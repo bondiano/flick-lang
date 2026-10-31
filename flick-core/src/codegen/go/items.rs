@@ -14,7 +14,7 @@ use crate::source::Span;
 use crate::types::{Constructor, Dict, InstanceInfo, Rep, default_method};
 
 /// The classes whose instances the runtime derives.
-const DERIVED: &[&str] = &["Eq", "Ord", "Hash", "Show"];
+const DERIVED: &[&str] = &["Eq", "Ord", "Hash", "Show", "Value"];
 
 /// The declarations of a module, each with whether it holds a `//line`
 /// directive; the statements of its init function.

@@ -2,6 +2,7 @@ package flickrt
 
 import (
 	"math/big"
+	"strings"
 	"sync"
 )
 
@@ -178,10 +179,46 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 			}
 			return out
 		}))
+	case "Value":
+		d.Set("parse", Fn(func(fb *Fiber, text Value) Value {
+			if constructors == nil {
+				return Apply(fb, Method(fb, dict(fb, 0), "parse"), text)
+			}
+			return Succeed(deriveChoice(constructors, text.(string)))
+		}))
 	default:
 		panic(Defect{"`deriving " + name + "` is not available on the go target"})
 	}
 	return d
+}
+
+// deriveChoice is `Cli.Value` of a type of constructors: the kebab-case name
+// of one, `GreenLight` as `green-light`.
+func deriveChoice(constructors []Constructor, text string) Value {
+	names := make([]string, len(constructors))
+	for i, c := range constructors {
+		names[i] = kebab(c.Name)
+		if names[i] == text {
+			return Ok(Nullary(c.Tag))
+		}
+	}
+	return Err("expected one of " + strings.Join(names, ", ") + ", got " + text)
+}
+
+// kebab is JS `name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase()`.
+func kebab(name string) string {
+	var out strings.Builder
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if i > 0 && c >= 'A' && c <= 'Z' {
+			p := name[i-1]
+			if p >= 'a' && p <= 'z' || p >= '0' && p <= '9' {
+				out.WriteByte('-')
+			}
+		}
+		out.WriteByte(c)
+	}
+	return strings.ToLower(out.String())
 }
 
 // atom wraps a shown argument of a constructor in parentheses when it has

@@ -1,28 +1,46 @@
 package flickrt
 
-import (
-	"strconv"
-	"strings"
-)
+import "strings"
 
-// CLI descriptions retain callbacks, not their construction-time fiber.
-type cliMulti uint8
+// `Cli.Command r e` and its parts: plain data the combinators of the
+// standard library build, turned into Effect's CLI model only when a
+// command runs (`cli_command.go`). Descriptions retain callbacks, not their
+// construction-time fiber.
 
-const (
-	cliRequired cliMulti = iota
-	cliSome
-)
+// cliSource is where the text of a value comes from before `Cli.Value`
+// parses it: "text", "path", "fileText" or "fileParse".
+type cliSource struct {
+	kind      string
+	pathType  string // path: "file", "directory" or "either"
+	mustExist bool
+	format    string // fileParse: "ini", "json", "toml", "yaml" or "" (by extension)
+}
 
-var (
-	CliMultiRequired Value = cliRequired
-	CliMultiSome     Value = cliSome
-	cliErrorTag            = Tag("Cli.CliError.CliError")
-)
+// cliMods is what the modifiers of a multiplicity add to its parameter.
+type cliMods struct {
+	hidden        bool
+	metavar       *string
+	optionalValue *string
+	source        cliSource
+}
 
-type cliArg struct {
-	label, help string
-	multi       cliMulti
-	value       Value // the Cli.Value dictionary
+// cliMulti is `Cli.Multi a t`: how the values of a parameter make its field.
+// kind: "switch", "required", "default", "optional", "variadic", "some",
+// "config" or "prompt"; min and max of a variadic are -1 when absent.
+type cliMulti struct {
+	kind     string
+	value    Value // default; config; prompt
+	min, max int
+	mods     cliMods
+}
+
+type cliSpecParam struct {
+	flag    bool
+	label   string // the field of the options record
+	aliases []string
+	help    string
+	multi   *cliMulti
+	value   Value // the `Cli.Value` dictionary
 }
 
 type cliSubcommand struct {
@@ -30,208 +48,155 @@ type cliSubcommand struct {
 	help    string
 }
 
+type cliExample struct{ command, description string }
+
+// cliAction is `Cli.action`: a flag that runs `run` instead of the command.
+type cliAction struct {
+	name, help string
+	run        Value
+}
+
+// cliSpec is `Cli.Spec r e o`, and `Cli.Command r e` once `isCommand`;
+// a command without a handler is a group.
 type cliSpec struct {
-	name, description string
-	args              []cliArg
-	subcommands       []cliSubcommand
-	handler           Value // nil for a group
+	name, description, shortDescription, alias string
+	unlisted                                   bool
+	examples                                   []cliExample
+	actions                                    []cliAction
+	params                                     []cliSpecParam
+	subcommands                                []cliSubcommand
+	handler                                    Value
+}
+
+var cliErrorTag = Tag("Cli.CliError.CliError")
+
+func cliMultiOf(kind string) *cliMulti {
+	return &cliMulti{kind: kind, min: -1, max: -1, mods: cliMods{source: cliSource{kind: "text"}}}
+}
+
+var (
+	CliMultiSwitch   Value = cliMultiOf("switch")
+	CliMultiRequired Value = cliMultiOf("required")
+	CliMultiOptional Value = cliMultiOf("optional")
+	CliMultiMany     Value = &cliMulti{kind: "variadic", min: 0, max: -1, mods: cliMods{source: cliSource{kind: "text"}}}
+	CliMultiSome     Value = cliMultiOf("some")
+)
+
+func CliMultiDefault(value Value) Value {
+	m := cliMultiOf("default")
+	m.value = value
+	return m
+}
+
+func cliVariadic(min, max int) Value {
+	m := cliMultiOf("variadic")
+	m.min, m.max = min, max
+	return m
+}
+
+func CliMultiAtLeast(min Value) Value      { return cliVariadic(int(min.(int32)), -1) }
+func CliMultiAtMost(max Value) Value       { return cliVariadic(-1, int(max.(int32))) }
+func CliMultiBetween(min, max Value) Value { return cliVariadic(int(min.(int32)), int(max.(int32))) }
+func CliMultiConfig(config Value) Value    { m := cliMultiOf("config"); m.value = config; return m }
+func CliMultiPrompt(prompt Value) Value    { m := cliMultiOf("prompt"); m.value = prompt; return m }
+func cliModify(m Value, f func(*cliMods)) Value {
+	out := *m.(*cliMulti)
+	f(&out.mods)
+	return &out
+}
+
+func CliMultiHidden(m Value) Value { return cliModify(m, func(o *cliMods) { o.hidden = true }) }
+
+func CliMultiMetavar(metavar, m Value) Value {
+	s := metavar.(string)
+	return cliModify(m, func(o *cliMods) { o.metavar = &s })
+}
+
+func CliMultiOptionalValue(text, m Value) Value {
+	s := text.(string)
+	return cliModify(m, func(o *cliMods) { o.optionalValue = &s })
+}
+
+func cliPathSource(pathType string, mustExist, m Value) Value {
+	return cliModify(m, func(o *cliMods) { o.source = cliSource{kind: "path", pathType: pathType, mustExist: Bool(mustExist)} })
+}
+
+func CliMultiFile(mustExist, m Value) Value      { return cliPathSource("file", mustExist, m) }
+func CliMultiDirectory(mustExist, m Value) Value { return cliPathSource("directory", mustExist, m) }
+func CliMultiPath(mustExist, m Value) Value      { return cliPathSource("either", mustExist, m) }
+
+func CliMultiFileText(m Value) Value {
+	return cliModify(m, func(o *cliMods) { o.source = cliSource{kind: "fileText"} })
+}
+
+// CliMultiFileParse is `Cli.file_parse`: a `Cli.FileFormat`, or `None` for
+// the file's extension.
+func CliMultiFileParse(format, m Value) Value {
+	name := ""
+	if f, ok := some(format); ok {
+		name = strings.ToLower(ConstructorName(f.(*Data).Tag))
+	}
+	return cliModify(m, func(o *cliMods) { o.source = cliSource{kind: "fileParse", format: name} })
+}
+
+func cliWith(spec Value, f func(*cliSpec)) Value {
+	out := *spec.(*cliSpec)
+	f(&out)
+	return &out
 }
 
 func CliSpecCommand(name Value) Value { return &cliSpec{name: name.(string)} }
 
-func CliSpecDescription(description, spec Value) Value {
-	out := *spec.(*cliSpec)
-	out.description = description.(string)
-	return &out
+func CliSpecDescription(text, spec Value) Value {
+	return cliWith(spec, func(s *cliSpec) { s.description = text.(string) })
+}
+
+func CliSpecShortDescription(text, spec Value) Value {
+	return cliWith(spec, func(s *cliSpec) { s.shortDescription = text.(string) })
+}
+
+func CliSpecAlias(alias, spec Value) Value {
+	return cliWith(spec, func(s *cliSpec) { s.alias = alias.(string) })
+}
+
+func CliSpecUnlisted(spec Value) Value { return cliWith(spec, func(s *cliSpec) { s.unlisted = true }) }
+
+func CliSpecExample(command, description, spec Value) Value {
+	return cliWith(spec, func(s *cliSpec) {
+		s.examples = append(s.examples[:len(s.examples):len(s.examples)], cliExample{command.(string), description.(string)})
+	})
+}
+
+func CliSpecAction(name, help, run, spec Value) Value {
+	return cliWith(spec, func(s *cliSpec) {
+		s.actions = append(s.actions[:len(s.actions):len(s.actions)], cliAction{name.(string), help.(string), run})
+	})
+}
+
+func cliAddParam(spec Value, p cliSpecParam) Value {
+	return cliWith(spec, func(s *cliSpec) { s.params = append(s.params[:len(s.params):len(s.params)], p) })
+}
+
+func CliSpecFlag(dict, _lacks, _union, label, aliases, help, multi, spec Value) Value {
+	names := make([]string, 0, len(List(aliases)))
+	for _, a := range List(aliases) {
+		names = append(names, a.(string))
+	}
+	return cliAddParam(spec, cliSpecParam{true, label.(string), names, help.(string), multi.(*cliMulti), dict})
 }
 
 func CliSpecArg(dict, _lacks, _union, label, help, multi, spec Value) Value {
-	out := *spec.(*cliSpec)
-	out.args = make([]cliArg, len(out.args)+1)
-	copy(out.args, spec.(*cliSpec).args)
-	out.args[len(out.args)-1] = cliArg{label.(string), help.(string), multi.(cliMulti), dict}
-	return &out
+	return cliAddParam(spec, cliSpecParam{false, label.(string), nil, help.(string), multi.(*cliMulti), dict})
 }
 
 func CliSpecSubcommand(command, help, spec Value) Value {
-	out := *spec.(*cliSpec)
-	out.subcommands = make([]cliSubcommand, len(out.subcommands)+1)
-	copy(out.subcommands, spec.(*cliSpec).subcommands)
-	out.subcommands[len(out.subcommands)-1] = cliSubcommand{command.(*cliSpec), help.(string)}
-	return &out
+	return cliWith(spec, func(s *cliSpec) {
+		s.subcommands = append(s.subcommands[:len(s.subcommands):len(s.subcommands)], cliSubcommand{command.(*cliSpec), help.(string)})
+	})
 }
 
 func CliSpecHandle(handler, spec Value) Value {
-	out := *spec.(*cliSpec)
-	out.handler = handler
-	return &out
+	return cliWith(spec, func(s *cliSpec) { s.handler = handler })
 }
 
-func CliSpecGroup(spec Value) Value {
-	out := *spec.(*cliSpec)
-	out.handler = nil
-	return &out
-}
-
-func cliFail(message string) Value { return Fail(NewData(cliErrorTag, message)) }
-
-func cliArgName(arg cliArg) string { return strings.ReplaceAll(arg.label, "_", "-") }
-
-type cliInput struct {
-	command *cliSpec
-	texts   []string
-}
-
-// Negative numeric arguments are values, not unrecognized short flags.
-func cliNegativeNumber(text string) bool {
-	if !strings.HasPrefix(text, "-") || len(text) < 2 {
-		return false
-	}
-	_, err := strconv.ParseFloat(text, 64)
-	if err == nil {
-		return true
-	}
-	if e, ok := err.(*strconv.NumError); ok && e.Err == strconv.ErrRange {
-		return true
-	}
-	return false
-}
-
-// Routing and arity validation finish before any value parser or handler runs.
-func cliRoute(root *cliSpec, args []Value) ([]cliInput, string, string) {
-	inputs := []cliInput{{command: root}}
-	builtin, shell := "", ""
-	ended := false
-	for at := 0; at < len(args); at++ {
-		text := args[at].(string)
-		if !ended {
-			if text == "--" {
-				ended = true
-				continue
-			}
-			action := ""
-			switch {
-			case text == "--help" || text == "-h":
-				action = "help"
-			case text == "--version":
-				action = "version"
-			case text == "--completions":
-				action = "completions"
-				at++
-				if at == len(args) {
-					cliFail("Missing shell for --completions (supported: bash)")
-				}
-				shell = args[at].(string)
-			case strings.HasPrefix(text, "--completions="):
-				action = "completions"
-				shell = strings.TrimPrefix(text, "--completions=")
-			case text == "--wizard" || text == "--trace" || text == "--log-level" || strings.HasPrefix(text, "--log-level="):
-				cliFail("Unsupported built-in flag on the go target: " + text)
-			case strings.HasPrefix(text, "-") && text != "-" && !cliNegativeNumber(text):
-				cliFail("Unknown flag: " + text)
-			}
-			if action != "" {
-				if builtin != "" && builtin != action {
-					cliFail("Choose only one of --help, --version and --completions")
-				}
-				builtin = action
-				continue
-			}
-		}
-		input := &inputs[len(inputs)-1]
-		found := false
-		if !ended && len(input.texts) >= len(input.command.args) {
-			for _, sub := range input.command.subcommands {
-				if sub.command.name == text {
-					inputs = append(inputs, cliInput{command: sub.command})
-					found = true
-					break
-				}
-			}
-		}
-		if found {
-			continue
-		}
-		if len(input.command.args) == 0 && len(input.command.subcommands) > 0 {
-			cliFail("Unknown command " + strconv.Quote(text) + " for " + input.command.name)
-		}
-		input.texts = append(input.texts, text)
-	}
-	return inputs, builtin, shell
-}
-
-func cliValidate(input cliInput) {
-	args, texts := input.command.args, input.texts
-	if len(texts) < len(args) {
-		cliFail("Missing required argument <" + cliArgName(args[len(texts)]) + "> for " + input.command.name)
-	}
-	for _, arg := range args {
-		if arg.multi == cliSome {
-			return
-		}
-	}
-	if len(texts) > len(args) {
-		cliFail("Unexpected argument " + strconv.Quote(texts[len(args)]) + " for " + input.command.name)
-	}
-}
-
-func cliParseValue(fb *Fiber, parser Value, arg cliArg, text string) Value {
-	parsed := Run(fb, Apply(fb, parser, text))
-	if !isOk(parsed) {
-		return cliFail("Invalid value " + strconv.Quote(text) + " for <" + cliArgName(arg) + ">: " + value(parsed).(string))
-	}
-	return value(parsed)
-}
-
-// CliRunVersion runs only the selected handler, after the entire line parses.
-func CliRunVersion(fb *Fiber, version, spec, args Value) Value {
-	inputs, builtin, shell := cliRoute(spec.(*cliSpec), List(args))
-	selected := inputs[len(inputs)-1].command
-	switch builtin {
-	case "help":
-		return StdoutWrite(cliHelp(selected, cliPath(inputs)))
-	case "version":
-		return StdoutLine(inputs[0].command.name + " v" + version.(string))
-	case "completions":
-		if shell != "bash" {
-			return cliFail("Unsupported completion shell " + strconv.Quote(shell) + " on the go target (supported: bash)")
-		}
-		return StdoutWrite(cliBashCompletions(inputs[0].command))
-	}
-	for _, input := range inputs {
-		cliValidate(input)
-	}
-	if selected.handler == nil {
-		path := cliPath(inputs)
-		StdoutWrite(cliHelp(selected, path))
-		return cliFail("Missing subcommand for " + path)
-	}
-	var options *Record
-	for i, input := range inputs {
-		if i == len(inputs)-1 {
-			options = newRecord(len(input.command.args))
-		}
-		at := 0
-		for j, arg := range input.command.args {
-			parser := Method(fb, arg.value, "parse")
-			var parsed Value
-			if arg.multi == cliSome {
-				count := len(input.texts) - at - (len(input.command.args) - j - 1)
-				values := make([]Value, count)
-				for k := range values {
-					values[k] = cliParseValue(fb, parser, arg, input.texts[at+k])
-				}
-				at += count
-				parsed = values // NonEmpty is represented by its list.
-			} else {
-				parsed = cliParseValue(fb, parser, arg, input.texts[at])
-				at++
-			}
-			if i == len(inputs)-1 {
-				options.put(arg.label, parsed)
-			}
-		}
-	}
-	Run(fb, Apply(fb, selected.handler, options))
-	return Unit
-}
+func CliSpecGroup(spec Value) Value { return cliWith(spec, func(s *cliSpec) { s.handler = nil }) }

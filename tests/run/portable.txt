@@ -34,7 +34,10 @@ codegen/recursion
 codegen/stage_order
 codegen/strings_utf16
 codegen/task_twice
+stdlib/cli/cli
+stdlib/cli/cli_exit
 stdlib/cli/prompt
+stdlib/cli/surface
 stdlib/collections
 stdlib/decimals
 stdlib/effect/array

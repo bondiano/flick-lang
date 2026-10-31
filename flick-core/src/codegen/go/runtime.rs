@@ -23,12 +23,60 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/cli.go"),
     ),
     (
-        "cli_output.go",
-        include_str!("../../../../runtime-go/flickrt/cli_output.go"),
+        "cli_command.go",
+        include_str!("../../../../runtime-go/flickrt/cli_command.go"),
+    ),
+    (
+        "cli_complete.go",
+        include_str!("../../../../runtime-go/flickrt/cli_complete.go"),
+    ),
+    (
+        "cli_complete_bash.go",
+        include_str!("../../../../runtime-go/flickrt/cli_complete_bash.go"),
+    ),
+    (
+        "cli_complete_fish.go",
+        include_str!("../../../../runtime-go/flickrt/cli_complete_fish.go"),
+    ),
+    (
+        "cli_complete_powershell.go",
+        include_str!("../../../../runtime-go/flickrt/cli_complete_powershell.go"),
+    ),
+    (
+        "cli_complete_zsh.go",
+        include_str!("../../../../runtime-go/flickrt/cli_complete_zsh.go"),
+    ),
+    (
+        "cli_doc.go",
+        include_str!("../../../../runtime-go/flickrt/cli_doc.go"),
+    ),
+    (
+        "cli_error.go",
+        include_str!("../../../../runtime-go/flickrt/cli_error.go"),
+    ),
+    (
+        "cli_file.go",
+        include_str!("../../../../runtime-go/flickrt/cli_file.go"),
+    ),
+    (
+        "cli_help.go",
+        include_str!("../../../../runtime-go/flickrt/cli_help.go"),
+    ),
+    (
+        "cli_param.go",
+        include_str!("../../../../runtime-go/flickrt/cli_param.go"),
+    ),
+    (
+        "cli_parse.go",
+        include_str!("../../../../runtime-go/flickrt/cli_parse.go"),
     ),
     (
         "cli_prompt.go",
         include_str!("../../../../runtime-go/flickrt/cli_prompt.go"),
+    ),
+    (
+        "cli_prompt_darwin.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_darwin.go"),
     ),
     (
         "cli_prompt_date.go",
@@ -39,12 +87,20 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/cli_prompt_file.go"),
     ),
     (
+        "cli_prompt_linux.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_linux.go"),
+    ),
+    (
         "cli_prompt_multi.go",
         include_str!("../../../../runtime-go/flickrt/cli_prompt_multi.go"),
     ),
     (
         "cli_prompt_number.go",
         include_str!("../../../../runtime-go/flickrt/cli_prompt_number.go"),
+    ),
+    (
+        "cli_prompt_posix.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_posix.go"),
     ),
     (
         "cli_prompt_run.go",
@@ -59,20 +115,20 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/cli_prompt_text.go"),
     ),
     (
-        "cli_prompt_posix.go",
-        include_str!("../../../../runtime-go/flickrt/cli_prompt_posix.go"),
-    ),
-    (
-        "cli_prompt_darwin.go",
-        include_str!("../../../../runtime-go/flickrt/cli_prompt_darwin.go"),
-    ),
-    (
-        "cli_prompt_linux.go",
-        include_str!("../../../../runtime-go/flickrt/cli_prompt_linux.go"),
-    ),
-    (
         "cli_prompt_windows.go",
         include_str!("../../../../runtime-go/flickrt/cli_prompt_windows.go"),
+    ),
+    (
+        "cli_run.go",
+        include_str!("../../../../runtime-go/flickrt/cli_run.go"),
+    ),
+    (
+        "cli_settings.go",
+        include_str!("../../../../runtime-go/flickrt/cli_settings.go"),
+    ),
+    (
+        "cli_width.go",
+        include_str!("../../../../runtime-go/flickrt/cli_width.go"),
     ),
     (
         "codec.go",
@@ -139,16 +195,16 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/eff.go"),
     ),
     (
-        "events.go",
-        include_str!("../../../../runtime-go/flickrt/events.go"),
-    ),
-    (
         "effectmore.go",
         include_str!("../../../../runtime-go/flickrt/effectmore.go"),
     ),
     (
         "effnum.go",
         include_str!("../../../../runtime-go/flickrt/effnum.go"),
+    ),
+    (
+        "events.go",
+        include_str!("../../../../runtime-go/flickrt/events.go"),
     ),
     (
         "exit.go",
