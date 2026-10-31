@@ -1,0 +1,15 @@
+trampoline: (Odd, Odd, 3)
+fold 1
+fold 2
+fold 3
+fold_effect: 6
+safe_integer: (Some 3, None, None, Some -9007199254740991)
+Int.json: Ok 12, Ok -3, Err SchemaError [{ message = "expected an Int, an integer from -2147483648 to 2147483647", path = "(root)" }], Err SchemaError [{ message = "expected an Int, got string", path = "(root)" }], Err SchemaError [{ message = "expected an Int, an integer from -2147483648 to 2147483647", path = "(root)" }]
+Int.json encode: 42
+info: to stdout
+debug: debugging
+added
+attached
+removed
+closed
+properties: 2

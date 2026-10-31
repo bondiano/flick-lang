@@ -18,6 +18,12 @@ func customSchema(json codec, valid func(*Fiber, Value) (Value, []issue)) Value 
 	return s
 }
 
+// needing is the custom schema, of a type Schema.arbitrary names `what`.
+func needing(what string, s Value) Value {
+	sch(s).needs = what
+	return s
+}
+
 func SchemaValidate(fb *Fiber, s, in Value) Value {
 	v, issues := sch(s).validate(fb, in)
 	if issues != nil {

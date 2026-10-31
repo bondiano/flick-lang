@@ -1,0 +1,84 @@
+// The core's loops, folds, numbers, codecs, console log and event
+// listeners, and generators of schemas for property tests.
+module App.Main exposing (main)
+
+type Parity = Even | Odd
+  deriving Show
+
+/// Mutual recursion, one step at a time.
+rec {
+  is_even : Int -> Loop.Trampoline Parity
+  let is_even n = if n == 0 then Loop.done Even else Loop.suspend (fun () -> is_odd (n - 1))
+
+  is_odd : Int -> Loop.Trampoline Parity
+  let is_odd n = if n == 0 then Loop.done Odd else Loop.suspend (fun () -> is_even (n - 1))
+}
+
+line : String -> String ->{} Unit
+let line label text = Platform.stdout_line (label ++ ": " ++ text)
+
+decode : PureCodec Json Int -> String -> String
+let decode int text =
+  match Json.parse text with
+  | Err _ -> "not JSON"
+  | Ok json ->
+    match Codec.decode_result int json with
+    | Ok n -> "Ok " ++ show n
+    | Err e -> "Err " ++ show e
+
+listening : Unit ->{; AppError} Unit
+let listening () =
+  scope s {
+    let listener : Events.Listener s Int =
+      Events.listen
+        s
+        (Events.queue 4)
+        (fun _ -> Platform.stdout_line "supervised")
+        (fun n -> task { Platform.stdout_line ("event " ++ show n) })
+    Events.attach
+      listener
+      (fun _ -> Platform.stdout_line "added")
+      (fun _ -> Platform.stdout_line "removed")
+    Platform.stdout_line "attached"
+  }
+  Platform.stdout_line "closed"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  line "trampoline" (show (Loop.run (is_even 100001), Loop.run (is_odd 10), Loop.run (Loop.done 3)))
+  let total =
+    List.fold_effect
+      (fun acc n ->
+        Platform.stdout_line ("fold " ++ show n)
+        acc + n
+      )
+      0
+      [1, 2, 3]
+  line "fold_effect" (show total)
+  line
+    "safe_integer"
+    (show (
+      Float.safe_integer 3,
+      Float.safe_integer 3.5,
+      Float.safe_integer 9007199254740992,
+      Float.safe_integer (0 - 9007199254740991),
+    ))
+  line "Int.json" (String.join ", " (List.map (decode Int.json) ["12", "-3", "1.5", "\"7\"", "2147483648"]))
+  line
+    "Int.json encode"
+    (match Codec.encode_result Int.json 42 with
+    | Ok json -> Json.stringify json
+    | Err e -> show e)
+  provide Log.console {
+    Log.info "to stdout"
+    Log.debug "debugging"
+    Log.warn "to stderr"
+    Log.error "failed"
+  }
+  listening ()
+  let numbers = Schema.with_generator (Gen.constant 4) Schema.number
+  let tests = [
+    Test.property "drawn" (Schema.arbitrary numbers) (fun n -> Test.equal 4 n),
+    Test.property "structured" (Schema.arbitrary (Schema.list Schema.string)) (fun xs -> Test.equal xs xs),
+  ]
+  line "properties" (show (List.length tests))

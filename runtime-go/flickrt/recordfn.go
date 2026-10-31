@@ -15,6 +15,28 @@ func RecordLabels(_, r Value) Value {
 	return out
 }
 
+// RecordLabel is `Record.label`, which the compiler writes as the label's
+// string: the binding itself is JS's `undefined`.
+var RecordLabel Value = Unit
+
+// RecordGet is the field `label` of `r`; the dictionary is erased.
+func RecordGet(_, label, r Value) Value { return record(r).Get(label.(string)) }
+
+// RecordExtend is `r` with the field `label`, added as JS spreads `r` into a
+// new object first.
+func RecordExtend(_, _, label, v, r Value) Value { return record(r).set(label.(string), v) }
+
+func RecordRemove(_, label, r Value) Value { return record(r).without(label.(string)) }
+
+// RecordMergeDisjoint is JS's `{ ...a, ...b }`.
+func RecordMergeDisjoint(_, a, b Value) Value {
+	out, y := record(a), record(b)
+	for i, k := range y.keys {
+		out = out.set(k, y.vals[i])
+	}
+	return out
+}
+
 // RecordProject is the fields of `r` the dictionary's labels name, in
 // that order.
 func RecordProject(labels, r Value) Value {

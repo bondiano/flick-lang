@@ -43,6 +43,7 @@ stdlib/cli/prompt
 stdlib/cli/surface
 stdlib/cli/trace
 stdlib/collections
+stdlib/core_more
 stdlib/decimals
 stdlib/effect/array
 stdlib/effect/combine

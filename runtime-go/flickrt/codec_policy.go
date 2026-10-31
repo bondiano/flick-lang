@@ -77,8 +77,8 @@ func (r refused) encode(*Fiber, Value) (Value, []issue) { return nil, fail(r.rea
 
 // SchemaOpaque is `Schema.opaque name reason`: any value checks, and its
 // JSON codec is refused with `reason`; no issue names it.
-func SchemaOpaque(_, reason Value) Value {
-	s := &Schema{kind: kindUnknown}
+func SchemaOpaque(name, reason Value) Value {
+	s := &Schema{kind: kindUnknown, needs: name.(string)}
 	s.wireOnce.Do(func() { s.wire = refused{reason.(string)} })
 	return s
 }

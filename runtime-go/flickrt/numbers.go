@@ -173,6 +173,15 @@ func FloatIsSafeInteger(x Value) Value {
 	f := x.(float64)
 	return FloatIsInteger(x).(bool) && math.Abs(f) <= 1<<53-1
 }
+
+// NumberSafeInteger is `Float.safe_integer`: `n` when it is a safe integer.
+func NumberSafeInteger(x Value) Value {
+	if FloatIsSafeInteger(x).(bool) {
+		return Some(x)
+	}
+	return None
+}
+
 func FloatAbs(x Value) Value   { return math.Abs(x.(float64)) }
 func FloatFloor(x Value) Value { return math.Floor(x.(float64)) }
 func FloatCeil(x Value) Value  { return math.Ceil(x.(float64)) }

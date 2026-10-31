@@ -87,12 +87,12 @@ var (
 		pure(func(d Value) Value { return dur(d).String() }),
 	}, nonNegativeDuration)}
 
-	SchemaDuration Value = customSchema(CodecDurationMillis.(codec), func(fb *Fiber, v Value) (Value, []issue) {
+	SchemaDuration Value = needing("a check", customSchema(CodecDurationMillis.(codec), func(fb *Fiber, v Value) (Value, []issue) {
 		if _, ok := v.(*Duration); !ok {
 			return nil, expected("Duration", v)
 		}
 		return v, nonNegativeDuration.issues(fb, v)
-	})
+	}))
 
 	// CodecDecimal is `BigDecimal.json`: a decimal as its string.
 	CodecDecimal Value = &fallible{&stage{
@@ -106,12 +106,12 @@ var (
 		pure(DecimalToString),
 	}}
 
-	SchemaDecimal Value = customSchema(CodecDecimal.(codec), func(_ *Fiber, v Value) (Value, []issue) {
+	SchemaDecimal Value = needing("BigDecimal", customSchema(CodecDecimal.(codec), func(_ *Fiber, v Value) (Value, []issue) {
 		if _, ok := v.(*Decimal); !ok {
 			return nil, expected("BigDecimal", v)
 		}
 		return v, nil
-	})
+	}))
 )
 
 // Chunk is Effect's immutable Chunk: its elements, never changed.
@@ -131,7 +131,7 @@ func CodecChunk(item Value) Value {
 // SchemaChunk is `Schema.chunk`; its canonical JSON form is an array.
 func SchemaChunk(item Value) Value {
 	s := sch(item)
-	return customSchema(codecOf(CodecChunk(s.jsonOf())), func(fb *Fiber, v Value) (Value, []issue) {
+	return needing("Chunk", customSchema(codecOf(CodecChunk(s.jsonOf())), func(fb *Fiber, v Value) (Value, []issue) {
 		c, ok := v.(*Chunk)
 		if !ok {
 			return nil, expected("Chunk", v)
@@ -141,7 +141,7 @@ func SchemaChunk(item Value) Value {
 			return nil, issues
 		}
 		return ChunkFromList(xs), nil
-	})
+	}))
 }
 
 // CodecHashSet is `HashSet.json`: a set as a JSON array of its elements,

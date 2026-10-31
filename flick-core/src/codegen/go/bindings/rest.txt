@@ -1,1 +1,19 @@
 # The rest of the runtime's bindings.
+
+[@flick-lang/runtime]
+recordLabel RecordLabel
+recordGet RecordGet
+recordExtend RecordExtend
+recordRemove RecordRemove
+recordMergeDisjoint RecordMergeDisjoint
+trampolineDone TrampolineDone
+trampolineSuspend TrampolineSuspend
+trampolineRun *TrampolineRun
+eventsAttach *EventsAttach
+logConsole LogConsole
+listFoldEffect *ListFoldEffect
+numberSafeInteger NumberSafeInteger
+codecInt CodecInt
+schemaArbitrary SchemaArbitrary
+schemaWithGenerator SchemaWithGenerator
+
