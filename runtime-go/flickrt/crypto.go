@@ -7,7 +7,6 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"math"
-	"time"
 )
 
 // Effect's `Crypto` made over the platform's randomness and digests, as the
@@ -105,16 +104,15 @@ func CryptoRandomUuidV4() Value {
 	return uuidString(b)
 }
 
-// cryptoMillis is the time of UUID v7 and ULID, clamped to 48 bits.
-// shortcut: the wall clock, not the fiber's `Clock` (a test clock does not
-// move it); read the fiber's clock once the Go `Clock` is ported.
-func cryptoMillis() uint64 {
-	return uint64(min(max(0, time.Now().UnixMilli()), 1<<48-1))
+// cryptoMillis is the fiber's `Clock` time of UUID v7 and ULID, clamped to
+// 48 bits.
+func cryptoMillis(fb *Fiber) uint64 {
+	return uint64(min(max(0, math.Trunc(clockOf(fb).millis())), 1<<48-1))
 }
 
-func CryptoRandomUuidV7() Value {
+func CryptoRandomUuidV7(fb *Fiber) Value {
 	b := cryptoBytes(16)
-	t := cryptoMillis()
+	t := cryptoMillis(fb)
 	for i := 0; i < 6; i++ {
 		b[i] = byte(t >> (40 - 8*i))
 	}
@@ -125,8 +123,8 @@ func CryptoRandomUuidV7() Value {
 
 const crockford = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-func CryptoRandomUlid() Value {
-	t := cryptoMillis()
+func CryptoRandomUlid(fb *Fiber) Value {
+	t := cryptoMillis(fb)
 	out := make([]byte, 0, 26)
 	for shift := 45; shift >= 0; shift -= 5 {
 		out = append(out, crockford[t>>shift&0x1f])
