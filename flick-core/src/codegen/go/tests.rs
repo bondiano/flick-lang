@@ -24,9 +24,7 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime/effect/Sink",
     "@flick-lang/runtime/effect/Stream",
     "@flick-lang/runtime/effect/SubscriptionRef",
-    // transactions
-    "@flick-lang/runtime/effect/TxPubSub",
-    "@flick-lang/runtime/effect/TxQueue",
+    // changes waits for Stream (S2): `Stream.Platform.from_tx_subscription_ref`
     "@flick-lang/runtime/effect/TxSubscriptionRef",
     // time
     "@flick-lang/runtime/effect/Cron",

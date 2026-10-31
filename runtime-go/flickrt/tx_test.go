@@ -109,3 +109,37 @@ func TestTxFailureRollsBackAndNestedTransactionsJoin(t *testing.T) {
 		t.Fatal("a first attempt has no retry reason")
 	}
 }
+
+func TestTxQueueProducersAndConsumersMeetThroughRetry(t *testing.T) {
+	const producers, consumers, each = 4, 3, 60
+	q := TxQueueBounded(int32(3))
+	var wg sync.WaitGroup
+	for p := range producers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			fb := rootFiber()
+			for i := range each {
+				TxQueueOffer(fb, int32(p*each+i), q)
+			}
+		}()
+	}
+	sums := make(chan int, consumers)
+	for range consumers {
+		go func() {
+			fb, sum := rootFiber(), 0
+			for range producers * each / consumers {
+				sum += int(TxQueueTake(fb, q).(int32))
+			}
+			sums <- sum
+		}()
+	}
+	wg.Wait()
+	total := 0
+	for range consumers {
+		total += <-sums
+	}
+	if n := producers * each; total != n*(n-1)/2 {
+		t.Fatalf("took a sum of %v, want %v", total, n*(n-1)/2)
+	}
+}

@@ -153,3 +153,59 @@ releaseN *TxSemaphoreReleaseN
 withPermit *TxSemaphoreWithPermit
 withPermits *TxSemaphoreWithPermits
 withPermitScoped *TxSemaphoreWithPermitScoped
+
+[@flick-lang/runtime/effect/TxQueue]
+bounded TxQueueBounded
+unbounded TxQueueUnbounded
+dropping TxQueueDropping
+sliding TxQueueSliding
+offer *TxQueueOffer
+offerAll *TxQueueOfferAll
+take *TxQueueTake
+poll *TxQueuePoll
+takeAll *TxQueueTakeAll
+takeN *TxQueueTakeN
+takeBetween *TxQueueTakeBetween
+peek *TxQueuePeek
+size *TxQueueSize
+isEmpty *TxQueueIsEmpty
+isNonEmpty *TxQueueIsNonEmpty
+isFull *TxQueueIsFull
+interrupt *TxQueueInterrupt
+fail *TxQueueFail
+flickFailCause *TxQueueFailCause
+clear *TxQueueClear
+shutdown *TxQueueShutdown
+isOpen *TxQueueIsOpen
+isClosing *TxQueueIsClosing
+isDone *TxQueueIsDone
+isShutdown *TxQueueIsDone
+awaitCompletion *TxQueueAwaitCompletion
+
+[@flick-lang/runtime/effect/TxPubSub]
+bounded TxPubSubBounded
+dropping TxPubSubDropping
+sliding TxPubSubSliding
+unbounded TxPubSubUnbounded
+capacity TxPubSubCapacity
+size *TxPubSubSize
+isEmpty *TxPubSubIsEmpty
+isNonEmpty *TxPubSubIsNonEmpty
+isFull *TxPubSubIsFull
+isShutdown *TxPubSubIsShutdown
+publish *TxPubSubPublish
+publishAll *TxPubSubPublishAll
+subscribe *TxPubSubSubscribe
+shutdown *TxPubSubShutdown
+awaitShutdown *TxPubSubAwaitShutdown
+
+[@flick-lang/runtime/effect/TxSubscriptionRef]
+make TxSubscriptionRefMake
+get *TxSubscriptionRefGet
+modify *TxSubscriptionRefModify
+set *TxSubscriptionRefSet
+update *TxSubscriptionRefUpdate
+getAndSet *TxSubscriptionRefGetAndSet
+getAndUpdate *TxSubscriptionRefGetAndUpdate
+updateAndGet *TxSubscriptionRefUpdateAndGet
+changes *TxSubscriptionRefChanges

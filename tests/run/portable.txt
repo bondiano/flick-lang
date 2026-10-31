@@ -142,3 +142,5 @@ stdlib/effect/txdeferred
 stdlib/effect/txhashmap
 stdlib/effect/txhashset
 stdlib/effect/txlock
+stdlib/effect/txqueue
+stdlib/effect/txpubsub
