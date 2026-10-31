@@ -25,7 +25,7 @@ mod reach;
 mod runtime;
 mod schema;
 
-pub use runtime::{DRIVER, DRIVER_GO_MOD, RUNTIME};
+pub use runtime::{DRIVER, DRIVER_GO_MOD, DRIVER_GO_SUM, RUNTIME};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::{mem, slice};
@@ -80,7 +80,7 @@ pub struct Output {
     pub files: Vec<(String, String)>,
     pub diagnostics: Vec<Diagnostic>,
     /// Whether the program reaches the `PostgreSQL` driver, which its Go
-    /// module then vendors.
+    /// module then requires.
     pub driver: bool,
 }
 

@@ -67,15 +67,8 @@ pub fn go_build(out_dir: &Path, name: &str) -> Option<Diagnostic> {
         .arg(out_dir.join(build::go::executable(name)))
         .arg(".")
         .current_dir(&dir)
-        // the module needs nothing from the network: what it requires is vendored
-        .env(
-            "GOFLAGS",
-            if dir.join("vendor").is_dir() {
-                "-mod=vendor"
-            } else {
-                "-mod=mod"
-            },
-        )
+        // only the PostgreSQL driver requires a module, which go downloads once
+        .env("GOFLAGS", "-mod=mod")
         .env("GOTOOLCHAIN", "local");
     // the runtime needs no C: a static executable, built without a C compiler
     if env::var_os("CGO_ENABLED").is_none() {
@@ -88,6 +81,16 @@ pub fn go_build(out_dir: &Path, name: &str) -> Option<Diagnostic> {
         }
         Err(err) => format!("cannot run `go build`: {err}"),
         Ok(out) if out.status.success() => return None,
+        Ok(out)
+            if dir.join("flickpg").is_dir()
+                && String::from_utf8_lossy(&out.stderr).contains("github.com/jackc/pgx") =>
+        {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            format!(
+                "the PostgreSQL driver needs pgx v5.7.6, which `go build` could not download: build once with network access, or fill Go's module cache with `go mod download github.com/jackc/pgx/v5@v5.7.6`\n{}",
+                stderr.trim_end()
+            )
+        }
         Ok(out) => {
             let stderr = String::from_utf8_lossy(&out.stderr);
             let lines: Vec<&str> = stderr.lines().collect();

@@ -39,15 +39,13 @@ fn main() -> io::Result<()> {
 }
 
 /// `go_driver.rs`: the files of the go target's `PostgreSQL` driver, the
-/// package `flickpg` and the modules it vendors, by their path in a
-/// program's Go module.
+/// package `flickpg`, by their path in a program's Go module; the modules
+/// it needs are downloaded by `go build`, as `go.sum` pins them.
 fn go_driver(output: &Path) -> io::Result<()> {
     let root = Path::new("../runtime-go");
     let mut files = Vec::new();
-    for dir in ["flickpg", "vendor"] {
-        println!("cargo:rerun-if-changed={}", root.join(dir).display());
-        list(root, &root.join(dir), &mut files)?;
-    }
+    println!("cargo:rerun-if-changed={}", root.join("flickpg").display());
+    list(root, &root.join("flickpg"), &mut files)?;
     files.sort();
     let mut out = String::from("&[\n");
     for rel in files {
