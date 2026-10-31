@@ -375,6 +375,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/platform.go"),
     ),
     (
+        "pubsub.go",
+        include_str!("../../../../runtime-go/flickrt/pubsub.go"),
+    ),
+    (
         "record.go",
         include_str!("../../../../runtime-go/flickrt/record.go"),
     ),
@@ -417,6 +421,14 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "stream.go",
         include_str!("../../../../runtime-go/flickrt/stream.go"),
+    ),
+    (
+        "stream_more.go",
+        include_str!("../../../../runtime-go/flickrt/stream_more.go"),
+    ),
+    (
+        "stream_watch.go",
+        include_str!("../../../../runtime-go/flickrt/stream_watch.go"),
     ),
     (
         "string.go",

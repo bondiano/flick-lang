@@ -1,0 +1,32 @@
+# Streams and the hubs they read.
+
+[@flick-lang/runtime/effect/Stream]
+fromIterable StreamFromSeq
+fromArray StreamFromList
+fromArrayEffect StreamFromListEffect
+runCollect *StreamRunCollect
+mapEffect StreamMapEffect
+pipeThroughChannel StreamPipeThroughChannel
+flickDecodeText StreamDecodeText
+flickEncodeText StreamEncodeText
+make StreamMake
+succeed StreamSucceed
+map StreamMap
+filter StreamFilter
+take StreamTake
+mergeEffect StreamMergeEffect
+runCount *StreamRunCount
+mkString *StreamMkString
+flickMkBytes *StreamMkBytes
+splitLines StreamSplitLines
+flickLimitBytes StreamLimitBytes
+fromSubscription StreamFromSubscription
+flickReadFile StreamReadFile
+flickStdin StreamStdin
+flickWatch StreamWatch
+flickWatchWith StreamWatchWith
+
+[@flick-lang/runtime/effect/PubSub]
+flickUnbounded *PubSubUnbounded
+publishAll *PubSubPublishAll
+subscribe *PubSubSubscribe
