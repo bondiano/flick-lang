@@ -122,3 +122,34 @@ takeUpTo *TxPriorityQueueTakeUpTo
 removeIf *TxPriorityQueueRemoveIf
 retainIf *TxPriorityQueueRetainIf
 toArray *TxPriorityQueueToArray
+
+[@flick-lang/runtime/effect/TxReentrantLock]
+make TxReentrantLockMake
+acquireRead *TxReentrantLockAcquireRead
+acquireWrite *TxReentrantLockAcquireWrite
+releaseRead *TxReentrantLockReleaseRead
+releaseWrite *TxReentrantLockReleaseWrite
+readLock *TxReentrantLockReadLock
+writeLock *TxReentrantLockWriteLock
+withReadLock *TxReentrantLockWithReadLock
+withWriteLock *TxReentrantLockWithWriteLock
+withLock *TxReentrantLockWithWriteLock
+readLocks *TxReentrantLockReadLocks
+writeLocks *TxReentrantLockWriteLocks
+locked *TxReentrantLockLocked
+readLocked *TxReentrantLockReadLocked
+writeLocked *TxReentrantLockWriteLocked
+
+[@flick-lang/runtime/effect/TxSemaphore]
+make TxSemaphoreMake
+available *TxSemaphoreAvailable
+capacity TxSemaphoreCapacity
+acquire *TxSemaphoreAcquire
+acquireN *TxSemaphoreAcquireN
+tryAcquire *TxSemaphoreTryAcquire
+tryAcquireN *TxSemaphoreTryAcquireN
+release *TxSemaphoreRelease
+releaseN *TxSemaphoreReleaseN
+withPermit *TxSemaphoreWithPermit
+withPermits *TxSemaphoreWithPermits
+withPermitScoped *TxSemaphoreWithPermitScoped

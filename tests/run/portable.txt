@@ -141,3 +141,4 @@ stdlib/effect/txchunk
 stdlib/effect/txdeferred
 stdlib/effect/txhashmap
 stdlib/effect/txhashset
+stdlib/effect/txlock
