@@ -48,11 +48,15 @@ func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 		c.state.clock = tc
 		tc.running.Add(1)
 	}
+	recorded := fiberMetrics(&inner)
 	go func() {
 		if tc != nil {
 			defer tc.running.Add(-1)
 		}
 		c.value, c.cause = catch(func() Value { return Run(&inner, task) })
+		if recorded != nil {
+			recorded(c.cause)
+		}
 		c.mu.Lock()
 		c.ended = true
 		observers := c.observers
