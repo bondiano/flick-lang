@@ -166,3 +166,6 @@ stdlib/effect/metric
 stdlib/effect/tracer
 stdlib/effect/observe
 stdlib/observability/prometheus
+runtime/leases
+stdlib/effect/cache
+stdlib/effect/request
