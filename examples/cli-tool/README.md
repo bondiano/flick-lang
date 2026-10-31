@@ -49,8 +49,9 @@ and `test`. The checked-in example keeps JavaScript as its default.
 
 On Go, the CLI is a port of Effect's: commands, prompts, help, version,
 errors and completions for every shell print the same text as on
-JavaScript, and `--log-level` sets the handler's minimum log level. The
-built-in `--wizard` and the OTLP export of `--trace` are not ported yet.
+JavaScript, `--log-level` sets the handler's minimum log level and
+`--trace` sends the command's span over OTLP. The built-in `--wizard` is
+not ported yet.
 
 ## Tests
 

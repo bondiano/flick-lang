@@ -9,7 +9,7 @@ import (
 // layer installs loggers for its body, and what logs (the HTTP logger
 // middleware) gives each installed one its message.
 //
-// shortcut: no logger is installed by default, where Effect's writes `timestamp=… level=… message=…` to the console, and `Effect.log` has no go form yet; port Effect's default logger with them
+// shortcut: no logger is installed by default, where Effect's writes `timestamp=… level=… message=…` to the console, so `Effect.log` without `with_loggers` or `Logger.layer` prints nothing; port Effect's default logger
 
 const loggersKey = "effect/Loggers"
 
@@ -65,3 +65,27 @@ func logMessage(fb *Fiber, level, message string) {
 		l.(*logger).out(fb, options)
 	}
 }
+
+// LoggerWithLoggers is `Logger.with_loggers`: the task runs with exactly
+// these loggers.
+func LoggerWithLoggers(fb *Fiber, loggers, task Value) Value {
+	return withEnv(fb, loggersKey, loggers, task)
+}
+
+// logAt logs the message at the level when the fiber's minimum allows it.
+// shortcut: log messages are not exported over OTLP under `--trace`, only the command's span is; export them as log records when a program reads them
+func logAt(fb *Fiber, level string, message Value) Value {
+	if logLevelOrdinal(minimumLogLevel(fb)) <= logLevelOrdinal(level) {
+		logMessage(fb, level, message.(string))
+	}
+	return Unit
+}
+
+// EffectLog is `Effect.log`, at Effect's default current level `Info`.
+func EffectLog(fb *Fiber, message Value) Value        { return logAt(fb, "Info", message) }
+func EffectLogFatal(fb *Fiber, message Value) Value   { return logAt(fb, "Fatal", message) }
+func EffectLogError(fb *Fiber, message Value) Value   { return logAt(fb, "Error", message) }
+func EffectLogWarning(fb *Fiber, message Value) Value { return logAt(fb, "Warn", message) }
+func EffectLogInfo(fb *Fiber, message Value) Value    { return logAt(fb, "Info", message) }
+func EffectLogDebug(fb *Fiber, message Value) Value   { return logAt(fb, "Debug", message) }
+func EffectLogTrace(fb *Fiber, message Value) Value   { return logAt(fb, "Trace", message) }

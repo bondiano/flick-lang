@@ -38,6 +38,7 @@ stdlib/cli/cli
 stdlib/cli/cli_exit
 stdlib/cli/prompt
 stdlib/cli/surface
+stdlib/cli/trace
 stdlib/collections
 stdlib/decimals
 stdlib/effect/array

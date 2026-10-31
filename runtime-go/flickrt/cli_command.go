@@ -160,14 +160,14 @@ func (c *cliCommand) parse(fb *Fiber, raw *cliParsed) (*cliInput, *cliError) {
 
 // handle runs the handler of the command the input chose, or asks for help
 // for a group.
-func (c *cliCommand) handle(fb *Fiber, in *cliInput, path []string, trace func(name string, run func() Value) Value) *cliError {
+func (c *cliCommand) handle(fb *Fiber, in *cliInput, path []string, trace func(fb *Fiber, name string, run func(*Fiber) Value) Value) *cliError {
 	if in.child != nil {
 		return in.child.handle(fb, in.childsIn, append(path[:len(path):len(path)], in.child.name), trace)
 	}
 	if c.handler == nil {
 		return cliShowHelp(path, nil)
 	}
-	trace(c.name, func() Value { return Run(fb, Apply(fb, c.handler, in.options)) })
+	trace(fb, c.name, func(fb *Fiber) Value { return Run(fb, Apply(fb, c.handler, in.options)) })
 	return nil
 }
 

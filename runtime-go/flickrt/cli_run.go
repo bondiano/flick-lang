@@ -200,22 +200,22 @@ func cliRunParsed(fb *Fiber, root *cliCommand, args []string, env *cliEnv) *cliE
 			trace = v.(bool)
 		}
 	}
-	traced := func(name string, run func() Value) Value {
+	traced := func(fb *Fiber, name string, run func(*Fiber) Value) Value {
 		if trace {
 			return cliTraced(fb, name, run)
 		}
-		return run()
+		return run(fb)
 	}
-	program := func() Value {
+	program := func(fb *Fiber) Value {
 		if handleErr := root.handle(fb, input, []string{root.name}, traced); handleErr != nil {
 			err = handleErr
 		}
 		return Unit
 	}
 	if l, ok := some(level); ok {
-		withEnv(fb, minimumLogLevelKey, l, Eff(func(*Fiber) Value { return program() }))
+		withEnv(fb, minimumLogLevelKey, l, Eff(program))
 	} else {
-		program()
+		program(fb)
 	}
 	return err
 }

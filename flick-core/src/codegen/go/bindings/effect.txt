@@ -716,3 +716,13 @@ flickBytes ByteSizeBytes
 flickMake LoggerMake
 withConsoleLog LoggerWithConsoleLog
 flickLayer LoggerLayer
+flickWithLoggers *LoggerWithLoggers
+
+[@flick-lang/runtime/effect/Effect]
+log *EffectLog
+logFatal *EffectLogFatal
+logError *EffectLogError
+logWarning *EffectLogWarning
+logInfo *EffectLogInfo
+logDebug *EffectLogDebug
+logTrace *EffectLogTrace
