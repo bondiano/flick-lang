@@ -17,3 +17,5 @@ codecInt CodecInt
 schemaArbitrary SchemaArbitrary
 schemaWithGenerator SchemaWithGenerator
 
+[@flick-lang/runtime/effect/http/HttpClientResponse]
+flickFormData *ClientResponseFormData

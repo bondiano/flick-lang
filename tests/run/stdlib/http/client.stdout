@@ -25,6 +25,9 @@ schema_body_json: { label = "pen", size = 2 }
 json: {"label":"pen","size":2}
 bytes: 24
 url_params_body: UrlParams [("a", "1"), ("a", "2")]
+form_data: [("a", "1"), ("b", "x y"), ("a", "3")]
+form_data urlencoded: [("a", "1"), ("a", "2")]
+form_data plain: DecodeError { description = Some "Content-Type was not one of \"multipart/form-data\" or \"application/x-www-form-urlencoded\".", method = GET, status = 200, url = "http://fake/plain" }
 schema_headers: { contentType = "application/json" }
 schema_no_body: { status = 200 }
 schema_json: { body = { label = "pen", size = 2 }, status = 200 }
