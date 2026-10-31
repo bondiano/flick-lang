@@ -330,31 +330,26 @@ func LayerMergeAll(first, rest Value) Value {
 			children[i] = fork(fb, newOwner(), build, func(c *child) { ended <- c })
 		}
 		var failed *Cause
-		signal := fb.state.signal
-		if fb.state.mask > 0 {
-			signal = nil
-		}
+		signal := signalOf(fb)
 		stopAll := func() {
 			for _, other := range children {
 				other.state.interrupt(fb.state.id)
 			}
 		}
-		idle()
 		for left := len(layers); left > 0; {
-			select {
-			case c := <-ended:
+			if c := nextEnded(fb, ended, signal); c != nil {
 				left--
 				if c.cause != nil && failed == nil {
 					failed = c.cause
 					stopAll()
 				}
-			case <-signal:
-				// interrupted: the builds stop, and their scopes release with the merged one's
-				signal = nil
-				stopAll()
-				if failed == nil {
-					failed = fb.state.stopped().Cause
-				}
+				continue
+			}
+			// interrupted: the builds stop, and their scopes release with the merged one's
+			signal = nil
+			stopAll()
+			if failed == nil {
+				failed = fb.state.stopped().Cause
 			}
 		}
 		if failed != nil {

@@ -8,3 +8,7 @@ flickCurrentTimeMillis *ClockCurrentTimeMillis
 flickCurrentTimeNanos *ClockCurrentTimeNanos
 flickMonotonicTimeNanos *ClockMonotonicTimeNanos
 
+[@flick-lang/runtime]
+testClock TestClock
+testAdjust *TestAdjust
+testSetTime *TestSetTime

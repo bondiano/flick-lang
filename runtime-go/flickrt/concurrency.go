@@ -43,7 +43,15 @@ func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 	c := &child{state: newState(), done: make(chan struct{})}
 	inner := *fb
 	inner.state, inner.owner = c.state, owner
+	tc := counted(fb)
+	if tc != nil {
+		c.state.clock = tc
+		tc.running.Add(1)
+	}
 	go func() {
+		if tc != nil {
+			defer tc.running.Add(-1)
+		}
 		c.value, c.cause = catch(func() Value { return Run(&inner, task) })
 		c.mu.Lock()
 		c.ended = true
@@ -62,12 +70,50 @@ func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 
 // stop interrupts children and awaits them.
 func stop(fb *Fiber, children ...*child) {
-	idle()
 	for _, c := range children {
 		c.state.interrupt(fb.state.id)
 	}
+	if tc := parking(fb); tc != nil {
+		defer tc.park(func() bool {
+			for _, c := range children {
+				if !isClosed(c.done) {
+					return false
+				}
+			}
+			return true
+		})()
+	}
 	for _, c := range children {
 		<-c.done
+	}
+}
+
+// nextEnded is the next child to end, nil when `signal` comes first.
+func nextEnded(fb *Fiber, ended chan *child, signal <-chan struct{}) *child {
+	if tc := parking(fb); tc != nil {
+		defer tc.park(func() bool { return len(ended) > 0 || isClosed(signal) })()
+	}
+	select {
+	case c := <-ended:
+		return c
+	case <-signal:
+		return nil
+	}
+}
+
+// firstClosed is the index of the first of the channels, which are only ever
+// closed, to close.
+func firstClosed(fb *Fiber, a, b, c <-chan struct{}) int {
+	if tc := parking(fb); tc != nil {
+		defer tc.park(func() bool { return isClosed(a) || isClosed(b) || isClosed(c) })()
+	}
+	select {
+	case <-a:
+		return 0
+	case <-b:
+		return 1
+	case <-c:
+		return 2
 	}
 }
 
@@ -167,31 +213,20 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 		if permits != nil {
 			task := t
 			t = Eff(func(fb *Fiber) Value {
-				select {
-				case permits <- struct{}{}:
-				case <-fb.state.signal:
-					panic(fb.state.stopped())
-				}
+				takePermit(fb, permits)
 				defer func() { <-permits }()
 				return Run(fb, task)
 			})
 		}
 		children[i] = fork(fb, fb.owner, t, func(c *child) { ended <- c })
 	}
-	var failure *Failure
-	idle()
+	signal := signalOf(fb)
 	for range tasks {
-		var c *child
-		if fb.state.mask > 0 {
-			c = <-ended
-		} else {
-			select {
-			case c = <-ended:
-			case <-fb.state.signal:
-				failure = fb.state.stopped()
-			}
-		}
-		if failure == nil && c.cause != nil {
+		var failure *Failure
+		switch c := nextEnded(fb, ended, signal); {
+		case c == nil:
+			failure = fb.state.stopped()
+		case c.cause != nil:
 			failure = &Failure{c.cause}
 		}
 		if failure != nil {
@@ -204,6 +239,18 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 		out[i] = c.value
 	}
 	return out
+}
+
+// takePermit takes one of the permits, or fails with the fiber's interruption.
+func takePermit(fb *Fiber, permits chan struct{}) {
+	if tc := parking(fb); tc != nil {
+		defer tc.park(func() bool { return len(permits) < cap(permits) || isClosed(fb.state.signal) })()
+	}
+	select {
+	case permits <- struct{}{}:
+	case <-fb.state.signal:
+		panic(fb.state.stopped())
+	}
 }
 
 // ParallelPair is `parallel a b`: both results, or the first failure.
@@ -252,18 +299,12 @@ func race(fb *Fiber, a, b Value, success bool) Value {
 		fork(fb, fb.owner, b, func(c *child) { ended <- c }),
 	}
 	var failed *Cause
-	idle()
+	signal := signalOf(fb)
 	for range children {
-		var c *child
-		if fb.state.mask > 0 {
-			c = <-ended
-		} else {
-			select {
-			case c = <-ended:
-			case <-fb.state.signal:
-				stop(fb, children...)
-				panic(fb.state.stopped())
-			}
+		c := nextEnded(fb, ended, signal)
+		if c == nil {
+			stop(fb, children...)
+			panic(fb.state.stopped())
 		}
 		if c.cause == nil || !success {
 			stop(fb, children...)
@@ -283,21 +324,15 @@ func timeoutAfter(fb *Fiber, millis Value, task Value, done func(Value) Value, l
 	c := fork(fb, fb.owner, task, nil)
 	timer, cancel := clockOf(fb).timer(time.Duration(millis.(float64) * float64(time.Millisecond)))
 	defer cancel()
-	signal := fb.state.signal
-	if fb.state.mask > 0 {
-		signal = nil
-	}
-	idle()
-	select {
-	case <-c.done:
+	switch firstClosed(fb, c.done, timer, signalOf(fb)) {
+	case 0:
 		return done(c.result())
-	case <-timer:
+	case 1:
 		stop(fb, c)
 		return late()
-	case <-signal:
-		stop(fb, c)
-		panic(fb.state.stopped())
 	}
+	stop(fb, c)
+	panic(fb.state.stopped())
 }
 
 var timeoutError = NewData(Tag("Prelude.TimeoutError.TimeoutError"))

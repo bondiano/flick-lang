@@ -88,7 +88,7 @@ func releasePromptTty() Value {
 
 func (tty *promptProcessTty) read(fb *Fiber) Value {
 	Check(fb)
-	idle()
+	defer park(fb, nil)()
 	if fb.state.mask > 0 {
 		<-tty.readGate
 	} else {

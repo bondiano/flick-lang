@@ -16,18 +16,12 @@ func raceAll(fb *Fiber, tasks []Value, first bool) Value {
 		children[i] = fork(fb, fb.owner, t, func(c *child) { ended <- c })
 	}
 	var failed *Cause
-	idle()
+	signal := signalOf(fb)
 	for range tasks {
-		var c *child
-		if fb.state.mask > 0 {
-			c = <-ended
-		} else {
-			select {
-			case c = <-ended:
-			case <-fb.state.signal:
-				stop(fb, children...)
-				panic(fb.state.stopped())
-			}
+		c := nextEnded(fb, ended, signal)
+		if c == nil {
+			stop(fb, children...)
+			panic(fb.state.stopped())
 		}
 		if c.cause == nil || first {
 			stop(fb, children...)

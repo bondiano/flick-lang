@@ -273,7 +273,7 @@ var StreamStdin Value = &Stream{open: func(fb *Fiber) pull {
 	}
 	buf := make([]byte, 64<<10)
 	return func(fb *Fiber) ([]Value, bool) {
-		idle()
+		defer park(fb, nil)()
 		n, err := os.Stdin.Read(buf)
 		if n > 0 {
 			return []Value{byteList(buf[:n])}, true

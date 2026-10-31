@@ -23,11 +23,10 @@ func ForeignAsync(fb *Fiber, call func(Context) Value) Value {
 		v, c := catch(func() Value { return call(ctx) })
 		ended <- result{v, c}
 	}()
-	signal := fb.state.signal
-	if fb.state.mask > 0 {
-		signal = nil
+	signal := signalOf(fb)
+	if c := parking(fb); c != nil {
+		defer c.park(func() bool { return len(ended) > 0 || isClosed(signal) })()
 	}
-	idle()
 	select {
 	case r := <-ended:
 		cancel()
