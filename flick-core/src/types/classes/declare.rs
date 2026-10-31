@@ -17,7 +17,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::convert::{Free, is_type};
 use crate::types::env::Instance;
 use crate::types::kinds::Kind;
-use crate::types::ty::{Binder, Type};
+use crate::types::ty::{Binder, PRELUDE, Type};
 use crate::types::typing::range;
 use crate::types::{Checker, Constructor, Form, InstanceInfo, env, passes_dictionary};
 
@@ -151,9 +151,20 @@ impl<'n> Checker<'_> {
         let head = self.canon(&head?);
         let ((module, name), _) = split(&head)?;
         self.class_info(module, name)?;
+        // the name keys the dictionary: types of one name from two modules
+        // must not share it
+        let shown = self.show(&head);
+        let taken = self
+            .env
+            .own_instances()
+            .any(|i| i.module == self.env.module && i.name == shown);
         Some(Instance {
             module: self.env.module.clone(),
-            name: self.show(&head),
+            name: if taken {
+                self.show_qualified(&head)
+            } else {
+                shown
+            },
             vars,
             context: context.iter().map(|c| self.canon(c)).collect(),
             head,
@@ -185,6 +196,15 @@ impl<'n> Checker<'_> {
                 codes::C012,
                 span,
                 format!("`{cn}` is closed: the module `Numeric` has every instance of it, for `Int`, `Float` and `BigInt`"),
+            );
+            return false;
+        }
+        // `for` iterates its sources as JS and Go containers, without `iter`
+        if cm == PRELUDE && cn == "Iterable" && instance.module != "Instances" {
+            self.error(
+                codes::C012,
+                span,
+                "`Iterable` is closed: `for` iterates a `List` or a `Seq` as it is, and the module `Instances` has the instances for them".to_owned(),
             );
             return false;
         }
@@ -391,13 +411,11 @@ impl<'n> Checker<'_> {
             self.classes.steps = 0;
             let name = d.instance.name.clone();
             let mut supers = Vec::new();
-            for s in self.supers_of(&d.instance.head) {
-                let shown = self.show(&s);
-                match self.entails(&s, &d.instance.context) {
-                    Outcome::Solved(dict) => {
-                        let class = super::split(&s).map(|((_, n), _)| n.to_owned());
-                        supers.push((class.unwrap_or_default(), dict));
-                    }
+            let declared = self.supers_of(&d.instance.head);
+            for (i, s) in declared.iter().enumerate() {
+                let shown = self.show(s);
+                match self.entails(s, &d.instance.context) {
+                    Outcome::Solved(dict) => supers.push((super::super_slot(&declared, i), dict)),
                     Outcome::Budget(_) => self.error(
                         codes::C009,
                         d.span,

@@ -19,8 +19,10 @@ codegen/eval_order
 codegen/exports
 codegen/for_comprehension
 codegen/functor
+codegen/given_shadow
 codegen/fusion
 codegen/higher_rank
+codegen/instance_names
 codegen/ints
 codegen/let_assert
 codegen/lift
@@ -31,6 +33,7 @@ codegen/patterns
 codegen/question
 codegen/ranges
 codegen/recursion
+codegen/repeated_superclass
 codegen/stage_order
 codegen/strings_utf16
 codegen/task_twice
@@ -72,6 +75,8 @@ runtime/concurrency
 runtime/scopes
 runtime/releases
 runtime/owners
+runtime/close_phases
+runtime/cause_lists
 codegen/for_loop
 stdlib/file
 runtime/paths
@@ -95,3 +100,5 @@ stdlib/http/api_bodies
 stdlib/http/redaction_context
 stdlib/http/router_patterns
 stdlib/effect/filesystem_node
+stdlib/effect/platform
+stdlib/effect/console

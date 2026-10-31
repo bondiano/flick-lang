@@ -15,6 +15,7 @@ import {
   failureRawCause,
   tryWith,
 } from "../src/index.ts";
+import { flickMap, flickReasons, toFailure } from "../src/effect/Cause.ts";
 import { causeOf, value } from "./support.ts";
 
 interface Tagged {
@@ -23,6 +24,7 @@ interface Tagged {
 
 const A: Tagged = { _tag: "A" };
 const B: Tagged = { _tag: "B" };
+const C: Tagged = { _tag: "C" };
 const fails = (...reasons: Array<Cause.Reason<Tagged>>) => Effect.failCause(Cause.fromReasons(reasons));
 const fail = (e: Tagged) => Cause.makeFailReason(e);
 const handled = (body: Effect.Effect<never, Tagged>, tags: ReadonlyArray<string>) =>
@@ -145,4 +147,22 @@ test("inspecting a cause never runs code of its payloads", async () => {
   assert.equal(Object.getPrototypeOf(report), null, "the report is inert data");
   assert.equal(Reflect.get(report, "toString"), undefined);
   assert.ok(Object.isFrozen(report));
+});
+
+test("a typed failure after the first has no type of the row: reasons give it as a defect, map leaves it", () => {
+  const failure = toFailure(Cause.fromReasons([fail(B), fail(A)]));
+  assert.deepEqual(
+    flickReasons(failure).map((r) => r._tag),
+    ["Fail", "Die"],
+  );
+  const seen: Array<unknown> = [];
+  const mapped = flickMap((e) => {
+    seen.push(e);
+    return C;
+  })(failure);
+  assert.deepEqual(seen, [B]);
+  assert.deepEqual(
+    (nativeCause(mapped)?.reasons ?? []).map((r) => (Cause.isFailReason(r) ? r.error : r._tag)),
+    [C, A],
+  );
 });

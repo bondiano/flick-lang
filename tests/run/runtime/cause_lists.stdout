@@ -1,0 +1,5 @@
+(1, 2, 1)
+parallel 2 1, race 2
+primary B b, reasons 2
+mapped B b!
+map_error B b!

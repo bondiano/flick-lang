@@ -75,6 +75,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/config.go"),
     ),
     (
+        "console.go",
+        include_str!("../../../../runtime-go/flickrt/console.go"),
+    ),
+    (
         "context.go",
         include_str!("../../../../runtime-go/flickrt/context.go"),
     ),
@@ -331,6 +335,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/logger.go"),
     ),
     (
+        "loglevel.go",
+        include_str!("../../../../runtime-go/flickrt/loglevel.go"),
+    ),
+    (
         "mime_types.go",
         include_str!("../../../../runtime-go/flickrt/mime_types.go"),
     ),
@@ -349,6 +357,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "owner.go",
         include_str!("../../../../runtime-go/flickrt/owner.go"),
+    ),
+    (
+        "path.go",
+        include_str!("../../../../runtime-go/flickrt/path.go"),
     ),
     (
         "platform.go",
@@ -389,6 +401,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "service.go",
         include_str!("../../../../runtime-go/flickrt/service.go"),
+    ),
+    (
+        "stdio.go",
+        include_str!("../../../../runtime-go/flickrt/stdio.go"),
     ),
     (
         "stream.go",

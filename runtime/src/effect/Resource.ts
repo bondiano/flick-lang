@@ -4,13 +4,13 @@
 // resource's region closes.
 import { Effect, Exit, Scope, Semaphore } from "effect";
 
-import { type Holder, acquireHolder, leased, retire } from "./lease.ts";
+import { type Holder, type Restore, acquireHolder, leased, retire } from "./lease.ts";
 
 /** `Resource s e a`: the last successful acquisition, or the first failure. */
 export interface FlickResource<A, E> {
   current: Exit.Exit<Holder<A>, E>;
   /** `acquire` with the services of the call that made the resource. */
-  readonly again: Effect.Effect<Holder<A>, E>;
+  readonly again: (outer: Restore) => Effect.Effect<Holder<A>, E>;
   readonly lock: Semaphore.Semaphore;
 }
 
@@ -18,11 +18,12 @@ export interface FlickResource<A, E> {
 export const flickManual = <A, E, R>(
   acquire: Effect.Effect<A, E, R>,
 ): Effect.Effect<FlickResource<A, E>, never, Exclude<R, Scope.Scope> | Scope.Scope> =>
-  Effect.gen(function* () {
+  // the first value is registered under the mask it was acquired in, as `acquireRelease` does
+  Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
     const context = yield* Effect.context<Exclude<R, Scope.Scope>>();
-    const again = Effect.provideContext(acquireHolder(acquire), context);
+    const again = (outer: Restore) => Effect.provideContext(acquireHolder(acquire, outer), context);
     const resource: FlickResource<A, E> = {
-      current: yield* Effect.exit(again),
+      current: yield* Effect.exit(again(restore)),
       again,
       lock: Semaphore.makeUnsafe(1),
     };
@@ -31,7 +32,7 @@ export const flickManual = <A, E, R>(
       Effect.suspend(() => (Exit.isSuccess(resource.current) ? retire(resource.current.value) : Effect.void)),
     );
     return resource;
-  });
+  }));
 
 /** `Resource.use resource f`: fails as the acquisition did if it never succeeded. */
 export const flickUse = <A, B, E, E2, R>(
@@ -49,7 +50,8 @@ export const flickUse = <A, B, E, E2, R>(
 /** `Resource.refresh resource`: if the acquisition fails, the previous value stays. */
 export const flickRefresh = <A, E>(resource: FlickResource<A, E>): Effect.Effect<void, E> =>
   resource.lock.withPermit(
-    Effect.flatMap(Effect.exit(resource.again), (exit) => {
+    // an interruption between the swap and `retire` would leave the previous value unreleased
+    Effect.uninterruptibleMask((restore) => Effect.flatMap(Effect.exit(resource.again(restore)), (exit) => {
       const previous = resource.current;
       if (Exit.isFailure(exit)) {
         if (Exit.isFailure(previous)) resource.current = exit;
@@ -57,5 +59,5 @@ export const flickRefresh = <A, E>(resource: FlickResource<A, E>): Effect.Effect
       }
       resource.current = exit;
       return Exit.isSuccess(previous) ? retire(previous.value) : Effect.void;
-    }),
+    })),
   );

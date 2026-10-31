@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { Cause, Deferred, Effect } from "effect";
+import { Cause, Deferred, Effect, Fiber } from "effect";
 
 import {
   type Failure,
@@ -68,4 +68,34 @@ test("a defect of the supervisor goes to the root reporter", async () => {
   const added = reportedDefects().slice(before);
   assert.equal(added.length, 1);
   assert.ok(Cause.hasDies(at(added, 0)));
+});
+
+test("an interrupted spawner leaves no child without its owner and supervisor", async () => {
+  let started = 0;
+  let stopped = 0;
+  let supervised = 0;
+  const child = Effect.onInterrupt(
+    Effect.andThen(Effect.sync(() => (started += 1)), Effect.never),
+    () => Effect.sync(() => (stopped += 1)),
+  );
+  await Effect.runPromise(
+    scope((owner) =>
+      Effect.gen(function* () {
+        // the spawner is interrupted right as the child joins the owner: between two steps of the spawn
+        const spawner = yield* Effect.forkChild(
+          Effect.withFiber((fiber) => {
+            const add = owner.children.add.bind(owner.children);
+            owner.children.add = (spawned) => {
+              fiber.interruptUnsafe();
+              return add(spawned);
+            };
+            return fiberSpawn(owner, () => Effect.sync(() => (supervised += 1)), child);
+          }),
+        );
+        yield* Fiber.await(spawner);
+        yield* Effect.yieldNow;
+      }),
+    ),
+  );
+  assert.deepEqual([started, stopped, supervised], [1, 1, 1]);
 });

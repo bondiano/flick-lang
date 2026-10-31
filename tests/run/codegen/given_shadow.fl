@@ -1,0 +1,30 @@
+// Two assumptions of one class whose variables share a name: an instance's
+// context and a method's own constraint, a signature's and a higher-rank
+// argument's. Each use takes the dictionary of its own assumption.
+module App.Main exposing (main)
+
+type Pair b a = Pair b a
+
+type Color = Red
+
+instance Show Color =
+  let show _ = "Color.Red"
+
+class Container (f : Type -> Type) =
+  render : forall a. Show a => f a -> String
+
+instance Show a => Container (Pair a) =
+  let render p =
+    match p with
+    | Pair x y -> show x ++ " / " ++ show y
+
+twice : forall c. (forall a. Show a => a -> String)^c -> String
+let twice f = f 42
+
+inner : Show a => a -> String
+let inner x = twice (fun v -> show v ++ " & " ++ show x)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (render (Pair Red 42))
+  Platform.stdout_line (inner Red)

@@ -4,7 +4,7 @@ import { Exit, Option, Result } from "effect";
 
 import { type Failure, type FlickExit, describeDefect } from "../cause.ts";
 import { failureCause, flickExit, nativeExit } from "../stdlib/outcome.ts";
-import { toFailure } from "./Cause.ts";
+import { mapHead, toFailure } from "./Cause.ts";
 
 export * from "effect/Exit";
 
@@ -50,14 +50,18 @@ export const flickMap =
   <A, B>(f: (value: A) => B) =>
   (exit: FlickExit<A>): FlickExit<B> =>
     flickExit(Exit.map(native(exit), f));
+/** The exit with the first typed error of its failure mapped, as `Cause.map` does. */
+const mapFailure = <A>(exit: Exit.Exit<A, unknown>, f: (error: unknown) => unknown): Exit.Exit<A, unknown> =>
+  Exit.isFailure(exit) ? Exit.failCause(mapHead(exit.cause, f)) : exit;
+
 export const flickMapError =
   (f: (error: unknown) => unknown) =>
   <A>(exit: FlickExit<A>): FlickExit<A> =>
-    flickExit(Exit.mapError(native(exit), f));
+    flickExit(mapFailure(native(exit), f));
 export const flickMapBoth =
   <A, B>(onFailure: (error: unknown) => unknown, onSuccess: (value: A) => B) =>
   (exit: FlickExit<A>): FlickExit<B> =>
-    flickExit(Exit.mapBoth(native(exit), { onFailure, onSuccess }));
+    flickExit(Exit.map(mapFailure(native(exit), onFailure), onSuccess));
 export const flickAsVoid = <A>(exit: FlickExit<A>): FlickExit<void> => flickExit(Exit.asVoid(native(exit)));
 export const flickAsVoidAll = <A>(exits: ReadonlyArray<FlickExit<A>>): FlickExit<void> =>
   flickExit(Exit.asVoidAll(exits.map(native)));

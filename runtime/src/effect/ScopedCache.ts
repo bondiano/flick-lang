@@ -13,12 +13,15 @@ export * from "effect/ScopedCache";
 const leasedLookup =
   <K, A, E, R>(lookup: (key: K) => Effect.Effect<A, E, R>) =>
   (key: K): Effect.Effect<Holder<A>, E, Exclude<R, Scope.Scope> | Scope.Scope> =>
-    Effect.gen(function* () {
-      const entry = yield* Scope.Scope;
-      const holder = yield* acquireHolder(lookup(key));
-      yield* Scope.addFinalizer(entry, retire(holder));
-      return holder;
-    });
+    // the holder is registered under the mask it was acquired in, as `acquireRelease` does
+    Effect.uninterruptibleMask((restore) =>
+      Effect.gen(function* () {
+        const entry = yield* Scope.Scope;
+        const holder = yield* acquireHolder(lookup(key), restore);
+        yield* Scope.addFinalizer(entry, retire(holder));
+        return holder;
+      }),
+    );
 
 /** `ScopedCache.make`: the options record with `Option` fields. */
 export const flickMake = <K, A, E, R>(options: {

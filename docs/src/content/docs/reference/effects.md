@@ -258,3 +258,4 @@ lets `b` replace what `a` builds.
 | - | - |
 | `Layer.merge` used other than applied to both layers | conflicts are not reported |
 | a service named as a value with a module qualifier | not accepted; name it unqualified |
+| a child of an outer owner spawned inside `provide` | it keeps the services of the `provide` after their layer is released |

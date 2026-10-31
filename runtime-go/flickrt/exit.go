@@ -150,18 +150,19 @@ func ExitMap(fb *Fiber, f, e Value) Value {
 	return e
 }
 
-// mapErrors is the cause with each typed error mapped by `f`.
+// mapErrors is the cause with its first typed error mapped by `f`: only
+// that one has an error of the row; a later one, which a narrowing `try`
+// left behind, has no type to map from (docs/formal/runtime.md §2.4).
 func (c *Cause) mapErrors(fb *Fiber, f Value) *Cause {
-	if c == nil {
-		return nil
+	var out *Cause
+	head := true
+	for _, r := range c.reasons() {
+		if head && r.kind == causeFail {
+			r, head = &Cause{kind: causeFail, err: Apply(fb, f, r.err)}, false
+		}
+		out = concat(out, r)
 	}
-	switch c.kind {
-	case causeFail:
-		return &Cause{kind: causeFail, err: Apply(fb, f, c.err)}
-	case causeSequential, causeParallel:
-		return &Cause{kind: c.kind, left: c.left.mapErrors(fb, f), right: c.right.mapErrors(fb, f)}
-	}
-	return c
+	return out
 }
 
 func ExitMapError(fb *Fiber, f, e Value) Value {
@@ -183,7 +184,7 @@ func ExitAsVoid(e Value) Value {
 func ExitAsVoidAll(exits Value) Value {
 	var cause *Cause
 	for _, e := range List(exits) {
-		cause = Parallel(cause, ex(e).cause)
+		cause = concat(cause, ex(e).cause)
 	}
 	return &Exit{Unit, cause}
 }
@@ -207,11 +208,20 @@ func CauseMap(fb *Fiber, f, self Value) Value {
 	return failureOf(causeOfFailure(self).mapErrors(fb, f))
 }
 
+// CauseReasons is the reasons as `Failure e` types them: a typed failure
+// after the first is a defect here.
 func CauseReasons(f Value) Value {
 	reasons := causeOfFailure(f).reasons()
 	out := make([]Value, len(reasons))
-	for i, reason := range reasons {
-		out[i] = reason
+	head := true
+	for i, r := range reasons {
+		if r.kind == causeFail {
+			if !head {
+				r = &Cause{kind: causeDie, defect: describe(r.err)}
+			}
+			head = false
+		}
+		out[i] = r
 	}
 	return out
 }
@@ -313,7 +323,7 @@ func EffectExit(fb *Fiber, task Value) Value { return exitOf(fb, task) }
 func withExit(fb *Fiber, task Value, after func(*Exit) Value) Value {
 	e := exitOf(fb, task)
 	if task := after(e); task != nil {
-		_, c := catch(func() Value { return Uninterruptible(fb, task) })
+		_, c := catch(func() Value { return uninterruptible(fb, task) })
 		e = &Exit{e.value, Sequential(e.cause, c)}
 	}
 	if e.cause != nil {

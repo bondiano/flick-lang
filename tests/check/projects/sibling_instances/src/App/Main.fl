@@ -1,0 +1,11 @@
+// The module that sees both instances reports their overlap.
+module App.Main exposing (both)
+
+import App.A
+import App.B
+import App.Ty exposing (T(..))
+
+both : String
+let both = show T
+
+//~ FLICK-C003 @2:1-2:32 `Show T` of module `App.B` overlaps `Show T` of module `App.A`

@@ -223,7 +223,7 @@ A successful recovery may absorb the cause and its secondary diagnostics. If the
 
 `task { service_call () }` looks up the required service at run time in the current environment. If the task has already captured a specific instance of the service, it keeps that instance's lifetime. A finalizer receives the context saved at registration, not an arbitrary service from the environment of a later close.
 
-One Layer identity is reused within one graph build. Independent `provide`s build independent instances; there is no global singleton. Long-lived shared construction requires explicit memoization with an owner. Two implementations of one service key in a graph are an error, except for an explicit override combinator. This rule relies on [Effect layer memoization](https://effect.website/docs/v4/requirements-management/layer-memoization), and the source checker additionally verifies lifetime.
+One Layer identity is reused within one graph build, and a `provide` nested in the body of another reuses the outer build of the same identity. Independent, side-by-side `provide`s build independent instances; there is no global singleton. Long-lived shared construction requires explicit memoization with an owner. Two implementations of one service key in a graph are an error, except for an explicit override combinator. This rule relies on [Effect layer memoization](https://effect.website/docs/v4/requirements-management/layer-memoization), and the source checker additionally verifies lifetime.
 
 ## Finalization and resource boundaries
 

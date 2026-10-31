@@ -56,6 +56,20 @@ pub enum Dict {
     Error,
 }
 
+impl Dict {
+    /// Whether it is built from an assumption, so holds only where that is.
+    fn assumes(&self) -> bool {
+        match self {
+            Self::Given(_) => true,
+            Self::Super { dict, .. } => dict.assumes(),
+            Self::Instance { args: dicts, .. } | Self::Structural { fields: dicts, .. } => {
+                dicts.iter().any(Self::assumes)
+            }
+            Self::Primitive { .. } | Self::Error => false,
+        }
+    }
+}
+
 /// A constraint to solve, with what was assumed where it was required.
 #[derive(Debug, Clone)]
 pub struct Wanted {
@@ -77,7 +91,8 @@ pub struct State {
     pub evidence: Vec<(Span, Dict)>,
     /// Solver steps spent on the current definition.
     pub steps: u32,
-    /// Dictionaries of constraints without unknowns or variables.
+    /// Dictionaries of constraints without unknowns or variables, built
+    /// from instances alone.
     cache: HashMap<Type, Dict>,
     required: u32,
 }
@@ -89,6 +104,20 @@ pub struct ClassInfo {
     pub fundeps: Vec<Fundep>,
     pub methods: Vec<String>,
     pub defaults: Vec<String>,
+}
+
+/// The field of a dictionary holding the superclass at `index` of `supers`:
+/// the class's name, numbered when another superclass has the same name.
+pub(super) fn super_slot(supers: &[Type], index: usize) -> String {
+    fn name(t: &Type) -> &str {
+        split(t).map_or("", |((_, n), _)| n)
+    }
+    let own = name(&supers[index]);
+    if supers.iter().filter(|s| name(s) == own).count() > 1 {
+        format!("{own}{index}")
+    } else {
+        own.to_owned()
+    }
 }
 
 /// The class and the arguments of a constraint `C t1 … tn`.

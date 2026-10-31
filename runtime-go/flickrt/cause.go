@@ -2,6 +2,7 @@ package flickrt
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -35,9 +36,46 @@ func (f *Failure) Error() string { return pretty(f.Cause) }
 // Fail fails with a typed error.
 func Fail(err Value) Value { panic(&Failure{&Cause{kind: causeFail, err: err}}) }
 
-// Sequential and Parallel combine two causes.
-func Sequential(a, b *Cause) *Cause { return combine2(causeSequential, a, b) }
-func Parallel(a, b *Cause) *Cause   { return combine2(causeParallel, a, b) }
+// Sequential and Parallel combine two causes as Effect's `Cause.combine`
+// does: the reasons of both, each once, so the kind of the node is never
+// observed (docs/formal/runtime.md §2.1).
+func Sequential(a, b *Cause) *Cause { return combineReasons(causeSequential, a, b) }
+func Parallel(a, b *Cause) *Cause   { return combineReasons(causeParallel, a, b) }
+
+// concat is the reasons of both causes, repeats kept, as Effect's
+// `Cause.fromReasons` over both lists: races and a scope's finalizers.
+func concat(a, b *Cause) *Cause { return combine2(causeSequential, a, b) }
+
+func combineReasons(kind causeKind, a, b *Cause) *Cause {
+	if a == nil || b == nil {
+		return combine2(kind, a, b)
+	}
+	var out *Cause
+	var kept []*Cause
+	for _, r := range append(a.reasons(), b.reasons()...) {
+		if !slices.ContainsFunc(kept, func(k *Cause) bool { return sameReason(k, r) }) {
+			kept = append(kept, r)
+			out = combine2(kind, out, r)
+		}
+	}
+	return out
+}
+
+// sameReason is Effect's equality of reasons as far as Go can tell it: a
+// defect is only its own text here, while two defects of one text are
+// two different errors in JS.
+func sameReason(a, b *Cause) bool {
+	if a.kind != b.kind {
+		return false
+	}
+	switch a.kind {
+	case causeFail:
+		return Equals(a.err, b.err)
+	case causeInterrupt:
+		return a.fiber == b.fiber
+	}
+	return a == b
+}
 
 func combine2(kind causeKind, a, b *Cause) *Cause {
 	switch {
@@ -76,7 +114,19 @@ func (c *Cause) failsToDies() *Cause {
 		if r.kind == causeFail {
 			r = &Cause{kind: causeDie, defect: describe(r.err)}
 		}
-		out = Sequential(out, r)
+		out = concat(out, r)
+	}
+	return out
+}
+
+// withoutInterrupts is the cause without its interruptions; nil when only
+// they were left.
+func withoutInterrupts(c *Cause) *Cause {
+	var out *Cause
+	for _, r := range c.reasons() {
+		if r.kind != causeInterrupt {
+			out = concat(out, r)
+		}
 	}
 	return out
 }

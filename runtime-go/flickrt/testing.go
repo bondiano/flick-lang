@@ -318,6 +318,7 @@ func outcome(message string, bad bool, cause *Cause) (string, string) {
 // runOne runs a test in a fiber and an owner of its own.
 func runOne(fb *Fiber, t named, seed int64) testResult {
 	owner := newOwner()
+	owner.defects = &defects{}
 	inner := Fiber{state: newState(), env: fb.env, owner: owner}
 	// stopping the run interrupts each running test
 	done := make(chan struct{})
@@ -338,11 +339,13 @@ func runOne(fb *Fiber, t named, seed int64) testResult {
 		message, bad = t.test.checks(fb, seed)
 		return Unit
 	})
-	all := owner.close(&inner, exit)
+	released := owner.closeFinalizers(&inner, exit)
+	// a supervisor that failed during the test fails it, as it fails a program
+	exit = Sequential(exit, owner.defects.all())
 	kind, text := outcome(message, bad, exit)
 	cleanup := ""
-	if rest := all.reasons()[len(exit.reasons()):]; len(rest) > 0 {
-		cleanup = describeReasons(rest)
+	if released != nil {
+		cleanup = describeReasons(released.reasons())
 	}
 	switch {
 	case kind == "" && cleanup == "":

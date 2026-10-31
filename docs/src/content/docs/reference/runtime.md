@@ -54,7 +54,8 @@ typed error of its own.
 child that fails, including one interrupted by its closing owner, passes its
 `Failure` to the supervisor; `failure.shutdown` tells the interruption of a
 closing owner apart. A defect of the supervisor goes to the root reporter
-and makes the run fail. `Fiber.join` waits for a child and fails with its
+and makes the run fail; under `flick test` it fails the test it happened
+in. `Fiber.join` waits for a child and fails with its
 original cause. A closing owner admits no new children: spawning into it is
 a defect. The child and its supervisor acquire into the owner's region, so a
 task that acquires names `Scope` of that region.
@@ -134,7 +135,9 @@ getters, `toString`, `toJSON` or Proxy traps.
 
 `provide layer { body }` is a lexical owner too. The layer is built before
 the body; if building fails, the body never runs. One build shares each
-layer, and two `provide`s build it twice. The body sees the services of its
+layer, and so does a `provide` nested in the body: it takes the outer
+build of the same layer value. Two `provide`s side by side build it twice.
+The body sees the services of its
 surroundings besides those of the layer, which are gone after it.
 Finalizers of the layer run when the body has ended, with the services they
 were registered with.

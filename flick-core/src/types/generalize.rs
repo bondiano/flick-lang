@@ -8,6 +8,7 @@ use super::classes::Outcome;
 use super::env::Found;
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
+use super::typing::passes_dictionary;
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::source::Span;
@@ -23,17 +24,30 @@ impl Checker<'_> {
         runtime: bool,
         span: Span,
     ) {
-        if runtime && matches!(scheme, Type::Forall { vars, .. } if !vars.is_empty()) {
+        let Type::Forall {
+            vars, constraints, ..
+        } = scheme
+        else {
+            return;
+        };
+        // a dictionary makes the value a function of it, run again at each use
+        let dictionaries = constraints.iter().any(passes_dictionary);
+        if runtime && (!vars.is_empty() || dictionaries) {
             let shown = self.show(scheme);
             let (what, value) = match name {
                 Some(name) => (format!("`{name}`"), "its value"),
                 None => ("this".to_owned(), "it"),
             };
+            let kind = if vars.is_empty() {
+                "constrained"
+            } else {
+                "polymorphic"
+            };
             self.error(
                 codes::T013,
                 span,
                 format!(
-                    "{what} is computed by a runtime call, so {value} cannot have the polymorphic type `{shown}`; make it a function or build it with `task`"
+                    "{what} is computed by a runtime call, so {value} cannot have the {kind} type `{shown}`; make it a function or build it with `task`"
                 ),
             );
         }

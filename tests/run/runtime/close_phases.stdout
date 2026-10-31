@@ -1,0 +1,21 @@
+body done
+open late
+child uses late
+child done with late
+supervised (false, false, true)
+close late
+--
+open sup
+supervisor ran
+inner done
+outer body done
+close sup
+--
+open group
+body done
+group child done
+close group
+--
+block done
+supervised (false, false, true)
+interrupted

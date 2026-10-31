@@ -1,0 +1,7 @@
+// `App.A` and `App.B` do not see each other: each instance is admitted.
+module App.B exposing (..)
+
+import App.Ty exposing (T(..))
+
+instance Show T =
+  let show _ = "from B"

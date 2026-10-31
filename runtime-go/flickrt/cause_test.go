@@ -51,3 +51,44 @@ func TestFindDefectGivesTheMessage(t *testing.T) {
 		}
 	}
 }
+
+// Combining keeps each reason once, as Effect's `Cause.combine` does
+// (docs/formal/runtime.md §2.2); races and a scope's finalizers keep repeats.
+func TestCombineKeepsEachReasonOnce(t *testing.T) {
+	fail := func(v Value) *Cause { return &Cause{kind: causeFail, err: v} }
+	die := &Cause{kind: causeDie, defect: "boom"}
+	count := func(c *Cause) int { return len(c.reasons()) }
+	if n := count(Sequential(fail(1.0), fail(1.0))); n != 1 {
+		t.Errorf("equal typed failures are one: %d", n)
+	}
+	if n := count(Parallel(Sequential(fail(1.0), fail(2.0)), fail(1.0))); n != 2 {
+		t.Errorf("sequential and parallel are one combination: %d", n)
+	}
+	if n := count(Sequential(die, &Cause{kind: causeDie, defect: "boom"})); n != 2 {
+		t.Errorf("two defects of one text are two errors: %d", n)
+	}
+	if n := count(concat(fail(1.0), fail(1.0))); n != 2 {
+		t.Errorf("concatenation keeps repeats: %d", n)
+	}
+	if Sequential(nil, die) != die || Sequential(die, nil) != die {
+		t.Error("the empty cause is the unit")
+	}
+}
+
+// Only the first typed failure of a `Failure e` has an error of `e`.
+func TestTheTypedViewOfACauseSeesItsHeadOnly(t *testing.T) {
+	fb := rootFiber()
+	c := Sequential(&Cause{kind: causeFail, err: "b"}, &Cause{kind: causeFail, err: "a"})
+	var seen []Value
+	mapped := c.mapErrors(fb, Fn(func(_ *Fiber, err Value) Value { seen = append(seen, err); return "b!" }))
+	if len(seen) != 1 || seen[0] != "b" {
+		t.Errorf("map sees the head only: %v", seen)
+	}
+	if r := mapped.reasons(); r[0].err != "b!" || r[1].err != "a" {
+		t.Errorf("the later failure stays as it was: %v, %v", r[0].err, r[1].err)
+	}
+	reasons := CauseReasons(failureOf(c)).([]Value)
+	if reasons[0].(*Cause).kind != causeFail || reasons[1].(*Cause).kind != causeDie {
+		t.Error("reasons give a later typed failure as a defect")
+	}
+}

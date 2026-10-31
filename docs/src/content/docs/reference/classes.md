@@ -76,7 +76,7 @@ Instances are canonical. The checker rejects an instance when:
 | a determined variable is not covered by the determining head arguments and the context's dependencies | `FLICK-C005` |
 | neither the class nor the nominal type at the head of its first type belongs to this package | `FLICK-C006` |
 | a context variable is not in the head, or a context constraint is not smaller than the head or repeats a variable more often | `FLICK-C007` |
-| it is for a row primitive, or for `Eq`, `Ord`, `Hash`, `Show` of a record or tuple | `FLICK-C012` |
+| it is for a row primitive, for `Eq`, `Ord`, `Hash`, `Show` of a record or tuple, or for the closed `Numeric` or `Iterable` | `FLICK-C012` |
 
 Coverage starts with the variables in a dependency's determining head
 arguments. The checker repeatedly adds variables determined by the instance
@@ -113,6 +113,9 @@ nominal type.
 
 A module sees the instances of every module it depends on, directly or not,
 however it imports them; the order and form of `import` change nothing.
+Two modules that do not depend on each other cannot see each other's
+instances: a module that sees both reports an overlap between them
+(`FLICK-C003`, `FLICK-C004`) at its `module` line.
 
 ## Resolution
 

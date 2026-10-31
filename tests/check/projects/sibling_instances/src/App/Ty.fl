@@ -1,0 +1,3 @@
+module App.Ty exposing (..)
+
+type T = T

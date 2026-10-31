@@ -262,3 +262,15 @@ func promptTerminalSize(tty *promptTerminalState) (int, int) {
 	}
 	return int(info.right - info.left + 1), int(info.bottom - info.top + 1)
 }
+
+func fileIsTerminal(f *os.File) bool {
+	var mode uint32
+	return syscall.GetConsoleMode(syscall.Handle(f.Fd()), &mode) == nil
+}
+
+func fileTerminalSize(f *os.File) (int, int) {
+	if !fileIsTerminal(f) {
+		return 0, 0
+	}
+	return promptTerminalSize(&promptTerminalState{output: syscall.Handle(f.Fd())})
+}

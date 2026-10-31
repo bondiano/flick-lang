@@ -142,9 +142,9 @@ func Main(run func(*Fiber)) {
 		})
 	})
 	s, _ := stopped.Load().(os.Signal)
-	reportedMu.Lock()
-	code := conclude(cause, s, reported)
-	reportedMu.Unlock()
+	rootDefects.mu.Lock()
+	code := conclude(cause, s, rootDefects.causes)
+	rootDefects.mu.Unlock()
 	stdout.Flush()
 	os.Exit(code)
 }
