@@ -22,13 +22,13 @@ func HashMapGet(fb *Fiber, k, m Value) Value {
 	return None
 }
 
-func HashMapSize(m Value) Value    { return int32(len(hmap(m).entries)) }
-func HashMapIsEmpty(m Value) Value { return len(hmap(m).entries) == 0 }
+func HashMapSize(m Value) Value    { return hmap(m).size }
+func HashMapIsEmpty(m Value) Value { return hmap(m).size == 0 }
 
 func HashMapToList(m Value) Value {
 	t := hmap(m)
-	out := make([]Value, len(t.entries))
-	for i, e := range t.entries {
+	out := make([]Value, t.size)
+	for i, e := range t.all() {
 		out[i] = []Value{e.key, e.value}
 	}
 	return out
@@ -77,8 +77,8 @@ func HashMapHasBy(fb *Fiber, f, m Value) Value { return HashMapSome(fb, f, m) }
 
 func HashMapKeys(m Value) Value {
 	t := hmap(m)
-	out := make([]Value, len(t.entries))
-	for i, e := range t.entries {
+	out := make([]Value, t.size)
+	for i, e := range t.all() {
 		out[i] = e.key
 	}
 	return out
@@ -86,8 +86,8 @@ func HashMapKeys(m Value) Value {
 
 func HashMapValues(m Value) Value {
 	t := hmap(m)
-	out := make([]Value, len(t.entries))
-	for i, e := range t.entries {
+	out := make([]Value, t.size)
+	for i, e := range t.all() {
 		out[i] = e.value
 	}
 	return out
@@ -142,13 +142,10 @@ func HashMapSetMany(fb *Fiber, entries, m Value) Value {
 // mapped is `t` with each entry's value as `f` makes it, dropping those it
 // makes nothing of.
 func mapped(t *table, f func(e entry) (Value, bool)) *table {
-	out := &table{w: t.w, next: t.next}
-	for _, e := range t.entries {
-		if v, ok := f(e); ok {
-			out.entries = append(out.entries, entry{e.key, v, e.hash, e.order})
-		}
-	}
-	return out
+	return t.kept(func(e entry) (entry, bool) {
+		v, ok := f(e)
+		return entry{e.key, v, e.hash}, ok
+	})
 }
 
 func HashMapMap(fb *Fiber, f, m Value) Value {
@@ -159,7 +156,7 @@ func HashMapMap(fb *Fiber, f, m Value) Value {
 func HashMapFlatMap(fb *Fiber, f, m Value) Value {
 	t := hmap(m)
 	out := empty(t.w)
-	for _, e := range t.entries {
+	for _, e := range t.all() {
 		out = fromEntries(fb, out, HashMapToList(apply2(fb, f, e.value, e.key)))
 	}
 	return mapOf(out)
@@ -167,7 +164,7 @@ func HashMapFlatMap(fb *Fiber, f, m Value) Value {
 
 func HashMapReduce(fb *Fiber, zero, f, m Value) Value {
 	acc := zero
-	for _, e := range hmap(m).entries {
+	for _, e := range hmap(m).all() {
 		acc = Apply(fb, apply2(fb, f, acc, e.value), e.key)
 	}
 	return acc
@@ -200,7 +197,7 @@ func HashMapFilterMap(fb *Fiber, f, m Value) Value {
 }
 
 func HashMapFindFirst(fb *Fiber, f, m Value) Value {
-	for _, e := range hmap(m).entries {
+	for _, e := range hmap(m).all() {
 		if Bool(apply2(fb, f, e.value, e.key)) {
 			return Some([]Value{e.key, e.value})
 		}
@@ -209,7 +206,7 @@ func HashMapFindFirst(fb *Fiber, f, m Value) Value {
 }
 
 func HashMapSome(fb *Fiber, f, m Value) Value {
-	for _, e := range hmap(m).entries {
+	for _, e := range hmap(m).all() {
 		if Bool(apply2(fb, f, e.value, e.key)) {
 			return true
 		}
@@ -218,7 +215,7 @@ func HashMapSome(fb *Fiber, f, m Value) Value {
 }
 
 func HashMapEvery(fb *Fiber, f, m Value) Value {
-	for _, e := range hmap(m).entries {
+	for _, e := range hmap(m).all() {
 		if !Bool(apply2(fb, f, e.value, e.key)) {
 			return false
 		}

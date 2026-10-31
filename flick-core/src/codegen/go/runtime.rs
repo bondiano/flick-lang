@@ -275,6 +275,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/foreign.go"),
     ),
     (
+        "hamt.go",
+        include_str!("../../../../runtime-go/flickrt/hamt.go"),
+    ),
+    (
         "hash.go",
         include_str!("../../../../runtime-go/flickrt/hash.go"),
     ),
