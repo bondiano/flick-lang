@@ -7,7 +7,7 @@
 use std::mem;
 
 use super::matching::{Match, Subst, match_type};
-use super::{Dict, RECORD, has_metas, split, vars};
+use super::{Dict, RECORD, has_metas, split, super_slot, vars};
 use crate::numeric::{Num, default_num};
 use crate::types::Checker;
 use crate::types::env::Instance;
@@ -156,11 +156,9 @@ impl Checker<'_> {
             let supers = checker.supers_of(&g);
             let index = out.len();
             out.push((g, dict));
-            for s in supers.into_iter().rev() {
-                let s = checker.canon(&s);
-                let class = split(&s)
-                    .map(|((_, n), _)| n.to_owned())
-                    .unwrap_or_default();
+            for (i, s) in supers.iter().enumerate().rev() {
+                let class = super_slot(&supers, i);
+                let s = checker.canon(s);
                 let dict = Dict::Super {
                     dict: Box::new(out[index].1.clone()),
                     class,

@@ -106,6 +106,20 @@ pub struct ClassInfo {
     pub defaults: Vec<String>,
 }
 
+/// The field of a dictionary holding the superclass at `index` of `supers`:
+/// the class's name, numbered when another superclass has the same name.
+pub(super) fn super_slot(supers: &[Type], index: usize) -> String {
+    fn name(t: &Type) -> &str {
+        split(t).map_or("", |((_, n), _)| n)
+    }
+    let own = name(&supers[index]);
+    if supers.iter().filter(|s| name(s) == own).count() > 1 {
+        format!("{own}{index}")
+    } else {
+        own.to_owned()
+    }
+}
+
 /// The class and the arguments of a constraint `C t1 … tn`.
 pub fn split(c: &Type) -> Option<((&str, &str), Vec<&Type>)> {
     let (head, args) = c.spine();

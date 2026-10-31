@@ -32,6 +32,7 @@ codegen/patterns
 codegen/question
 codegen/ranges
 codegen/recursion
+codegen/repeated_superclass
 codegen/stage_order
 codegen/strings_utf16
 codegen/task_twice

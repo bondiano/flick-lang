@@ -391,13 +391,11 @@ impl<'n> Checker<'_> {
             self.classes.steps = 0;
             let name = d.instance.name.clone();
             let mut supers = Vec::new();
-            for s in self.supers_of(&d.instance.head) {
-                let shown = self.show(&s);
-                match self.entails(&s, &d.instance.context) {
-                    Outcome::Solved(dict) => {
-                        let class = super::split(&s).map(|((_, n), _)| n.to_owned());
-                        supers.push((class.unwrap_or_default(), dict));
-                    }
+            let declared = self.supers_of(&d.instance.head);
+            for (i, s) in declared.iter().enumerate() {
+                let shown = self.show(s);
+                match self.entails(s, &d.instance.context) {
+                    Outcome::Solved(dict) => supers.push((super::super_slot(&declared, i), dict)),
                     Outcome::Budget(_) => self.error(
                         codes::C009,
                         d.span,

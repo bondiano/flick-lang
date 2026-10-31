@@ -1,0 +1,46 @@
+// A class with two superclasses of one class: each has its own slot in the
+// dictionary.
+module App.Main exposing (main)
+
+type Celsius = Celsius Float
+type Fahrenheit = Fahrenheit Float
+
+class Convert a b =
+  convert : a -> b
+
+class (Convert a b, Convert b a) => Iso a b =
+  label : a -> b -> String
+
+instance Convert Celsius Fahrenheit =
+  let convert c =
+    match c with
+    | Celsius x -> Fahrenheit (x * 9 / 5 + 32)
+
+instance Convert Fahrenheit Celsius =
+  let convert f =
+    match f with
+    | Fahrenheit x -> Celsius ((x - 32) * 5 / 9)
+
+instance Iso Celsius Fahrenheit =
+  let label _ _ = "C<->F"
+
+there : Iso a b => a -> b
+let there x = convert x
+
+back : Iso a b => b -> a
+let back y = convert y
+
+show_f : Fahrenheit -> String
+let show_f f =
+  match f with
+  | Fahrenheit x -> "F " ++ show x
+
+show_c : Celsius -> String
+let show_c c =
+  match c with
+  | Celsius x -> "C " ++ show x
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show_f (there (Celsius 100)))
+  Platform.stdout_line (show_c (back (Fahrenheit 212)))
