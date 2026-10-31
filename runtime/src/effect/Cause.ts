@@ -32,7 +32,34 @@ export const flickInterrupt = (fiberId: Option.Option<number>): Failure =>
   toFailure(Cause.interrupt(Option.getOrUndefined(fiberId)));
 export const flickFromReasons = (reasons: ReadonlyArray<Cause.Reason<unknown>>): Failure =>
   toFailure(Cause.fromReasons(reasons));
-export const flickReasons = (failure: Failure): ReadonlyArray<Cause.Reason<unknown>> => causeOf(failure).reasons;
+/**
+ * The reasons of a failure as `Failure e` types them: only its first typed
+ * failure has an error of `e`; a later one, which a narrowing `try` left
+ * behind, is a defect here (docs/formal/runtime.md §2.4).
+ */
+export const flickReasons = (failure: Failure): ReadonlyArray<Cause.Reason<unknown>> => {
+  let head = true;
+  return causeOf(failure).reasons.map((reason) => {
+    if (!Cause.isFailReason(reason)) return reason;
+    if (head) {
+      head = false;
+      return reason;
+    }
+    return Cause.makeDieReason(reason.error);
+  });
+};
+
+/** The cause with its first typed error mapped by `f`: the later ones have no type to map from. */
+export const mapHead = (cause: Cause.Cause<unknown>, f: (error: unknown) => unknown): Cause.Cause<unknown> => {
+  let head = true;
+  return Cause.fromReasons(
+    cause.reasons.map((reason) => {
+      if (!head || !Cause.isFailReason(reason)) return reason;
+      head = false;
+      return Cause.makeFailReason(f(reason.error));
+    }),
+  );
+};
 export const flickMakeInterruptReason = (fiberId: Option.Option<number>): Cause.Interrupt =>
   Cause.makeInterruptReason(Option.getOrUndefined(fiberId));
 
@@ -44,7 +71,7 @@ export const flickHasInterrupts = (failure: Failure): boolean => Cause.hasInterr
 export const flickMap =
   (f: (error: unknown) => unknown) =>
   (failure: Failure): Failure =>
-    toFailure(Cause.map(causeOf(failure), f));
+    toFailure(mapHead(causeOf(failure), f));
 export const flickCombine =
   (that: Failure) =>
   (failure: Failure): Failure =>

@@ -205,8 +205,14 @@ export interface TestResult {
 const runOne = ({ name, test }: Named, seed: number): Effect.Effect<TestResult> =>
   Effect.map(
     ownedExits(() => (test.kind === "effect" ? Effect.as(test.task, undefined) : checks(test, seed))),
-    ({ exit, cleanup }): TestResult => {
-      const body = outcome(exit);
+    ({ exit, cleanup, defects }): TestResult => {
+      // a supervisor that failed during the test fails it, as it fails a program
+      const body = outcome(
+        defects.reduce<typeof exit>(
+          (out, cause) => Exit.failCause(Exit.isFailure(out) ? Cause.combine(out.cause, cause) : cause),
+          exit,
+        ),
+      );
       if (Exit.isSuccess(cleanup)) return body ? { name, status: "failed", ...body } : { name, status: "passed" };
       const failed = describeCause(cleanup.cause);
       return { name, status: "failed", ...(body ?? { kind: "cleanup", message: failed }), cleanup: failed };

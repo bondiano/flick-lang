@@ -103,3 +103,22 @@ func TestWriteTestResultFlushes(t *testing.T) {
 		})
 	}
 }
+
+// A supervisor that fails during a test fails that test, as it fails a
+// program, and not the run of another one.
+func TestASupervisorThatFailsFailsItsTest(t *testing.T) {
+	broken := Fn(func(*Fiber, Value) Value { panic(Defect{"Error: broken"}) })
+	task := Eff(func(fb *Fiber) Value {
+		return Scope(fb, func(fb *Fiber, owner, _ Value) Value {
+			return FiberSpawn(fb, owner, broken, Eff(func(*Fiber) Value { panic(Defect{"Error: child"}) }))
+		})
+	})
+	before := len(rootDefects.causes)
+	got := runOne(rootFiber(), named{"dies", &test{name: "dies", task: task}}, 0)
+	if got.Status != "failed" || got.Kind != "defect" {
+		t.Errorf("the test fails with the supervisor's defect: %+v", got)
+	}
+	if len(rootDefects.causes) != before {
+		t.Error("the defect stays with the test, not the program")
+	}
+}

@@ -22,13 +22,15 @@ func EventsQueue(capacity Value) Value { return int(capacity.(int32)) }
 
 func EventsListen(fb *Fiber, owner, policy, supervisor, handler Value) Value {
 	l := &listener{events: make(chan Value, policy.(int)), done: make(chan struct{})}
-	// the supervisor runs with the services of where the listener was made; a failure of its own is dropped
-	//
-	// shortcut: a failing supervisor is not reported as a defect of the owner; report it if a program needs to see it
-	supervising := *fb
-	supervising.state = newState()
+	// the supervisor runs with the services of where the listener was made,
+	// in a fiber of its own on each call: the worker and senders call it
+	o := owner.(*Owner)
 	l.fail = func(c *Cause) {
-		catch(func() Value { return Run(&supervising, Apply(&supervising, supervisor, failureOf(c))) })
+		supervising := *fb
+		supervising.state, supervising.owner = newState(), o
+		if _, failed := catch(func() Value { return Run(&supervising, Apply(&supervising, supervisor, failureOf(c))) }); failed != nil {
+			o.report(failed)
+		}
 	}
 	FiberSpawn(fb, owner, Fn(func(fb *Fiber, _ Value) Value { return Succeed(Unit) }), Eff(func(w *Fiber) Value {
 		defer close(l.done)

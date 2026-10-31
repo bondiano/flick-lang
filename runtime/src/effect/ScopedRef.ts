@@ -23,7 +23,8 @@ const owned = <A>(holder: Holder<A>): Effect.Effect<FlickScopedRef<A>, never, Sc
 export const flickFromAcquire = <A, E, R>(
   acquire: Effect.Effect<A, E, R>,
 ): Effect.Effect<FlickScopedRef<A>, E, Exclude<R, Scope.Scope> | Scope.Scope> =>
-  Effect.flatMap(acquireHolder(acquire), owned);
+  // the holder is registered under the mask it was acquired in, as `acquireRelease` does
+  Effect.uninterruptibleMask((restore) => Effect.flatMap(acquireHolder(acquire, restore), owned));
 
 /** `ScopedRef.make f`: a value that needs no release. */
 export const flickMake = <A>(f: () => A): Effect.Effect<FlickScopedRef<A>, never, Scope.Scope> =>
@@ -40,10 +41,13 @@ export const flickSet =
   <A, E, R>(acquire: Effect.Effect<A, E, R>) =>
   (ref: FlickScopedRef<A>): Effect.Effect<void, E, Exclude<R, Scope.Scope>> =>
     ref.lock.withPermit(
-      Effect.gen(function* () {
-        const next = yield* acquireHolder(acquire);
-        const previous = ref.current;
-        ref.current = next;
-        yield* retire(previous);
-      }),
+      // an interruption between the swap and `retire` would leave the previous resource unreleased
+      Effect.uninterruptibleMask((restore) =>
+        Effect.gen(function* () {
+          const next = yield* acquireHolder(acquire, restore);
+          const previous = ref.current;
+          ref.current = next;
+          yield* retire(previous);
+        }),
+      ),
     );

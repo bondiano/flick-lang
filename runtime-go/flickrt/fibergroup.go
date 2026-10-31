@@ -5,7 +5,8 @@ import "sync"
 // fiberGroup is Effect's FiberSet, FiberMap and FiberHandle: children of
 // the owner of its region, by key. A child that ends leaves the group; a
 // failure other than an interruption by the group itself fails `join`.
-// Closing the region interrupts and awaits what is left.
+// The owner of the region interrupts and awaits what is left when it
+// begins to close, before its finalizers: a hook, as in the JS runtime.
 type fiberGroup struct {
 	mu      sync.Mutex
 	owner   *Owner
@@ -25,14 +26,13 @@ const internalFiber = -1
 
 func newGroup(fb *Fiber) Value {
 	g := &fiberGroup{owner: fb.owner, failed: DeferredMake(fb)}
-	fb.owner.add(fb, func(*Fiber, *Cause) Value {
+	fb.owner.onClose(fb, func(*Fiber) {
 		g.mu.Lock()
 		g.closed = true
 		children := g.children()
 		g.mu.Unlock()
 		interruptAs(internalFiber, children)
 		settle(g.failed, Succeed(Unit))
-		return Unit
 	})
 	return g
 }
@@ -113,16 +113,38 @@ func (g *fiberGroup) add(key Value, c *child, options Value) {
 	})
 }
 
-// run forks `task` in the group's owner and adds it.
+// run forks `task` in the group's owner and adds it; a closed group gives
+// an interrupted child without running the task.
 func (g *fiberGroup) run(fb *Fiber, key, options, task Value) Value {
-	g.mu.Lock()
-	closed := g.closed
-	g.mu.Unlock()
-	c := fork(fb, g.owner, task, nil)
-	if closed {
-		c.state.interrupt(internalFiber)
+	if g.isClosed() {
+		return stoppedChild(internalFiber)
 	}
+	c := fork(fb, g.owner, task, nil)
 	g.add(key, c, options)
+	g.awaitIfClosed(c)
+	return c
+}
+
+func (g *fiberGroup) isClosed() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.closed
+}
+
+// awaitIfClosed waits for a child the group closed around while it was
+// being added: the closing hook did not see it, so it ends before its
+// caller does.
+func (g *fiberGroup) awaitIfClosed(c *child) {
+	if g.isClosed() {
+		<-c.done
+	}
+}
+
+// stoppedChild is a child that ended interrupted by `by` without running.
+func stoppedChild(by int64) *child {
+	c := &child{state: newState(), done: make(chan struct{}), ended: true, cause: &Cause{kind: causeInterrupt, fiber: by}}
+	c.state.interrupt(by)
+	close(c.done)
 	return c
 }
 
@@ -192,8 +214,12 @@ func FiberGroupAwaitEmpty(fb *Fiber, g Value) Value { return groupAwaitEmpty(fb,
 // A FiberSet keys each child by itself.
 func FiberSetRun(fb *Fiber, options, task, s Value) Value {
 	g := group(s)
+	if g.isClosed() {
+		return stoppedChild(internalFiber)
+	}
 	c := fork(fb, g.owner, task, nil)
 	g.add(c, c, options)
+	g.awaitIfClosed(c)
 	return c
 }
 

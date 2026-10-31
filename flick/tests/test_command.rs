@@ -24,6 +24,9 @@ foreign sync crash from global "JSON.parse"
 note : String ->{} Unit
 let note text = Platform.stderr_line text
 
+broken : forall e. Failure e ->{} Unit
+let broken _ = todo
+
 tests : List Test.Test
 let tests =
   [
@@ -37,6 +40,14 @@ let tests =
       (task {
         let r = Resource.acquire_release (task { 1 }) (fun _ -> crash "{")
         ()
+      }),
+    Test.effect_test
+      "a supervisor that dies"
+      (task {
+        scope o {
+          let _f = Fiber.spawn o broken (task { todo })
+          ()
+        }
       }),
     Test.effect_test
       "releases"
@@ -113,6 +124,7 @@ fn outcomes_are_reported_apart() {
     );
     assert_eq!(status(&json, "dies"), ("failed", "defect"));
     assert_eq!(status(&json, "fails to clean up"), ("failed", "cleanup"));
+    assert_eq!(status(&json, "a supervisor that dies"), ("failed", "defect"));
     assert_eq!(status(&json, "releases"), ("passed", ""));
     assert_eq!(status(&json, "numbers > reverse twice"), ("passed", ""));
     assert_eq!(status(&json, "numbers > small"), ("failed", "assertion"));

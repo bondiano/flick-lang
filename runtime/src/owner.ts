@@ -23,9 +23,12 @@ export class Owner {
   readonly pending = new Set<Promise<unknown>>();
   /** Effects run first when closing begins: listeners stop taking events. */
   readonly closing = new Set<() => Effect.Effect<unknown, unknown>>();
+  /** Failures of supervisors: the root's fail the program, a test's fail the test. */
+  readonly defects: Array<Cause.Cause<unknown>>;
 
-  constructor(resources: Scope.Closeable) {
+  constructor(resources: Scope.Closeable, defects: Array<Cause.Cause<unknown>> = reported) {
     this.resources = resources;
+    this.defects = defects;
   }
 
   track(promise: Promise<unknown>): void {
@@ -35,11 +38,8 @@ export class Owner {
   }
 }
 
-/** Defects of supervisors: the entry runner reports them and fails. */
+/** Defects of supervisors under the root: the entry runner reports them and fails. */
 const reported: Array<Cause.Cause<unknown>> = [];
-export const reportDefect = (cause: Cause.Cause<unknown>): void => {
-  reported.push(cause);
-};
 export const reportedDefects = (): ReadonlyArray<Cause.Cause<unknown>> => reported;
 
 const settle = async (owner: Owner): Promise<void> => {
@@ -55,14 +55,22 @@ export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<
   Effect.gen(function* () {
     owner.open = false;
     let cause: Cause.Cause<unknown> = Exit.isFailure(exit) ? exit.cause : Cause.empty;
-    for (const hook of owner.closing) {
-      const closed = yield* Effect.exit(Effect.suspend(hook));
-      if (Exit.isFailure(closed)) cause = Cause.combine(cause, closed.cause);
-    }
+    const ran = new Set<() => Effect.Effect<unknown, unknown>>();
+    const hooks = Effect.gen(function* () {
+      for (const hook of owner.closing) {
+        if (ran.has(hook)) continue;
+        ran.add(hook);
+        const closed = yield* Effect.exit(Effect.suspend(hook));
+        if (Exit.isFailure(closed)) cause = Cause.combine(cause, closed.cause);
+      }
+    });
+    yield* hooks;
     yield* Fiber.interruptAll([...owner.children]);
     for (let next = first(owner.watchers); next !== undefined; next = first(owner.watchers)) {
       yield* Fiber.await(next);
     }
+    // a supervisor may have made a fiber group while the children ended
+    yield* hooks;
     yield* Effect.promise(() => settle(owner));
     const closed = yield* Effect.exit(Scope.close(owner.resources, exit));
     if (Exit.isFailure(closed)) cause = Cause.combine(cause, closed.cause);
@@ -89,16 +97,17 @@ export const withOwner = <A, E, R>(
     Effect.gen(function* () {
       const outer = yield* Effect.service(CurrentOwner);
       const resources = yield* Scope.make();
-      const owner = new Owner(resources);
+      const owner = new Owner(resources, outer?.defects);
       const exit = yield* Effect.exit(restore(inside(owner, body(owner, outer))));
       return yield* resume(yield* close(owner, exit));
     }),
   );
 
-/** The exit of a test body and that of its cleanup, apart. */
+/** The exit of a test body and that of its cleanup, apart, and the failures of its supervisors. */
 export interface OwnedExits<A, E> {
   readonly exit: Exit.Exit<A, E>;
   readonly cleanup: Exit.Exit<unknown, unknown>;
+  readonly defects: ReadonlyArray<Cause.Cause<unknown>>;
 }
 
 /**
@@ -111,10 +120,10 @@ export const ownedExits = <A, E, R>(
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
       const resources = yield* Scope.make();
-      const owner = new Owner(resources);
+      const owner = new Owner(resources, []);
       const exit = yield* Effect.exit(restore(inside(owner, body(owner))));
       const cleanup = yield* close(owner, Exit.void);
-      return { exit, cleanup };
+      return { exit, cleanup, defects: owner.defects };
     }),
   );
 
@@ -141,13 +150,14 @@ export class FlickFiber<A, E> {
  * A failure of the child, its interruption by a closing owner included,
  * goes to `supervisor`; a defect of the supervisor goes to the root
  * reporter. The child and the supervisor acquire into its owner's scope.
+ * Uninterruptible, so that no child is left without its watcher.
  */
 export const fiberSpawn = <A, E, R, R2>(
   owner: Owner,
   supervisor: (failure: Failure) => Effect.Effect<unknown, unknown, R2>,
   task: Effect.Effect<A, E, R>,
 ): Effect.Effect<FlickFiber<A, E>, never, Exclude<R, Scope.Scope> | R2> =>
-  Effect.gen(function* () {
+  Effect.uninterruptible(Effect.gen(function* () {
     if (!owner.open) {
       return yield* Effect.die(new Error("the owner is closing: it admits no new children"));
     }
@@ -161,7 +171,7 @@ export const fiberSpawn = <A, E, R, R2>(
           if (Exit.isFailure(exit)) {
             const shutdown = !owner.open && Cause.hasInterruptsOnly(exit.cause);
             const supervised = yield* Effect.exit(inside(owner, supervisor(new Failure(exit.cause, shutdown))));
-            if (Exit.isFailure(supervised)) reportDefect(supervised.cause);
+            if (Exit.isFailure(supervised)) owner.defects.push(supervised.cause);
           }
         }),
       ),
@@ -169,7 +179,7 @@ export const fiberSpawn = <A, E, R, R2>(
     owner.watchers.add(watcher);
     watcher.addObserver(() => owner.watchers.delete(watcher));
     return new FlickFiber(child);
-  });
+  }));
 
 /** `Fiber.join fiber`: its result, or its failure with the original cause. */
 export const fiberJoin = <A, E>(fiber: FlickFiber<A, E>): Effect.Effect<A, E> => Fiber.join(fiber.fiber);

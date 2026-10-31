@@ -5,7 +5,7 @@ import { Cause, type Context, Effect, Exit, type Fiber, Result } from "effect";
 
 import { Failure, describeCause } from "../cause.ts";
 import { applyRuntime } from "../effects.ts";
-import { CurrentOwner, type Owner, reportDefect, within, withOwner } from "../owner.ts";
+import { CurrentOwner, type Owner, within, withOwner } from "../owner.ts";
 
 /** The rejection of a Promise callback or façade: a safe, inert report. */
 export class RuntimeFailure extends Error {
@@ -86,7 +86,7 @@ export const eventsListen = <A, R, R2>(
       const run = Effect.exit(Effect.suspend(() => within(owner, supervisor(new Failure(cause)))));
       const fiber = runChild(owner, context, run);
       fiber.addObserver((exit) => {
-        if (Exit.isSuccess(exit) && Exit.isFailure(exit.value)) reportDefect(exit.value.cause);
+        if (Exit.isSuccess(exit) && Exit.isFailure(exit.value)) owner.defects.push(exit.value.cause);
       });
     };
     const state: ListenerState<A> = { closed: false, queue: [], wake: undefined };

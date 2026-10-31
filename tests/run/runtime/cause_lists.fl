@@ -1,0 +1,73 @@
+// Causes as lists (docs/formal/runtime.md §2): `combine` keeps each reason
+// once; `parallel` joins what the stopped branches failed with besides
+// their interruption; and only the first typed failure of a `Failure e`
+// has an error of `e`, so `Cause.map` and `Exit.map_error` do not hand a
+// later one, which a narrowing `try` left behind, to code typed with `e`.
+module App.Main exposing (main)
+
+type error A = A Float
+type error B = B String
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+nap : Float ->{} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+late_a : Float -> Float ->{; A} Float
+let late_a n millis = Effect.uninterruptible (task {
+  nap millis
+  from_result (Err (A n))
+})
+
+late_b : String -> Float ->{; B} Float
+let late_b s millis = Effect.uninterruptible (task {
+  nap millis
+  from_result (Err (B s))
+})
+
+count : Exit e a -> String
+let count ex =
+  match Exit.failure ex with
+  | Some f -> show (List.length (Cause.reasons f))
+  | None -> "ok"
+
+handled : Unit ->{; B} (Float, Float)
+let handled () =
+  try parallel (task { late_b "b" 10 }) (task { late_a 1 40 }) with
+  | A _ -> (0, 0)
+
+bang : Errors {B} -> Errors {B}
+let bang e =
+  match e with
+  | B s -> B (s ++ "!")
+
+name : Option (Errors {B}) -> String
+let name o =
+  match o with
+  | Some (B s) -> "B " ++ s
+  | None -> "none"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let same : Failure {A} = Cause.combine (Cause.fail (A 1)) (Cause.fail (A 1))
+  let other : Failure {A} = Cause.combine (Cause.fail (A 2)) (Cause.fail (A 1))
+  let empty : Failure {A} = Cause.empty
+  say (show (List.length (Cause.reasons same), List.length (Cause.reasons other), List.length (Cause.reasons (Cause.combine empty same))))
+  let distinct : Exit {A} (Float, Float) = Effect.exit (task { parallel (task { late_a 1 10 }) (task { late_a 2 40 }) })
+  let equal : Exit {A} (Float, Float) = Effect.exit (task { parallel (task { late_a 1 10 }) (task { late_a 1 40 }) })
+  let raced : Exit {A} Float = Effect.exit (task { race_success (task { late_a 1 10 }) (task { late_a 1 40 }) })
+  say ("parallel " ++ count distinct ++ " " ++ count equal ++ ", race " ++ count raced)
+  let ex : Exit {B} (Float, Float) = Effect.exit (task { handled () })
+  match Exit.failure ex with
+  | Some f ->
+    say ("primary " ++ name (Cause.find_error_option f) ++ ", reasons " ++ show (List.length (Cause.reasons f)))
+    let mapped = Cause.map bang f
+    say ("mapped " ++ name (Cause.find_error_option mapped))
+    match Exit.failure (Exit.map_error bang ex) with
+    | Some g -> say ("map_error " ++ name (Cause.find_error_option g))
+    | None -> say "no failure"
+  | None -> say "no failure"

@@ -99,11 +99,6 @@ func FailurePrimary(f Value) Value {
 	return None
 }
 
-var (
-	reportedMu sync.Mutex
-	reported   []*Cause // failures of supervisors, which fail the program
-)
-
 // FiberSpawn is `Fiber.spawn owner supervisor task`: runs `task` as a child
 // of `owner`. A failure of the child, its interruption by a closing owner
 // included, goes to `supervisor`; a failure of the supervisor goes to the
@@ -117,7 +112,7 @@ func FiberSpawn(fb *Fiber, owner, supervisor, task Value) Value {
 	}
 	o.watchers.Add(1)
 	watcher := *fb
-	watcher.state = newState()
+	watcher.state, watcher.owner = newState(), o
 	watcher.state.mask = 1
 	var c *child
 	c = fork(fb, o, task, func(c *child) {
@@ -131,9 +126,7 @@ func FiberSpawn(fb *Fiber, owner, supervisor, task Value) Value {
 		}
 		_, failed := catch(func() Value { return Run(&watcher, Apply(&watcher, supervisor, &Supervised{c.cause, shutdown})) })
 		if failed != nil {
-			reportedMu.Lock()
-			reported = append(reported, failed)
-			reportedMu.Unlock()
+			o.report(failed)
 		}
 	})
 	o.children[c] = struct{}{}
@@ -178,9 +171,8 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 		}
 		children[i] = fork(fb, fb.owner, t, func(c *child) { ended <- c })
 	}
-	var failure *Failure
 	idle()
-	for range tasks {
+	for pending := len(tasks); pending > 0; pending-- {
 		var c *child
 		if fb.state.mask > 0 {
 			c = <-ended
@@ -188,16 +180,25 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 			select {
 			case c = <-ended:
 			case <-fb.state.signal:
-				failure = fb.state.stopped()
+				stop(fb, children...)
+				panic(fb.state.stopped())
 			}
 		}
-		if failure == nil && c.cause != nil {
-			failure = &Failure{c.cause}
+		if c.cause == nil {
+			continue
 		}
-		if failure != nil {
-			stop(fb, children...)
-			panic(failure)
+		// as Effect's forEachConcurrent: the others are interrupted, and what
+		// they fail with besides that interruption joins the first failure
+		failed := c.cause
+		for _, other := range children {
+			other.state.interrupt(fb.state.id)
 		}
+		for pending--; pending > 0; pending-- {
+			if rest := withoutInterrupts((<-ended).cause); rest != nil {
+				failed = Sequential(failed, rest)
+			}
+		}
+		panic(&Failure{failed})
 	}
 	out := make([]Value, len(tasks))
 	for i, c := range children {
@@ -269,7 +270,7 @@ func race(fb *Fiber, a, b Value, success bool) Value {
 			stop(fb, children...)
 			return c.result()
 		}
-		failed = Parallel(failed, c.cause)
+		failed = concat(failed, c.cause)
 	}
 	panic(&Failure{failed})
 }
@@ -362,6 +363,15 @@ func EffectInterrupt(fb *Fiber) Value {
 }
 
 func Uninterruptible(fb *Fiber, task Value) Value {
+	v := uninterruptible(fb, task)
+	// a request that came in while masked interrupts as the mask ends, as in Effect
+	Check(fb)
+	return v
+}
+
+// uninterruptible runs `task` masked, leaving a pending interruption to the
+// next checkpoint.
+func uninterruptible(fb *Fiber, task Value) Value {
 	return masked(fb, fb.state.mask+1, func() Value { return Run(fb, task) })
 }
 
@@ -376,7 +386,9 @@ func regionMask(fb *Fiber, mask int, f Value) Value {
 	restore := Fn(func(fb *Fiber, task Value) Value {
 		return Eff(func(fb *Fiber) Value { return masked(fb, outer, func() Value { return Run(fb, task) }) })
 	})
-	return masked(fb, mask, func() Value { return Run(fb, Apply(fb, f, restore)) })
+	v := masked(fb, mask, func() Value { return Run(fb, Apply(fb, f, restore)) })
+	Check(fb)
+	return v
 }
 
 func UninterruptibleMask(fb *Fiber, f Value) Value { return regionMask(fb, fb.state.mask+1, f) }
@@ -385,7 +397,7 @@ func InterruptibleMask(fb *Fiber, f Value) Value   { return regionMask(fb, 0, f)
 // EffectEnsuring runs `finalizer`, uninterruptibly, however `task` ends.
 func EffectEnsuring(fb *Fiber, finalizer, task Value) Value {
 	v, c := catch(func() Value { return Run(fb, task) })
-	_, f := catch(func() Value { return Uninterruptible(fb, finalizer) })
+	_, f := catch(func() Value { return uninterruptible(fb, finalizer) })
 	if c = Sequential(c, f); c != nil {
 		panic(&Failure{c})
 	}

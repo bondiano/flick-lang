@@ -22,14 +22,21 @@ export const plain = <A>(value: A): Holder<A> => ({
   closed: false,
 });
 
-/** Runs `acquire` with a fresh scope as its `Scope`: what it acquires belongs to the holder. */
+export type Restore = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+
+/**
+ * Runs `acquire` with a fresh scope as its `Scope`: what it acquires belongs
+ * to the holder. A caller that registers the holder under its own mask
+ * passes that mask's `restore`, so the acquisition stays interruptible.
+ */
 export const acquireHolder = <A, E, R>(
   acquire: Effect.Effect<A, E, R>,
+  outer: Restore = (effect) => effect,
 ): Effect.Effect<Holder<A>, E, Exclude<R, Scope.Scope>> =>
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
       const scope = yield* Scope.make();
-      const exit = yield* Effect.exit(restore(Scope.provide(acquire, scope)));
+      const exit = yield* Effect.exit(restore(outer(Scope.provide(acquire, scope))));
       if (Exit.isFailure(exit)) {
         yield* Scope.close(scope, exit);
         return yield* Effect.failCause(exit.cause);

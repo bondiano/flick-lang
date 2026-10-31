@@ -210,3 +210,18 @@ test("failed closing hooks preserve every failure and complete all shutdown stag
     await Effect.runPromise(Fiber.interrupt(fiber));
   }
 });
+
+test("a closing hook a supervisor adds while its owner closes runs before the finalizers", async () => {
+  const order: Array<string> = [];
+  await Effect.runPromise(
+    scope((owner) =>
+      Effect.gen(function* () {
+        yield* acquireRelease(Effect.void, () => Effect.sync(() => order.push("finalizer")));
+        const supervisor = () =>
+          Effect.sync(() => owner.closing.add(() => Effect.sync(() => order.push("hook"))));
+        yield* fiberSpawn(owner, supervisor, Effect.never);
+      }),
+    ),
+  );
+  assert.deepEqual(order, ["hook", "finalizer"]);
+});

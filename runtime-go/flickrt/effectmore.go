@@ -32,7 +32,7 @@ func raceAll(fb *Fiber, tasks []Value, first bool) Value {
 			stop(fb, children...)
 			return c.result()
 		}
-		failed = Parallel(failed, c.cause)
+		failed = concat(failed, c.cause)
 	}
 	panic(&Failure{failed})
 }
