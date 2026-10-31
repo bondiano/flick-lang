@@ -122,3 +122,4 @@ stdlib/effect/clock
 stdlib/effect/schedule
 stdlib/effect/hash_ring
 stdlib/effect/crypto
+stdlib/effect/trie

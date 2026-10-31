@@ -43,7 +43,6 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime/effect/Chunk",
     "@flick-lang/runtime/effect/Graph",
     "@flick-lang/runtime/effect/Schema",
-    "@flick-lang/runtime/effect/Trie",
     // time
     "@flick-lang/runtime/effect/Cron",
     "@flick-lang/runtime/effect/DateTime",

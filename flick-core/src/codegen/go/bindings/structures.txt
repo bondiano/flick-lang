@@ -21,3 +21,28 @@ flickRandomShuffle CryptoRandomShuffle
 flickRandomUuidV4 CryptoRandomUuidV4
 flickRandomUuidV7 CryptoRandomUuidV7
 flickRandomUlid CryptoRandomUlid
+
+[@flick-lang/runtime/effect/Trie]
+flickEmpty TrieEmpty
+fromIterable TrieFromList
+insert TrieInsert
+insertMany TrieInsertMany
+remove TrieRemove
+removeMany TrieRemoveMany
+get TrieGet
+has TrieHas
+size TrieSize
+isEmpty TrieIsEmpty
+flickKeys TrieKeys
+flickValues TrieValues
+toEntries TrieEntries
+flickKeysWithPrefix TrieKeysWithPrefix
+flickValuesWithPrefix TrieValuesWithPrefix
+toEntriesWithPrefix TrieEntriesWithPrefix
+longestPrefixOf TrieLongestPrefixOf
+modify *TrieModify
+reduce *TrieReduce
+map *TrieMap
+filter *TrieFilter
+filterMap *TrieFilterMap
+compact TrieCompact
