@@ -5,6 +5,8 @@ module App.LateCaptures exposing (..)
 
 type alias Batch o = { flush : List o ->{} Unit }
 
+type error Oops = Oops Int
+
 take : Batch String -> Unit
 let take _ = ()
 
@@ -47,3 +49,15 @@ let unknown c =
   match (await (if c then task { { a = None } } else task { { a = None } })).a with
   | Some _ -> 1
   | None -> 0
+
+// a projection takes the record's bound, which holds the type of `b` never
+// inferred; a `Unit` holds nothing, whatever its bound says (found by X2)
+dropped : Unit ->{; Oops} Unit
+let dropped () =
+  ({ a = from_result (Err (Oops 0)); b = from_result (Err (Oops 1)) }).a
+  ()
+
+matched : Unit ->{; Oops} Int
+let matched () =
+  match ({ a = from_result (Err (Oops 0)); b = from_result (Err (Oops 1)) }).a with
+  | () -> 0

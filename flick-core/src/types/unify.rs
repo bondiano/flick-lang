@@ -515,13 +515,16 @@ impl Checker<'_> {
             }
             (Type::Bounded { ty, captures }, other) | (other, Type::Bounded { ty, captures }) => {
                 // A function holds what its qualifier says, not its parameter
-                // or result types; only data holds the captures its parts show.
-                let held = if matches!(self.whnf(other), Type::Fun { .. }) {
-                    Type::empty_row()
-                } else {
-                    self.captures_of(other).into_type()
-                };
-                self.unify_qualifiers(captures, &held)?;
+                // or result types; only data holds the captures its parts show;
+                // a scalar holds nothing, whatever its bound says.
+                if !self.scalar(other) {
+                    let held = if matches!(self.whnf(other), Type::Fun { .. }) {
+                        Type::empty_row()
+                    } else {
+                        self.captures_of(other).into_type()
+                    };
+                    self.unify_qualifiers(captures, &held)?;
+                }
                 let identity = self.capture_identity(ty);
                 return self.unify(&identity, other);
             }
