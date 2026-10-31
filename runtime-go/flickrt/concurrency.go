@@ -41,6 +41,7 @@ var concurrent atomic.Bool
 func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 	concurrent.Store(true)
 	c := &child{state: newState(), done: make(chan struct{})}
+	forked(c.state)
 	inner := *fb
 	inner.state, inner.owner = c.state, owner
 	tc := counted(fb)
@@ -57,6 +58,7 @@ func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 		if recorded != nil {
 			recorded(c.cause)
 		}
+		suspended(c.state)
 		c.mu.Lock()
 		c.ended = true
 		observers := c.observers
@@ -383,6 +385,7 @@ func EffectNever(fb *Fiber) Value {
 }
 
 func EffectYieldNow(fb *Fiber) Value {
+	suspended(fb.state)
 	runtime.Gosched()
 	Check(fb)
 	return Unit

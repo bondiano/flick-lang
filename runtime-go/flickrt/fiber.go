@@ -41,6 +41,7 @@ type fiberState struct {
 	once      sync.Once
 	mask      int        // depth of uninterruptible regions; only the fiber's goroutine touches it
 	clock     *testClock // the test clock that counts the fiber as running, if any
+	cohort    *cohort    // a forked fiber's until it first suspends (startup.go)
 }
 
 var fibers atomic.Int64
@@ -119,6 +120,7 @@ func isClosed(ch <-chan struct{}) bool {
 // whether what it waits for has come; the closure is only made then.
 func parking(fb *Fiber) *testClock {
 	idle()
+	suspended(fb.state)
 	if testClocks.Load() == 0 {
 		return nil
 	}

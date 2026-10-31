@@ -194,6 +194,7 @@ func (o *Owner) closeWithCause(fb *Fiber, exit, cause *Cause) *Cause {
 	for _, c := range children {
 		c.state.interrupt(fb.state.id)
 	}
+	suspended(fb.state)
 	o.watchers.Wait()
 	// a supervisor may have made a fiber group while the children ended
 	cause = Sequential(cause, o.runHooks(fb))
