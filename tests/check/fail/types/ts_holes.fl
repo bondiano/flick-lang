@@ -1,0 +1,62 @@
+module App.TsHoles exposing (..)
+
+// The Flick forms of the TypeScript holes in docs/formal/ts-holes.md.
+
+/// A JS object as the importer gives it: an opaque type without fields.
+type Handle
+
+type alias Named = { name : String }
+
+strict : Named -> String
+let strict value = value.name
+
+/// A lying `x is Point` comes through the importer as a plain `Bool`.
+is_point : JsValue -> Bool
+foreign pure is_point from "./shapes.mjs" "isPoint"
+
+any_as_string : JsValue -> Int
+let any_as_string value = String.length value
+
+cast : Unit -> String
+let cast () = (1 : String)
+
+double_cast : String -> Float
+let double_cast text = ((text : Unknown) : Float)
+
+guard : JsValue -> String
+let guard value = if is_point value then value.name else ""
+
+run_now : (Unit -> Unit) ->{} Unit
+let run_now f = f ()
+
+pure_callback : (Unit ->{} Unit) ->{} Unit
+let pure_callback = run_now
+
+covariant_ref : Ref (Unit -> Unit) -> Ref (Unit ->{} Unit)
+let covariant_ref cell = cell
+
+width_via_variable : Unit -> String
+let width_via_variable () =
+  let person = { name = "a"; age = 1 }
+  strict person
+
+spread_handle : Handle -> Handle
+let spread_handle handle = { handle with name = "x" }
+
+field_of_handle : Handle -> String
+let field_of_handle handle = handle.value
+
+index_lookup : List Int -> Int
+let index_lookup xs = List.get 0 xs
+
+//~ FLICK-T003 @18:41-18:46 expected `String`, found `JsValue`
+//~ FLICK-T003 @21:16-21:17 expected `String`, found `Int`
+//~ FLICK-T003 @24:25-24:41 expected `Float`, found `Unknown`
+//~ FLICK-T003 @24:26-24:30 expected `Unknown`, found `String`
+//~ FLICK-T003 @27:42-27:52 `JsValue` has no field `name`
+//~ FLICK-T003 @33:21-33:28 expected `(Unit ->{} Unit) ->{} Unit`, found `(Unit -> Unit) ->{} Unit`
+//~ FLICK-T003 @36:26-36:30 expected `Ref (Unit ->{} Unit)`, found `Ref (Unit -> Unit)`
+//~ FLICK-T003 @41:10-41:16 expected `Named`, found `{ age : Int; name : String }`
+//~ FLICK-T003 @44:42-44:46 `Handle` has no field `name`; `with` only replaces existing fields
+//~ FLICK-T003 @47:30-47:42 `Handle` has no field `value`
+//~ FLICK-T003 @50:23-50:36 expected `Int`, found `Option Int`

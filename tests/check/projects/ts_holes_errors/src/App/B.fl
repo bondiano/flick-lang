@@ -1,0 +1,7 @@
+module App.B exposing (NotFound(..), find)
+
+// Same name and payload in both modules: in TypeScript only a hand-made brand tells them apart.
+type error NotFound = NotFound String
+
+find : String ->{; NotFound} Int
+let find key = from_result (Err (NotFound key))
