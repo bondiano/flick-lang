@@ -4,3 +4,4 @@ tools/dts-importer/test/fixtures/*.snapshot.json linguist-generated=true
 runtime/test/fixtures/openapi-3.1.schema.json linguist-vendored=true
 # Impeccable generates self-contained specimens in one schema-v2 sidecar.
 .impeccable/design.json linguist-generated=true
+runtime-go/vendor/** linguist-vendored=true
