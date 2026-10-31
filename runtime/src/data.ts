@@ -3,7 +3,7 @@
 // which compiled code without Effect uses alone.
 import { Effect, Equal, Hash, Option, Result } from "effect";
 
-import { type Dict, type FieldDict, derive as deriveData } from "./core/data.ts";
+import { type Dict, type FieldDict, copyThrough, derive as deriveData } from "./core/data.ts";
 import { item } from "./internal.ts";
 
 export {
@@ -87,3 +87,11 @@ export const fromNullable = <A>(value: A | null | undefined): Option.Option<A> =
 /** `optional i`: `None` is passed as `undefined`. */
 export const optionalArg = <A>(option: Option.Option<A>): A | undefined =>
   Option.isSome(option) ? option.value : undefined;
+
+/** The `copyData` of `core/data.ts`, into Effect's `Option` and `Result` too. */
+export const copyData = <A>(value: A): A =>
+  copyThrough(value, (x) => {
+    if (Option.isOption(x)) return Option.map(x, copyData);
+    if (Result.isResult(x)) return Result.isSuccess(x) ? Result.succeed(copyData(x.success)) : Result.fail(copyData(x.failure));
+    return x;
+  }) as A;

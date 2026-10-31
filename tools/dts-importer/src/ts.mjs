@@ -68,6 +68,7 @@ export const typeParameters = (s) => s.getTypeParameters() ?? [];
 export const declarationIs = (kind, d) => ts[`is${kind}`](d);
 export const declarationHas = (field, d) => d[field] !== undefined;
 export const declarationName = (d) => d.name?.getText();
+export const declarationSite = (d) => `${d.getSourceFile().fileName}:${d.pos}`;
 export const printed = (d) => printer.printNode(ts.EmitHint.Unspecified, d, d.getSourceFile());
 
 export const sha256 = (text) => createHash("sha256").update(text).digest("hex");

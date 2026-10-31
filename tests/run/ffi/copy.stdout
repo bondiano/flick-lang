@@ -1,0 +1,4 @@
+argument [3, 1, 2], result [1, 2, 3]
+held result [1, 2]
+record ann ["a"]
+callback result [1, 2], JS saw 3

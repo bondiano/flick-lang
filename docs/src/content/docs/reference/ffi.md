@@ -85,6 +85,14 @@ in an array, a throwing proxy or a value past the limits is a
 `SnapshotError` naming the path. A subtree shared by two places is copied
 once.
 
+Flick data crosses a binding outside `@flick-lang/runtime` as a copy: a
+`List`, tuple, record or constructed value in an argument, the result, the
+value of a `Promise` or `Effect`, and what a callback is given or returns.
+JS may sort the array it got in place or change an object it returned
+earlier; the Flick value stays as it was. Primitives, `JsValue`, opaque types
+and functions pass as they are, and a callback without data keeps its
+identity.
+
 ## The go target
 
 On the go target a binding to a module of the program — a relative path,
@@ -156,7 +164,9 @@ error too. Nothing is inferred that a declaration cannot show: a call is
 
 Unions, literal types, intersections, bounded or result-only type
 parameters, `this` parameters, `null` arguments, object arguments of
-unnamed shape and functions returned are unsupported, each with its reason.
+unnamed shape, functions returned, the class itself (`typeof C`) and a type
+name the package declares twice (two `Options` in different files) are
+unsupported, each with its reason.
 A trailing optional parameter of such a type is left out, with a note.
 
 Policies sit in `<dir>/<Pkg>/policy.toml`, which the import reads and never

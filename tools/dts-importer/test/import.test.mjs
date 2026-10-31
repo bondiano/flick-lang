@@ -72,24 +72,35 @@ const holes = (t) => {
   cpSync(path.join(root, "../../tests/ffi/ts-holes"), path.join(projectRoot, "node_modules/ts-holes"), {
     recursive: true,
   });
-  const surface = JSON.parse(read("ts-holes", projectRoot));
-  return (name) => surface.exports.find((e) => e.name === name);
+  return JSON.parse(read("ts-holes", projectRoot));
 };
+const exported = (surface, name) => surface.exports.find((e) => e.name === name);
 
 test("import mode reads no members of a class: brand, accessors and index signature stay behind its name", (t) => {
-  const exported = holes(t);
-  assert.equal(exported("Point").kind, "class");
-  assert.deepEqual(exported("makePoint").signatures[0].result, { k: "handle", name: "Point" });
+  const surface = holes(t);
+  assert.equal(exported(surface, "Point").kind, "class");
+  assert.deepEqual(exported(surface, "makePoint").signatures[0].result, { k: "handle", name: "Point" });
 });
 
 test("import mode reduces a type predicate to its boolean", (t) => {
-  assert.deepEqual(holes(t)("isPoint").signatures[0].result, { k: "boolean" });
+  assert.deepEqual(exported(holes(t), "isPoint").signatures[0].result, { k: "boolean" });
 });
 
 test("import mode gives a readonly array the shape of a mutable one", (t) => {
-  assert.deepEqual(holes(t)("first").signatures[0].params[0].type, { k: "array", element: { k: "number" } });
+  assert.deepEqual(exported(holes(t), "first").signatures[0].params[0].type, { k: "array", element: { k: "number" } });
 });
 
 test("import mode leaves an index signature outside the supported subset", (t) => {
-  assert.deepEqual(holes(t)("scores").signatures[0].result, { k: "other", text: "Record<string, number>" });
+  assert.deepEqual(exported(holes(t), "scores").signatures[0].result, { k: "other", text: "Record<string, number>" });
+});
+
+test("import mode keeps the static side of a class apart from its instances", (t) => {
+  assert.deepEqual(exported(holes(t), "register").signatures[0].params[0].type, { k: "other", text: "typeof Point" });
+});
+
+test("import mode names the object types whose one name stands for two declarations", (t) => {
+  const surface = holes(t);
+  assert.deepEqual(surface.ambiguous, ["Options"]);
+  // where each is declared tells them apart but never reaches the shapes
+  assert.doesNotMatch(JSON.stringify(surface.exports), /"site"/);
 });

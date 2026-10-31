@@ -123,6 +123,14 @@ pub fn generate(
                     "its Flick name `{name}` is taken by another export"
                 )))
             };
+            let outcome = outcome.and_then(|b| {
+                match b.handles.iter().find(|h| surface.ambiguous.contains(h)) {
+                    Some(h) => Err(Blocked::unsupported(format!(
+                        "`{h}` names more than one TypeScript type: bind them by hand under distinct names"
+                    ))),
+                    None => Ok(b),
+                }
+            });
             let provenance = format!("{} {}", surface.provenance(), export.fingerprint);
             match outcome {
                 Ok(b) => {

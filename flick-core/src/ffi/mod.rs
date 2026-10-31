@@ -24,6 +24,10 @@ pub struct Surface {
     /// The declaration file, from the package name: `date-fns/index.d.ts`.
     pub declarations: String,
     pub exports: Vec<ExportShape>,
+    /// Simple names of object types that stand for more than one TypeScript
+    /// declaration: one Flick type would confuse them.
+    #[serde(default)]
+    pub ambiguous: Vec<String>,
 }
 
 impl Surface {

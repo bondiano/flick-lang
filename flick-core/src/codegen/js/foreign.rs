@@ -6,6 +6,17 @@ use std::collections::HashMap;
 
 use super::{Gen, names};
 use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
+use crate::types::Copies;
+
+/// What crosses `f` as a copy: an import outside the runtime may change
+/// Flick data in place (`docs/formal/ts-holes.md` Р26).
+fn copies(f: &Foreign) -> Option<&Copies> {
+    let trusted = f
+        .module
+        .as_deref()
+        .is_some_and(|m| m.starts_with("@flick-lang/runtime"));
+    (!trusted && f.info.copies.any()).then_some(&f.info.copies)
+}
 
 impl Gen<'_> {
     pub(super) fn foreign(&mut self, f: &Foreign) -> String {
@@ -27,8 +38,10 @@ impl Gen<'_> {
             .and_then(|i| f.stages.get(i))
             .copied()
             .unwrap_or(false);
+        let copy_result = copies(f).is_some_and(|c| c.result);
         if f.arity == 0 && params.is_empty() && f.dicts == 0 && f.mode == ForeignMode::Pure {
-            return self.export(&names::ident(&f.name), &target);
+            let value = self.copied(copy_result, target);
+            return self.export(&names::ident(&f.name), &value);
         }
         let id = names::ident(&f.name);
         let plain = self.direct_foreigns.contains_key(&f.name);
@@ -38,10 +51,11 @@ impl Gen<'_> {
         }
         let call = self.foreign_call(f, &target, &dicts, &params);
         let result = |g: &mut Self, v: &str| {
+            let v = g.copied(copy_result, v.to_owned());
             let v = if info.result.nullable {
                 format!("{}({v})", g.rt("fromNullable"))
             } else {
-                v.to_owned()
+                v
             };
             if info.result.unit {
                 format!("(void {v})")
@@ -73,7 +87,7 @@ impl Gen<'_> {
                     Some(c) => format!("{}(() => {call}, {c})", self.rt("foreignEffect")),
                     None => format!("{}(() => {call})", self.effect("suspend")),
                 };
-                if info.result.nullable || info.result.unit {
+                if info.result.nullable || info.result.unit || copy_result {
                     let value = result(self, "$v");
                     format!("{}({effect}, ($v) => {value})", self.effect("map"))
                 } else {
@@ -112,21 +126,22 @@ impl Gen<'_> {
         params: &[String],
     ) -> String {
         let info = &f.info;
+        let copies = copies(f);
         let mut args: Vec<String> = dicts.to_vec();
         for (i, param) in params.iter().take(f.arity).enumerate() {
+            let copy = copies.is_some_and(|c| c.args.get(i) == Some(&true));
+            let callback = copies.and_then(|c| c.callbacks.get(i).cloned().flatten());
             let arg = match info.callbacks.get(i).copied().flatten() {
-                _ if info.this && i == 0 => param.clone(),
-                Some(1) => param.clone(),
-                Some(n) => {
-                    let xs: Vec<String> = (0..n).map(|k| format!("$x{k}")).collect();
-                    let applied = xs.iter().fold(String::new(), |acc, x| acc + "(" + x + ")");
-                    format!("{} {param}{applied}", self.arrow(&xs.join(", ")))
-                }
+                _ if info.this && i == 0 => self.copied(copy, param.clone()),
+                Some(n) => self.callback(param, n, callback.as_ref()),
                 None if info.optional.contains(&i) => {
-                    format!("{}({param})", self.rt("optionalArg"))
+                    let arg = format!("{}({param})", self.rt("optionalArg"));
+                    self.copied(copy, arg)
                 }
-                None if info.variadic && i + 1 == f.arity => format!("...{param}"),
-                None => param.clone(),
+                None if info.variadic && i + 1 == f.arity => {
+                    format!("...{}", self.copied(copy, param.clone()))
+                }
+                None => self.copied(copy, param.clone()),
             };
             args.push(arg);
         }
@@ -140,6 +155,35 @@ impl Gen<'_> {
         } else {
             format!("{target}({})", args.join(", "))
         }
+    }
+}
+
+impl Gen<'_> {
+    /// `value`, as a copy when `copy`.
+    fn copied(&mut self, copy: bool, value: String) -> String {
+        if copy {
+            format!("{}({value})", self.rt("copyData"))
+        } else {
+            value
+        }
+    }
+
+    /// The Flick function `param` as the JS callback of `n` arguments, with
+    /// `copies` of what crosses: each argument JS gives, and the result.
+    fn callback(&mut self, param: &str, n: usize, copies: Option<&(Vec<bool>, bool)>) -> String {
+        let (args, result) = copies.map_or((&[][..], false), |(a, r)| (a.as_slice(), *r));
+        // a callback of one argument keeps its identity unless it copies
+        if n == 1 && !result && !args.contains(&true) {
+            return param.to_owned();
+        }
+        let xs: Vec<String> = (0..n).map(|k| format!("$x{k}")).collect();
+        let mut call = param.to_owned();
+        for (k, x) in xs.iter().enumerate() {
+            let x = self.copied(args.get(k) == Some(&true), x.clone());
+            call = format!("{call}({x})");
+        }
+        let call = self.copied(result, call);
+        format!("{} {call}", self.arrow(&xs.join(", ")))
     }
 }
 
@@ -159,6 +203,7 @@ pub(super) fn plain(f: &Foreign) -> bool {
         && info.optional.is_empty()
         && info.callbacks.iter().all(|c| matches!(c, None | Some(1)))
         && !(info.result.nullable || info.result.unit)
+        && copies(f).is_none()
 }
 
 /// The plain foreigns of a module (see [`plain`]), by name, with their arity
