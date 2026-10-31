@@ -7,11 +7,10 @@ import (
 
 // The checks of the standard library's `Check` that state what values
 // Arbitrary generates: Effect's filters with their arbitrary constraints.
-//
-// shortcut: only apply, int, finite, between, min_length, max_length and pattern; bind the rest of `Check` as programs on the go target use them
+// The rest are in check_strings.go, check_order.go and check_properties.go.
 
 // CheckApply is `Check.apply`.
-func CheckApply(c, codec Value) Value { return withChecks(codecOf(codec), c.(*check)) }
+func CheckApply(c, codec Value) Value { return withChecks(codecOf(codec), checksOf(c)...) }
 
 func bound(v float64) *float64 { return &v }
 

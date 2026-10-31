@@ -40,7 +40,6 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime/effect/TxSubscriptionRef",
     // data structures
     "@flick-lang/runtime/effect/Graph",
-    "@flick-lang/runtime/effect/Schema",
     // time
     "@flick-lang/runtime/effect/Cron",
     "@flick-lang/runtime/effect/DateTime",

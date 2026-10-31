@@ -125,3 +125,4 @@ stdlib/effect/crypto
 stdlib/effect/trie
 stdlib/effect/bytesize
 stdlib/effect/chunk
+stdlib/effect/check

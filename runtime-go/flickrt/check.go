@@ -287,7 +287,8 @@ func transforms(c codec) bool {
 		case kindRefined:
 			return transforms(s.item.jsonOf())
 		}
-	case *literalCodec, *numberAs, *stringAs, jsonValue:
+	// an array's node has no encoding of its own, whatever its items have
+	case *literalCodec, *numberAs, *stringAs, jsonValue, *listCodec:
 		return false
 	}
 	return true
