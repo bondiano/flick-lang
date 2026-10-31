@@ -7,24 +7,21 @@ service Render =
   pair : (Show a, Show b) => a -> b ->{} String
 
 render_impl : Render.Impl
-let render_impl =
-  {
-    render = fun x -> "<" ++ show x ++ ">";
-    pair = fun x y -> show x ++ "/" ++ show y;
-  }
+let render_impl = {
+  render = fun x -> "<" ++ show x ++ ">";
+  pair = fun x y -> show x ++ "/" ++ show y;
+}
 
 // the dictionary of `a` is the one `twice` is given
 twice : Show a => a ->{Render;} String
-let twice x =
-  Render.render x ++ Render.render [x]
+let twice x = Render.render x ++ Render.render [x]
 
 main : Unit ->{} Unit
-let main () =
-  provide (Layer.succeed Render render_impl) {
-    Platform.stdout_line (Render.render 42)
-    Platform.stdout_line (Render.render "text")
-    half : Bool ->{Render;} String
-    let half = Render.pair 1
-    Platform.stdout_line (half true)
-    Platform.stdout_line (twice 1.5)
-  }
+let main () = provide (Layer.succeed Render render_impl) {
+  Platform.stdout_line (Render.render 42)
+  Platform.stdout_line (Render.render "text")
+  half : Bool ->{Render;} String
+  let half = Render.pair 1
+  Platform.stdout_line (half true)
+  Platform.stdout_line (twice 1.5)
+}

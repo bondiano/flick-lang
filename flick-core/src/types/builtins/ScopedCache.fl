@@ -41,10 +41,9 @@ foreign effect make_with from "@flick-lang/runtime/effect/ScopedCache" "flickMak
 /// Runs `f` with the value of `key`, looking it up once if it is missing or
 /// expired; a failed lookup is cached too. The value stays acquired until
 /// `f` ends, and what `f` gives cannot hold it.
-use : forall c s k r e e2 a b. k ->
-  ScopedCache s k e a ->
-  (forall t. a^{t} ->{r; e2} b)^c ->{r; e + e2}
-  b
+use :
+  forall c s k r e e2 a b.
+  k -> ScopedCache s k e a -> (forall t. a^{t} ->{r; e2} b)^c ->{r; e + e2} b
 foreign effect use from "@flick-lang/runtime/effect/ScopedCache" "flickUse"
   retention call
 

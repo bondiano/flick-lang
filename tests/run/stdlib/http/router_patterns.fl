@@ -11,12 +11,16 @@ let handler _ = Http.ServerResponse.text (show (Http.Router.params ())) Http.Ser
 attempt : String -> String ->{} Unit
 let attempt pattern path =
   app : ServerRequest ->{; HttpServerError} ServerResponse
-  let app = Http.Router.router Http.Router.config [
-    Http.Router.route (Some Http.Method.GET) pattern handler,
-  ]
+  let app =
+    Http.Router.router Http.Router.config [
+      Http.Router.route (Some Http.Method.GET) pattern handler,
+    ]
   let label = pattern ++ " " ++ path ++ " -> "
   try
-    let response = app (Http.ServerRequest.from_client_request (Http.ClientRequest.get ("http://example.com" ++ path)))
+    let response =
+      app
+        (Http.ServerRequest.from_client_request
+          (Http.ClientRequest.get ("http://example.com" ++ path)))
     let body = Option.with_default "" (Http.Body.to_text (Http.ServerResponse.body response))
     Platform.stdout_line (label ++ show (Http.ServerResponse.status response) ++ " " ++ body)
   with
