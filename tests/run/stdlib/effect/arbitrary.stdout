@@ -14,3 +14,32 @@ report mentions shrunk input: true
 check: falsified at 4 (error), replay true
 check: exhausted after 501 discards
 sample error after 101 discards
+Property falsified after 9 run(s) and 37 shrink(s)
+Shrunk input: {
+  "tags": [],
+  "x": 5
+}
+Failure: returned false
+Replay: [0,"7",8,2,[0,2,0,0,1,1,0,0,0,0,0,0,2,1,4,1,0,0,0,0,0,0,0,0,2,2,0,0,2,1,1,1,1,1,5,0,0],"ReturnedFalse"]
+Property falsified after 8 run(s) and 56 shrink(s)
+Shrunk input: {
+  "_tag": "Circle#5b80ca66ac21",
+  "_0": 3
+}
+Failure: returned false
+Replay: [0,"7",7,1,[2,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0],"ReturnedFalse"]
+Property falsified after 1 run(s) and 0 shrink(s)
+Shrunk input: some([])
+Failure: returned false
+Replay: [0,"7",0,0,[],"ReturnedFalse"]
+Property falsified after 2 run(s) and 1 shrink(s)
+Shrunk input: 4
+Failure: {
+  "_tag": "TooBig#c50e9dc5ca12",
+  "_0": 4
+}
+Replay: [0,"7",1,0,[1],"PropertyError"]
+Property falsified after 10 run(s) and 2 shrink(s)
+Shrunk input: "\u0000\u0000"
+Failure: returned false
+Replay: [0,"7",9,2,[2,2],"ReturnedFalse"]

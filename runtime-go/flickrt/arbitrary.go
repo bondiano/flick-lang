@@ -142,9 +142,8 @@ func evaluate(fb *Fiber, property, v Value) Value {
 }
 
 // ArbitraryFormatCheckFailure is `Arbitrary.format_check_failure`: the
-// report of a failed check, `None` when it passed.
-//
-// shortcut: values are written by Format, not Effect's Formatter.format with two spaces; port the Formatter if a program prints a report of a falsified check with other than a number or a string
+// report of a failed check, `None` when it passed, its values written by
+// Effect's `Formatter.format` with two spaces.
 func ArbitraryFormatCheckFailure(result Value) Value {
 	d := result.(*Data)
 	switch d.Tag {
@@ -152,11 +151,11 @@ func ArbitraryFormatCheckFailure(result Value) Value {
 		f := record(d.Fields[0])
 		failure := "Failure: returned false"
 		if e := f.Get("failure").(*Data); e.Tag == propertyErrorTag {
-			failure = "Failure: " + Format(e.Fields[0])
+			failure = "Failure: " + formatSpaced(e.Fields[0], 2)
 		}
 		return Some(strings.Join([]string{
 			"Property falsified after " + jsString(f.Get("runs")) + " run(s) and " + jsString(f.Get("shrinks")) + " shrink(s)",
-			"Shrunk input: " + Format(f.Get("shrunkInput")),
+			"Shrunk input: " + formatSpaced(f.Get("shrunkInput"), 2),
 			failure,
 			"Replay: " + f.Get("replay").(string),
 		}, "\n"))
