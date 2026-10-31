@@ -25,7 +25,6 @@ const PENDING: &[&str] = &[
     // time
     "@flick-lang/runtime/effect/Cron",
     "@flick-lang/runtime/effect/DateTime",
-    "@flick-lang/runtime/effect/Random",
     // observability
     "@flick-lang/runtime/effect/Logger",
     "@flick-lang/runtime/effect/Metric",

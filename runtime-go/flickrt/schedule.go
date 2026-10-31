@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"math"
-	"math/rand/v2"
 )
 
 // Schedule is Effect 4's: each run of it starts a step function, which
@@ -252,12 +251,11 @@ func ScheduleAddDelay(f, self Value) Value {
 	})
 }
 
-// ScheduleJittered scales each delay by a random factor in [0.8, 1.2].
-//
-// shortcut: the factor comes from Go's global source, not the fiber's Random service, which `Random.with_seed` sets; draw from that service once Random is on the go target
+// ScheduleJittered scales each delay by a random factor in [0.8, 1.2],
+// drawn from the fiber's Random.
 func ScheduleJittered(self Value) Value {
-	return modifyDelay(scheduleOf(self), func(_ *Fiber, m metadata) *Duration {
-		r, millis := rand.Float64(), millisOf(m.duration)
+	return modifyDelay(scheduleOf(self), func(fb *Fiber, m metadata) *Duration {
+		r, millis := randomOf(fb).nextDouble(), millisOf(m.duration)
 		return fromMillis(millis*0.8*(1-r) + millis*1.2*r)
 	})
 }

@@ -1,1 +1,10 @@
 # Random, DateTime and Cron.
+[@flick-lang/runtime/effect/Random]
+flickNext *RandomNext
+flickNextBoolean *RandomNextBoolean
+flickNextInt *RandomNextInt
+nextBetween *RandomNextBetween
+flickNextIntBetween *RandomNextIntBetween
+shuffle *RandomShuffle
+choice *RandomChoice
+withSeed *RandomWithSeed
