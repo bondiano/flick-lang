@@ -211,6 +211,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/datetime.go"),
     ),
     (
+        "datetime_json.go",
+        include_str!("../../../../runtime-go/flickrt/datetime_json.go"),
+    ),
+    (
         "decimal.go",
         include_str!("../../../../runtime-go/flickrt/decimal.go"),
     ),
@@ -301,6 +305,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "foreign.go",
         include_str!("../../../../runtime-go/flickrt/foreign.go"),
+    ),
+    (
+        "graph.go",
+        include_str!("../../../../runtime-go/flickrt/graph.go"),
     ),
     (
         "hamt.go",

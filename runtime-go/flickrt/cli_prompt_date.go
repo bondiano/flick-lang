@@ -335,7 +335,7 @@ func PromptDate(options Value) Value {
 				}
 				return moved(first)
 			case "enter", "return":
-				value, err := promptValidate(c.fb, o.Get("validate"), &DateTime{s.date.t.UTC()})
+				value, err := promptValidate(c.fb, o.Get("validate"), &DateTime{t: s.date.t.UTC()})
 				if err != nil {
 					return promptNext(promptDateState{s.date, s.typed, s.cursor, err})
 				}

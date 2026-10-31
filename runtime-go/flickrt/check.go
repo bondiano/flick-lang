@@ -103,12 +103,7 @@ func isBetweenLength(minimum, maximum int) *check {
 	}
 	return &check{
 		test: func(_ *Fiber, v Value) bool {
-			n := 0
-			if s, ok := v.(string); ok {
-				n = len(utf16Units(s))
-			} else {
-				n = len(List(v))
-			}
+			n := lengthOf(v)
 			return n >= minimum && n <= maximum
 		},
 		expected: expected,
@@ -121,6 +116,33 @@ func isBetweenLength(minimum, maximum int) *check {
 				return kw, maximum == 0 || (minimum+1)/2 > maximum
 			case "array":
 				return record(Rec("minItems", float64(minimum), "maxItems", float64(maximum))), true
+			}
+			return newRecord(0), false
+		},
+	}
+}
+
+// lengthOf is the length Effect's length checks test: a string's in UTF-16
+// units, or a list's.
+func lengthOf(v Value) int {
+	if s, ok := v.(string); ok {
+		return len(utf16Units(s))
+	}
+	return len(List(v))
+}
+
+// isMinLength is Effect's `isMinLength` (`isNonEmpty` is of 1).
+func isMinLength(minimum int) *check {
+	return &check{
+		test:     func(_ *Fiber, v Value) bool { return lengthOf(v) >= minimum },
+		expected: "a value with a length of at least " + jsString(float64(minimum)),
+		keywords: func(typ string) (*Record, bool) {
+			switch typ {
+			case "string":
+				// a code point may take two UTF-16 units, which JSON Schema counts as one
+				return record(Rec("minLength", float64((minimum+1)/2))), minimum <= 1
+			case "array":
+				return record(Rec("minItems", float64(minimum))), true
 			}
 			return newRecord(0), false
 		},

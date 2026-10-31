@@ -711,6 +711,15 @@ flickStringTree CodecStringTree
 [@flick-lang/runtime/effect/ByteSize]
 zero ByteSizeZero
 flickBytes ByteSizeBytes
+flickFormat ByteSizeFormat
+flickJson CodecByteSize
+flickJsonNumber CodecByteSizeNumber
+flickJsonBigint CodecByteSizeBigint
+
+[@flick-lang/runtime/effect/Graph]
+flickJson GraphJson
+nodeCount GraphNodeCount
+edgeCount GraphEdgeCount
 
 [@flick-lang/runtime/effect/Logger]
 flickMake LoggerMake

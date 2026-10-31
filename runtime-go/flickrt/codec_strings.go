@@ -90,8 +90,14 @@ var (
 	CodecStringFromBase64Url Value = textBytes("a base64 (URL) encoded string that will be decoded as a UTF-8 string",
 		decodeBase64Url, base64.RawURLEncoding.EncodeToString)
 	CodecStringFromHex Value = textBytes("a hex encoded string that will be decoded as a UTF-8 string",
-		func(s string) ([]byte, bool) { b, err := hex.DecodeString(s); return b, err == nil },
-		hex.EncodeToString)
+		decodeHex, hex.EncodeToString)
+
+	CodecBytesFromBase64 Value = byteCodec("a base64 encoded string that will be decoded as Uint8Array",
+		func(s string) ([]byte, bool) { return decodeBase64(s, base64.StdEncoding) },
+		base64.StdEncoding.EncodeToString)
+	CodecBytesFromBase64Url Value = byteCodec("a base64 (URL) encoded string that will be decoded as a Uint8Array",
+		decodeBase64Url, base64.RawURLEncoding.EncodeToString)
+	CodecBytesFromHex Value = byteCodec("a hex encoded string that will be decoded as a Uint8Array", decodeHex, hex.EncodeToString)
 
 	CodecStringFromUriComponent Value = &fallible{&stage{
 		&stringAs{"a URI component encoded string that will be decoded as a UTF-8 string"},
@@ -161,6 +167,46 @@ func textBytes(expectedText string, read func(string) ([]byte, bool), write func
 		pure(func(v Value) Value { return write([]byte(wellFormed(v.(string)))) }),
 	}}
 }
+
+// byteElem is a byte of Flick's bytes: a whole number from 0 to 255.
+var byteElem codec = withChecks(numberType, isInt(), isBetween(0, 255, ""))
+
+// byteCodec is a `Codec.bytes_*`: the bytes of text read by `read`, as a
+// list of Ints, written back by `write`.
+func byteCodec(expectedText string, read func(string) ([]byte, bool), write func([]byte) string) Value {
+	return &fallible{&stage{
+		&stringAs{expectedText},
+		func(_ *Fiber, v Value) (Value, []issue) {
+			b, ok := read(v.(string))
+			if !ok {
+				return nil, fail("an invalid value")
+			}
+			out := make([]Value, len(b))
+			for i, x := range b {
+				out[i] = int32(x)
+			}
+			return out, nil
+		},
+		func(fb *Fiber, v Value) (Value, []issue) {
+			if _, issues := (&listCodec{byteElem}).encode(fb, v); issues != nil {
+				return nil, issues
+			}
+			return write(bytesOf(v)), nil
+		},
+	}}
+}
+
+// bytesOf is a list of Ints from 0 to 255 as bytes.
+func bytesOf(v Value) []byte {
+	xs := List(v)
+	b := make([]byte, len(xs))
+	for i, x := range xs {
+		b[i] = byte(numberOf(x))
+	}
+	return b
+}
+
+func decodeHex(s string) ([]byte, bool) { b, err := hex.DecodeString(s); return b, err == nil }
 
 func decodeBase64(s string, enc *base64.Encoding) ([]byte, bool) {
 	b, err := enc.DecodeString(strings.NewReplacer("\n", "", "\r", "").Replace(s))
