@@ -67,7 +67,9 @@ func clientOfTransport(send transport) *Client {
 					[]Value{"traceparent", "00-" + s.traceId + "-" + s.spanId + "-01"},
 				}, request))
 			}
-			return withEnv(fb, parentSpanKey, s, Eff(func(fb *Fiber) Value { return send(fb, request, value(url)) }))
+			return spanning(fb, s, func(s *span) Value {
+				return withEnv(fb, parentSpanKey, s, Eff(func(fb *Fiber) Value { return send(fb, request, value(url)) }))
+			})
 		})
 	}}
 }

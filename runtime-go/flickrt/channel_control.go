@@ -151,14 +151,15 @@ func channelUpdateService(self *Channel, key string, f func(fb *Fiber, impl Valu
 }
 
 // channelWithSpan runs the channel in a span of the name, the parent of
-// the spans it opens.
-//
-// shortcut: Go's spans are not exported, so ending one records nothing; end it with its exit once the go target has a tracer
+// the spans it opens, ended with the channel's exit.
 func channelWithSpan(self *Channel, name, options Value) *Channel {
 	return channelAcquireUseRelease(
 		func(fb *Fiber) Value { return openSpan(fb, name, options) },
 		func(_ *Fiber, s Value) *Channel { return channelProvideServices(self, Services{parentSpanKey: s}) },
-		func(*Fiber, Value, *Exit) Value { return Unit },
+		func(fb *Fiber, s Value, exit *Exit) Value {
+			endSpan(spanOf(s), exit.cause, clockOf(fb), envOr(fb, tracerTimingKey, true).(bool))
+			return Unit
+		},
 	)
 }
 

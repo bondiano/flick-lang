@@ -112,8 +112,9 @@ func MiddlewareTracer(fb *Fiber, handler, request Value) Value {
 	if f, ok := fb.env.get(spanNameKey); ok {
 		name = Apply(fb, f, request)
 	}
-	span := openSpan(fb, name, Rec("parent", None, "root", false))
-	return withEnv(fb, parentSpanKey, span, Apply(fb, handler, request))
+	return useSpan(fb, name, Rec("parent", None, "root", false), func(s *span) Value {
+		return withEnv(fb, parentSpanKey, s, Apply(fb, handler, request))
+	})
 }
 
 func MiddlewareWithTracerDisabledWhen(fb *Fiber, f, task Value) Value {

@@ -15,12 +15,6 @@ use crate::project::js_only;
 const PENDING: &[&str] = &[
     // the rest: Record, Loop and failures of the core
     "@flick-lang/runtime",
-    // observability
-    "@flick-lang/runtime/effect/Logger",
-    "@flick-lang/runtime/effect/Metric",
-    "@flick-lang/runtime/effect/References",
-    "@flick-lang/runtime/effect/Tracer",
-    "@flick-lang/runtime/effect/observability/PrometheusMetrics",
     // resources, caches and requests
     "@flick-lang/runtime/effect/Cache",
     "@flick-lang/runtime/effect/Pool",
