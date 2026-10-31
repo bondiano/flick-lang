@@ -136,3 +136,4 @@ stdlib/effect/graph_algorithms
 stdlib/effect/queue
 stdlib/effect/channel_core
 stdlib/effect/stream_core
+stdlib/effect/txref

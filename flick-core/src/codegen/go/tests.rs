@@ -25,7 +25,6 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime/effect/Stream",
     "@flick-lang/runtime/effect/SubscriptionRef",
     // transactions
-    "@flick-lang/runtime/effect/Tx",
     "@flick-lang/runtime/effect/TxChunk",
     "@flick-lang/runtime/effect/TxDeferred",
     "@flick-lang/runtime/effect/TxHashMap",
@@ -34,7 +33,6 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime/effect/TxPubSub",
     "@flick-lang/runtime/effect/TxQueue",
     "@flick-lang/runtime/effect/TxReentrantLock",
-    "@flick-lang/runtime/effect/TxRef",
     "@flick-lang/runtime/effect/TxSemaphore",
     "@flick-lang/runtime/effect/TxSubscriptionRef",
     // time

@@ -1,1 +1,15 @@
-# Transactions: TxRef and the structures over it.
+# Transactions: TxRef and the structures over it (tx*.go).
+
+[@flick-lang/runtime/effect/Effect]
+tx *TxAtomically
+
+[@flick-lang/runtime/effect/Tx]
+flickRetry *TxRetry
+flickCurrent *TxCurrent
+
+[@flick-lang/runtime/effect/TxRef]
+make TxRefMake
+get *TxRefGet
+set *TxRefSet
+update *TxRefUpdate
+modify *TxRefModify

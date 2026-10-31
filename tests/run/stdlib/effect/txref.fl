@@ -4,14 +4,22 @@ module App.Main exposing (main)
 
 type error Broke = Broke
 
-ms : Float -> Duration.Duration
-let ms n = Result.with_default Duration.zero (Duration.millis n)
-
 transfer : Float -> TxRef.TxRef Float -> TxRef.TxRef Float ->{Tx.Transaction; Broke} Unit
 let transfer amount src dst =
   TxRef.update (fun b -> b - amount) src
   TxRef.update (fun b -> b + amount) dst
   if TxRef.get src < 0 then from_result (Err Broke)
+
+/// Retries until `flag` is set, telling `started` once it has to wait, so
+/// that the setter comes after a first attempt on any scheduling.
+await_flag : TxRef.TxRef Float -> Deferred.Deferred {} Unit ->{Tx.Transaction;} (Float, Bool)
+let await_flag flag started =
+  let v = TxRef.get flag
+  if v == 0 then
+    let _ = Deferred.succeed () started
+    Tx.retry ()
+  else
+    (v, (Tx.current ()).retryReason == Some Tx.Retry)
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -52,17 +60,12 @@ let main () =
   let meta = Tx.atomically (task { Tx.current () })
   Platform.stdout_line ("first attempt: " ++ show (meta.attempt, meta.retryReason))
   let flag = TxRef.make 0
+  let started : Deferred.Deferred {} Unit = Deferred.make ()
   let (seen, _) =
     parallel
+      (task { Tx.atomically (task { await_flag flag started }) })
       (task {
-        Tx.atomically
-          (task {
-            let v = TxRef.get flag
-            if v == 0 then Tx.retry () else (v, (Tx.current ()).retryReason == Some Tx.Retry)
-          })
-      })
-      (task {
-        Effect.sleep (ms 2)
+        Deferred.await_ started
         Tx.atomically (task { TxRef.set 7 flag })
       })
   Platform.stdout_line ("after retry: " ++ show seen)
