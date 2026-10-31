@@ -75,16 +75,7 @@ func ByteSizeFormat(options, self Value) Value {
 		trailingZeros = t.(bool)
 	}
 	if u, ok := some(o.Get("unit")); ok {
-		tag := u.(*Data).Tag
-		name := tag[strings.LastIndex(tag, ".")+1:]
-		if name == "KB" {
-			name = "kB"
-		}
-		for _, unit := range append(append([]byteUnit{}, decimalUnits...), binaryUnits[1:]...) {
-			if unit.symbol == name {
-				return formatWithUnit(n, unit, precision, trailingZeros)
-			}
-		}
+		return formatWithUnit(n, unitOf(u), precision, trailingZeros)
 	}
 	units, base := decimalUnits, int64(1000)
 	if o.Get("binary").(bool) {

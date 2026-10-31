@@ -39,7 +39,6 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime/effect/TxSemaphore",
     "@flick-lang/runtime/effect/TxSubscriptionRef",
     // data structures
-    "@flick-lang/runtime/effect/ByteSize",
     "@flick-lang/runtime/effect/Chunk",
     "@flick-lang/runtime/effect/Graph",
     "@flick-lang/runtime/effect/Schema",
