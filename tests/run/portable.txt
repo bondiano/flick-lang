@@ -119,3 +119,4 @@ stdlib/effect/values
 sql/queries
 stdlib/effect/mutable_ref
 stdlib/effect/clock
+stdlib/effect/schedule

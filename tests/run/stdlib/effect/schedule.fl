@@ -6,10 +6,6 @@ type error Flaky = Flaky Float
 ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-/// Throws: a defect, not a typed failure.
-explode : String ->{} JsValue
-foreign sync explode from global "JSON.parse"
-
 /// Fails with `Flaky n` on the first `failures` calls, counting them.
 flaky : Ref Float -> Float -> Eff none {Flaky} String
 let flaky calls failures = task {
@@ -129,8 +125,8 @@ let main () =
           (Schedule.recurs 5)
           (task {
             Ref.set defects (Ref.get defects + 1)
-            let _ = explode "{"
-            "unreachable"
+            // dividing by zero is a defect, not a typed failure
+            Int.unsafe_div 1 0
           })
       },
     ]

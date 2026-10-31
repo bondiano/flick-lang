@@ -129,20 +129,13 @@ func SchedulerMaxOps(fb *Fiber) Value {
 func SchedulerWithMaxOps(fb *Fiber, n, task Value) Value       { return withEnv(fb, maxOpsKey, n, task) }
 func SchedulerWithPreventYield(fb *Fiber, _, task Value) Value { return Run(fb, task) }
 
-// A Schedule is only what an execution plan reads of one.
-//
-// shortcut: Schedule is a marker for execution plans, retried without delay; port Effect's Schedule with its module
-type schedule struct{}
-
-var ScheduleForever Value = &schedule{}
-
 // planStep is a step of an execution plan: the layer each attempt runs
-// with, how many attempts (0 for one, or unbounded with a schedule) and
-// whether a failure may try again.
+// with, how many attempts (0 when not set), the schedule of its retries
+// and which errors it retries.
 type planStep struct {
 	provide  Value
-	attempts int
-	schedule Value
+	attempts int32
+	schedule *Schedule
 	while    Value
 }
 
@@ -155,11 +148,11 @@ func withStep(plan Value, f func(*planStep)) Value {
 }
 
 func PlanWithAttempts(n, step Value) Value {
-	return withStep(step, func(s *planStep) { s.attempts = int(n.(int32)) })
+	return withStep(step, func(s *planStep) { s.attempts = n.(int32) })
 }
 
 func PlanWithSchedule(sch, step Value) Value {
-	return withStep(step, func(s *planStep) { s.schedule = sch })
+	return withStep(step, func(s *planStep) { s.schedule = scheduleOf(sch) })
 }
 
 func PlanWithWhile(f, step Value) Value {
@@ -189,49 +182,109 @@ var (
 	attemptStart   = Tag("ExecutionPlan.Event.AttemptStart")
 	attemptSuccess = Tag("ExecutionPlan.Event.AttemptSuccess")
 	attemptFailure = Tag("ExecutionPlan.Event.AttemptFailure")
+	scheduleOnce   = ScheduleRecurs(int32(1)).(*Schedule)
 )
 
+// retries is Effect's `scheduleFromStep`: the schedule that retries the
+// step, nil for none. A step after the first replays the previous step's
+// error to it first.
+func (s *planStep) retries(first bool) *Schedule {
+	var while func(*Fiber, Value) bool
+	if s.while != nil {
+		while = func(fb *Fiber, input Value) bool { return Bool(Run(fb, Apply(fb, s.while, input))) }
+	}
+	times := s.attempts
+	if times == 0 {
+		times = -1
+	}
+	if !first {
+		sch := s.schedule
+		if sch == nil && s.attempts == 0 {
+			sch = scheduleOnce
+		}
+		return fromOptions(sch, while, times)
+	}
+	if s.attempts == 1 || s.schedule == nil && s.attempts == 0 {
+		return nil
+	}
+	if times > 0 {
+		times--
+	}
+	return fromOptions(s.schedule, while, times)
+}
+
 // WithExecutionPlan runs `task` with the services of the plan's steps in
-// turn until an attempt succeeds, telling `onEvent` of each attempt.
+// turn, each retried by its schedule, until one succeeds, telling
+// `onEvent` of each attempt.
 func WithExecutionPlan(fb *Fiber, plan, onEvent, task Value) Value {
-	var last *Cause
-	attempt := 0
-	for index, step := range plan.([]*planStep) {
-		for stepAttempt := 1; ; stepAttempt++ {
+	steps := plan.([]*planStep)
+	attempt, lastStepIndex, stepAttempt := int32(0), int32(-1), int32(0)
+	emit := func(fb *Fiber, event Value) { catch(func() Value { return Run(fb, Apply(fb, onEvent, event)) }) }
+	// an attempt with its metadata and events, as Effect's `provideMeta` and `instrument`
+	attemptAt := func(index int32, step *planStep) Value {
+		return Eff(func(fb *Fiber) Value {
 			attempt++
-			info := Rec("attempt", int32(attempt), "stepAttempt", int32(stepAttempt), "stepIndex", int32(index))
-			Run(fb, Apply(fb, onEvent, NewData(attemptStart, info)))
-			clock := clockOf(fb)
-			started := clock.monotonic()
-			meta := Rec("attempt", int32(attempt), "stepIndex", int32(index))
-			e := exitOf(fb, Eff(func(fb *Fiber) Value {
-				return withEnv(fb, metadataKey, meta, Eff(func(fb *Fiber) Value {
-					return Provide(fb, step.provide, task)
-				}))
+			meta := Rec("attempt", attempt, "stepIndex", index)
+			return withEnv(fb, metadataKey, meta, Eff(func(fb *Fiber) Value {
+				outer := fb.state.mask
+				return masked(fb, outer+1, func() Value {
+					if index != lastStepIndex {
+						lastStepIndex, stepAttempt = index, 0
+					}
+					stepAttempt++
+					info := Rec("attempt", attempt, "stepAttempt", stepAttempt, "stepIndex", index)
+					clock := clockOf(fb)
+					emit(fb, NewData(attemptStart, info))
+					started := clock.monotonic()
+					v, c := catch(func() Value {
+						return masked(fb, outer, func() Value { return Provide(fb, step.provide, task) })
+					})
+					took := fromNanos(new(big.Int).Sub(clock.monotonic(), started))
+					if c == nil {
+						emit(fb, NewData(attemptSuccess, info, took))
+						return v
+					}
+					emit(fb, NewData(attemptFailure, info, took, failureOf(c)))
+					panic(&Failure{c})
+				})
 			}))
-			took := fromNanos(new(big.Int).Sub(clock.monotonic(), started))
-			if e.cause == nil {
-				Run(fb, Apply(fb, onEvent, NewData(attemptSuccess, info, took)))
-				return e.value
-			}
-			Run(fb, Apply(fb, onEvent, NewData(attemptFailure, info, took, failureOf(e.cause))))
-			last = e.cause
-			if e.cause.has(causeInterrupt) && !e.cause.has(causeFail) {
-				panic(&Failure{e.cause})
-			}
-			limit := step.attempts
-			if limit == 0 && step.schedule == nil {
-				limit = 1
-			}
-			if limit > 0 && stepAttempt >= limit {
-				break
-			}
-			if step.while != nil {
-				if r := e.cause.firstOf(causeFail); r == nil || !Bool(Run(fb, Apply(fb, step.while, r.err))) {
-					break
+		})
+	}
+	// how the last step ended: a typed error is kept, anything else ends the plan
+	var value, err Value
+	failed := false
+	for i := 0; i < len(steps) && (i == 0 || failed); i++ {
+		step := steps[i]
+		next := attemptAt(int32(i), step)
+		if i > 0 {
+			attempted, wrapped, previous := false, next, err
+			next = Eff(func(fb *Fiber) Value {
+				if attempted {
+					return Run(fb, wrapped)
 				}
+				attempted = true
+				return Fail(previous)
+			})
+			next = retrying(step.retries(false), next)
+		} else if s := step.retries(true); s != nil {
+			next = retrying(s, next)
+		}
+		v, c := catch(func() Value { return Run(fb, next) })
+		value, failed = v, c != nil
+		if failed {
+			r := c.firstOf(causeFail)
+			if r == nil {
+				panic(&Failure{c})
 			}
+			err = r.err
 		}
 	}
-	panic(&Failure{last})
+	if failed {
+		return Fail(err)
+	}
+	return value
+}
+
+func retrying(s *Schedule, task Value) Value {
+	return Eff(func(fb *Fiber) Value { return retryOrElse(fb, s, failWith, task) })
 }

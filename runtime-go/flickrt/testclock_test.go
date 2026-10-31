@@ -74,15 +74,38 @@ func TestTestClockWakesSleepersInOrderAndSettles(t *testing.T) {
 	})
 }
 
-func TestTestClockDrivesTimeouts(t *testing.T) {
+func TestTestClockDrivesTimeoutsAndSchedules(t *testing.T) {
 	onTestClock(func(fb *Fiber) {
+		var n notes
 		timed := fork(fb, fb.owner, Eff(func(fb *Fiber) Value {
 			return TimeoutOption(fb, 50.0, Eff(func(fb *Fiber) Value {
 				sleepFor(fb, fromMillis(100))
 				return "late"
 			}))
 		}), nil)
-		TestAdjust(fb, fromMillis(50))
+		calls := 0
+		retried := fork(fb, fb.owner, Eff(func(fb *Fiber) Value {
+			return EffectRetry(fb, ScheduleSpaced(fromMillis(10)), Eff(func(fb *Fiber) Value {
+				calls++
+				n.add("call")
+				if calls < 3 {
+					return Fail("again")
+				}
+				return "done"
+			}))
+		}), nil)
+		TestAdjust(fb, DurationZero)
+		if got := n.get(); len(got) != 1 {
+			t.Fatalf("before any time passed: %v", got)
+		}
+		TestAdjust(fb, fromMillis(10))
+		if got := n.get(); len(got) != 2 {
+			t.Fatalf("after 10ms: %v", got)
+		}
+		TestAdjust(fb, fromMillis(40))
+		if v := FiberJoin(fb, retried); v != "done" {
+			t.Fatalf("retried: %v", v)
+		}
 		if v := FiberJoin(fb, timed); v != None {
 			t.Fatalf("timed out: %v", v)
 		}

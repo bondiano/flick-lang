@@ -1,12 +1,12 @@
 package flickrt
 
 import (
+	"math"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // The combinators of Http.Client, as Effect's: each makes a client of
@@ -178,33 +178,8 @@ func HttpClientWithCookiesRef(cell, client Value) Value {
 
 func HttpClientRetry(policy, client Value) Value {
 	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
-		return Eff(func(fb *Fiber) Value { return retrying(fb, scheduleOf(policy), task, nil) })
+		return Eff(func(fb *Fiber) Value { return EffectRetry(fb, policy, task) })
 	})
-}
-
-// retrying runs `task` again after each typed failure the schedule, given
-// the error, continues for, waiting the schedule's delay or the one
-// `delayOf` the error gives, whichever is longer.
-func retrying(fb *Fiber, s *Schedule, task Value, delayOf func(Value) time.Duration) Value {
-	next := s.start()
-	for {
-		out, cause := catch(func() Value { return Run(fb, task) })
-		if cause == nil {
-			return out
-		}
-		err, ok := typedError(cause)
-		if !ok {
-			panic(&Failure{cause})
-		}
-		d, again := next(err)
-		if !again {
-			panic(&Failure{cause})
-		}
-		if delayOf != nil {
-			d = max(d, delayOf(err))
-		}
-		sleep(fb, d)
-	}
 }
 
 var transientStatus = map[int32]bool{408: true, 429: true, 500: true, 502: true, 503: true, 504: true}
@@ -215,36 +190,39 @@ var transientStatus = map[int32]bool{408: true, 429: true, 500: true, 502: true,
 // delaying the next try.
 func HttpClientRetryTransient(on, times, client Value) Value {
 	mode := ConstructorName(on.(*Data).Tag)
-	limited := ScheduleRecurs(times).(*Schedule)
+	n := times.(int32)
+	schedule := withRetryAfter(ScheduleForever.(*Schedule))
+	repeats := fromOptions(schedule, func(_ *Fiber, r Value) bool { return transientStatus[clientResponseOf(r).status] }, n)
+	retries := fromOptions(schedule, func(_ *Fiber, err Value) bool { return isTransientFailure(err) }, n)
 	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
 		if mode != "ErrorsOnly" {
-			task = repeatingTransient(task, limited)
+			repeated := task
+			task = Eff(func(fb *Fiber) Value { return repeatOrElse(fb, repeats, failWith, repeated) })
 		}
 		if mode != "ResponseOnly" {
-			retried := task
-			task = Eff(func(fb *Fiber) Value {
-				return retrying(fb, limited.while(isTransientFailure), retried, nil)
-			})
+			task = retrying(retries, task)
 		}
 		return task
 	})
 }
 
-func repeatingTransient(task Value, s *Schedule) Value {
-	return Eff(func(fb *Fiber) Value {
-		next := s.start()
-		for {
-			r := clientResponseOf(Run(fb, task))
-			if !transientStatus[r.status] {
-				return r
+// withRetryAfter delays a step whose input is a response with a
+// `Retry-After` header at least as long as the header asks.
+func withRetryAfter(s *Schedule) *Schedule {
+	return &Schedule{func(fb *Fiber) scheduleStep {
+		step := s.start(fb)
+		return func(fb *Fiber, now float64, input Value) (Value, *Duration, bool) {
+			var after *Duration
+			if r, ok := input.(*ClientResponse); ok {
+				after = retryAfter(now, recordField(r.headers, "retry-after"))
 			}
-			d, again := next(r)
-			if !again {
-				return r
+			out, delay, done := step(fb, now, input)
+			if after != nil && !done && durationOrder(delay, after) < 0 {
+				delay = after
 			}
-			sleep(fb, max(d, retryAfter(recordField(r.headers, "retry-after"))))
+			return out, delay, done
 		}
-	})
+	}}
 }
 
 // isTransientFailure is whether a Flick HttpClientError is of the
@@ -260,23 +238,29 @@ func isTransientFailure(err Value) bool {
 
 var retryAfterSeconds = regexp.MustCompile(`^\d+(?:\.\d+)?$`)
 
-// retryAfter is the delay a `Retry-After` value asks for, at least a
-// millisecond: seconds or a date.
-func retryAfter(header Value) time.Duration {
+// retryAfter is the delay a `Retry-After` value asks for at `now`, at
+// least a millisecond: seconds or a date; nil for none.
+func retryAfter(now float64, header Value) *Duration {
 	v, ok := header.(string)
 	if !ok {
-		return 0
+		return nil
 	}
 	v = strings.TrimSpace(v)
 	if retryAfterSeconds.MatchString(v) {
 		s, _ := strconv.ParseFloat(v, 64)
-		return max(time.Duration(s*float64(time.Second)), time.Millisecond)
+		if math.IsInf(s, 0) {
+			return nil
+		}
+		return dur(orderMax(durationOrder, fromMillis(s*1000), fromMillis(1)))
 	}
 	at, err := http.ParseTime(v)
 	if err != nil {
-		return 0
+		return nil
 	}
-	return max(time.Until(at), time.Millisecond)
+	if millis := float64(at.UnixMilli()) - now; millis > 0 {
+		return fromMillis(millis)
+	}
+	return fromMillis(1)
 }
 
 // HttpClientFollowRedirects follows a 3xx answer with a `Location`, at

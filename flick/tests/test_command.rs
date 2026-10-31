@@ -270,6 +270,8 @@ fn watch_runs_again_after_the_previous_run_cleaned_up() {
 
 const CLOCKS: &str = r#"module Test.Clocks exposing (tests)
 
+type error Again = Again
+
 hour : Duration.Duration
 let hour = Result.with_default Duration.zero (Duration.hours 1)
 
@@ -320,15 +322,38 @@ let tests =
           Test.expect (Test.equal ["one", "two"] (Ref.get order))
         }
       }),
+    Test.clock_test
+      "a retry waits for its schedule's delays"
+      (task {
+        scope s {
+          let calls = Ref.make 0
+          let retried = Fiber.spawn s (fun _ -> ()) (task {
+            try
+              Effect.retry
+                (Schedule.spaced hour)
+                (task {
+                  Ref.set calls (Ref.get calls + 1)
+                  if Ref.get calls < 3 then from_result (Err Again) else "done"
+                })
+            with
+            | Again -> "gave up"
+          })
+          Test.adjust hour
+          Test.expect (Test.equal 2 (Ref.get calls))
+          Test.adjust hour
+          Test.expect (Test.equal "done" (Fiber.join retried))
+        }
+      }),
   ]
 "#;
 
 /// The names of the tests of `CLOCKS`.
-const CLOCK_TESTS: [&str; 4] = [
+const CLOCK_TESTS: [&str; 5] = [
     "an hour passes when the test moves the clock",
     "each test starts at zero",
     "another test's clock is not this one",
     "sleepers wake in order, each run before the clock moves on",
+    "a retry waits for its schedule's delays",
 ];
 
 /// Runs `CLOCKS` by `flick test` with `args`: each test passes, without

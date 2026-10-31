@@ -692,9 +692,6 @@ flickMaxOpsBeforeYield *SchedulerMaxOps
 flickWithMaxOpsBeforeYield *SchedulerWithMaxOps
 flickWithPreventSchedulerYield *SchedulerWithPreventYield
 
-[@flick-lang/runtime/effect/Schedule]
-forever ScheduleForever
-
 [@flick-lang/runtime/effect/ExecutionPlan]
 flickStep PlanStep
 flickWithAttempts PlanWithAttempts
