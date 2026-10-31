@@ -8,9 +8,8 @@ import (
 
 // Stream is Effect's (Stream.ts:131): a channel of chunks, non-empty lists
 // of the elements, ended with Unit. Its resources go to the scope a run
-// gives the channel; the Flick tasks it runs see the lexical owner.
-//
-// shortcut: only the operations the HTTP streams need and the core are here; port more of Effect's Stream as programs use them on Go
+// gives the channel; the Flick tasks it runs see the lexical owner. The
+// operations are in the stream_*.go files.
 type Stream struct{ ch *Channel }
 
 func streamOf(v Value) *Stream { return v.(*Stream) }
