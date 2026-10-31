@@ -1,0 +1,147 @@
+#compdef my-app
+###-begin-my-app-completions-###
+#
+# Static completion script for Zsh
+#
+# Installation:
+#   my-app --completions zsh > ~/.zsh/completions/_my-app
+#   then add ~/.zsh/completions to your fpath
+#
+
+_my_app() {
+  local context state state_descr line
+  typeset -A opt_args
+
+  local -a commands
+  commands=(
+    'remote:Manage remotes\: add]'
+    'rm:Manage remotes\: add]'
+  )
+
+  local -a specs
+  specs=(
+    '(--verbose -v --no-verbose)--verbose[Be loud\: '\''very'\'' [x\] \\ café 😀]'
+    '(--verbose -v --no-verbose)-v[Be loud\: '\''very'\'' [x\] \\ café 😀]'
+    '(--verbose -v --no-verbose)--no-verbose[Disable verbose]'
+    '(--color -c --colour)--color:value:(auto never x\:y)'
+    '(--color -c --colour)-c:value:(auto never x\:y)'
+    '(--color -c --colour)--colour:value:(auto never x\:y)'
+    '(--config)--config[Config file]:file:_files'
+    '(--log)--log=-[Log level]::value:'
+    '(--count)--count:integer:'
+    -
+    parent-arguments
+    ':Input path:_files'
+    '*:rest:(one two)'
+    -
+    subcommands
+    '1:command:->command'
+    '*::arg:->args'
+  )
+
+  _arguments -C "${specs[@]}"
+
+  case "$state" in
+    command)
+      _describe -t commands 'commands' commands
+      ;;
+    args)
+      case "$words[1]" in
+        remote)
+          _my_app_remote
+          ;;
+        rm)
+          _my_app_rm
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_my_app_remote() {
+  local context state state_descr line
+  typeset -A opt_args
+
+  local -a commands
+  commands=(
+    'deploy:Deploy it'
+  )
+
+  local -a specs
+  specs=(
+    '1:command:->command'
+    '*::arg:->args'
+  )
+
+  _arguments -C "${specs[@]}"
+
+  case "$state" in
+    command)
+      _describe -t commands 'commands' commands
+      ;;
+    args)
+      case "$words[1]" in
+        deploy)
+          _my_app_remote_deploy
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_my_app_remote_deploy() {
+  local -a specs
+  specs=(
+    '(--env)--env:value:(prod it\'\''s\ \"qa\" a\ b)'
+    ':target:_directories'
+  )
+  _arguments "${specs[@]}"
+}
+
+_my_app_rm() {
+  local context state state_descr line
+  typeset -A opt_args
+
+  local -a commands
+  commands=(
+    'deploy:Deploy it'
+  )
+
+  local -a specs
+  specs=(
+    '1:command:->command'
+    '*::arg:->args'
+  )
+
+  _arguments -C "${specs[@]}"
+
+  case "$state" in
+    command)
+      _describe -t commands 'commands' commands
+      ;;
+    args)
+      case "$words[1]" in
+        deploy)
+          _my_app_rm_deploy
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_my_app_rm_deploy() {
+  local -a specs
+  specs=(
+    '(--env)--env:value:(prod it\'\''s\ \"qa\" a\ b)'
+    ':target:_directories'
+  )
+  _arguments "${specs[@]}"
+}
+
+# Handle both direct invocation and autoload
+if [[ "${zsh_eval_context[-1]}" == "loadautofunc" ]]; then
+  _my_app "$@"
+else
+  compdef _my_app my-app
+fi
+###-end-my-app-completions-###
