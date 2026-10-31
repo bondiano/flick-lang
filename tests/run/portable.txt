@@ -156,3 +156,8 @@ stdlib/effect/datetime
 stdlib/effect/datetime_more
 stdlib/effect/cron
 stdlib/effect/cron_more
+stdlib/effect/stream
+stdlib/effect/stream_transform
+stdlib/effect/stream_errors
+stdlib/effect/stream_combine
+stdlib/effect/stream_sink
