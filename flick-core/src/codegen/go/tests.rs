@@ -10,13 +10,6 @@ use crate::ir::tests::lower_text;
 use crate::ir::{ItemKind, Module};
 use crate::project::js_only;
 
-/// The runtime modules (`global M` for the JS globals of module `M`) whose
-/// foreigns the go target does not bind all of yet; G10e empties it.
-const PENDING: &[&str] = &[
-    // the core: Failure and RawCause
-    "@flick-lang/runtime",
-];
-
 /// The Go program of `text` with the built-in modules.
 fn build(text: &str) -> Output {
     let ir = lower_text("App", text).expect("lowers");
@@ -131,8 +124,7 @@ fn go_bindings_cover_builtins() {
                 Some(from) => (from.clone(), f.export.clone()),
                 None => (format!("global {}", module.name), f.name.clone()),
             };
-            if PENDING.contains(&from.as_str())
-                || lookup(&module.name, &f.name, f.module.as_deref(), &f.export).is_some()
+            if lookup(&module.name, &f.name, f.module.as_deref(), &f.export).is_some()
                 || js_only_exports.contains(&(from.clone(), key))
             {
                 continue;
@@ -149,7 +141,7 @@ fn go_bindings_cover_builtins() {
         });
     assert!(
         missing.is_empty(),
-        "foreigns with no go binding, not in bindings/js_only.txt nor PENDING:\n{report}"
+        "foreigns with no go binding, not in bindings/js_only.txt:\n{report}"
     );
 }
 
