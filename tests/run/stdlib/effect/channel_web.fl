@@ -1,0 +1,104 @@
+// Effect's `Channel` and `Sink` over JS streams: web streams and async
+// iterables, which only the JS target has.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+readable : List String ->{} Channel.ReadableStream String
+foreign sync readable from "./channel_js.mjs" "readable"
+
+async_iterable : List Float -> String ->{} Channel.AsyncIterable Float String
+foreign sync async_iterable from "./channel_js.mjs" "asyncIterable"
+
+upper : Unit ->{} Channel.TransformStream String String
+foreign sync upper from "./channel_js.mjs" "upper"
+  arity 0
+
+writable : Unit ->{} Channel.WritableStream String
+foreign sync writable from "./channel_js.mjs" "writable"
+  arity 0
+
+written : Unit ->{} List String
+foreign sync written from "./channel_js.mjs" "writtenSoFar"
+  arity 0
+
+writable_numbers : Unit ->{} Channel.WritableStream Float
+foreign sync writable_numbers from "./channel_js.mjs" "writable"
+  arity 0
+
+written_numbers : Unit ->{} List Float
+foreign sync written_numbers from "./channel_js.mjs" "writtenSoFar"
+  arity 0
+
+boom : JsValue -> Boom
+let boom value = Boom "js"
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+lists : Channel.Channel none e i (NonEmpty.NonEmpty a) d none Unit ->{; e} List (List a)
+let lists channel = Channel.run_collect (Channel.map NonEmpty.to_list channel)
+
+sources : Unit ->{; Boom} Unit
+let sources () =
+  let stream = readable ["x", "y"]
+  let web =
+    Channel.from_readable_stream {
+      evaluate = fun () -> stream;
+      onError = boom;
+      releaseLockOnEnd = true;
+    }
+  say ("from_readable_stream: " ++ show (lists web))
+  let iterated = Channel.from_async_iterable (async_iterable [1, 2] "end") boom
+  say ("from_async_iterable: " ++ show (Channel.run_collect iterated))
+  say
+    ("its end: "
+      ++ Channel.run_drain (Channel.from_async_iterable (async_iterable [] "only end") boom))
+  say
+    ("from_async_iterable_array: "
+      ++ show (lists (Channel.from_async_iterable_array (async_iterable [3, 4] "end") boom)))
+  let transform = upper ()
+  let shouted =
+    Channel.from_list_chunked 1 ["a", "b"]
+    |> Channel.pipe_to_or_fail
+      (Channel.from_transform_stream {
+        evaluate = fun () -> transform;
+        onError = boom;
+        closeOnDone = true;
+        releaseLockOnEnd = true;
+      })
+  say ("from_transform_stream: " ++ show (lists shouted))
+
+sinks : Unit ->{; Boom} Unit
+let sinks () =
+  let stream = writable ()
+  let into =
+    Channel.from_list_chunked 2 ["a", "b", "c"]
+    |> Channel.pipe_to
+      (Channel.from_writable_stream {
+        evaluate = fun () -> stream;
+        onError = boom;
+        closeOnDone = true;
+      })
+  Channel.run_drain into
+  say ("Channel.from_writable_stream: " ++ show (written ()))
+  let numbers = writable_numbers ()
+  let _ =
+    Channel.run_drain
+      (Channel.from_list_chunked 2 [1, 2, 3, 4, 5]
+        |> Channel.pipe_to
+          (Sink.to_channel
+            (Sink.from_writable_stream {
+              evaluate = fun () -> numbers;
+              onError = boom;
+              closeOnDone = true;
+            })))
+  say ("Sink.from_writable_stream: " ++ show (written_numbers ()))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    sources ()
+    sinks ()
+  with
+  | Boom why -> say ("unexpected " ++ why)

@@ -12,17 +12,6 @@ service Greeter =
 greeter : Greeter.Impl
 let greeter = { greet = fun name -> "hi " ++ name }
 
-written : Unit ->{} List String
-foreign sync written from "./channel_js.mjs" "writtenSoFar"
-  arity 0
-
-writable : Unit ->{} Channel.WritableStream String
-foreign sync writable from "./channel_js.mjs" "writable"
-  arity 0
-
-boom : JsValue -> Boom
-let boom value = Boom "js"
-
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
@@ -261,17 +250,6 @@ let running () =
     PubSub.take_between 4 4 sub
   }
   say ("run_into_pubsub, run_into_pubsub_array: " ++ show (replayed, ended))
-  let stream = writable ()
-  let into =
-    Channel.from_list_chunked 2 ["a", "b", "c"]
-    |> Channel.pipe_to
-      (Channel.from_writable_stream {
-        evaluate = fun () -> stream;
-        onError = boom;
-        closeOnDone = true;
-      })
-  Channel.run_drain into
-  say ("from_writable_stream: " ++ show (written ()))
 
 main : Unit ->{; AppError} Unit
 let main () =

@@ -7,17 +7,6 @@ type error Boom = Boom String
 service Scale =
   factor : Unit ->{} Int
 
-writable : Unit ->{} Channel.WritableStream Float
-foreign sync writable from "./channel_js.mjs" "writable"
-  arity 0
-
-written : Unit ->{} List Float
-foreign sync written from "./channel_js.mjs" "writtenSoFar"
-  arity 0
-
-boom : JsValue -> Boom
-let boom value = Boom "js"
-
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
@@ -235,15 +224,6 @@ let targets () =
     PubSub.take_between 5 5 sub
   }
   say ("from_pubsub: " ++ show got)
-  let stream = writable ()
-  let _ =
-    run
-      (Sink.from_writable_stream {
-        evaluate = fun () -> stream;
-        onError = boom;
-        closeOnDone = true;
-      })
-  say ("from_writable_stream: " ++ show (written ()))
   let summing : Channel.Channel
     none
     none

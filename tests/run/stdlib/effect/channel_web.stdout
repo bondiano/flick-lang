@@ -1,0 +1,7 @@
+from_readable_stream: [["x"], ["y"]]
+from_async_iterable: [1, 2]
+its end: only end
+from_async_iterable_array: [[3], [4]]
+from_transform_stream: [["A"], ["B"]]
+Channel.from_writable_stream: ["a", "b", "c"]
+Sink.from_writable_stream: [1, 2, 3, 4, 5]

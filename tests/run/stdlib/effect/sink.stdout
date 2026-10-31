@@ -60,5 +60,4 @@ on_exit, ensuring: 5 None ["exit Some 5", "ensuring"]
 map_error: mapped
 from_queue: [1, 2, 3, 4, 5]
 from_pubsub: [1, 2, 3, 4, 5]
-from_writable_stream: [1, 2, 3, 4, 5]
 from_channel: 15 None
