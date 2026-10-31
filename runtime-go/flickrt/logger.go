@@ -63,8 +63,8 @@ func loggerSet(existing, add []Value) []Value {
 	return out
 }
 
-// text is a part of a message as text: Node's inspection of one that is
-// not a string.
+// messageParts is the parts of a message as text: Node's inspection of
+// one that is not a string.
 func messageParts(message []Value) []Value {
 	out := make([]Value, len(message))
 	for i, part := range message {
@@ -152,7 +152,6 @@ func logMessage(fb *Fiber, level, message string) { logWith(fb, level, []Value{m
 func currentLogLevel(fb *Fiber) string { return envOr(fb, currentLogLevelKey, "Info").(string) }
 
 // logAt logs the message at the level.
-// shortcut: log messages are not exported over OTLP under `--trace`, only spans are; export them as log records when a program reads them
 func logAt(fb *Fiber, level string, message Value) Value {
 	logWith(fb, level, []Value{message}, nil)
 	return Unit
