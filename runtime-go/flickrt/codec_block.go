@@ -32,16 +32,7 @@ func DslOnMissing(factory, field Value) Value {
 // SchemaError is the field's issue.
 func DslOnMissingEffect(factory, field Value) Value {
 	f := *field.(*fieldSpec)
-	f.onMissing = func(fb *Fiber) (Value, []issue) {
-		v, cause := catch(func() Value { return Run(fb, Apply(fb, factory, Unit)) })
-		if cause == nil {
-			return v, nil
-		}
-		if d, ok := cause.err.(*Data); ok && cause.kind == causeFail && d.Tag == schemaErrorTag {
-			return nil, issuesOf(d)
-		}
-		panic(&Failure{cause})
-	}
+	f.onMissing = func(fb *Fiber) (Value, []issue) { return schemaTask(fb, Apply(fb, factory, Unit)) }
 	return &f
 }
 

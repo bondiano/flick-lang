@@ -3,3 +3,41 @@
 
 [@flick-lang/runtime]
 schemaValidate *SchemaValidate
+codecTransformEffect CodecTransformEffect
+
+[@flick-lang/runtime/effect/Schema]
+Literal CodecLiteral
+Literals CodecLiterals
+flickEntries CodecEntries
+NonEmptyArray CodecNonEmptyList
+ArrayEnsure CodecListEnsure
+Trim CodecTrim
+flickToLowerCase CodecToLowerCase
+flickToUpperCase CodecToUpperCase
+flickCapitalize CodecCapitalize
+flickUncapitalize CodecUncapitalize
+flickSnakeToCamel CodecSnakeToCamel
+NumberFromString CodecNumberFromString
+flickFiniteFromString CodecFiniteFromString
+BooleanFromBit CodecBoolFromBit
+flickStringFromBase64 CodecStringFromBase64
+flickStringFromBase64Url CodecStringFromBase64Url
+flickStringFromHex CodecStringFromHex
+flickStringFromUriComponent CodecStringFromUriComponent
+flickFromJsonString CodecJsonString
+flickSplit CodecSplit
+flickSplitKeyValue CodecSplitKeyValue
+Natural CodecNatural
+Port CodecPort
+Char CodecChar
+flickAnnotate CodecAnnotate
+flickResolveAnnotations CodecAnnotations
+flip CodecFlip
+flickToType CodecToSchema
+flickToEncoded CodecWireSchema
+flickCatchDecoding CodecCatchDecoding
+flickCatchDecodingWithContext CodecCatchDecodingEffect
+flickCatchEncoding CodecCatchEncoding
+flickCatchEncodingWithContext CodecCatchEncodingEffect
+flickCheckEffect CodecCheckEffect
+flickToEncoderXml *CodecEncodeXml

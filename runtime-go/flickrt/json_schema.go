@@ -45,6 +45,11 @@ func closedObject(keys []string, schemas []Value, closed bool) Value {
 	return Rec("type", "object", "properties", props, "required", required, "additionalProperties", false)
 }
 
+// exportable is a codec that writes its own JSON Schema.
+type exportable interface {
+	jsonSchema(x *schemaExport, path string) Value
+}
+
 func (x *schemaExport) codec(c codec, path string) Value {
 	switch k := c.(type) {
 	case *wire:
@@ -79,6 +84,12 @@ func (x *schemaExport) codec(c codec, path string) Value {
 		return Rec("const", maskedText)
 	case refused:
 		refuseExport(path, k.reason)
+	case *stage:
+		return x.codec(k.wire, path)
+	case *stringAs:
+		return Rec("type", "string")
+	case exportable:
+		return k.jsonSchema(x, path)
 	}
 	// shortcut: the string-tree, parameter and HTTP value codecs are refused; write their forms when a program exports one
 	refuseExport(path, "this codec has no JSON Schema form on the go target")
@@ -107,6 +118,8 @@ func (x *schemaExport) schema(s *Schema, path string) Value {
 			base = base.set(keywords[i].(string), keywords[i+1])
 		}
 		return base
+	case kindCustom:
+		return x.codec(s.jsonOf(), path)
 	case kindLazy:
 		s.resolved()
 		if x.defs.index(s.name) < 0 {

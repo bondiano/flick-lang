@@ -19,6 +19,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/cause.go"),
     ),
     (
+        "check.go",
+        include_str!("../../../../runtime-go/flickrt/check.go"),
+    ),
+    (
         "cli.go",
         include_str!("../../../../runtime-go/flickrt/cli.go"),
     ),
@@ -143,12 +147,20 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/codec_block.go"),
     ),
     (
+        "codec_more.go",
+        include_str!("../../../../runtime-go/flickrt/codec_more.go"),
+    ),
+    (
         "codec_policy.go",
         include_str!("../../../../runtime-go/flickrt/codec_policy.go"),
     ),
     (
         "codec_standard.go",
         include_str!("../../../../runtime-go/flickrt/codec_standard.go"),
+    ),
+    (
+        "codec_strings.go",
+        include_str!("../../../../runtime-go/flickrt/codec_strings.go"),
     ),
     (
         "codec_tree.go",
