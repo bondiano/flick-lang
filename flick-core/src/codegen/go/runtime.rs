@@ -523,6 +523,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/schema.go"),
     ),
     (
+        "schema_validate.go",
+        include_str!("../../../../runtime-go/flickrt/schema_validate.go"),
+    ),
+    (
         "schema_write.go",
         include_str!("../../../../runtime-go/flickrt/schema_write.go"),
     ),

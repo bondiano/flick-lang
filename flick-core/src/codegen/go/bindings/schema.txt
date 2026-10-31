@@ -1,0 +1,5 @@
+# The schemas, codecs and checks over Effect Schema beyond the core ones of
+# runtime.txt: Effect's combinators and the standard library's types.
+
+[@flick-lang/runtime]
+schemaValidate *SchemaValidate

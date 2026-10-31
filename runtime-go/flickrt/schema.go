@@ -26,6 +26,7 @@ type Schema struct {
 	check    Value       // refined: its check, a function to Bool
 	known    string      // refined: the check JSON Schema can state, or ""
 	get      func() Value
+	valid    func(*Fiber, Value) (Value, []issue) // custom: the check of a value of the type
 	once     sync.Once
 	target   *Schema // a lazy schema, resolved
 	wireOnce sync.Once
@@ -52,6 +53,7 @@ const (
 	kindAdt
 	kindLazy
 	kindRefined
+	kindCustom // a type of the runtime: its check and its JSON codec
 )
 
 // Variant is a constructor of a variant type: its qualified tag, its name
@@ -219,6 +221,8 @@ func (w *wire) accepts(in Value) bool {
 		return ok
 	case kindOption:
 		return in == JsonNull || s.item.jsonOf().accepts(in)
+	case kindCustom:
+		return s.jsonOf().accepts(in)
 	}
 	return true
 }
@@ -278,6 +282,8 @@ func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 		return in, nil
 	case kindRedacted:
 		return nil, fail(redactedRefusal)
+	case kindCustom:
+		return s.jsonOf().decode(fb, in)
 	case kindList:
 		xs, ok := in.([]Value)
 		if !ok {
@@ -441,6 +447,8 @@ func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 		return nil, expected("nothing (Never)", v)
 	case kindRedacted:
 		return nil, fail(redactedRefusal)
+	case kindCustom:
+		return s.jsonOf().encode(fb, v)
 	case kindString, kindBool, kindUnknown:
 		return v, nil
 	case kindList, kindTuple:
