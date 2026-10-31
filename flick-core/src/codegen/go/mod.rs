@@ -25,7 +25,7 @@ mod reach;
 mod runtime;
 mod schema;
 
-pub use runtime::RUNTIME;
+pub use runtime::{DRIVER, DRIVER_GO_MOD, RUNTIME};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::{mem, slice};
@@ -40,6 +40,11 @@ use reach::Key;
 
 /// The Go import path of the runtime package.
 pub const RUNTIME_PACKAGE: &str = "flick.app/flickrt";
+
+/// The package of the `PostgreSQL` driver, and the binding that needs it.
+const DRIVER_PACKAGE: &str = "flick.app/flickpg";
+const DRIVER_MODULE: &str = "@flick-lang/runtime/sql";
+const DRIVER_EXPORT: &str = "pgLayer";
 
 /// The source path and line of a span of a module.
 pub type Locate<'a> = dyn Fn(&str, Span) -> Option<(String, u32)> + 'a;
@@ -74,6 +79,9 @@ pub type ForeignFile<'a> = dyn Fn(&str, &str) -> Option<(String, String)> + 'a;
 pub struct Output {
     pub files: Vec<(String, String)>,
     pub diagnostics: Vec<Diagnostic>,
+    /// Whether the program reaches the `PostgreSQL` driver, which its Go
+    /// module then vendors.
+    pub driver: bool,
 }
 
 /// How a top-level name is held in Go.
@@ -187,6 +195,7 @@ pub fn go(program: &Program) -> Output {
         return Output {
             files: Vec::new(),
             diagnostics,
+            driver: false,
         };
     };
     let fb = a.text("fb");
@@ -291,6 +300,16 @@ fn compile<'a>(
         "flickrt.Main",
         [docvec![a, "func(fb *flickrt.Fiber) ", run]],
     );
+    // the driver registers itself with the runtime as it is imported
+    let driver = reached.iter().any(|&(m, i)| {
+        matches!(&modules[m].items[i].kind, ItemKind::Foreign(f)
+            if f.module.as_deref() == Some(DRIVER_MODULE) && f.export == DRIVER_EXPORT)
+    });
+    let import_driver = if driver {
+        docvec![a, "import _ \"", DRIVER_PACKAGE, "\"", a.lines(2)]
+    } else {
+        a.empty()
+    };
     let main_go = docvec![
         a,
         "package main",
@@ -299,6 +318,7 @@ fn compile<'a>(
         RUNTIME_PACKAGE,
         "\"",
         a.lines(2),
+        import_driver,
         "func main() ",
         block(a, [statement(a, run)]),
         a.line()
@@ -306,7 +326,11 @@ fn compile<'a>(
     files.push(("main.go".to_owned(), layout::print(main_go)));
     files.extend(sources);
     dedup(&mut diagnostics);
-    Output { files, diagnostics }
+    Output {
+        files,
+        diagnostics,
+        driver,
+    }
 }
 
 /// The modules in an order where each one's initialization runs after

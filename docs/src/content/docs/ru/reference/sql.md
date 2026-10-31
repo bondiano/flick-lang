@@ -202,7 +202,10 @@ let load id = Database.query (Sql.bind balances { user_id = id })
 даёт 10 соединений без таймаутов; чтобы изменить их, задайте поля записи:
 `{ Database.config url with max_connections = 4; statement_timeout_ms =
 Some 5000 }`. Пакет `pg` — необязательная peer-зависимость
-`@flick-lang/runtime`; его загружает только этот слой.
+`@flick-lang/runtime`; его загружает только этот слой. На Go-target пул —
+из pgx, завендоренного в Go-модуль программы, которая обращается к
+`Database`, поэтому сборке не нужна сеть; остальные программы драйвер не
+несут.
 
 ## Транзакции
 

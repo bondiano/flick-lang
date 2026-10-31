@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use std::env;
+use std::fmt::Write as _;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -29,11 +30,50 @@ mod builtin_source;
 
 fn main() -> io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
+    let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo supplies OUT_DIR"));
+    go_driver(&output)?;
     if cfg!(feature = "builtin-docs") {
         return Ok(());
     }
-    let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo supplies OUT_DIR"));
     strip_tree(Path::new("src/types/builtins"), &output.join("builtins"))
+}
+
+/// `go_driver.rs`: the files of the go target's `PostgreSQL` driver, the
+/// package `flickpg` and the modules it vendors, by their path in a
+/// program's Go module.
+fn go_driver(output: &Path) -> io::Result<()> {
+    let root = Path::new("../runtime-go");
+    let mut files = Vec::new();
+    for dir in ["flickpg", "vendor"] {
+        println!("cargo:rerun-if-changed={}", root.join(dir).display());
+        list(root, &root.join(dir), &mut files)?;
+    }
+    files.sort();
+    let mut out = String::from("&[\n");
+    for rel in files {
+        let path = fs::canonicalize(root.join(&rel))?;
+        writeln!(
+            out,
+            "    ({rel:?}, include_str!({:?})),",
+            path.display().to_string()
+        )
+        .expect("writing to a String");
+    }
+    out.push_str("]\n");
+    fs::write(output.join("go_driver.rs"), out)
+}
+
+fn list(root: &Path, dir: &Path, out: &mut Vec<String>) -> io::Result<()> {
+    for entry in fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            list(root, &path, out)?;
+        } else if !path.to_string_lossy().ends_with("_test.go") {
+            let rel = path.strip_prefix(root).expect("under the root");
+            out.push(rel.to_string_lossy().replace('\\', "/"));
+        }
+    }
+    Ok(())
 }
 
 fn strip_tree(input: &Path, output: &Path) -> io::Result<()> {

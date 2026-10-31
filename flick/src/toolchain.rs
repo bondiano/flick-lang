@@ -67,8 +67,15 @@ pub fn go_build(out_dir: &Path, name: &str) -> Option<Diagnostic> {
         .arg(out_dir.join(build::go::executable(name)))
         .arg(".")
         .current_dir(&dir)
-        // the module needs nothing from the network
-        .env("GOFLAGS", "-mod=mod")
+        // the module needs nothing from the network: what it requires is vendored
+        .env(
+            "GOFLAGS",
+            if dir.join("vendor").is_dir() {
+                "-mod=vendor"
+            } else {
+                "-mod=mod"
+            },
+        )
         .env("GOTOOLCHAIN", "local");
     // the runtime needs no C: a static executable, built without a C compiler
     if env::var_os("CGO_ENABLED").is_none() {

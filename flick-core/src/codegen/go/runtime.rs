@@ -531,6 +531,14 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/service.go"),
     ),
     (
+        "sql.go",
+        include_str!("../../../../runtime-go/flickrt/sql.go"),
+    ),
+    (
+        "sql_db.go",
+        include_str!("../../../../runtime-go/flickrt/sql_db.go"),
+    ),
+    (
         "stdio.go",
         include_str!("../../../../runtime-go/flickrt/stdio.go"),
     ),
@@ -599,3 +607,11 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/value.go"),
     ),
 ];
+
+/// The `PostgreSQL` driver, the package `flickpg` with the modules it vendors,
+/// written beside a program that reaches the `Database` service.
+pub const DRIVER: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/go_driver.rs"));
+
+/// The `go.mod` of a program with the driver: the runtime's, which
+/// requires what `vendor/` holds.
+pub const DRIVER_GO_MOD: &str = include_str!("../../../../runtime-go/go.mod");

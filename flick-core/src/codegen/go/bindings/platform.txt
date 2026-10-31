@@ -120,3 +120,19 @@ flickStderr ChildProcessStderr
 flickString *ChildProcessString
 flickLines *ChildProcessLines
 flickExitCode *ChildProcessExitCode
+
+[@flick-lang/runtime/sql]
+sqlCodec SqlCodec
+sqlBind SqlBind
+sqlText SqlText
+sqlTemplateText SqlTemplateText
+sqlParameterCount SqlParameterCount
+sqlIdentifier SqlIdentifier
+sqlRawText SqlRawText
+sqlRawIdent SqlRawIdent
+sqlRawParam SqlRawParam
+sqlRawQuery SqlRawQuery
+sqlTable SqlTable
+sqlTemplate SqlTemplate
+pgTransaction *DatabaseTransaction
+pgLayer DatabasePgLayer

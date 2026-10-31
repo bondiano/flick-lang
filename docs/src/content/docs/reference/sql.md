@@ -176,7 +176,10 @@ connections, ended with the scope of its `provide`. `Database.config url`
 gives 10 connections and no timeouts; set the fields of the record to
 change them: `{ Database.config url with max_connections = 4;
 statement_timeout_ms = Some 5000 }`. The `pg` package is an optional peer
-dependency of `@flick-lang/runtime`, loaded only by this layer.
+dependency of `@flick-lang/runtime`, loaded only by this layer. On the go
+target the pool is pgx's, vendored into the Go module of a program that
+reaches `Database`, so its build needs no network; other programs carry no
+driver.
 
 ## Transactions
 
