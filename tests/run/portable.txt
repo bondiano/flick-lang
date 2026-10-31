@@ -124,3 +124,4 @@ stdlib/effect/hash_ring
 stdlib/effect/crypto
 stdlib/effect/trie
 stdlib/effect/bytesize
+stdlib/effect/chunk

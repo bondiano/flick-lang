@@ -13,7 +13,7 @@ use crate::project::js_only;
 /// The runtime modules (`global M` for the JS globals of module `M`) whose
 /// foreigns the go target does not bind all of yet; G10e empties it.
 const PENDING: &[&str] = &[
-    // the rest: Chunk, Record, Loop and failures of the core
+    // the rest: Record, Loop and failures of the core
     "@flick-lang/runtime",
     // Schedule: `cron` needs Cron
     "@flick-lang/runtime/effect/Schedule",
@@ -39,7 +39,6 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime/effect/TxSemaphore",
     "@flick-lang/runtime/effect/TxSubscriptionRef",
     // data structures
-    "@flick-lang/runtime/effect/Chunk",
     "@flick-lang/runtime/effect/Graph",
     "@flick-lang/runtime/effect/Schema",
     // time
