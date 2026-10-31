@@ -62,7 +62,9 @@ func TestChildProcessKillAndScope(t *testing.T) {
 }
 
 func TestChildProcessMissingProgramIsNotFound(t *testing.T) {
-	_, cause := catch(func() Value { return ChildProcessExitCode(rootFiber(), ChildProcessMake("flick-no-such-program", []Value{})) })
+	_, cause := catch(func() Value {
+		return ChildProcessExitCode(rootFiber(), ChildProcessMake("flick-no-such-program", []Value{}))
+	})
 	if cause == nil || cause.kind != causeFail {
 		t.Fatalf("no failure: %v", cause)
 	}
