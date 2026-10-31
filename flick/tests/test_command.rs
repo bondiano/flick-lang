@@ -124,7 +124,10 @@ fn outcomes_are_reported_apart() {
     );
     assert_eq!(status(&json, "dies"), ("failed", "defect"));
     assert_eq!(status(&json, "fails to clean up"), ("failed", "cleanup"));
-    assert_eq!(status(&json, "a supervisor that dies"), ("failed", "defect"));
+    assert_eq!(
+        status(&json, "a supervisor that dies"),
+        ("failed", "defect")
+    );
     assert_eq!(status(&json, "releases"), ("passed", ""));
     assert_eq!(status(&json, "numbers > reverse twice"), ("passed", ""));
     assert_eq!(status(&json, "numbers > small"), ("failed", "assertion"));
