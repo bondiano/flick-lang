@@ -8,3 +8,16 @@ flickRemove *HashRingRemove
 flickHas *HashRingHas
 flickGet HashRingGet
 flickGetShards HashRingGetShards
+
+[@flick-lang/runtime/effect/Crypto]
+flickRandomBytes CryptoRandomBytes
+flickDigest CryptoDigest
+flickRandom CryptoRandom
+flickRandomBoolean CryptoRandomBoolean
+flickRandomInt CryptoRandomInt
+flickRandomBetween CryptoRandomBetween
+flickRandomIntBetween CryptoRandomIntBetween
+flickRandomShuffle CryptoRandomShuffle
+flickRandomUuidV4 CryptoRandomUuidV4
+flickRandomUuidV7 CryptoRandomUuidV7
+flickRandomUlid CryptoRandomUlid
