@@ -1,0 +1,3 @@
+from_readable_stream: ["1", "2"]
+from_async_iterable: ["1", "2"]
+from_event_listener: [1]

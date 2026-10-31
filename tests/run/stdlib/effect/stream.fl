@@ -6,20 +6,6 @@ type error Boom = Boom Float
 ms1 : Duration.Duration
 let ms1 = Result.with_default Duration.zero (Duration.millis 1)
 
-/// An async iterable and a readable stream of the values.
-readable : List JsValue ->{} JsValue
-foreign sync readable from "./streams.mjs" "readable"
-
-/// An event target that dispatches `abort` after the milliseconds.
-aborting : Float ->{} JsValue
-foreign sync aborting from global "AbortSignal.timeout"
-
-js_number : Float -> JsValue
-foreign pure js_number from global "Number"
-
-js_text : JsValue -> String
-foreign pure js_text from global "String"
-
 line : Show a => (String, List a) ->{} Unit
 let line (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
@@ -110,21 +96,6 @@ let main () =
   line (
     "from_tx_subscription_ref",
     (Stream.run_collect (Stream.take 1 (Stream.from_tx_subscription_ref tx))),
-  )
-  let values = [js_number 1, js_number 2]
-  let read = Stream.from_readable_stream JsError.from_js (readable values)
-  let chunks =
-    try Stream.run_collect read with
-    | JsError.JsError _ -> []
-  Platform.stdout_line ("from_readable_stream: " ++ show (List.map js_text chunks))
-  let iterated = Stream.from_async_iterable JsError.from_js (readable values)
-  let items =
-    try Stream.run_collect iterated with
-    | JsError.JsError _ -> []
-  Platform.stdout_line ("from_async_iterable: " ++ show (List.map js_text items))
-  line (
-    "from_event_listener",
-    [Stream.run_count (Stream.take 1 (Stream.from_event_listener "abort" (aborting 30)))],
   )
   line ("never", [Stream.run_count (Stream.take 0 Stream.never)])
   line ("default_chunk_size", [Stream.default_chunk_size])

@@ -1,0 +1,34 @@
+// Sources of Effect's `Stream` over JS values: web streams, async
+// iterables and event targets, which only the JS target has.
+module App.Main exposing (main)
+
+/// An async iterable and a readable stream of the values.
+readable : List JsValue ->{} JsValue
+foreign sync readable from "./streams.mjs" "readable"
+
+/// An event target that dispatches `abort` after the milliseconds.
+aborting : Float ->{} JsValue
+foreign sync aborting from global "AbortSignal.timeout"
+
+js_number : Float -> JsValue
+foreign pure js_number from global "Number"
+
+js_text : JsValue -> String
+foreign pure js_text from global "String"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let values = [js_number 1, js_number 2]
+  let read = Stream.from_readable_stream JsError.from_js (readable values)
+  let chunks =
+    try Stream.run_collect read with
+    | JsError.JsError _ -> []
+  Platform.stdout_line ("from_readable_stream: " ++ show (List.map js_text chunks))
+  let iterated = Stream.from_async_iterable JsError.from_js (readable values)
+  let items =
+    try Stream.run_collect iterated with
+    | JsError.JsError _ -> []
+  Platform.stdout_line ("from_async_iterable: " ++ show (List.map js_text items))
+  Platform.stdout_line
+    ("from_event_listener: "
+      ++ show [Stream.run_count (Stream.take 1 (Stream.from_event_listener "abort" (aborting 30)))])
