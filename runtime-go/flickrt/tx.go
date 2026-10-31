@@ -337,35 +337,44 @@ func TxCurrent(fb *Fiber) Value {
 
 func TxRefMake(v Value) Value { return newTxRef(v) }
 
-func TxRefGet(fb *Fiber, r Value) Value {
-	return txDo(fb, func(fb *Fiber, t *tx) Value { return t.get(fb, txRefOf(r)) })
-}
+func TxRefGet(fb *Fiber, r Value) Value { return txRead(fb, txRefOf(r), Identity) }
 
 func TxRefSet(fb *Fiber, v, r Value) Value {
-	return txDo(fb, func(fb *Fiber, t *tx) Value {
-		t.set(fb, txRefOf(r), v)
-		return Unit
-	})
+	return txUpdate(fb, txRefOf(r), func(Value) Value { return v })
 }
 
 func TxRefUpdate(fb *Fiber, f, r Value) Value {
+	return txUpdate(fb, txRefOf(r), func(v Value) Value { return Apply(fb, f, v) })
+}
+
+func TxRefModify(fb *Fiber, f, r Value) Value { return txModify(fb, txRefOf(r), txPair(fb, f)) }
+
+// txPair is a Flick function giving a pair `(out, next)`, for `modify`.
+func txPair(fb *Fiber, f Value) func(Value) (Value, Value) {
+	return func(v Value) (Value, Value) {
+		p := Apply(fb, f, v).([]Value)
+		return p[0], p[1]
+	}
+}
+
+// txRead, txUpdate and txModify are TxRef's `get`, `update` and `modify`
+// of `r` by Go functions, in the fiber's transaction or one of their own,
+// for the structures over TxRefs.
+func txRead(fb *Fiber, r *TxRef, f func(Value) Value) Value {
+	return txDo(fb, func(fb *Fiber, t *tx) Value { return f(t.get(fb, r)) })
+}
+
+func txUpdate(fb *Fiber, r *TxRef, f func(Value) Value) Value {
 	return txDo(fb, func(fb *Fiber, t *tx) Value {
-		t.update(fb, txRefOf(r), func(v Value) Value { return Apply(fb, f, v) })
+		t.update(fb, r, f)
 		return Unit
 	})
 }
 
-// TxRefModify sets the second of `f` of the value; gives the first.
-func TxRefModify(fb *Fiber, f, r Value) Value {
-	return txDo(fb, func(fb *Fiber, t *tx) Value {
-		return t.modify(fb, txRefOf(r), func(v Value) (Value, Value) {
-			p := Apply(fb, f, v).([]Value)
-			return p[0], p[1]
-		})
-	})
+func txModify(fb *Fiber, r *TxRef, f func(Value) (Value, Value)) Value {
+	return txDo(fb, func(fb *Fiber, t *tx) Value { return t.modify(fb, r, f) })
 }
 
-// update and modify are TxRef's, for the structures over TxRefs.
 func (t *tx) update(fb *Fiber, r *TxRef, f func(Value) Value) {
 	t.set(fb, r, f(t.get(fb, r)))
 }

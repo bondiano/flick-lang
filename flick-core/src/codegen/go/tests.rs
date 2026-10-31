@@ -25,8 +25,6 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime/effect/Stream",
     "@flick-lang/runtime/effect/SubscriptionRef",
     // transactions
-    "@flick-lang/runtime/effect/TxChunk",
-    "@flick-lang/runtime/effect/TxDeferred",
     "@flick-lang/runtime/effect/TxHashMap",
     "@flick-lang/runtime/effect/TxHashSet",
     "@flick-lang/runtime/effect/TxPriorityQueue",

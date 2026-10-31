@@ -13,3 +13,33 @@ get *TxRefGet
 set *TxRefSet
 update *TxRefUpdate
 modify *TxRefModify
+
+[@flick-lang/runtime/effect/TxChunk]
+make TxChunkMake
+empty TxChunkEmpty
+fromIterable TxChunkFromIterable
+modify *TxChunkModify
+update *TxChunkUpdate
+get *TxChunkGet
+set *TxChunkSet
+append *TxChunkAppend
+prepend *TxChunkPrepend
+size *TxChunkSize
+isEmpty *TxChunkIsEmpty
+isNonEmpty *TxChunkIsNonEmpty
+take *TxChunkTake
+drop *TxChunkDrop
+slice *TxChunkSlice
+map *TxChunkMap
+filter *TxChunkFilter
+appendAll *TxChunkAppendAll
+prependAll *TxChunkPrependAll
+concat *TxChunkConcat
+
+[@flick-lang/runtime/effect/TxDeferred]
+make TxDeferredMake
+await *TxDeferredAwait
+poll *TxDeferredPoll
+done *TxDeferredDone
+succeed *TxDeferredSucceed
+fail *TxDeferredFail

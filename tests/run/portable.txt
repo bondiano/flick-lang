@@ -137,3 +137,5 @@ stdlib/effect/queue
 stdlib/effect/channel_core
 stdlib/effect/stream_core
 stdlib/effect/txref
+stdlib/effect/txchunk
+stdlib/effect/txdeferred
