@@ -161,3 +161,8 @@ stdlib/effect/stream_transform
 stdlib/effect/stream_errors
 stdlib/effect/stream_combine
 stdlib/effect/stream_sink
+stdlib/effect/logger
+stdlib/effect/metric
+stdlib/effect/tracer
+stdlib/effect/observe
+stdlib/observability/prometheus
