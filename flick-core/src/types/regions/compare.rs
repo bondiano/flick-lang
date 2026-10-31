@@ -36,16 +36,22 @@ impl Checker<'_> {
                 let right = cb.unwrap_or_else(Type::empty_row);
                 // the types first: what they solve decides what a qualifier holds
                 self.unify(&a, &b)?;
-                let (left, right) = (self.expanded(&left), self.expanded(&right));
-                match self.unify(&left, &right) {
-                    Err(mismatch) if self.unknown_captures(&mismatch) => {
-                        let span = self.regions.deferring.expect("checked");
-                        self.regions.deferred.push((left, right, span));
-                        Ok(())
-                    }
-                    other => other,
-                }
+                self.unify_qualifiers(&left, &right)
             }
+        }
+    }
+
+    /// Unifies two capture qualifiers; inside a subsumption, ones that differ
+    /// only by the captures of a type not inferred yet are compared when it is.
+    pub fn unify_qualifiers(&mut self, left: &Type, right: &Type) -> Unified {
+        let (left, right) = (self.expanded(left), self.expanded(right));
+        match self.unify(&left, &right) {
+            Err(mismatch) if self.unknown_captures(&mismatch) => {
+                let span = self.regions.deferring.expect("checked");
+                self.regions.deferred.push((left, right, span));
+                Ok(())
+            }
+            other => other,
         }
     }
 
@@ -55,12 +61,16 @@ impl Checker<'_> {
         let Mismatch::Label { label, .. } = mismatch else {
             return false;
         };
+        self.regions.deferring.is_some() && self.uninferred(label)
+    }
+
+    /// Whether `label` is the captures `^?m` of a type not inferred yet.
+    fn uninferred(&self, label: &str) -> bool {
         let meta = label.strip_prefix("^?").and_then(|m| m.parse().ok());
-        self.regions.deferring.is_some()
-            && meta.is_some_and(|m| {
-                !self.store.is_capture_row(m)
-                    && matches!(self.store.resolve(&Type::Meta(m)), Type::Meta(_))
-            })
+        meta.is_some_and(|m| {
+            !self.store.is_capture_row(m)
+                && matches!(self.store.resolve(&Type::Meta(m)), Type::Meta(_))
+        })
     }
 
     /// A capture row whose entries are what they hold now: the entry of a
@@ -94,6 +104,14 @@ impl Checker<'_> {
         out.into_type()
     }
 
+    /// A deferred qualifier at the end of a declaration: a type it never
+    /// inferred holds nothing, as no value of it was made (`None`, `[]`).
+    fn inferred(&self, row: &Type) -> Type {
+        let mut norm = self.store.normalize(&self.expanded(row));
+        norm.entries.retain(|(label, _)| !self.uninferred(label));
+        norm.into_type()
+    }
+
     /// Whether a region diagnostic already covers `span`.
     fn hold_reported(&self, span: Span) -> bool {
         self.diagnostics.iter().any(|d| {
@@ -107,6 +125,7 @@ impl Checker<'_> {
     /// reports the captures no hold named.
     pub fn compare_deferred(&mut self) {
         for (left, right, span) in mem::take(&mut self.regions.deferred) {
+            let (left, right) = (self.inferred(&left), self.inferred(&right));
             if let Err(mismatch) = self.unify(&left, &right)
                 && !self.hold_reported(span)
             {

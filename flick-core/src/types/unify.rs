@@ -521,7 +521,7 @@ impl Checker<'_> {
                 } else {
                     self.captures_of(other).into_type()
                 };
-                self.unify(captures, &held)?;
+                self.unify_qualifiers(captures, &held)?;
                 let identity = self.capture_identity(ty);
                 return self.unify(&identity, other);
             }
