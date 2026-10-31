@@ -117,3 +117,4 @@ stdlib/effect/stream_platform
 stdlib/process/child_process
 stdlib/effect/values
 sql/queries
+stdlib/effect/mutable_ref
