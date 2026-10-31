@@ -257,11 +257,7 @@ impl<'a> Gen<'a> {
                         let args = args.iter().map(|arg| arg.doc);
                         call(a, "flickrt.NewData", iter::once(a.text(tag)).chain(args)).into()
                     }),
-                    Rep::Unboxed => Box::new(|_, args: &[Code<'a>]| args[0]),
-                    Rep::Typeof(_) => {
-                        self.unsupported(head.span, "an `untagged` type");
-                        Box::new(|_, args: &[Code<'a>]| args[0])
-                    }
+                    Rep::Unboxed | Rep::Typeof(_) => Box::new(|_, args: &[Code<'a>]| args[0]),
                 };
                 (make, Vec::new(), c.arity, 0)
             }

@@ -206,7 +206,7 @@ impl<'a> Gen<'a> {
                 None => a.text("nil"),
                 Some(cs) => {
                     let cs: Vec<Document<'a>> =
-                        cs.iter().map(|c| self.constructor_info(c, span)).collect();
+                        cs.iter().map(|c| self.constructor_info(c)).collect();
                     list(a, "[]flickrt.Constructor{", cs, "}")
                 }
             };
@@ -284,11 +284,12 @@ impl<'a> Gen<'a> {
         }
     }
 
-    fn constructor_info(&mut self, c: &Constructor, span: Span) -> Document<'a> {
+    fn constructor_info(&mut self, c: &Constructor) -> Document<'a> {
         let a = self.a;
-        if let Rep::Typeof(_) = c.rep {
-            self.unsupported(span, "an `untagged` type");
-        }
+        let class = match c.rep {
+            Rep::Typeof(class) => class.name(),
+            _ => "",
+        };
         let unboxed = if c.rep == Rep::Unboxed {
             "true"
         } else {
@@ -299,6 +300,7 @@ impl<'a> Gen<'a> {
             docvec![a, "Name: ", self.string(&c.name)],
             docvec![a, "Arity: ", c.arity],
             docvec![a, "Unboxed: ", unboxed],
+            docvec![a, "Class: ", self.string(class)],
         ];
         list(a, "{", fields, "}")
     }

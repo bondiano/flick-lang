@@ -1,6 +1,9 @@
 package flickrt
 
-import "sync"
+import (
+	"math/big"
+	"sync"
+)
 
 // Dict is the dictionary of a class instance: its methods, and entries
 // computed on first use (superclass dictionaries `$Class` and default
@@ -53,12 +56,32 @@ func Method(fb *Fiber, d Value, name string) Value { return d.(*Dict).get(fb, na
 func Super(fb *Fiber, d Value, class string) Value { return d.(*Dict).get(fb, "$"+class) }
 
 // Constructor describes a constructor of a derived type: its tag, name and
-// arity, and whether a value is its one field.
+// arity, and whether a value is its one field: always when unboxed, and
+// when of its JS class `Class` (an `untagged` type).
 type Constructor struct {
 	Tag     string
 	Name    string
 	Arity   int
 	Unboxed bool
+	Class   string
+}
+
+// IsClass is whether a value is of the JS class, as `typeof` tells the
+// fields of an `untagged` type apart.
+func IsClass(v Value, class string) bool {
+	switch v.(type) {
+	case int32, float64:
+		return class == "number"
+	case string:
+		return class == "string"
+	case bool:
+		return class == "boolean"
+	case *big.Int:
+		return class == "bigint"
+	case []Value:
+		return class == "array"
+	}
+	return false
 }
 
 // Derive is a derived instance of class `name`. `fields` gives the
@@ -75,7 +98,7 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 	variant := func(v Value) (int, int) {
 		offset := 0
 		for i, c := range constructors {
-			if c.Unboxed || v.(*Data).Tag == c.Tag {
+			if c.Unboxed || c.Class != "" && IsClass(v, c.Class) || c.Class == "" && v.(*Data).Tag == c.Tag {
 				return i, offset
 			}
 			offset += c.Arity
@@ -83,7 +106,7 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 		panic(Defect{"value of no constructor of its type"})
 	}
 	args := func(i int, v Value) []Value {
-		if constructors[i].Unboxed {
+		if constructors[i].Unboxed || constructors[i].Class != "" {
 			return []Value{v}
 		}
 		return v.(*Data).Fields
