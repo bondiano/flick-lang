@@ -23,6 +23,8 @@ pub use checking::ModuleCache;
 pub use entry::{MainKind, main_kind};
 #[cfg(feature = "ide")]
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
+#[cfg(test)]
+pub(crate) use target::js_only;
 
 #[cfg(feature = "native-project")]
 use super::packages::Packages;

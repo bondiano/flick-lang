@@ -29,6 +29,18 @@ const TABLES: &[&str] = &[
     include_str!("bindings/globals.txt"),
     include_str!("bindings/schema.txt"),
     include_str!("bindings/net.txt"),
+    include_str!("bindings/clock.txt"),
+    include_str!("bindings/schedule.txt"),
+    include_str!("bindings/queue.txt"),
+    include_str!("bindings/channel.txt"),
+    include_str!("bindings/sink.txt"),
+    include_str!("bindings/tx.txt"),
+    include_str!("bindings/structures.txt"),
+    include_str!("bindings/graph.txt"),
+    include_str!("bindings/time.txt"),
+    include_str!("bindings/observability.txt"),
+    include_str!("bindings/resources.txt"),
+    include_str!("bindings/rest.txt"),
 ];
 
 fn table() -> &'static HashMap<(String, String), String> {
@@ -50,15 +62,29 @@ fn table() -> &'static HashMap<(String, String), String> {
                     Some(go) => format!("*flickrt.{go}"),
                     None => format!("flickrt.{go}"),
                 };
-                out.insert((module.to_owned(), export.to_owned()), go);
+                let earlier = out.insert((module.to_owned(), export.to_owned()), go);
+                assert!(earlier.is_none(), "`{export}` of `{module}` is bound twice");
             }
         }
         out
     })
 }
 
+/// The Go functions and variables the tables name.
+#[cfg(test)]
+pub(super) fn targets() -> impl Iterator<Item = &'static str> {
+    table()
+        .values()
+        .map(|go| go.trim_start_matches('*').trim_start_matches("flickrt."))
+}
+
 /// The Go function of the binding `name` of `module` to `export` of `from`.
-fn lookup(module: &str, name: &str, from: Option<&str>, export: &str) -> Option<&'static str> {
+pub(super) fn lookup(
+    module: &str,
+    name: &str,
+    from: Option<&str>,
+    export: &str,
+) -> Option<&'static str> {
     let key = match from {
         Some(from) => (from.to_owned(), export.to_owned()),
         None => (format!("global {module}"), name.to_owned()),

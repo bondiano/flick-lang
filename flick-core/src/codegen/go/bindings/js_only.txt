@@ -1,0 +1,4 @@
+# Exports the go target never binds, as they are JS values by nature (Web
+# Streams, JS arrays, promises): under each `[module]`, an export, each with
+# a comment saying why. Modules of `project/load/target.rs::JS_ONLY` are
+# left out whole and need no entry here.

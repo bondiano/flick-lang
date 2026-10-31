@@ -31,11 +31,46 @@ mod builtin_source;
 fn main() -> io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo supplies OUT_DIR"));
+    go_runtime(&output)?;
     go_driver(&output)?;
     if cfg!(feature = "builtin-docs") {
         return Ok(());
     }
     strip_tree(Path::new("src/types/builtins"), &output.join("builtins"))
+}
+
+/// `go_runtime.rs`: the files of the go target's runtime, the package
+/// `flickrt`, by their name: every `.go` file of `runtime-go/flickrt` but
+/// its tests.
+fn go_runtime(output: &Path) -> io::Result<()> {
+    let dir = Path::new("../runtime-go/flickrt");
+    println!("cargo:rerun-if-changed={}", dir.display());
+    let mut files = Vec::new();
+    for entry in fs::read_dir(dir)? {
+        let path = entry?.path();
+        let name = path
+            .file_name()
+            .expect("a file name")
+            .to_string_lossy()
+            .into_owned();
+        let go = path.extension().is_some_and(|e| e == "go");
+        if path.is_file() && go && !name.ends_with("_test.go") {
+            files.push(name);
+        }
+    }
+    files.sort();
+    let mut out = String::from("&[\n");
+    for name in files {
+        let path = fs::canonicalize(dir.join(&name))?;
+        writeln!(
+            out,
+            "    ({name:?}, include_str!({:?})),",
+            path.display().to_string()
+        )
+        .expect("writing to a String");
+    }
+    out.push_str("]\n");
+    fs::write(output.join("go_runtime.rs"), out)
 }
 
 /// `go_driver.rs`: the files of the go target's `PostgreSQL` driver, the

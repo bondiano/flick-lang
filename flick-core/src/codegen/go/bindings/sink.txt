@@ -1,0 +1,1 @@
+# Sinks: channels that end with a value and leftovers.

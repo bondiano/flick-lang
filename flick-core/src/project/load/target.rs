@@ -25,7 +25,7 @@ const JS_ONLY: &[&str] = &[
 ];
 
 /// Whether the built-in module `name`, or a module under it, is js only.
-pub(super) fn js_only(name: &str) -> bool {
+pub(crate) fn js_only(name: &str) -> bool {
     JS_ONLY.iter().any(|m| {
         name.strip_prefix(m)
             .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
