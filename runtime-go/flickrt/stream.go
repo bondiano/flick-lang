@@ -6,39 +6,171 @@ import (
 	"unicode/utf8"
 )
 
-// Stream as Effect's: a description of elements pulled in chunks, run anew
-// each time it is opened. Opening may acquire resources into the owner of
-// the fiber it opens in, so a run opens it in a scope of its own whose
-// closing releases them, as an Effect run closes the stream's scope. A
-// pull fails as the stream does, by panicking with its failure.
+// Stream is Effect's (Stream.ts:131): a channel of chunks, non-empty lists
+// of the elements, ended with Unit. Its resources go to the scope a run
+// gives the channel; the Flick tasks it runs see the lexical owner.
 //
-// shortcut: only the operations the HTTP streams need are here; port more of Effect's Stream as programs use them on Go
-
-// pull is the next chunk, never empty, or false once the stream ended.
-type pull func(fb *Fiber) ([]Value, bool)
-
-type Stream struct{ open func(fb *Fiber) pull }
-
-// Channel is the one kind of Effect channel the go target builds: a
-// transformation of the chunks of a stream into others.
-type Channel struct {
-	transform func(fb *Fiber, upstream pull) pull
-}
+// shortcut: only the operations the HTTP streams need and the core are here; port more of Effect's Stream as programs use them on Go
+type Stream struct{ ch *Channel }
 
 func streamOf(v Value) *Stream { return v.(*Stream) }
 
-// chunkStream is the stream of one chunk, or none when it is empty.
-func chunkStream(chunk []Value) *Stream {
-	return &Stream{open: func(*Fiber) pull {
-		done := len(chunk) == 0
-		return func(*Fiber) ([]Value, bool) {
-			if done {
-				return nil, false
+// pull is a pull of the streams written before the Effect core: the next
+// chunk, or false once the stream ended.
+type pull func(fb *Fiber) ([]Value, bool)
+
+// newPull is the Pull of chunks of an old pull; an empty chunk is skipped.
+func newPull(next pull) Pull {
+	return func(fb *Fiber) Value {
+		for {
+			chunk, ok := next(fb)
+			if !ok {
+				return halt(Unit)
 			}
-			done = true
-			return chunk, true
+			if len(chunk) > 0 {
+				return chunk
+			}
 		}
-	}}
+	}
+}
+
+// oldPull is the old pull of a Pull of chunks, ended by (nil, false).
+func oldPull(p Pull) pull {
+	return func(fb *Fiber) ([]Value, bool) {
+		var chunk []Value
+		ended := false
+		catchDone(fb, func(fb *Fiber) Value { chunk = p(fb).([]Value); return nil },
+			func(*Fiber, Value) Value { ended = true; return nil })
+		return chunk, !ended
+	}
+}
+
+// streamOpen is the stream `open` pulls, opened with the channel's scope
+// as the owner of what it acquires.
+func streamOpen(open func(fb *Fiber) pull) *Stream {
+	return &Stream{fromTransform(func(fb *Fiber, _ Pull, scope *Owner) Pull {
+		return newPull(open(Within(fb, scope)))
+	})}
+}
+
+// open is the stream's pull in the owner of `fb`.
+func (s *Stream) open(fb *Fiber) pull { return oldPull(toPullScoped(fb, s.ch, fb.owner)) }
+
+func streamFromPull(f func(fb *Fiber) Pull) *Stream { return &Stream{fromPull(f)} }
+
+// streamTransformPull is the stream of the pull `f` makes of the stream's.
+func streamTransformPull(self *Stream, f func(fb *Fiber, pull Pull, scope *Owner) Pull) *Stream {
+	return &Stream{fromTransform(func(fb *Fiber, _ Pull, scope *Owner) Pull {
+		return f(fb, toPullScoped(fb, self.ch, scope), scope)
+	})}
+}
+
+func streamTransformPullBracket(self *Stream, f func(fb *Fiber, pull Pull, scope, forked *Owner) Pull) *Stream {
+	return &Stream{fromTransformBracket(func(fb *Fiber, _ Pull, scope, forked *Owner) Pull {
+		return f(fb, toPullScoped(fb, self.ch, scope), scope, forked)
+	})}
+}
+
+var streamEmpty = &Stream{channelEmpty}
+
+// chunkStream is the stream of one chunk, or none when it is empty, as
+// Effect's fromArray.
+func chunkStream(chunk []Value) *Stream {
+	if len(chunk) == 0 {
+		return streamEmpty
+	}
+	return &Stream{channelSucceed(chunk)}
+}
+
+// streamRun runs the sink on the stream; the sink's value is the result.
+func streamRun(fb *Fiber, self *Stream, sink *Sink) Value {
+	scope := newOwner()
+	out, cause := catch(func() Value {
+		v, _ := sink.transform(fb, toPullScoped(fb, self.ch, scope), scope)
+		return v
+	})
+	if cause = scope.close(fb, cause); cause != nil {
+		panic(&Failure{cause})
+	}
+	return out
+}
+
+// runStream runs the stream, giving each chunk to `each` as it comes.
+func runStream(fb *Fiber, s *Stream, each func(chunk []Value)) {
+	runForEach(fb, s.ch, func(fb *Fiber, chunk Value) {
+		Check(fb)
+		each(chunk.([]Value))
+	})
+}
+
+// streamRechunk regroups the elements in chunks of `target`, the last one
+// shorter.
+func streamRechunk(self *Stream, target int) *Stream {
+	target = max(1, target)
+	return streamTransformPull(self, func(_ *Fiber, pull Pull, _ *Owner) Pull {
+		var chunk, current []Value
+		index, ended := 0, false
+		loop := func(fb *Fiber) Value {
+			for {
+				if current == nil {
+					arr := pull(fb).([]Value)
+					switch {
+					case len(chunk) == 0 && len(arr) == target:
+						return arr
+					case len(chunk)+len(arr) < target:
+						chunk = append(chunk, arr...)
+					default:
+						current = arr
+					}
+					continue
+				}
+				for index < len(current) {
+					chunk = append(chunk, current[index])
+					index++
+					if len(chunk) == target {
+						out := chunk
+						chunk = nil
+						return out
+					}
+				}
+				index, current = 0, nil
+			}
+		}
+		return func(fb *Fiber) Value {
+			if ended {
+				return halt(Unit)
+			}
+			return catchDone(fb, loop, func(*Fiber, Value) Value {
+				if len(chunk) == 0 {
+					return halt(Unit)
+				}
+				out := chunk
+				ended, chunk = true, nil
+				return out
+			})
+		}
+	})
+}
+
+func StreamFromChannel(ch Value) Value { return &Stream{channelOf(ch)} }
+func StreamToChannel(s Value) Value    { return streamOf(s).ch }
+
+func StreamRun(fb *Fiber, sink, s Value) Value { return streamRun(fb, streamOf(s), sinkOf(sink)) }
+
+func StreamRunFold(fb *Fiber, initial, f, s Value) Value {
+	return runFold(fb, streamOf(s).ch, initial, func(fb *Fiber, z, chunk Value) Value {
+		for _, x := range chunk.([]Value) {
+			z = Apply(fb, Apply(fb, f, z), x)
+		}
+		return z
+	})
+}
+
+func StreamRechunk(size, s Value) Value { return streamRechunk(streamOf(s), int(size.(int32))) }
+
+// StreamChunks emits each chunk as an element of its own.
+func StreamChunks(s Value) Value {
+	return &Stream{channelMap(streamOf(s).ch, func(_ *Fiber, chunk Value) Value { return []Value{chunk} })}
 }
 
 func StreamFromList(xs Value) Value { return chunkStream(List(xs)) }
@@ -46,15 +178,7 @@ func StreamFromList(xs Value) Value { return chunkStream(List(xs)) }
 // StreamFromListEffect is the list the task gives as one chunk, the task
 // run when the stream is pulled.
 func StreamFromListEffect(task Value) Value {
-	return &Stream{open: func(fb *Fiber) pull {
-		var next pull
-		return func(fb *Fiber) ([]Value, bool) {
-			if next == nil {
-				next = chunkStream(List(Run(fb, task))).open(fb)
-			}
-			return next(fb)
-		}
-	}}
+	return &Stream{channelUnwrap(func(fb *Fiber) *Channel { return chunkStream(List(Run(fb, task))).ch })}
 }
 
 // streamChunkSize is Effect's chunk size of a stream of an iterable.
@@ -62,7 +186,7 @@ const streamChunkSize = 4096
 
 // StreamFromSeq pulls the sequence's elements as the stream runs.
 func StreamFromSeq(s Value) Value {
-	return &Stream{open: func(fb *Fiber) pull {
+	return streamOpen(func(fb *Fiber) pull {
 		next, stop := iter.Pull(Iter(fb, s))
 		fb.owner.add(fb, func(*Fiber, *Cause) Value { stop(); return Unit })
 		return func(*Fiber) ([]Value, bool) {
@@ -76,22 +200,6 @@ func StreamFromSeq(s Value) Value {
 			}
 			return chunk, len(chunk) > 0
 		}
-	}}
-}
-
-// runStream runs the stream in a scope of its own, giving each chunk to
-// `each` as it comes.
-func runStream(fb *Fiber, s *Stream, each func(chunk []Value)) {
-	owned(fb, func(fb *Fiber, _ *Owner) Value {
-		next := s.open(fb)
-		for {
-			Check(fb)
-			chunk, ok := next(fb)
-			if !ok {
-				return Unit
-			}
-			each(chunk)
-		}
 	})
 }
 
@@ -104,46 +212,28 @@ func StreamRunCollect(fb *Fiber, s Value) Value {
 // StreamMapEffect runs the task of each element in turn, each result a
 // chunk of its own, as Effect's sequential `mapEffect` emits them.
 func StreamMapEffect(f, s Value) Value {
-	src := streamOf(s)
-	return &Stream{open: func(fb *Fiber) pull {
-		up := src.open(fb)
-		var chunk []Value
-		return func(fb *Fiber) ([]Value, bool) {
-			for len(chunk) == 0 {
-				var ok bool
-				if chunk, ok = up(fb); !ok {
-					return nil, false
-				}
-			}
-			x := chunk[0]
-			chunk = chunk[1:]
-			return []Value{Run(fb, Apply(fb, f, x))}, true
-		}
-	}}
+	return &Stream{channelMap(channelFlattenArray(streamOf(s).ch),
+		func(fb *Fiber, x Value) Value { return []Value{Run(fb, Apply(fb, f, x))} })}
 }
 
 func StreamPipeThroughChannel(c, s Value) Value {
-	ch, src := c.(*Channel), streamOf(s)
-	return &Stream{open: func(fb *Fiber) pull { return ch.transform(fb, src.open(fb)) }}
+	return &Stream{channelPipeTo(streamOf(s).ch, channelOf(c))}
 }
 
 // mapElements is the stream of each element mapped by the function a run
 // makes, which may keep state across the run's elements.
 func mapElements(src *Stream, start func() func(*Fiber, Value) Value) *Stream {
-	return &Stream{open: func(fb *Fiber) pull {
-		up, f := src.open(fb), start()
-		return func(fb *Fiber) ([]Value, bool) {
-			chunk, ok := up(fb)
-			if !ok {
-				return nil, false
-			}
+	return streamTransformPull(src, func(_ *Fiber, up Pull, _ *Owner) Pull {
+		f := start()
+		return func(fb *Fiber) Value {
+			chunk := up(fb).([]Value)
 			out := make([]Value, len(chunk))
 			for i, x := range chunk {
 				out[i] = f(fb, x)
 			}
-			return out, true
+			return out
 		}
-	}}
+	})
 }
 
 // StreamEncodeText is each string's UTF-8 bytes, a lone surrogate a

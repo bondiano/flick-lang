@@ -18,20 +18,15 @@ func StreamMake(xs Value) Value { return chunkStream(List(xs)) }
 // mapChunks is the stream of each chunk mapped by `f`; an empty result is
 // skipped.
 func mapChunks(src *Stream, f func(fb *Fiber, chunk []Value) []Value) *Stream {
-	return &Stream{open: func(fb *Fiber) pull {
-		up := src.open(fb)
-		return func(fb *Fiber) ([]Value, bool) {
+	return streamTransformPull(src, func(_ *Fiber, up Pull, _ *Owner) Pull {
+		return func(fb *Fiber) Value {
 			for {
-				chunk, ok := up(fb)
-				if !ok {
-					return nil, false
-				}
-				if out := f(fb, chunk); len(out) > 0 {
-					return out, true
+				if out := f(fb, up(fb).([]Value)); len(out) > 0 {
+					return out
 				}
 			}
 		}
-	}}
+	})
 }
 
 func StreamMap(f, s Value) Value {
@@ -58,35 +53,31 @@ func StreamFilter(p, s Value) Value {
 
 // StreamTake is the first `n` elements; it ends without pulling more.
 func StreamTake(n, s Value) Value {
-	src := streamOf(s)
-	return &Stream{open: func(fb *Fiber) pull {
-		left := int(n.(int32))
-		var up pull
-		return func(fb *Fiber) ([]Value, bool) {
+	left := int(n.(int32))
+	if left <= 0 {
+		return streamEmpty
+	}
+	return streamTransformPull(streamOf(s), func(_ *Fiber, up Pull, _ *Owner) Pull {
+		left := left
+		return func(fb *Fiber) Value {
 			if left <= 0 {
-				return nil, false
+				return halt(Unit)
 			}
-			if up == nil {
-				up = src.open(fb)
-			}
-			chunk, ok := up(fb)
-			if !ok {
-				return nil, false
-			}
+			chunk := up(fb).([]Value)
 			if len(chunk) > left {
 				chunk = chunk[:left]
 			}
 			left -= len(chunk)
-			return chunk, true
+			return chunk
 		}
-	}}
+	})
 }
 
 // StreamMergeEffect runs the task beside the stream; its failure fails the
 // stream, and the stream's end interrupts it.
 func StreamMergeEffect(task, s Value) Value {
 	src := streamOf(s)
-	return &Stream{open: func(fb *Fiber) pull {
+	return streamOpen(func(fb *Fiber) pull {
 		c := fork(fb, fb.owner, task, nil)
 		fb.owner.add(fb, func(fb *Fiber, _ *Cause) Value { stop(fb, c); return Unit })
 		up := src.open(fb)
@@ -104,7 +95,7 @@ func StreamMergeEffect(task, s Value) Value {
 			failed()
 			return chunk, ok
 		}
-	}}
+	})
 }
 
 func StreamRunCount(fb *Fiber, s Value) Value {
@@ -133,7 +124,7 @@ func StreamMkBytes(fb *Fiber, s Value) Value {
 // as Effect's splitLines.
 func StreamSplitLines(s Value) Value {
 	src := streamOf(s)
-	return &Stream{open: func(fb *Fiber) pull {
+	return streamOpen(func(fb *Fiber) pull {
 		up := src.open(fb)
 		var rest strings.Builder
 		ended, cr := false, false
@@ -169,7 +160,7 @@ func StreamSplitLines(s Value) Value {
 			}
 			return nil, false
 		}
-	}}
+	})
 }
 
 // StreamLimitBytes is the chunks of bytes while their total stays within
@@ -177,8 +168,8 @@ func StreamSplitLines(s Value) Value {
 func StreamLimitBytes(limit, onLimit, s Value) Value {
 	max := limit.(*big.Int).Int64()
 	src := streamOf(s)
-	return &Stream{open: func(fb *Fiber) pull {
-		up, total := src.open(fb), int64(0)
+	return streamOpen(func(fb *Fiber) pull {
+		up, total, owner := src.open(fb), int64(0), fb.owner
 		var instead pull
 		return func(fb *Fiber) ([]Value, bool) {
 			if instead != nil {
@@ -190,7 +181,7 @@ func StreamLimitBytes(limit, onLimit, s Value) Value {
 			}
 			for i, x := range chunk {
 				if total += int64(len(List(x))); total > max {
-					instead = streamOf(onLimit).open(fb)
+					instead = streamOf(onLimit).open(Within(fb, owner))
 					if i > 0 {
 						return chunk[:i], true
 					}
@@ -199,7 +190,7 @@ func StreamLimitBytes(limit, onLimit, s Value) Value {
 			}
 			return chunk, true
 		}
-	}}
+	})
 }
 
 // byteSizeOption is a ByteSize option as a count, or `fallback`.
@@ -220,7 +211,7 @@ func StreamReadFile(options, path Value) Value {
 	if n, ok := some(o.Get("chunkSize")); ok {
 		size = int64(n.(int32))
 	}
-	return &Stream{open: func(fb *Fiber) pull {
+	return streamOpen(func(fb *Fiber) pull {
 		f, err := os.Open(p)
 		if err != nil {
 			Fail(systemError(err, "readFile", "open", p))
@@ -249,7 +240,7 @@ func StreamReadFile(options, path Value) Value {
 			}
 			return []Value{byteList(buf[:n])}, true
 		}
-	}}
+	})
 }
 
 var (
@@ -260,7 +251,7 @@ var (
 // StreamStdin is the bytes of stdin in chunks; it needs the Stdio of
 // `Stdio.node`, and fails with NotFound under another.
 // shortcut: the read blocks its goroutine and ignores interruption until input comes; read stdin on a goroutine of its own if a program interrupts it
-var StreamStdin Value = &Stream{open: func(fb *Fiber) pull {
+var StreamStdin Value = streamOpen(func(fb *Fiber) pull {
 	impl, ok := fb.env.get("Stdio.Stdio")
 	stdioNodesMu.Lock()
 	native := ok && stdioNodes[impl.(*Record)]
@@ -283,4 +274,4 @@ var StreamStdin Value = &Stream{open: func(fb *Fiber) pull {
 		}
 		return nil, false
 	}
-}}
+})

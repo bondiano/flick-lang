@@ -25,6 +25,12 @@ flickReadFile StreamReadFile
 flickStdin StreamStdin
 flickWatch StreamWatch
 flickWatchWith StreamWatchWith
+fromChannel StreamFromChannel
+toChannel StreamToChannel
+run *StreamRun
+flickRunFold *StreamRunFold
+rechunk StreamRechunk
+chunks StreamChunks
 
 [@flick-lang/runtime/effect/PubSub]
 flickUnbounded *PubSubUnbounded

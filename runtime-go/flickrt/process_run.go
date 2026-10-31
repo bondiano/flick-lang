@@ -78,7 +78,7 @@ func (q *outputQueue) all(fb *Fiber) []byte {
 }
 
 func (q *outputQueue) stream() Value {
-	return &Stream{open: func(*Fiber) pull {
+	return streamOpen(func(*Fiber) pull {
 		return func(fb *Fiber) ([]Value, bool) {
 			chunk, ok := q.next(fb)
 			if !ok {
@@ -86,7 +86,7 @@ func (q *outputQueue) stream() Value {
 			}
 			return []Value{byteList(chunk)}, true
 		}
-	}}
+	})
 }
 
 type process struct {

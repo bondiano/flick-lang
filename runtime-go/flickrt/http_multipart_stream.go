@@ -43,7 +43,7 @@ func formParts(f *formReader) pull {
 // moves past it.
 func fileContent(f *formReader) *Stream {
 	part := f.part
-	return &Stream{open: func(*Fiber) pull {
+	return streamOpen(func(*Fiber) pull {
 		buf := make([]byte, 32*1024)
 		return func(*Fiber) ([]Value, bool) {
 			for f.part == part && part != nil {
@@ -57,7 +57,7 @@ func fileContent(f *formReader) *Stream {
 			}
 			return nil, false
 		}
-	}}
+	})
 }
 
 // formStream reads the form of the body, with the limits of the fiber the
@@ -83,11 +83,11 @@ func MultipartParts(r Value) Value {
 		}
 		return chunkStream(parts)
 	}
-	return &Stream{open: func(fb *Fiber) pull {
+	return streamOpen(func(fb *Fiber) pull {
 		body, headers := q.formBody(fb)
 		fb.owner.add(fb, func(*Fiber, *Cause) Value { body.Close(); return Unit })
 		return formStream(fb, body, headers)
-	}}
+	})
 }
 
 // MultipartMakeChannel parses the chunks of bytes it is given as the form
@@ -98,9 +98,9 @@ func MultipartMakeChannel(headers Value) Value {
 		k, v := pairOf(pair)
 		h.put(k, v)
 	}
-	return &Channel{transform: func(fb *Fiber, upstream pull) pull {
-		return formStream(fb, &pullReader{fb: fb, next: upstream}, h)
-	}}
+	return fromTransform(func(fb *Fiber, upstream Pull, _ *Owner) Pull {
+		return newPull(formStream(fb, &pullReader{fb: fb, next: oldPull(upstream)}, h))
+	})
 }
 
 // MultipartToPersisted is the form of the parts, its files written to a

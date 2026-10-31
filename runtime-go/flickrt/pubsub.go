@@ -73,7 +73,7 @@ func PubSubSubscribe(fb *Fiber, hub Value) Value {
 // StreamFromSubscription is the messages of the subscription, as they come.
 func StreamFromSubscription(sub Value) Value {
 	s := sub.(*subscription)
-	return &Stream{open: func(*Fiber) pull {
+	return streamOpen(func(*Fiber) pull {
 		return func(fb *Fiber) ([]Value, bool) { return s.take(fb), true }
-	}}
+	})
 }

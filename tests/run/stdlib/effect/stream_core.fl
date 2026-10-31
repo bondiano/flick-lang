@@ -1,0 +1,61 @@
+// Effect's `Stream` and `Sink` core, on both targets: a stream is a channel
+// of chunks, whose boundaries show, run with a sink or folded; a sink is a
+// channel that ends with a value and its leftovers.
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+note : Ref (List String) -> String ->{} Unit
+let note log line = Ref.set log (Ref.get log ++ [line])
+
+chunked : Stream.Stream none none a ->{} List (List a)
+let chunked stream = List.map NonEmpty.to_list (Stream.run_collect (Stream.chunks stream))
+
+/// A sink that reads all its input, noting each chunk, and ends with
+/// "read" and the leftover 9.
+recording : Ref (List String) -> Sink.Sink none none Float Float String
+let recording log =
+  Channel.identity ()
+  |> Channel.map_effect (fun chunk -> note log (show (NonEmpty.to_list chunk)))
+  |> Channel.concat_with (fun _ -> Channel.end ("read", Some (NonEmpty.singleton 9)))
+  |> Sink.from_channel
+
+/// The value and leftovers of the sink's end, run on the stream through
+/// its channel.
+ended :
+  Sink.Sink none none Float Float String ->
+  Stream.Stream none none Float ->{}
+  (String, Option (List Float))
+let ended sink stream =
+  let (value, leftover) =
+    Stream.to_channel stream |> Channel.pipe_to (Sink.to_channel sink) |> Channel.run_drain
+  (value, Option.map NonEmpty.to_list leftover)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let five = Stream.from_list [1, 2, 3, 4, 5]
+  say ("from_list chunks: " ++ show (chunked five))
+  say ("rechunk 2: " ++ show (chunked (Stream.rechunk 2 five)))
+  let pairs = Stream.from_channel (Channel.from_list_chunked 2 [1, 2, 3, 4, 5, 6, 7])
+  say ("from_channel chunks: " ++ show (chunked pairs))
+  say ("rechunk 3: " ++ show (chunked (Stream.rechunk 3 pairs)))
+  say ("rechunk 0: " ++ show (chunked (Stream.rechunk 0 (Stream.from_list [1, 2]))))
+  let to_lists = Channel.map NonEmpty.to_list (Stream.to_channel pairs)
+  say ("to_channel: " ++ show (Channel.run_collect to_lists))
+  say ("run_fold: " ++ show (Stream.run_fold 0 (fun total n -> total + n) five))
+  let log = Ref.make []
+  say ("run: " ++ Stream.run (recording log) pairs ++ " " ++ show (Ref.get log))
+  say ("sink channel: " ++ show (ended (recording log) five))
+  let again = Sink.from_channel (Sink.to_channel (recording log))
+  say ("from_channel of to_channel: " ++ Stream.run again five)
+  let early = Sink.from_channel (Channel.end ("first", None))
+  say ("early: " ++ show (ended early five))
+  let released = Ref.make []
+  let resource =
+    Channel.acquire_release (fun _ -> note released "released") (task { NonEmpty.singleton 5 })
+  say
+    ("resources: "
+      ++ show (Stream.run_collect (Stream.from_channel resource))
+      ++ " "
+      ++ show (Ref.get released))

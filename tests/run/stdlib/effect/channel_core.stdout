@@ -1,0 +1,35 @@
+from_list: [1, 2, 3]
+from_list_chunked: [[1, 2], [3, 4], [5]]
+succeed: ["one"]
+end: done
+empty: 0
+fail: failed no
+suspend: [4]
+unwrap: ["built"]
+identity: [1, 2, 3]
+acquire_release: [5] ["release 5"]
+map: [10, 20, 30]
+map_effect: [1, 2, 3] ["saw 1", "saw 2", "saw 3"]
+map_accum: [0, 1, 1, 2, 3, 3]
+flatten_array: [1, 2, 3]
+flat_map: [1, 1, 2, 2]
+flat_map scopes: [1, 2] ["acquire 1", "release 1", "acquire 2", "release 2"]
+concat_with: [1, 2, 3, 0]
+concat_with done: [7]
+pipe_to_or_fail: failed late
+pipe_to_or_fail ok: [101, 102, 103]
+catch_cause: [1, 2, 3, 0]
+fail_cause: failed late
+on_exit: [1, 2, 3] ["on_exit Some ()"]
+on_exit failure: failed late ["on_exit Some ()", "on_exit failed true"]
+merge_all one: [1, 2, 3]
+merge_all all: [1, 2, 3, 10, 20, 30]
+merge_all failure: failed late
+merge both: [1, 2, 3, 10, 20]
+merge either: e
+interrupt_when: interrupted
+interrupt_when ended: first
+run_fold: 6
+run_for_each: d ["1", "2", "3"]
+run_drain: ()
+run_collect failure: failed late

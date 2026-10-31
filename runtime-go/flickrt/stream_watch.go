@@ -82,7 +82,7 @@ func watchChanges(before, after map[string]watchEntry) []Value {
 }
 
 func pollStream(path string, recursive bool) *Stream {
-	return &Stream{open: func(fb *Fiber) pull {
+	return streamOpen(func(fb *Fiber) pull {
 		seen, err := watchScan(path, recursive)
 		if err != nil {
 			Fail(systemError(err, "watch", "watch", path))
@@ -103,7 +103,7 @@ func pollStream(path string, recursive bool) *Stream {
 				}
 			}
 		}
-	}}
+	})
 }
 
 // StreamWatch is the changes under the path, until the stream ends.
@@ -116,7 +116,7 @@ func StreamWatch(options, path Value) Value {
 func StreamWatchWith(backend, options, path Value) Value {
 	p := path.(string)
 	recursive := record(options).Get("recursive").(bool)
-	return &Stream{open: func(fb *Fiber) pull {
+	return streamOpen(func(fb *Fiber) pull {
 		info, err := os.Stat(p)
 		if err != nil {
 			Fail(systemError(err, "watch", "stat", p))
@@ -125,5 +125,5 @@ func StreamWatchWith(backend, options, path Value) Value {
 			return streamOf(s).open(fb)
 		}
 		return pollStream(p, recursive).open(fb)
-	}}
+	})
 }

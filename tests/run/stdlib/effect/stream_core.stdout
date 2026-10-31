@@ -1,0 +1,12 @@
+from_list chunks: [[1, 2, 3, 4, 5]]
+rechunk 2: [[1, 2], [3, 4], [5]]
+from_channel chunks: [[1, 2], [3, 4], [5, 6], [7]]
+rechunk 3: [[1, 2, 3], [4, 5, 6], [7]]
+rechunk 0: [[1], [2]]
+to_channel: [[1, 2], [3, 4], [5, 6], [7]]
+run_fold: 15
+run: read ["[1, 2]", "[3, 4]", "[5, 6]", "[7]"]
+sink channel: ("read", Some [9])
+from_channel of to_channel: read
+early: ("first", None)
+resources: [5] ["released"]
