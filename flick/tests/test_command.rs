@@ -402,3 +402,67 @@ fn clock_tests_run_on_virtual_time() {
 fn clock_tests_run_on_virtual_time_on_go() {
     clock_tests_pass("clocks_go", &["--emit", "go"]);
 }
+
+/// Properties over `Schema.arbitrary`, each failing at once so its report
+/// shows what was drawn.
+const DRAWS: &str = r#"module Test.Sample exposing (tests)
+
+type Tree = Leaf | Node Float (List Tree)
+  deriving Show, Schema
+
+refined type Digit = Int where fun n -> n >= 0 && n < 10
+  deriving Show, Schema
+
+type alias Item = {
+  name : String;
+  tags : List String;
+  count : Option BigInt;
+  done : Result String Bool;
+  pair : (Bool, Float);
+  tree : Tree;
+} deriving Schema
+
+digits : List Digit
+let digits = List.filter_map (fun n -> Result.to_option (Digit.parse n)) (List.range 0 10)
+
+drawn : Show a => String -> Schema a -> Test.Test
+let drawn name witness = Test.property name (Schema.arbitrary witness) (fun v -> Test.equal "" (show v))
+
+tests : List Test.Test
+let tests =
+  [
+    drawn "items" (schema Item),
+    drawn "trees" (schema Tree),
+    drawn "generated" (Schema.with_generator (Gen.one_of digits) (schema Digit)),
+    drawn "secrets" (Schema.redacted Schema.string),
+    Test.property "durations" (Schema.arbitrary Schema.duration) (fun _ -> Test.is_true "drawn" true),
+  ]
+"#;
+
+#[test]
+#[ignore = "needs Node, pnpm install and Go"]
+fn schema_arbitrary_draws_alike_on_go() {
+    let report = |name: &str, args: &[&str]| {
+        let dir = project(name);
+        fs::write(dir.join("test/Test/Sample.fl"), DRAWS).expect("write");
+        let out = flick_in(&dir, &[&["test", "--reporter", "json", "--seed", "11"], args].concat());
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        results(&out)["tests"]
+            .as_array()
+            .expect("tests")
+            .iter()
+            .map(|t| (t["name"].clone(), t["status"].clone(), t["kind"].clone(), t["message"].clone()))
+            .collect::<Vec<_>>()
+    };
+    let js = report("draws", &[]);
+    assert_eq!(js.len(), 5, "{js:?}");
+    assert!(js.iter().all(|t| t.1 == "failed"), "{js:?}");
+    // the generator a schema with a check needs is Schema.with_generator's
+    assert!(js[2].3.as_str().is_some_and(|m| m.starts_with("expected \"\", got \"")), "{js:?}");
+    assert_eq!(js[4].2, "defect", "{js:?}");
+    let go = report("draws_go", &["--emit", "go"]);
+    for (j, g) in js.iter().zip(&go).take(4) {
+        assert_eq!(j, g);
+    }
+    assert_eq!((&go[4].1, &go[4].2), (&js[4].1, &js[4].2));
+}
