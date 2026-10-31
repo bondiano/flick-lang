@@ -61,10 +61,28 @@ flickChunkJson CodecChunk
 flickChunk SchemaChunk
 flickHashSetJson *CodecHashSet
 flickHashMapJson *CodecHashMap
+flickCheck CheckApply
+flickIsInt CheckInt
+flickIsFinite CheckFinite
+isBetween CheckBetween
+isMinLength CheckMinLength
+isMaxLength CheckMaxLength
+flickIsPattern CheckPattern
 
 [@flick-lang/runtime/effect/Arbitrary]
 schema ArbitrarySchema
+flickSchema ArbitrarySchemaWith
+Constant ArbitraryConstant
+flickArray ArbitraryArray
+all ArbitraryAll
+flickZip2 ArbitraryZip2
+flickZip3 ArbitraryZip3
+flickZip4 ArbitraryZip4
+map ArbitraryMap
 filter ArbitraryFilter
+filterMap ArbitraryFilterMap
+flatMap ArbitraryFlatMap
+flickSampleEffect *ArbitrarySample
 flickCheckEffect *ArbitraryCheck
 flickFormatCheckFailure ArbitraryFormatCheckFailure
 

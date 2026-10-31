@@ -16,6 +16,8 @@ type check struct {
 	// ("" when unknown); exact is false when they only approximate it.
 	// nil: it has no JSON Schema form.
 	keywords func(typ string) (kw *Record, exact bool)
+	// arb is what generating values of the checked type reads of it
+	arb *arbConstraint
 }
 
 // issues is the issue of `v` failing the check, or nil.
