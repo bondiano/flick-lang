@@ -17,7 +17,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::convert::{Free, is_type};
 use crate::types::env::Instance;
 use crate::types::kinds::Kind;
-use crate::types::ty::{Binder, Type};
+use crate::types::ty::{Binder, PRELUDE, Type};
 use crate::types::typing::range;
 use crate::types::{Checker, Constructor, Form, InstanceInfo, env, passes_dictionary};
 
@@ -196,6 +196,15 @@ impl<'n> Checker<'_> {
                 codes::C012,
                 span,
                 format!("`{cn}` is closed: the module `Numeric` has every instance of it, for `Int`, `Float` and `BigInt`"),
+            );
+            return false;
+        }
+        // `for` iterates its sources as JS and Go containers, without `iter`
+        if cm == PRELUDE && cn == "Iterable" && instance.module != "Instances" {
+            self.error(
+                codes::C012,
+                span,
+                "`Iterable` is closed: `for` iterates a `List` or a `Seq` as it is, and the module `Instances` has the instances for them".to_owned(),
             );
             return false;
         }

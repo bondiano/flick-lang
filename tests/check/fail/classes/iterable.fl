@@ -1,0 +1,13 @@
+// `Iterable` is closed: `for` iterates a `List` or a `Seq` as it is and
+// never calls `iter`, so another instance would be ignored.
+module App.Iterable exposing (..)
+
+type Box a = Box a a
+
+instance Iterable Box =
+  iter : forall d a. (Box a)^d -> (Seq a)^d
+  let iter b =
+    match b with
+    | Box x y -> iter [x, y]
+
+//~ FLICK-C012 @7:1-11:29 `Iterable` is closed
