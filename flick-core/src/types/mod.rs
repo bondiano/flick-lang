@@ -15,6 +15,7 @@
 mod abi;
 mod applicative_do;
 mod bindings;
+mod builtin_sources;
 mod builtins;
 mod calls;
 mod classes;

@@ -58,6 +58,7 @@ title: "Стандартная библиотека"
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write`, `args`, `env` |
 | `Log` | сервис `Log` с `info`, `warn`, `error`, `debug` и `Log.console` |
 | `File` | сервис `FileSystem`: `open_scoped`, `read_all`, `read_text`, `write_text` и `File.node` |
+| `ChildProcess` | дочерние процессы, как в Effect: команда `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) выполняется до конца через `string`, `lines` и `exit_code` или запускается `spawn` как `Process` scope'а, с `stdout`, `stderr`, `wait`, `is_running`, `kill` и `kill_with` |
 | `Resource` | `acquire_release` с передачей ресурса владельцу области и `bracket` |
 | `Events` | политики `queue` и супервизор `log_failures` |
 | `Ui`, `Ui.Event` | пользовательские интерфейсы, отображаемые с помощью React, см. [пользовательские интерфейсы](../ui/) |

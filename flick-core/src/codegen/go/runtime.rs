@@ -375,6 +375,22 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/platform.go"),
     ),
     (
+        "process.go",
+        include_str!("../../../../runtime-go/flickrt/process.go"),
+    ),
+    (
+        "process_posix.go",
+        include_str!("../../../../runtime-go/flickrt/process_posix.go"),
+    ),
+    (
+        "process_run.go",
+        include_str!("../../../../runtime-go/flickrt/process_run.go"),
+    ),
+    (
+        "process_windows.go",
+        include_str!("../../../../runtime-go/flickrt/process_windows.go"),
+    ),
+    (
         "pubsub.go",
         include_str!("../../../../runtime-go/flickrt/pubsub.go"),
     ),

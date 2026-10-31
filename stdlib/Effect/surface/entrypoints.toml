@@ -14,7 +14,7 @@
 "effect/net" = { excluded = "sockets and networking below HTTP are outside 0.1.0" }
 "effect/observability" = { modules = "observability" }
 "effect/persistence" = { excluded = "persistence backends are outside 0.1.0" }
-"effect/process" = { excluded = "child processes are outside the 0.1.0 standard library" }
+"effect/process" = { modules = "process" }
 "effect/reactivity" = { modules = "reactivity" }
 "effect/rpc" = { modules = "rpc" }
 "effect/schema" = { excluded = "Flick's Schema and codecs cover schemas; this entrypoint's extras are outside 0.1.0" }

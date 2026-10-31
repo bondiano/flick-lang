@@ -101,3 +101,4 @@ codegen/abi
 stdlib/effect/config
 stdlib/effect/filesystem
 stdlib/effect/stream_platform
+stdlib/process/child_process

@@ -100,3 +100,23 @@ flickReadAlloc *FileSystemReadAlloc
 flickFileTruncate *FileSystemFileTruncate
 flickWrite *FileSystemWrite
 flickWriteAll *FileSystemWriteAll
+
+[@flick-lang/runtime/effect/ChildProcess]
+flickMake ChildProcessMake
+setCwd ChildProcessSetCwd
+flickSetEnv ChildProcessSetEnv
+flickPrefix ChildProcessPrefix
+pipeTo ChildProcessPipeTo
+flickSetStdin ChildProcessSetStdin
+flickInheritOutput ChildProcessInheritOutput
+flickSpawn *ChildProcessSpawn
+flickPid ChildProcessPid
+flickWait *ChildProcessWait
+flickIsRunning *ChildProcessIsRunning
+flickKill *ChildProcessKill
+flickKillWith *ChildProcessKillWith
+flickStdout ChildProcessStdout
+flickStderr ChildProcessStderr
+flickString *ChildProcessString
+flickLines *ChildProcessLines
+flickExitCode *ChildProcessExitCode
