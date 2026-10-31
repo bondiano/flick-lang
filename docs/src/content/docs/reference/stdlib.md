@@ -132,13 +132,16 @@ Cases:
 
 ```flick
 // a. spawn, then only wait: 1 MiB nobody reads
-scope {
+waits : Unit ->{; PlatformError.PlatformError} Int
+let waits () = scope {
   let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
   ChildProcess.wait p // JS: never returns; Go: 0
 }
 
 // b. exit_code of a command with much output: the same
-ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
+chatty : Unit ->{; PlatformError.PlatformError} Int
+let chatty () =
+  ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
 
 // c. endless output nobody reads, e.g. `yes`: JS stalls the child;
 //    Go holds everything it wrote until `kill` or the scope's close

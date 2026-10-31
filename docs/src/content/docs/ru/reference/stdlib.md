@@ -141,13 +141,16 @@ let case_blind =
 
 ```flick
 // a. spawn и только wait: 1 МиБ, который никто не читает
-scope {
+waits : Unit ->{; PlatformError.PlatformError} Int
+let waits () = scope {
   let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
   ChildProcess.wait p // JS: не возвращается; Go: 0
 }
 
 // b. exit_code команды с большим выводом: так же
-ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
+chatty : Unit ->{; PlatformError.PlatformError} Int
+let chatty () =
+  ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
 
 // c. бесконечный непрочитанный вывод, например `yes`: на JS ребёнок встаёт;
 //    на Go всё написанное держится в памяти до `kill` или закрытия scope
