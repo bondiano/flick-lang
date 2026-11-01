@@ -7,6 +7,7 @@ import { APP_ERROR, type AppError } from "./builtins.ts";
 import { versionProblems } from "./capabilities.ts";
 import { env, offSignal, onSignal, setExitCode, writeStderr } from "./host.ts";
 import { reportedDefects, traceExit, withOwner } from "./owner.ts";
+import { stressed } from "./stress.ts";
 import { traceEvent, tracing } from "./trace.ts";
 
 const SIGNALS = { SIGINT: 130, SIGTERM: 143 } as const;
@@ -117,7 +118,7 @@ export const start = <I>(main: Main<I>, input: I, provide: Around = (program) =>
       ),
     "main",
   );
-  return Effect.runFork(around === undefined ? program : around(program));
+  return Effect.runFork(stressed(around === undefined ? program : around(program)));
 };
 
 /** What a test of the runner overrides. */
