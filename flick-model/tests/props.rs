@@ -164,6 +164,28 @@ fn leaks_reach_a_use_after_close() {
     assert_eq!(seen, 8);
 }
 
+/// Р130: `(fun g x -> g x) (try … with _ -> as4)`, the λ of `v1` after
+/// its `let` with a signature stepped, whose argument needs the runtime
+/// arrow of the signature. A case X2 found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_function_keeps_its_signature() {
+    let c = [
+        53872532, 614429763, 316647345, 3323234475, 11786860, 1371144852, 2703845322, 1737490265,
+        255759160, 2157138854, 3717280138, 1624885393, 2433392247, 2010853328, 2566700010,
+        409181594, 736146643, 0, 17231705, 3249833829, 0, 0, 0, 3387466705, 0, 3191903211, 0, 0,
+        1714366921, 0, 2364491101, 3175111223, 0, 95212, 8248188, 12185093, 0, 0, 0, 0, 2690176445,
+        0, 0, 0, 0, 0, 0, 0, 0,
+    ];
+    let p = generate::program(&c);
+    assert!(model(&p).is_ok());
+    let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
+    assert!(checked.is_ok(), "{checked:?}\n{}", generate::source(&p));
+}
+
 proptest! {
     // a failure becomes a case of `tests/check`, not a file of seeds
     // (the programs with a hole of TypeScript are not run, below)

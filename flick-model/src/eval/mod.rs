@@ -253,6 +253,12 @@ impl<'p> Machine<'p> {
                 Control::Eval((*a).clone())
             }
             Frame::AppR(func) => return Self::apply(func, v),
+            // a λ keeps its signature as `fix x. λ`, `x` not free in it: a
+            // state types it against σ, as the source did (Р130)
+            Frame::Let(x, Some(sig), e2) if matches!(v, Term::Lam(..)) => {
+                let fix = Term::Fix(x.clone(), Some(sig), Rc::new(v));
+                Control::Eval(subst(&e2, &[(x, fix)]))
+            }
             Frame::Let(x, _, e2) => Control::Eval(subst(&e2, &[(x, v)])),
             Frame::Match(arms) => return self.select(v, &arms, 0),
             Frame::Guard {
