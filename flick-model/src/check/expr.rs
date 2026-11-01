@@ -144,7 +144,9 @@ impl Checker<'_> {
                 self.record_against(fields, &f)
             }
             (Term::Record(fields), Type::Dict(c, args)) => self.dictionary(fields, c, args),
-            (Term::With(..) | Term::Handle(..), _) => self.runtime_form(e, Some(&full)).map(drop),
+            (Term::With(..) | Term::Handle(..) | Term::Inside(..), _) => {
+                self.runtime_form(e, Some(&full)).map(drop)
+            }
             (Term::App(f, a), _) if self.config && matches!(&**f, Term::Lam(..)) => {
                 let Term::Lam(x, body) = &**f else {
                     unreachable!("a λ, matched above")
@@ -207,7 +209,7 @@ impl Checker<'_> {
     }
 
     /// (Var) on the top-level values of §2.6 and Γ₀.
-    fn global(&mut self, p: &Path) -> Check<Type> {
+    pub(super) fn global(&mut self, p: &Path) -> Check<Type> {
         let s = self
             .decls
             .values

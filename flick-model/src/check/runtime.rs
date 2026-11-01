@@ -2,23 +2,39 @@
 //! configuration `⟨μ, E[e]⟩` holds besides source forms, typed so that
 //! Preservation can be checked on every state the machine passes through
 //! (X2). `Ψ` is a meta per cell, made before anything else is checked, so
-//! `Gen` never quantifies a cell's type (T3).
+//! `Gen` never quantifies a cell's type (T3). The forms of regions and
+//! `⊢ Λ` are those of `docs/formal/regions.md` §3.4.
 
+use std::collections::HashMap;
 use std::mem;
 use std::rc::Rc;
 
 use super::expr::mono;
-use super::{Check, Checker, error};
+use super::regions::owner;
+use super::{Check, Checker, Inst, error, substitute};
 use crate::decls::Decls;
+use crate::eval::Lambda;
+use crate::eval::regions::{Finalizer, reach, region_name};
+use crate::subst::any;
 use crate::syntax::{Const, Env, Term};
-use crate::types::{Row, Stage, Type, Var};
+use crate::types::{Kind, Row, Stage, Type, Var};
 
-/// `·;Ψ ⊢ e : τ ! φ` for some `Ψ` with `⊢ μ : Ψ`: a configuration of the
-/// machine against the type of the program. Returns the least `φ`: a row
-/// still unknown once everything is settled is `none` (§2.1).
-pub fn check_config(decls: &Decls, mem: &[Term], e: &Term, expected: &Type) -> Check<Stage> {
+/// `·;Ψ;Λ ⊢ e : τ ! φ` for some `Ψ` with `⊢ μ : Ψ`, and `⊢ Λ`: a
+/// configuration of the machine against the type of the program. Returns
+/// the least `φ`: a row still unknown once everything is settled is
+/// `none` (§2.1).
+pub fn check_config(
+    decls: &Decls,
+    mem: &[Term],
+    lambda: &Lambda,
+    e: &Term,
+    expected: &Type,
+) -> Check<Stage> {
     let mut c = Checker::new(decls);
     c.config = true;
+    for (pi, r) in lambda.regions.iter().enumerate() {
+        c.declare_region(region_name(pi), r.parent.map(region_name));
+    }
     c.store = (0..mem.len()).map(|_| c.fresh()).collect();
     for (l, v) in mem.iter().enumerate() {
         let t = c.store[l].clone();
@@ -28,7 +44,14 @@ pub fn check_config(decls: &Decls, mem: &[Term], e: &Term, expected: &Type) -> C
             return error("μ", format!("the value in ℓ{l} is not pure"));
         }
     }
+    if any(
+        e,
+        &|t| matches!(t, Term::Inside(pi, ..) if !lambda.regions[*pi].live),
+    ) {
+        return error("Inside", "the body of a closed region runs");
+    }
     c.check(e, expected)?;
+    c.lambda(lambda, mem)?;
     c.finish()?;
     Ok(match c.zonk_stage(&c.stage.clone()) {
         Stage::Runtime(r, e) => Stage::Runtime(least(r), least(e)),
@@ -89,8 +112,60 @@ impl Checker<'_> {
             }
             // (Handle): the arms of (Try) on what the body raised
             Term::Handle(v, arms) => self.try_(&Term::Raise(v.clone()), arms, expected),
+            // (Own)
+            Term::Own(pi) => Ok(owner(&region_name(*pi))),
+            // (Cap): what the binding gives, of region `π`
+            Term::Cap(p, pi, _) => {
+                let Some(s) = self.decls.values.get(p).cloned() else {
+                    return error("Cap", format!("no type for `{p}`"));
+                };
+                let map: HashMap<_, _> = s
+                    .vars
+                    .iter()
+                    .map(|(v, k)| {
+                        let inst = match (k, pi) {
+                            (Kind::Region, Some(pi)) => {
+                                Inst::Type(Type::Var(Var::Named(region_name(*pi))))
+                            }
+                            _ => self.fresh_inst(k),
+                        };
+                        (v.clone(), inst)
+                    })
+                    .collect();
+                let mut t = substitute(&s.body, &map);
+                while let Type::Fun(_, _, r) = t {
+                    t = (*r).clone();
+                }
+                Ok(t)
+            }
+            Term::Inside(pi, s, body) => self.inside(s, region_name(*pi), body, expected),
             other => error("Runtime", format!("a form of the run time: {other:?}")),
         }
+    }
+
+    /// `⊢ Λ`: the children and finalizers of each live region are typed,
+    /// and reach only regions that outlive it (§2.4, T4).
+    fn lambda(&mut self, lambda: &Lambda, mem: &[Term]) -> Check<()> {
+        for (pi, r) in lambda.regions.iter().enumerate().filter(|(_, r)| r.live) {
+            let fins = r.finalizers.iter().filter_map(|f| match f {
+                Finalizer::Run(t) => Some(t),
+                Finalizer::Release(_) => None,
+            });
+            let kids = r.children.iter().flat_map(|(f, t)| [f, t]);
+            let outer = lambda.outlived_by(pi);
+            for t in fins.chain(kids) {
+                let stage = mem::replace(&mut self.stage, Stage::Pure);
+                self.infer(t)?;
+                self.stage = stage;
+                if let Some(q) = reach(t, mem).difference(&outer).next() {
+                    return error(
+                        "Λ",
+                        format!("work of region π{pi} reaches π{q}, which may close first"),
+                    );
+                }
+            }
+        }
+        Ok(())
     }
 
     /// (Env): each implementation at its service.

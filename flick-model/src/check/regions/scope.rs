@@ -22,18 +22,51 @@ impl Checker<'_> {
         body: &Term,
         expected: Option<&Type>,
     ) -> Check<Type> {
+        self.scoped(name, None, body, expected)
+    }
+
+    /// (Inside) (§3.4): (Scope) with the region `π` of `Λ`, which
+    /// `declare_region` made.
+    pub(in crate::check) fn inside(
+        &mut self,
+        name: &Name,
+        pi: Name,
+        body: &Term,
+        expected: Option<&Type>,
+    ) -> Check<Type> {
+        self.scoped(name, Some(pi), body, expected)
+    }
+
+    /// Region `π` of `Λ`, made in `parent`: every one is declared, the
+    /// closed ones too, whose cells stay in `μ`.
+    pub(in crate::check) fn declare_region(&mut self, pi: Name, parent: Option<Name>) {
+        self.regions.kinds.insert(Var::Named(pi.clone()));
+        self.regions.scopes.insert(pi, (0, parent));
+    }
+
+    fn scoped(
+        &mut self,
+        name: &Name,
+        pi: Option<Name>,
+        body: &Term,
+        expected: Option<&Type>,
+    ) -> Check<Type> {
         self.level += 1;
-        // a region is fresh: one a `scope` around binds is renamed
-        let s: Name = if self.regions.scopes.contains_key(name) {
-            self.rigid += 1;
-            format!("{name}'{}", self.rigid).into()
-        } else {
-            name.clone()
+        let s: Name = match pi {
+            Some(pi) => pi,
+            // a region is fresh: one a `scope` around binds is renamed
+            None if self.regions.scopes.contains_key(name) => {
+                self.rigid += 1;
+                format!("{name}'{}", self.rigid).into()
+            }
+            None => name.clone(),
         };
         let region = Var::Named(s.clone());
-        let parent = self.regions.open.last().cloned();
-        self.regions.scopes.insert(s.clone(), (self.level, parent));
-        self.regions.kinds.insert(region.clone());
+        if !self.regions.scopes.contains_key(&s) {
+            let parent = self.regions.open.last().cloned();
+            self.regions.scopes.insert(s.clone(), (self.level, parent));
+            self.regions.kinds.insert(region.clone());
+        }
         self.regions.open.push(s.clone());
         self.regions.renamed.push((name.clone(), s.clone()));
         self.locals.push((name.clone(), mono(owner(&s))));

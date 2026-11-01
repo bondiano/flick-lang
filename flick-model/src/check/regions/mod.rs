@@ -56,7 +56,7 @@ pub(crate) fn scope_service() -> Path {
     Path::new("Prelude", "Scope")
 }
 
-fn owner(s: &Name) -> Type {
+pub(super) fn owner(s: &Name) -> Type {
     Type::app(
         Type::con("Fiber", "Owner"),
         Type::Var(Var::Named(s.clone())),

@@ -95,18 +95,21 @@ fn runnable(p: &Program) -> (Term, Type) {
 /// (Progress); an error it ends with must be one of `ε₀` (T1).
 fn progress_and_preservation(decls: &eval::Program, d: &Decls, p: &Program) -> Result<(), String> {
     let (e0, t0) = runnable(p);
-    let phi0 = check_config(d, &[], &e0, &t0).map_err(|e| format!("e₀: {e}"))?;
+    let phi0 =
+        check_config(d, &[], &Lambda::default(), &e0, &t0).map_err(|e| format!("e₀: {e}"))?;
     let mut machine = Machine::new(decls, FUEL);
     let mut failure = None;
     let mut mem = Vec::new();
+    let mut regions = Lambda::default();
     let mut steps = 0;
-    let outcome = machine.run_watched(e0, &mut |m: &[Term], _: &Lambda, e: &Term| {
+    let outcome = machine.run_watched(e0, &mut |m: &[Term], l: &Lambda, e: &Term| {
         steps += 1;
         if failure.is_some() {
             return;
         }
         mem = m.to_vec();
-        match check_config(d, m, e, &t0) {
+        regions = l.clone();
+        match check_config(d, m, l, e, &t0) {
             Ok(phi) if phi.within(&phi0) => {}
             Ok(phi) => {
                 failure = Some(format!(
@@ -121,10 +124,12 @@ fn progress_and_preservation(decls: &eval::Program, d: &Decls, p: &Program) -> R
     }
     match outcome {
         Outcome::Stuck(why) => Err(format!("stuck after {steps} steps: {why}")),
-        Outcome::Raise(v) => match check_config(d, &mem, &Term::Raise(Rc::new(v.clone())), &t0) {
-            Ok(phi) if phi.within(&phi0) => Ok(()),
-            other => Err(format!("raised {v:?}, not an error of `{phi0}`: {other:?}")),
-        },
+        Outcome::Raise(v) => {
+            match check_config(d, &mem, &regions, &Term::Raise(Rc::new(v.clone())), &t0) {
+                Ok(phi) if phi.within(&phi0) => Ok(()),
+                other => Err(format!("raised {v:?}, not an error of `{phi0}`: {other:?}")),
+            }
+        }
         Outcome::Value(_) | Outcome::Die(_) | Outcome::OutOfFuel => Ok(()),
     }
 }

@@ -31,7 +31,7 @@ pub(super) fn rigid_inst(name: &str, k: &Kind) -> Inst {
 }
 
 impl Checker<'_> {
-    fn fresh_inst(&mut self, k: &Kind) -> Inst {
+    pub(super) fn fresh_inst(&mut self, k: &Kind) -> Inst {
         let v = Var::Meta(self.meta());
         if *k == Kind::Region {
             self.regions.kinds.insert(v.clone());
