@@ -214,6 +214,7 @@ dependencies = [
  "anstyle",
  "clap",
  "flick-core",
+ "flick-model",
  "flick-wasm",
  "insta",
  "rustix",

@@ -10,7 +10,14 @@
 //! both profiles and must give the same output; the others are listed as
 //! skipped for it. `FLICK_E2E_GO_ONLY` runs only those, without Node: the
 //! platform jobs of CI.
+//!
+//! Every run writes its trace (`FLICK_TRACE`), which the monitor of `λRT`
+//! checks; for the cases of tests/run/runtime the Go runs must project it
+//! to what the JS debug run projects it to (`trace`).
 
+mod trace;
+
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -43,9 +50,16 @@ fn compare(what: &str, expected: &str, actual: &str) -> Option<String> {
         .then(|| format!("  {what}:\n    expected: {expected:?}\n    actual:   {actual:?}"))
 }
 
-/// Builds and runs one case, as JS or as TypeScript, in a profile; returns
-/// the mismatch report, if any, and how long the build took.
-fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> (Option<String>, Duration) {
+/// A case run: the mismatch report, if any, how long the build took, and
+/// the projection of its trace when the runtimes must agree on it.
+struct Ran {
+    problem: Option<String>,
+    built: Duration,
+    projection: Option<String>,
+}
+
+/// Builds and runs one case, as JS, TypeScript or Go, in a profile.
+fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) -> Ran {
     let _ = fs::remove_dir_all(out_dir);
     let started = Instant::now();
     let build = Command::new(env!("CARGO_BIN_EXE_flick"))
@@ -65,19 +79,24 @@ fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> (Option<S
             "  build failed:\n{}",
             String::from_utf8_lossy(&build.stderr)
         );
-        return (Some(report), build_time);
+        return Ran {
+            problem: Some(report),
+            built: build_time,
+            projection: None,
+        };
     }
-    let output = if emit == "go" {
+    let mut command = if emit == "go" {
         Command::new(out_dir.join(executable(MAIN_ENTRY)))
-            .output()
-            .expect("the built executable runs")
     } else {
-        Command::new("node")
-            .arg("--enable-source-maps")
-            .arg(out_dir.join(runner_path(emit == "ts")))
-            .output()
-            .expect("`node` is on PATH (Node.js >= 24.18.0)")
+        let mut node = Command::new("node");
+        node.arg("--enable-source-maps")
+            .arg(out_dir.join(runner_path(emit == "ts")));
+        node
     };
+    let output = command
+        .env("FLICK_TRACE", out_dir.join(trace::FILE))
+        .output()
+        .expect("the program runs: `node` (Node.js >= 24.18.0) is on PATH for JS");
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stderr_problem = match expected(case, "stderr.contains") {
         Some(lines) => lines
@@ -90,6 +109,11 @@ fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> (Option<S
             &stderr,
         ),
     };
+    let traced = trace::checked(out_dir);
+    let monitor = traced
+        .as_ref()
+        .err()
+        .map(|violation| format!("  λRT: {violation}"));
     let problems: Vec<_> = [
         compare(
             "stdout",
@@ -105,14 +129,16 @@ fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> (Option<S
                 .code()
                 .map_or("signal".into(), |c| c.to_string()),
         ),
+        monitor,
     ]
     .into_iter()
     .flatten()
     .collect();
-    (
-        (!problems.is_empty()).then(|| problems.join("\n")),
-        build_time,
-    )
+    Ran {
+        problem: (!problems.is_empty()).then(|| problems.join("\n")),
+        built: build_time,
+        projection: traced.ok().filter(|_| trace::compared(rel)),
+    }
 }
 
 /// The cases of `tests/run/portable.txt`, by path without `.fl`.
@@ -194,6 +220,8 @@ fn run_cases() {
     let mut report = Vec::new();
     let mut times = Vec::new();
     let jobs = jobs();
+    // what the JS debug run of each case projects its trace to
+    let mut projections: HashMap<PathBuf, String> = HashMap::new();
     // release must agree with the debug reference: same stdout, stderr and exit
     let node_runs = [
         ("js", "debug"),
@@ -208,13 +236,20 @@ fn run_cases() {
                 .join(profile)
                 .join(emit)
                 .join(rel.with_extension(""));
-            let (problem, built) = run_case(case, &out_dir, emit, profile);
-            let problem = problem.map(|p| format!("{} ({emit}, {profile}):\n{p}", rel.display()));
-            (problem, built)
+            let ran = run_case(case, rel, &out_dir, emit, profile);
+            let problem = ran
+                .problem
+                .map(|p| format!("{} ({emit}, {profile}):\n{p}", rel.display()));
+            (problem, ran.built, ran.projection)
         });
         // the sum of the builds: with the same jobs in both profiles it compares them
-        times.push(results.iter().map(|(_, built)| *built).sum::<Duration>());
-        report.extend(results.into_iter().filter_map(|(problem, _)| problem));
+        times.push(results.iter().map(|(_, built, _)| *built).sum::<Duration>());
+        for (case, (problem, _, projection)) in paths.iter().zip(results) {
+            report.extend(problem);
+            if let (("js", "debug"), Some(p)) = ((emit, profile), projection) {
+                projections.insert(case.clone(), p);
+            }
+        }
     }
     let portable = portable(&root);
     let (go_cases, skipped): (Vec<PathBuf>, Vec<PathBuf>) = paths.iter().cloned().partition(|p| {
@@ -237,8 +272,19 @@ fn run_cases() {
                 .join(profile)
                 .join("go")
                 .join(rel.with_extension(""));
-            let (problem, _) = run_case(case, &out_dir, "go", profile);
-            problem.map(|p| format!("{} (go, {profile}):\n{p}", rel.display()))
+            let ran = run_case(case, rel, &out_dir, "go", profile);
+            let differs = match (projections.get(case), &ran.projection) {
+                (Some(js), Some(go)) => trace::differ(js, go),
+                _ => None,
+            };
+            let problems: Vec<String> = ran.problem.into_iter().chain(differs).collect();
+            (!problems.is_empty()).then(|| {
+                format!(
+                    "{} (go, {profile}):\n{}",
+                    rel.display(),
+                    problems.join("\n")
+                )
+            })
         });
         report.extend(results.into_iter().flatten());
     }
