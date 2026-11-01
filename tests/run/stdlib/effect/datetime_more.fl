@@ -83,6 +83,12 @@ let zones () =
   zone_names "offset +5:30" (offset 19800000)
   zone_names "offset -3:30" (offset (-12600000))
   zone_names "offset +2" (offset 7200000)
+  let summer = at "2024-07-15T09:30:00Z"
+  zone_names "berlin" (in_zone winter "Europe/Berlin")
+  zone_names "new york summer" (in_zone summer "America/New_York")
+  zone_names "sydney summer" (in_zone summer "Australia/Sydney")
+  zone_names "kolkata" (in_zone winter "Asia/Kolkata")
+  zone_names "named +0530" (in_zone winter "+0530")
   Platform.stdout_line
     ("zones: "
       ++ show [
@@ -91,6 +97,18 @@ let zones () =
         text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "europe/paris")),
         text (Result.map DateTime.zone_to_string (DateTime.zone_from_string "US/Pacific")),
         text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "Factory")),
+      ])
+  Platform.stdout_line
+    ("offset names: "
+      ++ show [
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "+01:00")),
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "+01")),
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "-0530")),
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "\u{2212}00:00")),
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "+23:59")),
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "+24:00")),
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "+1")),
+        iso (DateTime.set_zone_named keep "-03" (at "2024-07-04T21:05:09.250Z")),
       ])
 
 transitions : Unit ->{} Unit
@@ -152,6 +170,11 @@ let main () =
     "ko",
     "zh-TW",
     "he",
+    "en-SG",
+    "es-CO",
+    "zh-Hant",
+    "en-Latn-SG",
+    "zh-Hant-SG",
   ]
   tags t
   zones ()

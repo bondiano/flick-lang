@@ -360,7 +360,12 @@ for an invalid one; a `RegExp` runs on Go's RE2 engine, with positions in code
 units and JS's `$` replacement patterns, and syntax RE2 lacks (lookaround,
 backreferences) is a `RegExpError`. `String.locale_compare` orders as
 `Intl.Collator("en")` does, by weights the same script reads from Node;
-every locale collates as `en`. A date in text (`DateTime.make`,
+every locale collates as `en`. `DateTime` formats from tables
+`tools/go-intl/gen.mjs` writes from Node: the languages of 52 common
+locales with every regional variant ICU has, a tag resolved as V8 resolves
+it, zone names by metazone (`CET`, `Central European Standard Time`) at the
+offsets a zone has in 2024, and an offset (`+01:00`, `+0100`) taken as a
+zone's name. A date in text (`DateTime.make`,
 `Config.date`, HTTP dates) is read by a port of V8's `Date.parse`, legacy
 forms included; a date-time without an offset is local time, Go's
 `time.Local`. `Cli.file_parse` reads INI, TOML and YAML with ports of

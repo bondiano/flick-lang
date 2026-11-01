@@ -11,8 +11,8 @@ import (
 // Effect's DateTime formatting through `Intl.DateTimeFormat`, on the
 // tables tools/go-intl/gen.mjs writes from Node's ICU (datetime_intl.go).
 //
-// shortcut: a tag outside the tables falls back along its subtags to one in them, or to the default locale, where ICU has data for most languages and regions; Unicode extensions (`-u-hc-h23`, `-u-ca-…`) are ignored; regenerate with more locales when a program needs them
-// shortcut: a named zone other than UTC is named by its offset (`GMT+1`, `GMT+01:00`), where ICU names most by their metazone (`CET`, `Central European Standard Time`); generate metazone names when a program formats them
+// shortcut: the tables have the languages of 52 common locales on the Gregorian calendar, a tag of another falls back to the default locale; Unicode extensions (`-u-hc-h23`, `-u-ca-…`) are ignored; regenerate with more languages when a program needs them
+// shortcut: a named zone has its metazone's names at the offsets it has in 2024, by its offset at other times, where ICU follows the metazone's history (Europe/Berlin is `GMT+1` in 1900); generate the history when a program formats old dates
 
 // intlLocale is a locale's table: its patterns, by date and time style,
 // and the names they use.
@@ -41,9 +41,10 @@ func intlLocales() map[string]*intlLocale {
 	})
 }
 
-// localeTable is the table of the locale Intl negotiates for a well-formed
-// tag, as far as the tables go.
-func localeTable(id localeID) (*intlLocale, bool) {
+// localeTable is the locale Intl negotiates for a well-formed tag, as far
+// as the tables go: as V8 does, the first of the tag without its variants
+// and extensions and its shorter prefixes that ICU has data for.
+func localeTable(id localeID) (string, bool) {
 	language, script, region := id.language, id.script, id.region
 	tag := func(subtags ...string) string {
 		out := language
@@ -54,16 +55,16 @@ func localeTable(id localeID) (*intlLocale, bool) {
 		}
 		return out
 	}
-	for _, c := range []string{tag(script, region), tag(region), tag(script), language} {
-		if t, ok := intlLocales()[c]; ok {
-			return t, true
+	for _, c := range []string{tag(script, region), tag(script), language} {
+		if _, ok := intlLocales()[c]; ok {
+			return c, true
 		}
 	}
-	return nil, false
+	return "", false
 }
 
 // defaultLocale is ICU's default locale, from the environment.
-func defaultLocale() *intlLocale {
+func defaultLocale() string {
 	for _, name := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
 		if v := os.Getenv(name); v != "" {
 			v, _, _ = strings.Cut(v, ".")
@@ -76,13 +77,14 @@ func defaultLocale() *intlLocale {
 			break
 		}
 	}
-	return intlLocales()["en-US"]
+	return "en-US"
 }
 
 var styles = []string{"full", "long", "medium", "short"}
 
 // intlFormat is an `Intl.DateTimeFormat` of the adapter's FormatOptions.
 type intlFormat struct {
+	tag     string
 	locale  *intlLocale
 	pattern string
 }
@@ -104,13 +106,14 @@ func newIntlFormat(o Value) intlFormat {
 		panic(rangeError("invalid style " + QuoteJSON(value(s).(string))))
 	}
 	date, time := style("dateStyle"), style("timeStyle")
-	locale := defaultLocale()
+	tag := defaultLocale()
 	if l := r.Get("locale"); isSome(l) {
 		if t, ok := localeTable(parseLocale(value(l).(string))); ok {
-			locale = t
+			tag = t
 		}
 	}
-	return intlFormat{locale, locale.patterns[date*5+time]}
+	locale := intlLocales()[tag]
+	return intlFormat{tag, locale, locale.patterns[date*5+time]}
 }
 
 // format is the instant `ms` on the wall clock of `zone`, nil for UTC.
@@ -144,7 +147,11 @@ func (f intlFormat) format(ms float64, zone *TimeZone) string {
 			pattern = pattern[min(i+1, len(pattern)):]
 		case c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z':
 			n := len(pattern) - len(strings.TrimLeft(pattern, pattern[:1]))
-			out.WriteString(l.field(pattern[:n], wall, utc, offset))
+			if pattern[0] == 'z' {
+				out.WriteString(f.zoneName(zone, utc, offset, n == 4))
+			} else {
+				out.WriteString(l.field(pattern[:n], wall))
+			}
 			pattern = pattern[n:]
 		default:
 			_, size := utf8.DecodeRuneInString(pattern)
@@ -162,7 +169,7 @@ func twoDigits(n int) string {
 	return strconv.Itoa(n)
 }
 
-func (l *intlLocale) field(token string, wall *jsDate, utc bool, offset float64) string {
+func (l *intlLocale) field(token string, wall *jsDate) string {
 	year, month, day, hour := int(wall.year()), int(wall.month()), int(wall.date()), int(wall.hours())
 	h12 := hour % 12
 	switch token {
@@ -205,15 +212,19 @@ func (l *intlLocale) field(token string, wall *jsDate, utc bool, offset float64)
 		return strconv.Itoa(int(wall.seconds()))
 	case "ss":
 		return twoDigits(int(wall.seconds()))
-	case "z", "zzzz":
-		return l.zoneName(utc, offset, token == "zzzz")
 	}
 	panic(Defect{"no Intl field " + token})
 }
 
-// zoneName is the zone's short or long name: UTC's, offset 0's, or a
-// template of the offset's.
-func (l *intlLocale) zoneName(utc bool, offset float64, long bool) string {
+// zoneName is the zone's short or long name: UTC's, a named zone's own,
+// offset 0's, or a template of the offset's.
+func (f intlFormat) zoneName(zone *TimeZone, utc bool, offset float64, long bool) string {
+	if !utc && zone != nil && zone.loc != nil {
+		if name := metazoneName(f.tag, zone, offset, long); name != "" {
+			return name
+		}
+	}
+	l := f.locale
 	b := map[bool]int{false: 0, true: 1}
 	minutes := math.Round(offset / 60000)
 	switch {
