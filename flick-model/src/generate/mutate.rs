@@ -3,16 +3,21 @@
 
 use std::rc::Rc;
 
+use super::regions::leak;
 use super::{Gen, Program, mono, unit};
 use crate::syntax::{Arm, Const, Head, Lit, Term};
 use crate::types::{Row, Scheme, Stage, Type};
 
 /// `p` changed as `choices` say: a subterm replaced by a closed term of
 /// some type and stage, a runtime step put at the head of a block, an arm
-/// dropped, or an element taken off a row of a signature.
+/// dropped, an element taken off a row of a signature, a leak of a region
+/// put at the head of a block, or a qualifier or `Outlives` taken off a
+/// local signature (`regions.md` §4).
 pub fn mutate(p: &Program, choices: &[u32]) -> Program {
     let mut g = Gen::new(choices);
-    let kind = g.pick(4);
+    // the names a change makes are not the program's: a `scope` would shadow one
+    g.names = 100_000;
+    let kind = g.pick(6);
     let mut at = g.pick(size(&p.term) + 1);
     let mut p = p.clone();
     if kind == 3 && at == 0 {
@@ -45,6 +50,16 @@ pub fn mutate(p: &Program, choices: &[u32]) -> Program {
             (3, Term::Let(x, Some(s), rhs, rest)) => Some(Term::Let(
                 x.clone(),
                 Some(Rc::new(narrow(s, g.pick(64)))),
+                rhs.clone(),
+                rest.clone(),
+            )),
+            (4, _) if block => {
+                let path = g.pick(10);
+                Some(leak(g, path, e.clone()))
+            }
+            (5, Term::Let(x, Some(s), rhs, rest)) => Some(Term::Let(
+                x.clone(),
+                Some(Rc::new(unqualify(s))),
                 rhs.clone(),
                 rest.clone(),
             )),
@@ -85,6 +100,32 @@ fn narrow(s: &Scheme, k: usize) -> Scheme {
         vars: s.vars.clone(),
         body: narrow_type(&s.body, &mut k),
         outlives: s.outlives.clone(),
+    }
+}
+
+/// `σ` without its facts `Θ`, or else without its first qualifier.
+fn unqualify(s: &Scheme) -> Scheme {
+    if !s.outlives.is_empty() {
+        return Scheme {
+            outlives: Vec::new(),
+            ..s.clone()
+        };
+    }
+    Scheme {
+        body: strip(&s.body).unwrap_or_else(|| s.body.clone()),
+        ..s.clone()
+    }
+}
+
+/// `t` with its first qualifier, outermost first, taken off.
+fn strip(t: &Type) -> Option<Type> {
+    match t {
+        Type::Captured(x, _) | Type::Bounded(x, _) => Some((**x).clone()),
+        Type::Fun(p, s, r) => match strip(p) {
+            Some(p) => Some(Type::Fun(Rc::new(p), s.clone(), r.clone())),
+            None => Some(Type::Fun(p.clone(), s.clone(), Rc::new(strip(r)?))),
+        },
+        _ => None,
     }
 }
 
@@ -218,6 +259,7 @@ fn rewrite(e: &Term, at: &mut usize, block: bool, g: &mut Gen, change: &mut Chan
         }
         Term::Field(r, l) => Term::Field(go(r, false), l.clone()),
         Term::Task(b) => Term::Task(go(b, true)),
+        Term::Scope(s, b) => Term::Scope(s.clone(), go(b, true)),
         Term::Await(x) => Term::Await(go(x, false)),
         Term::Provide(l, b) => {
             let l = go(l, false);

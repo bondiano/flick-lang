@@ -5,12 +5,13 @@
 //! data: a function there would be typed by the guess of Р7, which the
 //! rules do not make.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
 use flick_core::numeric::{Arith, Num};
 
 use super::bind::fits;
+use super::regions::{handles, holders, visible};
 use super::{
     ERRORS, Gen, SERVICES, boolean, error_con, int, mono, nothing, operation, option, payload, row,
     service, some, string, unit,
@@ -40,6 +41,9 @@ enum Form {
     Set,
     Prim,
     Field,
+    Scope,
+    Hold,
+    Consume,
 }
 
 impl Gen<'_> {
@@ -201,6 +205,9 @@ impl Gen<'_> {
                 Term::apps(Term::konst(Const::RefSet), [Term::Var(x), v])
             }
             Form::Prim => self.prim(cx, t, budget, s),
+            Form::Scope => self.scope(cx, t, budget, s),
+            Form::Hold => self.hold(cx, t, budget, s),
+            Form::Consume => self.consume(cx),
             Form::Field => {
                 let other = self.data(0);
                 let fields =
@@ -267,14 +274,16 @@ impl Gen<'_> {
                     .map(|(l, t)| (l.clone(), self.term(cx, t, budget, s, false)))
                     .collect(),
             ),
+            // a closure of a bare type holds no region (`regions.md` §2.3)
             Type::Fun(p, stage, r) => {
                 let x = self.fresh("x");
-                let inner = extend(cx, &x, mono((**p).clone()));
+                let inner = extend(&visible(cx, &BTreeSet::new()), &x, mono((**p).clone()));
                 Term::Lam(x, Rc::new(self.term(&inner, r, stage, s, true)))
             }
             Type::Eff(r, e, a) => {
                 let stage = Stage::Runtime(r.clone(), e.clone());
-                Term::Task(Rc::new(self.term(cx, a, &stage, s, true)))
+                let cx = visible(cx, &BTreeSet::new());
+                Term::Task(Rc::new(self.term(&cx, a, &stage, s, true)))
             }
             _ => self.value(t),
         }
@@ -429,6 +438,16 @@ fn forms(cx: &Cx, t: &Type, budget: &Stage, block: bool) -> Vec<Form> {
     if runtime && *t == unit() && cells(cx).next().is_some() {
         forms.push(Form::Set);
     }
+    if runtime {
+        forms.push(Form::Scope);
+    }
+    // a block in a `scope` often holds its capability, and uses what does
+    if block && runtime && !handles(cx).is_empty() {
+        forms.extend([Form::Hold; 3]);
+    }
+    if runtime && *t == unit() && !holders(cx).is_empty() {
+        forms.extend([Form::Consume; 3]);
+    }
     if [int(), boolean(), string()].contains(t) {
         forms.push(Form::Prim);
     }
@@ -454,8 +473,20 @@ pub(super) fn plain(t: &Type) -> bool {
 
 /// The cells of `Γ` with the type they hold.
 fn cells(cx: &Cx) -> impl Iterator<Item = (Name, &Type)> {
+    // a cell of a capability is used by `regions.rs` only
     cx.iter().filter_map(|(x, s)| match &s.body {
-        Type::Ref(c) if s.vars.is_empty() => Some((x.clone(), &**c)),
+        Type::Ref(c) if s.vars.is_empty() && plain_data(c) => Some((x.clone(), &**c)),
         _ => None,
     })
+}
+
+/// Whether `t` is data without variables: what `data` makes.
+fn plain_data(t: &Type) -> bool {
+    match t {
+        Type::Var(_) => false,
+        Type::App(f, x) => plain_data(f) && plain_data(x),
+        Type::Tuple(ts) => ts.iter().all(plain_data),
+        Type::Record(f) => f.fields.values().all(plain_data),
+        _ => true,
+    }
 }

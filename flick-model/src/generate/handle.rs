@@ -1,7 +1,10 @@
 //! The handlers of a budget's rows: `try` takes errors the budget lacks,
 //! `provide` a service it lacks.
 
+use std::collections::BTreeSet;
 use std::rc::Rc;
+
+use super::regions::visible;
 
 use super::term::{Cx, extend};
 use super::{
@@ -70,8 +73,10 @@ impl Gen<'_> {
         let mut needed = services.clone();
         needed.elems.insert(service(name), Rc::from([]));
         let body = self.term(cx, t, &Stage::Runtime(needed, errors.clone()), s, true);
-        // what the operation does runs on its own stage, `->{}`
+        // what the operation does runs on its own stage, `->{}`, and what
+        // the layer builds holds no region
         let empty = Stage::Runtime(Row::none(), Row::none());
+        let cx = &visible(cx, &BTreeSet::new());
         let op = if name == "Log" {
             let line: Name = "line".into();
             self.term(&extend(cx, &line, mono(string())), &unit(), &empty, s, true)

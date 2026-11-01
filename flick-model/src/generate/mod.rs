@@ -10,6 +10,7 @@ mod bind;
 mod handle;
 mod mutate;
 mod print;
+mod regions;
 mod term;
 
 use std::rc::Rc;
@@ -90,6 +91,12 @@ impl<'c> Gen<'c> {
             term,
         }
     }
+}
+
+/// Whether `p` has a `scope`: running it needs the dynamics of regions
+/// (`docs/formal/regions.md` §3), which the machine has not.
+pub fn has_scope(p: &Program) -> bool {
+    source(p).contains("(scope ")
 }
 
 /// The program `choices` build.

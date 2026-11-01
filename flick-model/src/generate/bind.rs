@@ -2,11 +2,12 @@
 //! values of known scheme it may bind, and calls of what `Γ` holds at an
 //! instance of its scheme.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 
 use flick_core::numeric::{Arith, Num};
 
+use super::regions::visible;
 use super::term::{Cx, extend, plain};
 use super::{Gen, int, mono, nothing, option, some, unit};
 use crate::check::{Inst, substitute};
@@ -42,7 +43,8 @@ impl Gen<'_> {
                 let stage = self.within_budget(budget);
                 let fun = Type::fun(int(), stage.clone(), d.clone());
                 let n = self.fresh("n");
-                let base = self.term(&extend(cx, &n, mono(int())), &d, &stage, s, true);
+                let cx = visible(cx, &BTreeSet::new());
+                let base = self.term(&extend(&cx, &n, mono(int())), &d, &stage, s, true);
                 (
                     Some(mono(fun.clone())),
                     countdown(&x, &n, base),
@@ -145,7 +147,11 @@ fn template(i: usize, name: &str) -> (Scheme, Term, bool, bool) {
             .collect::<Vec<_>>()
     };
     let x = || Term::Var("x".into());
-    let scheme = |vars, body| Scheme { vars, body, outlives: Vec::new() };
+    let scheme = |vars, body| Scheme {
+        vars,
+        body,
+        outlives: Vec::new(),
+    };
     match i {
         0 => (
             scheme(ty_vars(&["a"]), Type::fun(a.clone(), Stage::Pure, a)),

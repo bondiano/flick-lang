@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 
 use super::{PRELUDE, Program};
 use crate::syntax::{Arm, Const, Head, Lit, Pat, Prim, Term};
-use crate::types::{Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Row, Scheme, Stage, Type, Var};
 
 use flick_core::numeric::Arith;
 
@@ -54,7 +54,7 @@ fn block(e: &Term, col: usize) -> String {
 fn binding(x: &str, sig: Option<&Scheme>, rhs: &Term, col: usize, rec: &str) -> String {
     let pad = " ".repeat(col);
     match sig {
-        Some(s) if matches!(s.body, Type::Fun(..)) => {
+        Some(s) if matches!(&s.body, Type::Fun(..) | Type::Captured(..) if function(&s.body)) => {
             let mut params = String::new();
             let mut body = rhs;
             // the parameters of one `let` are distinct: a name again is a λ
@@ -87,6 +87,9 @@ fn expr(e: &Term, col: usize) -> String {
     let inner = col + 2;
     match e {
         Term::Var(x) => x.to_string(),
+        Term::Global(p) if &*p.module == "Gen" => p.name.to_string(),
+        Term::Global(p) => p.to_string(),
+        Term::Scope(s, body) => format!("(scope {s} {{\n{} }})", block(body, inner)),
         Term::Lit(l) => lit(l),
         Term::Lam(x, body) => format!("(fun {x} ->\n{})", block(body, inner)),
         Term::Tuple(xs) => format!("({})", list(xs.iter().map(|x| expr(x, col)), ", ")),
@@ -237,18 +240,44 @@ fn list(items: impl Iterator<Item = String>, sep: &str) -> String {
     items.collect::<Vec<_>>().join(sep)
 }
 
+/// Whether `t` is a function, qualified or not: its `let` takes parameters.
+fn function(t: &Type) -> bool {
+    match t {
+        Type::Fun(..) => true,
+        Type::Captured(t, _) => function(t),
+        _ => false,
+    }
+}
+
 /// `σ`, its variables under an explicit `forall`, so a recursive binding
-/// is polymorphic in its own body for both checkers (σ° of (Let-Rec)).
+/// is polymorphic in its own body for both checkers (σ° of (Let-Rec)),
+/// and its facts `Θ`.
 fn scheme(s: &Scheme) -> String {
     if s.vars.is_empty() {
         return ty(&s.body);
     }
     let vars = list(s.vars.iter().map(|(v, _)| v.to_string()), " ");
-    format!("forall {vars}. {}", ty(&s.body))
+    let mut facts = String::new();
+    for (c, r) in &s.outlives {
+        let _ = write!(facts, "Fiber.Outlives {} {} => ", caps(c), ty_atom(r));
+    }
+    format!("forall {vars}. {facts}{}", ty(&s.body))
+}
+
+/// A set of captures after `^`: `c` or `{s, t}`.
+fn caps(c: &Caps) -> String {
+    match (c.atoms.len(), c.vars.iter().next()) {
+        (0, Some(v)) if c.vars.len() == 1 => v.to_string(),
+        _ => format!(
+            "{{{}}}",
+            list(c.atoms.iter().chain(&c.vars).map(ToString::to_string), ", ")
+        ),
+    }
 }
 
 fn ty(t: &Type) -> String {
     match t {
+        Type::Captured(x, c) | Type::Bounded(x, c) => format!("{}^{}", ty_atom(x), caps(c)),
         Type::Fun(p, s, r) => format!("{} {} {}", ty_atom(p), stage(s), ty(r)),
         Type::Eff(r, e, a) => format!("Eff {} {} {}", row_arg(r), row_arg(e), ty_atom(a)),
         Type::App(f, x) => format!("{} {}", ty(f), ty_atom(x)),
@@ -260,7 +289,8 @@ fn ty(t: &Type) -> String {
 fn ty_atom(t: &Type) -> String {
     match t {
         Type::Var(v) => v.to_string(),
-        Type::Con(p) => p.name.to_string(),
+        Type::Con(p) if ["Gen", "Prelude"].contains(&&*p.module) => p.name.to_string(),
+        Type::Con(p) => p.to_string(),
         Type::Tuple(ts) => format!("({})", list(ts.iter().map(ty), ", ")),
         Type::Record(f) => format!(
             "{{ {} }}",
@@ -293,7 +323,16 @@ fn row_arg(r: &Row) -> String {
 
 /// The elements of a row, then its variable: `Log, Counter | r`.
 fn items(r: &Row) -> String {
-    let elems = list(r.elems.keys().map(|p| p.name.to_string()), ", ");
+    let elems = list(
+        r.elems.iter().map(|(p, args)| {
+            let mut out = p.name.to_string();
+            for a in args.iter() {
+                let _ = write!(out, " {}", ty_atom(a));
+            }
+            out
+        }),
+        ", ",
+    );
     match r.vars.iter().next() {
         Some(Var::Named(v)) if elems.is_empty() => v.to_string(),
         Some(Var::Named(v)) => format!("{elems} | {v}"),
