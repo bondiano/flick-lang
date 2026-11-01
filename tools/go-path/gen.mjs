@@ -1,17 +1,20 @@
-// Writes runtime-go/flickrt/testdata/path_win32{,_more}.txt: what Node's
+// Writes runtime-go/flickrt/testdata/path_win32{,_parse,_more}.txt: what Node's
 // `path.win32`, and `fileURLToPath`/`pathToFileURL` with `windows`, give
 // for a corpus of Windows paths. TestPathWin32AsNode compares the go
 // runtime's win32 paths with these, one JSON line each: the operation,
-// its arguments, and the result (`null` for a thrown error). Inputs that
-// resolve against the working directory are left out: it differs here.
+// its arguments, and the result (`null` for a thrown error). The working
+// directory is `C:\work\dir` here and in the test, on every OS, and no
+// drive has a working directory of its own.
 // Run from the repository root: `node tools/go-path/gen.mjs`.
 import { writeFileSync } from "node:fs";
 import { win32 } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-// a path's parts in one file, the rest in the other, each a size Git reviews
-const out = "runtime-go/flickrt/testdata/path_win32.txt";
-const more = "runtime-go/flickrt/testdata/path_win32_more.txt";
+process.cwd = () => "C:\\work\\dir";
+for (const name of Object.keys(process.env)) if (/^=[A-Za-z]:$/.test(name)) delete process.env[name];
+
+// a path's parts, parsing and joining, and resolving: files of a size Git reviews
+const testdata = "runtime-go/flickrt/testdata/path_win32";
 
 const paths = [
   "", ".", "..", "\\", "/", "a", "a\\b", "a/b", "a\\b\\", "a/b/", "\\a", "/a", "\\\\", "//",
@@ -24,11 +27,10 @@ const paths = [
   "file.txt", "file.tar.gz", ".bashrc", "..txt", "a.", "C:\\a\\b.txt", "C:\\a\\.b", "C:\\a\\b.",
   "C:\\dir.x\\file", "\\\\server\\share\\f.txt", "a\\b\\..\\c.d", "über\\ñ.txt", "C:\\ünï\\é", "a\\😀\\b",
 ];
-const absolute = paths.filter((p) => win32.isAbsolute(p) && !/^[\\/](?![\\/])/.test(p));
+const absolute = paths.filter((p) => win32.isAbsolute(p));
 // pairs of these, as every pair of `absolute` would be a large file
-const some = ["C:\\", "C:\\a", "C:/a/b/", "c:\\A\\c", "D:\\a", "\\\\server\\share", "//server/share/x/y", "\\\\?\\C:\\a"];
+const some = ["a\\b", "C:\\", "C:\\a", "C:/a/b/", "c:\\A\\c", "D:\\a", "\\\\server\\share", "//server/share/x/y", "\\\\?\\C:\\a"];
 
-const cwd = process.cwd().replaceAll("/", "\\");
 const lines = [];
 const record = (op, args, f) => {
   let result;
@@ -66,16 +68,18 @@ const formats = [
   { root: "", dir: "", base: "", name: "", ext: "" },
 ];
 for (const f of formats) record("format", [f], () => win32.format(f));
+const parsing = lines.splice(0);
+for (const p of paths) {
+  record("resolve", [p], () => win32.resolve(p));
+  record("toNamespacedPath", [p], () => win32.toNamespacedPath(p));
+}
 for (const a of absolute) {
-  record("resolve", [a], () => win32.resolve(a));
-  record("toNamespacedPath", [a], () => win32.toNamespacedPath(a));
   // a root keeps its `\\`, which Node off Windows takes for no separator and adds a `/`
   if (!win32.resolve(a).endsWith("\\")) record("toFileUrl", [a], () => pathToFileURL(a, { windows: true }).href);
 }
 for (const a of some) {
   for (const b of ["..\\y", "D:z", "C:w", "\\\\h\\s\\t"]) {
-    // another drive's relative path reads the working directory
-    if (!win32.resolve(a, b).includes(cwd)) record("resolve", [a, b], () => win32.resolve(a, b));
+    record("resolve", [a, b], () => win32.resolve(a, b));
   }
   for (const b of some) record("relative", [a, b], () => win32.relative(a, b));
 }
@@ -89,6 +93,7 @@ for (const u of urls) record("fromFileUrl", [u], () => fileURLToPath(u, { window
 for (const p of ["C:\\a b\\#?%\\", "C:\\ü\\x", "C:\\a\\", "\\\\server\\share\\a b", "\\\\?\\UNC\\srv\\sh\\x", "\\\\server", "C:\\a\tb\nc"])
   record("toFileUrl", [p], () => pathToFileURL(p, { windows: true }).href);
 
-writeFileSync(out, parts.join("\n") + "\n");
-writeFileSync(more, lines.join("\n") + "\n");
-console.log(`${parts.length + lines.length} lines in ${out} and ${more}`);
+for (const [suffix, group] of [["", parts], ["_parse", parsing], ["_more", lines]]) {
+  writeFileSync(`${testdata}${suffix}.txt`, group.join("\n") + "\n");
+  console.log(`${group.length} lines in ${testdata}${suffix}.txt`);
+}

@@ -10,7 +10,10 @@ import (
 // TestPathWin32AsNode compares the win32 paths with Node's on the corpus
 // `node tools/go-path/gen.mjs` writes; a `null` result is a thrown error.
 func TestPathWin32AsNode(t *testing.T) {
-	for _, name := range []string{"testdata/path_win32.txt", "testdata/path_win32_more.txt"} {
+	// the working directory the generator gives Node, whatever the OS
+	defer func(dir func(string) string) { win32WorkingDir = dir }(win32WorkingDir)
+	win32WorkingDir = func(string) string { return `C:\work\dir` }
+	for _, name := range []string{"testdata/path_win32.txt", "testdata/path_win32_parse.txt", "testdata/path_win32_more.txt"} {
 		f, err := os.Open(name)
 		if err != nil {
 			t.Fatal(err)

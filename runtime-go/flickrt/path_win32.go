@@ -126,7 +126,15 @@ func win32NormalizeString(path string, allowAboveRoot bool) string {
 	return res
 }
 
-func win32Cwd() string {
+// win32WorkingDir is the working directory of `device`, or of the process
+// for "": Windows keeps one per drive in the variable `=C:`. A variable,
+// so the corpus test reads the same directory on every OS.
+var win32WorkingDir = func(device string) string {
+	if device != "" {
+		if dir := os.Getenv("=" + device); dir != "" {
+			return dir
+		}
+	}
 	cwd, _ := os.Getwd()
 	return cwd
 }
@@ -141,7 +149,7 @@ func win32Resolve(args ...string) string {
 				continue
 			}
 		case device == "":
-			path = win32Cwd()
+			path = win32WorkingDir("")
 			if len(args) == 0 || len(args) == 1 && (args[0] == "" || args[0] == ".") && path != "" && isWinSep(path[0]) {
 				if runtime.GOOS != "windows" {
 					path = strings.ReplaceAll(path, "/", `\`)
@@ -149,10 +157,7 @@ func win32Resolve(args ...string) string {
 				return path
 			}
 		default:
-			// the drive's own working directory, as Windows keeps one per drive
-			if path = os.Getenv("=" + device); path == "" {
-				path = win32Cwd()
-			}
+			path = win32WorkingDir(device)
 			if len(path) > 2 && path[2] == '\\' && !strings.EqualFold(path[:2], device) {
 				path = device + `\`
 			}
