@@ -114,6 +114,7 @@ stdlib/http/api
 stdlib/http/api_bodies
 stdlib/http/redaction_context
 stdlib/http/router_patterns
+stdlib/http/spans
 stdlib/effect/filesystem_node
 stdlib/effect/platform
 stdlib/effect/console

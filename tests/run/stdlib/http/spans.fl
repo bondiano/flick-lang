@@ -1,0 +1,82 @@
+// The attributes of the HTTP spans under the native tracer: a server span
+// records the request and its response only when the handler fails, a
+// client span records the request and the response always, and the
+// headers the filter passes, the secret ones masked.
+module App.Main exposing (main)
+
+import Http.ClientError exposing (HttpClientError)
+import Http.ClientRequest exposing (ClientRequest)
+import Http.ClientResponse exposing (ClientResponse)
+
+type error Boom = Boom
+  deriving Show
+
+ok : Http.ServerResponse.Options
+let ok = Http.ServerResponse.defaults
+
+/// The kind and the attributes of the span `seen` holds.
+spanned : Ref (Option Tracer.Span) ->{} String
+let spanned seen =
+  match Ref.get seen with
+  | Some span -> show (Tracer.span_kind span) ++ " " ++ show (Tracer.attributes span)
+  | None -> "no span"
+
+/// Only the headers the test sets, so that the host is left out.
+chosen : String -> String -> Bool
+let chosen name _ = name == "x-request-id" || name == "authorization" || name == "content-type"
+
+/// A GET of the URL with a header the filter passes and a secret one.
+get : String -> ClientRequest
+let get url =
+  Http.ClientRequest.get url
+  |> Http.ClientRequest.set_header "x-request-id" "r2"
+  |> Http.ClientRequest.set_header "authorization" "Bearer t"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let seen = Ref.make None
+  let request =
+    Http.ClientRequest.get "http://shop.example:8080/cart?id=7&Signature=s3"
+    |> Http.ClientRequest.set_header "user-agent" "flick-test"
+    |> Http.ClientRequest.set_header "authorization" "Bearer t"
+    |> Http.ClientRequest.set_header "x-request-id" "r1"
+    |> Http.ServerRequest.from_client_request
+  served : Http.Middleware.Handler none none
+  let served _ =
+    Ref.set seen (Tracer.parent_span ())
+    Http.ServerResponse.text "fine" ok
+  let _ = Http.Middleware.tracer served request
+  Platform.stdout_line ("server ok: " ++ spanned seen)
+  failing : Http.Middleware.Handler none {Boom}
+  let failing _ =
+    Ref.set seen (Tracer.parent_span ())
+    from_result (Err Boom)
+  try
+    Http.Middleware.with_tracer_header_filter
+      chosen
+      (task {
+        let _ = Http.Middleware.tracer failing request
+        ()
+      })
+  with
+  | Boom -> Platform.stdout_line ("server failed: " ++ spanned seen)
+  transport : ClientRequest -> Http.Url.Url ->{; HttpClientError} ClientResponse
+  let transport r _ =
+    Ref.set seen (Tracer.parent_span ())
+    let status = if String.contains "/gone" (Http.ClientRequest.url r) then 404 else 200
+    Http.ServerResponse.to_client_response
+      r
+      (Http.ServerResponse.text "body" { ok with status = Some status })
+  let client = Http.Client.make transport
+  try
+    let found = Http.Client.execute_with client (get "http://api.example/items?sig=x&page=2#top")
+    Platform.stdout_line
+      ("client " ++ show (Http.ClientResponse.status found) ++ ": " ++ spanned seen)
+    let gone =
+      Http.Client.with_tracer_header_filter
+        chosen
+        (task { Http.Client.execute_with client (get "https://[::1]/gone") })
+    Platform.stdout_line
+      ("client " ++ show (Http.ClientResponse.status gone) ++ ": " ++ spanned seen)
+  with
+  | e -> Platform.stdout_line ("client failed: " ++ show e)

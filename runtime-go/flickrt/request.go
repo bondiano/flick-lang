@@ -42,6 +42,7 @@ var requests sync.Mutex
 type requestEntry struct {
 	request         Value
 	by              int64 // the requesting fiber, which orders the window
+	span            Value // the requesting fiber's span, an Option
 	key             Value // its batch's
 	uninterruptible bool
 	complete        func(exit *Exit) // `with_cache` wraps it
@@ -261,7 +262,7 @@ func removeEntry(fb *Fiber, r *resolver, e *requestEntry) {
 // RequestRun runs `request` through `resolver`.
 func RequestRun(fb *Fiber, resolver, request Value) Value {
 	r := resolverOf(resolver)
-	e := &requestEntry{request: request, by: fb.state.id, done: make(chan struct{})}
+	e := &requestEntry{request: request, by: fb.state.id, span: currentSpan(fb), done: make(chan struct{})}
 	e.complete = e.settle
 	requests.Lock()
 	r.window = append(r.window, e)

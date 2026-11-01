@@ -30,6 +30,8 @@ race ["user1"]
 never true
 batch of 1
 with_span ["user1"]
+span [("batchSize", "2"), ("cache", "cold")] links 1
+with_span linked ["user1", "user2"]
 batch of 1
 with_cache ["user1"]
 with_cache again ["user1"]

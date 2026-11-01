@@ -101,6 +101,21 @@ let trace_options = {
   disablePropagation = false;
 }
 
+/// Prints the attributes and the number of links of the batch's span.
+traced : RequestResolver Query {NotFound} String
+let traced =
+  RequestResolver.make (fun entries ->
+    match Tracer.parent_span () with
+    | Some span ->
+      Platform.stdout_line
+        ("span "
+          ++ show (Tracer.attributes span)
+          ++ " links "
+          ++ show (List.length (Tracer.links span)))
+    | None -> Platform.stdout_line "no span"
+    List.each_effect answer (NonEmpty.to_list entries)
+  )
+
 twice : (c ->{; e} String) -> c ->{; e} String
 let twice get cache = get cache ++ " " ++ get cache
 
@@ -145,6 +160,11 @@ let main () =
   Platform.stdout_line ("never " ++ show (Option.is_none stuck))
   Platform.stdout_line
     ("with_span " ++ run_all (RequestResolver.with_span "users" trace_options batched) [1])
+  // the requests of one span make one link
+  let spanned =
+    RequestResolver.with_span "users" { trace_options with attributes = [("cache", "cold")] } traced
+  let linked = Tracer.with_span "caller" trace_options (task { run_all spanned [1, 2] })
+  Platform.stdout_line ("with_span linked " ++ linked)
   let cached =
     RequestResolver.with_cache { capacity = 10; strategy = Some RequestResolver.lru } batched
   Platform.stdout_line ("with_cache " ++ run_all cached [1])

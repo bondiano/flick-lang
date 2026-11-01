@@ -1,5 +1,7 @@
 package flickrt
 
+import "strconv"
+
 // Http.Client as Effect's HttpClient: a client is the preparation of each
 // request and the sending of the prepared one, both tasks, so that a
 // combinator retrying the sending prepares the request again as Effect's
@@ -41,9 +43,9 @@ func HttpClientMake(f Value) Value {
 // clientOfTransport is Effect's `make`: the URL of the request with its
 // parameters and hash, an InvalidUrlError without one; the request sent in
 // a client span whose trace context goes with it as headers, unless the
-// fiber's settings say otherwise.
-//
-// shortcut: the span has no `http.*` attributes and ends with the send's exit, not with the response's status; record the request and response as Effect's client does when a program exports them
+// fiber's settings say otherwise. The span records the request and the
+// response, and fails with a StatusCodeError on a 4xx or 5xx one, which
+// the call still answers.
 func clientOfTransport(send transport) *Client {
 	return &Client{pre: func(_ *Fiber, request Value) Value { return Succeed(request) }, post: func(fb *Fiber, prepared Value) Value {
 		return Eff(func(fb *Fiber) Value {
@@ -53,6 +55,9 @@ func clientOfTransport(send transport) *Client {
 				// Effect's UrlError has no message of its own
 				return Fail(requestFailure(fb, invalidUrlTag, request, Some("")))
 			}
+			if envOr(fb, disablePropagationKey, false).(bool) {
+				return send(fb, request, value(url))
+			}
 			if f, ok := fb.env.get(clientTracerDisabledKey); ok && Apply(fb, f, request).(bool) {
 				return send(fb, request, value(url))
 			}
@@ -60,7 +65,10 @@ func clientOfTransport(send transport) *Client {
 			if f, ok := fb.env.get(clientSpanNameKey); ok {
 				name = Apply(fb, f, request)
 			}
-			s := openSpan(fb, name, Rec("parent", None, "root", false))
+			s := openSpan(fb, name, Rec("parent", None, "root", false, "kind_", "client"))
+			s.attribute("http.request.method", request.method)
+			s.addURLAttributes(urlOf(value(url)), currentUrlRedactedNames(fb))
+			s.addHeaderAttributes(fb, "request", request.headers, clientHeaderFilterKey)
 			if on, ok := fb.env.get(clientPropagationKey); !ok || on.(bool) {
 				request = clientOf(ClientRequestSetHeaders([]Value{
 					[]Value{"b3", s.b3()},
@@ -68,7 +76,18 @@ func clientOfTransport(send transport) *Client {
 				}, request))
 			}
 			return spanning(fb, s, func(s *span) Value {
-				return withEnv(fb, parentSpanKey, s, Eff(func(fb *Fiber) Value { return send(fb, request, value(url)) }))
+				out := withEnv(fb, parentSpanKey, s, Eff(func(fb *Fiber) Value { return send(fb, request, value(url)) }))
+				response := clientResponseOf(out)
+				s.attribute("http.response.status_code", response.status)
+				s.addHeaderAttributes(fb, "response", response.headers, clientHeaderFilterKey)
+				// OpenTelemetry fails client spans of 4xx and 5xx responses,
+				// while the response itself still succeeds.
+				if response.status >= 400 && response.status < 600 {
+					s.attribute("error.type", strconv.Itoa(int(response.status)))
+					err := responseFailure(fb, statusErrorTag, response, None)
+					endSpan(s, &Cause{kind: causeFail, err: err}, clockOf(fb), envOr(fb, tracerTimingKey, true).(bool))
+				}
+				return out
 			})
 		})
 	}}
