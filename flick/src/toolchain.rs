@@ -62,8 +62,10 @@ pub fn check_runtime(root: &Path) -> Option<Diagnostic> {
 pub fn go_build(out_dir: &Path, name: &str) -> Option<Diagnostic> {
     let dir = out_dir.join(build::go::module_dir(name));
     let mut command = process::Command::new("go");
+    // without -trimpath the directory of a package keys Go's build cache: each
+    // run generation and e2e case would compile the runtime anew and keep it
     command
-        .args(["build", "-o"])
+        .args(["build", "-trimpath", "-o"])
         .arg(out_dir.join(build::go::executable(name)))
         .arg(".")
         .current_dir(&dir)
