@@ -20,8 +20,6 @@ var JsonNull Value = &jsonNull{}
 
 // JsonParse is `Json.parse`: the value of a JSON text, or a SchemaError
 // with the parser's reason.
-//
-// shortcut: syntax errors read as V8's for objects, strings, numbers, a bad token and the end of input; port V8's other texts if a program shows them
 func JsonParse(text Value) Value {
 	v, reason := parseJSON(text.(string))
 	if reason != "" {
@@ -107,15 +105,33 @@ func (p *jsonParser) space() {
 	}
 }
 
+// next is the byte at the parser's position, 0 at the end of the input.
+func (p *jsonParser) next() byte {
+	if p.i < len(p.s) {
+		return p.s[p.i]
+	}
+	return 0
+}
+
+// literal reads `word` as V8 does: unit by unit, refusing the first that
+// differs as a token of its own; a word cut short is the end of the input.
 func (p *jsonParser) literal(word string, v Value) (Value, bool) {
-	if strings.HasPrefix(p.s[p.i:], word) {
-		p.i += len(word)
-		return v, true
+	for i := 1; i < len(word); i++ {
+		p.i++
+		switch c := p.next(); {
+		case p.i >= len(p.s):
+			return nil, false
+		case c == word[i]:
+		case c == '"':
+			return p.expect("Unexpected string")
+		case c == '-' || c >= '0' && c <= '9':
+			return p.expect("Unexpected number")
+		default:
+			return nil, false
+		}
 	}
-	if strings.HasPrefix(word, p.s[p.i:]) {
-		p.i = len(p.s) // a word cut short is the end of the input
-	}
-	return nil, false
+	p.i++
+	return v, true
 }
 
 func (p *jsonParser) value() (Value, bool) {
@@ -215,7 +231,7 @@ func (p *jsonParser) quoted() (string, bool) {
 				units = utf16Units(p.s[plain:p.i])
 			}
 			if p.i+1 >= len(p.s) {
-				p.i = len(p.s)
+				p.problem = "Unexpected end of JSON input"
 				return "", false
 			}
 			e := p.s[p.i+1]
@@ -282,10 +298,7 @@ func (p *jsonParser) array() (Value, bool) {
 		}
 		p.vals = append(p.vals, v)
 		p.space()
-		if p.i >= len(p.s) {
-			return nil, false
-		}
-		switch p.s[p.i] {
+		switch p.next() {
 		case ',':
 			p.i++
 		case ']':
@@ -332,10 +345,7 @@ func (p *jsonParser) object() (Value, bool) {
 		}
 		p.keys, p.vals = append(p.keys, k), append(p.vals, v)
 		p.space()
-		if p.i >= len(p.s) {
-			return nil, false
-		}
-		switch p.s[p.i] {
+		switch p.next() {
 		case ',':
 			p.i++
 		case '}':

@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"regexp"
 	"strings"
-	"time"
 )
 
 var configErrorTag = Tag("Config.ConfigError.ConfigError")
@@ -320,19 +319,12 @@ func decodeURL(text string) (Value, string) {
 	return u.href(), ""
 }
 
-// decodeDate reads the ISO dates JS `Date` parses, as milliseconds.
-// shortcut: ISO 8601 forms only, where V8 also reads its legacy formats; port them when a program needs one
+// decodeDate is JS `new Date(text)`, as milliseconds.
 func decodeDate(text string) (Value, string) {
-	for _, layout := range []string{time.RFC3339Nano, "2006-01-02T15:04:05.999999999", "2006-01-02T15:04", "2006-01-02", "2006-01", "2006"} {
-		loc := time.UTC
-		if strings.Contains(layout, "T") && !strings.HasSuffix(layout, "Nano") {
-			loc = time.Local // V8 reads a date-time without an offset as local time
-		}
-		if t, err := time.ParseInLocation(layout, text, loc); err == nil {
-			return float64(t.UnixMilli()), ""
-		}
+	if ms := parseJsDate(text); !math.IsNaN(ms) {
+		return ms, ""
 	}
-	return nil, "Expected a valid date"
+	return nil, "Expected a valid Date"
 }
 
 func ConfigString(name Value) Value         { return scalar(name, decodeString) }

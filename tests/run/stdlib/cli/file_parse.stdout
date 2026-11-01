@@ -1,0 +1,22 @@
+$ --data $TMP/app.ini
+{"server":{"host":"localhost","port":"8080","tls":{"on":true,"list":["a","b"]}}}
+$ --data $TMP/app.toml
+{"title":"app","ports":[80,443],"born":"1979-05-27T15:32:00.000Z","owner":{"name":"Tom"},"peers":[{"id":1}]}
+$ --data $TMP/app.yaml
+{"base":{"x":1},"ref":{"x":1},"text":"two\nlines\n","list":[16,null,"café"]}
+$ --data $TMP/bad.toml
+USAGE
+  data [flags]
+
+FLAGS
+  --data file    A data file
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+CliError: Invalid value for flag --data: "$TMP/bad.toml". Expected: Failed to parse '.toml' file content: SyntaxError: Expected ',' at line 2, column 13
+files ok

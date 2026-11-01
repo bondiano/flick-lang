@@ -125,6 +125,13 @@ let cookies () =
       ++ (Http.Cookies.serialize_cookie (expiring until))
       ++ " / "
       ++ (Http.Cookies.serialize_cookie (expiring zoned)))
+  let read =
+    Http.Cookies.from_set_cookie [
+      "a=1; Expires=Wed, 21-Oct-15 07:28:00 GMT",
+      "b=2; Expires=10 Mar 2024 10:00 +01:00",
+      "c=3; Expires=soon",
+    ]
+  Platform.stdout_line ("read expires: " ++ (show (Http.Cookies.to_set_cookie_headers read)))
   let more =
     jar
     |> Http.Cookies.set_cookie cookie

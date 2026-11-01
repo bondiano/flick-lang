@@ -4,7 +4,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Reading cookies from headers, as Effect's `fromSetCookie` and
@@ -85,8 +84,8 @@ func readAttribute(o *cookieOptions, key, val string, hasValue bool) {
 			o.with(optDomain)
 		}
 	case "expires":
-		if t, ok := parseDate(val); ok {
-			o.expires = t.UnixMilli()
+		if ms := parseJsDate(val); !math.IsNaN(ms) {
+			o.expires = int64(ms)
 			o.with(optExpires)
 		}
 	case "max-age":
@@ -132,21 +131,6 @@ func parseLeadingInt(s string) (float64, bool) {
 	}
 	x, _ := strconv.ParseFloat(s[:n], 64)
 	return math.Copysign(x, sign), true
-}
-
-// parseDate reads the date of an `Expires` attribute.
-//
-// shortcut: reads the HTTP date forms, asctime and ISO 8601, where JS's Date reads more; two-digit years 50 to 68 fall in the 2000s here, the 1900s there
-func parseDate(s string) (time.Time, bool) {
-	for _, layout := range []string{
-		time.RFC1123, "Mon, 02-Jan-06 15:04:05 MST", "Mon, 02-Jan-2006 15:04:05 MST", time.RFC850,
-		time.ANSIC, time.RFC3339Nano, "2006-01-02T15:04", "2006-01-02", "2006-01", "2006",
-	} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t, true
-		}
-	}
-	return time.Time{}, false
 }
 
 // CookiesParseHeader is the names and values of a `Cookie` header, the

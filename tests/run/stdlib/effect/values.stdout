@@ -10,6 +10,7 @@ id: "same"
 some: 1 Some 2
 none: None
 result: Ok 1 Err "e" true
+misses: expected a Some value; expected a None value; expected a Result.Success value; expected a Result.Failure value
 from_check: 3 error: too big
 traversal: [1, 2] [2, 3]
 patch: replace /corner/y 6; replace /name "big box"

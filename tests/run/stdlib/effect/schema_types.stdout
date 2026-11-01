@@ -70,3 +70,5 @@ dns_tlsa_record {"_tag": "TLSA", "certUsage": 3, "selector": 1, "matchingType": 
 dns_txt_record {"_tag": "TXT", "chunks": ["v=spf1"]}: {"_tag":"TXT","chunks":["v=spf1"]}
 dns_txt_record {"_tag": "A", "address": "192.0.2.1"}: err an unknown key
 format_record: MX 10 mail.example.com
+parse_host bad: err expected exactly four decimal octets; expected an IPv6 zone; invalid domain name
+unions of a number: err expected Union, got number | err expected Union, got number | err expected Union, got an object

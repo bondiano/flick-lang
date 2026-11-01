@@ -23,14 +23,15 @@ func channelCodec(c Value, code func(l *listCodec, fb *Fiber, chunk Value) (Valu
 	})
 }
 
-// unreported is the issues without the inputs they name.
-//
-// shortcut: only `expected …, got …` drops its input; a number with no JSON form is still named while encoding, where Effect falls back to the check's own text
+// unreported is the issues without the inputs they name: a number with no
+// JSON form fails the wire's check, whose text Effect falls back to.
 func unreported(issues []issue) []issue {
 	out := make([]issue, len(issues))
 	for i, is := range issues {
 		if at := strings.Index(is.message, ", got "); at >= 0 && strings.HasPrefix(is.message, "expected ") {
 			is.message = is.message[:at]
+		} else if strings.HasSuffix(is.message, " has no JSON form") {
+			is.message = "expected a finite number"
 		}
 		out[i] = is
 	}

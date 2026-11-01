@@ -1,6 +1,9 @@
 package flickrt
 
-import "math"
+import (
+	"math"
+	"strconv"
+)
 
 // The compiler of a schema's generator (internal/arbitrary/schema.ts):
 // a node per AST node and inherited constraint, settled together so a
@@ -14,10 +17,32 @@ type arbCompiler struct {
 	pending []func()
 }
 
-// arbFail is Effect's error of a schema it cannot generate.
-//
-// shortcut: without the path of the node that Effect appends; thread the path through the compiler if a program reports it
-func arbFail(what string) { panic(Defect{"Error: Unable to derive an arbitrary for " + what}) }
+// arbFailure is what a node being compiled cannot be generated for; the
+// compiler adds the node's path.
+type arbFailure string
+
+func arbFail(what string) { panic(arbFailure(what)) }
+
+// arbError is Effect's error of a schema it cannot generate, at the path
+// of the node in it as Effect's `formatPath` writes one.
+func arbError(what string, path []any) Defect {
+	message := "Error: Unable to derive an arbitrary for " + what
+	if len(path) > 0 {
+		message += "\n  at "
+		for _, key := range path {
+			switch k := key.(type) {
+			case int:
+				message += "[" + strconv.Itoa(k) + "]"
+			default:
+				message += "[" + QuoteJSON(k.(string)) + "]"
+			}
+		}
+	}
+	return Defect{message}
+}
+
+// at is the path of a node's part at `key`: an index or a property name.
+func at(path []any, key any) []any { return append(path[:len(path):len(path)], key) }
 
 func discardAll(*genState) *sample { return nil }
 
@@ -35,7 +60,7 @@ func compileSchema(s *Schema) *arbGen {
 
 func compileAST(ast *arbAST) *arbGen {
 	c := &arbCompiler{cache: map[*arbAST]map[*arbConstraint]*arbGen{}, bodies: map[*arbGen]*arbGen{}}
-	root := c.recur(ast, nil)
+	root := c.recur(ast, nil, nil)
 	for i := 0; i < len(c.pending); i++ {
 		c.pending[i]()
 	}
@@ -73,12 +98,12 @@ func compileAST(ast *arbAST) *arbGen {
 		}
 	}
 	if root.minCost == infinity {
-		arbFail("a schema without a finite generation path")
+		panic(arbError("a schema without a finite generation path", nil))
 	}
 	return root
 }
 
-func (c *arbCompiler) recur(ast *arbAST, inherited *arbConstraint) *arbGen {
+func (c *arbCompiler) recur(ast *arbAST, path []any, inherited *arbConstraint) *arbGen {
 	entries := c.cache[ast]
 	if cached, ok := entries[inherited]; ok {
 		return cached
@@ -91,13 +116,22 @@ func (c *arbCompiler) recur(ast *arbAST, inherited *arbConstraint) *arbGen {
 	entries[inherited] = node
 	c.nodes = append(c.nodes, node)
 	c.pending = append(c.pending, func() {
+		defer func() {
+			switch r := recover().(type) {
+			case nil:
+			case arbFailure:
+				panic(arbError(string(r), path))
+			default:
+				panic(r)
+			}
+		}()
 		constraint := inherited
 		for _, ck := range ast.checks {
 			if ck.constraint != nil {
 				constraint = mergeConstraint(constraint, ck.constraint)
 			}
 		}
-		base := c.compileBase(ast, constraint)
+		base := c.compileBase(ast, path, constraint)
 		if ast.tag == astSuspend {
 			body := base.deps[0]
 			node.deps = []*arbGen{body}
@@ -170,7 +204,7 @@ func constantNode(v Value) *arbGen {
 	return compiledGen(nil, func() float64 { return 0 }, func(*genState) *sample { return s })
 }
 
-func (c *arbCompiler) compileBase(ast *arbAST, constraint *arbConstraint) *arbGen {
+func (c *arbCompiler) compileBase(ast *arbAST, path []any, constraint *arbConstraint) *arbGen {
 	switch ast.tag {
 	case astNever:
 		if ast.what != "" {
@@ -196,13 +230,13 @@ func (c *arbCompiler) compileBase(ast *arbAST, constraint *arbConstraint) *arbGe
 	case astDecimal:
 		return decimalNode()
 	case astArrays:
-		return c.compileArrays(ast, constraint)
+		return c.compileArrays(ast, path, constraint)
 	case astObjects:
-		return c.compileObjects(ast)
+		return c.compileObjects(ast, path)
 	case astUnion:
 		members := make([]*arbGen, len(ast.members))
 		for i, m := range ast.members {
-			members[i] = c.recur(m, constraint)
+			members[i] = c.recur(m, path, constraint)
 		}
 		if len(members) == 0 {
 			arbFail("a union with no members")
@@ -215,39 +249,44 @@ func (c *arbCompiler) compileBase(ast *arbAST, constraint *arbConstraint) *arbGe
 			return out
 		}, func(st *genState) *sample { return generateUnion(members, st) })
 	case astSuspend:
-		body := c.recur(ast.thunk(), nil)
+		body := c.recur(ast.thunk(), path, nil)
 		return compiledGen([]*arbGen{body}, func() float64 { return body.minCost }, func(st *genState) *sample { return body.generate(st) })
 	case astRecord:
-		return c.compileRecord(ast)
+		return c.compileRecord(ast, path)
 	}
-	return c.compileDeclaration(ast)
+	return c.compileDeclaration(ast, path)
 }
 
 // compileDeclaration is an Option, a Result or a Redacted value: its
 // parameters', through the union of tagged structs Effect links it to; or
-// a link's declaration.
-func (c *arbCompiler) compileDeclaration(ast *arbAST) *arbGen {
-	params := make([]*arbGen, len(ast.members))
-	for i, m := range ast.members {
-		params[i] = c.recur(m, nil)
+// a link's declaration. The parameters come first, as Effect compiles
+// them, so the target's structs find them compiled at their paths.
+func (c *arbCompiler) compileDeclaration(ast *arbAST, path []any) *arbGen {
+	members := ast.members
+	if ast.tag == astLink {
+		members = members[1:]
+	}
+	params := make([]*arbGen, len(members))
+	for i, m := range members {
+		params[i] = c.recur(m, at(path, i), nil)
 	}
 	var target *arbGen
 	wrap := func(v Value) Value { return v }
 	switch ast.tag {
 	case astLink:
-		target, params, wrap = params[0], params[1:], ast.decode
+		target, wrap = c.recur(ast.members[0], path, nil), ast.decode
 	case astOption:
 		target = c.recur(&arbAST{tag: astUnion, members: []*arbAST{
 			structNode("Some", ast.members, func(vs []Value) Value { return Some(vs[0]) }),
 			structNode("None", nil, func([]Value) Value { return None }),
-		}}, nil)
+		}}, path, nil)
 	case astResult:
 		target = c.recur(&arbAST{tag: astUnion, members: []*arbAST{
 			structNode("Success", ast.members[:1], func(vs []Value) Value { return Ok(vs[0]) }),
 			structNode("Failure", ast.members[1:], func(vs []Value) Value { return Err(vs[0]) }),
-		}}, nil)
+		}}, path, nil)
 	default:
-		target = c.recur(ast.members[0], nil)
+		target = c.recur(ast.members[0], path, nil)
 		wrap = func(v Value) Value { return &Redacted{v} }
 	}
 	return compiledGen(append([]*arbGen{target}, params...), func() float64 { return target.minCost }, func(st *genState) *sample {
@@ -291,10 +330,10 @@ func generateSamples(children []*arbGen, st *genState, reserved float64) []*samp
 
 // compileObjects is a struct of required properties, the only objects a
 // schema of the program has.
-func (c *arbCompiler) compileObjects(ast *arbAST) *arbGen {
+func (c *arbCompiler) compileObjects(ast *arbAST, path []any) *arbGen {
 	props := make([]*arbGen, len(ast.props))
 	for i, p := range ast.props {
-		props[i] = c.recur(p, nil)
+		props[i] = c.recur(p, at(path, ast.names[i]), nil)
 	}
 	return compiledGen(props, func() float64 {
 		costs := make([]float64, len(props))
@@ -353,15 +392,15 @@ func lengthBounds(minimum, maximum *float64, label string) (float64, float64) {
 }
 
 // compileArrays is a list, `rest` repeated, or a tuple of `elements`.
-func (c *arbCompiler) compileArrays(ast *arbAST, constraint *arbConstraint) *arbGen {
+func (c *arbCompiler) compileArrays(ast *arbAST, path []any, constraint *arbConstraint) *arbGen {
 	elements := make([]*arbGen, len(ast.elements))
 	for i, e := range ast.elements {
-		elements[i] = c.recur(e, nil)
+		elements[i] = c.recur(e, at(path, i), nil)
 	}
 	var head *arbGen
 	deps := elements
 	if ast.rest != nil {
-		head = c.recur(ast.rest, nil)
+		head = c.recur(ast.rest, at(path, len(ast.elements)), nil)
 		deps = append(append([]*arbGen(nil), elements...), head)
 	}
 	var minLength, maxLength *float64

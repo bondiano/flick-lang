@@ -31,16 +31,6 @@ func TestCliSuggestKeepsTheNearestWithinTwoEdits(t *testing.T) {
 	}
 }
 
-func TestCliYamlReadsMappingsSequencesAndFlowCollections(t *testing.T) {
-	v, issue := cliYaml("name: flick # the name\nlist: [1, 2]\nnested:\n  - a\n  - {k: 'v w'}\nempty:\n")
-	if issue != "" {
-		t.Fatal(issue)
-	}
-	if got := JsonStringify(v); got != `{"name":"flick","list":[1,2],"nested":["a",{"k":"v w"}],"empty":null}` {
-		t.Fatalf("got %s", got)
-	}
-}
-
 func TestCliHelpLaysOutSectionsAsEffect(t *testing.T) {
 	spec := CliSpecHandle(Unit, CliSpecArg(nil, nil, nil, "name", "Who", CliMultiRequired,
 		CliSpecFlag(nil, nil, nil, "loud", []Value{"l"}, "Shout", CliMultiSwitch,

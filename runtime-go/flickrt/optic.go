@@ -83,8 +83,8 @@ func OpticId() Value {
 	return OpticMakeIso(Fn(func(_ *Fiber, s Value) Value { return s }), Fn(func(_ *Fiber, a Value) Value { return a }))
 }
 
-// tagged is the prism of a constructor with one field.
-// shortcut: the messages of a mismatch are not checked against Effect's; compare them when a program shows one
+// tagged is the prism of a constructor with one field; `message` is the
+// expectation of Effect's prism.
 func tagged(tag string, message string, make func(Value) Value) Value {
 	return prism(func(s Value) (Value, string) {
 		if d := s.(*Data); d.Tag == tag {
@@ -94,16 +94,16 @@ func tagged(tag string, message string, make func(Value) Value) Value {
 	}, make)
 }
 
-func OpticSome() Value    { return tagged("Some", `Expected a Some value, got none()`, Some) }
-func OpticSuccess() Value { return tagged("Success", `Expected a Success value`, Ok) }
-func OpticFailure() Value { return tagged("Failure", `Expected a Failure value`, Err) }
+func OpticSome() Value    { return tagged("Some", "expected a Some value", Some) }
+func OpticSuccess() Value { return tagged("Success", "expected a Result.Success value", Ok) }
+func OpticFailure() Value { return tagged("Failure", "expected a Result.Failure value", Err) }
 
 func OpticNone() Value {
 	return prism(func(s Value) (Value, string) {
 		if s.(*Data).Tag == "None" {
 			return Unit, ""
 		}
-		return nil, "Expected a None value"
+		return nil, "expected a None value"
 	}, func(Value) Value { return None })
 }
 

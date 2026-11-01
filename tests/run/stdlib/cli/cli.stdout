@@ -25,6 +25,29 @@ GLOBAL FLAGS
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
   --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 CliError: Invalid value for flag --times: "abc". Expected: not a number: abc
+$ --loud=maybe Ada
+DESCRIPTION
+  Prints a greeting
+
+USAGE
+  greet [flags] <name>
+
+ARGUMENTS
+  name string    Who to greet
+
+FLAGS
+  --loud                Print in capitals
+  --times, -n string    How many times
+  --color, -c string    The color of the text
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+CliError: Invalid value for flag --loud: "maybe". Expected "true" | "yes" | "on" | "1" | "y" | "false" | "no" | "off" | "0" | "n"
 $ --color blue Ada
 DESCRIPTION
   Prints a greeting

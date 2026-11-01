@@ -1,0 +1,60 @@
+// `Cli.file_parse` by extension: INI, TOML and YAML files read as Effect's
+// encoding parsers read them, and the error of a malformed one.
+module App.Main exposing (main)
+
+type alias DataOptions = {
+  data : String;
+}
+
+data : Cli.Command none none
+let data =
+  Cli.command "data"
+  |> Cli.flag
+    (Record.label : Record.Label "data")
+    []
+    "A data file"
+    (Cli.required |> Cli.file_parse None)
+  |> Cli.handle (fun (o : DataOptions) -> Platform.stdout_line o.data)
+
+attempt_in : String -> List String ->{} Unit
+let attempt_in dir args =
+  Platform.stdout_line ("$ " ++ String.replace_all dir "$TMP" (String.join " " args))
+  try Cli.run data args with
+  | Cli.CliError message ->
+    Platform.stdout_line ("CliError: " ++ String.replace_all dir "$TMP" message)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let files = [
+    (
+      "app.ini",
+      "; settings\n[server]\nhost = localhost\nport = 8080\n[server.tls]\non = true\nlist[] = a\nlist[] = b\n",
+    ),
+    (
+      "app.toml",
+      "title = \"app\"\nports = [80, 0x1bb]\nborn = 1979-05-27T07:32:00-08:00\n[owner]\nname = 'Tom'\n[[peers]]\nid = 1\n",
+    ),
+    (
+      "app.yaml",
+      "base: &b\n  x: 1\nref: *b\ntext: |\n  two\n  lines\nlist:\n- 0x10\n- .inf\n- \"caf\\u00e9\"\n",
+    ),
+    ("bad.toml", "title = \"app\"\nports = [80 443]\n"),
+  ]
+  let written =
+    try
+      provide FileSystem.node {
+        scope {
+          let dir =
+            FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-parse-" }
+          List.each_effect
+            (fun (name, text) ->
+              FileSystem.write_file_string { flag = None; mode = None } (dir ++ "/" ++ name) text
+              attempt_in dir ["--data", dir ++ "/" ++ name]
+            )
+            files
+          "ok"
+        }
+      }
+    with
+    | PlatformError.PlatformError r -> "failed " ++ show r
+  Platform.stdout_line ("files " ++ written)

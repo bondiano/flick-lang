@@ -88,7 +88,7 @@ func utcNode() *arbAST {
 
 func zonedNode() *arbAST {
 	epoch := intBetween(-dayMillis+zoneSlackMillis, dayMillis-zoneSlackMillis)
-	return linkNode(&arbAST{tag: astObjects, props: []*arbAST{epoch, zones()}, make: func(vs []Value) Value {
+	return linkNode(&arbAST{tag: astObjects, props: []*arbAST{epoch, zones()}, names: []string{"epochMilliseconds", "timeZone"}, make: func(vs []Value) Value {
 		return &DateTime{floatOf(vs[0]), zoneOf(vs[1]).(*TimeZone)}
 	}}, Identity)
 }
@@ -140,8 +140,9 @@ func init() {
 // compileRecord is Effect's `compileObjects` of a record without
 // properties and with one index signature: keys drawn from its key's
 // node, each new, each with a value of its value's node.
-func (c *arbCompiler) compileRecord(ast *arbAST) *arbGen {
-	key, value := c.recur(ast.members[0], nil), c.recur(ast.members[1], nil)
+func (c *arbCompiler) compileRecord(ast *arbAST, path []any) *arbGen {
+	value := c.recur(ast.members[1], at(path, "index-0-value"), nil)
+	key := c.recur(ast.members[0], at(path, "index-0-key"), nil)
 	return compiledGen([]*arbGen{key, value}, func() float64 { return 0 }, func(st *genState) *sample {
 		upper := math.Max(0, st.size)
 		st.randomInt(0, 0) // the optional properties, of which there are none

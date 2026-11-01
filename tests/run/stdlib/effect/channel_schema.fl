@@ -57,3 +57,8 @@ let main () =
     say ("wrong: " ++ show (flat wrong))
   with
   | SchemaError found -> say (issues (SchemaError found))
+  let nan = 0.0 / 0.0
+  let no_wire =
+    Channel.from_list_chunked 1 [{ x = 1; y = nan }] |> Channel.pipe_to (ChannelSchema.encode point)
+  try say ("NaN: " ++ show (List.length (flat no_wire))) with
+  | SchemaError found -> say ("NaN: " ++ issues (SchemaError found))

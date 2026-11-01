@@ -1,8 +1,9 @@
 // Writes runtime-go/flickrt/testdata/arbitrary_links.txt: what Effect's
 // Arbitrary generates, checks and shrinks on Node for the schemas whose
 // declarations it generates through a link (Unknown, Duration, Chunk,
-// DateTime and its zones) or cannot generate (HashSet, HashMap), as the JS
-// runtime builds them. TestArbitraryLinksAsEffect compares the go
+// DateTime and its zones) or cannot generate (HashSet, HashMap, and a
+// node with constraints no value meets, at its path), as the JS runtime
+// builds them. TestArbitraryLinksAsEffect compares the go
 // runtime's lines with these.
 // Run from the repository root after `pnpm -C runtime build`:
 // `node tools/go-arbitrary/gen.mjs`.
@@ -50,6 +51,10 @@ const show = (v) => {
 
 const isRecord = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 const hashInt = { hash: (n) => n, $Eq: { eq: (a) => (b) => a === b } };
+const impossible = () =>
+  S.flickToType(
+    S.flickCheck(S.isBetween({ minimum: 9, maximum: 0, exclusiveMinimum: false, exclusiveMaximum: false }), rt.codecNumberFinite),
+  );
 
 const cases = [
   ["unknown", () => rt.schemaUnknown, (v) => !Array.isArray(v)],
@@ -71,6 +76,10 @@ const cases = [
   ["hashset", () => S.flickToType(S.flickHashSetJson(hashInt, rt.codecInt)), () => true],
   ["hashmap", () => S.flickToType(S.flickHashMapJson(hashInt, rt.codecInt, rt.codecInt)), () => true],
   ["result-json", () => S.flickToType(rt.schemaJsonCodec(rt.schemaResult(rt.schemaString, rt.schemaBool))), () => true],
+  ["path-option-list", () => rt.schemaOption(rt.schemaList(impossible())), () => true],
+  ["path-result", () => rt.schemaResult(impossible(), rt.schemaNumber), () => true],
+  ["path-record", () => rt.schemaRecord([["a", rt.schemaNumber], ["b c", rt.schemaList(impossible())]]), () => true],
+  ["path-variant", () => rt.schemaAdt("Shape", [["Shape.Dot", "Dot", []], ["Shape.Circle", "Circle", [impossible()]]]), () => true],
 ];
 
 const lines = [];
@@ -81,7 +90,7 @@ for (const [name, schema, property] of cases) {
     try {
       arb = Arbitrary.schema(schema());
     } catch (e) {
-      lines.push(`${prefix}error ${String(e)}`);
+      lines.push(`${prefix}error ${String(e).replaceAll("\n", "\\n")}`);
       continue;
     }
     const sampled = Effect.runSyncExit(Arbitrary.sampleEffect(arb, { count: 8, seed }));

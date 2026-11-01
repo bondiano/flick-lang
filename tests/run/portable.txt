@@ -39,6 +39,7 @@ codegen/strings_utf16
 codegen/task_twice
 stdlib/cli/cli
 stdlib/cli/cli_exit
+stdlib/cli/file_parse
 stdlib/cli/prompt
 stdlib/cli/surface
 stdlib/cli/trace

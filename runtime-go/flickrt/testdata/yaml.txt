@@ -1,0 +1,82 @@
+""	null
+"# only a comment\n"	null
+"a: 1\nb: two\nc: true\nd: null\ne: ~\nf:\ng: 1.5"	{"a":1,"b":"two","c":true,"d":null,"e":null,"f":null,"g":1.5}
+"list:\n  - a\n  - b\n  -\n  - c: 1\n    d: 2"	{"list":["a","b",null,{"c":1,"d":2}]}
+"list:\n- a\n- b"	{"list":["a","b"]}
+"- 1\n- [2, 3]\n- {a: 1, b: [x, y]}"	[1,[2,3],{"a":1,"b":["x","y"]}]
+"a: [1, 'two', \"three\", {x: y}]\nb: {}\nc: []"	{"a":[1,"two","three",{"x":"y"}],"b":{},"c":[]}
+"a: [1, 2,]\nb: {x: 1,}"	{"a":[1,2],"b":{"x":1}}
+"a: [1, 2"	SyntaxError: Expected ',' at flow offset 5
+"a: {x: 1 y}"	{"a":{"x":"1 y"}}
+"a: {x: 1, x: 2}"	SyntaxError: Duplicate key 'x' at flow offset 9
+"a: 0x1F\nb: 0o17\nc: -0x10\nd: 1_000\ne: .5\nf: 1e3\ng: +12\nh: 012\ni: 1.\nj: .inf\nk: -.Inf\nl: .NaN\nm: TRUE\nn: False\no: NULL"	{"a":31,"b":15,"c":-16,"d":1000,"e":0.5,"f":1000,"g":12,"h":"012","i":"1.","j":null,"k":null,"l":null,"m":true,"n":false,"o":null}
+"a: \"esc \\t \\n \\\" \\\\ \\x41 \\u00e9 \\U0001F600 \\N \\_ \\L \\P \\0 \\e \\/ \\ \""	{"a":"esc \t \n \" \\ A é 😀        \u0000 \u001b /  "}
+"a: \"\\uD83D\\uDE00\""	{"a":"😀"}
+"a: \"\\q\""	SyntaxError: Invalid YAML escape '\q'
+"a: \"\\u12\""	SyntaxError: Invalid unicode escape in YAML string
+"a: 'it''s'\nb: '#not comment'\nc: \"# not either\""	{"a":"it's","b":"#not comment","c":"# not either"}
+"a: plain # comment\nb: plain#not"	{"a":"plain","b":"plain#not"}
+"a: multi\n  line\n  plain\nb: x"	{"a":"multi line plain","b":"x"}
+"a: multi\n\n  with blank\nb: x"	{"a":"multi\nwith blank","b":"x"}
+"a: first # c\n  more"	SyntaxError: Unexpected indentation of 2 spaces at line 2
+"a: \"double\n  folded\n\n  lines\""	{"a":"double folded\nlines"}
+"a: \"escaped \\\n  break\""	{"a":"escaped break"}
+"a: 'single\n  folded'"	{"a":"single folded"}
+"a: \"trailing   \n  x\""	{"a":"trailing x"}
+"a: \"unterminated\n"	SyntaxError: Unterminated quoted YAML scalar
+"a: \"x\" extra"	SyntaxError: Unexpected content after quoted YAML scalar
+"a: \"x\" # ok"	{"a":"x"}
+"a: |\n  line1\n  line2\nb: x"	{"a":"line1\nline2\n","b":"x"}
+"a: |-\n  line1\n  line2\n\nb: x"	{"a":"line1\nline2","b":"x"}
+"a: |+\n  line1\n\n\nb: x"	{"a":"line1\n\n\n","b":"x"}
+"a: >\n  folded\n  text\n\n  para\n    more\n  back\nb: x"	{"a":"folded text\npara\n  more\nback\n","b":"x"}
+"a: >-\n  x\n  y"	{"a":"x y"}
+"a: |2\n    indented\n  base"	{"a":"  indented\nbase"}
+"a: |\n  last"	{"a":"last"}
+"a: |\n  last\n"	{"a":"last\n"}
+"a: |+\n  last\n\n"	{"a":"last\n\n"}
+"a: >\n\n  lead"	{"a":"\nlead"}
+"a: |\nb: x"	{"a":"","b":"x"}
+"base: &b\n  x: 1\n  y: 2\nref: *b\nflow: [*b]\nscalar: &s hello\nagain: *s"	{"base":{"x":1,"y":2},"ref":{"x":1,"y":2},"flow":[{"x":1,"y":2}],"scalar":"hello","again":"hello"}
+"a: *missing"	SyntaxError: Unknown YAML alias '*missing'
+"a: [*missing]"	SyntaxError: Unknown alias '*missing' at flow offset 9
+"a: &anc [1, 2]\nb: *anc"	{"a":[1,2],"b":[1,2]}
+"---\na: 1\n...\n"	{"a":1}
+"---\na: 1\n---\nb: 2"	SyntaxError: Multiple YAML documents are not supported at line 3
+"a: 1\n...\nb: 2"	SyntaxError: Multiple YAML documents are not supported at line 3
+"%YAML 1.2\n---\na: 1"	{"a":1}
+"a: 1\n b: 2"	SyntaxError: Invalid colon in plain scalar at line 2
+"a:\n  b: 1\n c: 2"	SyntaxError: Unexpected indentation of 1 spaces at line 3
+"a: 1\na: 2"	SyntaxError: Duplicate key 'a' at line 2
+"\ta: 1"	SyntaxError: Tabs cannot be used for YAML indentation at line 1
+"a:\n\t- 1"	SyntaxError: Tabs cannot be used for YAML indentation at line 2
+"- - nested"	SyntaxError: Compact nested block sequences are not supported at line 1
+"a: b: c"	SyntaxError: Invalid colon in plain scalar at line 1
+"a: plain\n  b: c"	SyntaxError: Invalid colon in plain scalar at line 2
+"\"quoted key\": 1\n'single': 2\n1: one\ntrue: t\nnull: n\n~: tilde\n0x10: hex\n1.50: f\n.inf: i"	SyntaxError: Duplicate key '' at line 6
+"? complex\n: key"	SyntaxError: Invalid colon in plain scalar at line 2
+"just a scalar"	"just a scalar"
+"\"just quoted\""	"just quoted"
+"a:\r\n  - 1\r\n  - 2\r\n"	{"a":[1,2]}
+"a: 1\rb: 2"	{"a":1,"b":2}
+"﻿a: 1"	{"a":1}
+"a: café 😀\n😀: emoji"	{"a":"café 😀","😀":"emoji"}
+"url: http://example.com:8080/path\ntime: 12:30:45"	{"url":"http://example.com:8080/path","time":"12:30:45"}
+"a: [x: 1]"	{"a":["x: 1"]}
+"a:\n  - b: 1\n    c: 2\n  - d: 3"	{"a":[{"b":1,"c":2},{"d":3}]}
+"a:\n  -   b: 1\n      c: 2"	SyntaxError: Invalid colon in plain scalar at line 3
+"a: |\n   x\n  y"	{"a":" x\ny"}
+"a: -1\nb: - 1"	{"a":-1,"b":"- 1"}
+"- a\n-b"	SyntaxError: Unexpected content at line 2
+"a: '"	SyntaxError: Unterminated quoted YAML scalar
+"a: \""	SyntaxError: Unterminated quoted YAML scalar
+"k: {a: \"x, y\", 'b': 'z'}"	{"k":{"a":"x, y","b":"z"}}
+"a: {\"k\": 1, 'j' : 2, null: 3}"	{"a":{"k":1,"j":2,"null":3}}
+"a: [ ]\nb: { }"	{"a":[],"b":{}}
+"a: [1] trailing"	SyntaxError: Unexpected flow collection content at flow offset 4
+"key with spaces: value with: colon"	SyntaxError: Invalid colon in plain scalar at line 1
+"a:   \n  # comment\n  b: 1"	{"a":{"b":1}}
+"a: [😀, café x"	SyntaxError: Expected ',' at flow offset 11
+"a: {é: 1 😀}"	{"a":{"é":"1 😀"}}
+"a:  spaced \nb: x"	{"a":"spaced","b":"x"}
+"a: &x value\nb: *x"	{"a":"value","b":"value"}

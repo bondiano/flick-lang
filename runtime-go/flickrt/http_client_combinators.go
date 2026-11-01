@@ -2,7 +2,6 @@ package flickrt
 
 import (
 	"math"
-	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -253,11 +252,11 @@ func retryAfter(now float64, header Value) *Duration {
 		}
 		return dur(orderMax(durationOrder, fromMillis(s*1000), fromMillis(1)))
 	}
-	at, err := http.ParseTime(v)
-	if err != nil {
+	at := parseJsDate(v)
+	if math.IsNaN(at) {
 		return nil
 	}
-	if millis := float64(at.UnixMilli()) - now; millis > 0 {
+	if millis := at - now; millis > 0 {
 		return fromMillis(millis)
 	}
 	return fromMillis(1)
