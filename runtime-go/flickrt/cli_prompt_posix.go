@@ -32,11 +32,8 @@ func promptIoctl(fd uintptr, request uintptr, value unsafe.Pointer) error {
 func promptOpenTerminal(input, output *os.File) (*promptTerminalState, error) {
 	tty := &promptTerminalState{input: input, output: output}
 	var original syscall.Termios
-	if err := promptIoctl(input.Fd(), promptGetTermios, unsafe.Pointer(&original)); err != nil {
-		if err != syscall.ENOTTY {
-			return nil, err
-		}
-	} else {
+	// any error means no terminal (ENOTTY, or ENODEV for /dev/null on macOS): no raw mode, as Node checks isTTY
+	if err := promptIoctl(input.Fd(), promptGetTermios, unsafe.Pointer(&original)); err == nil {
 		raw := original
 		raw.Iflag &^= syscall.IGNBRK | syscall.BRKINT | syscall.PARMRK | syscall.ISTRIP | syscall.INLCR | syscall.IGNCR | syscall.ICRNL | syscall.IXON
 		raw.Oflag &^= syscall.OPOST

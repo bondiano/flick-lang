@@ -447,20 +447,36 @@ fn schema_arbitrary_draws_alike_on_go() {
     let report = |name: &str, args: &[&str]| {
         let dir = project(name);
         fs::write(dir.join("test/Test/Sample.fl"), DRAWS).expect("write");
-        let out = flick_in(&dir, &[&["test", "--reporter", "json", "--seed", "11"], args].concat());
+        let out = flick_in(
+            &dir,
+            &[&["test", "--reporter", "json", "--seed", "11"], args].concat(),
+        );
         assert_eq!(out.status.code(), Some(1), "{out:?}");
         results(&out)["tests"]
             .as_array()
             .expect("tests")
             .iter()
-            .map(|t| (t["name"].clone(), t["status"].clone(), t["kind"].clone(), t["message"].clone()))
+            .map(|t| {
+                (
+                    t["name"].clone(),
+                    t["status"].clone(),
+                    t["kind"].clone(),
+                    t["message"].clone(),
+                )
+            })
             .collect::<Vec<_>>()
     };
     let js = report("draws", &[]);
     assert_eq!(js.len(), 5, "{js:?}");
     assert!(js.iter().all(|t| t.1 == "failed"), "{js:?}");
     // the generator a schema with a check needs is Schema.with_generator's
-    assert!(js[2].3.as_str().is_some_and(|m| m.starts_with("expected \"\", got \"")), "{js:?}");
+    assert!(
+        js[2]
+            .3
+            .as_str()
+            .is_some_and(|m| m.starts_with("expected \"\", got \"")),
+        "{js:?}"
+    );
     assert_eq!(js[4].2, "defect", "{js:?}");
     let go = report("draws_go", &["--emit", "go"]);
     for (j, g) in js.iter().zip(&go).take(4) {

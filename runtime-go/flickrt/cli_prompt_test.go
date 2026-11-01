@@ -296,7 +296,7 @@ func TestPromptTextCursorAndEcho(t *testing.T) {
 	c := &promptCtx{theme: theme}
 	opts := &promptTextOptions{kind: "text", message: "Q"}
 	frame := opts.render(c, nil, promptNext(promptTextState{1, []rune("界🙂x"), nil}))
-	if want := "? Q › 界🙂x\x1b[3D"; frame != want {
+	if want := "? Q " + theme.pointerSmall + " 界🙂x\x1b[3D"; frame != want {
 		t.Fatalf("incorrect Unicode cursor position: %q, want %q", frame, want)
 	}
 	if got := promptVisible("hello\x1b[31m\nworld"); strings.ContainsAny(got, "\x1b\n") {

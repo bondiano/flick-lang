@@ -254,7 +254,10 @@ func TestFileSystemCopyDoesNotDestroyItsSource(t *testing.T) {
 		}
 		fsTestFailure(t, func() Value {
 			return fsTestCall(fb, "copy", Rec("overwrite", true, "preserveTimestamps", false), tree, src)
-		}, "BadResource")
+		}, "UnknownError")
+		fsTestFailure(t, func() Value {
+			return fsTestCall(fb, "copy", Rec("overwrite", true, "preserveTimestamps", false), src, tree)
+		}, "UnknownError")
 		fsTestText(t, src, "precious")
 	})
 }
