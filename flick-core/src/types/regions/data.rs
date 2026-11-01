@@ -232,15 +232,29 @@ impl Checker<'_> {
                 base = self.bound_head(&ty);
             }
             // a value qualifier the bound already allows says nothing more:
-            // the variable takes the data without it; a closure's stored
-            // qualifier stays part of its type
-            let identity = match self.qualified_head(actual) {
+            // the variable takes the data without it; so does one not
+            // inferred yet under a bound not inferred yet, which the holds
+            // above grow by it (Р23); a closure's stored qualifier stays
+            // part of its type
+            let inferred = |checker: &Self, captures: &Type| {
+                let held = checker.store.normalize(captures);
+                let open = |t: &Type| matches!(checker.store.resolve(t), Type::Meta(_));
+                !allowed.tails.is_empty()
+                    && allowed.tails.iter().all(open)
+                    && held.entries.iter().all(|(_, t)| open(t))
+                    && held.tails.iter().all(open)
+            };
+            let mut head = self.qualified_head(actual);
+            while let Type::Bounded { ty, .. } = head {
+                head = self.qualified_head(&ty);
+            }
+            let identity = match head {
                 Type::Captured {
                     ty,
                     captures,
                     value: true,
                 } if !matches!(self.whnf(&ty), Type::Fun { .. })
-                    && self.within(&captures, &allowed) =>
+                    && (self.within(&captures, &allowed) || inferred(self, &captures)) =>
                 {
                     self.capture_identity(&ty)
                 }
