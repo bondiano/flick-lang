@@ -42,6 +42,10 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .econs S v θ => .econs S (v.rename ξ) (θ.rename ξ)
   | .bind S e => .bind S (e.rename ξ)
   | .join e₁ e₂ => .join (e₁.rename ξ) (e₂.rename ξ)
+  | .scope e => .scope (e.rename (liftR 1 ξ))
+  | .inside p e => .inside p (e.rename ξ)
+  | .cap p => .cap p
+  | .own p => .own p
 
 /-- Lift a substitution under `n` binders. -/
 def liftS (n : Nat) (σ : Nat → Tm) (i : Nat) : Tm :=
@@ -79,6 +83,10 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .econs S v θ => .econs S (v.subst σ) (θ.subst σ)
   | .bind S e => .bind S (e.subst σ)
   | .join e₁ e₂ => .join (e₁.subst σ) (e₂.subst σ)
+  | .scope e => .scope (e.subst (liftS 1 σ))
+  | .inside p e => .inside p (e.subst σ)
+  | .cap p => .cap p
+  | .own p => .own p
 
 /-- Substitute `vs` for the innermost `vs.length` variables: `e[δ]`. -/
 def inst (vs : List Tm) (i : Nat) : Tm :=

@@ -1,7 +1,9 @@
 # λFlick in Lean 4
 
-A mechanization of the core calculus in [`docs/formal/core.md`](../docs/formal/core.md)
-and, separately, of the runtime contract λRT in [`docs/formal/runtime.md`](../docs/formal/runtime.md)
+A mechanization of the core calculus in [`docs/formal/core.md`](../docs/formal/core.md),
+extended in place with the regions and captures of
+[`docs/formal/regions.md`](../docs/formal/regions.md), and, separately, of the runtime
+contract λRT in [`docs/formal/runtime.md`](../docs/formal/runtime.md)
 (`Formal/RT/`, see [λRT and T5](#λrt-and-t5)). Lean 4.29.1, no Mathlib.
 
 ```sh
@@ -21,36 +23,45 @@ only Lean's standard `propext`, `Classical.choice` and `Quot.sound`; the hypothe
 | P1a | λ, `let` without generalization, `let rec`, `match` with exhaustiveness and guards, records, `Ref` and the store | done |
 | P1b | stages `P`/`R⟨r;ε⟩` and subtyping, closed rows, `raise`/`try`/`handle`, `task`/`await`, `ask`/`with`/`provide` and layers; Л1–Л3, Progress, Preservation, T1, T2(a), T2(b) | done |
 | P1c | type variables and schemes, (Let-Gen) with the premise `P`, Л2 for schemes, lemma 3.1, T3 | done |
+| P2a | regions and capture sets as atoms, `⌈·⌉` and its commutation with substitution, qualifiers on arrows and `Eff`, (≤-Cap), nominal types with parameters, schemes over variables of every kind with facts `Θ`, (Lam)/(Task) with what the body holds, (Scope), the run-time forms `inside`/`cap`/`own`, `open_H`, `op_H`, `Scope.add_finalizer`, `Fiber.spawn`; regions `Λ` with children and finalizers, closing; Л4 without the store, T1–T3 again | done |
+| P2b | reach through the store, Л4–Л6, the invariant `⊢ Λ` | open |
+| P2c | the freshness premises of (Inside), T4, T1 with `op_H`; the provider of a service (Р37) | open |
 
-## Map to `core.md`
+## Map to `core.md` and `regions.md`
 
-| `core.md` | Lean |
+| Document | Lean |
 | - | - |
-| §1.2 types, stages, rows; `σ` | `Ty`, `Stage`, `Row`, `Scheme` (`Syntax.lean`) |
+| `core.md` §1.2 types, stages, rows; `σ` | `Ty`, `Stage`, `Row`, `Scheme` (`Syntax.lean`) |
+| `regions.md` §1.2 atoms, capture sets, `τ^C`, `H ϱ`, `Owner ϱ`, `Scope ϱ` | `Atom`, `Caps`, `Elem`; `Ty.arrow`/`Ty.eff` with `C`, `Ty.caps`, `Ty.rg`, `Ty.hnd`, `Ty.owner`; `Row.scope` (`Syntax.lean`) |
+| `regions.md` §2.1 `⌈τ⌉`; its commutation with substitution | `Ty.reach`; `Ty.reach_substT`, `Scheme.reach_substT` (`TyOps.lean`, `Reach.lean`) |
+| `regions.md` §2.4 `Θ ⊢ Outlives C ϱ` | `Facts`, `Outl` (`Syntax.lean`); dropping facts that follow: `Typ.cut` (`Cut.lean`) |
 | type substitution, `Gen` and instantiation | `Ty.substT`, `Ty.up`, `liftT`, `instT` (`TyOps.lean`) |
-| §1.3 terms, patterns; §3.1 run-time forms | `Tm`, `Pat` (`Syntax.lean`) |
+| `core.md` §1.3 terms, patterns; §3.1 run-time forms; `regions.md` §1.3, §3.1 | `Tm`, `Pat` (`Syntax.lean`) |
+| what a term holds: free variables, run-time regions, locations (the premise of (Lam)/(Task)) | `Tm.Free`, `Tm.Has`, `held` (`Reach.lean`) |
 | §1.3, §3.1 values | `Value`, `IsEnv` (`Typing.lean`) |
-| §1.5 constants `Ref.*`, `ask_S`, `Layer.*` | `Const`, `Const.ty` (`Syntax.lean`) |
-| §2.1 `⊑`, §2.2 `≤` | `Stage.le`, `Le` (`Syntax.lean`, `Typing.lean`, `Order.lean`) |
-| §2.3 rules, §3.6 run-time rules | `Typ` (`Rules.lean`) |
+| `core.md` §1.5, `regions.md` §1.5 constants | `Const`, `Const.ty`, `Const.ok` (`Syntax.lean`) |
+| §2.1 `⊑`, §2.2 `≤`, (≤-Cap) | `Stage.le`, `Le` (`Syntax.lean`, `Typing.lean`, `Order.lean`); `Le.reach` |
+| `core.md` §2.3, §3.6 rules; `regions.md` §2.3–§2.5, §3.4 | `Typ` (`Rules.lean`) |
 | (Sub) | admissible: `Typ.sub` (`SubAdm.lean`) |
 | §2.4 patterns, `Exh`; (Match-Val), Р29 | `PatTy`, `Shp`, `Exh`, `Covers` (`Typing.lean`) |
 | (Try), (Handle) | `HPat`, `Catches`, `HCov`; `tryR`, `tryP`, `handle` |
 | §3.6 `⊢ μ : Ψ`; §2.6 `Σ₀` | `StoreTy`, `RootTy` (`Rules.lean`) |
-| §3.2 contexts, `lookup(E, S)` | `Frame`, `plug`, `lookupE` (`Semantics.lean`) |
-| §3.3 `→ₚ`; §3.4–3.5 steps | `PHead`, `RHead`, `Step`, `Steps` (`Semantics.lean`) |
+| `core.md` §3.2 contexts, `lookup(E, S)`; the frame `inside π E` | `Frame`, `plug`, `lookupE` (`Semantics.lean`) |
+| `core.md` §3.3 `→ₚ`; §3.4–3.5 steps; `regions.md` §3.2–§3.3 | `PHead`, `RHead`, `Step`, `Steps` (`Semantics.lean`) |
+| `regions.md` §3.1 `Λ`, children step at any time | `Rgn`, `Cfg`, `CStep`, `CSteps` (`Semantics.lean`) |
 | lemma about `build` | `canonical_layer` (`CanonLayer.lean`) |
-| Л1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_env`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `CanonEnv.lean`, `Canonical.lean`) |
+| Л1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_owner`, `canonical_hnd`, `canonical_env`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `CanonEnv.lean`, `Canonical.lean`) |
 | (Let-Gen), (Let-Mono) | `Typ.letGen`, `Typ.let_` (`Rules.lean`) |
-| type substitution lemma | `Typ.substT` (`TySubst.lean`) |
-| Л2 | `Typ.subst`, `Typ.inst`, `SubOk.one` (`Substitution.lean`) |
+| type substitution lemma | `Typ.substT`, with `Fits` (`TySubst.lean`) |
+| Л2 | `Typ.subst`, `Typ.instantiate`, `SubOk.one` (`Substitution.lean`) |
 | Л3 | `ctx_typing` (`Lemma3.lean`) |
+| Л4 without the store: a value holds no more than its type shows | `Typ.holds` (`Held.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
-| Preservation | `preservation` (`Preservation.lean`) |
+| Preservation | `preservation` (`Preservation.lean`); of a configuration: `cstep_typed` (`Soundness.lean`) |
 | T1 | `T1` (`Soundness.lean`) |
 | T2(a), T2(b) | `T2a`, `T2b`, `T2b_await` (`Effects.lean`) |
 | lemma 3.1, T3 | `lemma_3_1`, `T3` (`Generalization.lean`) |
-| a polymorphic use, as a check | `Examples.lean` |
+| a polymorphic use; a scope that acquires and uses, as checks | `Examples.lean` |
 
 ## Representation
 
@@ -64,89 +75,140 @@ quantification in every binding rule, which costs more without a library.
 Typing contexts are lists of schemes, newest variable at index 0; a pattern's `Δ` is
 prepended in binding order as monotypes.
 
-Type variables are de Bruijn indices too (`tvar n`); types have no binders, a scheme
-`⟨k, τ⟩` binds the indices `0 … k-1` of `τ`. Terms carry no types (Curry style), so a type
-substitution changes the judgment and not the term. (Let-Gen) types its right-hand side
-with `Γ` and `Ψ` shifted by `k` (`Ty.up k`): the generalized variables are fresh by
-construction, which is `ᾱ ∉ ftv(Γ) ∪ ftv(Ψ)` of `Gen` and Л2. A variable instantiates its
-scheme in (Var); a substituted value is typed at its scheme's own level and instantiated by
-the type substitution lemma.
+Variables of every kind — types, regions, capture rows — are de Bruijn indices too
+(`tvar n`), and kinds are not checked; a run-time region `π` is `rg π`. An **atom** is a
+variable or a run-time region, and a capture set is a set of atoms (`Atom → Prop`).
+`⌈τ⌉` is a capture set, and a substitution `σ : Atom → Ty` maps a set by replacing each
+atom `a` with `⌈σ a⌉`; then `⌈τ[σ]⌉ = ⌈τ⌉[σ]` holds by definition of the substitution on
+sets (`Ty.reach_substT`). A capture row variable instantiated by `caps C` is the set `C`,
+a region variable instantiated by `rg π` is `{π}`, a type variable instantiated by `υ` is
+`⌈υ⌉`: one substitution serves all kinds. A row is a set of elements, a name or an atom:
+in a row of services the atom `ϱ` is `Scope ϱ`, in a row of errors the atoms bound what
+the errors reach (`⌈Errors ε⌉`), so rows are substituted too.
 
-Lists inside terms are spines, so `Tm` is one plain inductive type and `induction`
-works on it and on the typing derivation:
+Types have no binders; a scheme `⟨k, Θ, τ⟩` binds the indices `0 … k-1` of `τ` and of its
+facts `Θ`. Terms carry no types (Curry style), so a type substitution changes the judgment
+and not the term; constants carry no instance either, (Const) picks it (`CArg`).
+(Let-Gen) types its right-hand side with `Γ`, `Θ` and `Ψ` shifted by `k` (`Ty.up k`) and
+the facts of the scheme assumed: the generalized variables are fresh by construction,
+which is `ᾱ ∉ ftv(Γ) ∪ ftv(Ψ)` of `Gen` and Л2. (Scope) does the same with one variable,
+its region `s`, so `s ∉ fr(Γ)`, `s ∉ fr(τ)`, `s ∉ fr(r)` and `s ∉ fr(ε)` hold by
+construction; its body has `s : Owner s` and the fact that everything outside outlives
+`s`. A step of `scope` substitutes `rg π` for `s` and `own π` for the owner.
+
+Lists inside terms and types are spines, so `Tm` and `Ty` are plain inductive types and
+`induction` works on them and on the typing derivation:
 
 - a constructor application `K v₁ … vₙ` is `app (… (app (ctor K) v₁) …) vₙ`, as in `core.md`;
-  constructor patterns are spines too (`Pat.app`);
+  constructor patterns are spines too (`Pat.app`), and so is a nominal type `T ā`
+  (`Ty.tapp`, `Ty.tcon`);
 - a record is `rcons ℓ₁ e₁ (… rnil)`, a record type `Ty.rcons ℓ₁ τ₁ (… Ty.rnil)`;
 - an environment `env θ` is `econs S₁ v₁ (… enil)`;
 - match and `try` arms are `acons p b rest`, `aguard p g b rest`, ending in `anil`, with
   their own judgment forms `J.alts` and `J.halts` in the same inductive `Typ`.
 
-Rows are closed sets of names, `Name → Prop`; equality of rows is extensional, which is
+Rows are closed sets, `Elem → Prop`; equality of rows is extensional, which is
 `≡` of §1.2. Every rule types its premises at the stage of its conclusion, and the
 subsumption `≤` is folded into the rules whose result may be an arrow or an `Eff`; (Sub)
 is then admissible (`Typ.sub`). With (Sub) this is equivalent to the `⊔` form of §2.3,
-and inversion stays a plain `cases`.
+and inversion stays a plain `cases`. (≤-Cap) is a premise of `Le.arrow` and `Le.eff`:
+`⌈τ⌉ ⊆ ⌈τ'⌉` of the whole value.
+
+The premise of (Lam), (Task) and the fixpoint is `held Ψ Γ e ⊆ ⌈τ^C⌉`: `⌈Γ(y)⌉` of each
+free `y`, and also the run-time regions the body writes down and the cell types of its
+locations (Р141). The substitution lemma keeps it because a substituted value holds no
+more than its scheme shows (`Typ.holds`, the part of Л4 without the store).
+
+A thread steps in `⟨Λ, μ, e⟩`. `Λ` is a list of regions: live or closed, children and
+finalizers, both computations. A configuration is a main thread with `Λ` and `μ`, and
+`CStep` steps the main thread or a child of a live region.
 
 ## Assumptions and simplifications
 
-Each item narrows `core.md` unless it says otherwise.
+Each item narrows `core.md` or `regions.md` unless it says otherwise.
 
-1. **Polymorphism is over types only.** Rows are closed sets of names, so row variables
-   are neither generalized nor instantiated: `raise`, `Layer.effect_S` and `Layer.merge`
-   carry their rows (`Const.effect S r ε`). `Ref.*` are polymorphic in their cell type,
-   instantiated by (Const). ADTs, errors and services have no type parameters
-   (`Sig.ctor_closed`, `Sig.impl_closed`). (Let-Sig) is (Let-Gen) or (Let-Mono) with the
-   annotation erased: terms carry no types, and the premise `ᾱ ≠ ∅ ⇒ φ₁ = P` is the
-   premise `P` of (Let-Gen). `let rec` is monomorphic in its body and its scope
-   (`σ° = τ_f` and `σ = τ_f`). Higher-rank arguments are out of scope, as in `core.md`.
-2. **Declarations** are a parameter `S : Sig`: constructor ↦ argument types and type
-   name, service ↦ `S.Impl`. No well-formedness of `S` is needed. An error type `E` is an
-   ADT whose constructors are the error's constructors.
+1. **Rows are closed**, so row variables are neither generalized nor instantiated:
+   constants are typed at any rows (`CArg`), but schemes do not abstract over them.
+   Polymorphism is over variables of the other kinds. Nominal types have parameters
+   (`Sig.ctor` gives their number); their fields mention only the parameters
+   (`Sig.ctor_closed`, `Sig.ctor_reach`); services have no parameters (`Sig.impl_closed`).
+   (Let-Sig) is (Let-Gen) or (Let-Mono) with the annotation erased: terms carry no types,
+   and the premise `ᾱ ≠ ∅ ⇒ φ₁ = P` is the premise `P` of (Let-Gen). `let rec` is
+   monomorphic in its body and its scope (`σ° = τ_f` and `σ = τ_f`). Higher-rank
+   arguments are out of scope, as in `core.md`.
+2. **Declarations** are a parameter `S : Sig`: constructor ↦ the number of parameters,
+   argument types and type name; service ↦ `S.Impl`. An error type `E` is an ADT whose
+   constructors are the error's constructors.
 3. **`Unit`, `Bool`, `Int`** are base types with literals (`Lit`), not nominal ADTs;
    `True`/`False` patterns are literal patterns.
 4. **Records are closed with a fixed field order.** No row tail and no equality up to
    permutation: the elaborator is assumed to order labels; (Rec) requires the tail to be a
    record type (`Ty.IsRec`). Record patterns are always open (`{…, ..}`), as in `core.md`.
 5. **`Exh` over shapes.** `Exh(τ, Π)` quantifies over `Shp τ v`, the closed values of `τ`
-   as far as patterns see them (type variables, functions, references, computations,
-   layers, errors and environments are opaque), not over typed values: the typed version would put `Typ`
-   in a negative position of its own definition. Patterns only inspect literals,
-   constructors and record fields, so the two agree. The exhaustiveness algorithm
-   (`exhaust.rs`) is not modeled.
+   as far as patterns see them (variables, functions, references, computations,
+   layers, errors, environments, capabilities and owners are opaque), not over typed
+   values: the typed version would put `Typ` in a negative position of its own
+   definition. The fields of a constructor have the types of its declaration, so a field
+   of a parameter type is opaque: exhaustiveness through type arguments is not modeled.
+   The exhaustiveness algorithm (`exhaust.rs`) is not modeled.
 6. **`raise` is a term former**, not a first-class constant; `λx. raise x` recovers the
-   constant. It takes `Errors ε` (with stage `R⟨none; ε⟩`) or an error type `E` (with
-   `R⟨none; {E}⟩`), which is the `Errors {E} ≡ E` of §1.5 at the only place the core
-   needs it. (Errors-Val) types values only, as in §3.6; the other direction of
-   `Errors {E} ≡ E` and `Errors none ≡ Never` are not modeled.
-7. **`try` arms** are `x`/`_` at `Errors ε_b` or a constructor pattern `E p̄` at the error
-   type `E`, as in (Try). `H` is a judgment index: each arm without `when` may add what it
-   catches (`Catches`). (Handle) uses the value form of the coverage premise (Р102).
-8. **Environments.** `Env ρ` means "binds at least `ρ`" (an environment may be typed with
-   a smaller row). `with θ e` and `econs` require `θ` and the bound values to be values,
-   as `env θ` is a value form in §3.1. The disjointness of `Layer.merge` is kept
-   (`Const.wf`) though soundness does not need it.
-9. **Allocation is deterministic:** `Ref.make v` takes `ℓ = μ.length`.
-10. **Programs** are closed terms typed in the empty store; modules (§2.6) are not
-    modeled. `Σ₀` is a parameter with `RootTy`; Г3 is the hypothesis of `T1` that `Σ₀`
-    covers the services of the program's stage. Progress reports an `ask_S` that
-    neither a `with` frame nor `Σ₀` answers (`AskStuck`) instead of assuming Г3.
-11. **Л3** is stated as `ERel`: the hole's services are within those of the context and
-    of its `with` frames, its errors grow only under a `try` frame, and a pure context
-    has a pure hole. `core.md` names the errors each `try` frame removes; the weaker form
-    suffices for T2. Under `K` right-hand sides of (Let-Gen) the hole is typed `K` type
-    variables deep, with `Ψ` shifted, and is pure.
+   constant. It takes `Errors ε` (with stage `R⟨none; ε⟩`) or a value of an error type
+   `E ῡ` (with `R⟨none; {E} + ⌈E ῡ⌉⟩`, `Row.err`), which is the `Errors {E ῡ} ≡ E ῡ` of
+   §1.5 at the only place the core needs it. (Errors-Val) types values only, as in §3.6.
+7. **`try` arms** are `x`/`_` at `Errors ε_b` or a constructor pattern `E p̄` at an error
+   type `E` without parameters. `H` is a judgment index: each arm without `when` may add
+   what it catches (`Catches`), names only. (Handle) uses the value form of the coverage
+   premise (Р102); what the caught errors reach passes to the errors it lets through.
+8. **Environments.** `Env ρ` means "binds at least `ρ`". `with θ e` and `econs` require
+   `θ` and the bound values to be values. The disjointness of `Layer.merge` is kept
+   (`Const.ok`) though soundness does not need it.
+9. **Allocation is deterministic:** `Ref.make v` takes `ℓ = μ.length`, `scope` takes
+   `π = Λ.length`.
+10. **Programs** are closed terms typed in the empty store with no facts; modules
+    (`core.md` §2.6, path 4 of `regions.md` §4) are not modeled. `Σ₀` is a parameter with
+    `RootTy`; Г3 is the hypothesis of `T1` that `Σ₀` covers the services of the program's
+    stage. Progress reports an `ask_S` that neither a `with` frame nor `Σ₀` answers
+    (`AskStuck`) instead of assuming Г3.
+11. **Л3** is stated as `ERel`: the hole's services are within those of the context, of
+    its `with` frames and the `Scope π` of its `inside` frames, its errors grow only under
+    a `try` frame, and a pure context has a pure hole. Under `K` right-hand sides of
+    (Let-Gen) the hole is typed `K` variables deep, with `Ψ` and `Θ` shifted and the facts
+    of the schemes assumed, and is pure.
 12. **Steps carry labels** (`Lbl`): pure, runtime, or `root S` for an `ask_S` answered by
     `Σ₀`; T2(b) is about the `root` labels. `todo → die` is labelled pure, as T2(a) allows
     `die`; `bind_S` and `join` steps are pure (Р101).
 13. **Cell types may be open** (Р103). `Ψ(ℓ)` is a monotype that may mention free type
     variables of the configuration's derivation; (Let-Gen) shifts `Ψ`, so it never
-    generalizes them. `core.md` asked for closed `Ψ(ℓ)` without ever closing them.
+    generalizes them.
 14. **T3** is stated as: reachable configurations are typed at the program's type, the
     store typing only grows (a cell keeps its allocation type), and a redex under the
     right-hand side of a (Let-Gen) with `ᾱ ≠ ∅` is pure while the cell types it sees
-    avoid `ᾱ` (`Ty.Avoids`). "Without the premise `P` the first case breaks" is not
-    formalized as a counterexample.
+    avoid `ᾱ` (they are shifted past it, `Ty.Avoids`).
+15. **Qualifiers are hidden only.** The value bound `α^{≤C}` and the refinement of
+    (App-Pure) are not modeled: both let the checker accept more programs, and `Ref.*`
+    instantiate the cell type directly, which keeps it invariant. The hidden qualifier of
+    data with hidden storage is a parameter of kind `CRow` of its type, so (Con) and
+    (Proj) are (App) and (Match) at an instance (Р61).
+16. **Capabilities and constants.** `H ϱ̄ τ̄` is one family `hnd ϱ` with one region;
+    `open_H` takes the owner of its region and nothing else (Г6: the region is explicit)
+    and registers the use that releases it; `op_H` returns `()`; `cap π` has no index `n`.
+    `Fiber.spawn` has no supervisor and returns `()`: there is no `join`; a child does
+    not inherit the services of the context that spawns it (λRT's). A finalizer runs as a
+    child once the body of its region is finished and the earlier children are, the last
+    one first; the region closes when none is left. Closing waits for every child.
+17. **Facts are not chained.** `Θ ⊢ k ≥ ϱ` is reflexive or a fact; a scope gives one fact
+    for everything outside it, which is what transitivity would derive for a body
+    (`regions.md` §2.4, rules 1 and 2). A run-time configuration of T1 is typed with all
+    facts (`Facts.all`): T1 does not depend on them.
+18. **(Err-Raise) is checked where errors leave a scope**: the error row of the body of
+    `scope` does not mention its region by construction. The stricter rule of the spec
+    (also for errors caught inside) is not needed by the model; (Err-Decl) is not either,
+    since a row of errors carries what its errors reach.
+19. **(Inside) has no freshness premise yet** (P2a): `π ∉ fr(τ) ∪ fr(ε)` needs the
+    regions not yet created to be renamed away in the whole derivation, which T4 (P2c)
+    adds. T1 is stated with two blocked outcomes: a finished region body waiting for a
+    child (deadlock freedom is λRT's), and a step that needs a region that is not live,
+    which T4 rules out.
 
 ## Findings
 
@@ -158,6 +220,12 @@ Each item narrows `core.md` unless it says otherwise.
   breaks; it now asks for the error of the value only, as `flick-model` already did.
 - **Р103** (P1c): closed cell types and a fixed program type cannot both hold; cell types
   are monotypes with possibly free variables, and `Gen` excludes `ftv(Ψ)`.
+- **Р140** (P2a): (Spawn) bounded only the hidden qualifier `C` of the child; the child
+  also holds what its result shows. The premise is `Outlives (C ∪ ⌈a⌉) ϱ` (`Const.ok`);
+  the checker already checks it (`regions.md` §6).
+- **Р141** (P2a): the premise of (Lam)/(Task) must count the run-time regions and cell
+  types written in the body, or Л4 fails for `λx. (λy. ()) (cap π n)` (`held`,
+  `regions.md` §6).
 
 ## λRT and T5
 

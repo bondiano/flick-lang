@@ -22,39 +22,53 @@ theorem FRel.of_le {F φ' φ} (h : φ'.le φ) : FRel F φ' φ where
   rt := fun _ hp hφ => by subst hφ; exact hp (Stage.eq_pure h)
 
 /-- The hole after a step, in a store grown by `X`, refills the frame. -/
-def Refill0 (S : Sig) (Ψ : List Ty) (t' : Ty) (φ' : Stage) (C : Tm → Tm) (t : Ty) (φ : Stage) :
-    Prop :=
-  ∀ X r', Typ S (Ψ ++ X) [] r' (.ex t' φ') → Typ S (Ψ ++ X) [] (C r') (.ex t φ)
+def Refill0 (S : Sig) (Ψ : List Ty) (Θ : Facts) (t' : Ty) (φ' : Stage) (C : Tm → Tm) (t : Ty)
+    (φ : Stage) : Prop :=
+  ∀ X r', Typ S (Ψ ++ X) Θ [] r' (.ex t' φ') → Typ S (Ψ ++ X) Θ [] (C r') (.ex t φ)
 
 /-- As `Refill0`, for a hole `k` type variables deep: under (Let-Gen) the hole is
-typed with the store shifted past the generalized variables. -/
-def Refill (S : Sig) (Ψ : List Ty) (k : Nat) (t' : Ty) (φ' : Stage) (C : Tm → Tm) (t : Ty)
-    (φ : Stage) : Prop :=
-  ∀ X r', Typ S ((Ψ ++ X).map (Ty.up k)) [] r' (.ex t' φ') → Typ S (Ψ ++ X) [] (C r') (.ex t φ)
+typed with the store and the facts shifted past the generalized variables, and
+the facts of the scheme assumed (`Θ'`). -/
+def Refill (S : Sig) (Ψ : List Ty) (Θ : Facts) (k : Nat) (Θ' : Facts) (t' : Ty) (φ' : Stage)
+    (C : Tm → Tm) (t : Ty) (φ : Stage) : Prop :=
+  ∀ X r', Typ S ((Ψ ++ X).map (Ty.up k)) Θ' [] r' (.ex t' φ') → Typ S (Ψ ++ X) Θ [] (C r') (.ex t φ)
 
 /-- Services a frame provides have their types. -/
-def FLook (S : Sig) (Ψ : List Ty) (F : Frame) : Prop :=
-  ∀ N v, F.lookup N = some v → Typ S Ψ [] v (.ex (S.impl N) .pure)
+def FLook (S : Sig) (Ψ : List Ty) (Θ : Facts) (F : Frame) : Prop :=
+  ∀ N v, F.lookup N = some v → Typ S Ψ Θ [] v (.ex (S.impl N) .pure)
 
-theorem FLook.none {Ψ F} (h : ∀ N, F.lookup N = none) : FLook S Ψ F :=
+theorem FLook.none {Ψ Θ F} (h : ∀ N, F.lookup N = none) : FLook S Ψ Θ F :=
   fun N _ hv => by rw [h N] at hv; cases hv
 
-/-- One frame of Л3: the hole is `k` type variables deep, and pure if `k ≠ 0`. -/
-def FrameTy (S : Sig) (Ψ : List Ty) (F : Frame) (r : Tm) (t : Ty) (φ : Stage) : Prop :=
-  ∃ k t' φ', Typ S (Ψ.map (Ty.up k)) [] r (.ex t' φ') ∧ FRel F φ' φ ∧ (k ≠ 0 → φ' = .pure) ∧
-    Refill S Ψ k t' φ' F.plug t φ ∧ FLook S Ψ F
+/-- One frame of Л3: the hole is `k` type variables deep, and pure if `k ≠ 0`;
+at depth `0` it has the facts of the frame. -/
+def FrameTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (F : Frame) (r : Tm) (t : Ty) (φ : Stage) : Prop :=
+  ∃ k Θ' t' φ', Typ S (Ψ.map (Ty.up k)) Θ' [] r (.ex t' φ') ∧ FRel F φ' φ ∧
+    (φ' = .pure ∨ k = 0 ∧ Θ' = Θ) ∧ Refill S Ψ Θ k Θ' t' φ' F.plug t φ ∧ FLook S Ψ Θ F
 
-theorem FrameTy.mk0 {Ψ F r t φ}
-    (h : ∃ t' φ', Typ S Ψ [] r (.ex t' φ') ∧ FRel F φ' φ ∧ Refill0 S Ψ t' φ' F.plug t φ ∧
-      FLook S Ψ F) : FrameTy S Ψ F r t φ :=
+theorem FrameTy.mk0 {Ψ Θ F r t φ}
+    (h : ∃ t' φ', Typ S Ψ Θ [] r (.ex t' φ') ∧ FRel F φ' φ ∧ Refill0 S Ψ Θ t' φ' F.plug t φ ∧
+      FLook S Ψ Θ F) : FrameTy S Ψ Θ F r t φ :=
   let ⟨t', φ', h, rel, back, look⟩ := h
-  ⟨0, t', φ', by simpa using h, rel, fun h => (h rfl).elim,
+  ⟨0, Θ, t', φ', by simpa using h, rel, .inr ⟨rfl, rfl⟩,
     fun X r' h' => back X r' (by simpa using h'), look⟩
 
-theorem frame_typing {Ψ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
-    (h : Typ S Ψ [] (F.plug r) (.ex t φ)) : FrameTy S Ψ F r t φ := by
+theorem env_no_atm {Ψ Θ Γ θ ρ φ} (hθ : IsEnv θ) (h : Typ S Ψ Θ Γ θ (.ex (.env ρ) φ)) (a : Atom) :
+    ¬ ρ (.atm a) := by
+  induction hθ generalizing ρ with
+  | enil => cases h with | enil hρ => exact hρ _
+  | econs _ _ ih =>
+    cases h with
+    | econs _ _ _ hθ' hρ =>
+      intro ha
+      rcases hρ _ ha with h | h
+      · cases h
+      · exact ih hθ' h
+
+theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
+    (h : Typ S Ψ Θ [] (F.plug r) (.ex t φ)) : FrameTy S Ψ Θ F r t φ := by
   have nv := not_value_plug hr F
-  have look : (∀ N, F.lookup N = none) → FLook S Ψ F := FLook.none
+  have look : (∀ N, F.lookup N = none) → FLook S Ψ Θ F := FLook.none
   cases F <;> simp only [Frame.plug] at h nv
   case appL =>
     cases h with
@@ -74,8 +88,8 @@ theorem frame_typing {Ψ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun X _ h' => .let_ h' (h₂.weakenStore X),
         look fun _ => rfl⟩
     | letGen h₁ h₂ =>
-      exact ⟨_, _, _, h₁, ⟨fun _ h => h.elim, fun _ _ h => h.elim, fun _ => rfl,
-        fun _ h => (h rfl).elim⟩, fun _ => rfl, fun X _ h' => .letGen h' (h₂.weakenStore X),
+      exact ⟨_, _, _, _, h₁, ⟨fun _ h => h.elim, fun _ _ h => h.elim, fun _ => rfl,
+        fun _ h => (h rfl).elim⟩, .inl rfl, fun X _ h' => .letGen h' (h₂.weakenStore X),
         look fun _ => rfl⟩
     | errVal hv => exact (nv hv).elim
   case match_ =>
@@ -125,8 +139,8 @@ theorem frame_typing {Ψ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
     cases h with
     | raise h₁ hφ =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun _ _ h' => .raise h' hφ, look fun _ => rfl⟩
-    | raiseAdt h₁ hφ =>
-      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun _ _ h' => .raiseAdt h' hφ, look fun _ => rfl⟩
+    | raiseAdt h₁ hU hφ =>
+      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun _ _ h' => .raiseAdt h' hU hφ, look fun _ => rfl⟩
     | errVal hv => exact (nv hv).elim
   case bind =>
     cases h with
@@ -173,12 +187,28 @@ theorem frame_typing {Ψ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
       refine .mk0 ⟨_, _, h₂, ⟨fun n hn => ?_, fun _ => ?_, fun hp => (by cases hp), fun _ _ h => (by cases h)⟩,
         fun X _ h' => .with_ hθv (hθ.weakenStore X) h' hb hφ, ?_⟩
       · rcases Stage.le_svc hb n hn with h | h
-        · obtain ⟨w, hw⟩ := env_lookup_some henv hθ h
-          exact .inr (by simp [Frame.dom, Frame.lookup, hw])
+        · cases n with
+          | nm N =>
+            obtain ⟨w, hw⟩ := env_lookup_some henv hθ h
+            exact .inr (by simp [Frame.dom, Frame.lookup, hw])
+          | atm a => exact (env_no_atm henv hθ a h).elim
         · exact .inl (hr' n h)
       · exact (Stage.le_err hb).trans he'
       · intro N v hv
         exact env_lookup_typ hθ hv
+    | errVal hv => exact (nv hv).elim
+  case inside p =>
+    cases h with
+    | inside h₁ hφ' hφ hT =>
+      obtain ⟨_, _, rfl, hr', he'⟩ := Stage.rt_le hφ
+      refine .mk0 ⟨_, _, h₁, ⟨fun n hn => ?_, fun _ => ?_, fun hp => (by cases hp),
+        fun _ _ h => (by cases h)⟩, fun _ _ h' => .inside h' hφ' hφ hT, look fun _ => rfl⟩
+      · rcases Stage.le_svc hφ' n hn with h | h
+        · cases n with
+          | nm => exact h.elim
+          | atm a => exact .inr ⟨p, rfl, h⟩
+        · exact .inl (hr' n h)
+      · exact (Stage.le_err hφ').trans he'
     | errVal hv => exact (nv hv).elim
 
 end Flick

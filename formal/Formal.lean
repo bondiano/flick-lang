@@ -1,13 +1,16 @@
 import Formal.Syntax
 import Formal.TyOps
 import Formal.Subst
+import Formal.Reach
 import Formal.Typing
 import Formal.Rules
 import Formal.Semantics
 import Formal.Order
 import Formal.Covers
 import Formal.Weaken
+import Formal.Cut
 import Formal.SubAdm
+import Formal.Held
 import Formal.Substitution
 import Formal.Canonical
 import Formal.Shapes

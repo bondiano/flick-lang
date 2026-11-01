@@ -1,13 +1,28 @@
 import Formal.Rules
 
 /-!
-# Dynamics of λFlick (core.md §3)
+# Dynamics of λFlick (core.md §3, regions.md §3)
 
-A configuration is `⟨μ, e⟩` with `μ` a list of values: location `ℓ` is the
-index into `μ`, and `Ref.make` allocates `μ.length`. `Σ₀` is a parameter.
+A thread steps in `⟨Λ, μ, e⟩`: `μ` is a list of values, location `ℓ` is the
+index into `μ`, and `Ref.make` allocates `μ.length`; `Λ` is a list of run-time
+regions, region `π` is the index into `Λ`, and `scope` creates `Λ.length`.
+`Σ₀` is a parameter. A configuration is a main thread with `Λ` and `μ`; the
+children of a live region step between its steps (`CStep`).
 -/
 
 namespace Flick
+
+/-- A run-time region (regions.md §3.1): live or closed, its children `K(π)` and
+its finalizers `F(π)`, both computations to run. -/
+structure Rgn where
+  live : Bool
+  kids : List Tm
+  fins : List Tm
+
+def Rgn.new : Rgn := ⟨true, [], []⟩
+
+/-- A finished computation: a value or `raise v`. -/
+def Final (e : Tm) : Prop := Value e ∨ ∃ v, Value v ∧ e = .raise v
 
 /-- One-frame evaluation contexts `F` of core.md §3.2. -/
 inductive Frame
@@ -28,6 +43,7 @@ inductive Frame
   | joinR (v : Tm)
   | with_ (θ : Tm)
   | raise
+  | inside (p : Nat)
 
 def Frame.plug : Frame → Tm → Tm
   | .appL a, e => .app e a
@@ -47,6 +63,7 @@ def Frame.plug : Frame → Tm → Tm
   | .joinR v, e => .join v e
   | .with_ θ, e => .with_ θ e
   | .raise, e => .raise e
+  | .inside p, e => .inside p e
 
 /-- Left-to-right order: a frame to the right of a value needs the value. -/
 def Frame.ok : Frame → Prop
@@ -55,6 +72,11 @@ def Frame.ok : Frame → Prop
 
 def Frame.isTry : Frame → Prop
   | .try_ _ => True
+  | _ => False
+
+/-- `raise v` does not leave a region: the region closes first (regions.md §3.3). -/
+def Frame.isInside : Frame → Prop
+  | .inside _ => True
   | _ => False
 
 /-- The service a `with θ` frame provides. -/
@@ -95,33 +117,57 @@ inductive PHead : Tm → Tm → Prop
   | bind : Value v → PHead (.bind S v) (.econs S v .enil)
   | join : IsEnv θ₁ → IsEnv θ₂ → PHead (.join θ₁ θ₂) (θ₁.envAppend θ₂)
 
-/-- Runtime steps of core.md §3.4–3.5 at the redex, except `ask_S` and the
-propagation of `raise`, which need the context. -/
-inductive RHead : List Tm → Tm → List Tm → Tm → Prop
-  | refMake : Value v → RHead μ (.app (.const .refMake) v) (μ ++ [v]) (.loc μ.length)
-  | refGet : μ[l]? = some v → RHead μ (.app (.const .refGet) (.loc l)) μ v
+/-- `Λ[π] := g`. -/
+def setRgn (Λ : List Rgn) (p : Nat) (g : Rgn) : List Rgn := Λ.set p g
+
+/-- Runtime steps of core.md §3.4–3.5 and regions.md §3.2–§3.3 at the redex,
+except `ask_S` and the propagation of `raise`, which need the context. An
+acquisition registers the use that releases it as a finalizer. A finalizer runs
+as a child once the body is finished and the earlier children are, the last one
+first; the region closes when none is left. -/
+inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm → Prop
+  | refMake : Value v → RHead Λ μ (.app (.const .refMake) v) Λ (μ ++ [v]) (.loc μ.length)
+  | refGet : μ[l]? = some v → RHead Λ μ (.app (.const .refGet) (.loc l)) Λ μ v
   | refSet : Value v → l < μ.length →
-      RHead μ (.app (.app (.const .refSet) (.loc l)) v) (μ.set l v) (.lit .unit)
-  | await : RHead μ (.await (.task e)) μ e
-  | build : Value v → v.build = some b → RHead μ (.provide v e) μ (.provide b e)
-  | provideEnv : IsEnv θ → RHead μ (.provide θ e) μ (.with_ θ e)
-  | tryRaise : Value v → RHead μ (.try_ (.raise v) A) μ (.handle v A)
+      RHead Λ μ (.app (.app (.const .refSet) (.loc l)) v) Λ (μ.set l v) (.lit .unit)
+  | await : RHead Λ μ (.await (.task e)) Λ μ e
+  | build : Value v → v.build = some b → RHead Λ μ (.provide v e) Λ μ (.provide b e)
+  | provideEnv : IsEnv θ → RHead Λ μ (.provide θ e) Λ μ (.with_ θ e)
+  | tryRaise : Value v → RHead Λ μ (.try_ (.raise v) A) Λ μ (.handle v A)
   | handleYes : Value v → matchP p v = some δ →
-      RHead μ (.handle v (.acons p b r)) μ (b.subst (inst δ))
+      RHead Λ μ (.handle v (.acons p b r)) Λ μ (b.subst (inst δ))
   | handleNo : Value v → matchP p v = none →
-      RHead μ (.handle v (.acons p b r)) μ (.handle v r)
+      RHead Λ μ (.handle v (.acons p b r)) Λ μ (.handle v r)
   | hguardYes : Value v → matchP p v = some δ →
-      RHead μ (.handle v (.aguard p g b r)) μ
+      RHead Λ μ (.handle v (.aguard p g b r)) Λ μ
         (.match_ (g.subst (inst δ))
           (.acons (.lit (.bool true)) (b.subst (inst δ))
             (.acons (.lit (.bool false)) (.handle v r) .anil)))
   | hguardNo : Value v → matchP p v = none →
-      RHead μ (.handle v (.aguard p g b r)) μ (.handle v r)
-  | handleNil : Value v → RHead μ (.handle v .anil) μ (.raise v)
+      RHead Λ μ (.handle v (.aguard p g b r)) Λ μ (.handle v r)
+  | handleNil : Value v → RHead Λ μ (.handle v .anil) Λ μ (.raise v)
+  | scope : RHead Λ μ (.scope e) (Λ ++ [Rgn.new]) μ
+      (.inside Λ.length (e.subst (inst [.own Λ.length])))
+  | open_ : Λ[p]? = some g → g.live = true →
+      RHead Λ μ (.app (.const .open_) (.own p))
+        (setRgn Λ p ⟨g.live, g.kids, g.fins ++ [.app (.const .op) (.cap p)]⟩) μ (.cap p)
+  | op : Λ[p]? = some g → g.live = true →
+      RHead Λ μ (.app (.const .op) (.cap p)) Λ μ (.lit .unit)
+  | addFin : Λ[p]? = some g → g.live = true → Value t →
+      RHead Λ μ (.app (.app (.const .addFin) (.own p)) t)
+        (setRgn Λ p ⟨g.live, g.kids, g.fins ++ [.await t]⟩) μ (.lit .unit)
+  | spawn : Λ[p]? = some g → g.live = true → Value t →
+      RHead Λ μ (.app (.app (.const .spawn) (.own p)) t)
+        (setRgn Λ p ⟨g.live, g.kids ++ [.await t], g.fins⟩) μ (.lit .unit)
+  | finRun {fs : List Tm} : Λ[p]? = some g → g.live = true → Final w → (∀ k ∈ g.kids, Final k) →
+      g.fins = fs ++ [f] →
+      RHead Λ μ (.inside p w) (setRgn Λ p ⟨g.live, g.kids ++ [f], fs⟩) μ (.inside p w)
+  | close : Λ[p]? = some g → g.live = true → Final w → (∀ k ∈ g.kids, Final k) → g.fins = [] →
+      RHead Λ μ (.inside p w) (setRgn Λ p ⟨false, g.kids, []⟩) μ w
 
 /-- Outcome of a step: a configuration or a defect. -/
 inductive Out
-  | cfg (μ : List Tm) (e : Tm)
+  | cfg (Λ : List Rgn) (μ : List Tm) (e : Tm)
   | die
 
 /-- Step labels: pure, runtime, or an `ask_S` answered by `Σ₀` (T2(b)). -/
@@ -132,22 +178,48 @@ inductive Lbl
 
 def OkE (E : List Frame) : Prop := ∀ F ∈ E, Frame.ok F
 
-/-- `⟨μ, e⟩ → ⟨μ', e'⟩` and `⟨μ, e⟩ → die` (core.md §3.3–3.5). -/
-inductive Step (root : Name → Option Tm) : Lbl → List Tm → Tm → Out → Prop
-  | pure : OkE E → PHead e e' → Step root .pure μ (plug E e) (.cfg μ (plug E e'))
-  | rt : OkE E → RHead μ e μ' e' → Step root .rt μ (plug E e) (.cfg μ' (plug E e'))
+/-- `⟨Λ, μ, e⟩ → ⟨Λ', μ', e'⟩` and `⟨Λ, μ, e⟩ → die` of one thread (core.md
+§3.3–3.5, regions.md §3.2–§3.3). -/
+inductive Step (root : Name → Option Tm) : Lbl → List Rgn → List Tm → Tm → Out → Prop
+  | pure : OkE E → PHead e e' → Step root .pure Λ μ (plug E e) (.cfg Λ μ (plug E e'))
+  | rt : OkE E → RHead Λ μ e Λ' μ' e' → Step root .rt Λ μ (plug E e) (.cfg Λ' μ' (plug E e'))
   | askWith : OkE E → lookupE E S = some v →
-      Step root .rt μ (plug E (.app (.const (.ask S)) (.lit .unit))) (.cfg μ (plug E v))
+      Step root .rt Λ μ (plug E (.app (.const (.ask S)) (.lit .unit))) (.cfg Λ μ (plug E v))
   | askRoot : OkE E → lookupE E S = none → root S = some v →
-      Step root (.root S) μ (plug E (.app (.const (.ask S)) (.lit .unit))) (.cfg μ (plug E v))
-  | raise {F : Frame} : OkE E → F.ok → ¬ F.isTry → Value v →
-      Step root .rt μ (plug E (F.plug (.raise v))) (.cfg μ (plug E (.raise v)))
-  | todo : OkE E → Step root .pure μ (plug E .todo) .die
+      Step root (.root S) Λ μ (plug E (.app (.const (.ask S)) (.lit .unit)))
+        (.cfg Λ μ (plug E v))
+  | raise {F : Frame} : OkE E → F.ok → ¬ F.isTry → ¬ F.isInside → Value v →
+      Step root .rt Λ μ (plug E (F.plug (.raise v))) (.cfg Λ μ (plug E (.raise v)))
+  | todo : OkE E → Step root .pure Λ μ (plug E .todo) .die
 
-/-- `⟨μ, e⟩ →* ⟨μ', e'⟩` where every step has a label in `Q`. -/
+/-- `⟨Λ, μ, e⟩ →* ⟨Λ', μ', e'⟩` of one thread where every step has a label in `Q`. -/
 inductive Steps (root : Name → Option Tm) (Q : Lbl → Prop) :
-    List Tm → Tm → List Tm → Tm → Prop
-  | refl : Steps root Q μ e μ e
-  | step : Step root l μ e (.cfg μ₁ e₁) → Q l → Steps root Q μ₁ e₁ μ' e' → Steps root Q μ e μ' e'
+    List Rgn → List Tm → Tm → List Rgn → List Tm → Tm → Prop
+  | refl : Steps root Q Λ μ e Λ μ e
+  | step : Step root l Λ μ e (.cfg Λ₁ μ₁ e₁) → Q l → Steps root Q Λ₁ μ₁ e₁ Λ' μ' e' →
+      Steps root Q Λ μ e Λ' μ' e'
+
+/-- A configuration: the regions, the store and the main thread. -/
+structure Cfg where
+  rgs : List Rgn
+  mem : List Tm
+  main : Tm
+
+/-- Replace the child `j` of region `p`. -/
+def setKid (Λ : List Rgn) (p j : Nat) (k : Tm) : List Rgn :=
+  match Λ[p]? with
+  | some g => setRgn Λ p ⟨g.live, g.kids.set j k, g.fins⟩
+  | none => Λ
+
+/-- A step of the main thread, or of a child of a live region: children step
+between any two steps of the main thread (regions.md §3.2). -/
+inductive CStep (root : Name → Option Tm) : Lbl → Cfg → Cfg → Prop
+  | main : Step root l Λ μ e (.cfg Λ' μ' e') → CStep root l ⟨Λ, μ, e⟩ ⟨Λ', μ', e'⟩
+  | kid : Λ[p]? = some g → g.live = true → g.kids[j]? = some k →
+      Step root l Λ μ k (.cfg Λ' μ' k') → CStep root l ⟨Λ, μ, e⟩ ⟨setKid Λ' p j k', μ', e⟩
+
+inductive CSteps (root : Name → Option Tm) : Cfg → Cfg → Prop
+  | refl : CSteps root c c
+  | step : CStep root l c c₁ → CSteps root c₁ c' → CSteps root c c'
 
 end Flick

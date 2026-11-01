@@ -30,15 +30,25 @@ theorem lookupE_append (E : List Frame) (F : Frame) (N : Name) :
   | nil => simp [lookupE]; cases F.lookup N <;> rfl
   | cons G E ih => simp only [List.cons_append, lookupE]; cases G.lookup N <;> simp [ih]
 
+/-- Services a frame provides: those of `with θ`, and `Scope π` of `inside π`. -/
+def Frame.dom (F : Frame) : Row
+  | .nm N => (F.lookup N).isSome
+  | .atm a => ∃ p, F = .inside p ∧ a = .r p
+
 /-- Services the frames of `E` provide. -/
-def domE (E : List Frame) : Row := fun N => (lookupE E N).isSome
+def domE : List Frame → Row
+  | [] => Row.none
+  | F :: E => Row.union F.dom (domE E)
 
-def Frame.dom (F : Frame) : Row := fun N => (F.lookup N).isSome
+theorem domE_cons (F : Frame) (E : List Frame) (n : Elem) :
+    domE (F :: E) n ↔ F.dom n ∨ domE E n := Iff.rfl
 
-theorem domE_cons (F : Frame) (E : List Frame) (N : Name) :
-    domE (F :: E) N ↔ F.dom N ∨ domE E N := by
-  simp only [domE, Frame.dom, lookupE]
-  cases F.lookup N <;> simp
+theorem domE_nm (E : List Frame) (N : Name) : domE E (.nm N) ↔ (lookupE E N).isSome := by
+  induction E with
+  | nil => simp [domE, Row.none, lookupE]
+  | cons F E ih =>
+    simp only [domE, Row.union, Frame.dom, lookupE, ih]
+    cases F.lookup N <;> simp
 
 theorem not_value_plug {r : Tm} (hr : ¬ Value r) (F : Frame) : ¬ Value (F.plug r) := by
   intro hv
@@ -67,7 +77,7 @@ theorem PHead.not_value {e e'} (h : PHead e e') : ¬ Value e := by
     | (rename_i hc _; simp [Const.arity, Const.layer] at hc)
     | (rename_i hf; simp [Tm.head] at hf)
 
-theorem RHead.not_value {μ e μ' e'} (h : RHead μ e μ' e') : ¬ Value e := by
+theorem RHead.not_value {Λ μ e Λ' μ' e'} (h : RHead Λ μ e Λ' μ' e') : ¬ Value e := by
   intro hv
   cases h <;> cases hv
   all_goals first

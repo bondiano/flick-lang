@@ -11,7 +11,7 @@ variable {S : Sig}
 theorem Tm.unguarded_rename (ξ : Nat → Nat) (A : Tm) : (A.rename ξ).unguarded = A.unguarded := by
   induction A <;> simp_all [Tm.rename, Tm.unguarded]
 
-theorem Typ.unguarded_subst {Ψ Γ A J} (h : Typ S Ψ Γ A J) (σ : Nat → Tm) :
+theorem Typ.unguarded_subst {Ψ Θ Γ A J} (h : Typ S Ψ Θ Γ A J) (σ : Nat → Tm) :
     ∀ {t t' φ}, J = .alts t t' φ → (A.subst σ).unguarded = A.unguarded := by
   induction h with
   | anil => intros; rfl
@@ -41,14 +41,18 @@ structure Homo (m : Tm → Tm) : Prop where
   task : ∀ e, ∃ e', m (.task e) = .task e'
   enil : m .enil = .enil
   econs : ∀ N v θ, m (.econs N v θ) = .econs N (m v) (m θ)
+  cap : ∀ p, m (.cap p) = .cap p
+  own : ∀ p, m (.own p) = .own p
 
 theorem Homo.rename (ξ : Nat → Nat) : Homo (Tm.rename ξ) :=
   ⟨fun _ _ _ => rfl, fun _ _ => rfl, fun _ => rfl, fun _ => rfl, rfl, fun _ => ⟨_, rfl⟩,
-    fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩, rfl, fun _ _ _ => rfl⟩
+    fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩, rfl, fun _ _ _ => rfl,
+    fun _ => rfl, fun _ => rfl⟩
 
 theorem Homo.subst (σ : Nat → Tm) : Homo (Tm.subst σ) :=
   ⟨fun _ _ _ => rfl, fun _ _ => rfl, fun _ => rfl, fun _ => rfl, rfl, fun _ => ⟨_, rfl⟩,
-    fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩, rfl, fun _ _ _ => rfl⟩
+    fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩, rfl, fun _ _ _ => rfl,
+    fun _ => rfl, fun _ => rfl⟩
 
 theorem Homo.head {m : Tm → Tm} (hm : Homo m) {K} :
     ∀ {f : Tm}, Value f → f.head = .ctor K → (m f).head = .ctor K := by
@@ -76,6 +80,8 @@ theorem Homo.head_rev {m : Tm → Tm} (hm : Homo m) {K} :
   | enil => rw [hm.enil] at h; simp [Tm.head] at h
   | rcons => rw [hm.rcons] at h; simp [Tm.head] at h
   | econs => rw [hm.econs] at h; simp [Tm.head] at h
+  | cap => rw [hm.cap] at h; simp [Tm.head] at h
+  | own => rw [hm.own] at h; simp [Tm.head] at h
 
 theorem Homo.value {m : Tm → Tm} (hm : Homo m) {e} (h : Value e) : Value (m e) := by
   induction h with
@@ -88,6 +94,8 @@ theorem Homo.value {m : Tm → Tm} (hm : Homo m) {e} (h : Value e) : Value (m e)
   | ctor => rw [hm.ctor]; exact .ctor
   | rnil => rw [hm.rnil]; exact .rnil
   | enil => rw [hm.enil]; exact .enil
+  | cap => rw [hm.cap]; exact .cap
+  | own => rw [hm.own]; exact .own
   | rcons _ _ ih₁ ih₂ => rw [hm.rcons]; exact .rcons ih₁ ih₂
   | econs _ _ ih₁ ih₂ => rw [hm.econs]; exact .econs ih₁ ih₂
   | ctorApp hf hK _ ih₁ ih₂ => rw [hm.app]; exact .ctorApp ih₁ (hm.head hf hK) ih₂
@@ -173,7 +181,7 @@ theorem Covers.map {m : Tm → Tm} (hm : Homo m) {t ps e} (h : Covers S t ps e) 
 /-- The `try` coverage of a value is about its head constructor. -/
 theorem HCov.map {m : Tm → Tm} (hm : Homo m) {v H ε'} (hv : Value v) (h : HCov S v H ε') :
     HCov S (m v) H ε' := by
-  intro K ts T hK hS
-  exact h K ts T (hm.head_rev hv hK) hS
+  intro K k ts T hK hS
+  exact h K k ts T (hm.head_rev hv hK) hS
 
 end Flick

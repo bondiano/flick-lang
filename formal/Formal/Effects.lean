@@ -8,59 +8,60 @@ namespace Flick
 
 variable {S : Sig}
 
-/-- One step from a pure term is pure and keeps the store. -/
-theorem step_pure {root Ψ μ e t l μ' e'} (h : Typ S Ψ [] e (.ex t .pure))
-    (hs : Step root l μ e (.cfg μ' e')) : l = .pure ∧ μ' = μ := by
+/-- One step from a pure term is pure and keeps the store and the regions. -/
+theorem step_pure {root Ψ Θ Λ μ e t l Λ' μ' e'} (h : Typ S Ψ Θ [] e (.ex t .pure))
+    (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : l = .pure ∧ μ' = μ ∧ Λ' = Λ := by
   cases hs with
-  | pure => exact ⟨rfl, rfl⟩
+  | pure => exact ⟨rfl, rfl, rfl⟩
   | rt hE hh =>
-    obtain ⟨_, _, _, hr, rel, _⟩ := ctx_typing _ hE hh.not_value h
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE hh.not_value h
     obtain rfl := rel.pure rfl
     exact (hh.not_pure hr).elim
   | askWith hE =>
-    obtain ⟨_, _, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
     obtain rfl := rel.pure rfl
     exact (ask_inv hr).1.elim
   | askRoot hE =>
-    obtain ⟨_, _, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
     obtain rfl := rel.pure rfl
     exact (ask_inv hr).1.elim
   | raise hE hF =>
-    obtain ⟨_, _, _, hr, rel, _⟩ := ctx_typing _ hE (not_value_plug raise_not_value _) h
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (not_value_plug raise_not_value _) h
     obtain rfl := rel.pure rfl
-    obtain ⟨_, _, _, hr', rel', _⟩ := frame_typing raise_not_value _ hF hr
+    obtain ⟨_, _, _, _, hr', rel', _⟩ := frame_typing raise_not_value _ hF hr
     obtain rfl := rel'.pure rfl
     exact (raise_not_pure hr').elim
 
 /-- **T2(a), purity.** A computation from `·;Ψ ⊢ e : τ ! P` makes only pure
-steps, keeps the store and does not end in `raise v`. -/
-theorem T2a {root Ψ μ e t μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
-    (h : Typ S Ψ [] e (.ex t .pure)) (hs : Steps root (fun _ => True) μ e μ' e') :
-    Steps root (· = .pure) μ e μ' e' ∧ μ' = μ ∧ ∀ v, e' ≠ .raise v := by
+steps, keeps the store and the regions, and does not end in `raise v`. -/
+theorem T2a {root Ψ Λ μ e t Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
+    (h : Typ S Ψ Facts.all [] e (.ex t .pure)) (hs : Steps root (fun _ => True) Λ μ e Λ' μ' e') :
+    Steps root (· = .pure) Λ μ e Λ' μ' e' ∧ μ' = μ ∧ Λ' = Λ ∧ ∀ v, e' ≠ .raise v := by
   induction hs generalizing Ψ with
-  | refl => exact ⟨.refl, rfl, fun v he => by subst he; exact raise_not_pure h⟩
+  | refl => exact ⟨.refl, rfl, rfl, fun v he => by subst he; exact raise_not_pure h⟩
   | step h₁ _ _ ih =>
-    obtain ⟨hl, rfl⟩ := step_pure h h₁
+    obtain ⟨hl, rfl, rfl⟩ := step_pure h h₁
     obtain ⟨X, hμ', h'⟩ := preservation hroot h hμ h₁
-    obtain ⟨hs', rfl, hr⟩ := ih hμ' h'
-    exact ⟨.step h₁ hl hs', rfl, hr⟩
+    obtain ⟨hs', rfl, rfl, hr⟩ := ih hμ' h'
+    exact ⟨.step h₁ hl hs', rfl, rfl, hr⟩
 
 /-- An `ask_S` answered by `Σ₀` from a term with services `r` has `S ∈ r`. -/
-theorem step_root {root Ψ μ e t r ε N o} (h : Typ S Ψ [] e (.ex t (.rt r ε)))
-    (hs : Step root (.root N) μ e o) : r N := by
+theorem step_root {root Ψ Θ Λ μ e t r ε N o} (h : Typ S Ψ Θ [] e (.ex t (.rt r ε)))
+    (hs : Step root (.root N) Λ μ e o) : r (.nm N) := by
   cases hs with
   | askRoot hE hl =>
-    obtain ⟨_, _, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
-    rcases rel.svc N (ask_inv hr).1 with h | h
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
+    rcases rel.svc _ (ask_inv hr).1 with h | h
     · exact h
-    · simp [domE, hl] at h
+    · rw [domE_nm, hl] at h; cases h
 
 /-- **T2(b), rows.** From `·;Ψ ⊢ e : τ ! R⟨r; ε⟩`, every `ask_S` that reaches `Σ₀`
 has `S ∈ r`, and a computation that ends in `raise v` has `v : Errors ε`. -/
-theorem T2b {root Ψ μ e t r ε μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
-    (h : Typ S Ψ [] e (.ex t (.rt r ε))) (hs : Steps root (fun _ => True) μ e μ' e') :
-    Steps root (fun l => ∀ N, l = .root N → r N) μ e μ' e' ∧
-      ∀ v, e' = .raise v → Value v → ∃ Ψ', Typ S Ψ' [] v (.ex (.errors ε) .pure) := by
+theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
+    (h : Typ S Ψ Facts.all [] e (.ex t (.rt r ε)))
+    (hs : Steps root (fun _ => True) Λ μ e Λ' μ' e') :
+    Steps root (fun l => ∀ N, l = .root N → r (.nm N)) Λ μ e Λ' μ' e' ∧
+      ∀ v, e' = .raise v → Value v → ∃ Ψ', Typ S Ψ' Facts.all [] v (.ex (.errors ε) .pure) := by
   induction hs generalizing Ψ with
   | refl => exact ⟨.refl, fun v he hv => ⟨Ψ, by subst he; exact raise_errors hv h⟩⟩
   | step h₁ _ _ ih =>
@@ -69,11 +70,11 @@ theorem T2b {root Ψ μ e t r ε μ' e'} (hroot : RootTy S root) (hμ : StoreTy 
     exact ⟨.step h₁ (fun N hl => by subst hl; exact step_root h h₁) hs', hr⟩
 
 /-- T2(b) for `await v` with `v : Eff r ε τ`. -/
-theorem T2b_await {root Ψ μ v r ε t μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
-    (h : Typ S Ψ [] v (.ex (.eff r ε t) .pure))
-    (hs : Steps root (fun _ => True) μ (.await v) μ' e') :
-    Steps root (fun l => ∀ N, l = .root N → r N) μ (.await v) μ' e' ∧
-      ∀ w, e' = .raise w → Value w → ∃ Ψ', Typ S Ψ' [] w (.ex (.errors ε) .pure) :=
+theorem T2b_await {root Ψ Λ μ v r ε t C Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
+    (h : Typ S Ψ Facts.all [] v (.ex (.eff r ε t C) .pure))
+    (hs : Steps root (fun _ => True) Λ μ (.await v) Λ' μ' e') :
+    Steps root (fun l => ∀ N, l = .root N → r (.nm N)) Λ μ (.await v) Λ' μ' e' ∧
+      ∀ w, e' = .raise w → Value w → ∃ Ψ', Typ S Ψ' Facts.all [] w (.ex (.errors ε) .pure) :=
   T2b hroot hμ (.await (h.sub ⟨.refl, Stage.pure_le _⟩) (Stage.le_refl _) .refl) hs
 
 end Flick
