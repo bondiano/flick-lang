@@ -79,6 +79,16 @@ fn only_a_program_that_reaches_an_optional_package_imports_it() {
         ),
         ["flickpg"]
     );
+    let compressed = |middleware: &str| {
+        format!(
+            "Platform.stdout_line (show (Http.ServerResponse.status (Http.Middleware.{middleware} \
+             {{ algorithms = []; minSize = None; levels = [] }} \
+             (fun _ -> Http.ServerResponse.text \"x\" Http.ServerResponse.defaults) \
+             (Http.ServerRequest.from_client_request (Http.ClientRequest.get \"http://x/\")))))"
+        )
+    };
+    assert_eq!(packages(&compressed("compression")), ["flickcompress"]);
+    assert!(packages(&compressed("compression_web")).is_empty());
     assert!(packages("Platform.stdout_line \"plain\"").is_empty());
 }
 
@@ -98,14 +108,15 @@ fn optional_packages_are_the_runtime_s() {
 fn a_program_s_go_mod_requires_the_modules_of_its_packages() {
     use crate::build::go::go_mod;
     assert_eq!(go_mod(&[]), "module flick.app\n\ngo 1.23\n");
-    for package in super::PACKAGES {
-        let text = go_mod(&[package]);
+    let each = super::PACKAGES.iter().map(|package| vec![package]);
+    for packages in each.chain([super::PACKAGES.iter().collect()]) {
+        let text = go_mod(&packages);
         let mut required: Vec<&str> = text
             .lines()
             .filter(|line| line.starts_with('\t'))
             .filter_map(|line| line.split_whitespace().next())
             .collect();
-        let mut modules: Vec<&str> = package.modules.lines().collect();
+        let mut modules: Vec<&str> = packages.iter().flat_map(|p| p.modules.lines()).collect();
         required.sort_unstable();
         modules.sort_unstable();
         assert_eq!(required, modules, "{text}");

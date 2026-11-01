@@ -439,8 +439,11 @@ URLs, the router's defaults, middleware, multipart forms, static files,
 streamed bodies, the client on `net/http` (interrupting a fiber cancels its
 request), typed `HttpApi` clients and the same OpenAPI document. What
 `net/http` decides differs: a response's status text is always the
-standard one, a request's header order is not kept, and compression is
-gzip or deflate only.
+standard one and a request's header order is not kept. Compression with
+brotli and zstd uses the Go modules `andybalholm/brotli` and
+`klauspost/compress`, which a program requires only when it reaches
+`Http.Middleware.compression`; its first build downloads them unless the
+module cache has them.
 
 URL rendering and HTTP error details use the current fiber's
 `Http.UrlParams.with_redacted_names`, including nested and concurrent scopes;

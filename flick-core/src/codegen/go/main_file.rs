@@ -16,6 +16,12 @@ use crate::ir::{ItemKind, Module};
 pub const OPTIONAL: &[(&str, &str, &[&str])] = &[
     // the PostgreSQL driver, on pgx
     ("flickpg", "@flick-lang/runtime/sql", &["pgLayer"]),
+    // brotli and zstd of the compression middleware; the web one has neither
+    (
+        "flickcompress",
+        "@flick-lang/runtime/effect/http/HttpMiddleware",
+        &["flickCompression"],
+    ),
 ];
 
 /// The bindings that look a named time zone up: a program that reaches one

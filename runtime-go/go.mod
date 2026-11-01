@@ -2,7 +2,11 @@ module flick.app
 
 go 1.23.0
 
-require github.com/jackc/pgx/v5 v5.7.6
+require (
+	github.com/andybalholm/brotli v1.2.0
+	github.com/jackc/pgx/v5 v5.7.6
+	github.com/klauspost/compress v1.18.4
+)
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
