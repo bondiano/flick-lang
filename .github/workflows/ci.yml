@@ -46,6 +46,21 @@ jobs:
       - uses: extractions/setup-just@v2
       - run: just model
 
+  # the Lean 4 mechanization of λFlick in formal/; elan installs the toolchain
+  # pinned in formal/lean-toolchain; --wfail turns a `sorry` (a warning) into a failure
+  lean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: formal
+          build-args: --wfail
+          build: true
+          test: false
+          lint: false
+          use-mathlib-cache: false
+
   # the go target on each platform it supports: the runtime's tests and the
   # portable cases of the parity harness, built and run without Node
   go:
