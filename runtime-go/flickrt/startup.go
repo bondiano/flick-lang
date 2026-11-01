@@ -90,6 +90,10 @@ func advance() {
 // queueTurn queues a turn after the fibers forked so far and the turns
 // queued before; the fibers forked from now on come after it.
 func queueTurn() *cohort {
+	if stressing {
+		// turns are off under stress: each is granted at once
+		return &cohort{turn: closedChan, granted: true}
+	}
 	t := &cohort{n: 1, turn: make(chan struct{})}
 	t.next = &cohort{}
 	startup.mu.Lock()

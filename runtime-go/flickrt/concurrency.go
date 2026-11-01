@@ -51,6 +51,9 @@ func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 	}
 	recorded := fiberMetrics(&inner)
 	go func() {
+		if stressing {
+			stress()
+		}
 		if tc != nil {
 			defer tc.running.Add(-1)
 		}
