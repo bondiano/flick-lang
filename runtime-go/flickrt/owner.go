@@ -21,6 +21,9 @@ type Owner struct {
 	hooks      []func(fb *Fiber)
 	finalizers []finalizer
 	defects    *defects // where failures of supervisors go; the root's when nil
+	trace      int64    // its id in the trace; 0 when it is not traced (trace.go)
+	fins       int64    // the finalizers added through Flick so far, for the trace
+	calls      []int64  // the trace ids of `pending`, when traced
 }
 
 // defects collects failures of supervisors: the root's fail the program,
@@ -62,6 +65,10 @@ func (o *Owner) report(c *Cause) {
 func (o *Owner) track(done <-chan struct{}) {
 	o.mu.Lock()
 	o.pending = append(o.pending, done)
+	if tracing && o.trace != 0 {
+		o.calls = append(o.calls, traceID())
+		traceEvent("track", "o", o.trace, "t", o.calls[len(o.calls)-1])
+	}
 	o.mu.Unlock()
 }
 
@@ -69,14 +76,17 @@ func (o *Owner) track(done <-chan struct{}) {
 func (o *Owner) settle() {
 	for {
 		o.mu.Lock()
-		pending := o.pending
-		o.pending = nil
+		pending, calls := o.pending, o.calls
+		o.pending, o.calls = nil, nil
 		o.mu.Unlock()
 		if len(pending) == 0 {
 			return
 		}
-		for _, done := range pending {
+		for i, done := range pending {
 			<-done
+			if i < len(calls) {
+				traceEvent("settle", "o", o.trace, "t", calls[i])
+			}
 		}
 	}
 }
@@ -86,6 +96,8 @@ func (o *Owner) settle() {
 type finalizer struct {
 	added *Fiber
 	run   func(fb *Fiber, exit *Cause) Value
+	owner *Owner // and its place among the owner's: traced when set
+	place int64
 }
 
 func newOwner() *Owner { return &Owner{open: true, children: map[*child]struct{}{}} }
@@ -104,8 +116,23 @@ func catch(f func() Value) (out Value, cause *Cause) {
 // finalizers have started, as Effect's scopes do. A child still running
 // while the owner closes adds to the stack, released after it ended.
 func (o *Owner) add(fb *Fiber, run func(fb *Fiber, exit *Cause) Value) {
-	f := finalizer{fb, run}
+	o.addTraced(fb, run, false)
+}
+
+// addTraced is [Owner.add] that writes the finalizer to the trace when
+// `traced`: one Flick adds, as the JS runtime sees them.
+func (o *Owner) addTraced(fb *Fiber, run func(fb *Fiber, exit *Cause) Value, traced bool) {
+	f := finalizer{added: fb, run: run}
 	o.mu.Lock()
+	if traced && tracing && o.trace != 0 {
+		o.fins++
+		f.owner, f.place = o, o.fins
+		event := "fin"
+		if o.finalizing {
+			event = "now"
+		}
+		traceEvent(event, "o", o.trace, "i", f.place)
+	}
 	if !o.finalizing {
 		o.finalizers = append(o.finalizers, f)
 		o.mu.Unlock()
@@ -127,11 +154,14 @@ func (o *Owner) addIfOpen(fb *Fiber, run func(fb *Fiber, exit *Cause) Value, the
 		return false
 	}
 	then()
-	o.finalizers = append(o.finalizers, finalizer{fb, run})
+	o.finalizers = append(o.finalizers, finalizer{added: fb, run: run})
 	return true
 }
 
 func (f finalizer) call(closer *Fiber, exit *Cause) *Cause {
+	if f.owner != nil {
+		traceEvent("run", "o", f.owner.trace, "i", f.place)
+	}
 	fb := *f.added
 	fb.state = closer.state
 	_, cause := catch(func() Value { return masked(&fb, closer.state.mask+1, func() Value { return f.run(&fb, exit) }) })
@@ -183,7 +213,9 @@ func (o *Owner) runHooks(fb *Fiber) (cause *Cause) {
 func (o *Owner) closeWithCause(fb *Fiber, exit, cause *Cause) *Cause {
 	o.mu.Lock()
 	o.open = false
+	o.tracePhase("C0")
 	o.mu.Unlock()
+	o.tracePhase("C1")
 	cause = Sequential(cause, o.runHooks(fb))
 	o.mu.Lock()
 	children := make([]*child, 0, len(o.children))
@@ -191,16 +223,23 @@ func (o *Owner) closeWithCause(fb *Fiber, exit, cause *Cause) *Cause {
 		children = append(children, c)
 	}
 	o.mu.Unlock()
+	o.tracePhase("C2")
 	for _, c := range children {
+		if tracing && o.trace != 0 {
+			traceEvent("interrupt", "o", o.trace, "f", traceChild(c))
+		}
 		c.state.interrupt(fb.state.id)
 	}
 	suspended(fb.state)
 	o.watchers.Wait()
+	o.tracePhase("C3")
 	// a supervisor may have made a fiber group while the children ended
 	cause = Sequential(cause, o.runHooks(fb))
 	o.settle()
+	o.tracePhase("C4")
 	o.mu.Lock()
 	o.finalizing, o.exit = true, exit
+	o.tracePhase("C5")
 	finalizers := o.finalizers
 	o.finalizers = nil
 	o.mu.Unlock()
@@ -208,6 +247,7 @@ func (o *Owner) closeWithCause(fb *Fiber, exit, cause *Cause) *Cause {
 	for i := len(finalizers) - 1; i >= 0; i-- {
 		released = concat(released, finalizers[i].call(fb, exit))
 	}
+	o.tracePhase("C6")
 	return Sequential(cause, released)
 }
 
@@ -229,7 +269,12 @@ func owned(fb *Fiber, body func(fb *Fiber, owner *Owner) Value) Value {
 // Scope is `scope [s] { body }`: `body` receives the owner `s` and the one
 // around it.
 func Scope(fb *Fiber, body func(fb *Fiber, owner, outer Value) Value) Value {
-	return owned(fb, func(inner *Fiber, owner *Owner) Value { return body(inner, owner, fb.owner) })
+	return owned(fb, func(inner *Fiber, owner *Owner) Value {
+		if tracing {
+			traceOpen(owner, fb.owner, "scope")
+		}
+		return body(inner, owner, fb.owner)
+	})
 }
 
 // Within is `fb` acquiring into `owner`, an outer region's, not the
@@ -243,7 +288,7 @@ func Within(fb *Fiber, owner Value) *Fiber {
 // AcquireRelease is a resource released when the owner of the call closes.
 func AcquireRelease(fb *Fiber, acquire, release Value) Value {
 	v := masked(fb, fb.state.mask+1, func() Value { return Run(fb, acquire) })
-	fb.owner.add(fb, func(fb *Fiber, _ *Cause) Value { return Run(fb, Apply(fb, release, v)) })
+	fb.owner.addTraced(fb, func(fb *Fiber, _ *Cause) Value { return Run(fb, Apply(fb, release, v)) }, true)
 	return v
 }
 
@@ -264,19 +309,19 @@ func Bracket(fb *Fiber, acquire, use, release Value) Value {
 // AddFinalizer is `Scope.add_finalizer`: `finalizer` runs when the
 // innermost owner closes.
 func AddFinalizer(fb *Fiber, finalizer Value) Value {
-	fb.owner.add(fb, func(fb *Fiber, _ *Cause) Value { return Run(fb, finalizer) })
+	fb.owner.addTraced(fb, func(fb *Fiber, _ *Cause) Value { return Run(fb, finalizer) }, true)
 	return Unit
 }
 
 // AddFinalizerExit is `Scope.add_finalizer_exit`: the finalizer sees the
 // cause of a failure.
 func AddFinalizerExit(fb *Fiber, finalizer Value) Value {
-	fb.owner.add(fb, func(fb *Fiber, exit *Cause) Value {
+	fb.owner.addTraced(fb, func(fb *Fiber, exit *Cause) Value {
 		var o Value = None
 		if exit != nil {
 			o = Some(exit)
 		}
 		return Run(fb, Apply(fb, finalizer, o))
-	})
+	}, true)
 	return Unit
 }
