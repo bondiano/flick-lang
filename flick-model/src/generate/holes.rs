@@ -28,6 +28,9 @@ fn unknown() -> Type {
     Type::con("Prelude", "Unknown")
 }
 
+/// The values of `Gen.fl` and the standard library these forms use.
+pub(super) const GLOBALS: [&str; 5] = ["js_of", "shape_of", "is_point", "shape_name", "get"];
+
 fn global(name: &str) -> Term {
     Term::Global(Path::new(MODULE, name))
 }

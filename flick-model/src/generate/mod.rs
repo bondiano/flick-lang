@@ -9,6 +9,7 @@
 mod bind;
 mod handle;
 mod holes;
+mod leaks;
 mod mutate;
 mod print;
 mod regions;
@@ -16,6 +17,7 @@ mod term;
 
 use std::rc::Rc;
 
+pub use leaks::leak_used;
 pub use mutate::mutate;
 pub use print::source;
 
@@ -95,11 +97,13 @@ impl<'c> Gen<'c> {
     }
 }
 
-/// Whether the machine runs `p`: not with a `scope`, which needs the
-/// dynamics of regions (`docs/formal/regions.md` §3), nor with a value
-/// of `Gen.fl` or the standard library, which it has no natives for.
+/// Whether the machine runs `p`: not with a form of the holes of
+/// TypeScript (`holes.rs`), whose foreign values it has no natives for.
 pub fn runs(p: &Program) -> bool {
-    !subst::any(&p.term, &|t| matches!(t, Term::Scope(..) | Term::Global(_)))
+    !subst::any(
+        &p.term,
+        &|t| matches!(t, Term::Global(g) if holes::GLOBALS.contains(&&*g.name)),
+    )
 }
 
 /// The program `choices` build.

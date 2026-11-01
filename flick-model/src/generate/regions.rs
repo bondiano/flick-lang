@@ -13,7 +13,7 @@ use crate::check::scope_service;
 use crate::syntax::{Arm, Con, Const, Name, Pat, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
-fn con(name: &str, arity: usize) -> Rc<Con> {
+pub(super) fn con(name: &str, arity: usize) -> Rc<Con> {
     Rc::new(Con {
         ty: Path::new(MODULE, name),
         name: name.into(),
@@ -21,7 +21,7 @@ fn con(name: &str, arity: usize) -> Rc<Con> {
     })
 }
 
-fn global(module: &str, name: &str) -> Term {
+pub(super) fn global(module: &str, name: &str) -> Term {
     Term::Global(Path::new(module, name))
 }
 
@@ -63,7 +63,7 @@ fn var(x: &Name) -> Term {
     Term::Var(x.clone())
 }
 
-fn stmt(s: Term, rest: Term) -> Term {
+pub(super) fn stmt(s: Term, rest: Term) -> Term {
     Term::Let(
         "_".into(),
         Some(Rc::new(mono(unit()))),
@@ -84,7 +84,7 @@ fn open() -> Term {
     Term::app(global(MODULE, "open_scoped"), Term::string("x"))
 }
 
-fn use_(h: &Name) -> Term {
+pub(super) fn use_(h: &Name) -> Term {
     Term::app(global(MODULE, "use"), var(h))
 }
 
@@ -95,7 +95,7 @@ fn spawn(o: Term, t: Term, rest: Term) -> Term {
 }
 
 /// `match x with | K y -> body y`.
-fn unpack(x: Term, k: Rc<Con>, body: impl FnOnce(Term) -> Term) -> Term {
+pub(super) fn unpack(x: Term, k: Rc<Con>, body: impl FnOnce(Term) -> Term) -> Term {
     let y: Name = "y".into();
     let arm = Arm {
         pat: Pat::Con(k, Rc::from([Pat::Var(y.clone())])),
@@ -446,11 +446,12 @@ fn spawn_in_body() -> Term {
 }
 
 /// `e` after a leak of path `path` of `regions.md` §4: a value that holds
-/// a region leaves its `scope`, or is held past it. Every one is rejected.
-pub(super) fn leak(g: &mut Gen, path: usize, e: Term) -> Term {
+/// a region leaves its `scope`, or is held past it; `e` may use it as
+/// `x`. Every one is rejected.
+pub(super) fn leak(g: &mut Gen, path: usize, e: impl Fn(&Name) -> Term) -> Term {
     let (s, h, x) = (g.fresh("s"), g.fresh("h"), g.fresh("v"));
     let scoped = |body: Term| Term::Scope(s.clone(), Rc::new(let_(&h, None, open(), body)));
-    let leaves = |value: Term| let_(&x, None, scoped(value), e.clone());
+    let leaves = |value: Term| let_(&x, None, scoped(value), e(&x));
     let lam = |body: Term| Term::lam("y", body);
     match path % 10 {
         // the result, directly or in data
@@ -465,7 +466,7 @@ pub(super) fn leak(g: &mut Gen, path: usize, e: Term) -> Term {
             let sig = mono(Type::fun(thunk(), empty(), unit()));
             let apply = Term::Lam(f.clone(), Rc::new(Term::app(var(&f), Term::unit())));
             let call = Term::app(var(&x), lam(use_(&h)));
-            stmt(scoped(let_(&x, Some(sig), apply, call)), e)
+            stmt(scoped(let_(&x, Some(sig), apply, call)), e(&x))
         }
         // opaque packaging
         5 => leaves(Term::app(Term::konst_con(con("Sealed", 1)), lam(use_(&h)))),
@@ -474,7 +475,7 @@ pub(super) fn leak(g: &mut Gen, path: usize, e: Term) -> Term {
             let cell = Term::app(Term::konst(Const::RefMake), Term::konst_con(nothing()));
             let some_h = Term::app(Term::konst_con(some()), var(&h));
             let set = Term::apps(Term::konst(Const::RefSet), [var(&x), some_h]);
-            let_(&x, None, cell, stmt(scoped(set), e))
+            let_(&x, None, cell, stmt(scoped(set), e(&x)))
         }
         // an error that carries the capability, even one caught inside
         7 => {
@@ -485,15 +486,15 @@ pub(super) fn leak(g: &mut Gen, path: usize, e: Term) -> Term {
                 guard: None,
                 body: Term::unit(),
             };
-            stmt(scoped(Term::Try(Rc::new(raise), Rc::from([arm]))), e)
+            stmt(scoped(Term::Try(Rc::new(raise), Rc::from([arm]))), e(&x))
         }
         // a child of the outer `scope` that holds the inner region
         8 => {
             let o = g.fresh("s");
             let child = spawn(var(&o), task(use_(&h)), Term::unit());
-            stmt(Term::Scope(o, Rc::new(scoped(child))), e)
+            stmt(Term::Scope(o, Rc::new(scoped(child))), e(&x))
         }
         // what a foreign acquisition gives (Г4)
-        _ => let_(&x, None, Term::Scope(s.clone(), Rc::new(acquire())), e),
+        _ => let_(&x, None, Term::Scope(s.clone(), Rc::new(acquire())), e(&x)),
     }
 }

@@ -154,10 +154,13 @@ impl Checker<'_> {
                 self.redex(x, body, a, Some(&full)).map(drop)
             }
             // `bind_S (await v)` of a configuration: what the layer builds is
-            // checked against `S.Impl`, as `Layer.effect` checked it
+            // checked against `S.Impl`, as `Layer.effect` checked it; the
+            // task may hold what it likes
             (Term::Await(x), _) if self.config => {
                 let (r, x_rows) = (self.fresh_row(), self.fresh_row());
-                self.check(x, &Type::Eff(r.clone(), x_rows.clone(), Rc::new(full)))?;
+                let task = Type::Eff(r.clone(), x_rows.clone(), Rc::new(full));
+                let held = self.fresh_caps();
+                self.check(x, &Type::Captured(Rc::new(task), held))?;
                 self.perform(&Stage::Runtime(r, x_rows))
             }
             _ => {
