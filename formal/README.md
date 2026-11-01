@@ -13,9 +13,9 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
 command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
-`T1_regions`, `T5` and `T6b` lists only Lean's standard `propext`, `Classical.choice` and
-`Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`) and of T6(b) (`Coherent`, `Sim`) are their
-parameters.
+`T1_regions`, `T5`, `T6a` and `T6b` lists only Lean's standard `propext`, `Classical.choice`
+and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a) (`Target`) and of T6(b)
+(`Coherent`, `Sim`) are their parameters.
 
 ## Status
 
@@ -367,10 +367,19 @@ Simplifications of λRT:
     `modify` of `ℓ` (`cell`), and the memory is the replay of the journal. Allocation is
     deterministic, as in P1.
 
-## Elaboration: coherence and T6(b)
+## Elaboration and T6
 
-`Formal/Elab/` is another model of its own; it imports nothing from the core. It covers the
-coherence half of P4 (P4c) of [`docs/formal/elaboration.md`](../docs/formal/elaboration.md).
+`Formal/Elab/` is another model of its own; it imports nothing from the core. It covers
+T6 of [`docs/formal/elaboration.md`](../docs/formal/elaboration.md) relative to an abstract
+target: λFlick⁺ is the structure `Target`, whose typing and laws are fields; P4a is to
+instantiate it.
+
+| Stage | Scope | State |
+| - | - | - |
+| P4a | λFlick⁺ (Р54) as an instance of `Target`; T1–T3 for it | open |
+| P4b | the source, `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (§2.4), dictionaries typed, T6(a) | done |
+| P4b′ | the sugar of §3 (`do`, `for`, `?`) as core terms | open |
+| P4c | `≈`, К1–К8, lemmas 6.1 and 6.2, T6(b) | done |
 
 | `elaboration.md` | Lean |
 | - | - |
@@ -380,6 +389,10 @@ coherence half of P4 (P4c) of [`docs/formal/elaboration.md`](../docs/formal/elab
 | §4.1 К1–К8 | `Coherent` (`Elab/Hyp.lean`) |
 | §4.2 `≈` | `Eqv` (`Elab/Syntax.lean`) |
 | Lemma 6.1, Lemma 6.2, T6(b) | `lemma_6_1`, `lemma_6_2`, `T6b` (`Elab/Coherence.lean`) |
+| §1.1 method schemes | `Scheme`, `Prog.methods` (`Elab/Syntax.lean`) |
+| §2.2, §2.4 `Γ; Δ ⊢ e : τ ! φ ⇝ e'`: (Var-Dict), (Method), (Let-Sig-Dict) | `Exp`, `Tm`, `Elab` (`Elab/Source.lean`) |
+| §0.1, §2.1 λFlick⁺, `D_Q`, `⟦σ⟧`, `⊢⁺` | `TTy`, `TSch`, `Scheme.tr`, `Target` (`Elab/Target.lean`) |
+| `Δ ⊩ Q ⇝ d ⇒ ⟦Δ⟧ ⊢⁺ d : D_Q`; T6(a) | `ent_typed`, `T6a` (`Elab/T6a.lean`) |
 | "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`), for P4b |
 
 Simplifications:
@@ -397,4 +410,17 @@ Simplifications:
    substitution; К6 keeps the compiler's classes apart from the program's instances.
 5. An expression is a skeleton with dictionary holes all under one `Δ`; `Sim` says filling
    them with `≈` dictionaries gives the same result. A hole under a `λδ̄` of (Let-Sig-Dict)
-   sees a longer `Δ`, which P4b brings with the typing of expressions.
+   sees a longer `Δ`; T6(b) over two whole `Elab` derivations, which may also pick different
+   types, is not stated.
+6. The source of T6(a) has variables, methods, application, `λ` over a monotype, `let`
+   without generalization and `let` with a signature; no constants, constructors, `match`
+   or higher-rank parameters. Its types are the first-order `Ty`, the arrow `a →φ b` an
+   application of a reserved constructor (`arrTy`). (Sub) is kept for stages only: a value
+   has any stage, an application and a `let` run at the stage of the arrow and of the body,
+   the right side of a `let` at `φ₁ ⊑ φ` (Р182).
+7. `Target` is an interface, not λFlick⁺: its types are monotypes, stage arrows and `D_Q`,
+   a context entry is `∀ᾱ. t`, and a `∀`-field of `D_Q` shows only through the law `meth`
+   (projection with instantiation). The types of instances (`inst`: `I : ∀β̄. D_ctx →P
+   D_head`, by (Instance) of §2.5 and К7) and of (Struct)/(Prim) dictionaries are laws.
+   `lamD l` binds `l` premises at once, the `i`-th argument being the premise `i`;
+   λFlick⁺ curries it. P4a has to prove each law of its own typing.
