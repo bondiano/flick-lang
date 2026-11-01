@@ -40,3 +40,45 @@
 "\"\\u"	Bad Unicode escape in JSON at position 3 (line 1 column 4)
 "\"\\uZZZZ\""	Bad Unicode escape in JSON at position 3 (line 1 column 4)
 "[\"\\u00\"]"	Bad Unicode escape in JSON at position 6 (line 1 column 7)
+"[1,2"	Expected ',' or ']' after array element in JSON at position 4 (line 1 column 5)
+"{\"a\":1"	Expected ',' or '}' after property value in JSON at position 6 (line 1 column 7)
+"\"\\"	Unexpected end of JSON input
+"[1,2 "	Expected ',' or ']' after array element in JSON at position 5 (line 1 column 6)
+"{\"a\":1 "	Expected ',' or '}' after property value in JSON at position 7 (line 1 column 8)
+"\"a\\"	Unexpected end of JSON input
+"[\"a\\"	Unexpected end of JSON input
+"{\"a"	Unterminated string in JSON at position 3 (line 1 column 4)
+"{\"a\""	Expected ':' after property name in JSON at position 4 (line 1 column 5)
+"[\"x"	Unterminated string in JSON at position 3 (line 1 column 4)
+"[1"	Expected ',' or ']' after array element in JSON at position 2 (line 1 column 3)
+"[1 "	Expected ',' or ']' after array element in JSON at position 3 (line 1 column 4)
+"[\"a\" \"b\"]"	Expected ',' or ']' after array element in JSON at position 5 (line 1 column 6)
+"{\"a\":1 \"b\"}"	Expected ',' or '}' after property value in JSON at position 7 (line 1 column 8)
+"\"a\" \"b\""	Unexpected non-whitespace character after JSON at position 4 (line 1 column 5)
+"[1,"	Unexpected end of JSON input
+"{\"a\":1,"	Expected double-quoted property name in JSON at position 7 (line 1 column 8)
+"[tru"	Unexpected end of JSON input
+"{\"a\":tru"	Unexpected end of JSON input
+"[nul "	Unexpected token ' ', "[nul " is not valid JSON
+"\"\\ud800"	Unterminated string in JSON at position 7 (line 1 column 8)
+"{\"a\":[1"	Expected ',' or ']' after array element in JSON at position 7 (line 1 column 8)
+"[{\"a\":1"	Expected ',' or '}' after property value in JSON at position 7 (line 1 column 8)
+"\n[1,\n2"	Expected ',' or ']' after array element in JSON at position 6 (line 3 column 2)
+"[\"é\",1"	Expected ',' or ']' after array element in JSON at position 6 (line 1 column 7)
+"{\"a\":\"b\""	Expected ',' or '}' after property value in JSON at position 8 (line 1 column 9)
+"[\"a\"]x"	Unexpected non-whitespace character after JSON at position 5 (line 1 column 6)
+"[1] \"x\""	Unexpected non-whitespace character after JSON at position 4 (line 1 column 5)
+"{\"a\" \"b\"}"	Expected ':' after property name in JSON at position 5 (line 1 column 6)
+"[1,2]\"x\""	Unexpected non-whitespace character after JSON at position 5 (line 1 column 6)
+"\"x\"\"y\""	Unexpected non-whitespace character after JSON at position 3 (line 1 column 4)
+"tr\"ue\""	Unexpected string in JSON at position 2 (line 1 column 3)
+"nu1"	Unexpected number in JSON at position 2 (line 1 column 3)
+"[t\"]"	Unexpected string in JSON at position 2 (line 1 column 3)
+"nxll"	Unexpected token 'x', "nxll" is not valid JSON
+"falsy"	Unexpected token 'y', "falsy" is not valid JSON
+"[true1]"	Expected ',' or ']' after array element in JSON at position 5 (line 1 column 6)
+"n-ll"	Unexpected number in JSON at position 1 (line 1 column 2)
+"{\"a\":nul\"\"}"	Unexpected string in JSON at position 8 (line 1 column 9)
+"tr"	Unexpected end of JSON input
+"t"	Unexpected end of JSON input
+"[f "	Unexpected token ' ', "[f " is not valid JSON
