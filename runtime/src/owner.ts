@@ -98,7 +98,12 @@ export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<
     owner.phase("C3");
     // a supervisor may have made a fiber group while the children ended
     yield* hooks;
-    yield* Effect.promise(() => settle(owner));
+    // a settling foreign call may add a hook, and a hook may start one: repeat until neither (Р160)
+    for (;;) {
+      yield* Effect.promise(() => settle(owner));
+      if ([...owner.closing].every((hook) => ran.has(hook))) break;
+      yield* hooks;
+    }
     owner.phase("C4");
     owner.finalizing = true;
     owner.phase("C5");

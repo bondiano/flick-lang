@@ -235,9 +235,17 @@ func (o *Owner) closeWithCause(fb *Fiber, exit, cause *Cause) *Cause {
 	o.tracePhase("C3")
 	// a supervisor may have made a fiber group while the children ended
 	cause = Sequential(cause, o.runHooks(fb))
-	o.settle()
+	// a settling foreign call may add a hook, and a hook may leave one: repeat until neither (Р160)
+	for {
+		o.settle()
+		o.mu.Lock()
+		if len(o.hooks) == 0 {
+			break // still locked: a hook added from now on runs at once
+		}
+		o.mu.Unlock()
+		cause = Sequential(cause, o.runHooks(fb))
+	}
 	o.tracePhase("C4")
-	o.mu.Lock()
 	o.finalizing, o.exit = true, exit
 	o.tracePhase("C5")
 	finalizers := o.finalizers
