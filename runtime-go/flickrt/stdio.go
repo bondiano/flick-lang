@@ -33,10 +33,7 @@ func StdioNode(key Value) Value {
 			return Eff(func(*Fiber) Value { stderrWrite(text.(string)); return Unit })
 		}),
 	)
-	stdioNodesMu.Lock()
-	stdioNodes[impl.(*Record)] = true
-	stdioNodesMu.Unlock()
-	return LayerSucceed(key, impl)
+	return LayerSucceed(key, markNode(impl))
 }
 
 var (

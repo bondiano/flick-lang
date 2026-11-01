@@ -461,7 +461,12 @@ reports Go's unsupported-operation error rather than Node's no-op success.
 File-handle foreign operations not yet ported remain `FLICK-P012`;
 `stat` metadata remains partial.
 Glob's POSIX classes are checked on the minimum Go 1.23, including unassigned
-code points.
+code points. `Stream.watch` uses inotify on Linux, kqueue on macOS and
+`ReadDirectoryChangesW` on Windows. Unlike Node's FSEvents, kqueue does
+not coalesce events, and a file created as its new directory is listed
+may be reported twice. Where the system has no notifications, or runs out
+of watches or descriptors, the path is polled every 50 ms; Node fails
+there.
 `Path.node` and the paths of `Cli` flags are Node's win32 paths on Windows
 (`tools/go-path/gen.mjs` checks them against `path.win32`), POSIX elsewhere.
 
