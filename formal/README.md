@@ -28,7 +28,8 @@ and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a) (`Target`) and o
 | P2b | Л3 under a substitution that fits the term (`Refill`), the renaming of regions not yet created (`kill`), `reach_μ` and Л4 through the store | done |
 | P2b′ | the freshness premises of (Inside) with its own facts, the facts of the order of creation (`Facts.age`), the renaming in every step, a configuration writes only regions that exist; Л6 | done |
 | P2c | Л5, the invariant `⊢ Λ` (live work reaches only live regions), T4.1, T4.2, T1 with `op_H` | done |
-| P2c′ | T4.3: the provider of a service (Р37) | open |
+| P2c′1 | Р37 in the model: the region of `provide`, `with` frames with it, children and finalizers inheriting the frames, the use of a service of an ended `provide` stuck; obligations `Provided {S} ϱ` in rows, discharged by `with` frames, by the end of a region and by `provide`, deferred in rows; T1–T3, T4.1, T4.2 again | done |
+| P2c′2 | T4.3: no use of a service of an ended `provide` (`T4_3`), T1 with `op_H` without that stuck state | open |
 
 T4.3 (P2c′, in progress) is the premise Г11 of T5 in the form Р142 gives it: an `ask_S`
 answered by a `with` frame of the region `q` of a `provide`, inherited or not, happens only
@@ -81,6 +82,10 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | Л6 | `lemma_6` (`Lemma4.lean`); the invariant of a configuration: `CfgTy` (`Soundness.lean`) |
 | §3.4 `⊢ Λ`: where a region may be written, the ancestors of a region | `Tm.Within`, `LocOk`, `Nest` (`Within.lean`, `Nest.lean`); kept by every step: `Nest.step`, `Nest.cstep` (`NestMain.lean`, `Regions.lean`) |
 | Л5 | `Nest.nested` (`NestClose.lean`); in every reached configuration: `reach_nest`, `Nest.live` (`Regions.lean`) |
+| §2.7 obligations `{Provided {S} ϱ}`, uses of a service of a `provide` | `Elem.ob`, `Elem.need`; `Row.obs` in `Const.ty` of `spawn`/`addFin` (`Syntax.lean`); `Row.withP`, `Row.disch`, `Row.needs` in `Typ.with_`, `Typ.scope`, `Typ.inside`, `Typ.provideL`/`provideE` (`Rules.lean`) |
+| the region of `provide`; a service of an ended `provide` | `RHead.provideEnv`, `Tm.with_ q θ e`, the premise `Live Λ q` of `Step.askWith` (`Semantics.lean`); `DeadAsk` (`StepFrame.lean`) |
+| runtime.md §3.5: a child and a finalizer keep the `with` frames | `withs`, `Step.spawn`, `Step.addFin` (`Semantics.lean`); their typing `withs_typing`, `fin_await` (`KidTy.lean`) |
+| an `inside` form is younger than the `with` frames around it | `Tm.Asc`, `CfgAsc`, `Step.asc` (`Asc.lean`, `AscStep.lean`) |
 | T4.1, T4.2 | `T4` (`Regions.lean`) |
 | T1 with `op_H` | `T1_regions` (`Regions.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
@@ -252,6 +257,20 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     drops one, and only `scope` and closing change them. T4.2 is stated for every
     reached configuration (live work reaches only live regions), which after a step
     that closes `π` says that nothing that can step reaches `π`.
+21. **Obligations of `provide` (regions.md §2.7) are row elements.** `Provided {S} ϱ` is
+    an element `ob S ϱ` of a row of services; `Fiber.spawn` and `Scope.add_finalizer`
+    put one for each service of the work into the stage of the call (`Row.obs`). A
+    `provide` in a program binds no region variable: an obligation about a region
+    created in its body is discharged at the end of that region (`Row.disch`, the second
+    case of §2.7, `S` coming from outside it), and one that reaches a `provide` giving `S`
+    is rejected, which is the first case. An obligation not discharged stays in the row
+    of the stage and of the arrows that carry it, which is the deferred element and the
+    given `Provided` of a signature. At run time a `with` frame carries the region of its
+    `provide`, records the uses `need S q` of its services and discharges an obligation
+    when its region is older (`Row.withP`). A child and a finalizer keep the `with` frames
+    of the place that registered them (`withs`); asking a service of an ended `provide`
+    is stuck (`DeadAsk`). Typing a new child needs `Tm.Asc`: a region is younger than the
+    `with` frames around its `inside` form.
 
 ## Findings
 

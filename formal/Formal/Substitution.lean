@@ -280,8 +280,8 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ hσ
     exact .hguard hp (ih₁ (SubOk.lift hσ _ (by simpa using hp.binds)))
       (ih₂ (SubOk.lift hσ _ (by simpa using hp.binds))) (ih₃ hσ) hH
-  | provideL _ _ h₁ h₂ ih₁ ih₂ => intro _ _ hσ; exact .provideL (ih₁ hσ) (ih₂ hσ) h₁ h₂
-  | provideE _ _ h₁ h₂ ih₁ ih₂ => intro _ _ hσ; exact .provideE (ih₁ hσ) (ih₂ hσ) h₁ h₂
+  | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ _ hσ; exact .provideL (ih₁ hσ) (ih₂ hσ) h₁ h₀ h₂
+  | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ _ hσ; exact .provideE (ih₁ hσ) (ih₂ hσ) h₁ h₀ h₂
   | with_ hv _ _ h₁ h₂ ih₁ ih₂ =>
     intro _ _ hσ; exact .with_ hv.subst (ih₁ hσ) (ih₂ hσ) h₁ h₂
   | enil hρ => intro _ _ _; exact .enil hρ

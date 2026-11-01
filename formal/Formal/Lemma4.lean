@@ -50,7 +50,7 @@ theorem lemma_6 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] F
       ∀ {c'}, CSteps root c c' → ∃ X, CfgTy S (Ψ ++ X) c' t φ₀ := by
   obtain ⟨Ψ, hc⟩ := steps_typed hroot hs ht hφ (CfgTy.init h₀ hp)
   simp only [List.nil_append] at hc
-  exact ⟨Ψ, hc, fun u hu _ hle => (hc.2.2.2.2 u hu).mono hle,
+  exact ⟨Ψ, hc, fun u hu _ hle => (hc.2.2.2.2.1 u hu).mono hle,
     fun hs' => steps_typed hroot hs' ht hφ hc⟩
 
 end Flick

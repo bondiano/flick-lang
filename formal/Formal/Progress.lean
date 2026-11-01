@@ -59,7 +59,7 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
   have step : ∀ {l o}, Step root l Λ μ (.app f e) o → Value (.app f e) ∨ NV root Λ μ (.app f e) φ.svc :=
     fun h => .inr (.inr (.inl ⟨_, _, h⟩))
   have blocked : Blocks Λ (.app f e) → Value (.app f e) ∨ NV root Λ μ (.app f e) φ.svc :=
-    fun h => .inr (.inr (.inr (.inr ⟨[], _, OkE.nil, rfl, h⟩)))
+    fun h => .inr (.inr (.inr (.inr (.inl ⟨[], _, OkE.nil, rfl, h⟩))))
   rcases canonical_arrow hvf hf with ⟨b, rfl⟩ | ⟨g, rfl⟩ | ⟨K, hK⟩ | ⟨c, rfl⟩ |
       ⟨c, w, rfl, hc, hw⟩
   · exact step (Step.ofP (.beta hve))
@@ -123,7 +123,7 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
           cases h; cases la
           obtain ⟨p, rfl, -⟩ := canonical_owner hw hw'
           rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
-          · exact step (Step.ofR (.addFin hg hl hve))
+          · exact step (Step.addFin (E := []) OkE.nil hg hl hve)
           · exact blocked (.inr ⟨p, hd, .inr (.inr (.inl ⟨_, rfl⟩))⟩)
     | spawn =>
       cases hf with
@@ -134,7 +134,7 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
           cases h; cases la
           obtain ⟨p, rfl, -⟩ := canonical_owner hw hw'
           rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
-          · exact step (Step.ofR (.spawn hg hl hve))
+          · exact step (Step.spawn (E := []) OkE.nil hg hl hve)
           · exact blocked (.inr ⟨p, hd, .inr (.inr (.inr (.inl ⟨_, rfl⟩)))⟩)
     | _ => simp [Const.arity] at hc
 

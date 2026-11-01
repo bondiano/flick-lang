@@ -25,7 +25,7 @@ def kill (n : Nat) : Atom → Ty
 def Ty.YF (n : Nat) (t : Ty) : Prop := t.substT (kill n) = t
 
 /-- A term writes only regions `< n`. -/
-def Tm.Below (n : Nat) (e : Tm) : Prop := ∀ p, e.Has (.rgn p) → p < n
+def Tm.Below (n : Nat) (e : Tm) : Prop := ∀ p, (e.Has (.rgn p) ∨ e.Has (.prov p)) → p < n
 
 theorem kill_reach {n : Nat} {b a : Atom} (h : (kill n b).reach a) : a = b ∧ ∀ p, a = .r p → p < n := by
   cases b with
@@ -36,8 +36,18 @@ theorem kill_reach {n : Nat} {b a : Atom} (h : (kill n b).reach a) : a = b ∧ �
     · simp at h; subst h; exact ⟨rfl, fun p hp => by cases hp; assumption⟩
     · simp [Ty.reach, Caps.none] at h
 
+theorem kill_atom (n : Nat) (b a : Atom) (h : (kill n b).reach a) : kill n b = a.ty := by
+  obtain ⟨rfl, -⟩ := kill_reach h
+  cases a with
+  | v i => rfl
+  | r q =>
+    by_cases hq : q < n
+    · simp [kill, hq, Atom.ty]
+    · simp [kill, hq, Ty.reach, Caps.none] at h
+
 theorem Fits.kill {n : Nat} {e : Tm} (h : e.Below n) : Fits (kill n) e :=
-  ⟨fun p hp => by simp [Flick.kill, h p hp], fun _ b _ hb => (kill_reach hb).1.symm⟩
+  ⟨fun p hp => by simp [Flick.kill, h p hp], fun _ b _ hb => (kill_reach hb).1.symm,
+    fun _ b a hb => kill_atom n b a hb⟩
 
 theorem Ty.reach_kill {n : Nat} {t : Ty} {p : Nat} (h : (t.substT (kill n)).reach (.r p)) : p < n := by
   obtain ⟨b, _, hb⟩ := (Ty.reach_substT _ _ _).mp h

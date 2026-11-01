@@ -129,7 +129,7 @@ theorem Nest.close {c : Cfg} {home i E π w g} (hn : Nest Ψ c anc B home)
     split at he'
     · subst i'; cases he'
       refine ⟨hWE.fill hw', fun q hq => ?_⟩
-      have hq' := (hWE.frames_iff hwn).mp hq
+      have hq' := (hWE.frames_iff hwn.frame).mp hq
       have hqπ : q ≠ π := fun h => hπH (holeE_iff.mpr (.inr (h ▸ hq')))
       obtain ⟨h₁, h₂⟩ := (hn.thread i _ hi).2 q (plug_frame hq')
       exact ⟨h₁, (hlive q).mpr ⟨h₂, hqπ⟩⟩

@@ -21,6 +21,9 @@ structure Rgn where
 
 def Rgn.new : Rgn := ⟨true, [], []⟩
 
+/-- A live region. -/
+def Live (Λ : List Rgn) (p : Nat) : Prop := ∃ g, Λ[p]? = some g ∧ g.live = true
+
 /-- A finished computation: a value or `raise v`. -/
 def Final (e : Tm) : Prop := Value e ∨ ∃ v, Value v ∧ e = .raise v
 
@@ -41,7 +44,7 @@ inductive Frame
   | bind (S : Name)
   | joinL (e : Tm)
   | joinR (v : Tm)
-  | with_ (θ : Tm)
+  | with_ (q : Nat) (θ : Tm)
   | raise
   | inside (p : Nat)
 
@@ -61,13 +64,13 @@ def Frame.plug : Frame → Tm → Tm
   | .bind S, e => .bind S e
   | .joinL b, e => .join e b
   | .joinR v, e => .join v e
-  | .with_ θ, e => .with_ θ e
+  | .with_ q θ, e => .with_ q θ e
   | .raise, e => .raise e
   | .inside p, e => .inside p e
 
 /-- Left-to-right order: a frame to the right of a value needs the value. -/
 def Frame.ok : Frame → Prop
-  | .appR v | .rconsR _ v | .updR v _ | .joinR v | .with_ v => Value v
+  | .appR v | .rconsR _ v | .updR v _ | .joinR v | .with_ _ v => Value v
   | _ => True
 
 def Frame.isTry : Frame → Prop
@@ -79,10 +82,15 @@ def Frame.isInside : Frame → Prop
   | .inside _ => True
   | _ => False
 
-/-- The service a `with θ` frame provides. -/
-def Frame.lookup : Frame → Name → Option Tm
-  | .with_ θ, S => θ.envLookup S
+/-- The service a `with` frame provides, with the region of its `provide`. -/
+def Frame.lookup : Frame → Name → Option (Nat × Tm)
+  | .with_ q θ, S => (θ.envLookup S).map (q, ·)
   | _, _ => none
+
+/-- A `with` frame of a context kept around a child or a finalizer it registers. -/
+def Frame.wrap : Frame → Tm → Tm
+  | .with_ q θ, e => .with_ q θ e
+  | _, e => e
 
 /-- `E[e]`; the list starts at the innermost frame. -/
 def plug : List Frame → Tm → Tm
@@ -90,11 +98,17 @@ def plug : List Frame → Tm → Tm
   | F :: E, e => plug E (F.plug e)
 
 /-- `lookup(E, S)` of core.md §3.2 without the fallback to `Σ₀`. -/
-def lookupE : List Frame → Name → Option Tm
+def lookupE : List Frame → Name → Option (Nat × Tm)
   | [], _ => none
   | F :: E, S => match F.lookup S with
     | some v => some v
     | none => lookupE E S
+
+/-- The `with` frames of a context around a term: the environment a child or a
+finalizer inherits from where it is registered (runtime.md §3.5). -/
+def withs : List Frame → Tm → Tm
+  | [], e => e
+  | F :: E, e => withs E (F.wrap e)
 
 /-- Pure steps `→ₚ` of core.md §3.3, with `bind` and `join` (Р101). -/
 inductive PHead : Tm → Tm → Prop
@@ -113,7 +127,7 @@ inductive PHead : Tm → Tm → Prop
             (.acons (.lit (.bool false)) (.match_ v r) .anil)))
   | guardNo : Value v → matchP p v = none → PHead (.match_ v (.aguard p g b r)) (.match_ v r)
   | tryVal : Value v → PHead (.try_ v A) v
-  | withVal : Value v → PHead (.with_ θ v) v
+  | withVal : Value v → PHead (.with_ q θ v) v
   | bind : Value v → PHead (.bind S v) (.econs S v .enil)
   | join : IsEnv θ₁ → IsEnv θ₂ → PHead (.join θ₁ θ₂) (θ₁.envAppend θ₂)
 
@@ -132,7 +146,8 @@ inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm �
       RHead Λ μ (.app (.app (.const .refSet) (.loc l)) v) Λ (μ.set l v) (.lit .unit)
   | await : RHead Λ μ (.await (.task e)) Λ μ e
   | build : Value v → v.build = some b → RHead Λ μ (.provide v e) Λ μ (.provide b e)
-  | provideEnv : IsEnv θ → RHead Λ μ (.provide θ e) Λ μ (.with_ θ e)
+  | provideEnv : IsEnv θ → RHead Λ μ (.provide θ e) (Λ ++ [Rgn.new]) μ
+      (.inside Λ.length (.with_ Λ.length θ e))
   | tryRaise : Value v → RHead Λ μ (.try_ (.raise v) A) Λ μ (.handle v A)
   | handleYes : Value v → matchP p v = some δ →
       RHead Λ μ (.handle v (.acons p b r)) Λ μ (b.subst (inst δ))
@@ -153,12 +168,6 @@ inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm �
         (setRgn Λ p ⟨g.live, g.kids, g.fins ++ [.app (.const .op) (.cap p)]⟩) μ (.cap p)
   | op : Λ[p]? = some g → g.live = true →
       RHead Λ μ (.app (.const .op) (.cap p)) Λ μ (.lit .unit)
-  | addFin : Λ[p]? = some g → g.live = true → Value t →
-      RHead Λ μ (.app (.app (.const .addFin) (.own p)) t)
-        (setRgn Λ p ⟨g.live, g.kids, g.fins ++ [.await t]⟩) μ (.lit .unit)
-  | spawn : Λ[p]? = some g → g.live = true → Value t →
-      RHead Λ μ (.app (.app (.const .spawn) (.own p)) t)
-        (setRgn Λ p ⟨g.live, g.kids ++ [.await t], g.fins⟩) μ (.lit .unit)
   | finRun {fs : List Tm} : Λ[p]? = some g → g.live = true → Final w → (∀ k ∈ g.kids, Final k) →
       g.fins = fs ++ [f] →
       RHead Λ μ (.inside p w) (setRgn Λ p ⟨g.live, g.kids ++ [f], fs⟩) μ (.inside p w)
@@ -183,8 +192,14 @@ def OkE (E : List Frame) : Prop := ∀ F ∈ E, Frame.ok F
 inductive Step (root : Name → Option Tm) : Lbl → List Rgn → List Tm → Tm → Out → Prop
   | pure : OkE E → PHead e e' → Step root .pure Λ μ (plug E e) (.cfg Λ μ (plug E e'))
   | rt : OkE E → RHead Λ μ e Λ' μ' e' → Step root .rt Λ μ (plug E e) (.cfg Λ' μ' (plug E e'))
-  | askWith : OkE E → lookupE E S = some v →
+  | askWith : OkE E → lookupE E S = some (q, v) → Live Λ q →
       Step root .rt Λ μ (plug E (.app (.const (.ask S)) (.lit .unit))) (.cfg Λ μ (plug E v))
+  | addFin : OkE E → Λ[p]? = some g → g.live = true → Value t →
+      Step root .rt Λ μ (plug E (.app (.app (.const .addFin) (.own p)) t))
+        (.cfg (setRgn Λ p ⟨g.live, g.kids, g.fins ++ [withs E (.await t)]⟩) μ (plug E (.lit .unit)))
+  | spawn : OkE E → Λ[p]? = some g → g.live = true → Value t →
+      Step root .rt Λ μ (plug E (.app (.app (.const .spawn) (.own p)) t))
+        (.cfg (setRgn Λ p ⟨g.live, g.kids ++ [withs E (.await t)], g.fins⟩) μ (plug E (.lit .unit)))
   | askRoot : OkE E → lookupE E S = none → root S = some v →
       Step root (.root S) Λ μ (plug E (.app (.const (.ask S)) (.lit .unit)))
         (.cfg Λ μ (plug E v))

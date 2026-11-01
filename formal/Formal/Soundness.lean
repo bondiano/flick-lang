@@ -1,4 +1,4 @@
-import Formal.BelowStep
+import Formal.AscStep
 
 /-!
 # T1: type safety (core.md §4) with regions
@@ -78,6 +78,7 @@ theorem rgs_preservation {Ψ Θ Λ μ r t φ Λ' μ' r'} (hΛ : RgsTy S Ψ Λ)
     fun ⟨t, φ, h⟩ => ⟨t, φ, h.cut hout⟩
   cases hh with
   | scope => exact hΛ.append
+  | provideEnv => exact hΛ.append
   | open_ hg =>
     refine hΛ.set hg (fun k hk => .inl hk) fun f hf => ?_
     rcases List.mem_append.mp hf with hf | hf
@@ -85,20 +86,6 @@ theorem rgs_preservation {Ψ Θ Λ μ r t φ Λ' μ' r'} (hΛ : RgsTy S Ψ Λ)
     · simp at hf; subst hf
       exact .inr ⟨_, .rt Row.none Row.none, .app (.const (ι := { (default : CArg) with s := .rg _ })
         trivial .refl) .cap (Stage.le_refl _) .refl⟩
-  | addFin hg _ hv =>
-    refine hΛ.set hg (fun k hk => .inl hk) fun f hf => ?_
-    rcases List.mem_append.mp hf with hf | hf
-    · exact .inl hf
-    · simp at hf; subst hf
-      exact .inr (let ⟨t, φ, h⟩ := await_arg h hv fun _ => ⟨_, _, _, _, _, _, _, _, rfl⟩
-        ⟨t, φ, h.cut hout⟩)
-  | spawn hg _ hv =>
-    refine hΛ.set hg (fun k hk => ?_) fun f hf => .inl hf
-    rcases List.mem_append.mp hk with hk | hk
-    · exact .inl hk
-    · simp at hk; subst hk
-      exact .inr (let ⟨t, φ, h⟩ := await_arg h hv fun _ => ⟨_, _, _, _, _, _, _, _, rfl⟩
-        ⟨t, φ, h.cut hout⟩)
   | finRun hg _ _ _ hf =>
     obtain ⟨_, hf₀⟩ := hΛ _ _ hg
     refine hΛ.set hg (fun k hk => ?_) fun f hf' => .inl (by rw [hf]; exact List.mem_append_left _ hf')
@@ -111,8 +98,26 @@ theorem rgs_preservation {Ψ Θ Λ μ r t φ Λ' μ' r'} (hΛ : RgsTy S Ψ Λ)
 /-- A step of one thread keeps the regions typed. -/
 theorem step_rgs {root Ψ Λ μ e t φ l Λ' μ' e'} (hΛ : RgsTy S Ψ Λ)
     (h : Typ S Ψ Facts.age [] e (.ex t φ)) (hbl : e.Below Λ.length) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
-    (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : RgsTy S Ψ Λ' := by
+    (ha : e.Asc 0) (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : RgsTy S Ψ Λ' := by
+  have kid : ∀ {E c p w}, OkE E → e = plug E (.app (.app (.const c) (.own p)) w) →
+      (c = .addFin ∨ c = .spawn) → Value w → ∃ t φ, Typ S Ψ Facts.age [] (withs E (.await w)) (.ex t φ) := by
+    intro E c p w hE he hc hv
+    subst he
+    obtain ⟨hA, -⟩ := asc_of_plug (fin_not_value hc) hE ha
+    obtain ⟨t', R', ε', hk, -⟩ := withs_typing (fun h' hΘ => fin_await h' hc hΘ hv)
+      (fun h' => fin_not_pure h' hc) (fin_not_value hc) _ hE h (Entails.refl _) hA
+    exact ⟨_, _, hk⟩
   cases hs with
+  | addFin hE hg _ hv =>
+    refine hΛ.set hg (fun k hk => .inl hk) fun f hf => ?_
+    rcases List.mem_append.mp hf with hf | hf
+    · exact .inl hf
+    · simp at hf; subst hf; exact .inr (kid hE rfl (.inl rfl) hv)
+  | spawn hE hg _ hv =>
+    refine hΛ.set hg (fun k hk => ?_) fun f hf => .inl hf
+    rcases List.mem_append.mp hk with hk | hk
+    · exact .inl hk
+    · simp at hk; subst hk; exact .inr (kid hE rfl (.inr rfl) hv)
   | rt hE hh =>
     obtain ⟨K, Θ', _, _, hr, _, hK, _⟩ := ctx_typing _ hE hh.not_value h
     obtain ⟨rfl, hΘ, -⟩ := hK.resolve_left fun hp => by subst hp; exact hh.not_pure hr
@@ -143,7 +148,7 @@ children and finalizers are typed with the facts of creation, every term writes
 only regions that exist, and the store typing names none that does not. -/
 def CfgTy (S : Sig) (Ψ : List Ty) (c : Cfg) (t : Ty) (φ : Stage) : Prop :=
   StoreTy S Ψ c.mem ∧ Typ S Ψ Facts.age [] c.main (.ex t φ) ∧ RgsTy S Ψ c.rgs ∧
-    CfgBelow c.rgs c.mem c.main ∧ ∀ u ∈ Ψ, u.YF c.rgs.length
+    CfgBelow c.rgs c.mem c.main ∧ (∀ u ∈ Ψ, u.YF c.rgs.length) ∧ CfgAsc c.rgs c.mem c.main
 
 theorem setKid_get {Λ : List Rgn} {p j k q g} (h : (setKid Λ p j k)[q]? = some g) :
     ∃ g₀, Λ[q]? = some g₀ ∧ (q = p → g = ⟨g₀.live, g₀.kids.set j k, g₀.fins⟩) ∧ (q ≠ p → g = g₀) := by
@@ -176,6 +181,21 @@ theorem RgsTy.setKid {Ψ Λ p j k} (h : RgsTy S Ψ Λ) (hk : ∃ t φ, Typ S Ψ 
 theorem setKid_length (Λ : List Rgn) (p j : Nat) (k : Tm) : (setKid Λ p j k).length = Λ.length := by
   unfold setKid; split <;> simp [setRgn]
 
+theorem CfgAsc.setKid {Λ μ e p j k} (h : CfgAsc Λ μ e) (hk : k.Asc 0) :
+    CfgAsc (setKid Λ p j k) μ e := by
+  refine ⟨h.main, fun q g hq k' hk' => ?_, h.mem⟩
+  obtain ⟨g₀, hg₀, h₁, h₂⟩ := setKid_get hq
+  by_cases hqp : q = p
+  · rw [h₁ hqp] at hk'
+    rcases List.mem_append.mp hk' with hk' | hk'
+    · obtain ⟨i, hi, rfl⟩ := List.getElem_of_mem hk'
+      rw [List.getElem_set]
+      split
+      · exact hk
+      · exact h.rgs q g₀ hg₀ _ (List.mem_append_left _ (List.getElem_mem _))
+    · exact h.rgs q g₀ hg₀ _ (List.mem_append_right _ hk')
+  · rw [h₂ hqp] at hk'; exact h.rgs q g₀ hg₀ k' hk'
+
 theorem CfgBelow.kid {Λ μ e p j k} (h : CfgBelow Λ μ e) (hk : k.Below Λ.length) :
     CfgBelow (setKid Λ p j k) μ e := by
   have hl := setKid_length Λ p j k
@@ -199,13 +219,14 @@ program name no run-time region. -/
 theorem cstep_typed {root Ψ c c' t φ l} (hroot : RootTy S root) (ht : t.YF 0)
     (hφ : φ.substT (kill 0) = φ) (hc : CfgTy S Ψ c t φ) (hs : CStep root l c c') :
     ∃ X, CfgTy S (Ψ ++ X) c' t φ := by
-  obtain ⟨hμ, h, hΛ, hb, hΨ⟩ := hc
+  obtain ⟨hμ, h, hΛ, hb, hΨ, ha⟩ := hc
   cases hs with
   | main hs =>
     obtain ⟨X, hμ', h', hX⟩ := preservation hroot h hμ hb.main hb.mem hΨ hs
     obtain ⟨hb', hl⟩ := hs.below hroot hb
+    obtain ⟨ha', hka⟩ := hs.asc hroot ha hb.main
     rw [ht.mono (Nat.zero_le _), Stage.YF_mono hφ (Nat.zero_le _)] at h'
-    refine ⟨X, hμ', h', (step_rgs hΛ h hb.main hΨ hs).weaken X, hb', fun u hu => ?_⟩
+    refine ⟨X, hμ', h', (step_rgs hΛ h hb.main hΨ ha.main hs).weaken X, hb', fun u hu => ?_, hka _ ha'⟩
     rcases List.mem_append.mp hu with hu | hu
     · exact (hΨ u hu).mono hl
     · exact (hX u hu).mono hl
@@ -213,10 +234,13 @@ theorem cstep_typed {root Ψ c c' t φ l} (hroot : RootTy S root) (ht : t.YF 0)
     have hkm := List.mem_of_getElem? hj
     obtain ⟨t', φ', hk⟩ := (hΛ _ _ hg).1 _ hkm
     have hkb := (hb.rgs _ _ hg).1 _ hkm
+    have hkA := ha.rgs _ _ hg _ (List.mem_append_left _ hkm)
     obtain ⟨X, hμ', hk', hX⟩ := preservation hroot hk hμ hkb hb.mem hΨ hs
     obtain ⟨hb', hl⟩ := hs.below hroot ⟨hkb, hb.mem, hb.rgs⟩
-    refine ⟨X, hμ', h.weakenStore X, ((step_rgs hΛ hk hkb hΨ hs).weaken X).setKid ⟨_, _, hk'⟩,
-      CfgBelow.kid ⟨hb.main.mono hl, hb'.mem, hb'.rgs⟩ hb'.main, fun u hu => ?_⟩
+    obtain ⟨ha', hka⟩ := hs.asc hroot ⟨hkA, ha.rgs, ha.mem⟩ hkb
+    refine ⟨X, hμ', h.weakenStore X, ((step_rgs hΛ hk hkb hΨ hkA hs).weaken X).setKid ⟨_, _, hk'⟩,
+      CfgBelow.kid ⟨hb.main.mono hl, hb'.mem, hb'.rgs⟩ hb'.main, fun u hu => ?_,
+      (hka _ ha.main).setKid ha'⟩
     rw [setKid_length]
     rcases List.mem_append.mp hu with hu | hu
     · exact (hΨ u hu).mono hl
@@ -244,7 +268,8 @@ theorem raise_errors {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v
 theorem CfgTy.init {e₀ t φ₀} (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀)) (hb : e₀.Below 0) :
     CfgTy S [] ⟨[], [], e₀⟩ t φ₀ :=
   ⟨⟨rfl, by simp⟩, h₀.cut (Entails.none _), fun _ _ h => by simp at h,
-    ⟨hb, fun _ _ h => by simp at h, fun _ _ h => by simp at h⟩, by simp⟩
+    ⟨hb, fun _ _ h => by simp at h, fun _ _ h => by simp at h⟩, by simp,
+    ⟨Tm.Asc.of_noIns hb.noIns, fun _ _ h => by simp at h, fun _ _ h => by simp at h⟩⟩
 
 /-- **T1.** A program `· ⊢ e₀ : τ ! φ₀` (a term without run-time regions, at a type and
 a stage without them) whose services `Σ₀` provides (Г3) reaches

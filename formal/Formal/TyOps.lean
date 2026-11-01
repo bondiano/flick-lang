@@ -85,7 +85,7 @@ theorem Row.substT_comp (r : Row) (σ σ' : Atom → Ty) :
   funext x; apply propext
   cases x with
   | nm => rfl
-  | atm a =>
+  | atm a | ob _ a | need _ a =>
     simp only [Row.substT, Ty.reach_substT]
     constructor
     · rintro ⟨b, ⟨c, hc, hb⟩, h⟩; exact ⟨c, hc, b, hb, h⟩
@@ -126,7 +126,7 @@ theorem Row.Sub.substT {r r' : Row} (σ : Atom → Ty) (h : Row.Sub r r') :
   intro x hx
   cases x with
   | nm => exact h _ hx
-  | atm a => obtain ⟨b, hb, h'⟩ := hx; exact ⟨b, h _ hb, h'⟩
+  | atm a | ob _ a | need _ a => obtain ⟨b, hb, h'⟩ := hx; exact ⟨b, h _ hb, h'⟩
 
 theorem Stage.le_substT {φ φ' : Stage} (σ : Atom → Ty) (h : φ.le φ') :
     (φ.substT σ).le (φ'.substT σ) := by
@@ -145,7 +145,7 @@ theorem Stage.le_substT {φ φ' : Stage} (σ : Atom → Ty) (h : φ.le φ') :
   funext x; apply propext
   cases x with
   | nm => rfl
-  | atm a =>
+  | atm a | ob _ a | need _ a =>
     simp only [Row.substT, Row.union]
     constructor
     · rintro ⟨b, hb | hb, h⟩
@@ -295,6 +295,17 @@ def CArg.substT (σ : Atom → Ty) (ι : CArg) : CArg :=
 
 theorem Ty.reach_caps (s : Ty) (σ : Atom → Ty) : s.reach.substT σ = (s.substT σ).reach := by
   funext a; apply propext; simp [Caps.substT, Ty.reach_substT]
+
+@[simp] theorem Row.obs_substT (σ : Atom → Ty) (r : Row) (s : Ty) :
+    (r.obs s).substT σ = (r.substT σ).obs (s.substT σ) := by
+  funext x; apply propext
+  cases x with
+  | ob n a =>
+    simp only [Row.substT, Row.obs, Ty.reach_substT]
+    constructor
+    · rintro ⟨b, ⟨h₁, h₂⟩, h₃⟩; exact ⟨h₁, b, h₂, h₃⟩
+    · rintro ⟨h₁, b, h₂, h₃⟩; exact ⟨b, ⟨h₁, h₂⟩, h₃⟩
+  | _ => simp [Row.substT, Row.obs]
 
 theorem Const.ty_substT (S : Sig) (c : Const) (ι : CArg) (σ : Atom → Ty) :
     (c.ty S ι).substT σ = c.ty S (ι.substT σ) := by

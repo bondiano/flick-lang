@@ -26,6 +26,38 @@ inductive J
   | alts (t t' : Ty) (φ : Stage)
   | halts (ε₀ H : Row) (t : Ty) (φ : Stage)
 
+/-- What a `with` frame of the `provide` region `q` with the services `ρ` gives its
+body (regions.md §2.7): the frame answers a service of `ρ`, and the row outside records
+the use `need N q`; it discharges an obligation `Provided {N} ϱ` for a service of `ρ`
+when `q` outlives `ϱ`; everything else comes from outside. -/
+def Row.withP (Θ : Facts) (q : Nat) (ρ r : Row) : Row
+  | .nm N => (ρ (.nm N) → r (.need N (.r q))) ∧ (¬ ρ (.nm N) → r (.nm N))
+  | .ob N a => (ρ (.nm N) → Outl Θ (· = .r q) a.ty) ∧ (¬ ρ (.nm N) → r (.ob N a))
+  | x => r x
+
+/-- The obligations `Provided {N} a` that the end of the region `a` discharges: `N` comes
+from outside the region, whose provider outlives it (regions.md §2.7, second case). -/
+def Row.disch (a : Atom) (r : Row) : Row
+  | .ob N b => b = a ∧ r (.nm N)
+  | _ => False
+
+/-- The uses of the services of the `provide` region `a`. -/
+def Row.needs (a : Atom) : Row
+  | .need _ b => b = a
+  | _ => False
+
+theorem Stage.le_rt_sub {φ : Stage} {r r' ε : Row} (h : φ.le (.rt r ε)) (hr : Row.Sub r r') :
+    φ.le (.rt r' ε) := by
+  cases φ with
+  | pure => trivial
+  | rt r₀ e₀ => exact ⟨fun n hn => hr n (h.1 n hn), h.2⟩
+
+theorem Stage.le_of_svc {φ : Stage} {r r' ε : Row} (h : φ.le (.rt r ε)) (hr : ∀ x, φ.svc x → r' x) :
+    φ.le (.rt r' ε) := by
+  cases φ with
+  | pure => trivial
+  | rt r₀ e₀ => exact ⟨hr, h.2⟩
+
 variable (S : Sig)
 
 inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
@@ -93,12 +125,13 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ (Δ.map .mono ++ Γ) b (.ex t φ) → Typ Ψ Θ Γ r (.halts ε₀ H' t φ) → Row.Sub H H' →
       Typ Ψ Θ Γ (.aguard p g b r) (.halts ε₀ H t φ)
   | provideL : Typ Ψ Θ Γ l (.ex (.layer i ε₂ o) φ) → Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.union o r) ε) → (Stage.rt (Row.union i r) (Row.union ε₂ ε)).le φ →
-      Typ Ψ Θ Γ (.provide l e) (.ex t φ)
+      φ₀.le (.rt (Row.union o r) ε) → (∀ N a, φ₀.svc (.ob N a) → ¬ o (.nm N)) →
+      (Stage.rt (Row.union i r) (Row.union ε₂ ε)).le φ → Typ Ψ Θ Γ (.provide l e) (.ex t φ)
   | provideE : Typ Ψ Θ Γ l (.ex (.env o) φ) → Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.union o r) ε) → (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.provide l e) (.ex t φ)
+      φ₀.le (.rt (Row.union o r) ε) → (∀ N a, φ₀.svc (.ob N a) → ¬ o (.nm N)) →
+      (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.provide l e) (.ex t φ)
   | with_ : Value θ → Typ Ψ Θ Γ θ (.ex (.env ρ) .pure) → Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.union ρ r) ε) → (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.with_ θ e) (.ex t φ)
+      φ₀.le (.rt (Row.withP Θ q ρ r) ε) → (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.with_ q θ e) (.ex t φ)
   | enil : (∀ n, ¬ ρ n) → Typ Ψ Θ Γ .enil (.ex (.env ρ) φ)
   | econs : Value v → IsEnv θ → Typ Ψ Θ Γ v (.ex (S.impl N) φ) → Typ Ψ Θ Γ θ (.ex (.env ρ) φ) →
       (∀ n, ρ' n → n = .nm N ∨ ρ n) → Typ Ψ Θ Γ (.econs N v θ) (.ex (.env ρ') φ)
@@ -109,10 +142,12 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | scope : e.NoIns → (∀ C s, F C s → s = .tvar 0 ∧ ¬ C (.v 0)) →
       Typ (Ψ.map (Ty.up 1)) (Facts.union (Θ.substT (shiftV 1)) F)
         (.mono (.owner (.tvar 0)) :: Γ.map (Scheme.up 1)) e (.ex (t.up 1) φ') →
-      φ'.le (.rt (Row.union (Row.scope (.tvar 0)) (r.substT (shiftV 1))) (ε.substT (shiftV 1))) →
+      φ'.le (.rt (Row.union (Row.scope (.tvar 0))
+        (Row.union (r.substT (shiftV 1)) (Row.disch (.v 0) (r.substT (shiftV 1))))) (ε.substT (shiftV 1))) →
       (Stage.rt r ε).le φ → Le t T → Typ Ψ Θ Γ (.scope e) (.ex T φ)
   | inside : (∀ C s, F C s → s = .rg p ∧ ∀ q, C (.r q) → q < p) →
-      Typ Ψ (Facts.union Θ F) Γ e (.ex t φ') → φ'.le (.rt (Row.union (Row.scope (.rg p)) r) ε) →
+      Typ Ψ (Facts.union Θ F) Γ e (.ex t φ') →
+      φ'.le (.rt (Row.union (Row.scope (.rg p)) (Row.union r (Row.union (Row.disch (.r p) r) (Row.needs (.r p))))) ε) →
       ¬ t.reach (.r p) → ¬ ε (.atm (.r p)) → (Stage.rt r ε).le φ → Le t T →
       Typ Ψ Θ Γ (.inside p e) (.ex T φ)
   | cap : Typ Ψ Θ Γ (.cap p) (.ex (.hnd (.rg p)) φ)

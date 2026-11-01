@@ -52,7 +52,7 @@ structure Nest (Ψ : List Ty) (c : Cfg) (anc B : Nat → Nat → Prop)
     ∀ q, e.Has (.frame q) → home q = i ∧ Live c.rgs q
   home : ∀ q, Live c.rgs q → ∃ e, c.at (home q) = some e ∧ e.Has (.frame q)
   fins : ∀ (r : Nat) (g : Rgn), c.rgs[r]? = some g → g.live = true → ∀ f ∈ g.fins,
-    f.Within Ψ B anc (anc r) ∧ f.NoIns
+    f.Within Ψ B anc (anc r) ∧ ∀ q, ¬ f.Has (.frame q)
   cells : ∀ (l : Nat) (v : Tm), c.mem[l]? = some v → v.Within Ψ B anc (B l) ∧ v.NoIns
 
 theorem Cfg.at_some {c : Cfg} {r j : Nat} {k : Tm} :
@@ -97,7 +97,7 @@ theorem Nest.reach_fin {Ψ c anc B home} {r : Nat} {g : Rgn} {f : Tm} {p : Nat} 
   obtain ⟨hw, hni⟩ := hn.fins r g hg hl f hf
   rcases hw.reaches hn.cells hr with h' | h'
   · exact hn.live r p ⟨g, hg, hl⟩ h'
-  · exact absurd h' (hni.frame _)
+  · exact absurd h' (hni _)
 
 /-- A thread does not use a region that is not live (T4.1). -/
 theorem Nest.not_dead {Ψ c anc B home i E r} (hn : Nest Ψ c anc B home) (h : c.at i = some (plug E r))
@@ -119,10 +119,7 @@ theorem Final.noIns {Ψ B anc A} {w : Tm} (hw : Final w) (h : w.Within Ψ B anc 
 /-- The program at the start. -/
 theorem Nest.init {Ψ e₀ t φ} (h : Typ S [] Facts.none [] e₀ (.ex t φ)) (hb : e₀.Below 0) :
     Nest Ψ ⟨[], [], e₀⟩ (fun q x => x = q) (fun _ _ => False) (fun _ => none) := by
-  have hn : e₀.NoIns := fun h' => by
-    obtain ⟨p, hp⟩ : ∃ p, e₀.Has (.rgn p) := by
-      clear h hb; induction e₀ <;> simp_all [Tm.Has] <;> grind
-    exact absurd (hb p hp) (Nat.not_lt_zero _)
+  have hn : e₀.NoIns := hb.noIns
   have none : ∀ q, ¬ Live [] q := fun q ⟨_, hg, _⟩ => by simp at hg
   refine ⟨fun _ => rfl, fun _ _ h => h ▸ Nat.le_refl _, fun q h => (none q h).elim,
     fun q _ h => (none q h).elim, fun i e hi => ?_, fun q h => (none q h).elim,
@@ -130,7 +127,7 @@ theorem Nest.init {Ψ e₀ t φ} (h : Typ S [] Facts.none [] e₀ (.ex t φ)) (h
   cases i with
   | none =>
     cases hi
-    exact ⟨Tm.Within.of_has hn (fun p hp => absurd (hb p hp) (Nat.not_lt_zero _))
+    exact ⟨Tm.Within.of_has hn (fun p hp => absurd (hb p (.inl hp)) (Nat.not_lt_zero _))
       (fun l hl => absurd (h.locs l hl) (Nat.not_lt_zero _)), fun q hq => (hn.frame q hq).elim⟩
   | some rj => obtain ⟨g, hg, -⟩ := Cfg.at_some.mp hi; simp at hg
 

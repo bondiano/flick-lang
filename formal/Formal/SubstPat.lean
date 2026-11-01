@@ -97,7 +97,7 @@ theorem Catches.substT {ε₀ : Row} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom
     · exact .inl (.inl ⟨rfl, h'⟩)
     · exact .inl (.inr ⟨rfl, h'⟩)
     · exact .inr h'
-  | atm a =>
+  | atm a | ob _ a | need _ a =>
     obtain ⟨b, hb, h'⟩ := hn
     rcases h _ hb with h | h
     · exact h.elim

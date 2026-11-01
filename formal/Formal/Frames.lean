@@ -30,10 +30,13 @@ theorem lookupE_append (E : List Frame) (F : Frame) (N : Name) :
   | nil => simp [lookupE]; cases F.lookup N <;> rfl
   | cons G E ih => simp only [List.cons_append, lookupE]; cases G.lookup N <;> simp [ih]
 
-/-- Services a frame provides: those of `with θ`, and `Scope π` of `inside π`. -/
+/-- Services a frame provides: those of `with θ`, and `Scope π` of `inside π`; the
+obligations it may discharge and the uses of a `provide` region it ends. -/
 def Frame.dom (F : Frame) : Row
   | .nm N => (F.lookup N).isSome
   | .atm a => ∃ p, F = .inside p ∧ a = .r p
+  | .ob N a => (F.lookup N).isSome ∨ ∃ p, F = .inside p ∧ a = .r p
+  | .need _ a => ∃ p, F = .inside p ∧ a = .r p
 
 /-- Services the frames of `E` provide. -/
 def domE : List Frame → Row

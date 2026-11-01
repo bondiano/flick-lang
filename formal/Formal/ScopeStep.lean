@@ -80,11 +80,13 @@ theorem scope_body {Ψ : List Ty} {Θ : Facts} {e : Tm} {t₀ : Ty} {φ' : Stage
     (hF : ∀ C s, F C s → s = .tvar 0 ∧ ¬ C (.v 0))
     (h : Typ S (Ψ.map (Ty.up 1)) (Facts.union (Θ.substT (shiftV 1)) F)
       (.mono (.owner (.tvar 0)) :: [].map (Scheme.up 1)) e (.ex (t₀.up 1) φ'))
-    (hφ' : φ'.le (.rt (Row.union (Row.scope (.tvar 0)) (r.substT (shiftV 1))) (ε.substT (shiftV 1))))
+    (hφ' : φ'.le (.rt (Row.union (Row.scope (.tvar 0))
+      (Row.union (r.substT (shiftV 1)) (Row.disch (.v 0) (r.substT (shiftV 1))))) (ε.substT (shiftV 1))))
     (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ) :
     ∃ F' φ₁, (∀ C s, F' C s → s = .rg n ∧ ∀ q, C (.r q) → q < n) ∧
       Typ S Ψ (Facts.union Θ F') [] (e.subst (inst [.own n])) (.ex (t₀.substT (kill n)) φ₁) ∧
-      φ₁.le (.rt (Row.union (Row.scope (.rg n)) (r.substT (kill n))) (ε.substT (kill n))) := by
+      φ₁.le (.rt (Row.union (Row.scope (.rg n))
+        (Row.union (r.substT (kill n)) (Row.disch (.r n) (r.substT (kill n))))) (ε.substT (kill n))) := by
   have hΨ' : Ψ.map (Ty.substT (kill n)) = Ψ := by
     conv => rhs; rw [← List.map_id Ψ]
     exact List.map_congr_left fun u hu => hΨ u hu
@@ -123,7 +125,11 @@ theorem scope_body {Ψ : List Ty} {Θ : Facts} {e : Tm} {t₀ : Ty} {φ' : Stage
       simp [Atom.up, instT] at hq'
       subst hq'; exact hlt _ rfl
   · have := Stage.le_substT (instT [.rg n]) (Stage.le_substT (liftT 1 (kill n)) hφ')
-    simpa [Stage.substT, Row.union_substT, Row.scope_substT, Row.up_comm, Row.up_inst, Ty.substT,
-      instT, liftT] using this
+    have d₁ := Row.disch_substT_eq (a := .v 0) (a' := .v 0) (r := r.substT (shiftV 1))
+      (σ := liftT 1 (kill n)) (fun x => by simp [liftT])
+    have d₂ := Row.disch_substT_eq (a := .v 0) (a' := .r n)
+      (r := (r.substT (kill n)).substT (shiftV 1)) (σ := instT [.rg n]) (fun x => by simp [instT])
+    simpa [Stage.substT, Row.union_substT, Row.scope_substT, Row.up_comm, d₁, d₂, Row.up_inst,
+      Ty.substT, instT, liftT] using this
 
 end Flick

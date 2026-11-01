@@ -119,8 +119,8 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | hnil hH => exact .hnil hH
   | hcons hp _ _ hH ih₁ ih₂ => exact .hcons hp (ih₁ X) (ih₂ X) hH
   | hguard hp _ _ _ hH ih₁ ih₂ ih₃ => exact .hguard hp (ih₁ X) (ih₂ X) (ih₃ X) hH
-  | provideL _ _ h₁ h₂ ih₁ ih₂ => exact .provideL (ih₁ X) (ih₂ X) h₁ h₂
-  | provideE _ _ h₁ h₂ ih₁ ih₂ => exact .provideE (ih₁ X) (ih₂ X) h₁ h₂
+  | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ => exact .provideL (ih₁ X) (ih₂ X) h₁ h₀ h₂
+  | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ => exact .provideE (ih₁ X) (ih₂ X) h₁ h₀ h₂
   | with_ hv _ _ h₁ h₂ ih₁ ih₂ => exact .with_ hv (ih₁ X) (ih₂ X) h₁ h₂
   | enil hρ => exact .enil hρ
   | econs hv hθ _ _ hρ ih₁ ih₂ => exact .econs hv hθ (ih₁ X) (ih₂ X) hρ
@@ -231,8 +231,8 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ hξ
     exact .hguard hp (ih₁ (hξ.lift _ (by simpa using hp.binds)))
       (ih₂ (hξ.lift _ (by simpa using hp.binds))) (ih₃ hξ) hH
-  | provideL _ _ h₁ h₂ ih₁ ih₂ => intro _ _ hξ; exact .provideL (ih₁ hξ) (ih₂ hξ) h₁ h₂
-  | provideE _ _ h₁ h₂ ih₁ ih₂ => intro _ _ hξ; exact .provideE (ih₁ hξ) (ih₂ hξ) h₁ h₂
+  | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ _ hξ; exact .provideL (ih₁ hξ) (ih₂ hξ) h₁ h₀ h₂
+  | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ _ hξ; exact .provideE (ih₁ hξ) (ih₂ hξ) h₁ h₀ h₂
   | with_ hv _ _ h₁ h₂ ih₁ ih₂ =>
     intro _ _ hξ; exact .with_ hv.rename (ih₁ hξ) (ih₂ hξ) h₁ h₂
   | enil hρ => intro _ _ _; exact .enil hρ

@@ -34,12 +34,13 @@ theorem Cfg.at_append {Λ : List Rgn} {μ : List Tm} {m : Tm} (i : Option (Nat �
 
 theorem Frame.Within.withAnc {anc' : Nat → Nat → Prop} {F : Frame} {A : Nat → Prop}
     (h : F.Within Ψ B anc A) (ha : ∀ q, F = .inside q → anc' q = anc q) : F.Within Ψ B anc' A := by
-  have m : ∀ {x : Tm}, x.NoIns → x.Within Ψ B anc A → x.Within Ψ B anc' A :=
+  have m : ∀ {x : Tm} {A'}, x.NoIns → x.Within Ψ B anc A' → x.Within Ψ B anc' A' :=
     fun hn hx => hx.mono (fun _ _ h => h) fun q hq => (hn.frame q hq).elim
   cases F <;> simp only [Frame.Within] at h ⊢ <;>
     first
     | exact ⟨m h.2 h.1, h.2⟩
     | exact ⟨m (h.2.noIns h.1) h.1, h.2⟩
+    | exact ⟨h.1, m h.1 h.2⟩
     | trivial
     | exact ⟨h.1, (ha _ rfl).trans h.2⟩
 
@@ -58,15 +59,17 @@ theorem Nest.hole_live {c : Cfg} {home i E r} (hn : Nest Ψ c anc B home) (hi : 
   · exact baseOf_live hn.live (Cfg.at_live hi) hx
   · exact ((hn.thread i _ hi).2 x (plug_frame hx)).2
 
-/-- `scope` creates the region `|Λ|`, a child of the regions of its place. -/
-theorem Nest.scope {c : Cfg} {home i E e₁} (hn : Nest Ψ c anc B home)
-    (hi : c.at i = some (plug E (.scope e₁))) (hE : OkE E) (hΨ : ∀ u ∈ Ψ, u.YF c.rgs.length) :
+/-- A redex creates the region `|Λ|`, a child of the regions of its place, whose
+`inside` form holds a body without `inside` forms (`scope`, `provide`). -/
+theorem Nest.fresh {c : Cfg} {home i E r b} (hn : Nest Ψ c anc B home)
+    (hi : c.at i = some (plug E r)) (hE : OkE E) (hv : ¬ Value r) (hr : r.NoIns)
+    (hb : ∀ q, ¬ b.Has (.frame q))
+    (hbW : b.Within Ψ B anc (fun x => holeE (baseOf anc i) E x ∨ x = c.rgs.length)) :
     ∃ anc' home', Nest Ψ ((⟨c.rgs ++ [Rgn.new], c.mem, c.main⟩ : Cfg).put i
-      (plug E (.inside c.rgs.length (e₁.subst (inst [.own c.rgs.length]))))) anc' B home' := by
+      (plug E (.inside c.rgs.length b))) anc' B home' := by
   let p := c.rgs.length
   have hw := (hn.thread i _ hi).1
-  obtain ⟨hWE, hsc⟩ := within_of_plug (by intro h; cases h) hE hw
-  obtain ⟨h₁, hn₁⟩ := hsc
+  obtain ⟨hWE, -⟩ := within_of_plug hv hE hw
   let A₀ := baseOf anc i
   let H := holeE A₀ E
   have Hlive : ∀ x, H x → Live c.rgs x := fun x hx => hn.hole_live hi hx
@@ -80,32 +83,16 @@ theorem Nest.scope {c : Cfg} {home i E e₁} (hn : Nest Ψ c anc B home)
   have homeq : ∀ q, q ≠ p → home' q = home q := fun q hq => if_neg hq
   have chainH : Chain anc H := hWE.chain hn.le (hn.base_chain hi)
   have chainH' : Chain anc' H := fun x hx => by rw [ancq x (fun h => hpH (h ▸ hx))]; exact chainH x hx
-  -- the body at the new place
-  let b := e₁.subst (inst [.own p])
-  have hb : b.NoIns := fun h => by
-    rcases subst_inst_has h with h | ⟨w, hw, h⟩
-    · exact hn₁ h
-    · simp at hw; subst hw; cases h
-  have hbW : b.Within Ψ B anc' (fun x => H x ∨ x = p) := by
-    refine Tm.Within.of_has hb (fun x hx => ?_) fun l hl => ?_
-    · rcases subst_inst_has hx with hx | ⟨w, hw, hx⟩
-      · exact .inl (h₁.rgn0 hn₁ hx)
-      · simp at hw; subst hw; cases hx; exact .inr rfl
-    · rcases subst_inst_has hl with hl | ⟨w, hw, hl⟩
-      · obtain ⟨t, ht, hB⟩ := h₁.loc0 hn₁ hl
-        refine ⟨t, ht, hB.trans (funext fun x => propext ⟨fun ⟨h, h'⟩ => ⟨.inl h, h'⟩, ?_⟩)⟩
-        rintro ⟨h | rfl, h'⟩
-        · exact ⟨h, h'⟩
-        · exact absurd ((hΨ t (List.mem_of_getElem? ht)).reach h') (Nat.lt_irrefl _)
-      · simp at hw; subst hw; cases hl
-  have hrW : (Tm.inside p b).Within Ψ B anc' H := ⟨hpH, ancp, hbW⟩
+  have hbW' : b.Within Ψ B anc' (fun x => H x ∨ x = p) :=
+    hbW.mono (fun _ _ h => h) fun q hq => (hb q hq).elim
+  have hrW : (Tm.inside p b).Within Ψ B anc' H := ⟨hpH, ancp, hbW'⟩
   have hframes : ∀ q, .inside q ∈ E → Live c.rgs q := fun q hq => ((hn.thread i _ hi).2 q (plug_frame hq)).2
   have hWE' : WithinE Ψ B anc' A₀ E := hWE.withAnc fun q hq => ancq q (livep q (hframes q hq))
   have base' : ∀ i' e', c.at i' = some e' → baseOf anc' i' = baseOf anc i' := by
     rintro (_ | ⟨r, j⟩) e' h'
     · rfl
     · exact ancq r (livep r (Cfg.at_live h' r j rfl))
-  have hc₁ : (⟨c.rgs ++ [Rgn.new], c.mem, c.main⟩ : Cfg).at i = some (plug E (.scope e₁)) := by
+  have hc₁ : (⟨c.rgs ++ [Rgn.new], c.mem, c.main⟩ : Cfg).at i = some (plug E r) := by
     rw [Cfg.at_append]; exact hi
   have hat : ∀ i', ((⟨c.rgs ++ [Rgn.new], c.mem, c.main⟩ : Cfg).put i
       (plug E (.inside p b))).at i' = if i' = i then some (plug E (.inside p b)) else c.at i' := by
@@ -138,7 +125,7 @@ theorem Nest.scope {c : Cfg} {home i E e₁} (hn : Nest Ψ c anc B home)
       · cases h
       · cases h
       · cases h; exact .inr rfl
-      · exact (hb.frame q h).elim
+      · exact (hb q h).elim
   refine ⟨anc', home', ⟨fun q => ?_, fun q x hx => ?_, fun q hq => ?_, fun q x hq hx => ?_,
     fun i' e' he' => ?_, fun q hq => ?_, fun r g hg hgl f hf => ?_, fun l v hv => ?_⟩⟩
   · by_cases hq : q = p
@@ -189,7 +176,7 @@ theorem Nest.scope {c : Cfg} {home i E e₁} (hn : Nest Ψ c anc B home)
                   refine ⟨_, rfl, ?_⟩
                   rcases hWE.frames hq' with h' | h'
                   · exact plug_frame h'
-                  · exact (hn₁.frame q h').elim
+                  · exact (hr.frame q h').elim
       · exact ⟨e', he', hq'⟩
     · exact ⟨plug E (.inside p b), by rw [show home' p = i from if_pos rfl, hat, if_pos rfl],
         plug_has E (by simp [Tm.Has])⟩
@@ -198,10 +185,40 @@ theorem Nest.scope {c : Cfg} {home i E e₁} (hn : Nest Ψ c anc B home)
     · rw [h₂] at hf
       obtain ⟨h₃, h₄⟩ := hn.fins r g₀ h₀ (h₁ ▸ hgl) f hf
       rw [ancq r (livep r ⟨g₀, h₀, h₁ ▸ hgl⟩)]
-      exact ⟨h₃.mono (fun _ _ h => h) fun q hq => (h₄.frame q hq).elim, h₄⟩
+      exact ⟨h₃.mono (fun _ _ h => h) fun q hq => (h₄ q hq).elim, h₄⟩
     · rw [h₂] at hf; simp [Rgn.new] at hf
   · rw [Cfg.put_mem] at hv
     obtain ⟨h₁, h₂⟩ := hn.cells l v hv
     exact ⟨h₁.mono (fun _ _ h => h) fun q hq => (h₂.frame q hq).elim, h₂⟩
+
+/-- A term without run-time forms moves into a new region `p` that no type names. -/
+theorem Tm.Within.extend {e : Tm} {H : Nat → Prop} {p : Nat} (hn : e.NoIns) (h : e.Within Ψ B anc H)
+    (hΨ : ∀ (l : Nat) (t : Ty), Ψ[l]? = some t → ¬ t.reach (.r p)) :
+    e.Within Ψ B anc (fun x => H x ∨ x = p) := by
+  refine Tm.Within.of_has hn (fun x hx => .inl (h.rgn0 hn hx)) fun l hl => ?_
+  obtain ⟨t, ht, hB⟩ := h.loc0 hn hl
+  refine ⟨t, ht, hB.trans (funext fun x => propext ⟨fun ⟨h, h'⟩ => ⟨.inl h, h'⟩, ?_⟩)⟩
+  rintro ⟨h | rfl, h'⟩
+  · exact ⟨h, h'⟩
+  · exact absurd h' (hΨ l t ht)
+
+/-- `scope` creates the region `|Λ|`. -/
+theorem Nest.scope {c : Cfg} {home i E e₁} (hn : Nest Ψ c anc B home)
+    (hi : c.at i = some (plug E (.scope e₁))) (hE : OkE E) (hΨ : ∀ u ∈ Ψ, u.YF c.rgs.length) :
+    ∃ anc' home', Nest Ψ ((⟨c.rgs ++ [Rgn.new], c.mem, c.main⟩ : Cfg).put i
+      (plug E (.inside c.rgs.length (e₁.subst (inst [.own c.rgs.length]))))) anc' B home' := by
+  obtain ⟨-, h₁, hn₁⟩ := within_of_plug (by intro h; cases h) hE (hn.thread i _ hi).1
+  have hb : (e₁.subst (inst [.own c.rgs.length])).NoIns := fun h => by
+    rcases subst_inst_has h with h | ⟨w, hw, h⟩
+    · exact hn₁ h
+    · simp at hw; subst hw; cases h
+  refine hn.fresh hi hE (by intro h; cases h) hn₁ hb.frame (Tm.Within.of_has hb (fun x hx => ?_) fun l hl => ?_)
+  · rcases subst_inst_has hx with hx | ⟨w, hw, hx⟩
+    · exact .inl (h₁.rgn0 hn₁ hx)
+    · simp at hw; subst hw; cases hx; exact .inr rfl
+  · rcases subst_inst_has hl with hl | ⟨w, hw, hl⟩
+    · exact (h₁.extend hn₁ fun l' t ht => fun h => Nat.lt_irrefl _
+        ((hΨ t (List.mem_of_getElem? ht)).reach h)).loc0 hn₁ hl
+    · simp at hw; subst hw; cases hl
 
 end Flick
