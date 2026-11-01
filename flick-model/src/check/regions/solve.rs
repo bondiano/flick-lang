@@ -93,23 +93,30 @@ impl Checker<'_> {
     /// grow to allow it. A type never inferred holds nothing (Р31).
     fn excess(&self, h: &Hold) -> (Caps, Option<u32>) {
         let mut held = Caps::default();
+        let mut bounded = Vec::new();
         for t in &h.held {
-            held = held.union(&self.reach(t));
+            let (c, b) = self.reach_bounded(t);
+            held = held.union(&c);
+            bounded.extend(b);
         }
         let mut allowed = self.zonk_caps(&h.allowed);
         for t in &h.within {
-            allowed = allowed.union(&self.reach(t));
+            let (c, b) = self.reach_bounded(t);
+            allowed = allowed.union(&c);
+            allowed.atoms.extend(b.into_iter().map(|(a, _)| a));
         }
-
-        // shortcut: an obligation compares regions, the atoms T4 is about,
-        // not the type variables and capture variables of generic code (Р62:
-        // how a bound `α^{≤C}` and the atom `α` relate is not written); a
-        // generic function that hides a type variable passes. Compare them
-        // once Р62 is decided. A capture variable of a signature still
+        // `α^{≤C}` reaches `α`, and is within what allows `C` (§2.1, Р62)
+        for (a, c) in bounded {
+            if !allowed.atoms.contains(&a) {
+                held = held.union(&self.zonk_caps(&c));
+            }
+        }
+        // an atom is a region or a type variable; a meta of a type never
+        // inferred holds nothing (Р31). A capture variable of a signature
         // grows a row, for `Outlives`
         let mut missing = Caps::default();
         for a in &held.atoms {
-            if !allowed.atoms.contains(a) && self.is_region(a) {
+            if !allowed.atoms.contains(a) && (self.is_region(a) || matches!(a, Var::Named(_))) {
                 missing.atoms.insert(a.clone());
             }
         }

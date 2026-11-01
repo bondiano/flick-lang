@@ -6,7 +6,7 @@ use std::rc::Rc;
 use super::{Checker, TypeError};
 use crate::decls::Decls;
 use crate::syntax::{Arm, Con, Const, Lit, Pat, Path, Prim, Term};
-use crate::types::{Kind, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
 
 fn ty(name: &str) -> Type {
     Type::con("Prelude", name)
@@ -313,6 +313,30 @@ fn task_and_await() {
     let await_ = |e: Term| Term::Await(Rc::new(e));
     assert!(check(&task(await_(task(int(1)))), &mono(eff(ty("Int")))).is_ok());
     rejected_by(infer(&task(await_(int(1)))), "≡");
+}
+
+/// (Task) with a generic value (`regions.md` §2.1, Р62): `a^{≤c}` is
+/// within `c`, a bare `a` is a capture the bare `Eff` does not allow.
+#[test]
+fn task_holds_a_type_variable() {
+    let c = Var::Named("c".into());
+    let body = task(let_("_", var("x"), Term::unit()));
+    let lam = Term::lam("x", body);
+    let caps = Caps::var(c);
+    let bounded = Scheme {
+        vars: vec![("a".into(), Kind::Type), ("c".into(), Kind::Captures)],
+        body: Type::fun(
+            Type::Bounded(Rc::new(a()), caps.clone()),
+            Stage::Pure,
+            Type::Captured(Rc::new(eff(ty("Unit"))), caps),
+        ),
+        outlives: Vec::new(),
+    };
+    assert!(check(&lam, &bounded).is_ok());
+    rejected_by(
+        check(&lam, &poly(Type::fun(a(), Stage::Pure, eff(ty("Unit"))))),
+        "Task",
+    );
 }
 
 /// (Task): the body's errors are within the `Eff`'s.
