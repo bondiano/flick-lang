@@ -377,7 +377,7 @@ instantiate it.
 | Stage | Scope | State |
 | - | - | - |
 | P4a | λFlick⁺ (Р54) as an instance of `Target`; T1–T3 for it | open |
-| P4b | the source, `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (§2.4), dictionaries typed, T6(a) | done |
+| P4b | the source, `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (§2.4), dictionaries typed, T6(a); `Sim` from the steps of the target | done |
 | P4b′ | the sugar of §3 (`do`, `for`, `?`) as core terms | open |
 | P4c | `≈`, К1–К8, lemmas 6.1 and 6.2, T6(b) | done |
 
@@ -393,7 +393,7 @@ instantiate it.
 | §2.2, §2.4 `Γ; Δ ⊢ e : τ ! φ ⇝ e'`: (Var-Dict), (Method), (Let-Sig-Dict) | `Exp`, `Tm`, `Elab` (`Elab/Source.lean`) |
 | §0.1, §2.1 λFlick⁺, `D_Q`, `⟦σ⟧`, `⊢⁺` | `TTy`, `TSch`, `Scheme.tr`, `Target` (`Elab/Target.lean`) |
 | `Δ ⊩ Q ⇝ d ⇒ ⟦Δ⟧ ⊢⁺ d : D_Q`; T6(a) | `ent_typed`, `T6a` (`Elab/T6a.lean`) |
-| "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`), for P4b |
+| "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim`, then `T6b_target` (`Elab/Run.lean`) |
 
 Simplifications:
 
@@ -424,3 +424,11 @@ Simplifications:
    D_head`, by (Instance) of §2.5 and К7) and of (Struct)/(Prim) dictionaries are laws.
    `lamD l` binds `l` premises at once, the `i`-th argument being the premise `i`;
    λFlick⁺ curries it. P4a has to prove each law of its own typing.
+8. The run of the target is `Target.St`, `load`, `Step` and `obs`; a skeleton is a `Tm` with
+   holes `hole i`, and its result is the set of observations of the terminating runs of the
+   filled term (divergence is not compared). `Sim` follows by induction on the run from
+   three fields, which P4a has to prove for λFlick⁺ with a relation `Rel` of its choice:
+   `load_rel` (terms that differ by `≈` in dictionary positions, `TmEqv`, load to related
+   states), `step_rel` (a step of one side is matched by zero or more steps of the other:
+   evaluating `(I d̄).$slotᵢ` and `sᵢ[δ̄ := d̄]` takes different numbers of steps) and
+   `final_rel` (a result of one side is reached by the other).

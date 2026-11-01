@@ -4,8 +4,8 @@ import Formal.Elab.Hyp
 /-!
 # Elaboration: the target λFlick⁺ as an interface (elaboration.md §0.1, §2.1, §2.2)
 
-The target is abstract: `Target` gives its typing `⊢⁺` of elaborated terms as a field, and
-the laws T6 needs as fields too. P4a instantiates it with λFlick⁺ (Р54).
+The target is abstract: `Target` gives its typing `⊢⁺` of elaborated terms and its run as
+fields, and the laws T6 needs as fields too. P4a instantiates it with λFlick⁺ (Р54).
 
 Types of elaborated terms: monotypes `⟦τ⟧ = τ`, arrows `a →φ b` and dictionary types `D_Q`.
 A context entry is `∀ᾱ. t`; a record of `D_Q` with `∀`-fields shows only through its laws:
@@ -37,6 +37,22 @@ def TSch.subst (σ : Nat → Ty) (s : TSch) : TSch := ⟨s.k, s.ty.subst (lift s
 
 /-- `⟦∀ᾱ. Q̄ ⇒ τ⟧ = ∀ᾱ. D_Q̄ →P τ`. -/
 def Scheme.tr (s : Scheme) : TSch := ⟨s.k, dicts s.ctx (.mono s.ty)⟩
+
+/-- Reflexive transitive closure. -/
+inductive Star {α : Type} (R : α → α → Prop) : α → α → Prop
+  | refl {a} : Star R a a
+  | step {a b c} : R a b → Star R b c → Star R a c
+
+/-- Two terms that differ only by `≈` in dictionary positions. -/
+inductive TmEqv (P : Prog) : Tm → Tm → Prop
+  | var {x} : TmEqv P (.var x) (.var x)
+  | hole {i} : TmEqv P (.hole i) (.hole i)
+  | dict {d d'} : Eqv P d d' → TmEqv P (.dict d) (.dict d')
+  | meth {e e' m} : TmEqv P e e' → TmEqv P (.meth e m) (.meth e' m)
+  | app {f f' a a'} : TmEqv P f f' → TmEqv P a a' → TmEqv P (.app f a) (.app f' a')
+  | lam {b b'} : TmEqv P b b' → TmEqv P (.lam b) (.lam b')
+  | let_ {e e' b b'} : TmEqv P e e' → TmEqv P b b' → TmEqv P (.let_ e b) (.let_ e' b')
+  | lamD {l b b'} : TmEqv P b b' → TmEqv P (.lamD l b) (.lamD l b')
 
 /-- The target. `Has Γ Δ e t φ` is `Γ, ⟦Δ⟧ ⊢⁺ e : t ! φ`, where a premise `δ : Q` of `Δ` is
 the variable `δ : D_Q`. -/
@@ -80,5 +96,17 @@ structure Target (P : Prog) where
   /-- (Prim) -/
   prim : ∀ {Γ Δ q p φ}, P.primC q.cls = true → P.prims q = some p →
     Has Γ Δ (.dict (.prim p)) (.dict q) φ
+  /-- States of a run, the loading of a term, steps, observable results. -/
+  St : Type
+  load : Tm → St
+  Step : St → St → Prop
+  Obs : Type
+  obs : St → Option Obs
+  /-- `≈`-related dictionaries stay related under steps: `Rel` relates the states of terms
+  that differ by `≈` in dictionary positions, and is a weak simulation that keeps results. -/
+  Rel : St → St → Prop
+  load_rel : ∀ {e e'}, TmEqv P e e' → Rel (load e) (load e')
+  step_rel : ∀ {a a' b}, Rel a b → Step a a' → ∃ b', Star Step b b' ∧ Rel a' b'
+  final_rel : ∀ {a b o}, Rel a b → obs a = some o → ∃ b', Star Step b b' ∧ obs b' = some o
 
 end Flick.Elab
