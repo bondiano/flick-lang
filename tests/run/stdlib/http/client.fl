@@ -199,8 +199,10 @@ let forms () =
   let plain = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/plain")
   Platform.stdout_line
     ("form_data plain: "
-      ++ (try show (Http.ClientResponse.form_data plain) with
-      | e -> describe e))
+      ++ (
+        try show (Http.ClientResponse.form_data plain) with
+        | e -> describe e
+      ))
 
 responses : Unit ->{; HttpClientError, SchemaError} Unit
 let responses () =

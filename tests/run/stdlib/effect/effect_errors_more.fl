@@ -134,7 +134,8 @@ let handlers () =
   say
     ("match_cause_effect: "
       ++ Effect.match_cause_effect (fun f -> "failure") (fun v -> "value " ++ v) broken)
-  let interrupted : Exit {Boom} String = Effect.exit (task { Effect.or_die (task { Effect.interrupt () }) })
+  let interrupted : Exit {Boom} String =
+    Effect.exit (task { Effect.or_die (task { Effect.interrupt () }) })
   say ("or_die interrupt: " ++ RawCause.describe (Failure.inspect (failure_of interrupted)))
 
 even : Float ->{; Boom} Float
@@ -159,7 +160,8 @@ let collections () =
   say ("filter: " ++ show (Effect.filter (Effect.Bounded 2) (fun n -> n % 2 == 0) xs))
   say
     ("filter_map_effect: "
-      ++ show (Effect.filter_map_effect Effect.Unbounded (fun n -> if n > 2 then Ok n else Err ()) xs))
+      ++ show
+        (Effect.filter_map_effect Effect.Unbounded (fun n -> if n > 2 then Ok n else Err ()) xs))
   say ("for_each: " ++ show (Effect.for_each Effect.Sequential (fun n -> n + 1) xs))
   say ("replicate_effect: " ++ show (Effect.replicate_effect (Effect.Bounded 2) 3 (task { 7 })))
 

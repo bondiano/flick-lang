@@ -5,7 +5,8 @@ module App.Main exposing (main)
 
 type error TooBig = TooBig Float
 
-type alias Point = { x : Float; tags : List String } deriving Schema
+type alias Point = { x : Float; tags : List String }
+  deriving Schema
 
 type Shape = Dot | Circle Float
   deriving Show, Schema
@@ -197,10 +198,12 @@ let linked () =
   Platform.stdout_line
     ("durations: " ++ show (Arbitrary.sample (seeded 6) (Arbitrary.from_schema Schema.duration)))
   Platform.stdout_line
-    ("chunks: " ++ show (Arbitrary.sample (seeded 3) (Arbitrary.from_schema (Schema.chunk Schema.bool))))
+    ("chunks: "
+      ++ show (Arbitrary.sample (seeded 3) (Arbitrary.from_schema (Schema.chunk Schema.bool))))
   let instants = Arbitrary.from_schema (Codec.to_schema DateTime.json_utc_millis)
   Platform.stdout_line
-    ("instants: " ++ show (List.map DateTime.to_epoch_millis (Arbitrary.sample (seeded 4) instants)))
+    ("instants: "
+      ++ show (List.map DateTime.to_epoch_millis (Arbitrary.sample (seeded 4) instants)))
   let zones = Arbitrary.from_schema (Codec.to_schema DateTime.json_zone)
   Platform.stdout_line
     ("zones: " ++ show (List.map DateTime.zone_to_string (Arbitrary.sample (seeded 4) zones)))
