@@ -145,7 +145,7 @@ fn template(i: usize, name: &str) -> (Scheme, Term, bool, bool) {
             .collect::<Vec<_>>()
     };
     let x = || Term::Var("x".into());
-    let scheme = |vars, body| Scheme { vars, body };
+    let scheme = |vars, body| Scheme { vars, body, outlives: Vec::new() };
     match i {
         0 => (
             scheme(ty_vars(&["a"]), Type::fun(a.clone(), Stage::Pure, a)),

@@ -75,6 +75,7 @@ impl Checker<'_> {
         Scheme {
             vars,
             body: self.zonk(t),
+            outlives: Vec::new(),
         }
     }
 
@@ -117,6 +118,7 @@ pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
             _ => t.clone(),
         },
         Type::Var(_) | Type::Con(_) => t.clone(),
+        Type::Captured(x, _) | Type::Bounded(x, _) => substitute(x, map),
         Type::App(h, a) => Type::App(s(h), s(a)),
         Type::Fun(p, st, r) => Type::Fun(s(p), substitute_stage(st, map), s(r)),
         Type::Eff(r, e, x) => Type::Eff(substitute_row(r, map), substitute_row(e, map), s(x)),
@@ -156,6 +158,7 @@ pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
             Type::Forall(Rc::new(Scheme {
                 vars: sc.vars.clone(),
                 body: substitute(&sc.body, &inner),
+                outlives: sc.outlives.clone(),
             }))
         }
     }

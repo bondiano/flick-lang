@@ -187,6 +187,7 @@ fn mono(body: Type) -> Scheme {
     Scheme {
         vars: Vec::new(),
         body,
+        outlives: Vec::new(),
     }
 }
 

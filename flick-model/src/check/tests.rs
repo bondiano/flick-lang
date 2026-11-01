@@ -32,6 +32,7 @@ fn mono(body: Type) -> Scheme {
     Scheme {
         vars: Vec::new(),
         body,
+        outlives: Vec::new(),
     }
 }
 
@@ -40,6 +41,7 @@ fn poly(body: Type) -> Scheme {
     Scheme {
         vars: vec![("a".into(), Kind::Type)],
         body,
+        outlives: Vec::new(),
     }
 }
 

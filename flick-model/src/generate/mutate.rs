@@ -84,6 +84,7 @@ fn narrow(s: &Scheme, k: usize) -> Scheme {
     Scheme {
         vars: s.vars.clone(),
         body: narrow_type(&s.body, &mut k),
+        outlives: s.outlives.clone(),
     }
 }
 

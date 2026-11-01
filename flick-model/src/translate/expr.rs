@@ -127,7 +127,14 @@ impl Tr {
                 stuck("a `for` or a `Seq`")
             }
             ExprKind::Unwrap(_) => stuck("`?` on an `Option`, a return from the function,"),
-            ExprKind::Scope { .. } | ExprKind::Within(..) => stuck("a `scope`"),
+            ExprKind::Scope { owner, body, .. } => {
+                let s = owner.as_deref().map_or_else(|| self.fresh("s"), Name::from);
+                Term::Scope(s, rc(self.expr(body)))
+            }
+            // shortcut: the model acquires into the innermost `scope`, not the
+            // owner a `Within` names (`regions.md` §1.4, Г6); a program that
+            // acquires into an outer region from a nested one is rejected
+            ExprKind::Within(_, inner) => self.expr(inner),
             ExprKind::CodecBlock(..) => stuck("a `codec` block"),
         }
     }

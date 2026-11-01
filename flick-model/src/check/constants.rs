@@ -45,6 +45,7 @@ impl Checker<'_> {
                     runtime(Row::one(s.clone()), none()),
                     Type::Impl(Row::one(s.clone())),
                 ),
+                outlives: Vec::new(),
             },
             Const::LayerSucceed(s) => Scheme {
                 vars: Vec::new(),
@@ -53,6 +54,7 @@ impl Checker<'_> {
                     Stage::Pure,
                     Type::Layer(none(), none(), Row::one(s.clone())),
                 ),
+                outlives: Vec::new(),
             },
             Const::LayerEffect(s) => {
                 let (r, e) = (

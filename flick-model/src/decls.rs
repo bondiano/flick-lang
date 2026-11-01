@@ -114,6 +114,7 @@ impl Decls {
             let s = Scheme {
                 vars: binders(&i.vars),
                 body,
+                outlives: Vec::new(),
             };
             self.instances.insert(instance(&i.module, &i.name), s);
         }
@@ -165,6 +166,7 @@ impl Decls {
             Scheme {
                 vars: own,
                 body: (**rest).clone(),
+                outlives: Vec::new(),
             },
         ))
     }

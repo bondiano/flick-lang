@@ -30,6 +30,7 @@ pub(super) fn scheme(vars: &[(&str, Kind)], body: Type) -> Scheme {
             .map(|(n, k)| (Name::from(*n), k.clone()))
             .collect(),
         body,
+        outlives: Vec::new(),
     }
 }
 
@@ -408,6 +409,7 @@ pub(super) fn mono(t: Type) -> Scheme {
     Scheme {
         vars: Vec::new(),
         body: t,
+        outlives: Vec::new(),
     }
 }
 

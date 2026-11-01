@@ -35,13 +35,18 @@ impl Checker<'_> {
     }
 
     /// `t` with the metas at its head followed, and `EffOf ρ ρ' τ` as
-    /// `Eff ρ ρ' τ`.
+    /// `Eff ρ ρ' τ`. A qualifier is not yet checked: the type under it.
     pub(super) fn resolve(&self, t: &Type) -> Type {
         let mut t = t.clone();
-        while let Type::Var(v) = &t
-            && let Some(Solved::Type(next)) = self.solution(v)
-        {
-            t = next.clone();
+        loop {
+            match &t {
+                Type::Var(v) => match self.solution(v) {
+                    Some(Solved::Type(next)) => t = next.clone(),
+                    _ => break,
+                },
+                Type::Captured(inner, _) | Type::Bounded(inner, _) => t = (**inner).clone(),
+                _ => break,
+            }
         }
         if let Type::App(h, a) = &t
             && let Type::EffOf(r, e) = self.resolve(h)
@@ -74,7 +79,9 @@ impl Checker<'_> {
             Type::Forall(s) => Type::Forall(Rc::new(Scheme {
                 vars: s.vars.clone(),
                 body: self.zonk(&s.body),
+                outlives: s.outlives.clone(),
             })),
+            Type::Captured(..) | Type::Bounded(..) => unreachable!("resolved"),
         }
     }
 
@@ -175,6 +182,7 @@ impl Checker<'_> {
             Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().for_each(|t| self.metas(t, out)),
             Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => row(&r, out),
             Type::Forall(s) => self.metas(&s.body, out),
+            Type::Captured(..) | Type::Bounded(..) => unreachable!("zonked"),
         }
     }
 
