@@ -4,6 +4,7 @@
 
 use std::rc::Rc;
 
+use super::regions::Ended;
 use crate::syntax::{Arm, Env, Lit, Name, Pat, Path, Term};
 use crate::types::Scheme;
 
@@ -53,6 +54,11 @@ pub enum Frame {
     JoinRight(Term),
     /// `with θ □`.
     With(Rc<Env>),
+    /// `inside π □` (`regions.md` §3.2), its types naming the region `Name`.
+    Inside(usize, Name),
+    /// `inside π □` while `π` closes (§3.3): `□` is a child or a
+    /// finalizer, and the body ended with what it keeps.
+    Close(usize, Name, Ended),
 }
 
 impl Frame {
@@ -120,6 +126,16 @@ impl Frame {
             Frame::JoinLeft(b) => Term::Join(e, b.clone()),
             Frame::JoinRight(a) => Term::Join(Rc::new(a.clone()), e),
             Frame::With(env) => Term::With(env.clone(), e),
+            Frame::Inside(pi, s) => Term::Inside(*pi, s.clone(), e),
+            // inside π (let _ = □ in w)
+            Frame::Close(pi, s, ended) => {
+                let w = match ended {
+                    Ok(v) => v.clone(),
+                    Err(v) => Term::Raise(Rc::new(v.clone())),
+                };
+                let body = Term::Let("_".into(), None, e, Rc::new(w));
+                Term::Inside(*pi, s.clone(), Rc::new(body))
+            }
         }
     }
 }

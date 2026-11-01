@@ -18,7 +18,7 @@ use flick_core::diagnostics::Severity;
 use flick_core::source::SourceMap;
 use flick_model::check::{Checker, check_config};
 use flick_model::decls::Decls;
-use flick_model::eval::{self, Machine, Outcome};
+use flick_model::eval::{self, Lambda, Machine, Outcome};
 use flick_model::generate::{self, Program};
 use flick_model::run;
 use flick_model::syntax::Term;
@@ -100,7 +100,7 @@ fn progress_and_preservation(decls: &eval::Program, d: &Decls, p: &Program) -> R
     let mut failure = None;
     let mut mem = Vec::new();
     let mut steps = 0;
-    let outcome = machine.run_watched(e0, &mut |m: &[Term], e: &Term| {
+    let outcome = machine.run_watched(e0, &mut |m: &[Term], _: &Lambda, e: &Term| {
         steps += 1;
         if failure.is_some() {
             return;

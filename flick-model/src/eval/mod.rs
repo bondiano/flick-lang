@@ -2,9 +2,12 @@
 //! configuration is `⟨μ, E, e⟩`, with the context `E` kept as a stack of
 //! one-frame contexts `F` (§3.2). Each transition is one rule of §3.3–3.5;
 //! keeping `E` as a stack only spares re-finding the redex at every step.
+//! `Λ` and the steps of regions (`docs/formal/regions.md` §3) are in
+//! `regions.rs`.
 
 mod frames;
 mod prim;
+pub mod regions;
 #[cfg(test)]
 mod tests;
 
@@ -13,6 +16,7 @@ use std::rc::Rc;
 
 pub use frames::Frame;
 pub use prim::{atom, equal};
+pub use regions::Lambda;
 
 use crate::native::structural_dict;
 use crate::subst::{matches, subst};
@@ -49,13 +53,14 @@ enum Control {
 
 type Step = Result<Control, Outcome>;
 
-/// What sees each configuration `⟨μ, E[e]⟩`: `μ`, then `E[e]`.
-pub type Watch<'a> = dyn FnMut(&[Term], &Term) + 'a;
+/// What sees each configuration `⟨Λ, μ, E[e]⟩`: `μ`, `Λ`, then `E[e]`.
+pub type Watch<'a> = dyn FnMut(&[Term], &Lambda, &Term) + 'a;
 
 pub struct Machine<'p> {
     program: &'p Program,
     /// `μ`.
     mem: Vec<Term>,
+    lambda: Lambda,
     frames: Vec<Frame>,
     /// `Σ₀`, the services the runner provides.
     roots: Env,
@@ -73,6 +78,7 @@ impl<'p> Machine<'p> {
         Machine {
             program,
             mem: Vec::new(),
+            lambda: Lambda::default(),
             frames: Vec::new(),
             roots: Env::new(),
             stdout: String::new(),
@@ -95,7 +101,7 @@ impl<'p> Machine<'p> {
         let mut control = Control::Eval(e);
         loop {
             if let Some(w) = watch.as_mut() {
-                w(&self.mem, &self.configuration(&control));
+                w(&self.mem, &self.lambda, &self.configuration(&control));
             }
             if self.fuel == 0 {
                 return Outcome::OutOfFuel;
@@ -197,11 +203,7 @@ impl<'p> Machine<'p> {
             Term::Structural(class, fields) => Control::Eval(structural_dict(&class, &fields)),
             Term::Die(why) => return Err(Outcome::Die(why.to_string())),
             Term::Stuck(why) => return Err(stuck(why.to_string())),
-            // shortcut: the machine has no dynamics of regions (`regions.md`
-            // §3), a `scope` stops it; P2 adds them
-            Term::Scope(..) => {
-                return Err(stuck("a `scope` needs the dynamics of regions".to_owned()));
-            }
+            Term::Scope(s, body) => self.open_scope(s, &body),
             other => return Err(stuck(format!("no rule for {other:?}"))),
         })
     }
@@ -325,6 +327,9 @@ impl<'p> Machine<'p> {
                 }
                 (a, b) => return Err(stuck(format!("join of {a:?} and {b:?}"))),
             },
+            Frame::Inside(pi, s) => self.close(pi, s, Ok(v)),
+            // what a child or a finalizer gives is dropped
+            Frame::Close(pi, s, ended) => self.close(pi, s, ended),
         })
     }
 
@@ -387,11 +392,18 @@ impl<'p> Machine<'p> {
     }
 
     /// `E[F[raise v]] → E[raise v]` up to the nearest `try` (§3.5): a
-    /// `with` frame goes with the others, which restores the services.
+    /// `with` frame goes with the others, which restores the services. A
+    /// region closes on the way (`regions.md` §3.3).
     fn unwind(&mut self, v: Term) -> Step {
         while let Some(f) = self.frames.pop() {
-            if let Frame::Try(arms) = f {
-                return self.handle(v, &arms, 0);
+            match f {
+                Frame::Try(arms) => return self.handle(v, &arms, 0),
+                Frame::Inside(pi, s) => return Ok(self.close(pi, s, Err(v))),
+                // shortcut: a child or a finalizer that fails stops the machine, its supervisor and the order of failures are λRT's (`runtime.md`); run the supervisor once a generated child can fail
+                Frame::Close(pi, ..) => {
+                    return Err(stuck(format!("a child or finalizer of π{pi} raised {v:?}")));
+                }
+                _ => {}
             }
         }
         Err(Outcome::Raise(v))
@@ -431,6 +443,7 @@ impl<'p> Machine<'p> {
                 Ok(v) => Control::Eval(v),
                 Err(why) => return Err(stuck(why)),
             },
+            (Const::Region(p, op), args) => return self.region_step(p, *op, args),
             (Const::Native(n), args) => match (n.run)(args, &mut self.stdout) {
                 Ok(t) => Control::Eval(t),
                 Err(why) => return Err(stuck(format!("{}: {why}", n.export))),
