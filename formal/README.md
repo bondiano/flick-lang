@@ -29,6 +29,21 @@ the hypotheses of T5 (`Hyp`, `G11`) are its parameters.
 | P2c | Л5, the invariant `⊢ Λ` (live work reaches only live regions), T4.1, T4.2, T1 with `op_H` | done |
 | P2c′ | T4.3: the provider of a service (Р37) | open |
 
+T4.3 (P2c′, in progress) is the premise Г11 of T5 in the form Р142 gives it: an `ask_S`
+answered by a `with` frame of the region `q` of a `provide`, inherited or not, happens only
+while `q` is live. Its Lean statement, which `G11` in `Formal/RT/Hyp.lean` is to match:
+
+```lean
+theorem T4_3 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
+    (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
+    (hs : CSteps root ⟨[], [], e₀⟩ c) :
+    ∀ i e E N q v, c.at i = some e → OkE E → e = plug E (.app (.const (.ask N)) (.lit .unit)) →
+      lookupE E N = some (q, v) → Live c.rgs q
+```
+
+Here `lookupE E N` is the region and the value of the innermost `with` frame of `E` that
+provides `N`, and `c.at i` ranges over the main thread and the children of live regions.
+
 ## Map to `core.md` and `regions.md`
 
 | Document | Lean |
