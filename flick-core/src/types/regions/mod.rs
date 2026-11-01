@@ -45,6 +45,10 @@ pub struct State {
     /// Calls inside a `scope` that need `Scope`, until their innermost
     /// scope ends.
     pub needs: Vec<Need>,
+    /// While an `Eff` argument is checked: tasks in it that acquire into a
+    /// region not known yet, with the innermost scope, until the call has
+    /// all its arguments, since a later one may name the region (Р25).
+    pub defaults: Option<Vec<(Type, usize)>>,
     /// The functions around the expression being checked, innermost last,
     /// with the reader each lends to its lazy `for`s.
     pub readers: Vec<Reader>,

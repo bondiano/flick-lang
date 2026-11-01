@@ -212,4 +212,3 @@ of a background `Stream` or `Channel`.
 | - | - |
 | foreign retention contracts | signatures are written and reviewed by hand; the checker requires `retention`, and `Fiber.Outlives` for what `retention owner` keeps, but does not inspect foreign bodies |
 | a region variable unified late with another region in a capture row | the two are kept apart, which may reject a program |
-| `FiberSet.run`, `FiberHandle.run`, `FiberMap.run` of a task that acquires | the task, written before the set, acquires into the innermost scope: give its row `Scope s` of the set's region |

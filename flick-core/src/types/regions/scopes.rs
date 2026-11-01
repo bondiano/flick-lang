@@ -104,10 +104,16 @@ impl Checker<'_> {
             if let [region] = needed.spine().1[..]
                 && let Type::Meta(_) = self.store.resolve(region)
             {
-                let owner = self
-                    .declared_scope()
-                    .unwrap_or(Type::Skolem(self.regions.scopes[inner].region));
-                let _ = self.unify(region, &owner);
+                match (self.declared_scope(), &mut self.regions.defaults) {
+                    (Some(owner), _) => {
+                        let _ = self.unify(region, &owner);
+                    }
+                    (None, Some(defaults)) => defaults.push((region.clone(), inner)),
+                    (None, None) => {
+                        let owner = Type::Skolem(self.regions.scopes[inner].region);
+                        let _ = self.unify(region, &owner);
+                    }
+                }
             }
             return services.clone();
         }
@@ -136,6 +142,17 @@ impl Checker<'_> {
         });
         norm.entries.retain(|(label, _)| label != SCOPE);
         norm.into_type()
+    }
+
+    /// Gives the tasks an `Eff` argument left without a region the
+    /// innermost scope, once the call has all its arguments.
+    pub fn settle_defaults(&mut self, defaults: Vec<(Type, usize)>) {
+        for (region, inner) in defaults {
+            if let Type::Meta(_) = self.store.resolve(&region) {
+                let owner = Type::Skolem(self.regions.scopes[inner].region);
+                let _ = self.unify(&region, &owner);
+            }
+        }
     }
 
     /// The region of the `Scope` the current stage's row names, once known:

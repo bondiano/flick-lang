@@ -1,0 +1,27 @@
+// A task given to `FiberSet.run`, `FiberHandle.run` or `FiberMap.run` runs
+// at the owner of the group, which comes after it: an acquisition in it goes
+// to the group's region, not to the innermost scope (Р25).
+module App.SetAfterTask exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+
+groups : Path ->{FileSystem; OpenError} Unit
+let groups path = scope outer {
+  let options = { propagateInterruption = false; startImmediately = false }
+  let keyed = { onlyIfMissing = false; propagateInterruption = false; startImmediately = false }
+  let set : FiberSet.FiberSet outer {OpenError} Unit = FiberSet.make ()
+  let handle : FiberHandle.FiberHandle outer {OpenError} Unit = FiberHandle.make ()
+  let map : FiberMap.FiberMap outer String {OpenError} Unit = FiberMap.make ()
+  scope inner {
+    ignore (FiberSet.run options (task { ignore (FileSystem.open_scoped path) }) set)
+    ignore (FiberHandle.run keyed (task { ignore (FileSystem.open_scoped path) }) handle)
+    ignore (FiberMap.run keyed "key" (task { ignore (FileSystem.open_scoped path) }) map)
+  }
+}
