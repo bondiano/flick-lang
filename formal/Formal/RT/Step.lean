@@ -22,7 +22,7 @@ inductive Step (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
       (φ.role = .watcher → False) →
       Step K L C { C with
         Φ := upd C.Φ f (some (.done w)), J := .done f w :: C.J }
-  /-- a watcher ends: its supervisor returned -/
+  /-- a watcher ends, its supervisor returned -/
   | doneW {C f φ v} : C.Φ f = some (.run φ) → φ.role = .watcher → φ.code = .out (.ok v) →
       φ.stack = [] →
       Step K L C { C with
@@ -258,7 +258,7 @@ inductive Step (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
         Φ := setF C f { φ with code := .tm (K.plug e' (.ok (K.ofId C.n))) },
         Λ := upd C.Λ π (some { o with H := o.H ++ [.stop C.n] }),
         G := upd C.G C.n (some ⟨π, true, []⟩), n := C.n + 1 }
-  /-- `FiberSet.make` elsewhere: the group is born closed -/
+  /-- `FiberSet.make` elsewhere: born closed -/
   | groupClosed {C f φ e e' π} : C.Φ f = some (.run φ) → φ.code = .tm e →
       K.step e (.group π) e' → (∀ o, C.Λ π = some o → o.st.live = false) →
       Step K L C { C with
@@ -278,7 +278,7 @@ inductive Step (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
         Φ := upd (setF C f { φ with code := .tm (K.plug e' (.ok (K.ofId C.n))) }) C.n
                (some (.done (.fail [.int none]))),
         J := .done C.n (.fail [.int none]) :: C.J, n := C.n + 1 }
-  /-- (Par): start one more branch, acquiring in `π` -/
+  /-- (Par): one more branch, acquiring in `π` -/
   | parStart {C f φ t ts ks s} : C.Φ f = some (.run φ) → φ.code = .parC (t :: ts) →
       φ.stack = .par ks :: s →
       Step K L C { C with
@@ -327,10 +327,11 @@ inductive Step (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
         Φ := setF C f { φ with code := .idle, stack := .closing σ :: s },
         Λ := upd C.Λ σ (some { oσ with st := .closing, x := .fail c, ph := .hooks false }),
         M := setEnt C.M m Ly (some ⟨.failed c, σ, []⟩), J := .close σ :: C.J }
-  /-- `ask_S` answered by the environment `θ` -/
-  | use {C f φ e e'} : C.Φ f = some (.run φ) → φ.code = .tm e → K.step e .use e' →
+  /-- `ask_S` answered by `πₚ` of `θ` -/
+  | use {C f φ e e' π} : C.Φ f = some (.run φ) → φ.code = .tm e → K.step e (.use π) e' →
+      π ∈ φ.env →
       Step K L C { C with
         Φ := setF C f { φ with code := .tm (K.plug e' (.ok K.unit)) },
-        J := .use φ.env :: C.J }
+        J := .use π :: C.J }
 
 end Flick.RT

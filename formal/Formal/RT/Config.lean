@@ -55,8 +55,8 @@ inductive Act (T V : Type) where
   /-- `provide L { b }`: the memoizable layers of `L` in build order, each an identity
   and its build code -/
   | provide (Ls : List (Nat × T)) (b : T)
-  /-- an `ask_S` answered by the environment -/
-  | use
+  /-- an `ask_S` answered by the `provide` owner `π` of the environment -/
+  | use (π : Nat)
 
 /-- The core, a parameter of λRT. -/
 structure Core (T V : Type) where
@@ -241,7 +241,7 @@ inductive Ev (V : Type) where
   | build (m L σ : Nat)
   | obs (π m L σ i : Nat)
   | release (m L σ : Nat)
-  | use (θ : List Nat)
+  | use (π : Nat)
 
 /-- `⟨Φ, Λ, μ, M, D⟩` of §1.4, with groups `G`, pending Promises `X`, the journal `J` and
 the next fresh id `n`. -/

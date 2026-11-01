@@ -13,8 +13,9 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
 command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
-`T1_regions` and `T5` lists only Lean's standard `propext`, `Classical.choice` and `Quot.sound`;
-the hypotheses of T5 (`Hyp`, `G11`) are its parameters.
+`T1_regions`, `T5` and `T6b` lists only Lean's standard `propext`, `Classical.choice` and
+`Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`) and of T6(b) (`Coherent`, `Sim`) are their
+parameters.
 
 ## Status
 
@@ -28,6 +29,21 @@ the hypotheses of T5 (`Hyp`, `G11`) are its parameters.
 | P2b′ | the freshness premises of (Inside) with its own facts, the facts of the order of creation (`Facts.age`), the renaming in every step, a configuration writes only regions that exist; Л6 | done |
 | P2c | Л5, the invariant `⊢ Λ` (live work reaches only live regions), T4.1, T4.2, T1 with `op_H` | done |
 | P2c′ | T4.3: the provider of a service (Р37) | open |
+
+T4.3 (P2c′, in progress) is the premise Г11 of T5 in the form Р142 gives it: an `ask_S`
+answered by a `with` frame of the region `q` of a `provide`, inherited or not, happens only
+while `q` is live. Its Lean statement, which `G11` in `Formal/RT/Hyp.lean` is to match:
+
+```lean
+theorem T4_3 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
+    (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
+    (hs : CSteps root ⟨[], [], e₀⟩ c) :
+    ∀ i e E N q v, c.at i = some e → OkE E → e = plug E (.app (.const (.ask N)) (.lit .unit)) →
+      lookupE E N = some (q, v) → Live c.rgs q
+```
+
+Here `lookupE E N` is the region and the value of the innermost `with` frame of `E` that
+provides `N`, and `c.at i` ranges over the main thread and the children of live regions.
 
 ## Map to `core.md` and `regions.md`
 
@@ -341,8 +357,44 @@ Simplifications of λRT:
     outer `provide`, whose owner observes the build until its own (C5), that is "at most
     once". (b) A build is released only after every consumer's observer ran (`Good6` of
     `release`). (c) No service is used after its build is released (`GoodUse`), under Г11.
+    `G11` is about the answering entry only: `Act.use π` names the `provide` owner whose
+    environment entry answers the `ask_S`, and at such a step `π` is live. A child may carry
+    an entry of a closed `provide` that it never asks (Р142). P2 gives it as `T4_3`: the
+    region `q` of the `with` frame that `lookupE E N` finds for an `ask_N` is `Live`.
     A layer's build code runs in the providing fiber with the area `σ` as current owner; a
     failed build closes `σ` and makes the `provide` fail.
 12. **R7** is `Hist GoodRef`: each `Ref.modify ℓ` read the value of the latest `make` or
     `modify` of `ℓ` (`cell`), and the memory is the replay of the journal. Allocation is
     deterministic, as in P1.
+
+## Elaboration: coherence and T6(b)
+
+`Formal/Elab/` is another model of its own; it imports nothing from the core. It covers the
+coherence half of P4 (P4c) of [`docs/formal/elaboration.md`](../docs/formal/elaboration.md).
+
+| `elaboration.md` | Lean |
+| - | - |
+| §1.1 classes, instances; §2.1 superclass slots | `Prog`, `Inst`, `Prog.super` (`Elab/Syntax.lean`) |
+| §2.2 dictionary terms `d` | `Dict`, `apps`, `Dict.subst` (`Elab/Syntax.lean`) |
+| §2.3 `Δ*`, (Given), (Prim), (Struct), (Inst) | `Clo`, `Ent` (`Elab/Syntax.lean`) |
+| §4.1 К1–К8 | `Coherent` (`Elab/Hyp.lean`) |
+| §4.2 `≈` | `Eqv` (`Elab/Syntax.lean`) |
+| Lemma 6.1, Lemma 6.2, T6(b) | `lemma_6_1`, `lemma_6_2`, `T6b` (`Elab/Coherence.lean`) |
+| "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`), for P4b |
+
+Simplifications:
+
+1. Constraint types are first-order terms with binary application. К1 is semantic: heads
+   that some substitutions make equal belong to one instance, which is what a failed
+   first-order unification says.
+2. (Improve) gives no dictionary, so `Ent` starts from improved constraints; К2 and К3 only
+   make improvement order-independent and are not fields. К4 gives К1 for the whole program,
+   which `Coherent` assumes directly. К8 makes premise names fresh; premises here are
+   numbered.
+3. К5 is a well-founded transitive order `lt` with the instance context, a superclass and
+   a record's field below the constraint, plus "the variables of the context are in the head".
+4. (Struct) and (Prim) are black boxes: `fields` and `prims`, which commute with
+   substitution; К6 keeps the compiler's classes apart from the program's instances.
+5. An expression is a skeleton with dictionary holes all under one `Δ`; `Sim` says filling
+   them with `≈` dictionaries gives the same result. A hole under a `λδ̄` of (Let-Sig-Dict)
+   sees a longer `Δ`, which P4b brings with the typing of expressions.

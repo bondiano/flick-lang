@@ -16,7 +16,7 @@ variable {T V : Type} [DecidableEq V] {K : Core T V} {L : Lib V} {C C' : Conf T 
 
 /-- What a use of a service requires of the past: its layer was not released. -/
 def GoodUse : Ev V → List (Ev V) → Prop
-  | .use θ, J => ∀ π ∈ θ, ∀ m Ly σ i, .obs π m Ly σ i ∈ J → .release m Ly σ ∉ J
+  | .use π, J => ∀ m Ly σ i, .obs π m Ly σ i ∈ J → .release m Ly σ ∉ J
   | _, _ => True
 
 /-- **R6.** (a) A memo map builds a layer again only after releasing its build; (b) a build
@@ -44,13 +44,15 @@ theorem mem_order {α : Type} {a b : α} {J : List α} (ha : a ∈ J) (hb : b �
       · exact .inr (.inr ⟨x :: J₁, J₂, rfl, h⟩)
 
 omit [DecidableEq V] in
+omit [DecidableEq V] in
 theorem use_step (I : Inv C) (I6 : Inv6 C) (hu : Hist GoodUse C.J)
-    (h11 : ∀ f φ, C.Φ f = some (.run φ) → ∀ π ∈ φ.env, ∃ o, C.Λ π = some o ∧ o.st.live = true)
+    (h11 : ∀ f φ e e' π, C.Φ f = some (.run φ) → φ.code = .tm e → K.step e (.use π) e' →
+      π ∈ φ.env → ∃ o, C.Λ π = some o ∧ o.st.live = true)
     (hs : Step K L C C') : Hist GoodUse C'.J := by
   cases hs <;> simp only [hist_cons, GoodUse, hu, and_true]
-  case use f φ e e' hf hc hst =>
-    intro π hπ m Ly σ i hob hrel
-    obtain ⟨o, ho, hl⟩ := h11 f φ hf π hπ
+  case use f φ e e' π hf hc hst hπ =>
+    intro m Ly σ i hob hrel
+    obtain ⟨o, ho, hl⟩ := h11 f φ e e' π hf hc hst hπ
     rcases mem_order hob hrel with h | ⟨J₁, J₂, hJ, h⟩ | ⟨J₁, J₂, hJ, h⟩
     · cases h
     · have hr := I6.hist J₁ _ J₂ hJ π i h
