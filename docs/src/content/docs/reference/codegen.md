@@ -358,7 +358,10 @@ Node's ICU; a `RegExp` runs on Go's RE2 engine, with positions in code
 units and JS's `$` replacement patterns, and syntax RE2 lacks (lookaround,
 backreferences) is a `RegExpError`. `String.locale_compare` orders as
 `Intl.Collator("en")` does, by weights the same script reads from Node;
-every locale collates as `en`.
+every locale collates as `en`. A date in text (`DateTime.make`,
+`Config.date`, HTTP dates) is read by a port of V8's `Date.parse`, legacy
+forms included; a date-time without an offset is local time, Go's
+`time.Local`.
 
 A pattern RE2 reads still means something else in a few places, because
 RE2 has no JS mode and Flick passes the source on as written:

@@ -31,6 +31,7 @@ get_value: <redacted> / abc123
 cookie: Cookie "theme=<redacted>" theme dark
 serialize: theme=dark
 expires: until=1; Expires=Wed, 02 Jan 2030 03:04:05 GMT / until=1; Expires=Wed, 02 Jan 2030 04:04:05 GMT
+read expires: ["a=1; Expires=Wed, 21 Oct 2015 07:28:00 GMT", "b=2; Expires=Sun, 10 Mar 2024 09:00:00 GMT", "c=3"]
 names: ["session", "theme", "a"]
 get: Some "theme"
 remove: (true, false)

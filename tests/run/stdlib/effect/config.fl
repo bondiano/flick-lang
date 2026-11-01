@@ -22,6 +22,7 @@ let env =
     ("SITE", "https://example.com/a/../b"),
     ("DAY", "2024-01-02T00:00:00Z"),
     ("BAD_DAY", "not a date"),
+    ("OLD_DAY", "Tue, 15 Nov 1994 08:12:31 GMT"),
     ("MODE", "prod"),
     ("TAGS", "a,b,c"),
     ("PAIRS", "a=1;b=2"),
@@ -86,6 +87,7 @@ let main () =
   Platform.stdout_line (read (Config.url "SITE") (fun u -> u))
   Platform.stdout_line (read (Config.date "DAY") show)
   Platform.stdout_line (read (Config.date "BAD_DAY") show)
+  Platform.stdout_line (read (Config.date "OLD_DAY") show)
   Platform.stdout_line (read (Config.literal "prod" "MODE") (fun m -> m))
   Platform.stdout_line (read (Config.literals ["dev", "test"] "MODE") (fun m -> m))
   Platform.stdout_line (read (Config.array { separator = None } Schema.string "TAGS") show)

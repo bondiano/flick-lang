@@ -16,6 +16,7 @@ https://example.com/b
 1704153600000
 error: SchemaError(Expected a valid Date
   at ["BAD_DAY"])
+784887151000
 prod
 error: SchemaError(Expected "dev" | "test"
   at ["MODE"])

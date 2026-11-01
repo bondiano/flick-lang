@@ -200,11 +200,9 @@ func notModified(q *ServerRequest, full *ServerResponse) *ServerResponse {
 			}
 		}
 	} else if ims, ok := q.header("if-modified-since"); ok {
-		// shortcut: dates read as HTTP dates, not with all that Date.parse accepts; parse its other forms when a client sends them
 		lm, hasLm := responseHeader(full, "last-modified")
-		since, err1 := http.ParseTime(ims)
-		last, err2 := http.ParseTime(lm)
-		matches = hasLm && err1 == nil && err2 == nil && !last.After(since)
+		// NaN compares false, as in Effect's isNotModifiedSince
+		matches = hasLm && parseJsDate(lm) <= parseJsDate(ims)
 	}
 	if !matches {
 		return nil

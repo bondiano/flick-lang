@@ -1,4 +1,4 @@
-make: ["2024-03-10T08:30:00.000Z", "error: not a date-time: \"not a date\"", "1970-01-02T00:00:00.000Z", "error: epoch seconds out of range: NaN"]
+make: ["2024-03-10T08:30:00.000Z", "error: not a date-time: \"not a date\"", "error: not a date-time: \"March 10, 2024 8:30 PM\"", "2024-03-10T00:00:00.000Z", "1970-01-02T00:00:00.000Z", "error: epoch seconds out of range: NaN"]
 from_parts: 2024-02-29T12:00:00.000Z
 zoned string: ["2024-03-10T09:00:00.000+01:00", "2024-03-10T09:00:00.000+02:00", "error: not a zoned date-time: \"nowhere\""]
 zones: ["Europe/Paris", "-01:30", "+05:30", "error: invalid time zone: \"Mars/Olympus\""]
