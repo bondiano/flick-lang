@@ -77,10 +77,26 @@ impl Checker<'_> {
     }
 
     fn bind_pattern(&mut self, p: &Pat, t: &Type, out: &mut Vec<(Name, Type)>) -> Check<()> {
+        if !matches!(p, Pat::Var(_) | Pat::Wild) && !matches!(self.qualifier(t), q if q.is_empty())
+        {
+            // (Proj): the parts of `(T ῡ)^C` have `C` too
+            let whole = t.clone();
+            let bare = self.resolve(t);
+            let mut parts = Vec::new();
+            self.bind_pattern(p, &bare, &mut parts)?;
+            out.extend(
+                parts
+                    .into_iter()
+                    .map(|(x, part)| (x, self.project_part(&whole, part))),
+            );
+            return Ok(());
+        }
+        let full = t.clone();
+        let t = &self.resolve(t);
         match p {
             Pat::Wild => Ok(()),
             Pat::Var(x) => {
-                out.push((x.clone(), t.clone()));
+                out.push((x.clone(), full));
                 Ok(())
             }
             Pat::Lit(l) => self.unify(t, &lit_type(l)),
@@ -158,7 +174,7 @@ impl Checker<'_> {
             params.push((*p).clone());
             ct = (*r).clone();
         }
-        self.unify(&ct, t)?;
+        self.unify(&self.resolve(&ct), &self.resolve(t))?;
         Ok(params)
     }
 
@@ -206,7 +222,7 @@ impl Checker<'_> {
 
     /// The constructors of the values of `t`, if there are finitely many.
     fn signature(&mut self, t: &Type) -> Check<Option<Vec<Ctor>>> {
-        let t = self.zonk(t);
+        let t = self.zonk(&self.resolve(t));
         let mut head = &t;
         while let Type::App(h, _) = head {
             head = h;
@@ -253,11 +269,11 @@ impl Checker<'_> {
         Ok(match ctor {
             Ctor::Con(c) => self.con_fields(c, t)?,
             Ctor::Lit(_) | Ctor::Nil => Vec::new(),
-            Ctor::Tuple(_) => match self.zonk(t) {
+            Ctor::Tuple(_) => match self.zonk(&self.resolve(t)) {
                 Type::Tuple(ts) => ts.to_vec(),
                 _ => Vec::new(),
             },
-            Ctor::Record(labels) => match self.zonk(t) {
+            Ctor::Record(labels) => match self.zonk(&self.resolve(t)) {
                 Type::Record(f) => labels.iter().map(|l| f.fields[l].clone()).collect(),
                 _ => Vec::new(),
             },

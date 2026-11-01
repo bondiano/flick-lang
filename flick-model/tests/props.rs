@@ -3,8 +3,11 @@
 //! (`docs/formal/core.md` §4) hold on every state the machine passes
 //! through; flick-core accepts a program, changed or not, exactly when the
 //! model does, but for the local function without a signature flick-core
-//! rejects by design. Not part of `just test`: `just model` runs them, and
-//! `PROPTEST_CASES` sets how many programs each sees.
+//! rejects by design. The programs of regions (X3, `docs/formal/regions.md`)
+//! are checked by both and not run; a change may leak a region by each path
+//! of its §4 but the fourth. The generator makes none of the forms of the
+//! recorded incompletenesses Р23 and Р25. Not part of `just test`: `just
+//! model` runs them, and `PROPTEST_CASES` sets how many programs each sees.
 
 use std::path::Path;
 use std::rc::Rc;
@@ -126,7 +129,8 @@ fn progress_and_preservation(decls: &eval::Program, d: &Decls, p: &Program) -> R
 
 proptest! {
     // a failure becomes a case of `tests/check`, not a file of seeds
-    #![proptest_config(ProptestConfig { failure_persistence: None, ..ProptestConfig::default() })]
+    // (most programs with a `scope` are not run, below)
+    #![proptest_config(ProptestConfig { failure_persistence: None, max_global_rejects: 1 << 20, ..ProptestConfig::default() })]
 
     #[test]
     #[ignore = "a property of X2; run `just model`"]
@@ -142,6 +146,9 @@ proptest! {
     fn progress_and_preservation_hold(c in choices()) {
         let p = generate::program(&c);
         prop_assume!(model(&p).is_ok());
+        // shortcut: a program with a `scope` is not run, the machine has no
+        // dynamics of regions (`regions.md` §3); run it once P2 adds them
+        prop_assume!(!generate::has_scope(&p));
         let globals = eval::Program::default();
         let checked = DECLS.with(|d| progress_and_preservation(&globals, d, &p));
         if let Err(e) = checked {

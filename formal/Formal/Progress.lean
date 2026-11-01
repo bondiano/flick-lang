@@ -43,7 +43,7 @@ theorem handle_progress {Ψ μ v A ε₀ H t φ} (hv : Value v)
 theorem nt {F : Frame} (h : F.isTry → False) : ¬ F.isTry := h
 
 /-- Progress of an application of two values. -/
-theorem app_progress {Ψ μ root f e a ψ t φ} (hμ : StoreTy S Ψ μ) (hvf : Value f) (hve : Value e)
+theorem app_progress {Ψ μ root f e a ψ t φ} (hμ : μ.length = Ψ.length) (hvf : Value f) (hve : Value e)
     (hf : Typ S Ψ [] f (.ex (.arrow a ψ t) φ)) (he : Typ S Ψ [] e (.ex a φ)) (hψ : ψ.le φ) :
     Value (.app f e) ∨ NV root μ (.app f e) φ.svc := by
   have step : ∀ {l o}, Step root l μ (.app f e) o → Value (.app f e) ∨ NV root μ (.app f e) φ.svc :=
@@ -61,7 +61,7 @@ theorem app_progress {Ψ μ root f e a ψ t φ} (hμ : StoreTy S Ψ μ) (hvf : V
         obtain ⟨_, _, _, h, la, _, _⟩ := hT'.arrow_left
         cases h; cases la
         obtain ⟨l, rfl, hl⟩ := canonical_ref hve he
-        exact step (Step.ofR (.refGet (List.getElem?_eq_getElem (hμ.1 ▸ getElem?_lt hl))))
+        exact step (Step.ofR (.refGet (List.getElem?_eq_getElem (hμ ▸ getElem?_lt hl))))
       | refSet => exact .inl (.constApp (.inl rfl) hve)
       | ask N =>
         obtain ⟨_, _, _, h, la, hψ', _⟩ := hT'.arrow_left
@@ -84,7 +84,7 @@ theorem app_progress {Ψ μ root f e a ψ t φ} (hμ : StoreTy S Ψ μ) (hvf : V
           obtain ⟨_, _, _, h, la, _, _⟩ := hT'.arrow_left
           cases h; cases la
           obtain ⟨l, rfl, hl⟩ := canonical_ref hw hw'
-          exact step (Step.ofR (.refSet hve (hμ.1 ▸ getElem?_lt hl)))
+          exact step (Step.ofR (.refSet hve (hμ ▸ getElem?_lt hl)))
     | merge => exact .inl (.constApp2 rfl trivial hw hve)
     | _ => simp [Const.arity] at hc
 

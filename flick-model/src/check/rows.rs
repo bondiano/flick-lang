@@ -7,7 +7,7 @@
 use std::mem;
 
 use super::{Check, Checker, error};
-use crate::types::{Row, Stage, Type, Var};
+use crate::types::{Caps, Row, Stage, Type, Var};
 
 impl Checker<'_> {
     /// `ρ ⊆ ρ'`. An element or a rigid variable `ρ'` lacks goes into its
@@ -113,6 +113,8 @@ impl Checker<'_> {
 
     /// `φ ⊔ φ'` into the stage of the expression being checked.
     pub(super) fn perform(&mut self, s: &Stage) -> Check<()> {
+        self.raised(s);
+        self.lexical_owner(s)?;
         self.stage = match (self.stage.clone(), s) {
             (Stage::Pure, s) => self.zonk_stage(s),
             (current, Stage::Pure) => current,
@@ -141,8 +143,19 @@ impl Checker<'_> {
         }
     }
 
-    /// `τ ≤ τ'`: ≤-Fun and ≤-Eff, else ≤-Refl.
+    /// `τ ≤ τ'`: ≤-Fun and ≤-Eff, else ≤-Refl; with (≤-Cap) of
+    /// `regions.md` §2.2 on the whole value, qualified or bare.
     pub(super) fn subsume(&mut self, actual: &Type, expected: &Type) -> Check<()> {
+        let (a, b) = (self.follow(actual), self.follow(expected));
+        if matches!(b, Type::Var(Var::Meta(_))) {
+            return self.unify(&a, &b);
+        }
+        self.subsume_bare(actual, expected)?;
+        self.hold(&[a], &[b], &Caps::default(), "≤-Cap");
+        Ok(())
+    }
+
+    fn subsume_bare(&mut self, actual: &Type, expected: &Type) -> Check<()> {
         match (self.resolve(actual), self.resolve(expected)) {
             (Type::Fun(p, s, r), Type::Fun(p2, s2, r2)) => {
                 self.subsume(&p2, &p)?;

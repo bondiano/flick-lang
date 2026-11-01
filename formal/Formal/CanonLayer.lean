@@ -11,7 +11,7 @@ namespace Flick
 variable {S : Sig}
 
 /-- What `build` gives for a layer value. -/
-def Builds (S : Sig) (Ψ Γ : List Ty) (v : Tm) : Prop :=
+def Builds (S : Sig) (Ψ : List Ty) (Γ : List Scheme) (v : Tm) : Prop :=
   ∀ {i e o φ}, Typ S Ψ Γ v (.ex (.layer i e o) φ) →
     ∃ b, v.build = some b ∧ Typ S Ψ Γ b (.ex (.env o) (.rt i e))
 

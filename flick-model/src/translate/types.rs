@@ -1,7 +1,8 @@
-//! Types of flick-core to types of the model. Captures and regions are
-//! erased (`docs/formal/core.md` §0), class constraints become dictionary
-//! parameters (§1.6), and the prelude's `Eff`, `Ref`, `Layer`, `Errors`
-//! and `S.Impl` become the forms of §1.2.
+//! Types of flick-core to types of the model. Class constraints become
+//! dictionary parameters (`docs/formal/core.md` §1.6), `Fiber.Outlives`
+//! the facts `Θ` of a scheme (`docs/formal/regions.md` §1.2); regions are
+//! variables of kind `Region`, qualifiers `τ^C`; the prelude's `Eff`, `Ref`,
+//! `Layer`, `Errors` and `S.Impl` become the forms of §1.2.
 
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -9,7 +10,7 @@ use std::rc::Rc;
 use flick_core::types::{self as fc, Binder};
 
 use crate::syntax::Path;
-use crate::types::{Fields, Kind, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 const PRELUDE: &str = "Prelude";
 
@@ -19,8 +20,9 @@ fn kind(k: &fc::Kind) -> Option<Kind> {
         fc::Kind::ErrorRow => Kind::Errors,
         fc::Kind::Row(inner) if **inner == fc::Kind::Type => Kind::Fields,
         fc::Kind::Arrow(a, b) => Kind::Arrow(Rc::new(kind(a)?), Rc::new(kind(b)?)),
-        // regions and captures are erased; the rest is not in the core
-        fc::Kind::CaptureRow | fc::Kind::Region => return None,
+        fc::Kind::Region => Kind::Region,
+        fc::Kind::CaptureRow => Kind::Captures,
+        // the rest is not in the core
         _ => Kind::Type,
     })
 }
@@ -30,7 +32,7 @@ fn passes(c: &fc::Type) -> bool {
     fc::passes_dictionary(c)
 }
 
-/// `∀ᾱ. C̄ ⇒ τ` as `∀ᾱ. C₁.Dict τ̄₁ →P … →P τ`.
+/// `∀ᾱ. C̄ ⇒ τ` as `∀ᾱ. C₁.Dict τ̄₁ →P … →P τ`, with `Outlives C ϱ` in `Θ`.
 pub fn scheme(t: &fc::Type) -> Scheme {
     match t {
         fc::Type::Forall {
@@ -42,14 +44,27 @@ pub fn scheme(t: &fc::Type) -> Scheme {
             for c in constraints.iter().rev().filter(|c| passes(c)) {
                 out = Type::fun(constraint(c), Stage::Pure, out);
             }
+            let outlives = constraints
+                .iter()
+                .filter(|c| !passes(c))
+                .filter_map(|c| match c.spine() {
+                    (fc::Type::Con { name, .. }, args) if name == "Outlives" => match &args[..] {
+                        [c, s] => Some((caps(c), ty(s))),
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .collect();
             Scheme {
                 vars: binders(vars),
                 body: out,
+                outlives,
             }
         }
         other => Scheme {
             vars: Vec::new(),
             body: ty(other),
+            outlives: Vec::new(),
         },
     }
 }
@@ -93,7 +108,15 @@ pub fn ty(t: &fc::Type) -> Type {
         fc::Type::Tuple(ts) if ts.is_empty() => Type::con(PRELUDE, "Unit"),
         fc::Type::Tuple(ts) => Type::Tuple(ts.iter().map(ty).collect()),
         fc::Type::Record(r) => Type::Record(fields(r)),
-        fc::Type::Captured { ty: inner, .. } | fc::Type::Bounded { ty: inner, .. } => ty(inner),
+        fc::Type::Captured {
+            ty: inner,
+            captures,
+            ..
+        } => Type::Captured(Rc::new(ty(inner)), caps(captures)),
+        fc::Type::Bounded {
+            ty: inner,
+            captures,
+        } => Type::Bounded(Rc::new(ty(inner)), caps(captures)),
         fc::Type::Forall { .. } => Type::Forall(Rc::new(scheme(t))),
         other => Type::Con(Path::new("?", &format!("{other:?}"))),
     }
@@ -146,6 +169,40 @@ fn add(t: &fc::Type, out: &mut Row) {
         }
         fc::Type::Captured { ty: inner, .. } | fc::Type::Bounded { ty: inner, .. } => {
             add(inner, out);
+        }
+        _ => {}
+    }
+}
+
+/// A set of captures: the atoms a row of them names, and its tails. A tail
+/// may be a region the scheme binds; instantiating it makes it an atom.
+pub fn caps(t: &fc::Type) -> Caps {
+    let mut out = Caps::default();
+    add_caps(t, &mut out);
+    out
+}
+
+fn add_caps(t: &fc::Type, out: &mut Caps) {
+    match t {
+        fc::Type::Row(r) => {
+            for (_, atom) in &r.entries {
+                match atom {
+                    fc::Type::Var(v) => {
+                        out.atoms.insert(Var::Named(v.as_str().into()));
+                    }
+                    other => add_caps(other, out),
+                }
+            }
+            if let Some(tail) = &r.tail {
+                add_caps(tail, out);
+            }
+        }
+        fc::Type::Union(a, b) => {
+            add_caps(a, out);
+            add_caps(b, out);
+        }
+        fc::Type::Var(v) => {
+            out.vars.insert(Var::Named(v.as_str().into()));
         }
         _ => {}
     }

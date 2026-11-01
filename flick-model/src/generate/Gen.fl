@@ -1,5 +1,6 @@
 // The declarations every program of the generator of X2 uses
-// (flick-model/src/generate): two errors and two services.
+// (flick-model/src/generate): two errors and two services, and what the
+// programs of regions (docs/formal/regions.md) acquire and hold.
 module Gen exposing (..)
 
 type error Oops = Oops Int
@@ -11,3 +12,37 @@ service Log =
 
 service Counter =
   next : Unit ->{} Int
+
+// A capability of region `s`: acquired into it, released when it closes.
+type Handle (s : Region)
+
+open_scoped : forall s. String ->{Scope s;} Handle s
+foreign effect open_scoped from "./res.mjs" "open"
+
+use : forall s. Handle s ->{} Unit
+foreign effect use from "./res.mjs" "use"
+  retention call
+
+// Data that stores only its parameter, and data that hides what it holds.
+type Wrapper s = Wrapper (Handle s)
+
+opaque type Sealed = Sealed (Unit ->{} Unit)
+
+type error Leaked a = Leaked a
+
+// An object without a region, which `Resource.acquire_release` gives one.
+type Raw
+
+make_conn : String ->{} Raw
+foreign effect make_conn from "./res.mjs" "raw"
+
+close_conn : forall c. Raw^c ->{} Unit
+foreign effect close_conn from "./res.mjs" "close"
+  retention call
+
+use_conn : forall c. Raw^c ->{} Unit
+foreign effect use_conn from "./res.mjs" "use"
+  retention call
+
+report : Failure e ->{; none} Unit
+let report _ = ()

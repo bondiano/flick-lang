@@ -3,6 +3,7 @@
 //! shadow a name; it never renames.
 
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use crate::syntax::{Arm, Head, Lit, Name, Pat, Term};
@@ -71,6 +72,7 @@ pub fn subst(e: &Term, s: &Subst) -> Term {
         Term::Await(e) => Term::Await(go(e)),
         Term::Try(e, arms) => Term::Try(go(e), arms_subst(arms, s)),
         Term::Provide(l, e) => Term::Provide(go(l), go(e)),
+        Term::Scope(r, e) => Term::Scope(r.clone(), Rc::new(subst(e, &without(s, r)))),
         Term::Fix(f, sig, lam) => {
             Term::Fix(f.clone(), sig.clone(), Rc::new(subst(lam, &without(s, f))))
         }
@@ -175,5 +177,69 @@ pub fn lit_eq(a: &Lit, b: &Lit) -> bool {
     match (a, b) {
         (Lit::Float(x), Lit::Float(y)) => x == y,
         _ => a == b,
+    }
+}
+
+/// The variables `e` uses that no binder in it binds: `fv(e)`.
+pub fn free_vars(e: &Term) -> BTreeSet<Name> {
+    let mut out = BTreeSet::new();
+    free(e, &mut Vec::new(), &mut out);
+    out
+}
+
+fn free(e: &Term, bound: &mut Vec<Name>, out: &mut BTreeSet<Name>) {
+    let under = |x: &Name, t: &Term, bound: &mut Vec<Name>, out: &mut BTreeSet<Name>| {
+        bound.push(x.clone());
+        free(t, bound, out);
+        bound.pop();
+    };
+    match e {
+        Term::Var(x) => {
+            if !bound.contains(x) {
+                out.insert(x.clone());
+            }
+        }
+        Term::Lam(x, b) | Term::Fix(x, _, b) | Term::Scope(x, b) => under(x, b, bound, out),
+        Term::Let(x, _, e1, e2) => {
+            free(e1, bound, out);
+            under(x, e2, bound, out);
+        }
+        Term::LetRec(f, _, e1, e2) => {
+            under(f, e1, bound, out);
+            under(f, e2, bound, out);
+        }
+        Term::Match(x, arms) | Term::Try(x, arms) | Term::Handle(x, arms) => {
+            free(x, bound, out);
+            for arm in arms.iter() {
+                let mark = bound.len();
+                binders(&arm.pat, bound);
+                if let Some(g) = &arm.guard {
+                    free(g, bound, out);
+                }
+                free(&arm.body, bound, out);
+                bound.truncate(mark);
+            }
+        }
+        Term::Tuple(xs) | Term::List(xs) | Term::Structural(_, xs) | Term::Apply(_, xs) => {
+            xs.iter().for_each(|x| free(x, bound, out));
+        }
+        Term::Record(fs) => fs.iter().for_each(|(_, x)| free(x, bound, out)),
+        Term::App(a, b) | Term::Update(a, _, b) | Term::Provide(a, b) | Term::Join(a, b) => {
+            free(a, bound, out);
+            free(b, bound, out);
+        }
+        Term::Field(x, _)
+        | Term::Task(x)
+        | Term::Await(x)
+        | Term::Bind(_, x)
+        | Term::With(_, x)
+        | Term::Raise(x) => free(x, bound, out),
+        Term::Global(_)
+        | Term::Lit(_)
+        | Term::Tag(_)
+        | Term::Stuck(_)
+        | Term::Loc(_)
+        | Term::Env(_)
+        | Term::Die(_) => {}
     }
 }

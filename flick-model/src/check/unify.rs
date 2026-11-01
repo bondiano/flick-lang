@@ -1,14 +1,17 @@
 //! Metas and `≡` (`docs/formal/core.md` §1.2): unification of types and
 //! record fields, `Errors {E} ≡ E` and `Errors none ≡ Never`, and
-//! `EffOf ρ ρ' τ ≡ Eff ρ ρ' τ` (§1.6).
+//! `EffOf ρ ρ' τ ≡ Eff ρ ρ' τ` (§1.6). Qualified types are equal when the
+//! types are and they reach the same captures (`regions.md` §2.2); a meta
+//! never takes a region of a `scope` deeper than itself (§2.3 (Scope)).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
+use std::slice;
 
 use super::generalize::{Inst, rigid_inst, substitute_all};
 use super::{Check, Checker, Slot, Solved, error};
 use crate::syntax::{Name, Path};
-use crate::types::{Fields, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Fields, Row, Scheme, Stage, Type, Var};
 
 impl Checker<'_> {
     pub(super) fn meta(&mut self) -> u32 {
@@ -35,8 +38,8 @@ impl Checker<'_> {
     }
 
     /// `t` with the metas at its head followed, and `EffOf ρ ρ' τ` as
-    /// `Eff ρ ρ' τ`.
-    pub(super) fn resolve(&self, t: &Type) -> Type {
+    /// `Eff ρ ρ' τ`; a qualifier is kept.
+    pub(super) fn follow(&self, t: &Type) -> Type {
         let mut t = t.clone();
         while let Type::Var(v) = &t
             && let Some(Solved::Type(next)) = self.solution(v)
@@ -51,10 +54,46 @@ impl Checker<'_> {
         t
     }
 
+    /// `t` followed, under its qualifiers: what a rule that takes the
+    /// value apart sees.
+    pub(super) fn resolve(&self, t: &Type) -> Type {
+        let mut t = self.follow(t);
+        while let Type::Captured(inner, _) | Type::Bounded(inner, _) = &t {
+            t = self.follow(inner);
+        }
+        t
+    }
+
+    /// `C` with every solved meta replaced: a type meta in an atom by
+    /// what its type reaches (`regions.md` §2.1, Подстановка).
+    pub(super) fn zonk_caps(&self, c: &Caps) -> Caps {
+        let mut out = Caps::default();
+        for a in &c.atoms {
+            match self.solution(a) {
+                Some(Solved::Type(t)) => out = out.union(&self.reach(t)),
+                _ => {
+                    out.atoms.insert(a.clone());
+                }
+            }
+        }
+        for v in &c.vars {
+            match self.solution(v) {
+                Some(Solved::Caps(more)) => out = out.union(&self.zonk_caps(more)),
+                Some(Solved::Type(t)) => out = out.union(&self.reach(t)),
+                _ => {
+                    out.vars.insert(v.clone());
+                }
+            }
+        }
+        out
+    }
+
     /// `t` with every solved meta replaced.
     pub(super) fn zonk(&self, t: &Type) -> Type {
         let z = |t: &Rc<Type>| Rc::new(self.zonk(t));
-        match self.resolve(t) {
+        match self.follow(t) {
+            Type::Captured(t, c) => Type::Captured(z(&t), self.zonk_caps(&c)),
+            Type::Bounded(t, c) => Type::Bounded(z(&t), self.zonk_caps(&c)),
             t @ (Type::Var(_) | Type::Con(_)) => t,
             Type::App(h, a) => Type::App(z(&h), z(&a)),
             Type::Fun(p, s, r) => Type::Fun(z(&p), self.zonk_stage(&s), z(&r)),
@@ -74,6 +113,7 @@ impl Checker<'_> {
             Type::Forall(s) => Type::Forall(Rc::new(Scheme {
                 vars: s.vars.clone(),
                 body: self.zonk(&s.body),
+                outlives: s.outlives.clone(),
             })),
         }
     }
@@ -141,7 +181,18 @@ impl Checker<'_> {
                 args.iter().for_each(|a| self.metas(a, out));
             }
         };
+        let caps = |c: &Caps, out: &mut BTreeSet<u32>| {
+            for v in c.atoms.iter().chain(&c.vars) {
+                if let Var::Meta(m) = v {
+                    out.insert(*m);
+                }
+            }
+        };
         match self.zonk(t) {
+            Type::Captured(t, c) | Type::Bounded(t, c) => {
+                caps(&c, out);
+                self.metas(&t, out);
+            }
             Type::Var(Var::Meta(m)) => {
                 out.insert(m);
             }
@@ -180,7 +231,7 @@ impl Checker<'_> {
 
     /// Lowers the level of every meta in `t` to `level`: what a meta at
     /// that level is solved to is reachable from there.
-    fn lower(&mut self, t: &Type, level: u32) {
+    pub(super) fn lower(&mut self, t: &Type, level: u32) {
         let mut ms = BTreeSet::new();
         self.metas(t, &mut ms);
         for m in ms {
@@ -199,6 +250,7 @@ impl Checker<'_> {
             );
         }
         let level = self.slots[m as usize].level;
+        self.escapes(occurs, level)?;
         self.lower(occurs, level);
         self.slots[m as usize].solved = Some(solved);
         Ok(())
@@ -206,6 +258,11 @@ impl Checker<'_> {
 
     pub(super) fn bind_row(&mut self, m: u32, r: Row) -> Check<()> {
         self.bind(m, Solved::Row(r.clone()), &Type::Errors(r))
+    }
+
+    pub(super) fn bind_caps(&mut self, m: u32, c: Caps) -> Check<()> {
+        let occurs = Type::Captured(Rc::new(Type::con("Prelude", "Unit")), c.clone());
+        self.bind(m, Solved::Caps(c), &occurs)
     }
 
     fn bind_fields(&mut self, m: u32, f: Fields) -> Check<()> {
@@ -218,11 +275,26 @@ impl Checker<'_> {
 
     /// `τ ≡ τ'`.
     pub(super) fn unify(&mut self, a: &Type, b: &Type) -> Check<()> {
-        let (a, b) = (self.resolve(a), self.resolve(b));
+        let (a, b) = (self.follow(a), self.follow(b));
         match (&a, &b) {
             (Type::Var(Var::Meta(m)), Type::Var(Var::Meta(n))) if m == n => Ok(()),
             (Type::Var(Var::Meta(m)), t) | (t, Type::Var(Var::Meta(m))) => {
                 self.bind(*m, Solved::Type(t.clone()), t)
+            }
+            // `τ^C ≡ τ'^C'`: `τ ≡ τ'`, and both reach the same
+            (Type::Captured(x, c), Type::Captured(y, d))
+            | (Type::Bounded(x, c), Type::Bounded(y, d))
+                if c == d =>
+            {
+                self.unify(x, y)
+            }
+            (Type::Captured(..) | Type::Bounded(..), _)
+            | (_, Type::Captured(..) | Type::Bounded(..)) => {
+                self.unify(&self.resolve(&a), &self.resolve(&b))?;
+                let (a, b) = (slice::from_ref(&a), slice::from_ref(&b));
+                self.hold(a, b, &Caps::default(), "≡");
+                self.hold(b, a, &Caps::default(), "≡");
+                Ok(())
             }
             (Type::Var(x), Type::Var(y)) if x == y => Ok(()),
             (Type::Con(p), Type::Con(q)) if p == q => Ok(()),

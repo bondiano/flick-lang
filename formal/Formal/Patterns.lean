@@ -16,7 +16,7 @@ theorem field_typ {Ψ Γ l φ} :
   | rcons l' e r _ ih =>
     intro w R t h hw hR
     cases h with
-    | rcons _ he hr =>
+    | rcons _ _ he hr =>
       simp only [Tm.field, Ty.field] at hw hR
       split at hw
       · simp_all
@@ -32,14 +32,14 @@ theorem setField_typ {Ψ Γ l w t φ} (hw : Typ S Ψ Γ w (.ex t φ)) :
   | rcons l' e r _ ih =>
     intro v' R h hv hR
     cases h with
-    | rcons hl he hr =>
+    | rcons hRec hl he hr =>
       simp only [Tm.setField, Ty.field] at hv hR
       split at hv
       · simp_all only [if_true, Option.some.injEq]
-        subst hv hR; exact .rcons hl hw hr
+        subst hv hR; exact .rcons hRec hl hw hr
       · simp_all only [if_false]
         obtain ⟨r', hr', rfl⟩ := Option.map_eq_some_iff.mp hv
-        exact .rcons hl he (ih hr hr' hR)
+        exact .rcons hRec hl he (ih hr hr' hR)
     | errVal => simp [Ty.field] at hR
   | _ => intro _ _ _ hv; simp [Tm.setField] at hv
 

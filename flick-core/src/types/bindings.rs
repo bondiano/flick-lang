@@ -336,8 +336,9 @@ impl Checker<'_> {
                 ),
             );
         } else if (function || is_fun) && !header {
-            // the suggestion shows the rows the body needs, not their unknowns
-            self.close_rows();
+            // the suggestion shows the rows the body needs, not their unknowns;
+            // only this binding's own: an enclosing row still gathers its calls
+            self.close_rows_above(Some(self.store.level));
             let span = self.span(decl);
             let incomplete = self.zonk(&ty).contains(&mut |t| matches!(t, Type::Error));
             let diagnostic = Diagnostic::error(

@@ -141,6 +141,12 @@ impl Checker<'_> {
     /// Solves the constraints so far and makes every row they leave unknown
     /// empty.
     pub fn close_rows(&mut self) {
+        self.close_rows_above(None);
+    }
+
+    /// `close_rows` for the rows of variables deeper than `level` only: a
+    /// binding's own, while an enclosing declaration still gathers its calls.
+    pub fn close_rows_above(&mut self, level: Option<u32>) {
         self.grow();
         let mut open = Vec::new();
         for c in &self.subrows {
@@ -153,11 +159,15 @@ impl Checker<'_> {
             }
         }
         for m in open {
-            if self.store.meta_level(m).is_some() {
+            if self
+                .store
+                .meta_level(m)
+                .is_some_and(|l| level.is_none_or(|level| l > level))
+            {
                 self.store.set(m, Type::empty_row());
             }
         }
-        self.close_holds(None);
+        self.close_holds(level);
     }
 
     fn report_rows(&mut self) {

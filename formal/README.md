@@ -9,8 +9,8 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 ```
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
-command in the `lean` job. `#print axioms Flick.T1` (and `T2a`, `T2b`) lists only Lean's
-standard `propext`, `Classical.choice` and `Quot.sound`.
+command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1` and `T3` lists
+only Lean's standard `propext`, `Classical.choice` and `Quot.sound`.
 
 ## Status
 
@@ -18,13 +18,14 @@ standard `propext`, `Classical.choice` and `Quot.sound`.
 | - | - | - |
 | P1a | λ, `let` without generalization, `let rec`, `match` with exhaustiveness and guards, records, `Ref` and the store | done |
 | P1b | stages `P`/`R⟨r;ε⟩` and subtyping, closed rows, `raise`/`try`/`handle`, `task`/`await`, `ask`/`with`/`provide` and layers; Л1–Л3, Progress, Preservation, T1, T2(a), T2(b) | done |
-| P1c | generalization with the premise `P`, lemma 3.1, T3 | to do |
+| P1c | type variables and schemes, (Let-Gen) with the premise `P`, Л2 for schemes, lemma 3.1, T3 | done |
 
 ## Map to `core.md`
 
 | `core.md` | Lean |
 | - | - |
-| §1.2 types, stages, rows | `Ty`, `Stage`, `Row` (`Syntax.lean`) |
+| §1.2 types, stages, rows; `σ` | `Ty`, `Stage`, `Row`, `Scheme` (`Syntax.lean`) |
+| type substitution, `Gen` and instantiation | `Ty.substT`, `Ty.up`, `liftT`, `instT` (`TyOps.lean`) |
 | §1.3 terms, patterns; §3.1 run-time forms | `Tm`, `Pat` (`Syntax.lean`) |
 | §1.3, §3.1 values | `Value`, `IsEnv` (`Typing.lean`) |
 | §1.5 constants `Ref.*`, `ask_S`, `Layer.*` | `Const`, `Const.ty` (`Syntax.lean`) |
@@ -38,12 +39,16 @@ standard `propext`, `Classical.choice` and `Quot.sound`.
 | §3.3 `→ₚ`; §3.4–3.5 steps | `PHead`, `RHead`, `Step`, `Steps` (`Semantics.lean`) |
 | lemma about `build` | `canonical_layer` (`CanonLayer.lean`) |
 | Л1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_env`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `CanonEnv.lean`, `Canonical.lean`) |
-| Л2 (monotypes) | `Typ.subst`, `Typ.inst` (`Substitution.lean`) |
+| (Let-Gen), (Let-Mono) | `Typ.letGen`, `Typ.let_` (`Rules.lean`) |
+| type substitution lemma | `Typ.substT` (`TySubst.lean`) |
+| Л2 | `Typ.subst`, `Typ.inst`, `SubOk.one` (`Substitution.lean`) |
 | Л3 | `ctx_typing` (`Lemma3.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
 | Preservation | `preservation` (`Preservation.lean`) |
 | T1 | `T1` (`Soundness.lean`) |
 | T2(a), T2(b) | `T2a`, `T2b`, `T2b_await` (`Effects.lean`) |
+| lemma 3.1, T3 | `lemma_3_1`, `T3` (`Generalization.lean`) |
+| a polymorphic use, as a check | `Examples.lean` |
 
 ## Representation
 
@@ -54,8 +59,16 @@ is simply under `p.binds` binders, `e[δ]` is `inst δ`, and the substitution le
 the usual "a well-typed substitution maps a well-typed term to a well-typed term".
 Locally nameless would need opening by a list of fresh names and cofinite
 quantification in every binding rule, which costs more without a library.
-Typing contexts are lists, newest variable at index 0; a pattern's `Δ` is prepended
-in binding order.
+Typing contexts are lists of schemes, newest variable at index 0; a pattern's `Δ` is
+prepended in binding order as monotypes.
+
+Type variables are de Bruijn indices too (`tvar n`); types have no binders, a scheme
+`⟨k, τ⟩` binds the indices `0 … k-1` of `τ`. Terms carry no types (Curry style), so a type
+substitution changes the judgment and not the term. (Let-Gen) types its right-hand side
+with `Γ` and `Ψ` shifted by `k` (`Ty.up k`): the generalized variables are fresh by
+construction, which is `ᾱ ∉ ftv(Γ) ∪ ftv(Ψ)` of `Gen` and Л2. A variable instantiates its
+scheme in (Var); a substituted value is typed at its scheme's own level and instantiated by
+the type substitution lemma.
 
 Lists inside terms are spines, so `Tm` is one plain inductive type and `induction`
 works on it and on the typing derivation:
@@ -77,22 +90,25 @@ and inversion stays a plain `cases`.
 
 Each item narrows `core.md` unless it says otherwise.
 
-1. **Monomorphic.** Types have no variables and no `∀`; rows are closed; constants carry
-   their instance (`Const.refMake τ`, `Const.effect S r ε`). ADTs and errors have no
-   type parameters. `let` is (Let-Mono); `let x : τ = e` is the same term without the
-   annotation; `let rec` is monomorphic. (Let-Gen), (Let-Sig) and polymorphic
-   constants come with P1c.
+1. **Polymorphism is over types only.** Rows are closed sets of names, so row variables
+   are neither generalized nor instantiated: `raise`, `Layer.effect_S` and `Layer.merge`
+   carry their rows (`Const.effect S r ε`). `Ref.*` are polymorphic in their cell type,
+   instantiated by (Const). ADTs, errors and services have no type parameters
+   (`Sig.ctor_closed`, `Sig.impl_closed`). (Let-Sig) is (Let-Gen) or (Let-Mono) with the
+   annotation erased: terms carry no types, and the premise `ᾱ ≠ ∅ ⇒ φ₁ = P` is the
+   premise `P` of (Let-Gen). `let rec` is monomorphic in its body and its scope
+   (`σ° = τ_f` and `σ = τ_f`). Higher-rank arguments are out of scope, as in `core.md`.
 2. **Declarations** are a parameter `S : Sig`: constructor ↦ argument types and type
    name, service ↦ `S.Impl`. No well-formedness of `S` is needed. An error type `E` is an
    ADT whose constructors are the error's constructors.
 3. **`Unit`, `Bool`, `Int`** are base types with literals (`Lit`), not nominal ADTs;
    `True`/`False` patterns are literal patterns.
 4. **Records are closed with a fixed field order.** No row tail and no equality up to
-   permutation: the elaborator is assumed to order labels. Record patterns are always
-   open (`{…, ..}`), as in `core.md`.
+   permutation: the elaborator is assumed to order labels; (Rec) requires the tail to be a
+   record type (`Ty.IsRec`). Record patterns are always open (`{…, ..}`), as in `core.md`.
 5. **`Exh` over shapes.** `Exh(τ, Π)` quantifies over `Shp τ v`, the closed values of `τ`
-   as far as patterns see them (functions, references, computations, layers, errors and
-   environments are opaque), not over typed values: the typed version would put `Typ`
+   as far as patterns see them (type variables, functions, references, computations,
+   layers, errors and environments are opaque), not over typed values: the typed version would put `Typ`
    in a negative position of its own definition. Patterns only inspect literals,
    constructors and record fields, so the two agree. The exhaustiveness algorithm
    (`exhaust.rs`) is not modeled.
@@ -116,13 +132,19 @@ Each item narrows `core.md` unless it says otherwise.
 11. **Л3** is stated as `ERel`: the hole's services are within those of the context and
     of its `with` frames, its errors grow only under a `try` frame, and a pure context
     has a pure hole. `core.md` names the errors each `try` frame removes; the weaker form
-    suffices for T2.
+    suffices for T2. Under `K` right-hand sides of (Let-Gen) the hole is typed `K` type
+    variables deep, with `Ψ` shifted, and is pure.
 12. **Steps carry labels** (`Lbl`): pure, runtime, or `root S` for an `ask_S` answered by
     `Σ₀`; T2(b) is about the `root` labels. `todo → die` is labelled pure, as T2(a) allows
     `die`; `bind_S` and `join` steps are pure (Р101).
-13. **Record tails** (widening). `rcons ℓ e r` types any `r : R`, so `R` need not be a
-    record type. Such terms do not arise from the surface; field lookup and update
-    treat a non-record tail as having no fields.
+13. **Cell types may be open** (Р103). `Ψ(ℓ)` is a monotype that may mention free type
+    variables of the configuration's derivation; (Let-Gen) shifts `Ψ`, so it never
+    generalizes them. `core.md` asked for closed `Ψ(ℓ)` without ever closing them.
+14. **T3** is stated as: reachable configurations are typed at the program's type, the
+    store typing only grows (a cell keeps its allocation type), and a redex under the
+    right-hand side of a (Let-Gen) with `ᾱ ≠ ∅` is pure while the cell types it sees
+    avoid `ᾱ` (`Ty.Avoids`). "Without the premise `P` the first case breaks" is not
+    formalized as a counterexample.
 
 ## Findings
 
@@ -132,3 +154,5 @@ Each item narrows `core.md` unless it says otherwise.
   pure, so T2(a) failed for a bare `bind_S v`; they are pure steps now.
 - **Р102** (P1b): (Handle) asked for the whole row `ε_b ⊆ H + ε'`, which a failed arm
   breaks; it now asks for the error of the value only, as `flick-model` already did.
+- **Р103** (P1c): closed cell types and a fixed program type cannot both hold; cell types
+  are monotypes with possibly free variables, and `Gen` excludes `ftv(Ψ)`.

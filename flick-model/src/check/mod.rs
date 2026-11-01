@@ -20,6 +20,7 @@ mod expr;
 mod generalize;
 mod handlers;
 mod pattern;
+mod regions;
 mod rows;
 mod runtime;
 mod unify;
@@ -36,9 +37,10 @@ use std::rc::Rc;
 use crate::decls::Decls;
 use crate::eval::Program;
 use crate::syntax::{Name, Path, Term};
-use crate::types::{Fields, Row, Scheme, Stage, Type};
+use crate::types::{Caps, Fields, Row, Scheme, Stage, Type};
 
 pub(crate) use generalize::{Inst, substitute};
+pub(crate) use regions::scope_service;
 pub use runtime::check_config;
 
 /// A rule whose premise fails, and why.
@@ -69,6 +71,7 @@ enum Solved {
     Type(Type),
     Row(Row),
     Fields(Fields),
+    Caps(Caps),
 }
 
 #[derive(Clone)]
@@ -101,6 +104,8 @@ pub struct Checker<'d> {
     store: Vec<Type>,
     /// Whether a configuration is checked: the rules of §3.6 apply.
     config: bool,
+    /// Obligations and `scope`s of `docs/formal/regions.md` §2.
+    regions: regions::Regions,
 }
 
 impl<'d> Checker<'d> {
@@ -117,6 +122,7 @@ impl<'d> Checker<'d> {
             rigid: 0,
             store: Vec::new(),
             config: false,
+            regions: regions::Regions::default(),
         }
     }
 
@@ -153,7 +159,8 @@ impl<'d> Checker<'d> {
         for t in mem::take(&mut self.ordered) {
             self.ordered_operand(&t)?;
         }
-        self.settle()
+        self.settle()?;
+        self.solve_regions()
     }
 }
 

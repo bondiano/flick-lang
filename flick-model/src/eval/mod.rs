@@ -197,6 +197,11 @@ impl<'p> Machine<'p> {
             Term::Structural(class, fields) => Control::Eval(structural_dict(&class, &fields)),
             Term::Die(why) => return Err(Outcome::Die(why.to_string())),
             Term::Stuck(why) => return Err(stuck(why.to_string())),
+            // shortcut: the machine has no dynamics of regions (`regions.md`
+            // §3), a `scope` stops it; P2 adds them
+            Term::Scope(..) => {
+                return Err(stuck("a `scope` needs the dynamics of regions".to_owned()));
+            }
             other => return Err(stuck(format!("no rule for {other:?}"))),
         })
     }

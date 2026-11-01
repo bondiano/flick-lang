@@ -1,6 +1,7 @@
 //! Kinds, types and rows of λFlick (`docs/formal/core.md` §1.1, §1.2,
-//! §1.6). A row is kept in its normal form: elements by name, then
-//! variables, so `≡` on rows is equality of the two sets.
+//! §1.6), with the regions and captures of `docs/formal/regions.md` §1.
+//! A row is kept in its normal form: elements by name, then variables, so
+//! `≡` on rows is equality of the two sets; a set of captures likewise.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Write};
@@ -26,7 +27,7 @@ pub enum Var {
     Meta(u32),
 }
 
-/// `κ ::= Type | SRow | ERow | Row Type | κ → κ`.
+/// `κ ::= Type | SRow | ERow | Row Type | κ → κ | Region | CRow`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
     Type,
@@ -34,6 +35,46 @@ pub enum Kind {
     Errors,
     Fields,
     Arrow(Rc<Kind>, Rc<Kind>),
+    Region,
+    /// A set of captures (`regions.md` §1.1).
+    Captures,
+}
+
+/// `C ::= ∅ | {k₁, …, kₙ} | c | C ∪ C` in normal form: the atoms `k`, regions
+/// and type variables, and the variables `c` of kind `CRow`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Caps {
+    pub atoms: BTreeSet<Var>,
+    pub vars: BTreeSet<Var>,
+}
+
+impl Caps {
+    pub fn atom(v: Var) -> Caps {
+        Caps {
+            atoms: BTreeSet::from([v]),
+            vars: BTreeSet::new(),
+        }
+    }
+
+    pub fn var(v: Var) -> Caps {
+        Caps {
+            atoms: BTreeSet::new(),
+            vars: BTreeSet::from([v]),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.atoms.is_empty() && self.vars.is_empty()
+    }
+
+    /// `C ∪ C'`.
+    #[must_use]
+    pub fn union(&self, other: &Caps) -> Caps {
+        let mut out = self.clone();
+        out.atoms.extend(other.atoms.iter().cloned());
+        out.vars.extend(other.vars.iter().cloned());
+        out
+    }
 }
 
 /// `φ`: the stage of an arrow.
@@ -86,13 +127,32 @@ pub enum Type {
     Env(Row),
     /// A `∀` of a higher-rank parameter: checking against it is (Let-Sig).
     Forall(Rc<Scheme>),
+    /// `τ^C` with a hidden qualifier: `C` adds to what `τ` shows
+    /// (`regions.md` §1.2).
+    Captured(Rc<Type>, Caps),
+    /// `τ^C` as the bound of a whole value: of a variable, or of data that
+    /// stores only its parameters.
+    Bounded(Rc<Type>, Caps),
 }
 
-/// `σ ::= τ | ∀α:κ. σ`; constraints are already dictionary parameters.
+/// `σ ::= τ | ∀κ̄. Θ ⇒ τ`; class constraints are already dictionary
+/// parameters, `Θ` holds the facts `Outlives C ϱ` (`regions.md` §1.2).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Scheme {
     pub vars: Vec<(Name, Kind)>,
     pub body: Type,
+    pub outlives: Vec<(Caps, Type)>,
+}
+
+impl Scheme {
+    /// `∀ᾱ. τ` without facts.
+    pub fn new(vars: Vec<(Name, Kind)>, body: Type) -> Scheme {
+        Scheme {
+            vars,
+            body,
+            outlives: Vec::new(),
+        }
+    }
 }
 
 impl Row {
@@ -201,6 +261,18 @@ impl fmt::Display for Row {
     }
 }
 
+impl fmt::Display for Caps {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let parts: Vec<String> = self
+            .atoms
+            .iter()
+            .chain(&self.vars)
+            .map(ToString::to_string)
+            .collect();
+        write!(f, "{{{}}}", parts.join(", "))
+    }
+}
+
 impl fmt::Display for Stage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -274,6 +346,8 @@ impl fmt::Display for Type {
                 let vars: Vec<&str> = s.vars.iter().map(|(n, _)| &**n).collect();
                 write!(f, "forall {}. {}", vars.join(" "), s.body)
             }
+            Type::Captured(t, c) => write!(f, "{}^{c}", Atom(t)),
+            Type::Bounded(t, c) => write!(f, "{}^<={c}", Atom(t)),
         }
     }
 }

@@ -9,16 +9,17 @@ namespace Flick
 variable {S : Sig}
 
 /-- Every configuration reachable from a well-typed one is well-typed at the
-same type and stage. -/
+same type and stage, with a store typing that extends the first one. -/
 theorem steps_typed {root Q μ₀ e₀ μ e} (hroot : RootTy S root) (hs : Steps root Q μ₀ e₀ μ e) :
     ∀ {Ψ₀ t φ}, StoreTy S Ψ₀ μ₀ → Typ S Ψ₀ [] e₀ (.ex t φ) →
-      ∃ Ψ, StoreTy S Ψ μ ∧ Typ S Ψ [] e (.ex t φ) := by
+      ∃ X, StoreTy S (Ψ₀ ++ X) μ ∧ Typ S (Ψ₀ ++ X) [] e (.ex t φ) := by
   induction hs with
-  | refl => intro Ψ₀ _ _ hμ h; exact ⟨Ψ₀, hμ, h⟩
+  | refl => intro Ψ₀ _ _ hμ h; exact ⟨[], by simpa using hμ, by simpa using h⟩
   | step h₁ _ _ ih =>
     intro _ _ _ hμ h
-    obtain ⟨_, hμ', h'⟩ := preservation hroot h hμ h₁
-    exact ih hμ' h'
+    obtain ⟨X₁, hμ', h'⟩ := preservation hroot h hμ h₁
+    obtain ⟨X₂, hμ'', h''⟩ := ih hμ' h'
+    exact ⟨X₁ ++ X₂, by simpa using hμ'', by simpa using h''⟩
 
 /-- A raised value has a type of errors of the stage. -/
 theorem raise_errors {Ψ v t φ} (hv : Value v) (h : Typ S Ψ [] (.raise v) (.ex t φ)) :
@@ -36,7 +37,8 @@ theorem T1 {root e₀ t φ₀ μ e} (hroot : RootTy S root)
       (∃ v, e = .raise v ∧ ∃ Ψ, Typ S Ψ [] v (.ex (.errors φ₀.err) .pure)) ∨
       ∃ l o, Step root l μ e o := by
   obtain ⟨Ψ, hμ, h⟩ := steps_typed hroot hs ⟨rfl, by simp⟩ h₀
-  rcases progress (root := root) hμ h rfl rfl with hv | ⟨v, hv, rfl⟩ | hstep | ⟨_, N, _, _, _, hN, hD⟩
+  simp only [List.nil_append] at hμ h
+  rcases progress (root := root) h hμ.1 rfl rfl with hv | ⟨v, hv, rfl⟩ | hstep | ⟨_, N, _, _, _, hN, hD⟩
   · exact .inl ⟨hv, Ψ, hμ, h.valueAny hv _⟩
   · exact .inr (.inl ⟨v, rfl, Ψ, raise_errors hv h⟩)
   · exact .inr (.inr hstep)

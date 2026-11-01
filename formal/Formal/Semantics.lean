@@ -98,10 +98,10 @@ inductive PHead : Tm → Tm → Prop
 /-- Runtime steps of core.md §3.4–3.5 at the redex, except `ask_S` and the
 propagation of `raise`, which need the context. -/
 inductive RHead : List Tm → Tm → List Tm → Tm → Prop
-  | refMake : Value v → RHead μ (.app (.const (.refMake t)) v) (μ ++ [v]) (.loc μ.length)
-  | refGet : μ[l]? = some v → RHead μ (.app (.const (.refGet t)) (.loc l)) μ v
+  | refMake : Value v → RHead μ (.app (.const .refMake) v) (μ ++ [v]) (.loc μ.length)
+  | refGet : μ[l]? = some v → RHead μ (.app (.const .refGet) (.loc l)) μ v
   | refSet : Value v → l < μ.length →
-      RHead μ (.app (.app (.const (.refSet t)) (.loc l)) v) (μ.set l v) (.lit .unit)
+      RHead μ (.app (.app (.const .refSet) (.loc l)) v) (μ.set l v) (.lit .unit)
   | await : RHead μ (.await (.task e)) μ e
   | build : Value v → v.build = some b → RHead μ (.provide v e) μ (.provide b e)
   | provideEnv : IsEnv θ → RHead μ (.provide θ e) μ (.with_ θ e)

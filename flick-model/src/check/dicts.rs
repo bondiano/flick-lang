@@ -45,6 +45,7 @@ impl Checker<'_> {
             Some((_, s)) => Ok(Scheme {
                 vars: s.vars.clone(),
                 body: substitute(&s.body, &map),
+                outlives: Vec::new(),
             }),
             None => error("Field", format!("`{}` has no method `{l}`", c.name)),
         }

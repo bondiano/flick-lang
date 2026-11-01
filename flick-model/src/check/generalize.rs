@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use super::{Checker, Solved};
 use crate::syntax::Name;
-use crate::types::{Fields, Kind, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 /// What a variable of a scheme becomes.
 #[derive(Clone)]
@@ -16,6 +16,7 @@ pub(crate) enum Inst {
     Type(Type),
     Row(Row),
     Tail(Var),
+    Caps(Caps),
 }
 
 /// What a variable of kind `k` becomes as the rigid variable `name`.
@@ -24,6 +25,7 @@ pub(super) fn rigid_inst(name: &str, k: &Kind) -> Inst {
     match k {
         Kind::Services | Kind::Errors => Inst::Row(Row::var(v)),
         Kind::Fields => Inst::Tail(v),
+        Kind::Captures => Inst::Caps(Caps::var(v)),
         _ => Inst::Type(Type::Var(v)),
     }
 }
@@ -31,30 +33,49 @@ pub(super) fn rigid_inst(name: &str, k: &Kind) -> Inst {
 impl Checker<'_> {
     fn fresh_inst(&mut self, k: &Kind) -> Inst {
         let v = Var::Meta(self.meta());
+        if *k == Kind::Region {
+            self.regions.kinds.insert(v.clone());
+        }
         match k {
             Kind::Services | Kind::Errors => Inst::Row(Row::var(v)),
             Kind::Fields => Inst::Tail(v),
+            Kind::Captures => Inst::Caps(Caps::var(v)),
             _ => Inst::Type(Type::Var(v)),
         }
     }
 
-    /// `τ[ᾱ := τ̄]` with fresh metas: the instance (Var) takes.
+    /// `τ[ᾱ := τ̄]` with fresh metas: the instance (Var) takes, with the
+    /// premises of (Inst) on it (`regions.md` §2.3).
     pub(super) fn instantiate(&mut self, s: &Scheme) -> Type {
         let insts: Vec<Inst> = s.vars.iter().map(|(_, k)| self.fresh_inst(k)).collect();
-        substitute_all(&s.body, &s.vars, &insts)
+        let map = names(&s.vars, &insts);
+        self.instance_premises(s, &map);
+        substitute(&s.body, &map)
     }
 
-    /// The body of `s` with its variables rigid: what (Let-Sig) checks.
+    /// The body of `s` with its variables rigid and the stages of its
+    /// signature holding their parameters: what (Let-Sig) checks. Its
+    /// facts `Θ` are given from here on.
     pub(super) fn skolemize(&mut self, s: &Scheme) -> Type {
         let insts: Vec<Inst> = s
             .vars
             .iter()
             .map(|(n, k)| {
                 self.rigid += 1;
-                rigid_inst(&format!("{n}'{}", self.rigid), k)
+                let name = format!("{n}'{}", self.rigid);
+                if *k == Kind::Region {
+                    self.regions.kinds.insert(Var::Named(name.as_str().into()));
+                }
+                rigid_inst(&name, k)
             })
             .collect();
-        substitute_all(&s.body, &s.vars, &insts)
+        let map = names(&s.vars, &insts);
+        for (c, r) in &s.outlives {
+            let fact = (substitute_caps(c, &map), substitute(r, &map));
+            self.regions.facts.push(fact);
+        }
+        let body = self.implicit(&s.body, &Caps::default());
+        substitute(&body, &map)
     }
 
     /// `Gen(Γ, τ)`: the type metas of `t` deeper than the current level.
@@ -75,6 +96,7 @@ impl Checker<'_> {
         Scheme {
             vars,
             body: self.zonk(t),
+            outlives: Vec::new(),
         }
     }
 
@@ -85,7 +107,9 @@ impl Checker<'_> {
                 Type::Var(Var::Meta(n)) => n == m,
                 Type::App(h, a) => occurs(c, m, &h) || occurs(c, m, &a),
                 Type::Fun(p, _, r) => occurs(c, m, &p) || occurs(c, m, &r),
-                Type::Eff(_, _, t) | Type::Ref(t) => occurs(c, m, &t),
+                Type::Eff(_, _, t) | Type::Ref(t) | Type::Captured(t, _) | Type::Bounded(t, _) => {
+                    occurs(c, m, &t)
+                }
                 Type::Record(f) => f.fields.values().any(|t| occurs(c, m, t)),
                 Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().any(|t| occurs(c, m, t)),
                 Type::Forall(s) => occurs(c, m, &s.body),
@@ -97,12 +121,60 @@ impl Checker<'_> {
 }
 
 pub(super) fn substitute_all(t: &Type, vars: &[(Name, Kind)], insts: &[Inst]) -> Type {
-    let map: HashMap<Name, Inst> = vars
-        .iter()
+    substitute(t, &names(vars, insts))
+}
+
+fn names(vars: &[(Name, Kind)], insts: &[Inst]) -> HashMap<Name, Inst> {
+    vars.iter()
         .map(|(n, _)| n.clone())
         .zip(insts.iter().cloned())
-        .collect();
-    substitute(t, &map)
+        .collect()
+}
+
+/// `C[ᾱ := τ̄, c̄ := C̄]`: an atom or tail that becomes a type is what that
+/// type names.
+pub(super) fn substitute_caps(c: &Caps, map: &HashMap<Name, Inst>) -> Caps {
+    let mut out = Caps::default();
+    let all = c.atoms.iter().map(|v| (v, true));
+    for (v, atom) in all.chain(c.vars.iter().map(|v| (v, false))) {
+        let inst = match v {
+            Var::Named(n) => map.get(n),
+            Var::Meta(_) => None,
+        };
+        match inst {
+            Some(Inst::Caps(more)) => out = out.union(more),
+            Some(Inst::Type(t)) => free_atoms(t, &mut out),
+            _ if atom => {
+                out.atoms.insert(v.clone());
+            }
+            _ => {
+                out.vars.insert(v.clone());
+            }
+        }
+    }
+    out
+}
+
+/// The variables of `t` as atoms, its qualifiers as they are: `⌈t⌉` of a
+/// type without hidden storage.
+fn free_atoms(t: &Type, out: &mut Caps) {
+    match t {
+        Type::Var(v) => {
+            out.atoms.insert(v.clone());
+        }
+        Type::App(a, b) | Type::Fun(a, _, b) => {
+            free_atoms(a, out);
+            free_atoms(b, out);
+        }
+        Type::Eff(_, _, x) | Type::Ref(x) => free_atoms(x, out),
+        Type::Captured(x, c) | Type::Bounded(x, c) => {
+            *out = out.union(c);
+            free_atoms(x, out);
+        }
+        Type::Tuple(ts) => ts.iter().for_each(|t| free_atoms(t, out)),
+        Type::Record(f) => f.fields.values().for_each(|t| free_atoms(t, out)),
+        _ => {}
+    }
 }
 
 /// `τ[ᾱ := τ̄]`.
@@ -114,8 +186,12 @@ pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
     match t {
         Type::Var(Var::Named(n)) => match map.get(n) {
             Some(Inst::Type(t)) => t.clone(),
+            // a row as the argument of a type: `Fiber e a`, `Failure e`
+            Some(Inst::Row(r)) => Type::Errors(r.clone()),
             _ => t.clone(),
         },
+        Type::Captured(x, c) => Type::Captured(s(x), substitute_caps(c, map)),
+        Type::Bounded(x, c) => Type::Bounded(s(x), substitute_caps(c, map)),
         Type::Var(_) | Type::Con(_) => t.clone(),
         Type::App(h, a) => Type::App(s(h), s(a)),
         Type::Fun(p, st, r) => Type::Fun(s(p), substitute_stage(st, map), s(r)),
@@ -156,6 +232,11 @@ pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
             Type::Forall(Rc::new(Scheme {
                 vars: sc.vars.clone(),
                 body: substitute(&sc.body, &inner),
+                outlives: sc
+                    .outlives
+                    .iter()
+                    .map(|(c, r)| (substitute_caps(c, &inner), substitute(r, &inner)))
+                    .collect(),
             }))
         }
     }

@@ -174,6 +174,9 @@ pub enum Term {
     Await(Rc<Term>),
     Try(Rc<Term>, Rc<[Arm]>),
     Provide(Rc<Term>, Rc<Term>),
+    /// `scope s { e }` (`docs/formal/regions.md` §1.3): binds the region
+    /// `s` in the types of `e` and its owner `s : Owner s` in its values.
+    Scope(Name, Rc<Term>),
     /// `c v₁ … vₖ`, `K v₁ … vₖ`: built only from values, so closed.
     Apply(Head, Rc<[Term]>),
     /// A service named as a value: what `Layer.succeed` takes.

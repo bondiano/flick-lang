@@ -1,4 +1,5 @@
 import Formal.Subst
+import Formal.TyOps
 
 /-!
 # Values, patterns, shapes and subtyping (core.md §1.3, §2.2, §2.4)
@@ -64,7 +65,7 @@ inductive Le : Ty → Ty → Prop
 
 /-- Types whose values patterns cannot inspect. -/
 def Ty.Opaque : Ty → Prop
-  | .arrow .. | .ref _ | .eff .. | .layer .. | .errors _ | .env _ => True
+  | .tvar _ | .arrow .. | .ref _ | .eff .. | .layer .. | .errors _ | .env _ => True
   | _ => False
 
 variable (S : Sig)
