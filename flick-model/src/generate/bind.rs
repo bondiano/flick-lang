@@ -10,7 +10,7 @@ use flick_core::numeric::{Arith, Num};
 use super::regions::visible;
 use super::term::{Cx, extend, plain};
 use super::{Gen, int, mono, nothing, option, some, unit};
-use crate::check::{Inst, scope_service, substitute};
+use crate::check::{Inst, substitute};
 use crate::syntax::{Arm, Lit, Name, Pat, Prim, Term};
 use crate::types::{Kind, Row, Scheme, Stage, Type, Var};
 
@@ -64,15 +64,11 @@ impl Gen<'_> {
         }
     }
 
-    /// A stage that fits `budget`, for a local function. Without `Scope`:
-    /// flick-core takes a local function whose signature names `Scope s`
-    /// for one that holds `s` (Р64).
+    /// A stage that fits `budget`, for a local function.
     pub(super) fn within_budget(&mut self, budget: &Stage) -> Stage {
         match budget {
             Stage::Runtime(r, e) if self.pick(2) == 1 => {
-                let mut r = self.some_of(r);
-                r.elems.remove(&scope_service());
-                Stage::Runtime(r, self.some_of(e))
+                Stage::Runtime(self.some_of(r), self.some_of(e))
             }
             _ => Stage::Pure,
         }

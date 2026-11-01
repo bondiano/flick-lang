@@ -221,7 +221,7 @@ impl Checker<'_> {
                 .for_each(|(_, t)| self.collect_bounded_captures(t, out, bounded)),
             Type::Fun { param, result, .. } => {
                 if bounded {
-                    self.zonk(&t).visit(&mut |t| {
+                    without_rows(&self.zonk(&t)).visit(&mut |t| {
                         if matches!(self.atom_kind(t, &[]), Some(Kind::Region)) {
                             push_atom(out, t);
                         }
@@ -660,5 +660,24 @@ fn capture_mismatch(mismatch: &Mismatch) -> bool {
 fn push_atom(out: &mut Norm, t: &Type) {
     if let Some(label) = capture_label(t) {
         out.entries.push((label, t.clone()));
+    }
+}
+
+/// `t` without the service and error rows of its arrows and `Eff`s: a row
+/// holds no captures, and an `Eff` holds what its result holds
+/// (`docs/formal/regions.md` §2.1, Р64).
+fn without_rows(t: &Type) -> Type {
+    match t {
+        Type::Fun { param, result, .. } => Type::Fun {
+            param: Box::new(without_rows(param)),
+            effects: None,
+            result: Box::new(without_rows(result)),
+        },
+        Type::App { .. } if t.spine().0.is_prim("Eff") => t
+            .spine()
+            .1
+            .last()
+            .map_or(Type::Error, |result| without_rows(result)),
+        _ => t.map_children(&mut without_rows),
     }
 }
