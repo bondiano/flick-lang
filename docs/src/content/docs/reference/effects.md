@@ -259,10 +259,35 @@ needing `{Users, Log}` and `{NotFound}`, the block needs `{Config, Log}` and
 the same service are `FLICK-E004`. `Layer.override a b` merges them too and
 lets `b` replace what `a` builds.
 
+The services a `provide` builds end with it. Work an owner keeps until its
+scope closes (a child of `Fiber.spawn`, `FiberSet.run`, a finalizer of
+`Scope.add_finalizer`, a server's handler) runs with the services of the
+place that started it, so each of them must come from a provider that
+outlives that owner: a `provide` around the owner's `scope`, or the caller
+of a function whose body opens that `scope`. Otherwise it is `FLICK-G003`:
+
+```flick
+leaked : Unit ->{} Unit
+let leaked () = scope outer {
+  provide greeter {
+    // FLICK-G003: the child of `outer` would use `Greeter` after the
+    // `provide` released it
+    ignore (Fiber.spawn outer report (task { Greeter.greet "child" }))
+  }
+}
+```
+
+A function whose owner and services both come from its caller says that
+the services outlive the owner with `Fiber.Provided`; each call checks it:
+
+```flick
+start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
+let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
+```
+
 ## Not checked yet
 
 | Construct | Today |
 | - | - |
 | `Layer.merge` used other than applied to both layers | conflicts are not reported |
 | a service named as a value with a module qualifier | not accepted; name it unqualified |
-| a child of an outer owner spawned inside `provide` | it keeps the services of the `provide` after their layer is released |

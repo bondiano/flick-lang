@@ -4,6 +4,7 @@ module Fiber exposing (
   Owner,
   Fiber,
   Outlives,
+  Provided,
   spawn,
   join,
   await_,
@@ -25,11 +26,17 @@ type Fiber (e : ErrorRow) a
 /// decides it from the scopes; a program cannot declare instances of it.
 class Outlives (c : CaptureRow) (s : Region)
 
+/// The services `r` come from providers that end no earlier than the
+/// region `s`: a child of its owner runs with them after the code that
+/// started it. The compiler decides it from the `provide`s and scopes; a
+/// signature names it for an owner and services its caller gives.
+class Provided (r : ServiceRow) (s : Region)
+
 /// Starts `task` as a child of `owner`; `supervisor` observes its failure.
 /// Both may hold only what outlives the owner.
 spawn :
   forall s c r e a.
-  Outlives c s =>
+  (Outlives c s, Provided r s) =>
   Owner s ->
   (Failure e ->{Scope s | r; none} Unit)^c ->
   (Eff {Scope s | r} e a)^c ->{r; none}

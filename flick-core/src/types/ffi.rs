@@ -265,6 +265,37 @@ impl Checker<'_> {
             }
             after.is_some_and(|after| !mentions(&after, name))
         });
+        // work kept until the owner closes runs with the caller's services,
+        // which must outlive the owner too (Р37)
+        let provided: Vec<&str> = constraints
+            .iter()
+            .filter_map(|c| match super::classes::split(c)? {
+                (("Fiber", "Provided"), args) => match args.first()? {
+                    Type::Var(v) => Some(v.as_str()),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect();
+        let outlived: Vec<String> = outlived.iter().map(|v| (*v).to_owned()).collect();
+        let held = self.params_of(body);
+        let unprovided = vars.iter().find(|v| {
+            matches!(v.kind, Kind::ServiceRow)
+                && !provided.contains(&v.name.as_str())
+                && held
+                    .iter()
+                    .any(|p| mentions(p, &outlived) && mentions(p, slice::from_ref(&v.name)))
+        });
+        if let Some(row) = unprovided {
+            self.error(
+                codes::F002,
+                span,
+                format!(
+                    "with `retention owner` the foreign function keeps work that uses the services `{0}` until its owner closes, so its signature needs `Fiber.Provided {0} s` for the owner's region `s`",
+                    row.name
+                ),
+            );
+        }
         if let Some(row) = kept {
             self.error(
                 codes::F002,

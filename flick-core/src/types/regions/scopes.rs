@@ -36,10 +36,11 @@ impl Checker<'_> {
             span,
             node: node.range(),
             outer: self.stage.services.clone(),
-            parent: self.regions.open.last().copied(),
+            parent: self.regions.nest.last().copied(),
         });
         let index = self.regions.scopes.len() - 1;
         self.regions.open.push(index);
+        self.regions.nest.push(index);
         let (locals, tyvars) = (self.locals.len(), self.tyvars.len());
         if let Some(name) = name {
             let name = name.text(self.text);
@@ -75,6 +76,7 @@ impl Checker<'_> {
         self.locals.truncate(locals);
         self.tyvars.truncate(tyvars);
         self.regions.open.pop();
+        self.regions.nest.pop();
         self.store.level -= 1;
         if let Err(skolem) = self.store.leave(&ty) {
             let shown = self.show(&ty);

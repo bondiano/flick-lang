@@ -185,7 +185,7 @@ of a type that names its region, such as `File t`, cannot be kept in them.
 ```flick
 spawn :
   forall s c r e a.
-  Fiber.Outlives c s =>
+  (Fiber.Outlives c s, Fiber.Provided r s) =>
   Fiber.Owner s ->
   (Failure e ->{Scope s | r; none} Unit)^c ->
   (Eff {Scope s | r} e a)^c ->{r; none} Fiber.Fiber e a
@@ -197,7 +197,10 @@ closes, so the task and the supervisor may hold only regions that end no
 earlier: the owner's region, the regions of scopes around it, and what the
 signature names when the owner is a local scope. `Fiber.Outlives c s` states
 it; the compiler decides it and a program declares no instance of it. A
-child that holds a shorter region is `FLICK-G003`.
+child that holds a shorter region is `FLICK-G003`. The child runs with the
+services of the place that spawned it, so they must outlive the owner as
+well: `Fiber.Provided r s` (see [Effects](../effects/), "Layers
+and `provide`").
 
 A child acquires into its owner's region: a task that acquires names
 `Scope s` of its owner, and one that names another region is

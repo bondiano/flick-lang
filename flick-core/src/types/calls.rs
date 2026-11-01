@@ -145,8 +145,10 @@ impl Checker<'_> {
     /// at a stage makes the application a runtime call.
     pub fn apply(&mut self, head: &Node, args: &[&Node]) -> Type {
         let mut defaults = Vec::new();
+        let provided = self.regions.provided.len();
         let ty = self.apply_args(head, args, &mut defaults);
         self.settle_defaults(defaults);
+        self.settle_provided(provided);
         ty
     }
 

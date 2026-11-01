@@ -144,6 +144,12 @@ impl Checker<'_> {
             self.regions.outlives.push(outlives);
             return;
         }
+        if let Some((("Fiber", "Provided"), args)) = split(&constraint)
+            && let [row, owner] = args[..]
+        {
+            self.want_provided(row.clone(), owner.clone(), span);
+            return;
+        }
         self.want_under(constraint, span, self.classes.givens.clone());
     }
 

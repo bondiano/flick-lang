@@ -1,0 +1,49 @@
+// A child or finalizer keeps the services of the place that registers it
+// until its owner closes: each comes from a provider that outlives the
+// owner (Р37).
+module App.ProvideOwner exposing (..)
+
+service Greeter =
+  greet : String ->{} String
+
+report : Failure e ->{} Unit
+let report _ = ()
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+// the owner's scope is inside the `provide`
+inner_owner : Unit ->{} Unit
+let inner_owner () = provide greeter {
+  scope s {
+    ignore (Fiber.spawn s report (task { ignore (Greeter.greet "child") }))
+    Scope.add_finalizer (task { ignore (Greeter.greet "finalizer") })
+  }
+}
+
+// the service comes from the caller, which runs the whole function
+from_caller : Unit ->{Greeter;} Unit
+let from_caller () = scope s {
+  ignore (Fiber.spawn s report (task { ignore (Greeter.greet "child") }))
+}
+
+// the caller settles the obligation the signature names
+given : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
+let given owner = ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "child") }))
+
+uses_given : Unit ->{} Unit
+let uses_given () = provide greeter { scope s { given s } }
+
+// a task passes the obligation on to where it runs
+in_task : Unit ->{Greeter;} Unit
+let in_task () = scope s {
+  let start = task { ignore (Fiber.spawn s report (task { ignore (Greeter.greet "child") })) }
+  await start
+}
+
+local_signature : Unit ->{Greeter;} Unit
+let local_signature () = scope s {
+  start : Fiber.Provided {Greeter} s => Unit ->{Greeter;} Unit
+  let start () = ignore (Fiber.spawn s report (task { ignore (Greeter.greet "child") }))
+  start ()
+}

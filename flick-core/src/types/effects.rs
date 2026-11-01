@@ -47,6 +47,8 @@ pub struct Stage {
     /// How many `scope`s were open when the stage began: those opened
     /// after it provide `Scope` to its calls.
     pub scopes: usize,
+    /// How many `provide`s were open when the stage began.
+    pub provides: usize,
 }
 
 /// Where the upper bound of a stage comes from, for diagnostics.
@@ -73,6 +75,7 @@ impl Stage {
             returns: None,
             calls: 0,
             scopes: 0,
+            provides: 0,
         }
     }
 }
@@ -102,6 +105,7 @@ impl Checker<'_> {
             returns: None,
             calls: 0,
             scopes: self.regions.open.len(),
+            provides: self.regions.provides.len(),
         }
     }
 
@@ -162,6 +166,7 @@ impl Checker<'_> {
 
     /// Records a runtime call needing `effects` at the current stage.
     pub fn perform(&mut self, services: &Type, errors: &Type, span: Span) {
+        let services = &self.settle_performed(services, span);
         let services = &self.lexical_owner(services, span);
         self.regions.raised.push((errors.clone(), span));
         self.runtime = true;

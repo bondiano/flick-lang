@@ -1,17 +1,22 @@
 // With `retention owner` the JS code keeps an argument until the owner of
 // a region closes: a capture row it keeps needs `Fiber.Outlives`, unless
-// the result shows it.
+// the result shows it, and the services of kept work `Fiber.Provided`.
 module App.OwnerRetention exposing (..)
 
 defer : forall c s r. (Eff r none Unit)^c ->{Scope s | r;} Unit
 foreign effect defer from "./scope.js" "defer"
   retention owner
 
-defer_checked : forall c s r. Fiber.Outlives c s => (Eff r none Unit)^c ->{Scope s | r;} Unit
+defer_checked : forall c s r. (Fiber.Outlives c s, Fiber.Provided r s) => (Eff r none Unit)^c ->{Scope s | r;} Unit
 foreign effect defer_checked from "./scope.js" "defer"
   retention owner
 
 shown : forall c a. (Unit -> a)^c -> (Unit -> a)^c
 foreign pure shown from "./scope.js" "shown"
   retention owner
+
+defer_unprovided : forall c s r. Fiber.Outlives c s => (Eff r none Unit)^c ->{Scope s | r;} Unit
+foreign effect defer_unprovided from "./scope.js" "defer"
+  retention owner
 //~ FLICK-F002 @7:1-8:18
+//~ FLICK-F002 @19:1-20:18

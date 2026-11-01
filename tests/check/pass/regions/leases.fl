@@ -58,6 +58,6 @@ let direct () = scope {
 
 listen_on :
   forall c s r hs.
-  Fiber.Outlives c s =>
+  (Fiber.Outlives c s, Fiber.Provided r s) =>
   Rpc.ServeOptions -> Rpc.Group r hs -> hs^c ->{Scope s | r; Rpc.ServeError} Rpc.Server s
 let listen_on options group handlers = Rpc.listen options group handlers

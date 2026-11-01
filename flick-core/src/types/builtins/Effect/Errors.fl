@@ -215,7 +215,8 @@ foreign effect on_interrupt from "@flick-lang/runtime/effect/Effect" "flickOnInt
 /// Registers `finalizer` with the owner of region `s`: it runs when that
 /// scope closes, with the cause of its failure if it failed.
 add_finalizer :
-  forall s c r. Fiber.Outlives c s => (Option RawCause ->{r;} Unit)^c ->{Scope s | r;} Unit
+  forall s c r.
+  (Fiber.Outlives c s, Fiber.Provided r s) => (Option RawCause ->{r;} Unit)^c ->{Scope s | r;} Unit
 foreign effect add_finalizer from "@flick-lang/runtime/effect/Effect" "flickAddFinalizer"
   retention owner
   reviewed "effect@4.0.5 sha256:de9497fd0e3d4d55"

@@ -13,9 +13,11 @@
 
 mod compare;
 mod data;
+mod provided;
 mod scopes;
 mod solve;
 
+pub use provided::{PROVIDED, Provide};
 pub use solve::Outlives;
 
 use super::Checker;
@@ -37,6 +39,18 @@ pub struct State {
     pub scopes: Vec<Scope>,
     /// The scopes around the expression being checked, innermost last.
     pub open: Vec<usize>,
+    /// The scopes and `provide`s around it, innermost last: what a new one
+    /// nests in.
+    pub nest: Vec<usize>,
+    /// The `provide`s around it, innermost last.
+    pub provides: Vec<Provide>,
+    /// `Fiber.Provided` constraints until their call has its arguments,
+    /// and those whose row may still grow (`provided.rs`).
+    pub provided: Vec<provided::Want>,
+    pub provided_late: Vec<provided::Want>,
+    /// A `provide` compared with an owner not known yet: its scope, the
+    /// owner, the service and where.
+    pub late_owners: Vec<(usize, Type, String, Span)>,
     /// The locals used so far, by index into `Checker::locals`.
     pub uses: Vec<usize>,
     pub outlives: Vec<solve::Outlives>,
