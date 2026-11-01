@@ -6,7 +6,7 @@ use std::env;
 use std::path::Path;
 
 use super::{Artifact, Settings, builtin_modules, generic_of, specifier};
-use crate::codegen::go::{self, DRIVER, DRIVER_GO_MOD, DRIVER_GO_SUM, Program, RUNTIME};
+use crate::codegen::go::{self, GO_MOD, GO_SUM, PACKAGES, Package, Program, RUNTIME};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir;
 use crate::opt;
@@ -108,26 +108,30 @@ pub fn emit(
             foreign_file: &foreign_file,
         });
         diagnostics.extend(output.diagnostics);
-        // a program with the PostgreSQL driver requires pgx, which go build downloads once
-        let go_mod = if output.driver {
-            DRIVER_GO_MOD
-        } else {
-            "module flick.app\n\ngo 1.23\n"
-        };
+        let packages: Vec<&Package> = PACKAGES
+            .iter()
+            .filter(|p| output.packages.contains(&p.name))
+            .collect();
         out.push(Artifact {
             path: format!("{dir}/go.mod"),
-            contents: go_mod.to_owned(),
+            contents: go_mod(&packages),
         });
-        if output.driver {
+        // the modules of a package go build downloads once; go.sum pins them
+        if !packages.is_empty() {
             out.push(Artifact {
                 path: format!("{dir}/go.sum"),
-                contents: DRIVER_GO_SUM.to_owned(),
+                contents: GO_SUM.to_owned(),
             });
-            out.extend(DRIVER.iter().map(|(path, contents)| Artifact {
-                path: format!("{dir}/{path}"),
-                contents: (*contents).to_owned(),
-            }));
         }
+        out.extend(
+            packages
+                .iter()
+                .flat_map(|p| p.files)
+                .map(|(path, contents)| Artifact {
+                    path: format!("{dir}/{path}"),
+                    contents: (*contents).to_owned(),
+                }),
+        );
         out.extend(output.files.into_iter().map(|(path, contents)| Artifact {
             path: format!("{dir}/{path}"),
             contents,
@@ -138,4 +142,45 @@ pub fn emit(
         }));
     }
     (out, diagnostics)
+}
+
+/// The `go.mod` of a program with `packages`: the runtime's, requiring only
+/// the modules of those packages, so a program without one builds offline
+/// and a package's version skew never makes Go load the others.
+pub fn go_mod(packages: &[&Package]) -> String {
+    if packages.is_empty() {
+        return "module flick.app\n\ngo 1.23\n".to_owned();
+    }
+    let needed: Vec<&str> = packages.iter().flat_map(|p| p.modules.lines()).collect();
+    let mut header = String::new();
+    let mut requires = String::new();
+    let mut block = false;
+    for line in GO_MOD.lines() {
+        let line = line.trim();
+        let require = if block {
+            block = line != ")";
+            line
+        } else if line == "require (" {
+            block = true;
+            continue;
+        } else if let Some(rest) = line.strip_prefix("require ") {
+            rest
+        } else {
+            if line.starts_with("module ") || line.starts_with("go ") {
+                header.push_str(line);
+                header.push_str("\n\n");
+            }
+            continue;
+        };
+        if require
+            .split_whitespace()
+            .next()
+            .is_some_and(|m| needed.contains(&m))
+        {
+            requires.push('\t');
+            requires.push_str(require);
+            requires.push('\n');
+        }
+    }
+    format!("{header}require (\n{requires})\n")
 }
