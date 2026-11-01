@@ -24,6 +24,9 @@ def Tm.fill (ds : List Dict) : Tm → Tm
   | .lam b => .lam (b.fill ds)
   | .let_ e b => .let_ (e.fill ds) (b.fill ds)
   | .lamD l b => .lamD l (b.fill ds)
+  | .const c => .const c
+  | .ite c a b => .ite (c.fill ds) (a.fill ds) (b.fill ds)
+  | .caseOpt e n s => .caseOpt (e.fill ds) (n.fill ds) (s.fill ds)
 
 theorem args_eqv {ds ds' : List Dict} (h : All2 (Eqv P) ds ds') (i : Nat) :
     Eqv P (args ds i) (args ds' i) := by
@@ -44,6 +47,9 @@ theorem fill_eqv {ds ds' : List Dict} (h : All2 (Eqv P) ds ds') (s : Tm) :
   | lam _ ih => exact .lam ih
   | let_ _ _ ihe ihb => exact .let_ ihe ihb
   | lamD _ _ ih => exact .lamD ih
+  | const => exact .const
+  | ite _ _ _ ihc iha ihb => exact .ite ihc iha ihb
+  | caseOpt _ _ _ ihe ihn ihs => exact .caseOpt ihe ihn ihs
 
 theorem All2.symm {ds ds' : List Dict} (h : All2 (Eqv P) ds ds') : All2 (Eqv P) ds' ds := by
   induction h with

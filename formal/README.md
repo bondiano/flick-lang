@@ -412,15 +412,19 @@ Simplifications:
    them with `≈` dictionaries gives the same result. A hole under a `λδ̄` of (Let-Sig-Dict)
    sees a longer `Δ`; T6(b) over two whole `Elab` derivations, which may also pick different
    types, is not stated.
-6. The source of T6(a) has variables, methods, application, `λ` over a monotype, `let`
-   without generalization and `let` with a signature; no constants, constructors, `match`
-   or higher-rank parameters. Its types are the first-order `Ty`, the arrow `a →φ b` an
-   application of a reserved constructor (`arrTy`). (Sub) is kept for stages only: a value
-   has any stage, an application and a `let` run at the stage of the arrow and of the body,
-   the right side of a `let` at `φ₁ ⊑ φ` (Р182).
+6. The source of T6(a) has variables, methods, constants of Γ₀ (`Prog.consts`, with the
+   dictionaries of their schemes, as (Var-Dict)), application, `λ` over a monotype, `let`
+   without generalization, `let` with a signature, `if` and a `match` on `Option`; no
+   constructors, other `match` or higher-rank parameters. Its types are the first-order
+   `Ty`; the arrow `a →φ b`, `Bool` and `Option` are reserved constructors (`arrTy`,
+   `boolTy`, `optTy`). (Sub) is kept for stages only: a value has any stage, an application,
+   a `let` and a `match` run at one stage `φ`, the arrow applied and the right side of a
+   `let` at `ψ ⊑ φ` (Р182). A term at `P` elaborates at any stage (`Elab.anyStage`), and
+   renaming term variables keeps an elaboration (`Elab.rename`, weakening `Elab.shift`).
 7. `Target` is an interface, not λFlick⁺: its types are monotypes, stage arrows and `D_Q`,
    a context entry is `∀ᾱ. t`, and a `∀`-field of `D_Q` shows only through the law `meth`
-   (projection with instantiation). The types of instances (`inst`: `I : ∀β̄. D_ctx →P
+   (projection with instantiation). Constants of Γ₀ are typed by their schemes (`const`).
+   The types of instances (`inst`: `I : ∀β̄. D_ctx →P
    D_head`, by (Instance) of §2.5 and К7) and of (Struct)/(Prim) dictionaries are laws.
    `lamD l` binds `l` premises at once, the `i`-th argument being the premise `i`;
    λFlick⁺ curries it. P4a has to prove each law of its own typing.

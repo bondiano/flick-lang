@@ -53,6 +53,11 @@ inductive TmEqv (P : Prog) : Tm → Tm → Prop
   | lam {b b'} : TmEqv P b b' → TmEqv P (.lam b) (.lam b')
   | let_ {e e' b b'} : TmEqv P e e' → TmEqv P b b' → TmEqv P (.let_ e b) (.let_ e' b')
   | lamD {l b b'} : TmEqv P b b' → TmEqv P (.lamD l b) (.lamD l b')
+  | const {c} : TmEqv P (.const c) (.const c)
+  | ite {c c' a a' b b'} : TmEqv P c c' → TmEqv P a a' → TmEqv P b b' →
+      TmEqv P (.ite c a b) (.ite c' a' b')
+  | caseOpt {e e' n n' s s'} : TmEqv P e e' → TmEqv P n n' → TmEqv P s s' →
+      TmEqv P (.caseOpt e n s) (.caseOpt e' n' s')
 
 /-- The target. `Has Γ Δ e t φ` is `Γ, ⟦Δ⟧ ⊢⁺ e : t ! φ`, where a premise `δ : Q` of `Δ` is
 the variable `δ : D_Q`. -/
@@ -61,8 +66,16 @@ structure Target (P : Prog) where
   /-- (Var) with the instantiation of `∀` -/
   var : ∀ {Γ Δ x s ts φ}, Γ[x]? = some s → ts.length = s.k →
     Has Γ Δ (.var x) (s.ty.subst (inst ts)) φ
-  app : ∀ {Γ Δ f x a b φ}, Has Γ Δ f (.mono (arrTy φ a b)) φ → Has Γ Δ x (.mono a) φ →
-    Has Γ Δ (.app f x) (.mono b) φ
+  /-- (Const) with the instantiation of `∀` -/
+  const : ∀ {Γ Δ c s ts φ}, P.consts c = some s → ts.length = s.k →
+    Has Γ Δ (.const c) (s.tr.ty.subst (inst ts)) φ
+  /-- (App); a pure arrow applies at any stage -/
+  app : ∀ {Γ Δ f x a b ψ φ}, Has Γ Δ f (.mono (arrTy ψ a b)) φ → Has Γ Δ x (.mono a) φ →
+    (ψ = .P ∨ ψ = φ) → Has Γ Δ (.app f x) (.mono b) φ
+  ite : ∀ {Γ Δ c a b t φ}, Has Γ Δ c (.mono boolTy) φ → Has Γ Δ a (.mono t) φ →
+    Has Γ Δ b (.mono t) φ → Has Γ Δ (.ite c a b) (.mono t) φ
+  caseOpt : ∀ {Γ Δ e n s a t φ}, Has Γ Δ e (.mono (optTy a)) φ → Has Γ Δ n (.mono t) φ →
+    Has (⟨0, .mono a⟩ :: Γ) Δ s (.mono t) φ → Has Γ Δ (.caseOpt e n s) (.mono t) φ
   lam : ∀ {Γ Δ b a t φ ψ}, Has (⟨0, .mono a⟩ :: Γ) Δ b (.mono t) φ →
     Has Γ Δ (.lam b) (.mono (arrTy φ a t)) ψ
   /-- (Let-Sig) of λFlick⁺; `k = 0` is (Let-Mono) -/
