@@ -1,121 +1,131 @@
 import Formal.Substitution
 
 /-!
-# Canonical forms (Л1) and value shapes
+# Values are pure (Л1, last clause)
+
+Every value has a type below the given one that it has with `P`; for a
+constructor spine that type has only pure arrows.
 -/
 
 namespace Flick
 
 variable {S : Sig}
 
-/-- A constructor spine has type `τ₁ → … → τₙ → T`. -/
-theorem spine_ty {Ψ Γ K} :
-    ∀ {v t}, v.head = .ctor K → Typ S Ψ Γ v (.ex t) → ∃ ts T, t = .arrows ts (.adt T)
-  | .ctor _, _, _, h => by cases h; exact ⟨_, _, rfl⟩
-  | .app f _, _, hh, h => by
-    cases h with
-    | app hf _ =>
-      obtain ⟨ts, T, he⟩ := spine_ty (v := f) hh hf
-      cases ts with
-      | nil => cases he
-      | cons a ts => cases he; exact ⟨ts, T, rfl⟩
-  | .var _, _, hh, _ | .lam _, _, hh, _ | .let_ _ _, _, hh, _ | .letrec _ _, _, hh, _
-  | .fix _, _, hh, _ | .lit _, _, hh, _ | .loc _, _, hh, _ | .const _, _, hh, _
-  | .rnil, _, hh, _ | .rcons _ _ _, _, hh, _ | .proj _ _, _, hh, _ | .update _ _ _, _, hh, _
-  | .match_ _ _, _, hh, _ | .anil, _, hh, _ | .acons _ _ _, _, hh, _
-  | .aguard _ _ _ _, _, hh, _ | .todo, _, hh, _ => by simp [Tm.head] at hh
+/-- All arrows along the result spine are pure. -/
+def Ty.PureSpine : Ty → Prop
+  | .arrow _ φ t => φ = .pure ∧ t.PureSpine
+  | _ => True
 
-theorem Shp.full {t v} (h : Shp S false t v) (ht : ∃ ts T, t = .arrows ts (.adt T)) :
-    Shp S true t v := by
-  obtain ⟨ts, T, rfl⟩ := ht
-  cases ts with
-  | nil => exact .adt h
-  | cons _ _ => exact .arrow
+theorem Ty.arrows_pureSpine (ts : List Ty) (T : Name) : (Ty.arrows ts (.adt T)).PureSpine := by
+  induction ts with
+  | nil => trivial
+  | cons a ts ih => exact ⟨rfl, ih⟩
 
-theorem Typ.const_inv {Ψ Γ c t} (h : Typ S Ψ Γ (.const c) (.ex t)) : t = c.ty := by
-  cases h; rfl
+theorem Const.ty_first {c : Const} (h : c.arity = 2 ∨ c.layer) :
+    ∃ x y, c.ty S = .arrow x .pure y := by
+  cases c <;> simp [Const.arity, Const.layer] at h <;> exact ⟨_, _, rfl⟩
 
-theorem Const.shape {c : Const} {v} : Shp S true c.ty v := by
-  cases c <;> exact .arrow
+theorem Const.ty_merge {c : Const} (h₁ : c.arity = 2) (h₂ : c.layer) :
+    ∃ x y z, c.ty S = .arrow x .pure (.arrow y .pure z) := by
+  cases c <;> simp [Const.arity, Const.layer] at h₁ h₂
+  exact ⟨_, _, _, rfl⟩
 
-theorem Const.ty_ne_ref {c : Const} {t} : c.ty ≠ .ref t := by
-  cases c <;> simp [Const.ty]
+theorem Const.ty_arrow (c : Const) : ∃ x φ y, c.ty S = .arrow x φ y := by
+  cases c <;> exact ⟨_, _, _, rfl⟩
 
-/-- A binary constant applied once is still a function. -/
-theorem Const.ty_two {c : Const} {a t} (hc : c.arity = 2) (h : c.ty = .arrow a t) :
-    ∃ x y, t = .arrow x y := by
-  cases c <;> simp [Const.arity, Const.ty] at hc h
-  exact ⟨_, _, h.2.symm⟩
+/-- What `Value.pure` gives. -/
+def PureTy (S : Sig) (Ψ Γ : List Ty) (e : Tm) (T : Ty) : Prop :=
+  ∃ T₀, Le T₀ T ∧ Typ S Ψ Γ e (.ex T₀ .pure) ∧
+    (∀ K, e.head = .ctor K → T₀.PureSpine) ∧
+    (∀ c, e = .const c → T₀ = c.ty S) ∧
+    (∀ c e₁, e = .app (.const c) e₁ → c.arity = 2 → c.layer → ∃ y z, T₀ = .arrow y .pure z)
 
-/-- Every closed value has a shape of its type; a constructor spine also has
-a partial shape. -/
-theorem Value.shape {Ψ Γ v} (hv : Value v) :
-    ∀ {t}, Typ S Ψ Γ v (.ex t) →
-      Shp S true t v ∧ (∀ K, v.head = .ctor K → Shp S false t v) := by
-  induction hv with
-  | lam => intro _ h; cases h; exact ⟨.arrow, by simp [Tm.head]⟩
-  | fix => intro _ h; cases h; exact ⟨.arrow, by simp [Tm.head]⟩
-  | lit => intro _ h; cases h; exact ⟨.lit, by simp [Tm.head]⟩
-  | loc => intro _ h; cases h; exact ⟨.ref, by simp [Tm.head]⟩
-  | const =>
-    intro _ h; obtain rfl := h.const_inv
-    exact ⟨Const.shape, by simp [Tm.head]⟩
-  | ctor =>
-    intro _ h
-    cases h with
-    | ctor hK => exact ⟨Shp.full (.head hK) ⟨_, _, rfl⟩, fun _ _ => .head hK⟩
-  | rnil => intro _ h; cases h; exact ⟨.rnil, by simp [Tm.head]⟩
-  | rcons _ _ ih₁ ih₂ =>
-    intro _ h
-    cases h with
-    | rcons _ h₁ h₂ => exact ⟨.rcons (ih₁ h₁).1 (ih₂ h₂).1, by simp [Tm.head]⟩
-  | ctorApp _ hf _ ih₁ ih₂ =>
-    intro t h
-    cases h with
-    | app h₁ h₂ =>
-      have hsp : Shp S false t _ := .app ((ih₁ h₁).2 _ hf) (ih₂ h₂).1
-      exact ⟨hsp.full (spine_ty (by simpa [Tm.head] using hf) (.app h₁ h₂)), fun _ _ => hsp⟩
-  | constApp hc _ _ =>
-    intro t h
-    cases h with
-    | app h₁ _ =>
-      obtain ⟨x, y, rfl⟩ := Const.ty_two hc h₁.const_inv.symm
-      exact ⟨.arrow, by simp [Tm.head]⟩
+theorem Typ.pureTy {Ψ Γ e J} (h : Typ S Ψ Γ e J) :
+    Value e → ∀ {T φ}, J = .ex T φ → PureTy S Ψ Γ e T := by
+  induction h with
+  | lam hb hT =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨_, hT, .lam hb .refl, by simp [Tm.head], by simp, by simp⟩
+  | fix hf hT =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨_, hT, .fix hf .refl, by simp [Tm.head], by simp, by simp⟩
+  | lit => intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .lit, by simp [Tm.head], by simp, by simp⟩
+  | loc hl =>
+    intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .loc hl, by simp [Tm.head], by simp, by simp⟩
+  | const hc hT =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨_, hT, .const hc .refl, by simp [Tm.head], by simp, by simp⟩
+  | ctor hK hT =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨_, hT, .ctor hK .refl, fun _ _ => Ty.arrows_pureSpine _ _, by simp, by simp⟩
+  | rnil => intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .rnil, by simp [Tm.head], by simp, by simp⟩
+  | enil hρ =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨_, .refl, .enil hρ, by simp [Tm.head], by simp, by simp⟩
+  | task he hψ hT =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨_, hT, .task he hψ .refl, by simp [Tm.head], by simp, by simp⟩
+  | rcons hl _ _ ih₁ ih₂ =>
+    intro hv _ _ hJ; cases hJ
+    cases hv with
+    | rcons hv₁ hv₂ =>
+      obtain ⟨_, l₁, t₁, -⟩ := ih₁ hv₁ rfl
+      obtain ⟨_, l₂, t₂, -⟩ := ih₂ hv₂ rfl
+      exact ⟨_, .refl, .rcons hl (t₁.sub ⟨l₁, Stage.le_refl _⟩) (t₂.sub ⟨l₂, Stage.le_refl _⟩),
+        by simp [Tm.head], by simp, by simp⟩
+  | econs hv₁ hθ _ _ hρ ih₁ ih₂ =>
+    intro hv _ _ hJ; cases hJ
+    cases hv with
+    | econs _ hv₂ =>
+      obtain ⟨_, l₁, t₁, -⟩ := ih₁ hv₁ rfl
+      obtain ⟨_, l₂, t₂, -⟩ := ih₂ hv₂ rfl
+      exact ⟨_, .refl, .econs hv₁ hθ (t₁.sub ⟨l₁, Stage.le_refl _⟩) (t₂.sub ⟨l₂, Stage.le_refl _⟩) hρ,
+        by simp [Tm.head], by simp, by simp⟩
+  | errVal hv' _ hE ih =>
+    intro _ _ _ hJ; cases hJ
+    obtain ⟨T₀, l, t, _, hc, ha⟩ := ih hv' rfl
+    cases l
+    refine ⟨_, .refl, .errVal hv' t hE, fun _ _ => trivial, fun c hc' => ?_, fun c _ he h₁ h₂ => ?_⟩
+    · obtain ⟨_, _, _, h⟩ := Const.ty_arrow (S := S) c
+      have := hc c hc'; rw [h] at this; cases this
+    · obtain ⟨_, _, h⟩ := ha c _ he h₁ h₂; cases h
+  | app hf he hψ hT ih₁ ih₂ =>
+    intro hv _ _ hJ; cases hJ
+    cases hv with
+    | ctorApp hvf hK hve =>
+      obtain ⟨T₀, l₀, t₀, sp, -⟩ := ih₁ hvf rfl
+      obtain ⟨_, _, _, rfl, la, lφ, lt⟩ := l₀.arrow_right
+      obtain ⟨rfl, sp'⟩ := sp _ hK
+      obtain ⟨_, le, te, -⟩ := ih₂ hve rfl
+      refine ⟨_, lt.trans hT, .app t₀ (te.sub ⟨le.trans la, Stage.le_refl _⟩) trivial .refl,
+        fun _ _ => sp', fun _ h => (by cases h), fun c _ h => ?_⟩
+      cases h; simp [Tm.head] at hK
+    | constApp hc hve =>
+      obtain ⟨T₀, l₀, t₀, _, hcT, -⟩ := ih₁ .const rfl
+      obtain ⟨x, y, hxy⟩ := Const.ty_first (S := S) hc
+      rw [hcT _ rfl, hxy] at l₀ t₀
+      obtain ⟨_, _, _, h, la, _, lt⟩ := l₀.arrow_left
+      cases h
+      obtain ⟨_, le, te, -⟩ := ih₂ hve rfl
+      refine ⟨_, lt.trans hT, .app t₀ (te.sub ⟨le.trans la, Stage.le_refl _⟩) trivial .refl,
+        by simp [Tm.head], fun _ h => (by cases h), fun c' _ h h₁ h₂ => ?_⟩
+      cases h
+      obtain ⟨_, _, _, h'⟩ := Const.ty_merge (S := S) h₁ h₂
+      rw [hxy] at h'; cases h'; exact ⟨_, _, rfl⟩
+    | constApp2 h₁ h₂ hv₁ hve =>
+      obtain ⟨T₀, l₀, t₀, _, _, ha⟩ := ih₁ (.constApp (.inl h₁) hv₁) rfl
+      obtain ⟨y, z, rfl⟩ := ha _ _ rfl h₁ h₂
+      obtain ⟨_, _, _, h, la, _, lt⟩ := l₀.arrow_left
+      cases h
+      obtain ⟨_, le, te, -⟩ := ih₂ hve rfl
+      exact ⟨_, lt.trans hT, .app t₀ (te.sub ⟨le.trans la, Stage.le_refl _⟩) trivial .refl,
+        by simp [Tm.head], fun _ h => (by cases h), fun _ _ h => (by cases h)⟩
+  | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
-/-- Л1 for functions. -/
-theorem canonical_arrow {Ψ Γ v a t} (hv : Value v) (h : Typ S Ψ Γ v (.ex (.arrow a t))) :
-    (∃ b, v = .lam b) ∨ (∃ f, v = .fix f) ∨ (∃ K, v.head = .ctor K) ∨ (∃ c, v = .const c) ∨
-      (∃ c w, v = .app (.const c) w ∧ c.arity = 2 ∧ Value w) := by
-  cases hv with
-  | lam => exact .inl ⟨_, rfl⟩
-  | fix => exact .inr (.inl ⟨_, rfl⟩)
-  | ctor => exact .inr (.inr (.inl ⟨_, rfl⟩))
-  | ctorApp _ hf _ => exact .inr (.inr (.inl ⟨_, hf⟩))
-  | const => exact .inr (.inr (.inr (.inl ⟨_, rfl⟩)))
-  | constApp hc hw => exact .inr (.inr (.inr (.inr ⟨_, _, rfl, hc, hw⟩)))
-  | lit => cases h
-  | loc => cases h
-  | rnil => cases h
-  | rcons => cases h
-
-/-- Л1 for references. -/
-theorem canonical_ref {Ψ Γ v t} (hv : Value v) (h : Typ S Ψ Γ v (.ex (.ref t))) :
-    ∃ l, v = .loc l ∧ Ψ[l]? = some t := by
-  cases hv with
-  | loc => cases h with | loc hl => exact ⟨_, rfl, hl⟩
-  | ctor => obtain ⟨ts, _, he⟩ := spine_ty rfl h; cases ts <;> cases he
-  | ctorApp _ hf _ =>
-    obtain ⟨ts, _, he⟩ := spine_ty (v := .app _ _) hf h; cases ts <;> cases he
-  | const => exact absurd h.const_inv.symm Const.ty_ne_ref
-  | constApp hc _ =>
-    cases h with
-    | app h₁ _ =>
-      obtain ⟨_, _, he⟩ := Const.ty_two hc h₁.const_inv.symm
-      cases he
-  | lam => cases h
-  | fix => cases h
-  | lit => cases h
-  | rnil => cases h
-  | rcons => cases h
+/-- Л1, last clause: a value has its type with any stage. -/
+theorem Typ.valueAny {Ψ Γ v T φ} (h : Typ S Ψ Γ v (.ex T φ)) (hv : Value v) (ψ : Stage) :
+    Typ S Ψ Γ v (.ex T ψ) := by
+  obtain ⟨_, l, t, -⟩ := h.pureTy hv rfl
+  exact t.sub ⟨l, Stage.pure_le _⟩
 
 end Flick

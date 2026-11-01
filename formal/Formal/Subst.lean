@@ -31,6 +31,17 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .aguard p g b r =>
     .aguard p (g.rename (liftR p.binds ξ)) (b.rename (liftR p.binds ξ)) (r.rename ξ)
   | .todo => .todo
+  | .task e => .task (e.rename ξ)
+  | .await e => .await (e.rename ξ)
+  | .raise e => .raise (e.rename ξ)
+  | .try_ e al => .try_ (e.rename ξ) (al.rename ξ)
+  | .handle v al => .handle (v.rename ξ) (al.rename ξ)
+  | .provide l e => .provide (l.rename ξ) (e.rename ξ)
+  | .with_ θ e => .with_ (θ.rename ξ) (e.rename ξ)
+  | .enil => .enil
+  | .econs S v θ => .econs S (v.rename ξ) (θ.rename ξ)
+  | .bind S e => .bind S (e.rename ξ)
+  | .join e₁ e₂ => .join (e₁.rename ξ) (e₂.rename ξ)
 
 /-- Lift a substitution under `n` binders. -/
 def liftS (n : Nat) (σ : Nat → Tm) (i : Nat) : Tm :=
@@ -57,6 +68,17 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .aguard p g b r =>
     .aguard p (g.subst (liftS p.binds σ)) (b.subst (liftS p.binds σ)) (r.subst σ)
   | .todo => .todo
+  | .task e => .task (e.subst σ)
+  | .await e => .await (e.subst σ)
+  | .raise e => .raise (e.subst σ)
+  | .try_ e al => .try_ (e.subst σ) (al.subst σ)
+  | .handle v al => .handle (v.subst σ) (al.subst σ)
+  | .provide l e => .provide (l.subst σ) (e.subst σ)
+  | .with_ θ e => .with_ (θ.subst σ) (e.subst σ)
+  | .enil => .enil
+  | .econs S v θ => .econs S (v.subst σ) (θ.subst σ)
+  | .bind S e => .bind S (e.subst σ)
+  | .join e₁ e₂ => .join (e₁.subst σ) (e₂.subst σ)
 
 /-- Substitute `vs` for the innermost `vs.length` variables: `e[δ]`. -/
 def inst (vs : List Tm) (i : Nat) : Tm :=
