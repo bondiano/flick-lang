@@ -13,6 +13,7 @@ use std::slice;
 use super::{Check, Checker, error};
 use crate::subst::free_vars;
 
+mod provided;
 mod scope;
 mod solve;
 use crate::syntax::{Con, Name, Path, Term};
@@ -49,6 +50,10 @@ pub(super) struct Regions {
     pub(super) facts: Vec<(Caps, Type)>,
     /// The region each `scope` around binds its name to, innermost last.
     renamed: Vec<(Name, Name)>,
+    /// The regions of the `scope`s and `provide`s around, innermost last.
+    nest: Vec<Name>,
+    /// `Provided R ϱ` of the signatures around (§2.7).
+    givens: Vec<(Row, Type)>,
 }
 
 /// The element `Scope ϱ` of a row of services.

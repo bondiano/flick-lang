@@ -97,10 +97,11 @@ impl Checker<'_> {
                     return error("With", "no `env`");
                 };
                 let (t, inner) = self.own_stage(body, expected)?;
-                let (needed, raised) = match inner {
+                let (mut needed, raised) = match inner {
                     Stage::Pure => (Row::none(), Row::none()),
-                    Stage::Runtime(r, e) => (r, e),
+                    Stage::Runtime(r, e) => (self.zonk_row(&r), e),
                 };
+                self.settle_provide(&mut needed, &given, None)?;
                 let rest = self.minus(&needed, &given)?;
                 self.perform(&Stage::Runtime(rest, raised))?;
                 Ok(t)
@@ -148,10 +149,10 @@ impl Checker<'_> {
     fn lambda(&mut self, lambda: &Lambda, mem: &[Term]) -> Check<()> {
         for (pi, r) in lambda.regions.iter().enumerate().filter(|(_, r)| r.live) {
             let fins = r.finalizers.iter().filter_map(|f| match f {
-                Finalizer::Run(t) => Some(t),
+                Finalizer::Run(t, _) => Some(t),
                 Finalizer::Release(_) => None,
             });
-            let kids = r.children.iter().flat_map(|(f, t)| [f, t]);
+            let kids = r.children.iter().flat_map(|(f, t, _)| [f, t]);
             let outer = lambda.outlived_by(pi);
             for t in fins.chain(kids) {
                 let stage = mem::replace(&mut self.stage, Stage::Pure);

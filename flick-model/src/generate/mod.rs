@@ -12,6 +12,7 @@ mod holes;
 mod leaks;
 mod mutate;
 mod print;
+mod provides;
 mod regions;
 mod term;
 

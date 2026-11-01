@@ -74,8 +74,9 @@ impl Checker<'_> {
             let fact = (substitute_caps(c, &map), substitute(r, &map));
             self.regions.facts.push(fact);
         }
-        let body = self.implicit(&s.body, &Caps::default());
-        substitute(&body, &map)
+        let body = substitute(&self.implicit(&s.body, &Caps::default()), &map);
+        self.give_provided(&body);
+        body
     }
 
     /// `Gen(Γ, τ)`: the type metas of `t` deeper than the current level.

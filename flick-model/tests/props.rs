@@ -144,7 +144,7 @@ fn progress_and_preservation(decls: &eval::Program, d: &Decls, p: &Program) -> R
 #[test]
 fn leaks_reach_a_use_after_close() {
     let mut seen = 0;
-    for path in 0..10 {
+    for path in 0..13 {
         let Some(p) = generate::leak_used(path) else {
             continue;
         };
@@ -156,12 +156,12 @@ fn leaks_reach_a_use_after_close() {
         let (e, _) = runnable(&p);
         let outcome = GEN.with(|(_, globals)| Machine::new(globals, FUEL).run(e));
         assert!(
-            matches!(&outcome, Outcome::Stuck(w) if w.starts_with("use after close")),
+            matches!(&outcome, Outcome::Stuck(w) if w.starts_with("use after")),
             "path {path}: {outcome:?}\n{source}"
         );
         seen += 1;
     }
-    assert_eq!(seen, 8);
+    assert_eq!(seen, 11);
 }
 
 /// Р130: `(fun g x -> g x) (try … with _ -> as4)`, the λ of `v1` after

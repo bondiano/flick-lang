@@ -11,7 +11,8 @@ use crate::types::{Row, Stage, Type};
 
 /// A use of `x`, leaked by path `path` of `regions.md` §4, after its
 /// region closed. `None` where the path uses what leaked only inside its
-/// `scope`; a child of the outer `scope` uses it when that one closes.
+/// `scope`; a child of the outer `scope` uses it when that one closes, and
+/// work of path 10 uses its service then.
 fn use_after(path: usize, x: &Name) -> Option<Term> {
     let v = || Term::Var(x.clone());
     let call = |f: Term| Term::app(f, Term::unit());
@@ -39,20 +40,26 @@ fn use_after(path: usize, x: &Name) -> Option<Term> {
                 ]),
             )
         }
-        8 => Term::unit(),
+        8 | 10.. => Term::unit(),
         9 => Term::app(global(MODULE, "use_conn"), v()),
         _ => return None,
     })
 }
 
 /// `fun u -> e` with the leak of path `path` and a use after it, of
-/// `Unit ->{} Unit`; `None` for a path with no such use.
+/// `Unit ->{} Unit`; `None` for a path with no such use. Path 10 is
+/// `10 + k`: kept by a child, a finalizer or `start` (`provides.rs`).
 pub fn leak_used(path: usize) -> Option<Program> {
     use_after(path, &"x".into())?;
-    let mut g = Gen::new(&[]);
-    let body = leak(&mut g, path, |x| {
-        use_after(path, x).expect("a path with a use")
-    });
+    let choice = [u32::try_from(path.saturating_sub(10)).unwrap_or(0)];
+    let mut g = Gen::new(if path >= 10 { &choice } else { &[] });
+    let body = if path >= 10 {
+        super::provides::leak(&mut g, Term::unit())
+    } else {
+        leak(&mut g, path, |x| {
+            use_after(path, x).expect("a path with a use")
+        })
+    };
     let empty = Stage::Runtime(Row::none(), Row::none());
     Some(Program {
         scheme: mono(Type::fun(unit(), empty, unit())),

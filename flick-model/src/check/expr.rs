@@ -178,7 +178,7 @@ impl Checker<'_> {
 
     /// (Let-Sig) against `(∀ᾱ. τ)^C`: the value has `τ^C`.
     fn check_qualified_forall(&mut self, e: &Term, s: &Scheme, qualifier: Caps) -> Check<()> {
-        let facts = self.regions.facts.len();
+        let (facts, givens) = (self.regions.facts.len(), self.givens());
         let mut body = self.skolemize(s);
         if !qualifier.is_empty() {
             body = Type::Captured(Rc::new(body), qualifier);
@@ -187,6 +187,7 @@ impl Checker<'_> {
         let checked = self.check(e, &body);
         let inner = mem::replace(&mut self.stage, outer);
         self.regions.facts.truncate(facts);
+        self.forget_givens(givens);
         checked?;
         if !s.vars.is_empty() && inner != Stage::Pure {
             return error(

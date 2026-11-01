@@ -307,8 +307,12 @@ impl<'p> Machine<'p> {
                 Term::Task(e) => Control::Eval((*e).clone()),
                 other => return Err(stuck(format!("`await` of {other:?}"))),
             },
-            // try v with ā → v
-            Frame::Try(_) | Frame::With(_) => Control::Ret(v),
+            // try v with ā → v; a `provide` ends with its `with` (`regions.md` §2.7)
+            Frame::Try(_) | Frame::Kept(_) => Control::Ret(v),
+            Frame::With(env) => {
+                self.lambda.ended.push(env);
+                Control::Ret(v)
+            }
             Frame::ProvideLayer(e) => {
                 self.push(Frame::ProvideEnv(e));
                 Control::Eval(build(&v)?)
@@ -409,22 +413,30 @@ impl<'p> Machine<'p> {
                 Frame::Close(pi, ..) => {
                     return Err(stuck(format!("a child or finalizer of π{pi} raised {v:?}")));
                 }
+                Frame::With(env) => {
+                    self.lambda.ended.push(env);
+                }
                 _ => {}
             }
         }
         Err(Outcome::Raise(v))
     }
 
-    /// `lookup(E, S)`: the innermost `with` that has `S`, else `Σ₀`.
-    fn lookup(&self, s: &Path) -> Option<Term> {
-        self.frames
-            .iter()
-            .rev()
-            .find_map(|f| match f {
-                Frame::With(env) => env.get(s).cloned(),
-                _ => None,
-            })
-            .or_else(|| self.roots.get(s).cloned())
+    /// `lookup(E, S)`: the innermost `with` that has `S`, else `Σ₀`. One
+    /// of a `provide` that ended is a use after its release: work a region
+    /// kept uses it (T4.3, `regions.md` §5.3).
+    fn lookup(&self, s: &Path) -> Result<Option<Term>, Outcome> {
+        let found = self.frames.iter().rev().find_map(|f| match f {
+            Frame::With(env) | Frame::Kept(env) => env.get(s).map(|v| (env, v)),
+            _ => None,
+        });
+        match found {
+            Some((env, _)) if self.lambda.ended.iter().any(|e| Rc::ptr_eq(e, env)) => {
+                Err(stuck(format!("use after release of service `{s}`")))
+            }
+            Some((_, v)) => Ok(Some(v.clone())),
+            None => Ok(self.roots.get(s).cloned()),
+        }
     }
 
     /// The steps of the constants (§3.4), and of the natives that stand
@@ -441,7 +453,7 @@ impl<'p> Machine<'p> {
                 Control::Ret(Term::unit())
             }
             (Const::Raise, [v]) => Control::Raise(v.clone()),
-            (Const::Ask(s), [_]) => match self.lookup(s) {
+            (Const::Ask(s), [_]) => match self.lookup(s)? {
                 Some(v) => Control::Ret(v),
                 None => return Err(stuck(format!("no implementation of service `{s}`"))),
             },

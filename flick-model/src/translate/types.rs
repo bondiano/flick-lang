@@ -1,6 +1,7 @@
 //! Types of flick-core to types of the model. Class constraints become
 //! dictionary parameters (`docs/formal/core.md` §1.6), `Fiber.Outlives`
-//! the facts `Θ` of a scheme (`docs/formal/regions.md` §1.2); regions are
+//! the facts `Θ` of a scheme (`docs/formal/regions.md` §1.2),
+//! `Fiber.Provided` an element of a row (§2.7); regions are
 //! variables of kind `Region`, qualifiers `τ^C`; the prelude's `Eff`, `Ref`,
 //! `Layer`, `Errors` and `S.Impl` become the forms of §1.2.
 
@@ -43,6 +44,14 @@ pub fn scheme(t: &fc::Type) -> Scheme {
             let mut out = ty(body);
             for c in constraints.iter().rev().filter(|c| passes(c)) {
                 out = Type::fun(constraint(c), Stage::Pure, out);
+            }
+            for c in constraints.iter().filter(|c| !passes(c)) {
+                if let (fc::Type::Con { name, .. }, args) = c.spine()
+                    && let [r, s] = &args[..]
+                    && name == "Provided"
+                {
+                    out = out.with_provided(&row(r), &ty(s));
+                }
             }
             let outlives = constraints
                 .iter()

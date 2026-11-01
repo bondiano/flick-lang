@@ -63,16 +63,18 @@ impl Checker<'_> {
         };
         let region = Var::Named(s.clone());
         if !self.regions.scopes.contains_key(&s) {
-            let parent = self.regions.open.last().cloned();
+            let parent = self.regions.nest.last().cloned();
             self.regions.scopes.insert(s.clone(), (self.level, parent));
             self.regions.kinds.insert(region.clone());
         }
         self.regions.open.push(s.clone());
+        self.regions.nest.push(s.clone());
         self.regions.renamed.push((name.clone(), s.clone()));
         self.locals.push((name.clone(), mono(owner(&s))));
         let checked = self.own_stage(body, expected);
         self.locals.pop();
         self.regions.renamed.pop();
+        self.regions.nest.pop();
         self.regions.open.pop();
         self.level -= 1;
         let s = &s;
@@ -81,6 +83,7 @@ impl Checker<'_> {
             Stage::Pure => (Row::none(), Row::none()),
             Stage::Runtime(r, e) => (self.zonk_row(&r), self.zonk_row(&e)),
         };
+        self.settle_scope(&mut r, s);
         if let Some(args) = r.elems.remove(&scope_service()) {
             for a in args.iter() {
                 self.unify(a, &Type::Var(region.clone()))?;

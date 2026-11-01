@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use super::{Control, Frame, Machine, Outcome, Step, stuck};
 use crate::subst::{any, subst};
-use crate::syntax::{Const, Name, Path, RegionOp, Term};
+use crate::syntax::{Const, Env, Name, Path, RegionOp, Term};
 
 /// What `Λ` keeps of a region `π`.
 #[derive(Clone, Debug)]
@@ -20,22 +20,29 @@ pub struct Region {
     /// `F(π)`, run last first.
     pub finalizers: Vec<Finalizer>,
     /// `K(π)`: each child's supervisor and task, run first to last.
-    pub children: Vec<(Term, Term)>,
+    pub children: Vec<(Term, Term, Kept)>,
 }
+
+/// The environments `θ` of the `provide`s around the place that
+/// registered work: it runs with them (`runtime.md` §3.5), outermost first.
+pub type Kept = Rc<[Rc<Env>]>;
 
 #[derive(Clone, Debug)]
 pub enum Finalizer {
     /// `close_n`: releases object `n`.
     Release(usize),
-    /// A task, awaited.
-    Run(Term),
+    /// A task, awaited with what it kept.
+    Run(Term, Kept),
 }
 
-/// `Λ`, and the objects released so far.
+/// `Λ`, the objects released so far, and the environments of the
+/// `provide`s that ended (`regions.md` §2.7).
 #[derive(Clone, Debug, Default)]
 pub struct Lambda {
     pub regions: Vec<Region>,
     pub released: HashSet<usize>,
+    /// Kept alive, so no new environment takes the address of one.
+    pub ended: Vec<Rc<Env>>,
     objects: usize,
 }
 
@@ -129,15 +136,19 @@ impl Machine<'_> {
                     Some(Finalizer::Release(n)) => {
                         self.lambda.released.insert(n);
                     }
-                    Some(Finalizer::Run(t)) => break Some(t),
+                    Some(Finalizer::Run(t, kept)) => break Some((t, kept)),
                     None => break None,
                 }
             }
         } else {
-            Some(r.children.remove(0).1)
+            let (_, t, kept) = r.children.remove(0);
+            Some((t, kept))
         };
-        if let Some(t) = work {
+        if let Some((t, kept)) = work {
             self.push(Frame::Close(pi, s, ended));
+            for env in kept.iter() {
+                self.push(Frame::Kept(env.clone()));
+            }
             return Control::Eval(Term::Await(Rc::new(t)));
         }
         self.lambda.regions[pi].live = false;
@@ -145,6 +156,17 @@ impl Machine<'_> {
             Ok(v) => Control::Ret(v),
             Err(v) => Control::Raise(v),
         }
+    }
+
+    /// The environments of the `provide`s around the step.
+    fn kept(&self) -> Kept {
+        self.frames
+            .iter()
+            .filter_map(|f| match f {
+                Frame::With(env) | Frame::Kept(env) => Some(env.clone()),
+                _ => None,
+            })
+            .collect()
     }
 
     fn object(&mut self, p: &Path, region: Option<usize>) -> Term {
@@ -192,16 +214,18 @@ impl Machine<'_> {
             }
             (RegionOp::Spawn, [Term::Own(pi), f, t]) => {
                 let pi = self.live(*pi)?;
+                let kept = self.kept();
                 self.lambda.regions[pi]
                     .children
-                    .push((f.clone(), t.clone()));
+                    .push((f.clone(), t.clone(), kept));
                 Control::Ret(self.object(p, None))
             }
             (RegionOp::AddFinalizer, [t]) => {
                 let pi = self.live(owner()?)?;
+                let kept = self.kept();
                 self.lambda.regions[pi]
                     .finalizers
-                    .push(Finalizer::Run(t.clone()));
+                    .push(Finalizer::Run(t.clone(), kept));
                 Control::Ret(Term::unit())
             }
             // `let x = await t in Scope.add_finalizer (task (release x)); x`

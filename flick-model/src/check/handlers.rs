@@ -197,11 +197,15 @@ impl Checker<'_> {
                 (i, e, o)
             }
         };
-        let (t, inner) = self.own_stage(body, expected)?;
-        let (needed, raised) = match inner {
+        let p = self.enter_provide();
+        let checked = self.own_stage(body, expected);
+        self.leave_provide();
+        let (t, inner) = checked?;
+        let (mut needed, raised) = match inner {
             Stage::Pure => (Row::none(), Row::none()),
-            Stage::Runtime(r, e) => (r, e),
+            Stage::Runtime(r, e) => (self.zonk_row(&r), e),
         };
+        self.settle_provide(&mut needed, &self.zonk_row(&outputs), Some(&p))?;
         let rest = self.minus(&needed, &outputs)?;
         let services = self.sum(&inputs, &rest)?;
         let errors = self.sum(&errors, &raised)?;
