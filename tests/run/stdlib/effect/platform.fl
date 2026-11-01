@@ -77,7 +77,10 @@ let main () =
   let outcome =
     try
       provide Path.layer { paths () }
-      provide Path.node { Platform.stdout_line ("node join " ++ Path.join ["x", "y"]) }
+      // Node's paths of the OS: `x\y` on Windows, printed with `/` on every OS
+      provide Path.node {
+        Platform.stdout_line ("node join " ++ String.replace_all "\\" "/" (Path.join ["x", "y"]))
+      }
       provide fake_terminal { terminal () }
       provide Terminal.node { terminal () }
       provide (Terminal.node_quitting quit_on_q) {
