@@ -10,6 +10,8 @@ Info checkout
 "shop-cli": true
 "name":"pay": true
 "3 items": true
+"name":"exception": true
+/v1/metrics: true
 without TraceFlag:
 DESCRIPTION
   Checks out
