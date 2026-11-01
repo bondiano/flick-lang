@@ -360,6 +360,25 @@ backreferences) is a `RegExpError`. `String.locale_compare` orders as
 `Intl.Collator("en")` does, by weights the same script reads from Node;
 every locale collates as `en`.
 
+A pattern RE2 reads still means something else in a few places, because
+RE2 has no JS mode and Flick passes the source on as written:
+
+- `\s` is ASCII whitespace without `\v`; `.` matches `\r`, U+2028 and
+  U+2029; `^` and `$` with `m` break lines only at `\n`.
+- There is no non-`u` mode: `.` and a class take a whole code point, never
+  one surrogate half, and `\p{…}` is a Unicode class read from Go's
+  Unicode 15 tables rather than the literal `p{…}`.
+- `i` folds case as Unicode simple folding, so `ſ` matches `s` and the
+  Kelvin sign matches `k`; JS keeps those apart.
+- `replace_all` skips an empty match right after a non-empty one: `a*` on
+  `"baaac"` gives `-b-c-`, JS gives `-b--c-`.
+- A replacement reads `$$`, `$&`, `` $` ``, `$'` and `$n`, not `$<name>`.
+- Flags other than `g`, `i`, `m`, `s` and `y` are ignored rather than a
+  `SyntaxError`, so `d`, `u` and `v` change nothing.
+- A `RegExpError` carries RE2's text, not V8's. It is also what lookaround,
+  backreferences, `\u…`, `\c…`, `[\b]`, `[^]` and a repeat above 1000
+  give, all of which JS accepts.
+
 A `Seq` restarts on every iteration as on the JS target; a lazy `for` is
 one. A `HashMap` or `HashSet` lists its entries in the order Effect's HAMT
 walks them, by Effect's `Hash.hash` five bits at a time from the lowest,
