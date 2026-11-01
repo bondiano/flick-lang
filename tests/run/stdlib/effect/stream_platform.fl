@@ -28,6 +28,14 @@ let flat = { recursive = false }
 about_b : Stream.WatchEvent -> Bool
 let about_b e = e == Stream.Create "b.txt" || e == Stream.Update "b.txt"
 
+/// Whether the event is the creation of `sub/c.txt`, in the system's
+/// separator.
+created_c : Stream.WatchEvent -> Bool
+let created_c e =
+  match e with
+  | Stream.Create path -> String.ends_with "c.txt" path && String.starts_with "sub" path
+  | _ -> false
+
 files : String ->{FileSystem.FileSystem; PlatformError.PlatformError} Unit
 let files dir =
   let a = dir ++ "/a.txt"
@@ -60,6 +68,29 @@ let files dir =
     |> Stream.take 1
     |> Stream.run_count
   line ("watch", (show created))
+  let nested =
+    Stream.watch { recursive = true } dir
+    |> Stream.merge_effect
+      (task {
+        Effect.sleep ms50
+        FileSystem.make_directory { recursive = false; mode = None } (dir ++ "/sub")
+        FileSystem.write_file_string plain (dir ++ "/sub/c.txt") "c"
+      })
+    |> Stream.filter created_c
+    |> Stream.take 1
+    |> Stream.run_count
+  line ("watch recursive", (show nested))
+  let removed =
+    Stream.watch flat dir
+    |> Stream.merge_effect
+      (task {
+        Effect.sleep ms50
+        FileSystem.remove { recursive = false; force = false } (dir ++ "/b.txt")
+      })
+    |> Stream.filter (fun e -> e == Stream.Remove "b.txt")
+    |> Stream.take 1
+    |> Stream.run_count
+  line ("watch remove", (show removed))
 
 /// Each element of a stream of the scope's subscription, inside the scope.
 subscribed : PubSub.PubSub Float ->{} List Float

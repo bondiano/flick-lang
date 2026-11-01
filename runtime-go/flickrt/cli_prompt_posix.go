@@ -3,16 +3,17 @@
 package flickrt
 
 import (
+	"errors"
 	"io"
 	"os"
 	"syscall"
-	"time"
 	"unsafe"
 )
 
 type promptTerminalState struct {
 	input, output *os.File
 	original      *syscall.Termios
+	pump          *stdinPump
 	keys          promptKeyReader
 }
 
@@ -30,7 +31,7 @@ func promptIoctl(fd uintptr, request uintptr, value unsafe.Pointer) error {
 }
 
 func promptOpenTerminal(input, output *os.File) (*promptTerminalState, error) {
-	tty := &promptTerminalState{input: input, output: output}
+	tty := &promptTerminalState{input: input, output: output, pump: pumpOf(input)}
 	var original syscall.Termios
 	// any error means no terminal (ENOTTY, or ENODEV for /dev/null on macOS): no raw mode, as Node checks isTTY
 	if err := promptIoctl(input.Fd(), promptGetTermios, unsafe.Pointer(&original)); err == nil {
@@ -57,52 +58,14 @@ func promptRestoreTerminal(tty *promptTerminalState) error {
 	return promptIoctl(tty.input.Fd(), promptSetTermios, unsafe.Pointer(tty.original))
 }
 
+// readByte reads through the pump, so fd 0 has one reader; the raw mode
+// set on the fd holds for it.
 func (tty *promptTerminalState) readByte(fb *Fiber, timeout int) (byte, bool, error) {
-	var deadline time.Time
-	if timeout >= 0 {
-		deadline = time.Now().Add(time.Duration(timeout) * time.Millisecond)
+	b, ok, err := tty.pump.byte(fb, timeout)
+	if errors.Is(err, syscall.EIO) {
+		err = io.EOF // the terminal hung up
 	}
-	fd := int(tty.input.Fd())
-	for {
-		Check(fb)
-		delay := 30 * time.Millisecond
-		if !deadline.IsZero() {
-			remaining := time.Until(deadline)
-			if remaining <= 0 {
-				return 0, false, nil
-			}
-			delay = min(delay, remaining)
-		}
-		var set syscall.FdSet
-		bits := int(unsafe.Sizeof(set.Bits[0])) * 8
-		if fd < 0 || fd >= len(set.Bits)*bits {
-			return 0, false, syscall.EINVAL
-		}
-		set.Bits[fd/bits] |= 1 << uint(fd%bits)
-		tv := syscall.NsecToTimeval(int64(delay))
-		if err := promptSelect(fd+1, &set, &tv); err != nil {
-			if err == syscall.EINTR {
-				continue
-			}
-			return 0, false, err
-		}
-		if set.Bits[fd/bits]&(1<<uint(fd%bits)) == 0 {
-			continue
-		}
-		Check(fb)
-		var buffer [1]byte
-		n, err := syscall.Read(fd, buffer[:])
-		if err == syscall.EINTR || err == syscall.EAGAIN {
-			continue
-		}
-		if err == syscall.EIO || n == 0 && err == nil {
-			return 0, false, io.EOF
-		}
-		if err != nil {
-			return 0, false, err
-		}
-		return buffer[0], true, nil
-	}
+	return b, ok, err
 }
 
 func promptTerminalRead(fb *Fiber, tty *promptTerminalState) (Value, error) {

@@ -57,7 +57,7 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// one allocation for what a request's fiber needs
 		q := &servedRequest{fiber: serving}
-		q.source.r, q.source.marks = r, &q.marks
+		q.source.r, q.source.marks, q.source.head = r, &q.marks, requestHead(r)
 		q.request = ServerRequest{src: &q.source, method: r.Method, url: r.RequestURI, originalURL: r.RequestURI}
 		q.state.id, q.state.signal = fibers.Add(1), make(chan struct{})
 		q.fiber.state = &q.state
@@ -82,8 +82,8 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 		if aborted {
 			panic(http.ErrAbortHandler)
 		}
-	})}
-	go srv.Serve(listener)
+	}), ConnContext: orderContext}
+	go srv.Serve(orderListener{listener})
 	var grace time.Duration
 	if d, ok := some(o.Get("gracefulShutdownTimeout")); ok && !dur(d).infinite() {
 		grace = time.Duration(dur(d).toNanos().Int64())

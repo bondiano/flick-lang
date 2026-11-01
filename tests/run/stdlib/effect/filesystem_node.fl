@@ -39,7 +39,11 @@ let work dir =
   line "utimes" (show ((FileSystem.stat a).mtime == Some 2000))
   line
     "glob recursive"
-    (show (List.sort (FileSystem.glob { root = Some (dir ++ "/tree"); exclude = [] } "**/*.txt")))
+    (show
+      (List.sort
+        (List.map
+          (String.replace_all "\\" "/")
+          (FileSystem.glob { root = Some (dir ++ "/tree"); exclude = [] } "**/*.txt"))))
   line
     "glob braces"
     (show (List.sort (FileSystem.glob { root = Some dir; exclude = [] } "{a,b}.txt")))

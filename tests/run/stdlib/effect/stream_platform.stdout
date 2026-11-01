@@ -8,6 +8,8 @@ split_lines: ["one", "two", "three"]
 read_file missing: missing
 watch_with: (2, [true, false])
 watch: 1
+watch recursive: 1
+watch remove: 1
 scoped handles: [2, 2]
 done
 stdin: []

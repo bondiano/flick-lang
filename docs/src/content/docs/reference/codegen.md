@@ -439,8 +439,14 @@ URLs, the router's defaults, middleware, multipart forms, static files,
 streamed bodies, the client on `net/http` (interrupting a fiber cancels its
 request), typed `HttpApi` clients and the same OpenAPI document. What
 `net/http` decides differs: a response's status text is always the
-standard one, a request's header order is not kept, and compression is
-gzip or deflate only.
+standard one, and the client sends a request's headers sorted by name. The
+server sees a request's headers in the order they came, as Node does, over
+HTTP/1.x; where it cannot follow a connection's framing they come with the
+host first and the others by name. Compression with
+brotli and zstd uses the Go modules `andybalholm/brotli` and
+`klauspost/compress`, which a program requires only when it reaches
+`Http.Middleware.compression`; its first build downloads them unless the
+module cache has them.
 
 URL rendering and HTTP error details use the current fiber's
 `Http.UrlParams.with_redacted_names`, including nested and concurrent scopes;
@@ -458,7 +464,14 @@ reports Go's unsupported-operation error rather than Node's no-op success.
 File-handle foreign operations not yet ported remain `FLICK-P012`;
 `stat` metadata remains partial.
 Glob's POSIX classes are checked on the minimum Go 1.23, including unassigned
-code points.
+code points. `Stream.watch` uses inotify on Linux, kqueue on macOS and
+`ReadDirectoryChangesW` on Windows. Unlike Node's FSEvents, kqueue does
+not coalesce events, and a file created as its new directory is listed
+may be reported twice. Where the system has no notifications, or runs out
+of watches or descriptors, the path is polled every 50 ms; Node fails
+there.
+`Path.node` and the paths of `Cli` flags are Node's win32 paths on Windows
+(`tools/go-path/gen.mjs` checks them against `path.win32`), POSIX elsewhere.
 
 `flick run` and `flick dev` of a project that emits go build its
 executable into the run generation and start it, `dev` rebuilding and

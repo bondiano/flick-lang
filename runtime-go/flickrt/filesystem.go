@@ -522,7 +522,7 @@ func FileSystemNode(key Value) Value {
 			return Eff(func(*Fiber) Value { return writeFile(options, path.(string), []byte(wellFormed(text.(string)))) })
 		}),
 	)
-	return LayerSucceed(key, impl)
+	return LayerSucceed(key, markNode(impl))
 }
 
 // decodeText is the text of UTF-8 bytes as a `TextDecoder` reads it: a

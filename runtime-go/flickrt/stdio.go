@@ -3,13 +3,7 @@ package flickrt
 // `Stdio.node` and `Terminal.node`: the standard streams and the terminal
 // of the process, as Effect's Node.js layers give them.
 
-import (
-	"bufio"
-	"io"
-	"os"
-	"strings"
-	"sync"
-)
+import "os"
 
 // stderrWrite writes text to stderr after what stdout holds so far.
 func stderrWrite(text string) {
@@ -33,29 +27,14 @@ func StdioNode(key Value) Value {
 			return Eff(func(*Fiber) Value { stderrWrite(text.(string)); return Unit })
 		}),
 	)
-	stdioNodesMu.Lock()
-	stdioNodes[impl.(*Record)] = true
-	stdioNodesMu.Unlock()
-	return LayerSucceed(key, impl)
+	return LayerSucceed(key, markNode(impl))
 }
-
-var (
-	stdinOnce  sync.Once
-	stdinLines *bufio.Reader
-)
 
 // terminalReadLine is the next line of stdin without its line break;
 // false at its end.
-// shortcut: the read blocks its goroutine and ignores interruption, as a
-// quit key would; a terminal's raw key input waits for Terminal.readInput.
-func terminalReadLine() (string, bool) {
-	stdinOnce.Do(func() { stdinLines = bufio.NewReader(os.Stdin) })
+func terminalReadLine(fb *Fiber) (string, bool) {
 	idle()
-	line, err := stdinLines.ReadString('\n')
-	if err == io.EOF && line == "" || err != nil && err != io.EOF {
-		return "", false
-	}
-	return strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"), true
+	return processStdin().line(fb)
 }
 
 // TerminalNode is `Terminal.node` and `node_quitting`; `shouldQuit` picks
@@ -65,8 +44,8 @@ func TerminalNode(key, shouldQuit Value) Value {
 		"columns", Fn(func(*Fiber, Value) Value { c, _ := fileTerminalSize(os.Stdout); return Succeed(int32(c)) }),
 		"rows", Fn(func(*Fiber, Value) Value { _, r := fileTerminalSize(os.Stdout); return Succeed(int32(r)) }),
 		"read_line", Fn(func(*Fiber, Value) Value {
-			return Eff(func(*Fiber) Value {
-				line, ok := terminalReadLine()
+			return Eff(func(fb *Fiber) Value {
+				line, ok := terminalReadLine(fb)
 				if !ok {
 					return Fail(promptQuit)
 				}

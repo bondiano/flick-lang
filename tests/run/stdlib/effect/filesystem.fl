@@ -15,6 +15,10 @@ let reason failure =
   | PlatformError.PlatformError (PlatformError.System r) -> show r.tag
   | PlatformError.PlatformError (PlatformError.Bad r) -> "bad argument " ++ r.method
 
+/// `path` with Windows separators as `/`, so both OSes print the same.
+slashes : String -> String
+let slashes path = String.replace_all "\\" "/" path
+
 kind_of : FileSystem.Info -> FileSystem.FileType
 let kind_of info = info.type_
 
@@ -37,22 +41,26 @@ let work dir =
   FileSystem.copy_file a (dir ++ "/b.txt")
   FileSystem.copy { overwrite = true; preserveTimestamps = false } a (dir ++ "/c.txt")
   FileSystem.rename (dir ++ "/c.txt") (dir ++ "/d.txt")
-  FileSystem.chmod 0o600 (dir ++ "/d.txt")
+  // read-only is the one mode bit Windows keeps
+  FileSystem.chmod 0o444 (dir ++ "/d.txt")
   let d = FileSystem.stat (dir ++ "/d.txt")
-  line "chmod" (show (Int.bit_and d.mode 0o777 == 0o600))
+  line "chmod" (show (Int.bit_and d.mode 0o222 == 0))
+  FileSystem.chmod 0o644 (dir ++ "/d.txt")
   match (d.uid, d.gid) with
   | (Some uid, Some gid) -> FileSystem.chown uid gid (dir ++ "/d.txt")
   | _ -> ()
   FileSystem.link a (dir ++ "/hard.txt")
   FileSystem.symlink a (dir ++ "/soft.txt")
-  line "read_link" (show (FileSystem.read_link (dir ++ "/soft.txt") == a))
+  line "read_link" (show (slashes (FileSystem.read_link (dir ++ "/soft.txt")) == slashes a))
   line "real_path" (show (FileSystem.real_path (dir ++ "/soft.txt") == FileSystem.real_path a))
   line "glob" (show (List.sort (FileSystem.glob { root = Some dir; exclude = ["b.txt"] } "*.txt")))
   FileSystem.make_directory { recursive = true; mode = None } (dir ++ "/x/y")
   FileSystem.write_file plain (dir ++ "/x/y/z.bin") [1, 2, 255]
   line "read_file" (show (FileSystem.read_file (dir ++ "/x/y/z.bin")))
   line "read_directory" (show (List.sort (FileSystem.read_directory false dir)))
-  line "recursive" (show (List.sort (FileSystem.read_directory true (dir ++ "/x"))))
+  line
+    "recursive"
+    (show (List.sort (List.map slashes (FileSystem.read_directory true (dir ++ "/x")))))
   let append = FileSystem.Append
   FileSystem.write_file { flag = Some append; mode = None } a [33]
   line "append" (FileSystem.read_file_string a)

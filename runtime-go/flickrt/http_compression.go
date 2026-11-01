@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"io"
+	"maps"
 	"math/big"
 	"regexp"
 	"strconv"
@@ -15,8 +16,6 @@ import (
 // The compression middlewares as Effect's: responses compressed by the
 // request's `Accept-Encoding` before they are sent, request bodies
 // decompressed by their `Content-Encoding`.
-//
-// shortcut: the go platform compresses with gzip and deflate, Go's standard library having neither brotli nor zstd; Node's also offers br and zstd, which come with a Go module for them
 
 var (
 	acceptMember = regexp.MustCompile(`^([a-z0-9!#$%&'*+.^_` + "`" + `|~-]+)(?:;q=(0(?:\.[0-9]{0,3})?|1(?:\.0{0,3})?))?$`)
@@ -25,9 +24,9 @@ var (
 	algorithmOf  = map[string]string{"Gzip": "gzip", "Deflate": "deflate", "Brotli": "br", "Zstd": "zstd"}
 )
 
-// negotiate is the first preferred algorithm the platform has and the
-// header accepts, or "".
-func negotiate(header string, preferred []string) string {
+// negotiate is the first preferred algorithm of `supported` the header
+// accepts, or "".
+func negotiate(header string, preferred []string, supported map[string]openCompressor) string {
 	header = strings.TrimSpace(header)
 	if header == "" {
 		return ""
@@ -46,7 +45,7 @@ func negotiate(header string, preferred []string) string {
 		accepted[m[1]] = q
 	}
 	for _, a := range preferred {
-		if a != "gzip" && a != "deflate" {
+		if supported[a] == nil {
 			continue
 		}
 		q, ok := accepted[a]
@@ -70,22 +69,36 @@ func compressible(contentType string) bool {
 	return strings.HasPrefix(t, "text/") || strings.HasSuffix(t, "+json") || strings.HasSuffix(t, "+xml")
 }
 
-// compressor is a writer of the algorithm, gzip or deflate, into `buf`.
-type compressor interface {
+// Compressor writes what is written to it compressed.
+type Compressor interface {
 	io.WriteCloser
 	Flush() error
 }
 
-func newCompressor(algorithm string, level int, buf *bytes.Buffer) (compressor, error) {
-	if algorithm == "gzip" {
-		return gzip.NewWriterLevel(buf, level)
+type openCompressor = func(level int, w io.Writer) (Compressor, error)
+
+// webCompressors are the algorithms of the web's CompressionStream, and
+// compressors also those an optional package registers.
+var (
+	webCompressors = map[string]openCompressor{
+		"gzip":    func(level int, w io.Writer) (Compressor, error) { return gzip.NewWriterLevel(w, level) },
+		"deflate": func(level int, w io.Writer) (Compressor, error) { return zlib.NewWriterLevel(w, level) },
 	}
-	return zlib.NewWriterLevel(buf, level)
+	compressors = maps.Clone(webCompressors)
+)
+
+// RegisterCompression adds an algorithm to those `compression` answers
+// with: flickcompress registers br and zstd from its init, so a program
+// that never compresses carries neither module.
+func RegisterCompression(algorithm string, open func(level int, w io.Writer) (Compressor, error)) {
+	compressors[algorithm] = open
 }
 
+// compress compresses data in one write, which brotli also takes for its
+// size hint, as Node's brotliCompress is given the size of the body.
 func compress(algorithm string, level int, data []byte) ([]byte, error) {
 	var buf bytes.Buffer
-	w, err := newCompressor(algorithm, level, &buf)
+	w, err := compressors[algorithm](level, &buf)
 	if err != nil {
 		return nil, err
 	}
@@ -99,15 +112,15 @@ func compress(algorithm string, level int, data []byte) ([]byte, error) {
 // it flushed, so a streamed response streams compressed too.
 type compressingReader struct {
 	in  io.ReadCloser
-	w   compressor
+	w   Compressor
 	out bytes.Buffer
 	buf []byte
 	eof bool
 }
 
-func newCompressingReader(algorithm string, level int, in io.ReadCloser) (io.ReadCloser, error) {
+func newCompressingReader(open openCompressor, level int, in io.ReadCloser) (io.ReadCloser, error) {
 	r := &compressingReader{in: in, buf: make([]byte, 32<<10)}
-	w, err := newCompressor(algorithm, level, &r.out)
+	w, err := open(level, &r.out)
 	if err != nil {
 		in.Close()
 		return nil, err
@@ -166,7 +179,11 @@ func compression(fb *Fiber, options, handler, request Value, web bool) Value {
 	if m, ok := some(o.Get("minSize")); ok {
 		minSize = int64(m.(float64))
 	}
-	levels := map[string]int{"gzip": 6, "deflate": 6}
+	supported := compressors
+	if web {
+		supported = webCompressors
+	}
+	levels := map[string]int{"gzip": 6, "deflate": 6, "br": 4, "zstd": 3}
 	for _, l := range List(o.Get("levels")) {
 		if web {
 			break
@@ -200,7 +217,7 @@ func compression(fb *Fiber, options, handler, request Value, web bool) Value {
 			return response
 		}
 		accept, _ := requestOf(request).header("accept-encoding")
-		algorithm := negotiate(accept, preferred)
+		algorithm := negotiate(accept, preferred, supported)
 		if algorithm == "" {
 			return withVary(response)
 		}
@@ -213,14 +230,14 @@ func compression(fb *Fiber, options, handler, request Value, web bool) Value {
 		}
 		var body *Body
 		if r.body.kind == bodyStream {
-			source, level := r.body, levels[algorithm]
+			source, compressor, level := r.body, supported[algorithm], levels[algorithm]
 			body = &Body{kind: bodyStream, hasType: true, contentType: ct, length: -1,
 				open: func(fb *Fiber) (io.ReadCloser, error) {
 					in, err := source.open(fb)
 					if err != nil {
 						return nil, err
 					}
-					return newCompressingReader(algorithm, level, in)
+					return newCompressingReader(compressor, level, in)
 				}}
 		} else {
 			data, _, err := r.body.bytes(fb)

@@ -26,8 +26,15 @@ func TestRouterPriority(t *testing.T) {
 	if got, _ := find(c, routes, "POST", c.pathSegments("/files/new")); got == nil || got.handler != "param" {
 		t.Errorf("POST /files/new: got %v, want param", got)
 	}
-	if n := negotiate("br;q=1, gzip;q=0.5", []string{"br", "gzip"}); n != "gzip" {
-		t.Errorf("negotiate: %q", n)
+	if n := negotiate("br;q=1, gzip;q=0.5", []string{"br", "gzip"}, webCompressors); n != "gzip" {
+		t.Errorf("negotiate without br: %q", n)
+	}
+	withBr := map[string]openCompressor{"br": webCompressors["gzip"], "gzip": webCompressors["gzip"]}
+	if n := negotiate("br;q=1, gzip;q=0.5", []string{"br", "gzip"}, withBr); n != "br" {
+		t.Errorf("negotiate with br: %q", n)
+	}
+	if n := negotiate("br;q=0, *", []string{"zstd", "br", "gzip"}, withBr); n != "gzip" {
+		t.Errorf("negotiate refusing br: %q", n)
 	}
 }
 

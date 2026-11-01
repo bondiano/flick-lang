@@ -373,7 +373,24 @@ let middlewares () =
     zipped
     (Http.ServerRequest.from_client_request
       (Http.ClientRequest.set_header "accept-encoding" "gzip" r))
-  pre : ServerRequest -> ServerResponse ->{; HttpServerError} ServerResponse
+  // the compressed bytes are Node's or Go's own: only the coding is printed;
+  // a request of its own each, as its pre-response handlers stay with it
+  accepting : String -> ServerRequest
+  let accepting a =
+    Http.ServerRequest.from_client_request (Http.ClientRequest.set_header "accept-encoding" a r)
+  observe
+    "compression br"
+    ["content-encoding"]
+    (Http.Middleware.compression { algorithms = []; minSize = Some 10; levels = [] } big)
+    (accepting "gzip, deflate, br, zstd")
+  observe
+    "compression zstd"
+    ["content-encoding"]
+    (Http.Middleware.compression
+      { algorithms = [Http.Platform.Zstd, Http.Platform.Brotli]; minSize = Some 10; levels = [(Http.Platform.Zstd, 5)] }
+      big)
+    (accepting "br, zstd")
+  pre :ServerRequest -> ServerResponse ->{; HttpServerError} ServerResponse
   let pre _ response = Http.ServerResponse.set_header "x-pre" "1" response
   late : ServerRequest -> ServerResponse ->{; HttpServerError} ServerResponse
   let late _ response = Http.ServerResponse.set_header "x-late" "1" response

@@ -225,34 +225,45 @@ func StreamReadFile(options, path Value) Value {
 }
 
 var (
-	stdioNodesMu sync.Mutex
-	stdioNodes   = map[*Record]bool{} // the Stdio services `Stdio.node` made
+	nodesMu sync.Mutex
+	nodes   = map[*Record]bool{} // the services `Stdio.node` and `FileSystem.node` made
 )
+
+// markNode records a service of `Stdio.node` or `FileSystem.node`.
+func markNode(impl Value) Value {
+	nodesMu.Lock()
+	nodes[impl.(*Record)] = true
+	nodesMu.Unlock()
+	return impl
+}
+
+// requireNode fails with NotFound, as the js platform does, when the
+// service of `key` is not node's and so has no native streams.
+func requireNode(fb *Fiber, key, module, method, path string) {
+	impl, ok := fb.env.get(key)
+	nodesMu.Lock()
+	native := ok && nodes[impl.(*Record)]
+	nodesMu.Unlock()
+	if !native {
+		Fail(NewData(platformErrorTag, NewData(systemReasonTag, Rec(
+			"tag", Nullary(Tag("PlatformError.SystemErrorTag.NotFound")), "module_", module, "method", method,
+			"description", Some("the implementation of the service has no native streams"),
+			"syscall", None, "pathOrDescriptor", Some(path)))))
+	}
+}
 
 // StreamStdin is the bytes of stdin in chunks; it needs the Stdio of
 // `Stdio.node`, and fails with NotFound under another.
-// shortcut: the read blocks its goroutine and ignores interruption until input comes; read stdin on a goroutine of its own if a program interrupts it
 var StreamStdin Value = streamOpen(func(fb *Fiber) pull {
-	impl, ok := fb.env.get("Stdio.Stdio")
-	stdioNodesMu.Lock()
-	native := ok && stdioNodes[impl.(*Record)]
-	stdioNodesMu.Unlock()
-	if !native {
-		Fail(NewData(platformErrorTag, NewData(systemReasonTag, Rec(
-			"tag", Nullary(Tag("PlatformError.SystemErrorTag.NotFound")), "module_", "Stdio", "method", "stdin",
-			"description", Some("the implementation of the service has no native streams"),
-			"syscall", None, "pathOrDescriptor", Some("stdin")))))
-	}
-	buf := make([]byte, 64<<10)
+	requireNode(fb, "Stdio.Stdio", "Stdio", "stdin", "stdin")
 	return func(fb *Fiber) ([]Value, bool) {
-		defer park(fb, nil)()
-		n, err := os.Stdin.Read(buf)
-		if n > 0 {
-			return []Value{byteList(buf[:n])}, true
-		}
-		if err != nil && err != io.EOF {
+		chunk, err := processStdin().chunk(fb)
+		if err != nil {
 			Fail(systemError(err, "stdin", "read", "stdin"))
 		}
-		return nil, false
+		if chunk == nil {
+			return nil, false
+		}
+		return []Value{byteList(chunk)}, true
 	}
 })

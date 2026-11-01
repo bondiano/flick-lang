@@ -139,13 +139,15 @@ let tags = Cli.between 1 2
 parsed : Cli.Value a => String ->{} Result String a
 let parsed text = Cli.parse text
 
-/// `attempt`, printing the temporary directory `dir` as `$TMP`.
+/// `attempt`, printing the temporary directory `dir` as `$TMP` and a
+/// Windows separator as `/`.
 attempt_in : String -> Cli.Command none none -> List String ->{} Unit
 let attempt_in dir command args =
-  Platform.stdout_line ("$ " ++ String.replace_all dir "$TMP" (String.join " " args))
+  portable : String -> String
+  let portable text = String.replace_all "\\" "/" (String.replace_all dir "$TMP" text)
+  Platform.stdout_line ("$ " ++ portable (String.join " " args))
   try Cli.run command args with
-  | Cli.CliError message ->
-    Platform.stdout_line ("CliError: " ++ String.replace_all dir "$TMP" message)
+  | Cli.CliError message -> Platform.stdout_line ("CliError: " ++ portable message)
 
 show_flag : Cli.FlagDoc -> String
 let show_flag f = f.name ++ ":" ++ f.type_

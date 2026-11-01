@@ -34,6 +34,8 @@ x_forwarded_headers: Some "10.0.0.1"
 cors preflight: 204 [("access-control-allow-origin", Some "https://a.example"), ("access-control-max-age", Some "60")]
 cors: 200 [("access-control-allow-origin", Some "https://a.example")]
 compression: 200 [("content-encoding", Some "gzip")]
+compression br: 200 [("content-encoding", Some "br")]
+compression zstd: 200 [("content-encoding", Some "zstd")]
 to_handled: 200 [("x-pre", Some "1"), ("x-late", Some "1")]
 with_tracer_disabled_when: ran
 with_tracer_disabled_for_urls: ran
