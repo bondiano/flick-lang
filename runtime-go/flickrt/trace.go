@@ -32,7 +32,13 @@ import (
 //	settle o t     the call settled
 //	build l        a memoized layer builds; release l: its scope releases it
 //	exit x         main ends: ok, fail or int
-var tracing = os.Getenv("FLICK_TRACE") != ""
+var (
+	tracePath = os.Getenv("FLICK_TRACE")
+	tracing   = tracePath != ""
+)
+
+// a process this one starts writes no trace over this one's
+func init() { _ = os.Unsetenv("FLICK_TRACE") }
 
 var (
 	traceMu   sync.Mutex
@@ -52,7 +58,7 @@ func traceEvent(event string, fields ...any) {
 	traceMu.Lock()
 	defer traceMu.Unlock()
 	if traceFile == nil {
-		f, err := os.Create(os.Getenv("FLICK_TRACE"))
+		f, err := os.Create(tracePath)
 		if err != nil {
 			tracing = false
 			return

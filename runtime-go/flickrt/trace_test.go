@@ -11,11 +11,10 @@ import (
 // phases and the finalizer's run, one JSON object per line.
 func TestATracedScopeWritesItsSteps(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "trace")
-	t.Setenv("FLICK_TRACE", path)
-	tracing, traceFile = true, nil
+	tracePath, tracing, traceFile = path, true, nil
 	defer func() {
 		_ = traceFile.Close()
-		tracing, traceFile = false, nil
+		tracePath, tracing, traceFile = "", false, nil
 	}()
 	fb := rootFiber()
 	Scope(fb, func(fb *Fiber, _, _ Value) Value {
