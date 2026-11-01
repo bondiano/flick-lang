@@ -125,6 +125,13 @@ The checker relates `none` to the rest as follows:
 - A signature is an upper bound, so a body that needs nothing fits any row,
   and a function with `none` fits wherever more services or errors are
   allowed.
+- Only `->` and `Eff` relate by rows. Under any other constructor the rows
+  must be equal: `List (Eff {Log} none Unit)` is not a
+  `List (Eff {Log, Clock} none Unit)` (`FLICK-T003`).
+- A parameter of unknown type applied to an argument is taken as a pure
+  function, so `(fun h -> h ()) f` with an effectful `f` is `FLICK-T003`.
+  An effectful callback gets its type from the expected type or from a
+  signature.
 - A row the constraints leave unknown at the end of a declaration becomes
   `none`: an inferred function that calls no service gets an empty service
   row, not a free row variable.

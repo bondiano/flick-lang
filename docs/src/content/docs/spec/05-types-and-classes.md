@@ -32,7 +32,7 @@ In the position of a single row, the following are used: `none`, a variable `r`,
 
 `r1 + r2` and `e1 + e2` denote the union of rows of one kind, for example `Eff (r1 + r2) (e1 + e2) a`. This is a built-in operation of the row solver, not a user type family. A signature gives an upper bound: an implementation may require fewer services or allow fewer errors. Extending a row does not turn a runtime arrow into a pure one.
 
-`Errors e` turns an error row into an ordinary type of values: `Errors none = Never`, `Errors {NotFound} = NotFound`, and for several elements the result is a sum of the nominal errors. This is a fixed projection of the checker. An arbitrary type cannot be automatically turned back into a row: a generic bridge needs a saved row `e` or an annotation, and for a single declared error a singleton row is available.
+`Errors e` turns an error row into an ordinary type of values: `Errors none = Never`, `Errors {NotFound} = NotFound`. With two or more elements, or with a row variable, `Errors e` is an opaque type: its value comes only from the `x`/`_` branch of `try` and goes to `from_result`, `Failure.rethrow` or generic code; to take it apart by error, write a `try` with error branches over `from_result (Err e)`. This is a fixed projection of the checker. An arbitrary type cannot be automatically turned back into a row: a generic bridge needs a saved row `e` or an annotation, and for a single declared error a singleton row is available.
 
 ## An HKT example
 
@@ -362,7 +362,7 @@ The program must be rejected: the write `Some 42` fixes the cell's content as `O
 | Additional generalization by variance | Variance analysis is needed, including abstract types | Allows more safe programs; `Ref a` stays invariant |
 | State effects and regions | A substantially more complex state system | Allows hiding local mutation behind a pure API |
 
-**Provably pure constructions of values** are generalized, only over variables that are not free in the environment and not tied to local skolems, region/capture obligations or ambiguous constraints. The result of a runtime binding is not generalized even with `->{}`. A full signature does not cancel these checks. The relaxed value restriction by variance is not used in the first version; mutable containers are invariant. A trusted pure FFI must observe the same purity contract.
+**Provably pure constructions of values** are generalized, only over variables that are not free in the environment and not tied to local skolems, region/capture obligations or ambiguous constraints. A binding without a signature gets no class constraints: the variables of its unsolved constraints and of its number literals stay monomorphic, and constrained polymorphism needs a signature. The result of a runtime binding is not generalized even with `->{}`. A full signature does not cancel these checks. The relaxed value restriction by variance is not used in the first version; mutable containers are invariant. A trusted pure FFI must observe the same purity contract.
 
 ```flick
 make_empty : forall a. Unit ->{} Ref (Option a)
