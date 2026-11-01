@@ -12,8 +12,8 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 ```
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
-command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3` and `T5` lists
-only Lean's standard `propext`, `Classical.choice` and `Quot.sound`; the hypotheses of T5
+command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6` and
+`T5` lists only Lean's standard `propext`, `Classical.choice` and `Quot.sound`; the hypotheses of T5
 (`Hyp`, `G11`) are its parameters.
 
 ## Status
@@ -25,8 +25,9 @@ only Lean's standard `propext`, `Classical.choice` and `Quot.sound`; the hypothe
 | P1c | type variables and schemes, (Let-Gen) with the premise `P`, Л2 for schemes, lemma 3.1, T3 | done |
 | P2a | regions and capture sets as atoms, `⌈·⌉` and its commutation with substitution, qualifiers on arrows and `Eff`, (≤-Cap), nominal types with parameters, schemes over variables of every kind with facts `Θ`, (Lam)/(Task) with what the body holds, (Scope), the run-time forms `inside`/`cap`/`own`, `open_H`, `op_H`, `Scope.add_finalizer`, `Fiber.spawn`; regions `Λ` with children and finalizers, closing; Л4 without the store, T1–T3 again | done |
 | P2b | Л3 under a substitution that fits the term (`Refill`), the renaming of regions not yet created (`kill`), `reach_μ` and Л4 through the store | done |
-| P2b′ | Л5, Л6, the invariant `⊢ Λ` | open |
-| P2c | the freshness premises of (Inside), T4, T1 with `op_H`; the provider of a service (Р37) | open |
+| P2b′ | the freshness premises of (Inside) with its own facts, the facts of the order of creation (`Facts.age`), the renaming in every step, a configuration writes only regions that exist; Л6 | done |
+| P2b″ | Л5, the invariant `⊢ Λ` (what a configuration reaches is live) | open |
+| P2c | T4, T1 with `op_H`; the provider of a service (Р37) | open |
 
 ## Map to `core.md` and `regions.md`
 
@@ -59,6 +60,9 @@ only Lean's standard `propext`, `Classical.choice` and `Quot.sound`; the hypothe
 | Л4 without the store: a value holds no more than its type shows | `Typ.holds` (`Held.lean`) |
 | §5.2 `reach_μ`; Л4 | `Reaches`; `lemma_4`, `lemma_4_cell` (`Lemma4.lean`) |
 | regions not yet created, renamed away; facts of the order of creation | `kill`, `Ty.YF`, `Tm.Below`, `Facts.age` (`Fresh.lean`, `Rules.lean`) |
+| (Scope) and (Inside) in a run-time configuration | `RtCtx`, `scope_body`, `inside_entails` (`ScopeStep.lean`) |
+| a configuration writes only regions that exist | `CfgBelow`, `Step.below` (`Below.lean`, `BelowStep.lean`) |
+| Л6 | `lemma_6` (`Lemma4.lean`); the invariant of a configuration: `CfgTy` (`Soundness.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
 | Preservation | `preservation` (`Preservation.lean`); of a configuration: `cstep_typed` (`Soundness.lean`) |
 | T1 | `T1` (`Soundness.lean`) |
@@ -201,17 +205,24 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     one first; the region closes when none is left. Closing waits for every child.
 17. **Facts are not chained.** `Θ ⊢ k ≥ ϱ` is reflexive or a fact; a scope gives one fact
     for everything outside it, which is what transitivity would derive for a body
-    (`regions.md` §2.4, rules 1 and 2). A run-time configuration of T1 is typed with all
-    facts (`Facts.all`): T1 does not depend on them.
+    (`regions.md` §2.4, rules 1 and 2). A run-time configuration is typed with the
+    facts of the order of creation (`Facts.age`: a region outlives every region created
+    after it); (Inside) adds its own facts about `π`, which name only older regions.
 18. **(Err-Raise) is checked where errors leave a scope**: the error row of the body of
     `scope` does not mention its region by construction. The stricter rule of the spec
     (also for errors caught inside) is not needed by the model; (Err-Decl) is not either,
     since a row of errors carries what its errors reach.
-19. **(Inside) has no freshness premise yet** (P2a): `π ∉ fr(τ) ∪ fr(ε)` needs the
-    regions not yet created to be renamed away in the whole derivation, which T4 (P2c)
-    adds. T1 is stated with two blocked outcomes: a finished region body waiting for a
-    child (deadlock freedom is λRT's), and a step that needs a region that is not live,
-    which T4 rules out.
+19. **Regions not yet created are renamed away in every step.** A derivation may name
+    a region before it exists (the type of a hole is chosen by it). Each step renames
+    the derivation by `kill |Λ|`, which sends regions `≥ |Λ|` to `Unit`; this fits the
+    term because a configuration writes only regions that exist (`CfgBelow`). Then a new
+    scope gets a region no type mentions, and (Inside) has its freshness premise
+    `π ∉ fr(τ) ∪ fr(ε)`. Hence T1 and T3 assume of the program that it writes no
+    run-time region and that its type and stage name none (`hp`, `ht`, `hφ`): true of
+    every program, which has no run-time forms; T2 assumes the same of its configuration
+    (`hb`, `hΨ`). T1 is still stated with two blocked
+    outcomes: a finished region body waiting for a child (deadlock freedom is λRT's),
+    and a step that needs a region that is not live, which T4 (P2c) rules out.
 
 ## Findings
 

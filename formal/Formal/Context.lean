@@ -50,7 +50,7 @@ theorem Refill.id {Ψ Θ k Θ' t' φ' C t φ r} (h : Refill S Ψ Θ k Θ' t' φ'
     ∀ X r', Typ S ((Ψ ++ X).map (Ty.up k)) Θ' [] r' (.ex t' φ') →
       Typ S (Ψ ++ X) Θ [] (C r') (.ex t φ) := by
   intro X r' h'
-  have := h Ty.ident ⟨fun _ _ => rfl, fun _ _ _ b hb => ((Ty.reach_ident b _).mp hb).symm⟩ X r'
+  have := h Ty.ident ⟨fun _ _ => rfl, fun _ b _ hb => ((Ty.reach_ident b _).mp hb).symm⟩ X r'
   simp only [List.map_substT_ident, liftT_ident, Ty.substT_ident, Stage.substT_ident,
     Facts.substT_ident] at this
   exact this h'
@@ -76,13 +76,14 @@ theorem FLook.none {Ψ Θ F} (h : ∀ N, F.lookup N = none) : FLook S Ψ Θ F :=
 at depth `0` it has the facts of the frame. -/
 def FrameTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (F : Frame) (r : Tm) (t : Ty) (φ : Stage) : Prop :=
   ∃ k Θ' t' φ', Typ S (Ψ.map (Ty.up k)) Θ' [] r (.ex t' φ') ∧ FRel F φ' φ ∧
-    (φ' = .pure ∨ k = 0 ∧ Θ' = Θ) ∧ Refill S Ψ Θ k Θ' t' φ' F.plug t φ r ∧ FLook S Ψ Θ F
+    (φ' = .pure ∨ k = 0 ∧ Ext Θ Θ' ∧ (¬ F.isInside → Θ' = Θ)) ∧ Refill S Ψ Θ k Θ' t' φ' F.plug t φ r ∧
+      FLook S Ψ Θ F
 
 theorem FrameTy.mk0 {Ψ Θ F r t φ}
     (h : ∃ t' φ', Typ S Ψ Θ [] r (.ex t' φ') ∧ FRel F φ' φ ∧ Refill0 S Ψ Θ t' φ' F.plug t φ r ∧
       FLook S Ψ Θ F) : FrameTy S Ψ Θ F r t φ :=
   let ⟨t', φ', h, rel, back, look⟩ := h
-  ⟨0, Θ, t', φ', by simpa using h, rel, .inr ⟨rfl, rfl⟩,
+  ⟨0, Θ, t', φ', by simpa using h, rel, .inr ⟨rfl, Ext.refl _, fun _ => rfl⟩,
     fun σ hσ X r' h' => back σ hσ X r' (by rw [List.map_up_zero, liftT_zero] at h'; exact h'), look⟩
 
 theorem bind_row_substT {ρ : Row} {N : Name} (σ : Atom → Ty) (hρ : ∀ n, ρ n → n = .nm N) :
@@ -274,19 +275,30 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
     | errVal hv => exact (nv hv).elim
   case inside p =>
     cases h with
-    | inside h₁ hφ' hφ hT =>
+    | inside hF h₁ hφ' ht hε hφ hT =>
       obtain ⟨_, _, rfl, hr', he'⟩ := Stage.rt_le hφ
-      refine .mk0 ⟨_, _, h₁, ⟨fun n hn => ?_, fun _ => ?_, fun hp => (by cases hp),
-        fun _ _ h => (by cases h)⟩, fun σ hσ _ _ h' => .inside h' (by
-          have hp : σ (.r p) = .rg p := hσ.1 _ (.inl rfl)
-          simpa [Stage.substT, Row.union_substT, Row.scope_substT, Ty.substT, hp] using
-            Stage.le_substT σ hφ') (Stage.le_substT σ hφ) (hT.substT σ), look fun _ => rfl⟩
+      refine ⟨0, _, _, _, by simpa using h₁, ⟨fun n hn => ?_, fun _ => ?_, fun hp => (by cases hp),
+        fun _ _ h => (by cases h)⟩, .inr ⟨rfl, Ext.inside hF, fun h => (h trivial).elim⟩,
+        fun σ hσ X _ h' => ?_,
+        look fun _ => rfl⟩
       · rcases Stage.le_svc hφ' n hn with h | h
         · cases n with
           | nm => exact h.elim
           | atm a => exact .inr ⟨p, rfl, h⟩
         · exact .inl (hr' n h)
       · exact (Stage.le_err hφ').trans he'
+      · have hp : σ (.r p) = .rg p := hσ.1 _ (.inl rfl)
+        have hav := hσ.2 (.inr (.inl rfl))
+        rw [List.map_up_zero, liftT_zero, Facts.union_substT] at h'
+        refine .inside ?_ h' ?_ (fun h => ht ?_) (fun ⟨b, hb, h''⟩ => hε (by rwa [hav b _ h''] at hb))
+          (Stage.le_substT σ hφ) (hT.substT σ)
+        · rintro C s ⟨C₀, s₀, h₀, rfl, rfl⟩
+          obtain ⟨rfl, hC⟩ := hF C₀ s₀ h₀
+          exact ⟨by simp [Ty.substT, hp], fun q ⟨b, hb, h''⟩ => by rw [hav b q h''] at hb; exact hC q hb⟩
+        · simpa [Stage.substT, Row.union_substT, Row.scope_substT, Ty.substT, hp] using
+            Stage.le_substT σ hφ'
+        · obtain ⟨b, hb, h''⟩ := (Ty.reach_substT σ _ _).mp h
+          rwa [hav b _ h''] at hb
     | errVal hv => exact (nv hv).elim
 
 end Flick

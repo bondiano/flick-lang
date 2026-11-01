@@ -143,9 +143,9 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | scope hn hF hb hφ' hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .scope hn hF hb hφ' (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | inside hb hφ' hφ hT =>
+  | inside hF hb hφ' ht hε hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .inside hb hφ' (Stage.le_trans hφ h₂) (hT.trans h₁)
+    exact .inside hF hb hφ' ht hε (Stage.le_trans hφ h₂) (hT.trans h₁)
   | cap => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .cap
   | own => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .own
 

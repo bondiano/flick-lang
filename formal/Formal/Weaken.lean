@@ -129,7 +129,7 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | scope hn hF _ hφ' hφ hT ih =>
     refine .scope hn hF ?_ hφ' hφ hT
     rw [List.map_append]; exact ih _
-  | inside _ hφ' hφ hT ih => exact .inside (ih X) hφ' hφ hT
+  | inside hF _ hφ' ht hε hφ hT ih => exact .inside hF (ih X) hφ' ht hε hφ hT
   | cap => exact .cap
   | own => exact .own
 
@@ -242,7 +242,7 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | join _ _ hρ ih₁ ih₂ => intro _ _ hξ; exact .join (ih₁ hξ) (ih₂ hξ) hρ
   | scope hn hF _ hφ' hφ hT ih =>
     intro _ _ hξ; exact .scope (hn.rename _) hF (ih ((hξ.up 1).lift [_] rfl)) hφ' hφ hT
-  | inside _ hφ' hφ hT ih => intro _ _ hξ; exact .inside (ih hξ) hφ' hφ hT
+  | inside hF _ hφ' ht hε hφ hT ih => intro _ _ hξ; exact .inside hF (ih hξ) hφ' ht hε hφ hT
   | cap => intro _ _ _; exact .cap
   | own => intro _ _ _; exact .own
 

@@ -111,25 +111,24 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
         (.mono (.owner (.tvar 0)) :: Γ.map (Scheme.up 1)) e (.ex (t.up 1) φ') →
       φ'.le (.rt (Row.union (Row.scope (.tvar 0)) (r.substT (shiftV 1))) (ε.substT (shiftV 1))) →
       (Stage.rt r ε).le φ → Le t T → Typ Ψ Θ Γ (.scope e) (.ex T φ)
-  | inside : Typ Ψ Θ Γ e (.ex t φ') → φ'.le (.rt (Row.union (Row.scope (.rg p)) r) ε) →
-      (Stage.rt r ε).le φ → Le t T → Typ Ψ Θ Γ (.inside p e) (.ex T φ)
+  | inside : (∀ C s, F C s → s = .rg p ∧ ∀ q, C (.r q) → q < p) →
+      Typ Ψ (Facts.union Θ F) Γ e (.ex t φ') → φ'.le (.rt (Row.union (Row.scope (.rg p)) r) ε) →
+      ¬ t.reach (.r p) → ¬ ε (.atm (.r p)) → (Stage.rt r ε).le φ → Le t T →
+      Typ Ψ Θ Γ (.inside p e) (.ex T φ)
   | cap : Typ Ψ Θ Γ (.cap p) (.ex (.hnd (.rg p)) φ)
   | own : Typ Ψ Θ Γ (.own p) (.ex (.owner (.rg p)) φ)
 
-/-- The facts of a running configuration for T1: any. The facts a scope gives its
-region are about everything outside it; T4 needs them to hold of the order in
-which regions are created (`Facts.age`). -/
-def Facts.all : Facts := fun _ _ => True
-
-/-- Facts that hold of the order in which regions are created: a region outlives
-every region created after it. -/
+/-- The facts of a running configuration: a region outlives every region created
+after it. A scope gives its region facts about everything outside it, which
+exists before the region; with the regions not yet created renamed out, they hold
+of this order (regions.md §3.4). -/
 def Facts.age : Facts := fun C s => ∀ q p, C (.r q) → s.reach (.r p) → q < p
 
 /-- `⊢ μ : Ψ` of core.md §3.6. -/
 def StoreTy (Ψ : List Ty) (μ : List Tm) : Prop :=
   μ.length = Ψ.length ∧
     ∀ (i : Nat) v t, μ[i]? = some v → Ψ[i]? = some t →
-      Value v ∧ Typ S Ψ Facts.all [] v (.ex t .pure)
+      Value v ∧ Typ S Ψ Facts.age [] v (.ex t .pure)
 
 /-- The root environment `Σ₀` of core.md §2.6: closed values of `S.Impl`. -/
 def RootTy (root : Name → Option Tm) : Prop :=

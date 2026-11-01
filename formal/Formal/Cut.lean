@@ -30,6 +30,42 @@ theorem Entails.lift {Θ₁ Θ₂ : Facts} (h : Entails Θ₁ Θ₂) (k : Nat) (
     · exact .inr ⟨C'', .inl h₃, h₄⟩
   · exact .inr ⟨C', .inr h₁, h₂⟩
 
+theorem Entails.union {Θ₁ Θ₂ : Facts} (h : Entails Θ₁ Θ₂) (F : Facts) :
+    Entails (Facts.union Θ₁ F) (Facts.union Θ₂ F) := by
+  intro C s hC x hx
+  rcases hC x hx with h' | ⟨C', h₁ | h₁, h₂⟩
+  · exact .inl h'
+  · rcases h C' s (fun y hy => .inr ⟨C', h₁, hy⟩) x h₂ with h' | ⟨C'', h₃, h₄⟩
+    · exact .inl h'
+    · exact .inr ⟨C'', .inl h₃, h₄⟩
+  · exact .inr ⟨C', .inr h₁, h₂⟩
+
+theorem Entails.trans {Θ₁ Θ₂ Θ₃ : Facts} (h₁ : Entails Θ₁ Θ₂) (h₂ : Entails Θ₂ Θ₃) :
+    Entails Θ₁ Θ₃ := fun C s h => h₂ C s (h₁ C s h)
+
+/-- Facts that hold of the order of creation entail themselves under `Facts.age`. -/
+theorem Entails.of_age {Θ : Facts} (h : ∀ C s, Θ C s → Facts.age C s) : Entails Θ Facts.age :=
+  fun _ _ hC x hx => (hC x hx).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', h _ _ h₁, h₂⟩
+
+theorem Entails.none (Θ : Facts) : Entails Facts.none Θ :=
+  fun _ _ h x hx => (h x hx).imp id fun ⟨_, h, _⟩ => h.elim
+
+/-- `Θ'` is `Θ` with facts that hold of the order in which regions are created:
+the facts the `inside` frames of a context add. -/
+def Ext (Θ Θ' : Facts) : Prop :=
+  (∀ C s, Θ C s → Θ' C s) ∧ ∀ C s, Θ' C s → Θ C s ∨ Facts.age C s
+
+theorem Ext.refl (Θ : Facts) : Ext Θ Θ := ⟨fun _ _ h => h, fun _ _ h => .inl h⟩
+
+theorem Ext.trans {Θ₁ Θ₂ Θ₃ : Facts} (h₁ : Ext Θ₁ Θ₂) (h₂ : Ext Θ₂ Θ₃) : Ext Θ₁ Θ₃ :=
+  ⟨fun C s h => h₂.1 C s (h₁.1 C s h), fun C s h => (h₂.2 C s h).elim (h₁.2 C s) .inr⟩
+
+theorem Ext.inside {Θ F : Facts} {p : Nat} (hF : ∀ C s, F C s → s = .rg p ∧ ∀ q, C (.r q) → q < p) :
+    Ext Θ (Facts.union Θ F) :=
+  ⟨fun _ _ h => .inl h, fun C s h => h.elim .inl fun h => .inr fun q p' hq hp' => by
+    obtain ⟨rfl, hC⟩ := hF C s h
+    cases hp'; exact hC q hq⟩
+
 theorem Entails.union_left (Θ Φ : Facts) : Entails Θ (Facts.union Θ Φ) :=
   fun _ _ h => h.mono fun _ _ h => .inl h
 
@@ -79,7 +115,8 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | bind _ hρ ih => intro _ hΘ; exact .bind (ih hΘ) hρ
   | join _ _ hρ ih₁ ih₂ => intro _ hΘ; exact .join (ih₁ hΘ) (ih₂ hΘ) hρ
   | scope hn hF _ hφ' hφ hT ih => intro _ hΘ; exact .scope hn hF (ih (hΘ.lift _ _)) hφ' hφ hT
-  | inside _ hφ' hφ hT ih => intro _ hΘ; exact .inside (ih hΘ) hφ' hφ hT
+  | inside hF _ hφ' ht hε hφ hT ih =>
+    intro _ hΘ; exact .inside hF (ih (hΘ.union _)) hφ' ht hε hφ hT
   | cap => intro _ _; exact .cap
   | own => intro _ _; exact .own
 

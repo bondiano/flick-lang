@@ -35,14 +35,19 @@ theorem step_pure {root Ψ Θ Λ μ e t l Λ' μ' e'} (h : Typ S Ψ Θ [] e (.ex
 /-- **T2(a), purity.** A computation from `·;Ψ ⊢ e : τ ! P` makes only pure
 steps, keeps the store and the regions, and does not end in `raise v`. -/
 theorem T2a {root Ψ Λ μ e t Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
-    (h : Typ S Ψ Facts.all [] e (.ex t .pure)) (hs : Steps root (fun _ => True) Λ μ e Λ' μ' e') :
+    (hb : CfgBelow Λ μ e) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
+    (h : Typ S Ψ Facts.age [] e (.ex t .pure)) (hs : Steps root (fun _ => True) Λ μ e Λ' μ' e') :
     Steps root (· = .pure) Λ μ e Λ' μ' e' ∧ μ' = μ ∧ Λ' = Λ ∧ ∀ v, e' ≠ .raise v := by
-  induction hs generalizing Ψ with
+  induction hs generalizing Ψ t with
   | refl => exact ⟨.refl, rfl, rfl, fun v he => by subst he; exact raise_not_pure h⟩
   | step h₁ _ _ ih =>
     obtain ⟨hl, rfl, rfl⟩ := step_pure h h₁
-    obtain ⟨X, hμ', h'⟩ := preservation hroot h hμ h₁
-    obtain ⟨hs', rfl, rfl, hr⟩ := ih hμ' h'
+    obtain ⟨X, hμ', h', hX⟩ := preservation hroot h hμ hb.main hb.mem hΨ h₁
+    obtain ⟨hb', _⟩ := h₁.below hroot hb
+    obtain ⟨hs', rfl, rfl, hr⟩ := ih hμ' hb' (fun u hu => by
+      rcases List.mem_append.mp hu with hu | hu
+      · exact hΨ u hu
+      · exact hX u hu) (by simpa [Stage.substT] using h')
     exact ⟨.step h₁ hl hs', rfl, rfl, hr⟩
 
 /-- An `ask_S` answered by `Σ₀` from a term with services `r` has `S ∈ r`. -/
@@ -55,26 +60,41 @@ theorem step_root {root Ψ Θ Λ μ e t r ε N o} (h : Typ S Ψ Θ [] e (.ex t (
     · exact h
     · rw [domE_nm, hl] at h; cases h
 
+theorem Row.kill_sub (ε : Row) (n : Nat) : Row.Sub (ε.substT (kill n)) ε := by
+  intro x hx
+  cases x with
+  | nm => exact hx
+  | atm a => obtain ⟨b, hb, h⟩ := hx; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
+
 /-- **T2(b), rows.** From `·;Ψ ⊢ e : τ ! R⟨r; ε⟩`, every `ask_S` that reaches `Σ₀`
 has `S ∈ r`, and a computation that ends in `raise v` has `v : Errors ε`. -/
 theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
-    (h : Typ S Ψ Facts.all [] e (.ex t (.rt r ε)))
+    (hb : CfgBelow Λ μ e) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
+    (h : Typ S Ψ Facts.age [] e (.ex t (.rt r ε)))
     (hs : Steps root (fun _ => True) Λ μ e Λ' μ' e') :
     Steps root (fun l => ∀ N, l = .root N → r (.nm N)) Λ μ e Λ' μ' e' ∧
-      ∀ v, e' = .raise v → Value v → ∃ Ψ', Typ S Ψ' Facts.all [] v (.ex (.errors ε) .pure) := by
-  induction hs generalizing Ψ with
+      ∀ v, e' = .raise v → Value v → ∃ Ψ', Typ S Ψ' Facts.age [] v (.ex (.errors ε) .pure) := by
+  induction hs generalizing Ψ t r ε with
   | refl => exact ⟨.refl, fun v he hv => ⟨Ψ, by subst he; exact raise_errors hv h⟩⟩
   | step h₁ _ _ ih =>
-    obtain ⟨X, hμ', h'⟩ := preservation hroot h hμ h₁
-    obtain ⟨hs', hr⟩ := ih hμ' h'
-    exact ⟨.step h₁ (fun N hl => by subst hl; exact step_root h h₁) hs', hr⟩
+    obtain ⟨X, hμ', h', hX⟩ := preservation hroot h hμ hb.main hb.mem hΨ h₁
+    obtain ⟨hb', hl⟩ := h₁.below hroot hb
+    obtain ⟨hs', hr⟩ := ih hμ' hb' (fun u hu => by
+      rcases List.mem_append.mp hu with hu | hu
+      · exact (hΨ u hu).mono hl
+      · exact (hX u hu).mono hl) (by simpa only [Stage.substT] using h')
+    refine ⟨.step h₁ (fun N hl => by subst hl; exact step_root h h₁) hs', fun v he hv => ?_⟩
+    obtain ⟨Ψ', hv'⟩ := hr v he hv
+    obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hsub⟩ := canonical_errors hv hv'
+    exact ⟨Ψ', .errVal hv ht hU (hsub.trans (Row.kill_sub _ _))⟩
 
 /-- T2(b) for `await v` with `v : Eff r ε τ`. -/
 theorem T2b_await {root Ψ Λ μ v r ε t C Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
-    (h : Typ S Ψ Facts.all [] v (.ex (.eff r ε t C) .pure))
+    (hb : CfgBelow Λ μ (.await v)) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
+    (h : Typ S Ψ Facts.age [] v (.ex (.eff r ε t C) .pure))
     (hs : Steps root (fun _ => True) Λ μ (.await v) Λ' μ' e') :
     Steps root (fun l => ∀ N, l = .root N → r (.nm N)) Λ μ (.await v) Λ' μ' e' ∧
-      ∀ w, e' = .raise w → Value w → ∃ Ψ', Typ S Ψ' Facts.all [] w (.ex (.errors ε) .pure) :=
-  T2b hroot hμ (.await (h.sub ⟨.refl, Stage.pure_le _⟩) (Stage.le_refl _) .refl) hs
+      ∀ w, e' = .raise w → Value w → ∃ Ψ', Typ S Ψ' Facts.age [] w (.ex (.errors ε) .pure) :=
+  T2b hroot hμ hb hΨ (.await (h.sub ⟨.refl, Stage.pure_le _⟩) (Stage.le_refl _) .refl) hs
 
 end Flick

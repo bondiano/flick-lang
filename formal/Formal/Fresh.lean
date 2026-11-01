@@ -37,7 +37,7 @@ theorem kill_reach {n : Nat} {b a : Atom} (h : (kill n b).reach a) : a = b ∧ �
     · simp [Ty.reach, Caps.none] at h
 
 theorem Fits.kill {n : Nat} {e : Tm} (h : e.Below n) : Fits (kill n) e :=
-  ⟨fun p hp => by simp [Flick.kill, h p hp], fun _ _ _ b hb => (kill_reach hb).1.symm⟩
+  ⟨fun p hp => by simp [Flick.kill, h p hp], fun _ b _ hb => (kill_reach hb).1.symm⟩
 
 theorem Ty.reach_kill {n : Nat} {t : Ty} {p : Nat} (h : (t.substT (kill n)).reach (.r p)) : p < n := by
   obtain ⟨b, _, hb⟩ := (Ty.reach_substT _ _ _).mp h

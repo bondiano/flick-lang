@@ -27,7 +27,9 @@ import Formal.StepFrame
 import Formal.Progress
 import Formal.ProgressMain
 import Formal.PresPure
+import Formal.ScopeStep
 import Formal.PresRt
+import Formal.Below
 import Formal.Preservation
 import Formal.Soundness
 import Formal.Lemma4

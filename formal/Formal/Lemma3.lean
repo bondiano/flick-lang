@@ -52,10 +52,10 @@ services of its `with` frames have their types. -/
 theorem ctx_typing {Ψ Θ} :
     ∀ (E : List Frame) {r t φ}, OkE E → ¬ Value r → Typ S Ψ Θ [] (plug E r) (.ex t φ) →
       ∃ K Θ' t' φ', Typ S (Ψ.map (Ty.up K)) Θ' [] r (.ex t' φ') ∧ ERel E φ' φ ∧
-        (φ' = .pure ∨ K = 0 ∧ Θ' = Θ ∧ ELook S Ψ Θ E) ∧ Refill S Ψ Θ K Θ' t' φ' (plug E) t φ r
+        (φ' = .pure ∨ K = 0 ∧ Ext Θ Θ' ∧ ELook S Ψ Θ' E) ∧ Refill S Ψ Θ K Θ' t' φ' (plug E) t φ r
   | [], _, _, _, _, _, h =>
     ⟨0, Θ, _, _, by simpa using h, ⟨fun n hn => .inl hn, fun _ _ h => h, fun h => h⟩,
-      .inr ⟨rfl, rfl, fun _ _ h => by simp [lookupE] at h⟩,
+      .inr ⟨rfl, Ext.refl _, fun _ _ h => by simp [lookupE] at h⟩,
       fun _ _ _ _ h' => by rw [List.map_up_zero, liftT_zero] at h'; exact h'⟩
   | F :: E, r, _, _, hE, hr, h => by
     obtain ⟨hF, hE'⟩ := hE.cons
@@ -70,16 +70,18 @@ theorem ctx_typing {Ψ Θ} :
         · exact .inr ((domE_cons F E n).mpr (.inr h))
       · exact .inr ((domE_cons F E n).mpr (.inl h))
     · exact (rel.err (hT F (by simp))).trans (rel₁.err fun G hG => hT G (by simp [hG]))
-    · rcases p with hp | ⟨hk, hΘ⟩
+    · rcases p with hp | ⟨hk, hΘ, -⟩
       · exact .inl hp
       · rcases p₁ with hp₁ | ⟨hK₁, hΘ₁, look₁⟩
         · exact .inl (rel.pure hp₁)
-        · subst hk hK₁ hΘ hΘ₁
-          refine .inr ⟨rfl, rfl, fun N v hv => ?_⟩
+        · subst hk hK₁
+          refine .inr ⟨rfl, hΘ₁.trans hΘ, fun N v hv => ?_⟩
           simp only [lookupE] at hv
           cases hl : F.lookup N with
-          | some w => rw [hl] at hv; cases hv; simpa using lookF N _ hl
-          | none => rw [hl] at hv; exact look₁ N v hv
+          | some w =>
+            rw [hl] at hv; cases hv
+            exact (by simpa using lookF N _ hl : Typ S Ψ Θ₁ [] _ _).cut fun _ _ h => h.mono hΘ.1
+          | none => rw [hl] at hv; exact (look₁ N v hv).cut fun _ _ h => h.mono hΘ.1
     · have hσ' : Fits (liftT K₁ σ) (F.plug r) := (hσ.sub fun _ h => plug_has E h).lift K₁
       have := backF (liftT K₁ σ) hσ' (X.map (Ty.up K₁)) r' (by
         rw [liftT_add, shift_comm, ← List.map_append, List.map_up_up]; exact hr')

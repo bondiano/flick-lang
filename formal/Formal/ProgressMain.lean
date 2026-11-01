@@ -187,7 +187,7 @@ theorem progress {Λ μ root} :
         exact step (Step.ofP (.join (canonical_env hv h₁) (canonical_env hw h₂)))
       · exact .inr (hn.frame' (F := .joinR _) hv (nt id) (ni id))
     · exact .inr (hn.frame' (F := .joinL _) trivial (nt id) (ni id))
-  | inside _ hφ' hφ _ ih =>
+  | inside _ _ hφ' _ _ hφ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     obtain ⟨_, _, rfl, hr', _⟩ := Stage.rt_le hφ
     rcases ih hμ hΓ rfl with hv | ⟨v, hv, rfl⟩ | ⟨_, _, hs⟩ | hs | hb

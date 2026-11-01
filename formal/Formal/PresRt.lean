@@ -1,4 +1,4 @@
-import Formal.PresPure
+import Formal.ScopeStep
 
 /-!
 # Preservation of runtime steps at the redex
@@ -60,7 +60,7 @@ theorem raise_inv {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v) (
   | errVal hv' => cases hv'
 
 theorem StoreTy.alloc {Ψ μ v t₀} (hμ : StoreTy S Ψ μ) (hv : Value v)
-    (h : Typ S Ψ Facts.all [] v (.ex t₀ .pure)) : StoreTy S (Ψ ++ [t₀]) (μ ++ [v]) := by
+    (h : Typ S Ψ Facts.age [] v (.ex t₀ .pure)) : StoreTy S (Ψ ++ [t₀]) (μ ++ [v]) := by
   refine ⟨by simp [hμ.1], fun i w s hw hs => ?_⟩
   by_cases hi : i < μ.length
   · rw [List.getElem?_append_left hi] at hw
@@ -75,7 +75,7 @@ theorem StoreTy.alloc {Ψ μ v t₀} (hμ : StoreTy S Ψ μ) (hv : Value v)
     | succ => simp [hj] at hw
 
 theorem StoreTy.set {Ψ μ l v t₀} (hμ : StoreTy S Ψ μ) (hl : Ψ[l]? = some t₀)
-    (hlt : l < μ.length) (hv : Value v) (h : Typ S Ψ Facts.all [] v (.ex t₀ .pure)) :
+    (hlt : l < μ.length) (hv : Value v) (h : Typ S Ψ Facts.age [] v (.ex t₀ .pure)) :
     StoreTy S Ψ (μ.set l v) := by
   refine ⟨by simp [hμ.1], fun i w s hw hs => ?_⟩
   by_cases hi : l = i
@@ -96,45 +96,18 @@ theorem Stage.rt_union_right {i r e ε : Row} :
     (Stage.rt r ε).le (.rt (Row.union i r) (Row.union e ε)) :=
   ⟨fun _ h => .inr h, fun _ h => .inr h⟩
 
-theorem Entails.all (Θ : Facts) : Entails Θ Facts.all :=
-  fun C _ _ _ hk => .inr ⟨C, trivial, hk⟩
+theorem Ty.YF.ref {n : Nat} {t : Ty} (h : (Ty.ref t).YF n) : t.YF n := by
+  simp only [Ty.YF, Ty.substT, Ty.ref.injEq] at h; exact h
 
-theorem Row.up_inst (r : Row) (x : Ty) : (r.substT (shiftV 1)).substT (instT [x]) = r := by
-  rw [Row.substT_comp]; conv => rhs; rw [← r.substT_ident]
-  congr 1; funext a
-  cases a with
-  | v i => simp [shiftV, Ty.substT, instT, Ty.ident]
-  | r p => simp [shiftV, Ty.substT, instT, Ty.ident]
-
-@[simp] theorem Ty.up_inst1 (t x : Ty) : (t.up 1).substT (instT [x]) = t :=
-  Ty.up_substT t 1 [x] rfl
-
-/-- The body of a new scope, in its run-time region `π`. -/
-theorem scope_body {Ψ e t φ' r ε F p}
-    (hn : e.NoIns)
-    (h : Typ S (Ψ.map (Ty.up 1)) (Facts.union (Facts.all.substT (shiftV 1)) F)
-      (.mono (.owner (.tvar 0)) :: [].map (Scheme.up 1)) e (.ex (t.up 1) φ'))
-    (hφ' : φ'.le (.rt (Row.union (Row.scope (.tvar 0)) (r.substT (shiftV 1))) (ε.substT (shiftV 1)))) :
-    ∃ φ₁, Typ S Ψ Facts.all [] (e.subst (inst [.own p])) (.ex t φ₁) ∧
-      φ₁.le (.rt (Row.union (Row.scope (.rg p)) r) ε) := by
-  have h₁ := h.substT (instT [.rg p]) (Fits.noIns hn fun _ => rfl)
-  simp only [List.map_map, Function.comp_def, Ty.up_inst1, List.map_id_fun', id,
-    List.map_cons, List.map_nil, Scheme.mono_substT, Flick.J.substT] at h₁
-  have h₂ := h₁.cut (Entails.all _)
-  have hb : Typ S Ψ Facts.all [] (e.subst (inst [.own p])) (.ex t (φ'.substT (instT [.rg p]))) := by
-    refine h₂.inst (Δ := [_]) (.cons .own ?_ .nil)
-    simp [Ty.substT, instT]; exact .own
-  refine ⟨_, hb, ?_⟩
-  have := Stage.le_substT (instT [.rg p]) hφ'
-  simpa [Stage.substT, Row.union_substT, Row.scope_substT, Row.up_inst, Ty.substT, instT] using this
-
-theorem rt_preservation {Ψ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Facts.all [] e (.ex t φ))
-    (hμ : StoreTy S Ψ μ) (hh : RHead Λ μ e Λ' μ' e') :
-    ∃ X, StoreTy S (Ψ ++ X) μ' ∧ Typ S (Ψ ++ X) Facts.all [] e' (.ex t φ) := by
+theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.ex t φ))
+    (hμ : StoreTy S Ψ μ) (hc : RtCtx Ψ Θ Λ.length) (hbl : e.Below Λ.length)
+    (hμb : ∀ (l : Nat) (v : Tm), μ[l]? = some v → v.Below Λ.length) (ht : t.YF Λ.length)
+    (hφ : φ.substT (kill Λ.length) = φ) (hh : RHead Λ μ e Λ' μ' e') :
+    ∃ X, StoreTy S (Ψ ++ X) μ' ∧ Typ S (Ψ ++ X) Θ [] e' (.ex t φ) ∧ ∀ u ∈ X, u.YF Λ.length := by
   have nv := hh.not_value
-  have same : ∀ {e'}, Typ S Ψ Facts.all [] e' (.ex t φ) →
-      ∃ X, StoreTy S (Ψ ++ X) μ ∧ Typ S (Ψ ++ X) Facts.all [] e' (.ex t φ) :=
-    fun h' => ⟨[], by simpa using hμ, by simpa using h'⟩
+  have same : ∀ {e'}, Typ S Ψ Θ [] e' (.ex t φ) →
+      ∃ X, StoreTy S (Ψ ++ X) μ ∧ Typ S (Ψ ++ X) Θ [] e' (.ex t φ) ∧ ∀ u ∈ X, u.YF Λ.length :=
+    fun h' => ⟨[], by simpa using hμ, by simpa using h', by simp⟩
   cases hh with
   | refMake hv =>
     cases h with
@@ -143,8 +116,9 @@ theorem rt_preservation {Ψ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Facts.all [] 
       | const _ hT' =>
         obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
         cases h; cases lt; cases hT
-        exact ⟨_, hμ.alloc hv ((ha.valueAny hv _).sub ⟨la, Stage.le_refl _⟩),
-          .loc (by simp [hμ.1])⟩
+        exact ⟨_, hμ.alloc hv (((ha.valueAny hv .pure).sub (J' := .ex _ .pure) ⟨la, Stage.le_refl _⟩).cut
+            hc.outΘ),
+          .loc (by simp [hμ.1]), by simpa using ht.ref⟩
     | errVal hv' => exact (nv hv').elim
   | refGet hl =>
     cases h with
@@ -154,7 +128,15 @@ theorem rt_preservation {Ψ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Facts.all [] 
         obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
         cases h; cases la
         cases ha with
-        | loc hl' => exact same (((hμ.2 _ _ _ hl hl').2).sub ⟨lt.trans hT, Stage.pure_le _⟩)
+        | loc hl' =>
+          have hv := (hμ.2 _ _ _ hl hl').2
+          have hk := hv.substT (kill Λ.length) (Fits.kill (hμb _ _ hl))
+          simp only [Flick.J.substT, Stage.substT] at hk
+          rw [show Ψ.map (Ty.substT (kill Λ.length)) = Ψ by
+              conv => rhs; rw [← List.map_id Ψ]
+              exact List.map_congr_left fun u hu => hc.yf u hu,
+            hc.yf _ (List.mem_of_getElem? hl')] at hk
+          exact same ((hk.cut hc.inΘ).sub ⟨lt.trans hT, Stage.pure_le _⟩)
     | errVal hv' => exact (nv hv').elim
   | refSet hv hlt =>
     cases h with
@@ -169,8 +151,9 @@ theorem rt_preservation {Ψ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Facts.all [] 
           cases h; cases lt'; cases hT
           cases hloc with
           | loc hl =>
-            have hst := hμ.set hl hlt hv ((ha.valueAny hv _).sub ⟨la', Stage.le_refl _⟩)
-            exact ⟨[], by simpa using hst, by simpa using .lit⟩
+            have hst := hμ.set hl hlt hv (((ha.valueAny hv .pure).sub (J' := .ex _ .pure)
+              ⟨la', Stage.le_refl _⟩).cut hc.outΘ)
+            exact ⟨[], by simpa using hst, by simpa using .lit, by simp⟩
     | errVal hv' => exact (nv hv').elim
   | await =>
     cases h with
@@ -258,9 +241,11 @@ theorem rt_preservation {Ψ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Facts.all [] 
     | errVal hv'' => exact (nv hv'').elim
   | scope =>
     cases h with
-    | scope hn _ hb hφ' hφ hT =>
-      obtain ⟨_, hb', hφ₁⟩ := scope_body hn hb hφ'
-      exact same (.inside hb' hφ₁ hφ hT)
+    | scope hn hF hbody hφ' hφs hT =>
+      obtain ⟨F', _, hF', hb', hφ₁⟩ := scope_body hn (fun p hp => hbl p hp) hF hbody hφ' hc.yf hc.idem
+      refine same (.inside hF' hb' hφ₁ (Ty.kill_fresh _ _) (Row.kill_fresh _ _)
+        (Stage.YF_kill hφs hφ) ?_)
+      have := hT.substT (kill Λ.length); rwa [ht] at this
     | errVal hv'' => exact (nv hv'').elim
   | open_ =>
     cases h with
@@ -296,10 +281,12 @@ theorem rt_preservation {Ψ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Facts.all [] 
   | finRun => exact same h
   | close _ _ hw =>
     cases h with
-    | inside hb hφ' hφ hT =>
+    | inside hF hbody hφ' _ _ hφ hT =>
+      have hcut := inside_entails (hbl _ (.inl rfl)) hF hc.inΘ
+      have hbody := hbody.cut hcut
       rcases hw with hw | ⟨v, hv, rfl⟩
-      · exact same ((hb.valueAny hw _).sub ⟨hT, Stage.le_refl _⟩)
-      · obtain ⟨ε, hv', hε⟩ := raise_inv hv hb
+      · exact same ((hbody.valueAny hw _).sub ⟨hT, Stage.le_refl _⟩)
+      · obtain ⟨ε, hv', hε⟩ := raise_inv hv hbody
         obtain ⟨_, _, rfl, _, he⟩ := Stage.rt_le hφ
         exact same (.raise (hv'.valueAny hv _) ⟨fun _ h => h.elim,
           fun n hn => he n ((Stage.le_err (Stage.le_trans hε hφ')) n hn)⟩)

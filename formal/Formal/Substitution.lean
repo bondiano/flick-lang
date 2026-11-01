@@ -200,6 +200,11 @@ theorem noIns_subst {Γ : List Scheme} {e : Tm} {σ : Nat → Tm} (hΓ : ∀ i, 
   · exact hn h
   · exact hσ i _ (List.getElem?_eq_getElem (hΓ i hi)) h
 
+theorem SubOk.mono {Ψ Θ Θ' Γ Γ'} {σ : Nat → Tm} (h : SubOk S Ψ Θ Γ Γ' σ) (hΘ : Entails Θ Θ') :
+    SubOk S Ψ Θ' Γ Γ' σ := fun i s hi =>
+  let ⟨ht, hn, hc⟩ := h i s hi
+  ⟨ht.cut (hΘ.lift s.k s.cs), hn, hc⟩
+
 theorem SubOk.held {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {e : Tm} {T : Caps} {σ : Nat → Tm} (hσ : SubOk S Ψ Θ Γ Γ' σ)
     (hΓ : ∀ i, e.Free i → i < Γ.length) (h : Caps.Sub (held Ψ Γ e) T) :
     Caps.Sub (held Ψ Γ' (e.subst σ)) T :=
@@ -289,7 +294,8 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     have hΓ : ∀ i, (Tm.scope _).Free i → i < _ := fun i h => by
       have := he.frees _ h; simp at this; omega
     exact .scope (SubOk.noIns (e := .scope _) hσ hΓ hne) hF (ih (SubOk.lift (SubOk.up hσ 1 _) [_] rfl)) hφ' hφ hT
-  | inside _ hφ' hφ hT ih => intro _ _ hσ; exact .inside (ih hσ) hφ' hφ hT
+  | inside hF _ hφ' ht hε hφ hT ih =>
+    intro _ _ hσ; exact .inside hF (ih (hσ.mono (Entails.union_left _ _))) hφ' ht hε hφ hT
   | cap => intro _ _ _; exact .cap
   | own => intro _ _ _; exact .own
 
