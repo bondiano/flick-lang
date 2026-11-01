@@ -42,6 +42,14 @@ export const args = (): Array<string> => host()?.argv.slice(2) ?? [];
 
 export const env = (name: string): string | undefined => host()?.env[name];
 
+/** The variable `name`, removed so that the processes and workers this one starts do not inherit it. */
+export const takeEnv = (name: string): string | undefined => {
+  const p = host();
+  const value = p?.env[name];
+  if (value !== undefined) Reflect.deleteProperty(p?.env ?? {}, name);
+  return value;
+};
+
 export const setExitCode = (code: number): void => {
   const p = host();
   if (p !== undefined) p.exitCode = code;

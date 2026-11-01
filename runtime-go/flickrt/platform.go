@@ -146,13 +146,19 @@ func Main(run func(*Fiber)) {
 		fb.state.interrupt(0)
 	}()
 	_, cause := catch(func() Value {
-		return owned(fb, func(fb *Fiber, _ *Owner) Value {
+		return owned(fb, func(fb *Fiber, owner *Owner) Value {
+			if tracing {
+				traceOpen(owner, nil, "main")
+			}
 			run(fb)
 			return Unit
 		})
 	})
 	s, _ := stopped.Load().(os.Signal)
 	rootDefects.mu.Lock()
+	if tracing {
+		traceEvent("exit", "x", traceExit(cause))
+	}
 	code := conclude(cause, s, rootDefects.causes)
 	rootDefects.mu.Unlock()
 	stdout.Flush()

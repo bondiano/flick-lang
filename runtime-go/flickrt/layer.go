@@ -58,8 +58,17 @@ func fromBuild(build func(fb *Fiber, memo *MemoMap, scope *Owner) Services) *Lay
 // memoized is [fromBuild] whose build the memo map shares.
 func memoized(build func(fb *Fiber, memo *MemoMap, scope *Owner) Services) *Layer {
 	self := &Layer{}
+	traced := build
+	if tracing {
+		traced = func(fb *Fiber, memo *MemoMap, scope *Owner) Services {
+			id := traceLayer(self)
+			traceEvent("build", "l", id)
+			scope.add(fb, func(*Fiber, *Cause) Value { traceEvent("release", "l", id); return Unit })
+			return build(fb, memo, scope)
+		}
+	}
 	*self = *fromBuild(func(fb *Fiber, memo *MemoMap, scope *Owner) Services {
-		return memo.getOrBuild(fb, self, scope, build)
+		return memo.getOrBuild(fb, self, scope, traced)
 	})
 	return self
 }
@@ -246,6 +255,9 @@ func buildWith(fb *Fiber, l *Layer, memo *MemoMap, scope *Owner) Services {
 // fiber's; the body's owner holds what the layer acquired.
 func Provide(fb *Fiber, layer, body Value) Value {
 	return owned(fb, func(inner *Fiber, owner *Owner) Value {
+		if tracing {
+			traceOpen(owner, fb.owner, "provide")
+		}
 		s := buildWith(inner, layerOf(layer), currentMemo(inner), owner)
 		return Run(provided(inner, s), body)
 	})

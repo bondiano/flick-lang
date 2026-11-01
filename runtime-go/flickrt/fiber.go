@@ -71,6 +71,9 @@ type Eff func(*Fiber) Value
 // Check is an interruption checkpoint: an interruptible fiber asked to stop
 // fails with the interruption.
 func Check(fb *Fiber) {
+	if stressing {
+		stress()
+	}
 	if s := fb.state; s.requested.Load() && s.mask == 0 {
 		panic(s.stopped())
 	}

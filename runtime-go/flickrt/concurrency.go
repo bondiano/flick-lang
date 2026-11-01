@@ -51,6 +51,9 @@ func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 	}
 	recorded := fiberMetrics(&inner)
 	go func() {
+		if stressing {
+			stress()
+		}
 		if tc != nil {
 			defer tc.running.Add(-1)
 		}
@@ -160,6 +163,9 @@ func FiberSpawn(fb *Fiber, owner, supervisor, task Value) Value {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if !o.open {
+		if tracing && o.trace != 0 {
+			traceEvent("refuse", "o", o.trace)
+		}
 		panic(Defect{"Error: the owner is closing: it admits no new children"})
 	}
 	o.watchers.Add(1)
@@ -167,14 +173,24 @@ func FiberSpawn(fb *Fiber, owner, supervisor, task Value) Value {
 	watcher.state, watcher.owner = newState(), o
 	watcher.state.mask = 1
 	var c *child
+	traced := tracing && o.trace != 0
 	c = fork(fb, o, task, func(c *child) {
 		defer o.watchers.Done()
 		o.mu.Lock()
+		if traced {
+			// under the lock, so after the spawn's own event
+			id := traceChild(c)
+			traceEvent("end", "o", o.trace, "f", id, "x", traceExit(c.cause))
+			defer traceEvent("watched", "o", o.trace, "f", id)
+		}
 		delete(o.children, c)
 		shutdown := !o.open && !c.cause.has(causeFail) && !c.cause.has(causeDie)
 		o.mu.Unlock()
 		if c.cause == nil {
 			return
+		}
+		if traced {
+			traceEvent("sup", "o", o.trace, "f", traceChild(c))
 		}
 		_, failed := catch(func() Value { return Run(&watcher, Apply(&watcher, supervisor, &Supervised{c.cause, shutdown})) })
 		if failed != nil {
@@ -182,6 +198,9 @@ func FiberSpawn(fb *Fiber, owner, supervisor, task Value) Value {
 		}
 	})
 	o.children[c] = struct{}{}
+	if traced {
+		traceEvent("spawn", "o", o.trace, "f", traceChild(c))
+	}
 	return c
 }
 

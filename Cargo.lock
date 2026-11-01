@@ -214,6 +214,7 @@ dependencies = [
  "anstyle",
  "clap",
  "flick-core",
+ "flick-model",
  "flick-wasm",
  "insta",
  "rustix",
@@ -243,6 +244,7 @@ version = "0.1.0"
 dependencies = [
  "flick-core",
  "proptest",
+ "serde_json",
 ]
 
 [[package]]

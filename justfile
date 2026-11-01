@@ -116,6 +116,14 @@ bench runs="5":
     cargo build -p flick
     node tools/bench/index.mjs target/debug/flick {{runs}}
 
+# Run the runtime cases `runs` times each on both targets with random interleavings
+# (FLICK_STRESS) and check every trace against λRT; prefixes pick other portable cases. Not in CI
+stress runs="20" +prefixes="runtime/":
+    cargo build -p flick
+    cargo build -p flick-model --example rt_trace
+    pnpm -C runtime build
+    node tools/stress/index.mjs target/debug/flick target/debug/examples/rt_trace {{runs}} {{prefixes}}
+
 # Run SQL queries against PostgreSQL in Docker (after `just e2e` installs the runtime)
 e2e-postgres:
     cargo test -p flick --test sql_postgres -- --ignored
