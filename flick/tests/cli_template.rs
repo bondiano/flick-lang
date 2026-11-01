@@ -21,11 +21,7 @@ fn cli_project(name: &str) -> PathBuf {
 #[test]
 fn the_cli_template_checks_and_is_formatted() {
     let dir = cli_project("cli_template_check");
-    for args in [
-        &["check", "--warnings-as-errors"][..],
-        &["fmt", "--check"],
-        &["test"],
-    ] {
+    for args in [&["check", "--warnings-as-errors"][..], &["fmt", "--check"]] {
         let out = flick_in(&dir, args);
         assert!(out.status.success(), "{args:?} failed: {out:?}");
     }
@@ -33,8 +29,10 @@ fn the_cli_template_checks_and_is_formatted() {
 
 #[test]
 #[ignore = "needs Node and the installed runtime"]
-fn the_cli_template_prints_its_help_and_runs_its_handler() {
+fn the_cli_template_tests_prints_its_help_and_runs_its_handler() {
     let dir = cli_project("cli_template_run");
+    let tests = flick_in(&dir, &["test"]);
+    assert!(tests.status.success(), "{tests:?}");
     let help = flick_in(&dir, &["run", "--", "--help"]);
     assert!(help.status.success(), "{help:?}");
     let text = String::from_utf8_lossy(&help.stdout);
