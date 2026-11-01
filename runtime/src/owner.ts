@@ -6,6 +6,7 @@
 import { Cause, Context, Effect, Exit, Fiber, Scope } from "effect";
 
 import { Failure } from "./cause.ts";
+import { traceChild, traceEvent, traceId, tracing } from "./trace.ts";
 
 /** The owner of the innermost scope; the entry runner's root owner outside one. */
 export const CurrentOwner = /*#__PURE__*/ Context.Reference<Owner | undefined>("@flick-lang/runtime/CurrentOwner", {
@@ -25,6 +26,11 @@ export class Owner {
   readonly closing = new Set<() => Effect.Effect<unknown, unknown>>();
   /** Failures of supervisors: the root's fail the program, a test's fail the test. */
   readonly defects: Array<Cause.Cause<unknown>>;
+  /** Its id in the trace, 0 when it is not traced, and the finalizers Flick added to it. */
+  trace = 0;
+  fins = 0;
+  /** Whether its finalizers have started: one added now runs at once. */
+  finalizing = false;
 
   constructor(resources: Scope.Closeable, defects: Array<Cause.Cause<unknown>> = reported) {
     this.resources = resources;
@@ -33,8 +39,18 @@ export class Owner {
 
   track(promise: Promise<unknown>): void {
     this.pending.add(promise);
-    const done = (): void => void this.pending.delete(promise);
+    const traced = tracing && this.trace !== 0 ? { o: this.trace, t: traceId() } : undefined;
+    if (traced) traceEvent({ e: "track", ...traced });
+    const done = (): void => {
+      this.pending.delete(promise);
+      if (traced) traceEvent({ e: "settle", ...traced });
+    };
     promise.then(done, done);
+  }
+
+  /** Writes a phase of its close to the trace. */
+  phase(phase: string): void {
+    if (tracing && this.trace !== 0) traceEvent({ e: "phase", o: this.trace, c: phase });
   }
 }
 
@@ -54,6 +70,7 @@ const settle = async (owner: Owner): Promise<void> => {
 export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<Exit.Exit<A, unknown>> =>
   Effect.gen(function* () {
     owner.open = false;
+    owner.phase("C0");
     let cause: Cause.Cause<unknown> = Exit.isFailure(exit) ? exit.cause : Cause.empty;
     const ran = new Set<() => Effect.Effect<unknown, unknown>>();
     const hooks = Effect.gen(function* () {
@@ -64,15 +81,25 @@ export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<
         if (Exit.isFailure(closed)) cause = Cause.combine(cause, closed.cause);
       }
     });
+    owner.phase("C1");
     yield* hooks;
+    owner.phase("C2");
+    if (tracing && owner.trace !== 0) {
+      for (const child of owner.children) traceEvent({ e: "interrupt", o: owner.trace, f: traceChild(child) });
+    }
     yield* Fiber.interruptAll([...owner.children]);
     for (let next = first(owner.watchers); next !== undefined; next = first(owner.watchers)) {
       yield* Fiber.await(next);
     }
+    owner.phase("C3");
     // a supervisor may have made a fiber group while the children ended
     yield* hooks;
     yield* Effect.promise(() => settle(owner));
+    owner.phase("C4");
+    owner.finalizing = true;
+    owner.phase("C5");
     const closed = yield* Effect.exit(Scope.close(owner.resources, exit));
+    owner.phase("C6");
     if (Exit.isFailure(closed)) cause = Cause.combine(cause, closed.cause);
     return cause.reasons.length === 0 ? exit : Exit.failCause(cause);
   });
@@ -88,16 +115,22 @@ const inside = <A, E, R>(owner: Owner, effect: Effect.Effect<A, E, R>): Effect.E
 
 /**
  * Runs `body(owner, outer)` as the owner of a fresh scope, then closes it;
- * `outer` is the owner around it.
+ * `outer` is the owner around it. An owner of a `kind` (main, scope,
+ * provide) is traced.
  */
 export const withOwner = <A, E, R>(
   body: (owner: Owner, outer: Owner | undefined) => Effect.Effect<A, E, R>,
+  kind?: string,
 ): Effect.Effect<A, unknown, Exclude<R, Scope.Scope>> =>
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
       const outer = yield* Effect.service(CurrentOwner);
       const resources = yield* Scope.make();
       const owner = new Owner(resources, outer?.defects);
+      if (tracing && kind !== undefined) {
+        owner.trace = traceId();
+        traceEvent({ e: "open", o: owner.trace, p: outer?.trace ?? 0, k: kind });
+      }
       const exit = yield* Effect.exit(restore(inside(owner, body(owner, outer))));
       return yield* resume(yield* close(owner, exit));
     }),
@@ -128,7 +161,9 @@ export const ownedExits = <A, E, R>(
   );
 
 /** `scope [s] { body }`: `body` receives the owner `s` and the one around it. */
-export const scope = withOwner;
+export const scope = <A, E, R>(
+  body: (owner: Owner, outer: Owner | undefined) => Effect.Effect<A, E, R>,
+): Effect.Effect<A, unknown, Exclude<R, Scope.Scope>> => withOwner(body, "scope");
 
 /**
  * A call that acquires into the owner of a region the compiler chose
@@ -158,7 +193,9 @@ export const fiberSpawn = <A, E, R, R2>(
   task: Effect.Effect<A, E, R>,
 ): Effect.Effect<FlickFiber<A, E>, never, Exclude<R, Scope.Scope> | R2> =>
   Effect.uninterruptible(Effect.gen(function* () {
+    const traced = tracing && owner.trace !== 0;
     if (!owner.open) {
+      if (traced) traceEvent({ e: "refuse", o: owner.trace });
       return yield* Effect.die(new Error("the owner is closing: it admits no new children"));
     }
     const child = yield* Effect.forkDetach(inside(owner, task));
@@ -168,16 +205,20 @@ export const fiberSpawn = <A, E, R, R2>(
         Effect.gen(function* () {
           const exit = yield* Fiber.await(child);
           owner.children.delete(child);
+          if (traced) traceEvent({ e: "end", o: owner.trace, f: traceChild(child), x: traceExit(exit) });
           if (Exit.isFailure(exit)) {
             const shutdown = !owner.open && Cause.hasInterruptsOnly(exit.cause);
+            if (traced) traceEvent({ e: "sup", o: owner.trace, f: traceChild(child) });
             const supervised = yield* Effect.exit(inside(owner, supervisor(new Failure(exit.cause, shutdown))));
             if (Exit.isFailure(supervised)) owner.defects.push(supervised.cause);
           }
+          if (traced) traceEvent({ e: "watched", o: owner.trace, f: traceChild(child) });
         }),
       ),
     );
     owner.watchers.add(watcher);
     watcher.addObserver(() => owner.watchers.delete(watcher));
+    if (traced) traceEvent({ e: "spawn", o: owner.trace, f: traceChild(child) });
     return new FlickFiber(child);
   }));
 
@@ -233,7 +274,36 @@ export const foreignEffect = <A, E, R, E2>(
 export const acquireRelease = <A, E, R, R2>(
   acquire: Effect.Effect<A, E, R>,
   release: (resource: A) => Effect.Effect<unknown, never, R2>,
-): Effect.Effect<A, E, R | R2 | Scope.Scope> => Effect.acquireRelease(acquire, (resource) => release(resource));
+): Effect.Effect<A, E, R | R2 | Scope.Scope> =>
+  tracing
+    ? Effect.flatMap(Effect.scope, (resources) =>
+        Effect.map(
+          Effect.acquireRelease(
+            Effect.flatMap(acquire, (resource) => Effect.map(traceFinalizer(resources), (ran) => ({ resource, ran }))),
+            ({ resource, ran }) => Effect.andThen(ran, release(resource)),
+          ),
+          ({ resource }) => resource,
+        ),
+      )
+    : Effect.acquireRelease(acquire, (resource) => release(resource));
+
+/** How a fiber ended, as the trace names it. */
+export const traceExit = (exit: Exit.Exit<unknown, unknown>): string => {
+  if (Exit.isSuccess(exit)) return "ok";
+  return Cause.hasFails(exit.cause) || Cause.hasDies(exit.cause) ? "fail" : "int";
+};
+
+/**
+ * Writes a finalizer Flick adds to `resources` to the trace, when they are
+ * a traced owner's: the effect to run as it starts writes that it ran.
+ */
+export const traceFinalizer = (resources: Scope.Scope): Effect.Effect<Effect.Effect<void>> =>
+  Effect.map(Effect.service(CurrentOwner), (owner) => {
+    if (!tracing || owner === undefined || owner.trace === 0 || owner.resources !== resources) return Effect.void;
+    const event = { o: owner.trace, i: ++owner.fins };
+    traceEvent({ e: owner.finalizing ? "now" : "fin", ...event });
+    return Effect.sync(() => traceEvent({ e: "run", ...event }));
+  });
 
 /** `bracket`: `release` runs after `use` and may fail with a typed error. */
 export const bracket = <A, E, R, B, E2, R2, E3, R3>(

@@ -6,7 +6,8 @@ import { Cause, Effect, Exit, Fiber } from "effect";
 import { APP_ERROR, type AppError } from "./builtins.ts";
 import { versionProblems } from "./capabilities.ts";
 import { env, offSignal, onSignal, setExitCode, writeStderr } from "./host.ts";
-import { reportedDefects, withOwner } from "./owner.ts";
+import { reportedDefects, traceExit, withOwner } from "./owner.ts";
+import { traceEvent, tracing } from "./trace.ts";
 
 const SIGNALS = { SIGINT: 130, SIGTERM: 143 } as const;
 
@@ -105,14 +106,16 @@ export const aroundMain = (f: Around): void => {
  * returns. `provide` gives the services the runner provides to this call.
  */
 export const start = <I>(main: Main<I>, input: I, provide: Around = (program) => program): Fiber.Fiber<unknown, unknown> => {
-  const program = withOwner(() =>
-    provide(
-      Effect.suspend(() => {
-        const result = main(input);
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler checked `main` needs no service but the runner's
-        return Effect.isEffect(result) ? (result as Effect.Effect<unknown, unknown>) : Effect.succeed(result);
-      }),
-    ),
+  const program = withOwner(
+    () =>
+      provide(
+        Effect.suspend(() => {
+          const result = main(input);
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler checked `main` needs no service but the runner's
+          return Effect.isEffect(result) ? (result as Effect.Effect<unknown, unknown>) : Effect.succeed(result);
+        }),
+      ),
+    "main",
   );
   return Effect.runFork(around === undefined ? program : around(program));
 };
@@ -161,5 +164,6 @@ export const runMain = async (
   clearTimeout(run.timer);
   clearInterval(keepAlive);
   for (const [name, handler] of handlers) offSignal(name, handler);
+  if (tracing) traceEvent({ e: "exit", x: traceExit(exit) });
   setExitCode(conclude(exit, run.signal, reportedDefects()));
 };
