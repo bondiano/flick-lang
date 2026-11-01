@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use super::{Checker, TypeError};
 use crate::decls::Decls;
-use crate::syntax::{Arm, Con, Const, Lit, Pat, Path, Term};
+use crate::syntax::{Arm, Con, Const, Lit, Pat, Path, Prim, Term};
 use crate::types::{Kind, Row, Scheme, Stage, Type, Var};
 
 fn ty(name: &str) -> Type {
@@ -436,5 +436,23 @@ fn eff_as_a_type_constructor() {
     assert_eq!(
         c.zonk(&Type::app(f, ty("String"))),
         Type::Eff(r, Row::none(), Rc::new(ty("String")))
+    );
+}
+
+/// `<` orders numbers and strings, as flick-core's operators: `λf. f < f`
+/// over a function is rejected, an unknown operand becomes `Int` (X2).
+#[test]
+fn comparisons_order_numbers_and_strings_only() {
+    let lt = |a: Term, b: Term| Term::apps(Term::prim(Prim::Lt), [a, b]);
+    let f = Term::lam("y", int(0));
+    rejected_by(infer(&let_("f", f, lt(var("f"), var("f")))), "Prim");
+    let (t, _) = infer(&Term::lam("x", lt(var("x"), var("x")))).expect("an Int");
+    assert_eq!(t.to_string(), "Int -> Bool");
+    assert!(
+        infer(&lt(
+            Term::Lit(Lit::String("a".into())),
+            Term::Lit(Lit::String("b".into()))
+        ))
+        .is_ok()
     );
 }

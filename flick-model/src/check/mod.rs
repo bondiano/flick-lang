@@ -14,6 +14,7 @@
 //! which the translation never makes, are typed in `runtime.rs`, so that
 //! Preservation can be checked on the states of the machine (X2).
 
+mod constants;
 mod dicts;
 mod expr;
 mod generalize;
@@ -92,6 +93,8 @@ pub struct Checker<'d> {
     pending: Vec<(Row, Row)>,
     /// Compiler-owned instances waiting for the type of their record.
     structural: Vec<(Name, Rc<[Term]>, Type)>,
+    /// Operands of `<`, `<=`, `>`, `>=`, checked once their type is known.
+    ordered: Vec<Type>,
     /// Counter of the rigid variables a signature introduces.
     rigid: u32,
     /// `Ψ`: the type of each cell of `μ`, when a configuration is checked.
@@ -110,6 +113,7 @@ impl<'d> Checker<'d> {
             stage: Stage::Pure,
             pending: Vec::new(),
             structural: Vec::new(),
+            ordered: Vec::new(),
             rigid: 0,
             store: Vec::new(),
             config: false,
@@ -145,6 +149,9 @@ impl<'d> Checker<'d> {
     fn finish(&mut self) -> Check<()> {
         for (class, fields, t) in mem::take(&mut self.structural) {
             self.structural_fields(&class, &fields, &t)?;
+        }
+        for t in mem::take(&mut self.ordered) {
+            self.ordered_operand(&t)?;
         }
         self.settle()
     }
