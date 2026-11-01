@@ -38,6 +38,7 @@ func EventsListen(fb *Fiber, owner, policy, supervisor, handler Value) Value {
 	FiberSpawn(fb, owner, Fn(func(fb *Fiber, _ Value) Value { return Succeed(Unit) }), Eff(func(w *Fiber) Value {
 		defer close(l.done)
 		for {
+			suspended(w.state)
 			select {
 			case e := <-l.events:
 				_, cause := catch(func() Value { return Run(w, Apply(w, handler, e)) })

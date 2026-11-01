@@ -155,3 +155,9 @@ let main () =
     try twice (Cache.get (ask 2)) cache with
     | NotFound id -> "not found " ++ show id
   Platform.stdout_line ("as_cache " ++ cached_names)
+  // a listener waiting for events holds back no batch
+  scope s {
+    let _ : Events.Listener s Int =
+      Events.listen s (Events.queue 4) (fun _ -> ()) (fun _ -> task { () })
+    Platform.stdout_line ("listening " ++ run_all batched [1, 2])
+  }
