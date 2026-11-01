@@ -117,7 +117,7 @@ func ExitFindErrorOption(e Value) Value {
 
 func ExitFindDefect(e Value) Value {
 	if r := ex(e).cause.firstOf(causeDie); r != nil {
-		return Ok(defectMessage(r.defect))
+		return Ok(r.message())
 	}
 	return Err(e)
 }
@@ -217,7 +217,7 @@ func CauseReasons(f Value) Value {
 	for i, r := range reasons {
 		if r.kind == causeFail {
 			if !head {
-				r = &Cause{kind: causeDie, defect: describe(r.err)}
+				r = dieOf(r.err)
 			}
 			head = false
 		}

@@ -107,7 +107,7 @@ func StreamOrElseSucceed(f, s Value) Value {
 // defect.
 func StreamOrDie(s Value) Value {
 	return streamCatchError(streamOf(s), func(_ *Fiber, err Value) *Stream {
-		return streamFailCause(&Cause{kind: causeDie, defect: describe(err)})
+		return streamFailCause(dieOf(err))
 	})
 }
 

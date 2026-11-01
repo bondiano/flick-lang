@@ -96,3 +96,20 @@ func TestTheTypedViewOfACauseSeesItsHeadOnly(t *testing.T) {
 		t.Error("reasons give a later typed failure as a defect")
 	}
 }
+
+// A typed error that became a defect is that value, as in JS: told by its
+// constructor and equal to the same value (docs/formal/runtime.md Р81).
+func TestATypedErrorAsADefectIsItsValue(t *testing.T) {
+	a := func(n float64) *Cause { return &Cause{kind: causeFail, err: NewData(Tag("App.A#1"), n)} }
+	reasons := CauseReasons(failureOf(Sequential(a(1), a(2)))).([]Value)
+	if got := CauseFindDefect(CauseFromReasons(reasons[1:])).(*Data).Fields[0]; got != "A" {
+		t.Errorf("the defect is told by its constructor: %v", got)
+	}
+	dies := Sequential(a(1), &Cause{kind: causeDie, defect: "d"}).failsToDies()
+	if n := len(Sequential(dies, dieOf(a(1).err)).reasons()); n != 2 {
+		t.Errorf("a defect of an equal value is the same reason: %d", n)
+	}
+	if n := len(Sequential(dieOf(a(1).err), dieOf(a(2).err)).reasons()); n != 2 {
+		t.Errorf("defects of different values are two: %d", n)
+	}
+}

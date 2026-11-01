@@ -35,6 +35,10 @@ func describeCause(c *Cause) string {
 			}
 			parts = append(parts, "fail "+shown)
 		case causeDie:
+			if d, ok := r.err.(*Data); ok {
+				parts = append(parts, "die "+ConstructorName(d.Tag))
+				continue
+			}
 			text := strings.TrimSuffix(r.defect, "\n")
 			if message := defectMessage(r.defect); message != text {
 				parts = append(parts, "die error "+inert(message))

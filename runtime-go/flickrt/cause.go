@@ -114,11 +114,24 @@ func (c *Cause) failsToDies() *Cause {
 	var out *Cause
 	for _, r := range c.reasons() {
 		if r.kind == causeFail {
-			r = &Cause{kind: causeDie, defect: describe(r.err)}
+			r = dieOf(r.err)
 		}
 		out = concat(out, r)
 	}
 	return out
+}
+
+// dieOf is a typed error as a defect: the error itself, as JS keeps it,
+// so the defect is told and compared as that value.
+func dieOf(err Value) *Cause { return &Cause{kind: causeDie, defect: describe(err), err: err} }
+
+// message is a defect as the JS target describes it (`describeDefect`):
+// the constructor of a value, else the message of its text.
+func (c *Cause) message() string {
+	if d, ok := c.err.(*Data); ok {
+		return ConstructorName(d.Tag)
+	}
+	return defectMessage(c.defect)
 }
 
 // withoutInterrupts is the cause without its interruptions; nil when only

@@ -163,7 +163,7 @@ func EffectTrackDefects(fb *Fiber, m, f, task Value) Value {
 		if r == nil {
 			return nil, false
 		}
-		return Apply(fb, f, defectMessage(r.defect)), true
+		return Apply(fb, f, r.message()), true
 	})
 }
 
