@@ -118,6 +118,30 @@ func TestAnInterruptedFiberSkipsTheHandler(t *testing.T) {
 	}
 }
 
+// (Seq=Par): the kind of a node is never observed, so both combinations
+// of any two causes have the same reasons (docs/formal/runtime.md §2.2).
+func TestSequentialAndParallelAreOneCombination(t *testing.T) {
+	atoms := []*Cause{
+		{kind: causeFail, err: 1.0}, {kind: causeDie, defect: "d"}, {kind: causeInterrupt, fiber: 3}, nil,
+	}
+	for _, a := range atoms {
+		for _, b := range atoms {
+			for _, c := range atoms {
+				left, right := concat(a, b), concat(b, c)
+				seq, par := Sequential(left, right).reasons(), Parallel(left, right).reasons()
+				if len(seq) != len(par) {
+					t.Fatalf("%v and %v: %d and %d reasons", left, right, len(seq), len(par))
+				}
+				for i := range seq {
+					if seq[i] != par[i] {
+						t.Fatalf("%v and %v differ at %d", left, right, i)
+					}
+				}
+			}
+		}
+	}
+}
+
 // The empty cause still fails, as Effect's `Cause.empty` (Р82).
 func TestTheEmptyCauseFails(t *testing.T) {
 	if _, c := catch(func() Value { return FailureRethrow(nil, CauseEmpty) }); c == nil || len(c.reasons()) != 0 {

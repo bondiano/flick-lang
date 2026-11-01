@@ -138,6 +138,8 @@ Go хранит двоичное дерево `Sequential`/`Parallel` (`cause.go
 
 `⊕` не коммутативна, и порядок важен: от него зависит `head`, а значит, и восстановление.
 
+Законы, `recover` §2.3 и то, что `Cause.pretty` и `Cause.pretty_errors` зависят только от списка причин, проверяет `tests/run/runtime/cause_laws.fl`: свойства `Arbitrary.check` над причинами, которые `Arbitrary` Effect строит по сиду одинаково на Node и Go. (Seq=Par) с поверхности Flick недостижим (`Cause.combine` — всегда `Sequential`), его проверяет `cause_test.go`.
+
 (⊕-Assoc) верна, потому что `nub(nub(a ⧺ b) ⧺ c) = nub(a ⧺ b ⧺ c) = nub(a ⧺ nub(b ⧺ c))`. На списке с повторами `∅ ⊕ c` возвращает `c` как есть, а первая непустая `⊕` нормализует.
 
 Определения:
@@ -487,7 +489,7 @@ R8 — не утверждение о перестановках, а свойс�
 
 Статус: внесены Р26–Р36, Р38, Р40, Р41, Р43 и Р80–Р82; у каждого исправления рантайма есть тест или фикстура, которые падают до него. Р37, Р39, Р42, Р44, Р45 и В4 записаны.
 
-Фикстуры `tests/run/runtime/close_phases.fl` и `cause_lists.fl` входят в `portable.txt`: их вывод на Node и Go совпадает.
+Фикстуры `tests/run/runtime/close_phases.fl`, `cause_lists.fl` и `cause_laws.fl` входят в `portable.txt`: их вывод на Node и Go совпадает.
 
 Общие определения проб:
 
@@ -811,17 +813,17 @@ let main () =
 **Р80. Go: два дефекта с одной строкой — две причины.**
 
 - `sameReason` сравнивал `Die` по указателю (`cause.go:78`), а Effect — `Equal.equals` дефекта, то есть строку по значению. `Cause.combine (Cause.die "x") (Cause.die "x")` даёт одну причину на Node и две на Go: `Cause.die` каждый раз строит новый `*Cause`.
-- Нарушение (⊕-Idem) и паритета §2.5. Решение — `Die` по значению, кроме брошенного: паника, `Stream.die`, переполнение очереди событий и незавершённый запрос — `Error` в JS, их Go помечает `thrown`. Внесено; `cause_test.go`.
+- Нарушение (⊕-Idem) и паритета §2.5. Решение — `Die` по значению, кроме брошенного: паника, `Stream.die`, переполнение очереди событий и незавершённый запрос — `Error` в JS, их Go помечает `thrown`. Внесено; `cause_test.go` и `tests/run/runtime/cause_laws.fl`.
 
 **Р81. Go: типизированная ошибка, ставшая дефектом, теряет значение.**
 
 - JS кладёт в дефект само значение ошибки: `failsToDies` в `try`, вторичная `Fail` в `Cause.reasons`, `Effect.or_die`, `Stream.or_die`. `Cause.find_defect` описывает его конструктором (`describeDefect`), `Failure.inspect` — `die A`. Go хранил только текст `describe v`, поэтому `find_defect` давал JSON значения, а два дефекта одного значения различались бы по тексту, а не по `Equal.equals`.
-- Нарушение паритета §2.5. Решение — `dieOf` хранит значение рядом с текстом; `find_defect`, `catch_defect`, `tap_defect`, `Failure.inspect` и `Cause.pretty` читают его, как JS. Внесено; `cause_test.go`.
+- Нарушение паритета §2.5. Решение — `dieOf` хранит значение рядом с текстом; `find_defect`, `catch_defect`, `tap_defect`, `Failure.inspect` и `Cause.pretty` читают его, как JS. Внесено; `cause_test.go` и `tests/run/runtime/cause_laws.fl`.
 
 **Р82. Go: пустая причина — не падение.**
 
 - Go обозначал `nil` и «падения нет», и пустую причину `∅`. Поэтому `try Failure.rethrow Cause.empty with …` завершался успехом со значением `nil` любого типа, а `Exit.fail_cause Cause.empty` был успешным исходом. В Effect `failCause(empty)` падает, `try` отдаёт причину дальше (§2.3, «иначе»), а `report(∅)` — `pretty(∅)`, так как `hasInterruptsOnly` пустой причины ложно.
-- Нарушение (Try) и паритета. Решение — `Failure` всегда держит причину: пустая — это `emptyCause`, единица `⊕`; `report` и `conclude` считают прерыванием только причину, где `Int` есть. Внесено; `cause_test.go`.
+- Нарушение (Try) и паритета. Решение — `Failure` всегда держит причину: пустая — это `emptyCause`, единица `⊕`; `report` и `conclude` считают прерыванием только причину, где `Int` есть. Внесено; `cause_test.go` и `tests/run/runtime/cause_laws.fl` (`recover` на пустой причине).
 
 **В4. Go: HTTP-обработчики.**
 

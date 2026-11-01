@@ -1,0 +1,34 @@
+⧺ keeps every reason: passed 200
+⊕ is nub of ⧺: passed 200
+⊕-Unit: passed 200
+⊕-Assoc: passed 200
+⊕-Idem: passed 200
+⊕-Head: passed 200
+⧺-Free: passed 200
+recover: passed 200
+renders see the reasons only: passed 200
+pretty [0, 3, 0, 6]:
+Error: {"_tag":"A#e06b20889dc2","_0":0}
+Error: d3
+recovered ["DA", "Dd3", "I[6]"]
+pretty [4, 1, 4]:
+Error: d4
+Error: {"_tag":"A#e06b20889dc2","_0":1}
+recovered ["Dd4", "DA"]
+pretty [7, 8, 7]:
+InterruptError: All fibers interrupted without error {
+  [cause]: InterruptCause: The fiber was interrupted by:
+      at fiber (#7)
+      at fiber (unknown)
+}
+recovered ["I[7]", "I[]"]
+pretty [2, 5, 0, 3]:
+Error: {"_tag":"A#e06b20889dc2","_0":2}
+Error: d5
+Error: {"_tag":"A#e06b20889dc2","_0":0}
+Error: d3
+recovered ["DA", "Dd5", "DA", "Dd3"]
+pretty []:
+
+recovered []
+interrupted handler: ["I[1]"]
