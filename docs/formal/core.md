@@ -967,14 +967,11 @@ let program () =
 
 **Р130. После шага `let x : σ = v` состояние теряет `σ`, и чекер эталона его не выводит.**
 
-```flick
-program : Unit ->{Counter; Oops} (Unit, Int)
-let program u =
-  v1 : forall a b r e. (a ->{r; e} b) -> a ->{r; e} b
-  let v1 g x = (g x)
-  …
-    (v1 (try (try (fun x2 -> ((), 0)) with | _ -> (fun x3 -> ((), 0)))
-         with | _ -> as4) …)
+```text
+v1 : forall a b r e. (a ->{r; e} b) -> a ->{r; e} b
+let v1 g x = (g x)
+… (v1 (try (try (fun x2 -> ((), 0)) with | _ -> (fun x3 -> ((), 0)))
+       with | _ -> as4) …)
 ```
 
 - Что происходит: шаг §3.3 даёт `(λg. λx. g x) (try … with _ → as4)` с `as4 : Unit →R⟨none;none⟩ (Unit, Int)`. В программе `try` проверялся против `a →R⟨r;e⟩ b` из `σ`, а в состоянии `λg` без сигнатуры. Эталон выводит аргумент без ожидаемого типа: `λx2` берёт `P` (Р7), и ветвь с `as4` — `(⊑)` на шаге 32 (`progress_and_preservation_hold`).
