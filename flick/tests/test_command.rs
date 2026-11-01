@@ -236,8 +236,10 @@ fn collect(child: &mut Child) -> Arc<Mutex<String>> {
     out
 }
 
+/// Waits up to a minute: each run of `flick test` compiles the project
+/// first, which takes over 10 s in a debug build.
 fn wait_for(out: &Mutex<String>, text: &str, count: usize) -> String {
-    for _ in 0..200 {
+    for _ in 0..1200 {
         let now = out.lock().expect("lock").clone();
         if now.matches(text).count() >= count {
             return now;
