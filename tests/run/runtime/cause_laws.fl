@@ -1,0 +1,258 @@
+// The laws of causes (docs/formal/runtime.md §2.2–2.3) as properties over
+// causes Effect's `Arbitrary` draws by seed, the same on every target: a
+// cause is a list of atoms, a typed failure, a defect or an interruption,
+// few enough to repeat. `⊕` is `Cause.combine`, `⧺` is `Cause.from_reasons`
+// over both lists; a cause is seen as its list of reasons. (Seq=Par) has
+// no surface here: `cause_test.go` checks it. Last, a failure of a fiber
+// asked to stop skips `try` (Г7ж, Р43).
+module App.Main exposing (main)
+
+type error A = A Float
+  deriving Eq, Show
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// The atoms: 0–2 a typed failure, 3–5 a defect, 6–7 an interruption by a
+/// fiber, 8 one by no fiber.
+digit_json : PureCodec Json Float
+let digit_json =
+  Float.json_finite
+  |> Check.apply Check.int
+  |> Check.apply
+    (Check.between { minimum = 0; maximum = 8; exclusiveMinimum = false; exclusiveMaximum = false })
+
+atoms : Arbitrary.Arbitrary (List Float)
+let atoms =
+  Arbitrary.list
+    { minLength = Some 0; maxLength = Some 4 }
+    (Arbitrary.from_schema (Codec.to_schema digit_json))
+
+checking : Arbitrary.CheckOptions
+let checking = {
+  runs = Some 200;
+  size = None;
+  maxDiscards = None;
+  maxShrinks = None;
+  seed = Some 11;
+  replay = None;
+}
+
+empty : Failure {A}
+let empty = Cause.empty
+
+plus : Failure {A} -> Failure {A} -> Failure {A}
+let plus a b = Cause.combine b a
+
+/// The cause of one atom, by the constructors of `Cause`.
+atom : Float -> Failure {A}
+let atom k =
+  if k < 3 then
+    Cause.fail (A k)
+  else if k < 6 then
+    Cause.die ("d" ++ show k)
+  else if k < 8 then
+    Cause.interrupt (Some k)
+  else
+    Cause.interrupt None
+
+reason : Float -> Cause.Reason {A}
+let reason k =
+  if k < 3 then
+    Cause.make_fail_reason (A k)
+  else if k < 6 then
+    Cause.make_die_reason ("d" ++ show k)
+  else if k < 8 then
+    Cause.make_interrupt_reason (Some k)
+  else
+    Cause.make_interrupt_reason None
+
+/// `a₁ ⊕ … ⊕ aₙ`: a normal form.
+nf : List Float -> Failure {A}
+let nf xs = List.fold_left (fun c k -> plus c (atom k)) empty xs
+
+/// `[a₁] ⧺ … ⧺ [aₙ]`: repeats kept.
+free : List Float -> Failure {A}
+let free xs = Cause.from_reasons (List.map reason xs)
+
+label : Cause.Reason {A} -> String
+let label r =
+  let one = Cause.from_reasons [r]
+  if Cause.is_fail_reason r then
+    match Cause.find_error_option one with
+    | Some (A k) -> "F" ++ show k
+    | None -> "F?"
+  else if Cause.is_die_reason r then
+    match Cause.find_defect one with
+    | Ok s -> "D" ++ s
+    | Err _ -> "D?"
+  else
+    "I" ++ show (Cause.interruptors one)
+
+/// A cause as its reasons; a typed failure after the first is a defect of
+/// its error there (§2.4).
+view : Failure {A} -> List String
+let view c = List.map label (Cause.reasons c)
+
+/// What `view` gives of the cause of these atoms, with each typed failure
+/// a defect when `dies`.
+expected : Bool -> List Float -> List String
+let expected dies xs =
+  step : Bool -> Float -> (Bool, String)
+  let step seen k =
+    if k < 3 then
+      if seen || dies then (true, "DA") else (true, "F" ++ show k)
+    else if k < 6 then
+      (seen, "Dd" ++ show k)
+    else if k < 8 then
+      (seen, "I[" ++ show k ++ "]")
+    else
+      (seen, "I[]")
+  let (_, out) = List.map_accum false step xs
+  out
+
+has : (Float -> Bool) -> List Float -> Bool
+let has p xs = List.any p xs
+
+/// `try (fail c) with A 0 -> …`, as its view.
+recovered : Failure {A} ->{} List String
+let recovered c =
+  let ex : Exit {A} String =
+    Effect.exit
+      (task {
+        try Failure.rethrow c with
+        | A 0 -> "handled"
+      })
+  match Exit.failure ex with
+  | Some f -> view f
+  | None -> ["handled"]
+
+/// recover(c, A 0) of §2.3 on the atoms of a normal form.
+recover : List Float -> List String
+let recover xs =
+  let dies = has (fun k -> k >= 3 && k < 6) xs
+  let fails = has (fun k -> k < 3) xs
+  if dies && fails then
+    expected true xs
+  else
+    match List.find (fun k -> k < 3) xs with
+    | Some 0 -> ["handled"]
+    | _ -> expected false xs
+
+describe : Arbitrary.CheckResult e a -> String
+let describe result =
+  match result with
+  | Arbitrary.Passed r -> "passed " ++ show r.runs
+  | other -> Option.with_default "?" (Arbitrary.format_check_failure other)
+
+law : String -> Arbitrary.CheckResult e a ->{} Unit
+let law name result = say (name ++ ": " ++ describe result)
+
+one : (List Float ->{} Bool) ->{} Arbitrary.CheckResult none (List Float)
+let one p = Arbitrary.check checking p atoms
+
+three :
+  (List Float -> List Float -> List Float -> Bool) ->{}
+  Arbitrary.CheckResult none (List Float, List Float, List Float)
+let three p =
+  Arbitrary.check
+    checking
+    (fun t ->
+      match t with
+      | (a, b, c) -> p a b c
+    )
+    (Arbitrary.zip3 atoms atoms atoms)
+
+nap : Float ->{} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+/// Fails after the mask ends, by when the fiber was asked to stop.
+late : Unit ->{; A} String
+let late () =
+  Effect.uninterruptible
+    (task {
+      nap 40
+      from_result (Err (A 1))
+    })
+
+guarded : Unit ->{} String
+let guarded () =
+  try late () with
+  | A _ ->
+    say "the handler ran"
+    "handled"
+
+quiet : forall e. Failure e ->{} Unit
+let quiet _ = ()
+
+/// The handler is skipped: the fiber ends with its interruption alone.
+skipped : Unit ->{} Unit
+let skipped () =
+  let exits = scope owner {
+    let fiber = Fiber.spawn owner quiet (task { guarded () })
+    nap 10
+    Fiber.interrupt fiber
+    Fiber.await_all [fiber]
+  }
+  List.each_effect
+    (fun ex ->
+      match Exit.failure ex with
+      | Some f -> say ("interrupted handler: " ++ show (view f))
+      | None -> say "interrupted handler: succeeded"
+    )
+    exits
+
+main : Unit ->{; AppError} Unit
+let main () =
+  law "⧺ keeps every reason" (one (fun xs -> view (free xs) == expected false xs))
+  law "⊕ is nub of ⧺" (one (fun xs -> view (nf xs) == expected false (List.dedupe xs)))
+  law
+    "⊕-Unit"
+    (one (fun xs ->
+      let c = free xs
+      view (plus empty c) == view c && view (plus c empty) == view c
+    ))
+  law
+    "⊕-Assoc"
+    (three (fun a b c ->
+      view (plus (plus (nf a) (nf b)) (nf c)) == view (plus (nf a) (plus (nf b) (nf c)))
+    ))
+  law
+    "⊕-Idem"
+    (three (fun a b _ ->
+      view (plus (nf a) (nf a)) == view (nf a)
+        && view (plus (plus (nf a) (nf b)) (nf a)) == view (plus (nf a) (nf b))
+    ))
+  law
+    "⊕-Head"
+    (three (fun a b _ ->
+      let head = if Cause.has_fails (nf a) then nf a else nf b
+      Cause.find_error_option (plus (nf a) (nf b)) == Cause.find_error_option head
+    ))
+  law
+    "⧺-Free"
+    (three (fun a b c ->
+      view (free (a ++ b ++ c)) == expected false (a ++ b ++ c)
+        && view (Cause.from_reasons (Cause.reasons (free a) ++ Cause.reasons (free b)))
+          == view (free (a ++ b))
+    ))
+  law "recover" (one (fun xs -> recovered (nf xs) == recover (List.dedupe xs)))
+  law
+    "renders see the reasons only"
+    (one (fun xs ->
+      let ys = List.dedupe xs
+      Cause.pretty (nf xs) == Cause.pretty (free ys)
+        && Cause.pretty_errors (nf xs) == Cause.pretty_errors (free ys)
+    ))
+  let samples = [[0, 3, 0, 6], [4, 1, 4], [7, 8, 7], [2, 5, 0, 3], []]
+  List.each_effect
+    (fun xs ->
+      say ("pretty " ++ show xs ++ ":")
+      say (Cause.pretty (nf xs))
+      say ("recovered " ++ show (recovered (nf xs)))
+    )
+    samples
+  skipped ()

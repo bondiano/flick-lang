@@ -18,9 +18,10 @@ test("arrays and plain objects are copied all the way down", () => {
   assert.deepEqual(user, { name: "ann", tags: ["a"], home: { _tag: "Some", value: [1] } });
 });
 
+const f = () => 1;
+
 test("handles, functions and frozen constants keep their identity", () => {
   const date = new Date(0);
-  const f = () => 1;
   const [d, g, n] = coreCopy([date, f, none]);
   assert.equal(d, date);
   assert.equal(g, f);

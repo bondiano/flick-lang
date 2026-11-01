@@ -1,0 +1,9 @@
+name = "formal"
+defaultTargets = ["Formal"]
+
+[leanOptions]
+autoImplicit = true
+relaxedAutoImplicit = false
+
+[[lean_lib]]
+name = "Formal"

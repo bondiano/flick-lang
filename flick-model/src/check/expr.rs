@@ -7,25 +7,23 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::rc::Rc;
 
-use flick_core::numeric::Num;
-
 use super::{Check, Checker, error};
-use crate::syntax::{Const, Head, Lit, Name, Path, Prim, Term};
+use crate::syntax::{Head, Lit, Name, Path, Term};
 use crate::types::{Fields, Kind, Row, Scheme, Stage, Type, Var};
 
-fn prelude(name: &str) -> Type {
+pub(super) fn prelude(name: &str) -> Type {
     Type::con("Prelude", name)
 }
 
-fn list(t: Type) -> Type {
+pub(super) fn list(t: Type) -> Type {
     Type::app(prelude("List"), t)
 }
 
-fn var(n: &str) -> Type {
+pub(super) fn var(n: &str) -> Type {
     Type::Var(Var::Named(n.into()))
 }
 
-fn scheme(vars: &[(&str, Kind)], body: Type) -> Scheme {
+pub(super) fn scheme(vars: &[(&str, Kind)], body: Type) -> Scheme {
     Scheme {
         vars: vars
             .iter()
@@ -35,7 +33,7 @@ fn scheme(vars: &[(&str, Kind)], body: Type) -> Scheme {
     }
 }
 
-fn runtime(r: Row, e: Row) -> Stage {
+pub(super) fn runtime(r: Row, e: Row) -> Stage {
     Stage::Runtime(r, e)
 }
 
@@ -404,79 +402,6 @@ impl Checker<'_> {
             .iter()
             .try_for_each(|(l, x)| self.check(x, &expected.fields[l]))
     }
-
-    /// The constants of Γ₀ (§1.5) and the operators.
-    pub(super) fn constant(&mut self, c: &Const) -> Check<Type> {
-        let none = Row::none;
-        let a = || var("a");
-        let s = match c {
-            Const::RefMake => scheme(
-                &[("a", Kind::Type)],
-                Type::fun(a(), runtime(none(), none()), Type::Ref(Rc::new(a()))),
-            ),
-            Const::RefGet => scheme(
-                &[("a", Kind::Type)],
-                Type::fun(Type::Ref(Rc::new(a())), runtime(none(), none()), a()),
-            ),
-            Const::RefSet => scheme(
-                &[("a", Kind::Type)],
-                Type::fun(
-                    Type::Ref(Rc::new(a())),
-                    Stage::Pure,
-                    Type::fun(a(), runtime(none(), none()), prelude("Unit")),
-                ),
-            ),
-            Const::Raise => {
-                let e = Row::var(Var::Named("e".into()));
-                scheme(
-                    &[("e", Kind::Errors), ("a", Kind::Type)],
-                    Type::fun(Type::Errors(e.clone()), runtime(none(), e), a()),
-                )
-            }
-            Const::Ask(s) => Scheme {
-                vars: Vec::new(),
-                body: Type::fun(
-                    prelude("Unit"),
-                    runtime(Row::one(s.clone()), none()),
-                    Type::Impl(Row::one(s.clone())),
-                ),
-            },
-            Const::LayerSucceed(s) => Scheme {
-                vars: Vec::new(),
-                body: Type::fun(
-                    Type::Impl(Row::one(s.clone())),
-                    Stage::Pure,
-                    Type::Layer(none(), none(), Row::one(s.clone())),
-                ),
-            },
-            Const::LayerEffect(s) => {
-                let (r, e) = (
-                    Row::var(Var::Named("r".into())),
-                    Row::var(Var::Named("e".into())),
-                );
-                scheme(
-                    &[("r", Kind::Services), ("e", Kind::Errors)],
-                    Type::fun(
-                        Type::Eff(
-                            r.clone(),
-                            e.clone(),
-                            Rc::new(Type::Impl(Row::one(s.clone()))),
-                        ),
-                        Stage::Pure,
-                        Type::Layer(r, e, Row::one(s.clone())),
-                    ),
-                )
-            }
-            Const::Prim(p) => prim(*p),
-            other => {
-                return error(
-                    "Var",
-                    format!("the constant {other:?} has no type in the model"),
-                );
-            }
-        };
-        Ok(self.instantiate(&s))
-    }
 }
 
 pub(super) fn mono(t: Type) -> Scheme {
@@ -494,32 +419,4 @@ fn lit(l: &Lit) -> Type {
         Lit::Bool(_) => "Bool",
         Lit::Unit => "Unit",
     })
-}
-
-fn num(n: Num) -> Type {
-    prelude(n.name())
-}
-
-/// The operators: arithmetic on its type, comparisons on any.
-fn prim(p: Prim) -> Scheme {
-    let binary = |t: Type, r: Type| Type::fun(t.clone(), Stage::Pure, Type::fun(t, Stage::Pure, r));
-    let a = var("a");
-    let any = |body| scheme(&[("a", Kind::Type)], body);
-    match p {
-        Prim::Arith(_, n) => mono(binary(num(n), num(n))),
-        Prim::Neg(n) => mono(Type::fun(num(n), Stage::Pure, num(n))),
-        Prim::Eq
-        | Prim::NotEq
-        | Prim::Same
-        | Prim::NotSame
-        | Prim::Lt
-        | Prim::Le
-        | Prim::Gt
-        | Prim::Ge => any(binary(a, prelude("Bool"))),
-        Prim::Not => mono(Type::fun(prelude("Bool"), Stage::Pure, prelude("Bool"))),
-        Prim::Concat => mono(binary(prelude("String"), prelude("String"))),
-        Prim::ListConcat => any(binary(list(a.clone()), list(a))),
-        Prim::TagOf => any(Type::fun(a, Stage::Pure, prelude("String"))),
-        Prim::Atom => mono(Type::fun(prelude("String"), Stage::Pure, prelude("String"))),
-    }
 }

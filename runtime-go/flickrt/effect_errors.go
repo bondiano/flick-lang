@@ -10,6 +10,7 @@ func onCause(fb *Fiber, task Value, handle func(*Cause) Value) Value {
 	if c == nil {
 		return v
 	}
+	skipHandler(fb, c)
 	return handle(c)
 }
 
@@ -47,7 +48,7 @@ func EffectCatchDefect(fb *Fiber, f, task Value) Value {
 		if r == nil {
 			return failCause(c)
 		}
-		return Run(fb, Apply(fb, f, defectMessage(r.defect)))
+		return Run(fb, Apply(fb, f, r.message()))
 	})
 }
 
@@ -91,7 +92,7 @@ func EffectTapDefect(fb *Fiber, f, task Value) Value {
 		if r == nil {
 			return nil
 		}
-		return Apply(fb, f, defectMessage(r.defect))
+		return Apply(fb, f, r.message())
 	})
 }
 
@@ -122,7 +123,7 @@ func EffectOrDie(fb *Fiber, task Value) Value {
 		if r == nil {
 			return failCause(c)
 		}
-		return failCause(&Cause{kind: causeDie, defect: describe(r.err)})
+		return failCause(dieOf(r.err))
 	})
 }
 

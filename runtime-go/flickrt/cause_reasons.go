@@ -42,7 +42,7 @@ func CauseFindError(f Value) Value {
 }
 func CauseFindDie(f Value) Value { return findReason(f, causeDie, reasonItself) }
 func CauseFindDefect(f Value) Value {
-	return findReason(f, causeDie, func(r *Cause) Value { return defectMessage(r.defect) })
+	return findReason(f, causeDie, func(r *Cause) Value { return r.message() })
 }
 func CauseFindInterrupt(f Value) Value { return findReason(f, causeInterrupt, reasonItself) }
 

@@ -90,6 +90,7 @@ export const optionalArg = <A>(option: Option.Option<A>): A | undefined =>
 
 /** The `copyData` of `core/data.ts`, into Effect's `Option` and `Result` too. */
 export const copyData = <A>(value: A): A =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a copy has the shape of what it copies
   copyThrough(value, (x) => {
     if (Option.isOption(x)) return Option.map(x, copyData);
     if (Result.isResult(x)) return Result.isSuccess(x) ? Result.succeed(copyData(x.success)) : Result.fail(copyData(x.failure));

@@ -13,6 +13,7 @@ type Cause struct {
 	kind   causeKind
 	err    Value       // a typed failure's error
 	defect string      // a defect's message, with the Flick lines it unwound
+	thrown bool        // the defect is a thrown error, an `Error` in JS: equal only to itself
 	fiber  int64       // the interrupting fiber
 	trace  *stackFrame // a reason's `Cause.StackTrace`: the span it arose in, if any
 	left   *Cause
@@ -47,9 +48,17 @@ func Parallel(a, b *Cause) *Cause   { return combineReasons(causeParallel, a, b)
 // `Cause.fromReasons` over both lists: races and a scope's finalizers.
 func concat(a, b *Cause) *Cause { return combine2(causeSequential, a, b) }
 
+// emptyCause is the failure without reasons: nil is no failure at all.
+var emptyCause = &Cause{kind: causeSequential}
+
 func combineReasons(kind causeKind, a, b *Cause) *Cause {
-	if a == nil || b == nil {
+	switch {
+	case a == nil || b == nil:
 		return combine2(kind, a, b)
+	case a == emptyCause:
+		return b
+	case b == emptyCause:
+		return a
 	}
 	var out *Cause
 	var kept []*Cause
@@ -62,9 +71,9 @@ func combineReasons(kind causeKind, a, b *Cause) *Cause {
 	return out
 }
 
-// sameReason is Effect's equality of reasons as far as Go can tell it: a
-// defect is only its own text here, while two defects of one text are
-// two different errors in JS.
+// sameReason is Effect's `Equal.equals` of reasons: a typed error and a
+// defect's message or value by value, a thrown error by identity, an
+// interruption by its fiber.
 func sameReason(a, b *Cause) bool {
 	if a.kind != b.kind {
 		return false
@@ -75,7 +84,7 @@ func sameReason(a, b *Cause) bool {
 	case causeInterrupt:
 		return a.fiber == b.fiber
 	}
-	return a == b
+	return a == b || !a.thrown && !b.thrown && a.defect == b.defect && Equals(a.err, b.err)
 }
 
 func combine2(kind causeKind, a, b *Cause) *Cause {
@@ -113,11 +122,24 @@ func (c *Cause) failsToDies() *Cause {
 	var out *Cause
 	for _, r := range c.reasons() {
 		if r.kind == causeFail {
-			r = &Cause{kind: causeDie, defect: describe(r.err)}
+			r = dieOf(r.err)
 		}
 		out = concat(out, r)
 	}
 	return out
+}
+
+// dieOf is a typed error as a defect: the error itself, as JS keeps it,
+// so the defect is told and compared as that value.
+func dieOf(err Value) *Cause { return &Cause{kind: causeDie, defect: describe(err), err: err} }
+
+// message is a defect as the JS target describes it (`describeDefect`):
+// the constructor of a value, else the message of its text.
+func (c *Cause) message() string {
+	if d, ok := c.err.(*Data); ok {
+		return ConstructorName(d.Tag)
+	}
+	return defectMessage(c.defect)
 }
 
 // withoutInterrupts is the cause without its interruptions; nil when only
@@ -139,11 +161,34 @@ func causeOf(r any) *Cause {
 	case *Failure:
 		return x.Cause
 	case Defect:
-		return &Cause{kind: causeDie, defect: x.Message + "\n" + flickFrames()}
+		return &Cause{kind: causeDie, defect: x.Message + "\n" + flickFrames(), thrown: true}
 	case error:
-		return &Cause{kind: causeDie, defect: x.Error() + "\n" + flickFrames()}
+		return &Cause{kind: causeDie, defect: x.Error() + "\n" + flickFrames(), thrown: true}
 	}
-	return &Cause{kind: causeDie, defect: fmt.Sprint(r) + "\n" + flickFrames()}
+	return &Cause{kind: causeDie, defect: fmt.Sprint(r) + "\n" + flickFrames(), thrown: true}
+}
+
+// skipHandler is Effect's failure in a fiber asked to stop while it is
+// interruptible: it skips the handler, its typed failures dropped and the
+// interruption added (FX/internal/core.ts:611-622, Р43).
+//
+// shortcut: only `try` and the handlers of `onCause` skip; `Effect.exit`, races and streams still see the cause, fix when a probe shows one
+func skipHandler(fb *Fiber, c *Cause) {
+	s := fb.state
+	if !s.requested.Load() || s.mask != 0 {
+		return
+	}
+	var out *Cause
+	for _, r := range c.reasons() {
+		if r.kind != causeFail {
+			out = concat(out, r)
+		}
+	}
+	stop := s.stopped().Cause
+	if !slices.ContainsFunc(out.reasons(), func(r *Cause) bool { return sameReason(r, stop) }) {
+		out = concat(out, stop)
+	}
+	panic(&Failure{out})
 }
 
 // Unmatched is what the handler of a `try` gives when no arm matches.
@@ -158,6 +203,7 @@ func Try(fb *Fiber, body Eff, handle func(*Fiber, Value) Value) Value {
 	if caught == nil {
 		return out
 	}
+	skipHandler(fb, caught)
 	if caught.has(causeDie) {
 		if caught.has(causeFail) {
 			caught = caught.failsToDies()
@@ -226,7 +272,7 @@ func pretty(c *Cause) string {
 // report is what the runner writes on stderr when `main` fails, as the
 // JS runner's `conclude` does.
 func report(c *Cause) string {
-	if !c.has(causeFail) && !c.has(causeDie) {
+	if c.has(causeInterrupt) && !c.has(causeFail) && !c.has(causeDie) {
 		return "error: main was interrupted"
 	}
 	if !c.has(causeDie) {

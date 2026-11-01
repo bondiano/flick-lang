@@ -176,7 +176,7 @@ func conclude(cause *Cause, s os.Signal, supervisors []*Cause) int {
 		}
 		return 0
 	}
-	if !cause.has(causeFail) && !cause.has(causeDie) {
+	if cause.has(causeInterrupt) && !cause.has(causeFail) && !cause.has(causeDie) {
 		if s != nil && len(supervisors) == 0 {
 			if s == os.Interrupt {
 				return 130

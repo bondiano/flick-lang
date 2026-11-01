@@ -64,8 +64,12 @@ func TestCombineKeepsEachReasonOnce(t *testing.T) {
 	if n := count(Parallel(Sequential(fail(1.0), fail(2.0)), fail(1.0))); n != 2 {
 		t.Errorf("sequential and parallel are one combination: %d", n)
 	}
-	if n := count(Sequential(die, &Cause{kind: causeDie, defect: "boom"})); n != 2 {
-		t.Errorf("two defects of one text are two errors: %d", n)
+	if n := count(Sequential(die, &Cause{kind: causeDie, defect: "boom"})); n != 1 {
+		t.Errorf("two defects of one message are one, as two equal strings in JS: %d", n)
+	}
+	thrown := func() *Cause { return causeOf(Defect{Message: "boom"}) }
+	if n := count(Sequential(thrown(), thrown())); n != 2 {
+		t.Errorf("two thrown errors of one text are two errors: %d", n)
 	}
 	if n := count(concat(fail(1.0), fail(1.0))); n != 2 {
 		t.Errorf("concatenation keeps repeats: %d", n)
@@ -90,5 +94,84 @@ func TestTheTypedViewOfACauseSeesItsHeadOnly(t *testing.T) {
 	reasons := CauseReasons(failureOf(c)).([]Value)
 	if reasons[0].(*Cause).kind != causeFail || reasons[1].(*Cause).kind != causeDie {
 		t.Error("reasons give a later typed failure as a defect")
+	}
+}
+
+// A failure in a fiber asked to stop skips `try` while the fiber is
+// interruptible: its typed failures go, its interruption comes (Р43).
+func TestAnInterruptedFiberSkipsTheHandler(t *testing.T) {
+	fb := rootFiber()
+	fb.state.interrupt(5)
+	body := Eff(func(*Fiber) Value { return Fail(1.0) })
+	ran := false
+	handle := func(*Fiber, Value) Value { ran = true; return Unit }
+	masked(fb, 1, func() Value {
+		if _, c := catch(func() Value { return Try(fb, body, handle) }); c != nil || !ran {
+			t.Errorf("a masked fiber handles its failure: %v", c)
+		}
+		return Unit
+	})
+	ran = false
+	_, c := catch(func() Value { return Try(fb, body, handle) })
+	if r := c.reasons(); ran || len(r) != 1 || r[0].kind != causeInterrupt || r[0].fiber != 5 {
+		t.Errorf("the handler is skipped and the interruption stays: ran %v, %v", ran, r)
+	}
+}
+
+// (Seq=Par): the kind of a node is never observed, so both combinations
+// of any two causes have the same reasons (docs/formal/runtime.md §2.2).
+func TestSequentialAndParallelAreOneCombination(t *testing.T) {
+	atoms := []*Cause{
+		{kind: causeFail, err: 1.0}, {kind: causeDie, defect: "d"}, {kind: causeInterrupt, fiber: 3}, nil,
+	}
+	for _, a := range atoms {
+		for _, b := range atoms {
+			for _, c := range atoms {
+				left, right := concat(a, b), concat(b, c)
+				seq, par := Sequential(left, right).reasons(), Parallel(left, right).reasons()
+				if len(seq) != len(par) {
+					t.Fatalf("%v and %v: %d and %d reasons", left, right, len(seq), len(par))
+				}
+				for i := range seq {
+					if seq[i] != par[i] {
+						t.Fatalf("%v and %v differ at %d", left, right, i)
+					}
+				}
+			}
+		}
+	}
+}
+
+// The empty cause still fails, as Effect's `Cause.empty` (Р82).
+func TestTheEmptyCauseFails(t *testing.T) {
+	if _, c := catch(func() Value { return FailureRethrow(nil, CauseEmpty) }); c == nil || len(c.reasons()) != 0 {
+		t.Errorf("rethrowing the empty failure fails without reasons: %v", c)
+	}
+	if ExitIsFailure(ExitFailCause(CauseFromReasons([]Value{}))) != true {
+		t.Error("an exit of the empty failure is a failure")
+	}
+	die := &Cause{kind: causeDie, defect: "d"}
+	if causeOfFailure(CauseCombine(failureOf(die), CauseEmpty)) != die {
+		t.Error("the empty cause is the unit of combine")
+	}
+	if report(emptyCause) != "InterruptError: All fibers interrupted without error" {
+		t.Errorf("main failing without reasons is reported as the JS runner does: %q", report(emptyCause))
+	}
+}
+
+// A typed error that became a defect is that value, as in JS: told by its
+// constructor and equal to the same value (docs/formal/runtime.md Р81).
+func TestATypedErrorAsADefectIsItsValue(t *testing.T) {
+	a := func(n float64) *Cause { return &Cause{kind: causeFail, err: NewData(Tag("App.A#1"), n)} }
+	reasons := CauseReasons(failureOf(Sequential(a(1), a(2)))).([]Value)
+	if got := CauseFindDefect(CauseFromReasons(reasons[1:])).(*Data).Fields[0]; got != "A" {
+		t.Errorf("the defect is told by its constructor: %v", got)
+	}
+	dies := Sequential(a(1), &Cause{kind: causeDie, defect: "d"}).failsToDies()
+	if n := len(Sequential(dies, dieOf(a(1).err)).reasons()); n != 2 {
+		t.Errorf("a defect of an equal value is the same reason: %d", n)
+	}
+	if n := len(Sequential(dieOf(a(1).err), dieOf(a(2).err)).reasons()); n != 2 {
+		t.Errorf("defects of different values are two: %d", n)
 	}
 }

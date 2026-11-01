@@ -29,7 +29,11 @@ func prettyErrors(c *Cause) []*prettyError {
 		case causeFail:
 			out = append(out, prettyFailure(r.err, r.trace))
 		case causeDie:
-			out = append(out, prettyDefect(r.defect, r.trace))
+			if _, ok := r.err.(*Data); ok {
+				out = append(out, prettyFailure(r.err, r.trace))
+			} else {
+				out = append(out, prettyDefect(r.defect, r.trace))
+			}
 		}
 	}
 	if len(out) > 0 || len(interrupts) == 0 {

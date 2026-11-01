@@ -17,8 +17,16 @@ func exitOf(fb *Fiber, task Value) *Exit {
 	return &Exit{v, c}
 }
 
-func ex(v Value) *Exit              { return v.(*Exit) }
-func failureOf(c *Cause) Value      { return &Supervised{cause: c} }
+func ex(v Value) *Exit { return v.(*Exit) }
+
+// failureOf is the `Failure` of a cause; one without reasons is the empty
+// cause, which still fails, as Effect's `Cause.empty`.
+func failureOf(c *Cause) Value {
+	if c == nil {
+		c = emptyCause
+	}
+	return &Supervised{cause: c}
+}
 func causeOfFailure(f Value) *Cause { return f.(*Supervised).cause }
 
 // outcome is the exit as a task that ends the same way.
@@ -117,7 +125,7 @@ func ExitFindErrorOption(e Value) Value {
 
 func ExitFindDefect(e Value) Value {
 	if r := ex(e).cause.firstOf(causeDie); r != nil {
-		return Ok(defectMessage(r.defect))
+		return Ok(r.message())
 	}
 	return Err(e)
 }
@@ -217,7 +225,7 @@ func CauseReasons(f Value) Value {
 	for i, r := range reasons {
 		if r.kind == causeFail {
 			if !head {
-				r = &Cause{kind: causeDie, defect: describe(r.err)}
+				r = dieOf(r.err)
 			}
 			head = false
 		}

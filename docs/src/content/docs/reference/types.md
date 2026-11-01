@@ -252,7 +252,9 @@ bodies are deferred and count as pure. A polymorphic signature, annotation or
 higher-rank argument over a runtime result is `FLICK-T013`, and so is a
 top-level value whose type stays unknown. Type variables of an enclosing
 signature, or of a value already in scope, are never generalized, and mutable
-containers are invariant.
+containers are invariant. A row of calls still unknown when a binding is
+generalized becomes `none`, as at the end of a declaration
+([effects](../effects/)); it is not quantified.
 
 ```flick
 make_empty : forall a. Unit ->{} Ref (Option a)
