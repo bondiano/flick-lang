@@ -18,7 +18,7 @@ structure ERel (E : List Frame) (φ' φ : Stage) : Prop where
 
 /-- The services the `with` frames of `E` provide have their types. -/
 def ELook (S : Sig) (Ψ : List Ty) (Θ : Facts) (E : List Frame) : Prop :=
-  ∀ N v, lookupE E N = some v → Typ S Ψ Θ [] v (.ex (S.impl N) .pure)
+  ∀ N q v, lookupE E N = some (q, v) → Typ S Ψ Θ [] v (.ex (S.impl N) .pure)
 
 theorem List.map_up_up (Ψ : List Ty) (a b : Nat) :
     (Ψ.map (Ty.up a)).map (Ty.up b) = Ψ.map (Ty.up (a + b)) := by
@@ -55,7 +55,7 @@ theorem ctx_typing {Ψ Θ} :
         (φ' = .pure ∨ K = 0 ∧ Ext Θ Θ' ∧ ELook S Ψ Θ' E) ∧ Refill S Ψ Θ K Θ' t' φ' (plug E) t φ r
   | [], _, _, _, _, _, h =>
     ⟨0, Θ, _, _, by simpa using h, ⟨fun n hn => .inl hn, fun _ _ h => h, fun h => h⟩,
-      .inr ⟨rfl, Ext.refl _, fun _ _ h => by simp [lookupE] at h⟩,
+      .inr ⟨rfl, Ext.refl _, fun _ _ _ h => by simp [lookupE] at h⟩,
       fun _ _ _ _ h' => by rw [List.map_up_zero, liftT_zero] at h'; exact h'⟩
   | F :: E, r, _, _, hE, hr, h => by
     obtain ⟨hF, hE'⟩ := hE.cons
@@ -75,13 +75,13 @@ theorem ctx_typing {Ψ Θ} :
       · rcases p₁ with hp₁ | ⟨hK₁, hΘ₁, look₁⟩
         · exact .inl (rel.pure hp₁)
         · subst hk hK₁
-          refine .inr ⟨rfl, hΘ₁.trans hΘ, fun N v hv => ?_⟩
+          refine .inr ⟨rfl, hΘ₁.trans hΘ, fun N q v hv => ?_⟩
           simp only [lookupE] at hv
           cases hl : F.lookup N with
           | some w =>
             rw [hl] at hv; cases hv
-            exact (by simpa using lookF N _ hl : Typ S Ψ Θ₁ [] _ _).cut fun _ _ h => h.mono hΘ.1
-          | none => rw [hl] at hv; exact (look₁ N v hv).cut fun _ _ h => h.mono hΘ.1
+            exact (by simpa using lookF N _ _ hl : Typ S Ψ Θ₁ [] _ _).cut fun _ _ h => h.mono hΘ.1
+          | none => rw [hl] at hv; exact (look₁ N q v hv).cut fun _ _ h => h.mono hΘ.1
     · have hσ' : Fits (liftT K₁ σ) (F.plug r) := (hσ.sub fun _ h => plug_has E h).lift K₁
       have := backF (liftT K₁ σ) hσ' (X.map (Ty.up K₁)) r' (by
         rw [liftT_add, shift_comm, ← List.map_append, List.map_up_up]; exact hr')

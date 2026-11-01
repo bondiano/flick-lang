@@ -95,7 +95,8 @@ theorem envLookup_value {θ v : Tm} {N : Name} (hθ : Value θ) (h : θ.envLooku
       · exact ih hθ' h
   | _ => simp [Tm.envLookup] at h
 
-theorem lookupE_value {v : Tm} {N : Name} : ∀ {E : List Frame}, OkE E → lookupE E N = some v → Value v
+theorem lookupE_value {v : Tm} {N : Name} {q : Nat} :
+    ∀ {E : List Frame}, OkE E → lookupE E N = some (q, v) → Value v
   | [], _, h => by simp [lookupE] at h
   | F :: E, hE, h => by
     obtain ⟨hF, hE'⟩ := hE.cons
@@ -103,8 +104,13 @@ theorem lookupE_value {v : Tm} {N : Name} : ∀ {E : List Frame}, OkE E → look
     cases hF' : F.lookup N with
     | some w =>
       rw [hF'] at h; cases h
-      cases F <;> simp [Frame.lookup] at hF'
-      exact envLookup_value hF hF'
+      cases F with
+      | with_ q' θ =>
+        simp only [Frame.lookup, Option.map_eq_some_iff] at hF'
+        obtain ⟨w, hw, hwq⟩ := hF'
+        cases hwq
+        exact envLookup_value hF hw
+      | _ => simp [Frame.lookup] at hF'
     | none => rw [hF'] at h; exact lookupE_value hE' h
 
 end Flick

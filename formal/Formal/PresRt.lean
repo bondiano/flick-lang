@@ -166,20 +166,56 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
     | errVal hv'' => exact (nv hv'').elim
   | build hv hb =>
     cases h with
-    | provideL hl he hb' hφ =>
+    | provideL hl he hb' h₀ hφ =>
       obtain ⟨_, hb₂, tb⟩ := canonical_layer hv hl
       rw [hb] at hb₂; cases hb₂
       exact same (.provideE (tb.sub ⟨.refl, Stage.le_trans Stage.rt_union_left hφ⟩)
-        he hb' (Stage.le_trans Stage.rt_union_right hφ))
+        he hb' h₀ (Stage.le_trans Stage.rt_union_right hφ))
     | provideE hl =>
       cases canonical_env hv hl <;> simp [Tm.build] at hb
     | errVal hv'' => exact (nv hv'').elim
-  | provideEnv hθ =>
+  | @provideEnv θ₀ _ _ e₀ hθ =>
     cases h with
     | provideL hl =>
       obtain ⟨_, hb, -⟩ := canonical_layer hθ.value hl
       cases hθ <;> simp [Tm.build] at hb
-    | provideE hl he hb hφ => exact same (.with_ hθ.value (hl.valueAny hθ.value _) he hb hφ)
+    | @provideE _ _ _ _ o _ _ _ φ₀ r ε hl he hb h₀ hφr =>
+      have hθt := hl.valueAny hθ.value .pure
+      have nm : ∀ x, o x → ∃ N, x = .nm N := fun x hx => env_nm hθ hθt hx
+      have hw : Typ S Ψ (Facts.union Θ Facts.none) [] (.with_ Λ.length θ₀ e₀)
+          (.ex t (.rt (Row.union r (Row.needs (.r Λ.length))) ε)) := by
+        refine .with_ hθ.value (hθt.cut (Entails.union_left _ _)) (he.cut (Entails.union_left _ _))
+          (Stage.le_of_svc hb fun x hx => ?_) (Stage.le_refl _)
+        have hx' := Stage.le_svc hb x hx
+        cases x with
+        | nm N =>
+          refine ⟨fun _ => .inr rfl, fun h => ?_⟩
+          rcases hx' with h' | h'
+          · exact (h h').elim
+          · exact .inl h'
+        | ob N a =>
+          refine ⟨fun h => (h₀ N a hx h).elim, fun _ => ?_⟩
+          rcases hx' with h' | h'
+          · obtain ⟨_, h''⟩ := nm _ h'; cases h''
+          · exact .inl h'
+        | atm a =>
+          rcases hx' with h' | h'
+          · obtain ⟨_, h''⟩ := nm _ h'; cases h''
+          · exact .inl h'
+        | need N a =>
+          rcases hx' with h' | h'
+          · obtain ⟨_, h''⟩ := nm _ h'; cases h''
+          · exact .inl h'
+      have hε : ¬ ε (.atm (.r Λ.length)) := fun h => by
+        obtain ⟨_, _, rfl, _, he'⟩ := Stage.rt_le hφr
+        have h' := he' _ h
+        simp only [Stage.substT, Stage.rt.injEq] at hφ
+        rw [← hφ.2] at h'
+        exact Row.kill_fresh _ _ h'
+      exact same (.inside (F := Facts.none) (fun _ _ h => h.elim) hw
+        (Stage.le_rt_sub (Stage.le_refl _) fun x hx => hx.elim (fun h => .inr (.inl h))
+          fun h => .inr (.inr (.inr h)))
+        (fun h => Nat.lt_irrefl _ (ht.reach h)) hε hφr .refl)
     | errVal hv'' => exact (nv hv'').elim
   | tryRaise hv =>
     cases h with
@@ -236,14 +272,16 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
           rcases hx with rfl | hx
           · exact h
           · cases x with
-            | nm => exact hx.elim
             | atm a => exact ha _ (hsub _ (.inr hx))
+            | _ => exact hx.elim
     | errVal hv'' => exact (nv hv'').elim
   | scope =>
     cases h with
     | scope hn hF hbody hφ' hφs hT =>
       obtain ⟨F', _, hF', hb', hφ₁⟩ := scope_body hn (fun p hp => hbl p hp) hF hbody hφ' hc.yf hc.idem
-      refine same (.inside hF' hb' hφ₁ (Ty.kill_fresh _ _) (Row.kill_fresh _ _)
+      refine same (.inside hF' hb' (Stage.le_rt_sub hφ₁ fun x hx => hx.elim .inl fun h =>
+          h.elim (fun h => .inr (.inl h)) fun h => .inr (.inr (.inl h)))
+        (Ty.kill_fresh _ _) (Row.kill_fresh _ _)
         (Stage.YF_kill hφs hφ) ?_)
       have := hT.substT (kill Λ.length); rwa [ht] at this
     | errVal hv'' => exact (nv hv'').elim
@@ -266,23 +304,11 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
         obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
         cases h; cases lt; cases hT; exact same .lit
     | errVal hv' => exact (nv hv').elim
-  | addFin | spawn =>
-    cases h with
-    | app hf _ _ hT =>
-      cases hf with
-      | app hc _ _ hT₁ =>
-        cases hc with
-        | const _ hT' =>
-          obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
-          cases h
-          obtain ⟨_, _, _, _, h, _, _, lt', -⟩ := (lt.trans hT₁).arrow_left
-          cases h; cases lt'; cases hT; exact same .lit
-    | errVal hv' => exact (nv hv').elim
   | finRun => exact same h
   | close _ _ hw =>
     cases h with
     | inside hF hbody hφ' _ _ hφ hT =>
-      have hcut := inside_entails (hbl _ (.inl rfl)) hF hc.inΘ
+      have hcut := inside_entails (hbl _ (.inl (.inl rfl))) hF hc.inΘ
       have hbody := hbody.cut hcut
       rcases hw with hw | ⟨v, hv, rfl⟩
       · exact same ((hbody.valueAny hw _).sub ⟨hT, Stage.le_refl _⟩)

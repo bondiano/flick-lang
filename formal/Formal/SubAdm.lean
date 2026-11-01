@@ -121,12 +121,12 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | hguard hp _ _ _ hH ih₁ ih₂ ih₃ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.halts
     exact .hguard hp (ih₁ (.st h₂)) (ih₂ ⟨h₁, h₂⟩) (ih₃ ⟨rfl, rfl, h₁, h₂⟩) hH
-  | provideL _ _ hb hφ ih₁ ih₂ =>
+  | provideL _ _ hb h₀ hφ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .provideL (ih₁ (.st h₂)) (ih₂ ⟨h₁, Stage.le_refl _⟩) hb (Stage.le_trans hφ h₂)
-  | provideE _ _ hb hφ ih₁ ih₂ =>
+    exact .provideL (ih₁ (.st h₂)) (ih₂ ⟨h₁, Stage.le_refl _⟩) hb h₀ (Stage.le_trans hφ h₂)
+  | provideE _ _ hb h₀ hφ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .provideE (ih₁ (.st h₂)) (ih₂ ⟨h₁, Stage.le_refl _⟩) hb (Stage.le_trans hφ h₂)
+    exact .provideE (ih₁ (.st h₂)) (ih₂ ⟨h₁, Stage.le_refl _⟩) hb h₀ (Stage.le_trans hφ h₂)
   | with_ hv hθ _ hb hφ _ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .with_ hv hθ (ih₂ ⟨h₁, Stage.le_refl _⟩) hb (Stage.le_trans hφ h₂)

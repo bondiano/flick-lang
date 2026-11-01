@@ -27,10 +27,15 @@ def Caps.none : Caps := fun _ => False
 
 /-- An element of a row: a named service or error type, or an atom. In a row of
 services the atom `ϱ` is `Scope ϱ`; in a row of errors the atoms bound what the
-errors reach, `⌈Errors ε⌉` (regions.md §2.1). -/
+errors reach, `⌈Errors ε⌉` (regions.md §2.1). A row of services also carries the
+obligations `{Provided {S} ϱ}` not yet discharged (`ob S ϱ`, regions.md §2.7) and, at
+run time, the uses `need S π` of a service `S` that a `with` frame of the `provide`
+region `π` answers. -/
 inductive Elem
   | nm (N : Name)
   | atm (a : Atom)
+  | ob (N : Name) (a : Atom)
+  | need (N : Name) (a : Atom)
 
 instance : Coe Name Elem := ⟨Elem.nm⟩
 
@@ -45,8 +50,8 @@ def Row.union (r r' : Row) : Row := fun n => r n ∨ r' n
 def Row.Sub (r r' : Row) : Prop := ∀ n, r n → r' n
 /-- The atoms of a set as row elements: `Scope ϱ` for a region `ϱ`. -/
 def Row.ofCaps (C : Caps) : Row
-  | .nm _ => False
   | .atm a => C a
+  | _ => False
 
 /-- Stages `φ` of core.md §1.2: pure `P` or runtime `R⟨r; ε⟩`. -/
 inductive Stage
@@ -132,6 +137,8 @@ def Caps.substT (σ : Atom → Ty) (C : Caps) : Caps := fun a => ∃ b, C b ∧ 
 def Row.substT (σ : Atom → Ty) (r : Row) : Row
   | .nm n => r (.nm n)
   | .atm a => ∃ b, r (.atm b) ∧ (σ b).reach a
+  | .ob n a => ∃ b, r (.ob n b) ∧ (σ b).reach a
+  | .need n a => ∃ b, r (.need n b) ∧ (σ b).reach a
 
 def Stage.substT (σ : Atom → Ty) : Stage → Stage
   | .pure => .pure
@@ -271,7 +278,7 @@ inductive Tm
   | try_ (e alts : Tm)
   | handle (v alts : Tm)
   | provide (l e : Tm)
-  | with_ (θ e : Tm)
+  | with_ (p : Nat) (θ e : Tm)
   | enil
   | econs (S : Name) (v θ : Tm)
   | bind (S : Name) (e : Tm)
@@ -350,6 +357,17 @@ instance : Inhabited CArg :=
 /-- `Scope ϱ` as a row. -/
 def Row.scope (s : Ty) : Row := Row.ofCaps s.reach
 
+/-- `Fiber.Provided r s` of regions.md §2.7 as row elements: one obligation for each
+service of `r`. -/
+def Row.obs (r : Row) (s : Ty) : Row
+  | .ob N a => r (.nm N) ∧ s.reach a
+  | _ => False
+
+/-- An atom as a type. -/
+def Atom.ty : Atom → Ty
+  | .v n => .tvar n
+  | .r p => .rg p
+
 /-- The type of a constant at an instance. A spawned child and a finalizer are
 `Eff` with qualifier `C`; their owner is `s`. -/
 def Const.ty (S : Sig) : Const → CArg → Ty
@@ -368,10 +386,11 @@ def Const.ty (S : Sig) : Const → CArg → Ty
   | .op, ι => .arrow (.hnd ι.s) (.rt Row.none Row.none) (.base .unit) Caps.none
   | .addFin, ι =>
     .arrow (.owner ι.s) .pure (.arrow (.eff ι.r Row.none (.base .unit) ι.C)
-      (.rt (Row.union (Row.scope ι.s) ι.r) Row.none) (.base .unit) ι.s.reach) Caps.none
+      (.rt (Row.union (Row.scope ι.s) (Row.union ι.r (Row.obs ι.r ι.s))) Row.none) (.base .unit)
+      ι.s.reach) Caps.none
   | .spawn, ι =>
     .arrow (.owner ι.s) .pure (.arrow (.eff (Row.union (Row.scope ι.s) ι.r) ι.e ι.t ι.C)
-      (.rt ι.r Row.none) (.base .unit) ι.s.reach) Caps.none
+      (.rt (Row.union ι.r (Row.obs ι.r ι.s)) Row.none) (.base .unit) ι.s.reach) Caps.none
 
 /-- Side conditions of a constant at an instance: `Layer.merge` has disjoint
 outputs; a finalizer and a child outlive their owner, with everything they hold

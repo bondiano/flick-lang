@@ -18,7 +18,7 @@ theorem Nest.cstep {root : Name → Option Tm} {c c' : Cfg} {l Ψ X anc B home t
     (hroot : RootTy S root) (hc : CfgTy S Ψ c t φ) (hc' : CfgTy S (Ψ ++ X) c' t φ)
     (hn : Nest Ψ c anc B home) (hs : CStep root l c c') :
     ∃ anc' B' home', Nest (Ψ ++ X) c' anc' B' home' := by
-  obtain ⟨hμ, h, hΛ, -, hΨ⟩ := hc
+  obtain ⟨hμ, h, hΛ, -, hΨ, -⟩ := hc
   cases hs with
   | main hs => exact hn.step (i := none) hroot rfl h hμ hc'.1 hΨ hs
   | kid hg hl hj hs =>
@@ -88,20 +88,25 @@ theorem T4 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.
     · exact hn.reach_fin hg hl hk h
 
 /-- **T1 with `op_H`** (regions.md §5.3, corollary). As T1, and a thread that does not
-step and is not finished waits for a child of a region it closes. -/
+step and is not finished waits for a child of a region it closes, or asks a service of
+a `provide` that ended (which T4.3 rules out). -/
 theorem T1_regions {root e₀ t φ₀ c} (hroot : RootTy S root)
     (hcov : ∀ N, φ₀.svc (.nm N) → (root N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :
     ((Value c.main ∧ ∃ Ψ, StoreTy S Ψ c.mem ∧ Typ S Ψ Facts.age [] c.main (.ex t .pure)) ∨
       (∃ v, c.main = .raise v ∧ ∃ Ψ, Typ S Ψ Facts.age [] v (.ex (.errors φ₀.err) .pure)) ∨
-      (∃ l o, Step root l c.rgs c.mem c.main o) ∨ Waits c.rgs c.main) ∧
+      (∃ l o, Step root l c.rgs c.mem c.main o) ∨ Waits c.rgs c.main ∨ DeadAsk c.rgs c.main) ∧
     ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids,
-      Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, AskStuck root k D) ∨ Waits c.rgs k := by
+      Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, AskStuck root k D) ∨ Waits c.rgs k ∨
+        DeadAsk c.rgs k := by
   obtain ⟨h₁, h₂⟩ := T1 hroot hcov h₀ hp ht hφ hs
   obtain ⟨hm, hk, -, -⟩ := T4 hroot h₀ hp ht hφ hs
-  have waits : ∀ e, (∀ E r, OkE E → e = plug E r → ¬ DeadUse c.rgs r) → Blocked c.rgs e → Waits c.rgs e :=
-    fun e hd ⟨E, r, hE, he, hb⟩ => hb.elim (fun hw => ⟨E, r, hE, he, hw⟩) fun hb' => (hd E r hE he hb').elim
+  have waits : ∀ e, (∀ E r, OkE E → e = plug E r → ¬ DeadUse c.rgs r) → Blocked c.rgs e →
+      Waits c.rgs e ∨ DeadAsk c.rgs e := by
+    rintro e hd (⟨E, r, hE, he, hb⟩ | hd')
+    · exact .inl (hb.elim (fun hw => ⟨E, r, hE, he, hw⟩) fun hb' => (hd E r hE he hb').elim)
+    · exact .inr hd'
   refine ⟨h₁.imp_right (Or.imp_right (Or.imp_right (waits _ hm))), fun p g hg hl k hk' => ?_⟩
   exact (h₂ p g hg hl k hk').imp_right (Or.imp_right (Or.imp_right (waits _ (hk p g hg hl k hk'))))
 

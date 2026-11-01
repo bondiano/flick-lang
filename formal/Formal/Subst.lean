@@ -37,7 +37,7 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .try_ e al => .try_ (e.rename ξ) (al.rename ξ)
   | .handle v al => .handle (v.rename ξ) (al.rename ξ)
   | .provide l e => .provide (l.rename ξ) (e.rename ξ)
-  | .with_ θ e => .with_ (θ.rename ξ) (e.rename ξ)
+  | .with_ q θ e => .with_ q (θ.rename ξ) (e.rename ξ)
   | .enil => .enil
   | .econs S v θ => .econs S (v.rename ξ) (θ.rename ξ)
   | .bind S e => .bind S (e.rename ξ)
@@ -78,7 +78,7 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .try_ e al => .try_ (e.subst σ) (al.subst σ)
   | .handle v al => .handle (v.subst σ) (al.subst σ)
   | .provide l e => .provide (l.subst σ) (e.subst σ)
-  | .with_ θ e => .with_ (θ.subst σ) (e.subst σ)
+  | .with_ q θ e => .with_ q (θ.subst σ) (e.subst σ)
   | .enil => .enil
   | .econs S v θ => .econs S (v.subst σ) (θ.subst σ)
   | .bind S e => .bind S (e.subst σ)

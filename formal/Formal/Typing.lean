@@ -128,7 +128,7 @@ inductive HPat (εb : Row) : Pat → Ty → List Ty → Prop
 /-- The errors an arm without `when` removes: the set `H` of (Try). -/
 def Catches (εb : Row) (p : Pat) (θ : Ty) : Elem → Prop
   | .nm n => (θ = .errors εb ∧ εb n) ∨ (θ = .adt n ∧ Exh S (.adt n) [p])
-  | .atm _ => False
+  | _ => False
 
 /-- The error type of the raised value `v` is removed by the arms or let
 through: the value form of `ε_b ⊆ H + ε'`. -/

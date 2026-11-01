@@ -74,6 +74,13 @@ theorem Scheme.Holds.mono {Θ₁ Θ₂ : Facts} {s : Scheme} {ts : List Ty} (h :
   fun C r hc => hΘ _ _ (h C r hc)
 
 /-- Facts that follow from the context may be dropped. -/
+theorem Row.withP_mono {Θ₁ Θ₂ : Facts} {q : Nat} {ρ r : Row} (hΘ : Entails Θ₁ Θ₂) :
+    Row.Sub (Row.withP Θ₁ q ρ r) (Row.withP Θ₂ q ρ r) := by
+  intro x hx
+  cases x with
+  | ob N a => exact ⟨fun h => hΘ _ _ (hx.1 h), hx.2⟩
+  | _ => exact hx
+
 theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Entails Θ₁ Θ₂ → Typ S Ψ Θ₂ Γ e J := by
   induction h with
   | var hi hts hH hT => intro _ hΘ; exact .var hi hts (hH.mono hΘ) hT
@@ -107,9 +114,10 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | hnil hH => intro _ _; exact .hnil hH
   | hcons hp _ _ hH ih₁ ih₂ => intro _ hΘ; exact .hcons hp (ih₁ hΘ) (ih₂ hΘ) hH
   | hguard hp _ _ _ hH ih₁ ih₂ ih₃ => intro _ hΘ; exact .hguard hp (ih₁ hΘ) (ih₂ hΘ) (ih₃ hΘ) hH
-  | provideL _ _ h₁ h₂ ih₁ ih₂ => intro _ hΘ; exact .provideL (ih₁ hΘ) (ih₂ hΘ) h₁ h₂
-  | provideE _ _ h₁ h₂ ih₁ ih₂ => intro _ hΘ; exact .provideE (ih₁ hΘ) (ih₂ hΘ) h₁ h₂
-  | with_ hv _ _ h₁ h₂ ih₁ ih₂ => intro _ hΘ; exact .with_ hv (ih₁ hΘ) (ih₂ hΘ) h₁ h₂
+  | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ hΘ; exact .provideL (ih₁ hΘ) (ih₂ hΘ) h₁ h₀ h₂
+  | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ hΘ; exact .provideE (ih₁ hΘ) (ih₂ hΘ) h₁ h₀ h₂
+  | with_ hv _ _ h₁ h₂ ih₁ ih₂ =>
+    intro _ hΘ; exact .with_ hv (ih₁ hΘ) (ih₂ hΘ) (Stage.le_rt_sub h₁ (Row.withP_mono hΘ)) h₂
   | enil hρ => intro _ _; exact .enil hρ
   | econs hv hθ _ _ hρ ih₁ ih₂ => intro _ hΘ; exact .econs hv hθ (ih₁ hΘ) (ih₂ hΘ) hρ
   | bind _ hρ ih => intro _ hΘ; exact .bind (ih hΘ) hρ

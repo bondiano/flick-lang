@@ -16,9 +16,6 @@ where the term evaluates next, so none is lost or copied by a step.
 
 namespace Flick
 
-/-- A live region. -/
-def Live (Λ : List Rgn) (p : Nat) : Prop := ∃ g, Λ[p]? = some g ∧ g.live = true
-
 section
 variable (Ψ : List Ty) (B : Nat → Nat → Prop) (anc : Nat → Nat → Prop)
 
@@ -53,7 +50,7 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .try_ e al, A => e.Within A ∧ al.Within A ∧ al.NoIns
   | .handle v al, A => v.Within A ∧ al.Within A ∧ v.NoIns ∧ al.NoIns
   | .provide l e, A => l.Within A ∧ e.Within A ∧ e.NoIns
-  | .with_ θ e, A => θ.Within A ∧ e.Within A ∧ θ.NoIns
+  | .with_ _ θ e, A => θ.NoIns ∧ θ.Within (fun _ => False) ∧ e.Within A
   | .enil, _ => True
   | .econs _ v θ, A => v.Within A ∧ θ.Within A
   | .bind _ e, A => e.Within A
@@ -81,7 +78,7 @@ def Frame.Within (A : Nat → Prop) : Frame → Prop
   | .bind _ => True
   | .joinL e => e.Within Ψ B anc A ∧ e.NoIns
   | .joinR v => v.Within Ψ B anc A ∧ Value v
-  | .with_ θ => θ.Within Ψ B anc A ∧ θ.NoIns
+  | .with_ _ θ => θ.NoIns ∧ θ.Within Ψ B anc (fun _ => False)
   | .raise => True
   | .inside p => ¬ A p ∧ anc p = fun x => A x ∨ x = p
 
@@ -102,12 +99,6 @@ def WithinE (A : Nat → Prop) : List Frame → Prop
 end
 
 variable {Ψ : List Ty} {B : Nat → Nat → Prop} {anc : Nat → Nat → Prop}
-
-theorem Tm.has_frame_ins {e : Tm} {p : Nat} (h : e.Has (.frame p)) : e.Has .ins := by
-  induction e <;> simp_all [Tm.Has] <;> grind
-
-theorem Tm.NoIns.frame {e : Tm} (h : e.NoIns) (p : Nat) : ¬ e.Has (.frame p) :=
-  fun h' => h (Tm.has_frame_ins h')
 
 /-- A value at a place holds no `inside` form. -/
 theorem Value.noIns {e : Tm} {A : Nat → Prop} (hv : Value e) (h : e.Within Ψ B anc A) : e.NoIns := by
@@ -148,16 +139,32 @@ theorem Tm.Within.rgn {p : Nat} : ∀ {e : Tm} {A : Nat → Prop}, e.Within Ψ B
 
 /-- A location of a term is at a place between its place and the `inside` forms in it. -/
 theorem Tm.Within.loc {l : Nat} : ∀ {e : Tm} {A : Nat → Prop}, e.Within Ψ B anc A → e.Has (.loc l) →
-    ∃ A', (∀ x, A x → A' x) ∧ (∀ x, A' x → A x ∨ e.Has (.frame x)) ∧ LocOk Ψ B A' l := by
+    ∃ A', (∀ x, A' x → A x ∨ e.Has (.frame x)) ∧ LocOk Ψ B A' l := by
   intro e
   induction e <;> intro A h hs <;> simp only [Tm.Within, Tm.Has] at h hs ⊢ <;> grind
+
+/-- A location of a term without run-time forms is at the place of the term. -/
+theorem Tm.Within.loc0 {l : Nat} : ∀ {e : Tm} {A : Nat → Prop}, e.Within Ψ B anc A → e.NoIns →
+    e.Has (.loc l) → LocOk Ψ B A l := by
+  intro e
+  induction e <;> intro A h hn hs <;> simp only [Tm.NoIns, Tm.Has, not_or] at hn <;>
+    simp only [Tm.Within, Tm.Has] at h hs ⊢ <;> (try simp only [Tm.NoIns] at *) <;> grind
 
 /-- The `inside` form of `q` in a term: `q` is new at its place, and its ancestors
 are between the place of the term and the `inside` forms in it. -/
 theorem Tm.Within.frame {q : Nat} : ∀ {e : Tm} {A : Nat → Prop}, e.Within Ψ B anc A → e.Has (.frame q) →
     ¬ A q ∧ anc q q ∧ (∀ x, A x → anc q x) ∧ ∀ x, anc q x → A x ∨ e.Has (.frame x) := by
   intro e
-  induction e <;> intro A h hs <;> simp only [Tm.Within, Tm.Has] at h hs ⊢ <;> grind
+  induction e with
+  | with_ p θ e _ ih =>
+    intro A h hs
+    rcases hs with hs | hs | hs | hs
+    · cases hs
+    · cases hs
+    · exact absurd (Tm.has_frame_ins hs) h.1
+    · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih h.2.2 hs
+      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr h))⟩
+  | _ => intro A h hs; simp only [Tm.Within, Tm.Has] at h hs ⊢ <;> grind
 
 /-- A term stays at its place when the ancestors of its `inside` forms and its
 locations do. -/
@@ -218,6 +225,11 @@ theorem WithinE.frames {A : Nat → Prop} {r : Tm} {q : Nat} :
            · cases h
            · cases h; exact .inl (by simp)
            · exact .inr h)
+        | (rcases h with h | h | h | h
+           · cases h
+           · cases h
+           · exact absurd (Tm.has_frame_ins h) hF.1
+           · exact .inr h)
 
 /-- The `inside` form of `q` in a context: `q` is new there and its ancestors are
 regions of the hole. -/
@@ -274,7 +286,7 @@ theorem Tm.Within.reaches {μ : List Tm}
   | cell hl hv _ ih =>
     intro A h
     obtain ⟨hw, hn⟩ := hμ _ _ hv
-    obtain ⟨A', h₁, h₂, t, _, hB⟩ := h.loc hl
+    obtain ⟨A', h₂, t, _, hB⟩ := h.loc hl
     rcases ih hw with h' | h'
     · rw [hB] at h'; exact h₂ _ h'.1
     · exact absurd h' (hn.frame _)

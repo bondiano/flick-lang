@@ -16,11 +16,8 @@ theorem Tm.Within.rgn0 {e : Tm} {A : Nat → Prop} {p : Nat} (h : e.Within Ψ B 
     (hp : e.Has (.rgn p)) : A p :=
   (h.rgn hp).resolve_right (hn.frame p)
 
-theorem Tm.Within.loc0 {e : Tm} {A : Nat → Prop} {l : Nat} (h : e.Within Ψ B anc A) (hn : e.NoIns)
-    (hl : e.Has (.loc l)) : LocOk Ψ B A l := by
-  obtain ⟨A', h₁, h₂, hA⟩ := h.loc hl
-  have : A' = A := funext fun x => propext ⟨fun hx => (h₂ x hx).resolve_right (hn.frame x), h₁ x⟩
-  exact this ▸ hA
+theorem Tm.Within.loc0' {e : Tm} {A : Nat → Prop} {l : Nat} (h : e.Within Ψ B anc A) (hn : e.NoIns)
+    (hl : e.Has (.loc l)) : LocOk Ψ B A l := h.loc0 hn hl
 
 /-- A term without `inside` forms moves to a place that agrees with its own on `C`,
 when `C` bounds what it writes and the types of its locations. -/
@@ -69,13 +66,14 @@ theorem plug_frame {q : Nat} {x : Tm} : ∀ {E : List Frame}, .inside q ∈ E �
     · exact plug_frame (x := F.plug x) h
 
 theorem WithinE.frames_iff {A : Nat → Prop} {E : List Frame} {x : Tm} {q : Nat}
-    (h : WithinE Ψ B anc A E) (hx : x.NoIns) : (plug E x).Has (.frame q) ↔ .inside q ∈ E :=
-  ⟨fun h' => (h.frames h').resolve_right (hx.frame q), plug_frame⟩
+    (h : WithinE Ψ B anc A E) (hx : ∀ q, ¬ x.Has (.frame q)) : (plug E x).Has (.frame q) ↔ .inside q ∈ E :=
+  ⟨fun h' => (h.frames h').resolve_right (hx q), plug_frame⟩
 
 /-- The redex of a thread replaced by a term without `inside` forms at its place. -/
 theorem Nest.redex {Ψ' : List Ty} {c : Cfg} {μ' : List Tm} {B' home i E r r'}
     (hn : Nest Ψ c anc B home) (hi : c.at i = some (plug E r)) (hE : OkE E) (hv : ¬ Value r)
-    (hr : r.NoIns) (hr' : r'.NoIns) (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l)
+    (hr : ∀ q, ¬ r.Has (.frame q)) (hr' : ∀ q, ¬ r'.Has (.frame q))
+    (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l)
     (h' : (plug E r).Within Ψ B anc (baseOf anc i) → r.Within Ψ B anc (holeE (baseOf anc i) E) →
       r'.Within Ψ' B' anc (holeE (baseOf anc i) E))
     (hc : ∀ (l : Nat) (v : Tm), μ'[l]? = some v → v.Within Ψ' B' anc (B' l) ∧ v.NoIns) :
@@ -88,8 +86,8 @@ theorem Nest.redex {Ψ' : List Ty} {c : Cfg} {μ' : List Tm} {B' home i E r r'}
 /-- New children and finalizers of a live region, at its place. -/
 theorem Nest.regs {c : Cfg} {home p g g'} (hn : Nest Ψ c anc B home) (hg : c.rgs[p]? = some g)
     (hl : g.live = true) (hl' : g'.live = true)
-    (hk : ∃ ks, g'.kids = g.kids ++ ks ∧ ∀ k ∈ ks, k.Within Ψ B anc (anc p) ∧ k.NoIns)
-    (hf : ∀ f ∈ g'.fins, f.Within Ψ B anc (anc p) ∧ f.NoIns) :
+    (hk : ∃ ks, g'.kids = g.kids ++ ks ∧ ∀ k ∈ ks, k.Within Ψ B anc (anc p) ∧ ∀ q, ¬ k.Has (.frame q))
+    (hf : ∀ f ∈ g'.fins, f.Within Ψ B anc (anc p) ∧ ∀ q, ¬ f.Has (.frame q)) :
     Nest Ψ ⟨setRgn c.rgs p g', c.mem, c.main⟩ anc B home := by
   obtain ⟨ks, hks, hk⟩ := hk
   have get : ∀ {q g''}, (setRgn c.rgs p g')[q]? = some g'' ↔
@@ -135,7 +133,7 @@ theorem Nest.regs {c : Cfg} {home p g g'} (hn : Nest Ψ c anc B home) (hg : c.rg
           exact ⟨h₄, fun q hq => let ⟨a, b⟩ := h₅ q hq; ⟨a, (hlive q).mpr b⟩⟩
         · rw [List.getElem?_append_right (by omega)] at h₃
           obtain ⟨h₄, h₅⟩ := hk e (List.mem_of_getElem? h₃)
-          exact ⟨h₄, fun q hq => (h₅.frame q hq).elim⟩
+          exact ⟨h₄, fun q hq => (h₅ q hq).elim⟩
       · obtain ⟨h₄, h₅⟩ := hn.thread (some (r, j)) e (Cfg.at_some.mpr ⟨g'', h₁, h₂, h₃⟩)
         exact ⟨h₄, fun q hq => let ⟨a, b⟩ := h₅ q hq; ⟨a, (hlive q).mpr b⟩⟩
   · obtain ⟨e, he, hq'⟩ := hn.home q ((hlive q).mp hq)

@@ -12,6 +12,7 @@ import Formal.Cut
 import Formal.SubAdm
 import Formal.Held
 import Formal.SubstPat
+import Formal.RowSubst
 import Formal.Substitution
 import Formal.Canonical
 import Formal.Shapes
@@ -31,6 +32,10 @@ import Formal.ScopeStep
 import Formal.PresRt
 import Formal.Below
 import Formal.Preservation
+import Formal.BelowStep
+import Formal.Asc
+import Formal.KidTy
+import Formal.AscStep
 import Formal.Soundness
 import Formal.Lemma4
 import Formal.Within

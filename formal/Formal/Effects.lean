@@ -31,6 +31,14 @@ theorem step_pure {root Ψ Θ Λ μ e t l Λ' μ' e'} (h : Typ S Ψ Θ [] e (.ex
     obtain ⟨_, _, _, _, hr', rel', _⟩ := frame_typing raise_not_value _ hF hr
     obtain rfl := rel'.pure rfl
     exact (raise_not_pure hr').elim
+  | addFin hE =>
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (fin_not_value (.inl rfl)) h
+    obtain rfl := rel.pure rfl
+    exact (fin_not_pure hr (.inl rfl)).elim
+  | spawn hE =>
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (fin_not_value (.inr rfl)) h
+    obtain rfl := rel.pure rfl
+    exact (fin_not_pure hr (.inr rfl)).elim
 
 /-- **T2(a), purity.** A computation from `·;Ψ ⊢ e : τ ! P` makes only pure
 steps, keeps the store and the regions, and does not end in `raise v`. -/
@@ -64,7 +72,7 @@ theorem Row.kill_sub (ε : Row) (n : Nat) : Row.Sub (ε.substT (kill n)) ε := b
   intro x hx
   cases x with
   | nm => exact hx
-  | atm a => obtain ⟨b, hb, h⟩ := hx; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
+  | atm a | ob _ a | need _ a => obtain ⟨b, hb, h⟩ := hx; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
 
 /-- **T2(b), rows.** From `·;Ψ ⊢ e : τ ! R⟨r; ε⟩`, every `ask_S` that reaches `Σ₀`
 has `S ∈ r`, and a computation that ends in `raise v` has `v : Errors ε`. -/
