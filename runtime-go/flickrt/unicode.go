@@ -5,16 +5,38 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"unicode"
 )
 
 // Normalization and case mapping as JS computes them, from the tables in
 // unicode_tables.go, which tools/go-unicode/gen.mjs writes from Node.
 
 type unicodeTables struct {
-	nfd, nfkd, upper, lower map[rune][]rune
-	composite               map[[2]rune]rune
-	class                   map[rune]int
+	nfd, nfkd, upper, lower      map[rune][]rune
+	composite                    map[[2]rune]rune
+	class                        map[rune]int
+	cased, ignorable, softDotted []runeRange
+	greek                        map[rune]greekLetter
+}
+
+// runeRange is a run of code points of a property, from `lo` to `hi`.
+type runeRange struct{ lo, hi rune }
+
+// parseRanges reads `lo-hi` and `cp` entries in hex, apart by ";".
+func parseRanges(data string) []runeRange {
+	var out []runeRange
+	for _, entry := range strings.Split(data, ";") {
+		lo, hi, isRange := strings.Cut(entry, "-")
+		if !isRange {
+			hi = lo
+		}
+		out = append(out, runeRange{parseRunes(lo)[0], parseRunes(hi)[0]})
+	}
+	return out
+}
+
+func inRanges(ranges []runeRange, r rune) bool {
+	i := sort.Search(len(ranges), func(i int) bool { return ranges[i].hi >= r })
+	return i < len(ranges) && ranges[i].lo <= r
 }
 
 var (
@@ -43,12 +65,22 @@ func parseMapping(data string) map[rune][]rune {
 func unicodeData() *unicodeTables {
 	tablesOnce.Do(func() {
 		tables = unicodeTables{
-			nfd:       parseMapping(nfdData),
-			nfkd:      parseMapping(nfkdData),
-			upper:     parseMapping(upperData),
-			lower:     parseMapping(lowerData),
-			composite: map[[2]rune]rune{},
-			class:     map[rune]int{},
+			nfd:        parseMapping(nfdData),
+			nfkd:       parseMapping(nfkdData),
+			upper:      parseMapping(upperData),
+			lower:      parseMapping(lowerData),
+			composite:  map[[2]rune]rune{},
+			class:      map[rune]int{},
+			cased:      parseRanges(casedData),
+			ignorable:  parseRanges(ignorableData),
+			softDotted: parseRanges(softDotted),
+			greek:      map[rune]greekLetter{},
+		}
+		for _, entry := range strings.Split(greekData, ";") {
+			k, v, _ := strings.Cut(entry, "=")
+			capital, flags, _ := strings.Cut(v, ".")
+			n, _ := strconv.Atoi(flags)
+			tables.greek[parseRunes(k)[0]] = greekLetter{parseRunes(capital)[0], n}
 		}
 		for _, entry := range strings.Split(compositeData, ";") {
 			k, v, _ := strings.Cut(entry, "=")
@@ -184,13 +216,19 @@ func Normalize(form, s Value) Value {
 	return runesString(compose(decomposeRunes(text, false)))
 }
 
-func mapCase(s string, table map[rune][]rune, special func(rs []rune, i int) ([]rune, bool)) string {
+// toRunes is the code points of `s`, a lone surrogate as itself.
+func toRunes(s string) []rune {
 	rs := []rune{}
 	for len(s) > 0 {
 		r, n := decode(s)
 		rs = append(rs, r)
 		s = s[n:]
 	}
+	return rs
+}
+
+func mapCase(s string, table map[rune][]rune, special func(rs []rune, i int) ([]rune, bool)) string {
+	rs := toRunes(s)
 	var out []rune
 	for i, r := range rs {
 		if special != nil {
@@ -208,34 +246,32 @@ func mapCase(s string, table map[rune][]rune, special func(rs []rune, i int) ([]
 	return runesString(out)
 }
 
-func cased(r rune) bool { return unicode.IsUpper(r) || unicode.IsLower(r) || unicode.IsTitle(r) }
+func cased(r rune) bool         { return inRanges(unicodeData().cased, r) }
+func caseIgnorable(r rune) bool { return inRanges(unicodeData().ignorable, r) }
 
-// caseIgnorable approximates Unicode's Case_Ignorable for Final_Sigma.
-func caseIgnorable(r rune) bool {
-	return unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf, unicode.Lm, unicode.Sk) ||
-		strings.ContainsRune("'.:·‘’․‧︓﹒﹕＇．：", r)
+// casedAfter is whether a cased letter follows rs[i] past case-ignorable
+// ones, and casedBefore whether one precedes it: Final_Sigma's context.
+func casedAfter(rs []rune, i int) bool {
+	for j := i + 1; j < len(rs); j++ {
+		if !caseIgnorable(rs[j]) {
+			return cased(rs[j])
+		}
+	}
+	return false
+}
+
+func casedBefore(rs []rune, i int) bool {
+	for j := i - 1; j >= 0; j-- {
+		if !caseIgnorable(rs[j]) {
+			return cased(rs[j])
+		}
+	}
+	return false
 }
 
 // finalSigma is ς for a Σ that ends a word, as JS lower-cases it.
 func finalSigma(rs []rune, i int) ([]rune, bool) {
-	if rs[i] != 'Σ' {
-		return nil, false
-	}
-	before := false
-	for j := i - 1; j >= 0; j-- {
-		if !caseIgnorable(rs[j]) {
-			before = cased(rs[j])
-			break
-		}
-	}
-	after := false
-	for j := i + 1; j < len(rs); j++ {
-		if !caseIgnorable(rs[j]) {
-			after = cased(rs[j])
-			break
-		}
-	}
-	if before && !after {
+	if rs[i] == 'Σ' && casedBefore(rs, i) && !casedAfter(rs, i) {
 		return []rune{'ς'}, true
 	}
 	return nil, false
@@ -244,42 +280,6 @@ func finalSigma(rs []rune, i int) ([]rune, bool) {
 // ToUpperCase and ToLowerCase are JS's full case mappings.
 func ToUpperCase(s Value) Value { return mapCase(s.(string), unicodeData().upper, nil) }
 func ToLowerCase(s Value) Value { return mapCase(s.(string), unicodeData().lower, finalSigma) }
-
-func turkic(locale string) bool {
-	tag := strings.ToLower(strings.SplitN(strings.ReplaceAll(locale, "_", "-"), "-", 2)[0])
-	return tag == "tr" || tag == "az"
-}
-
-// ToLocaleUpperCase and ToLowerCase follow the root mapping, but for
-// Turkish and Azeri dotted and dotless i.
-//
-// shortcut: Lithuanian's dot rules use the root mapping; they need the locale's special casing
-func ToLocaleUpperCase(locale, s Value) Value {
-	if !turkic(locale.(string)) {
-		return ToUpperCase(s)
-	}
-	return mapCase(s.(string), unicodeData().upper, func(rs []rune, i int) ([]rune, bool) {
-		if rs[i] == 'i' {
-			return []rune{'İ'}, true
-		}
-		return nil, false
-	})
-}
-
-func ToLocaleLowerCase(locale, s Value) Value {
-	if !turkic(locale.(string)) {
-		return ToLowerCase(s)
-	}
-	return mapCase(s.(string), unicodeData().lower, func(rs []rune, i int) ([]rune, bool) {
-		switch rs[i] {
-		case 'İ':
-			return []rune{'i'}, true
-		case 'I':
-			return []rune{'ı'}, true
-		}
-		return finalSigma(rs, i)
-	})
-}
 
 // Capitalize upper-cases the first code unit, as Effect does.
 func Capitalize(s Value) Value { return mapFirst(s.(string), unicodeData().upper) }

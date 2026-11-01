@@ -44,6 +44,25 @@ const zones = goZones()
   })
   .join(";");
 
+// the languages and regions ICU replaces when it canonicalizes a tag
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+const codes2 = Array.from(LETTERS).flatMap((a) => Array.from(LETTERS, (b) => a + b));
+const canonical = (tag) => {
+  try {
+    return Intl.getCanonicalLocales(tag)[0];
+  } catch {
+    return tag;
+  }
+};
+const languageAliases = [...codes2, ...codes2.flatMap((c) => Array.from(LETTERS, (d) => c + d))]
+  .filter((c) => canonical(c) !== c)
+  .map((c) => `${c}>${canonical(c)}`)
+  .join(";");
+const regionAliases = [...codes2.map((c) => c.toUpperCase()), ...Array.from({ length: 1000 }, (_, i) => String(i).padStart(3, "0"))]
+  .filter((c) => canonical(`und-${c}`) !== `und-${c}`)
+  .map((c) => `${c}>${canonical(`und-${c}`).slice(4)}`)
+  .join(";");
+
 // The locales of the tables: common ones on the Gregorian calendar with
 // Latin digits; another tag falls back along its subtags to one of them.
 const LOCALES = [
@@ -245,6 +264,9 @@ package flickrt
 
 // As Node ${process.versions.node} (ICU ${process.versions.icu}, tz ${process.versions.tz}) answers.
 const (
+	// languageAliasData and regionAliasData are the subtags ICU replaces: \`from>to\`.
+	languageAliasData = "${languageAliases}"
+	regionAliasData   = "${regionAliases}"
 	// zoneData is the zones V8 accepts: \`name\`, or \`name>resolved\` for one it resolves to another.
 	zoneData = "${zones}"
 	// intlData is a line per locale: \`tag=@other\` for the data of another, or \`tag=\` and, apart by

@@ -1,8 +1,9 @@
 // Writes runtime-go/flickrt/unicode_tables.go: the Unicode data the go
 // target's String functions need, as Node (whose ICU the JS target uses)
 // computes it, so normalization and case mapping agree on both targets.
+// It also writes the locale lines of runtime-go/flickrt/testdata/unicode.txt.
 // Run from the repository root: `node tools/go-unicode/gen.mjs`.
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const out = "runtime-go/flickrt/unicode_tables.go";
 const hex = (cp) => cp.toString(16);
@@ -60,6 +61,39 @@ const mapping = (f) =>
     .filter(([cp, m]) => m !== String.fromCodePoint(cp))
     .map(([cp, m]) => `${hex(cp)}=${cps(m).map(hex).join(" ")}`)
     .join(";");
+
+// the code points of a property, as ranges `lo-hi` or `cp`
+const ranges = (property) => {
+  const re = new RegExp(`^\\p{${property}}$`, "u");
+  const out = [];
+  let start = -1;
+  for (let cp = 0; cp <= 0x110000; cp++) {
+    const has = cp < 0x110000 && re.test(String.fromCodePoint(cp));
+    if (has && start < 0) start = cp;
+    if (!has && start >= 0) {
+      out.push(start === cp - 1 ? hex(start) : `${hex(start)}-${hex(cp - 1)}`);
+      start = -1;
+    }
+  }
+  return out.join(";");
+};
+
+// ICU's Greek upper-casing: the letters it maps to their capital without
+// diacritics, as `cp=capital.flags` (1 vowel, 2 accent, 4 dialytika, 8
+// iota subscript). A letter is one when it drops a psili after it.
+const greek = [];
+for (const [lo, hi] of [[0x370, 0x3ff], [0x1f00, 0x1fff], [0x2126, 0x2126]]) {
+  for (let cp = lo; cp <= hi; cp++) {
+    const c = String.fromCodePoint(cp);
+    if ((c + "\u0313").toLocaleUpperCase("el").includes("\u0313")) continue;
+    const [base, ...marks] = cps(c.normalize("NFD"));
+    const capital = cps(String.fromCodePoint(base).toUpperCase());
+    if (capital.length !== 1) throw new Error(`Greek ${hex(cp)} has no single capital`);
+    let flags = "ΑΕΗΙΟΥΩ".includes(String.fromCodePoint(capital[0])) ? 1 : 0;
+    for (const m of marks) flags |= { 0x300: 2, 0x301: 2, 0x342: 2, 0x308: 4, 0x345: 8 }[m] ?? 0;
+    greek.push(`${hex(cp)}=${hex(capital[0])}.${flags}`);
+  }
+}
 
 
 // collation as Intl.Collator("en") orders strings, for `locale_compare`:
@@ -123,6 +157,10 @@ const (
 	classData     = "${classes}"
 	upperData     = "${mapping((s) => s.toUpperCase())}"
 	lowerData     = "${mapping((s) => s.toLowerCase())}"
+	casedData     = "${ranges("Cased")}"
+	ignorableData = "${ranges("Case_Ignorable")}"
+	softDotted    = "${ranges("Soft_Dotted")}"
+	greekData     = "${greek.join(";")}"
 	collated      = 0x${hex(COLLATED)}
 	primaryData   = "${weights.join(";")}"
 	secondaryData = "${secondaries.join(";")}"
@@ -131,3 +169,35 @@ const (
 `;
 writeFileSync(out, go);
 console.log(`${out}: ${go.length} bytes, ${nonstarters.length} nonstarters in ${rank} classes`);
+
+// the locale lines of the test corpus: `locale | input | upper | lower`
+const corpus = "runtime-go/flickrt/testdata/unicode.txt";
+const greekWords = (lo, hi, step) =>
+  greek
+    .map((e) => parseInt(e, 16))
+    .filter((cp) => cp >= lo && cp <= hi)
+    .filter((_, i) => i % step === 0)
+    .map((cp) => String.fromCodePoint(cp))
+    .join(" ");
+const LOCALE_CASES = {
+  el: [
+    "άδικος", "ή", "ῃ", "ΐ", "Ή ή", "αή", "ή.", "ἤ", "ἢ x", "ήι", "άι", "άϊ", "ά\u0308ι", "ᾶι", "ᾴι",
+    "ϓι", "ΐ\u0301", "ΆΙ", "Ω\u0301 \u2126\u0301", "ͺ\u0301 ϗ\u0301 ϶\u0301", "ὕβρις", "ΌΣΟΣ Σ.", "α\u0300\u0308",
+    "α\u0313\u0301 ᾳ\u0345", greekWords(0x370, 0x3ff, 1), greekWords(0x1f00, 0x1fff, 5),
+  ],
+  lt: [
+    "Ì Í Ĩ", "J\u0301 I\u0301 I\u0300", "I\u0328\u0301 Į\u0301", "I\u0323\u0301 I\u0301\u0323", "IA\u0301",
+    "i\u0307\u0300 j\u0307\u0301", "i\u0323\u0307 i\u0301\u0307 a\u0307", "į\u0307\u0303 ɨ\u0307",
+  ],
+  tr: ["İ I i ı", "I\u0307 I\u0323\u0307 I\u0301\u0307", "İstanbul ISPARTA", "ΣΑΣ İ\u0301"],
+  az: ["İI iı I\u0307"],
+};
+const line = (...fields) => fields.map((f) => cps(f).map(hex).join(" ")).join(" | ");
+const localeLines = Object.entries(LOCALE_CASES).flatMap(([locale, inputs]) =>
+  inputs.map((s) => `${locale} | ${line(s, s.toLocaleUpperCase(locale), s.toLocaleLowerCase(locale))}`),
+);
+const kept = readFileSync(corpus, "utf8")
+  .split("\n")
+  .filter((l) => l !== "" && !/^[a-z]{2} \|/.test(l) && !l.startsWith("# locale"));
+writeFileSync(corpus, [...kept, "# locale | input | upper | lower, as code points", ...localeLines, ""].join("\n"));
+console.log(`${corpus}: ${localeLines.length} locale lines`);

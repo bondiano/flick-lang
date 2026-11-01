@@ -353,8 +353,10 @@ writes. A `String` counts UTF-16 code units in `length`, indices and slices;
 a slice may cut a surrogate pair, `++` joins the halves back, strings order
 by code units, and writing to stdout replaces a lone half with U+FFFD as
 Node does. Normalization and case mapping (`ß` to `SS`, a final sigma,
-Turkish dotted i) follow tables `tools/go-unicode/gen.mjs` writes from
-Node's ICU; a `RegExp` runs on Go's RE2 engine, with positions in code
+the Turkish and Azeri i, Lithuanian dots, Greek capitals without accents)
+follow tables `tools/go-unicode/gen.mjs` writes from Node's ICU, and a
+locale tag is checked and canonicalized as V8 does, with its `RangeError`
+for an invalid one; a `RegExp` runs on Go's RE2 engine, with positions in code
 units and JS's `$` replacement patterns, and syntax RE2 lacks (lookaround,
 backreferences) is a `RegExpError`. `String.locale_compare` orders as
 `Intl.Collator("en")` does, by weights the same script reads from Node;

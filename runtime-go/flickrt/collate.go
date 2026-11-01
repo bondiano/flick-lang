@@ -101,4 +101,7 @@ func collate(a, b string) int {
 }
 
 // LocaleCompare is `self` against `that` as JS `localeCompare` orders them.
-func LocaleCompare(_, that, self Value) Value { return ordering(collate(self.(string), that.(string))) }
+func LocaleCompare(locale, that, self Value) Value {
+	parseLocale(locale.(string))
+	return ordering(collate(self.(string), that.(string)))
+}

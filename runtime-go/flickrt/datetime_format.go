@@ -41,67 +41,10 @@ func intlLocales() map[string]*intlLocale {
 	})
 }
 
-func alpha(s string) bool {
-	return strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") == ""
-}
-func allDigits(s string) bool { return strings.Trim(s, "0123456789") == "" }
-func alnum(s string) bool {
-	return strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") == ""
-}
-
-// languageTag reads a well-formed Unicode locale identifier, as V8 checks
-// one: its language, script and region, canonically cased.
-func languageTag(tag string) (language, script, region string, ok bool) {
-	subtags := strings.Split(tag, "-")
-	n, i := len(subtags), 1
-	language = strings.ToLower(subtags[0])
-	if l := len(language); !alpha(language) || l < 2 || l == 4 || l > 8 {
-		return "", "", "", false
-	}
-	if i < n && len(subtags[i]) == 4 && alpha(subtags[i]) {
-		script = strings.ToUpper(subtags[i][:1]) + strings.ToLower(subtags[i][1:])
-		i++
-	}
-	if i < n && (len(subtags[i]) == 2 && alpha(subtags[i]) || len(subtags[i]) == 3 && allDigits(subtags[i])) {
-		region = strings.ToUpper(subtags[i])
-		i++
-	}
-	seen := map[string]bool{}
-	for ; i < n; i++ {
-		s := strings.ToLower(subtags[i])
-		variant := len(s) >= 5 && len(s) <= 8 || len(s) == 4 && s[0] >= '0' && s[0] <= '9'
-		if !variant || !alnum(s) || seen[s] {
-			break
-		}
-		seen[s] = true
-	}
-	for i < n {
-		singleton := strings.ToLower(subtags[i])
-		if len(singleton) != 1 || !alnum(singleton) || seen[singleton] {
-			return "", "", "", false
-		}
-		seen[singleton] = true
-		least := 2
-		if singleton == "x" {
-			least = 1
-		}
-		j := i + 1
-		for j < n && len(subtags[j]) >= least && len(subtags[j]) <= 8 && alnum(subtags[j]) && (singleton == "x" || len(subtags[j]) > 1) {
-			j++
-		}
-		if j == i+1 {
-			return "", "", "", false
-		}
-		if i = j; singleton == "x" && i < n {
-			return "", "", "", false
-		}
-	}
-	return language, script, region, true
-}
-
 // localeTable is the table of the locale Intl negotiates for a well-formed
 // tag, as far as the tables go.
-func localeTable(language, script, region string) (*intlLocale, bool) {
+func localeTable(id localeID) (*intlLocale, bool) {
+	language, script, region := id.language, id.script, id.region
 	tag := func(subtags ...string) string {
 		out := language
 		for _, s := range subtags {
@@ -125,8 +68,8 @@ func defaultLocale() *intlLocale {
 		if v := os.Getenv(name); v != "" {
 			v, _, _ = strings.Cut(v, ".")
 			v, _, _ = strings.Cut(v, "@")
-			if l, s, r, ok := languageTag(strings.ReplaceAll(v, "_", "-")); ok {
-				if t, ok := localeTable(l, s, r); ok {
+			if id, problem := languageTag(strings.ReplaceAll(v, "_", "-")); problem == "" {
+				if t, ok := localeTable(id); ok {
 					return t
 				}
 			}
@@ -163,11 +106,7 @@ func newIntlFormat(o Value) intlFormat {
 	date, time := style("dateStyle"), style("timeStyle")
 	locale := defaultLocale()
 	if l := r.Get("locale"); isSome(l) {
-		language, script, region, ok := languageTag(value(l).(string))
-		if !ok {
-			panic(rangeError("Incorrect locale information provided"))
-		}
-		if t, ok := localeTable(language, script, region); ok {
+		if t, ok := localeTable(parseLocale(value(l).(string))); ok {
 			locale = t
 		}
 	}
