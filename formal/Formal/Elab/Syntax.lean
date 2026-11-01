@@ -82,7 +82,8 @@ structure Inst where
 /-- A program: its classes (superclasses over the class parameters), its instances `𝓘ₚ`, and
 the compiler's classes: structural (`Eq`, `Ord`, `Hash`, `Show` of records) and primitives of
 `Record` rows, whose rules (Struct) and (Prim) are black boxes. `methods m` is the class of the
-method `m` and its scheme `∀ᾱ β̄. (C ᾱ, Q̄) ⇒ τ` of §1.1: the class constraint comes first. -/
+method `m` and its scheme `∀ᾱ β̄. (C ᾱ, Q̄) ⇒ τ` of §1.1: the class constraint comes first.
+`consts c` is the scheme of a constant of Γ₀. -/
 structure Prog where
   supers : Nat → List Cn
   insts : Nat → Option Inst
@@ -91,6 +92,7 @@ structure Prog where
   primC : Nat → Bool
   prims : Cn → Option Nat
   methods : Nat → Option (Nat × Scheme)
+  consts : Nat → Option Scheme
 
 variable (P : Prog)
 

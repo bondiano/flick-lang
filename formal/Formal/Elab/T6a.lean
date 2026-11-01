@@ -92,7 +92,13 @@ theorem T6a {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') :
   | meth hm hc _ _ h₀ he =>
     cases ent_typed X h₀ with
     | cons r _ => exact tm_dapps X (X.meth hm hc r) (ent_typed X he)
-  | app _ _ ih₁ ih₂ => exact X.app ih₁ ih₂
+  | @const Γ Δ c σ ts ds φ hc hk he =>
+    have hv := X.const (Γ := Γ.map Scheme.tr) (Δ := Δ) (φ := φ) hc hk
+    simp only [Scheme.tr, TTy.subst_dicts, TTy.subst] at hv
+    exact tm_dapps X hv (ent_typed X he)
+  | app _ _ hψ ih₁ ih₂ => exact X.app ih₁ ih₂ hψ
+  | ite _ _ _ ihc iha ihb => exact X.ite ihc iha ihb
+  | caseOpt _ _ _ ihe ihn ihs => exact X.caseOpt ihe ihn ihs
   | lam _ ih => exact X.lam ih
   | let_ _ _ ih₁ ih₂ =>
     refine X.let_ (k := 0) ?_ (fun h => absurd rfl h) (.inr rfl) ih₂
