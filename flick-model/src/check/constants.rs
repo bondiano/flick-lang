@@ -7,7 +7,7 @@ use flick_core::numeric::Num;
 use super::expr::{list, mono, prelude, runtime, scheme, var};
 use super::{Check, Checker, error};
 use crate::syntax::{Const, Prim};
-use crate::types::{Kind, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
 
 impl Checker<'_> {
     /// The constants of Γ₀ (§1.5) and the operators.
@@ -15,20 +15,34 @@ impl Checker<'_> {
         let none = Row::none;
         let a = || var("a");
         let s = match c {
+            // with the capacity `c` of `regions.md` §1.5 inside the
+            // invariant argument of `Ref`
             Const::RefMake => scheme(
-                &[("a", Kind::Type)],
-                Type::fun(a(), runtime(none(), none()), Type::Ref(Rc::new(a()))),
+                &[("c", Kind::Captures), ("a", Kind::Type)],
+                Type::fun(
+                    bounded(a()),
+                    runtime(none(), none()),
+                    Type::Ref(Rc::new(bounded(a()))),
+                ),
             ),
             Const::RefGet => scheme(
-                &[("a", Kind::Type)],
-                Type::fun(Type::Ref(Rc::new(a())), runtime(none(), none()), a()),
+                &[("c", Kind::Captures), ("a", Kind::Type)],
+                Type::fun(
+                    captured(Type::Ref(Rc::new(a()))),
+                    runtime(none(), none()),
+                    bounded(a()),
+                ),
             ),
             Const::RefSet => scheme(
-                &[("a", Kind::Type)],
+                &[("c", Kind::Captures), ("a", Kind::Type)],
                 Type::fun(
-                    Type::Ref(Rc::new(a())),
+                    captured(Type::Ref(Rc::new(a()))),
                     Stage::Pure,
-                    Type::fun(a(), runtime(none(), none()), prelude("Unit")),
+                    captured(Type::fun(
+                        bounded(a()),
+                        runtime(none(), none()),
+                        prelude("Unit"),
+                    )),
                 ),
             ),
             Const::Raise => {
@@ -93,6 +107,16 @@ impl Checker<'_> {
     }
 }
 
+/// `τ^c`, `c` the capacity of a cell.
+fn captured(t: Type) -> Type {
+    Type::Captured(Rc::new(t), Caps::var(Var::Named("c".into())))
+}
+
+/// `a^c` as a value bound.
+fn bounded(t: Type) -> Type {
+    Type::Bounded(Rc::new(t), Caps::var(Var::Named("c".into())))
+}
+
 fn num(n: Num) -> Type {
     prelude(n.name())
 }
@@ -105,7 +129,7 @@ impl Checker<'_> {
     /// nothing chose it, as flick-core's `settle_operators`.
     // shortcut: a rigid variable is rejected even under a given `Ord`, which flick-core accepts; the generator makes no such program, check its `Ord` when it does
     pub(super) fn ordered_operand(&mut self, t: &Type) -> Check<()> {
-        match self.zonk(t) {
+        match self.zonk(&self.resolve(t)) {
             Type::Var(Var::Meta(_)) => self.unify(t, &prelude("Int")),
             Type::Con(p) if &*p.module == "Prelude" && ORDERED.contains(&&*p.name) => Ok(()),
             other => error(

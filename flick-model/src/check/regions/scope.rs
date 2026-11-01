@@ -1,0 +1,210 @@
+//! (Scope) (`docs/formal/regions.md` §2.3): a fresh region, its owner,
+//! the stage of the body, and the regions that must not leave it; the
+//! owner a step acquires into (§1.4), and the errors (Err-Raise) checks.
+
+use std::collections::{BTreeSet, HashMap};
+use std::rc::Rc;
+
+use super::super::expr::mono;
+use super::super::generalize::substitute_caps;
+use super::super::{Check, Checker, Inst, error, substitute};
+use super::{owner, scope_service};
+use crate::syntax::{Name, Term};
+use crate::types::{Caps, Row, Scheme, Stage, Type, Var};
+
+impl Checker<'_> {
+    /// (Scope): `s` fresh one level deeper, `s : Owner s` in the body, the
+    /// body's stage within `R⟨{Scope s} + r; ε⟩`, and `s` nowhere in the
+    /// type and the rows the `scope` leaves.
+    pub(in crate::check) fn scope(
+        &mut self,
+        name: &Name,
+        body: &Term,
+        expected: Option<&Type>,
+    ) -> Check<Type> {
+        self.level += 1;
+        // a region is fresh: one a `scope` around binds is renamed
+        let s: Name = if self.regions.scopes.contains_key(name) {
+            self.rigid += 1;
+            format!("{name}'{}", self.rigid).into()
+        } else {
+            name.clone()
+        };
+        let region = Var::Named(s.clone());
+        let parent = self.regions.open.last().cloned();
+        self.regions.scopes.insert(s.clone(), (self.level, parent));
+        self.regions.kinds.insert(region.clone());
+        self.regions.open.push(s.clone());
+        self.regions.renamed.push((name.clone(), s.clone()));
+        self.locals.push((name.clone(), mono(owner(&s))));
+        let checked = self.own_stage(body, expected);
+        self.locals.pop();
+        self.regions.renamed.pop();
+        self.regions.open.pop();
+        self.level -= 1;
+        let s = &s;
+        let (t, inner) = checked?;
+        let (mut r, e) = match inner {
+            Stage::Pure => (Row::none(), Row::none()),
+            Stage::Runtime(r, e) => (self.zonk_row(&r), self.zonk_row(&e)),
+        };
+        if let Some(args) = r.elems.remove(&scope_service()) {
+            for a in args.iter() {
+                self.unify(a, &Type::Var(region.clone()))?;
+            }
+        }
+        let left = Type::Tuple(Rc::from([
+            t.clone(),
+            Type::Errors(self.zonk_row(&r)),
+            Type::Errors(self.zonk_row(&e)),
+        ]));
+        if self.names(&left).contains(s) {
+            return error(
+                "Scope",
+                format!(
+                    "region `{s}` leaves its `scope` in `{}` (`FLICK-G002`)",
+                    self.zonk(&left)
+                ),
+            );
+        }
+        self.lower(&left, self.level);
+        self.perform(&Stage::Runtime(r, e))?;
+        Ok(t)
+    }
+
+    /// A signature written in the body of `scope`s: the regions it names
+    /// are theirs.
+    pub(in crate::check) fn in_scopes(&self, s: &Scheme) -> Scheme {
+        let map: HashMap<Name, Inst> = self
+            .regions
+            .renamed
+            .iter()
+            .filter(|(n, r)| n != r && !s.vars.iter().any(|(v, _)| v == n))
+            .map(|(n, r)| (n.clone(), Inst::Type(Type::Var(Var::Named(r.clone())))))
+            .collect();
+        if map.is_empty() {
+            return s.clone();
+        }
+        Scheme {
+            vars: s.vars.clone(),
+            body: substitute(&s.body, &map),
+            outlives: s
+                .outlives
+                .iter()
+                .map(|(c, r)| {
+                    let c = substitute_caps(c, &map);
+                    (c, substitute(r, &map))
+                })
+                .collect(),
+        }
+    }
+
+    /// Whether a value at `level` may take what `t` names: no region of a
+    /// `scope` deeper than it (§2.3 (Scope), §2.6).
+    pub(in crate::check) fn escapes(&self, t: &Type, level: u32) -> Check<()> {
+        for n in self.names(t) {
+            if let Some((l, _)) = self.regions.scopes.get(&n)
+                && *l > level
+            {
+                return error(
+                    "Scope",
+                    format!("region `{n}` would leave its `scope` (`FLICK-G002`)"),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// The named variables of `t`, in its rows and qualifiers too.
+    fn names(&self, t: &Type) -> BTreeSet<Name> {
+        let mut out = BTreeSet::new();
+        names_into(&self.zonk(t), &mut out);
+        out
+    }
+
+    /// A step that needs `Scope ϱ`, `ϱ` not known yet, acquires into the
+    /// innermost `scope` (§1.4).
+    pub(in crate::check) fn lexical_owner(&mut self, s: &Stage) -> Check<()> {
+        let (Stage::Runtime(r, _), Some(inner)) = (s, self.regions.open.last()) else {
+            return Ok(());
+        };
+        let inner = Type::Var(Var::Named(inner.clone()));
+        if let Some(args) = self.zonk_row(r).elems.get(&scope_service()) {
+            for a in args.iter() {
+                if matches!(self.follow(a), Type::Var(Var::Meta(_))) {
+                    self.unify(a, &inner)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// (Err-Raise) is recorded with the step: the errors of a step under
+    /// a `scope` reach none of its region.
+    pub(in crate::check) fn raised(&mut self, s: &Stage) {
+        if let Stage::Runtime(_, e) = s
+            && !self.regions.open.is_empty()
+            && !e.is_none()
+        {
+            let open = self.regions.open.clone();
+            self.regions.raised.push((e.clone(), open));
+        }
+    }
+}
+
+fn names_into(t: &Type, out: &mut BTreeSet<Name>) {
+    let row = |r: &Row, out: &mut BTreeSet<Name>| {
+        for args in r.elems.values() {
+            args.iter().for_each(|a| names_into(a, out));
+        }
+        for v in &r.vars {
+            if let Var::Named(n) = v {
+                out.insert(n.clone());
+            }
+        }
+    };
+    let caps = |c: &Caps, out: &mut BTreeSet<Name>| {
+        for v in c.atoms.iter().chain(&c.vars) {
+            if let Var::Named(n) = v {
+                out.insert(n.clone());
+            }
+        }
+    };
+    match t {
+        Type::Var(Var::Named(n)) => {
+            out.insert(n.clone());
+        }
+        Type::Var(_) | Type::Con(_) => {}
+        Type::App(a, b) => {
+            names_into(a, out);
+            names_into(b, out);
+        }
+        Type::Fun(p, s, r) => {
+            names_into(p, out);
+            if let Stage::Runtime(a, b) = s {
+                row(a, out);
+                row(b, out);
+            }
+            names_into(r, out);
+        }
+        Type::Eff(a, b, x) => {
+            row(a, out);
+            row(b, out);
+            names_into(x, out);
+        }
+        Type::EffOf(a, b) => {
+            row(a, out);
+            row(b, out);
+        }
+        Type::Ref(x) => names_into(x, out),
+        Type::Layer(a, b, c) => [a, b, c].iter().for_each(|r| row(r, out)),
+        Type::Record(f) => f.fields.values().for_each(|t| names_into(t, out)),
+        Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().for_each(|t| names_into(t, out)),
+        Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => row(r, out),
+        Type::Forall(s) => names_into(&s.body, out),
+        Type::Captured(x, c) | Type::Bounded(x, c) => {
+            caps(c, out);
+            names_into(x, out);
+        }
+    }
+}
