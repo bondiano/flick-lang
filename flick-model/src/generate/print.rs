@@ -45,6 +45,19 @@ fn block(e: &Term, col: usize) -> String {
                 block(rest, col)
             )
         }
+        // one arm without a guard over a tuple or a constructor: `let p = e`
+        Term::Match(s, arms)
+            if arms.len() == 1
+                && arms[0].guard.is_none()
+                && matches!(&arms[0].pat, Pat::Tuple(ps) | Pat::Con(_, ps) if !ps.is_empty()) =>
+        {
+            format!(
+                "{pad}let {} =\n{pad}  {}\n{}",
+                pat(&arms[0].pat, false),
+                expr(s, col + 2),
+                block(&arms[0].body, col)
+            )
+        }
         e => format!("{pad}{}", expr(e, col)),
     }
 }
@@ -87,8 +100,26 @@ fn expr(e: &Term, col: usize) -> String {
     let inner = col + 2;
     match e {
         Term::Var(x) => x.to_string(),
+        // `(e : σ)` is `let x : σ = e in x` (`core.md` §1.4)
+        Term::Let(x, Some(s), e, rest) if matches!(&**rest, Term::Var(y) if y == x) => {
+            format!("({} : {})", expr(e, col), scheme(s))
+        }
+        // the record is a leaf (`holes.rs` `update`), the field on a line of
+        // its own when it is long, deeper than the arms of what is around
+        Term::Update(r, l, v) => {
+            let v = expr(v, col + 4);
+            let pad = " ".repeat(col + 4);
+            let sep = if v.contains('\n') {
+                format!("\n{pad}")
+            } else {
+                " ".into()
+            };
+            format!("{{ ({}) with{sep}{l} = {v} }}", expr(r, col))
+        }
+        Term::List(xs) => format!("[{}]", list(xs.iter().map(|x| expr(x, col)), ", ")),
         Term::Global(p) if &*p.module == "Gen" => p.name.to_string(),
-        Term::Global(p) => p.to_string(),
+        // by the module that exposes it: `List.get` of `List.Core`
+        Term::Global(p) => format!("{}.{}", p.module.split('.').next().unwrap_or(""), p.name),
         Term::Scope(s, body) => format!("(scope {s} {{\n{} }})", block(body, inner)),
         Term::Lit(l) => lit(l),
         Term::Lam(x, body) => format!("(fun {x} ->\n{})", block(body, inner)),
@@ -118,9 +149,9 @@ fn expr(e: &Term, col: usize) -> String {
             cases(arms, col)
         ),
         Term::Provide(l, body) => {
-            // a record after `provide` would read as its block
+            // a record or `with` after `provide` would read as its block
             let layer = match &**l {
-                Term::Record(_) => format!("({})", expr(l, col)),
+                Term::Record(_) | Term::Update(..) => format!("({})", expr(l, col)),
                 _ => expr(l, col),
             };
             format!("(provide {layer} {{\n{} }})", block(body, inner))

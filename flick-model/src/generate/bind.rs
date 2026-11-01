@@ -10,7 +10,7 @@ use flick_core::numeric::{Arith, Num};
 use super::regions::visible;
 use super::term::{Cx, extend, plain};
 use super::{Gen, int, mono, nothing, option, some, unit};
-use crate::check::{Inst, substitute};
+use crate::check::{Inst, scope_service, substitute};
 use crate::syntax::{Arm, Lit, Name, Pat, Prim, Term};
 use crate::types::{Kind, Row, Scheme, Stage, Type, Var};
 
@@ -64,11 +64,15 @@ impl Gen<'_> {
         }
     }
 
-    /// A stage that fits `budget`.
+    /// A stage that fits `budget`, for a local function. Without `Scope`:
+    /// flick-core takes a local function whose signature names `Scope s`
+    /// for one that holds `s` (Р64).
     pub(super) fn within_budget(&mut self, budget: &Stage) -> Stage {
         match budget {
             Stage::Runtime(r, e) if self.pick(2) == 1 => {
-                Stage::Runtime(self.some_of(r), self.some_of(e))
+                let mut r = self.some_of(r);
+                r.elems.remove(&scope_service());
+                Stage::Runtime(r, self.some_of(e))
             }
             _ => Stage::Pure,
         }
@@ -132,7 +136,7 @@ impl Gen<'_> {
 }
 
 /// How many polymorphic templates there are.
-const TEMPLATES: usize = 8;
+const TEMPLATES: usize = 9;
 
 /// A polymorphic value of known scheme: its scheme, its λ, whether it is
 /// recursive and whether it is bound with its signature (Let-Sig) or
@@ -231,6 +235,8 @@ fn template(i: usize, name: &str) -> (Scheme, Term, bool, bool) {
             true,
             true,
         ),
+        // a function that relies on a pure parameter (`ts-holes.md` §2.6)
+        8 => pure_parameter(),
         // (Let-Gen): `None` generalized
         _ => (
             scheme(ty_vars(&["a"]), option(a)),
@@ -239,6 +245,25 @@ fn template(i: usize, name: &str) -> (Scheme, Term, bool, bool) {
             false,
         ),
     }
+}
+
+/// `apply : ∀a b. (a → b) → a → b`, which calls its parameter in a pure
+/// stage: a parameter with a wider stage is another type.
+fn pure_parameter() -> (Scheme, Term, bool, bool) {
+    let var = |n: &str| Type::Var(Var::Named(n.into()));
+    let (a, b) = (var("a"), var("b"));
+    let f = Type::fun(a.clone(), Stage::Pure, b.clone());
+    let vars = vec![(Name::from("a"), Kind::Type), (Name::from("b"), Kind::Type)];
+    let call = Term::app(Term::Var("g".into()), Term::Var("x".into()));
+    (
+        Scheme::new(
+            vars,
+            Type::fun(f, Stage::Pure, Type::fun(a, Stage::Pure, b)),
+        ),
+        Term::lam("g", Term::lam("x", call)),
+        false,
+        true,
+    )
 }
 
 /// `match n < 1 with true → x | false → f (n - 1) x`.

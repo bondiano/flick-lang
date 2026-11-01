@@ -3,6 +3,7 @@
 
 use std::rc::Rc;
 
+use super::holes::{cast, opaque_field, reshape, widen};
 use super::regions::leak;
 use super::{Gen, Program, mono, unit};
 use crate::syntax::{Arm, Const, Head, Lit, Term};
@@ -11,13 +12,15 @@ use crate::types::{Row, Scheme, Stage, Type};
 /// `p` changed as `choices` say: a subterm replaced by a closed term of
 /// some type and stage, a runtime step put at the head of a block, an arm
 /// dropped, an element taken off a row of a signature, a leak of a region
-/// put at the head of a block, or a qualifier or `Outlives` taken off a
-/// local signature (`regions.md` §4).
+/// put at the head of a block, a qualifier or `Outlives` taken off a local
+/// signature (`regions.md` §4); or what would open a hole of TypeScript
+/// (`ts-holes.md` §2): a stage widened in a parameter or a cell, a record
+/// with a field more or fewer, a field of an opaque value, a cast.
 pub fn mutate(p: &Program, choices: &[u32]) -> Program {
     let mut g = Gen::new(choices);
     // the names a change makes are not the program's: a `scope` would shadow one
     g.names = 100_000;
-    let kind = g.pick(6);
+    let kind = g.pick(10);
     let mut at = g.pick(size(&p.term) + 1);
     let mut p = p.clone();
     if kind == 3 && at == 0 {
@@ -63,6 +66,18 @@ pub fn mutate(p: &Program, choices: &[u32]) -> Program {
                 rhs.clone(),
                 rest.clone(),
             )),
+            (6, Term::Let(x, Some(s), rhs, rest)) => Some(Term::Let(
+                x.clone(),
+                Some(Rc::new(widen(s)?)),
+                rhs.clone(),
+                rest.clone(),
+            )),
+            (7, Term::Record(fs)) => Some(reshape(g, fs)),
+            (8, _) => Some(opaque_field(g)),
+            // a constant and an operation are written applied: a cast of a
+            // call could take its head apart, so neither is cast
+            (9, Term::Apply(Head::Const(_), _) | Term::Field(..) | Term::App(..)) => None,
+            (9, _) => Some(cast(g, e)),
             _ => None,
         }
     };
@@ -227,6 +242,10 @@ fn rewrite(e: &Term, at: &mut usize, block: bool, g: &mut Gen, change: &mut Chan
             let f = go(f, false);
             Term::App(f, go(a, false))
         }
+        // `(e : σ)`: its `e` is no block, its variable no subterm
+        Term::Let(x, sig @ Some(_), rhs, rest) if matches!(&**rest, Term::Var(y) if y == x) => {
+            Term::Let(x.clone(), sig.clone(), go(rhs, false), rest.clone())
+        }
         Term::Let(x, sig, rhs, rest) => {
             // a statement `s` of a block is a line, no block of its own
             let rhs = go(rhs, &**x != "_");
@@ -258,6 +277,9 @@ fn rewrite(e: &Term, at: &mut usize, block: bool, g: &mut Gen, change: &mut Chan
             e.clone()
         }
         Term::Field(r, l) => Term::Field(go(r, false), l.clone()),
+        // the record of `with` stays a leaf (`holes.rs` `update`)
+        Term::Update(r, l, v) => Term::Update(r.clone(), l.clone(), go(v, false)),
+        Term::List(xs) => Term::List(xs.iter().map(|x| (*go(x, false)).clone()).collect()),
         Term::Task(b) => Term::Task(go(b, true)),
         Term::Scope(s, b) => Term::Scope(s.clone(), go(b, true)),
         Term::Await(x) => Term::Await(go(x, false)),
