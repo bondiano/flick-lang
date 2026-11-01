@@ -1,164 +1,342 @@
-import Formal.SubAdm
+import Formal.SubstPat
 
 /-!
 # Type substitution preserves typing
 
-`Γ;Ψ ⊢ e : τ ! φ` implies `Γ[ρ];Ψ[ρ] ⊢ e : τ[ρ] ! φ` for any substitution `ρ`
-of type variables. Terms carry no types, so `e` does not change.
+`Γ;Θ;Ψ ⊢ e : τ ! φ` implies `Γ[σ];Θ[σ];Ψ[σ] ⊢ e : τ[σ] ! φ[σ]` for a
+substitution `σ` of variables and run-time regions that keeps the regions `e`
+writes down and, if `e` has an `inside` form, makes no other atom one of them
+(`Fits`). Terms carry no types, so `e` does not change. Shifting, the
+instantiation of a scheme, the region of a new scope and the renaming of regions
+not yet created all fit.
 -/
 
 namespace Flick
 
 variable {S : Sig}
 
-def J.substT (ρ : Nat → Ty) : J → J
-  | .ex t φ => .ex (t.substT ρ) φ
-  | .alts t t' φ => .alts (t.substT ρ) (t'.substT ρ) φ
-  | .halts ε H t φ => .halts ε H (t.substT ρ) φ
+def J.substT (σ : Atom → Ty) : J → J
+  | .ex t φ => .ex (t.substT σ) (φ.substT σ)
+  | .alts t t' φ => .alts (t.substT σ) (t'.substT σ) (φ.substT σ)
+  | .halts ε H t φ => .halts (ε.substT σ) (H.substT σ) (t.substT σ) (φ.substT σ)
 
-theorem Le.substT {a b : Ty} (ρ : Nat → Ty) (h : Le a b) : Le (a.substT ρ) (b.substT ρ) := by
-  induction h with
-  | refl => exact .refl
-  | arrow _ hφ _ ih₁ ih₂ => exact .arrow ih₁ hφ ih₂
-  | eff hr he _ ih => exact .eff hr he ih
+/-- A substitution that fits a term: it keeps the regions the term writes, and if
+the term has an `inside` form, it brings in no run-time region. -/
+def Fits (σ : Atom → Ty) (e : Tm) : Prop :=
+  (∀ p, e.Has (.rgn p) → σ (.r p) = .rg p) ∧
+    (e.Has .ins → ∀ b p, (σ b).reach (.r p) → b = .r p)
 
-theorem Shp.of_substT {ρ : Nat → Ty} : ∀ {t : Ty} {v : Tm}, Shp S true (t.substT ρ) v → Shp S true t v
-  | .tvar _, _, _ | .arrow .., _, _ | .ref _, _, _ | .eff .., _, _ | .layer .., _, _
-  | .errors _, _, _ | .env _, _, _ => .hidden trivial
-  | .base _, _, h | .adt _, _, h | .rnil, _, h => h
-  | .rcons _ _ _, _, h => by
-    simp only [Ty.substT] at h
-    cases h with
-    | hidden ho => exact ho.elim
-    | rcons h₁ h₂ => exact .rcons (Shp.of_substT h₁) (Shp.of_substT h₂)
+theorem Fits.sub {σ : Atom → Ty} {e e' : Tm} (h : Fits σ e) (hs : ∀ s, e'.Has s → e.Has s) :
+    Fits σ e' :=
+  ⟨fun p hp => h.1 p (hs _ hp), fun hi => h.2 (hs _ hi)⟩
 
-theorem Covers.substT {t ps e} (ρ : Nat → Ty) (h : Covers S t ps e) : Covers S (t.substT ρ) ps e :=
-  h.imp (fun hx v hs => hx v (Shp.of_substT hs)) id
+theorem Fits.noIns {σ : Atom → Ty} {e : Tm} (hn : e.NoIns) (hr : ∀ p, σ (.r p) = .rg p) :
+    Fits σ e :=
+  ⟨fun p _ => hr p, fun hi => (hn hi).elim⟩
 
-theorem PatTy.substT {fl p t Δ} (ρ : Nat → Ty) (h : PatTy S fl p t Δ) :
-    PatTy S fl p (t.substT ρ) (Δ.map (Ty.substT ρ)) := by
-  induction h with
-  | wild => exact .wild
-  | var => exact .var
-  | lit => exact .lit
-  | head hK => rw [S.ctor_ty_substT ρ hK]; exact .head hK
-  | app _ _ ih₁ ih₂ => rw [List.map_append]; exact .app ih₁ ih₂
-  | adt _ ih => exact .adt ih
-  | rany => exact .rany
-  | rfield hR _ _ ih₁ ih₂ => rw [List.map_append]; exact .rfield (Ty.field_substT ρ hR) ih₁ ih₂
-  | or _ _ ih₁ ih₂ => exact .or ih₁ ih₂
+theorem shift_lift (k : Nat) (σ : Atom → Ty) (a : Atom) :
+    (shiftV k a).substT (liftT k σ) = (σ a).up k := by
+  cases a with
+  | v i => have : ¬ i + k < k := by omega
+           simp [shiftV, Ty.substT, liftT, this]
+  | r p => simp [shiftV, Ty.substT, liftT]
 
-theorem HPat.substT {ε₀ p θ Δ} (ρ : Nat → Ty) (h : HPat S ε₀ p θ Δ) :
-    θ.substT ρ = θ ∧ HPat S ε₀ p θ (Δ.map (Ty.substT ρ)) := by
-  cases h with
-  | wild => exact ⟨rfl, .wild⟩
-  | var => exact ⟨rfl, .var⟩
-  | ctor hp => exact ⟨rfl, .ctor (hp.substT ρ)⟩
+theorem Fits.lift {σ : Atom → Ty} {e : Tm} (h : Fits σ e) (k : Nat) : Fits (liftT k σ) e := by
+  refine ⟨fun p hp => by simp [liftT, h.1 p hp, Ty.up, Ty.substT, shiftV], fun hi b p hb => ?_⟩
+  have key : ∀ t : Ty, (t.up k).reach (.r p) → t.reach (.r p) := by
+    intro t ht
+    obtain ⟨a, ha, he⟩ := (Ty.reach_up t k _).mp ht
+    cases a <;> simp [Atom.up] at he; subst he; exact ha
+  cases b with
+  | v i =>
+    by_cases hik : i < k
+    · simp [liftT, hik] at hb
+    · simp only [liftT, hik, if_false] at hb
+      exact absurd (h.2 hi _ p (key _ hb)) (by simp)
+  | r q => simp only [liftT] at hb; exact h.2 hi _ p (key _ hb)
 
-theorem ctx_substT (Δ : List Ty) (Γ : List Scheme) (ρ : Nat → Ty) :
-    (Δ.map Scheme.mono ++ Γ).map (Scheme.substT ρ) =
-      (Δ.map (Ty.substT ρ)).map Scheme.mono ++ Γ.map (Scheme.substT ρ) := by
+theorem Ty.up_avoid_v0 (t : Ty) : ¬ (t.up 1).reach (.v 0) := by
+  intro h
+  obtain ⟨a, _, he⟩ := (Ty.reach_up t 1 _).mp h
+  cases a <;> simp [Atom.up] at he
+
+theorem ctx_substT (Δ : List Ty) (Γ : List Scheme) (σ : Atom → Ty) :
+    (Δ.map Scheme.mono ++ Γ).map (Scheme.substT σ) =
+      (Δ.map (Ty.substT σ)).map Scheme.mono ++ Γ.map (Scheme.substT σ) := by
   simp
 
-theorem shift_comm (Ψ : List Ty) (k : Nat) (ρ : Nat → Ty) :
-    (Ψ.map (Ty.up k)).map (Ty.substT (liftT k ρ)) = (Ψ.map (Ty.substT ρ)).map (Ty.up k) := by
+theorem shift_comm (Ψ : List Ty) (k : Nat) (σ : Atom → Ty) :
+    (Ψ.map (Ty.up k)).map (Ty.substT (liftT k σ)) = (Ψ.map (Ty.substT σ)).map (Ty.up k) := by
   simp [Ty.up_comm]
 
-theorem shift_comm' (Γ : List Scheme) (k : Nat) (ρ : Nat → Ty) :
-    (Γ.map (Scheme.up k)).map (Scheme.substT (liftT k ρ)) =
-      (Γ.map (Scheme.substT ρ)).map (Scheme.up k) := by
+theorem shift_comm' (Γ : List Scheme) (k : Nat) (σ : Atom → Ty) :
+    (Γ.map (Scheme.up k)).map (Scheme.substT (liftT k σ)) =
+      (Γ.map (Scheme.substT σ)).map (Scheme.up k) := by
   simp [Scheme.up_comm]
 
-theorem Typ.letGen_substT {Ψ : List Ty} {Γ : List Scheme} {e b : Tm} {a t : Ty} {φ : Stage}
-    {k : Nat}
-    (ih₁ : ∀ ρ, Typ S ((Ψ.map (Ty.up k)).map (Ty.substT ρ)) ((Γ.map (Scheme.up k)).map
-      (Scheme.substT ρ)) e (J.substT ρ (.ex a .pure)))
-    (ih₂ : ∀ ρ, Typ S (Ψ.map (Ty.substT ρ)) ((⟨k, a⟩ :: Γ).map (Scheme.substT ρ)) b
-      (J.substT ρ (.ex t φ))) (ρ : Nat → Ty) :
-    Typ S (Ψ.map (Ty.substT ρ)) (Γ.map (Scheme.substT ρ)) (.let_ e b) (J.substT ρ (.ex t φ)) := by
-  have h₁ := ih₁ (liftT k ρ)
-  rw [shift_comm, shift_comm'] at h₁
-  exact .letGen h₁ (ih₂ ρ)
+theorem Facts.up_comm (Θ : Facts) (k : Nat) (σ : Atom → Ty) :
+    (Θ.substT (shiftV k)).substT (liftT k σ) = (Θ.substT σ).substT (shiftV k) := by
+  rw [Facts.substT_comp, Facts.substT_comp]; congr 1; funext a; exact shift_lift k σ a
 
-theorem Typ.substT {Ψ Γ e J} (h : Typ S Ψ Γ e J) :
-    ∀ ρ, Typ S (Ψ.map (Ty.substT ρ)) (Γ.map (Scheme.substT ρ)) e (J.substT ρ) := by
+theorem Row.up_comm (r : Row) (k : Nat) (σ : Atom → Ty) :
+    (r.substT (shiftV k)).substT (liftT k σ) = (r.substT σ).substT (shiftV k) := by
+  rw [Row.substT_comp, Row.substT_comp]; congr 1; funext a; exact shift_lift k σ a
+
+theorem Row.ofCaps_substT (C : Caps) (σ : Atom → Ty) :
+    (Row.ofCaps C).substT σ = Row.ofCaps (C.substT σ) := by
+  funext x; cases x <;> rfl
+
+theorem Row.err_substT (E : Name) (U : Ty) (σ : Atom → Ty) :
+    (Row.err E U).substT σ = Row.err E (U.substT σ) := by
+  simp [Row.err, Row.ofCaps_substT, Ty.reach_caps]
+
+/-- What a term holds is kept by a substitution that fits it. -/
+theorem held_substT {Ψ : List Ty} {Γ : List Scheme} {e : Tm} {T : Ty} {σ : Atom → Ty} (hσ : Fits σ e)
+    (h : Caps.Sub (held Ψ Γ e) T.reach) :
+    Caps.Sub (held (Ψ.map (Ty.substT σ)) (Γ.map (Scheme.substT σ)) e) (T.substT σ).reach := by
+  rintro a (⟨i, s, hi, hs, ha⟩ | ⟨p, hp, rfl⟩ | ⟨l, t, hl, ht, ha⟩)
+  · simp only [List.getElem?_map, Option.map_eq_some_iff] at hs
+    obtain ⟨s₀, hs₀, rfl⟩ := hs
+    obtain ⟨b, hb, h'⟩ := (Scheme.reach_substT _ _ _).mp ha
+    exact (Ty.reach_substT σ _ _).mpr ⟨b, h b (.inl ⟨i, s₀, hi, hs₀, hb⟩), h'⟩
+  · refine (Ty.reach_substT σ _ _).mpr ⟨.r p, h _ (.inr (.inl ⟨p, hp, rfl⟩)), ?_⟩
+    rw [hσ.1 p hp]; rfl
+  · simp only [List.getElem?_map, Option.map_eq_some_iff] at ht
+    obtain ⟨t₀, ht₀, rfl⟩ := ht
+    obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ _).mp ha
+    exact (Ty.reach_substT σ _ _).mpr ⟨b, h b (.inr (.inr ⟨l, t₀, hl, ht₀, hb⟩)), h'⟩
+
+theorem Tm.NoIns.of_has {e e' : Tm} (h : e.NoIns) (hs : ∀ s, e'.Has s → e.Has s) : e'.NoIns :=
+  fun h' => h (hs _ h')
+
+theorem Typ.var_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} {σ' : Scheme}
+    {ts : List Ty} {T : Ty} {φ : Stage} (hi : Γ[i]? = some σ') (hts : ts.length = σ'.k)
+    (hH : σ'.Holds Θ ts) (hT : Le (σ'.inst ts) T) (σ : Atom → Ty) :
+    Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) (.var i)
+      (.ex (T.substT σ) (φ.substT σ)) := by
+  refine .var (σ := σ'.substT σ) (ts := ts.map (Ty.substT σ)) (by simp [hi])
+    (by simp [Scheme.substT, hts]) (hH.substT σ hts) ?_
+  rw [Scheme.inst_substT _ _ _ hts]; exact hT.substT σ
+
+theorem Typ.ctor_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name} {k : Nat}
+    {ts us : List Ty} {T₀ : Name} {T : Ty} {φ : Stage} (hK : S.ctor K = some (k, ts, T₀))
+    (hk : us.length = k) (hT : Le (Sig.ctorTy ts T₀ us) T) (σ : Atom → Ty) :
+    Typ S Ψ Θ Γ (.ctor K) (.ex (T.substT σ) φ) := by
+  refine .ctor (us := us.map (Ty.substT σ)) hK (by simpa using hk) ?_
+  have := hT.substT σ; rwa [S.ctorTy_substT σ _ hk hK] at this
+
+theorem Typ.letGen_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {e b : Tm} {a t : Ty}
+    {φ : Stage} {k : Nat} {Φ : Facts}
+    (ih₁ : ∀ σ, Fits σ e → Typ S ((Ψ.map (Ty.up k)).map (Ty.substT σ))
+      ((Facts.union (Θ.substT (shiftV k)) Φ).substT σ) ((Γ.map (Scheme.up k)).map (Scheme.substT σ))
+      e (J.substT σ (.ex a .pure)))
+    (ih₂ : ∀ σ, Fits σ b → Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ)
+      ((⟨k, Φ, a⟩ :: Γ).map (Scheme.substT σ)) b (J.substT σ (.ex t φ)))
+    (σ : Atom → Ty) (hσ : Fits σ (.let_ e b)) :
+    Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) (.let_ e b)
+      (J.substT σ (.ex t φ)) := by
+  have h₁ := ih₁ (liftT k σ) ((hσ.sub fun _ h => .inl h).lift k)
+  rw [shift_comm, shift_comm', Facts.union_substT, Facts.up_comm] at h₁
+  exact .letGen h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
+
+theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    ∀ σ, Fits σ e →
+      Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) e (J.substT σ) := by
   induction h with
-  | @var _ _ σ _ _ _ ts hi hts hT =>
-    intro ρ
-    refine .var (σ := σ.substT ρ) (ts := ts.map (Ty.substT ρ)) (by simp [hi]) (by simp [Scheme.substT, hts]) ?_
-    rw [Scheme.inst_substT _ _ _ hts]; exact hT.substT ρ
-  | lam _ hT ih =>
-    intro ρ; have := ih ρ; simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at this
-    exact .lam this (hT.substT ρ)
-  | app _ _ hψ hT ih₁ ih₂ => intro ρ; exact .app (ih₁ ρ) (ih₂ ρ) hψ (hT.substT ρ)
+  | var hi hts hH hT => intro σ _; exact Typ.var_substT hi hts hH hT σ
+  | lam _ hn hc hT ih =>
+    intro σ hσ; have := ih σ hσ
+    simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at this
+    exact .lam this hn (held_substT (e := .lam _) hσ hc) (hT.substT σ)
+  | app _ _ hψ hT ih₁ ih₂ =>
+    intro σ hσ
+    exact .app (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
+      (Stage.le_substT σ hψ) (hT.substT σ)
   | let_ _ _ ih₁ ih₂ =>
-    intro ρ; have := ih₂ ρ; simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at this
-    exact .let_ (ih₁ ρ) this
+    intro σ hσ; have := ih₂ σ (hσ.sub fun _ h => .inr h)
+    simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at this
+    exact .let_ (ih₁ σ (hσ.sub fun _ h => .inl h)) this
   | letGen _ _ ih₁ ih₂ => exact Typ.letGen_substT ih₁ ih₂
-  | letrec _ _ ih₁ ih₂ =>
-    intro ρ
-    have h₁ := ih₁ ρ; simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at h₁
-    have h₂ := ih₂ ρ; simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at h₂
-    exact .letrec h₁ h₂
-  | fix _ hT ih =>
-    intro ρ; have := ih ρ; simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at this
-    exact .fix this (hT.substT ρ)
-  | lit => intro _; exact .lit
-  | loc hl => intro ρ; exact .loc (by simp [hl])
+  | letrec _ hn hc _ ih₁ ih₂ =>
+    intro σ hσ
+    have h₁ := ih₁ σ (hσ.sub fun _ h => .inl h)
+    simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at h₁
+    have h₂ := ih₂ σ (hσ.sub fun _ h => .inr h)
+    simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at h₂
+    exact .letrec h₁ hn (held_substT (e := .fix _) (hσ.sub fun _ h => .inl h) hc) h₂
+  | fix _ hn hc hT ih =>
+    intro σ hσ; have := ih σ hσ
+    simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at this
+    exact .fix this hn (held_substT (e := .fix _) hσ hc) (hT.substT σ)
+  | lit => intro _ _; exact .lit
+  | loc hl => intro σ _; exact .loc (by simp [hl])
   | const hc hT =>
-    intro ρ; exact .const hc (by have := hT.substT ρ; rwa [Const.ty_substT] at this)
-  | ctor hK hT =>
-    intro ρ; exact .ctor hK (by have := hT.substT ρ; rwa [S.ctor_ty_substT ρ hK] at this)
-  | rnil => intro _; exact .rnil
+    intro σ _; exact .const (Const.ok_substT σ hc) (by have := hT.substT σ; rwa [Const.ty_substT] at this)
+  | ctor hK hk hT => intro σ _; exact Typ.ctor_substT hK hk hT σ
+  | rnil => intro _ _; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ =>
-    intro ρ
-    exact .rcons (hR.substT ρ) (by rw [Ty.labels_substT ρ hR]; exact hl) (ih₁ ρ) (ih₂ ρ)
-  | proj _ hf hT ih => intro ρ; exact .proj (ih ρ) (Ty.field_substT ρ hf) (hT.substT ρ)
-  | update _ hf _ ih₁ ih₂ => intro ρ; exact .update (ih₁ ρ) (Ty.field_substT ρ hf) (ih₂ ρ)
-  | match_ _ _ hc ih₁ ih₂ => intro ρ; exact .match_ (ih₁ ρ) (ih₂ ρ) (hc.substT ρ)
-  | anil => intro _; exact .anil
+    intro σ hσ
+    exact .rcons (hR.substT σ) (by rw [Ty.labels_substT σ hR]; exact hl)
+      (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
+  | proj _ hf hT ih => intro σ hσ; exact .proj (ih σ hσ) (Ty.field_substT σ hf) (hT.substT σ)
+  | update _ hf _ ih₁ ih₂ =>
+    intro σ hσ
+    exact .update (ih₁ σ (hσ.sub fun _ h => .inl h)) (Ty.field_substT σ hf)
+      (ih₂ σ (hσ.sub fun _ h => .inr h))
+  | match_ _ _ hc ih₁ ih₂ =>
+    intro σ hσ
+    exact .match_ (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
+      (hc.substT σ)
+  | anil => intro _ _; exact .anil
   | acons hp _ _ ih₁ ih₂ =>
-    intro ρ
-    have := ih₁ ρ; rw [ctx_substT] at this
-    exact .acons (hp.substT ρ) this (ih₂ ρ)
+    intro σ hσ
+    have := ih₁ σ (hσ.sub fun _ h => .inl h); rw [ctx_substT] at this
+    exact .acons (hp.substT σ) this (ih₂ σ (hσ.sub fun _ h => .inr h))
   | aguard hp _ _ _ ih₁ ih₂ ih₃ =>
-    intro ρ
-    have g := ih₁ ρ; rw [ctx_substT] at g
-    have b := ih₂ ρ; rw [ctx_substT] at b
-    exact .aguard (hp.substT ρ) g b (ih₃ ρ)
-  | todo => intro _; exact .todo
-  | task _ hψ hT ih => intro ρ; exact .task (ih ρ) hψ (hT.substT ρ)
-  | await _ hφ hT ih => intro ρ; exact .await (ih ρ) hφ (hT.substT ρ)
-  | raise _ hφ ih => intro ρ; exact .raise (ih ρ) hφ
-  | raiseAdt _ hφ ih => intro ρ; exact .raiseAdt (ih ρ) hφ
-  | errVal hv _ hE ih => intro ρ; exact .errVal hv (ih ρ) hE
-  | tryR _ _ hφ hs ih₁ ih₂ => intro ρ; exact .tryR (ih₁ ρ) (ih₂ ρ) hφ hs
-  | tryP _ _ ih₁ ih₂ => intro ρ; exact .tryP (ih₁ ρ) (ih₂ ρ)
-  | handle hv _ _ hc hφ ih₁ ih₂ => intro ρ; exact .handle hv (ih₁ ρ) (ih₂ ρ) hc hφ
-  | hnil hH => intro _; exact .hnil hH
+    intro σ hσ
+    have g := ih₁ σ (hσ.sub fun _ h => .inl h); rw [ctx_substT] at g
+    have b := ih₂ σ (hσ.sub fun _ h => .inr (.inl h)); rw [ctx_substT] at b
+    exact .aguard (hp.substT σ) g b (ih₃ σ (hσ.sub fun _ h => .inr (.inr h)))
+  | todo => intro _ _; exact .todo
+  | task _ hψ hn hc hT ih =>
+    intro σ hσ
+    exact .task (ih σ hσ) (Stage.le_substT σ hψ) hn (held_substT (e := .task _) hσ hc)
+      (hT.substT σ)
+  | await _ hφ hT ih =>
+    intro σ hσ; exact .await (ih σ hσ) (Stage.le_substT σ hφ) (hT.substT σ)
+  | raise _ hφ ih =>
+    intro σ hσ; exact .raise (ih σ hσ) (by simpa [Stage.substT] using Stage.le_substT σ hφ)
+  | raiseAdt _ hU hφ ih =>
+    intro σ hσ
+    refine .raiseAdt (ih σ hσ) (Ty.hd_substT σ hU) ?_
+    simpa [Stage.substT, Row.err_substT] using Stage.le_substT σ hφ
+  | errVal hv _ hU hE ih =>
+    intro σ hσ
+    refine .errVal hv (ih σ hσ) (Ty.hd_substT σ hU) ?_
+    rw [← Row.err_substT]; exact hE.substT σ
+  | tryR _ _ hφ hs ih₁ ih₂ =>
+    intro σ hσ
+    exact .tryR (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
+      (Stage.le_substT σ hφ) (by simpa using hs.substT σ)
+  | tryP _ _ ih₁ ih₂ =>
+    intro σ hσ
+    have := ih₂ σ (hσ.sub fun _ h => .inr h)
+    simp only [Flick.J.substT, Row.none_substT] at this
+    exact .tryP (ih₁ σ (hσ.sub fun _ h => .inl h)) this
+  | handle hv _ _ hc ha hφ ih₁ ih₂ =>
+    intro σ hσ
+    refine .handle hv (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
+      ?_ ?_ (by simpa [Stage.substT] using Stage.le_substT σ hφ)
+    · exact hc
+    · rintro a ⟨b, hb, h'⟩; exact ⟨b, ha b hb, h'⟩
+  | hnil hH =>
+    intro σ _
+    refine .hnil fun n hn => ?_
+    cases n with
+    | nm N => exact hH _ hn
+    | atm a => obtain ⟨b, hb, _⟩ := hn; exact hH _ hb
   | hcons hp _ _ hH ih₁ ih₂ =>
-    intro ρ
-    obtain ⟨hθ, hp'⟩ := hp.substT ρ
-    have := ih₁ ρ; rw [ctx_substT] at this
-    exact .hcons hp' this (ih₂ ρ) hH
+    intro σ hσ
+    have := ih₁ σ (hσ.sub fun _ h => .inl h); rw [ctx_substT] at this
+    exact .hcons (hp.substT σ) this (ih₂ σ (hσ.sub fun _ h => .inr h)) (Catches.substT σ hH)
   | hguard hp _ _ _ hH ih₁ ih₂ ih₃ =>
-    intro ρ
-    obtain ⟨_, hp'⟩ := hp.substT ρ
-    have g := ih₁ ρ; rw [ctx_substT] at g
-    have b := ih₂ ρ; rw [ctx_substT] at b
-    exact .hguard hp' g b (ih₃ ρ) hH
-  | provideL _ _ h₁ h₂ ih₁ ih₂ => intro ρ; exact .provideL (ih₁ ρ) (ih₂ ρ) h₁ h₂
-  | provideE _ _ h₁ h₂ ih₁ ih₂ => intro ρ; exact .provideE (ih₁ ρ) (ih₂ ρ) h₁ h₂
-  | with_ hv _ _ h₁ h₂ ih₁ ih₂ => intro ρ; exact .with_ hv (ih₁ ρ) (ih₂ ρ) h₁ h₂
-  | enil hρ => intro _; exact .enil hρ
+    intro σ hσ
+    have g := ih₁ σ (hσ.sub fun _ h => .inl h); rw [ctx_substT] at g
+    have b := ih₂ σ (hσ.sub fun _ h => .inr (.inl h)); rw [ctx_substT] at b
+    exact .hguard (hp.substT σ) g b (ih₃ σ (hσ.sub fun _ h => .inr (.inr h))) (hH.substT σ)
+  | provideL _ _ h₁ h₂ ih₁ ih₂ =>
+    intro σ hσ
+    exact .provideL (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
+      (by simpa [Stage.substT] using Stage.le_substT σ h₁)
+      (by simpa [Stage.substT] using Stage.le_substT σ h₂)
+  | provideE _ _ h₁ h₂ ih₁ ih₂ =>
+    intro σ hσ
+    exact .provideE (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
+      (by simpa [Stage.substT] using Stage.le_substT σ h₁)
+      (by simpa [Stage.substT] using Stage.le_substT σ h₂)
+  | with_ hv _ _ h₁ h₂ ih₁ ih₂ =>
+    intro σ hσ
+    exact .with_ hv (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
+      (by simpa [Stage.substT] using Stage.le_substT σ h₁)
+      (by simpa [Stage.substT] using Stage.le_substT σ h₂)
+  | enil hρ =>
+    intro σ _
+    refine .enil fun n hn => ?_
+    cases n with
+    | nm N => exact hρ _ hn
+    | atm a => obtain ⟨b, hb, _⟩ := hn; exact hρ _ hb
   | econs hv hθ _ _ hρ ih₁ ih₂ =>
-    intro ρ
-    have := ih₁ ρ; simp only [Flick.J.substT, S.impl_closed] at this
-    exact .econs hv hθ this (ih₂ ρ) hρ
+    intro σ hσ
+    have := ih₁ σ (hσ.sub fun _ h => .inl h); simp only [Flick.J.substT, S.impl_closed] at this
+    refine .econs hv hθ this (ih₂ σ (hσ.sub fun _ h => .inr h)) fun n hn => ?_
+    cases n with
+    | nm N' => exact hρ _ hn
+    | atm a =>
+      obtain ⟨b, hb, h'⟩ := hn
+      rcases hρ _ hb with h | h
+      · cases h
+      · exact .inr ⟨b, h, h'⟩
   | bind _ hρ ih =>
-    intro ρ
-    have := ih ρ; simp only [Flick.J.substT, S.impl_closed] at this
-    exact .bind this hρ
-  | join _ _ hρ ih₁ ih₂ => intro ρ; exact .join (ih₁ ρ) (ih₂ ρ) hρ
+    intro σ hσ
+    have := ih σ hσ; simp only [Flick.J.substT, S.impl_closed] at this
+    refine .bind this fun n hn => ?_
+    cases n with
+    | nm N' => exact hρ _ hn
+    | atm a => obtain ⟨b, hb, _⟩ := hn; cases hρ _ hb
+  | join _ _ hρ ih₁ ih₂ =>
+    intro σ hσ
+    refine .join (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
+      fun n hn => ?_
+    cases n with
+    | nm N' => exact hρ _ hn
+    | atm a =>
+      obtain ⟨b, hb, h'⟩ := hn
+      rcases hρ _ hb with h | h
+      · exact .inl ⟨b, h, h'⟩
+      · exact .inr ⟨b, h, h'⟩
+  | @scope _ _ _ _ F _ _ r ε _ _ hn hF _ hφ' hφ hT ih =>
+    intro σ hσ
+    have h₁ := ih (liftT 1 σ) (hσ.lift 1)
+    simp only [Flick.J.substT, List.map_cons, Scheme.mono_substT, Ty.substT, liftT] at h₁
+    simp only [if_true, Nat.zero_lt_one] at h₁
+    rw [shift_comm, shift_comm', Facts.union_substT, Facts.up_comm, Ty.up_comm] at h₁
+    refine .scope hn ?_ h₁ ?_ (Stage.le_substT σ hφ) (hT.substT σ)
+    · rintro C s ⟨C₀, s₀, h₀, rfl, rfl⟩
+      obtain ⟨rfl, hC⟩ := hF C₀ s₀ h₀
+      refine ⟨by simp [Ty.substT, liftT], fun ⟨b, hb, hv⟩ => ?_⟩
+      cases b with
+      | v i =>
+        cases i with
+        | zero => exact hC hb
+        | succ i =>
+          simp only [liftT, show ¬ i + 1 < 1 by omega, if_false] at hv
+          exact Ty.up_avoid_v0 _ hv
+      | r q => simp only [liftT] at hv; exact Ty.up_avoid_v0 _ hv
+    · have := Stage.le_substT (liftT 1 σ) hφ'
+      simp only [Stage.substT, Row.union_substT, Row.scope_substT, Row.up_comm] at this
+      simpa [Ty.substT, liftT] using this
+  | inside hF _ hφ' ht hε hφ hT ih =>
+    intro σ hσ
+    have hp : σ (.r _) = .rg _ := hσ.1 _ (.inl rfl)
+    have hav := hσ.2 (.inr (.inl rfl))
+    have h₁ := ih σ (hσ.sub fun _ h => .inr (.inr (.inr h)))
+    rw [Facts.union_substT] at h₁
+    refine .inside ?_ h₁ ?_ (fun h => ht ?_) (fun ⟨b, hb, h'⟩ => hε (by rwa [hav b _ h'] at hb))
+      (Stage.le_substT σ hφ) (hT.substT σ)
+    · rintro C s ⟨C₀, s₀, h₀, rfl, rfl⟩
+      obtain ⟨rfl, hC⟩ := hF C₀ s₀ h₀
+      exact ⟨by simp [Ty.substT, hp], fun q ⟨b, hb, h'⟩ => by rw [hav b q h'] at hb; exact hC q hb⟩
+    · simpa [Stage.substT, Row.union_substT, Row.scope_substT, Ty.substT, hp] using
+        Stage.le_substT σ hφ'
+    · obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ _).mp h
+      rwa [hav b _ h'] at hb
+  | cap =>
+    intro σ hσ
+    have hp := hσ.1 _ rfl
+    simp only [Flick.J.substT, Ty.substT, hp]; exact .cap
+  | own =>
+    intro σ hσ
+    have hp := hσ.1 _ rfl
+    simp only [Flick.J.substT, Ty.substT, hp]; exact .own
 
 end Flick

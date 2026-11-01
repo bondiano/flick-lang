@@ -17,48 +17,74 @@ structure ERel (E : List Frame) (φ' φ : Stage) : Prop where
   pure : φ = .pure → φ' = .pure
 
 /-- The services the `with` frames of `E` provide have their types. -/
-def ELook (S : Sig) (Ψ : List Ty) (E : List Frame) : Prop :=
-  ∀ N v, lookupE E N = some v → Typ S Ψ [] v (.ex (S.impl N) .pure)
+def ELook (S : Sig) (Ψ : List Ty) (Θ : Facts) (E : List Frame) : Prop :=
+  ∀ N v, lookupE E N = some v → Typ S Ψ Θ [] v (.ex (S.impl N) .pure)
 
 theorem List.map_up_up (Ψ : List Ty) (a b : Nat) :
     (Ψ.map (Ty.up a)).map (Ty.up b) = Ψ.map (Ty.up (a + b)) := by
   simp [Ty.up_up]
 
+theorem liftT_add (K k : Nat) (σ : Atom → Ty) : liftT k (liftT K σ) = liftT (K + k) σ := by
+  funext a
+  cases a with
+  | v i =>
+    by_cases h₁ : i < k
+    · simp [liftT, h₁, show i < K + k by omega]
+    · by_cases h₂ : i - k < K
+      · simp [liftT, h₁, h₂, show i < K + k by omega, Ty.up, Ty.substT, shiftV]; omega
+      · simp only [liftT, h₁, h₂, if_false, show ¬ i < K + k by omega, Ty.up_up]
+        congr 3; omega
+  | r p => simp [liftT, Ty.up_up]
+
+theorem Frame.plug_has {e : Tm} {s : Site} (F : Frame) (h : e.Has s) : (F.plug e).Has s := by
+  cases F <;> simp only [Frame.plug, Tm.Has] <;> simp [h]
+
+/-- A term in a context has everything its context gives it. -/
+theorem plug_has {e : Tm} {s : Site} : ∀ (E : List Frame), e.Has s → (plug E e).Has s
+  | [], h => h
+  | F :: E, h => plug_has E (F.plug_has h)
+
 /-- **Л3.** The hole of a well-typed context is well-typed, its stage is bounded
 as in `ERel`, and any term of its type can replace it. Under `K` frames of
-(Let-Gen) right-hand sides the hole is `K` type variables deep, and pure. -/
-theorem ctx_typing {Ψ} :
-    ∀ (E : List Frame) {r t φ}, OkE E → ¬ Value r → Typ S Ψ [] (plug E r) (.ex t φ) →
-      ∃ K t' φ', Typ S (Ψ.map (Ty.up K)) [] r (.ex t' φ') ∧ ERel E φ' φ ∧
-        (K ≠ 0 → φ' = .pure) ∧ Refill S Ψ K t' φ' (plug E) t φ ∧ (K = 0 → ELook S Ψ E)
+(Let-Gen) right-hand sides the hole is `K` variables deep, with the facts of
+their schemes, and pure; otherwise it has the facts of the context and the
+services of its `with` frames have their types. -/
+theorem ctx_typing {Ψ Θ} :
+    ∀ (E : List Frame) {r t φ}, OkE E → ¬ Value r → Typ S Ψ Θ [] (plug E r) (.ex t φ) →
+      ∃ K Θ' t' φ', Typ S (Ψ.map (Ty.up K)) Θ' [] r (.ex t' φ') ∧ ERel E φ' φ ∧
+        (φ' = .pure ∨ K = 0 ∧ Ext Θ Θ' ∧ ELook S Ψ Θ' E) ∧ Refill S Ψ Θ K Θ' t' φ' (plug E) t φ r
   | [], _, _, _, _, _, h =>
-    ⟨0, _, _, by simpa using h, ⟨fun n hn => .inl hn, fun _ _ h => h, fun h => h⟩,
-      fun h => (h rfl).elim, fun _ _ h' => by simpa using h',
-      fun _ _ _ h => by simp [lookupE] at h⟩
+    ⟨0, Θ, _, _, by simpa using h, ⟨fun n hn => .inl hn, fun _ _ h => h, fun h => h⟩,
+      .inr ⟨rfl, Ext.refl _, fun _ _ h => by simp [lookupE] at h⟩,
+      fun _ _ _ _ h' => by rw [List.map_up_zero, liftT_zero] at h'; exact h'⟩
   | F :: E, r, _, _, hE, hr, h => by
     obtain ⟨hF, hE'⟩ := hE.cons
-    obtain ⟨K₁, t₁, φ₁, h₁, rel₁, p₁, back₁, look₁⟩ := ctx_typing E hE' (not_value_plug hr F) h
-    obtain ⟨k, t', φ', h', rel, p, backF, lookF⟩ := frame_typing hr F hF h₁
+    obtain ⟨K₁, Θ₁, t₁, φ₁, h₁, rel₁, p₁, back₁⟩ := ctx_typing E hE' (not_value_plug hr F) h
+    obtain ⟨k, Θ', t', φ', h', rel, p, backF, lookF⟩ := frame_typing hr F hF h₁
     rw [List.map_up_up] at h'
-    refine ⟨K₁ + k, t', φ', h', ⟨fun n hn => ?_, fun hT => ?_, fun hp => rel.pure (rel₁.pure hp)⟩,
-      fun hK => ?_, fun X r' hr' => back₁ X (F.plug r') ?_, fun hK N v hv => ?_⟩
+    refine ⟨K₁ + k, Θ', t', φ', h', ⟨fun n hn => ?_, fun hT => ?_, fun hp => rel.pure (rel₁.pure hp)⟩,
+      ?_, fun σ hσ X r' hr' => back₁ σ hσ X (F.plug r') ?_⟩
     · rcases rel.svc n hn with h | h
       · rcases rel₁.svc n h with h | h
         · exact .inl h
         · exact .inr ((domE_cons F E n).mpr (.inr h))
       · exact .inr ((domE_cons F E n).mpr (.inl h))
     · exact (rel.err (hT F (by simp))).trans (rel₁.err fun G hG => hT G (by simp [hG]))
-    · by_cases hk : k = 0
-      · subst hk; exact rel.pure (p₁ (by omega))
-      · exact p hk
-    · have := backF (X.map (Ty.up K₁)) r' (by rw [← List.map_append, List.map_up_up]; exact hr')
-      rwa [← List.map_append] at this
-    · have hK₁ : K₁ = 0 := by omega
-      have hk : k = 0 := by omega
-      subst hK₁ hk
-      simp only [lookupE] at hv
-      cases hl : F.lookup N with
-      | some w => rw [hl] at hv; cases hv; simpa using lookF N _ hl
-      | none => rw [hl] at hv; exact look₁ rfl N v hv
+    · rcases p with hp | ⟨hk, hΘ, -⟩
+      · exact .inl hp
+      · rcases p₁ with hp₁ | ⟨hK₁, hΘ₁, look₁⟩
+        · exact .inl (rel.pure hp₁)
+        · subst hk hK₁
+          refine .inr ⟨rfl, hΘ₁.trans hΘ, fun N v hv => ?_⟩
+          simp only [lookupE] at hv
+          cases hl : F.lookup N with
+          | some w =>
+            rw [hl] at hv; cases hv
+            exact (by simpa using lookF N _ hl : Typ S Ψ Θ₁ [] _ _).cut fun _ _ h => h.mono hΘ.1
+          | none => rw [hl] at hv; exact (look₁ N v hv).cut fun _ _ h => h.mono hΘ.1
+    · have hσ' : Fits (liftT K₁ σ) (F.plug r) := (hσ.sub fun _ h => plug_has E h).lift K₁
+      have := backF (liftT K₁ σ) hσ' (X.map (Ty.up K₁)) r' (by
+        rw [liftT_add, shift_comm, ← List.map_append, List.map_up_up]; exact hr')
+      rwa [shift_comm, ← List.map_append] at this
 
 end Flick

@@ -1,5 +1,4 @@
-import Formal.Subst
-import Formal.TyOps
+import Formal.Reach
 
 /-!
 # Values, patterns, shapes and subtyping (core.md §1.3, §2.2, §2.4)
@@ -26,6 +25,8 @@ inductive Value : Tm → Prop
   | task : Value (.task e)
   | enil : Value .enil
   | econs : Value v → Value θ → Value (.econs S v θ)
+  | cap : Value (.cap p)
+  | own : Value (.own p)
 
 /-- Environment values `env θ` of core.md §3.1. -/
 inductive IsEnv : Tm → Prop
@@ -57,16 +58,26 @@ def matchP : Pat → Tm → Option (List Tm)
   | .or p q, v => (matchP p v).or (matchP q v)
   | _, _ => none
 
-/-- Subtyping `τ ≤ τ'` of core.md §2.2: only arrows and `Eff` have it. -/
+/-- Subtyping `τ ≤ τ'` of core.md §2.2 with (≤-Cap) of regions.md §2.2: only
+arrows and `Eff` have it, and the whole value is compared by `⌈·⌉`. -/
 inductive Le : Ty → Ty → Prop
   | refl : Le t t
-  | arrow : Le a' a → Stage.le φ φ' → Le t t' → Le (.arrow a φ t) (.arrow a' φ' t')
-  | eff : Row.Sub r r' → Row.Sub e e' → Le t t' → Le (.eff r e t) (.eff r' e' t')
+  | arrow : Le a' a → Stage.le φ φ' → Le t t' →
+      Caps.Sub (Ty.arrow a φ t C).reach (Ty.arrow a' φ' t' C').reach →
+      Le (.arrow a φ t C) (.arrow a' φ' t' C')
+  | eff : Row.Sub r r' → Row.Sub e e' → Le t t' →
+      Caps.Sub (Ty.eff r e t C).reach (Ty.eff r' e' t' C').reach →
+      Le (.eff r e t C) (.eff r' e' t' C')
 
-/-- Types whose values patterns cannot inspect. -/
-def Ty.Opaque : Ty → Prop
-  | .tvar _ | .arrow .. | .ref _ | .eff .. | .layer .. | .errors _ | .env _ => True
-  | _ => False
+/-- Types whose values patterns cannot inspect: all but base types, records and
+nominal data, read at the head of an application. -/
+def Ty.Opaque (t : Ty) : Prop :=
+  match t.hd with
+  | .base _ | .adt _ | .rnil | .rcons .. => False
+  | _ => True
+
+/-- `α₀ … αₖ₋₁`. -/
+def idTs (k : Nat) : List Ty := (List.range k).map Ty.tvar
 
 variable (S : Sig)
 
@@ -76,24 +87,28 @@ inductive PatTy : Bool → Pat → Ty → List Ty → Prop
   | wild : PatTy true .wild t []
   | var : PatTy true .var t [t]
   | lit : PatTy true (.lit l) (.base l.base) []
-  | head {ts : List Ty} : S.ctor K = some (ts, T) → PatTy false (.ctor K) (.arrows ts (.adt T)) []
-  | app : PatTy false p (.arrow a .pure t) Δ₁ → PatTy true q a Δ₂ →
+  | head {ts us : List Ty} : S.ctor K = some (k, ts, T) → us.length = k →
+      PatTy false (.ctor K) (Sig.ctorTy ts T us) []
+  | app : PatTy false p (.arrow a .pure t Caps.none) Δ₁ → PatTy true q a Δ₂ →
       PatTy false (.app p q) t (Δ₁ ++ Δ₂)
-  | adt : PatTy false p (.adt T) Δ → PatTy true p (.adt T) Δ
+  | adt : PatTy false p U Δ → U.hd = .adt T → PatTy true p U Δ
   | rany : PatTy true .rany R []
   | rfield : R.field l = some t → PatTy true p t Δ₁ → PatTy true r R Δ₂ →
       PatTy true (.rfield l p r) R (Δ₁ ++ Δ₂)
   | or : PatTy true p t Δ → PatTy true q t Δ → PatTy true (.or p q) t Δ
 
-/-- Shapes of closed values of a type, as far as patterns see them. -/
+/-- Shapes of closed values of a type, as far as patterns see them. The fields of
+a constructor have the types of its declaration: a field of a parameter type is
+opaque. -/
 inductive Shp : Bool → Ty → Tm → Prop
   | hidden : t.Opaque → Shp true t v
   | lit : Shp true (.base l.base) (.lit l)
   | rnil : Shp true .rnil .rnil
   | rcons : Shp true t e → Shp true R r → Shp true (.rcons l t R) (.rcons l e r)
-  | head {ts : List Ty} : S.ctor K = some (ts, T) → Shp false (.arrows ts (.adt T)) (.ctor K)
-  | app : Shp false (.arrow a .pure t) f → Shp true a e → Shp false t (.app f e)
-  | adt : Shp false (.adt T) v → Shp true (.adt T) v
+  | head {ts : List Ty} : S.ctor K = some (k, ts, T) →
+      Shp false (.arrows ts (.tcon T (idTs k))) (.ctor K)
+  | app : Shp false (.arrow a .pure t Caps.none) f → Shp true a e → Shp false t (.app f e)
+  | adt : Shp false U v → U.hd = .adt T → T'.hd = .adt T → Shp true T' v
 
 /-- `Exh(τ, Π)` of core.md §2.4. -/
 def Exh (t : Ty) (ps : List Pat) : Prop :=
@@ -111,12 +126,13 @@ inductive HPat (εb : Row) : Pat → Ty → List Ty → Prop
   | ctor : PatTy S false p (.adt T) Δ → HPat εb p (.adt T) Δ
 
 /-- The errors an arm without `when` removes: the set `H` of (Try). -/
-def Catches (εb : Row) (p : Pat) (θ : Ty) (n : Name) : Prop :=
-  (θ = .errors εb ∧ εb n) ∨ (θ = .adt n ∧ Exh S (.adt n) [p])
+def Catches (εb : Row) (p : Pat) (θ : Ty) : Elem → Prop
+  | .nm n => (θ = .errors εb ∧ εb n) ∨ (θ = .adt n ∧ Exh S (.adt n) [p])
+  | .atm _ => False
 
 /-- The error type of the raised value `v` is removed by the arms or let
 through: the value form of `ε_b ⊆ H + ε'`. -/
 def HCov (v : Tm) (H ε' : Row) : Prop :=
-  ∀ K ts T, v.head = .ctor K → S.ctor K = some (ts, T) → H T ∨ ε' T
+  ∀ K k ts T, v.head = .ctor K → S.ctor K = some (k, ts, T) → H T ∨ ε' T
 
 end Flick

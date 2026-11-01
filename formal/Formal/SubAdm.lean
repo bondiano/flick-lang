@@ -42,12 +42,12 @@ theorem Ty.field_rcons {R : Ty} {l t} (h : R.field l = some t) :
   cases R <;> simp [Ty.field] at h
   exact ⟨_, _, _, rfl⟩
 
-theorem Typ.sub {Ψ Γ e J} (h : Typ S Ψ Γ e J) : ∀ {J'}, JLe J J' → Typ S Ψ Γ e J' := by
+theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' → Typ S Ψ Θ Γ e J' := by
   induction h with
-  | var hi hts hT =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .var hi hts (hT.trans h₁)
-  | lam hb hT =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .lam hb (hT.trans h₁)
+  | var hi hts hH hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .var hi hts hH (hT.trans h₁)
+  | lam hb hn hc hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .lam hb hn hc (hT.trans h₁)
   | app _ _ hψ hT ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .app (ih₁ (.st h₂)) (ih₂ (.st h₂)) (Stage.le_trans hψ h₂) (hT.trans h₁)
@@ -57,17 +57,17 @@ theorem Typ.sub {Ψ Γ e J} (h : Typ S Ψ Γ e J) : ∀ {J'}, JLe J J' → Typ S
   | letGen he _ _ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .letGen he (ih₂ ⟨h₁, h₂⟩)
-  | letrec hf _ _ ih₂ =>
+  | letrec hf hn hc _ _ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .letrec hf (ih₂ ⟨h₁, h₂⟩)
-  | fix hf hT =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .fix hf (hT.trans h₁)
+    exact .letrec hf hn hc (ih₂ ⟨h₁, h₂⟩)
+  | fix hf hn hc hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .fix hf hn hc (hT.trans h₁)
   | lit => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .lit
   | loc hl => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .loc hl
   | const hc hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .const hc (hT.trans h₁)
-  | ctor hK hT =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .ctor hK (hT.trans h₁)
+  | ctor hK hk hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .ctor hK hk (hT.trans h₁)
   | rnil => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases h₁
@@ -91,29 +91,29 @@ theorem Typ.sub {Ψ Γ e J} (h : Typ S Ψ Γ e J) : ∀ {J'}, JLe J J' → Typ S
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.alts
     exact .aguard hp (ih₁ (.st h₂)) (ih₂ ⟨h₁, h₂⟩) (ih₃ ⟨rfl, h₁, h₂⟩)
   | todo => intro _ hJ; obtain ⟨_, _, rfl, _, _⟩ := hJ.ex; exact .todo
-  | task he hψ hT =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .task he hψ (hT.trans h₁)
+  | task he hψ hn hc hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .task he hψ hn hc (hT.trans h₁)
   | await _ hφ hT ih =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .await (ih (.st h₂)) (Stage.le_trans hφ h₂) (hT.trans h₁)
   | raise _ hφ ih =>
     intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex
     exact .raise (ih (.st h₂)) (Stage.le_trans hφ h₂)
-  | raiseAdt _ hφ ih =>
+  | raiseAdt _ hU hφ ih =>
     intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex
-    exact .raiseAdt (ih (.st h₂)) (Stage.le_trans hφ h₂)
-  | errVal hv _ hE ih =>
+    exact .raiseAdt (ih (.st h₂)) hU (Stage.le_trans hφ h₂)
+  | errVal hv _ hU hE ih =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases h₁
-    exact .errVal hv (ih (.st h₂)) hE
+    exact .errVal hv (ih (.st h₂)) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .tryR (ih₁ ⟨h₁, Stage.le_refl _⟩) (ih₂ ⟨rfl, rfl, h₁, h₂⟩) (Stage.le_trans hφ h₂) hs
   | tryP _ _ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .tryP (ih₁ ⟨h₁, Stage.le_refl _⟩) (ih₂ ⟨rfl, rfl, h₁, h₂⟩)
-  | handle hv hv' _ hc hφ _ ih₂ =>
+  | handle hv hv' _ hc ha hφ _ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .handle hv hv' (ih₂ ⟨rfl, rfl, h₁, h₂⟩) hc (Stage.le_trans hφ h₂)
+    exact .handle hv hv' (ih₂ ⟨rfl, rfl, h₁, h₂⟩) hc ha (Stage.le_trans hφ h₂)
   | hnil hH => intro _ hJ; obtain ⟨_, _, rfl, _, _⟩ := hJ.halts; exact .hnil hH
   | hcons hp _ _ hH ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.halts
@@ -140,5 +140,13 @@ theorem Typ.sub {Ψ Γ e J} (h : Typ S Ψ Γ e J) : ∀ {J'}, JLe J J' → Typ S
   | join _ _ hρ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases h₁
     exact .join (ih₁ (.st h₂)) (ih₂ (.st h₂)) hρ
+  | scope hn hF hb hφ' hφ hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .scope hn hF hb hφ' (Stage.le_trans hφ h₂) (hT.trans h₁)
+  | inside hF hb hφ' ht hε hφ hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .inside hF hb hφ' ht hε (Stage.le_trans hφ h₂) (hT.trans h₁)
+  | cap => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .cap
+  | own => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .own
 
 end Flick
