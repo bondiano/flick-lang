@@ -79,6 +79,15 @@ let run job =
   match job with
   | Loud f | Quiet f -> f ()
 
+// a warning in an arm does not let the `match` around it miss a value
+warned : Option Bool -> Int
+let warned o =
+  match o with
+  | None ->
+    match 1 with
+    | _ -> 0
+    | 2 -> 1
+
 //~ FLICK-T009 @7:3-7:14 `match` does not cover every value: `None` is not matched
 //~ FLICK-T009 @12:3-12:14 `match` does not cover every value: `Rect _ _` is not
 //~ FLICK-T009 @18:3-18:14 `match` does not cover every value: `Some None` is not
@@ -95,3 +104,5 @@ let run job =
 //~ FLICK-T010 @72:5-72:11 this arm is never reached
 //~ FLICK-T055 @44:5-44:6 `_` stands for `Circle`, `Empty` of `Shape`
 //~ FLICK-T003 @80:14-80:21 expected `Unit ->{} String`, found `Unit -> String`
+//~ FLICK-T009 @85:3-85:10 `match` does not cover every value: `Some _` is not matched
+//~ FLICK-T010 @89:7-89:8 this arm is never reached

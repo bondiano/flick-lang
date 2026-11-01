@@ -9,7 +9,7 @@ use super::convert::is_type;
 use super::regions::Held;
 use super::ty::Type;
 use super::typing::Ref;
-use crate::diagnostics::codes;
+use crate::diagnostics::{Severity, codes};
 use crate::numeric;
 use crate::source;
 use crate::syntax::cst::Node;
@@ -581,7 +581,12 @@ impl Checker<'_> {
                 None => first = body,
             }
         }
-        if self.diagnostics.len() == errors {
+        // an error in an arm makes its patterns unreliable; a warning does
+        // not, and must not let a `match` that misses a value through
+        if !self.diagnostics[errors..]
+            .iter()
+            .any(|d| d.severity == Severity::Error)
+        {
             self.exhaustive(node, &arms);
         }
         result
