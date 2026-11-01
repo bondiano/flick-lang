@@ -10,6 +10,7 @@ func onCause(fb *Fiber, task Value, handle func(*Cause) Value) Value {
 	if c == nil {
 		return v
 	}
+	skipHandler(fb, c)
 	return handle(c)
 }
 

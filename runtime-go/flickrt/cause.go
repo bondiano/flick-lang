@@ -168,6 +168,29 @@ func causeOf(r any) *Cause {
 	return &Cause{kind: causeDie, defect: fmt.Sprint(r) + "\n" + flickFrames(), thrown: true}
 }
 
+// skipHandler is Effect's failure in a fiber asked to stop while it is
+// interruptible: it skips the handler, its typed failures dropped and the
+// interruption added (FX/internal/core.ts:611-622, Р43).
+//
+// shortcut: only `try` and the handlers of `onCause` skip; `Effect.exit`, races and streams still see the cause, fix when a probe shows one
+func skipHandler(fb *Fiber, c *Cause) {
+	s := fb.state
+	if !s.requested.Load() || s.mask != 0 {
+		return
+	}
+	var out *Cause
+	for _, r := range c.reasons() {
+		if r.kind != causeFail {
+			out = concat(out, r)
+		}
+	}
+	stop := s.stopped().Cause
+	if !slices.ContainsFunc(out.reasons(), func(r *Cause) bool { return sameReason(r, stop) }) {
+		out = concat(out, stop)
+	}
+	panic(&Failure{out})
+}
+
 // Unmatched is what the handler of a `try` gives when no arm matches.
 var Unmatched Value = &struct{ unmatched bool }{true}
 
@@ -180,6 +203,7 @@ func Try(fb *Fiber, body Eff, handle func(*Fiber, Value) Value) Value {
 	if caught == nil {
 		return out
 	}
+	skipHandler(fb, caught)
 	if caught.has(causeDie) {
 		if caught.has(causeFail) {
 			caught = caught.failsToDies()

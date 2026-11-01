@@ -97,6 +97,27 @@ func TestTheTypedViewOfACauseSeesItsHeadOnly(t *testing.T) {
 	}
 }
 
+// A failure in a fiber asked to stop skips `try` while the fiber is
+// interruptible: its typed failures go, its interruption comes (Р43).
+func TestAnInterruptedFiberSkipsTheHandler(t *testing.T) {
+	fb := rootFiber()
+	fb.state.interrupt(5)
+	body := Eff(func(*Fiber) Value { return Fail(1.0) })
+	ran := false
+	handle := func(*Fiber, Value) Value { ran = true; return Unit }
+	masked(fb, 1, func() Value {
+		if _, c := catch(func() Value { return Try(fb, body, handle) }); c != nil || !ran {
+			t.Errorf("a masked fiber handles its failure: %v", c)
+		}
+		return Unit
+	})
+	ran = false
+	_, c := catch(func() Value { return Try(fb, body, handle) })
+	if r := c.reasons(); ran || len(r) != 1 || r[0].kind != causeInterrupt || r[0].fiber != 5 {
+		t.Errorf("the handler is skipped and the interruption stays: ran %v, %v", ran, r)
+	}
+}
+
 // The empty cause still fails, as Effect's `Cause.empty` (Р82).
 func TestTheEmptyCauseFails(t *testing.T) {
 	if _, c := catch(func() Value { return FailureRethrow(nil, CauseEmpty) }); c == nil || len(c.reasons()) != 0 {
