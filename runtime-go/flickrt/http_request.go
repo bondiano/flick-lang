@@ -30,6 +30,7 @@ type requestSource struct {
 	r       *http.Request  // a request a server got, or
 	client  *ClientRequest // the client request it was made of
 	marks   *requestMarks
+	head    string // a served request's raw head, when its connection was marked
 	hdrOnce sync.Once
 	hdrs    *Record
 	once    sync.Once
@@ -51,15 +52,19 @@ func (q *ServerRequest) modified() *ServerRequest {
 	return &c
 }
 
-// sourceHeaders are the headers as Node gives them: lower-case names, the
-// values of a repeated one joined, the host first and the others by name.
-//
-// shortcut: net/http does not keep the order of the headers, so they come sorted by name; keep the order when a program needs it
+// sourceHeaders are the headers as Node gives them: lower-case names in
+// the order they came (http_order.go), the values of a repeated one
+// joined; unmarked, the host first and the others by name.
 func (s *requestSource) headers() *Record {
 	if s.client != nil {
 		return s.client.headers
 	}
 	s.hdrOnce.Do(func() {
+		if s.head != "" {
+			if s.hdrs = orderedHeaders(s.r, s.head); s.hdrs != nil {
+				return
+			}
+		}
 		h := newRecord(len(s.r.Header) + 1)
 		if s.r.Host != "" {
 			h.put("host", s.r.Host)

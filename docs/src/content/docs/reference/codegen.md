@@ -439,7 +439,10 @@ URLs, the router's defaults, middleware, multipart forms, static files,
 streamed bodies, the client on `net/http` (interrupting a fiber cancels its
 request), typed `HttpApi` clients and the same OpenAPI document. What
 `net/http` decides differs: a response's status text is always the
-standard one and a request's header order is not kept. Compression with
+standard one, and the client sends a request's headers sorted by name. The
+server sees a request's headers in the order they came, as Node does, over
+HTTP/1.x; where it cannot follow a connection's framing they come with the
+host first and the others by name. Compression with
 brotli and zstd uses the Go modules `andybalholm/brotli` and
 `klauspost/compress`, which a program requires only when it reaches
 `Http.Middleware.compression`; its first build downloads them unless the
