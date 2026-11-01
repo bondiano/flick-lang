@@ -79,3 +79,7 @@ import Formal.Elab.Target
 import Formal.Elab.T6a
 import Formal.Elab.Run
 import Formal.Elab.Weaken
+import Formal.Elab.Sugar
+import Formal.Elab.SugarBase
+import Formal.Elab.DoNotation
+import Formal.Elab.Comprehension

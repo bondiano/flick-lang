@@ -378,7 +378,7 @@ instantiate it.
 | - | - | - |
 | P4a | λFlick⁺ (Р54) as an instance of `Target`; T1–T3 for it | open |
 | P4b | the source, `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (§2.4), dictionaries typed, T6(a); `Sim` from the steps of the target | done |
-| P4b′ | the sugar of §3 (`do`, `for`, `?`) as core terms | open |
+| P4b′ | the sugar of §3 (`do`, `for`, `?`, blocks) as source terms; each elaborates with the checker's type, T6(a) covers it | done |
 | P4c | `≈`, К1–К8, lemmas 6.1 and 6.2, T6(b) | done |
 
 | `elaboration.md` | Lean |
@@ -393,6 +393,9 @@ instantiate it.
 | §2.2, §2.4 `Γ; Δ ⊢ e : τ ! φ ⇝ e'`: (Var-Dict), (Method), (Let-Sig-Dict) | `Exp`, `Tm`, `Elab` (`Elab/Source.lean`) |
 | §0.1, §2.1 λFlick⁺, `D_Q`, `⟦σ⟧`, `⊢⁺` | `TTy`, `TSch`, `Scheme.tr`, `Target` (`Elab/Target.lean`) |
 | `Δ ⊩ Q ⇝ d ⇒ ⟦Δ⟧ ⊢⁺ d : D_Q`; T6(a) | `ent_typed`, `T6a` (`Elab/T6a.lean`) |
+| §3.1 `do` | `Stmt`, `Sugar.desugarDo`, `DoOk`, `do_elab`, `T6a_do` (`Elab/Sugar.lean`, `Elab/DoNotation.lean`) |
+| §3.2 `for`, §3.3 `?`, §3.4 blocks | `Clause`, `Sugar.gen`, `Sugar.loop`, `GenOk`, `LoopOk`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`, `T6a_sugar` (`Elab/Sugar.lean`, `Elab/Comprehension.lean`) |
+| Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`) |
 | "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim`, then `T6b_target` (`Elab/Run.lean`) |
 
 Simplifications:
@@ -436,3 +439,15 @@ Simplifications:
    states), `step_rel` (a step of one side is matched by zero or more steps of the other:
    evaluating `(I d̄).$slotᵢ` and `sᵢ[δ̄ := d̄]` takes different numbers of steps) and
    `final_rel` (a result of one side is reached by the other).
+9. The sugar (§3) desugars into `Exp`; `Sugar` names the Prelude methods (`flat_map`,
+   `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
+   hypotheses on the program. The checker's rules are the judgements `DoOk`, `GenOk` and
+   `LoopOk`; `?` and `s; rest` are premises of their lemmas. Patterns are variables (and `_`):
+   a refutable pattern needs `match`, which the source lacks. The values of a group
+   `p₁ <- e₁ and … and pₙ <- eₙ` form a left-nested tuple built by `map2 pair`, and
+   `λ(p₁, …, pₙ). e` is `unc n (λp₁ … pₙ. e)` with a constant `unc n` per arity; the checker
+   uses flat tuples with the same curried patterns. The clauses of `for … yield` run at `P`
+   (Sync calls are not modelled) and the loop of `for … do` at its stage, with one constant
+   `Seq.each_φ` per stage (Р184). Each source of `for` goes through `iter` (Р183). Only the
+   last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
+   form before it is not.
