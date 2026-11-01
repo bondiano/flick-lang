@@ -1,0 +1,30 @@
+""	{}
+"a=1\nb = two \nc"	{"a":"1","b":"two","c":true}
+"; comment\n# comment\n  \n\n\r\na=1\r\nb=2"	{"a":"1","b":"2"}
+"[server]\nhost=localhost\nport=8080\n\n[db]\nuser = root"	{"server":{"host":"localhost","port":"8080"},"db":{"user":"root"}}
+"[a.b]\nx=1\n[a]\ny=2\n[c\\.d]\nz=1"	{"a":{"y":"2","b":{"x":"1"}},"c.d":{"z":"1"}}
+"[a.b.c]\nx=1"	{"a":{"b":{"c":{"x":"1"}}}}
+"x=1\n[x.y]\nz=2"	{"x":{"y":{"z":"2"}}}
+"list[]=1\nlist[]=2\nlist[]=3"	{"list":["1","2","3"]}
+"k=1\nk[]=2"	{"k":["1","2"]}
+"[]=1\n[] = 2"	{"[]":"2"}
+"a=true\nb=false\nc=null\nd=TRUE\ne= true "	{"a":true,"b":false,"c":null,"d":"TRUE","e":true}
+"a=\"quoted ; not comment\"\nb='single'\nc=\"bad json\nd='1'\ne='[1,2]'\nf='{\"x\":1}'"	{"a":"quoted ; not comment","b":"single","c":"\"bad json","d":1,"e":[1,2],"f":{"x":1}}
+"a=value ; comment\nb=value # comment\nc=v;x\nd=v\\#x\ne=v\\\\x\nf=v\\nx"	{"a":"value","b":"value","c":"v","d":"v#x","e":"v\\x","f":"v\\nx"}
+"a=x=y\n=novalue\nb="	{"a":"x=y","b":""}
+"[ spaced ]\nk=v\n[\"quoted\"]\nq=1\n['single']\ns=2"	{"spaced":{"k":"v"},"quoted":{"q":"1"},"single":{"s":"2"}}
+"[sec] trailing\nk=v"	{"[sec] trailing":true,"k":"v"}
+"[sec]   \nk=v"	{"sec":{"k":"v"}}
+"__proto__=x\n[__proto__]\ny=1\nz=2"	{}
+"[a]\n__proto__=1\nok=2"	{"a":{"ok":"2"}}
+"a=x\n[a]\nb=1"	TypeError: Cannot create property 'b' on string 'x'
+"a=true\n[a]\nb=1"	TypeError: Cannot create property 'b' on boolean 'true'
+"a='1'\n[a]\nb=1"	TypeError: Cannot create property 'b' on number '1'
+"a=null\n[a]\nb=1"	{"a":{"b":"1"}}
+"'null'=n"	TypeError: Cannot read properties of null (reading 'length')
+"'1'=x\n\"2\"=y\n10=z\nb=w"	{"1":"x","2":"y","10":"z","b":"w"}
+"k=v w\nok=1"	{"ok":"1"}
+"k=café 😀\nu= x "	{"k":"café 😀","u":"x"}
+"[a]\nk=1\n[b]\nk=2\n[a]\nm=3"	{"a":{"k":"1","m":"3"},"b":{"k":"2"}}
+"a.b=1\n[a]\nc=2"	{"a.b":"1","a":{"c":"2"}}
+"['null']\nk=1\n['[1,2,3]']\nj=2\n['{\"a\":1}']\nm=3"	{"null":{"k":"1","['[1,2,3]']":true,"j":"2"},"[object Object]":{"m":"3"}}

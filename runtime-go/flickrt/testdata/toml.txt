@@ -1,0 +1,60 @@
+""	{}
+"title = \"TOML\"\n\n[owner]\nname = \"Tom\"\ndob = 1979-05-27T07:32:00-08:00"	{"title":"TOML","owner":{"name":"Tom","dob":"1979-05-27T15:32:00.000Z"}}
+"a = 1\nb = -2\nc = +3\nd = 1_000\ne = 3.14\nf = -0.01\ng = 5e+22\nh = 1e06\ni = -2E-2\nj = 6.626e-34\nk = 224_617.445_991"	{"a":1,"b":-2,"c":3,"d":1000,"e":3.14,"f":-0.01,"g":5e+22,"h":1000000,"i":-0.02,"j":6.626e-34,"k":224617.445991}
+"a = inf\nb = +inf\nc = -inf\nd = nan\ne = +nan\nf = -nan"	{"a":null,"b":null,"c":null,"d":null,"e":null,"f":null}
+"a = 0xDEADBEEF\nb = 0xdead_beef\nc = 0o755\nd = 0b1101\ne = 0x1FFFFFFFFFFFFFFFFF"	{"a":3735928559,"b":3735928559,"c":493,"d":13,"e":590295810358705700000}
+"a = true\nb = false"	{"a":true,"b":false}
+"a = 1979-05-27T07:32:00Z\nb = 1979-05-27T00:32:00.999999-07:00\nc = 1979-05-27 07:32:00Z\nd = 1979-05-27T07:32:00\ne = 1979-05-27\nf = 07:32:00\ng = 00:32:00.999999\nh = 1979-05-27t07:32:00z\ni = 1979-05-27 07:32:00"	{"a":"1979-05-27T07:32:00.000Z","b":"1979-05-27T07:32:00.999Z","c":"1979-05-27T07:32:00.000Z","d":"1979-05-27T07:32:00","e":"1979-05-27","f":"07:32:00","g":"00:32:00.999999","h":"1979-05-27T07:32:00.000Z","i":"1979-05-27T07:32:00"}
+"a = 2024-02-30T00:00:00Z"	{"a":"2024-03-01T00:00:00.000Z"}
+"a = 2024-13-01T00:00:00Z"	SyntaxError: Invalid date-time '2024-13-01T00:00:00Z' at line 1, column 25
+"a = \"tab\\tnew\\nquote\\\"back\\\\u\\u00e9U\\U0001F600\""	{"a":"tab\tnew\nquote\"back\\uéU😀"}
+"a = \"\\uD83D\\uDE00\""	{"a":"😀"}
+"a = \"\\U00110000\""	RangeError: Invalid code point 1114112
+"a = \"\\x41\""	SyntaxError: Invalid escape '\x' at line 1, column 8
+"a = \"\\u12\""	SyntaxError: Invalid unicode escape at line 1, column 8
+"a = \"\"\"\nRoses are red\nViolets are blue\"\"\""	{"a":"Roses are red\nViolets are blue"}
+"a = \"\"\"\r\nline\\\n   continued \\\n\n  here\"\"\""	{"a":"linecontinued here"}
+"a = \"\"\"x\\   y\"\"\""	SyntaxError: Invalid multiline string continuation at line 1, column 13
+"a = 'C:\\Users\\nodejs'\nb = '''\nraw \\n text\n'''"	{"a":"C:\\Users\\nodejs","b":"raw \\n text\n"}
+"a = \"unterminated"	SyntaxError: Unterminated basic string at line 1, column 18
+"a = 'unterminated"	SyntaxError: Unterminated literal string at line 1, column 18
+"a = \"new\nline\""	SyntaxError: Basic strings cannot contain newlines at line 1, column 9
+"a = 'new\nline'"	SyntaxError: Literal strings cannot contain newlines at line 1, column 9
+"a = [1, 2, 3]\nb = [\"a\", 'b']\nc = [[1, 2], [3]]\nd = [\n  1,\n  2, # comment\n]\ne = []"	{"a":[1,2,3],"b":["a","b"],"c":[[1,2],[3]],"d":[1,2],"e":[]}
+"a = [1 2]"	SyntaxError: Expected ',' at line 1, column 8
+"a = { x = 1, y = \"two\", z.w = 3 }\nb = {}"	{"a":{"x":1,"y":"two","z":{"w":3}},"b":{}}
+"a = { x = 1, }"	SyntaxError: Inline tables cannot end with a trailing comma at line 1, column 14
+"a = { x = 1"	SyntaxError: Expected ',' at line 1, column 12
+"[table]\nkey = 1\n[table.sub]\nkey = 2\n[other]"	{"table":{"key":1,"sub":{"key":2}},"other":{}}
+"[a]\n[a]"	SyntaxError: Cannot redefine table 'a' at line 2, column 4
+"[a.b]\n[a]\nx = 1\n[a]"	SyntaxError: Cannot redefine table 'a' at line 4, column 4
+"a = 1\n[a]"	SyntaxError: Cannot redefine existing key 'a' at line 2, column 4
+"a = 1\na = 2"	SyntaxError: Cannot redefine existing key 'a' at line 2, column 6
+"a.b = 1\na.c = 2\n[a.d]\ne = 3"	{"a":{"b":1,"c":2,"d":{"e":3}}}
+"a = 1\na.b = 2"	SyntaxError: Cannot redefine existing key 'a' at line 2, column 8
+"[[fruit]]\nname = \"apple\"\n[fruit.physical]\ncolor = \"red\"\n[[fruit.variety]]\nname = \"red delicious\"\n[[fruit]]\nname = \"banana\""	{"fruit":[{"name":"apple","physical":{"color":"red"},"variety":[{"name":"red delicious"}]},{"name":"banana"}]}
+"a = 1\n[[a]]"	SyntaxError: Cannot redefine existing key 'a' at line 2, column 6
+"a = []\n[a.b]"	SyntaxError: Cannot redefine existing key 'a' at line 2, column 6
+"a = [{x = 1}]\n[[a]]\nx = 2"	{"a":[{"x":1},{"x":2}]}
+"\"quoted key\" = 1\n'literal key' = 2\n\"\" = 3\nbare-key_1 = 4\n1234 = 5"	SyntaxError: Expected a key at line 3, column 3
+"= 1"	SyntaxError: Expected a key at line 1, column 1
+"a = "	SyntaxError: Expected a value at line 1, column 5
+"a = 1 b = 2"	SyntaxError: Expected the end of the line at line 1, column 7
+"a = 1 # comment\n# whole line\n  b = 2   "	{"a":1,"b":2}
+"a = what"	SyntaxError: Invalid value 'what' at line 1, column 9
+"a = 1979-05-27T07:32:00+0800"	SyntaxError: Invalid value '1979-05-27T07:32:00+0800' at line 1, column 29
+"a = 01"	SyntaxError: Invalid value '01' at line 1, column 7
+"a = 1__0"	SyntaxError: Invalid value '1__0' at line 1, column 9
+"a = .5"	SyntaxError: Invalid value '.5' at line 1, column 7
+"a = 1."	SyntaxError: Invalid value '1.' at line 1, column 7
+"﻿a = 1"	{"a":1}
+"a = \"café 😀\"\n😀 = 1"	SyntaxError: Expected a key at line 2, column 1
+"a = \"😀\" b"	SyntaxError: Expected the end of the line at line 1, column 10
+"[a\n"	SyntaxError: Expected ']' at line 1, column 3
+"[[a]\n"	SyntaxError: Expected ']' at line 1, column 5
+"a = \"x\" \"y\""	SyntaxError: Expected the end of the line at line 1, column 9
+"a = \"\\q\""	SyntaxError: Invalid escape '\q' at line 1, column 8
+"a = \"x\\"	SyntaxError: Invalid escape '\' at line 1, column 9
+"a.\"b.c\".d = 1"	{"a":{"b.c":{"d":1}}}
+"a . b = 1"	{"a":{"b":1}}
+"[ a . b ]\nc = 1"	{"a":{"b":{"c":1}}}
