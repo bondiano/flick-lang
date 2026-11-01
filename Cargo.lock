@@ -243,6 +243,7 @@ version = "0.1.0"
 dependencies = [
  "flick-core",
  "proptest",
+ "serde_json",
 ]
 
 [[package]]

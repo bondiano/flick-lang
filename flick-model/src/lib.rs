@@ -18,6 +18,7 @@ pub mod decls;
 pub mod eval;
 pub mod generate;
 pub mod native;
+pub mod rt;
 pub mod run;
 pub mod subst;
 pub mod syntax;
