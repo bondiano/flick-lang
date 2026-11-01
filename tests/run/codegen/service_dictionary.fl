@@ -24,4 +24,7 @@ let main () = provide (Layer.succeed Render render_impl) {
   let half = Render.pair 1
   Platform.stdout_line (half true)
   Platform.stdout_line (twice 1.5)
+  // a field of the implementation is called directly at an instance
+  Platform.stdout_line (render_impl.render 7)
+  Platform.stdout_line (render_impl.pair "a" [true])
 }

@@ -65,8 +65,10 @@ impl Checker<'_> {
         let record = self.infer(target);
         #[cfg(feature = "ide")]
         self.note_field(label_span, &record);
+        // a polymorphic field (`S.Impl`, a dictionary) is used at an instance,
+        // with the dictionaries of its constraints, like a name
         if let Some(field) = self.known_field(&record, &label) {
-            return field;
+            return self.instantiate(&field, self.span(node));
         }
         let field = self.fresh();
         let rest = self.fresh();
@@ -89,7 +91,7 @@ impl Checker<'_> {
             );
             return Type::Error;
         }
-        field
+        self.instantiate(&field, self.span(node))
     }
 
     /// A record literal; `expected` gives the types of fields it mentions.

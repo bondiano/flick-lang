@@ -73,7 +73,14 @@ impl Lower<'_> {
             K::QuestionExpr => return self.question(node, children[0]),
             K::FieldExpr => {
                 let label = self.token_text(node, K::Ident).unwrap_or_default();
-                ExprKind::Field(self.boxed(children[0]), label)
+                let field = Expr::new(ExprKind::Field(self.boxed(children[0]), label), span);
+                let dicts = self
+                    .typing
+                    .dicts
+                    .get(&node.range())
+                    .cloned()
+                    .unwrap_or_default();
+                return with_dicts(field, dicts);
             }
             K::RecordExpr => ExprKind::Record(self.fields(node)),
             K::RecordUpdate => {
