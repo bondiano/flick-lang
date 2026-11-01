@@ -11,6 +11,7 @@ import Formal.Weaken
 import Formal.Cut
 import Formal.SubAdm
 import Formal.Held
+import Formal.SubstPat
 import Formal.Substitution
 import Formal.Canonical
 import Formal.Shapes
@@ -21,6 +22,7 @@ import Formal.Patterns
 import Formal.Frames
 import Formal.Context
 import Formal.Lemma3
+import Formal.Fresh
 import Formal.StepFrame
 import Formal.Progress
 import Formal.ProgressMain
@@ -28,6 +30,7 @@ import Formal.PresPure
 import Formal.PresRt
 import Formal.Preservation
 import Formal.Soundness
+import Formal.Lemma4
 import Formal.Effects
 import Formal.Generalization
 import Formal.Examples

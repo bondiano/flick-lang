@@ -128,26 +128,26 @@ theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
   cases hs with
   | pure hE hh =>
     obtain ⟨_, _, _, _, hr, _, _, back⟩ := ctx_typing _ hE hh.not_value h
-    exact ⟨[], by simpa using hμ, back [] _ (by simpa using pure_preservation hr hh)⟩
+    exact ⟨[], by simpa using hμ, back.id [] _ (by simpa using pure_preservation hr hh)⟩
   | rt hE hh =>
     obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE hh.not_value h
     obtain ⟨rfl, rfl, -⟩ := hK.resolve_left fun hp => by subst hp; exact hh.not_pure hr
     simp only [List.map_up_zero] at hr
     obtain ⟨X, hμ', hr'⟩ := rt_preservation hr hμ hh
-    exact ⟨X, hμ', back X _ (by simpa using hr')⟩
+    exact ⟨X, hμ', back.id X _ (by simpa using hr')⟩
   | askWith hE hl =>
     obtain ⟨K, Θ', t₁, φ₁, hr, _, hK, back⟩ := ctx_typing _ hE ask_not_value h
     obtain ⟨rfl, rfl, look⟩ := hK.resolve_left fun hp => by subst hp; exact (ask_inv hr).1
     simp only [List.map_up_zero] at hr
     have hv := (look _ _ hl).sub (J' := .ex t₁ φ₁) ⟨(ask_inv hr).2, Stage.pure_le _⟩
-    exact ⟨[], by simpa using hμ, back [] _ (by simpa using hv)⟩
+    exact ⟨[], by simpa using hμ, back.id [] _ (by simpa using hv)⟩
   | askRoot hE _ hr₀ =>
     obtain ⟨K, Θ', t₁, φ₁, hr, _, hK, back⟩ := ctx_typing _ hE ask_not_value h
     obtain ⟨rfl, rfl, -⟩ := hK.resolve_left fun hp => by subst hp; exact (ask_inv hr).1
     simp only [List.map_up_zero] at hr
     have hv := (((hroot _ _ hr₀).2.cut (Entails.all _)).weakenStore Ψ).sub (J' := .ex t₁ φ₁)
       ⟨(ask_inv hr).2, Stage.pure_le _⟩
-    exact ⟨[], by simpa using hμ, back [] _ (by simpa using hv)⟩
+    exact ⟨[], by simpa using hμ, back.id [] _ (by simpa using hv)⟩
   | raise hE hF hnt _ hv =>
     obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ :=
       ctx_typing _ hE (not_value_plug raise_not_value _) h
@@ -157,6 +157,6 @@ theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
       obtain rfl := rel'.pure rfl
       exact raise_not_pure hr'
     simp only [List.map_up_zero] at hr
-    exact ⟨[], by simpa using hμ, back [] _ (by simpa using raise_frame hF hnt hv hr)⟩
+    exact ⟨[], by simpa using hμ, back.id [] _ (by simpa using raise_frame hF hnt hv hr)⟩
 
 end Flick

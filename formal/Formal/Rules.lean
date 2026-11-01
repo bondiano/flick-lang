@@ -118,8 +118,12 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
 
 /-- The facts of a running configuration for T1: any. The facts a scope gives its
 region are about everything outside it; T4 needs them to hold of the order in
-which regions are created. -/
+which regions are created (`Facts.age`). -/
 def Facts.all : Facts := fun _ _ => True
+
+/-- Facts that hold of the order in which regions are created: a region outlives
+every region created after it. -/
+def Facts.age : Facts := fun C s => ∀ q p, C (.r q) → s.reach (.r p) → q < p
 
 /-- `⊢ μ : Ψ` of core.md §3.6. -/
 def StoreTy (Ψ : List Ty) (μ : List Tm) : Prop :=

@@ -24,7 +24,8 @@ only Lean's standard `propext`, `Classical.choice` and `Quot.sound`; the hypothe
 | P1b | stages `P`/`R⟨r;ε⟩` and subtyping, closed rows, `raise`/`try`/`handle`, `task`/`await`, `ask`/`with`/`provide` and layers; Л1–Л3, Progress, Preservation, T1, T2(a), T2(b) | done |
 | P1c | type variables and schemes, (Let-Gen) with the premise `P`, Л2 for schemes, lemma 3.1, T3 | done |
 | P2a | regions and capture sets as atoms, `⌈·⌉` and its commutation with substitution, qualifiers on arrows and `Eff`, (≤-Cap), nominal types with parameters, schemes over variables of every kind with facts `Θ`, (Lam)/(Task) with what the body holds, (Scope), the run-time forms `inside`/`cap`/`own`, `open_H`, `op_H`, `Scope.add_finalizer`, `Fiber.spawn`; regions `Λ` with children and finalizers, closing; Л4 without the store, T1–T3 again | done |
-| P2b | reach through the store, Л4–Л6, the invariant `⊢ Λ` | open |
+| P2b | Л3 under a substitution that fits the term (`Refill`), the renaming of regions not yet created (`kill`), `reach_μ` and Л4 through the store | done |
+| P2b′ | Л5, Л6, the invariant `⊢ Λ` | open |
 | P2c | the freshness premises of (Inside), T4, T1 with `op_H`; the provider of a service (Р37) | open |
 
 ## Map to `core.md` and `regions.md`
@@ -52,10 +53,12 @@ only Lean's standard `propext`, `Classical.choice` and `Quot.sound`; the hypothe
 | lemma about `build` | `canonical_layer` (`CanonLayer.lean`) |
 | Л1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_owner`, `canonical_hnd`, `canonical_env`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `CanonEnv.lean`, `Canonical.lean`) |
 | (Let-Gen), (Let-Mono) | `Typ.letGen`, `Typ.let_` (`Rules.lean`) |
-| type substitution lemma | `Typ.substT`, with `Fits` (`TySubst.lean`) |
+| type substitution lemma | `Typ.substT`, with `Fits` (`TySubst.lean`, `SubstPat.lean`) |
 | Л2 | `Typ.subst`, `Typ.instantiate`, `SubOk.one` (`Substitution.lean`) |
-| Л3 | `ctx_typing` (`Lemma3.lean`) |
+| Л3 | `ctx_typing` (`Lemma3.lean`); its `Refill` holds after any substitution that fits the term (`Context.lean`) |
 | Л4 without the store: a value holds no more than its type shows | `Typ.holds` (`Held.lean`) |
+| §5.2 `reach_μ`; Л4 | `Reaches`; `lemma_4`, `lemma_4_cell` (`Lemma4.lean`) |
+| regions not yet created, renamed away; facts of the order of creation | `kill`, `Ty.YF`, `Tm.Below`, `Facts.age` (`Fresh.lean`, `Rules.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
 | Preservation | `preservation` (`Preservation.lean`); of a configuration: `cstep_typed` (`Soundness.lean`) |
 | T1 | `T1` (`Soundness.lean`) |
