@@ -28,6 +28,9 @@ export const traceEvent = (event: Readonly<Record<string, string | number>>): vo
 
 const children = /*#__PURE__*/ new WeakMap<object, number>();
 
+/** The id of a child `fiberSpawn` registered, if it is one. */
+export const spawnedChild = (fiber: object): number | undefined => children.get(fiber);
+
 /** The id of a child, given at its spawn. */
 export const traceChild = (fiber: object): number => {
   let id = children.get(fiber);

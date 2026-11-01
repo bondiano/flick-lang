@@ -6,7 +6,7 @@
 import { Cause, Context, Effect, Exit, Fiber, Scope } from "effect";
 
 import { Failure } from "./cause.ts";
-import { traceChild, traceEvent, traceId, tracing } from "./trace.ts";
+import { spawnedChild, traceChild, traceEvent, traceId, tracing } from "./trace.ts";
 
 /** The owner of the innermost scope; the entry runner's root owner outside one. */
 export const CurrentOwner = /*#__PURE__*/ Context.Reference<Owner | undefined>("@flick-lang/runtime/CurrentOwner", {
@@ -85,7 +85,11 @@ export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<
     yield* hooks;
     owner.phase("C2");
     if (tracing && owner.trace !== 0) {
-      for (const child of owner.children) traceEvent({ e: "interrupt", o: owner.trace, f: traceChild(child) });
+      for (const child of owner.children) {
+        // the children of callbacks have no watcher and are not traced
+        const f = spawnedChild(child);
+        if (f !== undefined) traceEvent({ e: "interrupt", o: owner.trace, f });
+      }
     }
     yield* Fiber.interruptAll([...owner.children]);
     for (let next = first(owner.watchers); next !== undefined; next = first(owner.watchers)) {
