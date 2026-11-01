@@ -334,4 +334,6 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
 };
 
 /** Flick data that crosses the boundary of an import outside the runtime. */
-export const copyData = <A>(value: A): A => copyThrough(value, (x) => x) as A;
+export const copyData = <A>(value: A): A =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a copy has the shape of what it copies
+  copyThrough(value, (x) => x) as A;
