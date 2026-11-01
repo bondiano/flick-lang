@@ -5,9 +5,10 @@
 // which lists them. A disabled trace costs one check of `tracing`.
 //
 // shortcut: finalizers Effect adds itself (of layers, channels, servers) are not seen here, so neither runtime writes them; trace them when the monitor needs them
-import { env, nodeFs } from "./host.ts";
+import { nodeFs, takeEnv } from "./host.ts";
 
-const path = /*#__PURE__*/ env("FLICK_TRACE");
+// taken: a process or worker this one starts writes no trace over this one's
+const path = /*#__PURE__*/ takeEnv("FLICK_TRACE");
 
 /** Whether events are written. */
 export const tracing: boolean = path !== undefined && path !== "";
