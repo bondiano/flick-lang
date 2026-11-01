@@ -202,8 +202,9 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
     refine ⟨⟨fun p hp => ?_, fun l v hv => (h.mem l v hv).mono (by simp),
       fun q g hq => ?_⟩, by simp⟩
     · simp only [List.length_append, List.length_singleton]
-      rcases hp with hp | hp | hp
+      rcases hp with hp | hp | hp | hp
       · cases hp; omega
+      · cases hp
       · cases hp
       · rcases subst_inst_has hp with hp | ⟨w, hw, hp⟩
         · exact Nat.lt_succ_of_lt (h.main _ hp)
@@ -245,7 +246,7 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
     · simp at hk'; subst hk'; exact hf _ (by rw [hfs]; simp)
   | close hg =>
     obtain ⟨hk, _⟩ := h.rgs _ _ hg
-    exact ⟨h.set hg hk (fun f hf' => by simp at hf') (sub fun _ h => .inr (.inr h)),
+    exact ⟨h.set hg hk (fun f hf' => by simp at hf') (sub fun _ h => .inr (.inr (.inr h))),
       by simp [setRgn]⟩
 
 theorem root_below {root : Name → Option Tm} (hroot : RootTy S root) {N v} (h : root N = some v)

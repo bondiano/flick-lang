@@ -5,7 +5,7 @@ import Formal.TyOps
 # What a term holds (regions.md §2.1, §2.3, §5.2)
 
 `e.Has` is what a term writes down: a run-time region (in `cap π`, `own π`,
-`inside π e`), a location, an `inside` form. `e.Free i` is a free variable.
+`inside π e`), a location, an `inside` form, the `inside` form of a region. `e.Free i` is a free variable.
 `held Ψ Γ e` is what the premises of (Lam) and (Task) bound: `⌈Γ(y)⌉` of each
 free `y`, the run-time regions written in `e` and `⌈Ψ(ℓ)⌉` of each location.
 -/
@@ -17,6 +17,7 @@ inductive Site
   | rgn (p : Nat)
   | loc (l : Nat)
   | ins
+  | frame (p : Nat)
 
 def Tm.Has : Tm → Site → Prop
   | .var _, _ => False
@@ -50,7 +51,7 @@ def Tm.Has : Tm → Site → Prop
   | .bind _ e, s => e.Has s
   | .join e₁ e₂, s => e₁.Has s ∨ e₂.Has s
   | .scope e, s => e.Has s
-  | .inside p e, s => s = .rgn p ∨ s = .ins ∨ e.Has s
+  | .inside p e, s => s = .rgn p ∨ s = .ins ∨ s = .frame p ∨ e.Has s
   | .cap p, s => s = .rgn p
   | .own p, s => s = .rgn p
 
@@ -250,10 +251,11 @@ theorem Tm.has_subst :
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih => intro σ s h; exact ih σ s h
   | inside p e ih =>
     intro σ s h
-    rcases h with h | h | h
+    rcases h with h | h | h | h
     · exact .inl (.inl h)
     · exact .inl (.inr (.inl h))
-    · exact (ih σ s h).imp (.inr ∘ .inr) id
+    · exact .inl (.inr (.inr (.inl h)))
+    · exact (ih σ s h).imp (.inr ∘ .inr ∘ .inr) id
   | _ => intro σ s h; exact .inl h
 
 /-- An atom of a scheme's type, outside its own binders, in the context's terms. -/

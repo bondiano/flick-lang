@@ -12,9 +12,9 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 ```
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
-command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6` and
-`T5` lists only Lean's standard `propext`, `Classical.choice` and `Quot.sound`; the hypotheses of T5
-(`Hyp`, `G11`) are its parameters.
+command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
+`T1_regions` and `T5` lists only Lean's standard `propext`, `Classical.choice` and `Quot.sound`;
+the hypotheses of T5 (`Hyp`, `G11`) are its parameters.
 
 ## Status
 
@@ -26,8 +26,8 @@ command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `
 | P2a | regions and capture sets as atoms, `⌈·⌉` and its commutation with substitution, qualifiers on arrows and `Eff`, (≤-Cap), nominal types with parameters, schemes over variables of every kind with facts `Θ`, (Lam)/(Task) with what the body holds, (Scope), the run-time forms `inside`/`cap`/`own`, `open_H`, `op_H`, `Scope.add_finalizer`, `Fiber.spawn`; regions `Λ` with children and finalizers, closing; Л4 without the store, T1–T3 again | done |
 | P2b | Л3 under a substitution that fits the term (`Refill`), the renaming of regions not yet created (`kill`), `reach_μ` and Л4 through the store | done |
 | P2b′ | the freshness premises of (Inside) with its own facts, the facts of the order of creation (`Facts.age`), the renaming in every step, a configuration writes only regions that exist; Л6 | done |
-| P2b″ | Л5, the invariant `⊢ Λ` (what a configuration reaches is live) | open |
-| P2c | T4, T1 with `op_H`; the provider of a service (Р37) | open |
+| P2c | Л5, the invariant `⊢ Λ` (live work reaches only live regions), T4.1, T4.2, T1 with `op_H` | done |
+| P2c′ | T4.3: the provider of a service (Р37) | open |
 
 ## Map to `core.md` and `regions.md`
 
@@ -63,6 +63,10 @@ command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `
 | (Scope) and (Inside) in a run-time configuration | `RtCtx`, `scope_body`, `inside_entails` (`ScopeStep.lean`) |
 | a configuration writes only regions that exist | `CfgBelow`, `Step.below` (`Below.lean`, `BelowStep.lean`) |
 | Л6 | `lemma_6` (`Lemma4.lean`); the invariant of a configuration: `CfgTy` (`Soundness.lean`) |
+| §3.4 `⊢ Λ`: where a region may be written, the ancestors of a region | `Tm.Within`, `LocOk`, `Nest` (`Within.lean`, `Nest.lean`); kept by every step: `Nest.step`, `Nest.cstep` (`NestMain.lean`, `Regions.lean`) |
+| Л5 | `Nest.nested` (`NestClose.lean`); in every reached configuration: `reach_nest`, `Nest.live` (`Regions.lean`) |
+| T4.1, T4.2 | `T4` (`Regions.lean`) |
+| T1 with `op_H` | `T1_regions` (`Regions.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
 | Preservation | `preservation` (`Preservation.lean`); of a configuration: `cstep_typed` (`Soundness.lean`) |
 | T1 | `T1` (`Soundness.lean`) |
@@ -220,9 +224,18 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     `π ∉ fr(τ) ∪ fr(ε)`. Hence T1 and T3 assume of the program that it writes no
     run-time region and that its type and stage name none (`hp`, `ht`, `hφ`): true of
     every program, which has no run-time forms; T2 assumes the same of its configuration
-    (`hb`, `hΨ`). T1 is still stated with two blocked
-    outcomes: a finished region body waiting for a child (deadlock freedom is λRT's),
-    and a step that needs a region that is not live, which T4 (P2c) rules out.
+    (`hb`, `hΨ`). T1 is stated with two blocked outcomes: a finished region body
+    waiting for a child (deadlock freedom is λRT's), and a step that needs a region
+    that is not live; `T1_regions` drops the second by T4.
+20. **`⊢ Λ` is an invariant with ghost data.** `Nest` relates a configuration to the
+    ancestors `anc π` of each region, the regions `B ℓ` each cell may hold and the
+    thread `home π` of the `inside π` form; T4 needs no other change to the model.
+    A place in a thread names the regions of its base and of the `inside` forms
+    around it; a location sees through its cell exactly what its type names there.
+    `inside` forms stand only where the term evaluates, so a step neither copies nor
+    drops one, and only `scope` and closing change them. T4.2 is stated for every
+    reached configuration (live work reaches only live regions), which after a step
+    that closes `π` says that nothing that can step reaches `π`.
 
 ## Findings
 

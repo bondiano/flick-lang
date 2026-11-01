@@ -33,6 +33,16 @@ import Formal.Below
 import Formal.Preservation
 import Formal.Soundness
 import Formal.Lemma4
+import Formal.Within
+import Formal.Nest
+import Formal.NestPut
+import Formal.NestRedex
+import Formal.NestScope
+import Formal.NestClose
+import Formal.NestTyping
+import Formal.NestStep
+import Formal.NestMain
+import Formal.Regions
 import Formal.Effects
 import Formal.Generalization
 import Formal.Examples

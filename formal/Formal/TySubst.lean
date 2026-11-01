@@ -319,7 +319,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro σ hσ
     have hp : σ (.r _) = .rg _ := hσ.1 _ (.inl rfl)
     have hav := hσ.2 (.inr (.inl rfl))
-    have h₁ := ih σ (hσ.sub fun _ h => .inr (.inr h))
+    have h₁ := ih σ (hσ.sub fun _ h => .inr (.inr (.inr h)))
     rw [Facts.union_substT] at h₁
     refine .inside ?_ h₁ ?_ (fun h => ht ?_) (fun ⟨b, hb, h'⟩ => hε (by rwa [hav b _ h'] at hb))
       (Stage.le_substT σ hφ) (hT.substT σ)
