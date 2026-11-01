@@ -232,10 +232,11 @@ impl Checker<'_> {
                 base = self.bound_head(&ty);
             }
             // a value qualifier the bound already allows says nothing more:
-            // the variable takes the data without it; so does one not
-            // inferred yet under a bound not inferred yet, which the holds
-            // above grow by it (Р23); a closure's stored qualifier stays
-            // part of its type
+            // the variable takes the data without it; a closure's stored
+            // qualifier stays part of its type. Under a value bound, which
+            // alone gives what the value reaches (§2.1), a qualifier not
+            // inferred yet says nothing either when the bound expected is
+            // not inferred yet: the holds above grow it by the value (Р23)
             let inferred = |checker: &Self, captures: &Type| {
                 let held = checker.store.normalize(captures);
                 let open = |t: &Type| matches!(checker.store.resolve(t), Type::Meta(_));
@@ -244,17 +245,33 @@ impl Checker<'_> {
                     && held.entries.iter().all(|(_, t)| open(t))
                     && held.tails.iter().all(open)
             };
-            let mut head = self.qualified_head(actual);
-            while let Type::Bounded { ty, .. } = head {
-                head = self.qualified_head(&ty);
+            let mut inner = self.qualified_head(actual);
+            while let Type::Bounded { ty, .. } = inner {
+                inner = self.qualified_head(&ty);
             }
-            let identity = match head {
-                Type::Captured {
-                    ty,
-                    captures,
-                    value: true,
-                } if !matches!(self.whnf(&ty), Type::Fun { .. })
-                    && (self.within(&captures, &allowed) || inferred(self, &captures)) =>
+            let identity = match (self.qualified_head(actual), inner) {
+                (
+                    Type::Captured {
+                        ty,
+                        captures,
+                        value: true,
+                    },
+                    _,
+                ) if !matches!(self.whnf(&ty), Type::Fun { .. })
+                    && self.within(&captures, &allowed) =>
+                {
+                    self.capture_identity(&ty)
+                }
+                (
+                    _,
+                    Type::Captured {
+                        ty,
+                        captures,
+                        value: true,
+                    },
+                ) if !matches!(self.whnf(&ty), Type::Fun { .. })
+                    && matches!(self.qualified_head(actual), Type::Bounded { .. })
+                    && inferred(self, &captures) =>
                 {
                     self.capture_identity(&ty)
                 }
