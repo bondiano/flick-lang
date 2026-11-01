@@ -3,10 +3,8 @@ package flickrt
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"syscall"
-	"time"
 	"unicode/utf16"
 	"unsafe"
 )
@@ -15,7 +13,6 @@ var (
 	promptKernel32          = syscall.NewLazyDLL("kernel32.dll")
 	promptSetConsoleMode    = promptKernel32.NewProc("SetConsoleMode")
 	promptReadConsoleInput  = promptKernel32.NewProc("ReadConsoleInputW")
-	promptPeekNamedPipe     = promptKernel32.NewProc("PeekNamedPipe")
 	promptConsoleScreenInfo = promptKernel32.NewProc("GetConsoleScreenBufferInfo")
 )
 
@@ -34,7 +31,7 @@ type promptTerminalState struct {
 	input, output       syscall.Handle
 	inputMode, outMode  uint32
 	inputRaw, outputRaw bool
-	inputKind           uint32
+	pump                *stdinPump
 	keys                promptKeyReader
 	high                uint16
 	pending             *promptConsoleRecord
@@ -51,12 +48,7 @@ func promptConsoleMode(handle syscall.Handle, mode uint32) error {
 }
 
 func promptOpenTerminal(input, output *os.File) (*promptTerminalState, error) {
-	tty := &promptTerminalState{input: syscall.Handle(input.Fd()), output: syscall.Handle(output.Fd())}
-	var err error
-	tty.inputKind, err = syscall.GetFileType(tty.input)
-	if err != nil {
-		return nil, err
-	}
+	tty := &promptTerminalState{input: syscall.Handle(input.Fd()), output: syscall.Handle(output.Fd()), pump: pumpOf(input)}
 	if err := syscall.GetConsoleMode(tty.input, &tty.inputMode); err == nil {
 		// Read key events directly: no line buffering, echo, signal interception or Quick Edit pause.
 		mode := tty.inputMode &^ uint32(0x1|0x2|0x4|0x8|0x10|0x40|0x200)
@@ -90,55 +82,9 @@ func promptRestoreTerminal(tty *promptTerminalState) error {
 	return errors.Join(output, input)
 }
 
+// readByte reads a pipe or file through the pump, so stdin has one reader.
 func (tty *promptTerminalState) readByte(fb *Fiber, timeout int) (byte, bool, error) {
-	var deadline time.Time
-	if timeout >= 0 {
-		deadline = time.Now().Add(time.Duration(timeout) * time.Millisecond)
-	}
-	for {
-		Check(fb)
-		if tty.inputKind == syscall.FILE_TYPE_PIPE {
-			var available uint32
-			ok, _, err := promptPeekNamedPipe.Call(uintptr(tty.input), 0, 0, 0, uintptr(unsafe.Pointer(&available)), 0)
-			if ok == 0 {
-				if err == syscall.ERROR_BROKEN_PIPE || err == syscall.Errno(232) {
-					return 0, false, io.EOF
-				}
-				return 0, false, err
-			}
-			if available == 0 {
-				delay := 30 * time.Millisecond
-				if !deadline.IsZero() {
-					remaining := time.Until(deadline)
-					if remaining <= 0 {
-						return 0, false, nil
-					}
-					delay = min(delay, remaining)
-				}
-				timer := time.NewTimer(delay)
-				if fb.state.mask > 0 {
-					<-timer.C
-				} else {
-					select {
-					case <-timer.C:
-					case <-fb.state.signal:
-						timer.Stop()
-						panic(fb.state.stopped())
-					}
-				}
-				continue
-			}
-		}
-		var buffer [1]byte
-		n, err := syscall.Read(tty.input, buffer[:])
-		if n == 0 && err == nil || err == syscall.ERROR_HANDLE_EOF {
-			return 0, false, io.EOF
-		}
-		if err != nil {
-			return 0, false, err
-		}
-		return buffer[0], true, nil
-	}
+	return tty.pump.byte(fb, timeout)
 }
 
 func (tty *promptTerminalState) consoleRecord(fb *Fiber) (promptConsoleRecord, error) {

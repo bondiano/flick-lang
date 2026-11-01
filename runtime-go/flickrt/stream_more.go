@@ -254,19 +254,16 @@ func requireNode(fb *Fiber, key, module, method, path string) {
 
 // StreamStdin is the bytes of stdin in chunks; it needs the Stdio of
 // `Stdio.node`, and fails with NotFound under another.
-// shortcut: the read blocks its goroutine and ignores interruption until input comes; read stdin on a goroutine of its own if a program interrupts it
 var StreamStdin Value = streamOpen(func(fb *Fiber) pull {
 	requireNode(fb, "Stdio.Stdio", "Stdio", "stdin", "stdin")
-	buf := make([]byte, 64<<10)
 	return func(fb *Fiber) ([]Value, bool) {
-		defer park(fb, nil)()
-		n, err := os.Stdin.Read(buf)
-		if n > 0 {
-			return []Value{byteList(buf[:n])}, true
-		}
-		if err != nil && err != io.EOF {
+		chunk, err := processStdin().chunk(fb)
+		if err != nil {
 			Fail(systemError(err, "stdin", "read", "stdin"))
 		}
-		return nil, false
+		if chunk == nil {
+			return nil, false
+		}
+		return []Value{byteList(chunk)}, true
 	}
 })
