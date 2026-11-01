@@ -1,7 +1,8 @@
 # λFlick in Lean 4
 
-A mechanization of the core calculus in [`docs/formal/core.md`](../docs/formal/core.md).
-Lean 4.29.1, no Mathlib.
+A mechanization of the core calculus in [`docs/formal/core.md`](../docs/formal/core.md)
+and, separately, of the runtime contract λRT in [`docs/formal/runtime.md`](../docs/formal/runtime.md)
+(`Formal/RT/`, see [λRT and T5](#λrt-and-t5)). Lean 4.29.1, no Mathlib.
 
 ```sh
 cd formal
@@ -156,3 +157,32 @@ Each item narrows `core.md` unless it says otherwise.
   breaks; it now asks for the error of the value only, as `flick-model` already did.
 - **Р103** (P1c): closed cell types and a fixed program type cannot both hold; cell types
   are monotypes with possibly free variables, and `Gen` excludes `ftv(Ψ)`.
+
+## λRT and T5
+
+`Formal/RT/` is a model of its own: it imports nothing from the core above, and the core
+is a parameter of it.
+
+| Stage | Scope | State |
+| - | - | - |
+| P3a | causes: `⊕`, `⧺`, `head`, `recover`, I_ε; R8, R5 | done |
+
+| `runtime.md` | Lean |
+| - | - |
+| §1.1 reasons, causes | `Reason`, `Cause` (`RT/Cause.lean`) |
+| §2.1 `nub`, `⊕`, `⧺` | `nub`, `comb`, `++` (`RT/Cause.lean`) |
+| §2.2 normal form, laws, `head`; Go's tree | `NF`, `head`, `head_comb`, `CTree` (`RT/Cause.lean`) |
+| R8 | `R8` (`RT/Cause.lean`) |
+| §2.3 `dies`, `recover` | `dies`, `recover` (`RT/Recover.lean`) |
+| §2.4 I_ε and what keeps it | `Iε`, `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep` (`RT/Recover.lean`) |
+| R5 | `R5` (`RT/Recover.lean`) |
+
+Simplifications of the cause algebra:
+
+1. `≈` is equality of reasons (`DecidableEq V`). A thrown `Error`, compared by identity in
+   Effect, is a value of `V` that carries its identity.
+2. A row `ε` and `· ⊢ v : Errors ε` are a predicate `Has : V → Prop`; the premise of (Try)
+   is `Covers`. R5 is about one `recover`, as the sketch in §6 is; that the core's (Try)
+   gives `Covers` is T1 of P1.
+3. `pretty` and `report` (§2.5) are not defined: they read `Cause V`, a list, so the third
+   part of R8 holds by their type. (Seq=Par) is `CTree.reasons`, where both node kinds are `⊕`.
