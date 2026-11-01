@@ -53,6 +53,67 @@ fn only_a_program_that_names_zones_embeds_the_zone_database() {
 }
 
 #[test]
+fn only_a_program_that_reaches_an_optional_package_imports_it() {
+    let packages = |body: &str| {
+        let text =
+            format!("module App exposing (main)\nmain : Unit ->{{}} Unit\nlet main () = {body}\n");
+        let output = build(&text);
+        assert_eq!(output.diagnostics, []);
+        let main = &output
+            .files
+            .iter()
+            .find(|(path, _)| path == "main.go")
+            .expect("main.go")
+            .1;
+        for package in &output.packages {
+            assert!(
+                main.contains(&format!("import _ \"flick.app/{package}\"")),
+                "{main}"
+            );
+        }
+        output.packages
+    };
+    assert_eq!(
+        packages(
+            "provide Database.pg (Database.config \"postgres://x\") { Platform.stdout_line \"pg\" }"
+        ),
+        ["flickpg"]
+    );
+    assert!(packages("Platform.stdout_line \"plain\"").is_empty());
+}
+
+#[test]
+fn optional_packages_are_the_runtime_s() {
+    let mut named: Vec<&str> = super::main_file::OPTIONAL
+        .iter()
+        .map(|&(package, _, _)| package)
+        .collect();
+    let mut embedded: Vec<&str> = super::PACKAGES.iter().map(|p| p.name).collect();
+    named.sort_unstable();
+    embedded.sort_unstable();
+    assert_eq!(named, embedded);
+}
+
+#[test]
+fn a_program_s_go_mod_requires_the_modules_of_its_packages() {
+    use crate::build::go::go_mod;
+    assert_eq!(go_mod(&[]), "module flick.app\n\ngo 1.23\n");
+    for package in super::PACKAGES {
+        let text = go_mod(&[package]);
+        let mut required: Vec<&str> = text
+            .lines()
+            .filter(|line| line.starts_with('\t'))
+            .filter_map(|line| line.split_whitespace().next())
+            .collect();
+        let mut modules: Vec<&str> = package.modules.lines().collect();
+        required.sort_unstable();
+        modules.sort_unstable();
+        assert_eq!(required, modules, "{text}");
+        assert!(text.starts_with("module flick.app\n\ngo "), "{text}");
+    }
+}
+
+#[test]
 fn what_the_target_cannot_run_yet_is_reported() {
     let errors = compile(
         "module App exposing (main)\n\

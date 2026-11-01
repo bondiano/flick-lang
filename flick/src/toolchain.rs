@@ -6,6 +6,7 @@ use std::path::Path;
 use std::{env, fs, io, process};
 
 use flick_core::build;
+use flick_core::codegen::go::PACKAGES;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 
 pub const COMPILER: &str = env!("CARGO_PKG_VERSION");
@@ -69,7 +70,7 @@ pub fn go_build(out_dir: &Path, name: &str) -> Option<Diagnostic> {
         .arg(out_dir.join(build::go::executable(name)))
         .arg(".")
         .current_dir(&dir)
-        // only the PostgreSQL driver requires a module, which go downloads once
+        // only optional packages (the PostgreSQL driver, …) require modules, which go downloads once
         .env("GOFLAGS", "-mod=mod")
         .env("GOTOOLCHAIN", "local");
     // the runtime needs no C: a static executable, built without a C compiler
@@ -83,13 +84,12 @@ pub fn go_build(out_dir: &Path, name: &str) -> Option<Diagnostic> {
         }
         Err(err) => format!("cannot run `go build`: {err}"),
         Ok(out) if out.status.success() => return None,
-        Ok(out)
-            if dir.join("flickpg").is_dir()
-                && String::from_utf8_lossy(&out.stderr).contains("github.com/jackc/pgx") =>
-        {
+        Ok(out) if missing_module(&dir, &out.stderr).is_some() => {
+            let (package, module) = missing_module(&dir, &out.stderr).expect("matched");
             let stderr = String::from_utf8_lossy(&out.stderr);
             format!(
-                "the PostgreSQL driver needs pgx v5.7.6, which `go build` could not download: build once with network access, or fill Go's module cache with `go mod download github.com/jackc/pgx/v5@v5.7.6`\n{}",
+                "`{package}` of the runtime needs {module}, which `go build` could not download: build once with network access, or fill Go's module cache with `go mod download` in `{}`\n{}",
+                dir.display(),
                 stderr.trim_end()
             )
         }
@@ -104,4 +104,15 @@ pub fn go_build(out_dir: &Path, name: &str) -> Option<Diagnostic> {
         }
     };
     Some(Diagnostic::new(codes::P029, Severity::Error, message))
+}
+
+/// The optional package of the runtime in the Go module `dir` and the
+/// module of it that `go build` names in `stderr`: one it could not fetch.
+fn missing_module(dir: &Path, stderr: &[u8]) -> Option<(&'static str, &'static str)> {
+    let stderr = String::from_utf8_lossy(stderr);
+    PACKAGES
+        .iter()
+        .filter(|p| dir.join(p.name).is_dir())
+        .flat_map(|p| p.modules.lines().map(move |m| (p.name, m)))
+        .find(|(_, module)| stderr.contains(module))
 }
