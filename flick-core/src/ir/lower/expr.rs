@@ -71,17 +71,7 @@ impl Lower<'_> {
             K::ForExpr => return self.for_expr(node, false),
             K::RangeExpr => return self.range(node, false),
             K::QuestionExpr => return self.question(node, children[0]),
-            K::FieldExpr => {
-                let label = self.token_text(node, K::Ident).unwrap_or_default();
-                let field = Expr::new(ExprKind::Field(self.boxed(children[0]), label), span);
-                let dicts = self
-                    .typing
-                    .dicts
-                    .get(&node.range())
-                    .cloned()
-                    .unwrap_or_default();
-                return with_dicts(field, dicts);
-            }
+            K::FieldExpr => return self.field(node, children[0]),
             K::RecordExpr => ExprKind::Record(self.fields(node)),
             K::RecordUpdate => {
                 let record = self.boxed(children[0]);
@@ -197,6 +187,19 @@ impl Lower<'_> {
             }
             _ => ExprKind::Lit(Lit::Unit),
         }
+    }
+
+    /// A field; a polymorphic one with constraints takes their dictionaries.
+    fn field(&mut self, node: &Node, record: &Node) -> Expr {
+        let label = self.token_text(node, K::Ident).unwrap_or_default();
+        let field = Expr::new(ExprKind::Field(self.boxed(record), label), self.span(node));
+        let dicts = self
+            .typing
+            .dicts
+            .get(&node.range())
+            .cloned()
+            .unwrap_or_default();
+        with_dicts(field, dicts)
     }
 
     fn name(&mut self, node: &Node) -> Expr {
