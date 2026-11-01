@@ -64,6 +64,13 @@ def Dict.subst (ρ : Nat → Dict) : Dict → Dict
 /-- The dictionaries `d̄` as the values of `δ₀, δ₁, …`. -/
 def args (ds : List Dict) : Nat → Dict := fun k => ds.getD k (.var 0)
 
+/-- A scheme `∀ᾱ. Q̄ ⇒ τ`: `k` binders `var 0 … var (k-1)`; the variables from `var k` on are
+free. -/
+structure Scheme where
+  k : Nat
+  ctx : List Cn
+  ty : Ty
+
 /-- An instance `instance Q̄ ⇒ C τ̄` of §2.5: its head, its context (the premises `δ̄`) and the
 dictionaries of its superclass slots, written over the context. -/
 structure Inst where
@@ -74,7 +81,8 @@ structure Inst where
 
 /-- A program: its classes (superclasses over the class parameters), its instances `𝓘ₚ`, and
 the compiler's classes: structural (`Eq`, `Ord`, `Hash`, `Show` of records) and primitives of
-`Record` rows, whose rules (Struct) and (Prim) are black boxes. -/
+`Record` rows, whose rules (Struct) and (Prim) are black boxes. `methods m` is the class of the
+method `m` and its scheme `∀ᾱ β̄. (C ᾱ, Q̄) ⇒ τ` of §1.1: the class constraint comes first. -/
 structure Prog where
   supers : Nat → List Cn
   insts : Nat → Option Inst
@@ -82,6 +90,7 @@ structure Prog where
   fields : Ty → Option (List Ty)
   primC : Nat → Bool
   prims : Cn → Option Nat
+  methods : Nat → Option (Nat × Scheme)
 
 variable (P : Prog)
 

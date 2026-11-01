@@ -18,8 +18,8 @@ Not fields: К2 and К3 only make (Improve) order-independent, and the model sta
 improved constraints; К4 gives К1 for the whole `𝓘ₚ`, which `Coherent` assumes directly; К8
 makes premise names fresh, which the model's numbered premises are by construction.
 
-`Sim` is the simulation "≈ in dictionary positions ⇒ same result", which needs the core's
-semantics; P4b discharges it.
+`Sim` is the simulation "≈ in dictionary positions ⇒ same result", which needs the target's
+semantics; `Target.sim` (`Run.lean`) derives it from the steps of a `Target`.
 -/
 
 namespace Flick.Elab
@@ -68,7 +68,7 @@ structure Exprs where
   run : Skel → List Dict → Out
 
 /-- The simulation of T6(b): filling the holes with `≈` dictionaries gives the same result.
-It needs the core's semantics of λFlick⁺ and is discharged in P4b. -/
+It needs the semantics of λFlick⁺; `Target.sim` derives it from the steps of a target. -/
 def Sim (P : Prog) (X : Exprs) : Prop :=
   ∀ s ds ds', All2 (Eqv P) ds ds' → X.run s ds = X.run s ds'
 
