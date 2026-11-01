@@ -35,5 +35,6 @@ let main () =
       ++ String.to_locale_lower "lt" "Ì J\u{301}"
       ++ " "
       ++ show (String.length (String.to_locale_upper "lt" "i\u{307}\u{300}")))
-  Platform.stdout_line ("tr: " ++ String.to_locale_lower "tur" "İI I\u{307}" ++ " " ++ String.to_locale_upper "AZ" "i")
+  Platform.stdout_line
+    ("tr: " ++ String.to_locale_lower "tur" "İI I\u{307}" ++ " " ++ String.to_locale_upper "AZ" "i")
   Platform.stdout_line (String.to_locale_upper "tr_TR" "i")
