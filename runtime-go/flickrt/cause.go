@@ -13,6 +13,7 @@ type Cause struct {
 	kind   causeKind
 	err    Value       // a typed failure's error
 	defect string      // a defect's message, with the Flick lines it unwound
+	thrown bool        // the defect is a thrown error, an `Error` in JS: equal only to itself
 	fiber  int64       // the interrupting fiber
 	trace  *stackFrame // a reason's `Cause.StackTrace`: the span it arose in, if any
 	left   *Cause
@@ -62,9 +63,9 @@ func combineReasons(kind causeKind, a, b *Cause) *Cause {
 	return out
 }
 
-// sameReason is Effect's equality of reasons as far as Go can tell it: a
-// defect is only its own text here, while two defects of one text are
-// two different errors in JS.
+// sameReason is Effect's `Equal.equals` of reasons: a typed error and a
+// defect's message or value by value, a thrown error by identity, an
+// interruption by its fiber.
 func sameReason(a, b *Cause) bool {
 	if a.kind != b.kind {
 		return false
@@ -75,7 +76,7 @@ func sameReason(a, b *Cause) bool {
 	case causeInterrupt:
 		return a.fiber == b.fiber
 	}
-	return a == b
+	return a == b || !a.thrown && !b.thrown && a.defect == b.defect && Equals(a.err, b.err)
 }
 
 func combine2(kind causeKind, a, b *Cause) *Cause {
@@ -139,11 +140,11 @@ func causeOf(r any) *Cause {
 	case *Failure:
 		return x.Cause
 	case Defect:
-		return &Cause{kind: causeDie, defect: x.Message + "\n" + flickFrames()}
+		return &Cause{kind: causeDie, defect: x.Message + "\n" + flickFrames(), thrown: true}
 	case error:
-		return &Cause{kind: causeDie, defect: x.Error() + "\n" + flickFrames()}
+		return &Cause{kind: causeDie, defect: x.Error() + "\n" + flickFrames(), thrown: true}
 	}
-	return &Cause{kind: causeDie, defect: fmt.Sprint(r) + "\n" + flickFrames()}
+	return &Cause{kind: causeDie, defect: fmt.Sprint(r) + "\n" + flickFrames(), thrown: true}
 }
 
 // Unmatched is what the handler of a `try` gives when no arm matches.

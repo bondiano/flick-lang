@@ -81,7 +81,7 @@ func (l *listener) send(e Value) {
 	select {
 	case l.events <- e:
 	default:
-		l.fail(&Cause{kind: causeDie, defect: "Error: event queue full: " + strconv.Itoa(cap(l.events)) + " events are waiting"})
+		l.fail(&Cause{kind: causeDie, defect: "Error: event queue full: " + strconv.Itoa(cap(l.events)) + " events are waiting", thrown: true})
 	}
 }
 

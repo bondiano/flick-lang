@@ -212,7 +212,7 @@ func (b *batch) runAll(fb *Fiber, run int) {
 	masked(fb, fb.state.mask+1, func() Value {
 		exit := &Exit{cause: cause}
 		if cause == nil {
-			exit.cause = &Cause{kind: causeDie, defect: "Error: Effect.request: RequestResolver did not complete request"}
+			exit.cause = &Cause{kind: causeDie, defect: "Error: Effect.request: RequestResolver did not complete request", thrown: true}
 		}
 		requests.Lock()
 		rest := slices.Clone(b.pending)

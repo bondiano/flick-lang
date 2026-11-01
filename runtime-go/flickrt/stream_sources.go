@@ -26,7 +26,7 @@ func StreamFail(err Value) Value          { return streamFail(err) }
 func StreamFailCause(failure Value) Value { return streamFailCause(causeOfFailure(failure)) }
 
 func StreamDie(message Value) Value {
-	return streamFailCause(&Cause{kind: causeDie, defect: message.(string)})
+	return streamFailCause(&Cause{kind: causeDie, defect: message.(string), thrown: true})
 }
 
 func StreamFromEffect(task Value) Value {

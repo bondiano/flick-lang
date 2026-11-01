@@ -64,8 +64,12 @@ func TestCombineKeepsEachReasonOnce(t *testing.T) {
 	if n := count(Parallel(Sequential(fail(1.0), fail(2.0)), fail(1.0))); n != 2 {
 		t.Errorf("sequential and parallel are one combination: %d", n)
 	}
-	if n := count(Sequential(die, &Cause{kind: causeDie, defect: "boom"})); n != 2 {
-		t.Errorf("two defects of one text are two errors: %d", n)
+	if n := count(Sequential(die, &Cause{kind: causeDie, defect: "boom"})); n != 1 {
+		t.Errorf("two defects of one message are one, as two equal strings in JS: %d", n)
+	}
+	thrown := func() *Cause { return causeOf(Defect{Message: "boom"}) }
+	if n := count(Sequential(thrown(), thrown())); n != 2 {
+		t.Errorf("two thrown errors of one text are two errors: %d", n)
 	}
 	if n := count(concat(fail(1.0), fail(1.0))); n != 2 {
 		t.Errorf("concatenation keeps repeats: %d", n)
