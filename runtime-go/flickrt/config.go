@@ -332,7 +332,7 @@ func decodeDate(text string) (Value, string) {
 			return float64(t.UnixMilli()), ""
 		}
 	}
-	return nil, "Expected a valid date"
+	return nil, "Expected a valid Date"
 }
 
 func ConfigString(name Value) Value         { return scalar(name, decodeString) }

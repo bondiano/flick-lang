@@ -51,6 +51,7 @@ let main () =
   attempt greet ["Ada"]
   attempt greet ["--loud", "-n", "2", "--color", "green-light", "Bob"]
   attempt greet ["--times", "abc", "Ada"]
+  attempt greet ["--loud=maybe", "Ada"]
   attempt greet ["--color", "blue", "Ada"]
   attempt greet ["--nope", "Ada"]
   attempt greet []

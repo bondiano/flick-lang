@@ -69,12 +69,8 @@ type cliParam struct {
 func (p *cliPrim) parse(fb *Fiber, text string) (Value, string) {
 	switch p.tag {
 	case "Boolean":
-		v, issue := decodeBoolean(text)
-		if issue != "" {
-			// shortcut: Schema's issue text reduced to its expectation and input; port SchemaIssue's formatter if a program shows more
-			return nil, issue + ", got " + QuoteJSON(text)
-		}
-		return v, ""
+		// Effect's message of the issue, which names no input
+		return decodeBoolean(text)
 	case "Choice":
 		for i, k := range p.choiceKeys {
 			if k == text {

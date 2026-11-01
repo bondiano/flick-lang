@@ -106,9 +106,8 @@ func dnsRecordCodec(t string) codec {
 }
 
 // dnsUnion is Effect's union of the record types: the member of the
-// input's `_tag`, or of the record's type.
-//
-// shortcut: an object of no known `_tag` is "expected DnsRecord", where Effect reports each member's issue
+// input's `_tag`, or of the record's type. Input of no known `_tag` is the
+// union's issue, as Effect has no candidate for it.
 type dnsUnion struct{}
 
 func (dnsUnion) accepts(in Value) bool { _, ok := in.(*Record); return ok }
@@ -119,14 +118,14 @@ func (dnsUnion) decode(fb *Fiber, in Value) (Value, []issue) {
 			return dnsCodecs[t].decode(fb, in)
 		}
 	}
-	return nil, expected("DnsRecord", in)
+	return nil, expected("Union", in)
 }
 
 func (dnsUnion) encode(fb *Fiber, v Value) (Value, []issue) {
 	if r, ok := v.(*dnsRecord); ok {
 		return dnsCodecs[r.tag()].encode(fb, v)
 	}
-	return nil, expected("DnsRecord", v)
+	return nil, expected("Union", v)
 }
 
 func dnsJson(t string) Value { return &fallible{dnsCodecs[t]} }

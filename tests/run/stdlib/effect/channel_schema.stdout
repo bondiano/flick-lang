@@ -4,3 +4,4 @@ encode_unknown, decode_unknown: [{ x = 1, y = 2 }, { x = 3, y = 4 }, { x = 5, y 
 duplex: [{ x = 1, y = 2 }, { x = 3, y = 4 }, { x = 5, y = 6 }]
 duplex_unknown: [{ x = 1, y = 2 }, { x = 3, y = 4 }, { x = 5, y = 6 }]
 err [0]: expected an object
+NaN: err [0].y: expected a finite number

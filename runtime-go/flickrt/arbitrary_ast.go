@@ -3,6 +3,7 @@ package flickrt
 import (
 	"math"
 	"math/big"
+	"strconv"
 )
 
 // The Effect Schema AST a schema of the program has on the JS target, as
@@ -39,6 +40,7 @@ type arbAST struct {
 	elements []*arbAST // arrays: the fixed elements
 	rest     *arbAST   // arrays: the repeated element, nil for a tuple
 	props    []*arbAST // objects, in property order
+	names    []string  // objects: the property names of props
 	members  []*arbAST // union; option and result: their parameters
 	thunk    func() *arbAST
 	// make is the value of an object or an array of its parts' values
@@ -191,10 +193,15 @@ type astKey struct {
 func literalNode(v Value) *arbAST { return &arbAST{tag: astLiteral, literal: v} }
 
 // structNode is a struct of `_tag` and fields, made by `make` of the
-// fields' values.
+// fields' values. The fields are named as a variant's; those of the
+// structs a declaration links to are its parameters, compiled before them.
 func structNode(tag string, fields []*arbAST, make func([]Value) Value) *arbAST {
 	props := append([]*arbAST{literalNode(tag)}, fields...)
-	return &arbAST{tag: astObjects, props: props, make: func(vs []Value) Value { return make(vs[1:]) }}
+	names := []string{"_tag"}
+	for i := range fields {
+		names = append(names, "_"+strconv.Itoa(i))
+	}
+	return &arbAST{tag: astObjects, props: props, names: names, make: func(vs []Value) Value { return make(vs[1:]) }}
 }
 
 // of is the node of a schema's type side; `wire` the type side of its
@@ -248,7 +255,7 @@ func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 			fields[i] = b.of(item, wire)
 		}
 		keys, pos := s.keys, s.pos
-		return &arbAST{tag: astObjects, props: fields, make: func(vs []Value) Value { return shaped(keys, pos, vs) }}
+		return &arbAST{tag: astObjects, props: fields, names: s.labels, make: func(vs []Value) Value { return shaped(keys, pos, vs) }}
 	case kindAdt:
 		members := make([]*arbAST, len(s.variants))
 		for i, v := range s.variants {

@@ -217,7 +217,7 @@ func arbOracleLines(fb *Fiber, cases []arbCase) []string {
 			if build, ok := c.arb.(func() Value); ok {
 				var cause *Cause
 				if c.arb, cause = catch(build); cause != nil {
-					out = append(out, prefix+"error "+strings.TrimSpace(cause.firstOf(causeDie).defect))
+					out = append(out, prefix+"error "+strings.ReplaceAll(strings.TrimSpace(cause.firstOf(causeDie).defect), "\n", `\n`))
 					c.arb = build
 					continue
 				}

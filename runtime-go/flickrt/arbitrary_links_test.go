@@ -15,6 +15,10 @@ func arbLinkCases() []arbCase {
 	hashInt := NewDict().Set("hash", Fn(func(_ *Fiber, n Value) Value { return n })).
 		Set("$Eq", NewDict().Set("eq", Curry2(func(_ *Fiber, a, b Value) Value { return a == b })))
 	zone := func(v Value) *TimeZone { return v.(*TimeZone) }
+	impossible := CodecToSchema(CheckApply(CheckBetween(Rec("minimum", 9.0, "maximum", 0.0, "exclusiveMinimum", false, "exclusiveMaximum", false)),
+		CodecNumberFinite))
+	always := func(Value) bool { return true }
+	lazy := func(schema Value) func() Value { return func() Value { return s(schema) } }
 	return []arbCase{
 		{name: "unknown", arb: s(SchemaUnknown), property: func(v Value) bool { return !isList(v) }},
 		{name: "unknown-record", arb: s(SchemaUnknown), property: func(v Value) bool { return !isRecord(v) }},
@@ -36,6 +40,11 @@ func arbLinkCases() []arbCase {
 		{name: "hashset", arb: of(CodecHashSet(rootFiber(), hashInt, CodecInt)), property: func(Value) bool { return true }},
 		{name: "hashmap", arb: of(CodecHashMap(rootFiber(), hashInt, CodecInt, CodecInt)), property: func(Value) bool { return true }},
 		{name: "result-json", arb: of(SchemaJsonCodec(SchemaResult(SchemaString, SchemaBool))), property: func(Value) bool { return true }},
+		{name: "path-option-list", arb: lazy(SchemaOption(SchemaList(impossible))), property: always},
+		{name: "path-result", arb: lazy(SchemaResult(impossible, SchemaNumber)), property: always},
+		{name: "path-record", arb: lazy(SchemaRecord("a", SchemaNumber, "b c", SchemaList(impossible))), property: always},
+		{name: "path-variant", arb: lazy(SchemaAdt("Shape", []Variant{{Tag: "Shape.Dot", Name: "Dot"}, {Tag: "Shape.Circle", Name: "Circle", Fields: []Value{impossible}}})),
+			property: always},
 	}
 }
 

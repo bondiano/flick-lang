@@ -205,3 +205,17 @@ let main () =
         | Ok r -> Net.format_record r
         | Err e -> issues e
       ))
+  Platform.stdout_line
+    ("parse_host bad: "
+      ++ (
+        match Net.parse_host "bad host!!" with
+        | Ok h -> show h
+        | Err e -> issues e
+      ))
+  Platform.stdout_line
+    ("unions of a number: "
+      ++ String.join " | " [
+        rt "1" Net.host,
+        rt "1" Net.socket_address,
+        rt "{\"_tag\": \"ZZ\"}" Net.dns_record,
+      ])

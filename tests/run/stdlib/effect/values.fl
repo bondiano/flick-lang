@@ -39,6 +39,13 @@ let result r =
   | Ok n -> show n
   | Err (SchemaError issues) -> "error: " ++ String.join ", " (List.map (fun i -> i.message) issues)
 
+/// The messages of a prism that does not match.
+miss : Result SchemaError a -> String
+let miss r =
+  match r with
+  | Ok _ -> "matched"
+  | Err (SchemaError issues) -> String.join ", " (List.map (fun i -> i.message) issues)
+
 json : Shape -> Result SchemaError Json
 let json s = Codec.encode_result (Codec.json (schema Shape)) s
 
@@ -130,6 +137,16 @@ let main () =
       ++ show (Optic.set err_prism "e")
       ++ " "
       ++ show (Optic.get_result (Optic.prism_optional ok_prism) (Ok 5) == Ok 5))
+    ()
+  line
+    "misses"
+    (miss (Optic.get_result (Optic.prism_optional some_prism) None)
+      ++ "; "
+      ++ miss (Optic.get_result (Optic.prism_optional none_prism) (Some 1))
+      ++ "; "
+      ++ miss (Optic.get_result (Optic.prism_optional ok_prism) (Err "e"))
+      ++ "; "
+      ++ miss (Optic.get_result (Optic.prism_optional err_prism) (Ok 1)))
     ()
   let small = Optic.from_check (fun n -> n < 10) "too big"
   line

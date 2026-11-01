@@ -98,3 +98,11 @@ hashmap seed 1 error Error: Unable to derive an arbitrary for an unsupported Dec
 hashmap seed 42 error Error: Unable to derive an arbitrary for an unsupported Declaration
 result-json seed 1 error Error: Unable to derive an arbitrary for an unsupported Declaration
 result-json seed 42 error Error: Unable to derive an arbitrary for an unsupported Declaration
+path-option-list seed 1 error Error: Unable to derive an arbitrary for number constraints\n  at [0][0]
+path-option-list seed 42 error Error: Unable to derive an arbitrary for number constraints\n  at [0][0]
+path-result seed 1 error Error: Unable to derive an arbitrary for number constraints\n  at [1]
+path-result seed 42 error Error: Unable to derive an arbitrary for number constraints\n  at [1]
+path-record seed 1 error Error: Unable to derive an arbitrary for number constraints\n  at ["b c"][0]
+path-record seed 42 error Error: Unable to derive an arbitrary for number constraints\n  at ["b c"][0]
+path-variant seed 1 error Error: Unable to derive an arbitrary for number constraints\n  at ["_0"]
+path-variant seed 42 error Error: Unable to derive an arbitrary for number constraints\n  at ["_0"]

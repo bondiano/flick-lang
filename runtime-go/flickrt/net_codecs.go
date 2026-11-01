@@ -30,15 +30,20 @@ func netRefine(c codec, expected string, test func(Value) bool) codec {
 }
 
 // netUnion is Effect's `Union` of string codecs: the first member that
-// decodes, or encodes, the value.
-//
-// shortcut: when every member fails, the issues are each member's in turn, where Effect reports the union's; port its union messages when a program shows one
+// decodes, or encodes, the value, else every member's issues. Input no
+// member takes is the union's issue, as Effect has no candidate for it.
 type netUnion []codec
 
 func (u netUnion) accepts(in Value) bool { _, ok := in.(string); return ok }
 
-func (u netUnion) decode(fb *Fiber, in Value) (Value, []issue) { return u.first(fb, in, codec.decode) }
-func (u netUnion) encode(fb *Fiber, v Value) (Value, []issue)  { return u.first(fb, v, codec.encode) }
+func (u netUnion) decode(fb *Fiber, in Value) (Value, []issue) {
+	if !u.accepts(in) {
+		return nil, expected("Union", in)
+	}
+	return u.first(fb, in, codec.decode)
+}
+
+func (u netUnion) encode(fb *Fiber, v Value) (Value, []issue) { return u.first(fb, v, codec.encode) }
 
 func (u netUnion) first(fb *Fiber, in Value, run func(codec, *Fiber, Value) (Value, []issue)) (Value, []issue) {
 	var all []issue

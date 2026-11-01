@@ -14,6 +14,8 @@ error: SchemaError(Expected a value between -2147483648 and 2147483647
 Warn
 https://example.com/b
 1704153600000
+error: SchemaError(Expected a valid Date
+  at ["BAD_DAY"])
 prod
 error: SchemaError(Expected "dev" | "test"
   at ["MODE"])
