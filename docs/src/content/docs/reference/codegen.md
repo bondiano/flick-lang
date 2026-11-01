@@ -459,6 +459,8 @@ File-handle foreign operations not yet ported remain `FLICK-P012`;
 `stat` metadata remains partial.
 Glob's POSIX classes are checked on the minimum Go 1.23, including unassigned
 code points.
+`Path.node` and the paths of `Cli` flags are Node's win32 paths on Windows
+(`tools/go-path/gen.mjs` checks them against `path.win32`), POSIX elsewhere.
 
 `flick run` and `flick dev` of a project that emits go build its
 executable into the run generation and start it, `dev` rebuilding and

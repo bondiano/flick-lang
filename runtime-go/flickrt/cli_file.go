@@ -2,14 +2,21 @@ package flickrt
 
 import (
 	"os"
+	"runtime"
 	"strings"
 )
 
 // The primitives of Effect's CLI that read the file system: Path,
 // FileText and FileParse. Paths resolve against the working directory as
-// Node's `path.resolve` does.
+// Node's `path.resolve` of the OS does.
 
 func cliAbsolute(path string) string {
+	if runtime.GOOS == "windows" {
+		if record(win32Parse(path)).Get("root").(string) != "" {
+			return path
+		}
+		return win32Resolve(path)
+	}
 	if record(pathParse(path)).Get("root").(string) != "" {
 		return path
 	}

@@ -6,6 +6,7 @@ package flickrt
 
 import (
 	"os"
+	"runtime"
 	"strings"
 )
 
@@ -443,7 +444,10 @@ func PathLayer(key Value) Value {
 	))
 }
 
-// PathNode is `Path.node`.
-// shortcut: POSIX paths on every OS, as Node's on Linux and macOS; Node's
-// win32 paths on Windows when G12 runs the platform tests there.
-func PathNode(key Value) Value { return PathLayer(key) }
+// PathNode is `Path.node`: Node's paths of the OS it runs on.
+func PathNode(key Value) Value {
+	if runtime.GOOS == "windows" {
+		return PathWin32(key)
+	}
+	return PathLayer(key)
+}
