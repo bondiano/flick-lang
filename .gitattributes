@@ -5,5 +5,6 @@ runtime/test/fixtures/openapi-3.1.schema.json linguist-vendored=true
 # Impeccable generates self-contained specimens in one schema-v2 sidecar.
 .impeccable/design.json linguist-generated=true
 tests/run/portable.txt merge=union
-# corpora tools/go-unicode/graphemes.mjs writes from Node
+# corpora tools/go-unicode/graphemes.mjs and tools/go-collate/gen.mjs write from Node
 runtime-go/flickrt/testdata/graphemes.txt linguist-generated=true
+runtime-go/flickrt/testdata/collation.txt linguist-generated=true

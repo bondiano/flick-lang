@@ -42,25 +42,31 @@ func intlLocales() map[string]*intlLocale {
 }
 
 // localeTable is the locale Intl negotiates for a well-formed tag, as far
-// as the tables go: as V8 does, the first of the tag without its variants
-// and extensions and its shorter prefixes that ICU has data for.
+// as the tables go.
 func localeTable(id localeID) (string, bool) {
-	language, script, region := id.language, id.script, id.region
-	tag := func(subtags ...string) string {
-		out := language
-		for _, s := range subtags {
-			if s != "" {
-				out += "-" + s
-			}
-		}
-		return out
-	}
-	for _, c := range []string{tag(script, region), tag(script), language} {
-		if _, ok := intlLocales()[c]; ok {
-			return c, true
+	tag, _, ok := lookupLocale(id, intlLocales())
+	return tag, ok
+}
+
+// lookupLocale is the first of a tag without its variants and extensions
+// and its shorter prefixes that has an entry, as V8 looks a locale up.
+func lookupLocale[V any](id localeID, entries map[string]V) (string, V, bool) {
+	for _, tag := range []string{joinSubtags(id.language, id.script, id.region), joinSubtags(id.language, id.script), id.language} {
+		if v, ok := entries[tag]; ok {
+			return tag, v, true
 		}
 	}
-	return "", false
+	var none V
+	return "", none, false
+}
+
+func joinSubtags(language string, subtags ...string) string {
+	for _, s := range subtags {
+		if s != "" {
+			language += "-" + s
+		}
+	}
+	return language
 }
 
 // defaultLocale is ICU's default locale, from the environment.
