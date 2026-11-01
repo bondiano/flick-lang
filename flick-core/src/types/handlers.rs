@@ -161,7 +161,15 @@ impl Checker<'_> {
         if self.runtime_allowed(span) {
             self.perform(&inputs, &errors, span);
         }
-        let provided = self.store.normalize(&outputs).entries;
+        let outputs = self.store.normalize(&outputs);
+        let provided = outputs.entries;
+        // outputs ending in a variable of the signature (`Layer none none o`)
+        // provide all of it; an unknown tail does not grow by the body's needs
+        let open: Vec<Type> = outputs
+            .tails
+            .into_iter()
+            .filter(|t| matches!(t, Type::Skolem(_) | Type::Var(_)))
+            .collect();
         let needed = self.fresh();
         let mut stage = self.stage.clone();
         stage.services = needed.clone();
@@ -178,9 +186,14 @@ impl Checker<'_> {
         let inner = mem::replace(&mut self.stage, outer);
         self.stage.calls = inner.calls;
         if self.stage.pure.is_none() {
+            let tail = open
+                .into_iter()
+                .fold(self.stage.services.clone(), |rest, t| {
+                    Type::Union(Box::new(t), Box::new(rest))
+                });
             let rest = Type::Row(Row {
                 entries: provided,
-                tail: Some(Box::new(self.stage.services.clone())),
+                tail: Some(Box::new(tail)),
             });
             let site = self.stage.site;
             self.sub_row(&needed, &rest, site, span, false);
