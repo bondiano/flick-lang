@@ -61,3 +61,17 @@ matched : Unit ->{; Oops} Int
 let matched () =
   match ({ a = from_result (Err (Oops 0)); b = from_result (Err (Oops 1)) }).a with
   | () -> 0
+
+type error Bad = Bad String
+
+// a cell bounds its contents `a^c`; an arm whose type is not known yet is
+// that `a` itself, which is no infinite type (Р65, found by X6)
+in_cell : Unit ->{; Bad} Int
+let in_cell () =
+  let cell =
+    Ref.make
+      (
+        try { a = from_result (Err (Oops 1)); b = await (from_result (Err (Bad ""))) } with
+        | Oops _ -> { a = from_result (Err (Bad "")); b = () }
+      )
+  0

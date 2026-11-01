@@ -508,10 +508,15 @@ impl Checker<'_> {
                 let (x, y) = (self.capture_identity(x), self.capture_identity(y));
                 return self.unify(&x, &y);
             }
-            (Type::Bounded { .. } | Type::Captured { .. }, Type::Meta(m)) => {
+            // `α^c ≡ α` is no infinite type: the bound is compared below
+            (Type::Bounded { .. } | Type::Captured { .. }, Type::Meta(m))
+                if !self.qualifies_meta(&left, *m) =>
+            {
                 return self.bind(*m, &left);
             }
-            (Type::Meta(m), Type::Bounded { .. } | Type::Captured { .. }) => {
+            (Type::Meta(m), Type::Bounded { .. } | Type::Captured { .. })
+                if !self.qualifies_meta(&right, *m) =>
+            {
                 return self.bind(*m, &right);
             }
             (Type::Bounded { ty, captures }, other) | (other, Type::Bounded { ty, captures }) => {
@@ -636,6 +641,11 @@ impl Checker<'_> {
                 .iter()
                 .zip(&args2)
                 .all(|(x, y)| self.unify(x, y).is_ok())
+    }
+
+    /// Whether `t` is a qualifier on the meta `m` itself.
+    fn qualifies_meta(&self, t: &Type, m: u32) -> bool {
+        self.store.resolve(&self.capture_identity(t)) == Type::Meta(m)
     }
 
     pub fn bind(&mut self, m: u32, t: &Type) -> Unified {
