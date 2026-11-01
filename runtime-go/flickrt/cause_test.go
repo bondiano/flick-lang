@@ -97,6 +97,23 @@ func TestTheTypedViewOfACauseSeesItsHeadOnly(t *testing.T) {
 	}
 }
 
+// The empty cause still fails, as Effect's `Cause.empty` (Р82).
+func TestTheEmptyCauseFails(t *testing.T) {
+	if _, c := catch(func() Value { return FailureRethrow(nil, CauseEmpty) }); c == nil || len(c.reasons()) != 0 {
+		t.Errorf("rethrowing the empty failure fails without reasons: %v", c)
+	}
+	if ExitIsFailure(ExitFailCause(CauseFromReasons([]Value{}))) != true {
+		t.Error("an exit of the empty failure is a failure")
+	}
+	die := &Cause{kind: causeDie, defect: "d"}
+	if causeOfFailure(CauseCombine(failureOf(die), CauseEmpty)) != die {
+		t.Error("the empty cause is the unit of combine")
+	}
+	if report(emptyCause) != "InterruptError: All fibers interrupted without error" {
+		t.Errorf("main failing without reasons is reported as the JS runner does: %q", report(emptyCause))
+	}
+}
+
 // A typed error that became a defect is that value, as in JS: told by its
 // constructor and equal to the same value (docs/formal/runtime.md Р81).
 func TestATypedErrorAsADefectIsItsValue(t *testing.T) {

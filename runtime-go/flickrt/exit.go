@@ -17,8 +17,16 @@ func exitOf(fb *Fiber, task Value) *Exit {
 	return &Exit{v, c}
 }
 
-func ex(v Value) *Exit              { return v.(*Exit) }
-func failureOf(c *Cause) Value      { return &Supervised{cause: c} }
+func ex(v Value) *Exit { return v.(*Exit) }
+
+// failureOf is the `Failure` of a cause; one without reasons is the empty
+// cause, which still fails, as Effect's `Cause.empty`.
+func failureOf(c *Cause) Value {
+	if c == nil {
+		c = emptyCause
+	}
+	return &Supervised{cause: c}
+}
 func causeOfFailure(f Value) *Cause { return f.(*Supervised).cause }
 
 // outcome is the exit as a task that ends the same way.

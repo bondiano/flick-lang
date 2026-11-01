@@ -48,9 +48,17 @@ func Parallel(a, b *Cause) *Cause   { return combineReasons(causeParallel, a, b)
 // `Cause.fromReasons` over both lists: races and a scope's finalizers.
 func concat(a, b *Cause) *Cause { return combine2(causeSequential, a, b) }
 
+// emptyCause is the failure without reasons: nil is no failure at all.
+var emptyCause = &Cause{kind: causeSequential}
+
 func combineReasons(kind causeKind, a, b *Cause) *Cause {
-	if a == nil || b == nil {
+	switch {
+	case a == nil || b == nil:
 		return combine2(kind, a, b)
+	case a == emptyCause:
+		return b
+	case b == emptyCause:
+		return a
 	}
 	var out *Cause
 	var kept []*Cause
@@ -240,7 +248,7 @@ func pretty(c *Cause) string {
 // report is what the runner writes on stderr when `main` fails, as the
 // JS runner's `conclude` does.
 func report(c *Cause) string {
-	if !c.has(causeFail) && !c.has(causeDie) {
+	if c.has(causeInterrupt) && !c.has(causeFail) && !c.has(causeDie) {
 		return "error: main was interrupted"
 	}
 	if !c.has(causeDie) {
