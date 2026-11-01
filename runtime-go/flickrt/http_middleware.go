@@ -13,6 +13,8 @@ const (
 	headerFilterKey   = "effect/http/HttpMiddleware/TracerHeaderFilter"
 )
 
+var responseErrorTag = Tag("Http.ServerError.ServerErrorReason.ResponseError")
+
 func handle(fb *Fiber, handler Value, request Value) Value {
 	return Run(fb, Apply(fb, handler, request))
 }
@@ -100,23 +102,71 @@ func MiddlewareWithLoggerDisabled(fb *Fiber, handler, request Value) Value {
 	return handle(fb, handler, request)
 }
 
-// MiddlewareTracer runs the request in a server span named by the span
-// name generator, the request's method by default, continuing the trace
-// of the request's headers.
-//
-// shortcut: the span has no `http.*` attributes and ends with the handler's exit, not with the response's status; port Effect's responseSpanExit and attributes when a program exports them
+// MiddlewareTracer is Effect's `tracer`: the request runs in a server span
+// named by the span name generator, the request's method by default,
+// continuing the trace of the request's headers. The span ends with the
+// response, failed for a 5xx one. An exporting tracer gets the request's
+// and the response's attributes; the native one only those of a request
+// that failed.
 func MiddlewareTracer(fb *Fiber, handler, request Value) Value {
+	if !envOr(fb, tracerEnabledKey, true).(bool) {
+		return handle(fb, handler, request)
+	}
 	if f, ok := fb.env.get(tracerDisabledKey); ok && Apply(fb, f, request).(bool) {
 		return handle(fb, handler, request)
 	}
-	name := Value(requestOf(request).method)
+	q := requestOf(request)
+	name := Value(q.method)
 	if f, ok := fb.env.get(spanNameKey); ok {
 		name = Apply(fb, f, request)
 	}
 	options := Rec("parent", TraceContextFromHeaders(RequestHeaders(request)), "root", false, "kind_", "server")
-	return useSpan(fb, name, options, func(s *span) Value {
-		return withEnv(fb, parentSpanKey, s, Apply(fb, handler, request))
-	})
+	s := openSpan(fb, name, options)
+	out, cause := catch(func() Value { return withEnv(fb, parentSpanKey, s, Apply(fb, handler, request)) })
+	clock := clockOf(fb)
+	if cause == nil && (!s.sampled || Value(currentTracer(fb)) == TracerNative) {
+		endSpan(s, responseSpanExit(fb, q, responseOf(out)), clock, true)
+		return out
+	}
+	response, spanExit := (*ServerResponse)(nil), cause
+	if cause != nil {
+		// Effect's causeResponseStripped: a Flick defect is never a response
+		response = newResponse(500, "", false, nil, nil, nil, false)
+	} else {
+		response = responseOf(out)
+		spanExit = responseSpanExit(fb, q, response)
+	}
+	if s.sampled {
+		s.attribute("http.request.method", q.method)
+		if u, ok := some(q.toURL()); ok {
+			s.addURLAttributes(urlOf(u), currentUrlRedactedNames(fb))
+		}
+		if agent, ok := q.header("user-agent"); ok {
+			s.attribute("user_agent.original", agent)
+		}
+		s.addHeaderAttributes(fb, "request", q.headerRecord(), headerFilterKey)
+		if address, ok := some(RequestRemoteAddress(request)); ok {
+			s.attribute("client.address", address)
+		}
+		s.attribute("http.response.status_code", response.status)
+		s.addHeaderAttributes(fb, "response", response.headerRecord(), headerFilterKey)
+	}
+	endSpan(s, spanExit, clock, true)
+	if cause != nil {
+		panic(&Failure{cause})
+	}
+	return out
+}
+
+// responseSpanExit is how a server span ends with the response: failed
+// with a ResponseError for a 5xx one, as OpenTelemetry asks.
+func responseSpanExit(fb *Fiber, q *ServerRequest, response *ServerResponse) *Cause {
+	if response.status < 500 || response.status >= 600 {
+		return nil
+	}
+	details := Rec("method", methodValue(q.method), "url", redactURL(q.url, currentUrlRedactedNames(fb)),
+		"status", response.status, "description", None)
+	return &Cause{kind: causeFail, err: NewData(serverErrorTag, NewData(responseErrorTag, details))}
 }
 
 func MiddlewareWithTracerDisabledWhen(fb *Fiber, f, task Value) Value {

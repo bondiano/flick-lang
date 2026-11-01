@@ -353,12 +353,22 @@ writes. A `String` counts UTF-16 code units in `length`, indices and slices;
 a slice may cut a surrogate pair, `++` joins the halves back, strings order
 by code units, and writing to stdout replaces a lone half with U+FFFD as
 Node does. Normalization and case mapping (`ß` to `SS`, a final sigma,
-Turkish dotted i) follow tables `tools/go-unicode/gen.mjs` writes from
-Node's ICU; a `RegExp` runs on Go's RE2 engine, with positions in code
+the Turkish and Azeri i, Lithuanian dots, Greek capitals without accents)
+follow tables `tools/go-unicode/gen.mjs` writes from Node's ICU, and a
+locale tag is checked and canonicalized as V8 does, with its `RangeError`
+for an invalid one; a `RegExp` runs on Go's RE2 engine, with positions in code
 units and JS's `$` replacement patterns, and syntax RE2 lacks (lookaround,
 backreferences) is a `RegExpError`. `String.locale_compare` orders as
-`Intl.Collator("en")` does, by weights the same script reads from Node;
-every locale collates as `en`. A date in text (`DateTime.make`,
+`Intl.Collator` does: the Unicode Collation Algorithm on CLDR 48's root
+collation and its tailorings for the languages of 52 common locales, which
+`tools/go-collate/gen.mjs` builds as ICU does; a tag of another language
+collates as the default locale, and `-u-co-…` extensions are ignored.
+`DateTime` formats from tables
+`tools/go-intl/gen.mjs` writes from Node: the languages of 52 common
+locales with every regional variant ICU has, a tag resolved as V8 resolves
+it, zone names by metazone (`CET`, `Central European Standard Time`) at the
+offsets a zone has in 2024, and an offset (`+01:00`, `+0100`) taken as a
+zone's name. A date in text (`DateTime.make`,
 `Config.date`, HTTP dates) is read by a port of V8's `Date.parse`, legacy
 forms included; a date-time without an offset is local time, Go's
 `time.Local`. `Cli.file_parse` reads INI, TOML and YAML with ports of

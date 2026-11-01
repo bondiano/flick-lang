@@ -1,1 +1,5 @@
 locale_compare: LT GT EQ
+collation: [GT, LT, LT, LT, GT, GT, LT, LT, LT, GT, GT, GT, GT, GT]
+el: ΑΔΙΚΟΣ, Ή ΗΙ Ϊ ΑΪ
+lt: i̇̀ j̇́ 2
+tr: iı i İ

@@ -1,4 +1,5 @@
-// `String.locale_compare`: Intl's collation, which only the JS target has.
+// `String.locale_compare` and the case mappings of a locale: Intl's
+// collation and ICU's special casing. An invalid tag is a defect.
 module App.Main exposing (main)
 
 main : Unit ->{} Unit
@@ -10,3 +11,29 @@ let main () =
       ++ show ("b" |> String.locale_compare "en" "a")
       ++ " "
       ++ show ("a" |> String.locale_compare "en" "a"))
+  Platform.stdout_line
+    ("collation: "
+      ++ show [
+        "\u{e4}" |> String.locale_compare "sv" "z",
+        "\u{e4}" |> String.locale_compare "de-AT" "z",
+        "ch" |> String.locale_compare "cs" "i",
+        "A" |> String.locale_compare "da" "a",
+        "A" |> String.locale_compare "en" "a",
+        "cot\u{e9}" |> String.locale_compare "fr-CA" "c\u{f4}te",
+        "cot\u{e9}" |> String.locale_compare "fr" "c\u{f4}te",
+        "\u{f1}" |> String.locale_compare "es-MX" "o",
+        "\u{3b1}" |> String.locale_compare "el" "a",
+        "\u{3a2}" |> String.locale_compare "ja" "a",
+        "\u{554a}" |> String.locale_compare "zh" "\u{963f}",
+        "\u{554a}" |> String.locale_compare "zh-TW" "\u{963f}",
+        "\u{4e2d}" |> String.locale_compare "en" "\u{2ebf0}",
+        "a\u{323}\u{30a}" |> String.locale_compare "sv" "z",
+      ])
+  Platform.stdout_line ("el: " ++ String.to_locale_upper "el" "άδικος, ή ῃ ΐ άι")
+  Platform.stdout_line
+    ("lt: "
+      ++ String.to_locale_lower "lt" "Ì J\u{301}"
+      ++ " "
+      ++ show (String.length (String.to_locale_upper "lt" "i\u{307}\u{300}")))
+  Platform.stdout_line ("tr: " ++ String.to_locale_lower "tur" "İI I\u{307}" ++ " " ++ String.to_locale_upper "AZ" "i")
+  Platform.stdout_line (String.to_locale_upper "tr_TR" "i")

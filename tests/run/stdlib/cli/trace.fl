@@ -39,6 +39,8 @@ let options = {
   disablePropagation = false;
 }
 
+type error Declined = Declined
+
 command : Cli.Command none none
 let command = cli "shop" {
   description "Checks out"
@@ -47,6 +49,9 @@ let command = cli "shop" {
       [plain]
       (task {
         Tracer.with_span "pay" options (task { Effect.log_info "checkout" })
+        // a span that fails has an `exception` event
+        try Tracer.with_span "refund" options (task { from_result (Err Declined) }) with
+        | Declined -> ()
         Effect.log_debug "details"
       })
 }
@@ -71,6 +76,8 @@ let main () =
     Platform.stdout_line (has got "\"shop-cli\"")
     Platform.stdout_line (has got "\"name\":\"pay\"")
     Platform.stdout_line (has got "\"3 items\"")
+    Platform.stdout_line (has got "\"name\":\"exception\"")
+    Platform.stdout_line (has got "/v1/metrics")
     stop ()
     let settings = { Cli.settings with builtIns = [Cli.HelpFlag] }
     Platform.stdout_line "without TraceFlag:"

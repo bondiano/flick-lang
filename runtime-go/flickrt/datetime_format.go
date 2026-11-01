@@ -11,8 +11,8 @@ import (
 // Effect's DateTime formatting through `Intl.DateTimeFormat`, on the
 // tables tools/go-intl/gen.mjs writes from Node's ICU (datetime_intl.go).
 //
-// shortcut: a tag outside the tables falls back along its subtags to one in them, or to the default locale, where ICU has data for most languages and regions; Unicode extensions (`-u-hc-h23`, `-u-ca-…`) are ignored; regenerate with more locales when a program needs them
-// shortcut: a named zone other than UTC is named by its offset (`GMT+1`, `GMT+01:00`), where ICU names most by their metazone (`CET`, `Central European Standard Time`); generate metazone names when a program formats them
+// shortcut: the tables have the languages of 52 common locales on the Gregorian calendar, a tag of another falls back to the default locale; Unicode extensions (`-u-hc-h23`, `-u-ca-…`) are ignored; regenerate with more languages when a program needs them
+// shortcut: a named zone has its metazone's names at the offsets it has in 2024, by its offset at other times, where ICU follows the metazone's history (Europe/Berlin is `GMT+1` in 1900); generate the history when a program formats old dates
 
 // intlLocale is a locale's table: its patterns, by date and time style,
 // and the names they use.
@@ -41,105 +41,56 @@ func intlLocales() map[string]*intlLocale {
 	})
 }
 
-func alpha(s string) bool {
-	return strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") == ""
-}
-func allDigits(s string) bool { return strings.Trim(s, "0123456789") == "" }
-func alnum(s string) bool {
-	return strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") == ""
-}
-
-// languageTag reads a well-formed Unicode locale identifier, as V8 checks
-// one: its language, script and region, canonically cased.
-func languageTag(tag string) (language, script, region string, ok bool) {
-	subtags := strings.Split(tag, "-")
-	n, i := len(subtags), 1
-	language = strings.ToLower(subtags[0])
-	if l := len(language); !alpha(language) || l < 2 || l == 4 || l > 8 {
-		return "", "", "", false
-	}
-	if i < n && len(subtags[i]) == 4 && alpha(subtags[i]) {
-		script = strings.ToUpper(subtags[i][:1]) + strings.ToLower(subtags[i][1:])
-		i++
-	}
-	if i < n && (len(subtags[i]) == 2 && alpha(subtags[i]) || len(subtags[i]) == 3 && allDigits(subtags[i])) {
-		region = strings.ToUpper(subtags[i])
-		i++
-	}
-	seen := map[string]bool{}
-	for ; i < n; i++ {
-		s := strings.ToLower(subtags[i])
-		variant := len(s) >= 5 && len(s) <= 8 || len(s) == 4 && s[0] >= '0' && s[0] <= '9'
-		if !variant || !alnum(s) || seen[s] {
-			break
-		}
-		seen[s] = true
-	}
-	for i < n {
-		singleton := strings.ToLower(subtags[i])
-		if len(singleton) != 1 || !alnum(singleton) || seen[singleton] {
-			return "", "", "", false
-		}
-		seen[singleton] = true
-		least := 2
-		if singleton == "x" {
-			least = 1
-		}
-		j := i + 1
-		for j < n && len(subtags[j]) >= least && len(subtags[j]) <= 8 && alnum(subtags[j]) && (singleton == "x" || len(subtags[j]) > 1) {
-			j++
-		}
-		if j == i+1 {
-			return "", "", "", false
-		}
-		if i = j; singleton == "x" && i < n {
-			return "", "", "", false
-		}
-	}
-	return language, script, region, true
+// localeTable is the locale Intl negotiates for a well-formed tag, as far
+// as the tables go.
+func localeTable(id localeID) (string, bool) {
+	tag, _, ok := lookupLocale(id, intlLocales())
+	return tag, ok
 }
 
-// localeTable is the table of the locale Intl negotiates for a well-formed
-// tag, as far as the tables go.
-func localeTable(language, script, region string) (*intlLocale, bool) {
-	tag := func(subtags ...string) string {
-		out := language
-		for _, s := range subtags {
-			if s != "" {
-				out += "-" + s
-			}
-		}
-		return out
-	}
-	for _, c := range []string{tag(script, region), tag(region), tag(script), language} {
-		if t, ok := intlLocales()[c]; ok {
-			return t, true
+// lookupLocale is the first of a tag without its variants and extensions
+// and its shorter prefixes that has an entry, as V8 looks a locale up.
+func lookupLocale[V any](id localeID, entries map[string]V) (string, V, bool) {
+	for _, tag := range []string{joinSubtags(id.language, id.script, id.region), joinSubtags(id.language, id.script), id.language} {
+		if v, ok := entries[tag]; ok {
+			return tag, v, true
 		}
 	}
-	return nil, false
+	var none V
+	return "", none, false
+}
+
+func joinSubtags(language string, subtags ...string) string {
+	for _, s := range subtags {
+		if s != "" {
+			language += "-" + s
+		}
+	}
+	return language
 }
 
 // defaultLocale is ICU's default locale, from the environment.
-func defaultLocale() *intlLocale {
+func defaultLocale() string {
 	for _, name := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
 		if v := os.Getenv(name); v != "" {
 			v, _, _ = strings.Cut(v, ".")
 			v, _, _ = strings.Cut(v, "@")
-			if l, s, r, ok := languageTag(strings.ReplaceAll(v, "_", "-")); ok {
-				if t, ok := localeTable(l, s, r); ok {
+			if id, problem := languageTag(strings.ReplaceAll(v, "_", "-")); problem == "" {
+				if t, ok := localeTable(id); ok {
 					return t
 				}
 			}
 			break
 		}
 	}
-	return intlLocales()["en-US"]
+	return "en-US"
 }
 
 var styles = []string{"full", "long", "medium", "short"}
 
 // intlFormat is an `Intl.DateTimeFormat` of the adapter's FormatOptions.
 type intlFormat struct {
+	tag     string
 	locale  *intlLocale
 	pattern string
 }
@@ -161,17 +112,14 @@ func newIntlFormat(o Value) intlFormat {
 		panic(rangeError("invalid style " + QuoteJSON(value(s).(string))))
 	}
 	date, time := style("dateStyle"), style("timeStyle")
-	locale := defaultLocale()
+	tag := defaultLocale()
 	if l := r.Get("locale"); isSome(l) {
-		language, script, region, ok := languageTag(value(l).(string))
-		if !ok {
-			panic(rangeError("Incorrect locale information provided"))
-		}
-		if t, ok := localeTable(language, script, region); ok {
-			locale = t
+		if t, ok := localeTable(parseLocale(value(l).(string))); ok {
+			tag = t
 		}
 	}
-	return intlFormat{locale, locale.patterns[date*5+time]}
+	locale := intlLocales()[tag]
+	return intlFormat{tag, locale, locale.patterns[date*5+time]}
 }
 
 // format is the instant `ms` on the wall clock of `zone`, nil for UTC.
@@ -205,7 +153,11 @@ func (f intlFormat) format(ms float64, zone *TimeZone) string {
 			pattern = pattern[min(i+1, len(pattern)):]
 		case c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z':
 			n := len(pattern) - len(strings.TrimLeft(pattern, pattern[:1]))
-			out.WriteString(l.field(pattern[:n], wall, utc, offset))
+			if pattern[0] == 'z' {
+				out.WriteString(f.zoneName(zone, utc, offset, n == 4))
+			} else {
+				out.WriteString(l.field(pattern[:n], wall))
+			}
 			pattern = pattern[n:]
 		default:
 			_, size := utf8.DecodeRuneInString(pattern)
@@ -223,7 +175,7 @@ func twoDigits(n int) string {
 	return strconv.Itoa(n)
 }
 
-func (l *intlLocale) field(token string, wall *jsDate, utc bool, offset float64) string {
+func (l *intlLocale) field(token string, wall *jsDate) string {
 	year, month, day, hour := int(wall.year()), int(wall.month()), int(wall.date()), int(wall.hours())
 	h12 := hour % 12
 	switch token {
@@ -266,15 +218,19 @@ func (l *intlLocale) field(token string, wall *jsDate, utc bool, offset float64)
 		return strconv.Itoa(int(wall.seconds()))
 	case "ss":
 		return twoDigits(int(wall.seconds()))
-	case "z", "zzzz":
-		return l.zoneName(utc, offset, token == "zzzz")
 	}
 	panic(Defect{"no Intl field " + token})
 }
 
-// zoneName is the zone's short or long name: UTC's, offset 0's, or a
-// template of the offset's.
-func (l *intlLocale) zoneName(utc bool, offset float64, long bool) string {
+// zoneName is the zone's short or long name: UTC's, a named zone's own,
+// offset 0's, or a template of the offset's.
+func (f intlFormat) zoneName(zone *TimeZone, utc bool, offset float64, long bool) string {
+	if !utc && zone != nil && zone.loc != nil {
+		if name := metazoneName(f.tag, zone, offset, long); name != "" {
+			return name
+		}
+	}
+	l := f.locale
 	b := map[bool]int{false: 0, true: 1}
 	minutes := math.Round(offset / 60000)
 	switch {

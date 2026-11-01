@@ -35,17 +35,38 @@ const resolveZone = (name) => {
   }
 };
 
-const zones = goZones()
-  .flatMap((name) => {
-    const resolved = resolveZone(name);
-    if (resolved === undefined) return [];
-    if (resolveZone(resolved) !== resolved) throw new Error(`${name} resolves to ${resolved}, which resolves on`);
-    return [resolved === name ? name : `${name}>${resolved}`];
-  })
+const zoneNamesResolved = goZones().flatMap((name) => {
+  const resolved = resolveZone(name);
+  if (resolved === undefined) return [];
+  if (resolveZone(resolved) !== resolved) throw new Error(`${name} resolves to ${resolved}, which resolves on`);
+  return [[name, resolved]];
+});
+const zones = zoneNamesResolved.map(([name, resolved]) => (resolved === name ? name : `${name}>${resolved}`)).join(";");
+const zoneIds = [...new Set(zoneNamesResolved.map(([, resolved]) => resolved))].filter((id) => id !== "UTC").sort();
+
+// the languages and regions ICU replaces when it canonicalizes a tag
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+const codes2 = Array.from(LETTERS).flatMap((a) => Array.from(LETTERS, (b) => a + b));
+const canonical = (tag) => {
+  try {
+    return Intl.getCanonicalLocales(tag)[0];
+  } catch {
+    return tag;
+  }
+};
+const languageAliases = [...codes2, ...codes2.flatMap((c) => Array.from(LETTERS, (d) => c + d))]
+  .filter((c) => canonical(c) !== c)
+  .map((c) => `${c}>${canonical(c)}`)
+  .join(";");
+const regionAliases = [...codes2.map((c) => c.toUpperCase()), ...Array.from({ length: 1000 }, (_, i) => String(i).padStart(3, "0"))]
+  .filter((c) => canonical(`und-${c}`) !== `und-${c}`)
+  .map((c) => `${c}>${canonical(`und-${c}`).slice(4)}`)
   .join(";");
 
-// The locales of the tables: common ones on the Gregorian calendar with
-// Latin digits; another tag falls back along its subtags to one of them.
+// Common locales on the Gregorian calendar with Latin digits. The tables
+// have their languages: every locale of them ICU has data for (most the
+// same as another), which V8 resolves a tag to by dropping subtags from
+// its end. A tag of another language falls back to the default locale.
 const LOCALES = [
   "en", "en-US", "en-GB", "en-AU", "en-CA", "en-IE", "en-IN", "en-NZ", "en-ZA",
   "de", "de-AT", "de-CH", "fr", "fr-BE", "fr-CA", "fr-CH", "it", "it-CH",
@@ -53,6 +74,13 @@ const LOCALES = [
   "sv", "da", "nb", "fi", "is", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl",
   "el", "ru", "uk", "tr", "he", "ja", "ko", "zh", "zh-HK", "zh-TW", "id", "vi",
 ];
+const SCRIPTS = ["Latn", "Cyrl", "Grek", "Hebr", "Arab", "Hans", "Hant", "Jpan", "Kore", "Deva"];
+const REGIONS = [...codes2.map((c) => c.toUpperCase()), ...Array.from({ length: 1000 }, (_, i) => String(i).padStart(3, "0"))];
+const available = (tag) => new Intl.DateTimeFormat(tag).resolvedOptions().locale === tag;
+const locales = [...new Set(LOCALES.map((l) => l.split("-")[0]))]
+  .flatMap((l) => [l, ...SCRIPTS.map((s) => `${l}-${s}`).filter(available)])
+  .flatMap((base) => [base, ...REGIONS.map((r) => `${base}-${r}`).filter(available)]);
+for (const l of LOCALES) if (!locales.includes(l)) throw new Error(`${l} is no locale of ICU's`);
 
 const STYLES = [undefined, "full", "long", "medium", "short"];
 const SEP = "|";
@@ -229,9 +257,7 @@ const tableOf = (locale) => {
 };
 
 const seen = new Map();
-const lines = LOCALES.map((locale) => {
-  const resolved = new Intl.DateTimeFormat(locale).resolvedOptions().locale;
-  if (resolved !== locale) throw new Error(`${locale} resolves to ${resolved}`);
+const lines = locales.map((locale) => {
   const table = tableOf(locale);
   const same = seen.get(table);
   if (same !== undefined) return `${locale}=@${same}`;
@@ -239,12 +265,92 @@ const lines = LOCALES.map((locale) => {
   return `${locale}=${table}`;
 });
 
+// The names of named zones, which ICU takes from their metazone at the
+// date. Each zone is named at two probes, in winter and in summer, and the
+// Go side names a date by the probe of its offset; a name the offset would
+// give anyway is left out. Zones named alike in every locale share a group.
+const PROBES = [Date.UTC(2024, 0, 15, 12), Date.UTC(2024, 6, 15, 12)];
+const offsetAt = (timeZone, date) => {
+  const name = part(new Intl.DateTimeFormat("en", { timeZoneName: "longOffset", timeZone }), date, "timeZoneName");
+  const m = /GMT([+-−])(\d\d):(\d\d)/.exec(name);
+  return m === null ? 0 : (m[1] === "+" ? 1 : -1) * (Number(m[2]) * 60 + Number(m[3]));
+};
+const zoneOffsets = new Map(zoneIds.map((id) => [id, PROBES.map((d) => offsetAt(id, d))]));
+const tablesOf = new Map(lines.map((line) => line.split("=")).map(([l, t]) => [l, t]));
+const zoneTemplates = (locale) => {
+  let t = tablesOf.get(locale);
+  if (t.startsWith("@")) t = tablesOf.get(t.slice(1));
+  return t.split(SEP)[6].split(ITEM);
+};
+// names[locale][style][zone]: an entry `winter` or `winter~summer`
+const zoneNamesOf = (locale) => {
+  const templates = zoneTemplates(locale);
+  return [["long", false], ["full", true]].map(([timeStyle, full]) =>
+    zoneIds.map((timeZone) => {
+      const format = new Intl.DateTimeFormat(locale, { timeStyle, timeZone });
+      const [w, s] = PROBES.map((d, i) => {
+        const name = part(format, d, "timeZoneName");
+        return name === zoneText(templates, zoneOffsets.get(timeZone)[i], full) ? "" : name;
+      });
+      for (const n of [w, s]) if (/[|~\n`]/.test(n)) throw new Error(`${locale} ${timeZone}: ${n}`);
+      return w === s ? w : `${w}${ITEM}${s}`;
+    }),
+  );
+};
+const zoneNameTable = locales.map((locale) => [locale, zoneNamesOf(locale)]);
+const signatures = new Map();
+zoneIds.forEach((id, z) => {
+  const signature = zoneNameTable.map(([, styles]) => styles.map((names) => names[z]).join(SEP)).join("\n");
+  if (/^[|\n]*$/.test(signature)) return;
+  signatures.set(signature, [...(signatures.get(signature) ?? []), z]);
+});
+const groups = [...signatures.values()];
+const zoneLines = (style) => {
+  const seenNames = new Map();
+  return zoneNameTable.map(([locale, styles]) => {
+    const line = groups.map((zs) => styles[style][zs[0]]).join(SEP);
+    const same = seenNames.get(line);
+    if (same !== undefined) return `${locale}=@${same}`;
+    seenNames.set(line, locale);
+    return `${locale}=${line}`;
+  });
+};
+const zoneGroups = groups.map((zs) => zs.map((z) => zoneIds[z]).join(",")).join(";");
+const shortZoneLines = zoneLines(0), longZoneLines = zoneLines(1);
+
+// check the Go side's naming at other dates against Intl
+const nameAt = (locale, style, timeZone, date) => {
+  const g = groups.findIndex((zs) => zs.some((z) => zoneIds[z] === timeZone));
+  const [, styles] = zoneNameTable.find(([l]) => l === locale);
+  const offset = offsetAt(timeZone, date);
+  const [w, s = w] = g < 0 ? [""] : styles[style][groups[g][0]].split(ITEM);
+  const probe = zoneOffsets.get(timeZone).indexOf(offset);
+  return (probe === 0 ? w : probe === 1 ? s : "") || zoneText(zoneTemplates(locale), offset, style === 1);
+};
+let misnamed = 0;
+for (const locale of ["en", "en-US", "en-GB", "de", "fr", "ja", "zh-TW", "es-MX"]) {
+  for (const timeZone of zoneIds) {
+    for (const date of [Date.UTC(2023, 1, 1), Date.UTC(2025, 7, 1)]) {
+      ["long", "full"].forEach((timeStyle, style) => {
+        const want = part(new Intl.DateTimeFormat(locale, { timeStyle, timeZone }), date, "timeZoneName");
+        if (nameAt(locale, style, timeZone, date) !== want && misnamed++ < 10) {
+          console.log(`misnamed: ${locale} ${timeZone} ${new Date(date).toISOString()} ${timeStyle}: ${nameAt(locale, style, timeZone, date)}, Intl ${want}`);
+        }
+      });
+    }
+  }
+}
+console.log(`${misnamed} zone names at other dates differ from Intl's`);
+
 const go = `// Code generated by tools/go-intl/gen.mjs; DO NOT EDIT.
 
 package flickrt
 
 // As Node ${process.versions.node} (ICU ${process.versions.icu}, tz ${process.versions.tz}) answers.
 const (
+	// languageAliasData and regionAliasData are the subtags ICU replaces: \`from>to\`.
+	languageAliasData = "${languageAliases}"
+	regionAliasData   = "${regionAliases}"
 	// zoneData is the zones V8 accepts: \`name\`, or \`name>resolved\` for one it resolves to another.
 	zoneData = "${zones}"
 	// intlData is a line per locale: \`tag=@other\` for the data of another, or \`tag=\` and, apart by
@@ -253,7 +359,15 @@ const (
 	// the names of UTC, short and long, of offset 0, then templates of the short names of whole and
 	// other positive offsets, of negative ones, and of the long names of positive and negative ones.
 	intlData = \`${lines.join("\n")}\`
+	// zoneGroupData is the named zones with names of their own, by group: the zones of a group,
+	// apart by ",", are named alike in every locale.
+	zoneGroupData = "${zoneGroups}"
+	// shortZoneData and longZoneData are a line per locale, as intlData: the short and long name
+	// of each group, apart by "${SEP}", at a winter and a summer date: \`winter${ITEM}summer\` or, for
+	// the same, \`name\`; empty where the offset's name is the zone's.
+	shortZoneData = \`${shortZoneLines.join("\n")}\`
+	longZoneData = \`${longZoneLines.join("\n")}\`
 )
 `;
 writeFileSync(out, go);
-console.log(`${out}: ${go.length} bytes, ${LOCALES.length} locales, ${seen.size} tables`);
+console.log(`${out}: ${go.length} bytes, ${locales.length} locales, ${seen.size} tables, ${groups.length} zone groups`);

@@ -1,38 +1,25 @@
 package flickrt
 
 import (
-	"bytes"
 	"math"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // The built-in behavior of `--trace`.
 
 // cliTraced is run.ts's `traced`: under `--trace` the handler of command
-// `name` runs as a span of that name with a tracer that keeps every
-// sampled span as it ends, sent over OTLP/HTTP JSON to
-// OTEL_EXPORTER_OTLP_ENDPOINT as service OTEL_SERVICE_NAME when the
-// command ends. Log messages reach the spans as the tracer logger's events.
-// shortcut: no log records or metrics are exported, and a failed span has no `exception` events; port Effect's Otlp logger, metrics and Cause.prettyErrors when a program reads them
+// `name` runs as a span of that name with Effect's `Otlp.layer`, sending
+// to OTEL_EXPORTER_OTLP_ENDPOINT as service OTEL_SERVICE_NAME. Sampled
+// spans go to /v1/traces as they end, every 5 s; log records to /v1/logs
+// through a logger added to the fiber's, every second; the metrics to
+// /v1/metrics, every 10 s. What is left is sent as the command ends, each
+// within 3 s. Log messages also reach the spans as the tracer logger's
+// events.
 func cliTraced(fb *Fiber, name string, run func(*Fiber) Value) Value {
-	var mu sync.Mutex
-	var spans []*span
-	keep := &tracer{ended: func(s *span) {
-		if s.sampled {
-			mu.Lock()
-			spans = append(spans, s)
-			mu.Unlock()
-		}
-	}}
-	traced := *fb
-	traced.env = fb.env.with(tracerKey, keep)
-	out, cause := catch(func() Value {
-		return TracerWithSpan(&traced, name, Rec("parent", None, "root", false), Eff(run))
-	})
 	endpoint, service := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"), os.Getenv("OTEL_SERVICE_NAME")
 	if endpoint == "" {
 		endpoint = "http://localhost:4318"
@@ -40,29 +27,46 @@ func cliTraced(fb *Fiber, name string, run func(*Fiber) Value) Value {
 	if service == "" {
 		service = name
 	}
-	mu.Lock()
-	body := cliOtlpSpans(service, spans)
-	mu.Unlock()
-	if response, err := http.Post(endpoint+"/v1/traces", "application/json", bytes.NewReader([]byte(body))); err == nil {
-		response.Body.Close()
+	resource := otlpResource(service)
+	traces := newOtlpExporter(joinSegments(endpoint, "/v1/traces"), "OtlpTracer", 5*time.Second, 1000, false, func(spans []string) string {
+		return `{"resourceSpans":[{"resource":` + resource + `,"scopeSpans":[{"scope":` + otlpScope +
+			`,"spans":[` + strings.Join(spans, ",") + `]}]}]}`
+	})
+	logs := newOtlpExporter(joinSegments(endpoint, "/v1/logs"), "OtlpLogger", time.Second, 1000, false, func(records []string) string {
+		return otlpLogs(resource, records)
+	})
+	traced := *fb
+	clock, metrics := clockOf(fb), metricContextOf(&traced)
+	start := clock.nanos()
+	metered := newOtlpExporter(joinSegments(endpoint, "/v1/metrics"), "OtlpMetrics", 10*time.Second, 0, true, func([]string) string {
+		return otlpMetrics(resource, service, start, clock.nanos(), snapshotOf(metrics))
+	})
+	keep := &tracer{ended: func(s *span) {
+		if s.sampled {
+			traces.push(otlpSpan(s))
+		}
+	}}
+	logger := &logger{func(fb *Fiber, m *logEntry) Value {
+		logs.push(otlpLogRecord(fb, m))
+		return Unit
+	}}
+	traced.env = fb.env.with(tracerKey, keep).with(loggersKey, loggerSet(loggersOf(fb), []Value{logger}))
+	out, cause := catch(func() Value {
+		return TracerWithSpan(&traced, name, Rec("parent", None, "root", false), Eff(run))
+	})
+	var shutdowns sync.WaitGroup
+	for _, e := range []*otlpExporter{traces, logs, metered} {
+		shutdowns.Add(1)
+		go func() {
+			defer shutdowns.Done()
+			e.shutdown()
+		}()
 	}
+	shutdowns.Wait()
 	if cause != nil {
 		panic(&Failure{cause})
 	}
 	return out
-}
-
-// cliOtlpSpans is an ExportTraceServiceRequest of the spans, in OTLP's JSON.
-func cliOtlpSpans(service string, spans []*span) string {
-	encoded := make([]string, len(spans))
-	for i, s := range spans {
-		encoded[i] = otlpSpan(s)
-	}
-	return `{"resourceSpans":[{"resource":{"attributes":[{"key":"telemetry.sdk.name","value":{"stringValue":"effect"}},` +
-		`{"key":"telemetry.sdk.language","value":{"stringValue":"go"}},{"key":"telemetry.sdk.version","value":{"stringValue":"4.0.5"}},` +
-		`{"key":"service.name","value":{"stringValue":` + QuoteJSON(service) +
-		`}}],"droppedAttributesCount":0},"scopeSpans":[{"scope":{"name":"effect","version":"4.0.5"},"spans":[` +
-		strings.Join(encoded, ",") + `]}]}]}`
 }
 
 var otlpKinds = map[string]string{"internal": "1", "server": "2", "client": "3", "producer": "4", "consumer": "5"}
@@ -111,20 +115,25 @@ func otlpSpan(s *span) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	attrs := append([]spanAttr{}, s.attrs...)
+	events := make([]string, len(s.events))
+	for i, e := range s.events {
+		events[i] = `{"name":` + QuoteJSON(e.name) + `,"timeUnixNano":` + QuoteJSON(e.time.String()) +
+			`,"attributes":` + otlpAttributes(e.attrs) + `,"droppedAttributesCount":0}`
+	}
 	status := `{"code":1}`
 	if s.exit != nil {
 		if !s.exit.has(causeFail) && !s.exit.has(causeDie) {
 			status = `{"code":0}`
 			attrs = append(attrs, spanAttr{"effect.fiber.interrupted", true})
-		} else {
-			message, _, _ := strings.Cut(pretty(s.exit), "\n")
-			status = `{"code":2,"message":` + QuoteJSON(message) + `}`
+		} else if errs := prettyErrors(s.exit); len(errs) > 0 {
+			status = `{"code":2,"message":` + QuoteJSON(errs[0].message) + `}`
+			for _, e := range errs {
+				events = append(events, `{"name":"exception","timeUnixNano":`+QuoteJSON(s.end.String())+
+					`,"droppedAttributesCount":0,"attributes":`+otlpAttributes([]spanAttr{
+					{"exception.type", e.name}, {"exception.message", e.message}, {"exception.stacktrace", e.rendered()},
+				})+"}")
+			}
 		}
-	}
-	events := make([]string, len(s.events))
-	for i, e := range s.events {
-		events[i] = `{"name":` + QuoteJSON(e.name) + `,"timeUnixNano":` + QuoteJSON(e.time.String()) +
-			`,"attributes":` + otlpAttributes(e.attrs) + `,"droppedAttributesCount":0}`
 	}
 	links := make([]string, len(s.links))
 	for i, l := range s.links {

@@ -99,13 +99,19 @@ func causePretty(c *Cause) string {
 	errs := prettyErrors(c)
 	out := make([]string, len(errs))
 	for i, e := range errs {
-		out[i] = e.stack
-		if e.cause != nil {
-			lines := strings.Split(e.cause.stack, "\n")
-			out[i] += " {\n  [cause]: " + strings.Join(lines, "\n  ") + "\n}"
-		}
+		out[i] = e.rendered()
 	}
 	return strings.Join(out, "\n")
+}
+
+// rendered is Effect's renderPrettyError: the stack, its cause's nested,
+// the stack of `includeCauseInStack`.
+func (e *prettyError) rendered() string {
+	if e.cause == nil {
+		return e.stack
+	}
+	lines := strings.Split(e.cause.stack, "\n")
+	return e.stack + " {\n  [cause]: " + strings.Join(lines, "\n  ") + "\n}"
 }
 
 // formatJSON is Effect's `formatJson` of a Flick value: its JSON, with an

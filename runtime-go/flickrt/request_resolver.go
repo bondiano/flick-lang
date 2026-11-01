@@ -3,6 +3,8 @@ package flickrt
 // RequestResolver is Effect's: the batching of a resolver, and its
 // combinators, which make a resolver of the same batching otherwise.
 
+import "slices"
+
 // defaultBatchKey is the one key of a resolver that batches all its
 // entries together.
 var defaultBatchKey = new(byte)
@@ -157,14 +159,27 @@ func RequestResolverRace(that, self Value) Value {
 	})
 }
 
-// RequestResolverWithSpan runs each batch in a span of the name.
-//
-// shortcut: the span has no `batchSize` attribute nor links to the requests' spans, as spans keep no attributes on the go target yet; add them with the tracer's attributes
+// RequestResolverWithSpan runs each batch in a span of the name, with the
+// batch's size as its first attribute and links to the spans of the
+// requesting fibers, each once.
 func RequestResolverWithSpan(name, options, self Value) Value {
 	inner := resolverOf(self).runAll
+	o := record(options)
 	return resolverOf(self).with(func(r *resolver) {
 		r.runAll = func(fb *Fiber, entries []Value, key Value) {
-			TracerWithSpan(fb, name, options, Eff(func(fb *Fiber) Value { inner(fb, entries, key); return Unit }))
+			links := append([]Value{}, List(o.Get("links"))...)
+			var seen []Value
+			for _, e := range entries {
+				s, ok := some(entryOf(e).span)
+				if !ok || slices.Contains(seen, s) {
+					continue
+				}
+				seen = append(seen, s)
+				links = append(links, Rec("span", s, "attributes", []Value{}))
+			}
+			attributes := append([]Value{[]Value{"batchSize", int32(len(entries))}}, List(o.Get("attributes"))...)
+			spanned := o.set("links", links).set("attributes", attributes)
+			TracerWithSpan(fb, name, spanned, Eff(func(fb *Fiber) Value { inner(fb, entries, key); return Unit }))
 		}
 	})
 }

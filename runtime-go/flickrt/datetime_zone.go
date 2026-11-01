@@ -13,9 +13,8 @@ import (
 
 // TimeZone is Effect's: a named IANA zone or a fixed offset. Named zones
 // come from Go's time zone database, which a program that reaches them
-// embeds (`time/tzdata`), under the name V8 resolves each to.
-//
-// shortcut: Intl also takes an offset such as `+01:00` as a zone's name; take one when a program names a zone so
+// embeds (`time/tzdata`), under the name V8 resolves each to. Intl also
+// takes an offset (`+01:00`, `+01`, `+0100`) as a zone's name.
 type TimeZone struct {
 	id     string         // named: the IANA identifier
 	loc    *time.Location // named; nil for an offset
@@ -61,18 +60,34 @@ func zoneTable(id string) (string, bool) {
 
 var zoneCache sync.Map // resolved id → *TimeZone
 
+// offsetZoneName is the offsets Intl takes as a zone's name.
+var offsetZoneName = regexp.MustCompile(`^([+\-\x{2212}])([01]\d|2[0-3])(?::?([0-5]\d))?$`)
+
 // zoneNamed is Effect's `zoneMakeNamed`.
 func zoneNamed(id string) (*TimeZone, bool) {
+	var loc *time.Location
 	resolved, ok := resolveZone(id)
+	if m := offsetZoneName.FindStringSubmatch(id); m != nil {
+		h, _ := strconv.Atoi(m[2])
+		mm, _ := strconv.Atoi(m[3]) // 0 for none
+		seconds := (h*60 + mm) * 60
+		if m[1] != "+" {
+			seconds = -seconds
+		}
+		resolved, ok = offsetToString(float64(seconds)*1000), true
+		loc = time.FixedZone(resolved, seconds)
+	}
 	if !ok || resolved == "" || resolved == "Local" {
 		return nil, false
 	}
 	if z, ok := zoneCache.Load(resolved); ok {
 		return z.(*TimeZone), true
 	}
-	loc, err := time.LoadLocation(resolved)
-	if err != nil {
-		return nil, false
+	if loc == nil {
+		var err error
+		if loc, err = time.LoadLocation(resolved); err != nil {
+			return nil, false
+		}
 	}
 	z, _ := zoneCache.LoadOrStore(resolved, &TimeZone{id: resolved, loc: loc})
 	return z.(*TimeZone), true
