@@ -46,3 +46,20 @@ foreign effect use_conn from "./res.mjs" "use"
 
 report : Failure e ->{; none} Unit
 let report _ = ()
+
+// The holes of TypeScript (docs/formal/ts-holes.md): a JS value of unknown
+// type, a JS object as the importer gives it, a predicate that says
+// nothing of the type, and a member read by a call.
+type Shape
+
+js_of : String -> JsValue
+foreign pure js_of from "./shapes.mjs" "jsOf"
+
+is_point : JsValue -> Bool
+foreign pure is_point from "./shapes.mjs" "isPoint"
+
+shape_of : JsValue -> Shape
+foreign pure shape_of from "./shapes.mjs" "shape"
+
+shape_name : Shape ->{} String
+foreign effect shape_name from "./shapes.mjs" "name"

@@ -8,6 +8,7 @@
 
 mod bind;
 mod handle;
+mod holes;
 mod mutate;
 mod print;
 mod regions;
@@ -19,6 +20,7 @@ pub use mutate::mutate;
 pub use print::source;
 
 use crate::native::prelude;
+use crate::subst;
 use crate::syntax::{Con, Const, Lit, Name, Path, Term};
 use crate::types::{Row, Scheme, Stage, Type};
 
@@ -93,10 +95,11 @@ impl<'c> Gen<'c> {
     }
 }
 
-/// Whether `p` has a `scope`: running it needs the dynamics of regions
-/// (`docs/formal/regions.md` §3), which the machine has not.
-pub fn has_scope(p: &Program) -> bool {
-    source(p).contains("(scope ")
+/// Whether the machine runs `p`: not with a `scope`, which needs the
+/// dynamics of regions (`docs/formal/regions.md` §3), nor with a value
+/// of `Gen.fl` or the standard library, which it has no natives for.
+pub fn runs(p: &Program) -> bool {
+    !subst::any(&p.term, &|t| matches!(t, Term::Scope(..) | Term::Global(_)))
 }
 
 /// The program `choices` build.

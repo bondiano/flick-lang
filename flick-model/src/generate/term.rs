@@ -11,6 +11,7 @@ use std::rc::Rc;
 use flick_core::numeric::{Arith, Num};
 
 use super::bind::fits;
+use super::holes::{bases, js, js_value, shape, shape_value};
 use super::regions::{handles, holders, visible};
 use super::{
     ERRORS, Gen, SERVICES, boolean, error_con, int, mono, nothing, operation, option, payload, row,
@@ -44,6 +45,13 @@ enum Form {
     Scope,
     Hold,
     Consume,
+    Annotate,
+    Update,
+    Destructure,
+    Lookup,
+    Predicate,
+    Member,
+    FunctionCell,
 }
 
 impl Gen<'_> {
@@ -86,10 +94,11 @@ impl Gen<'_> {
     }
 
     fn base(&mut self) -> Type {
-        [int, boolean, string, unit][self.pick(4)]()
+        let bases = bases();
+        bases[self.pick(bases.len())]()
     }
 
-    fn stage(&mut self) -> Stage {
+    pub(super) fn stage(&mut self) -> Stage {
         if self.pick(2) == 0 {
             Stage::Pure
         } else {
@@ -208,6 +217,16 @@ impl Gen<'_> {
             Form::Scope => self.scope(cx, t, budget, s),
             Form::Hold => self.hold(cx, t, budget, s),
             Form::Consume => self.consume(cx),
+            Form::Annotate => self.annotate(cx, t, budget, s),
+            Form::Update => self.update(cx, t, budget, s),
+            Form::Destructure => self.destructure(cx, t, budget, s),
+            Form::Lookup => match t {
+                Type::App(_, a) => self.lookup(cx, a, budget, s),
+                _ => self.leaf(cx, t),
+            },
+            Form::Predicate => self.predicate(cx, budget, s),
+            Form::Member => self.member(cx, budget, s),
+            Form::FunctionCell => self.function_cell(cx, t, budget, s),
             Form::Field => {
                 let other = self.data(0);
                 let fields =
@@ -252,6 +271,8 @@ impl Gen<'_> {
             _ if *t == int() => Term::Lit(Lit::Int(i32::try_from(self.pick(3)).unwrap_or(0))),
             _ if *t == boolean() => Term::bool(self.pick(2) == 1),
             _ if *t == string() => Term::string(["", "a", "ok"][self.pick(3)]),
+            _ if *t == js() => js_value(),
+            _ if *t == shape() => shape_value(),
             _ => Term::unit(),
         }
     }
@@ -373,6 +394,7 @@ impl Gen<'_> {
                 );
                 arm(self, Pat::Wild, Vec::new(), false);
             }
+            _ if [js(), shape()].contains(&d) => arm(self, Pat::Wild, Vec::new(), false),
             _ => arm(self, Pat::Lit(Lit::Unit), Vec::new(), false),
         }
         Term::Match(Rc::new(scrutinee), arms.into())
@@ -447,6 +469,26 @@ fn forms(cx: &Cx, t: &Type, budget: &Stage, block: bool) -> Vec<Form> {
     }
     if runtime && *t == unit() && !holders(cx).is_empty() {
         forms.extend([Form::Consume; 3]);
+    }
+    // the Flick forms of the holes of TypeScript (`holes.rs`)
+    forms.push(Form::Annotate);
+    if matches!(t, Type::Record(_)) {
+        forms.push(Form::Update);
+    }
+    if matches!(t, Type::App(..)) && plain(t) {
+        forms.push(Form::Lookup);
+    }
+    if block {
+        forms.push(Form::Destructure);
+    }
+    if block && runtime {
+        forms.push(Form::FunctionCell);
+    }
+    if *t == boolean() {
+        forms.push(Form::Predicate);
+    }
+    if *t == string() && runtime {
+        forms.push(Form::Member);
     }
     if [int(), boolean(), string()].contains(t) {
         forms.push(Form::Prim);

@@ -180,6 +180,46 @@ pub fn lit_eq(a: &Lit, b: &Lit) -> bool {
     }
 }
 
+/// Whether `e` or a term in it is one `f` holds of.
+pub fn any(e: &Term, f: &dyn Fn(&Term) -> bool) -> bool {
+    let arms = |x: &Term, arms: &[Arm]| {
+        any(x, f)
+            || arms
+                .iter()
+                .any(|a| a.guard.as_ref().is_some_and(|g| any(g, f)) || any(&a.body, f))
+    };
+    f(e) || match e {
+        Term::Lam(_, b)
+        | Term::Fix(_, _, b)
+        | Term::Scope(_, b)
+        | Term::Field(b, _)
+        | Term::Task(b)
+        | Term::Await(b)
+        | Term::Bind(_, b)
+        | Term::With(_, b)
+        | Term::Raise(b) => any(b, f),
+        Term::Let(_, _, a, b)
+        | Term::LetRec(_, _, a, b)
+        | Term::App(a, b)
+        | Term::Update(a, _, b)
+        | Term::Provide(a, b)
+        | Term::Join(a, b) => any(a, f) || any(b, f),
+        Term::Match(x, a) | Term::Try(x, a) | Term::Handle(x, a) => arms(x, a),
+        Term::Tuple(xs) | Term::List(xs) | Term::Structural(_, xs) | Term::Apply(_, xs) => {
+            xs.iter().any(|x| any(x, f))
+        }
+        Term::Record(fs) => fs.iter().any(|(_, x)| any(x, f)),
+        Term::Var(_)
+        | Term::Global(_)
+        | Term::Lit(_)
+        | Term::Tag(_)
+        | Term::Stuck(_)
+        | Term::Loc(_)
+        | Term::Env(_)
+        | Term::Die(_) => false,
+    }
+}
+
 /// The variables `e` uses that no binder in it binds: `fv(e)`.
 pub fn free_vars(e: &Term) -> BTreeSet<Name> {
     let mut out = BTreeSet::new();

@@ -1,0 +1,11 @@
+// A local function whose row names `Scope s` holds nothing of `s`: a row is
+// no capture, so a task may use it inside the scope (regions.md Р64).
+module App.ScopeRow exposing (..)
+
+scoped_row : Unit ->{} Unit
+let scoped_row _ = scope s1 {
+  v3 : Int ->{Scope s1;} Unit
+  let v3 _ = ()
+  let t : Eff {Scope s1} none Unit = task { v3 0 }
+  await t
+}

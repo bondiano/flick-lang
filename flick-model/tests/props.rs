@@ -6,7 +6,9 @@
 //! rejects by design. The programs of regions (X3, `docs/formal/regions.md`)
 //! are checked by both and not run; a change may leak a region by each path
 //! of its §4 but the fourth. The generator makes none of the forms of the
-//! recorded incompletenesses Р23 and Р25. Not part of `just test`: `just
+//! recorded incompletenesses Р23 and Р25. The forms of the holes of
+//! TypeScript (X6, `docs/formal/ts-holes.md` §4) are checked by both and
+//! not run either: the machine has no natives of `Gen.fl`. Not part of `just test`: `just
 //! model` runs them, and `PROPTEST_CASES` sets how many programs each sees.
 
 use std::path::Path;
@@ -146,9 +148,10 @@ proptest! {
     fn progress_and_preservation_hold(c in choices()) {
         let p = generate::program(&c);
         prop_assume!(model(&p).is_ok());
-        // shortcut: a program with a `scope` is not run, the machine has no
-        // dynamics of regions (`regions.md` §3); run it once P2 adds them
-        prop_assume!(!generate::has_scope(&p));
+        // shortcut: a program with a `scope` or a foreign value is not run,
+        // the machine has no dynamics of regions (`regions.md` §3) and no
+        // natives of `Gen.fl`; run the first once P2 adds them
+        prop_assume!(generate::runs(&p));
         let globals = eval::Program::default();
         let checked = DECLS.with(|d| progress_and_preservation(&globals, d, &p));
         if let Err(e) = checked {
