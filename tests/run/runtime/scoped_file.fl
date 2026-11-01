@@ -14,8 +14,12 @@ let nap millis =
   | Ok d -> Effect.sleep d
   | Err _ -> ()
 
-path : String
-let path = "/tmp/flick-scoped-file.txt"
+/// The file, in Windows' temporary directory there and in `/tmp` elsewhere.
+path : Unit ->{} String
+let path () =
+  match Platform.env "TEMP" with
+  | Some dir -> dir ++ "/flick-scoped-file.txt"
+  | None -> "/tmp/flick-scoped-file.txt"
 
 /// Reads the file in a scope that says when it closes, then ends by `finish`.
 reading :
@@ -24,7 +28,7 @@ reading :
   (String ->{File.FileSystem; e} String) ->{File.FileSystem; e + {File.OpenError, File.ReadError}}
   String
 let reading label finish = scope {
-  let file = File.open_scoped path
+  let file = File.open_scoped (path ())
   Scope.add_finalizer (task { say (label ++ ": scope closed") })
   let text = File.read_all file
   finish text
@@ -34,7 +38,7 @@ main : Unit ->{; AppError} Unit
 let main () = provide File.node {
   let outcome =
     try
-      File.write_text path "hello from a file"
+      File.write_text (path ()) "hello from a file"
       say (reading "success" (fun text -> text))
       say
         (

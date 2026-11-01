@@ -56,9 +56,11 @@ let run windows dir =
     ChildProcess.make "echo prefixed" []
     |> ChildProcess.prefix (if windows then "cmd" else "sh") prefix_args
   line "prefix" (show (ChildProcess.lines prefixed))
-  line
-    "inherit_output"
-    (show (ChildProcess.exit_code (shell windows "echo inherited" |> ChildProcess.inherit_output)))
+  // cmd's `echo` ends its line with CRLF: there the child writes no line end and this does
+  let inherited = if windows then "<nul set /p =inherited& exit /b 0" else "echo inherited"
+  let code = ChildProcess.exit_code (shell windows inherited |> ChildProcess.inherit_output)
+  if windows then Platform.stdout_line "" else ()
+  line "inherit_output" (show code)
   let both = scope {
     let process = ChildProcess.spawn (shell windows "echo out&& echo err 1>&2")
     let out = text_lines (ChildProcess.stdout process)
