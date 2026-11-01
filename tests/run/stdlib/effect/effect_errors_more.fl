@@ -1,0 +1,174 @@
+// Effect's `Cause.pretty` text, inert reports of failures, the cause a
+// logger gets, and `Effect`'s handlers and collections in their other forms.
+module App.Main exposing (main)
+
+type error Boom = Boom Float
+  deriving Show
+
+boom : Eff none {Boom} String
+let boom = task { from_result (Err (Boom 1)) }
+
+broken : Eff none {Boom} String
+let broken = task { Effect.die "broken" }
+
+fine : Eff none {Boom} String
+let fine = task { "fine" }
+
+untraced : Tracer.SpanOptions
+let untraced = {
+  attributes = [];
+  links = [];
+  parent = None;
+  root = false;
+  kind_ = Tracer.internal;
+  sampled = None;
+  level = None;
+  captureStackTrace = false;
+  disablePropagation = false;
+}
+
+say : String ->{} Unit
+let say s = Platform.stdout_line s
+
+failure_of : Exit {Boom} a -> Failure {Boom}
+let failure_of x = Option.with_default Cause.empty (Exit.failure x)
+
+/// `Cause.pretty` and `Cause.pretty_errors` as Effect writes them.
+pretty : Unit ->{} Unit
+let pretty () =
+  let failed : Failure {Boom} = Cause.fail (Boom 1)
+  let died : Failure {Boom} = Cause.die "broken"
+  let stopped : Failure {Boom} = Cause.interrupt (Some 3)
+  let anon : Failure {Boom} = Cause.interrupt None
+  say ("fail: " ++ Cause.pretty failed)
+  say ("die: " ++ Cause.pretty died)
+  say ("interrupt: " ++ Cause.pretty stopped)
+  say ("interrupts: " ++ Cause.pretty (Cause.combine anon stopped))
+  say ("both: " ++ Cause.pretty (Cause.combine died failed))
+  say ("empty: [" ++ Cause.pretty Cause.empty ++ "]")
+  say ("pretty_errors: " ++ show (Cause.pretty_errors (Cause.combine stopped failed)))
+  say ("pretty_errors interrupt: " ++ show (Cause.pretty_errors stopped))
+  let traced : Exit {Boom} Unit =
+    Effect.exit
+      (task {
+        Tracer.with_span
+          "outer"
+          untraced
+          (task { Tracer.with_span "inner" untraced (task { from_result (Err (Boom 2)) }) })
+      })
+  say ("traced: " ++ Cause.pretty (failure_of traced))
+  let frame = Cause.stack_trace (failure_of traced)
+  say
+    ("frames: "
+      ++ show (
+        Option.map Cause.frame_name frame,
+        Option.map Cause.frame_name (Option.bind Cause.frame_parent frame),
+      ))
+
+/// Inert reports of failures and of the causes they hold.
+reports : Unit ->{} Unit
+let reports () =
+  let both : Failure {Boom} = Cause.combine (Cause.die "broken") (Cause.fail (Boom 1))
+  say ("inspect: " ++ RawCause.describe (Failure.inspect both))
+  let raw = Failure.raw_cause (Cause.combine (Cause.interrupt (Some 2)) both)
+  say ("raw: " ++ RawCause.describe (RawCause.inspect raw))
+  let empty : Failure {Boom} = Cause.empty
+  say ("empty: [" ++ RawCause.describe (Failure.inspect empty) ++ "]")
+  let none_left = Effect.exit (task { Effect.first_success_of [] })
+  say ("first_success_of []: " ++ RawCause.describe (Failure.inspect (failure_of none_left)))
+
+/// The cause each message is logged with, as a logger made by `make` gets it.
+logged : Unit ->{} Unit
+let logged () =
+  let seen = Ref.make []
+  let collect = {
+    window = Result.with_default Duration.zero (Duration.millis 1);
+    flush = fun causes -> Ref.set seen (Ref.get seen ++ causes);
+  }
+  let causes = Logger.make (fun (o : Logger.Options) -> o.cause)
+  provide (Logger.batched collect { mergeWithExisting = false } causes) {
+    Effect.log_info "plain"
+    Effect.ignore_ (Some LogLevel.info) boom
+    Effect.ignore_ (Some LogLevel.debug) boom
+    Effect.ignore_cause (Some LogLevel.warn) broken
+  }
+  let described = List.map_effect (fun c -> RawCause.describe (RawCause.inspect c)) (Ref.get seen)
+  say ("logged: " ++ show described)
+  let texts = Ref.make []
+  let keep = {
+    window = Result.with_default Duration.zero (Duration.millis 1);
+    flush = fun outputs -> Ref.set texts (Ref.get texts ++ outputs);
+  }
+  let structured = Logger.map (fun (s : Logger.Structured) -> s.cause) Logger.format_structured
+  provide (Logger.batched keep { mergeWithExisting = false } structured) {
+    Effect.ignore_ (Some LogLevel.error) boom
+    Effect.ignore_cause (Some LogLevel.error) broken
+  }
+  say ("structured: " ++ show (Ref.get texts))
+
+/// Handlers in the forms the first case does not take.
+handlers : Unit ->{} Unit
+let handlers () =
+  let replaced : Exit {Boom} String =
+    Effect.exit
+      (task {
+        Effect.catch_cause_filter
+          (fun f -> Err (Cause.die "replaced"))
+          (fun (d : String) f -> "caught")
+          boom
+      })
+  say ("catch_cause_filter: " ++ RawCause.describe (Failure.inspect (failure_of replaced)))
+  let kept : Exit {Boom} String =
+    Effect.exit (task { Effect.catch_cause_if Cause.has_dies (fun f -> "recovered") boom })
+  say ("catch_cause_if: " ++ RawCause.describe (Failure.inspect (failure_of kept)))
+  let seen = Ref.make []
+  let _ =
+    Effect.exit
+      (task {
+        Effect.on_exit_primitive
+          true
+          (fun x -> Some (task { Ref.update seen (fun xs -> xs ++ ["interruptible finalizer"]) }))
+          boom
+      })
+  say ("on_exit_primitive: " ++ show (Ref.get seen))
+  say
+    ("match_cause_effect: "
+      ++ Effect.match_cause_effect (fun f -> "failure") (fun v -> "value " ++ v) broken)
+  let interrupted : Exit {Boom} String =
+    Effect.exit (task { Effect.or_die (task { Effect.interrupt () }) })
+  say ("or_die interrupt: " ++ RawCause.describe (Failure.inspect (failure_of interrupted)))
+
+even : Float ->{; Boom} Float
+let even n = if n % 2 == 0 then n * 10 else from_result (Err (Boom n))
+
+/// Collections run by the other concurrencies.
+collections : Unit ->{} Unit
+let collections () =
+  let xs = [1, 2, 3, 4]
+  let (passes, fails) = Effect.partition Effect.Unbounded even xs
+  say
+    ("partition: "
+      ++ show (
+        passes,
+        List.map
+          (fun e ->
+            match e with
+            | Boom n -> n
+          )
+          fails,
+      ))
+  say ("filter: " ++ show (Effect.filter (Effect.Bounded 2) (fun n -> n % 2 == 0) xs))
+  say
+    ("filter_map_effect: "
+      ++ show
+        (Effect.filter_map_effect Effect.Unbounded (fun n -> if n > 2 then Ok n else Err ()) xs))
+  say ("for_each: " ++ show (Effect.for_each Effect.Sequential (fun n -> n + 1) xs))
+  say ("replicate_effect: " ++ show (Effect.replicate_effect (Effect.Bounded 2) 3 (task { 7 })))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  pretty ()
+  reports ()
+  logged ()
+  handlers ()
+  collections ()

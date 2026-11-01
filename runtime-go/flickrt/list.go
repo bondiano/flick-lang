@@ -41,6 +41,16 @@ func ListFold(fb *Fiber, f, init, xs Value) Value {
 	return acc
 }
 
+// ListFoldEffect runs the task of `f` of the result so far and each
+// element, in order.
+func ListFoldEffect(fb *Fiber, f, init, xs Value) Value {
+	acc := init
+	for _, x := range List(xs) {
+		acc = Run(fb, apply2(fb, f, acc, x))
+	}
+	return acc
+}
+
 func ListFoldRight(fb *Fiber, f, init, xs Value) Value {
 	in := List(xs)
 	acc := init

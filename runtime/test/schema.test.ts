@@ -28,6 +28,7 @@ import {
   schemaRefined,
   schemaString,
   schemaValidate,
+  schemaWithGenerator,
   writeSchemaAot,
 } from "../src/index.ts";
 import { codecs, tree } from "./fixtures/codecs.ts";
@@ -220,6 +221,8 @@ test("arbitrary values are values of their schema", () => {
   assert.ok(isRecord(drawn) && Option.isOption(drawn["maybe"]));
   const refined = schemaRefined("Even", schemaNumber, (n: number) => n % 2 === 0, null);
   assert.throws(() => schemaArbitrary(refined)(random(1)), /needs an explicit generator/);
+  // the annotations of a node with checks are on its last check
+  assert.equal(schemaArbitrary(schemaWithGenerator(() => 4, refined))(random(1)), 4);
 });
 
 test("missing, null, undefined, defaults and extra keys are told apart", () => {

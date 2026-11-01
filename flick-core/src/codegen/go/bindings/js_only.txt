@@ -2,3 +2,41 @@
 # Streams, JS arrays, promises): under each `[module]`, an export, each with
 # a comment saying why. Modules of `project/load/target.rs::JS_ONLY` are
 # left out whole and need no entry here.
+
+[@flick-lang/runtime/effect/Channel]
+# a web ReadableStream, a JS value Go has no form of
+fromReadableStream
+# a web WritableStream, a JS value Go has no form of
+fromWritableStream
+# a web TransformStream, a JS value Go has no form of
+fromTransformStream
+# a JS AsyncIterable and its promises, which Go has no form of
+fromAsyncIterable
+fromAsyncIterableArray
+
+[@flick-lang/runtime/effect/Sink]
+# a web WritableStream, a JS value Go has no form of
+fromWritableStream
+
+[@flick-lang/runtime/effect/Stream]
+# a web ReadableStream, a JS value Go has no form of
+flickFromReadableStream
+# a JS AsyncIterable and its promises, which Go has no form of
+flickFromAsyncIterable
+# a JS event target (`addEventListener`), which Go has no form of
+flickFromEventListener
+
+[@flick-lang/runtime]
+# a thrown JS value, which only a foreign `catch` gives and Go has no form of
+jsErrorMessage
+
+[@flick-lang/runtime/effect/server/Functions]
+# a `server fn` is called and served over Effect RPC, which is js only (Rpc)
+serverAuthenticated
+serverProcedure
+serverCall
+serverFunction
+
+[@flick-lang/runtime/effect/server/FunctionsNode]
+# serves the calls of `server fn` over Effect RPC, which is js only (Rpc)
+serverHandler

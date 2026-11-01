@@ -623,7 +623,7 @@ modifySome *SyncRefModifySome
 modifySomeEffect *SyncRefModifySomeEffect
 
 [@flick-lang/runtime/effect/SubscriptionRef]
-make *SyncRefMake
+make *SubscriptionRefMake
 get *SyncRefGet
 set *SyncRefSet
 getAndSet *SyncRefGetAndSet

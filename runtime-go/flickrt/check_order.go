@@ -172,23 +172,7 @@ func CheckLessThanOrEqualToDecimal(b Value) Value    { return decimalChecks.less
 func CheckBetweenDecimal(options Value) Value        { return decimalChecks.between(options) }
 
 // effectFormat is Effect's `format` of a bound in an expected text.
-//
-// shortcut: strings, numbers, bigints and booleans as Effect's; other values
-// as `Format` writes them; port Effect's Formatter if a program bounds a check
-// by another type and reads the message
-func effectFormat(v Value) string {
-	switch x := v.(type) {
-	case string:
-		return QuoteJSON(x)
-	case float64:
-		return formatNumber(x)
-	case int32:
-		return strconv.Itoa(int(x))
-	case *big.Int:
-		return x.String() + "n"
-	}
-	return Format(v)
-}
+func effectFormat(v Value) string { return formatSpaced(v, 0) }
 
 // byOrd is the order of a Flick `Ord` dictionary.
 func byOrd(d Value) orderChecks {

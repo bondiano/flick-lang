@@ -130,12 +130,15 @@ let main () =
   let delayed_effect =
     batched |> RequestResolver.set_delay_effect (task { Platform.stdout_line "delay ran" })
   Platform.stdout_line ("set_delay_effect " ++ run_all delayed_effect [6])
+  // `after` runs once the requests are answered, alongside their callers
+  let after : Deferred.Deferred {} Int = Deferred.make ()
   let wrapped =
     RequestResolver.around
       (fun es -> NonEmpty.length es)
-      (fun _ n -> Platform.stdout_line ("around after " ++ show n))
+      (fun _ n -> Deferred.succeed n after)
       batched
   Platform.stdout_line ("around " ++ run_all wrapped [7, 8])
+  Platform.stdout_line ("around after " ++ show (Deferred.await_ after))
   Platform.stdout_line ("race " ++ run_all (RequestResolver.race RequestResolver.never batched) [1])
   let never : RequestResolver Query none String = RequestResolver.never
   let stuck = timeout_option 5 (task { Request.run never (Request.of (UserName 1)) })
@@ -152,3 +155,9 @@ let main () =
     try twice (Cache.get (ask 2)) cache with
     | NotFound id -> "not found " ++ show id
   Platform.stdout_line ("as_cache " ++ cached_names)
+  // a listener waiting for events holds back no batch
+  scope s {
+    let _ : Events.Listener s Int =
+      Events.listen s (Events.queue 4) (fun _ -> ()) (fun _ -> task { () })
+    Platform.stdout_line ("listening " ++ run_all batched [1, 2])
+  }

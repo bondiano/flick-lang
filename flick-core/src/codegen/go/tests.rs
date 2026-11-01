@@ -3,75 +3,18 @@ use std::fmt::Write as _;
 use std::iter;
 
 use super::foreign::{lookup, targets};
-use super::{Program, RUNTIME, go};
+use super::{Output, Program, RUNTIME, go};
 use crate::build::builtin_modules;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::tests::lower_text;
 use crate::ir::{ItemKind, Module};
 use crate::project::js_only;
 
-/// The runtime modules (`global M` for the JS globals of module `M`) whose
-/// foreigns the go target does not bind all of yet; G10e empties it.
-const PENDING: &[&str] = &[
-    // the rest: Record, Loop and failures of the core
-    "@flick-lang/runtime",
-    // Schedule: `cron` needs Cron
-    "@flick-lang/runtime/effect/Schedule",
-    // queues and streams
-    "@flick-lang/runtime/effect/PubSub",
-    "@flick-lang/runtime/effect/Channel",
-    "@flick-lang/runtime/effect/ChannelSchema",
-    "@flick-lang/runtime/effect/Sink",
-    "@flick-lang/runtime/effect/Stream",
-    "@flick-lang/runtime/effect/SubscriptionRef",
-    // transactions
-    "@flick-lang/runtime/effect/Tx",
-    "@flick-lang/runtime/effect/TxChunk",
-    "@flick-lang/runtime/effect/TxDeferred",
-    "@flick-lang/runtime/effect/TxHashMap",
-    "@flick-lang/runtime/effect/TxHashSet",
-    "@flick-lang/runtime/effect/TxPriorityQueue",
-    "@flick-lang/runtime/effect/TxPubSub",
-    "@flick-lang/runtime/effect/TxQueue",
-    "@flick-lang/runtime/effect/TxReentrantLock",
-    "@flick-lang/runtime/effect/TxRef",
-    "@flick-lang/runtime/effect/TxSemaphore",
-    "@flick-lang/runtime/effect/TxSubscriptionRef",
-    // time
-    "@flick-lang/runtime/effect/Cron",
-    "@flick-lang/runtime/effect/DateTime",
-    "@flick-lang/runtime/effect/Random",
-    // observability
-    "@flick-lang/runtime/effect/Logger",
-    "@flick-lang/runtime/effect/Metric",
-    "@flick-lang/runtime/effect/References",
-    "@flick-lang/runtime/effect/Tracer",
-    "@flick-lang/runtime/effect/observability/PrometheusMetrics",
-    // resources, caches and requests
-    "@flick-lang/runtime/effect/Cache",
-    "@flick-lang/runtime/effect/Pool",
-    "@flick-lang/runtime/effect/RcMap",
-    "@flick-lang/runtime/effect/RcRef",
-    "@flick-lang/runtime/effect/Request",
-    "@flick-lang/runtime/effect/RequestResolver",
-    "@flick-lang/runtime/effect/Resource",
-    "@flick-lang/runtime/effect/ScopedCache",
-    "@flick-lang/runtime/effect/ScopedRef",
-    // Effect and Cause
-    "@flick-lang/runtime/effect/Cause",
-    "@flick-lang/runtime/effect/Effect",
-    // the rest
-    "@flick-lang/runtime/effect/http/HttpClientResponse",
-    "@flick-lang/runtime/effect/reactivity/AsyncResult",
-    "@flick-lang/runtime/effect/server/Functions",
-    "@flick-lang/runtime/effect/server/FunctionsNode",
-];
-
-/// The target diagnostics of `text` with the built-in modules.
-fn compile(text: &str) -> Vec<Diagnostic> {
+/// The Go program of `text` with the built-in modules.
+fn build(text: &str) -> Output {
     let ir = lower_text("App", text).expect("lowers");
     let modules: Vec<&Module> = iter::once(&ir).chain(builtin_modules()).collect();
-    let output = go(&Program {
+    go(&Program {
         suites: &[],
         modules: &modules,
         entry: &ir.name,
@@ -79,8 +22,34 @@ fn compile(text: &str) -> Vec<Diagnostic> {
         own: &|m| m == ir.name,
         location: &|_, _| None,
         foreign_file: &|_, _| None,
-    });
-    output.diagnostics
+    })
+}
+
+/// The target diagnostics of `text` with the built-in modules.
+fn compile(text: &str) -> Vec<Diagnostic> {
+    build(text).diagnostics
+}
+
+#[test]
+fn only_a_program_that_names_zones_embeds_the_zone_database() {
+    let main_go = |body: &str| {
+        let text =
+            format!("module App exposing (main)\nmain : Unit ->{{}} Unit\nlet main () = {body}\n");
+        let output = build(&text);
+        assert_eq!(output.diagnostics, []);
+        let (_, main) = output
+            .files
+            .into_iter()
+            .find(|(path, _)| path == "main.go")
+            .expect("main.go");
+        main.contains("import _ \"time/tzdata\"") && main.contains("flickrt.UseZones()")
+    };
+    assert!(main_go(
+        "Platform.stdout_line (show (Result.is_ok (DateTime.zone_make_named \"Europe/Paris\")))"
+    ));
+    assert!(!main_go(
+        "Platform.stdout_line (DateTime.format_iso (DateTime.add DateTime.Day 1 (DateTime.now ())))"
+    ));
 }
 
 #[test]
@@ -155,8 +124,7 @@ fn go_bindings_cover_builtins() {
                 Some(from) => (from.clone(), f.export.clone()),
                 None => (format!("global {}", module.name), f.name.clone()),
             };
-            if PENDING.contains(&from.as_str())
-                || lookup(&module.name, &f.name, f.module.as_deref(), &f.export).is_some()
+            if lookup(&module.name, &f.name, f.module.as_deref(), &f.export).is_some()
                 || js_only_exports.contains(&(from.clone(), key))
             {
                 continue;
@@ -173,7 +141,7 @@ fn go_bindings_cover_builtins() {
         });
     assert!(
         missing.is_empty(),
-        "foreigns with no go binding, not in bindings/js_only.txt nor PENDING:\n{report}"
+        "foreigns with no go binding, not in bindings/js_only.txt:\n{report}"
     );
 }
 

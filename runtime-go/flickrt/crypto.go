@@ -73,15 +73,8 @@ func CryptoRandomIntBetween(min, max Value) Value {
 	return cryptoIntBetween(float64(min.(int32)), float64(max.(int32)))
 }
 
-// CryptoRandomBetween is Effect's `nextBetween`: a draw that rounds up to
-// the excluded `max` gives its predecessor.
 func CryptoRandomBetween(min, max Value) Value {
-	lo, hi := min.(float64), max.(float64)
-	v := cryptoDouble()*(hi-lo) + lo
-	if v != hi || lo >= hi || math.IsInf(hi, 0) || math.IsNaN(hi) {
-		return v
-	}
-	return math.Nextafter(hi, math.Inf(-1))
+	return nextBetween(min.(float64), max.(float64), cryptoDouble())
 }
 
 func CryptoRandomShuffle(xs Value) Value {

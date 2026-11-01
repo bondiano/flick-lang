@@ -7,9 +7,6 @@ let ms1 = Result.with_default Duration.zero (Duration.millis 1)
 ms2 : Duration.Duration
 let ms2 = Result.with_default Duration.zero (Duration.millis 2)
 
-ms10 : Duration.Duration
-let ms10 = Result.with_default Duration.zero (Duration.millis 10)
-
 ms20 : Duration.Duration
 let ms20 = Result.with_default Duration.zero (Duration.millis 20)
 
@@ -89,7 +86,19 @@ let main () =
   line ("merge_with right", [Stream.run_count (Stream.merge_with Stream.Right nums Stream.never)])
   line ("merge_with both", (sorted (Stream.merge_with Stream.Both tens nums)))
   line ("merge_with either", [Stream.run_count (Stream.merge_with Stream.Either Stream.never nums)])
-  line ("merge_effect", (Stream.run_collect (Stream.merge_effect (task { Ref.set side 42 }) nums)))
+  // the stream ends only once the task has run, as the task runs beside it
+  let ran = Latch.make false
+  let waiting = Stream.concat (Stream.from_effect_drain (task { Latch.await_ ran })) nums
+  line (
+    "merge_effect",
+    (Stream.run_collect
+      (Stream.merge_effect
+        (task {
+          Ref.set side 42
+          Latch.open ran
+        })
+        waiting)),
+  )
   line ("merged effect", [Ref.get side])
   let tagged = Stream.run_collect (Stream.merge_result tens nums)
   Platform.stdout_line
@@ -164,15 +173,19 @@ let main () =
     (Stream.run_collect
       (Stream.interleave_with tens (Stream.make [true, false, false, true]) nums)),
   )
-  line (
-    "interrupt_when",
-    (Stream.run_collect
-      (Stream.interrupt_when (task { Effect.sleep ms10 }) (Stream.concat Stream.never nums))),
-  )
-  let ticking = Stream.schedule (Schedule.spaced ms2) (Stream.forever (Stream.succeed 1))
+  // each task ends once the stream has emitted what the line shows
+  let all_read = Latch.make false
+  let interrupted =
+    Stream.interrupt_when (task { Latch.await_ all_read }) (Stream.concat Stream.never nums)
+  let read_all = Stream.tap (fun n -> if n == 3 then Latch.open all_read else false) interrupted
+  line ("interrupt_when", (Stream.run_collect read_all))
+  let ticked = Latch.make false
+  let ticking =
+    Stream.schedule (Schedule.spaced ms2) (Stream.forever (Stream.succeed 1))
+    |> Stream.tap (fun _ -> Latch.open ticked)
   Platform.stdout_line
     ("halt_when: "
-      ++ show (Stream.run_count (Stream.halt_when (task { Effect.sleep ms10 }) ticking) > 0))
+      ++ show (Stream.run_count (Stream.halt_when (task { Latch.await_ ticked }) ticking) > 0))
   let groups =
     Stream.run_collect
       (Stream.flat_map_par
@@ -223,8 +236,10 @@ let main () =
     (Queue.collect passed, Queue.collect refused)
   }
   Platform.stdout_line ("partition_queue: " ++ show queues)
+  // the source never ends, so the hub its end would shut down replays it to a late subscriber
   let hubbed = scope {
-    let hub = Stream.to_pubsub { capacity = None; strategy = None; replay = Some 3 } tens
+    let source = Stream.concat Stream.never tens
+    let hub = Stream.to_pubsub { capacity = None; strategy = None; replay = Some 3 } source
     Stream.run_collect (Stream.take 3 (Stream.from_pubsub hub))
   }
   line ("to_pubsub", hubbed)

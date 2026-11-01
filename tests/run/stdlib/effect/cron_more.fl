@@ -1,0 +1,111 @@
+// Effect's `Cron` past the basics: aliases and steps, their errors, days
+// and weekdays together, months without the day, and searches across a
+// zone's daylight saving transitions.
+module App.Main exposing (main)
+
+at : String ->{} DateTime.DateTime
+let at s =
+  match DateTime.make s with
+  | Ok t -> t
+  | Err _ -> DateTime.now ()
+
+utc : DateTime.TimeZone
+let utc = DateTime.zone_make_offset 0
+
+zone : String -> DateTime.TimeZone
+let zone id = Result.with_default utc (DateTime.zone_make_named id)
+
+parsed : Result Cron.CronParseError Cron.Cron -> String
+let parsed r =
+  match r with
+  | Ok c -> Cron.format { includeSeconds = None } c
+  | Err (Cron.CronParseError message) -> "error: " ++ message
+
+on : Option DateTime.DateTime -> String
+let on o =
+  match o with
+  | Some t -> DateTime.format_iso t
+  | None -> "none"
+
+/// The next and previous matches of the expression in the zone, and the
+/// two after the next.
+around : DateTime.TimeZone -> String -> String ->{} String
+let around tz expression now =
+  match Cron.parse tz expression with
+  | Ok c ->
+    on (Cron.next (at now) c)
+      ++ " / "
+      ++ on (Cron.prev (at now) c)
+      ++ " / "
+      ++ show (List.map DateTime.format_iso (Cron.sequence 3 (at now) c))
+  | Err (Cron.CronParseError message) -> message
+
+fields : Cron.Fields
+let fields = {
+  seconds = None;
+  minutes = [];
+  hours = [];
+  days = [];
+  months = [];
+  weekdays = [];
+  and = None;
+  tz = utc;
+}
+
+texts : Unit ->{} Unit
+let texts () =
+  Platform.stdout_line
+    ("parse: "
+      ++ show [
+        parsed (Cron.parse utc "0 0 * * MON-FRI"),
+        parsed (Cron.parse utc "0 0 1 jan-mar,dec *"),
+        parsed (Cron.parse utc "0 0 * * 7,0"),
+        parsed (Cron.parse utc "1,2,3,5,7,9 */20 * * *"),
+        parsed (Cron.parse utc "*,5 0 * * *"),
+        parsed (Cron.parse utc "  0   12  *  *  *  "),
+      ])
+  Platform.stdout_line
+    ("errors: "
+      ++ show [
+        parsed (Cron.parse utc "*/0 * * * *"),
+        parsed (Cron.parse utc "*/x * * * *"),
+        parsed (Cron.parse utc "*/60 * * * *"),
+        parsed (Cron.parse utc "5-1 * * * *"),
+        parsed (Cron.parse utc "a * * * *"),
+        parsed (Cron.parse utc "0 0 0 * *"),
+        parsed (Cron.parse utc "0 0 * 13 *"),
+        parsed (Cron.parse utc "0 0 * * 8"),
+      ])
+  Platform.stdout_line
+    ("make: "
+      ++ show [
+        parsed
+          (Cron.make {
+            fields with
+            seconds = Some [30, 0, 30];
+            hours = [9, 17];
+            weekdays = [7, 1, 0];
+            and = Some true;
+          }),
+        parsed (Cron.make { fields with minutes = [60] }),
+        parsed (Cron.make { fields with weekdays = [8] }),
+      ])
+
+main : Unit ->{; AppError} Unit
+let main () =
+  texts ()
+  Platform.stdout_line ("or: " ++ around utc "0 0 13 * 5" "2024-09-01T00:00:00Z")
+  Platform.stdout_line ("and: " ++ around utc "0 0 */2 * 5" "2024-09-01T00:00:00Z")
+  Platform.stdout_line ("31st: " ++ around utc "0 0 31 * *" "2024-04-15T00:00:00Z")
+  Platform.stdout_line ("29 feb: " ++ around utc "0 0 29 2 *" "2025-03-01T00:00:00Z")
+  Platform.stdout_line ("months: " ++ around utc "0 0 * 2,11 *" "2024-06-10T12:00:00Z")
+  Platform.stdout_line
+    ("named utc: " ++ around (zone "Etc/UTC") "15 10 * * *" "2024-06-10T12:00:00Z")
+  Platform.stdout_line
+    ("offset: " ++ around (DateTime.zone_make_offset 19800000) "0 9 * * *" "2024-06-10T12:00:00Z")
+  let paris = zone "Europe/Paris"
+  Platform.stdout_line ("gap: " ++ around paris "30 2 * * *" "2024-03-31T00:30:00Z")
+  Platform.stdout_line ("fold: " ++ around paris "30 2 * * *" "2024-10-27T00:15:00Z")
+  Platform.stdout_line ("in fold: " ++ around paris "*/20 2 * * *" "2024-10-27T01:05:00Z")
+  Platform.stdout_line
+    ("new york: " ++ around (zone "America/New_York") "0 */5 * * *" "2024-11-03T05:30:00Z")

@@ -1,1 +1,95 @@
 # Resources, caches and requests.
+
+[@flick-lang/runtime/effect/Resource]
+flickManual *ResourceManual
+flickUse *ResourceUse
+flickRefresh *ResourceRefresh
+
+[@flick-lang/runtime/effect/ScopedRef]
+flickFromAcquire *ScopedRefFromAcquire
+flickMake *ScopedRefMake
+flickUse *ScopedRefUse
+flickSet *ScopedRefSet
+
+[@flick-lang/runtime/effect/RcRef]
+flickMake *RcRefMake
+get *RcRefGet
+invalidate *RcRefInvalidate
+
+[@flick-lang/runtime/effect/RcMap]
+flickMake *RcMapMake
+flickGet *RcMapGet
+getOption *RcMapGetOption
+flickKeys *RcMapKeys
+invalidate *RcMapInvalidate
+has *RcMapHas
+touch *RcMapTouch
+
+[@flick-lang/runtime/effect/Pool]
+flickMake *PoolMake
+flickMakeWithTtl *PoolMakeWithTtl
+get *PoolGet
+use *PoolUse
+invalidate *PoolInvalidate
+reserve *PoolReserve
+
+[@flick-lang/runtime/effect/Cache]
+flickMake *CacheMake
+flickMakeWith *CacheMakeWith
+get *CacheGet
+getOption *CacheGetOption
+getSuccess *CacheGetSuccess
+set *CacheSet
+has *CacheHas
+invalidate *CacheInvalidate
+invalidateWhen *CacheInvalidateWhen
+refresh *CacheRefresh
+invalidateAll *CacheInvalidateAll
+size *CacheSize
+flickKeys *CacheKeys
+flickValues *CacheValues
+flickEntries *CacheEntries
+
+[@flick-lang/runtime/effect/ScopedCache]
+flickMake *ScopedCacheMake
+flickMakeWith *ScopedCacheMakeWith
+flickUse *ScopedCacheUse
+flickUseOption *ScopedCacheUseOption
+flickUseSuccess *ScopedCacheUseSuccess
+flickSet *ScopedCacheSet
+has *ScopedCacheHas
+invalidate *ScopedCacheInvalidate
+flickInvalidateWhen *ScopedCacheInvalidateWhen
+flickRefresh *ScopedCacheRefresh
+invalidateAll *ScopedCacheInvalidateAll
+size *ScopedCacheSize
+keys *ScopedCacheKeys
+
+[@flick-lang/runtime/effect/Request]
+flickOf RequestOf
+flickPayload RequestPayload
+flickRequest RequestRequest
+flickRun *RequestRun
+flickComplete *RequestComplete
+completeEffect *RequestCompleteEffect
+succeed *RequestSucceed
+fail *RequestFail
+flickFailCause *RequestFailCause
+
+[@flick-lang/runtime/effect/RequestResolver]
+flickMake RequestResolverMake
+flickMakeWith RequestResolverMakeWith
+flickMakeGrouped RequestResolverMakeGrouped
+fromFunction RequestResolverFromFunction
+fromFunctionBatched RequestResolverFromFunctionBatched
+fromEffect RequestResolverFromEffect
+never RequestResolverNever
+flickSetDelayEffect RequestResolverSetDelayEffect
+setDelay RequestResolverSetDelay
+around RequestResolverAround
+batchN RequestResolverBatchN
+grouped RequestResolverGrouped
+race RequestResolverRace
+flickWithSpan RequestResolverWithSpan
+flickWithCache *RequestResolverWithCache
+flickAsCache *RequestResolverAsCache

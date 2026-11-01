@@ -8,6 +8,8 @@ Info checkout
 /v1/traces: true
 "name":"shop": true
 "shop-cli": true
+"name":"pay": true
+"3 items": true
 without TraceFlag:
 DESCRIPTION
   Checks out

@@ -1,4 +1,4 @@
-# Streams and the hubs they read.
+# Streams.
 
 [@flick-lang/runtime/effect/Stream]
 fromIterable StreamFromSeq
@@ -32,7 +32,190 @@ flickRunFold *StreamRunFold
 rechunk StreamRechunk
 chunks StreamChunks
 
-[@flick-lang/runtime/effect/PubSub]
-flickUnbounded *PubSubUnbounded
-publishAll *PubSubPublishAll
-subscribe *PubSubSubscribe
+# Sources (Stream/Core.fl).
+DefaultChunkSize ChannelDefaultChunkSize
+empty StreamEmpty
+never StreamNever
+fromArrays StreamFromArrays
+suspend StreamSuspend
+fail StreamFail
+flickFailCause StreamFailCause
+flickDie StreamDie
+fromEffect StreamFromEffect
+fromEffectDrain StreamFromEffectDrain
+fromEffectRepeat StreamFromEffectRepeat
+flickFromEffectSchedule StreamFromEffectSchedule
+fromIterableEffectRepeat StreamFromListEffectRepeat
+flickUnwrap StreamUnwrap
+flickCallback StreamCallback
+tick StreamTick
+fromSchedule StreamFromSchedule
+fromQueue StreamFromQueue
+fromPubSub StreamFromPubSub
+flickUnfold StreamUnfold
+paginate StreamPaginate
+iterate StreamIterate
+range StreamRange
+
+# Failures and what runs around a stream (Stream/Errors.fl).
+catch StreamCatch
+catchIf StreamCatchIf
+catchFilter StreamCatchFilter
+flickCatchCause StreamCatchCause
+flickCatchCauseIf StreamCatchCauseIf
+flickCatchCauseFilter StreamCatchCauseFilter
+flickCatchDefect StreamCatchDefect
+tapError StreamTapError
+flickTapCause StreamTapCause
+flickTapDefect StreamTapDefect
+flickOrElseIfEmpty StreamOrElseIfEmpty
+orElseSucceed StreamOrElseSucceed
+orDie StreamOrDie
+ignore StreamIgnore
+ignoreCause StreamIgnoreCause
+retry StreamRetry
+flickOnExit StreamOnExit
+flickOnError StreamOnError
+onStart StreamOnStart
+onFirst StreamOnFirst
+onEnd StreamOnEnd
+ensuring StreamEnsuring
+provide StreamProvide
+updateService StreamUpdateService
+withSpan StreamWithSpan
+
+# Runs (Stream/Run.fl).
+runSum *StreamRunSum
+runDrain *StreamRunDrain
+runHead *StreamRunHead
+runLast *StreamRunLast
+flickRunFoldEffect *StreamRunFoldEffect
+runForEach *StreamRunForEach
+runForEachWhile *StreamRunForEachWhile
+runForEachArray *StreamRunForEachArray
+runIntoPubSub *StreamRunIntoPubSub
+runIntoQueue *StreamRunIntoQueue
+flickToPubSub *StreamToPubSub
+flickToQueue *StreamToQueue
+
+# Sinks, channels and plans (Stream/Pipe.fl).
+transduce StreamTransduce
+aggregate StreamAggregate
+aggregateWithin StreamAggregateWithin
+pipeThrough StreamPipeThrough
+tapSink StreamTapSink
+peel *StreamPeel
+pipeThroughChannelOrFail StreamPipeThroughChannelOrFail
+flickStreamWithExecutionPlan StreamWithExecutionPlan
+
+# Combinations (Stream/Combine.fl).
+concat StreamConcat
+prepend StreamPrepend
+flatMap StreamFlatMap
+flickFlatMapPar StreamFlatMapPar
+switchMap StreamSwitchMap
+flatten StreamFlatten
+flattenArray StreamFlattenArray
+flattenIterable StreamFlattenIterable
+drain StreamDrain
+drainFork StreamDrainFork
+repeat StreamRepeat
+repeatElements StreamRepeatElements
+forever StreamForever
+schedule StreamSchedule
+timeout StreamTimeout
+flickTimeoutOrElse StreamTimeoutOrElse
+merge StreamMerge
+flickMergeWith StreamMergeWith
+mergeResult StreamMergeResult
+mergeLeft StreamMergeLeft
+mergeRight StreamMergeRight
+flickMergeAll StreamMergeAll
+cross StreamCross
+crossWith StreamCrossWith
+zip StreamZip
+zipWith StreamZipWith
+zipWithArray StreamZipWithArray
+zipLeft StreamZipLeft
+zipRight StreamZipRight
+zipFlatten StreamZipFlatten
+zipWithIndex StreamZipWithIndex
+zipWithNext StreamZipWithNext
+zipWithPrevious StreamZipWithPrevious
+zipWithPreviousAndNext StreamZipWithPreviousAndNext
+zipLatest StreamZipLatest
+zipLatestWith StreamZipLatestWith
+zipLatestAll StreamZipLatestAll
+race StreamRace
+raceAll StreamRaceAll
+interleave StreamInterleave
+interleaveWith StreamInterleaveWith
+interruptWhen StreamInterruptWhen
+haltWhen StreamHaltWhen
+groupBy StreamGroupBy
+groupByKey StreamGroupByKey
+flickBroadcast *StreamBroadcast
+flickBroadcastN *StreamBroadcastN
+flickShare *StreamShare
+partition *StreamPartition
+partitionEffect *StreamPartitionEffect
+partitionQueue *StreamPartitionQueue
+
+# Transformations (Stream/Transform.fl).
+as StreamAs
+mapBoth StreamMapBoth
+mapError StreamMapError
+mapArray StreamMapArray
+flickMapEffectPar StreamMapEffectPar
+mapArrayEffect StreamMapArrayEffect
+flattenEffect StreamFlattenEffect
+result StreamResult
+tap StreamTap
+tapBoth StreamTapBoth
+filterMap StreamFilterMap
+filterEffect StreamFilterEffect
+filterMapEffect StreamFilterMapEffect
+takeRight StreamTakeRight
+takeUntil StreamTakeUntil
+takeUntilEffect StreamTakeUntilEffect
+takeWhile StreamTakeWhile
+takeWhileFilter StreamTakeWhileFilter
+takeWhileEffect StreamTakeWhileEffect
+drop StreamDrop
+dropRight StreamDropRight
+dropUntil StreamDropUntil
+dropUntilEffect StreamDropUntilEffect
+dropWhile StreamDropWhile
+dropWhileFilter StreamDropWhileFilter
+dropWhileEffect StreamDropWhileEffect
+when StreamWhen
+sliding StreamSliding
+slidingSize StreamSlidingSize
+split StreamSplit
+grouped StreamGrouped
+groupedWithin StreamGroupedWithin
+groupAdjacentBy StreamGroupAdjacentBy
+flickMapAccum StreamMapAccum
+flickMapAccumArray StreamMapAccumArray
+flickMapAccumEffect StreamMapAccumEffect
+flickMapAccumArrayEffect StreamMapAccumArrayEffect
+flickScan StreamScan
+flickScanEffect StreamScanEffect
+collect StreamCollect
+accumulate StreamAccumulate
+changes StreamChanges
+changesWith StreamChangesWith
+changesWithEffect StreamChangesWithEffect
+intersperse StreamIntersperse
+intersperseAffixes StreamIntersperseAffixes
+debounce StreamDebounce
+flickThrottle StreamThrottle
+flickThrottleEffect StreamThrottleEffect
+flickBuffer StreamBuffer
+flickBufferArray StreamBufferArray
+
+[@flick-lang/runtime/effect/SubscriptionRef]
+changes SubscriptionRefChanges
+
+[@flick-lang/runtime/effect/TxSubscriptionRef]
+changesStream TxSubscriptionRefChangesStream

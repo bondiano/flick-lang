@@ -1,21 +1,8 @@
 // Effect's `Channel`: the sources of a pipeline, from values, effects,
-// queues, hubs, schedules and JS streams.
+// queues, hubs and schedules.
 module App.Main exposing (main)
 
 type error Boom = Boom String
-
-readable : List String ->{} Channel.ReadableStream String
-foreign sync readable from "./channel_js.mjs" "readable"
-
-async_iterable : List Float -> String ->{} Channel.AsyncIterable Float String
-foreign sync async_iterable from "./channel_js.mjs" "asyncIterable"
-
-upper : Unit ->{} Channel.TransformStream String String
-foreign sync upper from "./channel_js.mjs" "upper"
-  arity 0
-
-boom : JsValue -> Boom
-let boom value = Boom "js"
 
 say : String ->{} Unit
 let say line = Platform.stdout_line line
@@ -124,42 +111,11 @@ let resources () =
       )
   say ("acquire_use_release: " ++ show (Channel.run_collect used) ++ " " ++ show (Ref.get log))
 
-js : Unit ->{; Boom} Unit
-let js () =
-  let stream = readable ["x", "y"]
-  let web =
-    Channel.from_readable_stream {
-      evaluate = fun () -> stream;
-      onError = boom;
-      releaseLockOnEnd = true;
-    }
-  say ("from_readable_stream: " ++ show (lists web))
-  let iterated = Channel.from_async_iterable (async_iterable [1, 2] "end") boom
-  say ("from_async_iterable: " ++ show (Channel.run_collect iterated))
-  say
-    ("its end: "
-      ++ Channel.run_drain (Channel.from_async_iterable (async_iterable [] "only end") boom))
-  say
-    ("from_async_iterable_array: "
-      ++ show (lists (Channel.from_async_iterable_array (async_iterable [3, 4] "end") boom)))
-  let transform = upper ()
-  let shouted =
-    Channel.from_list_chunked 1 ["a", "b"]
-    |> Channel.pipe_to_or_fail
-      (Channel.from_transform_stream {
-        evaluate = fun () -> transform;
-        onError = boom;
-        closeOnDone = true;
-        releaseLockOnEnd = true;
-      })
-  say ("from_transform_stream: " ++ show (lists shouted))
-
 main : Unit ->{; AppError} Unit
 let main () =
   try
     values ()
     queues ()
     resources ()
-    js ()
   with
   | Boom why -> say ("unexpected " ++ why)

@@ -62,3 +62,17 @@ func TestParseContentType(t *testing.T) {
 		t.Error("persisted file names")
 	}
 }
+
+// A response's form data keeps the text fields, as a web Response does.
+func TestMultipartTexts(t *testing.T) {
+	body := "--XX\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\n1\r\n" +
+		"--XX\r\nContent-Disposition: form-data; name=\"f\"; filename=\"x.txt\"\r\n\r\nhi\r\n" +
+		"--XX\r\nContent-Disposition: form-data; name=\"b\"\r\n\r\n2\r\n--XX--\r\n"
+	fields, ok := multipartTexts([]byte(body), "XX")
+	if got := Format(fields); !ok || got != `[["a","1"],["b","2"]]` {
+		t.Errorf("fields %v %s", ok, got)
+	}
+	if _, ok := multipartTexts([]byte("garbage"), "XX"); ok {
+		t.Error("garbage parsed")
+	}
+}

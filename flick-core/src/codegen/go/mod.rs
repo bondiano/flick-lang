@@ -46,6 +46,20 @@ const DRIVER_PACKAGE: &str = "flick.app/flickpg";
 const DRIVER_MODULE: &str = "@flick-lang/runtime/sql";
 const DRIVER_EXPORT: &str = "pgLayer";
 
+/// The bindings that look a named time zone up: a program that reaches one
+/// embeds Go's zone database and V8's names of zones; others carry neither.
+const ZONE_MODULE: &str = "@flick-lang/runtime/effect/DateTime";
+const ZONE_EXPORTS: &[&str] = &[
+    "flickZoneMakeNamed",
+    "flickZoneFromString",
+    "flickSetZoneNamed",
+    "flickMakeZonedFromString",
+    "zoneMakeLocal",
+    "flickJsonZoned",
+    "flickJsonZone",
+    "flickJsonZoneNamed",
+];
+
 /// The source path and line of a span of a module.
 pub type Locate<'a> = dyn Fn(&str, Span) -> Option<(String, u32)> + 'a;
 
@@ -310,6 +324,18 @@ fn compile<'a>(
     } else {
         a.empty()
     };
+    let zones = reached.iter().any(|&(m, i)| {
+        matches!(&modules[m].items[i].kind, ItemKind::Foreign(f)
+            if f.module.as_deref() == Some(ZONE_MODULE) && ZONE_EXPORTS.contains(&f.export.as_str()))
+    });
+    let (import_zones, use_zones) = if zones {
+        (
+            docvec![a, "import _ \"time/tzdata\"", a.lines(2)],
+            Some(statement(a, "flickrt.UseZones()")),
+        )
+    } else {
+        (a.empty(), None)
+    };
     let main_go = docvec![
         a,
         "package main",
@@ -319,8 +345,9 @@ fn compile<'a>(
         "\"",
         a.lines(2),
         import_driver,
+        import_zones,
         "func main() ",
-        block(a, [statement(a, run)]),
+        block(a, use_zones.into_iter().chain([statement(a, run)])),
         a.line()
     ];
     files.push(("main.go".to_owned(), layout::print(main_go)));

@@ -51,6 +51,8 @@ let answer request url =
       }
     else if String.contains "/form" path then
       Http.ServerResponse.url_params (Http.UrlParams.make [("a", "1"), ("a", "2")]) ok
+    else if String.contains "/multipart" path then
+      Http.ServerResponse.form_data [("a", "1"), ("b", "x y"), ("a", "3")] ok
     else
       Http.ServerResponse.text echoed ok
   Http.ServerResponse.to_client_response request response
@@ -186,6 +188,22 @@ let bodies () =
       ++ (show
         (Http.Body.content_length (Http.Body.uint8_array [1, 2, 3] (Some "application/x-bin")))))
 
+/// The text fields of a multipart body, of a URL-encoded one, and the
+/// failure of a body of neither.
+forms : Unit ->{; HttpClientError} Unit
+let forms () =
+  let multipart = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/multipart")
+  Platform.stdout_line ("form_data: " ++ show (Http.ClientResponse.form_data multipart))
+  let urlencoded = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/form")
+  Platform.stdout_line ("form_data urlencoded: " ++ show (Http.ClientResponse.form_data urlencoded))
+  let plain = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/plain")
+  Platform.stdout_line
+    ("form_data plain: "
+      ++ (
+        try show (Http.ClientResponse.form_data plain) with
+        | e -> describe e
+      ))
+
 responses : Unit ->{; HttpClientError, SchemaError} Unit
 let responses () =
   let echoed = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/echo")
@@ -206,6 +224,7 @@ let responses () =
   Platform.stdout_line ("bytes: " ++ (show (List.length (Http.ClientResponse.bytes bytes))))
   let form = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/form")
   Platform.stdout_line ("url_params_body: " ++ (show (Http.ClientResponse.url_params_body form)))
+  forms ()
   let headers_codec =
     Codec.general
       (ignore_extra_fields

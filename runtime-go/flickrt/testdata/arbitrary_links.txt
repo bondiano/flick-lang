@@ -1,0 +1,100 @@
+unknown seed 1 sample [[null,4e-323,-8e-323,false,[],-3.8641075642121286e+186,1.3213374595484583e-14,false,{},-9.380469203650695e+273],false,[{" ":[],"-S{Y'~!HQ<":null,"/":[]," Rc@315X(":"prototype","\ud800":"hL<K>iG"},null,[],null,null],null,3.5e-323,null,null,null]
+unknown seed 1 check falsified 1 0 0 [] [] [0,"1",0,0,[],"ReturnedFalse"]
+unknown seed 1 replay Falsified []
+unknown seed 42 sample [true,"","",null,{"\ud800":true},["\u000a"],{"0":{},"CVw'":"\u0000","\ud83d\ude00":{},"":null," ":-2.620586716438842e-208,"t|IoC(BB%w":false,"\u000a":{},"\udc00":null,"\ud800":false,")?CW4*5v":[]},true]
+unknown seed 42 check falsified 6 0 0 [] [] [0,"42",5,2,[],"ReturnedFalse"]
+unknown seed 42 replay Falsified []
+unknown-record seed 1 sample [[null,4e-323,-8e-323,false,[],-3.8641075642121286e+186,1.3213374595484583e-14,false,{},-9.380469203650695e+273],false,[{" ":[],"-S{Y'~!HQ<":null,"/":[]," Rc@315X(":"prototype","\ud800":"hL<K>iG"},null,[],null,null],null,3.5e-323,null,null,null]
+unknown-record seed 1 check falsified 21 0 7 {"n!t9v4|":{},"@\\:<O":-6.596327852365731e-48,"":[],"\u000a":1.964819093577976e-191,"\u0000":2.0678547270459298e-262,"\ud83d\ude00":true,"GBDu$":[]} {"":[]} [0,"1",20,7,[0,0,0,0,0,0,1],"ReturnedFalse"]
+unknown-record seed 1 replay Falsified {"":[]}
+unknown-record seed 42 sample [true,"","",null,{"\ud800":true},["\u000a"],{"0":{},"CVw'":"\u0000","\ud83d\ude00":{},"":null," ":-2.620586716438842e-208,"t|IoC(BB%w":false,"\u000a":{},"\udc00":null,"\ud800":false,")?CW4*5v":[]},true]
+unknown-record seed 42 check falsified 7 0 2 {"\u0000":{},C:""} {"":""} [0,"42",6,2,[0,1],"ReturnedFalse"]
+unknown-record seed 42 replay Falsified {"":""}
+unknown-fields seed 1 sample [{a:1.4035908803856132e+262,b:[-8e-323,true,false,-3.8641075642121286e+186,[1.3213374595484583e-14,true,-9.380469203650695e+273,[]],3.5e-323]},{a:[],b:[true,false,{"\u000a":"|^#C~_","":-1e-323},[],[],"-5]Ii",{},[]]},{a:[],b:false},{a:"\ud800",b:[]},{a:false,b:-1.7976931348623131e+308},{a:-6e-323,b:null},{a:-9e-323,b:"__proto__"},{a:-3.8722632006908565e-243,b:"\u000a"}]
+unknown-fields seed 1 check falsified 3 0 0 {a:[],b:false} {a:[],b:false} [0,"1",2,1,[],"ReturnedFalse"]
+unknown-fields seed 1 replay Falsified {a:[],b:false}
+unknown-fields seed 42 sample [{a:["~S\"Yf","D`fr9e",[],{},9e-323,{},""],b:{j:null,sqg:-1.7976931348623151e+308,"4294967295":[]}},{a:[],b:[]},{a:[],b:{}},{a:null,b:0},{a:{"":false,"\u0009":-7.141074496981437e+306,"c^Cv@F":"prototype",prototype:0," ":{},toString:null,"x:$mboWJI;":"-1","~fBQmpo$t":"4294967295",__proto__:null,"\u0000":""},b:{}},{a:"__proto__",b:-5e-323},{a:false,b:null},{a:{toString:4.9595067669885955e+278,__proto__:[],"q@\\|rvJ/n~":-2.283554063222857e-39,"23ljVyG3/v":false,prototype:"O","\ud83d\ude00":{},"\ud800":{},"":"A\"n*'jp"},b:-1.7976931348623135e+308}]
+unknown-fields seed 42 check falsified 1 0 0 {a:[],b:{}} {a:[],b:{}} [0,"42",0,0,[],"ReturnedFalse"]
+unknown-fields seed 42 replay Falsified {a:[],b:{}}
+opaque seed 1 sample [[null,4e-323,-8e-323,false,[],-3.8641075642121286e+186,1.3213374595484583e-14,false,{},-9.380469203650695e+273],false,[{" ":[],"-S{Y'~!HQ<":null,"/":[]," Rc@315X(":"prototype","\ud800":"hL<K>iG"},null,[],null,null],null,3.5e-323,null,null,null]
+opaque seed 1 check falsified 9 0 1 "=S;" "" [0,"1",8,3,[0],"ReturnedFalse"]
+opaque seed 1 replay Falsified ""
+opaque seed 42 sample [true,"","",null,{"\ud800":true},["\u000a"],{"0":{},"CVw'":"\u0000","\ud83d\ude00":{},"":null," ":-2.620586716438842e-208,"t|IoC(BB%w":false,"\u000a":{},"\udc00":null,"\ud800":false,")?CW4*5v":[]},true]
+opaque seed 42 check falsified 2 0 0 "" "" [0,"42",1,0,[],"ReturnedFalse"]
+opaque seed 42 replay Falsified ""
+redacted-json seed 1 sample [[null,4e-323,-8e-323,false,[],-3.8641075642121286e+186,1.3213374595484583e-14,false,{},-9.380469203650695e+273],false,[{" ":[],"-S{Y'~!HQ<":null,"/":[]," Rc@315X(":"prototype","\ud800":"hL<K>iG"},null,[],null,null],null,3.5e-323,null,null,null]
+redacted-json seed 1 check falsified 4 0 0 null null [0,"1",3,1,[],"ReturnedFalse"]
+redacted-json seed 1 replay Falsified null
+redacted-json seed 42 sample [true,"","",null,{"\ud800":true},["\u000a"],{"0":{},"CVw'":"\u0000","\ud83d\ude00":{},"":null," ":-2.620586716438842e-208,"t|IoC(BB%w":false,"\u000a":{},"\udc00":null,"\ud800":false,")?CW4*5v":[]},true]
+redacted-json seed 42 check falsified 4 0 0 null null [0,"42",3,1,[],"ReturnedFalse"]
+redacted-json seed 42 replay Falsified null
+duration seed 1 sample [dur(0 millis),dur(Infinity),dur(Infinity),dur(Infinity),dur(Infinity),dur(Infinity),dur(1 millis),dur(Infinity)]
+duration seed 1 check falsified 2 2 0 dur(Infinity) dur(Infinity) [0,"1",3,0,[],"ReturnedFalse"]
+duration seed 1 replay Falsified dur(Infinity)
+duration seed 42 sample [dur(0 millis),dur(710036 nanos),dur(Infinity),dur(Infinity),dur(1146856982172360920640354313914243163457451655292462617894508437860919170751092382781982818215176321643510102234638288054916499958898580770409557501628910688151729747565553831554102644337370394358778107745931050817652306939864335206484984313657444821647319575570595294001528175489362070036372849134204430087839260471990445348070908729585043214731676068753552797499677156385817608630487710605991669155537326375115004868396772172696453340842 nanos),dur(Infinity),dur(Infinity),dur(1568222111413987394353340896106051035426765633382171029364836940207823737450951392598663637542714976822344967811546055874498476798672555722488976145055527513382179797341736992010994099816658524845981166205004568146387413643211505695005065062673869708315994079666029755059472689127803394020514099669322925455513709651922563395490874028641786375207358414156249100887143600663168302427588813153352587425853893960478028751886641991285221775473505692008784513929652994623576853779486143383637786014888834032804293893078496181671089635145807011655212830160096003710085656429662029326592 nanos)]
+duration seed 42 check falsified 3 1 0 dur(Infinity) dur(Infinity) [0,"42",3,1,[],"ReturnedFalse"]
+duration seed 42 replay Falsified dur(Infinity)
+duration-millis seed 1 sample [dur(-7815649878136097251825487625575680841823857868803618480454631779956705797110691868157991889377619290640565885039108552119856471568360715561657360255195004308236589629651345843358768725779372961168255574721318002481056788525262527643435630766929402076575091004425239418571083600333668894133453571815261962783187170752005598493845758500623156135487269299096402731114767155459070828731978038500657561385475699279255683109170436049541801814288483954282409 nanos),dur(-Infinity),dur(0 millis),dur(Infinity),dur(-Infinity),dur(Infinity),dur(Infinity),dur(Infinity)]
+duration-millis seed 1 check falsified 1 0 1 dur(-7815649878136097251825487625575680841823857868803618480454631779956705797110691868157991889377619290640565885039108552119856471568360715561657360255195004308236589629651345843358768725779372961168255574721318002481056788525262527643435630766929402076575091004425239418571083600333668894133453571815261962783187170752005598493845758500623156135487269299096402731114767155459070828731978038500657561385475699279255683109170436049541801814288483954282409 nanos) dur(-1 nanos) [0,"1",0,0,[1],"ReturnedFalse"]
+duration-millis seed 1 replay Falsified dur(-1 nanos)
+duration-millis seed 42 sample [dur(-Infinity),dur(0 millis),dur(710036 nanos),dur(Infinity),dur(-68 millis),dur(-79 millis),dur(-6 millis),dur(-Infinity)]
+duration-millis seed 42 check falsified 3 0 1 dur(710036 nanos) dur(1 nanos) [0,"42",2,1,[1],"ReturnedFalse"]
+duration-millis seed 42 replay Falsified dur(1 nanos)
+duration-string seed 1 sample [dur(0 millis),dur(Infinity),dur(Infinity),dur(Infinity),dur(Infinity),dur(Infinity),dur(1 millis),dur(Infinity)]
+duration-string seed 1 check falsified 1 2 0 dur(0 millis) dur(0 millis) [0,"1",2,0,[],"ReturnedFalse"]
+duration-string seed 1 replay Falsified dur(0 millis)
+duration-string seed 42 sample [dur(0 millis),dur(710036 nanos),dur(Infinity),dur(Infinity),dur(1146856982172360920640354313914243163457451655292462617894508437860919170751092382781982818215176321643510102234638288054916499958898580770409557501628910688151729747565553831554102644337370394358778107745931050817652306939864335206484984313657444821647319575570595294001528175489362070036372849134204430087839260471990445348070908729585043214731676068753552797499677156385817608630487710605991669155537326375115004868396772172696453340842 nanos),dur(Infinity),dur(Infinity),dur(1568222111413987394353340896106051035426765633382171029364836940207823737450951392598663637542714976822344967811546055874498476798672555722488976145055527513382179797341736992010994099816658524845981166205004568146387413643211505695005065062673869708315994079666029755059472689127803394020514099669322925455513709651922563395490874028641786375207358414156249100887143600663168302427588813153352587425853893960478028751886641991285221775473505692008784513929652994623576853779486143383637786014888834032804293893078496181671089635145807011655212830160096003710085656429662029326592 nanos)]
+duration-string seed 42 check falsified 1 1 0 dur(0 millis) dur(0 millis) [0,"42",1,0,[],"ReturnedFalse"]
+duration-string seed 42 replay Falsified dur(0 millis)
+chunk seed 1 sample [chunk[false,false,true],chunk[true,false,true,true,true,true,true,false,false,false],chunk[true,true,false,false,true,false,false,true],chunk[],chunk[false,false,true,true,false,false,false,false,true,false],chunk[],chunk[false,true,true,false,true,false,true,false,false,false],chunk[]]
+chunk seed 1 check falsified 9 0 2 chunk[false,true,true] chunk[false,false,false] [0,"1",8,3,[4,5],"ReturnedFalse"]
+chunk seed 1 replay Falsified chunk[false,false,false]
+chunk seed 42 sample [chunk[],chunk[false,false,false,false,true,true,true,true],chunk[true,true,false,true,true,false,true,true,true],chunk[],chunk[false,false,true,false,true,false,false,false,false,false],chunk[true,true,true,false,false,true],chunk[false,true,false,false],chunk[]]
+chunk seed 42 check falsified 9 0 1 chunk[false,true,false] chunk[false,false,false] [0,"42",8,3,[4],"ReturnedFalse"]
+chunk seed 42 replay Falsified chunk[false,false,false]
+chunk-json seed 1 sample [chunk["jsS~}r!?","",""],chunk["!","\ud83d\ude00","\u0000","d55Wp","^#C~_bt%8G","\u000a","QS-5]Iill","","__proto__","R"],chunk[""," ","a)$","\udc00","\u0000"," ","Z","4294967295"],chunk[],chunk["\udc00"," #8I6gu{3T","_Eb!","toString","5x+|","#HQt:","s/^DCt+~N","","j;EI_\"Bd","ry"],chunk[],chunk["__proto__","\u0000","","B~ee\\*W-","","aS3s\\cpn:G","","0","__proto__"," "],chunk[]]
+chunk-json seed 1 check falsified 7 0 2 chunk["0","\u000a"] chunk["",""] [0,"1",6,2,[2,3],"ReturnedFalse"]
+chunk-json seed 1 replay Falsified chunk["",""]
+chunk-json seed 42 sample [chunk[],chunk[" Y5iPvW(/*","I`mfMJ","\u000a","-1","__proto__","9",",><c&","__proto__"],chunk["\u0000","","","NJRxzr&2 ",".ycjt8*&nd","\\","","toString","\ud83d\ude00"],chunk[],chunk["-1","","\ud800","\u0009","\ud800","\ud83d\ude00","","c^Cv@F","Ia<!,d\\<\"-",""],chunk["__proto__","\u000a","\udc00","toString"," ",""],chunk["ujxCCVw'Q>","-1","BA*h9{''0",""],chunk[]]
+chunk-json seed 42 check falsified 9 0 1 chunk["ae ","",""] chunk["",""] [0,"42",8,3,[1],"ReturnedFalse"]
+chunk-json seed 42 replay Falsified chunk["",""]
+utc seed 1 sample [utc(-3207756272926022),utc(8639999999999996),utc(5732890986214049),utc(8639999999999966),utc(-33),utc(-32),utc(-2),utc(-12)]
+utc seed 1 check falsified 2 0 1 utc(8639999999999996) utc(0) [0,"1",1,0,[0],"ReturnedFalse"]
+utc seed 1 replay Falsified utc(0)
+utc seed 42 sample [utc(-8639999999999964),utc(4950130058503672),utc(6279833006461975),utc(-39),utc(8562431348983210),utc(2330545235733237),utc(-1056060463161190),utc(-40)]
+utc seed 42 check falsified 2 0 1 utc(4950130058503672) utc(0) [0,"42",1,0,[0],"ReturnedFalse"]
+utc seed 42 replay Falsified utc(0)
+utc-millis seed 1 sample [utc(-3207756272926022),utc(8639999999999996),utc(5732890986214049),utc(8639999999999966),utc(-33),utc(-32),utc(-2),utc(-12)]
+utc-millis seed 1 check falsified 1 0 1 utc(-3207756272926022) utc(0) [0,"1",0,0,[0],"ReturnedFalse"]
+utc-millis seed 1 replay Falsified utc(0)
+utc-millis seed 42 sample [utc(-8639999999999964),utc(4950130058503672),utc(6279833006461975),utc(-39),utc(8562431348983210),utc(2330545235733237),utc(-1056060463161190),utc(-40)]
+utc-millis seed 42 check falsified 1 0 1 utc(-8639999999999964) utc(0) [0,"42",0,0,[0],"ReturnedFalse"]
+utc-millis seed 42 replay Falsified utc(0)
+zoned seed 1 sample [zoned(-3207756222526022,Asia/Tokyo),zoned(8639999949599996,UTC),zoned(5732891036614049,offset(16)),zoned(8639999949599966,America/New_York),zoned(-33,Australia/Sydney),zoned(-32,offset(-21)),zoned(-2,Europe/London),zoned(-12,offset(-43199989))]
+zoned seed 1 check falsified 1 0 1 zoned(-3207756222526022,Asia/Tokyo) zoned(0,Asia/Tokyo) [0,"1",0,0,[0],"ReturnedFalse"]
+zoned seed 1 replay Falsified zoned(0,Asia/Tokyo)
+zoned seed 42 sample [zoned(-8639999949599964,offset(12659212)),zoned(4950130108903672,offset(-42408850)),zoned(6279833056861975,offset(-9385599)),zoned(-39,offset(-2)),zoned(8562431399383210,offset(2317474)),zoned(2330545286133237,Europe/London),zoned(-1056060412761190,offset(-43199980)),zoned(-40,Europe/London)]
+zoned seed 42 check falsified 6 0 1 zoned(2330545286133237,Europe/London) zoned(0,Europe/London) [0,"42",5,2,[0],"ReturnedFalse"]
+zoned seed 42 replay Falsified zoned(0,Europe/London)
+zone seed 1 sample [Europe/London,offset(43262312),Asia/Tokyo,offset(-10693838),offset(22),offset(-13),offset(2847540),offset(-6245282)]
+zone seed 1 check falsified 1 0 0 Europe/London Europe/London [0,"1",0,0,[],"ReturnedFalse"]
+zone seed 1 replay Falsified Europe/London
+zone seed 42 sample [offset(21999785),Asia/Tokyo,Australia/Sydney,offset(-10),Australia/Sydney,Asia/Tokyo,America/New_York,offset(23)]
+zone seed 42 check falsified 2 0 0 Asia/Tokyo Asia/Tokyo [0,"42",1,0,[],"ReturnedFalse"]
+zone seed 42 replay Falsified Asia/Tokyo
+zone-named seed 1 sample [Asia/Tokyo,America/New_York,Asia/Tokyo,UTC,Europe/London,UTC,UTC,UTC]
+zone-named seed 1 check falsified 1 0 0 Asia/Tokyo Asia/Tokyo [0,"1",0,0,[],"ReturnedFalse"]
+zone-named seed 1 replay Falsified Asia/Tokyo
+zone-named seed 42 sample [America/New_York,America/New_York,Asia/Tokyo,UTC,Australia/Sydney,Asia/Tokyo,Australia/Sydney,America/New_York]
+zone-named seed 42 check falsified 3 0 0 Asia/Tokyo Asia/Tokyo [0,"42",2,1,[],"ReturnedFalse"]
+zone-named seed 42 replay Falsified Asia/Tokyo
+zone-offset seed 1 sample [offset(-40),offset(100),offset(60),offset(96),offset(-4),offset(-4),offset(0),offset(-1)]
+zone-offset seed 1 check passed 30 0
+zone-offset seed 42 sample [offset(-96),offset(51),offset(66),offset(-5),offset(91),offset(22),offset(-16),offset(-5)]
+zone-offset seed 42 check passed 30 0
+hashset seed 1 error Error: Unable to derive an arbitrary for an unsupported Declaration
+hashset seed 42 error Error: Unable to derive an arbitrary for an unsupported Declaration
+hashmap seed 1 error Error: Unable to derive an arbitrary for an unsupported Declaration
+hashmap seed 42 error Error: Unable to derive an arbitrary for an unsupported Declaration
+result-json seed 1 error Error: Unable to derive an arbitrary for an unsupported Declaration
+result-json seed 42 error Error: Unable to derive an arbitrary for an unsupported Declaration

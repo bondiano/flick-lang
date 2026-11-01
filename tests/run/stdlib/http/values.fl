@@ -106,6 +106,25 @@ let cookies () =
         ++ " "
         ++ Redacted.reveal (Http.Cookies.value cookie)))
   Platform.stdout_line ("serialize: " ++ (Http.Cookies.serialize_cookie cookie))
+  let until = Result.to_option (DateTime.make "2030-01-02T03:04:05Z")
+  let zoned =
+    Option.bind
+      (fun t ->
+        Result.to_option
+          (DateTime.set_zone_offset { adjustForTimeZone = None; disambiguation = None } 3600000 t)
+      )
+      until
+  expiring : Option DateTime.DateTime ->{; Http.Cookies.CookiesError} Http.Cookies.Cookie
+  let expiring at =
+    Http.Cookies.make_cookie "until" (Redacted.make "1") {
+      Http.Cookies.attributes with
+      expires = at;
+    }
+  Platform.stdout_line
+    ("expires: "
+      ++ (Http.Cookies.serialize_cookie (expiring until))
+      ++ " / "
+      ++ (Http.Cookies.serialize_cookie (expiring zoned)))
   let more =
     jar
     |> Http.Cookies.set_cookie cookie

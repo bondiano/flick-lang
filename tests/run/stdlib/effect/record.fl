@@ -103,3 +103,9 @@ let main () =
   let user = { name = "Ada"; age = 36; admin = false }
   let small : { name : String; age : Float } = Record.project user
   line "struct" (show (Record.labels user, small.name, small.age))
+  let id : Record.Label "id" = Record.label
+  let named : Record.Label "name" = Record.label
+  let grown = Record.extend id 7 user
+  let trimmed = Record.remove named grown
+  let merged = Record.merge_disjoint trimmed { nick = "ada" }
+  line "rows" (show (Record.get named user, grown, trimmed, merged, Record.labels merged))

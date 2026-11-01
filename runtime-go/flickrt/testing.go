@@ -176,8 +176,8 @@ func (t *test) checks(fb *Fiber, seed int64) (string, bool) {
 }
 
 // preview is a property's case as the JS runner writes it: JSON.stringify
-// with a BigInt as "<digits>n", Effect's toJSON of Option and Result, and
-// a function as "<function>"; `undefined` alone as itself.
+// with a BigInt as "<digits>n", Effect's toJSON of Option, Result and
+// Redacted, and a function as "<function>"; `undefined` alone as itself.
 func preview(v Value) string {
 	if s, ok := previewJSON(v); ok {
 		return s
@@ -203,6 +203,8 @@ func previewJSON(v Value) (string, bool) {
 		return QuoteJSON(x.String() + "n"), true
 	case Fn, Poly:
 		return `"<function>"`, true
+	case *Redacted:
+		return `"<redacted>"`, true // its toJSON
 	case []Value:
 		parts := make([]string, len(x))
 		for i, e := range x {

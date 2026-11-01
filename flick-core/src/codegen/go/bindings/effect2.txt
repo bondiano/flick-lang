@@ -1,0 +1,87 @@
+# The rest of Effect's `Effect` and `Cause`, and the failures of the core.
+
+[@flick-lang/runtime/effect/Effect]
+# Effect.Core
+flickFailCauseSync *EffectFailCauseSync
+yieldNowWith *EffectYieldNowWith
+zipWith *EffectZipWith
+delay *EffectDelay
+timed *EffectTimed
+flickTimeoutOrElse *EffectTimeoutOrElse
+forever *EffectForever
+eventually *EffectEventually
+replicate EffectReplicate
+flickReplicateEffect *EffectReplicateEffect
+when *EffectWhen
+flickResourceAuto *EffectResourceAuto
+# Effect.Collections
+flickForEach *EffectForEach
+flickPartition *EffectPartition
+flickValidate *EffectValidate
+flickFilter *EffectFilter
+filterMap *EffectFilterMap
+flickFilterMapEffect *EffectFilterMapEffect
+findFirst *EffectFindFirst
+findFirstFilter *EffectFindFirstFilter
+firstSuccessOf *EffectFirstSuccessOf
+flickHead *EffectHead
+flickReduce *EffectReduce
+filterOrElse *EffectFilterOrElse
+filterMapOrElse *EffectFilterMapOrElse
+filterOrFail *EffectFilterOrFail
+filterMapOrFail *EffectFilterMapOrFail
+# Effect.Errors
+flickCatchCause *EffectCatchCause
+flickCatchCauseIf *EffectCatchCauseIf
+flickCatchCauseFilter *EffectCatchCauseFilter
+flickCatchDefect *EffectCatchDefect
+flickTapCause *EffectTapCause
+flickTapCauseIf *EffectTapCauseIf
+flickTapCauseFilter *EffectTapCauseFilter
+flickTapDefect *EffectTapDefect
+flickMatchCause *EffectMatchCause
+flickMatchCauseEager *EffectMatchCause
+flickMatchCauseEffect *EffectMatchCauseEffect
+flickMatchCauseEffectEager *EffectMatchCauseEffect
+orDie *EffectOrDie
+flickIgnore *EffectIgnore
+flickIgnoreCause *EffectIgnoreCause
+flickOnError *EffectOnError
+flickOnErrorIf *EffectOnErrorIf
+flickOnErrorFilter *EffectOnErrorFilter
+flickOnExitIf *EffectOnExitIf
+flickOnExitFilter *EffectOnExitFilter
+flickOnExitPrimitive *EffectOnExitPrimitive
+flickAddFinalizer *AddFinalizerExit
+flickWithErrorReporting *EffectWithErrorReporting
+
+[@flick-lang/runtime/effect/Cause]
+flickFromReasons CauseFromReasons
+makeFailReason CauseMakeFailReason
+makeDieReason CauseMakeDieReason
+flickMakeInterruptReason CauseMakeInterruptReason
+isFailReason CauseIsFailReason
+isDieReason CauseIsDieReason
+isInterruptReason CauseIsInterruptReason
+flickFindFail CauseFindFail
+flickFindError CauseFindError
+flickFindDie CauseFindDie
+flickFindDefect CauseFindDefect
+flickFindInterrupt CauseFindInterrupt
+flickFilterInterruptors CauseFilterInterruptors
+flickPretty CausePretty
+flickPrettyErrors CausePrettyErrors
+flickStackTrace CauseStackTrace
+flickInterruptorStackTrace CauseInterruptorStackTrace
+flickReasonStackTrace CauseReasonStackTrace
+flickAnnotate CauseAnnotate
+flickFrameName CauseFrameName
+flickFrameStack CauseFrameStack
+flickFrameParent CauseFrameParent
+
+[@flick-lang/runtime]
+failureRawCause FailureRawCause
+failureInspect *FailureInspect
+failureRethrow *FailureRethrow
+rawCauseInspect *RawCauseInspect
+describeReport DescribeReport

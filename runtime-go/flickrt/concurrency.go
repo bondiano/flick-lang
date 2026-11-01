@@ -41,6 +41,7 @@ var concurrent atomic.Bool
 func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 	concurrent.Store(true)
 	c := &child{state: newState(), done: make(chan struct{})}
+	forked(fb.state, c.state)
 	inner := *fb
 	inner.state, inner.owner = c.state, owner
 	tc := counted(fb)
@@ -48,11 +49,16 @@ func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 		c.state.clock = tc
 		tc.running.Add(1)
 	}
+	recorded := fiberMetrics(&inner)
 	go func() {
 		if tc != nil {
 			defer tc.running.Add(-1)
 		}
 		c.value, c.cause = catch(func() Value { return Run(&inner, task) })
+		if recorded != nil {
+			recorded(c.cause)
+		}
+		suspended(c.state)
 		c.mu.Lock()
 		c.ended = true
 		observers := c.observers
@@ -202,6 +208,7 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 	}
 	ended := make(chan *child, len(tasks))
 	children := make([]*child, len(tasks))
+	holdForks(fb.state)
 	for i, t := range tasks {
 		if permits != nil {
 			task := t
@@ -296,6 +303,7 @@ func ParallelResults(fb *Fiber, tasks Value) Value {
 // and awaited.
 func race(fb *Fiber, a, b Value, success bool) Value {
 	ended := make(chan *child, 2)
+	holdForks(fb.state)
 	children := []*child{
 		fork(fb, fb.owner, a, func(c *child) { ended <- c }),
 		fork(fb, fb.owner, b, func(c *child) { ended <- c }),
@@ -379,15 +387,16 @@ func EffectNever(fb *Fiber) Value {
 }
 
 func EffectYieldNow(fb *Fiber) Value {
+	suspended(fb.state)
 	runtime.Gosched()
 	Check(fb)
 	return Unit
 }
 
-// EffectInterrupt interrupts the fiber itself.
+// EffectInterrupt fails with the fiber's own interruption, as Effect's
+// `interrupt`: a recovery handles it, the fiber goes on.
 func EffectInterrupt(fb *Fiber) Value {
-	fb.state.interrupt(fb.state.id)
-	panic(fb.state.stopped())
+	panic(&Failure{&Cause{kind: causeInterrupt, fiber: fb.state.id}})
 }
 
 func Uninterruptible(fb *Fiber, task Value) Value {

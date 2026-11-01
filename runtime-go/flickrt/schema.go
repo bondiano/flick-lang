@@ -14,7 +14,7 @@ import (
 // untagged union reports the first issue of each case.
 type Schema struct {
 	kind     schemaKind
-	item     *Schema     // list, option, redacted
+	item     *Schema     // list, option, redacted, chunk
 	items    []*Schema   // tuple; result: error, then value
 	labels   []string    // record, in label order
 	keys     []string    // record, in key order
@@ -27,10 +27,13 @@ type Schema struct {
 	known    string      // refined: the check JSON Schema can state, or ""
 	get      func() Value
 	valid    func(*Fiber, Value) (Value, []issue) // custom: the check of a value of the type
-	once     sync.Once
-	target   *Schema // a lazy schema, resolved
-	wireOnce sync.Once
-	wire     codec
+	// needs is what Schema.arbitrary of a custom or opaque type says needs a generator
+	needs     string
+	generator gen // Schema.with_generator's, or nil
+	once      sync.Once
+	target    *Schema // a lazy schema, resolved
+	wireOnce  sync.Once
+	wire      codec
 }
 
 type schemaKind int

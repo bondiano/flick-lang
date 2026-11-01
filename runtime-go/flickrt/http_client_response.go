@@ -2,7 +2,10 @@ package flickrt
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"mime"
+	"mime/multipart"
 	"sync"
 )
 
@@ -168,6 +171,51 @@ func ClientResponseUrlParamsBody(fb *Fiber, r Value) Value {
 }
 
 func ClientResponseBytes(fb *Fiber, r Value) Value { return byteList(clientResponseOf(r).body(fb)) }
+
+// ClientResponseFormData is the text fields of a form body, as a web
+// Response's `formData` reads them.
+func ClientResponseFormData(fb *Fiber, v Value) Value {
+	r := clientResponseOf(v)
+	data := r.body(fb)
+	header, ok := recordField(r.headers, "content-type").(string)
+	switch ct := parseContentType(header, ok, false); ct.value {
+	case "application/x-www-form-urlencoded":
+		return formDecode(decodeUTF8(data))
+	case "multipart/form-data":
+		if fields, ok := multipartTexts(data, ct.params["boundary"]); ok {
+			return fields
+		}
+		return r.fail(fb, errors.New("Failed to parse body as FormData."))
+	}
+	return r.fail(fb, errors.New(`Content-Type was not one of "multipart/form-data" or "application/x-www-form-urlencoded".`))
+}
+
+// multipartTexts is the fields of a multipart body but its files, the
+// parts with a file name; false when it does not parse.
+func multipartTexts(data []byte, boundary string) ([]Value, bool) {
+	if boundary == "" {
+		return nil, false
+	}
+	out := []Value{}
+	parts := multipart.NewReader(bytes.NewReader(data), boundary)
+	for {
+		p, err := parts.NextRawPart()
+		if err == io.EOF {
+			return out, true
+		}
+		if err != nil {
+			return nil, false
+		}
+		value, err := io.ReadAll(p)
+		if err != nil {
+			return nil, false
+		}
+		_, params, _ := mime.ParseMediaType(p.Header.Get("Content-Disposition"))
+		if _, file := params["filename"]; !file {
+			out = append(out, []Value{p.FormName(), decodeUTF8(value)})
+		}
+	}
+}
 
 func ClientResponseFilterStatus(fb *Fiber, f, r Value) Value {
 	if !Apply(fb, f, clientResponseOf(r).status).(bool) {

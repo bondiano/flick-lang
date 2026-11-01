@@ -119,10 +119,12 @@ func validate(name, encoded string, o *cookieOptions) string {
 // every key, those not given undefined.
 func optionsOf(attributes Value) cookieOptions {
 	a := record(attributes)
-	if isSome(a.Get("expires")) {
-		panic(Defect{"a cookie's `expires` is a DateTime, which the go target does not have"})
-	}
 	o := cookieOptions{keys: optAll}
+	if e := a.Get("expires"); isSome(e) {
+		// the adapter's `DateTime.toDate`: a zoned one's wall clock
+		o.expires = int64(dateTime(value(e)).toDate().t)
+		o.with(optExpires)
+	}
 	if d := a.Get("domain"); isSome(d) {
 		o.domain = value(d).(string)
 		o.with(optDomain)

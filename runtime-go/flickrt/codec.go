@@ -45,6 +45,9 @@ func (j jsonValue) encode(fb *Fiber, v Value) (Value, []issue) { return j.decode
 
 var CodecBool Value = sch(SchemaBool).jsonOf()
 
+// CodecInt is `Int.json`, an Int's canonical JSON codec.
+var CodecInt Value = sch(SchemaInt).jsonOf()
+
 func codecOf(c Value) codec { return c.(codec) }
 
 // CodecNumberLossless is `Float.json`: every number, `NaN`, the

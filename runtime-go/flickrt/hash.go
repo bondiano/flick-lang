@@ -231,6 +231,24 @@ func Loop(fb *Fiber, step, state Value) Value {
 	}
 }
 
+// A Trampoline: its value when done, else the thunk of its next step.
+type trampoline struct {
+	done  bool
+	value Value
+}
+
+func TrampolineDone(v Value) Value        { return &trampoline{true, v} }
+func TrampolineSuspend(thunk Value) Value { return &trampoline{false, thunk} }
+
+// TrampolineRun runs the steps until one is done, in constant stack.
+func TrampolineRun(fb *Fiber, t Value) Value {
+	cur := t.(*trampoline)
+	for !cur.done {
+		cur = Apply(fb, cur.value, Unit).(*trampoline)
+	}
+	return cur.value
+}
+
 // ValidationMap2 is `map2` of a `Validation`: the errors of both, combined,
 // or `f` of both values.
 func ValidationMap2(fb *Fiber, combine, f, x, y Value) Value {

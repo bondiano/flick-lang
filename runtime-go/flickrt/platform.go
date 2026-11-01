@@ -44,6 +44,16 @@ func StdoutWrite(text Value) Value {
 	return Unit
 }
 
+// LogConsole is `Log.console`'s write: info and debug to stdout, warnings
+// and errors to stderr, after the level.
+func LogConsole(level, message Value) Value {
+	line := level.(string) + ": " + message.(string)
+	if level == "warn" || level == "error" {
+		return StderrLine(line)
+	}
+	return StdoutLine(line)
+}
+
 // StderrLine writes a line to stderr, after what stdout holds so far.
 func StderrLine(text Value) Value {
 	outMu.Lock()

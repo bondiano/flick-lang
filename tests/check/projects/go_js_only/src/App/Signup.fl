@@ -1,0 +1,6 @@
+// A form needs `Form`, though the module does not import it.
+module App.Signup exposing (Signup)
+
+type alias Signup = { name : String }
+  deriving Schema, Form
+//                 ^^^^ FLICK-P030 `Form` is available on the js target only, and this project emits go

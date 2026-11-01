@@ -11,9 +11,10 @@ import (
 // with a *Failure carrying its cause.
 type Cause struct {
 	kind   causeKind
-	err    Value  // a typed failure's error
-	defect string // a defect's message, with the Flick lines it unwound
-	fiber  int64  // the interrupting fiber
+	err    Value       // a typed failure's error
+	defect string      // a defect's message, with the Flick lines it unwound
+	fiber  int64       // the interrupting fiber
+	trace  *stackFrame // a reason's `Cause.StackTrace`: the span it arose in, if any
 	left   *Cause
 	right  *Cause
 }

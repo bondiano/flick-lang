@@ -334,7 +334,7 @@ func inspect(v Value) string {
 		}
 		parts := make([]string, len(x.keys))
 		for i, k := range x.keys {
-			parts[i] = k + ": " + inspect(x.vals[i])
+			parts[i] = inspectKey(k) + ": " + inspect(x.vals[i])
 		}
 		return "{ " + strings.Join(parts, ", ") + " }"
 	case *Data:

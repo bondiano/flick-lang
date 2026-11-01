@@ -8,9 +8,6 @@ type error Boom = Boom Float
 ms5 : Duration.Duration
 let ms5 = Result.with_default Duration.zero (Duration.millis 5)
 
-ms20 : Duration.Duration
-let ms20 = Result.with_default Duration.zero (Duration.millis 20)
-
 boom : Eff none {Boom} String
 let boom = task { from_result (Err (Boom 1)) }
 
@@ -147,26 +144,28 @@ interruption : Unit ->{} Unit
 let interruption () =
   Platform.stdout_line ("interrupt: " ++ ended (task { Effect.interrupt () }))
   let steps = Ref.make []
+  let entered : Deferred.Deferred {} Unit = Deferred.make ()
   let guarded = task {
     Effect.uninterruptible
       (task {
+        let _ = Deferred.succeed () entered
         Effect.sleep ms5
         Ref.update steps (fun xs -> xs ++ ["uninterruptible done"])
       })
-    "after"
+    Some "after"
   }
-  let raced = timeout_option 1 guarded
+  // the guarded region has begun when the other side wins and interrupts it
+  let raced =
+    race_first
+      (task {
+        Deferred.await_ entered
+        None
+      })
+      guarded
   Platform.stdout_line ("uninterruptible: " ++ show (raced, Ref.get steps))
   let masked =
     Effect.uninterruptible_mask (fun restore ->
-      let inner =
-        timeout_option
-          1
-          (restore
-            (task {
-              Effect.sleep ms20
-              "inner"
-            }))
+      let inner : Option String = timeout_option 1 (restore (task { Effect.never () }))
       show inner
     )
   Platform.stdout_line ("uninterruptible_mask: " ++ masked)

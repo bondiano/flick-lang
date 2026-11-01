@@ -1,0 +1,36 @@
+fail: Error: {"_tag":"Boom#fb15c134a64b","_0":1}
+die: Error: broken
+interrupt: InterruptError: All fibers interrupted without error {
+  [cause]: InterruptCause: The fiber was interrupted by:
+      at fiber (#3)
+}
+interrupts: InterruptError: All fibers interrupted without error {
+  [cause]: InterruptCause: The fiber was interrupted by:
+      at fiber (#3)
+      at fiber (unknown)
+}
+both: Error: {"_tag":"Boom#fb15c134a64b","_0":1}
+Error: broken
+empty: []
+pretty_errors: ["Error: {\"_tag\":\"Boom#fb15c134a64b\",\"_0\":1}"]
+pretty_errors interrupt: ["InterruptError: All fibers interrupted without error"]
+traced: Error: {"_tag":"Boom#fb15c134a64b","_0":2}
+    at inner
+    at outer
+frames: (Some "inner", Some "outer")
+inspect: fail Boom; die broken
+raw: fail Boom; die broken; interrupt
+empty: []
+first_success_of []: die error Received an empty collection of effects
+logged: ["", "fail Boom", "die broken"]
+structured: [Some "Error: {\"_tag\":\"Boom#fb15c134a64b\",\"_0\":1}", Some "Error: broken"]
+catch_cause_filter: die replaced
+catch_cause_if: fail Boom
+on_exit_primitive: ["interruptible finalizer"]
+match_cause_effect: failure
+or_die interrupt: interrupt
+partition: ([20, 40], [1, 3])
+filter: [2, 4]
+filter_map_effect: [3, 4]
+for_each: [2, 3, 4, 5]
+replicate_effect: [7, 7, 7]

@@ -22,8 +22,3 @@ callback: [1, 2]
 callback_array: [[3, 4]]
 acquire_release: [5] ["release 5"]
 acquire_use_release: [10, 11] ["release 5", "used 10 Some \"ok\""]
-from_readable_stream: [["x"], ["y"]]
-from_async_iterable: [1, 2]
-its end: only end
-from_async_iterable_array: [[3], [4]]
-from_transform_stream: [["A"], ["B"]]

@@ -12,6 +12,7 @@ import (
 func raceAll(fb *Fiber, tasks []Value, first bool) Value {
 	ended := make(chan *child, len(tasks))
 	children := make([]*child, len(tasks))
+	holdForks(fb.state)
 	for i, t := range tasks {
 		children[i] = fork(fb, fb.owner, t, func(c *child) { ended <- c })
 	}

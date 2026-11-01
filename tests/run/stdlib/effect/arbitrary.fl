@@ -5,6 +5,12 @@ module App.Main exposing (main)
 
 type error TooBig = TooBig Float
 
+type alias Point = { x : Float; tags : List String }
+  deriving Schema
+
+type Shape = Dot | Circle Float
+  deriving Show, Schema
+
 seeded : Int -> Arbitrary.SampleOptions
 let seeded n = { count = Some n; size = None; maxDiscards = None; seed = Some 42 }
 
@@ -157,6 +163,50 @@ let run () =
     try show (Arbitrary.sample (seeded 2) (Arbitrary.filter (fun _ -> false) digits)) with
     | Arbitrary.SampleError e -> "sample error after " ++ show e.discards ++ " discards"
   Platform.stdout_line sampled
+  reports ()
+  linked ()
+
+report : Arbitrary.CheckResult e a ->{} Unit
+let report result =
+  Platform.stdout_line (Option.with_default "passed" (Arbitrary.format_check_failure result))
+
+/// Reports of falsified checks, their values as Effect's Formatter writes them.
+reports : Unit ->{} Unit
+let reports () =
+  report (Arbitrary.check checking (fun p -> p.x < 5) (Arbitrary.from_schema (schema Point)))
+  report
+    (Arbitrary.check
+      checking
+      (fun s ->
+        match s with
+        | Dot -> true
+        | Circle r -> r < 3
+      )
+      (Arbitrary.from_schema (schema Shape)))
+  report
+    (Arbitrary.check
+      checking
+      (fun o -> Option.is_none o)
+      (Arbitrary.from_schema (Schema.option (Schema.list Schema.bool))))
+  report (Arbitrary.check checking small digits)
+  report
+    (Arbitrary.check checking (fun s -> String.length s < 2) (Arbitrary.from_schema Schema.string))
+
+/// Values Effect generates through the link of their declaration.
+linked : Unit ->{; Arbitrary.SampleError} Unit
+let linked () =
+  Platform.stdout_line
+    ("durations: " ++ show (Arbitrary.sample (seeded 6) (Arbitrary.from_schema Schema.duration)))
+  Platform.stdout_line
+    ("chunks: "
+      ++ show (Arbitrary.sample (seeded 3) (Arbitrary.from_schema (Schema.chunk Schema.bool))))
+  let instants = Arbitrary.from_schema (Codec.to_schema DateTime.json_utc_millis)
+  Platform.stdout_line
+    ("instants: "
+      ++ show (List.map DateTime.to_epoch_millis (Arbitrary.sample (seeded 4) instants)))
+  let zones = Arbitrary.from_schema (Codec.to_schema DateTime.json_zone)
+  Platform.stdout_line
+    ("zones: " ++ show (List.map DateTime.zone_to_string (Arbitrary.sample (seeded 4) zones)))
 
 main : Unit ->{; AppError} Unit
 let main () =

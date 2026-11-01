@@ -5,7 +5,7 @@ import { Option, Redacted, Result, type SchemaAST } from "effect";
 
 import { item } from "../internal.ts";
 import type { Gen, Rng } from "../stdlib/testing.ts";
-import { notesOf } from "./notes.ts";
+import { noteOf, notesOf } from "./notes.ts";
 import type { AnySchema } from "./schemas.ts";
 
 const needs = (what: string): RangeError =>
@@ -40,7 +40,8 @@ export const schemaArbitrary =
   (rng) => {
     const draw = (ast: SchemaAST.AST, depth: number): unknown => {
       const notes = notesOf(ast);
-      const generator = notes["flick/generator"];
+      // a node with checks keeps its annotations, the generator among them, on its last check
+      const generator = noteOf(ast, "flick/generator");
       if (generator) return generator(rng);
       if (ast.checks?.length) {
         const refined = ast.checks.map((c) => notesOf(c)["flick/refined"]).find(Boolean);

@@ -278,19 +278,25 @@ func DurationParts(d Value) Value {
 }
 
 // DurationFormat is Effect's `Duration.format`: the non-zero parts of
-// days down to nanoseconds.
+// days down to nanoseconds, the days as JS writes their Number.
 func DurationFormat(d Value) Value {
 	x := dur(d)
-	if x.infinite() {
+	switch {
+	case x.tag == durationNegativeInfinite:
+		return "-Infinity"
+	case x.infinite():
 		return "Infinity"
-	}
-	if DurationIsZero(d).(bool) {
+	case DurationIsZero(d).(bool):
 		return "0"
 	}
 	p := record(DurationParts(d))
 	var pieces []string
-	for i, suffix := range []string{"d", "h", "m", "s", "ms", "ns"} {
-		if v := p.vals[i].(int32); v != 0 {
+	days, _ := new(big.Float).SetInt(new(big.Int).Quo(new(big.Int).Abs(x.toNanos()), big.NewInt(86400e9))).Float64()
+	if days != 0 {
+		pieces = append(pieces, formatNumber(days)+"d")
+	}
+	for i, suffix := range []string{"h", "m", "s", "ms", "ns"} {
+		if v := p.vals[i+1].(int32); v != 0 {
 			pieces = append(pieces, strconv.Itoa(int(v))+suffix)
 		}
 	}

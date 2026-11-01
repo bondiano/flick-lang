@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -15,7 +16,9 @@ type listener struct {
 	events chan Value
 	// done is closed when the worker has stopped; events sent after are dropped
 	done chan struct{}
-	fail func(*Cause)
+	// closed is set when the owner it is attached in begins to close
+	closed atomic.Bool
+	fail   func(*Cause)
 }
 
 func EventsQueue(capacity Value) Value { return int(capacity.(int32)) }
@@ -35,6 +38,7 @@ func EventsListen(fb *Fiber, owner, policy, supervisor, handler Value) Value {
 	FiberSpawn(fb, owner, Fn(func(fb *Fiber, _ Value) Value { return Succeed(Unit) }), Eff(func(w *Fiber) Value {
 		defer close(l.done)
 		for {
+			suspended(w.state)
 			select {
 			case e := <-l.events:
 				_, cause := catch(func() Value { return Run(w, Apply(w, handler, e)) })
@@ -49,8 +53,26 @@ func EventsListen(fb *Fiber, owner, policy, supervisor, handler Value) Value {
 	return l
 }
 
+// EventsAttach registers the listener by `add`. When the owner begins to
+// close, later events are ignored and `remove` gets the same listener,
+// with the services of where it was attached.
+func EventsAttach(fb *Fiber, l, add, remove Value) Value {
+	Run(fb, Apply(fb, add, l))
+	attached := *fb
+	fb.owner.onClose(fb, func(closer *Fiber) {
+		l.(*listener).closed.Store(true)
+		inner := attached
+		inner.state = closer.state
+		Run(&inner, Apply(&inner, remove, l))
+	})
+	return Unit
+}
+
 // send queues an event, as the function JS gets for a listener does.
 func (l *listener) send(e Value) {
+	if l.closed.Load() {
+		return
+	}
 	select {
 	case <-l.done:
 		return
