@@ -75,7 +75,12 @@ impl Loader<'_> {
         }
         let mut found = Vec::new();
         for m in &self.modules {
-            derived_forms(&m.parse.tree, &self.sources.get(m.file).text, m.file, &mut found);
+            derived_forms(
+                &m.parse.tree,
+                &self.sources.get(m.file).text,
+                m.file,
+                &mut found,
+            );
             for import in &m.syntax.imports {
                 let name = import.module.as_str();
                 if self.by_name.contains_key(name) {
