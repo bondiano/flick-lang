@@ -15,7 +15,7 @@ Not here:
   so safety does not depend on it.
 - the parts of Г8 and Г9 that are liveness (a Promise settles, the process is not killed)
   and Г10: R1–R7 speak about steps that happened.
-- Г11 is about the program, not a library: `G11` (`Layers.lean`).
+- Г11 is about the program, not a library: `G11` below, over the reachable configurations.
 -/
 
 namespace Flick.RT
@@ -42,5 +42,27 @@ structure Hyp (L : Lib V) : Prop where
   g8 : L.refAtomic = true
   /-- Г9: a foreign call is tracked by `P` of its owner -/
   g9 : L.extTracked = true
+
+section
+variable {T : Type}
+
+/-- `→*` -/
+inductive Steps (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
+  | refl {C} : Steps K L C C
+  | step {C C' C''} : Steps K L C C' → Step K L C' C'' → Steps K L C C''
+
+/-- A configuration reachable from the program `e₀`. -/
+def Reach (K : Core T V) (L : Lib V) (e₀ : T) (C : Conf T V) : Prop :=
+  Steps K L (init e₀ K.unit) C
+
+/-- **Г11**, the premise of Р37: a fiber whose environment has the services of the
+`provide` owner `πₚ` runs only while `πₚ` is live, i.e. it ends before (C5) of `πₚ`. It is
+the typing rule of `regions.md` §2.7 (services carry the region of their `provide`), point 3
+of T4; P2 proves it in Lean. -/
+def G11 (K : Core T V) (L : Lib V) (e₀ : T) : Prop :=
+  ∀ C, Reach K L e₀ C → ∀ f φ, C.Φ f = some (.run φ) → ∀ π ∈ φ.env,
+    ∃ o, C.Λ π = some o ∧ o.st.live = true
+
+end
 
 end Flick.RT

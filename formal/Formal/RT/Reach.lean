@@ -26,15 +26,6 @@ theorem Inv.initial (e₀ : T) (unit : V) : Inv (init e₀ unit) := by
     (try simp [RT.init, upd, Hist, Owner.fresh, St.live, StartedIn, Guard, FrOk, GroupOk]) <;>
     first | omega | (intro π o t _ ho; subst ho; simp)
 
-/-- `→*` -/
-inductive Steps (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
-  | refl {C} : Steps K L C C
-  | step {C C' C''} : Steps K L C C' → Step K L C' C'' → Steps K L C C''
-
-/-- A configuration reachable from the program `e₀`. -/
-def Reach (K : Core T V) (L : Lib V) (e₀ : T) (C : Conf T V) : Prop :=
-  Steps K L (init e₀ K.unit) C
-
 theorem Inv.reach (h : Hyp L) {e₀ : T} (hr : Reach K L e₀ C) : Inv C := by
   induction hr with
   | refl => exact Inv.initial e₀ K.unit

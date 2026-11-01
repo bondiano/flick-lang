@@ -10,8 +10,9 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 ```
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
-command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1` and `T3` lists
-only Lean's standard `propext`, `Classical.choice` and `Quot.sound`.
+command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3` and `T5` lists
+only Lean's standard `propext`, `Classical.choice` and `Quot.sound`; the hypotheses of T5
+(`Hyp`, `G11`) are its parameters.
 
 ## Status
 
@@ -167,6 +168,7 @@ is a parameter of it.
 | - | - | - |
 | P3a | causes: `⊕`, `⧺`, `head`, `recover`, I_ε; R8, R5 | done |
 | P3b | configurations, steps §3.2–§3.6, the closing C0–C6 by phases; И1–И3; R1–R4 | done |
+| P3c | layers and memo maps, `Ref`; И6, R6 (with Г11), R7; T5 | done |
 
 | `runtime.md` | Lean |
 | - | - |
@@ -190,6 +192,11 @@ is a parameter of it.
 | И5 | `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep` (`RT/Recover.lean`) |
 | R1, R2, R3, R4 | `R1`–`R4`, `Inv.r1`–`Inv.r4`, `Inv.r4_closed`, `parResult_keeps` (`RT/Props.lean`) |
 | the sketch of R3: who waits for a running fiber | `Guard`, `Inv.noRun` (`RT/Inv.lean`, `RT/NoRun.lean`) |
+| §3.5 memo maps, `build`, observers | `Memo`, `Ent`, `lookup`, `Step.provide`, `.provHit`, `.provBuild`, `.buildOk`, `.buildFail`, `.finObs`, `.finObsLast` |
+| И6 | `Inv6.obsIn`, `Good6` of `release` (`RT/Layers.lean`) |
+| R6; its premise from Р37 | `R6`, `Good6`, `GoodUse` (`RT/Layers.lean`, `RT/T5.lean`); `G11` (`RT/Hyp.lean`) |
+| §3.7, R7 | `Step.modify`, `cell`, `R7` (`RT/RefLin.lean`) |
+| T5 | `T5` (`RT/T5.lean`) |
 
 Simplifications of the cause algebra:
 
@@ -234,3 +241,13 @@ Simplifications of λRT:
    interrupted (§1.3); the model does it at the call, as JS does.
 10. A memo map is forked by every `provide`, and a layer is built in the map of the
     `provide` that asked for it, reading the maps of the enclosing ones (§3.5).
+11. **R6** is stated over the journal. (a) A map builds a layer again only after its earlier
+    build of that layer was released (`Good6` of `build`): within one execution of the
+    outer `provide`, whose owner observes the build until its own (C5), that is "at most
+    once". (b) A build is released only after every consumer's observer ran (`Good6` of
+    `release`). (c) No service is used after its build is released (`GoodUse`), under Г11.
+    A layer's build code runs in the providing fiber with the area `σ` as current owner; a
+    failed build closes `σ` and makes the `provide` fail.
+12. **R7** is `Hist GoodRef`: each `Ref.modify ℓ` read the value of the latest `make` or
+    `modify` of `ℓ` (`cell`), and the memory is the replay of the journal. Allocation is
+    deterministic, as in P1.
