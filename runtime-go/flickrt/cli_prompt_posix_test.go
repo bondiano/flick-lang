@@ -28,6 +28,21 @@ func promptTestPipe(t *testing.T) (*promptTerminalState, *os.File) {
 	return tty, writer
 }
 
+func TestPromptOpensOnInputThatIsNoTerminal(t *testing.T) {
+	input, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer input.Close()
+	tty, err := promptOpenTerminal(input, os.Stdout)
+	if err != nil {
+		t.Fatalf("%s: %v", os.DevNull, err)
+	}
+	if err := promptRestoreTerminal(tty); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPromptProcessInputPipeKeysAndEOF(t *testing.T) {
 	tty, writer := promptTestPipe(t)
 	if _, err := io.WriteString(writer, "é🙂\x1b[D\x7f\rnext"); err != nil {
