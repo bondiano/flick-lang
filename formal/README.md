@@ -356,6 +356,10 @@ Simplifications of λRT:
     outer `provide`, whose owner observes the build until its own (C5), that is "at most
     once". (b) A build is released only after every consumer's observer ran (`Good6` of
     `release`). (c) No service is used after its build is released (`GoodUse`), under Г11.
+    `G11` is about the answering entry only: `Act.use π` names the `provide` owner whose
+    environment entry answers the `ask_S`, and at such a step `π` is live. A child may carry
+    an entry of a closed `provide` that it never asks (Р142). P2 gives it as `T4_3`: the
+    region `q` of the `with` frame that `lookupE E N` finds for an `ask_N` is `Live`.
     A layer's build code runs in the providing fiber with the area `σ` as current owner; a
     failed build closes `σ` and makes the `provide` fail.
 12. **R7** is `Hist GoodRef`: each `Ref.modify ℓ` read the value of the latest `make` or

@@ -55,13 +55,13 @@ inductive Steps (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
 def Reach (K : Core T V) (L : Lib V) (e₀ : T) (C : Conf T V) : Prop :=
   Steps K L (init e₀ K.unit) C
 
-/-- **Г11**, the premise of Р37: a fiber whose environment has the services of the
-`provide` owner `πₚ` runs only while `πₚ` is live, i.e. it ends before (C5) of `πₚ`. It is
-the typing rule of `regions.md` §2.7 (services carry the region of their `provide`), point 3
-of T4; P2 proves it in Lean. -/
+/-- **Г11**, the premise of Р37: at an `ask_S`, the environment entry that answers it — the
+`provide` owner `πₚ` — is live (before its (C5)). Only the answering entry counts: a child
+may carry an entry it never asks (Р142). It is the typing rule of `regions.md` §2.7, point 3
+of T4; P2 proves it as `T4_3`, `Live` of the region of the `with` frame `lookupE` finds. -/
 def G11 (K : Core T V) (L : Lib V) (e₀ : T) : Prop :=
-  ∀ C, Reach K L e₀ C → ∀ f φ, C.Φ f = some (.run φ) → ∀ π ∈ φ.env,
-    ∃ o, C.Λ π = some o ∧ o.st.live = true
+  ∀ C, Reach K L e₀ C → ∀ f φ e e' π, C.Φ f = some (.run φ) → φ.code = .tm e →
+    K.step e (.use π) e' → π ∈ φ.env → ∃ o, C.Λ π = some o ∧ o.st.live = true
 
 end
 
