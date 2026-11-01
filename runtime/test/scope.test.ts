@@ -225,3 +225,20 @@ test("a closing hook a supervisor adds while its owner closes runs before the fi
   );
   assert.deepEqual(order, ["hook", "finalizer"]);
 });
+
+test("a closing hook added while foreign calls settle runs before the finalizers", async () => {
+  const order: Array<string> = [];
+  await Effect.runPromise(
+    scope((owner) =>
+      Effect.gen(function* () {
+        yield* acquireRelease(Effect.void, () => Effect.sync(() => order.push("finalizer")));
+        // the call settles after C3, while the closing waits for it (C4)
+        const call = new Promise<void>((resolve) => setTimeout(resolve, 10)).then(() => {
+          owner.closing.add(() => Effect.sync(() => order.push("hook")));
+        });
+        owner.track(call);
+      }),
+    ),
+  );
+  assert.deepEqual(order, ["hook", "finalizer"]);
+});

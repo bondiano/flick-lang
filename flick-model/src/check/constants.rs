@@ -96,6 +96,8 @@ impl Checker<'_> {
                 return Ok(t);
             }
             Const::Prim(p) => prim(*p),
+            // a binding of regions has the scheme of the global it stands for
+            Const::Region(p, _) => return self.global(p),
             other => {
                 return error(
                     "Var",

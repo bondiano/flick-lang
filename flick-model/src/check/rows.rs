@@ -113,6 +113,10 @@ impl Checker<'_> {
 
     /// `φ ⊔ φ'` into the stage of the expression being checked.
     pub(super) fn perform(&mut self, s: &Stage) -> Check<()> {
+        let s = &match s {
+            Stage::Runtime(r, e) => Stage::Runtime(self.split_provided(r)?, e.clone()),
+            Stage::Pure => Stage::Pure,
+        };
         self.raised(s);
         self.lexical_owner(s)?;
         self.stage = match (self.stage.clone(), s) {
@@ -137,7 +141,9 @@ impl Checker<'_> {
                 ),
             ),
             (Stage::Runtime(r, e), Stage::Runtime(r2, e2)) => {
-                self.within(r, r2)?;
+                let mut r = self.split_provided(r)?;
+                self.settle_given(&mut r);
+                self.within(&r, r2)?;
                 self.within(e, e2)
             }
         }

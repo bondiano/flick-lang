@@ -102,6 +102,40 @@ pub enum Const {
     LayerMerge,
     Prim(Prim),
     Native(&'static Native),
+    /// A foreign binding of regions (`docs/formal/regions.md` §1.5): the
+    /// machine takes its step (§3.2), its type is the scheme of the global
+    /// `Path` it stands for.
+    Region(Path, RegionOp),
+}
+
+/// The steps of the foreign bindings of regions (`regions.md` §3.2), and
+/// of the resource of its probes, which marks a closed object (§6).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RegionOp {
+    /// `open_H`: a capability of the owner's region, released when it closes.
+    Acquire,
+    /// `op_H`: stuck on a capability of a closed region, or a released object.
+    Use,
+    /// An object without a region.
+    Make,
+    /// Releases an object.
+    Release,
+    /// `Fiber.spawn`: a child of the region of an owner.
+    Spawn,
+    /// `Scope.add_finalizer`.
+    AddFinalizer,
+    /// `Resource.acquire_release`: the value, its release a finalizer.
+    AcquireRelease,
+}
+
+impl RegionOp {
+    pub fn arity(self) -> usize {
+        match self {
+            RegionOp::Spawn => 3,
+            RegionOp::AcquireRelease => 2,
+            _ => 1,
+        }
+    }
 }
 
 impl Const {
@@ -119,6 +153,7 @@ impl Const {
                 _ => 2,
             },
             Const::Native(n) => n.arity,
+            Const::Region(_, op) => op.arity(),
         }
     }
 
@@ -200,6 +235,16 @@ pub enum Term {
     Raise(Rc<Term>),
     /// `die`, with what the defect says.
     Die(Rc<str>),
+    // the forms of regions (`docs/formal/regions.md` §3.1); `π` is an index of Λ
+    /// `own π`: the owner of region `π`.
+    Own(usize),
+    /// `cap π n`: object `n` the foreign binding `Path` gave. Of a region
+    /// when the binding acquires into one; without, an object of Г4, as
+    /// the one `Resource.acquire_release` holds, or a fiber.
+    Cap(Path, Option<usize>, usize),
+    /// `inside π e`: the body of a `scope` run in region `π`; its types
+    /// name the region `Name`, as the `scope` did.
+    Inside(usize, Name, Rc<Term>),
 }
 
 /// `p → e` or `p when g → e`.
@@ -265,7 +310,9 @@ impl Term {
             | Term::Tag(_)
             | Term::Fix(..)
             | Term::Loc(_)
-            | Term::Env(_) => true,
+            | Term::Env(_)
+            | Term::Own(_)
+            | Term::Cap(..) => true,
             Term::Apply(head, args) => {
                 args.len() < head.arity()
                     || matches!(head, Head::Con(_))

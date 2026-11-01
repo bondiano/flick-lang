@@ -39,7 +39,9 @@ pub fn subst(e: &Term, s: &Subst) -> Term {
         | Term::Stuck(_)
         | Term::Loc(_)
         | Term::Env(_)
-        | Term::Die(_) => e.clone(),
+        | Term::Die(_)
+        | Term::Own(_)
+        | Term::Cap(..) => e.clone(),
         Term::Lam(x, b) => Term::Lam(x.clone(), Rc::new(subst(b, &without(s, x)))),
         Term::App(f, a) => Term::App(go(f), go(a)),
         Term::Let(x, sig, e1, e2) => Term::Let(
@@ -81,6 +83,8 @@ pub fn subst(e: &Term, s: &Subst) -> Term {
         Term::With(env, e) => Term::With(env.clone(), go(e)),
         Term::Handle(v, arms) => Term::Handle(go(v), arms_subst(arms, s)),
         Term::Raise(v) => Term::Raise(go(v)),
+        // the region's name binds in types only
+        Term::Inside(p, r, e) => Term::Inside(*p, r.clone(), go(e)),
     }
 }
 
@@ -197,7 +201,8 @@ pub fn any(e: &Term, f: &dyn Fn(&Term) -> bool) -> bool {
         | Term::Await(b)
         | Term::Bind(_, b)
         | Term::With(_, b)
-        | Term::Raise(b) => any(b, f),
+        | Term::Raise(b)
+        | Term::Inside(_, _, b) => any(b, f),
         Term::Let(_, _, a, b)
         | Term::LetRec(_, _, a, b)
         | Term::App(a, b)
@@ -216,7 +221,9 @@ pub fn any(e: &Term, f: &dyn Fn(&Term) -> bool) -> bool {
         | Term::Stuck(_)
         | Term::Loc(_)
         | Term::Env(_)
-        | Term::Die(_) => false,
+        | Term::Die(_)
+        | Term::Own(_)
+        | Term::Cap(..) => false,
     }
 }
 
@@ -273,13 +280,16 @@ fn free(e: &Term, bound: &mut Vec<Name>, out: &mut BTreeSet<Name>) {
         | Term::Await(x)
         | Term::Bind(_, x)
         | Term::With(_, x)
-        | Term::Raise(x) => free(x, bound, out),
+        | Term::Raise(x)
+        | Term::Inside(_, _, x) => free(x, bound, out),
         Term::Global(_)
         | Term::Lit(_)
         | Term::Tag(_)
         | Term::Stuck(_)
         | Term::Loc(_)
         | Term::Env(_)
-        | Term::Die(_) => {}
+        | Term::Die(_)
+        | Term::Own(_)
+        | Term::Cap(..) => {}
     }
 }

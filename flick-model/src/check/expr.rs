@@ -144,7 +144,9 @@ impl Checker<'_> {
                 self.record_against(fields, &f)
             }
             (Term::Record(fields), Type::Dict(c, args)) => self.dictionary(fields, c, args),
-            (Term::With(..) | Term::Handle(..), _) => self.runtime_form(e, Some(&full)).map(drop),
+            (Term::With(..) | Term::Handle(..) | Term::Inside(..), _) => {
+                self.runtime_form(e, Some(&full)).map(drop)
+            }
             (Term::App(f, a), _) if self.config && matches!(&**f, Term::Lam(..)) => {
                 let Term::Lam(x, body) = &**f else {
                     unreachable!("a λ, matched above")
@@ -152,10 +154,13 @@ impl Checker<'_> {
                 self.redex(x, body, a, Some(&full)).map(drop)
             }
             // `bind_S (await v)` of a configuration: what the layer builds is
-            // checked against `S.Impl`, as `Layer.effect` checked it
+            // checked against `S.Impl`, as `Layer.effect` checked it; the
+            // task may hold what it likes
             (Term::Await(x), _) if self.config => {
                 let (r, x_rows) = (self.fresh_row(), self.fresh_row());
-                self.check(x, &Type::Eff(r.clone(), x_rows.clone(), Rc::new(full)))?;
+                let task = Type::Eff(r.clone(), x_rows.clone(), Rc::new(full));
+                let held = self.fresh_caps();
+                self.check(x, &Type::Captured(Rc::new(task), held))?;
                 self.perform(&Stage::Runtime(r, x_rows))
             }
             _ => {
@@ -173,7 +178,7 @@ impl Checker<'_> {
 
     /// (Let-Sig) against `(∀ᾱ. τ)^C`: the value has `τ^C`.
     fn check_qualified_forall(&mut self, e: &Term, s: &Scheme, qualifier: Caps) -> Check<()> {
-        let facts = self.regions.facts.len();
+        let (facts, givens) = (self.regions.facts.len(), self.givens());
         let mut body = self.skolemize(s);
         if !qualifier.is_empty() {
             body = Type::Captured(Rc::new(body), qualifier);
@@ -182,6 +187,7 @@ impl Checker<'_> {
         let checked = self.check(e, &body);
         let inner = mem::replace(&mut self.stage, outer);
         self.regions.facts.truncate(facts);
+        self.forget_givens(givens);
         checked?;
         if !s.vars.is_empty() && inner != Stage::Pure {
             return error(
@@ -207,7 +213,7 @@ impl Checker<'_> {
     }
 
     /// (Var) on the top-level values of §2.6 and Γ₀.
-    fn global(&mut self, p: &Path) -> Check<Type> {
+    pub(super) fn global(&mut self, p: &Path) -> Check<Type> {
         let s = self
             .decls
             .values

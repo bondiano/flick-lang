@@ -2,6 +2,8 @@
 //! numeric types, `++` on `String` or `List`, comparisons on the numeric
 //! types and `String`; operands never mix types or coerce.
 
+use std::mem;
+
 use super::ty::Type;
 use super::typing::Ref;
 use super::{Checker, Domain, Local, Operator};
@@ -142,6 +144,20 @@ impl Checker<'_> {
     /// `f a b` is `(f a) b`: each argument is one stage, and a runtime arrow
     /// at a stage makes the application a runtime call.
     pub fn apply(&mut self, head: &Node, args: &[&Node]) -> Type {
+        let mut defaults = Vec::new();
+        let provided = self.regions.provided.len();
+        let ty = self.apply_args(head, args, &mut defaults);
+        self.settle_defaults(defaults);
+        self.settle_provided(provided);
+        ty
+    }
+
+    fn apply_args(
+        &mut self,
+        head: &Node,
+        args: &[&Node],
+        defaults: &mut Vec<(Type, usize)>,
+    ) -> Type {
         #[cfg(feature = "diagnostic-fixes")]
         let since = self.diagnostics.len();
         let mut ty = self.infer(head);
@@ -158,14 +174,22 @@ impl Checker<'_> {
                 } => {
                     let calls = self.stage.calls;
                     let since = self.diagnostics.len();
+                    // a task acquiring into a region a later argument names
+                    // waits for it (Р25)
+                    let eff = self.eff_parts(&param).is_some();
+                    let outer = eff.then(|| self.regions.defaults.replace(Vec::new()));
                     let argument = self.check_value(arg, &param);
+                    if let Some(outer) = outer {
+                        let mine = mem::replace(&mut self.regions.defaults, outer);
+                        defaults.extend(mine.unwrap_or_default());
+                    }
                     self.explain_argument(since, head, i, &param);
                     if i == 0 {
                         self.refined_constant(head, arg);
                         self.ui_capacity(head, arg);
                         self.ui_render_handlers(head, arg);
                     }
-                    if self.eff_parts(&param).is_some() {
+                    if eff {
                         if self.stage.calls > calls {
                             self.early_argument(head, arg);
                         }

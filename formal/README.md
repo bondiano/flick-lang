@@ -1,7 +1,8 @@
 # λFlick in Lean 4
 
-A mechanization of the core calculus in [`docs/formal/core.md`](../docs/formal/core.md).
-Lean 4.29.1, no Mathlib.
+A mechanization of the core calculus in [`docs/formal/core.md`](../docs/formal/core.md)
+and, separately, of the runtime contract λRT in [`docs/formal/runtime.md`](../docs/formal/runtime.md)
+(`Formal/RT/`, see [λRT and T5](#λrt-and-t5)). Lean 4.29.1, no Mathlib.
 
 ```sh
 cd formal
@@ -9,8 +10,9 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 ```
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
-command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1` and `T3` lists
-only Lean's standard `propext`, `Classical.choice` and `Quot.sound`.
+command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3` and `T5` lists
+only Lean's standard `propext`, `Classical.choice` and `Quot.sound`; the hypotheses of T5
+(`Hyp`, `G11`) are its parameters.
 
 ## Status
 
@@ -156,3 +158,96 @@ Each item narrows `core.md` unless it says otherwise.
   breaks; it now asks for the error of the value only, as `flick-model` already did.
 - **Р103** (P1c): closed cell types and a fixed program type cannot both hold; cell types
   are monotypes with possibly free variables, and `Gen` excludes `ftv(Ψ)`.
+
+## λRT and T5
+
+`Formal/RT/` is a model of its own: it imports nothing from the core above, and the core
+is a parameter of it.
+
+| Stage | Scope | State |
+| - | - | - |
+| P3a | causes: `⊕`, `⧺`, `head`, `recover`, I_ε; R8, R5 | done |
+| P3b | configurations, steps §3.2–§3.6, the closing C0–C6 by phases; И1–И3; R1–R4 | done |
+| P3c | layers and memo maps, `Ref`; И6, R6 (with Г11), R7; T5 | done |
+
+| `runtime.md` | Lean |
+| - | - |
+| §1.1 reasons, causes | `Reason`, `Cause` (`RT/Cause.lean`) |
+| §2.1 `nub`, `⊕`, `⧺` | `nub`, `comb`, `++` (`RT/Cause.lean`) |
+| §2.2 normal form, laws, `head`; Go's tree | `NF`, `head`, `head_comb`, `CTree` (`RT/Cause.lean`) |
+| R8 | `R8` (`RT/Cause.lean`) |
+| §2.3 `dies`, `recover` | `dies`, `recover` (`RT/Recover.lean`) |
+| §2.4 I_ε and what keeps it | `Iε`, `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep` (`RT/Recover.lean`) |
+| R5 | `R5` (`RT/Recover.lean`) |
+| §1.2–§1.4 fibers, owners, configurations, run-time forms | `Fiber`, `Code`, `Frame`, `Owner`, `Phase`, `Conf` (`RT/Config.lean`) |
+| the core, a parameter | `Core`, `Act` (`RT/Config.lean`) |
+| what the libraries decide | `Lib` (`RT/Config.lean`) |
+| §3.1–§3.6 steps | `Local` (`RT/Local.lean`), `Step` (`RT/Step.lean`), `Steps`, `Reach` (`RT/Reach.lean`) |
+| §3.3 C0–C6 | `Step.close`, `.hookCode`, `.hookStop`, `.stopDone`, `.kids`, `.kidsDone`, `.fins`, `.finCode`, `.finObs`, `.finObsLast`, `.closed`, `.absorbH`, `.absorbF` |
+| §5 Г7(а)–(ж) but (в), Г8, Г9 | `Hyp` (`RT/Hyp.lean`) |
+| invariants of reachable configurations | `Inv`, `Inv.step`, `Inv.reach` (`RT/Inv.lean`, `RT/Reach.lean`) |
+| И1 | `Inv.stJ` and `Good` of `close`, `fins`, `closed` (`RT/Inv.lean`) |
+| И2 | `Inv.empty` and `Good` of `spawn`, `fin`, `gkid`, `branch` |
+| И3 | `Inv.spawnJ` |
+| И5 | `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep` (`RT/Recover.lean`) |
+| R1, R2, R3, R4 | `R1`–`R4`, `Inv.r1`–`Inv.r4`, `Inv.r4_closed`, `parResult_keeps` (`RT/Props.lean`) |
+| the sketch of R3: who waits for a running fiber | `Guard`, `Inv.noRun` (`RT/Inv.lean`, `RT/NoRun.lean`) |
+| §3.5 memo maps, `build`, observers | `Memo`, `Ent`, `lookup`, `Step.provide`, `.provHit`, `.provBuild`, `.buildOk`, `.buildFail`, `.finObs`, `.finObsLast` |
+| И6 | `Inv6.obsIn`, `Good6` of `release` (`RT/Layers.lean`) |
+| R6; its premise from Р37 | `R6`, `Good6`, `GoodUse` (`RT/Layers.lean`, `RT/T5.lean`); `G11` (`RT/Hyp.lean`) |
+| §3.7, R7 | `Step.modify`, `cell`, `R7` (`RT/RefLin.lean`) |
+| T5 | `T5` (`RT/T5.lean`) |
+
+Simplifications of the cause algebra:
+
+1. `≈` is equality of reasons (`DecidableEq V`). A thrown `Error`, compared by identity in
+   Effect, is a value of `V` that carries its identity.
+2. A row `ε` and `· ⊢ v : Errors ε` are a predicate `Has : V → Prop`; the premise of (Try)
+   is `Covers`. R5 is about one `recover`, as the sketch in §6 is; that the core's (Try)
+   gives `Covers` is T1 of P1.
+3. `pretty` and `report` (§2.5) are not defined: they read `Cause V`, a list, so the third
+   part of R8 holds by their type. (Seq=Par) is `CTree.reasons`, where both node kinds are `⊕`.
+
+Simplifications of λRT:
+
+1. **The core is a parameter.** A fiber's code is a term of any type with a labelled
+   transition relation `Core.step`; a label says what the code asks of the runtime, and
+   `Core.plug` hands the result back. Every theorem holds for every core.
+2. **Handles can be forged.** An action names owners, fibers and groups by number, and the
+   rules check only their states (`spawn` needs `open`, and so on). So И4, which needs Г6,
+   is not modelled; R1–R4 do not use it. R3 is proved from `Guard` instead: a child is in
+   `K`, a watcher in `W`, a group's child in an open group or one its owner's closing waits
+   for, a branch in a `par` frame of a running fiber whose current owner, below that frame,
+   started it (`Inv.noRun` is the induction of the sketch).
+3. **No mask.** An interruption is delivered at any point of user code and of the waits that
+   are interruption points (`Code.IntPoint`); a closing, a watcher's wait and a combinator's
+   wait are not. That is more interleavings than §3.2, so safety carries over; Г7(в) is about
+   when an interruption arrives and is not needed. Requests to stop (Int-Req, C2, a group's
+   hook, `parallel` stopping its branches) arrive at any time (`Step.req`): that they are
+   sent is liveness.
+4. **The closing** is run by the fiber that ran the body, through a `closing π` frame; its
+   phase is in the owner (`Phase`). `hooks true` is both the hooks added since C1 (Р38) and
+   C4: it runs hooks until `H = ∅` and then waits for `P = ∅` (Р160).
+5. **Groups**: the hook `stop γ` closes the group; `FiberSet.make` in an owner past (C5)
+   gives a closed group; `join` of a group is not modelled.
+6. **Combinators**: only `parallel`. `race_*` and `timeout` wait the same way and differ in
+   the result, which R3 does not see; the result of `parallel` takes the first failure in
+   input order rather than in the order of ending.
+7. The flag `sd` of `Failure c sd` is not modelled; the root owner never closes, and the
+   runner reading `D` is outside the model (R4 shows `c_g ∈ D`).
+8. One counter gives fresh fibers, owners, finalizers, Promises, groups and maps; finalizer
+   ids follow registration, so R2's "reverse order of addition" is "decreasing ids".
+9. A Promise settles at any time with any outcome. Go puts a call into `P` only after it is
+   interrupted (§1.3); the model does it at the call, as JS does.
+10. A memo map is forked by every `provide`, and a layer is built in the map of the
+    `provide` that asked for it, reading the maps of the enclosing ones (§3.5).
+11. **R6** is stated over the journal. (a) A map builds a layer again only after its earlier
+    build of that layer was released (`Good6` of `build`): within one execution of the
+    outer `provide`, whose owner observes the build until its own (C5), that is "at most
+    once". (b) A build is released only after every consumer's observer ran (`Good6` of
+    `release`). (c) No service is used after its build is released (`GoodUse`), under Г11.
+    A layer's build code runs in the providing fiber with the area `σ` as current owner; a
+    failed build closes `σ` and makes the `provide` fail.
+12. **R7** is `Hist GoodRef`: each `Ref.modify ℓ` read the value of the latest `make` or
+    `modify` of `ℓ` (`cell`), and the memory is the replay of the journal. Allocation is
+    deterministic, as in P1.

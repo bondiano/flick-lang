@@ -57,8 +57,12 @@ pub fn mutate(p: &Program, choices: &[u32]) -> Program {
                 rest.clone(),
             )),
             (4, _) if block => {
-                let path = g.pick(10);
-                Some(leak(g, path, e.clone()))
+                let path = g.pick(11);
+                Some(if path == 10 {
+                    super::provides::leak(g, e.clone())
+                } else {
+                    leak(g, path, |_| e.clone())
+                })
             }
             (5, Term::Let(x, Some(s), rhs, rest)) => Some(Term::Let(
                 x.clone(),

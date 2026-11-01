@@ -172,6 +172,7 @@ impl Checker<'_> {
         for o in mem::take(&mut self.regions.outlives) {
             self.check_outlives(&o);
         }
+        self.settle_late_provided();
         for (errors, span) in mem::take(&mut self.regions.raised) {
             self.check_raised(&errors, span);
         }
@@ -201,7 +202,7 @@ impl Checker<'_> {
     }
 
     /// The region `atom` as a diagnostic names it, and the scope it ends with.
-    fn describe(&self, atom: &Type) -> (String, Option<Span>) {
+    pub(super) fn describe(&self, atom: &Type) -> (String, Option<Span>) {
         match atom {
             Type::Skolem(s) if self.regions.lent.contains(s) => (
                 "the reader of a lazy `for` that reads atoms".to_owned(),
@@ -296,7 +297,7 @@ impl Checker<'_> {
     }
 
     /// Whether the scope `outer` is `inner` or around it.
-    fn encloses(&self, outer: usize, inner: usize) -> bool {
+    pub(super) fn encloses(&self, outer: usize, inner: usize) -> bool {
         let mut at = Some(inner);
         while let Some(i) = at {
             if i == outer {
@@ -307,7 +308,7 @@ impl Checker<'_> {
         false
     }
 
-    fn scope_index(&self, t: &Type) -> Option<usize> {
+    pub(super) fn scope_index(&self, t: &Type) -> Option<usize> {
         match t {
             Type::Skolem(s) => self.regions.scopes.iter().position(|x| x.region == *s),
             _ => None,

@@ -162,6 +162,9 @@ impl Checker<'_> {
             self.perform(&inputs, &errors, span);
         }
         let outputs = self.store.normalize(&outputs);
+        let labels = outputs.entries.iter().map(|(l, _)| l.clone()).collect();
+        // an unknown layer may build any service
+        let unknown = !outputs.tails.is_empty();
         let provided = outputs.entries;
         // outputs ending in a variable of the signature (`Layer none none o`)
         // provide all of it; an unknown tail does not grow by the body's needs
@@ -175,6 +178,7 @@ impl Checker<'_> {
         stage.services = needed.clone();
         stage.returns = None;
         let outer = mem::replace(&mut self.stage, stage);
+        self.enter_provide(node, span, labels, unknown);
         let ty = match (children.get(1), expected) {
             (Some(body), Some(expected)) => {
                 self.check(body, expected);
@@ -183,6 +187,7 @@ impl Checker<'_> {
             (Some(body), None) => self.infer(body),
             (None, _) => Type::Error,
         };
+        self.leave_provide();
         let inner = mem::replace(&mut self.stage, outer);
         self.stage.calls = inner.calls;
         if self.stage.pure.is_none() {

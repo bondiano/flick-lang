@@ -47,7 +47,7 @@ let spawn_outer path =
   }
 
 spawn_given :
-  forall s c.
+  forall s c. Fiber.Provided {FileSystem} s =>
   Fiber.Owner s -> (Eff {FileSystem} {ReadError} String)^c ->{FileSystem; none} Unit
 let spawn_given owner work =
   ignore (Fiber.spawn owner report work)

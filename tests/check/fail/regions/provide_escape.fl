@@ -1,0 +1,42 @@
+// The services a `provide` builds end with it: work kept by an owner that
+// outlives the `provide` cannot use them (Р37).
+module App.ProvideEscape exposing (..)
+
+service Greeter =
+  greet : String ->{} String
+
+report : Failure e ->{} Unit
+let report _ = ()
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+outer_child : Unit ->{} Unit
+let outer_child () = scope outer {
+  provide greeter { ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "child") })) }
+}
+
+outer_finalizer : Unit ->{} Unit
+let outer_finalizer () = scope {
+  provide greeter { Scope.add_finalizer (task { ignore (Greeter.greet "finalizer") }) }
+}
+
+not_given : forall s. Fiber.Owner s ->{Greeter;} Unit
+let not_given owner = ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "child") }))
+
+given : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
+let given owner = ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "child") }))
+
+given_inside : Unit ->{} Unit
+let given_inside () = scope s { provide greeter { given s } }
+
+awaited_inside : Unit ->{} Unit
+let awaited_inside () = scope s {
+  let start = task { ignore (Fiber.spawn s report (task { ignore (Greeter.greet "child") })) }
+  provide greeter { await start }
+}
+//~ FLICK-G003 @16:29-16:40
+//~ FLICK-G003 @21:21-21:40
+//~ FLICK-G003 @25:31-25:42
+//~ FLICK-G003 @31:51-31:56
+//~ FLICK-G003 @36:21-36:32

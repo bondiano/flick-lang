@@ -31,7 +31,7 @@ pub(super) fn rigid_inst(name: &str, k: &Kind) -> Inst {
 }
 
 impl Checker<'_> {
-    fn fresh_inst(&mut self, k: &Kind) -> Inst {
+    pub(super) fn fresh_inst(&mut self, k: &Kind) -> Inst {
         let v = Var::Meta(self.meta());
         if *k == Kind::Region {
             self.regions.kinds.insert(v.clone());
@@ -74,8 +74,9 @@ impl Checker<'_> {
             let fact = (substitute_caps(c, &map), substitute(r, &map));
             self.regions.facts.push(fact);
         }
-        let body = self.implicit(&s.body, &Caps::default());
-        substitute(&body, &map)
+        let body = substitute(&self.implicit(&s.body, &Caps::default()), &map);
+        self.give_provided(&body);
+        body
     }
 
     /// `Gen(Γ, τ)`: the type metas of `t` deeper than the current level.

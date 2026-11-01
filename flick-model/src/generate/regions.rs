@@ -13,7 +13,7 @@ use crate::check::scope_service;
 use crate::syntax::{Arm, Con, Const, Name, Pat, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
-fn con(name: &str, arity: usize) -> Rc<Con> {
+pub(super) fn con(name: &str, arity: usize) -> Rc<Con> {
     Rc::new(Con {
         ty: Path::new(MODULE, name),
         name: name.into(),
@@ -21,11 +21,11 @@ fn con(name: &str, arity: usize) -> Rc<Con> {
     })
 }
 
-fn global(module: &str, name: &str) -> Term {
+pub(super) fn global(module: &str, name: &str) -> Term {
     Term::Global(Path::new(module, name))
 }
 
-fn region(s: &Name) -> Type {
+pub(super) fn region(s: &Name) -> Type {
     Type::Var(Var::Named(s.clone()))
 }
 
@@ -33,7 +33,7 @@ fn handle(s: &Name) -> Type {
     Type::app(Type::con(MODULE, "Handle"), region(s))
 }
 
-fn owner(s: &Name) -> Type {
+pub(super) fn owner(s: &Name) -> Type {
     Type::app(Type::con("Fiber", "Owner"), region(s))
 }
 
@@ -59,11 +59,11 @@ fn job() -> Type {
     Type::Eff(Row::none(), Row::none(), Rc::new(unit()))
 }
 
-fn var(x: &Name) -> Term {
+pub(super) fn var(x: &Name) -> Term {
     Term::Var(x.clone())
 }
 
-fn stmt(s: Term, rest: Term) -> Term {
+pub(super) fn stmt(s: Term, rest: Term) -> Term {
     Term::Let(
         "_".into(),
         Some(Rc::new(mono(unit()))),
@@ -72,11 +72,11 @@ fn stmt(s: Term, rest: Term) -> Term {
     )
 }
 
-fn let_(x: &Name, sig: Option<Scheme>, rhs: Term, rest: Term) -> Term {
+pub(super) fn let_(x: &Name, sig: Option<Scheme>, rhs: Term, rest: Term) -> Term {
     Term::Let(x.clone(), sig.map(Rc::new), Rc::new(rhs), Rc::new(rest))
 }
 
-fn task(body: Term) -> Term {
+pub(super) fn task(body: Term) -> Term {
     Term::Task(Rc::new(body))
 }
 
@@ -84,18 +84,18 @@ fn open() -> Term {
     Term::app(global(MODULE, "open_scoped"), Term::string("x"))
 }
 
-fn use_(h: &Name) -> Term {
+pub(super) fn use_(h: &Name) -> Term {
     Term::app(global(MODULE, "use"), var(h))
 }
 
 /// `Fiber.spawn o report t`, its result dropped.
-fn spawn(o: Term, t: Term, rest: Term) -> Term {
+pub(super) fn spawn(o: Term, t: Term, rest: Term) -> Term {
     let call = Term::apps(global("Fiber", "spawn"), [o, global(MODULE, "report"), t]);
     Term::Let("_".into(), None, Rc::new(call), Rc::new(rest))
 }
 
 /// `match x with | K y -> body y`.
-fn unpack(x: Term, k: Rc<Con>, body: impl FnOnce(Term) -> Term) -> Term {
+pub(super) fn unpack(x: Term, k: Rc<Con>, body: impl FnOnce(Term) -> Term) -> Term {
     let y: Name = "y".into();
     let arm = Arm {
         pat: Pat::Con(k, Rc::from([Pat::Var(y.clone())])),
@@ -296,11 +296,19 @@ impl Gen<'_> {
             0 => {
                 let (o, child) = self.child(cx, size);
                 let rest = rest(self, None);
-                if self.pick(2) == 0 {
-                    spawn(var(&o), child, rest)
-                } else {
-                    let call = Term::apps(var(&x), [var(&o), child]);
-                    let_(&x, Some(spawn_in()), spawn_in_body(), stmt(call, rest))
+                match self.pick(3) {
+                    0 => spawn(var(&o), child, rest),
+                    1 => {
+                        let call = Term::apps(var(&x), [var(&o), child]);
+                        let_(
+                            &x,
+                            Some(spawn_in(&Row::none())),
+                            spawn_in_body(),
+                            stmt(call, rest),
+                        )
+                    }
+                    // path 10: work kept with a service (`provides.rs`)
+                    _ => self.kept_service(rest),
                 }
             }
             // a closure handed to a parameter whose qualifier allows it
@@ -417,24 +425,31 @@ fn acquire() -> Term {
     )
 }
 
-/// `spawn_in : forall t c. Fiber.Outlives c t => Fiber.Owner t -> (Eff {Scope t} none Unit)^c ->{} Unit`.
-pub(super) fn spawn_in() -> Scheme {
+/// `spawn_in : forall t c. (Fiber.Outlives c t, Fiber.Provided r t) =>
+/// Fiber.Owner t -> (Eff {Scope t | r} none Unit)^c ->{r;} Unit`, `r` the
+/// services; without them, no `Provided`.
+pub(super) fn spawn_in(services: &Row) -> Scheme {
     let (t, c): (Name, Name) = ("t".into(), "c".into());
-    let mut r = Row::none();
+    let mut r = services.clone();
     r.elems.insert(scope_service(), Rc::from([region(&t)]));
     let work = Type::Captured(
         Rc::new(Type::Eff(r, Row::none(), Rc::new(unit()))),
         Caps::var(Var::Named(c.clone())),
     );
+    let call = Stage::Runtime(services.clone(), Row::none());
+    let mut body = Type::fun(owner(&t), Stage::Pure, Type::fun(work, call, unit()));
+    if !services.is_none() {
+        body = body.with_provided(services, &region(&t));
+    }
     Scheme {
         vars: vec![(t.clone(), Kind::Region), (c.clone(), Kind::Captures)],
-        body: Type::fun(owner(&t), Stage::Pure, Type::fun(work, empty(), unit())),
+        body,
         outlives: vec![(Caps::var(Var::Named(c)), region(&t))],
     }
 }
 
 /// `fun o w -> let _ = Fiber.spawn o report w; ()`.
-fn spawn_in_body() -> Term {
+pub(super) fn spawn_in_body() -> Term {
     let (o, w): (Name, Name) = ("o".into(), "w".into());
     Term::Lam(
         o.clone(),
@@ -446,11 +461,12 @@ fn spawn_in_body() -> Term {
 }
 
 /// `e` after a leak of path `path` of `regions.md` §4: a value that holds
-/// a region leaves its `scope`, or is held past it. Every one is rejected.
-pub(super) fn leak(g: &mut Gen, path: usize, e: Term) -> Term {
+/// a region leaves its `scope`, or is held past it; `e` may use it as
+/// `x`. Every one is rejected.
+pub(super) fn leak(g: &mut Gen, path: usize, e: impl Fn(&Name) -> Term) -> Term {
     let (s, h, x) = (g.fresh("s"), g.fresh("h"), g.fresh("v"));
     let scoped = |body: Term| Term::Scope(s.clone(), Rc::new(let_(&h, None, open(), body)));
-    let leaves = |value: Term| let_(&x, None, scoped(value), e.clone());
+    let leaves = |value: Term| let_(&x, None, scoped(value), e(&x));
     let lam = |body: Term| Term::lam("y", body);
     match path % 10 {
         // the result, directly or in data
@@ -465,7 +481,7 @@ pub(super) fn leak(g: &mut Gen, path: usize, e: Term) -> Term {
             let sig = mono(Type::fun(thunk(), empty(), unit()));
             let apply = Term::Lam(f.clone(), Rc::new(Term::app(var(&f), Term::unit())));
             let call = Term::app(var(&x), lam(use_(&h)));
-            stmt(scoped(let_(&x, Some(sig), apply, call)), e)
+            stmt(scoped(let_(&x, Some(sig), apply, call)), e(&x))
         }
         // opaque packaging
         5 => leaves(Term::app(Term::konst_con(con("Sealed", 1)), lam(use_(&h)))),
@@ -474,7 +490,7 @@ pub(super) fn leak(g: &mut Gen, path: usize, e: Term) -> Term {
             let cell = Term::app(Term::konst(Const::RefMake), Term::konst_con(nothing()));
             let some_h = Term::app(Term::konst_con(some()), var(&h));
             let set = Term::apps(Term::konst(Const::RefSet), [var(&x), some_h]);
-            let_(&x, None, cell, stmt(scoped(set), e))
+            let_(&x, None, cell, stmt(scoped(set), e(&x)))
         }
         // an error that carries the capability, even one caught inside
         7 => {
@@ -485,15 +501,15 @@ pub(super) fn leak(g: &mut Gen, path: usize, e: Term) -> Term {
                 guard: None,
                 body: Term::unit(),
             };
-            stmt(scoped(Term::Try(Rc::new(raise), Rc::from([arm]))), e)
+            stmt(scoped(Term::Try(Rc::new(raise), Rc::from([arm]))), e(&x))
         }
         // a child of the outer `scope` that holds the inner region
         8 => {
             let o = g.fresh("s");
             let child = spawn(var(&o), task(use_(&h)), Term::unit());
-            stmt(Term::Scope(o, Rc::new(scoped(child))), e)
+            stmt(Term::Scope(o, Rc::new(scoped(child))), e(&x))
         }
         // what a foreign acquisition gives (Г4)
-        _ => let_(&x, None, Term::Scope(s.clone(), Rc::new(acquire())), e),
+        _ => let_(&x, None, Term::Scope(s.clone(), Rc::new(acquire())), e(&x)),
     }
 }

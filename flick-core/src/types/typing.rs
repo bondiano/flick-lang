@@ -371,7 +371,7 @@ pub fn default_method(class: &str, method: &str) -> String {
 pub fn passes_dictionary(constraint: &Type) -> bool {
     !matches!(
         super::classes::split(constraint),
-        Some((("Fiber", "Outlives"), _))
+        Some((("Fiber", "Outlives" | "Provided"), _))
     )
 }
 

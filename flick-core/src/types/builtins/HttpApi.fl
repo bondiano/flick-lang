@@ -291,7 +291,8 @@ foreign pure add_group from "@flick-lang/runtime/effect/http-api/HttpApi" "httpA
 /// is 400 with the issues; the handlers run with the services here.
 listen :
   forall c s r gs.
-  Fiber.Outlives c s => ServeOptions -> Api r gs -> (gs^c ->{Scope s | r; ServeError} Server s)^c
+  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  ServeOptions -> Api r gs -> (gs^c ->{Scope s | r; ServeError} Server s)^c
 foreign effect listen from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiListen"
   arity 3
   retention owner

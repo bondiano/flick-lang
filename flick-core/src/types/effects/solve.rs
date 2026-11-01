@@ -189,6 +189,13 @@ impl Checker<'_> {
                         }
                     }
                     None if label == regions::SCOPE => self.no_owner(c.span),
+                    None if label.starts_with(regions::PROVIDED) => {
+                        if let [service, owner] = ty.spine().1[..] {
+                            let service = self.show(service);
+                            let owner = self.show(owner);
+                            self.unprovided(service.trim_matches(['{', '}', ' ']), &owner, c.span);
+                        }
+                    }
                     None => lacking.push(self.show(ty)),
                 }
             }

@@ -13,6 +13,7 @@ use std::slice;
 use super::{Check, Checker, error};
 use crate::subst::free_vars;
 
+mod provided;
 mod scope;
 mod solve;
 use crate::syntax::{Con, Name, Path, Term};
@@ -49,6 +50,10 @@ pub(super) struct Regions {
     pub(super) facts: Vec<(Caps, Type)>,
     /// The region each `scope` around binds its name to, innermost last.
     renamed: Vec<(Name, Name)>,
+    /// The regions of the `scope`s and `provide`s around, innermost last.
+    nest: Vec<Name>,
+    /// `Provided R ϱ` of the signatures around (§2.7).
+    givens: Vec<(Row, Type)>,
 }
 
 /// The element `Scope ϱ` of a row of services.
@@ -56,7 +61,7 @@ pub(crate) fn scope_service() -> Path {
     Path::new("Prelude", "Scope")
 }
 
-fn owner(s: &Name) -> Type {
+pub(super) fn owner(s: &Name) -> Type {
     Type::app(
         Type::con("Fiber", "Owner"),
         Type::Var(Var::Named(s.clone())),
@@ -66,59 +71,78 @@ fn owner(s: &Name) -> Type {
 const SCALARS: [&str; 7] = ["Int", "Float", "BigInt", "String", "Bool", "Unit", "Never"];
 
 impl Checker<'_> {
-    /// `⌈τ⌉` (§2.1): the atoms a value of `t` may reach.
+    /// `⌈τ⌉` (§2.1): the atoms a value of `t` may reach, an atom `α^{≤C}`
+    /// as `C`.
     pub(super) fn reach(&self, t: &Type) -> Caps {
-        let mut out = Caps::default();
-        self.reach_into(&self.zonk(t), &mut out);
+        let (mut out, bounded) = self.reach_bounded(t);
+        for (_, c) in bounded {
+            out = out.union(&c);
+        }
         out
     }
 
-    fn reach_into(&self, t: &Type, out: &mut Caps) {
+    /// `⌈τ⌉` with each atom `α^{≤C}` apart (Р62): a type variable under a
+    /// bound reaches what `α` does, no more than `C`.
+    pub(super) fn reach_bounded(&self, t: &Type) -> (Caps, Vec<(Var, Caps)>) {
+        let mut out = Caps::default();
+        let mut bounded = Vec::new();
+        self.reach_into(&self.zonk(t), &mut out, &mut bounded);
+        (out, bounded)
+    }
+
+    fn reach_into(&self, t: &Type, out: &mut Caps, bounded: &mut Vec<(Var, Caps)>) {
+        let mut go = |t: &Type, out: &mut Caps| self.reach_into(t, out, bounded);
         match t {
             Type::Var(v) => {
                 out.atoms.insert(v.clone());
             }
-            Type::App(h, a) => {
-                self.reach_into(h, out);
-                self.reach_into(a, out);
+            Type::App(a, b) | Type::Fun(a, _, b) => {
+                go(a, out);
+                go(b, out);
             }
-            Type::Fun(p, _, r) => {
-                self.reach_into(p, out);
-                self.reach_into(r, out);
-            }
-            Type::Eff(_, _, a) | Type::Ref(a) => self.reach_into(a, out),
-            Type::Record(f) => f.fields.values().for_each(|t| self.reach_into(t, out)),
-            Type::Tuple(ts) => ts.iter().for_each(|t| self.reach_into(t, out)),
+            Type::Eff(_, _, a) | Type::Ref(a) => go(a, out),
+            Type::Record(f) => f.fields.values().for_each(|t| go(t, out)),
+            Type::Tuple(ts) => ts.iter().for_each(|t| go(t, out)),
             // the variables a `∀` binds are no captures: each use instantiates them
             Type::Forall(s) => {
                 let mut inner = Caps::default();
-                self.reach_into(&s.body, &mut inner);
+                let mut under = Vec::new();
+                self.reach_into(&s.body, &mut inner, &mut under);
                 let bound =
                     |v: &Var| matches!(v, Var::Named(n) if s.vars.iter().any(|(b, _)| b == n));
+                for (a, c) in under {
+                    if bound(&a) {
+                        inner = inner.union(&c);
+                    } else {
+                        bounded.push((a, c));
+                    }
+                }
                 inner.atoms.retain(|v| !bound(v));
                 inner.vars.retain(|v| !bound(v));
                 *out = out.union(&inner);
             }
             Type::Captured(t, c) => {
-                self.reach_into(t, out);
+                go(t, out);
                 if self.hidden(t, &mut Vec::new()) {
                     *out = out.union(c);
                 }
             }
-            Type::Bounded(t, c) => {
-                if !self.holds_nothing(t) {
+            Type::Bounded(t, c) => match self.resolve(t) {
+                Type::Var(v @ Var::Named(_)) if !self.is_region(&v) => bounded.push((v, c.clone())),
+                _ if self.holds_nothing(t) => {}
+                _ => {
                     let mut inner = Caps::default();
-                    self.reach_into(t, &mut inner);
+                    go(t, &mut inner);
                     inner.atoms.retain(|v| self.is_region(v));
                     inner.vars.clear();
                     *out = out.union(&inner).union(c);
                 }
-            }
+            },
             // `Errors {E ῡ} ≡ E ῡ` (`core.md` §1.5) reaches what its errors
             // do; a variable of the row is no capture (Р60)
             Type::Errors(r) => {
                 for args in r.elems.values() {
-                    args.iter().for_each(|a| self.reach_into(a, out));
+                    args.iter().for_each(|a| go(a, out));
                 }
             }
             // a row is no capture; `Layer`, implementations, tags and

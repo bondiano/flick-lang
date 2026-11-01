@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 
 use super::{PRELUDE, Program};
 use crate::syntax::{Arm, Const, Head, Lit, Pat, Prim, Term};
-use crate::types::{Caps, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Row, Scheme, Stage, Type, Var, provided};
 
 use flick_core::numeric::Arith;
 
@@ -288,11 +288,36 @@ fn scheme(s: &Scheme) -> String {
         return ty(&s.body);
     }
     let vars = list(s.vars.iter().map(|(v, _)| v.to_string()), " ");
-    let mut facts = String::new();
-    for (c, r) in &s.outlives {
-        let _ = write!(facts, "Fiber.Outlives {} {} => ", caps(c), ty_atom(r));
-    }
+    let mut facts: Vec<String> = s
+        .outlives
+        .iter()
+        .map(|(c, r)| format!("Fiber.Outlives {} {}", caps(c), ty_atom(r)))
+        .collect();
+    given(&s.body, &mut facts);
+    let facts = match &facts[..] {
+        [] => String::new(),
+        [one] => format!("{one} => "),
+        _ => format!("({}) => ", facts.join(", ")),
+    };
     format!("forall {vars}. {facts}{}", ty(&s.body))
+}
+
+/// The `Fiber.Provided R s` a signature writes as a constraint, which the
+/// model keeps in the row of its last runtime arrow (`regions.md` §2.7).
+fn given(t: &Type, out: &mut Vec<String>) {
+    match t {
+        Type::Fun(_, s, r) => {
+            if let Stage::Runtime(row, _) = s
+                && let Some(args) = row.elems.get(&provided())
+                && let [Type::Tag(g), owner] = &args[..]
+            {
+                out.push(format!("Fiber.Provided {} {}", row_arg(g), ty_atom(owner)));
+            }
+            given(r, out);
+        }
+        Type::Captured(t, _) => given(t, out),
+        _ => {}
+    }
 }
 
 /// A set of captures after `^`: `c` or `{s, t}`.
@@ -355,13 +380,16 @@ fn row_arg(r: &Row) -> String {
 /// The elements of a row, then its variable: `Log, Counter | r`.
 fn items(r: &Row) -> String {
     let elems = list(
-        r.elems.iter().map(|(p, args)| {
-            let mut out = p.name.to_string();
-            for a in args.iter() {
-                let _ = write!(out, " {}", ty_atom(a));
-            }
-            out
-        }),
+        r.elems
+            .iter()
+            .filter(|(p, _)| **p != provided())
+            .map(|(p, args)| {
+                let mut out = p.name.to_string();
+                for a in args.iter() {
+                    let _ = write!(out, " {}", ty_atom(a));
+                }
+                out
+            }),
         ", ",
     );
     match r.vars.iter().next() {

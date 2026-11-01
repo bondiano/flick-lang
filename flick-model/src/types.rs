@@ -216,7 +216,41 @@ impl Stage {
     }
 }
 
+/// The element `{Provided R ϱ}` of a row of services before the call
+/// splits it by service (`regions.md` §2.7): a scheme's `Fiber.Provided R
+/// ϱ` stands in the row of its last runtime arrow, which is where the call
+/// is, `R` held in a tag.
+pub fn provided() -> Path {
+    Path::new("Fiber", "Provided")
+}
+
+/// The module of the elements `{Provided {S} ϱ}`, named by the service.
+pub const PROVIDED: &str = "Fiber.Provided";
+
 impl Type {
+    /// `t` with `Provided r s` in the row of its last runtime arrow, the
+    /// one its call performs; unchanged without one.
+    #[must_use]
+    pub fn with_provided(&self, r: &Row, s: &Type) -> Type {
+        match self {
+            Type::Fun(p, stage, res) => {
+                let inner = res.with_provided(r, s);
+                if inner != **res {
+                    return Type::Fun(p.clone(), stage.clone(), Rc::new(inner));
+                }
+                let Stage::Runtime(sr, e) = stage else {
+                    return self.clone();
+                };
+                let mut sr = sr.clone();
+                sr.elems
+                    .insert(provided(), Rc::from([Type::Tag(r.clone()), s.clone()]));
+                Type::Fun(p.clone(), Stage::Runtime(sr, e.clone()), res.clone())
+            }
+            Type::Captured(t, c) => Type::Captured(Rc::new(t.with_provided(r, s)), c.clone()),
+            other => other.clone(),
+        }
+    }
+
     pub fn con(module: &str, name: &str) -> Type {
         Type::Con(Path::new(module, name))
     }

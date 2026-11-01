@@ -118,6 +118,16 @@ let partial path =
 no_owner : Path ->{FileSystem; OpenError} Unit
 let no_owner path =
   ignore (FileSystem.open_scoped path)
+
+// a cell made empty in a scope and written there still cannot leave it
+empty_cell_out : Path ->{FileSystem; OpenError} Unit
+let empty_cell_out path =
+  let out = scope inner {
+    let cell = Ref.make None
+    Ref.set cell (Some (FileSystem.open_scoped path))
+    cell
+  }
+  ignore out
 //~ FLICK-G001 @27:5-27:38
 //~ FLICK-G001 @34:5-34:39
 //~ FLICK-G002 @41:7-41:34
@@ -130,3 +140,4 @@ let no_owner path =
 //~ FLICK-E005 @100:7-100:39
 //~ FLICK-G002 @114:26-114:59
 //~ FLICK-G004 @120:11-120:38
+//~ FLICK-G002 @126:5-128:9

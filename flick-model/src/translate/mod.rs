@@ -19,7 +19,7 @@ use self::expr::pat;
 use crate::eval::Program;
 use crate::native;
 use crate::subst::binders;
-use crate::syntax::{Arm, Const, Name, Path, Term};
+use crate::syntax::{Arm, Const, Name, Path, RegionOp, Term};
 
 /// The program of `modules`: those of a build and the built-in ones.
 pub fn program<'a>(modules: impl IntoIterator<Item = &'a ir::Module>) -> Program {
@@ -96,7 +96,8 @@ impl Tr {
                 }
             }
             ItemKind::Foreign(f) => {
-                globals.insert(self.path(&f.name), foreign(f));
+                let path = self.path(&f.name);
+                globals.insert(path.clone(), foreign(path, f));
             }
             ItemKind::Instance { info, methods } => {
                 let path = instance(&info.module, &info.name);
@@ -177,17 +178,22 @@ fn dict(d: &Dict) -> Term {
 }
 
 /// The constant a foreign binding stands for: a constant of Γ₀ or a
-/// native, with every argument the binding takes in Flick.
-fn foreign(f: &ir::Foreign) -> Term {
+/// native, with every argument the binding takes in Flick. The bindings
+/// of regions, and those of `./res.mjs`, the resource of the probes of
+/// `docs/formal/regions.md` (§6), are steps of the machine (§3.2).
+fn foreign(path: Path, f: &ir::Foreign) -> Term {
     let arity = f.dicts + f.stages.len();
     let module = f.module.as_deref().unwrap_or("global");
     let core = match (module, f.export.as_str()) {
         ("@flick-lang/runtime", "refMake") => Some(Const::RefMake),
         ("@flick-lang/runtime", "refGet") => Some(Const::RefGet),
         ("@flick-lang/runtime", "refSet") => Some(Const::RefSet),
-        _ => None,
+        (m, e) => region_op(m, e).map(|op| Const::Region(path, op)),
     };
     match core {
+        Some(c) if c.arity() != arity => {
+            Term::Stuck(format!("{c:?} takes {} arguments, the binding {arity}", c.arity()).into())
+        }
         Some(c) => Term::konst(c),
         None => match native::find(module, &f.export) {
             Some(n) if n.arity == arity => Term::konst(Const::Native(n)),
@@ -203,4 +209,17 @@ fn foreign(f: &ir::Foreign) -> Term {
             }
         },
     }
+}
+
+fn region_op(module: &str, export: &str) -> Option<RegionOp> {
+    Some(match (module, export) {
+        ("./res.mjs", "open") => RegionOp::Acquire,
+        ("./res.mjs", "use") => RegionOp::Use,
+        ("./res.mjs", "raw") => RegionOp::Make,
+        ("./res.mjs", "close") => RegionOp::Release,
+        ("@flick-lang/runtime", "fiberSpawn") => RegionOp::Spawn,
+        ("@flick-lang/runtime", "acquireRelease") => RegionOp::AcquireRelease,
+        ("@flick-lang/runtime/effect/Scope", "flickAddFinalizer") => RegionOp::AddFinalizer,
+        _ => return None,
+    })
 }
