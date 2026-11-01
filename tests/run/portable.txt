@@ -177,3 +177,4 @@ stdlib/effect/effect_core
 stdlib/effect/effect_errors
 stdlib/effect/effect_errors_more
 stdlib/effect/exit_cause
+runtime/interrupt_skips

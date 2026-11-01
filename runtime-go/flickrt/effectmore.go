@@ -270,7 +270,7 @@ func WithExecutionPlan(fb *Fiber, plan, onEvent, task Value) Value {
 		} else if s := step.retries(true); s != nil {
 			next = retrying(s, next)
 		}
-		v, c := catch(func() Value { return Run(fb, next) })
+		v, c := caught(fb, func() Value { return Run(fb, next) })
 		value, failed = v, c != nil
 		if failed {
 			r := c.firstOf(causeFail)

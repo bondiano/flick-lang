@@ -6,11 +6,10 @@ package flickrt
 
 // onCause runs `task`; when it fails, `handle` of the cause ends it.
 func onCause(fb *Fiber, task Value, handle func(*Cause) Value) Value {
-	v, c := catch(func() Value { return Run(fb, task) })
+	v, c := caught(fb, func() Value { return Run(fb, task) })
 	if c == nil {
 		return v
 	}
-	skipHandler(fb, c)
 	return handle(c)
 }
 
@@ -100,7 +99,7 @@ func EffectTapDefect(fb *Fiber, f, task Value) Value {
 // value; the eager form is the same here, as a task has no exit to read
 // before it runs.
 func EffectMatchCause(fb *Fiber, onFailure, onSuccess, task Value) Value {
-	v, c := catch(func() Value { return Run(fb, task) })
+	v, c := caught(fb, func() Value { return Run(fb, task) })
 	if c != nil {
 		return Apply(fb, onFailure, failureOf(c))
 	}
@@ -108,7 +107,7 @@ func EffectMatchCause(fb *Fiber, onFailure, onSuccess, task Value) Value {
 }
 
 func EffectMatchCauseEffect(fb *Fiber, onFailure, onSuccess, task Value) Value {
-	v, c := catch(func() Value { return Run(fb, task) })
+	v, c := caught(fb, func() Value { return Run(fb, task) })
 	if c != nil {
 		return Run(fb, Apply(fb, onFailure, failureOf(c)))
 	}

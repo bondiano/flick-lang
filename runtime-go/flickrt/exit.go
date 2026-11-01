@@ -318,13 +318,20 @@ func ParallelExits(fb *Fiber, tasks Value) Value {
 	in := List(tasks)
 	wrapped := make([]Value, len(in))
 	for i, t := range in {
-		wrapped[i] = Eff(func(fb *Fiber) Value { return exitOf(fb, t) })
+		wrapped[i] = Eff(func(fb *Fiber) Value { return handledExit(fb, t) })
 	}
 	return all(fb, wrapped, 0)
 }
 
 // EffectExit is `Effect.exit`: the exit of a task.
-func EffectExit(fb *Fiber, task Value) Value { return exitOf(fb, task) }
+func EffectExit(fb *Fiber, task Value) Value { return handledExit(fb, task) }
+
+// handledExit is the exit of `task` for a handler that sees it, which a
+// fiber asked to stop skips; `exitOf` is for a boundary that must run.
+func handledExit(fb *Fiber, task Value) *Exit {
+	v, c := caught(fb, func() Value { return Run(fb, task) })
+	return &Exit{v, c}
+}
 
 // withExit runs `task`, then `after` of its exit uninterruptibly; a
 // failure of `after` joins the task's.

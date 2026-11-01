@@ -281,7 +281,7 @@ func ParallelResults(fb *Fiber, tasks Value) Value {
 	wrapped := make([]Value, len(in))
 	for i, t := range in {
 		wrapped[i] = Eff(func(fb *Fiber) Value {
-			v, c := catch(func() Value { return Run(fb, t) })
+			v, c := caught(fb, func() Value { return Run(fb, t) })
 			if c == nil {
 				return Ok(v)
 			}

@@ -110,7 +110,7 @@ formal/                       проект Lean 4 (lake), модули ≤ 20 KB
 
 ### Трек P — механизация (Lean 4)
 
-**P1. T1–T3 для ядра.** 🔶 (после M1, X2. P1a ✅ `33b97174`: `formal/`, Lean 4.29.1 без Mathlib, de Bruijn; λ, `let`, `let rec`, `match` с охранниками и исчерпываемостью, записи, `Ref` — Л1, Л2, Progress, Preservation и T1 без эффектов, без `sorry`, job `lean` в CI. Найдено Р100: неполное применение конструктора не было значением. P1b — стадии и строки, T2; P1c — обобщение, T3)
+**P1. T1–T3 для ядра.** 🔶 (после M1, X2. P1a ✅ `33b97174`: `formal/`, Lean 4.29.1 без Mathlib, de Bruijn; λ, `let`, `let rec`, `match` с охранниками и исчерпываемостью, записи, `Ref` — Л1, Л2, Progress, Preservation и T1 без эффектов, без `sorry`, job `lean` в CI. Найдено Р100: неполное применение конструктора не было значением. P1b ✅ `93cd6d05`: стадии `P`/`R⟨r;ε⟩`, закрытые строки и подтипы у стрелок и `Eff`, `raise`/`try`, `task`/`await`, `ask`/`with`/`provide` и `Layer.*`; Л1–Л3, Progress, Preservation, T1 с исходом `raise`, T2(a), T2(b). Найдено Р101 — `bind`/`join` стояли среди рантайм-шагов, хотя типизируются с `P`; Р102 — посылка (Handle) ломала Preservation после несовпавшей ветви, как Р29 у `match`. P1c — обобщение, T3)
 - AC: `formal/`: синтаксис и типизация как в `core.md` (locally nameless или de Bruijn), доказаны progress, preservation, T2, T3; `lake build` в CI.
 
 **P2. T4 — регионы.** ⬜ (после M2, P1)
