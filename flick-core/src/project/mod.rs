@@ -14,7 +14,7 @@ pub mod pnpm;
 use std::path::{Component, Path, PathBuf};
 
 pub use config::Config;
-#[cfg(test)]
+#[cfg(all(test, feature = "build-artifacts"))]
 pub(crate) use load::js_only;
 #[cfg(feature = "ide")]
 pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
