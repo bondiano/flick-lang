@@ -8,74 +8,27 @@ namespace Flick
 
 variable {S : Sig}
 
-theorem raise_not_pure {Ψ e t} (h : Typ S Ψ [] (.raise e) (.ex t .pure)) : False := by
-  obtain ⟨_, hε⟩ := raise_stage h; exact hε
-
-/-- No runtime redex has a pure stage. -/
-theorem RHead.not_pure {Ψ μ r t μ' r'} (h : Typ S Ψ [] r (.ex t .pure)) (hh : RHead μ r μ' r') :
-    False := by
-  have nv := hh.not_value
-  cases hh with
-  | refMake | refGet =>
-    cases h with
-    | app hf _ hψ _ =>
-      cases hf with
-      | const _ hT' =>
-        obtain ⟨_, _, _, h, _, lψ, _⟩ := hT'.arrow_left
-        cases h; exact Stage.le_trans lψ hψ
-    | errVal hv => exact nv hv
-  | refSet =>
-    cases h with
-    | app hf _ hψ _ =>
-      cases hf with
-      | app hc _ _ hT =>
-        cases hc with
-        | const _ hT' =>
-          obtain ⟨_, _, _, h, _, _, lt⟩ := hT'.arrow_left
-          cases h
-          obtain ⟨_, _, _, h, _, lψ, _⟩ := (lt.trans hT).arrow_left
-          cases h; exact Stage.le_trans lψ hψ
-    | errVal hv => exact nv hv
-  | await => cases h with
-    | await _ hφ => exact hφ
-    | errVal hv => exact nv hv
-  | build => cases h with
-    | provideL _ _ _ hφ => exact hφ
-    | provideE _ _ _ hφ => exact hφ
-    | errVal hv => exact nv hv
-  | provideEnv => cases h with
-    | provideL _ _ _ hφ => exact hφ
-    | provideE _ _ _ hφ => exact hφ
-    | errVal hv => exact nv hv
-  | tryRaise => cases h with
-    | tryR _ _ hφ => exact hφ
-    | tryP hb => exact raise_not_pure hb
-    | errVal hv => exact nv hv
-  | handleYes | handleNo | hguardYes | hguardNo | handleNil => cases h with
-    | handle _ _ _ _ hφ => exact hφ
-    | errVal hv => exact nv hv
-
 /-- One step from a pure term is pure and keeps the store. -/
 theorem step_pure {root Ψ μ e t l μ' e'} (h : Typ S Ψ [] e (.ex t .pure))
     (hs : Step root l μ e (.cfg μ' e')) : l = .pure ∧ μ' = μ := by
   cases hs with
   | pure => exact ⟨rfl, rfl⟩
   | rt hE hh =>
-    obtain ⟨_, _, hr, rel, _⟩ := ctx_typing _ hE hh.not_value h
+    obtain ⟨_, _, _, hr, rel, _⟩ := ctx_typing _ hE hh.not_value h
     obtain rfl := rel.pure rfl
     exact (hh.not_pure hr).elim
   | askWith hE =>
-    obtain ⟨_, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
+    obtain ⟨_, _, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
     obtain rfl := rel.pure rfl
     exact (ask_inv hr).1.elim
   | askRoot hE =>
-    obtain ⟨_, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
+    obtain ⟨_, _, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
     obtain rfl := rel.pure rfl
     exact (ask_inv hr).1.elim
   | raise hE hF =>
-    obtain ⟨_, _, hr, rel, _⟩ := ctx_typing _ hE (not_value_plug raise_not_value _) h
+    obtain ⟨_, _, _, hr, rel, _⟩ := ctx_typing _ hE (not_value_plug raise_not_value _) h
     obtain rfl := rel.pure rfl
-    obtain ⟨_, _, hr', rel', _⟩ := frame_typing raise_not_value _ hF hr
+    obtain ⟨_, _, _, hr', rel', _⟩ := frame_typing raise_not_value _ hF hr
     obtain rfl := rel'.pure rfl
     exact (raise_not_pure hr').elim
 
@@ -97,7 +50,7 @@ theorem step_root {root Ψ μ e t r ε N o} (h : Typ S Ψ [] e (.ex t (.rt r ε)
     (hs : Step root (.root N) μ e o) : r N := by
   cases hs with
   | askRoot hE hl =>
-    obtain ⟨_, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
+    obtain ⟨_, _, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
     rcases rel.svc N (ask_inv hr).1 with h | h
     · exact h
     · simp [domE, hl] at h

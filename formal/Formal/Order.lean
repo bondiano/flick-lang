@@ -77,7 +77,8 @@ theorem Le.trans : ∀ {b a c : Ty}, Le a b → Le b c → Le a c
     obtain ⟨_, _, _, rfl, gr, ge, gt⟩ := h₂.eff_left
     exact .eff (hr.trans gr) (he.trans ge) (ht.trans gt)
   | .base _, _, _, h₁, h₂ | .ref _, _, _, h₁, h₂ | .adt _, _, _, h₁, h₂
-  | .rnil, _, _, h₁, h₂ | .rcons _ _ _, _, _, h₁, h₂ | .layer _ _ _, _, _, h₁, h₂
+  | .tvar _, _, _, h₁, h₂ | .rnil, _, _, h₁, h₂ | .rcons _ _ _, _, _, h₁, h₂
+  | .layer _ _ _, _, _, h₁, h₂
   | .errors _, _, _, h₁, h₂ | .env _, _, _, h₁, h₂ => by
     cases h₁; exact h₂
 

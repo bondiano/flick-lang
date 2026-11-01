@@ -44,8 +44,8 @@ theorem Ty.field_rcons {R : Ty} {l t} (h : R.field l = some t) :
 
 theorem Typ.sub {Ψ Γ e J} (h : Typ S Ψ Γ e J) : ∀ {J'}, JLe J J' → Typ S Ψ Γ e J' := by
   induction h with
-  | var hi hT =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .var hi (hT.trans h₁)
+  | var hi hts hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .var hi hts (hT.trans h₁)
   | lam hb hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .lam hb (hT.trans h₁)
   | app _ _ hψ hT ih₁ ih₂ =>
@@ -54,6 +54,9 @@ theorem Typ.sub {Ψ Γ e J} (h : Typ S Ψ Γ e J) : ∀ {J'}, JLe J J' → Typ S
   | let_ _ _ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .let_ (ih₁ (.st h₂)) (ih₂ ⟨h₁, h₂⟩)
+  | letGen he _ _ ih₂ =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .letGen he (ih₂ ⟨h₁, h₂⟩)
   | letrec hf _ _ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .letrec hf (ih₂ ⟨h₁, h₂⟩)
@@ -66,9 +69,9 @@ theorem Typ.sub {Ψ Γ e J} (h : Typ S Ψ Γ e J) : ∀ {J'}, JLe J J' → Typ S
   | ctor hK hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .ctor hK (hT.trans h₁)
   | rnil => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .rnil
-  | rcons hl _ _ ih₁ ih₂ =>
+  | rcons hR hl _ _ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases h₁
-    exact .rcons hl (ih₁ (.st h₂)) (ih₂ (.st h₂))
+    exact .rcons hR hl (ih₁ (.st h₂)) (ih₂ (.st h₂))
   | proj _ hf hT ih =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .proj (ih (.st h₂)) hf (hT.trans h₁)

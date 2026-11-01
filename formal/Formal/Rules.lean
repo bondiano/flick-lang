@@ -6,6 +6,10 @@ import Formal.Typing
 `Γ;Ψ ⊢ e : τ ! φ`. Every rule types its premises at the stage `φ` of the
 conclusion, and subsumption (Sub) is folded into the rules whose result type
 may be an arrow or an `Eff` (`Le … T`); `Typ.sub` proves (Sub) admissible.
+
+`Γ` holds schemes. (Let-Gen) types its right-hand side with `k` fresh type
+variables, the indices `0 … k-1`, with `Γ` and `Ψ` shifted past them, so that
+`ᾱ ∉ ftv(Γ) ∪ ftv(Ψ)` holds by construction.
 -/
 
 namespace Flick
@@ -19,23 +23,27 @@ inductive J
 
 variable (S : Sig)
 
-inductive Typ (Ψ : List Ty) : List Ty → Tm → J → Prop
-  | var : Γ[i]? = some t → Le t T → Typ Ψ Γ (.var i) (.ex T φ)
-  | lam : Typ Ψ (a :: Γ) b (.ex t ψ) → Le (.arrow a ψ t) T → Typ Ψ Γ (.lam b) (.ex T φ)
+inductive Typ : List Ty → List Scheme → Tm → J → Prop
+  | var {ts : List Ty} : Γ[i]? = some σ → ts.length = σ.k → Le (σ.inst ts) T →
+      Typ Ψ Γ (.var i) (.ex T φ)
+  | lam : Typ Ψ (.mono a :: Γ) b (.ex t ψ) → Le (.arrow a ψ t) T → Typ Ψ Γ (.lam b) (.ex T φ)
   | app : Typ Ψ Γ f (.ex (.arrow a ψ t) φ) → Typ Ψ Γ e (.ex a φ) → ψ.le φ → Le t T →
       Typ Ψ Γ (.app f e) (.ex T φ)
-  | let_ : Typ Ψ Γ e (.ex a φ) → Typ Ψ (a :: Γ) b (.ex t φ) → Typ Ψ Γ (.let_ e b) (.ex t φ)
-  | letrec : Typ Ψ (a :: .arrow a ψ r :: Γ) f (.ex r ψ) → Typ Ψ (.arrow a ψ r :: Γ) b (.ex t φ) →
-      Typ Ψ Γ (.letrec f b) (.ex t φ)
-  | fix : Typ Ψ (a :: .arrow a ψ r :: Γ) f (.ex r ψ) → Le (.arrow a ψ r) T →
+  | let_ : Typ Ψ Γ e (.ex a φ) → Typ Ψ (.mono a :: Γ) b (.ex t φ) →
+      Typ Ψ Γ (.let_ e b) (.ex t φ)
+  | letGen : Typ (Ψ.map (Ty.up k)) (Γ.map (Scheme.up k)) e (.ex a .pure) →
+      Typ Ψ (⟨k, a⟩ :: Γ) b (.ex t φ) → Typ Ψ Γ (.let_ e b) (.ex t φ)
+  | letrec : Typ Ψ (.mono a :: .mono (.arrow a ψ r) :: Γ) f (.ex r ψ) →
+      Typ Ψ (.mono (.arrow a ψ r) :: Γ) b (.ex t φ) → Typ Ψ Γ (.letrec f b) (.ex t φ)
+  | fix : Typ Ψ (.mono a :: .mono (.arrow a ψ r) :: Γ) f (.ex r ψ) → Le (.arrow a ψ r) T →
       Typ Ψ Γ (.fix f) (.ex T φ)
   | lit : Typ Ψ Γ (.lit l) (.ex (.base l.base) φ)
   | loc : Ψ[l]? = some t → Typ Ψ Γ (.loc l) (.ex (.ref t) φ)
-  | const : c.wf → Le (c.ty S) T → Typ Ψ Γ (.const c) (.ex T φ)
+  | const : c.wf → Le (c.ty S τ) T → Typ Ψ Γ (.const c) (.ex T φ)
   | ctor {ts : List Ty} : S.ctor K = some (ts, T₀) → Le (.arrows ts (.adt T₀)) T →
       Typ Ψ Γ (.ctor K) (.ex T φ)
   | rnil : Typ Ψ Γ .rnil (.ex .rnil φ)
-  | rcons : l ∉ R.labels → Typ Ψ Γ e (.ex t φ) → Typ Ψ Γ r (.ex R φ) →
+  | rcons : R.IsRec → l ∉ R.labels → Typ Ψ Γ e (.ex t φ) → Typ Ψ Γ r (.ex R φ) →
       Typ Ψ Γ (.rcons l e r) (.ex (.rcons l t R) φ)
   | proj : Typ Ψ Γ e (.ex R φ) → R.field l = some t → Le t T → Typ Ψ Γ (.proj e l) (.ex T φ)
   | update : Typ Ψ Γ e (.ex R φ) → R.field l = some t → Typ Ψ Γ e' (.ex t φ) →
@@ -43,10 +51,10 @@ inductive Typ (Ψ : List Ty) : List Ty → Tm → J → Prop
   | match_ : Typ Ψ Γ e (.ex t φ) → Typ Ψ Γ A (.alts t t' φ) → Covers S t A.unguarded e →
       Typ Ψ Γ (.match_ e A) (.ex t' φ)
   | anil : Typ Ψ Γ .anil (.alts t t' φ)
-  | acons : PatTy S true p t Δ → Typ Ψ (Δ ++ Γ) b (.ex t' φ) → Typ Ψ Γ r (.alts t t' φ) →
+  | acons : PatTy S true p t Δ → Typ Ψ (Δ.map .mono ++ Γ) b (.ex t' φ) → Typ Ψ Γ r (.alts t t' φ) →
       Typ Ψ Γ (.acons p b r) (.alts t t' φ)
-  | aguard : PatTy S true p t Δ → Typ Ψ (Δ ++ Γ) g (.ex (.base .bool) φ) →
-      Typ Ψ (Δ ++ Γ) b (.ex t' φ) → Typ Ψ Γ r (.alts t t' φ) →
+  | aguard : PatTy S true p t Δ → Typ Ψ (Δ.map .mono ++ Γ) g (.ex (.base .bool) φ) →
+      Typ Ψ (Δ.map .mono ++ Γ) b (.ex t' φ) → Typ Ψ Γ r (.alts t t' φ) →
       Typ Ψ Γ (.aguard p g b r) (.alts t t' φ)
   | todo : Typ Ψ Γ .todo (.ex t φ)
   | task : Typ Ψ Γ e (.ex t ψ) → ψ.le (.rt r ε) → Le (.eff r ε t) T →
@@ -65,10 +73,10 @@ inductive Typ (Ψ : List Ty) : List Ty → Tm → J → Prop
   | handle : Value v → Typ Ψ Γ v (.ex (.errors ε₀) .pure) → Typ Ψ Γ A (.halts ε₀ H t φ) →
       HCov S v H ε' → (Stage.rt Row.none ε').le φ → Typ Ψ Γ (.handle v A) (.ex t φ)
   | hnil : (∀ n, ¬ H n) → Typ Ψ Γ .anil (.halts ε₀ H t φ)
-  | hcons : HPat S ε₀ p θ Δ → Typ Ψ (Δ ++ Γ) b (.ex t φ) → Typ Ψ Γ r (.halts ε₀ H' t φ) →
+  | hcons : HPat S ε₀ p θ Δ → Typ Ψ (Δ.map .mono ++ Γ) b (.ex t φ) → Typ Ψ Γ r (.halts ε₀ H' t φ) →
       (∀ n, H n → Catches S ε₀ p θ n ∨ H' n) → Typ Ψ Γ (.acons p b r) (.halts ε₀ H t φ)
-  | hguard : HPat S ε₀ p θ Δ → Typ Ψ (Δ ++ Γ) g (.ex (.base .bool) φ) →
-      Typ Ψ (Δ ++ Γ) b (.ex t φ) → Typ Ψ Γ r (.halts ε₀ H' t φ) → Row.Sub H H' →
+  | hguard : HPat S ε₀ p θ Δ → Typ Ψ (Δ.map .mono ++ Γ) g (.ex (.base .bool) φ) →
+      Typ Ψ (Δ.map .mono ++ Γ) b (.ex t φ) → Typ Ψ Γ r (.halts ε₀ H' t φ) → Row.Sub H H' →
       Typ Ψ Γ (.aguard p g b r) (.halts ε₀ H t φ)
   | provideL : Typ Ψ Γ l (.ex (.layer i ε₂ o) φ) → Typ Ψ Γ e (.ex t φ₀) →
       φ₀.le (.rt (Row.union o r) ε) → (Stage.rt (Row.union i r) (Row.union ε₂ ε)).le φ →

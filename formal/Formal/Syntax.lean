@@ -1,8 +1,9 @@
 /-!
 # Syntax of λFlick (core.md §1)
 
-Types are monomorphic: rows are closed sets of names and there are no type
-variables (P1c adds them). Terms use de Bruijn indices; see `formal/README.md`
+Rows are closed sets of names. Type variables are de Bruijn indices `tvar n`;
+`∀` appears only in the schemes of a typing context (`Scheme`). Terms carry no
+types (Curry style) and use de Bruijn indices; see `formal/README.md`
 for the encoding of lists (record fields, match arms, constructor arguments,
 environments) as spines.
 -/
@@ -63,6 +64,7 @@ def Lit.base : Lit → Base
 /-- Monotypes `τ` of core.md §1.2 and the run-time `Env ρ` of §3.6.
 A record type is a spine `rcons ℓ τ (… rnil)`; field order is fixed. -/
 inductive Ty
+  | tvar (n : Nat)
   | base (b : Base)
   | arrow (a : Ty) (φ : Stage) (r : Ty)
   | ref (t : Ty)
@@ -73,6 +75,20 @@ inductive Ty
   | layer (i e o : Row)
   | errors (e : Row)
   | env (r : Row)
+
+/-- Parallel substitution of type variables. Types have no binders. -/
+def Ty.substT (ρ : Nat → Ty) : Ty → Ty
+  | .tvar n => ρ n
+  | .base b => .base b
+  | .arrow a φ r => .arrow (a.substT ρ) φ (r.substT ρ)
+  | .ref t => .ref (t.substT ρ)
+  | .adt T => .adt T
+  | .rnil => .rnil
+  | .rcons l t r => .rcons l (t.substT ρ) (r.substT ρ)
+  | .eff r e t => .eff r e (t.substT ρ)
+  | .layer i e o => .layer i e o
+  | .errors e => .errors e
+  | .env r => .env r
 
 /-- `τ₁ →P … →P τₙ →P r`. -/
 def Ty.arrows : List Ty → Ty → Ty
@@ -87,18 +103,19 @@ def Ty.field : Ty → Label → Option Ty
   | .rcons l' t r, l => if l' = l then some t else r.field l
   | _, _ => none
 
-/-- Constants of Γ₀ (core.md §1.5), instantiated at monotypes and closed rows. -/
+/-- Constants of Γ₀ (core.md §1.5). `Ref.*` are polymorphic in their cell type,
+which the typing rule instantiates; the rows of `Layer.*` are closed. -/
 inductive Const
-  | refMake (t : Ty)
-  | refGet (t : Ty)
-  | refSet (t : Ty)
+  | refMake
+  | refGet
+  | refSet
   | ask (S : Name)
   | succeed (S : Name)
   | effect (S : Name) (r e : Row)
   | merge (i₁ e₁ o₁ i₂ e₂ o₂ : Row)
 
 def Const.arity : Const → Nat
-  | .refSet _ => 2
+  | .refSet => 2
   | .merge .. => 2
   | _ => 1
 
@@ -207,20 +224,31 @@ def Tm.build : Tm → Option Tm
   | _ => none
 
 /-- Declared ADTs and services: a constructor's argument types and type name;
-the record type `S.Impl` of a service. -/
+the record type `S.Impl` of a service. Declarations are closed: ADTs and
+services have no type parameters. -/
 structure Sig where
   ctor : Name → Option (List Ty × Name)
   impl : Name → Ty
+  ctor_closed : ∀ K ts T ρ, ctor K = some (ts, T) → ts.map (Ty.substT ρ) = ts
+  impl_closed : ∀ N ρ, (impl N).substT ρ = impl N
 
-def Const.ty (S : Sig) : Const → Ty
-  | .refMake t => .arrow t (.rt Row.none Row.none) (.ref t)
-  | .refGet t => .arrow (.ref t) (.rt Row.none Row.none) t
-  | .refSet t => .arrow (.ref t) .pure (.arrow t (.rt Row.none Row.none) (.base .unit))
-  | .ask Sv => .arrow (.base .unit) (.rt (Row.single Sv) Row.none) (S.impl Sv)
-  | .succeed Sv => .arrow (S.impl Sv) .pure (.layer Row.none Row.none (Row.single Sv))
-  | .effect Sv r e => .arrow (.eff r e (S.impl Sv)) .pure (.layer r e (Row.single Sv))
-  | .merge i₁ e₁ o₁ i₂ e₂ o₂ =>
+/-- The type of a constant at the instance `t` of its type variable. -/
+def Const.ty (S : Sig) : Const → Ty → Ty
+  | .refMake, t => .arrow t (.rt Row.none Row.none) (.ref t)
+  | .refGet, t => .arrow (.ref t) (.rt Row.none Row.none) t
+  | .refSet, t => .arrow (.ref t) .pure (.arrow t (.rt Row.none Row.none) (.base .unit))
+  | .ask Sv, _ => .arrow (.base .unit) (.rt (Row.single Sv) Row.none) (S.impl Sv)
+  | .succeed Sv, _ => .arrow (S.impl Sv) .pure (.layer Row.none Row.none (Row.single Sv))
+  | .effect Sv r e, _ => .arrow (.eff r e (S.impl Sv)) .pure (.layer r e (Row.single Sv))
+  | .merge i₁ e₁ o₁ i₂ e₂ o₂, _ =>
     .arrow (.layer i₁ e₁ o₁) .pure (.arrow (.layer i₂ e₂ o₂) .pure
       (.layer (Row.union i₁ i₂) (Row.union e₁ e₂) (Row.union o₁ o₂)))
+
+/-- A type scheme `∀ α₀ … αₖ₋₁. t` of a typing context; `k = 0` is a monotype. -/
+structure Scheme where
+  k : Nat
+  t : Ty
+
+def Scheme.mono (t : Ty) : Scheme := ⟨0, t⟩
 
 end Flick

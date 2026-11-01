@@ -1,4 +1,5 @@
 import Formal.Syntax
+import Formal.TyOps
 import Formal.Subst
 import Formal.Typing
 import Formal.Rules
@@ -25,3 +26,5 @@ import Formal.PresRt
 import Formal.Preservation
 import Formal.Soundness
 import Formal.Effects
+import Formal.Generalization
+import Formal.Examples

@@ -69,6 +69,7 @@ theorem pure_preservation {Ψ e t φ e'} (h : Typ S Ψ [] e (.ex t φ)) (hh : PH
   | let_ hv =>
     cases h with
     | let_ h₁ h₂ => exact h₂.inst (Δ := [_]) (.cons (h₁.valueAny hv _) .nil)
+    | letGen h₁ h₂ => exact h₂.subst (SubOk.one h₁)
     | errVal hv'' => exact (nv hv'').elim
   | letrec =>
     cases h with

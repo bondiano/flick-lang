@@ -21,23 +21,23 @@ theorem Ty.arrows_pureSpine (ts : List Ty) (T : Name) : (Ty.arrows ts (.adt T)).
   | nil => trivial
   | cons a ts ih => exact ⟨rfl, ih⟩
 
-theorem Const.ty_first {c : Const} (h : c.arity = 2 ∨ c.layer) :
-    ∃ x y, c.ty S = .arrow x .pure y := by
+theorem Const.ty_first {c : Const} {τ : Ty} (h : c.arity = 2 ∨ c.layer) :
+    ∃ x y, c.ty S τ = .arrow x .pure y := by
   cases c <;> simp [Const.arity, Const.layer] at h <;> exact ⟨_, _, rfl⟩
 
-theorem Const.ty_merge {c : Const} (h₁ : c.arity = 2) (h₂ : c.layer) :
-    ∃ x y z, c.ty S = .arrow x .pure (.arrow y .pure z) := by
+theorem Const.ty_merge {c : Const} {τ : Ty} (h₁ : c.arity = 2) (h₂ : c.layer) :
+    ∃ x y z, c.ty S τ = .arrow x .pure (.arrow y .pure z) := by
   cases c <;> simp [Const.arity, Const.layer] at h₁ h₂
   exact ⟨_, _, _, rfl⟩
 
-theorem Const.ty_arrow (c : Const) : ∃ x φ y, c.ty S = .arrow x φ y := by
+theorem Const.ty_arrow (c : Const) (τ : Ty) : ∃ x φ y, c.ty S τ = .arrow x φ y := by
   cases c <;> exact ⟨_, _, _, rfl⟩
 
 /-- What `Value.pure` gives. -/
-def PureTy (S : Sig) (Ψ Γ : List Ty) (e : Tm) (T : Ty) : Prop :=
+def PureTy (S : Sig) (Ψ : List Ty) (Γ : List Scheme) (e : Tm) (T : Ty) : Prop :=
   ∃ T₀, Le T₀ T ∧ Typ S Ψ Γ e (.ex T₀ .pure) ∧
     (∀ K, e.head = .ctor K → T₀.PureSpine) ∧
-    (∀ c, e = .const c → T₀ = c.ty S) ∧
+    (∀ c, e = .const c → ∃ τ, T₀ = c.ty S τ) ∧
     (∀ c e₁, e = .app (.const c) e₁ → c.arity = 2 → c.layer → ∃ y z, T₀ = .arrow y .pure z)
 
 theorem Typ.pureTy {Ψ Γ e J} (h : Typ S Ψ Γ e J) :
@@ -54,7 +54,8 @@ theorem Typ.pureTy {Ψ Γ e J} (h : Typ S Ψ Γ e J) :
     intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .loc hl, by simp [Tm.head], by simp, by simp⟩
   | const hc hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, hT, .const hc .refl, by simp [Tm.head], by simp, by simp⟩
+    exact ⟨_, hT, .const hc .refl, by simp [Tm.head], fun _ h => by cases h; exact ⟨_, rfl⟩,
+      by simp⟩
   | ctor hK hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨_, hT, .ctor hK .refl, fun _ _ => Ty.arrows_pureSpine _ _, by simp, by simp⟩
@@ -65,13 +66,13 @@ theorem Typ.pureTy {Ψ Γ e J} (h : Typ S Ψ Γ e J) :
   | task he hψ hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨_, hT, .task he hψ .refl, by simp [Tm.head], by simp, by simp⟩
-  | rcons hl _ _ ih₁ ih₂ =>
+  | rcons hR hl _ _ ih₁ ih₂ =>
     intro hv _ _ hJ; cases hJ
     cases hv with
     | rcons hv₁ hv₂ =>
       obtain ⟨_, l₁, t₁, -⟩ := ih₁ hv₁ rfl
       obtain ⟨_, l₂, t₂, -⟩ := ih₂ hv₂ rfl
-      exact ⟨_, .refl, .rcons hl (t₁.sub ⟨l₁, Stage.le_refl _⟩) (t₂.sub ⟨l₂, Stage.le_refl _⟩),
+      exact ⟨_, .refl, .rcons hR hl (t₁.sub ⟨l₁, Stage.le_refl _⟩) (t₂.sub ⟨l₂, Stage.le_refl _⟩),
         by simp [Tm.head], by simp, by simp⟩
   | econs hv₁ hθ _ _ hρ ih₁ ih₂ =>
     intro hv _ _ hJ; cases hJ
@@ -86,8 +87,9 @@ theorem Typ.pureTy {Ψ Γ e J} (h : Typ S Ψ Γ e J) :
     obtain ⟨T₀, l, t, _, hc, ha⟩ := ih hv' rfl
     cases l
     refine ⟨_, .refl, .errVal hv' t hE, fun _ _ => trivial, fun c hc' => ?_, fun c _ he h₁ h₂ => ?_⟩
-    · obtain ⟨_, _, _, h⟩ := Const.ty_arrow (S := S) c
-      have := hc c hc'; rw [h] at this; cases this
+    · obtain ⟨τ, hτ⟩ := hc c hc'
+      obtain ⟨_, _, _, h⟩ := Const.ty_arrow (S := S) c τ
+      rw [h] at hτ; cases hτ
     · obtain ⟨_, _, h⟩ := ha c _ he h₁ h₂; cases h
   | app hf he hψ hT ih₁ ih₂ =>
     intro hv _ _ hJ; cases hJ
@@ -102,15 +104,16 @@ theorem Typ.pureTy {Ψ Γ e J} (h : Typ S Ψ Γ e J) :
       cases h; simp [Tm.head] at hK
     | constApp hc hve =>
       obtain ⟨T₀, l₀, t₀, _, hcT, -⟩ := ih₁ .const rfl
-      obtain ⟨x, y, hxy⟩ := Const.ty_first (S := S) hc
-      rw [hcT _ rfl, hxy] at l₀ t₀
+      obtain ⟨τ, hτ⟩ := hcT _ rfl
+      obtain ⟨x, y, hxy⟩ := Const.ty_first (S := S) (τ := τ) hc
+      rw [hτ, hxy] at l₀ t₀
       obtain ⟨_, _, _, h, la, _, lt⟩ := l₀.arrow_left
       cases h
       obtain ⟨_, le, te, -⟩ := ih₂ hve rfl
       refine ⟨_, lt.trans hT, .app t₀ (te.sub ⟨le.trans la, Stage.le_refl _⟩) trivial .refl,
         by simp [Tm.head], fun _ h => (by cases h), fun c' _ h h₁ h₂ => ?_⟩
       cases h
-      obtain ⟨_, _, _, h'⟩ := Const.ty_merge (S := S) h₁ h₂
+      obtain ⟨_, _, _, h'⟩ := Const.ty_merge (S := S) (τ := τ) h₁ h₂
       rw [hxy] at h'; cases h'; exact ⟨_, _, rfl⟩
     | constApp2 h₁ h₂ hv₁ hve =>
       obtain ⟨T₀, l₀, t₀, _, _, ha⟩ := ih₁ (.constApp (.inl h₁) hv₁) rfl

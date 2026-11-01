@@ -10,6 +10,7 @@ variable {S : Sig}
 
 /-- The outermost type former. -/
 def Ty.kind : Ty → Nat
+  | .tvar _ => 9
   | .base _ => 0
   | .arrow .. => 1
   | .ref _ => 2
@@ -38,51 +39,51 @@ def Const.resKind : Const → Nat
 theorem Const.resKind_cases (c : Const) : c.resKind = 1 ∨ c.resKind = 6 := by
   cases c <;> simp [Const.resKind]
 
-theorem Const.ty_kind (c : Const) : (c.ty S).kind = 1 := by
+theorem Const.ty_kind (c : Const) (τ : Ty) : (c.ty S τ).kind = 1 := by
   cases c <;> rfl
 
 /-- The result of a binary or layer constant after one argument. -/
-theorem Const.ty_res {c : Const} (h : c.arity = 2 ∨ c.layer) :
-    ∃ x y, c.ty S = .arrow x .pure y ∧ y.kind = c.resKind := by
+theorem Const.ty_res {c : Const} {τ : Ty} (h : c.arity = 2 ∨ c.layer) :
+    ∃ x y, c.ty S τ = .arrow x .pure y ∧ y.kind = c.resKind := by
   cases c <;> simp [Const.arity, Const.layer] at h <;> exact ⟨_, _, rfl, rfl⟩
+
+theorem Const.res_kind {c : Const} {τ a ψ t T'} (hc : c.arity = 2 ∨ c.layer)
+    (h : Le (c.ty S τ) (.arrow a ψ t)) (hT : Le t T') : T'.kind = c.resKind := by
+  obtain ⟨x, y, hxy, hk⟩ := Const.ty_res (S := S) (τ := τ) hc
+  rw [hxy] at h
+  obtain ⟨_, _, _, h', _, _, lt⟩ := h.arrow_left
+  cases h'; rw [← hT.kind, ← lt.kind, hk]
+
+theorem Const.res2_kind {c : Const} {τ a ψ t a₂ ψ₂ t₂ T'} (h₁ : c.arity = 2) (h₂ : c.layer)
+    (h : Le (c.ty S τ) (.arrow a ψ t)) (h' : Le t (.arrow a₂ ψ₂ t₂)) (hT : Le t₂ T') :
+    T'.kind = 6 := by
+  cases c <;> simp [Const.arity, Const.layer] at h₁ h₂
+  simp only [Const.ty] at h
+  obtain ⟨_, _, _, e, _, _, lt⟩ := h.arrow_left
+  cases e
+  obtain ⟨_, _, _, e, _, _, lt'⟩ := (lt.trans h').arrow_left
+  cases e; rw [← hT.kind, ← lt'.kind]; rfl
 
 theorem Typ.constApp_kind {Ψ Γ c w T φ} (h : Typ S Ψ Γ (.app (.const c) w) (.ex T φ))
     (hc : c.arity = 2 ∨ c.layer) : T.kind = c.resKind := by
-  obtain ⟨x, y, hxy, hk⟩ := Const.ty_res (S := S) hc
-  have key : ∀ {a ψ t T'}, Typ S Ψ Γ (.const c) (.ex (.arrow a ψ t) φ) → Le t T' →
-      T'.kind = y.kind := by
-    intro _ _ _ _ hf hT
-    cases hf with
-    | const _ hT' =>
-      rw [hxy] at hT'
-      obtain ⟨_, _, _, h, _, _, lt⟩ := hT'.arrow_left
-      cases h; rw [← hT.kind, ← lt.kind]
   cases h with
-  | app hf _ _ hT => rw [key hf hT, hk]
+  | app hf _ _ hT => cases hf with | const _ hT' => exact Const.res_kind hc hT' hT
   | errVal _ h' _ =>
     exfalso
     cases h' with
     | app hf _ _ hT =>
-      have := key hf hT; rw [hk] at this
-      cases c <;> simp [Const.resKind, Ty.kind] at this
+      cases hf with
+      | const _ hT' =>
+        have := Const.res_kind hc hT' hT
+        cases c <;> simp [Const.resKind, Ty.kind] at this
 
 theorem Typ.constApp2_kind {Ψ Γ c w₁ w₂ T φ} (h : Typ S Ψ Γ (.app (.app (.const c) w₁) w₂) (.ex T φ))
     (h₁ : c.arity = 2) (h₂ : c.layer) : T.kind = 6 := by
-  obtain ⟨x, y, z, hxyz⟩ := Const.ty_merge (S := S) h₁ h₂
-  have hz : z.kind = 6 := by cases c <;> simp [Const.arity, Const.layer, Const.ty] at h₁ h₂ hxyz <;>
-    (obtain ⟨-, -, rfl⟩ := hxyz; rfl)
   have key : ∀ {a ψ t T'}, Typ S Ψ Γ (.app (.const c) w₁) (.ex (.arrow a ψ t) φ) → Le t T' →
       T'.kind = 6 := by
     intro _ _ _ _ hf hT
     cases hf with
-    | app hc _ _ hT' =>
-      cases hc with
-      | const _ hT'' =>
-        rw [hxyz] at hT''
-        obtain ⟨_, _, _, h, _, _, lt⟩ := hT''.arrow_left
-        cases h
-        obtain ⟨_, _, _, h, _, _, lt'⟩ := (lt.trans hT').arrow_left
-        cases h; rw [← hT.kind, ← lt'.kind, hz]
+    | app hc _ _ hT' => cases hc with | const _ hT'' => exact Const.res2_kind h₁ h₂ hT'' hT' hT
   cases h with
   | app hf _ _ hT => exact key hf hT
   | errVal _ h' _ =>
@@ -118,7 +119,7 @@ theorem Shp.full_of {U T e} (h : Shp S false U e) (hl : Le U T) : Shp S true T e
   | cons _ _ => exact .hidden (hl.opaque trivial)
 
 /-- The spine clause of `Typ.shape`. -/
-def SpineShp (S : Sig) (Ψ Γ : List Ty) (e : Tm) (T : Ty) (φ : Stage) : Prop :=
+def SpineShp (S : Sig) (Ψ : List Ty) (Γ : List Scheme) (e : Tm) (T : Ty) (φ : Stage) : Prop :=
   (∃ U, Le U T ∧ Shp S false U e) ∨
     ∃ ε E, T = .errors ε ∧ ε E ∧ Shp S false (.adt E) e ∧ Typ S Ψ Γ e (.ex (.adt E) φ)
 
@@ -130,14 +131,14 @@ theorem Typ.shape {Ψ Γ e J} (h : Typ S Ψ Γ e J) : Value e → ∀ {T φ}, J 
   | task _ _ hT => intro _ _ _ hJ; cases hJ; exact ⟨.hidden (hT.opaque trivial), by simp [Tm.head]⟩
   | const _ hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨.hidden (Ty.opaque_of_kind (.inl (by rw [← hT.kind]; exact Const.ty_kind _))),
+    exact ⟨.hidden (Ty.opaque_of_kind (.inl (by rw [← hT.kind]; exact Const.ty_kind _ _))),
       by simp [Tm.head]⟩
   | loc => intro _ _ _ hJ; cases hJ; exact ⟨.hidden trivial, by simp [Tm.head]⟩
   | lit => intro _ _ _ hJ; cases hJ; exact ⟨.lit, by simp [Tm.head]⟩
   | rnil => intro _ _ _ hJ; cases hJ; exact ⟨.rnil, by simp [Tm.head]⟩
   | enil => intro _ _ _ hJ; cases hJ; exact ⟨.hidden trivial, by simp [Tm.head]⟩
   | econs => intro _ _ _ hJ; cases hJ; exact ⟨.hidden trivial, by simp [Tm.head]⟩
-  | rcons _ _ _ ih₁ ih₂ =>
+  | rcons _ _ _ _ ih₁ ih₂ =>
     intro hv _ _ hJ; cases hJ
     cases hv with
     | rcons hv₁ hv₂ => exact ⟨.rcons (ih₁ hv₁ rfl).1 (ih₂ hv₂ rfl).1, by simp [Tm.head]⟩
