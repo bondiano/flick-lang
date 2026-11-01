@@ -61,3 +61,31 @@ func TestAnInterruptedTurnLetsTheNextRun(t *testing.T) {
 		t.Fatal("the second turn never ran")
 	}
 }
+
+// A turn the first task of `all` queues comes after the tasks forked after
+// it, however soon that first one runs.
+func TestATurnOfATaskOfAllComesAfterItsSiblings(t *testing.T) {
+	for range 200 {
+		fb := rootFiber()
+		fb.owner = newOwner()
+		var mu sync.Mutex
+		var log []string
+		add := func(s string) {
+			mu.Lock()
+			log = append(log, s)
+			mu.Unlock()
+		}
+		tasks := []Value{Eff(func(fb *Fiber) Value {
+			yieldTurn(fb)
+			add("turn")
+			return Unit
+		})}
+		for range 8 {
+			tasks = append(tasks, Eff(func(*Fiber) Value { add("sibling"); return Unit }))
+		}
+		all(fb, tasks, 0)
+		if log[len(log)-1] != "turn" {
+			t.Fatalf("log %v: the turn ran before a sibling", log)
+		}
+	}
+}

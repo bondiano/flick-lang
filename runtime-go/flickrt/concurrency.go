@@ -41,7 +41,7 @@ var concurrent atomic.Bool
 func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 	concurrent.Store(true)
 	c := &child{state: newState(), done: make(chan struct{})}
-	forked(c.state)
+	forked(fb.state, c.state)
 	inner := *fb
 	inner.state, inner.owner = c.state, owner
 	tc := counted(fb)
@@ -208,6 +208,7 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 	}
 	ended := make(chan *child, len(tasks))
 	children := make([]*child, len(tasks))
+	holdForks(fb.state)
 	for i, t := range tasks {
 		if permits != nil {
 			task := t
@@ -302,6 +303,7 @@ func ParallelResults(fb *Fiber, tasks Value) Value {
 // and awaited.
 func race(fb *Fiber, a, b Value, success bool) Value {
 	ended := make(chan *child, 2)
+	holdForks(fb.state)
 	children := []*child{
 		fork(fb, fb.owner, a, func(c *child) { ended <- c }),
 		fork(fb, fb.owner, b, func(c *child) { ended <- c }),

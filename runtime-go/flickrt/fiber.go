@@ -39,9 +39,10 @@ type fiberState struct {
 	by        atomic.Int64  // the fiber that asked for the interruption
 	signal    chan struct{} // closed when interruption is asked for
 	once      sync.Once
-	mask      int        // depth of uninterruptible regions; only the fiber's goroutine touches it
-	clock     *testClock // the test clock that counts the fiber as running, if any
-	cohort    *cohort    // a forked fiber's until it first suspends (startup.go)
+	mask      int                    // depth of uninterruptible regions; only the fiber's goroutine touches it
+	clock     *testClock             // the test clock that counts the fiber as running, if any
+	cohort    *cohort                // a forked fiber's until it first suspends (startup.go)
+	forks     atomic.Pointer[cohort] // the cohort its forks join until it suspends (startup.go)
 }
 
 var fibers atomic.Int64

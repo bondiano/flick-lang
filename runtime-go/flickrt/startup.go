@@ -12,7 +12,10 @@ import "sync"
 //
 // A forked fiber belongs to the cohort of the fibers forked after the last
 // turn until it first suspends; a turn is a cohort of the one fiber that
-// takes it, from the moment it may run until it suspends.
+// takes it, from the moment it may run until it suspends. The tasks that
+// `all` and the races fork join one cohort, which their fiber holds until it
+// waits for them: Effect runs none of them before, so a turn one of them
+// queues comes after all of them.
 
 // A cohort is fibers before their first suspension, or a turn.
 type cohort struct {
@@ -31,23 +34,43 @@ var startup = struct {
 
 var firstCohort = &cohort{}
 
-// forked counts a new fiber in the tail cohort until it first suspends.
-func forked(s *fiberState) {
+// forked counts a new fiber of `parent` until it first suspends, in the
+// cohort the parent holds or else in the tail one.
+func forked(parent, s *fiberState) {
 	startup.mu.Lock()
-	startup.tail.n++
-	s.cohort = startup.tail
+	c := parent.forks.Load()
+	if c == nil {
+		c = startup.tail
+	}
+	c.n++
+	s.cohort = c
 	startup.mu.Unlock()
 }
 
-// suspended ends the fiber's run in its cohort, if it is in one.
+// holdForks makes the fiber's forks join the tail cohort, held until the
+// fiber suspends; only a fiber that waits right after forking holds one.
+func holdForks(s *fiberState) {
+	startup.mu.Lock()
+	c := startup.tail
+	c.n++
+	s.forks.Store(c)
+	startup.mu.Unlock()
+}
+
+// suspended ends the fiber's run in its cohort and its hold on its forks'.
 func suspended(s *fiberState) {
 	c := s.cohort
-	if c == nil {
+	if c == nil && s.forks.Load() == nil {
 		return
 	}
 	s.cohort = nil
 	startup.mu.Lock()
-	c.n--
+	if c != nil {
+		c.n--
+	}
+	if f := s.forks.Swap(nil); f != nil {
+		f.n--
+	}
 	advance()
 	startup.mu.Unlock()
 }
