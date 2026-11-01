@@ -538,9 +538,13 @@ impl Checker<'_> {
             if let Some((j, meta)) = unknown
                 && *j == i
             {
-                // a number literal's variable stands for a number only
+                // a number literal's variable stands for a number only; any
+                // other failure is the closure's captures, which `close_over`
+                // reports
                 let meta = meta.clone();
-                if self.unify(&meta, &ty).is_err() {
+                let numeric =
+                    matches!(self.store.resolve(&meta), Type::Meta(m) if self.store.is_numeric(m));
+                if self.unify(&meta, &ty).is_err() && numeric {
                     let shown = self.show(&meta);
                     self.error(
                         codes::T003,
