@@ -57,7 +57,7 @@ func errorOnly(c *Cause) (Value, bool) {
 // schedule goes to `orElse`, with the metadata of the last step if one ran.
 func repeatOrElse(fb *Fiber, s *Schedule, orElse func(fb *Fiber, err, last Value) Value, task Value) Value {
 	step, meta := s.stepper(fb), defaultMetadata
-	out, cause := catch(func() Value {
+	out, cause := caught(fb, func() Value {
 		for {
 			m, done := step(fb, runWithMetadata(fb, meta, task))
 			if done {
@@ -86,7 +86,7 @@ func repeatOrElse(fb *Fiber, s *Schedule, orElse func(fb *Fiber, err, last Value
 func retryOrElse(fb *Fiber, s *Schedule, orElse func(fb *Fiber, err, out Value) Value, task Value) Value {
 	step, meta := s.stepper(fb), defaultMetadata
 	for {
-		out, cause := catch(func() Value { return runWithMetadata(fb, meta, task) })
+		out, cause := caught(fb, func() Value { return runWithMetadata(fb, meta, task) })
 		if cause == nil {
 			return out
 		}

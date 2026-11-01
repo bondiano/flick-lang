@@ -54,7 +54,7 @@ func EffectForever(fb *Fiber, task Value) Value {
 // typed failure; a cause without one fails as it is.
 func EffectEventually(fb *Fiber, task Value) Value {
 	for {
-		v, c := catch(func() Value { return Run(fb, task) })
+		v, c := caught(fb, func() Value { return Run(fb, task) })
 		if c == nil {
 			return v
 		}

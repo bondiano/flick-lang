@@ -43,7 +43,7 @@ func partition(fb *Fiber, concurrency, f, xs Value) ([]Value, []Value) {
 	tasks := each(fb, f, xs)
 	for i, t := range tasks {
 		tasks[i] = Eff(func(fb *Fiber) Value {
-			v, c := catch(func() Value { return Run(fb, t) })
+			v, c := caught(fb, func() Value { return Run(fb, t) })
 			if c == nil {
 				return Ok(v)
 			}
@@ -145,7 +145,7 @@ func EffectFirstSuccessOf(fb *Fiber, tasks Value) Value {
 		return Die("Error: Received an empty collection of effects")
 	}
 	for _, t := range in[:len(in)-1] {
-		v, c := catch(func() Value { return Run(fb, t) })
+		v, c := caught(fb, func() Value { return Run(fb, t) })
 		if c == nil {
 			return v
 		}
