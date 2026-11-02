@@ -60,6 +60,17 @@ pub struct RunArguments {
 }
 
 #[derive(Args)]
+pub struct ScriptArguments {
+    /// The script to run; without one, every script is listed.
+    #[arg(value_name = "NAME")]
+    pub name: Option<String>,
+
+    /// Arguments of the script's commands, their `"$@"`, after `--`.
+    #[arg(last = true)]
+    pub args: Vec<String>,
+}
+
+#[derive(Args)]
 pub struct CleanArguments {
     /// Also remove the project's Flick cache.
     #[arg(long)]

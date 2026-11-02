@@ -43,6 +43,8 @@ pub enum Commands {
     Dev(RunArguments),
     /// Remove the build artifacts of the project.
     Clean(CleanArguments),
+    /// Run a script of `[scripts]`, or list them.
+    Script(ScriptArguments),
     /// Install the dependencies with the pinned pnpm.
     Install(InstallArguments),
     /// Add npm packages to the dependencies.
@@ -141,6 +143,18 @@ pub struct GlobalArguments {
     /// `flick.toml` from the working directory upwards.
     #[arg(long, global = true, value_name = "PATH")]
     pub project: Option<String>,
+
+    /// The workspace member to run on, the name of its directory; at the
+    /// root of a workspace `check`, `build`, `test`, `fmt` and `clean`
+    /// otherwise run on every member.
+    #[arg(
+        long,
+        short = 'p',
+        global = true,
+        value_name = "NAME",
+        conflicts_with = "project"
+    )]
+    pub package: Option<String>,
 
     /// Treat warnings as errors.
     #[arg(long, global = true)]

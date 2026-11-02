@@ -4,7 +4,8 @@ title: "Project"
 
 A project is a directory with `flick.toml` (see [Compiler CLI](../cli/)). Commands find the nearest
 `flick.toml` from the working directory upwards; `--project <path>` selects a
-project directory or a configuration file explicitly.
+project directory or a configuration file explicitly. Several projects form a
+[workspace](#workspaces), and `--package <name>` selects one of its members.
 
 ## `flick.toml`
 
@@ -74,6 +75,7 @@ Errors in the configuration exit with code `2`:
 | `kind = "app"` without `entry` or `entries`, or with an empty `entries` | `FLICK-P007` |
 | both `entry` and `entries`, or an entry name that is not one | `FLICK-P005` |
 | no project found, or `--project` names none | `FLICK-P008` |
+| a command needs a project at a workspace root, `--package` names no member, a member has no `flick.toml`, a path dependency is not a library, or dependencies form a cycle | `FLICK-P031` |
 | an entry is not a source module that exports `main` | `FLICK-P011` |
 | an entry `main` does not take and return `Unit`, needs a service or can fail with an error other than `AppError` | `FLICK-P026` |
 | `sql.dialect` names a dialect that is not supported yet | `FLICK-P022` |
@@ -112,6 +114,61 @@ Entries of a web page are something else: a bundler such as Vite takes
 JavaScript entry modules, which import the `.fl` modules they need (see
 [codegen.md](../codegen/)); `entries` are the programs the runtime starts.
 
+## Workspaces
+
+A `flick.toml` with `[workspace]` groups projects, its members, by their
+directories:
+
+```toml
+schema-version = 1
+
+[workspace]
+members = ["contract", "server"]
+```
+
+A root without `[project]` is no project itself, and takes only
+`[workspace]` and `[scripts]`. There, `flick check`, `build`, `test`, `fmt`
+and `clean` without paths go through every member, each after the members it
+depends on by path, and fail if one does; `flick run`, `dev` and the other
+commands need a member, `--package <name>` (`-p`), the name of its directory.
+In a member, commands run on that member as usual, and `--package` picks
+another.
+
+## Path dependencies
+
+A project compiles a Flick library from its sources with a dependency by
+path, relative to its `flick.toml`:
+
+```toml
+[dependencies]
+contract = { path = "../contract" }
+```
+
+The directory holds a `flick.toml` of `kind = "lib"`; its `source-dir` is
+where the modules are, and its own path dependencies come along. The library
+is compiled like a [source package](#packages): for the target the project
+emits, without its warnings, after the project's own modules. A change to its
+sources or its `flick.toml` rebuilds the project, and `--watch` follows them.
+npm dependencies stay in `package.json`.
+
+## Scripts
+
+`[scripts]` names commands to run in order, each a shell command (`sh -c`,
+`cmd /C` on Windows) in the directory of the `flick.toml`, with the `flick`
+that runs them first on `PATH`. A step `@name` runs another script of the same
+file:
+
+```toml
+[scripts]
+lint = ["flick fmt --check", "flick check --warnings-as-errors"]
+test = "flick test"
+ci = ["@lint", "@test"]
+```
+
+`flick script ci` runs one, looking in the project's `flick.toml`, then in
+the workspace root's; `flick script` lists them. The steps stop at the first
+that fails, with its exit code. Arguments after `--` are each step's `"$@"`.
+
 ## `flick check`
 
 Without paths `flick check` checks every module of the source and test roots.
@@ -141,8 +198,8 @@ A source package names the directory of its sources instead:
 Each dependent compiles its modules for the target it emits, js or go, as
 modules of that package. So a JS client and a Go server that both depend on it
 share its types, and its constructors have the same tags on both sides. A
-source package is a workspace member: pnpm links it into `node_modules` with a
-`workspace:` version, and it needs no build of its own. Its modules are checked
+source package needs no build of its own; within a repository, a
+[path dependency](#path-dependencies) names it without `node_modules`. Its modules are checked
 for the target of the dependent, so on go an import of a js-only module is
 `FLICK-P030`. The dependent does not report the package's warnings. Its own
 modules come first: a module the project declares is not looked up in the
