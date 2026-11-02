@@ -1,4 +1,4 @@
-//! PostgreSQL in Docker for the tests that need a database.
+//! `PostgreSQL` in Docker for the tests that need a database.
 
 use std::process::{Command, Stdio};
 use std::thread;

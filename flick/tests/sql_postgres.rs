@@ -6,10 +6,10 @@
 //! default: it needs Docker, the installed runtime and Go (`just
 //! e2e-postgres`).
 
+use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::fs;
 
 use flick_core::build::go::executable;
 use flick_core::build::runner_path;

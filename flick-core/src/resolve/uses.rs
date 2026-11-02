@@ -190,7 +190,7 @@ impl Walker<'_> {
         for child in node.nodes() {
             if child.kind == K::SqlCapture {
                 self.walk(child);
-            } else if child.kind == K::NameExpr && self.is_table(child) {
+            } else if child.kind == K::NameExpr && Self::is_table(child) {
                 self.reference(child, Namespace::Type);
             } else {
                 self.sql_names(child);
@@ -199,7 +199,7 @@ impl Walker<'_> {
     }
 
     /// A capitalized name, maybe qualified: what a table is in SQL.
-    fn is_table(&self, node: &Node) -> bool {
+    fn is_table(node: &Node) -> bool {
         let tokens: Vec<_> = node.child_tokens().collect();
         tokens.last().is_some_and(|t| t.kind == K::Con)
             && tokens.iter().all(|t| matches!(t.kind, K::Con | K::Dot))

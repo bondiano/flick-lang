@@ -1,13 +1,14 @@
-//! The Conduit example against the RealWorld spec: builds the Go server of
+//! The Conduit example against the `RealWorld` spec: builds the Go server of
 //! `examples/conduit/server`, which compiles the contract package from its
-//! sources, serves it over a fresh PostgreSQL in Docker and runs the
+//! sources, serves it over a fresh `PostgreSQL` in Docker and runs the
 //! official Hurl suite vendored in `examples/conduit/vendor/realworld`.
 //! Ignored by default: it needs Docker, Go and `hurl` on `PATH`
 //! (`just conduit-api`).
 
 mod common;
 
-use std::net::TcpListener;
+use std::fs;
+use std::net::{TcpListener, TcpStream};
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -41,9 +42,12 @@ fn the_go_server_passes_the_realworld_api_suite() {
     let server = conduit.join("server");
     // the source package as pnpm links a workspace member
     let linked = server.join("node_modules/@conduit/contract");
-    std::fs::create_dir_all(linked.parent().expect("a parent")).expect("dir");
+    fs::create_dir_all(linked.parent().expect("a parent")).expect("dir");
     #[cfg(unix)]
-    std::os::unix::fs::symlink(conduit.join("contract"), &linked).expect("symlink");
+    {
+        use std::os::unix::fs::symlink;
+        symlink(conduit.join("contract"), &linked).expect("symlink");
+    }
     let build = common::flick_in(&server, &["build"]);
     assert!(build.status.success(), "{build:?}");
     let (_database, url) = start();
@@ -60,7 +64,7 @@ fn the_go_server_passes_the_realworld_api_suite() {
             .expect("the server runs"),
     );
     let started = Instant::now();
-    while std::net::TcpStream::connect(("127.0.0.1", port)).is_err() {
+    while TcpStream::connect(("127.0.0.1", port)).is_err() {
         assert!(
             started.elapsed() < Duration::from_secs(60),
             "the server did not start"
@@ -68,7 +72,7 @@ fn the_go_server_passes_the_realworld_api_suite() {
         thread::sleep(Duration::from_millis(100));
     }
     let suite = conduit.join("vendor/realworld/specs/api/hurl");
-    let mut files: Vec<_> = std::fs::read_dir(&suite)
+    let mut files: Vec<_> = fs::read_dir(&suite)
         .expect("the suite")
         .filter_map(|e| Some(e.ok()?.path()))
         .filter(|p| p.extension().is_some_and(|x| x == "hurl"))
