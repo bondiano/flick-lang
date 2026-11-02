@@ -397,8 +397,8 @@ outputs; a finalizer and a child outlive their owner, with everything they hold
 (Р140). -/
 def Const.ok (Θ : Facts) : Const → CArg → Prop
   | .merge, ι => ∀ N, ¬ (ι.o (.nm N) ∧ ι.o' (.nm N))
-  | .addFin, ι => Outl Θ ι.C ι.s
-  | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s
+  | .addFin, ι => Outl Θ ι.C ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
+  | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
   | _, _ => True
 
 /-- A type scheme `∀ α₀ … αₖ₋₁. Θ ⇒ t` of a typing context; `k = 0` and no

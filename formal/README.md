@@ -13,9 +13,9 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
 command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
-`T1_regions`, `T5`, `T6a` and `T6b` lists only Lean's standard `propext`, `Classical.choice`
-and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a) (`Target`) and of T6(b)
-(`Coherent`, `Sim`) are their parameters.
+`T4_3`, `T1_regions`, `T5`, `T6a` and `T6b` lists only Lean's standard `propext`,
+`Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
+(`Target`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
 
 ## Status
 
@@ -29,11 +29,11 @@ and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a) (`Target`) and o
 | P2b′ | the freshness premises of (Inside) with its own facts, the facts of the order of creation (`Facts.age`), the renaming in every step, a configuration writes only regions that exist; Л6 | done |
 | P2c | Л5, the invariant `⊢ Λ` (live work reaches only live regions), T4.1, T4.2, T1 with `op_H` | done |
 | P2c′1 | Р37 in the model: the region of `provide`, `with` frames with it, children and finalizers inheriting the frames, the use of a service of an ended `provide` stuck; obligations `Provided {S} ϱ` in rows, discharged by `with` frames, by the end of a region and by `provide`, deferred in rows; T1–T3, T4.1, T4.2 again | done |
-| P2c′2 | T4.3: no use of a service of an ended `provide` (`T4_3`), T1 with `op_H` without that stuck state | open |
+| P2c′2 | T4.3: no use of a service of an ended `provide` (`T4_3`), T1 with `op_H` without that stuck state | done |
 
-T4.3 (P2c′, in progress) is the premise Г11 of T5 in the form Р142 gives it: an `ask_S`
-answered by a `with` frame of the region `q` of a `provide`, inherited or not, happens only
-while `q` is live. Its Lean statement, which `G11` in `Formal/RT/Hyp.lean` is to match:
+T4.3 is the premise Г11 of T5 in the form Р142 gives it: an `ask_S` answered by a `with`
+frame of the region `q` of a `provide`, inherited or not, happens only while `q` is live.
+Its Lean statement (`T43Main.lean`), which `G11` in `Formal/RT/Hyp.lean` is to match:
 
 ```lean
 theorem T4_3 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
@@ -87,7 +87,8 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | runtime.md §3.5: a child and a finalizer keep the `with` frames | `withs`, `Step.spawn`, `Step.addFin` (`Semantics.lean`); their typing `withs_typing`, `fin_await` (`KidTy.lean`) |
 | an `inside` form is younger than the `with` frames around it | `Tm.Asc`, `CfgAsc`, `Step.asc` (`Asc.lean`, `AscStep.lean`) |
 | T4.1, T4.2 | `T4` (`Regions.lean`) |
-| T1 with `op_H` | `T1_regions` (`Regions.lean`) |
+| T4.3: a child and a finalizer of a live region `ϱ` use services only of `provide` regions that are ancestors of `ϱ`; an `ask_S` leaves its use at the top of the thread or at the `inside` form of the region of its frame | `KidRow`, `withs_typing` (`KidTy.lean`); `KidNeeds`, `KidNeeds.step` (`T43.lean`); `env_dom`, `need_out` (`NeedOut.lean`); `cstep_all`, `T4_3` (`T43Main.lean`) |
+| T1 with `op_H` | `T1_regions` (`T43Main.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
 | Preservation | `preservation` (`Preservation.lean`); of a configuration: `cstep_typed` (`Soundness.lean`) |
 | T1 | `T1` (`Soundness.lean`) |
@@ -191,7 +192,8 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    type `E` without parameters. `H` is a judgment index: each arm without `when` may add
    what it catches (`Catches`), names only. (Handle) uses the value form of the coverage
    premise (Р102); what the caught errors reach passes to the errors it lets through.
-8. **Environments.** `Env ρ` means "binds at least `ρ`". `with θ e` and `econs` require
+8. **Environments.** `Env ρ` means "binds exactly `ρ`", as (Env), (Bind) and (Join)
+   give it: T4.3 needs that a `with` frame answers `S` exactly when its row has `S`. `with θ e` and `econs` require
    `θ` and the bound values to be values. The disjointness of `Layer.merge` is kept
    (`Const.ok`) though soundness does not need it.
 9. **Allocation is deterministic:** `Ref.make v` takes `ℓ = μ.length`, `scope` takes
@@ -247,7 +249,8 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     every program, which has no run-time forms; T2 assumes the same of its configuration
     (`hb`, `hΨ`). T1 is stated with two blocked outcomes: a finished region body
     waiting for a child (deadlock freedom is λRT's), and a step that needs a region
-    that is not live; `T1_regions` drops the second by T4.
+    that is not live or a service of an ended `provide`; `T1_regions` drops the second
+    by T4 and T4.3.
 20. **`⊢ Λ` is an invariant with ghost data.** `Nest` relates a configuration to the
     ancestors `anc π` of each region, the regions `B ℓ` each cell may hold and the
     thread `home π` of the `inside π` form; T4 needs no other change to the model.
@@ -270,7 +273,11 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     when its region is older (`Row.withP`). A child and a finalizer keep the `with` frames
     of the place that registered them (`withs`); asking a service of an ended `provide`
     is stuck (`DeadAsk`). Typing a new child needs `Tm.Asc`: a region is younger than the
-    `with` frames around its `inside` form.
+    `with` frames around its `inside` form. T4.3 adds the invariant `KidNeeds`: a child
+    or a finalizer of a live region `ϱ` has a typing whose uses `need S q` name ancestors
+    of `ϱ`, which the obligation `Provided {S} ϱ` of its registration gives
+    (`withs_typing`). The row of the work `spawn` and `addFin` take has no uses (`Const.ok`):
+    uses come only from `with` frames, so the derivations `regions.md` gives have none there.
 
 ## Findings
 

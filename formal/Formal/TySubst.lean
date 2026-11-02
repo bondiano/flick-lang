@@ -291,32 +291,43 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | econs hv hθ _ _ hρ ih₁ ih₂ =>
     intro σ hσ
     have := ih₁ σ (hσ.sub fun _ h => .inl h); simp only [Flick.J.substT, S.impl_closed] at this
-    refine .econs hv hθ this (ih₂ σ (hσ.sub fun _ h => .inr h)) fun n hn => ?_
+    refine .econs hv hθ this (ih₂ σ (hσ.sub fun _ h => .inr h)) fun n => ?_
     cases n with
-    | nm N' => exact hρ _ hn
+    | nm N' => exact hρ _
     | atm a | ob _ a | need _ a =>
-      obtain ⟨b, hb, h'⟩ := hn
-      rcases hρ _ hb with h | h
-      · cases h
-      · exact .inr ⟨b, h, h'⟩
+      constructor
+      · rintro ⟨b, hb, h'⟩
+        rcases (hρ _).mp hb with h | h
+        · cases h
+        · exact .inr ⟨b, h, h'⟩
+      · rintro (h | ⟨b, hb, h'⟩)
+        · cases h
+        · exact ⟨b, (hρ _).mpr (.inr hb), h'⟩
   | bind _ hρ ih =>
     intro σ hσ
     have := ih σ hσ; simp only [Flick.J.substT, S.impl_closed] at this
-    refine .bind this fun n hn => ?_
+    refine .bind this fun n => ?_
     cases n with
-    | nm N' => exact hρ _ hn
-    | atm a | ob _ a | need _ a => obtain ⟨b, hb, _⟩ := hn; cases hρ _ hb
+    | nm N' => exact hρ _
+    | atm a | ob _ a | need _ a =>
+      constructor
+      · rintro ⟨b, hb, _⟩; cases (hρ _).mp hb
+      · intro h; cases h
   | join _ _ hρ ih₁ ih₂ =>
     intro σ hσ
     refine .join (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
-      fun n hn => ?_
+      fun n => ?_
     cases n with
-    | nm N' => exact hρ _ hn
+    | nm N' => exact hρ _
     | atm a | ob _ a | need _ a =>
-      obtain ⟨b, hb, h'⟩ := hn
-      rcases hρ _ hb with h | h
-      · exact .inl ⟨b, h, h'⟩
-      · exact .inr ⟨b, h, h'⟩
+      constructor
+      · rintro ⟨b, hb, h'⟩
+        rcases (hρ _).mp hb with h | h
+        · exact .inl ⟨b, h, h'⟩
+        · exact .inr ⟨b, h, h'⟩
+      · rintro (⟨b, hb, h'⟩ | ⟨b, hb, h'⟩)
+        · exact ⟨b, (hρ _).mpr (.inl hb), h'⟩
+        · exact ⟨b, (hρ _).mpr (.inr hb), h'⟩
   | @scope F _ _ r ε _ _ _ _ _ _ hn hF _ hφ' hφ hT ih =>
     intro σ hσ
     have h₁ := ih (liftT 1 σ) (hσ.lift 1)

@@ -48,6 +48,9 @@ import Formal.NestTyping
 import Formal.NestStep
 import Formal.NestMain
 import Formal.Regions
+import Formal.NeedOut
+import Formal.T43
+import Formal.T43Main
 import Formal.Effects
 import Formal.Generalization
 import Formal.Examples

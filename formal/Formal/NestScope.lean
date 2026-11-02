@@ -66,7 +66,7 @@ theorem Nest.fresh {c : Cfg} {home i E r b} (hn : Nest Ψ c anc B home)
     (hb : ∀ q, ¬ b.Has (.frame q))
     (hbW : b.Within Ψ B anc (fun x => holeE (baseOf anc i) E x ∨ x = c.rgs.length)) :
     ∃ anc' home', Nest Ψ ((⟨c.rgs ++ [Rgn.new], c.mem, c.main⟩ : Cfg).put i
-      (plug E (.inside c.rgs.length b))) anc' B home' := by
+      (plug E (.inside c.rgs.length b))) anc' B home' ∧ ∀ q, q ≠ c.rgs.length → anc' q = anc q := by
   let p := c.rgs.length
   have hw := (hn.thread i _ hi).1
   obtain ⟨hWE, -⟩ := within_of_plug hv hE hw
@@ -127,7 +127,8 @@ theorem Nest.fresh {c : Cfg} {home i E r b} (hn : Nest Ψ c anc B home)
       · cases h; exact .inr rfl
       · exact (hb q h).elim
   refine ⟨anc', home', ⟨fun q => ?_, fun q x hx => ?_, fun q hq => ?_, fun q x hq hx => ?_,
-    fun i' e' he' => ?_, fun q hq => ?_, fun r g hg hgl f hf => ?_, fun l v hv => ?_⟩⟩
+    fun i' e' he' => ?_, fun q hq => ?_, fun r g hg hgl f hf => ?_, fun l v hv => ?_⟩,
+    fun q hq => ancq q hq⟩
   · by_cases hq : q = p
     · subst hq; rw [ancp]; exact .inr rfl
     · rw [ancq q hq]; exact hn.self q
@@ -206,7 +207,8 @@ theorem Tm.Within.extend {e : Tm} {H : Nat → Prop} {p : Nat} (hn : e.NoIns) (h
 theorem Nest.scope {c : Cfg} {home i E e₁} (hn : Nest Ψ c anc B home)
     (hi : c.at i = some (plug E (.scope e₁))) (hE : OkE E) (hΨ : ∀ u ∈ Ψ, u.YF c.rgs.length) :
     ∃ anc' home', Nest Ψ ((⟨c.rgs ++ [Rgn.new], c.mem, c.main⟩ : Cfg).put i
-      (plug E (.inside c.rgs.length (e₁.subst (inst [.own c.rgs.length]))))) anc' B home' := by
+      (plug E (.inside c.rgs.length (e₁.subst (inst [.own c.rgs.length]))))) anc' B home' ∧
+      ∀ q, q ≠ c.rgs.length → anc' q = anc q := by
   obtain ⟨-, h₁, hn₁⟩ := within_of_plug (by intro h; cases h) hE (hn.thread i _ hi).1
   have hb : (e₁.subst (inst [.own c.rgs.length])).NoIns := fun h => by
     rcases subst_inst_has h with h | ⟨w, hw, h⟩
