@@ -6,9 +6,7 @@
 module Conduit.Server.Main exposing (main)
 
 import Database exposing (Database)
-import Http.ServerRequest exposing (ServerRequest)
-import Http.ServerResponse exposing (ServerResponse)
-import Conduit.Server.Routes as Routes
+import Conduit.Server.App as Server
 import Conduit.Server.Schema as Schema
 import Conduit.Server.Session exposing (Keys)
 
@@ -21,22 +19,6 @@ let settings () = {
   secret = Config.get (Config.non_empty_string "JWT_SECRET");
   files = Config.get (Config.option (Config.string "STATIC_DIR"));
 }
-
-/// The router of the API and, given a directory, of the client's files.
-app :
-  Settings ->{Database, Keys, Crypto.Crypto; PlatformError.PlatformError}
-  (ServerRequest ->{Database, Keys, Crypto.Crypto; Http.ServerError.HttpServerError} ServerResponse)
-let app config =
-  let api = HttpApi.route "/api/*" Routes.api Routes.handlers
-  let files =
-    match config.files with
-    | Some dir -> [
-      Http.StaticServer.route { Http.StaticServer.static_options dir with spa = true } "",
-    ]
-    | None -> []
-  Http.Middleware.cors
-    Http.Middleware.cors_options
-    (Http.Router.router Http.Router.config ([api] ++ files))
 
 serve :
   Settings ->{Database, Keys, Crypto.Crypto, Http.Platform.HttpPlatform, FileSystem.FileSystem; PlatformError.PlatformError, Http.ServerError.ServeError}
@@ -51,7 +33,7 @@ let serve config =
       port = config.port;
       gracefulShutdownTimeout = None;
     }
-    let server = Http.Server.serve options (app config)
+    let server = Http.Server.serve options (Server.router config.files)
     Platform.stdout_line
       ("Conduit listens on " ++ Http.Server.format_address (Http.Server.address server))
     Effect.never ()
@@ -62,7 +44,7 @@ let main () =
   let config =
     try settings () with
     | Config.ConfigError message -> App.fail ("configuration: " ++ message)
-  let keys = Layer.succeed Keys { secret = fun () -> Bytes.from_string config.secret }
+  let keys = Server.keys config.secret
   let platform = Layer.merge Http.Server.layer_services FileSystem.node
   let database = Database.pg (Database.config config.database)
   provide (Layer.merge database (Layer.merge keys (Layer.merge Crypto.system platform))) {
