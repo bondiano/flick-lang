@@ -6,6 +6,7 @@ import Database exposing (Database)
 import Conduit.Api exposing (Request)
 import Conduit.Input exposing (LoginBody, NewUserBody, ProfilePath, UpdateUserBody)
 import Conduit.Model exposing (ProfileBody, UserBody)
+import Conduit.Route exposing (Username)
 import Conduit.Problem as Problem exposing (
   Conflict(..),
   NotFound(..),
@@ -108,18 +109,18 @@ let named username =
 get_profile :
   Request ProfilePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ProfileBody
 let get_profile request =
-  let account = named request.path.username
+  let account = named (Username.value request.path.username)
   { profile = Present.profile account (People.follows (Auth.reader ()) account.id) }
 
 follow : Request ProfilePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ProfileBody
 let follow request =
-  let account = named request.path.username
+  let account = named (Username.value request.path.username)
   People.follow (Auth.signed_in ()).account.id account.id
   { profile = Present.profile account true }
 
 unfollow :
   Request ProfilePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ProfileBody
 let unfollow request =
-  let account = named request.path.username
+  let account = named (Username.value request.path.username)
   People.unfollow (Auth.signed_in ()).account.id account.id
   { profile = Present.profile account false }
