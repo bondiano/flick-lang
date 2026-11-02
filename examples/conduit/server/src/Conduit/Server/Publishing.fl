@@ -23,6 +23,7 @@ import Conduit.Model exposing (
   TagsBody,
 )
 import Conduit.Model as Model
+import Conduit.Route as Route
 import Conduit.Problem as Problem exposing (
   Forbidden(..),
   NotFound(..),
@@ -78,7 +79,7 @@ let feed request =
 
 get_article :
   Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ArticleBody
-let get_article request = { article = shown (found request.path.slug) }
+let get_article request = { article = shown (found (Route.Slug.value request.path.slug)) }
 
 create_article :
   Request Unit Unit NewArticleBody ->{Session, Database, Crypto.Crypto | r; Unauthorized, Unprocessable}
@@ -98,7 +99,7 @@ update_article :
   Request ArticlePath Unit UpdateArticleBody ->{Session, Database | r; Unauthorized, Forbidden, NotFound, Unprocessable}
   ArticleBody
 let update_article request =
-  let row = found request.path.slug
+  let row = found (Route.Slug.value request.path.slug)
   own "article" row.author_id
   let edit = Accounts.valid (Validate.edit request.payload.article)
   let fields = {
@@ -115,35 +116,35 @@ let update_article request =
 delete_article :
   Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, Forbidden, NotFound} Unit
 let delete_article request =
-  let row = found request.path.slug
+  let row = found (Route.Slug.value request.path.slug)
   own "article" row.author_id
   Articles.delete row.id
 
 favorite :
   Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ArticleBody
 let favorite request =
-  let row = found request.path.slug
+  let row = found (Route.Slug.value request.path.slug)
   Articles.favorite (Auth.signed_in ()).account.id row.id
   { article = shown (found row.slug) }
 
 unfavorite :
   Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ArticleBody
 let unfavorite request =
-  let row = found request.path.slug
+  let row = found (Route.Slug.value request.path.slug)
   Articles.unfavorite (Auth.signed_in ()).account.id row.id
   { article = shown (found row.slug) }
 
 list_comments :
   Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} CommentsBody
 let list_comments request =
-  let row = found request.path.slug
+  let row = found (Route.Slug.value request.path.slug)
   { comments = List.map Present.comment (Comments.of_article (Auth.reader ()) row.id) }
 
 add_comment :
   Request ArticlePath Unit NewCommentBody ->{Session, Database | r; Unauthorized, NotFound, Unprocessable}
   CommentBody
 let add_comment request =
-  let row = found request.path.slug
+  let row = found (Route.Slug.value request.path.slug)
   let body = Accounts.valid (Validate.comment request.payload.comment.body)
   let id = Comments.insert row.id (Auth.signed_in ()).account.id body (now ())
   match Comments.find (Auth.reader ()) row.id id with
@@ -153,10 +154,10 @@ let add_comment request =
 delete_comment :
   Request CommentPath Unit Unit ->{Session, Database | r; Unauthorized, Forbidden, NotFound} Unit
 let delete_comment request =
-  let row = found request.path.slug
+  let row = found (Route.Slug.value request.path.slug)
   let missing = NotFound (Problem.problem "comment" "not found")
   let comment =
-    match BigInt.from_string request.path.id with
+    match BigInt.from_string (Route.CommentId.value request.path.comment_id) with
     | Some id -> Comments.find (Auth.reader ()) row.id id
     | None -> None
   match comment with

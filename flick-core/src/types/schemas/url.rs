@@ -3,7 +3,9 @@
 //! and a final record field the query. A segment is text, a number, a
 //! boolean or a refined type over them, which the type's schema checks, or
 //! a type whose constructors have no fields, each its name in kebab case.
-//! The last segment may be an `Option`: `None` leaves it out of the URL.
+//! The last segment may be an `Option`: `None` leaves it out of the URL,
+//! or another type that derives `Url`, whose route is the rest of the path:
+//! `Articles (Option ArticleRoute)` is `/articles` and `/articles/feed`.
 
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
@@ -40,6 +42,9 @@ pub enum UrlSegment {
         ty: String,
         constructors: Vec<String>,
     },
+    /// The last field, of a type `ty` of `module` that derives `Url`: its
+    /// route is the rest of the path.
+    Nested { module: String, ty: String },
 }
 
 impl UrlSegment {
@@ -101,15 +106,22 @@ impl Checker<'_> {
                         SchemaPlan::Option(inner) if i + 1 == plans.len() => &**inner,
                         _ => plan,
                     };
-                    self.segment(plan).ok_or_else(|| {
-                        (
+                    match self.segment(plan) {
+                        Some(UrlSegment::Nested { .. }) if i + 1 < plans.len() => Err((
                             at(i),
-                            "a segment is a `String`, a `Float`, a `Bool`, a refined type over them or a type whose constructors have no fields; only the last may be an `Option`"
+                            "a nested route is the rest of the path: only the last segment may be one"
                                 .to_owned(),
-                        )
-                    })
+                        )),
+                        Some(segment) => Ok(segment),
+                        None => Err((
+                            at(i),
+                            "a segment is a `String`, a `Float`, a `Bool`, a refined type over them, a type whose constructors have no fields or one that derives `Url`; only the last may be an `Option`"
+                                .to_owned(),
+                        )),
+                    }
                 })
                 .collect::<Result<Vec<_>, _>>()?;
+            let nested = matches!(segments.last(), Some(UrlSegment::Nested { .. }));
             let query = query
                 .map(|query| {
                     query
@@ -134,10 +146,15 @@ impl Checker<'_> {
                 kebab(constructor)
             };
             // the counts of segments a route's URLs have
-            let counts = |n: usize, optional: bool| (n - usize::from(optional))..=n;
-            let mine = counts(segments.len(), optional);
+            // a nested route may take any number of segments, none included
+            let counts = |n: usize, optional: bool, nested: bool| {
+                let fixed = n - usize::from(optional || nested);
+                fixed..=if nested { usize::MAX } else { n }
+            };
+            let mine = counts(segments.len(), optional, nested);
             if let Some(other) = routes.iter().find(|r| {
-                let theirs = counts(r.segments.len(), r.optional);
+                let nests = matches!(r.segments.last(), Some(UrlSegment::Nested { .. }));
+                let theirs = counts(r.segments.len(), r.optional, nests);
                 r.path == path && mine.start() <= theirs.end() && theirs.start() <= mine.end()
             }) {
                 return Err((
@@ -174,6 +191,11 @@ impl Checker<'_> {
         else {
             return None;
         };
+        let url = Entity {
+            module: module.clone(),
+            namespace: Namespace::Value,
+            name: super::companion_name(ty, "url"),
+        };
         let nullary = |name: &String| {
             let entity = Entity {
                 module: module.clone(),
@@ -189,14 +211,19 @@ impl Checker<'_> {
         let mut words: Vec<String> = constructors.iter().map(|c| kebab(c)).collect();
         words.sort();
         words.dedup();
-        (args.is_empty()
-            && !constructors.is_empty()
-            && words.len() == constructors.len()
-            && constructors.iter().all(nullary))
-        .then(|| UrlSegment::Words {
+        if !args.is_empty() || constructors.is_empty() {
+            return None;
+        }
+        if words.len() == constructors.len() && constructors.iter().all(nullary) {
+            return Some(UrlSegment::Words {
+                module: module.clone(),
+                ty: ty.clone(),
+                constructors: constructors.clone(),
+            });
+        }
+        self.env.value(&url).is_some().then(|| UrlSegment::Nested {
             module: module.clone(),
             ty: ty.clone(),
-            constructors: constructors.clone(),
         })
     }
 
@@ -220,7 +247,7 @@ impl Checker<'_> {
 }
 
 /// `UserProfile` → `user-profile`.
-fn kebab(name: &str) -> String {
+pub(crate) fn kebab(name: &str) -> String {
     let mut out = String::new();
     let mut previous_lower = false;
     for c in name.chars() {

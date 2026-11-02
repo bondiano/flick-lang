@@ -1,5 +1,7 @@
 package flickrt
 
+import "strings"
+
 // HttpApi values as the JS runtime's: endpoints, groups and APIs are
 // immutable data that the server, the client and the OpenAPI writer read.
 // A label is the name the compiler passes for `Record.Label`; the codecs
@@ -289,6 +291,36 @@ func HttpApiInfo(info, api Value) Value {
 	i, a := record(info), *api.(*apiDefinition)
 	a.info = apiInfo{i.Get("version").(string), i.Get("description").(string), List(i.Get("servers"))}
 	return &a
+}
+
+// HttpApiUnder is `HttpApi.Mount.under prefix api`: every endpoint's path
+// after `prefix`.
+func HttpApiUnder(prefix, api Value) Value {
+	a := *api.(*apiDefinition)
+	groups := make([]*apiGroup, len(a.groups))
+	for i, g := range a.groups {
+		endpoints := make([]*apiEndpoint, len(g.endpoints))
+		for j, e := range g.endpoints {
+			moved := *e
+			moved.path = joinPath(prefix.(string), e.path)
+			endpoints[j] = &moved
+		}
+		groups[i] = &apiGroup{g.name, endpoints}
+	}
+	a.groups = groups
+	return &a
+}
+
+// joinPath is `/api` and `/users` as `/api/users`, whatever slashes either
+// has.
+func joinPath(prefix, path string) string {
+	var parts []string
+	for _, p := range []string{prefix, path} {
+		if p = strings.Trim(p, "/"); p != "" {
+			parts = append(parts, p)
+		}
+	}
+	return "/" + strings.Join(parts, "/")
 }
 
 func HttpApiAddGroup(_, _, group, api Value) Value {

@@ -1,4 +1,5 @@
-/// The API the server serves: the contract's three groups. Signing up and
+/// The API the server serves: the contract's three groups, under `/api`.
+/// Signing up and
 /// in and the tags need no user; the other endpoints get a `Session` from
 /// the request's token, which the contract's `Authed` endpoints require and
 /// its `MaybeAuthed` ones take if it is there.
@@ -23,6 +24,7 @@ let api =
   |> HttpApi.add_group Api.Public.api
   |> HttpApi.add_group (Api.Users.api token Session Auth.check Auth.maybe)
   |> HttpApi.add_group (Api.Articles.api token Session Auth.check Auth.maybe)
+  |> HttpApi.Mount.under "/api"
 
 let handlers = {
   public = { register = Accounts.register; login = Accounts.login; tags = Publishing.tags };

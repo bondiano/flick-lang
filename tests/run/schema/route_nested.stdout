@@ -1,0 +1,14 @@
+/users true
+/users/login true
+/user true
+/profiles/ada/follow true
+/articles true
+/articles/feed true
+/articles/how-to true
+/articles/how-to/favorite true
+/articles/how-to/comments true
+/articles/how-to/comments/7 true
+/tags true
+/articles/how-to/comments/7/extra -> None
+/articles/how-to/likes -> None
+/users/logout -> None

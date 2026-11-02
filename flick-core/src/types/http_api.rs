@@ -130,6 +130,7 @@ impl Checker<'_> {
             for field in record.nodes().filter(|n| n.kind == K::RecordTypeField) {
                 match self.endpoint(field) {
                     Ok(shape) => shapes.push(shape),
+                    Err(message) if message.is_empty() => {}
                     Err(message) => self.error(codes::D011, self.span(field), message),
                 }
             }
@@ -301,11 +302,19 @@ impl Checker<'_> {
                 "endpoint `{label}` is `Get`, `Post`, `Put`, `Patch` or `Delete` of `HttpApi.Derive` with a path, the request, the success and the errors"
             ));
         };
-        let path = path
-            .child_tokens()
-            .find(|t| t.kind == K::String)
-            .map(|t| string_value(t.text(self.text)))
-            .ok_or_else(|| format!("endpoint `{label}`: the path is a string, `\"/users/:id\"`"))?;
+        let path = match path.child_tokens().find(|t| t.kind == K::String) {
+            Some(t) => string_value(t.text(self.text)),
+            None => match self.route_template(path) {
+                Some(Ok(path)) => path,
+                // reported where the record's types were converted
+                Some(Err(_)) => return Err(String::new()),
+                None => {
+                    return Err(format!(
+                        "endpoint `{label}`: the path is a string, `\"/users/:id\"`, or a route of a type that derives `Url`, `Users (Some Login)`"
+                    ));
+                }
+            },
+        };
         let (parts, codecs) = self.request_parts(&label, request)?;
         self.path_params(&label, &path, &parts[0])?;
         let (status, success) = match self.head(success) {

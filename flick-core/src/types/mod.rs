@@ -54,6 +54,7 @@ mod recursion;
 mod redundant;
 mod regions;
 mod report;
+mod route_template;
 mod rows;
 mod schemas;
 mod server;

@@ -7,8 +7,9 @@ import (
 
 // URLs of a type that derives `Url`, as the JS runtime's route.ts: a
 // constructor is a path segment, its fields the segments after it and a
-// final record field the query. A parsed value is checked by the type's own
-// schema, so refined fields stay valid.
+// final record field the query; the last segment may be another route type,
+// the rest of the path. A parsed value is checked by the type's own schema,
+// so refined fields stay valid.
 
 // QueryField is a query parameter: its label, its schema, and whether it
 // is an `Option`.
@@ -44,15 +45,27 @@ func RouteWords(pairs []string) Value {
 	return w
 }
 
-// routeSegmentText is the text of a segment's field.
-func routeSegmentText(segment, field Value) string {
+// routeNested is the last segment of another route type: the rest of the
+// path. Its `T$url` is read when first used, as it may be initialized later.
+type routeNested struct{ url func() Value }
+
+// RouteNested is the segment of the nested route type of this `T$url`.
+func RouteNested(url func() Value) Value { return &routeNested{url} }
+
+// routeSegmentTexts is the texts of a segment's field: one, or a nested
+// route's path.
+func routeSegmentTexts(segment, field Value) []string {
+	if n, ok := segment.(*routeNested); ok {
+		parts, _ := routeParts(n.url().(*urlCodec), field.(*Data))
+		return parts
+	}
 	w, ok := segment.(*routeWords)
 	if !ok {
-		return jsString(field)
+		return []string{jsString(field)}
 	}
 	for i, tag := range w.tags {
 		if tag == field.(*Data).Tag {
-			return w.words[i]
+			return []string{w.words[i]}
 		}
 	}
 	panic(Defect{"TypeError: a constructor of another type"})
@@ -104,30 +117,11 @@ func coerce(fb *Fiber, schema Value, text string) (Value, bool) {
 // RoutePrint is `Route.print url value`: the path and query of `value`. A
 // lone surrogate, which has no UTF-8 form, prints as U+FFFD.
 func RoutePrint(codec, value Value) Value {
-	c, d := codec.(*urlCodec), value.(*Data)
-	var route *Route
-	for i := range c.routes {
-		if c.routes[i].Tag == d.Tag {
-			route = &c.routes[i]
-		}
-	}
-	if route == nil {
-		panic(Defect{"TypeError: a value of another type"})
-	}
+	d := value.(*Data)
+	parts, route := routeParts(codec.(*urlCodec), d)
 	var b strings.Builder
-	if route.Path != "" {
-		b.WriteString("/" + route.Path)
-	}
-	for i, s := range route.Segments {
-		field := d.Fields[i]
-		if route.Optional && i == len(route.Segments)-1 {
-			v, ok := some(field)
-			if !ok {
-				continue
-			}
-			field = v
-		}
-		segment, _ := encodeURIComponent(wellFormed(routeSegmentText(s, field)))
+	for _, part := range parts {
+		segment, _ := encodeURIComponent(wellFormed(part))
 		b.WriteString("/" + segment)
 	}
 	if b.Len() == 0 {
@@ -153,6 +147,35 @@ func RoutePrint(codec, value Value) Value {
 		b.WriteString("?" + formEncode(pairs))
 	}
 	return b.String()
+}
+
+// routeParts is the path's segments of `d`, unencoded, and its route.
+func routeParts(c *urlCodec, d *Data) ([]string, *Route) {
+	var route *Route
+	for i := range c.routes {
+		if c.routes[i].Tag == d.Tag {
+			route = &c.routes[i]
+		}
+	}
+	if route == nil {
+		panic(Defect{"TypeError: a value of another type"})
+	}
+	var parts []string
+	if route.Path != "" {
+		parts = append(parts, route.Path)
+	}
+	for i, s := range route.Segments {
+		field := d.Fields[i]
+		if route.Optional && i == len(route.Segments)-1 {
+			v, ok := some(field)
+			if !ok {
+				continue
+			}
+			field = v
+		}
+		parts = append(parts, routeSegmentTexts(s, field)...)
+	}
+	return parts, route
 }
 
 // RouteParse is `Route.parse url text`: the value whose URL is `text`,
@@ -183,6 +206,15 @@ func RouteParse(fb *Fiber, codec, text Value) Value {
 		}
 		return "", false
 	}
+	if v, ok := c.match(fb, parts, param); ok {
+		return Some(v)
+	}
+	return None
+}
+
+// match is the checked value of the first route of these path segments
+// and query.
+func (c *urlCodec) match(fb *Fiber, parts []string, param func(string) (string, bool)) (Value, bool) {
 	for _, route := range c.routes {
 		rest := parts
 		if route.Path != "" {
@@ -193,21 +225,49 @@ func RouteParse(fb *Fiber, codec, text Value) Value {
 		}
 		if v, ok := route.parse(fb, rest, param); ok {
 			if checked, issues := sch(c.schema).validate(fb, v); issues == nil {
-				return Some(checked)
+				return checked, true
 			}
 		}
 	}
-	return None
+	return nil, false
 }
+
+// noParams is the query of a nested route: none.
+func noParams(string) (string, bool) { return "", false }
 
 // parse is the value of the route of these segments and query, unchecked.
 func (route *Route) parse(fb *Fiber, rest []string, param func(string) (string, bool)) (Value, bool) {
 	n := len(route.Segments)
+	fields := make([]Value, n, n+1)
+	// the fixed segments, then the nested route takes the rest of the path
+	if nested, ok := route.nested(); ok {
+		if len(rest) < n-1 {
+			return nil, false
+		}
+		for i, s := range route.Segments[:n-1] {
+			v, ok := routeSegmentField(fb, s, rest[i])
+			if !ok {
+				return nil, false
+			}
+			fields[i] = v
+		}
+		tail := rest[n-1:]
+		switch v, ok := nested.url().(*urlCodec).match(fb, tail, noParams); {
+		case route.Optional && len(tail) == 0:
+			fields[n-1] = None
+		case !ok:
+			return nil, false
+		case route.Optional:
+			fields[n-1] = Some(v)
+		default:
+			fields[n-1] = v
+		}
+		return route.withQuery(fb, fields, param)
+	}
 	missing := route.Optional && len(rest) == n-1
 	if len(rest) != n && !missing {
 		return nil, false
 	}
-	fields := make([]Value, n, n+1)
 	for i, s := range route.Segments {
 		last := route.Optional && i == n-1
 		if last && missing {
@@ -223,6 +283,20 @@ func (route *Route) parse(fb *Fiber, rest []string, param func(string) (string, 
 		}
 		fields[i] = v
 	}
+	return route.withQuery(fb, fields, param)
+}
+
+// nested is the route type of the last segment, if it is one.
+func (route *Route) nested() (*routeNested, bool) {
+	if len(route.Segments) == 0 {
+		return nil, false
+	}
+	n, ok := route.Segments[len(route.Segments)-1].(*routeNested)
+	return n, ok
+}
+
+// withQuery is the value of the route of these segment fields and the query.
+func (route *Route) withQuery(fb *Fiber, fields []Value, param func(string) (string, bool)) (Value, bool) {
 	if route.Query != nil {
 		record := make([]Value, 0, 2*len(route.Query))
 		for _, q := range route.Query {

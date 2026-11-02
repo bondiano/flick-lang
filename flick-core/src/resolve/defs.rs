@@ -291,8 +291,23 @@ fn type_names(node: &Node, text: &str, out: &mut Vec<String>) {
                 .map(|t| t.text(text).to_owned()),
         );
     }
-    for child in node.nodes() {
-        type_names(child, text, out);
+    // the path of an endpoint, `Get (Articles None) …`, names constructors
+    // of a route type, not the group `Articles`
+    let endpoint = node.kind == K::AppType
+        && node.nodes().next().is_some_and(|head| {
+            head.kind == K::NameType
+                && head
+                    .child_tokens()
+                    .filter(|t| t.kind == K::Con)
+                    .last()
+                    .is_some_and(|t| {
+                        matches!(t.text(text), "Get" | "Post" | "Put" | "Patch" | "Delete")
+                    })
+        });
+    for (i, child) in node.nodes().enumerate() {
+        if !(endpoint && i == 1) {
+            type_names(child, text, out);
+        }
     }
 }
 

@@ -1,0 +1,52 @@
+// Nested routes: a last field of another type that derives `Url` is the
+// rest of the path, so one type names every path of a REST API. `Index`
+// adds no segment of its own, and a word wins over a parameter.
+module App.Main exposing (main)
+
+refined type Slug = String where Checks.non_empty
+  deriving Eq, Show, Schema
+
+type Login = Login
+  deriving Eq, Show, Schema, Url
+
+type Follow = Follow
+  deriving Eq, Show, Schema
+
+type ArticleTail = Favorite | Comments (Option Float)
+  deriving Eq, Show, Schema, Url
+
+type ArticleRoute = Feed | Index Slug (Option ArticleTail)
+  deriving Eq, Show, Schema, Url
+
+/// Declared before the types it nests.
+type ApiRoute =
+  | Users (Option Login)
+  | User
+  | Profiles String (Option Follow)
+  | Articles (Option ArticleRoute)
+  | Tags
+  deriving Eq, Show, Schema, Url
+
+main : Unit ->{; AppError} Unit
+let main () =
+  match Slug.parse "how-to" with
+  | Err _ -> App.fail "a slug"
+  | Ok slug ->
+    let routes = [
+      Users None,
+      Users (Some Login),
+      User,
+      Profiles "ada" (Some Follow),
+      Articles None,
+      Articles (Some Feed),
+      Articles (Some (Index slug None)),
+      Articles (Some (Index slug (Some Favorite))),
+      Articles (Some (Index slug (Some (Comments None)))),
+      Articles (Some (Index slug (Some (Comments (Some 7))))),
+      Tags,
+    ]
+    for route <- routes do
+      let url = Route.print ApiRoute.url route
+      Platform.stdout_line (url ++ " " ++ show (Route.parse ApiRoute.url url == Some route))
+    let misses = ["/articles/how-to/comments/7/extra", "/articles/how-to/likes", "/users/logout"]
+    for url <- misses do Platform.stdout_line (url ++ " -> " ++ show (Route.parse ApiRoute.url url))

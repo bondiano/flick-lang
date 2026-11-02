@@ -56,6 +56,13 @@ A type that derives `Url` derives `Schema` too. Each constructor is a path:
   `type Tab = Favorites` and `Profile String (Option Tab)` above.
 - The last segment may be an `Option` of one: `None` leaves it out of the
   URL, so one constructor has the URLs with and without it.
+- The last segment may also be another type that derives `Url`: its route
+  is the rest of the path. `Index` adds no segment, and a word wins over a
+  parameter, so with `type ArticleRoute = Feed | Index Slug` and
+  `Articles (Option ArticleRoute)`, `/articles/feed` is
+  `Articles (Some Feed)` and `/articles/hi` is
+  `Articles (Some (Index hi))`. One type names every path of a REST API
+  this way (`tests/run/schema/route_nested.fl`).
 - A final record field is the query. Its fields have the same types, or an
   `Option` of one, which may be missing from the URL.
 - Any other field, a generic type or two constructors with the same URLs are
@@ -67,6 +74,19 @@ constructor matches or a field fails its type, refined checks included. It
 ignores the origin and the fragment. Printing and parsing round-trip for
 every value whose text is well-formed Unicode: `tests/run/schema/route.fl`
 checks it with `Arbitrary.check` over `schema Page`.
+
+## Routes as the paths of an API
+
+Where a `Symbol` is expected, a constructor of a route type stands for its
+path, with the type of each parameter in place of a value: given
+`Profiles Username (Option Follow)`, `Profiles Username (Some Follow)` is
+`"/profiles/:username/follow"`. A parameter is named after its type in
+snake case, so it is a type of its own, such as a refined type; an `Option`
+field is written `None` or `Some …`, a field of words or of a nested route
+type as one of its constructors. The route type is declared in another
+module. This is how the endpoints of `deriving HttpApi` name their paths
+(see [HttpApi](/reference/http-api/#an-api-as-a-type)); a template that is
+no path is `FLICK-D009`.
 
 ## The current page
 

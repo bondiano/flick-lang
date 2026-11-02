@@ -376,6 +376,7 @@ httpApiAdd HttpApiAdd
 httpApiMake HttpApiMake
 httpApiInfo HttpApiInfo
 httpApiAddGroup HttpApiAddGroup
+httpApiUnder HttpApiUnder
 httpApiListen *HttpApiListen
 httpApiRoute *HttpApiRoute
 httpApiPort HttpApiPort

@@ -1,15 +1,20 @@
 /// The endpoints of the Conduit API, shared by the client, which calls them,
 /// and the server, which serves them: three groups, each a record that
-/// derives `HttpApi`. Each endpoint declares the errors its handler may
-/// answer with; every request carries the optional `Authorization` header,
-/// which the server's checks read for the `Authed` endpoints, and for the
-/// `MaybeAuthed` ones when it is there. Each part is decoded by the codec
-/// named after its type in `Conduit.Input`, each error is answered as its
-/// `Problem` instance in `Conduit.Problem` says.
+/// derives `HttpApi`. An endpoint's path is a constructor of
+/// `Conduit.Route.ApiRoute` with the type of each parameter in place of its
+/// value, so `Profiles Username (Some Follow)` is
+/// `/profiles/:username/follow`, and a typo is a type error. Each endpoint
+/// declares the errors its handler may answer with; every request carries
+/// the optional `Authorization` header, which the server's checks read for
+/// the `Authed` endpoints, and for the `MaybeAuthed` ones when it is there.
+/// Each part is decoded by the codec named after its type in
+/// `Conduit.Input`, each error is answered as its `Problem` instance in
+/// `Conduit.Problem` says.
 module Conduit.Api exposing (..)
 
 import HttpApi.Derive exposing (..)
 import Conduit.Model exposing (..)
+import Conduit.Route exposing (..)
 import Conduit.Input exposing (
   ArticlePath,
   CommentPath,
@@ -32,42 +37,42 @@ type alias Request p q b = HttpApi.Request p q Credentials b
 /// Signing up and in, and the tags: no user needed.
 type alias Public = {
   register : Post
-    "/api/users"
+    (Users None)
     { headers : Credentials; payload : NewUserBody }
     (Created UserBody)
     {Conflict, Unprocessable};
   login : Post
-    "/api/users/login"
+    (Users (Some Login))
     { headers : Credentials; payload : LoginBody }
     UserBody
     {Unauthorized, Unprocessable};
-  tags : Get "/api/tags" { headers : Credentials } TagsBody {};
+  tags : Get Tags { headers : Credentials } TagsBody {};
 } deriving HttpApi
 
 /// The signed-in user and the profiles.
 type alias Users = {
-  current_user : Authed (Get "/api/user" { headers : Credentials } UserBody {Unauthorized});
+  current_user : Authed (Get User { headers : Credentials } UserBody {Unauthorized});
   update_user : Authed
     (Put
-      "/api/user"
+      User
       { headers : Credentials; payload : UpdateUserBody }
       UserBody
       {Unauthorized, Conflict, Unprocessable});
   get_profile : MaybeAuthed
     (Get
-      "/api/profiles/:username"
+      (Profiles Username None)
       { headers : Credentials; path : ProfilePath }
       ProfileBody
       {Unauthorized, NotFound});
   follow : Authed
     (Post
-      "/api/profiles/:username/follow"
+      (Profiles Username (Some Follow))
       { headers : Credentials; path : ProfilePath }
       ProfileBody
       {Unauthorized, NotFound});
   unfollow : Authed
     (Delete
-      "/api/profiles/:username/follow"
+      (Profiles Username (Some Follow))
       { headers : Credentials; path : ProfilePath }
       ProfileBody
       {Unauthorized, NotFound});
@@ -76,60 +81,60 @@ type alias Users = {
 /// The articles, the feed, favorites and comments.
 type alias Articles = {
   list_articles : MaybeAuthed
-    (Get "/api/articles" { headers : Credentials; query : ListQuery } ArticlesBody {Unauthorized});
+    (Get (Articles None) { headers : Credentials; query : ListQuery } ArticlesBody {Unauthorized});
   feed : Authed
-    (Get "/api/articles/feed" { headers : Credentials; query : Page } ArticlesBody {Unauthorized});
+    (Get (Articles (Some Feed)) { headers : Credentials; query : Page } ArticlesBody {Unauthorized});
   get_article : MaybeAuthed
     (Get
-      "/api/articles/:slug"
+      (Articles (Some (Index Slug None)))
       { headers : Credentials; path : ArticlePath }
       ArticleBody
       {Unauthorized, NotFound});
   create_article : Authed
     (Post
-      "/api/articles"
+      (Articles None)
       { headers : Credentials; payload : NewArticleBody }
       (Created ArticleBody)
       {Unauthorized, Unprocessable});
   update_article : Authed
     (Put
-      "/api/articles/:slug"
+      (Articles (Some (Index Slug None)))
       { headers : Credentials; path : ArticlePath; payload : UpdateArticleBody }
       ArticleBody
       {Unauthorized, Forbidden, NotFound, Unprocessable});
   delete_article : Authed
     (Delete
-      "/api/articles/:slug"
+      (Articles (Some (Index Slug None)))
       { headers : Credentials; path : ArticlePath }
       Unit
       {Unauthorized, Forbidden, NotFound});
   favorite : Authed
     (Post
-      "/api/articles/:slug/favorite"
+      (Articles (Some (Index Slug (Some Favorite))))
       { headers : Credentials; path : ArticlePath }
       ArticleBody
       {Unauthorized, NotFound});
   unfavorite : Authed
     (Delete
-      "/api/articles/:slug/favorite"
+      (Articles (Some (Index Slug (Some Favorite))))
       { headers : Credentials; path : ArticlePath }
       ArticleBody
       {Unauthorized, NotFound});
   list_comments : MaybeAuthed
     (Get
-      "/api/articles/:slug/comments"
+      (Articles (Some (Index Slug (Some (Comments None)))))
       { headers : Credentials; path : ArticlePath }
       CommentsBody
       {Unauthorized, NotFound});
   add_comment : Authed
     (Post
-      "/api/articles/:slug/comments"
+      (Articles (Some (Index Slug (Some (Comments None)))))
       { headers : Credentials; path : ArticlePath; payload : NewCommentBody }
       (Created CommentBody)
       {Unauthorized, NotFound, Unprocessable});
   delete_comment : Authed
     (Delete
-      "/api/articles/:slug/comments/:id"
+      (Articles (Some (Index Slug (Some (Comments (Some CommentId))))))
       { headers : Credentials; path : CommentPath }
       Unit
       {Unauthorized, Forbidden, NotFound});

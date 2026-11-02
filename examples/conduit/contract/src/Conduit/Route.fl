@@ -1,0 +1,46 @@
+/// Every path of the Conduit API as one type that derives `Url`. A value is
+/// a path, `Route.print ApiRoute.url (Profiles ada (Some Follow))` is
+/// `/profiles/ada/follow`, and an endpoint in `Conduit.Api` names its path
+/// with the same constructors and the type of each parameter in place of
+/// a value: `Profiles Username (Some Follow)` is `/profiles/:username/follow`.
+/// The server mounts them all under `/api`.
+module Conduit.Route exposing (..)
+
+/// A user's name in a path.
+refined type Username = String where Checks.non_empty
+  deriving Eq, Show, Schema
+
+/// An article's address in a path, made from its title.
+refined type Slug = String where Checks.non_empty
+  deriving Eq, Show, Schema
+
+/// A comment's id in a path, as text; the server reads the number.
+refined type CommentId = String where Checks.non_empty
+  deriving Eq, Show, Schema
+
+/// After `/users`: signing in.
+type UserAction = Login
+  deriving Eq, Show, Schema
+
+/// After `/profiles/:username`: following.
+type ProfileAction = Follow
+  deriving Eq, Show, Schema
+
+/// After `/articles/:slug`: its favorite, or its comments and one of them.
+type ArticleAction = Favorite | Comments (Option CommentId)
+  deriving Eq, Show, Schema, Url
+
+/// After `/articles`: the feed, or one article; `Index` adds no segment,
+/// so `Index slug None` is `/<slug>`.
+type ArticleRoute = Feed | Index Slug (Option ArticleAction)
+  deriving Eq, Show, Schema, Url
+
+/// The paths of the API: a last `Option` is left out for `None`, and a last
+/// field of another route type is the rest of the path.
+type ApiRoute =
+  | Users (Option UserAction)
+  | User
+  | Profiles Username (Option ProfileAction)
+  | Articles (Option ArticleRoute)
+  | Tags
+  deriving Eq, Show, Schema, Url

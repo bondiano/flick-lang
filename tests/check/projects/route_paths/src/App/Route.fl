@@ -1,0 +1,32 @@
+// The paths of an API as one route type, for `deriving HttpApi` elsewhere.
+module App.Route exposing (..)
+
+refined type Username = String where Checks.non_empty
+  deriving Eq, Show, Schema
+
+refined type Slug = String where Checks.non_empty
+  deriving Eq, Show, Schema
+
+type Login = Login
+  deriving Eq, Show, Schema
+
+type Follow = Follow
+  deriving Eq, Show, Schema
+
+type ArticleTail = Favorite | Comments (Option Float)
+  deriving Eq, Show, Schema, Url
+
+type ArticleRoute = Feed | Index Slug (Option ArticleTail)
+  deriving Eq, Show, Schema, Url
+
+type ApiRoute =
+  | Users (Option Login)
+  | Profiles Username (Option Follow)
+  | Articles (Option ArticleRoute)
+  | Search String
+  | Tags
+  deriving Eq, Show, Schema, Url
+
+/// No `Url`: its constructors are no paths.
+type Plain = Plain
+  deriving Eq, Show, Schema

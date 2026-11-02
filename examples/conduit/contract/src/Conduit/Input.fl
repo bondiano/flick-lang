@@ -5,6 +5,8 @@
 /// `null` clears it.
 module Conduit.Input exposing (..)
 
+import Conduit.Route exposing (CommentId, Slug, Username)
+
 type alias NewUser = { username : Option String; email : Option String; password : Option String }
   deriving Schema
 
@@ -73,14 +75,14 @@ type alias Page = { limit : Option Float; offset : Option Float }
 type alias Credentials = { authorization : Option String }
   deriving Schema
 
-type alias ProfilePath = { username : String }
+/// The parameters of a path, each named after its type in `Conduit.Route`.
+type alias ProfilePath = { username : Username }
   deriving Schema
 
-type alias ArticlePath = { slug : String }
+type alias ArticlePath = { slug : Slug }
   deriving Schema
 
-/// The comment's id is a text here; the server reads the number.
-type alias CommentPath = { slug : String; id : String }
+type alias CommentPath = { slug : Slug; comment_id : CommentId }
   deriving Schema
 
 texts : PureCodec Json (List String)
@@ -181,16 +183,16 @@ let credentials = codec (schema Credentials) {
 
 profile_path : PureCodec Json ProfilePath
 let profile_path = codec (schema ProfilePath) {
-  username = field "username" String.json;
+  username = field "username" Username.json;
 }
 
 article_path : PureCodec Json ArticlePath
 let article_path = codec (schema ArticlePath) {
-  slug = field "slug" String.json;
+  slug = field "slug" Slug.json;
 }
 
 comment_path : PureCodec Json CommentPath
 let comment_path = codec (schema CommentPath) {
-  slug = field "slug" String.json;
-  id = field "id" String.json;
+  slug = field "slug" Slug.json;
+  comment_id = field "comment_id" CommentId.json;
 }

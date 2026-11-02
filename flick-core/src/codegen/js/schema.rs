@@ -137,6 +137,11 @@ impl Gen<'_> {
                     .collect();
                 format!("{}([{}])", self.rt("routeWords"), words.join(", "))
             }
+            // lazily: the nested type may be declared after this one
+            UrlSegment::Nested { module, ty } => {
+                let url = self.global(module, &companion_name(ty, "url"));
+                format!("{}({} {url})", self.rt("routeNested"), self.arrow(""))
+            }
         }
     }
 

@@ -128,6 +128,9 @@ impl Checker<'_> {
     pub fn ty(&mut self, node: &Node, expected: &Kind, free: Free) -> Type {
         let span = self.span(node);
         let children: Vec<&Node> = node.nodes().collect();
+        if let Some(path) = self.symbol_route(node, expected) {
+            return path;
+        }
         let (ty, kind) = match node.kind {
             K::ParenType => return self.ty(children[0], expected, free),
             K::NameType if node.has_token(K::NoneKw) => {

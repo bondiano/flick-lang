@@ -1,0 +1,36 @@
+// Route constructors as the paths of endpoints: each is the path
+// `Route.print` makes of such a value, its parameters named after types.
+module App.Api exposing (..)
+
+import HttpApi.Derive exposing (..)
+import App.Route exposing (..)
+
+type alias ProfilePath = { username : Username }
+  deriving Schema
+
+type alias ArticlePath = { slug : Slug }
+  deriving Schema
+
+type alias Paths = {
+  register : Post (Users None) {} Unit {};
+  login : Post (Users (Some Login)) {} Unit {};
+  profile : Get (Profiles Username None) { path : ProfilePath } Unit {};
+  follow : Post (Profiles Username (Some Follow)) { path : ProfilePath } Unit {};
+  feed : Get (Articles (Some Feed)) {} Unit {};
+  article : Get (Articles (Some (Index Slug None))) { path : ArticlePath } Unit {};
+  favorite : Post (Articles (Some (Index Slug (Some Favorite)))) { path : ArticlePath } Unit {};
+  tags : Get Tags {} Unit {};
+} deriving HttpApi
+
+type alias Wrong = {
+  missing : Get (Profiles Username (Some Follow)) {} Unit {};
+  //~ FLICK-D011 @26:3-26:61 endpoint `missing`: the path `/profiles/:username/follow` has the parameters `username`, and its `path` part the fields none
+  short : Get (Profiles Username) {} Unit {};
+  //~ FLICK-D009 @28:15-28:34 `Profiles` has 2 field(s), each written as its type, `None` or `Some …`: here 1
+  bare : Get (Search String) {} Unit {};
+  //~ FLICK-D009 @30:14-30:29 a parameter of a path is named after its type: give the `String` field of `Search` a type of its own, `refined type Username = String where …`
+  plain : Get Plain {} Unit {};
+  //~ FLICK-D009 @32:15-32:20 `Plain` stands for a path when `Plain` derives `Url`, from another module
+  option : Get (Users Login) {} Unit {};
+  //~ FLICK-D009 @34:16-34:29 the `Option` field of `Users` is written as `None` or `Some …`
+} deriving HttpApi
