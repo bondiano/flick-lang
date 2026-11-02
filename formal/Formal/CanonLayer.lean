@@ -31,12 +31,12 @@ theorem builds_one {Ψ Θ Γ} (c : Const) {w} (hc : c.arity = 2 ∨ c.layer) (hw
         obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
         cases h; cases lt; cases hT
         exact ⟨_, rfl, .econs hw .enil ((hw'.valueAny hw _).sub ⟨la, Stage.le_refl _⟩)
-          (.enil fun _ h => h) fun _ h => .inl h⟩
+          (.enil fun _ h => h) fun _ => ⟨.inl, fun h => h.resolve_right id⟩⟩
       | effect N =>
         obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
         cases h; cases lt; cases hT
         exact ⟨_, rfl, .bind (.await ((hw'.valueAny hw _).sub ⟨la, Stage.le_refl _⟩)
-          (Stage.le_refl _) .refl) fun _ h => h⟩
+          (Stage.le_refl _) .refl) fun _ => Iff.rfl⟩
 
 theorem builds_two {Ψ Θ Γ} (c : Const) {w₁ w₂} (h₁ : c.arity = 2) (h₂ : c.layer)
     (ih₁ : Builds S Ψ Θ Γ w₁) (ih₂ : Builds S Ψ Θ Γ w₂) :
@@ -56,7 +56,7 @@ theorem builds_two {Ψ Θ Γ} (c : Const) {w₁ w₂} (h₁ : c.arity = 2) (h₂
         obtain ⟨b₁, hb₁, t₁⟩ := ih₁ hw₁'
         obtain ⟨b₂, hb₂, t₂⟩ := ih₂ hw₂'
         refine ⟨_, by simp [Tm.build, hb₁, hb₂], .join (t₁.sub ⟨.refl, ?_⟩)
-          (t₂.sub ⟨.refl, ?_⟩) fun _ h => h⟩
+          (t₂.sub ⟨.refl, ?_⟩) fun _ => Iff.rfl⟩
         · exact ⟨fun _ h => .inl h, fun _ h => .inl h⟩
         · exact ⟨fun _ h => .inr h, fun _ h => .inr h⟩
 

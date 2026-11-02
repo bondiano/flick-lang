@@ -118,7 +118,7 @@ theorem pure_preservation {Ψ Θ e t φ e'} (h : Typ S Ψ Θ [] e (.ex t φ)) (h
     | errVal hv'' => exact (nv hv'').elim
   | bind hv =>
     cases h with
-    | bind h₁ hρ => exact .econs hv .enil h₁ (.enil fun _ h => h) fun n h => .inl (hρ n h)
+    | bind h₁ hρ => exact .econs hv .enil h₁ (.enil fun _ h => h) fun n => (hρ n).trans ⟨.inl, fun h => h.resolve_right id⟩
     | errVal hv'' => exact (nv hv'').elim
   | join h₁ h₂ =>
     cases h with

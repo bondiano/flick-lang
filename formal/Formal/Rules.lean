@@ -134,11 +134,11 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       φ₀.le (.rt (Row.withP Θ q ρ r) ε) → (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.with_ q θ e) (.ex t φ)
   | enil : (∀ n, ¬ ρ n) → Typ Ψ Θ Γ .enil (.ex (.env ρ) φ)
   | econs : Value v → IsEnv θ → Typ Ψ Θ Γ v (.ex (S.impl N) φ) → Typ Ψ Θ Γ θ (.ex (.env ρ) φ) →
-      (∀ n, ρ' n → n = .nm N ∨ ρ n) → Typ Ψ Θ Γ (.econs N v θ) (.ex (.env ρ') φ)
-  | bind : Typ Ψ Θ Γ e (.ex (S.impl N) φ) → (∀ n, ρ n → n = .nm N) →
+      (∀ n, ρ' n ↔ n = .nm N ∨ ρ n) → Typ Ψ Θ Γ (.econs N v θ) (.ex (.env ρ') φ)
+  | bind : Typ Ψ Θ Γ e (.ex (S.impl N) φ) → (∀ n, ρ n ↔ n = .nm N) →
       Typ Ψ Θ Γ (.bind N e) (.ex (.env ρ) φ)
   | join : Typ Ψ Θ Γ e₁ (.ex (.env ρ₁) φ) → Typ Ψ Θ Γ e₂ (.ex (.env ρ₂) φ) →
-      (∀ n, ρ n → ρ₁ n ∨ ρ₂ n) → Typ Ψ Θ Γ (.join e₁ e₂) (.ex (.env ρ) φ)
+      (∀ n, ρ n ↔ ρ₁ n ∨ ρ₂ n) → Typ Ψ Θ Γ (.join e₁ e₂) (.ex (.env ρ) φ)
   | scope : e.NoIns → (∀ C s, F C s → s = .tvar 0 ∧ ¬ C (.v 0)) →
       Typ (Ψ.map (Ty.up 1)) (Facts.union (Θ.substT (shiftV 1)) F)
         (.mono (.owner (.tvar 0)) :: Γ.map (Scheme.up 1)) e (.ex (t.up 1) φ') →

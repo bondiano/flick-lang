@@ -52,7 +52,7 @@ theorem env_lookup_some {Ψ Θ Γ N} {θ : Tm} (hθ : IsEnv θ) :
     | econs _ _ _ hθ' hρ =>
       by_cases he : N' = N
       · exact ⟨v, by simp [Tm.envLookup, he]⟩
-      · rcases hρ _ hN with h | h
+      · rcases (hρ _).mp hN with h | h
         · cases h; exact absurd rfl he
         · obtain ⟨w, hw⟩ := ih hθ' h
           exact ⟨w, by simp [Tm.envLookup, he, hw]⟩
@@ -64,7 +64,7 @@ theorem IsEnv.append {θ₁ θ₂ : Tm} (h₁ : IsEnv θ₁) (h₂ : IsEnv θ₂
   | econs hv _ ih => exact .econs hv ih
 
 theorem env_append_typ {Ψ Θ Γ φ θ₂ ρ₂} (h₂ : Typ S Ψ Θ Γ θ₂ (.ex (.env ρ₂) φ)) (hθ₂ : IsEnv θ₂) :
-    ∀ {θ₁ ρ₁ ρ}, IsEnv θ₁ → Typ S Ψ Θ Γ θ₁ (.ex (.env ρ₁) φ) → (∀ n, ρ n → ρ₁ n ∨ ρ₂ n) →
+    ∀ {θ₁ ρ₁ ρ}, IsEnv θ₁ → Typ S Ψ Θ Γ θ₁ (.ex (.env ρ₁) φ) → (∀ n, ρ n ↔ ρ₁ n ∨ ρ₂ n) →
       Typ S Ψ Θ Γ (θ₁.envAppend θ₂) (.ex (.env ρ) φ) := by
   intro θ₁ ρ₁ ρ hθ₁ h₁ hρ
   induction hθ₁ generalizing ρ₁ ρ with
@@ -72,25 +72,14 @@ theorem env_append_typ {Ψ Θ Γ φ θ₂ ρ₂} (h₂ : Typ S Ψ Θ Γ θ₂ (.
     cases h₁ with
     | enil hρ₁ =>
       simp only [Tm.envAppend]
-      cases hθ₂ with
-      | enil => cases h₂ with
-        | enil hρ₂ => exact .enil fun n h => by rcases hρ n h with h | h <;> simp_all
-      | econs => cases h₂ with
-        | econs hv₀ hθ₀ hv hθ hρ' =>
-          exact .econs hv₀ hθ₀ hv hθ fun n h => by
-            rcases hρ n h with h | h
-            · exact (hρ₁ _ h).elim
-            · exact hρ' n h
+      have : ρ = ρ₂ := funext fun n => propext ((hρ n).trans ⟨fun h => h.resolve_left (hρ₁ n), .inr⟩)
+      subst this; exact h₂
   | econs _ hθe ih =>
     cases h₁ with
     | econs hv₀ _ hv hθ hρ₁ =>
       simp only [Tm.envAppend]
-      refine .econs hv₀ (hθe.append hθ₂) hv (ih hθ (ρ := Row.union _ ρ₂) fun n h => h) fun n h => ?_
-      rcases hρ n h with h | h
-      · rcases hρ₁ n h with h | h
-        · exact .inl h
-        · exact .inr (.inl h)
-      · exact .inr (.inr h)
+      refine .econs hv₀ (hθe.append hθ₂) hv (ih hθ (ρ := Row.union _ ρ₂) fun n => Iff.rfl) fun n => ?_
+      rw [hρ, hρ₁]; simp only [Row.union]; exact or_assoc
 
 /-- Л1 for errors: a value of `Errors ε` is a constructor of an error in `ε`, at a
 type whose `⌈·⌉` is within the atoms of `ε`. -/

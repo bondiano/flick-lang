@@ -46,7 +46,7 @@ theorem owner_arg {Θ : Facts} {c : Const} {p : Nat} {T : Ty} {φ : Stage} {w : 
           cases hq
           obtain ⟨_, _, _, _, h, la', _, _, -⟩ := (lt.trans hT₁).arrow_left
           cases h
-          refine ⟨_, ht, fun x hx => out _ _ hok hs x ?_⟩
+          refine ⟨_, ht, fun x hx => out _ _ hok.1 hs x ?_⟩
           rcases la'.reach _ hx with h' | h'
           · cases h'
           · exact h'
@@ -57,7 +57,7 @@ theorem owner_arg {Θ : Facts} {c : Const} {p : Nat} {T : Ty} {φ : Stage} {w : 
           cases hq
           obtain ⟨_, _, _, _, h, la', _, _, -⟩ := (lt.trans hT₁).arrow_left
           cases h
-          refine ⟨_, ht, fun x hx => out _ _ hok hs x ?_⟩
+          refine ⟨_, ht, fun x hx => out _ _ hok.1 hs x ?_⟩
           rcases la'.reach _ hx with h' | h'
           · exact .inr h'
           · exact .inl h'

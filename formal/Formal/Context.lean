@@ -87,23 +87,30 @@ theorem FrameTy.mk0 {Ψ Θ F r t φ}
   ⟨0, Θ, t', φ', by simpa using h, rel, .inr ⟨rfl, Ext.refl _, fun _ => rfl⟩,
     fun σ hσ X r' h' => back σ hσ X r' (by rw [List.map_up_zero, liftT_zero] at h'; exact h'), look⟩
 
-theorem bind_row_substT {ρ : Row} {N : Name} (σ : Atom → Ty) (hρ : ∀ n, ρ n → n = .nm N) :
-    ∀ n, ρ.substT σ n → n = .nm N := by
-  intro n hn
+theorem bind_row_substT {ρ : Row} {N : Name} (σ : Atom → Ty) (hρ : ∀ n, ρ n ↔ n = .nm N) :
+    ∀ n, ρ.substT σ n ↔ n = .nm N := by
+  intro n
   cases n with
-  | nm N' => exact hρ _ hn
-  | atm a | ob _ a | need _ a => obtain ⟨b, hb, _⟩ := hn; cases hρ _ hb
-
-theorem join_row_substT {ρ ρ₁ ρ₂ : Row} (σ : Atom → Ty) (hρ : ∀ n, ρ n → ρ₁ n ∨ ρ₂ n) :
-    ∀ n, ρ.substT σ n → ρ₁.substT σ n ∨ ρ₂.substT σ n := by
-  intro n hn
-  cases n with
-  | nm N' => exact hρ _ hn
+  | nm N' => exact hρ _
   | atm a | ob _ a | need _ a =>
-    obtain ⟨b, hb, h'⟩ := hn
-    rcases hρ _ hb with h | h
-    · exact .inl ⟨b, h, h'⟩
-    · exact .inr ⟨b, h, h'⟩
+    constructor
+    · rintro ⟨b, hb, _⟩; cases (hρ _).mp hb
+    · intro h; cases h
+
+theorem join_row_substT {ρ ρ₁ ρ₂ : Row} (σ : Atom → Ty) (hρ : ∀ n, ρ n ↔ ρ₁ n ∨ ρ₂ n) :
+    ∀ n, ρ.substT σ n ↔ ρ₁.substT σ n ∨ ρ₂.substT σ n := by
+  intro n
+  cases n with
+  | nm N' => exact hρ _
+  | atm a | ob _ a | need _ a =>
+    constructor
+    · rintro ⟨b, hb, h'⟩
+      rcases (hρ _).mp hb with h | h
+      · exact .inl ⟨b, h, h'⟩
+      · exact .inr ⟨b, h, h'⟩
+    · rintro (⟨b, hb, h'⟩ | ⟨b, hb, h'⟩)
+      · exact ⟨b, (hρ _).mpr (.inl hb), h'⟩
+      · exact ⟨b, (hρ _).mpr (.inr hb), h'⟩
 
 theorem env_nm {Ψ Θ Γ θ ρ φ} (hθ : IsEnv θ) (h : Typ S Ψ Θ Γ θ (.ex (.env ρ) φ)) {x : Elem} :
     ρ x → ∃ N, x = .nm N := by
@@ -113,7 +120,7 @@ theorem env_nm {Ψ Θ Γ θ ρ φ} (hθ : IsEnv θ) (h : Typ S Ψ Θ Γ θ (.ex 
     cases h with
     | econs _ _ _ hθ' hρ =>
       intro ha
-      rcases hρ _ ha with h | h
+      rcases (hρ _).mp ha with h | h
       · exact ⟨_, h⟩
       · exact ih hθ' h
 

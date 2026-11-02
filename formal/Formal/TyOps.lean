@@ -358,9 +358,9 @@ theorem Const.ok_substT {Θ c ι} (σ : Atom → Ty) (h : Const.ok Θ c ι) :
     Const.ok (Θ.substT σ) c (ι.substT σ) := by
   cases c <;> simp only [Const.ok, CArg.substT] at h ⊢
   · exact fun N ⟨h₁, h₂⟩ => h N ⟨h₁, h₂⟩
-  · exact h.substT σ
-  · have := h.substT σ
-    refine fun k hk => this k ?_
+  · exact ⟨h.1.substT σ, fun N a ⟨b, hb, _⟩ => h.2 N b hb⟩
+  · have := h.1.substT σ
+    refine ⟨fun k hk => this k ?_, fun N a ⟨b, hb, _⟩ => h.2 N b hb⟩
     rcases hk with ⟨b, hb, h'⟩ | hk
     · exact ⟨b, .inl hb, h'⟩
     · obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ k).mp hk
@@ -368,7 +368,7 @@ theorem Const.ok_substT {Θ c ι} (σ : Atom → Ty) (h : Const.ok Θ c ι) :
 
 theorem Const.ok_mono {Θ Θ' c ι} (h : Const.ok Θ c ι)
     (hΘ : ∀ C s, Outl Θ C s → Outl Θ' C s) : Const.ok Θ' c ι := by
-  cases c <;> simp only [Const.ok] at h ⊢ <;> first | exact h | exact hΘ _ _ h
+  cases c <;> simp only [Const.ok] at h ⊢ <;> first | exact h | exact hΘ _ _ h | exact ⟨hΘ _ _ h.1, h.2⟩
 
 def Scheme.substT (σ : Atom → Ty) (s : Scheme) : Scheme :=
   ⟨s.k, s.cs.substT (liftT s.k σ), s.t.substT (liftT s.k σ)⟩
