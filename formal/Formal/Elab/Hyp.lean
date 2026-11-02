@@ -61,15 +61,17 @@ structure Coherent (P : Prog) (lt : Cn → Cn → Prop) : Prop where
   prims_subst : ∀ {Q p θ}, P.prims Q = some p → P.prims (Q.subst θ) = some p
 
 /-- An elaborated expression as a skeleton with holes for dictionaries, and what running it
-gives. -/
+gives. `Ok s ds` says the filling is one the simulation speaks of: for a target, a closed
+term typed at the skeleton's type. -/
 structure Exprs where
   Skel : Type
   Out : Type
+  Ok : Skel → List Dict → Prop
   run : Skel → List Dict → Out
 
 /-- The simulation of T6(b): filling the holes with `≈` dictionaries gives the same result.
 It needs the semantics of λFlick⁺; `Target.sim` derives it from the steps of a target. -/
 def Sim (P : Prog) (X : Exprs) : Prop :=
-  ∀ s ds ds', All2 (Eqv P) ds ds' → X.run s ds = X.run s ds'
+  ∀ s ds ds', All2 (Eqv P) ds ds' → X.Ok s ds → X.Ok s ds' → X.run s ds = X.run s ds'
 
 end Flick.Elab

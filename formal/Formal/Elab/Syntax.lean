@@ -8,23 +8,44 @@ prim_Q ℓ̄`, with application as a binary spine.
 
 namespace Flick.Elab
 
-/-- Types inside constraints: variables, constructors, application. -/
+/-- The two stages; `P ⊑ R`. -/
+inductive Stage where
+  | P
+  | R
+  deriving DecidableEq
+
+/-- Types: variables, constructors, application, and the arrow `a →φ^q b` of `Fun` in the
+checker (Р186). Its qualifier `q` is a capture row written as a type: a variable, `cnil`
+(`∅`) or a union `cun`. Capture variables are ordinary variables. -/
 inductive Ty where
   | var (n : Nat)
   | con (c : Nat)
   | app (t u : Ty)
+  | arr (φ : Stage) (a b q : Ty)
+  | cnil
+  | cun (q q' : Ty)
   deriving DecidableEq
 
 def Ty.subst (σ : Nat → Ty) : Ty → Ty
   | .var n => σ n
   | .con c => .con c
   | .app t u => .app (t.subst σ) (u.subst σ)
+  | .arr φ a b q => .arr φ (a.subst σ) (b.subst σ) (q.subst σ)
+  | .cnil => .cnil
+  | .cun q q' => .cun (q.subst σ) (q'.subst σ)
 
 /-- `n` occurs in `t`. -/
 def Ty.Occurs (n : Nat) : Ty → Prop
   | .var m => m = n
   | .con _ => False
   | .app t u => t.Occurs n ∨ u.Occurs n
+  | .arr _ a b q => a.Occurs n ∨ b.Occurs n ∨ q.Occurs n
+  | .cnil => False
+  | .cun q q' => q.Occurs n ∨ q'.Occurs n
+
+/-- `⌈t⌉`: `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈arr φ a b q⌉ = ⌈a⌉ ∪ ⌈b⌉ ∪ ⌈q⌉`, the rest
+by union. It is exactly the set of variables of `t`. -/
+abbrev Ty.reach (t : Ty) (n : Nat) : Prop := t.Occurs n
 
 /-- A ground type has no variables. -/
 def Ty.Ground (t : Ty) : Prop := ∀ n, ¬ t.Occurs n
@@ -65,11 +86,13 @@ def Dict.subst (ρ : Nat → Dict) : Dict → Dict
 def args (ds : List Dict) : Nat → Dict := fun k => ds.getD k (.var 0)
 
 /-- A scheme `∀ᾱ. Q̄ ⇒ τ`: `k` binders `var 0 … var (k-1)`; the variables from `var k` on are
-free. -/
+free. `q` is the qualifier of its dictionary arrows, what the right side of its `let` holds
+(Р187); nothing reads it for methods and constants of Γ₀. -/
 structure Scheme where
   k : Nat
   ctx : List Cn
   ty : Ty
+  q : Ty
 
 /-- An instance `instance Q̄ ⇒ C τ̄` of §2.5: its head, its context (the premises `δ̄`) and the
 dictionaries of its superclass slots, written over the context. -/

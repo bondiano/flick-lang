@@ -445,29 +445,38 @@ Simplifications:
    dictionaries of their schemes, as (Var-Dict)), application, `λ` over a monotype, `let`
    without generalization, `let` with a signature, `if` and a `match` on `Option`; no
    constructors, other `match` or higher-rank parameters. Its types are the first-order
-   `Ty`; the arrow `a →φ b`, `Bool` and `Option` are reserved constructors (`arrTy`,
-   `boolTy`, `optTy`). (Sub) is kept for stages only: a value has any stage, an application,
+   `Ty` with the arrow `a →φ^q b` (`Ty.arr`, Р186), whose qualifier is a capture row
+   written as a type (a variable, `cnil`, `cun`); `Bool` and `Option` are reserved
+   constructors (`boolTy`, `optTy`). (Lam) and (Let-Sig-Dict) show what a closure holds,
+   `heldS` (Р185, Р187); qualifiers match exactly, there is no (≤-Cap). (Sub) is kept for stages only: a value has any stage, an application,
    a `let` and a `match` run at one stage `φ`, the arrow applied and the right side of a
    `let` at `ψ ⊑ φ` (Р182). A term at `P` elaborates at any stage (`Elab.anyStage`), and
    renaming term variables keeps an elaboration (`Elab.rename`, weakening `Elab.shift`).
 7. `Target` is an interface, not λFlick⁺: its types are monotypes, stage arrows and `D_Q`,
    a context entry is `∀ᾱ. t`, and a `∀`-field of `D_Q` shows only through the law `meth`
    (projection with instantiation). Constants of Γ₀ are typed by their schemes (`const`).
+   Arrows carry qualifiers: `lam` and `lamD` have the held premises of the source, and
+   the arrows of methods, constants, instances and `struct_C` hold nothing (`cnil`), so the
+   `q` of their schemes is never read.
    The types of instances (`inst`: `I : ∀β̄. D_ctx →P
    D_head`, by (Instance) of §2.5 and К7) and of (Struct)/(Prim) dictionaries are laws.
    `lamD l` binds `l` premises at once, the `i`-th argument being the premise `i`;
    λFlick⁺ curries it. P4a has to prove each law of its own typing.
 8. The run of the target is `Target.St`, `load`, `Step` and `obs`; a skeleton is a `Tm` with
-   holes `hole i`, and its result is the set of observations of the terminating runs of the
+   holes `hole i` and the type and stage of its fillings, and its result is the set of observations of the terminating runs of the
    filled term (divergence is not compared). `Sim` follows by induction on the run from
    three fields, which P4a has to prove for λFlick⁺ with a relation `Rel` of its choice:
-   `load_rel` (terms that differ by `≈` in dictionary positions, `TmEqv`, load to related
-   states), `step_rel` (a step of one side is matched by zero or more steps of the other:
+   `load_rel` (closed terms typed at one type that differ by `≈` in dictionary positions,
+   `TmEqv`, load to related states), `step_rel` (a step of one side is matched by zero or more steps of the other:
    evaluating `(I d̄).$slotᵢ` and `sᵢ[δ̄ := d̄]` takes different numbers of steps) and
-   `final_rel` (a result of one side is reached by the other).
+   `final_rel` (a result of one side is reached by the other). Only typed dictionaries
+   evaluate, so `Sim` and `T6b` speak of fillings with `Exprs.Ok`, for a target the typing
+   of the filled skeleton, and `T6b_target` takes it for both fillings.
 9. The sugar (§3) desugars into `Exp`; `Sugar` names the Prelude methods (`flat_map`,
    `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
-   hypotheses on the program. The checker's rules are the judgements `DoOk`, `GenOk` and
+   hypotheses on the program. The schemes have capture variables; qualifiers of non-arrow
+   types are dropped (Р188). A lambda of the sugar takes as its qualifier a row that covers
+   its context (`ctxRow`). The checker's rules are the judgements `DoOk`, `GenOk` and
    `LoopOk`; `?` and `s; rest` are premises of their lemmas. Patterns are variables (and `_`):
    a refutable pattern needs `match`, which the source lacks. The values of a group
    `p₁ <- e₁ and … and pₙ <- eₙ` form a left-nested tuple built by `map2 pair`, and
@@ -484,10 +493,11 @@ The owner's decision on Р185 is that T6 goes through the core with regions. λF
 this Lean core plus nominal dictionary records `D_C ᾱ` with `∀`-fields, and captures
 enter the elaboration source and `Target`. This section is the plan for P4a. Each piece
 is committed without `sorry` and builds from a clean `git archive`. The next free Р
-number is Р188.
+number is Р189.
 
 **Status.** Р185–Р187 are recorded in `elaboration.md` §5, and §0.1 and §2.1 are
-updated. No P4a code is written yet. The pieces below are in their intended order.
+updated. P4a1 is done; Р188 records the Prelude schemes. P4a2–P4a4 are open. The pieces
+below are in their intended order.
 
 #### P4a1: captures in `Elab` and `Target`
 
@@ -503,10 +513,10 @@ Only `Formal/Elab/` changes; the core is untouched.
   (Var), (Method) and (Const) instantiate them through `ts` with no new rule. Schemes
   have no `Outlives` facts: `Fiber.Outlives` is dropped by `⟦·⟧` (§2.1).
 - **Schemes.** `Scheme` gets `q : Ty`, the qualifier of its dictionary arrows (Р187).
-  `Scheme.subst` lifts `q` like `ty`. The schemes of methods, of `Prog.consts` and of
-  instances have `q = cnil`; make this a field of a well-formedness hypothesis on
-  `Prog`. `Scheme.reach` is the reach of `Scheme.tr s` below its `k` binders, so it
-  equals the core's `Scheme.reach` of the translation.
+  `Scheme.subst` lifts `q` like `ty`. The `q` of methods and of `Prog.consts` is never
+  read: the laws `meth` and `const` use `cnil`, so `Prog` needs no well-formedness
+  hypothesis for it. `Scheme.reach` is the reach of `Scheme.tr s` below its `k`
+  binders, so it equals the core's `Scheme.reach` of the translation.
 - **Judgement** (`Elab/Source.lean`). Add `Exp.Free` and `Tm.Free`, and
   `heldS Γ e n := ∃ x s, e.Free x ∧ Γ[x]? = some s ∧ s.reach n`. `Δ` adds nothing,
   because `⌈D_Q⌉ = ∅`.
@@ -520,17 +530,20 @@ Only `Formal/Elab/` changes; the core is untouched.
   `Scheme.tr s = ⟨s.k, dicts s.q s.ctx (.mono s.ty)⟩`.
   - The `lam` law gets the held premise over `Tm.Free`.
   - The `lamD` law gets the premise `qs ≠ [] → heldT Γ e ⊆ ⌈t⌉ ∪ ⌈q⌉`.
-  - `meth`, `inst`, `strct` and `prim` use `q = cnil`.
-  - The `Rel` fields may take typing premises, because P4a4 needs closed typed terms:
-    `load_rel` gets `Has [] [] e t φ` and `Has [] [] e' t φ`, and
-    `Target.sim`/`T6b_target` take the typing of the filled skeleton. Decide this
-    here, while `Target` is being rewritten anyway.
-- **Re-proofs.** `T6a` needs the held lemma in the `lam` and `letSig` cases.
-  `Coherence.lean`, `Weaken.lean` and `Run.lean` need only new `Ty` cases.
+  - `meth`, `const`, `inst`, `strct` and `prim` use `q = cnil`.
+  - Decided: the `Rel` fields take typing premises, because P4a4 needs closed typed terms.
+    `load_rel` gets `Has [] [] e t φ` and `Has [] [] e' t φ`. `Exprs` gets `Ok`, and
+    `Sim` and `T6b` speak only of fillings with `Ok`. A skeleton of `Target.exprs` is
+    `Tm × TTy × Stage`, `Ok` is the typing of the filled skeleton, and `T6b_target`
+    takes it for both fillings. `step_rel` and `final_rel` take none: `Rel` carries them.
+- **Re-proofs.** `T6a` needs the held lemma in the `lam` and `letSig` cases
+  (`Elab.free`, `heldT_of`). `Weaken.lean` renames the held premises (`heldS_rename`);
+  `Coherence.lean` needs only new `Ty` cases and the `Ok` premises of `T6b`.
 - **Sugar.** Each higher-order parameter of a Prelude scheme gets a capture variable,
   and the arrows after it show that variable:
-  `flat_map : ∀m a b c. (a →^c m b) →P (m a →^c m b)`. Check these schemes against the
-  checker's types of the Prelude, and record an Р where they differ.
+  `flat_map : ∀m a b c. (a →^c m b) →P (m a →^c m b)`. Checked against `Prelude.fl` and
+  `Seq.fl`: they are the checker's types with the qualifiers of non-arrow types dropped
+  (Р188). A lambda of the sugar takes `ctxRow Γ`, a row that covers its context.
 
 #### P4a2: dictionary records in the core
 
