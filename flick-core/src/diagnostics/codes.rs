@@ -243,6 +243,7 @@ codes! {
     Q010 = Sql 10, "outside the supported SQL subset";
     Q011 = Sql 11, "column type does not match its SQL type";
     Q012 = Sql 12, "value without a SQL form";
+    Q013 = Sql 13, "migration does not apply";
     U001 = Ui 1, "event policy needs a positive integer";
     U002 = Ui 2, "handler made while a view renders";
     U003 = Ui 3, "serializable atom without a key of its own";

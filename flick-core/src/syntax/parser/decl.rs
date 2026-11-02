@@ -21,6 +21,7 @@ fn top_decl(p: &mut Parser) {
         K::ClassKw => class_decl(p),
         K::InstanceKw => instance_decl(p),
         K::ForeignKw => foreign_decl(p),
+        K::SqlKw if p.nth(1) == K::Ident && word_at(p, 1, "migration") => sql_migration(p),
         K::SqlKw if p.nth(1) == K::Ident => sql_table(p),
         // `component name`: the word is a name everywhere else
         K::Ident if p.at_word("component") && p.nth(1) == K::Ident => component_decl(p),
@@ -349,6 +350,34 @@ fn sql_table(p: &mut Parser) {
         p.braces(K::Block, sql_column, |_| false);
     }
     p.complete(m, K::SqlTableDecl);
+}
+
+/// `sql migration 1 "name" { create table …; … }`: the statements are SQL,
+/// kept as tokens for `syntax::ddl` to read, layout and all words free.
+fn sql_migration(p: &mut Parser) {
+    let m = p.start();
+    p.bump();
+    p.bump();
+    if p.expect(K::Number) && p.expect(K::String) {
+        let opener = p.raw();
+        if p.expect(K::LBrace) {
+            let body = p.start();
+            let mut depth = 0u32;
+            loop {
+                match p.raw().kind {
+                    K::Eof => break,
+                    K::RBrace if depth == 0 => break,
+                    K::LBrace => depth += 1,
+                    K::RBrace => depth -= 1,
+                    _ => {}
+                }
+                p.bump();
+            }
+            p.complete(body, K::Block);
+            p.expect_closer(K::RBrace, opener);
+        }
+    }
+    p.complete(m, K::SqlMigrationDecl);
 }
 
 fn sql_column(p: &mut Parser) {

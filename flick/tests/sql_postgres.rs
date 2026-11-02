@@ -1,7 +1,8 @@
 //! E2E against `PostgreSQL`: starts `postgres:17-alpine` in Docker, loads
 //! `tests/postgres/schema.sql`, builds a program of `tests/postgres/` for
 //! each target and compares its stdout with its `.stdout` file: `app.fl`,
-//! the queries, `tx.fl`, transactions and cancellation, and `migrate.fl`,
+//! the queries, `tx.fl`, transactions and cancellation, `migrated.fl`, the
+//! tables of `sql migration` declarations, and `migrate.fl`,
 //! migrations on a fresh database. Ignored by
 //! default: it needs Docker, the installed runtime and Go (`just
 //! e2e-postgres`).
@@ -125,6 +126,24 @@ fn transactions_and_cancellation(emit: &str) {
 fn migrations(emit: &str) {
     let (_container, url) = start();
     run_program("migrate", emit, &url);
+}
+
+/// `migrated.fl` on a fresh database: its tables are its `sql migration`s.
+fn migrated_tables(emit: &str) {
+    let (_container, url) = start();
+    run_program("migrated", emit, &url);
+}
+
+#[test]
+#[ignore = "needs Docker and the installed runtime"]
+fn migrated_tables_against_postgres() {
+    migrated_tables("js");
+}
+
+#[test]
+#[ignore = "needs Docker and Go"]
+fn migrated_tables_against_postgres_on_go() {
+    migrated_tables("go");
 }
 
 #[test]

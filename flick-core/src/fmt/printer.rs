@@ -134,8 +134,20 @@ impl<'a> Printer<'a> {
             K::TypeDecl | K::KindDecl | K::ErrorDecl => self.type_decl(n),
             K::ClassDecl | K::InstanceDecl | K::ServiceDecl => self.class(n),
             K::ForeignDecl => self.foreign(n),
+            K::SqlMigrationDecl => self.as_written(n),
             _ => self.generic(n),
         }
+    }
+
+    /// `n` as written, without whitespace at line ends: SQL keeps its own
+    /// layout.
+    fn as_written(&mut self, n: &'a Node) -> Doc<'a> {
+        let (start, end) = n.range();
+        // its comments are in the text
+        self.comments.skip(end);
+        let text = &self.text[start as usize..end as usize];
+        let lines: Vec<&str> = text.lines().map(str::trim_end).collect();
+        self.a.text(self.a.alloc_str(&lines.join("\n")))
     }
 
     /// The children of `n` on one line.

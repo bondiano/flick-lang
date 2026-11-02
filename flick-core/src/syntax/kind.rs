@@ -142,6 +142,7 @@ pub enum SyntaxKind {
     DerivingClause,
     KindDecl,
     SqlTableDecl,
+    SqlMigrationDecl,
     SqlColumn,
     ErrorDecl,
     ServiceDecl,

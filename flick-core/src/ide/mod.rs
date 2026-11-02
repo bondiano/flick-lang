@@ -415,6 +415,8 @@ mod hover_tests;
 #[cfg(test)]
 mod kind_hover_tests;
 #[cfg(test)]
+mod migration_tests;
+#[cfg(test)]
 mod pattern_tests;
 #[cfg(test)]
 mod tests;
