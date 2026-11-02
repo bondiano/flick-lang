@@ -1,0 +1,13 @@
+/// Where an API is served: its endpoints under a prefix of the path, so a
+/// route type names the paths of the API itself and the server says where
+/// it lives.
+module HttpApi.Mount exposing (under)
+
+import HttpApi exposing (Api)
+
+/// The API with every endpoint under `prefix` (`/api`), as it serves and
+/// documents them. A client of the same endpoints has the prefix in its
+/// base: `HttpApi.call "/api" Users.endpoints.login request`.
+under : String -> Api r gs -> Api r gs
+foreign pure under from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiUnder"
+  arity 2

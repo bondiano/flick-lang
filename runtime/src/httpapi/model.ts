@@ -250,3 +250,15 @@ export const httpApiInfo = (info: Info, api: Api): Api => Object.freeze({ ...api
 
 export const httpApiAddGroup = (_lacks: unknown, _union: unknown, group: Group, api: Api): Api =>
   Object.freeze({ ...api, groups: [...api.groups, group] });
+
+/** `HttpApi.Mount.under prefix api`: every endpoint's path after `prefix`. */
+export const httpApiUnder = (prefix: string, api: Api): Api =>
+  Object.freeze({
+    ...api,
+    groups: api.groups.map((group) =>
+      Object.freeze({ ...group, endpoints: group.endpoints.map((e) => Object.freeze({ ...e, path: joinPath(prefix, e.path) })) }),
+    ),
+  });
+
+/** `/api` and `/users` as `/api/users`, whatever slashes either has. */
+const joinPath = (prefix: string, path: string): string => `/${[prefix, path].map((p) => p.replace(/^\/+|\/+$/g, "")).filter((p) => p !== "").join("/")}`;

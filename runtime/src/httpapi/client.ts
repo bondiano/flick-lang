@@ -178,12 +178,28 @@ const withExtras = (endpoint: Endpoint, r: Received, value: unknown): Effect.Eff
     return Effect.succeed([inner, shown] as const);
   });
 
+/** The address the browser shows, against which a relative base resolves. */
+const pageAddress = (): string | undefined => {
+  const location: unknown = Reflect.get(globalThis, "location");
+  return typeof location === "object" && location !== null ? String(Reflect.get(location, "href")) : undefined;
+};
+
+/** `base` as a directory URL: `/api` in a browser is the page's origin's. */
+const baseUrl = (base: string): Result.Result<URL, ClientError> => {
+  const directory = base.endsWith("/") ? base : `${base}/`;
+  try {
+    return Result.succeed(new URL(directory, pageAddress()));
+  } catch {
+    return Result.fail(clientError(0, `the base ${JSON.stringify(base)} is no absolute URL, and there is no page to resolve it against`));
+  }
+};
+
 /** `HttpApi.call base endpoint request`. */
 export const httpApiCall = (base: string, endpoint: Endpoint, request: Request): Effect.Effect<unknown, unknown, unknown> =>
   Effect.gen(function* () {
     const params = new Map(strings(yield* encode(endpoint.params, request.path, "path")));
     const path = endpoint.path.replace(/:([A-Za-z_][\w]*)/g, (_, name: string) => encodeURIComponent(params.get(name) ?? ""));
-    const url = new URL(path.replace(/^\//, ""), base.endsWith("/") ? base : `${base}/`);
+    const url = new URL(path.replace(/^\//, ""), yield* Effect.fromResult(baseUrl(base)));
     for (const [k, v] of strings(yield* encode(endpoint.query, request.query, "query"))) url.searchParams.append(k, v);
     const headers = new Headers(strings(yield* encode(endpoint.headers, request.headers, "headers")));
     const payload = endpoint.payload === null ? request.payload : yield* encode(endpoint.payload, request.payload, "payload");
@@ -219,7 +235,9 @@ export const httpApiUrl = (base: string, endpoint: Endpoint, path: unknown, quer
   if (Result.isFailure(search)) return Result.fail(search.failure);
   const values = new Map(params.success);
   const resolved = endpoint.path.replace(/:([A-Za-z_][\w]*)/g, (_, name: string) => encodeURIComponent(values.get(name) ?? ""));
-  const url = new URL(resolved.replace(/^\//, ""), base.endsWith("/") ? base : `${base}/`);
+  const root = baseUrl(base);
+  if (Result.isFailure(root)) return Result.fail(root.failure);
+  const url = new URL(resolved.replace(/^\//, ""), root.success);
   for (const [k, v] of search.success) url.searchParams.append(k, v);
   return Result.succeed(url.href);
 };

@@ -17,6 +17,8 @@ import {
   httpApiMake,
   httpApiOpenApi,
   httpApiSecuritySetCookie,
+  httpApiUnder,
+  httpApiUrl,
   httpApiWithErrors,
   httpApiWithPath,
   httpApiWithPayload,
@@ -90,4 +92,28 @@ test("a login whose cookie the response hides, as a browser hides HttpOnly ones,
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test("a relative base resolves against the page, and without one is a ClientError", () => {
+  const tags = httpApiEndpoint(get, "/tags", "tags");
+  const none = Reflect.get(globalThis, "location");
+  try {
+    Reflect.set(globalThis, "location", { href: "https://conduit.test/article/hi" });
+    const url = httpApiUrl("/api", tags, undefined, undefined);
+    assert.ok(Result.isSuccess(url));
+    assert.equal(url.success, "https://conduit.test/api/tags");
+    Reflect.deleteProperty(globalThis, "location");
+    const failed = httpApiUrl("/api", tags, undefined, undefined);
+    assert.ok(Result.isFailure(failed));
+    assert.match(failed.failure._0.message, /no absolute URL/);
+  } finally {
+    if (none !== undefined) Reflect.set(globalThis, "location", none);
+  }
+});
+
+test("an API under a prefix serves and documents its endpoints there", () => {
+  const mounted = httpApiUnder("/api/", api(json([["name", schemaString]])));
+  const spec = httpApiOpenApi(mounted);
+  assert.ok(Result.isSuccess(spec));
+  assert.match(spec.success, /"\/api\/users\/\{id\}"/);
 });

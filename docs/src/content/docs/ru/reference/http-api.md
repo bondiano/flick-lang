@@ -138,7 +138,11 @@ type alias Users = {
 - Поле называет эндпоинт, а имя типа в snake case — группу (`users`).
 - `Get`, `Post`, `Put`, `Patch` и `Delete` принимают путь, запрос — запись из
   его частей (`path`, `query`, `headers`, `payload`) или `{}`, успешный ответ и
-  ошибки. Каждый `:name` пути — поле части `path`.
+  ошибки. Каждый `:name` пути — поле части `path`. Путь — строка или
+  конструктор типа маршрутов с `deriving Url` из другого модуля, где на месте
+  каждого параметра стоит его тип: `Post (Profiles Username (Some Follow))` —
+  это `/profiles/:username/follow` (см.
+  [Маршруты как пути API](/ru/reference/route/#маршруты-как-пути-api)).
 - Успешный ответ отправляется с 200, `Created a` — с 201, а `Unit` — с 204 и
   без тела.
 - Часть или ответ декодирует значение, названное по типу в snake case в
@@ -159,6 +163,10 @@ let api =
   |> HttpApi.add_group (Users.api token Session check maybe)
   |> HttpApi.add_group Public.api
 ```
+
+`HttpApi.Mount.under "/api" api` помещает каждый эндпоинт под префикс — так
+сервер их обслуживает и документирует; клиент тогда вызывает с префиксом в
+базе: `HttpApi.call "/api" Users.endpoints.me request`.
 
 Запись, которую нельзя обслужить в таком виде, — `FLICK-D011`.
 
@@ -208,7 +216,9 @@ let server = Http.Server.serve options app
 `HttpApi.call base endpoint request` кодирует запрос кодеками эндпоинта
 и декодирует ответ. Вызов возвращает успешный результат либо
 завершается объявленной типизированной ошибкой или `HttpApi.ClientError`.
-`HttpApi.url` строит только URL.
+`HttpApi.url` строит только URL. В браузере база может быть относительной,
+`/api`, от адреса страницы; в других местах относительная база на JS — это
+`ClientError`.
 
 `HttpApi.openapi api` возвращает документ OpenAPI 3.1. Каждую схему
 в нём записывает строгий экспортёр. Если какую-либо часть нельзя представить
