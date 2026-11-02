@@ -45,10 +45,17 @@ A type that derives `Url` derives `Schema` too. Each constructor is a path:
 | `User 42` | `/user/42` |
 | `UserPost 7 slug` | `/user-post/7/<slug>` |
 | `Search { q = "atoms"; page = None }` | `/search?q=atoms` |
+| `Editor None`, `Editor (Some slug)` | `/editor`, `/editor/<slug>` |
+| `Profile "ada" (Some Favorites)` | `/profile/ada/favorites` |
 
 - The constructor's name in kebab case is the first segment.
 - Each field after it is a segment: a `String`, a `Float`, a `Bool` or a
-  refined type over one of them.
+  refined type over one of them, or a type whose constructors have no
+  fields, written as the constructor's name in kebab case (`Favorites` is
+  `favorites`). Such a type gives the words of a nested path:
+  `type Tab = Favorites` and `Profile String (Option Tab)` above.
+- The last segment may be an `Option` of one: `None` leaves it out of the
+  URL, so one constructor has the URLs with and without it.
 - A final record field is the query. Its fields have the same types, or an
   `Option` of one, which may be missing from the URL.
 - Any other field, a generic type or two constructors with the same URLs are

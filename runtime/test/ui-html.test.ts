@@ -4,7 +4,28 @@ import { test } from "node:test";
 import { Effect, Option } from "effect";
 
 import { ReadService, atomState, syncOperation } from "../src/index.ts";
-import { eventExhaust, uiButton, uiComponent, uiDiv, uiField, uiFieldArea, uiFragment, uiHtml, uiInput, uiRender, uiText, uiView } from "../src/ui/react/index.ts";
+import {
+  eventExhaust,
+  uiButton,
+  uiComponent,
+  uiDiv,
+  uiField,
+  uiFieldArea,
+  uiFieldset,
+  uiFooter,
+  uiForm,
+  uiFragment,
+  uiHr,
+  uiHtml,
+  uiIcon,
+  uiImage,
+  uiInput,
+  uiNav,
+  uiRender,
+  uiSubmit,
+  uiText,
+  uiView,
+} from "../src/ui/react/index.ts";
 import { uiToHtml } from "../src/ui/html.ts";
 
 /** `Atom.get` as a Flick render calls it: a Sync operation of `Atom.Read`. */
@@ -13,6 +34,25 @@ const get = syncOperation(ReadService, "get", 1) as (atom: unknown) => unknown;
 
 const handler = eventExhaust(() => Effect.void);
 const Widget = () => null;
+
+test("the elements of a page: navigation, images, icons, forms and their fields", () => {
+  const ui = uiNav({ class_name: "navbar" }, [
+    uiImage({ src: "/a.svg", alt: "ada", class_name: "user-pic" }),
+    uiIcon({ class_name: "ion-heart" }),
+    uiHr,
+    uiForm({ on_submit: handler }, [
+      uiFieldset({ class_name: "form-group" }, [uiInput({ value: "", placeholder: "Password", on_input: handler })]),
+      uiSubmit({ disabled: true }, [uiText("Sign in")]),
+    ]),
+    uiFooter({ class_name: "footer" }, []),
+  ]);
+  assert.equal(
+    uiToHtml(ui),
+    '<nav class="navbar"><img src="/a.svg" alt="ada" class="user-pic"><i class="ion-heart"></i><hr>' +
+      '<form><fieldset class="form-group"><input value="" placeholder="Password"></fieldset><button type="submit" disabled>Sign in</button></form>' +
+      '<footer class="footer"></footer></nav>',
+  );
+});
 
 test("text and attribute values are escaped, booleans written as React writes them", () => {
   const ui = uiDiv({ class_name: 'a"b' }, [

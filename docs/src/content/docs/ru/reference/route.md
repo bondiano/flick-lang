@@ -45,10 +45,17 @@ let profile =
 | `User 42` | `/user/42` |
 | `UserPost 7 slug` | `/user-post/7/<slug>` |
 | `Search { q = "atoms"; page = None }` | `/search?q=atoms` |
+| `Editor None`, `Editor (Some slug)` | `/editor`, `/editor/<slug>` |
+| `Profile "ada" (Some Favorites)` | `/profile/ada/favorites` |
 
 - Имя конструктора в kebab-case — первый сегмент.
 - Каждое поле после него — сегмент: `String`, `Float`, `Bool` или
-  уточнённый тип над одним из них.
+  уточнённый тип над одним из них либо тип, конструкторы которого без полей:
+  он записывается именем конструктора в kebab-case (`Favorites` —
+  `favorites`). Такой тип даёт слова вложенного пути: `type Tab = Favorites` и
+  `Profile String (Option Tab)` выше.
+- Последний сегмент может быть `Option` одного из них: `None` убирает его из
+  URL, поэтому у одного конструктора есть URL и с ним, и без него.
 - Последнее поле-запись — query. Его поля тех же типов или `Option` одного
   из них; такого параметра в URL может не быть.
 - Другое поле, обобщённый тип или два конструктора с одинаковыми URL —
