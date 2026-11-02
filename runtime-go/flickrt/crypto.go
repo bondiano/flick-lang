@@ -1,11 +1,13 @@
 package flickrt
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
+	gohash "hash"
 	"math"
 )
 
@@ -30,24 +32,54 @@ func CryptoRandomBytes(size Value) Value {
 	return byteList(cryptoBytes(int(n)))
 }
 
-func CryptoDigest(algorithm, data Value) Value {
-	in := []byte(byteString(data))
-	var sum []byte
+// cryptoHash is the hash function of a `DigestAlgorithm`.
+func cryptoHash(algorithm Value) func() gohash.Hash {
 	switch ConstructorName(algorithm.(*Data).Tag) {
 	case "Sha1":
-		s := sha1.Sum(in)
-		sum = s[:]
+		return sha1.New
 	case "Sha384":
-		s := sha512.Sum384(in)
-		sum = s[:]
+		return sha512.New384
 	case "Sha512":
-		s := sha512.Sum512(in)
-		sum = s[:]
+		return sha512.New
 	default:
-		s := sha256.Sum256(in)
-		sum = s[:]
+		return sha256.New
 	}
-	return byteList(sum)
+}
+
+func CryptoDigest(algorithm, data Value) Value {
+	h := cryptoHash(algorithm)()
+	h.Write([]byte(byteString(data)))
+	return byteList(h.Sum(nil))
+}
+
+// CryptoPbkdf2 is PBKDF2 (RFC 8018) over HMAC, as Web Crypto's `deriveBits`.
+func CryptoPbkdf2(algorithm, iterations, length, salt, password Value) Value {
+	rounds, size := int(iterations.(int32)), int(length.(int32))
+	if rounds <= 0 || size <= 0 {
+		return Fail(NewData(cryptoErrorTag, "Crypto.pbkdf2: iterations and length must be positive"))
+	}
+	prf := hmac.New(cryptoHash(algorithm), []byte(byteString(password)))
+	s := []byte(byteString(salt))
+	out := make([]byte, 0, size+prf.Size())
+	u := make([]byte, 0, prf.Size())
+	t := make([]byte, prf.Size())
+	for block := uint32(1); len(out) < size; block++ {
+		prf.Reset()
+		prf.Write(s)
+		prf.Write([]byte{byte(block >> 24), byte(block >> 16), byte(block >> 8), byte(block)})
+		u = prf.Sum(u[:0])
+		copy(t, u)
+		for i := 1; i < rounds; i++ {
+			prf.Reset()
+			prf.Write(u)
+			u = prf.Sum(u[:0])
+			for j := range t {
+				t[j] ^= u[j]
+			}
+		}
+		out = append(out, t...)
+	}
+	return byteList(out[:size])
 }
 
 // cryptoDouble is Effect's `nextDoubleUnsafe`: 53 random bits over 2^53.

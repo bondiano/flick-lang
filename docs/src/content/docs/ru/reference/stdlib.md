@@ -53,6 +53,9 @@ title: "Стандартная библиотека"
 | `Redacted` | эффектные `make`, `reveal`; `show` выводит `<redacted>` |
 | `BigDecimal` | `BigDecimal` из Effect: `from_string`, точные `add`, `subtract`, проверяемые `multiply`, `divide_to_scale` |
 | `Duration` | `Duration` из Effect: проверяемые `nanos`, `millis`, `seconds`, `minutes`; для неограниченной длительности — явное `infinity` |
+| `Bytes` | байты как списки чисел от 0 до 255: `from_string` и `to_string` (UTF-8, `None`, если это не UTF-8), `to_base64url` и `from_base64url`, и `equal`, время которого зависит только от длин |
+| `Crypto` | сервис `Crypto` поверх Web Crypto (`Crypto.system`): `random_bytes`, `digest` (SHA-1, SHA-256, SHA-384, SHA-512), `hmac` поверх `digest` (RFC 2104), случайные числа, UUID и ULID; `pbkdf2` (RFC 8018), а также `hash_password` / `verify_password`: PBKDF2-HMAC-SHA256 на 600000 раундов со случайной солью, хранится как `$pbkdf2-sha256$i=<раунды>$<соль>$<хеш>` в URL-safe base64, проверка за постоянное время |
+| `Jwt` | JSON Web Token с подписью HMAC-SHA256 (`alg` `HS256`): `sign` и `verify` над JSON-кодеком утверждений; `verify` отвергает другой `alg`, неверную подпись и `exp`, который часы уже прошли, ошибкой `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` и `expires_in` дают `iat` и `exp` в секундах от эпохи |
 | `EqHash`, `HashSet`, `HashMap` | хеш-коллекции, сохраняющие своё свидетельство |
 | `Loop` | `loop` над `Step` и `Trampoline` для чистой рекурсии без переполнения стека |
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write`, `args`, `env` |

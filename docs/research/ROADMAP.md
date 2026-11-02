@@ -397,13 +397,13 @@ component search (props : SearchProps) =
 **W2. Сборка workspace.** ⬜
 - AC: пакеты `examples/conduit/*` в `pnpm-workspace.yaml`; библиотека собирается раньше зависимых; связка pnpm `workspace:` доходит до `node_modules/<pkg>`, как ждёт загрузчик; рецепты `just` для примера.
 
-**W3. `Crypto.hmac` и байты строки.** ⬜
+**W3. `Crypto.hmac` и байты строки.** ✅ (`Crypto.hmac` — HMAC на Flick поверх `digest`, без нового кода рантайма; модуль `Bytes`: `from_string`/`to_string` — UTF-8 (одиночный суррогат — U+FFFD, как `TextEncoder`; не UTF-8 — `None`), `to_base64url`/`from_base64url`, `equal` за время, зависящее только от длин; run-кейс `stdlib/effect/hmac` на векторах RFC 4231 на обоих таргетах)
 - AC: HMAC-SHA256/384/512, сравнение за постоянное время, UTF-8-байты строки и обратно; сверено с тестовыми векторами RFC 4231 на обоих таргетах.
 
-**W4. Хеширование паролей.** ⬜
+**W4. Хеширование паролей.** ✅ (`Crypto.pbkdf2` — Web Crypto `deriveBits` на JS и PBKDF2 поверх `crypto/hmac` в `flickrt` на Go, без зависимостей; `Crypto.hash_password`/`verify_password` на Flick: 600000 раундов SHA-256, соль 16 байт, `$pbkdf2-sha256$i=…$соль$хеш` в URL-safe base64, сравнение `Bytes.equal`; хеш, записанный Python `hashlib`, проверяется на обоих таргетах; run-кейс `stdlib/effect/password` на векторах RFC 7914 и RFC 6070)
 - AC: `Crypto.Password.hash`/`verify` — PBKDF2-HMAC-SHA256 со случайной солью, строка формата PHC с параметрами; хеш одного таргета проверяется другим.
 
-**W5. Модуль `Jwt`.** ⬜
+**W5. Модуль `Jwt`.** ✅ (на Flick поверх `Crypto.hmac` и `Bytes`, без кода рантайма: `sign`/`verify` над `PureCodec Json c`, заголовок `HS256` (другой `alg`, в том числе `none`, — `Malformed`), подпись сравнивается `Bytes.equal`, `exp` — по `Clock`; `JwtError` с `Malformed`/`BadSignature`/`Expired`; `Jwt.now`/`expires_in` — секунды от эпохи; run-кейс `stdlib/effect/jwt`: пример RFC 7515 A.1, токен Python, круг подписи и порчи на обоих таргетах. Найдено: `ignore_extra_fields` не действует на `Codec.json (schema …)`, только на блок `codec`)
 - AC: HS256 `sign`/`verify`, утверждения через Schema, `exp`/`iat` от `Clock`, типизированные ошибки (подпись, срок, формат); векторы RFC 7515/7519; оба таргета.
 
 **W6. Аутентификация `HttpApi` со значением для обработчика.** ✅ `75cc5d06` (`HttpApi.with_auth scheme Service check` и `with_optional_auth` — сервис для обработчика по каждому запросу, как `Rpc.with_auth`; `check` читает объявленные заголовки, её типизированная ошибка отвечает статусом и телом своего варианта (тела RealWorld), сервер сам 401 не отвечает; `HttpApi.authenticated` убирает сервис из требований группы; документ — `security` эндпоинта, у необязательной `[{}, {scheme: []}]`; `tests/run/stdlib/http/auth`, оба таргета)
