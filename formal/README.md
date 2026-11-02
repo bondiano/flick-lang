@@ -430,6 +430,7 @@ instantiate it.
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
 | §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
 | T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
+| Р188: the lazy `Monad Eff` in the core, `Eff q b` with the field `eff ∅ ∅ b {q}` | `effT`, `effField`, `effPure`, `effMap2`, `effBind`, `typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr` (`Elab/LazyEff.lean`) |
 | the run of dictionaries in the core: closed derivations evaluate, `≈` keeps values | `RealRun`, `ent_eval`, `eqv_sem` (`Elab/CoreDictSem.lean`); `Eval`, `SemEq` (`Elab/CoreEval.lean`); `PStep`, `decomp_eq` (`Decomp.lean`) |
 | λFlick⁺ as `Target` with the run of the core: `Rel`, `load_rel`, `step_rel`, `final_rel`; T6(b) for the core | `Cg`, `DP`, `CfgR` (`Elab/CoreCg*.lean`, `Elab/CoreRel.lean`); `phead_sim`, `rhead_sim`, `thread_sim`, `cstep_sim`, `final_sim` (`Elab/CoreHead.lean`, `Elab/CoreStep.lean`, `Elab/CoreSim.lean`); `DSim`, `eqv_dsim`, `DTyp`, `dsim_cg` (`Elab/CoreLoad.lean`); `trE`, `RHas`, `runTarget`, `T6b_core` (`Elab/CoreRun.lean`) |
 
@@ -528,7 +529,9 @@ updated. P4a1 is done; Р188 records the Prelude schemes. P4a2 is done (Р194). 
 (Р188 decided, Р195). P4a4 is done: Р196 and Р197 fixed the model, P4a4a is the run of
 dictionaries (`eqv_sem`), P4a4b `Rel` and its closure, P4a4c the fields of the target and
 `T6b_core`, T6(b) for the core with its run without the hypothesis `Sim` (Р198–Р200). P4a is
-done. Р188 through a `CRow` parameter: the translation and the schemes of `Sugar` are done. The pieces below are in their intended order.
+done. Р188 through a `CRow` parameter is done: the translation and the schemes of `Sugar`,
+and the lazy `pure`, `map2` and `flat_map` of `Monad Eff` typed by the rules of the core at
+those schemes (`LazyEff.lean`). The pieces below are in their intended order.
 
 #### P4a1: captures in `Elab` and `Target`
 
@@ -677,7 +680,8 @@ five places.
   `Seq` is a parameter of kind `CRow` of the type (simplification 15), the schemes of
   `Sugar` show it (`elaboration.md` Р188 gives the translation of the checker's schemes),
   and a lazy body is `MkEff (task …)` of the nominal type `Eff q b` with the field
-  `eff ∅ ∅ b {q}`.
+  `eff ∅ ∅ b {q}`: `typ_effPure_tr`, `typ_effMap2_tr` and `typ_effBind_tr` (`LazyEff.lean`)
+  derive the bodies of `Monad Eff` at the schemes of `Sugar` with the class variable `Eff`.
 
 #### P4a4: `Rel` and `Sim`
 
