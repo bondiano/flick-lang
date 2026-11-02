@@ -194,7 +194,7 @@ theorem slot_ok (h : Coherent P lt) (Q : Cn) : SlotOK P Q := by
           obtain ⟨es', h₂, a⟩ := ihu es₀ (fun t ht => hsub t (List.mem_cons_of_mem _ ht)) he₂
           exact ⟨e' :: es', .cons he' h₂, .cons r a⟩
       obtain ⟨es', he', a⟩ := key ts ds (fun _ ht => ht) hds
-      refine ⟨apps (.strct S₀.cls τ) es', .trans (.strctSlot hC hS₀) (Eqv.apps .refl a), ?_⟩
+      refine ⟨apps (.strct S₀.cls τ) es', .trans (.strctSlot hC hS₀ hf hds) (Eqv.apps .refl a), ?_⟩
       have : S₀.subst (params [τ]) = ⟨S₀.cls, [τ]⟩ := by
         simp [Cn.subst, hSa, Ty.subst, params]
       rw [this]; exact .strct hSC hf he'
@@ -215,7 +215,7 @@ theorem slot_ok (h : Coherent P lt) (Q : Cn) : SlotOK P Q := by
         ih _ (hQ ▸ clo_lt h hI hc)
       obtain ⟨ds', e, a⟩ := closed_rep h hρ ho hse
       obtain ⟨d', rfl, r⟩ := a.single
-      refine ⟨_, .trans (.instSlot hI hsl) r, ?_⟩
+      refine ⟨_, .trans (.instSlot hI hsl hds) r, ?_⟩
       have hS : S = (S₀.subst (params ins.head)).subst σ := by
         rw [hS₀] at hs; simp only [Option.map_some, Option.some.injEq] at hs
         rw [← hs, Cn.subst_comp]; congr 1; funext n; rw [params_subst, ← hargs]

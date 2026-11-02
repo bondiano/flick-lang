@@ -145,7 +145,7 @@ inductive Ent (Δ : List Cn) : List Cn → List Dict → Prop
       Ent Δ [Q] [apps (.inst I) ds]
 
 /-- `≈` of §4.2: the least congruence with the slot rule of an instance, and of a structural
-dictionary (Р180); a structural or primitive dictionary of a type is `≈` the one of its
+dictionary (Р180), both for closed derivations of the arguments (Р197); a structural or primitive dictionary of a type is `≈` the one of its
 instance, as the run erases the type (Р196). -/
 inductive Eqv : Dict → Dict → Prop
   | refl {d} : Eqv d d
@@ -153,11 +153,13 @@ inductive Eqv : Dict → Dict → Prop
   | trans {d e f} : Eqv d e → Eqv e f → Eqv d f
   | slot {d e i} : Eqv d e → Eqv (.slot d i) (.slot e i)
   | ap {d d' e e'} : Eqv d d' → Eqv e e' → Eqv (.ap d e) (.ap d' e')
-  /-- `(I d̄).$slotᵢ ≈ sᵢ[δ̄ := d̄]` -/
-  | instSlot {I ins i s ds} : P.insts I = some ins → ins.slots[i]? = some s →
+  /-- `(I d̄).$slotᵢ ≈ sᵢ[δ̄ := d̄]`, `d̄` closed derivations of the context (Р197) -/
+  | instSlot {I ins i s σ ds} : P.insts I = some ins → ins.slots[i]? = some s →
+      Ent P [] (ins.ctx.map (·.subst σ)) ds →
       Eqv (.slot (apps (.inst I) ds) i) (s.subst (args ds))
-  /-- `(struct_C d̄).$slotᵢ ≈ struct_S (d̄.$slotᵢ)` (Р180) -/
-  | strctSlot {C τ i S ds} : P.structC C = true → (P.supers C)[i]? = some S →
+  /-- `(struct_C d̄).$slotᵢ ≈ struct_S (d̄.$slotᵢ)` (Р180), `d̄` closed derivations (Р197) -/
+  | strctSlot {C τ ts i S ds} : P.structC C = true → (P.supers C)[i]? = some S →
+      P.fields τ = some ts → Ent P [] (ts.map fun t => ⟨C, [t]⟩) ds →
       Eqv (.slot (apps (.strct C τ) ds) i) (apps (.strct S.cls τ) (ds.map (.slot · i)))
   /-- `struct_C^τ ≈ struct_C^{τθ}` (Р196) -/
   | strctSub {C τ ts θ} : P.fields τ = some ts → Eqv (.strct C τ) (.strct C (τ.subst θ))
