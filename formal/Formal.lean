@@ -95,3 +95,8 @@ import Formal.Elab.Sugar
 import Formal.Elab.SugarBase
 import Formal.Elab.DoNotation
 import Formal.Elab.Comprehension
+import Formal.Elab.CoreTy
+import Formal.Elab.CoreTr
+import Formal.Elab.CoreLaws
+import Formal.Elab.CoreDict
+import Formal.Elab.CoreT6a

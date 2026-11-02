@@ -13,9 +13,9 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
 command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
-`T4_3`, `T1_regions`, `T5`, `T6a` and `T6b` lists only Lean's standard `propext`,
+`T4_3`, `T1_regions`, `T5`, `T6a`, `T6a_core` and `T6b` lists only Lean's standard `propext`,
 `Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
-(`Target`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
+(`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
 
 ## Status
 
@@ -31,6 +31,7 @@ command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `
 | P2c′1 | Р37 in the model: the region of `provide`, `with` frames with it, children and finalizers inheriting the frames, the use of a service of an ended `provide` stuck; obligations `Provided {S} ϱ` in rows, discharged by `with` frames, by the end of a region and by `provide`, deferred in rows; T1–T3, T4.1, T4.2 again | done |
 | P2c′2 | T4.3: no use of a service of an ended `provide` (`T4_3`), T1 with `op_H` without that stuck state | done |
 | P4a2 | λFlick⁺: dictionary records `D_C ā` with `∀`-fields, projection with instantiation, globals with their bodies in `root`; T1–T4, T4.3 again | done |
+| P4a3 | the core as an instance of `Target`: the translation of types and terms, `Has` through `Typ`, each law one rule of the core under `Real`; T6(a) and its sugar forms for the core | done |
 
 T4.3 is the premise Г11 of T5 in the form Р142 gives it: an `ask_S` answered by a `with`
 frame of the region `q` of a `provide`, inherited or not, happens only while `q` is live.
@@ -404,7 +405,7 @@ instantiate it.
 
 | Stage | Scope | State |
 | - | - | - |
-| P4a | λFlick⁺ (Р54) as an instance of `Target`; T1–T3 for it | open |
+| P4a | λFlick⁺ (Р54) as an instance of `Target`; T1–T3 for it | the typing done (P4a3); the run (P4a4) open |
 | P4b | the source, `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (§2.4), dictionaries typed, T6(a); `Sim` from the steps of the target | done |
 | P4b′ | the sugar of §3 (`do`, `for`, `?`, blocks) as source terms; each elaborates with the checker's type, T6(a) covers it | done |
 | P4c | `≈`, К1–К8, lemmas 6.1 and 6.2, T6(b) | done |
@@ -425,6 +426,10 @@ instantiate it.
 | §3.2 `for`, §3.3 `?`, §3.4 blocks | `Clause`, `Sugar.gen`, `Sugar.loop`, `GenOk`, `LoopOk`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`, `T6a_sugar` (`Elab/Sugar.lean`, `Elab/Comprehension.lean`) |
 | Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`) |
 | "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim`, then `T6b_target` (`Elab/Run.lean`) |
+| §0.1 `⟦·⟧` into the core with regions: types, stages, schemes | `Names`, `trT`, `trTT`, `trD`, `trS`, `trStage`, `trT_subst`, `trT_reach` (`Elab/CoreTy.lean`) |
+| §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
+| §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
+| T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
 
 Simplifications:
 
@@ -488,6 +493,17 @@ Simplifications:
    `Seq.each_φ` per stage (Р184). Each source of `for` goes through `iter` (Р183). Only the
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
+10. The core instance (P4a3). `⟦R⟧ = rt ∅ ∅`; `Bool` is `base bool`, other constructors are
+    ADTs named by `Names.con`. `Real` is a hypothesis on the core's signature, not on the
+    bodies of the globals (`RootTy`, P4a4). A class has a record type for each number of
+    parameters (`Names.cls C n`), because the law `slot` holds for any constraint `q`;
+    `Prog.super` pads missing parameters with `con 0`, and so does the slot's field. A method
+    field binds the method's own variables first (`rot`) and needs the method scheme closed.
+    The translation `Tr` is a relation: `struct_C` and `prim_p` are families over the record
+    type and the constraint, and `Dict` does not show them, so the global is chosen with the
+    type (Р195). `if` is `match c with true → a | _ → b`, and `match e with None → n |
+    Some y → s` is `match e with Some y → s | _ → n`, exhaustive by `_` without declaring
+    `None`. `typingTarget` has an empty run; the run of the core is P4a4.
 
 ### P4a design
 
@@ -495,11 +511,13 @@ The owner's decision on Р185 is that T6 goes through the core with regions. λF
 this Lean core plus nominal dictionary records `D_C ᾱ` with `∀`-fields, and captures
 enter the elaboration source and `Target`. This section is the plan for P4a. Each piece
 is committed without `sorry` and builds from a clean `git archive`. The next free Р
-number is Р189.
+number is Р196.
 
 **Status.** Р185–Р187 are recorded in `elaboration.md` §5, and §0.1 and §2.1 are
-updated. P4a1 is done; Р188 records the Prelude schemes. P4a2 is done (Р194). P4a3 and
-P4a4 are open. The pieces below are in their intended order.
+updated. P4a1 is done; Р188 records the Prelude schemes. P4a2 is done (Р194). P4a3 is done
+(Р188 decided, Р195). P4a4 is open and not started in Lean: nothing of it is committed,
+and its plan below has the points P4a3 found (**Where P4a4 starts**). The pieces below are
+in their intended order.
 
 #### P4a1: captures in `Elab` and `Target`
 
@@ -597,38 +615,53 @@ and fields need not be values.
 
 #### P4a3: the instance of `Target`
 
-- **Types.** The translation `⟦·⟧ : Elab.Ty → Flick.Ty` maps
-  - `var ↦ tvar`, `app ↦ tapp`;
-  - `con c` to `adt` names, with `Bool` to `base bool` and `Option` to the ADT of `Sig`;
-  - `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉`;
-  - `cnil ↦ caps ∅` and `cun ↦ caps (∪)`.
+Done. `typingTarget` is the typing of the core with dictionary records as the laws of
+`Target`; `T6a_core`, `T6a_do_core` and `T6a_sugar_core` are T6(a) and its sugar forms
+for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`. It differs from the plan in
+five places.
 
-  Stages map `⟦P⟧ = pure` and `⟦R⟧ = rt R₀ E₀`, with fixed name-only rows. Prove
-  `⟦t.subst σ⟧ = ⟦t⟧.substT ⟦σ⟧` (with `Ty.reach_substT`) and `⌈⟦t⟧⌉ = ⟦⌈t⌉⌉`.
-  `TTy.dict q ↦ Ty.dict`.
-- **Terms.** `tr γ δ` maps `Γ`-variables and `Δ`-variables into one core context:
-  `lam` pushes `γ`, `lamD l` pushes `l` entries of `δ`.
-  - `meth`/`slot ↦ proj` (on a dictionary, `Typ.dproj`).
-  - `inst`/`strct`/`prim`/`const ↦ glob _`, and `ap ↦ app`.
-  - `ite`/`caseOpt ↦ match_` on literals and on the `Option` constructors.
-- **Typing.** `Has Γ Δ e t φ := ∀ Ψ Θ Γc γ δ, Corr Γc Γ Δ γ δ → Typ S Ψ Θ Γc (tr γ δ e) (.ex ⟦t⟧ ⟦φ⟧)`,
-  where `Corr` says `Γc[γ x] = ⟦Γ[x]⟧` and `Γc[δ k] = mono (dict …)`.
-- **Hypotheses.** A bundle `Real P S` covers:
-  - `Sig.dict` realises each class: slots, then methods, with `s.ctx = ⟨C, vars p⟩ :: rest`;
-  - the globals: instance bodies built from `ins.slots` and method bodies, and
-    `struct_C` with slots `struct_S (δ̄.$slotᵢ)` (Р180);
-  - `RootTy` for the bodies of the globals (`root.glob`);
-  - the `Option` constructors.
-- **The laws.** Each law is one core rule plus the commutation lemmas.
-  - `var`: `Typ.var`.
-  - `lam`: `Typ.lam`; only `Γ`-variables have non-empty reach.
-  - `let_`: `Typ.letGen` with `Φ = Facts.none`; `k = 0` uses `Typ.let_`.
-  - `lamD`: `Typ.lam`, `l` times.
-  - `meth`, `slot`: `Typ.dproj`.
-  - `dvar`: `Typ.var`.
-  - `app`, `dapp`, `dap`: `Typ.app`.
-  - `inst`, `strct`, `prim`, `const`: `Typ.glob`.
-  - `ite`, `caseOpt`: `Typ.match_` with `Covers`.
+- **Types** (`CoreTy.lean`). As planned: `var ↦ tvar`, `app ↦ tapp`, `Bool ↦ base bool`,
+  other constructors `↦ adt (N.con c)`, `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉`,
+  `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R⟧ = rt ∅ ∅`, the empty rows being the fixed
+  name-only rows. `trT_subst`/`trTT_subst`/`trS_subst` and `trT_reach` are the two
+  commutations. The names of the core are a parameter `Names`, not a fixed encoding.
+  *Deviation 1:* `D_{C τ̄} ↦ dict (N.cls C |τ̄|) ⟦τ̄⟧`: the class name carries the number
+  of parameters, because the law `slot` holds for any `q` and `Typ.dproj` needs
+  `|τ̄| = k`.
+- **Terms** (`CoreTr.lean`). *Deviation 2:* the translation is a relation `Tr N γ δ e e'`,
+  not a function: `struct_C` and `prim_p` are families over the record type and the
+  constraint (`struct_C : D_{C τ₁} →P … →P D_{C τ}` for each `τ`), `Dict` does not show
+  them, and the global (`N.strct C τ`, `N.prim p q`) is chosen with the type (Р195). The
+  rest is a function of the term: `meth`/`slot ↦ proj`, `inst`/`const ↦ glob`,
+  `lamD l ↦ λ^l` (`lamsC`, the premise `k < l` at `l - 1 - k`, `dext`). *Deviation 3:*
+  `ite ↦ match c with true → a | _ → b` and `caseOpt ↦ match e with Some y → s | _ → n`:
+  the last arm `_` makes `Covers` immediate, and `None` need not be declared.
+- **Typing.** `Has Γ Δ e t φ := ∀ Ψ Θ Γc γ δ, Corr Γc Γ Δ γ δ → ∃ e', Tr γ δ e e' ∧
+  Typ S Ψ Θ Γc e' (.ex ⟦t⟧ ⟦φ⟧)`. `Corr` says `Γc[γ x]? = ⟦Γ[x]?⟧` and
+  `Γc[δ k]? = D_{Δ[k]?}`, `none` included, so the held premises transfer (`corr_held`).
+- **Hypotheses** (`Real`). *Deviation 4:* only the signature: a record type per class and
+  number of parameters with its slots (`N.slot i : D_{Sᵢ}`, `Prog.super` of `⟨C, vars n⟩`),
+  for the class's own parameters a field per method at its scheme with the own variables
+  first (`rot`), the method scheme closed and `s.ctx = ⟨C, vars p⟩ :: rest`; the closed
+  schemes of the globals of instances (`instTy`), constants, structural and primitive
+  dictionaries; `Some : ∀a. a → Option a`. The bodies of the globals (`RootTy`) and the
+  slot fields of `struct_C` (Р180) are about the run and move to P4a4.
+- **The laws** (`CoreLaws.lean`, `CoreDict.lean`), each one rule of the core:
+  `var`, `dvar` — `Typ.var`; `const`, `inst`, `strct`, `prim` — `Typ.glob` (`has_glob`,
+  `trTT_inst`); `app`, `dapp`, `dap` — `Typ.app`; `lam` — `Typ.lam`; `lamD` — `Typ.lam`
+  `l` times (`lams_typ`); `let_` — `Typ.letGen` with `Φ = ∅`, and `Typ.let_` when `k = 0`
+  and the right side runs at `φ`; `meth`, `slot` — `Typ.dproj` (`rot_inst`); `ite`,
+  `caseOpt` — `Typ.match_`.
+- *Deviation 5:* `typingTarget` has an empty run (`Rel = True`, no steps), so that T6(a)
+  is stated now; P4a4 gives the run of the core with the same laws.
+- **Р188, decided.** `τ^q` on types other than arrows and `Eff` is not added to the core.
+  It is a new type former with its (≤-Cap) in `Le`, and every case analysis on `Ty` and
+  `Le` changes: substitution, `⌈·⌉`, canonical forms, shapes and patterns, `held`,
+  preservation, T4 and T4.3 — 45 of the 60 files of `Formal/` use them. A lazy instance or
+  constant is a global declared in `Real` at its scheme without the value qualifier; its
+  body is a hypothesis `RootTy` that the core does not derive for it. T6(a) does not read
+  bodies; the run (P4a4) and T1–T3 of a program with a lazy instance rest on that
+  hypothesis.
 
 #### P4a4: `Rel` and `Sim`
 
@@ -652,6 +685,27 @@ and fields need not be values.
 - **Rejected alternative.** Inert dictionaries, where projection unfolds one slot,
   need Church–Rosser and standardisation of slot rewriting under call-by-value, which
   is more work.
+- **Where P4a4 starts** (after P4a3). A new file `Elab/CoreRun.lean` builds `coreTarget`
+  from the laws of `typingTarget` and the run of the core; the order of work:
+  1. `RealRun P S N root`, the bodies: `RootTy S root`; the body of `N.inst I` is
+     `λ^l. drec (N.cls C n) r` with the slot `N.slot i` the translation of `ins.slots[i]`
+     under the premises, and the methods; the body of `N.strct C τ` has the slot
+     `struct_S (δ̄.$slotᵢ)` (Р180). A lazy instance satisfies `RootTy` only as a
+     hypothesis (Р188).
+  2. `load e`: `Tr` is a relation (Р195), so `load` picks a typed translation by choice,
+     `⟨[], [], e''⟩` with `Typ S [] Facts.none [] e'' …`, and `load_rel` relates any two
+     translations of `TmEqv` terms: at a typed position the record type fixes `τ` of a
+     structural global, if `Names` is injective (a hypothesis to add to `Real`).
+  3. Evaluation of a dictionary: a translation of `apps (inst I) d̄` is a value after its
+     arguments, the global and `l` β-steps, because `drec` with any fields is a value. Only a
+     projection evaluates a slot field. In an `Ent` derivation `.slot` occurs only on `Clo`
+     paths from premises, so the termination is an induction on `lt` of the record a slot is
+     projected from (К7 with `k5inst`, `k5super`), inside it on the term.
+  4. `Rel` is a congruence on the whole configuration: a dictionary flows into the store,
+     into children (`spawn`) and finalizers, so the store and the children of the regions are
+     related pointwise, not equal. It is closed under substitution of related values
+     (β-steps). `step_rel` goes by cases of `CStep`; the decomposition `plug E e` of the
+     redex needs uniqueness of evaluation contexts, which `Formal/` does not state yet.
 
 **Order.** P4a1 and P4a2 are independent; they can run in parallel in separate
 worktrees, and both touch this README. P4a3 needs both, and P4a4 needs P4a3. Record
