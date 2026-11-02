@@ -383,6 +383,76 @@ component search (props : SearchProps) =
 - AC: `examples/mtl/`: `Identity`, `StateT`, `ReaderT`, `WriterT`, `ExceptT`, `MonadState`/`MonadReader`/`MonadWriter`/`MonadError` с FD, `MonadTrans`; программа на `do` поверх `Identity` и `Eff`; невыразимое записано в `implementation-decisions.md`.
 - AC: property-тесты (`Test.property`) законов `Functor`/`Applicative`/`Monad`/`Semigroup`/`Monoid` для инстансов прелюдии, `Seq`, обёрток и трансформеров; эквивалентность сахара и ручных цепочек, fused и не-fused.
 
+### Трек W — RealWorld Conduit: клиент на React, сервер на Go 🆕
+
+Цель: большое показательное приложение [RealWorld Conduit](https://github.com/realworld-apps/realworld) в `examples/conduit` — монорепа из библиотеки контракта (`HttpApi` и общие типы), сервера с таргетом Go и SPA на React с таргетом JS, без SSR, по заветам ФП и под жёстким линтером. Решения владельца (2026-11-02): каждый пробел закрывается в языке и stdlib, а не обходится в примере (в примере нет FFI); контракт — `HttpApi` (`Rpc` и `server fn` на Go нет, а RealWorld — REST со своими наборами Hurl и Playwright); общий код — настоящий workspace; линтер — существующая строгость плюс новые правила, которых не хватит. Возможность stdlib работает на обоих таргетах (run-кейс и строка в `tests/run/portable.txt`), кроме браузерных по природе. Спецификация вендорится по закреплённому коммиту.
+
+**W0. Трек и спецификация.** ✅
+- AC: трек записан; `examples/conduit/vendor/realworld/` — `specs/api` (`openapi.yml`, `hurl/*.hurl`, `run-api-tests-hurl.sh`), `specs/e2e` (Playwright, `SELECTORS.md`) и `assets/theme/styles.css` из `realworld-apps/realworld` на `25588846`, без изменений, с лицензией апстрима (`SOURCE.md`).
+
+**W1. Пакеты с исходниками: одна библиотека для JS и Go.** ⬜
+- AC: библиотека с `"flick": { "source-dir": … }` в `package.json`, модули которой проходят проверку Go, пишет в `.iface` `targets = ["js", "go"]`; проект `emit = "go"` берёт её модули из исходников и собирает их с пакетом библиотеки, поэтому теги конструкторов совпадают с JS-стороной; JS-сторона, как и раньше, берёт сборку библиотеки.
+- AC: фикстура: JS-клиент и Go-сервер импортируют одну библиотеку, значение суммы и записи проходит по `HttpApi` туда и обратно с одинаковыми тегами; библиотека без Go — по-прежнему `P030`.
+
+**W2. Сборка workspace.** ⬜
+- AC: пакеты `examples/conduit/*` в `pnpm-workspace.yaml`; библиотека собирается раньше зависимых; связка pnpm `workspace:` доходит до `node_modules/<pkg>`, как ждёт загрузчик; рецепты `just` для примера.
+
+**W3. `Crypto.hmac` и байты строки.** ⬜
+- AC: HMAC-SHA256/384/512, сравнение за постоянное время, UTF-8-байты строки и обратно; сверено с тестовыми векторами RFC 4231 на обоих таргетах.
+
+**W4. Хеширование паролей.** ⬜
+- AC: `Crypto.Password.hash`/`verify` — PBKDF2-HMAC-SHA256 со случайной солью, строка формата PHC с параметрами; хеш одного таргета проверяется другим.
+
+**W5. Модуль `Jwt`.** ⬜
+- AC: HS256 `sign`/`verify`, утверждения через Schema, `exp`/`iat` от `Clock`, типизированные ошибки (подпись, срок, формат); векторы RFC 7515/7519; оба таргета.
+
+**W6. Аутентификация `HttpApi` со значением для обработчика.** ⬜
+- AC: схема с произвольным префиксом (`Authorization: Token <jwt>`); `with_auth check` отдаёт обработчику типизированный результат, есть вариант необязательной аутентификации; `securitySchemes` в OpenAPI; оба таргета.
+
+**W7. Раздача: CORS и SPA.** ⬜
+- AC: CORS в `HttpApi.listen`; статика с откатом на `index.html` для путей SPA; оба таргета.
+
+**W8. Миграции и SQL для Conduit.** ⬜
+- AC: модуль `Migrate` — упорядоченный список SQL с таблицей версий, прогон при старте, повторный прогон ничего не делает; оба таргета.
+- AC: запросы Conduit (`favorited`, `following`, счётчики, фильтры по тегу, автору, избранному, пагинация) пишутся DSL `sql` без `unsafe_query`; каждый найденный пробел DSL — подпункт.
+
+**W9. Элементы и атрибуты `Ui`.** ⬜
+- AC: `img`, `form` (отправка без перезагрузки), `nav`, `a`, `i`, `hr`, `fieldset`, `footer`, списки с классами; `input` с `type` (password, email); кнопка отправки формы; `class_name` у каждого элемента одинаково.
+
+**W10. Навигация.** ⬜
+- AC: ссылка внутри приложения перехватывает клик и меняет маршрут через `pushState` без перезагрузки; `deriving Url` описывает вложенные пути (`/profile/:username/favorites`, `/editor/:slug`, `/article/:slug`).
+
+**W11. `Storage`.** ⬜
+- AC: localStorage и sessionStorage как сервис браузера; атом, который сохраняется в хранилище и читается при старте.
+
+**W12. Клиент `HttpApi`.** ⬜
+- AC: относительный `base`; заголовки и middleware на весь клиент (токен) вместо `with_headers` у каждой точки.
+
+**W13. Сервисы в задачах UI.** ⬜
+- AC: задачи `Atom.query`/`Atom.mutation` получают сервисы, которые даёт корень монтирования (клиент `HttpApi`, сессия); дизайн записан до кода, если меняется модель эффектов `Atom`.
+
+**W14. `Markdown` на чистом Flick.** ⬜
+- AC: подмножество CommonMark (заголовки, абзацы, выделение, код, списки, ссылки, цитаты) в HTML с экранированием — безопасно против XSS по построению (кейсы `xss-security.spec.ts`); оба таргета.
+
+**W15. `Form` для Conduit.** ⬜
+- AC: поле-список (`tagList`), заполнение и сброс, поле пароля.
+
+**W16. Строгость примера.** ⬜
+- AC: `[lint]` с жёсткими `max-function-*` и `no-let-assert`; `check --warnings-as-errors` и `fmt --check` для contract, server и client в `flick/tests/examples.rs`.
+- AC: каждое правило, которого не хватило при написании, — отдельный пункт W17+ с кодом в `diagnostics/codes.rs` и фикстурой.
+
+**W20. Контракт.** ⬜ (после W1)
+- AC: `Conduit.Types`, `Conduit.Errors`, `Conduit.Api` — уточнённые `Email`/`Username`/`Slug`, записи, точки `HttpApi` по `openapi.yml`; OpenAPI из контракта сверен со спецификацией.
+
+**W21–W23. Сервер.** ⬜ (после W3–W8, W20)
+- AC: схема, миграции, репозитории за сервисом (Postgres и `Ref` в памяти); auth, users, profiles; articles, feed, favorites, comments, tags. Чистое ядро (slug, пагинация, проверки) без `Eff`, property-тесты; весь официальный набор Hurl проходит против Go-сервера с Postgres в Docker.
+
+**W24–W26. Клиент.** ⬜ (после W9–W15, W20)
+- AC: оболочка, маршруты, сессия, шапка; Home, Login, Register, Settings; Editor, Article, Profile. Чистое ядро (маршруты, модели вида, проверки) покрыто `flick test`; официальный набор Playwright проходит против Vite и Go-сервера.
+
+**W27. Рецепты и README.** ⬜
+- AC: `just conduit-dev`, `just conduit-test` (Hurl, Playwright, unit), README с запуском и устройством монорепы.
+
 ## 4. Порядок и зависимости
 
 ```
