@@ -459,7 +459,7 @@ fn json_reporter_and_json_diagnostics_keep_their_streams() {
     );
 }
 
-/// The example sessions of the CLI specification, without the commands that reach the
+/// The example sessions of the CLI reference, without the commands that reach the
 /// npm registry (`install`, `add`), on a project from `flick new`.
 #[test]
 #[ignore = "needs Node and the installed runtime"]

@@ -65,7 +65,7 @@ Contextual words are ordinary names everywhere except in one position:
 ### Float literals
 
 The grammar of JavaScript `NumericLiteral`, so a literal means exactly the JS
-number (see [Schema and standard data types](../../spec/09-schema/)):
+number (see [Schema and standard data types](../../spec/07-schema/)):
 
 - decimal `0`, `42`, `1.5`, exponents `1e-3`, `2E+10`;
 - `0x1F`, `0o17`, `0b1010` (prefix letters in either case);
@@ -99,7 +99,7 @@ There is no interpolation.
 
 Line breaks inside any string value are `\n`, also in `\r\n` sources.
 Expressions made only of literals are evaluated at compile time with JS
-semantics (see [Evaluating literal expressions](../../spec/08-typescript-and-ffi/#evaluating-literal-expressions)): `60 * 60 * 24`,
+semantics (see [Evaluating literal expressions](../../spec/06-typescript-and-ffi/#evaluating-literal-expressions)): `60 * 60 * 24`,
 `"a" ++ "b"`, `not false`.
 
 ```flick
@@ -153,7 +153,7 @@ a range, `1.5` a number. Bitwise operations are the functions `Float.bit_*`.
 
 Function bodies, match arms and the members of `class`, `instance` and
 `service` are delimited by indentation; there is no `in` and the last
-expression of a block is its value (see [Direct effectful calls](../../spec/03-direct-calls/)). Braces delimit records and the
+expression of a block is its value (see [Direct effectful calls](../../spec/01-direct-calls/)). Braces delimit records and the
 blocks of `task`, `scope`, `provide`, `sql`, `ui`, `cli`, `codec` and `rec`.
 
 1. Top-level declarations start at column 1. A line indented further continues
@@ -264,7 +264,7 @@ two. Writing `of` before the fields is `FLICK-S010`.
 `type error E` declares an error; its one constructor is named `E` too, and an
 error with fields is `type error E = E T …`. A constructor named otherwise is
 `FLICK-S007`.
-Every named function has its full signature right above its `let` (see [Direct effectful calls](../../spec/03-direct-calls/)),
+Every named function has its full signature right above its `let` (see [Direct effectful calls](../../spec/01-direct-calls/)),
 except an instance method, whose signature comes from its class; the
 parser accepts a signature without a definition, and later phases check the
 pairing.
@@ -339,7 +339,7 @@ atom        = name | Con { "." Con } | "none" | "(" ")" | "(" type ")"
 
 - `a -> b` is pure; `a ->{r; e} b` is a runtime call needing services `r` and
   failing with errors `e`; `a ->{} b` is a runtime call with both rows empty,
-  never the same as `->` (see [Decisions of the first version](../../spec/02-decisions/), [Values of computations and their execution](../../spec/04-computations/)). `-> {` with a space is an arrow to a record
+  never the same as `->` (see [Specification](../../spec/), [Values of computations and their execution](../../spec/02-computations/)). `-> {` with a space is an arrow to a record
   type.
 - `none` is the empty row literal. An arrow side left out is empty too:
   `->{; E}` is `->{none; E}`, `->{R;}` is `->{R; none}` (see
@@ -403,7 +403,7 @@ nothing, `if c` without `then` is `if c then rest else nothing` of
 `Alternative`, `let` scopes over the rest, and the last statement is an
 expression of the block's monad. The pattern after `<-` must be irrefutable,
 and the rest of the block is a pure function: a runtime call there is
-`FLICK-E001` (see [`do`, `for` and comprehensions](../../spec/06-higher-order/#do-for-and-comprehensions)).
+`FLICK-E001` (see [`do`, `for` and comprehensions](../../spec/04-higher-order/#do-for-and-comprehensions)).
 `p <- a and q <- b` binds both independently through `map2` of
 `Applicative`: neither value sees `p` or `q`, and a group followed only by
 `pure e` needs no `Monad`. `and` is a word only there; elsewhere it is a name.
@@ -432,12 +432,12 @@ too). `f x?` is `f (x?)`; write `(f x)?`.
 `todo` (optionally followed by a string) is an expression of any type, and
 `echo` without an operand is a function, as in `x |> echo`. `_` is a type
 only in a signature or annotation. `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). `ignore e` discards a non-`Unit`
-result of an intermediate statement (see [Direct effectful calls](../../spec/03-direct-calls/)). `await e` runs a stored `Eff` once in
-the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/04-computations/)). In
+result of an intermediate statement (see [Direct effectful calls](../../spec/01-direct-calls/)). `await e` runs a stored `Eff` once in
+the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/02-computations/)). In
 `provide e { … }` and `codec e { … }` the `{` ends the head expression.
 In `cli "name" { … }` the parser fixes only the clause shapes; aliases on an
 `arg`, duplicate names and the option types are checked by CLI elaboration
-(see [CLI eDSL: flags, arguments and subcommands](../../spec/10-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands)). A `///` comment right above a `flag`, `arg` or
+(see [CLI eDSL: flags, arguments and subcommands](../../spec/08-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands)). A `///` comment right above a `flag`, `arg` or
 `subcommand` clause is its help text.
 
 ```flick
@@ -499,7 +499,7 @@ list_item    = or_pattern | "..." (name | "_")
 
 A record pattern field without `= pattern` binds a variable named like the
 field. `...rest` may only be the last item of a list pattern; it binds the
-rest of the list. Or-patterns and guards follow Rust's rules (see [Variants, guards and or-patterns](../../spec/08-typescript-and-ffi/#variants-guards-and-or-patterns)): every alternative binds the same names, a name is bound at
+rest of the list. Or-patterns and guards follow Rust's rules (see [Variants, guards and or-patterns](../../spec/06-typescript-and-ffi/#variants-guards-and-or-patterns)): every alternative binds the same names, a name is bound at
 most once per pattern or per function's parameters (`FLICK-S012`), and a
 guard `when e` covers the whole arm. A `|` at the start of a line inside an
 arm's pattern continues the or-pattern; after `->` it starts the next arm.

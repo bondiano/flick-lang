@@ -1,372 +1,165 @@
 ---
-title: "10. Type-level programming and eDSLs"
+title: "Type-level programming and eDSLs"
 ---
 
-**Accepted for the first version:** library SQL/UI/CLI DSLs with the chosen ML syntax `sql params { ... }`, `ui { ... }` and `cli "name" { ... }`; a PostgreSQL backend, a React adapter and Effect CLI. The type core is shared: rows, labels, finite indices, HKT and MPTC/FD. The examples below are Flick syntax, not Selda or Droplet.
+Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
 
-## What Selda and Droplet show
+## Type-level capabilities
 
-[Selda](https://github.com/Kamirus/purescript-selda) builds SQL through a pure state monad and typed column expressions; [Droplet](https://github.com/easafe/purescript-droplet) is closer to SQL combinators, where the AST type contains clauses, fields and the projection. Both libraries tie the structure of a query to the type of its result through rows, multiparameter classes and functional dependencies.
-
-| Task | Observation from the sources | Decision for Flick |
+| Mechanism | What it expresses | Boundary |
 | - | - | - |
-| Building a query | In Selda, `Query s a` wraps a pure `State GenState a` | Building the AST is pure; touching the database is a separate runtime call |
-| Table and result fields | A row is turned into a record of SQL expressions, then into a record of values | Generic operations over rows; the user works with ordinary fields |
-| LEFT JOIN | Both libraries make the right side nullable without doubling Maybe | Nullability as a separate index of the SQL expression; the output is `Option a` |
-| Projection inference | In Droplet, `ToQuery q projection` has the dependency `q -> projection` | The result type is computed uniquely from the completed query |
-| Hiding a large type | Droplet's internal `buildQuery` erases the AST into SQL and parameters, keeping the projection | A public opaque Query with a short signature, with no need to write the type of the whole AST |
-| Handling special cases | The sources contain ordered `else instance` chains | A direct port conflicts with no-overlap; non-overlapping indices and deterministic row/type operations are needed |
-
-The sources of Selda were checked at commit `a81f47f9054e9ea893d5ef79586be70068462249`: [Query.Type](https://github.com/Kamirus/purescript-selda/blob/a81f47f9054e9ea893d5ef79586be70068462249/src/Selda/Query/Type.purs), [FromTable and nullable JOIN](https://github.com/Kamirus/purescript-selda/blob/a81f47f9054e9ea893d5ef79586be70068462249/src/Selda/Query.purs#L197-L302). For Droplet, commit `990dd8ce078436bdb6c9ffe280dfdc97c516802b`: [ToQuery](https://github.com/easafe/purescript-droplet/blob/990dd8ce078436bdb6c9ffe280dfdc97c516802b/src/Droplet/Language/Internal/Translate.purs#L99-L145), [nullable instance chains](https://github.com/easafe/purescript-droplet/blob/990dd8ce078436bdb6c9ffe280dfdc97c516802b/src/Droplet/Language/Internal/Syntax.purs#L1507-L1516), [internal buildQuery](https://github.com/easafe/purescript-droplet/blob/990dd8ce078436bdb6c9ffe280dfdc97c516802b/src/Droplet/Language/Internal/Translate.purs#L1161-L1172).
-
-For SQL the target set chooses restricted MPTC/FD and compiler-owned row primitives. Non-overlapping indices and a typed AST replace the cases where the original PureScript libraries use ordered instance chains. A letter-for-letter port of such instances is not promised; the original coherence rules are preserved.
-
-## Minimal type-level capabilities
-
-| First-version mechanism | What it expresses | Boundary |
-| - | - | - |
-| Type, FieldRow = Row Type, Symbol, Constraint, Region, CaptureRow | Data, fields, constraints and lifetime | Different row kinds are not mixed |
-| User-defined finite kinds | Closed nullability/phase indices | Only finite nullary constructors; no general promotion/dependent values |
+| Kinds `Type`, `Row k`, `Symbol`, `Constraint`, `Region`, `CaptureRow`, `ServiceRow`, `ErrorRow` | Data, fields, labels, constraints and lifetime | Different row kinds are not mixed |
+| User-defined finite kinds (`kind`) | Closed indices such as nullability or phase | Only nullary constructors; no general promotion of values |
 | Exact structural records and row polymorphism | Known fields and an open tail | No implicit width subtyping |
-| HasField, Lacks, Project, Remove, UnionDisjoint | Access, projection, absence and field collisions | Compiler-owned deterministic primitives |
-| Map over a row and canonical labels | Transforming every field type with a Type → Type constructor | Not a general language of type families |
-| MPTC, superclasses, FD | Relations between the AST, projections and parameters | Strict coverage, non-overlap, termination |
-| Opaque indexed AST | Scope, phase, nullability and a checked Query | Cannot be bypassed through a public constructor |
-| Higher-rank callbacks and captures | Fresh DSL scopes and callbacks | Explicit forall; provenance is preserved |
-| Diagnostic constraints | An error with a label and a source range | Not arbitrary compile-time JS |
+| Row primitives `HasField`, `Lacks`, `Remove`, `Project`, `UnionDisjoint`, `Map`, `Labels` | Access, absence, removal, projection, disjoint merge, mapping every field type, canonical labels | Solved by the compiler from known records; a program cannot declare instances of them |
+| Multiparameter classes, superclasses, functional dependencies | Relations between an AST, its projections and its parameters | Coverage, non-overlap and a solver budget |
+| Opaque indexed types | Scope, phase, nullability and a checked query | No public constructor to bypass them |
+| Higher-rank callbacks and captures | Fresh DSL scopes and callbacks | Explicit `forall`; captures are preserved |
 
-HKT alone does not compute which fields appear after a JOIN. Higher-rank alone does not transform a record. Operations over the structure of types are what is needed.
+The row primitives are described in [Row primitives](../../reference/classes/#row-primitives). HKT alone does not compute which fields appear after a JOIN, and higher-rank types alone do not transform a record: operations over the structure of types are what the DSLs need.
 
-A user-defined finite kind is declared, for example, as `kind Nullability = NonNull | Nullable`; its constructors are only type-level indices. Such declarations create neither runtime values nor a general promotion mechanism. User-defined open/closed type functions, associated types, instance chains, impredicativity and dependent types are not part of the first version. If a relation does not pass strict coverage, the library moves the computed projection into a parameter of the typed AST or uses a fixed row primitive, rather than enabling UndecidableInstances.
+A finite kind is declared, for example, as `kind Nullability = NonNull | Nullable`; its constructors are only type-level indices and create no runtime values. Flick has no type families, associated types, instance chains, impredicativity or dependent types. If a relation does not pass the coverage rules, a library moves the computed type into a parameter of its typed AST or uses a row primitive.
 
-### Three ways to implement the type-level part
-
-| Approach | Benefit | Cost |
-| - | - | - |
-| A dedicated SQL checker in the compiler | A fast path to good SQL errors | The compiler knows the domain; new DSLs need new special rules |
-| Library relations on MPTC/FD and row primitives | Extensibility through ordinary libraries; the same mechanism is needed for Schema and UI | Termination/coherence and clear diagnostics are required |
-| Closed functions over types | Convenient notation for transformations such as projection/defaults/nullability | A separate normalizer and reduction rules for equalities; open inputs may stay unevaluated |
-
-The second path is chosen: shared row primitives and library relations. The SQL elaborator translates surface syntax into typed constructors and attaches source ranges; PostgreSQL semantics do not become a set of special rules of the universal checker. Closed type functions are excluded from the first version.
-
-Normalization is cached and has an explicit budget: the initial default is 100,000 solver steps per checked definition and a depth of 256 class constraints. The build configuration can raise the limit; exceeding it produces a diagnostic with the chain of constraints. The budget does not replace termination rules and does not let unchecked code be accepted. Type-level computations do not run arbitrary JS and do not access the network or the database.
+Constraint solving has a budget per checked definition: `solver-steps` (100 000) and `solver-depth` (256 nested constraints) in `[build]` of `flick.toml`. Exceeding it is `FLICK-C009`, with the chain of constraints; running out is never a success. Type-level computations do not run JS and do not access the network or the database.
 
 ## SQL: a short signature, full inference of the result
 
-The public API uses distinct opaque types:
-
-- `Sql.Template dialect params result` — a plan of the query shape with named parameters that are not yet bound.
-
-- `Sql.Query dialect result` — a query with bound parameter values.
-
-- Internal fragments/expressions — intermediate types with scope and phase indices; they cannot be executed directly.
-
-`Template` does not promise server-side PREPARE: that is a separate driver optimization. The query completion boundary checks all references and clauses, then hides the large AST type. This preserves our rule of a full signature above every named function and makes it possible to do without `_` in the public query type.
-
-Suppose the tables Users and Accounts are described. `Users.id` and `Accounts.user_id` have type UserId, `Users.name` is String, and the original `Accounts.balance` is a non-null BigDecimal.
+`sql table Name "table" { … }` declares the row type `Name` and its table; the compiler never connects to a database. `sql [p] { … }` is a pure, checked `Sql.Template Pg params row`. The name after `sql` binds the parameters, whose types follow from where they are used; `$name` captures a value of the program as a placeholder.
 
 ```flick
-type alias BalanceRow =
-  {
-    name : String;
-    balance : Option BigDecimal;
-  }
+type alias BalanceRow = {
+  name : String;
+  balance : Option BigDecimal;
+}
 
-balances :
-  Sql.Template Pg { user_id : UserId } BalanceRow
-let balances =
-  sql params {
-    from user in Users
-    left_join account in Accounts
-      on account.user_id == user.id
-    where user.id == params.user_id
-    select {
-      name = user.name;
-      balance = account.balance;
-    }
+balances : Sql.Template Pg { user_id : UserId } BalanceRow
+let balances = sql params {
+  from user in Users
+  left_join account in Accounts on account.user_id == user.id
+  where user.id == params.user_id
+  select {
+    name = user.name;
+    balance = account.balance;
   }
+}
 
-load_balances :
-  UserId ->{Database; EncodeError, DbError, DecodeError} List BalanceRow
+load_balances : UserId ->{Database; EncodeError, DbError, DecodeError} List BalanceRow
 let load_balances user_id =
   let query = Sql.bind balances { user_id = user_id }
   Database.query query
 ```
 
-`params` is the binder of the chosen SQL grammar; its fields are inferred from the expected Template. `Sql.bind` purely binds inert values without performing I/O. In the first version, parameter/response codecs are certified as pure; their expected failures are not lost. `Database.query` has the contract `Sql.Query Pg a ->{Database; EncodeError, DbError, DecodeError} List a`: it encodes the parameters, executes the query and checks the response. Effectful enrichment runs after the query as ordinary runtime code; serviceful SQL codecs are deferred.
+A block consists of clauses, one per line or separated by `;`; the continuation of a clause is indented deeper. `from x in T`, `join x in T` and `left_join x in T` introduce an alias; `on e` refines the preceding join. The other clauses are a word followed by comma-separated expressions: `where`, `group_by`, `having`, `order_by`, `limit`, `offset`, `select`, `union`, `union_all`, `insert_into`, `values`, `update`, `set`, `delete_from`, `returning`. Inside the block these words end a function application, so a clause can begin without a separator. The parser fixes only this form; the SQL elaboration of the checker checks the rest against the tables:
 
-The type of balance becomes `Option BigDecimal` precisely because of the LEFT JOIN. If the JOIN is replaced with an INNER JOIN, the nullable cause from that join disappears, but a column that was nullable to begin with still remains nullable. A repeated LEFT JOIN must not produce nested `Option (Option a)` merely because of two identical causes of absence.
-
-A call to `load_balances` is an ordinary direct effectful call. Keeping it for later looks like this:
-
-```flick
-deferred_balances :
-  UserId -> Eff {Database} {EncodeError, DbError, DecodeError} (List BalanceRow)
-let deferred_balances user_id =
-  task { load_balances user_id }
-```
-
-`sql params { ... }` builds a pure AST; without the sugar, the same library combinators are available. An ordinary let does not bind an arbitrary monad. Generic do is not part of the first version.
-
-A `sql params { … }` block consists of clauses — one per line or separated by `;`; the continuation of a clause is written with a deeper indent. The optional name after `sql` binds the query parameters. `from x in T`, `join x in T` and `left_join x in T` introduce an alias; `on e` refines the preceding join and may stand on the next line. The remaining clauses are a word followed by comma-separated expressions: `where`, `group_by`, `having`, `order_by`, `limit`, `offset`, `select`, `union`, `union_all`, `insert_into`, `values`, `update`, `set`, `delete_from`, `returning`. Inside the block these words terminate a function application, so a clause can begin without a separator. The parser fixes only this form; types, scopes, phases and the dialect are checked by SQL elaboration.
-
-### What is checked in SQL
-
-| Check | Example of a rejected program |
+| Check | Code |
 | - | - |
-| Fields and column types | `user.nmae`; comparing UserId with Date |
-| Scope and aliases | A reference to an alias of a neighboring completed query; an ambiguous unqualified name |
-| Projection | Two results with the same name without an explicit renaming policy |
-| Nullable JOIN | An attempt to get a plain BigDecimal from a nullable balance |
-| Phases and aggregation | A non-aggregated field in the SELECT of an aggregate query without a valid grouping |
-| INSERT | A missing required field; a value of the wrong type; a write to a generated-always field |
-| Dialect | An operation that does not exist in the chosen backend |
-| Parameters | An unknown parameter name; an unsuitable codec |
+| Unknown column, unknown or out-of-scope alias, ambiguous column | `FLICK-Q001`, `FLICK-Q002`, `FLICK-Q003` |
+| Two results with the same name | `FLICK-Q004` |
+| A column neither grouped nor aggregated; an aggregate where none is allowed | `FLICK-Q005`, `FLICK-Q006` |
+| An INSERT missing a required column; a write to a generated column | `FLICK-Q007`, `FLICK-Q008` |
+| An unknown parameter; a construct outside the supported subset | `FLICK-Q009`, `FLICK-Q010` |
+| Comparing values of different Flick types | A type error, even when both are numbers in SQL |
 
-The internal opaque `Sql.Expr scope phase nullability sql_type` preserves the indices; its constructors belong to the DSL. LEFT JOIN changes nullability, group_by creates a grouping witness, and an aggregate expression cannot be substituted into WHERE. Alias scopes are fresh; a completed Query does not leak local expressions. The first version supports only uncorrelated subqueries; outer correlation and LATERAL are out of its scope.
+A result that may be `NULL` — a nullable column, a column of a `left_join`ed table, an aggregate other than `count` — has type `Option t`, once: two left joins do not make `Option (Option t)`. `==` is SQL's comparison, and `where` keeps only rows where the condition is true; `is_null`, `is_not_null` and `is_not_distinct_from` are separate functions.
 
-SQL uses its own three-valued logic. `==` inside a SQL block is translated into an SQL comparison, not into the language's ordinary `Eq`. WHERE keeps rows with SQL TRUE; SQL UNKNOWN is not automatically turned into a source Bool. Separate `is_null`, `is_not_null` and null-safe equality are needed. Aggregates also have their own rules: MAX over an empty set may produce NULL, COUNT has a different contract.
-
-### Data and SQL text
-
-Parameters and identifiers are different channels. User values are passed through placeholders and the driver's parameter array; they are not concatenated into SQL. Table, alias and column names come from metadata or a checked Identifier and are correctly encoded by the backend. A runtime String is not implicitly turned into an SQL fragment.
-
-Raw SQL remains a separate, explicitly unsafe API with a specified result codec. It does not get the static guarantees of the typed AST. Substituting a user-supplied table name into a value position must not be called parameterization.
-
-### The Schema and SQL boundary
-
-The first dialect is **PostgreSQL**. Table metadata explicitly specifies SQL types, nullability, keys, generated/identity/default and the link to pure domain/wire codecs. Metadata is written in source or generated by a separate tool from migrations/the schema; ordinary compilation does not connect to the database. A domain Schema does not infer SQL constraints automatically and does not turn any refinement into a CHECK.
-
-| SQL subset | First version |
-| - | - |
-| SELECT/FROM/WHERE and an explicit projection | Yes |
-| INNER JOIN and LEFT JOIN | Yes |
-| GROUP BY/HAVING, the main aggregates | Yes, with phase checking |
-| ORDER BY, LIMIT/OFFSET | Yes |
-| Uncorrelated subqueries, EXISTS/IN | Yes |
-| UNION/UNION ALL | With compatible projections |
-| INSERT/UPDATE/DELETE and RETURNING | Yes; required/default/generated columns are checked |
-| Correlated/LATERAL, recursive CTE, window functions | After the first version |
-| RIGHT/FULL JOIN, arbitrary extensions, DDL/migration DSL | After the first version |
-
-Outside the safe subset, a separately named unsafe/raw API with an explicit result decoder is available.
-
-SQL bigint maps to BigInt, decimal to BigDecimal; Float is allowed only through an explicitly checked range/precision. SQL NULL is an expression index and an Option on output; a source Option as a domain value does not replace this index. Schema drift and response mismatch yield DecodeError, parameter encoding yields EncodeError, and driver/server/constraint failures yield DbError with inert diagnostics. Defects and interruption keep the common runtime contract.
-
-Cancellation does not promise to roll back SQL that has already been executed. The driver does not return the connection to the pool until a coordinated drain/close/quiescence. Types do not prove that the database is up to date, permissions, plan cost, transaction isolation or the number of rows without a separate cardinality contract.
+`Sql.bind` binds parameters without I/O; only `Database.query` and `Database.execute` talk to the database. Values never enter the SQL text: each parameter and literal is a placeholder, and tables, aliases and columns come from metadata. A refused parameter is `EncodeError`, a response that does not match the query `DecodeError`, a refusal of the server or driver `DbError`. Correlated and `LATERAL` subqueries, recursive CTEs, window functions, `RIGHT` and `FULL` joins and DDL are outside the checked subset; `Sql.unsafe_query` runs raw SQL with an explicit decoder, and only an `Sql.Identifier` names a table or a column there. See [SQL](../../reference/sql/) for tables, transactions, migrations and cancellation.
 
 ## UI eDSL: types of props, children and actions
 
-The base model is `Ui`: a pure description of an interface with deferred handlers. A handler's task writes atoms through `Atom.Write` and nothing else; it provides any other service itself and handles its own errors, so `Ui` carries no service or error rows. Building the UI does not run these handlers.
+`Ui` is a pure description of an interface with deferred handlers. A handler's task writes atoms through `Atom.Write` and nothing else; it provides any other service itself and handles its own errors, so `Ui` carries no service or error rows. Building a `Ui` runs no handler, reads no state and touches no DOM.
 
 ```flick
-type alias SaveButtonProps c =
-  {
-    label : String;
-    disabled : Bool;
-    on_save : (Unit ->{Atom.Write;} Unit)^c;
-  }
+type alias SaveButtonProps c = {
+  label : String;
+  disabled : Bool;
+  on_save : (Unit ->{Atom.Write;} Unit)^c;
+}
 
-save_button :
-  SaveButtonProps c -> Ui^c
-let save_button props =
-  Ui.button
+save_button : SaveButtonProps c -> Ui^c
+let save_button props = ui {
+  button
     {
       disabled = props.disabled;
-      on_click = Ui.Event.exhaust (fun _ ->
-        task { props.on_save () }
-      );
+      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
     }
-    [Ui.text props.label]
+    [text props.label]
+}
 ```
 
-`on_click` has the opaque type `(Ui.Handler ClickSnapshot)^c`. Its builder takes a callback that creates a cold Eff and an explicitly chosen concurrency policy. In the example, Exhaust ignores new clicks until the current task finishes. The pure `save_button` does not run `props.on_save` or Ref.get during render; state arrives through the model/props. General effectful hooks inside a pure render are not allowed. Captures of props/handlers are preserved in Ui.
+`ui { … }` is a block in which the names of `Ui` need no `Ui.`: a local binding wins, then a name of `Ui`, then the module's own names. It compiles to the same IR as the calls `Ui.button … [Ui.text …]`, and applying a `Ui.Component p` to props inside it is `Ui.component value props`, including `props |> value`. JSX is not part of the language.
 
-This agrees with [React](https://react.dev/reference/rules/components-and-hooks-must-be-pure)'s requirement of repeatable render, but the purity and lifetime checking is a Flick contract.
+Props are exact records: a missing field, an unknown one or a wrong type is an error. Children are an ordinary argument of the chosen type — `List Ui`, `Ui`, `Option Ui`, named places, `NonEmpty Tab` — and a key is metadata given with `Ui.keyed`, never a prop. Handlers keep their captures: a button whose handler holds a file of a scope cannot leave that scope (`FLICK-G001`). `Ui.text` inserts text through a safe channel; a URL is a `SafeUrl` and raw HTML a `SanitizedHtml`, which a plain `String` never is.
 
-### UI syntax in Flick
+### Atoms, views and components
 
-`ui { ... }` is the chosen sugar over the same checked calls:
+State lives in atoms: `Atom.make value` is a state, `Atom.derived` an atom computed from the atoms it reads, and `Atom.set`/`Atom.update` write through the service `Atom.Write`. A view (`Ui.view`, of type `Ui.View p`) is a component whose render reads atoms through `Atom.Read` and renders again only when an atom it read changes. A render is a Sync stage: a write, another service or an error in it is `FLICK-U004`. Nothing is made while rendering: an atom, an action or a view made in a render is `FLICK-U006`.
+
+`component name (props : P) = body` declares a view of type `Ui.View P`, which `Ui.render name props` places. The body is a block: its last expression is the render, run again whenever an atom it read or its props change; the statements before it are the setup of each instance, run once when the instance mounts with the service `Setup s` of the instance's region. `Atom.local` makes an atom of the instance there, and the `Action` makers its actions.
 
 ```flick
-save_button :
-  SaveButtonProps c -> Ui^c
-let save_button props =
+component counter (start : Float) =
+  let count = Atom.local start
+  let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
   ui {
-    button
-      {
-        disabled = props.disabled;
-        on_click = Ui.Event.exhaust (fun _ ->
-          task { props.on_save () }
-        );
-      }
-      [text props.label]
+    let n = Atom.value count
+    button { on_click = bump; disabled = false } [text (show n)]
   }
 ```
 
-JSX `<...>` is not added in the first version; `ui { ... }` and ordinary Ui functions build one representation. The block opens the names of the `Ui` module (a local binding wins, then a name of `Ui`, then the module's names) and treats applying a `Ui.Component p` to props as `Ui.component value props`, including `props |> value`. Other values and calls keep their ordinary types. Both forms yield the same typed IR, retaining the ML syntax and uniform props/callback checks. [ReScript components](https://rescript-lang.org/docs/react/components-and-props/) serve as an example of a typed façade over React; Flick's surface syntax was chosen independently.
-
-The first renderer is the **React adapter**. A custom reconciler/DOM renderer, SSR, hydration, React Server Components and the full hooks model are outside the first version. The adapter preserves React's component boundaries, key/ref and lifecycle; the optimizer does not replace a component with an arbitrary direct function call. The runtime state of the bridge lives outside the pure component body.
-
-### Props and children
-
-Props are an exact structural record. A missing required field, a typo or a wrong type is an error. Spread uses a disjoint row merge; overwriting only through an explicit update. Optional/defaults follow the general language, and JS undefined appears only in the adapter. Children are an ordinary argument of the chosen type. Renderer key/ref are separate metadata, not hidden fields of the user's props record.
-
-| Children contract | Data type |
-| - | - |
-| Any number of nodes | `List Ui` |
-| Exactly one node | `Ui` |
-| An optional node | `Option Ui` |
-| Named slots | A record with header/body/footer |
-| A non-empty set of tabs | `NonEmpty Tab` |
-| An element without content | The API has no children argument |
-
-If a component must accept specifically Tab, we keep the Tab type until the container is assembled. After any child is erased into a general Ui, it is too late to find out its origin. An ordinary signature also does not prove key uniqueness in a dynamic list.
-
-An ordinary generic component does not require general type families:
-
-```flick
-type alias SelectProps a c =
-  {
-    items : List a;
-    selected : Option a;
-    key : (a -> String)^c;
-    render_item : (a -> Ui^c)^c;
-    on_change : (Ui.Handler a)^c;
-  }
-```
-
-`on_change` is a handler with a mandatory policy (`Ui.Event.latest …`), and the event snapshot is the selected item: a bare function `a -> Eff r e Unit` would mean an implicit fire-and-forget. All fields are tied by a single a. It is impossible to combine items of User with a handler for Product. Row operations will be needed for generic wrappers, defaults and a controlled spread; higher-rank for special polymorphic render callbacks, not for every generic component. [TypeScript JSX](https://www.typescriptlang.org/docs/handbook/jsx.html) also separates checking of intrinsic props and children; Flick's DSL can express these contracts with ordinary functions without reproducing the whole TS type system.
+When an instance unmounts, the events of the actions its setup made stop and their tasks are interrupted. An action (`Action.exhaust`, `latest`, `queue`, `concurrent`) is a handler declared once and given to as many elements as need it; they share its policy state in a root, and `Action.with action arg` gives each element its own argument and state. See [Atoms and views](../../reference/ui/#atoms-and-views), [Components](../../reference/ui/#components) and [Actions](../../reference/ui/#actions).
 
 ### Event execution and lifetime
 
-A DOM callback that expects void does not run the returned Eff. The adapter must obtain an inert event snapshot, synchronously decide on the default action, start a managed task and observe its completion. `preventDefault` cannot be deferred to an arbitrary await; a declarative policy or a pure synchronous decision callback is suitable.
+A handler field has the opaque type `Ui.Handler snapshot`, which only a policy makes, so no handler is fire-and-forget:
 
-A handler handles its expected errors in its own task, so a UI root's supervisor receives `Failure none`: infrastructure defects, such as an event a full policy rejects, and shutdown interruption remain distinguishable. `Ui.Dom.container id` looks up an optional `Ui.Dom.Container`. `Ui.Dom.mount container supervisor ui` renders `ui` with the registry of `Atom.Registry`; a view (`Ui.view`) reads atoms through `Atom.Read` while it renders and renders again only when an atom it read changes, and handlers write atoms with `Atom.set`/`Atom.update` through the service `Atom.Write`; `Atom.layer` provides the registry as both. The initial DOM mount is synchronous. React 19 may coalesce later renders; this does not promise a commit after every task or one render per animation frame. `Ui.Dom.mount` lives until the root is closed and cleanup is complete. A completed mount does not promise to return future failures through its ordinary result. A failure of the supervisor itself ends the root as a defect and is passed to the runtime reporter, without recursive reporting.
-
-`Ui.mount_with renderer supervisor ui` has the same registry, services, errors, captures and shutdown contract, using an opaque `Ui.Renderer` factory instead of a DOM container. The factory opens the root only when the Effect runs and supplies `render(node)` and synchronous `unmount()` operations. `Ui` imports only `@flick-lang/runtime/ui/react`; DOM mounting belongs to `Ui.Dom` and `@flick-lang/runtime/ui`, so a compiled `Ui.mount_with` consumer need not load `react-dom`. HTML constructors remain DOM-specific. React Native, Ink and React Three Fiber adapters and their typed host primitives are not implemented.
-
-Sibling keys preserve subtree and event-policy identity on reorder, while stable component-owned listeners receive the committed handler. Views over atoms with Effect handlers are Elm-like, not a complete TEA program: the serialized message loop, `init`/`update` commands and model-driven subscriptions are still missing. See the [UI reference](../../reference/ui/#prioritized-gaps) for the prioritized gaps and implementation evidence.
-
-A policy is mandatory for every handler; there is no implicit fire-and-forget.
-
-| Constructor | Behavior |
+| Constructor | An event that comes while earlier tasks run |
 | - | - |
-| `Ui.Event.exhaust` | Ignores new events until the current task has finished |
-| `Ui.Event.latest` | Cancels the previous one, waits for stop/quiescence, then starts the last snapshot; there is a single pending slot |
-| `Ui.Event.queue capacity` | A bounded FIFO; when full, a new event is rejected and the supervisor receives an infrastructure overflow defect |
-| `Ui.Event.concurrent limit` | No more than limit active tasks; when saturated, a new event is rejected with an infrastructure overflow defect, with no hidden unbounded queue |
+| `Ui.Event.exhaust` | Is ignored |
+| `Ui.Event.latest` | Interrupts the running task, waits until it stopped, then runs; at most one event waits, the newest |
+| `Ui.Event.queue capacity` | Waits, `capacity` events at most; beyond that it is rejected |
+| `Ui.Event.concurrent limit` | Runs, `limit` tasks at most; beyond that it is rejected |
 
-Capacity/limit are checked positive integers; constants are checked by the compiler, dynamic values by a checked constructor. Infrastructure defects are not passed off as a new element of the typed row `e`. Cancellation does not roll back an external action that has already taken place. The default action is preserved if a declarative policy or a pure synchronous decision does not require preventDefault.
+`capacity` and `limit` are positive integers: a constant that is not one is `FLICK-U001`, a computed one is checked when the handler is made. A rejected event is an infrastructure defect for the supervisor, never an error of the typed row. The handler gets an inert snapshot taken inside the DOM callback; `Ui.Event.prevent_default decide h` decides the default action synchronously with the pure `decide`.
 
-Capture checking passes through props, callbacks, Eff and Ui. Returning a button whose handler captured a file from an already closed scope is an error. It is acceptable to open the file inside a task or to keep the UI within the file's lifetime region. The presence of `Ui` does not prove the absence of a captured scoped resource.
+`Ui.Dom.mount container supervisor ui` renders `ui` with the provided atom registry (`Atom.layer`); the initial DOM mount is synchronous, later renders are React 19's to schedule. The supervisor receives `Failure none`: task failures and rejected events. Closing has two phases: React cleanup stops taking events and unmounts the tree, then the handler tasks are interrupted and joined, and only then does `mount` end, so the scope releases its resources after the tasks have stopped. `Ui.mount_with renderer supervisor ui` has the same contract with an opaque `Ui.Renderer` instead of a DOM container.
 
-React cleanup synchronously closes event intake and removes registrations. The app-owned close task interrupts and joins owned fibers, waits for foreign quiescence and only then releases resources. `Ui.Dom.mount` and `Ui.mount_with` hold the app owner until this work is done. The renderer must unmount its React components, not merely hide its surface. The React cleanup callback itself is not declared a promise to wait for async finalizers. [React useEffect](https://react.dev/reference/react/useEffect) defines lifecycle cleanup; the two-phase wait is an additional contract of the Flick bridge.
-
-### Content safety and interop
-
-`Ui.text : String -> Ui` (a `Ui` has no rows, so it stands among the children of any element) inserts text through a safe text channel. URLs and raw HTML have separate policies and opaque types, for example SafeUrl and SanitizedHtml. Their constructors validate the input or are explicitly trusted; a plain String cast does not create a proof of safety. This is a separation of channels, not a promise to automatically prove the entire HTML grammar, accessibility and the correctness of the application.
-
-A `.d.ts` can give the props shape of a foreign component, but does not prove purity, retention and cancellation. A foreign component is stored as an opaque renderer component; a pure source builder does not execute it. The adapter sets the callback/lifetime policy and the owner. The supported part of the React ecosystem that is imported goes through the same FFI pipeline; unrepresentable guarantees are not erased.
+`Ui.Server.render ui` renders the markup of an initial view on the server, its views reading atoms from a registry of the request; handlers do not run there. A container marked `data-flick-ssr` is hydrated by `Ui.Dom.mount` instead of being cleared. See [Server-rendered initial views](../../reference/ui/#server-rendered-initial-views).
 
 ## CLI eDSL: flags, arguments and subcommands
 
-A command-line application is described by a value `Cli.Command r e`: a pure description of flags, positional arguments, subcommands and a deferred handler that needs services r and may finish with errors e. Building a command parses and runs nothing. The runtime part is [Effect CLI](https://effect.website/docs/v4/api/effect/cli/Command); help, completion and parsing are taken from it, while option types, completeness and captures are a Flick contract.
+A command-line application is a value `Cli.Command r e`: a pure description of flags, positional arguments, subcommands and a handler that needs services `r` and may fail with errors `e`. Building a command parses and runs nothing.
 
 ```flick
-greet : Cli.Command {Platform} none
-let greet =
-  cli "greet" {
-    description "Печатает приветствие"
-    /// Print in capital letters
-    flag loud : Bool
-    /// How many times to repeat
-    flag times "n" : Float = 1
-    /// Whom the greeting is addressed to
-    arg name : String
-    handle fun { loud; times; name } ->
-      let text = "Hello, " ++ name
-      let line = if loud then String.to_upper text else text
-      Platform.print_line (String.join "\n" (List.repeat times line))
-  }
+greet : Cli.Command none none
+let greet = cli "greet" {
+  description "Prints a greeting"
+  /// Print in capitals
+  flag loud : Bool
+  /// How many times
+  flag times "n" : Float = 1
+  /// Who to greet
+  arg name : String
+  handle fun { loud; times; name } ->
+    let text = "Hello, " ++ name
+    let line = if loud then String.to_upper text else text
+    Platform.stdout_line (String.join "\n" (List.repeat times line))
+}
 ```
 
-`cli "name" { … }` is sugar over the functions `Cli.command`, `Cli.flag`, `Cli.arg`, `Cli.description`, `Cli.subcommands` and `Cli.handle`; without the sugar the same combinators are available, and both forms build one representation. The block consists of clauses — one per line or separated by `;`:
+`cli "name" { … }` is sugar over the combinators `Cli.command`, `Cli.flag`, `Cli.arg`, `Cli.description`, `Cli.subcommand` and `Cli.handle`; both forms compile to the same IR. The block consists of clauses, one per line or separated by `;`; the clause words are special only at the start of a clause:
 
 | Clause | Meaning |
 | - | - |
 | `description e` | The command's help text, `e : String`; at most one |
-| `flag name "alias"… : T [= default]` | A named parameter `--name`; the strings after the name are additional names |
-| `arg name : T [= default]` | A positional argument; the order of clauses is the order on the command line |
+| `flag name "alias"… : T [= default]` | A named option `--name`; the strings after the name are more names |
+| `arg name : T [= default]` | The next positional argument |
 | `subcommand e` | A nested command, `e : Cli.Command r e` |
-| `handle f` | The handler, `f : Options ->{r; e} Unit` |
+| `handle f` | The handler, `f : Options ->{r; e} Unit`; at most one |
 
-The clause words are contextual: they are special only at the start of a clause inside `cli { … }`. A doc comment `///` directly above `flag`, `arg` or `subcommand` becomes its help text; the same text is shown by `flick doc`.
+A `///` comment right above a `flag`, `arg` or `subcommand` is its help text. The handler gets an exact record with a field per `flag` and `arg`, so a typo in its pattern is an ordinary type error. The type decides parsing and multiplicity: `Bool` is a switch, `T` is required unless it has a default, `Option T` is optional and takes no default, `List T` and `NonEmpty T` repeat (for an `arg`, only the last). A value is parsed by the class `Cli.Value T`. The services and errors of a command are the union of the rows of its handler and subcommands; a command keeps the captures of its handler (`FLICK-G001`).
 
-### Options as an exact record
+`Cli.run command args` parses the arguments with Effect's CLI and only then runs the handler in the current fiber. `--help`, `--version` and `--completions` run no handler; invalid input fails with `Cli.CliError` and runs no handler. Duplicate names, a default on `Option`, a many-valued `arg` before the last, a repeated `description` or `handle`, a command with neither a handler nor subcommands, and an `arg` beside subcommands are compile errors (`FLICK-L001`–`FLICK-L007`). See [Command-line applications](../../reference/cli-dsl/).
 
-Elaboration infers an exact record of options: one field per each `flag` and `arg` in declaration order, the field name being the clause name. In the example, the handler receives `{ loud : Bool; times : Float; name : String }`; a typo in the record pattern or an access to a nonexistent field is an ordinary type error. The name on the command line is obtained from the field name by replacing `_` with `-`: `dry_run` → `--dry-run`. An additional name of one character gives the short form `-n`, a longer one gives `--name`; hyphens are not written in the string.
+## `do` and library combinators
 
-The type of the value determines both parsing and multiplicity:
-
-| Type in the clause | Behavior |
-| - | - |
-| `Bool` | A toggle flag; without `= default` it equals `false` |
-| `T` | A required parameter if there is no `= default` |
-| `Option T` | Optional; `= default` is forbidden |
-| `List T` | A repeatable flag (0 or more); for `arg`, a variable-length tail, only in the last position |
-| `NonEmpty T` | Like `List T`, but at least one value |
-
-`T` needs an instance of the class `Cli.Value T`, which parses a string into a typed error. The library provides instances for `String`, `Float` (rejects NaN and the empty string), `BigInt`, `Path`, `Duration` and `Redacted String`; a `Redacted` value is not printed in help, errors and logs. `deriving Cli.Value` builds an instance for an ADT of nullary constructors — a choice among the constructor names in kebab-case — and for a refined type if the base type has an instance: parsing calls `T.parse`. A default is a pure expression of type `T`; in help it is shown through `Show T` if such an instance exists.
-
-### Subcommands and the handler
-
-```flick
-tool : Cli.Command {Platform} none
-let tool =
-  cli "tool" {
-    description "Утилиты проекта"
-    /// Verbose output
-    flag verbose "v" : Bool
-    subcommand greet
-    subcommand version
-  }
-```
-
-The services and errors of a command are the union of the rows of its handler and subcommands, as for any compound expression. A subcommand's handler receives only its own record of options; the parent's flags are parsed before the subcommand name and are visible only to the parent's handler. Configuration common to all subcommands is passed as a service provided in `main`. A command without `handle` must have subcommands; invoking it without a subcommand prints help and ends with `CliError`. A command with subcommands does not declare an `arg`, otherwise a positional argument is indistinguishable from a subcommand name.
-
-Compile errors: a repeated field, flag or subcommand name, a collision of a long or short name, including with the reserved `--help`, `-h`, `--version` and `--completions`; `= default` on `Option`; `List`/`NonEmpty` on an `arg` that is not last; a type without `Cli.Value`; a default of the wrong type; `handle` or `description` twice; a command with neither `handle` nor subcommands; an `arg` next to a `subcommand`.
-
-### Running
-
-`Cli.run : Cli.Command r e -> List String ->{Platform | r; CliError | e} Unit` parses the arguments with a pure function and only after successful parsing executes the handler in the current fiber. `--help`, `--version` and `--completions bash|zsh|fish` print the result to stdout and finish without calling the handler. Invalid input — an unknown flag, a missing required argument, a value that `Cli.Value` could not parse — yields `type error CliError = CliError String` with text for the user; the handler is not run.
-
-```flick
-main : Unit ->{; AppError} Unit
-let main () =
-  provide Platform.live {
-    try
-      Cli.run tool (Platform.args ())
-    with
-    | CliError message -> App.fail message
-  }
-```
-
-A command remains an ordinary value: the entry that runs it is an ordinary
-runtime `main`, and an application may expose several named entries.
-Exit codes and cleanup order follow the general rules of section 12.
-SIGINT interrupts the handler, whose resources close under the owner
-contract of section 7. Captures pass through the handler just as through UI
-callbacks: a command capturing a scoped resource cannot escape that scope.
-Interactive prompts (`Cli.Prompt`) are ordinary effectful functions inside
-the handler, not clauses of the block.
-
-## What SQL and UI add to design validation
-
-The accepted design is validated by two mandatory end-to-end prototypes; their result may reveal a defect in the specification, but the choice of mechanisms has already been made:
-
-- SQL: typed table → LEFT JOIN → nullable projection → bind parameters → Effect execution; negative examples with an unknown field, an incorrect grouping, a leaked alias and a wrong parameter.
-
-- UI: generic props → typed children → pure render → task callback → managed completion; negative examples with a wrong prop, a runtime call in render and a capture of a closed resource.
-
-They validate expressiveness and the cost of inference. For large rows and nested queries, checking time and diagnostic quality are measured; successful small examples do not prove scalability. Optimizations may precompile the static shape of SQL and the pure creation of UI, preserving parameters, capture metadata, renderer boundaries and the observable execution of Effect.
+Each DSL block is sugar over ordinary library functions, which programs may call directly. Generic monadic code uses `do { … }` over the `Monad` of the Prelude, with `and` for independent bindings through `Applicative` (see [`do`, `for` and comprehensions](../04-higher-order/#do-for-and-comprehensions)); an ordinary `let` does not bind through a monad.

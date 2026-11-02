@@ -2,7 +2,7 @@
 title: "Effect coverage"
 ---
 
-The standard library wraps the pinned Effect release (see [The boundary of the language core](../../spec/07-errors-and-concurrency/#the-boundary-of-the-language-core)): every public export of the entrypoints `effect`, `effect/cli`, `effect/devtools`,
+The standard library wraps the pinned Effect release (see [The boundary of the language core](../../spec/05-errors-and-concurrency/#the-boundary-of-the-language-core)): every public export of the entrypoints `effect`, `effect/cli`, `effect/devtools`,
 `effect/http`, `effect/http-api`, `effect/observability`, `effect/process`, `effect/reactivity` and `effect/rpc` has a typed wrapper or an explicit
 decision, and a linter in `cargo test` checks that nothing is lost when
 Effect moves.

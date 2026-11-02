@@ -100,7 +100,7 @@ let x : Float = "hi"
 как предыдущий освободит ресурсы.
 
 Стандартная библиотека объявляет все сигнатуры из спецификации дословно:
-`flick-core/tests/stdlib_signatures.rs` читает их из блоков `text` спецификации.
+`flick-core/tests/stdlib_signatures.rs` читает их из блоков `text` русской спецификации (`ru/spec`).
 
 ## Языковые тесты — `tests/language/`
 
@@ -139,10 +139,12 @@ let x : Float = "hi"
 
 ## Синтаксический корпус и фаззинг — `flick-core/tests/{corpus,fuzz}.rs`
 
-- Каждый блок ```` ```flick ```` в спецификации и в `docs/` должен разбираться
-  без диагностик. Примеры спецификации закреплены отпечатками в
-  `tests/syntax/spec_examples.txt`: новый или изменённый пример приводит к ошибке
-  теста, пока его разбор не проверен и напечатанная строка не добавлена в этот файл.
+- Каждый блок ```` ```flick ```` в `docs/` должен разбираться без диагностик.
+  Блоки русской спецификации (`ru/spec`), исходного текста, закреплены
+  отпечатками в `tests/syntax/spec_examples.txt`: новый или изменённый пример
+  приводит к ошибке теста, пока его разбор не проверен и напечатанная строка
+  не добавлена в этот файл; закреплённый пример, которого больше нет,
+  тоже приводит к ошибке.
 - Каждый файл `.fl` в `tests/` и каждый блок документации должны проходить
   обратное преобразование через дерево без потерь, сохраняя исходный текст
   байт в байт. Примеры без диагностик должны форматироваться идемпотентно:
@@ -168,3 +170,25 @@ let x : Float = "hi"
 Тест проверяет запись из 200 полей, читаемых по одному, и функцию из 2000 строк,
 а затем каждую из них в четверть размера. Проверка полного размера должна
 укладываться в лимит времени, а время при изменении размера должно расти линейно.
+
+## Что покрывают наборы тестов
+
+Где искать тесты поведения и куда добавлять новый:
+
+| Поведение | Тесты |
+| - | - |
+| кинды, выбор экземпляров и их согласованность | `tests/check/{pass,fail}/types/kinds.fl`, `tests/check/fail/classes/` |
+| холодные задачи, прямые вызовы, связывающие результат, порядок стадий и вычисления | `tests/run/codegen/{task_twice,stage_order,eval_order}.fl`, `tests/check/{pass,fail}/effects/`, `flick/tests/first_slice.rs` над `examples/first-slice/` |
+| строки ошибок и `Cause`, сервисы и слои | `tests/run/stdlib/effect/`, `tests/run/codegen/{errors,defect,services}.fl`, `runtime/test/{cause,layer}.test.ts` |
+| области, владельцы, `parallel` и гонки | `tests/run/runtime/`, `runtime/test/{scope,concurrency,race}.test.ts` |
+| регионы и захваты | `tests/check/{pass,fail}/regions/`, `tests/check/projects/regions/` |
+| семантика `Float` в debug, release и при свёртке констант | `flick/tests/e2e_numbers.rs`, `tests/run/codegen/numbers.fl`, `flick-core/tests/consteval_node.rs` |
+| проходы оптимизатора | `flick-core/src/opt/tests.rs`, `tests/run/codegen/release.fl` |
+| `deriving Schema`, политики кодеков, строгий экспорт, OpenAPI | `tests/{check,run}/**/schema/`, `runtime/test/{schema,httpapi}.test.ts`, `flick/tests/schema_export.rs` |
+| обратные вызовы FFI, импорт `.d.ts` и проверенные привязки | `tests/run/ffi/`, `runtime/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
+| SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `runtime/test/sql.test.ts`, `flick/tests/sql_postgres.rs` над `tests/postgres/` |
+| UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `runtime/test/ui-*.test.ts` |
+| блок `cli` | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, тесты в `flick-core/src/ir/lower/cli.rs` |
+| подсказки, языковой сервер и проекция TypeScript | `flick-core/src/ide/tests.rs`, `flick/tests/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
+| CLI: `check`/`build` не запускают код, поколения запуска, `dev`, кеш, pnpm, коды выхода, NDJSON | `flick/tests/{cli_project,cli_run,check_command}.rs` |
+| фасады `.d.ts` и `pack` | `flick/tests/dts_command.rs`, `flick/tests/cli_run.rs` |

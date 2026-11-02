@@ -3,7 +3,7 @@ title: "Покрытие Effect"
 ---
 
 Стандартная библиотека оборачивает закреплённую версию Effect
-(см. [Граница языкового ядра](../../spec/07-errors-and-concurrency/#граница-языкового-ядра)).
+(см. [Граница языкового ядра](../../spec/05-errors-and-concurrency/#граница-языкового-ядра)).
 Для каждого публичного экспорта из точек входа `effect`, `effect/cli`, `effect/devtools`,
 `effect/http`, `effect/http-api`, `effect/observability`, `effect/process`, `effect/reactivity` и `effect/rpc` есть типизированная обёртка или явно
 записанное решение. Линтер, который выполняется в `cargo test`,

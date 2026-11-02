@@ -1,12 +1,10 @@
 ---
-title: "14. Источники"
+title: "Дополнительное чтение"
 ---
 
-Эти источники описывают существующие механизмы. Решения Flick о синтаксисе, типах исходного языка и семантике, а также их статус описаны в документации проекта.
+Материалы о механизмах, на которые опирается Flick или с которыми его полезно сравнить. Правила самого Flick изложены в главах этой спецификации.
 
-- [Content Mappers PR](https://github.com/microsoft/typescript-go/pull/4712) — основа интеграции с TS.
-
-- [ets-go](https://github.com/mikearnaldi/ets-go) — пример отдельного синтаксиса поверх TS и Effect.
+- [Content Mappers PR](https://github.com/microsoft/typescript-go/pull/4712) — механизм typescript-go, на котором построена TS-проекция исходников Flick.
 
 - [Тип Effect](https://effect.website/docs/v4/getting-started/the-effect-type) — отложенные вычисления, результат, ошибки и зависимости.
 
@@ -20,15 +18,11 @@ title: "14. Источники"
 
 - [Koka](https://koka-lang.github.io/koka/doc/book.html) — эффекты вызовов и полиморфные по эффектам функции.
 
-- [Классы типов PureScript](https://book.purescript.org/chapter6.html) — классы, их экземпляры и словари.
-
-- [TypeScript для функциональных программистов](https://www.typescriptlang.org/docs/handbook/typescript-in-5-minutes-func.html) — выразительность и ограничения TS.
+- [Классы типов PureScript](https://book.purescript.org/chapter6.html) — классы, их экземпляры и словари; [согласованность экземпляров и экземпляры-сироты](https://github.com/purescript/documentation/blob/master/language/Type-Classes.md).
 
 - [Полиморфизм OCaml](https://ocaml.org/manual/5.4/polymorphism.html) — ограничение на обобщение значений, изменяемое состояние и вариантность.
 
-- [Полиморфизм высших рангов в GHC](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rank_polymorphism.html) и [функциональные зависимости](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/functional_dependencies.html) — выразительные возможности системы типов.
-
-- [Классы типов PureScript](https://github.com/purescript/documentation/blob/master/language/Type-Classes.md) — согласованность экземпляров классов и экземпляры-сироты.
+- [Полиморфизм высших рангов в GHC](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rank_polymorphism.html) и [функциональные зависимости](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/functional_dependencies.html) — аннотированные полиморфные аргументы, ограничения вывода типов и зависимости между параметрами классов.
 
 - [Порты Elm](https://guide.elm-lang.org/interop/ports.html), [PureScript FFI](https://book.purescript.org/chapter10.html), [Привязки ReScript](https://rescript-lang.org/docs/manual/bind-to-js-function/) — разные контракты взаимодействия с JavaScript.
 
@@ -40,10 +34,8 @@ title: "14. Источники"
 
 - [Мемоизация слоёв](https://effect.website/docs/v4/requirements-management/layer-memoization), [Fiber API](https://effect.website/docs/v4/api/effect/Fiber) и [Effect.ts](https://github.com/Effect-TS/effect/blob/main/packages/effect/src/Effect.ts) — совместное использование, отмена и контракты финализаторов.
 
-- [Полиморфизм высших рангов в GHC](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rank_polymorphism.html) — аннотированные полиморфные аргументы и ограничения вывода типов.
-
 - [Числовые типы ECMAScript](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html) — точная семантика Float и BigInt.
 
-- [Effect Cause](https://effect.website/docs/v4/data-types/cause) и [проверенный снимок исходного кода](https://github.com/Effect-TS/effect/tree/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f) — основа контрактов среды выполнения; изменения зависимости требуют повторной проверки.
+- [Effect Cause](https://effect.website/docs/v4/data-types/cause) — fail, die, interrupt и их последовательные и параллельные сочетания.
 
 - [Запуск вычислений Effect](https://effect.website/docs/v4/getting-started/running-effects), [Chunk](https://effect.website/docs/v4/data-types/chunk) и [Scheduler](https://effect.website/docs/v4/api/effect/Scheduler) — взаимодействие через функции обратного вызова, коллекции и кооперативная передача управления.

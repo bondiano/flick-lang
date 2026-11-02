@@ -3,7 +3,7 @@ title: "Typed HTTP APIs"
 ---
 
 `HttpApi` describes an HTTP API as values: endpoints with the codecs of
-their parts, groups of endpoints and an API of groups (see [The boundary of the language core](../../spec/07-errors-and-concurrency/#the-boundary-of-the-language-core)). The type of an API is the record of handlers
+their parts, groups of endpoints and an API of groups (see [The boundary of the language core](../../spec/05-errors-and-concurrency/#the-boundary-of-the-language-core)). The type of an API is the record of handlers
 it needs, so serving it takes exactly one handler per endpoint; the client
 requests an endpoint from the same value, and the strict JSON Schema
 exporter writes the API as OpenAPI 3.1.

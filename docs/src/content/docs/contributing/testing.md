@@ -91,7 +91,7 @@ previous one released its resources.
 
 The standard library declares every signature the specification gives for
 it word for word: `flick-core/tests/stdlib_signatures.rs` reads them from the
-spec's `text` blocks.
+Russian spec's (`ru/spec`) `text` blocks.
 
 ## Language tests — `tests/language/`
 
@@ -128,10 +128,11 @@ matrix, codecs against their compiled decoders. Entry runner tests start
 
 ## Syntax corpus and fuzzing — `flick-core/tests/{corpus,fuzz}.rs`
 
-- Every ```` ```flick ```` block of the specification and of `docs/` must parse
-  without diagnostics. Spec examples are pinned by fingerprint in
-  `tests/syntax/spec_examples.txt`: a new or edited example fails the test
-  until its parse is reviewed and the printed line is added there.
+- Every ```` ```flick ```` block of `docs/` must parse without diagnostics.
+  The blocks of the Russian specification (`ru/spec`), the original text, are
+  pinned by fingerprint in `tests/syntax/spec_examples.txt`: a new or edited
+  example fails the test until its parse is reviewed and the printed line is
+  added there, and a pin whose example is gone fails it too.
 - Every `.fl` file under `tests/` and every doc block must round-trip through
   the lossless tree byte for byte; those without diagnostics must format
   idempotently, and the formatter re-checks that the AST is unchanged.
@@ -155,3 +156,25 @@ matrix, codecs against their compiled decoders. Entry runner tests start
 Checks a record of 200 fields read field by field and a function of 2000
 lines, each also at a quarter of the size: the full size must stay within a
 time budget, and the ratio between the sizes must stay linear.
+
+## What the test suites cover
+
+Where to look for the tests of a behavior, and where a new one goes:
+
+| Behavior | Tests |
+| - | - |
+| kinds, instance resolution and coherence | `tests/check/{pass,fail}/types/kinds.fl`, `tests/check/fail/classes/` |
+| cold tasks, direct calls binding results, stage and evaluation order | `tests/run/codegen/{task_twice,stage_order,eval_order}.fl`, `tests/check/{pass,fail}/effects/`, `flick/tests/first_slice.rs` over `examples/first-slice/` |
+| error rows and `Cause`, services and layers | `tests/run/stdlib/effect/`, `tests/run/codegen/{errors,defect,services}.fl`, `runtime/test/{cause,layer}.test.ts` |
+| scopes, owners, `parallel` and races | `tests/run/runtime/`, `runtime/test/{scope,concurrency,race}.test.ts` |
+| regions and captures | `tests/check/{pass,fail}/regions/`, `tests/check/projects/regions/` |
+| `Float` semantics in debug, release and constant folding | `flick/tests/e2e_numbers.rs`, `tests/run/codegen/numbers.fl`, `flick-core/tests/consteval_node.rs` |
+| optimizer passes | `flick-core/src/opt/tests.rs`, `tests/run/codegen/release.fl` |
+| `deriving Schema`, codec policies, strict export, OpenAPI | `tests/{check,run}/**/schema/`, `runtime/test/{schema,httpapi}.test.ts`, `flick/tests/schema_export.rs` |
+| FFI callbacks, `.d.ts` import and reviewed bindings | `tests/run/ffi/`, `runtime/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
+| SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `runtime/test/sql.test.ts`, `flick/tests/sql_postgres.rs` over `tests/postgres/` |
+| UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `runtime/test/ui-*.test.ts` |
+| the `cli` block | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, the tests in `flick-core/src/ir/lower/cli.rs` |
+| hover, the language server and the TypeScript projection | `flick-core/src/ide/tests.rs`, `flick/tests/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
+| the CLI: no code run by `check`/`build`, run generations, `dev`, cache, pnpm, exit codes, NDJSON | `flick/tests/{cli_project,cli_run,check_command}.rs` |
+| `.d.ts` façades and `pack` | `flick/tests/dts_command.rs`, `flick/tests/cli_run.rs` |

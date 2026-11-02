@@ -3,7 +3,7 @@ title: "Effects, errors and services"
 ---
 
 How the checker decides where a runtime call may run and which services and
-errors it needs (see [Direct effectful calls](../../spec/03-direct-calls/), [Values of computations and their execution](../../spec/04-computations/), [Errors, services, resources and concurrency](../../spec/07-errors-and-concurrency/)). Types and kinds are in [types.md](../types/).
+errors it needs (see [Direct effectful calls](../../spec/01-direct-calls/), [Values of computations and their execution](../../spec/02-computations/), [Errors, services, resources and concurrency](../../spec/05-errors-and-concurrency/)). Types and kinds are in [types.md](../types/).
 
 ## Stages
 
@@ -38,7 +38,7 @@ and stages run strictly left to right.
 ## Rows a body needs
 
 The rows of the calls at a stage are joined, and the signature is an upper
-bound for them (see [Notation and joining of rows](../../spec/05-types-and-classes/#notation-and-joining-of-rows)): a body may need fewer
+bound for them (see [Notation and joining of rows](../../spec/03-types-and-classes/#notation-and-joining-of-rows)): a body may need fewer
 services and errors than its signature allows, never more. What exceeds the
 bound is `FLICK-E002`, which lists every extra service and error:
 
@@ -80,7 +80,7 @@ compiler lifts it). A runtime function never passes for a pure one.
 ## Empty rows: `none`
 
 `none` is the literal of the empty row: no services, or no expected errors
-(see [Unit, Never and empty rows](../../spec/04-computations/#unit-never-and-empty-rows)). It fits every row kind, so the same
+(see [Unit, Never and empty rows](../../spec/02-computations/#unit-never-and-empty-rows)). It fits every row kind, so the same
 `none` is a service row, an error row or a capture row by where it stands.
 Every spelling below is the same closed row with no elements and no tail:
 

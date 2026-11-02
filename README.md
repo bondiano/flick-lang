@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="https://flick-lang.dev">Documentation</a> ·
   <a href="./docs/src/content/docs/learn/index.md">Learn</a> ·
   <a href="./docs/src/content/docs/start/getting-started.md">Get started</a> ·
   <a href="./examples/first-slice/">Examples</a> ·
@@ -18,7 +19,8 @@
 </p>
 
 Flick is an ML-family language that compiles to JavaScript and TypeScript,
-with [Effect](https://effect.website/) at its runtime foundation.
+with [Effect](https://effect.website/) at its runtime foundation, and to Go
+for a standalone executable.
 Pattern matching, higher-kinded types and type classes meet typed effects,
 errors and services, with regions to keep scoped resources from escaping.
 
@@ -46,7 +48,10 @@ possible `AppError` explicit. Generated programs are ordinary ES modules.
 ## Try it from source
 
 From a checkout, install the [pinned Rust toolchain](./rust-toolchain.toml),
-Node.js **24.18.0 or newer**, and **pnpm 12.14.0**:
+Node.js **24.18.0 or newer**, and **pnpm 12.14.0**. Go 1.23 or newer is
+needed only for the Go target (`--emit go`, `just go-test`), and Lean 4
+(the version in [`formal/lean-toolchain`](./formal/lean-toolchain)) only for
+the proofs in [`formal/`](./formal/README.md):
 
 ```sh
 pnpm install --frozen-lockfile
@@ -68,8 +73,10 @@ Use matching compiler and runtime versions.
   library and runtime contracts.
 - [Ecosystem](./docs/src/content/docs/ecosystem/index.md) — compiler, browser
   playground, JavaScript interop and editor tooling.
-- **Flick 0.7 specification:** [English](./docs/src/content/docs/spec/) ·
-  [Русский — оригинал](./docs/src/content/docs/ru/spec/).
+- [Specification](./docs/src/content/docs/spec/index.md) — the normative
+  description of the language (version 0.7); the formal semantics and its
+  Lean proofs are in [`docs/formal/`](./docs/formal/) and
+  [`formal/`](./formal/README.md).
 
 The documentation site includes **Play**, which runs Flick in an isolated
 browser worker, and **Transpile**, which shows the generated JavaScript.
@@ -238,8 +245,8 @@ the build. Search uses Pagefind's supported main-thread mode: its 1.5
 blob-worker initializer loses the absolute index URL. Revisit this when
 upgrading Pagefind; it does not affect program-worker isolation.
 `pnpm -C docs test` exercises linking and executing a real compiled program.
-The visual contract and approved composition are recorded in `PRODUCT.md`,
-`DESIGN.md` and `.impeccable/`.
+The visual contract of the site is recorded in `PRODUCT.md`, `DESIGN.md`
+and `.impeccable/`.
 
 </details>
 

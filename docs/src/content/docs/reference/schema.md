@@ -3,7 +3,7 @@ title: "Schemas and codecs"
 ---
 
 A schema is a runtime witness of the values of a type; a codec adds a wire
-form and turns it into values and back (see [Schema and standard data types](../../spec/09-schema/)). Both are values of the program
+form and turns it into values and back (see [Schema and standard data types](../../spec/07-schema/)). Both are values of the program
 built from declarations, a DSL and library combinators. Decoding fails with
 `SchemaError`, a list of issues `{ message; path }` that names paths and
 never holds the input.

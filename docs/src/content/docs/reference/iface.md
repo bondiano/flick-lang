@@ -4,7 +4,7 @@ title: "`.iface` — native module interface"
 
 An `.iface` file describes what one module exposes, in the form the checker
 needs, so an importer never re-reads, re-parses or re-checks the module's
-source (see [The Flick compiler and Content Mapper integration](../../spec/11-compiler/)). It is versioned JSON. `.d.ts` is only a projection for
+source (see [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). It is versioned JSON. `.d.ts` is only a projection for
 TypeScript; `.iface` is the source of truth for Flick importers.
 
 Until 0.1.0 the schema grows with the compiler: every change bumps
