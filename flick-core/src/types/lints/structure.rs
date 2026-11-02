@@ -170,10 +170,11 @@ fn is_function(node: &Node) -> bool {
 }
 
 /// The branches of `node` apart from local functions: each `if`, each arm
-/// after the first, each guard, each `&&` and `||`.
+/// after the first, each guard, each `&&` and `||`. A `sql { … }` block has
+/// none: its conditions run in the database, not as the function's paths.
 fn branches(node: &Node) -> u32 {
     node.nodes()
-        .filter(|c| !is_function(c))
+        .filter(|c| !is_function(c) && c.kind != K::SqlExpr)
         .map(|c| {
             let own = match c.kind {
                 K::IfExpr | K::Guard | K::GuardStmt => 1,
