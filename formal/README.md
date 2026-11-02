@@ -477,3 +477,157 @@ Simplifications:
    `Seq.each_φ` per stage (Р184). Each source of `for` goes through `iter` (Р183). Only the
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
+
+### P4a design
+
+The owner's decision on Р185 is that T6 goes through the core with regions. λFlick⁺ is
+this Lean core plus nominal dictionary records `D_C ᾱ` with `∀`-fields, and captures
+enter the elaboration source and `Target`. This section is the plan for P4a. Each piece
+is committed without `sorry` and builds from a clean `git archive`. The next free Р
+number is Р188.
+
+**Status.** Р185–Р187 are recorded in `elaboration.md` §5, and §0.1 and §2.1 are
+updated. No P4a code is written yet. The pieces below are in their intended order.
+
+#### P4a1: captures in `Elab` and `Target`
+
+Only `Formal/Elab/` changes; the core is untouched.
+
+- **Types** (`Elab/Syntax.lean`). `Ty` gets `arr (φ : Stage) (a b q : Ty)`, `cnil` and
+  `cun (q q' : Ty)`. The qualifier `q` is a capture row written as a type: a variable,
+  `cnil`, or a union. Substitution stays structural, and `DecidableEq`,
+  `Ty.agree_of_eq` and К1 keep working without semantic sets. `Stage` moves to
+  `Syntax.lean`. `arrTy` becomes `arr` (Р186), and `Ty.reach : Ty → Nat → Prop` is
+  defined with `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈app⌉ = ⌈cun⌉ = ∪` and
+  `⌈arr φ a b q⌉ = ⌈a⌉ ∪ ⌈b⌉ ∪ ⌈q⌉`. Capture variables are ordinary variables, so
+  (Var), (Method) and (Const) instantiate them through `ts` with no new rule. Schemes
+  have no `Outlives` facts: `Fiber.Outlives` is dropped by `⟦·⟧` (§2.1).
+- **Schemes.** `Scheme` gets `q : Ty`, the qualifier of its dictionary arrows (Р187).
+  `Scheme.subst` lifts `q` like `ty`. The schemes of methods, of `Prog.consts` and of
+  instances have `q = cnil`; make this a field of a well-formedness hypothesis on
+  `Prog`. `Scheme.reach` is the reach of `Scheme.tr s` below its `k` binders, so it
+  equals the core's `Scheme.reach` of the translation.
+- **Judgement** (`Elab/Source.lean`). Add `Exp.Free` and `Tm.Free`, and
+  `heldS Γ e n := ∃ x s, e.Free x ∧ Γ[x]? = some s ∧ s.reach n`. `Δ` adds nothing,
+  because `⌈D_Q⌉ = ∅`.
+  - (Lam) gets the premise `heldS Γ (.lam b) ⊆ ⌈arr φ a t q⌉`.
+  - (Let-Sig-Dict) gets the premise `σ.ctx ≠ [] → heldS (Γ↑σ.k) e ⊆ ⌈σ.ty⌉ ∪ ⌈σ.q⌉`.
+  - No (≤-Cap) in the source: qualifiers match exactly. This is a simplification;
+    T6(a) does not need completeness.
+  - New lemma: elaboration adds no term variables
+    (`Elab … e' → e'.Free x → e.Free x`).
+- **`Target`.** `TTy.arr φ a b q`. `dicts q qs t` puts `q` on every dictionary arrow.
+  `Scheme.tr s = ⟨s.k, dicts s.q s.ctx (.mono s.ty)⟩`.
+  - The `lam` law gets the held premise over `Tm.Free`.
+  - The `lamD` law gets the premise `qs ≠ [] → heldT Γ e ⊆ ⌈t⌉ ∪ ⌈q⌉`.
+  - `meth`, `inst`, `strct` and `prim` use `q = cnil`.
+  - The `Rel` fields may take typing premises, because P4a4 needs closed typed terms:
+    `load_rel` gets `Has [] [] e t φ` and `Has [] [] e' t φ`, and
+    `Target.sim`/`T6b_target` take the typing of the filled skeleton. Decide this
+    here, while `Target` is being rewritten anyway.
+- **Re-proofs.** `T6a` needs the held lemma in the `lam` and `letSig` cases.
+  `Coherence.lean`, `Weaken.lean` and `Run.lean` need only new `Ty` cases.
+- **Sugar.** Each higher-order parameter of a Prelude scheme gets a capture variable,
+  and the arrows after it show that variable:
+  `flat_map : ∀m a b c. (a →^c m b) →P (m a →^c m b)`. Check these schemes against the
+  checker's types of the Prelude, and record an Р where they differ.
+
+#### P4a2: dictionary records in the core
+
+λFlick⁺ in `Formal/`. Afterwards, T1–T4 must hold again.
+
+- **Type.** `Ty.dict (c : Nat) (args : Ty)` is `D_C τ̄`, where `args` is a `tapp` spine
+  on `rnil`. Its reach is `⌈dict c args⌉ = ∅` (§0.1): a dictionary is built from
+  top-level values and dictionary variables. `substT` is structural.
+- **Signature.** `Sig.dict c = some (k, fs)`: `k` class parameters, and fields
+  `(label, j, t)` with `j` binders of their own. `t` is over `j + k` variables: the
+  binders are `0 … j-1` and the parameters `j … j+k-1`, as `letGen` shifts. Slots are
+  fields with `j = 0` of type `dict S ῡ`; methods are fields of type
+  `⟦∀β̄. rest ⇒ τ⟧`.
+- **Terms.** `Tm.drec (c : Nat) (r : Tm)`, where `r` is an `rcons` spine of values;
+  it is a value. `Tm.dproj (e : Tm) (l : Label)` has the frame `dproj · l` and the pure
+  head step `dproj (drec c r) l → v` when `r.field l = some v`. Fields are values, so
+  `drec` needs no frame. An instance evaluates its slots first:
+  `λδ̄. let s̄ = slots in drec C {slots = s̄, methods}`.
+- **Introduction, like (Let-Gen).** `Typ.drec`: `S.dict c = some (k, fs)`,
+  `us.length = k`, each field value `v` typed with
+  `Typ (Ψ.map (Ty.up j)) (Θ.substT (shiftV j)) (Γ.map (Scheme.up j)) v (.ex (t.substT (liftT j (instT us))) .pure)`,
+  an auxiliary inductive over the spine, and `held Ψ Γ (drec c r) ⊆ ∅` (it holds
+  nothing). The conclusion is `Typ … (drec c r) (.ex (dict c ūs) φ)`.
+- **Projection, like (Var).** `Typ.dproj`: `e : dict c ūs` with field `l = (j, t)`,
+  `ts.length = j` and `Le (t.substT (instT (ts ++ us))) T`, gives `dproj e l : T`.
+- **Globals.** Add `Const.glob (g : Nat)` with a table `glob : Nat → Option (Scheme × Tm)`
+  of closed values. A hypothesis `GlobTy` types each value at its scheme, like
+  `RootTy`. The δ-step is `const (glob g) → v_g`, and `CArg` gets `ts : List Ty`.
+  Instances, `struct_C`, `prim_p` and the constants of Γ₀ are globals, so instance
+  bodies refer to each other by name and their typing is not circular.
+- **Re-proving T1–T4.** Every inductive and function over `Ty`, `Tm` and `Frame` gets
+  the new cases.
+  - The substitution case of `drec` is the `letGen` case.
+  - Preservation of `dproj` instantiates the field through `Typ.instantiate`.
+  - New canonical form: a value of type `dict` is a `drec`.
+  - Progress for `dproj` and `glob`.
+  - Л4: `drec` holds nothing by its premise.
+  - `NoIns`, `Within`, `Asc` and `Below`: fields have no run-time forms.
+
+#### P4a3: the instance of `Target`
+
+- **Types.** The translation `⟦·⟧ : Elab.Ty → Flick.Ty` maps
+  - `var ↦ tvar`, `app ↦ tapp`;
+  - `con c` to `adt` names, with `Bool` to `base bool` and `Option` to the ADT of `Sig`;
+  - `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉`;
+  - `cnil ↦ caps ∅` and `cun ↦ caps (∪)`.
+
+  Stages map `⟦P⟧ = pure` and `⟦R⟧ = rt R₀ E₀`, with fixed name-only rows. Prove
+  `⟦t.subst σ⟧ = ⟦t⟧.substT ⟦σ⟧` (with `Ty.reach_substT`) and `⌈⟦t⟧⌉ = ⟦⌈t⌉⌉`.
+  `TTy.dict q ↦ Ty.dict`.
+- **Terms.** `tr γ δ` maps `Γ`-variables and `Δ`-variables into one core context:
+  `lam` pushes `γ`, `lamD l` pushes `l` entries of `δ`.
+  - `meth`/`slot ↦ dproj`.
+  - `inst`/`strct`/`prim`/`const ↦ const (glob _)`, and `ap ↦ app`.
+  - `ite`/`caseOpt ↦ match_` on literals and on the `Option` constructors.
+- **Typing.** `Has Γ Δ e t φ := ∀ Ψ Θ Γc γ δ, Corr Γc Γ Δ γ δ → Typ S Ψ Θ Γc (tr γ δ e) (.ex ⟦t⟧ ⟦φ⟧)`,
+  where `Corr` says `Γc[γ x] = ⟦Γ[x]⟧` and `Γc[δ k] = mono (dict …)`.
+- **Hypotheses.** A bundle `Real P S` covers:
+  - `Sig.dict` realises each class: slots, then methods, with `s.ctx = ⟨C, vars p⟩ :: rest`;
+  - the globals: instance bodies built from `ins.slots` and method bodies, and
+    `struct_C` with slots `struct_S (δ̄.$slotᵢ)` (Р180);
+  - `GlobTy`;
+  - the `Option` constructors.
+- **The laws.** Each law is one core rule plus the commutation lemmas.
+  - `var`: `Typ.var`.
+  - `lam`: `Typ.lam`; only `Γ`-variables have non-empty reach.
+  - `let_`: `Typ.letGen` with `Φ = Facts.none`; `k = 0` uses `Typ.let_`.
+  - `lamD`: `Typ.lam`, `l` times.
+  - `meth`, `slot`: `Typ.dproj`.
+  - `dvar`: `Typ.var`.
+  - `app`, `dapp`, `dap`: `Typ.app`.
+  - `inst`, `strct`, `prim`, `const`: `Typ.const`.
+  - `ite`, `caseOpt`: `Typ.match_` with `Covers`.
+
+#### P4a4: `Rel` and `Sim`
+
+- **States.** `St := Cfg`, `load e := ⟨[], [], tr e⟩`, `Step := ∃ l, CStep root l`.
+  `Obs := Lit`, observed when the main thread is a literal (ground observation).
+- **Dictionary evaluation.** A closed typed dictionary term evaluates in pure,
+  deterministic main-thread steps to a `drec`. The proof is well-founded induction on
+  К5's `lt`: the slots of an instance derive smaller constraints (К7 with `k5super`),
+  and method fields are already values. Compositionality: for pure terminating `d`,
+  `t[d] ⇓ v ↔ t[val d] ⇓ v`.
+- **The relation.** `Rel` is the congruence on configurations generated by two kinds of
+  pairs: closed pure dictionary computations with the same value, and translations of
+  `Eqv`-related open dictionaries, closed under substitution (`Eqv.subst`). Two
+  lemmas:
+  - `Eqv d d'` with a closing `ρ` gives one value. For `instSlot` this follows from the
+    instance's body, for `strctSlot` from Р180's `struct_C`, and for the congruences
+    from compositionality.
+  - `step_rel`. If the redex lies inside a related dictionary computation, `b` takes 0
+    steps. Otherwise `b` first evaluates its dictionary at the redex position to the
+    same value, then takes the same step.
+- **Rejected alternative.** Inert dictionaries, where projection unfolds one slot,
+  need Church–Rosser and standardisation of slot rewriting under call-by-value, which
+  is more work.
+
+**Order.** P4a1 and P4a2 are independent; they can run in parallel in separate
+worktrees, and both touch this README. P4a3 needs both, and P4a4 needs P4a3. Record
+where each piece stops in **Status** above.
