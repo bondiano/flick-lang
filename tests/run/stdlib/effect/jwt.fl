@@ -1,0 +1,91 @@
+// HS256 tokens: the example of RFC 7515 A.1 has a good signature and an
+// `exp` of 2011, a token written by Python decodes, a fresh token with an
+// `exp` an hour ahead round-trips, and tampering, another key, `alg: none`
+// and a malformed token are refused.
+module App.Main exposing (main)
+
+type alias Claims = { sub : String; admin : Bool }
+  deriving Schema
+
+type alias Session = { sub : String; iat : Float; exp : Float }
+  deriving Schema
+
+type alias Issuer = { iss : String }
+  deriving Schema
+
+line : String -> String -> Unit ->{} Unit
+let line label value () = Platform.stdout_line (label ++ ": " ++ value)
+
+claims_json : PureCodec Json Claims
+let claims_json = Codec.json (schema Claims)
+
+session_json : PureCodec Json Session
+let session_json = Codec.json (schema Session)
+
+issuer_json : PureCodec Json Issuer
+let issuer_json =
+  ignore_extra_fields
+    (codec (schema Issuer) {
+      iss = field "iss" String.json;
+    })
+
+secret : List Int
+let secret = Bytes.from_string "secret"
+
+outcome : PureCodec Json a -> List Int -> String ->{Crypto.Crypto; Crypto.CryptoError} String
+let outcome wire key token =
+  try
+    let _ = Jwt.verify wire key token
+    "accepted"
+  with
+  | Jwt.JwtError problem -> show problem
+
+rfc : String
+let rfc =
+  "eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+
+python : String
+let python =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZGEiLCJhZG1pbiI6dHJ1ZX0.LG5jqWCrAAWbUMv6IIF_kHEjmYwSQrtDQajAELdwFLs"
+
+checks : Unit ->{Crypto.Crypto; Crypto.CryptoError, SchemaError} Unit
+let checks () =
+  let rfc_key =
+    Option.with_default
+      []
+      (Bytes.from_base64url
+        "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow")
+  line "rfc 7515" (outcome issuer_json rfc_key rfc) ()
+  line "rfc 7515 other key" (outcome issuer_json secret rfc) ()
+  let decoded =
+    try show (Jwt.verify claims_json secret python) with
+    | Jwt.JwtError problem -> show problem
+  line "python" decoded ()
+  let session = { sub = "ada"; iat = Jwt.now (); exp = Jwt.expires_in 3600 }
+  let token = Jwt.sign session_json secret session
+  let back =
+    try show (Jwt.verify session_json secret token == session) with
+    | Jwt.JwtError problem -> show problem
+  line "round trip" back ()
+  line "header" (String.slice 0 37 token) ()
+  let tampered =
+    match String.split "." token with
+    | [h, p, s] -> h ++ ".e" ++ p ++ "." ++ s
+    | _ -> token
+  line "tampered" (outcome session_json secret tampered) ()
+  line "other key" (outcome session_json (Bytes.from_string "other") token) ()
+  line
+    "alg none"
+    (outcome
+      claims_json
+      secret
+      "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhZGEiLCJhZG1pbiI6dHJ1ZX0.")
+    ()
+  line "malformed" (outcome claims_json secret "not.a token") ()
+  line "wrong claims" (outcome session_json secret python) ()
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try provide Crypto.system { checks () } with
+  | Crypto.CryptoError message -> line "error" message ()
+  | SchemaError _ -> line "error" "schema" ()

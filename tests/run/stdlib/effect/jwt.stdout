@@ -1,0 +1,10 @@
+rfc 7515: Expired
+rfc 7515 other key: BadSignature
+python: { admin = true, sub = "ada" }
+round trip: true
+header: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
+tampered: BadSignature
+other key: BadSignature
+alg none: Malformed
+malformed: Malformed
+wrong claims: Malformed

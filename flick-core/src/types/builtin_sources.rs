@@ -124,6 +124,7 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
     ("DateTime", builtin_source!("builtins/DateTime.fl")),
     ("Cron", builtin_source!("builtins/Cron.fl")),
     ("Clock", builtin_source!("builtins/Clock.fl")),
+    ("Jwt", builtin_source!("builtins/Jwt.fl")),
     ("Random", builtin_source!("builtins/Random.fl")),
     // end of Effect: time
     // Effect: concurrency

@@ -1,0 +1,99 @@
+/// JSON Web Tokens signed with HMAC-SHA256 (RFC 7519 with `alg` `HS256`,
+/// RFC 7515 compact form). The claims are a value of a JSON codec; `exp` and
+/// `iat` are whole seconds since the epoch, read from the `Clock`.
+module Jwt exposing (Problem(..), JwtError(..), sign, verify, now, expires_in)
+
+/// Why a token was refused.
+type Problem = Malformed | BadSignature | Expired
+  deriving Eq, Show
+
+/// A token that `verify` refused.
+type error JwtError = JwtError Problem
+  deriving Eq, Show
+
+type alias Header = { alg : String }
+  deriving Schema
+
+type alias Expiry = { exp : Option Float }
+  deriving Schema
+
+header_json : PureCodec Json Header
+let header_json =
+  ignore_extra_fields
+    (codec (schema Header) {
+      alg = field "alg" String.json;
+    })
+
+expiry_json : PureCodec Json Expiry
+let expiry_json =
+  ignore_extra_fields
+    (codec (schema Expiry) {
+      exp = optional_field "exp" Float.json_finite;
+    })
+
+/// The base64url of `{"alg":"HS256","typ":"JWT"}`.
+signed_header : String
+let signed_header = Bytes.to_base64url (Bytes.from_string "{\"alg\":\"HS256\",\"typ\":\"JWT\"}")
+
+signature : List Int -> String ->{Crypto.Crypto; Crypto.CryptoError} List Int
+let signature secret input = Crypto.hmac Crypto.Sha256 secret (Bytes.from_string input)
+
+/// The token of the claims, signed with the secret.
+sign : PureCodec Json c -> List Int -> c ->{Crypto.Crypto; Crypto.CryptoError, SchemaError} String
+let sign wire secret claims =
+  let payload =
+    Bytes.to_base64url
+      (Bytes.from_string (Json.stringify (Codec.encode (Codec.general wire) claims)))
+  let input = signed_header ++ "." ++ payload
+  input ++ "." ++ Bytes.to_base64url (signature secret input)
+
+/// The JSON of a base64url segment.
+segment : String -> Option Unknown
+let segment text =
+  Option.bind
+    (fun json -> Result.to_option (Json.parse json))
+    (Option.bind Bytes.to_string (Bytes.from_base64url text))
+
+refuse : Problem ->{; JwtError} a
+let refuse problem = from_result (Err (JwtError problem))
+
+/// The claims of a token signed with the secret: its header names `HS256`,
+/// its signature matches (compared in constant time), and its `exp`, when it
+/// has one, is still ahead of the clock.
+verify : PureCodec Json c -> List Int -> String ->{Crypto.Crypto; Crypto.CryptoError, JwtError} c
+let verify wire secret token =
+  match String.split "." token with
+  | [header, payload, signed] ->
+    let alg =
+      Option.bind (fun h -> Result.to_option (Codec.decode_result header_json h)) (segment header)
+    if alg != Some { alg = "HS256" } then
+      refuse Malformed
+    else
+      match Bytes.from_base64url signed with
+      | Some given ->
+        if not (Bytes.equal given (signature secret (header ++ "." ++ payload))) then
+          refuse BadSignature
+        else
+          claims wire payload
+      | None -> refuse Malformed
+  | _ -> refuse Malformed
+
+claims : PureCodec Json c -> String ->{; JwtError} c
+let claims wire payload =
+  match segment payload with
+  | Some json ->
+    match (Codec.decode_result expiry_json json, Codec.decode_result wire json) with
+    | (Ok expiry, Ok value) ->
+      match expiry.exp with
+      | Some exp -> if exp * 1000 <= Clock.current_time_millis () then refuse Expired else value
+      | None -> value
+    | _ -> refuse Malformed
+  | None -> refuse Malformed
+
+/// The clock's time, in whole seconds since the epoch: an `iat`.
+now : Unit ->{} Float
+let now () = Float.floor (Clock.current_time_millis () / 1000)
+
+/// The time `seconds` from now, in whole seconds since the epoch: an `exp`.
+expires_in : Float ->{} Float
+let expires_in seconds = now () + seconds
