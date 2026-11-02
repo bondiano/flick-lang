@@ -1,0 +1,4 @@
+profile ada: ada
+profile bob: 404 bob
+post: posted hi
+post without the prefix: client error 404

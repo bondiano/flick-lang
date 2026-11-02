@@ -237,12 +237,41 @@ func lowerHeaders(h http.Header) *Record {
 	return out
 }
 
+// apiSend is how a request reaches a server: over the network, or to a
+// handler; nil when it got no response.
+type apiSend func(method, url string, header http.Header, body io.Reader) *received
+
 // HttpApiCall is `HttpApi.call base endpoint request`.
 func HttpApiCall(fb *Fiber, base, endpoint, request Value) Value {
+	return apiCallWith(fb, base.(string), endpoint, request, func(method, url string, header http.Header, body io.Reader) *received {
+		got, _ := ForeignAsync(fb, func(ctx Context) Value {
+			req, err := http.NewRequestWithContext(ctx, method, url, body)
+			if err != nil {
+				return nil
+			}
+			req.Header = header
+			res, err := fetchClient.Do(req)
+			if err != nil {
+				return nil
+			}
+			defer res.Body.Close()
+			data, err := io.ReadAll(res.Body)
+			if err != nil {
+				return nil
+			}
+			return &received{int32(res.StatusCode), res.Header, data}
+		}).(*received)
+		return got
+	})
+}
+
+// apiCallWith requests the endpoint under `base` by `send` and decodes the
+// response.
+func apiCallWith(fb *Fiber, base string, endpoint, request Value, send apiSend) Value {
 	e, r := endpointOf(endpoint), record(request)
 	params := clientPairs(fb, e.params, r.Get("path"), "path")
 	query := clientPairs(fb, e.query, r.Get("query"), "query")
-	url := apiURL(base.(string), e, params, query)
+	url := apiURL(base, e, params, query)
 	headers := clientPairs(fb, e.headers, r.Get("headers"), "headers")
 	payload := r.Get("payload")
 	if e.payload != nil {
@@ -260,35 +289,20 @@ func HttpApiCall(fb *Fiber, base, endpoint, request Value) Value {
 			contentType = own
 		}
 	}
-	got := ForeignAsync(fb, func(ctx Context) Value {
-		var reader io.Reader
-		if e.hasPayload() {
-			reader = bytes.NewReader(body)
+	header := http.Header{}
+	for _, p := range headers {
+		k, v := pairOf(p)
+		header.Set(k, wellFormed(v))
+	}
+	var reader io.Reader
+	if e.hasPayload() {
+		reader = bytes.NewReader(body)
+		if contentType != "" {
+			header.Set("Content-Type", contentType)
 		}
-		req, err := http.NewRequestWithContext(ctx, e.method, url, reader)
-		if err != nil {
-			return nil
-		}
-		for _, p := range headers {
-			k, v := pairOf(p)
-			req.Header.Set(k, wellFormed(v))
-		}
-		if e.hasPayload() && contentType != "" {
-			req.Header.Set("Content-Type", contentType)
-		}
-		res, err := fetchClient.Do(req)
-		if err != nil {
-			return nil
-		}
-		defer res.Body.Close()
-		data, err := io.ReadAll(res.Body)
-		if err != nil {
-			return nil
-		}
-		return &received{int32(res.StatusCode), res.Header, data}
-	})
-	res, ok := got.(*received)
-	if !ok {
+	}
+	res := send(e.method, url, header, reader)
+	if res == nil {
 		return Fail(clientError(0, "fetch failed"))
 	}
 	text := decodeUTF8(res.body)

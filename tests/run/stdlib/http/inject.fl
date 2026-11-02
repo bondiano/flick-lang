@@ -1,0 +1,69 @@
+// `HttpApi.Inject.call`: typed requests answered by the server's router in
+// the same process, no socket: the API mounted under `/api`, its routing,
+// decoding and declared errors, each answered as a client of the network
+// would get it.
+module App.Main exposing (main)
+
+import HttpApi.Derive exposing (..)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+type error NotFound = NotFound String
+  deriving Schema
+
+instance Problem NotFound =
+  let problem = { status = 404; body = Codec.json (schema NotFound) }
+
+type alias Name = { name : String }
+  deriving Schema
+
+type alias Note = { text : String }
+  deriving Schema
+
+type alias Notes = {
+  profile : Get "/profiles/:name" { path : Name } Name {NotFound};
+  post : Post "/notes" { payload : Note } (Created Note) {};
+} deriving HttpApi
+
+type alias Handler = ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse
+
+post_note : HttpApi.Request Unit Unit Unit Note ->{} Note
+let post_note request = { text = "posted " ++ request.payload.text }
+
+/// The server's router: the API under `/api`.
+app : Unit ->{} Handler
+let app () =
+  let api = HttpApi.api "Notes" |> HttpApi.add_group Notes.api |> HttpApi.Mount.under "/api"
+  let handlers = {
+    notes = {
+      profile = fun request ->
+        if request.path.name == "ada" then
+          request.path
+        else
+          from_result (Err (NotFound request.path.name));
+      post = post_note;
+    };
+  }
+  Http.Router.router Http.Router.config [HttpApi.route "/api/*" api handlers]
+
+profile : Handler -> String ->{} String
+let profile server name =
+  let request = { path = { name = name }; query = (); headers = (); payload = () }
+  try (HttpApi.Inject.call server "/api" Notes.endpoints.profile request).name with
+  | NotFound who -> "404 " ++ who
+  | HttpApi.ClientError e -> "client error " ++ show e.status
+
+post : Handler -> String -> String ->{} String
+let post server base text =
+  let request = { path = (); query = (); headers = (); payload = { text = text } }
+  try (HttpApi.Inject.call server base Notes.endpoints.post request).text with
+  | HttpApi.ClientError e -> "client error " ++ show e.status
+
+main : Unit ->{; AppError} Unit
+let main () =
+  server : Handler
+  let server = app ()
+  Platform.stdout_line ("profile ada: " ++ profile server "ada")
+  Platform.stdout_line ("profile bob: " ++ profile server "bob")
+  Platform.stdout_line ("post: " ++ post server "/api" "hi")
+  Platform.stdout_line ("post without the prefix: " ++ post server "/" "hi")

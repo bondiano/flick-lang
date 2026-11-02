@@ -210,6 +210,14 @@ typed failure, or `HttpApi.ClientError`. `HttpApi.url` builds the URL alone.
 In a browser the base may be relative, `/api`, against the page's address;
 elsewhere a relative base is a `ClientError` on JS.
 
+`HttpApi.Inject.call handler base endpoint request` is `call` answered by a
+handler of the server in the same process, as Fastify's `inject`: the
+server's router, `Http.Router.router config [HttpApi.route "/api/*" api
+handlers]`, gets the request a client would send and answers it with the
+same routing, auth, decoding and errors, so a test checks the whole server
+without a socket; an error the router does not answer is answered as a
+server would, a missing route with 404.
+
 `HttpApi.openapi api` is the OpenAPI 3.1 document, every schema written by
 the strict exporter; a part without an exact form is an `ExportError`
 naming `group.endpoint.part -> field`. `flick schema export Module.api

@@ -381,6 +381,7 @@ httpApiListen *HttpApiListen
 httpApiRoute *HttpApiRoute
 httpApiPort HttpApiPort
 httpApiCall *HttpApiCall
+httpApiInject *HttpApiInject
 httpApiUrl *HttpApiUrl
 httpApiOpenApi HttpApiOpenApi
 httpApiWithBytesPayload HttpApiWithBytesPayload

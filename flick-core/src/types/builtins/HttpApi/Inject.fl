@@ -1,0 +1,22 @@
+/// Requests of an API answered by its server in the same process, without
+/// a socket, as Fastify's `inject` does: a test sends typed requests through
+/// the whole server, routing, auth, decoding and errors, and gets typed
+/// answers back.
+module HttpApi.Inject exposing (call)
+
+import HttpApi exposing (ClientError, Endpoint, Request)
+
+/// `HttpApi.call` whose request goes to `handler`, the server's router, as
+/// `base` (`/api`) says: the success, a declared error as the typed
+/// failure, or `ClientError`; an error the handler does not answer is
+/// answered as a server would answer it, a missing route with 404.
+call :
+  forall l p q h b r e s a.
+  (Http.ServerRequest.ServerRequest ->{a; Http.ServerError.HttpServerError}
+    Http.ServerResponse.ServerResponse) ->
+  String ->
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Request p q h b ->{a; ClientError | e}
+  s
+foreign effect call from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiInject"
+  arity 4
