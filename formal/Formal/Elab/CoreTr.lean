@@ -1,7 +1,7 @@
 import Formal.Elab.CoreTy
 
 /-!
-# λFlick⁺ as a `Target`: the terms (P4a3)
+# λFlick⁺ as a `Target`: the terms
 
 `Tr N γ δ e e'`: the elaborated term `e` is the core term `e'`. The variables of `Γ` and the
 premises of `Δ` go into one context of the core, through the maps `γ` and `δ`: `lam` pushes

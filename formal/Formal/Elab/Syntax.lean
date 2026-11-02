@@ -1,7 +1,7 @@
 /-!
 # Elaboration: classes, instances, dictionaries, entailment (elaboration.md §1.1, §2.1–§2.3)
 
-A model of its own, like `Formal/RT/`: it imports nothing from the core of P1. Constraint
+A model of its own, like `Formal/RT/`: it imports nothing from the core (`Formal/Syntax.lean`). Constraint
 types are first-order terms; a dictionary term is `d ::= δ | d.$slot | I d̄ | struct_C d̄ |
 prim_Q ℓ̄`, with application as a binary spine. A structural dictionary carries its record type
 and a primitive one its constraint (Р196): the run of the target picks its global by them.

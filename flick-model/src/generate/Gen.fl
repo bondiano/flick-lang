@@ -1,4 +1,4 @@
-// The declarations every program of the generator of X2 uses
+// The declarations every program of the generator of the model properties uses
 // (flick-model/src/generate): two errors and two services, and what the
 // programs of regions (docs/formal/regions.md) acquire and hold.
 module Gen exposing (..)

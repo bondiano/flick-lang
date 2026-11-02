@@ -2,7 +2,7 @@ import Formal.Elab.Witness.Inst
 import Formal.Elab.CoreDictSem
 
 /-!
-# Witness: the bodies of the globals, `RootTy` and `RealRun` (W2)
+# Witness: the bodies of the globals, `RootTy` and `RealRun`
 
 `root` has a body for every global of `Sg`: the instances (`instBody`), the constants and
 the structural `Eq` of `Rec`, each typed by the rules of the core at its scheme. No body is

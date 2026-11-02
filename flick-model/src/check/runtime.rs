@@ -1,7 +1,7 @@
 //! The forms of the run time (`docs/formal/core.md` §3.6): what a
 //! configuration `⟨μ, E[e]⟩` holds besides source forms, typed so that
 //! Preservation can be checked on every state the machine passes through
-//! (X2). `Ψ` is a meta per cell, made before anything else is checked, so
+//! (the model properties). `Ψ` is a meta per cell, made before anything else is checked, so
 //! `Gen` never quantifies a cell's type (T3). The forms of regions and
 //! `⊢ Λ` are those of `docs/formal/regions.md` §3.4.
 

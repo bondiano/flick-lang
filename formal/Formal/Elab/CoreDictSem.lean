@@ -1,7 +1,7 @@
 import Formal.Elab.CoreDictRun
 
 /-!
-# λFlick⁺ as a `Target`: `≈` keeps the values of dictionaries (P4a4)
+# λFlick⁺ as a `Target`: `≈` keeps the values of dictionaries
 
 `RealRun P N root` gives the bodies of the globals that realise the program's dictionaries.
 `ent_eval`: a closed derivation evaluates. `eqv_sem`: `≈`-related dictionaries have the same

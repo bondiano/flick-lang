@@ -1,4 +1,4 @@
-//! The traces of the e2e cases (X4): every run writes one with
+//! The traces of the e2e cases: every run writes one with
 //! `FLICK_TRACE` and the monitor of flick-model checks it against `λRT`;
 //! for the cases of the runtime contract the projection of the JS run must
 //! be that of the Go run (docs/formal/runtime.md §6.1).

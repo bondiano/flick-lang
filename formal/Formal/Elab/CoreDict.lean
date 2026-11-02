@@ -3,7 +3,7 @@ import Formal.Elab.Basic
 import Formal.Elab.SugarBase
 
 /-!
-# λFlick⁺ as a `Target`: the laws of dictionaries (P4a3)
+# λFlick⁺ as a `Target`: the laws of dictionaries
 
 `lamD l` is `l` nested `λ`s of the core, each over a premise `D_Q` (`lams_typ`); a method and
 a superclass slot are `Typ.dproj` on a dictionary record; instances, constants of Γ₀ and the

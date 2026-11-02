@@ -35,12 +35,12 @@ let phantom () = phantom_value
 
 let phantom_value = []
 
-// a number literal is no function, whatever number it becomes (X2)
+// a number literal is no function, whatever number it becomes
 literal_call : Float -> Float
 let literal_call n = 2 n
 
 // nor is it a function next to one: the list would hold a function as an
-// `Int` (X2)
+// `Int`
 literal_element : Unit -> Int
 let literal_element () =
   match [0, fun x -> x] with

@@ -2,7 +2,7 @@ import Formal.Elab.Witness.Bodies
 import Formal.Elab.Exh
 
 /-!
-# Witness: the bodies of `Seq` and of `iter` (W2)
+# Witness: the bodies of `Seq` and of `iter`
 
 `Seq q a` and `ListQ q a` are lists of the core, `SNil | SCons a (Seq q a)`, whose `CRow`
 parameter `q` is phantom: the model does not need `Seq` to be lazy, and its schemes are those of

@@ -9,7 +9,7 @@ The progression follows the idea in the [Monday Morning Haskell transformer
 tutorial](https://mmhaskell.com/monads/transformers): start with the representation,
 define how actions compose, then stack the wrappers. Haskell's
 [`mtl`](https://github.com/haskell/mtl) defines capability classes on top of
-transformers. This example covers the D15 set: five transformers, shared
+transformers. This example covers an enumerated set: five transformers, shared
 `MonadTrans`, and state, reader, writer and error capability classes with
 functional dependencies. It is not every transformer in Haskell's ecosystem.
 

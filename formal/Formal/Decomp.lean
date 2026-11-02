@@ -1,7 +1,7 @@
 import Formal.Frames
 
 /-!
-# Unique decomposition of a term into a context and a redex (P4a4)
+# Unique decomposition of a term into a context and a redex
 
 A redex is a term that is not a value and is not a frame around a non-value. A term has at
 most one decomposition `plug E r` with an ordered context `E` and a redex `r`

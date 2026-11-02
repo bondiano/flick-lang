@@ -1,7 +1,7 @@
 import Formal.Elab.Witness.Real
 
 /-!
-# Witness: the bodies of the methods and constants (W2)
+# Witness: the bodies of the methods and constants
 
 Each body is typed by the rules of the core at the translation of its scheme in `Sugar`, in
 the empty context. `OptQ` is eager: `flat_map k x` matches `x` and copies the result of `k`

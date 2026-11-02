@@ -46,7 +46,7 @@ gen = "a runtime function body: direct calls"
 isSchedule = "TS-only: a type guard; Flick values are typed statically"
 
 [pending]
-cron = "M20"
+cron = "cron expressions need a parser of their own"
 ```
 
 | Статус | Значение | Смысл |
@@ -54,7 +54,7 @@ cron = "M20"
 | `wrapped` | `"<Flick.Name> <fingerprint>"` | типизированный символ стандартной библиотеки, проверенный по этому отпечатку |
 | `language` | конструкция | возможность уже есть в языке: вместо `Effect.gen` используются прямые вызовы, вместо `Context.Service` — `service`, вместо `Data.TaggedError` — `type error`, вместо `Layer.provide` — `provide`, вместо `Match` — `match` |
 | `excluded` | причина | возможность нужна только в TypeScript (`HKT`, `Types`, проверки типов, извлечение типов) либо противоречит инварианту языка (`unsafe*`, `Mutable*`, порождение задачи без владельца, выполнение эффекта вне средства запуска точки входа, управление потоком через канал ошибок) |
-| `pending` | ответственный этап, `M<n>` | обёртки временно нет |
+| `pending` | чего не хватает | обёртки временно нет |
 
 Запись `"*"` распространяется на все экспорты модуля, у которых нет собственной записи.
 
@@ -70,7 +70,7 @@ cron = "M20"
   в `tests/run/stdlib/` на него не ссылается (ссылки разрешает модуль проверки типов);
 - у внешней привязки символа `wrapped` нет отметки `reviewed
   "effect@<pinned> …"` либо привязка проверена по другой версии;
-- у `pending` не указан ответственный этап;
+- у решения `language`, `excluded` или `pending` не указана причина;
 - версия снимка отличается от закреплённой в `runtime/package.json`.
 
 `just effect-coverage` выводит число экспортов по статусам и модулям.

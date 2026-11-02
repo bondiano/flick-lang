@@ -1,7 +1,7 @@
 import Formal.Elab.CoreTr
 
 /-!
-# λFlick⁺ as a `Target`: the typing and its laws (P4a3)
+# λFlick⁺ as a `Target`: the typing and its laws
 
 `Has Γ Δ e t φ`: in every core context that corresponds to `Γ` and `Δ` (`Corr`), `e` is a
 core term typed at `⟦t⟧ ! ⟦φ⟧`, for every store typing `Ψ` and facts `Θ`.

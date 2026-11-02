@@ -6,7 +6,7 @@ A cause is a flat list of reasons, as in Effect 4.0.5. `c ⊕ c'` is `nub (c ⧺
 concatenation (`causeFromReasons`). `≈` of §2.1 is equality of reasons: `V` stands for
 the values Flick puts into a cause, with a thrown `Error` told apart by its identity.
 
-This file imports nothing from the core of P1.
+This file imports nothing from the core (`Formal/Syntax.lean`).
 -/
 
 namespace Flick.RT

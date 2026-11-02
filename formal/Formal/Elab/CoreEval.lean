@@ -3,7 +3,7 @@ import Formal.SubstComp
 import Formal.Elab.CoreT6a
 
 /-!
-# λFlick⁺ as a `Target`: evaluation by pure steps (P4a4)
+# λFlick⁺ as a `Target`: evaluation by pure steps
 
 `Eval root a v`: `a` reaches the value `v` by pure steps of one thread (`PStep`), which do not
 read the store or the regions. Pure steps are deterministic, so a term has at most one value

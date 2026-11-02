@@ -1,5 +1,5 @@
 //! Syntax and checking time scale with long lines, records and functions.
-//! Checking budgets cover the roadmap's sizes (200 fields, 2000 lines);
+//! Checking budgets cover the target sizes (200 fields, 2000 lines);
 //! growth ratios catch quadratic behavior without a machine-specific syntax budget.
 
 use std::fmt::Write;

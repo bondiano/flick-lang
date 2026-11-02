@@ -3,7 +3,7 @@ import Formal.Weaken
 import Formal.Closed
 
 /-!
-# Witness: `unc n`, `from_result_n` and the structural `eq` (W2)
+# Witness: `unc n`, `from_result_n` and the structural `eq`
 
 `unc n` is built by a Lean function of `n` (`uncB`): `unc 1 f t = f t`, and
 `unc (n+1) f t = match t with (t', x) → unc n f t' x`, `unc n` taken at the result

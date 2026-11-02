@@ -1,7 +1,7 @@
 import Formal.Elab.CoreCgOps
 
 /-!
-# λFlick⁺ as a `Target`: related evaluation contexts (P4a4b)
+# λFlick⁺ as a `Target`: related evaluation contexts
 
 `FrR B F F'`: two frames of one kind with related parts. Related contexts plug related terms
 into related terms (`FrR.plugs`), keep the order of evaluation (`FrR.okE`), the services of

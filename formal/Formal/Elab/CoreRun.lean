@@ -1,7 +1,7 @@
 import Formal.Elab.CoreLoad
 
 /-!
-# λFlick⁺ as a `Target` with the run of the core (P4a4c)
+# λFlick⁺ as a `Target` with the run of the core
 
 `runTarget` is the core with its run: states are configurations, `load e` puts the translation
 `trE` of `e` (the function `Tr` is) in the main thread, a step is a `CStep`, the result is the

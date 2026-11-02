@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Stress (`just stress`, X4): with FLICK_STRESS set to a seed, each
+// Stress (`just stress`): with FLICK_STRESS set to a seed, each
 // checkpoint and each new fiber yields or sleeps at random and turns are
 // off (startup.go), so the runs of a program take interleavings a plain
 // run rarely does; the monitor of λRT checks the trace of each. Go's own

@@ -1,14 +1,14 @@
-//! The properties of X2 on the programs of `flick_model::generate`: the
+//! The model properties on the programs of `flick_model::generate`: the
 //! model accepts what the generator builds; Progress and Preservation
 //! (`docs/formal/core.md` §4) hold on every state the machine passes
 //! through; flick-core accepts a program, changed or not, exactly when the
 //! model does, but for the local function without a signature flick-core
-//! rejects by design. The programs of regions (X3, `docs/formal/regions.md`)
+//! rejects by design. The programs of regions (`docs/formal/regions.md`)
 //! are run too: each state has `⊢ Λ`, and no run uses a capability after
 //! its region closed (T4.1), which the leaks reach. A change may leak a
 //! region by each path of its §4 but the fourth. The generator makes none
 //! of the forms of the recorded incompletenesses Р23 and Р25. The forms of
-//! the holes of TypeScript (X6, `docs/formal/ts-holes.md` §4) are checked
+//! the holes of TypeScript (`docs/formal/ts-holes.md` §4) are checked
 //! by both and not run: the machine has no natives for their foreign
 //! values. Not part of `just test`: `just model` runs them, and
 //! `PROPTEST_CASES` sets how many programs each sees.
@@ -166,7 +166,7 @@ fn leaks_reach_a_use_after_close() {
 
 /// Р130: `(fun g x -> g x) (try … with _ -> as4)`, the λ of `v1` after
 /// its `let` with a signature stepped, whose argument needs the runtime
-/// arrow of the signature. A case X2 found.
+/// arrow of the signature. A case the model properties found.
 #[test]
 #[allow(
     clippy::unreadable_literal,
@@ -192,7 +192,7 @@ proptest! {
     #![proptest_config(ProptestConfig { failure_persistence: None, max_global_rejects: 1 << 20, ..ProptestConfig::default() })]
 
     #[test]
-    #[ignore = "a property of X2; run `just model`"]
+    #[ignore = "a model property; run `just model`"]
     fn generated_programs_are_well_typed(c in choices()) {
         let p = generate::program(&c);
         if let Err(e) = model(&p) {
@@ -201,7 +201,7 @@ proptest! {
     }
 
     #[test]
-    #[ignore = "a property of X2; run `just model`"]
+    #[ignore = "a model property; run `just model`"]
     fn progress_and_preservation_hold(c in choices()) {
         let p = generate::program(&c);
         prop_assume!(model(&p).is_ok());
@@ -213,7 +213,7 @@ proptest! {
     }
 
     #[test]
-    #[ignore = "a property of X2; run `just model`"]
+    #[ignore = "a model property; run `just model`"]
     fn checkers_agree(c in choices(), m in option::of(vec(any::<u32>(), 0..8))) {
         let mut p = generate::program(&c);
         if let Some(m) = &m {

@@ -36,7 +36,7 @@ jobs:
       - run: just e2e-postgres
 
   # the reference model of λFlick (flick-model) against tests/run/model.txt,
-  # and the properties of X2 on generated programs; it needs neither Node nor Go
+  # and the model properties on generated programs; it needs neither Node nor Go
   model:
     runs-on: ubuntu-latest
     steps:

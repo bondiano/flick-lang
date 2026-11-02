@@ -3,7 +3,7 @@ import Formal.Elab.T6a
 import Formal.Elab.Sugar
 
 /-!
-# λFlick⁺ as a `Target`: the types (P4a3)
+# λFlick⁺ as a `Target`: the types
 
 The types of `Elab` in the core of `Formal/` with regions and dictionary records:
 `var ↦ tvar`, `app ↦ tapp`, `con c ↦ adt`, `Bool ↦ base bool`, `Int ↦ base int`,

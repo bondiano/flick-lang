@@ -1,7 +1,7 @@
 import Formal.Elab.Sugar
 
 /-!
-# Witness: a program that meets the hypotheses (W1, the program and К1–К8)
+# Witness: a program that meets the hypotheses (the program and K1–K8)
 
 A concrete program of `Elab`: the classes `Eq`, `Applicative`, `Monad`, `Alternative` and
 `Iterable` with the methods of `Sugar`, and the instances

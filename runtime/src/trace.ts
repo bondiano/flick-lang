@@ -1,4 +1,4 @@
-// The runtime trace of docs/formal/runtime.md (X4): with FLICK_TRACE set to
+// The runtime trace of docs/formal/runtime.md: with FLICK_TRACE set to
 // a file, each step of the owner contract λRT names is written there as one
 // JSON object per line, in the order the steps happened. The events and
 // their fields are those of the Go runtime (runtime-go/flickrt/trace.go),

@@ -304,16 +304,16 @@ fn a_binding_reviewed_against_another_release_or_none_fails() {
 }
 
 #[test]
-fn pending_needs_an_owning_stage() {
+fn pending_needs_a_reason() {
     let module = MODULE
         .replace(
             "[excluded]\n",
-            "[pending]\nInput = \"M21\"\nunsafeRun = \"later\"\n[excluded]\n",
+            "[pending]\nInput = \"a parser of its own\"\nunsafeRun = \" \"\n[excluded]\n",
         )
         .replace("Input = \"TS-only\"\nunsafeRun = \"unsafe\"\n", "");
     assert_eq!(
         fixture(&module, SNAPSHOT),
-        ["Sched.unsafeRun: pending without an owning stage (`M<n>`), got `later`"]
+        ["Sched.unsafeRun: pending without a reason"]
     );
 }
 

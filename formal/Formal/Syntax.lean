@@ -258,7 +258,7 @@ def Pat.binds : Pat → Nat
   | _ => 0
 
 /-- Terms of core.md §1.3 and regions.md §1.3, and the run-time forms of
-core.md §3.1 and regions.md §3.1. Binders as in P1: `lam b`, `let_ e b` and
+core.md §3.1 and regions.md §3.1. Binders: `lam b`, `let_ e b` and
 `scope e` bind one variable (`scope` binds the owner); `letrec f b` and `fix f`
 bind two in `f` (`0 = x`, `1 = f`) and `letrec` one in `b`; arms bind
 `p.binds` in the guard and the body. An environment `θ` is a spine

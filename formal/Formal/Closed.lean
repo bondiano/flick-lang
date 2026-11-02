@@ -1,7 +1,7 @@
 import Formal.Reach
 
 /-!
-# Renaming and substitution that fix the free variables (P4a4)
+# Renaming and substitution that fix the free variables
 
 A renaming or a substitution that is the identity on the free variables of a term leaves it
 unchanged; in particular a closed term is unchanged by any of them.

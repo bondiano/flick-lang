@@ -5,7 +5,7 @@ import Formal.Elab.Hyp
 # Elaboration: the target λFlick⁺ as an interface (elaboration.md §0.1, §2.1, §2.2)
 
 The target is abstract: `Target` gives its typing `⊢⁺` of elaborated terms and its run as
-fields, and the laws T6 needs as fields too. P4a instantiates it with λFlick⁺ (Р54).
+fields, and the laws T6 needs as fields too. `Elab/Core*.lean` instantiate it with λFlick⁺ (Р54).
 
 Types of elaborated terms: monotypes `⟦τ⟧ = τ`, arrows `a →φ^q b` and dictionary types `D_Q`.
 A context entry is `∀ᾱ. t`; a record of `D_Q` with `∀`-fields shows only through its laws:
@@ -142,7 +142,7 @@ structure Target (P : Prog) where
   obs : St → Option Obs
   /-- `≈`-related dictionaries stay related under steps: `Rel` relates the states of closed
   typed terms that differ by `≈` in dictionary positions, and is a weak simulation that keeps
-  results. The typings are there because only typed dictionaries evaluate (P4a4). -/
+  results. The typings are there because only typed dictionaries evaluate (`CoreDictRun.lean`). -/
   Rel : St → St → Prop
   load_rel : ∀ {e e' t φ}, TmEqv P e e' → Has [] [] e t φ → Has [] [] e' t φ →
     Rel (load e) (load e')

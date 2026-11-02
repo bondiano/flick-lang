@@ -466,7 +466,7 @@ fn eff_as_a_type_constructor() {
 }
 
 /// `<` orders numbers and strings, as flick-core's operators: `λf. f < f`
-/// over a function is rejected, an unknown operand becomes `Int` (X2).
+/// over a function is rejected, an unknown operand becomes `Int` (found by the model properties).
 #[test]
 fn comparisons_order_numbers_and_strings_only() {
     let lt = |a: Term, b: Term| Term::apps(Term::prim(Prim::Lt), [a, b]);

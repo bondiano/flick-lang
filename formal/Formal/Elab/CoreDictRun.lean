@@ -1,7 +1,7 @@
 import Formal.Elab.CoreEval
 
 /-!
-# λFlick⁺ as a `Target`: the run of dictionaries (P4a4)
+# λFlick⁺ as a `Target`: the run of dictionaries
 
 `trDt N δ d` is the translation of a dictionary, a function of the term since Р196 (`TrD.eq`).
 `RealRun P N root` is what the bodies of the globals do: the global of an instance is

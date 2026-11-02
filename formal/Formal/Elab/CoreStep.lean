@@ -1,7 +1,7 @@
 import Formal.Elab.CoreHead
 
 /-!
-# λFlick⁺ as a `Target`: a step of related configurations (P4a4c)
+# λFlick⁺ as a `Target`: a step of related configurations
 
 A step of one thread is matched by the other side (`thread_sim`): either the redex lies inside
 the left side of a base pair, and the other side waits or reaches the value of the pair by
