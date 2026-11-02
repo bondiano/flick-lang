@@ -107,17 +107,18 @@ theorem elab_lams {Δ r b b' q} : ∀ {as : List Ty} {Γ : List Scheme} {ψ : St
       (List.cons_ne_nil _ _) (by simpa using hq) (by simpa using hb)
     exact ⟨_, .lam (φ := .P) he (lam_cov fun s hs => hq s (List.mem_append_right _ hs))⟩
 
-/-- The tuple of a group: `map2 pair` at each `and`. -/
-theorem elab_tuple {Γ Δ φ m d} (hd : Ent P Δ [⟨S.applicative, [m]⟩] [d]) :
-    ∀ {es : List Exp} {as : List Ty} {acc t acc'},
-    All2 (fun e a => ∃ e', Elab P Γ Δ e (.app m a) φ e') es as →
-    Elab P Γ Δ acc (.app m t) φ acc' → ∃ e', Elab P Γ Δ (S.tuple acc es) (.app m (nest S.tup t as)) φ e'
-  | _, _, _, _, _, .nil, h => ⟨_, h⟩
-  | _, _, acc, t, _, .cons (a := e) (b := a) ⟨_, he⟩ hs, h => by
+/-- The tuple of a group: `map2 pair` at each `and`; its row is whatever `map2` shows. -/
+theorem elab_tuple {Γ Δ φ m dk} (hd : Ent P Δ [⟨S.applicative, [m]⟩] [dk]) :
+    ∀ {es : List Exp} {as : List Ty} {acc t d acc'},
+    All2 (fun e a => ∃ d e', Elab P Γ Δ e (appQ m d a) φ e') es as →
+    Elab P Γ Δ acc (appQ m d t) φ acc' →
+    ∃ q e', Elab P Γ Δ (S.tuple acc es) (appQ m q (nest S.tup t as)) φ e'
+  | _, _, _, _, _, _, .nil, h => ⟨_, _, h⟩
+  | _, _, acc, t, d, _, .cons (a := e) (b := a) ⟨d', _, he⟩ hs, h => by
     let ta : Ty := .app (.app (.con S.tup) t) a
-    have hm := elab_meth (Γ := Γ) (φ := φ) S.hMap2 rfl (ts := [m, t, a, ta, .cnil]) rfl
-      (by simpa [Cn.subst, Ty.subst, inst] using hd)
-      (τ := arrP (arrP t (arrP a ta)) (arrP (.app m t) (arrP (.app m a) (.app m ta)))) rfl
+    have hm := elab_meth (Γ := Γ) (φ := φ) S.hMap2 rfl (ts := [m, .cnil, d, t, a, ta, .cnil, d'])
+      rfl (by simpa [Cn.subst, Ty.subst, inst] using hd)
+      (τ := map2Ty m .cnil d t a ta .cnil d') rfl
     have hp := elab_const (Γ := Γ) (Δ := Δ) (φ := φ) S.hPair (ts := [t, a])
       (τ := arrP t (arrP a ta)) rfl rfl
     have := elab_tuple hd hs (.app (.app (.app hm hp (.inl rfl)) h (.inl rfl)) he (.inl rfl))

@@ -483,8 +483,14 @@ Simplifications:
    of the filled skeleton, and `T6b_target` takes it for both fillings.
 9. The sugar (§3) desugars into `Exp`; `Sugar` names the Prelude methods (`flat_map`,
    `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
-   hypotheses on the program. The schemes have capture variables; qualifiers of non-arrow
-   types are dropped (Р188). A lambda of the sugar takes as its qualifier a row that covers
+   hypotheses on the program. Simplification 15 extends to the Prelude (Р188): a type with
+   hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
+   qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and
+   data without storage drops it. That argument is invariant, so a qualifier the caller
+   supplies is a variable of the scheme, a result shows what the arguments it holds reach
+   (`flat_map : (a →^c m e b) →P (m d a →^(c ∪ e) m ((c ∪ e) ∪ (d ∪ a)) b)`, `bindTy`), and
+   a block of `do` or `for … yield` has the row its desugaring shows (`∃q` in `do_elab`,
+   `gen_elab`, `T6a_do`). A lambda of the sugar takes as its qualifier a row that covers
    its context (`ctxRow`). The checker's rules are the judgements `DoOk`, `GenOk` and
    `LoopOk`; `?` and `s; rest` are premises of their lemmas. Patterns are variables (and `_`):
    a refutable pattern needs `match`, which the source lacks. The values of a group
@@ -522,7 +528,7 @@ updated. P4a1 is done; Р188 records the Prelude schemes. P4a2 is done (Р194). 
 (Р188 decided, Р195). P4a4 is done: Р196 and Р197 fixed the model, P4a4a is the run of
 dictionaries (`eqv_sem`), P4a4b `Rel` and its closure, P4a4c the fields of the target and
 `T6b_core`, T6(b) for the core with its run without the hypothesis `Sim` (Р198–Р200). P4a is
-done. The pieces below are in their intended order.
+done. Р188 through a `CRow` parameter: the translation and the schemes of `Sugar` are done. The pieces below are in their intended order.
 
 #### P4a1: captures in `Elab` and `Target`
 
@@ -659,14 +665,19 @@ five places.
   `caseOpt` — `Typ.match_`.
 - *Deviation 5:* `typingTarget` has an empty run (`Rel = True`, no steps), so that T6(a)
   is stated now; P4a4 gives the run of the core with the same laws.
-- **Р188, decided.** `τ^q` on types other than arrows and `Eff` is not added to the core.
+- **Р188, decided; superseded by the `CRow` parameter.** `τ^q` on types other than arrows
+  and `Eff` is not added to the core.
   It is a new type former with its (≤-Cap) in `Le`, and every case analysis on `Ty` and
   `Le` changes: substitution, `⌈·⌉`, canonical forms, shapes and patterns, `held`,
   preservation, T4 and T4.3 — 45 of the 60 files of `Formal/` use them. A lazy instance or
   constant is a global declared in `Real` at its scheme without the value qualifier; its
   body is a hypothesis `RootTy` that the core does not derive for it. T6(a) does not read
   bodies; the run (P4a4) and T1–T3 of a program with a lazy instance rest on that
-  hypothesis.
+  hypothesis. Р188 is now done without a new type former: the hidden qualifier of `Eff` and
+  `Seq` is a parameter of kind `CRow` of the type (simplification 15), the schemes of
+  `Sugar` show it (`elaboration.md` Р188 gives the translation of the checker's schemes),
+  and a lazy body is `MkEff (task …)` of the nominal type `Eff q b` with the field
+  `eff ∅ ∅ b {q}`.
 
 #### P4a4: `Rel` and `Sim`
 

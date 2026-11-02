@@ -11,9 +11,12 @@ A tuple of the values of a group `p₁ <- e₁ and … and pₙ <- eₙ` is nest
 `((a₁, a₂), …, aₙ)`, built by `map2 pair`; `λ(p₁, …, pₙ). e` is `unc n (λp₁ … pₙ. e)` with a
 constant `unc n : (a₁ → … → aₙ → r) → T_n → r` for each `n ≥ 1`.
 
-The schemes are the checker's types of the Prelude (`Prelude.fl`, `Seq.fl`) with the
-qualifiers of non-arrow types dropped (Р188): each higher-order parameter has a capture
-variable `c`, its arrows and the arrows after it show `c`.
+The schemes are the checker's types of the Prelude (`Prelude.fl`, `Seq.fl`) translated by
+Р188: a type with hidden storage (`Eff`, `Seq`) and the variable of a class over containers
+take the qualifier of the value as their first argument, `(T ā)^q ↦ T q ā` (`appQ`), and data
+without storage drops it. The core has no (≤-Cap) on that argument, so a qualifier the
+caller supplies is a variable of the scheme, and one the result shows names what the
+arguments it holds reach (`elaboration.md` Р188).
 -/
 
 namespace Flick.Elab
@@ -31,6 +34,23 @@ def nest (tup : Nat) : Ty → List Ty → Ty
 
 /-- `var 0, …, var (n-1)`. -/
 def vars (n : Nat) : List Ty := (List.range n).map .var
+
+/-- `T q a`: a type with hidden storage, or a class variable over containers, with the
+qualifier `q` of its value (Р188). -/
+abbrev appQ (m q a : Ty) : Ty := .app (.app m q) a
+
+/-- The type of `flat_map` for the container `m`:
+`(a →P^c m e b) →P (m d a →P^(c ∪ e) m ((c ∪ e) ∪ (d ∪ a)) b)`. -/
+def bindTy (m c d a b e : Ty) : Ty :=
+  arrP (.arr .P a (appQ m e b) c)
+    (.arr .P (appQ m d a) (appQ m (.cun (.cun c e) (.cun d a)) b) (.cun c e))
+
+/-- The type of `map2` for the container `f`, with `R = (c ∪ g) ∪ ((d ∪ a) ∪ (d' ∪ b))`:
+`(a →P^c b →P^g x) →P (f d a →P^(c ∪ g) f d' b →P^R f R x)`. -/
+def map2Ty (f c d a b x g d' : Ty) : Ty :=
+  let R : Ty := .cun (.cun c g) (.cun (.cun d a) (.cun d' b))
+  arrP (.arr .P a (.arr .P b x g) c)
+    (.arr .P (appQ f d a) (.arr .P (appQ f d' b) (appQ f R x) R) (.cun c g))
 
 /-- `∀a₁ … aₙ r c. (a₁ →^c … → aₙ →^c r) →P (T_n →^c r)`, for `n ≥ 1`. -/
 def uncSch (tup n : Nat) : Scheme :=
@@ -64,37 +84,46 @@ structure Sugar (P : Prog) where
   each : Stage → Nat
   unitV : Nat
   fromResult : Nat
-  /-- `flat_map : ∀m a b c. Monad m ⇒ (a →^c m b) →P (m a →^c m b)` -/
-  hFlatMap : P.methods flatMap = some (monad, ⟨4, [⟨monad, [.var 0]⟩],
-    arrP (.arr .P (.var 1) (.app (.var 0) (.var 2)) (.var 3))
-      (.arr .P (.app (.var 0) (.var 1)) (.app (.var 0) (.var 2)) (.var 3)), .cnil⟩)
-  /-- `map2 : ∀f a b x c. Applicative f ⇒ (a →^c b →^c x) →P (f a →^c f b →^c f x)` -/
-  hMap2 : P.methods map2 = some (applicative, ⟨5, [⟨applicative, [.var 0]⟩],
-    arrP (.arr .P (.var 1) (.arr .P (.var 2) (.var 3) (.var 4)) (.var 4))
-      (.arr .P (.app (.var 0) (.var 1))
-        (.arr .P (.app (.var 0) (.var 2)) (.app (.var 0) (.var 3)) (.var 4)) (.var 4)), .cnil⟩)
-  /-- `nothing : ∀f a. Alternative f ⇒ f a` -/
-  hNothing : P.methods nothing = some (alternative, ⟨2, [⟨alternative, [.var 0]⟩],
-    .app (.var 0) (.var 1), .cnil⟩)
-  /-- `iter : ∀f a. Iterable f ⇒ f a → Seq a` -/
-  hIter : P.methods iter = some (iterable, ⟨2, [⟨iterable, [.var 0]⟩],
-    arrP (.app (.var 0) (.var 1)) (.app (.con seq) (.var 1)), .cnil⟩)
+  /-- `flat_map : ∀m c d a b e. Monad m ⇒ bindTy m c d a b e` (`Prelude.fl`:
+  `∀c d a b. (∀v. a^v → (m b)^(c + v))^c → ((m a)^d → (m b)^(c + d))^c`) -/
+  hFlatMap : P.methods flatMap = some (monad, ⟨6, [⟨monad, [.var 0]⟩],
+    bindTy (.var 0) (.var 1) (.var 2) (.var 3) (.var 4) (.var 5), .cnil⟩)
+  /-- `map2 : ∀f c d a b x g d'. Applicative f ⇒ map2Ty f c d a b x g d'` (`Prelude.fl`:
+  `∀c d a b x. (∀u v. a^u → (b^v → x)^(c + u))^c →
+  ((f a)^d → ((f b)^d → (f x)^(c + d))^(c + d))^c`) -/
+  hMap2 : P.methods map2 = some (applicative, ⟨8, [⟨applicative, [.var 0]⟩],
+    map2Ty (.var 0) (.var 1) (.var 2) (.var 3) (.var 4) (.var 5) (.var 6) (.var 7), .cnil⟩)
+  /-- `pure : ∀f c a. Applicative f ⇒ a →P f c a` (`∀c a. a^c → (f a)^c`) -/
+  hPure : P.methods pure = some (applicative, ⟨3, [⟨applicative, [.var 0]⟩],
+    arrP (.var 2) (appQ (.var 0) (.var 1) (.var 2)), .cnil⟩)
+  /-- `nothing : ∀f a r. Alternative f ⇒ f r a` (`∀a. f a`) -/
+  hNothing : P.methods nothing = some (alternative, ⟨3, [⟨alternative, [.var 0]⟩],
+    appQ (.var 0) (.var 2) (.var 1), .cnil⟩)
+  /-- `iter : ∀f d a. Iterable f ⇒ f d a →P Seq (d ∪ a) a` (`∀d a. (f a)^d → (Seq a)^d`) -/
+  hIter : P.methods iter = some (iterable, ⟨3, [⟨iterable, [.var 0]⟩],
+    arrP (appQ (.var 0) (.var 1) (.var 2)) (appQ (.con seq) (.cun (.var 1) (.var 2)) (.var 2)),
+    .cnil⟩)
+  /-- `pair : ∀a b. a →P b →P (a, b)`, a constant of the model (no Prelude name) -/
   hPair : P.consts pair = some ⟨2, [], arrP (.var 0) (arrP (.var 1)
     (.app (.app (.con tup) (.var 0)) (.var 1))), .cnil⟩
+  /-- `unc n`, a constant of the model (no Prelude name) -/
   hUnc : ∀ n, 0 < n → P.consts (unc n) = some (uncSch tup n)
   hNone : P.consts noneC = some ⟨1, [], optTy (.var 0), .cnil⟩
-  /-- `Seq.flat_map : ∀a b c. (a →^c Seq b) →P (Seq a →^c Seq b)` -/
-  hSeqFlatMap : P.consts seqFlatMap = some ⟨3, [],
-    arrP (.arr .P (.var 0) (.app (.con seq) (.var 1)) (.var 2))
-      (.arr .P (.app (.con seq) (.var 0)) (.app (.con seq) (.var 1)) (.var 2)), .cnil⟩
-  hSingleton : P.consts singleton = some ⟨1, [], arrP (.var 0) (.app (.con seq) (.var 0)), .cnil⟩
-  hEmpty : P.consts empty = some ⟨1, [], .app (.con seq) (.var 0), .cnil⟩
-  hToList : P.consts toList = some ⟨1, [], arrP (.app (.con seq) (.var 0)) (.app (.con list) (.var 0)),
+  /-- `Seq.flat_map : ∀c d a b e. bindTy Seq c d a b e` (`Seq.fl`) -/
+  hSeqFlatMap : P.consts seqFlatMap = some ⟨5, [],
+    bindTy (.con seq) (.var 0) (.var 1) (.var 2) (.var 3) (.var 4), .cnil⟩
+  /-- `singleton : ∀a r. a →P Seq r a` (`a → Seq a`) -/
+  hSingleton : P.consts singleton = some ⟨2, [], arrP (.var 0) (appQ (.con seq) (.var 1) (.var 0)),
     .cnil⟩
-  /-- `each_φ : ∀a c. (a →φ^c Unit) →P (Seq a →φ^c Unit)`, the loop of `for … do` at the
-  stage `φ` -/
-  hEach : ∀ φ, P.consts (each φ) = some ⟨2, [], arrP (.arr φ (.var 0) (.con unit) (.var 1))
-    (.arr φ (.app (.con seq) (.var 0)) (.con unit) (.var 1)), .cnil⟩
+  /-- `empty : ∀a r. Seq r a` (`Seq a`) -/
+  hEmpty : P.consts empty = some ⟨2, [], appQ (.con seq) (.var 1) (.var 0), .cnil⟩
+  /-- `to_list : ∀d a. Seq d a →P List a` (`∀d a. (Seq a)^d → List a`) -/
+  hToList : P.consts toList = some ⟨2, [],
+    arrP (appQ (.con seq) (.var 0) (.var 1)) (.app (.con list) (.var 1)), .cnil⟩
+  /-- `each_φ : ∀c d a. (a →φ^c Unit) →P (Seq d a →φ^c Unit)`, the loop of `for … do` at the
+  stage `φ` (Р184); `each_R` is `Seq.each_effect` -/
+  hEach : ∀ φ, P.consts (each φ) = some ⟨3, [], arrP (.arr φ (.var 2) (.con unit) (.var 0))
+    (.arr φ (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil⟩
   hUnitV : P.consts unitV = some ⟨0, [], .con unit, .cnil⟩
   /-- `from_result : ∀e a. Result (Errors e) a →R a` (`core.md` §1.4) -/
   hFromResult : P.consts fromResult = some ⟨2, [], .arr .R
