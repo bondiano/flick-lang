@@ -5,6 +5,7 @@ mod features;
 mod foreign;
 mod quick_fix;
 mod sql_table;
+mod workspace;
 
 use super::*;
 
