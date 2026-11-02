@@ -370,7 +370,12 @@ impl Ide<'_> {
             }
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;
-                let export = interface.find(e.namespace, &e.name);
+                let export = self
+                    .analysis
+                    .module(&e.module)
+                    .filter(|m| m.file == file)
+                    .and_then(|m| m.typing.declarations.find(e.namespace, &e.name))
+                    .or_else(|| interface.find(e.namespace, &e.name));
                 let source = self.source(&e.module);
                 let code = match e.namespace {
                     Namespace::Type => self.type_hover(
