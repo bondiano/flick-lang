@@ -7,7 +7,8 @@ schema-version = 1
 [workspace]
 members = ["contract", "server"]
 
-# `flick script <name>`. The database scripts need Docker; `api` also needs
+# `flick script <name>`. The database scripts need Docker, and so does
+# `test`, whose API suite starts a PostgreSQL of its own; `api` also needs
 # Go and hurl, and runs the RealWorld suite against a fresh server.
 [scripts]
 lint = ["flick fmt --check", "flick check --warnings-as-errors"]

@@ -3,6 +3,7 @@ package flickrt
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"math"
 	"math/big"
 	"strings"
@@ -123,11 +124,44 @@ func TestASupervisorThatFailsFailsItsTest(t *testing.T) {
 		})
 	})
 	before := len(rootDefects.causes)
-	got := runOne(rootFiber(), named{"dies", &test{name: "dies", task: task}}, 0)
+	got := runOne(rootFiber(), named{"dies", &test{name: "dies", task: task}, nil}, 0, nil)
 	if got.Status != "failed" || got.Kind != "defect" {
 		t.Errorf("the test fails with the supervisor's defect: %+v", got)
 	}
 	if len(rootDefects.causes) != before {
 		t.Error("the defect stays with the test, not the program")
+	}
+}
+
+// A suite builds its layer once, before its first test, and releases it
+// after its last; its tests share what it built.
+func TestSuiteSharesItsLayer(t *testing.T) {
+	var events []string
+	layer := &Layer{func(fb *Fiber, _ *MemoMap, scope *Owner) Services {
+		events = append(events, "acquire")
+		scope.add(fb, func(*Fiber, *Cause) Value {
+			events = append(events, "release")
+			return Unit
+		})
+		return Services{"App.Box": "shared"}
+	}}
+	read := func(name string) Value {
+		return Eff(func(fb *Fiber) Value {
+			box, _ := fb.env.get("App.Box")
+			events = append(events, name+" "+box.(string))
+			return Unit
+		})
+	}
+	suite := TestSuite("suite", layer, []Value{TestEffect("a", read("a")), TestEffect("b", read("b"))})
+	selected := flatten("M", []Value{suite}, nil, nil)
+	runs := suiteRuns(rootFiber(), selected)
+	for _, n := range selected {
+		if got := runOne(rootFiber(), n, 0, runs); got.Status != "passed" {
+			t.Fatalf("%s: %+v", n.name, got)
+		}
+	}
+	want := []string{"acquire", "a shared", "b shared", "release"}
+	if fmt.Sprint(events) != fmt.Sprint(want) {
+		t.Errorf("events %v, want %v", events, want)
 	}
 }

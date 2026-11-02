@@ -14,12 +14,12 @@ import { type Endpoint, hasPayload, typed } from "./model.ts";
 /** `HttpApi.ClientError`. */
 export type ClientError = Tagged<string, { readonly status: number; readonly message: string }>;
 
-const clientError = (status: number, message: string): ClientError => ({
+export const clientError = (status: number, message: string): ClientError => ({
   _tag: tag("HttpApi.ClientError.ClientError"),
   _0: { status, message },
 });
 
-interface Request {
+export interface Request {
   readonly path: unknown;
   readonly query: unknown;
   readonly headers: unknown;
@@ -135,7 +135,7 @@ const events = (text: string) =>
     .filter((e) => e.any)
     .map((e) => ({ id: e.id, event: e.event, data: e.data }));
 
-interface Received {
+export interface Received {
   readonly status: number;
   readonly headers: Headers;
   readonly bytes: Uint8Array;
@@ -194,29 +194,40 @@ const baseUrl = (base: string): Result.Result<URL, ClientError> => {
   }
 };
 
-/** `HttpApi.call base endpoint request`. */
-export const httpApiCall = (base: string, endpoint: Endpoint, request: Request): Effect.Effect<unknown, unknown, unknown> =>
+/** How a request reaches a server: over the network, or to a handler. */
+export type Send = (url: URL, init: RequestInit) => Effect.Effect<Received, ClientError, unknown>;
+
+/** The request over the network with `fetch`. */
+const fetched: Send = (url, init) =>
+  Effect.tryPromise({
+    try: async (signal) => {
+      const r = await fetch(url, { ...init, signal });
+      return { status: r.status, headers: r.headers, bytes: new Uint8Array(await r.arrayBuffer()) };
+    },
+    catch: (error) => clientError(0, error instanceof Error ? error.message : String(error)),
+  });
+
+/** A request of `endpoint` under `root`, sent by `send`, its response decoded. */
+export const callWith = (send: Send, root: URL, endpoint: Endpoint, request: Request): Effect.Effect<unknown, unknown, unknown> =>
   Effect.gen(function* () {
     const params = new Map(strings(yield* encode(endpoint.params, request.path, "path")));
     const path = endpoint.path.replace(/:([A-Za-z_][\w]*)/g, (_, name: string) => encodeURIComponent(params.get(name) ?? ""));
-    const url = new URL(path.replace(/^\//, ""), yield* Effect.fromResult(baseUrl(base)));
+    const url = new URL(path.replace(/^\//, ""), root);
     for (const [k, v] of strings(yield* encode(endpoint.query, request.query, "query"))) url.searchParams.append(k, v);
     const headers = new Headers(strings(yield* encode(endpoint.headers, request.headers, "headers")));
     const payload = endpoint.payload === null ? request.payload : yield* encode(endpoint.payload, request.payload, "payload");
     const type = MEDIA[endpoint.payloadEncoding];
     if (hasPayload(endpoint) && type !== undefined) headers.set("content-type", type);
     const body = hasPayload(endpoint) ? yield* sent(endpoint, payload) : undefined;
-    const response: Received = yield* Effect.tryPromise({
-      try: async (signal) => {
-        const r = await fetch(url, { method: endpoint.method, headers, signal, ...(body === undefined ? {} : { body }) });
-        return { status: r.status, headers: r.headers, bytes: new Uint8Array(await r.arrayBuffer()) };
-      },
-      catch: (error) => clientError(0, error instanceof Error ? error.message : String(error)),
-    });
+    const response = yield* send(url, { method: endpoint.method, headers, ...(body === undefined ? {} : { body }) });
     const text = new TextDecoder().decode(response.bytes);
     if (response.status !== endpoint.status) return yield* declared(endpoint, response.status, json(text));
     return yield* withExtras(endpoint, response, yield* successOf(endpoint, response, text));
   });
+
+/** `HttpApi.call base endpoint request`. */
+export const httpApiCall = (base: string, endpoint: Endpoint, request: Request): Effect.Effect<unknown, unknown, unknown> =>
+  Effect.flatMap(Effect.fromResult(baseUrl(base)), (root) => callWith(fetched, root, endpoint, request));
 
 /** The fields of an encoded part as strings, or the error of its encoding. */
 const encodedPart = (codec: AnySchema | null, value: unknown, name: string): Result.Result<Array<[string, string]>, ClientError> => {

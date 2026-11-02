@@ -1,0 +1,33 @@
+/// The Conduit server as a value: the router of the API under `/api` and,
+/// given a directory, of the client's built files, the client's own routes
+/// answered with its `index.html`. `Main` serves it; the tests send it
+/// requests in the same process with `HttpApi.Inject`.
+module Conduit.Server.App exposing (Handler, router, keys)
+
+import Database exposing (Database)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+import Conduit.Server.Routes as Routes
+import Conduit.Server.Session exposing (Keys)
+
+/// A request answered with the services the server runs with.
+type alias Handler =
+  ServerRequest ->{Database, Keys, Crypto.Crypto; Http.ServerError.HttpServerError} ServerResponse
+
+/// The router of the API and, given a directory, of the client's files.
+router : Option String ->{Database, Keys, Crypto.Crypto; PlatformError.PlatformError} Handler
+let router files =
+  let api = HttpApi.route "/api/*" Routes.api Routes.handlers
+  let client =
+    match files with
+    | Some dir -> [
+      Http.StaticServer.route { Http.StaticServer.static_options dir with spa = true } "",
+    ]
+    | None -> []
+  Http.Middleware.cors
+    Http.Middleware.cors_options
+    (Http.Router.router Http.Router.config ([api] ++ client))
+
+/// The key that signs the tokens, from its text.
+keys : String -> Layer none none {Keys}
+let keys secret = Layer.succeed Keys { secret = fun () -> Bytes.from_string secret }

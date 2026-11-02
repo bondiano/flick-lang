@@ -1,14 +1,15 @@
 // Tests and generators. A test is data built by pure code; `runTests` runs
 // them, each in an owner of its own, and reports assertions, typed
 // failures, defects and failed cleanup apart.
-import { Cause, type Duration, Effect, Exit, Fiber, Layer } from "effect";
+import { Cause, type Context, type Duration, Effect, Exit, Fiber, Layer, Scope } from "effect";
 import * as TestClock from "effect/testing/TestClock";
 
 import { describeCause } from "../cause.ts";
 import { service } from "../effects.ts";
 import type { HashDict, Tagged } from "../data.ts";
 import { item } from "../internal.ts";
-import { ownedExits } from "../owner.ts";
+import { buildInto } from "../layer.ts";
+import { Owner, close, inside, ownedExits } from "../owner.ts";
 import { tag } from "../tags.ts";
 
 const ASSERTION = /*#__PURE__*/ tag("Test.AssertionFailed.AssertionFailed");
@@ -88,9 +89,13 @@ export type Test =
   | Readonly<{ kind: "pure"; name: string; body: (unit: undefined) => Assertion }>
   | Readonly<{ kind: "effect"; name: string; task: Effect.Effect<unknown, unknown> }>
   | Readonly<{ kind: "property"; name: string; run: (rng: Rng, index: number) => string | undefined }>
-  | Readonly<{ kind: "group"; name: string; tests: ReadonlyArray<Test> }>;
+  | Readonly<{ kind: "group"; name: string; tests: ReadonlyArray<Test> }>
+  | Suite;
 
-type Leaf = Exclude<Test, { kind: "group" }>;
+/** `Test.suite`: tests that share the services of `layer`, built once for them. */
+type Suite = Readonly<{ kind: "suite"; name: string; layer: Layer.Layer<unknown, unknown>; tests: ReadonlyArray<Test> }>;
+
+type Leaf = Exclude<Test, { kind: "group" | "suite" }>;
 
 export const testPure = (name: string, body: (unit: undefined) => Assertion): Test =>
   Object.freeze({ kind: "pure", name, body });
@@ -125,23 +130,87 @@ export const testProperty = <A>(name: string, gen: Gen<A>, check: (value: A) => 
     },
   });
 export const testGroup = (name: string, tests: ReadonlyArray<Test>): Test => Object.freeze({ kind: "group", name, tests });
+export const testSuite = (name: string, layer: Layer.Layer<unknown, unknown>, tests: ReadonlyArray<Test>): Test =>
+  Object.freeze({ kind: "suite", name, layer, tests });
 
 const CASES = 100;
 
 interface Named {
   readonly name: string;
   readonly test: Leaf;
+  /** The suites it is in, outermost first. */
+  readonly suites: ReadonlyArray<Suite>;
 }
 
 /** Tests with their full names, `Module > group > name`. */
-const flatten = (prefix: string, tests: ReadonlyArray<Test>, out: Array<Named> = []): Array<Named> => {
+const flatten = (
+  prefix: string,
+  tests: ReadonlyArray<Test>,
+  out: Array<Named> = [],
+  suites: ReadonlyArray<Suite> = [],
+): Array<Named> => {
   for (const t of tests) {
     const name = `${prefix} > ${t.name}`;
-    if (t.kind === "group") flatten(name, t.tests, out);
-    else out.push({ name, test: t });
+    if (t.kind === "group") flatten(name, t.tests, out, suites);
+    else if (t.kind === "suite") flatten(name, t.tests, out, [...suites, t]);
+    else out.push({ name, test: t, suites });
   }
   return out;
 };
+
+/**
+ * A suite in a run: an owner of its own, into which its layer is built
+ * before its first selected test, and which closes after its last one.
+ */
+interface SuiteRun {
+  remaining: number;
+  readonly owner: Owner;
+  /** The build, run once, its outcome shared by the suite's tests. */
+  readonly services: Effect.Effect<Exit.Exit<Context.Context<unknown>, unknown>>;
+}
+
+const suiteRuns = (selected: ReadonlyArray<Named>): Map<Suite, SuiteRun> => {
+  const runs = new Map<Suite, SuiteRun>();
+  for (const { suites } of selected) {
+    for (const suite of suites) {
+      const run = runs.get(suite);
+      if (run !== undefined) {
+        run.remaining++;
+        continue;
+      }
+      const owner = new Owner(Effect.runSync(Scope.make()), []);
+      const build = Effect.exit(inside(owner, buildInto(suite.layer, owner.resources)));
+      runs.set(suite, { remaining: 1, owner, services: Effect.runSync(Effect.cached(build)) });
+    }
+  }
+  return runs;
+};
+
+/** The test's task with the services of its suites, or the failure of their build. */
+const withSuites = (
+  task: Effect.Effect<unknown, unknown>,
+  runs: ReadonlyArray<SuiteRun>,
+): Effect.Effect<unknown, unknown> =>
+  runs.reduceRight<Effect.Effect<unknown, unknown>>(
+    (body, run) =>
+      Effect.flatMap(run.services, (built) =>
+        Exit.isSuccess(built) ? Effect.provideContext(body, built.value) : Effect.failCause(built.cause),
+      ),
+    task,
+  );
+
+/** After a test: the suites it ended, closed; why one failed to close. */
+const leave = (runs: ReadonlyArray<SuiteRun>): Effect.Effect<string | undefined> =>
+  Effect.gen(function* () {
+    let failed: string | undefined;
+    for (const run of runs.toReversed()) {
+      run.remaining--;
+      if (run.remaining > 0) continue;
+      const closed = yield* close(run.owner, Exit.void);
+      if (Exit.isFailure(closed)) failed = describeCause(closed.cause);
+    }
+    return failed;
+  });
 
 /** A BigInt as `<digits>n` and a function as `<function>`, not its source. */
 const replacePreview = (_: string, v: unknown): unknown =>
@@ -202,9 +271,24 @@ export interface TestResult {
   readonly cleanup?: string;
 }
 
-const runOne = ({ name, test }: Named, seed: number): Effect.Effect<TestResult> =>
+const runOne = ({ name, test, suites }: Named, seed: number, runs: Map<Suite, SuiteRun>): Effect.Effect<TestResult> => {
+  const mine = suites.flatMap((s) => runs.get(s) ?? []);
+  const result = runLeaf(name, test, seed, mine);
+  if (mine.length === 0) return result;
+  return Effect.flatMap(result, (r) =>
+    Effect.map(leave(mine), (failed): TestResult => {
+      if (failed === undefined) return r;
+      // the suite's release fails the test that ended it
+      return { ...r, status: "failed", ...(r.status === "passed" ? { kind: "cleanup", message: failed } : {}), cleanup: failed };
+    }),
+  );
+};
+
+const runLeaf = (name: string, test: Leaf, seed: number, suites: ReadonlyArray<SuiteRun>): Effect.Effect<TestResult> =>
   Effect.map(
-    ownedExits(() => (test.kind === "effect" ? Effect.as(test.task, undefined) : checks(test, seed))),
+    ownedExits(() =>
+      test.kind === "effect" ? Effect.as(withSuites(test.task, suites), undefined) : checks(test, seed),
+    ),
     ({ exit, cleanup, defects }): TestResult => {
       // a supervisor that failed during the test fails it, as it fails a program
       const body = outcome(
@@ -341,6 +425,7 @@ export const runTests = async (
   const selected = modules
     .flatMap(([module, tests]) => flatten(module, tests ?? []))
     .filter(({ name }) => name.includes(options.filter ?? ""));
+  const runs = suiteRuns(selected);
   const human = options.reporter !== "json";
   const color = options.color ?? false;
   let completed = 0;
@@ -374,7 +459,7 @@ export const runTests = async (
               const testStarted = performance.now();
               active.set(index, t.name);
               draw();
-              return Effect.map(runOne(t, seed), (result) => {
+              return Effect.map(runOne(t, seed, runs), (result) => {
                 active.delete(index);
                 clear();
                 write(humanResult(result, ++completed, selected.length, performance.now() - testStarted, color));
@@ -382,7 +467,7 @@ export const runTests = async (
                 return result;
               });
             })
-          : runOne(t, seed),
+          : runOne(t, seed, runs),
       { concurrency: jobs },
     ),
   );
@@ -395,6 +480,8 @@ export const runTests = async (
   // a watcher stops the run by closing stdin, which works on every platform
   if (options.watched) process.stdin.once("end", stop).resume();
   const exit = await new Promise<Exit.Exit<Array<TestResult>>>((resolve) => fiber.addObserver(resolve));
+  // an interrupted run still releases what its suites made
+  await Promise.all([...runs.values()].filter((r) => r.remaining > 0).map((r) => Effect.runPromise(close(r.owner, Exit.void))));
   process.off("SIGINT", stop);
   if (options.watched) process.stdin.off("end", stop).destroy();
   if (timer !== undefined) clearInterval(timer);

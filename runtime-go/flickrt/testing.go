@@ -104,7 +104,8 @@ func GenFunction(fb *Fiber, d, g Value) Value {
 	})
 }
 
-// A test: a pure body, an effectful task, a property or a group.
+// A test: a pure body, an effectful task, a property, a group, or a
+// suite: a group whose tests get the services of its layer.
 type test struct {
 	name  string
 	body  Value // pure: Unit -> Assertion
@@ -112,11 +113,16 @@ type test struct {
 	gen   gen   // property, with its check
 	check Value
 	group []Value
+	layer Value // suite
 }
 
 func TestPure(name, body Value) Value   { return &test{name: name.(string), body: body} }
 func TestEffect(name, task Value) Value { return &test{name: name.(string), task: task} }
 func TestGroup(name, tests Value) Value { return &test{name: name.(string), group: List(tests)} }
+
+func TestSuite(name, layer, tests Value) Value {
+	return &test{name: name.(string), group: List(tests), layer: layer}
+}
 
 func TestProperty(name, g, check Value) Value {
 	return &test{name: name.(string), gen: g.(gen), check: check}
@@ -134,20 +140,102 @@ func failed(a Value) (string, bool) {
 type named struct {
 	name string
 	test *test
+	// the suites it is in, outermost first
+	suites []*test
 }
 
 // flatten is the tests with their full names, `Module > group > name`.
-func flatten(prefix string, tests []Value, out []named) []named {
+func flatten(prefix string, tests []Value, out []named, suites []*test) []named {
 	for _, v := range tests {
 		t := v.(*test)
 		name := prefix + " > " + t.name
-		if t.group != nil {
-			out = flatten(name, t.group, out)
-		} else {
-			out = append(out, named{name, t})
+		switch {
+		case t.layer != nil:
+			out = flatten(name, t.group, out, append(suites[:len(suites):len(suites)], t))
+		case t.group != nil:
+			out = flatten(name, t.group, out, suites)
+		default:
+			out = append(out, named{name, t, suites})
 		}
 	}
 	return out
+}
+
+// suiteRun is a suite in a run: an owner of its own, into which its layer
+// is built before its first selected test, and which closes after its last.
+type suiteRun struct {
+	once      sync.Once
+	fiber     Fiber
+	services  Services
+	failure   *Cause
+	mu        sync.Mutex
+	remaining int
+}
+
+// suiteRuns is the run of each suite of the selected tests.
+func suiteRuns(fb *Fiber, selected []named) map[*test]*suiteRun {
+	runs := map[*test]*suiteRun{}
+	for _, t := range selected {
+		for _, s := range t.suites {
+			if runs[s] == nil {
+				owner := newOwner()
+				owner.defects = &defects{}
+				runs[s] = &suiteRun{fiber: Fiber{state: newState(), env: fb.env, owner: owner}}
+			}
+			runs[s].remaining++
+		}
+	}
+	return runs
+}
+
+// enter is the fiber `inner` with the services of these suites, each built
+// on first use; a failed build fails the test.
+func enter(inner *Fiber, suites []*test, runs map[*test]*suiteRun) *Fiber {
+	for _, s := range suites {
+		run := runs[s]
+		run.once.Do(func() {
+			built, failure := catch(func() Value {
+				return buildWith(&run.fiber, layerOf(s.layer), currentMemo(&run.fiber), run.fiber.owner)
+			})
+			if run.failure = failure; failure == nil {
+				run.services = built.(Services)
+			}
+		})
+		if run.failure != nil {
+			panic(&Failure{run.failure})
+		}
+		inner = provided(inner, run.services)
+	}
+	return inner
+}
+
+// leave closes the suites this test ended; why one failed to close.
+func leave(suites []*test, runs map[*test]*suiteRun) string {
+	failed := ""
+	for i := len(suites) - 1; i >= 0; i-- {
+		if released := runs[suites[i]].release(false); released != nil {
+			failed = describeReasons(released.reasons())
+		}
+	}
+	return failed
+}
+
+// release closes the suite's owner after its last test, or at once when
+// the run stopped early.
+func (r *suiteRun) release(stopped bool) *Cause {
+	r.mu.Lock()
+	if !stopped {
+		r.remaining--
+	}
+	last := r.remaining == 0 || stopped && r.remaining > 0
+	if stopped {
+		r.remaining = 0
+	}
+	r.mu.Unlock()
+	if !last {
+		return nil
+	}
+	return r.fiber.owner.closeFinalizers(&r.fiber, nil)
 }
 
 // testResult is the result of one test, as the reporters write it.
@@ -318,7 +406,22 @@ func outcome(message string, bad bool, cause *Cause) (string, string) {
 }
 
 // runOne runs a test in a fiber and an owner of its own.
-func runOne(fb *Fiber, t named, seed int64) testResult {
+func runOne(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResult {
+	result := runLeaf(fb, t, seed, runs)
+	if len(t.suites) == 0 {
+		return result
+	}
+	// the suite's release fails the test that ended it
+	if failed := leave(t.suites, runs); failed != "" {
+		if result.Status == "passed" {
+			result.Kind, result.Message = "cleanup", failed
+		}
+		result.Status, result.Cleanup = "failed", failed
+	}
+	return result
+}
+
+func runLeaf(fb *Fiber, t named, seed int64, runs map[*test]*suiteRun) testResult {
 	owner := newOwner()
 	owner.defects = &defects{}
 	inner := Fiber{state: newState(), env: fb.env, owner: owner}
@@ -336,7 +439,7 @@ func runOne(fb *Fiber, t named, seed int64) testResult {
 	var bad bool
 	_, exit := catch(func() Value {
 		if t.test.task != nil {
-			return Run(&inner, t.test.task)
+			return Run(enter(&inner, t.suites, runs), t.test.task)
 		}
 		message, bad = t.test.checks(fb, seed)
 		return Unit
@@ -489,7 +592,7 @@ func RunTests(fb *Fiber, suites []Suite) {
 	}
 	var selected []named
 	for _, s := range suites {
-		for _, t := range flatten(s.Module, List(s.Tests), nil) {
+		for _, t := range flatten(s.Module, List(s.Tests), nil, nil) {
 			if strings.Contains(t.name, o.filter) {
 				selected = append(selected, t)
 			}
@@ -502,6 +605,7 @@ func RunTests(fb *Fiber, suites []Suite) {
 			fb.state.interrupt(0)
 		}()
 	}
+	runs := suiteRuns(fb, selected)
 	results := make([]testResult, len(selected))
 	slots := make(chan struct{}, o.jobs)
 	var wg sync.WaitGroup
@@ -587,7 +691,7 @@ func RunTests(fb *Fiber, suites []Suite) {
 				draw()
 				outMu.Unlock()
 			}
-			result := runOne(fb, t, seed)
+			result := runOne(fb, t, seed, runs)
 			results[i] = result
 			if human {
 				elapsed := time.Since(started)
@@ -604,6 +708,10 @@ func RunTests(fb *Fiber, suites []Suite) {
 		}()
 	}
 	wg.Wait()
+	// an interrupted run still releases what its suites made
+	for _, run := range runs {
+		run.release(true)
+	}
 	if live {
 		close(progressStop)
 		<-progressDone

@@ -28,7 +28,7 @@ const tracedMemoMap = (inner: Layer.MemoMap): Layer.MemoMap => {
 };
 
 /** `layer` built into `scope`, as `Layer.buildWithScope`; traced when the trace is on. */
-const buildInto = <ROut, E, RIn>(layer: Layer.Layer<ROut, E, RIn>, scope: Scope.Scope) =>
+export const buildInto = <ROut, E, RIn>(layer: Layer.Layer<ROut, E, RIn>, scope: Scope.Scope) =>
   tracing
     ? Effect.flatMap(Effect.context(), (context) =>
         Layer.buildWithMemoMap(layer, tracedMemoMap(Layer.CurrentMemoMap.forkOrCreate(context)), scope),

@@ -1,0 +1,277 @@
+/// The API end to end, as Fastify's `inject` tests a server: each test
+/// sends typed requests of the contract's endpoints to the server's own
+/// router, with a real PostgreSQL that the suite starts before its first
+/// test and removes after its last. A test makes its own users, so the
+/// tests share the database without seeing each other.
+module Conduit.Server.ApiTest exposing (tests)
+
+import Database exposing (Database)
+import Conduit.Api as Api
+import Conduit.Input exposing (Credentials, NewArticle)
+import Conduit.Model exposing (Article, User)
+import Conduit.Problem exposing (
+  Conflict(..),
+  Forbidden(..),
+  NotFound(..),
+  Unauthorized(..),
+  Unprocessable(..),
+)
+import Conduit.Route as Route exposing (Slug, Username)
+import Conduit.Server.App as Server
+import Conduit.Server.Postgres as Postgres
+import Conduit.Server.Session exposing (Keys)
+
+/// What the server runs with: the database of the suite, a key and the
+/// system's cryptography.
+services : Layer none none {Database, Keys, Crypto.Crypto}
+let services =
+  Layer.merge Postgres.layer (Layer.merge (Server.keys "conduit-test-key") Crypto.system)
+
+/// Sends `request` to `endpoint` of the server, as a client of `/api` would.
+send :
+  forall l p q h b r e s.
+  HttpApi.Request p q h b ->
+  HttpApi.Endpoint l (HttpApi.Request p q h b ->{r; e} s) ->{Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError | e}
+  s
+let send request endpoint = HttpApi.Inject.call (Server.router None) "/api" endpoint request
+
+/// The `Authorization` header of a user, or none.
+as_user : Option User -> Credentials
+let as_user user = { authorization = Option.map (fun u -> "Token " ++ u.token) user }
+
+/// A request with only headers.
+asking : Option User -> HttpApi.Request Unit Unit Credentials Unit
+let asking user = { path = (); query = (); headers = as_user user; payload = () }
+
+/// A request of `user` with a path and a payload.
+at : Option User -> p -> b -> HttpApi.Request p Unit Credentials b
+let at user path payload = { path = path; query = (); headers = as_user user; payload = payload }
+
+/// Signs `name` up, its password `<name>-password`.
+sign_up :
+  String ->{Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError, Conflict, Unprocessable}
+  User
+let sign_up name =
+  let user = {
+    username = Some name;
+    email = Some (name ++ "@example.org");
+    password = Some (name ++ "-password");
+  }
+  (send (at None () { user = user }) Api.Public.endpoints.register).user
+
+/// A name of a path.
+username : String ->{; SchemaError} Username
+let username name = from_result (Route.Username.parse name)
+
+slug : Article ->{; SchemaError} Slug
+let slug article = from_result (Route.Slug.parse article.slug)
+
+/// An article with a title and tags, the rest made from the title.
+draft : String -> List String -> { article : NewArticle }
+let draft title tags = {
+  article = {
+    title = Some title;
+    description = Some ("about " ++ title);
+    body = Some ("# " ++ title);
+    tagList = Some tags;
+  };
+}
+
+publish :
+  User ->
+  String ->
+  List String ->{Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError, Unauthorized, Unprocessable}
+  Article
+let publish author title tags =
+  (send (at (Some author) () (draft title tags)) Api.Articles.endpoints.create_article).article
+
+accounts : List (Test.Spec {Database, Keys, Crypto.Crypto})
+let accounts = [
+  Test.it
+    "signing up answers the user and a token that signs in"
+    (task {
+      let ada = sign_up "ada-signup"
+      let login = { user = { email = Some ada.email; password = Some "ada-signup-password" } }
+      let again = (send (at None () login) Api.Public.endpoints.login).user
+      let current = (send (asking (Some again)) Api.Users.endpoints.current_user).user
+      Test.expect
+        (Test.all [
+          Test.equal "ada-signup" ada.username,
+          Test.is_true "a token" (ada.token != ""),
+          Test.equal ada.email current.email,
+        ])
+    }),
+  Test.it
+    "a taken name is a conflict, and blank fields are each named"
+    (task {
+      ignore (sign_up "taken")
+      let conflict =
+        try
+          ignore (sign_up "taken")
+          []
+        with
+        | Conflict problems -> List.map (fun (field, _) -> field) problems
+      let blank = { username = Some " "; email = Some "not-an-email"; password = None }
+      let missing =
+        try
+          ignore (send (at None () { user = blank }) Api.Public.endpoints.register)
+          []
+        with
+        | Unprocessable problems -> List.map (fun (field, _) -> field) problems
+      Test.expect
+        (Test.all [
+          Test.equal ["username", "email"] conflict,
+          Test.equal ["username", "email", "password"] missing,
+        ])
+    }),
+  Test.it
+    "a wrong password and a missing token are unauthorized"
+    (task {
+      let bob = sign_up "bob-password"
+      let login = { user = { email = Some bob.email; password = Some "not-it" } }
+      let wrong =
+        try (send (at None () login) Api.Public.endpoints.login).user.username with
+        | Unauthorized _ -> "unauthorized"
+      let anonymous =
+        try (send (asking None) Api.Users.endpoints.current_user).user.username with
+        | Unauthorized _ -> "unauthorized"
+      Test.expect (Test.all [Test.equal "unauthorized" wrong, Test.equal "unauthorized" anonymous])
+    }),
+  Test.it
+    "following shows on the profile, and unfollowing takes it back"
+    (task {
+      let cat = sign_up "cat-follower"
+      let dan = sign_up "dan-followed"
+      let path = { username = username dan.username }
+      let followed = (send (at (Some cat) path ()) Api.Users.endpoints.follow).profile
+      let seen = (send (at (Some cat) path ()) Api.Users.endpoints.get_profile).profile
+      let unfollowed = (send (at (Some cat) path ()) Api.Users.endpoints.unfollow).profile
+      let nobody =
+        try
+          (send (at None { username = username "nobody-here" } ()) Api.Users.endpoints.get_profile).profile.username
+        with
+        | NotFound _ -> "not found"
+      Test.expect
+        (Test.all [
+          Test.is_true "following" (followed.following && seen.following),
+          Test.is_true "not following" (not unfollowed.following),
+          Test.equal "not found" nobody,
+        ])
+    }),
+]
+
+publishing : List (Test.Spec {Database, Keys, Crypto.Crypto})
+let publishing = [
+  Test.it
+    "an article is found by its slug, and only its author edits it"
+    (task {
+      let eve = sign_up "eve-author"
+      let fay = sign_up "fay-reader"
+      let article = publish eve "Training dragons" ["dragons", "training"]
+      let path = { slug = slug article }
+      let found = (send (at None path ()) Api.Articles.endpoints.get_article).article
+      let tags = (send (asking None) Api.Public.endpoints.tags).tags
+      let change = {
+        article = { title = None; description = Some "edited"; body = None; tagList = None };
+      }
+      let forbidden =
+        try
+          (send (at (Some fay) path change) Api.Articles.endpoints.update_article).article.description
+        with
+        | Forbidden _ -> "forbidden"
+      send (at (Some eve) path ()) Api.Articles.endpoints.delete_article
+      let gone =
+        try (send (at None path ()) Api.Articles.endpoints.get_article).article.title with
+        | NotFound _ -> "gone"
+      Test.expect
+        (Test.all [
+          Test.equal "Training dragons" found.title,
+          Test.equal ["dragons", "training"] found.tagList,
+          Test.equal "forbidden" forbidden,
+          Test.equal "gone" gone,
+          Test.is_true
+            "the tags are listed"
+            (List.all (fun t -> List.any (fun x -> x == t) tags) ["dragons", "training"]),
+        ])
+    }),
+  Test.it
+    "a favorite counts once and is taken back"
+    (task {
+      let gus = sign_up "gus-author"
+      let hal = sign_up "hal-fan"
+      let path = { slug = slug (publish gus "Favored" []) }
+      let favored = (send (at (Some hal) path ()) Api.Articles.endpoints.favorite).article
+      let again = (send (at (Some hal) path ()) Api.Articles.endpoints.favorite).article
+      let back = (send (at (Some hal) path ()) Api.Articles.endpoints.unfavorite).article
+      Test.expect
+        (Test.all [
+          Test.is_true "favorited" favored.favorited,
+          Test.equal 1 again.favoritesCount,
+          Test.equal 0 back.favoritesCount,
+        ])
+    }),
+  Test.it
+    "comments are listed, and only their author deletes one"
+    (task {
+      let ian = sign_up "ian-author"
+      let jo = sign_up "jo-commenter"
+      let article = publish ian "Discussed" []
+      let path = { slug = slug article }
+      let comment = { comment = { body = Some "first!" } }
+      let added = (send (at (Some jo) path comment) Api.Articles.endpoints.add_comment).comment
+      let listed = (send (at None path ()) Api.Articles.endpoints.list_comments).comments
+      let one = {
+        slug = slug article;
+        comment_id = from_result (Route.CommentId.parse (show added.id));
+      }
+      let forbidden =
+        try
+          send (at (Some ian) one ()) Api.Articles.endpoints.delete_comment
+          "deleted"
+        with
+        | Forbidden _ -> "forbidden"
+      send (at (Some jo) one ()) Api.Articles.endpoints.delete_comment
+      let left = (send (at None path ()) Api.Articles.endpoints.list_comments).comments
+      Test.expect
+        (Test.all [
+          Test.equal ["first!"] (List.map (fun c -> c.body) listed),
+          Test.equal "jo-commenter" added.author.username,
+          Test.equal "forbidden" forbidden,
+          Test.equal 0 (List.length left),
+        ])
+    }),
+  Test.it
+    "the feed shows the articles of whom one follows"
+    (task {
+      let kim = sign_up "kim-reader"
+      let lee = sign_up "lee-writer"
+      ignore (publish lee "Followed news" [])
+      ignore (send
+        (at (Some kim) { username = username lee.username } ())
+        Api.Users.endpoints.follow)
+      let page = { limit = None; offset = None }
+      let feed =
+        send
+          { path = (); query = page; headers = as_user (Some kim); payload = () }
+          Api.Articles.endpoints.feed
+      let by = {
+        tag = None;
+        author = Some "lee-writer";
+        favorited = None;
+        limit = Some 1;
+        offset = None;
+      }
+      let listed =
+        send
+          { path = (); query = by; headers = as_user None; payload = () }
+          Api.Articles.endpoints.list_articles
+      Test.expect
+        (Test.all [
+          Test.equal ["Followed news"] (List.map (fun a -> a.title) feed.articles),
+          Test.equal 1 listed.articlesCount,
+        ])
+    }),
+]
+
+tests : List Test.Test
+let tests = [Test.suite "the API over PostgreSQL" services (accounts ++ publishing)]

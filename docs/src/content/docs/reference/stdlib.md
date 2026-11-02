@@ -214,6 +214,28 @@ let tests =
 | `Test.clock_test name task` | as `effect_test`, on a clock of its own that starts at 0 and moves only by `Test.adjust duration` and `Test.set_time millis`: a sleep, a timeout or a retry schedule waits for virtual time, so a test of an hour's backoff runs at once |
 | `Test.property name gen check` | `check` on 100 values of `gen`, drawn from the run's seed; `Gen.function result` (for a `Hash` argument) draws pure functions, as a law over functions needs |
 | `Test.group name tests` | `name >` before the names of `tests` |
+| `Test.suite name layer specs` | tests that share what `layer` makes: built once, before the first of them that runs, and released after the last, the `beforeAll` and `afterAll` of the suite; each spec, `Test.it name task`, is an `effect_test` with the layer's services, and a failed build fails each of them |
+
+A suite of end-to-end tests starts what they need once, such as a database
+in a container, and sends requests to the server's own router with
+`HttpApi.Inject.call` (see [HttpApi](/reference/http-api/#clients-and-documents)):
+
+```flick
+let services = Layer.merge Postgres.layer (Layer.merge (Server.keys "test") Crypto.system)
+
+tests : List Test.Test
+let tests = [
+  Test.suite "the API" services [
+    Test.it "signing up answers a token" (task {
+      let user = (send (at None () { user = ada }) Api.Public.endpoints.register).user
+      Test.expect (Test.is_true "a token" (user.token != ""))
+    }),
+  ],
+]
+```
+
+`examples/conduit/server/test` runs the RealWorld API this way, its
+PostgreSQL started from Flick with `ChildProcess`.
 
 `flick test` builds the project with its test root into `.flick/test/` and
 runs every test; the full name of a test is `Module > group > name`.

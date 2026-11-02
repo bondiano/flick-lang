@@ -1,0 +1,63 @@
+/// A fresh PostgreSQL for the tests: a container started from Flick with
+/// Docker when a suite starts, its schema migrated, and stopped when the
+/// suite ends, so each run of the tests starts from an empty database.
+module Conduit.Server.Postgres exposing (layer)
+
+import Database exposing (Database)
+import Conduit.Server.Schema as Schema
+
+/// The database did not answer in time.
+type error NotReady = NotReady String
+
+docker : List String -> ChildProcess.Command
+let docker args = ChildProcess.make "docker" args
+
+/// Waits until the server in the container answers over TCP: while it
+/// initializes it listens on its socket only.
+ready : String -> Int ->{; PlatformError.PlatformError, NotReady} Unit
+let rec ready id tries =
+  let probe = ["exec", id, "psql", "-h", "127.0.0.1", "-U", "postgres", "-c", "select 1"]
+  if ChildProcess.exit_code (docker probe) == 0 then
+    ()
+  else if tries <= 0 then
+    from_result (Err (NotReady ("the database in " ++ id ++ " did not start")))
+  else
+    match Duration.millis 300 with
+    | Ok pause ->
+      Effect.sleep pause
+      ready id (tries - 1)
+    | Err _ -> ()
+
+/// The container's address on Docker's bridge: published ports are not
+/// reachable everywhere.
+address : String ->{; PlatformError.PlatformError} String
+let address id =
+  let format = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}"
+  String.trim (ChildProcess.string (docker ["inspect", "--format", format, id]))
+
+/// A database in a container of its own, migrated, removed with the scope
+/// that built it; a failure to start is a defect of the suite.
+layer : Layer none none {Database}
+let layer =
+  Layer.or_die
+    (Layer.from_build (fun memo ->
+      let run = [
+        "run",
+        "--detach",
+        "--rm",
+        "--env",
+        "POSTGRES_PASSWORD=conduit",
+        "postgres:17-alpine",
+      ]
+      let id = String.trim (ChildProcess.string (docker run))
+      Scope.add_finalizer
+        (task {
+          try ignore (ChildProcess.exit_code (docker ["stop", id])) with
+          | PlatformError.PlatformError _ -> ()
+        })
+      ready id 200
+      let url = "postgres://postgres:conduit@" ++ address id ++ ":5432/postgres"
+      let built = Layer.build_with_memo_map memo (Database.pg (Database.config url))
+      provide (Layer.succeed_context built) { ignore (Database.Migrate.run Schema.migrations) }
+      built
+    ))

@@ -405,6 +405,11 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
         "HttpApi.Mount",
         builtin_source!("builtins/HttpApi/Mount.fl"),
     ),
+    #[cfg(feature = "server-stdlib")]
+    (
+        "HttpApi.Inject",
+        builtin_source!("builtins/HttpApi/Inject.fl"),
+    ),
     // end of Effect: HttpApi
     // Effect: RPC (unstable in Effect 4.0.5)
     #[cfg(feature = "server-stdlib")]
