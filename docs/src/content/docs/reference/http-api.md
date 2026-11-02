@@ -126,6 +126,21 @@ the calls of `server fn`, on one origin. It decodes and answers as `listen`
 does, a request no endpoint takes is 404, and the handlers run with the
 services where the route is made.
 
+A built single-page app and its API share one server the same way, on both
+targets: the API's route beside `Http.StaticServer.route` with `spa = true`,
+which answers a path of no file with `index.html` when the request accepts
+HTML (the client's own routes), and `Http.Middleware.cors` around the router
+for a dev server on another origin.
+
+```flick
+let files = Http.StaticServer.route { Http.StaticServer.static_options "dist" with spa = true } ""
+let app =
+  Http.Middleware.cors
+    { Http.Middleware.cors_options with allowedOrigins = ["http://localhost:5173"] }
+    (Http.Router.router Http.Router.config [HttpApi.route "/api/*" api handlers, files])
+let server = Http.Server.serve options app
+```
+
 ## Clients and documents
 
 `HttpApi.call base endpoint request` encodes the request with the endpoint's

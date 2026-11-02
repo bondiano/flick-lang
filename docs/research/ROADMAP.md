@@ -406,11 +406,11 @@ component search (props : SearchProps) =
 **W5. Модуль `Jwt`.** ⬜
 - AC: HS256 `sign`/`verify`, утверждения через Schema, `exp`/`iat` от `Clock`, типизированные ошибки (подпись, срок, формат); векторы RFC 7515/7519; оба таргета.
 
-**W6. Аутентификация `HttpApi` со значением для обработчика.** ✅ (`HttpApi.with_auth scheme Service check` и `with_optional_auth` — сервис для обработчика по каждому запросу, как `Rpc.with_auth`; `check` читает объявленные заголовки, её типизированная ошибка отвечает статусом и телом своего варианта (тела RealWorld), сервер сам 401 не отвечает; `HttpApi.authenticated` убирает сервис из требований группы; документ — `security` эндпоинта, у необязательной `[{}, {scheme: []}]`; `tests/run/stdlib/http/auth`, оба таргета)
+**W6. Аутентификация `HttpApi` со значением для обработчика.** ✅ `75cc5d06` (`HttpApi.with_auth scheme Service check` и `with_optional_auth` — сервис для обработчика по каждому запросу, как `Rpc.with_auth`; `check` читает объявленные заголовки, её типизированная ошибка отвечает статусом и телом своего варианта (тела RealWorld), сервер сам 401 не отвечает; `HttpApi.authenticated` убирает сервис из требований группы; документ — `security` эндпоинта, у необязательной `[{}, {scheme: []}]`; `tests/run/stdlib/http/auth`, оба таргета)
 - AC: схема `Authorization: Token <jwt>` (`api_key` в заголовке); `with_auth` отдаёт обработчику типизированный сервис, есть вариант необязательной аутентификации; `securitySchemes` в OpenAPI; оба таргета.
 
-**W7. Раздача: CORS и SPA.** ⬜
-- AC: CORS в `HttpApi.listen`; статика с откатом на `index.html` для путей SPA; оба таргета.
+**W7. Раздача: CORS и SPA.** ✅ (нового API не нужно: `HttpApi.route` рядом с `Http.StaticServer.route` и `Http.Middleware.cors` на одном маршрутизаторе — так Go-сервер раздаёт собранный клиент; найден и исправлен дефект на обоих таргетах: `spa = true` без явного `index` не отдавал `index.html`, потому что привязка передавала Effect ключ `index: undefined`, а Go повторил это; `tests/run/stdlib/http/spa`)
+- AC: API, статика и CORS для dev-сервера на одном сервере; путь клиента без файла отвечает `index.html`; оба таргета.
 
 **W8. Миграции и SQL для Conduit.** ⬜
 - AC: модуль `Migrate` — упорядоченный список SQL с таблицей версий, прогон при старте, повторный прогон ничего не делает; оба таргета.

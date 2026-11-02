@@ -138,6 +138,21 @@ let server = HttpApi.listen options api { users = { get_user = find_user } }
 `listen`, на запрос, который не принял ни один эндпоинт, отвечает 404, а
 обработчики работают с сервисами того места, где создан маршрут.
 
+Собранное одностраничное приложение и его API так же делят один сервер, на
+обоих таргетах: маршрут API рядом с `Http.StaticServer.route` с `spa = true`,
+который на путь без файла отвечает `index.html`, если запрос принимает HTML
+(собственные маршруты клиента), и `Http.Middleware.cors` вокруг маршрутизатора
+для dev-сервера на другом origin.
+
+```flick
+let files = Http.StaticServer.route { Http.StaticServer.static_options "dist" with spa = true } ""
+let app =
+  Http.Middleware.cors
+    { Http.Middleware.cors_options with allowedOrigins = ["http://localhost:5173"] }
+    (Http.Router.router Http.Router.config [HttpApi.route "/api/*" api handlers, files])
+let server = Http.Server.serve options app
+```
+
 ## Клиенты и документы
 
 `HttpApi.call base endpoint request` кодирует запрос кодеками эндпоинта

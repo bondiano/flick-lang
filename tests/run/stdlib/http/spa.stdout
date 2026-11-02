@@ -1,0 +1,7 @@
+api: 200 {"word":"hi"}
+index: 200 <div id="app"></div>
+file: 200 run()
+client route: 200 <div id="app"></div>
+missing file: 404 
+cors get: 200 http://localhost:5173
+cors preflight: 204 http://localhost:5173

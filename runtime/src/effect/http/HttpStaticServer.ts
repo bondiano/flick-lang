@@ -19,11 +19,12 @@ export interface StaticOptions {
   readonly mimeTypes: ReadonlyArray<readonly [string, string]>;
 }
 
-/** `Http.StaticServer.make options`. */
+/** `Http.StaticServer.make options`; without an index, Effect's `index.html`. */
 export const flickMake = (o: StaticOptions) =>
   StaticServer.make({
     root: o.root,
-    index: Option.getOrUndefined(o.index),
+    // Effect falls back to `index.html` only when the key is absent
+    ...(Option.isSome(o.index) ? { index: o.index.value } : {}),
     spa: o.spa,
     cacheControl: Option.getOrUndefined(o.cacheControl),
     mimeTypes: Object.fromEntries(o.mimeTypes),

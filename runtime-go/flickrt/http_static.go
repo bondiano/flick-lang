@@ -336,15 +336,15 @@ func (s *staticServer) handle(fb *Fiber, q *ServerRequest) Value {
 }
 
 // StaticServerMake answers the request with the files below the root; the
-// go target calls it with the options and the request at once. An index
-// is served only when the options name one, as the options always pass
-// Effect the key.
+// go target calls it with the options and the request at once. The index is
+// `index.html` unless the options name one, as Effect's default.
 func StaticServerMake(fb *Fiber, options, request Value) Value {
 	o := record(options)
 	root, _ := filepath.Abs(o.Get("root").(string))
 	s := &staticServer{root: root, spa: o.Get("spa").(bool), mimeTypes: map[string]string{}}
+	s.index, s.hasIndex = "index.html", true
 	if i, ok := some(o.Get("index")); ok {
-		s.index, s.hasIndex = i.(string), true
+		s.index = i.(string)
 	}
 	if c, ok := some(o.Get("cacheControl")); ok {
 		s.cacheControl, s.hasCache = c.(string), true
