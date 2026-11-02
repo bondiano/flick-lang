@@ -130,6 +130,9 @@ impl Ide<'_> {
         if let Some(symbol) = self.module_at(m, offset) {
             return Some(symbol);
         }
+        if let Some(found) = self.companion_owner_at(m, offset) {
+            return Some(found);
+        }
         if let Some((range, r)) = tree::innermost(m.typing.names.iter(), offset)
             && let Some(node) = tree::find(&m.tree, range)
             && let Some(token) = tree::last_name(node)
@@ -190,6 +193,30 @@ impl Ide<'_> {
         self.declared_at(m, file, offset)
     }
 
+    /// `Public` in `Api.Public.api`: the type that owns a companion, named
+    /// just before it.
+    fn companion_owner_at(&self, m: &Analyzed, offset: u32) -> Option<(Symbol, (u32, u32))> {
+        let (range, r) = tree::innermost(m.typing.names.iter(), offset)?;
+        let Ref::Value { module, name } = r else {
+            return None;
+        };
+        let (owner, _) = name.split_once('$')?;
+        let names: Vec<_> = tree::path_to(&m.tree, offset)
+            .into_iter()
+            .find(|n| n.kind == K::NameExpr && n.range() == range)?
+            .child_tokens()
+            .filter(|t| matches!(t.kind, K::Con | K::Ident))
+            .collect();
+        let token = names.iter().rev().nth(1)?;
+        (token.start <= offset && offset <= token.end && token.text(self.text(m.file)) == owner)
+            .then(|| {
+                (
+                    entity(module, Namespace::Type, owner),
+                    (token.start, token.end),
+                )
+            })
+    }
+
     fn module_at(&self, m: &Analyzed, offset: u32) -> Option<(Symbol, (u32, u32))> {
         let text = self.text(m.file);
         for node in tree::path_to(&m.tree, offset).into_iter().rev() {
@@ -238,14 +265,7 @@ impl Ide<'_> {
                 if node.kind == K::ModulePath {
                     qualifier
                 } else {
-                    m.tree
-                        .nodes()
-                        .find(|n| {
-                            n.kind == K::ImportDecl
-                                && tree::name_of(n, K::Con, text) == Some(qualifier.as_str())
-                        })
-                        .and_then(|n| n.nodes().find(|p| p.kind == K::ModulePath))
-                        .map_or(qualifier, |p| p.text(text).split_whitespace().collect())
+                    self.unalias(m, qualifier)
                 }
             };
             if self.interface(&module).is_some() {
@@ -281,16 +301,22 @@ impl Ide<'_> {
             .map(|t| t.text(text))
             .collect::<Vec<_>>()
             .join(".");
-        let module = m
-            .tree
+        let module = self.unalias(m, qualifier);
+        self.interface(&module).is_some().then_some(module)
+    }
+
+    /// The module `qualifier` stands for in `m`: the one an import names
+    /// with this alias, or `qualifier` as written.
+    fn unalias(&self, m: &Analyzed, qualifier: String) -> String {
+        let text = self.text(m.file);
+        m.tree
             .nodes()
             .find(|n| {
                 n.kind == K::ImportDecl
                     && tree::name_of(n, K::Con, text) == Some(qualifier.as_str())
             })
             .and_then(|n| n.nodes().find(|p| p.kind == K::ModulePath))
-            .map_or(qualifier, |p| p.text(text).split_whitespace().collect());
-        self.interface(&module).is_some().then_some(module)
+            .map_or(qualifier, |p| p.text(text).split_whitespace().collect())
     }
 
     /// A declaration's own name, a binder, or a name in `exposing`.
@@ -380,6 +406,8 @@ fn entity(module: &str, namespace: Namespace, name: &str) -> Symbol {
         name: name.to_owned(),
     })
 }
+#[cfg(test)]
+mod companion_tests;
 #[cfg(test)]
 mod hints_tests;
 #[cfg(test)]

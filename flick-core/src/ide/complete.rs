@@ -6,7 +6,8 @@
 use std::collections::BTreeMap;
 use std::iter;
 
-use super::{Ide, locals};
+use super::hover::companions::companion_note;
+use super::{Ide, locals, tree};
 use crate::diagnostics::Edit;
 use crate::iface::{Export, Interface, Namespace};
 use crate::resolve::declarations;
@@ -127,14 +128,10 @@ impl Ide<'_> {
                 continue;
             };
             let module: String = path.text(text).split_whitespace().collect();
-            add(
-                IMPORTED,
-                item(
-                    module.rsplit('.').next().unwrap_or(&module),
-                    CompletionKind::Module,
-                    None,
-                ),
-            );
+            // `import Conduit.Server.Session as Auth` is `Auth` here
+            let name = tree::name_of(import, K::Con, text)
+                .unwrap_or_else(|| module.rsplit('.').next().unwrap_or(&module));
+            add(IMPORTED, item(name, CompletionKind::Module, None));
             let Some(interface) = self.interface(&module) else {
                 continue;
             };
@@ -186,8 +183,19 @@ impl Ide<'_> {
             .rev()
             .collect();
         if qualifier.starts_with(|c: char| c.is_ascii_uppercase()) {
-            if let Some(interface) = self.interface(&qualifier) {
+            if let Some(interface) = self.interface(&self.unalias(m, qualifier.clone())) {
                 return exports(&interface);
+            }
+            // `Api.Public.` or `Public.`: the companions of a type
+            let (owner, interface) = match qualifier.rsplit_once('.') {
+                Some((module, owner)) => {
+                    (owner, self.interface(&self.unalias(m, module.to_owned())))
+                }
+                None => (qualifier.as_str(), Some(m.interface.clone())),
+            };
+            let companions = interface.map(|i| companions(&i, owner)).unwrap_or_default();
+            if !companions.is_empty() {
+                return companions;
             }
             if let Some(ops) = local_operations(&m.tree, text, &qualifier) {
                 return ops;
@@ -256,6 +264,26 @@ pub(super) fn exports(interface: &Interface) -> Vec<Completion> {
         .iter()
         .filter(|e| !e.entity.name.contains('$'))
         .map(completion)
+        .collect()
+}
+
+/// The companions of the type `owner`, such as `api` of `Public`, under
+/// their member names.
+fn companions(interface: &Interface, owner: &str) -> Vec<Completion> {
+    interface
+        .exports
+        .iter()
+        .filter_map(|e| {
+            let member = e.entity.name.strip_prefix(owner)?.strip_prefix('$')?;
+            Some(Completion {
+                documentation: companion_note(member).map(str::to_owned),
+                ..item(
+                    member,
+                    CompletionKind::Value,
+                    e.scheme.as_ref().map(show_type),
+                )
+            })
+        })
         .collect()
 }
 

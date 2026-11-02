@@ -3,6 +3,8 @@
 //! completion, rename, formatting, and a stdout of protocol only.
 
 mod common;
+#[path = "lsp_command/conduit.rs"]
+mod conduit;
 #[path = "lsp_command/isolation.rs"]
 mod isolation;
 #[path = "lsp_command/logging.rs"]

@@ -13,7 +13,7 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, Ref, TypeDef, component_instance, show_type};
 
-mod companions;
+pub(super) mod companions;
 mod kinds;
 mod types;
 
