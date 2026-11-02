@@ -38,8 +38,8 @@ inductive TrD (δ : Nat → Nat) : Dict → Flick.Tm → Prop
   | var {k} : TrD δ (.var k) (.var (δ k))
   | slot {d d' i} : TrD δ d d' → TrD δ (.slot d i) (.proj d' (N.slot i))
   | inst {I} : TrD δ (.inst I) (.glob (N.inst I))
-  | strct {C} (τ : Ty) : TrD δ (.strct C) (.glob (N.strct C τ))
-  | prim {p} (q : Cn) : TrD δ (.prim p) (.glob (N.prim p q))
+  | strct {C τ} : TrD δ (.strct C τ) (.glob (N.strct C τ))
+  | prim {p q} : TrD δ (.prim p q) (.glob (N.prim p q))
   | ap {d d' e e'} : TrD δ d d' → TrD δ e e' → TrD δ (.ap d e) (.app d' e')
 
 /-- The elaborated term `e` is the core term `e'`. -/

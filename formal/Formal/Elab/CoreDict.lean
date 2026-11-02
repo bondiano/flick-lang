@@ -169,15 +169,15 @@ theorem has_inst (hR : Real P S N) {Γ Δ I ins σ φ} (hI : P.insts I = some in
 
 theorem has_strct (hR : Real P S N) {Γ Δ C τ ts φ} (hC : P.structC C = true)
     (hf : P.fields τ = some ts) :
-    Has S N Γ Δ (.dict (.strct C)) (dicts .cnil (ts.map fun t => ⟨C, [t]⟩) (.dict ⟨C, [τ]⟩)) φ := by
+    Has S N Γ Δ (.dict (.strct C τ)) (dicts .cnil (ts.map fun t => ⟨C, [t]⟩) (.dict ⟨C, [τ]⟩)) φ := by
   obtain ⟨k, hg, hcl⟩ := hR.strct hC hf
-  have := has_glob (Γ := Γ) (Δ := Δ) (φ := φ) hg hcl .var fun _ _ => .dict (.strct τ)
+  have := has_glob (Γ := Γ) (Δ := Δ) (φ := φ) hg hcl .var fun _ _ => .dict .strct
   rwa [TTy.subst_id] at this
 
 theorem has_prim (hR : Real P S N) {Γ Δ q p φ} (hq : P.primC q.cls = true) (hp : P.prims q = some p) :
-    Has S N Γ Δ (.dict (.prim p)) (.dict q) φ := by
+    Has S N Γ Δ (.dict (.prim p q)) (.dict q) φ := by
   obtain ⟨k, hg, hcl⟩ := hR.prim hq hp
-  have := has_glob (Γ := Γ) (Δ := Δ) (φ := φ) (t := .dict q) hg hcl .var fun _ _ => .dict (.prim q)
+  have := has_glob (Γ := Γ) (Δ := Δ) (φ := φ) (t := .dict q) hg hcl .var fun _ _ => .dict .prim
   rwa [TTy.subst_id] at this
 
 end Flick.Elab

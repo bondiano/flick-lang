@@ -94,9 +94,9 @@ theorem Clo.not_nil {d : Dict} {Q : Cn} (h : Clo P [] d Q) : False := by
 /-- A derivation of one constraint ends in one of the four rules. -/
 theorem Ent.single {Δ : List Cn} {Q : Cn} {d : Dict} (h : Ent P Δ [Q] [d]) :
     Clo P Δ d Q ∨
-    (∃ p, P.primC Q.cls = true ∧ P.prims Q = some p ∧ d = .prim p) ∨
+    (∃ p, P.primC Q.cls = true ∧ P.prims Q = some p ∧ d = .prim p Q) ∨
     (∃ C τ ts ds, Q = ⟨C, [τ]⟩ ∧ P.structC C = true ∧ P.fields τ = some ts ∧
-      Ent P Δ (ts.map fun t => ⟨C, [t]⟩) ds ∧ d = apps (.strct C) ds) ∨
+      Ent P Δ (ts.map fun t => ⟨C, [t]⟩) ds ∧ d = apps (.strct C τ) ds) ∨
     (∃ I ins σ ds, P.insts I = some ins ∧ ins.cls = Q.cls ∧ Q.args = ins.head.map (·.subst σ) ∧
       Ent P Δ (ins.ctx.map (·.subst σ)) ds ∧ d = apps (.inst I) ds) := by
   generalize hq : [Q] = qs at h

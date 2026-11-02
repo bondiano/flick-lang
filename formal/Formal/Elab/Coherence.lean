@@ -69,16 +69,16 @@ theorem closed_rep (h : Coherent P lt) {Δ : List Cn} {θ : Nat → Ty} {ρ : Na
   | given hc =>
     obtain ⟨d', h1, h2⟩ := clo_rep hρ ho hc
     exact ⟨[d'], h2, .cons h1 .nil⟩
-  | prim h1 h2 => exact ⟨[_], .prim h1 (h.prims_subst h2), .cons .refl .nil⟩
+  | prim h1 h2 => exact ⟨[_], .prim h1 (h.prims_subst h2), .cons (.primSub h1 h2) .nil⟩
   | @strct C τ ts ds h1 h2 _ ih =>
     obtain ⟨ds', e, a⟩ := ih
-    refine ⟨[apps (.strct C) ds'], ?_, .cons ?_ .nil⟩
+    refine ⟨[apps (.strct C (τ.subst θ)) ds'], ?_, .cons ?_ .nil⟩
     · have : (ts.map fun t => (⟨C, [t]⟩ : Cn)).map (·.subst θ) =
           (ts.map (·.subst θ)).map fun t => (⟨C, [t]⟩ : Cn) := by
         simp [List.map_map, Function.comp, Cn.subst]
       rw [this] at e
       exact .strct h1 (h.fields_subst h2) e
-    · simp only [apps_subst]; exact Eqv.apps .refl a
+    · simp only [apps_subst]; exact Eqv.apps (.strctSub h1 h2) a
   | @inst Q I ins σ ds h1 h2 h3 _ ih =>
     obtain ⟨ds', e, a⟩ := ih
     refine ⟨[apps (.inst I) ds'], ?_, .cons ?_ .nil⟩
@@ -194,7 +194,7 @@ theorem slot_ok (h : Coherent P lt) (Q : Cn) : SlotOK P Q := by
           obtain ⟨es', h₂, a⟩ := ihu es₀ (fun t ht => hsub t (List.mem_cons_of_mem _ ht)) he₂
           exact ⟨e' :: es', .cons he' h₂, .cons r a⟩
       obtain ⟨es', he', a⟩ := key ts ds (fun _ ht => ht) hds
-      refine ⟨apps (.strct S₀.cls) es', .trans (.strctSlot hC hS₀) (Eqv.apps .refl a), ?_⟩
+      refine ⟨apps (.strct S₀.cls τ) es', .trans (.strctSlot hC hS₀ hf hds) (Eqv.apps .refl a), ?_⟩
       have : S₀.subst (params [τ]) = ⟨S₀.cls, [τ]⟩ := by
         simp [Cn.subst, hSa, Ty.subst, params]
       rw [this]; exact .strct hSC hf he'
@@ -215,7 +215,7 @@ theorem slot_ok (h : Coherent P lt) (Q : Cn) : SlotOK P Q := by
         ih _ (hQ ▸ clo_lt h hI hc)
       obtain ⟨ds', e, a⟩ := closed_rep h hρ ho hse
       obtain ⟨d', rfl, r⟩ := a.single
-      refine ⟨_, .trans (.instSlot hI hsl) r, ?_⟩
+      refine ⟨_, .trans (.instSlot hI hsl hds) r, ?_⟩
       have hS : S = (S₀.subst (params ins.head)).subst σ := by
         rw [hS₀] at hs; simp only [Option.map_some, Option.some.injEq] at hs
         rw [← hs, Cn.subst_comp]; congr 1; funext n; rw [params_subst, ← hargs]
