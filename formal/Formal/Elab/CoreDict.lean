@@ -1,0 +1,183 @@
+import Formal.Elab.CoreLaws
+import Formal.Elab.Basic
+import Formal.Elab.SugarBase
+
+/-!
+# λFlick⁺ as a `Target`: the laws of dictionaries (P4a3)
+
+`lamD l` is `l` nested `λ`s of the core, each over a premise `D_Q` (`lams_typ`); a method and
+a superclass slot are `Typ.dproj` on a dictionary record; instances, constants of Γ₀ and the
+compiler's dictionaries are `Typ.glob` at their declared schemes (`Real`).
+-/
+
+namespace Flick.Elab
+
+variable {P : Prog} {S : Sig} {N : Names}
+
+/-- `λδ₁ … λδₗ. b` over the premises `qs`, each arrow with the qualifier `q`. -/
+theorem lams_typ {Ψ Θ} {q : Ty} {T : TTy} {b' : Flick.Tm} (hns : ∀ s, ¬ b'.Has s) :
+    ∀ (qs : List Cn) (Γc : List Flick.Scheme), qs ≠ [] →
+    Typ S Ψ Θ (dctx N qs ++ Γc) b' (.ex (trTT N T) .pure) →
+    (∀ i s a, b'.Free (i + qs.length) → Γc[i]? = some s → s.reach a →
+      (trT N q).reach a ∨ (trTT N T).reach a) →
+    ∀ φ, Typ S Ψ Θ Γc (lamsC qs.length b') (.ex (trTT N (dicts q qs T)) φ) := by
+  intro qs
+  induction qs with
+  | nil => intro _ h; exact absurd rfl h
+  | cons c qs ih =>
+    intro Γc _ hb hh φ
+    have hb' : Typ S Ψ Θ (dctx N qs ++ (Flick.Scheme.mono (trD N c) :: Γc)) b'
+        (.ex (trTT N T) .pure) := by
+      simpa [dctx, List.append_assoc] using hb
+    have inner : Typ S Ψ Θ (Flick.Scheme.mono (trD N c) :: Γc) (lamsC qs.length b')
+        (.ex (trTT N (dicts q qs T)) .pure) := by
+      cases qs with
+      | nil => exact hb'
+      | cons c' qs' =>
+        refine ih _ (List.cons_ne_nil _ _) hb' ?_ .pure
+        intro i s a hi hs hr
+        cases i with
+        | zero =>
+          simp only [List.getElem?_cons_zero, Option.some.injEq] at hs; subst hs
+          exact absurd ((Flick.Scheme.reach_mono _ _).1 hr) (trD_reach N c a)
+        | succ i =>
+          refine hh i s a ?_ hs hr
+          simp only [List.length_cons] at hi ⊢; rwa [Nat.add_right_comm] at hi
+    refine .lam inner (fun h => hns _ (lamsC_has.1 h)) ?_ .refl
+    rintro a (⟨i, s, hi, hs, hr⟩ | ⟨⟨p, hp, -⟩ | ⟨l, u, hl, -⟩⟩)
+    · have hi' : b'.Free (i + (c :: qs).length) := by
+        have := lamsC_free.1 hi; simp only [List.length_cons]; rwa [Nat.add_right_comm] at this
+      rcases hh i s a hi' hs hr with h | h
+      · exact .inr (.inr h)
+      · exact .inr (.inl (trTT_reach_dicts N h))
+    · exact absurd (lamsC_has.1 hp) (hns _)
+    · exact absurd (lamsC_has.1 hl) (hns _)
+
+theorem has_lamD {Γ Δ qs e t q φ} (he : Has S N Γ (qs ++ Δ) e t φ) (hφ : qs ≠ [] → φ = .P)
+    (hh : qs ≠ [] → ∀ n, heldT Γ e n → t.reach n ∨ q.reach n) :
+    Has S N Γ Δ (.lamD qs.length e) (dicts q qs t) φ := by
+  intro Ψ Θ Γc γ δ hc
+  obtain ⟨b', hb', tb⟩ := he Ψ Θ _ _ _ (hc.lamD N qs)
+  refine ⟨_, .lamD hb', ?_⟩
+  by_cases hq : qs = []
+  · subst hq; exact tb
+  · have := hφ hq; subst this
+    refine lams_typ (hb'.has N) qs Γc hq tb ?_ _
+    have fin : ∀ {a n}, a = Atom.v n → heldT Γ e n → (trT N q).reach a ∨ (trTT N t).reach a := by
+      rintro a n rfl hn
+      rcases hh hq n hn with h | h
+      · exact .inr ((trTT_reach N t _).2 ⟨n, rfl, h⟩)
+      · exact .inl (trT_reach_v N h)
+    intro i s a hi hs hr
+    rcases hb'.free N hi with ⟨x, hx, hγ⟩ | ⟨k, hk⟩
+    · obtain ⟨n, hn, hn'⟩ := corr_held N hc (.inl ⟨x, hx, by omega⟩) hs hr
+      exact fin hn hn'
+    · unfold dext at hk
+      split at hk
+      · omega
+      · obtain ⟨n, hn, hn'⟩ := corr_held N hc (e := e) (.inr ⟨k - qs.length, by omega⟩) hs hr
+        exact fin hn hn'
+
+/-- The field of a method at the instance `θ` of its class parameters and own variables. -/
+theorem rot_inst (T : Flick.Ty) {p kk : Nat} (θ : Nat → Ty) :
+    ((T.substT (rot p kk)).substT (liftT kk (instT (((vars p).map (·.subst θ)).map (trT N))))).substT
+        (instT ((List.range kk).map fun j => trT N (θ (j + p)))) =
+      T.substT (trσ N fun j => if j < p + kk then θ j else .var (j - (p + kk))) := by
+  simp only [Flick.Ty.substT_comp]
+  apply Flick.Ty.substT_congr
+  intro a
+  cases a with
+  | r q => rfl
+  | v j =>
+    simp only [rot]
+    by_cases h1 : j < p
+    · rw [if_pos h1]
+      simp only [Flick.Ty.substT, liftT, if_neg (by omega : ¬ j + kk < kk), Nat.add_sub_cancel]
+      rw [Flick.Ty.up_substT _ _ _ (by simp)]
+      simp [instT, vars, trσ, Ty.subst, h1, show j < p + kk by omega]
+    · rw [if_neg h1]
+      by_cases h2 : j < p + kk
+      · rw [if_pos h2]
+        simp [Flick.Ty.substT, liftT, instT, trσ, h2, show j - p < kk by omega,
+          Nat.sub_add_cancel (by omega : p ≤ j)]
+      · rw [if_neg h2]
+        simp only [Flick.Ty.substT, liftT, if_neg (by omega : ¬ j < kk), instT, List.length_map,
+          vars, List.length_range, dif_neg (by omega : ¬ j - kk < p), Flick.Ty.up, shiftV,
+          dif_neg (by omega : ¬ j - kk - p + kk < kk), trσ, if_neg h2, trT]
+        congr 1; omega
+
+theorem has_meth (hR : Real P S N) {Γ Δ e m C s c₀ rest θ φ} (hm : P.methods m = some (C, s))
+    (hc₀ : s.ctx = c₀ :: rest) (he : Has S N Γ Δ e (.dict (c₀.subst θ)) φ) :
+    Has S N Γ Δ (.meth e m) (dicts .cnil (rest.map (·.subst θ)) (.mono (s.ty.subst θ))) φ := by
+  obtain ⟨p, rest', hctx, hp, hcl, hfs⟩ := hR.meth hm
+  rw [hctx] at hc₀; cases hc₀
+  intro Ψ Θ Γc γ δ hc
+  obtain ⟨e', he', te⟩ := he Ψ Θ Γc γ δ hc
+  obtain ⟨fs, hd⟩ := hR.dict C p
+  have hlen : ((vars p).map (·.subst θ)).length = p := by simp [vars]
+  have te' : Typ S Ψ Θ Γc e'
+      (.ex (.dict (N.cls C p) (Flick.Ty.spine (((vars p).map (·.subst θ)).map (trT N)))) (trStage φ)) := by
+    have := te; simp only [trTT, trD, Cn.subst, hlen] at this; exact this
+  refine ⟨_, .meth he', .dproj te' hd (by simp [vars]) (hfs fs hd)
+    (ts := (List.range (s.k - p)).map fun j => trT N (θ (j + p))) (by simp) holds_none ?_⟩
+  simp only [Flick.Scheme.inst, Flick.Scheme.substT]
+  rw [rot_inst, ← trTT_subst, Nat.add_sub_cancel' hp,
+    hcl _ θ fun j hj => by simp [hj]]
+  simp only [methTy, TTy.subst_dicts, TTy.subst, Ty.subst]
+  exact .refl
+
+theorem has_slot (hR : Real P S N) {Γ Δ d q i Sup φ} (hd : Has S N Γ Δ (.dict d) (.dict q) φ)
+    (hs : P.super q i = some Sup) : Has S N Γ Δ (.dict (.slot d i)) (.dict Sup) φ := by
+  intro Ψ Θ Γc γ δ hc
+  obtain ⟨d', hd', td⟩ := hd Ψ Θ Γc γ δ hc
+  cases hd' with | dict hD =>
+  obtain ⟨fs, hfs⟩ := hR.dict q.cls q.args.length
+  obtain ⟨Sup', hs', hSup⟩ : ∃ Sup', P.super ⟨q.cls, vars q.args.length⟩ i = some Sup' ∧
+      Sup = Sup'.subst (inst q.args) := by
+    unfold Prog.super at hs
+    cases h : (P.supers q.cls)[i]? with
+    | none => rw [h] at hs; cases hs
+    | some S₀ =>
+      refine ⟨S₀.subst (params (vars q.args.length)), by simp [Prog.super, h], ?_⟩
+      have h₂ := Prog.super_subst (P := P) (inst q.args) (Q := ⟨q.cls, vars q.args.length⟩)
+        (S := S₀.subst (params (vars q.args.length))) (i := i) (by simp [Prog.super, h])
+      have hv := vars_inst (as := q.args) [] rfl
+      rw [List.append_nil] at hv
+      simp only [Cn.subst, hv] at h₂
+      unfold Prog.super at h₂
+      rw [hs] at h₂; exact Option.some.inj h₂
+  refine ⟨_, .dict (.slot hD), .dproj td hfs (by simp) (hR.slot hfs hs') (ts := []) rfl
+    holds_none ?_⟩
+  simp only [Flick.Scheme.inst, Flick.Scheme.substT, liftT_zero, substT_instT_nil]
+  rw [hSup, trTT, trD_subst]
+  rw [Flick.Ty.substT_congr fun a => (trσ_inst N q.args a)]
+  exact .refl
+
+/-- A global at a closed scheme, at the instance `σ`. -/
+theorem has_glob {Γ Δ D g k} {t : TTy} (hg : S.glob g = some ⟨k, Facts.none, trTT N t⟩)
+    (hcl : t.Closed k) (σ : Nat → Ty) {φ} (hD : ∀ γ δ, Tr N γ δ (.dict D) (.glob g)) :
+    Has S N Γ Δ (.dict D) (t.subst σ) φ := fun _ _ _ γ δ _ =>
+  ⟨_, hD γ δ, .glob hg (ts := (List.range k).map fun j => trT N (σ j)) (by simp)
+    (fun _ _ h => (h : False).elim) (by rw [Flick.Scheme.inst, trTT_inst N hcl]; exact .refl)⟩
+
+theorem has_inst (hR : Real P S N) {Γ Δ I ins σ φ} (hI : P.insts I = some ins) :
+    Has S N Γ Δ (.dict (.inst I))
+      (dicts .cnil (ins.ctx.map (·.subst σ)) (.dict ⟨ins.cls, ins.head.map (·.subst σ)⟩)) φ := by
+  obtain ⟨k, hg, hcl⟩ := hR.inst hI
+  have := has_glob (Γ := Γ) (Δ := Δ) (φ := φ) hg hcl σ fun _ _ => .dict .inst
+  simpa [instTy, TTy.subst_dicts, TTy.subst, Cn.subst, Ty.subst] using this
+
+theorem has_strct (hR : Real P S N) {Γ Δ C τ ts φ} (hC : P.structC C = true)
+    (hf : P.fields τ = some ts) :
+    Has S N Γ Δ (.dict (.strct C)) (dicts .cnil (ts.map fun t => ⟨C, [t]⟩) (.dict ⟨C, [τ]⟩)) φ := by
+  obtain ⟨k, hg, hcl⟩ := hR.strct hC hf
+  have := has_glob (Γ := Γ) (Δ := Δ) (φ := φ) hg hcl .var fun _ _ => .dict (.strct τ)
+  rwa [TTy.subst_id] at this
+
+theorem has_prim (hR : Real P S N) {Γ Δ q p φ} (hq : P.primC q.cls = true) (hp : P.prims q = some p) :
+    Has S N Γ Δ (.dict (.prim p)) (.dict q) φ := by
+  obtain ⟨k, hg, hcl⟩ := hR.prim hq hp
+  have := has_glob (Γ := Γ) (Δ := Δ) (φ := φ) (t := .dict q) hg hcl .var fun _ _ => .dict (.prim q)
+  rwa [TTy.subst_id] at this
+
+end Flick.Elab
