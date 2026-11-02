@@ -18,7 +18,7 @@ type Page =
 encodable : Page -> Bool
 foreign pure encodable from "./route.mjs" "encodable"
 
-// checking : Arbitrary.CheckOptions
+checking : Arbitrary.CheckOptions
 let checking = {
   runs = Some 200;
   size = None;
