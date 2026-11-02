@@ -1,12 +1,12 @@
 //! Native TOML parsing and validation of the shared project configuration.
 
 use std::collections::BTreeMap;
-use std::ops;
+use std::{mem, ops};
 
 use serde::Deserialize;
 use toml::{Spanned, de};
 
-use super::{Build, Config, Entry, Kind, MAIN_ENTRY};
+use super::{Build, Config, Dependency, Entry, Kind, MAIN_ENTRY, Manifest, Script};
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::source::{FileId, Span};
 use crate::types::{Dialect, Thresholds, dialect};
@@ -24,13 +24,33 @@ struct Version {
 struct Raw {
     #[serde(rename = "schema-version")]
     _schema_version: i64,
-    project: Spanned<RawProject>,
+    project: Option<Spanned<RawProject>>,
+    build: Option<Spanned<Build>>,
+    sql: Option<Spanned<RawSql>>,
+    lint: Option<Spanned<RawLint>>,
+    dependencies: Option<Spanned<BTreeMap<String, Spanned<RawDependency>>>>,
+    workspace: Option<RawWorkspace>,
     #[serde(default)]
-    build: Build,
-    #[serde(default)]
-    sql: RawSql,
-    #[serde(default)]
-    lint: RawLint,
+    scripts: BTreeMap<String, Spanned<RawScript>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawDependency {
+    path: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawWorkspace {
+    members: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum RawScript {
+    One(String),
+    Many(Vec<String>),
 }
 
 #[derive(Default, Deserialize)]
@@ -74,9 +94,21 @@ fn test_dir() -> String {
     "test".into()
 }
 
-/// Parses `flick.toml`; reports the first problem. The schema version is
-/// checked first: a file of another version is not judged by this schema.
+/// Parses the `flick.toml` of a project; reports the first problem. A
+/// workspace root without `[project]` is not one.
 pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
+    parse_manifest(text, file)?.project.ok_or_else(|| {
+        Diagnostic::error(
+            codes::P031,
+            "this `flick.toml` is a workspace root, not a project: choose a member with `--package <name>`",
+            Span::new(file, 0, 0),
+        )
+    })
+}
+
+/// Parses a `flick.toml`: a project, a workspace or both. The schema version
+/// is checked first: a file of another version is not judged by this schema.
+pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> {
     let span = |range: ops::Range<usize>| Span::new(file, offset(range.start), offset(range.end));
     let invalid = |err: de::Error| {
         let message = format!("invalid `flick.toml`: {}", err.message().trim_end());
@@ -109,10 +141,85 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
             ));
         }
     }
-    let raw: Raw = toml::from_str(text).map_err(invalid)?;
-    let project_span = span(raw.project.span());
-    let project = raw.project.into_inner();
-    let entries = entries(project.entry, project.entries, project.runner, &span)?;
+    let mut raw: Raw = toml::from_str(text).map_err(invalid)?;
+    let scripts = scripts(mem::take(&mut raw.scripts), &span)?;
+    let members = raw.workspace.take().map(|w| w.members);
+    let project = if let Some(project) = raw.project.take() {
+        Some(config(project, raw, &span)?)
+    } else {
+        if members.is_none() {
+            return Err(Diagnostic::error(
+                codes::P005,
+                "`flick.toml` needs `[project]`, or `[workspace]` at the root of a workspace",
+                Span::new(file, 0, 0),
+            ));
+        }
+        let settings = [
+            ("build", raw.build.map(|b| b.span())),
+            ("sql", raw.sql.map(|s| s.span())),
+            ("lint", raw.lint.map(|l| l.span())),
+            ("dependencies", raw.dependencies.map(|d| d.span())),
+        ];
+        if let Some((table, at)) = settings.into_iter().find_map(|(t, at)| Some((t, at?))) {
+            return Err(Diagnostic::error(
+                codes::P005,
+                format!("`[{table}]` belongs to a project: this workspace root has no `[project]`"),
+                span(at),
+            ));
+        }
+        None
+    };
+    Ok(Manifest {
+        project,
+        members,
+        scripts,
+    })
+}
+
+/// The scripts of `[scripts]`; a step `@name` must name one of them.
+fn scripts(
+    raw: BTreeMap<String, Spanned<RawScript>>,
+    span: &dyn Fn(ops::Range<usize>) -> Span,
+) -> Result<Vec<Script>, Diagnostic> {
+    let scripts: Vec<(Script, Span)> = raw
+        .into_iter()
+        .map(|(name, value)| {
+            let at = span(value.span());
+            let steps = match value.into_inner() {
+                RawScript::One(step) => vec![step],
+                RawScript::Many(steps) => steps,
+            };
+            (Script { name, steps }, at)
+        })
+        .collect();
+    for (script, at) in &scripts {
+        let unknown = script.steps.iter().find_map(|step| {
+            let name = step.strip_prefix('@')?;
+            (!scripts.iter().any(|(s, _)| s.name == name)).then_some(name)
+        });
+        if let Some(name) = unknown {
+            return Err(Diagnostic::error(
+                codes::P005,
+                format!(
+                    "script `{}` runs `@{name}`, which `[scripts]` does not name",
+                    script.name
+                ),
+                *at,
+            ));
+        }
+    }
+    Ok(scripts.into_iter().map(|(s, _)| s).collect())
+}
+
+/// The project of `[project]` with its other tables.
+fn config(
+    project: Spanned<RawProject>,
+    raw: Raw,
+    span: &dyn Fn(ops::Range<usize>) -> Span,
+) -> Result<Config, Diagnostic> {
+    let project_span = span(project.span());
+    let project = project.into_inner();
+    let entries = entries(project.entry, project.entries, project.runner, span)?;
     if project.kind == Kind::App && entries.is_empty() {
         return Err(Diagnostic::error(
             codes::P007,
@@ -124,13 +231,14 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
             Vec::new(),
         )));
     }
-    let sql_dialect = match raw.sql.dialect {
+    let sql = raw.sql.map(Spanned::into_inner).unwrap_or_default();
+    let sql_dialect = match sql.dialect {
         None => Default::default(),
         Some(name) => sql_dialect(name.get_ref())
             .map_err(|(code, message)| Diagnostic::error(code, message, span(name.span())))?,
     };
-    let allow = raw
-        .lint
+    let lint = raw.lint.map(Spanned::into_inner).unwrap_or_default();
+    let allow = lint
         .allow
         .iter()
         .map(|c| {
@@ -154,7 +262,6 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
             }),
     };
     let defaults = Thresholds::default();
-    let lint = &raw.lint;
     let thresholds = Thresholds {
         function_lines: threshold(
             &lint.max_function_lines,
@@ -165,15 +272,27 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
         complexity: threshold(&lint.max_complexity, "max-complexity", defaults.complexity)?,
         params: threshold(&lint.max_params, "max-params", defaults.params)?,
     };
+    let dependencies = raw
+        .dependencies
+        .map(Spanned::into_inner)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(name, value)| Dependency {
+            name,
+            span: span(value.span()),
+            path: value.into_inner().path,
+        })
+        .collect();
     Ok(Config {
         kind: project.kind,
         source_dir: project.source_dir,
         test_dir: project.test_dir,
         entries,
-        build: raw.build,
+        dependencies,
+        build: raw.build.map(Spanned::into_inner).unwrap_or_default(),
         sql_dialect,
         allow,
-        no_let_assert: raw.lint.no_let_assert,
+        no_let_assert: lint.no_let_assert,
         thresholds,
     })
 }

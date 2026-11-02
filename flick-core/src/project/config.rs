@@ -1,5 +1,6 @@
-//! `flick.toml`: the schema version, `[project]`, `[build]` and `[sql]`. Unknown
-//! keys are errors so that a typo never silently means a default.
+//! `flick.toml`: the schema version, `[project]`, `[build]`, `[sql]`, `[lint]`,
+//! `[dependencies]`, `[workspace]` and `[scripts]`. Unknown keys are errors so
+//! that a typo never silently means a default.
 
 use crate::codegen::Labels;
 use crate::diagnostics::Code;
@@ -9,7 +10,37 @@ use crate::types::{self, Dialect, Thresholds};
 #[cfg(feature = "native-project")]
 mod parse;
 #[cfg(feature = "native-project")]
-pub use parse::{SCHEMA_VERSION, parse};
+pub use parse::{SCHEMA_VERSION, parse, parse_manifest};
+
+/// A whole `flick.toml`: a project, a workspace of member projects, or both,
+/// and the scripts it names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Manifest {
+    pub project: Option<Config>,
+    /// `[workspace] members`: the directories of the member projects,
+    /// relative to the manifest.
+    pub members: Option<Vec<String>>,
+    /// `[scripts]`, by name.
+    pub scripts: Vec<Script>,
+}
+
+/// A script of `[scripts]`: shell commands run in order, where `@name` runs
+/// another script of the same manifest.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Script {
+    pub name: String,
+    pub steps: Vec<String>,
+}
+
+/// A Flick library this project compiles from its sources:
+/// `[dependencies] name = { path = "…" }`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Dependency {
+    pub name: String,
+    /// The library's directory, relative to the manifest.
+    pub path: String,
+    pub span: Span,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -19,6 +50,8 @@ pub struct Config {
     /// The entry points of an app, by name: `entries`, or `entry` as the
     /// one named `main`. Each builds a runner `flick-<name>.js`.
     pub entries: Vec<Entry>,
+    /// `[dependencies]`, by name.
+    pub dependencies: Vec<Dependency>,
     pub build: Build,
     /// `[sql] dialect`: what `sql table` and `sql { … }` are checked against.
     pub sql_dialect: &'static Dialect,

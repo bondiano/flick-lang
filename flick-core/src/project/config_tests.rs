@@ -239,3 +239,72 @@ fn lint_thresholds_default_and_override() {
             .contains("`[lint] max-nesting` is a positive integer")
     );
 }
+
+fn manifest(text: &str) -> Result<Manifest, Diagnostic> {
+    let mut sources = SourceMap::default();
+    let file = sources.add("flick.toml", text);
+    parse_manifest(text, file)
+}
+
+#[test]
+fn a_workspace_root_names_members_and_scripts() {
+    let root = manifest(
+        "schema-version = 1\n[workspace]\nmembers = [\"contract\", \"server\"]\n\
+         [scripts]\nlint = [\"flick fmt --check\", \"flick check\"]\nci = [\"@lint\", \"flick test\"]\ntest = \"flick test\"\n",
+    )
+    .expect("valid");
+    assert_eq!(root.project, None);
+    assert_eq!(
+        root.members,
+        Some(vec!["contract".to_owned(), "server".to_owned()])
+    );
+    let scripts: Vec<_> = root
+        .scripts
+        .iter()
+        .map(|s| (s.name.as_str(), s.steps.len()))
+        .collect();
+    assert_eq!(scripts, [("ci", 2), ("lint", 2), ("test", 1)]);
+    let err =
+        parse_text("schema-version = 1\n[workspace]\nmembers = []\n").expect_err("no project");
+    assert_eq!(err.code, codes::P031);
+}
+
+#[test]
+fn a_project_depends_on_libraries_by_path() {
+    let config = parse_text(
+        "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"Main\"\n[dependencies]\ncontract = { path = \"../contract\" }\n",
+    )
+    .expect("valid");
+    let deps: Vec<_> = config
+        .dependencies
+        .iter()
+        .map(|d| (d.name.as_str(), d.path.as_str()))
+        .collect();
+    assert_eq!(deps, [("contract", "../contract")]);
+}
+
+#[test]
+fn rejects_invalid_workspaces_and_scripts() {
+    for (text, code) in [
+        ("schema-version = 1\n", codes::P005),
+        (
+            "schema-version = 1\n[workspace]\nmembers = []\n[build]\nemit = \"go\"\n",
+            codes::P005,
+        ),
+        (
+            "schema-version = 1\n[workspace]\nmembers = []\n[scripts]\nci = [\"@lint\"]\n",
+            codes::P005,
+        ),
+        (
+            "schema-version = 1\n[workspace]\nmembers = []\nexclude = []\n",
+            codes::P005,
+        ),
+        (
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[dependencies]\nx = { version = \"1\" }\n",
+            codes::P005,
+        ),
+    ] {
+        let err = manifest(text).expect_err(text);
+        assert_eq!(err.code, code, "{text}: {}", err.message);
+    }
+}
