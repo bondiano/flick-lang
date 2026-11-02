@@ -89,6 +89,7 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
       | merge => exact .inl (.constApp (.inl rfl) hve)
       | addFin => exact .inl (.constApp (.inl rfl) hve)
       | spawn => exact .inl (.constApp (.inl rfl) hve)
+      | intEq => exact .inl (.constApp (.inl rfl) hve)
       | open_ =>
         obtain ⟨_, _, _, _, h, la, _, _, -⟩ := hT'.arrow_left
         cases h; cases la
@@ -136,6 +137,18 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
           rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
           · exact step (Step.spawn (E := []) OkE.nil hg hl hve)
           · exact blocked (.inr ⟨p, hd, .inr (.inr (.inr (.inl ⟨_, rfl⟩)))⟩)
+    | intEq =>
+      cases hf with
+      | app hc' hw' _ hT =>
+        cases hc' with
+        | const _ hT' =>
+          obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
+          cases h; cases la
+          obtain ⟨_, _, _, _, h', la', _, _, -⟩ := (lt.trans hT).arrow_left
+          cases h'; cases la'
+          obtain ⟨m, rfl⟩ := canonical_int hw hw'
+          obtain ⟨n, rfl⟩ := canonical_int hve he
+          exact step (Step.ofP .intEq)
     | _ => simp [Const.arity] at hc
 
 end Flick

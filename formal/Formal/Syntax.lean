@@ -213,7 +213,8 @@ def Outl (Θ : Facts) (C : Caps) (s : Ty) : Prop :=
   ∀ k, C k → s.reach k ∨ ∃ C', Θ C' s ∧ C' k
 
 /-- Constants of Γ₀ (core.md §1.5, regions.md §1.5). The typing rule instantiates
-their types (`CArg`); `open_` acquires a capability `H ϱ`, `op` uses one. -/
+their types (`CArg`); `open_` acquires a capability `H ϱ`, `op` uses one; `intEq`
+compares two `Int`s. -/
 inductive Const
   | refMake
   | refGet
@@ -226,9 +227,10 @@ inductive Const
   | op
   | addFin
   | spawn
+  | intEq
 
 def Const.arity : Const → Nat
-  | .refSet | .merge | .addFin | .spawn => 2
+  | .refSet | .merge | .addFin | .spawn | .intEq => 2
   | _ => 1
 
 /-- `Layer.*`: a saturated application is a value, built by `provide`. -/
@@ -426,6 +428,7 @@ def Const.ty (S : Sig) : Const → CArg → Ty
   | .spawn, ι =>
     .arrow (.owner ι.s) .pure (.arrow (.eff (Row.union (Row.scope ι.s) ι.r) ι.e ι.t ι.C)
       (.rt (Row.union ι.r (Row.obs ι.r ι.s)) Row.none) (.base .unit) ι.s.reach) Caps.none
+  | .intEq, _ => .arrow (.base .int) .pure (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none
 
 /-- Side conditions of a constant at an instance: `Layer.merge` has disjoint
 outputs; a finalizer and a child outlive their owner, with everything they hold

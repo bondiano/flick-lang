@@ -32,6 +32,7 @@ theorem PHead.asc {r r' : Tm} {n : Nat} (hh : PHead r r') (h : r.Asc n) : r'.Asc
         | exact ⟨vn ‹_› h.1, vn ‹_› h.2.1⟩
         | exact ⟨vn (IsEnv.value ‹_›) h.1, vn (IsEnv.value ‹_›) h.2.1⟩
         | (have h3 := h.2; simp only [Tm.NoIns, Tm.Has, not_or] at h3; exact ⟨vn ‹_› h.1, h3⟩)
+        | simp
     exact Tm.Asc.of_noIns fun hi => hn (hh.has hi)
 
 theorem envLookup_noIns {θ v : Tm} {N : Name} (hθ : θ.NoIns) (h : θ.envLookup N = some v) : v.NoIns :=

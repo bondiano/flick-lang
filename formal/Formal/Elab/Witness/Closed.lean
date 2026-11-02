@@ -43,7 +43,7 @@ theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
     intro b hb; obtain ⟨n, rfl, hn⟩ := (trT_reach N t b).1 hb; exact h n hn
   induction t with
   | var n => exact h n rfl
-  | con c => unfold trT; split <;> rfl
+  | con c => unfold trT; split <;> (try split) <;> rfl
   | cnil => simp [trT, Flick.Ty.substT]
   | app t u iht ihu =>
     simp only [trT, Flick.Ty.substT]
@@ -88,7 +88,7 @@ theorem mfield_closed {p kk k' : Nat} {t : Ty} (h : ∀ n, t.Occurs n → n < p 
   rw [e]; exact hσ m hm
 
 theorem trT_con_up (c kk : Nat) : (trT N (.con c)).up kk = trT N (.con c) := by
-  unfold trT; split <;> rfl
+  unfold trT; split <;> (try split) <;> rfl
 
 /-- **The field of a method at a ground class argument** `con c`. -/
 theorem field_inst (t : Ty) (c kk : Nat) :

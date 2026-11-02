@@ -4,7 +4,7 @@ import Formal.Elab.Syntax
 # Elaboration: the source and `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (elaboration.md §2.2, §2.4)
 
 Source types are the `Ty` of constraints, with the arrow `a →φ^q b` (Р186); `Bool` is
-`con 2` and `Option a` is `app (con 3) a`. Schemes bind `var 0 … var (k-1)`, capture
+`con 2`, `Int` is `con 4` and `Option a` is `app (con 3) a`. Schemes bind `var 0 … var (k-1)`, capture
 variables among them; under a binder of `k` variables the context is shifted by `k`, as
 `Typ.letGen` does in the core. Terms are Curry-style with de Bruijn variables; a premise `δ`
 is an index into `Δ`. (Lam) and (Let-Sig-Dict) show what a closure holds, as (Lam) of
@@ -14,6 +14,8 @@ is an index into `Δ`. (Lam) and (Let-Sig-Dict) show what a closure holds, as (L
 namespace Flick.Elab
 
 def boolTy : Ty := .con 2
+
+def intTy : Ty := .con 4
 
 def optTy (a : Ty) : Ty := .app (.con 3) a
 

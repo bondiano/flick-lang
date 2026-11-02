@@ -13,7 +13,8 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
 command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
-`T4_3`, `T1_regions`, `T5`, `T6a`, `T6a_core` and `T6b` lists only Lean's standard `propext`,
+`T4_3`, `T1_regions`, `T5`, `T6a`, `T6a_core`, `T6b`, `T6b_core`, `witness_T6b_example` and
+`witness_T6b_closed` lists only Lean's standard `propext`,
 `Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
 (`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
 
@@ -176,7 +177,8 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    argument types and type name; service ↦ `S.Impl`. An error type `E` is an ADT whose
    constructors are the error's constructors.
 3. **`Unit`, `Bool`, `Int`** are base types with literals (`Lit`), not nominal ADTs;
-   `True`/`False` patterns are literal patterns.
+   `True`/`False` patterns are literal patterns. The only primitive on them is `Int.eq`, the
+   constant `intEq : Int →P Int →P Bool` with a pure step on two literals.
 4. **Records are closed with a fixed field order.** No row tail and no equality up to
    permutation: the elaborator is assumed to order labels; (Rec) requires the tail to be a
    record type (`Ty.IsRec`). Record patterns are always open (`{…, ..}`), as in `core.md`.
@@ -430,7 +432,7 @@ instantiate it.
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
 | §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
 | T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
-| the hypotheses of T6 hold together: a witness program | `P`, `S`, `N`, `Sg`, `root`, `coherent`, `real`, `rootTy`, `realRun`, `witness_T6a`, `witness_T6a_do`, `witness_T6b` (`Elab/Witness/`) |
+| the hypotheses of T6 hold together: a witness program | `P`, `S`, `N`, `Sg`, `root`, `coherent`, `real`, `rootTy`, `realRun`, `witness_T6a`, `witness_T6a_do`, `witness_T6b`, `witness_T6b_example`, `witness_T6b_closed` (`Elab/Witness/`, `T6b.lean`); the bodies `seqFlatMap`, `seqEach`, `seqToList`, `iterL` (`Seq.lean`), `uncB`, `frBody`, `eqRec` (`Unc.lean`); arms for every constructor are exhaustive, `exh_ctors` (`Elab/Exh.lean`) |
 | Р188: the lazy `Monad Eff` in the core, `Eff q b` with the field `eff ∅ ∅ b {q}` | `effT`, `effField`, `effPure`, `effMap2`, `effBind`, `typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr` (`Elab/LazyEff.lean`) |
 | the run of dictionaries in the core: closed derivations evaluate, `≈` keeps values | `RealRun`, `ent_eval`, `eqv_sem` (`Elab/CoreDictSem.lean`); `Eval`, `SemEq` (`Elab/CoreEval.lean`); `PStep`, `decomp_eq` (`Decomp.lean`) |
 | λFlick⁺ as `Target` with the run of the core: `Rel`, `load_rel`, `step_rel`, `final_rel`; T6(b) for the core | `Cg`, `DP`, `CfgR` (`Elab/CoreCg*.lean`, `Elab/CoreRel.lean`); `phead_sim`, `rhead_sim`, `thread_sim`, `cstep_sim`, `final_sim` (`Elab/CoreHead.lean`, `Elab/CoreStep.lean`, `Elab/CoreSim.lean`); `DSim`, `eqv_dsim`, `DTyp`, `dsim_cg` (`Elab/CoreLoad.lean`); `trE`, `RHas`, `runTarget`, `T6b_core` (`Elab/CoreRun.lean`) |
@@ -487,7 +489,10 @@ Simplifications:
    `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
    hypotheses on the program. The schemes of the Prelude names are generated from the
    checker (`PreludeSchemes.lean`); `pair`, `unc n` and `each_P` have no Prelude name and are
-   written in `Sugar.lean`. Simplification 15 extends to the Prelude (Р188): a type with
+   written in `Sugar.lean`. `from_result` is a family `from_result_n` over closed rows of
+   errors, one error type `con n` each (`frSch`, equal to the generated scheme at `e := con n`
+   by `frSch_gen`, Р210): the core has no row variables, and `e?` takes the member of the row
+   of `e`'s type (`tryResult_elab`). Simplification 15 extends to the Prelude (Р188): a type with
    hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
    qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and
    data without storage drops it. That argument is invariant, so a qualifier the caller
@@ -505,8 +510,10 @@ Simplifications:
    `Seq.each_φ` per stage (Р184). Each source of `for` goes through `iter` (Р183). Only the
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
-10. The core instance (P4a3). `⟦R⟧ = rt ∅ ∅`; `Bool` is `base bool`, other constructors are
-    ADTs named by `Names.con`. `Real` is a hypothesis on the core's signature, not on the
+10. The core instance (P4a3). `⟦R⟧ = rt ∅ ε` with `ε` every name (`allNames`): the stage `R`
+    of the source has no row of errors, so a runtime body may raise any error type that reaches
+    nothing (Р210). `Bool` is `base bool`, `Int` (`con 4`) is `base int` (Р211), other
+    constructors are ADTs named by `Names.con`. `Real` is a hypothesis on the core's signature, not on the
     bodies of the globals (`RootTy`, P4a4). A class has a record type for each number of
     parameters (`Names.cls C n`), because the law `slot` holds for any constraint `q`;
     `Prog.super` pads missing parameters with `con 0`, and so does the slot's field. A method
@@ -522,11 +529,16 @@ Simplifications:
     `RootTy`, `Coherent` and `Sugar` at once, with `Eq` on `Int` and structural on a record,
     the lazy `Monad Eff` (Р188), an eager `Option` monad `OptQ q a` and `Iterable` of
     `ListQ q a` (data without storage gets a phantom `CRow` parameter as an instance of a class
-    over containers), `Seq q a` as a thunk `Unit →P^q List a`. The bodies of `Seq.flat_map`,
-    `each_φ`, `from_result`, `unc n`, of `eq` on `Int` and of the structural `eq` are stubs
-    (`todo` or a constant): the hypotheses ask only for typed bodies, and the core has no
-    comparison of `Int`, no raising at `R` with an empty row of errors, and these bodies
-    would need recursion on lists.
+    over containers). Every global has a body typed by the rules of the core, none is `todo`;
+    the bodies are honest but narrower than the checker's in three places. `Seq q a` is an
+    eager list `SNil | SCons a (Seq q a)` with a phantom `q`: `Seq.flat_map`, `each_φ`,
+    `to_list` and `iter` are fixpoints over it, and the laziness of the checker's `Seq` is not
+    modelled (T6 needs only the types of Р188, and the witness has no infinite or effectful
+    sequence). `Rec` has one field, so the `&&` of the structural `eq` over its fields is one
+    comparison by the slot dictionary `D_{Eq Int}`. `from_result_n` is a member at one closed
+    error type (simplification 9). `eq` on `Int` is the constant `intEq`, and `unc n` is
+    built by a Lean function of `n` and typed by induction. A match has one arm per
+    constructor and no `_` (`exh_ctors`, `Exh.lean`), also in the lazy `Monad Eff`.
 
 ### P4a design
 
@@ -534,7 +546,7 @@ The owner's decision on Р185 is that T6 goes through the core with regions. λF
 this Lean core plus nominal dictionary records `D_C ᾱ` with `∀`-fields, and captures
 enter the elaboration source and `Target`. This section is the plan for P4a. Each piece
 is committed without `sorry` and builds from a clean `git archive`. The next free Р
-number is Р201.
+number of this track is Р212 (Р210–Р229 are reserved for it).
 
 **Status.** Р185–Р187 are recorded in `elaboration.md` §5, and §0.1 and §2.1 are
 updated. P4a1 is done; Р188 records the Prelude schemes. P4a2 is done (Р194). P4a3 is done
@@ -548,7 +560,18 @@ a program with `Eq` (an instance on `Int`, structural on a record), `Applicative
 `Eff` and of an eager `OptQ`, `Alternative OptQ`, `Iterable ListQ`, all of `Sugar`, with
 `Coherent` (`coherent`) and `Real` (`real`); W2, the bodies of the globals (`RootTy`,
 `RealRun`) and T6 on the witness, is done too (`rootTy`, `realRun`, `witness_T6a`,
-`witness_T6a_do`, `witness_T6b`, `do_eff`, `do_opt`). The schemes of `Sugar` come from
+`witness_T6a_do`, `witness_T6b`, `do_eff`, `do_opt`). The bodies are real (Р210, Р211): the
+core has `Int.eq` (`intEq`), and no global of the witness is `todo`. T6(b) holds on the witness without
+premises of typing: `witness_T6b_example` is the block `do { x <- pure (); pure x }` over `Eff`
+under the premise `Monad Eff` closed by `I2`, with `Applicative Eff` for `pure` from the instance
+`I1` in one filling and from the slot of `Monad Eff` in the other; both typings `RHas` are proved
+by the laws of `runTarget` (`has_do`), and the observations of the runs are equal.
+`witness_T6b_closed` is T6(b) for any two elaborations of one source term in the empty contexts
+(`Δ = []`), typed by T6(a) for `runTarget`. With premises it is not stated: the typing `RHas` of
+the closed filling `s[d̄ρ]` from an elaboration under `Δ` needs the substitution of the premises
+by `ρ` (and of the types by `θ`) in the core's typing and in `DTyp`, which the model does not
+prove (Р199: `Has` does not type the dictionaries in the empty context); the example does it by
+hand for one term. The schemes of `Sugar` come from
 `PreludeSchemes.lean`, generated from the checker's `Prelude.fl` and `Seq.fl` by the
 translation of Р188 (`flick-model/src/translate/lean.rs`, `just formal-schemes`; a golden test
 of `cargo test -p flick-model` holds the file to the checker). The witness's own schemes are
@@ -658,7 +681,7 @@ five places.
 
 - **Types** (`CoreTy.lean`). As planned: `var ↦ tvar`, `app ↦ tapp`, `Bool ↦ base bool`,
   other constructors `↦ adt (N.con c)`, `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉`,
-  `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R⟧ = rt ∅ ∅`, the empty rows being the fixed
+  `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R⟧ = rt ∅ ∅` (now `rt ∅ allNames`, Р210), the empty rows being the fixed
   name-only rows. `trT_subst`/`trTT_subst`/`trS_subst` and `trT_reach` are the two
   commutations. The names of the core are a parameter `Names`, not a fixed encoding.
   *Deviation 1:* `D_{C τ̄} ↦ dict (N.cls C |τ̄|) ⟦τ̄⟧`: the class name carries the number

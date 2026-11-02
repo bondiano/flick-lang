@@ -171,6 +171,22 @@ theorem phead_sim (hC : BClosed B) (hV : BNoVal B) (hA : BNoAlts B) {r r' r₂ :
     cases h with
     | base hb => exact .inl hb
     | join a b => exact .inr ⟨_, .join (a.isEnv hV h₁) (b.isEnv hV h₂), a.envAppend hV h₁ b⟩
+  | intEq =>
+    cases h with
+    | base hb => exact .inl hb
+    | app h₁ h₂ =>
+      cases h₂ with
+      | base hb => exact (nb hb .lit).elim
+      | lit =>
+        cases h₁ with
+        | base hb => exact (nb hb (.constApp (.inl rfl) .lit)).elim
+        | app h₃ h₄ =>
+          cases h₃ with
+          | base hb => exact (nb hb .const).elim
+          | const =>
+            cases h₄ with
+            | base hb => exact (nb hb .lit).elim
+            | lit => exact .inr ⟨_, .intEq, .lit⟩
 
 /-- Related stores and regions. -/
 def StR (B : Flick.Tm → Flick.Tm → Prop) (Λ Λ₂ : List Rgn) (μ μ₂ : List Flick.Tm) : Prop :=

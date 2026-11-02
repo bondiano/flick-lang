@@ -132,6 +132,7 @@ theorem PHead.has {e e' : Tm} (h : PHead e e') {s : Site} (hs : e'.Has s) : e.Ha
   | withVal => exact .inr (.inr (.inr hs))
   | bind => rcases hs with h | h; exact h; cases h
   | join => exact envAppend_has hs
+  | intEq => cases hs
 
 /-- The terms of a configuration write only regions that exist. -/
 structure CfgBelow (Λ : List Rgn) (μ : List Tm) (e : Tm) : Prop where

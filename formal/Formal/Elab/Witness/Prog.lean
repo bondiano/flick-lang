@@ -54,7 +54,7 @@ def methSch : Nat → Option (Nat × Scheme)
   | _ => none
 
 /-- The constants of Γ₀: `pair`, `None`, `Seq.flat_map`, `singleton`, `empty`, `to_list`,
-`each_P`, `each_R`, `()`, `from_result`, and `unc n` at `10 + n`. -/
+`each_P`, `each_R`, `()`, then `unc n` at `2n + 10` and `from_result_n` at `2n + 11`. -/
 def constSch : Nat → Option Scheme
   | 0 => some ⟨2, [], arrP (.var 0) (arrP (.var 1) (.app (.app (.con 10) (.var 0)) (.var 1))), .cnil⟩
   | 1 => some ⟨1, [], optTy (.var 0), .cnil⟩
@@ -67,9 +67,9 @@ def constSch : Nat → Option Scheme
   | 7 => some ⟨3, [], arrP (.arr .R (.var 2) (.con 1) (.var 0))
       (.arr .R (appQ (.con 9) (.var 1) (.var 2)) (.con 1) (.var 0)), .cnil⟩
   | 8 => some ⟨0, [], .con 1, .cnil⟩
-  | 9 => some ⟨2, [], .arr .R (.app (.app (.con 11) (.app (.con 12) (.var 0))) (.var 1)) (.var 1)
-      .cnil, .cnil⟩
-  | n + 10 => if 0 < n then some (uncSch 10 n) else none
+  | 9 => none
+  | n + 10 => if n % 2 = 0 then (if 0 < n / 2 then some (uncSch 10 (n / 2)) else none)
+      else some (frSch 11 12 (n / 2))
 
 /-- The instances `I0 … I6`. -/
 def insts : Nat → Option Inst
@@ -116,7 +116,7 @@ def S : Sugar P where
   nothing := 4
   iter := 5
   pair := 0
-  unc n := n + 10
+  unc n := 2 * n + 10
   noneC := 1
   seqFlatMap := 2
   singleton := 3
@@ -124,14 +124,14 @@ def S : Sugar P where
   toList := 5
   each φ := match φ with | .P => 6 | .R => 7
   unitV := 8
-  fromResult := 9
+  fromResult n := 2 * n + 11
   hFlatMap := rfl
   hMap2 := rfl
   hPure := rfl
   hNothing := rfl
   hIter := rfl
   hPair := rfl
-  hUnc n hn := by show constSch (n + 10) = _; simp [constSch, hn]
+  hUnc n hn := by show constSch (2 * n + 10) = _; simp [constSch, hn]
   hNone := rfl
   hSeqFlatMap := rfl
   hSingleton := rfl
@@ -139,7 +139,8 @@ def S : Sugar P where
   hToList := rfl
   hEach φ := by cases φ <;> rfl
   hUnitV := rfl
-  hFromResult := rfl
+  hFromResult n := by
+    show constSch (2 * n + 1 + 10) = _; simp only [constSch]; rw [if_neg (by omega)]; congr 3; omega
 
 /-- The size of a type; a constructor counts by its number, so `Int < Rec`. -/
 def tsize : Ty → Nat

@@ -6,8 +6,8 @@ import Formal.Elab.LazyEff
 # Witness: the names and the signature of the core, `Real` (W1)
 
 `N` names the core's types, records, labels and globals; `Sg` declares the constructors
-(`MkEff : eff ∅ ∅ b {q} → Eff q b`, `MkSeq : (Unit →P^q List a) → Seq q a`, the phantom
-`OptQ q a` and `ListQ q a`, …), one record type `D_C` per class and number of parameters
+(`MkEff : eff ∅ ∅ b {q} → Eff q b`, the lists `Seq q a` and `ListQ q a` and the option
+`OptQ q a` with a phantom `q`, `Result e a` with `Ok` and `Err`, …), one record type `D_C` per class and number of parameters
 (`N.cls C n = 8n + C`, classes from `5` on share the empty record `7`), and a global per
 instance, constant and structural dictionary. `real` proves `Real P Sg N`.
 -/
@@ -38,8 +38,9 @@ def N : Names where
 
 def listT (t : Flick.Ty) : Flick.Ty := .tapp (.adt "List") t
 
-/-- The field of `MkSeq`: a thunk `Unit →P^q List a`. -/
-def seqField : Flick.Ty := .arrow (.adt "Unit") .pure (listT (.tvar 1)) fun a => a = .v 0
+/-- `Seq q a` and `ListQ q a` of the core: lists with a phantom `CRow` parameter `q`. -/
+def seqT (q a : Flick.Ty) : Flick.Ty := .tapp (.tapp (.adt "Seq") q) a
+def lqT (q a : Flick.Ty) : Flick.Ty := .tapp (.tapp (.adt "ListQ") q) a
 
 def ctorF : Name → Option (Nat × List Flick.Ty × Name)
   | "Some" => some (1, [.tvar 0], "Option")
@@ -47,13 +48,17 @@ def ctorF : Name → Option (Nat × List Flick.Ty × Name)
   | "MkEff" => some (2, [effField], "Eff")
   | "SomeQ" => some (2, [.tvar 1], "OptQ")
   | "NoneQ" => some (2, [], "OptQ")
-  | "MkListQ" => some (2, [listT (.tvar 1)], "ListQ")
+  | "NilQ" => some (2, [], "ListQ")
+  | "ConsQ" => some (2, [.tvar 1, lqT (.tvar 0) (.tvar 1)], "ListQ")
   | "Nil" => some (1, [], "List")
   | "Cons" => some (1, [.tvar 0, listT (.tvar 0)], "List")
-  | "MkSeq" => some (2, [seqField], "Seq")
+  | "SNil" => some (2, [], "Seq")
+  | "SCons" => some (2, [.tvar 1, seqT (.tvar 0) (.tvar 1)], "Seq")
   | "Tup" => some (2, [.tvar 0, .tvar 1], "Tup")
   | "MkUnit" => some (0, [], "Unit")
-  | "MkRec" => some (0, [.adt "Int"], "Rec")
+  | "MkRec" => some (0, [.base .int], "Rec")
+  | "Ok" => some (2, [.tvar 1], "Result")
+  | "Err" => some (2, [.tvar 0], "Result")
   | _ => none
 
 /-- The field of the method with scheme `s` in the record of its class. -/
@@ -87,7 +92,7 @@ theorem ctorF_closed : ∀ K k ts T σ, ctorF K = some (k, ts, T) →
   intro K k ts T σ hK hσ
   unfold ctorF at hK
   split at hK <;> cases hK <;>
-    simp [Flick.Ty.substT, Flick.Stage.substT, effField, seqField, listT, hσ, caps_v0]
+    simp [Flick.Ty.substT, effField, listT, seqT, lqT, hσ, caps_v0]
 
 theorem ctorF_reach : ∀ K k ts T, ctorF K = some (k, ts, T) →
     ∀ t ∈ ts, ∀ a, t.reach a → ∃ i, i < k ∧ a = .v i := by
@@ -95,7 +100,7 @@ theorem ctorF_reach : ∀ K k ts T, ctorF K = some (k, ts, T) →
   unfold ctorF at hK
   split at hK <;> cases hK <;> simp at ht <;>
     (try rcases ht with rfl | rfl) <;> (try subst ht) <;>
-    simp [Flick.Ty.reach, effField, seqField, listT, Caps.none] at ha <;>
+    simp [Flick.Ty.reach, effField, listT, seqT, lqT, Caps.none] at ha <;>
     (try rcases ha with ha | ha) <;> (try subst ha) <;> refine ⟨_, ?_, rfl⟩ <;> decide
 
 theorem ty_lt {t : Ty} {k : Nat} (h : ∀ n, t.Occurs n → n < k) : ∀ n, t.Occurs n → n < k := h
@@ -183,14 +188,18 @@ theorem constSch_ok {c s} (h : constSch c = some s) : s.ctx = [] ∧ ∀ n, s.ty
   split at h
   rotate_right
   · split at h
-    · cases h; exact ⟨rfl, uncSch_lt _⟩
-    · cases h
+    · split at h
+      · cases h; exact ⟨rfl, uncSch_lt _⟩
+      · cases h
+    · cases h; exact ⟨rfl, fun n hn => by simp [frSch, Ty.Occurs] at hn ⊢; omega⟩
   all_goals
-    cases h
-    refine ⟨rfl, ?_⟩
-    intro n hn
-    simp [Ty.Occurs, bindTy, appQ, arrP, optTy] at hn ⊢
-    try omega
+    first
+    | (cases h; done)
+    | (cases h
+       refine ⟨rfl, ?_⟩
+       intro n hn
+       simp [Ty.Occurs, bindTy, appQ, arrP, optTy] at hn ⊢
+       try omega)
 
 theorem glob_closed : ∀ g s, globF g = some s → s.Closed s.k := by
   intro g s h
