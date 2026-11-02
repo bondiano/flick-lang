@@ -23,32 +23,35 @@ component redirect (target : Page) =
 
 /// The page of a signed-in user, or a redirect to signing in.
 signed : Option User -> (User -> Ui) -> Ui
-let signed user page =
+let signed user page = ui {
   match user with
   | Some me -> page me
-  | None -> Ui.render redirect Login
+  | None -> render redirect Login
+}
 
 /// The global feed, or the reader's, which a visitor signs in for.
 home : Route.Listing -> Option User -> Ui
-let home listing user =
+let home listing user = ui {
   let shown = if listing.feed == Some "following" then Following else Global
   match (shown, user) with
-  | (Following, None) -> Ui.render redirect Login
-  | _ -> Ui.render Home.page { listing = shown; number = Option.with_default 1 listing.page }
+  | (Following, None) -> render redirect Login
+  | _ -> render Home.page { listing = shown; number = Option.with_default 1 listing.page }
+}
 
 /// The page `page` shows.
 body : Page -> Option User -> Ui
-let body page user =
+let body page user = ui {
   match page with
   | Home listing -> home listing user
   | Tag tag query ->
-    Ui.render Home.page { listing = Tagged tag; number = Option.with_default 1 query.page }
+    render Home.page { listing = Tagged tag; number = Option.with_default 1 query.page }
   | Login -> Auth.sign_in_page
   | Register -> Auth.sign_up_page
-  | Editor slug -> signed user (fun _ -> Ui.render Editor.page slug)
-  | Settings -> signed user (fun me -> Ui.render Settings.page me)
-  | Profile name tab -> Ui.render Profile.page { name = name; favorites = Option.is_some tab }
-  | Article slug -> Ui.render Article.page slug
+  | Editor slug -> signed user (fun _ -> render Editor.page slug)
+  | Settings -> signed user (render Settings.page)
+  | Profile name tab -> render Profile.page { name = name; favorites = Option.is_some tab }
+  | Article slug -> render Article.page slug
+}
 
 /// Waits for the user of a stored token before a page that needs one.
 waiting : Page -> Bool
@@ -81,7 +84,7 @@ component shell () =
       if loading && waiting page then
         div { class_name = "container page" } [text "Loading..."]
       else body page user,
-      View.footer,
+      View.page_footer,
     ]
   }
 

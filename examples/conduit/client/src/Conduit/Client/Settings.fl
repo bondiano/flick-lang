@@ -83,14 +83,14 @@ component page (user : User) =
       div { class_name = "container page" } [
         div { class_name = "row" } [
           div { class_name = "col-md-6 offset-md-3 col-xs-12" } [
-            View.classed "text-xs-center" (heading_at Ui.H1 [text "Your Settings"]),
-            Ui.render View.errors (),
+            View.classed "text-xs-center" (heading_at H1 [text "Your Settings"]),
+            render View.errors (),
             form { on_submit = save } [
-              Auth.field "image" Ui.TextInput "URL of profile picture" picture,
-              Auth.field "username" Ui.TextInput "Your Name" username,
-              Auth.area "bio" "Short bio about you" bio,
-              Auth.field "email" Ui.EmailInput "Email" email,
-              Auth.field "password" Ui.PasswordInput "New Password" password,
+              Auth.form_input "image" TextInput "URL of profile picture" picture,
+              Auth.form_input "username" TextInput "Your Name" username,
+              Auth.form_area "bio" "Short bio about you" bio,
+              Auth.form_input "email" EmailInput "Email" email,
+              Auth.form_input "password" PasswordInput "New Password" password,
               View.classed
                 "btn btn-lg btn-primary pull-xs-right"
                 (submit { disabled = false } [text "Update Settings"]),

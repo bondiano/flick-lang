@@ -14,24 +14,21 @@ import Conduit.Client.Session as Session
 
 /// `node` with the classes `classes`.
 classed : String -> Ui -> Ui
-let classed classes node = Ui.with_host { Ui.host with class_name = Some classes } node
+let classed classes node = ui { with_host { host with class_name = Some classes } node }
 
 /// A link to `target` with the classes `classes`.
-link : String -> Page -> List Ui -> Ui
-let link classes target children = classed classes (Route.to target children)
+anchor : String -> Page -> List Ui -> Ui
+let anchor classes target children = classed classes (Route.to target children)
 
 /// The image at `url`, or the default avatar when there is none or it is
 /// no safe URL.
 avatar : String -> Option String -> Ui
-let avatar classes url =
-  let fallback = Ui.safe_url "/default-avatar.svg"
-  let src =
-    match Option.bind Ui.safe_url (Option.filter (fun u -> String.trim u != "") url) with
-    | Some safe -> Some safe
-    | None -> fallback
-  match src with
-  | Some safe -> Ui.image { src = safe; alt = ""; class_name = classes }
-  | None -> Ui.empty
+let avatar classes url = ui {
+  let given = Option.bind safe_url (Option.filter (fun u -> String.trim u != "") url)
+  match Option.or_else (safe_url "/default-avatar.svg") given with
+  | Some src -> image { src = src; alt = ""; class_name = classes }
+  | None -> empty
+}
 
 /// The months of a date, by their number.
 months : List String
@@ -64,62 +61,58 @@ let date iso =
 
 /// The navbar: the brand, and the links of a visitor or of `user`.
 navbar : Option User -> Ui
-let navbar user =
+let navbar user = ui {
   let links =
     match user with
     | None -> [
-      Ui.item [link "nav-link" Route.home [Ui.text "Home"]],
-      Ui.item [link "nav-link" Login [Ui.text "Sign in"]],
-      Ui.item [link "nav-link" Register [Ui.text "Sign up"]],
+      anchor "nav-link" Route.home [text "Home"],
+      anchor "nav-link" Login [text "Sign in"],
+      anchor "nav-link" Register [text "Sign up"],
     ]
     | Some me -> [
-      Ui.item [link "nav-link" Route.home [Ui.text "Home"]],
-      Ui.item [
-        link "nav-link" (Editor None) [
-          Ui.icon { class_name = "ion-compose" },
-          Ui.text " New Article",
-        ],
-      ],
-      Ui.item [
-        link "nav-link" Settings [Ui.icon { class_name = "ion-gear-a" }, Ui.text " Settings"],
-      ],
-      Ui.item [
-        link "nav-link" (Profile me.username None) [
-          avatar "user-pic" me.image,
-          Ui.text (" " ++ me.username),
-        ],
+      anchor "nav-link" Route.home [text "Home"],
+      anchor "nav-link" (Editor None) [icon { class_name = "ion-compose" }, text " New Article"],
+      anchor "nav-link" Settings [icon { class_name = "ion-gear-a" }, text " Settings"],
+      anchor "nav-link" (Profile me.username None) [
+        avatar "user-pic" me.image,
+        text (" " ++ me.username),
       ],
     ]
-  Ui.nav { class_name = "navbar navbar-light" } [
-    Ui.div { class_name = "container" } [
-      link "navbar-brand" Route.home [Ui.text "conduit"],
-      classed "nav navbar-nav pull-xs-right" (Ui.list (List.map (classed "nav-item") links)),
+  nav { class_name = "navbar navbar-light" } [
+    div { class_name = "container" } [
+      anchor "navbar-brand" Route.home [text "conduit"],
+      classed
+        "nav navbar-nav pull-xs-right"
+        (list (List.map (fun l -> classed "nav-item" (item [l])) links)),
     ],
   ]
+}
 
 /// The footer of every page.
-footer : Ui
-let footer =
-  Ui.footer { class_name = "" } [
-    Ui.div { class_name = "container" } [
-      link "logo-font" Route.home [Ui.text "conduit"],
-      Ui.span { class_name = "attribution" } [
-        Ui.text " An interactive learning project from Thinkster, written in Flick.",
+page_footer : Ui
+let page_footer = ui {
+  footer { class_name = "" } [
+    div { class_name = "container" } [
+      anchor "logo-font" Route.home [text "conduit"],
+      span { class_name = "attribution" } [
+        text " An interactive learning project from Thinkster, written in Flick.",
       ],
     ],
   ]
+}
 
 /// Each problem of a form as `field message`, in `ul.error-messages`.
 problems : Problems -> Ui
-let problems found =
+let problems found = ui {
   let lines =
     List.flat_map
-      (fun (field, messages) -> List.map (fun m -> String.trim (field ++ " " ++ m)) messages)
+      (fun (subject, messages) -> List.map (fun m -> String.trim (subject ++ " " ++ m)) messages)
       found
   if lines == [] then
-    Ui.empty
+    empty
   else
-    classed "error-messages" (Ui.list (List.map (fun l -> Ui.item [Ui.text l]) lines))
+    classed "error-messages" (list (List.map (fun l -> item [text l]) lines))
+}
 
 /// What the last submit of a form went wrong with; leaving a page clears it.
 form_problems : Atom.Writable Problems
@@ -130,25 +123,27 @@ component errors () = ui { problems (Atom.value form_problems) }
 
 /// The tags of an article, in the order written.
 tag_list : List String -> Ui
-let tag_list tags =
+let tag_list tags = ui {
   classed
     "tag-list"
-    (Ui.list
-      (List.map (fun t -> classed "tag-default tag-pill tag-outline" (Ui.item [Ui.text t])) tags))
+    (list (List.map (fun t -> classed "tag-default tag-pill tag-outline" (item [text t])) tags))
+}
 
 /// The author and the date of an article.
 meta : Profile -> String -> List Ui -> Ui
-let meta author created more =
-  Ui.div
+let meta author created more = ui {
+  let profile = Profile author.username None
+  div
     { class_name = "article-meta" }
     ([
-      link "" (Profile author.username None) [avatar "" author.image],
-      Ui.div { class_name = "info" } [
-        link "author" (Profile author.username None) [Ui.text author.username],
-        Ui.span { class_name = "date" } [Ui.text (date created)],
+      anchor "" profile [avatar "" author.image],
+      div { class_name = "info" } [
+        anchor "author" profile [text author.username],
+        span { class_name = "date" } [text (date created)],
       ],
     ]
       ++ more)
+}
 
 /// Takes the favorite back when `favorited`, else favors the article.
 toggle :
@@ -179,65 +174,71 @@ let favorite =
 /// The favorite button of an article: outlined until the reader favors it.
 /// `place` is its classes of layout, as a host's classes replace them all.
 favorite_button : String -> String -> ArticlePreview -> Ui
-let favorite_button place label article =
+let favorite_button place label article = ui {
   let style =
     if article.favorited then "btn btn-sm btn-primary" else "btn btn-sm btn-outline-primary"
   classed
     (style ++ " " ++ place)
-    (Ui.button { disabled = false; on_click = Action.with favorite article } [
-      Ui.icon { class_name = "ion-heart" },
-      Ui.text (" " ++ label ++ show article.favoritesCount),
+    (button { disabled = false; on_click = Action.with favorite article } [
+      icon { class_name = "ion-heart" },
+      text (" " ++ label ++ show article.favoritesCount),
     ])
+}
 
 /// An article in a feed: its meta, title, description and tags.
-preview : ArticlePreview -> Ui
-let preview article =
-  Ui.keyed
-    article.slug
-    (Ui.div { class_name = "article-preview" } [
-      meta article.author article.createdAt [favorite_button "pull-xs-right" "" article],
-      link "preview-link" (Article article.slug) [
-        Ui.heading_at Ui.H1 [Ui.text article.title],
-        Ui.paragraph [Ui.text article.description],
-        Ui.span { class_name = "" } [Ui.text "Read more..."],
-        tag_list article.tagList,
-      ],
-    ])
+component preview (article : ArticlePreview) = ui {
+  div { class_name = "article-preview" } [
+    meta article.author article.createdAt [favorite_button "pull-xs-right" "" article],
+    anchor "preview-link" (Article article.slug) [
+      heading_at H1 [text article.title],
+      paragraph [text article.description],
+      span { class_name = "" } [text "Read more..."],
+      tag_list article.tagList,
+    ],
+  ]
+}
 
 /// The link to page `n` of a list, `active` when it is the one shown.
 page_link : Int -> (Int -> Page) -> Int -> Ui
-let page_link current page_of n =
+let page_link current page_of n = ui {
   let style = if n == current then "page-item active" else "page-item"
-  classed style (Ui.item [link "page-link" (page_of n) [Ui.text (Int.to_string n)]])
+  classed style (item [anchor "page-link" (page_of n) [text (Int.to_string n)]])
+}
 
 /// The page links of a list of `count` articles, ten a page.
 pagination : Int -> Int -> (Int -> Page) -> Ui
-let pagination count current page_of =
+let pagination count current page_of = ui {
   let pages = (count + 9) / 10
   if pages <= 1 then
-    Ui.empty
+    empty
   else
-    let links = List.map (page_link current page_of) (List.range 1 (pages + 1))
-    Ui.nav { class_name = "" } [classed "pagination" (Ui.list links)]
+    nav { class_name = "" } [
+      classed "pagination" (list (List.map (page_link current page_of) (List.range 1 (pages + 1)))),
+    ]
+}
+
+/// Each article of a feed, by its slug.
+previews : List ArticlePreview -> Ui
+let previews found = ui { fragment (List.map (fun a -> keyed a.slug (render preview a)) found) }
 
 /// The articles of a feed, or what it says when it has none.
 articles : List ArticlePreview -> Ui
-let articles found =
+let articles found = ui {
   if found == [] then
-    Ui.div { class_name = "article-preview empty-feed-message" } [
-      Ui.text "No articles are here... yet.",
-    ]
+    div { class_name = "article-preview empty-feed-message" } [text "No articles are here... yet."]
   else
-    Ui.fragment (List.map preview found)
+    previews found
+}
 
 /// The articles of the reader's feed, or where to find some.
 followed : List ArticlePreview -> Ui
-let followed found =
+let followed found = ui {
   if found == [] then
-    Ui.div { class_name = "article-preview empty-feed-message" } [
-      Ui.text "Your feed is empty. Follow some authors, or see the ",
-      Route.to Route.home [Ui.text "Global Feed"],
-      Ui.text ".",
+    div { class_name = "article-preview empty-feed-message" } [
+      text "Your feed is empty. Follow some authors, or see the ",
+      Route.to Route.home [text "Global Feed"],
+      text ".",
     ]
   else
-    Ui.fragment (List.map preview found)
+    previews found
+}

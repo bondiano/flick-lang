@@ -151,15 +151,16 @@ component chosen () = ui { View.classed "tag-list" (list (List.map classed_tag (
 
 /// A tag of the article with its remove icon.
 classed_tag : String -> Ui
-let classed_tag t =
+let classed_tag t = ui {
   View.classed
     "tag-default tag-pill"
-    (Ui.item [
-      Ui.button { disabled = false; on_click = Action.with remove_tag t } [
-        Ui.icon { class_name = "ion-close-round" },
+    (item [
+      button { disabled = false; on_click = Action.with remove_tag t } [
+        icon { class_name = "ion-close-round" },
       ],
-      Ui.text (" " ++ t),
+      text (" " ++ t),
     ])
+}
 
 /// The editor of a new article, or of the one at `slug`.
 component page (slug : Option String) =
@@ -175,18 +176,18 @@ component page (slug : Option String) =
       div { class_name = "container page" } [
         div { class_name = "row" } [
           div { class_name = "col-md-10 offset-md-1 col-xs-12" } [
-            Ui.render View.errors (),
+            render View.errors (),
             form { on_submit = Action.with submitted slug } [
-              Auth.field "title" Ui.TextInput "Article Title" title,
-              Auth.field "description" Ui.TextInput "What's this article about?" description,
-              Auth.area "body" "Write your article (in markdown)" body,
+              Auth.form_input "title" TextInput "Article Title" title,
+              Auth.form_input "description" TextInput "What's this article about?" description,
+              Auth.form_area "body" "Write your article (in markdown)" body,
             ],
             form { on_submit = add_tag } [
               fieldset { class_name = "form-group" } [
-                Ui.with_host
-                  { Ui.host with class_name = Some "form-control"; name = Some "tags" }
-                  (Ui.field { bind = tag; placeholder = "Enter tags"; on_input = None }),
-                Ui.render chosen (),
+                with_host
+                  { host with class_name = Some "form-control"; name = Some "tags" }
+                  (field { bind = tag; placeholder = "Enter tags"; on_input = None }),
+                render chosen (),
               ],
             ],
             View.classed

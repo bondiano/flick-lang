@@ -20,12 +20,12 @@ type Feed = Feed (Option String) Listing Int
   deriving Eq, Hash, Show
 
 /// A page of every article, or of those of `tag`.
-list :
+listing_of :
   Option String ->
   Option String ->
   Option Float ->{; HttpApi.ClientError, Unauthorized}
   ArticlesBody
-let list jwt tag offset =
+let listing_of jwt tag offset =
   let query = { tag = tag; author = None; favorited = None; limit = Some 10; offset = offset }
   Session.call
     { path = (); query = query; headers = Session.credentials jwt; payload = () }
@@ -43,8 +43,8 @@ let load feed = task {
       Session.call
         { path = (); query = query; headers = Session.credentials jwt; payload = () }
         Api.Articles.endpoints.feed
-    | Global -> list jwt None offset
-    | Tagged t -> list jwt (Some t) offset
+    | Global -> listing_of jwt None offset
+    | Tagged t -> listing_of jwt (Some t) offset
 }
 
 /// Every feed as a query that a change of articles loads again.
@@ -68,33 +68,36 @@ let page_of listing n =
   | Tagged t -> Tag t { page = number }
 
 /// A tab of the feed toggle, `active` when it is the one shown.
-tab : Bool -> Page -> String -> Ui
-let tab active target label =
+feed_tab : Bool -> Page -> String -> Ui
+let feed_tab active target label = ui {
   View.classed
     "nav-item"
-    (Ui.item [View.link (if active then "nav-link active" else "nav-link") target [Ui.text label]])
+    (item [View.anchor (if active then "nav-link active" else "nav-link") target [text label]])
+}
 
 /// The feed toggle: the reader's feed, the global one and the tag shown.
 toggle : Bool -> Listing -> Ui
-let toggle signed listing =
-  let mine = if signed then [tab (listing == Following) (page_of Following 1) "Your Feed"] else []
+let toggle signed listing = ui {
+  let mine =
+    if signed then [feed_tab (listing == Following) (page_of Following 1) "Your Feed"] else []
   let tagged =
     match listing with
-    | Tagged t -> [tab true (page_of listing 1) ("# " ++ t)]
+    | Tagged t -> [feed_tab true (page_of listing 1) ("# " ++ t)]
     | Global -> []
     | Following -> []
-  Ui.div { class_name = "feed-toggle" } [
+  div { class_name = "feed-toggle" } [
     View.classed
       "nav nav-pills outline-active"
-      (Ui.list (mine ++ [tab (listing == Global) Route.home "Global Feed"] ++ tagged)),
+      (list (mine ++ [feed_tab (listing == Global) Route.home "Global Feed"] ++ tagged)),
   ]
+}
 
 /// The popular tags, each a link to its articles.
 component sidebar () = ui {
   let links =
     match Atom.get tags with
     | Atom.Loaded found ->
-      List.map (fun t -> View.link "tag-pill tag-default" (Tag t { page = None }) [text t]) found
+      List.map (fun t -> View.anchor "tag-pill tag-default" (Tag t { page = None }) [text t]) found
     | Atom.Loading -> [text "Loading tags..."]
     | Atom.Failed _ -> [text "The tags cannot be loaded."]
   div { class_name = "sidebar" } [
@@ -118,28 +121,27 @@ component listed (props : { listing : Listing; number : Int }) = ui {
   | Atom.Failed _ -> div { class_name = "article-preview" } [text "The articles cannot be loaded."]
 }
 
+/// The banner a visitor sees.
+banner : Ui
+let banner = ui {
+  div { class_name = "banner" } [
+    div { class_name = "container" } [
+      View.classed "logo-font" (heading_at H1 [text "conduit"]),
+      paragraph [text "A place to share your knowledge."],
+    ],
+  ]
+}
+
 /// The home page of a listing at a page.
-page : Ui.View { listing : Listing; number : Int }
-let page =
-  Ui.view (fun props ->
-    let signed = Option.is_some (Session.signed_in ())
-    let banner =
-      if signed then
-        Ui.empty
-      else
-        Ui.div { class_name = "banner" } [
-          Ui.div { class_name = "container" } [
-            View.classed "logo-font" (Ui.heading_at Ui.H1 [Ui.text "conduit"]),
-            Ui.paragraph [Ui.text "A place to share your knowledge."],
-          ],
-        ]
-    Ui.div { class_name = "home-page" } [
-      banner,
-      Ui.div { class_name = "container page" } [
-        Ui.div { class_name = "row" } [
-          Ui.div { class_name = "col-md-9" } [toggle signed props.listing, Ui.render listed props],
-          Ui.div { class_name = "col-md-3" } [Ui.render sidebar ()],
-        ],
+component page (props : { listing : Listing; number : Int }) = ui {
+  let signed = Option.is_some (Session.signed_in ())
+  div { class_name = "home-page" } [
+    if signed then empty else banner,
+    div { class_name = "container page" } [
+      div { class_name = "row" } [
+        div { class_name = "col-md-9" } [toggle signed props.listing, render listed props],
+        div { class_name = "col-md-3" } [render sidebar ()],
       ],
-    ]
-  )
+    ],
+  ]
+}
