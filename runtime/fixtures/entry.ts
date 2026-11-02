@@ -36,5 +36,5 @@ if (name === "devtools") await import("../src/runner/devtools.ts");
 const program = programs[name] ?? (() => Effect.void);
 await runMain(
   program,
-  name === "old-effect" ? { capabilities: ["the Flick runtime requires effect 4.0.5, found 4.1.0"] } : {},
+  name === "old-effect" ? { capabilities: ["the Flick runtime requires effect 4.1.2, found 4.1.0"] } : {},
 );
