@@ -70,11 +70,7 @@ pub fn emit(
         .collect();
     let all: Vec<&ir::Module> = optimized.iter().chain(builtin_modules()).collect();
     let own = |m: &str| modules.iter().any(|c| c.name == m);
-    let package = |m: &str| {
-        own(m)
-            .then(|| settings.package.map(str::to_owned))
-            .flatten()
-    };
+    let package = |m: &str| super::own_package(modules, settings, m);
     // `./x.mjs` of a module is `x.go` beside it, named in the Go module by its path
     let foreign_file = |module: &str, spec: &str| {
         let path = normalize(&(settings.source_dir)(module)?.join(spec)).with_extension("go");

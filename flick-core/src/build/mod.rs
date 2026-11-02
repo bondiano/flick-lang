@@ -176,12 +176,9 @@ pub fn emit(
             None => file,
         }
     };
-    let own = |m: &str| modules.iter().any(|c| c.name == m);
     let package = |m: &str| match provider(m) {
         Some(module) => Some(module.package.clone()),
-        None => own(m)
-            .then(|| settings.package.map(str::to_owned))
-            .flatten(),
+        None => own_package(modules, settings, m),
     };
     #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
     let published_interfaces = published_interfaces(compilation, settings);
@@ -242,6 +239,16 @@ pub fn emit(
     (out, diagnostics)
 }
 
+/// The package that owns the compiled module `m`: its source package, else
+/// the project's.
+pub(crate) fn own_package(modules: &[Compiled], settings: &Settings, m: &str) -> Option<String> {
+    let module = modules.iter().find(|c| c.name == m)?;
+    module
+        .package
+        .clone()
+        .or_else(|| settings.package.map(str::to_owned))
+}
+
 fn foreign_specifier(
     settings: &Settings,
     path: &dyn Fn(&str) -> String,
@@ -292,7 +299,7 @@ fn published_interfaces<'a>(
             let mut published = interface(
                 &module.ir,
                 &module.interface,
-                settings.package,
+                module.package.as_deref().or(settings.package),
                 &[],
                 &checked_interfaces,
             );

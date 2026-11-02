@@ -51,7 +51,7 @@ e2e: docs-wasm
     pnpm -r typecheck
     pnpm -r lint
     pnpm -r test
-    cargo test -p flick --test e2e --test e2e_numbers --test go_main --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path -- --ignored
+    cargo test -p flick --test e2e --test e2e_numbers --test go_main --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path --test source_packages -- --ignored
     cargo test -p flick-core --test consteval_node -- --ignored
     just go-test
     just language

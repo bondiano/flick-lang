@@ -132,6 +132,22 @@ modules names the directory of their interfaces:
 Module `Acme.Text` of that package is described by `iface/Acme/Text.iface`;
 the format is in [iface.md](../iface/).
 
+A source package names the directory of its sources instead:
+
+```json
+{ "name": "@acme/contract", "flick": { "source-dir": "src" } }
+```
+
+Each dependent compiles its modules for the target it emits, js or go, as
+modules of that package. So a JS client and a Go server that both depend on it
+share its types, and its constructors have the same tags on both sides. A
+source package is a workspace member: pnpm links it into `node_modules` with a
+`workspace:` version, and it needs no build of its own. Its modules are checked
+for the target of the dependent, so on go an import of a js-only module is
+`FLICK-P030`. The dependent does not report the package's warnings. Its own
+modules come first: a module the project declares is not looked up in the
+package.
+
 | Problem | Diagnostic |
 | - | - |
 | an imported module is found nowhere while a dependency is not installed | `FLICK-P009`: run `flick install` (exit code `2`) |
