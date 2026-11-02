@@ -1,0 +1,43 @@
+// HMAC over `Crypto.digest` checked against the vectors of RFC 4231 (and a
+// key longer than a block), and the conversions of `Bytes`.
+module App.Main exposing (main)
+
+line : String -> String -> Unit ->{} Unit
+let line label value () = Platform.stdout_line (label ++ ": " ++ value)
+
+digit : Int -> String
+let digit n = String.slice n (n + 1) "0123456789abcdef"
+
+hex : List Int -> String
+let hex bytes = String.join "" (List.map (fun b -> digit (b / 16) ++ digit (b % 16)) bytes)
+
+checks : Unit ->{Crypto.Crypto; Crypto.CryptoError} Unit
+let checks () =
+  let key = List.repeat 20 11
+  let data = Bytes.from_string "Hi There"
+  line "hmac-sha256" (hex (Crypto.hmac Crypto.Sha256 key data)) ()
+  line "hmac-sha384" (hex (Crypto.hmac Crypto.Sha384 key data)) ()
+  line "hmac-sha512" (hex (Crypto.hmac Crypto.Sha512 key data)) ()
+  let long = List.repeat 131 170
+  let first = Bytes.from_string "Test Using Larger Than Block-Size Key - Hash Key First"
+  line "long key sha256" (hex (Crypto.hmac Crypto.Sha256 long first)) ()
+  line "long key sha512" (hex (Crypto.hmac Crypto.Sha512 long first)) ()
+  let fox = Bytes.from_string "The quick brown fox jumps over the lazy dog"
+  line "hmac-sha1" (hex (Crypto.hmac Crypto.Sha1 (Bytes.from_string "key") fox)) ()
+
+main : Unit ->{; AppError} Unit
+let main () =
+  line "utf8" (show (Bytes.from_string "é")) ()
+  line "decode" (show (Bytes.to_string [195, 169])) ()
+  line "not utf8" (show (Bytes.to_string [255])) ()
+  line "bom kept" (show (Option.map String.length (Bytes.to_string [239, 187, 191, 97]))) ()
+  line "base64url" (Bytes.to_base64url [251, 255, 0]) ()
+  line "unpadded" (show (Bytes.from_base64url "-_8")) ()
+  line "padded" (show (Bytes.from_base64url "-_8=")) ()
+  line "not base64" (show (Bytes.from_base64url "*")) ()
+  let same = Bytes.equal [1, 2] [1, 2]
+  let other = Bytes.equal [1, 2] [1, 3]
+  let shorter = Bytes.equal [1] [1, 2]
+  line "equal" (show same ++ " " ++ show other ++ " " ++ show shorter) ()
+  try provide Crypto.system { checks () } with
+  | Crypto.CryptoError message -> line "error" message ()

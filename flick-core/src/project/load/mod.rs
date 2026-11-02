@@ -5,6 +5,7 @@
 
 use std::collections::BTreeMap;
 use std::io;
+use std::mem;
 use std::path::{Path, PathBuf};
 
 mod checking;
@@ -40,6 +41,8 @@ use crate::types;
 enum Root {
     Source,
     Test,
+    /// The source directory of the named source package.
+    Package(String),
     /// A file outside the project roots; the directory its module path
     /// starts in, when its header matches its path.
     Other(Option<PathBuf>),
@@ -118,6 +121,8 @@ pub struct Compiled {
     pub file: FileId,
     /// Whether it is in the test root.
     pub test: bool,
+    /// The source package it belongs to; `None` for the project's own.
+    pub package: Option<String>,
     /// The modules it imports.
     pub imports: Vec<String>,
     pub ir: ir::Module,
@@ -224,6 +229,10 @@ fn run(
                     path: m.path.clone(),
                     file: m.file,
                     test: m.root == Root::Test,
+                    package: match &m.root {
+                        Root::Package(name) => Some(name.clone()),
+                        _ => None,
+                    },
                     imports: m.syntax.imports.iter().map(|i| i.module.clone()).collect(),
                     ir: ir?,
                     interface: interface?,
@@ -234,11 +243,7 @@ fn run(
     };
     #[cfg(feature = "native-project")]
     let package_modules = loader.package_modules();
-    let mut diagnostics = loader.diagnostics;
-    if let Some(p) = project {
-        diagnostics
-            .retain(|d| d.severity != Severity::Warning || !p.config.allow.contains(&d.code));
-    }
+    let mut diagnostics = loader.reported();
     // by path, not by load order, which follows the order of imports
     diagnostics.sort_by_cached_key(|d| {
         (
@@ -262,12 +267,48 @@ fn run(
 }
 
 impl Loader<'_> {
+    /// The diagnostics of the run without the warnings it does not report:
+    /// those the project allows, and those of source packages, whose
+    /// dependent does not answer for them.
+    fn reported(&mut self) -> Vec<Diagnostic> {
+        let package_files: Vec<FileId> = self
+            .modules
+            .iter()
+            .filter(|m| matches!(m.root, Root::Package(_)))
+            .map(|m| m.file)
+            .collect();
+        let allowed = self.project.map(|p| &p.config.allow);
+        let mut diagnostics = mem::take(&mut self.diagnostics);
+        diagnostics.retain(|d| {
+            d.severity != Severity::Warning
+                || (d.span.is_none_or(|s| !package_files.contains(&s.file))
+                    && allowed.is_none_or(|a| !a.contains(&d.code)))
+        });
+        diagnostics
+    }
+
     fn root_of(&self, path: &Path) -> Root {
         match self.project {
             Some(p) if path.starts_with(p.source_root()) => Root::Source,
             Some(p) if path.starts_with(p.test_root()) => Root::Test,
-            _ => Root::Other(None),
+            _ => self
+                .package_sources()
+                .into_iter()
+                .find(|(_, dir)| path.starts_with(dir))
+                .map_or(Root::Other(None), |(name, _)| Root::Package(name)),
         }
+    }
+
+    /// The source directory of each source package the project depends on.
+    fn package_sources(&self) -> Vec<(String, PathBuf)> {
+        #[cfg(feature = "native-project")]
+        return self
+            .packages
+            .sources()
+            .map(|(name, dir)| (name.to_owned(), dir.to_path_buf()))
+            .collect();
+        #[cfg(not(feature = "native-project"))]
+        Vec::new()
     }
 
     /// Loads and registers a module file once; `Ok(None)` if it is already loaded.
@@ -285,6 +326,11 @@ impl Loader<'_> {
         let root_dir = match (&root, self.project) {
             (Root::Source, Some(p)) => Some(p.source_root()),
             (Root::Test, Some(p)) => Some(p.test_root()),
+            (Root::Package(name), _) => self
+                .package_sources()
+                .into_iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, dir)| dir),
             _ => None,
         };
         let expected = root_dir
@@ -387,9 +433,15 @@ impl Loader<'_> {
     }
 
     fn find_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
+        let packages = self.package_sources().into_iter().map(|(_, dir)| dir);
+        // the project's own modules come before those of source packages
         let dirs: Vec<PathBuf> = match (&self.modules[importer].root, self.project) {
-            (Root::Source, Some(p)) => vec![p.source_root()],
-            (Root::Test, Some(p)) => vec![p.source_root(), p.test_root()],
+            (Root::Source, Some(p)) => [p.source_root()].into_iter().chain(packages).collect(),
+            (Root::Test, Some(p)) => [p.source_root(), p.test_root()]
+                .into_iter()
+                .chain(packages)
+                .collect(),
+            (Root::Package(_), _) => packages.collect(),
             (Root::Other(dir), _) => dir.iter().cloned().collect(),
             _ => Vec::new(),
         };

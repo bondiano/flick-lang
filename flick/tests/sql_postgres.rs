@@ -1,7 +1,8 @@
 //! E2E against `PostgreSQL`: starts `postgres:17-alpine` in Docker, loads
 //! `tests/postgres/schema.sql`, builds a program of `tests/postgres/` for
 //! each target and compares its stdout with its `.stdout` file: `app.fl`,
-//! the queries, and `tx.fl`, transactions and cancellation. Ignored by
+//! the queries, `tx.fl`, transactions and cancellation, and `migrate.fl`,
+//! migrations on a fresh database. Ignored by
 //! default: it needs Docker, the installed runtime and Go (`just
 //! e2e-postgres`).
 
@@ -181,6 +182,24 @@ fn transactions_and_cancellation(emit: &str) {
         "select count(*) from pg_stat_activity where query = 'select pg_sleep(30)'",
     ]);
     assert_eq!(sleeping, "0");
+}
+
+/// `migrate.fl` on a fresh database: it makes its own schema.
+fn migrations(emit: &str) {
+    let (_container, url) = start();
+    run_program("migrate", emit, &url);
+}
+
+#[test]
+#[ignore = "needs Docker and the installed runtime"]
+fn migrations_against_postgres() {
+    migrations("js");
+}
+
+#[test]
+#[ignore = "needs Docker and Go"]
+fn migrations_against_postgres_on_go() {
+    migrations("go");
 }
 
 #[test]

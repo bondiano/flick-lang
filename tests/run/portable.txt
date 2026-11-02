@@ -113,6 +113,8 @@ stdlib/http/streams
 stdlib/http/lifecycle
 stdlib/http/api
 stdlib/http/api_bodies
+stdlib/http/auth
+stdlib/http/spa
 stdlib/http/redaction_context
 stdlib/http/router_patterns
 stdlib/http/spans
@@ -131,6 +133,9 @@ stdlib/effect/clock
 stdlib/effect/schedule
 stdlib/effect/hash_ring
 stdlib/effect/crypto
+stdlib/effect/hmac
+stdlib/effect/password
+stdlib/effect/jwt
 stdlib/effect/trie
 stdlib/effect/bytesize
 stdlib/effect/chunk

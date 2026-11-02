@@ -223,7 +223,12 @@ func serveEndpoint(fb *Fiber, e *apiEndpoint, handler Value, services *env, r Va
 			for _, hook := range e.middleware {
 				runMaybe(&inner, Apply(&inner, hook, request))
 			}
-			return runMaybe(&inner, Apply(&inner, handler, request))
+			serving := inner
+			if a := e.auth; a != nil {
+				// each request makes its own service: concurrent requests do not share it
+				serving.env = inner.env.with(a.tag, runMaybe(&inner, Apply(&inner, a.check, request)))
+			}
+			return runMaybe(&serving, Apply(&serving, handler, request))
 		})
 		if c != nil {
 			if err, ok := typedFailure(c); ok {

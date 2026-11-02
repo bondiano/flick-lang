@@ -1,0 +1,148 @@
+// An endpoint's handler runs with the session `HttpApi.with_auth` makes
+// from each request: the `authorization` header it declares names who
+// calls, and a request the check refuses gets the check's declared error,
+// with its status and body, while the handler does not run. An endpoint
+// with `with_optional_auth` also serves anonymous requests. Serving the
+// group needs no session, and the document lists each security requirement.
+module App.Main exposing (main)
+
+/// Refused credentials, in the body RealWorld answers with.
+type error Unauthorized = Unauthorized { errors : { token : List String } }
+  deriving Schema
+
+/// Who calls, if anyone.
+service Session =
+  user : Unit ->{} Option String
+
+type alias Credentials = { authorization : Option String }
+  deriving Schema
+
+type alias Request = HttpApi.Request Unit Unit Credentials Unit
+
+session : Option String -> Session.Impl
+let session name = { user = fun () -> name }
+
+refuse : String ->{; Unauthorized} a
+let refuse reason = from_result (Err (Unauthorized { errors = { token = [reason] } }))
+
+/// The user a `Token` credential names.
+known : String ->{; Unauthorized} Session.Impl
+let known credential =
+  match credential with
+  | "Token ada" -> session (Some "ada")
+  | "Token bob" -> session (Some "bob")
+  | _ -> refuse "is invalid"
+
+check : Request ->{; Unauthorized} Session.Impl
+let check request =
+  match request.headers.authorization with
+  | Some credential -> known credential
+  | None -> refuse "is missing"
+
+maybe : Request ->{; Unauthorized} Session.Impl
+let maybe request =
+  match request.headers.authorization with
+  | Some credential -> known credential
+  | None -> session None
+
+token : HttpApi.Security
+let token = HttpApi.api_key "Token" { key = "authorization"; location = HttpApi.InHeader }
+
+/// A request without the header is anonymous.
+credentials : PureCodec Json Credentials
+let credentials = codec (schema Credentials) {
+  authorization = optional_field "authorization" String.json;
+}
+
+refusals : HttpApi.ErrorCases {Unauthorized}
+let refusals = HttpApi.errors |> HttpApi.error_case 401 (Codec.json (schema Unauthorized))
+
+me : HttpApi.Endpoint "me" (Request ->{Session; Unauthorized} String)
+let me =
+  HttpApi.endpoint HttpApi.Get "/me" (Record.label : Record.Label "me")
+  |> HttpApi.with_headers credentials
+  |> HttpApi.with_success 200 (Codec.json Schema.string)
+  |> HttpApi.with_errors refusals
+  |> HttpApi.with_auth token Session check
+
+greet : HttpApi.Endpoint "greet" (Request ->{Session; Unauthorized} String)
+let greet =
+  HttpApi.endpoint HttpApi.Get "/greet" (Record.label : Record.Label "greet")
+  |> HttpApi.with_headers credentials
+  |> HttpApi.with_success 200 (Codec.json Schema.string)
+  |> HttpApi.with_errors refusals
+  |> HttpApi.with_optional_auth token Session maybe
+
+type alias Handlers = {
+  me : Request ->{Session; Unauthorized} String;
+  greet : Request ->{Session; Unauthorized} String;
+}
+
+users : HttpApi.Group "users" none Handlers
+let users =
+  HttpApi.authenticated
+    Session
+    (HttpApi.group (Record.label : Record.Label "users") |> HttpApi.add me |> HttpApi.add greet)
+
+api : HttpApi.Api none { users : Handlers }
+let api = HttpApi.api "Users" |> HttpApi.add_group users
+
+handlers : { users : Handlers }
+let handlers = {
+  users = {
+    me = fun _ -> Option.with_default "?" (Session.user ());
+    greet = fun _ -> "hello " ++ Option.with_default "stranger" (Session.user ());
+  };
+}
+
+get_raw : String ->{} String
+foreign async get_raw from "./raw.mjs" "get"
+
+/// A request of `endpoint` with `authorization`.
+ask :
+  String ->
+  Option String ->
+  HttpApi.Endpoint l (Request ->{Session; Unauthorized} String) ->{}
+  String
+let ask base authorization endpoint =
+  let request = { path = (); query = (); headers = { authorization = authorization }; payload = () }
+  try HttpApi.call base endpoint request with
+  | Unauthorized e -> "401 " ++ String.join ", " e.errors.token
+  | HttpApi.ClientError e -> "client error " ++ e.message
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let options : HttpApi.ServeOptions = {
+    host = "127.0.0.1";
+    port = 0;
+    openapi = None;
+    swagger = None;
+    scalar = None;
+  }
+  try
+    scope s {
+      let server = HttpApi.listen options api handlers
+      let base = "http://127.0.0.1:" ++ show (HttpApi.port server)
+      Platform.stdout_line ("me as ada: " ++ ask base (Some "Token ada") me)
+      Platform.stdout_line ("me as bob: " ++ ask base (Some "Token bob") me)
+      Platform.stdout_line ("me as eve: " ++ ask base (Some "Token eve") me)
+      Platform.stdout_line ("me anonymous: " ++ ask base None me)
+      Platform.stdout_line ("greet as ada: " ++ ask base (Some "Token ada") greet)
+      Platform.stdout_line ("greet anonymous: " ++ ask base None greet)
+      Platform.stdout_line ("greet as eve: " ++ ask base (Some "Token eve") greet)
+      Platform.stdout_line ("raw anonymous me: " ++ get_raw (base ++ "/me"))
+    }
+  with
+  | HttpApi.ServeError message -> Platform.stdout_line ("serve error " ++ message)
+  match HttpApi.openapi api with
+  | Ok written ->
+    let document = String.replace_all "\n" "" (String.replace_all " " "" written)
+    Platform.stdout_line
+      ("me requires the token: " ++ show (String.contains "\"security\":[{\"Token\":[]}]" document))
+    Platform.stdout_line
+      ("greet takes it optionally: "
+        ++ show (String.contains "\"security\":[{},{\"Token\":[]}]" document))
+    Platform.stdout_line
+      ("the scheme is an API key: "
+        ++ show (String.contains "\"Token\":{\"type\":\"apiKey\"" document))
+  | Err (Codec.ExportError message) -> Platform.stdout_line ("document: " ++ message)

@@ -175,11 +175,7 @@ func (d *openAPI) operation(g *apiGroup, e *apiEndpoint) Value {
 	if e.deprecated {
 		op = append(op, "deprecated", true)
 	}
-	if len(e.security) > 0 {
-		security := make([]Value, len(e.security))
-		for i, s := range e.security {
-			security[i] = Rec(s.name, []Value{})
-		}
+	if security := operationSecurity(e); security != nil {
 		op = append(op, "security", security)
 	}
 	params := append(append(d.parameters(e.params, "path", root+".path"),
@@ -203,6 +199,26 @@ func (d *openAPI) operation(g *apiGroup, e *apiEndpoint) Value {
 
 var pathParam = regexp.MustCompile(`:([A-Za-z_]\w*)`)
 
+// operationSecurity is the security requirements of the operation: its
+// schemes and that of its `with_auth`, after `{}` when that is optional.
+func operationSecurity(e *apiEndpoint) []Value {
+	schemes := e.security
+	if e.auth != nil {
+		schemes = append(append([]*apiSecurity{}, schemes...), e.auth.security)
+	}
+	if len(schemes) == 0 {
+		return nil
+	}
+	var security []Value
+	if e.auth != nil && e.auth.optional {
+		security = append(security, newRecord(0))
+	}
+	for _, s := range schemes {
+		security = append(security, Rec(s.name, []Value{}))
+	}
+	return security
+}
+
 func securityScheme(s *apiSecurity) Value {
 	switch s.kind {
 	case "bearer":
@@ -223,6 +239,9 @@ func (d *openAPI) document(a *apiDefinition) Value {
 			}
 			for _, s := range e.security {
 				schemes.put(s.name, securityScheme(s))
+			}
+			if e.auth != nil {
+				schemes.put(e.auth.security.name, securityScheme(e.auth.security))
 			}
 			path := pathParam.ReplaceAllString(e.path, "{$1}")
 			methods, ok := recordField(paths, path).(*Record)

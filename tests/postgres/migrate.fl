@@ -1,0 +1,92 @@
+// Against a real PostgreSQL: `Database.Migrate.run` applies each step once,
+// a second run applies none, a new step is applied alone, migrators that
+// start together apply each step once, a failing step leaves the schema as
+// it was, and steps out of order or behind the database are refused. Run by
+// `flick/tests/sql_postgres.rs` on a fresh database.
+module App.Migrate exposing (main)
+
+import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+import Database exposing (Database)
+import Database.Migrate exposing (Migration, MigrationError(..))
+
+type alias Count = { n : Int }
+  deriving Schema
+
+users : Migration
+let users = {
+  version = 1;
+  name = "users";
+  statements = ["create table people (id serial primary key, name text not null)"];
+}
+
+seed : Migration
+let seed = { version = 2; name = "seed"; statements = ["insert into people (name) values ('ada')"] }
+
+emails : Migration
+let emails = {
+  version = 3;
+  name = "emails";
+  statements = ["alter table people add column email text"];
+}
+
+broken : Migration
+let broken = {
+  version = 4;
+  name = "broken";
+  statements = ["create table half (id int)", "select * from no_such_table"];
+}
+
+people : Sql.Query Pg Count
+let people =
+  Sql.unsafe_query
+    [Sql.unsafe_text "select count(*)::int as n from people"]
+    (Codec.json (schema Count))
+
+halves : Sql.Query Pg Count
+let halves =
+  Sql.unsafe_query
+    [Sql.unsafe_text "select count(*)::int as n from pg_tables where tablename = 'half'"]
+    (Codec.json (schema Count))
+
+count : Sql.Query Pg Count ->{Database; EncodeError, DbError, DecodeError} Int
+let count query =
+  match Database.query query with
+  | [row] -> row.n
+  | _ -> -1
+
+/// What a run of `steps` applied, or why it was refused.
+migrate : String -> List Migration ->{Database; EncodeError, DecodeError} Unit
+let migrate label steps =
+  let outcome =
+    try "applied " ++ show (Database.Migrate.run steps) with
+    | MigrationError message -> "refused: " ++ message
+    | DbError e -> "failed " ++ e.code
+  Platform.stdout_line (label ++ ": " ++ outcome)
+
+run : Unit ->{Database; MigrationError, EncodeError, DbError, DecodeError} Unit
+let run () =
+  migrate "first" [users, seed]
+  migrate "again" [users, seed]
+  migrate "new step" [users, seed, emails]
+  Platform.stdout_line ("people: " ++ show (count people))
+  let together =
+    parallel_all 2 [
+      task { show (Database.Migrate.run [users, seed, emails]) },
+      task { show (Database.Migrate.run [users, seed, emails]) },
+    ]
+  Platform.stdout_line ("together: " ++ String.join " " together)
+  migrate "failing step" [users, seed, emails, broken]
+  Platform.stdout_line ("half-made table left: " ++ show (count halves))
+  migrate "out of order" [seed, users]
+  migrate "behind the database" [users]
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let url = Option.with_default "" (Platform.env "DATABASE_URL")
+  provide (Database.pg (Database.config url)) {
+    try run () with
+    | MigrationError message -> Platform.stdout_line ("migration error " ++ message)
+    | DbError e -> Platform.stdout_line ("database error " ++ e.code ++ " " ++ e.message)
+    | EncodeError _ -> Platform.stdout_line "encode error"
+    | DecodeError _ -> Platform.stdout_line "decode error"
+  }

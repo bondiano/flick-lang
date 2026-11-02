@@ -2,6 +2,9 @@
 //! reads. A package with Flick modules
 //! names its interface directory in `package.json`:
 //! `"flick": { "iface-dir": "iface" }`, and module `A.B` is `iface/A/B.iface`.
+//! A source package names its source directory instead,
+//! `"flick": { "source-dir": "src" }`: each dependent compiles its modules,
+//! for whichever target it emits, as modules of that package.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -25,6 +28,8 @@ struct Package {
     /// The `iface-dir` as written, and resolved.
     layout: Option<String>,
     iface_dir: Option<PathBuf>,
+    /// The resolved `source-dir` of a source package.
+    source_dir: Option<PathBuf>,
 }
 
 #[derive(Deserialize, Default)]
@@ -43,6 +48,8 @@ struct Manifest {
 struct FlickField {
     /// Where a package of Flick modules keeps their interfaces.
     iface_dir: Option<String>,
+    /// Where a source package keeps the modules its dependents compile.
+    source_dir: Option<String>,
     /// The compiler a project pins; `flick` itself reads it.
     #[serde(rename = "compiler")]
     _compiler: Option<String>,
@@ -67,14 +74,17 @@ impl Packages {
             .map(|name| {
                 let dir = root.join("node_modules").join(name);
                 let installed = manifest(host, &dir.join("package.json"), diagnostics);
-                let layout = installed
-                    .as_ref()
-                    .and_then(|m| m.flick.as_ref()?.iface_dir.clone());
+                let flick = installed.as_ref().and_then(|m| m.flick.as_ref());
+                let layout = flick.and_then(|f| f.iface_dir.clone());
+                let source_dir = flick
+                    .and_then(|f| f.source_dir.as_ref())
+                    .map(|s| super::normalize(&dir.join(s)));
                 Package {
                     name: name.clone(),
                     installed: installed.is_some(),
                     iface_dir: layout.as_ref().map(|l| dir.join(l)),
                     layout,
+                    source_dir,
                 }
             })
             .collect();
@@ -102,6 +112,13 @@ impl Packages {
             .join("/")
     }
 
+    /// The source directory of each source package, in dependency order.
+    pub fn sources(&self) -> impl Iterator<Item = (&str, &Path)> {
+        self.packages
+            .iter()
+            .filter_map(|p| Some((p.name.as_str(), p.source_dir.as_deref()?)))
+    }
+
     /// Declared dependencies missing from `node_modules`.
     pub fn missing(&self) -> Vec<&str> {
         self.packages
@@ -127,7 +144,8 @@ impl Packages {
             return Vec::new();
         }
         let mut found = Vec::new();
-        for package in &self.packages {
+        // a source package's modules are compiled, not read from interfaces
+        for package in self.packages.iter().filter(|p| p.source_dir.is_none()) {
             let Some(dir) = &package.iface_dir else {
                 continue;
             };

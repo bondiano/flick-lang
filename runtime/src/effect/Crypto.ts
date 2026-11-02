@@ -2,7 +2,8 @@
 // `Crypto` made over the platform's Web Crypto (`globalThis.crypto`, in Node
 // and in browsers), behind the operations of the Flick service
 // `Crypto.Crypto`. A `PlatformError` becomes a `Crypto.CryptoError`.
-import { Crypto, Effect, PlatformError } from "effect";
+import { Crypto, Effect, Option, PlatformError, Result } from "effect";
+import { Base64Url } from "effect/encoding";
 
 import type { Tagged } from "../data.ts";
 import { constructorName, tag } from "../tags.ts";
@@ -56,6 +57,28 @@ export const flickDigest = (
 ): Effect.Effect<Array<number>, CryptoError> =>
   bytes(system.digest(ALGORITHMS[constructorName(algorithm._tag)] ?? "SHA-256", Uint8Array.from(data)));
 
+const cryptoError = (message: string): CryptoError => ({ _tag: CRYPTO_ERROR, _0: message });
+
+export const flickPbkdf2 = (
+  algorithm: Readonly<{ _tag: string }>,
+  iterations: number,
+  length: number,
+  salt: ReadonlyArray<number>,
+  password: ReadonlyArray<number>,
+): Effect.Effect<Array<number>, CryptoError> =>
+  iterations <= 0 || length <= 0
+    ? Effect.fail(cryptoError("Crypto.pbkdf2: iterations and length must be positive"))
+    : Effect.tryPromise({
+        try: async () => {
+          const subtle = globalThis.crypto.subtle;
+          const key = await subtle.importKey("raw", Uint8Array.from(password), "PBKDF2", false, ["deriveBits"]);
+          const hash = ALGORITHMS[constructorName(algorithm._tag)] ?? "SHA-256";
+          const bits = await subtle.deriveBits({ name: "PBKDF2", hash, salt: Uint8Array.from(salt), iterations }, key, length * 8);
+          return Array.from(new Uint8Array(bits));
+        },
+        catch: (cause) => cryptoError(`Crypto.pbkdf2: ${String(cause)}`),
+      });
+
 export const flickRandom = (): Effect.Effect<number> => system.random;
 export const flickRandomBoolean = (): Effect.Effect<boolean> => system.randomBoolean;
 // Flick's `Int` is 32-bit, so the draw is over that range rather than the safe integers.
@@ -66,3 +89,23 @@ export const flickRandomShuffle = <A>(xs: ReadonlyArray<A>): Effect.Effect<Array
 export const flickRandomUuidV4 = (): Effect.Effect<string, CryptoError> => text(system.randomUUIDv4());
 export const flickRandomUuidV7 = (): Effect.Effect<string, CryptoError> => text(system.randomUUIDv7());
 export const flickRandomUlid = (): Effect.Effect<string, CryptoError> => text(system.randomULID);
+
+// `Bytes`: text as UTF-8, bytes as URL-safe base64.
+const UTF8 = /*#__PURE__*/ new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+
+export const flickUtf8Encode = (input: string): Array<number> => Array.from(new TextEncoder().encode(input));
+
+export const flickUtf8Decode = (data: ReadonlyArray<number>): Option.Option<string> => {
+  try {
+    return Option.some(UTF8.decode(Uint8Array.from(data)));
+  } catch {
+    return Option.none();
+  }
+};
+
+export const flickBase64UrlEncode = (data: ReadonlyArray<number>): string => Base64Url.encode(Uint8Array.from(data));
+
+export const flickBase64UrlDecode = (input: string): Option.Option<Array<number>> => {
+  const decoded = Base64Url.decode(input);
+  return Result.isSuccess(decoded) ? Option.some(Array.from(decoded.success)) : Option.none();
+};

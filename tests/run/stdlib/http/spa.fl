@@ -1,0 +1,102 @@
+// One server for a single-page app and its API, as a Go backend serves a
+// built client: the routes of an `HttpApi` share a router with the static
+// files, a path of no file answers with `index.html` for the client's own
+// routing, and `cors` lets the dev server's origin call the API.
+module App.Main exposing (main)
+
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+type alias Hello = { word : String }
+  deriving Schema
+
+hello : HttpApi.Endpoint "hello" (HttpApi.Request Unit Unit Unit Unit ->{r;} Hello)
+let hello =
+  HttpApi.endpoint HttpApi.Get "/api/hello" (Record.label : Record.Label "hello")
+  |> HttpApi.with_success 200 (Codec.json (schema Hello))
+
+api : HttpApi.Api none { greet : { hello : HttpApi.Request Unit Unit Unit Unit ->{} Hello } }
+let api =
+  HttpApi.api "Greet"
+  |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "greet") |> HttpApi.add hello)
+
+origin : String
+let origin = "http://localhost:5173"
+
+/// The status and body of a GET of `url`.
+fetch : String ->{Http.Client.HttpClient; Http.ClientError.HttpClientError} String
+let fetch url =
+  let response = Http.Client.get url
+  show (Http.ClientResponse.status response) ++ " " ++ Http.ClientResponse.text response
+
+/// The status and body of a page a browser asks for: a path of no file
+/// answers with the index only for a request that accepts HTML.
+page : String ->{Http.Client.HttpClient; Http.ClientError.HttpClientError} String
+let page url =
+  let response =
+    Http.Client.execute (Http.ClientRequest.accept "text/html" (Http.ClientRequest.get url))
+  show (Http.ClientResponse.status response) ++ " " ++ Http.ClientResponse.text response
+
+/// The CORS header of a request from the dev server's origin.
+allowed :
+  Http.ClientRequest.ClientRequest ->{Http.Client.HttpClient; Http.ClientError.HttpClientError}
+  String
+let allowed request =
+  let response = Http.Client.execute (Http.ClientRequest.set_header "origin" origin request)
+  show (Http.ClientResponse.status response)
+    ++ " "
+    ++ Option.with_default
+      "-"
+      (Http.Headers.get "access-control-allow-origin" (Http.ClientResponse.headers response))
+
+main : Unit ->{; AppError} Unit
+let main () = provide (Layer.merge
+  Http.FetchClient.layer
+  (Layer.merge Http.Server.layer_services FileSystem.node)) {
+  try
+    scope {
+      let dir =
+        FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-spa" }
+      write : String -> String ->{FileSystem.FileSystem; PlatformError.PlatformError} Unit
+      let write = FileSystem.write_file_string { flag = None; mode = None }
+      write (dir ++ "/index.html") "<div id=\"app\"></div>"
+      write (dir ++ "/app.js") "run()"
+      scope s {
+        let files =
+          Http.StaticServer.route { Http.StaticServer.static_options dir with spa = true } ""
+        app : (ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        let app =
+          Http.Middleware.cors
+            { Http.Middleware.cors_options with allowedOrigins = [origin] }
+            (Http.Router.router Http.Router.config [
+              HttpApi.route "/api/*" api { greet = { hello = fun _ -> { word = "hi" } } },
+              files,
+            ])
+        let options : Http.Server.ServeOptions = {
+          host = "127.0.0.1";
+          port = 0;
+          gracefulShutdownTimeout = None;
+        }
+        let server = Http.Server.serve options app
+        let base = Http.Server.format_address (Http.Server.address server)
+        Platform.stdout_line ("api: " ++ fetch (base ++ "/api/hello"))
+        Platform.stdout_line ("index: " ++ fetch (base ++ "/"))
+        Platform.stdout_line ("file: " ++ fetch (base ++ "/app.js"))
+        Platform.stdout_line ("client route: " ++ page (base ++ "/article/how-to"))
+        Platform.stdout_line ("missing file: " ++ fetch (base ++ "/missing.js"))
+        Platform.stdout_line
+          ("cors get: " ++ allowed (Http.ClientRequest.get (base ++ "/api/hello")))
+        Platform.stdout_line
+          ("cors preflight: "
+            ++ allowed
+              (Http.ClientRequest.set_header
+                "access-control-request-method"
+                "POST"
+                (Http.ClientRequest.options (base ++ "/api/hello"))))
+      }
+    }
+  with
+  | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
+  | PlatformError.PlatformError _ -> Platform.stdout_line "no files"
+  | Http.ClientError.HttpClientError _ -> Platform.stdout_line "client failed"
+}

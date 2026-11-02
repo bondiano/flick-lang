@@ -209,6 +209,30 @@ answer arrives, it is `DbError` with the code `"commit_unknown"`: the
 transaction may or may not have happened, and only the data tells. Nothing
 is retried.
 
+## Migrations
+
+`Database.Migrate.run steps` brings the schema up to date: each
+`{ version; name; statements }` whose version is above the latest one the
+table `flick_migrations` records runs its statements in order, and is
+recorded. It answers the versions it applied, none when the schema is
+current. All of a run is one transaction under an advisory lock, so servers
+that start together apply each step once, and a failing step leaves the
+schema as it was. Steps not in increasing order of version, and a database
+already past the last step, are refused with `MigrationError`. The
+statements are raw SQL, as DDL is outside the checked subset.
+
+```flick
+import Database.Migrate exposing (Migration)
+
+steps : List Migration
+let steps = [
+  { version = 1; name = "users"; statements = ["create table users (id serial primary key, name text not null)"] },
+  { version = 2; name = "emails"; statements = ["alter table users add column email text"] },
+]
+
+let applied = Database.Migrate.run steps
+```
+
 ## Cancellation and limits
 
 An interrupted query is cancelled on the server with the protocol's

@@ -7,6 +7,10 @@ module Crypto exposing (
   Crypto,
   random_bytes,
   digest,
+  hmac,
+  pbkdf2,
+  hash_password,
+  verify_password,
   random,
   random_boolean,
   random_int,
@@ -47,6 +51,70 @@ let random_bytes size = Crypto.random_bytes size
 /// The digest of the bytes by the algorithm.
 digest : DigestAlgorithm -> List Int ->{Crypto; CryptoError} List Int
 let digest algorithm data = Crypto.digest algorithm data
+
+/// The HMAC of the message under the key (RFC 2104), over `digest`.
+hmac : DigestAlgorithm -> List Int -> List Int ->{Crypto; CryptoError} List Int
+let hmac algorithm key message =
+  let block =
+    match algorithm with
+    | Sha384 -> 128
+    | Sha512 -> 128
+    | _ -> 64
+  let short = if List.length key > block then Crypto.digest algorithm key else key
+  let padded = short ++ List.repeat (block - List.length short) 0
+  let inner = Crypto.digest algorithm (List.map (Int.bit_xor 54) padded ++ message)
+  Crypto.digest algorithm (List.map (Int.bit_xor 92) padded ++ inner)
+
+/// PBKDF2 (RFC 8018) with HMAC over the digest: `length` bytes derived from
+/// the salt and the password in `iterations` rounds. Both counts must be
+/// positive.
+pbkdf2 : DigestAlgorithm -> Int -> Int -> List Int -> List Int ->{; CryptoError} List Int
+foreign effect pbkdf2 from "@flick-lang/runtime/effect/Crypto" "flickPbkdf2"
+
+/// A hash of the password to store: PBKDF2-HMAC-SHA256 with 600000 rounds
+/// and a random 16-byte salt, written
+/// `$pbkdf2-sha256$i=600000$<salt>$<hash>` in URL-safe base64.
+hash_password : String ->{Crypto; CryptoError} String
+let hash_password password =
+  let salt = Crypto.random_bytes 16
+  let hash = pbkdf2 Sha256 600000 32 salt (Bytes.from_string password)
+  String.join "$" [
+    "",
+    "pbkdf2-sha256",
+    "i=600000",
+    Bytes.to_base64url salt,
+    Bytes.to_base64url hash,
+  ]
+
+/// Whether the password is the one `hash_password` hashed into `stored`, in
+/// its rounds, compared in constant time. A stored text of another form is a
+/// `CryptoError`.
+verify_password : String -> String ->{; CryptoError} Bool
+let verify_password password stored =
+  let parts = String.split "$" stored
+  let rounds = Option.with_default "" (List.get 2 parts)
+  let count =
+    if String.starts_with "i=" rounds then
+      Int.parse (String.slice 2 (String.length rounds) rounds)
+    else
+      None
+  let salt = Option.bind Bytes.from_base64url (List.get 3 parts)
+  let hash = Option.bind Bytes.from_base64url (List.get 4 parts)
+  let shape =
+    List.length parts == 5
+      && List.get 0 parts == Some ""
+      && List.get 1 parts == Some "pbkdf2-sha256"
+  match (count, salt, hash) with
+  | (Some n, Some s, Some h) ->
+    if shape && n > 0 && not (List.is_empty h) then
+      Bytes.equal (pbkdf2 Sha256 n (List.length h) s (Bytes.from_string password)) h
+    else
+      malformed_hash ()
+  | _ -> malformed_hash ()
+
+malformed_hash : Unit ->{; CryptoError} Bool
+let malformed_hash () =
+  from_result (Err (CryptoError "not a password hash written by hash_password"))
 
 /// A random number from 0 up to 1.
 random : Unit ->{Crypto;} Float

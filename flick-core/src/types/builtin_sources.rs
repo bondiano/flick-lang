@@ -75,6 +75,10 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
     ("Json", builtin_source!("builtins/Json.fl")),
     ("Sql", builtin_source!("builtins/Sql.fl")),
     ("Database", builtin_source!("builtins/Database.fl")),
+    (
+        "Database.Migrate",
+        builtin_source!("builtins/Database/Migrate.fl"),
+    ),
     ("Test", builtin_source!("builtins/Test.fl")),
     ("Flick.Debug", builtin_source!("builtins/Flick/Debug.fl")),
     #[cfg(feature = "server-stdlib")]
@@ -98,6 +102,7 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
     ("Formatter", builtin_source!("builtins/Formatter.fl")),
     ("Version", builtin_source!("builtins/Version.fl")),
     ("ByteSize", builtin_source!("builtins/ByteSize.fl")),
+    ("Bytes", builtin_source!("builtins/Bytes.fl")),
     ("Crypto", builtin_source!("builtins/Crypto.fl")),
     // end of Effect: values and classes
     // Effect: lists and records
@@ -123,6 +128,7 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
     ("DateTime", builtin_source!("builtins/DateTime.fl")),
     ("Cron", builtin_source!("builtins/Cron.fl")),
     ("Clock", builtin_source!("builtins/Clock.fl")),
+    ("Jwt", builtin_source!("builtins/Jwt.fl")),
     ("Random", builtin_source!("builtins/Random.fl")),
     // end of Effect: time
     // Effect: concurrency
