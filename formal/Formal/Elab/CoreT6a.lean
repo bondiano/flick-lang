@@ -60,8 +60,10 @@ theorem T6a_closed (hR : Real P Sg N) {e τ φ e'} (h : Elab P [] [] e τ φ e')
   T6a_core hR h (Corr.nil id id)
 
 /-- **T6(a) for `do`** in the core. -/
-theorem T6a_do_core (hR : Real P Sg N) (S : Sugar P) {Γ Δ ss r τ φ} (h : DoOk S Γ Δ ss r τ φ) :
-    ∃ e', Elab P Γ Δ (S.desugarDo ss r) τ φ e' ∧ Has Sg N (Γ.map Scheme.tr) Δ e' (.mono τ) φ :=
+theorem T6a_do_core (hR : Real P Sg N) (S : Sugar P) {Γ Δ ss r m b φ}
+    (h : DoOk S Γ Δ ss r m b φ) :
+    ∃ q e', Elab P Γ Δ (S.desugarDo ss r) (appQ m q b) φ e' ∧
+      Has Sg N (Γ.map Scheme.tr) Δ e' (.mono (appQ m q b)) φ :=
   T6a_do S (typingTarget hR) h
 
 /-- **T6(a) for `for`, `?` and blocks** in the core. -/

@@ -1,0 +1,117 @@
+import Formal.Elab.CoreLaws
+
+/-!
+# Witness: closed types and the instance of a method field
+
+A substitution acts on a translated type only through the variables the type mentions, in the
+source and in the core (`Ty.subst_congr`, `trTT_substT_congr`); so a type whose variables lie
+below `k` gives a closed scheme. `field_inst`: the field of a method, its own variables rotated
+first (`rot`), instantiated at a ground class argument `U`, is the translation of the method's
+type instantiated at `U`.
+-/
+
+namespace Flick.Elab
+
+theorem Ty.subst_congr {σ σ' : Nat → Ty} : ∀ {t : Ty}, (∀ n, t.Occurs n → σ n = σ' n) →
+    t.subst σ = t.subst σ'
+  | .var n, h => h n rfl
+  | .con _, _ | .cnil, _ => rfl
+  | .app t u, h => by
+    simp only [Ty.subst]; rw [Ty.subst_congr fun n hn => h n (.inl hn),
+      Ty.subst_congr fun n hn => h n (.inr hn)]
+  | .cun t u, h => by
+    simp only [Ty.subst]; rw [Ty.subst_congr fun n hn => h n (.inl hn),
+      Ty.subst_congr fun n hn => h n (.inr hn)]
+  | .arr φ a b q, h => by
+    simp only [Ty.subst]; rw [Ty.subst_congr fun n hn => h n (.inl hn),
+      Ty.subst_congr fun n hn => h n (.inr (.inl hn)), Ty.subst_congr fun n hn => h n (.inr (.inr hn))]
+
+theorem TTy.closed_of {k : Nat} {t : Ty} (h : ∀ n, t.Occurs n → n < k) : (TTy.mono t).Closed k :=
+  fun _ _ hσ => by simp only [TTy.subst]; rw [Ty.subst_congr fun n hn => hσ n (h n hn)]
+
+variable (N : Names)
+
+theorem caps_congr {C : Caps} {σ σ' : Atom → Flick.Ty} (h : ∀ b, C b → σ b = σ' b) :
+    C.substT σ = C.substT σ' := by
+  funext a; apply propext; constructor
+  · rintro ⟨b, hb, h'⟩; exact ⟨b, hb, h b hb ▸ h'⟩
+  · rintro ⟨b, hb, h'⟩; exact ⟨b, hb, (h b hb).symm ▸ h'⟩
+
+theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
+    (h : ∀ n, t.Occurs n → σ (.v n) = σ' (.v n)) : (trT N t).substT σ = (trT N t).substT σ' := by
+  have hc : ∀ b, (trT N t).reach b → σ b = σ' b := by
+    intro b hb; obtain ⟨n, rfl, hn⟩ := (trT_reach N t b).1 hb; exact h n hn
+  induction t with
+  | var n => exact h n rfl
+  | con c => unfold trT; split <;> rfl
+  | cnil => simp [trT, Flick.Ty.substT]
+  | app t u iht ihu =>
+    simp only [trT, Flick.Ty.substT]
+    rw [iht (fun n hn => h n (.inl hn)) (fun b hb => hc b (.inl hb)),
+      ihu (fun n hn => h n (.inr hn)) (fun b hb => hc b (.inr hb))]
+  | cun q q' _ _ => exact congrArg Flick.Ty.caps (caps_congr hc)
+  | arr φ a b q iha ihb _ =>
+    simp only [trT, Flick.Ty.substT, trStage_substT]
+    rw [iha (fun n hn => h n (.inl hn)) (fun x hx => hc x (.inl hx)),
+      ihb (fun n hn => h n (.inr (.inl hn))) (fun x hx => hc x (.inr (.inl hx))),
+      caps_congr fun x hx => hc x (.inr (.inr hx))]
+
+/-- A translated type whose variables lie below `k` is closed at `k`. -/
+theorem trT_closed {k k' : Nat} {t : Ty} (h : ∀ n, t.Occurs n → n < k) :
+    Flick.Scheme.Closed k ⟨k', Facts.none, trT N t⟩ :=
+  fun _ _ hσ => ⟨trT_substT_congr N fun n hn => hσ n (h n hn), by simp⟩
+
+/-- A ground `D_Q` is closed. -/
+theorem trD_closed {k k' : Nat} {c : Nat} {args : List Ty} (h : ∀ t ∈ args, ∀ n, t.Occurs n → n < k) :
+    Flick.Scheme.Closed k ⟨k', Facts.none, trD N ⟨c, args⟩⟩ := by
+  intro σ σ' hσ
+  refine ⟨?_, by simp⟩
+  simp only [trD, Flick.Ty.substT, Flick.Ty.spine_substT, List.map_map]
+  congr 2
+  exact List.map_congr_left fun t ht => trT_substT_congr N fun n hn => hσ n (h t ht n hn)
+
+theorem rot_v {p kk n : Nat} (h : n < p + kk) : ∃ m, rot p kk (.v n) = .tvar m ∧ m < p + kk := by
+  simp only [rot]
+  by_cases h1 : n < p
+  · rw [if_pos h1]; exact ⟨_, rfl, by omega⟩
+  · rw [if_neg h1, if_pos h]; exact ⟨_, rfl, by omega⟩
+
+/-- The field of a method with the variables of its type below `p + kk` is closed. -/
+theorem mfield_closed {p kk k' : Nat} {t : Ty} (h : ∀ n, t.Occurs n → n < p + kk) :
+    Flick.Scheme.Closed (p + kk) ⟨k', Facts.none, (trT N t).substT (rot p kk)⟩ := by
+  intro σ σ' hσ
+  refine ⟨?_, by simp⟩
+  simp only [Flick.Ty.substT_comp]
+  apply trT_substT_congr
+  intro n hn
+  obtain ⟨m, e, hm⟩ := rot_v (h n hn)
+  rw [e]; exact hσ m hm
+
+theorem trT_con_up (c kk : Nat) : (trT N (.con c)).up kk = trT N (.con c) := by
+  unfold trT; split <;> rfl
+
+/-- **The field of a method at a ground class argument** `con c`. -/
+theorem field_inst (t : Ty) (c kk : Nat) :
+    ((trT N t).substT (rot 1 kk)).substT (liftT kk (instT [trT N (.con c)])) =
+      trT N (t.subst (inst [.con c])) := by
+  rw [trT_subst, Flick.Ty.substT_comp]
+  apply Flick.Ty.substT_congr
+  intro a
+  cases a with
+  | r p => rfl
+  | v j =>
+    simp only [rot, trσ, inst, List.length_singleton]
+    by_cases h0 : j < 1
+    · have : j = 0 := by omega
+      subst this
+      simp [Flick.Ty.substT, liftT, instT, trT_con_up]
+    · rw [if_neg h0, dif_neg h0]
+      by_cases h1 : j < 1 + kk
+      · rw [if_pos h1]; simp only [Flick.Ty.substT, liftT, trT]; rw [if_pos (by omega)]
+      · rw [if_neg h1]
+        simp only [Flick.Ty.substT, liftT, if_neg (show ¬ j < kk by omega), instT,
+          List.length_singleton, trT]
+        rw [dif_neg (by omega)]
+        simp only [Flick.Ty.up, Flick.Ty.substT, shiftV]; congr 1; omega
+
+end Flick.Elab

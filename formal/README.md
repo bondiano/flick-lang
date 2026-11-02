@@ -430,6 +430,8 @@ instantiate it.
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
 | §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
 | T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
+| the hypotheses of T6 hold together: a witness program | `P`, `S`, `N`, `Sg`, `root`, `coherent`, `real`, `rootTy`, `realRun`, `witness_T6a`, `witness_T6a_do`, `witness_T6b` (`Elab/Witness/`) |
+| Р188: the lazy `Monad Eff` in the core, `Eff q b` with the field `eff ∅ ∅ b {q}` | `effT`, `effField`, `effPure`, `effMap2`, `effBind`, `typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr` (`Elab/LazyEff.lean`) |
 | the run of dictionaries in the core: closed derivations evaluate, `≈` keeps values | `RealRun`, `ent_eval`, `eqv_sem` (`Elab/CoreDictSem.lean`); `Eval`, `SemEq` (`Elab/CoreEval.lean`); `PStep`, `decomp_eq` (`Decomp.lean`) |
 | λFlick⁺ as `Target` with the run of the core: `Rel`, `load_rel`, `step_rel`, `final_rel`; T6(b) for the core | `Cg`, `DP`, `CfgR` (`Elab/CoreCg*.lean`, `Elab/CoreRel.lean`); `phead_sim`, `rhead_sim`, `thread_sim`, `cstep_sim`, `final_sim` (`Elab/CoreHead.lean`, `Elab/CoreStep.lean`, `Elab/CoreSim.lean`); `DSim`, `eqv_dsim`, `DTyp`, `dsim_cg` (`Elab/CoreLoad.lean`); `trE`, `RHas`, `runTarget`, `T6b_core` (`Elab/CoreRun.lean`) |
 
@@ -483,8 +485,14 @@ Simplifications:
    of the filled skeleton, and `T6b_target` takes it for both fillings.
 9. The sugar (§3) desugars into `Exp`; `Sugar` names the Prelude methods (`flat_map`,
    `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
-   hypotheses on the program. The schemes have capture variables; qualifiers of non-arrow
-   types are dropped (Р188). A lambda of the sugar takes as its qualifier a row that covers
+   hypotheses on the program. Simplification 15 extends to the Prelude (Р188): a type with
+   hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
+   qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and
+   data without storage drops it. That argument is invariant, so a qualifier the caller
+   supplies is a variable of the scheme, a result shows what the arguments it holds reach
+   (`flat_map : (a →^c m e b) →P (m d a →^(c ∪ e) m ((c ∪ e) ∪ (d ∪ a)) b)`, `bindTy`), and
+   a block of `do` or `for … yield` has the row its desugaring shows (`∃q` in `do_elab`,
+   `gen_elab`, `T6a_do`). A lambda of the sugar takes as its qualifier a row that covers
    its context (`ctxRow`). The checker's rules are the judgements `DoOk`, `GenOk` and
    `LoopOk`; `?` and `s; rest` are premises of their lemmas. Patterns are variables (and `_`):
    a refutable pattern needs `match`, which the source lacks. The values of a group
@@ -508,6 +516,15 @@ Simplifications:
     `None`. `typingTarget` has an empty run; `runTarget` (P4a4) has the run of the core,
     and its `Has` adds to the core's typing the typing `DTyp` of the dictionaries of the term
     by the laws (`RHas`, Р199).
+11. The hypotheses are satisfiable (`Elab/Witness/`): one program meets `Real`, `RealRun`,
+    `RootTy`, `Coherent` and `Sugar` at once, with `Eq` on `Int` and structural on a record,
+    the lazy `Monad Eff` (Р188), an eager `Option` monad `OptQ q a` and `Iterable` of
+    `ListQ q a` (data without storage gets a phantom `CRow` parameter as an instance of a class
+    over containers), `Seq q a` as a thunk `Unit →P^q List a`. The bodies of `Seq.flat_map`,
+    `each_φ`, `from_result`, `unc n`, of `eq` on `Int` and of the structural `eq` are stubs
+    (`todo` or a constant): the hypotheses ask only for typed bodies, and the core has no
+    comparison of `Int`, no raising at `R` with an empty row of errors, and these bodies
+    would need recursion on lists.
 
 ### P4a design
 
@@ -522,7 +539,16 @@ updated. P4a1 is done; Р188 records the Prelude schemes. P4a2 is done (Р194). 
 (Р188 decided, Р195). P4a4 is done: Р196 and Р197 fixed the model, P4a4a is the run of
 dictionaries (`eqv_sem`), P4a4b `Rel` and its closure, P4a4c the fields of the target and
 `T6b_core`, T6(b) for the core with its run without the hypothesis `Sim` (Р198–Р200). P4a is
-done. The pieces below are in their intended order.
+done. Р188 through a `CRow` parameter is done: the translation and the schemes of `Sugar`,
+and the lazy `pure`, `map2` and `flat_map` of `Monad Eff` typed by the rules of the core at
+those schemes (`LazyEff.lean`). The witness of the hypotheses (`Elab/Witness/`): W1 is done,
+a program with `Eq` (an instance on `Int`, structural on a record), `Applicative`/`Monad` of
+`Eff` and of an eager `OptQ`, `Alternative OptQ`, `Iterable ListQ`, all of `Sugar`, with
+`Coherent` (`coherent`) and `Real` (`real`); W2, the bodies of the globals (`RootTy`,
+`RealRun`) and T6 on the witness, is done too (`rootTy`, `realRun`, `witness_T6a`,
+`witness_T6a_do`, `witness_T6b`, `do_eff`, `do_opt`). Its `Sugar` schemes are still compared
+with the hand-written ones of `Sugar.lean`; they move to `PreludeSchemes.lean` (generated
+from the checker, step 2 of the plan) when that file exists. The pieces below are in their intended order.
 
 #### P4a1: captures in `Elab` and `Target`
 
@@ -659,14 +685,20 @@ five places.
   `caseOpt` — `Typ.match_`.
 - *Deviation 5:* `typingTarget` has an empty run (`Rel = True`, no steps), so that T6(a)
   is stated now; P4a4 gives the run of the core with the same laws.
-- **Р188, decided.** `τ^q` on types other than arrows and `Eff` is not added to the core.
+- **Р188, decided; superseded by the `CRow` parameter.** `τ^q` on types other than arrows
+  and `Eff` is not added to the core.
   It is a new type former with its (≤-Cap) in `Le`, and every case analysis on `Ty` and
   `Le` changes: substitution, `⌈·⌉`, canonical forms, shapes and patterns, `held`,
   preservation, T4 and T4.3 — 45 of the 60 files of `Formal/` use them. A lazy instance or
   constant is a global declared in `Real` at its scheme without the value qualifier; its
   body is a hypothesis `RootTy` that the core does not derive for it. T6(a) does not read
   bodies; the run (P4a4) and T1–T3 of a program with a lazy instance rest on that
-  hypothesis.
+  hypothesis. Р188 is now done without a new type former: the hidden qualifier of `Eff` and
+  `Seq` is a parameter of kind `CRow` of the type (simplification 15), the schemes of
+  `Sugar` show it (`elaboration.md` Р188 gives the translation of the checker's schemes),
+  and a lazy body is `MkEff (task …)` of the nominal type `Eff q b` with the field
+  `eff ∅ ∅ b {q}`: `typ_effPure_tr`, `typ_effMap2_tr` and `typ_effBind_tr` (`LazyEff.lean`)
+  derive the bodies of `Monad Eff` at the schemes of `Sugar` with the class variable `Eff`.
 
 #### P4a4: `Rel` and `Sim`
 
