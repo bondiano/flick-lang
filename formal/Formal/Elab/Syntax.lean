@@ -162,8 +162,10 @@ inductive Eqv : Dict → Dict → Prop
       P.fields τ = some ts → Ent P [] (ts.map fun t => ⟨C, [t]⟩) ds →
       Eqv (.slot (apps (.strct C τ) ds) i) (apps (.strct S.cls τ) (ds.map (.slot · i)))
   /-- `struct_C^τ ≈ struct_C^{τθ}` (Р196) -/
-  | strctSub {C τ ts θ} : P.fields τ = some ts → Eqv (.strct C τ) (.strct C (τ.subst θ))
+  | strctSub {C τ ts θ} : P.structC C = true → P.fields τ = some ts →
+      Eqv (.strct C τ) (.strct C (τ.subst θ))
   /-- `prim_q ℓ̄ ≈ prim_{qθ} ℓ̄` (Р196) -/
-  | primSub {p q θ} : P.prims q = some p → Eqv (.prim p q) (.prim p (q.subst θ))
+  | primSub {p q θ} : P.primC q.cls = true → P.prims q = some p →
+      Eqv (.prim p q) (.prim p (q.subst θ))
 
 end Flick.Elab

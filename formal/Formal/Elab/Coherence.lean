@@ -69,7 +69,7 @@ theorem closed_rep (h : Coherent P lt) {Δ : List Cn} {θ : Nat → Ty} {ρ : Na
   | given hc =>
     obtain ⟨d', h1, h2⟩ := clo_rep hρ ho hc
     exact ⟨[d'], h2, .cons h1 .nil⟩
-  | prim h1 h2 => exact ⟨[_], .prim h1 (h.prims_subst h2), .cons (.primSub h2) .nil⟩
+  | prim h1 h2 => exact ⟨[_], .prim h1 (h.prims_subst h2), .cons (.primSub h1 h2) .nil⟩
   | @strct C τ ts ds h1 h2 _ ih =>
     obtain ⟨ds', e, a⟩ := ih
     refine ⟨[apps (.strct C (τ.subst θ)) ds'], ?_, .cons ?_ .nil⟩
@@ -78,7 +78,7 @@ theorem closed_rep (h : Coherent P lt) {Δ : List Cn} {θ : Nat → Ty} {ρ : Na
         simp [List.map_map, Function.comp, Cn.subst]
       rw [this] at e
       exact .strct h1 (h.fields_subst h2) e
-    · simp only [apps_subst]; exact Eqv.apps (.strctSub h2) a
+    · simp only [apps_subst]; exact Eqv.apps (.strctSub h1 h2) a
   | @inst Q I ins σ ds h1 h2 h3 _ ih =>
     obtain ⟨ds', e, a⟩ := ih
     refine ⟨[apps (.inst I) ds'], ?_, .cons ?_ .nil⟩

@@ -82,6 +82,9 @@ import Formal.RT.Layers
 import Formal.RT.Layers2
 import Formal.RT.RefLin
 import Formal.RT.T5
+import Formal.Decomp
+import Formal.Closed
+import Formal.SubstComp
 import Formal.Elab.Syntax
 import Formal.Elab.Hyp
 import Formal.Elab.Basic
@@ -100,3 +103,6 @@ import Formal.Elab.CoreTr
 import Formal.Elab.CoreLaws
 import Formal.Elab.CoreDict
 import Formal.Elab.CoreT6a
+import Formal.Elab.CoreEval
+import Formal.Elab.CoreDictRun
+import Formal.Elab.CoreDictSem
