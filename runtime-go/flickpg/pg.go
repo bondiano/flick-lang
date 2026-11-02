@@ -74,24 +74,27 @@ func (c *pgConn) Exec(ctx context.Context, text string, args []*string) (*flickr
 			values[i] = []byte(*a)
 		}
 	}
-	res := c.conn.Conn().PgConn().ExecParams(ctx, text, values, nil, nil, nil).Read()
-	if res.Err != nil {
-		return nil, failure(res.Err)
-	}
-	out := &flickrt.PgResult{RowCount: res.CommandTag.RowsAffected()}
-	for _, f := range res.FieldDescriptions {
-		out.Fields = append(out.Fields, flickrt.PgField{Name: f.Name, OID: f.DataTypeOID})
-	}
-	out.Rows = make([][]*string, len(res.Rows))
-	for r, row := range res.Rows {
-		out.Rows[r] = make([]*string, len(row))
-		for i, v := range row {
+	// not ResultReader.Read: it keeps the fields only of a result with rows
+	rr := c.conn.Conn().PgConn().ExecParams(ctx, text, values, nil, nil, nil)
+	out := &flickrt.PgResult{}
+	for rr.NextRow() {
+		row := make([]*string, len(rr.Values()))
+		for i, v := range rr.Values() {
 			if v != nil {
 				s := string(v)
-				out.Rows[r][i] = &s
+				row[i] = &s
 			}
 		}
+		out.Rows = append(out.Rows, row)
 	}
+	for _, f := range rr.FieldDescriptions() {
+		out.Fields = append(out.Fields, flickrt.PgField{Name: f.Name, OID: f.DataTypeOID})
+	}
+	tag, err := rr.Close()
+	if err != nil {
+		return nil, failure(err)
+	}
+	out.RowCount = tag.RowsAffected()
 	return out, nil
 }
 

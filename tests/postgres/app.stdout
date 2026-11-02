@@ -9,6 +9,7 @@
 [{ balance = 5 }, { balance = 17 }]
 [{ email = None }]
 [{ email = Some "'; --" }]
+[]
 [{ name = "'; DROP TABLE users; --" }, { name = "Ada" }]
 [{ name = "Ada" }]
 2
