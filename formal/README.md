@@ -430,6 +430,7 @@ instantiate it.
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
 | §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
 | T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
+| the hypotheses of T6 hold together: a witness program | `P`, `S`, `N`, `Sg`, `root`, `coherent`, `real`, `rootTy`, `realRun`, `witness_T6a`, `witness_T6a_do`, `witness_T6b` (`Elab/Witness/`) |
 | Р188: the lazy `Monad Eff` in the core, `Eff q b` with the field `eff ∅ ∅ b {q}` | `effT`, `effField`, `effPure`, `effMap2`, `effBind`, `typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr` (`Elab/LazyEff.lean`) |
 | the run of dictionaries in the core: closed derivations evaluate, `≈` keeps values | `RealRun`, `ent_eval`, `eqv_sem` (`Elab/CoreDictSem.lean`); `Eval`, `SemEq` (`Elab/CoreEval.lean`); `PStep`, `decomp_eq` (`Decomp.lean`) |
 | λFlick⁺ as `Target` with the run of the core: `Rel`, `load_rel`, `step_rel`, `final_rel`; T6(b) for the core | `Cg`, `DP`, `CfgR` (`Elab/CoreCg*.lean`, `Elab/CoreRel.lean`); `phead_sim`, `rhead_sim`, `thread_sim`, `cstep_sim`, `final_sim` (`Elab/CoreHead.lean`, `Elab/CoreStep.lean`, `Elab/CoreSim.lean`); `DSim`, `eqv_dsim`, `DTyp`, `dsim_cg` (`Elab/CoreLoad.lean`); `trE`, `RHas`, `runTarget`, `T6b_core` (`Elab/CoreRun.lean`) |
@@ -515,6 +516,15 @@ Simplifications:
     `None`. `typingTarget` has an empty run; `runTarget` (P4a4) has the run of the core,
     and its `Has` adds to the core's typing the typing `DTyp` of the dictionaries of the term
     by the laws (`RHas`, Р199).
+11. The hypotheses are satisfiable (`Elab/Witness/`): one program meets `Real`, `RealRun`,
+    `RootTy`, `Coherent` and `Sugar` at once, with `Eq` on `Int` and structural on a record,
+    the lazy `Monad Eff` (Р188), an eager `Option` monad `OptQ q a` and `Iterable` of
+    `ListQ q a` (data without storage gets a phantom `CRow` parameter as an instance of a class
+    over containers), `Seq q a` as a thunk `Unit →P^q List a`. The bodies of `Seq.flat_map`,
+    `each_φ`, `from_result`, `unc n`, of `eq` on `Int` and of the structural `eq` are stubs
+    (`todo` or a constant): the hypotheses ask only for typed bodies, and the core has no
+    comparison of `Int`, no raising at `R` with an empty row of errors, and these bodies
+    would need recursion on lists.
 
 ### P4a design
 
@@ -535,7 +545,10 @@ those schemes (`LazyEff.lean`). The witness of the hypotheses (`Elab/Witness/`):
 a program with `Eq` (an instance on `Int`, structural on a record), `Applicative`/`Monad` of
 `Eff` and of an eager `OptQ`, `Alternative OptQ`, `Iterable ListQ`, all of `Sugar`, with
 `Coherent` (`coherent`) and `Real` (`real`); W2, the bodies of the globals (`RootTy`,
-`RealRun`) and T6 on the witness, is next. The pieces below are in their intended order.
+`RealRun`) and T6 on the witness, is done too (`rootTy`, `realRun`, `witness_T6a`,
+`witness_T6a_do`, `witness_T6b`, `do_eff`, `do_opt`). Its `Sugar` schemes are still compared
+with the hand-written ones of `Sugar.lean`; they move to `PreludeSchemes.lean` (generated
+from the checker, step 2 of the plan) when that file exists. The pieces below are in their intended order.
 
 #### P4a1: captures in `Elab` and `Target`
 

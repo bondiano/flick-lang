@@ -1,0 +1,86 @@
+import Formal.Elab.Witness.Bodies
+
+/-!
+# Witness: the bodies of the instances typed at their globals (W2)
+
+An instance is the record `drec (N.cls C 1) …` of its slot (the global of the superclass's
+instance) and its methods, each typed at its field by `field_inst`.
+-/
+
+namespace Flick.Elab.Witness
+
+open Flick.Elab
+
+def eqInt : Flick.Tm := .lam (.lam (.lit (.bool true)))
+
+def instBody : Nat → Option Flick.Tm
+  | 0 => some (.drec (N.cls 0 1) (.rcons "eq" eqInt .rnil))
+  | 1 => some (.drec (N.cls 1 1) (.rcons "pure" (effPure "MkEff") (.rcons "map2" (effMap2 "MkEff") .rnil)))
+  | 2 => some (.drec (N.cls 2 1) (.rcons "slot" (.glob 4) (.rcons "flat_map" (effBind "MkEff") .rnil)))
+  | 3 => some (.drec (N.cls 1 1) (.rcons "pure" optPure (.rcons "map2" optMap2 .rnil)))
+  | 4 => some (.drec (N.cls 2 1) (.rcons "slot" (.glob 12) (.rcons "flat_map" optBind .rnil)))
+  | 5 => some (.drec (N.cls 3 1) (.rcons "slot" (.glob 12) (.rcons "nothing" noneQ .rnil)))
+  | 6 => some (.drec (N.cls 4 1) (.rcons "iter" iterL .rnil))
+  | _ => none
+
+theorem mfield_t (s : Scheme) (c : Nat) :
+    ((mfield s).substT (instT [trT N (.con c)])).t = trT N (s.ty.subst (inst [.con c])) := by
+  simp only [Flick.Scheme.substT, mfield]; exact field_inst N s.ty c _
+
+theorem hmk : Sg.ctor "MkEff" = some (2, [effField], "Eff") := rfl
+
+variable {Ψ : List Flick.Ty} {Θ : Facts}
+
+theorem dcons_m {s : Scheme} {c : Nat} {v r : Flick.Tm} {fs l}
+    (hv : ∀ Ψ Θ, Typ Sg Ψ Θ [] v (.ex (trT N (s.ty.subst (inst [.con c]))) .pure))
+    (hr : Typ Sg Ψ Θ [] r (.dfs fs)) :
+    Typ Sg Ψ Θ [] (.rcons l v r) (.dfs ((l, (mfield s).substT (instT [trT N (.con c)])) :: fs)) :=
+  .dcons (by rw [mfield_t]; exact hv _ _) hr
+
+theorem typ_optBind_tr (c d a b e : Ty) {φ} :
+    Typ Sg Ψ Θ [] optBind (.ex (trT N (bindTy (.con 6) c d a b e)) φ) := by
+  simp only [bindTy, arrP, appQ, trT, if_neg (show (6 : Nat) ≠ 2 by decide), trStage]
+  refine typ_optBind ?_
+  intro x h; rcases x with n | p <;>
+    simp [optT, N, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind
+
+theorem typ_optMap2_tr (c d a b x g d' : Ty) {φ} :
+    Typ Sg Ψ Θ [] optMap2 (.ex (trT N (map2Ty (.con 6) c d a b x g d')) φ) := by
+  simp only [map2Ty, arrP, appQ, trT, if_neg (show (6 : Nat) ≠ 2 by decide), trStage]
+  refine typ_optMap2 ?_ ?_ ?_ <;> intro y h <;> rcases y with n | p <;>
+    simp [optT, N, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind
+
+theorem hdrec {c : Nat} {r : Flick.Tm} (hn : ∀ s, ¬ r.Has s) :
+    Caps.Sub (held Ψ [] (.drec c r)) (Flick.Ty.dict c (Flick.Ty.spine [trT N (.con 5)])).reach :=
+  held_sub (fun s h => hn s h) (by simp)
+
+theorem inst_typ {I ins b} (hI : insts I = some ins) (hb : instBody I = some b) :
+    Typ Sg [] Facts.none [] b (.ex (trTT N (instTy ins)) .pure) := by
+  unfold insts at hI
+  split at hI <;> cases hI <;> simp only [instBody, Option.some.injEq] at hb <;> subst hb <;>
+    refine .drec (us := [trT N (.con _)]) rfl rfl ?_ (fun h => by
+      simp [eqInt, effPure, effMap2, effBind, mkEff, unEff, optPure, optMap2, optBind, un1, someQ,
+        noneQ, iterL, Flick.Tm.Has] at h)
+      (held_sub (fun s h => by
+        simp [eqInt, effPure, effMap2, effBind, mkEff, unEff, optPure, optMap2, optBind, un1, someQ,
+          noneQ, iterL, Flick.Tm.Has] at h) (by simp))
+  · exact dcons_m (s := ((methSch 0).get rfl).2) (fun _ _ => .lam (.lam .lit (fun h => h) (held_sub
+      (fun _ h => h) (mem1 fun x h => .inl ((Flick.Scheme.reach_mono _ _).1 h))) .refl) (fun h => h)
+      (held_sub (fun _ h => h) (by simp)) .refl) .dnil
+  · exact dcons_m (s := ((methSch 1).get rfl).2) (fun _ _ => typ_effPure_tr hmk N rfl (by decide) _ _)
+      (dcons_m (s := ((methSch 2).get rfl).2)
+        (fun _ _ => typ_effMap2_tr hmk N rfl (by decide) _ _ _ _ _ _ _) .dnil)
+  · exact .dcons (.glob (ts := []) rfl rfl (fun _ _ h => h.elim) .refl) (dcons_m (s := ((methSch 3).get rfl).2)
+      (fun _ _ => typ_effBind_tr hmk N rfl (by decide) _ _ _ _ _) .dnil)
+  · exact dcons_m (s := ((methSch 1).get rfl).2)
+      (fun _ _ => typ_optPure)
+      (dcons_m (s := ((methSch 2).get rfl).2) (fun _ _ => typ_optMap2_tr _ _ _ _ _ _ _) .dnil)
+  · exact .dcons (.glob (ts := []) rfl rfl (fun _ _ h => h.elim) .refl) (dcons_m (s := ((methSch 3).get rfl).2)
+      (fun _ _ => typ_optBind_tr _ _ _ _ _) .dnil)
+  · exact .dcons (.glob (ts := []) rfl rfl (fun _ _ h => h.elim) .refl) (dcons_m (s := ((methSch 4).get rfl).2)
+      (fun _ _ => typ_noneQ) .dnil)
+  · exact dcons_m (s := ((methSch 5).get rfl).2) (fun _ _ => by
+      exact typ_iterL fun x h => by
+        rcases x with n | p <;> simp [trT_reach, Ty.subst, inst, Ty.Occurs] at h ⊢ <;> omega) .dnil
+
+end Flick.Elab.Witness

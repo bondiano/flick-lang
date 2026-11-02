@@ -116,4 +116,4 @@ import Formal.Elab.CoreSim
 import Formal.Elab.CoreLoad
 import Formal.Elab.CoreRun
 import Formal.Elab.LazyEff
-import Formal.Elab.Witness.Real
+import Formal.Elab.Witness.Main
