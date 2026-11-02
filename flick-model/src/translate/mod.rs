@@ -8,6 +8,7 @@
 
 mod derive;
 mod expr;
+pub mod lean;
 pub mod types;
 
 use std::rc::Rc;

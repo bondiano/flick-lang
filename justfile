@@ -26,6 +26,10 @@ test:
 model:
     cargo test -p flick-model -- --include-ignored
 
+# Regenerate formal/Formal/Elab/PreludeSchemes.lean from the checker's Prelude
+formal-schemes:
+    FLICK_FORMAL_SCHEMES=1 cargo test -p flick-model --lib translate::lean
+
 # Check each capability independently, without workspace feature unification
 feature-check:
     cargo clippy -p flick-core --all-targets --no-default-features -- -D warnings

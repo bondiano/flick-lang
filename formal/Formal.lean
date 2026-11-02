@@ -86,6 +86,7 @@ import Formal.Decomp
 import Formal.Closed
 import Formal.SubstComp
 import Formal.Elab.Syntax
+import Formal.Elab.PreludeSchemes
 import Formal.Elab.Hyp
 import Formal.Elab.Basic
 import Formal.Elab.Coherence
