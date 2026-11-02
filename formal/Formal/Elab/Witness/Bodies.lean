@@ -5,8 +5,8 @@ import Formal.Elab.Witness.Real
 
 Each body is typed by the rules of the core at the translation of its scheme in `Sugar`, in
 the empty context. `OptQ` is eager: `flat_map k x` matches `x` and copies the result of `k`
-into the row of the result, as the `CRow` argument is invariant. `iter` of `ListQ` and the
-constants of `Seq` are lazy: `MkSeq (λ_. l)` holds what the list holds.
+into the row of the result, as the `CRow` argument is invariant. The lists `Seq` and `ListQ`
+are in `Seq.lean`, `unc n`, `from_result_n` and `eq` in `Unc.lean`.
 -/
 
 namespace Flick.Elab.Witness
@@ -53,12 +53,6 @@ theorem typ_lam {a t b φ} {C : Caps} (hb : Typ Sg Ψ Θ (.mono a :: Γ) b (.ex 
     (hn : ∀ s, ¬ b.Has s) (hh : ∀ s ∈ Γ, ∀ x, Flick.Scheme.reach s x → (Flick.Ty.arrow a .pure t C).reach x) :
     Typ Sg Ψ Θ Γ (.lam b) (.ex (.arrow a .pure t C) φ) :=
   .lam hb (hn .ins) (held_sub (fun s h => hn s h) hh) .refl
-
-theorem seqField_inst (q a : Flick.Ty) :
-    seqField.substT (instT [q, a]) = .arrow (.adt "Unit") .pure (listT a) q.reach := by
-  simp only [seqField, Flick.Ty.substT, listT, Flick.Stage.substT]
-  congr 1
-  funext x; apply propext; simp [Caps.substT, instT]
 
 /-- `OptQ q a` of the core. -/
 def optT (q a : Flick.Ty) : Flick.Ty := .tapp (.tapp (.adt "OptQ") q) a
@@ -125,49 +119,7 @@ theorem typ_optMap2 {A Bt X Cg C C0 C1 C2 D D' R φ}
     (mem1 fun x h => hg₁ x ((Flick.Scheme.reach_mono _ _).1 h)))
     (fun s h => by simp [un1, someQ, noneQ, Flick.Tm.Has] at h) (by simp)
 
-/-- `iter xs = MkSeq (λ_. l)` for `xs = MkListQ l`. -/
-def iterL : Flick.Tm := .lam (un1 "MkListQ" (.var 0) (.app (.ctor "MkSeq") (.lam (.var 1))) .todo)
-def seqSingleton : Flick.Tm :=
-  .lam (.app (.ctor "MkSeq") (.lam (.app (.app (.ctor "Cons") (.var 1)) (.ctor "Nil"))))
-def seqEmpty : Flick.Tm := .app (.ctor "MkSeq") (.lam (.ctor "Nil"))
-def seqToList : Flick.Tm := .lam (un1 "MkSeq" (.var 0) (.app (.var 0) (.ctor "MkUnit")) .todo)
 def pairB : Flick.Tm := .lam (.lam (.app (.app (.ctor "Tup") (.var 1)) (.var 0)))
-
-theorem typ_mkSeq {e Q A φ} (he : Typ Sg Ψ Θ Γ e (.ex (.arrow (.adt "Unit") .pure (listT A) Q.reach) φ)) :
-    Typ Sg Ψ Θ Γ (.app (.ctor "MkSeq") e) (.ex (tc "Seq" [Q, A]) φ) :=
-  typ_con1 (us := [Q, A]) rfl (by rw [seqField_inst]; exact he)
-
-theorem typ_iterL {D Q A C0 φ} (hQ : ∀ x, D.reach x → Q.reach x) :
-    Typ Sg Ψ Θ [] iterL (.ex (.arrow (tc "ListQ" [D, A]) .pure (tc "Seq" [Q, A]) C0) φ) :=
-  typ_lam (typ_un1 (us := [D, A]) rfl (typ_var_mono rfl)
-      (typ_mkSeq (typ_lam (Γ := [.mono (listT A), .mono (tc "ListQ" [D, A])]) (typ_var_mono rfl)
-        (fun s h => by simp [Flick.Tm.Has] at h)
-        (mem2 (fun x h => .inr (.inl ((Flick.Scheme.reach_mono _ _).1 h)))
-          (fun x h => by
-            simp only [Flick.Scheme.reach_mono, tc, Flick.Ty.tcon, List.foldl, Flick.Ty.reach,
-              Caps.none, false_or] at h
-            rcases h with h | h
-            · exact .inr (.inr (hQ x h))
-            · exact .inr (.inl (.inr h))))))
-      .todo)
-    (fun s h => by simp [un1, Flick.Tm.Has] at h) (by simp)
-
-theorem typ_seqSingleton {Q A C0 φ} :
-    Typ Sg Ψ Θ [] seqSingleton (.ex (.arrow A .pure (tc "Seq" [Q, A]) C0) φ) :=
-  typ_lam (typ_mkSeq (typ_lam (typ_con2 (us := [A]) rfl (typ_var_mono rfl) (typ_con0 (us := [A]) rfl))
-      (fun s h => by simp [Flick.Tm.Has] at h)
-      (mem1 fun x h => .inr (.inl (.inr ((Flick.Scheme.reach_mono _ _).1 h))))))
-    (fun s h => by simp [Flick.Tm.Has] at h) (by simp)
-
-theorem typ_seqEmpty {Q A φ} : Typ Sg Ψ Θ [] seqEmpty (.ex (tc "Seq" [Q, A]) φ) :=
-  typ_mkSeq (typ_lam (typ_con0 (us := [A]) rfl) (fun s h => by simp [Flick.Tm.Has] at h) (by simp))
-
-theorem typ_seqToList {D A C0 φ} :
-    Typ Sg Ψ Θ [] seqToList (.ex (.arrow (tc "Seq" [D, A]) .pure (listT A) C0) φ) :=
-  typ_lam (typ_un1 (us := [D, A]) rfl (typ_var_mono rfl)
-      (by rw [seqField_inst]
-          exact .app (ψ := .pure) (typ_var_mono rfl) (typ_con0 (us := []) rfl) trivial .refl) .todo)
-    (fun s h => by simp [un1, Flick.Tm.Has] at h) (by simp)
 
 theorem typ_pairB {A B C C0 φ} (hC : ∀ x, A.reach x → (Flick.Ty.arrow B .pure (tc "Tup" [A, B]) C).reach x) :
     Typ Sg Ψ Θ [] pairB (.ex (.arrow A .pure (.arrow B .pure (tc "Tup" [A, B]) C) C0) φ) :=

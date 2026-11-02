@@ -6,8 +6,10 @@ import Formal.Elab.Sugar
 # λFlick⁺ as a `Target`: the types (P4a3)
 
 The types of `Elab` in the core of `Formal/` with regions and dictionary records:
-`var ↦ tvar`, `app ↦ tapp`, `con c ↦ adt`, `Bool ↦ base bool`, `arr φ a b q ↦ ⟦a⟧ →⟦φ⟧^⌈⟦q⟧⌉ ⟦b⟧`,
-`cnil ↦ caps ∅`, `cun ↦ caps (∪)`, `D_{C τ̄} ↦ dict (cls C |τ̄|) τ̄`. A stage `R` is `rt ∅ ∅`.
+`var ↦ tvar`, `app ↦ tapp`, `con c ↦ adt`, `Bool ↦ base bool`, `Int ↦ base int`,
+`arr φ a b q ↦ ⟦a⟧ →⟦φ⟧^⌈⟦q⟧⌉ ⟦b⟧`,
+`cnil ↦ caps ∅`, `cun ↦ caps (∪)`, `D_{C τ̄} ↦ dict (cls C |τ̄|) τ̄`. A stage `R` is `rt ∅ ε` with
+`ε` every name (`allNames`, Р210).
 The translation commutes with substitution (`trT_subst`, `trTT_subst`, `trS_subst`) and with
 `⌈·⌉` (`trT_reach`): a capture variable is an ordinary variable on both sides.
 
@@ -38,15 +40,24 @@ structure Names where
 
 variable (N : Names)
 
-/-- `⟦P⟧ = pure`, `⟦R⟧ = rt ∅ ∅`. -/
+/-- Every name, as a row of errors: the stage `R` of the source has no row of errors, and
+`⟦R⟧` lets a body raise any error type whose values reach nothing (Р210). -/
+def allNames : Row
+  | .nm _ => True
+  | _ => False
+
+@[simp] theorem allNames_substT (σ : Atom → Flick.Ty) : allNames.substT σ = allNames := by
+  funext x; cases x <;> simp [Row.substT, allNames]
+
+/-- `⟦P⟧ = pure`, `⟦R⟧ = rt ∅ allNames`. -/
 def trStage : Stage → Flick.Stage
   | .P => .pure
-  | .R => .rt Row.none Row.none
+  | .R => .rt Row.none allNames
 
 /-- `⟦τ⟧`. -/
 def trT : Ty → Flick.Ty
   | .var n => .tvar n
-  | .con c => if c = 2 then .base .bool else .adt (N.con c)
+  | .con c => if c = 2 then .base .bool else if c = 4 then .base .int else .adt (N.con c)
   | .app t u => .tapp (trT t) (trT u)
   | .arr φ a b q => .arrow (trT a) (trStage φ) (trT b) (trT q).reach
   | .cnil => .caps Caps.none
@@ -79,6 +90,8 @@ def TTy.Closed (k : Nat) (t : TTy) : Prop :=
 
 theorem trT_bool : trT N boolTy = .base .bool := by simp [trT, boolTy]
 
+theorem trT_int : trT N intTy = .base .int := by simp [trT, intTy]
+
 theorem trT_opt (a : Ty) : trT N (optTy a) = .tapp (.adt (N.con 3)) (trT N a) := by
   simp [trT, optTy]
 
@@ -98,7 +111,7 @@ theorem trT_reach (t : Ty) (a : Atom) : (trT N t).reach a ↔ ∃ n, a = .v n �
   | var m => simp [trT, Ty.Occurs]
   | con c =>
     simp only [trT, Ty.Occurs, and_false, exists_false, iff_false]
-    split <;> simp [Flick.Ty.reach, Caps.none]
+    split <;> (try split) <;> simp [Flick.Ty.reach, Caps.none]
   | app t u iht ihu => simp only [trT, Flick.Ty.reach, iht, ihu, Ty.Occurs, ex_or]
   | arr φ a b q iha ihb ihq => simp only [trT, Flick.Ty.reach, iha, ihb, ihq, Ty.Occurs, ex_or]
   | cnil => simp [trT, Flick.Ty.reach, Caps.none, Ty.Occurs]
@@ -148,7 +161,7 @@ theorem Caps.substT_or (C C' : Caps) (σ : Atom → Flick.Ty) :
 theorem trT_subst (t : Ty) (σ : Nat → Ty) : trT N (t.subst σ) = (trT N t).substT (trσ N σ) := by
   induction t with
   | var n => rfl
-  | con c => simp only [Ty.subst, trT]; split <;> rfl
+  | con c => simp only [Ty.subst, trT]; split <;> (try split) <;> rfl
   | app t u iht ihu => simp [Ty.subst, trT, Flick.Ty.substT, iht, ihu]
   | arr φ a b q iha ihb ihq =>
     simp [Ty.subst, trT, Flick.Ty.substT, iha, ihb, ihq, Ty.reach_caps]

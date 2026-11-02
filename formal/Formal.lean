@@ -116,5 +116,6 @@ import Formal.Elab.CoreStep
 import Formal.Elab.CoreSim
 import Formal.Elab.CoreLoad
 import Formal.Elab.CoreRun
+import Formal.Elab.Exh
 import Formal.Elab.LazyEff
 import Formal.Elab.Witness.Main
