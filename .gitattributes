@@ -8,3 +8,5 @@ tests/run/portable.txt merge=union
 # corpora tools/go-unicode/graphemes.mjs and tools/go-collate/gen.mjs write from Node
 runtime-go/flickrt/testdata/graphemes.txt linguist-generated=true
 runtime-go/flickrt/testdata/collation.txt linguist-generated=true
+# just formal-schemes writes the Prelude schemes from the checker
+formal/Formal/Elab/PreludeSchemes.lean linguist-generated=true

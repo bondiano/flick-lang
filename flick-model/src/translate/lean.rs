@@ -1,11 +1,12 @@
-//! The checker's schemes of the Prelude names the sugar uses as terms of
-//! `Elab.Scheme` in Lean (`formal/Formal/Elab/PreludeSchemes.lean`), by the
-//! translation of Р188 (`docs/formal/elaboration.md`):
+//! The checker's schemes of the exports of the Prelude and of the modules
+//! the sugar may take as terms of `Elab.Scheme` in Lean
+//! (`formal/Formal/Elab/PreludeSchemes.lean`), by the translation of Р188
+//! (`docs/formal/elaboration.md`):
 //!
 //! 1. `(T ā)^q` is `T q ā` (`appQ`) for a type with hidden storage and for
-//!    the class variable over containers; data without storage and a type
-//!    variable drop `q`; `(A → B)^q` is `.arr φ A B q`, without `q` `.cnil`;
-//!    an arrow with rows is at the stage `R`.
+//!    a variable over containers; data without storage and a type variable
+//!    drop `q`; `(A → B)^q` is `.arr φ A B q`, without `q` `.cnil`; an arrow
+//!    with rows is at the stage `R`.
 //! 2. `∀v. a^v → …` of a parameter is instantiated `v := a`.
 //! 3. A qualifier in a negative position is a variable: a single variable
 //!    of the checker stays itself at its first such position, the rest are
@@ -15,251 +16,66 @@
 //!    data, `q` and the new variables inside of a function.
 //! 5. Binders: the class parameter, the checker's `∀` that remain in their
 //!    order, then the new variables in the order they appear.
+//!
+//! A scheme the model cannot write is a line of the skipped list, with its
+//! reason (Р230).
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::Write;
-use std::iter;
+mod tr;
 
-use flick_core::iface::Decl;
-use flick_core::types::{self as fc, show_type};
+use std::fmt::{self, Write};
 
-/// The names `Sugar` uses, by module.
-pub const SUGAR: [(&str, &str); 11] = [
-    ("Prelude", "flat_map"),
-    ("Prelude", "map2"),
-    ("Prelude", "pure"),
-    ("Prelude", "nothing"),
-    ("Prelude", "iter"),
-    ("Seq", "flat_map"),
-    ("Seq", "singleton"),
-    ("Seq", "empty"),
-    ("Seq", "to_list"),
-    ("Seq", "each_effect"),
-    ("Prelude", "from_result"),
-];
+use flick_core::iface::{Decl, Export};
+use flick_core::types::{self as fc, Kind, show_type};
 
-/// Types with hidden storage: the qualifier of a value is their argument.
-const STORED: [&str; 1] = ["Seq"];
+use self::tr::{Tr, Ty, occurs};
 
-/// A type of `Elab`, its variables by name.
-#[derive(Clone)]
-enum Ty {
-    Var(String),
-    Con(String),
-    App(Box<Ty>, Box<Ty>),
-    /// `.arr φ a b q`, `R` when `true`
-    Arr(bool, Box<Ty>, Box<Ty>, Box<Ty>),
-    Nil,
-    Un(Box<Ty>, Box<Ty>),
-    /// a positive qualifier, its variables of the checker, before rule 4
-    Pos(Vec<String>),
+/// The modules whose exports the model takes, in this order.
+const MODULES: [&str; 5] = ["Prelude", "Seq", "Option", "Result", "List"];
+
+/// Families by a row of errors: the variable of the row is their index
+/// (`from_result`, Р230).
+const ROW_FAMILIES: [(&str, &str); 1] = [("Prelude", "from_result")];
+
+/// Identifiers of the checker that are Lean keywords.
+const KEYWORDS: [&str; 4] = ["show", "from", "at", "fun"];
+
+/// Why an export has no `def`.
+#[derive(Debug)]
+enum Skip {
+    /// a row of services or errors outside an arrow and `Eff`
+    Row,
+    /// `∀` of a parameter other than `∀v. a^v → …` (Р194)
+    Rank,
+    /// a region parameter
+    Region,
+    Other(String),
 }
 
-/// `x₁ ∪ … ∪ xₙ`, nested to the left.
-fn cun(xs: Vec<Ty>) -> Ty {
-    xs.into_iter()
-        .reduce(|a, b| Ty::Un(Box::new(a), Box::new(b)))
-        .unwrap_or(Ty::Nil)
-}
-
-fn app(head: Ty, args: impl IntoIterator<Item = Ty>) -> Ty {
-    args.into_iter()
-        .fold(head, |h, a| Ty::App(Box::new(h), Box::new(a)))
-}
-
-#[derive(Default)]
-struct Tr {
-    /// the class variable over containers
-    container: Option<String>,
-    /// `v := a` of rule 2
-    inst: BTreeMap<String, String>,
-    /// variables that stayed themselves at a negative position
-    kept: BTreeSet<String>,
-    /// what each qualified argument reaches, by its variable (rule 4)
-    reach: BTreeMap<String, Vec<Ty>>,
-    fresh: Vec<String>,
-    /// the type constructors, in the order they appear
-    cons: Vec<String>,
-}
-
-/// What a qualified argument reaches besides its qualifier.
-enum Site {
-    Data(Vec<Ty>),
-    /// a function: the new variables from this one on
-    Fun(usize),
-}
-
-impl Tr {
-    fn new_var(&mut self) -> Ty {
-        let name = format!("'{}", self.fresh.len());
-        self.fresh.push(name.clone());
-        Ty::Var(name)
-    }
-
-    fn ty(&mut self, t: &fc::Type, neg: bool) -> Ty {
-        match t {
-            fc::Type::Var(a) => Ty::Var(a.clone()),
-            fc::Type::Con { name, .. } => {
-                let c = name.to_lowercase();
-                if !self.cons.contains(&c) {
-                    self.cons.push(c.clone());
-                }
-                Ty::Con(c)
-            }
-            fc::Type::App { .. } => self.data(t, None, neg),
-            fc::Type::Fun {
-                param,
-                effects,
-                result,
-            } => self.arrow(param, effects.is_some(), result, None, neg),
-            fc::Type::Captured { ty, captures, .. } | fc::Type::Bounded { ty, captures } => {
-                match self.open(ty) {
-                    fc::Type::Fun {
-                        param,
-                        effects,
-                        result,
-                    } => self.arrow(param, effects.is_some(), result, Some(captures), neg),
-                    fc::Type::App { .. } => self.data(ty, Some(captures), neg),
-                    // a type variable: its bound is not modelled
-                    fc::Type::Var(_) => self.ty(ty, neg),
-                    other => panic!("Р188: no qualifier on {}", show_type(other)),
-                }
-            }
-            fc::Type::Forall { .. } => {
-                let body = self.open(t);
-                self.ty(body, neg)
-            }
-            other => panic!("Р188: no translation of {}", show_type(other)),
-        }
-    }
-
-    /// The body of `∀v. a^v → …`, with `v := a` (rule 2).
-    fn open<'t>(&mut self, t: &'t fc::Type) -> &'t fc::Type {
-        let fc::Type::Forall {
-            vars,
-            constraints,
-            body,
-        } = t
-        else {
-            return t;
-        };
-        assert!(constraints.is_empty(), "Р188: a context of rank 2");
-        for v in vars {
-            let a = bound(body, &v.name)
-                .unwrap_or_else(|| panic!("Р188: `{}` bounds no variable", v.name));
-            self.inst.insert(v.name.clone(), a);
-        }
-        body
-    }
-
-    fn arrow(
-        &mut self,
-        param: &fc::Type,
-        runtime: bool,
-        result: &fc::Type,
-        q: Option<&fc::Type>,
-        neg: bool,
-    ) -> Ty {
-        let start = self.fresh.len();
-        let a = self.ty(param, !neg);
-        let b = self.ty(result, neg);
-        let q = match q {
-            Some(q) => self.qual(q, neg, Site::Fun(start)),
-            None => Ty::Nil,
-        };
-        Ty::Arr(runtime, Box::new(a), Box::new(b), Box::new(q))
-    }
-
-    /// `T ā` with the qualifier `q` of its value.
-    fn data(&mut self, t: &fc::Type, q: Option<&fc::Type>, neg: bool) -> Ty {
-        let (head, args) = t.spine();
-        let stored = match head {
-            fc::Type::Var(m) => self.container.as_ref() == Some(m),
-            fc::Type::Con { name, .. } => STORED.contains(&name.as_str()),
-            _ => false,
-        };
-        let h = self.ty(head, neg);
-        let args: Vec<Ty> = args.into_iter().map(|a| self.ty(a, neg)).collect();
-        if !stored {
-            return app(h, args);
-        }
-        let q = match q {
-            Some(q) => self.qual(q, neg, Site::Data(args.clone())),
-            None => self.new_var(),
-        };
-        app(h, iter::once(q).chain(args))
-    }
-
-    fn qual(&mut self, q: &fc::Type, neg: bool, site: Site) -> Ty {
-        let mut atoms = Vec::new();
-        self.atoms(q, &mut atoms);
-        if !neg {
-            return Ty::Pos(atoms);
-        }
-        let var = match &atoms[..] {
-            [v] if self.kept.insert(v.clone()) => Ty::Var(v.clone()),
-            _ => self.new_var(),
-        };
-        if let [v] = &atoms[..] {
-            let rest = match site {
-                Site::Data(args) => args,
-                Site::Fun(start) => self.fresh[start..].iter().cloned().map(Ty::Var).collect(),
-            };
-            let reach = cun(iter::once(var.clone()).chain(rest).collect());
-            self.reach.entry(v.clone()).or_default().push(reach);
-        }
-        var
-    }
-
-    fn atoms(&self, q: &fc::Type, out: &mut Vec<String>) {
-        match q {
-            fc::Type::Var(v) => out.push(self.inst.get(v).unwrap_or(v).clone()),
-            fc::Type::Union(a, b) => {
-                self.atoms(a, out);
-                self.atoms(b, out);
-            }
-            other => panic!("Р188: no qualifier {}", show_type(other)),
-        }
-    }
-
-    /// Rule 4 on the positive qualifiers.
-    fn resolve(&self, t: Ty) -> Ty {
-        let go = |t: Box<Ty>| Box::new(self.resolve(*t));
-        match t {
-            Ty::Pos(atoms) => cun(atoms
-                .into_iter()
-                .map(|v| match self.reach.get(&v) {
-                    Some(sites) => cun(sites.clone()),
-                    None => Ty::Var(v),
-                })
-                .collect()),
-            Ty::App(a, b) => Ty::App(go(a), go(b)),
-            Ty::Arr(r, a, b, q) => Ty::Arr(r, go(a), go(b), go(q)),
-            Ty::Un(a, b) => Ty::Un(go(a), go(b)),
-            leaf => leaf,
+impl fmt::Display for Skip {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Skip::Row => f.write_str("row"),
+            Skip::Rank => f.write_str("rank"),
+            Skip::Region => f.write_str("region"),
+            Skip::Other(why) => write!(f, "other: {why}"),
         }
     }
 }
 
-/// The type variable `a` of `a^v` in `t`.
-fn bound(t: &fc::Type, v: &str) -> Option<String> {
-    match t {
-        fc::Type::Bounded { ty, captures } => match (&**ty, &**captures) {
-            (fc::Type::Var(a), fc::Type::Var(w)) if w == v => Some(a.clone()),
-            _ => bound(ty, v),
-        },
-        fc::Type::Fun { param, result, .. } => bound(param, v).or_else(|| bound(result, v)),
-        fc::Type::Captured { ty, .. } => bound(ty, v),
-        _ => None,
+fn ident(s: &str) -> String {
+    if KEYWORDS.contains(&s) {
+        format!("«{s}»")
+    } else {
+        s.to_string()
     }
 }
 
-fn occurs(t: &Ty, v: &str) -> bool {
-    match t {
-        Ty::Var(w) => w == v,
-        Ty::App(a, b) | Ty::Un(a, b) => occurs(a, v) || occurs(b, v),
-        Ty::Arr(_, a, b, q) => occurs(a, v) || occurs(b, v) || occurs(q, v),
-        _ => false,
+/// The Lean name of an export: a name of `Prelude` stays bare.
+fn lean_name(module: &str, name: &str) -> String {
+    if module == "Prelude" {
+        ident(name)
+    } else {
+        format!("{module}.{}", ident(name))
     }
 }
 
@@ -279,7 +95,7 @@ fn lean(t: &Ty, vars: &[String], out: &mut String) {
             let _ = write!(out, ".var {i}");
         }
         Ty::Con(c) => {
-            let _ = write!(out, ".con {c}");
+            let _ = write!(out, ".con {}", ident(c));
         }
         Ty::App(a, b) => {
             out.push_str(".app ");
@@ -307,74 +123,115 @@ fn lean(t: &Ty, vars: &[String], out: &mut String) {
     }
 }
 
-/// The `def` of one scheme: its parameters are the class of a method, then
-/// the type constructors in the order they appear.
-fn def(module: &str, name: &str, scheme: &fc::Type, class: Option<&str>) -> String {
-    let fc::Type::Forall {
-        vars,
-        constraints,
-        body,
-    } = scheme
-    else {
-        panic!("Р188: {module}.{name} is not generic");
+/// The `def` of one scheme: its parameters are the classes of its context,
+/// the class of a method first, then the type constructors in the order
+/// they appear.
+fn def(module: &str, name: &str, scheme: &fc::Type, class: Option<&str>) -> Result<String, Skip> {
+    let (vars, constraints, body) = match scheme {
+        fc::Type::Forall {
+            vars,
+            constraints,
+            body,
+        } => (&vars[..], &constraints[..], &**body),
+        t => (&[][..], &[][..], t),
     };
+    let family = ROW_FAMILIES.contains(&(module, name));
     let mut tr = Tr::default();
-    let mut ctx = Vec::new();
-    if let Some(class) = class {
-        let [c] = &constraints[..] else {
-            panic!("Р188: {module}.{name} has a context besides its class");
-        };
-        let (_, args) = c.spine();
-        let [fc::Type::Var(f)] = &args[..] else {
-            panic!("Р188: the class of {module}.{name} is not over a variable");
-        };
-        tr.container = Some(f.clone());
-        ctx.push((class.to_lowercase(), f.clone()));
-    } else if !constraints.is_empty() {
-        panic!("Р188: {module}.{name} has a context");
+    for b in vars {
+        match &b.kind {
+            Kind::Type | Kind::CaptureRow => {}
+            Kind::ServiceRow | Kind::ErrorRow => {
+                if !family {
+                    tr.rows.insert(b.name.clone());
+                }
+            }
+            Kind::Arrow(..) => {
+                tr.containers.insert(b.name.clone());
+            }
+            Kind::Region => return Err(Skip::Region),
+            k => return Err(Skip::Other(format!("a variable of kind {k:?}"))),
+        }
     }
-    let t = tr.ty(body, false);
+    // the class of a method comes first, its parameter is the first binder
+    let mut ctx: Vec<(String, Vec<&fc::Type>)> = Vec::new();
+    let mut first = None;
+    for c in constraints {
+        let (head, args) = c.spine();
+        let fc::Type::Con { name: cls, .. } = head else {
+            return Err(Skip::Other(format!("a constraint {}", show_type(c))));
+        };
+        let entry = (cls.to_lowercase(), args);
+        if Some(cls.as_str()) == class {
+            if let [fc::Type::Var(f)] = &entry.1[..] {
+                first = Some(f.clone());
+            }
+            ctx.insert(0, entry);
+        } else {
+            ctx.push(entry);
+        }
+    }
+    let t = tr.ty(body, false)?;
     let t = tr.resolve(t);
-    let binders: Vec<String> = tr
-        .container
+    let ctx: Vec<(String, Vec<Ty>)> = ctx
+        .into_iter()
+        .map(|(c, args)| {
+            let args = args.into_iter().map(|a| tr.ty(a, false));
+            Ok((c, args.collect::<Result<_, Skip>>()?))
+        })
+        .collect::<Result<_, Skip>>()?;
+    let binders: Vec<String> = first
         .iter()
         .chain(
             vars.iter()
                 .map(|b| &b.name)
-                .filter(|v| tr.container.as_ref() != Some(*v)),
+                .filter(|v| first.as_ref() != Some(*v)),
         )
-        .filter(|v| occurs(&t, v))
+        .filter(|v| occurs(&t, v) || ctx.iter().flat_map(|c| &c.1).any(|a| occurs(a, v)))
         .chain(&tr.fresh)
         .cloned()
         .collect();
-    let params: Vec<&str> = ctx
-        .iter()
-        .map(|(c, _)| c.as_str())
-        .chain(tr.cons.iter().map(String::as_str))
-        .collect();
+    let mut params: Vec<String> = Vec::new();
+    for p in ctx.iter().map(|c| &c.0).chain(&tr.cons) {
+        if !params.contains(p) {
+            params.push(p.clone());
+        }
+    }
     let mut out = format!("/-- `{module}.{name} : {}` -/\n", show_type(scheme));
-    let lean_name = if module == "Prelude" {
-        name.to_string()
-    } else {
-        format!("{module}.{name}")
-    };
-    let _ = write!(
-        out,
-        "def {lean_name} ({} : Nat) : Scheme :=\n  ⟨{}, [",
-        params.join(" "),
-        binders.len()
-    );
-    for (i, (c, f)) in ctx.iter().enumerate() {
+    let _ = write!(out, "def {}", lean_name(module, name));
+    if !params.is_empty() {
+        let params: Vec<String> = params.iter().map(|p| ident(p)).collect();
+        let _ = write!(out, " ({} : Nat)", params.join(" "));
+    }
+    let _ = write!(out, " : Scheme :=\n  ⟨{}, [", binders.len());
+    for (i, (c, args)) in ctx.iter().enumerate() {
         if i > 0 {
             out.push_str(", ");
         }
-        let f = binders.iter().position(|v| v == f).expect("bound");
-        let _ = write!(out, "⟨{c}, [.var {f}]⟩");
+        let _ = write!(out, "⟨{}, [", ident(c));
+        for (j, a) in args.iter().enumerate() {
+            if j > 0 {
+                out.push_str(", ");
+            }
+            lean(a, &binders, &mut out);
+        }
+        out.push_str("]⟩");
     }
     out.push_str("],\n    ");
     lean(&t, &binders, &mut out);
     out.push_str(", .cnil⟩\n");
-    out
+    Ok(out)
+}
+
+/// The exports with a scheme of [`MODULES`], in order.
+fn exports() -> impl Iterator<Item = (&'static str, &'static Export)> {
+    MODULES.into_iter().flat_map(|module| {
+        fc::builtins()
+            .iter()
+            .filter(move |i| i.module == module)
+            .flat_map(|i| &i.exports)
+            .filter(|e| e.scheme.is_some())
+            .map(move |e| (module, e))
+    })
 }
 
 /// The text of `formal/Formal/Elab/PreludeSchemes.lean`.
@@ -383,29 +240,47 @@ pub fn prelude_schemes() -> String {
         "-- Code generated by `just formal-schemes`. DO NOT EDIT.\n\n\
          import Formal.Elab.Syntax\n\n\
          /-!\n\
-         # Elaboration: the schemes of the Prelude names the sugar uses\n\n\
-         The checker's types of `Prelude.fl` and `Seq.fl` translated by Р188 (`docs/formal/elaboration.md`)\n\
-         in `flick-model/src/translate/lean.rs`. A `def` takes the numbers of the class of a method and of\n\
-         the type constructors it names.\n\
+         # Elaboration: the schemes of the Prelude\n\n\
+         The checker's types of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List`\n\
+         translated by Р188 (`docs/formal/elaboration.md`) in `flick-model/src/translate/lean.rs`.\n\
+         A `def` takes the numbers of the classes of its context and of the type constructors it\n\
+         names. A tuple is `tup` nested to the left, a closed record `rec_ℓ̄` of its fields.\n\
+         The exports the model cannot write close the file, each with its reason (Р230).\n\
          -/\n\n\
          namespace Flick.Elab.PreludeSchemes\n",
     );
-    for (module, name) in SUGAR {
-        let export = fc::builtins()
-            .iter()
-            .filter(|i| i.module == module)
-            .flat_map(|i| &i.exports)
-            .find(|e| e.entity.name == name && e.scheme.is_some())
-            .unwrap_or_else(|| panic!("no {module}.{name}"));
-        let scheme = export.scheme.as_ref().expect("checked");
-        out.push('\n');
+    let mut skipped = String::new();
+    for (module, export) in exports() {
+        let scheme = export.scheme.as_ref().expect("filtered");
+        let name = &export.entity.name;
         let class = export
             .parent
             .as_deref()
             .filter(|_| export.decl == Decl::Method);
-        out.push_str(&def(module, name, scheme, class));
+        match def(module, name, scheme, class) {
+            Ok(d) => {
+                out.push('\n');
+                out.push_str(&d);
+            }
+            Err(why) => {
+                let _ = writeln!(
+                    skipped,
+                    "-- skip {module}.{name} ({why}): {}",
+                    show_type(scheme)
+                );
+            }
+        }
     }
     out.push_str("\nend Flick.Elab.PreludeSchemes\n");
+    if !skipped.is_empty() {
+        out.push_str(
+            "\n/-! ## Skipped\n\n\
+             `row`: a row of services or errors outside an arrow and `Eff`; `rank`: `∀` of a\n\
+             parameter other than `∀v. a^v → …` (Р194); `region`: a region parameter.\n\
+             -/\n\n",
+        );
+        out.push_str(&skipped);
+    }
     out
 }
 
@@ -413,7 +288,8 @@ pub fn prelude_schemes() -> String {
 mod tests {
     use std::{env, fs};
 
-    /// The committed file is what the checker's Prelude gives; with
+    /// The committed file is what the checker's Prelude gives, and each
+    /// export is in it, a `def` or a skipped line; with
     /// `FLICK_FORMAL_SCHEMES` set the test writes it.
     #[test]
     fn prelude_schemes_are_generated() {
@@ -423,12 +299,20 @@ mod tests {
         );
         let text = super::prelude_schemes();
         if env::var_os("FLICK_FORMAL_SCHEMES").is_some() {
-            fs::write(path, text).expect("write PreludeSchemes.lean");
-        } else {
-            let committed = fs::read_to_string(path).unwrap_or_default();
+            fs::write(path, &text).expect("write PreludeSchemes.lean");
+        }
+        let committed = fs::read_to_string(path).unwrap_or_default();
+        assert!(
+            committed == text,
+            "PreludeSchemes.lean is stale: run `just formal-schemes`"
+        );
+        for (module, e) in super::exports() {
+            let name = &e.entity.name;
+            let def = format!("\ndef {} ", super::lean_name(module, name));
+            let skip = format!("\n-- skip {module}.{name} (");
             assert!(
-                committed == text,
-                "PreludeSchemes.lean is stale: run `just formal-schemes`"
+                committed.contains(&def) || committed.contains(&skip),
+                "{module}.{name} is neither a `def` nor skipped"
             );
         }
     }

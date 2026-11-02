@@ -3,68 +3,1199 @@
 import Formal.Elab.Syntax
 
 /-!
-# Elaboration: the schemes of the Prelude names the sugar uses
+# Elaboration: the schemes of the Prelude
 
-The checker's types of `Prelude.fl` and `Seq.fl` translated by Р188 (`docs/formal/elaboration.md`)
-in `flick-model/src/translate/lean.rs`. A `def` takes the numbers of the class of a method and of
-the type constructors it names.
+The checker's types of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List`
+translated by Р188 (`docs/formal/elaboration.md`) in `flick-model/src/translate/lean.rs`.
+A `def` takes the numbers of the classes of its context and of the type constructors it
+names. A tuple is `tup` nested to the left, a closed record `rec_ℓ̄` of its fields.
+The exports the model cannot write close the file, each with its reason (Р230).
 -/
 
 namespace Flick.Elab.PreludeSchemes
 
-/-- `Prelude.flat_map : forall m c d a b. Monad m => (forall v. a^v -> (m b)^(c + v))^c -> ((m a)^d -> (m b)^(c + d))^c` -/
-def flat_map (monad : Nat) : Scheme :=
-  ⟨6, [⟨monad, [.var 0]⟩],
-    .arr .P (.arr .P (.var 3) (.app (.app (.var 0) (.var 5)) (.var 4)) (.var 1)) (.arr .P (.app (.app (.var 0) (.var 2)) (.var 3)) (.app (.app (.var 0) (.cun (.cun (.var 1) (.var 5)) (.cun (.var 2) (.var 3)))) (.var 4)) (.cun (.var 1) (.var 5))) .cnil, .cnil⟩
+/-- `Prelude.None : forall a. Option a` -/
+def None (option : Nat) : Scheme :=
+  ⟨1, [],
+    .app (.con option) (.var 0), .cnil⟩
 
-/-- `Prelude.map2 : forall f c d a b x. Applicative f => (forall u v. a^u -> (b^v -> x)^(c + u))^c -> ((f a)^d -> ((f b)^d -> (f x)^(c + d))^(c + d))^c` -/
-def map2 (applicative : Nat) : Scheme :=
-  ⟨8, [⟨applicative, [.var 0]⟩],
-    .arr .P (.arr .P (.var 3) (.arr .P (.var 4) (.var 5) (.var 6)) (.var 1)) (.arr .P (.app (.app (.var 0) (.var 2)) (.var 3)) (.arr .P (.app (.app (.var 0) (.var 7)) (.var 4)) (.app (.app (.var 0) (.cun (.cun (.var 1) (.var 6)) (.cun (.cun (.var 2) (.var 3)) (.cun (.var 7) (.var 4))))) (.var 5)) (.cun (.cun (.var 1) (.var 6)) (.cun (.cun (.var 2) (.var 3)) (.cun (.var 7) (.var 4))))) (.cun (.var 1) (.var 6))) .cnil, .cnil⟩
+/-- `Prelude.Some : forall a captures. a^captures -> (Option a)^{captures}` -/
+def Some (option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.var 0) (.app (.con option) (.var 0)) .cnil, .cnil⟩
+
+/-- `Prelude.Err : forall e a captures. e^captures -> (Result e a)^{captures}` -/
+def Err (result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.var 0) (.app (.app (.con result) (.var 0)) (.var 1)) .cnil, .cnil⟩
+
+/-- `Prelude.Ok : forall e a captures. a^captures -> (Result e a)^{captures}` -/
+def Ok (result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.var 1) (.app (.app (.con result) (.var 0)) (.var 1)) .cnil, .cnil⟩
+
+/-- `Prelude.LT : Ordering` -/
+def LT (ordering : Nat) : Scheme :=
+  ⟨0, [],
+    .con ordering, .cnil⟩
+
+/-- `Prelude.EQ : Ordering` -/
+def EQ (ordering : Nat) : Scheme :=
+  ⟨0, [],
+    .con ordering, .cnil⟩
+
+/-- `Prelude.GT : Ordering` -/
+def GT (ordering : Nat) : Scheme :=
+  ⟨0, [],
+    .con ordering, .cnil⟩
+
+/-- `Prelude.eq : forall a. Eq a => a -> (a -> Bool)^{a}` -/
+def eq (eq bool : Nat) : Scheme :=
+  ⟨1, [⟨eq, [.var 0]⟩],
+    .arr .P (.var 0) (.arr .P (.var 0) (.con bool) (.var 0)) .cnil, .cnil⟩
+
+/-- `Prelude.compare : forall a. Ord a => a -> (a -> Ordering)^{a}` -/
+def compare (ord ordering : Nat) : Scheme :=
+  ⟨1, [⟨ord, [.var 0]⟩],
+    .arr .P (.var 0) (.arr .P (.var 0) (.con ordering) (.var 0)) .cnil, .cnil⟩
+
+/-- `Prelude.hash : forall a. Hash a => a -> Int` -/
+def hash (hash int : Nat) : Scheme :=
+  ⟨1, [⟨hash, [.var 0]⟩],
+    .arr .P (.var 0) (.con int) .cnil, .cnil⟩
+
+/-- `Prelude.show : forall a. Show a => a -> String` -/
+def «show» («show» string : Nat) : Scheme :=
+  ⟨1, [⟨«show», [.var 0]⟩],
+    .arr .P (.var 0) (.con string) .cnil, .cnil⟩
+
+/-- `Prelude.map : forall f c d a b. Functor f => (forall v. a^v -> b)^c -> ((f a)^d -> (f b)^(c + d))^c` -/
+def map (functor : Nat) : Scheme :=
+  ⟨5, [⟨functor, [.var 0]⟩],
+    .arr .P (.arr .P (.var 3) (.var 4) (.var 1)) (.arr .P (.app (.app (.var 0) (.var 2)) (.var 3)) (.app (.app (.var 0) (.cun (.var 1) (.cun (.var 2) (.var 3)))) (.var 4)) (.var 1)) .cnil, .cnil⟩
+
+/-- `Prelude.fold : forall f c a b. Foldable f => (b -> (a -> b)^{b | c})^c -> (b^c -> (f a -> b)^c)^c` -/
+def fold (foldable : Nat) : Scheme :=
+  ⟨6, [⟨foldable, [.var 0]⟩],
+    .arr .P (.arr .P (.var 3) (.arr .P (.var 2) (.var 3) (.var 4)) (.var 1)) (.arr .P (.var 3) (.arr .P (.app (.app (.var 0) (.var 5)) (.var 2)) (.var 3) (.cun (.var 1) (.var 4))) (.cun (.var 1) (.var 4))) .cnil, .cnil⟩
+
+/-- `Prelude.fold_map : forall f a m. (Foldable f, Monoid m) => (a -> m) -> (f a -> m)^{a, m}` -/
+def fold_map (foldable monoid : Nat) : Scheme :=
+  ⟨4, [⟨foldable, [.var 0]⟩, ⟨monoid, [.var 2]⟩],
+    .arr .P (.arr .P (.var 1) (.var 2) .cnil) (.arr .P (.app (.app (.var 0) (.var 3)) (.var 1)) (.var 2) (.cun (.var 1) (.var 2))) .cnil, .cnil⟩
+
+/-- `Prelude.traverse : forall f c a b r e. Traversable f => (a ->{r; e} b)^c -> (f a ->{r; e} f b)^c` -/
+def traverse (traversable : Nat) : Scheme :=
+  ⟨6, [⟨traversable, [.var 0]⟩],
+    .arr .P (.arr .R (.var 2) (.var 3) (.var 1)) (.arr .R (.app (.app (.var 0) (.var 4)) (.var 2)) (.app (.app (.var 0) (.var 5)) (.var 3)) (.var 1)) .cnil, .cnil⟩
 
 /-- `Prelude.pure : forall f c a. Applicative f => a^c -> (f a)^c` -/
 def pure (applicative : Nat) : Scheme :=
   ⟨3, [⟨applicative, [.var 0]⟩],
     .arr .P (.var 2) (.app (.app (.var 0) (.var 1)) (.var 2)) .cnil, .cnil⟩
 
+/-- `Prelude.map2 : forall f c d a b x. Applicative f => (forall u v. a^u -> (b^v -> x)^(c + u))^c -> ((f a)^d -> ((f b)^d -> (f x)^(c + d))^(c + d))^c` -/
+def map2 (applicative : Nat) : Scheme :=
+  ⟨8, [⟨applicative, [.var 0]⟩],
+    .arr .P (.arr .P (.var 3) (.arr .P (.var 4) (.var 5) (.var 6)) (.var 1)) (.arr .P (.app (.app (.var 0) (.var 2)) (.var 3)) (.arr .P (.app (.app (.var 0) (.var 7)) (.var 4)) (.app (.app (.var 0) (.cun (.cun (.var 1) (.var 6)) (.cun (.cun (.var 2) (.var 3)) (.cun (.var 7) (.var 4))))) (.var 5)) (.cun (.cun (.var 1) (.var 6)) (.cun (.cun (.var 2) (.var 3)) (.cun (.var 7) (.var 4))))) (.cun (.var 1) (.var 6))) .cnil, .cnil⟩
+
+/-- `Prelude.flat_map : forall m c d a b. Monad m => (forall v. a^v -> (m b)^(c + v))^c -> ((m a)^d -> (m b)^(c + d))^c` -/
+def flat_map (monad : Nat) : Scheme :=
+  ⟨6, [⟨monad, [.var 0]⟩],
+    .arr .P (.arr .P (.var 3) (.app (.app (.var 0) (.var 5)) (.var 4)) (.var 1)) (.arr .P (.app (.app (.var 0) (.var 2)) (.var 3)) (.app (.app (.var 0) (.cun (.cun (.var 1) (.var 5)) (.cun (.var 2) (.var 3)))) (.var 4)) (.cun (.var 1) (.var 5))) .cnil, .cnil⟩
+
 /-- `Prelude.nothing : forall f a. Alternative f => f a` -/
 def nothing (alternative : Nat) : Scheme :=
   ⟨3, [⟨alternative, [.var 0]⟩],
     .app (.app (.var 0) (.var 2)) (.var 1), .cnil⟩
+
+/-- `Prelude.or_else : forall f a. Alternative f => f a -> (f a -> f a)^{a}` -/
+def or_else (alternative : Nat) : Scheme :=
+  ⟨5, [⟨alternative, [.var 0]⟩],
+    .arr .P (.app (.app (.var 0) (.var 2)) (.var 1)) (.arr .P (.app (.app (.var 0) (.var 3)) (.var 1)) (.app (.app (.var 0) (.var 4)) (.var 1)) (.var 1)) .cnil, .cnil⟩
 
 /-- `Prelude.iter : forall f d a. Iterable f => (f a)^d -> (Seq a)^d` -/
 def iter (iterable seq : Nat) : Scheme :=
   ⟨3, [⟨iterable, [.var 0]⟩],
     .arr .P (.app (.app (.var 0) (.var 1)) (.var 2)) (.app (.app (.con seq) (.cun (.var 1) (.var 2))) (.var 2)) .cnil, .cnil⟩
 
-/-- `Seq.flat_map : forall c d a b. (forall v. a^v -> (Seq b)^(c + v))^c -> ((Seq a)^d -> (Seq b)^(c + d))^c` -/
-def Seq.flat_map (seq : Nat) : Scheme :=
-  ⟨5, [],
-    .arr .P (.arr .P (.var 2) (.app (.app (.con seq) (.var 4)) (.var 3)) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.app (.app (.con seq) (.cun (.cun (.var 0) (.var 4)) (.cun (.var 1) (.var 2)))) (.var 3)) (.cun (.var 0) (.var 4))) .cnil, .cnil⟩
+/-- `Prelude.combine : forall a. Semigroup a => a -> (a -> a)^{a}` -/
+def combine (semigroup : Nat) : Scheme :=
+  ⟨1, [⟨semigroup, [.var 0]⟩],
+    .arr .P (.var 0) (.arr .P (.var 0) (.var 0) (.var 0)) .cnil, .cnil⟩
 
-/-- `Seq.singleton : forall a. a -> Seq a` -/
-def Seq.singleton (seq : Nat) : Scheme :=
-  ⟨2, [],
-    .arr .P (.var 0) (.app (.app (.con seq) (.var 1)) (.var 0)) .cnil, .cnil⟩
+/-- `Prelude.empty : forall a. Monoid a => a` -/
+def empty (monoid : Nat) : Scheme :=
+  ⟨1, [⟨monoid, [.var 0]⟩],
+    .var 0, .cnil⟩
 
-/-- `Seq.empty : forall a. Seq a` -/
-def Seq.empty (seq : Nat) : Scheme :=
-  ⟨2, [],
-    .app (.app (.con seq) (.var 1)) (.var 0), .cnil⟩
+/-- `Prelude.TimeoutError : TimeoutError` -/
+def TimeoutError (timeouterror : Nat) : Scheme :=
+  ⟨0, [],
+    .con timeouterror, .cnil⟩
 
-/-- `Seq.to_list : forall d a. (Seq a)^d -> List a` -/
-def Seq.to_list (seq list : Nat) : Scheme :=
-  ⟨2, [],
-    .arr .P (.app (.app (.con seq) (.var 0)) (.var 1)) (.app (.con list) (.var 1)) .cnil, .cnil⟩
+/-- `Prelude.SchemaError : List { message : String; path : String } -> SchemaError` -/
+def SchemaError (list rec_message_path string schemaerror : Nat) : Scheme :=
+  ⟨0, [],
+    .arr .P (.app (.con list) (.app (.app (.con rec_message_path) (.con string)) (.con string))) (.con schemaerror) .cnil, .cnil⟩
 
-/-- `Seq.each_effect : forall c d a r e. (a ->{r; e} Unit)^c -> ((Seq a)^d ->{r; e} Unit)^c` -/
-def Seq.each_effect (unit seq : Nat) : Scheme :=
-  ⟨3, [],
-    .arr .P (.arr .R (.var 2) (.con unit) (.var 0)) (.arr .R (.app (.app (.con seq) (.var 1)) (.var 2)) (.con unit) (.var 0)) .cnil, .cnil⟩
+/-- `Prelude.AppError : { details : Option String; message : String } -> AppError` -/
+def AppError (rec_details_message option string apperror : Nat) : Scheme :=
+  ⟨0, [],
+    .arr .P (.app (.app (.con rec_details_message) (.app (.con option) (.con string))) (.con string)) (.con apperror) .cnil, .cnil⟩
+
+/-- `Prelude.identity : forall a. a -> a` -/
+def identity : Scheme :=
+  ⟨1, [],
+    .arr .P (.var 0) (.var 0) .cnil, .cnil⟩
 
 /-- `Prelude.from_result : forall e a. Result (Errors e) a ->{none; e} a` -/
 def from_result (result errors : Nat) : Scheme :=
   ⟨2, [],
     .arr .R (.app (.app (.con result) (.app (.con errors) (.var 0))) (.var 1)) (.var 1) .cnil, .cnil⟩
 
+/-- `Prelude.parallel : forall c r e a b. (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c` -/
+def parallel (eff tup : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.app (.app (.con eff) (.var 0)) (.var 1)) (.arr .R (.app (.app (.con eff) (.var 3)) (.var 2)) (.app (.app (.con tup) (.var 1)) (.var 2)) (.cun (.cun (.var 0) (.var 1)) (.cun (.var 3) (.var 2)))) .cnil, .cnil⟩
+
+/-- `Prelude.parallel_all : forall c r e a. Int -> List (Eff r e a)^c ->{r; e} List a` -/
+def parallel_all (int list eff : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.con int) (.arr .R (.app (.con list) (.app (.app (.con eff) (.var 0)) (.var 1))) (.app (.con list) (.var 1)) .cnil) .cnil, .cnil⟩
+
+/-- `Prelude.race_success : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c` -/
+def race_success (eff : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.app (.app (.con eff) (.var 0)) (.var 1)) (.arr .R (.app (.app (.con eff) (.var 2)) (.var 1)) (.var 1) (.cun (.cun (.var 0) (.var 1)) (.cun (.var 2) (.var 1)))) .cnil, .cnil⟩
+
+/-- `Prelude.race_first : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c` -/
+def race_first (eff : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.app (.app (.con eff) (.var 0)) (.var 1)) (.arr .R (.app (.app (.con eff) (.var 2)) (.var 1)) (.var 1) (.cun (.cun (.var 0) (.var 1)) (.cun (.var 2) (.var 1)))) .cnil, .cnil⟩
+
+/-- `Prelude.timeout : forall c r e a. Float -> (Eff r e a)^c ->{r; TimeoutError | e} a` -/
+def timeout (float eff : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.con float) (.arr .R (.app (.app (.con eff) (.var 0)) (.var 1)) (.var 1) .cnil) .cnil, .cnil⟩
+
+/-- `Prelude.timeout_option : forall c r e a. Float -> (Eff r e a)^c ->{r; e} Option a` -/
+def timeout_option (float eff option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.con float) (.arr .R (.app (.app (.con eff) (.var 0)) (.var 1)) (.app (.con option) (.var 1)) .cnil) .cnil, .cnil⟩
+
+/-- `Prelude.bind : forall c d m a b. Monad m => (m a)^c -> ((a -> (m b)^d)^d -> (m b)^(c + d))^c` -/
+def bind (monad : Nat) : Scheme :=
+  ⟨6, [⟨monad, [.var 2]⟩],
+    .arr .P (.app (.app (.var 2) (.var 0)) (.var 3)) (.arr .P (.arr .P (.var 3) (.app (.app (.var 2) (.var 1)) (.var 4)) (.var 5)) (.app (.app (.var 2) (.cun (.cun (.var 0) (.var 3)) (.cun (.cun (.var 1) (.var 4)) (.var 5)))) (.var 4)) (.cun (.var 0) (.var 3))) .cnil, .cnil⟩
+
+/-- `Prelude.bind_eff : forall c d r1 r2 e1 e2 a b. (Eff r1 e1 a)^c -> ((a -> (Eff r2 e2 b)^d)^d -> (Eff (r1 + r2) (e1 + e2) b)^(c + d))^c` -/
+def bind_eff (eff : Nat) : Scheme :=
+  ⟨5, [],
+    .arr .P (.app (.app (.con eff) (.var 0)) (.var 2)) (.arr .P (.arr .P (.var 2) (.app (.app (.con eff) (.var 1)) (.var 3)) (.var 4)) (.app (.app (.con eff) (.cun (.cun (.var 0) (.var 2)) (.cun (.cun (.var 1) (.var 3)) (.var 4)))) (.var 3)) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
+
+/-- `Prelude.option_as_null : forall a. PureCodec Json a -> PureCodec Json (Option a)` -/
+def option_as_null (purecodec json option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.app (.con purecodec) (.con json)) (.var 0)) (.app (.app (.con purecodec) (.con json)) (.app (.con option) (.var 0))) .cnil, .cnil⟩
+
+/-- `Prelude.option_as_nullish : forall a. PureCodec Json a -> PureCodec Json (Option a)` -/
+def option_as_nullish (purecodec json option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.app (.con purecodec) (.con json)) (.var 0)) (.app (.app (.con purecodec) (.con json)) (.app (.con option) (.var 0))) .cnil, .cnil⟩
+
+/-- `Prelude.ignore_extra_fields : forall a. PureCodec Json a -> PureCodec Json a` -/
+def ignore_extra_fields (purecodec json : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.app (.con purecodec) (.con json)) (.var 0)) (.app (.app (.con purecodec) (.con json)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.of_list : forall a. List a -> Seq a` -/
+def Seq.of_list (list seq : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con list) (.var 0)) (.app (.app (.con seq) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.from : Int -> Seq Int` -/
+def Seq.«from» (int seq : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.app (.app (.con seq) (.var 0)) (.con int)) .cnil, .cnil⟩
+
+/-- `Seq.range : Int -> Int -> Seq Int` -/
+def Seq.range (int seq : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.con int) (.app (.app (.con seq) (.var 0)) (.con int)) .cnil) .cnil, .cnil⟩
+
+/-- `Seq.range_to : Int -> Int -> Seq Int` -/
+def Seq.range_to (int seq : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.con int) (.app (.app (.con seq) (.var 0)) (.con int)) .cnil) .cnil, .cnil⟩
+
+/-- `Seq.range_by : Int -> Int -> Int -> Seq Int` -/
+def Seq.range_by (int seq : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.con int) (.arr .P (.con int) (.app (.app (.con seq) (.var 0)) (.con int)) .cnil) .cnil) .cnil, .cnil⟩
+
+/-- `Seq.iterate : forall c a. (a -> a)^c -> (a -> (Seq a)^c)^c` -/
+def Seq.iterate (seq : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.var 1) (.var 0)) (.arr .P (.var 1) (.app (.app (.con seq) (.var 0)) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.repeat : forall a. a -> Seq a` -/
+def Seq.repeat (seq : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.var 0) (.app (.app (.con seq) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.cycle : forall a. List a -> Seq a` -/
+def Seq.cycle (list seq : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con list) (.var 0)) (.app (.app (.con seq) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.unfold : forall c a s. (s -> Option (a, s))^c -> (s -> (Seq a)^c)^c` -/
+def Seq.unfold (option tup seq : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 2) (.app (.con option) (.app (.app (.con tup) (.var 1)) (.var 2))) (.var 0)) (.arr .P (.var 2) (.app (.app (.con seq) (.var 0)) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.append : forall d a. (Seq a)^d -> ((Seq a)^d -> (Seq a)^d)^d` -/
+def Seq.append (seq : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.app (.app (.con seq) (.var 0)) (.var 1)) (.arr .P (.app (.app (.con seq) (.var 2)) (.var 1)) (.app (.app (.con seq) (.cun (.cun (.var 0) (.var 1)) (.cun (.var 2) (.var 1)))) (.var 1)) (.cun (.cun (.var 0) (.var 1)) (.cun (.var 2) (.var 1)))) .cnil, .cnil⟩
+
+/-- `Seq.map : forall c d a b. (forall v. a^v -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c` -/
+def Seq.map (seq : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 2) (.var 3) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.app (.app (.con seq) (.cun (.var 0) (.cun (.var 1) (.var 2)))) (.var 3)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.filter : forall c d a. (a -> Bool)^c -> ((Seq a)^d -> (Seq a)^(c + d))^c` -/
+def Seq.filter (bool seq : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 2) (.con bool) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.app (.app (.con seq) (.cun (.var 0) (.cun (.var 1) (.var 2)))) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.filter_map : forall c d a b. (a -> Option b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c` -/
+def Seq.filter_map (option seq : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 2) (.app (.con option) (.var 3)) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.app (.app (.con seq) (.cun (.var 0) (.cun (.var 1) (.var 2)))) (.var 3)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.flat_map : forall c d a b. (forall v. a^v -> (Seq b)^(c + v))^c -> ((Seq a)^d -> (Seq b)^(c + d))^c` -/
+def Seq.flat_map (seq : Nat) : Scheme :=
+  ⟨5, [],
+    .arr .P (.arr .P (.var 2) (.app (.app (.con seq) (.var 4)) (.var 3)) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.app (.app (.con seq) (.cun (.cun (.var 0) (.var 4)) (.cun (.var 1) (.var 2)))) (.var 3)) (.cun (.var 0) (.var 4))) .cnil, .cnil⟩
+
+/-- `Seq.take : forall d a. Int -> (Seq a)^d -> (Seq a)^d` -/
+def Seq.take (int seq : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.con int) (.arr .P (.app (.app (.con seq) (.var 0)) (.var 1)) (.app (.app (.con seq) (.cun (.var 0) (.var 1))) (.var 1)) .cnil) .cnil, .cnil⟩
+
+/-- `Seq.take_while : forall c d a. (a -> Bool)^c -> ((Seq a)^d -> (Seq a)^(c + d))^c` -/
+def Seq.take_while (bool seq : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 2) (.con bool) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.app (.app (.con seq) (.cun (.var 0) (.cun (.var 1) (.var 2)))) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.drop : forall d a. Int -> (Seq a)^d -> (Seq a)^d` -/
+def Seq.drop (int seq : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.con int) (.arr .P (.app (.app (.con seq) (.var 0)) (.var 1)) (.app (.app (.con seq) (.cun (.var 0) (.var 1))) (.var 1)) .cnil) .cnil, .cnil⟩
+
+/-- `Seq.drop_while : forall c d a. (a -> Bool)^c -> ((Seq a)^d -> (Seq a)^(c + d))^c` -/
+def Seq.drop_while (bool seq : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 2) (.con bool) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.app (.app (.con seq) (.cun (.var 0) (.cun (.var 1) (.var 2)))) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.zip : forall d a b. (Seq a)^d -> ((Seq b)^d -> (Seq (a, b))^d)^d` -/
+def Seq.zip (seq tup : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.app (.app (.con seq) (.var 0)) (.var 1)) (.arr .P (.app (.app (.con seq) (.var 3)) (.var 2)) (.app (.app (.con seq) (.cun (.cun (.var 0) (.var 1)) (.cun (.var 3) (.var 2)))) (.app (.app (.con tup) (.var 1)) (.var 2))) (.cun (.cun (.var 0) (.var 1)) (.cun (.var 3) (.var 2)))) .cnil, .cnil⟩
+
+/-- `Seq.zip_with : forall c d a b x. (a -> (b -> x)^{a | c})^c -> ((Seq a)^d -> ((Seq b)^d -> (Seq x)^(c + d))^(c + d))^c` -/
+def Seq.zip_with (seq : Nat) : Scheme :=
+  ⟨7, [],
+    .arr .P (.arr .P (.var 2) (.arr .P (.var 3) (.var 4) (.var 5)) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.arr .P (.app (.app (.con seq) (.var 6)) (.var 3)) (.app (.app (.con seq) (.cun (.cun (.var 0) (.var 5)) (.cun (.cun (.var 1) (.var 2)) (.cun (.var 6) (.var 3))))) (.var 4)) (.cun (.cun (.var 0) (.var 5)) (.cun (.cun (.var 1) (.var 2)) (.cun (.var 6) (.var 3))))) (.cun (.var 0) (.var 5))) .cnil, .cnil⟩
+
+/-- `Seq.enumerate : forall d a. (Seq a)^d -> (Seq (Int, a))^d` -/
+def Seq.enumerate (seq tup int : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con seq) (.var 0)) (.var 1)) (.app (.app (.con seq) (.cun (.var 0) (.var 1))) (.app (.app (.con tup) (.con int)) (.var 1))) .cnil, .cnil⟩
+
+/-- `Seq.scan : forall c d a b. (b -> (a -> b)^{b | c})^c -> (b -> ((Seq a)^d -> (Seq b)^(c + d))^c)^c` -/
+def Seq.scan (seq : Nat) : Scheme :=
+  ⟨5, [],
+    .arr .P (.arr .P (.var 3) (.arr .P (.var 2) (.var 3) (.var 4)) (.var 0)) (.arr .P (.var 3) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.app (.app (.con seq) (.cun (.cun (.var 0) (.var 4)) (.cun (.var 1) (.var 2)))) (.var 3)) (.cun (.var 0) (.var 4))) (.cun (.var 0) (.var 4))) .cnil, .cnil⟩
+
+/-- `Seq.chunks : forall d a. Int -> (Seq a)^d -> (Seq (List a))^d` -/
+def Seq.chunks (int seq list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.con int) (.arr .P (.app (.app (.con seq) (.var 0)) (.var 1)) (.app (.app (.con seq) (.cun (.var 0) (.var 1))) (.app (.con list) (.var 1))) .cnil) .cnil, .cnil⟩
+
+/-- `Seq.windows : forall d a. Int -> (Seq a)^d -> (Seq (List a))^d` -/
+def Seq.windows (int seq list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.con int) (.arr .P (.app (.app (.con seq) (.var 0)) (.var 1)) (.app (.app (.con seq) (.cun (.var 0) (.var 1))) (.app (.con list) (.var 1))) .cnil) .cnil, .cnil⟩
+
+/-- `Seq.to_list : forall d a. (Seq a)^d -> List a` -/
+def Seq.to_list (seq list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con seq) (.var 0)) (.var 1)) (.app (.con list) (.var 1)) .cnil, .cnil⟩
+
+/-- `Seq.fold : forall c d a b. (b -> (a -> b)^{b | c})^c -> (b -> ((Seq a)^d -> b)^c)^c` -/
+def Seq.fold (seq : Nat) : Scheme :=
+  ⟨5, [],
+    .arr .P (.arr .P (.var 3) (.arr .P (.var 2) (.var 3) (.var 4)) (.var 0)) (.arr .P (.var 3) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.var 3) (.cun (.var 0) (.var 4))) (.cun (.var 0) (.var 4))) .cnil, .cnil⟩
+
+/-- `Seq.any : forall c d a. (a -> Bool)^c -> ((Seq a)^d -> Bool)^c` -/
+def Seq.any (bool seq : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 2) (.con bool) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.con bool) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.all : forall c d a. (a -> Bool)^c -> ((Seq a)^d -> Bool)^c` -/
+def Seq.all (bool seq : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 2) (.con bool) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.con bool) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.find : forall c d a. (a -> Bool)^c -> ((Seq a)^d -> Option a)^c` -/
+def Seq.find (bool seq option : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 2) (.con bool) (.var 0)) (.arr .P (.app (.app (.con seq) (.var 1)) (.var 2)) (.app (.con option) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.first : forall d a. (Seq a)^d -> Option a` -/
+def Seq.first (seq option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con seq) (.var 0)) (.var 1)) (.app (.con option) (.var 1)) .cnil, .cnil⟩
+
+/-- `Seq.each_effect : forall c d a r e. (a ->{r; e} Unit)^c -> ((Seq a)^d ->{r; e} Unit)^c` -/
+def Seq.each_effect (unit seq : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .R (.var 2) (.con unit) (.var 0)) (.arr .R (.app (.app (.con seq) (.var 1)) (.var 2)) (.con unit) (.var 0)) .cnil, .cnil⟩
+
+/-- `Seq.fold_effect : forall c d a b r e. (b -> (a ->{r; e} b)^{b | c})^c -> (b -> ((Seq a)^d ->{r; e} b)^c)^c` -/
+def Seq.fold_effect (seq : Nat) : Scheme :=
+  ⟨5, [],
+    .arr .P (.arr .P (.var 3) (.arr .R (.var 2) (.var 3) (.var 4)) (.var 0)) (.arr .P (.var 3) (.arr .R (.app (.app (.con seq) (.var 1)) (.var 2)) (.var 3) (.cun (.var 0) (.var 4))) (.cun (.var 0) (.var 4))) .cnil, .cnil⟩
+
+/-- `Seq.empty : forall a. Seq a` -/
+def Seq.empty (seq : Nat) : Scheme :=
+  ⟨2, [],
+    .app (.app (.con seq) (.var 1)) (.var 0), .cnil⟩
+
+/-- `Seq.singleton : forall a. a -> Seq a` -/
+def Seq.singleton (seq : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.var 0) (.app (.app (.con seq) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.map : forall c d a b. (forall v. a^v -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c` -/
+def Option.map (option : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.var 2) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.bind : forall c a b. (a -> Option b)^c -> (Option a -> Option b)^c` -/
+def Option.bind (option : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.app (.con option) (.var 2)) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.with_default : forall a. a -> (Option a -> a)^{a}` -/
+def Option.with_default (option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.var 0) (.arr .P (.app (.con option) (.var 0)) (.var 0) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.is_some : forall a. Option a -> Bool` -/
+def Option.is_some (option bool : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con option) (.var 0)) (.con bool) .cnil, .cnil⟩
+
+/-- `Option.is_none : forall a. Option a -> Bool` -/
+def Option.is_none (option bool : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con option) (.var 0)) (.con bool) .cnil, .cnil⟩
+
+/-- `Option.or_else : forall a. Option a -> (Option a -> Option a)^{a}` -/
+def Option.or_else (option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con option) (.var 0)) (.arr .P (.app (.con option) (.var 0)) (.app (.con option) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.to_result : forall e a. e -> (Option a -> Result e a)^{e}` -/
+def Option.to_result (option result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.var 0) (.arr .P (.app (.con option) (.var 1)) (.app (.app (.con result) (.var 0)) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.to_list : forall a. Option a -> List a` -/
+def Option.to_list (option list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con option) (.var 0)) (.app (.con list) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.all : forall a. List (Option a) -> Option (List a)` -/
+def Option.all (list option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.app (.con option) (.var 0))) (.app (.con option) (.app (.con list) (.var 0))) .cnil, .cnil⟩
+
+/-- `Option.as_ : forall b a. b -> (Option a -> Option b)^{b}` -/
+def Option.as_ (option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.var 0) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.as_void : forall a. Option a -> Option Unit` -/
+def Option.as_void (option unit : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con option) (.var 0)) (.app (.con option) (.con unit)) .cnil, .cnil⟩
+
+/-- `Option.void : Option Unit` -/
+def Option.void (option unit : Nat) : Scheme :=
+  ⟨0, [],
+    .app (.con option) (.con unit), .cnil⟩
+
+/-- `Option.compose_k : forall b c a. (b -> Option c) -> ((a -> Option b) -> (a -> Option c)^{a, b, c})^{b, c}` -/
+def Option.compose_k (option : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 0) (.app (.con option) (.var 1)) .cnil) (.arr .P (.arr .P (.var 2) (.app (.con option) (.var 0)) .cnil) (.arr .P (.var 2) (.app (.con option) (.var 1)) (.cun (.cun (.var 2) (.var 0)) (.var 1))) (.cun (.var 0) (.var 1))) .cnil, .cnil⟩
+
+/-- `Option.contains_with : forall c a. (a -> (a -> Bool)^{a | c})^c -> (a -> (Option a -> Bool)^{a | c})^c` -/
+def Option.contains_with (bool option : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.arr .P (.var 1) (.con bool) (.var 2)) (.var 0)) (.arr .P (.var 1) (.arr .P (.app (.con option) (.var 1)) (.con bool) (.cun (.var 1) (.cun (.var 0) (.var 2)))) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
+
+/-- `Option.contains : forall a. Eq a => a -> (Option a -> Bool)^{a}` -/
+def Option.contains (eq option bool : Nat) : Scheme :=
+  ⟨1, [⟨eq, [.var 0]⟩],
+    .arr .P (.var 0) (.arr .P (.app (.con option) (.var 0)) (.con bool) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.exists : forall c a. (a -> Bool)^c -> (Option a -> Bool)^c` -/
+def Option.exists (bool option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.con bool) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.filter : forall c a. (a -> Bool)^c -> (Option a -> Option a)^c` -/
+def Option.filter (bool option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.filter_map : forall c a b e. (a -> Result e b)^c -> (Option a -> Option b)^c` -/
+def Option.filter_map (result option : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 1) (.app (.app (.con result) (.var 3)) (.var 2)) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.first_some_of : forall a. List (Option a) -> Option a` -/
+def Option.first_some_of (list option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.app (.con option) (.var 0))) (.app (.con option) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.flatten : forall a. Option (Option a) -> Option a` -/
+def Option.flatten (option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con option) (.app (.con option) (.var 0))) (.app (.con option) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.lift2 : forall a b c. (a -> (b -> c)^{a}) -> (Option b -> (Option a -> Option c)^{a, b})^{a}` -/
+def Option.lift2 (option : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 0) (.arr .P (.var 1) (.var 2) (.var 0)) .cnil) (.arr .P (.app (.con option) (.var 1)) (.arr .P (.app (.con option) (.var 0)) (.app (.con option) (.var 2)) (.cun (.var 0) (.var 1))) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.lift_predicate : forall a. (a -> Bool) -> (a -> Option a)^{a}` -/
+def Option.lift_predicate (bool option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.arr .P (.var 0) (.con bool) .cnil) (.arr .P (.var 0) (.app (.con option) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.match_ : forall b a. { onNone : Unit -> b; onSome : a -> b } -> (Option a -> b)^{a, b}` -/
+def Option.match_ (rec_onNone_onSome unit option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con rec_onNone_onSome) (.arr .P (.con unit) (.var 0) .cnil)) (.arr .P (.var 1) (.var 0) .cnil)) (.arr .P (.app (.con option) (.var 1)) (.var 0) (.cun (.var 1) (.var 0))) .cnil, .cnil⟩
+
+/-- `Option.or_else_result : forall c a b. (Unit -> Option b)^c -> (Option a -> Option (Result a b))^c` -/
+def Option.or_else_result (unit option result : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.con unit) (.app (.con option) (.var 2)) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.app (.app (.con result) (.var 1)) (.var 2))) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.or_else_some : forall c a. (Unit -> a)^c -> (Option a -> Option a)^c` -/
+def Option.or_else_some (unit option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.con unit) (.var 1) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.partition_map : forall c a b d. (a -> Result b d)^c -> (Option a -> (Option d, Option b))^c` -/
+def Option.partition_map (result option tup : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 1) (.app (.app (.con result) (.var 2)) (.var 3)) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.app (.con tup) (.app (.con option) (.var 3))) (.app (.con option) (.var 2))) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.product : forall b a. Option b -> (Option a -> Option (a, b))^{b}` -/
+def Option.product (option tup : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con option) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.app (.app (.con tup) (.var 1)) (.var 0))) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.product_many : forall a. List (Option a) -> (Option a -> Option (NonEmpty a))^{a}` -/
+def Option.product_many (list option nonempty : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.app (.con option) (.var 0))) (.arr .P (.app (.con option) (.var 0)) (.app (.con option) (.app (.con nonempty) (.var 0))) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.reduce_compact : forall c a b. b -> ((b -> (a -> b)^{b | c})^c -> (List (Option a) -> b)^c)^{b}` -/
+def Option.reduce_compact (list option : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.var 2) (.arr .P (.arr .P (.var 2) (.arr .P (.var 1) (.var 2) (.var 3)) (.var 0)) (.arr .P (.app (.con list) (.app (.con option) (.var 1))) (.var 2) (.cun (.var 0) (.var 3))) (.var 2)) .cnil, .cnil⟩
+
+/-- `Option.tap : forall c a x. (a -> Option x)^c -> (Option a -> Option a)^c` -/
+def Option.tap (option : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.app (.con option) (.var 2)) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.zip_left : forall x a. Option x -> (Option a -> Option a)^{x}` -/
+def Option.zip_left (option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con option) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.zip_right : forall b x. Option b -> (Option x -> Option b)^{b}` -/
+def Option.zip_right (option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con option) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Option.zip_with : forall c a b d. Option b -> ((a -> (b -> d)^{a | c})^c -> (Option a -> Option d)^c)^{b}` -/
+def Option.zip_with (option : Nat) : Scheme :=
+  ⟨5, [],
+    .arr .P (.app (.con option) (.var 2)) (.arr .P (.arr .P (.var 1) (.arr .P (.var 2) (.var 3) (.var 4)) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 3)) (.cun (.var 0) (.var 4))) (.var 2)) .cnil, .cnil⟩
+
+/-- `Result.map : forall c d e a b. (forall v. a^v -> b)^c -> ((Result e a)^d -> (Result e b)^(c + d))^c` -/
+def Result.map (result : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 2) (.var 3) (.var 0)) (.arr .P (.app (.app (.con result) (.var 1)) (.var 2)) (.app (.app (.con result) (.var 1)) (.var 3)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Result.map_err : forall c e x a. (e -> x)^c -> (Result e a -> Result x a)^c` -/
+def Result.map_err (result : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 1) (.var 2) (.var 0)) (.arr .P (.app (.app (.con result) (.var 1)) (.var 3)) (.app (.app (.con result) (.var 2)) (.var 3)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Result.bind : forall c e a b. (a -> Result e b)^c -> (Result e a -> Result e b)^c` -/
+def Result.bind (result : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 2) (.app (.app (.con result) (.var 1)) (.var 3)) (.var 0)) (.arr .P (.app (.app (.con result) (.var 1)) (.var 2)) (.app (.app (.con result) (.var 1)) (.var 3)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Result.with_default : forall a e. a -> (Result e a -> a)^{a}` -/
+def Result.with_default (result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.var 0) (.arr .P (.app (.app (.con result) (.var 1)) (.var 0)) (.var 0) (.var 0)) .cnil, .cnil⟩
+
+/-- `Result.is_ok : forall e a. Result e a -> Bool` -/
+def Result.is_ok (result bool : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con result) (.var 0)) (.var 1)) (.con bool) .cnil, .cnil⟩
+
+/-- `Result.is_err : forall e a. Result e a -> Bool` -/
+def Result.is_err (result bool : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con result) (.var 0)) (.var 1)) (.con bool) .cnil, .cnil⟩
+
+/-- `Result.to_option : forall e a. Result e a -> Option a` -/
+def Result.to_option (result option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con result) (.var 0)) (.var 1)) (.app (.con option) (.var 1)) .cnil, .cnil⟩
+
+/-- `Result.from_option : forall e a. e -> (Option a -> Result e a)^{e}` -/
+def Result.from_option (option result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.var 0) (.arr .P (.app (.con option) (.var 1)) (.app (.app (.con result) (.var 0)) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Result.all : forall e a. List (Result e a) -> Result e (List a)` -/
+def Result.all (list result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con list) (.app (.app (.con result) (.var 0)) (.var 1))) (.app (.app (.con result) (.var 0)) (.app (.con list) (.var 1))) .cnil, .cnil⟩
+
+/-- `Result.fail_void : forall a. Result Unit a` -/
+def Result.fail_void (result unit : Nat) : Scheme :=
+  ⟨1, [],
+    .app (.app (.con result) (.con unit)) (.var 0), .cnil⟩
+
+/-- `Result.void : forall e. Result e Unit` -/
+def Result.void (result unit : Nat) : Scheme :=
+  ⟨1, [],
+    .app (.app (.con result) (.var 0)) (.con unit), .cnil⟩
+
+/-- `Result.filter_or_fail : forall c e a. (a -> Bool)^c -> ((a -> e)^c -> (Result e a -> Result e a)^c)^{c}` -/
+def Result.filter_or_fail (bool result : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 2) (.con bool) (.var 0)) (.arr .P (.arr .P (.var 2) (.var 1) (.var 3)) (.arr .P (.app (.app (.con result) (.var 1)) (.var 2)) (.app (.app (.con result) (.var 1)) (.var 2)) (.cun (.var 0) (.var 3))) (.cun (.var 0) (.var 3))) .cnil, .cnil⟩
+
+/-- `Result.flip : forall e a. Result e a -> Result a e` -/
+def Result.flip (result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con result) (.var 0)) (.var 1)) (.app (.app (.con result) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Result.get_failure : forall e a. Result e a -> Option e` -/
+def Result.get_failure (result option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con result) (.var 0)) (.var 1)) (.app (.con option) (.var 0)) .cnil, .cnil⟩
+
+/-- `Result.lift_predicate : forall a e. (a -> Bool) -> ((a -> e) -> (a -> Result e a)^{a, e})^{a}` -/
+def Result.lift_predicate (bool result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 0) (.con bool) .cnil) (.arr .P (.arr .P (.var 0) (.var 1) .cnil) (.arr .P (.var 0) (.app (.app (.con result) (.var 1)) (.var 0)) (.cun (.var 0) (.var 1))) (.var 0)) .cnil, .cnil⟩
+
+/-- `Result.map_both : forall e e2 a a2. { onFailure : e -> e2; onSuccess : a -> a2 } -> (Result e a -> Result e2 a2)^{a, a2, e, e2}` -/
+def Result.map_both (rec_onFailure_onSuccess result : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.app (.app (.con rec_onFailure_onSuccess) (.arr .P (.var 0) (.var 1) .cnil)) (.arr .P (.var 2) (.var 3) .cnil)) (.arr .P (.app (.app (.con result) (.var 0)) (.var 2)) (.app (.app (.con result) (.var 1)) (.var 3)) (.cun (.cun (.cun (.var 2) (.var 3)) (.var 0)) (.var 1))) .cnil, .cnil⟩
+
+/-- `Result.match_ : forall e b a. { onFailure : e -> b; onSuccess : a -> b } -> (Result e a -> b)^{a, b, e}` -/
+def Result.match_ (rec_onFailure_onSuccess result : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.app (.app (.con rec_onFailure_onSuccess) (.arr .P (.var 0) (.var 1) .cnil)) (.arr .P (.var 2) (.var 1) .cnil)) (.arr .P (.app (.app (.con result) (.var 0)) (.var 2)) (.var 1) (.cun (.cun (.var 2) (.var 1)) (.var 0))) .cnil, .cnil⟩
+
+/-- `Result.merge : forall a. Result a a -> a` -/
+def Result.merge (result : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.app (.con result) (.var 0)) (.var 0)) (.var 0) .cnil, .cnil⟩
+
+/-- `Result.or_else : forall c e e2 a. (e -> Result e2 a)^c -> (Result e a -> Result e2 a)^c` -/
+def Result.or_else (result : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 1) (.app (.app (.con result) (.var 2)) (.var 3)) (.var 0)) (.arr .P (.app (.app (.con result) (.var 1)) (.var 3)) (.app (.app (.con result) (.var 2)) (.var 3)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Result.succeed_none : forall e a. Result e (Option a)` -/
+def Result.succeed_none (result option : Nat) : Scheme :=
+  ⟨2, [],
+    .app (.app (.con result) (.var 0)) (.app (.con option) (.var 1)), .cnil⟩
+
+/-- `Result.succeed_some : forall a e. a -> Result e (Option a)` -/
+def Result.succeed_some (result option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.var 0) (.app (.app (.con result) (.var 1)) (.app (.con option) (.var 0))) .cnil, .cnil⟩
+
+/-- `Result.transpose_option : forall e a. Option (Result e a) -> Result e (Option a)` -/
+def Result.transpose_option (option result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con option) (.app (.app (.con result) (.var 0)) (.var 1))) (.app (.app (.con result) (.var 0)) (.app (.con option) (.var 1))) .cnil, .cnil⟩
+
+/-- `Result.transpose_map_option : forall c e a b. (a -> Result e b)^c -> (Option a -> Result e (Option b))^c` -/
+def Result.transpose_map_option (result option : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 2) (.app (.app (.con result) (.var 1)) (.var 3)) (.var 0)) (.arr .P (.app (.con option) (.var 2)) (.app (.app (.con result) (.var 1)) (.app (.con option) (.var 3))) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.map : forall c a b. (a -> b)^c -> (List a -> List b)^c` -/
+def List.map (list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.var 2) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c` -/
+def List.map_effect (list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .R (.var 1) (.var 2) (.var 0)) (.arr .R (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.map_indexed : forall c a b. (Int -> (a -> b)^c)^c -> (List a -> List b)^c` -/
+def List.map_indexed (int list : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.con int) (.arr .P (.var 1) (.var 2) (.var 0)) (.var 3)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.cun (.var 0) (.var 3))) .cnil, .cnil⟩
+
+/-- `List.each_effect : forall c a r e. (a ->{r; e} Unit)^c -> (List a ->{r; e} Unit)^c` -/
+def List.each_effect (unit list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .R (.var 1) (.con unit) (.var 0)) (.arr .R (.app (.con list) (.var 1)) (.con unit) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.fold_left : forall c a b. (b -> (a -> b)^{b | c})^c -> (b -> (List a -> b)^c)^c` -/
+def List.fold_left (list : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 2) (.arr .P (.var 1) (.var 2) (.var 3)) (.var 0)) (.arr .P (.var 2) (.arr .P (.app (.con list) (.var 1)) (.var 2) (.cun (.var 0) (.var 3))) (.cun (.var 0) (.var 3))) .cnil, .cnil⟩
+
+/-- `List.fold_right : forall c a b. (a -> (b -> b)^{a | c})^c -> (b -> (List a -> b)^c)^c` -/
+def List.fold_right (list : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 1) (.arr .P (.var 2) (.var 2) (.var 3)) (.var 0)) (.arr .P (.var 2) (.arr .P (.app (.con list) (.var 1)) (.var 2) (.cun (.var 0) (.var 3))) (.cun (.var 0) (.var 3))) .cnil, .cnil⟩
+
+/-- `List.fold_effect : forall c a b r e. (b -> (a ->{r; e} b)^{b | c})^c -> (b -> (List a ->{r; e} b)^c)^c` -/
+def List.fold_effect (list : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 2) (.arr .R (.var 1) (.var 2) (.var 3)) (.var 0)) (.arr .P (.var 2) (.arr .R (.app (.con list) (.var 1)) (.var 2) (.cun (.var 0) (.var 3))) (.cun (.var 0) (.var 3))) .cnil, .cnil⟩
+
+/-- `List.filter : forall c a. (a -> Bool)^c -> (List a -> List a)^c` -/
+def List.filter (bool list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.filter_map : forall c a b. (a -> Option b)^c -> (List a -> List b)^c` -/
+def List.filter_map (option list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.app (.con option) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.flat_map : forall c a b. (a -> List b)^c -> (List a -> List b)^c` -/
+def List.flat_map (list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.app (.con list) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.find : forall c a. (a -> Bool)^c -> (List a -> Option a)^c` -/
+def List.find (bool list option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con option) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.find_index : forall c a. (a -> Bool)^c -> (List a -> Option Int)^c` -/
+def List.find_index (bool list option int : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con option) (.con int)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.any : forall c a. (a -> Bool)^c -> (List a -> Bool)^c` -/
+def List.any (bool list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.con bool) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.all : forall c a. (a -> Bool)^c -> (List a -> Bool)^c` -/
+def List.all (bool list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.con bool) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.partition : forall c a. (a -> Bool)^c -> (List a -> (List a, List a))^c` -/
+def List.partition (bool list tup : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.app (.con tup) (.app (.con list) (.var 1))) (.app (.con list) (.var 1))) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.sort_by : forall c a. (a -> (a -> Ordering)^{a | c})^c -> (List a -> List a)^c` -/
+def List.sort_by (ordering list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.arr .P (.var 1) (.con ordering) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
+
+/-- `List.sort : forall a. Ord a => List a -> List a` -/
+def List.sort (ord list : Nat) : Scheme :=
+  ⟨1, [⟨ord, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.contains : forall a. Eq a => a -> (List a -> Bool)^{a}` -/
+def List.contains (eq list bool : Nat) : Scheme :=
+  ⟨1, [⟨eq, [.var 0]⟩],
+    .arr .P (.var 0) (.arr .P (.app (.con list) (.var 0)) (.con bool) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.maximum : forall a. Ord a => List a -> Option a` -/
+def List.maximum (ord list option : Nat) : Scheme :=
+  ⟨1, [⟨ord, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con option) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.minimum : forall a. Ord a => List a -> Option a` -/
+def List.minimum (ord list option : Nat) : Scheme :=
+  ⟨1, [⟨ord, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con option) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.length : forall a. List a -> Int` -/
+def List.length (list int : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.var 0)) (.con int) .cnil, .cnil⟩
+
+/-- `List.is_empty : forall a. List a -> Bool` -/
+def List.is_empty (list bool : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.var 0)) (.con bool) .cnil, .cnil⟩
+
+/-- `List.get : forall a. Int -> List a -> Option a` -/
+def List.get (int list option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con option) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.set : forall a. Int -> a -> (List a -> List a)^{a}` -/
+def List.set (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.var 0) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.head : forall a. List a -> Option a` -/
+def List.head (list option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con option) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.last : forall a. List a -> Option a` -/
+def List.last (list option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con option) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.singleton : forall a. a -> List a` -/
+def List.singleton (list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.var 0) (.app (.con list) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.repeat : forall a. Int -> a -> List a` -/
+def List.repeat (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.var 0) (.app (.con list) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.range : Int -> Int -> List Int` -/
+def List.range (int list : Nat) : Scheme :=
+  ⟨0, [],
+    .arr .P (.con int) (.arr .P (.con int) (.app (.con list) (.con int)) .cnil) .cnil, .cnil⟩
+
+/-- `List.initialize : forall c a. Int -> (Int -> a)^c -> List a` -/
+def List.initialize (int list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.con int) (.arr .P (.arr .P (.con int) (.var 1) (.var 0)) (.app (.con list) (.var 1)) .cnil) .cnil, .cnil⟩
+
+/-- `List.reverse : forall a. List a -> List a` -/
+def List.reverse (list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.append : forall a. List a -> (List a -> List a)^{a}` -/
+def List.append (list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.var 0)) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.concat : forall a. List (List a) -> List a` -/
+def List.concat (list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.app (.con list) (.var 0))) (.app (.con list) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.take : forall a. Int -> List a -> List a` -/
+def List.take (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.drop : forall a. Int -> List a -> List a` -/
+def List.drop (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.slice : forall a. Int -> Int -> List a -> List a` -/
+def List.slice (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil) .cnil) .cnil, .cnil⟩
+
+/-- `List.zip : forall a b. List a -> (List b -> List (a, b))^{a}` -/
+def List.zip (list tup : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con list) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.app (.app (.con tup) (.var 0)) (.var 1))) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.unzip : forall a b. List (a, b) -> (List a, List b)` -/
+def List.unzip (list tup : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con list) (.app (.app (.con tup) (.var 0)) (.var 1))) (.app (.app (.con tup) (.app (.con list) (.var 0))) (.app (.con list) (.var 1))) .cnil, .cnil⟩
+
+/-- `List.sum : forall a. Numeric a => List a -> a` -/
+def List.sum (numeric list : Nat) : Scheme :=
+  ⟨1, [⟨numeric, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.var 0) .cnil, .cnil⟩
+
+/-- `List.product : forall a. Numeric a => List a -> a` -/
+def List.product (numeric list : Nat) : Scheme :=
+  ⟨1, [⟨numeric, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.var 0) .cnil, .cnil⟩
+
+/-- `List.empty : forall a. List a` -/
+def List.empty (list : Nat) : Scheme :=
+  ⟨1, [],
+    .app (.con list) (.var 0), .cnil⟩
+
+/-- `List.take_right : forall a. Int -> List a -> List a` -/
+def List.take_right (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.drop_right : forall a. Int -> List a -> List a` -/
+def List.drop_right (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.take_while : forall c a. (a -> Bool)^c -> (List a -> List a)^c` -/
+def List.take_while (bool list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.drop_while : forall c a. (a -> Bool)^c -> (List a -> List a)^c` -/
+def List.drop_while (bool list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.take_while_filter : forall c a b e. (a -> Result e b)^c -> (List a -> List b)^c` -/
+def List.take_while_filter (result list : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 1) (.app (.app (.con result) (.var 3)) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.drop_while_filter : forall c a b e. (a -> Result e b)^c -> (List a -> List a)^c` -/
+def List.drop_while_filter (result list : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 1) (.app (.app (.con result) (.var 3)) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.span : forall c a. (a -> Bool)^c -> (List a -> (List a, List a))^c` -/
+def List.span (bool list tup : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.app (.con tup) (.app (.con list) (.var 1))) (.app (.con list) (.var 1))) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.split_at : forall a. Int -> List a -> (List a, List a)` -/
+def List.split_at (int list tup : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.app (.con tup) (.app (.con list) (.var 0))) (.app (.con list) (.var 0))) .cnil) .cnil, .cnil⟩
+
+/-- `List.split : forall a. Int -> List a -> List (List a)` -/
+def List.split (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.app (.con list) (.var 0))) .cnil) .cnil, .cnil⟩
+
+/-- `List.split_where : forall c a. (a -> Bool)^c -> (List a -> (List a, List a))^c` -/
+def List.split_where (bool list tup : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.app (.con tup) (.app (.con list) (.var 1))) (.app (.con list) (.var 1))) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.chunks_of : forall a. Int -> List a -> List (NonEmpty a)` -/
+def List.chunks_of (int list nonempty : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.app (.con nonempty) (.var 0))) .cnil) .cnil, .cnil⟩
+
+/-- `List.window : forall a. Int -> List a -> List (List a)` -/
+def List.window (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.app (.con list) (.var 0))) .cnil) .cnil, .cnil⟩
+
+/-- `List.chop : forall c a b. (NonEmpty a -> (b, List a))^c -> (List a -> List b)^c` -/
+def List.chop (nonempty tup list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.app (.con nonempty) (.var 1)) (.app (.app (.con tup) (.var 2)) (.app (.con list) (.var 1))) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.tail : forall a. List a -> Option (List a)` -/
+def List.tail (list option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con option) (.app (.con list) (.var 0))) .cnil, .cnil⟩
+
+/-- `List.init : forall a. List a -> Option (List a)` -/
+def List.init (list option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con option) (.app (.con list) (.var 0))) .cnil, .cnil⟩
+
+/-- `List.pad : forall a. Int -> a -> (List a -> List a)^{a}` -/
+def List.pad (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.var 0) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.rotate : forall a. Int -> List a -> List a` -/
+def List.rotate (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.insert_at : forall a. Int -> a -> (List a -> Option (NonEmpty a))^{a}` -/
+def List.insert_at (int list option nonempty : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.var 0) (.arr .P (.app (.con list) (.var 0)) (.app (.con option) (.app (.con nonempty) (.var 0))) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.remove : forall a. Int -> List a -> List a` -/
+def List.remove (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.modify : forall c a. Int -> (a -> a)^c -> (List a -> Option (List a))^c` -/
+def List.modify (int list option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.con int) (.arr .P (.arr .P (.var 1) (.var 1) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con option) (.app (.con list) (.var 1))) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.replace : forall a. Int -> a -> (List a -> Option (List a))^{a}` -/
+def List.replace (int list option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.var 0) (.arr .P (.app (.con list) (.var 0)) (.app (.con option) (.app (.con list) (.var 0))) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.intersperse : forall a. a -> (List a -> List a)^{a}` -/
+def List.intersperse (list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.var 0) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.append_all : forall a. List a -> (List a -> List a)^{a}` -/
+def List.append_all (list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.var 0)) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.find_last : forall c a. (a -> Bool)^c -> (List a -> Option a)^c` -/
+def List.find_last (bool list option : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con option) (.var 1)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.find_last_index : forall c a. (a -> Bool)^c -> (List a -> Option Int)^c` -/
+def List.find_last_index (bool list option int : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con option) (.con int)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.find_first_with_index : forall c a. (a -> Bool)^c -> (List a -> Option (a, Int))^c` -/
+def List.find_first_with_index (bool list option tup int : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con option) (.app (.app (.con tup) (.var 1)) (.con int))) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.count_by : forall c a. (a -> Bool)^c -> (List a -> Int)^c` -/
+def List.count_by (bool list int : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con bool) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.con int) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.contains_with : forall c a. (a -> (a -> Bool)^{a | c})^c -> (a -> (List a -> Bool)^{a | c})^c` -/
+def List.contains_with (bool list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.arr .P (.var 1) (.con bool) (.var 2)) (.var 0)) (.arr .P (.var 1) (.arr .P (.app (.con list) (.var 1)) (.con bool) (.cun (.var 1) (.cun (.var 0) (.var 2)))) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
+
+/-- `List.dedupe_with : forall c a. (a -> (a -> Bool)^{a | c})^c -> (List a -> List a)^c` -/
+def List.dedupe_with (bool list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.arr .P (.var 1) (.con bool) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
+
+/-- `List.dedupe : forall a. Eq a => List a -> List a` -/
+def List.dedupe (eq list : Nat) : Scheme :=
+  ⟨1, [⟨eq, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.dedupe_adjacent_with : forall c a. (a -> (a -> Bool)^{a | c})^c -> (List a -> List a)^c` -/
+def List.dedupe_adjacent_with (bool list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.arr .P (.var 1) (.con bool) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
+
+/-- `List.dedupe_adjacent : forall a. Eq a => List a -> List a` -/
+def List.dedupe_adjacent (eq list : Nat) : Scheme :=
+  ⟨1, [⟨eq, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.difference_with : forall c a. (a -> (a -> Bool)^{a | c})^c -> (List a -> (List a -> List a)^{a | c})^c` -/
+def List.difference_with (bool list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.arr .P (.var 1) (.con bool) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.cun (.var 1) (.cun (.var 0) (.var 2)))) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
+
+/-- `List.difference : forall a. Eq a => List a -> (List a -> List a)^{a}` -/
+def List.difference (eq list : Nat) : Scheme :=
+  ⟨1, [⟨eq, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.intersection_with : forall c a. (a -> (a -> Bool)^{a | c})^c -> (List a -> (List a -> List a)^{a | c})^c` -/
+def List.intersection_with (bool list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.arr .P (.var 1) (.con bool) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.cun (.var 1) (.cun (.var 0) (.var 2)))) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
+
+/-- `List.intersection : forall a. Eq a => List a -> (List a -> List a)^{a}` -/
+def List.intersection (eq list : Nat) : Scheme :=
+  ⟨1, [⟨eq, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.union_with : forall c a. List a -> ((a -> (a -> Bool)^{a | c})^c -> (List a -> List a)^c)^{a}` -/
+def List.union_with (list bool : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.app (.con list) (.var 1)) (.arr .P (.arr .P (.var 1) (.arr .P (.var 1) (.con bool) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.cun (.var 0) (.var 2))) (.var 1)) .cnil, .cnil⟩
+
+/-- `List.union : forall a. Eq a => List a -> (List a -> List a)^{a}` -/
+def List.union (eq list : Nat) : Scheme :=
+  ⟨1, [⟨eq, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.group_with : forall c a. (a -> (a -> Bool)^{a | c})^c -> (List a -> List (NonEmpty a))^c` -/
+def List.group_with (bool list nonempty : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 1) (.arr .P (.var 1) (.con bool) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.app (.con nonempty) (.var 1))) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
+
+/-- `List.group : forall a. Eq a => List a -> List (NonEmpty a)` -/
+def List.group (eq list nonempty : Nat) : Scheme :=
+  ⟨1, [⟨eq, [.var 0]⟩],
+    .arr .P (.app (.con list) (.var 0)) (.app (.con list) (.app (.con nonempty) (.var 0))) .cnil, .cnil⟩
+
+/-- `List.group_by : forall c a. (a -> String)^c -> (List a -> ReadonlyRecord (NonEmpty a))^c` -/
+def List.group_by (string list readonlyrecord nonempty : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 1) (.con string) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con readonlyrecord) (.app (.con nonempty) (.var 1))) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.join : String -> List String -> String` -/
+def List.join (string list : Nat) : Scheme :=
+  ⟨0, [],
+    .arr .P (.con string) (.arr .P (.app (.con list) (.con string)) (.con string) .cnil) .cnil, .cnil⟩
+
+/-- `List.cartesian : forall b a. List b -> (List a -> List (a, b))^{b}` -/
+def List.cartesian (list tup : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con list) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.app (.app (.con tup) (.var 1)) (.var 0))) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.cartesian_with : forall c a b d. List b -> ((a -> (b -> d)^{a | c})^c -> (List a -> List d)^c)^{b}` -/
+def List.cartesian_with (list : Nat) : Scheme :=
+  ⟨5, [],
+    .arr .P (.app (.con list) (.var 2)) (.arr .P (.arr .P (.var 1) (.arr .P (.var 2) (.var 3) (.var 4)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 3)) (.cun (.var 0) (.var 4))) (.var 2)) .cnil, .cnil⟩
+
+/-- `List.zip_with : forall c a b d. List b -> ((a -> (b -> d)^{a | c})^c -> (List a -> List d)^c)^{b}` -/
+def List.zip_with (list : Nat) : Scheme :=
+  ⟨5, [],
+    .arr .P (.app (.con list) (.var 2)) (.arr .P (.arr .P (.var 1) (.arr .P (.var 2) (.var 3) (.var 4)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 3)) (.cun (.var 0) (.var 4))) (.var 2)) .cnil, .cnil⟩
+
+/-- `List.map_accum : forall c s a b. s -> ((s -> (a -> (s, b))^{s | c})^c -> (List a -> (s, List b))^c)^{s}` -/
+def List.map_accum (tup list : Nat) : Scheme :=
+  ⟨5, [],
+    .arr .P (.var 1) (.arr .P (.arr .P (.var 1) (.arr .P (.var 2) (.app (.app (.con tup) (.var 1)) (.var 3)) (.var 4)) (.var 0)) (.arr .P (.app (.con list) (.var 2)) (.app (.app (.con tup) (.var 1)) (.app (.con list) (.var 3))) (.cun (.var 0) (.var 4))) (.var 1)) .cnil, .cnil⟩
+
+/-- `List.scan : forall c a b. b -> ((b -> (a -> b)^{b | c})^c -> (List a -> NonEmpty b)^c)^{b}` -/
+def List.scan (list nonempty : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.var 2) (.arr .P (.arr .P (.var 2) (.arr .P (.var 1) (.var 2) (.var 3)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con nonempty) (.var 2)) (.cun (.var 0) (.var 3))) (.var 2)) .cnil, .cnil⟩
+
+/-- `List.scan_right : forall c a b. b -> ((b -> (a -> b)^{b | c})^c -> (List a -> NonEmpty b)^c)^{b}` -/
+def List.scan_right (list nonempty : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.var 2) (.arr .P (.arr .P (.var 2) (.arr .P (.var 1) (.var 2) (.var 3)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con nonempty) (.var 2)) (.cun (.var 0) (.var 3))) (.var 2)) .cnil, .cnil⟩
+
+/-- `List.extend : forall c a b. (List a -> b)^c -> (List a -> List b)^c` -/
+def List.extend (list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.app (.con list) (.var 1)) (.var 2) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.filter_map_while : forall c a b e. (a -> Result e b)^c -> (List a -> List b)^c` -/
+def List.filter_map_while (result list : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 1) (.app (.app (.con result) (.var 3)) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.get_somes : forall a. List (Option a) -> List a` -/
+def List.get_somes (list option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.app (.con list) (.app (.con option) (.var 0))) (.app (.con list) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.get_failures : forall e a. List (Result e a) -> List e` -/
+def List.get_failures (list result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con list) (.app (.app (.con result) (.var 0)) (.var 1))) (.app (.con list) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.get_successes : forall e a. List (Result e a) -> List a` -/
+def List.get_successes (list result : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con list) (.app (.app (.con result) (.var 0)) (.var 1))) (.app (.con list) (.var 1)) .cnil, .cnil⟩
+
+/-- `List.separate : forall e a. List (Result e a) -> (List a, List e)` -/
+def List.separate (list result tup : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.con list) (.app (.app (.con result) (.var 0)) (.var 1))) (.app (.app (.con tup) (.app (.con list) (.var 1))) (.app (.con list) (.var 0))) .cnil, .cnil⟩
+
+/-- `List.partition_map : forall c a f p. (a -> Result f p)^c -> (List a -> (List p, List f))^c` -/
+def List.partition_map (result list tup : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr .P (.var 1) (.app (.app (.con result) (.var 2)) (.var 3)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.app (.con tup) (.app (.con list) (.var 3))) (.app (.con list) (.var 2))) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.unfold : forall c a b. b -> ((b -> Option (a, b))^c -> List a)^{b}` -/
+def List.unfold (option tup list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.var 2) (.arr .P (.arr .P (.var 2) (.app (.con option) (.app (.app (.con tup) (.var 1)) (.var 2))) (.var 0)) (.app (.con list) (.var 1)) (.var 2)) .cnil, .cnil⟩
+
+/-- `List.lift_option : forall a b. (a -> Option b) -> (a -> List b)^{a, b}` -/
+def List.lift_option (option list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.arr .P (.var 0) (.app (.con option) (.var 1)) .cnil) (.arr .P (.var 0) (.app (.con list) (.var 1)) (.cun (.var 0) (.var 1))) .cnil, .cnil⟩
+
+/-- `List.lift_predicate : forall a. (a -> Bool) -> (a -> List a)^{a}` -/
+def List.lift_predicate (bool list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.arr .P (.var 0) (.con bool) .cnil) (.arr .P (.var 0) (.app (.con list) (.var 0)) (.var 0)) .cnil, .cnil⟩
+
+/-- `List.lift_result : forall a e b. (a -> Result e b) -> (a -> List b)^{a, b, e}` -/
+def List.lift_result (result list : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.var 0) (.app (.app (.con result) (.var 1)) (.var 2)) .cnil) (.arr .P (.var 0) (.app (.con list) (.var 2)) (.cun (.cun (.var 0) (.var 2)) (.var 1))) .cnil, .cnil⟩
+
+/-- `List.sort_with : forall b a. Ord b => (a -> b) -> (List a -> List a)^{a, b}` -/
+def List.sort_with (ord list : Nat) : Scheme :=
+  ⟨2, [⟨ord, [.var 0]⟩],
+    .arr .P (.arr .P (.var 1) (.var 0) .cnil) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.var 1)) (.cun (.var 1) (.var 0))) .cnil, .cnil⟩
+
+/-- `List.repeat_all : forall a. Int -> List a -> List a` -/
+def List.repeat_all (int list : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con int) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `List.match_ : forall b a. { onEmpty : Unit -> b; onNonEmpty : NonEmpty a -> b } -> (List a -> b)^{a, b}` -/
+def List.match_ (rec_onEmpty_onNonEmpty unit nonempty list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con rec_onEmpty_onNonEmpty) (.arr .P (.con unit) (.var 0) .cnil)) (.arr .P (.app (.con nonempty) (.var 1)) (.var 0) .cnil)) (.arr .P (.app (.con list) (.var 1)) (.var 0) (.cun (.var 1) (.var 0))) .cnil, .cnil⟩
+
+/-- `List.match_left : forall b a. { onEmpty : Unit -> b; onNonEmpty : a -> (List a -> b)^{a} } -> (List a -> b)^{a, b}` -/
+def List.match_left (rec_onEmpty_onNonEmpty unit list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con rec_onEmpty_onNonEmpty) (.arr .P (.con unit) (.var 0) .cnil)) (.arr .P (.var 1) (.arr .P (.app (.con list) (.var 1)) (.var 0) (.var 1)) .cnil)) (.arr .P (.app (.con list) (.var 1)) (.var 0) (.cun (.var 1) (.var 0))) .cnil, .cnil⟩
+
+/-- `List.match_right : forall b a. { onEmpty : Unit -> b; onNonEmpty : List a -> (a -> b)^{a} } -> (List a -> b)^{a, b}` -/
+def List.match_right (rec_onEmpty_onNonEmpty unit list : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.app (.app (.con rec_onEmpty_onNonEmpty) (.arr .P (.con unit) (.var 0) .cnil)) (.arr .P (.app (.con list) (.var 1)) (.arr .P (.var 1) (.var 0) (.var 1)) .cnil)) (.arr .P (.app (.con list) (.var 1)) (.var 0) (.cun (.var 1) (.var 0))) .cnil, .cnil⟩
+
 end Flick.Elab.PreludeSchemes
+
+/-! ## Skipped
+
+`row`: a row of services or errors outside an arrow and `Eff`; `rank`: `∀` of a
+parameter other than `∀v. a^v → …` (Р194); `region`: a region parameter.
+-/
+
+-- skip Prelude.parallel_results (row): forall c r e a. List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)
+-- skip Prelude.parallel_exits (row): forall c r e a. List (Eff r e a)^c ->{r; none} List (Exit e a)
+-- skip Prelude.field (row): forall a. String -> PureCodec Json a -> FieldCodec none a
+-- skip Prelude.optional_field (row): forall a. String -> PureCodec Json a -> FieldCodec none (Option a)
+-- skip Prelude.field_effect (row): forall rd a. String -> Codec rd none Json a -> FieldCodec rd a
+-- skip Prelude.on_missing (row): forall c rd a. (Unit -> a)^c -> (FieldCodec rd a -> FieldCodec rd a)^c
+-- skip Prelude.on_missing_effect (row): forall c r rd a. (Unit ->{r; SchemaError} a)^c -> (FieldCodec rd a -> FieldCodec (rd + r) a)^c
