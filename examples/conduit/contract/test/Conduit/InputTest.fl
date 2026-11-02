@@ -24,6 +24,7 @@ let encode wire value =
   | Ok json -> Json.stringify json
   | Err e -> show e
 
+/// The checks of the codecs of what clients send.
 tests : List Test.Test
 let tests = [
   Test.test "a registration with fields missing still decodes" (fun () ->

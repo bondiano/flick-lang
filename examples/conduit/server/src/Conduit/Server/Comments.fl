@@ -7,6 +7,7 @@ import Database exposing (Database)
 import Conduit.Server.Db as Db
 import Conduit.Server.Schema exposing (Comments, Follows, Users)
 
+/// A comment with its author and whether the reader follows them.
 type alias Row = {
   id : BigInt;
   body : String;
@@ -41,6 +42,7 @@ let rows reader article id = sql {
   }
 }
 
+/// The comments of an article, oldest first.
 of_article : Option BigInt -> BigInt ->{Database;} List Row
 let of_article reader article = Db.rows (rows reader (Some article) None)
 
@@ -48,6 +50,7 @@ let of_article reader article = Db.rows (rows reader (Some article) None)
 find : Option BigInt -> BigInt -> BigInt ->{Database;} Option Row
 let find reader article id = Db.first (rows reader (Some article) (Some id))
 
+/// Stores a comment: its id.
 insert : BigInt -> BigInt -> String -> String ->{Database;} BigInt
 let insert article author body now =
   Db.insert_id
@@ -63,6 +66,7 @@ let insert article author body now =
       returning { id = Comments.id }
     })
 
+/// Deletes a comment.
 delete : BigInt ->{Database;} Unit
 let delete id =
   Db.run

@@ -15,3 +15,12 @@ contract = { path = "../contract" }
 [build]
 out-dir = "dist"
 emit = "go"
+
+# Tight thresholds: a function that grows past them is split; a query
+# reads as one statement, its subqueries inline, so it may take 60 lines.
+[lint]
+no-let-assert = true
+max-function-lines = 60
+max-nesting = 3
+max-complexity = 8
+max-params = 4

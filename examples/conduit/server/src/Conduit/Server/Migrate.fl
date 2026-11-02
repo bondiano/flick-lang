@@ -4,9 +4,11 @@ module Conduit.Server.Migrate exposing (main)
 
 import Conduit.Server.Schema as Schema
 
+/// The database to migrate.
 url : Unit ->{; Config.ConfigError} String
 let url () = Config.get (Config.string "DATABASE_URL")
 
+/// Applies the migrations the database lacks and says which.
 main : Unit ->{; AppError} Unit
 let main () =
   let database =

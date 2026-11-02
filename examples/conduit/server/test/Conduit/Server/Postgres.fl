@@ -9,6 +9,7 @@ import Conduit.Server.Schema as Schema
 /// The database did not answer in time.
 type error NotReady = NotReady String
 
+/// A command of the Docker CLI.
 docker : List String -> ChildProcess.Command
 let docker args = ChildProcess.make "docker" args
 

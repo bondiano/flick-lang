@@ -32,6 +32,7 @@ let slug_of text =
   | Ok slug -> slug
   | Err _ -> from_result (Err (NotFound [("article", ["not found"])]))
 
+/// Each article as a reader sees it, which a change of articles loads again.
 articles :
   Atom.Family Key (Atom.Atom (Atom.Async ArticleBody {HttpApi.ClientError, NotFound, Unauthorized}))
 let articles =
@@ -47,6 +48,7 @@ let articles =
         })
   )
 
+/// The comments of each article, which a new or deleted comment loads again.
 comments :
   Atom.Family
     Key
@@ -75,6 +77,7 @@ let toggle_follow following request =
   else
     Session.call request Api.Users.endpoints.follow
 
+/// Follows the author, or stops; a visitor signs up first.
 follow : Action.Action (Profile, Ui.ClickSnapshot)
 let follow =
   Action.exhaust (fun (author, _) -> task {
@@ -93,7 +96,7 @@ let follow =
 
 /// `Follow <name>`, or `Unfollow <name>` when the reader follows them.
 follow_button : Profile -> Ui
-let follow_button author =
+let follow_button author = ui {
   let (style, label) =
     if author.following then
       ("btn btn-sm btn-secondary", "Unfollow ")
@@ -101,11 +104,13 @@ let follow_button author =
       ("btn btn-sm btn-outline-secondary", "Follow ")
   View.classed
     style
-    (Ui.button { disabled = false; on_click = Action.with follow author } [
-      Ui.icon { class_name = "ion-plus-round" },
-      Ui.text (" " ++ label ++ author.username),
+    (button { disabled = false; on_click = Action.with follow author } [
+      icon { class_name = "ion-plus-round" },
+      text (" " ++ label ++ author.username),
     ])
+}
 
+/// Deletes the reader's article and goes home.
 remove : Action.Action (String, Ui.ClickSnapshot)
 let remove =
   Action.exhaust (fun (slug, _) -> task {
@@ -125,34 +130,36 @@ let remove =
 
 /// The author's edit and delete, or the reader's follow and favorite.
 actions : Article -> Option User -> List Ui
-let actions article reader =
+let actions article reader = ui {
   match reader with
   | Some me when me.username == article.author.username -> [
-    View.link "btn btn-sm btn-outline-secondary" (Editor (Some article.slug)) [
-      Ui.icon { class_name = "ion-edit" },
-      Ui.text " Edit Article",
+    View.anchor "btn btn-sm btn-outline-secondary" (Editor (Some article.slug)) [
+      icon { class_name = "ion-edit" },
+      text " Edit Article",
     ],
-    Ui.text " ",
+    text " ",
     View.classed
       "btn btn-sm btn-outline-danger"
-      (Ui.button { disabled = false; on_click = Action.with remove article.slug } [
-        Ui.icon { class_name = "ion-trash-a" },
-        Ui.text " Delete Article",
+      (button { disabled = false; on_click = Action.with remove article.slug } [
+        icon { class_name = "ion-trash-a" },
+        text " Delete Article",
       ]),
   ]
   | _ -> [
     follow_button article.author,
-    Ui.text " ",
+    text " ",
     View.favorite_button
       ""
       (if article.favorited then "Unfavorite Article " else "Favorite Article ")
       (Model.preview article),
   ]
+}
 
 /// What the reader writes as a comment.
 draft : Atom.Writable String
 let draft = Atom.make ""
 
+/// Posts the comment written, then clears it; or lists its problems.
 post : Action.Action (String, Unit)
 let post =
   Action.exhaust (fun (slug, _) -> task {
@@ -173,6 +180,7 @@ let post =
       Atom.set View.form_problems (Session.unreachable (HttpApi.ClientError e))
   })
 
+/// Deletes a comment of the reader.
 delete_comment : Action.Action ((String, Int), Ui.ClickSnapshot)
 let delete_comment =
   Action.exhaust (fun ((slug, id), _) -> task {
@@ -193,105 +201,119 @@ let delete_comment =
     | Err _ -> ()
   })
 
+/// The props of a comment and of the comment form: the article's slug and
+/// who reads it.
+type alias Reading = { slug : String; reader : Option User }
+
 /// A comment, which its author may delete.
-comment_card : String -> Option User -> Comment -> Ui
-let comment_card slug reader comment =
-  let mine = Option.exists (fun (me : User) -> me.username == comment.author.username) reader
+component comment_card (props : { slug : String; reader : Option User; comment : Comment }) = ui {
+  let comment = props.comment
+  let mine = Option.exists (fun (me : User) -> me.username == comment.author.username) props.reader
+  let author = Profile comment.author.username None
   let delete =
     if mine then
-      Ui.span { class_name = "mod-options" } [
-        Ui.button { disabled = false; on_click = Action.with delete_comment (slug, comment.id) } [
-          Ui.icon { class_name = "ion-trash-a" },
-        ],
+      span { class_name = "mod-options" } [
+        button
+          { disabled = false; on_click = Action.with delete_comment (props.slug, comment.id) }
+          [
+            icon { class_name = "ion-trash-a" },
+          ],
       ]
     else
-      Ui.empty
-  let author = Profile comment.author.username None
-  Ui.keyed
-    (Int.to_string comment.id)
-    (Ui.div { class_name = "card" } [
-      Ui.div { class_name = "card-block" } [
-        View.classed "card-text" (Ui.paragraph [Ui.text comment.body]),
-      ],
-      Ui.div { class_name = "card-footer" } [
-        View.link "comment-author" author [View.avatar "comment-author-img" comment.author.image],
-        Ui.text " ",
-        View.link "comment-author" author [Ui.text comment.author.username],
-        Ui.span { class_name = "date-posted" } [Ui.text (View.date comment.createdAt)],
-        delete,
-      ],
-    ])
+      empty
+  div { class_name = "card" } [
+    div { class_name = "card-block" } [View.classed "card-text" (paragraph [text comment.body])],
+    div { class_name = "card-footer" } [
+      View.anchor "comment-author" author [View.avatar "comment-author-img" comment.author.image],
+      text " ",
+      View.anchor "comment-author" author [text comment.author.username],
+      span { class_name = "date-posted" } [text (View.date comment.createdAt)],
+      delete,
+    ],
+  ]
+}
 
-/// The comment form of a reader, or the links to sign in.
-comment_form : String -> Option User -> Ui
-let comment_form slug reader =
-  match reader with
+/// The comment form of a reader, or the link to sign up.
+component comment_form (props : Reading) = ui {
+  match props.reader with
   | None ->
-    Ui.paragraph [
-      Route.to Register [Ui.text "Sign up"],
-      Ui.text " or sign in to add comments on this article.",
+    paragraph [
+      Route.to Register [text "Sign up"],
+      text " or sign in to add comments on this article.",
     ]
   | Some me ->
-    Ui.fragment [
-      Ui.render View.errors (),
+    fragment [
+      render View.errors (),
       View.classed
         "card comment-form"
-        (Ui.form { on_submit = Action.with post slug } [
-          Ui.div { class_name = "card-block" } [
-            Ui.with_host
-              { Ui.host with class_name = Some "form-control"; name = Some "comment" }
-              (Ui.field_area { bind = draft; placeholder = "Write a comment..."; on_input = None }),
+        (form { on_submit = Action.with post props.slug } [
+          div { class_name = "card-block" } [
+            with_host
+              { host with class_name = Some "form-control"; name = Some "comment" }
+              (field_area { bind = draft; placeholder = "Write a comment..."; on_input = None }),
           ],
-          Ui.div { class_name = "card-footer" } [
+          div { class_name = "card-footer" } [
             View.avatar "comment-author-img" me.image,
             View.classed
               "btn btn-sm btn-primary"
-              (Ui.submit { disabled = false } [Ui.text "Post Comment"]),
+              (submit { disabled = false } [text "Post Comment"]),
           ],
         ]),
     ]
+}
 
-/// The comments of the article, newest first.
+/// A comment of the article being read, by its id.
+card : Reading -> Comment -> Ui
+let card reading comment = ui {
+  keyed
+    (Int.to_string comment.id)
+    (render comment_card { slug = reading.slug; reader = reading.reader; comment = comment })
+}
+
+/// The comments of the article, oldest first, under the comment form.
 component thread (key : Key) = ui {
   match key with
   | Key _ slug ->
     let reader = Session.signed_in ()
     let cards =
       match Atom.get (Atom.at comments key) with
-      | Atom.Loaded body -> List.map (comment_card slug reader) body.comments
+      | Atom.Loaded body -> List.map (card { slug = slug; reader = reader }) body.comments
       | Atom.Loading -> []
       | Atom.Failed _ -> [text "The comments cannot be loaded."]
-    fragment ([comment_form slug reader] ++ cards)
+    fragment ([render comment_form { slug = slug; reader = reader }] ++ cards)
 }
 
 /// The article page of a loaded article.
-shown : Article -> Option User -> Key -> Ui
-let shown article reader key =
-  let meta = View.meta article.author article.createdAt (actions article reader)
-  Ui.div { class_name = "article-page" } [
-    Ui.div { class_name = "banner" } [
-      Ui.div { class_name = "container" } [Ui.heading_at Ui.H1 [Ui.text article.title], meta],
+component shown (props : { article : Article; reader : Option User; key : Key }) = ui {
+  let article = props.article
+  let meta = View.meta article.author article.createdAt (actions article props.reader)
+  div { class_name = "article-page" } [
+    div { class_name = "banner" } [
+      div { class_name = "container" } [heading_at H1 [text article.title], meta],
     ],
-    Ui.div { class_name = "container page" } [
-      Ui.div { class_name = "row article-content" } [
-        Ui.div { class_name = "col-md-12" } [
-          Ui.html (Ui.trusted_html (Markdown.to_html article.body)),
+    div { class_name = "container page" } [
+      div { class_name = "row article-content" } [
+        div { class_name = "col-md-12" } [
+          html (trusted_html (Markdown.to_html article.body)),
           View.tag_list article.tagList,
         ],
       ],
-      Ui.hr,
-      Ui.div { class_name = "article-actions" } [meta],
-      Ui.div { class_name = "row" } [
-        Ui.div { class_name = "col-xs-12 col-md-8 offset-md-2" } [Ui.render thread key],
+      hr,
+      div { class_name = "article-actions" } [meta],
+      div { class_name = "row" } [
+        div { class_name = "col-xs-12 col-md-8 offset-md-2" } [render thread props.key],
       ],
     ],
   ]
+}
 
 /// The page of the article at `slug`.
 component page (slug : String) = ui {
   let key = Key (Atom.value Session.token) slug
-  match Atom.get (Atom.at articles key) with
-  | Atom.Loaded body -> shown body.article (Session.signed_in ()) key
+  let state = Atom.get (Atom.at articles key)
+  match state with
+  | Atom.Loaded body ->
+    render shown { article = body.article; reader = Session.signed_in (); key = key }
   | Atom.Loading ->
     div { class_name = "article-page" } [
       div { class_name = "container page" } [text "Loading article..."],

@@ -7,3 +7,11 @@ schema-version = 1
 kind = "lib"
 source-dir = "src"
 test-dir = "test"
+
+# Tight thresholds: a function that grows past them is split.
+[lint]
+no-let-assert = true
+max-function-lines = 40
+max-nesting = 3
+max-complexity = 8
+max-params = 4

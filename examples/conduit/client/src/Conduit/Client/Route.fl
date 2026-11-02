@@ -35,4 +35,4 @@ let current = Atom.route Page.url home
 
 /// A link to `target`, which navigates without a reload.
 to : Page -> List Ui -> Ui
-let to target children = Ui.route_link { route = current; url = Page.url; to = target } children
+let to target children = ui { route_link { route = current; url = Page.url; to = target } children }

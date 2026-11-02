@@ -1,7 +1,7 @@
 /// Signing in and up. Each form's fields are states bound to its inputs;
 /// a submit sends them, keeps the token the server answers and goes home,
 /// or lists the problems the server named for each field.
-module Conduit.Client.Auth exposing (field, area, sign_in_page, sign_up_page, keep)
+module Conduit.Client.Auth exposing (form_input, form_area, sign_in_page, sign_up_page, keep)
 
 import Conduit.Api as Api
 import Conduit.Model exposing (User)
@@ -10,6 +10,7 @@ import Conduit.Client.Route as Route exposing (Page(..))
 import Conduit.Client.Session as Session
 import Conduit.Client.View as View
 
+/// The fields of the sign-in and sign-up forms.
 username : Atom.Writable String
 let username = Atom.make ""
 
@@ -20,25 +21,27 @@ password : Atom.Writable String
 let password = Atom.make ""
 
 /// An input of a form, named `name` for the browser and the spec's tests.
-field : String -> Ui.InputType -> String -> Atom.Writable String -> Ui
-let field name input placeholder bind =
-  let host = {
-    Ui.host with
+form_input : String -> Ui.InputType -> String -> Atom.Writable String -> Ui
+let form_input name input placeholder bind = ui {
+  let attributes = {
+    host with
     name = Some name;
     input_type = Some input;
     class_name = Some "form-control form-control-lg";
   }
-  Ui.fieldset { class_name = "form-group" } [
-    Ui.with_host host (Ui.field { bind = bind; placeholder = placeholder; on_input = None }),
+  fieldset { class_name = "form-group" } [
+    with_host attributes (field { bind = bind; placeholder = placeholder; on_input = None }),
   ]
+}
 
 /// A text area of a form, named `name`.
-area : String -> String -> Atom.Writable String -> Ui
-let area name placeholder bind =
-  let host = { Ui.host with name = Some name; class_name = Some "form-control form-control-lg" }
-  Ui.fieldset { class_name = "form-group" } [
-    Ui.with_host host (Ui.field_area { bind = bind; placeholder = placeholder; on_input = None }),
+form_area : String -> String -> Atom.Writable String -> Ui
+let form_area name placeholder bind = ui {
+  let attributes = { host with name = Some name; class_name = Some "form-control form-control-lg" }
+  fieldset { class_name = "form-group" } [
+    with_host attributes (field_area { bind = bind; placeholder = placeholder; on_input = None }),
   ]
+}
 
 /// Keeps the token of `user`, clears the form and goes home.
 keep : User ->{Atom.Write;} Unit
@@ -62,6 +65,7 @@ let failed send =
   | Ok user -> keep user
   | Err found -> Atom.set View.form_problems found
 
+/// Signs in with the email and password written.
 sign_in : Action.Action Unit
 let sign_in =
   Action.exhaust (fun _ -> task {
@@ -71,6 +75,7 @@ let sign_in =
     )
   })
 
+/// Signs up with the name, email and password written.
 sign_up : Action.Action Unit
 let sign_up =
   Action.exhaust (fun _ -> task {
@@ -84,41 +89,62 @@ let sign_up =
     )
   })
 
+/// What a form page shows beside its fields.
+type alias Layout = { heading : String; other : Ui; submit : Action.Action Unit; label : String }
+
 /// The page of a form: its heading, the link to the other one, its
 /// problems and its fields.
-layout : String -> Ui -> Action.Action Unit -> String -> List Ui -> Ui
-let layout heading other submit label fields =
-  Ui.div { class_name = "auth-page" } [
-    Ui.div { class_name = "container page" } [
-      Ui.div { class_name = "row" } [
-        Ui.div { class_name = "col-md-6 offset-md-3 col-xs-12" } [
-          View.classed "text-xs-center" (Ui.heading_at Ui.H1 [Ui.text heading]),
-          View.classed "text-xs-center" (Ui.paragraph [other]),
-          Ui.render View.errors (),
-          Ui.form
-            { on_submit = submit }
-            (fields
-              ++ [
-                View.classed
-                  "btn btn-lg btn-primary pull-xs-right"
-                  (Ui.submit { disabled = false } [Ui.text label]),
-              ]),
+component form_page (props : { layout : Layout; fields : List Ui }) = ui {
+  let page = props.layout
+  let send =
+    View.classed
+      "btn btn-lg btn-primary pull-xs-right"
+      (submit { disabled = false } [text page.label])
+  div { class_name = "auth-page" } [
+    div { class_name = "container page" } [
+      div { class_name = "row" } [
+        div { class_name = "col-md-6 offset-md-3 col-xs-12" } [
+          View.classed "text-xs-center" (heading_at H1 [text page.heading]),
+          View.classed "text-xs-center" (paragraph [page.other]),
+          render View.errors (),
+          form { on_submit = page.submit } (props.fields ++ [send]),
         ],
       ],
     ],
   ]
+}
 
+/// The page of `/login`.
 sign_in_page : Ui
-let sign_in_page =
-  layout "Sign in" (Route.to Register [Ui.text "Need an account?"]) sign_in "Sign in" [
-    field "email" Ui.EmailInput "Email" email,
-    field "password" Ui.PasswordInput "Password" password,
-  ]
+let sign_in_page = ui {
+  render form_page {
+    layout = {
+      heading = "Sign in";
+      other = Route.to Register [text "Need an account?"];
+      submit = sign_in;
+      label = "Sign in";
+    };
+    fields = [
+      form_input "email" EmailInput "Email" email,
+      form_input "password" PasswordInput "Password" password,
+    ];
+  }
+}
 
+/// The page of `/register`.
 sign_up_page : Ui
-let sign_up_page =
-  layout "Sign up" (Route.to Login [Ui.text "Have an account?"]) sign_up "Sign up" [
-    field "username" Ui.TextInput "Username" username,
-    field "email" Ui.EmailInput "Email" email,
-    field "password" Ui.PasswordInput "Password" password,
-  ]
+let sign_up_page = ui {
+  render form_page {
+    layout = {
+      heading = "Sign up";
+      other = Route.to Login [text "Have an account?"];
+      submit = sign_up;
+      label = "Sign up";
+    };
+    fields = [
+      form_input "username" TextInput "Username" username,
+      form_input "email" EmailInput "Email" email,
+      form_input "password" PasswordInput "Password" password,
+    ];
+  }
+}

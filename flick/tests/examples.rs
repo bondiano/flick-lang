@@ -1,5 +1,6 @@
 //! The projects of `examples/` beyond the first slice, each on a copy in the
-//! target directory (`common::example`). `examples/observability` runs with
+//! target directory (`common::example`); Conduit's suites run in
+//! `flick/tests/conduit.rs`. `examples/observability` runs with
 //! the local collector of the observability run tests in its environment;
 //! `examples/cli-tool` with `NOTES_FILE` set.
 
@@ -36,6 +37,15 @@ const code = await new Promise((resolve) => child.on("close", resolve));
 console.log(`exit ${code}\n${out}\n${received()}`);
 await stop();
 "#;
+
+/// The contract, the server and the client of Conduit, under the tight
+/// `[lint]` thresholds of each.
+#[test]
+fn the_conduit_workspace_checks_and_is_formatted() {
+    let dir = common::example("conduit", "examples/conduit-check");
+    success(&dir, &["check", "--warnings-as-errors"]);
+    success(&dir, &["fmt", "--check"]);
+}
 
 #[test]
 fn the_observability_example_checks_and_is_formatted() {

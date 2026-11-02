@@ -3,7 +3,7 @@
 module Conduit.Client.Profile exposing (page)
 
 import Conduit.Api as Api
-import Conduit.Model exposing (ArticlesBody, ProfileBody)
+import Conduit.Model exposing (ArticlesBody, Profile, ProfileBody, User)
 import Conduit.Problem exposing (NotFound(..), Unauthorized(..))
 import Conduit.Route as Paths
 import Conduit.Client.Article as Article
@@ -19,6 +19,7 @@ type Key = Key (Option String) String
 type Listed = Listed (Option String) String Bool
   deriving Eq, Hash, Show
 
+/// Each profile as a reader sees it, which a follow loads again.
 profiles :
   Atom.Family Key (Atom.Atom (Atom.Async ProfileBody {HttpApi.ClientError, NotFound, Unauthorized}))
 let profiles =
@@ -35,6 +36,7 @@ let profiles =
         })
   )
 
+/// The articles of each profile's tabs.
 listed :
   Atom.Family Listed (Atom.Atom (Atom.Async ArticlesBody {HttpApi.ClientError, Unauthorized}))
 let listed =
@@ -59,22 +61,24 @@ let listed =
 
 /// A tab of a profile, `active` when it is the one shown.
 profile_tab : Bool -> Page -> String -> Ui
-let profile_tab active target label =
+let profile_tab active target label = ui {
   View.classed
     "nav-item"
-    (Ui.item [View.link (if active then "nav-link active" else "nav-link") target [Ui.text label]])
+    (item [View.anchor (if active then "nav-link active" else "nav-link") target [text label]])
+}
 
 /// The tabs of a profile's articles.
 article_tabs : String -> Bool -> Ui
-let article_tabs name favorites =
-  Ui.div { class_name = "articles-toggle" } [
+let article_tabs name favorites = ui {
+  div { class_name = "articles-toggle" } [
     View.classed
       "nav nav-pills outline-active"
-      (Ui.list [
+      (list [
         profile_tab (not favorites) (Profile name None) "My Articles",
         profile_tab favorites (Profile name (Some Favorites)) "Favorited Articles",
       ]),
   ]
+}
 
 /// The articles of a profile's tab.
 component articles (key : Listed) = ui {
@@ -84,39 +88,48 @@ component articles (key : Listed) = ui {
   | Atom.Failed _ -> div { class_name = "article-preview" } [text "The articles cannot be loaded."]
 }
 
+/// The reader's follow of the profile, or their own settings link.
+action : Profile -> Option User -> Ui
+let action profile reader = ui {
+  match reader with
+  | Some me when me.username == profile.username ->
+    View.anchor "btn btn-sm btn-outline-secondary action-btn" Settings [
+      icon { class_name = "ion-gear-a" },
+      text " Edit Profile Settings",
+    ]
+  | _ -> Article.follow_button profile
+}
+
+/// The user of a profile: their picture, name and bio.
+component user_info (props : { profile : Profile; reader : Option User }) = ui {
+  let profile = props.profile
+  div { class_name = "user-info" } [
+    div { class_name = "container" } [
+      div { class_name = "row" } [
+        div { class_name = "col-xs-12 col-md-10 offset-md-1" } [
+          View.avatar "user-img" profile.image,
+          heading_at H4 [text profile.username],
+          paragraph [text (Option.with_default "" profile.bio)],
+          action profile props.reader,
+        ],
+      ],
+    ],
+  ]
+}
+
 /// The profile of `name`, on its tab of favored articles when `favorites`.
 component page (props : { name : String; favorites : Bool }) = ui {
   let jwt = Atom.value Session.token
-  let reader = Session.signed_in ()
   match Atom.get (Atom.at profiles (Key jwt props.name)) with
   | Atom.Loaded body ->
     let profile = body.profile
-    let action =
-      match reader with
-      | Some me when me.username == profile.username ->
-        View.link "btn btn-sm btn-outline-secondary action-btn" Settings [
-          icon { class_name = "ion-gear-a" },
-          text " Edit Profile Settings",
-        ]
-      | _ -> Article.follow_button profile
     div { class_name = "profile-page" } [
-      div { class_name = "user-info" } [
-        div { class_name = "container" } [
-          div { class_name = "row" } [
-            div { class_name = "col-xs-12 col-md-10 offset-md-1" } [
-              View.avatar "user-img" profile.image,
-              heading_at Ui.H4 [text profile.username],
-              paragraph [text (Option.with_default "" profile.bio)],
-              action,
-            ],
-          ],
-        ],
-      ],
+      render user_info { profile = profile; reader = Session.signed_in () },
       div { class_name = "container" } [
         div { class_name = "row" } [
           div { class_name = "col-xs-12 col-md-10 offset-md-1" } [
             article_tabs profile.username props.favorites,
-            Ui.render articles (Listed jwt profile.username props.favorites),
+            render articles (Listed jwt profile.username props.favorites),
           ],
         ],
       ],

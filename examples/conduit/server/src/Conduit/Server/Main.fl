@@ -10,8 +10,10 @@ import Conduit.Server.App as Server
 import Conduit.Server.Schema as Schema
 import Conduit.Server.Session exposing (Keys)
 
+/// What the server reads from its environment.
 type alias Settings = { port : Float; database : String; secret : String; files : Option String }
 
+/// The settings of the environment, or which one is wrong.
 settings : Unit ->{; Config.ConfigError} Settings
 let settings () = {
   port = Config.get (Config.with_default 8000 (Config.port "PORT"));
@@ -20,6 +22,7 @@ let settings () = {
   files = Config.get (Config.option (Config.string "STATIC_DIR"));
 }
 
+/// Migrates the database, then serves until the process is stopped.
 serve :
   Settings ->{Database, Keys, Crypto.Crypto, Http.Platform.HttpPlatform, FileSystem.FileSystem; PlatformError.PlatformError, Http.ServerError.ServeError}
   Unit
@@ -39,6 +42,7 @@ let serve config =
     Effect.never ()
   }
 
+/// Serves Conduit; a wrong setting stops it with what is wrong.
 main : Unit ->{; AppError} Unit
 let main () =
   let config =

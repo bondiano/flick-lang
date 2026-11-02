@@ -22,6 +22,7 @@ let pages = [
   (Article "how-to", "/article/how-to"),
 ]
 
+/// The checks of the pages' URLs and of dates.
 tests : List Test.Test
 let tests = [
   Test.test "each page has the URL of the spec, and that URL is the page" (fun () ->

@@ -19,6 +19,7 @@ type alias Filter = {
   feed : Option BigInt;
 }
 
+/// An article with its author, its favorites and what the reader does.
 type alias Row = {
   id : BigInt;
   slug : String;
@@ -36,12 +37,14 @@ type alias Row = {
   following : BigInt;
 }
 
+/// What an author writes of an article.
 type alias Fields = { title : String; description : String; body : String }
 
 /// Every article.
 everything : Filter
 let everything = { slug = None; tag = None; author = None; favorited = None; feed = None }
 
+/// A page of the articles `f` keeps, newest first, as `reader` sees them.
 rows : Option BigInt -> Filter -> Int -> Int -> Sql.Template Pg {} Row
 let rows reader f limit offset = sql {
   from a in Articles
@@ -145,6 +148,7 @@ let page reader f at =
 find : Option BigInt -> String ->{Database;} Option Row
 let find reader slug = Db.first (rows reader { everything with slug = Some slug } 1 0)
 
+/// The tags of an article, in the order its author gave them.
 tags_of : BigInt ->{Database;} List String
 let tags_of id =
   List.map
@@ -211,6 +215,7 @@ let set_tags article names =
     )
     (List.map_indexed (fun i name -> (i, name)) names)
 
+/// Stores a new article: its id.
 insert : BigInt -> String -> Fields -> String ->{Database;} BigInt
 let insert author slug fields now =
   Db.insert_id
@@ -228,6 +233,7 @@ let insert author slug fields now =
       returning { id = Articles.id }
     })
 
+/// Stores the new fields of an article and when they changed.
 save : BigInt -> Fields -> String ->{Database;} Unit
 let save id fields now =
   Db.run
@@ -242,6 +248,7 @@ let save id fields now =
       where Articles.id == $id
     })
 
+/// Deletes an article, its tags, favorites and comments.
 delete : BigInt ->{Database;} Unit
 let delete id =
   Db.run
@@ -250,6 +257,7 @@ let delete id =
       where Articles.id == $id
     })
 
+/// The user favors the article; twice is once.
 favorite : BigInt -> BigInt ->{Database;} Unit
 let favorite user article =
   Db.run_once
@@ -258,6 +266,7 @@ let favorite user article =
       values { user_id = $user; article_id = $article }
     })
 
+/// The user takes their favorite back.
 unfavorite : BigInt -> BigInt ->{Database;} Unit
 let unfavorite user article =
   Db.run

@@ -28,6 +28,7 @@ type error Conflict = Conflict Problems
 type error Unprocessable = Unprocessable Problems
   deriving Eq, Show, Schema
 
+/// The body of every error: its problems under `errors`.
 type alias Body = { errors : Problems }
   deriving Schema
 
@@ -35,11 +36,13 @@ type alias Body = { errors : Problems }
 problem : String -> String -> Problems
 let problem subject message = [(subject, [message])]
 
+/// The codec of the body of every error.
 body : PureCodec Json Body
 let body = codec (schema Body) {
   errors = field "errors" (Codec.entries (Codec.list String.json));
 }
 
+/// The body of a 401.
 unauthorized : PureCodec Json Unauthorized
 let unauthorized =
   Codec.transform_as
@@ -48,6 +51,7 @@ let unauthorized =
     (fun (Unauthorized p) -> { errors = p })
     body
 
+/// The body of a 403.
 forbidden : PureCodec Json Forbidden
 let forbidden =
   Codec.transform_as
@@ -56,6 +60,7 @@ let forbidden =
     (fun (Forbidden p) -> { errors = p })
     body
 
+/// The body of a 404.
 not_found : PureCodec Json NotFound
 let not_found =
   Codec.transform_as
@@ -64,6 +69,7 @@ let not_found =
     (fun (NotFound p) -> { errors = p })
     body
 
+/// The body of a 409.
 conflict : PureCodec Json Conflict
 let conflict =
   Codec.transform_as
@@ -72,6 +78,7 @@ let conflict =
     (fun (Conflict p) -> { errors = p })
     body
 
+/// The body of a 422.
 unprocessable : PureCodec Json Unprocessable
 let unprocessable =
   Codec.transform_as
