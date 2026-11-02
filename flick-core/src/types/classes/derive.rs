@@ -10,7 +10,7 @@ use super::declare::Declared;
 use super::solve::Outcome;
 use super::{Dict, STRUCTURAL, has_metas};
 use crate::diagnostics::{Diagnostic, codes};
-use crate::iface::Namespace;
+use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -225,8 +225,12 @@ impl<'n> Checker<'_> {
 
     /// The field types of a constructor of this module, over the type's parameters.
     pub(crate) fn constructor_fields(&self, constructor: &str) -> Vec<Type> {
-        let entity = self.env.entity(Namespace::Constructor, constructor);
-        let mut ty = match self.env.value(&entity) {
+        self.entity_fields(&self.env.entity(Namespace::Constructor, constructor))
+    }
+
+    /// The field types of a constructor of any module.
+    pub(crate) fn entity_fields(&self, constructor: &Entity) -> Vec<Type> {
+        let mut ty = match self.env.value(constructor) {
             Some(Type::Forall { body, .. }) => (**body).clone(),
             Some(t) => t.clone(),
             None => return Vec::new(),

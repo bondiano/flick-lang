@@ -13,6 +13,10 @@
 /// } deriving HttpApi
 /// ```
 ///
+/// The path is a string, or a constructor of a route type that derives
+/// `Url` with the type of each parameter in place of a value:
+/// `Get (Profiles Username None)` is `"/profiles/:username"`.
+///
 /// The type has the companions `Users.endpoints`, the record of its
 /// endpoints, which `HttpApi.call` requests, and `Users.api`, the group,
 /// which `HttpApi.add_group` adds to an API. With `Authed` or `MaybeAuthed`

@@ -56,6 +56,13 @@ let profile =
   `Profile String (Option Tab)` выше.
 - Последний сегмент может быть `Option` одного из них: `None` убирает его из
   URL, поэтому у одного конструктора есть URL и с ним, и без него.
+- Последним сегментом может быть и другой тип с `deriving Url`: его маршрут —
+  остаток пути. `Index` не добавляет сегмента, а слово выигрывает у
+  параметра, поэтому при `type ArticleRoute = Feed | Index Slug` и
+  `Articles (Option ArticleRoute)` путь `/articles/feed` — это
+  `Articles (Some Feed)`, а `/articles/hi` — `Articles (Some (Index hi))`.
+  Так один тип называет все пути REST API
+  (`tests/run/schema/route_nested.fl`).
 - Последнее поле-запись — query. Его поля тех же типов или `Option` одного
   из них; такого параметра в URL может не быть.
 - Другое поле, обобщённый тип или два конструктора с одинаковыми URL —
@@ -68,6 +75,19 @@ let profile =
 обратимы для всякого значения, чей текст — корректный Unicode:
 `tests/run/schema/route.fl` проверяет это `Arbitrary.check` над
 `schema Page`.
+
+## Маршруты как пути API
+
+Там, где ожидается `Symbol`, конструктор типа маршрутов означает свой путь,
+а на месте каждого параметра стоит его тип: при
+`Profiles Username (Option Follow)` запись `Profiles Username (Some Follow)` —
+это `"/profiles/:username/follow"`. Параметр называется по своему типу в
+snake_case, поэтому у него должен быть собственный тип, например
+уточнённый; поле `Option` записывается как `None` или `Some …`, поле слов или
+вложенного типа маршрутов — одним из его конструкторов. Тип маршрутов
+объявлен в другом модуле. Так эндпоинты `deriving HttpApi` называют свои
+пути (см. [HttpApi](/ru/reference/http-api/#api-как-тип)); шаблон, который не
+является путём, — `FLICK-D009`.
 
 ## Текущая страница
 
