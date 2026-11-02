@@ -97,7 +97,8 @@ func ArrayIntersectionWith(fb *Fiber, eq, that, self Value) Value {
 
 func ArrayFilter(fb *Fiber, f, xs Value) Value { return ListFilter(fb, f, xs) }
 
-// ArrayUnionWith dedupes both, unless one is empty: then the other as it is.
+// ArrayUnionWith is self, then the elements of that no element of self
+// equals (as Effect 4.1 has it: neither side is deduplicated).
 func ArrayUnionWith(fb *Fiber, that, eq, self Value) Value {
 	a, b := List(self), List(that)
 	switch {
@@ -106,7 +107,17 @@ func ArrayUnionWith(fb *Fiber, that, eq, self Value) Value {
 	case len(b) == 0:
 		return a
 	}
-	return ArrayDedupeWith(fb, eq, ListConcat(a, b))
+	out := append([]Value{}, a...)
+next:
+	for _, y := range b {
+		for _, x := range a {
+			if Bool(apply2(fb, eq, x, y)) {
+				continue next
+			}
+		}
+		out = append(out, y)
+	}
+	return out
 }
 
 // ArrayGroupBy is a record of the elements by key, keys in JS key order.

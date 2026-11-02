@@ -7,8 +7,6 @@
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { type Context, Effect, Exit, Option, Result, Schema, Scope } from "effect";
 import { HttpRouter, type HttpServerRequest, HttpServerResponse } from "effect/http";
-import { javascript as scalarJs } from "effect/http-api/internal/httpApiScalar";
-import { css as swaggerCss, javascript as swaggerJs } from "effect/http-api/internal/httpApiSwagger";
 
 import type { Tagged } from "../data.ts";
 import { nodeHttp } from "../host.ts";
@@ -195,11 +193,34 @@ const isRoutePath = (path: string): path is `/${string}` => path.startsWith("/")
 
 const escapeJson = (text: string): string => text.replaceAll("<", "\\u003c");
 
-const swaggerPage = (title: string, spec: string): string =>
+// Effect's Swagger UI and Scalar bundles, which its exports no longer reach
+// since 4.1: imported from their files when `listen` serves a docs page.
+interface Swagger {
+  readonly css: string;
+  readonly javascript: string;
+}
+
+interface Scalar {
+  readonly javascript: string;
+}
+
+const bundle = <A>(name: string): Effect.Effect<A> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the bundle modules export these strings
+  Effect.promise(() => import(new URL(`./http-api/internal/${name}.js`, import.meta.resolve("effect")).href) as Promise<A>);
+
+const swaggerPage = (
+  { css: swaggerCss, javascript: swaggerJs }: Swagger,
+  title: string,
+  spec: string,
+): string =>
   `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><title>${title}</title><style>${swaggerCss}</style></head><body><div id="swagger-ui"></div><script id="swagger-spec" type="application/json">${escapeJson(spec)}</script><script>${swaggerJs}
 window.onload = () => { window.ui = SwaggerUIBundle({ spec: JSON.parse(document.getElementById("swagger-spec").textContent), dom_id: "#swagger-ui" }); };</script></body></html>`;
 
-const scalarPage = (title: string, spec: string): string =>
+const scalarPage = (
+  { javascript: scalarJs }: Scalar,
+  title: string,
+  spec: string,
+): string =>
   `<!doctype html><html><head><meta charset="utf-8" /><title>${title}</title></head><body><div id="api-reference-container"></div><script>${scalarJs}</script><script>window.Scalar.createApiReference(document.getElementById("api-reference-container"), { _integration: "html", content: ${escapeJson(spec)} })</script></body></html>`;
 
 const start = (options: ServeOptions, api: Api, handlers: Handlers) =>
@@ -222,10 +243,10 @@ const start = (options: ServeOptions, api: Api, handlers: Handlers) =>
       yield* router.add("GET", routePath(options.openapi.value), HttpServerResponse.text(text, { contentType: "application/json" }));
     }
     if (Option.isSome(options.swagger)) {
-      yield* router.add("GET", routePath(options.swagger.value), HttpServerResponse.html(swaggerPage(api.name, text)));
+      yield* router.add("GET", routePath(options.swagger.value), HttpServerResponse.html(swaggerPage(yield* bundle<Swagger>("httpApiSwagger"), api.name, text)));
     }
     if (Option.isSome(options.scalar)) {
-      yield* router.add("GET", routePath(options.scalar.value), HttpServerResponse.html(scalarPage(api.name, text)));
+      yield* router.add("GET", routePath(options.scalar.value), HttpServerResponse.html(scalarPage(yield* bundle<Scalar>("httpApiScalar"), api.name, text)));
     }
     const scope = yield* Scope.make();
     const made = yield* NodeHttpServer.make(() => nodeHttp().createServer(), {

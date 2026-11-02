@@ -86,7 +86,11 @@ export const intersectionWith =
 export const unionWith =
   <A>(that: List<A>, eq: Eqv<A>) =>
   (self: List<A>): List<A> =>
-    self.length === 0 ? that : that.length === 0 ? self : dedupe(self.concat(that), eq);
+    self.length === 0 || that.length === 0
+      ? self.length === 0
+        ? that
+        : self
+      : self.concat(that.filter((b) => !self.some((a) => eq(a, b))));
 
 export const groupBy =
   <A>(f: (a: A) => string) =>

@@ -60,11 +60,13 @@ foreign pure tracer from "@flick-lang/runtime/effect/http/HttpMiddleware" "flick
   arity 1
   reviewed "effect@4.0.5 sha256:35d3acdbc2d9d015"
 
-/// Takes the host and the client address of a request from its
-/// `X-Forwarded-*` headers, behind a proxy.
-x_forwarded_headers : Handler r e -> Handler r e
+/// Takes the client address, the host and the protocol of a request from
+/// its `X-Forwarded-*` headers when the peer is one of the proxies, given
+/// as CIDRs (`"10.0.0.0/8"`): the nearest address that is not a proxy is
+/// the client. An invalid CIDR is a defect.
+x_forwarded_headers : List String -> Handler r e -> Handler r e
 foreign pure x_forwarded_headers from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickXForwardedHeaders"
-  arity 1
+  arity 2
   reviewed "effect@4.0.5 sha256:64a69dc1477e3d49"
 
 /// Parses the query of each request once for the router's decoders.

@@ -320,7 +320,7 @@ let middlewares () =
   let wrapped =
     hello
     |> Http.Middleware.tracer
-    |> Http.Middleware.x_forwarded_headers
+    |> Http.Middleware.x_forwarded_headers ["10.0.0.0/8"]
     |> Http.Middleware.search_params_parser
     |> Http.Middleware.with_logger_disabled
     |> Http.Middleware.decompression None
@@ -328,7 +328,7 @@ let middlewares () =
     ("stack: " ++ (status_and (wrapped (Http.ServerRequest.from_client_request r)) []))
   forwarded : Http.Middleware.Handler none none
   let forwarded =
-    Http.Middleware.x_forwarded_headers (fun req ->
+    Http.Middleware.x_forwarded_headers ["10.0.0.0/8"] (fun req ->
       Http.ServerResponse.text (show (Http.ServerRequest.remote_address req)) ok
     )
   Platform.stdout_line

@@ -18,13 +18,11 @@ type ClientRequest struct {
 	hash    Value // an Option String
 	headers *Record
 	body    *Body
-	// what the server requests made of this one note on it, as Effect keys
-	// them by the request they come from
-	marks requestMarks
 }
 
-// requestMarks are what Effect keeps by a request's source: whether the
-// logger middleware is off for it and the handlers to run on its response.
+// requestMarks are Effect's request state, one a handled request (a served
+// one, or one of `to_handled`): whether the logger middleware is off for it
+// and the handlers to run on its response. Outside one nothing keeps them.
 type requestMarks struct {
 	mu          sync.Mutex
 	loggerOff   bool

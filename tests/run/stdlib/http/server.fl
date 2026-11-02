@@ -84,6 +84,21 @@ let whoami request =
   let known = List.any (fun (name, _) -> name == "session") cookies
   Http.ServerResponse.text ("known " ++ show known) ok
 
+/// The client's address and the host the handler sees, without the port
+/// the system picked.
+seen : ServerRequest ->{} ServerResponse
+let seen request =
+  let host = Option.with_default "" (Http.Headers.get "host" (Http.ServerRequest.headers request))
+  let shown = if String.starts_with "127.0.0.1:" host then "127.0.0.1" else host
+  Http.ServerResponse.text (show (Http.ServerRequest.remote_address request) ++ " " ++ shown) ok
+
+/// `seen` behind `x_forwarded_headers`: the proxies are the loopback
+/// network for `/forwarded/loopback`, another network otherwise.
+forwarded : ServerRequest ->{RouteContext;} ServerResponse
+let forwarded request =
+  let proxies = if Http.Router.param "by" == Some "loopback" then ["127.0.0.0/8"] else ["10.0.0.0/8"]
+  Http.Middleware.x_forwarded_headers proxies seen request
+
 broken : ServerRequest ->{; Boom} ServerResponse
 let broken _ = from_result (Err Boom)
 
@@ -176,6 +191,15 @@ let exercise base dir =
   line
     "with_limits"
     (show (Http.ClientResponse.status refused) ++ " " ++ Http.ClientResponse.text refused)
+  via : String ->{Http.Client.HttpClient; HttpClientError} String
+  let via path =
+    Http.ClientResponse.text
+      (Http.Client.execute
+        (Http.ClientRequest.get (base ++ path)
+          |> Http.ClientRequest.set_header "x-forwarded-for" "198.51.100.7, 203.0.113.9"
+          |> Http.ClientRequest.set_header "x-forwarded-host" "a.example, b.example"))
+  line "forwarded by a trusted proxy" (via "/forwarded/loopback")
+  line "forwarded by another" (via "/forwarded/other")
   line "static" (status_of (base ++ "/static/page.txt"))
   line "static missing" (status_of (base ++ "/static/none.txt"))
   let sent = Http.Client.get (base ++ "/file")
@@ -202,6 +226,7 @@ let serve_all dir =
           Http.Router.route (Some Http.Method.POST) "/items" create,
           Http.Router.route (Some Http.Method.GET) "/whoami" whoami,
           Http.Router.route (Some Http.Method.GET) "/broken" broken,
+          Http.Router.route (Some Http.Method.GET) "/forwarded/:by" forwarded,
           Http.Router.route (Some Http.Method.POST) "/parse" parse,
           Http.Router.route (Some Http.Method.POST) "/upload" upload,
           Http.Router.route (Some Http.Method.POST) "/upload-one" upload_one,

@@ -188,11 +188,11 @@ export const atomSerializableResult = <A>(
   atom: Atom.Atom<object>,
 ): Atom.Atom<object> => atomSerializableTask(key, codec, atom, errors);
 
-/** `Atom.task`: the atom of a task's result, run by the registry that first reads it. */
-export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => Atom.map(taskAtom(task), toAsync);
-
-/** `Atom.query keys task`: a task atom that a mutation of one of `keys` runs anew. */
-export const atomQuery = <A, E>(keys: ReadonlyArray<string>, task: Effect.Effect<A, E>): Atom.Atom<object> => {
+/**
+ * `task`, whose next run is a hydrated result instead once `hydrate` has
+ * one: a hydrated atom still builds since Effect 4.1, which would run it.
+ */
+const seededTask = <A, E>(task: Effect.Effect<A, E>) => {
   let hydrated: Option.Option<Effect.Effect<A, E>> = Option.none();
   const first = Effect.suspend(() => {
     const value = hydrated;
@@ -202,7 +202,19 @@ export const atomQuery = <A, E>(keys: ReadonlyArray<string>, task: Effect.Effect
   const hydrate = (result: Effect.Effect<A, E>): void => {
     hydrated = Option.some(result);
   };
-  return Object.assign(Atom.withReactivity(keys)(atomTask(first)), { [QUERY]: hydrate });
+  return { first, hydrate };
+};
+
+/** `Atom.task`: the atom of a task's result, run by the registry that first reads it. */
+export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => {
+  const { first, hydrate } = seededTask(task);
+  return Object.assign(Atom.map(taskAtom(first), toAsync), { [QUERY]: hydrate });
+};
+
+/** `Atom.query keys task`: a task atom that a mutation of one of `keys` runs anew. */
+export const atomQuery = <A, E>(keys: ReadonlyArray<string>, task: Effect.Effect<A, E>): Atom.Atom<object> => {
+  const { first, hydrate } = seededTask(task);
+  return Object.assign(Atom.withReactivity(keys)(Atom.map(taskAtom(first), toAsync)), { [QUERY]: hydrate });
 };
 
 /**

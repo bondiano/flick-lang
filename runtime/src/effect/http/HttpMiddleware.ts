@@ -10,6 +10,7 @@ import * as Middleware from "effect/http/HttpMiddleware";
 import { HttpServerRequest } from "effect/http/HttpServerRequest";
 import type { HttpServerResponse } from "effect/http/HttpServerResponse";
 import * as Response from "effect/http/HttpServerResponse";
+import * as IpNetwork from "effect/net/IpNetwork";
 
 import type { Data } from "../../data.ts";
 import { type Handler, lift, toApp, toHandler } from "./handler.ts";
@@ -20,7 +21,6 @@ export * from "effect/http/HttpMiddleware";
 export const flickLogger = /*#__PURE__*/ lift(Middleware.logger);
 export const flickWithLoggerDisabled = /*#__PURE__*/ lift(Middleware.withLoggerDisabled);
 export const flickTracer = /*#__PURE__*/ lift(Middleware.tracer);
-export const flickXForwardedHeaders = /*#__PURE__*/ lift(Middleware.xForwardedHeaders);
 export const flickSearchParamsParser = /*#__PURE__*/ lift(Middleware.searchParamsParser);
 
 /** `Http.Middleware.CorsOptions`. */
@@ -96,6 +96,10 @@ const webPlatform = /*#__PURE__*/ Layer.effect(
 ).pipe(Layer.provide(NodeHttpServer.layerHttpServices));
 
 export const flickCompressionWeb = /*#__PURE__*/ compressWith(webPlatform);
+
+/** `x_forwarded_headers proxies`: the `X-Forwarded-*` headers of the proxies in the CIDRs `proxies`. */
+export const flickXForwardedHeaders = (proxies: ReadonlyArray<string>, handler: Handler) =>
+  lift(Middleware.xForwardedHeaders({ trustedProxies: proxies.map((cidr) => IpNetwork.fromStringUnsafe(cidr)) }))(handler);
 
 export const flickDecompression = (max: Option.Option<ByteSize.ByteSize>, handler: Handler) =>
   lift(Middleware.decompression({ maxDecompressedSize: Option.getOrUndefined(max) }))(handler);

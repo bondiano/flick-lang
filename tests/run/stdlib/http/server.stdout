@@ -12,6 +12,8 @@ log info: headers Headers [("cookie", "<redacted>")]
 whoami: known true
 upload: [("title", ["notes"]), ("tag", ["a", "b"])]
 with_limits: 413 
+forwarded by a trusted proxy: Some "203.0.113.9" b.example
+forwarded by another: Some "127.0.0.1" 127.0.0.1
 static: 200 static page
 static missing: 404 
 file: static page true
