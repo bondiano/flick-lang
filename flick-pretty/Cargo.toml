@@ -12,5 +12,5 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-typed-arena = "2"
-unicode-segmentation = "1"
+typed-arena = "2.0.2"
+unicode-segmentation = "1.13.3"

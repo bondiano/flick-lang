@@ -13,10 +13,10 @@
     "test": "node --test test/*.test.ts"
   },
   "dependencies": {
-    "@astrojs/starlight": "0.42.6",
+    "@astrojs/starlight": "0.42.8",
     "@flick-lang/astro": "workspace:*",
     "@flick-lang/runtime": "workspace:*",
-    "astro": "7.4.2",
+    "astro": "7.4.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "shiki": "4.5.0"
@@ -24,7 +24,7 @@
   "devDependencies": {
     "@astrojs/check": "0.9.12",
     "@flick-lang/content-mapper": "workspace:*",
-    "@types/jsdom": "28.0.3",
+    "@types/jsdom": "30.0.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "typescript": "6.0.3"
