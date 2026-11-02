@@ -96,7 +96,9 @@ A record type is a spine `rcons ℓ τ (… rnil)`; field order is fixed. A nomi
 type `T ā` is a spine `tapp (… (tapp (adt T) a₁) …) aₙ`. A region is `tvar n` or
 `rg π`; a capture row is `tvar n` or `caps C`. The hidden qualifier `C` of a
 function or a computation is part of `arrow` and `eff`; that of data with hidden
-storage is a parameter of kind `CRow` of its type. `hnd ϱ` is `H ϱ`. -/
+storage is a parameter of kind `CRow` of its type. `hnd ϱ` is `H ϱ`. `dict c ā` is the
+dictionary record `D_C ā` of λFlick⁺ (elaboration.md §0.1), its arguments a spine
+`Ty.spine`; it reaches nothing. -/
 inductive Ty
   | tvar (n : Nat)
   | rg (p : Nat)
@@ -114,6 +116,7 @@ inductive Ty
   | env (r : Row)
   | hnd (s : Ty)
   | owner (s : Ty)
+  | dict (c : Nat) (args : Ty)
 
 /-- `⌈τ⌉` of regions.md §2.1: the atoms a value of type `τ` may reach. Rows of
 services are not in it; a row of errors contributes its atoms. -/
@@ -162,6 +165,7 @@ def Ty.substT (σ : Atom → Ty) : Ty → Ty
   | .env r => .env (r.substT σ)
   | .hnd s => .hnd (s.substT σ)
   | .owner s => .owner (s.substT σ)
+  | .dict c a => .dict c (a.substT σ)
 
 /-- The identity substitution. -/
 def Ty.ident : Atom → Ty
@@ -173,6 +177,11 @@ does not show. -/
 def Ty.arrows : List Ty → Ty → Ty
   | [], r => r
   | a :: rest, r => .arrow a .pure (Ty.arrows rest r) Caps.none
+
+/-- The arguments `ā` of `D_C ā`: a spine `tapp u₁ (… (tapp uₙ rnil))`. -/
+def Ty.spine : List Ty → Ty
+  | [] => .rnil
+  | u :: us => .tapp u (Ty.spine us)
 
 /-- `T ā`. -/
 def Ty.tcon (T : Name) (us : List Ty) : Ty := us.foldl .tapp (.adt T)
@@ -251,7 +260,10 @@ core.md §3.1 and regions.md §3.1. Binders as in P1: `lam b`, `let_ e b` and
 `scope e` bind one variable (`scope` binds the owner); `letrec f b` and `fix f`
 bind two in `f` (`0 = x`, `1 = f`) and `letrec` one in `b`; arms bind
 `p.binds` in the guard and the body. An environment `θ` is a spine
-`econs S v (… enil)`; `raise` is a term former, not a constant. -/
+`econs S v (… enil)`; `raise` is a term former, not a constant. `drec c r` is a
+dictionary record of λFlick⁺ with the fields `r`, an `rcons` spine; it is a value and
+`proj` reads its fields. `glob g` is a global: an instance, a structural or primitive
+dictionary or a constant of Γ₀, which steps to its value in `Σ₀`. -/
 inductive Tm
   | var (i : Nat)
   | lam (b : Tm)
@@ -287,6 +299,8 @@ inductive Tm
   | inside (p : Nat) (e : Tm)
   | cap (p : Nat)
   | own (p : Nat)
+  | drec (c : Nat) (r : Tm)
+  | glob (g : Nat)
 
 def Tm.head : Tm → Tm
   | .app f _ => f.head
@@ -294,6 +308,7 @@ def Tm.head : Tm → Tm
 
 def Tm.field : Tm → Label → Option Tm
   | .rcons l' e r, l => if l' = l then some e else r.field l
+  | .drec _ r, l => r.field l
   | _, _ => none
 
 def Tm.setField : Tm → Label → Tm → Option Tm
@@ -326,10 +341,26 @@ def Tm.build : Tm → Option Tm
     pure (.join b₁ b₂)
   | _ => none
 
+/-- A type scheme `∀ α₀ … αₖ₋₁. Θ ⇒ t` of a typing context; `k = 0` and no
+facts is a monotype. -/
+structure Scheme where
+  k : Nat
+  cs : Facts
+  t : Ty
+
+def Scheme.mono (t : Ty) : Scheme := ⟨0, Facts.none, t⟩
+
+/-- A scheme that mentions no atom but the variables below `n`. -/
+def Scheme.Closed (n : Nat) (s : Scheme) : Prop :=
+  ∀ σ σ' : Atom → Ty, (∀ i, i < n → σ (.v i) = σ' (.v i)) →
+    s.t.substT σ = s.t.substT σ' ∧ s.cs.substT σ = s.cs.substT σ'
+
 /-- Declared ADTs and services. A constructor has the number of parameters of its
 type, its argument types over them and its type name; its fields mention nothing
 but the parameters (`ctor_closed`, `ctor_reach`). The record type `S.Impl` of a
-service is closed. -/
+service is closed. A class `c` of λFlick⁺ has `k` parameters and fields with their
+schemes, which mention the parameters below their own binders (`dict_closed`); a global
+has a closed scheme. -/
 structure Sig where
   ctor : Name → Option (Nat × List Ty × Name)
   impl : Name → Ty
@@ -338,6 +369,10 @@ structure Sig where
   ctor_reach : ∀ K k ts T, ctor K = some (k, ts, T) →
     ∀ t ∈ ts, ∀ a, t.reach a → ∃ i, i < k ∧ a = .v i
   impl_closed : ∀ N σ, (impl N).substT σ = impl N
+  dict : Nat → Option (Nat × List (Label × Scheme))
+  glob : Nat → Option Scheme
+  dict_closed : ∀ c k fs, dict c = some (k, fs) → ∀ l s, (l, s) ∈ fs → s.Closed (s.k + k)
+  glob_closed : ∀ g s, glob g = some s → s.Closed s.k
 
 /-- The instance of a constant's type variables. -/
 structure CArg where
@@ -400,14 +435,5 @@ def Const.ok (Θ : Facts) : Const → CArg → Prop
   | .addFin, ι => Outl Θ ι.C ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
   | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
   | _, _ => True
-
-/-- A type scheme `∀ α₀ … αₖ₋₁. Θ ⇒ t` of a typing context; `k = 0` and no
-facts is a monotype. -/
-structure Scheme where
-  k : Nat
-  cs : Facts
-  t : Ty
-
-def Scheme.mono (t : Ty) : Scheme := ⟨0, Facts.none, t⟩
 
 end Flick

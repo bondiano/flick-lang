@@ -91,7 +91,7 @@ theorem Le.trans : ∀ {b a c : Ty}, Le a b → Le b c → Le a c
   | .tvar _, _, _, h₁, h₂ | .rnil, _, _, h₁, h₂ | .rcons _ _ _, _, _, h₁, h₂
   | .layer _ _ _, _, _, h₁, h₂ | .rg _, _, _, h₁, h₂ | .caps _, _, _, h₁, h₂
   | .tapp _ _, _, _, h₁, h₂ | .hnd _, _, _, h₁, h₂ | .owner _, _, _, h₁, h₂
-  | .errors _, _, _, h₁, h₂ | .env _, _, _, h₁, h₂ => by
+  | .errors _, _, _, h₁, h₂ | .env _, _, _, h₁, h₂ | .dict _ _, _, _, h₁, h₂ => by
     cases h₁; exact h₂
 
 end Flick

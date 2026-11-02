@@ -31,6 +31,7 @@ def VKind (e : Tm) (k : Nat) : Prop :=
   | .enil | .econs .. => k = 8
   | .cap _ => k = 10
   | .own _ => k = 11
+  | .drec .. => k = 13
   | _ => True
 
 theorem Const.kindAt_ne3 (c : Const) (n : Nat) : c.kindAt n ≠ 3 := by
@@ -53,6 +54,7 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | rcons => intro _ _ _ hJ; cases hJ; rfl
   | enil => intro _ _ _ hJ; cases hJ; rfl
   | econs => intro _ _ _ hJ; cases hJ; rfl
+  | drec => intro _ _ _ hJ; cases hJ; rfl
   | const _ hT =>
     intro _ _ _ hJ; cases hJ
     simp only [VKind, Tm.head, Tm.args, Const.kindAt]; rw [← hT.kind, Const.ty_kind]

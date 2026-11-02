@@ -182,7 +182,10 @@ theorem Step.asc {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     exact ⟨hA.fill (Tm.Asc.of_noIns (lookupE_noIns hA hl)), fun _ => keep⟩
   | askRoot hE _ hr₀ =>
     obtain ⟨hA, -⟩ := asc_of_plug ask_not_value hE hc.main
-    exact ⟨hA.fill (Tm.Asc.of_noIns ((hroot _ _ hr₀).2.noIns (hroot _ _ hr₀).1)), fun _ => keep⟩
+    exact ⟨hA.fill (Tm.Asc.of_noIns ((hroot.svc _ _ hr₀).2.noIns (hroot.svc _ _ hr₀).1)), fun _ => keep⟩
+  | glob hE hg =>
+    obtain ⟨hA, -⟩ := asc_of_plug (fun h => by cases h) hE hc.main
+    exact ⟨hA.fill (Tm.Asc.of_noIns ((hroot.glob _ _ hg).1 _)), fun _ => keep⟩
   | raise hE hF _ _ hv =>
     obtain ⟨hA, hr⟩ := asc_of_plug (not_value_plug raise_not_value _) hE hc.main
     obtain ⟨-, hr'⟩ := Frame.asc_of_plug hF raise_not_value hr

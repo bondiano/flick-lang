@@ -298,6 +298,13 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ hσ; exact .inside hF (ih (hσ.mono (Entails.union_left _ _))) hφ' ht hε hφ hT
   | cap => intro _ _ _; exact .cap
   | own => intro _ _ _; exact .own
+  | drec hc hk hr hn hh ih =>
+    intro _ _ hσ
+    exact .drec hc hk (ih hσ) (SubOk.noIns hσ hr.frees hn) (SubOk.held (e := .drec _ _) hσ hr.frees hh)
+  | dnil => intro _ _ _; exact .dnil
+  | dcons _ _ ih₁ ih₂ => intro _ _ hσ; exact .dcons (ih₁ (SubOk.up hσ _ _)) (ih₂ hσ)
+  | dproj _ hc hk hl hts hH hT ih => intro _ _ hσ; exact .dproj (ih hσ) hc hk hl hts hH hT
+  | glob hg hts hH hT => intro _ _ _; exact .glob hg hts hH hT
 
 /-- `e[x := v]` for `x` with a scheme: `v` is a value typed with the scheme's
 variables fresh and its facts assumed. -/

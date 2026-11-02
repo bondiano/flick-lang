@@ -20,11 +20,13 @@ namespace Flick
 def Row.err (E : Name) (U : Ty) : Row := Row.union (Row.single E) (Row.ofCaps U.reach)
 
 /-- Judgment forms: an expression, `match` arms, `try` arms. For `try` arms,
-`ε₀` is the error row of the body and `H` the errors the arms remove. -/
+`ε₀` is the error row of the body and `H` the errors the arms remove. The fields of a
+dictionary record have the schemes `fs`. -/
 inductive J
   | ex (t : Ty) (φ : Stage)
   | alts (t t' : Ty) (φ : Stage)
   | halts (ε₀ H : Row) (t : Ty) (φ : Stage)
+  | dfs (fs : List (Label × Scheme))
 
 /-- What a `with` frame of the `provide` region `q` with the services `ρ` gives its
 body (regions.md §2.7): the frame answers a service of `ρ`, and the row outside records
@@ -152,6 +154,19 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ (.inside p e) (.ex T φ)
   | cap : Typ Ψ Θ Γ (.cap p) (.ex (.hnd (.rg p)) φ)
   | own : Typ Ψ Θ Γ (.own p) (.ex (.owner (.rg p)) φ)
+  | drec {us : List Ty} {fs : List (Label × Scheme)} : S.dict c = some (k, fs) → us.length = k →
+      Typ Ψ Θ Γ r (.dfs (fs.map fun f => (f.1, f.2.substT (instT us)))) → r.NoIns →
+      Caps.Sub (held Ψ Γ (.drec c r)) (Ty.dict c (Ty.spine us)).reach →
+      Typ Ψ Θ Γ (.drec c r) (.ex (.dict c (Ty.spine us)) φ)
+  | dnil : Typ Ψ Θ Γ .rnil (.dfs [])
+  | dcons {s : Scheme} {fs : List (Label × Scheme)} : Typ (Ψ.map (Ty.up s.k)) (Facts.union (Θ.substT (shiftV s.k)) s.cs) (Γ.map (Scheme.up s.k)) v
+        (.ex s.t .pure) →
+      Typ Ψ Θ Γ r (.dfs fs) → Typ Ψ Θ Γ (.rcons l v r) (.dfs ((l, s) :: fs))
+  | dproj {ts us : List Ty} {fs : List (Label × Scheme)} {s : Scheme} : Typ Ψ Θ Γ e (.ex (.dict c (Ty.spine us)) φ) → S.dict c = some (k, fs) →
+      us.length = k → fs.lookup l = some s → ts.length = s.k → (s.substT (instT us)).Holds Θ ts →
+      Le ((s.substT (instT us)).inst ts) T → Typ Ψ Θ Γ (.proj e l) (.ex T φ)
+  | glob {ts : List Ty} : S.glob g = some σ → ts.length = σ.k → σ.Holds Θ ts → Le (σ.inst ts) T →
+      Typ Ψ Θ Γ (.glob g) (.ex T φ)
 
 /-- The facts of a running configuration: a region outlives every region created
 after it. A scope gives its region facts about everything outside it, which
@@ -165,8 +180,17 @@ def StoreTy (Ψ : List Ty) (μ : List Tm) : Prop :=
     ∀ (i : Nat) v t, μ[i]? = some v → Ψ[i]? = some t →
       Value v ∧ Typ S Ψ Facts.age [] v (.ex t .pure)
 
-/-- The root environment `Σ₀` of core.md §2.6: closed values of `S.Impl`. -/
-def RootTy (root : Name → Option Tm) : Prop :=
-  ∀ N v, root N = some v → Value v ∧ Typ S [] Facts.none [] v (.ex (S.impl N) .pure)
+/-- The root environment `Σ₀` of core.md §2.6 and the bodies of the globals of λFlick⁺. -/
+structure Roots where
+  svc : Name → Option Tm
+  glob : Nat → Option Tm
+
+/-- `Σ₀` has closed values of `S.Impl`. The body of a global is closed source code,
+typed at the scheme of the global; each declared global has a body. -/
+structure RootTy (root : Roots) : Prop where
+  svc : ∀ N v, root.svc N = some v → Value v ∧ Typ S [] Facts.none [] v (.ex (S.impl N) .pure)
+  glob : ∀ g v, root.glob g = some v → (∀ x, ¬ v.Has x) ∧
+    ∃ s, S.glob g = some s ∧ Typ S [] s.cs [] v (.ex s.t .pure)
+  globs : ∀ g s, S.glob g = some s → (root.glob g).isSome
 
 end Flick

@@ -141,6 +141,9 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       obtain ⟨_, le, te, -⟩ := ih₂ hve rfl
       exact ⟨_, lt.trans hT, .app t₀ (te.sub ⟨le.trans la, Stage.le_refl _⟩) trivial .refl,
         by simp [Tm.head], fun _ h => (by cases h), fun _ _ h => (by cases h)⟩
+  | drec hc hk hr hn hh =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨_, .refl, .drec hc hk hr hn hh, by simp [Tm.head], by simp, by simp⟩
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
 /-- Л1, last clause: a value has its type with any stage. -/

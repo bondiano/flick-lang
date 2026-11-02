@@ -70,7 +70,7 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
       · exact .inr ⟨b, hb, h⟩
   | errors e => simp [Ty.substT, Ty.reach, Row.substT]
   | hnd s ih | owner s ih => simp only [Ty.substT, Ty.reach, ih]
-  | base | adt | rnil | layer | env => simp [Ty.substT, Ty.reach, Caps.none]
+  | base | adt | rnil | layer | env | dict => simp [Ty.substT, Ty.reach, Caps.none]
 
 theorem Caps.substT_comp (C : Caps) (σ σ' : Atom → Ty) :
     (C.substT σ).substT σ' = C.substT fun a => (σ a).substT σ' := by

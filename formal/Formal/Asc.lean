@@ -48,6 +48,8 @@ def Tm.Asc : Tm → Nat → Prop
   | .inside p e, n => n ≤ p ∧ e.Asc n
   | .cap _, _ => True
   | .own _, _ => True
+  | .drec _ r, _ => r.NoIns
+  | .glob _, _ => True
 
 theorem Tm.Asc.of_noIns : ∀ {e : Tm} {n : Nat}, e.NoIns → e.Asc n := by
   intro e
@@ -65,6 +67,7 @@ theorem Value.ascNoIns {e : Tm} {n : Nat} (hv : Value e) (h : e.Asc n) : e.NoIns
   | constApp2 _ _ _ _ ih₁ ih₂ =>
     rintro ((h' | h') | h'); cases h'; exact ih₁ h.1.2.1 h'; exact ih₂ h.2.1 h'
   | econs => rintro (h' | h'); exact h.1 h'; exact h.2 h'
+  | drec => exact h
   | _ => intro h'; cases h'
 
 /-- The bound under a frame. -/

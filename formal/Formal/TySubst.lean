@@ -1,163 +1,14 @@
-import Formal.RowSubst
+import Formal.TySubstBase
 
 /-!
-# Type substitution preserves typing
+# Type substitution preserves typing: the lemma
 
-`Γ;Θ;Ψ ⊢ e : τ ! φ` implies `Γ[σ];Θ[σ];Ψ[σ] ⊢ e : τ[σ] ! φ[σ]` for a
-substitution `σ` of variables and run-time regions that keeps the regions `e`
-writes down and, if `e` has an `inside` form, makes no other atom one of them
-(`Fits`). Terms carry no types, so `e` does not change. Shifting, the
-instantiation of a scheme, the region of a new scope and the renaming of regions
-not yet created all fit.
+The fitting substitutions and the cases with binders are in `TySubstBase`.
 -/
 
 namespace Flick
 
 variable {S : Sig}
-
-def J.substT (σ : Atom → Ty) : J → J
-  | .ex t φ => .ex (t.substT σ) (φ.substT σ)
-  | .alts t t' φ => .alts (t.substT σ) (t'.substT σ) (φ.substT σ)
-  | .halts ε H t φ => .halts (ε.substT σ) (H.substT σ) (t.substT σ) (φ.substT σ)
-
-/-- A substitution that fits a term: it keeps the regions the term writes and the
-`provide` regions of its `with` frames, and if the term has a run-time form, it brings
-in no run-time region and sends each atom to an atom or to a type without one. -/
-def Fits (σ : Atom → Ty) (e : Tm) : Prop :=
-  (∀ p, (e.Has (.rgn p) ∨ e.Has (.prov p)) → σ (.r p) = .rg p) ∧
-    (e.Has .ins → ∀ b p, (σ b).reach (.r p) → b = .r p) ∧
-    (e.Has .ins → ∀ b a, (σ b).reach a → σ b = a.ty)
-
-theorem Fits.sub {σ : Atom → Ty} {e e' : Tm} (h : Fits σ e) (hs : ∀ s, e'.Has s → e.Has s) :
-    Fits σ e' :=
-  ⟨fun p hp => h.1 p (hp.imp (hs _) (hs _)), fun hi => h.2.1 (hs _ hi), fun hi => h.2.2 (hs _ hi)⟩
-
-theorem Fits.noIns {σ : Atom → Ty} {e : Tm} (hn : e.NoIns) (hr : ∀ p, σ (.r p) = .rg p) :
-    Fits σ e :=
-  ⟨fun p _ => hr p, fun hi => (hn hi).elim, fun hi => (hn hi).elim⟩
-
-theorem shift_lift (k : Nat) (σ : Atom → Ty) (a : Atom) :
-    (shiftV k a).substT (liftT k σ) = (σ a).up k := by
-  cases a with
-  | v i => have : ¬ i + k < k := by omega
-           simp [shiftV, Ty.substT, liftT, this]
-  | r p => simp [shiftV, Ty.substT, liftT]
-
-theorem Atom.ty_up (a : Atom) (k : Nat) : a.ty.up k = (a.up k).ty := by
-  cases a <;> simp [Atom.ty, Atom.up, Ty.up, Ty.substT, shiftV]
-
-theorem Fits.lift {σ : Atom → Ty} {e : Tm} (h : Fits σ e) (k : Nat) : Fits (liftT k σ) e := by
-  refine ⟨fun p hp => by simp [liftT, h.1 p hp, Ty.up, Ty.substT, shiftV], fun hi b p hb => ?_,
-    fun hi b a hb => ?_⟩
-  · have key : ∀ t : Ty, (t.up k).reach (.r p) → t.reach (.r p) := by
-      intro t ht
-      obtain ⟨a, ha, he⟩ := (Ty.reach_up t k _).mp ht
-      cases a <;> simp [Atom.up] at he; subst he; exact ha
-    cases b with
-    | v i =>
-      by_cases hik : i < k
-      · simp [liftT, hik] at hb
-      · simp only [liftT, hik, if_false] at hb
-        exact absurd (h.2.1 hi _ p (key _ hb)) (by simp)
-    | r q => simp only [liftT] at hb; exact h.2.1 hi _ p (key _ hb)
-  · have up : ∀ b', (σ b').up k = liftT k σ b → σ b = σ b → (liftT k σ b) = a.ty := by
-      intro b' hb' _
-      rw [← hb'] at hb ⊢
-      obtain ⟨a', ha', rfl⟩ := (Ty.reach_up _ k _).mp hb
-      rw [h.2.2 hi b' a' ha', Atom.ty_up]
-    cases b with
-    | v i =>
-      by_cases hik : i < k
-      · simp only [liftT, hik, if_true] at hb ⊢
-        simp [Ty.reach] at hb; subst hb; rfl
-      · simp only [liftT, hik, if_false] at hb ⊢
-        have := up (.v (i - k)) (by simp [liftT, hik]) rfl
-        simpa [liftT, hik] using this
-    | r q => exact up (.r q) (by simp [liftT]) rfl
-
-theorem Ty.up_avoid_v0 (t : Ty) : ¬ (t.up 1).reach (.v 0) := by
-  intro h
-  obtain ⟨a, _, he⟩ := (Ty.reach_up t 1 _).mp h
-  cases a <;> simp [Atom.up] at he
-
-theorem ctx_substT (Δ : List Ty) (Γ : List Scheme) (σ : Atom → Ty) :
-    (Δ.map Scheme.mono ++ Γ).map (Scheme.substT σ) =
-      (Δ.map (Ty.substT σ)).map Scheme.mono ++ Γ.map (Scheme.substT σ) := by
-  simp
-
-theorem shift_comm (Ψ : List Ty) (k : Nat) (σ : Atom → Ty) :
-    (Ψ.map (Ty.up k)).map (Ty.substT (liftT k σ)) = (Ψ.map (Ty.substT σ)).map (Ty.up k) := by
-  simp [Ty.up_comm]
-
-theorem shift_comm' (Γ : List Scheme) (k : Nat) (σ : Atom → Ty) :
-    (Γ.map (Scheme.up k)).map (Scheme.substT (liftT k σ)) =
-      (Γ.map (Scheme.substT σ)).map (Scheme.up k) := by
-  simp [Scheme.up_comm]
-
-theorem Facts.up_comm (Θ : Facts) (k : Nat) (σ : Atom → Ty) :
-    (Θ.substT (shiftV k)).substT (liftT k σ) = (Θ.substT σ).substT (shiftV k) := by
-  rw [Facts.substT_comp, Facts.substT_comp]; congr 1; funext a; exact shift_lift k σ a
-
-theorem Row.up_comm (r : Row) (k : Nat) (σ : Atom → Ty) :
-    (r.substT (shiftV k)).substT (liftT k σ) = (r.substT σ).substT (shiftV k) := by
-  rw [Row.substT_comp, Row.substT_comp]; congr 1; funext a; exact shift_lift k σ a
-
-theorem Row.ofCaps_substT (C : Caps) (σ : Atom → Ty) :
-    (Row.ofCaps C).substT σ = Row.ofCaps (C.substT σ) := by
-  funext x; cases x <;> first | rfl | simp [Row.substT, Row.ofCaps]
-
-theorem Row.err_substT (E : Name) (U : Ty) (σ : Atom → Ty) :
-    (Row.err E U).substT σ = Row.err E (U.substT σ) := by
-  simp [Row.err, Row.ofCaps_substT, Ty.reach_caps]
-
-/-- What a term holds is kept by a substitution that fits it. -/
-theorem held_substT {Ψ : List Ty} {Γ : List Scheme} {e : Tm} {T : Ty} {σ : Atom → Ty} (hσ : Fits σ e)
-    (h : Caps.Sub (held Ψ Γ e) T.reach) :
-    Caps.Sub (held (Ψ.map (Ty.substT σ)) (Γ.map (Scheme.substT σ)) e) (T.substT σ).reach := by
-  rintro a (⟨i, s, hi, hs, ha⟩ | ⟨p, hp, rfl⟩ | ⟨l, t, hl, ht, ha⟩)
-  · simp only [List.getElem?_map, Option.map_eq_some_iff] at hs
-    obtain ⟨s₀, hs₀, rfl⟩ := hs
-    obtain ⟨b, hb, h'⟩ := (Scheme.reach_substT _ _ _).mp ha
-    exact (Ty.reach_substT σ _ _).mpr ⟨b, h b (.inl ⟨i, s₀, hi, hs₀, hb⟩), h'⟩
-  · refine (Ty.reach_substT σ _ _).mpr ⟨.r p, h _ (.inr (.inl ⟨p, hp, rfl⟩)), ?_⟩
-    rw [hσ.1 p (.inl hp)]; rfl
-  · simp only [List.getElem?_map, Option.map_eq_some_iff] at ht
-    obtain ⟨t₀, ht₀, rfl⟩ := ht
-    obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ _).mp ha
-    exact (Ty.reach_substT σ _ _).mpr ⟨b, h b (.inr (.inr ⟨l, t₀, hl, ht₀, hb⟩)), h'⟩
-
-theorem Tm.NoIns.of_has {e e' : Tm} (h : e.NoIns) (hs : ∀ s, e'.Has s → e.Has s) : e'.NoIns :=
-  fun h' => h (hs _ h')
-
-theorem Typ.var_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} {σ' : Scheme}
-    {ts : List Ty} {T : Ty} {φ : Stage} (hi : Γ[i]? = some σ') (hts : ts.length = σ'.k)
-    (hH : σ'.Holds Θ ts) (hT : Le (σ'.inst ts) T) (σ : Atom → Ty) :
-    Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) (.var i)
-      (.ex (T.substT σ) (φ.substT σ)) := by
-  refine .var (σ := σ'.substT σ) (ts := ts.map (Ty.substT σ)) (by simp [hi])
-    (by simp [Scheme.substT, hts]) (hH.substT σ hts) ?_
-  rw [Scheme.inst_substT _ _ _ hts]; exact hT.substT σ
-
-theorem Typ.ctor_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name} {k : Nat}
-    {ts us : List Ty} {T₀ : Name} {T : Ty} {φ : Stage} (hK : S.ctor K = some (k, ts, T₀))
-    (hk : us.length = k) (hT : Le (Sig.ctorTy ts T₀ us) T) (σ : Atom → Ty) :
-    Typ S Ψ Θ Γ (.ctor K) (.ex (T.substT σ) φ) := by
-  refine .ctor (us := us.map (Ty.substT σ)) hK (by simpa using hk) ?_
-  have := hT.substT σ; rwa [S.ctorTy_substT σ _ hk hK] at this
-
-theorem Typ.letGen_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {e b : Tm} {a t : Ty}
-    {φ : Stage} {k : Nat} {Φ : Facts}
-    (ih₁ : ∀ σ, Fits σ e → Typ S ((Ψ.map (Ty.up k)).map (Ty.substT σ))
-      ((Facts.union (Θ.substT (shiftV k)) Φ).substT σ) ((Γ.map (Scheme.up k)).map (Scheme.substT σ))
-      e (J.substT σ (.ex a .pure)))
-    (ih₂ : ∀ σ, Fits σ b → Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ)
-      ((⟨k, Φ, a⟩ :: Γ).map (Scheme.substT σ)) b (J.substT σ (.ex t φ)))
-    (σ : Atom → Ty) (hσ : Fits σ (.let_ e b)) :
-    Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) (.let_ e b)
-      (J.substT σ (.ex t φ)) := by
-  have h₁ := ih₁ (liftT k σ) ((hσ.sub fun _ h => .inl h).lift k)
-  rw [shift_comm, shift_comm', Facts.union_substT, Facts.up_comm] at h₁
-  exact .letGen h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
 
 theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ σ, Fits σ e →
@@ -387,5 +238,10 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro σ hσ
     have hp := hσ.1 _ (.inl rfl)
     simp only [Flick.J.substT, Ty.substT, hp]; exact .own
+  | drec hc hk _ hn hh ih => exact Typ.drec_substT hc hk ih hn hh
+  | dnil => intro _ _; exact .dnil
+  | dcons _ _ ih₁ ih₂ => exact Typ.dcons_substT ih₁ ih₂
+  | dproj _ hc hk hl hts hH hT ih => exact Typ.dproj_substT ih hc hk hl hts hH hT
+  | glob hg hts hH hT => intro σ _; exact Typ.glob_substT hg hts hH hT σ
 
 end Flick

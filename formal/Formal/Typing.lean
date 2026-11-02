@@ -1,4 +1,5 @@
 import Formal.Reach
+import Formal.DictOps
 
 /-!
 # Values, patterns, shapes and subtyping (core.md §1.3, §2.2, §2.4)
@@ -27,6 +28,7 @@ inductive Value : Tm → Prop
   | econs : Value v → Value θ → Value (.econs S v θ)
   | cap : Value (.cap p)
   | own : Value (.own p)
+  | drec : Value (.drec c r)
 
 /-- Environment values `env θ` of core.md §3.1. -/
 inductive IsEnv : Tm → Prop

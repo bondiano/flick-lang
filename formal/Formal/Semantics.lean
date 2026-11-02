@@ -188,8 +188,8 @@ inductive Lbl
 def OkE (E : List Frame) : Prop := ∀ F ∈ E, Frame.ok F
 
 /-- `⟨Λ, μ, e⟩ → ⟨Λ', μ', e'⟩` and `⟨Λ, μ, e⟩ → die` of one thread (core.md
-§3.3–3.5, regions.md §3.2–§3.3). -/
-inductive Step (root : Name → Option Tm) : Lbl → List Rgn → List Tm → Tm → Out → Prop
+§3.3–3.5, regions.md §3.2–§3.3). A global steps to its body, a pure step. -/
+inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → Prop
   | pure : OkE E → PHead e e' → Step root .pure Λ μ (plug E e) (.cfg Λ μ (plug E e'))
   | rt : OkE E → RHead Λ μ e Λ' μ' e' → Step root .rt Λ μ (plug E e) (.cfg Λ' μ' (plug E e'))
   | askWith : OkE E → lookupE E S = some (q, v) → Live Λ q →
@@ -200,15 +200,16 @@ inductive Step (root : Name → Option Tm) : Lbl → List Rgn → List Tm → Tm
   | spawn : OkE E → Λ[p]? = some g → g.live = true → Value t →
       Step root .rt Λ μ (plug E (.app (.app (.const .spawn) (.own p)) t))
         (.cfg (setRgn Λ p ⟨g.live, g.kids ++ [withs E (.await t)], g.fins⟩) μ (plug E (.lit .unit)))
-  | askRoot : OkE E → lookupE E S = none → root S = some v →
+  | askRoot : OkE E → lookupE E S = none → root.svc S = some v →
       Step root (.root S) Λ μ (plug E (.app (.const (.ask S)) (.lit .unit)))
         (.cfg Λ μ (plug E v))
   | raise {F : Frame} : OkE E → F.ok → ¬ F.isTry → ¬ F.isInside → Value v →
       Step root .rt Λ μ (plug E (F.plug (.raise v))) (.cfg Λ μ (plug E (.raise v)))
   | todo : OkE E → Step root .pure Λ μ (plug E .todo) .die
+  | glob : OkE E → root.glob g = some v → Step root .pure Λ μ (plug E (.glob g)) (.cfg Λ μ (plug E v))
 
 /-- `⟨Λ, μ, e⟩ →* ⟨Λ', μ', e'⟩` of one thread where every step has a label in `Q`. -/
-inductive Steps (root : Name → Option Tm) (Q : Lbl → Prop) :
+inductive Steps (root : Roots) (Q : Lbl → Prop) :
     List Rgn → List Tm → Tm → List Rgn → List Tm → Tm → Prop
   | refl : Steps root Q Λ μ e Λ μ e
   | step : Step root l Λ μ e (.cfg Λ₁ μ₁ e₁) → Q l → Steps root Q Λ₁ μ₁ e₁ Λ' μ' e' →
@@ -228,12 +229,12 @@ def setKid (Λ : List Rgn) (p j : Nat) (k : Tm) : List Rgn :=
 
 /-- A step of the main thread, or of a child of a live region: children step
 between any two steps of the main thread (regions.md §3.2). -/
-inductive CStep (root : Name → Option Tm) : Lbl → Cfg → Cfg → Prop
+inductive CStep (root : Roots) : Lbl → Cfg → Cfg → Prop
   | main : Step root l Λ μ e (.cfg Λ' μ' e') → CStep root l ⟨Λ, μ, e⟩ ⟨Λ', μ', e'⟩
   | kid : Λ[p]? = some g → g.live = true → g.kids[j]? = some k →
       Step root l Λ μ k (.cfg Λ' μ' k') → CStep root l ⟨Λ, μ, e⟩ ⟨setKid Λ' p j k', μ', e⟩
 
-inductive CSteps (root : Name → Option Tm) : Cfg → Cfg → Prop
+inductive CSteps (root : Roots) : Cfg → Cfg → Prop
   | refl : CSteps root c c
   | step : CStep root l c c₁ → CSteps root c₁ c' → CSteps root c c'
 

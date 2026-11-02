@@ -9,9 +9,9 @@ namespace Flick
 variable {S : Sig}
 
 /-- `ask_S` whose service is in neither a `with` frame nor `Σ₀`; `D` must hold `S`. -/
-def AskStuck (root : Name → Option Tm) (e : Tm) (D : Row) : Prop :=
+def AskStuck (root : Roots) (e : Tm) (D : Row) : Prop :=
   ∃ E N, OkE E ∧ e = plug E (.app (.const (.ask N)) (.lit .unit)) ∧ lookupE E N = none ∧
-    root N = none ∧ D (.nm N)
+    root.svc N = none ∧ D (.nm N)
 
 /-- A region that is not live: closed or never created. -/
 def Dead (Λ : List Rgn) (p : Nat) : Prop := ∀ g, Λ[p]? = some g → g.live = false
@@ -34,7 +34,7 @@ def DeadAsk (Λ : List Rgn) (e : Tm) : Prop :=
 def Blocked (Λ : List Rgn) (e : Tm) : Prop := (∃ E r, OkE E ∧ e = plug E r ∧ Blocks Λ r) ∨ DeadAsk Λ e
 
 /-- The non-value outcomes of Progress. -/
-def NV (root : Name → Option Tm) (Λ : List Rgn) (μ : List Tm) (e : Tm) (D : Row) : Prop :=
+def NV (root : Roots) (Λ : List Rgn) (μ : List Tm) (e : Tm) (D : Row) : Prop :=
   (∃ v, Value v ∧ e = .raise v) ∨ (∃ l o, Step root l Λ μ e o) ∨ AskStuck root e D ∨ Blocked Λ e
 
 theorem Step.ofP {root Λ μ e e'} (h : PHead e e') : Step root .pure Λ μ e (.cfg Λ μ e') :=
@@ -80,6 +80,9 @@ theorem Step.frame {root l Λ μ e o} (h : Step root l Λ μ e o) {F : Frame} (h
   | todo hE =>
     have := Step.todo (root := root) (Λ := Λ) (μ := μ) (hE.append hF)
     rw [plug_append] at this; exact .inl ⟨_, _, this⟩
+  | glob hE hg =>
+    have := Step.glob (root := root) (Λ := Λ) (μ := μ) (hE.append hF) hg
+    rw [plug_append, plug_append] at this; exact .inl ⟨_, _, this⟩
   | addFin hE hg hl hv =>
     have := Step.addFin (root := root) (μ := μ) (hE.append hF) hg hl hv
     rw [plug_append, plug_append] at this; exact .inl ⟨_, _, this⟩

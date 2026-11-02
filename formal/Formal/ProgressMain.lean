@@ -1,4 +1,5 @@
 import Formal.Progress
+import Formal.DictCanon
 
 /-!
 # Progress (core.md §4)
@@ -29,7 +30,7 @@ theorem inside_final {root Λ μ p w D} (hw : Final w) :
   · exact .inr (.inr (.inr (.inr (.inl ⟨[], _, OkE.nil, rfl,
       .inr ⟨p, hd, .inr (.inr (.inr (.inr ⟨w, rfl, hw⟩)))⟩⟩))))
 
-theorem progress {Λ μ root} :
+theorem progress {Λ μ root} (hroot : RootTy S root) :
     ∀ {Ψ Θ Γ e J}, Typ S Ψ Θ Γ e J → μ.length = Ψ.length → Γ = [] → ∀ {t φ}, J = .ex t φ →
       Value e ∨ NV root Λ μ e φ.svc := by
   intro Ψ Θ Γ e J h
@@ -49,6 +50,13 @@ theorem progress {Λ μ root} :
   | econs hv hθ => intros; exact .inl (.econs hv hθ.value)
   | cap => intros; exact .inl .cap
   | own => intros; exact .inl .own
+  | drec => intros; exact .inl .drec
+  | dnil => intro _ _ _ _ hJ; cases hJ
+  | dcons => intro _ _ _ _ hJ; cases hJ
+  | glob hg =>
+    intros
+    obtain ⟨_, hv⟩ := Option.isSome_iff_exists.mp (hroot.globs _ _ hg)
+    exact step (Step.glob (E := []) OkE.nil hv)
   | scope => intros; exact step (Step.ofR .scope)
   | errVal hv => intros; exact .inl hv
   | anil => intro _ _ _ _ hJ; cases hJ
@@ -88,6 +96,16 @@ theorem progress {Λ μ root} :
     rcases ih hμ hΓ rfl with hv | hn
     · subst hΓ
       obtain ⟨⟨w, hw⟩, _⟩ := (he.shape hv rfl).1.field rfl hR
+      exact step (Step.ofP (.proj hv hw))
+    · exact .inr (hn.frame' (F := .proj _) trivial (nt id) (ni id))
+  | dproj he hc₀ _ hl _ _ _ ih =>
+    intro hμ hΓ _ _ hJ; cases hJ
+    rcases ih hμ hΓ rfl with hv | hn
+    · subst hΓ
+      obtain ⟨r, _, _, _, rfl, hU, hc, _, hr, -⟩ := canonical_dict hv he
+      obtain rfl := Ty.spine_inj hU
+      rw [hc₀] at hc; cases hc
+      obtain ⟨w, hw, -⟩ := hr.dfs_field (by rw [List.lookup_map_snd, hl]; rfl)
       exact step (Step.ofP (.proj hv hw))
     · exact .inr (hn.frame' (F := .proj _) trivial (nt id) (ni id))
   | update he hR _ ih₁ ih₂ =>

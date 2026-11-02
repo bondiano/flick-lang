@@ -78,6 +78,8 @@ theorem pure_preservation {Ψ Θ e t φ e'} (h : Typ S Ψ Θ [] e (.ex t φ)) (h
   | proj _ hw =>
     cases h with
     | proj h₁ hR hT => exact (field_typ h₁ hw hR).sub ⟨hT, Stage.le_refl _⟩
+    | dproj h₁ hc hk hl hts hH hT =>
+      exact (dict_field ‹_› h₁ hc hl hts hH hw).sub ⟨hT, Stage.pure_le _⟩
     | errVal hv'' => exact (nv hv'').elim
   | update _ _ hv' =>
     cases h with

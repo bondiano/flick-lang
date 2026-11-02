@@ -79,7 +79,7 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
         obtain ⟨_, _, _, _, h, la, hψ', _, -⟩ := hT'.arrow_left
         cases h; cases la
         obtain rfl := canonical_unit hve he
-        cases hr : root N with
+        cases hr : root.svc N with
         | some w => exact step (Step.askRoot (E := []) OkE.nil rfl hr)
         | none =>
           exact .inr (.inr (.inr (.inl ⟨[], N, OkE.nil, rfl, rfl, hr,
