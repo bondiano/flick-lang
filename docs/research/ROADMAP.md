@@ -416,7 +416,7 @@ component search (props : SearchProps) =
 - AC: модуль `Migrate` — упорядоченный список SQL с таблицей версий, прогон при старте, повторный прогон ничего не делает; оба таргета.
 - AC: запросы Conduit (`favorited`, `following`, счётчики, фильтры по тегу, автору, избранному, пагинация) пишутся DSL `sql` без `unsafe_query`; каждый найденный пробел DSL — подпункт.
 
-**W9. Элементы и атрибуты `Ui`.** ⬜
+**W9. Элементы и атрибуты `Ui`.** ✅ (`nav`, `footer`, `fieldset` и `icon` (`i`) с `{ class_name }`, `hr`, `image { src : SafeUrl; alt; class_name }`, `form { on_submit }` — отправка всегда без перезагрузки (`preventDefault` в обработчике), `submit { disabled }` — `button type="submit"`; у `Host` — `name` и `input_type` (`TextInput | PasswordInput | EmailInput`); классы любого элемента, в том числе списков и ссылок, — через `with_host`, как и прежде; `Ui.fl` сжат по комментариям, чтобы остаться ≤ 20000 байт; `runtime/test/ui-html.test.ts`)
 - AC: `img`, `form` (отправка без перезагрузки), `nav`, `a`, `i`, `hr`, `fieldset`, `footer`, списки с классами; `input` с `type` (password, email); кнопка отправки формы; `class_name` у каждого элемента одинаково.
 
 **W10. Навигация.** ⬜

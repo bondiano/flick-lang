@@ -76,6 +76,12 @@ let save_button props = ui {
 | `textarea { value; placeholder; on_input }` | многострочный вариант `input` | нет |
 | `pre { class_name }` | `pre`: пробелы и переводы строк сохраняются | `List Ui` |
 | `link { href : SafeUrl }` | `a` | `List Ui` |
+| `nav`, `footer`, `fieldset` `{ class_name }` | `nav`, `footer`, `fieldset` | `List Ui` |
+| `icon { class_name }` | `i` иконочного шрифта, иконку называют его классы | нет |
+| `hr` | `hr` | нет |
+| `image { src : SafeUrl; alt; class_name }` | `img` | нет |
+| `form { on_submit }` | `form`: отправка запускает `on_submit` и никогда не перезагружает страницу | `List Ui` |
+| `submit { disabled }` | `button type="submit"`, отправляет форму вокруг себя | `List Ui` |
 | `html (s : SanitizedHtml)` | `div` с HTML | нет |
 | `select (SelectProps a c)` | `ul role="listbox"`; выбор элемента запускает `on_change` с этим элементом | элементы через `render_item` |
 | `panel { header; body; footer }` | `section` с `header`, `main`, `footer` | задаются именованными полями |
@@ -112,10 +118,13 @@ let example = ui { div { class_name = "badges" } [badge { label = "new" }] }
 `with_host attrs node` задаёт элементу атрибуты хоста: `id`,
 `class_name`, `role`, `aria_label`, `aria_describedby`, `aria_hidden`,
 `aria_invalid`, `aria_pressed`, `aria_live` (`Polite`, `Assertive`, `Off`), `tab_index`,
-`data` (пары, которые записываются как `data-<name>`) и подсказки для ввода
-текста `auto_capitalize`, `auto_correct` и `wrap`. Каждый атрибут
-типизирован и необязателен:
+`data` (пары, которые записываются как `data-<name>`), подсказки для ввода
+текста `auto_capitalize`, `auto_correct` и `wrap`, а также `name` поля формы и
+`input_type` (`TextInput`, `PasswordInput`, `EmailInput`, его `type`). Каждый
+атрибут типизирован и необязателен:
 `with_host { host with role = Some "status" } (span { class_name = "s" } […])`.
+Так же любой элемент получает классы, в том числе тот, у пропсов которого нет
+`class_name`: `with_host { host with class_name = Some "nav-link" } (link …)`.
 
 ## Атомы и представления
 
