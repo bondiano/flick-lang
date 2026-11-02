@@ -55,9 +55,10 @@ theorem gen_elab {Γ Δ cs e t} (h : GenOk S Γ Δ cs e t) :
   | @gen Γ Δ s cs e t f a d s' hd hs _ ih =>
     obtain ⟨_, hk⟩ := ih
     obtain ⟨_, hi⟩ := elab_iter S hd hs
-    have hf := elab_const (Γ := Γ) (Δ := Δ) (φ := .P) S.hSeqFlatMap (ts := [a, t]) rfl
-      (τ := arrP (arrP a (.app (.con S.seq) t)) (arrP (.app (.con S.seq) a) (.app (.con S.seq) t))) rfl
-    exact ⟨_, .app (.app hf (.lam hk) (.inl rfl)) hi (.inl rfl)⟩
+    have hf := elab_const (Γ := Γ) (Δ := Δ) (φ := .P) S.hSeqFlatMap (ts := [a, t, ctxRow Γ]) rfl
+      (τ := arrP (.arr .P a (.app (.con S.seq) t) (ctxRow Γ))
+        (.arr .P (.app (.con S.seq) a) (.app (.con S.seq) t) (ctxRow Γ))) rfl
+    exact ⟨_, .app (.app hf (.lam hk (lam_cov (cov_ctxRow Γ))) (.inl rfl)) hi (.inl rfl)⟩
   | @guard Γ Δ c cs e t c' hc _ ih =>
     obtain ⟨_, hk⟩ := ih
     exact ⟨_, .ite hc hk (elab_const S.hEmpty (ts := [t]) rfl rfl)⟩
@@ -84,9 +85,10 @@ theorem loop_elab {φ Γ Δ cs e} (h : LoopOk S φ Γ Δ cs e) :
   | @gen Γ Δ s cs e f a d s' hd hs _ ih =>
     obtain ⟨_, hk⟩ := ih
     obtain ⟨_, hi⟩ := elab_iter S hd hs
-    have hf := elab_const (Γ := Γ) (Δ := Δ) (φ := φ) (S.hEach φ) (ts := [a]) rfl
-      (τ := arrP (arrTy φ a (.con S.unit)) (arrTy φ (.app (.con S.seq) a) (.con S.unit))) rfl
-    exact ⟨_, .app (.app hf (.lam hk) (.inl rfl)) hi (.inr rfl)⟩
+    have hf := elab_const (Γ := Γ) (Δ := Δ) (φ := φ) (S.hEach φ) (ts := [a, ctxRow Γ]) rfl
+      (τ := arrP (.arr φ a (.con S.unit) (ctxRow Γ))
+        (.arr φ (.app (.con S.seq) a) (.con S.unit) (ctxRow Γ))) rfl
+    exact ⟨_, .app (.app hf (.lam hk (lam_cov (cov_ctxRow Γ))) (.inl rfl)) hi (.inr rfl)⟩
   | guard hc _ ih =>
     obtain ⟨_, hk⟩ := ih
     exact ⟨_, .ite hc hk (elab_const S.hUnitV (ts := []) rfl rfl)⟩
@@ -97,7 +99,7 @@ theorem tryResult_elab {Γ Δ e ε a e'}
     (he : Elab P Γ Δ e (.app (.app (.con S.result) (.app (.con S.errors) ε)) a) .R e') :
     ∃ e'', Elab P Γ Δ (S.tryResult e) a .R e'' :=
   ⟨_, .app (elab_const S.hFromResult (ts := [ε, a]) rfl
-    (τ := arrTy .R (.app (.app (.con S.result) (.app (.con S.errors) ε)) a) a) rfl) he (.inr rfl)⟩
+    (τ := .arr .R (.app (.app (.con S.result) (.app (.con S.errors) ε)) a) a .cnil) rfl) he (.inr rfl)⟩
 
 /-- **`let y = e? in b` on an `Option` elaborates** when the rest returns an `Option`. -/
 theorem tryOption_elab {Γ Δ e b a r φ e' b'} (he : Elab P Γ Δ e (optTy a) φ e')
@@ -113,7 +115,8 @@ theorem seqUnit_elab {Γ Δ s rest τ φ s' r'} (hs : Elab P Γ Δ s (.con S.uni
     (hr : Elab P Γ Δ rest τ φ r') : ∃ e', Elab P Γ Δ (S.seqUnit s rest) τ φ e' := by
   have hs' : Elab P (Γ.map (·.subst (up 0))) ([] ++ Δ.map (·.subst (up 0))) s (.con S.unit) φ s' := by
     simpa [Scheme.subst_up_zero, Cn.subst_up_zero] using hs
-  exact ⟨_, .letSig (σ := ⟨0, [], .con S.unit⟩) hs' (by simp) (.inr rfl) (hr.shift _)⟩
+  exact ⟨_, .letSig (σ := ⟨0, [], .con S.unit, .cnil⟩) hs' (by simp) (.inr rfl)
+    (fun h => absurd rfl h) (hr.shift _)⟩
 
 /-- **T6(a) for `for`, `?` and blocks**: each elaboration above is typed in the target. -/
 theorem T6a_sugar (X : Target P) {Γ Δ e τ φ} (h : ∃ e', Elab P Γ Δ e τ φ e') :

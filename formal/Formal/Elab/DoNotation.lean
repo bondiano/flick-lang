@@ -27,7 +27,9 @@ inductive DoOk : List Scheme → List Cn → List Stmt → Exp → Ty → Stage 
       DoOk Γ Δ (.let_ e :: ss) r τ φ
   | letSig {Γ Δ σ e ss r τ φ₁ φ e'} :
       Elab P (Γ.map (·.subst (up σ.k))) (σ.ctx ++ Δ.map (·.subst (up σ.k))) e σ.ty φ₁ e' →
-      (σ.ctx ≠ [] ∨ σ.k ≠ 0 → φ₁ = .P) → (φ₁ = .P ∨ φ₁ = φ) → DoOk (σ :: Γ) Δ ss r τ φ →
+      (σ.ctx ≠ [] ∨ σ.k ≠ 0 → φ₁ = .P) → (φ₁ = .P ∨ φ₁ = φ) →
+      (σ.ctx ≠ [] → ∀ n, heldS (Γ.map (·.subst (up σ.k))) e n → σ.ty.reach n ∨ σ.q.reach n) →
+      DoOk (σ :: Γ) Δ ss r τ φ →
       DoOk Γ Δ (.letSig σ e :: ss) r τ φ
   | guard {Γ Δ c ss r m b φ d c'} : Ent P Δ [⟨S.alternative, [m]⟩] [d] →
       Elab P Γ Δ c boolTy φ c' → DoOk Γ Δ ss r (.app m b) φ →
@@ -59,16 +61,17 @@ theorem All2.append {α β : Type} {R : α → β → Prop} {l₁ l₂ : List α
   | nil => exact h₂
   | cons r _ ih => exact .cons r ih
 
-theorem curry_append (l : List Ty) (a x : Ty) : curry (l ++ [a]) x = curry l (arrP a x) := by
+theorem curry_append (q : Ty) (l : List Ty) (a x : Ty) :
+    curry q (l ++ [a]) x = curry q l (.arr .P a x q) := by
   simp [curry, List.foldr_append]
 
 /-- `flat_map k e` -/
-theorem elab_bind {Γ Δ k e m a b φ d k' e'} (hd : Ent P Δ [⟨S.monad, [m]⟩] [d])
-    (hk : Elab P Γ Δ k (arrP a (.app m b)) φ k') (he : Elab P Γ Δ e (.app m a) φ e') :
+theorem elab_bind {Γ Δ k e m a b c φ d k' e'} (hd : Ent P Δ [⟨S.monad, [m]⟩] [d])
+    (hk : Elab P Γ Δ k (.arr .P a (.app m b) c) φ k') (he : Elab P Γ Δ e (.app m a) φ e') :
     ∃ e'', Elab P Γ Δ (S.bind k e) (.app m b) φ e'' := by
-  have hm := elab_meth (Γ := Γ) (φ := φ) S.hFlatMap rfl (ts := [m, a, b]) rfl
+  have hm := elab_meth (Γ := Γ) (φ := φ) S.hFlatMap rfl (ts := [m, a, b, c]) rfl
     (by simpa [Cn.subst, Ty.subst, inst] using hd)
-    (τ := arrP (arrP a (.app m b)) (arrP (.app m a) (.app m b))) rfl
+    (τ := arrP (.arr .P a (.app m b) c) (.arr .P (.app m a) (.app m b) c)) rfl
   exact ⟨_, .app (.app hm hk (.inl rfl)) he (.inl rfl)⟩
 
 /-- **`do` elaborates.** -/
@@ -76,14 +79,14 @@ theorem do_elab {Γ Δ ss r τ φ} (h : DoOk S Γ Δ ss r τ φ) :
     ∃ e', Elab P Γ Δ (S.desugarDo ss r) τ φ e' := by
   induction h with
   | ret h => exact ⟨_, h⟩
-  | bind hd he _ ih =>
+  | @bind Γ _ _ _ _ _ _ _ _ _ _ hd he _ ih =>
     obtain ⟨_, hk⟩ := ih
-    exact elab_bind S hd (.lam (φ := .P) hk) he
-  | exp hd he _ ih =>
+    exact elab_bind S hd (.lam (φ := .P) hk (lam_cov (cov_ctxRow Γ))) he
+  | @exp Γ _ _ _ _ _ _ _ _ _ _ hd he _ ih =>
     obtain ⟨_, hk⟩ := ih
-    exact elab_bind S hd (.lam (φ := .P) (hk.shift _)) he
+    exact elab_bind S hd (.lam (φ := .P) (hk.shift _) (lam_cov (cov_ctxRow Γ))) he
   | let_ he _ ih => obtain ⟨_, hb⟩ := ih; exact ⟨_, .let_ he hb⟩
-  | letSig he hp hφ _ ih => obtain ⟨_, hb⟩ := ih; exact ⟨_, .letSig he hp hφ hb⟩
+  | letSig he hp hφ hq _ ih => obtain ⟨_, hb⟩ := ih; exact ⟨_, .letSig he hp hφ hq hb⟩
   | @guard Γ Δ c ss r m b φ d c' hd hc _ ih =>
     obtain ⟨_, hb⟩ := ih
     have hn := elab_meth (Γ := Γ) (φ := φ) S.hNothing rfl (ts := [m, b]) rfl
@@ -92,8 +95,10 @@ theorem do_elab {Γ Δ ss r τ φ} (h : DoOk S Γ Δ ss r τ φ) :
   | @group Γ Δ e₁ mid eₙ ss r m a₁ as aₙ b φ d d' e₁' eₙ' hp hd hd' h₁ hs hₙ _ ih =>
     obtain ⟨_, hk⟩ := ih
     have hl := hs.length_eq
-    obtain ⟨_, hK⟩ := elab_lams (as := a₁ :: as ++ [aₙ]) (ψ := φ) (List.cons_ne_nil _ _) hk
+    obtain ⟨_, hK⟩ := elab_lams (as := a₁ :: as ++ [aₙ]) (ψ := φ) (List.cons_ne_nil _ _)
+      (cov_ctxRow _) hk
     have hu := elab_unc S (Γ := Γ) (Δ := Δ) (φ := φ) a₁ (as ++ [aₙ]) (.app m b)
+      (ctxRow ((a₁ :: as ++ [aₙ]).reverse.map Scheme.mono ++ Γ))
     obtain ⟨_, ht⟩ := elab_tuple S hd' (hs.append (.cons ⟨_, hₙ⟩ .nil)) h₁
     obtain ⟨_, he⟩ := elab_bind S hd (.app hu hK (.inl rfl)) ht
     simp only [Sugar.desugarDo, hp]
@@ -101,14 +106,16 @@ theorem do_elab {Γ Δ ss r τ φ} (h : DoOk S Γ Δ ss r τ φ) :
     rw [hl]; exact ⟨_, he⟩
   | @groupPure Γ Δ e₁ mid eₙ ss r v m a₁ as aₙ x φ d' e₁' eₙ' v' hp hd' h₁ hs hₙ hv =>
     have hl := hs.length_eq
-    obtain ⟨_, hK⟩ := elab_lams (as := a₁ :: as ++ [aₙ]) (ψ := φ) (List.cons_ne_nil _ _) hv
+    let q := ctxRow ((a₁ :: as ++ [aₙ]).reverse.map Scheme.mono ++ Γ)
+    obtain ⟨_, hK⟩ := elab_lams (q := q) (as := a₁ :: as ++ [aₙ]) (ψ := φ) (List.cons_ne_nil _ _)
+      (cov_ctxRow _) hv
     rw [curry_append] at hK
-    have hu := elab_unc S (Γ := Γ) (Δ := Δ) (φ := φ) a₁ as (arrP aₙ x)
+    have hu := elab_unc S (Γ := Γ) (Δ := Δ) (φ := φ) a₁ as (.arr .P aₙ x q) q
     obtain ⟨_, ht⟩ := elab_tuple S hd' hs h₁
-    have hm := elab_meth (Γ := Γ) (φ := φ) S.hMap2 rfl (ts := [m, nest S.tup a₁ as, aₙ, x]) rfl
+    have hm := elab_meth (Γ := Γ) (φ := φ) S.hMap2 rfl (ts := [m, nest S.tup a₁ as, aₙ, x, q]) rfl
       (by simpa [Cn.subst, Ty.subst, inst] using hd')
-      (τ := arrP (arrP (nest S.tup a₁ as) (arrP aₙ x))
-        (arrP (.app m (nest S.tup a₁ as)) (arrP (.app m aₙ) (.app m x)))) rfl
+      (τ := arrP (.arr .P (nest S.tup a₁ as) (.arr .P aₙ x q) q)
+        (.arr .P (.app m (nest S.tup a₁ as)) (.arr .P (.app m aₙ) (.app m x) q) q)) rfl
     simp only [Sugar.desugarDo, hp]
     simp only [List.length_append, List.length_cons, List.length_nil] at hK
     rw [hl]

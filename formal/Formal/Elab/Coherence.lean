@@ -234,10 +234,7 @@ theorem lemma_6_1 (h : Coherent P lt) {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat
   exact .trans r₁ (.symm r₂)
 
 theorem Ty.subst_var (t : Ty) : t.subst .var = t := by
-  induction t with
-  | var n => rfl
-  | con c => rfl
-  | app t u iht ihu => simp [Ty.subst, iht, ihu]
+  induction t <;> simp_all [Ty.subst]
 
 /-- **Lemma 6.2 (cache).** A constraint without variables solved without premises: its
 derivation in any `Δ` is, after `ρ`, `≈` that solution (Р181). -/
@@ -264,7 +261,8 @@ dictionaries agree after `ρ` up to `≈` in every dictionary position; with the
 `Sim`, they give one result. -/
 theorem T6b (h : Coherent P lt) {X : Exprs} (hsim : Sim P X) (s : X.Skel) {Δ : List Cn}
     {θ : Nat → Ty} {ρ : Nat → Dict} (hρ : Closes P Δ θ ρ) {qs : List Cn} {ds₁ ds₂ : List Dict}
-    (h₁ : Ent P Δ qs ds₁) (h₂ : Ent P Δ qs ds₂) :
+    (h₁ : Ent P Δ qs ds₁) (h₂ : Ent P Δ qs ds₂) (o₁ : X.Ok s (ds₁.map (·.subst ρ)))
+    (o₂ : X.Ok s (ds₂.map (·.subst ρ))) :
     All2 (Eqv P) (ds₁.map (·.subst ρ)) (ds₂.map (·.subst ρ)) ∧
       X.run s (ds₁.map (·.subst ρ)) = X.run s (ds₂.map (·.subst ρ)) := by
   have ho : ∀ d Q, Clo P Δ d Q → SlotOK P (Q.subst θ) := fun _ _ _ => slot_ok h _
@@ -272,6 +270,6 @@ theorem T6b (h : Coherent P lt) {X : Exprs} (hsim : Sim P X) (s : X.Skel) {Δ : 
   obtain ⟨_, e₂, a₂⟩ := closed_rep h hρ ho h₂
   cases closed_unique h e₁ e₂
   have a := All2.trans_symm a₁ a₂
-  exact ⟨a, hsim s _ _ a⟩
+  exact ⟨a, hsim s _ _ a o₁ o₂⟩
 
 end Flick.Elab

@@ -6,10 +6,7 @@ namespace Flick.Elab
 
 theorem Ty.subst_comp (t : Ty) (σ θ : Nat → Ty) :
     (t.subst σ).subst θ = t.subst fun n => (σ n).subst θ := by
-  induction t with
-  | var n => rfl
-  | con c => rfl
-  | app t u iht ihu => simp [Ty.subst, iht, ihu]
+  induction t <;> simp_all [Ty.subst]
 
 theorem Cn.subst_comp (c : Cn) (σ θ : Nat → Ty) :
     (c.subst σ).subst θ = c.subst fun n => (σ n).subst θ := by
@@ -20,20 +17,40 @@ theorem Ty.subst_agree {t : Ty} {σ σ' : Nat → Ty} (h : ∀ n, t.Occurs n →
   induction t with
   | var n => exact h n rfl
   | con c => rfl
+  | cnil => rfl
   | app t u iht ihu =>
     simp only [Ty.subst]
     rw [iht fun n hn => h n (.inl hn), ihu fun n hn => h n (.inr hn)]
+  | cun t u iht ihu =>
+    simp only [Ty.subst]
+    rw [iht fun n hn => h n (.inl hn), ihu fun n hn => h n (.inr hn)]
+  | arr φ a b q iha ihb ihq =>
+    simp only [Ty.subst]
+    rw [iha fun n hn => h n (.inl hn), ihb fun n hn => h n (.inr (.inl hn)),
+      ihq fun n hn => h n (.inr (.inr hn))]
 
 theorem Ty.agree_of_eq {t : Ty} {σ σ' : Nat → Ty} (h : t.subst σ = t.subst σ') :
     ∀ n, t.Occurs n → σ n = σ' n := by
   induction t with
   | var m => intro n hn; cases hn; exact h
   | con c => intro n hn; cases hn
+  | cnil => intro n hn; cases hn
   | app t u iht ihu =>
     simp only [Ty.subst, Ty.app.injEq] at h
     intro n hn; rcases hn with hn | hn
     · exact iht h.1 n hn
     · exact ihu h.2 n hn
+  | cun t u iht ihu =>
+    simp only [Ty.subst, Ty.cun.injEq] at h
+    intro n hn; rcases hn with hn | hn
+    · exact iht h.1 n hn
+    · exact ihu h.2 n hn
+  | arr φ a b q iha ihb ihq =>
+    simp only [Ty.subst, Ty.arr.injEq, true_and] at h
+    intro n hn; rcases hn with hn | hn | hn
+    · exact iha h.1 n hn
+    · exact ihb h.2.1 n hn
+    · exact ihq h.2.2 n hn
 
 theorem params_subst (ts : List Ty) (θ : Nat → Ty) (n : Nat) :
     (params ts n).subst θ = params (ts.map (·.subst θ)) n := by

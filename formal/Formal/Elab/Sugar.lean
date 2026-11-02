@@ -10,15 +10,19 @@ elaborating these terms, by (Method). Patterns are variables, and `_` (a binder 
 A tuple of the values of a group `p₁ <- e₁ and … and pₙ <- eₙ` is nested to the left,
 `((a₁, a₂), …, aₙ)`, built by `map2 pair`; `λ(p₁, …, pₙ). e` is `unc n (λp₁ … pₙ. e)` with a
 constant `unc n : (a₁ → … → aₙ → r) → T_n → r` for each `n ≥ 1`.
+
+The schemes are the checker's types of the Prelude (`Prelude.fl`, `Seq.fl`) with the
+qualifiers of non-arrow types dropped (Р188): each higher-order parameter has a capture
+variable `c`, its arrows and the arrows after it show `c`.
 -/
 
 namespace Flick.Elab
 
-/-- `a →P b`. -/
-abbrev arrP (a b : Ty) : Ty := arrTy .P a b
+/-- `a →P b`, holding nothing. -/
+abbrev arrP (a b : Ty) : Ty := .arr .P a b .cnil
 
-/-- `a₁ →P … →P aₙ →P r`. -/
-def curry (as : List Ty) (r : Ty) : Ty := as.foldr arrP r
+/-- `a₁ →P^q … →P^q aₙ →P^q r`. -/
+def curry (q : Ty) (as : List Ty) (r : Ty) : Ty := as.foldr (fun a r => .arr .P a r q) r
 
 /-- The left-nested tuple `((t, a₁), …, aₙ)` of the type constructor `tup`. -/
 def nest (tup : Nat) : Ty → List Ty → Ty
@@ -28,9 +32,10 @@ def nest (tup : Nat) : Ty → List Ty → Ty
 /-- `var 0, …, var (n-1)`. -/
 def vars (n : Nat) : List Ty := (List.range n).map .var
 
-/-- `∀a₁ … aₙ r. (a₁ → … → aₙ → r) → T_n → r`, for `n ≥ 1`. -/
+/-- `∀a₁ … aₙ r c. (a₁ →^c … → aₙ →^c r) →P (T_n →^c r)`, for `n ≥ 1`. -/
 def uncSch (tup n : Nat) : Scheme :=
-  ⟨n + 1, [], arrP (curry (vars n) (.var n)) (arrP (nest tup (.var 0) (vars n).tail) (.var n))⟩
+  ⟨n + 2, [], arrP (curry (.var (n + 1)) (vars n) (.var n))
+    (.arr .P (nest tup (.var 0) (vars n).tail) (.var n) (.var (n + 1))), .cnil⟩
 
 /-- The Prelude classes and methods, the constants of Γ₀ and the types the sugar uses. -/
 structure Sugar (P : Prog) where
@@ -59,37 +64,41 @@ structure Sugar (P : Prog) where
   each : Stage → Nat
   unitV : Nat
   fromResult : Nat
-  /-- `flat_map : ∀m a b. Monad m ⇒ (a → m b) → m a → m b` -/
-  hFlatMap : P.methods flatMap = some (monad, ⟨3, [⟨monad, [.var 0]⟩],
-    arrP (arrP (.var 1) (.app (.var 0) (.var 2)))
-      (arrP (.app (.var 0) (.var 1)) (.app (.var 0) (.var 2)))⟩)
-  /-- `map2 : ∀f a b x. Applicative f ⇒ (a → b → x) → f a → f b → f x` -/
-  hMap2 : P.methods map2 = some (applicative, ⟨4, [⟨applicative, [.var 0]⟩],
-    arrP (arrP (.var 1) (arrP (.var 2) (.var 3)))
-      (arrP (.app (.var 0) (.var 1)) (arrP (.app (.var 0) (.var 2)) (.app (.var 0) (.var 3))))⟩)
+  /-- `flat_map : ∀m a b c. Monad m ⇒ (a →^c m b) →P (m a →^c m b)` -/
+  hFlatMap : P.methods flatMap = some (monad, ⟨4, [⟨monad, [.var 0]⟩],
+    arrP (.arr .P (.var 1) (.app (.var 0) (.var 2)) (.var 3))
+      (.arr .P (.app (.var 0) (.var 1)) (.app (.var 0) (.var 2)) (.var 3)), .cnil⟩)
+  /-- `map2 : ∀f a b x c. Applicative f ⇒ (a →^c b →^c x) →P (f a →^c f b →^c f x)` -/
+  hMap2 : P.methods map2 = some (applicative, ⟨5, [⟨applicative, [.var 0]⟩],
+    arrP (.arr .P (.var 1) (.arr .P (.var 2) (.var 3) (.var 4)) (.var 4))
+      (.arr .P (.app (.var 0) (.var 1))
+        (.arr .P (.app (.var 0) (.var 2)) (.app (.var 0) (.var 3)) (.var 4)) (.var 4)), .cnil⟩)
   /-- `nothing : ∀f a. Alternative f ⇒ f a` -/
   hNothing : P.methods nothing = some (alternative, ⟨2, [⟨alternative, [.var 0]⟩],
-    .app (.var 0) (.var 1)⟩)
+    .app (.var 0) (.var 1), .cnil⟩)
   /-- `iter : ∀f a. Iterable f ⇒ f a → Seq a` -/
   hIter : P.methods iter = some (iterable, ⟨2, [⟨iterable, [.var 0]⟩],
-    arrP (.app (.var 0) (.var 1)) (.app (.con seq) (.var 1))⟩)
+    arrP (.app (.var 0) (.var 1)) (.app (.con seq) (.var 1)), .cnil⟩)
   hPair : P.consts pair = some ⟨2, [], arrP (.var 0) (arrP (.var 1)
-    (.app (.app (.con tup) (.var 0)) (.var 1)))⟩
+    (.app (.app (.con tup) (.var 0)) (.var 1))), .cnil⟩
   hUnc : ∀ n, 0 < n → P.consts (unc n) = some (uncSch tup n)
-  hNone : P.consts noneC = some ⟨1, [], optTy (.var 0)⟩
-  /-- `Seq.flat_map : ∀a b. (a → Seq b) → Seq a → Seq b` -/
-  hSeqFlatMap : P.consts seqFlatMap = some ⟨2, [], arrP (arrP (.var 0) (.app (.con seq) (.var 1)))
-    (arrP (.app (.con seq) (.var 0)) (.app (.con seq) (.var 1)))⟩
-  hSingleton : P.consts singleton = some ⟨1, [], arrP (.var 0) (.app (.con seq) (.var 0))⟩
-  hEmpty : P.consts empty = some ⟨1, [], .app (.con seq) (.var 0)⟩
-  hToList : P.consts toList = some ⟨1, [], arrP (.app (.con seq) (.var 0)) (.app (.con list) (.var 0))⟩
-  /-- `each_φ : ∀a. (a →φ Unit) →P Seq a →φ Unit`, the loop of `for … do` at the stage `φ` -/
-  hEach : ∀ φ, P.consts (each φ) = some ⟨1, [], arrP (arrTy φ (.var 0) (.con unit))
-    (arrTy φ (.app (.con seq) (.var 0)) (.con unit))⟩
-  hUnitV : P.consts unitV = some ⟨0, [], .con unit⟩
+  hNone : P.consts noneC = some ⟨1, [], optTy (.var 0), .cnil⟩
+  /-- `Seq.flat_map : ∀a b c. (a →^c Seq b) →P (Seq a →^c Seq b)` -/
+  hSeqFlatMap : P.consts seqFlatMap = some ⟨3, [],
+    arrP (.arr .P (.var 0) (.app (.con seq) (.var 1)) (.var 2))
+      (.arr .P (.app (.con seq) (.var 0)) (.app (.con seq) (.var 1)) (.var 2)), .cnil⟩
+  hSingleton : P.consts singleton = some ⟨1, [], arrP (.var 0) (.app (.con seq) (.var 0)), .cnil⟩
+  hEmpty : P.consts empty = some ⟨1, [], .app (.con seq) (.var 0), .cnil⟩
+  hToList : P.consts toList = some ⟨1, [], arrP (.app (.con seq) (.var 0)) (.app (.con list) (.var 0)),
+    .cnil⟩
+  /-- `each_φ : ∀a c. (a →φ^c Unit) →P (Seq a →φ^c Unit)`, the loop of `for … do` at the
+  stage `φ` -/
+  hEach : ∀ φ, P.consts (each φ) = some ⟨2, [], arrP (.arr φ (.var 0) (.con unit) (.var 1))
+    (.arr φ (.app (.con seq) (.var 0)) (.con unit) (.var 1)), .cnil⟩
+  hUnitV : P.consts unitV = some ⟨0, [], .con unit, .cnil⟩
   /-- `from_result : ∀e a. Result (Errors e) a →R a` (`core.md` §1.4) -/
-  hFromResult : P.consts fromResult = some ⟨2, [], arrTy .R
-    (.app (.app (.con result) (.app (.con errors) (.var 0))) (.var 1)) (.var 1)⟩
+  hFromResult : P.consts fromResult = some ⟨2, [], .arr .R
+    (.app (.app (.con result) (.app (.con errors) (.var 0))) (.var 1)) (.var 1) .cnil, .cnil⟩
 
 variable {P : Prog} (S : Sugar P)
 
@@ -168,6 +177,7 @@ def Sugar.tryResult (e : Exp) : Exp := .app (.const S.fromResult) e
 def Sugar.tryOption (e b : Exp) : Exp := .caseOpt e (.const S.noneC) b
 
 /-- `s; rest` of a block: `let _ : Unit = s in rest`. -/
-def Sugar.seqUnit (s rest : Exp) : Exp := .letSig ⟨0, [], .con S.unit⟩ s (rest.rename Nat.succ)
+def Sugar.seqUnit (s rest : Exp) : Exp :=
+  .letSig ⟨0, [], .con S.unit, .cnil⟩ s (rest.rename Nat.succ)
 
 end Flick.Elab
