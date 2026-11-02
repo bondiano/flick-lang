@@ -110,15 +110,21 @@ impl Checker<'_> {
             }
             columns.push(column);
         }
-        let info = SqlTable {
+        self.declare_table(SqlTable {
             decl: range(self.span(decl)),
             name: name.to_owned(),
             table,
             columns,
-        };
+        })
+    }
+
+    /// The row type of a table; defines its companion `Name$table` and
+    /// records the table for lowering.
+    pub(in super::super) fn declare_table(&mut self, info: SqlTable) -> Type {
+        let name = info.name.clone();
         let entity = self.env.entity(
             Namespace::Value,
-            &super::super::companion_name(name, "table"),
+            &super::super::companion_name(&name, "table"),
         );
         self.env.set_value(entity, table_type(&info));
         let row = row_type(&info);

@@ -1,0 +1,72 @@
+// Against a real PostgreSQL: the tables of `sql migration` declarations are
+// the schema they build, queried as typed tables. The second migration
+// renames a column and adds one with a default, a string as SQL text, so the row type is the
+// schema after both; `migrations` applies them as written. Run by
+// `flick/tests/sql_postgres.rs` on a fresh database.
+module App.Migrated exposing (main)
+
+import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+import Database exposing (Database)
+import Database.Migrate exposing (MigrationError(..))
+
+sql migration 1 "people" {
+  create table people (
+    id bigint primary key generated always as identity,
+    name text not null,
+    nick text
+  );
+  create table pets (
+    owner bigint not null references people on delete cascade,
+    name text not null,
+    primary key (owner, name)
+  );
+}
+
+sql migration 2 "kind" {
+  alter table pets add column species text not null default "cat";
+  alter table people rename column nick to nickname;
+}
+
+add_person : Sql.Template Pg { name : String } { id : BigInt }
+let add_person = sql p {
+  insert_into People
+  values { name = p.name }
+  returning { id = People.id }
+}
+
+add_pet : Sql.Template Pg { owner : BigInt; name : String } {}
+let add_pet = sql p {
+  insert_into Pets
+  values { owner = p.owner; name = p.name }
+}
+
+pets : Sql.Template Pg {} { owner : String; pet : String; species : String }
+let pets = sql {
+  from person in People
+  join pet in Pets on pet.owner == person.id
+  select { owner = person.name; pet = pet.name; species = pet.species }
+  order_by pet.name
+}
+
+run : Unit ->{Database; MigrationError, EncodeError, DbError, DecodeError} Unit
+let run () =
+  Platform.stdout_line ("applied " ++ show (Database.Migrate.run migrations))
+  Platform.stdout_line ("again " ++ show (Database.Migrate.run migrations))
+  match Database.query (Sql.bind add_person { name = "ada" }) with
+  | [person] ->
+    ignore (Database.execute (Sql.bind add_pet { owner = person.id; name = "tom" }))
+    ignore (Database.execute (Sql.bind add_pet { owner = person.id; name = "rex" }))
+    for row <- Database.query (Sql.bind pets {}) do
+      Platform.stdout_line (row.owner ++ " " ++ row.pet ++ " " ++ row.species)
+  | _ -> Platform.stdout_line "no person"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let url = Option.with_default "" (Platform.env "DATABASE_URL")
+  provide (Database.pg (Database.config url)) {
+    try run () with
+    | MigrationError message -> Platform.stdout_line ("migration error " ++ message)
+    | DbError e -> Platform.stdout_line ("database error " ++ e.code ++ " " ++ e.message)
+    | EncodeError _ -> Platform.stdout_line "encode error"
+    | DecodeError _ -> Platform.stdout_line "decode error"
+  }
