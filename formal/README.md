@@ -531,7 +531,11 @@ dictionaries (`eqv_sem`), P4a4b `Rel` and its closure, P4a4c the fields of the t
 `T6b_core`, T6(b) for the core with its run without the hypothesis `Sim` (Р198–Р200). P4a is
 done. Р188 through a `CRow` parameter is done: the translation and the schemes of `Sugar`,
 and the lazy `pure`, `map2` and `flat_map` of `Monad Eff` typed by the rules of the core at
-those schemes (`LazyEff.lean`). The pieces below are in their intended order.
+those schemes (`LazyEff.lean`). The witness of the hypotheses (`Elab/Witness/`): W1 is done,
+a program with `Eq` (an instance on `Int`, structural on a record), `Applicative`/`Monad` of
+`Eff` and of an eager `OptQ`, `Alternative OptQ`, `Iterable ListQ`, all of `Sugar`, with
+`Coherent` (`coherent`) and `Real` (`real`); W2, the bodies of the globals (`RootTy`,
+`RealRun`) and T6 on the witness, is next. The pieces below are in their intended order.
 
 #### P4a1: captures in `Elab` and `Target`
 
