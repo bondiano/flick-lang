@@ -39,7 +39,13 @@ impl Checker<'_> {
                     return Kind::Type;
                 };
                 match self.find_type(node, &qualifier.join("."), name) {
-                    Some((_, def)) if def.form == Form::Kind => def.kind,
+                    Some((module, def)) if def.form == Form::Kind => {
+                        self.typing.type_names.insert(
+                            (node.range().0, node.range().1),
+                            (module, (*name).to_owned()),
+                        );
+                        def.kind
+                    }
                     Some(_) => {
                         self.error(
                             codes::T002,

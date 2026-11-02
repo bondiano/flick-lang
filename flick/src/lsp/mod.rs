@@ -19,6 +19,7 @@ use std::sync::LazyLock;
 use std::time::Instant;
 
 use flick_core::diagnostics::{Diagnostic, Severity};
+use flick_core::project::config::Emit;
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, ModuleCache};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{resolve, syntax, types};
@@ -95,6 +96,8 @@ pub struct Snapshot {
     pub sources: SourceMap,
     /// The project's root, where `node_modules` is.
     pub root: PathBuf,
+    /// The target selected by the project's build configuration.
+    pub emit: Emit,
     context: Context,
 }
 
@@ -186,6 +189,7 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
     roots.retain(|root| seen.insert(canonical(root)));
     let cache = caches.entry(context.clone()).or_default();
     let analysis = project::analyze_with(&host, &mut sources, found.as_ref(), &roots, cache);
+    let emit = found.as_ref().map_or(Emit::Js, |p| p.config.build.emit);
     let root = found.map_or(dir, |p| p.root);
     debug!(
         root = %root.display(),
@@ -198,6 +202,7 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
         analysis,
         sources,
         root,
+        emit,
         context,
     }
 }
@@ -264,6 +269,7 @@ fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         },
         sources,
         root: path.parent().expect("source directory").to_path_buf(),
+        emit: Emit::Js,
         context: Context::Builtin(path.to_path_buf()),
     }
 }

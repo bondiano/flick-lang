@@ -4,9 +4,9 @@
 use std::fmt::Write;
 use std::ptr;
 
-use super::{Ide, Symbol, Target, navigate::Source, tree};
+use super::{Ide, Symbol, navigate::Source, tree};
 use crate::doc;
-use crate::iface::{Decl, Entity, Namespace};
+use crate::iface::{Decl, Namespace};
 use crate::project::Analyzed;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
@@ -14,6 +14,10 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, Ref, TypeDef, component_instance, show_type};
 
 mod companions;
+mod kinds;
+mod types;
+
+use kinds::kind_description;
 
 /// `node` as its source lays it out, one written line per line, its
 /// continuation lines dedented by the indentation of its first line.
@@ -272,52 +276,6 @@ impl Ide<'_> {
         Some((format!("```flick\n{name} : {}\n```", show_type(ty)), range))
     }
 
-    fn type_hover(
-        &self,
-        file: FileId,
-        entity: &Entity,
-        source: Option<&Source>,
-        definition: Option<&TypeDef>,
-        range: &mut (u32, u32),
-    ) -> Option<String> {
-        let local_alias = self
-            .analysis
-            .module(&entity.module)
-            .is_some_and(|m| m.typing.aliases.contains_key(&entity.name));
-        let public_alias = definition.is_some_and(|d| matches!(&d.form, Form::Alias { .. }));
-        if (local_alias || public_alias)
-            && let Some(source) = source
-            && let Some(decl) = source.tree.nodes().find(|d| {
-                d.kind == K::TypeDecl
-                    && tree::name_of(d, K::Con, &source.text) == Some(entity.name.as_str())
-            })
-        {
-            if source.target == Target::File(file)
-                && decl.child_tokens().any(|t| (t.start, t.end) == *range)
-            {
-                range.1 = decl
-                    .nodes()
-                    .filter(|n| n.kind == K::TypeParam)
-                    .last()
-                    .map_or(range.1, |n| n.range().1);
-            }
-            return Some(as_written(decl, &source.text));
-        }
-        let definition = definition?;
-        Some(match &definition.form {
-            Form::Alias { params, body, .. } => {
-                let params = params.iter().fold(String::new(), |mut acc, p| {
-                    let _ = write!(acc, " {p}");
-                    acc
-                });
-                format!("type alias {}{params} = {}", entity.name, show_type(body))
-            }
-            Form::Error => format!("type error {}", entity.name),
-            Form::Service { .. } => format!("service {}", entity.name),
-            _ => format!("type {} : {}", entity.name, definition.kind),
-        })
-    }
-
     fn exposing_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
         let m = self.module(file)?;
         let text = self.text(file);
@@ -373,6 +331,9 @@ impl Ide<'_> {
 
     /// Markdown for the symbol at `offset`, and the range it covers.
     pub fn hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
+        if let Some(hover) = self.kind_hover(file, offset) {
+            return Some(hover);
+        }
         if let Some((code, note, range)) = self.keyword(file, offset) {
             return Some((format!("```flick\n{code}\n```\n\n{note}"), range));
         }
@@ -409,7 +370,12 @@ impl Ide<'_> {
             }
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;
-                let export = interface.find(e.namespace, &e.name);
+                let export = self
+                    .analysis
+                    .module(&e.module)
+                    .filter(|m| m.file == file)
+                    .and_then(|m| m.typing.declarations.find(e.namespace, &e.name))
+                    .or_else(|| interface.find(e.namespace, &e.name));
                 let source = self.source(&e.module);
                 let code = match e.namespace {
                     Namespace::Type => self.type_hover(
@@ -432,7 +398,19 @@ impl Ide<'_> {
                         }
                     },
                 };
-                let doc = source.and_then(|source| documentation(&source, &e.name));
+                let doc = source
+                    .and_then(|source| documentation(&source, &e.name))
+                    .or_else(|| match export.and_then(|item| item.definition.as_ref()) {
+                        Some(TypeDef {
+                            kind,
+                            form: Form::Kind,
+                        }) => Some(kind_description(kind).to_owned()),
+                        Some(TypeDef {
+                            kind,
+                            form: Form::KindMember,
+                        }) => Some(format!("A member of the finite kind `{kind}`.")),
+                        _ => None,
+                    });
                 let from = format!("from `{}`", e.module);
                 let note = doc.map_or(from.clone(), |d| format!("{d}\n\n{from}"));
                 match self.derived(file, range, &e.module, &e.name) {
