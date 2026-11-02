@@ -1,12 +1,15 @@
 //! Routes of a type that derives `Url`: a constructor is its name in kebab
 //! case (`Home` and `Index` are the root), its fields the segments after it,
 //! and a final record field the query. A segment is text, a number, a
-//! boolean or a refined type over them, which the type's schema checks.
+//! boolean or a refined type over them, which the type's schema checks, or
+//! a type whose constructors have no fields, each its name in kebab case.
+//! The last segment may be an `Option`: `None` leaves it out of the URL.
 
 use crate::diagnostics::codes;
+use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::types::Checker;
-use crate::types::env::Form;
+use crate::types::env::{Abi, Form};
 use crate::types::ty::Type;
 use crate::types::typing::SchemaPlan;
 
@@ -16,11 +19,34 @@ pub struct UrlRoute {
     pub constructor: String,
     /// The first segment, in kebab case; empty for the root.
     pub path: String,
-    /// The witnesses of the fields that are the following segments.
-    pub segments: Vec<SchemaPlan>,
+    /// The fields that are the following segments.
+    pub segments: Vec<UrlSegment>,
+    /// Whether the last segment is an `Option`, left out of the URL for `None`.
+    pub optional: bool,
     /// The fields of a final record field, the query: a label, the witness
     /// of the value, and whether the field is an `Option`.
     pub query: Option<Vec<(String, SchemaPlan, bool)>>,
+}
+
+/// A segment of a route.
+#[derive(Debug, Clone, PartialEq)]
+pub enum UrlSegment {
+    /// A scalar field, by its witness.
+    Value(SchemaPlan),
+    /// A field of type `ty` of `module`, whose constructors have no fields:
+    /// each is its name in kebab case.
+    Words {
+        module: String,
+        ty: String,
+        constructors: Vec<String>,
+    },
+}
+
+impl UrlSegment {
+    /// A constructor's text in a URL: its name in kebab case.
+    pub fn word(constructor: &str) -> String {
+        kebab(constructor)
+    }
 }
 
 impl Checker<'_> {
@@ -62,19 +88,28 @@ impl Checker<'_> {
         let mut routes: Vec<UrlRoute> = Vec::new();
         for (constructor, fields) in variants {
             let at = |i: usize| format!("{name}.{constructor}[{i}]");
-            let (query, segments) = match fields.split_last() {
+            let (query, plans) = match fields.split_last() {
                 Some((SchemaPlan::Record(query), rest)) => (Some(query), rest),
                 _ => (None, &fields[..]),
             };
-            for (i, segment) in segments.iter().enumerate() {
-                if !self.is_scalar(segment) {
-                    return Err((
-                        at(i),
-                        "a segment is a `String`, a `Float`, a `Bool` or a refined type over them"
-                            .to_owned(),
-                    ));
-                }
-            }
+            let optional = matches!(plans.last(), Some(SchemaPlan::Option(_)));
+            let segments = plans
+                .iter()
+                .enumerate()
+                .map(|(i, plan)| {
+                    let plan = match plan {
+                        SchemaPlan::Option(inner) if i + 1 == plans.len() => &**inner,
+                        _ => plan,
+                    };
+                    self.segment(plan).ok_or_else(|| {
+                        (
+                            at(i),
+                            "a segment is a `String`, a `Float`, a `Bool`, a refined type over them or a type whose constructors have no fields; only the last may be an `Option`"
+                                .to_owned(),
+                        )
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             let query = query
                 .map(|query| {
                     query
@@ -98,10 +133,13 @@ impl Checker<'_> {
             } else {
                 kebab(constructor)
             };
-            if let Some(other) = routes
-                .iter()
-                .find(|r| r.path == path && r.segments.len() == segments.len())
-            {
+            // the counts of segments a route's URLs have
+            let counts = |n: usize, optional: bool| (n - usize::from(optional))..=n;
+            let mine = counts(segments.len(), optional);
+            if let Some(other) = routes.iter().find(|r| {
+                let theirs = counts(r.segments.len(), r.optional);
+                r.path == path && mine.start() <= theirs.end() && theirs.start() <= mine.end()
+            }) {
                 return Err((
                     format!("{name}.{constructor}"),
                     format!("its URLs are those of `{}`", other.constructor),
@@ -110,11 +148,56 @@ impl Checker<'_> {
             routes.push(UrlRoute {
                 constructor: constructor.clone(),
                 path,
-                segments: segments.to_vec(),
+                segments,
+                optional,
                 query,
             });
         }
         Ok(routes)
+    }
+
+    /// The segment of a field of the witness `plan`, if it has a URL form.
+    fn segment(&self, plan: &SchemaPlan) -> Option<UrlSegment> {
+        if self.is_scalar(plan) {
+            return Some(UrlSegment::Value(plan.clone()));
+        }
+        let SchemaPlan::Named {
+            module, ty, args, ..
+        } = plan
+        else {
+            return None;
+        };
+        let Some(Form::Adt {
+            constructors,
+            abi: Abi::Tagged,
+        }) = self.env.type_def(module, ty).map(|d| &d.form)
+        else {
+            return None;
+        };
+        let nullary = |name: &String| {
+            let entity = Entity {
+                module: module.clone(),
+                namespace: Namespace::Constructor,
+                name: name.clone(),
+            };
+            match self.env.value(&entity) {
+                Some(Type::Forall { body, .. }) => !matches!(**body, Type::Fun { .. }),
+                Some(ty) => !matches!(ty, Type::Fun { .. }),
+                None => false,
+            }
+        };
+        let mut words: Vec<String> = constructors.iter().map(|c| kebab(c)).collect();
+        words.sort();
+        words.dedup();
+        (args.is_empty()
+            && !constructors.is_empty()
+            && words.len() == constructors.len()
+            && constructors.iter().all(nullary))
+        .then(|| UrlSegment::Words {
+            module: module.clone(),
+            ty: ty.clone(),
+            constructors: constructors.clone(),
+        })
     }
 
     /// Text, a number, a boolean, or a refined type, whose schema checks it.

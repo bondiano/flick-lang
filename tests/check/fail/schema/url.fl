@@ -2,7 +2,7 @@ module App.Url exposing (..)
 
 type Page = Front | Tags (List String)
   deriving Schema, Url
-//~ FLICK-D009 @4:3-4:23 `Page.Tags[0]`: a segment is a `String`, a `Float`, a `Bool` or a refined type over them
+//~ FLICK-D009 @4:3-4:23 `Page.Tags[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them or a type whose constructors have no fields; only the last may be an `Option`
 
 type Lookup = Lookup { tags : List String }
   deriving Schema, Url
@@ -19,3 +19,14 @@ type Root = Index | Home
 type Bare = Bare Float
   deriving Url
 //~ FLICK-D009 @19:1-20:15 `Bare`: a type that derives `Url` derives `Schema` too
+
+type Middle = Middle (Option String) Float
+  deriving Schema, Url
+//~ FLICK-D009 @24:3-24:23 `Middle.Middle[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them or a type whose constructors have no fields; only the last may be an `Option`
+
+type Shape = Dot | Circle Float
+  deriving Schema
+
+type Drawing = Drawing Shape
+  deriving Schema, Url
+//~ FLICK-D009 @31:3-31:23 `Drawing.Drawing[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them or a type whose constructors have no fields; only the last may be an `Option`

@@ -76,6 +76,7 @@ let save_button props = ui {
 | `textarea { value; placeholder; on_input }` | многострочный вариант `input` | нет |
 | `pre { class_name }` | `pre`: пробелы и переводы строк сохраняются | `List Ui` |
 | `link { href : SafeUrl }` | `a` | `List Ui` |
+| `route_link { route; url; to }` | `a` на страницу `to`, переход без перезагрузки (ниже) | `List Ui` |
 | `nav`, `footer`, `fieldset` `{ class_name }` | `nav`, `footer`, `fieldset` | `List Ui` |
 | `icon { class_name }` | `i` иконочного шрифта, иконку называют его классы | нет |
 | `hr` | `hr` | нет |
@@ -124,7 +125,15 @@ let example = ui { div { class_name = "badges" } [badge { label = "new" }] }
 атрибут типизирован и необязателен:
 `with_host { host with role = Some "status" } (span { class_name = "s" } […])`.
 Так же любой элемент получает классы, в том числе тот, у пропсов которого нет
-`class_name`: `with_host { host with class_name = Some "nav-link" } (link …)`.
+`class_name`: `with_host { host with class_name = Some "nav-link" } (route_link …)`.
+
+`route_link { route; url; to } children` — ссылка внутри приложения на
+страницу `to` состояния маршрута `route = Atom.route url fallback`. Её `href` —
+`Route.print url to`, поэтому разметка сервера, клик для новой вкладки и клик
+средней кнопкой идут по нему, как обычно в браузере. Обычный клик левой
+кнопкой без клавиш-модификаторов вместо этого записывает `to` в `route`: URL
+добавляется в историю без перезагрузки, и представления, которые читают
+`route`, показывают новую страницу.
 
 ## Атомы и представления
 

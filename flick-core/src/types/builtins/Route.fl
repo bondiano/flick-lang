@@ -1,8 +1,10 @@
 /// URLs of a route type. A type that derives `Url` (and `Schema`) maps each
 /// constructor to a path: its name in kebab case is the first segment
 /// (`Home` and `Index` are `/`), its fields of type `String`, `Float`,
-/// `Bool` or a refined type over them the segments after it, and a final
-/// record field the query, where an `Option` field may be missing.
+/// `Bool` or a refined type over them the segments after it, a field of a
+/// type whose constructors have no fields a segment of the constructor's
+/// name in kebab case, the last segment an `Option` that may be missing, and
+/// a final record field the query, where an `Option` field may be missing.
 ///
 /// ```flick
 /// type Page = Home | User Float | Search { q : String; page : Option Float }

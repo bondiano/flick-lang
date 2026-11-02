@@ -24,7 +24,7 @@ mod plan;
 mod url;
 
 pub use form::FormField;
-pub use url::UrlRoute;
+pub use url::{UrlRoute, UrlSegment};
 
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};

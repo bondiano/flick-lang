@@ -65,6 +65,10 @@ type alias FormProps c = { on_submit : (Handler Unit)^c }
 /// The props of `submit`.
 type alias SubmitProps = { disabled : Bool }
 
+/// The props of `route_link`: the state of `Atom.route`, the URLs of its
+/// type and the page the link goes to.
+type alias RouteLinkProps a = { route : Atom.Writable a; url : Url a; to : a }
+
 /// The props of `tabs`.
 type alias TabsProps = {
   /// The tab shown, counting from 0.
@@ -180,6 +184,13 @@ foreign pure pre from "@flick-lang/runtime/ui/react" "uiPre"
 
 link : forall c. LinkProps -> List (Ui^c) -> Ui^c
 foreign pure link from "@flick-lang/runtime/ui/react" "uiLink"
+  retention call
+
+/// A link inside the app: a plain left click writes `to` to `route`, which
+/// pushes its URL without a reload; other clicks, and markup without a
+/// client, follow its `href`, `Route.print url to`.
+route_link : forall c a. RouteLinkProps a -> List (Ui^c) -> Ui^c
+foreign pure route_link from "@flick-lang/runtime/ui/react" "uiRouteLink"
   retention call
 
 nav : forall c. ElementProps -> List (Ui^c) -> Ui^c

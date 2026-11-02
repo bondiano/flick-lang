@@ -1,11 +1,13 @@
 // `Ui r e` values: inert descriptions of elements. Building one runs no
 // handler and touches no DOM; the bridge turns them into React elements.
-import { Option } from "effect";
+import { Effect, Option } from "effect";
 import type * as Atom from "../../effect/reactivity/Atom.ts";
 import type { ComponentType } from "react";
 
+import { WriteService } from "../../effect/reactivity/Atom.ts";
+import { routePrint, type UrlCodec } from "../../route.ts";
 import { constructorName } from "../../tags.ts";
-import type { Handler } from "./policies.ts";
+import { type Handler, eventLatest, eventPreventDefault } from "./policies.ts";
 
 /** What an event prop of an element gives its handler. */
 export interface Binding {
@@ -192,6 +194,36 @@ export const uiForm = (props: { readonly on_submit: Handler }, children: Readonl
 /** The button that submits the form around it. */
 export const uiSubmit = (props: { readonly disabled: boolean }, children: ReadonlyArray<Ui>): Ui =>
   element("button", { type: "submit", disabled: props.disabled }, {}, children);
+
+interface RouteLinkProps {
+  readonly route: Atom.Writable<unknown>;
+  readonly url: UrlCodec;
+  readonly to: Readonly<Record<string, unknown>>;
+}
+
+/** A left click without a modifier key: what a browser follows in the same tab. */
+const plainClick = (snapshot: unknown): boolean =>
+  typeof snapshot === "object" &&
+  snapshot !== null &&
+  Reflect.get(snapshot, "button") === 0 &&
+  !["alt", "ctrl", "shift", "meta"].some((key) => Reflect.get(snapshot, key) === true);
+
+/**
+ * A link inside the app: a plain click writes `to` to the route state, which
+ * pushes its URL without a reload; another click, and markup without a
+ * client, follow the real `href`.
+ */
+export const uiRouteLink = (props: RouteLinkProps, children: ReadonlyArray<Ui>): Ui => {
+  const navigate = Effect.flatMap(Effect.service(WriteService), (write) => write.set("Ui.route_link")(props.route)(props.to));
+  // a handler's task runs with the root's `Atom.Write`, as one of Flick's does
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the root provides the service
+  const run = navigate as Effect.Effect<void>;
+  const handler = eventPreventDefault(
+    plainClick,
+    eventLatest((snapshot) => (plainClick(snapshot) ? run : Effect.void)),
+  );
+  return element("a", { href: routePrint(props.url, props.to) }, { onClick: { handler, snapshot: clickSnapshot } }, children);
+};
 
 export const uiHtml = (html: string): Ui => Object.freeze({ kind: "element", tag: "div", attrs: {}, events: {}, children: [], html });
 

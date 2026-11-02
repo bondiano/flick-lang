@@ -14,9 +14,24 @@ type Page =
   | Settings
   deriving Eq, Show, Schema, Url
 
+/// A segment written as a word: a type whose constructors have no fields.
+type Tab = Favorites | FollowedBy
+  deriving Eq, Show, Schema
+
+/// Nested paths: a word segment and a last segment that may be missing.
+type Site =
+  | Index { page : Option Float }
+  | Editor (Option Slug)
+  | Profile String (Option Tab)
+  | Feed Tab Float
+  deriving Eq, Show, Schema, Url
+
 /// Whether every text of the page is well-formed Unicode, which a URL can carry.
 encodable : Page -> Bool
 foreign pure encodable from "./route.mjs" "encodable"
+
+site_encodable : Site -> Bool
+foreign pure site_encodable from "./route.mjs" "encodable"
 
 checking : Arbitrary.CheckOptions
 let checking = {
@@ -63,3 +78,30 @@ let main () =
         (Arbitrary.filter encodable (Arbitrary.from_schema (schema Page)))
     Platform.stdout_line
       ("round trip: " ++ Option.with_default "passed" (Arbitrary.format_check_failure round_trip))
+    let sites = [
+      Index { page = None },
+      Editor None,
+      Editor (Some slug),
+      Profile "ada" None,
+      Profile "ada" (Some Favorites),
+      Feed FollowedBy 3,
+    ]
+    for site <- sites do Platform.stdout_line (Route.print Site.url site)
+    let site_urls = [
+      "/?page=2",
+      "/editor",
+      "/editor/",
+      "/profile/ada/favorites",
+      "/profile/ada/other",
+      "/feed/followed-by/3",
+      "/feed/favorites",
+    ]
+    for url <- site_urls do Platform.stdout_line (url ++ " -> " ++ show (Route.parse Site.url url))
+    let site_round_trip =
+      Arbitrary.check
+        checking
+        (fun s -> Route.parse Site.url (Route.print Site.url s) == Some s)
+        (Arbitrary.filter site_encodable (Arbitrary.from_schema (schema Site)))
+    Platform.stdout_line
+      ("site round trip: "
+        ++ Option.with_default "passed" (Arbitrary.format_check_failure site_round_trip))
