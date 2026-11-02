@@ -6,42 +6,42 @@ type Chunk a
 /// The chunk without elements.
 empty : Chunk a
 foreign pure empty from "@flick-lang/runtime" "chunkEmpty"
-  reviewed "effect@4.0.5 sha256:ba0aaa4da4ba7b9e"
+  reviewed "effect@4.1.2 sha256:ba0aaa4da4ba7b9e"
 
 /// The chunk of the list's elements.
 from_list : List a -> Chunk a
 foreign pure from_list from "@flick-lang/runtime" "chunkFromList"
-  reviewed "effect@4.0.5 sha256:fcd9223c9ed9b03d"
+  reviewed "effect@4.1.2 sha256:fcd9223c9ed9b03d"
 
 /// The chunk's elements as a list.
 to_list : Chunk a -> List a
 foreign pure to_list from "@flick-lang/runtime" "chunkToList"
-  reviewed "effect@4.0.5 sha256:09802bc87043bb48"
+  reviewed "effect@4.1.2 sha256:09802bc87043bb48"
 
 /// The chunk with `x` at the end.
 append : a -> Chunk a -> Chunk a
 foreign pure append from "@flick-lang/runtime" "chunkAppend"
-  reviewed "effect@4.0.5 sha256:f5a26e0100fdd106"
+  reviewed "effect@4.1.2 sha256:f5a26e0100fdd106"
 
 /// `concat c d` is `c` followed by `d`.
 concat : Chunk a -> Chunk a -> Chunk a
 foreign pure concat from "@flick-lang/runtime" "chunkConcat"
-  reviewed "effect@4.0.5 sha256:f4c41fd17cb00fb2"
+  reviewed "effect@4.1.2 sha256:f4c41fd17cb00fb2"
 
 /// How many elements the chunk has.
 size : Chunk a -> Int
 foreign pure size from "@flick-lang/runtime" "chunkSize"
-  reviewed "effect@4.0.5 sha256:2d15ae289a3c4212"
+  reviewed "effect@4.1.2 sha256:2d15ae289a3c4212"
 
 /// The element at `index`, counting from 0.
 get : Int -> Chunk a -> Option a
 foreign pure get from "@flick-lang/runtime" "chunkGet"
-  reviewed "effect@4.0.5 sha256:bf32eaa2e937dd0a"
+  reviewed "effect@4.1.2 sha256:bf32eaa2e937dd0a"
 
 /// Applies a pure function to each element.
 map : forall c a b. (a -> b)^c -> (Chunk a -> Chunk b)^c
 foreign pure map from "@flick-lang/runtime" "chunkMap"
-  reviewed "effect@4.0.5 sha256:84dd2c3aef65c490"
+  reviewed "effect@4.1.2 sha256:84dd2c3aef65c490"
   arity 2
   retention call
 
@@ -63,166 +63,166 @@ foreign pure to_chunk from "@flick-lang/runtime" "identity"
 /// The chunk as a non-empty one, `None` when it is empty.
 non_empty : Chunk a -> Option (NonEmptyChunk a)
 foreign pure non_empty from "@flick-lang/runtime/effect/Chunk" "flickNonEmpty"
-  reviewed "effect@4.0.5 sha256:7ea07aed8fd0e8ba"
+  reviewed "effect@4.1.2 sha256:7ea07aed8fd0e8ba"
 
 /// Whether the chunk has no element.
 is_empty : Chunk a -> Bool
 foreign pure is_empty from "@flick-lang/runtime/effect/Chunk" "isEmpty"
-  reviewed "effect@4.0.5 sha256:0625688371015770"
+  reviewed "effect@4.1.2 sha256:0625688371015770"
 
 /// The chunk of one element.
 of : a -> NonEmptyChunk a
 foreign pure of from "@flick-lang/runtime/effect/Chunk" "of"
-  reviewed "effect@4.0.5 sha256:060eee8e1d25bbc4"
+  reviewed "effect@4.1.2 sha256:060eee8e1d25bbc4"
 
 /// The chunk of `x` and then the elements of `rest`.
 make : a -> List a -> NonEmptyChunk a
 foreign pure make from "@flick-lang/runtime/effect/Chunk" "make"
   variadic
-  reviewed "effect@4.0.5 sha256:13c3dcd82f057205"
+  reviewed "effect@4.1.2 sha256:13c3dcd82f057205"
 
 /// `f 0`, …, `f (n - 1)`, with at least `f 0`.
 make_by : forall c a. Int -> (Int -> a)^c -> NonEmptyChunk a
 foreign pure make_by from "@flick-lang/runtime/effect/Chunk" "makeBy"
   retention call
-  reviewed "effect@4.0.5 sha256:aa518f13a96a2a82"
+  reviewed "effect@4.1.2 sha256:aa518f13a96a2a82"
 
 /// `start` to `end`, both included; `[start]` when `end < start`.
 range : Int -> Int -> NonEmptyChunk Int
 foreign pure range from "@flick-lang/runtime/effect/Chunk" "range"
-  reviewed "effect@4.0.5 sha256:696779ea8465982b"
+  reviewed "effect@4.1.2 sha256:696779ea8465982b"
 
 /// The first element.
 head : Chunk a -> Option a
 foreign pure head from "@flick-lang/runtime/effect/Chunk" "head"
-  reviewed "effect@4.0.5 sha256:62d501614d800d3f"
+  reviewed "effect@4.1.2 sha256:62d501614d800d3f"
 
 /// The first element of a non-empty chunk.
 head_non_empty : NonEmptyChunk a -> a
 foreign pure head_non_empty from "@flick-lang/runtime/effect/Chunk" "headNonEmpty"
-  reviewed "effect@4.0.5 sha256:841c8d57f54e119b"
+  reviewed "effect@4.1.2 sha256:841c8d57f54e119b"
 
 /// The last element.
 last : Chunk a -> Option a
 foreign pure last from "@flick-lang/runtime/effect/Chunk" "last"
-  reviewed "effect@4.0.5 sha256:a334c8ec4fdc134e"
+  reviewed "effect@4.1.2 sha256:a334c8ec4fdc134e"
 
 /// The last element of a non-empty chunk.
 last_non_empty : NonEmptyChunk a -> a
 foreign pure last_non_empty from "@flick-lang/runtime/effect/Chunk" "lastNonEmpty"
-  reviewed "effect@4.0.5 sha256:dcbe929444358513"
+  reviewed "effect@4.1.2 sha256:dcbe929444358513"
 
 /// Every element after the first; `None` for the empty chunk.
 tail : Chunk a -> Option (Chunk a)
 foreign pure tail from "@flick-lang/runtime/effect/Chunk" "tail"
-  reviewed "effect@4.0.5 sha256:5f88a9dd21d21b15"
+  reviewed "effect@4.1.2 sha256:5f88a9dd21d21b15"
 
 /// Every element of a non-empty chunk after the first.
 tail_non_empty : NonEmptyChunk a -> Chunk a
 foreign pure tail_non_empty from "@flick-lang/runtime/effect/Chunk" "tailNonEmpty"
-  reviewed "effect@4.0.5 sha256:7817c369f394589c"
+  reviewed "effect@4.1.2 sha256:7817c369f394589c"
 
 /// The chunk with `x` in front.
 prepend : a -> Chunk a -> NonEmptyChunk a
 foreign pure prepend from "@flick-lang/runtime/effect/Chunk" "prepend"
   arity 1
-  reviewed "effect@4.0.5 sha256:794225fcfe145bad"
+  reviewed "effect@4.1.2 sha256:794225fcfe145bad"
 
 /// `c |> append_all d` is `c` followed by `d`.
 append_all : Chunk a -> Chunk a -> Chunk a
 foreign pure append_all from "@flick-lang/runtime/effect/Chunk" "appendAll"
   arity 1
-  reviewed "effect@4.0.5 sha256:71f71c3ea76f8a06"
+  reviewed "effect@4.1.2 sha256:71f71c3ea76f8a06"
 
 /// The first `n` elements.
 take : Int -> Chunk a -> Chunk a
 foreign pure take from "@flick-lang/runtime/effect/Chunk" "take"
   arity 1
-  reviewed "effect@4.0.5 sha256:3426c76e7e6c6cf6"
+  reviewed "effect@4.1.2 sha256:3426c76e7e6c6cf6"
 
 /// The last `n` elements.
 take_right : Int -> Chunk a -> Chunk a
 foreign pure take_right from "@flick-lang/runtime/effect/Chunk" "takeRight"
   arity 1
-  reviewed "effect@4.0.5 sha256:f233b07dd2dd2823"
+  reviewed "effect@4.1.2 sha256:f233b07dd2dd2823"
 
 /// Every element but the first `n`.
 drop : Int -> Chunk a -> Chunk a
 foreign pure drop from "@flick-lang/runtime/effect/Chunk" "drop"
   arity 1
-  reviewed "effect@4.0.5 sha256:fb9036ac8460aac1"
+  reviewed "effect@4.1.2 sha256:fb9036ac8460aac1"
 
 /// Every element but the last `n`.
 drop_right : Int -> Chunk a -> Chunk a
 foreign pure drop_right from "@flick-lang/runtime/effect/Chunk" "dropRight"
   arity 1
-  reviewed "effect@4.0.5 sha256:fb2a52f5de072e79"
+  reviewed "effect@4.1.2 sha256:fb2a52f5de072e79"
 
 /// The longest prefix whose elements satisfy `p`.
 take_while : forall c a. (a -> Bool)^c -> (Chunk a -> Chunk a)^c
 foreign pure take_while from "@flick-lang/runtime/effect/Chunk" "takeWhile"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:7b184d69b9f8a531"
+  reviewed "effect@4.1.2 sha256:7b184d69b9f8a531"
 
 /// The chunk without its longest prefix whose elements satisfy `p`.
 drop_while : forall c a. (a -> Bool)^c -> (Chunk a -> Chunk a)^c
 foreign pure drop_while from "@flick-lang/runtime/effect/Chunk" "dropWhile"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:a12b095750d2a0bc"
+  reviewed "effect@4.1.2 sha256:a12b095750d2a0bc"
 
 /// The first `n` elements, and the rest.
 split_at : Int -> Chunk a -> (Chunk a, Chunk a)
 foreign pure split_at from "@flick-lang/runtime/effect/Chunk" "splitAt"
   arity 1
-  reviewed "effect@4.0.5 sha256:1a1f7715fce99119"
+  reviewed "effect@4.1.2 sha256:1a1f7715fce99119"
 
 /// The first `n` elements, at least one, and the rest.
 split_non_empty_at : Int -> NonEmptyChunk a -> (NonEmptyChunk a, Chunk a)
 foreign pure split_non_empty_at from "@flick-lang/runtime/effect/Chunk" "splitNonEmptyAt"
   arity 1
-  reviewed "effect@4.0.5 sha256:59b725d9da87a34f"
+  reviewed "effect@4.1.2 sha256:59b725d9da87a34f"
 
 /// The chunk cut into `n` runs of about the same length.
 split : Int -> Chunk a -> Chunk (Chunk a)
 foreign pure split from "@flick-lang/runtime/effect/Chunk" "split"
   arity 1
-  reviewed "effect@4.0.5 sha256:77424bdbf7e89f6b"
+  reviewed "effect@4.1.2 sha256:77424bdbf7e89f6b"
 
 /// The elements before the first one that satisfies `p`, and the rest.
 split_where : forall c a. (a -> Bool)^c -> (Chunk a -> (Chunk a, Chunk a))^c
 foreign pure split_where from "@flick-lang/runtime/effect/Chunk" "splitWhere"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:02417186d2e96555"
+  reviewed "effect@4.1.2 sha256:02417186d2e96555"
 
 /// Runs of `n` elements; the last one may be shorter.
 chunks_of : Int -> Chunk a -> Chunk (Chunk a)
 foreign pure chunks_of from "@flick-lang/runtime/effect/Chunk" "chunksOf"
   arity 1
-  reviewed "effect@4.0.5 sha256:5fc6c230d73ca313"
+  reviewed "effect@4.1.2 sha256:5fc6c230d73ca313"
 
 /// The chunk without the element at index `i`; out of range, unchanged.
 remove : Int -> Chunk a -> Chunk a
 foreign pure remove from "@flick-lang/runtime/effect/Chunk" "remove"
   arity 1
-  reviewed "effect@4.0.5 sha256:7479f14c2d120cd5"
+  reviewed "effect@4.1.2 sha256:7479f14c2d120cd5"
 
 /// The element at index `i` replaced by `f` of it; `None` out of range.
 modify : forall c a. Int -> (a -> a)^c -> (Chunk a -> Option (Chunk a))^c
 foreign pure modify from "@flick-lang/runtime/effect/Chunk" "modify"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:59d6a3119c9901c1"
+  reviewed "effect@4.1.2 sha256:59d6a3119c9901c1"
 
 /// The element at index `i` replaced by `x`; `None` out of range.
 replace : Int -> a -> Chunk a -> Option (Chunk a)
 foreign pure replace from "@flick-lang/runtime/effect/Chunk" "replace"
   arity 2
-  reviewed "effect@4.0.5 sha256:cd38f0494ae67d78"
+  reviewed "effect@4.1.2 sha256:cd38f0494ae67d78"
 
 /// The elements in reverse order.
 reverse : Chunk a -> Chunk a
 foreign pure reverse from "@flick-lang/runtime/effect/Chunk" "reverse"
-  reviewed "effect@4.0.5 sha256:f6561417229d1bbb"
+  reviewed "effect@4.1.2 sha256:f6561417229d1bbb"

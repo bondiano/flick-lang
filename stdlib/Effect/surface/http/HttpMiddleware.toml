@@ -11,7 +11,10 @@ logger = "Http.Middleware.logger 273dbfddf64ab5b1"
 searchParamsParser = "Http.Middleware.search_params_parser 548fee1527db2edc"
 tracer = "Http.Middleware.tracer 35d3acdbc2d9d015"
 withLoggerDisabled = "Http.Middleware.with_logger_disabled a23f5ffa75fe52b4"
-xForwardedHeaders = "Http.Middleware.x_forwarded_headers 64a69dc1477e3d49"
+xForwardedHeaders = "Http.Middleware.x_forwarded_headers 72dbfe4c67f56c94"
 
 [language]
 make = "a Flick function from `Http.Middleware.Handler` to `Http.Middleware.Handler`"
+
+[excluded]
+TrustedProxyOptions = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

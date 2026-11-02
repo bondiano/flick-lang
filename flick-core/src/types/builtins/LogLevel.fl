@@ -42,42 +42,42 @@ let name level =
 /// Every level, from `all` to `none_`.
 values : List LogLevel
 foreign pure values from "@flick-lang/runtime/effect/LogLevel" "values"
-  reviewed "effect@4.0.5 sha256:dd1f953033fab26f"
+  reviewed "effect@4.1.2 sha256:dd1f953033fab26f"
 
 /// The rank of the level: higher is more severe.
 get_ordinal : LogLevel -> Float
 foreign pure get_ordinal from "@flick-lang/runtime/effect/LogLevel" "getOrdinal"
-  reviewed "effect@4.0.5 sha256:280a33d80234f9a5"
+  reviewed "effect@4.1.2 sha256:280a33d80234f9a5"
 
 /// `level |> is_greater_than that`: `level` is more severe than `that`.
 is_greater_than : LogLevel -> LogLevel -> Bool
 foreign pure is_greater_than from "@flick-lang/runtime/effect/LogLevel" "isGreaterThan"
   arity 1
-  reviewed "effect@4.0.5 sha256:6d01956b9822116b"
+  reviewed "effect@4.1.2 sha256:6d01956b9822116b"
 
 /// `level |> is_greater_than_or_equal_to that`.
 is_greater_than_or_equal_to : LogLevel -> LogLevel -> Bool
 foreign pure is_greater_than_or_equal_to from "@flick-lang/runtime/effect/LogLevel" "isGreaterThanOrEqualTo"
   arity 1
-  reviewed "effect@4.0.5 sha256:1f3b565858715fd8"
+  reviewed "effect@4.1.2 sha256:1f3b565858715fd8"
 
 /// `level |> is_less_than that`: `level` is less severe than `that`.
 is_less_than : LogLevel -> LogLevel -> Bool
 foreign pure is_less_than from "@flick-lang/runtime/effect/LogLevel" "isLessThan"
   arity 1
-  reviewed "effect@4.0.5 sha256:543dbb98246cdb23"
+  reviewed "effect@4.1.2 sha256:543dbb98246cdb23"
 
 /// `level |> is_less_than_or_equal_to that`.
 is_less_than_or_equal_to : LogLevel -> LogLevel -> Bool
 foreign pure is_less_than_or_equal_to from "@flick-lang/runtime/effect/LogLevel" "isLessThanOrEqualTo"
   arity 1
-  reviewed "effect@4.0.5 sha256:371988eb8e39fd3e"
+  reviewed "effect@4.1.2 sha256:371988eb8e39fd3e"
 
 /// Whether a message at the level would be logged: the level is at least
 /// the current minimum level of the fiber.
 is_enabled : LogLevel ->{} Bool
 foreign effect is_enabled from "@flick-lang/runtime/effect/LogLevel" "isEnabled"
-  reviewed "effect@4.0.5 sha256:c68766ed87e3755d"
+  reviewed "effect@4.1.2 sha256:c68766ed87e3755d"
 
 instance Eq LogLevel =
   eq : LogLevel -> LogLevel -> Bool

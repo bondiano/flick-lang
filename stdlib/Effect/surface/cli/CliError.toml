@@ -1,15 +1,18 @@
 [wrapped]
-CliError = "Cli.CliError 7c5b2f9446ad8670"
+CliError = "Cli.CliError 6bd8a790e4168289"
 DuplicateOption = "Cli.CliError 55e7c87f76aa14a7"
 InvalidValue = "Cli.CliError 420362cbf9a06dd2"
 MissingArgument = "Cli.CliError be33984298555973"
 MissingOption = "Cli.CliError a7037963d55f2d37"
-NonShowHelpErrors = "Cli.CliError a208ed762eef7901"
+NonShowHelpErrors = "Cli.CliError f3b6d7bc5be29969"
 ShowHelp = "Cli.CliError bfb3ab5b50e0fcae"
 UnexpectedArgument = "Cli.CliError c934d6e2e7fccff2"
 UnknownSubcommand = "Cli.CliError 87334898c7ef71fc"
 UnrecognizedOption = "Cli.CliError 245cb3750cc4161f"
-UserError = "Cli.CliError c0962e96183fd3f1"
+UserError = "Cli.CliError e42e7373ea39cc45"
 
 [excluded]
 isCliError = "TS-only: a type guard; Flick values are typed statically"
+ValidationError = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+getUserMessage = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+userMessage = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

@@ -1,5 +1,5 @@
 // The `Array` bindings of `List` without Effect: the semantics of
-// `effect/Array` (4.0.5) on plain data, curried as the bindings call them.
+// `effect/Array` (4.1.2) on plain data, curried as the bindings call them.
 // A callback of the program takes one argument, or two uncurried; the index
 // Effect passes besides is never read by it, so it is not passed.
 import { item } from "../internal.ts";

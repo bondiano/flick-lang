@@ -10,20 +10,20 @@ foreign pure map_indexed from "@flick-lang/runtime" "listMapIndexed"
 /// Runs a runtime function on each element in order, for what it does.
 each_effect : forall c a r e. (a ->{r; e} Unit)^c -> (List a ->{r; e} Unit)^c
 foreign effect each_effect from "@flick-lang/runtime" "listEachEffect"
-  reviewed "effect@4.0.5 sha256:b1c62c32136cf403"
+  reviewed "effect@4.1.2 sha256:b1c62c32136cf403"
   retention call
 
 /// Folds from the first element: `fold_left f init [a, b]` is `f (f init a) b`.
 fold_left : forall c a b. (b -> a -> b)^c -> (b -> (List a -> b)^c)^c
 foreign pure fold_left from "@flick-lang/runtime" "listFold"
-  reviewed "effect@4.0.5 sha256:f9f3cb8097473b9a"
+  reviewed "effect@4.1.2 sha256:f9f3cb8097473b9a"
   arity 3
   retention call
 
 /// Folds from the last element: `fold_right f init [a, b]` is `f a (f b init)`.
 fold_right : forall c a b. (a -> b -> b)^c -> (b -> (List a -> b)^c)^c
 foreign pure fold_right from "@flick-lang/runtime" "listFoldRight"
-  reviewed "effect@4.0.5 sha256:f4b0f812b7a90bf5"
+  reviewed "effect@4.1.2 sha256:f4b0f812b7a90bf5"
   arity 3
   retention call
 
@@ -35,49 +35,49 @@ foreign effect fold_effect from "@flick-lang/runtime" "listFoldEffect"
 /// The elements that satisfy `p`, in order.
 filter : forall c a. (a -> Bool)^c -> (List a -> List a)^c
 foreign pure filter from "@flick-lang/runtime" "listFilter"
-  reviewed "effect@4.0.5 sha256:0d0d5816fea5fabe"
+  reviewed "effect@4.1.2 sha256:0d0d5816fea5fabe"
   arity 2
   retention call
 
 /// The values of the `Some` results of `f`, in order.
 filter_map : forall c a b. (a -> Option b)^c -> (List a -> List b)^c
 foreign pure filter_map from "@flick-lang/runtime" "listFilterMap"
-  reviewed "effect@4.0.5 sha256:71ace19b419814b2"
+  reviewed "effect@4.1.2 sha256:71ace19b419814b2"
   arity 2
   retention call
 
 /// The lists `f` gives each element, joined.
 flat_map : forall c a b. (a -> List b)^c -> (List a -> List b)^c
 foreign pure flat_map from "@flick-lang/runtime" "listFlatMap"
-  reviewed "effect@4.0.5 sha256:37e174dd96bf5c77"
+  reviewed "effect@4.1.2 sha256:37e174dd96bf5c77"
   arity 2
   retention call
 
 /// The first element that satisfies `p`.
 find : forall c a. (a -> Bool)^c -> (List a -> Option a)^c
 foreign pure find from "@flick-lang/runtime" "listFind"
-  reviewed "effect@4.0.5 sha256:67b59648cd02439d"
+  reviewed "effect@4.1.2 sha256:67b59648cd02439d"
   arity 2
   retention call
 
 /// The index of the first element that satisfies `p`.
 find_index : forall c a. (a -> Bool)^c -> (List a -> Option Int)^c
 foreign pure find_index from "@flick-lang/runtime" "listFindIndex"
-  reviewed "effect@4.0.5 sha256:74e1ef30d4775390"
+  reviewed "effect@4.1.2 sha256:74e1ef30d4775390"
   arity 2
   retention call
 
 /// Whether some element satisfies `p`.
 any : forall c a. (a -> Bool)^c -> (List a -> Bool)^c
 foreign pure any from "@flick-lang/runtime" "listAny"
-  reviewed "effect@4.0.5 sha256:42b6945cc2f397cd"
+  reviewed "effect@4.1.2 sha256:42b6945cc2f397cd"
   arity 2
   retention call
 
 /// Whether every element satisfies `p`.
 all : forall c a. (a -> Bool)^c -> (List a -> Bool)^c
 foreign pure all from "@flick-lang/runtime" "listAll"
-  reviewed "effect@4.0.5 sha256:8ca3b291bb5f5933"
+  reviewed "effect@4.1.2 sha256:8ca3b291bb5f5933"
   arity 2
   retention call
 
@@ -90,7 +90,7 @@ foreign pure partition from "@flick-lang/runtime" "listPartition"
 /// Sorts by `compare`, keeping equal elements in their order.
 sort_by : forall c a. (a -> a -> Ordering)^c -> (List a -> List a)^c
 foreign pure sort_by from "@flick-lang/runtime" "listSortBy"
-  reviewed "effect@4.0.5 sha256:26b8439a0f86a059"
+  reviewed "effect@4.1.2 sha256:26b8439a0f86a059"
   arity 2
   retention call
 
@@ -130,7 +130,7 @@ let minimum xs =
 /// How many elements the list has.
 length : List a -> Int
 foreign pure length from "@flick-lang/runtime" "listLength"
-  reviewed "effect@4.0.5 sha256:e3bc0aabe62baf6c"
+  reviewed "effect@4.1.2 sha256:e3bc0aabe62baf6c"
 
 /// Whether the list has no element.
 is_empty : List a -> Bool
@@ -139,7 +139,7 @@ let is_empty xs = length xs == 0
 /// The element at `index`, counting from 0.
 get : Int -> List a -> Option a
 foreign pure get from "@flick-lang/runtime" "listGet"
-  reviewed "effect@4.0.5 sha256:2c896b5ea54dbe9a"
+  reviewed "effect@4.1.2 sha256:2c896b5ea54dbe9a"
 
 /// The list with the element at `index` replaced; out of range, unchanged.
 set : Int -> a -> List a -> List a
@@ -160,7 +160,7 @@ let singleton x = [x]
 /// `n` copies of `x`.
 repeat : Int -> a -> List a
 foreign pure repeat from "@flick-lang/runtime" "listRepeat"
-  reviewed "effect@4.0.5 sha256:163da23fbce2ffe9"
+  reviewed "effect@4.1.2 sha256:163da23fbce2ffe9"
 
 /// `[from, from + 1, …]` below `until`.
 range : Int -> Int -> List Int
@@ -169,13 +169,13 @@ foreign pure range from "@flick-lang/runtime" "listRange"
 /// The list of `f 0`, …, `f (n - 1)`.
 initialize : forall c a. Int -> (Int -> a)^c -> List a
 foreign pure initialize from "@flick-lang/runtime" "listInitialize"
-  reviewed "effect@4.0.5 sha256:e33643fd5390dc62"
+  reviewed "effect@4.1.2 sha256:e33643fd5390dc62"
   retention call
 
 /// The elements in reverse order.
 reverse : List a -> List a
 foreign pure reverse from "@flick-lang/runtime" "listReverse"
-  reviewed "effect@4.0.5 sha256:e969bf75834545fd"
+  reviewed "effect@4.1.2 sha256:e969bf75834545fd"
 
 /// `append xs ys` is `xs ++ ys`: `ys |> append xs` puts `xs` in front.
 append : List a -> List a -> List a
@@ -184,17 +184,17 @@ let append xs ys = xs ++ ys
 /// The lists joined.
 concat : List (List a) -> List a
 foreign pure concat from "@flick-lang/runtime" "listConcat"
-  reviewed "effect@4.0.5 sha256:79a7557ec647ea64"
+  reviewed "effect@4.1.2 sha256:79a7557ec647ea64"
 
 /// The first `n` elements.
 take : Int -> List a -> List a
 foreign pure take from "@flick-lang/runtime" "listTake"
-  reviewed "effect@4.0.5 sha256:12fb0eb32a21c379"
+  reviewed "effect@4.1.2 sha256:12fb0eb32a21c379"
 
 /// Every element but the first `n`.
 drop : Int -> List a -> List a
 foreign pure drop from "@flick-lang/runtime" "listDrop"
-  reviewed "effect@4.0.5 sha256:1e7b70fa9118de64"
+  reviewed "effect@4.1.2 sha256:1e7b70fa9118de64"
 
 /// The elements from `start` up to `end`, as JS `slice`: it copies only them.
 slice : Int -> Int -> List a -> List a
@@ -203,12 +203,12 @@ foreign pure slice from "@flick-lang/runtime" "listSlice"
 /// The pairs of the elements at each index of both, as long as the shorter.
 zip : List a -> List b -> List (a, b)
 foreign pure zip from "@flick-lang/runtime" "listZip"
-  reviewed "effect@4.0.5 sha256:acfd4eb64d599b89"
+  reviewed "effect@4.1.2 sha256:acfd4eb64d599b89"
 
 /// The firsts and the seconds of the pairs.
 unzip : List (a, b) -> (List a, List b)
 foreign pure unzip from "@flick-lang/runtime" "listUnzip"
-  reviewed "effect@4.0.5 sha256:fc08e4a943b8119d"
+  reviewed "effect@4.1.2 sha256:fc08e4a943b8119d"
 
 /// The sum of the numbers.
 sum : Numeric.Numeric a => List a -> a

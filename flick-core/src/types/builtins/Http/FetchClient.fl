@@ -5,7 +5,7 @@ import Http.Client exposing (HttpClient)
 
 layer_of : ServiceTag {HttpClient} -> Layer none none {HttpClient}
 foreign pure layer_of from "@flick-lang/runtime/effect/http/FetchHttpClient" "flickLayer"
-  reviewed "effect@4.0.5 sha256:3aff91b759103525"
+  reviewed "effect@4.1.2 sha256:3aff91b759103525"
 
 /// The service `Http.Client.HttpClient` sending requests with `fetch`.
 layer : Layer none none {HttpClient}

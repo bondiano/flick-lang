@@ -97,129 +97,129 @@ type alias Snapshot = {
 counter : String -> CounterOptions -> Counter
 foreign pure counter from "@flick-lang/runtime/effect/Metric" "flickCounter"
   arity 2
-  reviewed "effect@4.0.5 sha256:96624b4cee289b01"
+  reviewed "effect@4.1.2 sha256:96624b4cee289b01"
 
 gauge : String -> GaugeOptions -> Gauge
 foreign pure gauge from "@flick-lang/runtime/effect/Metric" "flickGauge"
   arity 2
-  reviewed "effect@4.0.5 sha256:114f4dae5ebaa2f8"
+  reviewed "effect@4.1.2 sha256:114f4dae5ebaa2f8"
 
 /// Counts the words; `preregisteredWords` start at 0.
 frequency : String -> FrequencyOptions -> Frequency
 foreign pure frequency from "@flick-lang/runtime/effect/Metric" "flickFrequency"
   arity 2
-  reviewed "effect@4.0.5 sha256:f2871b566ded936e"
+  reviewed "effect@4.1.2 sha256:f2871b566ded936e"
 
 histogram : String -> HistogramOptions -> Histogram Float
 foreign pure histogram from "@flick-lang/runtime/effect/Metric" "flickHistogram"
   arity 2
-  reviewed "effect@4.0.5 sha256:ce211dc5e29f1037"
+  reviewed "effect@4.1.2 sha256:ce211dc5e29f1037"
 
 summary : String -> SummaryOptions -> Summary Float
 foreign pure summary from "@flick-lang/runtime/effect/Metric" "flickSummary"
   arity 2
-  reviewed "effect@4.0.5 sha256:98a93f3d372881b3"
+  reviewed "effect@4.1.2 sha256:98a93f3d372881b3"
 
 /// A summary whose inputs carry their time, in milliseconds since the epoch.
 summary_with_timestamp : String -> SummaryOptions -> Summary (Float, Float)
 foreign pure summary_with_timestamp from "@flick-lang/runtime/effect/Metric" "flickSummaryWithTimestamp"
   arity 2
-  reviewed "effect@4.0.5 sha256:b570957a401713b8"
+  reviewed "effect@4.1.2 sha256:b570957a401713b8"
 
 /// A histogram of durations, in milliseconds.
 timer : String -> TimerOptions -> Histogram Duration.Duration
 foreign pure timer from "@flick-lang/runtime/effect/Metric" "flickTimer"
   arity 2
-  reviewed "effect@4.0.5 sha256:7fc32923e5828aea"
+  reviewed "effect@4.1.2 sha256:7fc32923e5828aea"
 
 /// The current state of the metric.
 value : Metric i s ->{} s
 foreign effect value from "@flick-lang/runtime/effect/Metric" "flickValue"
-  reviewed "effect@4.0.5 sha256:6877b8641e13d033"
+  reviewed "effect@4.1.2 sha256:6877b8641e13d033"
 
 /// `metric |> update input`: the input as the metric takes it.
 update : i -> Metric i s ->{} Unit
 foreign effect update from "@flick-lang/runtime/effect/Metric" "update"
   arity 1
-  reviewed "effect@4.0.5 sha256:e07f65868794ec65"
+  reviewed "effect@4.1.2 sha256:e07f65868794ec65"
 
 /// `metric |> modify input`: a gauge adds the input instead of keeping it.
 modify : i -> Metric i s ->{} Unit
 foreign effect modify from "@flick-lang/runtime/effect/Metric" "modify"
   arity 1
-  reviewed "effect@4.0.5 sha256:4cb2c552e44a3b9c"
+  reviewed "effect@4.1.2 sha256:4cb2c552e44a3b9c"
 
 /// The metric fed with `f` of each input.
 map_input : (i2 -> i) -> Metric i s -> Metric i2 s
 foreign pure map_input from "@flick-lang/runtime/effect/Metric" "mapInput"
   arity 1
-  reviewed "effect@4.0.5 sha256:bf7bc82a0431f2b8"
+  reviewed "effect@4.1.2 sha256:bf7bc82a0431f2b8"
 
 /// The metric fed with `input` whatever it gets.
 with_constant_input : i -> Metric i s -> Metric x s
 foreign pure with_constant_input from "@flick-lang/runtime/effect/Metric" "withConstantInput"
   arity 1
-  reviewed "effect@4.0.5 sha256:a0cbcfcf53799032"
+  reviewed "effect@4.1.2 sha256:a0cbcfcf53799032"
 
 /// The metric with the attributes added: a separate series.
 with_attributes : Attributes -> Metric i s -> Metric i s
 foreign pure with_attributes from "@flick-lang/runtime/effect/Metric" "withAttributes"
   arity 1
-  reviewed "effect@4.0.5 sha256:b5509a6111af12fd"
+  reviewed "effect@4.1.2 sha256:b5509a6111af12fd"
 
 /// Runs `task` with the attributes added to every metric it updates.
 with_current_attributes : forall c r e a. Attributes -> (Eff r e a)^c ->{r; e} a
 foreign effect with_current_attributes from "@flick-lang/runtime/effect/Metric" "flickWithCurrentAttributes"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:00937f62d0267603"
+  reviewed "effect@4.1.2 sha256:00937f62d0267603"
 
 /// Every metric of the registry and its state.
 snapshot : Unit ->{} List Snapshot
 foreign effect snapshot from "@flick-lang/runtime/effect/Metric" "flickSnapshot"
   arity 0
-  reviewed "effect@4.0.5 sha256:2e37d894f5230254"
+  reviewed "effect@4.1.2 sha256:2e37d894f5230254"
 
 /// The registry as text, a line per metric.
 dump : Unit ->{} String
 foreign effect dump from "@flick-lang/runtime/effect/Metric" "flickDump"
   arity 0
-  reviewed "effect@4.0.5 sha256:d3094a1db72aa0bf"
+  reviewed "effect@4.1.2 sha256:d3094a1db72aa0bf"
 
 /// The numbers without duplicates, then `Infinity`: boundaries of a histogram.
 boundaries_from_iterable : List Float -> List Float
 foreign pure boundaries_from_iterable from "@flick-lang/runtime/effect/Metric" "boundariesFromIterable"
-  reviewed "effect@4.0.5 sha256:d7a4be7a6128c37d"
+  reviewed "effect@4.1.2 sha256:d7a4be7a6128c37d"
 
 /// `count - 1` boundaries `width` apart after `start`, then `Infinity`.
 linear_boundaries : { start : Float; width : Float; count : Int } -> List Float
 foreign pure linear_boundaries from "@flick-lang/runtime/effect/Metric" "linearBoundaries"
-  reviewed "effect@4.0.5 sha256:358b9c160fbab6d8"
+  reviewed "effect@4.1.2 sha256:358b9c160fbab6d8"
 
 /// `count - 1` boundaries from `start`, each `factor` times the one before,
 /// then `Infinity`.
 exponential_boundaries : { start : Float; factor : Float; count : Int } -> List Float
 foreign pure exponential_boundaries from "@flick-lang/runtime/effect/Metric" "exponentialBoundaries"
-  reviewed "effect@4.0.5 sha256:06bb01033a19c1c9"
+  reviewed "effect@4.1.2 sha256:06bb01033a19c1c9"
 
 /// Runs `task` counting the fibers it starts and ends.
 enable_runtime_metrics : forall c r e a. (Eff r e a)^c ->{r; e} a
 foreign effect enable_runtime_metrics from "@flick-lang/runtime/effect/Metric" "enableRuntimeMetrics"
   retention call
-  reviewed "effect@4.0.5 sha256:e483ef6416bf088a"
+  reviewed "effect@4.1.2 sha256:e483ef6416bf088a"
 
 /// Runs `task` without counting its fibers.
 disable_runtime_metrics : forall c r e a. (Eff r e a)^c ->{r; e} a
 foreign effect disable_runtime_metrics from "@flick-lang/runtime/effect/Metric" "disableRuntimeMetrics"
   retention call
-  reviewed "effect@4.0.5 sha256:f1ab50373d790fb2"
+  reviewed "effect@4.1.2 sha256:f1ab50373d790fb2"
 
 /// `enable_runtime_metrics` for the body of a `provide`.
 enable_runtime_metrics_layer : Layer none none none
 foreign pure enable_runtime_metrics_layer from "@flick-lang/runtime/effect/Metric" "enableRuntimeMetricsLayer"
-  reviewed "effect@4.0.5 sha256:bb65c74cbc334126"
+  reviewed "effect@4.1.2 sha256:bb65c74cbc334126"
 
 /// `disable_runtime_metrics` for the body of a `provide`.
 disable_runtime_metrics_layer : Layer none none none
 foreign pure disable_runtime_metrics_layer from "@flick-lang/runtime/effect/Metric" "disableRuntimeMetricsLayer"
-  reviewed "effect@4.0.5 sha256:9e6f775267a80d6b"
+  reviewed "effect@4.1.2 sha256:9e6f775267a80d6b"

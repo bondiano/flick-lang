@@ -1,7 +1,7 @@
 [wrapped]
 Arbitrary = "Arbitrary.Arbitrary 721e5c3ab794bbea"
 ArrayOptions = "Arbitrary.ArrayOptions e1dcc115c5c2b78a"
-CheckOptions = "Arbitrary.CheckOptions ba05d6765f8e38f6"
+CheckOptions = "Arbitrary.CheckOptions d6bae24749fe9093"
 CheckResult = "Arbitrary.CheckResult 9a4b5d289c03b31b"
 Constant = "Arbitrary.constant d5b6d788a8786bef"
 Exhausted = "Arbitrary.Exhausted 4c30618d5a259cfb"

@@ -166,7 +166,7 @@ let identity value = value
 /// `{NotFound}`.
 from_result : Result (Errors e) a ->{; e} a
 foreign effect from_result from "@flick-lang/runtime" "fromResult"
-  reviewed "effect@4.0.5 sha256:5776a5b0ab051f96"
+  reviewed "effect@4.1.2 sha256:5776a5b0ab051f96"
 
 /// Runs both, as children: on a failure the other one is interrupted and
 /// awaited. The results keep the order of the arguments.
@@ -195,25 +195,25 @@ foreign effect parallel_exits from "@flick-lang/runtime" "parallelExits"
 race_success : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
 foreign effect race_success from "@flick-lang/runtime" "raceSuccess"
   retention call
-  reviewed "effect@4.0.5 sha256:ac5b5886f22dc7c6"
+  reviewed "effect@4.1.2 sha256:ac5b5886f22dc7c6"
 
 /// The first task to end, however it ends.
 race_first : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
 foreign effect race_first from "@flick-lang/runtime" "raceFirst"
   retention call
-  reviewed "effect@4.0.5 sha256:5247faa250c6adc7"
+  reviewed "effect@4.1.2 sha256:5247faa250c6adc7"
 
 /// Fails with `TimeoutError` when `millis` pass before the task ends.
 timeout : forall c r e a. Float -> (Eff r e a)^c ->{r; TimeoutError | e} a
 foreign effect timeout from "@flick-lang/runtime" "timeout"
   retention call
-  reviewed "effect@4.0.5 sha256:297e05405fa2e747"
+  reviewed "effect@4.1.2 sha256:297e05405fa2e747"
 
 /// `None` when `millis` pass before the task ends; other failures stay.
 timeout_option : forall c r e a. Float -> (Eff r e a)^c ->{r; e} Option a
 foreign effect timeout_option from "@flick-lang/runtime" "timeoutOption"
   retention call
-  reviewed "effect@4.0.5 sha256:35e1a71b230ac8e2"
+  reviewed "effect@4.1.2 sha256:35e1a71b230ac8e2"
 
 /// `ma` followed by `f` of its value, for any monad.
 bind : forall c d m a b. Monad m => (m a)^c -> ((a -> (m b)^d)^d -> (m b)^(c + d))^c
@@ -230,12 +230,12 @@ foreign pure bind_eff from "@flick-lang/runtime" "bindEff"
 /// A field under the wire name `wire`: the key must be present.
 field : String -> PureCodec Json a -> FieldCodec none a
 foreign pure field from "@flick-lang/runtime" "dslField"
-  reviewed "effect@4.0.5 sha256:e623c16c7b6244f7"
+  reviewed "effect@4.1.2 sha256:e623c16c7b6244f7"
 
 /// A field that may be missing: missing is `None`, `None` is not written.
 optional_field : String -> PureCodec Json a -> FieldCodec none (Option a)
 foreign pure optional_field from "@flick-lang/runtime" "dslOptionalField"
-  reviewed "effect@4.0.5 sha256:6f386babb608471d"
+  reviewed "effect@4.1.2 sha256:6f386babb608471d"
 
 /// A field whose codec may need services to decode.
 field_effect : String -> Codec rd none Json a -> FieldCodec rd a
@@ -244,12 +244,12 @@ foreign pure field_effect from "@flick-lang/runtime" "dslFieldEffect"
 /// `null` is `None`; a missing key is an error.
 option_as_null : PureCodec Json a -> PureCodec Json (Option a)
 foreign pure option_as_null from "@flick-lang/runtime" "codecOptionNull"
-  reviewed "effect@4.0.5 sha256:833c83dfb847977e"
+  reviewed "effect@4.1.2 sha256:833c83dfb847977e"
 
 /// `null` and a missing key are `None`; `None` is written as `null`.
 option_as_nullish : PureCodec Json a -> PureCodec Json (Option a)
 foreign pure option_as_nullish from "@flick-lang/runtime" "codecOptionNullish"
-  reviewed "effect@4.0.5 sha256:038a29f7741a127f"
+  reviewed "effect@4.1.2 sha256:038a29f7741a127f"
 
 /// A missing key decodes to `default ()`, called once per decode; `null` or
 /// a wrong value is still an error.
@@ -257,7 +257,7 @@ on_missing : forall c rd a. (Unit -> a)^c -> (FieldCodec rd a -> FieldCodec rd a
 foreign pure on_missing from "@flick-lang/runtime" "dslOnMissing"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:f0155391ca2658bc"
+  reviewed "effect@4.1.2 sha256:f0155391ca2658bc"
 
 /// `on_missing` with a runtime default, whose services decoding then needs.
 on_missing_effect :
@@ -265,7 +265,7 @@ on_missing_effect :
 foreign pure on_missing_effect from "@flick-lang/runtime" "dslOnMissingEffect"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:f0155391ca2658bc"
+  reviewed "effect@4.1.2 sha256:f0155391ca2658bc"
 
 /// The codec of a `codec` block, dropping keys it does not name instead of
 /// refusing them.

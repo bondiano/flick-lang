@@ -1,6 +1,0 @@
-[wrapped]
-Crypto = "Crypto.Crypto 9c5f9c0360920787"
-DigestAlgorithm = "Crypto.DigestAlgorithm 48087bfaa421aa96"
-
-[excluded]
-make = "invariant: its `randomBytes` is a synchronous impure callback, which a Flick function can only be by running an effect outside the entry runner; `Crypto.system` is Effect's `Crypto` made over Web Crypto"

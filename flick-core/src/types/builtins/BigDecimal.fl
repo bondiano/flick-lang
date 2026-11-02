@@ -28,27 +28,27 @@ type error DecimalError = DecimalError String
 /// A decimal written as `-12.345` or `1e-3`.
 from_string : String -> Result DecimalError BigDecimal
 foreign pure from_string from "@flick-lang/runtime" "decimalFromString"
-  reviewed "effect@4.0.5 sha256:3565dfd8fc758141"
+  reviewed "effect@4.1.2 sha256:3565dfd8fc758141"
 
 /// `coefficient × 10^-scale`; the scale must be a safe integer.
 from_bigint : BigInt -> Float -> Result DecimalError BigDecimal
 foreign pure from_bigint from "@flick-lang/runtime" "decimalFromBigInt"
-  reviewed "effect@4.0.5 sha256:0f9eaa78f8124757"
+  reviewed "effect@4.1.2 sha256:0f9eaa78f8124757"
 
 /// The integer as a decimal of scale 0.
 from_integer : BigInt -> BigDecimal
 foreign pure from_integer from "@flick-lang/runtime" "decimalFromInteger"
-  reviewed "effect@4.0.5 sha256:23a4a03e29f07231"
+  reviewed "effect@4.1.2 sha256:23a4a03e29f07231"
 
 /// The decimal a finite number holds after binary rounding.
 from_number : Float -> Result DecimalError BigDecimal
 foreign pure from_number from "@flick-lang/runtime" "decimalFromNumber"
-  reviewed "effect@4.0.5 sha256:59106a68968c7119"
+  reviewed "effect@4.1.2 sha256:59106a68968c7119"
 
 /// The decimal in plain notation, as `"-12.345"`.
 to_string : BigDecimal -> String
 foreign pure to_string from "@flick-lang/runtime" "decimalToString"
-  reviewed "effect@4.0.5 sha256:b7b8e9a3bc6c2ac2"
+  reviewed "effect@4.1.2 sha256:b7b8e9a3bc6c2ac2"
 
 /// The number of digits after the point the decimal keeps.
 scale : BigDecimal -> Float
@@ -57,17 +57,17 @@ foreign pure scale from "@flick-lang/runtime" "decimalScale"
 /// The exact sum.
 add : BigDecimal -> BigDecimal -> BigDecimal
 foreign pure add from "@flick-lang/runtime" "decimalAdd"
-  reviewed "effect@4.0.5 sha256:82fe2ea17680fe46"
+  reviewed "effect@4.1.2 sha256:82fe2ea17680fe46"
 
 /// The exact difference, `a - b`.
 subtract : BigDecimal -> BigDecimal -> BigDecimal
 foreign pure subtract from "@flick-lang/runtime" "decimalSubtract"
-  reviewed "effect@4.0.5 sha256:32640ed4b7d5bdd5"
+  reviewed "effect@4.1.2 sha256:32640ed4b7d5bdd5"
 
 /// The exact product; a scale beyond the safe integers is an error.
 multiply : BigDecimal -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure multiply from "@flick-lang/runtime" "decimalMultiply"
-  reviewed "effect@4.0.5 sha256:b73b2b5dc0e9d510"
+  reviewed "effect@4.1.2 sha256:b73b2b5dc0e9d510"
 
 /// `dividend / divisor` with `scale` digits after the point, rounded by
 /// `mode`; `Exact` fails when rounding is needed, and so does a zero
@@ -79,145 +79,145 @@ foreign pure divide_to_scale from "@flick-lang/runtime" "decimalDivideToScale"
 /// The same value without trailing zeros in its coefficient.
 normalize : BigDecimal -> BigDecimal
 foreign pure normalize from "@flick-lang/runtime/effect/BigDecimal" "normalize"
-  reviewed "effect@4.0.5 sha256:f6201ce0da31126a"
+  reviewed "effect@4.1.2 sha256:f6201ce0da31126a"
 
 /// The value at `scale` digits after the point, cutting digits toward zero;
 /// the scale must be a safe integer.
 set_scale : Float -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure set_scale from "@flick-lang/runtime/effect/BigDecimal" "flickScale"
-  reviewed "effect@4.0.5 sha256:a83472f08ea851cd"
+  reviewed "effect@4.1.2 sha256:a83472f08ea851cd"
 
 /// The sum of the list, 0 when it is empty.
 sum_all : List BigDecimal -> BigDecimal
 foreign pure sum_all from "@flick-lang/runtime/effect/BigDecimal" "sumAll"
-  reviewed "effect@4.0.5 sha256:a4fa15b329575086"
+  reviewed "effect@4.1.2 sha256:a4fa15b329575086"
 
 /// The product of the list, 1 when it is empty.
 multiply_all : List BigDecimal -> BigDecimal
 foreign pure multiply_all from "@flick-lang/runtime/effect/BigDecimal" "multiplyAll"
-  reviewed "effect@4.0.5 sha256:5df7122f8e0de431"
+  reviewed "effect@4.1.2 sha256:5df7122f8e0de431"
 
 /// `self / that` to Effect's default precision; `None` for a zero divisor:
 /// `a |> BigDecimal.divide b`.
 divide : BigDecimal -> BigDecimal -> Option BigDecimal
 foreign pure divide from "@flick-lang/runtime/effect/BigDecimal" "divide"
   arity 1
-  reviewed "effect@4.0.5 sha256:dda5e4b9176e9072"
+  reviewed "effect@4.1.2 sha256:dda5e4b9176e9072"
 
 /// The remainder of `self / divisor`; `None` for a zero divisor.
 remainder : BigDecimal -> BigDecimal -> Option BigDecimal
 foreign pure remainder from "@flick-lang/runtime/effect/BigDecimal" "remainder"
   arity 1
-  reviewed "effect@4.0.5 sha256:f3e3cd6aadd3ba39"
+  reviewed "effect@4.1.2 sha256:f3e3cd6aadd3ba39"
 
 /// The lesser of the two.
 min : BigDecimal -> BigDecimal -> BigDecimal
 foreign pure min from "@flick-lang/runtime/effect/BigDecimal" "min"
   arity 1
-  reviewed "effect@4.0.5 sha256:d8310f210ce0fa14"
+  reviewed "effect@4.1.2 sha256:d8310f210ce0fa14"
 
 /// The greater of the two.
 max : BigDecimal -> BigDecimal -> BigDecimal
 foreign pure max from "@flick-lang/runtime/effect/BigDecimal" "max"
   arity 1
-  reviewed "effect@4.0.5 sha256:bc5bf68176dafe7a"
+  reviewed "effect@4.1.2 sha256:bc5bf68176dafe7a"
 
 /// `self < that`: `a |> BigDecimal.is_less_than b`.
 is_less_than : BigDecimal -> BigDecimal -> Bool
 foreign pure is_less_than from "@flick-lang/runtime/effect/BigDecimal" "isLessThan"
   arity 1
-  reviewed "effect@4.0.5 sha256:493eb5d4350b16ba"
+  reviewed "effect@4.1.2 sha256:493eb5d4350b16ba"
 
 /// `self <= that`.
 is_less_than_or_equal_to : BigDecimal -> BigDecimal -> Bool
 foreign pure is_less_than_or_equal_to from "@flick-lang/runtime/effect/BigDecimal" "isLessThanOrEqualTo"
   arity 1
-  reviewed "effect@4.0.5 sha256:95c3ceff8c46b811"
+  reviewed "effect@4.1.2 sha256:95c3ceff8c46b811"
 
 /// `self > that`.
 is_greater_than : BigDecimal -> BigDecimal -> Bool
 foreign pure is_greater_than from "@flick-lang/runtime/effect/BigDecimal" "isGreaterThan"
   arity 1
-  reviewed "effect@4.0.5 sha256:5a13552f05a528e5"
+  reviewed "effect@4.1.2 sha256:5a13552f05a528e5"
 
 /// `self >= that`.
 is_greater_than_or_equal_to : BigDecimal -> BigDecimal -> Bool
 foreign pure is_greater_than_or_equal_to from "@flick-lang/runtime/effect/BigDecimal" "isGreaterThanOrEqualTo"
   arity 1
-  reviewed "effect@4.0.5 sha256:a7682e509f662af4"
+  reviewed "effect@4.1.2 sha256:a7682e509f662af4"
 
 /// Whether `self` lies within `minimum` and `maximum`, both included.
 between : { minimum : BigDecimal; maximum : BigDecimal } -> BigDecimal -> Bool
 foreign pure between from "@flick-lang/runtime/effect/BigDecimal" "between"
   arity 1
-  reviewed "effect@4.0.5 sha256:a15bc2fe8717ba46"
+  reviewed "effect@4.1.2 sha256:a15bc2fe8717ba46"
 
 /// `self` kept within `minimum` and `maximum`.
 clamp : { minimum : BigDecimal; maximum : BigDecimal } -> BigDecimal -> BigDecimal
 foreign pure clamp from "@flick-lang/runtime/effect/BigDecimal" "clamp"
   arity 1
-  reviewed "effect@4.0.5 sha256:0b37bfc237ec8bb2"
+  reviewed "effect@4.1.2 sha256:0b37bfc237ec8bb2"
 
 /// How the value compares with 0.
 sign : BigDecimal -> Ordering
 foreign pure sign from "@flick-lang/runtime/effect/BigDecimal" "flickSign"
-  reviewed "effect@4.0.5 sha256:6cfb1405109d9689"
+  reviewed "effect@4.1.2 sha256:6cfb1405109d9689"
 
 /// The absolute value.
 abs : BigDecimal -> BigDecimal
 foreign pure abs from "@flick-lang/runtime/effect/BigDecimal" "abs"
-  reviewed "effect@4.0.5 sha256:f2e24bbf41643ef8"
+  reviewed "effect@4.1.2 sha256:f2e24bbf41643ef8"
 
 /// The value with its sign flipped.
 negate : BigDecimal -> BigDecimal
 foreign pure negate from "@flick-lang/runtime/effect/BigDecimal" "negate"
-  reviewed "effect@4.0.5 sha256:0619a7fc6e981672"
+  reviewed "effect@4.1.2 sha256:0619a7fc6e981672"
 
 /// Scientific notation: `"1.5e+3"`.
 to_exponential : BigDecimal -> String
 foreign pure to_exponential from "@flick-lang/runtime/effect/BigDecimal" "toExponential"
-  reviewed "effect@4.0.5 sha256:74cc1d51e7ee8319"
+  reviewed "effect@4.1.2 sha256:74cc1d51e7ee8319"
 
 /// Whether the value has no fractional digits.
 is_integer : BigDecimal -> Bool
 foreign pure is_integer from "@flick-lang/runtime/effect/BigDecimal" "isInteger"
-  reviewed "effect@4.0.5 sha256:f95cc1ee419bff0b"
+  reviewed "effect@4.1.2 sha256:f95cc1ee419bff0b"
 
 /// Whether the value is 0.
 is_zero : BigDecimal -> Bool
 foreign pure is_zero from "@flick-lang/runtime/effect/BigDecimal" "isZero"
-  reviewed "effect@4.0.5 sha256:093ee96e85bcbfc4"
+  reviewed "effect@4.1.2 sha256:093ee96e85bcbfc4"
 
 /// Whether the value is below 0.
 is_negative : BigDecimal -> Bool
 foreign pure is_negative from "@flick-lang/runtime/effect/BigDecimal" "isNegative"
-  reviewed "effect@4.0.5 sha256:21dab63b7dffc390"
+  reviewed "effect@4.1.2 sha256:21dab63b7dffc390"
 
 /// Whether the value is above 0.
 is_positive : BigDecimal -> Bool
 foreign pure is_positive from "@flick-lang/runtime/effect/BigDecimal" "isPositive"
-  reviewed "effect@4.0.5 sha256:356f8acd4777461d"
+  reviewed "effect@4.1.2 sha256:356f8acd4777461d"
 
 /// Rounded to `scale` digits after the point by `mode`; `Exact` fails when a
 /// digit would be lost, and the scale must be a safe integer.
 round : Float -> RoundingMode -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure round from "@flick-lang/runtime/effect/BigDecimal" "flickRound"
-  reviewed "effect@4.0.5 sha256:b17f93cdbdcb8e0d"
+  reviewed "effect@4.1.2 sha256:b17f93cdbdcb8e0d"
 
 /// Cut toward zero to `scale` digits after the point.
 truncate : Float -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure truncate from "@flick-lang/runtime/effect/BigDecimal" "flickTruncate"
-  reviewed "effect@4.0.5 sha256:7a332d19963ee0fe"
+  reviewed "effect@4.1.2 sha256:7a332d19963ee0fe"
 
 /// Rounded up to `scale` digits after the point.
 ceil : Float -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure ceil from "@flick-lang/runtime/effect/BigDecimal" "flickCeil"
-  reviewed "effect@4.0.5 sha256:1c953425ea5ddcfd"
+  reviewed "effect@4.1.2 sha256:1c953425ea5ddcfd"
 
 /// Rounded down to `scale` digits after the point.
 floor : Float -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure floor from "@flick-lang/runtime/effect/BigDecimal" "flickFloor"
-  reviewed "effect@4.0.5 sha256:4022beb25f56c30a"
+  reviewed "effect@4.1.2 sha256:4022beb25f56c30a"
 
 compare_decimal : BigDecimal -> BigDecimal -> Ordering
 foreign pure compare_decimal from "@flick-lang/runtime" "decimalCompare"
@@ -244,4 +244,4 @@ foreign pure to_string_normal from "@flick-lang/runtime" "decimalNormalString"
 /// A decimal as its JSON string, `"1.25"`; other text is an error.
 json : PureCodec Json BigDecimal
 foreign pure json from "@flick-lang/runtime/effect/Schema" "flickBigDecimalFromString"
-  reviewed "effect@4.0.5 sha256:9a46b1224dbb404f"
+  reviewed "effect@4.1.2 sha256:9a46b1224dbb404f"

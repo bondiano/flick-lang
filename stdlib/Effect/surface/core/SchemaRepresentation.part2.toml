@@ -19,3 +19,6 @@ toJsonSchemaMultiDocument = "invariant: Effect's JSON Schema generation writes a
 toMultiDocument = "TS-only: Effect's representation of a schema serves generating TS schema code and reviving schemas; Flick schemas come from declarations"
 toRepresentation = "TS-only: Effect's representation of a schema serves generating TS schema code and reviving schemas; Flick schemas come from declarations"
 toRepresentations = "TS-only: Effect's representation of a schema serves generating TS schema code and reviving schemas; Flick schemas come from declarations"
+SemVerRangeReviver = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+SemVerReviver = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+isAsciiReviver = "TS-only: a type guard; Flick values are typed statically"

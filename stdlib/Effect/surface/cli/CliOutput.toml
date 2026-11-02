@@ -1,5 +1,10 @@
 [wrapped]
 Formatter = "Cli.Formatter da15e12bcf12bdd7"
-defaultFormatter = "Cli.default_formatter 381e2a39c3f920ba"
+defaultFormatter = "Cli.default_formatter 414e73326ef266bc"
 displayWidth = "Cli.display_width 2a6f63717edc3afe"
 layer = "Cli.run_with 11c11a4834e78b50"
+
+[excluded]
+Presenter = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+defaultPresenter = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+layerPresenter = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

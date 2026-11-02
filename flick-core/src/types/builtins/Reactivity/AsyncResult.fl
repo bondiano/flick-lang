@@ -11,14 +11,14 @@ type AsyncResult a (e : ErrorRow)
 /// `failure` of what went wrong.
 fold : b -> (a -> b) -> (Failure e -> b) -> AsyncResult a e -> b
 foreign pure fold from "@flick-lang/runtime/effect/reactivity/AsyncResult" "flickFold"
-  reviewed "effect@4.0.5 sha256:bb0f230e80dc1cfc"
+  reviewed "effect@4.1.2 sha256:bb0f230e80dc1cfc"
 
 /// The value of a success, the last one kept by a failure, else `None`.
 value : AsyncResult a e -> Option a
 foreign pure value from "@flick-lang/runtime/effect/reactivity/AsyncResult" "value"
-  reviewed "effect@4.0.5 sha256:d43f686611659163"
+  reviewed "effect@4.1.2 sha256:d43f686611659163"
 
 /// Whether a run is under way.
 is_waiting : AsyncResult a e -> Bool
 foreign pure is_waiting from "@flick-lang/runtime/effect/reactivity/AsyncResult" "isWaiting"
-  reviewed "effect@4.0.5 sha256:aa0af91299b3a059"
+  reviewed "effect@4.1.2 sha256:aa0af91299b3a059"

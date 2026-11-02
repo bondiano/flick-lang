@@ -88,7 +88,7 @@ CI добавляет эти данные в сводку запуска.
 
 ## Нестабильные модули
 
-Effect помечает `effect/reactivity` как `@stability unstable` в 4.0.5, и так
+Effect помечает `effect/reactivity` как `@stability unstable` в 4.1.2, и так
 же помечены его привязки: `Reactivity.Atom` (атомы, сервис `Registry`,
 который хранит их значения, и его `layer`) и `Reactivity.AsyncResult`
 (значение атома, вычисленное задачей). Их API может измениться с любым
@@ -149,7 +149,7 @@ span'ы программы по WebSocket в Effect DevTools, которые с�
 /// Recurs forever, each step the duration after the previous one ended.
 spaced : Duration.Duration -> Schedule none none i Float
 foreign pure spaced from "@flick-lang/runtime/effect/Schedule" "spaced"
-  reviewed "effect@4.0.5 sha256:498f22b480d2397e"
+  reviewed "effect@4.1.2 sha256:498f22b480d2397e"
 
 retry :
   forall c r e a r2 e2 o.
@@ -157,7 +157,7 @@ retry :
 foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:508d9e1864f6c9d3"
+  reviewed "effect@4.1.2 sha256:508d9e1864f6c9d3"
 ```
 
 Имена записываются в snake_case, а основной аргумент передаётся последним.

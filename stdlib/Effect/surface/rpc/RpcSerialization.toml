@@ -1,7 +1,7 @@
 [wrapped]
 layerJson = "Rpc.json 868b3e8b899a14b1"
-layerJsonRpc = "Rpc.json_rpc e6046c0ea4f44ba8"
-layerNdJsonRpc = "Rpc.ndjson_rpc a78d50601c4030fb"
+layerJsonRpc = "Rpc.json_rpc 8442484c92ce8133"
+layerNdJsonRpc = "Rpc.ndjson_rpc 8e90c634696879c6"
 layerNdjson = "Rpc.ndjson c72ee8574fb6c140"
 layerSchemaBinary = "Rpc.binary 5d78f3975991bfc4"
 
@@ -17,3 +17,4 @@ layerNdjsonWith = "the serializations are the layers of `Rpc`'s values; making o
 makeNdjson = "the serializations are the layers of `Rpc`'s values; making one by hand is outside the binding"
 ndJsonRpc = "the serializations are the layers of `Rpc`'s values; making one by hand is outside the binding"
 ndjson = "the serializations are the layers of `Rpc`'s values; making one by hand is outside the binding"
+NdjsonDecodeError = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

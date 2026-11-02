@@ -11,37 +11,37 @@ type Scheduler
 make_mixed : Unit ->{} Scheduler
 foreign sync make_mixed from "@flick-lang/runtime/effect/Scheduler" "flickMakeMixed"
   arity 0
-  reviewed "effect@4.0.5 sha256:599cb79ccc778b11"
+  reviewed "effect@4.1.2 sha256:599cb79ccc778b11"
 
 /// The scheduler of the current fiber.
 current : Unit ->{} Scheduler
 foreign effect current from "@flick-lang/runtime/effect/Scheduler" "flickCurrent"
   arity 0
-  reviewed "effect@4.0.5 sha256:70845d060d47fc95"
+  reviewed "effect@4.1.2 sha256:70845d060d47fc95"
 
 /// Runs `task` with the scheduler.
 with_scheduler : forall c r e a. Scheduler -> (Eff r e a)^c ->{r; e} a
 foreign effect with_scheduler from "@flick-lang/runtime/effect/Scheduler" "flickWithScheduler"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:70845d060d47fc95"
+  reviewed "effect@4.1.2 sha256:70845d060d47fc95"
 
 /// The number of steps a fiber of the current task runs before it yields.
 max_ops_before_yield : Unit ->{} Int
 foreign effect max_ops_before_yield from "@flick-lang/runtime/effect/Scheduler" "flickMaxOpsBeforeYield"
   arity 0
-  reviewed "effect@4.0.5 sha256:5382e7fca4410878"
+  reviewed "effect@4.1.2 sha256:5382e7fca4410878"
 
 /// Runs `task` with fibers yielding after that many steps.
 with_max_ops_before_yield : forall c r e a. Int -> (Eff r e a)^c ->{r; e} a
 foreign effect with_max_ops_before_yield from "@flick-lang/runtime/effect/Scheduler" "flickWithMaxOpsBeforeYield"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:5382e7fca4410878"
+  reviewed "effect@4.1.2 sha256:5382e7fca4410878"
 
 /// Runs `task` with fibers that, if `prevent`, never yield to the scheduler.
 with_prevent_scheduler_yield : forall c r e a. Bool -> (Eff r e a)^c ->{r; e} a
 foreign effect with_prevent_scheduler_yield from "@flick-lang/runtime/effect/Scheduler" "flickWithPreventSchedulerYield"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:9f51c84fce10c69a"
+  reviewed "effect@4.1.2 sha256:9f51c84fce10c69a"

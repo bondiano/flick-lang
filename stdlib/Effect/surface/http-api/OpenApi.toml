@@ -9,7 +9,7 @@ Summary = "HttpApi.describe d6a2b6875e10e51e"
 Title = "HttpApi.info 4532310fadf172a2"
 Version = "HttpApi.info 144794ade8cb2d20"
 annotations = "HttpApi.info 9a9d9c09c07d1c7b"
-fromApi = "HttpApi.openapi 1e4da6e1f98e9647"
+fromApi = "HttpApi.openapi 7418712a7a98def8"
 
 [language]
 Identifier = "the endpoint's label is its operationId (`group.endpoint`)"
@@ -42,3 +42,4 @@ OpenApiSpecMediaType = "TS-only: the TypeScript shape of the OpenAPI document; F
 OpenApiSpecResponse = "TS-only: the TypeScript shape of the OpenAPI document; Flick writes the document as JSON text"
 Override = "invariant: an override writes the document by hand, past the strict exporter"
 Transform = "invariant: a transform rewrites the document by hand, past the strict exporter"
+FromApiOptions = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

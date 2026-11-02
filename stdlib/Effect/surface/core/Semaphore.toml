@@ -1,5 +1,5 @@
 [wrapped]
-Semaphore = "Semaphore.Semaphore dfc09adad67970fd"
+Semaphore = "Semaphore.Semaphore a35e034235ab04fc"
 make = "Semaphore.make bdb4b05fc373aa39"
 resize = "Semaphore.resize b62848d985c2f336"
 withPermits = "Semaphore.with_permits 1c963a339f788ddd"
@@ -12,3 +12,4 @@ releaseAll = "Semaphore.release_all 2d52897abf63236f"
 
 [excluded]
 makeUnsafe = "invariant: `unsafe*`: a plain synchronous call outside the effect, unordered with the fiber's steps"
+takeScoped = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

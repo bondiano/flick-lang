@@ -48,3 +48,5 @@ symbol = "TS-only: a type guard over `unknown`; Flick values are typed staticall
 undefined = "TS-only: a type guard over `unknown`; Flick values are typed statically"
 instanceOf = "TS-only: a type guard over `unknown`; Flick values are typed statically"
 instanceOfUnsafe = "invariant: `unsafe*`: a refinement the type does not prove"
+literals = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+literalsExhaustive = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

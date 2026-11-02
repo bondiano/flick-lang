@@ -38,3 +38,7 @@ mapTryCatch = "the `Cli.Value` instance of the field's type parses the text"
 orElse = "two `Cli.optional` parameters matched in the handler"
 orElseResult = "two `Cli.optional` parameters matched in the handler"
 withSchema = "a `Cli.Value` instance whose `parse` decodes with a codec (`Codec.decode_result`)"
+
+[excluded]
+withNegation = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+withoutNegation = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

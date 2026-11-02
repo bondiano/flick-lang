@@ -10,3 +10,7 @@ Client = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `Http
 ForApi = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `HttpApi` types carry the same information"
 SuccessType = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `HttpApi` types carry the same information"
 UrlBuilder = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `HttpApi` types carry the same information"
+Upgraded = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+UpgradedTypeId = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+decodeResponse = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+isUpgraded = "TS-only: a type guard; Flick values are typed statically"

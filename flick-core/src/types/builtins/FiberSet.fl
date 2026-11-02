@@ -14,7 +14,7 @@ type alias RunOptions = { propagateInterruption : Bool; startImmediately : Bool 
 make : forall s e a. Unit ->{Scope s;} FiberSet s e a
 foreign effect make from "@flick-lang/runtime/effect/FiberSet" "flickMake"
   arity 0
-  reviewed "effect@4.0.5 sha256:0ccf473d77d74576"
+  reviewed "effect@4.1.2 sha256:0ccf473d77d74576"
 
 /// Runs `task` as a child of the set; it may hold only what outlives the
 /// set's region.
@@ -25,7 +25,7 @@ run :
 foreign effect run from "@flick-lang/runtime/effect/FiberSet" "flickRun"
   arity 1
   retention owner
-  reviewed "effect@4.0.5 sha256:5574e79c6e88b3a4"
+  reviewed "effect@4.1.2 sha256:5574e79c6e88b3a4"
 
 /// Adds a child spawned elsewhere; with `propagate_interruption` its
 /// interruption fails `join`.
@@ -33,28 +33,28 @@ add : Bool -> Fiber.Fiber e a -> FiberSet s e a ->{} Unit
 foreign effect add from "@flick-lang/runtime/effect/FiberSet" "flickAdd"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:598395337876f1d4"
+  reviewed "effect@4.1.2 sha256:598395337876f1d4"
 
 /// Interrupts every child and empties the set.
 clear : FiberSet s e a ->{} Unit
 foreign effect clear from "@flick-lang/runtime/effect/FiberSet" "clear"
   retention call
-  reviewed "effect@4.0.5 sha256:84d569b250f4f0fa"
+  reviewed "effect@4.1.2 sha256:84d569b250f4f0fa"
 
 /// How many children are running.
 size : FiberSet s e a ->{} Int
 foreign effect size from "@flick-lang/runtime/effect/FiberSet" "size"
   retention call
-  reviewed "effect@4.0.5 sha256:39bcfa8eedf749bc"
+  reviewed "effect@4.1.2 sha256:39bcfa8eedf749bc"
 
 /// Waits until the scope closes or a child fails, and fails as it did.
 join : FiberSet s e a ->{; e} Unit
 foreign effect join from "@flick-lang/runtime/effect/FiberSet" "join"
   retention call
-  reviewed "effect@4.0.5 sha256:2b481a2440fa00ef"
+  reviewed "effect@4.1.2 sha256:2b481a2440fa00ef"
 
 /// Waits until no child is running.
 await_empty : FiberSet s e a ->{} Unit
 foreign effect await_empty from "@flick-lang/runtime/effect/FiberSet" "awaitEmpty"
   retention call
-  reviewed "effect@4.0.5 sha256:82b27c89ddbba48c"
+  reviewed "effect@4.1.2 sha256:82b27c89ddbba48c"

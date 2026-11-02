@@ -6,6 +6,9 @@ mutation = "the registry's `Reactivity` is internal: `Atom.query` registers with
 query = "the registry's `Reactivity` is internal: `Atom.query` registers with it and `Atom.mutation` invalidates"
 stream = "the registry's `Reactivity` is internal: `Atom.query` registers with it and `Atom.mutation` invalidates"
 
+Keys = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+KeysInput = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+
 [language]
 invalidate = "`Atom.mutation keys f`: a success of `f` invalidates the queries of `keys`"
 layer = "the registry builds it for `Atom.query` and `Atom.mutation`"

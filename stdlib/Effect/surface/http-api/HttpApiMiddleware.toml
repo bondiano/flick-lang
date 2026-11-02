@@ -22,3 +22,5 @@ Requires = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `Ht
 ServiceClass = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `HttpApi` types carry the same information"
 isSecurity = "TS-only: a type guard; Flick values are typed statically"
 layerSchemaErrorTransform = "invariant: a request that does not decode is answered 400 with the issues and never the input; a transform could put the input back"
+ProblemDetails = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+layerProblemDetails = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

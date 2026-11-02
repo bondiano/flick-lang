@@ -10,7 +10,7 @@ add_finalizer :
   (Fiber.Outlives c s, Fiber.Provided r s) => (Eff r none Unit)^c ->{Scope s | r;} Unit
 foreign effect add_finalizer from "@flick-lang/runtime/effect/Scope" "flickAddFinalizer"
   retention owner
-  reviewed "effect@4.0.5 sha256:53499de357d8640a"
+  reviewed "effect@4.1.2 sha256:53499de357d8640a"
 
 /// `add_finalizer`, the finalizer seeing how the scope ended: `None` when
 /// its body succeeded, the cause otherwise.
@@ -19,4 +19,4 @@ add_finalizer_exit :
   (Fiber.Outlives c s, Fiber.Provided r s) => (Option RawCause ->{r;} Unit)^c ->{Scope s | r;} Unit
 foreign effect add_finalizer_exit from "@flick-lang/runtime/effect/Scope" "flickAddFinalizerExit"
   retention owner
-  reviewed "effect@4.0.5 sha256:219836b437064bd1"
+  reviewed "effect@4.1.2 sha256:219836b437064bd1"

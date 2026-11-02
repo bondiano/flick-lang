@@ -12,7 +12,7 @@ run : forall c r e a r2 e2 l b. Sink r2 e2 a l b -> (Stream r e a)^c ->{r + r2; 
 foreign effect run from "@flick-lang/runtime/effect/Stream" "run"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:6fb1ab9d6a6747fa"
+  reviewed "effect@4.1.2 sha256:6fb1ab9d6a6747fa"
 
 /// The values of the sink, run again over the rest each time it ends; an
 /// element it leaves over starts its next run.
@@ -21,7 +21,7 @@ transduce :
 foreign pure transduce from "@flick-lang/runtime/effect/Stream" "transduce"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:60ee018766ec2cef"
+  reviewed "effect@4.1.2 sha256:60ee018766ec2cef"
 
 /// `transduce` that feeds the sink while the downstream is busy, so a slow
 /// consumer gets fewer, larger values.
@@ -30,7 +30,7 @@ aggregate :
 foreign pure aggregate from "@flick-lang/runtime/effect/Stream" "aggregate"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:eaffc96aa5eafd58"
+  reviewed "effect@4.1.2 sha256:eaffc96aa5eafd58"
 
 /// `aggregate` that also ends the sink's run each time the schedule fires;
 /// the schedule gets the last value, if any.
@@ -43,7 +43,7 @@ aggregate_within :
 foreign pure aggregate_within from "@flick-lang/runtime/effect/Stream" "aggregateWithin"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:47dbb4412f1ede76"
+  reviewed "effect@4.1.2 sha256:47dbb4412f1ede76"
 
 /// The leftovers of the sink, which reads the stream.
 pipe_through :
@@ -51,7 +51,7 @@ pipe_through :
 foreign pure pipe_through from "@flick-lang/runtime/effect/Stream" "pipeThrough"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:11b397949cd59f9d"
+  reviewed "effect@4.1.2 sha256:11b397949cd59f9d"
 
 /// The stream, with every element also fed to the sink.
 tap_sink :
@@ -59,7 +59,7 @@ tap_sink :
 foreign pure tap_sink from "@flick-lang/runtime/effect/Stream" "tapSink"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:36c45c59338ecd64"
+  reviewed "effect@4.1.2 sha256:36c45c59338ecd64"
 
 /// The first value of the sink and the rest of the stream, which belongs to
 /// the scope of region `s`.
@@ -70,21 +70,21 @@ peel :
 foreign effect peel from "@flick-lang/runtime/effect/Stream" "peel"
   arity 1
   retention owner
-  reviewed "effect@4.0.5 sha256:707e1796543327f9"
+  reviewed "effect@4.1.2 sha256:707e1796543327f9"
 
 /// The channel the stream is made of: it emits chunks of the elements.
 to_channel :
   forall c r e a i ie id. (Stream r e a)^c -> (Channel r e i (NonEmpty.NonEmpty a) Unit ie id)^c
 foreign pure to_channel from "@flick-lang/runtime/effect/Stream" "toChannel"
   retention call
-  reviewed "effect@4.0.5 sha256:55d89455ce5afc88"
+  reviewed "effect@4.1.2 sha256:55d89455ce5afc88"
 
 /// The stream of the elements of the chunks the channel emits.
 from_channel :
   forall c r e a i. (Channel r e i (NonEmpty.NonEmpty a) Unit none Unit)^c -> (Stream r e a)^c
 foreign pure from_channel from "@flick-lang/runtime/effect/Stream" "fromChannel"
   retention call
-  reviewed "effect@4.0.5 sha256:bbbdae98c9854d69"
+  reviewed "effect@4.1.2 sha256:bbbdae98c9854d69"
 
 /// What the channel emits when it reads the chunks of the stream, its
 /// failure and its end.
@@ -96,7 +96,7 @@ pipe_through_channel :
 foreign pure pipe_through_channel from "@flick-lang/runtime/effect/Stream" "pipeThroughChannel"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:f48e8b8b83b331fc"
+  reviewed "effect@4.1.2 sha256:f48e8b8b83b331fc"
 
 /// `pipe_through_channel` with a channel that sees no failure: one of the
 /// stream fails the result directly.
@@ -108,7 +108,7 @@ pipe_through_channel_or_fail :
 foreign pure pipe_through_channel_or_fail from "@flick-lang/runtime/effect/Stream" "pipeThroughChannelOrFail"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:3d6acc9efcb47f3c"
+  reviewed "effect@4.1.2 sha256:3d6acc9efcb47f3c"
 
 /// Runs the stream with the services of the plan's first step, and on a
 /// failure with those of the next steps as the plan says; with
@@ -123,4 +123,4 @@ with_execution_plan :
 foreign pure with_execution_plan from "@flick-lang/runtime/effect/Stream" "flickStreamWithExecutionPlan"
   arity 3
   retention call
-  reviewed "effect@4.0.5 sha256:e771fc190fc8f7d1"
+  reviewed "effect@4.1.2 sha256:e771fc190fc8f7d1"

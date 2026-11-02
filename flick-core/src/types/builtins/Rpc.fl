@@ -35,29 +35,29 @@ type Serialization
 /// The default.
 ndjson : Serialization
 foreign pure ndjson from "@flick-lang/runtime/effect/rpc/Rpc" "rpcNdjson"
-  reviewed "effect@4.0.5 sha256:c72ee8574fb6c140"
+  reviewed "effect@4.1.2 sha256:c72ee8574fb6c140"
 
 /// One JSON document: over HTTP the messages of a call come together, so a
 /// stream's elements come once it ends.
 json : Serialization
 foreign pure json from "@flick-lang/runtime/effect/rpc/Rpc" "rpcJson"
-  reviewed "effect@4.0.5 sha256:868b3e8b899a14b1"
+  reviewed "effect@4.1.2 sha256:868b3e8b899a14b1"
 
 /// JSON-RPC 2.0 documents, for clients that speak it.
 json_rpc : Serialization
 foreign pure json_rpc from "@flick-lang/runtime/effect/rpc/Rpc" "rpcJsonRpc"
-  reviewed "effect@4.0.5 sha256:e6046c0ea4f44ba8"
+  reviewed "effect@4.1.2 sha256:8442484c92ce8133"
 
 /// JSON-RPC 2.0, one message a line.
 ndjson_rpc : Serialization
 foreign pure ndjson_rpc from "@flick-lang/runtime/effect/rpc/Rpc" "rpcNdjsonRpc"
-  reviewed "effect@4.0.5 sha256:a78d50601c4030fb"
+  reviewed "effect@4.1.2 sha256:8e90c634696879c6"
 
 /// Effect's binary frames, laid out by the codecs: smaller than JSON, but
 /// both ends must be Effect's, and it adds to a bundle.
 binary : Serialization
 foreign pure binary from "@flick-lang/runtime/effect/rpc/Rpc" "rpcBinary"
-  reviewed "effect@4.0.5 sha256:5d78f3975991bfc4"
+  reviewed "effect@4.1.2 sha256:5d78f3975991bfc4"
 
 /// Where the server listens, the path of its procedures and how it writes
 /// its messages.
@@ -78,19 +78,19 @@ type Transport
 /// A POST per call over fetch: a server of `listen`.
 http : Transport
 foreign pure http from "@flick-lang/runtime/effect/rpc/Rpc" "rpcHttp"
-  reviewed "effect@4.0.5 sha256:8da7c46726693970"
+  reviewed "effect@4.1.2 sha256:227f4e7f4b1f1c65"
 
 /// The messages of calls over the global WebSocket: a server of
 /// `listen_websocket`. Only a program that names it bundles it.
 websocket : Transport
 foreign pure websocket from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWebsocket"
-  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+  reviewed "effect@4.1.2 sha256:c3de3399064bf5e6"
 
 /// The messages of calls over a TCP connection to `tcp://host:port`, opened
 /// on the first call: a server of `listen_tcp`. Node only.
 tcp : Transport
 foreign pure tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcTcp"
-  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+  reviewed "effect@4.1.2 sha256:c3de3399064bf5e6"
 
 /// How a client writes its messages, as its server does, and how it
 /// reaches the server.
@@ -112,21 +112,21 @@ type error ClientError = ClientError String
 /// answers `Unit`.
 make : forall l r. Record.Label l -> Rpc l (Unit ->{r; none} Unit)
 foreign pure make from "@flick-lang/runtime/effect/rpc/Rpc" "rpcMake"
-  reviewed "effect@4.0.5 sha256:04f66df479054dbe"
+  reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
 /// The payload, coded as JSON.
 with_payload :
   forall l p r e s p2. PureCodec Json p2 -> Rpc l (p ->{r; e} s) -> Rpc l (p2 ->{r; e} s)
 foreign pure with_payload from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithPayload"
   arity 2
-  reviewed "effect@4.0.5 sha256:04f66df479054dbe"
+  reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
 /// The success, coded as JSON.
 with_success :
   forall l p r e s s2. PureCodec Json s2 -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e} s2)
 foreign pure with_success from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithSuccess"
   arity 2
-  reviewed "effect@4.0.5 sha256:04f66df479054dbe"
+  reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
 /// The success as a stream of elements, each coded as JSON and sent as it
 /// comes; a failure of the handler fails the stream.
@@ -135,7 +135,7 @@ with_stream :
   PureCodec Json a -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e} Stream none none a)
 foreign pure with_stream from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithStream"
   arity 2
-  reviewed "effect@4.0.5 sha256:60a7d20a9e48db21"
+  reviewed "effect@4.1.2 sha256:60a7d20a9e48db21"
 
 /// No typed error.
 errors : ErrorCases none
@@ -145,7 +145,7 @@ foreign pure errors from "@flick-lang/runtime/effect/rpc/Rpc" "rpcErrors"
 error_case : forall t e. PureCodec Json t -> ErrorCases e -> ErrorCases {t | e}
 foreign pure error_case from "@flick-lang/runtime/effect/rpc/Rpc" "rpcErrorCase"
   arity 2
-  reviewed "effect@4.0.5 sha256:04f66df479054dbe"
+  reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
 /// More typed errors of the handler, each coded as its case says: a
 /// handler failing with an error no case has is a type error, not a defect.
@@ -153,7 +153,7 @@ with_errors :
   forall l p r e s e2. ErrorCases e2 -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e + e2} s)
 foreign pure with_errors from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithErrors"
   arity 2
-  reviewed "effect@4.0.5 sha256:04f66df479054dbe"
+  reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
 /// What a hook of `with_middleware` gets: the decoded payload and the
 /// headers of the call, those of its HTTP request or WebSocket with those
@@ -167,7 +167,7 @@ type alias Call p = { payload : p; headers : Http.Headers.Headers }
 with_middleware : (Call p ->{r; e} Unit) -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e} s)
 foreign pure with_middleware from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithMiddleware"
   arity 2
-  reviewed "effect@4.0.5 sha256:93976e18ef904486"
+  reviewed "effect@4.1.2 sha256:93976e18ef904486"
 
 /// Runs the handler with the service `tag` that `check` makes from each
 /// call, after the hooks of `with_middleware`: from its `authorization`
@@ -189,12 +189,12 @@ foreign pure with_auth from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithAuth"
 /// or interrupts the call: for a write that must not stop halfway.
 uninterruptible : Rpc l f -> Rpc l f
 foreign pure uninterruptible from "@flick-lang/runtime/effect/rpc/Rpc" "rpcUninterruptible"
-  reviewed "effect@4.0.5 sha256:1a4870136a854e0f"
+  reviewed "effect@4.1.2 sha256:1a4870136a854e0f"
 
 /// A group with no procedures yet.
 group : Group r {}
 foreign pure group from "@flick-lang/runtime/effect/rpc/Rpc" "rpcGroup"
-  reviewed "effect@4.0.5 sha256:2778a7f9eb6fd7f5"
+  reviewed "effect@4.1.2 sha256:2778a7f9eb6fd7f5"
 
 /// The group, served without the service `tag`: each of its procedures
 /// makes it per call with `with_auth`. A procedure without one is a defect
@@ -209,7 +209,7 @@ add :
   Rpc l (p ->{r; e} s) -> Group r hs -> Group r out
 foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
   arity 2
-  reviewed "effect@4.0.5 sha256:2778a7f9eb6fd7f5"
+  reviewed "effect@4.1.2 sha256:2778a7f9eb6fd7f5"
 
 /// Serves the group with these handlers, one per procedure, at `path`,
 /// until the scope owning region `s` closes: then it stops accepting, lets
@@ -222,7 +222,7 @@ listen :
 foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
   arity 3
   retention owner
-  reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
+  reviewed "effect@4.1.2 sha256:96a035f63aca976f"
 
 /// As `listen`, each client a WebSocket at `path` whose messages carry its
 /// calls: `ws://127.0.0.1:8080/rpc`. Every serialization streams over it.
@@ -233,7 +233,7 @@ listen_websocket :
 foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenWebsocket"
   arity 3
   retention owner
-  reviewed "effect@4.0.5 sha256:9aaac4b7a11d7595"
+  reviewed "effect@4.1.2 sha256:95596588ccbf7076"
 
 /// As `listen`, each client a TCP connection to `host` and `port` whose
 /// messages carry its calls: `tcp://127.0.0.1:8080`. Only a serialization
@@ -246,14 +246,14 @@ listen_tcp :
 foreign effect listen_tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenTcp"
   arity 3
   retention owner
-  reviewed "effect@4.0.5 sha256:32acbc4cf74e10ac"
+  reviewed "effect@4.1.2 sha256:32acbc4cf74e10ac"
 
 /// The port the server listens on: the one asked for, or the one the system
 /// chose for port 0.
 port : Server s -> Float
 foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
   retention call
-  reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
+  reviewed "effect@4.1.2 sha256:96a035f63aca976f"
 
 /// The group with these handlers as an HTTP handler, a POST per call, for a
 /// route of `Http.Router` beside others: `Http.Router.route (Some POST)
@@ -266,7 +266,7 @@ handler :
 foreign effect handler from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandler"
   arity 3
   retention owner
-  reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
+  reviewed "effect@4.1.2 sha256:96a035f63aca976f"
 
 /// As `handler`, each client a WebSocket whose messages carry its calls,
 /// for a `GET` route.
@@ -277,7 +277,7 @@ handler_websocket :
 foreign effect handler_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandlerWebsocket"
   arity 3
   retention owner
-  reviewed "effect@4.0.5 sha256:9aaac4b7a11d7595"
+  reviewed "effect@4.1.2 sha256:95596588ccbf7076"
 
 /// Calls the procedure at `url` (`http://127.0.0.1:8080/rpc`, or
 /// `ws://…` over `websocket`) as `options` says: the success, a declared
@@ -286,13 +286,13 @@ call_with :
   forall l p r e s. CallOptions -> String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
 foreign effect call_with from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCall"
   arity 4
-  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+  reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
 /// `call_with call_defaults`.
 call : forall l p r e s. String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
 foreign effect call from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallNdjson"
   arity 3
-  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+  reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
 /// Calls the stream procedure at `url` writing as `options` says: its
 /// elements as they come, a declared error as the stream's failure, or
@@ -306,7 +306,7 @@ call_stream_with :
   Stream none {ClientError | e} a
 foreign pure call_stream_with from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStream"
   arity 4
-  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+  reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
 /// `call_stream_with call_defaults`.
 call_stream :
@@ -314,7 +314,7 @@ call_stream :
   String -> Rpc l (p ->{r; e} Stream none none a) -> p -> Stream none {ClientError | e} a
 foreign pure call_stream from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamNdjson"
   arity 3
-  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+  reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
 /// A connection to a server that calls share until the scope owning region
 /// `s` closes.
@@ -326,14 +326,14 @@ type Client (s : Region)
 connect : forall s. CallOptions -> String ->{Scope s; ClientError} Client s
 foreign effect connect from "@flick-lang/runtime/effect/rpc/Rpc" "rpcConnect"
   arity 2
-  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+  reviewed "effect@4.1.2 sha256:c3de3399064bf5e6"
 
 /// Calls the procedure over the connection.
 call_on : forall s l p r e x. Client s -> Rpc l (p ->{r; e} x) -> p ->{; ClientError | e} x
 foreign effect call_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallOn"
   arity 3
   retention call
-  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+  reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
 /// Calls the stream procedure over the connection.
 call_stream_on :
@@ -342,7 +342,7 @@ call_stream_on :
 foreign pure call_stream_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamOn"
   arity 3
   retention owner
-  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+  reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
 /// Answers the calls of the messages on stdin on stdout until stdin ends:
 /// a program another starts with `spawn`, as editors start language
@@ -351,7 +351,7 @@ serve_stdio : forall c r hs. Serialization -> Group r hs -> (hs^c ->{Stdio.Stdio
 foreign effect serve_stdio from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcServeStdio"
   arity 3
   retention call
-  reviewed "effect@4.0.5 sha256:8aea91f3d781cae8"
+  reviewed "effect@4.1.2 sha256:8aea91f3d781cae8"
 
 /// Starts `command` with `args` and connects to it over its stdin and
 /// stdout, which its `serve_stdio` answers; its stderr is the program's.
@@ -359,7 +359,7 @@ foreign effect serve_stdio from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcSer
 spawn : forall s. Serialization -> String -> List String ->{Scope s; ClientError} Client s
 foreign effect spawn from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcSpawn"
   arity 3
-  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+  reviewed "effect@4.1.2 sha256:c3de3399064bf5e6"
 
 /// Answers the calls of the page that started this Web Worker until it
 /// closes the worker: the program of the module `worker` starts. Messages
@@ -368,14 +368,14 @@ serve_worker : forall c r hs. Group r hs -> (hs^c ->{r; none} Unit)^c
 foreign effect serve_worker from "@flick-lang/runtime/effect/rpc/Rpc" "rpcServeWorker"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:a3c91b37d4a12a3f"
+  reviewed "effect@4.1.2 sha256:a3c91b37d4a12a3f"
 
 /// Starts a module Web Worker from `url` and connects to it; its
 /// `serve_worker` answers. The end of the scope closes it. Browsers only.
 worker : forall s. String ->{Scope s; ClientError} Client s
 foreign effect worker from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWorker"
   arity 1
-  reviewed "effect@4.0.5 sha256:5a2bb17815a939f5"
+  reviewed "effect@4.1.2 sha256:5a2bb17815a939f5"
 
 /// Answers the calls of the thread that started this worker thread until it
 /// closes it, as `serve_worker` in a browser. Node only.
@@ -383,7 +383,7 @@ serve_node_worker : forall c r hs. Group r hs -> (hs^c ->{r; none} Unit)^c
 foreign effect serve_node_worker from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcServeNodeWorker"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:a3c91b37d4a12a3f"
+  reviewed "effect@4.1.2 sha256:a3c91b37d4a12a3f"
 
 /// Starts a worker thread running the script at `path` with `args` and
 /// connects to it; its `serve_node_worker` answers. The end of the scope
@@ -391,7 +391,7 @@ foreign effect serve_node_worker from "@flick-lang/runtime/effect/rpc/RpcNode" "
 node_worker : forall s. String -> List String ->{Scope s; ClientError} Client s
 foreign effect node_worker from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcNodeWorker"
   arity 2
-  reviewed "effect@4.0.5 sha256:5a2bb17815a939f5"
+  reviewed "effect@4.1.2 sha256:5a2bb17815a939f5"
 
 /// Runs `task` with its calls carrying the headers too, which the hooks of
 /// `with_middleware` read: `authorization`, say.
@@ -399,7 +399,7 @@ with_headers : forall c r e a. Http.Headers.Input -> (Eff r e a)^c ->{r; e} a
 foreign effect with_headers from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithHeaders"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:dcacf8ec37486efd"
+  reviewed "effect@4.1.2 sha256:dcacf8ec37486efd"
 
 /// Calls the procedure of the group in memory, client and server joined
 /// without a transport: for tests of the handlers. The codecs do not run,
@@ -409,7 +409,7 @@ call_local : forall c l p r e s hs. Group r hs -> hs^c -> Rpc l (p ->{r; e} s) -
 foreign effect call_local from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallLocal"
   arity 4
   retention call
-  reviewed "effect@4.0.5 sha256:0b1d15cf1be88aba"
+  reviewed "effect@4.1.2 sha256:e7f8fc6a44cc917c"
 
 /// Calls the stream procedure of the group in memory, as `call_local`.
 call_stream_local :
@@ -418,4 +418,4 @@ call_stream_local :
 foreign pure call_stream_local from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamLocal"
   arity 4
   retention owner
-  reviewed "effect@4.0.5 sha256:0b1d15cf1be88aba"
+  reviewed "effect@4.1.2 sha256:e7f8fc6a44cc917c"

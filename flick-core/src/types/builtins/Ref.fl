@@ -31,13 +31,13 @@ module Ref exposing (
 make : forall c a. a^c ->{} Ref (a^c)
 foreign sync make from "@flick-lang/runtime" "refMake"
   retention call
-  reviewed "effect@4.0.5 sha256:13ba531db6f50e31"
+  reviewed "effect@4.1.2 sha256:13ba531db6f50e31"
 
 /// The current contents.
 get : forall c a. (Ref a)^c ->{} a^c
 foreign sync get from "@flick-lang/runtime" "refGet"
   retention call
-  reviewed "effect@4.0.5 sha256:b4713cd12c52d94d"
+  reviewed "effect@4.1.2 sha256:b4713cd12c52d94d"
 
 /// Whether both are the same cell. Cells have no `Eq` or `Hash`: a write
 /// would change what they compare by.
@@ -48,13 +48,13 @@ foreign pure same from "@flick-lang/runtime" "refSame"
 set : forall c a. (Ref a)^c -> (a^c ->{} Unit)^c
 foreign sync set from "@flick-lang/runtime" "refSet"
   retention call
-  reviewed "effect@4.0.5 sha256:7ab1cc29131d058b"
+  reviewed "effect@4.1.2 sha256:7ab1cc29131d058b"
 
 /// `f` gives the result and the new contents, in one step.
 modify : forall c d x a b. (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
 foreign sync modify from "@flick-lang/runtime" "refModify"
   retention call
-  reviewed "effect@4.0.5 sha256:2931caacecf3556c"
+  reviewed "effect@4.1.2 sha256:2931caacecf3556c"
 
 /// The contents after a partial update: `next`, or `old` with `None`.
 or_old : forall c a. a^c -> ((Option a)^c -> a^c)^c

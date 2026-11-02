@@ -43,3 +43,7 @@ FiberRuntimeMetricsImpl = "invariant: hooks the fiber runtime calls synchronousl
 MetricRegistry = "invariant: a mutable `Map` shared by every fiber and metric, state outside `Ref`"
 isMetric = "TS-only: a type guard; Flick values are typed statically"
 snapshotUnsafe = "invariant: unsafe; reads the registry outside an effect with a raw context (`Metric.snapshot` is the effect)"
+Registration = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+registerUnsafe = "invariant: `unsafe*`: a plain synchronous call outside the effect, unordered with the fiber's steps"
+remove = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+removeUnsafe = "invariant: `unsafe*`: a plain synchronous call outside the effect, unordered with the fiber's steps"

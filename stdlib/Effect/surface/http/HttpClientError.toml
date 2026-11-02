@@ -1,14 +1,14 @@
 [wrapped]
-DecodeError = "Http.ClientError.ClientErrorReason 687e5bb389ae9a0c"
-EmptyBodyError = "Http.ClientError.ClientErrorReason d327b9169716431a"
-EncodeError = "Http.ClientError.ClientErrorReason 4b0159f48cf8c697"
+DecodeError = "Http.ClientError.ClientErrorReason 71dc92ccc485b096"
+EmptyBodyError = "Http.ClientError.ClientErrorReason 7325766727742d99"
+EncodeError = "Http.ClientError.ClientErrorReason 309b3263e9368268"
 HttpClientError = "Http.ClientError.HttpClientError cd105b894a1aabb1"
 HttpClientErrorReason = "Http.ClientError.ClientErrorReason cbecbc242d067785"
-InvalidUrlError = "Http.ClientError.ClientErrorReason 27d48e971cf24b01"
+InvalidUrlError = "Http.ClientError.ClientErrorReason b820788ccbb5923a"
 RequestError = "Http.ClientError.RequestDetails f87d2ff9f09a270c"
 ResponseError = "Http.ClientError.ResponseDetails ce10c28f1bd3f92d"
-StatusCodeError = "Http.ClientError.ClientErrorReason 73cae5aacf3363da"
-TransportError = "Http.ClientError.ClientErrorReason c5ed27903e40167a"
+StatusCodeError = "Http.ClientError.ClientErrorReason 1e28ebe8cc6dcc93"
+TransportError = "Http.ClientError.ClientErrorReason 946ebdf84de7e004"
 
 [excluded]
 HttpClientErrorSchema = "TS-only: an Effect `Schema` class that carries the error over `effect/rpc` and `effect/workers`, entrypoints excluded from 0.1.0"

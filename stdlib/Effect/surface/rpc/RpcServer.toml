@@ -2,8 +2,8 @@
 layerProtocolSocketServer = "Rpc.listen_tcp 32acbc4cf74e10ac"
 layerProtocolStdio = "Rpc.serve_stdio 8aea91f3d781cae8"
 layerProtocolWorkerRunner = "Rpc.serve_node_worker a3c91b37d4a12a3f"
-toHttpEffect = "Rpc.listen 686bfd3f4471e7d1"
-toHttpEffectWebsocket = "Rpc.listen_websocket 9aaac4b7a11d7595"
+toHttpEffect = "Rpc.listen 96a035f63aca976f"
+toHttpEffectWebsocket = "Rpc.listen_websocket 95596588ccbf7076"
 
 [excluded]
 Protocol = "`Rpc` serves HTTP, WebSocket, TCP and standard streams on Node; this protocol or server is outside the binding"
