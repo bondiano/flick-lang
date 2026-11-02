@@ -98,6 +98,14 @@ let by_owner who = sql {
   select { id = u.id }
 }
 
+/// A filter that may be absent: an `Option` capture is `NULL` when `None`.
+of_name : Option String -> Sql.Template Pg {} { id : UserId }
+let of_name name = sql {
+  from u in Users
+  where is_null $name || u.name == $name
+  select { id = u.id }
+}
+
 main : Unit ->{; AppError} Unit
 let main () =
   let q = Sql.bind by_name { name = "'; DROP TABLE users; --" }
@@ -112,3 +120,5 @@ let main () =
   Platform.stdout_line (Sql.template_text (by_owner { name = "Ada"; email = None }))
   Platform.stdout_line
     (show (Option.is_some (Sql.identifier "users"), Option.is_some (Sql.identifier "users; drop")))
+  Platform.stdout_line (Sql.template_text (of_name None))
+  Platform.stdout_line (show (Sql.parameter_count (Sql.bind (of_name (Some "Ada")) {})))

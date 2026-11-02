@@ -157,6 +157,15 @@ let set_email who email = sql {
   returning { email = Users.email }
 }
 
+/// The users of a name, or all of them: a filter given or not.
+filtered : Option String -> Sql.Template Pg {} { name : String }
+let filtered name = sql {
+  from u in Users
+  where is_null $name || u.name == $name
+  order_by u.name
+  select u.name
+}
+
 drift : Sql.Template Pg {} { amount : BigInt }
 let drift = sql {
   from d in Drift
@@ -194,6 +203,8 @@ let run () =
   Platform.stdout_line (show (Database.query (Sql.bind (accounts_of ada) {})))
   Platform.stdout_line (show (Database.query (Sql.bind (set_email ada None) {})))
   Platform.stdout_line (show (Database.query (Sql.bind (set_email bob (Some "'; --")) {})))
+  Platform.stdout_line (show (Database.query (Sql.bind (filtered None) {})))
+  Platform.stdout_line (show (Database.query (Sql.bind (filtered (Some "Ada")) {})))
   Platform.stdout_line (show (Database.query (Sql.bind close { owner = ada }) |> List.length))
   let kept =
     (one (open_account, { owner = bob; balance = BigDecimal.from_integer 1n }, { id = 0n })).id

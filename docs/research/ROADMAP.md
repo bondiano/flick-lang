@@ -412,7 +412,7 @@ component search (props : SearchProps) =
 **W7. Раздача: CORS и SPA.** ✅ `44194447` (нового API не нужно: `HttpApi.route` рядом с `Http.StaticServer.route` и `Http.Middleware.cors` на одном маршрутизаторе — так Go-сервер раздаёт собранный клиент; найден и исправлен дефект на обоих таргетах: `spa = true` без явного `index` не отдавал `index.html`, потому что привязка передавала Effect ключ `index: undefined`, а Go повторил это; `tests/run/stdlib/http/spa`)
 - AC: API, статика и CORS для dev-сервера на одном сервере; путь клиента без файла отвечает `index.html`; оба таргета.
 
-**W8. Миграции и SQL для Conduit.** 🔶 (`Database.Migrate.run` — на Flick поверх `Database`, поэтому на обоих таргетах: шаги выше записанной версии в одной транзакции под advisory-блокировкой; `tests/postgres/migrate.fl` в `flick/tests/sql_postgres.rs`, js и go; пробелы DSL для запросов Conduit — при W21)
+**W8. Миграции и SQL для Conduit.** 🔶 (`Database.Migrate.run` — на Flick поверх `Database`, поэтому на обоих таргетах: шаги выше записанной версии в одной транзакции под advisory-блокировкой; `tests/postgres/migrate.fl` в `flick/tests/sql_postgres.rs`, js и go; пробелы DSL для запросов Conduit — при W21: захват `Option t` — `t` или `NULL`, с приведением базового типа, для необязательных фильтров; в документации исправлены `Int` у целых столбцов и `limit`/`offset`)
 - AC: модуль `Migrate` — упорядоченный список SQL с таблицей версий, прогон при старте, повторный прогон ничего не делает; оба таргета.
 - AC: запросы Conduit (`favorited`, `following`, счётчики, фильтры по тегу, автору, избранному, пагинация) пишутся DSL `sql` без `unsafe_query`; каждый найденный пробел DSL — подпункт.
 

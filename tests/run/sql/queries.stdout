@@ -5,6 +5,8 @@ SELECT "u"."name" AS "name", COUNT("a"."id") AS "accounts", SUM("a"."balance")::
 INSERT INTO "users" AS "Users" ("name", "email") VALUES ($1, $2) RETURNING "Users"."id" AS "id"
 SELECT "u"."name" AS "name", "a"."balance" AS "balance" FROM "users" AS "u" LEFT JOIN "accounts" AS "a" ON ("a"."user_id" = "u"."id") WHERE (("u"."id" = $1) AND ("u"."name" <> $2))
 2
-UPDATE "users" AS "Users" SET "name" = $1, "email" = $2 WHERE ("Users"."id" = $3) RETURNING "Users"."id" AS "id"
+UPDATE "users" AS "Users" SET "name" = $1, "email" = CAST($2 AS text) WHERE ("Users"."id" = $3) RETURNING "Users"."id" AS "id"
 SELECT "u"."id" AS "id" FROM "users" AS "u" WHERE (("u"."name" = $1) AND ("u"."name" <> $2))
 (true, false)
+SELECT "u"."id" AS "id" FROM "users" AS "u" WHERE ((CAST($1 AS text) IS NULL) OR ("u"."name" = CAST($2 AS text)))
+2
