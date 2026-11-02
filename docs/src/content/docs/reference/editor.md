@@ -7,7 +7,10 @@ title: "Editors"
 `flick lsp --stdio` is the language server. Its stdout carries only the
 protocol; logs go to stderr. It runs the same analysis as `flick check` and
 `flick build` over the project the document belongs to (the nearest
-`flick.toml`), with the open buffers in place of the files.
+`flick.toml`), with the open buffers in place of the files. In a
+[workspace](../project/#workspaces) a library's files are reported by the
+library itself, and saving one checks the open members that depend on it
+again; navigation into a path dependency opens its own files.
 
 Hover and navigation follow unsaved edits in imported open modules, including
 standalone files without `flick.toml`. Closing an imported buffer restores its
@@ -18,13 +21,13 @@ on-disk version for dependent requests.
 | diagnostics | exactly those of `flick check`, with their `FLICK-` codes, at UTF-16 positions, published when a document is opened or saved; help lines follow the message, related spans (where an expected type came from) are `relatedInformation`, unused code is tagged `Unnecessary` |
 | `textDocument/hover` | source signatures and `///` documentation for public and private values, at declarations and uses; module documentation on qualifiers such as `Sql`; inferred locals and values, SQL aliases, columns and parameters, on a keyword that opens an expression (`task`, `scope`, `match`, `fun` …) the type of the whole expression, on `await` and `ignore` the type of the operand (see [keywords.md](../keywords/#in-the-editor)); declarations distinguish `type error` from `service` |
 | `textDocument/definition` | across modules; module qualifiers lead to their module header, members to their declaration; built-ins open as real read-only `.fl` files; installed packages use their published `.fl`, else `.iface`; companions lead to their type, class methods at a known instance to that instance |
-| `textDocument/references` | every occurrence in the project |
-| `textDocument/rename` | the project's own values, types, constructors and locals, in `.fl` sources only; names of built-in modules and packages, service operations and instance methods have no exact mapping and are refused |
+| `textDocument/references` | every occurrence in the project and, for a name of a workspace member, in the members that depend on it by path |
+| `textDocument/rename` | the project's own values, types, constructors and locals, in `.fl` sources only, and in the members of the workspace that depend on the project; names of built-in modules and packages, service operations and instance methods have no exact mapping and are refused |
 | `textDocument/completion` | items carry their `///` documentation and a snippet of a function's parameters, sorted locals first; a value of a module the file does not import is offered as `Module.name` (built-ins need no import, a project module gets its `import` added); record fields after `x.`, module exports or service operations after `M.`, otherwise names in scope; SQL blocks offer tables, aliases, columns, parameters, clauses and functions; `sql table` columns offer the SQL types of the project's dialect, then the modifiers that are not written yet and do not conflict, after `as` Flick types and after `via` the codecs in scope whose type instantiates to the column's `PureCodec`, imported ones also as `Module.codec` |
 | `textDocument/codeAction` | quick fixes of diagnostics that carry an edit: the closest name for a misspelt one, removing unused imports and definitions, `_` for an unused variable, the missing arms of a `match`, a `todo` definition of a missing function, the inferred type for a `_` hole; on `FLICK-T004` it inserts the inferred signature `name : T` right above the `let`, at its indentation, with effect rows, type variables, class constraints and names qualified as the module's imports allow; a binding the checker rejected gets none |
 | `textDocument/codeAction` (refactors) | add the signature of a `let` value; pattern match on a variable that is a block's result; qualify an imported name at every use, or drop a qualifier and import the name; extract the selected expression into a `let`; inline a local `let` into its uses |
 | `textDocument/formatting` | `flick fmt` |
-| `textDocument/documentSymbol`, `workspace/symbol` | declarations, with constructors and methods under their type or class; workspace symbols match the letters of the query in order |
+| `textDocument/documentSymbol`, `workspace/symbol` | declarations, with constructors and methods under their type or class; workspace symbols match the letters of the query in order, over every member of the workspace |
 | `textDocument/signatureHelp` | in a call `f a b`, the signature of `f` with the argument being written marked |
 | `textDocument/typeDefinition` | the declaration of the type of the expression under the cursor |
 | `textDocument/semanticTokens/full` | what each name is: module, type, constructor, function, variable, method or parameter |

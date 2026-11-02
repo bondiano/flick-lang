@@ -133,8 +133,8 @@ impl Ide<'_> {
         if let Some((range, r)) = tree::innermost(m.typing.names.iter(), offset)
             && let Some(node) = tree::find(&m.tree, range)
             && let Some(token) = tree::last_name(node)
-            && token.start <= offset
-            && offset <= token.end
+            // the keyword of `schema T` stands for `T` too
+            && (token.start <= offset && offset <= token.end || node.kind == K::SchemaExpr)
         {
             let at = (token.start, token.end);
             let symbol = match r {
@@ -192,13 +192,18 @@ impl Ide<'_> {
         for node in tree::path_to(&m.tree, offset).into_iter().rev() {
             if !node
                 .child_tokens()
-                .any(|t| t.kind == K::Con && t.start <= offset && offset < t.end)
+                .any(|t| t.kind == K::Con && t.start <= offset && offset <= t.end)
             {
                 continue;
             }
             if !matches!(
                 node.kind,
-                K::NameExpr | K::NameType | K::ConPat | K::ModulePath | K::ImportDecl
+                K::NameExpr
+                    | K::NameType
+                    | K::ConPat
+                    | K::SchemaExpr
+                    | K::ModulePath
+                    | K::ImportDecl
             ) {
                 continue;
             }
@@ -206,10 +211,13 @@ impl Ide<'_> {
                 .child_tokens()
                 .filter(|t| matches!(t.kind, K::Con | K::Ident))
                 .collect();
-            if matches!(node.kind, K::NameExpr | K::NameType | K::ConPat) {
+            if matches!(
+                node.kind,
+                K::NameExpr | K::NameType | K::ConPat | K::SchemaExpr
+            ) {
                 names.pop();
             }
-            if !names.iter().any(|t| t.start <= offset && offset < t.end) {
+            if !names.iter().any(|t| t.start <= offset && offset <= t.end) {
                 continue;
             }
             let module = if node.kind == K::ImportDecl {

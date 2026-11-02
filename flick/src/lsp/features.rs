@@ -8,7 +8,7 @@ use flick_core::source::FileId;
 use serde_json::{Value, json};
 
 use super::requests::{ide, package_dir};
-use super::{Server, protocol};
+use super::{Snapshot, protocol};
 
 /// The line and UTF-16 column of `offset`.
 fn line_column(text: &str, offset: u32) -> (u64, u64) {
@@ -90,30 +90,22 @@ pub(super) fn signature_help(ide: &Ide, file: FileId, offset: u32) -> Value {
     })
 }
 
-impl Server {
-    /// `workspace/symbol` over the latest analysis; none before one exists.
-    pub(super) fn workspace_symbols(&self, params: &Value) -> Value {
-        let Some(snapshot) = &self.snapshot else {
-            return json!([]);
-        };
-        let query = params["query"].as_str().unwrap_or("");
-        let dir = package_dir(&snapshot.root);
-        let ide = ide(snapshot, &dir);
-        let symbols: Vec<Value> = ide
-            .workspace_symbols(query)
-            .into_iter()
-            .map(|(file, o)| {
-                let source = snapshot.sources.get(file);
-                json!({
-                    "name": o.name,
-                    "kind": o.kind,
-                    "location": {
-                        "uri": protocol::uri_of(Path::new(&source.path)),
-                        "range": protocol::range(&source.text, o.selection.0, o.selection.1),
-                    },
-                })
+/// The symbols of `snapshot` that match `query`, as LSP symbol information.
+pub(super) fn symbols(snapshot: &Snapshot, query: &str) -> Vec<Value> {
+    let dir = package_dir(&snapshot.root);
+    let ide = ide(snapshot, &dir);
+    ide.workspace_symbols(query)
+        .into_iter()
+        .map(|(file, o)| {
+            let source = snapshot.sources.get(file);
+            json!({
+                "name": o.name,
+                "kind": o.kind,
+                "location": {
+                    "uri": protocol::uri_of(Path::new(&source.path)),
+                    "range": protocol::range(&source.text, o.selection.0, o.selection.1),
+                },
             })
-            .collect();
-        Value::Array(symbols)
-    }
+        })
+        .collect()
 }

@@ -51,6 +51,11 @@ fn members_follow_their_path_dependencies() {
         .expect("a workspace");
     assert_eq!(workspace.names(), ["contract", "server"]);
     assert_eq!(workspace.member("server"), Some(Path::new("/w/server")));
+    assert_eq!(
+        workspace.dependents(Path::new("/w/contract")),
+        [Path::new("/w/server")]
+    );
+    assert!(workspace.dependents(Path::new("/w/server")).is_empty());
     let inside = find(&host, &mut sources, Path::new("/w/server/src")).expect("valid");
     assert!(inside.is_some());
     let host = memory(&[
