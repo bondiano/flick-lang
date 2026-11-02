@@ -44,6 +44,7 @@ and `Monad`.
 | `Chunk` | Effect's `Chunk`, for repeated concatenation |
 | `Js.Array` | mutable JS arrays, behind runtime operations; lists are copied in and out |
 | `String` | `split`, `join`, `slice`, `index_of`, `to_number`, … over UTF-16 code units |
+| `Markdown` | `to_html`: the everyday CommonMark subset (headings, paragraphs, lists, quotes, fenced code, rules, `code`, strong, emphasis, links) into HTML in which every text is escaped and links go only to `http`, `https`, `mailto` and relative URLs, so a script in the source stays text; `escape` |
 | `Int` | `to_float`, `from_float`, `truncate`, `parse`, bitwise `bit_*` and `shift_*`, checked `checked_add`, `checked_div`, … returning `Result ArithmeticError Int`, and `unsafe_div`, `unsafe_rem` |
 | `Float` | `strict_equal` (`===`), `same_value` (`Object.is`), rounding, `parse`, `is_nan`, `is_finite`, … |
 | `BigInt` | conversions and checked `divide`, `remainder` |

@@ -45,6 +45,7 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
         builtin_source!("builtins/List/Transform.fl"),
     ),
     ("List", builtin_source!("builtins/List.fl")),
+    ("Markdown", builtin_source!("builtins/Markdown.fl")),
     ("Seq", builtin_source!("builtins/Seq.fl")),
     ("Monoids", builtin_source!("builtins/Monoids.fl")),
     ("Validation", builtin_source!("builtins/Validation.fl")),
