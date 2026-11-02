@@ -10,6 +10,8 @@ mod load;
 mod packages;
 #[cfg(feature = "native-project")]
 pub mod pnpm;
+#[cfg(feature = "native-project")]
+pub mod workspace;
 
 use std::path::{Component, Path, PathBuf};
 

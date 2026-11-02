@@ -287,6 +287,7 @@ codes! {
     P028 = Project 28, "output directory holds the project's files";
     P029 = Project 29, "Go toolchain cannot build the program";
     P030 = Project 30, "module not available on the go target";
+    P031 = Project 31, "invalid workspace or path dependency";
 }
 
 #[cfg(test)]

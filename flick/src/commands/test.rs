@@ -319,13 +319,23 @@ pub fn watched(global: &GlobalArguments) -> Vec<PathBuf> {
     }
 }
 
-/// What a watch of `project` follows.
+/// What a watch of `project` follows: its roots, its configuration and the
+/// libraries it depends on by path.
 pub fn watched_roots(project: &Project) -> Vec<PathBuf> {
-    vec![
+    // shortcut: only direct path dependencies are watched, add theirs when a workspace nests libraries
+    let libraries = project
+        .config
+        .dependencies
+        .iter()
+        .map(|d| project::normalize(&project.root.join(&d.path)));
+    [
         project.source_root(),
         project.test_root(),
         project.root.join(project::CONFIG_FILE),
     ]
+    .into_iter()
+    .chain(libraries)
+    .collect()
 }
 
 /// Per-path filesystem state, independent of the newest timestamp in the tree.

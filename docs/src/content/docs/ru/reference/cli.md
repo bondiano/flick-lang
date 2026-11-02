@@ -3,7 +3,8 @@ title: "Командная строка"
 ---
 
 `flick` — исполняемый файл с командами компилятора. Все команды принимают
-глобальные параметры `--project <path>`, `--diagnostics human|json`,
+глобальные параметры `--project <path>`, `--package <name>` (`-p`, участник
+[workspace](../project/#workspace)), `--diagnostics human|json`,
 `--warnings-as-errors`, `--color auto|always|never`, `--quiet` (псевдоним `--silent`)/`--verbose`
 и `--help`. Команда `flick help <command>` выводит справку по выбранной команде,
 а `flick --version` — версию компилятора. Остальные сведения показывает `flick doctor`.
@@ -22,6 +23,7 @@ title: "Командная строка"
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile] [--emit js\|go]` | запускает тесты из корневого каталога тестов на Node или исполняемым файлом Go |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | записывает каноническую раскладку кода ([форматирование](../grammar/#форматирование)); если пути не указаны, обрабатывает корневые каталоги исходников и тестов |
 | `clean [--cache]` | удаляет артефакты сборки; с `--cache` — также кеш сборки |
+| `script [name] -- args` | выполняет скрипт из [`[scripts]`](../project/#скрипты): его команды оболочки по порядку до первой упавшей; без имени выводит список скриптов |
 | `install [--locked] [--offline]` | устанавливает зависимости с помощью pnpm (`--frozen-lockfile`, `--offline`) |
 | `add <pkg>… [--dev]`, `remove <pkg>…`, `update [pkg]…` | изменяет зависимости с помощью pnpm |
 | `deps [--why <pkg>]` | показывает установленный граф зависимостей и модули Flick каждой прямой зависимости |
@@ -37,6 +39,9 @@ title: "Командная строка"
 | `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | выводит одно представление модуля |
 | `lsp --stdio` | запускает [языковой сервер](../editor/#языковой-сервер); stdio — его единственный транспорт |
 | `content-mapper [--declarations <paths>…]` | обслуживает через stdio запросы [Content Mapper](../editor/#content-mapper) TypeScript для файлов `.fl`; его запускает `@flick-lang/content-mapper`; с `--declarations` вместо этого записывает проекцию каждого файла `.fl` из указанных путей рядом с ним как `Name.d.fl.ts` и завершается |
+
+В корне workspace без `[project]` команды `check`, `build`, `test`, `fmt` и
+`clean` без путей выполняются для каждого участника, сначала для зависимостей.
 
 `check`, `build` и этапы сборки в `run`, `dev` и `test` ничего не устанавливают,
 не запускают `main` и не загружают внешние модули. Если версия установленного

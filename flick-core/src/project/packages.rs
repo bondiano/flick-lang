@@ -4,16 +4,20 @@
 //! `"flick": { "iface-dir": "iface" }`, and module `A.B` is `iface/A/B.iface`.
 //! A source package names its source directory instead,
 //! `"flick": { "source-dir": "src" }`: each dependent compiles its modules,
-//! for whichever target it emits, as modules of that package.
+//! for whichever target it emits, as modules of that package. A library of
+//! `[dependencies] name = { path = "…" }` is a source package too, with the
+//! `source-dir` of its own `flick.toml`, and so are its path dependencies.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use super::Host;
+use super::config::{self, Dependency, Kind};
+use super::{Host, Project};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::{self, Interface};
+use crate::source::SourceMap;
 
 #[derive(Debug, Default)]
 pub(super) struct Packages {
@@ -61,16 +65,35 @@ pub fn project_name(host: &dyn Host, root: &Path) -> Option<String> {
 }
 
 impl Packages {
-    /// Reads `package.json` of the project and of its installed direct dependencies.
-    pub fn load(host: &dyn Host, root: &Path, diagnostics: &mut Vec<Diagnostic>) -> Self {
+    /// Reads the path dependencies of the project, then `package.json` of the
+    /// project and of its installed direct dependencies.
+    pub fn load(
+        host: &dyn Host,
+        sources: &mut SourceMap,
+        project: &Project,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) -> Self {
+        let root = &project.root;
+        let mut packages = Vec::new();
+        let dependencies = &project.config.dependencies;
+        path_packages(
+            host,
+            sources,
+            root,
+            root,
+            dependencies,
+            &mut packages,
+            diagnostics,
+        );
         let Some(project) = manifest(host, &root.join("package.json"), diagnostics) else {
-            return Packages::default();
+            return Packages { packages };
         };
         let names = project
             .dependencies
             .keys()
             .chain(project.dev_dependencies.keys());
-        let packages = names
+        let installed = names
+            .filter(|name| !packages.iter().any(|p| p.name == **name))
             .map(|name| {
                 let dir = root.join("node_modules").join(name);
                 let installed = manifest(host, &dir.join("package.json"), diagnostics);
@@ -86,8 +109,8 @@ impl Packages {
                     layout,
                     source_dir,
                 }
-            })
-            .collect();
+            });
+        packages.extend(installed.collect::<Vec<_>>());
         Packages { packages }
     }
 
@@ -170,6 +193,75 @@ impl Packages {
             }
         }
         found
+    }
+}
+
+/// The libraries `dependencies` of the manifest in `dir` name by path, then
+/// theirs, each once; `project` is the root of the project being loaded.
+fn path_packages(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: &Path,
+    dir: &Path,
+    dependencies: &[Dependency],
+    out: &mut Vec<Package>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let mut found = Vec::new();
+    for dependency in dependencies {
+        let at = super::normalize(&dir.join(&dependency.path));
+        let error = |message: String| Diagnostic::error(codes::P031, message, dependency.span);
+        if at == project {
+            diagnostics.push(error(format!(
+                "dependency `{}` is the project itself: path dependencies must not form a cycle",
+                dependency.name
+            )));
+            continue;
+        }
+        if out.iter().any(|p| p.name == dependency.name) {
+            continue;
+        }
+        let file = at.join(super::CONFIG_FILE);
+        let Ok(bytes) = host.read(&file) else {
+            diagnostics.push(error(format!(
+                "dependency `{}`: no `{}` at `{}`",
+                dependency.name,
+                super::CONFIG_FILE,
+                host.display(&at)
+            )));
+            continue;
+        };
+        let (id, utf8) = sources.add_bytes(host.display(&file), bytes);
+        let parsed = match utf8 {
+            Some(diagnostic) => Err(diagnostic),
+            None => config::parse(&sources.get(id).text, id),
+        };
+        let library = match parsed {
+            Ok(library) => library,
+            Err(diagnostic) => {
+                diagnostics.push(diagnostic);
+                continue;
+            }
+        };
+        if library.kind != Kind::Lib {
+            diagnostics.push(error(format!(
+                "dependency `{}` at `{}` is an app: a path dependency is a `kind = \"lib\"`",
+                dependency.name,
+                host.display(&at)
+            )));
+            continue;
+        }
+        out.push(Package {
+            name: dependency.name.clone(),
+            installed: true,
+            layout: None,
+            iface_dir: None,
+            source_dir: Some(super::normalize(&at.join(&library.source_dir))),
+        });
+        found.push((at, library.dependencies));
+    }
+    for (at, dependencies) in found {
+        path_packages(host, sources, project, &at, &dependencies, out, diagnostics);
     }
 }
 

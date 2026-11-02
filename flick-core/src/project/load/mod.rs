@@ -166,7 +166,7 @@ fn run(
     let mut diagnostics = Vec::new();
     #[cfg(feature = "native-project")]
     let packages = project.map_or_else(Packages::default, |p| {
-        Packages::load(host, &p.root, &mut diagnostics)
+        Packages::load(host, sources, p, &mut diagnostics)
     });
     #[cfg(not(feature = "native-project"))]
     let diagnostics = Vec::new();

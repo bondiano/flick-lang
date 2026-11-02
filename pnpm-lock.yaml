@@ -242,9 +242,6 @@ importers:
 
   examples/conduit/server:
     dependencies:
-      '@conduit/contract':
-        specifier: workspace:*
-        version: link:../contract
       '@flick-lang/runtime':
         specifier: workspace:*
         version: link:../../../runtime

@@ -23,6 +23,7 @@ mod progress;
 mod report;
 mod sources;
 mod toolchain;
+mod workspace;
 
 /// Runs `command` again after every change of the project's files.
 fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
@@ -64,8 +65,6 @@ fn dependency_command(cmd: Commands) -> pnpm::Command {
 
 fn main() -> ExitCode {
     let args = CommandArguments::parse();
-    let global = &args.global;
-    let project = global.project.as_deref();
     if !matches!(
         args.cmd,
         Commands::Fmt(_)
@@ -81,11 +80,37 @@ fn main() -> ExitCode {
             | Commands::Deps(_)
             | Commands::Explain(_)
             | Commands::Doctor
+            | Commands::Script(_)
             // after its logging starts
             | Commands::Lsp(_)
     ) {
         builtins::prepare();
     }
+    let members = match workspace::members(&args) {
+        Ok(Some(members)) => members,
+        Ok(None) => return dispatch(args),
+        Err(outcome) => return report(outcome, &args.global),
+    };
+    let several = members.len() > 1;
+    let mut code = ExitCode::SUCCESS;
+    for member in members {
+        let mut args = CommandArguments::parse();
+        if several {
+            report::log(&args.global, &format!("in `{member}`"));
+        }
+        args.global.project = Some(member);
+        let done = dispatch(args);
+        if code == ExitCode::SUCCESS {
+            code = done;
+        }
+    }
+    code
+}
+
+/// Runs the command on its project.
+fn dispatch(args: CommandArguments) -> ExitCode {
+    let global = &args.global;
+    let project = global.project.as_deref();
     match args.cmd {
         Commands::Check(options) => {
             let watching = options.watch;
@@ -140,6 +165,7 @@ fn main() -> ExitCode {
         Commands::Run(options) => commands::run(&options, global),
         Commands::Dev(options) => commands::dev(&options, global),
         Commands::Clean(options) => report(commands::clean(&options, global), global),
+        Commands::Script(options) => commands::script(&options, global),
         Commands::Install(_)
         | Commands::Add(_)
         | Commands::Remove(_)

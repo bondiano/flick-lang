@@ -4,7 +4,6 @@
   "type": "module",
   "version": "0.1.0",
   "dependencies": {
-    "@conduit/contract": "workspace:*",
     "@flick-lang/runtime": "workspace:*",
     "effect": "4.0.5"
   },

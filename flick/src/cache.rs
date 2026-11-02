@@ -1,7 +1,7 @@
 //! The build cache in `.flick/cache/`: a build's artifacts by a key over
 //! everything that decides them (sources, effective configuration, profile
 //! and emit settings, compiler and runtime versions, the lockfile and the
-//! interfaces of installed dependencies), and the manifest of what each
+//! interfaces and sources of dependencies), and the manifest of what each
 //! build wrote, which `flick clean` follows.
 
 use std::collections::HashSet;
@@ -11,7 +11,7 @@ use std::{env, fs, io};
 
 use flick_core::build::Artifact;
 use flick_core::project::cache::{self, Key, Manifest};
-use flick_core::project::{self, Project};
+use flick_core::project::{self, Project, config};
 use flick_core::source::SourceMap;
 
 use crate::commands::inputs::{declared_name, sibling_root};
@@ -114,6 +114,7 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
             .map(|file| project.root.join(file)),
     );
     files.extend(dependency_files(&project.root));
+    library_files(&project.root, &project.config.dependencies, &mut files);
     for path in &mut files {
         *path = project::normalize(path);
     }
@@ -141,15 +142,55 @@ fn dependency_files(root: &Path) -> Vec<PathBuf> {
             let Ok(package) = fs::read(dir.join("package.json")) else {
                 continue;
             };
-            let iface_dir = serde_json::from_slice::<serde_json::Value>(&package)
+            let flick = serde_json::from_slice::<serde_json::Value>(&package)
                 .ok()
-                .and_then(|p| Some(p.get("flick")?.get("iface-dir")?.as_str()?.to_owned()));
-            if let Some(iface_dir) = iface_dir {
+                .and_then(|p| p.get("flick").cloned());
+            let dir_of = |key: &str| Some(flick.as_ref()?.get(key)?.as_str()?.to_owned());
+            if let Some(iface_dir) = dir_of("iface-dir") {
                 files_under(&dir.join(iface_dir), &mut out);
+            }
+            // a source package is compiled with the project: its modules are inputs
+            if let Some(source_dir) = dir_of("source-dir") {
+                let mut sources = Vec::new();
+                files_under(&dir.join(source_dir), &mut sources);
+                out.extend(
+                    sources
+                        .into_iter()
+                        .filter(|p| p.extension().is_some_and(|e| e == "fl")),
+                );
             }
         }
     }
     out
+}
+
+/// The configuration and modules of the libraries `dependencies` of the
+/// manifest in `dir` name by path, and of theirs.
+fn library_files(dir: &Path, dependencies: &[config::Dependency], out: &mut Vec<PathBuf>) {
+    for dependency in dependencies {
+        let at = project::normalize(&dir.join(&dependency.path));
+        let file = at.join(project::CONFIG_FILE);
+        if out.contains(&file) {
+            continue;
+        }
+        out.push(file.clone());
+        let Ok(text) = fs::read_to_string(&file) else {
+            continue;
+        };
+        let mut sources = SourceMap::default();
+        let id = sources.add(file.display().to_string(), text.clone());
+        let Ok(library) = config::parse(&text, id) else {
+            continue;
+        };
+        let mut modules = Vec::new();
+        files_under(&at.join(&library.source_dir), &mut modules);
+        out.extend(
+            modules
+                .into_iter()
+                .filter(|p| p.extension().is_some_and(|e| e == "fl")),
+        );
+        library_files(&at, &library.dependencies, out);
+    }
 }
 
 fn entry_path(root: &Path, key: &str) -> PathBuf {

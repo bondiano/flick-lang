@@ -3,7 +3,8 @@ title: "Command line"
 ---
 
 `flick` is one binary over the compiler core. Every command takes the
-global options `--project <path>`, `--diagnostics human|json`,
+global options `--project <path>`, `--package <name>` (`-p`, a member of the
+[workspace](../project/#workspaces)), `--diagnostics human|json`,
 `--warnings-as-errors`, `--color auto|always|never`, `--quiet` (alias `--silent`)/`--verbose`
 and `--help`; `flick help <command>` prints a command's help and
 `flick --version` the compiler's version (`flick doctor` shows the rest).
@@ -22,6 +23,7 @@ and `--help`; `flick help <command>` prints a command's help and
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile] [--emit js\|go]` | runs the tests of the test root, on Node or as a Go executable |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | writes the canonical layout ([formatting](../grammar/#formatting)); without paths the source and test roots |
 | `clean [--cache]` | removes the build artifacts; `--cache` also the build cache |
+| `script [name] -- args` | runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails; without a name lists the scripts |
 | `install [--locked] [--offline]` | installs with pnpm (`--frozen-lockfile`, `--offline`) |
 | `add <pkg>… [--dev]`, `remove <pkg>…`, `update [pkg]…` | changes dependencies with pnpm |
 | `deps [--why <pkg>]` | the installed graph, and the Flick modules of each direct dependency |
@@ -37,6 +39,9 @@ and `--help`; `flick help <command>` prints a command's help and
 | `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | one representation of a module |
 | `lsp --stdio` | the [language server](../editor/#language-server); stdio is its only transport |
 | `content-mapper [--declarations <paths>…]` | serves TypeScript's [Content Mapper](../editor/#content-mapper) requests for `.fl` files on stdio, started by `@flick-lang/content-mapper`; `--declarations` instead writes the projection of each `.fl` file under the paths beside it as `Name.d.fl.ts` and exits |
+
+At the root of a workspace without `[project]`, `check`, `build`, `test`,
+`fmt` and `clean` without paths run on every member, dependencies first.
 
 `check`, `build` and the build steps of `run`, `dev` and `test` install
 nothing, run no `main` and load no foreign module. An installed
