@@ -12,7 +12,7 @@ variable {S : Sig}
 theorem step_pure {root Ψ Θ Λ μ e t l Λ' μ' e'} (h : Typ S Ψ Θ [] e (.ex t .pure))
     (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : l = .pure ∧ μ' = μ ∧ Λ' = Λ := by
   cases hs with
-  | pure => exact ⟨rfl, rfl, rfl⟩
+  | pure | glob => exact ⟨rfl, rfl, rfl⟩
   | rt hE hh =>
     obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE hh.not_value h
     obtain rfl := rel.pure rfl

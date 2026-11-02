@@ -278,7 +278,7 @@ makes a step, or is blocked (waits for a child of a region it closes, or uses a
 region that is not live); every child of a live region is finished, makes a step,
 asks for a service `Σ₀` lacks, or is blocked. -/
 theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
-    (hcov : ∀ N, φ₀.svc (.nm N) → (root N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
+    (hcov : ∀ N, φ₀.svc (.nm N) → (root.svc N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :
     ((Value c.main ∧ ∃ Ψ, StoreTy S Ψ c.mem ∧ Typ S Ψ Facts.age [] c.main (.ex t .pure)) ∨
@@ -290,7 +290,7 @@ theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
   obtain ⟨Ψ, hμ, h, hΛ, -⟩ := steps_typed hroot hs ht hφ (CfgTy.init h₀ hp)
   simp only [List.nil_append] at hμ h hΛ
   refine ⟨?_, fun p g hg _ k hk => ?_⟩
-  · rcases progress (Λ := c.rgs) (root := root) h hμ.1 rfl rfl with
+  · rcases progress (Λ := c.rgs) (root := root) hroot h hμ.1 rfl rfl with
       hv | ⟨v, hv, he⟩ | hstep | ⟨_, N, _, _, _, hN, hD⟩ | hb
     · exact .inl ⟨hv, Ψ, hμ, h.valueAny hv _⟩
     · exact .inr (.inl ⟨v, he, Ψ, raise_errors hv (he ▸ h)⟩)
@@ -298,7 +298,7 @@ theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
     · have := hcov N hD; rw [hN] at this; cases this
     · exact .inr (.inr (.inr hb))
   · obtain ⟨t', φ', hk'⟩ := (hΛ p g hg).1 k hk
-    rcases progress (Λ := c.rgs) (root := root) hk' hμ.1 rfl rfl with
+    rcases progress (Λ := c.rgs) (root := root) hroot hk' hμ.1 rfl rfl with
       hv | ⟨v, hv, he⟩ | hstep | ha | hb
     · exact .inl (.inl hv)
     · exact .inl (.inr ⟨v, hv, he⟩)

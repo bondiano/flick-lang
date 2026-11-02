@@ -23,6 +23,7 @@ def Ty.kind : Ty → Nat
   | .hnd _ => 10
   | .owner _ => 11
   | .rg _ | .caps _ => 12
+  | .dict .. => 13
 
 theorem Le.kind {a b : Ty} (h : Le a b) : a.kind = b.kind := by
   cases h <;> rfl
@@ -185,7 +186,7 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     intro _ _ _ hJ; cases hJ
     exact ⟨.hidden (Ty.opaque_of_kind (.inl (by rw [← hT.kind]; exact Const.ty_kind _ _))),
       by simp [Tm.head]⟩
-  | loc | cap | own | enil | econs =>
+  | loc | cap | own | enil | econs | drec =>
     intro _ _ _ hJ; cases hJ; exact ⟨.hidden (by simp [Ty.Opaque, Ty.hd]), by simp [Tm.head]⟩
   | lit => intro _ _ _ hJ; cases hJ; exact ⟨.lit, by simp [Tm.head]⟩
   | rnil => intro _ _ _ hJ; cases hJ; exact ⟨.rnil, by simp [Tm.head]⟩

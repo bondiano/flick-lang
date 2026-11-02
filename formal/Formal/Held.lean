@@ -296,6 +296,9 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         · exact ha₀ _ _ _ _ rfl x (h₃ x h)
       refine ⟨key.of_none _, by simp [Tm.head], by simp, ?_⟩
       intro c e₀ he _ _; cases he
+  | drec _ _ _ _ hh =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨hh, by simp [Tm.head], by simp, by simp⟩
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
 /-- A value has no `inside` form. -/
@@ -332,7 +335,14 @@ theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns 
       rintro (h | h)
       · exact ih₁ (.constApp (.inl ‹_›) hv₁) h
       · exact ih₂ hve h
-  | lit | loc | const | ctor | rnil | enil | cap | own => intro _ h; cases h
+  | lit | loc | const | ctor | rnil | enil | cap | own | dnil => intro _ h; cases h
+  | drec _ _ _ hn => intro _; exact hn
+  | dcons _ _ ih₁ ih₂ =>
+    intro hv; cases hv with
+    | rcons hv₁ hv₂ =>
+      rintro (h | h)
+      · exact ih₁ hv₁ h
+      · exact ih₂ hv₂ h
   | _ => intro hv; cases hv
 
 end Flick

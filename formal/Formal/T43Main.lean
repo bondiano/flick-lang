@@ -8,7 +8,7 @@ namespace Flick
 
 variable {S : Sig}
 
-theorem cstep_all {root : Name → Option Tm} {Ψ : List Ty} {c c' : Cfg} {t : Ty} {φ : Stage} {l : Lbl}
+theorem cstep_all {root : Roots} {Ψ : List Ty} {c c' : Cfg} {t : Ty} {φ : Stage} {l : Lbl}
     {anc B : Nat → Nat → Prop} {home : Nat → Option (Nat × Nat)}
     (hroot : RootTy S root) (ht : t.YF 0) (hφ : φ.substT (kill 0) = φ)
     (hc : CfgTy S Ψ c t φ) (hn : Nest Ψ c anc B home) (hk : KidNeeds S Ψ c.rgs anc)
@@ -47,7 +47,7 @@ theorem cstep_all {root : Name → Option Tm} {Ψ : List Ty} {c c' : Cfg} {t : T
     rw [hag _ (Nat.ne_of_lt (getElem?_lt hg))]
     exact hkn N q (Stage.kill_need h)
 
-theorem steps_all {root : Name → Option Tm} {c c' : Cfg} (hroot : RootTy S root)
+theorem steps_all {root : Roots} {c c' : Cfg} (hroot : RootTy S root)
     (hs : CSteps root c c') :
     ∀ {Ψ t φ anc B home}, t.YF 0 → φ.substT (kill 0) = φ → CfgTy S Ψ c t φ →
       Nest Ψ c anc B home → KidNeeds S Ψ c.rgs anc →
@@ -93,7 +93,7 @@ theorem T4_3 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Fact
 /-- **T1 with `op_H`** (regions.md §5.3, corollary). As T1, and a thread that does not
 step and is not finished waits for a child of a region it closes. -/
 theorem T1_regions {root e₀ t φ₀ c} (hroot : RootTy S root)
-    (hcov : ∀ N, φ₀.svc (.nm N) → (root N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
+    (hcov : ∀ N, φ₀.svc (.nm N) → (root.svc N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :
     ((Value c.main ∧ ∃ Ψ, StoreTy S Ψ c.mem ∧ Typ S Ψ Facts.age [] c.main (.ex t .pure)) ∨

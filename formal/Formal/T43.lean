@@ -71,7 +71,7 @@ theorem KidNeeds.setKid {Ψ Λ anc p j k} (h : KidNeeds S Ψ Λ anc)
 
 /-- A step of a thread keeps the uses of the children and finalizers among the
 ancestors of their owner. -/
-theorem KidNeeds.step {root : Name → Option Tm} {Λ : List Rgn} {μ : List Tm} {m : Tm}
+theorem KidNeeds.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     {i : Option (Nat × Nat)} {e : Tm} {l : Lbl} {Λ' : List Rgn} {μ' : List Tm} {e' : Tm}
     {Ψ : List Ty} {anc anc' B : Nat → Nat → Prop} {home : Nat → Option (Nat × Nat)} {t : Ty} {φ : Stage}
     (hn : Nest Ψ ⟨Λ, μ, m⟩ anc B home) (hi : (⟨Λ, μ, m⟩ : Cfg).at i = some e)

@@ -8,7 +8,7 @@ namespace Flick
 
 variable {S : Sig} {Ψ : List Ty} {B anc : Nat → Nat → Prop}
 
-theorem Nest.step {root : Name → Option Tm} {Λ : List Rgn} {μ : List Tm} {m : Tm}
+theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     {i : Option (Nat × Nat)} {e : Tm} {l : Lbl} {Λ' : List Rgn} {μ' : List Tm} {e' : Tm} {X : List Ty}
     {home : Nat → Option (Nat × Nat)} {t : Ty} {φ : Stage} (hroot : RootTy S root)
     (hn : Nest Ψ ⟨Λ, μ, m⟩ anc B home) (hi : (⟨Λ, μ, m⟩ : Cfg).at i = some e)
@@ -61,12 +61,18 @@ theorem Nest.step {root : Name → Option Tm} {Λ : List Rgn} {μ : List Tm} {m 
         fun h => (S.impl_reach _ _ (hvl l' t' hl' ht' x h.2)).elim⟩)⟩
   | askRoot hE _ hr₀ =>
     rw [nil rfl, List.append_nil]
-    obtain ⟨hvv, hvT⟩ := hroot _ _ hr₀
+    obtain ⟨hvv, hvT⟩ := hroot.svc _ _ hr₀
     obtain ⟨hvr, -⟩ := Typ.sites hvv hvT
     exact keep (hn.redex hi hE ask_not_value (fun q h => by simp [Tm.Has] at h)
       (nf (hvT.noIns hvv)) (fun _ _ h => h) (fun _ _ => Tm.Within.of_has (hvT.noIns hvv)
         (fun p hp => (S.impl_reach _ _ (hvr p hp)).elim)
         fun l hl => absurd (hvT.locs l hl) (Nat.not_lt_zero _)) hn.cells)
+  | glob hE hg =>
+    rw [nil rfl, List.append_nil]
+    have hno := (hroot.glob _ _ hg).1
+    exact keep (hn.redex hi hE (fun h => by cases h) (fun q h => by simp [Tm.Has] at h)
+      (nf (hno _)) (fun _ _ h => h) (fun _ _ => Tm.Within.of_has (hno _)
+        (fun p hp => (hno _ hp).elim) fun l hl => (hno _ hl).elim) hn.cells)
   | raise hE hF hnt hni hv =>
     rw [nil rfl, List.append_nil]
     have hrW := (within_of_plug (not_value_plug raise_not_value _) hE hW).2

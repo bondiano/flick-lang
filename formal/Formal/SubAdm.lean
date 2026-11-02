@@ -16,6 +16,7 @@ def JLe : J → J → Prop
   | .ex t φ, .ex t' φ' => Le t t' ∧ φ.le φ'
   | .alts t r φ, .alts t' r' φ' => t = t' ∧ Le r r' ∧ φ.le φ'
   | .halts ε H r φ, .halts ε' H' r' φ' => ε = ε' ∧ H = H' ∧ Le r r' ∧ φ.le φ'
+  | .dfs fs, .dfs fs' => fs = fs'
   | _, _ => False
 
 theorem JLe.ex {t φ J'} (h : JLe (.ex t φ) J') :
@@ -34,6 +35,10 @@ theorem JLe.halts {ε H r φ J'} (h : JLe (.halts ε H r φ) J') :
   cases J' <;> simp only [JLe] at h
   obtain ⟨rfl, rfl, h⟩ := h
   exact ⟨_, _, rfl, h⟩
+
+theorem JLe.dfs {fs J'} (h : JLe (.dfs fs) J') : J' = .dfs fs := by
+  cases J' <;> simp only [JLe] at h
+  rw [h]
 
 theorem JLe.st {t φ φ'} (h : φ.le φ') : JLe (.ex t φ) (.ex t φ') := ⟨.refl, h⟩
 
@@ -148,5 +153,14 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
     exact .inside hF hb hφ' ht hε (Stage.le_trans hφ h₂) (hT.trans h₁)
   | cap => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .cap
   | own => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .own
+  | drec hc hk hr hn hh =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .drec hc hk hr hn hh
+  | dnil => intro _ hJ; rw [hJ.dfs]; exact .dnil
+  | dcons he hr => intro _ hJ; rw [hJ.dfs]; exact .dcons he hr
+  | dproj _ hc hk hl hts hH hT ih =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .dproj (ih (.st h₂)) hc hk hl hts hH (hT.trans h₁)
+  | glob hg hts hH hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .glob hg hts hH (hT.trans h₁)
 
 end Flick

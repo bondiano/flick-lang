@@ -59,6 +59,8 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .inside p e, A => ¬ A p ∧ anc p = (fun x => A x ∨ x = p) ∧ e.Within (fun x => A x ∨ x = p)
   | .cap p, A => A p
   | .own p, A => A p
+  | .drec _ r, A => r.Within A ∧ r.NoIns
+  | .glob _, _ => True
 
 /-- The frames of a context at a place with the regions `A`: what the frame
 holds besides the hole is there, and does not evaluate before the hole. -/
@@ -112,6 +114,7 @@ theorem Value.noIns {e : Tm} {A : Nat → Prop} (hv : Value e) (h : e.Within Ψ 
   | constApp2 _ _ _ _ ih₁ ih₂ =>
     rintro ((h' | h') | h'); cases h'; exact ih₁ h.1.2.1 h'; exact ih₂ h.2.1 h'
   | econs _ _ ih₁ ih₂ => rintro (h' | h'); exact ih₁ h.1 h'; exact ih₂ h.2 h'
+  | drec => exact h.2
   | _ => intro h'; cases h'
 
 /-- A term without `inside` forms is at a place when what it writes is. -/

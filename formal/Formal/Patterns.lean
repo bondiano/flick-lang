@@ -22,16 +22,35 @@ theorem field_typ {Ψ Θ Γ l φ} :
       · simp_all
       · next hne => simp only [hne, if_false] at hR; exact ih hr hw hR
     | errVal => simp [Ty.field] at hR
+  | drec =>
+    intro _ _ _ h _ hR
+    cases h with
+    | drec => simp [Ty.field] at hR
+    | errVal => simp [Ty.field] at hR
   | _ => intro _ _ _ _ hw; simp [Tm.field] at hw
 
-theorem Value.field {v w : Tm} {l} (hv : Value v) (h : v.field l = some w) : Value w := by
-  induction hv with
-  | rcons hv₁ _ _ ih₂ =>
-    simp only [Tm.field] at h
-    split at h
-    · cases h; exact hv₁
-    · exact ih₂ h
-  | _ => simp [Tm.field] at h
+/-- A field of a record value is a value. A dictionary record is not a record. -/
+theorem Value.field {Ψ Θ Γ l φ} : ∀ {v w R t}, Value v → Typ S Ψ Θ Γ v (.ex R φ) →
+    v.field l = some w → R.field l = some t → Value w := by
+  intro v
+  induction v with
+  | rcons l' e r _ ih =>
+    intro w R t hv h hw hR
+    cases hv with
+    | rcons hv₁ hv₂ =>
+      cases h with
+      | rcons _ _ _ hr =>
+        simp only [Tm.field, Ty.field] at hw hR
+        split at hw
+        · cases hw; exact hv₁
+        · next hne => simp only [hne, if_false] at hR; exact ih hv₂ hr hw hR
+      | errVal => simp [Ty.field] at hR
+  | drec =>
+    intro _ _ _ _ h _ hR
+    cases h with
+    | drec => simp [Ty.field] at hR
+    | errVal => simp [Ty.field] at hR
+  | _ => intro _ _ _ _ _ hw; simp [Tm.field] at hw
 
 theorem setField_typ {Ψ Θ Γ l w t φ} (hw : Typ S Ψ Θ Γ w (.ex t φ)) :
     ∀ {v v' R}, Typ S Ψ Θ Γ v (.ex R φ) → v.setField l w = some v' → R.field l = some t →
@@ -222,7 +241,7 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
     intro v δ _ hvv hv hm ht _
     obtain rfl := ht rfl
     obtain ⟨x, δ₁, δ₂, hx, h1, h2, rfl⟩ := matchP_rfield.mp hm
-    obtain ⟨_, i₁⟩ := ih₁ (hvv.field hx) (field_typ hv hx hR) h1 (fun _ => rfl) (fun h => by cases h)
+    obtain ⟨_, i₁⟩ := ih₁ (hvv.field hv hx hR) (field_typ hv hx hR) h1 (fun _ => rfl) (fun h => by cases h)
     obtain ⟨_, i₂⟩ := ih₂ hvv hv h2 (fun _ => rfl) (fun h => by cases h)
     exact ⟨.refl, i₁.append i₂⟩
   | or _ _ ih₁ ih₂ =>

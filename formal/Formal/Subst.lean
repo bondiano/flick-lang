@@ -46,6 +46,8 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .inside p e => .inside p (e.rename ξ)
   | .cap p => .cap p
   | .own p => .own p
+  | .drec c r => .drec c (r.rename ξ)
+  | .glob g => .glob g
 
 /-- Lift a substitution under `n` binders. -/
 def liftS (n : Nat) (σ : Nat → Tm) (i : Nat) : Tm :=
@@ -87,6 +89,8 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .inside p e => .inside p (e.subst σ)
   | .cap p => .cap p
   | .own p => .own p
+  | .drec c r => .drec c (r.subst σ)
+  | .glob g => .glob g
 
 /-- Substitute `vs` for the innermost `vs.length` variables: `e[δ]`. -/
 def inst (vs : List Tm) (i : Nat) : Tm :=

@@ -40,4 +40,29 @@ example (S : Sig) :
     · exact ⟨fun _ h => h.elim, fun _ h => h⟩
   · exact ⟨fun x h => .inl h, fun _ h => h.elim⟩
 
+/-- The scheme `∀a. a →P a` of the field `id`. -/
+def idField : Scheme := ⟨1, Facts.none, .arrow (.tvar 0) .pure (.tvar 0) Caps.none⟩
+
+/-- A dictionary record of a class with one parameter and the field `id : ∀a. a →P a`,
+projected and used at `Int` (λFlick⁺, elaboration.md §0.1). -/
+example (S : Sig) (h : S.dict 0 = some (1, [("id", idField)])) :
+    Typ S [] Facts.none [] (.app (.proj (.drec 0 (.rcons "id" (.lam (.var 0)) .rnil)) "id") (.lit (.int 1)))
+      (.ex (.base .int) .pure) := by
+  have hl : [("id", idField)].lookup "id" = some idField := rfl
+  refine .app (a := .base .int) (ψ := .pure) (t := .base .int) (C := Caps.none)
+    (.dproj (us := [.base .bool]) (ts := [.base .int]) ?_ h rfl hl rfl ?_ ?_) .lit trivial .refl
+  · refine .drec h rfl (.dcons ?_ .dnil) (fun h => by simp [Tm.Has] at h) ?_
+    · refine .lam (.var (ts := []) rfl rfl (fun _ _ h => h.elim) ?_) (fun h => h) ?_ .refl
+      · simp [idField, Scheme.inst, Ty.substT, liftT]; exact .refl
+      · rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
+        · simp [Tm.Free] at hi
+        · exact hp.elim
+        · exact hl.elim
+    · rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
+      · simp [Tm.Free] at hi
+      · simp [Tm.Has] at hp
+      · simp [Tm.Has] at hl
+  · rintro _ _ ⟨_, _, h, _⟩; exact h.elim
+  · simp [idField, Scheme.substT, Scheme.inst, Ty.substT, liftT, instT]; exact .refl
+
 end Flick

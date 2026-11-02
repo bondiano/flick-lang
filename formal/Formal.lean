@@ -1,5 +1,6 @@
 import Formal.Syntax
 import Formal.TyOps
+import Formal.DictOps
 import Formal.Subst
 import Formal.Reach
 import Formal.Typing
@@ -12,11 +13,14 @@ import Formal.Cut
 import Formal.SubAdm
 import Formal.Held
 import Formal.SubstPat
+import Formal.TySubstBase
+import Formal.TySubst
 import Formal.RowSubst
 import Formal.Substitution
 import Formal.Canonical
 import Formal.Shapes
 import Formal.CanonForms
+import Formal.DictCanon
 import Formal.CanonEnv
 import Formal.CanonLayer
 import Formal.Patterns

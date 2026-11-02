@@ -14,7 +14,7 @@ namespace Flick
 
 variable {S : Sig}
 
-theorem Nest.cstep {root : Name → Option Tm} {c c' : Cfg} {l Ψ X anc B home t φ}
+theorem Nest.cstep {root : Roots} {c c' : Cfg} {l Ψ X anc B home t φ}
     (hroot : RootTy S root) (hc : CfgTy S Ψ c t φ) (hc' : CfgTy S (Ψ ++ X) c' t φ)
     (hn : Nest Ψ c anc B home) (hs : CStep root l c c') :
     ∃ anc' B' home', Nest (Ψ ++ X) c' anc' B' home' ∧ ∀ q, q ≠ c.rgs.length → anc' q = anc q := by
@@ -25,7 +25,7 @@ theorem Nest.cstep {root : Name → Option Tm} {c c' : Cfg} {l Ψ X anc B home t
     obtain ⟨t', φ', hk⟩ := (hΛ _ _ hg).1 _ (List.mem_of_getElem? hj)
     exact hn.step hroot (Cfg.at_some.mpr ⟨_, hg, hl, hj⟩) hk hμ hc'.1 hΨ hs
 
-theorem steps_nest {root : Name → Option Tm} {c c' : Cfg} (hroot : RootTy S root)
+theorem steps_nest {root : Roots} {c c' : Cfg} (hroot : RootTy S root)
     (hs : CSteps root c c') :
     ∀ {Ψ t φ anc B home}, t.YF 0 → φ.substT (kill 0) = φ → CfgTy S Ψ c t φ → Nest Ψ c anc B home →
       ∃ X anc' B' home', CfgTy S (Ψ ++ X) c' t φ ∧ Nest (Ψ ++ X) c' anc' B' home' := by

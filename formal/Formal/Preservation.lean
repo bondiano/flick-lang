@@ -198,6 +198,17 @@ theorem RtCtx.hole {Ψ : List Ty} {Θ' : Facts} {n : Nat} (hΘ : Ext Facts.age �
   idem := Facts.kill_idem _ _
   yf := hΨ
 
+/-- A global steps to its body, typed at each instance of its scheme. -/
+theorem glob_preservation {root Ψ Θ g T φ v} (hroot : RootTy S root)
+    (h : Typ S Ψ Θ [] (.glob g) (.ex T φ)) (hg : root.glob g = some v) : Typ S Ψ Θ [] v (.ex T φ) := by
+  cases h with
+  | glob hs hts hH hT =>
+    obtain ⟨hno, _, hs', ht⟩ := hroot.glob _ _ hg
+    rw [hs] at hs'; cases hs'
+    refine (Typ.instantiate (Γ := []) hts hH (hno _) ?_).sub ⟨hT, Stage.pure_le _⟩
+    exact (ht.weakenStore _).cut fun _ _ h => h.mono fun _ _ h => .inr h
+  | errVal hv => cases hv
+
 theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
     (h : Typ S Ψ Facts.age [] e (.ex t φ)) (hμ : StoreTy S Ψ μ) (hbl : e.Below Λ.length)
     (hμb : ∀ (l : Nat) (v : Tm), μ[l]? = some v → v.Below Λ.length) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
@@ -230,10 +241,14 @@ theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
     obtain ⟨K, Θ', t₁, φ₁, hr, _, hK, back⟩ := ctx_typing _ hE ask_not_value h
     obtain ⟨rfl, -, -⟩ := hK.resolve_left fun hp => by subst hp; exact (ask_inv hr).1
     simp only [List.map_up_zero] at hr
-    have hv := (((hroot _ _ hr₀).2.cut (Entails.none (Θ'.substT (kill Λ.length)))).weakenStore Ψ).sub
+    have hv := (((hroot.svc _ _ hr₀).2.cut (Entails.none (Θ'.substT (kill Λ.length)))).weakenStore Ψ).sub
       (J' := .ex (t₁.substT (kill Λ.length)) (φ₁.substT (kill Λ.length)))
       ⟨by have := (ask_inv hr).2.substT (kill Λ.length); rwa [S.impl_closed] at this, Stage.pure_le _⟩
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by simpa using hv), by simp⟩
+  | glob hE hg =>
+    obtain ⟨_, _, _, _, hr, _, _, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+    exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
+      simpa using glob_preservation hroot (hole_kill hr hbl hΨ) hg), by simp⟩
   | raise hE hF hnt hni hv =>
     obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ :=
       ctx_typing _ hE (not_value_plug raise_not_value _) h

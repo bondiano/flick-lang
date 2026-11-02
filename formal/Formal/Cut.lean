@@ -127,5 +127,10 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
     intro _ hΘ; exact .inside hF (ih (hΘ.union _)) hφ' ht hε hφ hT
   | cap => intro _ _; exact .cap
   | own => intro _ _; exact .own
+  | drec hc hk _ hn hh ih => intro _ hΘ; exact .drec hc hk (ih hΘ) hn hh
+  | dnil => intro _ _; exact .dnil
+  | dcons _ _ ih₁ ih₂ => intro _ hΘ; exact .dcons (ih₁ (hΘ.lift _ _)) (ih₂ hΘ)
+  | dproj _ hc hk hl hts hH hT ih => intro _ hΘ; exact .dproj (ih hΘ) hc hk hl hts (hH.mono hΘ) hT
+  | glob hg hts hH hT => intro _ hΘ; exact .glob hg hts (hH.mono hΘ) hT
 
 end Flick

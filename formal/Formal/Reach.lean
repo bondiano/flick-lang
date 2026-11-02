@@ -56,6 +56,8 @@ def Tm.Has : Tm → Site → Prop
   | .inside p e, s => s = .rgn p ∨ s = .ins ∨ s = .frame p ∨ e.Has s
   | .cap p, s => s = .rgn p
   | .own p, s => s = .rgn p
+  | .drec _ r, s => r.Has s
+  | .glob _, _ => False
 
 /-- No `inside` form: values and unevaluated code. -/
 def Tm.NoIns (e : Tm) : Prop := ¬ e.Has .ins
@@ -86,6 +88,7 @@ def Tm.Free : Tm → Nat → Prop
   | .join e₁ e₂, j => e₁.Free j ∨ e₂.Free j
   | .scope e, j => e.Free (j + 1)
   | .inside _ e, j => e.Free j
+  | .drec _ r, j => r.Free j
   | _, _ => False
 
 theorem Tm.has_rename (ξ : Nat → Nat) (e : Tm) (s : Site) : (e.rename ξ).Has s ↔ e.Has s := by
@@ -139,7 +142,7 @@ theorem Tm.free_rename (ξ : Nat → Nat) :
     rcases h with h | h
     · obtain ⟨i, hi, he⟩ := ih₁ ξ j h; exact ⟨i, .inl hi, he⟩
     · obtain ⟨i, hi, he⟩ := ih₂ ξ j h; exact ⟨i, .inr hi, he⟩
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih | drec _ _ ih =>
     intro j h; exact ih ξ j h
   | _ => intro j h; exact h.elim
 
@@ -203,7 +206,7 @@ theorem Tm.free_subst :
     rcases h with h | h
     · obtain ⟨i, hi, he⟩ := ih₁ σ j h; exact ⟨i, .inl hi, he⟩
     · obtain ⟨i, hi, he⟩ := ih₂ σ j h; exact ⟨i, .inr hi, he⟩
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih | drec _ _ ih =>
     intro σ j h; exact ih σ j h
   | _ => intro σ j h; exact h.elim
 
@@ -257,7 +260,8 @@ theorem Tm.has_subst :
     · exact .inl (.inr (.inl h))
     · exact (ih₁ σ s h).imp (.inr ∘ .inr ∘ .inl) fun ⟨i, hi, he⟩ => ⟨i, .inl hi, he⟩
     · exact (ih₂ σ s h).imp (.inr ∘ .inr ∘ .inr) fun ⟨i, hi, he⟩ => ⟨i, .inr hi, he⟩
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih => intro σ s h; exact ih σ s h
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | drec _ _ ih =>
+    intro σ s h; exact ih σ s h
   | inside p e ih =>
     intro σ s h
     rcases h with h | h | h | h

@@ -130,6 +130,7 @@ where
       split at h
       · cases h; exact .inl hx
       · exact .inr (ih h)
+    | drec _ _ ih => exact ih h
     | _ => simp [Tm.field] at h
 
 end Flick

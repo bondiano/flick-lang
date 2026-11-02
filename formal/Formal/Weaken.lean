@@ -132,6 +132,14 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | inside hF _ hφ' ht hε hφ hT ih => exact .inside hF (ih X) hφ' ht hε hφ hT
   | cap => exact .cap
   | own => exact .own
+  | drec hc hk hr hn hh ih =>
+    exact .drec hc hk (ih X) hn (Caps.Sub.trans (held_weaken (e := .drec _ _) X hr.locs) hh)
+  | dnil => exact .dnil
+  | dcons _ _ ih₁ ih₂ =>
+    refine .dcons ?_ (ih₂ X)
+    rw [List.map_append]; exact ih₁ _
+  | dproj _ hc hk hl hts hH hT ih => exact .dproj (ih X) hc hk hl hts hH hT
+  | glob hg hts hH hT => exact .glob hg hts hH hT
 
 /-- A renaming `ξ : Γ → Γ'`. -/
 def RenOk (Γ Γ' : List Scheme) (ξ : Nat → Nat) : Prop :=
@@ -245,5 +253,13 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | inside hF _ hφ' ht hε hφ hT ih => intro _ _ hξ; exact .inside hF (ih hξ) hφ' ht hε hφ hT
   | cap => intro _ _ _; exact .cap
   | own => intro _ _ _; exact .own
+  | drec hc hk hr hn hh ih =>
+    intro _ _ hξ
+    exact .drec hc hk (ih hξ) (hn.rename _)
+      (Caps.Sub.trans (held_rename (e := .drec _ _) hξ hr.frees) hh)
+  | dnil => intro _ _ _; exact .dnil
+  | dcons _ _ ih₁ ih₂ => intro _ _ hξ; exact .dcons (ih₁ (hξ.up _)) (ih₂ hξ)
+  | dproj _ hc hk hl hts hH hT ih => intro _ _ hξ; exact .dproj (ih hξ) hc hk hl hts hH hT
+  | glob hg hts hH hT => intro _ _ _; exact .glob hg hts hH hT
 
 end Flick

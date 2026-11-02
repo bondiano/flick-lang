@@ -30,6 +30,7 @@ command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `
 | P2c | Л5, the invariant `⊢ Λ` (live work reaches only live regions), T4.1, T4.2, T1 with `op_H` | done |
 | P2c′1 | Р37 in the model: the region of `provide`, `with` frames with it, children and finalizers inheriting the frames, the use of a service of an ended `provide` stuck; obligations `Provided {S} ϱ` in rows, discharged by `with` frames, by the end of a region and by `provide`, deferred in rows; T1–T3, T4.1, T4.2 again | done |
 | P2c′2 | T4.3: no use of a service of an ended `provide` (`T4_3`), T1 with `op_H` without that stuck state | done |
+| P4a2 | λFlick⁺: dictionary records `D_C ā` with `∀`-fields, projection with instantiation, globals with their bodies in `root`; T1–T4, T4.3 again | done |
 
 T4.3 is the premise Г11 of T5 in the form Р142 gives it: an `ask_S` answered by a `with`
 frame of the region `q` of a `provide`, inherited or not, happens only while `q` is live.
@@ -89,6 +90,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | T4.1, T4.2 | `T4` (`Regions.lean`) |
 | T4.3: a child and a finalizer of a live region `ϱ` use services only of `provide` regions that are ancestors of `ϱ`; an `ask_S` leaves its use at the top of the thread or at the `inside` form of the region of its frame | `KidRow`, `withs_typing` (`KidTy.lean`); `KidNeeds`, `KidNeeds.step` (`T43.lean`); `env_dom`, `need_out` (`NeedOut.lean`); `cstep_all`, `T4_3` (`T43Main.lean`) |
 | T1 with `op_H` | `T1_regions` (`T43Main.lean`) |
+| `elaboration.md` §0.1 λFlick⁺: `D_C ā`, dictionary records, projection with `∀`-instantiation, globals | `Ty.dict`, `Ty.spine`, `Sig.dict`, `Sig.glob` (`Syntax.lean`); `Tm.drec`, `Tm.glob`, `J.dfs`, `Typ.drec`, `Typ.dcons`, `Typ.dproj`, `Typ.glob`, `Roots`, `RootTy` (`Rules.lean`); `Step.glob` (`Semantics.lean`); `canonical_dict`, `dict_field` (`DictCanon.lean`); `glob_preservation` (`Preservation.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
 | Preservation | `preservation` (`Preservation.lean`); of a configuration: `cstep_typed` (`Soundness.lean`) |
 | T1 | `T1` (`Soundness.lean`) |
@@ -199,8 +201,8 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 9. **Allocation is deterministic:** `Ref.make v` takes `ℓ = μ.length`, `scope` takes
    `π = Λ.length`.
 10. **Programs** are closed terms typed in the empty store with no facts; modules
-    (`core.md` §2.6, path 4 of `regions.md` §4) are not modeled. `Σ₀` is a parameter with
-    `RootTy`; Г3 is the hypothesis of `T1` that `Σ₀` covers the services of the program's
+    (`core.md` §2.6, path 4 of `regions.md` §4) are not modeled. `Σ₀` and the bodies of the
+    globals of λFlick⁺ are a parameter `root : Roots` with `RootTy`; Г3 is the hypothesis of `T1` that `Σ₀` covers the services of the program's
     stage. Progress reports an `ask_S` that neither a `with` frame nor `Σ₀` answers
     (`AskStuck`) instead of assuming Г3.
 11. **Л3** is stated as `ERel`: the hole's services are within those of the context, of
@@ -496,8 +498,8 @@ is committed without `sorry` and builds from a clean `git archive`. The next fre
 number is Р189.
 
 **Status.** Р185–Р187 are recorded in `elaboration.md` §5, and §0.1 and §2.1 are
-updated. P4a1 is done; Р188 records the Prelude schemes. P4a2–P4a4 are open. The pieces
-below are in their intended order.
+updated. P4a1 is done; Р188 records the Prelude schemes. P4a2 is done (Р194). P4a3 and
+P4a4 are open. The pieces below are in their intended order.
 
 #### P4a1: captures in `Elab` and `Target`
 
@@ -547,41 +549,51 @@ Only `Formal/Elab/` changes; the core is untouched.
 
 #### P4a2: dictionary records in the core
 
-λFlick⁺ in `Formal/`. Afterwards, T1–T4 must hold again.
+Done. λFlick⁺ is the core of `Formal/` with dictionary records and globals; T1–T4,
+T4.3 and `T1_regions` hold again with the same statements, `RootTy` now covering the
+globals. It differs from the plan above in four places, each to keep the existing
+proofs: projection is the core's `proj`, globals are a term form, fields are schemes,
+and fields need not be values.
 
-- **Type.** `Ty.dict (c : Nat) (args : Ty)` is `D_C τ̄`, where `args` is a `tapp` spine
-  on `rnil`. Its reach is `⌈dict c args⌉ = ∅` (§0.1): a dictionary is built from
-  top-level values and dictionary variables. `substT` is structural.
-- **Signature.** `Sig.dict c = some (k, fs)`: `k` class parameters, and fields
-  `(label, j, t)` with `j` binders of their own. `t` is over `j + k` variables: the
-  binders are `0 … j-1` and the parameters `j … j+k-1`, as `letGen` shifts. Slots are
-  fields with `j = 0` of type `dict S ῡ`; methods are fields of type
-  `⟦∀β̄. rest ⇒ τ⟧`.
-- **Terms.** `Tm.drec (c : Nat) (r : Tm)`, where `r` is an `rcons` spine of values;
-  it is a value. `Tm.dproj (e : Tm) (l : Label)` has the frame `dproj · l` and the pure
-  head step `dproj (drec c r) l → v` when `r.field l = some v`. Fields are values, so
-  `drec` needs no frame. An instance evaluates its slots first:
-  `λδ̄. let s̄ = slots in drec C {slots = s̄, methods}`.
-- **Introduction, like (Let-Gen).** `Typ.drec`: `S.dict c = some (k, fs)`,
-  `us.length = k`, each field value `v` typed with
-  `Typ (Ψ.map (Ty.up j)) (Θ.substT (shiftV j)) (Γ.map (Scheme.up j)) v (.ex (t.substT (liftT j (instT us))) .pure)`,
-  an auxiliary inductive over the spine, and `held Ψ Γ (drec c r) ⊆ ∅` (it holds
-  nothing). The conclusion is `Typ … (drec c r) (.ex (dict c ūs) φ)`.
-- **Projection, like (Var).** `Typ.dproj`: `e : dict c ūs` with field `l = (j, t)`,
-  `ts.length = j` and `Le (t.substT (instT (ts ++ us))) T`, gives `dproj e l : T`.
-- **Globals.** Add `Const.glob (g : Nat)` with a table `glob : Nat → Option (Scheme × Tm)`
-  of closed values. A hypothesis `GlobTy` types each value at its scheme, like
-  `RootTy`. The δ-step is `const (glob g) → v_g`, and `CArg` gets `ts : List Ty`.
-  Instances, `struct_C`, `prim_p` and the constants of Γ₀ are globals, so instance
-  bodies refer to each other by name and their typing is not circular.
-- **Re-proving T1–T4.** Every inductive and function over `Ty`, `Tm` and `Frame` gets
-  the new cases.
-  - The substitution case of `drec` is the `letGen` case.
-  - Preservation of `dproj` instantiates the field through `Typ.instantiate`.
-  - New canonical form: a value of type `dict` is a `drec`.
-  - Progress for `dproj` and `glob`.
-  - Л4: `drec` holds nothing by its premise.
-  - `NoIns`, `Within`, `Asc` and `Below`: fields have no run-time forms.
+- **Type.** `Ty.dict c args` is `D_C ā` with `args = Ty.spine ā`, a `tapp` spine on
+  `rnil`; `⌈dict c args⌉ = ∅` (§0.1), `substT` is structural (`Ty.spine_substT`,
+  `Ty.spine_inj`, `DictOps.lean`).
+- **Signature.** `Sig.dict c = some (k, fs)`: `k` class parameters and fields
+  `(label, s)` with a scheme `s` whose type is over `s.k + k` variables, its own binders
+  first (`dict_closed`); `Sig.glob g` is the closed scheme of a global (`glob_closed`).
+  A field scheme may have facts, as a (Let-Gen) scheme; the elaboration gives none.
+- **Terms.** `Tm.drec c r` with `r` an `rcons` spine is a value (`Value.drec`) and has
+  no frame. Projection is `proj e l`: `Tm.field` reads through `drec`, so the existing
+  pure step `proj v l → w` serves both. Fields are any pure terms without run-time
+  forms; they need not be values, so slot fields may be globals (`glob I`) or let-bound
+  variables, and `let s̄ = slots in drec …` is not required.
+- **Typing** (`Rules.lean`). A judgment form `J.dfs fs` types the spine field by field:
+  `Typ.dcons` types a field at its scheme as (Let-Gen) types its right-hand side, at `P`.
+  `Typ.drec`: `S.dict c = some (k, fs)`, `us.length = k`, the spine at
+  `fs` instantiated by `us`, `r.NoIns` and `held Ψ Γ (drec c r) ⊆ ⌈dict c ūs⌉ = ∅`
+  (it holds nothing); conclusion `drec c r : dict c ūs` at any stage. `Typ.dproj`:
+  `e : dict c ūs`, `fs.lookup l = some s`, and (Var) at the instantiated scheme of
+  `s`: `ts`, its facts, `Le`. `Typ.glob` is (Var) at `S.glob g`.
+- **Globals.** `Tm.glob g` steps to its body in a pure step, `Step.glob`, with label
+  `pure`. The bodies are a table next to `Σ₀`: `root : Roots` has `svc` (the old
+  `Σ₀`) and `glob`. `RootTy` gains `glob` (a body is closed source code without any
+  `Site` and is typed at the scheme of its global) and `globs` (each declared global has
+  a body). Instance bodies refer to other instances by name, so their typing is not
+  circular. Not `Const.glob`: every constant is a value (`Value.const`), and a value
+  must not step.
+- **Proofs.** The `drec` and `dcons` cases are those of `letGen` (`TySubstBase.lean`:
+  `Typ.drec_substT`, `Typ.dcons_substT`, `Typ.dproj_at`, `Typ.glob_substT`); a
+  dictionary is canonical (`canonical_dict`), and its declared fields are there
+  (`Typ.dfs_field`, `dict_field` with `Typ.instantiate`, `DictCanon.lean`); a global
+  steps to a body typed by `Typ.instantiate` (`glob_preservation`); Progress takes
+  `RootTy` for `globs`. `Value.field` takes the record typing, since a field of a
+  dictionary need not be a value. `Examples.lean` projects a polymorphic method.
+- **Р188.** Fields are typed at their schemes exactly, and a dictionary holds nothing,
+  so a lazy instance whose method result holds its continuation (`Monad (Eff r e)`) is
+  typed in the core iff its method scheme shows that: the core has (≤-Cap) on arrows and
+  `Eff`, but no `τ^q` on other types. P4a2 does not decide Р188; P4a3 does.
+- **Р194.** §0.1 also allows `∀` in an arrow parameter; the model has `∀` in dictionary
+  fields only, as the source of `Elab` has no higher-rank parameters.
 
 #### P4a3: the instance of `Target`
 
@@ -596,8 +608,8 @@ Only `Formal/Elab/` changes; the core is untouched.
   `TTy.dict q ↦ Ty.dict`.
 - **Terms.** `tr γ δ` maps `Γ`-variables and `Δ`-variables into one core context:
   `lam` pushes `γ`, `lamD l` pushes `l` entries of `δ`.
-  - `meth`/`slot ↦ dproj`.
-  - `inst`/`strct`/`prim`/`const ↦ const (glob _)`, and `ap ↦ app`.
+  - `meth`/`slot ↦ proj` (on a dictionary, `Typ.dproj`).
+  - `inst`/`strct`/`prim`/`const ↦ glob _`, and `ap ↦ app`.
   - `ite`/`caseOpt ↦ match_` on literals and on the `Option` constructors.
 - **Typing.** `Has Γ Δ e t φ := ∀ Ψ Θ Γc γ δ, Corr Γc Γ Δ γ δ → Typ S Ψ Θ Γc (tr γ δ e) (.ex ⟦t⟧ ⟦φ⟧)`,
   where `Corr` says `Γc[γ x] = ⟦Γ[x]⟧` and `Γc[δ k] = mono (dict …)`.
@@ -605,7 +617,7 @@ Only `Formal/Elab/` changes; the core is untouched.
   - `Sig.dict` realises each class: slots, then methods, with `s.ctx = ⟨C, vars p⟩ :: rest`;
   - the globals: instance bodies built from `ins.slots` and method bodies, and
     `struct_C` with slots `struct_S (δ̄.$slotᵢ)` (Р180);
-  - `GlobTy`;
+  - `RootTy` for the bodies of the globals (`root.glob`);
   - the `Option` constructors.
 - **The laws.** Each law is one core rule plus the commutation lemmas.
   - `var`: `Typ.var`.
@@ -615,7 +627,7 @@ Only `Formal/Elab/` changes; the core is untouched.
   - `meth`, `slot`: `Typ.dproj`.
   - `dvar`: `Typ.var`.
   - `app`, `dapp`, `dap`: `Typ.app`.
-  - `inst`, `strct`, `prim`, `const`: `Typ.const`.
+  - `inst`, `strct`, `prim`, `const`: `Typ.glob`.
   - `ite`, `caseOpt`: `Typ.match_` with `Covers`.
 
 #### P4a4: `Rel` and `Sim`

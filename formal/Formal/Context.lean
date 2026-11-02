@@ -188,6 +188,9 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
     | proj h₁ hR hT =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .proj h' (Ty.field_substT σ hR) (hT.substT σ),
         look fun _ => rfl⟩
+    | dproj h₁ hc hk hl hts hH hT =>
+      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun _ _ _ _ h' => .dproj_at h' hc hk hl hts hH hT,
+        look fun _ => rfl⟩
     | errVal hv => exact (nv hv).elim
   case updL =>
     cases h with

@@ -269,13 +269,13 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
     exact ⟨h.set hg hk (fun f hf' => by simp at hf') (sub fun _ h => .inr (.inr (.inr h))),
       by simp [setRgn]⟩
 
-theorem root_below {root : Name → Option Tm} (hroot : RootTy S root) {N v} (h : root N = some v)
+theorem root_below {root : Roots} (hroot : RootTy S root) {N v} (h : root.svc N = some v)
     (n : Nat) : v.Below n := by
   intro p hp
   rcases hp with hp | hp
-  · have := ((hroot N v h).2.holds (hroot N v h).1 rfl).1 _ (.inr (.inl ⟨p, hp, rfl⟩))
+  · have := ((hroot.svc N v h).2.holds (hroot.svc N v h).1 rfl).1 _ (.inr (.inl ⟨p, hp, rfl⟩))
     exact (S.impl_reach N _ this).elim
-  · exact ((hroot N v h).2.noIns (hroot N v h).1 (Tm.has_prov_ins hp)).elim
+  · exact ((hroot.svc N v h).2.noIns (hroot.svc N v h).1 (Tm.has_prov_ins hp)).elim
 
 theorem plug_below {E : List Frame} {r r' : Tm} {n : Nat} (h : (plug E r).Below n) (h' : r'.Below n) :
     (plug E r').Below n := fun p hp => by
@@ -320,6 +320,9 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     exact ⟨⟨plug_below h.main (h.main.sub fun _ hp => lookupE_has _ hv hp), h.mem, h.rgs⟩,
       Nat.le_refl _⟩
   | askRoot hE _ hr => exact ⟨⟨plug_below h.main (root_below hroot hr _), h.mem, h.rgs⟩, Nat.le_refl _⟩
+  | glob hE hg =>
+    exact ⟨⟨plug_below h.main fun _ hp => (hp.elim ((hroot.glob _ _ hg).1 _) ((hroot.glob _ _ hg).1 _)).elim,
+      h.mem, h.rgs⟩, Nat.le_refl _⟩
   | raise hE =>
     exact ⟨⟨plug_below h.main (h.main.sub fun _ hp => plug_has _ (Frame.plug_has _ hp)), h.mem, h.rgs⟩,
       Nat.le_refl _⟩
