@@ -1,0 +1,62 @@
+/// The answers of the API, from what the database holds: pure functions
+/// from rows to the wire forms of the contract.
+module Conduit.Server.Present exposing (..)
+
+import Conduit.Model exposing (Article, Comment, Profile, User)
+import Conduit.Server.Articles as Articles
+import Conduit.Server.Comments as Comments
+import Conduit.Server.People exposing (Account)
+
+/// The signed-in user with their token.
+user : Account -> String -> User
+let user account token = {
+  email = account.email;
+  token = token;
+  username = account.username;
+  bio = account.bio;
+  image = account.image;
+}
+
+profile : Account -> Bool -> Profile
+let profile account following = {
+  username = account.username;
+  bio = account.bio;
+  image = account.image;
+  following = following;
+}
+
+whole : BigInt -> Int
+let whole n = Int.truncate (BigInt.to_number n)
+
+article : Articles.Row -> List String -> Article
+let article row tags = {
+  slug = row.slug;
+  title = row.title;
+  description = row.description;
+  body = row.body;
+  tagList = tags;
+  createdAt = row.created_at;
+  updatedAt = row.updated_at;
+  favorited = row.favorited > 0n;
+  favoritesCount = whole row.favorites;
+  author = {
+    username = row.username;
+    bio = row.bio;
+    image = row.image;
+    following = row.following > 0n;
+  };
+}
+
+comment : Comments.Row -> Comment
+let comment row = {
+  id = whole row.id;
+  createdAt = row.created_at;
+  updatedAt = row.updated_at;
+  body = row.body;
+  author = {
+    username = row.username;
+    bio = row.bio;
+    image = row.image;
+    following = row.following > 0n;
+  };
+}

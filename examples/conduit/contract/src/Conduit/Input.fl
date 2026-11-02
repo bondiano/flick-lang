@@ -13,9 +13,9 @@ type alias Login = { email : Option String; password : Option String }
 
 /// `Some None` is an explicit `null`: clear the field.
 type alias UpdateUser = {
-  email : Option String;
-  username : Option String;
-  password : Option String;
+  email : Option (Option String);
+  username : Option (Option String);
+  password : Option (Option String);
   bio : Option (Option String);
   image : Option (Option String);
 } deriving Schema
@@ -27,11 +27,12 @@ type alias NewArticle = {
   tagList : Option (List String);
 } deriving Schema
 
+/// `tagList` set to `null` is `Some None`, which the server refuses.
 type alias UpdateArticle = {
   title : Option String;
   description : Option String;
   body : Option String;
-  tagList : Option (List String);
+  tagList : Option (Option (List String));
 } deriving Schema
 
 type alias NewComment = { body : Option String }
@@ -100,9 +101,9 @@ let login = codec (schema Login) {
 
 update_user : PureCodec Json UpdateUser
 let update_user = codec (schema UpdateUser) {
-  email = optional_field "email" String.json;
-  username = optional_field "username" String.json;
-  password = optional_field "password" String.json;
+  email = optional_field "email" (option_as_null String.json);
+  username = optional_field "username" (option_as_null String.json);
+  password = optional_field "password" (option_as_null String.json);
   bio = optional_field "bio" (option_as_null String.json);
   image = optional_field "image" (option_as_null String.json);
 }
@@ -120,7 +121,7 @@ let update_article = codec (schema UpdateArticle) {
   title = optional_field "title" String.json;
   description = optional_field "description" String.json;
   body = optional_field "body" String.json;
-  tagList = optional_field "tagList" texts;
+  tagList = optional_field "tagList" (option_as_null texts);
 }
 
 new_comment : PureCodec Json NewComment

@@ -1,0 +1,267 @@
+/// Articles, their tags and favorites, in the database. One query gives
+/// both a page of a list and a single article: each row with its author,
+/// its number of favorites, and whether the reader, if anyone, favorited it
+/// and follows its author. A filter left `None` keeps every article.
+module Conduit.Server.Articles exposing (..)
+
+import Sql exposing (Pg)
+import Database exposing (Database)
+import Conduit.Server.Db as Db
+import Conduit.Server.Schema exposing (Articles, ArticleTags, Favorites, Follows, Tags, Users)
+
+/// What to list: `slug` picks one article, `feed` the authors a user
+/// follows; the others are the API's filters.
+type alias Filter = {
+  slug : Option String;
+  tag : Option String;
+  author : Option String;
+  favorited : Option String;
+  feed : Option BigInt;
+}
+
+type alias Row = {
+  id : BigInt;
+  slug : String;
+  title : String;
+  description : String;
+  body : String;
+  created_at : String;
+  updated_at : String;
+  author_id : BigInt;
+  username : String;
+  bio : Option String;
+  image : Option String;
+  favorites : BigInt;
+  favorited : BigInt;
+  following : BigInt;
+}
+
+type alias Fields = { title : String; description : String; body : String }
+
+/// Every article.
+everything : Filter
+let everything = { slug = None; tag = None; author = None; favorited = None; feed = None }
+
+rows : Option BigInt -> Filter -> Int -> Int -> Sql.Template Pg {} Row
+let rows reader f limit offset = sql {
+  from a in Articles
+  join u in Users on u.id == a.author_id
+  left_join fav in Favorites on fav.article_id == a.id
+  left_join mine in Favorites on mine.article_id == a.id && mine.user_id == $reader
+  left_join fol in Follows on fol.followed_id == u.id && fol.follower_id == $reader
+  where (is_null $(f.slug) || a.slug == $(f.slug))
+    && (is_null $(f.author) || u.username == $(f.author))
+    && (is_null $(f.tag)
+      || is_in
+        a.id
+        (sql {
+          from at in ArticleTags
+          join t in Tags on t.id == at.tag_id
+          where t.name == $(f.tag)
+          select at.article_id
+        }))
+    && (is_null $(f.favorited)
+      || is_in
+        a.id
+        (sql {
+          from fv in Favorites
+          join fu in Users on fu.id == fv.user_id
+          where fu.username == $(f.favorited)
+          select fv.article_id
+        }))
+    && (is_null $(f.feed)
+      || is_in
+        a.author_id
+        (sql {
+          from fo in Follows
+          where fo.follower_id == $(f.feed)
+          select fo.followed_id
+        }))
+  group_by a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at, a.author_id, u.username, u.bio, u.image
+  order_by desc a.created_at, desc a.id
+  limit $limit
+  offset $offset
+  select {
+    id = a.id;
+    slug = a.slug;
+    title = a.title;
+    description = a.description;
+    body = a.body;
+    created_at = a.created_at;
+    updated_at = a.updated_at;
+    author_id = a.author_id;
+    username = u.username;
+    bio = u.bio;
+    image = u.image;
+    favorites = count fav.user_id;
+    favorited = count mine.user_id;
+    following = count fol.follower_id;
+  }
+}
+
+/// How many articles the filter keeps, as `rows` would list them.
+total : Filter -> Sql.Template Pg {} { n : BigInt }
+let total f = sql {
+  from a in Articles
+  join u in Users on u.id == a.author_id
+  where (is_null $(f.author) || u.username == $(f.author))
+    && (is_null $(f.tag)
+      || is_in
+        a.id
+        (sql {
+          from at in ArticleTags
+          join t in Tags on t.id == at.tag_id
+          where t.name == $(f.tag)
+          select at.article_id
+        }))
+    && (is_null $(f.favorited)
+      || is_in
+        a.id
+        (sql {
+          from fv in Favorites
+          join fu in Users on fu.id == fv.user_id
+          where fu.username == $(f.favorited)
+          select fv.article_id
+        }))
+    && (is_null $(f.feed)
+      || is_in
+        a.author_id
+        (sql {
+          from fo in Follows
+          where fo.follower_id == $(f.feed)
+          select fo.followed_id
+        }))
+  select { n = count_all }
+}
+
+/// A page of the articles the filter keeps, newest first, and their number.
+page : Option BigInt -> Filter -> { limit : Int; offset : Int } ->{Database;} (List Row, Int)
+let page reader f at =
+  let found = Db.rows (rows reader f at.limit at.offset)
+  let n = Option.map (fun row -> row.n) (Db.first (total f)) |> Option.with_default 0n
+  (found, Int.truncate (BigInt.to_number n))
+
+/// The article of `slug`, as `reader` sees it.
+find : Option BigInt -> String ->{Database;} Option Row
+let find reader slug = Db.first (rows reader { everything with slug = Some slug } 1 0)
+
+tags_of : BigInt ->{Database;} List String
+let tags_of id =
+  List.map
+    (fun row -> row.name)
+    (Db.rows
+      (sql {
+        from at in ArticleTags
+        join t in Tags on t.id == at.tag_id
+        where at.article_id == $id
+        order_by at.position
+        select t.name
+      }))
+
+/// The tags in use, the most used first.
+all_tags : Unit ->{Database;} List String
+let all_tags () =
+  List.map
+    (fun row -> row.name)
+    (Db.rows
+      (sql {
+        from t in Tags
+        join at in ArticleTags on at.tag_id == t.id
+        group_by t.id, t.name
+        order_by desc (count_all), t.name
+        select t.name
+      }))
+
+/// The id of the tag `name`, made if there is none.
+tag_id : String ->{Database;} BigInt
+let tag_id name =
+  let existing =
+    Db.first
+      (sql {
+        from t in Tags
+        where t.name == $name
+        select t.id
+      })
+  match existing with
+  | Some row -> row.id
+  | None ->
+    Db.insert_id
+      (sql {
+        insert_into Tags
+        values { name = $name }
+        returning { id = Tags.id }
+      })
+
+/// Replaces the tags of the article, in their order.
+set_tags : BigInt -> List String ->{Database;} Unit
+let set_tags article names =
+  Db.run
+    (sql {
+      delete_from ArticleTags
+      where ArticleTags.article_id == $article
+    })
+  List.each_effect
+    (fun (position, name) ->
+      let tag = tag_id name
+      Db.run
+        (sql {
+          insert_into ArticleTags
+          values { article_id = $article; tag_id = $tag; position = $position }
+        })
+    )
+    (List.map_indexed (fun i name -> (i, name)) names)
+
+insert : BigInt -> String -> Fields -> String ->{Database;} BigInt
+let insert author slug fields now =
+  Db.insert_id
+    (sql {
+      insert_into Articles
+      values {
+        slug = $slug;
+        title = $fields.title;
+        description = $fields.description;
+        body = $fields.body;
+        author_id = $author;
+        created_at = $now;
+        updated_at = $now;
+      }
+      returning { id = Articles.id }
+    })
+
+save : BigInt -> Fields -> String ->{Database;} Unit
+let save id fields now =
+  Db.run
+    (sql {
+      update Articles
+      set {
+        title = $fields.title;
+        description = $fields.description;
+        body = $fields.body;
+        updated_at = $now;
+      }
+      where Articles.id == $id
+    })
+
+delete : BigInt ->{Database;} Unit
+let delete id =
+  Db.run
+    (sql {
+      delete_from Articles
+      where Articles.id == $id
+    })
+
+favorite : BigInt -> BigInt ->{Database;} Unit
+let favorite user article =
+  Db.run_once
+    (sql {
+      insert_into Favorites
+      values { user_id = $user; article_id = $article }
+    })
+
+unfavorite : BigInt -> BigInt ->{Database;} Unit
+let unfavorite user article =
+  Db.run
+    (sql {
+      delete_from Favorites
+      where Favorites.user_id == $user && Favorites.article_id == $article
+    })

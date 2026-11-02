@@ -1,0 +1,27 @@
+/// The address of an article: its title in lower case, letters and digits
+/// kept and every other run of characters one `-`, then a suffix that makes
+/// it unique among articles of the same title.
+module Conduit.Server.Slug exposing (base, is_word, slug, page)
+
+/// Letters and digits stay; anything else separates words.
+is_word : String -> Bool
+let is_word c = (c >= "a" && c <= "z") || (c >= "0" && c <= "9")
+
+/// The title's words joined with `-`; `article` for a title of none.
+base : String -> String
+let base title =
+  let marked =
+    List.map (fun c -> if is_word c then c else " ") (String.chars (String.to_lower title))
+  let words = List.filter (fun w -> w != "") (String.split " " (String.join "" marked))
+  if List.is_empty words then "article" else String.join "-" words
+
+/// The slug of `title` with the unique `suffix`.
+slug : String -> String -> String
+let slug title suffix = base title ++ "-" ++ suffix
+
+/// A page of a list: at most 100 items, 20 unless asked, from `offset`.
+page : Option Float -> Option Float -> { limit : Int; offset : Int }
+let page limit offset = {
+  limit = Int.truncate (Float.clamp { minimum = 1; maximum = 100 } (Option.with_default 20 limit));
+  offset = Int.truncate (Float.max 0 (Option.with_default 0 offset));
+}

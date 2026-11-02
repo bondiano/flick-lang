@@ -1,0 +1,13 @@
+schema-version = 1
+
+# The Conduit API on the go target, over PostgreSQL. It serves the endpoints
+# of `@conduit/contract` and, when built, the client's files.
+[project]
+kind = "app"
+entry = "Conduit.Server.Main"
+source-dir = "src"
+test-dir = "test"
+
+[build]
+out-dir = "dist"
+emit = "go"

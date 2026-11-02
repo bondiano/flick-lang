@@ -1,0 +1,118 @@
+/// Users and who follows whom, in the database. Lookups answer `None` for
+/// no row.
+module Conduit.Server.People exposing (..)
+
+import Database exposing (Database)
+import Conduit.Server.Db as Db
+import Conduit.Server.Schema exposing (Follows, Users)
+
+/// A user as stored.
+type alias Account = Users
+
+type alias NewAccount = { username : String; email : String; password_hash : String }
+
+by_id : BigInt ->{Database;} Option Account
+let by_id id =
+  Db.first
+    (sql {
+      from u in Users
+      where u.id == $id
+      select u
+    })
+
+by_email : String ->{Database;} Option Account
+let by_email email =
+  Db.first
+    (sql {
+      from u in Users
+      where u.email == $email
+      select u
+    })
+
+by_username : String ->{Database;} Option Account
+let by_username username =
+  Db.first
+    (sql {
+      from u in Users
+      where u.username == $username
+      select u
+    })
+
+/// Whether another user than `except` has the account `found`.
+other : Option BigInt -> Option Account -> Bool
+let other except found =
+  match found with
+  | Some account -> Some account.id != except
+  | None -> false
+
+/// The fields among `username` and `email` another user than `except`
+/// already has.
+taken : Option BigInt -> Option String -> Option String ->{Database;} List String
+let taken except username email =
+  let name =
+    match username with
+    | Some n -> by_username n
+    | None -> None
+  let address =
+    match email with
+    | Some e -> by_email e
+    | None -> None
+  (if other except name then ["username"] else [])
+    ++ (if other except address then ["email"] else [])
+
+insert : NewAccount ->{Database;} BigInt
+let insert account =
+  Db.insert_id
+    (sql {
+      insert_into Users
+      values {
+        username = $account.username;
+        email = $account.email;
+        password_hash = $account.password_hash;
+      }
+      returning { id = Users.id }
+    })
+
+/// Stores every field of `account`.
+save : Account ->{Database;} Unit
+let save account =
+  Db.run
+    (sql {
+      update Users
+      set {
+        username = $account.username;
+        email = $account.email;
+        password_hash = $account.password_hash;
+        bio = $account.bio;
+        image = $account.image;
+      }
+      where Users.id == $account.id
+    })
+
+/// Whether `reader`, if anyone, follows `author`.
+follows : Option BigInt -> BigInt ->{Database;} Bool
+let follows reader author =
+  let found =
+    Db.first
+      (sql {
+        from f in Follows
+        where f.follower_id == $reader && f.followed_id == $author
+        select { n = count_all }
+      })
+  Option.map (fun row -> row.n > 0n) found |> Option.with_default false
+
+follow : BigInt -> BigInt ->{Database;} Unit
+let follow reader author =
+  Db.run_once
+    (sql {
+      insert_into Follows
+      values { follower_id = $reader; followed_id = $author }
+    })
+
+unfollow : BigInt -> BigInt ->{Database;} Unit
+let unfollow reader author =
+  Db.run
+    (sql {
+      delete_from Follows
+      where Follows.follower_id == $reader && Follows.followed_id == $author
+    })

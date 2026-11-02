@@ -1,0 +1,85 @@
+/// The pure core of the server: what a request must hold, the addresses
+/// of articles and the pages of lists, without a database.
+module Conduit.Server.CoreTest exposing (tests)
+
+import Conduit.Server.Slug as Slug
+import Conduit.Server.Validate as Validate
+
+/// Whether `text` is a slug's base: words of `a`–`z` and `0`–`9` joined by `-`.
+is_slug : String -> Bool
+let is_slug text =
+  let words = String.split "-" text
+  List.all (fun w -> w != "" && List.all Slug.is_word (String.chars w)) words
+
+/// The problems of a registration, or none.
+problems :
+  { username : Option String; email : Option String; password : Option String } ->
+  List (String, List String)
+let problems input =
+  match Validate.registration input with
+  | Ok _ -> []
+  | Err found -> found
+
+/// The `bio` an update with only `bio` sets.
+bio_of : Option (Option String) -> Result (List (String, List String)) (Option (Option String))
+let bio_of bio =
+  Result.map
+    (fun c -> c.bio)
+    (Validate.change { email = None; username = None; password = None; bio = bio; image = None })
+
+tests : List Test.Test
+let tests = [
+  Test.test "a registration names each field it misses or gets wrong" (fun () ->
+    Test.equal
+      [
+        ("username", ["can't be blank"]),
+        ("email", ["is invalid"]),
+        ("password", ["can't be blank"]),
+      ]
+      (problems { username = Some "  "; email = Some "not-an-email"; password = None })
+  ),
+  Test.test "a password needs 8 characters and takes 64" (fun () ->
+    Test.all [
+      Test.equal
+        [("password", ["is too short (minimum is 8 characters)"])]
+        (problems {
+          username = Some "ada";
+          email = Some "ada@example.org";
+          password = Some "short7c";
+        }),
+      Test.equal
+        []
+        (problems {
+          username = Some "ada";
+          email = Some "ada@example.org";
+          password = Some (String.repeat 64 "a");
+        }),
+    ]
+  ),
+  Test.test "a blank bio clears it, a missing one keeps it" (fun () ->
+    Test.all [
+      Test.equal (Ok (Some None)) (bio_of (Some (Some "  "))),
+      Test.equal (Ok None) (bio_of None),
+      Test.equal (Ok (Some (Some "hi"))) (bio_of (Some (Some "hi"))),
+    ]
+  ),
+  Test.test "tags keep their order without blanks or repeats" (fun () ->
+    Test.equal ["dragons", "training"] (Validate.tags [" dragons", "", "training", "dragons"])
+  ),
+  Test.test "a slug is the title's words" (fun () ->
+    Test.all [
+      Test.equal "how-to-train-your-dragon" (Slug.base "How to train your Dragon?!"),
+      Test.equal "article" (Slug.base "!!!"),
+    ]
+  ),
+  Test.property "every title has a slug of words" (Gen.string 40) (fun title ->
+    Test.is_true "the base is words" (is_slug (Slug.base title))
+  ),
+  Test.property
+    "a page holds 1 to 100 articles from an offset of 0 or more"
+    (Gen.pair (Gen.number (-50) 500) (Gen.number (-50) 500))
+    (fun (limit, offset) ->
+      let page = Slug.page (Some limit) (Some offset)
+      Test.is_true "in bounds" (page.limit >= 1 && page.limit <= 100 && page.offset >= 0)
+    ),
+]
