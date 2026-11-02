@@ -75,6 +75,10 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
     ("Json", builtin_source!("builtins/Json.fl")),
     ("Sql", builtin_source!("builtins/Sql.fl")),
     ("Database", builtin_source!("builtins/Database.fl")),
+    (
+        "Database.Migrate",
+        builtin_source!("builtins/Database/Migrate.fl"),
+    ),
     ("Test", builtin_source!("builtins/Test.fl")),
     ("Flick.Debug", builtin_source!("builtins/Flick/Debug.fl")),
     #[cfg(feature = "server-stdlib")]

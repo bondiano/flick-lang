@@ -1,0 +1,9 @@
+first: applied [1, 2]
+again: applied []
+new step: applied [3]
+people: 1
+together: [] []
+failing step: failed 42P01
+half-made table left: 0
+out of order: refused: step 1 is out of order
+behind the database: refused: the database is at version 3, past 1

@@ -1,0 +1,92 @@
+/// Migrations of a PostgreSQL schema: an ordered list of steps, each run
+/// once and recorded in the table `flick_migrations`. `run` applies the
+/// steps the database has not recorded, in one transaction under an
+/// advisory lock, so servers that start together run each step once and a
+/// failing step leaves the schema as it was.
+module Database.Migrate exposing (Migration, MigrationError(..), run)
+
+import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+import Database exposing (Database)
+
+/// A step: its version, above that of the step before it, a name for the
+/// record, and its statements, run in order.
+type alias Migration = { version : Int; name : String; statements : List String }
+
+/// The steps are not in increasing order of their versions, or the database
+/// records a version past the last step: a newer program migrated it.
+type error MigrationError = MigrationError String
+  deriving Eq, Show
+
+type alias Applied = { version : Int }
+  deriving Schema
+
+/// A statement whose rows nobody reads.
+statement : String -> Sql.Query Pg Unknown
+let statement text = Sql.unsafe_query [Sql.unsafe_text text] (Codec.json Schema.unknown)
+
+/// The lock every migrator of a database takes until its transaction ends.
+lock : Sql.Query Pg Unknown
+let lock = statement "select pg_advisory_xact_lock(7302964166741229)"
+
+table : Sql.Query Pg Unknown
+let table =
+  statement
+    "create table if not exists flick_migrations (version integer primary key, name text not null, applied_at timestamptz not null default now())"
+
+latest : Sql.Query Pg Applied
+let latest =
+  Sql.unsafe_query
+    [Sql.unsafe_text "select coalesce(max(version), 0)::int as version from flick_migrations"]
+    (Codec.json (schema Applied))
+
+record : Migration -> Sql.Query Pg Unknown
+let record step =
+  Sql.unsafe_query
+    [
+      Sql.unsafe_text "insert into flick_migrations (version, name) values (",
+      Sql.param Int.json step.version,
+      Sql.unsafe_text ", ",
+      Sql.param String.json step.name,
+      Sql.unsafe_text ")",
+    ]
+    (Codec.json Schema.unknown)
+
+/// The first step whose version is not above the one before it.
+out_of_order : List Migration -> Option Migration
+let rec out_of_order steps =
+  match steps with
+  | [first, second, ...rest] ->
+    if second.version <= first.version then Some second else out_of_order ([second] ++ rest)
+  | _ -> None
+
+apply : Migration ->{Database; EncodeError, DbError} Int
+let apply step =
+  List.each_effect (fun text -> ignore (Database.execute (statement text))) step.statements
+  ignore (Database.execute (record step))
+  step.version
+
+/// Applies the steps above the latest version the database records, in
+/// order, and gives their versions: none when the schema is current.
+run : List Migration ->{Database; MigrationError, EncodeError, DbError, DecodeError} List Int
+let run steps =
+  match out_of_order steps with
+  | Some step ->
+    from_result (Err (MigrationError ("step " ++ show step.version ++ " is out of order")))
+  | None ->
+    Database.transaction
+      (task {
+        ignore (Database.execute lock)
+        ignore (Database.execute table)
+        let applied =
+          match Database.query latest with
+          | [row] -> row.version
+          | _ -> 0
+        let last = Option.with_default 0 (Option.map (fun step -> step.version) (List.last steps))
+        if applied > last then
+          from_result
+            (Err
+              (MigrationError
+                ("the database is at version " ++ show applied ++ ", past " ++ show last)))
+        else
+          List.map_effect apply (List.filter (fun step -> step.version > applied) steps)
+      })

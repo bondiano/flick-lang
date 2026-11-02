@@ -235,6 +235,30 @@ let transfer source target amount =
 `DbError` с кодом `"commit_unknown"`: транзакция могла произойти, а могла и
 нет, и ответ есть только в данных. Ничего не повторяется.
 
+## Миграции
+
+`Database.Migrate.run steps` приводит схему к актуальной: каждый шаг
+`{ version; name; statements }` с версией выше последней, записанной в
+таблице `flick_migrations`, выполняет свои инструкции по порядку и
+записывается. Ответ — версии применённых шагов, пустой список, если схема
+актуальна. Весь запуск — одна транзакция под advisory-блокировкой, поэтому
+серверы, которые стартуют одновременно, применяют каждый шаг один раз, а
+упавший шаг оставляет схему прежней. Шаги не по возрастанию версии и база,
+которая уже дальше последнего шага, отклоняются с `MigrationError`.
+Инструкции — произвольный SQL: DDL вне проверяемого подмножества.
+
+```flick
+import Database.Migrate exposing (Migration)
+
+steps : List Migration
+let steps = [
+  { version = 1; name = "users"; statements = ["create table users (id serial primary key, name text not null)"] },
+  { version = 2; name = "emails"; statements = ["alter table users add column email text"] },
+]
+
+let applied = Database.Migrate.run steps
+```
+
 ## Отмена и ограничения
 
 Прерванный запрос отменяется на сервере запросом CancelRequest протокола,
