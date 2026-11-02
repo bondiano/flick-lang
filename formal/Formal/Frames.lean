@@ -79,6 +79,7 @@ theorem PHead.not_value {e e'} (h : PHead e e') : ¬ Value e := by
     | (rename_i hf _; simp [Tm.head] at hf)
     | (rename_i hc _; simp [Const.arity, Const.layer] at hc)
     | (rename_i hf; simp [Tm.head] at hf)
+    | simp_all [Const.layer]
 
 theorem RHead.not_value {Λ μ e Λ' μ' e'} (h : RHead Λ μ e Λ' μ' e') : ¬ Value e := by
   intro hv

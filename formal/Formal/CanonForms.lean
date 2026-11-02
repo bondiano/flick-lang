@@ -151,6 +151,16 @@ theorem canonical_unit {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex
   | adt _ _ h => subst hT; simp [Ty.hd] at h
   | _ => cases hT
 
+theorem canonical_int {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.base .int) φ)) :
+    ∃ n, v = .lit (.int n) := by
+  have hs := (h.shape hv rfl).1
+  generalize hT : Ty.base Base.int = T at hs
+  cases hs with
+  | hidden h => subst hT; cases h
+  | @lit l => cases l <;> simp [Lit.base] at hT; exact ⟨_, rfl⟩
+  | adt _ _ h => subst hT; simp [Ty.hd] at h
+  | _ => cases hT
+
 /-- Л1 for owners. -/
 theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.owner s) φ)) :
     ∃ p, v = .own p ∧ s = .rg p := by

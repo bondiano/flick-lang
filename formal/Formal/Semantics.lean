@@ -130,6 +130,7 @@ inductive PHead : Tm → Tm → Prop
   | withVal : Value v → PHead (.with_ q θ v) v
   | bind : Value v → PHead (.bind S v) (.econs S v .enil)
   | join : IsEnv θ₁ → IsEnv θ₂ → PHead (.join θ₁ θ₂) (θ₁.envAppend θ₂)
+  | intEq : PHead (.app (.app (.const .intEq) (.lit (.int a))) (.lit (.int b))) (.lit (.bool (a == b)))
 
 /-- `Λ[π] := g`. -/
 def setRgn (Λ : List Rgn) (p : Nat) (g : Rgn) : List Rgn := Λ.set p g

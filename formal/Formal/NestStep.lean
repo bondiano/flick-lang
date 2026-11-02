@@ -22,6 +22,7 @@ theorem PHead.noIns {r r' : Tm} {A : Nat → Prop} (hh : PHead r r') (h : r.With
     | exact ⟨h.2.2, vn ‹_› h.2.1⟩
     | exact ⟨vn (IsEnv.value ‹_›) h.1, vn (IsEnv.value ‹_›) h.2.1⟩
     | (have h3 := h.2.2; simp only [Tm.NoIns, Tm.Has, not_or] at h3; exact ⟨vn ‹_› h.1, h3⟩)
+    | simp
 
 theorem Frame.Within.noFrame_plug {F : Frame} {A : Nat → Prop} {x : Tm} (hF : F.Within Ψ B anc A)
     (hni : ¬ F.isInside) (hx : ∀ q, ¬ x.Has (.frame q)) : ∀ q, ¬ (F.plug x).Has (.frame q) := by

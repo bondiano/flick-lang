@@ -176,7 +176,8 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    argument types and type name; service ↦ `S.Impl`. An error type `E` is an ADT whose
    constructors are the error's constructors.
 3. **`Unit`, `Bool`, `Int`** are base types with literals (`Lit`), not nominal ADTs;
-   `True`/`False` patterns are literal patterns.
+   `True`/`False` patterns are literal patterns. The only primitive on them is `Int.eq`, the
+   constant `intEq : Int →P Int →P Bool` with a pure step on two literals.
 4. **Records are closed with a fixed field order.** No row tail and no equality up to
    permutation: the elaborator is assumed to order labels; (Rec) requires the tail to be a
    record type (`Ty.IsRec`). Record patterns are always open (`{…, ..}`), as in `core.md`.

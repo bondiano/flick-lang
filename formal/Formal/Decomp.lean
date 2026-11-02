@@ -86,6 +86,8 @@ theorem PHead.redex {e e' : Tm} (h : PHead e e') : Redex e := by
     | (obtain ⟨-, -, rfl⟩ := ha; assumption)
     | (obtain ⟨-, rfl, -⟩ := ha; assumption)
     | (subst ha; assumption)
+    | (obtain ⟨rfl, -⟩ := ha; exact .constApp (.inl rfl) .lit)
+    | (obtain ⟨-, rfl⟩ := ha; exact .lit)
 
 theorem glob_redex (g : Nat) : Redex (.glob g) := by
   unfold Redex
