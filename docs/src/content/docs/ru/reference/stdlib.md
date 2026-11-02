@@ -53,6 +53,8 @@ title: "Стандартная библиотека"
 | `Redacted` | эффектные `make`, `reveal`; `show` выводит `<redacted>` |
 | `BigDecimal` | `BigDecimal` из Effect: `from_string`, точные `add`, `subtract`, проверяемые `multiply`, `divide_to_scale` |
 | `Duration` | `Duration` из Effect: проверяемые `nanos`, `millis`, `seconds`, `minutes`; для неограниченной длительности — явное `infinity` |
+| `Bytes` | байты как списки чисел от 0 до 255: `from_string` и `to_string` (UTF-8, `None`, если это не UTF-8), `to_base64url` и `from_base64url`, и `equal`, время которого зависит только от длин |
+| `Crypto` | сервис `Crypto` поверх Web Crypto (`Crypto.system`): `random_bytes`, `digest` (SHA-1, SHA-256, SHA-384, SHA-512), `hmac` поверх `digest` (RFC 2104), случайные числа, UUID и ULID |
 | `EqHash`, `HashSet`, `HashMap` | хеш-коллекции, сохраняющие своё свидетельство |
 | `Loop` | `loop` над `Step` и `Trampoline` для чистой рекурсии без переполнения стека |
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write`, `args`, `env` |

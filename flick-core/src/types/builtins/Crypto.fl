@@ -7,6 +7,7 @@ module Crypto exposing (
   Crypto,
   random_bytes,
   digest,
+  hmac,
   random,
   random_boolean,
   random_int,
@@ -47,6 +48,19 @@ let random_bytes size = Crypto.random_bytes size
 /// The digest of the bytes by the algorithm.
 digest : DigestAlgorithm -> List Int ->{Crypto; CryptoError} List Int
 let digest algorithm data = Crypto.digest algorithm data
+
+/// The HMAC of the message under the key (RFC 2104), over `digest`.
+hmac : DigestAlgorithm -> List Int -> List Int ->{Crypto; CryptoError} List Int
+let hmac algorithm key message =
+  let block =
+    match algorithm with
+    | Sha384 -> 128
+    | Sha512 -> 128
+    | _ -> 64
+  let short = if List.length key > block then Crypto.digest algorithm key else key
+  let padded = short ++ List.repeat (block - List.length short) 0
+  let inner = Crypto.digest algorithm (List.map (Int.bit_xor 54) padded ++ message)
+  Crypto.digest algorithm (List.map (Int.bit_xor 92) padded ++ inner)
 
 /// A random number from 0 up to 1.
 random : Unit ->{Crypto;} Float

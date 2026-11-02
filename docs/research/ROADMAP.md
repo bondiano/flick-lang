@@ -397,7 +397,7 @@ component search (props : SearchProps) =
 **W2. Сборка workspace.** ⬜
 - AC: пакеты `examples/conduit/*` в `pnpm-workspace.yaml`; библиотека собирается раньше зависимых; связка pnpm `workspace:` доходит до `node_modules/<pkg>`, как ждёт загрузчик; рецепты `just` для примера.
 
-**W3. `Crypto.hmac` и байты строки.** ⬜
+**W3. `Crypto.hmac` и байты строки.** ✅ (`Crypto.hmac` — HMAC на Flick поверх `digest`, без нового кода рантайма; модуль `Bytes`: `from_string`/`to_string` — UTF-8 (одиночный суррогат — U+FFFD, как `TextEncoder`; не UTF-8 — `None`), `to_base64url`/`from_base64url`, `equal` за время, зависящее только от длин; run-кейс `stdlib/effect/hmac` на векторах RFC 4231 на обоих таргетах)
 - AC: HMAC-SHA256/384/512, сравнение за постоянное время, UTF-8-байты строки и обратно; сверено с тестовыми векторами RFC 4231 на обоих таргетах.
 
 **W4. Хеширование паролей.** ⬜

@@ -131,6 +131,7 @@ stdlib/effect/clock
 stdlib/effect/schedule
 stdlib/effect/hash_ring
 stdlib/effect/crypto
+stdlib/effect/hmac
 stdlib/effect/trie
 stdlib/effect/bytesize
 stdlib/effect/chunk
