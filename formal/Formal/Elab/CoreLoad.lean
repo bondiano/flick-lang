@@ -144,9 +144,11 @@ inductive DTyp (P : Prog) : List Cn → Dict → TTy → Prop
   | inst {Δ I ins σ} : P.insts I = some ins →
       DTyp P Δ (.inst I)
         (dicts .cnil (ins.ctx.map (·.subst σ)) (.dict ⟨ins.cls, ins.head.map (·.subst σ)⟩))
-  | strct {Δ C τ ts} : P.structC C = true → P.fields τ = some ts →
-      DTyp P Δ (.strct C τ) (dicts .cnil (ts.map fun t => ⟨C, [t]⟩) (.dict ⟨C, [τ]⟩))
-  | prim {Δ q p} : P.primC q.cls = true → P.prims q = some p → DTyp P Δ (.prim p q) (.dict q)
+  | strct {Δ C τ ts θ} : P.structC C = true → P.fields τ = some ts →
+      DTyp P Δ (.strct C τ)
+        (dicts .cnil (ts.map fun t => ⟨C, [t.subst θ]⟩) (.dict ⟨C, [τ.subst θ]⟩))
+  | prim {Δ q p θ} : P.primC q.cls = true → P.prims q = some p →
+      DTyp P Δ (.prim p q) (.dict (q.subst θ))
 
 theorem DTyp.target (X : Target P) {Δ : List Cn} {d : Dict} {T : TTy} (h : DTyp P Δ d T)
     (Γ : List TSch) (φ : Stage) : X.Has Γ Δ (.dict d) T φ := by

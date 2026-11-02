@@ -71,8 +71,14 @@ theorem ent_typed {Γ Δ φ qs ds} (h : Ent P Δ qs ds) : DTy X Γ Δ φ ds qs :
   | nil => exact .nil
   | cons _ _ ih₁ ih₂ => cases ih₁ with | cons r _ => exact .cons r ih₂
   | given hc => exact .cons (clo_typed X hc) .nil
-  | prim h₁ h₂ => exact .cons (X.prim h₁ h₂) .nil
-  | strct h₁ h₂ _ ih => exact .cons (dict_apps X (X.strct h₁ h₂) ih) .nil
+  | @prim Q _ h₁ h₂ =>
+    have := X.prim (Γ := Γ) (Δ := Δ) (φ := φ) (θ := .var) h₁ h₂
+    rw [show Q.subst .var = Q by simp [Cn.subst, Ty.subst_id]] at this
+    exact .cons this .nil
+  | strct h₁ h₂ _ ih =>
+    have := X.strct (Γ := Γ) (Δ := Δ) (φ := φ) (θ := .var) h₁ h₂
+    simp only [Ty.subst_id] at this
+    exact .cons (dict_apps X this ih) .nil
   | @inst Q I ins σ ds h₁ h₂ h₃ _ ih =>
     have hq : Q = ⟨ins.cls, ins.head.map (·.subst σ)⟩ := by cases Q; simp_all
     subst hq

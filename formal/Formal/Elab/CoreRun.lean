@@ -144,9 +144,9 @@ def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg ro
     _, _, .ap (h₁.2.1 _ rfl) (h₂.2.1 _ rfl)⟩
   inst hI := ⟨(typingTarget hR).inst hI, (fun _ e => by cases e; exact .inst hI), [], _, .inst (σ := Ty.var) hI⟩
   strct h₁ h₂ := ⟨(typingTarget hR).strct h₁ h₂, (fun _ e => by cases e; exact .strct h₁ h₂),
-    [], _, .strct h₁ h₂⟩
+    [], _, .strct (θ := .var) h₁ h₂⟩
   prim h₁ h₂ := ⟨(typingTarget hR).prim h₁ h₂, (fun _ e => by cases e; exact .prim h₁ h₂),
-    [], _, .prim h₁ h₂⟩
+    [], _, .prim (θ := .var) h₁ h₂⟩
   St := Cfg
   load e := ⟨[], [], trE N id id e⟩
   Step := CS root

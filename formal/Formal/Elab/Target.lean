@@ -126,12 +126,14 @@ structure Target (P : Prog) where
   inst : ∀ {Γ Δ I ins σ φ}, P.insts I = some ins →
     Has Γ Δ (.dict (.inst I))
       (dicts .cnil (ins.ctx.map (·.subst σ)) (.dict ⟨ins.cls, ins.head.map (·.subst σ)⟩)) φ
-  /-- (Struct): `struct_C^τ : D_{C τ₁} →P … →P D_{C τ}` -/
-  strct : ∀ {Γ Δ C τ ts φ}, P.structC C = true → P.fields τ = some ts →
-    Has Γ Δ (.dict (.strct C τ)) (dicts .cnil (ts.map fun t => ⟨C, [t]⟩) (.dict ⟨C, [τ]⟩)) φ
-  /-- (Prim) -/
-  prim : ∀ {Γ Δ q p φ}, P.primC q.cls = true → P.prims q = some p →
-    Has Γ Δ (.dict (.prim p q)) (.dict q) φ
+  /-- (Struct): `struct_C^τ : D_{C τ₁θ} →P … →P D_{C τθ}` at any instance `θ` of its type: the
+  run erases `τ` (Р196, Р201) -/
+  strct : ∀ {Γ Δ C τ ts θ φ}, P.structC C = true → P.fields τ = some ts →
+    Has Γ Δ (.dict (.strct C τ))
+      (dicts .cnil (ts.map fun t => ⟨C, [t.subst θ]⟩) (.dict ⟨C, [τ.subst θ]⟩)) φ
+  /-- (Prim), at any instance `θ` of the constraint (Р201) -/
+  prim : ∀ {Γ Δ q p θ φ}, P.primC q.cls = true → P.prims q = some p →
+    Has Γ Δ (.dict (.prim p q)) (.dict (q.subst θ)) φ
   /-- States of a run, the loading of a term, steps, observable results. -/
   St : Type
   load : Tm → St
