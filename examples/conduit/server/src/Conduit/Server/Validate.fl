@@ -1,0 +1,197 @@
+/// What a request must hold, as pure checks: each field missing, blank or
+/// malformed is a problem of that field, with RealWorld's wording, and a
+/// request is valid when it has none. Texts are trimmed; a blank `bio` or
+/// `image` clears it.
+module Conduit.Server.Validate exposing (..)
+
+import Conduit.Input exposing (NewArticle, NewUser, Login, UpdateArticle, UpdateUser)
+import Conduit.Problem exposing (Problems)
+
+type alias Registration = { username : String; email : String; password : String }
+
+type alias Credentials = { email : String; password : String }
+
+/// A change of the user: each field to set, `None` to keep. `Some None` clears.
+type alias Change = {
+  email : Option String;
+  username : Option String;
+  password : Option String;
+  bio : Option (Option String);
+  image : Option (Option String);
+}
+
+type alias Draft = { title : String; description : String; body : String; tags : List String }
+
+type alias Edit = {
+  title : Option String;
+  description : Option String;
+  body : Option String;
+  tags : Option (List String);
+}
+
+blank_message : String
+let blank_message = "can't be blank"
+
+/// The trimmed text, unless it is missing or blank.
+present : Option String -> Option String
+let present text =
+  match Option.map String.trim text with
+  | Some "" -> None
+  | other -> other
+
+/// A text `field` must have, or its problem.
+required : String -> Option String -> Result Problems String
+let required field text =
+  match present text with
+  | Some value -> Ok value
+  | None -> Err [(field, [blank_message])]
+
+/// A text that may be left out, but not given blank.
+optional : String -> Option String -> Result Problems (Option String)
+let optional field text =
+  match text with
+  | None -> Ok None
+  | Some _ -> Result.map Some (required field text)
+
+/// A field of an update: left out, or given neither `null` nor blank.
+updated : String -> Option (Option String) -> Result Problems (Option String)
+let updated field given =
+  match given with
+  | None -> Ok None
+  | Some text -> Result.map Some (required field text)
+
+/// The shortest password: NIST 800-63B asks for 8 characters, no more rules.
+shortest : Int
+let shortest = 8
+
+secret : Result Problems String -> Result Problems String
+let secret checked =
+  match checked with
+  | Ok text ->
+    if String.length text >= shortest then
+      Ok text
+    else
+      Err [("password", ["is too short (minimum is 8 characters)"])]
+  | Err problems -> Err problems
+
+/// `name@host.domain`, without spaces.
+is_email : String -> Bool
+let is_email text =
+  match String.split "@" text with
+  | [name, host] ->
+    name != ""
+      && not (String.contains " " text)
+      && String.contains "." host
+      && not (String.starts_with "." host)
+      && not (String.ends_with "." host)
+  | _ -> false
+
+email : Result Problems String -> Result Problems String
+let email checked =
+  match checked with
+  | Ok text -> if is_email text then Ok text else Err [("email", ["is invalid"])]
+  | Err problems -> Err problems
+
+/// The problems of all results, in order.
+problems_of : List (Result Problems Unit) -> Problems
+let problems_of results =
+  List.flat_map
+    (fun r ->
+      match r with
+      | Ok _ -> []
+      | Err problems -> problems
+    )
+    results
+
+/// Forgets the value of a result, keeping its problems.
+check : Result Problems a -> Result Problems Unit
+let check result = Result.map (fun _ -> ()) result
+
+/// `value` when there are no problems.
+valid : Problems -> a -> Result Problems a
+let valid problems value = if List.is_empty problems then Ok value else Err problems
+
+registration : NewUser -> Result Problems Registration
+let registration input =
+  let username = required "username" input.username
+  let address = email (required "email" input.email)
+  let password = secret (required "password" input.password)
+  match (username, address, password) with
+  | (Ok u, Ok e, Ok p) -> Ok { username = u; email = e; password = p }
+  | _ -> Err (problems_of [check username, check address, check password])
+
+credentials : Login -> Result Problems Credentials
+let credentials input =
+  let address = email (required "email" input.email)
+  let password = required "password" input.password
+  match (address, password) with
+  | (Ok e, Ok p) -> Ok { email = e; password = p }
+  | _ -> Err (problems_of [check address, check password])
+
+/// A blank `bio` or `image` is no `bio` or `image`.
+cleared : Option (Option String) -> Option (Option String)
+let cleared field = Option.map present field
+
+change : UpdateUser -> Result Problems Change
+let change input =
+  let username = updated "username" input.username
+  let address =
+    match updated "email" input.email with
+    | Ok (Some text) -> Result.map Some (email (Ok text))
+    | other -> other
+  let password =
+    match updated "password" input.password with
+    | Ok (Some text) -> Result.map Some (secret (Ok text))
+    | other -> other
+  match (username, address, password) with
+  | (Ok u, Ok e, Ok p) ->
+    Ok {
+      email = e;
+      username = u;
+      password = p;
+      bio = cleared input.bio;
+      image = cleared input.image;
+    }
+  | _ -> Err (problems_of [check username, check address, check password])
+
+/// The tags given, trimmed, without blanks or repeats, in their order.
+tags : List String -> List String
+let tags given =
+  List.fold_left
+    (fun kept tag ->
+      let t = String.trim tag
+      if t == "" || List.contains t kept then kept else kept ++ [t]
+    )
+    []
+    given
+
+draft : NewArticle -> Result Problems Draft
+let draft input =
+  let title = required "title" input.title
+  let description = required "description" input.description
+  let body = required "body" input.body
+  match (title, description, body) with
+  | (Ok t, Ok d, Ok b) ->
+    Ok { title = t; description = d; body = b; tags = tags (Option.with_default [] input.tagList) }
+  | _ -> Err (problems_of [check title, check description, check body])
+
+/// The tags of an update: a list to set, or `null`, which is refused.
+retag : Option (Option (List String)) -> Result Problems (Option (List String))
+let retag given =
+  match given with
+  | Some (Some list) -> Ok (Some (tags list))
+  | Some None -> Err [("tagList", ["can't be null"])]
+  | None -> Ok None
+
+edit : UpdateArticle -> Result Problems Edit
+let edit input =
+  let title = optional "title" input.title
+  let description = optional "description" input.description
+  let body = optional "body" input.body
+  let retagged = retag input.tagList
+  match (title, description, body, retagged) with
+  | (Ok t, Ok d, Ok b, Ok g) -> Ok { title = t; description = d; body = b; tags = g }
+  | _ -> Err (problems_of [check title, check description, check body, check retagged])
+
+comment : Option String -> Result Problems String
+let comment body = required "body" body

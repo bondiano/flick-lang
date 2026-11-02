@@ -11,6 +11,7 @@ import {
   type FieldSpec,
   codecCheck,
   codecFields,
+  codecTransformAs as transformAs,
   codecTransformEffect as transformEffect,
   codecTransformPure as transformPure,
   codecTransformResult as transformResult,
@@ -284,6 +285,12 @@ export const codecStandardAsync = (codec: AnySchema): Effect.Effect<StandardSche
 
 export const codecTransformPure = <W, A>(decodeFn: (wire: W) => A, encodeFn: (value: A) => W, from: AnySchema): AnySchema =>
   transformPure(erase(decodeFn), erase(encodeFn), from);
+export const codecTransformAs = <W, A>(
+  type: AnySchema,
+  decodeFn: (wire: W) => A,
+  encodeFn: (value: A) => W,
+  from: AnySchema,
+): AnySchema => transformAs(type, erase(decodeFn), erase(encodeFn), from);
 export const codecTransformResult = <W, A>(
   decodeFn: (wire: W) => Result.Result<A, SchemaError>,
   encodeFn: (value: A) => W,

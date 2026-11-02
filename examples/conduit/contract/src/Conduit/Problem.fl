@@ -1,0 +1,79 @@
+/// The errors of the Conduit API. Each is answered with its status and the
+/// body RealWorld uses for all of them, the problems by field or resource:
+/// `{"errors": {"email": ["is invalid"]}}`.
+module Conduit.Problem exposing (..)
+
+/// What is wrong, by field or resource, in order.
+type alias Problems = List (String, List String)
+
+/// 401: no token, or one that does not name a user.
+type error Unauthorized = Unauthorized Problems
+  deriving Eq, Show, Schema
+
+/// 403: the resource belongs to someone else.
+type error Forbidden = Forbidden Problems
+  deriving Eq, Show, Schema
+
+/// 404: no such user, article or comment.
+type error NotFound = NotFound Problems
+  deriving Eq, Show, Schema
+
+/// 409: a username or email another user has.
+type error Conflict = Conflict Problems
+  deriving Eq, Show, Schema
+
+/// 422: a field missing, blank or malformed.
+type error Unprocessable = Unprocessable Problems
+  deriving Eq, Show, Schema
+
+type alias Body = { errors : Problems }
+  deriving Schema
+
+/// One problem: the field or resource, and what is wrong with it.
+problem : String -> String -> Problems
+let problem subject message = [(subject, [message])]
+
+body : PureCodec Json Body
+let body = codec (schema Body) {
+  errors = field "errors" (Codec.entries (Codec.list String.json));
+}
+
+unauthorized : PureCodec Json Unauthorized
+let unauthorized =
+  Codec.transform_as
+    (schema Unauthorized)
+    (fun b -> Unauthorized b.errors)
+    (fun (Unauthorized p) -> { errors = p })
+    body
+
+forbidden : PureCodec Json Forbidden
+let forbidden =
+  Codec.transform_as
+    (schema Forbidden)
+    (fun b -> Forbidden b.errors)
+    (fun (Forbidden p) -> { errors = p })
+    body
+
+not_found : PureCodec Json NotFound
+let not_found =
+  Codec.transform_as
+    (schema NotFound)
+    (fun b -> NotFound b.errors)
+    (fun (NotFound p) -> { errors = p })
+    body
+
+conflict : PureCodec Json Conflict
+let conflict =
+  Codec.transform_as
+    (schema Conflict)
+    (fun b -> Conflict b.errors)
+    (fun (Conflict p) -> { errors = p })
+    body
+
+unprocessable : PureCodec Json Unprocessable
+let unprocessable =
+  Codec.transform_as
+    (schema Unprocessable)
+    (fun b -> Unprocessable b.errors)
+    (fun (Unprocessable p) -> { errors = p })
+    body

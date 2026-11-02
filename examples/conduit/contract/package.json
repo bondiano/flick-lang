@@ -1,0 +1,14 @@
+{
+  "name": "@conduit/contract",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "dependencies": {
+    "@flick-lang/runtime": "workspace:*",
+    "effect": "4.0.5"
+  },
+  "flick": {
+    "compiler": "0.1.0",
+    "source-dir": "src"
+  }
+}

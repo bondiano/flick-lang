@@ -22,6 +22,8 @@ const none = {
   auto_capitalize: Option.none(),
   auto_correct: Option.none(),
   wrap: Option.none(),
+  name: Option.none(),
+  input_type: Option.none(),
 };
 
 const markup = (node: Parameters<typeof uiRenderStatic>[0]): string => renderToStaticMarkup(uiRenderStatic(node));

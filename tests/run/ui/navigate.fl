@@ -1,0 +1,128 @@
+// The elements of a Conduit page, and navigation without a reload: a
+// `route_link` keeps its real `href`, a plain click on it writes the route
+// and pushes the URL, a click for a new tab is the browser's, and a `form`
+// runs its handler on a submit and never reloads.
+module App.Main exposing (main)
+
+type Tab = Favorites
+  deriving Eq, Show, Schema
+
+type Page = Home | Profile String (Option Tab)
+  deriving Eq, Show, Schema, Url
+
+open : String ->{} Unit
+foreign sync open from "./navigate.mjs" "open"
+  arity 1
+
+click : String -> Bool ->{} String
+foreign sync click from "./navigate.mjs" "click"
+  arity 2
+
+submit : String ->{} String
+foreign sync submit from "./navigate.mjs" "submit"
+  arity 1
+
+path : Unit ->{} String
+foreign sync path from "./navigate.mjs" "path"
+  arity 0
+
+href : String ->{} String
+foreign sync href from "./navigate.mjs" "href"
+  arity 1
+
+settle : Unit ->{} Unit
+foreign async settle from "./navigate.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign sync text from "./navigate.mjs" "text"
+  arity 0
+
+close : Unit ->{} Unit
+foreign sync close from "./navigate.mjs" "close"
+  arity 0
+
+page : Atom.Writable Page
+let page = Atom.route Page.url Home
+
+submits : Atom.Writable Float
+let submits = Atom.make 0
+
+saved : Action.Action Unit
+let saved = Action.exhaust (fun _ -> task { Atom.update submits (fun n -> n + 1) })
+
+typed : Action.Action Ui.InputSnapshot
+let typed = Action.latest (fun _ -> task { () })
+
+/// `node` with the classes `classes`.
+classed : String -> Ui -> Ui
+let classed classes node = Ui.with_host { Ui.host with class_name = Some classes } node
+
+to : Page -> List Ui -> Ui
+let to target children = Ui.route_link { route = page; url = Page.url; to = target } children
+
+avatar : Ui
+let avatar =
+  match Ui.safe_url "/default-avatar.svg" with
+  | Some src -> Ui.image { src = src; alt = "ada"; class_name = "user-pic" }
+  | None -> Ui.empty
+
+view : Ui.View Unit
+let view =
+  Ui.view (fun () -> ui {
+    fragment [
+      nav { class_name = "navbar" } [
+        classed "nav-link" (to Home [text "Home"]),
+        classed "nav-link" (to (Profile "ada" (Some Favorites)) [avatar, text "Favorited"]),
+      ],
+      text (show (Atom.value page) ++ ", submits " ++ show (Atom.value submits)),
+      form { on_submit = saved } [
+        fieldset { class_name = "form-group" } [
+          Ui.with_host
+            { Ui.host with name = Some "password"; input_type = Some Ui.PasswordInput }
+            (input {
+              value = "";
+              placeholder = "Password";
+              on_input = typed;
+            }),
+        ],
+        classed
+          "btn btn-primary"
+          (submit { disabled = false } [icon { class_name = "ion-heart" }, text "Sign in"]),
+      ],
+      hr,
+      footer { class_name = "footer" } [classed "error-messages" (list [item [text "ok"]])],
+    ]
+  })
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (Ui.Server.to_html (Ui.render view ()))
+  open "http://localhost/"
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root -> provide Atom.layer {
+    scope s {
+      let _ui = Fiber.spawn s report (task { Ui.Dom.mount root (fun _ -> ()) (Ui.render view ()) })
+      settle ()
+      let favorites = "a[href=\"/profile/ada/favorites\"]"
+      Platform.stdout_line ("href: " ++ href favorites)
+      Platform.stdout_line ("new tab: " ++ click favorites true)
+      settle ()
+      Platform.stdout_line (path () ++ ": " ++ text ())
+      Platform.stdout_line ("plain click: " ++ click favorites false)
+      settle ()
+      Platform.stdout_line (path () ++ ": " ++ text ())
+      Platform.stdout_line ("submit: " ++ submit "form")
+      settle ()
+      Platform.stdout_line (path () ++ ": " ++ text ())
+      Platform.stdout_line ("home: " ++ click "a[href=\"/\"]" false)
+      settle ()
+      Platform.stdout_line (path () ++ ": " ++ text ())
+    }
+  }
+  close ()

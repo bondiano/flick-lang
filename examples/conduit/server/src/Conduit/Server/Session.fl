@@ -1,0 +1,114 @@
+/// Who makes a request. A user signs in with a token, an HS256 JWT of their
+/// id that the server signs with its secret; a request carries it as
+/// `Authorization: Token <jwt>`. `check` makes the `Session` of an endpoint
+/// that needs a user and `maybe` that of one that serves anyone, both from
+/// the header the endpoint declares; a refused token is the endpoint's 401.
+module Conduit.Server.Session exposing (
+  Keys,
+  Session,
+  Signed,
+  check,
+  maybe,
+  issue,
+  reader,
+  signed_in,
+)
+
+import Database exposing (Database)
+import Conduit.Input exposing (Credentials)
+import Conduit.Problem as Problem exposing (Unauthorized(..))
+import Conduit.Server.People as People exposing (Account)
+
+/// The user, and the token they sent.
+type alias Signed = { account : Account; token : String }
+
+/// Who makes the request, if anyone.
+service Session =
+  current : Unit ->{} Option Signed
+
+/// The secret the server signs tokens with.
+service Keys =
+  secret : Unit ->{} List Int
+
+type alias Claims = { sub : String; exp : Float }
+  deriving Schema
+
+claims : PureCodec Json Claims
+let claims = Codec.json (schema Claims)
+
+/// How long a token holds: 30 days.
+lifetime : Float
+let lifetime = 30 * 24 * 60 * 60
+
+/// A new token of the account.
+issue : Account ->{Keys, Crypto.Crypto;} String
+let issue account =
+  Effect.or_die
+    (task {
+      Jwt.sign claims (Keys.secret ()) {
+        sub = BigInt.to_string account.id;
+        exp = Jwt.expires_in lifetime;
+      }
+    })
+
+refuse : String ->{; Unauthorized} a
+let refuse reason = from_result (Err (Unauthorized (Problem.problem "token" reason)))
+
+/// The token of a `Token <jwt>` header.
+token_of : String -> Option String
+let token_of header =
+  if String.starts_with "Token " header then
+    Some (String.slice 6 (String.length header) header)
+  else
+    None
+
+/// The id a valid token signs, if it is one.
+signed_id : String ->{Keys, Crypto.Crypto;} Option BigInt
+let signed_id token =
+  Effect.or_die
+    (task {
+      try BigInt.from_string (Jwt.verify claims (Keys.secret ()) token).sub with
+      | Jwt.JwtError _ -> None
+    })
+
+/// The user a header names, or 401.
+known : String ->{Database, Keys, Crypto.Crypto; Unauthorized} Signed
+let known header =
+  let token = Option.with_default "" (token_of header)
+  let account =
+    match signed_id token with
+    | Some id -> People.by_id id
+    | None -> None
+  match account with
+  | Some found -> { account = found; token = token }
+  | None -> refuse "is invalid"
+
+session : Option Signed -> Session.Impl
+let session signed = { current = fun () -> signed }
+
+/// The session of a request that must name a user.
+check :
+  HttpApi.Request p q Credentials b ->{Database, Keys, Crypto.Crypto; Unauthorized} Session.Impl
+let check request =
+  match request.headers.authorization with
+  | Some header -> session (Some (known header))
+  | None -> refuse "is missing"
+
+/// The session of a request that may name a user.
+maybe :
+  HttpApi.Request p q Credentials b ->{Database, Keys, Crypto.Crypto; Unauthorized} Session.Impl
+let maybe request =
+  match request.headers.authorization with
+  | Some header -> session (Some (known header))
+  | None -> session None
+
+/// The signed-in user of an endpoint `check` guards.
+signed_in : Unit ->{Session;} Signed
+let signed_in () =
+  match Session.current () with
+  | Some signed -> signed
+  | None -> Effect.die "an endpoint that needs a user ran without one"
+
+/// The id of the reader, if anyone.
+reader : Unit ->{Session;} Option BigInt
+let reader () = Option.map (fun me -> me.account.id) (Session.current ())

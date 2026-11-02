@@ -3,7 +3,9 @@
 
 use super::{Gen, names};
 use crate::ir::Expr;
-use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, UrlRoute, companion_name};
+use crate::types::{
+    Constructor, Rep, SchemaItem, SchemaPlan, UrlRoute, UrlSegment, companion_name,
+};
 
 impl Gen<'_> {
     /// `T$check`, `T$parse` and `T$value` of a refined type.
@@ -78,7 +80,7 @@ impl Gen<'_> {
                     rep: Rep::Tagged,
                 };
                 let tag = names::tag(&constructor, package.as_deref());
-                let segments: Vec<String> = r.segments.iter().map(|p| self.plan(p)).collect();
+                let segments: Vec<String> = r.segments.iter().map(|s| self.segment(s)).collect();
                 let query = r.query.as_ref().map_or("null".to_owned(), |query| {
                     let fields: Vec<String> = query
                         .iter()
@@ -89,10 +91,11 @@ impl Gen<'_> {
                     format!("[{}]", fields.join(", "))
                 });
                 format!(
-                    "[{}, {}, [{}], {query}]",
+                    "[{}, {}, [{}], {query}, {}]",
                     names::string(&tag),
                     names::string(&r.path),
-                    segments.join(", ")
+                    segments.join(", "),
+                    r.optional
                 )
             })
             .collect();
@@ -101,6 +104,40 @@ impl Gen<'_> {
             self.rt("routeCodec"),
             routes.join(", ")
         )
+    }
+
+    /// A segment of a route: a witness, or the words and tags of a type's
+    /// constructors.
+    fn segment(&mut self, segment: &UrlSegment) -> String {
+        match segment {
+            UrlSegment::Value(plan) => self.plan(plan),
+            UrlSegment::Words {
+                module,
+                ty,
+                constructors,
+            } => {
+                let package = (self.options.package)(module);
+                let words: Vec<String> = constructors
+                    .iter()
+                    .map(|name| {
+                        let constructor = Constructor {
+                            module: module.clone(),
+                            ty: ty.clone(),
+                            name: name.clone(),
+                            arity: 0,
+                            rep: Rep::Tagged,
+                        };
+                        let tag = names::tag(&constructor, package.as_deref());
+                        format!(
+                            "[{}, {}]",
+                            names::string(&UrlSegment::word(name)),
+                            names::string(&tag)
+                        )
+                    })
+                    .collect();
+                format!("{}([{}])", self.rt("routeWords"), words.join(", "))
+            }
+        }
     }
 
     fn plan(&mut self, plan: &SchemaPlan) -> String {

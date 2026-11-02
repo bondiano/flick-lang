@@ -97,6 +97,7 @@ a `PureCodec`, and using one as such is a type error.
 | `Codec.json schema` | the canonical JSON form: records as objects, variants as `{"_tag": "Name", "_0": …}`, `Option` as the value or `null`, `Unit` as `null`, `BigInt` as a string |
 | `String.json`, `Float.json_finite`, `Float.json`, `BigInt.json`, `Codec.bool`, `Codec.list` | primitives; `Float.json_finite` refuses `NaN` and the infinities both ways, `Float.json` writes them as strings |
 | `Codec.transform`, `Codec.transform_result`, `Codec.transform_effect` | pure, fallible and runtime transformations |
+| `Codec.transform_as schema decode encode codec` | `transform` whose values are those of `schema`: a union or the errors of an `HttpApi` endpoint tell them from others by their constructors, which a plain `transform` cannot |
 | `Codec.check predicate message` | a check of the whole decoded value |
 | `Redacted.json_reveal codec`, `Redacted.json_masked` | the explicit policies of a `Redacted` value: its content, or `"<redacted>"` one way |
 

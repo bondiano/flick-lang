@@ -21,3 +21,16 @@ let count = Atom.make 0
 label : Unit ->{Atom.Read;} Ui
 let label () = Ui.text (show (Atom.value count))
 //~ FLICK-U007 @22:5-22:10 `label` reads atoms to build a `Ui`
+
+sql table Rooms "rooms" {
+  width : integer not null as Int
+  depth : integer not null as Int
+}
+
+/// Its conditions run in the database: no branches of the function.
+odd : Sql.Template Sql.Pg {} { width : Int }
+let odd = sql {
+  from r in Rooms
+  where r.width == 1 || r.width == 2 || r.depth == 3
+  select r.width
+}

@@ -66,6 +66,13 @@ an error. A key is metadata, given with `Ui.keyed`, never a prop.
 | `textarea { value; placeholder; on_input }` | `textarea`, as `input` over several lines | none |
 | `pre { class_name }` | `pre`: spaces and line breaks kept | `List Ui` |
 | `link { href : SafeUrl }` | `a` | `List Ui` |
+| `route_link { route; url; to }` | `a` to the page `to`, navigating without a reload (below) | `List Ui` |
+| `nav`, `footer`, `fieldset` `{ class_name }` | `nav`, `footer`, `fieldset` | `List Ui` |
+| `icon { class_name }` | `i` of an icon font, which its classes name | none |
+| `hr` | `hr` | none |
+| `image { src : SafeUrl; alt; class_name }` | `img` | none |
+| `form { on_submit }` | `form`: a submit runs `on_submit` and never reloads | `List Ui` |
+| `submit { disabled }` | `button type="submit"`, which submits the form around it | `List Ui` |
 | `html (s : SanitizedHtml)` | `div` with the HTML | none |
 | `select (SelectProps a c)` | `ul role="listbox"`; choosing an item runs `on_change` with it | items through `render_item` |
 | `panel { header; body; footer }` | `section` with `header`, `main`, `footer` | named places |
@@ -97,9 +104,20 @@ are unchanged. Outside `ui`, use `Ui.component badge props`.
 `with_host attrs node` puts host attributes on an element: `id`,
 `class_name`, `role`, `aria_label`, `aria_describedby`, `aria_hidden`,
 `aria_invalid`, `aria_pressed`, `aria_live` (`Polite`, `Assertive`, `Off`), `tab_index`,
-`data` (pairs written `data-<name>`), and the text-entry hints
-`auto_capitalize`, `auto_correct` and `wrap`. Each is typed and optional:
+`data` (pairs written `data-<name>`), the text-entry hints
+`auto_capitalize`, `auto_correct` and `wrap`, and a form field's `name` and
+`input_type` (`TextInput`, `PasswordInput`, `EmailInput`, its `type`). Each is
+typed and optional:
 `with_host { host with role = Some "status" } (span { class_name = "s" } […])`.
+It gives every element its classes the same way, those whose props have no
+`class_name` included: `with_host { host with class_name = Some "nav-link" } (route_link …)`.
+
+`route_link { route; url; to } children` is a link inside the app to the page
+`to` of a route state, `route = Atom.route url fallback`. Its `href` is
+`Route.print url to`, so a server's markup, a click for a new tab and a
+middle click follow it as the browser does. A plain left click, without a
+modifier key, writes `to` to `route` instead: the URL is pushed to the history
+without a reload, and the views that read `route` render the new page.
 
 ## Atoms and views
 

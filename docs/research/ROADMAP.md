@@ -394,7 +394,7 @@ component search (props : SearchProps) =
 - AC: пакет с `"flick": { "source-dir": … }` в `package.json` компилируется каждым зависимым проектом под его таргет (js или go) как модули этого пакета, поэтому теги конструкторов совпадают на обеих сторонах.
 - AC: фикстура: JS-клиент и Go-сервер импортируют одну библиотеку, значение суммы и записи проходит по `HttpApi` туда и обратно с одинаковыми тегами; модуль пакета с импортом только для js в Go-проекте — `P030`.
 
-**W2. Сборка workspace.** ⬜
+**W2. Сборка workspace.** 🔶 (`examples/conduit/contract` и `server` в корневом `pnpm-workspace.yaml`, `@flick-lang/runtime` и `@conduit/contract` — `workspace:*`; pnpm связывает `node_modules/@conduit/contract` с исходниками, как ждёт загрузчик; клиент — с W24)
 - AC: пакеты `examples/conduit/*` в `pnpm-workspace.yaml`; библиотека собирается раньше зависимых; связка pnpm `workspace:` доходит до `node_modules/<pkg>`, как ждёт загрузчик; рецепты `just` для примера.
 
 **W3. `Crypto.hmac` и байты строки.** ✅ (`Crypto.hmac` — HMAC на Flick поверх `digest`, без нового кода рантайма; модуль `Bytes`: `from_string`/`to_string` — UTF-8 (одиночный суррогат — U+FFFD, как `TextEncoder`; не UTF-8 — `None`), `to_base64url`/`from_base64url`, `equal` за время, зависящее только от длин; run-кейс `stdlib/effect/hmac` на векторах RFC 4231 на обоих таргетах)
@@ -412,14 +412,14 @@ component search (props : SearchProps) =
 **W7. Раздача: CORS и SPA.** ✅ `44194447` (нового API не нужно: `HttpApi.route` рядом с `Http.StaticServer.route` и `Http.Middleware.cors` на одном маршрутизаторе — так Go-сервер раздаёт собранный клиент; найден и исправлен дефект на обоих таргетах: `spa = true` без явного `index` не отдавал `index.html`, потому что привязка передавала Effect ключ `index: undefined`, а Go повторил это; `tests/run/stdlib/http/spa`)
 - AC: API, статика и CORS для dev-сервера на одном сервере; путь клиента без файла отвечает `index.html`; оба таргета.
 
-**W8. Миграции и SQL для Conduit.** 🔶 (`Database.Migrate.run` — на Flick поверх `Database`, поэтому на обоих таргетах: шаги выше записанной версии в одной транзакции под advisory-блокировкой; `tests/postgres/migrate.fl` в `flick/tests/sql_postgres.rs`, js и go; пробелы DSL для запросов Conduit — при W21)
+**W8. Миграции и SQL для Conduit.** 🔶 (`Database.Migrate.run` — на Flick поверх `Database`, поэтому на обоих таргетах: шаги выше записанной версии в одной транзакции под advisory-блокировкой; `tests/postgres/migrate.fl` в `flick/tests/sql_postgres.rs`, js и go; пробелы DSL для запросов Conduit — при W21: захват `Option t` — `t` или `NULL`, с приведением базового типа, для необязательных фильтров; в документации исправлены `Int` у целых столбцов и `limit`/`offset`)
 - AC: модуль `Migrate` — упорядоченный список SQL с таблицей версий, прогон при старте, повторный прогон ничего не делает; оба таргета.
 - AC: запросы Conduit (`favorited`, `following`, счётчики, фильтры по тегу, автору, избранному, пагинация) пишутся DSL `sql` без `unsafe_query`; каждый найденный пробел DSL — подпункт.
 
-**W9. Элементы и атрибуты `Ui`.** ⬜
+**W9. Элементы и атрибуты `Ui`.** ✅ (`nav`, `footer`, `fieldset` и `icon` (`i`) с `{ class_name }`, `hr`, `image { src : SafeUrl; alt; class_name }`, `form { on_submit }` — отправка всегда без перезагрузки (`preventDefault` в обработчике), `submit { disabled }` — `button type="submit"`; у `Host` — `name` и `input_type` (`TextInput | PasswordInput | EmailInput`); классы любого элемента, в том числе списков и ссылок, — через `with_host`, как и прежде; `Ui.fl` сжат по комментариям, чтобы остаться ≤ 20000 байт; `runtime/test/ui-html.test.ts`)
 - AC: `img`, `form` (отправка без перезагрузки), `nav`, `a`, `i`, `hr`, `fieldset`, `footer`, списки с классами; `input` с `type` (password, email); кнопка отправки формы; `class_name` у каждого элемента одинаково.
 
-**W10. Навигация.** ⬜
+**W10. Навигация.** ✅ (`Ui.route_link { route; url; to }` — `a` с настоящим `href` = `Route.print url to`: обычный клик левой кнопкой без модификаторов отменяет переход браузера и пишет `to` в состояние `Atom.route`, которое кладёт URL в историю через `pushState`; клик для новой вкладки, средняя кнопка и разметка без клиента идут по `href`. Решение по вложенным путям — без нового синтаксиса, два правила `deriving Url`: поле типа, все конструкторы которого без полей, — сегмент-слово (имя конструктора в kebab-case), и последний сегмент может быть `Option` — `None` убирает его из URL. Пути Conduit: `Editor (Option Slug)` — `/editor` и `/editor/:slug`, `Profile String (Option Tab)` с `type Tab = Favorites` — `/profile/:u` и `/profile/:u/favorites`; печать и разбор тотальны и обратимы (`Arbitrary.check` в `tests/run/schema/route`, оба таргета), пересечение диапазонов числа сегментов двух конструкторов — `D009`; `tests/run/ui/navigate` в jsdom)
 - AC: ссылка внутри приложения перехватывает клик и меняет маршрут через `pushState` без перезагрузки; `deriving Url` описывает вложенные пути (`/profile/:username/favorites`, `/editor/:slug`, `/article/:slug`).
 
 **W11. `Storage`.** ⬜
@@ -441,10 +441,16 @@ component search (props : SearchProps) =
 - AC: `[lint]` с жёсткими `max-function-*` и `no-let-assert`; `check --warnings-as-errors` и `fmt --check` для contract, server и client в `flick/tests/examples.rs`.
 - AC: каждое правило, которого не хватило при написании, — отдельный пункт W17+ с кодом в `diagnostics/codes.rs` и фикстурой.
 
-**W20. Контракт.** ⬜ (после W1)
-- AC: `Conduit.Types`, `Conduit.Errors`, `Conduit.Api` — уточнённые `Email`/`Username`/`Slug`, записи, точки `HttpApi` по `openapi.yml`; OpenAPI из контракта сверен со спецификацией.
+**W17. Импорт таблицы, названной только в `sql { … }`, — использование.** ✅ (линтер `R012` считал такой импорт неиспользуемым, хотя без него запрос не компилируется, и под `--warnings-as-errors` модуль запросов нельзя было собрать; имена таблиц `T` и `M.T` внутри `sql { … }` теперь ссылки, столбцы и псевдонимы — нет; фикстура `tests/check/projects/sql_table_imports`)
 
-**W21–W23. Сервер.** ⬜ (после W3–W8, W20)
+**W18. Условия `sql { … }` не ветвления функции.** ✅ (`max-complexity` (`T038`) считал каждое `&&` и `||` запроса веткой функции, и запрос с несколькими необязательными фильтрами превышал порог, хотя его условия выполняет база, а не функция; блок `sql` теперь не добавляет веток; фикстура `tests/check/projects/lint_thresholds`)
+
+**W19. Ошибки эндпоинта с общим телом различимы.** ✅ (сервер выбирал вариант ошибки по первому кодеку, который её принимает, а кодек `Codec.transform` принимал любое значение: 422 RealWorld уходил с 409 первого варианта, на обоих таргетах; `Codec.transform_as schema` даёт кодеку тип значений — тег конструктора проверяют `Schema.is` (JS) и `codecHas` (Go); эндпоинт, ошибки которого нельзя различить, отклоняется при создании; `tests/run/stdlib/http/error_cases`, `error_cases_opaque`)
+
+**W20. Контракт.** ✅ (`examples/conduit/contract`, пакет с исходниками `@conduit/contract`: `Conduit.Model` — ответы как на проводе, `Conduit.Input` — запросы, где каждое поле может отсутствовать, чтобы сервер отвечал 422 по полю, а обновление отличало отсутствие от `null`; `Conduit.Problem` — ошибки 401/403/404/409/422 с телом RealWorld через `Codec.entries`; `Conduit.Api` — 18 точек `HttpApi` с заголовком `Authorization`, сервисы обработчиков — забота сервера, поэтому `with_auth` навешивает сервер; тесты кодеков на js и go)
+- AC: `Conduit.Model`, `Conduit.Input`, `Conduit.Problem`, `Conduit.Api` — записи и точки `HttpApi` по `openapi.yml`; проверка тел ошибок и терпимого разбора запросов на обоих таргетах. Сверка OpenAPI со спецификацией — при W23, когда сервер соберёт API с `with_auth`.
+
+**W21–W23. Сервер.** ✅ (`examples/conduit/server`, `emit = "go"`: чистое ядро `Validate`/`Slug` без `Eff` с unit- и property-тестами (`flick test` на go); база за функциями `People`/`Articles`/`Comments` над `Database` — отказ базы дефект (500), поэтому типы обработчиков несут только ошибки предметной области; `Session` из токена `Token <jwt>` через `with_auth`/`with_optional_auth` и сервис `Keys`; обработчики с открытыми строками сервисов `{… | r}`, группы и API выводятся из контракта; `Main` — настройки из окружения, `Database.Migrate`, маршрутизатор API + статика клиента + CORS. Весь официальный набор Hurl — 13 файлов, 157 запросов — проходит против Go-сервера на PostgreSQL. По пути найдены и закрыты: W17, W18, W19, захват `Option` в SQL (W8) и пустой результат типизированного запроса на go (`7d08f9db`))
 - AC: схема, миграции, репозитории за сервисом (Postgres и `Ref` в памяти); auth, users, profiles; articles, feed, favorites, comments, tags. Чистое ядро (slug, пагинация, проверки) без `Eff`, property-тесты; весь официальный набор Hurl проходит против Go-сервера с Postgres в Docker.
 
 **W24–W26. Клиент.** ⬜ (после W9–W15, W20)

@@ -1,6 +1,7 @@
 //! Values passed beside the SQL text as placeholders: literals, and the
 //! captures `$name`, `$name.field` and `$(e)` of values of the program,
-//! typed where they stand and never parameters of the template.
+//! typed where they stand and never parameters of the template. A capture
+//! of an `Option t` is a nullable placeholder of `t`: `None` is `NULL`.
 
 use super::super::Checker;
 use super::super::infer::literal_type;
@@ -22,11 +23,12 @@ impl Cx {
         captured: Type,
         span: Span,
         ty: Type,
+        nullable: bool,
     ) -> usize {
         self.params.push(Param {
             name: name.clone(),
             ty: ty.clone(),
-            nullable: false,
+            nullable,
             form: None,
             span,
             placeholder: self.slots.len(),
@@ -37,7 +39,7 @@ impl Cx {
             name,
             literal: Some(at),
             form: SqlForm::Kind(String::new()),
-            nullable: false,
+            nullable,
         });
         self.params.len() - 1
     }
@@ -69,19 +71,51 @@ impl Checker<'_> {
         };
         let captured = self.infer(name);
         let span = self.span(node);
-        let ty = self.store.fresh();
+        // an `Option t` stands for `t` or `NULL`
+        let resolved = self.whnf(&self.zonk(&captured));
+        let (head, args) = resolved.spine();
+        let nullable = *head == Type::prim("Option") && args.len() == 1;
+        let ty = if nullable {
+            args[0].clone()
+        } else {
+            self.store.fresh()
+        };
         let at = cx.capture(
             self.text_of(node),
             range(self.span(name)),
             captured,
             span,
             ty,
+            nullable,
         );
-        let mut v = Val::plain(
-            format!("${}", cx.params[at].placeholder + 1),
-            cx.params[at].ty.clone(),
-        );
+        let placeholder = format!("${}", cx.params[at].placeholder + 1);
+        // PostgreSQL cannot type `$1 IS NULL` alone: a nullable capture says its type
+        let sql = match nullable.then(|| cast(&self.whnf(&self.zonk(&cx.params[at].ty)))) {
+            Some(Some(sql_type)) => format!("CAST({placeholder} AS {sql_type})"),
+            _ => placeholder,
+        };
+        let mut v = Val::plain(sql, cx.params[at].ty.clone());
+        v.null = nullable;
         v.param = Some(at);
         v
+    }
+}
+
+/// The SQL type a nullable capture of `ty` is cast to.
+// shortcut: only base types; a type with a `via` codec gets no cast, so it
+// cannot stand alone as in `is_null $x`; derive its column's type when one needs it.
+fn cast(ty: &Type) -> Option<&'static str> {
+    match ty {
+        Type::Con { module, name } => match (module.as_str(), name.as_str()) {
+            ("Prelude", "String") => Some("text"),
+            ("Prelude", "Bool") => Some("boolean"),
+            ("Prelude", "Int") => Some("integer"),
+            ("Prelude", "Float") => Some("double precision"),
+            ("Prelude", "BigInt") => Some("bigint"),
+            ("Prelude", "Json") => Some("json"),
+            ("BigDecimal", "BigDecimal") => Some("numeric"),
+            _ => None,
+        },
+        _ => None,
     }
 }

@@ -23,9 +23,6 @@ use super::{
     protocol,
 };
 
-#[path = "foreign.rs"]
-mod foreign;
-
 pub(super) type Reply = Result<Value, (i64, String)>;
 
 const INVALID_PARAMS: i64 = -32602;
@@ -129,7 +126,6 @@ impl Server {
                 .map_or(Ok(Value::Null), |l| location(snapshot, &l)),
             "textDocument/definition" => ide
                 .field_definition(file, offset)
-                .or_else(|| foreign::definition(snapshot, file, offset))
                 .or_else(|| {
                     ide.symbol_at(file, offset)
                         .and_then(|(symbol, _)| ide.definition(&symbol))

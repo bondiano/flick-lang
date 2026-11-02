@@ -1,0 +1,125 @@
+/// The handlers of users and profiles: signing up and in, the signed-in
+/// user, and following others.
+module Conduit.Server.Accounts exposing (..)
+
+import Database exposing (Database)
+import Conduit.Api exposing (Request)
+import Conduit.Input exposing (LoginBody, NewUserBody, ProfilePath, UpdateUserBody)
+import Conduit.Model exposing (ProfileBody, UserBody)
+import Conduit.Problem as Problem exposing (
+  Conflict(..),
+  NotFound(..),
+  Problems,
+  Unauthorized(..),
+  Unprocessable(..),
+)
+import Conduit.Server.People as People exposing (Account)
+import Conduit.Server.Present as Present
+import Conduit.Server.Session as Auth exposing (Keys, Session)
+import Conduit.Server.Validate as Validate
+
+/// The value of a valid request, or 422 with its problems.
+valid : Result Problems a ->{; Unprocessable} a
+let valid checked =
+  match checked with
+  | Ok value -> value
+  | Err problems -> from_result (Err (Unprocessable problems))
+
+/// 409 for each field another user has.
+unique : List String ->{; Conflict} Unit
+let unique taken =
+  if not (List.is_empty taken) then
+    from_result (Err (Conflict (List.map (fun field -> (field, ["has already been taken"])) taken)))
+
+hash : String ->{Crypto.Crypto;} String
+let hash password = Effect.or_die (task { Crypto.hash_password password })
+
+/// The answer for a user who just signed in or up.
+signed : Account ->{Keys, Crypto.Crypto;} UserBody
+let signed account = { user = Present.user account (Auth.issue account) }
+
+register :
+  Request Unit Unit NewUserBody ->{Database, Keys, Crypto.Crypto | r; Conflict, Unprocessable}
+  UserBody
+let register request =
+  let given = valid (Validate.registration request.payload.user)
+  unique (People.taken None (Some given.username) (Some given.email))
+  let id =
+    People.insert {
+      username = given.username;
+      email = given.email;
+      password_hash = hash given.password;
+    }
+  match People.by_id id with
+  | Some account -> signed account
+  | None -> Effect.die "a new user is not there"
+
+login :
+  Request Unit Unit LoginBody ->{Database, Keys, Crypto.Crypto | r; Unauthorized, Unprocessable}
+  UserBody
+let login request =
+  let given = valid (Validate.credentials request.payload.user)
+  let refused = Unauthorized (Problem.problem "credentials" "invalid")
+  match People.by_email given.email with
+  | Some account ->
+    if Effect.or_die (task { Crypto.verify_password given.password account.password_hash }) then
+      signed account
+    else
+      from_result (Err refused)
+  | None -> from_result (Err refused)
+
+current_user : Request Unit Unit Unit ->{Session | r; Unauthorized} UserBody
+let current_user _ =
+  let me = Auth.signed_in ()
+  { user = Present.user me.account me.token }
+
+/// The account with the change applied; a new password is hashed.
+changed : Account -> Validate.Change ->{Crypto.Crypto;} Account
+let changed account change = {
+  id = account.id;
+  username = Option.with_default account.username change.username;
+  email = Option.with_default account.email change.email;
+  password_hash =
+    match change.password with
+    | Some password -> hash password
+    | None -> account.password_hash;
+  bio = Option.with_default account.bio change.bio;
+  image = Option.with_default account.image change.image;
+}
+
+update_user :
+  Request Unit Unit UpdateUserBody ->{Session, Database, Crypto.Crypto | r; Unauthorized, Conflict, Unprocessable}
+  UserBody
+let update_user request =
+  let me = Auth.signed_in ()
+  let change = valid (Validate.change request.payload.user)
+  unique (People.taken (Some me.account.id) change.username change.email)
+  let account = changed me.account change
+  People.save account
+  { user = Present.user account me.token }
+
+/// The user of the path, or 404.
+named : String ->{Database; NotFound} Account
+let named username =
+  match People.by_username username with
+  | Some account -> account
+  | None -> from_result (Err (NotFound (Problem.problem "profile" "not found")))
+
+get_profile :
+  Request ProfilePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ProfileBody
+let get_profile request =
+  let account = named request.path.username
+  { profile = Present.profile account (People.follows (Auth.reader ()) account.id) }
+
+follow : Request ProfilePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ProfileBody
+let follow request =
+  let account = named request.path.username
+  People.follow (Auth.signed_in ()).account.id account.id
+  { profile = Present.profile account true }
+
+unfollow :
+  Request ProfilePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ProfileBody
+let unfollow request =
+  let account = named request.path.username
+  People.unfollow (Auth.signed_in ()).account.id account.id
+  { profile = Present.profile account false }

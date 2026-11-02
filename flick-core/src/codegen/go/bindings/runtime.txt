@@ -28,6 +28,7 @@ codecList CodecList
 codecBool CodecBool
 codecTaggedOption CodecTaggedOption
 codecTransformPure CodecTransformPure
+codecTransformAs CodecTransformAs
 codecTransformResult CodecTransformResult
 codecCheckWhole CodecCheckWhole
 codecNumberFinite CodecNumberFinite

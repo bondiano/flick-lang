@@ -1,0 +1,74 @@
+/// The database of Conduit: its migrations and its tables. Dates are ISO
+/// 8601 texts in UTC that the server writes from its clock, so they sort as
+/// they read and go out as they are stored.
+module Conduit.Server.Schema exposing (..)
+
+import Database.Migrate exposing (Migration)
+
+migrations : List Migration
+let migrations = [
+  {
+    version = 1;
+    name = "conduit";
+    statements = [
+      "create table users (id bigserial primary key, username text not null unique, email text not null unique, password_hash text not null, bio text, image text)",
+      "create table follows (follower_id bigint not null references users on delete cascade, followed_id bigint not null references users on delete cascade, primary key (follower_id, followed_id))",
+      "create table articles (id bigserial primary key, slug text not null unique, title text not null, description text not null, body text not null, author_id bigint not null references users on delete cascade, created_at text not null, updated_at text not null)",
+      "create index articles_by_date on articles (created_at desc, id desc)",
+      "create table tags (id bigserial primary key, name text not null unique)",
+      "create table article_tags (article_id bigint not null references articles on delete cascade, tag_id bigint not null references tags, position integer not null, primary key (article_id, tag_id))",
+      "create table favorites (user_id bigint not null references users on delete cascade, article_id bigint not null references articles on delete cascade, primary key (user_id, article_id))",
+      "create table comments (id bigserial primary key, body text not null, article_id bigint not null references articles on delete cascade, author_id bigint not null references users on delete cascade, created_at text not null, updated_at text not null)",
+    ];
+  },
+]
+
+sql table Users "users" {
+  id : bigint primary key generated always as BigInt
+  username : text not null unique as String
+  email : text not null unique as String
+  password_hash : text not null as String
+  bio : text as String
+  image : text as String
+}
+
+sql table Follows "follows" {
+  follower_id : bigint not null as BigInt
+  followed_id : bigint not null as BigInt
+}
+
+sql table Articles "articles" {
+  id : bigint primary key generated always as BigInt
+  slug : text not null unique as String
+  title : text not null as String
+  description : text not null as String
+  body : text not null as String
+  author_id : bigint not null as BigInt
+  created_at : text not null as String
+  updated_at : text not null as String
+}
+
+sql table Tags "tags" {
+  id : bigint primary key generated always as BigInt
+  name : text not null unique as String
+}
+
+sql table ArticleTags "article_tags" {
+  article_id : bigint not null as BigInt
+  tag_id : bigint not null as BigInt
+  position : integer not null as Int
+}
+
+sql table Favorites "favorites" {
+  user_id : bigint not null as BigInt
+  article_id : bigint not null as BigInt
+}
+
+sql table Comments "comments" {
+  id : bigint primary key generated always as BigInt
+  body : text not null as String
+  article_id : bigint not null as BigInt
+  author_id : bigint not null as BigInt
+  created_at : text not null as String
+  updated_at : text not null as String
+}

@@ -18,13 +18,58 @@ type QueryField struct {
 	Optional bool
 }
 
-// Route is a constructor: its tag, its path segment ("" for the root), the
-// schemas of its segment fields and its query, nil without a record field.
+// Route is a constructor: its tag, its path segment ("" for the root), its
+// segment fields, its query, nil without a record field, and whether its
+// last segment is an `Option`, absent from the URL for `None`. A segment is
+// a scalar field's schema or the *routeWords of a type's constructors.
 type Route struct {
 	Tag      string
 	Path     string
 	Segments []Value
 	Query    []QueryField
+	Optional bool
+}
+
+// routeWords is a segment of constructors without fields: each word with
+// its tag.
+type routeWords struct{ words, tags []string }
+
+// RouteWords is the segment of the constructors with these words and tags,
+// in pairs.
+func RouteWords(pairs []string) Value {
+	w := &routeWords{}
+	for i := 0; i+1 < len(pairs); i += 2 {
+		w.words, w.tags = append(w.words, pairs[i]), append(w.tags, pairs[i+1])
+	}
+	return w
+}
+
+// routeSegmentText is the text of a segment's field.
+func routeSegmentText(segment, field Value) string {
+	w, ok := segment.(*routeWords)
+	if !ok {
+		return jsString(field)
+	}
+	for i, tag := range w.tags {
+		if tag == field.(*Data).Tag {
+			return w.words[i]
+		}
+	}
+	panic(Defect{"TypeError: a constructor of another type"})
+}
+
+// routeSegmentField is the field of a segment's text.
+func routeSegmentField(fb *Fiber, segment Value, text string) (Value, bool) {
+	w, ok := segment.(*routeWords)
+	if !ok {
+		return coerce(fb, segment, text)
+	}
+	for i, word := range w.words {
+		if word == text {
+			return NewData(w.tags[i]), true
+		}
+	}
+	return nil, false
 }
 
 // urlCodec is `Url a`, what `Route.print` and `Route.parse` read.
@@ -73,8 +118,16 @@ func RoutePrint(codec, value Value) Value {
 	if route.Path != "" {
 		b.WriteString("/" + route.Path)
 	}
-	for i := range route.Segments {
-		segment, _ := encodeURIComponent(wellFormed(jsString(d.Fields[i])))
+	for i, s := range route.Segments {
+		field := d.Fields[i]
+		if route.Optional && i == len(route.Segments)-1 {
+			v, ok := some(field)
+			if !ok {
+				continue
+			}
+			field = v
+		}
+		segment, _ := encodeURIComponent(wellFormed(routeSegmentText(s, field)))
 		b.WriteString("/" + segment)
 	}
 	if b.Len() == 0 {
@@ -149,14 +202,24 @@ func RouteParse(fb *Fiber, codec, text Value) Value {
 
 // parse is the value of the route of these segments and query, unchecked.
 func (route *Route) parse(fb *Fiber, rest []string, param func(string) (string, bool)) (Value, bool) {
-	if len(rest) != len(route.Segments) {
+	n := len(route.Segments)
+	missing := route.Optional && len(rest) == n-1
+	if len(rest) != n && !missing {
 		return nil, false
 	}
-	fields := make([]Value, len(rest), len(rest)+1)
+	fields := make([]Value, n, n+1)
 	for i, s := range route.Segments {
-		v, ok := coerce(fb, s, rest[i])
+		last := route.Optional && i == n-1
+		if last && missing {
+			fields[i] = None
+			continue
+		}
+		v, ok := routeSegmentField(fb, s, rest[i])
 		if !ok {
 			return nil, false
+		}
+		if last {
+			v = Some(v)
 		}
 		fields[i] = v
 	}

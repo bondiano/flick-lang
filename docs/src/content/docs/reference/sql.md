@@ -37,7 +37,8 @@ never written.
 | SQL type | Flick type |
 | - | - |
 | `bigint`, `int8`, `bigserial` | `BigInt` |
-| `integer`, `int`, `int4`, `smallint`, `int2`, `serial`, `real`, `double precision`, `float8` | `Float` |
+| `integer`, `int`, `int4`, `smallint`, `int2`, `serial` | `Int` |
+| `real`, `double precision`, `float8` | `Float` |
 | `numeric`, `decimal` | `BigDecimal` |
 | `text`, `varchar`, `character varying`, `uuid`, `date`, `timestamp`, `timestamptz` | `String` |
 | `boolean`, `bool` | `Bool` |
@@ -73,8 +74,11 @@ declare is `FLICK-Q009`. A query without a name has no parameters.
 placeholder; `$name.field` captures a field of it and `$(e)` the value of any
 expression `e`, both written right after `$`: its type follows from where it is used, as a parameter's does,
 and it passes through the codec of the column it is compared with or
-written to. A capture is no parameter of the template, so a function builds
-the template from its arguments:
+written to. A capture of an `Option t` is a `t` that may be `NULL`: `None`
+is `NULL`, so `where is_null $tag || t.name == $tag` is a filter that may be
+absent. Of a base type it is cast to its SQL type (`CAST($1 AS text)`), as
+PostgreSQL cannot type `$1 IS NULL` alone. A capture is no parameter of the
+template, so a function builds the template from its arguments:
 
 ```flick
 balances_of : UserId -> Sql.Template Pg {} BalanceRow
@@ -102,7 +106,7 @@ order whatever order they are written in:
 | `having e` | a condition on groups |
 | `select { label = e; … }`, `select a.x, b.y`, `select a` | the results; written as a list each takes its column's name, an alias alone selects all its columns |
 | `order_by e, asc e, desc e` | ordering |
-| `limit e`, `offset e` | `Float`s |
+| `limit e`, `offset e` | `Int`s |
 | `union (sql { … })`, `union_all (sql { … })` | a query with the same results in the same order |
 | `insert_into T`, `values { column = e; … }` | an insert |
 | `update T`, `set { column = e; … }`, `where e` | an update |

@@ -1,0 +1,11 @@
+<nav class="navbar"><a href="/" class="nav-link">Home</a><a href="/profile/ada/favorites" class="nav-link"><img src="/default-avatar.svg" alt="ada" class="user-pic">Favorited</a></nav>Home, submits 0<form><fieldset class="form-group"><input value="" placeholder="Password" name="password" type="password"></fieldset><button type="submit" class="btn btn-primary"><i class="ion-heart"></i>Sign in</button></form><hr><footer class="footer"><ul class="error-messages"><li>ok</li></ul></footer>
+href: /profile/ada/favorites
+new tab: followed
+/: HomeFavoritedHome, submits 0Sign inok
+plain click: prevented
+/profile/ada/favorites: HomeFavoritedProfile "ada" (Some Favorites), submits 0Sign inok
+submit: stays
+/profile/ada/favorites: HomeFavoritedProfile "ada" (Some Favorites), submits 1Sign inok
+home: prevented
+/: HomeFavoritedHome, submits 1Sign inok
+supervisor: interrupt

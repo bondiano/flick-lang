@@ -66,6 +66,13 @@ foreign pure transform from "@flick-lang/runtime" "codecTransformPure"
   retention call
   reviewed "effect@4.0.5 sha256:931c4e91baad9254"
 
+/// `transform` whose values are those of `s`: a union, or the errors of an
+/// `HttpApi` endpoint, tells them from others by their constructors.
+transform_as : forall c a b. Schema b -> (a -> b)^c -> (b -> a)^c -> (PureCodec Json a -> PureCodec Json b)^c
+foreign pure transform_as from "@flick-lang/runtime" "codecTransformAs"
+  arity 4
+  retention call
+
 /// A decoding that may fail, and its encoding.
 transform_result :
   forall c a b.

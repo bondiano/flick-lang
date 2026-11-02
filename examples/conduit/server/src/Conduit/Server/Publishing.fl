@@ -1,0 +1,169 @@
+/// The handlers of articles, their comments and favorites, and tags. Only
+/// an article's author changes or deletes it, and only a comment's author
+/// deletes it: anyone else gets 403.
+module Conduit.Server.Publishing exposing (..)
+
+import Database exposing (Database)
+import Conduit.Api exposing (Request)
+import Conduit.Input exposing (
+  ArticlePath,
+  CommentPath,
+  ListQuery,
+  NewArticleBody,
+  NewCommentBody,
+  Page,
+  UpdateArticleBody,
+)
+import Conduit.Model exposing (
+  Article,
+  ArticleBody,
+  ArticlesBody,
+  CommentBody,
+  CommentsBody,
+  TagsBody,
+)
+import Conduit.Model as Model
+import Conduit.Problem as Problem exposing (
+  Forbidden(..),
+  NotFound(..),
+  Unauthorized(..),
+  Unprocessable(..),
+)
+import Conduit.Server.Accounts as Accounts
+import Conduit.Server.Articles as Articles
+import Conduit.Server.Comments as Comments
+import Conduit.Server.Present as Present
+import Conduit.Server.Session as Auth exposing (Session)
+import Conduit.Server.Slug as Slug
+import Conduit.Server.Validate as Validate
+
+/// The time now, as the database keeps it.
+now : Unit ->{} String
+let now () = DateTime.format_iso (DateTime.now ())
+
+/// The article as the reader sees it, with its tags.
+shown : Articles.Row ->{Database;} Article
+let shown row = Present.article row (Articles.tags_of row.id)
+
+/// The article of `slug`, or 404.
+found : String ->{Session, Database; NotFound} Articles.Row
+let found slug =
+  match Articles.find (Auth.reader ()) slug with
+  | Some row -> row
+  | None -> from_result (Err (NotFound (Problem.problem "article" "not found")))
+
+/// 403 unless the signed-in user is `author`.
+own : String -> BigInt ->{Session; Forbidden} Unit
+let own what author =
+  if (Auth.signed_in ()).account.id != author then
+    from_result (Err (Forbidden (Problem.problem what "forbidden")))
+
+listed : Articles.Filter -> Option Float -> Option Float ->{Session, Database;} ArticlesBody
+let listed filter limit offset =
+  let (rows, total) = Articles.page (Auth.reader ()) filter (Slug.page limit offset)
+  { articles = List.map Model.preview (List.map_effect shown rows); articlesCount = total }
+
+list_articles : Request Unit ListQuery Unit ->{Session, Database | r; Unauthorized} ArticlesBody
+let list_articles request =
+  let q = request.query
+  listed
+    { Articles.everything with tag = q.tag; author = q.author; favorited = q.favorited }
+    q.limit
+    q.offset
+
+feed : Request Unit Page Unit ->{Session, Database | r; Unauthorized} ArticlesBody
+let feed request =
+  let me = (Auth.signed_in ()).account.id
+  listed { Articles.everything with feed = Some me } request.query.limit request.query.offset
+
+get_article :
+  Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ArticleBody
+let get_article request = { article = shown (found request.path.slug) }
+
+create_article :
+  Request Unit Unit NewArticleBody ->{Session, Database, Crypto.Crypto | r; Unauthorized, Unprocessable}
+  ArticleBody
+let create_article request =
+  let draft = Accounts.valid (Validate.draft request.payload.article)
+  let suffix = String.slice 0 8 (Effect.or_die (task { Crypto.random_uuid_v4 () }))
+  let slug = Slug.slug draft.title suffix
+  let fields = { title = draft.title; description = draft.description; body = draft.body }
+  let id = Articles.insert (Auth.signed_in ()).account.id slug fields (now ())
+  Articles.set_tags id draft.tags
+  match Articles.find (Auth.reader ()) slug with
+  | Some row -> { article = shown row }
+  | None -> Effect.die "a new article is not there"
+
+update_article :
+  Request ArticlePath Unit UpdateArticleBody ->{Session, Database | r; Unauthorized, Forbidden, NotFound, Unprocessable}
+  ArticleBody
+let update_article request =
+  let row = found request.path.slug
+  own "article" row.author_id
+  let edit = Accounts.valid (Validate.edit request.payload.article)
+  let fields = {
+    title = Option.with_default row.title edit.title;
+    description = Option.with_default row.description edit.description;
+    body = Option.with_default row.body edit.body;
+  }
+  Articles.save row.id fields (now ())
+  match edit.tags with
+  | Some tags -> Articles.set_tags row.id tags
+  | None -> ()
+  { article = shown (found row.slug) }
+
+delete_article :
+  Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, Forbidden, NotFound} Unit
+let delete_article request =
+  let row = found request.path.slug
+  own "article" row.author_id
+  Articles.delete row.id
+
+favorite :
+  Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ArticleBody
+let favorite request =
+  let row = found request.path.slug
+  Articles.favorite (Auth.signed_in ()).account.id row.id
+  { article = shown (found row.slug) }
+
+unfavorite :
+  Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ArticleBody
+let unfavorite request =
+  let row = found request.path.slug
+  Articles.unfavorite (Auth.signed_in ()).account.id row.id
+  { article = shown (found row.slug) }
+
+list_comments :
+  Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} CommentsBody
+let list_comments request =
+  let row = found request.path.slug
+  { comments = List.map Present.comment (Comments.of_article (Auth.reader ()) row.id) }
+
+add_comment :
+  Request ArticlePath Unit NewCommentBody ->{Session, Database | r; Unauthorized, NotFound, Unprocessable}
+  CommentBody
+let add_comment request =
+  let row = found request.path.slug
+  let body = Accounts.valid (Validate.comment request.payload.comment.body)
+  let id = Comments.insert row.id (Auth.signed_in ()).account.id body (now ())
+  match Comments.find (Auth.reader ()) row.id id with
+  | Some comment -> { comment = Present.comment comment }
+  | None -> Effect.die "a new comment is not there"
+
+delete_comment :
+  Request CommentPath Unit Unit ->{Session, Database | r; Unauthorized, Forbidden, NotFound} Unit
+let delete_comment request =
+  let row = found request.path.slug
+  let missing = NotFound (Problem.problem "comment" "not found")
+  let comment =
+    match BigInt.from_string request.path.id with
+    | Some id -> Comments.find (Auth.reader ()) row.id id
+    | None -> None
+  match comment with
+  | Some c ->
+    own "comment" c.author_id
+    Comments.delete c.id
+  | None -> from_result (Err missing)
+
+tags : Request Unit Unit Unit ->{Database | r;} TagsBody
+let tags _ = { tags = Articles.all_tags () }

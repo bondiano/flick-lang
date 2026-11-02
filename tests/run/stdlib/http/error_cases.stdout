@@ -1,0 +1,5 @@
+welcome bob
+conflict [("username", ["has already been taken"])]
+unprocessable [("username", ["can't be blank"])]
+raw blank: 422 {"errors":{"username":["can't be blank"]}}
+raw taken: 409 {"errors":{"username":["has already been taken"]}}

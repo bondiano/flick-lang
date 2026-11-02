@@ -1,0 +1,11 @@
+module App.Schema exposing (..)
+
+sql table People "people" {
+  id : bigint primary key generated always as BigInt
+  name : text not null as String
+}
+
+sql table Pets "pets" {
+  id : bigint primary key generated always as BigInt
+  owner : bigint not null as BigInt
+}

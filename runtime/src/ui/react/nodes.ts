@@ -1,11 +1,13 @@
 // `Ui r e` values: inert descriptions of elements. Building one runs no
 // handler and touches no DOM; the bridge turns them into React elements.
-import { Option } from "effect";
+import { Effect, Option } from "effect";
 import type * as Atom from "../../effect/reactivity/Atom.ts";
 import type { ComponentType } from "react";
 
+import { WriteService } from "../../effect/reactivity/Atom.ts";
+import { routePrint, type UrlCodec } from "../../route.ts";
 import { constructorName } from "../../tags.ts";
-import type { Handler } from "./policies.ts";
+import { type Handler, eventLatest, eventPreventDefault } from "./policies.ts";
 
 /** What an event prop of an element gives its handler. */
 export interface Binding {
@@ -167,6 +169,62 @@ export const uiPre = (props: ClassProps, children: ReadonlyArray<Ui>): Ui =>
 export const uiLink = (props: { readonly href: string }, children: ReadonlyArray<Ui>): Ui =>
   element("a", { href: props.href }, {}, children);
 
+export const uiNav = (props: ClassProps, children: ReadonlyArray<Ui>): Ui =>
+  element("nav", { className: props.class_name }, {}, children);
+export const uiFooter = (props: ClassProps, children: ReadonlyArray<Ui>): Ui =>
+  element("footer", { className: props.class_name }, {}, children);
+export const uiFieldset = (props: ClassProps, children: ReadonlyArray<Ui>): Ui =>
+  element("fieldset", { className: props.class_name }, {}, children);
+/** The `i` element of an icon font: its classes name the icon. */
+export const uiIcon = (props: ClassProps): Ui => element("i", { className: props.class_name }, {}, []);
+export const uiHr: Ui = /*#__PURE__*/ element("hr", {}, {}, []);
+
+export const uiImage = (props: { readonly src: string; readonly alt: string; readonly class_name: string }): Ui =>
+  element("img", { src: props.src, alt: props.alt, className: props.class_name }, {}, []);
+
+/** A form: a submit runs `on_submit` and never reloads the page. */
+export const uiForm = (props: { readonly on_submit: Handler }, children: ReadonlyArray<Ui>): Ui =>
+  element(
+    "form",
+    {},
+    { onSubmit: { handler: Object.freeze({ ...props.on_submit, prevent: () => true }), snapshot: () => undefined } },
+    children,
+  );
+
+/** The button that submits the form around it. */
+export const uiSubmit = (props: { readonly disabled: boolean }, children: ReadonlyArray<Ui>): Ui =>
+  element("button", { type: "submit", disabled: props.disabled }, {}, children);
+
+interface RouteLinkProps {
+  readonly route: Atom.Writable<unknown>;
+  readonly url: UrlCodec;
+  readonly to: Readonly<Record<string, unknown>>;
+}
+
+/** A left click without a modifier key: what a browser follows in the same tab. */
+const plainClick = (snapshot: unknown): boolean =>
+  typeof snapshot === "object" &&
+  snapshot !== null &&
+  Reflect.get(snapshot, "button") === 0 &&
+  !["alt", "ctrl", "shift", "meta"].some((key) => Reflect.get(snapshot, key) === true);
+
+/**
+ * A link inside the app: a plain click writes `to` to the route state, which
+ * pushes its URL without a reload; another click, and markup without a
+ * client, follow the real `href`.
+ */
+export const uiRouteLink = (props: RouteLinkProps, children: ReadonlyArray<Ui>): Ui => {
+  const navigate = Effect.flatMap(Effect.service(WriteService), (write) => write.set("Ui.route_link")(props.route)(props.to));
+  // a handler's task runs with the root's `Atom.Write`, as one of Flick's does
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the root provides the service
+  const run = navigate as Effect.Effect<void>;
+  const handler = eventPreventDefault(
+    plainClick,
+    eventLatest((snapshot) => (plainClick(snapshot) ? run : Effect.void)),
+  );
+  return element("a", { href: routePrint(props.url, props.to) }, { onClick: { handler, snapshot: clickSnapshot } }, children);
+};
+
 export const uiHtml = (html: string): Ui => Object.freeze({ kind: "element", tag: "div", attrs: {}, events: {}, children: [], html });
 
 interface SelectProps {
@@ -248,7 +306,12 @@ interface Host {
   readonly auto_capitalize: Option.Option<boolean>;
   readonly auto_correct: Option.Option<boolean>;
   readonly wrap: Option.Option<boolean>;
+  readonly name: Option.Option<string>;
+  readonly input_type: Option.Option<{ readonly _tag: string }>;
 }
+
+/** The `type` of an input of each `Ui.InputType`. */
+const INPUT_TYPES: Readonly<Record<string, string>> = { TextInput: "text", PasswordInput: "password", EmailInput: "email" };
 
 const onOff = (on: boolean): string => (on ? "on" : "off");
 
@@ -271,6 +334,8 @@ const hostAttrs = (host: Host, base: Attrs): Attrs => {
   put("autoCapitalize", host.auto_capitalize, onOff);
   put("autoCorrect", host.auto_correct, onOff);
   put("wrap", host.wrap, (wrap) => (wrap ? "soft" : "off"));
+  put("name", host.name, String);
+  put("type", host.input_type, (kind) => INPUT_TYPES[constructorName(kind._tag)] ?? "text");
   for (const [name, value] of host.data) {
     if (!/^[a-z][a-z0-9-]*$/.test(name)) throw new RangeError(`\`data-${name}\` is not an attribute name: use lowercase letters, digits and hyphens`);
     attrs[`data-${name}`] = value;

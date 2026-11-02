@@ -190,9 +190,17 @@ func HttpApiSecuritySetCookie(security, e Value) Value {
 	return withExtra(apiExtra{cookie: s.key}, e)
 }
 
+// HttpApiWithErrors is `with_errors cases endpoint`. Of several cases each
+// must tell its errors from the others', or a response would take the
+// first case's status.
 func HttpApiWithErrors(errors, e Value) Value {
 	return changedEndpoint(e, func(x *apiEndpoint) {
 		x.errors = append(append(apiErrors{}, x.errors...), errors.(apiErrors)...)
+		for _, c := range x.errors {
+			if len(x.errors) > 1 && codecOpaque(c.codec) {
+				panic(Defect{"TypeError: the errors of " + x.name + " cannot be told apart: give the codec of each a type with Codec.transform_as"})
+			}
+		}
 	})
 }
 

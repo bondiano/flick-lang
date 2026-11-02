@@ -9,7 +9,9 @@ use super::items::Decls;
 use super::layout::{call, closure, list, signature, single, statement};
 use super::{Gen, Shape, names};
 use crate::source::Span;
-use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, UrlRoute, companion_name};
+use crate::types::{
+    Constructor, Rep, SchemaItem, SchemaPlan, UrlRoute, UrlSegment, companion_name,
+};
 
 impl<'a> Gen<'a> {
     /// `T$schema`: its declaration, and the statement of the module's init
@@ -81,8 +83,9 @@ impl<'a> Gen<'a> {
                 };
                 let tag = self.string(&self.tag(&constructor));
                 let segments: Vec<Document<'a>> =
-                    r.segments.iter().map(|p| self.plan(p, span)).collect();
+                    r.segments.iter().map(|s| self.segment(s, span)).collect();
                 let segments = list(a, "[]flickrt.Value{", segments, "}");
+                let optional = a.text(if r.optional { "true" } else { "false" });
                 let query = match &r.query {
                     None => a.text("nil"),
                     Some(fields) => {
@@ -97,11 +100,48 @@ impl<'a> Gen<'a> {
                         list(a, "[]flickrt.QueryField{", fields, "}")
                     }
                 };
-                list(a, "{", [tag, self.string(&r.path), segments, query], "}")
+                list(
+                    a,
+                    "{",
+                    [tag, self.string(&r.path), segments, query, optional],
+                    "}",
+                )
             })
             .collect();
         let routes = list(a, "[]flickrt.Route{", routes, "}");
         call(a, "flickrt.RouteCodec", [a.text(schema), routes])
+    }
+
+    /// A segment of a route: a witness, or the words and tags of a type's
+    /// constructors.
+    fn segment(&mut self, segment: &UrlSegment, span: Span) -> Document<'a> {
+        let a = self.a;
+        match segment {
+            UrlSegment::Value(plan) => self.plan(plan, span),
+            UrlSegment::Words {
+                module,
+                ty,
+                constructors,
+            } => {
+                let words: Vec<Document<'a>> = constructors
+                    .iter()
+                    .flat_map(|name| {
+                        let constructor = Constructor {
+                            module: module.clone(),
+                            ty: ty.clone(),
+                            name: name.clone(),
+                            arity: 0,
+                            rep: Rep::Tagged,
+                        };
+                        [
+                            self.string(&UrlSegment::word(name)),
+                            self.string(&self.tag(&constructor)),
+                        ]
+                    })
+                    .collect();
+                call(a, "flickrt.RouteWords", [list(a, "[]string{", words, "}")])
+            }
+        }
     }
 
     fn plan(&mut self, plan: &SchemaPlan, span: Span) -> Document<'a> {

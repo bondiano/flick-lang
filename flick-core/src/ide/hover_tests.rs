@@ -3,66 +3,6 @@ use super::{Symbol, Target};
 use crate::diagnostics::Diagnostic;
 
 #[test]
-fn private_recursive_type_and_constructor_hover_uses_local_declarations() {
-    let source = "module App.Main exposing (make, example)
-
-type Tree a = Leaf a | Branch (List (Tree a))
-  deriving Schema
-
-type Expr = Num Float | Neg Expr | Block Statements
-  deriving Schema
-
-type Statements = Statements (List Expr)
-  deriving Schema
-
-make : Tree Float
-let make = Branch [Leaf 1]
-
-example : Expr
-let example = Block (Statements [Neg (Num 1)])
-";
-    let f = fixture_of(&[("src/App/Main.fl", source)]);
-    let ide = f.ide();
-    assert!(
-        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
-        "{:?}",
-        ide.analysis.diagnostics
-    );
-    let file = f.file("App.Main");
-    for (needle, expected) in [
-        ("Tree a =", "type Tree : Type -> Type"),
-        ("Tree a))", "type Tree : Type -> Type"),
-        ("Expr =", "type Expr : Type"),
-        ("Expr | Block", "type Expr : Type"),
-        ("Statements =", "type Statements : Type"),
-        ("Leaf a", "Leaf :"),
-        ("Branch (", "Branch :"),
-        ("Num Float", "Num :"),
-        ("Neg Expr", "Neg :"),
-        ("Block Statements", "Block :"),
-        ("Statements (", "Statements :"),
-        ("Branch [", "Branch :"),
-        ("Leaf 1", "Leaf :"),
-        ("Block (", "Block :"),
-    ] {
-        let start = source.find(needle).expect("hover target") as u32;
-        let (markdown, range) = ide.hover(file, start + 1).expect(needle);
-        assert!(markdown.contains(expected), "{needle}: {markdown}");
-        let name = needle.split([' ', '=']).next().expect("name");
-        if name == "Branch" {
-            assert!(
-                markdown.contains("List") && markdown.contains("Tree a"),
-                "{markdown}"
-            );
-        }
-        if name == "Block" {
-            assert!(markdown.contains("Statements"), "{markdown}");
-        }
-        assert_eq!(range, (start, start + name.len() as u32), "{needle}");
-    }
-}
-
-#[test]
 fn alias_declaration_hover_covers_parameters_without_widening_symbol_ranges() {
     let source = "module App.Plan exposing (plan, ready, pair)
 

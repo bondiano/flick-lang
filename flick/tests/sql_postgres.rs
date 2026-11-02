@@ -6,11 +6,10 @@
 //! default: it needs Docker, the installed runtime and Go (`just
 //! e2e-postgres`).
 
+use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
-use std::{fs, thread};
 
 use flick_core::build::go::executable;
 use flick_core::build::runner_path;
@@ -18,69 +17,7 @@ use flick_core::project::config::MAIN_ENTRY;
 
 mod common;
 
-const IMAGE: &str = "postgres:17-alpine";
-
-/// The container, removed when dropped.
-struct Container(String);
-
-impl Drop for Container {
-    fn drop(&mut self) {
-        let _ = Command::new("docker").args(["rm", "-f", &self.0]).output();
-    }
-}
-
-fn docker(args: &[&str]) -> String {
-    let out = Command::new("docker")
-        .args(args)
-        .output()
-        .expect("docker runs");
-    assert!(out.status.success(), "docker {args:?}: {out:?}");
-    String::from_utf8(out.stdout)
-        .expect("utf-8")
-        .trim()
-        .to_owned()
-}
-
-fn start() -> (Container, String) {
-    let id = docker(&["run", "-d", "-e", "POSTGRES_PASSWORD=flick", IMAGE]);
-    let container = Container(id.clone());
-    let started = Instant::now();
-    // the server initializing listens on its socket only; wait for TCP
-    while Command::new("docker")
-        .args([
-            "exec",
-            &id,
-            "psql",
-            "-h",
-            "127.0.0.1",
-            "-U",
-            "postgres",
-            "-c",
-            "select 1",
-        ])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|s| !s.success())
-    {
-        assert!(
-            started.elapsed() < Duration::from_secs(60),
-            "postgres did not start"
-        );
-        thread::sleep(Duration::from_millis(300));
-    }
-    // the bridge address: published ports are not reachable everywhere
-    let ip = docker(&[
-        "inspect",
-        "-f",
-        "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
-        &id,
-    ]);
-    (
-        container,
-        format!("postgres://postgres:flick@{ip}:5432/postgres"),
-    )
-}
+use common::postgres::{Container, docker, start};
 
 /// A server with the schema loaded.
 fn prepared() -> (Container, String) {

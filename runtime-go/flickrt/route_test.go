@@ -13,9 +13,9 @@ func TestRoute(t *testing.T) {
 		{"Search", "Search", []Value{SchemaString, query}},
 	})
 	codec := RouteCodec(schema, []Route{
-		{"Home", "", []Value{}, nil},
-		{"User", "user", []Value{SchemaNumber}, nil},
-		{"Search", "search", []Value{SchemaString}, []QueryField{{"page", SchemaNumber, true}, {"q", SchemaString, false}}},
+		{"Home", "", []Value{}, nil, false},
+		{"User", "user", []Value{SchemaNumber}, nil, false},
+		{"Search", "search", []Value{SchemaString}, []QueryField{{"page", SchemaNumber, true}, {"q", SchemaString, false}}, false},
 	})
 	search := NewData("Search", "a/b", Rec("page", Some(2.0), "q", "x y"))
 	if got := RoutePrint(codec, search); got != "/search/a%2Fb?page=2&q=x+y" {

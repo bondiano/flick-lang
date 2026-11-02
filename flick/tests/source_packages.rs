@@ -7,7 +7,7 @@
 mod common;
 
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::thread;
@@ -95,7 +95,7 @@ let main () =
 
 /// A workspace of the contract package and a dependent `app` that emits
 /// `emit`, the package linked into its `node_modules` as pnpm links one.
-fn workspace(name: &str, app_main: &str, emit: &str) -> std::path::PathBuf {
+fn workspace(name: &str, app_main: &str, emit: &str) -> PathBuf {
     let config = format!("{APP}\n[build]\nemit = \"{emit}\"\n");
     let dir = project(
         name,
@@ -122,16 +122,13 @@ fn workspace(name: &str, app_main: &str, emit: &str) -> std::path::PathBuf {
     dir
 }
 
-#[cfg(unix)]
 fn link(target: &Path, at: &Path) {
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
+    #[cfg(windows)]
+    use std::os::windows::fs::symlink_dir as symlink;
     fs::create_dir_all(at.parent().expect("a parent")).expect("dir");
-    std::os::unix::fs::symlink(target, at).expect("symlink");
-}
-
-#[cfg(windows)]
-fn link(target: &Path, at: &Path) {
-    fs::create_dir_all(at.parent().expect("a parent")).expect("dir");
-    std::os::windows::fs::symlink_dir(target, at).expect("symlink");
+    symlink(target, at).expect("symlink");
 }
 
 #[test]

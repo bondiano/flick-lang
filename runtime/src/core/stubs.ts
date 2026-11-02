@@ -66,6 +66,7 @@ export const refinedParse = /*#__PURE__*/ needsEffect("refinedParse");
 export const schemaAdt = /*#__PURE__*/ needsEffect("schemaAdt");
 export const schemaJsonCodec = /*#__PURE__*/ needsEffect("schemaJsonCodec");
 export const routeCodec = /*#__PURE__*/ needsEffect("routeCodec");
+export const routeWords = /*#__PURE__*/ needsEffect("routeWords");
 export const formSpec = /*#__PURE__*/ needsEffect("formSpec");
 export const syncExport = /*#__PURE__*/ needsEffect("syncExport");
 export const schemaList = /*#__PURE__*/ needsEffect("schemaList");

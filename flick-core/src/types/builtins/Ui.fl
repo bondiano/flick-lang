@@ -13,19 +13,10 @@ module Ui exposing (..)
 /// provides any other service itself and handles its own errors.
 type Handler s
 
-/// A click, as an inert copy of the DOM event.
-type alias ClickSnapshot = {
-  /// The mouse button: 0 the main one, 1 the wheel, 2 the secondary one.
-  button : Int;
-  /// Whether Alt (Option) was held.
-  alt : Bool;
-  /// Whether Control was held.
-  ctrl : Bool;
-  /// Whether Shift was held.
-  shift : Bool;
-  /// Whether Meta (Command, Windows) was held.
-  meta : Bool;
-}
+/// A click, as an inert copy of the DOM event: the mouse button (0 the main
+/// one, 1 the wheel, 2 the secondary one) and whether Alt (Option), Control,
+/// Shift and Meta (Command, Windows) were held.
+type alias ClickSnapshot = { button : Int; alt : Bool; ctrl : Bool; shift : Bool; meta : Bool }
 
 /// The text of an input after an edit.
 type alias InputSnapshot = {
@@ -42,9 +33,8 @@ type SafeUrl
 /// HTML trusted to be safe; nothing checks it.
 type SanitizedHtml
 
-/// A React renderer factory bound with `foreign pure`. It is called when
-/// `mount_with` starts and returns `render(node)` and `unmount()` operations;
-/// importing it does not mount a root. The adapter supplies its host nodes.
+/// A React renderer factory bound with `foreign pure`: `mount_with` calls it
+/// for `render(node)` and `unmount()`; importing it mounts nothing.
 type Renderer
 
 /// A React component of foreign code taking props `p`, bound with
@@ -63,6 +53,21 @@ type alias LinkProps = {
   /// Where the link goes: a URL with a safe scheme, or a relative one.
   href : SafeUrl;
 }
+
+/// The props of `image`: a URL with a safe scheme or a relative one, the
+/// text that stands for it, and its CSS classes.
+type alias ImageProps = { src : SafeUrl; alt : String; class_name : String }
+
+/// The props of `form`: what runs on a submit, by Enter or by `submit`;
+/// the page never reloads.
+type alias FormProps c = { on_submit : (Handler Unit)^c }
+
+/// The props of `submit`.
+type alias SubmitProps = { disabled : Bool }
+
+/// The props of `route_link`: the state of `Atom.route`, the URLs of its
+/// type and the page the link goes to.
+type alias RouteLinkProps a = { route : Atom.Writable a; url : Url a; to : a }
 
 /// The props of `tabs`.
 type alias TabsProps = {
@@ -94,8 +99,7 @@ type alias SelectProps a c = {
   items : List a;
   /// The item shown as chosen, if any: the one with its `key`.
   selected : Option a;
-  /// A string telling the items apart: their React key, and how
-  /// `selected` is found among them.
+  /// What tells the items apart: their React key, which finds `selected`.
   key : (a -> String)^c;
   /// How an item is shown in the list.
   render_item : (a -> Ui^c)^c;
@@ -182,6 +186,45 @@ link : forall c. LinkProps -> List (Ui^c) -> Ui^c
 foreign pure link from "@flick-lang/runtime/ui/react" "uiLink"
   retention call
 
+/// A link inside the app: a plain left click writes `to` to `route`, which
+/// pushes its URL without a reload; other clicks, and markup without a
+/// client, follow its `href`, `Route.print url to`.
+route_link : forall c a. RouteLinkProps a -> List (Ui^c) -> Ui^c
+foreign pure route_link from "@flick-lang/runtime/ui/react" "uiRouteLink"
+  retention call
+
+nav : forall c. ElementProps -> List (Ui^c) -> Ui^c
+foreign pure nav from "@flick-lang/runtime/ui/react" "uiNav"
+  retention call
+
+footer : forall c. ElementProps -> List (Ui^c) -> Ui^c
+foreign pure footer from "@flick-lang/runtime/ui/react" "uiFooter"
+  retention call
+
+fieldset : forall c. ElementProps -> List (Ui^c) -> Ui^c
+foreign pure fieldset from "@flick-lang/runtime/ui/react" "uiFieldset"
+  retention call
+
+/// The `i` element of an icon font, which its classes name.
+icon : ElementProps -> Ui
+foreign pure icon from "@flick-lang/runtime/ui/react" "uiIcon"
+
+/// A thematic break, `hr`.
+hr : Ui
+foreign pure hr from "@flick-lang/runtime/ui/react" "uiHr"
+
+image : ImageProps -> Ui
+foreign pure image from "@flick-lang/runtime/ui/react" "uiImage"
+
+form : forall c. FormProps c -> List (Ui^c) -> Ui^c
+foreign pure form from "@flick-lang/runtime/ui/react" "uiForm"
+  retention call
+
+/// The button that submits the `form` around it.
+submit : forall c. SubmitProps -> List (Ui^c) -> Ui^c
+foreign pure submit from "@flick-lang/runtime/ui/react" "uiSubmit"
+  retention call
+
 /// Trusted HTML, inside a `div`.
 html : SanitizedHtml -> Ui
 foreign pure html from "@flick-lang/runtime/ui/react" "uiHtml"
@@ -219,11 +262,8 @@ foreign pure safe_url from "@flick-lang/runtime/ui/react" "uiSafeUrl"
 trusted_html : String -> SanitizedHtml
 foreign pure trusted_html from "@flick-lang/runtime/ui/react" "uiTrustedHtml"
 
-/// Like `Ui.Dom.mount`, with a renderer factory instead of a DOM container.
-/// The factory is called only when this runtime call starts; the registry,
-/// events, supervision and cleanup are the same. The DOM helpers of this
-/// module still build DOM nodes, not host-neutral primitives; a native
-/// adapter supplies its own components.
+/// `Ui.Dom.mount` with a renderer factory, called when this call starts,
+/// instead of a DOM container. The elements here are still DOM ones.
 mount_with :
   forall c r.
   Renderer ->
@@ -325,8 +365,7 @@ measure : forall t d. (Element t)^d ->{Document; Detached} Rect
 let measure element = Document.measure element
 
 /// The component whose instances run `setup` once, when they mount, and
-/// render with what it made: `component … setup … render …`. What the
-/// setup makes has the instance's region `s`, so it cannot leave it.
+/// render with what it made, which has the instance's region `s`.
 stateful :
   forall c p. (forall s. p ->{Setup s;} (p ->{Atom.Read;} Ui^{s | c})^{s | c})^c -> (View p)^c
 foreign pure stateful from "@flick-lang/runtime/ui/react" "uiStateful"
@@ -412,15 +451,15 @@ type alias Host = {
   class_name : Option String;
   /// The ARIA role, such as `"status"` or `"dialog"`.
   role : Option String;
-  /// `aria-label`: the name assistive technology reads.
+  /// The name assistive technology reads.
   aria_label : Option String;
-  /// `aria-describedby`: the `id` of the element that describes this one.
+  /// The `id` of the element that describes this one.
   aria_describedby : Option String;
-  /// `aria-hidden`: whether assistive technology skips the element.
+  /// Whether assistive technology skips the element.
   aria_hidden : Option Bool;
-  /// `aria-pressed`: whether a toggle button is on.
-  /// The `aria-invalid` attribute: the value fails its check.
+  /// The value fails its check.
   aria_invalid : Option Bool;
+  /// A toggle button is on.
   aria_pressed : Option Bool;
   /// `aria-live`: how changes inside the element are announced.
   aria_live : Option Live;
@@ -436,7 +475,15 @@ type alias Host = {
   /// Whether a text area wraps long lines (`wrap="soft"`) or scrolls
   /// (`wrap="off"`).
   wrap : Option Bool;
+  /// The `name` of a form field.
+  name : Option String;
+  /// The kind of text an input takes: its `type`.
+  input_type : Option InputType;
 }
+
+/// The `type` of an input: `text`, `password` or `email`.
+type InputType = TextInput | PasswordInput | EmailInput
+  deriving Eq, Show
 
 /// No host attribute.
 host : Host
@@ -455,6 +502,8 @@ let host = {
   auto_capitalize = None;
   auto_correct = None;
   wrap = None;
+  name = None;
+  input_type = None;
 }
 
 /// The element `node` with the host attributes `attrs`; `data` names are

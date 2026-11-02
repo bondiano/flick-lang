@@ -1,0 +1,29 @@
+// Two errors with the same body whose codecs do not know their errors: a
+// response could not tell which status is the error's, so the endpoint is
+// refused when it is made, not answered with the first case's status.
+module App.Main exposing (main)
+
+type error Conflict = Conflict String
+
+type error Unprocessable = Unprocessable String
+
+conflict : PureCodec Json Conflict
+let conflict = Codec.transform (fun s -> Conflict s) (fun (Conflict s) -> s) String.json
+
+unprocessable : PureCodec Json Unprocessable
+let unprocessable =
+  Codec.transform (fun s -> Unprocessable s) (fun (Unprocessable s) -> s) String.json
+
+register :
+  HttpApi.Endpoint
+    "register"
+    (HttpApi.Request Unit Unit Unit Unit ->{r; Conflict, Unprocessable} Unit)
+let register =
+  HttpApi.endpoint HttpApi.Post "/users" (Record.label : Record.Label "register")
+  |> HttpApi.with_errors
+    (HttpApi.errors |> HttpApi.error_case 409 conflict |> HttpApi.error_case 422 unprocessable)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line "made"
+  ignore (HttpApi.url "http://127.0.0.1" register () ())

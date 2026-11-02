@@ -1,0 +1,196 @@
+/// What clients send. Every field may be missing: the server answers a
+/// missing or blank one with 422 and the field's problem, as the RealWorld
+/// spec asks, so decoding never refuses a body for an absent field. In an
+/// update, a missing field keeps its value, and `bio` or `image` set to
+/// `null` clears it.
+module Conduit.Input exposing (..)
+
+type alias NewUser = { username : Option String; email : Option String; password : Option String }
+  deriving Schema
+
+type alias Login = { email : Option String; password : Option String }
+  deriving Schema
+
+/// `Some None` is an explicit `null`: clear the field.
+type alias UpdateUser = {
+  email : Option (Option String);
+  username : Option (Option String);
+  password : Option (Option String);
+  bio : Option (Option String);
+  image : Option (Option String);
+} deriving Schema
+
+type alias NewArticle = {
+  title : Option String;
+  description : Option String;
+  body : Option String;
+  tagList : Option (List String);
+} deriving Schema
+
+/// `tagList` set to `null` is `Some None`, which the server refuses.
+type alias UpdateArticle = {
+  title : Option String;
+  description : Option String;
+  body : Option String;
+  tagList : Option (Option (List String));
+} deriving Schema
+
+type alias NewComment = { body : Option String }
+  deriving Schema
+
+type alias NewUserBody = { user : NewUser }
+  deriving Schema
+
+type alias LoginBody = { user : Login }
+  deriving Schema
+
+type alias UpdateUserBody = { user : UpdateUser }
+  deriving Schema
+
+type alias NewArticleBody = { article : NewArticle }
+  deriving Schema
+
+type alias UpdateArticleBody = { article : UpdateArticle }
+  deriving Schema
+
+type alias NewCommentBody = { comment : NewComment }
+  deriving Schema
+
+/// The filters of the article list, and its page.
+type alias ListQuery = {
+  tag : Option String;
+  author : Option String;
+  favorited : Option String;
+  limit : Option Float;
+  offset : Option Float;
+} deriving Schema
+
+/// A page of the feed.
+type alias Page = { limit : Option Float; offset : Option Float }
+  deriving Schema
+
+/// The `Authorization` header, `Token <jwt>`, when the request has one.
+type alias Credentials = { authorization : Option String }
+  deriving Schema
+
+type alias ProfilePath = { username : String }
+  deriving Schema
+
+type alias ArticlePath = { slug : String }
+  deriving Schema
+
+/// The comment's id is a text here; the server reads the number.
+type alias CommentPath = { slug : String; id : String }
+  deriving Schema
+
+texts : PureCodec Json (List String)
+let texts = Codec.list String.json
+
+new_user : PureCodec Json NewUser
+let new_user = codec (schema NewUser) {
+  username = optional_field "username" String.json;
+  email = optional_field "email" String.json;
+  password = optional_field "password" String.json;
+}
+
+login : PureCodec Json Login
+let login = codec (schema Login) {
+  email = optional_field "email" String.json;
+  password = optional_field "password" String.json;
+}
+
+update_user : PureCodec Json UpdateUser
+let update_user = codec (schema UpdateUser) {
+  email = optional_field "email" (option_as_null String.json);
+  username = optional_field "username" (option_as_null String.json);
+  password = optional_field "password" (option_as_null String.json);
+  bio = optional_field "bio" (option_as_null String.json);
+  image = optional_field "image" (option_as_null String.json);
+}
+
+new_article : PureCodec Json NewArticle
+let new_article = codec (schema NewArticle) {
+  title = optional_field "title" String.json;
+  description = optional_field "description" String.json;
+  body = optional_field "body" String.json;
+  tagList = optional_field "tagList" texts;
+}
+
+update_article : PureCodec Json UpdateArticle
+let update_article = codec (schema UpdateArticle) {
+  title = optional_field "title" String.json;
+  description = optional_field "description" String.json;
+  body = optional_field "body" String.json;
+  tagList = optional_field "tagList" (option_as_null texts);
+}
+
+new_comment : PureCodec Json NewComment
+let new_comment = codec (schema NewComment) {
+  body = optional_field "body" String.json;
+}
+
+new_user_body : PureCodec Json NewUserBody
+let new_user_body = codec (schema NewUserBody) {
+  user = field "user" new_user;
+}
+
+login_body : PureCodec Json LoginBody
+let login_body = codec (schema LoginBody) {
+  user = field "user" login;
+}
+
+update_user_body : PureCodec Json UpdateUserBody
+let update_user_body = codec (schema UpdateUserBody) {
+  user = field "user" update_user;
+}
+
+new_article_body : PureCodec Json NewArticleBody
+let new_article_body = codec (schema NewArticleBody) {
+  article = field "article" new_article;
+}
+
+update_article_body : PureCodec Json UpdateArticleBody
+let update_article_body = codec (schema UpdateArticleBody) {
+  article = field "article" update_article;
+}
+
+new_comment_body : PureCodec Json NewCommentBody
+let new_comment_body = codec (schema NewCommentBody) {
+  comment = field "comment" new_comment;
+}
+
+list_query : PureCodec Json ListQuery
+let list_query = codec (schema ListQuery) {
+  tag = optional_field "tag" String.json;
+  author = optional_field "author" String.json;
+  favorited = optional_field "favorited" String.json;
+  limit = optional_field "limit" Codec.number_from_string;
+  offset = optional_field "offset" Codec.number_from_string;
+}
+
+page : PureCodec Json Page
+let page = codec (schema Page) {
+  limit = optional_field "limit" Codec.number_from_string;
+  offset = optional_field "offset" Codec.number_from_string;
+}
+
+credentials : PureCodec Json Credentials
+let credentials = codec (schema Credentials) {
+  authorization = optional_field "authorization" String.json;
+}
+
+profile_path : PureCodec Json ProfilePath
+let profile_path = codec (schema ProfilePath) {
+  username = field "username" String.json;
+}
+
+article_path : PureCodec Json ArticlePath
+let article_path = codec (schema ArticlePath) {
+  slug = field "slug" String.json;
+}
+
+comment_path : PureCodec Json CommentPath
+let comment_path = codec (schema CommentPath) {
+  slug = field "slug" String.json;
+  id = field "id" String.json;
+}

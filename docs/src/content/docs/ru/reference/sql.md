@@ -41,7 +41,8 @@ sql table Users "users" {
 | Тип SQL | Тип Flick |
 | - | - |
 | `bigint`, `int8`, `bigserial` | `BigInt` |
-| `integer`, `int`, `int4`, `smallint`, `int2`, `serial`, `real`, `double precision`, `float8` | `Float` |
+| `integer`, `int`, `int4`, `smallint`, `int2`, `serial` | `Int` |
+| `real`, `double precision`, `float8` | `Float` |
 | `numeric`, `decimal` | `BigDecimal` |
 | `text`, `varchar`, `character varying`, `uuid`, `date`, `timestamp`, `timestamptz` | `String` |
 | `boolean`, `bool` | `Bool` |
@@ -82,7 +83,10 @@ let balances =
 а `$(e)` — результат любого выражения `e`; пробел после `$` не ставится.
 Тип захвата, как и тип параметра, определяется местом использования.
 Значение обрабатывается кодеком столбца, с которым оно сравнивается
-или в который записывается.
+или в который записывается. Захват `Option t` — это `t`, который может быть
+`NULL`: `None` — это `NULL`, поэтому `where is_null $tag || t.name == $tag` —
+фильтр, которого может не быть. Захват базового типа приводится к своему
+типу SQL (`CAST($1 AS text)`): PostgreSQL сам не выводит тип `$1 IS NULL`.
 
 Захват не входит в параметры шаблона. Поэтому функция может строить
 шаблон из своих аргументов:
@@ -114,7 +118,7 @@ let balances_of id =
 | `having e` | условие для групп |
 | `select { label = e; … }`, `select a.x, b.y`, `select a` | задаёт результат; в списке каждый столбец сохраняет своё имя, а отдельный псевдоним таблицы выбирает все её столбцы |
 | `order_by e, asc e, desc e` | задаёт порядок строк |
-| `limit e`, `offset e` | принимают значения `Float` |
+| `limit e`, `offset e` | принимают значения `Int` |
 | `union (sql { … })`, `union_all (sql { … })` | объединяет с запросом, у которого такие же результирующие столбцы в том же порядке |
 | `insert_into T`, `values { column = e; … }` | вставка |
 | `update T`, `set { column = e; … }`, `where e` | обновление |

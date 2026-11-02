@@ -1,0 +1,1 @@
+TypeError: the errors of register cannot be told apart: give the codec of each a type with Codec.transform_as

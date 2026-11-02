@@ -1,0 +1,37 @@
+/// Running the server's queries. A failure of the database is no answer the
+/// API declares: it is a defect, which the server answers with 500, so the
+/// functions over the database need only the `Database` service.
+module Conduit.Server.Db exposing (rows, first, run, run_once, insert_id)
+
+import Sql exposing (Pg, DbError)
+import Database exposing (Database)
+
+/// The PostgreSQL code of a unique violation.
+unique_violation : String
+let unique_violation = "23505"
+
+rows : Sql.Template Pg {} a ->{Database;} List a
+let rows query = Effect.or_die (task { Database.query (Sql.bind query {}) })
+
+/// The first row, if any.
+first : Sql.Template Pg {} a ->{Database;} Option a
+let first query = List.head (rows query)
+
+run : Sql.Template Pg {} a ->{Database;} Unit
+let run query = Effect.or_die (task { ignore (Database.execute (Sql.bind query {})) })
+
+/// `run` of an insert that may find its row already there: then nothing.
+run_once : Sql.Template Pg {} a ->{Database;} Unit
+let run_once query =
+  Effect.or_die
+    (task {
+      try ignore (Database.execute (Sql.bind query {})) with
+      | DbError e -> if e.code == unique_violation then () else from_result (Err (DbError e))
+    })
+
+/// The id an insert returns.
+insert_id : Sql.Template Pg {} { id : BigInt } ->{Database;} BigInt
+let insert_id query =
+  match first query with
+  | Some row -> row.id
+  | None -> Effect.die "an insert returned no row"

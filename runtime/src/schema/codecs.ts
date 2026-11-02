@@ -94,6 +94,20 @@ export const codecTransformPure = (
   from: AnySchema,
 ): AnySchema => transformed("pure", SchemaGetter.transform(decode), encode, from);
 
+/** `Codec.transform_as`: `Codec.transform` whose values are those of the type side of `type`. */
+export const codecTransformAs = (
+  type: AnySchema,
+  decode: (wire: unknown) => unknown,
+  encode: (value: unknown) => unknown,
+  from: AnySchema,
+): AnySchema =>
+  from.pipe(
+    Schema.decodeTo(Schema.toType(type), {
+      decode: SchemaGetter.transform(decode),
+      encode: SchemaGetter.transform(encode),
+    }),
+  );
+
 /** `Codec.transform_result`: decoding may fail with a `SchemaError`. */
 export const codecTransformResult = (
   decode: (wire: unknown) => Result.Result<unknown, SchemaError>,

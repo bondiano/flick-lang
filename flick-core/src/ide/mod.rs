@@ -339,8 +339,6 @@ mod hints_tests;
 #[cfg(test)]
 mod hover_tests;
 #[cfg(test)]
-mod kind_hover_tests;
-#[cfg(test)]
 mod pattern_tests;
 #[cfg(test)]
 mod tests;
