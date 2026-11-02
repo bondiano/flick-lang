@@ -1,12 +1,16 @@
 schema-version = 1
 
 # The Conduit API on the go target, over PostgreSQL. It serves the endpoints
-# of `@conduit/contract` and, when built, the client's files.
+# of the contract and, when built, the client's files; `migrate` only brings
+# the database up to date, as the server does when it starts.
 [project]
 kind = "app"
-entry = "Conduit.Server.Main"
+entries = { main = "Conduit.Server.Main", migrate = "Conduit.Server.Migrate" }
 source-dir = "src"
 test-dir = "test"
+
+[dependencies]
+contract = { path = "../contract" }
 
 [build]
 out-dir = "dist"

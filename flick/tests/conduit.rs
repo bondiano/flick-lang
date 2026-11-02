@@ -1,6 +1,6 @@
 //! The Conduit example against the `RealWorld` spec: builds the Go server of
-//! `examples/conduit/server`, which compiles the contract package from its
-//! sources, serves it over a fresh `PostgreSQL` in Docker and runs the
+//! `examples/conduit/server`, which compiles the contract, its path
+//! dependency, from its sources, serves it over a fresh `PostgreSQL` in Docker and runs the
 //! official Hurl suite vendored in `examples/conduit/vendor/realworld`.
 //! Ignored by default: it needs Docker, Go and `hurl` on `PATH`
 //! (`just conduit-api`).
@@ -40,14 +40,6 @@ fn free_port() -> u16 {
 fn the_go_server_passes_the_realworld_api_suite() {
     let conduit = common::example("conduit", "conduit_api");
     let server = conduit.join("server");
-    // the source package as pnpm links a workspace member
-    let linked = server.join("node_modules/@conduit/contract");
-    fs::create_dir_all(linked.parent().expect("a parent")).expect("dir");
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::symlink;
-        symlink(conduit.join("contract"), &linked).expect("symlink");
-    }
     let build = common::flick_in(&server, &["build"]);
     assert!(build.status.success(), "{build:?}");
     let (_database, url) = start();

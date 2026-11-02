@@ -1,0 +1,31 @@
+schema-version = 1
+
+# The Conduit workspace: the contract, which the client and the server
+# compile from its sources, and the Go server. At this root `flick check`,
+# `build`, `test`, `fmt` and `clean` go through both, the contract first;
+# `--package server` picks one.
+[workspace]
+members = ["contract", "server"]
+
+# `flick script <name>`. The database scripts need Docker; `api` also needs
+# Go and hurl, and runs the RealWorld suite against a fresh server.
+[scripts]
+lint = ["flick fmt --check", "flick check --warnings-as-errors"]
+test = "flick test"
+build = "flick build"
+db = "docker run --detach --rm --name conduit-db --env POSTGRES_PASSWORD=conduit --publish 54329:5432 postgres:17-alpine"
+migrate = "DATABASE_URL=postgres://postgres:conduit@localhost:54329/postgres flick run --package server migrate"
+api = [
+  "@build",
+  """
+  set -e
+  trap 'kill $server 2>/dev/null; docker stop conduit-api-db >/dev/null' EXIT
+  docker run --detach --rm --name conduit-api-db --env POSTGRES_PASSWORD=conduit --publish 54330:5432 postgres:17-alpine >/dev/null
+  until docker exec conduit-api-db pg_isready --quiet; do sleep 1; done
+  DATABASE_URL=postgres://postgres:conduit@localhost:54330/postgres JWT_SECRET=conduit-api PORT=8037 server/dist/flick-main &
+  server=$!
+  until curl --silent --output /dev/null localhost:8037/api/tags; do sleep 1; done
+  hurl --test --jobs 1 --variable host=http://localhost:8037 --variable uid=flick vendor/realworld/specs/api/hurl/*.hurl
+  """,
+]
+ci = ["@lint", "@test", "@api"]

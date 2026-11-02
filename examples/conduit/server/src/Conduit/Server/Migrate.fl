@@ -1,0 +1,18 @@
+/// Brings the database at `DATABASE_URL` up to date and stops: the
+/// migrations the server also applies when it starts.
+module Conduit.Server.Migrate exposing (main)
+
+import Conduit.Server.Schema as Schema
+
+url : Unit ->{; Config.ConfigError} String
+let url () = Config.get (Config.string "DATABASE_URL")
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let database =
+    try url () with
+    | Config.ConfigError message -> App.fail ("configuration: " ++ message)
+  provide (Database.pg (Database.config database)) {
+    let applied = Effect.or_die (task { Database.Migrate.run Schema.migrations })
+    Platform.stdout_line ("migrations applied: " ++ show applied)
+  }
