@@ -424,7 +424,7 @@ instantiate it.
 | `Δ ⊩ Q ⇝ d ⇒ ⟦Δ⟧ ⊢⁺ d : D_Q`; T6(a) | `ent_typed`, `T6a` (`Elab/T6a.lean`) |
 | §3.1 `do` | `Stmt`, `Sugar.desugarDo`, `DoOk`, `do_elab`, `T6a_do` (`Elab/Sugar.lean`, `Elab/DoNotation.lean`) |
 | §3.2 `for`, §3.3 `?`, §3.4 blocks | `Clause`, `Sugar.gen`, `Sugar.loop`, `GenOk`, `LoopOk`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`, `T6a_sugar` (`Elab/Sugar.lean`, `Elab/Comprehension.lean`) |
-| Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`) |
+| Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`); the schemes of the Prelude names generated from the checker (`Elab/PreludeSchemes.lean`) |
 | "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim`, then `T6b_target` (`Elab/Run.lean`) |
 | §0.1 `⟦·⟧` into the core with regions: types, stages, schemes | `Names`, `trT`, `trTT`, `trD`, `trS`, `trStage`, `trT_subst`, `trT_reach` (`Elab/CoreTy.lean`) |
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
@@ -485,7 +485,9 @@ Simplifications:
    of the filled skeleton, and `T6b_target` takes it for both fillings.
 9. The sugar (§3) desugars into `Exp`; `Sugar` names the Prelude methods (`flat_map`,
    `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
-   hypotheses on the program. Simplification 15 extends to the Prelude (Р188): a type with
+   hypotheses on the program. The schemes of the Prelude names are generated from the
+   checker (`PreludeSchemes.lean`); `pair`, `unc n` and `each_P` have no Prelude name and are
+   written in `Sugar.lean`. Simplification 15 extends to the Prelude (Р188): a type with
    hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
    qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and
    data without storage drops it. That argument is invariant, so a qualifier the caller
@@ -546,9 +548,12 @@ a program with `Eq` (an instance on `Int`, structural on a record), `Applicative
 `Eff` and of an eager `OptQ`, `Alternative OptQ`, `Iterable ListQ`, all of `Sugar`, with
 `Coherent` (`coherent`) and `Real` (`real`); W2, the bodies of the globals (`RootTy`,
 `RealRun`) and T6 on the witness, is done too (`rootTy`, `realRun`, `witness_T6a`,
-`witness_T6a_do`, `witness_T6b`, `do_eff`, `do_opt`). Its `Sugar` schemes are still compared
-with the hand-written ones of `Sugar.lean`; they move to `PreludeSchemes.lean` (generated
-from the checker, step 2 of the plan) when that file exists. The pieces below are in their intended order.
+`witness_T6a_do`, `witness_T6b`, `do_eff`, `do_opt`). The schemes of `Sugar` come from
+`PreludeSchemes.lean`, generated from the checker's `Prelude.fl` and `Seq.fl` by the
+translation of Р188 (`flick-model/src/translate/lean.rs`, `just formal-schemes`; a golden test
+of `cargo test -p flick-model` holds the file to the checker). The witness's own schemes are
+written with `bindTy`, `map2Ty` and `eachSch`, and `S` equates them with the generated ones by
+`rfl`. The pieces below are in their intended order.
 
 #### P4a1: captures in `Elab` and `Target`
 

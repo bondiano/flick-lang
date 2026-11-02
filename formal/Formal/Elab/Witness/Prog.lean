@@ -19,6 +19,10 @@ sugar uses it.
 The type constructors are `unit = 1`, `Bool = 2`, `Option = 3`, `Int = 4`, `Eff = 5`,
 `OptQ = 6`, `ListQ = 7`, `List = 8`, `Seq = 9`, the pair `Tup = 10`, `Result = 11`,
 `Errors = 12`, `Rec = 13`.
+
+The schemes of `methSch` and `constSch` are written by hand (`bindTy`, `map2Ty`, `eachSch`);
+the fields of `S` equate them with the ones generated from the checker (`PreludeSchemes`) by
+`rfl`, so a hand scheme that drifts from `Prelude.fl` breaks the build.
 -/
 
 namespace Flick.Elab.Witness
