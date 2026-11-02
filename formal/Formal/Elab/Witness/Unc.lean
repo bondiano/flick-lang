@@ -8,7 +8,7 @@ import Formal.Closed
 `unc n` is built by a Lean function of `n` (`uncB`): `unc 1 f t = f t`, and
 `unc (n+1) f t = match t with (t', x) → unc n f t' x`, `unc n` taken at the result
 `aₙ₊₁ →^c r`. Its typing is an induction on `n` (`typ_uncB`). `from_result_n` matches
-`Ok x → x | Err e → raise e`; the error type reaches nothing, so `⟦R⟧` lets it raise (`docs/formal/elaboration.md#from`_result-could-not-raise-in-the-core).
+`Ok x → x | Err e → raise e`; the error type reaches nothing, so `⟦R⟧` lets it raise (`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
 The structural `eq` of `Rec = MkRec Int` compares the one field by the `eq` of the slot
 dictionary `D_{Eq Int}` (`docs/formal/elaboration.md#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries`), so its `&&` over the fields is that one comparison.
 -/

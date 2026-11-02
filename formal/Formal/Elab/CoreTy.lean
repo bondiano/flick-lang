@@ -9,7 +9,7 @@ The types of `Elab` in the core of `Formal/` with regions and dictionary records
 `var ↦ tvar`, `app ↦ tapp`, `con c ↦ adt`, `Bool ↦ base bool`, `Int ↦ base int`,
 `arr φ a b q ↦ ⟦a⟧ →⟦φ⟧^⌈⟦q⟧⌉ ⟦b⟧`,
 `cnil ↦ caps ∅`, `cun ↦ caps (∪)`, `D_{C τ̄} ↦ dict (cls C |τ̄|) τ̄`. A stage `R` is `rt ∅ ε` with
-`ε` every name (`allNames`, `docs/formal/elaboration.md#from`_result-could-not-raise-in-the-core).
+`ε` every name (`allNames`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
 The translation commutes with substitution (`trT_subst`, `trTT_subst`, `trS_subst`) and with
 `⌈·⌉` (`trT_reach`): a capture variable is an ordinary variable on both sides.
 
@@ -41,7 +41,7 @@ structure Names where
 variable (N : Names)
 
 /-- Every name, as a row of errors: the stage `R` of the source has no row of errors, and
-`⟦R⟧` lets a body raise any error type whose values reach nothing (`docs/formal/elaboration.md#from`_result-could-not-raise-in-the-core). -/
+`⟦R⟧` lets a body raise any error type whose values reach nothing (`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). -/
 def allNames : Row
   | .nm _ => True
   | _ => False

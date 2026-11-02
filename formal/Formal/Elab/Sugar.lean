@@ -23,7 +23,7 @@ The schemes of the Prelude names are generated from the checker (`PreludeSchemes
 formal-schemes`). `bindTy`, `map2Ty` and `eachSch` are their forms the proofs use; the witness
 holds them to the generated ones by `rfl` (`Witness/Prog.lean`, `eachSch_R`). `pair`, `unc n`
 and `each_P` have no Prelude name and stay written here (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`, README simplification 9);
-`from_result` is a family over closed rows of errors (`frSch`, `docs/formal/elaboration.md#from`_result-could-not-raise-in-the-core).
+`from_result` is a family over closed rows of errors (`frSch`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
 -/
 
 namespace Flick.Elab
@@ -76,7 +76,7 @@ theorem eachSch_R (unit seq : Nat) :
 /-- `from_result_n : ∀a. Result (Errors (con n)) a →R a`, `from_result` at the closed row of
 errors `con n`. The core has no row variables, and its `raise` adds what the error reaches to
 the row, so the checker's `∀e a` becomes a family over closed rows, as `each_φ` is over stages
-(`docs/formal/elaboration.md#from`_result-could-not-raise-in-the-core). `frSch_gen`: a member is the generated scheme at `e := con n`. -/
+(`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). `frSch_gen`: a member is the generated scheme at `e := con n`. -/
 def frSch (result errors n : Nat) : Scheme :=
   ⟨1, [], .arr .R (.app (.app (.con result) (.app (.con errors) (.con n))) (.var 0)) (.var 0) .cnil,
     .cnil⟩
@@ -144,7 +144,7 @@ structure Sugar (P : Prog) where
   hEach : ∀ φ, P.consts (each φ) = some (eachSch unit seq φ)
   hUnitV : P.consts unitV = some ⟨0, [], .con unit, .cnil⟩
   /-- `from_result_n : ∀a. Result (Errors (con n)) a →R a` (`core.md` §1.4), the generated
-  scheme at a closed row (`frSch_gen`, `docs/formal/elaboration.md#from`_result-could-not-raise-in-the-core) -/
+  scheme at a closed row (`frSch_gen`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`) -/
   hFromResult : ∀ n, P.consts (fromResult n) = some (frSch result errors n)
 
 variable {P : Prog} (S : Sugar P)
