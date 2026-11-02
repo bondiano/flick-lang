@@ -1,6 +1,7 @@
 // `HttpApi` values: endpoints, groups and APIs as frozen data. Labels are
 // the names the compiler passes for `Record.Label`; the codecs are Flick's
 // (Effect Schema codecs of the JSON wire form).
+import type { Context } from "effect";
 import type { AnySchema } from "../schema/schemas.ts";
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "QUERY";
@@ -10,6 +11,15 @@ export type Security =
   | { readonly kind: "bearer"; readonly name: string }
   | { readonly kind: "basic"; readonly name: string }
   | { readonly kind: "apiKey"; readonly name: string; readonly key: string; readonly in: "header" | "query" | "cookie" };
+
+/** `HttpApi.with_auth`: the service `tag` that `check` makes from each request, for the handler. */
+export interface Auth {
+  readonly security: Security;
+  readonly tag: Context.Key<unknown, unknown>;
+  readonly check: (request: unknown) => unknown;
+  /** Anonymous requests are served too: the document's security is optional. */
+  readonly optional: boolean;
+}
 
 /** One of `HttpApi.ErrorCases`: a typed error with its status and codec. */
 export interface ErrorCase {
@@ -63,6 +73,8 @@ export interface Endpoint {
   readonly security: ReadonlyArray<Security>;
   /** Run in order before the handler, on the decoded request; a failure answers instead. */
   readonly middleware: ReadonlyArray<(request: unknown) => unknown>;
+  /** Makes a service for the handler after the middleware. */
+  readonly auth: Auth | null;
   readonly deprecated: boolean;
   /** Left out of the OpenAPI document. */
   readonly hidden: boolean;
@@ -125,6 +137,7 @@ export const httpApiEndpoint = (method: { readonly _tag: string }, path: string,
     description: "",
     security: [],
     middleware: [],
+    auth: null,
     deprecated: false,
     hidden: false,
   });
@@ -179,6 +192,20 @@ export const httpApiWithSecurity = (security: Security, e: Endpoint): Endpoint =
   update(e, { security: [...e.security, security] });
 export const httpApiWithMiddleware = (hook: (request: unknown) => unknown, e: Endpoint): Endpoint =>
   update(e, { middleware: [...e.middleware, hook] });
+/** `HttpApi.with_auth security tag check endpoint`. */
+export const httpApiWithAuth = (
+  security: Security,
+  tag: Context.Key<unknown, unknown>,
+  check: (request: unknown) => unknown,
+  e: Endpoint,
+): Endpoint => update(e, { auth: Object.freeze({ security, tag, check, optional: false }) });
+/** `HttpApi.with_optional_auth security tag check endpoint`. */
+export const httpApiWithOptionalAuth = (
+  security: Security,
+  tag: Context.Key<unknown, unknown>,
+  check: (request: unknown) => unknown,
+  e: Endpoint,
+): Endpoint => update(e, { auth: Object.freeze({ security, tag, check, optional: true }) });
 export const httpApiDeprecate = (e: Endpoint): Endpoint => update(e, { deprecated: true });
 export const httpApiHide = (e: Endpoint): Endpoint => update(e, { hidden: true });
 
@@ -196,6 +223,13 @@ export const httpApiGroup = (name: string): Group => Object.freeze({ name, endpo
 
 export const httpApiAdd = (_lacks: unknown, _union: unknown, endpoint: Endpoint, group: Group): Group =>
   Object.freeze({ ...group, endpoints: [...group.endpoints, endpoint] });
+
+/** `HttpApi.authenticated tag group`: every endpoint makes the service `tag` for its handler. */
+export const httpApiAuthenticated = (tag: Context.Key<unknown, unknown>, group: Group): Group => {
+  const missing = group.endpoints.find((e) => e.auth?.tag !== tag);
+  if (missing !== undefined) throw new TypeError(`the endpoint ${missing.name} has no \`with_auth\` making ${tag.key}`);
+  return group;
+};
 
 export const httpApiMake = (name: string): Api =>
   Object.freeze({ name, info: { version: "0.1.0", description: "", servers: [] }, groups: [] });

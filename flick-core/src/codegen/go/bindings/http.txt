@@ -365,6 +365,9 @@ httpApiBasic HttpApiBasic
 httpApiKey HttpApiKey
 httpApiWithSecurity HttpApiWithSecurity
 httpApiWithMiddleware HttpApiWithMiddleware
+httpApiWithAuth HttpApiWithAuth
+httpApiWithOptionalAuth HttpApiWithOptionalAuth
+httpApiAuthenticated HttpApiAuthenticated
 httpApiDeprecate HttpApiDeprecate
 httpApiHide HttpApiHide
 httpApiDescribe HttpApiDescribe

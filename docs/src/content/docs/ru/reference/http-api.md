@@ -57,6 +57,7 @@ let api =
 | `with_errors (errors \|> error_case status codec \|> …)` | задаёт типизированные ошибки обработчика и способ отправки каждой |
 | `with_security scheme` | задаёт `bearer name`, `basic name` или `api_key name { key; location }`: без учётных данных возвращается 401 |
 | `with_middleware hook` | добавляет эффектную функцию, которая получает декодированный запрос перед обработчиком |
+| `with_auth scheme Service check`, `with_optional_auth …` | даёт обработчику сервис, который `check` строит по каждому запросу (ниже) |
 | `describe`, `deprecate`, `hide` | добавляют краткое описание, пометку об устаревании или исключают эндпоинт из документа |
 
 Эндпоинт создаётся без типизированных ошибок: обработчик может завершиться
@@ -66,6 +67,50 @@ let api =
 с указанным в ней статусом там, где её объявляет `http_error status`.
 Обработчик потоковой формы может завершиться и ошибкой потока
 `MultipartError`; она отправляется с указанным в ней статусом.
+
+### Аутентификация
+
+`HttpApi.with_auth scheme Service check` строит для обработчика сервис
+`Service` по каждому запросу, после хуков: например, пользователя, которого
+называет заголовок `authorization`. `check` читает учётные данные из
+заголовков, которые объявляет эндпоинт, и решает. Её типизированная ошибка
+отправляется так же, как ошибка обработчика, со статусом и телом своего
+варианта, а обработчик не запускается. У каждого запроса свой сервис, поэтому
+одновременные запросы не видят чужих. Документ указывает для эндпоинта
+`scheme`, но, в отличие от `with_security`, сервер сам 401 не отвечает: как
+выглядит отказ, решает `check`. `with_optional_auth` обслуживает и анонимные
+запросы, а документ указывает схему как необязательную.
+`HttpApi.authenticated Service group` убирает сервис из того, что нужно для
+обслуживания группы; эндпоинт группы без `with_auth` для него — дефект при
+создании группы.
+
+```flick
+service Session =
+  user : Unit ->{} Option String
+
+type alias Credentials = { authorization : Option String }
+  deriving Schema
+
+check : HttpApi.Request Unit Unit Credentials Unit ->{; Unauthorized} Session.Impl
+let check request =
+  match request.headers.authorization with
+  | Some "Token ada" -> { user = fun () -> Some "ada" }
+  | Some _ -> from_result (Err (Unauthorized { errors = { token = ["is invalid"] } }))
+  | None -> from_result (Err (Unauthorized { errors = { token = ["is missing"] } }))
+
+me : HttpApi.Endpoint "me" (HttpApi.Request Unit Unit Credentials Unit ->{Session; Unauthorized} String)
+let me =
+  HttpApi.endpoint HttpApi.Get "/me" (Record.label : Record.Label "me")
+  |> HttpApi.with_headers credentials
+  |> HttpApi.with_success 200 (Codec.json Schema.string)
+  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 401 (Codec.json (schema Unauthorized)))
+  |> HttpApi.with_auth token Session check
+```
+
+Здесь `credentials` декодирует запрос без заголовка как `None`
+(`optional_field "authorization" String.json`), а `token` —
+`HttpApi.api_key "Token" { key = "authorization"; location = HttpApi.InHeader }`.
+Оба таргета обслуживают это одинаково.
 
 ## Обслуживание запросов
 

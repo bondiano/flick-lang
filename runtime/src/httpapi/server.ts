@@ -125,6 +125,10 @@ const succeeded = (endpoint: Endpoint, value: unknown): Effect.Effect<HttpServer
 const effectOf = (value: unknown): Effect.Effect<unknown, unknown, unknown> =>
   Effect.isEffect(value) ? value : Effect.void;
 
+/** A check's result: the effect of a runtime function, or the value of a lifted pure one. */
+const valueOf = (value: unknown): Effect.Effect<unknown, unknown, unknown> =>
+  Effect.isEffect(value) ? value : Effect.succeed(value);
+
 /** Whether the request carries the credentials of one of the schemes. */
 const authorized = (schemes: ReadonlyArray<Security>, request: HttpServerRequest.HttpServerRequest, url: URL): boolean => {
   const authorization = (request.headers["authorization"] ?? "").toLowerCase();
@@ -166,7 +170,15 @@ const route =
       );
       if (Result.isFailure(decoded)) return badRequest(decoded.failure);
       const hooks = endpoint.middleware.map((hook) => Effect.asVoid(effectOf(hook(decoded.success))));
-      const run = Effect.andThen(Effect.all(hooks, { discard: true }), () => handler(decoded.success));
+      const auth = endpoint.auth;
+      // each request makes its own service: concurrent requests do not share it
+      const serve = (): Effect.Effect<unknown, unknown, unknown> =>
+        auth === null
+          ? handler(decoded.success)
+          : Effect.flatMap(valueOf(auth.check(decoded.success)), (impl) =>
+              Effect.provideService(handler(decoded.success), auth.tag, impl),
+            );
+      const run = Effect.andThen(Effect.all(hooks, { discard: true }), serve);
       return yield* Effect.matchEffect(Effect.provideContext(run, context), {
         onFailure: (error) => failed(endpoint, error),
         onSuccess: (value) => succeeded(endpoint, value),

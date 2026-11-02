@@ -142,7 +142,7 @@ const operation = (group: Group, endpoint: Endpoint, components: Map<string, unk
     tags: [group.name],
     ...(endpoint.description === "" ? {} : { summary: endpoint.description }),
     ...(endpoint.deprecated ? { deprecated: true } : {}),
-    ...(endpoint.security.length === 0 ? {} : { security: endpoint.security.map((s) => ({ [s.name]: [] })) }),
+    ...security(endpoint),
     parameters: [
       ...parameters(endpoint.params, "path", `${root}.path`, components),
       ...parameters(endpoint.query, "query", `${root}.query`, components),
@@ -172,6 +172,14 @@ const securityScheme = (s: Security): Json => {
   return { type: "apiKey", name: s.key, in: s.in };
 };
 
+/** The security requirements of the operation: its schemes, and that of its `with_auth`, optional or not. */
+const security = (endpoint: Endpoint): Json => {
+  const auth = endpoint.auth;
+  const required = [...endpoint.security, ...(auth === null ? [] : [auth.security])].map((s) => ({ [s.name]: [] }));
+  if (required.length === 0) return {};
+  return { security: auth?.optional === true ? [{}, ...required] : required };
+};
+
 /** The document as a value; throws `Refused`. */
 const document = (api: Api): Json => {
   const components = new Map<string, unknown>();
@@ -180,6 +188,7 @@ const document = (api: Api): Json => {
   for (const group of api.groups) {
     for (const endpoint of group.endpoints.filter((e) => !e.hidden)) {
       for (const s of endpoint.security) schemes.set(s.name, securityScheme(s));
+      if (endpoint.auth !== null) schemes.set(endpoint.auth.security.name, securityScheme(endpoint.auth.security));
       const path = openApiPath(endpoint.path);
       paths[path] = { ...paths[path], [endpoint.method.toLowerCase()]: operation(group, endpoint, components) };
     }

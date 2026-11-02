@@ -1,0 +1,11 @@
+me as ada: ada
+me as bob: bob
+me as eve: 401 is invalid
+me anonymous: 401 is missing
+greet as ada: hello ada
+greet anonymous: hello stranger
+greet as eve: 401 is invalid
+raw anonymous me: 401 application/json true
+me requires the token: true
+greet takes it optionally: true
+the scheme is an API key: true

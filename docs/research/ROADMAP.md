@@ -406,8 +406,8 @@ component search (props : SearchProps) =
 **W5. Модуль `Jwt`.** ⬜
 - AC: HS256 `sign`/`verify`, утверждения через Schema, `exp`/`iat` от `Clock`, типизированные ошибки (подпись, срок, формат); векторы RFC 7515/7519; оба таргета.
 
-**W6. Аутентификация `HttpApi` со значением для обработчика.** ⬜
-- AC: схема с произвольным префиксом (`Authorization: Token <jwt>`); `with_auth check` отдаёт обработчику типизированный результат, есть вариант необязательной аутентификации; `securitySchemes` в OpenAPI; оба таргета.
+**W6. Аутентификация `HttpApi` со значением для обработчика.** ✅ (`HttpApi.with_auth scheme Service check` и `with_optional_auth` — сервис для обработчика по каждому запросу, как `Rpc.with_auth`; `check` читает объявленные заголовки, её типизированная ошибка отвечает статусом и телом своего варианта (тела RealWorld), сервер сам 401 не отвечает; `HttpApi.authenticated` убирает сервис из требований группы; документ — `security` эндпоинта, у необязательной `[{}, {scheme: []}]`; `tests/run/stdlib/http/auth`, оба таргета)
+- AC: схема `Authorization: Token <jwt>` (`api_key` в заголовке); `with_auth` отдаёт обработчику типизированный сервис, есть вариант необязательной аутентификации; `securitySchemes` в OpenAPI; оба таргета.
 
 **W7. Раздача: CORS и SPA.** ⬜
 - AC: CORS в `HttpApi.listen`; статика с откатом на `index.html` для путей SPA; оба таргета.

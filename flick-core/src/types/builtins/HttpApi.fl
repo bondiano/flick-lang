@@ -234,6 +234,30 @@ foreign pure with_middleware from "@flick-lang/runtime/effect/http-api/HttpApi" 
   arity 2
   reviewed "effect@4.0.5 sha256:468649beea1d8514"
 
+/// The service `a` for the handler, made per request by `check` from the
+/// declared headers; its typed failure is answered as the handler's would
+/// be, and no 401 is sent by itself. The document lists `security`.
+with_auth :
+  forall a l p q h b r e s.
+  Security ->
+  ServiceTag a ->
+  (Request p q h b ->{r; e} ServiceImpl a) ->
+  Endpoint l (Request p q h b ->{a + r; e} s) ->
+  Endpoint l (Request p q h b ->{a + r; e} s)
+foreign pure with_auth from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithAuth"
+  arity 4
+
+/// `with_auth` that also serves anonymous requests: `security` is optional.
+with_optional_auth :
+  forall a l p q h b r e s.
+  Security ->
+  ServiceTag a ->
+  (Request p q h b ->{r; e} ServiceImpl a) ->
+  Endpoint l (Request p q h b ->{a + r; e} s) ->
+  Endpoint l (Request p q h b ->{a + r; e} s)
+foreign pure with_optional_auth from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithOptionalAuth"
+  arity 4
+
 /// The endpoint is marked deprecated in the document.
 deprecate : Endpoint l f -> Endpoint l f
 foreign pure deprecate from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiDeprecate"
@@ -265,6 +289,12 @@ add :
 foreign pure add from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiAdd"
   arity 2
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
+
+/// The group without the service `a` its endpoints make with `with_auth`
+/// (a defect when one does not).
+authenticated : forall a n r hs. ServiceTag a -> Group n (a + r) hs -> Group n r hs
+foreign pure authenticated from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiAuthenticated"
+  arity 2
 
 /// An API with no groups yet; `name` is the title of its document.
 api : String -> Api r {}

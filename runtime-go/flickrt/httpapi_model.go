@@ -59,7 +59,17 @@ type apiEndpoint struct {
 	description            string
 	security               []*apiSecurity
 	middleware             []Value // run in order before the handler
+	auth                   *apiAuth
 	deprecated, hidden     bool
+}
+
+// apiAuth is `HttpApi.with_auth`: the service `tag` that `check` makes from
+// each request, for the handler; `optional` serves anonymous requests too.
+type apiAuth struct {
+	security *apiSecurity
+	tag      string
+	check    Value
+	optional bool
 }
 
 type apiGroup struct {
@@ -206,6 +216,32 @@ func HttpApiWithMiddleware(hook, e Value) Value {
 	return changedEndpoint(e, func(x *apiEndpoint) {
 		x.middleware = append(append([]Value{}, x.middleware...), hook)
 	})
+}
+
+// HttpApiWithAuth is `with_auth security tag check endpoint`.
+func HttpApiWithAuth(security, tag, check, e Value) Value {
+	return changedEndpoint(e, func(x *apiEndpoint) {
+		x.auth = &apiAuth{security.(*apiSecurity), tag.(string), check, false}
+	})
+}
+
+// HttpApiWithOptionalAuth is `with_optional_auth security tag check endpoint`.
+func HttpApiWithOptionalAuth(security, tag, check, e Value) Value {
+	return changedEndpoint(e, func(x *apiEndpoint) {
+		x.auth = &apiAuth{security.(*apiSecurity), tag.(string), check, true}
+	})
+}
+
+// HttpApiAuthenticated is `authenticated tag group`: every endpoint makes
+// the service `tag` for its handler.
+func HttpApiAuthenticated(tag, group Value) Value {
+	g := group.(*apiGroup)
+	for _, e := range g.endpoints {
+		if e.auth == nil || e.auth.tag != tag.(string) {
+			panic(Defect{"TypeError: the endpoint " + e.name + " has no `with_auth` making " + tag.(string)})
+		}
+	}
+	return g
 }
 
 func HttpApiDeprecate(e Value) Value {
