@@ -1,15 +1,17 @@
 schema-version = 1
 
 # The Conduit workspace: the contract, which the client and the server
-# compile from its sources, and the Go server. At this root `flick check`,
-# `build`, `test`, `fmt` and `clean` go through both, the contract first;
-# `--package server` picks one.
+# compile from its sources, the Go server and the browser client. At this
+# root `flick check`, `build`, `test`, `fmt` and `clean` go through each,
+# the contract first; `--package server` picks one.
 [workspace]
-members = ["contract", "server"]
+members = ["contract", "server", "client"]
 
 # `flick script <name>`. The database scripts need Docker, and so does
 # `test`, whose API suite starts a PostgreSQL of its own; `api` also needs
-# Go and hurl, and runs the RealWorld suite against a fresh server.
+# Go and hurl, and runs the RealWorld API suite against a fresh server;
+# `e2e` runs the RealWorld Playwright suite against the client as the
+# server serves it, in Chromium (`CHROMIUM` names one already installed).
 [scripts]
 lint = ["flick fmt --check", "flick check --warnings-as-errors"]
 test = "flick test"
@@ -29,4 +31,19 @@ api = [
   hurl --test --jobs 1 --variable host=http://localhost:8037 --variable uid=flick vendor/realworld/specs/api/hurl/*.hurl
   """,
 ]
-ci = ["@lint", "@test", "@api"]
+e2e = [
+  "flick build --package server",
+  "pnpm --dir client build",
+  """
+  set -e
+  trap 'kill $server 2>/dev/null; docker stop conduit-e2e-db >/dev/null' EXIT
+  docker run --detach --rm --name conduit-e2e-db --env POSTGRES_PASSWORD=conduit --publish 54331:5432 postgres:17-alpine >/dev/null
+  until docker exec conduit-e2e-db psql -h 127.0.0.1 -U postgres -c 'select 1' >/dev/null 2>&1; do sleep 1; done
+  DATABASE_URL=postgres://postgres:conduit@localhost:54331/postgres JWT_SECRET=conduit-e2e PORT=8038 STATIC_DIR=client/dist server/dist/flick-main &
+  server=$!
+  until curl --silent --output /dev/null localhost:8038/api/tags; do sleep 1; done
+  cd client
+  BASE_URL=http://localhost:8038 NODE_PATH="$PWD/node_modules" pnpm exec playwright test
+  """,
+]
+ci = ["@lint", "@test", "@api", "@e2e"]

@@ -1,0 +1,303 @@
+/// An article: its body from Markdown, which `Markdown.to_html` escapes so
+/// no script in it runs, its author's actions or the reader's follow and
+/// favorite, and its comments.
+module Conduit.Client.Article exposing (page, articles, follow_button)
+
+import Conduit.Api as Api
+import Conduit.Input exposing (Credentials, ProfilePath)
+import Conduit.Model exposing (
+  Article,
+  ArticleBody,
+  Comment,
+  CommentsBody,
+  Profile,
+  ProfileBody,
+  User,
+)
+import Conduit.Model as Model
+import Conduit.Problem exposing (Forbidden(..), NotFound(..), Unauthorized(..), Unprocessable(..))
+import Conduit.Route as Paths
+import Conduit.Client.Route as Route exposing (Page(..))
+import Conduit.Client.Session as Session
+import Conduit.Client.View as View
+
+/// An article as a reader sees it: their token and its slug.
+type Key = Key (Option String) String
+  deriving Eq, Hash, Show
+
+/// The slug of a path, which the URL's text may fail to be.
+slug_of : String ->{; NotFound} Paths.Slug
+let slug_of text =
+  match Paths.Slug.parse text with
+  | Ok slug -> slug
+  | Err _ -> from_result (Err (NotFound [("article", ["not found"])]))
+
+articles :
+  Atom.Family Key (Atom.Atom (Atom.Async ArticleBody {HttpApi.ClientError, NotFound, Unauthorized}))
+let articles =
+  Atom.family (fun key ->
+    match key with
+    | Key jwt slug ->
+      Atom.query
+        ["articles"]
+        (task {
+          Session.call
+            (Session.at jwt { slug = slug_of slug } ())
+            Api.Articles.endpoints.get_article
+        })
+  )
+
+comments :
+  Atom.Family
+    Key
+    (Atom.Atom (Atom.Async CommentsBody {HttpApi.ClientError, NotFound, Unauthorized}))
+let comments =
+  Atom.family (fun key ->
+    match key with
+    | Key jwt slug ->
+      Atom.query
+        ["comments"]
+        (task {
+          Session.call
+            (Session.at jwt { slug = slug_of slug } ())
+            Api.Articles.endpoints.list_comments
+        })
+  )
+
+/// Follows the author, or stops; a visitor signs up first.
+toggle_follow :
+  Bool ->
+  HttpApi.Request ProfilePath Unit Credentials Unit ->{; HttpApi.ClientError, Unauthorized, NotFound}
+  ProfileBody
+let toggle_follow following request =
+  if following then
+    Session.call request Api.Users.endpoints.unfollow
+  else
+    Session.call request Api.Users.endpoints.follow
+
+follow : Action.Action (Profile, Ui.ClickSnapshot)
+let follow =
+  Action.exhaust (fun (author, _) -> task {
+    let jwt = Atom.current Session.token
+    match (jwt, Paths.Username.parse author.username) with
+    | (Some _, Ok name) ->
+      let request = Session.at jwt { username = name } ()
+      try
+        ignore (Atom.mutation ["articles", "profiles"] (toggle_follow author.following) request)
+      with
+      | Unauthorized _ -> Atom.set Route.current Login
+      | NotFound _ -> ()
+      | HttpApi.ClientError _ -> ()
+    | _ -> Atom.set Route.current Register
+  })
+
+/// `Follow <name>`, or `Unfollow <name>` when the reader follows them.
+follow_button : Profile -> Ui
+let follow_button author =
+  let (style, label) =
+    if author.following then
+      ("btn btn-sm btn-secondary", "Unfollow ")
+    else
+      ("btn btn-sm btn-outline-secondary", "Follow ")
+  View.classed
+    style
+    (Ui.button { disabled = false; on_click = Action.with follow author } [
+      Ui.icon { class_name = "ion-plus-round" },
+      Ui.text (" " ++ label ++ author.username),
+    ])
+
+remove : Action.Action (String, Ui.ClickSnapshot)
+let remove =
+  Action.exhaust (fun (slug, _) -> task {
+    let jwt = Atom.current Session.token
+    try
+      Atom.mutation
+        ["articles"]
+        (fun r -> Session.call r Api.Articles.endpoints.delete_article)
+        (Session.at jwt { slug = slug_of slug } ())
+      Atom.set Route.current Route.home
+    with
+    | Unauthorized _ -> Atom.set Route.current Login
+    | Forbidden _ -> ()
+    | NotFound _ -> ()
+    | HttpApi.ClientError _ -> ()
+  })
+
+/// The author's edit and delete, or the reader's follow and favorite.
+actions : Article -> Option User -> List Ui
+let actions article reader =
+  match reader with
+  | Some me when me.username == article.author.username -> [
+    View.link "btn btn-sm btn-outline-secondary" (Editor (Some article.slug)) [
+      Ui.icon { class_name = "ion-edit" },
+      Ui.text " Edit Article",
+    ],
+    Ui.text " ",
+    View.classed
+      "btn btn-sm btn-outline-danger"
+      (Ui.button { disabled = false; on_click = Action.with remove article.slug } [
+        Ui.icon { class_name = "ion-trash-a" },
+        Ui.text " Delete Article",
+      ]),
+  ]
+  | _ -> [
+    follow_button article.author,
+    Ui.text " ",
+    View.favorite_button
+      ""
+      (if article.favorited then "Unfavorite Article " else "Favorite Article ")
+      (Model.preview article),
+  ]
+
+/// What the reader writes as a comment.
+draft : Atom.Writable String
+let draft = Atom.make ""
+
+post : Action.Action (String, Unit)
+let post =
+  Action.exhaust (fun (slug, _) -> task {
+    let jwt = Atom.current Session.token
+    let comment = { comment = { body = Some (Atom.current draft) } }
+    try
+      ignore (Atom.mutation
+        ["comments"]
+        (fun r -> Session.call r Api.Articles.endpoints.add_comment)
+        (Session.at jwt { slug = slug_of slug } comment))
+      Atom.set draft ""
+      Atom.set View.form_problems []
+    with
+    | Unauthorized found -> Atom.set View.form_problems found
+    | Unprocessable found -> Atom.set View.form_problems found
+    | NotFound found -> Atom.set View.form_problems found
+    | HttpApi.ClientError e ->
+      Atom.set View.form_problems (Session.unreachable (HttpApi.ClientError e))
+  })
+
+delete_comment : Action.Action ((String, Int), Ui.ClickSnapshot)
+let delete_comment =
+  Action.exhaust (fun ((slug, id), _) -> task {
+    let jwt = Atom.current Session.token
+    match Paths.CommentId.parse (Int.to_string id) with
+    | Ok comment_id ->
+      try
+        let path = { slug = slug_of slug; comment_id = comment_id }
+        Atom.mutation
+          ["comments"]
+          (fun r -> Session.call r Api.Articles.endpoints.delete_comment)
+          (Session.at jwt path ())
+      with
+      | Unauthorized _ -> ()
+      | Forbidden _ -> ()
+      | NotFound _ -> ()
+      | HttpApi.ClientError _ -> ()
+    | Err _ -> ()
+  })
+
+/// A comment, which its author may delete.
+comment_card : String -> Option User -> Comment -> Ui
+let comment_card slug reader comment =
+  let mine = Option.exists (fun (me : User) -> me.username == comment.author.username) reader
+  let delete =
+    if mine then
+      Ui.span { class_name = "mod-options" } [
+        Ui.button { disabled = false; on_click = Action.with delete_comment (slug, comment.id) } [
+          Ui.icon { class_name = "ion-trash-a" },
+        ],
+      ]
+    else
+      Ui.empty
+  let author = Profile comment.author.username None
+  Ui.keyed
+    (Int.to_string comment.id)
+    (Ui.div { class_name = "card" } [
+      Ui.div { class_name = "card-block" } [
+        View.classed "card-text" (Ui.paragraph [Ui.text comment.body]),
+      ],
+      Ui.div { class_name = "card-footer" } [
+        View.link "comment-author" author [View.avatar "comment-author-img" comment.author.image],
+        Ui.text " ",
+        View.link "comment-author" author [Ui.text comment.author.username],
+        Ui.span { class_name = "date-posted" } [Ui.text (View.date comment.createdAt)],
+        delete,
+      ],
+    ])
+
+/// The comment form of a reader, or the links to sign in.
+comment_form : String -> Option User -> Ui
+let comment_form slug reader =
+  match reader with
+  | None ->
+    Ui.paragraph [
+      Route.to Register [Ui.text "Sign up"],
+      Ui.text " or sign in to add comments on this article.",
+    ]
+  | Some me ->
+    Ui.fragment [
+      Ui.render View.errors (),
+      View.classed
+        "card comment-form"
+        (Ui.form { on_submit = Action.with post slug } [
+          Ui.div { class_name = "card-block" } [
+            Ui.with_host
+              { Ui.host with class_name = Some "form-control"; name = Some "comment" }
+              (Ui.field_area { bind = draft; placeholder = "Write a comment..."; on_input = None }),
+          ],
+          Ui.div { class_name = "card-footer" } [
+            View.avatar "comment-author-img" me.image,
+            View.classed
+              "btn btn-sm btn-primary"
+              (Ui.submit { disabled = false } [Ui.text "Post Comment"]),
+          ],
+        ]),
+    ]
+
+/// The comments of the article, newest first.
+component thread (key : Key) = ui {
+  match key with
+  | Key _ slug ->
+    let reader = Session.signed_in ()
+    let cards =
+      match Atom.get (Atom.at comments key) with
+      | Atom.Loaded body -> List.map (comment_card slug reader) body.comments
+      | Atom.Loading -> []
+      | Atom.Failed _ -> [text "The comments cannot be loaded."]
+    fragment ([comment_form slug reader] ++ cards)
+}
+
+/// The article page of a loaded article.
+shown : Article -> Option User -> Key -> Ui
+let shown article reader key =
+  let meta = View.meta article.author article.createdAt (actions article reader)
+  Ui.div { class_name = "article-page" } [
+    Ui.div { class_name = "banner" } [
+      Ui.div { class_name = "container" } [Ui.heading_at Ui.H1 [Ui.text article.title], meta],
+    ],
+    Ui.div { class_name = "container page" } [
+      Ui.div { class_name = "row article-content" } [
+        Ui.div { class_name = "col-md-12" } [
+          Ui.html (Ui.trusted_html (Markdown.to_html article.body)),
+          View.tag_list article.tagList,
+        ],
+      ],
+      Ui.hr,
+      Ui.div { class_name = "article-actions" } [meta],
+      Ui.div { class_name = "row" } [
+        Ui.div { class_name = "col-xs-12 col-md-8 offset-md-2" } [Ui.render thread key],
+      ],
+    ],
+  ]
+
+/// The page of the article at `slug`.
+component page (slug : String) = ui {
+  let key = Key (Atom.value Session.token) slug
+  match Atom.get (Atom.at articles key) with
+  | Atom.Loaded body -> shown body.article (Session.signed_in ()) key
+  | Atom.Loading ->
+    div { class_name = "article-page" } [
+      div { class_name = "container page" } [text "Loading article..."],
+    ]
+  | Atom.Failed _ ->
+    div { class_name = "article-page" } [
+      div { class_name = "container page" } [text "The article cannot be found."],
+    ]
+}

@@ -1,0 +1,89 @@
+/// The Conduit client: the navbar, the page of the address bar and the
+/// footer. The page is a value of `Route.Page`, so a link or a redirect
+/// writes one and the browser's URL follows; the pages that need a user
+/// send a visitor to sign in.
+module Conduit.Client.Main exposing (main)
+
+import Conduit.Model exposing (User)
+import Conduit.Client.Article as Article
+import Conduit.Client.Auth as Auth
+import Conduit.Client.Editor as Editor
+import Conduit.Client.Home as Home exposing (Listing(..))
+import Conduit.Client.Profile as Profile
+import Conduit.Client.Route as Route exposing (Page(..))
+import Conduit.Client.Session as Session
+import Conduit.Client.Settings as Settings
+import Conduit.Client.View as View
+
+/// Goes to `target` once it is shown: what a page shows a reader it is
+/// not for.
+component redirect (target : Page) =
+  let _go = Ui.on_mount (task { Atom.set Route.current target })
+  ui { empty }
+
+/// The page of a signed-in user, or a redirect to signing in.
+signed : Option User -> (User -> Ui) -> Ui
+let signed user page =
+  match user with
+  | Some me -> page me
+  | None -> Ui.render redirect Login
+
+/// The page `page` shows.
+body : Page -> Option User -> Ui
+let body page user =
+  match page with
+  | Home listing ->
+    let shown = if listing.feed == Some "following" then Following else Global
+    match (shown, user) with
+    | (Following, None) -> Ui.render redirect Login
+    | _ -> Ui.render Home.page { listing = shown; number = Option.with_default 1 listing.page }
+  | Tag tag query ->
+    Ui.render Home.page { listing = Tagged tag; number = Option.with_default 1 query.page }
+  | Login -> Auth.sign_in_page
+  | Register -> Auth.sign_up_page
+  | Editor slug -> signed user (fun _ -> Ui.render Editor.page slug)
+  | Settings -> signed user (fun me -> Ui.render Settings.page me)
+  | Profile name tab -> Ui.render Profile.page { name = name; favorites = Option.is_some tab }
+  | Article slug -> Ui.render Article.page slug
+
+/// Waits for the user of a stored token before a page that needs one.
+waiting : Page -> Bool
+let waiting page =
+  match page with
+  | Editor _ -> true
+  | Settings -> true
+  | Home listing -> listing.feed == Some "following"
+  | _ -> false
+
+component shell () =
+  // a new page starts without the problems of the last form
+  let _clear =
+    Ui.watch (fun () -> Atom.value Route.current) (fun _ -> task { Atom.set View.form_problems [] })
+  ui {
+    let page = Atom.value Route.current
+    let token = Atom.value Session.token
+    let state = Atom.get (Atom.at Session.user token)
+    let loading =
+      match (token, state) with
+      | (Some _, Atom.Loading) -> true
+      | _ -> false
+    let user =
+      match state with
+      | Atom.Loaded found -> found
+      | _ -> None
+    fragment [
+      View.navbar user,
+      if loading && waiting page then
+        div { class_name = "container page" } [text "Loading..."]
+      else body page user,
+      View.footer,
+    ]
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  match Ui.Dom.container "app" with
+  | None -> App.fail "the page has no #app"
+  | Some root ->
+    let _ = provide Atom.layer { Ui.Dom.mount root (fun _ -> ()) (Ui.render shell ()) }
+    ()

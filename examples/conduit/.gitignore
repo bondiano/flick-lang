@@ -1,2 +1,5 @@
 dist/
 .flick/
+test-results/
+playwright-report/
+*.d.fl.ts

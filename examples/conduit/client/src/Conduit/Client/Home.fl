@@ -1,0 +1,141 @@
+/// The home page: the global feed, the feed of the authors the reader
+/// follows, or the articles of a tag, ten a page, and the popular tags.
+/// Each feed is a query of its own, one per reader, list and page, so
+/// going back to a page shows it at once.
+module Conduit.Client.Home exposing (Listing(..), Feed, page, tags, feeds)
+
+import Conduit.Api as Api
+import Conduit.Model exposing (ArticlesBody)
+import Conduit.Problem exposing (Unauthorized(..))
+import Conduit.Client.Route as Route exposing (Page(..))
+import Conduit.Client.Session as Session
+import Conduit.Client.View as View
+
+/// Which articles a feed lists.
+type Listing = Global | Following | Tagged String
+  deriving Eq, Hash, Show
+
+/// A feed of a reader: their token, its listing and its page from 1.
+type Feed = Feed (Option String) Listing Int
+  deriving Eq, Hash, Show
+
+/// The articles of a feed.
+load : Feed -> Eff none {HttpApi.ClientError, Unauthorized} ArticlesBody
+let load feed = task {
+  match feed with
+  | Feed jwt listing number ->
+    let offset = Some (Int.to_float ((number - 1) * 10))
+    match listing with
+    | Following ->
+      let query = { limit = Some 10; offset = offset }
+      Session.call
+        { path = (); query = query; headers = Session.credentials jwt; payload = () }
+        Api.Articles.endpoints.feed
+    | _ ->
+      let tag =
+        match listing with
+        | Tagged t -> Some t
+        | Global -> None
+        | Following -> None
+      let query = { tag = tag; author = None; favorited = None; limit = Some 10; offset = offset }
+      Session.call
+        { path = (); query = query; headers = Session.credentials jwt; payload = () }
+        Api.Articles.endpoints.list_articles
+}
+
+/// Every feed as a query that a change of articles loads again.
+feeds : Atom.Family Feed (Atom.Atom (Atom.Async ArticlesBody {HttpApi.ClientError, Unauthorized}))
+let feeds = Atom.family (fun feed -> Atom.query ["articles"] (load feed))
+
+/// The tags in use.
+tags : Atom.Atom (Atom.Async (List String) {HttpApi.ClientError})
+let tags =
+  Atom.query
+    ["articles"]
+    (task { (Session.call (Session.asking None) Api.Public.endpoints.tags).tags })
+
+/// The page of a listing at `n`.
+page_of : Listing -> Int -> Page
+let page_of listing n =
+  let number = if n == 1 then None else Some n
+  match listing with
+  | Global -> Home { feed = None; page = number }
+  | Following -> Home { feed = Some "following"; page = number }
+  | Tagged t -> Tag t { page = number }
+
+/// A tab of the feed toggle, `active` when it is the one shown.
+tab : Bool -> Page -> String -> Ui
+let tab active target label =
+  View.classed
+    "nav-item"
+    (Ui.item [View.link (if active then "nav-link active" else "nav-link") target [Ui.text label]])
+
+/// The feed toggle: the reader's feed, the global one and the tag shown.
+toggle : Bool -> Listing -> Ui
+let toggle signed listing =
+  let mine = if signed then [tab (listing == Following) (page_of Following 1) "Your Feed"] else []
+  let tagged =
+    match listing with
+    | Tagged t -> [tab true (page_of listing 1) ("# " ++ t)]
+    | Global -> []
+    | Following -> []
+  Ui.div { class_name = "feed-toggle" } [
+    View.classed
+      "nav nav-pills outline-active"
+      (Ui.list (mine ++ [tab (listing == Global) Route.home "Global Feed"] ++ tagged)),
+  ]
+
+/// The popular tags, each a link to its articles.
+component sidebar () = ui {
+  let links =
+    match Atom.get tags with
+    | Atom.Loaded found ->
+      List.map (fun t -> View.link "tag-pill tag-default" (Tag t { page = None }) [text t]) found
+    | Atom.Loading -> [text "Loading tags..."]
+    | Atom.Failed _ -> [text "The tags cannot be loaded."]
+  div { class_name = "sidebar" } [
+    paragraph [text "Popular Tags"],
+    div { class_name = "tag-list" } links,
+  ]
+}
+
+/// The articles of the feed shown, and its pages.
+component listed (props : { listing : Listing; number : Int }) = ui {
+  let feed = Atom.at feeds (Feed (Atom.value Session.token) props.listing props.number)
+  match Atom.get feed with
+  | Atom.Loaded body ->
+    let shown =
+      if props.listing == Following then
+        View.followed body.articles
+      else
+        View.articles body.articles
+    fragment [shown, View.pagination body.articlesCount props.number (page_of props.listing)]
+  | Atom.Loading -> div { class_name = "article-preview" } [text "Loading articles..."]
+  | Atom.Failed _ -> div { class_name = "article-preview" } [text "The articles cannot be loaded."]
+}
+
+/// The home page of a listing at a page.
+page : Ui.View { listing : Listing; number : Int }
+let page =
+  Ui.view (fun props ->
+    let signed = Option.is_some (Session.signed_in ())
+    let banner =
+      if signed then
+        Ui.empty
+      else
+        Ui.div { class_name = "banner" } [
+          Ui.div { class_name = "container" } [
+            View.classed "logo-font" (Ui.heading_at Ui.H1 [Ui.text "conduit"]),
+            Ui.paragraph [Ui.text "A place to share your knowledge."],
+          ],
+        ]
+    Ui.div { class_name = "home-page" } [
+      banner,
+      Ui.div { class_name = "container page" } [
+        Ui.div { class_name = "row" } [
+          Ui.div { class_name = "col-md-9" } [toggle signed props.listing, Ui.render listed props],
+          Ui.div { class_name = "col-md-3" } [Ui.render sidebar ()],
+        ],
+      ],
+    ]
+  )

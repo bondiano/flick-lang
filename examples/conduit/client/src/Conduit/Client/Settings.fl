@@ -1,0 +1,103 @@
+/// The settings of the signed-in user: their picture, name, bio, email and
+/// a new password, and signing out.
+module Conduit.Client.Settings exposing (page)
+
+import Conduit.Api as Api
+import Conduit.Model exposing (User)
+import Conduit.Problem exposing (Conflict(..), Problems, Unauthorized(..), Unprocessable(..))
+import Conduit.Client.Auth as Auth
+import Conduit.Client.Route as Route exposing (Page(..))
+import Conduit.Client.Session as Session
+import Conduit.Client.View as View
+
+picture : Atom.Writable String
+let picture = Atom.make ""
+
+username : Atom.Writable String
+let username = Atom.make ""
+
+bio : Atom.Writable String
+let bio = Atom.make ""
+
+email : Atom.Writable String
+let email = Atom.make ""
+
+password : Atom.Writable String
+let password = Atom.make ""
+
+/// A field set to its text, or cleared when it is blank.
+cleared : String -> Option (Option String)
+let cleared text = if String.trim text == "" then Some None else Some (Some text)
+
+save : Action.Action Unit
+let save =
+  Action.exhaust (fun _ -> task {
+    let jwt = Atom.current Session.token
+    let change = {
+      user = {
+        image = cleared (Atom.current picture);
+        username = Some (Some (Atom.current username));
+        bio = cleared (Atom.current bio);
+        email = Some (Some (Atom.current email));
+        password = if Atom.current password == "" then None else Some (Some (Atom.current password));
+      };
+    }
+    let outcome : Result Problems User =
+      try Ok (Session.call (Session.at jwt () change) Api.Users.endpoints.update_user).user with
+      | Unauthorized found -> Err found
+      | Conflict found -> Err found
+      | Unprocessable found -> Err found
+      | HttpApi.ClientError e -> Err (Session.unreachable (HttpApi.ClientError e))
+    match outcome with
+    | Ok user ->
+      Atom.set password ""
+      Atom.set Session.token (Some user.token)
+      ignore (Atom.mutation ["user", "profiles", "articles"] (fun () -> ()) ())
+      Atom.set Route.current (Profile user.username None)
+    | Err found -> Atom.set View.form_problems found
+  })
+
+sign_out : Action.Action Ui.ClickSnapshot
+let sign_out =
+  Action.exhaust (fun _ -> task {
+    Atom.set Session.token None
+    Atom.set Route.current Route.home
+  })
+
+/// The settings of `user`, its fields filled from it.
+component page (user : User) =
+  let _fill =
+    Ui.on_mount
+      (task {
+        Atom.set picture (Option.with_default "" user.image)
+        Atom.set username user.username
+        Atom.set bio (Option.with_default "" user.bio)
+        Atom.set email user.email
+        Atom.set password ""
+      })
+  ui {
+    div { class_name = "settings-page" } [
+      div { class_name = "container page" } [
+        div { class_name = "row" } [
+          div { class_name = "col-md-6 offset-md-3 col-xs-12" } [
+            View.classed "text-xs-center" (heading_at Ui.H1 [text "Your Settings"]),
+            Ui.render View.errors (),
+            form { on_submit = save } [
+              Auth.field "image" Ui.TextInput "URL of profile picture" picture,
+              Auth.field "username" Ui.TextInput "Your Name" username,
+              Auth.area "bio" "Short bio about you" bio,
+              Auth.field "email" Ui.EmailInput "Email" email,
+              Auth.field "password" Ui.PasswordInput "New Password" password,
+              View.classed
+                "btn btn-lg btn-primary pull-xs-right"
+                (submit { disabled = false } [text "Update Settings"]),
+            ],
+            hr,
+            View.classed
+              "btn btn-outline-danger"
+              (button { disabled = false; on_click = sign_out } [text "Or click here to logout."]),
+          ],
+        ],
+      ],
+    ]
+  }
