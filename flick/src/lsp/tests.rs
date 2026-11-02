@@ -1,4 +1,5 @@
 use super::*;
+use serde_json::json;
 
 fn document(path: &Path) -> Value {
     json!({ "textDocument": { "uri": protocol::uri_of(path), "languageId": "flick", "version": 1,

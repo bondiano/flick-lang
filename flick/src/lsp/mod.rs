@@ -4,8 +4,10 @@
 //! same analysis that compiles it, and publishes the diagnostics `flick
 //! check` reports, positions converted to UTF-16.
 
+mod diagnostics;
 mod features;
 mod logging;
+mod members;
 pub mod protocol;
 mod requests;
 
@@ -18,15 +20,16 @@ use std::process::{self, ExitCode};
 use std::sync::LazyLock;
 use std::time::Instant;
 
-use flick_core::diagnostics::{Diagnostic, Severity};
+use flick_core::diagnostics::Diagnostic;
 use flick_core::project::config::Emit;
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, ModuleCache};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{resolve, syntax, types};
-use serde_json::{Value, json};
+use serde_json::Value;
 use tracing::{debug, debug_span, error, info, info_span, warn};
 
 use crate::{builtins, sources};
+use diagnostics::{lsp_diagnostic, publish};
 
 static BUILTIN_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     let temp = env::temp_dir();
@@ -44,6 +47,15 @@ fn canonical(path: &Path) -> PathBuf {
 /// Files read from the open buffers first.
 struct Overlay<'a> {
     docs: HashMap<PathBuf, (&'a Path, &'a str)>,
+}
+
+fn overlay(docs: &HashMap<PathBuf, String>) -> Overlay<'_> {
+    Overlay {
+        docs: docs
+            .iter()
+            .map(|(path, text)| (canonical(path), (path.as_path(), text.as_str())))
+            .collect(),
+    }
 }
 
 impl Host for Overlay<'_> {
@@ -137,12 +149,7 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
         );
         return snapshot;
     }
-    let host = Overlay {
-        docs: docs
-            .iter()
-            .map(|(path, text)| (canonical(path), (path.as_path(), text.as_str())))
-            .collect(),
-    };
+    let host = overlay(docs);
     let mut sources = SourceMap::default();
     let dir = path
         .parent()
@@ -486,6 +493,10 @@ impl Server {
                     .push(d);
             }
         }
+        // a library's files are reported by its own analysis, not its dependents'
+        if let Context::Project(_) = &snapshot.context {
+            by_file.retain(|file, _| Context::of(&self.docs, file) == snapshot.context);
+        }
         // Open documents always get a report, even an empty one.
         for open in self.docs.keys() {
             if Context::of(&self.docs, open) == snapshot.context {
@@ -522,57 +533,21 @@ impl Server {
                 self.refresh(&open);
             }
         }
+        // the members that compile a library check it again with it
+        if let Context::Project(dir) = &context {
+            for member in members::dependents(&self.docs, dir) {
+                let member = Context::Project(canonical(&member));
+                let open = self
+                    .docs
+                    .keys()
+                    .find(|doc| Context::of(&self.docs, doc) == member)
+                    .cloned();
+                if let Some(open) = open {
+                    self.refresh(&open);
+                }
+            }
+        }
     }
-}
-
-fn publish(path: &Path, diagnostics: &[Value]) -> Value {
-    protocol::notification(
-        "textDocument/publishDiagnostics",
-        &json!({ "uri": protocol::uri_of(path), "diagnostics": diagnostics }),
-    )
-}
-
-/// A diagnostic in LSP terms; its code keeps the `FLICK-` spelling.
-pub fn lsp_diagnostic(sources: &SourceMap, d: &Diagnostic) -> Value {
-    let span = d.span.expect("only located diagnostics are published");
-    let text = &sources.get(span.file).text;
-    let severity = match d.severity {
-        Severity::Error => 1,
-        Severity::Warning => 2,
-        Severity::Note => 3,
-    };
-    let related: Vec<Value> = d
-        .related
-        .iter()
-        .map(|r| {
-            let file = sources.get(r.span.file);
-            json!({
-                "location": {
-                    "uri": protocol::uri_of(Path::new(&file.path)),
-                    "range": protocol::range(&file.text, r.span.start, r.span.end),
-                },
-                "message": r.message,
-            })
-        })
-        .collect();
-    // fixes without edits are advice; editors show them under the message
-    let message = d
-        .fixes
-        .iter()
-        .filter(|f| f.edits.is_empty())
-        .fold(d.message.clone(), |m, f| {
-            format!("{m}\nhelp: {}", f.message)
-        });
-    json!({
-        "range": protocol::range(text, span.start, span.end),
-        "severity": severity,
-        "code": d.code.to_string(),
-        "source": "flick",
-        "message": message,
-        "relatedInformation": related,
-        // 1 is `Unnecessary`: editors grey the code out
-        "tags": if d.unnecessary() { json!([1]) } else { json!([]) },
-    })
 }
 
 #[cfg(test)]

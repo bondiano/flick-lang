@@ -29,7 +29,7 @@ mod foreign;
 pub(super) type Reply = Result<Value, (i64, String)>;
 
 const INVALID_PARAMS: i64 = -32602;
-const REQUEST_FAILED: i64 = -32803;
+pub(super) const REQUEST_FAILED: i64 = -32803;
 
 /// The directory of an installed package of the project at `root`.
 pub(super) fn package_dir(root: &Path) -> impl Fn(&str) -> Option<PathBuf> + '_ {
@@ -78,7 +78,7 @@ impl Server {
         Ok((path, text))
     }
 
-    fn snapshot_for(&mut self, path: &Path) -> &Snapshot {
+    pub(super) fn snapshot_for(&mut self, path: &Path) -> &Snapshot {
         let context = Context::of(&self.docs, path);
         let fresh = self
             .snapshot
@@ -102,6 +102,13 @@ impl Server {
             ));
         }
         let offset = protocol::offset(&text, &params["position"]);
+        match method {
+            "textDocument/references" => return self.references(&path, offset),
+            "textDocument/rename" => {
+                return self.rename(&path, offset, params["newName"].as_str().unwrap_or(""));
+            }
+            _ => {}
+        }
         let snapshot = self.snapshot_for(&path);
         let Some(file) = snapshot.file(&path) else {
             return Ok(Value::Null);
@@ -135,50 +142,11 @@ impl Server {
                         .and_then(|(symbol, _)| ide.definition(&symbol))
                 })
                 .map_or(Ok(Value::Null), |l| location(snapshot, &l)),
-            "textDocument/references" => {
-                let Some((symbol, _)) = ide.symbol_at(file, offset) else {
-                    return Ok(json!([]));
-                };
-                let refs: Result<Vec<Value>, _> = ide
-                    .references(&symbol)
-                    .into_iter()
-                    .map(|(f, (s, e))| {
-                        location(
-                            snapshot,
-                            &Location {
-                                target: Target::File(f),
-                                start: s,
-                                end: e,
-                            },
-                        )
-                    })
-                    .collect();
-                Ok(Value::Array(refs?))
-            }
             "textDocument/prepareRename" => {
                 let (_, (s, e), _) = ide
                     .renamable(file, offset)
                     .map_err(|e| (REQUEST_FAILED, e))?;
                 Ok(protocol::range(&text, s, e))
-            }
-            "textDocument/rename" => {
-                let new_name = params["newName"].as_str().unwrap_or("");
-                let edits = ide
-                    .rename(file, offset, new_name)
-                    .map_err(|e| (REQUEST_FAILED, e))?;
-                let mut changes = serde_json::Map::new();
-                for (f, (s, e)) in edits {
-                    let source = snapshot.sources.get(f);
-                    let uri = protocol::uri_of(Path::new(&source.path));
-                    let edit = json!({ "range": protocol::range(&source.text, s, e), "newText": new_name });
-                    changes
-                        .entry(uri)
-                        .or_insert_with(|| json!([]))
-                        .as_array_mut()
-                        .expect("array")
-                        .push(edit);
-                }
-                Ok(json!({ "changes": changes }))
             }
             _ => Err((-32601, format!("`{method}` is not supported"))),
         }

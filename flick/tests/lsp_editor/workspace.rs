@@ -147,3 +147,84 @@ fn server_names_go_to_the_contract_s_own_files() {
     lsp.close();
     assert!(failed.is_empty(), "{failed:#?}");
 }
+
+#[test]
+fn references_renames_and_symbols_reach_the_members_that_compile_a_library() {
+    let dir = common::example("conduit", "lsp_conduit_members");
+    let api = dir.join("contract/src/Conduit/Api.fl");
+    let routes = dir.join("server/src/Conduit/Server/Routes.fl");
+    let text = fs::read_to_string(&api).expect("Api.fl");
+    let mut lsp = Lsp::start(&dir.join("contract"));
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&api), "languageId": "flick", "version": 1, "text": text } }));
+    let _ = lsp.diagnostics(&uri(&api));
+    let at = position(&text, text.find("let update_user").expect("declared") + 4);
+    let refs = lsp.request(
+        "textDocument/references",
+        &json!({ "textDocument": { "uri": uri(&api) }, "position": at, "context": { "includeDeclaration": true } }),
+    );
+    let uris: Vec<&str> = refs["result"]
+        .as_array()
+        .expect("locations")
+        .iter()
+        .filter_map(|l| l["uri"].as_str())
+        .collect();
+    assert!(uris.contains(&uri(&routes).as_str()), "{uris:?}");
+    assert!(uris.iter().all(|u| !u.contains("node_modules")), "{uris:?}");
+    let renamed = lsp.request(
+        "textDocument/rename",
+        &json!({ "textDocument": { "uri": uri(&api) }, "position": at, "newName": "change_user" }),
+    );
+    let changes = &renamed["result"]["changes"];
+    assert!(changes[uri(&api)].is_array(), "{renamed}");
+    assert_eq!(
+        changes[uri(&routes)].as_array().map(Vec::len),
+        Some(1),
+        "{renamed}"
+    );
+    let symbols = lsp.request("workspace/symbol", &json!({ "query": "settings" }));
+    let main = dir.join("server/src/Conduit/Server/Main.fl");
+    assert!(
+        symbols["result"]
+            .as_array()
+            .expect("symbols")
+            .iter()
+            .any(|s| s["location"]["uri"] == uri(&main)),
+        "{symbols}"
+    );
+    lsp.close();
+}
+
+#[test]
+fn a_library_s_diagnostics_come_from_it_and_a_save_rechecks_its_members() {
+    let dir = common::example("conduit", "lsp_conduit_publish");
+    let api = dir.join("contract/src/Conduit/Api.fl");
+    let routes = dir.join("server/src/Conduit/Server/Routes.fl");
+    let open = |lsp: &mut Lsp, path: &Path, text: &str| {
+        lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(path), "languageId": "flick", "version": 1, "text": text } }));
+    };
+    let mut lsp = Lsp::start(&dir.join("server"));
+    open(
+        &mut lsp,
+        &routes,
+        &fs::read_to_string(&routes).expect("Routes.fl"),
+    );
+    let _ = lsp.publications();
+    let text = fs::read_to_string(&api).expect("Api.fl");
+    let broken = text.replacen("Problem.conflict", "Problem.conflic", 1);
+    open(&mut lsp, &api, &broken);
+    let published = lsp.publications();
+    let of_api: Vec<_> = published.iter().filter(|p| p["uri"] == uri(&api)).collect();
+    // once, by the contract, though the server compiles the module too
+    assert_eq!(of_api.len(), 1, "{published:#?}");
+    assert!(
+        !of_api[0]["diagnostics"]
+            .as_array()
+            .expect("list")
+            .is_empty()
+    );
+    assert!(
+        published.iter().any(|p| p["uri"] == uri(&routes)),
+        "{published:#?}"
+    );
+    lsp.close();
+}
