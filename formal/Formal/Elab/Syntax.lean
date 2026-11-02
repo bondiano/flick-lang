@@ -3,7 +3,8 @@
 
 A model of its own, like `Formal/RT/`: it imports nothing from the core of P1. Constraint
 types are first-order terms; a dictionary term is `d ::= δ | d.$slot | I d̄ | struct_C d̄ |
-prim_Q ℓ̄`, with application as a binary spine.
+prim_Q ℓ̄`, with application as a binary spine. A structural dictionary carries its record type
+and a primitive one its constraint (Р196): the run of the target picks its global by them.
 -/
 
 namespace Flick.Elab
@@ -61,13 +62,15 @@ def Cn.subst (σ : Nat → Ty) (q : Cn) : Cn := ⟨q.cls, q.args.map (·.subst �
 /-- The substitution of a class's parameters `ᾱ := τ̄` (parameters are `var 0 … var (k-1)`). -/
 def params (ts : List Ty) : Nat → Ty := fun n => ts.getD n (.con 0)
 
-/-- Dictionary terms of §2.2; `ap` applies an instance or `struct_C` to a dictionary. -/
+/-- Dictionary terms of §2.2; `ap` applies an instance or `struct_C^τ` to a dictionary.
+`strct C τ` is `struct_C` for the record `τ`, `prim p q` is `prim_q` with the labels `p`
+(Р196). -/
 inductive Dict where
   | var (k : Nat)
   | slot (d : Dict) (i : Nat)
   | inst (I : Nat)
-  | strct (C : Nat)
-  | prim (p : Nat)
+  | strct (C : Nat) (τ : Ty)
+  | prim (p : Nat) (q : Cn)
   | ap (d e : Dict)
 
 /-- `I d̄`, `struct_C d̄`. -/
@@ -78,8 +81,8 @@ def Dict.subst (ρ : Nat → Dict) : Dict → Dict
   | .var k => ρ k
   | .slot d i => .slot (d.subst ρ) i
   | .inst I => .inst I
-  | .strct C => .strct C
-  | .prim p => .prim p
+  | .strct C τ => .strct C τ
+  | .prim p q => .prim p q
   | .ap d e => .ap (d.subst ρ) (e.subst ρ)
 
 /-- The dictionaries `d̄` as the values of `δ₀, δ₁, …`. -/
@@ -134,15 +137,16 @@ inductive Ent (Δ : List Cn) : List Cn → List Dict → Prop
   | nil : Ent Δ [] []
   | cons {Q d qs ds} : Ent Δ [Q] [d] → Ent Δ qs ds → Ent Δ (Q :: qs) (d :: ds)
   | given {Q d} : Clo P Δ d Q → Ent Δ [Q] [d]
-  | prim {Q p} : P.primC Q.cls = true → P.prims Q = some p → Ent Δ [Q] [.prim p]
+  | prim {Q p} : P.primC Q.cls = true → P.prims Q = some p → Ent Δ [Q] [.prim p Q]
   | strct {C τ ts ds} : P.structC C = true → P.fields τ = some ts →
-      Ent Δ (ts.map fun t => ⟨C, [t]⟩) ds → Ent Δ [⟨C, [τ]⟩] [apps (.strct C) ds]
+      Ent Δ (ts.map fun t => ⟨C, [t]⟩) ds → Ent Δ [⟨C, [τ]⟩] [apps (.strct C τ) ds]
   | inst {Q I ins σ ds} : P.insts I = some ins → ins.cls = Q.cls →
       Q.args = ins.head.map (·.subst σ) → Ent Δ (ins.ctx.map (·.subst σ)) ds →
       Ent Δ [Q] [apps (.inst I) ds]
 
 /-- `≈` of §4.2: the least congruence with the slot rule of an instance, and of a structural
-dictionary (Р180). -/
+dictionary (Р180); a structural or primitive dictionary of a type is `≈` the one of its
+instance, as the run erases the type (Р196). -/
 inductive Eqv : Dict → Dict → Prop
   | refl {d} : Eqv d d
   | symm {d e} : Eqv d e → Eqv e d
@@ -153,7 +157,11 @@ inductive Eqv : Dict → Dict → Prop
   | instSlot {I ins i s ds} : P.insts I = some ins → ins.slots[i]? = some s →
       Eqv (.slot (apps (.inst I) ds) i) (s.subst (args ds))
   /-- `(struct_C d̄).$slotᵢ ≈ struct_S (d̄.$slotᵢ)` (Р180) -/
-  | strctSlot {C i S ds} : P.structC C = true → (P.supers C)[i]? = some S →
-      Eqv (.slot (apps (.strct C) ds) i) (apps (.strct S.cls) (ds.map (.slot · i)))
+  | strctSlot {C τ i S ds} : P.structC C = true → (P.supers C)[i]? = some S →
+      Eqv (.slot (apps (.strct C τ) ds) i) (apps (.strct S.cls τ) (ds.map (.slot · i)))
+  /-- `struct_C^τ ≈ struct_C^{τθ}` (Р196) -/
+  | strctSub {C τ ts θ} : P.fields τ = some ts → Eqv (.strct C τ) (.strct C (τ.subst θ))
+  /-- `prim_q ℓ̄ ≈ prim_{qθ} ℓ̄` (Р196) -/
+  | primSub {p q θ} : P.prims q = some p → Eqv (.prim p q) (.prim p (q.subst θ))
 
 end Flick.Elab

@@ -499,9 +499,9 @@ Simplifications:
     parameters (`Names.cls C n`), because the law `slot` holds for any constraint `q`;
     `Prog.super` pads missing parameters with `con 0`, and so does the slot's field. A method
     field binds the method's own variables first (`rot`) and needs the method scheme closed.
-    The translation `Tr` is a relation: `struct_C` and `prim_p` are families over the record
-    type and the constraint, and `Dict` does not show them, so the global is chosen with the
-    type (Р195). `if` is `match c with true → a | _ → b`, and `match e with None → n |
+    `struct_C` and `prim_p` are families over the record type and the constraint, so their
+    dictionary terms carry them, `Dict.strct C τ` and `Dict.prim p q`, and the translation
+    `Tr` picks the global `N.strct C τ` (`N.prim p q`) from the term (Р195, Р196). `if` is `match c with true → a | _ → b`, and `match e with None → n |
     Some y → s` is `match e with Some y → s | _ → n`, exhaustive by `_` without declaring
     `None`. `typingTarget` has an empty run; the run of the core is P4a4.
 
@@ -511,7 +511,7 @@ The owner's decision on Р185 is that T6 goes through the core with regions. λF
 this Lean core plus nominal dictionary records `D_C ᾱ` with `∀`-fields, and captures
 enter the elaboration source and `Target`. This section is the plan for P4a. Each piece
 is committed without `sorry` and builds from a clean `git archive`. The next free Р
-number is Р196.
+number is Р197.
 
 **Status.** Р185–Р187 are recorded in `elaboration.md` §5, and §0.1 and §2.1 are
 updated. P4a1 is done; Р188 records the Prelude schemes. P4a2 is done (Р194). P4a3 is done
@@ -628,11 +628,11 @@ five places.
   *Deviation 1:* `D_{C τ̄} ↦ dict (N.cls C |τ̄|) ⟦τ̄⟧`: the class name carries the number
   of parameters, because the law `slot` holds for any `q` and `Typ.dproj` needs
   `|τ̄| = k`.
-- **Terms** (`CoreTr.lean`). *Deviation 2:* the translation is a relation `Tr N γ δ e e'`,
-  not a function: `struct_C` and `prim_p` are families over the record type and the
-  constraint (`struct_C : D_{C τ₁} →P … →P D_{C τ}` for each `τ`), `Dict` does not show
-  them, and the global (`N.strct C τ`, `N.prim p q`) is chosen with the type (Р195). The
-  rest is a function of the term: `meth`/`slot ↦ proj`, `inst`/`const ↦ glob`,
+- **Terms** (`CoreTr.lean`). *Deviation 2:* `struct_C` and `prim_p` are families over the
+  record type and the constraint (`struct_C : D_{C τ₁} →P … →P D_{C τ}` for each `τ`). P4a3
+  chose the global (`N.strct C τ`, `N.prim p q`) with the type, as `Dict` did not show it
+  (Р195); P4a4 found that this breaks the run (Р196), so `Dict.strct C τ` and
+  `Dict.prim p q` now carry it and `Tr N γ δ e e'` is a function of the term: `meth`/`slot ↦ proj`, `inst`/`const ↦ glob`,
   `lamD l ↦ λ^l` (`lamsC`, the premise `k < l` at `l - 1 - k`, `dext`). *Deviation 3:*
   `ite ↦ match c with true → a | _ → b` and `caseOpt ↦ match e with Some y → s | _ → n`:
   the last arm `_` makes `Covers` immediate, and `None` need not be declared.
@@ -692,10 +692,11 @@ five places.
      under the premises, and the methods; the body of `N.strct C τ` has the slot
      `struct_S (δ̄.$slotᵢ)` (Р180). A lazy instance satisfies `RootTy` only as a
      hypothesis (Р188).
-  2. `load e`: `Tr` is a relation (Р195), so `load` picks a typed translation by choice,
-     `⟨[], [], e''⟩` with `Typ S [] Facts.none [] e'' …`, and `load_rel` relates any two
-     translations of `TmEqv` terms: at a typed position the record type fixes `τ` of a
-     structural global, if `Names` is injective (a hypothesis to add to `Real`).
+  2. `load e := ⟨[], [], e''⟩` with the translation `Tr N id id e e''`, a function of `e`
+     since Р196. Choosing a typed translation does not work: a record type that the type of
+     the whole term does not show is free, and two `≈` terms may pick different structural
+     globals (Р196). The bodies of `N.strct C (τθ)` and `N.strct C τ` (and of
+     `N.prim p (qθ)`, `N.prim p q`) must coincide, for `Eqv.strctSub` and `Eqv.primSub`.
   3. Evaluation of a dictionary: a translation of `apps (inst I) d̄` is a value after its
      arguments, the global and `l` β-steps, because `drec` with any fields is a value. Only a
      projection evaluates a slot field. In an `Ent` derivation `.slot` occurs only on `Clo`

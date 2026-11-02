@@ -126,12 +126,12 @@ structure Target (P : Prog) where
   inst : ∀ {Γ Δ I ins σ φ}, P.insts I = some ins →
     Has Γ Δ (.dict (.inst I))
       (dicts .cnil (ins.ctx.map (·.subst σ)) (.dict ⟨ins.cls, ins.head.map (·.subst σ)⟩)) φ
-  /-- (Struct): `struct_C : D_{C τ₁} →P … →P D_{C τ}` -/
+  /-- (Struct): `struct_C^τ : D_{C τ₁} →P … →P D_{C τ}` -/
   strct : ∀ {Γ Δ C τ ts φ}, P.structC C = true → P.fields τ = some ts →
-    Has Γ Δ (.dict (.strct C)) (dicts .cnil (ts.map fun t => ⟨C, [t]⟩) (.dict ⟨C, [τ]⟩)) φ
+    Has Γ Δ (.dict (.strct C τ)) (dicts .cnil (ts.map fun t => ⟨C, [t]⟩) (.dict ⟨C, [τ]⟩)) φ
   /-- (Prim) -/
   prim : ∀ {Γ Δ q p φ}, P.primC q.cls = true → P.prims q = some p →
-    Has Γ Δ (.dict (.prim p)) (.dict q) φ
+    Has Γ Δ (.dict (.prim p q)) (.dict q) φ
   /-- States of a run, the loading of a term, steps, observable results. -/
   St : Type
   load : Tm → St
