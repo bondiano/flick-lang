@@ -231,6 +231,15 @@ importers:
         specifier: 9.0.1
         version: 9.0.1
 
+  examples/conduit/contract:
+    dependencies:
+      '@flick-lang/runtime':
+        specifier: workspace:*
+        version: link:../../../runtime
+      effect:
+        specifier: 4.0.5
+        version: 4.0.5
+
   runtime:
     dependencies:
       '@effect/platform-browser':

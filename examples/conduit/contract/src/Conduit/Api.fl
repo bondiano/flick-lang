@@ -1,0 +1,249 @@
+/// The endpoints of the Conduit API, shared by the client, which calls them,
+/// and the server, which serves them. Each declares the errors its handler
+/// may answer with; every request carries the optional `Authorization`
+/// header, and the server decides which endpoints need it. The handlers'
+/// services `r` are the server's affair.
+module Conduit.Api exposing (..)
+
+import Conduit.Model exposing (..)
+import Conduit.Input as Input exposing (
+  ArticlePath,
+  CommentPath,
+  Credentials,
+  ListQuery,
+  LoginBody,
+  NewArticleBody,
+  NewCommentBody,
+  NewUserBody,
+  Page,
+  ProfilePath,
+  UpdateArticleBody,
+  UpdateUserBody,
+)
+import Conduit.Problem as Problem exposing (
+  Conflict,
+  Forbidden,
+  NotFound,
+  Unauthorized,
+  Unprocessable,
+)
+
+/// A request of the API: its path, query and body, and the credentials.
+type alias Request p q b = HttpApi.Request p q Credentials b
+
+/// An endpoint at `path` with the credentials header and no other part yet.
+at :
+  forall l r.
+  HttpApi.Method ->
+  String ->
+  Record.Label l ->
+  HttpApi.Endpoint l (Request Unit Unit Unit ->{r; none} Unit)
+let at method path label =
+  HttpApi.endpoint method path label |> HttpApi.with_headers Input.credentials
+
+login :
+  HttpApi.Endpoint "login" (Request Unit Unit LoginBody ->{r; Unauthorized, Unprocessable} UserBody)
+let login =
+  at HttpApi.Post "/api/users/login" (Record.label : Record.Label "login")
+  |> HttpApi.with_payload Input.login_body
+  |> HttpApi.with_success 200 (Codec.json (schema UserBody))
+  |> HttpApi.with_errors
+    (HttpApi.errors
+      |> HttpApi.error_case 401 Problem.unauthorized
+      |> HttpApi.error_case 422 Problem.unprocessable)
+
+register :
+  HttpApi.Endpoint
+    "register"
+    (Request Unit Unit NewUserBody ->{r; Conflict, Unprocessable} UserBody)
+let register =
+  at HttpApi.Post "/api/users" (Record.label : Record.Label "register")
+  |> HttpApi.with_payload Input.new_user_body
+  |> HttpApi.with_success 201 (Codec.json (schema UserBody))
+  |> HttpApi.with_errors
+    (HttpApi.errors
+      |> HttpApi.error_case 409 Problem.conflict
+      |> HttpApi.error_case 422 Problem.unprocessable)
+
+current_user : HttpApi.Endpoint "current_user" (Request Unit Unit Unit ->{r; Unauthorized} UserBody)
+let current_user =
+  at HttpApi.Get "/api/user" (Record.label : Record.Label "current_user")
+  |> HttpApi.with_success 200 (Codec.json (schema UserBody))
+  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 401 Problem.unauthorized)
+
+update_user :
+  HttpApi.Endpoint
+    "update_user"
+    (Request Unit Unit UpdateUserBody ->{r; Unauthorized, Conflict, Unprocessable} UserBody)
+let update_user =
+  at HttpApi.Put "/api/user" (Record.label : Record.Label "update_user")
+  |> HttpApi.with_payload Input.update_user_body
+  |> HttpApi.with_success 200 (Codec.json (schema UserBody))
+  |> HttpApi.with_errors
+    (HttpApi.errors
+      |> HttpApi.error_case 401 Problem.unauthorized
+      |> HttpApi.error_case 409 Problem.conflict
+      |> HttpApi.error_case 422 Problem.unprocessable)
+
+/// The errors of a request about a resource: refused credentials, or none.
+missing : HttpApi.ErrorCases {Unauthorized, NotFound}
+let missing =
+  HttpApi.errors
+  |> HttpApi.error_case 401 Problem.unauthorized
+  |> HttpApi.error_case 404 Problem.not_found
+
+/// The errors of a change to someone's resource.
+owned : HttpApi.ErrorCases {Unauthorized, Forbidden, NotFound}
+let owned =
+  HttpApi.errors
+  |> HttpApi.error_case 401 Problem.unauthorized
+  |> HttpApi.error_case 403 Problem.forbidden
+  |> HttpApi.error_case 404 Problem.not_found
+
+get_profile :
+  HttpApi.Endpoint
+    "get_profile"
+    (Request ProfilePath Unit Unit ->{r; Unauthorized, NotFound} ProfileBody)
+let get_profile =
+  at HttpApi.Get "/api/profiles/:username" (Record.label : Record.Label "get_profile")
+  |> HttpApi.with_path Input.profile_path
+  |> HttpApi.with_success 200 (Codec.json (schema ProfileBody))
+  |> HttpApi.with_errors missing
+
+follow :
+  HttpApi.Endpoint
+    "follow"
+    (Request ProfilePath Unit Unit ->{r; Unauthorized, NotFound} ProfileBody)
+let follow =
+  at HttpApi.Post "/api/profiles/:username/follow" (Record.label : Record.Label "follow")
+  |> HttpApi.with_path Input.profile_path
+  |> HttpApi.with_success 200 (Codec.json (schema ProfileBody))
+  |> HttpApi.with_errors missing
+
+unfollow :
+  HttpApi.Endpoint
+    "unfollow"
+    (Request ProfilePath Unit Unit ->{r; Unauthorized, NotFound} ProfileBody)
+let unfollow =
+  at HttpApi.Delete "/api/profiles/:username/follow" (Record.label : Record.Label "unfollow")
+  |> HttpApi.with_path Input.profile_path
+  |> HttpApi.with_success 200 (Codec.json (schema ProfileBody))
+  |> HttpApi.with_errors missing
+
+list_articles :
+  HttpApi.Endpoint "list_articles" (Request Unit ListQuery Unit ->{r; Unauthorized} ArticlesBody)
+let list_articles =
+  at HttpApi.Get "/api/articles" (Record.label : Record.Label "list_articles")
+  |> HttpApi.with_query Input.list_query
+  |> HttpApi.with_success 200 (Codec.json (schema ArticlesBody))
+  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 401 Problem.unauthorized)
+
+feed : HttpApi.Endpoint "feed" (Request Unit Page Unit ->{r; Unauthorized} ArticlesBody)
+let feed =
+  at HttpApi.Get "/api/articles/feed" (Record.label : Record.Label "feed")
+  |> HttpApi.with_query Input.page
+  |> HttpApi.with_success 200 (Codec.json (schema ArticlesBody))
+  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 401 Problem.unauthorized)
+
+get_article :
+  HttpApi.Endpoint
+    "get_article"
+    (Request ArticlePath Unit Unit ->{r; Unauthorized, NotFound} ArticleBody)
+let get_article =
+  at HttpApi.Get "/api/articles/:slug" (Record.label : Record.Label "get_article")
+  |> HttpApi.with_path Input.article_path
+  |> HttpApi.with_success 200 (Codec.json (schema ArticleBody))
+  |> HttpApi.with_errors missing
+
+create_article :
+  HttpApi.Endpoint
+    "create_article"
+    (Request Unit Unit NewArticleBody ->{r; Unauthorized, Unprocessable} ArticleBody)
+let create_article =
+  at HttpApi.Post "/api/articles" (Record.label : Record.Label "create_article")
+  |> HttpApi.with_payload Input.new_article_body
+  |> HttpApi.with_success 201 (Codec.json (schema ArticleBody))
+  |> HttpApi.with_errors
+    (HttpApi.errors
+      |> HttpApi.error_case 401 Problem.unauthorized
+      |> HttpApi.error_case 422 Problem.unprocessable)
+
+update_article :
+  HttpApi.Endpoint
+    "update_article"
+    (Request ArticlePath Unit UpdateArticleBody ->{r; Unauthorized, Forbidden, NotFound, Unprocessable}
+      ArticleBody)
+let update_article =
+  at HttpApi.Put "/api/articles/:slug" (Record.label : Record.Label "update_article")
+  |> HttpApi.with_path Input.article_path
+  |> HttpApi.with_payload Input.update_article_body
+  |> HttpApi.with_success 200 (Codec.json (schema ArticleBody))
+  |> HttpApi.with_errors (owned |> HttpApi.error_case 422 Problem.unprocessable)
+
+delete_article :
+  HttpApi.Endpoint
+    "delete_article"
+    (Request ArticlePath Unit Unit ->{r; Unauthorized, Forbidden, NotFound} Unit)
+let delete_article =
+  at HttpApi.Delete "/api/articles/:slug" (Record.label : Record.Label "delete_article")
+  |> HttpApi.with_path Input.article_path
+  |> HttpApi.with_errors owned
+
+favorite :
+  HttpApi.Endpoint
+    "favorite"
+    (Request ArticlePath Unit Unit ->{r; Unauthorized, NotFound} ArticleBody)
+let favorite =
+  at HttpApi.Post "/api/articles/:slug/favorite" (Record.label : Record.Label "favorite")
+  |> HttpApi.with_path Input.article_path
+  |> HttpApi.with_success 200 (Codec.json (schema ArticleBody))
+  |> HttpApi.with_errors missing
+
+unfavorite :
+  HttpApi.Endpoint
+    "unfavorite"
+    (Request ArticlePath Unit Unit ->{r; Unauthorized, NotFound} ArticleBody)
+let unfavorite =
+  at HttpApi.Delete "/api/articles/:slug/favorite" (Record.label : Record.Label "unfavorite")
+  |> HttpApi.with_path Input.article_path
+  |> HttpApi.with_success 200 (Codec.json (schema ArticleBody))
+  |> HttpApi.with_errors missing
+
+list_comments :
+  HttpApi.Endpoint
+    "list_comments"
+    (Request ArticlePath Unit Unit ->{r; Unauthorized, NotFound} CommentsBody)
+let list_comments =
+  at HttpApi.Get "/api/articles/:slug/comments" (Record.label : Record.Label "list_comments")
+  |> HttpApi.with_path Input.article_path
+  |> HttpApi.with_success 200 (Codec.json (schema CommentsBody))
+  |> HttpApi.with_errors missing
+
+add_comment :
+  HttpApi.Endpoint
+    "add_comment"
+    (Request ArticlePath Unit NewCommentBody ->{r; Unauthorized, NotFound, Unprocessable}
+      CommentBody)
+let add_comment =
+  at HttpApi.Post "/api/articles/:slug/comments" (Record.label : Record.Label "add_comment")
+  |> HttpApi.with_path Input.article_path
+  |> HttpApi.with_payload Input.new_comment_body
+  |> HttpApi.with_success 201 (Codec.json (schema CommentBody))
+  |> HttpApi.with_errors (missing |> HttpApi.error_case 422 Problem.unprocessable)
+
+delete_comment :
+  HttpApi.Endpoint
+    "delete_comment"
+    (Request CommentPath Unit Unit ->{r; Unauthorized, Forbidden, NotFound} Unit)
+let delete_comment =
+  at
+    HttpApi.Delete
+    "/api/articles/:slug/comments/:id"
+    (Record.label : Record.Label "delete_comment")
+  |> HttpApi.with_path Input.comment_path
+  |> HttpApi.with_errors owned
+
+tags : HttpApi.Endpoint "tags" (Request Unit Unit Unit ->{r;} TagsBody)
+let tags =
+  at HttpApi.Get "/api/tags" (Record.label : Record.Label "tags")
+  |> HttpApi.with_success 200 (Codec.json (schema TagsBody))

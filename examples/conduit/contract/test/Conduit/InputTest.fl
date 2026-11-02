@@ -1,0 +1,58 @@
+/// The wire forms of the contract: requests decode with every field
+/// optional, so the server can answer a missing one with 422, an update
+/// tells a missing field from an explicit `null`, and errors are written in
+/// RealWorld's `{"errors": {…}}` body.
+module Conduit.InputTest exposing (tests)
+
+import Conduit.Input as Input
+import Conduit.Problem as Problem exposing (Unprocessable(..))
+
+/// `text` decoded by `wire`, or the error's text.
+decode : PureCodec Json a -> String -> Result String a
+let decode wire text =
+  match Json.parse text with
+  | Ok value ->
+    match Codec.decode_result wire value with
+    | Ok decoded -> Ok decoded
+    | Err e -> Err (show e)
+  | Err e -> Err (show e)
+
+/// `value` written by `wire` as JSON text.
+encode : PureCodec Json a -> a -> String
+let encode wire value =
+  match Codec.encode_result wire value with
+  | Ok json -> Json.stringify json
+  | Err e -> show e
+
+tests : List Test.Test
+let tests = [
+  Test.test "a registration with fields missing still decodes" (fun () ->
+    Test.equal
+      (Ok { username = Some "ada"; email = None; password = None })
+      (Result.map
+        (fun b -> b.user)
+        (decode Input.new_user_body "{\"user\":{\"username\":\"ada\"}}"))
+  ),
+  Test.test "an update tells a missing bio from a null one" (fun () ->
+    bio : String -> Result String (Option (Option String))
+    let bio text = Result.map (fun b -> b.user.bio) (decode Input.update_user_body text)
+    Test.all [
+      Test.equal (Ok None) (bio "{\"user\":{\"email\":\"a@b.c\"}}"),
+      Test.equal (Ok (Some None)) (bio "{\"user\":{\"bio\":null}}"),
+      Test.equal (Ok (Some (Some "hi"))) (bio "{\"user\":{\"bio\":\"hi\"}}"),
+    ]
+  ),
+  Test.test "the list query reads its numbers from texts" (fun () ->
+    Test.equal
+      (Ok { tag = Some "dragons"; author = None; favorited = None; limit = Some 5; offset = None })
+      (decode Input.list_query "{\"tag\":\"dragons\",\"limit\":\"5\"}")
+  ),
+  Test.test "a request without the header is anonymous" (fun () ->
+    Test.equal (Ok { authorization = None }) (decode Input.credentials "{}")
+  ),
+  Test.test "an error is written as RealWorld's errors body" (fun () ->
+    Test.equal
+      "{\"errors\":{\"email\":[\"can't be blank\"]}}"
+      (encode Problem.unprocessable (Unprocessable (Problem.problem "email" "can't be blank")))
+  ),
+]

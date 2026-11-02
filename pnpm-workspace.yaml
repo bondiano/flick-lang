@@ -7,5 +7,6 @@ packages:
   - tools/load
   - docs
   - editors/vscode
+  - examples/conduit/contract
 overrides:
   "@effect/platform-node-shared": 4.0.5

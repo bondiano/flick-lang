@@ -394,7 +394,7 @@ component search (props : SearchProps) =
 - AC: пакет с `"flick": { "source-dir": … }` в `package.json` компилируется каждым зависимым проектом под его таргет (js или go) как модули этого пакета, поэтому теги конструкторов совпадают на обеих сторонах.
 - AC: фикстура: JS-клиент и Go-сервер импортируют одну библиотеку, значение суммы и записи проходит по `HttpApi` туда и обратно с одинаковыми тегами; модуль пакета с импортом только для js в Go-проекте — `P030`.
 
-**W2. Сборка workspace.** ⬜
+**W2. Сборка workspace.** 🔶 (`examples/conduit/contract` в корневом `pnpm-workspace.yaml`, `@flick-lang/runtime` — `workspace:*`; сервер и клиент — с W21 и W24)
 - AC: пакеты `examples/conduit/*` в `pnpm-workspace.yaml`; библиотека собирается раньше зависимых; связка pnpm `workspace:` доходит до `node_modules/<pkg>`, как ждёт загрузчик; рецепты `just` для примера.
 
 **W3. `Crypto.hmac` и байты строки.** ✅ (`Crypto.hmac` — HMAC на Flick поверх `digest`, без нового кода рантайма; модуль `Bytes`: `from_string`/`to_string` — UTF-8 (одиночный суррогат — U+FFFD, как `TextEncoder`; не UTF-8 — `None`), `to_base64url`/`from_base64url`, `equal` за время, зависящее только от длин; run-кейс `stdlib/effect/hmac` на векторах RFC 4231 на обоих таргетах)
@@ -441,8 +441,8 @@ component search (props : SearchProps) =
 - AC: `[lint]` с жёсткими `max-function-*` и `no-let-assert`; `check --warnings-as-errors` и `fmt --check` для contract, server и client в `flick/tests/examples.rs`.
 - AC: каждое правило, которого не хватило при написании, — отдельный пункт W17+ с кодом в `diagnostics/codes.rs` и фикстурой.
 
-**W20. Контракт.** ⬜ (после W1)
-- AC: `Conduit.Types`, `Conduit.Errors`, `Conduit.Api` — уточнённые `Email`/`Username`/`Slug`, записи, точки `HttpApi` по `openapi.yml`; OpenAPI из контракта сверен со спецификацией.
+**W20. Контракт.** ✅ (`examples/conduit/contract`, пакет с исходниками `@conduit/contract`: `Conduit.Model` — ответы как на проводе, `Conduit.Input` — запросы, где каждое поле может отсутствовать, чтобы сервер отвечал 422 по полю, а обновление отличало отсутствие от `null`; `Conduit.Problem` — ошибки 401/403/404/409/422 с телом RealWorld через `Codec.entries`; `Conduit.Api` — 18 точек `HttpApi` с заголовком `Authorization`, сервисы обработчиков — забота сервера, поэтому `with_auth` навешивает сервер; тесты кодеков на js и go)
+- AC: `Conduit.Model`, `Conduit.Input`, `Conduit.Problem`, `Conduit.Api` — записи и точки `HttpApi` по `openapi.yml`; проверка тел ошибок и терпимого разбора запросов на обоих таргетах. Сверка OpenAPI со спецификацией — при W23, когда сервер соберёт API с `with_auth`.
 
 **W21–W23. Сервер.** ⬜ (после W3–W8, W20)
 - AC: схема, миграции, репозитории за сервисом (Postgres и `Ref` в памяти); auth, users, profiles; articles, feed, favorites, comments, tags. Чистое ядро (slug, пагинация, проверки) без `Eff`, property-тесты; весь официальный набор Hurl проходит против Go-сервера с Postgres в Docker.

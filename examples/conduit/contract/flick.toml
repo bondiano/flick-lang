@@ -1,0 +1,9 @@
+schema-version = 1
+
+# The contract between the Conduit client and server: the types on the wire
+# and the endpoints of the API. A source package: the client compiles it for
+# js and the server for go.
+[project]
+kind = "lib"
+source-dir = "src"
+test-dir = "test"
