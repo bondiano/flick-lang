@@ -2,41 +2,59 @@
 
 A mechanization of the core calculus in [`docs/formal/core.md`](../docs/formal/core.md),
 extended in place with the regions and captures of
-[`docs/formal/regions.md`](../docs/formal/regions.md), and, separately, of the runtime
+[`docs/formal/regions.md`](../docs/formal/regions.md); separately, of the runtime
 contract λRT in [`docs/formal/runtime.md`](../docs/formal/runtime.md)
-(`Formal/RT/`, see [λRT and T5](#λrt-and-t5)). Lean 4.29.1, no Mathlib.
+(`Formal/RT/`, see [λRT and T5](#λrt-and-t5)); and of the elaboration of classes into
+dictionaries in [`docs/formal/elaboration.md`](../docs/formal/elaboration.md)
+(`Formal/Elab/`, see [Elaboration and T6](#elaboration-and-t6)). Lean 4.29.1
+(`lean-toolchain`), no Mathlib.
+
+## Building
 
 ```sh
 cd formal
 lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 ```
 
-`--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
-command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
+`--wfail` makes a `sorry` (reported as a warning) fail the build. CI runs the same build
+in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
+
+`Formal/Elab/PreludeSchemes.lean` is generated from the checker:
+`just formal-schemes` rewrites it, and a golden test of `cargo test -p flick-model`
+(`flick-model/src/translate/lean.rs`) fails when it is stale.
+
+## What is proved
+
+- **The core** (`Formal/`, the top-level modules): type soundness `T1` (Progress and
+  Preservation over every reachable configuration), `T2a` (a pure computation makes only
+  pure steps) and `T2b` (a runtime computation asks only the services and raises only the
+  errors of its row), `lemma_3_1` and `T3` (generalization and the store typing), `T4` (T4.1, T4.2: live work reaches only live
+  regions), `T4_3` (no service of an ended `provide` is used) and `T1_regions` (`T1` with
+  `op_H`, without the blocked outcome of a step that needs a region that is not live or a
+  service of an ended `provide`, which `T4` and `T4_3` rule out).
+- **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
+  interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
+  R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
+- **T6, the elaboration** (`Formal/Elab/`): `T6a` (`Elab/T6a.lean`), an elaborated term is
+  typed in the target, and `T6b` (`Elab/Coherence.lean`), two elaborations that differ only
+  in the derivations of their dictionaries give the same result. Both are stated for an
+  abstract target and instantiated on the core with regions and dictionary records as
+  `T6a_core` (`Elab/CoreT6a.lean`) and `T6b_core` (`Elab/CoreRun.lean`), the latter with the
+  run of the core itself.
+- **The hypotheses of T6 are satisfiable** (`Formal/Elab/Witness/`): one concrete program
+  meets all of them, and `witness_T6a`, `witness_T6b` (`Witness/Main.lean`),
+  `witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` (`Witness/T6b.lean`)
+  are T6 on it, the last three without premises of typing.
+
+`#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
 `T4_3`, `T1_regions`, `T5`, `T6a`, `T6a_core`, `T6a_close`, `T6b`, `T6b_core`,
 `witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` lists only Lean's standard `propext`,
 `Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
 (`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
 
-## Status
-
-| Stage | Scope | State |
-| - | - | - |
-| P1a | λ, `let` without generalization, `let rec`, `match` with exhaustiveness and guards, records, `Ref` and the store | done |
-| P1b | stages `P`/`R⟨r;ε⟩` and subtyping, closed rows, `raise`/`try`/`handle`, `task`/`await`, `ask`/`with`/`provide` and layers; Л1–Л3, Progress, Preservation, T1, T2(a), T2(b) | done |
-| P1c | type variables and schemes, (Let-Gen) with the premise `P`, Л2 for schemes, lemma 3.1, T3 | done |
-| P2a | regions and capture sets as atoms, `⌈·⌉` and its commutation with substitution, qualifiers on arrows and `Eff`, (≤-Cap), nominal types with parameters, schemes over variables of every kind with facts `Θ`, (Lam)/(Task) with what the body holds, (Scope), the run-time forms `inside`/`cap`/`own`, `open_H`, `op_H`, `Scope.add_finalizer`, `Fiber.spawn`; regions `Λ` with children and finalizers, closing; Л4 without the store, T1–T3 again | done |
-| P2b | Л3 under a substitution that fits the term (`Refill`), the renaming of regions not yet created (`kill`), `reach_μ` and Л4 through the store | done |
-| P2b′ | the freshness premises of (Inside) with its own facts, the facts of the order of creation (`Facts.age`), the renaming in every step, a configuration writes only regions that exist; Л6 | done |
-| P2c | Л5, the invariant `⊢ Λ` (live work reaches only live regions), T4.1, T4.2, T1 with `op_H` | done |
-| P2c′1 | Р37 in the model: the region of `provide`, `with` frames with it, children and finalizers inheriting the frames, the use of a service of an ended `provide` stuck; obligations `Provided {S} ϱ` in rows, discharged by `with` frames, by the end of a region and by `provide`, deferred in rows; T1–T3, T4.1, T4.2 again | done |
-| P2c′2 | T4.3: no use of a service of an ended `provide` (`T4_3`), T1 with `op_H` without that stuck state | done |
-| P4a2 | λFlick⁺: dictionary records `D_C ā` with `∀`-fields, projection with instantiation, globals with their bodies in `root`; T1–T4, T4.3 again | done |
-| P4a3 | the core as an instance of `Target`: the translation of types and terms, `Has` through `Typ`, each law one rule of the core under `Real`; T6(a) and its sugar forms for the core | done |
-
-T4.3 is the premise Г11 of T5 in the form Р142 gives it: an `ask_S` answered by a `with`
+T4.3 is the premise G11 of T5 in the form [the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives) gives it: an `ask_S` answered by a `with`
 frame of the region `q` of a `provide`, inherited or not, happens only while `q` is live.
-Its Lean statement (`T43Main.lean`), which `G11` in `Formal/RT/Hyp.lean` is to match:
+Its Lean statement (`T43Main.lean`), the counterpart of `G11` in `Formal/RT/Hyp.lean`:
 
 ```lean
 theorem T4_3 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
@@ -65,26 +83,26 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | §2.1 `⊑`, §2.2 `≤`, (≤-Cap) | `Stage.le`, `Le` (`Syntax.lean`, `Typing.lean`, `Order.lean`); `Le.reach` |
 | `core.md` §2.3, §3.6 rules; `regions.md` §2.3–§2.5, §3.4 | `Typ` (`Rules.lean`) |
 | (Sub) | admissible: `Typ.sub` (`SubAdm.lean`) |
-| §2.4 patterns, `Exh`; (Match-Val), Р29 | `PatTy`, `Shp`, `Exh`, `Covers` (`Typing.lean`) |
+| §2.4 patterns, `Exh`; (Match-Val), [Match-Val: a value needs only its own coverage](../docs/formal/core.md#the-residual-match-after-a-false-guard-fails-exh) | `PatTy`, `Shp`, `Exh`, `Covers` (`Typing.lean`) |
 | (Try), (Handle) | `HPat`, `Catches`, `HCov`; `tryR`, `tryP`, `handle` |
 | §3.6 `⊢ μ : Ψ`; §2.6 `Σ₀` | `StoreTy`, `RootTy` (`Rules.lean`) |
 | `core.md` §3.2 contexts, `lookup(E, S)`; the frame `inside π E` | `Frame`, `plug`, `lookupE` (`Semantics.lean`) |
 | `core.md` §3.3 `→ₚ`; §3.4–3.5 steps; `regions.md` §3.2–§3.3 | `PHead`, `RHead`, `Step`, `Steps` (`Semantics.lean`) |
 | `regions.md` §3.1 `Λ`, children step at any time | `Rgn`, `Cfg`, `CStep`, `CSteps` (`Semantics.lean`) |
 | lemma about `build` | `canonical_layer` (`CanonLayer.lean`) |
-| Л1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_owner`, `canonical_hnd`, `canonical_env`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `CanonEnv.lean`, `Canonical.lean`) |
+| L1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_owner`, `canonical_hnd`, `canonical_env`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `CanonEnv.lean`, `Canonical.lean`) |
 | (Let-Gen), (Let-Mono) | `Typ.letGen`, `Typ.let_` (`Rules.lean`) |
 | type substitution lemma | `Typ.substT`, with `Fits` (`TySubst.lean`, `SubstPat.lean`) |
-| Л2 | `Typ.subst`, `Typ.instantiate`, `SubOk.one` (`Substitution.lean`) |
-| Л3 | `ctx_typing` (`Lemma3.lean`); its `Refill` holds after any substitution that fits the term (`Context.lean`) |
-| Л4 without the store: a value holds no more than its type shows | `Typ.holds` (`Held.lean`) |
-| §5.2 `reach_μ`; Л4 | `Reaches`; `lemma_4`, `lemma_4_cell` (`Lemma4.lean`) |
+| L2 | `Typ.subst`, `Typ.instantiate`, `SubOk.one` (`Substitution.lean`) |
+| L3 | `ctx_typing` (`Lemma3.lean`); its `Refill` holds after any substitution that fits the term (`Context.lean`) |
+| L4 without the store: a value holds no more than its type shows | `Typ.holds` (`Held.lean`) |
+| §5.2 `reach_μ`; L4 | `Reaches`; `lemma_4`, `lemma_4_cell` (`Lemma4.lean`) |
 | regions not yet created, renamed away; facts of the order of creation | `kill`, `Ty.YF`, `Tm.Below`, `Facts.age` (`Fresh.lean`, `Rules.lean`) |
 | (Scope) and (Inside) in a run-time configuration | `RtCtx`, `scope_body`, `inside_entails` (`ScopeStep.lean`) |
 | a configuration writes only regions that exist | `CfgBelow`, `Step.below` (`Below.lean`, `BelowStep.lean`) |
-| Л6 | `lemma_6` (`Lemma4.lean`); the invariant of a configuration: `CfgTy` (`Soundness.lean`) |
+| L6 | `lemma_6` (`Lemma4.lean`); the invariant of a configuration: `CfgTy` (`Soundness.lean`) |
 | §3.4 `⊢ Λ`: where a region may be written, the ancestors of a region | `Tm.Within`, `LocOk`, `Nest` (`Within.lean`, `Nest.lean`); kept by every step: `Nest.step`, `Nest.cstep` (`NestMain.lean`, `Regions.lean`) |
-| Л5 | `Nest.nested` (`NestClose.lean`); in every reached configuration: `reach_nest`, `Nest.live` (`Regions.lean`) |
+| L5 | `Nest.nested` (`NestClose.lean`); in every reached configuration: `reach_nest`, `Nest.live` (`Regions.lean`) |
 | §2.7 obligations `{Provided {S} ϱ}`, uses of a service of a `provide` | `Elem.ob`, `Elem.need`; `Row.obs` in `Const.ty` of `spawn`/`addFin` (`Syntax.lean`); `Row.withP`, `Row.disch`, `Row.needs` in `Typ.with_`, `Typ.scope`, `Typ.inside`, `Typ.provideL`/`provideE` (`Rules.lean`) |
 | the region of `provide`; a service of an ended `provide` | `RHead.provideEnv`, `Tm.with_ q θ e`, the premise `Live Λ q` of `Step.askWith` (`Semantics.lean`); `DeadAsk` (`StepFrame.lean`) |
 | runtime.md §3.5: a child and a finalizer keep the `with` frames | `withs`, `Step.spawn`, `Step.addFin` (`Semantics.lean`); their typing `withs_typing`, `fin_await` (`KidTy.lean`) |
@@ -128,7 +146,7 @@ facts `Θ`. Terms carry no types (Curry style), so a type substitution changes t
 and not the term; constants carry no instance either, (Const) picks it (`CArg`).
 (Let-Gen) types its right-hand side with `Γ`, `Θ` and `Ψ` shifted by `k` (`Ty.up k`) and
 the facts of the scheme assumed: the generalized variables are fresh by construction,
-which is `ᾱ ∉ ftv(Γ) ∪ ftv(Ψ)` of `Gen` and Л2. (Scope) does the same with one variable,
+which is `ᾱ ∉ ftv(Γ) ∪ ftv(Ψ)` of `Gen` and L2. (Scope) does the same with one variable,
 its region `s`, so `s ∉ fr(Γ)`, `s ∉ fr(τ)`, `s ∉ fr(r)` and `s ∉ fr(ε)` hold by
 construction; its body has `s : Owner s` and the fact that everything outside outlives
 `s`. A step of `scope` substitutes `rg π` for `s` and `own π` for the owner.
@@ -153,8 +171,8 @@ and inversion stays a plain `cases`. (≤-Cap) is a premise of `Le.arrow` and `L
 
 The premise of (Lam), (Task) and the fixpoint is `held Ψ Γ e ⊆ ⌈τ^C⌉`: `⌈Γ(y)⌉` of each
 free `y`, and also the run-time regions the body writes down and the cell types of its
-locations (Р141). The substitution lemma keeps it because a substituted value holds no
-more than its scheme shows (`Typ.holds`, the part of Л4 without the store).
+locations ([Lam and Task count runtime forms](../docs/formal/regions.md#lam-and-task-count-runtime-forms)). The substitution lemma keeps it because a substituted value holds no
+more than its scheme shows (`Typ.holds`, the part of L4 without the store).
 
 A thread steps in `⟨Λ, μ, e⟩`. `Λ` is a list of regions: live or closed, children and
 finalizers, both computations. A configuration is a main thread with `Λ` and `μ`, and
@@ -196,7 +214,7 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 7. **`try` arms** are `x`/`_` at `Errors ε_b` or a constructor pattern `E p̄` at an error
    type `E` without parameters. `H` is a judgment index: each arm without `when` may add
    what it catches (`Catches`), names only. (Handle) uses the value form of the coverage
-   premise (Р102); what the caught errors reach passes to the errors it lets through.
+   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the caught errors reach passes to the errors it lets through.
 8. **Environments.** `Env ρ` means "binds exactly `ρ`", as (Env), (Bind) and (Join)
    give it: T4.3 needs that a `with` frame answers `S` exactly when its row has `S`. `with θ e` and `econs` require
    `θ` and the bound values to be values. The disjointness of `Layer.merge` is kept
@@ -205,18 +223,18 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    `π = Λ.length`.
 10. **Programs** are closed terms typed in the empty store with no facts; modules
     (`core.md` §2.6, path 4 of `regions.md` §4) are not modeled. `Σ₀` and the bodies of the
-    globals of λFlick⁺ are a parameter `root : Roots` with `RootTy`; Г3 is the hypothesis of `T1` that `Σ₀` covers the services of the program's
+    globals of λFlick⁺ are a parameter `root : Roots` with `RootTy`; G3 is the hypothesis of `T1` that `Σ₀` covers the services of the program's
     stage. Progress reports an `ask_S` that neither a `with` frame nor `Σ₀` answers
-    (`AskStuck`) instead of assuming Г3.
-11. **Л3** is stated as `ERel`: the hole's services are within those of the context, of
+    (`AskStuck`) instead of assuming G3.
+11. **L3** is stated as `ERel`: the hole's services are within those of the context, of
     its `with` frames and the `Scope π` of its `inside` frames, its errors grow only under
     a `try` frame, and a pure context has a pure hole. Under `K` right-hand sides of
     (Let-Gen) the hole is typed `K` variables deep, with `Ψ` and `Θ` shifted and the facts
     of the schemes assumed, and is pure.
 12. **Steps carry labels** (`Lbl`): pure, runtime, or `root S` for an `ask_S` answered by
     `Σ₀`; T2(b) is about the `root` labels. `todo → die` is labelled pure, as T2(a) allows
-    `die`; `bind_S` and `join` steps are pure (Р101).
-13. **Cell types may be open** (Р103). `Ψ(ℓ)` is a monotype that may mention free type
+    `die`; `bind_S` and `join` steps are pure ([bind_S and join steps are pure](../docs/formal/core.md#bind_s-and-join-steps-are-pure)).
+13. **Cell types may be open** ([store types are ungeneralized monotypes](../docs/formal/core.md#a-store-typing-of-closed-types-is-not-preserved)). `Ψ(ℓ)` is a monotype that may mention free type
     variables of the configuration's derivation; (Let-Gen) shifts `Ψ`, so it never
     generalizes them.
 14. **T3** is stated as: reachable configurations are typed at the program's type, the
@@ -227,9 +245,9 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     (App-Pure) are not modeled: both let the checker accept more programs, and `Ref.*`
     instantiate the cell type directly, which keeps it invariant. The hidden qualifier of
     data with hidden storage is a parameter of kind `CRow` of its type, so (Con) and
-    (Proj) are (App) and (Match) at an instance (Р61).
+    (Proj) are (App) and (Match) at an instance ([Con field premise ignores field qualifier](../docs/formal/regions.md#the-field-premise-of-con-ignores-the-field-qualifier)).
 16. **Capabilities and constants.** `H ϱ̄ τ̄` is one family `hnd ϱ` with one region;
-    `open_H` takes the owner of its region and nothing else (Г6: the region is explicit)
+    `open_H` takes the owner of its region and nothing else (G6: the region is explicit)
     and registers the use that releases it; `op_H` returns `()`; `cap π` has no index `n`.
     `Fiber.spawn` has no supervisor and returns `()`: there is no `join`; a child does
     not inherit the services of the context that spawns it (λRT's). A finalizer runs as a
@@ -286,31 +304,28 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 
 ## Findings
 
-- **Р100** (P1a): a partially applied constructor is a value, and Л1 for an arrow type
+Mechanizing the core found these errors in the calculus; each is fixed in the document
+that states the rule.
+
+- [a partial constructor application is a value](../docs/formal/core.md#a-partial-constructor-application-is-a-value): a partially applied constructor is a value, and L1 for an arrow type
   has to list it (`Value.ctorApp`, `canonical_arrow`).
-- **Р101** (P1b): `bind_S` and `join` steps were runtime steps while their rules are
-  pure, so T2(a) failed for a bare `bind_S v`; they are pure steps now.
-- **Р102** (P1b): (Handle) asked for the whole row `ε_b ⊆ H + ε'`, which a failed arm
-  breaks; it now asks for the error of the value only, as `flick-model` already did.
-- **Р103** (P1c): closed cell types and a fixed program type cannot both hold; cell types
+- [bind_S and join steps are pure](../docs/formal/core.md#bind_s-and-join-steps-are-pure): `bind_S` and `join` steps were runtime steps while their rules are
+  pure, so T2(a) failed for a bare `bind_S v`; they are pure steps.
+- [Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch): (Handle) asked for the whole row `ε_b ⊆ H + ε'`, which a failed arm
+  breaks; it asks for the error of the value only, as `flick-model` does.
+- [store types are ungeneralized monotypes](../docs/formal/core.md#a-store-typing-of-closed-types-is-not-preserved): closed cell types and a fixed program type cannot both hold; cell types
   are monotypes with possibly free variables, and `Gen` excludes `ftv(Ψ)`.
-- **Р140** (P2a): (Spawn) bounded only the hidden qualifier `C` of the child; the child
+- [Spawn bounds everything the task holds](../docs/formal/regions.md#spawn-bounds-everything-the-task-holds): (Spawn) bounded only the hidden qualifier `C` of the child; the child
   also holds what its result shows. The premise is `Outlives (C ∪ ⌈a⌉) ϱ` (`Const.ok`);
-  the checker already checks it (`regions.md` §6).
-- **Р141** (P2a): the premise of (Lam)/(Task) must count the run-time regions and cell
-  types written in the body, or Л4 fails for `λx. (λy. ()) (cap π n)` (`held`,
+  the checker checks it (`regions.md` §6).
+- [Lam and Task count runtime forms](../docs/formal/regions.md#lam-and-task-count-runtime-forms): the premise of (Lam)/(Task) must count the run-time regions and cell
+  types written in the body, or L4 fails for `λx. (λy. ()) (cap π n)` (`held`,
   `regions.md` §6).
 
 ## λRT and T5
 
 `Formal/RT/` is a model of its own: it imports nothing from the core above, and the core
 is a parameter of it.
-
-| Stage | Scope | State |
-| - | - | - |
-| P3a | causes: `⊕`, `⧺`, `head`, `recover`, I_ε; R8, R5 | done |
-| P3b | configurations, steps §3.2–§3.6, the closing C0–C6 by phases; И1–И3; R1–R4 | done |
-| P3c | layers and memo maps, `Ref`; И6, R6 (with Г11), R7; T5 | done |
 
 | `runtime.md` | Lean |
 | - | - |
@@ -326,17 +341,17 @@ is a parameter of it.
 | what the libraries decide | `Lib` (`RT/Config.lean`) |
 | §3.1–§3.6 steps | `Local` (`RT/Local.lean`), `Step` (`RT/Step.lean`), `Steps`, `Reach` (`RT/Reach.lean`) |
 | §3.3 C0–C6 | `Step.close`, `.hookCode`, `.hookStop`, `.stopDone`, `.kids`, `.kidsDone`, `.fins`, `.finCode`, `.finObs`, `.finObsLast`, `.closed`, `.absorbH`, `.absorbF` |
-| §5 Г7(а)–(ж) but (в), Г8, Г9 | `Hyp` (`RT/Hyp.lean`) |
+| §5 G7(a)–(g) but (c), G8, G9 | `Hyp` (`RT/Hyp.lean`) |
 | invariants of reachable configurations | `Inv`, `Inv.step`, `Inv.reach` (`RT/Inv.lean`, `RT/Reach.lean`) |
-| И1 | `Inv.stJ` and `Good` of `close`, `fins`, `closed` (`RT/Inv.lean`) |
-| И2 | `Inv.empty` and `Good` of `spawn`, `fin`, `gkid`, `branch` |
-| И3 | `Inv.spawnJ` |
-| И5 | `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep` (`RT/Recover.lean`) |
+| I1 | `Inv.stJ` and `Good` of `close`, `fins`, `closed` (`RT/Inv.lean`) |
+| I2 | `Inv.empty` and `Good` of `spawn`, `fin`, `gkid`, `branch` |
+| I3 | `Inv.spawnJ` |
+| I5 | `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep` (`RT/Recover.lean`) |
 | R1, R2, R3, R4 | `R1`–`R4`, `Inv.r1`–`Inv.r4`, `Inv.r4_closed`, `parResult_keeps` (`RT/Props.lean`) |
 | the sketch of R3: who waits for a running fiber | `Guard`, `Inv.noRun` (`RT/Inv.lean`, `RT/NoRun.lean`) |
 | §3.5 memo maps, `build`, observers | `Memo`, `Ent`, `lookup`, `Step.provide`, `.provHit`, `.provBuild`, `.buildOk`, `.buildFail`, `.finObs`, `.finObsLast` |
-| И6 | `Inv6.obsIn`, `Good6` of `release` (`RT/Layers.lean`) |
-| R6; its premise from Р37 | `R6`, `Good6`, `GoodUse` (`RT/Layers.lean`, `RT/T5.lean`); `G11` (`RT/Hyp.lean`) |
+| I6 | `Inv6.obsIn`, `Good6` of `release` (`RT/Layers.lean`) |
+| R6; its premise from [provide services must not outlive their layer](../docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer) | `R6`, `Good6`, `GoodUse` (`RT/Layers.lean`, `RT/T5.lean`); `G11` (`RT/Hyp.lean`) |
 | §3.7, R7 | `Step.modify`, `cell`, `R7` (`RT/RefLin.lean`) |
 | T5 | `T5` (`RT/T5.lean`) |
 
@@ -346,7 +361,7 @@ Simplifications of the cause algebra:
    Effect, is a value of `V` that carries its identity.
 2. A row `ε` and `· ⊢ v : Errors ε` are a predicate `Has : V → Prop`; the premise of (Try)
    is `Covers`. R5 is about one `recover`, as the sketch in §6 is; that the core's (Try)
-   gives `Covers` is T1 of P1.
+   gives `Covers` is `T1` of the core development.
 3. `pretty` and `report` (§2.5) are not defined: they read `Cause V`, a list, so the third
    part of R8 holds by their type. (Seq=Par) is `CTree.reasons`, where both node kinds are `⊕`.
 
@@ -356,20 +371,20 @@ Simplifications of λRT:
    transition relation `Core.step`; a label says what the code asks of the runtime, and
    `Core.plug` hands the result back. Every theorem holds for every core.
 2. **Handles can be forged.** An action names owners, fibers and groups by number, and the
-   rules check only their states (`spawn` needs `open`, and so on). So И4, which needs Г6,
+   rules check only their states (`spawn` needs `open`, and so on). So I4, which needs G6,
    is not modelled; R1–R4 do not use it. R3 is proved from `Guard` instead: a child is in
    `K`, a watcher in `W`, a group's child in an open group or one its owner's closing waits
    for, a branch in a `par` frame of a running fiber whose current owner, below that frame,
    started it (`Inv.noRun` is the induction of the sketch).
 3. **No mask.** An interruption is delivered at any point of user code and of the waits that
    are interruption points (`Code.IntPoint`); a closing, a watcher's wait and a combinator's
-   wait are not. That is more interleavings than §3.2, so safety carries over; Г7(в) is about
+   wait are not. That is more interleavings than §3.2, so safety carries over; G7(c) is about
    when an interruption arrives and is not needed. Requests to stop (Int-Req, C2, a group's
    hook, `parallel` stopping its branches) arrive at any time (`Step.req`): that they are
    sent is liveness.
 4. **The closing** is run by the fiber that ran the body, through a `closing π` frame; its
-   phase is in the owner (`Phase`). `hooks true` is both the hooks added since C1 (Р38) and
-   C4: it runs hooks until `H = ∅` and then waits for `P = ∅` (Р160).
+   phase is in the owner (`Phase`). `hooks true` is both the hooks added since C1 ([hooks added during closing still run](../docs/formal/runtime.md#a-closing-hook-added-after-c1-does-not-run)) and
+   C4: it runs hooks until `H = ∅` and then waits for `P = ∅` ([hooks added while foreign calls settle run](../docs/formal/runtime.md#a-hook-added-during-c4-does-not-run)).
 5. **Groups**: the hook `stop γ` closes the group; `FiberSet.make` in an owner past (C5)
    gives a closed group; `join` of a group is not modelled.
 6. **Combinators**: only `parallel`. `race_*` and `timeout` wait the same way and differ in
@@ -387,37 +402,33 @@ Simplifications of λRT:
     build of that layer was released (`Good6` of `build`): within one execution of the
     outer `provide`, whose owner observes the build until its own (C5), that is "at most
     once". (b) A build is released only after every consumer's observer ran (`Good6` of
-    `release`). (c) No service is used after its build is released (`GoodUse`), under Г11.
+    `release`). (c) No service is used after its build is released (`GoodUse`), under G11.
     `G11` is about the answering entry only: `Act.use π` names the `provide` owner whose
     environment entry answers the `ask_S`, and at such a step `π` is live. A child may carry
-    an entry of a closed `provide` that it never asks (Р142). P2 gives it as `T4_3`: the
+    an entry of a closed `provide` that it never asks ([the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives)). The core development gives it as `T4_3`: the
     region `q` of the `with` frame that `lookupE E N` finds for an `ask_N` is `Live`.
     A layer's build code runs in the providing fiber with the area `σ` as current owner; a
     failed build closes `σ` and makes the `provide` fail.
 12. **R7** is `Hist GoodRef`: each `Ref.modify ℓ` read the value of the latest `make` or
     `modify` of `ℓ` (`cell`), and the memory is the replay of the journal. Allocation is
-    deterministic, as in P1.
+    deterministic, as in the core development.
 
 ## Elaboration and T6
 
-`Formal/Elab/` is another model of its own; it imports nothing from the core. It covers
-T6 of [`docs/formal/elaboration.md`](../docs/formal/elaboration.md) relative to an abstract
-target: λFlick⁺ is the structure `Target`, whose typing and laws are fields; P4a is to
-instantiate it.
-
-| Stage | Scope | State |
-| - | - | - |
-| P4a | λFlick⁺ (Р54) as an instance of `Target`; T1–T3 for it | done: the typing (P4a3), the run (P4a4) |
-| P4b | the source, `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (§2.4), dictionaries typed, T6(a); `Sim` from the steps of the target | done |
-| P4b′ | the sugar of §3 (`do`, `for`, `?`, blocks) as source terms; each elaborates with the checker's type, T6(a) covers it | done |
-| P4c | `≈`, К1–К8, lemmas 6.1 and 6.2, T6(b) | done |
+`Formal/Elab/` proves T6 of [`docs/formal/elaboration.md`](../docs/formal/elaboration.md).
+Its abstract part imports nothing from the core: λFlick⁺ is the structure `Target`, whose
+typing, laws and run are fields, and T6(a) and T6(b) hold for every `Target`. The `Core*`
+modules instantiate `Target` with the core of `Formal/`, so T6 goes through the core with
+regions ([elaboration preserves captures and regions](../docs/formal/elaboration.md#t6a-without-captures-does-not-carry-over-to-the-core-with-regions)): λFlick⁺ is that core plus nominal dictionary records
+`D_C ā` with `∀`-fields ([dictionaries need polymorphic fields](../docs/formal/elaboration.md#dictionaries-need-polymorphic-fields-and-higher-rank-parameters)), and captures enter the elaboration source
+and `Target`. See [The core as the target](#the-core-as-the-target).
 
 | `elaboration.md` | Lean |
 | - | - |
 | §1.1 classes, instances; §2.1 superclass slots | `Prog`, `Inst`, `Prog.super` (`Elab/Syntax.lean`) |
 | §2.2 dictionary terms `d` | `Dict`, `apps`, `Dict.subst` (`Elab/Syntax.lean`) |
 | §2.3 `Δ*`, (Given), (Prim), (Struct), (Inst) | `Clo`, `Ent` (`Elab/Syntax.lean`) |
-| §4.1 К1–К8 | `Coherent` (`Elab/Hyp.lean`) |
+| §4.1 K1–K8 | `Coherent` (`Elab/Hyp.lean`) |
 | §4.2 `≈` | `Eqv` (`Elab/Syntax.lean`) |
 | Lemma 6.1, Lemma 6.2, T6(b) | `lemma_6_1`, `lemma_6_2`, `T6b` (`Elab/Coherence.lean`) |
 | §1.1 method schemes | `Scheme`, `Prog.methods` (`Elab/Syntax.lean`) |
@@ -426,31 +437,31 @@ instantiate it.
 | `Δ ⊩ Q ⇝ d ⇒ ⟦Δ⟧ ⊢⁺ d : D_Q`; T6(a) | `ent_typed`, `T6a` (`Elab/T6a.lean`) |
 | §3.1 `do` | `Stmt`, `Sugar.desugarDo`, `DoOk`, `do_elab`, `T6a_do` (`Elab/Sugar.lean`, `Elab/DoNotation.lean`) |
 | §3.2 `for`, §3.3 `?`, §3.4 blocks | `Clause`, `Sugar.gen`, `Sugar.loop`, `GenOk`, `LoopOk`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`, `T6a_sugar` (`Elab/Sugar.lean`, `Elab/Comprehension.lean`) |
-| Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`); the schemes of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List` generated from the checker, those the model cannot write listed as skipped with a reason (`Elab/PreludeSchemes.lean`, Р230) |
+| Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`); the schemes of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List` generated from the checker, those the model cannot write listed as skipped with a reason (`Elab/PreludeSchemes.lean`, [Prelude scheme generator with skip list](../docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names)) |
 | "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim`, then `T6b_target` (`Elab/Run.lean`) |
 | §0.1 `⟦·⟧` into the core with regions: types, stages, schemes | `Names`, `trT`, `trTT`, `trD`, `trS`, `trStage`, `trT_subst`, `trT_reach` (`Elab/CoreTy.lean`) |
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
 | §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
 | T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
-| Р199: an elaboration with its premises closed by `θ`, `ρ` | `T6a_close`, `ent_close`, `Tm.dsubst`, `Tm.Skel`, `fill_dsubst` (`Elab/Close.lean`); `lift_inst`, `up_lift`, `heldS_subst`, `Cn.Ground`, `Prog.ConstsClosed` (`Elab/CloseTy.lean`) |
+| an elaboration with its premises closed by `θ`, `ρ` ([dictionaries typed closed in the run target](../docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)) | `T6a_close`, `ent_close`, `Tm.dsubst`, `Tm.Skel`, `fill_dsubst` (`Elab/Close.lean`); `lift_inst`, `up_lift`, `heldS_subst`, `Cn.Ground`, `Prog.ConstsClosed` (`Elab/CloseTy.lean`) |
 | the hypotheses of T6 hold together: a witness program | `P`, `S`, `N`, `Sg`, `root`, `coherent`, `real`, `rootTy`, `realRun`, `witness_T6a`, `witness_T6a_do`, `witness_T6b`, `witness_T6b_example`, `witness_T6b_closed`, `witness_T6b_open` (`Elab/Witness/`, `T6b.lean`), `consts_closed` (`Consts.lean`); the bodies `seqFlatMap`, `seqEach`, `seqToList`, `iterL` (`Seq.lean`), `uncB`, `frBody`, `eqRec` (`Unc.lean`); arms for every constructor are exhaustive, `exh_ctors` (`Elab/Exh.lean`) |
-| Р188: the lazy `Monad Eff` in the core, `Eff q b` with the field `eff ∅ ∅ b {q}` | `effT`, `effField`, `effPure`, `effMap2`, `effBind`, `typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr` (`Elab/LazyEff.lean`) |
+| the lazy `Monad Eff` in the core ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)), `Eff q b` with the field `eff ∅ ∅ b {q}` | `effT`, `effField`, `effPure`, `effMap2`, `effBind`, `typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr` (`Elab/LazyEff.lean`) |
 | the run of dictionaries in the core: closed derivations evaluate, `≈` keeps values | `RealRun`, `ent_eval`, `eqv_sem` (`Elab/CoreDictSem.lean`); `Eval`, `SemEq` (`Elab/CoreEval.lean`); `PStep`, `decomp_eq` (`Decomp.lean`) |
 | λFlick⁺ as `Target` with the run of the core: `Rel`, `load_rel`, `step_rel`, `final_rel`; T6(b) for the core | `Cg`, `DP`, `CfgR` (`Elab/CoreCg*.lean`, `Elab/CoreRel.lean`); `phead_sim`, `rhead_sim`, `thread_sim`, `cstep_sim`, `final_sim` (`Elab/CoreHead.lean`, `Elab/CoreStep.lean`, `Elab/CoreSim.lean`); `DSim`, `eqv_dsim`, `DTyp`, `dsim_cg` (`Elab/CoreLoad.lean`); `trE`, `RHas`, `runTarget`, `T6b_core` (`Elab/CoreRun.lean`) |
 
 Simplifications:
 
-1. Constraint types are first-order terms with binary application. К1 is semantic: heads
+1. Constraint types are first-order terms with binary application. K1 is semantic: heads
    that some substitutions make equal belong to one instance, which is what a failed
    first-order unification says.
-2. (Improve) gives no dictionary, so `Ent` starts from improved constraints; К2 and К3 only
-   make improvement order-independent and are not fields. К4 gives К1 for the whole program,
-   which `Coherent` assumes directly. К8 makes premise names fresh; premises here are
+2. (Improve) gives no dictionary, so `Ent` starts from improved constraints; K2 and K3 only
+   make improvement order-independent and are not fields. K4 gives K1 for the whole program,
+   which `Coherent` assumes directly. K8 makes premise names fresh; premises here are
    numbered.
-3. К5 is a well-founded transitive order `lt` with the instance context, a superclass and
+3. K5 is a well-founded transitive order `lt` with the instance context, a superclass and
    a record's field below the constraint, plus "the variables of the context are in the head".
 4. (Struct) and (Prim) are black boxes: `fields` and `prims`, which commute with
-   substitution; К6 keeps the compiler's classes apart from the program's instances.
+   substitution; K6 keeps the compiler's classes apart from the program's instances.
 5. An expression is a skeleton with dictionary holes all under one `Δ`; `Sim` says filling
    them with `≈` dictionaries gives the same result. A hole under a `λδ̄` of (Let-Sig-Dict)
    sees a longer `Δ`; T6(b) over two whole `Elab` derivations, which may also pick different
@@ -459,12 +470,12 @@ Simplifications:
    dictionaries of their schemes, as (Var-Dict)), application, `λ` over a monotype, `let`
    without generalization, `let` with a signature, `if` and a `match` on `Option`; no
    constructors, other `match` or higher-rank parameters. Its types are the first-order
-   `Ty` with the arrow `a →φ^q b` (`Ty.arr`, Р186), whose qualifier is a capture row
+   `Ty` with the arrow `a →φ^q b` (`Ty.arr`, [source arrow is a separate type form](../docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor)), whose qualifier is a capture row
    written as a type (a variable, `cnil`, `cun`); `Bool` and `Option` are reserved
    constructors (`boolTy`, `optTy`). (Lam) and (Let-Sig-Dict) show what a closure holds,
-   `heldS` (Р185, Р187); qualifiers match exactly, there is no (≤-Cap). (Sub) is kept for stages only: a value has any stage, an application,
+   `heldS` ([elaboration preserves captures and regions](../docs/formal/elaboration.md#t6a-without-captures-does-not-carry-over-to-the-core-with-regions), [dictionary arrows carry the let qualifier](../docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds)); qualifiers match exactly, there is no (≤-Cap). (Sub) is kept for stages only: a value has any stage, an application,
    a `let` and a `match` run at one stage `φ`, the arrow applied and the right side of a
-   `let` at `ψ ⊑ φ` (Р182). A term at `P` elaborates at any stage (`Elab.anyStage`), and
+   `let` at `ψ ⊑ φ` ([constrained let keeps the right-hand side effect](../docs/formal/elaboration.md#let-sig-dict-lost-the-effect-of-the-right-hand-side)). A term at `P` elaborates at any stage (`Elab.anyStage`), and
    renaming term variables keeps an elaboration (`Elab.rename`, weakening `Elab.shift`).
 7. `Target` is an interface, not λFlick⁺: its types are monotypes, stage arrows and `D_Q`,
    a context entry is `∀ᾱ. t`, and a `∀`-field of `D_Q` shows only through the law `meth`
@@ -473,13 +484,15 @@ Simplifications:
    the arrows of methods, constants, instances and `struct_C` hold nothing (`cnil`), so the
    `q` of their schemes is never read.
    The types of instances (`inst`: `I : ∀β̄. D_ctx →P
-   D_head`, by (Instance) of §2.5 and К7) and of (Struct)/(Prim) dictionaries are laws.
+   D_head`, by (Instance) of §2.5 and K7) and of (Struct)/(Prim) dictionaries are laws.
    `lamD l` binds `l` premises at once, the `i`-th argument being the premise `i`;
-   λFlick⁺ curries it. P4a has to prove each law of its own typing.
+   λFlick⁺ curries it. The core instance proves each law from its own typing
+   ([below](#the-core-instance-of-target)).
 8. The run of the target is `Target.St`, `load`, `Step` and `obs`; a skeleton is a `Tm` with
    holes `hole i` and the type and stage of its fillings, and its result is the set of observations of the terminating runs of the
    filled term (divergence is not compared). `Sim` follows by induction on the run from
-   three fields, which P4a has to prove for λFlick⁺ with a relation `Rel` of its choice:
+   three fields, which the core instance proves with its relation `Rel`
+   ([below](#the-run-rel-and-sim)):
    `load_rel` (closed terms typed at one type that differ by `≈` in dictionary positions,
    `TmEqv`, load to related states), `step_rel` (a step of one side is matched by zero or more steps of the other:
    evaluating `(I d̄).$slotᵢ` and `sᵢ[δ̄ := d̄]` takes different numbers of steps) and
@@ -492,8 +505,8 @@ Simplifications:
    checker (`PreludeSchemes.lean`); `pair`, `unc n` and `each_P` have no Prelude name and are
    written in `Sugar.lean`. `from_result` is a family `from_result_n` over closed rows of
    errors, one error type `con n` each (`frSch`, equal to the generated scheme at `e := con n`
-   by `frSch_gen`, Р210): the core has no row variables, and `e?` takes the member of the row
-   of `e`'s type (`tryResult_elab`). Simplification 15 extends to the Prelude (Р188): a type with
+   by `frSch_gen`): the core has no row variables, and `e?` takes the member of the row
+   of `e`'s type (`tryResult_elab`). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
    hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
    qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and
    data without storage drops it. That argument is invariant, so a qualifier the caller
@@ -508,134 +521,87 @@ Simplifications:
    `λ(p₁, …, pₙ). e` is `unc n (λp₁ … pₙ. e)` with a constant `unc n` per arity; the checker
    uses flat tuples with the same curried patterns. The clauses of `for … yield` run at `P`
    (Sync calls are not modelled) and the loop of `for … do` at its stage, with one constant
-   `Seq.each_φ` per stage (Р184). Each source of `for` goes through `iter` (Р183). Only the
+   `Seq.each_φ` per stage ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
-10. The core instance (P4a3). `⟦R⟧ = rt ∅ ε` with `ε` every name (`allNames`): the stage `R`
+10. The core instance. `⟦R⟧ = rt ∅ ε` with `ε` every name (`allNames`): the stage `R`
     of the source has no row of errors, so a runtime body may raise any error type that reaches
-    nothing (Р210). `Bool` is `base bool`, `Int` (`con 4`) is `base int` (Р211), other
+    nothing. `Bool` is `base bool`, `Int` (`con 4`) is `base int`, other
     constructors are ADTs named by `Names.con`. `Real` is a hypothesis on the core's signature, not on the
-    bodies of the globals (`RootTy`, P4a4). A class has a record type for each number of
+    bodies of the globals (`RootTy`, part of the run). A class has a record type for each number of
     parameters (`Names.cls C n`), because the law `slot` holds for any constraint `q`;
     `Prog.super` pads missing parameters with `con 0`, and so does the slot's field. A method
     field binds the method's own variables first (`rot`) and needs the method scheme closed.
     `struct_C` and `prim_p` are families over the record type and the constraint, so their
     dictionary terms carry them, `Dict.strct C τ` and `Dict.prim p q`, and the translation
-    `Tr` picks the global `N.strct C τ` (`N.prim p q`) from the term (Р195, Р196). The laws
+    `Tr` picks the global `N.strct C τ` (`N.prim p q`) from the term ([structural dictionaries are type-indexed families](../docs/formal/elaboration.md#structural-and-primitive-dictionaries-are-families-indexed-by-type), [structural dictionary terms carry their type](../docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type)). The laws
     `strct` and `prim` type them at any instance `θ` of the type, `struct_C^τ : D_{C τ₁θ} →P …
     →P D_{C τθ}` and `prim_q : D_{qθ}`: the global has a closed scheme and the run erases the
-    type, and closing premises by types needs it (Р201). `if` is `match c with true → a | _ → b`, and `match e with None → n |
+    type, and closing premises by types needs it ([structural dictionaries typed at any type instance](../docs/formal/elaboration.md#structural-dictionaries-were-typed-only-at-their-own-record-type)). `if` is `match c with true → a | _ → b`, and `match e with None → n |
     Some y → s` is `match e with Some y → s | _ → n`, exhaustive by `_` without declaring
-    `None`. `typingTarget` has an empty run; `runTarget` (P4a4) has the run of the core,
+    `None`. `typingTarget` has an empty run; `runTarget` has the run of the core,
     and its `Has` adds to the core's typing the typing `DTyp` of the dictionaries of the term
-    by the laws (`RHas`, Р199).
+    by the laws (`RHas`, [dictionaries typed closed in the run target](../docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)).
 11. The hypotheses are satisfiable (`Elab/Witness/`): one program meets `Real`, `RealRun`,
     `RootTy`, `Coherent` and `Sugar` at once, with `Eq` on `Int` and structural on a record,
-    the lazy `Monad Eff` (Р188), an eager `Option` monad `OptQ q a` and `Iterable` of
+    the lazy `Monad Eff` ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)), an eager `Option` monad `OptQ q a` and `Iterable` of
     `ListQ q a` (data without storage gets a phantom `CRow` parameter as an instance of a class
     over containers). Every global has a body typed by the rules of the core, none is `todo`;
     the bodies are honest but narrower than the checker's in three places. `Seq q a` is an
     eager list `SNil | SCons a (Seq q a)` with a phantom `q`: `Seq.flat_map`, `each_φ`,
     `to_list` and `iter` are fixpoints over it, and the laziness of the checker's `Seq` is not
-    modelled (T6 needs only the types of Р188, and the witness has no infinite or effectful
+    modelled (T6 needs only the types of [Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes), and the witness has no infinite or effectful
     sequence). `Rec` has one field, so the `&&` of the structural `eq` over its fields is one
     comparison by the slot dictionary `D_{Eq Int}`. `from_result_n` is a member at one closed
     error type (simplification 9). `eq` on `Int` is the constant `intEq`, and `unc n` is
     built by a Lean function of `n` and typed by induction. A match has one arm per
     constructor and no `_` (`exh_ctors`, `Exh.lean`), also in the lazy `Monad Eff`.
 
-### P4a design
 
-The owner's decision on Р185 is that T6 goes through the core with regions. λFlick⁺ is
-this Lean core plus nominal dictionary records `D_C ᾱ` with `∀`-fields, and captures
-enter the elaboration source and `Target`. This section is the plan for P4a. Each piece
-is committed without `sorry` and builds from a clean `git archive`. The next free Р
-number of this track is Р212 (Р210–Р229 are reserved for it).
+### The core as the target
 
-**Status.** Р185–Р187 are recorded in `elaboration.md` §5, and §0.1 and §2.1 are
-updated. P4a1 is done; Р188 records the Prelude schemes. P4a2 is done (Р194). P4a3 is done
-(Р188 decided, Р195). P4a4 is done: Р196 and Р197 fixed the model, P4a4a is the run of
-dictionaries (`eqv_sem`), P4a4b `Rel` and its closure, P4a4c the fields of the target and
-`T6b_core`, T6(b) for the core with its run without the hypothesis `Sim` (Р198–Р200). P4a is
-done. Р188 through a `CRow` parameter is done: the translation and the schemes of `Sugar`,
-and the lazy `pure`, `map2` and `flat_map` of `Monad Eff` typed by the rules of the core at
-those schemes (`LazyEff.lean`). The witness of the hypotheses (`Elab/Witness/`): W1 is done,
-a program with `Eq` (an instance on `Int`, structural on a record), `Applicative`/`Monad` of
-`Eff` and of an eager `OptQ`, `Alternative OptQ`, `Iterable ListQ`, all of `Sugar`, with
-`Coherent` (`coherent`) and `Real` (`real`); W2, the bodies of the globals (`RootTy`,
-`RealRun`) and T6 on the witness, is done too (`rootTy`, `realRun`, `witness_T6a`,
-`witness_T6a_do`, `witness_T6b`, `do_eff`, `do_opt`). The bodies are real (Р210, Р211): the
-core has `Int.eq` (`intEq`), and no global of the witness is `todo`. T6(b) holds on the witness without
-premises of typing: `witness_T6b_example` is the block `do { x <- pure (); pure x }` over `Eff`
-under the premise `Monad Eff` closed by `I2`, with `Applicative Eff` for `pure` from the instance
-`I1` in one filling and from the slot of `Monad Eff` in the other; both typings `RHas` are proved
-by the laws of `runTarget` (`has_do`), and the observations of the runs are equal.
-`witness_T6b_closed` is T6(b) for any two elaborations of one source term in the empty contexts
-(`Δ = []`), typed by T6(a) for `runTarget`. `witness_T6b_open` is the same under premises `Δ`
-closed by any types `θ` and closed dictionaries `ρ` to ground constraints (Р199): the typings
-`RHas` of the closed fillings `s[d̄ρ]` come from `T6a_close`, T6(a) with the premises closed, for
-`runTarget`. It needs the skeleton's holes outside the abstractions over dictionaries
-(`Tm.Skel`), the constants of `Γ₀` closed (`consts_closed`), and `struct_C^τ` typed at `τθ`
-(Р201). The schemes of `Sugar` come from
-`PreludeSchemes.lean`, generated from the checker's `Prelude.fl` and `Seq.fl` by the
-translation of Р188 (`flick-model/src/translate/lean.rs`, `just formal-schemes`; a golden test
-of `cargo test -p flick-model` holds the file to the checker). The witness's own schemes are
-written with `bindTy`, `map2Ty` and `eachSch`, and `S` equates them with the generated ones by
-`rfl`. The pieces below are in their intended order.
+#### Captures in `Elab` and `Target`
 
-#### P4a1: captures in `Elab` and `Target`
-
-Only `Formal/Elab/` changes; the core is untouched.
-
-- **Types** (`Elab/Syntax.lean`). `Ty` gets `arr (φ : Stage) (a b q : Ty)`, `cnil` and
-  `cun (q q' : Ty)`. The qualifier `q` is a capture row written as a type: a variable,
-  `cnil`, or a union. Substitution stays structural, and `DecidableEq`,
-  `Ty.agree_of_eq` and К1 keep working without semantic sets. `Stage` moves to
-  `Syntax.lean`. `arrTy` becomes `arr` (Р186), and `Ty.reach : Ty → Nat → Prop` is
-  defined with `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈app⌉ = ⌈cun⌉ = ∪` and
+- **Types** (`Elab/Syntax.lean`). `Ty` has `arr (φ : Stage) (a b q : Ty)`, `cnil` and
+  `cun (q q' : Ty)` ([source arrow is a separate type form](../docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor)). The qualifier `q` is a capture row written
+  as a type: a variable, `cnil`, or a union. Substitution is structural, so `DecidableEq`,
+  `Ty.agree_of_eq` and K1 work without semantic sets. `Ty.reach` is the occurrence of a
+  variable: `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈app⌉ = ⌈cun⌉ = ∪` and
   `⌈arr φ a b q⌉ = ⌈a⌉ ∪ ⌈b⌉ ∪ ⌈q⌉`. Capture variables are ordinary variables, so
   (Var), (Method) and (Const) instantiate them through `ts` with no new rule. Schemes
-  have no `Outlives` facts: `Fiber.Outlives` is dropped by `⟦·⟧` (§2.1).
-- **Schemes.** `Scheme` gets `q : Ty`, the qualifier of its dictionary arrows (Р187).
-  `Scheme.subst` lifts `q` like `ty`. The `q` of methods and of `Prog.consts` is never
-  read: the laws `meth` and `const` use `cnil`, so `Prog` needs no well-formedness
-  hypothesis for it. `Scheme.reach` is the reach of `Scheme.tr s` below its `k`
-  binders, so it equals the core's `Scheme.reach` of the translation.
-- **Judgement** (`Elab/Source.lean`). Add `Exp.Free` and `Tm.Free`, and
-  `heldS Γ e n := ∃ x s, e.Free x ∧ Γ[x]? = some s ∧ s.reach n`. `Δ` adds nothing,
+  have no `Outlives` facts: `⟦·⟧` drops `Fiber.Outlives` (§2.1).
+- **Schemes.** `Scheme` has `q : Ty`, the qualifier of its dictionary arrows
+  ([dictionary arrows carry the let qualifier](../docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds)); `Scheme.subst` lifts `q` like `ty`. The `q` of methods and of
+  `Prog.consts` is never read: the laws `meth` and `const` use `cnil`, so `Prog` needs no
+  well-formedness hypothesis for it. `Scheme.reach` is the reach of `Scheme.tr s` below its
+  `k` binders, so it equals the core's `Scheme.reach` of the translation.
+- **Judgement** (`Elab/Source.lean`). `Exp.Free` and `Tm.Free` are the free term variables,
+  and `heldS Γ e n := ∃ x s, e.Free x ∧ Γ[x]? = some s ∧ s.reach n`. `Δ` adds nothing,
   because `⌈D_Q⌉ = ∅`.
-  - (Lam) gets the premise `heldS Γ (.lam b) ⊆ ⌈arr φ a t q⌉`.
-  - (Let-Sig-Dict) gets the premise `σ.ctx ≠ [] → heldS (Γ↑σ.k) e ⊆ ⌈σ.ty⌉ ∪ ⌈σ.q⌉`.
-  - No (≤-Cap) in the source: qualifiers match exactly. This is a simplification;
+  - (Lam) has the premise `heldS Γ (.lam b) ⊆ ⌈arr φ a t q⌉`.
+  - (Let-Sig-Dict) has the premise `σ.ctx ≠ [] → heldS (Γ↑σ.k) e ⊆ ⌈σ.ty⌉ ∪ ⌈σ.q⌉`.
+  - There is no (≤-Cap) in the source: qualifiers match exactly. This is a simplification;
     T6(a) does not need completeness.
-  - New lemma: elaboration adds no term variables
-    (`Elab … e' → e'.Free x → e.Free x`).
-- **`Target`.** `TTy.arr φ a b q`. `dicts q qs t` puts `q` on every dictionary arrow.
+  - Elaboration adds no term variables (`Elab.free`: `Elab … e' → e'.Free x → e.Free x`),
+    so the held premises of the source give those of the target (`heldT_of`), and
+    renaming keeps them (`heldS_rename`, `Weaken.lean`).
+- **`Target`.** `TTy.arr φ a b q`. `dicts q qs t` puts `q` on every dictionary arrow, and
   `Scheme.tr s = ⟨s.k, dicts s.q s.ctx (.mono s.ty)⟩`.
-  - The `lam` law gets the held premise over `Tm.Free`.
-  - The `lamD` law gets the premise `qs ≠ [] → heldT Γ e ⊆ ⌈t⌉ ∪ ⌈q⌉`.
+  - The `lam` law has the held premise over `Tm.Free`.
+  - The `lamD` law has the premise `qs ≠ [] → heldT Γ e ⊆ ⌈t⌉ ∪ ⌈q⌉`.
   - `meth`, `const`, `inst`, `strct` and `prim` use `q = cnil`.
-  - Decided: the `Rel` fields take typing premises, because P4a4 needs closed typed terms.
-    `load_rel` gets `Has [] [] e t φ` and `Has [] [] e' t φ`. `Exprs` gets `Ok`, and
+  - The `Rel` fields take typing premises, because the run of the core relates closed typed
+    terms. `load_rel` takes `Has [] [] e t φ` and `Has [] [] e' t φ`. `Exprs` has `Ok`, and
     `Sim` and `T6b` speak only of fillings with `Ok`. A skeleton of `Target.exprs` is
     `Tm × TTy × Stage`, `Ok` is the typing of the filled skeleton, and `T6b_target`
     takes it for both fillings. `step_rel` and `final_rel` take none: `Rel` carries them.
-- **Re-proofs.** `T6a` needs the held lemma in the `lam` and `letSig` cases
-  (`Elab.free`, `heldT_of`). `Weaken.lean` renames the held premises (`heldS_rename`);
-  `Coherence.lean` needs only new `Ty` cases and the `Ok` premises of `T6b`.
-- **Sugar.** Each higher-order parameter of a Prelude scheme gets a capture variable,
-  and the arrows after it show that variable:
-  `flat_map : ∀m a b c. (a →^c m b) →P (m a →^c m b)`. Checked against `Prelude.fl` and
-  `Seq.fl`: they are the checker's types with the qualifiers of non-arrow types dropped
-  (Р188). A lambda of the sugar takes `ctxRow Γ`, a row that covers its context.
 
-#### P4a2: dictionary records in the core
+#### Dictionary records in the core
 
-Done. λFlick⁺ is the core of `Formal/` with dictionary records and globals; T1–T4,
-T4.3 and `T1_regions` hold again with the same statements, `RootTy` now covering the
-globals. It differs from the plan above in four places, each to keep the existing
-proofs: projection is the core's `proj`, globals are a term form, fields are schemes,
-and fields need not be values.
+λFlick⁺ is the core of `Formal/` with dictionary records and globals; T1–T4, T4.3 and
+`T1_regions` hold for it with the same statements, `RootTy` covering the globals. Four choices
+keep the proofs of the core: projection is the core's `proj`, globals are a term form, fields
+are schemes, and fields need not be values.
 
 - **Type.** `Ty.dict c args` is `D_C ā` with `args = Ty.spine ā`, a `tapp` spine on
   `rnil`; `⌈dict c args⌉ = ∅` (§0.1), `substT` is structural (`Ty.spine_substT`,
@@ -657,11 +623,11 @@ and fields need not be values.
   `e : dict c ūs`, `fs.lookup l = some s`, and (Var) at the instantiated scheme of
   `s`: `ts`, its facts, `Le`. `Typ.glob` is (Var) at `S.glob g`.
 - **Globals.** `Tm.glob g` steps to its body in a pure step, `Step.glob`, with label
-  `pure`. The bodies are a table next to `Σ₀`: `root : Roots` has `svc` (the old
-  `Σ₀`) and `glob`. `RootTy` gains `glob` (a body is closed source code without any
-  `Site` and is typed at the scheme of its global) and `globs` (each declared global has
-  a body). Instance bodies refer to other instances by name, so their typing is not
-  circular. Not `Const.glob`: every constant is a value (`Value.const`), and a value
+  `pure`. The bodies are a table next to `Σ₀`: `root : Roots` has `svc` (`Σ₀`) and
+  `glob`. `RootTy` has `glob` (a body is closed source code without any `Site` and is
+  typed at the scheme of its global) and `globs` (each declared global has a body).
+  Instance bodies refer to other instances by name, so their typing is not circular.
+  A global is not a constant: every constant is a value (`Value.const`), and a value
   must not step.
 - **Proofs.** The `drec` and `dcons` cases are those of `letGen` (`TySubstBase.lean`:
   `Typ.drec_substT`, `Typ.dcons_substT`, `Typ.dproj_at`, `Typ.glob_substT`); a
@@ -670,82 +636,78 @@ and fields need not be values.
   steps to a body typed by `Typ.instantiate` (`glob_preservation`); Progress takes
   `RootTy` for `globs`. `Value.field` takes the record typing, since a field of a
   dictionary need not be a value. `Examples.lean` projects a polymorphic method.
-- **Р188.** Fields are typed at their schemes exactly, and a dictionary holds nothing,
-  so a lazy instance whose method result holds its continuation (`Monad (Eff r e)`) is
-  typed in the core iff its method scheme shows that: the core has (≤-Cap) on arrows and
-  `Eff`, but no `τ^q` on other types. P4a2 does not decide Р188; P4a3 does.
-- **Р194.** §0.1 also allows `∀` in an arrow parameter; the model has `∀` in dictionary
-  fields only, as the source of `Elab` has no higher-rank parameters.
+- **Lazy instances.** Fields are typed at their schemes exactly, and a dictionary holds
+  nothing, so a lazy instance whose method result holds its continuation (`Monad (Eff r e)`)
+  is typed in the core iff its method scheme shows that: the core has (≤-Cap) on arrows and
+  `Eff`, but no `τ^q` on other types. The `CRow` parameter of simplification 15 is how the
+  schemes show it ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes); see the core instance below).
+- **Higher rank** ([no higher-rank parameters in the model](../docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields)). `elaboration.md` §0.1 also allows `∀` in an
+  arrow parameter; the model has `∀` in dictionary fields only, as the source of `Elab` has
+  no higher-rank parameters.
 
-#### P4a3: the instance of `Target`
+#### The core instance of `Target`
 
-Done. `typingTarget` is the typing of the core with dictionary records as the laws of
+`typingTarget` is the typing of the core with dictionary records as the laws of
 `Target`; `T6a_core`, `T6a_do_core` and `T6a_sugar_core` are T6(a) and its sugar forms
-for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`. It differs from the plan in
-five places.
+for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
 
-- **Types** (`CoreTy.lean`). As planned: `var ↦ tvar`, `app ↦ tapp`, `Bool ↦ base bool`,
+- **Types** (`CoreTy.lean`). `var ↦ tvar`, `app ↦ tapp`, `Bool ↦ base bool`,
   other constructors `↦ adt (N.con c)`, `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉`,
-  `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R⟧ = rt ∅ ∅` (now `rt ∅ allNames`, Р210), the empty rows being the fixed
-  name-only rows. `trT_subst`/`trTT_subst`/`trS_subst` and `trT_reach` are the two
-  commutations. The names of the core are a parameter `Names`, not a fixed encoding.
-  *Deviation 1:* `D_{C τ̄} ↦ dict (N.cls C |τ̄|) ⟦τ̄⟧`: the class name carries the number
-  of parameters, because the law `slot` holds for any `q` and `Typ.dproj` needs
-  `|τ̄| = k`.
-- **Terms** (`CoreTr.lean`). *Deviation 2:* `struct_C` and `prim_p` are families over the
-  record type and the constraint (`struct_C : D_{C τ₁} →P … →P D_{C τ}` for each `τ`). P4a3
-  chose the global (`N.strct C τ`, `N.prim p q`) with the type, as `Dict` did not show it
-  (Р195); P4a4 found that this breaks the run (Р196), so `Dict.strct C τ` and
-  `Dict.prim p q` now carry it and `Tr N γ δ e e'` is a function of the term: `meth`/`slot ↦ proj`, `inst`/`const ↦ glob`,
-  `lamD l ↦ λ^l` (`lamsC`, the premise `k < l` at `l - 1 - k`, `dext`). *Deviation 3:*
+  `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R⟧ = rt ∅ allNames` (simplification 10).
+  `trT_subst`/`trTT_subst`/`trS_subst` and `trT_reach` are the two commutations. The
+  names of the core are a parameter `Names`, not a fixed encoding.
+  `D_{C τ̄} ↦ dict (N.cls C |τ̄|) ⟦τ̄⟧`: the class name carries the number of parameters,
+  because the law `slot` holds for any `q` and `Typ.dproj` needs `|τ̄| = k`.
+- **Terms** (`CoreTr.lean`). `struct_C` and `prim_p` are families over the record type and
+  the constraint (`struct_C : D_{C τ₁} →P … →P D_{C τ}` for each `τ`). The dictionary terms
+  `Dict.strct C τ` and `Dict.prim p q` carry them ([structural dictionaries are type-indexed families](../docs/formal/elaboration.md#structural-and-primitive-dictionaries-are-families-indexed-by-type),
+  [structural dictionary terms carry their type](../docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type)), so `Tr N γ δ e e'` is a function of the term: `meth`/`slot ↦ proj`,
+  `inst`/`const ↦ glob`, `lamD l ↦ λ^l` (`lamsC`, the premise `k < l` at `l - 1 - k`, `dext`).
   `ite ↦ match c with true → a | _ → b` and `caseOpt ↦ match e with Some y → s | _ → n`:
   the last arm `_` makes `Covers` immediate, and `None` need not be declared.
 - **Typing.** `Has Γ Δ e t φ := ∀ Ψ Θ Γc γ δ, Corr Γc Γ Δ γ δ → ∃ e', Tr γ δ e e' ∧
   Typ S Ψ Θ Γc e' (.ex ⟦t⟧ ⟦φ⟧)`. `Corr` says `Γc[γ x]? = ⟦Γ[x]?⟧` and
   `Γc[δ k]? = D_{Δ[k]?}`, `none` included, so the held premises transfer (`corr_held`).
-- **Hypotheses** (`Real`). *Deviation 4:* only the signature: a record type per class and
+- **Hypotheses** (`Real`), on the signature only: a record type per class and
   number of parameters with its slots (`N.slot i : D_{Sᵢ}`, `Prog.super` of `⟨C, vars n⟩`),
   for the class's own parameters a field per method at its scheme with the own variables
   first (`rot`), the method scheme closed and `s.ctx = ⟨C, vars p⟩ :: rest`; the closed
   schemes of the globals of instances (`instTy`), constants, structural and primitive
   dictionaries; `Some : ∀a. a → Option a`. The bodies of the globals (`RootTy`) and the
-  slot fields of `struct_C` (Р180) are about the run and move to P4a4.
+  slot fields of `struct_C` ([structural slot equals structural superclass dictionary](../docs/formal/elaboration.md#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries)) are about the run: `RealRun` and
+  `RootTy` below.
 - **The laws** (`CoreLaws.lean`, `CoreDict.lean`), each one rule of the core:
   `var`, `dvar` — `Typ.var`; `const`, `inst`, `strct`, `prim` — `Typ.glob` (`has_glob`,
   `trTT_inst`); `app`, `dapp`, `dap` — `Typ.app`; `lam` — `Typ.lam`; `lamD` — `Typ.lam`
   `l` times (`lams_typ`); `let_` — `Typ.letGen` with `Φ = ∅`, and `Typ.let_` when `k = 0`
   and the right side runs at `φ`; `meth`, `slot` — `Typ.dproj` (`rot_inst`); `ite`,
   `caseOpt` — `Typ.match_`.
-- *Deviation 5:* `typingTarget` has an empty run (`Rel = True`, no steps), so that T6(a)
-  is stated now; P4a4 gives the run of the core with the same laws.
-- **Р188, decided; superseded by the `CRow` parameter.** `τ^q` on types other than arrows
-  and `Eff` is not added to the core.
-  It is a new type former with its (≤-Cap) in `Le`, and every case analysis on `Ty` and
-  `Le` changes: substitution, `⌈·⌉`, canonical forms, shapes and patterns, `held`,
-  preservation, T4 and T4.3 — 45 of the 60 files of `Formal/` use them. A lazy instance or
-  constant is a global declared in `Real` at its scheme without the value qualifier; its
-  body is a hypothesis `RootTy` that the core does not derive for it. T6(a) does not read
-  bodies; the run (P4a4) and T1–T3 of a program with a lazy instance rest on that
-  hypothesis. Р188 is now done without a new type former: the hidden qualifier of `Eff` and
+- **Two targets.** `typingTarget` has an empty run (`Rel = True`, no steps): T6(a) reads
+  no run. `runTarget` has the run of the core with the same laws.
+- **No value qualifier on other types.** `τ^q` on types other than arrows and `Eff` is not
+  in the core: it would be a new type former with its (≤-Cap) in `Le`, and every case
+  analysis on `Ty` and `Le` would change (substitution, `⌈·⌉`, canonical forms, shapes and
+  patterns, `held`, preservation, T4 and T4.3). Instead the hidden qualifier of `Eff` and
   `Seq` is a parameter of kind `CRow` of the type (simplification 15), the schemes of
-  `Sugar` show it (`elaboration.md` Р188 gives the translation of the checker's schemes),
-  and a lazy body is `MkEff (task …)` of the nominal type `Eff q b` with the field
-  `eff ∅ ∅ b {q}`: `typ_effPure_tr`, `typ_effMap2_tr` and `typ_effBind_tr` (`LazyEff.lean`)
-  derive the bodies of `Monad Eff` at the schemes of `Sugar` with the class variable `Eff`.
+  `Sugar` show it (`elaboration.md` gives the translation of the checker's schemes,
+  [Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)), and a lazy body is `MkEff (task …)` of the nominal type `Eff q b`
+  with the field `eff ∅ ∅ b {q}`: `typ_effPure_tr`, `typ_effMap2_tr` and `typ_effBind_tr`
+  (`LazyEff.lean`) derive the bodies of `Monad Eff` at the schemes of `Sugar` with the class
+  variable `Eff`.
 
-#### P4a4: `Rel` and `Sim`
+#### The run: `Rel` and `Sim`
 
 - **States.** `St := Cfg`, `load e := ⟨[], [], tr e⟩`, `Step := ∃ l, CStep root l`.
   `Obs := Lit`, observed when the main thread is a literal (ground observation).
-- **Two model fixes came first.** Р196: `Tr` chose the structural (primitive) global
-  with the type, and a record type that the type of the whole term does not show is free,
-  so two `≈` terms could run different globals; `Dict.strct C τ` and `Dict.prim p q` now
-  carry it, `Tr` is a function, and `≈` has `struct_C^τ ≈ struct_C^{τθ}`,
-  `prim_q ≈ prim_{qθ}` (the run erases the type). Р197: the slot rules of `≈` dropped
-  arguments the slot does not mention, so `≈` did not keep results and the induction on
-  `≈` ("≈ dictionaries give one value") broke at `trans`; they now take closed derivations,
-  as `slot_ok` uses them.
-- **P4a4a, done: the run of dictionaries.**
+- **Two properties of the model the run needs.** `Dict.strct C τ` and `Dict.prim p q` carry
+  the type ([structural dictionary terms carry their type](../docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type)): a record type that the type of the whole term does not
+  show is free, so a `Tr` that chose the structural (primitive) global by the type could run
+  different globals for two `≈` terms. `Tr` is a function, and `≈` has
+  `struct_C^τ ≈ struct_C^{τθ}`, `prim_q ≈ prim_{qθ}` (the run erases the type). The slot
+  rules of `≈` take closed derivations, as `slot_ok` uses them ([slot equivalence over closed derivations only](../docs/formal/elaboration.md#slot-rules-of-equivalence-take-closed-derivations)):
+  slot rules that drop arguments the slot does not mention make `≈` lose results, and the
+  induction on `≈` ("≈ dictionaries give one value") breaks at `trans`.
+- **The run of dictionaries.**
   - The core (`Decomp.lean`, `Closed.lean`, `SubstComp.lean`): `Redex`, `frame_inj`,
     `decomp_eq` (a term has one ordered decomposition `plug E r` with a redex `r`),
     `decomp_frame`; `PStep`, a pure step of one thread that reads neither the store nor
@@ -761,40 +723,38 @@ five places.
     `λ^l. drec …` with the slot `N.slot i` the translation of `slots[i]`, `struct_C^τ` has
     the slot `struct_S^τ (δ̄.$slotᵢ)`, a primitive one is a value, `N.strct C (τθ)` and
     `N.strct C τ` have one body); `ent_eval` (a closed derivation evaluates, without any
-    slot projection, so no induction on К5 is needed); `trDt_sem` (the values of a
+    slot projection, so no induction on K5 is needed); `trDt_sem` (the values of a
     translated dictionary depend only on the values of its variables); **`eqv_sem`**: `≈`
     dictionaries have the same values, for every term, typed or not.
-- **Rejected alternatives.** Inert dictionaries, where projection unfolds one slot, need
+- **Alternatives that fail.** Inert dictionaries, where projection unfolds one slot, need
   Church–Rosser and standardisation of slot rewriting under call-by-value. A `Rel` built
-  from translations of `Eqv` pairs (the earlier plan) is not a simulation: through `trans` a
-  pair may hold a junk dictionary that is stuck (Р197). Choosing a typed translation in
-  `load` (the earlier plan) is unsound (Р196).
-- **P4a4b, done: `Rel`.**
+  from translations of `Eqv` pairs is not a simulation: through `trans` a pair may hold a
+  junk dictionary that is stuck. Choosing a typed translation in `load` is unsound.
+- **`Rel`.**
   - `Cg B x a b` (`CoreCg.lean`): the congruence on core terms generated by base pairs `B`,
-    one rule per term former. *Deviation 1:* it has an index: inside a `drec` (down the spine
-    and through `app` and `rcons`) no base pair may stand at the top, because `matchP`
-    inspects the fields of a record without evaluating them (`rfield`); a value has no base
-    pair at the top anyway, so it moves to either index (`Cg.value`). Closed base pairs make
-    `Cg` closed under renaming and substitution (`Cg.rename`, `Cg.subst`, pointwise `SubR`).
-  - *Deviation 2: no catching up.* The left side of a base pair is never a value
-    (`BNoVal`), so a value is related only to a value of the same shape (`Cg.value`), and the
-    other side never has to evaluate a dictionary before the same rule applies. When the left
-    side of a pair becomes a value, the right side reaches that value at once (`DP.step`), and
-    the pair is gone.
+    one rule per term former. It has an index: inside a `drec` (down the spine and through
+    `app` and `rcons`) no base pair may stand at the top, because `matchP` inspects the
+    fields of a record without evaluating them (`rfield`); a value has no base pair at the
+    top anyway, so it moves to either index (`Cg.value`). Closed base pairs make `Cg`
+    closed under renaming and substitution (`Cg.rename`, `Cg.subst`, pointwise `SubR`).
+  - No catching up: the left side of a base pair is never a value (`BNoVal`), so a value is
+    related only to a value of the same shape (`Cg.value`), and the other side never has to
+    evaluate a dictionary before the same rule applies. When the left side of a pair becomes
+    a value, the right side reaches that value at once (`DP.step`), and the pair is gone.
   - The operations of the steps on related values (`CoreCgOps.lean`): `field`, `matchP`,
     `envLookup`, `envAppend`, `IsEnv`, `build`, `Final`; related contexts
     (`CoreCgFrames.lean`): `FrR`, plugging, order, `lookupE`, `withs`, and `Cg.decomp`, a
     related term around a hole is a base pair at some frame or the same frames around a
     related hole.
   - `DP S root a b` (`CoreRel.lean`), the base pairs: `a` is not a value and is typed in the
-    empty context at the pure stage, `b` is closed, `SemEq root a b`. *Deviation 3:* the
-    typing of the core, not a syntactic class of dictionary terms, gives the open point:
-    a step whose redex lies inside `a` is a `PStep` of `a` (`dp_calm`: a pure term has no
-    runtime redex, `ask`, registration or `raise`), and a `PStep` keeps the typing
-    (`pstep_typed`, with `RootTy`). No hypothesis on `Names` is needed.
+    empty context at the pure stage, `b` is closed, `SemEq root a b`. The typing of the core,
+    not a syntactic class of dictionary terms, gives the open point: a step whose redex lies
+    inside `a` is a `PStep` of `a` (`dp_calm`: a pure term has no runtime redex, `ask`,
+    registration or `raise`), and a `PStep` keeps the typing (`pstep_typed`, with `RootTy`).
+    No hypothesis on `Names` is needed.
   - `CfgR B`: related main threads, stores pointwise, regions pointwise (`RgR`: one `live`
     flag, related children and finalizers), with `RgR.setKid`.
-- **P4a4c, done: the target with the run.**
+- **The target with the run.**
   - `step_rel` (`CoreHead.lean`, `CoreStep.lean`, `CoreSim.lean`). For one thread
     (`thread_sim`): `Cg.decomp` at the redex of each `Step` rule; a base pair around it is
     `dp_calm` and `DP.step`, and the other side waits or reaches the value of the pair by pure
@@ -807,17 +767,43 @@ five places.
     `λδ̄`), through `trans` and junk terms. Its congruence closure of closed pairs `DSim` is
     transitive, so `Eqv ⇒ DSim` (`eqv_dsim`) once the slots of an instance name only its
     premises (`SlotsBelow`); the bodies of the instances are closed, so `RootTy` and
-    `RealRun` give it (`slots_below`, Р198). A closed pair of typed dictionaries is a base
-    pair `DP`: `eqv_sem` gives `SemEq`, and `DTyp` the core's typing at the pure stage
-    (`DTy.core`). `trE` is the function `Tr` is (`Tr.eq`); `load e = ⟨[], [], trE id id e⟩`.
-  - *Deviation:* the typing of the core of the whole term does not show its dictionaries in
-    the empty context, so `runTarget` types terms with `RHas`, the core's `Has` together with
-    `DTyp` of every dictionary of the term; the laws of `Target` give both (Р199). Closing the
-    premises of an elaboration gives `RHas` of the closed filling (`T6a_close`).
+    `RealRun` give it (`slots_below`, [equivalence as closure of closed pairs](../docs/formal/elaboration.md#equivalence-relates-open-dictionaries)). A closed pair of typed
+    dictionaries is a base pair `DP`: `eqv_sem` gives `SemEq`, and `DTyp` the core's typing
+    at the pure stage (`DTy.core`). `trE` is the function `Tr` is (`Tr.eq`);
+    `load e = ⟨[], [], trE id id e⟩`.
+  - The typing of the core of the whole term does not show its dictionaries in the empty
+    context, so `runTarget` types terms with `RHas`, the core's `Has` together with `DTyp`
+    of every dictionary of the term; the laws of `Target` give both
+    ([dictionaries typed closed in the run target](../docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)). Closing the premises of an elaboration gives `RHas` of the
+    closed filling (`T6a_close`).
   - `runTarget hR hRun hroot : Target P` with `Real`, `RealRun` and `RootTy`; `T6b_core` is
-    `T6b_target` for it. `#print axioms T6b_core`: `propext`, `Classical.choice`,
-    `Quot.sound`.
+    `T6b_target` for it: T6(b) for the core with its run, without the hypothesis `Sim`
+    ([no base pairs inside dictionary records](../docs/formal/elaboration.md#record-patterns-read-dictionary-fields-without-evaluating-them)).
 
-**Order.** P4a1 and P4a2 are independent; they can run in parallel in separate
-worktrees, and both touch this README. P4a3 needs both, and P4a4 needs P4a3. Record
-where each piece stops in **Status** above.
+### The witness
+
+`Formal/Elab/Witness/` is one program that meets every hypothesis of `T6a_core` and
+`T6b_core` (simplification 11): `Eq` (an instance on `Int`, structural on a record),
+`Applicative`/`Monad` of the lazy `Eff` and of an eager `OptQ`, `Alternative OptQ`,
+`Iterable ListQ` and all of `Sugar`, with `Coherent` (`coherent`), `Real` (`real`), the
+bodies of the globals (`rootTy`, `realRun`) and the constants of `Γ₀` closed
+(`consts_closed`). Its own schemes are written with `bindTy`, `map2Ty` and `eachSch`, and `S`
+equates them with the generated ones of `PreludeSchemes.lean` by `rfl`.
+
+- `witness_T6a`, `witness_T6a_do` and `witness_T6b` (`Witness/Main.lean`) are `T6a_core`,
+  `T6a_do_core` and `T6b_core` with every hypothesis discharged; `do { x <- pure (); pure x }`
+  desugars and elaborates over `Eff` and over `OptQ` and is typed in the core (`do_eff`,
+  `do_opt`).
+- `witness_T6b_example` (`Witness/T6b.lean`) is that block over `Eff` under the premise
+  `Monad Eff` closed by the instance `I2`, with `Applicative Eff` for `pure` from the instance
+  `I1` in one filling and from the slot of `Monad Eff` in the other. Both typings `RHas` are
+  proved by the laws of `runTarget` (`has_do`), and the observations of the runs are equal.
+  It has no premises.
+- `witness_T6b_closed` is T6(b) for any two elaborations of one source term in the empty
+  contexts (`Δ = []`), typed by T6(a) for `runTarget`.
+- `witness_T6b_open` is the same under premises `Δ` closed by any types `θ` and closed
+  dictionaries `ρ` to ground constraints ([dictionaries typed closed in the run target](../docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)): the typings `RHas` of
+  the closed fillings `s[d̄ρ]` come from `T6a_close`, T6(a) with the premises closed, for
+  `runTarget`. It needs the skeleton's holes outside the abstractions over dictionaries
+  (`Tm.Skel`), the constants of `Γ₀` closed (`consts_closed`), and `struct_C^τ` typed at
+  `τθ` ([structural dictionaries typed at any type instance](../docs/formal/elaboration.md#structural-dictionaries-were-typed-only-at-their-own-record-type)).

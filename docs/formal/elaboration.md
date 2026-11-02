@@ -1,68 +1,68 @@
 # λFlick: elaboration
 
-Сверено с кодом на `bea06b9e`; расхождения §5 внесены в следующих коммитах. Описывает сведение поверхностного языка в ядро `core.md`. Классы и экземпляры становятся передачей словарей. `do`, `for`, `?` и прямые вызовы становятся формами ядра. Расхождения со спекой, чекером и кодогеном и решения по ним — в §5; номера продолжают список `runtime.md`.
+This document describes the elaboration of the surface language into the core of `core.md`. Classes and instances become dictionary passing. `do`, `for`, `?` and direct calls become core forms. Divergences from the spec, the checker and the code generator, and how each is resolved, are in §5.
 
-Ссылки — как в `core.md`. Пути чекера даны от `flick-core/src/types/`, сведения в IR — от `flick-core/src/ir/`, кодогена — от `flick-core/src/codegen/`. Пробы §5 собраны `flick build` и запущены на Node (`--emit js`) и как исполняемый файл Go (`--emit go`).
+References are as in `core.md`. Checker paths are relative to `flick-core/src/types/`, IR lowering paths to `flick-core/src/ir/`, code generator paths to `flick-core/src/codegen/`. The probes of §5 were built with `flick build` and run on Node (`--emit js`) and as a Go executable (`--emit go`).
 
-## 0. Область
+## 0. Scope
 
-Сводится:
+Elaborated here:
 
-- классы с одним и несколькими параметрами, суперклассы, функциональные зависимости, методы по умолчанию;
-- экземпляры с контекстом и `deriving`;
-- ограничения в сигнатурах, в аннотациях и в параметрах высшего ранга;
-- `do` с `<-`, `and`, охранником `if` и `let`;
+- classes with one or several parameters, superclasses, functional dependencies, default methods;
+- instances with a context, and `deriving`;
+- constraints in signatures, in annotations and in higher-rank parameters;
+- `do` with `<-`, `and`, an `if` guard and `let`;
 - `for … yield`, `[for …]`, `for … do`;
-- постфиксный `?`;
-- прямые вызовы.
+- postfix `?`;
+- direct calls.
 
-| Не входит | Где | Как модель это учитывает |
+| Not covered | Where | How the model accounts for it |
 | - | - | - |
-| Решение примитивов строк `Record` (`HasField`, `Lacks`, `Remove`, `Project`, `UnionDisjoint`, `Map`, `Labels`) | `classes/prims.rs` | Правило (Prim) §2.3 — чёрный ящик: оно даёт `Dict::Primitive` с метками, которые нужны операции в рантайме |
-| Захваты и регионы в словарях | `regions.md` | Словарь собран из значений верхнего уровня, своих захватов у него нет (`regions.md` §0) |
-| Сахар записей, операторы, `\|>`, блоки `sql` и `ui` | `core.md` §1.4 | Сводятся до этапа, который описан здесь, или константами Γ₀ |
-| Оптимизации: `opt/specialize.rs`, `opt/fold.rs`, `js/expr.rs` `direct_method`, `opt/fuse.rs` | гипотеза Г2 `core.md` | Опираются на когерентность (T6(b)): заменяют словарь известным экземпляром или вызовом его метода |
-| Порядок проверки, сообщения, бюджет решателя как число | — | Бюджет входит в модель только как отказ: исчерпание — ошибка `FLICK-C009`, а не решение |
+| Solving the `Record` row primitives (`HasField`, `Lacks`, `Remove`, `Project`, `UnionDisjoint`, `Map`, `Labels`) | `classes/prims.rs` | Rule (Prim) of §2.3 is a black box: it yields a `Dict::Primitive` with the labels the operation needs at run time |
+| Captures and regions in dictionaries | `regions.md` | A dictionary is built from top-level values and has no captures of its own (`regions.md` §0) |
+| Record sugar, operators, `\|>`, `sql` and `ui` blocks | `core.md` §1.4 | Elaborated before the stage described here, or as constants of Γ₀ |
+| Optimizations: `opt/specialize.rs`, `opt/fold.rs`, `js/expr.rs` `direct_method`, `opt/fuse.rs` | hypothesis G2 of `core.md` | They rely on coherence (T6(b)): they replace a dictionary with a known instance or with a call of its method |
+| Checking order, messages, the solver budget as a number | — | The budget enters the model only as a failure: exhausting it is the error `FLICK-C009`, not a solution |
 
-### 0.1 Цель сведения: λFlick⁺
+### 0.1 Elaboration target: λFlick⁺
 
-Ядро `core.md` предикативно и ранга 1. Словарю нужно больше:
+The core of `core.md` is predicative and rank 1. A dictionary needs more:
 
-- метод с собственными переменными (`map : ∀a b. (a → b) → f a → f b`) — поле записи с `∀`-типом;
-- параметр высшего ранга с ограничением (`(∀a. Show a ⇒ a → String) → String`) — стрелка, чей параметр — `∀`-тип.
+- a method with its own variables (`map : ∀a b. (a → b) → f a → f b`) is a record field with a `∀`-type;
+- a higher-rank parameter with a constraint (`(∀a. Show a ⇒ a → String) → String`) is an arrow whose parameter has a `∀`-type.
 
-Цель сведения — **λFlick⁺**: ядро `core.md` с регионами и захватами `regions.md`, в котором `∀ᾱ. τ` допускается как тип поля записи словаря и как тип параметра стрелки. Абстракция и применение типа неявны, как в ядре: `Λᾱ` и `[τ̄]` не пишутся, правила (Var) и (Let-Sig) действуют для полей и параметров. Квантор по-прежнему пробегает только монотипы (предикативность). Р54 записывает это требование к механизации.
+The elaboration target is **λFlick⁺**: the core of `core.md` with the regions and captures of `regions.md`, in which `∀ᾱ. τ` is allowed as the type of a dictionary record field and as the type of an arrow parameter. Type abstraction and application are implicit, as in the core: `Λᾱ` and `[τ̄]` are not written, and rules (Var) and (Let-Sig) apply to fields and parameters. The quantifier still ranges over monotypes only (predicativity). [This is a requirement on the mechanization](#dictionaries-need-polymorphic-fields-and-higher-rank-parameters).
 
-Сведение сохраняет захваты (Р185): у стрелки источника есть квалификатор, схемы связывают и переменные захватов, (Lam) источника требует, чтобы стрелка показывала то, что держит замыкание, как (Lam) `regions.md`. Словарь `D_C ᾱ` — номинальный тип записи, который ничего не достигает: `⌈D_C τ̄⌉ = ∅`. Это верно, потому что словарь собран из значений верхнего уровня и переменных-словарей (§0), и правило записи словаря требует, чтобы она ничего не держала.
+Elaboration preserves captures ([captures in the elaboration](#t6a-without-captures-does-not-carry-over-to-the-core-with-regions)): a source arrow carries a qualifier, schemes also bind capture variables, and the source (Lam) requires the arrow to show what the closure holds, as (Lam) of `regions.md` does. A dictionary `D_C ᾱ` is a nominal record type that reaches nothing: `⌈D_C τ̄⌉ = ∅`. This holds because a dictionary is built from top-level values and dictionary variables (§0), and the dictionary record rule requires the record to hold nothing.
 
-## 1. Поверхность
+## 1. Surface
 
-### 1.1 Классы и экземпляры
+### 1.1 Classes and instances
 
 ```text
 cls  ::= class (Q̄ ⇒)? C ᾱ (| fd̄)? = (m : σ)* (let m = e)*
-fd   ::= i₁ … iₖ → j₁ … jₗ                позиции параметров класса
+fd   ::= i₁ … iₖ → j₁ … jₗ                positions of class parameters
 inst ::= instance (Q̄ ⇒)? C τ̄ = (let m = e)*
        | type T ᾱ = … deriving C̄
-Q    ::= C τ̄                              ограничение
-σ    ::= ∀ᾱ. Q̄ ⇒ τ                         схема
+Q    ::= C τ̄                              constraint
+σ    ::= ∀ᾱ. Q̄ ⇒ τ                         scheme
 ```
 
-Класс `C ᾱ` с суперклассами `S₁ ῡ₁, …, Sₖ ῡₖ` и методом `m : ∀β̄. Q̄ ⇒ τ`. Сам метод получает схему `∀ᾱ β̄. (C ᾱ, Q̄) ⇒ τ`:
+Take a class `C ᾱ` with superclasses `S₁ ῡ₁, …, Sₖ ῡₖ` and a method `m : ∀β̄. Q̄ ⇒ τ`. The method itself gets the scheme `∀ᾱ β̄. (C ᾱ, Q̄) ⇒ τ`:
 
-- ограничение класса стоит первым;
-- параметры класса стоят перед собственными переменными.
+- the class constraint comes first;
+- the class parameters come before the method's own variables.
 
-Чекер:
+Checker:
 
-- синтаксис: `syntax/parser/decl.rs` `class_decl`, `fundep`, `instance_decl`, `context`, `deriving`;
-- класс: `decls.rs` `members` (схема метода), `declare_methods`, `fundep` (имена → позиции, `env.rs` `Fundep`), `Form::Class`;
-- циклы суперклассов — `classes/declare.rs` `declare_classes` (`FLICK-C008`);
-- экземпляр: `classes/declare.rs` `instance_head` (голова каноническая, псевдонимы раскрыты), `admit`; методы — `instances.rs` `instance_methods`, `method_type`, `compare_method`;
-- лишнее ограничение в сигнатуре метода — `FLICK-C010`, нет метода — `FLICK-C011`;
-- `deriving`: `classes/derive.rs` `derive`. Голова `C (T ᾱ)` не канонизируется, контекст — `C α` для каждого параметра вида `Type`, словари полей — `derived_fields`.
+- syntax: `syntax/parser/decl.rs` `class_decl`, `fundep`, `instance_decl`, `context`, `deriving`;
+- class: `decls.rs` `members` (method scheme), `declare_methods`, `fundep` (names → positions, `env.rs` `Fundep`), `Form::Class`;
+- superclass cycles: `classes/declare.rs` `declare_classes` (`FLICK-C008`);
+- instance: `classes/declare.rs` `instance_head` (canonical head, aliases expanded), `admit`; methods: `instances.rs` `instance_methods`, `method_type`, `compare_method`;
+- an extra constraint in a method signature is `FLICK-C010`, a missing method is `FLICK-C011`;
+- `deriving`: `classes/derive.rs` `derive`. The head `C (T ᾱ)` is not canonicalized, the context is `C α` for every parameter of kind `Type`, the field dictionaries come from `derived_fields`.
 
-### 1.2 Сахар
+### 1.2 Sugar
 
 ```text
 e ::= … | do { s̄ } | for { c̄ } yield e | [for { c̄ } yield e] | for { c̄ } do e | e?
@@ -70,193 +70,193 @@ s ::= p <- e | p₁ <- e₁ and … and pₙ <- eₙ | let p = e | if e | e
 c ::= p <- e | if e | let p = e
 ```
 
-Последний оператор `do` — выражение. Чекер: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`. Синтаксис — `reference/grammar.md` «`do`», «`for`», `?`.
+The last statement of a `do` is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`. Syntax: `reference/grammar.md` "`do`", "`for`", `?`.
 
-## 2. Словари
+## 2. Dictionaries
 
-### 2.1 Типы словарей
+### 2.1 Dictionary types
 
-Каждому классу `C ᾱ` с суперклассами `S₁ ῡ₁, …, Sₖ ῡₖ` и методами `mⱼ : ∀β̄ⱼ. Q̄ⱼ ⇒ τⱼ` (собственные схемы, без `C ᾱ`) соответствует тип записи λFlick⁺:
+Every class `C ᾱ` with superclasses `S₁ ῡ₁, …, Sₖ ῡₖ` and methods `mⱼ : ∀β̄ⱼ. Q̄ⱼ ⇒ τⱼ` (their own schemes, without `C ᾱ`) corresponds to a λFlick⁺ record type:
 
 ```text
 D_C ᾱ = { $slot₁ : D_{S₁} ῡ₁, …, $slotₖ : D_{Sₖ} ῡₖ,  m₁ : ⟦∀β̄₁. Q̄₁ ⇒ τ₁⟧, …, mₙ : ⟦∀β̄ₙ. Q̄ₙ ⇒ τₙ⟧ }
 
 ⟦∀β̄. Q₁, …, Qₗ ⇒ τ⟧ = ∀β̄. D_{Q₁} →P … →P D_{Qₗ} →P ⟦τ⟧
-⟦τ⟧                  — то же сведение внутри τ (параметры высшего ранга)
+⟦τ⟧                  — the same elaboration inside τ (higher-rank parameters)
 D_{C τ̄}              = D_C ᾱ [ᾱ := τ̄]
 ```
 
-У схемы `let` с ограничениями стрелки словарей несут квалификатор `q` — то, что держит правая часть: `⟦∀ᾱ. Q̄ ⇒ τ⟧_q = ∀ᾱ. D_{Q₁} →P^q … →P^q ⟦τ⟧` (Р187). У методов, констант Γ₀ и экземпляров `q = ∅`.
+For a constrained `let` scheme, the dictionary arrows carry the qualifier `q`, which is what the right-hand side holds: `⟦∀ᾱ. Q̄ ⇒ τ⟧_q = ∀ᾱ. D_{Q₁} →P^q … →P^q ⟦τ⟧` ([dictionary arrows carry the qualifier](#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds)). For methods, constants of Γ₀ and instances, `q = ∅`.
 
-`$slotᵢ` — имя суперкласса `Sᵢ`. Если у класса два суперкласса с одним именем, к имени добавляется позиция (`classes/mod.rs` `super_slot`, Р49). Ограничение `Fiber.Outlives` словаря не передаёт и в `⟦·⟧` пропадает (`typing.rs` `passes_dictionary`): его решает чекер регионов.
+`$slotᵢ` is the name of the superclass `Sᵢ`. If a class has two superclasses with the same name, the position is appended to the name (`classes/mod.rs` `super_slot`, [slots distinguished by position](#superclass-slots-named-by-the-bare-class-name)). The constraint `Fiber.Outlives` passes no dictionary and vanishes under `⟦·⟧` (`typing.rs` `passes_dictionary`): the region checker solves it.
 
-В рантайме словарь — объект:
+At run time a dictionary is an object:
 
-- методы — его поля;
-- суперклассы и методы по умолчанию — ленивые поля (геттер `get $S()` в JS, `d.Lazy("$S", …)` в Go).
+- methods are its fields;
+- superclasses and default methods are lazy fields (a getter `get $S()` in JS, `d.Lazy("$S", …)` in Go).
 
-Ленивость не видна модели: поле — чистое значение, а рекурсия словарей экземпляра через суперклассы конечна, потому что граф суперклассов ацикличен. Кодоген: `js/items.rs` `instance`, `go/items.rs` `instance`.
+Laziness is invisible to the model: a field is a pure value, and the recursion of instance dictionaries through superclasses is finite because the superclass graph is acyclic. Code generator: `js/items.rs` `instance`, `go/items.rs` `instance`.
 
-### 2.2 Суждения
+### 2.2 Judgments
 
 ```text
-Γ; Δ ⊢ e : τ ! φ ⇝ e'      e имеет тип τ и эффект φ, e' — его сведение в λFlick⁺
-Δ ⊩ Q ⇝ d                    ограничение Q следует из посылок Δ и экземпляров; d — словарь
-Δ ::= · | Δ, δ : Q            посылки с переменными-словарями
+Γ; Δ ⊢ e : τ ! φ ⇝ e'      e has type τ and effect φ; e' is its elaboration into λFlick⁺
+Δ ⊩ Q ⇝ d                    constraint Q follows from the givens Δ and the instances; d is the dictionary
+Δ ::= · | Δ, δ : Q            givens with dictionary variables
 ```
 
-`d` — терм словаря:
+`d` is a dictionary term:
 
 ```text
 d ::= δ | d.$slot | I d̄ | struct_C^τ d̄ | prim_Q ℓ̄
 ```
 
-- `I` — словарь экземпляра (значение верхнего уровня модуля экземпляра, функция от словарей контекста);
-- `struct_C^τ` — словарь записи или кортежа `τ`, который строит компилятор (`$rt.structural`). Рантайм тип стирает и берёт метки из значения; в терме он нужен сведению в типизированное ядро (Р196);
-- `prim_Q ℓ̄` — примитив строки с метками.
+- `I` is an instance dictionary (a top-level value of the instance's module, a function of the context dictionaries);
+- `struct_C^τ` is the dictionary of a record or tuple `τ` built by the compiler (`$rt.structural`). The runtime erases the type and takes the labels from the value; the term needs it for elaboration into the typed core ([dictionary terms carry their type](#the-structural-dictionary-term-carries-its-type));
+- `prim_Q ℓ̄` is a row primitive with labels.
 
-Это ровно случаи `Dict` (`classes/mod.rs`): `Given`, `Super`, `Instance`, `Structural`, `Primitive`. `Dict::Error` стоит на месте ограничения, о котором уже сообщено, и в сведении принятой программы не встречается.
+These are exactly the cases of `Dict` (`classes/mod.rs`): `Given`, `Super`, `Instance`, `Structural`, `Primitive`. `Dict::Error` stands in for a constraint that has already been reported and does not occur in the elaboration of an accepted program.
 
-Сведение `⟦Γ⟧`: `x : σ` становится `x : ⟦σ⟧`, каждая посылка `δ : Q` — переменной `δ : D_Q`.
+Elaboration `⟦Γ⟧`: `x : σ` becomes `x : ⟦σ⟧`, and every given `δ : Q` becomes a variable `δ : D_Q`.
 
-### 2.3 Вывод ограничений
+### 2.3 Constraint entailment
 
-Замыкание посылок по суперклассам (`classes/solve.rs` `closure`):
+Closure of the givens under superclasses (`classes/solve.rs` `closure`):
 
 ```text
-δ : Q ∈ Δ                     δ : Q ∈ Δ*     Q = C τ̄    Sᵢ ῡᵢ — i-й суперкласс C ᾱ
+δ : Q ∈ Δ                     δ : Q ∈ Δ*     Q = C τ̄    Sᵢ ῡᵢ is the i-th superclass of C ᾱ
 ──────────  (Δ-Given)        ─────────────────────────────────────────────────── (Δ-Super)
 δ : Q ∈ Δ*                    δ.$slotᵢ : Sᵢ ῡᵢ[ᾱ := τ̄] ∈ Δ*
 ```
 
-Если одно ограничение достижимо двумя путями, чекер оставляет первый: ближние посылки раньше внешних, внутри посылки — суперклассы по порядку (`closure` пропускает повтор по типу). Какой путь взят, не важно по лемме 6.1 (§4).
+If one constraint is reachable by two paths, the checker keeps the first: inner givens before outer ones, and within a given its superclasses in order (`closure` skips a repeat by type). Which path is taken does not matter, by Lemma 6.1 (§4).
 
-Правила вывода, в порядке, в котором их пробует `entail_one`:
+Entailment rules, in the order `entail_one` tries them:
 
 ```text
 d : Q ∈ Δ*
 ────────── (Given)
 Δ ⊩ Q ⇝ d
 
-Q = C τ̄    C — примитив строк Record    prims(Q) = ℓ̄
+Q = C τ̄    C is a Record row primitive    prims(Q) = ℓ̄
 ─────────────────────────────────────────────────── (Prim)
 Δ ⊩ Q ⇝ prim_Q ℓ̄
 
-C ∈ {Eq, Ord, Hash, Show}    τ — запись или кортеж с полями τ₁ … τₙ    Δ ⊩ C τᵢ ⇝ dᵢ
+C ∈ {Eq, Ord, Hash, Show}    τ is a record or tuple with fields τ₁ … τₙ    Δ ⊩ C τᵢ ⇝ dᵢ
 ───────────────────────────────────────────────────────────────────────────────── (Struct)
 Δ ⊩ C τ ⇝ struct_C^τ d̄
 
-instance Q̄' ⇒ C τ̄' ∈ 𝓘    τ̄ = τ̄'[β̄ := ῡ]    Δ ⊩ Q'ᵢ[β̄ := ῡ] ⇝ dᵢ  для каждого i
+instance Q̄' ⇒ C τ̄' ∈ 𝓘    τ̄ = τ̄'[β̄ := ῡ]    Δ ⊩ Q'ᵢ[β̄ := ῡ] ⇝ dᵢ  for each i
 ──────────────────────────────────────────────────────────────────────────────── (Inst)
 Δ ⊩ C τ̄ ⇝ I d̄
 ```
 
-Чекер:
+Checker:
 
-- `entail` — бюджет шагов и глубины (`Limits`, по умолчанию 100 000 и 256; `FLICK-C009`);
-- (Given) — `entail_one` по `givens`. Перед ним стоит кэш: решённое ограничение без переменных берётся оттуда. В кэш попадают только словари, построенные без посылок (`Dict::assumes`, Р48). Поэтому кэш даёт тот же словарь, что (Inst);
-- (Prim) — `classes/prims.rs` `primitive`;
-- (Struct) — `structural_instance`;
-- (Inst) — `by_instance`: первая голова, для которой `head_match` (`matching.rs` `match_type`) даёт `Yes`. Сопоставление связывает только переменные экземпляра. При `Unknown` (мешают только метапеременные) ограничение откладывается. Затем `by_context` решает контекст;
-- 𝓘 — экземпляры, которые видит модуль: встроенные, всех модулей, от которых он зависит, и свои (`env.rs` `instances`).
+- `entail`: a budget of steps and depth (`Limits`, by default 100 000 and 256; `FLICK-C009`);
+- (Given): `entail_one` over `givens`. A cache comes first: a solved constraint without variables is taken from it. Only dictionaries built without givens enter the cache (`Dict::assumes`, [the cache excludes them](#the-solver-cache-stored-dictionaries-built-from-givens)). The cache therefore yields the same dictionary as (Inst);
+- (Prim): `classes/prims.rs` `primitive`;
+- (Struct): `structural_instance`;
+- (Inst): `by_instance`, the first head for which `head_match` (`matching.rs` `match_type`) returns `Yes`. Matching binds only the instance's variables. On `Unknown` (only metavariables are in the way) the constraint is deferred. Then `by_context` solves the context;
+- 𝓘 is the set of instances the module sees: the built-in ones, those of every module it depends on, and its own (`env.rs` `instances`).
 
-Функциональные зависимости уточняют типы, а не словари:
+Functional dependencies refine types, not dictionaries:
 
 ```text
-fd = ī → j̄ класса C    (C σ̄ ∈ Δ*  или  голова экземпляра C σ̄ сопоставима по ī)    τ̄ ≡ σ̄ на ī
+fd = ī → j̄ of class C    (C σ̄ ∈ Δ*  or  an instance head C σ̄ matches on ī)    τ̄ ≡ σ̄ on ī
 ───────────────────────────────────────────────────────────────────────────── (Improve)
-τⱼ := σⱼ  для j ∈ j̄,  затем вывод C τ̄ заново
+τⱼ := σⱼ  for j ∈ j̄, then entail C τ̄ again
 ```
 
-Чекер: `improve_by_givens` перед (Prim)/(Struct)/(Inst), `improve_by_instances` после неудачного (Inst). Каждое уточнение тратит бюджет.
+Checker: `improve_by_givens` before (Prim)/(Struct)/(Inst), `improve_by_instances` after a failed (Inst). Every refinement spends budget.
 
-Отказы: `Missing` → `FLICK-C001`, `Stuck` к концу определения → `FLICK-C002`, `Budget` → `FLICK-C009` (`classes/report.rs` `report_classes`).
+Failures: `Missing` → `FLICK-C001`, `Stuck` at the end of a definition → `FLICK-C002`, `Budget` → `FLICK-C009` (`classes/report.rs` `report_classes`).
 
-### 2.4 Выражения
+### 2.4 Expressions
 
-Правила ядра (`core.md` §2.3) переносятся с тем же `φ` и сведением по структуре. Меняются три места: использование имени, сигнатура и проверка против `∀` с ограничениями.
+The core rules (`core.md` §2.3) carry over with the same `φ` and a structural elaboration. Three places change: the use of a name, a signature, and checking against a `∀` with constraints.
 
 ```text
-x : ∀ᾱ. Q₁ … Qₗ ⇒ τ ∈ Γ      τ̄ — монотипы      Δ ⊩ Qᵢ[ᾱ := τ̄] ⇝ dᵢ
+x : ∀ᾱ. Q₁ … Qₗ ⇒ τ ∈ Γ      τ̄ monotypes      Δ ⊩ Qᵢ[ᾱ := τ̄] ⇝ dᵢ
 ────────────────────────────────────────────────────────────── (Var-Dict)
 Γ; Δ ⊢ x : τ[ᾱ := τ̄] ! P ⇝ x d₁ … dₗ
 
-m — метод класса C, схема ∀ᾱ β̄. (C ᾱ, Q̄) ⇒ τ      Δ ⊩ C τ̄ ⇝ d₀      Δ ⊩ Qᵢ[…] ⇝ dᵢ
+m is a method of class C with scheme ∀ᾱ β̄. (C ᾱ, Q̄) ⇒ τ      Δ ⊩ C τ̄ ⇝ d₀      Δ ⊩ Qᵢ[…] ⇝ dᵢ
 ──────────────────────────────────────────────────────────────────────────── (Method)
 Γ; Δ ⊢ m : τ[ᾱ β̄ := τ̄ ῡ] ! P ⇝ d₀.m d₁ … dₗ
 ```
 
-Чекер:
+Checker:
 
-- `unify.rs` `instantiate` требует (`want`) каждое ограничение схемы на месте использования;
-- `solve_classes` решает их в конце группы определений;
-- `typing.rs` `record_dict` записывает словари по месту и порядку.
+- `unify.rs` `instantiate` wants (`want`) every constraint of the scheme at the use site;
+- `solve_classes` solves them at the end of the definition group;
+- `typing.rs` `record_dict` records the dictionaries by site and order.
 
-IR: `ir/lower/expr.rs` `name`. Для `Ref::Method` первый словарь — `ExprKind::Method { dict, name }` (проекция), остальные — `Dicts(e, d̄)` (`with_dicts`).
+IR: `ir/lower/expr.rs` `name`. For `Ref::Method` the first dictionary is `ExprKind::Method { dict, name }` (a projection), the rest are `Dicts(e, d̄)` (`with_dicts`).
 
 ```text
-σ = ∀ᾱ. Q₁ … Qₗ ⇒ τ₁    ᾱ ∩ ftv(Γ) = ∅    δ̄ свежие
+σ = ∀ᾱ. Q₁ … Qₗ ⇒ τ₁    ᾱ ∩ ftv(Γ) = ∅    δ̄ fresh
 Γ, ᾱ; Δ, δ₁ : Q₁, …, δₗ : Qₗ ⊢ e₁ : τ₁ ! φ₁ ⇝ e₁'
-ᾱ ≠ ∅  или  l > 0   ⇒   φ₁ = P
+ᾱ ≠ ∅  or  l > 0   ⇒   φ₁ = P
 Γ, x : σ; Δ ⊢ e₂ : τ ! φ₂ ⇝ e₂'
 ─────────────────────────────────────────────────────────────── (Let-Sig-Dict)
 Γ; Δ ⊢ let x : σ = e₁ in e₂ : τ ! φ₁ ⊔ φ₂ ⇝ let x : ⟦σ⟧ = λδ₁ … δₗ. e₁' in e₂'
 ```
 
-Посылка `l > 0 ⇒ φ₁ = P` нужна потому, что сведение делает правую часть функцией словарей. Рантайм-шаги правой части выполнялись бы при каждом использовании `x`, а не один раз. Эту посылку чекер проверял только при `ᾱ ≠ ∅` (Р55).
+The premise `l > 0 ⇒ φ₁ = P` is needed because elaboration turns the right-hand side into a function of dictionaries. The runtime steps of the right-hand side would then run at every use of `x` rather than once. The checker enforces it for every constraint that passes a dictionary, not only when `ᾱ ≠ ∅` ([constrained signature over a runtime right-hand side](#a-constrained-signature-over-a-runtime-right-hand-side)).
 
-Чекер:
+Checker:
 
 - (Let-Sig-Dict): `bindings.rs` `check_signed` → `skolemize`, `record_givens`; `generalize.rs` `polymorphic_runtime` (`FLICK-T013`);
-- параметр высшего ранга и аннотация с `∀` — та же ветка, `infer.rs` `check_value`.
+- a higher-rank parameter and an annotation with `∀` take the same branch, `infer.rs` `check_value`.
 
 IR:
 
-- верхний уровень — `ItemKind::Value { dicts }` (`ir/lower/mod.rs` `givens`);
-- локальная сигнатура — `Stmt::Fun { dicts }`;
-- аргумент высшего ранга — `ExprKind::Abstract(dicts, e)`.
+- top level: `ItemKind::Value { dicts }` (`ir/lower/mod.rs` `givens`);
+- a local signature: `Stmt::Fun { dicts }`;
+- a higher-rank argument: `ExprKind::Abstract(dicts, e)`.
 
-Привязка без сигнатуры ограничений не получает: переменные нерешённых ограничений остаются мономорфными (`generalize.rs` `generalize`; `core.md` Р10).
+A binding without a signature gets no constraints: the variables of unsolved constraints stay monomorphic (`generalize.rs` `generalize`; [unsigned bindings get no class constraints](core.md#class-constraints-and-generalization)).
 
-**Имена посылок.** В реализации `δ` — это ограничение, как его показывает `show`:
+**Names of givens.** In the implementation `δ` is the constraint as `show` prints it:
 
-- `record_givens` записывает строки;
-- `Dict::Given` хранит строку;
-- кодоген ищет словарь по строке, от ближайшей посылки наружу (`js/mod.rs` `dict`, `go/items.rs` `dict`, `opt/specialize.rs` `resolve`).
+- `record_givens` records strings;
+- `Dict::Given` stores a string;
+- the code generator looks a dictionary up by string, from the nearest given outwards (`js/mod.rs` `dict`, `go/items.rs` `dict`, `opt/specialize.rs` `resolve`).
 
-Модель требует, чтобы `δ̄` были свежими. Для строк это значит, что посылки в области видимости показываются по-разному. `skolemize` нумерует жёсткую переменную, если её имя уже занято посылкой, которая передаёт словарь (`unify.rs` `unshadowed`, Р47).
+The model requires `δ̄` to be fresh. For strings this means that the givens in scope print differently. `skolemize` numbers a rigid variable if its name is already taken by a given that passes a dictionary (`unify.rs` `unshadowed`, [distinct names for givens](#givens-looked-up-by-string-confused-same-named-variables)).
 
-### 2.5 Экземпляры и методы по умолчанию
+### 2.5 Instances and default methods
 
 ```text
 instance Q̄ ⇒ C τ̄ = let m₁ = e₁ … let mₙ = eₙ,      β̄ = ftv(τ̄)
-Γ, β̄; δ̄ : Q̄ ⊢ eⱼ : ⟦…⟧ ⇝ eⱼ'        против method_type: схема mⱼ с ᾱ := τ̄ без C τ̄
-δ̄ : Q̄ ⊩ Sᵢ ῡᵢ[ᾱ := τ̄] ⇝ sᵢ            для каждого суперкласса
+Γ, β̄; δ̄ : Q̄ ⊢ eⱼ : ⟦…⟧ ⇝ eⱼ'        against method_type: the scheme of mⱼ with ᾱ := τ̄, without C τ̄
+δ̄ : Q̄ ⊩ Sᵢ ῡᵢ[ᾱ := τ̄] ⇝ sᵢ            for each superclass
 ────────────────────────────────────────────────────────────────── (Instance)
 I = λδ̄. { $slotᵢ = sᵢ, mⱼ = eⱼ', mₖ = default_C_mₖ (I δ̄) … }   : ∀β̄. D_{Q̄} →P D_{C τ̄}
 ```
 
-Чекер:
+Checker:
 
-- суперклассы — `classes/declare.rs` `check_instances` (`FLICK-C001`);
-- методы — `instances.rs` `instance_methods`: контекст становится посылками, методы проверяются против `method_type`;
-- запись в `InstanceInfo` — `record_instance`.
+- superclasses: `classes/declare.rs` `check_instances` (`FLICK-C001`);
+- methods: `instances.rs` `instance_methods`; the context becomes givens, and the methods are checked against `method_type`;
+- the entry in `InstanceInfo`: `record_instance`.
 
-Умолчание:
+Defaults:
 
-- `class_defaults` проверяет тело умолчания как функцию с посылкой `C ᾱ`;
-- в IR это значение `$default_C_m` (`typing.rs` `default_method`, `ir/lower/mod.rs`), первый параметр — словарь класса;
-- экземпляр, который не определил метод, ссылается на него лениво (`get m(){ return $default_C_m(this, …) }`).
+- `class_defaults` checks the body of a default as a function with the given `C ᾱ`;
+- in the IR it is the value `$default_C_m` (`typing.rs` `default_method`, `ir/lower/mod.rs`), whose first parameter is the class dictionary;
+- an instance that does not define the method refers to it lazily (`get m(){ return $default_C_m(this, …) }`).
 
-Экземпляр `deriving` — тот же (Instance) с методами, которые строит рантайм по словарям полей (`InstanceInfo.derived`).
+A `deriving` instance is the same (Instance), with methods the runtime builds from the field dictionaries (`InstanceInfo.derived`).
 
-Имя `I` — голова, как её показывает `show` (`Instance.name`; `codegen/names.rs` `instance`). Две головы одного модуля с одинаковым показом получили бы одно имя. Тогда голова показывается с модулями (`display.rs` `show_qualified`, Р50).
+The name `I` is the head as `show` prints it (`Instance.name`; `codegen/names.rs` `instance`). Two heads of one module that print the same would get one name; in that case the head is printed with its modules (`display.rs` `show_qualified`, [module-qualified instance names](#instance-names-were-heads-without-modules)).
 
-## 3. Сахар → ядро
+## 3. Sugar → core
 
 ### 3.1 `do`
 
-Пусть `⟦·⟧ₘ` — сведение блока в монаде `m`. Словари: `dᴹ : Monad m` по ключу `<-`, `dᴬ : Alternative m` по ключу `if`, `dᴬᵖ : Applicative m` по ключу `and`.
+Let `⟦·⟧ₘ` be the elaboration of a block in the monad `m`. Dictionaries: `dᴹ : Monad m` under the key of `<-`, `dᴬ : Alternative m` under the key of `if`, `dᴬᵖ : Applicative m` under the key of `and`.
 
 ```text
 ⟦do { e }⟧ₘ                     = e
@@ -271,21 +271,21 @@ I = λδ̄. { $slotᵢ = sᵢ, mⱼ = eⱼ', mₖ = default_C_mₖ (I δ̄) … 
                                 = dᴹ.flat_map (λ(p₁, …, pₙ). ⟦do { s̄ }⟧ₘ) (dᴬᵖ.map2 … e₁ … eₙ)
 ```
 
-- `λp. e` с паттерном — `λx. match x with p → e`.
-- Сигнатура перед `let` внутри блока — (Let-Sig-Dict) §2.4 (`do_rest`, ветка `Signature` → `local_let`).
-- Методы берутся из `Prelude`, как бы ни назывались имена в области (`do_notation.rs` `prelude_method`).
-- `eᵢ` группы `and` не видят `pⱼ` своей группы (`applicative_do.rs` `unbound_in_group`).
+- `λp. e` with a pattern is `λx. match x with p → e`.
+- A signature before a `let` inside a block is (Let-Sig-Dict) of §2.4 (`do_rest`, branch `Signature` → `local_let`).
+- The methods are taken from `Prelude`, whatever the names in scope are bound to (`do_notation.rs` `prelude_method`).
+- The `eᵢ` of an `and` group do not see the `pⱼ` of their own group (`applicative_do.rs` `unbound_in_group`).
 
-Чекер — `do_notation.rs` `do_expr`, `do_rest`, `do_bind`, ключи `bind_key`, `guard_key`; `applicative_do.rs` `do_group`, `and_keys`, `group_key`. IR — `ir/lower/do_notation.rs`, `ir/lower/applicative_do.rs`.
+Checker: `do_notation.rs` `do_expr`, `do_rest`, `do_bind`, keys `bind_key`, `guard_key`; `applicative_do.rs` `do_group`, `and_keys`, `group_key`. IR: `ir/lower/do_notation.rs`, `ir/lower/applicative_do.rs`.
 
-Продолжение — обычная λ. Поэтому `?` внутри `do` возвращает из продолжения, а не из функции вокруг блока (§3.3). Если продолжение возвращает тип, который `?` вернуть не может, это `FLICK-T003`.
+The continuation is an ordinary λ. Hence `?` inside `do` returns from the continuation, not from the function around the block (§3.3). If the continuation returns a type that `?` cannot return, that is `FLICK-T003`.
 
 ### 3.2 `for`
 
 ```text
-⟦[for c̄ yield e]⟧ = toList (G⟦c̄ ; e⟧)          строгий: List, вычислен сразу
-⟦for c̄ yield e⟧   = G⟦c̄ ; e⟧                    ленивый: Seq, вычисляется при обходе
-⟦for c̄ do e⟧      = L⟦c̄ ; e⟧                    цикл: Unit, выполняется сразу
+⟦[for c̄ yield e]⟧ = toList (G⟦c̄ ; e⟧)          strict: List, computed at once
+⟦for c̄ yield e⟧   = G⟦c̄ ; e⟧                    lazy: Seq, computed on traversal
+⟦for c̄ do e⟧      = L⟦c̄ ; e⟧                    loop: Unit, run at once
 
 G⟦· ; e⟧              = Seq.singleton e
 G⟦p <- s, c̄ ; e⟧      = Seq.flat_map (λx. match x with p → G⟦c̄ ; e⟧ | _ → Seq.empty) (dᴵ.iter s)
@@ -298,124 +298,126 @@ L_φ⟦if c, c̄ ; e⟧       = if c then L_φ⟦c̄ ; e⟧ else ()
 L_φ⟦let p = e', c̄ ; e⟧ = let p = e' in L_φ⟦c̄ ; e⟧
 ```
 
-`dᴵ : Iterable f` — словарь по ключу `<-`. `L_φ` — цикл в стадии `φ` выражения `for … do`: `Seq.each_φ : ∀a. (a →φ Unit) →P Seq a →φ Unit` обходит последовательность и выполняет тело для каждого элемента (Р184).
+`dᴵ : Iterable f` is the dictionary under the key of `<-`. `L_φ` is the loop at the stage `φ` of the `for … do` expression: `Seq.each_φ : ∀a. (a →φ Unit) →P Seq a →φ Unit` traverses the sequence and runs the body for each element ([the loop rule](#the-loop-rule-l-was-missing)).
 
-Источник `s` имеет тип `f a` с `Iterable f`, и правило чекера типизирует его через `iter : f a → Seq a` (`for_clause`). IR не вызывает `iter`: класс закрыт, его экземпляры — `List` и `Seq`, и для них `iter` — тождество в рантайме (Р51). Это сокращение по `≈`-равному словарю, как оптимизации §0 (Р183). `Seq.*` в правилах — константы Γ₀ с семантикой ленивой последовательности. Тело ленивого `for` делает только Sync-вызовы (`comprehension.rs`).
+The source `s` has type `f a` with `Iterable f`, and the checker rule types it through `iter : f a → Seq a` (`for_clause`). The IR does not call `iter`: the class is closed ([closed `Iterable`](#for-did-not-call-iter-while-iterable-was-open)), its instances are `List` and `Seq`, and for them `iter` is the identity at run time. This is a shortcut by a `≈`-equal dictionary, like the optimizations of §0 ([sources go through `iter`](#g-elaborated-the-for-source-without-iter)). `Seq.*` in the rules are constants of Γ₀ with lazy-sequence semantics. The body of a lazy `for` makes only Sync calls (`comprehension.rs`).
 
-Чекер — `comprehension.rs` `for_expr`, `for_clause`, `for_loop`. IR — `ir/lower/comprehension.rs`: `Generate { strict, sync }` с вложенными `Each`/`If`/`Block`/`Yield`; у `for … do` нет `Generate`. Кодоген — `js/generator.rs`. Слияние `Seq`/`List` (`opt/fuse.rs`) — оптимизация.
+Checker: `comprehension.rs` `for_expr`, `for_clause`, `for_loop`. IR: `ir/lower/comprehension.rs`, `Generate { strict, sync }` with nested `Each`/`If`/`Block`/`Yield`; `for … do` has no `Generate`. Code generator: `js/generator.rs`. Fusion of `Seq`/`List` (`opt/fuse.rs`) is an optimization.
 
 ### 3.3 `?`
 
-Чекер выбирает форму по типу операнда на месте `?` (`question.rs` `question`, `typing.questions`):
+The checker picks the form from the operand type at the site of `?` (`question.rs` `question`, `typing.questions`):
 
 ```text
-e : Result (Errors ε) τ,  рантайм-стадия:   e?  ⇝  from_result e
-e : Option τ:                               e?  ⇝  ранний возврат None из ближайшей функции
+e : Result (Errors ε) τ,  runtime stage:    e?  ⇝  from_result e
+e : Option τ:                               e?  ⇝  early return of None from the nearest function
 ```
 
-- `from_result` сведён в `core.md` §1.4: `match r with Err v → raise v | Ok v → v`.
-- Ранний возврат: тело ближайшей функции (λ, продолжения `do`, функции верхнего уровня) приводится к A-нормальной форме в порядке вычисления. Затем `let y = e? in b` ⇝ `match e with None → None | Some y → b`. A-нормальная форма сохраняет порядок рантайм-шагов слева от `?`.
-- Тип возврата функции — `Option τ'` (`stage.returns`, `infer.rs`), иначе `FLICK-T003`.
+- `from_result` is elaborated in `core.md` §1.4: `match r with Err v → raise v | Ok v → v`.
+- Early return: the body of the nearest function (a λ, a `do` continuation, a top-level function) is put into A-normal form in evaluation order. Then `let y = e? in b` ⇝ `match e with None → None | Some y → b`. A-normal form preserves the order of the runtime steps to the left of `?`.
+- The function's return type is `Option τ'` (`stage.returns`, `infer.rs`); otherwise `FLICK-T003`.
 
-IR — `ir/lower/question.rs`: `App(Prelude.from_result, e, Runtime)` или `ExprKind::Unwrap`. Кодоген `Unwrap` — `if (v._tag === "None") return v` (`js/expr.rs`).
+IR: `ir/lower/question.rs`, `App(Prelude.from_result, e, Runtime)` or `ExprKind::Unwrap`. Code generation of `Unwrap`: `if (v._tag === "None") return v` (`js/expr.rs`).
 
-### 3.4 Прямые вызовы
+### 3.4 Direct calls
 
-Вызов эффектной функции без `await` (spec/03) в модели ничего не переписывает. Ядро уже различает чистую и рантайм-стрелку, и (App) даёт `φ₁ ⊔ φ₂ ⊔ φ`. Сведение только делает явным:
+Calling an effectful function without `await` (spec/01) rewrites nothing in the model. The core already distinguishes the pure and the runtime arrow, and (App) gives `φ₁ ⊔ φ₂ ⊔ φ`. Elaboration only makes explicit:
 
-- стадию каждого применения: `App { stage }` из `typing.runtime`, `typing.sync` (`ir/lower/expr.rs`);
-- подъём `≤-Fun`: узел `Lift` из `typing.lifts`;
+- the stage of each application: `App { stage }` from `typing.runtime`, `typing.sync` (`ir/lower/expr.rs`);
+- the `≤-Fun` lift: a `Lift` node from `typing.lifts`;
 - `task e`, `await e`: `ExprKind::Task`, `Await`;
-- оператор блока: `let _ : Unit = s in rest` (`core.md` §1.4).
+- a block statement: `let _ : Unit = s in rest` (`core.md` §1.4).
 
-## 4. Когерентность и T6
+## 4. Coherence and T6
 
-### 4.1 Предпосылки
+### 4.1 Premises
 
-Программа — модуль входа и все модули, от которых он зависит. 𝓘ₚ — все её экземпляры.
+A program is the entry module and every module it depends on. 𝓘ₚ is the set of all its instances.
 
-| | Предпосылка | Чекер |
+| | Premise | Checker |
 | - | - | - |
-| К1 | **Нет перекрытий.** Головы двух экземпляров одного класса в 𝓘ₚ после раскрытия псевдонимов не унифицируются. Контекст не выбирает | `coherence.rs` `conflicts` (свой против видимых), `imported_conflicts` (два видимых из модулей, которые не видят друг друга, Р46); `FLICK-C003` |
-| К2 | **FD согласованы.** Если у двух голов унифицируются определяющие позиции зависимости, определяемые позиции равны уже при этой подстановке | там же, `FLICK-C004` |
-| К3 | **FD покрыты.** Переменные определяемых позиций лежат в наименьшей неподвижной точке от определяющих позиций головы по зависимостям контекста и его суперклассов | `declare.rs` `admit`, `coverage_rules`; `FLICK-C005` |
-| К4 | **Нет сирот.** Экземпляр объявляет пакет класса или пакет номинального конструктора первого параметра головы | `declare.rs` `ownership`; `FLICK-C006` |
-| К5 | **Завершение.** Переменные контекста есть в голове; каждое ограничение контекста структурно меньше головы и не повторяет переменную чаще. Суперклассы ацикличны. Исчерпание бюджета — отказ | `declare.rs` `terminates`, `declare_classes`; `FLICK-C007`, `FLICK-C008`, `FLICK-C009` |
-| К6 | **Закрытые классы.** Экземпляры примитивов строк, `Numeric`, `Iterable` и структурных `Eq`/`Ord`/`Hash`/`Show` записей принадлежат компилятору | `declare.rs` `admit`; `FLICK-C012` (Р51) |
-| К7 | **Слоты экземпляра.** Слот `$slotᵢ` экземпляра `I` хранит словарь, выведенный для `Sᵢ ῡᵢ[ᾱ := τ̄]` из контекста `I` | `check_instances`; слоты различимы (Р49) |
-| К8 | **Имена.** Посылки в области показываются различно (Р47); экземпляры модуля названы различно (Р50) | `unify.rs` `unshadowed`, `declare.rs` `instance_head` |
+| K1 | **No overlap.** The heads of two instances of one class in 𝓘ₚ do not unify after alias expansion. The context does not select | `coherence.rs` `conflicts` (own against visible), `imported_conflicts` (two visible ones from modules that do not see each other, [overlap across modules](#overlapping-instances-in-modules-that-do-not-see-each-other)); `FLICK-C003` |
+| K2 | **Consistent FDs.** If two heads unify on the determining positions of a dependency, the determined positions are already equal under that substitution | same place, `FLICK-C004` |
+| K3 | **Covered FDs.** The variables of the determined positions lie in the least fixed point reached from the determining positions of the head by the dependencies of the context and its superclasses | `declare.rs` `admit`, `coverage_rules`; `FLICK-C005` |
+| K4 | **No orphans.** An instance is declared by the package of the class or the package of the nominal constructor of the head's first parameter | `declare.rs` `ownership`; `FLICK-C006` |
+| K5 | **Termination.** The context's variables occur in the head; every context constraint is structurally smaller than the head and repeats no variable more often. Superclasses are acyclic. Exhausting the budget is a failure | `declare.rs` `terminates`, `declare_classes`; `FLICK-C007`, `FLICK-C008`, `FLICK-C009` |
+| K6 | **Closed classes.** Instances of the row primitives, `Numeric`, `Iterable` and the structural `Eq`/`Ord`/`Hash`/`Show` of records belong to the compiler | `declare.rs` `admit`; `FLICK-C012` ([closed `Iterable`](#for-did-not-call-iter-while-iterable-was-open)) |
+| K7 | **Instance slots.** The slot `$slotᵢ` of an instance `I` holds the dictionary entailed for `Sᵢ ῡᵢ[ᾱ := τ̄]` from the context of `I` | `check_instances`; slots are distinct ([slots by position](#superclass-slots-named-by-the-bare-class-name)) |
+| K8 | **Names.** Givens in scope print differently ([given names](#givens-looked-up-by-string-confused-same-named-variables)); the instances of a module are named differently ([instance names](#instance-names-were-heads-without-modules)) | `unify.rs` `unshadowed`, `declare.rs` `instance_head` |
 
-К4 и К1 вместе дают модульность: экземпляр, который перекрыл бы чужой, нельзя объявить в третьем пакете. Пакет, который владеет и классом, и типом, проверяет перекрытие у себя. К1 для модулей одного пакета, которые не видят друг друга, проверяет модуль, который видит оба (`imported_conflicts`). Модуль входа видит все экземпляры программы: экземпляры зависимостей видны транзитивно, как бы они ни импортированы (`env.rs` `learn`). Поэтому К1 проверена для 𝓘ₚ целиком.
+K4 and K1 together give modularity: an instance that would overlap someone else's cannot be declared in a third package. A package that owns both the class and the type checks the overlap itself. K1 for modules of one package that do not see each other is checked by a module that sees both (`imported_conflicts`). The entry module sees every instance of the program: instances of dependencies are visible transitively, however they are imported (`env.rs` `learn`). Therefore K1 is checked for the whole of 𝓘ₚ.
 
-`FLICK-C006` не мешает регистрации экземпляра (`admit` продолжает после `ownership`). Это безвредно: ошибка останавливает сборку до IR.
+`FLICK-C006` does not prevent the instance from being registered (`admit` continues after `ownership`). This is harmless: the error stops the build before IR.
 
-### 4.2 Утверждения
+### 4.2 Statements
 
-Эквивалентность словарей `≈` — наименьшая конгруэнция на замкнутых термах словарей, для которой
+Dictionary equivalence `≈` is the least congruence on closed dictionary terms such that
 
 ```text
-(I d̄).$slotᵢ ≈ sᵢ[δ̄ := d̄]                      sᵢ — слот i экземпляра I по (Instance)
-(struct_C^τ d̄).$slotᵢ ≈ struct_S^τ (d̄.$slotᵢ)   S — i-й суперкласс структурного C (Р180)
-                     в обоих правилах d̄ — замкнутые выводы: · ⊩ Q̄'[β̄ := ῡ] ⇝ d̄, · ⊩ C τᵢ ⇝ dᵢ (Р197)
-struct_C^τ ≈ struct_C^{τθ}    prim_Q ℓ̄ ≈ prim_{Qθ} ℓ̄    θ — подстановка типов (Р196)
+(I d̄).$slotᵢ ≈ sᵢ[δ̄ := d̄]                      sᵢ is slot i of instance I by (Instance)
+(struct_C^τ d̄).$slotᵢ ≈ struct_S^τ (d̄.$slotᵢ)   S is the i-th superclass of the structural C
+                     in both rules d̄ are closed derivations: · ⊩ Q̄'[β̄ := ῡ] ⇝ d̄, · ⊩ C τᵢ ⇝ dᵢ
+struct_C^τ ≈ struct_C^{τθ}    prim_Q ℓ̄ ≈ prim_{Qθ} ℓ̄    θ a type substitution
 ```
 
-**Лемма 6.1 (пути суперклассов).** Пусть программа удовлетворяет К1–К8, `Δ ⊩ Q ⇝ d₁` и `Δ ⊩ Q ⇝ d₂`, а `ρ` подставляет вместо каждой `δ : Q' ∈ Δ` замкнутый словарь `ρ(δ)` с `· ⊩ Q'ρ ⇝ ρ(δ)`. Тогда `ρ(d₁) ≈ ρ(d₂)`.
+The structural slot rule is explained in [structural slots](#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries), the restriction to closed derivations in [closed slot arguments](#slot-rules-of-equivalence-take-closed-derivations), and the type-substitution rules in [typed dictionary terms](#the-structural-dictionary-term-carries-its-type).
 
-Набросок. Индукция по сумме размеров выводов:
+**Lemma 6.1 (superclass paths).** Let the program satisfy K1–K8, `Δ ⊩ Q ⇝ d₁` and `Δ ⊩ Q ⇝ d₂`, and let `ρ` substitute for every `δ : Q' ∈ Δ` a closed dictionary `ρ(δ)` with `· ⊩ Q'ρ ⇝ ρ(δ)`. Then `ρ(d₁) ≈ ρ(d₂)`.
 
-- в замкнутом случае `Q` без переменных, и по К1 его выводит ровно один экземпляр или правило (Struct)/(Prim). Аргументы — снова по предположению индукции;
-- путь через (Given) и (Δ-Super) после `ρ` — проекция `.$slot` из словаря, который сам выведен замкнуто. Каждую проекцию из `I d̄` правило `≈` переписывает в слот, а слот по К7 — вывод того же ограничения;
-- (Improve) не порождает словаря: по К2 и К3 уточнённые типы одни и те же при любом порядке уточнений.
+Sketch. Induction on the sum of the sizes of the derivations:
 
-Ромб (`Ord a, Hash a`, общий суперкласс `Eq a`) — частный случай: `δ_Ord.$Eq` и `δ_Hash.$Eq` после `ρ` переписываются в словари `Eq τ`, выведенные замкнуто, и по К1 они совпадают.
+- in the closed case `Q` has no variables, and by K1 exactly one instance or rule (Struct)/(Prim) entails it. The arguments follow again by the induction hypothesis;
+- a path through (Given) and (Δ-Super) after `ρ` is a `.$slot` projection from a dictionary that is itself entailed closed. The `≈` rule rewrites every projection from `I d̄` into the slot, and by K7 the slot is a derivation of the same constraint;
+- (Improve) produces no dictionary: by K2 and K3 the refined types are the same in any order of refinement.
 
-**Лемма 6.2 (кэш).** Если ограничение без переменных решено (Inst)/(Struct)/(Prim) без посылок, то в любом `Δ` его вывод после любой `ρ`, как в лемме 6.1, `≈` этому решению (Р181). Отсюда — корректность кэша, в котором только такие решения.
+The diamond (`Ord a, Hash a`, with the common superclass `Eq a`) is a special case: after `ρ`, `δ_Ord.$Eq` and `δ_Hash.$Eq` rewrite to dictionaries `Eq τ` entailed closed, and by K1 they coincide.
 
-**T6 (elaboration).** Пусть программа удовлетворяет К1–К8.
+**Lemma 6.2 (cache).** If a constraint without variables is solved by (Inst)/(Struct)/(Prim) without givens, then in any `Δ` its derivation, after any `ρ` as in Lemma 6.1, is `≈` to that solution ([why `ρ` is needed](#lemma-62-needs-the-substitution)). Hence a cache that holds only such solutions is sound.
 
-- **(a) Сохранение типов.** Если `Γ; Δ ⊢ e : τ ! φ ⇝ e'`, то `⟦Γ⟧, ⟦Δ⟧ ⊢⁺ e' : ⟦τ⟧ ! φ` в λFlick⁺. В частности, сведение принятой программы существует. Кодоген не падает на отсутствующем словаре (ср. Р48), а принятая программа после сведения удовлетворяет T1–T3, перенесённым на λFlick⁺.
-- **(b) Когерентность.** Пусть `Γ; Δ ⊢ e : τ ! φ ⇝ e₁` и `⇝ e₂` — два вывода, которые отличаются только выбором выводов ограничений. Тогда для любой `ρ`, как в лемме 6.1, `ρ(e₁)` и `ρ(e₂)` совпадают с точностью до `≈` в позициях словарей. Значит, их вычисления дают один результат.
+**T6 (elaboration).** Let the program satisfy K1–K8.
 
-Набросок (a): индукция по выводу.
+- **(a) Type preservation.** If `Γ; Δ ⊢ e : τ ! φ ⇝ e'`, then `⟦Γ⟧, ⟦Δ⟧ ⊢⁺ e' : ⟦τ⟧ ! φ` in λFlick⁺. In particular, the elaboration of an accepted program exists. The code generator does not fail on a missing dictionary (cf. [the solver cache](#the-solver-cache-stored-dictionaries-built-from-givens)), and an accepted program after elaboration satisfies T1–T3 carried over to λFlick⁺.
+- **(b) Coherence.** Let `Γ; Δ ⊢ e : τ ! φ ⇝ e₁` and `⇝ e₂` be two derivations that differ only in the choice of constraint derivations. Then for any `ρ` as in Lemma 6.1, `ρ(e₁)` and `ρ(e₂)` coincide up to `≈` in dictionary positions. Hence their evaluations give the same result.
 
-- (Var-Dict) и (Method): `D_{Q}` — тип записи, проекция `.m` даёт `⟦schema⟧`, применение к `d̄` снимает `D_{Qᵢ} →P`. Эффект `P` не меняется: применение словаря — чистая стрелка.
-- (Let-Sig-Dict): `λδ̄. e₁'` имеет тип `D_{Q̄} →P ⟦τ₁⟧`, и эффект правой части `P` по посылке `l > 0 ⇒ φ₁ = P`. Без неё правая часть с рантайм-шагом попадала бы в чистую λ, и (Lam) ядра не выводилась бы (Р55).
-- Сахар (§3): каждое правило — комбинация констант Γ₀ и форм ядра, тип которых совпадает с правилом чекера. `flat_map` получает продолжение типа `a → m b`, а `?` с `Option` — функцию с возвратом `Option`.
+Sketch of (a): induction on the derivation.
 
-Набросок (b): по лемме 6.1 для каждого места словаря.
+- (Var-Dict) and (Method): `D_{Q}` is a record type, the projection `.m` gives `⟦schema⟧`, and application to `d̄` strips `D_{Qᵢ} →P`. The effect `P` does not change: applying a dictionary is a pure arrow.
+- (Let-Sig-Dict): `λδ̄. e₁'` has type `D_{Q̄} →P ⟦τ₁⟧`, and the effect of the right-hand side is `P` by the premise `l > 0 ⇒ φ₁ = P`. Without it a right-hand side with a runtime step would land in a pure λ, and the core (Lam) would not be derivable ([constrained signature over a runtime right-hand side](#a-constrained-signature-over-a-runtime-right-hand-side)).
+- Sugar (§3): every rule is a combination of constants of Γ₀ and core forms whose type matches the checker rule. `flat_map` gets a continuation of type `a → m b`, and `?` with `Option` gets a function returning `Option`.
 
-Lean (`formal/Formal/Elab/`, P4c; ядро P1 не импортируется): `≈` — `Eqv`, `Δ ⊩ Q̄ ⇝ d̄` — `Ent`, `Δ*` — `Clo` (`Syntax.lean`); К1–К8 — поля `Coherent`, симуляция «`≈` в позициях словарей ⇒ тот же результат» — гипотеза `Sim` (`Hyp.lean`), выведенная из шагов цели в P4b; лемма 6.1 — `lemma_6_1`, лемма 6.2 — `lemma_6_2`, T6(b) — `T6b` (`Coherence.lean`). Набросок проведён так: после `ρ` каждый вывод `≈` замкнутому выводу подставленного ограничения (`closed_rep`); слот замкнутого словаря `≈` замкнутому выводу суперкласса, индукцией по порядку К5 (`slot_ok`); замкнутый вывод единствен по К1, К5 и К6 (`closed_unique`). Упрощения — `formal/README.md`.
+Sketch of (b): by Lemma 6.1 at every dictionary site.
 
-T6(a) в Lean (P4b, `formal/Formal/Elab/`) сформулирована относительно абстрактной цели: λFlick⁺ — структура `Target` (`Target.lean`), её типизация `⊢⁺` и законы — поля, P4a должна её построить. Схема метода — `Scheme`, `Prog.methods` (`Syntax.lean`); суждение `Γ; Δ ⊢ e : τ ! φ ⇝ e'` — `Elab`, исходные и сведённые термы — `Exp` и `Tm` (`Source.lean`); `⟦σ⟧` — `Scheme.tr`, `D_Q` — `TTy.dict`. Леммы (`T6a.lean`): `Δ ⊩ Q̄ ⇝ d̄ ⇒ ⟦Δ⟧ ⊢⁺ d̄ : D_Q̄` — `ent_typed`, T6(a) — `T6a`, индукцией по `Elab`. Типы экземпляров `I : ∀β̄. D_ctx →P D_head` (по (Instance) §2.5 и К7) и словарей (Struct)/(Prim) — законы `Target`.
+Lean (`formal/Formal/Elab/`; this part does not import the Lean core in `formal/Formal/`): `≈` is `Eqv`, `Δ ⊩ Q̄ ⇝ d̄` is `Ent`, `Δ*` is `Clo` (`Syntax.lean`); K1–K8 are the fields of `Coherent`; the simulation "`≈` in dictionary positions ⇒ the same result" is the hypothesis `Sim` (`Hyp.lean`), derived from the target's steps (`Run.lean`, below); Lemma 6.1 is `lemma_6_1`, Lemma 6.2 is `lemma_6_2`, T6(b) is `T6b` (`Coherence.lean`). The sketch is carried out as follows: after `ρ`, every derivation is `≈` to the closed derivation of the substituted constraint (`closed_rep`); the slot of a closed dictionary is `≈` to the closed derivation of the superclass, by induction on the order of K5 (`slot_ok`); the closed derivation is unique by K1, K5 and K6 (`closed_unique`). Simplifications: `formal/README.md`.
 
-Сахар §3 в Lean (P4b′, `Sugar.lean`, `SugarBase.lean`, `DoNotation.lean`, `Comprehension.lean`) сводится в исходные термы `Exp` над методами Prelude и константами Γ₀; их схемы — гипотезы `Sugar` о программе, словари даёт (Method) при сведении. Правила чекера — суждения `DoOk` (`do`), `GenOk` (`for … yield`, `[for …]`), `LoopOk` (`for … do`); для `?` и оператора блока — посылки лемм. Сведённый терм выводится с типом правила: `do_elab`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`, — и T6(a) его покрывает (`T6a_do`, `T6a_sugar`).
+T6(a) in Lean (`formal/Formal/Elab/`, `T6a.lean`) is stated relative to an abstract target: λFlick⁺ is the structure `Target` (`Target.lean`), whose typing `⊢⁺` and laws are fields; the core instance below constructs it. A method scheme is `Scheme`, `Prog.methods` (`Syntax.lean`); the judgment `Γ; Δ ⊢ e : τ ! φ ⇝ e'` is `Elab`, source and elaborated terms are `Exp` and `Tm` (`Source.lean`); `⟦σ⟧` is `Scheme.tr`, `D_Q` is `TTy.dict`. Lemmas (`T6a.lean`): `Δ ⊩ Q̄ ⇝ d̄ ⇒ ⟦Δ⟧ ⊢⁺ d̄ : D_Q̄` is `ent_typed`, T6(a) is `T6a`, by induction on `Elab`. The types of instances `I : ∀β̄. D_ctx →P D_head` (by (Instance) of §2.5 and K7) and of (Struct)/(Prim) dictionaries are laws of `Target`.
 
-`Sim` выведена из шагов цели (`Run.lean`): у `Target` есть отношение шага и отношение `Rel` на состояниях, которое связывает термы, отличающиеся на `≈` в позициях словарей (`TmEqv`), и является слабой симуляцией, сохраняющей результат (`load_rel`, `step_rel`, `final_rel`). Вычисляются только типизированные словари, поэтому `load_rel` требует, чтобы оба терма были замкнуты и типизированы одним типом, а `Sim` и `T6b` говорят только о заполнениях `Exprs.Ok`: у цели это типизация заполненного скелета. Отсюда `Target.sim` индукцией по прогону и T6(b) без гипотезы `Sim` — `T6b_target`, с типизацией обоих заполнений в посылках. Результат — множество наблюдений завершившихся прогонов; расходимость не сравнивается. Поля `Rel` доказывает P4a4 (`runTarget`, `T6b_core`).
+The sugar of §3 in Lean (`Sugar.lean`, `SugarBase.lean`, `DoNotation.lean`, `Comprehension.lean`) desugars into source terms `Exp` over the Prelude methods and constants of Γ₀; their schemes are the hypotheses `Sugar` about the program, and (Method) supplies the dictionaries during elaboration. The checker rules are the judgments `DoOk` (`do`), `GenOk` (`for … yield`, `[for …]`), `LoopOk` (`for … do`); for `?` and a block statement they are premises of the lemmas. The elaborated term is derived with the rule's type (`do_elab`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`), and T6(a) covers it (`T6a_do`, `T6a_sugar`).
 
-Экземпляр `Target` на ядре Lean с регионами (P4a3, `CoreTy.lean`, `CoreTr.lean`, `CoreLaws.lean`, `CoreDict.lean`, `CoreT6a.lean`). Сведение типов `⟦·⟧` — `trT`, `trTT`, `trS`; оно коммутирует с подстановкой (`trT_subst`) и с `⌈·⌉` (`trT_reach`). Сведённый терм в ядре — `Tr`; глобал структурного или примитивного словаря выбран по типу в терме (Р195, Р196), соответствие контекстов — `Corr`. `Has` — типизация ядра `Typ` сведения в любом соответствующем контексте. Гипотеза `Real` — объявления программы в сигнатуре ядра: записи словарей со слотами и методами, схемы глобалов экземпляров, констант Γ₀, структурных и примитивных словарей, конструктор `Some`. Каждый закон `Target` — одно правило ядра (`has_var` … `has_prim`), `typingTarget` собирает их. T6(a) для ядра — `T6a_core`, для замкнутой программы — `T6a_closed`, для сахара — `T6a_do_core` и `T6a_sugar_core`. Прогон словарей в ядре (P4a4): гипотеза `RealRun` — тела глобалов словарей; замкнутый вывод вычисляется чистыми шагами (`ent_eval`), а `≈` сохраняет значения словаря (`eqv_sem`, после Р197). Цель с прогоном ядра (P4a4, `CoreRel.lean` … `CoreRun.lean`) — `runTarget`: состояние — конфигурация, шаг — `CStep`, результат — литерал главного потока. `Rel` — конгруэнция `Cg` на термах, порождённая базовыми парами `DP`: слева замкнутое вычисление словаря, типизированное в ядре в стадии `P` и ещё не значение, справа замкнутый терм с теми же значениями; на хранилище, детях и финализаторах — поточечно (`CfgR`). Шаг внутри базовой пары чистый (`dp_calm`), иначе другая сторона делает тот же шаг (`thread_sim`, `cstep_sim`); `≈`-словари дают базовые пары (`eqv_dsim`, `dsim_cg`, Р198, Р199). T6(b) для ядра без гипотезы `Sim` — `T6b_core`.
+`Sim` is derived from the target's steps (`Run.lean`): `Target` has a step relation and a relation `Rel` on states that relates terms differing by `≈` in dictionary positions (`TmEqv`) and is a result-preserving weak simulation (`load_rel`, `step_rel`, `final_rel`). Only typed dictionaries are evaluated, so `load_rel` requires both terms to be closed and typed at one type, and `Sim` and `T6b` speak only of fillings `Exprs.Ok`: for the target, that is the typing of the filled skeleton. From this follow `Target.sim`, by induction on the run, and T6(b) without the hypothesis `Sim`, `T6b_target`, with the typing of both fillings as premises. The result is the set of observations of terminated runs; divergence is not compared. The fields of `Rel` are proved for the core by `runTarget` (`T6b_core`).
 
-Что даёт T6 оптимизациям:
+The instance of `Target` on the Lean core with regions (`CoreTy.lean`, `CoreTr.lean`, `CoreLaws.lean`, `CoreDict.lean`, `CoreT6a.lean`). The type translation `⟦·⟧` is `trT`, `trTT`, `trS`; it commutes with substitution (`trT_subst`) and with `⌈·⌉` (`trT_reach`). The elaborated term in the core is `Tr`; the global of a structural or primitive dictionary is chosen by the type held in the term ([type-indexed families](#structural-and-primitive-dictionaries-are-families-indexed-by-type), [typed dictionary terms](#the-structural-dictionary-term-carries-its-type)), and the correspondence of contexts is `Corr`. `Has` is the core typing `Typ` of the elaboration in any corresponding context. The hypothesis `Real` is the program's declarations in the core signature: the dictionary records with slots and methods, the schemes of instance globals, of constants of Γ₀, of structural and primitive dictionaries, and the constructor `Some`. Every law of `Target` is one core rule (`has_var` … `has_prim`), and `typingTarget` collects them. T6(a) for the core is `T6a_core`, for a closed program `T6a_closed`, for the sugar `T6a_do_core` and `T6a_sugar_core`. Running dictionaries in the core: the hypothesis `RealRun` gives the bodies of dictionary globals; a closed derivation evaluates by pure steps (`ent_eval`), and `≈` preserves the values of a dictionary (`eqv_sem`, given [closed slot arguments](#slot-rules-of-equivalence-take-closed-derivations)). The target with the core's run (`CoreRel.lean` … `CoreRun.lean`) is `runTarget`: a state is a configuration, a step is `CStep`, the result is a literal of the main thread. `Rel` is the congruence `Cg` on terms generated by the base pairs `DP`: on the left a closed dictionary computation, typed in the core at stage `P` and not yet a value; on the right a closed term with the same values; on the store, children and finalizers it is pointwise (`CfgR`). A step inside a base pair is pure (`dp_calm`); otherwise the other side takes the same step (`thread_sim`, `cstep_sim`); `≈`-dictionaries give base pairs (`eqv_dsim`, `dsim_cg`; see [open dictionaries](#equivalence-relates-open-dictionaries) and [dictionaries typed in the empty context](#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)). T6(b) for the core without the hypothesis `Sim` is `T6b_core`.
 
-- `opt/specialize.rs` заменяет посылку `Numeric` известным экземпляром;
-- `direct_method` вызывает метод известного экземпляра напрямую.
+What T6 gives the optimizations:
 
-Обе замены — переход по `≈`, и (b) гарантирует, что результат не меняется.
+- `opt/specialize.rs` replaces a `Numeric` given with a known instance;
+- `direct_method` calls the method of a known instance directly.
 
-## 5. Расхождения
+Both replacements are a step along `≈`, and (b) guarantees that the result does not change.
 
-Р46–Р51 и Р55 нарушали T6. Каждое подтверждено пробой: программа принята чекером на `bea06b9e`, а её сборка делает то, что указано. Р52–Р54, Р56 и Р57 — неполнота чекера, решение по замыслу или требование к модели.
+## 5. Known divergences
 
-Статус: Р46–Р51 и Р55 внесены, у каждого исправления есть фикстура; Р180–Р184, Р186 и Р187 внесены в модель, Р185 — в источник, `Target` и ядро, Р188 внесена (параметр `CRow`), Р195–Р201, Р210, Р211 и Р230 внесены в модель. Р52–Р54, Р56, Р57 и Р194 записаны.
+Each entry states a divergence between the model and the spec, the checker or the code generator, or a correction the model needed, and how it is resolved.
 
-**Р46. Перекрытие экземпляров двух модулей, которые не видят друг друга.**
+The first group concerns the checker and the code generator. Six of these entries (overlap across modules, given names, the solver cache, superclass slots, instance names, `Iterable`) and the constrained signature over a runtime right-hand side violated T6. Each was confirmed by a probe: the checker accepted the program, and its build behaved as stated. All of them are fixed in the checker, each with a fixture. The opaque alias, equality, polymorphic dictionary fields, `?` and numeric defaulting entries record checker incompleteness, a design decision or a requirement on the model.
+
+### Overlapping instances in modules that do not see each other
 
 ```flick
 // App/Ty.fl
 module App.Ty exposing (..)
 type T = T
 
-// App/A.fl                              // App/B.fl — то же с "from B"
+// App/A.fl                              // App/B.fl — the same with "from B"
 module App.A exposing (..)
 import App.Ty exposing (T(..))
 instance Show T =
@@ -433,11 +435,11 @@ let main () =
   Platform.stdout_line (show T ++ ", " ++ App.A.from_a T ++ ", " ++ App.B.from_b T)
 ```
 
-- Что происходит: `flick check` проекта проходит. На Node и в Go печатается `from A, from A, from B`: у одного типа два экземпляра, и `Main` берёт первый по порядку импорта. Нарушает К1 и T6(b).
-- Причина: `coherence.rs` `conflicts` сравнивает экземпляр только с `env.instances()` объявляющего модуля. Соседний модуль, который его не импортирует, туда не входит. Импортёр учит экземпляры из интерфейсов и сравнивает их только по `(module, name)` (`env.rs` `learn`). Проза `reference/classes.md` и spec/05 «Local implicit instances» («conflicts are diagnosed when the whole accessible graph is checked») обещала проверку.
-- Решение — чекер. Модуль, который видит оба экземпляра, проверяет их друг с другом: `imported_conflicts` перед `declare_instances`, `FLICK-C003`/`FLICK-C004` на строке `module`. Сравниваются только невстроенные выученные экземпляры: встроенные проверены при компиляции своих модулей. Внесено; фикстура — проект `tests/check/projects/sibling_instances`.
+- Divergence: `flick check` of the project passed. Node and Go printed `from A, from A, from B`: one type had two instances, and `Main` took the first in import order. This violated K1 and T6(b).
+- Cause: `coherence.rs` `conflicts` compared an instance only with `env.instances()` of the declaring module. A sibling module that does not import it is not in that set. An importer learns instances from interfaces and compared them only by `(module, name)` (`env.rs` `learn`). The prose of `reference/classes.md` and spec/03 "Local implicit instances" ("conflicts are diagnosed when the whole accessible graph is checked") promised the check.
+- Resolution (checker): a module that sees both instances checks them against each other: `imported_conflicts` before `declare_instances`, `FLICK-C003`/`FLICK-C004` on the `module` line. Only non-built-in learned instances are compared: built-in ones were checked when their modules were compiled. Fixture: the project `tests/check/projects/sibling_instances`.
 
-**Р47. Словарь посылки ищется по строке, и одноимённые переменные двух посылок путаются.**
+### Givens looked up by string confused same-named variables
 
 ```flick
 type Pair b a = Pair b a
@@ -461,11 +463,11 @@ inner : Show a => a -> String
 let inner x = twice (fun v -> show v ++ " & " ++ show x)
 ```
 
-- Что происходит: `render (Pair Red 42)` печатает `Red / 42`, а `inner Red` — `42 & Red`, на Node и в Go. Должно быть `Color.Red / 42` и `42 & Color.Red`. Сгенерированный JS: `render: ($d1) => (p) => … $d1.show(x) …` и `twice(($d1) => (v) => $d1.show(v) + " & " + $d1.show(x))`. `show x` берёт словарь `Show Int` вместо словаря контекста экземпляра или сигнатуры `inner`. Нарушает T6(a): сведение не типизируется.
-- Причина: посылка экземпляра `Show a` и собственная посылка метода `Show a` показываются одинаково. Так же совпадают посылка сигнатуры и посылка параметра высшего ранга. `record_givens` и `closure` записывают обе строкой `"Show a"`, а кодоген берёт ближайшую посылку с той же строкой (`js/mod.rs` `dict`, `go/items.rs` `dict`). Чекер различает их по идентичности жёсткой переменной, кодоген — нет.
-- Решение — чекер. `skolemize` нумерует жёсткую переменную (`a1`), если её имя уже занято посылкой в области, которая передаёт словарь, а сама переменная входит в ограничение нового `∀` (`unify.rs` `unshadowed`). Имена в сообщениях меняются только в этом случае. Внесено; фикстура — e2e `tests/run/codegen/given_shadow.fl`, на JS и Go.
+- Divergence: `render (Pair Red 42)` printed `Red / 42` and `inner Red` printed `42 & Red`, on Node and in Go. Expected: `Color.Red / 42` and `42 & Color.Red`. Generated JS: `render: ($d1) => (p) => … $d1.show(x) …` and `twice(($d1) => (v) => $d1.show(v) + " & " + $d1.show(x))`. `show x` took the `Show Int` dictionary instead of the dictionary of the instance context or of the signature of `inner`. This violated T6(a): the elaboration does not type.
+- Cause: the instance given `Show a` and the method's own given `Show a` print the same. So do a signature given and a higher-rank parameter given. `record_givens` and `closure` record both as the string `"Show a"`, and the code generator takes the nearest given with the same string (`js/mod.rs` `dict`, `go/items.rs` `dict`). The checker distinguishes them by the identity of the rigid variable; the code generator does not.
+- Resolution (checker): `skolemize` numbers a rigid variable (`a1`) if its name is already taken by a given in scope that passes a dictionary, and the variable itself occurs in a constraint of the new `∀` (`unify.rs` `unshadowed`). Names in messages change only in this case. Fixture: the e2e test `tests/run/codegen/given_shadow.fl`, on JS and Go.
 
-**Р48. Кэш решателя хранит словарь, построенный из посылки.**
+### The solver cache stored dictionaries built from givens
 
 ```flick
 type Foo = Foo
@@ -477,11 +479,11 @@ g : Foo -> String
 let g x = show [x]
 ```
 
-- Что происходит: чекер принимает модуль, хотя экземпляра `Show Foo` нет. `flick build` падает в кодогене: `dictionary \`Show Foo\` is in scope` (`js/mod.rs`, `go/items.rs`). Нарушает T6(a): у принятой программы нет сведения.
-- Причина: `entail_one` кладёт в кэш модуля каждое решённое ограничение без переменных. `Show (List Foo)` в `f` решено через (Inst) с аргументом-посылкой `Show Foo`, и `g` получает этот словарь из кэша.
-- Решение — чекер: в кэш попадают только словари, построенные без посылок (`Dict::assumes`; лемма 6.2). Внесено; фикстура — `tests/check/fail/classes/assumption_cache.fl`.
+- Divergence: the checker accepted the module although there is no `Show Foo` instance. `flick build` failed in the code generator: `dictionary \`Show Foo\` is in scope` (`js/mod.rs`, `go/items.rs`). This violated T6(a): the accepted program had no elaboration.
+- Cause: `entail_one` put every solved constraint without variables into the module cache. `Show (List Foo)` in `f` was solved by (Inst) with the given `Show Foo` as argument, and `g` got that dictionary from the cache.
+- Resolution (checker): only dictionaries built without givens enter the cache (`Dict::assumes`; Lemma 6.2). Fixture: `tests/check/fail/classes/assumption_cache.fl`.
 
-**Р49. Слоты суперклассов по голому имени класса.**
+### Superclass slots named by the bare class name
 
 ```flick
 class Convert a b =
@@ -494,11 +496,11 @@ back : Iso a b => b -> a
 let back y = convert y
 ```
 
-- Что происходит: с экземплярами `Convert Celsius Fahrenheit`, `Convert Fahrenheit Celsius` и `Iso Celsius Fahrenheit` вызов `back (Fahrenheit 212)` получает `Fahrenheit` вместо `Celsius`. Node: `TypeError: Cannot read properties of undefined (reading '_tag')`, Go: `no pattern matched the value`. Так же столкнулись бы два одноимённых класса из разных модулей. Нарушает К7 и T6(a).
-- Причина: `Dict::Super { class }`, `InstanceInfo.supers` и поле словаря (`get $Convert()` в JS, `d.Lazy("$Convert")` в Go) названы именем класса без аргументов. Второй геттер замещает первый.
-- Решение — чекер: слот — имя класса, а при повторе имени среди суперклассов к нему добавляется позиция (`classes/mod.rs` `super_slot`; в `closure` и `check_instances`). Слоты встроенных классов (`$Eq` у `Ord` и `Hash`, которые рантайм строит сам в `core/data.ts` и `dict.go`) не меняются. Внесено; фикстура — e2e `tests/run/codegen/repeated_superclass.fl`.
+- Divergence: with instances `Convert Celsius Fahrenheit`, `Convert Fahrenheit Celsius` and `Iso Celsius Fahrenheit`, the call `back (Fahrenheit 212)` got a `Fahrenheit` instead of a `Celsius`. Node: `TypeError: Cannot read properties of undefined (reading '_tag')`; Go: `no pattern matched the value`. Two same-named classes from different modules would collide the same way. This violated K7 and T6(a).
+- Cause: `Dict::Super { class }`, `InstanceInfo.supers` and the dictionary field (`get $Convert()` in JS, `d.Lazy("$Convert")` in Go) were named by the class name without arguments. The second getter replaced the first.
+- Resolution (checker): a slot is the class name, and when the name repeats among the superclasses the position is appended (`classes/mod.rs` `super_slot`; used in `closure` and `check_instances`). The slots of built-in classes (`$Eq` of `Ord` and `Hash`, which the runtime builds itself in `core/data.ts` and `dict.go`) do not change. Fixture: the e2e test `tests/run/codegen/repeated_superclass.fl`.
 
-**Р50. Имя экземпляра — голова без модулей.**
+### Instance names were heads without modules
 
 ```flick
 import App.A   // type Id = Id Float
@@ -514,11 +516,11 @@ instance Pretty App.B.Id =
   let pretty _ = "B.Id"
 ```
 
-- Что происходит: Node — `SyntaxError: Identifier '$i_Pretty_Id' has already been declared` при загрузке модуля. Go печатает `B.Id, B.Id`. Импортёр, который учит оба экземпляра, одинаковых по `(module, name)`, оставил бы один (`env.rs` `learn`). `FLICK-C003` не срабатывает: головы не унифицируются. Нарушает К8 и T6(b).
-- Причина: `instance_head` называет экземпляр `show(head)`, а `show` печатает конструкторы без модуля.
-- Решение — чекер. Если голова уже названа так у экземпляра того же модуля, имя — голова с модулями (`display.rs` `show_qualified`): `Pretty App.B.Id`. Остальные имена и словари не меняются. Внесено; фикстура — e2e `tests/run/codegen/instance_names.fl` (`HttpApi.ServeError` и `Rpc.ServeError`).
+- Divergence: Node failed at module load with `SyntaxError: Identifier '$i_Pretty_Id' has already been declared`. Go printed `B.Id, B.Id`. An importer that learns both instances, equal by `(module, name)`, would have kept one (`env.rs` `learn`). `FLICK-C003` does not fire: the heads do not unify. This violated K8 and T6(b).
+- Cause: `instance_head` named the instance `show(head)`, and `show` prints constructors without their module.
+- Resolution (checker): if an instance of the same module already has that name, the name is the head with modules (`display.rs` `show_qualified`): `Pretty App.B.Id`. Other names and dictionaries do not change. Fixture: the e2e test `tests/run/codegen/instance_names.fl` (`HttpApi.ServeError` and `Rpc.ServeError`).
 
-**Р51. `for` не вызывает `iter`, а класс `Iterable` открыт.**
+### `for` did not call `iter` while `Iterable` was open
 
 ```flick
 type Box a = Box a a
@@ -534,11 +536,11 @@ let main () =
   Platform.stdout_line (show [for x <- Box 1 2 yield x * 10])
 ```
 
-- Что происходит: программа принята (`my_seq` — привязка к `seqOfList` с `retention call`). Node: `TypeError: Box is not a function or its return value is not iterable`, Go: `not a sequence`. Нарушает T6(a): правило чекера требует `Iterable f`, а сведение передаёт источник как есть.
-- Причина: `comprehension.rs` записывает словарь `iter`, а `ir/lower/comprehension.rs` его не использует, и JS делает `for…of`. Доккомментарий класса в `Prelude.fl` говорит, что `iter` ничего не стоит, — это верно только для `List` и `Seq`.
-- Решение — чекер: `Iterable` закрыт, как `Numeric`. Экземпляр вне модуля `Instances` — `FLICK-C012` (К6). Вызывать `iter` в каждом `for` — лишняя цена ради экземпляров, которых в stdlib нет. Внесено; фикстура — `tests/check/fail/classes/iterable.fl`; `reference/classes.md` и объяснение `C012` дополнены.
+- Divergence: the program was accepted (`my_seq` is a binding to `seqOfList` with `retention call`). Node: `TypeError: Box is not a function or its return value is not iterable`; Go: `not a sequence`. This violated T6(a): the checker rule requires `Iterable f`, while the elaboration passed the source as is.
+- Cause: `comprehension.rs` records the `iter` dictionary, but `ir/lower/comprehension.rs` does not use it, and JS does `for…of`. The class doc comment in `Prelude.fl` says `iter` costs nothing, which holds only for `List` and `Seq`.
+- Resolution (checker): `Iterable` is closed, like `Numeric`. An instance outside the module `Instances` is `FLICK-C012` (K6). Calling `iter` in every `for` would be a cost paid for instances the stdlib does not have. Fixture: `tests/check/fail/classes/iterable.fl`; `reference/classes.md` and the explanation of `C012` were extended.
 
-**Р52. Непрозрачный псевдоним внутри своего модуля решается через представление.**
+### An opaque alias inside its module resolves through its representation
 
 ```flick
 module App.Ids exposing (UserId, make, inside)
@@ -550,20 +552,20 @@ inside : UserId -> String
 let inside u = show u
 ```
 
-- Что происходит: `inside` компилируется в `Instances.$i_Show_String.show(u)`, а `show u` в другом модуле — в `App_Ids.$i_Show_UserId.show(u)`. Печатают одно и то же. Ручной экземпляр `instance Pretty UserId` в своём модуле — `FLICK-C003` «`Pretty String` overlaps `Pretty String`»: `instance_head` канонизирует голову, и внутри модуля псевдоним раскрывается (`unify.rs` `whnf`). Снаружи `UserId` номинален (`exports.rs`).
-- Решение — запись. Когерентность держится, потому что производный экземпляр непрозрачного псевдонима делегирует экземпляру представления (`derive.rs`): словари разные, вычисления совпадают. Своего экземпляра у непрозрачного псевдонима быть не может. Сообщение `FLICK-C003` для этого случая стоит заменить объяснением; пока не сделано.
+- Divergence: `inside` compiles to `Instances.$i_Show_String.show(u)`, while `show u` in another module compiles to `App_Ids.$i_Show_UserId.show(u)`. Both print the same. A hand-written `instance Pretty UserId` in its own module is `FLICK-C003` "`Pretty String` overlaps `Pretty String`": `instance_head` canonicalizes the head, and inside its module the alias expands (`unify.rs` `whnf`). Outside, `UserId` is nominal (`exports.rs`).
+- Resolution (recorded): coherence holds because the derived instance of an opaque alias delegates to the instance of the representation (`derive.rs`): the dictionaries differ, the computations coincide. An opaque alias cannot have its own instance. The `FLICK-C003` message for this case should be replaced by an explanation; this is not done yet.
 
-**Р53. `==` и `!=` не используют `Eq`.**
+### Equality operators do not use `Eq`
 
-- Что происходит: `==` проверяет только равенство типов операндов (`calls.rs`, `settle.rs` `settle_operators`) и компилируется в структурное `$rt.equals`. Ручной экземпляр `Eq` на `==` не влияет, а `==` на переменной типа не требует `Eq a`.
-- Решение — запись, по замыслу: `reference/codegen.md` определяет `==` как каноническое структурное равенство. В модели `==` — константа Γ₀ `∀α. α →P α →P Bool`, а не метод. T6 его не касается. Законы `Eq` (`eq` согласован с `hash`, spec/09) чекер не доказывает.
+- Divergence: `==` checks only that the operand types are equal (`calls.rs`, `settle.rs` `settle_operators`) and compiles to the structural `$rt.equals`. A hand-written `Eq` instance does not affect `==`, and `==` on a type variable does not require `Eq a`. The same holds for `!=`.
+- Resolution (recorded, by design): `reference/codegen.md` defines `==` as canonical structural equality. In the model `==` is a constant of Γ₀, `∀α. α →P α →P Bool`, not a method. T6 does not concern it. The checker does not prove the laws of `Eq` (`eq` consistent with `hash`, spec/07).
 
-**Р54. Словарям нужны полиморфные поля и параметры высшего ранга, а ядро — ранга 1.**
+### Dictionaries need polymorphic fields and higher-rank parameters
 
-- Модель: `core.md` §0 откладывает вложенный `∀`, а `D_C` и `⟦σ⟧` §2.1 им пользуются.
-- Решение — модель. T6 сформулирована для λFlick⁺ (§0.1). P1 должна механизировать ядро сразу с полиморфными полями и параметрами (предикативно), иначе P4 не на что опереться.
+- Divergence: `core.md` §0 defers nested `∀`, while `D_C` and `⟦σ⟧` of §2.1 use it.
+- Resolution (model): T6 is stated for λFlick⁺ (§0.1). The Lean core (`formal/Formal/`) has to mechanize the core with polymorphic fields and parameters (predicatively) from the start; otherwise the elaboration development (`formal/Formal/Elab/`) has nothing to build on. The Lean core provides dictionary records with `∀`-fields; higher-rank parameters are not modelled ([`∀` only in dictionary fields](#the-model-allows-polymorphic-types-only-in-dictionary-fields)).
 
-**Р55. Сигнатура с ограничением над рантайм-правой частью.**
+### A constrained signature over a runtime right-hand side
 
 ```flick
 main : Unit ->{; AppError} Unit
@@ -573,153 +575,153 @@ let main () =
   Platform.stdout_line (show x)
 ```
 
-- Что происходит: программа принята. `flick build` падает в кодогене: JS — `a runtime call runs inside a runtime or Sync stage` (`js/expr.rs`), Go — `effects run where a fiber is in scope` (`go/call.rs`). Будь сведение выполнено, `Ref.modify` выполнялся бы при каждом использовании `x`. Нарушает T6(a).
-- Причина: `generalize.rs` `polymorphic_runtime` проверял посылку `φ₁ = P` только при `ᾱ ≠ ∅`. Ограничение без переменных (`Show Int`) тоже превращает правую часть в функцию словаря (`Stmt::Fun { dicts }`).
-- Решение — чекер: `polymorphic_runtime` требует `P` и при ограничении, которое передаёт словарь. Сообщение — `FLICK-T013` «cannot have the constrained type». Объяснение `T013` дополнено. Внесено; фикстура — `counted` в `tests/check/fail/types/generalization.fl`.
+- Divergence: the program was accepted. `flick build` failed in the code generator: JS with `a runtime call runs inside a runtime or Sync stage` (`js/expr.rs`), Go with `effects run where a fiber is in scope` (`go/call.rs`). Had elaboration gone through, `Ref.modify` would have run at every use of `x`. This violated T6(a).
+- Cause: `generalize.rs` `polymorphic_runtime` checked the premise `φ₁ = P` only when `ᾱ ≠ ∅`. A constraint without variables (`Show Int`) also turns the right-hand side into a function of a dictionary (`Stmt::Fun { dicts }`).
+- Resolution (checker): `polymorphic_runtime` requires `P` also for a constraint that passes a dictionary. The message is `FLICK-T013` "cannot have the constrained type". The explanation of `T013` was extended. Fixture: `counted` in `tests/check/fail/types/generalization.fl`.
 
-**Р56. `?` выбирает форму по типу операнда в момент проверки.**
+### Postfix question mark picks its form at check time
 
-- Что происходит: если тип операнда к месту `?` ещё неизвестен, это ошибка (`question.rs`), даже когда его определило бы дальнейшее использование. Порядок проверки становится видимым.
-- Решение — запись (неполнота). Модель (§3.3) требует известный тип; принятых программ меньше, гарантии те же.
+- Divergence: if the operand type is not yet known at the site of `?`, it is an error (`question.rs`), even when later use would determine it. The checking order becomes visible.
+- Resolution (recorded, incompleteness): the model (§3.3) requires a known type; fewer programs are accepted, with the same guarantees.
 
-**Р57. Умолчание числового литерала выбирает тип по головам экземпляров.**
+### Numeric literal defaulting picks a type by instance heads
 
-- Что происходит: `default_numeric` берёт первый числовой тип, для которого у каждого открытого ограничения есть подходящая голова (`may_have_instance`). Контекст экземпляра не проверяется, а класс без экземпляров считается подходящим. Если контекст не выполняется, после выбора будет `FLICK-C001`, хотя подошёл бы другой тип.
-- Решение — запись (неполнота). На T6 не влияет: выбранный тип дальше проверяется обычным выводом.
+- Divergence: `default_numeric` takes the first numeric type for which every open constraint has a matching head (`may_have_instance`). The instance context is not checked, and a class without instances counts as matching. If the context does not hold, `FLICK-C001` follows the choice, even though another type would have fit.
+- Resolution (recorded, incompleteness): this does not affect T6: the chosen type is then checked by ordinary entailment.
 
-Р180 и Р181 нашла механизация в Lean (`formal/Formal/Elab/`, P4c), Р182 — P4b, Р183 и Р184 — P4b′, Р185–Р188 и Р194–Р201 — P4a.
+The remaining entries were found by the Lean mechanization (`formal/Formal/Elab/`). They correct this document and the model; the checker is not affected.
 
-**Р180. `≈` не связывает слот структурного словаря со структурным словарём суперкласса.**
+### Equivalence did not relate structural slots to superclass dictionaries
 
-- Что происходит: посылка `δ : Ord τ` и путь `δ.$Eq` дают `Eq τ`. Для записи `τ` с полями `τ₁ … τₙ` `ρ` может подставить `δ := struct_Ord d̄`, и путь становится `(struct_Ord d̄).$Eq`. Тот же `Eq τ` выводится и прямо, (Struct): `struct_Eq ē`. Правило `≈` §4.2 переписывает только слоты экземпляров `I d̄`, и эти два словаря не `≈`: лемма 6.1 в такой форме неверна.
-- Причина: (Struct) — пятый вид словаря, а `≈` написано для четырёх. Рантайм строит `$Eq` структурного `Ord` из словарей `Eq` полей, то есть из `dᵢ.$Eq`: `$Eq: structural("Eq", dicts.map((d) => d.$Eq))` в `runtime/src/core/data.ts` `structural`. Поведение совпадает с новым правилом.
-- Решение — модель, внесено: в `≈` правило `(struct_C d̄).$slotᵢ ≈ struct_S (d̄.$slotᵢ)`. Доказательство опирается на то, что суперкласс структурного класса — структурный класс того же параметра (`Ord ⇒ Eq`), а у примитивов строк суперклассов нет. Lean: `Eqv.strctSlot`, поля `structSupers`, `primSupers` у `Coherent`.
+- Divergence: the given `δ : Ord τ` and the path `δ.$Eq` give `Eq τ`. For a record `τ` with fields `τ₁ … τₙ`, `ρ` may substitute `δ := struct_Ord d̄`, and the path becomes `(struct_Ord d̄).$Eq`. The same `Eq τ` is also entailed directly by (Struct): `struct_Eq ē`. The `≈` rule of §4.2 rewrote only slots of instances `I d̄`, and these two dictionaries were not `≈`: Lemma 6.1 in that form was false.
+- Cause: (Struct) is the fifth kind of dictionary, and `≈` was written for four. The runtime builds the `$Eq` of a structural `Ord` from the `Eq` dictionaries of the fields, that is from `dᵢ.$Eq`: `$Eq: structural("Eq", dicts.map((d) => d.$Eq))` in `runtime/src/core/data.ts` `structural`. Its behaviour matches the new rule.
+- Resolution (model): `≈` has the rule `(struct_C d̄).$slotᵢ ≈ struct_S (d̄.$slotᵢ)`. The proof relies on the superclass of a structural class being a structural class of the same parameter (`Ord ⇒ Eq`), and on row primitives having no superclasses. Lean: `Eqv.strctSlot`, the fields `structSupers`, `primSupers` of `Coherent`.
 
-**Р181. Лемма 6.2 без `ρ` неверна.**
+### Lemma 6.2 needs the substitution
 
-- Что происходит: «в любом `Δ` его вывод `≈` этому решению». Но в `Δ = δ : Eq Int` вывод (Given) даёт `δ`, а это не `≈` словарю экземпляра: `≈` определено на замкнутых термах, а `δ` — переменная.
-- Решение — проза, внесено: «после любой `ρ`, как в лемме 6.1». Чекер не задет: кэш хранит только решения без посылок (Р48), а сведение подставляет словари посылок при вызове. Lean: `lemma_6_2`.
+- Divergence: the statement read "in any `Δ` its derivation is `≈` to that solution". But in `Δ = δ : Eq Int` the derivation (Given) yields `δ`, which is not `≈` to the instance dictionary: `≈` is defined on closed terms, and `δ` is a variable.
+- Resolution (prose): "after any `ρ` as in Lemma 6.1". The checker is not affected: the cache holds only solutions without givens ([the solver cache](#the-solver-cache-stored-dictionaries-built-from-givens)), and elaboration substitutes the given dictionaries at the call. Lean: `lemma_6_2`.
 
-**Р182. (Let-Sig-Dict) теряла эффект правой части.**
+### (Let-Sig-Dict) lost the effect of the right-hand side
 
-- Что происходит: заключение (Let-Sig-Dict) было `! φ₂`. При `ᾱ = ∅` и `l = 0` посылка Р55 не требует `φ₁ = P`, и `let x : Int = Ref.modify … in 1` выводился с `! P`, хотя правая часть делает рантайм-шаг. Сведение `let x : Int = e₁' in e₂'` тогда не типизируется в λFlick⁺ с `P`, и T6(a) неверна.
-- Причина: правило переписано из (Let-Sig) `core.md` §2.3 без её заключения `φ₁ ⊔ φ₂`.
-- Решение — проза, внесено: заключение `! φ₁ ⊔ φ₂`, как в (Let-Sig) ядра. Чекер не задет: правая часть без параметров проверяется в стадии объемлющей функции (`bindings.rs` `check_signed` → `check`), и её рантайм-вызов отмечает эту стадию (`effects.rs` `perform`). Lean: посылки `φ₁ = P ∨ φ₁ = φ` у `Elab.letSig` и `Target.let_` (стадийная часть (Sub)).
+- Divergence: the conclusion of (Let-Sig-Dict) was `! φ₂`. With `ᾱ = ∅` and `l = 0`, the premise on [constrained signatures](#a-constrained-signature-over-a-runtime-right-hand-side) does not require `φ₁ = P`, and `let x : Int = Ref.modify … in 1` was derived with `! P` although the right-hand side takes a runtime step. The elaboration `let x : Int = e₁' in e₂'` then does not type in λFlick⁺ at `P`, and T6(a) was false.
+- Cause: the rule was copied from (Let-Sig) of `core.md` §2.3 without its conclusion `φ₁ ⊔ φ₂`.
+- Resolution (prose): the conclusion is `! φ₁ ⊔ φ₂`, as in the core's (Let-Sig). The checker is not affected: a right-hand side without parameters is checked at the stage of the enclosing function (`bindings.rs` `check_signed` → `check`), and its runtime call marks that stage (`effects.rs` `perform`). Lean: the premises `φ₁ = P ∨ φ₁ = φ` of `Elab.letSig` and `Target.let_` (the stage part of (Sub)).
 
-**Р183. `G` сводил источник `for` без `iter`.**
+### G elaborated the `for` source without `iter`
 
-- Что происходит: §3.2 давал `Seq.flat_map (λx. …) s`, а `s : f a` с `Iterable f`. При `f = List` терм `Seq.flat_map k s` не типизируется в λFlick⁺: `Seq.flat_map` ждёт `Seq a`. T6(a) для такого сведения неверна.
-- Причина: правило записано по IR, который `iter` не вызывает (Р51). Чекер типизирует источник через `iter : f a → Seq a` и записывает его словарь по ключу `<-` (`comprehension.rs` `for_clause`).
-- Решение — проза, внесено: `G` и `L` применяют `dᴵ.iter` к источнику. IR без `iter` — сокращение: оба экземпляра закрытого `Iterable` дают тождество в рантайме. Чекер и кодоген не задеты. Lean: `Sugar.gen`, `Sugar.loop`.
+- Divergence: §3.2 gave `Seq.flat_map (λx. …) s`, while `s : f a` with `Iterable f`. For `f = List` the term `Seq.flat_map k s` does not type in λFlick⁺: `Seq.flat_map` expects a `Seq a`. T6(a) for that elaboration was false.
+- Cause: the rule was written after the IR, which does not call `iter` ([closed `Iterable`](#for-did-not-call-iter-while-iterable-was-open)). The checker types the source through `iter : f a → Seq a` and records its dictionary under the key of `<-` (`comprehension.rs` `for_clause`).
+- Resolution (prose): `G` and `L` apply `dᴵ.iter` to the source. The IR without `iter` is a shortcut: both instances of the closed `Iterable` give the identity at run time. Checker and code generator are not affected. Lean: `Sugar.gen`, `Sugar.loop`.
 
-**Р184. Правило `L` для `for … do` не было записано.**
+### The loop rule L was missing
 
-- Что происходит: §3.2 определял `L` словами «то же с `Unit` вместо последовательности». Не было сказано, какая константа обходит последовательность и в какой стадии выполняется тело. Без этого T6(a) для `for … do` не сформулировать.
-- Причина: IR сводит цикл в узел `Each` без `Generate` (`ir/lower/comprehension.rs`), и у `L` нет формы в ядре.
-- Решение — проза, внесено: правила `L_φ` §3.2 с константой Γ₀ `Seq.each_φ : ∀a. (a →φ Unit) →P Seq a →φ Unit`. Тело и клаузы выполняются в стадии цикла: чекер проверяет их в текущей стадии (`for_loop`). В ядре нет переменных стадии, поэтому констант две, по одной на стадию. Lean: `Sugar.loop`, `Sugar.each`, `loop_elab`.
+- Divergence: §3.2 defined `L` only in words, "the same with `Unit` instead of a sequence". It did not say which constant traverses the sequence and at which stage the body runs. Without that, T6(a) for `for … do` cannot be stated.
+- Cause: the IR lowers the loop into an `Each` node without `Generate` (`ir/lower/comprehension.rs`), and `L` had no core form.
+- Resolution (prose): the rules `L_φ` of §3.2 with the Γ₀ constant `Seq.each_φ : ∀a. (a →φ Unit) →P Seq a →φ Unit`. The body and the clauses run at the loop's stage: the checker checks them at the current stage (`for_loop`). The core has no stage variables, so there are two constants, one per stage. Lean: `Sugar.loop`, `Sugar.each`, `loop_elab`.
 
-**Р185. T6(a) для λFlick⁺ без захватов не переносится на ядро с регионами.**
+### T6(a) without captures does not carry over to the core with regions
 
-- Что происходит: модель ядра в Lean расширена `regions.md` на месте, и её (Lam) требует, чтобы тип стрелки показывал всё, что держит замыкание: `held Ψ Γ (λb) ⊆ ⌈a →ψ^C t⌉`. Источник сведения (`Elab`) и цель (`Target`) захватов не знают: их (Lam) допускает любое `Γ`. Пример: `Γ = y : α`, константа `c : ∀b. b → Bool` из Γ₀; `λx. c y : Bool →P Bool` выводится, а в ядре это замыкание держит `α`, и `α` должно стоять в `C`. Законы `var`, `let_`, `meth` и `inst` требуют сведения типов `⟦·⟧`, которое коммутирует с подстановкой. Тогда замкнутый `Bool →P Bool` сводится к квалификатору, который не меняет ни одна подстановка, а в таком нет атомов переменных. Квалификатор «все атомы» ломается сдвигом `up k` контекста в (Let-Gen), «все переменные в области» — тоже, а сужение контекста не помогает из-за контравариантности параметра.
-- Причина: T6(a) сформулирована для λFlick⁺ §0.1, то есть для ядра `core.md` без захватов; `regions.md` к сведению не применялся (§0: у словаря своих захватов нет, но у остального терма они есть).
-- Решение — модель и документ: T6 идёт через ядро с регионами. Захваты входят в источник сведения и в `Target`: у стрелки квалификатор, схемы связывают переменные захватов, (Lam) источника несёт посылку `regions.md`, (Var) и (Inst) инстанцируют переменные захватов как прочие. λFlick⁺ — ядро Lean с регионами и номинальными записями словарей `D_C ᾱ` с `∀`-полями; `⌈D_C τ̄⌉ = ∅` (§0.1). §0.1 исправлен. План механизации — `formal/README.md`, «P4a design». Статус: документ внесён; в модели внесены источник и `Target` (P4a1: `heldS`, посылки `Elab.lam`, `Elab.letSig`, законы `lam`, `lamD`), ядро с записями словарей (P4a2: `Ty.dict`, `Typ.drec`, `Typ.dproj`, глобалы `Tm.glob`), экземпляр `Target` на ядре (P4a3: `typingTarget`, `T6a_core`).
+- Divergence: the Lean model of the core is extended in place with `regions.md`, and its (Lam) requires the arrow type to show everything the closure holds: `held Ψ Γ (λb) ⊆ ⌈a →ψ^C t⌉`. The elaboration source (`Elab`) and target (`Target`) did not know captures: their (Lam) allowed any `Γ`. Example: `Γ = y : α`, a constant `c : ∀b. b → Bool` from Γ₀; `λx. c y : Bool →P Bool` is derivable, while in the core this closure holds `α`, and `α` must be in `C`. The laws `var`, `let_`, `meth` and `inst` require a type translation `⟦·⟧` that commutes with substitution. Then the closed `Bool →P Bool` translates to a qualifier that no substitution changes, and such a qualifier has no variable atoms. The qualifier "all atoms" breaks under the context shift `up k` in (Let-Gen), "all variables in scope" breaks as well, and narrowing the context does not help because the parameter is contravariant.
+- Cause: T6(a) was stated for λFlick⁺ of §0.1, that is for the core of `core.md` without captures; `regions.md` was not applied to elaboration (§0: a dictionary has no captures of its own, but the rest of the term does).
+- Resolution (model and document): T6 goes through the core with regions. Captures are part of the elaboration source and of `Target`: an arrow has a qualifier, schemes bind capture variables, the source (Lam) carries the premise of `regions.md`, and (Var) and (Inst) instantiate capture variables like the others. λFlick⁺ is the Lean core with regions and nominal dictionary records `D_C ᾱ` with `∀`-fields; `⌈D_C τ̄⌉ = ∅` (§0.1). The mechanization design is in `formal/README.md`. Lean: in the source and `Target`, `heldS`, the premises of `Elab.lam`, `Elab.letSig`, the laws `lam`, `lamD`; in the core, dictionary records `Ty.dict`, `Typ.drec`, `Typ.dproj` and globals `Tm.glob`; the instance of `Target` on the core, `typingTarget`, `T6a_core`.
 
-**Р186. Стрелка источника — зарезервированный конструктор, а в ядре она не конструктор.**
+### The source arrow was a reserved constructor
 
-- Что происходит: в `Elab` стрелка `a →φ b` — терм `app (app (con c_φ) a) b`. Подстановка `f := con c_P` в `f a b` даёт стрелку, а в ядре `tapp (tapp f a) b` после подстановки стрелкой не становится. Сведение типов `⟦·⟧` не коммутирует с подстановкой, и закон `var` для типа `∀f. f Bool Bool` неверен.
-- Причина: упрощение модели источника; в чекере стрелка — отдельная форма `Fun`, а не `Con` (`types/ty.rs`), и чекер такой подстановки не допускает.
-- Решение — модель: отдельная стрелка `Ty.arr φ a b q` с квалификатором `q` в `Elab`, как `Fun` чекера. Статус: внесено (P4a1).
+- Divergence: in `Elab` the arrow `a →φ b` was the term `app (app (con c_φ) a) b`. Substituting `f := con c_P` into `f a b` gives an arrow, while in the core `tapp (tapp f a) b` does not become an arrow after substitution. The type translation `⟦·⟧` did not commute with substitution, and the law `var` for the type `∀f. f Bool Bool` was false.
+- Cause: a simplification of the source model; in the checker the arrow is a separate form `Fun`, not a `Con` (`types/ty.rs`), and the checker allows no such substitution.
+- Resolution (model): a separate arrow `Ty.arr φ a b q` with a qualifier `q` in `Elab`, like the checker's `Fun`.
 
-**Р187. Функция словарей из (Let-Sig-Dict) держит то, что держит правая часть.**
+### The dictionary function of (Let-Sig-Dict) holds what the right-hand side holds
 
-- Что происходит: `let x : Show a => String = show y` с `y : a` из окружения сводится в `λδ. δ.show y`. Замыкание держит `a`, а `⌈D_{Show a} →P String⌉ = ∅`, и (Lam) ядра с регионами для него не выводится: перевод схем §2.1 не давал стрелкам словарей квалификатора.
-- Причина: чекер регионов проверяет источник, где `x : String`; функция словарей появляется только при сведении. Она второго сорта: каждое использование `x` сразу применяет её к словарям (Var-Dict), поэтому из области она не уходит, и в рантайме это не опасно.
-- Решение — документ и модель: `⟦·⟧` схемы `let` с ограничениями несёт квалификатор `q` стрелок словарей (§2.1), сведение берёт `q` — то, что держит правая часть. Статус: внесено. Lean: `Scheme.q`, `Scheme.tr`, посылка `Elab.letSig` и закон `lamD` (P4a1).
+- Divergence: `let x : Show a => String = show y` with `y : a` from the environment elaborates to `λδ. δ.show y`. The closure holds `a`, while `⌈D_{Show a} →P String⌉ = ∅`, so the core (Lam) with regions is not derivable for it: the scheme translation of §2.1 gave dictionary arrows no qualifier.
+- Cause: the region checker checks the source, where `x : String`; the dictionary function appears only during elaboration. It is second-class: every use of `x` applies it to dictionaries at once (Var-Dict), so it never escapes its scope and is harmless at run time.
+- Resolution (document and model): `⟦·⟧` of a constrained `let` scheme carries the qualifier `q` of the dictionary arrows (§2.1), and elaboration takes `q` to be what the right-hand side holds. Lean: `Scheme.q`, `Scheme.tr`, the premise of `Elab.letSig` and the law `lamD`.
 
-**Р188. Схемы Prelude в модели без квалификаторов значений.**
+### Value qualifiers in Prelude schemes
 
-- Что происходит: у чекера квалификатор может стоять у любого типа. `flat_map : ∀c d a b. (∀v. a^v → (m b)^(c + v))^c → ((m a)^d → (m b)^(c + d))^c` (`Prelude.fl`); так же `map2`, `pure`, `iter`, `Seq.flat_map`, `Seq.each_effect`, `Seq.to_list` (`Seq.fl`). В `Elab` квалификатор был только у стрелки (Р186), и схемы гипотезы `Sugar` снимали квалификаторы нестрелочных типов. У `pure` схемы не было вовсе.
-- Причина: в ядре Lean квалификатор есть только у стрелки и у `Eff` (`Ty.arrow`, `Ty.eff`), и `⌈m b⌉ = ⌈m⌉ ∪ ⌈b⌉`. Значение типа `m b` не может держать продолжение `c`, поэтому ленивый экземпляр, результат которого держит продолжение (`Monad (Eff r e)`, `Seq.flat_map`), со схемой без квалификатора не типизируется.
-- Решение — модель: приём, который ядро уже применяет к данным со скрытым хранилищем (упрощение 15 README), — параметр вида `CRow` у типа. `τ^q` в ядро не вносится, ядро и T1–T4 не меняются.
-  - **Перевод схемы чекера в схему модели.** По нему шаг 2 плана генерирует схемы `Sugar`.
-    1. `(T ā)^ρ`, где `T` — тип со скрытым хранилищем (`Eff`, `Seq`) или переменная класса над контейнерами (`m`, `f`), переводится в `T ρ ā` (`appQ`): квалификатор значения — первый аргумент, вида `CRow`. Классы над контейнерами — над `m : CRow → Type → Type`. У данных без хранилища (`Option`, `List`, `Result`, `Errors`) квалификатор снимается: он ничего не добавляет к `⌈·⌉`. `a^ρ` у переменной типа — `a`: граница значения не моделируется (упрощение 15). `(A → B)^ρ` — `A →^ρ B`, без `ρ` — `cnil`; `ρ₁ + ρ₂` — `cun ρ₁ ρ₂`. Строки сервисов и ошибок стрелки — стадия модели (`Seq.each_φ`, Р184).
-    2. `∀v. a^v → …` у параметра (высший ранг, Р194) инстанцируется `v := a`: значение типа `a` достигает ровно `⌈a⌉`.
-    3. Аргумент `CRow` в ядре инвариантен: (≤-Cap) есть только у стрелки и `Eff`, а квалификаторы `Elab` совпадают точно. Поэтому где чекер полагается на подтипизацию квалификатора, схема модели берёт переменную. Квалификатор в отрицательной позиции (тип параметра, результат параметра-функции; и у данных, и у стрелок) — переменная: одиночная переменная чекера при первом таком вхождении остаётся собой, остальные — новые. Отсутствующий квалификатор данных в положительной позиции — новая переменная (`nothing`, `empty`, `singleton`).
-    4. В положительной позиции каждая переменная `q`, которая квалифицировала отрицательные позиции, заменяется тем, что достигают эти аргументы, слева направо через `cun`: у данных `(T ā)^q` — `q ∪ ⌈ā⌉`, у параметра-функции `(…)^q` — `q` и новые переменные внутри его типа. Значение, которое держит функцию, держит и то, что она возвращает.
-    5. Связыватели: параметры класса, затем `∀` чекера в его порядке (неявные — по первому вхождению) без инстанцированных и снятых, затем новые переменные в порядке вхождения.
-  - **Почему в результате `flat_map` стоит `a`.** По правилу 4 `d` результата `(m b)^(c + d)` — это `d ∪ a`: аргумент `(m a)^d` достигает и `⌈a⌉`. Ленивый результат держит аргумент целиком, и без `a` его тело не типизируется. Проба чекера (шаг 0, координатор) это подтверждает: ленивые `flat_map` и `map2` над `Eff` с ресурсом из `scope` отвергнуты (`FLICK-G001`), даже когда регион виден только в типе (`m : Eff none none (Res s)`); обобщённая обёртка `let bind_gen m k = flat_map k m` со схемой `∀a b. Eff none none a -> (a -> Eff none none b) -> Eff none none b` отвергнута с «this value holds `a`». При инстанциации чекер растит `d` полным охватом аргумента, включая атом `a`. Дыры нет, и правило 4 — то же самое явно.
-  - **Схемы** (`Sugar.lean`): `flat_map : ∀m c d a b e. Monad m ⇒ (a →^c m e b) →P (m d a →^(c ∪ e) m ((c ∪ e) ∪ (d ∪ a)) b)` (`bindTy`), `map2 : ∀f c d a b x g d'. (a →^c b →^g x) →P (f d a →^(c ∪ g) f d' b →^R f R x)` с `R = (c ∪ g) ∪ ((d ∪ a) ∪ (d' ∪ b))` (`map2Ty`), `pure : ∀f c a. a →P f c a`, `nothing : ∀f a r. f r a`, `iter : ∀f d a. f d a →P Seq (d ∪ a) a`, `Seq.flat_map` — `bindTy Seq`, `singleton : ∀a r. a →P Seq r a`, `empty : ∀a r. Seq r a`, `to_list : ∀d a. Seq d a →P List a`, `Seq.each_φ : ∀c d a. (a →φ^c Unit) →P (Seq d a →φ^c Unit)`, `from_result` — семейство по замкнутой строке ошибок (Р210). `pair`, `unc n` и `Seq.each_P` — константы модели без пары в Prelude (§3, Р184).
-  - **Сахар.** Строка блока `do` и `for … yield` — та, что даёт его сведение: `DoOk` индексирован контейнером `m` и типом элементов, `do_elab`, `gen_elab` и `T6a_do` дают `∃q`. Посылки берут любые строки.
-  - **`Eff` модели** — номинальный тип ядра `Eff q b` с конструктором `MkEff : eff ∅ ∅ b {q} → Eff q b`, `⌈Eff q b⌉ = ⌈q⌉ ∪ ⌈b⌉` через `tapp`; ленивое тело — `MkEff (task …)` по правилу (Task) ядра. Экземпляр класса над контейнерами у данных без хранилища — тип с фиктивным параметром `CRow`, который поля не упоминают; `Option` источника (`optTy`, `caseOpt`) остаётся без него.
-  - **Генерация.** Схемы экспортов `Prelude`, `Seq`, `Option`, `Result` и `List` порождает перевод выше, невыразимые идут в список пропусков (Р230): `flick-model/src/translate/lean.rs` берёт схему чекера (`builtins()`) и печатает `formal/Formal/Elab/PreludeSchemes.lean` (`just formal-schemes`; golden-тест `cargo test -p flick-model` сверяет файл с чекером). «Первое вхождение» правил 3 и 5 — в порядке текста: аргументы и тело стрелки раньше её квалификатора. `a^ρ` у переменной типа снят по правилу 1 и в правиле 4 не участвует (`pure`). `def` берёт номера класса метода и конструкторов типов в порядке вхождения. Ручные формы `bindTy`, `map2Ty`, `eachSch` совпадают с порождёнными по `rfl` (свидетель, `eachSch_R`); `pair`, `unc n` и `each_P` остаются ручными.
-- Чекер не задет. Статус: внесено. Lean: схемы `Sugar`, `appQ`, `bindTy`, `map2Ty`, `DoOk`, `GenOk`; ленивые `pure`, `map2` и `flat_map` экземпляра `Monad Eff` выводятся правилами ядра при схемах `Sugar` (`typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr`, `LazyEff.lean`). Гипотеза `RootTy` для них больше не допущение о программе, а следствие.
+- Divergence: in the checker a qualifier may stand on any type. `flat_map : ∀c d a b. (∀v. a^v → (m b)^(c + v))^c → ((m a)^d → (m b)^(c + d))^c` (`Prelude.fl`); likewise `map2`, `pure`, `iter`, `Seq.flat_map`, `Seq.each_effect`, `Seq.to_list` (`Seq.fl`). In `Elab` only the arrow had a qualifier ([separate source arrow](#the-source-arrow-was-a-reserved-constructor)), and the schemes of the hypothesis `Sugar` dropped the qualifiers of non-arrow types. `pure` had no scheme at all.
+- Cause: in the Lean core only the arrow and `Eff` have a qualifier (`Ty.arrow`, `Ty.eff`), and `⌈m b⌉ = ⌈m⌉ ∪ ⌈b⌉`. A value of type `m b` cannot hold the continuation `c`, so a lazy instance whose result holds the continuation (`Monad (Eff r e)`, `Seq.flat_map`) does not type with a scheme without a qualifier.
+- Resolution (model): the technique the core already uses for data with a hidden store (`formal/README.md`, simplification "Qualifiers are hidden only"): a parameter of kind `CRow` on the type. `τ^q` is not added to the core; the core and T1–T4 do not change.
+  - **Translating a checker scheme into a model scheme.** The `Sugar` schemes are generated by this translation.
+    1. `(T ā)^ρ`, where `T` is a type with a hidden store (`Eff`, `Seq`) or a class variable over containers (`m`, `f`), translates to `T ρ ā` (`appQ`): the value qualifier is the first argument, of kind `CRow`. Classes over containers range over `m : CRow → Type → Type`. For data without a store (`Option`, `List`, `Result`, `Errors`) the qualifier is dropped: it adds nothing to `⌈·⌉`. `a^ρ` on a type variable is `a`: the value bound is not modelled (simplification "Qualifiers are hidden only"). `(A → B)^ρ` is `A →^ρ B`, and without `ρ` it is `cnil`; `ρ₁ + ρ₂` is `cun ρ₁ ρ₂`. The service and error rows of an arrow become the model's stage (`Seq.each_φ`, [the loop rule](#the-loop-rule-l-was-missing)).
+    2. `∀v. a^v → …` on a parameter (higher rank, [not modelled otherwise](#the-model-allows-polymorphic-types-only-in-dictionary-fields)) is instantiated with `v := a`: a value of type `a` reaches exactly `⌈a⌉`.
+    3. The `CRow` argument is invariant in the core: (≤-Cap) exists only for the arrow and `Eff`, and the qualifiers of `Elab` match exactly. So wherever the checker relies on qualifier subtyping, the model scheme takes a variable. A qualifier in a negative position (a parameter type, the result of a function parameter; for data and arrows alike) is a variable: a single checker variable stays itself at its first such occurrence, the others are fresh. A missing data qualifier in a positive position is a fresh variable (`nothing`, `empty`, `singleton`).
+    4. In a positive position, every variable `q` that qualified negative positions is replaced by what those arguments reach, left to right through `cun`: for data `(T ā)^q` it is `q ∪ ⌈ā⌉`, for a function parameter `(…)^q` it is `q` and the fresh variables inside its type. A value that holds a function also holds what it returns.
+    5. Binders: the class parameters, then the checker's `∀` in its order (implicit ones by first occurrence) without the instantiated and dropped ones, then the fresh variables in order of occurrence.
+  - **Why `a` stands in the result of `flat_map`.** By rule 4, the `d` of the result `(m b)^(c + d)` is `d ∪ a`: the argument `(m a)^d` also reaches `⌈a⌉`. A lazy result holds the whole argument, and without `a` its body does not type. A checker probe confirms this: lazy `flat_map` and `map2` over `Eff` with a resource from `scope` are rejected (`FLICK-G001`), even when the region is visible only in the type (`m : Eff none none (Res s)`); the generalized wrapper `let bind_gen m k = flat_map k m` with the scheme `∀a b. Eff none none a -> (a -> Eff none none b) -> Eff none none b` is rejected with "this value holds `a`". On instantiation the checker grows `d` to the full reach of the argument, including the atom `a`. There is no hole, and rule 4 states the same explicitly.
+  - **Schemes** (`Sugar.lean`): `flat_map : ∀m c d a b e. Monad m ⇒ (a →^c m e b) →P (m d a →^(c ∪ e) m ((c ∪ e) ∪ (d ∪ a)) b)` (`bindTy`), `map2 : ∀f c d a b x g d'. (a →^c b →^g x) →P (f d a →^(c ∪ g) f d' b →^R f R x)` with `R = (c ∪ g) ∪ ((d ∪ a) ∪ (d' ∪ b))` (`map2Ty`), `pure : ∀f c a. a →P f c a`, `nothing : ∀f a r. f r a`, `iter : ∀f d a. f d a →P Seq (d ∪ a) a`, `Seq.flat_map` is `bindTy Seq`, `singleton : ∀a r. a →P Seq r a`, `empty : ∀a r. Seq r a`, `to_list : ∀d a. Seq d a →P List a`, `Seq.each_φ : ∀c d a. (a →φ^c Unit) →P (Seq d a →φ^c Unit)`, `from_result` is a family over a closed error row ([`from_result` family](#from_result-could-not-raise-in-the-core)). `pair`, `unc n` and `Seq.each_P` are model constants without a Prelude counterpart (§3, [the loop rule](#the-loop-rule-l-was-missing)).
+  - **Sugar.** The row of a `do` block and of `for … yield` is the one its elaboration gives: `DoOk` is indexed by the container `m` and the element type, and `do_elab`, `gen_elab` and `T6a_do` give `∃q`. The premises take any rows.
+  - **The model's `Eff`** is the nominal core type `Eff q b` with the constructor `MkEff : eff ∅ ∅ b {q} → Eff q b`, and `⌈Eff q b⌉ = ⌈q⌉ ∪ ⌈b⌉` through `tapp`; a lazy body is `MkEff (task …)` by the core rule (Task). An instance of a class over containers for data without a store is a type with a phantom `CRow` parameter that the fields do not mention; the source `Option` (`optTy`, `caseOpt`) stays without it.
+  - **Generation.** The schemes of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List` are produced by the translation above, and inexpressible ones go to a skip list ([generator coverage](#the-scheme-generator-translated-only-the-sugar-names)): `flick-model/src/translate/lean.rs` takes the checker's scheme (`builtins()`) and prints `formal/Formal/Elab/PreludeSchemes.lean` (`just formal-schemes`; the golden test `cargo test -p flick-model` compares the file with the checker). The "first occurrence" of rules 3 and 5 is in text order: the arguments and body of an arrow come before its qualifier. `a^ρ` on a type variable is dropped by rule 1 and takes no part in rule 4 (`pure`). A `def` takes the numbers of the method's class and of type constructors in order of occurrence. The hand-written forms `bindTy`, `map2Ty`, `eachSch` coincide with the generated ones by `rfl` (the witness, `eachSch_R`); `pair`, `unc n` and `each_P` stay hand-written.
+- The checker is not affected. Lean: the schemes `Sugar`, `appQ`, `bindTy`, `map2Ty`, `DoOk`, `GenOk`; the lazy `pure`, `map2` and `flat_map` of the `Monad Eff` instance are derived by the core rules under the `Sugar` schemes (`typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr`, `LazyEff.lean`). The hypothesis `RootTy` for them is a consequence rather than an assumption about the program.
 
-**Р195. Структурный и примитивный словари — семейства по типу, а терм словаря тип не показывает.**
+### Structural and primitive dictionaries are families indexed by type
 
-- Что происходит: (Struct) даёт `struct_C d̄` для `C τ` с полями `τ₁ … τₙ`, и `struct_C : D_{C τ₁} →P … →P D_{C τ}`. Число стрелок и `τ` зависят от записи, поэтому в λFlick⁺ это не одна константа со схемой, а семейство `struct_C^τ`: тело для `{a, b}` сравнивает поля `a` и `b`. Так же `prim_p` — словарь ограничения `Q`, которое (Prim) решила меткой `p`. Терм `struct_C d̄` §2.2 и `Dict.strct C` в Lean `τ` не содержат, и глобал ядра по одному терму не выбрать.
-- Причина: рантайм строит структурный словарь динамически, `structural("Eq", dicts)` (`runtime/src/core/data.ts`), и метки берёт из значения; в типизированном ядре так нельзя.
-- Решение — модель: сведение в ядро — отношение `Tr`, которое выбирает глобал `N.strct C τ` (`N.prim p q`) вместе с типом; закон `strct` берёт глобал записи `τ` из своей посылки. Остальное сведение — функция терма. Добавить `τ` в `Dict.strct` значило бы подставлять типы и в термы словарей (`Dict.subst`, лемма 6.1), и это больше работы. Чекер не задет. Статус: внесено (P4a3); заменено Р196: выбор по типу ломает прогон, и тип стоит в терме.
+- Divergence: (Struct) gives `struct_C d̄` for `C τ` with fields `τ₁ … τₙ`, and `struct_C : D_{C τ₁} →P … →P D_{C τ}`. The number of arrows and `τ` depend on the record, so in λFlick⁺ this is not one constant with a scheme but a family `struct_C^τ`: the body for `{a, b}` compares the fields `a` and `b`. Likewise `prim_p` is the dictionary of a constraint `Q` that (Prim) solved with the label `p`. The term `struct_C d̄` (as §2.2 then wrote it) and `Dict.strct C` in Lean did not contain `τ`, and a core global cannot be chosen from the term alone.
+- Cause: the runtime builds a structural dictionary dynamically, `structural("Eq", dicts)` (`runtime/src/core/data.ts`), and takes the labels from the value; a typed core cannot do that.
+- Resolution (model), superseded by the next entry: elaboration into the core was a relation `Tr` that chose the global `N.strct C τ` (`N.prim p q`) together with the type, with the law `strct` taking the global of the record `τ` from its premise. Choosing by type breaks the run, so the type is now part of the term.
 
-**Р196. Прогон сведения зависит от выбора структурного глобала, если тип словаря не виден снаружи.**
+### The structural dictionary term carries its type
 
-- Что происходит: по Р195 сведение `Tr` выбирает глобал `N.strct C τ` по типу, а терм `struct_C d̄` типа не показывает. Тип записи определяет типизация, но не всегда: `let y = (struct_Def (I_Int)).def in 0` типизируется при любой записи `τ` с полями `[Int]`, например `{a : Int}` и `{b : Int}`, и сведения с разными `τ` — разные программы, тела глобалов которых модель не связывает. Пусть экземпляр `J` имеет суперкласс `Def {a : Int}`, а его слот — `struct_Def I_Int`. Тогда `J.$slot` и слот `≈`, но тело `J` берёт глобал `{a : Int}`, а сведение слота может взять `{b : Int}`. Тело `def` у него может упасть (`todo`), и у двух `≈` термов разные результаты: `load_rel` P4a4 неверна для любой `load`, которая выбирает сведение, и T6(b) для ядра — тоже. То же у `prim_p`: глобал `N.prim p q` выбран по ограничению `q`.
-- Причина: Р195 оставила терм словаря без типа, а «типизированная позиция фиксирует `τ`» верно только для типа всего терма, не для его словарей. Ещё одно: тело экземпляра называет глобал `N.strct C τ` с переменными экземпляра, а замкнутый вывод того же ограничения — с `τθ`; это разные глобалы и при однозначном выборе.
-- Решение — модель и документ: структурный словарь несёт тип записи, `struct_C^τ`, примитивный — своё ограничение, как `prim_Q ℓ̄` §2.2. Сведение стало функцией терма. `≈` получила правила `struct_C^τ ≈ struct_C^{τθ}` и `prim_Q ℓ̄ ≈ prim_{Qθ} ℓ̄`: рантайм тип стирает (`structural` берёт метки из значения), поэтому прогон P4a4 потребует от тел глобалов `N.strct C (τθ)` и `N.strct C τ` совпадения (гипотеза о телах, как `RootTy`). Лемма 6.1 и T6(b) прежние: `closed_rep` связывает словарь до и после `θ` новыми правилами. Чекер не задет: его `Dict::Structural` типа не хранит, и это верно, потому что рантайм его не читает. Статус: внесено (P4a4). Lean: `Dict.strct C τ`, `Dict.prim p q`, `Eqv.strctSub`, `Eqv.primSub`, `TrD.strct`, `TrD.prim`.
+- Divergence: with the global chosen by type as in the previous entry, the term `struct_C d̄` does not show the type. Typing determines the record type, but not always: `let y = (struct_Def (I_Int)).def in 0` types for any record `τ` with fields `[Int]`, for example `{a : Int}` and `{b : Int}`, and elaborations with different `τ` are different programs whose global bodies the model does not relate. Let an instance `J` have the superclass `Def {a : Int}` with slot `struct_Def I_Int`. Then `J.$slot` and the slot are `≈`, but the body of `J` takes the global for `{a : Int}`, while the elaboration of the slot may take the one for `{b : Int}`. Its `def` body may fail (`todo`), and two `≈` terms have different results: `load_rel` is false for any `load` that chooses the elaboration, and so is T6(b) for the core. The same holds for `prim_p`: the global `N.prim p q` is chosen by the constraint `q`.
+- Cause: the dictionary term had no type, and "a typed position fixes `τ`" holds only for the type of the whole term, not for its dictionaries. In addition, an instance body names the global `N.strct C τ` with the instance's variables, while a closed derivation of the same constraint names it with `τθ`; these are different globals even when the choice is unique.
+- Resolution (model and document): a structural dictionary carries the record type, `struct_C^τ`, and a primitive one carries its constraint, as `prim_Q ℓ̄` of §2.2. Elaboration is a function of the term. `≈` has the rules `struct_C^τ ≈ struct_C^{τθ}` and `prim_Q ℓ̄ ≈ prim_{Qθ} ℓ̄`: the runtime erases the type (`structural` takes the labels from the value), so the run requires the bodies of the globals `N.strct C (τθ)` and `N.strct C τ` to agree (a hypothesis about bodies, like `RootTy`). Lemma 6.1 and T6(b) are unchanged: `closed_rep` relates a dictionary before and after `θ` by the new rules. The checker is not affected: its `Dict::Structural` stores no type, which is correct because the runtime does not read it. Lean: `Dict.strct C τ`, `Dict.prim p q`, `Eqv.strctSub`, `Eqv.primSub`, `TrD.strct`, `TrD.prim`.
 
-**Р197. `≈` с произвольными аргументами в правилах слотов не сохраняет результат.**
+### Slot rules of equivalence take closed derivations
 
-- Что происходит: `(I d̄).$slotᵢ ≈ sᵢ[δ̄ := d̄]` верно для любых `d̄`. Если `sᵢ` не упоминает `δⱼ`, то `dⱼ` справа пропадает, а слева вычисляется: при расходящемся или застрявшем `dⱼ` у левой стороны значения нет, у правой есть. Поэтому `≈` не сохраняет результат, а через `trans` с таким промежуточным термом связывает и типизированные концы: индукция по `≈`, которую план P4a4 брал для «`≈` словари дают одно значение», ломается на `trans`. Для типизированных концов это не контрпример, но доказательство тогда требует нормализации и конфлюэнтности переписывания слотов, от которых план отказался.
-- Причина: правило записано по подстановке, а смысл оно получает от вычисления. Лемма 6.1 применяет оба правила слотов только к замкнутым выводам аргументов (`slot_ok`).
-- Решение — модель и документ: в правилах слотов `d̄` — замкнутые выводы. Лемма 6.1, лемма 6.2 и T6(b) прежние. Для замкнутых выводов аргументы вычисляются, и тогда каждое правило `≈` сохраняет множество значений словаря; индукция по `≈` идёт без типизации промежуточных термов. Чекер не задет: `≈` нужна только доказательству. Статус: внесено (P4a4). Lean: посылки `Ent` у `Eqv.instSlot` и `Eqv.strctSlot`.
+- Divergence: `(I d̄).$slotᵢ ≈ sᵢ[δ̄ := d̄]` held for any `d̄`. If `sᵢ` does not mention `δⱼ`, then `dⱼ` disappears on the right but is evaluated on the left: for a diverging or stuck `dⱼ` the left side has no value and the right side has one. So `≈` did not preserve the result, and through `trans` with such an intermediate term it also related typed ends: an induction on `≈` for "`≈` dictionaries give one value" breaks at `trans`. For typed ends this is not a counterexample, but the proof would then need normalization and confluence of slot rewriting, which the mechanization avoids.
+- Cause: the rule was written by substitution, while its meaning comes from evaluation. Lemma 6.1 applies both slot rules only to closed derivations of the arguments (`slot_ok`).
+- Resolution (model and document): in the slot rules `d̄` are closed derivations. Lemma 6.1, Lemma 6.2 and T6(b) are unchanged. For closed derivations the arguments evaluate, and then every `≈` rule preserves the set of values of a dictionary; the induction on `≈` goes through without typing intermediate terms. The checker is not affected: `≈` is needed only by the proof. Lean: the `Ent` premises of `Eqv.instSlot` and `Eqv.strctSlot`.
 
-**Р198. `≈` связывает открытые словари, и слоты экземпляра могут называть не только его посылки.**
+### Equivalence relates open dictionaries
 
-- Что происходит: §4.2 определяет `≈` на замкнутых термах словарей, но T6(b) сравнивает и словари под `λδ̄` правила (Let-Sig-Dict), а они открыты; Lean-`Eqv` определена на всех термах. Открытая пара может быть связана через `trans` с промежуточным термом, который не вычисляется. Прогон P4a4 сравнивает словари по значениям, а значение есть только у замкнутого словаря. Сводить `≈` к замкнутым парам можно, если правило слота экземпляра связывает замкнутые термы: `sᵢ[δ̄ := d̄]` замкнут, только если слот `sᵢ` называет лишь посылки `δ̄`. К7 говорит это только о слотах суперклассов, а у `Inst` список слотов может быть длиннее.
-- Решение — модель: `≈` — конгруэнтное замыкание своих замкнутых пар (`DSim`, `eqv_dsim`). Слоты называют только посылки (`SlotsBelow`): это следует из замкнутости тел экземпляров (`RootTy`) и их вида (`RealRun`), отдельной гипотезы не нужно (`slots_below`). Чекер не задет. Статус: внесено (P4a4).
+- Divergence: §4.2 defines `≈` on closed dictionary terms, but T6(b) also compares dictionaries under the `λδ̄` of rule (Let-Sig-Dict), and these are open; the Lean `Eqv` is defined on all terms. An open pair may be related through `trans` with an intermediate term that does not evaluate. The run compares dictionaries by value, and only a closed dictionary has a value. Reducing `≈` to closed pairs works if the instance slot rule relates closed terms: `sᵢ[δ̄ := d̄]` is closed only if the slot `sᵢ` names only the givens `δ̄`. K7 says this only about superclass slots, while the slot list of `Inst` may be longer.
+- Resolution (model): `≈` is the congruence closure of its closed pairs (`DSim`, `eqv_dsim`). Slots name only givens (`SlotsBelow`): this follows from the closedness of instance bodies (`RootTy`) and their shape (`RealRun`), with no separate hypothesis (`slots_below`). The checker is not affected.
 
-**Р199. Типизация всего сведённого терма не типизирует его словари в пустом контексте.**
+### Typing the whole term does not type its dictionaries in the empty context
 
-- Что происходит: `load_rel` получает `Has [] [] e t φ` для обоих термов, то есть типизацию ядра всего сведения. Базовой паре прогона нужна типизация каждого замкнутого словаря в пустом контексте в стадии `P`: только так шаг внутри словаря — чистый. Словарь может стоять под связывателем, и из типизации всего терма её получить нельзя без усиления контекста и смены стадии в ядре.
-- Решение — модель: у цели с прогоном (`runTarget`) `Has` — это `Has` ядра вместе с типизацией словарей терма по законам `Target` (`DTyp`, `RHas`). Законы дают обе. `T6b_core` берёт `RHas` для обоих заполнений; T6(a) для ядра (`T6a_core`) прежняя. Чекер не задет. Статус: внесено (P4a4).
-- `RHas` замкнутых заполнений теперь выводится, а не берётся посылкой. `T6a_close` — T6(a) с замкнутыми посылками: вывод под `Δl, Δ`, где `Δ` замкнуто типами `θ` и замкнутыми словарями `ρ` до ограничений без переменных, в любой цели имеет тип `τθ` под `Δl θ`, а посылки `Δ` в нём заменены словарями. Для скелета, у которого дыры стоят вне абстракций по словарям (`Tm.Skel`), замкнуть заполнение — то же, что заполнить замкнутыми словарями (`fill_dsubst`). Отсюда `witness_T6b_open`: T6(b) на свидетеле под посылками без посылок о типизации. Нужна Р201. Lean: `Elab/Close.lean`, `Elab/CloseTy.lean`, `Witness/Consts.lean`.
+- Divergence: `load_rel` gets `Has [] [] e t φ` for both terms, that is the core typing of the whole elaboration. A base pair of the run needs the typing of every closed dictionary in the empty context at stage `P`: only then is a step inside the dictionary pure. A dictionary may stand under a binder, and its typing cannot be obtained from the typing of the whole term without strengthening the context and changing the stage in the core.
+- Resolution (model): in the target with a run (`runTarget`), `Has` is the core `Has` together with the typing of the term's dictionaries by the laws of `Target` (`DTyp`, `RHas`). The laws give both. `T6b_core` takes `RHas` for both fillings; T6(a) for the core (`T6a_core`) is unchanged. The checker is not affected.
+- `RHas` of closed fillings is derived rather than taken as a premise. `T6a_close` is T6(a) with closed givens: a derivation under `Δl, Δ`, where `Δ` is closed by the types `θ` and by closed dictionaries `ρ` down to constraints without variables, has type `τθ` under `Δl θ` in any target, with the givens `Δ` replaced by dictionaries. For a skeleton whose holes stand outside dictionary abstractions (`Tm.Skel`), closing a filling is the same as filling with closed dictionaries (`fill_dsubst`). From this follows `witness_T6b_open`: T6(b) on the witness under givens, without premises about typing. It relies on [structural dictionaries typed at any instance](#structural-dictionaries-were-typed-only-at-their-own-record-type). Lean: `Elab/Close.lean`, `Elab/CloseTy.lean`, `Witness/Consts.lean`.
 
-**Р200. Образец записи читает поля словаря, не вычисляя их.**
+### Record patterns read dictionary fields without evaluating them
 
-- Что происходит: в ядре `Tm.field` читает поле и у записи словаря `drec` (P4a2), поэтому образец `rfield` сопоставляется и со словарём, а поля словаря — любые чистые термы, не значения. Сопоставление проверяет их форму без вычисления. Типизированная программа так не делает: тип словаря не тип записи.
-- Решение — модель: отношение `Rel` (`Cg`) не ставит базовых пар внутри `drec` (индекс `true`), поэтому сопоставление со связанными значениями даёт связанные результаты и без типизации. Ядро не меняется. Статус: внесено (P4a4).
+- Divergence: in the core `Tm.field` also reads a field of a dictionary record `drec`, so the pattern `rfield` matches a dictionary too, and the fields of a dictionary are arbitrary pure terms, not values. Matching inspects their shape without evaluating them. A typed program does not do this: a dictionary type is not a record type.
+- Resolution (model): the relation `Rel` (`Cg`) places no base pairs inside `drec` (index `true`), so matching related values gives related results even without typing. The core does not change.
 
-**Р201. Структурный словарь типизировался только при своём типе записи, и замкнуть посылки типами было нельзя.**
+### Structural dictionaries were typed only at their own record type
 
-- Что происходит: законы `strct` и `prim` у `Target` и `DTyp` давали `struct_C^τ` только тип при самом `τ`, `prim_q` — только при `q`. Замыкание посылок (Р199) подставляет типы `θ`, а терм словаря тип хранит (Р196) и подстановкой типов не меняется. Пусть `Δ = [Eq a]`, `d = struct_Eq^{x:a} δ₀`, `θ: a := Int`, `ρ₀ = I_EqInt`. Тогда `d[ρ] = struct_Eq^{x:a} I_EqInt`: функция ждёт `D_{Eq a}`, а получает `D_{Eq Int}`. `DTyp` такого терма нет, `DOk` ложно, и `RHas` замкнутого заполнения не выполняется: при `θ` не тождественной утверждение Р199 в модели было неверно.
-- Причина: закон фиксировал тип. В ядре глобал `N.strct C τ` имеет замкнутую схему `∀k` (`Real.strct`), а прогон тип стирает (`Eqv.strctSub`, `primSub`, Р196): терм пригоден при любом `τθ`.
-- Решение — модель: законы `strct` и `prim` и `DTyp` берут любой экземпляр `θ` своего типа, `struct_C^τ : D_{C τ₁θ} →P … →P D_{C τθ}` и `prim_q : D_{qθ}`, как закон `inst` берёт любое `σ`. Ядро доказывает их через `has_glob` при `θ`. Прогон (`DSim`, `eqv_sem`, `DTyp.core`) от типа не зависит и не меняется. Чекер не задет: `Dict::Structural` тип не хранит. Статус: внесено. Lean: `Target.strct`, `Target.prim`, `DTyp.strct`, `DTyp.prim`, `has_strct`, `has_prim`.
+- Divergence: the laws `strct` and `prim` of `Target` and `DTyp` gave `struct_C^τ` a type only at `τ` itself, and `prim_q` only at `q`. Closing the givens ([typing dictionaries in the empty context](#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)) substitutes types `θ`, while a dictionary term stores its type ([typed dictionary terms](#the-structural-dictionary-term-carries-its-type)) and is unchanged by type substitution. Let `Δ = [Eq a]`, `d = struct_Eq^{x:a} δ₀`, `θ: a := Int`, `ρ₀ = I_EqInt`. Then `d[ρ] = struct_Eq^{x:a} I_EqInt`: the function expects `D_{Eq a}` but gets `D_{Eq Int}`. There is no `DTyp` for this term, `DOk` is false, and `RHas` of the closed filling does not hold: for a non-identity `θ` the claim about closed fillings was false in the model.
+- Cause: the law fixed the type. In the core the global `N.strct C τ` has a closed scheme `∀k` (`Real.strct`), and the run erases the type (`Eqv.strctSub`, `primSub`): the term is usable at any `τθ`.
+- Resolution (model): the laws `strct` and `prim` and `DTyp` take any instance `θ` of their type, `struct_C^τ : D_{C τ₁θ} →P … →P D_{C τθ}` and `prim_q : D_{qθ}`, as the law `inst` takes any `σ`. The core proves them through `has_glob` at `θ`. The run (`DSim`, `eqv_sem`, `DTyp.core`) does not depend on the type and does not change. The checker is not affected: `Dict::Structural` stores no type. Lean: `Target.strct`, `Target.prim`, `DTyp.strct`, `DTyp.prim`, `has_strct`, `has_prim`.
 
-**Р210. `from_result` в ядре не может бросить ошибку: строка ошибок `R` пуста, а `raise` требует атомов.**
+### `from_result` could not raise in the core
 
-- Что происходит: свидетель гипотез (README, упрощение 11) должен дать `from_result : ∀e a. Result (Errors e) a →R a` тело `match r with Ok x → x | Err e → raise e` (§3.3, `core.md` §1.4). В ядре это не типизируется. Стадия `R` источника строк не несёт, и `⟦R⟧ = rt ∅ ∅` запрещает любой `raise`. Кроме того, (Raise) ядра добавляет в строку ошибок то, чего достигает ошибка: у `Errors e` это переменная `e`. Схема с переменной `e` даёт атом, которого не покрывает никакая замкнутая строка, а переменных строк в ядре нет.
-- Причина: модель сводит строки сервисов и ошибок стадии `R` в одну стадию без строк, а ядро типизирует ошибки строками атомов.
-- Решение — модель: `⟦R⟧ = rt ∅ ε`, где `ε` — все имена (`allNames`): тело стадии `R` может бросить ошибку любого типа, который ничего не достигает. Строки модели замкнуты, поэтому `from_result` — семейство `from_result_n` по замкнутым строкам ошибок, как `each_φ` по стадиям (Р184): `∀a. Result (Errors (con n)) a →R a` (`frSch`). Член семейства — порождённая схема (Р230) при `e := con n`, это теорема `frSch_gen` (`rfl`), поэтому генератор не меняется. `e?` берёт член по строке типа `e` (`tryResult_elab`). Сужение: строка ошибок `?` — один тип ошибки `con n`; строка из нескольких типов и переменная строки не моделируются. T6(a) и T6(b) прежние. Чекер не задет. Статус: внесено. Lean: `allNames`, `trStage`, `frSch`, `frSch_gen`, `Sugar.hFromResult`, `frBody`, `typ_frBody`.
+- Divergence: the witness of the hypotheses (`formal/Formal/Elab/Witness/`, see `formal/README.md`) has to give `from_result : ∀e a. Result (Errors e) a →R a` the body `match r with Ok x → x | Err e → raise e` (§3.3, `core.md` §1.4). In the core this does not type. The source stage `R` carries no rows, and `⟦R⟧ = rt ∅ ∅` forbids any `raise`. In addition, the core (Raise) adds to the error row what the error reaches: for `Errors e` that is the variable `e`. A scheme with a variable `e` gives an atom that no closed row covers, and the core has no row variables.
+- Cause: the model collapses the service and error rows of stage `R` into one stage without rows, while the core types errors by rows of atoms.
+- Resolution (model): `⟦R⟧ = rt ∅ ε`, where `ε` is every name (`allNames`): a body at stage `R` may raise an error of any type that reaches nothing. The model's rows are closed, so `from_result` is a family `from_result_n` over closed error rows, as `each_φ` is over stages ([the loop rule](#the-loop-rule-l-was-missing)): `∀a. Result (Errors (con n)) a →R a` (`frSch`). A member of the family is the generated scheme ([generator coverage](#the-scheme-generator-translated-only-the-sugar-names)) at `e := con n`; this is the theorem `frSch_gen` (`rfl`), so the generator does not change. `e?` takes the member by the row of the type of `e` (`tryResult_elab`). Narrowing: the error row of `?` is a single error type `con n`; a row of several types and a row variable are not modelled. T6(a) and T6(b) are unchanged. The checker is not affected. Lean: `allNames`, `trStage`, `frSch`, `frSch_gen`, `Sugar.hFromResult`, `frBody`, `typ_frBody`.
 
-**Р211. `Int` источника переводился в номинальный тип без операций.**
+### Source `Int` translated to a nominal type without operations
 
-- Что происходит: `⟦Int⟧` был `adt "Int"` — тип без конструкторов, и у экземпляра `Eq Int` не было настоящего тела: в ядре не было сравнения `Int`.
-- Решение — модель: в ядро добавлена константа `intEq : Int →P Int →P Bool` с чистым шагом на двух литералах (единственное изменение ядра; T1–T4, T4.3 передоказаны). `Int` источника — зарезервированный конструктор `con 4` (`intTy`), как `Bool` — `con 2`, и `⟦Int⟧ = base int`. Тело `eq` экземпляра `Eq Int` — `intEq`. Чекер не задет. Статус: внесено. Lean: `Const.intEq`, `PHead.intEq`, `canonical_int`, `trT_int`.
+- Divergence: `⟦Int⟧` was `adt "Int"`, a type without constructors, and the `Eq Int` instance had no real body: the core had no comparison of `Int`.
+- Resolution (model): the core has a constant `intEq : Int →P Int →P Bool` with a pure step on two literals (the only change to the core; T1–T4 and T4.3 were re-proved). The source `Int` is the reserved constructor `con 4` (`intTy`), as `Bool` is `con 2`, and `⟦Int⟧ = base int`. The body of `eq` of the `Eq Int` instance is `intEq`. The checker is not affected. Lean: `Const.intEq`, `PHead.intEq`, `canonical_int`, `trT_int`.
 
-**Р194. λFlick⁺ модели допускает `∀` только в полях словаря.**
+### The model allows polymorphic types only in dictionary fields
 
-- Что происходит: §0.1 допускает `∀ᾱ. τ` как тип поля записи словаря и как тип параметра стрелки. Ядро Lean (P4a2) даёт первое: `Ty.dict`, поля со схемами (`Sig.dict`), (Let-Gen) для поля (`Typ.dcons`) и (Var) для проекции (`Typ.dproj`). Параметра стрелки с `∀`-типом в нём нет.
-- Причина: источник сведения в Lean (`Elab`) не имеет параметров высшего ранга (`formal/README.md`, упрощение 6 раздела об Elaboration), поэтому T6(a) модели они не нужны.
-- Решение — модель: сужение записано, §0.1 остаётся описанием языка. Параметры высшего ранга войдут в модель вместе с ними в `Elab`. Статус: записано.
+- Divergence: §0.1 allows `∀ᾱ. τ` as the type of a dictionary record field and as the type of an arrow parameter. The Lean core provides the former: `Ty.dict`, fields with schemes (`Sig.dict`), (Let-Gen) for a field (`Typ.dcons`) and (Var) for a projection (`Typ.dproj`). It has no arrow parameter with a `∀`-type.
+- Cause: the elaboration source in Lean (`Elab`) has no higher-rank parameters (`formal/README.md`, section "Elaboration and T6", the simplification on the source of T6(a)), so the model's T6(a) does not need them.
+- Resolution (model): the narrowing is recorded; §0.1 remains a description of the language. Higher-rank parameters will enter the model together with their addition to `Elab`.
 
-**Р230. Генератор схем переводил только имена `Sugar`.**
+### The scheme generator translated only the Sugar names
 
-- Что происходит: `flick-model/src/translate/lean.rs` переводил 11 имён, которые берёт `Sugar`, и падал на схеме со строкой вне стрелки, с кортежем, записью или контекстом сверх класса. Остальные экспорты `Prelude`, `Seq`, `Option`, `Result` и `List` с моделью не сверялись.
-- Причина: перевод Р188 написан для схем сахара и не говорит, что делать со строками вне стрелки, кортежами, записями и контекстом.
-- Решение — модель: генератор переводит каждый экспорт этих модулей со схемой в `def` файла `PreludeSchemes.lean`. Невыразимое не роняет генератор, а идёт строкой `-- skip M.x (категория)` в конец того же файла. Дополнения к Р188:
-  1. Строки стрелки — стадия `R` и тогда, когда они переменные: схема — член семейства по стадии, как `Seq.each_R` (Р184). Строки `Eff` снимаются: `(Eff r e a)^q` — `Eff q a`, тип со скрытым хранилищем, как `Seq`. `Eff` модели исполняется с пустыми строками (Р188).
-  2. Строка в аргументе другого типа (`Errors e`, `Exit e a`, `FieldCodec none a`) — пропуск `row`: у типов `Elab` нет вида строк, и замкнутая строка тоже не выражается. Исключение — `from_result`: переменная строки ошибок — индекс семейства по строке, в схеме она переменная типа.
-  3. Классы всех ограничений — `Scheme.ctx`, то есть стрелки словарей §2.1; класс метода первый, его параметр — первый связыватель. Переменная вида `Type → Type` — переменная над контейнерами правила 1 и вне методов (`bind`).
-  4. Кортеж `(a, b, c)` — `tup (tup a b) c`, как `nest` в `Sugar`. Закрытая запись `{ℓ̄ : τ̄}` — номинальный тип `rec_ℓ̄ τ̄`, поля в порядке меток. Квалификатор у них снимается: это данные без хранилища (правило 1). Строка захватов `{a, b | c}` — квалификатор `a ∪ b ∪ c`.
-  5. В правиле 4 параметр-функция с новой переменной-квалификатором достигает новых переменных внутри своего типа, без самой этой переменной (иначе `'0 ∪ '0` у `bind`).
-  6. Категории пропусков: `row`; `rank` — `∀` параметра, кроме `∀v. a^v → …`, или `∀` с контекстом (Р194); `region` — параметр-регион; `other` — прочее (открытая запись, `Symbol`).
-- Golden-тест (`translate::lean::tests`) сверяет файл с чекером и проверяет, что каждый экспорт пяти модулей — `def` или строка пропуска: новое имя без `just formal-schemes` ломает тест. Схемы 11 имён `Sugar` не изменились, `rfl` свидетеля остаётся. Статус: внесено. Пропущено 7 экспортов `Prelude`, все `row`: `parallel_results` и `parallel_exits` (`Errors e`, `Exit e a`) и кодеки полей (`field`, `optional_field`, `field_effect`, `on_missing`, `on_missing_effect`).
+- Divergence: `flick-model/src/translate/lean.rs` translated the 11 names that `Sugar` uses and failed on a scheme with a row outside an arrow, a tuple, a record, or a context beyond the class. The other exports of `Prelude`, `Seq`, `Option`, `Result` and `List` were not checked against the model.
+- Cause: the translation of [value qualifiers](#value-qualifiers-in-prelude-schemes) was written for the sugar schemes and did not say what to do with rows outside an arrow, tuples, records and contexts.
+- Resolution (model): the generator translates every export of these modules that has a scheme into a `def` of `PreludeSchemes.lean`. Inexpressible schemes do not crash the generator; they become a line `-- skip M.x (category)` at the end of the same file. Additions to the translation of [value qualifiers](#value-qualifiers-in-prelude-schemes):
+  1. The rows of an arrow are the stage `R` even when they are variables: the scheme is a member of a family over stages, like `Seq.each_R` ([the loop rule](#the-loop-rule-l-was-missing)). The rows of `Eff` are dropped: `(Eff r e a)^q` is `Eff q a`, a type with a hidden store, like `Seq`. The model's `Eff` runs with empty rows.
+  2. A row in an argument of another type (`Errors e`, `Exit e a`, `FieldCodec none a`) is skipped as `row`: the types of `Elab` have no row kind, and a closed row cannot be expressed either. The exception is `from_result`: the error row variable is the index of the family over rows, and in the scheme it is a type variable.
+  3. The classes of all constraints are `Scheme.ctx`, that is the dictionary arrows of §2.1; the method's class comes first, and its parameter is the first binder. A variable of kind `Type → Type` is a variable over containers in the sense of rule 1, also outside methods (`bind`).
+  4. A tuple `(a, b, c)` is `tup (tup a b) c`, like `nest` in `Sugar`. A closed record `{ℓ̄ : τ̄}` is the nominal type `rec_ℓ̄ τ̄`, with fields in label order. Their qualifier is dropped: they are data without a store (rule 1). A capture row `{a, b | c}` is the qualifier `a ∪ b ∪ c`.
+  5. In rule 4, a function parameter with a fresh qualifier variable reaches the fresh variables inside its type, without that variable itself (otherwise `bind` would get `'0 ∪ '0`).
+  6. Skip categories: `row`; `rank`, a `∀` on a parameter other than `∀v. a^v → …`, or a `∀` with a context ([`∀` only in dictionary fields](#the-model-allows-polymorphic-types-only-in-dictionary-fields)); `region`, a region parameter; `other`, everything else (an open record, `Symbol`).
+- The golden test (`translate::lean::tests`) compares the file with the checker and checks that every export of the five modules is a `def` or a skip line: a new name without `just formal-schemes` breaks the test. The schemes of the 11 `Sugar` names did not change, and the witness's `rfl` still holds. Seven `Prelude` exports are skipped, all as `row`: `parallel_results` and `parallel_exits` (`Errors e`, `Exit e a`) and the field codecs (`field`, `optional_field`, `field_effect`, `on_missing`, `on_missing_effect`).

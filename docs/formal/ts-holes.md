@@ -1,57 +1,66 @@
-# Дыры TypeScript и что с ними во Flick
+# TypeScript holes and how Flick closes them
 
-Сверено с кодом на `0d6016d5`. Каталог перечисляет известные дыры TypeScript: места, где TS принимает программу, а значение в рантайме не совпадает с типом. Для каждой записано, чем она закрыта во Flick.
+This catalog lists the known holes of TypeScript: places where TS accepts a program but the
+value at run time does not match its type. For each hole it records what closes it in Flick.
 
-Каждый пример на TS проверен на TypeScript 5.9.3 с `--strict`: он компилируется и в Node даёт указанный результат.
+Each TS example was checked on TypeScript 5.9.3 with `--strict`: it compiles, and on Node it
+gives the stated result.
 
-Ссылки:
+References:
 
-- `core.md`, `regions.md` — модель;
-- `spec/08` — `docs/src/content/docs/spec/08-typescript-and-ffi.md`;
+- `core.md`, `regions.md` — the model;
+- `spec/04` — `docs/src/content/docs/spec/06-typescript-and-ffi.md`;
 - `reference/ffi` — `docs/src/content/docs/reference/ffi.md`.
 
-Импортёр устроен в два шага:
+The importer works in two steps:
 
-1. `tools/dts-importer/src/` переводит `.d.ts` в формы (`Shape.fl`);
-2. `flick-core/src/ffi/` переводит формы в привязки Flick (`convert.rs` `ty`, `import.rs` `generate`).
+1. `tools/dts-importer/src/` translates `.d.ts` into shapes (`Shape.fl`);
+2. `flick-core/src/ffi/` translates shapes into Flick bindings (`convert.rs` `ty`, `import.rs` `generate`).
 
-## 0. Как закрыта дыра
+## 0. How a hole is closed
 
-| Класс | Что значит | Чем подтверждается |
+| Class | Meaning | Evidence |
 | - | - | - |
-| ядро | эквивалент на Flick не выводится по правилам модели | правило `core.md`/`regions.md` и отрицательная фикстура `tests/check` |
-| граница | форма TS не доходит до Flick как есть: импортёр её отвергает или даёт непрозрачный тип, кодоген копирует данные | функция импортёра или кодогена, тест импортёра или run-тест |
-| гипотеза | остаётся на доверенной привязке | часть гипотезы Г1 (`core.md` §4) |
+| core | the Flick equivalent is not derivable by the rules of the model | a rule of `core.md`/`regions.md` and a negative fixture in `tests/check` |
+| boundary | the TS form does not reach Flick as is: the importer rejects it or gives an opaque type, the codegen copies the data | a function of the importer or the codegen, an importer test or a run test |
+| hypothesis | it rests on a trusted binding | part of hypothesis G1 (`core.md` §4) |
 
-Одна дыра бывает закрыта в двух классах. Тогда её эквивалент на Flick отвергает ядро, а форма из `.d.ts` останавливается на границе.
+One hole can be closed in two classes. Then the core rejects its Flick equivalent, and the
+form from `.d.ts` stops at the boundary.
 
-Фикстуры:
+Fixtures:
 
-- `tests/check/fail/types/ts_holes.fl` — по форме на определение; ниже на неё ссылаются по имени определения.
-- `tests/check/projects/ts_holes_errors` — ошибки с одинаковым именем в двух модулях.
-- `tests/ffi/ts-holes` — пакет `.d.ts` с формами для импортёра. Тесты к нему: `tools/dts-importer/test/import.test.mjs` и `flick-core/src/ffi/tests.rs`.
-- Генератор X6 (`flick-model/src/generate/holes.rs`, §4) — формы дыр ядра в программах X2 и изменения, которые их открывают; оба чекера судят каждую.
+- `tests/check/fail/types/ts_holes.fl` — one form per definition; below it is referred to by the name of the definition.
+- `tests/check/projects/ts_holes_errors` — errors with the same name in two modules.
+- `tests/ffi/ts-holes` — a `.d.ts` package with forms for the importer. Its tests: `tools/dts-importer/test/import.test.mjs` and `flick-core/src/ffi/tests.rs`.
+- The hole generator (`flick-model/src/generate/holes.rs`, §4) — the forms of the core's holes in the programs of the model properties (`just model`), and the changes that would open them; both checkers judge each one.
 
-## 1. Правило границы: внешний объект непрозрачен
+## 1. The boundary rule: a foreign object is opaque
 
-Объект, интерфейс или экземпляр класса из `.d.ts` импортируется как непрозрачный тип, а не как запись Flick:
+An object, an interface or a class instance from `.d.ts` is imported as an opaque type, not as a Flick record:
 
-- Именованная форма становится `type Name` без конструкторов и полей: «A JS `Name`, opaque to Flick» (`convert.rs` `ty`, `import.rs` `generate`).
-- Анонимная форма в результате становится `JsValue`. В параметре импортёр отвечает «needs a checked adapter».
-- Экспорт класса отвергается: конструктор и методы привязываются руками.
+- A named shape becomes `type Name` without constructors or fields: "A JS `Name`, opaque to Flick" (`convert.rs` `ty`, `import.rs` `generate`).
+- An anonymous shape in a result becomes `JsValue`. In a parameter the importer answers "needs a checked adapter".
+- A class export is rejected: the constructor and the methods are bound by hand.
 
-Члены объекта импортёр не читает: `Shape.fl` `object_shape` сводит класс и объект к имени. Доступ к свойству — только явная привязка `foreign` с `this`, то есть вызов со своей стадией, а не чтение поля записи. Данные из внешнего объекта Flick получает в два шага:
+The importer does not read the members of an object: `Shape.fl` `object_shape` reduces a class
+and an object to a name. A property is accessed only through an explicit `foreign` binding with
+`this`, that is, a call with its own stage, not the read of a record field. Flick gets data out of
+a foreign object in two steps:
 
-1. `Js.snapshot : JsValue ->{; SnapshotError} Unknown` копирует граф и отвергает аксессоры, функции, чужие прототипы и циклы (spec/08 «`Unknown` и `JsValue`»);
-2. `Schema.validate` проверяет полученное значение.
+1. `Js.snapshot : JsValue ->{; SnapshotError} Unknown` copies the graph and rejects accessors, functions, foreign prototypes and cycles (spec/06 "`Unknown` and `JsValue`");
+2. `Schema.validate` checks the resulting value.
 
-spec/08 записывает это так: «A simple TS object shape stays by default a foreign shape with runtime access until a checked snapshot/adapter; it does not become an immutable source record because of `readonly`».
+spec/06 states it this way: "A simple TS object shape stays by default a foreign shape with runtime access until a checked snapshot/adapter; it does not become an immutable source record because of `readonly`".
 
-У непрозрачного типа нет полей, поэтому Flick не видит spread, аксессоров, `readonly` у членов и индексных сигнатур. Это закрывает на границе дыры §2.9–2.11 и §2.13.
+An opaque type has no fields, so Flick sees no spread, no accessors, no `readonly` on members and
+no index signatures. This closes holes §2.9–2.11 and §2.13 at the boundary.
 
-Данные самого Flick (`List`, кортеж, запись, ADT) непрозрачными не становятся. Внешний код вне рантайма получает и отдаёт их копией (Р26, §3): так меняется массив или объект в JS, а значение Flick остаётся прежним.
+Flick's own data (`List`, tuple, record, ADT) does not become opaque. Foreign code outside the
+runtime receives and returns it as a copy ([§3.1](#31-flick-data-is-copied-at-the-foreign-boundary)):
+so when JS changes an array or an object, the Flick value stays the same.
 
-## 2. Каталог
+## 2. Catalog
 
 ### 2.1 `any`
 
@@ -61,13 +70,13 @@ const m: number = n;
 m.toFixed(1); // TypeError: m.toFixed is not a function
 ```
 
-- Во Flick нет ни `any`, ни верхнего типа: у ≤ есть только ≤-Refl, ≤-Fun и ≤-Eff (`core.md` §2.2).
-- Внешнее значение неизвестного типа — непрозрачный `JsValue`. Его можно только передать во внешний код или в `Js.snapshot`.
-- `any` и `unknown` из `.d.ts` становятся `JsValue` (`convert.rs` `ty`). При `strict = true` импортёр их отвергает.
-- Закрыта: ядро и граница.
-- Тесты:
-  - `ts_holes.fl` `any_as_string` — `FLICK-T003` «expected `String`, found `JsValue`»;
-  - `ffi/tests.rs` `any_pure_and_cancellation_are_never_implied` и `strict_mode_refuses_unknown`.
+- Flick has neither `any` nor a top type: ≤ has only ≤-Refl, ≤-Fun and ≤-Eff (`core.md` §2.2).
+- A foreign value of unknown type is the opaque `JsValue`. It can only be passed to foreign code or to `Js.snapshot`.
+- `any` and `unknown` from `.d.ts` become `JsValue` (`convert.rs` `ty`). With `strict = true` the importer rejects them.
+- Closed: core and boundary.
+- Tests:
+  - `ts_holes.fl` `any_as_string` — `FLICK-T003` "expected `String`, found `JsValue`";
+  - `ffi/tests.rs` `any_pure_and_cancellation_are_never_implied` and `strict_mode_refuses_unknown`.
 
 ### 2.2 `as T`
 
@@ -77,10 +86,10 @@ const c = { name: "x" } as Cat;
 c.meow(); // TypeError: c.meow is not a function
 ```
 
-- Приведения во Flick нет.
-- `(e : σ)` — это `let x : σ = e in x` (`core.md` §1.4). Его типизируют (Let-Sig) и (Sub). Аннотация может расширить стадию стрелки или строки `Eff`, но не может сменить тип.
-- Закрыта: ядро (§2.2–2.3).
-- Тест: `ts_holes.fl` `cast` — `(1 : String)` даёт `FLICK-T003`.
+- Flick has no cast.
+- `(e : σ)` is `let x : σ = e in x` (`core.md` §1.4). It is typed by (Let-Sig) and (Sub). An annotation can widen the stage of an arrow or the row of an `Eff`, but cannot change the type.
+- Closed: core (§2.2–2.3).
+- Test: `ts_holes.fl` `cast` — `(1 : String)` gives `FLICK-T003`.
 
 ### 2.3 `as unknown as T`
 
@@ -89,10 +98,10 @@ const n = "42" as unknown as number;
 n.toFixed(1); // TypeError: n.toFixed is not a function
 ```
 
-- `Unknown` во Flick не верхний тип: по (Sub) в него не переходит ни одно значение.
-- Значение `Unknown` создаёт только `Js.snapshot`. Выйти из него можно только через `Schema.validate : Schema a -> Unknown -> Result SchemaError a`, то есть с проверкой в рантайме.
-- Закрыта: ядро.
-- Тест: `ts_holes.fl` `double_cast` — `FLICK-T003` на обеих аннотациях.
+- `Unknown` is not a top type in Flick: by (Sub) no value goes into it.
+- A value of `Unknown` is created only by `Js.snapshot`. The only way out of it is `Schema.validate : Schema a -> Unknown -> Result SchemaError a`, that is, with a check at run time.
+- Closed: core.
+- Test: `ts_holes.fl` `double_cast` — `FLICK-T003` on both annotations.
 
 ### 2.4 `!`
 
@@ -102,14 +111,14 @@ const v: number = m.get("k")!;
 v.toFixed(1); // TypeError: Cannot read properties of undefined
 ```
 
-- `null` и `undefined` во Flick нет: отсутствие значения — `Option`.
-- Снять `Option` можно только `match`, а он обязан быть исчерпывающим (Exh, `core.md` §2.4).
-- Опровержимый `let Some n = v` — `FLICK-T009`.
-- `let assert Some n = v` при несовпадении — явный дефект. Это исход `die`, который допускает T1, а не значение чужого типа.
-- Закрыта: ядро.
-- Тест: `tests/check/fail/types/matching.fl` `refutable` (`FLICK-T009`).
+- Flick has no `null` or `undefined`: an absent value is `Option`.
+- An `Option` is taken apart only by `match`, which must be exhaustive (Exh, `core.md` §2.4).
+- A refutable `let Some n = v` is `FLICK-T009`.
+- `let assert Some n = v` on a mismatch is an explicit defect. This is the outcome `die`, which T1 allows, not a value of another type.
+- Closed: core.
+- Test: `tests/check/fail/types/matching.fl` `refutable` (`FLICK-T009`).
 
-### 2.5 Лгущий предикат `x is T`
+### 2.5 A lying predicate `x is T`
 
 ```ts
 function isNumber(x: unknown): x is number { return true; }
@@ -117,15 +126,15 @@ const s: unknown = "a";
 if (isNumber(s)) s.toFixed(1); // TypeError: s.toFixed is not a function
 ```
 
-- `if` и `match` по значению `Bool` не меняют тип переменной.
-- Тип меняет только паттерн конструктора. Тип связанной переменной берётся из объявления конструктора (`core.md` §2.4), а не из обещания функции.
-- Предикат из `.d.ts` импортёр не читает. Тип возврата `x is T` для TS — `boolean`, и привязка возвращает `Bool`. `asserts x is T` даёт `Unit`.
-- Закрыта: ядро и граница.
-- Тесты:
-  - `ts_holes.fl` `guard` — после `if is_point value` поле `value.name` даёт `FLICK-T003`;
-  - тест импортёра «reduces a type predicate to its boolean».
+- `if` and `match` on a `Bool` value do not change the type of a variable.
+- Only a constructor pattern changes a type. The type of the bound variable comes from the constructor's declaration (`core.md` §2.4), not from a function's promise.
+- The importer does not read a predicate from `.d.ts`. For TS the return type `x is T` is `boolean`, and the binding returns `Bool`. `asserts x is T` gives `Unit`.
+- Closed: core and boundary.
+- Tests:
+  - `ts_holes.fl` `guard` — after `if is_point value` the field `value.name` gives `FLICK-T003`;
+  - the importer test "reduces a type predicate to its boolean".
 
-### 2.6 Бивариантность параметров методов
+### 2.6 Bivariant method parameters
 
 ```ts
 class Ev { constructor(readonly type: string) {} }
@@ -135,13 +144,13 @@ const h: Handler = { handle(e: MouseEv) { return e.clientX.toFixed(1); } };
 h.handle(new Ev("key")); // TypeError: Cannot read properties of undefined
 ```
 
-- Подтипы во Flick есть только у стрелок и `Eff`. Параметр стрелки контравариантен (≤-Fun, `core.md` §2.2; `effects.rs` `subsume`).
-- Методов, которые сравнивались бы иначе, у записей нет. Метод инстанса сверяется с сигнатурой класса как написан (`FLICK-C010`).
-- Аналог во Flick: функцию, которая полагается на чистый колбэк, ставят туда, где ей передадут эффектный.
-- Закрыта: ядро.
-- Тест: `ts_holes.fl` `pure_callback` — `(Unit -> Unit) ->{} Unit` за `(Unit ->{} Unit) ->{} Unit` даёт `FLICK-T003`.
+- In Flick only arrows and `Eff` have subtypes. An arrow's parameter is contravariant (≤-Fun, `core.md` §2.2; `effects.rs` `subsume`).
+- Records have no methods that would be compared differently. An instance method is checked against the class signature as written (`FLICK-C010`).
+- The Flick analogue: a function that relies on a pure callback is put where it will be passed an effectful one.
+- Closed: core.
+- Test: `ts_holes.fl` `pure_callback` — `(Unit -> Unit) ->{} Unit` in place of `(Unit ->{} Unit) ->{} Unit` gives `FLICK-T003`.
 
-### 2.7 Ковариантные изменяемые массивы
+### 2.7 Covariant mutable arrays
 
 ```ts
 class Animal { constructor(readonly name: string) {} }
@@ -153,53 +162,54 @@ animals.push(new Dog("rex"));
 cats[0].meow(); // TypeError: cats[0].meow is not a function
 ```
 
-- `List` неизменяем. Изменяемая ячейка — только `Ref`, и `Ref` инвариантен: внутри `Ref`, `List`, записей и ADT типы сравниваются по ≡ (`core.md` §2.2, Р8).
-- На границе `T[]` и `readonly T[]` из `.d.ts` становятся `List T`. Массив, который пересекает границу, копируется (Р26).
-- Закрыта: ядро и граница.
-- Тесты:
-  - `ts_holes.fl` `covariant_ref` — `Ref (Unit -> Unit)` за `Ref (Unit ->{} Unit)` даёт `FLICK-T003`;
-  - тест импортёра «gives a readonly array the shape of a mutable one»;
-  - run-тест Р26.
+- `List` is immutable. The only mutable cell is `Ref`, and `Ref` is invariant: inside `Ref`, `List`, records and ADTs types are compared by ≡ (`core.md` §2.2, [only arrows and Eff have subtyping](core.md#only-arrows-and-eff-have-subtyping)).
+- At the boundary `T[]` and `readonly T[]` from `.d.ts` become `List T`. An array that crosses the boundary is copied ([§3.1](#31-flick-data-is-copied-at-the-foreign-boundary)).
+- Closed: core and boundary.
+- Tests:
+  - `ts_holes.fl` `covariant_ref` — `Ref (Unit -> Unit)` in place of `Ref (Unit ->{} Unit)` gives `FLICK-T003`;
+  - the importer test "gives a readonly array the shape of a mutable one";
+  - the run test of [§3.1](#31-flick-data-is-copied-at-the-foreign-boundary).
 
-### 2.8 Подтипы по ширине
+### 2.8 Width subtyping
 
 ```ts
 type Point2 = { x: number; y: number };
 const p3 = { x: 1, y: 2, z: "far" };
-const p2: Point2 = p3; // лишние свойства проверяются только у литерала
+const p2: Point2 = p3; // excess properties are checked only on a literal
 const total: number = Object.values(p2).reduce((s, v) => s + v, 0);
 total; // "3far"
 ```
 
-- Записи Flick точные. (Rec) даёт запись ровно с данными полями, а вложения строк полей нет (`core.md` §1.2: «подтипов по ширине нет»).
-- Лишнее поле — `FLICK-T003`, и в литерале, и через переменную.
-- Открытый хвост `{ name : String | r }` — полиморфизм, а не подтип: функция получает запись целиком, в своём типе.
-- Закрыта: ядро.
-- Тесты:
-  - `ts_holes.fl` `width_via_variable` — через переменную;
-  - `tests/check/fail/types/records.fl` `extra` — в литерале.
+- Flick records are exact. (Rec) gives a record with exactly the given fields, and there is no inclusion of field rows (`core.md` §1.2: "no width subtyping").
+- An extra field is `FLICK-T003`, both in a literal and through a variable.
+- An open tail `{ name : String | r }` is polymorphism, not a subtype: the function gets the whole record, at its own type.
+- Closed: core.
+- Tests:
+  - `ts_holes.fl` `width_via_variable` — through a variable;
+  - `tests/check/fail/types/records.fl` `extra` — in a literal.
 
 ### 2.9 Spread
 
 ```ts
 class Temperature { #c = 20; get celsius() { return this.#c; } }
-interface Temp { readonly celsius: number } // так `.d.ts` описывает геттер
+interface Temp { readonly celsius: number } // how `.d.ts` describes a getter
 const t: Temp = new Temperature();
-const copy = { ...t };          // тип { celsius: number }
+const copy = { ...t };          // type { celsius: number }
 copy.celsius.toFixed(1);        // TypeError: Cannot read properties of undefined
 ```
 
-Тип `{...a}` одинаков для перечисляемого собственного свойства, неперечисляемого и аксессора на прототипе. Значение получает только первое, а прототип теряется.
+The type of `{...a}` is the same for an enumerable own property, a non-enumerable one and an
+accessor on the prototype. Only the first gets a value, and the prototype is lost.
 
-- Spread во Flick нет. `{ r with ℓ = e }` есть только у записей Flick, а у них только собственные поля данных (spec/08 «Value representation»: «a plain JS object with the exact set of own data fields»).
-- Внешний объект — непрозрачный тип (§1). `with` и чтение поля к нему не применимы.
-- Закрыта: граница.
-- Тесты:
-  - `ts_holes.fl` `spread_handle` — `FLICK-T003` «`Handle` has no field `name`; `with` only replaces existing fields»;
-  - тест импортёра «reads no members of a class»;
+- Flick has no spread. `{ r with ℓ = e }` exists only for Flick records, and those have only own data fields (spec/06 "Value representation": "a plain JS object with the exact set of own data fields").
+- A foreign object is an opaque type (§1). Neither `with` nor a field read applies to it.
+- Closed: boundary.
+- Tests:
+  - `ts_holes.fl` `spread_handle` — `FLICK-T003` "`Handle` has no field `name`; `with` only replaces existing fields";
+  - the importer test "reads no members of a class";
   - `ffi/tests.rs` `an_object_type_is_opaque_without_fields`.
 
-### 2.10 Свойство только с сеттером
+### 2.10 A setter-only property
 
 ```ts
 class Box { v = 0; set value(x: number) { this.v = x; } }
@@ -207,57 +217,57 @@ const x: number = new Box().value;
 x.toFixed(1); // TypeError: Cannot read properties of undefined
 ```
 
-- Доступа к свойствам внешнего объекта во Flick нет (§1). Привязка с `this` — это вызов функции, которую написал человек, а не чтение аксессора.
-- `Js.snapshot` отвергает аксессоры.
-- Закрыта: граница.
-- Тесты:
-  - `ts_holes.fl` `field_of_handle` — `FLICK-T003` «`Handle` has no field `value`»;
-  - тест импортёра «reads no members of a class»: класс с геттером, сеттером и индексной сигнатурой даёт только `handle`.
+- Flick has no access to the properties of a foreign object (§1). A binding with `this` is a call of a function a person wrote, not the read of an accessor.
+- `Js.snapshot` rejects accessors.
+- Closed: boundary.
+- Tests:
+  - `ts_holes.fl` `field_of_handle` — `FLICK-T003` "`Handle` has no field `value`";
+  - the importer test "reads no members of a class": a class with a getter, a setter and an index signature gives only `handle`.
 
-### 2.11 `readonly` и другая ссылка
+### 2.11 `readonly` and another reference
 
 ```ts
 const frozen: { readonly n: number } = Object.freeze({ n: 1 });
-const loose: { n: number } = frozen; // readonly свойства не участвует в совместимости
+const loose: { n: number } = frozen; // readonly does not take part in compatibility
 loose.n = 2; // TypeError: Cannot assign to read only property 'n'
 ```
 
-- Данные Flick неизменяемы. Изменяемо только `Ref`, и это видно по типу.
-- Вида «только для чтения» над `Ref` нет. В ядре нет формы, которую надо было бы отвергать, поэтому отрицательной фикстуры здесь нет.
-- Внешний код получает данные Flick копией (Р26), поэтому другая ссылка из JS их тоже не меняет.
-- Закрыта: ядро и граница.
-- Тест: run-тест Р26.
+- Flick data is immutable. Only `Ref` is mutable, and that shows in the type.
+- There is no read-only view of a `Ref`. The core has no form that would have to be rejected, so there is no negative fixture here.
+- Foreign code receives Flick data as a copy ([§3.1](#31-flick-data-is-copied-at-the-foreign-boundary)), so another reference from JS does not change it either.
+- Closed: core and boundary.
+- Test: the run test of [§3.1](#31-flick-data-is-copied-at-the-foreign-boundary).
 
-### 2.12 Необязательное свойство против `| undefined`
+### 2.12 Optional property versus `| undefined`
 
 ```ts
 type Opts = { retries?: number };
-const o: Opts = { retries: undefined }; // без exactOptionalPropertyTypes
+const o: Opts = { retries: undefined }; // without exactOptionalPropertyTypes
 "retries" in o ? o.retries!.toFixed(0) : "none"; // TypeError
 ```
 
-- `undefined` во Flick нет. Поле типа `Option T` обязательно: пропуск — `FLICK-T003`. Различия «нет ключа» и «нет значения» не возникает.
-- На границе параметр `x?: T` и параметр `x: T | undefined` оба становятся `Option T` с пометкой `optional i`. `None` передаёт явный `undefined` при той же арности (`runtime/src/core/data.ts` `optionalArg`). Функция, которая различает пропущенный аргумент и `undefined` (`arguments.length`, `in`), видит одно и то же. Это гипотеза Г1.
-- Результат `T | undefined` импортируется только по политике `undefined = "none"`.
-- Закрыта: ядро; на границе — гипотеза.
-- Тест: `tests/check/fail/ui/children.fl` `panel_no_header` — пропущенное поле типа `Option`.
+- Flick has no `undefined`. A field of type `Option T` is required: omitting it is `FLICK-T003`. The distinction between "no key" and "no value" does not arise.
+- At the boundary both a parameter `x?: T` and a parameter `x: T | undefined` become `Option T` marked `optional i`. `None` passes an explicit `undefined` at the same arity (`runtime/src/core/data.ts` `optionalArg`). A function that tells a missing argument from `undefined` (`arguments.length`, `in`) sees the same thing for both. This is hypothesis G1.
+- A result `T | undefined` is imported only under the policy `undefined = "none"`.
+- Closed: core; at the boundary, hypothesis.
+- Test: `tests/check/fail/ui/children.fl` `panel_no_header` — a missing field of type `Option`.
 
-### 2.13 Индексная сигнатура возвращает `T`
+### 2.13 An index signature returns `T`
 
 ```ts
 const scores: Record<string, number> = {};
-const s: number = scores["ann"]; // без noUncheckedIndexedAccess
+const s: number = scores["ann"]; // without noUncheckedIndexedAccess
 s.toFixed(1); // TypeError: Cannot read properties of undefined
 ```
 
-- Поиск по ключу и по индексу возвращает `Option`: `HashMap.get`, `List.get`, `Record.get_key`, `String.at`. Это типы констант Γ₀.
-- Индексные сигнатуры импортёр не читает. `Record<K, V>` вне поддерживаемого подмножества.
-- Закрыта: ядро и граница.
-- Тесты:
-  - `ts_holes.fl` `index_lookup` — `FLICK-T003` «expected `Int`, found `Option Int`»;
-  - тест импортёра «leaves an index signature outside the supported subset».
+- A lookup by key or by index returns `Option`: `HashMap.get`, `List.get`, `Record.get_key`, `String.at`. These are the types of constants of Γ₀.
+- The importer does not read index signatures. `Record<K, V>` is outside the supported subset.
+- Closed: core and boundary.
+- Tests:
+  - `ts_holes.fl` `index_lookup` — `FLICK-T003` "expected `Int`, found `Option Int`";
+  - the importer test "leaves an index signature outside the supported subset".
 
-### 2.14 Структурно равные ошибки с одинаковым `_tag`
+### 2.14 Structurally equal errors with the same `_tag`
 
 ```ts
 class StoreMissing { readonly _tag = "NotFound"; constructor(readonly key: string) {} }
@@ -266,63 +276,72 @@ function fromStore(): StoreMissing { return new CacheMissing("k"); }
 fromStore() instanceof StoreMissing; // false
 ```
 
-Различить их в TS может только ручной бренд: поле `declare protected readonly brand: "StoreMissing"`, уникальное для класса.
+In TS only a hand-written brand can tell them apart: a field
+`declare protected readonly brand: "StoreMissing"` unique to the class.
 
-- Элемент строки ошибок определяется именем `Module.Name` (`core.md` §1.2).
-- Конструкторы двух модулей — разные значения. Их `_tag` — имя и 48 бит FNV-1a от id пакета, модуля, типа и конструктора (spec/08 «Value representation»).
-- Ветвь `A.NotFound _` снимает из строки только `App.A.NotFound`.
-- Закрыта: ядро.
-- Тесты:
-  - `tests/check/projects/ts_holes_errors` — `FLICK-E002`: `App.B.NotFound` остаётся в строке;
-  - `flick-core/src/codegen/tests.rs` `constructor_ids_name_package_module_and_type` — теги различаются между модулями и пакетами.
+- An element of an error row is identified by its name `Module.Name` (`core.md` §1.2).
+- The constructors of two modules are different values. Their `_tag` is the name plus 48 bits of FNV-1a of the ids of the package, module, type and constructor (spec/06 "Value representation").
+- An arm `A.NotFound _` removes only `App.A.NotFound` from the row.
+- Closed: core.
+- Tests:
+  - `tests/check/projects/ts_holes_errors` — `FLICK-E002`: `App.B.NotFound` stays in the row;
+  - `flick-core/src/codegen/tests.rs` `constructor_ids_name_package_module_and_type` — tags differ between modules and packages.
 
-## 3. Находки
+## 3. Findings
 
-Нумерация продолжает `regions.md`.
+Each of the first three findings was confirmed by a probe: the program was accepted, and its
+value at run time disagreed with its type. The fourth was found by the hole generator (§4).
+All four are fixed.
 
-Каждая находка подтверждена пробой на `0d6016d5`: программа принята, а значение в рантайме расходится с типом. Все три внесены. Р63 нашёл генератор X6 (§4), она тоже внесена.
+### 3.1 Flick data is copied at the foreign boundary
 
-**Р26. Данные Flick пересекают внешнюю границу по ссылке.**
+The finding: Flick data crossed the foreign boundary by reference.
 
-- spec/08 «Value representation» обещает: «Immutable data is copied by default at an untrusted input and output boundary».
-- Кодоген передаёт `List`, кортежи, записи и ADT как есть, в обе стороны (`codegen/js/foreign.rs` `foreign_call`).
-- Проба — `tests/run/ffi/copy.fl` на Node:
+- spec/06 "Value representation" promises: "Immutable data is copied by default at an untrusted input and output boundary".
+- The codegen passed `List`, tuples, records and ADTs as they are, in both directions (`codegen/js/foreign.rs` `foreign_call`).
+- The probe is `tests/run/ffi/copy.fl` on Node:
 
   ```text
-  argument [1, 2, 3], result [1, 2, 3]     JS отсортировал аргумент на месте
-  held result [1, 2, 99]                   JS изменил массив, который вернул раньше
-  record mallory ["a", "b"]                JS изменил запись
-  callback result [1, 2, 9], JS saw 3      JS изменил то, что вернул колбэк
+  argument [1, 2, 3], result [1, 2, 3]     JS sorted the argument in place
+  held result [1, 2, 99]                   JS changed an array it had returned earlier
+  record mallory ["a", "b"]                JS changed a record
+  callback result [1, 2, 9], JS saw 3      JS changed what a callback returned
   ```
 
-  Неизменяемое значение Flick меняется. JS может так же положить в `List Float` строку, и это нарушает T1.
-- Решение — кодоген, как обещает spec/08.
-  - Недоверенная граница — каждый `foreign` вне `@flick-lang/runtime`, включая `global`.
-  - Копируются аргументы (и `this`), результат (у `async` и `effect` — значение успеха), аргументы и результат колбэка.
-  - Что копировать, решает тип: позиция с `List`, кортежем, записью, ADT или переменной типа (`types/ffi.rs` `holds_data`, план в `ForeignInfo.copies`).
-  - Как есть передаются примитивы, `JsValue`, непрозрачные типы и функции. Колбэк без данных сохраняет свою идентичность.
-  - Копию делает `copyData` рантайма (`runtime/src/core/data.ts`, на Effect — `runtime/src/data.ts`, с `Option` и `Result` Effect). Она копирует массивы и простые объекты насквозь, а другие объекты передаёт как есть.
-  - Доверенная граница (рантайм) не копирует. Для неё это гипотеза Г1.
-- Статус: внесено. Тест: `tests/run/ffi/copy.fl` печатает `argument [3, 1, 2], result [1, 2, 3]`, `held result [1, 2]`, `record ann ["a"]`, `callback result [1, 2], JS saw 3`.
+  An immutable Flick value changes. In the same way JS can put a string into a `List Float`, which breaks T1.
+- The fix is in the codegen, as spec/06 promises.
+  - The untrusted boundary is every `foreign` outside `@flick-lang/runtime`, including `global`.
+  - Copied are the arguments (and `this`), the result (for `async` and `effect`, the success value), and the arguments and result of a callback.
+  - The type decides what to copy: a position with a `List`, a tuple, a record, an ADT or a type variable (`types/ffi.rs` `holds_data`, the plan in `ForeignInfo.copies`).
+  - Primitives, `JsValue`, opaque types and functions are passed as they are. A callback without data keeps its identity.
+  - The copy is made by the runtime's `copyData` (`runtime/src/core/data.ts`; on Effect, `runtime/src/data.ts`, with Effect's `Option` and `Result`). It copies arrays and plain objects all the way down and passes other objects as they are.
+  - The trusted boundary (the runtime) does not copy. For it this is hypothesis G1.
+- Test: `tests/run/ffi/copy.fl` prints `argument [3, 1, 2], result [1, 2, 3]`, `held result [1, 2]`, `record ann ["a"]`, `callback result [1, 2], JS saw 3`.
 
-**Р27. `typeof C` импортируется как сам `C`.**
+### 3.2 `typeof C` is not imported as `C`
 
-- `Shape.fl` `object_shape` даёт `handle` любому типу с символом класса. Статическая сторона класса, то есть конструктор, получает то же имя, что экземпляр.
-- Проба: `register(ctor: typeof Point): void` становится `register : Point ->{} Unit`, и `register (make_point 1)` проходит проверку. JS получает экземпляр вместо класса.
-- Решение — импортёр: тип с construct-сигнатурами и символом класса — `other`, то есть отказ «outside the supported subset».
-- Статус: внесено. Тест импортёра «keeps the static side of a class apart from its instances».
+The finding: `typeof C` was imported as `C` itself.
 
-**Р28. Два TS-типа с одним простым именем — один тип Flick.**
+- `Shape.fl` `object_shape` gave `handle` to any type with a class symbol. The static side of a class, that is its constructor, got the same name as an instance.
+- The probe: `register(ctor: typeof Point): void` became `register : Point ->{} Unit`, and `register (make_point 1)` passed the check. JS received an instance instead of the class.
+- The fix is in the importer: a type with construct signatures and a class symbol is `other`, that is, a refusal "outside the supported subset".
+- Test: the importer test "keeps the static side of a class apart from its instances".
 
-- Непрозрачные типы в сгенерированном модуле различаются только простым именем (`import.rs` `generate`, множество `handles`).
-- Проба: `retry(options: a.Options)` и `logOptions(): b.Options` дают один `type Options`, и `retry (log_options ())` проходит проверку.
-- Решение — импортёр. Он находит простые имена, за которыми стоят разные объявления, и блокирует экспорты, которые их называют. Привязка для них пишется руками, с разными именами.
-  - `Shape.fl` помечает именованный тип местом объявления (`site`) и снимает пометку до отпечатка и вывода, так что отпечатки и формы экспортов не меняются.
-  - `Import.fl` `ambiguous` собирает имена с разными местами в поле поверхности `ambiguous`.
-  - `import.rs` `generate` блокирует экспорт, который называет такое имя: «`Options` names more than one TypeScript type».
-- Статус: внесено. Тесты: импортёр «names the object types whose one name stands for two declarations», `ffi/tests.rs` `a_name_of_two_typescript_types_blocks_what_uses_it` и `an_object_type_is_opaque_without_fields`.
+### 3.3 Two TS types with one simple name block their exports
 
-**Р63. Предупреждение в ветви отключало проверку исчерпываемости `match` (дыра 2.4).**
+The finding: two TS types with the same simple name were one Flick type.
+
+- In a generated module opaque types differ only by their simple name (`import.rs` `generate`, the set `handles`).
+- The probe: `retry(options: a.Options)` and `logOptions(): b.Options` gave one `type Options`, and `retry (log_options ())` passed the check.
+- The fix is in the importer. It finds simple names that stand for different declarations and blocks the exports that name them. Bindings for those are written by hand, with different names.
+  - `Shape.fl` marks a named type with its place of declaration (`site`) and removes the mark before the fingerprint and the output, so fingerprints and the shapes of exports do not change.
+  - `Import.fl` `ambiguous` collects the names with different places into the surface field `ambiguous`.
+  - `import.rs` `generate` blocks an export that names such a name: "`Options` names more than one TypeScript type".
+- Tests: the importer test "names the object types whose one name stands for two declarations", `ffi/tests.rs` `a_name_of_two_typescript_types_blocks_what_uses_it` and `an_object_type_is_opaque_without_fields`.
+
+### 3.4 A warning in an arm no longer disables the exhaustiveness check
+
+The finding: a warning in an arm disabled the exhaustiveness check of `match` (hole 2.4).
 
 ```flick
 warned : Option Bool -> Int
@@ -334,43 +353,56 @@ let warned o =
     | 2 -> 1
 ```
 
-- Что происходит: программа принята без ошибок, хотя ветви `Some _` нет; при `Some true` `match` не находит ветвь. Внутренний `match` даёт только предупреждение `FLICK-T010`.
-- Причина: `infer.rs` `match_expr` проверял исчерпываемость, только если ветви не добавили ни одной диагностики, в том числе предупреждения. Так проверка пропускается после любой ошибки в ветвях, чтобы не сообщать о паттернах неверного типа, но предупреждение тип не портит.
-- Решение — чекер: проверка пропускается только после ошибки. Модель (`core.md` §2.4, Exh) отвергала программу всегда; расхождение нашло свойство `checkers_agree` на программе с `match`, у которого генератор снял ветвь. Статус: внесено. Фикстура: `tests/check/fail/types/matching.fl` `warned`.
+- What happened: the program was accepted without errors although the arm `Some _` is missing; on `Some true` the `match` finds no arm. The inner `match` gives only the warning `FLICK-T010`.
+- The cause: `infer.rs` `match_expr` checked exhaustiveness only if the arms added no diagnostics at all, warnings included. The check is skipped after any error in the arms so as not to report patterns of the wrong type, but a warning does not spoil the type.
+- The fix is in the checker: the check is skipped only after an error. The model (`core.md` §2.4, Exh) always rejected the program; the divergence was found by the property `checkers_agree` on a program with a `match` from which the generator removed an arm.
+- Fixture: `tests/check/fail/types/matching.fl` `warned`.
 
-**Остаётся гипотезой Г1.** На это верится на слово, и тесты этого не проверяют:
+### What remains hypothesis G1
 
-- результат `never` (`Never`);
-- параметричность дженериков: `.d.ts` её не доказывает (spec/08);
-- примитивный результат: `number` не проверяется в рантайме;
-- различие пропущенного аргумента и `undefined` (§2.12);
-- отпечаток экспорта: у именованного типа это только имя, поэтому изменение его членов `ffi check` не видит.
+These are taken on trust, and the tests do not check them:
 
-**Вне каталога, не исправлено:**
+- a `never` result (`Never`);
+- the parametricity of generics: `.d.ts` does not prove it (spec/06);
+- a primitive result: `number` is not checked at run time;
+- the distinction between a missing argument and `undefined` (§2.12);
+- an export's fingerprint: for a named type it is only the name, so `ffi check` does not see a change in its members.
 
-- `T | void` в результате требует политики (`convert.rs` `result`), но `check.rs` `required` не требует `nullable` у проверенной привязки;
-- имя из пакета вроде `Option` или `String` объявляется в сгенерированном модуле и затеняет имя прелюдии. Обычно это громкая ошибка типов, а не тихая;
-- пустой кортеж `[]` становится `Unit`, а значит JS получает `undefined`.
+### Outside the catalog, not fixed
 
-## 4. Генератор X6
+- `T | void` in a result requires a policy (`convert.rs` `result`), but `check.rs` `required` does not require `nullable` of a checked binding;
+- a name from a package such as `Option` or `String` is declared in the generated module and shadows the prelude name. Usually this is a loud type error, not a silent one;
+- an empty tuple `[]` becomes `Unit`, so JS receives `undefined`.
 
-Генератор программ X2 (`flick-model/src/generate/`) строит формы Flick, у которых в TS есть дыра, а `mutate` вносит изменение, которое эту дыру открыло бы. Свойство `checkers_agree` (`flick-model/tests/props.rs`) требует, чтобы модель и flick-core приняли изменённую программу вместе или вместе отвергли. Привязки — в `Gen.fl`: `JsValue` из `js_of`, непрозрачный `Shape` из `shape_of`, член `shape_name` (вызов с `this`), предикат `is_point` (`foreign pure`).
+## 4. The hole generator
 
-| Дыра | Форма в программе | Изменение |
+The program generator of the model properties (`flick-model/src/generate/`) builds Flick forms
+whose TS counterpart has a hole, and `mutate` makes the change that would open that hole. The
+property `checkers_agree` (`flick-model/tests/props.rs`) requires the model and flick-core to
+accept the changed program together or reject it together. The bindings are in `Gen.fl`:
+`JsValue` from `js_of`, the opaque `Shape` from `shape_of`, the member `shape_name` (a call with
+`this`), the predicate `is_point` (`foreign pure`).
+
+| Hole | Form in the program | Change |
 | - | - | - |
-| 2.1 `any` | `JsValue` и `Shape` среди типов данных | подтерм заменён термом другого типа |
-| 2.2 `as T` | аннотация `(e : σ)` | `(e : σ')` с другим типом |
+| 2.1 `any` | `JsValue` and `Shape` among the data types | a subterm replaced by a term of another type |
+| 2.2 `as T` | an annotation `(e : σ)` | `(e : σ')` with another type |
 | 2.3 `as unknown as T` | — | `((e : Unknown) : σ)` |
-| 2.4 `!` | `let (x, y) = e` | ветвь `None` снята: `let Some x = e` |
-| 2.5 предикат | `if is_point v` | поле у `JsValue` |
-| 2.6 параметр метода | `∀a b. (a → b) → a → b` и функции высшего порядка | стадия параметра в сигнатуре расширена |
-| 2.7 ковариантный массив | `let c : Ref (a → b) = Ref.make (f : a → b)` | стадия под `Ref` в сигнатуре расширена |
-| 2.8 подтипы по ширине | записи | у литерала лишнее поле |
-| 2.9 spread | `{ r with a = e }` | `with` у `Shape` и `JsValue` |
-| 2.10 сеттер | член через вызов `shape_name` | поле у `Shape` |
-| 2.12 необязательное свойство | записи с полями `Option` | у литерала нет поля |
-| 2.13 индексная сигнатура | `List.get i [e, e']` даёт `Option` | подтерм заменён термом другого типа |
+| 2.4 `!` | `let (x, y) = e` | the `None` arm removed: `let Some x = e` |
+| 2.5 predicate | `if is_point v` | a field of a `JsValue` |
+| 2.6 method parameter | `∀a b. (a → b) → a → b` and higher-order functions | the stage of a parameter in the signature widened |
+| 2.7 covariant array | `let c : Ref (a → b) = Ref.make (f : a → b)` | the stage under `Ref` in the signature widened |
+| 2.8 width subtyping | records | an extra field in a literal |
+| 2.9 spread | `{ r with a = e }` | `with` on `Shape` and `JsValue` |
+| 2.10 setter | a member through a call of `shape_name` | a field of `Shape` |
+| 2.12 optional property | records with `Option` fields | a field missing from a literal |
+| 2.13 index signature | `List.get i [e, e']` gives `Option` | a subterm replaced by a term of another type |
 
-2.11 и 2.14 в одну программу генератора не укладываются. Для 2.11 нужна другая ссылка из JS: run-тест Р26. Для 2.14 — ошибки с одним именем в двух модулях: проект `tests/check/projects/ts_holes_errors`.
+2.11 and 2.14 do not fit in one generator program. 2.11 needs another reference from JS: the run
+test of [§3.1](#31-flick-data-is-copied-at-the-foreign-boundary). 2.14 needs errors with one name
+in two modules: the project `tests/check/projects/ts_holes_errors`.
 
-Генератор нашёл дыру чекера Р63, к дыре 2.4, и две неполноты в регионах: Р64 (записана) и Р65 (внесена) в `regions.md`. Машина программы с внешними значениями не исполняет: у неё нет нативов `Gen.fl` (`generate::runs`).
+The generator found the checker hole of [§3.4](#34-a-warning-in-an-arm-no-longer-disables-the-exhaustiveness-check),
+for hole 2.4, and two incompletenesses in the regions: [Scope in function row is not a capture](regions.md#a-scope-in-a-local-function-row-is-not-a-capture) (recorded) and
+[qualified meta is not bound to itself](regions.md#a-qualifier-on-a-meta-does-not-bind-the-meta-to-itself) (fixed) in `regions.md`. The abstract machine does not run programs with
+foreign values: it has no natives for `Gen.fl` (`generate::runs`).

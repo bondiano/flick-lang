@@ -1,100 +1,100 @@
-# λFlick: регионы и захваты
+# λFlick: regions and captures
 
-Сверено с кодом на `a01ce3ec`; расхождения §6 внесены в следующих коммитах. Расширяет `core.md`: всё, что здесь не переопределено, действует как там. Расхождения со спекой, чекером и встроенными привязками и решения по ним — в §6; номера продолжают список `core.md`.
+Extends `core.md`: everything not redefined here holds as there. Divergences from the spec, the checker and the built-in bindings, and how each is resolved, are in §6.
 
-Ссылки — как в `core.md`. Пути чекера даны от `flick-core/src/types/`, привязки — `builtins/X.fl` в том же каталоге. Пробы §6 собраны `flick build` и запущены на Node с JS-ресурсом, который помечает закрытый дескриптор и печатает `USE AFTER CLOSE`, если его используют после закрытия.
+References are as in `core.md`. Checker paths are relative to `flick-core/src/types/`; bindings are `builtins/X.fl` in the same directory. The probes of §6 are built with `flick build` and run on Node with a JS resource that marks a closed handle and prints `USE AFTER CLOSE` if the handle is used after close.
 
-## 0. Область
+## 0. Scope
 
-Добавляется к ядру:
+Added to the core:
 
-- виды `Region` и `CRow`;
-- `scope s { e }` — свежий регион и его владелец;
-- сервис `Scope ϱ` — право приобретать ресурс в регион `ϱ`;
-- значение `Owner ϱ` (`Fiber.Owner`);
-- квалификаторы захватов `τ^C`;
-- регистрация работы у владельца (дети и финализаторы) с ограничением `Outlives C ϱ`;
-- приобретение ресурса — константа с `Scope ϱ` в строке сервисов;
-- ошибки без регионов.
+- the kinds `Region` and `CRow`;
+- `scope s { e }`: a fresh region and its owner;
+- the service `Scope ϱ`: the right to acquire a resource into region `ϱ`;
+- the value `Owner ϱ` (`Fiber.Owner`);
+- capture qualifiers `τ^C`;
+- registration of work with an owner (children and finalizers) under the constraint `Outlives C ϱ`;
+- resource acquisition: a constant with `Scope ϱ` in its service row;
+- region-free errors.
 
-| Не входит | Где | Как модель это учитывает |
+| Not covered | Where | How the model accounts for it |
 | - | - | - |
-| Конкурентное исполнение детей, отмена, двухфазное закрытие | `runtime.md` (λRT) | Ребёнок региона `π` — работа, которая может сделать шаг в любой момент, пока `π` жив; закрытие `π` ждёт её конца (§3.3). Порядок шагов и отмену задаёт λRT |
-| Регион читателя ленивого `for` (`reader_region`) и регион экземпляра UI (`Setup s`) | — | Те же правила с другим источником региона: функция или экземпляр компонента вместо `scope`. Отдельно не формализуются |
-| Устройство аренды `ScopedRef`, `Resource`, `ScopedCache` | гипотеза Г5 (§5) | Значение доступно только в `use` с регионом аренды; освобождение ждёт конца аренд (Р19) |
-| Классы, `do`, словари | `elaboration.md` | Словарь собран из значений верхнего уровня и своих захватов не имеет |
+| Concurrent execution of children, cancellation, two-phase close | `runtime.md` (λRT) | A child of region `π` is work that may take a step at any moment while `π` is live; closing `π` waits for it to finish (§3.3). Step order and cancellation are given by λRT |
+| The reader region of a lazy `for` (`reader_region`) and the region of a UI instance (`Setup s`) | — | The same rules with a different source of the region: a function or a component instance instead of `scope`. Not formalized separately |
+| The internals of leases in `ScopedRef`, `Resource`, `ScopedCache` | hypothesis G5 (§5) | The value is available only inside `use`, with the lease region; release waits for the leases to end ([leases](#leases-instead-of-early-close)) |
+| Classes, `do`, dictionaries | `elaboration.md` | A dictionary is built from top-level values and has no captures of its own |
 
-## 1. Синтаксис
+## 1. Syntax
 
-### 1.1 Виды
+### 1.1 Kinds
 
 ```text
 κ ::= … | Region | CRow
 ```
 
-`CRow` — строка захватов (spec/07 «CaptureRow»). Чекер: `kinds.rs`, `Kind::Region`, `Kind::CaptureRow`.
+`CRow` is a capture row (spec/05 "CaptureRow"). Checker: `kinds.rs`, `Kind::Region`, `Kind::CaptureRow`.
 
-### 1.2 Регионы, захваты, типы
+### 1.2 Regions, captures, types
 
 ```text
-ϱ ::= s                          переменная вида Region
-    | π                          регион времени исполнения (§3)
+ϱ ::= s                          variable of kind Region
+    | π                          runtime region (§3)
 
-C ::= ∅ | {k₁, …, kₙ} | c | C ∪ C        множество захватов, c — переменная вида CRow
-k ::= ϱ | α                       атом: регион или переменная вида Type
+C ::= ∅ | {k₁, …, kₙ} | c | C ∪ C        capture set, c is a variable of kind CRow
+k ::= ϱ | α                       atom: a region or a variable of kind Type
 
-τ ::= … (ядро)
-    | τ^C                         квалифицированный тип
-    | H ϱ̄ τ̄                       номинальный тип с параметрами вида Region: File s, Server s
-    | Owner ϱ                     владелец региона
+τ ::= … (core)
+    | τ^C                         qualified type
+    | H ϱ̄ τ̄                       nominal type with parameters of kind Region: File s, Server s
+    | Owner ϱ                     owner of a region
 
-элемент SRow:  … | Scope ϱ
+SRow element:  … | Scope ϱ
 
-σ ::= τ | ∀κ̄. Θ ⇒ τ               Θ — ограничения Outlives C ϱ
+σ ::= τ | ∀κ̄. Θ ⇒ τ               Θ are constraints Outlives C ϱ
 ```
 
-Как это пишется в языке:
+How this is written in the language:
 
-- `T^{s, t}` — `τ^{s,t}`, `T^c` — `τ^c`, `T^(c + d)` — `τ^(c ∪ d)`;
-- голый `T` — `τ^∅`: скрытых захватов сверх того, что показывает `T`, нет;
-- `Fiber.Outlives c s` — `Outlives c s`.
+- `T^{s, t}` is `τ^{s,t}`, `T^c` is `τ^c`, `T^(c + d)` is `τ^(c ∪ d)`;
+- a bare `T` is `τ^∅`: no hidden captures beyond what `T` shows;
+- `Fiber.Outlives c s` is `Outlives c s`.
 
-Равенство множеств захватов: `∪` ассоциативно, коммутативно, идемпотентно, `∅` — единица. Нормальная форма — множество атомов и множество переменных `c`, как у строк ядра. Атом `α` в исходном языке не пишется (`FLICK-T002`): он появляется, когда ⌈·⌉ (§2.1) встречает переменную типа.
+Equality of capture sets: `∪` is associative, commutative and idempotent, with unit `∅`. The normal form is a set of atoms and a set of variables `c`, as for core rows. The atom `α` is not written in the source language (`FLICK-T002`): it appears when ⌈·⌉ (§2.1) meets a type variable.
 
-Квалификаторы двух видов, по тому, к чему приложены:
+Qualifiers come in two sorts, by what they are attached to:
 
-- **скрытый** — у функции, `Eff` и данных со скрытым хранилищем (поле-функция, непрозрачный тип): `C` добавляется к тому, что показывает тип;
-- **граница значения** — у переменной типа и у данных, которые хранят только свои параметры: `C` ограничивает всё значение (reference/regions «For a generic value, `a^c` bounds the whole value»).
+- **hidden**: on a function, on `Eff`, and on data with hidden storage (a function field, an opaque type); `C` is added to what the type shows;
+- **value bound**: on a type variable and on data that stores only its parameters; `C` bounds the whole value (reference/regions "For a generic value, `a^c` bounds the whole value").
 
-Чекер:
+Checker:
 
-- `ty.rs` `Type::Captured` — скрытый квалификатор, `Type::Bounded` — граница значения;
-- `regions/data.rs` `value_bound`, `bound_head`, `hidden_fields` — какой из двух видов;
-- `regions/data.rs` `scalar` — скаляры захватов не имеют ни под каким квалификатором.
+- `ty.rs` `Type::Captured` is the hidden qualifier, `Type::Bounded` the value bound;
+- `regions/data.rs` `value_bound`, `bound_head`, `hidden_fields` decide which of the two applies;
+- `regions/data.rs` `scalar`: scalars have no captures under any qualifier.
 
-### 1.3 Выражения
+### 1.3 Expressions
 
 ```text
 e ::= … | scope s { e }
 ```
 
-`scope s { e }` связывает `s` в типах тела и `s : Owner s` в его значениях. `scope { e }` — то же со свежим невидимым именем.
+`scope s { e }` binds `s` in the types of the body and `s : Owner s` in its values. `scope { e }` is the same with a fresh invisible name.
 
-### 1.4 Сведение поверхности
+### 1.4 Desugaring the surface
 
-| Поверхность | Модель |
+| Surface | Model |
 | - | - |
-| `scope { e }` | `scope s { e }`, `s` свежий |
-| Стадия каррирования `a -> b -> c` в сигнатуре | `a → (b → c)^{⌈a⌉}`: стадия держит предыдущие параметры (`regions/mod.rs` `implicit_captures`, `stages`) |
-| `fun`, `task` без ожидаемого типа | квалификатор — свежая переменная вида `CRow`; решение наименьшее (§2.6) |
-| Вызов с `Scope ϱ`, где `ϱ` ещё не известен | `ϱ` — регион `Scope`, который называет строка стадии (задача против `Eff {Scope t \| r} e a`), иначе ближайшего `scope` (`regions/scopes.rs` `lexical_owner`, `declared_scope`) |
-| Вызов с `Scope ϱ` внешнего региона внутри вложенного `scope` | требование уходит через вложенные `scope` к тому, чей регион `ϱ` (`settle_needs`); кодоген передаёт владельца лексически: `$rt.within(owner, …)` |
+| `scope { e }` | `scope s { e }`, `s` fresh |
+| A curried stage `a -> b -> c` in a signature | `a → (b → c)^{⌈a⌉}`: a stage holds the earlier parameters (`regions/mod.rs` `implicit_captures`, `stages`) |
+| `fun`, `task` without an expected type | the qualifier is a fresh variable of kind `CRow`; the solution is the least one (§2.6) |
+| A call with `Scope ϱ` where `ϱ` is not yet known | `ϱ` is the region of the `Scope` named by the stage row (a task against `Eff {Scope t \| r} e a`), otherwise of the nearest `scope` (`regions/scopes.rs` `lexical_owner`, `declared_scope`) |
+| A call with `Scope ϱ` of an outer region inside a nested `scope` | the requirement travels through the nested `scope`s to the one whose region is `ϱ` (`settle_needs`); codegen passes the owner lexically: `$rt.within(owner, …)` |
 
-### 1.5 Константы Γ₀
+### 1.5 Constants Γ₀
 
 ```text
-open_H    : ∀s. τ_a →R⟨{Scope s}; ε⟩ H s               приобретение
-op_H      : ∀s. H s →R⟨r; ε⟩ τ                         использование способности
+open_H    : ∀s. τ_a →R⟨{Scope s}; ε⟩ H s               acquisition
+op_H      : ∀s. H s →R⟨r; ε⟩ τ                         use of a capability
 
 Fiber.spawn :
   ∀s c r e a. Outlives c s ⇒
@@ -108,59 +108,61 @@ Ref.get   : ∀c α. (Ref α)^c →R⟨none;none⟩ α^c
 Ref.set   : ∀c α. (Ref α)^c →P (α^c →R⟨none;none⟩ Unit)^c
 ```
 
-Откуда:
+Sources:
 
-- `open_H`, `op_H` — схема для `File.open`, `File.read_handle` (`builtins/File.fl`) и любых привязок `foreign` с `Scope s` в строке. Приобретение регистрирует освобождение у владельца `s`, и освобождает способность только закрытие `s` (Г4). Пометка `retention` говорит об аргументах, а не о результате: у `File.node_open` она `call`.
-- `Fiber.spawn` — `builtins/Fiber.fl`, `Scope.add_finalizer` — `builtins/Scope.fl`. `Outlives c s` у финализатора появился с Р16, `Scope s` в строках ребёнка — с Р22.
-- `Ref.*` — `builtins/Ref.fl`: ёмкость `c` стоит внутри инвариантного аргумента `Ref`, поэтому её нельзя расширить через внешнюю границу ссылки.
+- `open_H`, `op_H` are the scheme for `File.open`, `File.read_handle` (`builtins/File.fl`) and any `foreign` binding with `Scope s` in its row. Acquisition registers the release with the owner of `s`, and only closing `s` releases the capability (G4). The `retention` annotation speaks about the arguments, not the result: for `File.node_open` it is `call`.
+- `Fiber.spawn` is in `builtins/Fiber.fl`, `Scope.add_finalizer` in `builtins/Scope.fl`. The finalizer's `Outlives c s` is required because [owner retention requires `Outlives`](#owner-retention-requires-outlives); the child's rows name `Scope s` because [children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner).
+- `Ref.*` are in `builtins/Ref.fl`: the capacity `c` sits inside the invariant argument of `Ref`, so it cannot be widened through the outer bound of the reference.
 
-## 2. Статика
+## 2. Statics
 
-### 2.1 Граница достижимости ⌈τ⌉
+### 2.1 The reach bound ⌈τ⌉
 
-`⌈τ⌉` — множество атомов, которые может достичь значение типа `τ`: регионы его способностей и захваты значений, подставленных вместо переменных.
+`⌈τ⌉` is the set of atoms a value of type `τ` can reach: the regions of its capabilities and the captures of the values substituted for variables.
 
 ```text
 ⌈α⌉            = {α}
-⌈B⌉            = ∅                     B — Int, Float, BigInt, String, Bool, Unit, Never
+⌈B⌉            = ∅                     B is Int, Float, BigInt, String, Bool, Unit, Never
 ⌈H ϱ̄ τ̄⌉        = ϱ̄ ∪ ⋃ ⌈τᵢ⌉
-⌈T ā⌉          = ⋃ ⌈aᵢ⌉ по аргументам видов Type, Region, CRow    аргументы SRow и ERow не входят
+⌈T ā⌉          = ⋃ ⌈aᵢ⌉ over arguments of kinds Type, Region, CRow    arguments of kinds SRow and ERow are excluded
 ⌈Owner ϱ⌉      = {ϱ}
 ⌈Ref τ⌉        = ⌈τ⌉
 ⌈{ℓᵢ : τᵢ | ρ}⌉ = ⋃ ⌈τᵢ⌉
 ⌈τ₁ →φ τ₂⌉     = ⌈τ₁⌉ ∪ ⌈τ₂⌉
 ⌈Eff r e τ⌉    = ⌈τ⌉
 ⌈Layer ri e ro⌉ = ⌈S.Impl⌉ = ∅
-⌈Errors ρ⌉     = ⋃ ⌈ῡ⌉ по элементам E ῡ ∈ ρ               переменная строки не входит (Р60)
+⌈Errors ρ⌉     = ⋃ ⌈ῡ⌉ over elements E ῡ ∈ ρ               the row variable is excluded (see below)
 
-скрытый квалификатор:    ⌈τ^C⌉ = ⌈τ⌉ ∪ C
-граница значения:        ⌈τ^C⌉ = C ∪ (регионы τ)       τ — не переменная типа
-граница на переменной:   ⌈α^{≤C}⌉ = {α^{≤C}}
+hidden qualifier:        ⌈τ^C⌉ = ⌈τ⌉ ∪ C
+value bound:             ⌈τ^C⌉ = C ∪ (regions of τ)       τ is not a type variable
+bound on a variable:     ⌈α^{≤C}⌉ = {α^{≤C}}
 ```
 
-**Атом под границей** — `α` с фактом «`α` не шире `C`» (Р62). Граница на переменной появляется только вместе с посылкой (Inst) `⌈υ⌉ ⊆ C` для значения `υ`, подставленного вместо `α`: она проверена у того, кто инстанцирует схему, или стала обязательством, если `C` растёт. Поэтому `α^{≤C}` достигает того же, что `α`: при подстановке оба дают `⌈υ⌉`. Как такой атом сравнивается:
+`⌈Errors ρ⌉` is the union over the elements because `Errors {E ῡ} ≡ E ῡ` ([`Errors` reaches its payloads](#errors-reaches-its-payloads)).
 
-- `K ⊆ X`, где в `K` атом `α^{≤C}`: верно, если `α ∈ X` или `C ⊆ X`;
-- в `X` атом `α^{≤C}` разрешает только `α`: `C` может быть шире `⌈υ⌉`;
-- в остальных суждениях (§2.4, §2.5) `α^{≤C}` читается как `C`, как до Р62: это не слабее.
+**Bounded atom**: `α` together with the fact "`α` is no wider than `C`" ([bounded variable atoms](#a-bounded-variable-reaches-what-the-variable-reaches)). A bound on a variable appears only together with the premise (Inst) `⌈υ⌉ ⊆ C` for the value `υ` substituted for `α`: the premise is checked by whoever instantiates the scheme, or becomes an obligation if `C` grows. Hence `α^{≤C}` reaches the same as `α`: under substitution both give `⌈υ⌉`. How such an atom compares:
 
-Почему строки сервисов не входят в ⌈·⌉: значение типа `Eff r e τ`, `τ₁ →R⟨r;e⟩ τ₂` или `Layer ri e ro` используется только через `await`, применение или `provide`, а они добавляют `r` (`ri`) к стадии того, кто использует. Регион из строки, например `Scope s`, появляется в типе каждого места, где значение работает; неиспользованное значение ничего не достигает.
+- `K ⊆ X` with the atom `α^{≤C}` in `K` holds if `α ∈ X` or `C ⊆ X`;
+- in `X`, the atom `α^{≤C}` admits only `α`: `C` may be wider than `⌈υ⌉`;
+- in the other judgments (§2.4, §2.5) `α^{≤C}` reads as `C`; this is not weaker.
 
-Почему результат входит: результат можно отбросить (`ignore (await t)`), и регион, который тип показывал только в результате, пропадёт из типа объемлющего значения. Поэтому `⌈Eff r e τ⌉ ⊇ ⌈τ⌉`, как у функции. Чекер считал `Eff` непрозрачным, и это была дыра (Р14).
+Why service rows are excluded from ⌈·⌉: a value of type `Eff r e τ`, `τ₁ →R⟨r;e⟩ τ₂` or `Layer ri e ro` is used only through `await`, application or `provide`, and these add `r` (`ri`) to the stage of the user. A region from the row, for example `Scope s`, appears in the type of every place where the value runs; an unused value reaches nothing.
 
-Почему параметр входит: замыкание с параметром, тип которого показывает `s`, вправе не писать `s` в квалификаторе. Сужение параметра подтипом (§2.2) тогда сверяет ⌈·⌉ всего значения, а не только квалификатор.
+Why the result is included: the result can be discarded (`ignore (await t)`), and a region the type showed only in the result would vanish from the type of the enclosing value. Hence `⌈Eff r e τ⌉ ⊇ ⌈τ⌉`, as for a function. Treating `Eff` as opaque is unsound ([the reach bound of `Eff` includes its result](#the-reach-bound-of-eff-includes-its-result)).
 
-**Подстановка.** `⌈τ[α := υ]⌉ = ⌈τ⌉[α := ⌈υ⌉]` и `⌈τ[c := C]⌉ = ⌈τ⌉[c := C]`. Для границы значения подстановка допустима, только если выполнено её условие (§2.3, (Inst)).
+Why the parameter is included: a closure whose parameter type shows `s` may omit `s` from its qualifier. Narrowing the parameter by subtyping (§2.2) then compares ⌈·⌉ of the whole value, not just the qualifier.
 
-Чекер:
+**Substitution.** `⌈τ[α := υ]⌉ = ⌈τ⌉[α := ⌈υ⌉]` and `⌈τ[c := C]⌉ = ⌈τ⌉[c := C]`. For a value bound, substitution is allowed only if its condition holds (§2.3, (Inst)).
 
-- `regions/mod.rs` `captures_of`, `collect_bounded_captures` — ⌈·⌉: непрозрачны `Layer`, `ServiceTag`, `ServiceImpl`, `Errors`, аргументы видов `ServiceRow` и `ErrorRow` не входят (Р14, Р15); квалификатор на значении, которое ничего не может держать (скаляр, данные без скрытого хранилища и без захватов в типе), ничего не добавляет (`regions/data.rs` `holds_nothing`, Р24);
-- `regions/mod.rs` `shown_by` — что тип показывает открыто: ровно ⌈·⌉;
-- `regions/compare.rs` `expanded` — атом переменной, уже решённой в тип, заменяется на ⌈типа⌉.
+Checker:
 
-### 2.2 Подтипы
+- `regions/mod.rs` `captures_of`, `collect_bounded_captures` compute ⌈·⌉: `Layer`, `ServiceTag`, `ServiceImpl`, `Errors` are opaque, and arguments of kinds `ServiceRow` and `ErrorRow` are excluded ([the reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result), [service row variables](#service-row-variables-are-not-captures)); a qualifier on a value that can hold nothing (a scalar, data without hidden storage and without captures in its type) adds nothing (`regions/data.rs` `holds_nothing`, [value bounds in unknown positions](#a-value-bound-survives-an-unknown-type-position));
+- `regions/mod.rs` `shown_by` is what a type shows openly: exactly ⌈·⌉;
+- `regions/compare.rs` `expanded` replaces the atom of a variable already solved to a type by ⌈that type⌉.
 
-К правилам `core.md` §2.2 добавляется одно:
+### 2.2 Subtyping
+
+One rule is added to those of `core.md` §2.2:
 
 ```text
 τ ≤ τ'    ⌈τ^C⌉ ⊆ ⌈τ'^C'⌉
@@ -168,22 +170,22 @@ Ref.set   : ∀c α. (Ref α)^c →P (α^c →R⟨none;none⟩ Unit)^c
 τ^C ≤ τ'^C'
 ```
 
-Голый тип — `τ^∅`, поэтому (≤-Cap) применяется и к значению без квалификатора в позицию без квалификатора: ⌈·⌉ сверяется у всего значения. Отсюда:
+A bare type is `τ^∅`, so (≤-Cap) also applies to an unqualified value in an unqualified position: ⌈·⌉ of the whole value is compared. Consequences:
 
-- расширение квалификатора разрешено, сужение — `FLICK-G001`;
-- замыкание `(Unit → File s)^{s}` проходит за `Unit → File s`: тип показывает `s`;
-- внутри `Ref`, `List`, записей и ADT типы сравниваются по `≡` вместе с квалификаторами: «explicit stored qualifications are part of type identity», изменяемое хранилище инвариантно (`FLICK-T003`);
-- `α^{≤C} ≤ α` и `α ≤ α^{≤C}` по §2.1: оба достигают `⌈υ⌉`. Поэтому `Option (a^{≤v}, b^{≤w}) ≡ Option (a, b)` (Р62).
+- widening a qualifier is allowed, narrowing is `FLICK-G001`;
+- the closure `(Unit → File s)^{s}` passes as `Unit → File s`: the type shows `s`;
+- inside `Ref`, `List`, records and ADTs, types are compared by `≡` together with their qualifiers: "explicit stored qualifications are part of type identity", and mutable storage is invariant (`FLICK-T003`);
+- `α^{≤C} ≤ α` and `α ≤ α^{≤C}` by §2.1: both reach `⌈υ⌉`. Hence `Option (a^{≤v}, b^{≤w}) ≡ Option (a, b)` ([bounded variable atoms](#a-bounded-variable-reaches-what-the-variable-reaches)).
 
-Чекер:
+Checker:
 
 - `effects.rs` `subsume_at` → `regions/compare.rs` `subsume_captured`, `held_fits`; `regions/data.rs` `subsume_bound`, `bounded_callable`;
-- проверку ⌈·⌉ делает не сама `subsume`, а обязательство `Hold` (`regions/mod.rs` `hold`) с `visible` ожидаемого типа: что тип показывает, из удерживаемого вычитается (`regions/solve.rs` `hidden`);
-- `regions/compare.rs` `unify_captured` — квалификаторы под инвариантным конструктором равны.
+- the ⌈·⌉ check is not done by `subsume` itself but by the `Hold` obligation (`regions/mod.rs` `hold`) with the `visible` part of the expected type: what the type shows is subtracted from what is held (`regions/solve.rs` `hidden`);
+- `regions/compare.rs` `unify_captured`: qualifiers under an invariant constructor are equal.
 
-### 2.3 Правила
+### 2.3 Rules
 
-Суждение — как в ядре, `Γ ⊢ e : τ ! φ`. В `Γ` добавляются переменные видов `Region` и `CRow`, факты `Θ` (§2.4) и список открытых `scope` — регионов, которые связал `scope` вокруг текущего места.
+The judgment is as in the core, `Γ ⊢ e : τ ! φ`. `Γ` additionally holds variables of kinds `Region` and `CRow`, facts `Θ` (§2.4), and the list of open `scope`s: the regions bound by `scope`s around the current position.
 
 ```text
 Γ, x : τ₁ ⊢ e : τ₂ ! φ      ⋃_{y ∈ fv(λx.e)} ⌈Γ(y)⌉ ⊆ ⌈(τ₁ →φ τ₂)^C⌉
@@ -195,27 +197,27 @@ Ref.set   : ∀c α. (Ref α)^c →P (α^c →R⟨none;none⟩ Unit)^c
 Γ ⊢ task e : (Eff r ε τ)^C ! P
 ```
 
-Сервисы, которые тело ищет при исполнении, захватами не считаются: они в строке `r`.
+Services the body looks up at run time are not captures: they are in the row `r`.
 
-Чекер:
+Checker:
 
-- (Lam): `infer.rs` `curry` → `regions/mod.rs` `close_over`; используемые локальные — `held_since`. Без ожидаемого типа квалификатор — свежая переменная, против ожидаемого берётся его квалификатор, против голого — `∅`.
+- (Lam): `infer.rs` `curry` → `regions/mod.rs` `close_over`; the locals used are `held_since`. Without an expected type the qualifier is a fresh variable; against an expected type its qualifier is taken; against a bare type, `∅`.
 - (Task): `handlers.rs` `task` → `close_over`.
-- Посылку проверяет `Hold` в конце объявления (§2.6). Она считает `hidden = ⋃ ⌈Γ(y)⌉ ∖ shown_by(τ)` и требует `hidden ⊆ C`. `shown_by(τ) = ⌈τ⌉`, так что это ровно (Lam)/(Task); до Р14 там стояла `visible_in`, которая видела больше ⌈·⌉.
+- The premise is checked by `Hold` at the end of the declaration (§2.6). It computes `hidden = ⋃ ⌈Γ(y)⌉ ∖ shown_by(τ)` and requires `hidden ⊆ C`. `shown_by(τ) = ⌈τ⌉`, so this is exactly (Lam)/(Task); a subtraction that sees more than ⌈·⌉ would be unsound ([the reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result)).
 
 ```text
 K : ∀ᾱ. τ̄ →P T ᾱ      Γ ⊢ eᵢ : τᵢ' ! φᵢ      τᵢ' ≤ τᵢ[ᾱ := ῡ]      ⋃ ⌈τᵢ'⌉ ⊆ ⌈(T ῡ)^C⌉
 ──────────────────────────────────────────────────────────────────────────── (Con)
 Γ ⊢ K ē : (T ῡ)^C ! ⊔ φᵢ
 
-Γ ⊢ e : (T ῡ)^C ! φ    поле i типа τᵢ[ᾱ := ῡ]
+Γ ⊢ e : (T ῡ)^C ! φ    field i of type τᵢ[ᾱ := ῡ]
 ──────────────────────────────────────────── (Proj)
-поле, извлечённое match или .ℓ, имеет тип (τᵢ[ᾱ := ῡ])^C
+a field extracted by match or .ℓ has type (τᵢ[ᾱ := ῡ])^C
 ```
 
-У данных, хранящих только параметры, `⌈T ῡ⌉` уже покрывает поля, и `C = ∅`. Поле-функция или непрозрачный тип требует `C`. Конструктор не стирает захваты, номинальность и непрозрачность — тоже (spec/07 «Existential/opaque packaging»).
+For data that stores only its parameters, `⌈T ῡ⌉` already covers the fields and `C = ∅`. A function field or an opaque type requires `C`. A constructor does not erase captures, and neither do nominality and opacity (spec/05 "Existential/opaque packaging"). The premise `τᵢ' ≤ τᵢ` is read without the field qualifier ([the field premise of (Con)](#the-field-premise-of-con-ignores-the-field-qualifier)).
 
-Чекер: `regions/data.rs` `constructor_field`, `data_value`, `data_field`; записи и кортежи — `records.rs`, `patterns.rs` через те же функции.
+Checker: `regions/data.rs` `constructor_field`, `data_value`, `data_field`; records and tuples in `records.rs`, `patterns.rs` through the same functions.
 
 ```text
 Γ ⊢ e₁ : τ_f ! φ₁    τ_f = τ₁ →P τ₂    Γ ⊢ e₂ : τ₁ ! φ₂
@@ -223,20 +225,20 @@ K : ∀ᾱ. τ̄ →P T ᾱ      Γ ⊢ eᵢ : τᵢ' ! φᵢ      τᵢ' ≤ τ
 Γ ⊢ e₁ e₂ : τ₂^{≤ ⌈τ_f⌉ ∪ ⌈τ₁⌉} ! φ₁ ⊔ φ₂
 ```
 
-`τ^{≤C}` — граница значения. Уточнение верно по T2(a): чистое применение не выделяет память и не приобретает, его результат собран из функции, аргумента и констант.
+`τ^{≤C}` is a value bound. The refinement is sound by T2(a): a pure application neither allocates nor acquires, and its result is built from the function, the argument and constants.
 
-Чекер: `regions/data.rs` `application_result` (вызов из `calls.rs` `apply`); регион читателя из границы исключён.
+Checker: `regions/data.rs` `application_result` (called from `calls.rs` `apply`); the reader region is excluded from the bound.
 
 ```text
-x : ∀ᾱ c̄. Θ ⇒ τ ∈ Γ    τ̄, C̄ — подстановка    Γ ⊢ Θ[ᾱ := τ̄, c̄ := C̄]
-для каждого вхождения αᵢ^D в τ:   ⌈τᵢ⌉ ⊆ D[c̄ := C̄]
+x : ∀ᾱ c̄. Θ ⇒ τ ∈ Γ    τ̄, C̄ a substitution    Γ ⊢ Θ[ᾱ := τ̄, c̄ := C̄]
+for each occurrence αᵢ^D in τ:   ⌈τᵢ⌉ ⊆ D[c̄ := C̄]
 ───────────────────────────────────────────────────────── (Inst)
 Γ ⊢ x : τ[ᾱ := τ̄, c̄ := C̄] ! P
 ```
 
-Граница значения ограничивает всё подставленное значение. `a^{}` с `a := File s` отвергается в месте вызова: `FLICK-G001` «the expected type `File s` holds no captures» (проба p90).
+A value bound bounds the whole substituted value. `a^{}` with `a := File s` is rejected at the call site: `FLICK-G001` "the expected type `File s` holds no captures" (probe p90).
 
-Чекер: `unify.rs` `Checker::instantiate`; условие на границы — `Hold` от `subsume_bound` с `Visible::Now`; ограничения `Outlives` — `classes/mod.rs` `want`.
+Checker: `unify.rs` `Checker::instantiate`; the bound condition is a `Hold` from `subsume_bound` with `Visible::Now`; `Outlives` constraints are `classes/mod.rs` `want`.
 
 ```text
 s ∉ fr(Γ)    Γ, s : Region, s : Owner s ⊢ e : τ ! φ    φ ⊑ R⟨{Scope s} + r; ε⟩
@@ -245,31 +247,31 @@ s ∉ fr(τ) ∪ fr(r) ∪ fr(ε)
 Γ ⊢ scope s { e } : τ ! R⟨r; ε⟩
 ```
 
-- `fr(τ)` — свободные регионы `τ`, включая квалификаторы и строки.
-- `R⟨r; ε⟩` входит в результат всегда: `scope` — рантайм-шаг, чистая функция его не открывает (`FLICK-E001`).
-- `scope` снимает `Scope s` только своего региона, остальные `Scope ϱ` проходят наружу в `r`.
-- Требование `Scope ϱ`, которое не снял ни один `scope` и которого нет в сигнатуре, — `FLICK-G004`.
+- `fr(τ)` are the free regions of `τ`, including qualifiers and rows.
+- `R⟨r; ε⟩` is always part of the result: `scope` is a runtime step, and a pure function cannot open one (`FLICK-E001`).
+- `scope` discharges only the `Scope s` of its own region; every other `Scope ϱ` passes outwards in `r`.
+- A `Scope ϱ` requirement that no `scope` discharges and that the signature does not list is `FLICK-G004`.
 
-Чекер:
+Checker:
 
-- `regions/scopes.rs` `scope_expr`: свежий жёсткий регион на уровень глубже, `Owner`, отдельная стадия тела;
-- `effects.rs` `scope_row` — требования тела без `Scope s`;
-- `unify.rs` `Store::leave` и `regions/mod.rs` `region_escape` — `s ∉ fr(τ)`, `FLICK-G002`;
-- для квалификатора, ещё не решённого к концу `scope`, `s ∉ fr(τ)` проверяет решатель: переменная уровня вне `scope` не принимает жёсткий регион уровня внутри (`regions/solve.rs` `grow_holds`, `report_hold`);
-- `effects/solve.rs` `no_owner` — `FLICK-G004`.
+- `regions/scopes.rs` `scope_expr`: a fresh rigid region one level deeper, `Owner`, a separate stage for the body;
+- `effects.rs` `scope_row`: the body's requirements without `Scope s`;
+- `unify.rs` `Store::leave` and `regions/mod.rs` `region_escape`: `s ∉ fr(τ)`, `FLICK-G002`;
+- for a qualifier still unsolved at the end of the `scope`, `s ∉ fr(τ)` is checked by the solver: a variable at a level outside the `scope` does not accept a rigid region of a level inside it (`regions/solve.rs` `grow_holds`, `report_hold`);
+- `effects/solve.rs` `no_owner`: `FLICK-G004`.
 
-### 2.4 «Переживает»: `Θ ⊢ k ≥ ϱ`
+### 2.4 Outlives: `Θ ⊢ k ≥ ϱ`
 
 ```text
 k ≥ k          k ≥ ϱ, ϱ ≥ ϱ' ⇒ k ≥ ϱ'          Outlives C ϱ ∈ Θ, k ∈ C ⇒ k ≥ ϱ
 
-s₁ ≥ s₂,  если scope s₂ лексически внутри scope s₁
-k ≥ s,    если s связал scope в теле объявления, а k — регион сигнатуры или переменная типа
+s₁ ≥ s₂,  if scope s₂ is lexically inside scope s₁
+k ≥ s,    if s is bound by a scope in the declaration body, and k is a region of the signature or a type variable
 
-Θ ⊢ Outlives C ϱ   ⇔   ∀k ∈ C. Θ ⊢ k ≥ ϱ, и каждая переменная c в C покрыта фактом Outlives c ϱ ∈ Θ
+Θ ⊢ Outlives C ϱ   ⇔   ∀k ∈ C. Θ ⊢ k ≥ ϱ, and each variable c in C is covered by a fact Outlives c ϱ ∈ Θ
 ```
 
-Второе правило верно, потому что регионы сигнатуры и захваты подставленных значений приходят от вызывающего: они живы весь вызов, а `scope` внутри тела закрывается раньше.
+The second rule is sound because signature regions and the captures of substituted values come from the caller: they are live for the whole call, while a `scope` inside the body closes earlier.
 
 ```text
 Γ ⊢ Outlives (C ∪ ⌈a⌉) ϱ    Γ ⊢ o : Owner ϱ    Γ ⊢ f : (Failure e →R⟨{Scope ϱ} + r;none⟩ Unit)^C    Γ ⊢ t : (Eff ({Scope ϱ} + r) e a)^C
@@ -277,151 +279,151 @@ k ≥ s,    если s связал scope в теле объявления, а k
 Γ ⊢ Fiber.spawn o f t : Fiber e a ! R⟨r; none⟩
 ```
 
-Это (Inst) с `Θ = Outlives c s` и (App) ядра, и `Outlives` берётся у всего, что держит задача: `⌈(Eff … a)^C⌉ = C ∪ ⌈a⌉`. Регион, который показывает только результат, ребёнок тоже держит до своего конца (Р140). Строки ребёнка и супервизора называют `Scope ϱ` владельца: рантайм исполняет их у владельца (`runtime/src/owner.ts` `inside`), поэтому они приобретают в его регион, а строка вызова — только `r` (Р22). Тот же вид у любой константы, которая держит аргумент до закрытия владельца: финализатор, обработчик событий, фоновый поток (Г4).
+This is (Inst) with `Θ = Outlives c s` plus the core (App), and `Outlives` is taken over everything the task holds: `⌈(Eff … a)^C⌉ = C ∪ ⌈a⌉`. A region shown only by the result is also held by the child until it ends ([(Spawn) bounds everything the task holds](#spawn-bounds-everything-the-task-holds)). The rows of the child and of the supervisor name the owner's `Scope ϱ`: the runtime runs them under the owner (`runtime/src/owner.ts` `inside`), so they acquire into its region, and the row of the call is only `r` ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)). Any constant that holds an argument until its owner closes has the same shape: a finalizer, an event handler, a background stream (G4).
 
-Чекер: `regions/solve.rs` `check_outlives` (`FLICK-G003`): регион `scope` должен охватывать регион владельца (`encloses`), атом не из `scope` подходит, если владелец — `scope` тела, или если его покрывает данное `Outlives`.
+Checker: `regions/solve.rs` `check_outlives` (`FLICK-G003`): the region of a `scope` must enclose the owner's region (`encloses`); an atom not from a `scope` fits if the owner is a `scope` of the body, or if a given `Outlives` covers it.
 
-### 2.5 Ошибки без регионов
+### 2.5 Region-free errors
 
 ```text
-объявление type error E ᾱ = E τ̄:
-    у E нет параметров видов Region и CRow;
-    τ̄ не содержат Ref, Eff, Layer, Unknown, рантайм-стрелок и непустых квалификаторов      (Err-Decl)
+declaration type error E ᾱ = E τ̄:
+    E has no parameters of kinds Region and CRow;
+    τ̄ contain no Ref, Eff, Layer, Unknown, runtime arrows or non-empty qualifiers      (Err-Decl)
 
-шаг с эффектом R⟨r; ε⟩ под scope s:   s ∉ ⌈E ῡ⌉ для каждого E ῡ ∈ ε                       (Err-Raise)
+a step with effect R⟨r; ε⟩ under scope s:   s ∉ ⌈E ῡ⌉ for each E ῡ ∈ ε                       (Err-Raise)
 ```
 
-Второе правило действует и тогда, когда ошибку ловит `try` внутри того же `scope` (spec/07 «Expected errors»). Модели хватило бы проверки только на ошибках, покидающих `scope`; спека выбирает более простое и строгое правило, модель его принимает.
+The second rule applies even when a `try` inside the same `scope` catches the error (spec/05 "Expected errors"). The model would only need the check on errors that leave the `scope`; the spec chooses the simpler and stricter rule, and the model adopts it.
 
-`Exit e a` хранит успешное значение: `⌈Exit e a⌉ = ⌈a⌉`. `Failure e` и `RawCause` непрозрачны и регионов не достигают: полезная нагрузка ошибок проверена (Err-Decl), а чужие JS-значения запечатаны (Г4).
+`Exit e a` stores the success value: `⌈Exit e a⌉ = ⌈a⌉`. `Failure e` and `RawCause` are opaque and reach no regions: error payloads are checked (Err-Decl), and foreign JS values are sealed (G4).
 
-Чекер:
+Checker:
 
 - (Err-Decl): `services.rs` `check_error_payload`, `live_part` (`FLICK-E005`);
-- (Err-Raise): `effects.rs` `perform` кладёт строку ошибок каждого вызова в `regions.raised`, `regions/solve.rs` `check_raised` ищет в ней регион `scope` (`FLICK-E005`).
+- (Err-Raise): `effects.rs` `perform` puts the error row of each call into `regions.raised`, and `regions/solve.rs` `check_raised` looks for the region of the `scope` in it (`FLICK-E005`).
 
-Регион сигнатуры в строке ошибок не проверяется: `∀s. File s →R⟨none; {Wrapped (File s)}⟩ Unit` принят. Каждое место вызова внутри `scope` подставляет регион этого `scope` и проверяется (пробы p5, p5b: `FLICK-E005` у вызова), поэтому на уровне программы это равносильно (Err-Raise).
+A signature region in the error row is not checked: `∀s. File s →R⟨none; {Wrapped (File s)}⟩ Unit` is accepted. Each call site inside a `scope` substitutes the region of that `scope` and is checked (probes p5, p5b: `FLICK-E005` at the call), so at the level of a program this is equivalent to (Err-Raise).
 
-### 2.6 Вывод квалификаторов и обобщение
+### 2.6 Qualifier inference and generalization
 
-Квалификатор без ожидаемого типа — переменная вида `CRow`. Каждое обязательство `Hold` даёт ограничение `hidden ⊆ C`. Решатель растит переменные до наименьшего решения, как строки эффектов, затем закрывает оставшиеся `∅`.
+A qualifier without an expected type is a variable of kind `CRow`. Each `Hold` obligation yields a constraint `hidden ⊆ C`. The solver grows variables to the least solution, as for effect rows, then closes the remaining ones to `∅`.
 
-- Переменная уровня вне `scope` не принимает регион этого `scope`. Такое ограничение остаётся невыполненным и даёт `FLICK-G002`.
-- Обязательство с записанной границей сообщает `FLICK-G001`.
+- A variable at a level outside a `scope` does not accept the region of that `scope`. Such a constraint stays unsatisfied and yields `FLICK-G002`.
+- An obligation with a written bound reports `FLICK-G001`.
 
-Обобщение (`core.md` §2.5) не квантифицирует переменные значения, обязательство которого ещё не закрыто. Иначе `let f = fun () -> use h` получил бы `∀c. (Unit → Unit)^c`, и инстанциация `c := ∅` стёрла бы захват (проба p4: `FLICK-G002`).
+Generalization (`core.md` §2.5) does not quantify the variables of a value whose obligation is still open. Otherwise `let f = fun () -> use h` would get `∀c. (Unit → Unit)^c`, and instantiating `c := ∅` would erase the capture (probe p4: `FLICK-G002`).
 
-Локальная сигнатура не обязана называть регионы, которые держит её функция: внешний квалификатор выводится. Квалификаторы следующих стадий, которые добавляет `implicit_captures`, — записанные границы (Р21).
+A local signature need not name the regions its function holds: the outer qualifier is inferred. The qualifiers of later stages added by `implicit_captures` are written bounds ([local signatures](#local-signatures-infer-only-the-outer-qualifier)).
 
-Чекер:
+Checker:
 
-- `effects/solve.rs` (цикл `grow_holds` вместе со строками, `close_holds`, `report_regions`);
+- `effects/solve.rs` (the `grow_holds` loop together with rows, `close_holds`, `report_regions`);
 - `regions/solve.rs` `grow_holds`, `blocked_capture_rows`, `close_holds`, `report_regions`, `report_hold`;
-- `regions/compare.rs` `compare_deferred` — квалификаторы типа, который выведется позже;
-- `generalize.rs`: переменные значения, которое держит открытое обязательство, мономорфны; `without_value_captures`.
+- `regions/compare.rs` `compare_deferred`: qualifiers of a type that is inferred later;
+- `generalize.rs`: the variables of a value held by an open obligation are monomorphic; `without_value_captures`.
 
-### 2.7 Сервисы и регион `provide` (Р37)
+### 2.7 Services and the region of `provide`
 
-`provide L { e }` — лексический владелец сборки `L` (`runtime.md` §3.5). Для порядка §2.4 он вводит регион `ϱₚ`, как `scope`: `ϱₚ ≥ s` для `scope s` внутри тела и `s ≥ ϱₚ` для `scope s` вокруг. В типах значений `ϱₚ` не появляется: он есть только у поставщика сервисов тела.
+This section states [provide services must not outlive their layer](runtime.md#a-provide-service-outlives-the-release-of-its-layer). `provide L { e }` is the lexical owner of the build of `L` (`runtime.md` §3.5). For the order of §2.4 it introduces a region `ϱₚ`, like `scope`: `ϱₚ ≥ s` for a `scope s` inside the body and `s ≥ ϱₚ` for a `scope s` around it. `ϱₚ` does not appear in the types of values: only the service provider of the body has it.
 
-Ребёнок владельца `ϱ`, запущенный изнутри `provide`, наследует окружение `θ` места вызова. Он пользуется сервисами `L` до закрытия `ϱ`, а слой освобождается при закрытии `ϱₚ`. Поэтому удержание задачи у владельца требует, чтобы её сервисы пережили владельца:
+A child of owner `ϱ` started from inside `provide` inherits the environment `θ` of the call site. It uses the services of `L` until `ϱ` closes, while the layer is released when `ϱₚ` closes. Hence retaining a task with an owner requires its services to outlive the owner:
 
 ```text
-Provided R ϱ         ограничение (как Outlives, §2.4): поставщик каждого сервиса строки R переживает ϱ
-{Provided {S} ϱ}     элемент строки сервисов: то же обязательство, ещё не снятое в стадии
+Provided R ϱ         constraint (like Outlives, §2.4): the provider of each service of row R outlives ϱ
+{Provided {S} ϱ}     service row element: the same obligation, not yet discharged in the stage
 
 Γ ⊢ Outlives C ϱ    Γ ⊢ Provided r ϱ    Γ ⊢ o : Owner ϱ    Γ ⊢ t : (Eff ({Scope ϱ} + r) e a)^C
 ────────────────────────────────────────────────────────────────────── (Spawn-Svc)
 Γ ⊢ Fiber.spawn o f t : Fiber e a ! R⟨r; none⟩
 ```
 
-Схема каждой константы с `retention owner` (Г4) требует `Fiber.Provided r s` для строки удерживаемой задачи или финализатора, как требует `Fiber.Outlives c s` для захватов; у внешней функции без него — `FLICK-F002` (`ffi.rs` `owner_retention`).
+The scheme of every constant with `retention owner` (G4) requires `Fiber.Provided r s` for the row of the retained task or finalizer, as it requires `Fiber.Outlives c s` for captures; a foreign function without it is `FLICK-F002` (`ffi.rs` `owner_retention`).
 
-Место вызова раскладывает `Provided r ϱ` на сервисы `S ∈ r` (кроме `Scope` и самих обязательств) и снимает каждое в стадии `X`, где стоит вызов, лексически, как `Scope ϱ` (`regions/scopes.rs` `lexical_owner`):
+The call site splits `Provided r ϱ` into the services `S ∈ r` (except `Scope` and the obligations themselves) and discharges each in the stage `X` that contains the call, lexically, like `Scope ϱ` (`regions/scopes.rs` `lexical_owner`):
 
 ```text
-S выдаёт provide ϱₚ внутри X, ближайший к месту:      снято, если ϱₚ ≥ ϱ; иначе FLICK-G003
-иначе, если ϱ — scope внутри X:                         снято: поставщик X охватывает всё исполнение X
-иначе, если в области данное Provided R ϱ с S ∈ R:      снято
-иначе:                                                  элемент {Provided {S} ϱ} в строке X                (Provided)
+S is given by a provide ϱₚ inside X, the nearest to the call:   discharged if ϱₚ ≥ ϱ; otherwise FLICK-G003
+otherwise, if ϱ is a scope inside X:                             discharged: the provider of X covers the whole run of X
+otherwise, if a given Provided R ϱ with S ∈ R is in scope:      discharged
+otherwise:                                                       element {Provided {S} ϱ} in the row of X                (Provided)
 ```
 
-Во втором случае `S` приходит из строки `X`, а значит от того, кто исполняет `X`, и живёт всё время исполнения, в том числе после закрытия `ϱ` внутри `X`. В последнем решить нельзя: элемент переходит с остальной строкой к тому, кто исполняет `X` (`await`, применение, `provide` слоя), и снимается там по тем же правилам. Сигнатура не пишет такой элемент, она пишет ограничение: `start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit`. Внутри `start` оно данное, а место вызова получает его при инстанциации и снимает своим поставщиком.
+In the second case `S` comes from the row of `X`, hence from whoever runs `X`, and lives for the whole run of `X`, including after `ϱ` closes inside `X`. In the last case it cannot be decided: the element moves with the rest of the row to whoever runs `X` (`await`, application, `provide` of a layer) and is discharged there by the same rules. A signature does not write such an element; it writes a constraint: `start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit`. Inside `start` the constraint is given, and the call site receives it at instantiation and discharges it with its own provider.
 
-У строки один элемент `Provided {S}` на сервис: два обязательства одного сервиса под разными владельцами в одной стадии сводят владельцев к одному региону, иначе `FLICK-T003`. Это неполнота, а не дыра: программа отвергается.
+A row has one `Provided {S}` element per service: two obligations for the same service under different owners in one stage unify the owners into one region, otherwise `FLICK-T003`. This is incompleteness, not a hole: the program is rejected.
 
-Чекер:
+Checker:
 
-- `types/handlers.rs` `provide` — регион `ϱₚ` в `regions.scopes`, поставщики сервисов тела в стадии;
-- `regions/provided.rs` — обязательства `Fiber.Provided`: раскладка по сервисам в конце вызова (`calls.rs` `apply`), снятие, переход в строку стадии и снятие при `perform` того, кто её исполняет (`FLICK-G003`); владелец, который выведется из строк, ждёт конца объявления;
-- `effects/solve.rs` — обязательство, дошедшее до записанной строки сигнатуры (`FLICK-G003` с подсказкой `Fiber.Provided`).
+- `types/handlers.rs` `provide`: the region `ϱₚ` in `regions.scopes`, the service providers of the body in the stage;
+- `regions/provided.rs`: `Fiber.Provided` obligations: splitting by service at the end of a call (`calls.rs` `apply`), discharge, moving into the stage row and discharge at the `perform` of whoever runs it (`FLICK-G003`); an owner that will be inferred from rows waits for the end of the declaration;
+- `effects/solve.rs`: an obligation that reaches a written signature row (`FLICK-G003` with a `Fiber.Provided` hint).
 
-В Lean (`formal/`): обязательство — элемент `ob S ϱ` строки сервисов (`Elem.ob`), `Fiber.spawn` и `Scope.add_finalizer` кладут их в стадию вызова (`Row.obs`); конец региона снимает их по второму случаю (`Row.disch`), `provide`, который выдаёт `S`, их не пропускает, а на шаге кадр `with` региона `provide` снимает, когда его регион старше (`Row.withP`). Ребёнок и финализатор сохраняют кадры `with` места регистрации (`withs`), запрос сервиса через кадр кончившегося `provide` застревает (`DeadAsk`), и `T4_3` показывает, что этого не бывает.
+In Lean (`formal/`): an obligation is an element `ob S ϱ` of the service row (`Elem.ob`); `Fiber.spawn` and `Scope.add_finalizer` put them into the stage of the call (`Row.obs`); the end of a region discharges them by the second case (`Row.disch`); a `provide` that gives `S` does not let them through; and at a step the `with` frame of a `provide` region discharges them when its region is older (`Row.withP`). A child and a finalizer keep the `with` frames of their registration site (`withs`); a service request through the frame of a finished `provide` gets stuck (`DeadAsk`), and `T4_3` shows that this does not happen.
 
-Эталон (`flick-model/src/check/regions/provided.rs`) пишет то же по этому документу. `Provided R ϱ` схемы стоит элементом `{Provided R ϱ}` в строке её последней рантайм-стрелки, и вызов раскладывает его при `perform`. Элементы идут вверх со строкой стадии: `provide` снимает их по первому случаю, `scope` своего региона — по второму, конец λ или задачи — по данному `Provided`. Отличие: данное снимает у конца λ или задачи вокруг вызова, а не у самого вызова, поэтому λ с записанной строкой между ними отвергнет то, что этот раздел принимает (`shortcut:`). `with θ` конфигурации снимает элементы своих сервисов без сравнения регионов: слой уже собран, а использование после его конца ловит машина (§3.3).
+The reference model (`flick-model/src/check/regions/provided.rs`) implements the same from this document. The `Provided R ϱ` of a scheme is an element `{Provided R ϱ}` in the row of its last runtime arrow, and the call splits it at `perform`. Elements move up with the stage row: `provide` discharges them by the first case, the `scope` of their region by the second, the end of a λ or task by a given `Provided`. Difference: a given constraint discharges at the end of the λ or task around the call, not at the call itself, so a λ with a written row in between rejects what this section accepts (`shortcut:`). The `with θ` of a configuration discharges the elements of its services without comparing regions: the layer is already built, and use after its end is caught by the machine (§3.3).
 
-## 3. Динамика
+## 3. Dynamics
 
-### 3.1 Конфигурации
+### 3.1 Configurations
 
-Конфигурация — `⟨Λ, μ, e⟩`. `Λ` отображает регион времени исполнения `π` в:
+A configuration is `⟨Λ, μ, e⟩`. `Λ` maps a runtime region `π` to:
 
-- состояние — `live` или `closed`;
-- список финализаторов `F(π)`;
-- множество детей `K(π)`.
+- a state: `live` or `closed`;
+- a list of finalizers `F(π)`;
+- a set of children `K(π)`.
 
-Формы времени исполнения:
+Runtime forms:
 
 ```text
 v ::= … | cap π n | own π
 e ::= … | inside π e
 ```
 
-- `cap π n` — способность `n` региона `π`, тип `H π`;
-- `own π` — владелец, тип `Owner π`;
-- `inside π e` — тело `scope`, исполняемое в регионе `π`.
+- `cap π n` is capability `n` of region `π`, of type `H π`;
+- `own π` is the owner, of type `Owner π`;
+- `inside π e` is the body of a `scope` running in region `π`.
 
-Аргументы вида `Region` в модели явные. `open_H π v` получает регион, а не ищет ближайший: кодоген передаёт владельца лексически (`$rt.within`), гипотеза Г6.
+Arguments of kind `Region` are explicit in the model. `open_H π v` receives its region rather than looking up the nearest one: codegen passes the owner lexically (`$rt.within`), hypothesis G6.
 
-### 3.2 Шаги
+### 3.2 Steps
 
 ```text
-⟨Λ, μ, E[scope s { e }]⟩       →  ⟨Λ[π ↦ live, F = [], K = ∅], μ, E[inside π e[s := π][s := own π]]⟩     π свежий
-⟨Λ, μ, E[open_H π v]⟩          →  ⟨Λ[F(π) += close_n], μ, E[cap π n]⟩                  Λ(π) = live, n свежий
+⟨Λ, μ, E[scope s { e }]⟩       →  ⟨Λ[π ↦ live, F = [], K = ∅], μ, E[inside π e[s := π][s := own π]]⟩     π fresh
+⟨Λ, μ, E[open_H π v]⟩          →  ⟨Λ[F(π) += close_n], μ, E[cap π n]⟩                  Λ(π) = live, n fresh
 ⟨Λ, μ, E[op_H (cap π n) v̄]⟩    →  ⟨Λ, μ, E[v']⟩                                       Λ(π) = live
-⟨Λ, μ, E[op_H (cap π n) v̄]⟩    — застревает                                           Λ(π) = closed
+⟨Λ, μ, E[op_H (cap π n) v̄]⟩    — stuck                                                Λ(π) = closed
 ⟨Λ, μ, E[add_finalizer π t]⟩   →  ⟨Λ[F(π) += t], μ, E[()]⟩
 ⟨Λ, μ, E[spawn (own π) f t]⟩   →  ⟨Λ[K(π) += (f, t)], μ, E[fiber]⟩
 ```
 
-Пока `Λ(π) = live`, ребёнок из `K(π)` может сделать шаг между любыми шагами основного вычисления; его ошибка уходит в `f`. Контекст `E` из `core.md` §3.2 дополняется кадром `inside π E`.
+While `Λ(π) = live`, a child from `K(π)` may take a step between any two steps of the main computation; its error goes to `f`. The context `E` of `core.md` §3.2 is extended with the frame `inside π E`.
 
-### 3.3 Закрытие
+### 3.3 Close
 
 ```text
-⟨Λ, μ, E[inside π w]⟩   →  дети K(π) доходят до конца или прерываются;
-                           финализаторы F(π) выполняются в обратном порядке;
+⟨Λ, μ, E[inside π w]⟩   →  the children K(π) run to completion or are interrupted;
+                           the finalizers F(π) run in reverse order;
                            Λ(π) := closed;
                            ⟨Λ', μ', E[w]⟩
 ```
 
-Здесь `w` — значение или `raise v`. `die` и прерывание закрывают регион так же; это описывает λRT. Регион закрывается только тогда, когда его тело — значение. Поэтому регион `scope`, вложенного в тело, и регионы `scope` внутри детей закрыты раньше (Л5).
+Here `w` is a value or `raise v`. `die` and interruption close the region the same way; λRT describes this. A region closes only when its body is a value. Hence the region of a `scope` nested in the body, and the regions of `scope`s inside the children, are closed earlier (L5).
 
-Застревание `op_H` на закрытом регионе — «использование после закрытия». В JS-рантайме это шаг ресурса с уже выполненным `release`; пробы его видят.
+`op_H` getting stuck on a closed region is "use after close". In the JS runtime this is a step of a resource whose `release` has already run; the probes detect it.
 
-Фазы закрытия по отдельности, хуки и финализатор, добавленный в закрытую область, описывает λRT (`runtime.md` §3.3, Р41).
+The individual phases of close, hooks, and a finalizer added to a closed scope are described by λRT (`runtime.md` §3.3, [region closing refined into closing phases](runtime.md#region-closing-as-one-step-versus-closing-phases)).
 
-Эталон `flick-model` (`src/eval/regions.rs`) исполняет §3.2–§3.3 в одном допустимом порядке:
+The reference model `flick-model` (`src/eval/regions.rs`) runs §3.2–§3.3 in one admissible order:
 
-- дети `K(π)` делают шаги только при закрытии `π`, по порядку запуска. Это самый поздний момент: ребёнок, который держит уже закрытый регион, на нём застрянет;
-- регион `open_H` — ближайший `inside` вокруг шага. Генератор не исполняет шаг внешнего `Scope` во вложенном `scope`, поэтому по Г6 это тот же регион;
-- способность и объект без региона, который даёт внешняя привязка (`make_conn`, Г4), — одна форма `cap`; `op_H` застревает и на освобождённом объекте;
-- ошибка ребёнка или финализатора останавливает машину: супервизор и порядок причин — λRT. Ребёнок программ генератора ошибок не имеет;
-- ребёнок и финализатор запоминают окружения `θ` всех `provide` вокруг места регистрации и исполняются под ними (`runtime.md` §3.5). `provide` кончается вместе со своим `with θ`, и операция сервиса из кончившегося `θ` застревает: это нарушение T4.3.
+- the children `K(π)` take steps only when `π` closes, in start order. This is the latest possible moment: a child that holds an already closed region gets stuck on it;
+- the region of `open_H` is the nearest `inside` around the step. The generator does not run a step of an outer `Scope` inside a nested `scope`, so by G6 this is the same region;
+- a capability and a region-free object given by a foreign binding (`make_conn`, G4) are one form `cap`; `op_H` also gets stuck on a released object;
+- an error of a child or a finalizer stops the machine: the supervisor and the order of causes are λRT. The children of generated programs have no errors;
+- a child and a finalizer remember the environments `θ` of all `provide`s around the registration site and run under them (`runtime.md` §3.5). A `provide` ends together with its `with θ`, and a service operation from a finished `θ` gets stuck: that is a violation of T4.3.
 
-X2 проверяет (Inside) и `⊢ Λ` на каждом состоянии. `⊢ Λ` там сильнее §3.4: работа живого `π` достигает (`reach_μ`, §5.2) только `π` и регионов, в которых он создан. Свойство `leaks_reach_a_use_after_close` проверяет саму машину: утечки генератора, после которых утёкшее значение используется, доходят до застревания §3.2. Таких путей девять, вместе с путём 10: его ребёнок, финализатор или `start` с данным `Provided` застревают на сервисе кончившегося `provide`. Колбэк, переданный в параметр, и ошибка, пойманная внутри `scope`, используют значение только до закрытия.
+The model properties (`just model`) check (Inside) and `⊢ Λ` on every state. There `⊢ Λ` is stronger than §3.4: the work of a live `π` reaches (`reach_μ`, §5.2) only `π` and the regions it was created in. The property `leaks_reach_a_use_after_close` checks the machine itself: the generator's leaks, after which the leaked value is used, reach the stuck state of §3.2. There are nine such paths, plus path 10, in which a child, a finalizer or a `start` with a given `Provided` gets stuck on a service of a finished `provide`. A callback passed as a parameter and an error caught inside the `scope` use the value only before close.
 
-### 3.4 Типизация форм времени исполнения
+### 3.4 Typing runtime forms
 
 ```text
 ──────────────────── (Cap)        ───────────────────── (Own)
@@ -432,97 +434,95 @@ X2 проверяет (Inside) и `⊢ Λ` на каждом состоянии.
 Γ ⊢ inside π e : τ ! R⟨r; ε⟩
 ```
 
-`⊢ Λ` — финализаторы и дети каждого живого `π` типизируются с границей `C`, для которой `Outlives C π` верно в порядке вложенности живых регионов.
+`⊢ Λ`: the finalizers and children of each live `π` are typed with a bound `C` for which `Outlives C π` holds in the nesting order of live regions.
 
-Посылки (Lam) и (Task) для термов времени исполнения считают регионы `cap π n` и `own π` тела и `⌈Ψ(ℓ)⌉` его локаций наравне с `⌈Γ(y)⌉` свободных переменных; в программе таких форм нет, и правило прежнее (Р141). Тела `λ`, `fix` и `task` не содержат `inside`.
+For runtime terms, the premises of (Lam) and (Task) count the regions of `cap π n` and `own π` in the body and `⌈Ψ(ℓ)⌉` of its locations on a par with `⌈Γ(y)⌉` of the free variables; programs contain no such forms, so for them the rule is unchanged ([(Lam) and (Task) count runtime forms](#lam-and-task-count-runtime-forms)). The bodies of `λ`, `fix` and `task` contain no `inside`.
 
-## 4. Пути утечки
+## 4. Leak paths
 
-Таблица spec/07 «Static regions and captures»: правило модели, контрпример, который оно отвергает, и где этот контрпример проверен. Фикстуры — `tests/check/fail/regions/`.
+The table of spec/05 "Static regions and captures": the model rule, the counterexample it rejects, and where that counterexample is checked. Fixtures are in `tests/check/fail/regions/`.
 
-| Путь | Правило | Контрпример | Проверка |
+| Path | Rule | Counterexample | Check |
 | - | - | - | - |
-| Прямой результат, вложенные запись или ADT | (Scope): `s ∉ fr(τ)`; ⌈·⌉ транзитивен по аргументам | `scope { File.open_scoped path }`, `Wrapper (File s)`, запись с замыканием | `escape.fl` `result`, `wrapper`, `in_record` (`FLICK-G002`) |
-| Замыкание или `Eff` | (Lam), (Task), (≤-Cap); обобщение не квантифицирует открытое обязательство | `bad_callback`, `bad_deferred`; `let f = fun () -> use h` после `scope`; задача, которая прячет захват за регионом результата или строки | `escape.fl` `bad_callback`, `bad_deferred` (`FLICK-G001`); `eff_result.fl` (Р14); пробы p4, p4b |
-| Передача, в том числе через контравариантный параметр | (≤-Cap) на всём значении | колбэк с голым параметром за `((Unit → Unit)^{s} → Unit)`; замыкание с `s` в параметре за голый параметр | пробы p33, p34, p92, p93 (`FLICK-G001`/`G002`) |
-| Интерфейсы модулей | сигнатура верхнего уровня обязательна для функций и проверяется как написана; `.iface` хранит квалификаторы | вызов `reader` из другого модуля с выходом из `scope` | `tests/check/projects/regions` (`FLICK-G001`, `FLICK-G002`); вне модели Lean: модулей в ней нет (`core.md` §2.6) |
-| Экзистенциальная и непрозрачная упаковка | (Con), (Proj) | `Sealed (File s)`; `opaque type Sealed = Sealed (Unit ->{} Unit)` вокруг замыкания над `h` | `escape.fl` `sealed`; проба p20 (`FLICK-G002`) |
-| Запись во внешний `Ref` или кэш | инвариантность `Ref (α^c)`; тип ячейки замкнут при выделении | `Ref.set cell (Some file)`; `Ref (Unit ->{} String)` против `Ref ((Unit ->{} String)^{s})`; атом верхнего уровня | `escape.fl` `outer_cell`, `outer_callback`; `qualifiers.fl` `invariant` (`FLICK-T003`); `ref_capacity.fl`; `instance.fl` |
-| Ошибка, `Exit`, диагностика | (Err-Decl), (Err-Raise); `Failure`, `RawCause` инертны | `Wrapped file` под `try` внутри `scope`; `type error Leak (s : Region)`; обобщённый `boom : ∀a. a →R⟨none;{Wrapped a}⟩ Unit` с дескриптором | `escape.fl` `raised`; `qualifiers.fl` `Leak` (`FLICK-E005`); проба p5 |
-| Ребёнок и финализатор | (Spawn), §2.4 | ребёнок внешнего владельца держит внутренний регион; данная `c` без `Outlives` | `qualifiers.fl` `spawn_outer`, `spawn_given` (`FLICK-G003`); `retention.fl` (Р16); `children.fl` (Р22); проба p53 |
-| Сервис слоя у ребёнка внешнего владельца | (Spawn-Svc), (Provided), §2.7 | `Fiber.spawn outer` или `Scope.add_finalizer` внешнего региона изнутри `provide` с сервисом слоя (Р37) | `provide_escape.fl` (`FLICK-G003`); путь 10 генератора X2 (`flick-model/src/generate/provides.rs`) |
-| Внешний вызов | Г4: сигнатура — контракт удержания; удерживаемое при `retention owner` требует `Outlives` (`FLICK-F002`) | приобретённое значение вне `scope`, в том числе через обобщённую функцию; значение аренды из `use` | `acquired.fl` (Р18, Р24), `leases.fl` (Р19), `fail/ffi/owner_retention.fl` |
+| Direct result, nested record or ADT | (Scope): `s ∉ fr(τ)`; ⌈·⌉ is transitive over arguments | `scope { File.open_scoped path }`, `Wrapper (File s)`, a record with a closure | `escape.fl` `result`, `wrapper`, `in_record` (`FLICK-G002`) |
+| Closure or `Eff` | (Lam), (Task), (≤-Cap); generalization does not quantify an open obligation | `bad_callback`, `bad_deferred`; `let f = fun () -> use h` after `scope`; a task that hides a capture behind the region of its result or row | `escape.fl` `bad_callback`, `bad_deferred` (`FLICK-G001`); `eff_result.fl` ([reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result)); probes p4, p4b |
+| Passing, including through a contravariant parameter | (≤-Cap) on the whole value | a callback with a bare parameter as `((Unit → Unit)^{s} → Unit)`; a closure with `s` in its parameter as a bare parameter | probes p33, p34, p92, p93 (`FLICK-G001`/`G002`) |
+| Module interfaces | a top-level signature is mandatory for functions and is checked as written; `.iface` stores qualifiers | a call of `reader` from another module that escapes the `scope` | `tests/check/projects/regions` (`FLICK-G001`, `FLICK-G002`); outside the Lean model, which has no modules (`core.md` §2.6) |
+| Existential and opaque packaging | (Con), (Proj) | `Sealed (File s)`; `opaque type Sealed = Sealed (Unit ->{} Unit)` around a closure over `h` | `escape.fl` `sealed`; probe p20 (`FLICK-G002`) |
+| Write to an outer `Ref` or cache | invariance of `Ref (α^c)`; the cell type is closed at allocation | `Ref.set cell (Some file)`; `Ref (Unit ->{} String)` against `Ref ((Unit ->{} String)^{s})`; a top-level atom | `escape.fl` `outer_cell`, `outer_callback`; `qualifiers.fl` `invariant` (`FLICK-T003`); `ref_capacity.fl`; `instance.fl` |
+| Error, `Exit`, diagnostics | (Err-Decl), (Err-Raise); `Failure`, `RawCause` are inert | `Wrapped file` under `try` inside `scope`; `type error Leak (s : Region)`; a generic `boom : ∀a. a →R⟨none;{Wrapped a}⟩ Unit` with a handle | `escape.fl` `raised`; `qualifiers.fl` `Leak` (`FLICK-E005`); probe p5 |
+| Child and finalizer | (Spawn), §2.4 | a child of an outer owner holds an inner region; a given `c` without `Outlives` | `qualifiers.fl` `spawn_outer`, `spawn_given` (`FLICK-G003`); `retention.fl` ([owner retention](#owner-retention-requires-outlives)); `children.fl` ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)); probe p53 |
+| A layer service in a child of an outer owner | (Spawn-Svc), (Provided), §2.7 | `Fiber.spawn outer` or `Scope.add_finalizer` of an outer region from inside a `provide` with a layer service ([provide services must not outlive their layer](runtime.md#a-provide-service-outlives-the-release-of-its-layer)) | `provide_escape.fl` (`FLICK-G003`); path 10 of the model's program generator (`flick-model/src/generate/provides.rs`) |
+| Foreign call | G4: the signature is a retention contract; what is retained under `retention owner` requires `Outlives` (`FLICK-F002`) | an acquired value outside its `scope`, including through a generic function; a lease value from `use` | `acquired.fl` ([acquired values](#acquired-values-carry-their-region), [value bounds](#a-value-bound-survives-an-unknown-type-position)), `leases.fl` ([leases](#leases-instead-of-early-close)), `fail/ffi/owner_retention.fl` |
 
-## 5. Теорема T4
+## 5. Theorem T4
 
-### 5.1 Гипотезы
+### 5.1 Hypotheses
 
-Действуют Г1–Г3 из `core.md` и добавляются:
+G1–G3 of `core.md` hold, and the following are added:
 
-- **Г4 (контракт удержания FFI).**
-  - `retention call`: после возврата функция не держит аргументы, кроме достижимых из результата в пределах ⌈типа результата⌉.
-  - `retention owner` с владельцем `ϱ` (из `Scope ϱ` или `Owner ϱ`): функция держит аргументы до закрытия `ϱ`, и её схема требует `Outlives c ϱ` для каждой строки захватов `c` удерживаемого аргумента, которую не показывает то, что идёт после него, и `Provided r ϱ` для строки сервисов `r` удерживаемой работы (§2.7) (`ffi.rs` `owner_retention`, `FLICK-F002`). Место вызова проверяет `Outlives` для всего ⌈·⌉ удерживаемого аргумента, в том числе для того, что показывает его результат (Р140).
-  - Приобретение `∀s. τ_a →R⟨{Scope s} + r; ε⟩ τ` возвращает способности региона `s`, и `s ∈ ⌈τ⌉`, если `τ` не скаляр. Освобождает их только закрытие `s`.
-  - Без `retention` функция считается `call`. `FLICK-F002` требует пометку только у параметров с переменными видов `Region` и `CRow` (`ffi.rs` `foreign_info`). Параметр-переменная вида `Type` (`∀a. a →R Unit`) пометки не требует, хотя может принять способность: такую привязку покрывает только эта гипотеза.
-  - Чистые операции над способностью (`Rpc.port`, `Http.Server.address`) не зависят от того, жив ли регион.
-- **Г5 (аренда).** `ScopedRef`, `Resource`, `ScopedCache` отдают значение только в `use`, с регионом аренды `t`, и освобождают прежнее значение, когда его не держит ни одна аренда (`runtime/src/effect/lease.ts`); приобретение идёт в собственный регион высшего ранга. `RcRef`, `RcMap`, `Pool` одалживают значение области вызова (`a^{t}`) и не отзывают его до её закрытия (Effect 4.0.5).
-- **Г6 (владелец лексический).** Шаг, которому нужен `Scope ϱ`, получает владельца региона `ϱ`, а не ближайшего `scope` при исполнении (`$rt.within`). Константа не исполняет свой аргумент типа `Eff` под другим владельцем, чем тот, что назван в его строке: аргумент, который исполняет комбинатор, называет регион комбинатора — высшего ранга у подвладельцев (Р19), `Scope s` владельца у детей (Р22).
+- **G4 (FFI retention contract).**
+  - `retention call`: after returning, the function holds no arguments except those reachable from the result within ⌈result type⌉.
+  - `retention owner` with owner `ϱ` (from `Scope ϱ` or `Owner ϱ`): the function holds its arguments until `ϱ` closes, and its scheme requires `Outlives c ϱ` for each capture row `c` of a retained argument that is not shown by what follows it, and `Provided r ϱ` for the service row `r` of retained work (§2.7) (`ffi.rs` `owner_retention`, `FLICK-F002`). The call site checks `Outlives` for the whole ⌈·⌉ of the retained argument, including what its result shows ([(Spawn) bounds everything the task holds](#spawn-bounds-everything-the-task-holds)).
+  - An acquisition `∀s. τ_a →R⟨{Scope s} + r; ε⟩ τ` returns capabilities of region `s`, and `s ∈ ⌈τ⌉` unless `τ` is a scalar. Only closing `s` releases them.
+  - A function without `retention` counts as `call`. `FLICK-F002` requires the annotation only on parameters with variables of kinds `Region` and `CRow` (`ffi.rs` `foreign_info`). A parameter that is a variable of kind `Type` (`∀a. a →R Unit`) needs no annotation even though it can receive a capability: such a binding is covered only by this hypothesis.
+  - Pure operations on a capability (`Rpc.port`, `Http.Server.address`) do not depend on whether the region is live.
+- **G5 (leases).** `ScopedRef`, `Resource`, `ScopedCache` hand out their value only in `use`, with lease region `t`, and release the previous value when no lease holds it (`runtime/src/effect/lease.ts`); acquisition goes into a region of its own, of higher rank. `RcRef`, `RcMap`, `Pool` lend the value to the calling scope (`a^{t}`) and do not revoke it before that scope closes (Effect 4.0.5).
+- **G6 (lexical owner).** A step that needs `Scope ϱ` receives the owner of region `ϱ`, not the nearest `scope` at run time (`$rt.within`). A constant does not run its `Eff` argument under an owner other than the one named in that argument's row: an argument that a combinator runs names the combinator's region, of higher rank for sub-owners ([leases](#leases-instead-of-early-close)) and the owner's `Scope s` for children ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)).
 
-### 5.2 Леммы
+### 5.2 Lemmas
 
-`reach_μ(e)` — регионы `π`, которые встречаются в `e` (в `cap π n`, `own π` и внутри тел `λ` и `task`), вместе с `reach_μ(μ(ℓ))` для каждой локации `ℓ` из `e`, транзитивно. В семантике подстановкой это и есть достижимость.
+`reach_μ(e)` are the regions `π` that occur in `e` (in `cap π n`, `own π`, and inside the bodies of `λ` and `task`), together with `reach_μ(μ(ℓ))` for each location `ℓ` in `e`, transitively. In a substitution semantics this is exactly reachability.
 
-- **Л4 (достижимость ограничена типом).** Если `·;Ψ;Λ ⊢ v : τ ! P` и `⊢ μ : Ψ`, то `reach_μ(v) ⊆ ⌈τ⌉`. Индукция по выводу:
-  - (Cap), (Own) — по определению;
-  - (Lam), (Task), (Con) — посылка и лемма о подстановке: значения, подставленные вместо свободных переменных, ограничены своими типами;
-  - `ℓ` — `⊢ μ : Ψ` и инвариантность `Ψ(ℓ)`: запись в `ℓ` имеет тип ровно `Ψ(ℓ)` вместе с квалификаторами;
-  - (≤-Cap) — посылка `⌈τ^C⌉ ⊆ ⌈τ'^C'⌉`;
-  - (App-Pure) — T2(a).
+- **L4 (reachability is bounded by the type).** If `·;Ψ;Λ ⊢ v : τ ! P` and `⊢ μ : Ψ`, then `reach_μ(v) ⊆ ⌈τ⌉`. By induction on the derivation:
+  - (Cap), (Own): by definition;
+  - (Lam), (Task), (Con): the premise and the substitution lemma: the values substituted for free variables are bounded by their types;
+  - `ℓ`: `⊢ μ : Ψ` and invariance of `Ψ(ℓ)`: a write to `ℓ` has exactly type `Ψ(ℓ)`, qualifiers included;
+  - (≤-Cap): the premise `⌈τ^C⌉ ⊆ ⌈τ'^C'⌉`;
+  - (App-Pure): T2(a).
 
-  Чекер вычисляет посылку (Lam)/(Task) через `shown_by = ⌈·⌉`. До Р14 там стояла `visible_in ⊋ ⌈·⌉`, и лемма в чекере была неверна; до Р24 граница значения терялась в позиции неизвестного типа.
-- **Л5 (вложенность).** Если `π₂` создан внутри `inside π₁` (в теле или в ребёнке `π₁`), то `π₂` закрыт раньше `π₁`. Следует из §3.3: `inside π₁ w` закрывается, только когда тело — значение, а дети `π₁` закончены.
-- **Л6 (старые ячейки).** Если `ℓ` выделена до создания `π`, то `π ∉ fr(Ψ(ℓ))`: `Ψ(ℓ)` замкнут при выделении, а `π` свежий.
+  The checker computes the premise of (Lam)/(Task) through `shown_by = ⌈·⌉`. The lemma fails in a checker that subtracts more than ⌈·⌉ ([reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result)) or drops a value bound in a position of unknown type ([value bounds](#a-value-bound-survives-an-unknown-type-position)).
+- **L5 (nesting).** If `π₂` is created inside `inside π₁` (in the body or in a child of `π₁`), then `π₂` closes before `π₁`. Follows from §3.3: `inside π₁ w` closes only when the body is a value and the children of `π₁` have finished.
+- **L6 (old cells).** If `ℓ` was allocated before `π` was created, then `π ∉ fr(Ψ(ℓ))`: `Ψ(ℓ)` is closed at allocation, and `π` is fresh.
 
-  В Lean: Л4 — `Typ.holds` (без хранилища) и `lemma_4`, `lemma_4_cell` (`reach_μ` — `Reaches`); Л5 — `Nest.nested` и `Nest.live`; Л6 — `lemma_6`. Свежесть `π` держит переименование: каждый шаг переименовывает вывод через `kill |Λ|`, который заменяет регионы `≥ |Λ|` на `Unit`, а конфигурация пишет только существующие регионы (`CfgBelow`). Факты конфигурации — порядок создания (`Facts.age`): регион переживает все регионы, созданные после него.
+  In Lean: L4 is `Typ.holds` (without a store) and `lemma_4`, `lemma_4_cell` (`reach_μ` is `Reaches`); L5 is `Nest.nested` and `Nest.live`; L6 is `lemma_6`. Freshness of `π` is kept by renaming: each step renames the derivation through `kill |Λ|`, which replaces regions `≥ |Λ|` with `Unit`, and the configuration mentions only existing regions (`CfgBelow`). The facts of a configuration are the creation order (`Facts.age`): a region outlives all regions created after it.
 
-  `⊢ Λ` в Lean — `Nest`: у каждого региона есть предки `anc π` (регионы, в которых он создан, и он сам), у каждой ячейки — регионы `B ℓ`, которые она может держать. Место в потоке называет регионы своей базы (у главного потока — никаких, у ребёнка и финализатора `ϱ` — `anc ϱ`) и форм `inside` вокруг него; локация видит через ячейку ровно то, что её тип называет на этом месте (`Tm.Within`). Формы `inside` стоят только там, где терм вычисляется, поэтому шаг их не копирует и не теряет. Инвариант держит каждый шаг (`Nest.step`); отсюда живая работа достигает только живых регионов.
+  `⊢ Λ` in Lean is `Nest`: each region has ancestors `anc π` (the regions it was created in, and itself), and each cell has the regions `B ℓ` it may hold. A position in a thread names the regions of its base (none for the main thread, `anc ϱ` for a child or finalizer of `ϱ`) and of the `inside` forms around it; a location sees through a cell exactly what its type names at that position (`Tm.Within`). `inside` forms occur only where the term is being evaluated, so a step neither copies nor loses them. Every step preserves the invariant (`Nest.step`); hence live work reaches only live regions.
 
-### 5.3 Утверждение
+### 5.3 Statement
 
-**T4 (регионы).** Пусть `e₀` — программа (`core.md` §2.6) без `Scope` в `φ₀`, выполнены Г1–Г6, и `⟨∅, ∅, e₀⟩ →* ⟨Λ, μ, e⟩` при любом допустимом порядке шагов детей. Тогда:
+**T4 (regions).** Let `e₀` be a program (`core.md` §2.6) without `Scope` in `φ₀`, let G1–G6 hold, and let `⟨∅, ∅, e₀⟩ →* ⟨Λ, μ, e⟩` under any admissible order of child steps. Then:
 
-1. ни один шаг не применяет `op_H` к `cap π n` с `Λ(π) = closed`;
-2. сильнее, в момент шага закрытия `E[inside π w] → E[w]`:
-   - ни `E[w]`, ни ячейки, достижимые из него, не достигают `π`;
-   - финализаторы и дети других живых регионов не достигают `π`;
-   - если `w = raise v`, то `v` не достигает `π`;
-3. ни один файбер не исполняет операцию сервиса, выданного `provide` с регионом `ϱₚ`, после закрытия `ϱₚ`.
+1. no step applies `op_H` to `cap π n` with `Λ(π) = closed`;
+2. more strongly, at the moment of a close step `E[inside π w] → E[w]`:
+   - neither `E[w]` nor the cells reachable from it reach `π`;
+   - the finalizers and children of other live regions do not reach `π`;
+   - if `w = raise v`, then `v` does not reach `π`;
+3. no fiber performs an operation of a service given by a `provide` with region `ϱₚ` after `ϱₚ` closes.
 
-Набросок. Инвариант: каждое достижимое состояние типизируется, `⊢ μ : Ψ`, `⊢ Λ`, и всё, что может сделать шаг, достигает только живых регионов. Сохранение по шагам:
+Sketch. Invariant: every reachable state is well typed, `⊢ μ : Ψ`, `⊢ Λ`, and everything that can take a step reaches only live regions. Preservation by step:
 
-- **Закрытие `π`**, `w` — значение. `w : τ` с `π ∉ fr(τ)` по (Inside), и по Л4 `π ∉ reach(w)`. `E` построен до создания `π` и `π` не содержит. Ячейки старше `π` по Л6 и инвариантности не получают значений, достигающих `π`. Ячейка моложе `π` с `π ∈ fr(Ψ(ℓ))` недостижима: `ℓ` достижима только через значение, тип которого содержит `Ref Ψ(ℓ)`, а значит и `π`.
-- **Финализаторы и дети внешнего `π'`** (`π' ≥ π`, `π' ≠ π`). Их граница `C` удовлетворяет `Outlives C π'`, а `π ≥ π'` неверно; по Л4 они не достигают `π`. Регионы внутри `π` уже закрыты (Л5).
-- **`w = raise v`.** По (Err-Raise) `π ∉ ⌈тип v⌉`, по Л4 `π ∉ reach(v)`.
-- **Регистрация** (`open_H π`, `add_finalizer π`, `spawn (own π)`). Терм содержит `π`, по инварианту `π` жив.
-- **Внешние вызовы** — по Г4. Без неё константа может удержать аргумент мимо типа.
+- **Close of `π`**, `w` a value. `w : τ` with `π ∉ fr(τ)` by (Inside), and `π ∉ reach(w)` by L4. `E` was built before `π` was created and does not contain `π`. Cells older than `π` receive no values reaching `π`, by L6 and invariance. A cell younger than `π` with `π ∈ fr(Ψ(ℓ))` is unreachable: `ℓ` is reachable only through a value whose type contains `Ref Ψ(ℓ)`, and hence `π`.
+- **Finalizers and children of an outer `π'`** (`π' ≥ π`, `π' ≠ π`). Their bound `C` satisfies `Outlives C π'`, and `π ≥ π'` does not hold; by L4 they do not reach `π`. The regions inside `π` are already closed (L5).
+- **`w = raise v`.** By (Err-Raise) `π ∉ ⌈type of v⌉`, by L4 `π ∉ reach(v)`.
+- **Registration** (`open_H π`, `add_finalizer π`, `spawn (own π)`). The term contains `π`, so `π` is live by the invariant.
+- **Foreign calls**: by G4. Without it a constant could retain an argument past its type.
 
-Пункт 1 следует из пункта 2: после закрытия `π` ни одно вычисление, которое может сделать шаг, не содержит `cap π n`.
+Item 1 follows from item 2: after `π` closes, no computation that can take a step contains `cap π n`.
 
-Пункт 3. Окружение `θ` из `provide` получают тело `provide` и то, что оно запускает. Тело и дети владельцев внутри `ϱₚ` закончены до его закрытия (Л5). Удержанная работа владельца `ϱ` из тела получила `Provided S ϱ`, которое снято только при `ϱₚ ≥ ϱ` (§2.7): `ϱ` закрывается не позже `ϱₚ`, и его дети закончены до этого. Обязательство, перешедшее к исполнителю стадии, снимается там тем же правилом. Это посылка R6 `runtime.md`, которую до Р37 никто не проверял.
+Item 3. The environment `θ` of a `provide` is received by the body of the `provide` and by what it starts. The body and the children of owners inside `ϱₚ` finish before it closes (L5). Retained work of an owner `ϱ` from the body received `Provided S ϱ`, which is discharged only when `ϱₚ ≥ ϱ` (§2.7): `ϱ` closes no later than `ϱₚ`, and its children finish before that. An obligation that moved to the runner of a stage is discharged there by the same rule. This discharges the premise of R6 in `runtime.md` ([provide services must not outlive their layer](runtime.md#a-provide-service-outlives-the-release-of-its-layer)).
 
-**Следствие (progress для способностей).** Застревание §3.2 недостижимо, и T1 ядра остаётся верной с константами `op_H`.
+**Corollary (progress for capabilities).** The stuck state of §3.2 is unreachable, and T1 of the core stays valid with the constants `op_H`.
 
-В Lean пункты 1 и 2 — `T4`, пункт 3 — `T4_3`, следствие — `T1_regions`. Пункт 2 там сказан для каждого достижимого состояния: главный поток, дети и финализаторы живых регионов достигают только живых регионов; после шага закрытия `π` это и есть пункт 2. Пункт 3 сказан в форме Р142 (`runtime.md`): в каждом достижимом состоянии `ask_S`, на который отвечает кадр `with` региона `ϱₚ`, свой или унаследованный, стоит только при живом `ϱₚ`. Доказательство идёт по наброску: ребёнок и финализатор живого `ϱ` используют сервисы только тех `provide`, чьи регионы — предки `ϱ` (`KidNeeds`), потому что `Provided {S} ϱ` их регистрации снял кадр старшего региона (`withs_typing`); использование из `ask_S` доходит до верха потока или до формы `inside ϱₚ` (`need_out`), а предки живого региона и формы `inside` живы (`Nest`).
+In Lean, items 1 and 2 are `T4`, item 3 is `T4_3`, and the corollary is `T1_regions`. Item 2 is stated there for every reachable state: the main thread and the children and finalizers of live regions reach only live regions; after the close step of `π` this is item 2. Item 3 is stated in the form of [the answering provide must be live](runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives): in every reachable state, an `ask_S` answered by the `with` frame of region `ϱₚ`, its own or inherited, occurs only while `ϱₚ` is live. The proof follows the sketch: a child and a finalizer of a live `ϱ` use the services only of those `provide`s whose regions are ancestors of `ϱ` (`KidNeeds`), because the `Provided {S} ϱ` of their registration was discharged by the frame of an older region (`withs_typing`); the use from `ask_S` reaches the top of the thread or an `inside ϱₚ` form (`need_out`), and the ancestors of a live region and the `inside` forms are live (`Nest`).
 
-`Fiber e a` не является способностью региона владельца: дескриптор ребёнка может пережить владельца, и `join` тогда получит прерывание. T4 этого не запрещает, spec/07 тоже.
+`Fiber e a` is not a capability of the owner's region: a child's handle may outlive the owner, and `join` then gets an interruption. T4 does not forbid this, and neither does spec/05.
 
-## 6. Расхождения
+## 6. Known divergences
 
-Р14 нарушает T4 в правилах чекера. Р16–Р18 нарушают гипотезу Г4 во встроенных привязках, через неё и T4. Р19 нарушает Г6 и «no early close» spec/07. Каждое из них подтверждено пробой: программа принята чекером на `a01ce3ec` и при запуске на Node печатает `USE AFTER CLOSE`, либо принята там, где аналогичная форма отвергается (`FLICK-G003`). Остальные — неполнота чекера или неточность прозы.
+Some divergences broke T4. [The reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result) broke it in the checker's rules. [Owner retention](#owner-retention-requires-outlives), [background work](#background-work-has-owner-retention) and [acquired values](#acquired-values-carry-their-region) broke hypothesis G4 in the built-in bindings, and through it T4. [Leases](#leases-instead-of-early-close) broke G6 and the "no early close" promise of spec/05. Each of these is confirmed by a probe: a program the checker accepted that prints `USE AFTER CLOSE` when run on Node, or a program accepted where the analogous form is rejected (`FLICK-G003`). The others are checker incompleteness or imprecise prose. All are resolved in the checker, the bindings, the runtime, the spec or this document, as each item states; every checker fix has a fixture.
 
-Статус: внесены все. Р14–Р19, Р22–Р25, Р31–Р33, Р64, Р65 и В3 — чекер, привязки и рантайм; Р20, Р21, Р60, Р61, Р140, Р141 — спека и этот документ; Р62 — этот документ и модель. У каждого исправления чекера есть фикстура.
-
-Общие определения проб:
+Common definitions for the probes:
 
 ```flick
 type Handle (s : Region)
@@ -549,9 +549,11 @@ report : Failure e ->{; none} Unit
 let report _ = ()
 ```
 
-`open` приобретает в регион `s` и регистрирует освобождение у его владельца; `make_conn` создаёт объект без региона, который освобождает `close_conn`.
+`open` acquires into region `s` and registers the release with its owner; `make_conn` creates a region-free object that `close_conn` releases.
 
-**Р14. `Eff` непрозрачен для ⌈·⌉, а его результат виден `visible_in`.**
+### The reach bound of Eff includes its result
+
+Divergence: `Eff` was opaque to ⌈·⌉, while its result was visible to `visible_in`.
 
 ```flick
 forget_result : forall s. Eff none none (Handle s) -> Eff none none Unit
@@ -567,21 +569,23 @@ let main () =
   await later
 ```
 
-- Что происходит: программа принята, Node печатает `USE AFTER CLOSE inner`. Сигнатура верхнего уровня проверена как написана.
-  - Аргумент-задача держит `h`, но против голого `Eff none none (Handle s)` её квалификатор пуст: `visible_in` видит `s` в результате.
-  - Тело `forget_result` захватывает `t`, а `captures_of` у `Eff` пуст: задача-результат голая.
-  - Та же дыра без сигнатуры: `let t : Eff none none (Handle inner) = task { use h; h }`, затем `Fiber.spawn outer report t` (у `c` пусто, `Outlives` проходит) или `Ref.set cell (task { ignore (await t) })` во внешнюю ячейку. Обе печатают `USE AFTER CLOSE`.
-  - Та же форма с функцией вместо задачи, `(Unit ->{} Handle s) -> Eff none none Unit`, отвергается: `FLICK-G001` «this task uses `f`, which holds `s`».
-- Причина: `regions/mod.rs` `collect_bounded_captures` не заходит в `Eff` (список `opaque`), а `regions/solve.rs` `hidden` вычитает `visible_in`, которая заходит. Нарушена Л4.
-- Решение — чекер. `⌈Eff r e τ⌉ = ⌈τ⌉`: `collect_bounded_captures` собирает аргумент-результат `Eff`, но не его строки (§2.1). `Layer`, `ServiceTag`, `ServiceImpl`, `Errors` остаются непрозрачными: их регионы бывают только в строках, а строки возвращаются в тип при использовании. Внесено; фикстура — `tests/check/fail/regions/eff_result.fl` (три формы выше и задача с `Scope inner` в строке).
+- Symptom: the program was accepted, and Node printed `USE AFTER CLOSE inner`. The top-level signature is checked as written.
+  - The argument task holds `h`, but against the bare `Eff none none (Handle s)` its qualifier was empty: `visible_in` sees `s` in the result.
+  - The body of `forget_result` captures `t`, but `captures_of` of `Eff` was empty: the result task was bare.
+  - The same hole without a signature: `let t : Eff none none (Handle inner) = task { use h; h }`, then `Fiber.spawn outer report t` (`c` is empty, so `Outlives` passes) or `Ref.set cell (task { ignore (await t) })` into an outer cell. Both printed `USE AFTER CLOSE`.
+  - The same shape with a function instead of a task, `(Unit ->{} Handle s) -> Eff none none Unit`, was rejected: `FLICK-G001` "this task uses `f`, which holds `s`".
+- Cause: `regions/mod.rs` `collect_bounded_captures` did not enter `Eff` (the `opaque` list), while `regions/solve.rs` `hidden` subtracted `visible_in`, which does. L4 was violated.
+- Resolution, checker: `⌈Eff r e τ⌉ = ⌈τ⌉`; `collect_bounded_captures` collects the result argument of `Eff` but not its rows (§2.1). `Layer`, `ServiceTag`, `ServiceImpl`, `Errors` stay opaque: their regions occur only in rows, and rows return to the type on use. Fixture: `tests/check/fail/regions/eff_result.fl` (the three shapes above and a task with `Scope inner` in its row).
 
-**Р15. Переменная строки сервисов считается захватом.**
+### Service row variables are not captures
 
-- Что происходит: обёртка `rpc_listen o g hs = Rpc.listen o g hs` с сигнатурой, повторяющей `Rpc.listen`, — `FLICK-G001` «this function uses `g`, which holds `r`». Здесь `g : Group r hs`, а `r` — строка сервисов.
-- Причина: `collect_bounded_captures` пропускает аргументы вида `ErrorRow`, но не `ServiceRow`; переменная-хвост попадает в ⌈·⌉ как атом.
-- Неполнота, не дыра. Решение — чекер: пропускать и `ServiceRow`, как в §2.1. Внесено; фикстура — `listen_on` в `tests/check/pass/regions/leases.fl`.
+- Symptom: the wrapper `rpc_listen o g hs = Rpc.listen o g hs` with a signature repeating that of `Rpc.listen` was `FLICK-G001` "this function uses `g`, which holds `r`". Here `g : Group r hs`, and `r` is a service row.
+- Cause: `collect_bounded_captures` skipped arguments of kind `ErrorRow` but not `ServiceRow`; the tail variable entered ⌈·⌉ as an atom.
+- Incompleteness, not a hole. Resolution, checker: `ServiceRow` arguments are skipped too, as in §2.1. Fixture: `listen_on` in `tests/check/pass/regions/leases.fl`.
 
-**Р16. `retention owner` без `Outlives c s`.**
+### Owner retention requires Outlives
+
+Divergence: `retention owner` without `Outlives c s`.
 
 ```flick
 defer_to : forall s c. Fiber.Owner s -> (Eff none none Unit)^c ->{Scope s;} Unit
@@ -597,22 +601,24 @@ let main () =
   }
 ```
 
-- Что происходит: принято. Node: `close inner`, затем при закрытии `outer` — `USE AFTER CLOSE inner`. Так же `Resource.acquire_release` с `release`, держащим `h` (`USE AFTER CLOSE inner`).
-- Обёртки с данными `s`, `c` без `Outlives` над `Fiber.spawn` и `Stream.to_pubsub` — `FLICK-G003`. Над этими константами они приняты:
+- Symptom: accepted. Node printed `close inner`, then, when `outer` closed, `USE AFTER CLOSE inner`. The same with `Resource.acquire_release` whose `release` holds `h` (`USE AFTER CLOSE inner`).
+- Wrappers with given `s`, `c` and no `Outlives` over `Fiber.spawn` and `Stream.to_pubsub` are `FLICK-G003`. Over these constants they were accepted:
   - `Scope.add_finalizer`, `Scope.add_finalizer_exit` (`builtins/Scope.fl`);
   - `Effect.add_finalizer` (`builtins/Effect/Errors.fl`);
   - `Resource.acquire_release`: `release` (`builtins/Resource.fl`);
-  - `Events.listen`: обработчик и супервизор (`builtins/Events.fl`).
-- По сигнатуре так же `Rpc.listen`, `listen_websocket`, `listen_tcp`, `handler`, `handler_websocket` (`builtins/Rpc.fl`): обработчики `hs^c` живут до закрытия `s`.
-- Решение — привязки: `Fiber.Outlives c s =>` у каждой, и у `HttpApi.listen`, которую нашла проверка ниже. Чтобы не повторилось — чекер: у `foreign` с `retention owner` строка захватов параметра, которую не показывает то, что идёт после последнего такого параметра, требует `Outlives` (`FLICK-F002`). Внесено; фикстуры — `tests/check/fail/regions/retention.fl`, `tests/check/fail/ffi/owner_retention.fl`.
+  - `Events.listen`: the handler and the supervisor (`builtins/Events.fl`).
+- By signature the same held for `Rpc.listen`, `listen_websocket`, `listen_tcp`, `handler`, `handler_websocket` (`builtins/Rpc.fl`): the handlers `hs^c` live until `s` closes.
+- Resolution, bindings: `Fiber.Outlives c s =>` on each of them, and on `HttpApi.listen`, which the check below found. To keep it from recurring, checker: for a `foreign` with `retention owner`, a parameter's capture row not shown by what follows the last such parameter requires `Outlives` (`FLICK-F002`). Fixtures: `tests/check/fail/regions/retention.fl`, `tests/check/fail/ffi/owner_retention.fl`.
 
-**Р17. Фоновая работа помечена `retention call`.**
+### Background work has owner retention
 
-- Что происходит: `Channel.to_queue`, `to_queue_array`, `to_pubsub`, `to_pubsub_array` (`builtins/Channel/Run.fl`) запускают канал «in the background of the innermost `scope`» до его закрытия, но объявлены `retention call` без `Outlives`.
-- Обёртка над `Channel.to_queue` с данными `s`, `c` принята. Такая же над `Stream.to_pubsub`, у которого `retention owner` и `Outlives c s`, — `FLICK-G003`. Канал `Channel.from_subscription sub` внутреннего региона так уходит во владельца внешнего.
-- Решение — привязки: `retention owner` и `Fiber.Outlives c s =>`, как у `Stream`. Внесено; фикстура — `channel_queue` в `retention.fl`.
+- Symptom: `Channel.to_queue`, `to_queue_array`, `to_pubsub`, `to_pubsub_array` (`builtins/Channel/Run.fl`) run the channel "in the background of the innermost `scope`" until it closes, but were declared `retention call` without `Outlives`.
+- A wrapper over `Channel.to_queue` with given `s`, `c` was accepted. The same wrapper over `Stream.to_pubsub`, which has `retention owner` and `Outlives c s`, is `FLICK-G003`. A channel `Channel.from_subscription sub` of an inner region escaped this way into the owner of an outer one.
+- Resolution, bindings: `retention owner` and `Fiber.Outlives c s =>`, as for `Stream`. Fixture: `channel_queue` in `retention.fl`.
 
-**Р18. Приобретённое значение без региона в типе.**
+### Acquired values carry their region
+
+Divergence: an acquired value had no region in its type.
 
 ```flick
 leak : Unit ->{} Unit
@@ -624,12 +630,14 @@ let leak () =
   use_conn conn
 ```
 
-- Что происходит: принято, Node: `close db`, затем `USE AFTER CLOSE db`. `acquire_release : … ->{Scope s | r; e} a` возвращает `a`, где `s` не встречается. Так же `ScopedRef.get r` после `scope` (`USE AFTER CLOSE ref`).
-- По сигнатуре так же: `Resource.get`, `RcRef.get`, `RcMap.get`, `RcMap.get_option`, `Pool.get`, `ScopedCache.get`, `get_option`, `get_success`. `LayerMap.get : k -> LayerMap s k e ro -> Layer none e ro` теряет `s` у слоя, услуги которого построены в `s`.
-- Через это проходит и `Layer.build`: `Context ro` без региона, а реализация может захватить значение из `acquire_release`, у которого захватов нет.
-- Решение — привязки: результат `a^{s}`; у аренды с `Scope t` (`RcRef`, `RcMap`, `Pool`) — `a^{t}`; `LayerMap.get` — `(Layer none e ro)^{s}`. Скалярное `a` после этого по-прежнему уходит, но скаляр — копия, а не способность (Г4). Функция, которой передают такое значение, принимает его с квалификатором: `close_conn : forall c. Raw^c ->{} Unit`. Внесено; фикстура — `tests/check/fail/regions/acquired.fl`. Без Р24 значение уходило через обобщённую функцию.
+- Symptom: accepted; Node printed `close db`, then `USE AFTER CLOSE db`. `acquire_release : … ->{Scope s | r; e} a` returned `a`, in which `s` does not occur. The same for `ScopedRef.get r` after `scope` (`USE AFTER CLOSE ref`).
+- By signature the same held for `Resource.get`, `RcRef.get`, `RcMap.get`, `RcMap.get_option`, `Pool.get`, `ScopedCache.get`, `get_option`, `get_success`. `LayerMap.get : k -> LayerMap s k e ro -> Layer none e ro` lost `s` on a layer whose services are built in `s`.
+- `Layer.build` let it through as well: `Context ro` has no region, and the implementation can capture a value from `acquire_release`, which has no captures.
+- Resolution, bindings: the result is `a^{s}`; for a lease with `Scope t` (`RcRef`, `RcMap`, `Pool`) it is `a^{t}`; `LayerMap.get` returns `(Layer none e ro)^{s}`. A scalar `a` still escapes, but a scalar is a copy, not a capability (G4). A function that receives such a value accepts it with a qualifier: `close_conn : forall c. Raw^c ->{} Unit`. Fixture: `tests/check/fail/regions/acquired.fl`. The remaining path through a generic function is closed by [value bounds in unknown positions](#a-value-bound-survives-an-unknown-type-position).
 
-**Р19. Подвладельцы освобождают ресурс внутри живого региона.**
+### Leases instead of early close
+
+Divergence: sub-owners released a resource inside a live region.
 
 ```flick
 early : Unit ->{} Unit
@@ -642,27 +650,27 @@ let early () =
   }
 ```
 
-- Что происходит: принято. Node: `close first` при `set`, затем `USE AFTER CLOSE first`, хотя регион `scope` открыт и тип `h1` — `Handle s`. Так же `Resource.refresh` (`USE AFTER CLOSE res`).
-- По сигнатуре так же `RcRef.invalidate`, `RcMap.invalidate`, `Pool.invalidate`, вытеснение `ScopedCache` и `idleTimeToLive`.
-- Причина двойная:
-  - spec/07 обещает «the safe scoped API has **no early close**», а эти модули — ранние закрытия;
-  - задача, которую комбинатор исполняет сам, приобретает в его собственный `Scope` Effect, а не в регион, названный её типом: `open` внутри `from_acquire` получил владельца `ScopedRef`. Нарушена Г6: лексическая передача владельца (`$rt.within`) срабатывает только там, где требование `Scope` исполняет код Flick.
-- `RcRef.invalidate`, `RcMap.invalidate`, `Pool.invalidate` в Effect 4.0.5 не отзывают уже одолженное значение, так что им хватает `a^{t}` из Р18. Ранние закрытия — `ScopedRef.set`, `Resource.refresh` и вытеснение `ScopedCache`.
-- Решение — API, аренда (принято 2026-10-30):
-  - `use : ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; e} b`, так же `Resource.use`, `ScopedCache.use`, `use_option`, `use_success`; `get`, `get_option`, `get_success`, `ScopedCache.values` и `entries` убраны, `ScopedCache.refresh` даёт `Unit`;
-  - приобретение — высшего ранга по региону: `from_acquire : (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a`, так же `set`, `Resource.manual`, `Effect.resource_auto`, `lookup` у `ScopedCache`; задача против такого типа приобретает в `t` (`lexical_owner`, `declared_scope`);
-  - рантайм: `runtime/src/effect/lease.ts` держит счётчик аренд, и замена, обновление или вытеснение освобождают прежнее значение после конца последней аренды; `ScopedRef` и `Resource` теперь свои, а не Effect;
-  - имя функции верхнего уровня, переданное за тип высшего ранга, ничего не держит (`infer.rs` `names_top_level`): `Resource.use res ping` проходит так же, как `fun c -> ping c`.
+- Symptom: accepted. Node printed `close first` at `set`, then `USE AFTER CLOSE first`, although the region of the `scope` is open and the type of `h1` is `Handle s`. The same for `Resource.refresh` (`USE AFTER CLOSE res`).
+- By signature the same held for `RcRef.invalidate`, `RcMap.invalidate`, `Pool.invalidate`, and `ScopedCache` eviction and `idleTimeToLive`.
+- Two causes:
+  - spec/05 promises "the safe scoped API has **no early close**", and these modules were early closes;
+  - a task that a combinator runs itself acquired into the combinator's own Effect `Scope`, not into the region its type names: `open` inside `from_acquire` received the owner of the `ScopedRef`. G6 was violated: lexical owner passing (`$rt.within`) works only where Flick code performs the `Scope` requirement.
+- In Effect 4.0.5 `RcRef.invalidate`, `RcMap.invalidate`, `Pool.invalidate` do not revoke a value already lent, so `a^{t}` from [acquired values](#acquired-values-carry-their-region) suffices for them. The early closes are `ScopedRef.set`, `Resource.refresh` and `ScopedCache` eviction.
+- Resolution, API with leases:
+  - `use : ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; e} b`, likewise `Resource.use`, `ScopedCache.use`, `use_option`, `use_success`; `get`, `get_option`, `get_success`, `ScopedCache.values` and `entries` are removed, and `ScopedCache.refresh` returns `Unit`;
+  - acquisition is of higher rank in the region: `from_acquire : (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a`, likewise `set`, `Resource.manual`, `Effect.resource_auto`, and `lookup` of `ScopedCache`; a task against such a type acquires into `t` (`lexical_owner`, `declared_scope`);
+  - runtime: `runtime/src/effect/lease.ts` keeps a lease count, and replacement, refresh or eviction release the previous value after the last lease ends; `ScopedRef` and `Resource` are Flick's own, not Effect's;
+  - the name of a top-level function passed at a higher-rank type holds nothing (`infer.rs` `names_top_level`): `Resource.use res ping` passes just like `fun c -> ping c`.
 
-  Значение типа, который называет свой регион (`File t`), так хранить нельзя: `t` вышел бы за `forall`. Фикстуры — `tests/check/fail/regions/leases.fl`, `tests/check/pass/regions/leases.fl`, e2e `tests/run/runtime/leases.fl`.
+  A value of a type that names its region (`File t`) cannot be stored this way: `t` would escape the `forall`. Fixtures: `tests/check/fail/regions/leases.fl`, `tests/check/pass/regions/leases.fl`, e2e `tests/run/runtime/leases.fl`.
 
-**Р20. Захваты реализации сервиса.**
+### Service implementations hold no captures
 
-- Спека (spec/07 «Services and type classes»): «The hidden captures of an implementation record are kept in its type and in the Layer».
-- Чекер: поля реализации — голые позиции. `Layer.effect Probe (task { let h = open "layer"; { poke = fun () -> use h } })` — `FLICK-G001` «the expected type `Unit ->{} Unit` holds no captures». У `Layer` и `S.Impl` квалификаторов нет.
-- Неполнота относительно прозы, не дыра. Решение — спека: в первой версии реализация сервиса захватов не держит; слой, которому нужен ресурс, приобретает его при построении. Внесено в spec/07, английскую и русскую версии.
+- Spec (spec/05 "Services and type classes"): "The hidden captures of an implementation record are kept in its type and in the Layer".
+- Checker: the fields of an implementation are bare positions. `Layer.effect Probe (task { let h = open "layer"; { poke = fun () -> use h } })` is `FLICK-G001` "the expected type `Unit ->{} Unit` holds no captures". `Layer` and `S.Impl` have no qualifiers.
+- Incompleteness relative to the prose, not a hole. Resolution, spec: a service implementation holds no captures; a layer that needs a resource acquires it while being built. spec/05 states this.
 
-**Р21. Квалификаторы следующих стадий у локальной сигнатуры.**
+### Local signatures infer only the outer qualifier
 
 ```flick
 local : Unit ->{} Unit
@@ -675,13 +683,13 @@ let local () =
   }
 ```
 
-- Что происходит: `FLICK-G001` «the expected type `(Unit ->{} Unit)^{a}` allows only `a`», хотя замыкание не покидает `scope`.
-- reference/regions обещает: «a local signature need not name the regions its function holds». Внешний квалификатор действительно выводится, а квалификаторы стадий от `implicit_captures` остаются записанными границами.
-- Неполнота. Решение — спека: в reference/regions уточнить, что выводится только квалификатор самой функции. Обойти можно так: назвать регион, `scope s { … }` и `(Unit ->{} Unit)^{a, s}`. Внесено в reference/regions, английскую и русскую версии.
+- Symptom: `FLICK-G001` "the expected type `(Unit ->{} Unit)^{a}` allows only `a`", although the closure does not leave the `scope`.
+- reference/regions promised: "a local signature need not name the regions its function holds". The outer qualifier is indeed inferred, but the stage qualifiers from `implicit_captures` remain written bounds.
+- Incompleteness. Resolution, spec: reference/regions states that only the qualifier of the function itself is inferred. Workaround: name the region, `scope s { … }`, and write `(Unit ->{} Unit)^{a, s}`.
 
-Найдено при исправлении:
+### Children acquire in the region of their owner
 
-**Р22. Ребёнок приобретает в регион владельца, а его тип называет другой.**
+Divergence: a child acquired into its owner's region while its type named another.
 
 ```flick
 elsewhere : Unit ->{} Unit
@@ -698,17 +706,19 @@ let elsewhere () =
   }
 ```
 
-- Что происходит: принято, Node: `close child` при закрытии `inner2`, затем `USE AFTER CLOSE child`. Задача приобретает в `inner` по типу, а рантайм исполняет ребёнка у владельца `inner2` (`inside(owner, …)`), и ячейка `inner` держит освобождённый дескриптор. Так же у `FiberSet.run`, `FiberHandle.run`, `FiberMap.run` (`inOwner`) и `Events.listen`.
-- Нарушена Г6.
-- Решение — привязки и рантайм: строки задачи и супервизора — `{Scope s | r}` владельца, строка вызова — `r`; рантайм исполняет у владельца и супервизора, и обработчик событий. Задача, которую пишут прямо в вызове, приобретает в `s` (`declared_scope`); задача с другим регионом — `FLICK-T008`. Внесено; фикстуры — `tests/check/fail/regions/children.fl`, `eff_result.fl` `in_row`.
+- Symptom: accepted; Node printed `close child` when `inner2` closed, then `USE AFTER CLOSE child`. By its type the task acquires into `inner`, but the runtime runs the child under the owner `inner2` (`inside(owner, …)`), and the cell of `inner` holds a released handle. The same for `FiberSet.run`, `FiberHandle.run`, `FiberMap.run` (`inOwner`) and `Events.listen`.
+- G6 was violated.
+- Resolution, bindings and runtime: the rows of the task and of the supervisor are the owner's `{Scope s | r}`, and the row of the call is `r`; the runtime runs the task, the supervisor and the event handler under the owner. A task written directly in the call acquires into `s` (`declared_scope`); a task with another region is `FLICK-T008`. Fixtures: `tests/check/fail/regions/children.fl`, `eff_result.fl` `in_row`.
 
-**Р23. Ячейка, созданная пустой в области, не принимает ресурс этой области.**
+### A cell created empty accepts a resource of its scope
 
-- Что происходит: `scope inner { let cell = Ref.make None; Ref.set cell (Some (open "x")); … }` — `FLICK-G002` «this value holds region `inner`, so it cannot leave the `scope`», хотя ячейка не покидает `inner`. С `Ref.make (Some (open "first"))` то же принято.
-- Неполнота. Причина: `Some x` несёт скрытый квалификатор значения `^{c}`, ещё не выведенный, а ячейка из `None` хранит голый `Option α` под своей границей. (Inst) с границей значения снимала скрытый квалификатор, только если граница его уже допускала; иначе тип переменной сравнивался с ним, и невыведенная `c` закрывалась пустой, после чего захват `open` не помещался в `c`. С `Ref.make (Some …)` тип элемента сам несёт `^{c}`, и сравнение проходило.
-- Решение — чекер, внесено: `regions/data.rs` `subsume_bound_at` снимает и квалификатор значения, который ещё не выведен, когда не выведена и граница: hold той же подстановки растит границу его захватами (§2.6), так что (≤-Cap) проверяется, как прежде. Фикстуры: `tests/check/pass/regions/scopes.fl` `empty_cell`; `tests/check/fail/regions/escape.fl` `empty_cell_out` — такая ячейка по-прежнему не покидает `scope`.
+- Symptom: `scope inner { let cell = Ref.make None; Ref.set cell (Some (open "x")); … }` was `FLICK-G002` "this value holds region `inner`, so it cannot leave the `scope`", although the cell does not leave `inner`. With `Ref.make (Some (open "first"))` the same program was accepted.
+- Incompleteness. Cause: `Some x` carries a hidden value qualifier `^{c}` not yet inferred, while a cell made from `None` stores a bare `Option α` under its bound. (Inst) with a value bound removed the hidden qualifier only if the bound already admitted it; otherwise the variable's type was compared with it, the uninferred `c` was closed to empty, and the capture of `open` then did not fit in `c`. With `Ref.make (Some …)` the element type itself carries `^{c}`, and the comparison passed.
+- Resolution, checker: `regions/data.rs` `subsume_bound_at` also removes a value qualifier that is not yet inferred when the bound is not inferred either: the hold of the same substitution grows the bound by its captures (§2.6), so (≤-Cap) is checked as before. Fixtures: `tests/check/pass/regions/scopes.fl` `empty_cell`; `tests/check/fail/regions/escape.fl` `empty_cell_out`: such a cell still cannot leave the `scope`.
 
-**Р24. Граница значения терялась в позиции неизвестного типа.**
+### A value bound survives an unknown type position
+
+Divergence: a value bound was lost in a position of unknown type.
 
 ```flick
 pass : forall a. a -> a
@@ -724,19 +734,23 @@ let through () =
   use_conn leaked
 ```
 
-- Что происходит: с Р18 `c : Raw^{s}`, но `pass c` давал `Raw` без границы, и значение уходило из `scope` (Node: `USE AFTER CLOSE db`). Так же `ScopedRef.use r (fun c -> c)` возвращал значение аренды.
-- Причина: `regions/data.rs` `subsume_bound_at` снимал границу значения, когда ожидаемый тип был ещё переменной.
-- Решение — чекер: такая позиция получает значение вместе с границей, если граница называет регион, а тип может что-то хранить; граница на значении, которое ничего не может держать, отбрасывается всегда (`holds_nothing`); квалификатор значения, который граница уже допускает, переменная границы не получает; квалификатор замыкания остаётся частью типа. Внесено; фикстуры — `acquired.fl` `generic`, `leases.fl` `returned`.
+- Symptom: since [acquired values carry their region](#acquired-values-carry-their-region), `c : Raw^{s}`, but `pass c` gave `Raw` without a bound, and the value escaped the `scope` (Node: `USE AFTER CLOSE db`). Likewise `ScopedRef.use r (fun c -> c)` returned the lease value.
+- Cause: `regions/data.rs` `subsume_bound_at` dropped the value bound when the expected type was still a variable.
+- Resolution, checker: such a position receives the value together with its bound if the bound names a region and the type can store something; a bound on a value that can hold nothing is always dropped (`holds_nothing`); a value qualifier the bound already admits is not given to the bound variable; a closure qualifier stays part of the type. Fixtures: `acquired.fl` `generic`, `leases.fl` `returned`.
 
-**Р25. `FiberSet.run` получает задачу раньше набора.**
+### Scope region of a task argument is resolved after the call
 
-- Что происходит: `FiberSet.run options (task { … open … }) set` во вложенной области — `FLICK-T003`: задача проверяется раньше `set`, её регион ещё не известен, и приобретение уходит в ближайшую область.
-- Неполнота. Причина: `calls.rs` `apply` проверяет аргументы слева направо, а `regions/scopes.rs` `lexical_owner` давал невыведенному региону `Scope` задачи ближайший `scope` сразу.
-- Решение — чекер, внесено: пока проверяется аргумент типа `Eff`, такой регион ждёт конца вызова. Если ни один следующий аргумент его не назвал, он получает ближайший `scope`, как прежде. Фикстура: `tests/check/pass/regions/set_after_task.fl` (`FiberSet.run`, `FiberHandle.run`, `FiberMap.run`).
+Divergence: `FiberSet.run` received the task before the set.
 
-Р31–Р33 нашёл генератор X2: программы без регионов, которые принимает модель ядра.
+- Symptom: `FiberSet.run options (task { … open … }) set` in a nested scope was `FLICK-T003`: the task is checked before `set`, its region is not yet known, and the acquisition went to the nearest scope.
+- Incompleteness. Cause: `calls.rs` `apply` checks arguments left to right, and `regions/scopes.rs` `lexical_owner` gave an uninferred `Scope` region of the task the nearest `scope` immediately.
+- Resolution, checker: while an argument of type `Eff` is being checked, such a region waits for the end of the call. If no later argument names it, it gets the nearest `scope`, as before. Fixture: `tests/check/pass/regions/set_after_task.fl` (`FiberSet.run`, `FiberHandle.run`, `FiberMap.run`).
 
-**Р31. Квалификатор `Bounded` сравнивался раньше, чем выведен тип.**
+The next three were found by the model's program generator (`just model`): programs without regions that the core model accepts.
+
+### Bounded qualifiers are compared after the type is inferred
+
+Divergence: a `Bounded` qualifier was compared before its type was inferred.
 
 ```flick
 empty : Bool ->{} { b : Option Int }
@@ -744,17 +758,19 @@ let empty c =
   await (if c then task { { b = None } } else task { { b = None } })
 ```
 
-- Что происходит: `FLICK-T003` «expected `{ b : Option Int }`, found `{ b : Option Int }`». Так же отвергались запись с функцией `{ a = fun x -> x }` в двух ветвях и `match` по `Some s` с литеральным паттерном, когда `s` из `None`.
-- Причина: `unify.rs` при `Bounded` с другим типом сравнивал границу с захватами значения сразу, без отсрочки, которую `unify_captured` делает внутри подтипов (`compare.rs` `unknown_captures`). Граница `{}` против `^a` ещё не выведенного `a` — несовпадение метки, хотя `a` затем становится `Int` и ничего не держит.
-- Решение — чекер, внесено: обе ветви сравнивают квалификаторы через общий `unify_qualifiers`, который откладывает сравнение захватов невыведенного типа. Тип, который объявление так и не вывело (`None` с неиспользованным содержимым), к концу объявления ничего не держит: значения такого типа не создавались, и `compare_deferred` его захваты отбрасывает. Фикстуры: `tests/check/pass/regions/late_captures.fl` `literal`, `pick`, `empty`, `unknown`.
+- Symptom: `FLICK-T003` "expected `{ b : Option Int }`, found `{ b : Option Int }`". Also rejected: a record with a function `{ a = fun x -> x }` in two branches, and a `match` on `Some s` with a literal pattern when `s` comes from `None`.
+- Cause: on `Bounded` against another type, `unify.rs` compared the bound with the value's captures immediately, without the deferral `unify_captured` performs inside subtyping (`compare.rs` `unknown_captures`). The bound `{}` against `^a` of a not yet inferred `a` was a label mismatch, although `a` later becomes `Int` and holds nothing.
+- Resolution, checker: both branches compare qualifiers through the shared `unify_qualifiers`, which defers comparing the captures of an uninferred type. A type the declaration never infers (`None` with unused contents) holds nothing at the end of the declaration: no values of that type were created, and `compare_deferred` drops its captures. Fixtures: `tests/check/pass/regions/late_captures.fl` `literal`, `pick`, `empty`, `unknown`.
 
-**Р32. Рекурсивная локальная функция под полным `forall` удерживала свои переменные.**
+### Forall-bound variables are not captures
 
-- Что происходит: `go : forall a. Nested a -> Float -> Float` с `let rec go` внутри функции отвергался: `go` использует себя при своей схеме, и переменные `forall` считались захватами значения.
-- Причина: `regions/mod.rs` `collect_bounded_captures` собирал захваты тела `Forall` вместе с переменными, которые тот связывает.
-- Решение — чекер, внесено: связанные `forall` переменные не захваты, каждое использование их инстанцирует. Фикстура: `tests/check/pass/types/recursion.fl` `nested_depth`.
+- Symptom: `go : forall a. Nested a -> Float -> Float` with `let rec go` inside a function was rejected: `go` uses itself at its scheme, and the `forall` variables counted as captures of the value.
+- Cause: `regions/mod.rs` `collect_bounded_captures` collected the captures of a `Forall` body together with the variables it binds.
+- Resolution, checker: variables bound by `forall` are not captures; each use instantiates them. Fixture: `tests/check/pass/types/recursion.fl` `nested_depth`.
 
-**Р33. Граница скаляра сравнивалась с пустой.**
+### A scalar bound is not compared
+
+Divergence: the bound of a scalar was compared with the empty one.
 
 ```flick
 dropped : Unit ->{; Oops} Unit
@@ -763,28 +779,36 @@ let dropped () =
   ()
 ```
 
-- Что происходит: `FLICK-T011` «has type `Unit^{_}` and would be discarded»; с `match … with | () -> 0` — `FLICK-T003` «expected `Unit^{_}`, found `Unit`». Проекция берёт границу записи, а в ней захваты невыведенного типа поля `b`.
-- Решение — чекер, внесено: `unify.rs` при `Bounded` со скаляром (`regions/data.rs` `scalar`) границу не сравнивает: скаляр ничего не держит, как уже считает `value_bound`. Фикстуры: `tests/check/pass/regions/late_captures.fl` `dropped`, `matched`.
+- Symptom: `FLICK-T011` "has type `Unit^{_}` and would be discarded"; with `match … with | () -> 0`, `FLICK-T003` "expected `Unit^{_}`, found `Unit`". The projection takes the bound of the record, which contains the captures of the uninferred type of field `b`.
+- Resolution, checker: on `Bounded` with a scalar (`regions/data.rs` `scalar`), `unify.rs` does not compare the bound: a scalar holds nothing, as `value_bound` already assumes. Fixtures: `tests/check/pass/regions/late_captures.fl` `dropped`, `matched`.
 
-Р60–Р62 нашла модель X3 (`flick-model/src/check/regions/`, правила §2 по этому документу) на программах генератора с регионами (`flick-model/src/generate/regions.rs`: пути §4, кроме четвёртого) и на корпусе `tests/run/model.txt`. Расхождений с чекером на сгенерированных программах нет: оба принимают их и отвергают каждую утечку.
+The next three were found by the checker's differential tests against the reference model (`flick-model/src/check/regions/`, the rules of §2 as written here), on generated programs with regions (`flick-model/src/generate/regions.rs`: the paths of §4 except the fourth) and on the corpus `tests/run/model.txt`. On generated programs the model and the checker agree: both accept them and reject every leak.
 
-**Р60. `⌈Errors ρ⌉ = ∅` противоречит `Errors {E} ≡ E`.**
+### Errors reaches its payloads
 
-- Что происходит: `raise : ∀e a. Errors e →R⟨none; e⟩ a`, и аргумент `Leaked h` с `h : Handle s` сравнивается с `Errors {Leaked (Handle s)}` по (≤-Cap). При `⌈Errors ρ⌉ = ∅` это `{s} ⊆ ∅`, и программа отвергается этой посылкой, а не (Err-Raise), даже вне `scope`. Так же отвергся бы `∀s. File s →R⟨none; {Wrapped (File s)}⟩ Unit`, который §2.5 принимает.
-- Неточность документа. Решение — документ: `⌈Errors ρ⌉` — объединение ⌈·⌉ аргументов элементов `ρ` (§2.1), как у `E ῡ`, с которым `Errors {E ῡ}` совпадает. Строка ошибок проверяется только (Err-Raise). Модель так и считает; чекер ошибку из `scope` отвергает `FLICK-E005`, как и модель.
+Divergence: `⌈Errors ρ⌉ = ∅` contradicted `Errors {E} ≡ E`.
 
-**Р61. Посылка (Con) `τᵢ' ≤ τᵢ` со (≤-Cap) отвергла бы скрытое поле.**
+- Symptom: `raise : ∀e a. Errors e →R⟨none; e⟩ a`, and the argument `Leaked h` with `h : Handle s` is compared with `Errors {Leaked (Handle s)}` by (≤-Cap). With `⌈Errors ρ⌉ = ∅` this is `{s} ⊆ ∅`, and the program is rejected by this premise rather than by (Err-Raise), even outside a `scope`. Likewise `∀s. File s →R⟨none; {Wrapped (File s)}⟩ Unit`, which §2.5 accepts, would be rejected.
+- Imprecise document. Resolution, document: `⌈Errors ρ⌉` is the union of ⌈·⌉ of the arguments of the elements of `ρ` (§2.1), like `E ῡ`, with which `Errors {E ῡ}` coincides. The error row is checked only by (Err-Raise). The model computes exactly this; the checker rejects an error leaving a `scope` with `FLICK-E005`, as the model does.
 
-- Что происходит: в `Sealed (fun () -> use h)` поле объявлено голым `Unit ->{} Unit`. (≤-Cap) на всём значении (§2.2) требует `{s} ⊆ ∅`, и (Con) не выводится. Таблица §4 (проба p20) и чекер принимают конструктор и отвергают только выход из `scope` по `⌈Sealed^C⌉ ∋ s`.
-- Неточность документа. Решение — читать посылку (Con) как `≤` без квалификатора поля: захват значения поля уходит в `C` данных, что и требует последняя посылка. Модель проверяет поле со скрытым хранилищем против `τᵢ^{c}` со свежей `c` (`regions/mod.rs` `construct`); в схемах конструкторов чекера то же записано явно: `Some : ∀a c. a^{≤c} → (Option a)^{c}`.
+### The field premise of Con ignores the field qualifier
 
-**Р62. Как граница `α^{≤C}` соотносится с атомом `α`, документ не говорит.**
+Divergence: the premise `τᵢ' ≤ τᵢ` of (Con), read with (≤-Cap), would reject a hidden field.
 
-- Что происходит: в `tests/run/codegen/do_notation.fl` `pair_optional` значение `Option (a^{≤v₁}, b^{≤v₂})` проверяется против `Option (a, b)`. По §2.1 `⌈a^{≤v}⌉ = {v}`, а `⌈a⌉ = {a}`, и (≤-Cap) не выполнена; так же `carry` и `shadowed` в `applicative_do.fl`. Чекер их принимает.
-- Неполнота: атомы-переменные `α` (§1.2) и границы значения, которые подстановка (Inst) проверяет только в месте вызова, документ не связывал. Модель сравнивала в обязательствах только регионы, а переменные строк захватов лишь растила для `Outlives`. Для T4 этого хватает, пока обобщённый код не прячет переменную типа.
-- Решение — документ и модель, внесено. §2.1: `⌈α^{≤C}⌉ = {α^{≤C}}`, атом `α` с фактом «не шире `C`»; он укладывается в множество с `α` или с `C`, а в разрешающем множестве даёт только `α`. Тогда `a^{≤v} ≡ a` (§2.2), и `pair_optional`, `carry`, `shadowed` выводятся. Модель (`flick-model/src/check/regions/mod.rs` `reach_bounded`, `solve.rs` `excess`) держит атом вместе с границей и теперь сравнивает в обязательствах и атомы `α`: переменная типа, которую обобщённый код прячет за квалификатором, — `FLICK-G001`, как регион. Корпус `tests/run/model.txt` и X2 расхождений с чекером не дают.
+- Symptom: in `Sealed (fun () -> use h)` the field is declared as bare `Unit ->{} Unit`. (≤-Cap) on the whole value (§2.2) requires `{s} ⊆ ∅`, and (Con) does not derive. The table of §4 (probe p20) and the checker accept the constructor and reject only the escape from the `scope` by `⌈Sealed^C⌉ ∋ s`.
+- Imprecise document. Resolution: the premise of (Con) reads as `≤` without the field qualifier: the capture of the field value goes into the data's `C`, which is what the last premise requires. The model checks a field with hidden storage against `τᵢ^{c}` with a fresh `c` (`regions/mod.rs` `construct`); the checker's constructor schemes state the same explicitly: `Some : ∀a c. a^{≤c} → (Option a)^{c}`.
 
-**Р64. Локальная функция, в строке которой `Scope s`, считается держащей `s`.**
+### A bounded variable reaches what the variable reaches
+
+Divergence: the document did not say how the bound `α^{≤C}` relates to the atom `α`.
+
+- Symptom: in `tests/run/codegen/do_notation.fl` `pair_optional`, the value `Option (a^{≤v₁}, b^{≤v₂})` is checked against `Option (a, b)`. By the earlier §2.1, `⌈a^{≤v}⌉ = {v}` while `⌈a⌉ = {a}`, so (≤-Cap) fails; the same for `carry` and `shadowed` in `applicative_do.fl`. The checker accepts them.
+- Incompleteness: the document did not connect variable atoms `α` (§1.2) with the value bounds that substitution (Inst) checks only at the call site. The model compared only regions in obligations and merely grew capture row variables for `Outlives`. This suffices for T4 as long as generic code does not hide a type variable.
+- Resolution, document and model. §2.1: `⌈α^{≤C}⌉ = {α^{≤C}}`, the atom `α` with the fact "no wider than `C`"; it fits into a set containing `α` or `C`, and in an admitting set it gives only `α`. Then `a^{≤v} ≡ a` (§2.2), and `pair_optional`, `carry`, `shadowed` derive. The model (`flick-model/src/check/regions/mod.rs` `reach_bounded`, `solve.rs` `excess`) keeps the atom together with its bound and also compares atoms `α` in obligations: a type variable that generic code hides behind a qualifier is `FLICK-G001`, like a region. The corpus `tests/run/model.txt` and the model properties (`just model`) show no divergence from the checker.
+
+### A Scope in a local function row is not a capture
+
+Divergence: a local function with `Scope s` in its row was considered to hold `s`.
 
 ```flick
 scoped_row : Unit ->{} Unit
@@ -797,11 +821,13 @@ let scoped_row u =
   }
 ```
 
-- Что происходит: `FLICK-G001` «this task uses `v3`, which holds region `s1`». `v3` ничего не захватывает, а `Scope s1` стоит в её строке сервисов, которая в ⌈·⌉ не входит (§2.1). С `v3 : Int ->{} Unit` программа принята. Модель принимает обе.
-- Неполнота чекера, не дыра: он отвергает лишнее. Нашёл генератор X6: рекурсивная локальная функция со стадией из бюджета внутри `scope`.
-- Решение — чекер, внесено. Для функции под квалификатором `collect_bounded_captures` (`regions/mod.rs`) обходил весь её тип вместе со строками стрелок; теперь `without_rows` убирает строки стрелок и `Eff`, как ⌈·⌉ §2.1. Фикстура `tests/check/pass/regions/scope_row.fl`; генератор снова ставит `Scope` в строку локальной функции.
+- Symptom: `FLICK-G001` "this task uses `v3`, which holds region `s1`". `v3` captures nothing, and `Scope s1` is in its service row, which ⌈·⌉ excludes (§2.1). With `v3 : Int ->{} Unit` the program was accepted. The model accepts both.
+- Checker incompleteness, not a hole: it rejected too much. Found by the model's program generator: a recursive local function with a stage from the budget inside a `scope`.
+- Resolution, checker: for a function under a qualifier, `collect_bounded_captures` (`regions/mod.rs`) walked its whole type including arrow rows; now `without_rows` removes the rows of arrows and `Eff`, as ⌈·⌉ of §2.1 does. Fixture: `tests/check/pass/regions/scope_row.fl`; the generator puts `Scope` in the rows of local functions.
 
-**Р65. Граница `a^c` на переменной того же `a` давала бесконечный тип.**
+### A qualifier on a meta does not bind the meta to itself
+
+Divergence: the bound `a^c` on a variable of the same `a` gave an infinite type.
 
 ```flick
 in_cell : Unit ->{; Bad} Int
@@ -814,11 +840,13 @@ let in_cell () =
   0
 ```
 
-- Что происходит: `FLICK-T016` «expected `{ a : _; b : Unit }`, found `{ a : _; b : Unit }`: the type would contain itself». Без `Ref.make` программа принята, модель принимает обе.
-- Причина: `unify.rs` при `α^c ≡ α`, где `α` — ещё не выведенная мета, связывал `α := α^c`, и проверка вхождения находила `α` в своём решении. Граница не делает тип другим: это `α ≡ α` и сравнение квалификатора, которое для невыведенного типа откладывается (Р31).
-- Неполнота чекера, не дыра. Решение — чекер, внесено: мета не связывается с квалификатором на себе самой, и пара идёт дальше, к сравнению квалификаторов. Нашёл генератор X6. Фикстура: `tests/check/pass/regions/late_captures.fl` `in_cell`.
+- Symptom: `FLICK-T016` "expected `{ a : _; b : Unit }`, found `{ a : _; b : Unit }`: the type would contain itself". Without `Ref.make` the program was accepted; the model accepts both.
+- Cause: on `α^c ≡ α`, where `α` is a not yet inferred meta, `unify.rs` bound `α := α^c`, and the occurs check found `α` in its own solution. The bound does not make the type different: this is `α ≡ α` plus a qualifier comparison, which for an uninferred type is deferred ([bounded qualifiers](#bounded-qualifiers-are-compared-after-the-type-is-inferred)).
+- Checker incompleteness, not a hole. Resolution, checker: a meta is not bound to a qualifier on itself, and the pair proceeds to the qualifier comparison. Found by the model's program generator. Fixture: `tests/check/pass/regions/late_captures.fl` `in_cell`.
 
-**Р140. (Spawn) ограничивает только скрытый квалификатор задачи.**
+### Spawn bounds everything the task holds
+
+Divergence: (Spawn) bounded only the hidden qualifier of the task.
 
 ```flick
 shown_by_result : Unit ->{} Unit
@@ -831,18 +859,20 @@ let shown_by_result () =
   }
 ```
 
-- Что происходит: по прежней записи §2.4 посылка (Spawn) — `Outlives C ϱ` для квалификатора `C` задачи `(Eff … a)^C`. Задача держит `h`, но регион `inner` показывает её результат `Handle inner`, и (Task) допускает `C = ∅`. По правилу документа программа принята, хотя ребёнок `outer` держит `h` после закрытия `inner`. Г4 говорила так же: `Outlives` нужно для захватов, которых не показывает то, что идёт после аргумента, а результат `Fiber e a` их показывает.
-- Чекер программу не принимает: `FLICK-G003` «the child holds region `inner`, which may end before its owner region `outer`» (`regions/solve.rs` `check_outlives` проверяет всё, что держит задача). Неточность документа, не дыра.
-- Решение — документ: посылка (Spawn) — `Outlives (C ∪ ⌈a⌉) ϱ`, всё, что держит удерживаемый аргумент; так же у финализатора и у любой константы с `retention owner` (Г4). Lean: `Const.ok`. Внесено. Нашла формализация P2.
+- Symptom: under the earlier wording of §2.4, the premise of (Spawn) was `Outlives C ϱ` for the qualifier `C` of the task `(Eff … a)^C`. The task holds `h`, but the region `inner` is shown by its result `Handle inner`, and (Task) admits `C = ∅`. By the document's rule the program was accepted, although the child of `outer` holds `h` after `inner` closes. G4 said the same: `Outlives` is needed for captures not shown by what follows the argument, and the result `Fiber e a` shows them.
+- The checker does not accept the program: `FLICK-G003` "the child holds region `inner`, which may end before its owner region `outer`" (`regions/solve.rs` `check_outlives` checks everything the task holds). Imprecise document, not a hole.
+- Resolution, document: the premise of (Spawn) is `Outlives (C ∪ ⌈a⌉) ϱ`, everything the retained argument holds; likewise for a finalizer and for any constant with `retention owner` (G4). Lean: `Const.ok`. Found while proving T4 in Lean (`formal/Formal/Regions.lean`).
 
-**Р141. (Lam) и (Task) не видят форм времени исполнения в теле.**
+### Lam and Task count runtime forms
 
-- Что происходит: посылка (Lam) считает только свободные переменные тела. Терм `λx. (λy. ()) (cap π n)` их не имеет и получает тип `(Unit → Unit)^∅`, хотя тело держит способность региона `π`, и Л4 для него неверна. В программе таких термов нет, но шаг их создаёт: подстановка значения вместо свободной переменной оставляет `cap π n` внутри `λ`.
-- Неточность §3.4. Решение — документ: для форм времени исполнения посылка (Lam) и (Task) считает регионы `cap π n`, `own π` и `⌈Ψ(ℓ)⌉` локаций тела наравне с `⌈Γ(y)⌉` свободных переменных; для программы правило прежнее. Подстановка значения сохраняет посылку по синтаксической части Л4: значение держит не больше, чем показывает его тип. Lean: `held`, `Typ.lam`, `Typ.holds`. Внесено. Нашла формализация P2.
+Divergence: (Lam) and (Task) did not see runtime forms in the body.
 
-Вне регионов, найдено попутно:
+- Symptom: the premise of (Lam) counted only the free variables of the body. The term `λx. (λy. ()) (cap π n)` has none and gets type `(Unit → Unit)^∅`, although the body holds a capability of region `π`, and L4 fails for it. Programs contain no such terms, but a step creates them: substituting a value for a free variable leaves `cap π n` inside a `λ`.
+- Imprecise §3.4. Resolution, document: for runtime forms, the premises of (Lam) and (Task) count the regions of `cap π n`, `own π` and `⌈Ψ(ℓ)⌉` of the body's locations on a par with `⌈Γ(y)⌉` of the free variables; for programs the rule is unchanged. Substituting a value preserves the premise by the syntactic part of L4: a value holds no more than its type shows. Lean: `held`, `Typ.lam`, `Typ.holds`. Found while proving T4 in Lean (`formal/Formal/Regions.lean`).
 
-**В3. `flick build` падает на неизвестном модуле.**
+Outside regions, found along the way:
 
-- Что происходит: `import App.Missing exposing (thing)` в файле, переданном `flick build`, — паника `the checker resolved` в `ir/lower/expr.rs:208`. `flick check` на том же файле сообщает `FLICK-R003`.
-- Решение — компилятор: `build` не переходит к понижению, если загрузка дала ошибки (`project/load/checking.rs`). Внесено; тест — `flick/tests/build_command.rs` `build_stops_at_an_unknown_module`.
+### flick build stops at an unknown module
+
+- Symptom: `import App.Missing exposing (thing)` in a file passed to `flick build` panicked with `the checker resolved` in `ir/lower/expr.rs:208`. `flick check` on the same file reports `FLICK-R003`.
+- Resolution, compiler: `build` does not proceed to lowering if loading produced errors (`project/load/checking.rs`). Test: `flick/tests/build_command.rs` `build_stops_at_an_unknown_module`.

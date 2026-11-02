@@ -1,534 +1,534 @@
-# λRT: контракт рантайма
+# λRT: the runtime contract
 
-Сверено с кодом на `bea06b9e`; расхождения §7 внесены в следующих коммитах. Расширяет `core.md` и `regions.md`: всё, что здесь не переопределено, действует как там. Расхождения со спекой и обоими рантаймами и решения по ним — в §7; номера продолжают список `regions.md`.
+Extends `core.md` and `regions.md`: everything not redefined here holds as stated there. Divergences from the spec and between the two runtimes, and how each is resolved, are in §7.
 
-Ссылки:
+References:
 
 - JS — `runtime/src/X.ts`;
 - Go — `runtime-go/flickrt/X.go`;
-- Effect — `FX/…`, то есть `node_modules/.pnpm/effect@4.0.5/node_modules/effect/src/…`;
-- остальное — как в `core.md`.
+- Effect — `FX/…`, that is, `node_modules/.pnpm/effect@4.0.5/node_modules/effect/src/…`;
+- everything else — as in `core.md`.
 
-Пробы §7 собраны `flick build --emit js` и `--emit go` и запущены на Node и как исполняемый файл Go. Ресурсы — `tests/run/runtime/resources.{mjs,go}`: `open name` печатает `open name` и регистрирует освобождение, которое печатает `close name`.
+The probe programs of §7 are built with `flick build --emit js` and `--emit go` and run on Node and as a Go executable. Resources come from `tests/run/runtime/resources.{mjs,go}`: `open name` prints `open name` and registers a release that prints `close name`.
 
-## 0. Область
+## 0. Scope
 
-λRT описывает, что происходит между шагами вычисления: какие файберы живы, кто ими владеет, чем кончилась работа и когда освобождаются ресурсы. Ядро даёт шаги одной нити, регионы — статическую границу того, что достигает ресурса. λRT добавляет:
+λRT describes what happens between evaluation steps: which fibers are alive, who owns them, how work ended and when resources are released. The core gives the steps of one thread; regions give the static bound on what reaches a resource. λRT adds:
 
-- пул файберов и недетерминированный выбор следующего шага;
-- владельцев областей: приём детей, наблюдателей-супервизоров, внешние Promise, хуки закрытия, стек финализаторов, двухфазное закрытие;
-- причины (Cause), их алгебру и исход «прерывание»;
-- прерывание и маскирование;
+- a pool of fibers and a nondeterministic choice of the next step;
+- scope owners: admission of children, supervisor watchers, foreign Promises, closing hooks, the finalizer stack, two-phase closing;
+- causes (Cause), their algebra and the "interrupted" outcome;
+- interruption and masking;
 - `parallel*`, `race_*`, `timeout*`;
-- построение слоёв с мемоизацией по идентичности и освобождение после всех потребителей;
-- атомарность `Ref`.
+- building layers with memoization by identity, and release after all consumers;
+- atomicity of `Ref`.
 
-| Не входит | Как λRT это учитывает |
+| Out of scope | How λRT accounts for it |
 | - | - |
-| Планировщик, время, бюджет операций Effect, `yield_now` | Шаг может сделать любой готовый файбер; таймер — внешнее событие, которое наступает когда угодно |
-| UI-корни, Bridge-супервизор, атомы | Корневые владельцы со своим приёмником дефектов, как у раннера (§3.8) |
-| HTTP-сервер, RPC, очереди, PubSub, `Tx*`, стримы | Источники файберов и финализаторов через те же шаги; расхождения в них — В4 |
-| `FiberMap`, `FiberHandle` | Как `FiberSet` (§3.6): у JS и у Go одна реализация на три |
-| Устройство аренды `ScopedRef`, `Resource`, `ScopedCache` | Гипотеза Г5 (`regions.md`); маскирование её регистрации — Р36 |
-| Сигналы ОС, коды выхода | Прерывание главного файбера; коды — `reference/runtime.md` «Entry runner» |
+| The scheduler, time, the Effect operation budget, `yield_now` | Any ready fiber may take a step; a timer is an external event that can happen at any time |
+| UI roots, the Bridge supervisor, atoms | Root owners with their own defect sink, like the runner's (§3.8) |
+| HTTP server, RPC, queues, PubSub, `Tx*`, streams | Sources of fibers and finalizers through the same steps; divergences in them — [HTTP handlers](#go-http-handlers) |
+| `FiberMap`, `FiberHandle` | As `FiberSet` (§3.6): JS and Go each have one implementation for all three |
+| Internals of the `ScopedRef`, `Resource`, `ScopedCache` leases | Hypothesis G5 (`regions.md`); masking of their registration — [leases](#js-leases-register-their-release-outside-the-mask) |
+| OS signals, exit codes | Interruption of the main fiber; codes — `reference/runtime.md` "Entry runner" |
 
-## 1. Конфигурации
+## 1. Configurations
 
-### 1.1 Причины и исходы
+### 1.1 Causes and outcomes
 
 ```text
-r ::= Fail v | Die d | Int f          причина: ожидаемая ошибка, дефект, прерывание файбером f
-c ::= [r₁, …, rₙ]                     причина целиком — список
-x ::= ok v | fail c                   исход (Exit)
+r ::= Fail v | Die d | Int f          reason: expected error, defect, interruption by fiber f
+c ::= [r₁, …, rₙ]                     a whole cause is a list
+x ::= ok v | fail c                   outcome (Exit)
 ```
 
-`d` — значение дефекта: в JS `Error` или любое значение, в Go текст с кадрами Flick. `f` — номер файбера или `·`. Операции над `c` — §2.
+`d` is the defect value: in JS an `Error` or any value, in Go text with Flick frames. `f` is a fiber number or `·`. Operations on `c` are in §2.
 
-### 1.2 Файберы
+### 1.2 Fibers
 
-Файбер — `⟨e, m, q, π, θ⟩`:
+A fiber is `⟨e, m, q, π, θ⟩`:
 
-- `e` — терм ядра с формами времени исполнения (§1.4);
-- `m ∈ ℕ` — глубина маски; файбер прерываем при `m = 0`;
-- `q` — запрос прерывания: `·` или номер файбера, который его послал. Запрос липкий и не снимается (Go `fiberState.requested`, Effect `interruptUnsafe`);
-- `π` — текущий владелец (`CurrentOwner` в JS, `Fiber.owner` в Go): куда идут приобретения и внешние вызовы;
-- `θ` — окружение сервисов при старте, унаследованное от того, кто запустил.
+- `e` — a core term with runtime forms (§1.4);
+- `m ∈ ℕ` — the mask depth; the fiber is interruptible when `m = 0`;
+- `q` — the interruption request: `·` or the number of the fiber that sent it. The request is sticky and never cleared (Go `fiberState.requested`, Effect `interruptUnsafe`);
+- `π` — the current owner (`CurrentOwner` in JS, `Fiber.owner` in Go): where acquisitions and foreign calls go;
+- `θ` — the service environment at start, inherited from whoever started the fiber.
 
-`Φ` — пул: конечное отображение номеров файберов в файберы, а законченных — в исходы `done x`.
+`Φ` is the pool: a finite map from fiber numbers to fibers, and for finished fibers to outcomes `done x`.
 
-### 1.3 Владельцы
+### 1.3 Owners
 
 `Λ(π) = ⟨st, K, W, P, H, F, x⟩`:
 
 - `st ∈ {open, closing, finalizing, closed}`;
-- `K` — дети (`Fiber.spawn`);
-- `W` — наблюдатели: ждут детей, чтобы вызвать супервизор;
-- `P` — внешние Promise, ещё не осевшие;
-- `H` — хуки закрытия, по порядку добавления: останов групп, отсоединение слушателей;
-- `F` — финализаторы, стек: последний добавленный выполняется первым;
-- `x` — исход тела, известный с начала закрытия.
+- `K` — children (`Fiber.spawn`);
+- `W` — watchers: they wait for children in order to call the supervisor;
+- `P` — foreign Promises not yet settled;
+- `H` — closing hooks, in order of addition: stopping groups, detaching listeners;
+- `F` — finalizers, a stack: the last added runs first;
+- `x` — the outcome of the body, known from the start of closing.
 
-`regions.md` §3.1 различает два состояния: `live` — это `open` и `closing`, `closed` — `finalizing` и `closed`.
+`regions.md` §3.1 distinguishes two states: `live` is `open` and `closing`, `closed` is `finalizing` and `closed`.
 
 | | JS | Go |
 | - | - | - |
 | `st = open` | `Owner.open` (`owner.ts:18`) | `Owner.open` (`owner.go:13`) |
-| `K`, `W` | `children`, `watchers` (`owner.ts:20-21`) | `children`, `watchers`; `WaitGroup` считает и детей, и супервизоров |
-| `P` | `pending`, `track` (`owner.ts:31-35`) | `pending`, `track` (`owner.go:22-26`), только после прерывания внешнего вызова |
-| `H` | `closing` (`owner.ts:25`) | нет до Р31; после — `hooks`, `onClose` |
-| `F` | `Scope.Closeable` Effect: `Map` в порядке добавления, закрывается с конца (`FX/internal/effect.ts:3982-4003`) | срез `finalizers` |
-| Корень | владелец раннера (`entry.ts`), `reportDefect` (`owner.ts:38-43`) | `Main`, `reported` (`concurrency.go:102-105`) |
+| `K`, `W` | `children`, `watchers` (`owner.ts:20-21`) | `children`, `watchers`; a `WaitGroup` counts both children and supervisors |
+| `P` | `pending`, `track` (`owner.ts:31-35`) | `pending`, `track` (`owner.go:22-26`), only after a foreign call is interrupted |
+| `H` | `closing` (`owner.ts:25`) | `hooks`, `onClose` |
+| `F` | Effect's `Scope.Closeable`: a `Map` in insertion order, closed from the end (`FX/internal/effect.ts:3982-4003`) | the `finalizers` slice |
+| Root | the runner's owner (`entry.ts`), `reportDefect` (`owner.ts:38-43`) | `Main`, `reported` (`concurrency.go:102-105`) |
 
-### 1.4 Конфигурация и формы
+### 1.4 Configuration and forms
 
-Конфигурация — `⟨Φ, Λ, μ, M, D⟩`:
+A configuration is `⟨Φ, Λ, μ, M, D⟩`:
 
-- `μ` — память, как в `core.md`;
-- `M` — memo-карты слоёв (§3.5);
-- `D` — приёмник дефектов корня: причины падений супервизоров.
+- `μ` — memory, as in `core.md`;
+- `M` — layer memo maps (§3.5);
+- `D` — the root's defect sink: causes of supervisor failures.
 
-Формы времени исполнения добавляются к `core.md` §3.1 и `regions.md` §3.1:
+Runtime forms extend `core.md` §3.1 and `regions.md` §3.1:
 
 ```text
-v ::= … | fib k                       дескриптор ребёнка, тип Fiber ε τ
-e ::= … | inside π e                  тело scope (regions.md)
-      | mask e | unmask m e           маска +1 / вернуть глубину m
-      | onexit e h                    после e выполнить h под маской; исход e сохраняется
-      | ext p                         ждать внешний Promise p
-      | close π                       закрытие в работе (§3.3)
-      | fail c                        падение с причиной c
+v ::= … | fib k                       child handle, of type Fiber ε τ
+e ::= … | inside π e                  body of a scope (regions.md)
+      | mask e | unmask m e           mask +1 / restore depth m
+      | onexit e h                    after e run h under a mask; the outcome of e is kept
+      | ext p                         wait for the foreign Promise p
+      | close π                       closing in progress (§3.3)
+      | fail c                        failure with cause c
 ```
 
-`fail c` обобщает `raise v` и `die` ядра: `raise v` — это `fail [Fail v]`, `die` — `fail [Die d]`. Падение поднимается через кадры: `F[fail c] → fail c`, кроме `try`, `onexit`, `inside`, `mask` и `unmask`, у которых свои правила.
+`fail c` generalizes the core's `raise v` and `die`: `raise v` is `fail [Fail v]`, `die` is `fail [Die d]`. A failure propagates through frames: `F[fail c] → fail c`, except for `try`, `onexit`, `inside`, `mask` and `unmask`, which have their own rules.
 
-## 2. Алгебра причин
+## 2. The algebra of causes
 
-### 2.1 Две операции
+### 2.1 Two operations
 
-Effect 4.0.5 хранит причину плоским списком `reasons`; дерева Sequential/Parallel в нём нет (spec/07 «A complex Cause»). Списки соединяются двумя способами:
+Effect 4.0.5 stores a cause as a flat list `reasons`; it has no Sequential/Parallel tree (spec/05 "A complex Cause"). Lists are joined in two ways:
 
 ```text
-c ⧺ c'      конкатенация         FX causeFromReasons над конкатенацией: race_success, финализаторы области
+c ⧺ c'      concatenation        FX causeFromReasons over the concatenation: race_success, scope finalizers
 c ⊕ c'      nub (c ⧺ c')         FX causeCombine (internal/core.ts:306-322)
 ∅ = []
 ```
 
-`nub` оставляет первое вхождение каждой причины с точностью до `≈` (`dedupeReasons`, `internal/core.ts:282-303`). Если один аргумент пуст, `causeCombine` возвращает другой без нормализации.
+`nub` keeps the first occurrence of each reason up to `≈` (`dedupeReasons`, `internal/core.ts:282-303`). If one argument is empty, `causeCombine` returns the other without normalizing it.
 
-`≈` в Effect — `Equal.equals` вместе с `Hash.hash`; аннотации участвуют. Для значений Flick:
+In Effect, `≈` is `Equal.equals` together with `Hash.hash`; annotations take part. For Flick values:
 
-- `Fail v ≈ Fail v'` — структурное равенство ошибок. Значения ADT и записей — простые объекты, Effect сравнивает их поэлементно: проба p3, «same 1» в Р29;
-- `Die d ≈ Die d'` — `Equal.equals` дефектов. Строка (`Cause.die`, `Effect.die`, `Exit.die`) и значение (типизированная ошибка, ставшая дефектом) сравниваются по значению. Брошенный `Error` (паника, `Stream.die`) — по идентичности объекта: две паники с одним текстом различны. Go отличает брошенный дефект признаком `thrown` (Р80);
-- `Int f ≈ Int f'` — тот же файбер и те же аннотации.
+- `Fail v ≈ Fail v'` — structural equality of errors. ADT and record values are plain objects, and Effect compares them element by element: the `same 1` output of the [`parallel` probe](#go-parallel-keeps-only-the-first-failure);
+- `Die d ≈ Die d'` — `Equal.equals` of the defects. A string (`Cause.die`, `Effect.die`, `Exit.die`) and a value (a typed error turned into a defect) compare by value. A thrown `Error` (a panic, `Stream.die`) compares by object identity: two panics with the same text are different. Go marks a thrown defect with the `thrown` flag ([defects by value](#go-two-defects-with-the-same-string-are-two-reasons));
+- `Int f ≈ Int f'` — the same fiber and the same annotations.
 
-Go хранит двоичное дерево `Sequential`/`Parallel` (`cause.go:11-50`), но читает его только через `reasons()` — обход слева направо (`cause.go:53-61`). Вид узла ничего не меняет. До Р30 `nub` в Go не было.
+Go stores a binary `Sequential`/`Parallel` tree (`cause.go:11-50`) but reads it only through `reasons()`, a left-to-right traversal (`cause.go:53-61`). The kind of a node changes nothing. Go applies `nub` as well ([combining causes in Go](#go-combining-causes-without-nub)).
 
-### 2.2 Законы
+### 2.2 Laws
 
-Нормальная форма — список без повторов. Её дают все конструкторы, кроме `Cause.from_reasons`. На нормальных формах:
+The normal form is a list without repetitions. Every constructor except `Cause.from_reasons` produces it. On normal forms:
 
 ```text
 (⊕-Unit)    ∅ ⊕ c = c = c ⊕ ∅
 (⊕-Assoc)   (a ⊕ b) ⊕ c = a ⊕ (b ⊕ c)
 (⊕-Idem)    c ⊕ c = c,  a ⊕ b ⊕ a = a ⊕ b
-(⊕-Head)    head(a ⊕ b) = head(a), если в a есть Fail; иначе head(b)
-(Seq=Par)   узлы Sequential и Parallel неразличимы: оба — ⊕
-(⧺-Free)    ⧺ — свободный моноид с единицей ∅
+(⊕-Head)    head(a ⊕ b) = head(a) if a contains a Fail; otherwise head(b)
+(Seq=Par)   Sequential and Parallel nodes are indistinguishable: both are ⊕
+(⧺-Free)    ⧺ is the free monoid with unit ∅
 ```
 
-`⊕` не коммутативна, и порядок важен: от него зависит `head`, а значит, и восстановление.
+`⊕` is not commutative, and the order matters: `head` depends on it, and so does recovery.
 
-Законы, `recover` §2.3 и то, что `Cause.pretty` и `Cause.pretty_errors` зависят только от списка причин, проверяет `tests/run/runtime/cause_laws.fl`: свойства `Arbitrary.check` над причинами, которые `Arbitrary` Effect строит по сиду одинаково на Node и Go. (Seq=Par) с поверхности Flick недостижим (`Cause.combine` — всегда `Sequential`), его проверяет `cause_test.go`.
+`tests/run/runtime/cause_laws.fl` checks the laws, `recover` of §2.3, and that `Cause.pretty` and `Cause.pretty_errors` depend only on the list of reasons: `Arbitrary.check` properties over causes that Effect's `Arbitrary` builds from a seed identically on Node and Go. (Seq=Par) is unreachable from the Flick surface (`Cause.combine` is always `Sequential`); `cause_test.go` checks it.
 
-(⊕-Assoc) верна, потому что `nub(nub(a ⧺ b) ⧺ c) = nub(a ⧺ b ⧺ c) = nub(a ⧺ nub(b ⧺ c))`. На списке с повторами `∅ ⊕ c` возвращает `c` как есть, а первая непустая `⊕` нормализует.
+(⊕-Assoc) holds because `nub(nub(a ⧺ b) ⧺ c) = nub(a ⧺ b ⧺ c) = nub(a ⧺ nub(b ⧺ c))`. On a list with repetitions, `∅ ⊕ c` returns `c` as is, and the first non-empty `⊕` normalizes.
 
-Определения:
+Definitions:
 
-- `head(c)` — первая `Fail v` в `c` (`Cause.find_error_option`, `Cause.find_fail`);
-- `primary(c)` — то, что выбирает восстановление: `head(c)`, если в `c` нет `Die`, иначе ничего (`cause.ts:28-29`, Go `Try`).
+- `head(c)` — the first `Fail v` in `c` (`Cause.find_error_option`, `Cause.find_fail`);
+- `primary(c)` — what recovery selects: `head(c)` if `c` has no `Die`, otherwise nothing (`cause.ts:28-29`, Go `Try`).
 
-### 2.3 Восстановление и `try`
+### 2.3 Recovery and `try`
 
 ```text
-recover(c, ā) = fail (dies c)          в c есть Die и есть Fail
-                fail c                 в c есть Die и нет Fail
-                handle v with ā        head(c) = Fail v и v подходит одной из ветвей ā
-                fail c                 иначе: причина уходит целиком
+recover(c, ā) = fail (dies c)          c has a Die and a Fail
+                fail c                 c has a Die and no Fail
+                handle v with ā        head(c) = Fail v and v matches one of the branches ā
+                fail c                 otherwise: the whole cause propagates
 
 try (fail c) with ā   →   recover(c, ā)
 ```
 
-`dies c` — `c`, где каждая `Fail v` заменена на `Die v`. Оба рантайма сохраняют значение: JS `failsToDies` (`cause.ts:19-22`), Go `failsToDies` через `dieOf` (Р81).
+`dies c` is `c` with every `Fail v` replaced by `Die v`. Both runtimes keep the value: JS `failsToDies` (`cause.ts:19-22`), Go `failsToDies` through `dieOf` ([typed errors as defects](#go-a-typed-error-turned-into-a-defect-loses-its-value)).
 
-Ветвь видит только `head(c)`. Вторичные `Fail` других типов остаются в `c`, если ветвь не подошла, и пропадают вместе с `c`, если подошла. Таблица `reference/runtime.md` «Outcomes» — частные случаи `recover`. JS: `tryWith` (`cause.ts:39-54`) над `Effect.catchCauseFilter`; Go: `Try` (`cause.go:105-125`).
+A branch sees only `head(c)`. Secondary `Fail`s of other types stay in `c` if no branch matched, and disappear with `c` if one did. The "Outcomes" table of `reference/runtime.md` lists special cases of `recover`. JS: `tryWith` (`cause.ts:39-54`) over `Effect.catchCauseFilter`; Go: `Try` (`cause.go:105-125`).
 
-### 2.4 Типизированная голова
+### 2.4 The typed head
 
-Тип `Failure ε` (и `Exit ε τ`) обещает меньше, чем весь список: только голову.
+The type `Failure ε` (and `Exit ε τ`) promises less than the whole list: only the head.
 
-**Инвариант I_ε.** Если причина значения `Failure ε` содержит `Fail`, то `head(c) = Fail v` и `· ⊢ v : Errors ε`. Вторичные `Fail` типа не имеют.
+**Invariant I_ε.** If the cause of a `Failure ε` value contains a `Fail`, then `head(c) = Fail v` and `· ⊢ v : Errors ε`. Secondary `Fail`s have no type.
 
-Сохраняют I_ε:
+I_ε is preserved by:
 
-- `raise`, `Cause.fail`, `from_result` — список из одной причины;
-- `⊕` и `⧺` при типе `Failure (ε + ε')` — по (⊕-Head);
-- `try` с остатком `ε'` (правило (Try) ядра): голова, которая не подошла ни одной ветви, принадлежит `ε'`. Это R5;
-- закрытие области: `x ⊕ c_H ⊕ c_F`, а у финализаторов и хуков нет типизированных ошибок (`regions.md`, Р16);
-- `parallel`: голова — у первой упавшей ветви;
-- `Failure.rethrow`, `Exit.failure`, `Effect.exit` — та же причина.
+- `raise`, `Cause.fail`, `from_result` — a list of one reason;
+- `⊕` and `⧺` at type `Failure (ε + ε')` — by (⊕-Head);
+- `try` with residual `ε'` (the core's (Try) rule): a head that matched no branch belongs to `ε'`. This is R5;
+- closing a scope: `x ⊕ c_H ⊕ c_F`, and finalizers and hooks have no typed errors (`regions.md`, [owner retention requires Outlives](regions.md#owner-retention-requires-outlives));
+- `parallel`: the head belongs to the first branch that failed;
+- `Failure.rethrow`, `Exit.failure`, `Effect.exit` — the same cause.
 
-Нарушают I_ε операции, которые дают вторичной `Fail` тип `ε` (Р26):
+I_ε is broken by operations that give a secondary `Fail` the type `ε` ([secondary `Fail`](#a-secondary-fail-gets-the-type-of-the-residual)):
 
-- `Cause.map`, `Exit.map_error`, `Exit.map_both` вызывают функцию на каждой `Fail`;
-- `Cause.reasons` отдаёт каждую `Fail` как `Reason ε`, и `Cause.from_reasons` после перестановки делает вторичную головой.
+- `Cause.map`, `Exit.map_error`, `Exit.map_both` call the function on every `Fail`;
+- `Cause.reasons` returns each `Fail` as `Reason ε`, and `Cause.from_reasons` after a permutation makes a secondary one the head.
 
-spec/07 запрещает и то, и другое: «it is impossible to attribute the residual e to every secondary Fail or to run a callback for it under a false type».
+spec/05 forbids both: "it is impossible to attribute the residual e to every secondary Fail or to run a callback for it under a false type".
 
-### 2.5 Рендер и паритет
+### 2.5 Rendering and parity
 
 ```text
-pretty(c)  = строки Fail (describe v) и Die (текст d) в порядке c;
-             "InterruptError: All fibers interrupted without error", если строк нет
-report(c)  = "error: main was interrupted", если в c только Int;
-             "error: m" для первой Fail с AppError {message = m}, если в c нет Die;
-             иначе pretty(c)
+pretty(c)  = lines for Fail (describe v) and Die (text of d) in the order of c;
+             "InterruptError: All fibers interrupted without error" if there are no lines
+report(c)  = "error: main was interrupted" if c has only Int;
+             "error: m" for the first Fail with AppError {message = m}, if c has no Die;
+             otherwise pretty(c)
 ```
 
 JS: `entry.ts:44-76` (`pretty`, `conclude`). Go: `cause.go:159-189` (`pretty`, `report`), `platform.go:145-183`.
 
-Паритет `tests/run/portable.txt` сравнивает `stdout`, `stderr` и код выхода: `report` главной причины и всё, что программа печатает из `Cause.*`. Отсюда что должно совпадать:
+Parity (`tests/run/portable.txt`) compares `stdout`, `stderr` and the exit code: the `report` of the main cause and everything the program prints from `Cause.*`. Hence what must agree:
 
-- порядок и число причин после `⊕` и `⧺`. Поэтому Go обязан повторять `nub` там, где JS идёт через `causeCombine`, и не повторять там, где через `causeFromReasons` (Р29, Р30);
-- `Int` в `pretty` не видны, но видны в `Cause.reasons`, `Cause.interruptors`, `Cause.has_interrupts`.
+- the order and number of reasons after `⊕` and `⧺`. So Go must repeat `nub` where JS goes through `causeCombine`, and must not repeat it where JS goes through `causeFromReasons` ([`parallel` in Go](#go-parallel-keeps-only-the-first-failure), [combining causes in Go](#go-combining-causes-without-nub));
+- `Int`s are not visible in `pretty`, but are visible in `Cause.reasons`, `Cause.interruptors`, `Cause.has_interrupts`.
 
-## 3. Шаги
+## 3. Steps
 
-### 3.1 Недетерминированность
+### 3.1 Nondeterminism
 
 ```text
 ⟨Φ[f ↦ φ], Λ, μ, M, D⟩  →  ⟨Φ[f ↦ φ'] ∪ Φ_new, Λ', μ', M', D'⟩
 ```
 
-Это шаг одного файбера `f`, выбранного произвольно среди готовых, шаг закрытия или внешнее событие: оседание Promise, срабатывание таймера. Порядок ничем не ограничен, кроме условий правил. Допустимая перестановка — любая последовательность таких шагов; свойства §4 утверждаются для всех.
+This is a step of one fiber `f`, chosen arbitrarily among the ready ones, a closing step, or an external event: a Promise settling, a timer firing. The order is unconstrained beyond the side conditions of the rules. An admissible interleaving is any sequence of such steps; the properties of §4 are claimed for all of them.
 
-Шаг ядра поднимается: `⟨μ, e⟩ → ⟨μ', e'⟩` из `core.md` даёт шаг файбера с `e`. `Ref.*` — один шаг (§3.7).
+A core step lifts: `⟨μ, e⟩ → ⟨μ', e'⟩` from `core.md` gives a step of the fiber with `e`. `Ref.*` is one step (§3.7).
 
-JS исполняет файберы на одной нити и переключается на `yield*` и по бюджету операций. Go даёт каждому файберу горутину. Обе реализации — частные случаи перестановок модели.
+JS runs fibers on one thread and switches on `yield*` and on the operation budget. Go gives each fiber a goroutine. Both implementations are special cases of the model's interleavings.
 
-### 3.2 Прерывание и маска
+### 3.2 Interruption and mask
 
 ```text
-(Int-Req)      interrupt (fib k) в f   →  q(k) := f, если q(k) = ·;  f ждёт done(k)
-(Int-Deliver)  ⟨E[e], 0, q⟩            →  ⟨E[fail [Int q]], 0, q⟩       q ≠ ·, в точке прерывания
-(Mask)         mask e   при глубине m  →  unmask m e   при глубине m + 1
-(Unmask)       unmask m v              →  v   при глубине m; если m = 0 и q ≠ ·, сразу (Int-Deliver)
-(Unmask-Fail)  unmask m (fail c)       →  fail c   при глубине m
-(OnExit)       onexit w h              →  mask h, затем w; падение h с c_h даёт fail (cause(w) ⊕ c_h)
+(Int-Req)      interrupt (fib k) in f  →  q(k) := f if q(k) = ·;  f waits for done(k)
+(Int-Deliver)  ⟨E[e], 0, q⟩            →  ⟨E[fail [Int q]], 0, q⟩       q ≠ ·, at an interruption point
+(Mask)         mask e   at depth m     →  unmask m e   at depth m + 1
+(Unmask)       unmask m v              →  v   at depth m; if m = 0 and q ≠ ·, (Int-Deliver) at once
+(Unmask-Fail)  unmask m (fail c)       →  fail c   at depth m
+(OnExit)       onexit w h              →  mask h, then w; a failure of h with c_h gives fail (cause(w) ⊕ c_h)
 ```
 
-Здесь `w` — значение или `fail c`, `cause(v) = ∅`, `cause(fail c) = c`.
+Here `w` is a value or `fail c`, `cause(v) = ∅`, `cause(fail c) = c`.
 
-Точка прерывания:
+Interruption points:
 
-- JS — любая граница шага Effect при `m = 0` (`FX/internal/effect.ts:4570-4576`);
-- Go — `Check` (`fiber.go:70-74`): каждый `Run`, голова эффектного цикла и блокирующие ожидания (`wait`, `sleep`, `all`, `race`, разрешения семафора, внешние вызовы).
+- JS — any Effect step boundary with `m = 0` (`FX/internal/effect.ts:4570-4576`);
+- Go — `Check` (`fiber.go:70-74`): every `Run`, the head of the effect loop, and blocking waits (`wait`, `sleep`, `all`, `race`, semaphore permits, foreign calls).
 
-Модель берёт точки JS. В Go их меньше, и Go допускает подмножество перестановок. Исключение — (Unmask): выход из маски с ожидающим запросом обязан прерывать сразу (Р32).
+The model takes the JS points. Go has fewer, so Go admits a subset of the interleavings. The exception is (Unmask): leaving a mask with a pending request must interrupt at once ([mask exit in Go](#go-leaving-a-mask-does-not-deliver-a-pending-interruption)).
 
-Под маской в обоих рантаймах исполняются:
+In both runtimes the following run under a mask:
 
-- приобретение `acquire_release` вместе с регистрацией освобождения;
-- `bracket`: приобретение и освобождение;
-- финализаторы, хуки, всё закрытие владельца;
-- наблюдатель и супервизор;
-- обработчики `on_exit` и `ensuring`.
+- the acquisition of `acquire_release` together with the registration of the release;
+- `bracket`: acquisition and release;
+- finalizers, hooks, the whole closing of an owner;
+- the watcher and the supervisor;
+- `on_exit` and `ensuring` handlers.
 
-### 3.3 Владелец
+### 3.3 The owner
 
 ```text
-(Scope)         scope s { e } в f при глубине m
+(Scope)         scope s { e } in f at depth m
                 →  mask (inside π (unmask m e[s := π][s := own π]))
-                   π свежий, Λ(π) = ⟨open, ∅, ∅, ∅, [], [], ·⟩
-(Spawn)         spawn (own π) g t в f,  st(π) = open
+                   π fresh, Λ(π) = ⟨open, ∅, ∅, ∅, [], [], ·⟩
+(Spawn)         spawn (own π) g t in f,  st(π) = open
                 →  fib k;  Φ += k ↦ ⟨await t, 0, ·, π, θ_f⟩,  w ↦ ⟨watch π k g, 1, ·, π, θ_f⟩;
                    K(π) += k,  W(π) += w
 (Spawn-Closed)  spawn (own π) g t,  st(π) ≠ open  →  fail [Die "the owner is closing"]
-(Watch)         watch π k g,  Φ(k) = done x  →  K(π) -= k;  при x = fail c — g (Failure c sd),
-                   где sd = (st(π) ≠ open и c — только Int);  падение g с c_g: D += c_g;  W(π) -= w
-(Join)          join (fib k),  Φ(k) = done x  →  v при x = ok v,  fail c при x = fail c
+(Watch)         watch π k g,  Φ(k) = done x  →  K(π) -= k;  if x = fail c then g (Failure c sd),
+                   where sd = (st(π) ≠ open and c is only Int);  a failure of g with c_g: D += c_g;  W(π) -= w
+(Join)          join (fib k),  Φ(k) = done x  →  v if x = ok v,  fail c if x = fail c
 (Fin-Add)       add_finalizer π t,  st(π) ∈ {open, closing}  →  F(π) := t :: F(π)
 (Fin-Now)       add_finalizer π t,  st(π) ∈ {finalizing, closed}  →  mask (t x(π))
 (Acquire)       acquire_release π a rel  →  mask (let v = a in add_finalizer π (rel v); v)
-(Ext)           ext p в f  →  P(π_f) += p;  f ждёт оседания p;
-                   (Int-Deliver) роняет f сразу, а p остаётся в P(π_f)
-(Ext-Settle)    p осел  →  P -= p;  ждущий файбер, если он ещё ждёт, получает значение или падение
+(Ext)           ext p in f  →  P(π_f) += p;  f waits for p to settle;
+                   (Int-Deliver) fails f at once, and p stays in P(π_f)
+(Ext-Settle)    p settled  →  P -= p;  the waiting fiber, if it still waits, gets the value or the failure
 ```
 
-Закрытие — шаги без выбора в фиксированном порядке:
+Closing is a sequence of steps without choice, in a fixed order:
 
 ```text
-(C0)  inside π w  →  close π;  x(π) := w;  st(π) := closing          w — значение или fail c
-(C1)  для каждого h ∈ H(π) по порядку, включая добавленные во время C1:  h ();  c_H := c_H ⊕ причина падения h
-(C2)  q(k) := f для каждого k ∈ K(π);  ждать K(π) = ∅
-(C3)  ждать W(π) = ∅
-(C4)  ждать P(π) = ∅; повторять, пока оседающие добавляют новые
-(C5)  st(π) := finalizing;  для t ∈ F(π) с вершины:  mask (t x);  c_F := c_F ⧺ причина падения t
-(C6)  st(π) := closed;  результат — w, если c_H ⊕ c_F = ∅, иначе fail (cause(w) ⊕ c_H ⊕ c_F)
+(C0)  inside π w  →  close π;  x(π) := w;  st(π) := closing          w is a value or fail c
+(C1)  for each h ∈ H(π) in order, including those added during C1:  h ();  c_H := c_H ⊕ the cause of h's failure
+(C2)  q(k) := f for each k ∈ K(π);  wait until K(π) = ∅
+(C3)  wait until W(π) = ∅
+(C4)  wait until P(π) = ∅; repeat while settling calls add new ones
+(C5)  st(π) := finalizing;  for t ∈ F(π) from the top:  mask (t x);  c_F := c_F ⧺ the cause of t's failure
+(C6)  st(π) := closed;  the result is w if c_H ⊕ c_F = ∅, otherwise fail (cause(w) ⊕ c_H ⊕ c_F)
 ```
 
 JS — `close` (`owner.ts:54-70`), Go — `closeWithCause` (`owner.go:111-130`):
 
-| Фаза | JS | Go |
+| Phase | JS | Go |
 | - | - | - |
-| C0 | `owner.open = false` | `o.open = false` под `o.mu` |
-| C1 | цикл по `owner.closing`; после Р38 — и после C3 | нет до Р31 |
-| C2 | `Fiber.interruptAll([...owner.children])`: прерывает и ждёт (`FX/internal/effect.ts:925-936`) | `interrupt` по снимку детей; ожидание в C3 |
-| C3 | цикл `Fiber.await` по `watchers` | `watchers.Wait()` |
-| C4 | `settle` (`owner.ts:45-51`), затем хуки, добавленные за это время (Р160) | `settle` (`owner.go:29-42`), затем то же |
-| C5 | `Scope.close(owner.resources, exit)`: Effect ставит `Closed` до финализаторов, выполняет их последовательно с конца и собирает исходы `exitAsVoidAll`, то есть `⧺` | цикл с конца, `Sequential`; приём финализаторов закрыт ещё в C0 (Р27) |
-| C6 | `Cause.combine`, то есть `⊕` | `Sequential` (до Р30 без `nub`) |
+| C0 | `owner.open = false` | `o.open = false` under `o.mu` |
+| C1 | a loop over `owner.closing`; again after C3 ([hooks added after C1](#a-closing-hook-added-after-c1-does-not-run)) | `hooks`, run in order; again after C3 |
+| C2 | `Fiber.interruptAll([...owner.children])`: interrupts and waits (`FX/internal/effect.ts:925-936`) | `interrupt` over a snapshot of the children; the wait is in C3 |
+| C3 | a loop of `Fiber.await` over `watchers` | `watchers.Wait()` |
+| C4 | `settle` (`owner.ts:45-51`), then the hooks added meanwhile ([hooks added during C4](#a-hook-added-during-c4-does-not-run)) | `settle` (`owner.go:29-42`), then the same |
+| C5 | `Scope.close(owner.resources, exit)`: Effect sets `Closed` before the finalizers, runs them sequentially from the end and collects the outcomes with `exitAsVoidAll`, that is, `⧺` | a loop from the end, `Sequential`; finalizer admission ends here, with `finalizing` ([late finalizers in Go](#go-a-finalizer-added-during-closing-runs-at-once)) |
+| C6 | `Cause.combine`, that is, `⊕` | `Sequential`, which is `⊕` with `nub` |
 
-Почему `F` отдельно от `K` (spec/07 «Fiber owner and release order»): ресурс, приобретённый после старта ребёнка, освобождается после его конца. Один LIFO-список детей и ресурсов этого не даёт.
+Why `F` is separate from `K` (spec/05 "Fiber owner and release order"): a resource acquired after a child started is released after the child ends. A single LIFO list of children and resources cannot give this.
 
-Тело `scope` прерываемо (`restore` в `withOwner`, `owner.ts:85-96`), закрытие — нет. В Go у закрытия нет точек прерывания.
+The body of a `scope` is interruptible (`restore` in `withOwner`, `owner.ts:85-96`); the closing is not. In Go the closing has no interruption points.
 
-### 3.4 Структурные комбинаторы
+### 3.4 Structural combinators
 
-Ветвями комбинатора владеет комбинатор, а не `K(π)`. Их приобретения идут в `π` вызывающего: «The operation does not close an external Scope» (spec/07).
+The branches of a combinator are owned by the combinator, not by `K(π)`. Their acquisitions go into the caller's `π`: "The operation does not close an external Scope" (spec/05).
 
 ```text
-(Par)       parallel* t₁ … tₙ: ветви kᵢ, не больше limit одновременно
-            все ok vᵢ       →  (v₁, …, vₙ) в порядке входа
-            первая fail c₁  →  новых не запускать; q(kⱼ) := f у живых; ждать всех;
-                               fail (c₁ ⊕ c₂' ⊕ …), где cⱼ' — причины без Int у ветвей, упавших позже
-(Par-Res)   parallel_results: Fail ветви → Err (head); Die или Int останавливает группу, как (Par)
-(Par-Exit)  parallel_exits: исход каждой ветви; внешнее прерывание — как (Par)
-(Race)      race_first a b: первая законченная ветвь k с любым исходом; q(другой) := f; ждать её; исход k
-            race_success a b: первая ok; если обе упали — fail (c₁ ⧺ c₂) в порядке окончания
+(Par)       parallel* t₁ … tₙ: branches kᵢ, at most limit at a time
+            all ok vᵢ       →  (v₁, …, vₙ) in input order
+            first fail c₁   →  start no new ones; q(kⱼ) := f for the live ones; wait for all;
+                               fail (c₁ ⊕ c₂' ⊕ …), where cⱼ' are the causes without Int of the branches that failed later
+(Par-Res)   parallel_results: a branch's Fail → Err (head); a Die or Int stops the group, as in (Par)
+(Par-Exit)  parallel_exits: the outcome of each branch; external interruption — as in (Par)
+(Race)      race_first a b: the first finished branch k with any outcome; q(other) := f; wait for it; the outcome of k
+            race_success a b: the first ok; if both failed — fail (c₁ ⧺ c₂) in order of finishing
 (Timeout)   timeout ms t = race_first t (sleep ms; fail [Fail TimeoutError]);
-            timeout_option ms t — то же с None вместо TimeoutError
+            timeout_option ms t — the same with None instead of TimeoutError
 ```
 
-Исходы проигравших в результат не входят. Это контракт spec/07 «Race and timeout», а не потеря, и R4 их исключает. Проигравший прерывается и ожидается до возврата: его финализаторы выполнены.
+The outcomes of losers do not enter the result. This is the spec/05 "Race and timeout" contract, not a loss, and R4 excludes them. A loser is interrupted and awaited before the return: its finalizers have run.
 
-- JS: `concurrency.ts:10-45` над `Effect.all`, то есть `forEachConcurrent` (`FX/internal/effect.ts:5098-5252`; поздние причины без `Int` соединяются `⊕` в 5140-5146). `race.ts` — над `raceAll`/`raceFirst` (`FX/internal/effect.ts:1614-1700`, `⧺` в 1641-1643); `timeout` — над `raceFirst` (3895-3915).
+- JS: `concurrency.ts:10-45` over `Effect.all`, that is, `forEachConcurrent` (`FX/internal/effect.ts:5098-5252`; late causes without `Int` are joined with `⊕` at 5140-5146). `race.ts` is over `raceAll`/`raceFirst` (`FX/internal/effect.ts:1614-1700`, `⧺` at 1641-1643); `timeout` is over `raceFirst` (3895-3915).
 - Go: `all` (`concurrency.go:159-207`), `race` (248-275), `timeoutAfter` (282-301).
 
-Синхронный победитель в Effect может выиграть до старта второй ветви; Go запускает обе. Модель допускает оба поведения: старт второй ветви — шаг, который может не успеть случиться.
+In Effect a synchronous winner can win before the second branch starts; Go starts both. The model admits both behaviours: starting the second branch is a step that may not get to happen.
 
-### 3.5 Слои и `provide`
+### 3.5 Layers and `provide`
 
-`provide L { e }` — лексический владелец (`reference/runtime.md` «Layers»):
+`provide L { e }` is a lexical owner (`reference/runtime.md` "Layers"):
 
 ```text
-(Provide)  provide L e в f  →  владелец πₚ по (Scope);  m := fork(M_f) или новая карта;
-           θ := build(m, πₚ, L);  with θ e внутри πₚ;  закрытие πₚ — по §3.3
+(Provide)  provide L e in f  →  owner πₚ by (Scope);  m := fork(M_f) or a new map;
+           θ := build(m, πₚ, L);  with θ e inside πₚ;  closing πₚ — by §3.3
 
-build(m, π, L) для мемоизуемого L (Layer.effect, sync, suspend, from_build_memo):
-           L ∉ m:  m[L] := ⟨строится, σ, n = 0⟩ с новой областью σ;  построить L в σ;  m[L] := ⟨θ_L, σ, n⟩
-           L ∈ m:  ждать конца построения
-           затем n += 1 и F(π) += «n -= 1; при n = 0 закрыть σ и убрать L из m»
-build для составных (merge, provide_, flat_map, …) строит части; fresh, or_die, константы — без карты
+build(m, π, L) for a memoizable L (Layer.effect, sync, suspend, from_build_memo):
+           L ∉ m:  m[L] := ⟨building, σ, n = 0⟩ with a new scope σ;  build L in σ;  m[L] := ⟨θ_L, σ, n⟩
+           L ∈ m:  wait for the build to finish
+           then n += 1 and F(π) += "n -= 1; if n = 0 close σ and remove L from m"
+build for composite layers (merge, provide_, flat_map, …) builds the parts; fresh, or_die, constants — without the map
 ```
 
-- Ключ карты — идентичность значения слоя (`FX/Layer.ts:418-469`; Go `memoized`, `layer.go:56-62`).
-- `fork` даёт карту, которая читает предков. Вложенный `provide` того же слоя берёт сборку внешнего (`FX/Layer.ts:440, 781`; Go `currentMemo`, `layer.go:181-186`). Соседние `provide` строят заново (проба p10, Р40).
-- Освобождение сборки — финализатор-наблюдатель в `F` каждого владельца-потребителя; последний закрывает `σ`. Значит, слой освобождается в C5 последнего потребителя, после его детей и внешних Promise.
+- The map key is the identity of the layer value (`FX/Layer.ts:418-469`; Go `memoized`, `layer.go:56-62`).
+- `fork` gives a map that reads its ancestors. A nested `provide` of the same layer takes the outer build (`FX/Layer.ts:440, 781`; Go `currentMemo`, `layer.go:181-186`). Sibling `provide`s build anew ([nested `provide`s](#nested-provides-share-a-build)).
+- The release of a build is an observer finalizer in the `F` of each consuming owner; the last one closes `σ`. So a layer is released in the C5 of its last consumer, after that consumer's children and foreign Promises.
 
-JS: `layer.ts:9-15` (`Layer.buildWithScope(layer, owner.resources)`), счётчик наблюдателей — `FX/Layer.ts:253-275`. Go: `Provide` (`layer.go:198-203`), `getOrBuild` (135-166), счётчик (115-131).
+JS: `layer.ts:9-15` (`Layer.buildWithScope(layer, owner.resources)`), the observer counter — `FX/Layer.ts:253-275`. Go: `Provide` (`layer.go:198-203`), `getOrBuild` (135-166), the counter (115-131).
 
-### 3.6 Группы файберов
+### 3.6 Fiber groups
 
-`FiberSet.make` в регионе `π` регистрирует хук останова в `H(π)` (JS `stdlib/fibers.ts:66-88`). `FiberSet.run`:
+`FiberSet.make` in region `π` registers a stop hook in `H(π)` (JS `stdlib/fibers.ts:66-88`). `FiberSet.run`:
 
-- группа открыта → ребёнок группы; приобретает в `π`, но в `K(π)` не входит;
-- группа закрыта → прерванный файбер, тело не выполняется (`fibers.ts:87`).
+- group open → a child of the group; it acquires in `π` but is not in `K(π)`;
+- group closed → an interrupted fiber; the body does not run (`fibers.ts:87`).
 
-Хук закрывает группу, прерывает её детей и ждёт их. Так как хук выполняется в C1, до C4 и до финализаторов, приобретения детей группы освобождаются после их конца. Go до Р31 останавливал группу финализатором в C5, по её месту в стеке.
+The hook closes the group, interrupts its children and waits for them. Since the hook runs in C1, before C4 and before the finalizers, the acquisitions of the group's children are released after those children end. Go registers the stop the same way, as an `onClose` hook ([fiber groups in Go](#go-a-fiber-group-is-stopped-by-a-finalizer)).
 
-`join` группы ждёт первой неудачи. Падение после закрытия группы, если `join` не было, никуда не идёт: группа сама себе супервизор (`FiberSet.fl`).
+`join` on a group waits for the first failure. A failure after the group closed, without a `join`, goes nowhere: the group is its own supervisor (`FiberSet.fl`).
 
 ### 3.7 `Ref`
 
 ```text
-Ref.modify ℓ g  →  (b, v') := g μ(ℓ);  μ(ℓ) := v';  b          один шаг
+Ref.modify ℓ g  →  (b, v') := g μ(ℓ);  μ(ℓ) := v';  b          one step
 ```
 
-`g` — чистая стрелка (`Ref.fl`). По T2(a) ядра её вычисление — только шаги `→ₚ` и, возможно, `die`, без `Ref`, `await` и сервисов. Поэтому шаг атомарен: в JS вычисление `g` не отдаёт нить, в Go оно идёт под мьютексом ячейки (`sync.go:30-37`). `die` в `g` оставляет ячейку прежней. Остальные операции `Ref` — обёртки над `modify` (`Ref.fl:68-160`).
+`g` is a pure arrow (`Ref.fl`). By the core's T2(a), its evaluation consists only of `→ₚ` steps and possibly `die`, with no `Ref`, `await` or services. So the step is atomic: in JS evaluating `g` does not yield the thread, in Go it runs under the cell's mutex (`sync.go:30-37`). A `die` in `g` leaves the cell unchanged. The other `Ref` operations wrap `modify` (`Ref.fl:68-160`).
 
-### 3.8 Корень и приёмник дефектов
+### 3.8 The root and the defect sink
 
-Раннер выполняет `main` в корневом владельце `π₀` (JS `entry.ts`, Go `Main`). Падение супервизора идёт в `D` корня (`reportDefect`, Go `reported`), и раннер завершает программу с кодом 1 (`reference/runtime.md` «Entry runner»). Сигнал — `interrupt` главного файбера и закрытие `π₀` по §3.3.
+The runner runs `main` in the root owner `π₀` (JS `entry.ts`, Go `Main`). A supervisor failure goes to the root's `D` (`reportDefect`, Go `reported`), and the runner ends the program with code 1 (`reference/runtime.md` "Entry runner"). A signal is an `interrupt` of the main fiber followed by closing `π₀` by §3.3.
 
-Тест `flick test` — свой корень: тело и закрытие в `ownedExits` (`owner.ts:108-119`), в Go — `testing.go`. До Р33 `D` в тестах не читался.
+A `flick test` test is its own root: the body and the closing run in `ownedExits` (`owner.ts:108-119`), in Go in `testing.go`. The test reads its own `D` and fails on a supervisor defect ([supervisor defects in tests](#a-supervisor-defect-is-lost-in-flick-test)).
 
-## 4. Свойства
+## 4. Properties
 
-Метки:
+Labels:
 
-- **[JS]** — держит JS-рантайм своим кодом;
-- **[E]** — держит Effect 4.0.5; это гипотеза о библиотеке, её пункт в Г7;
-- **[Go]** — держит Go-рантайм своим кодом.
+- **[JS]** — held by the JS runtime's own code;
+- **[E]** — held by Effect 4.0.5; this is a hypothesis about the library, its item in G7;
+- **[Go]** — held by the Go runtime's own code.
 
-**R1 (ровно один раз).** Пусть `acquire_release π a rel` вернул `v` или выполнился `add_finalizer π t`. Тогда при любом исходе тела `π` — значение, `fail c` с любыми причинами, прерывание — `rel v` (`t`) начинается ровно один раз, и до конца закрытия `π`.
+**R1 (exactly once).** Suppose `acquire_release π a rel` returned `v`, or `add_finalizer π t` ran. Then for any outcome of the body of `π` — a value, `fail c` with any reasons, an interruption — `rel v` (`t`) starts exactly once, and before closing `π` ends.
 
 - JS:
-  - [E] `Scope.close` переходит в `Closed` до финализаторов и повторно ничего не делает (Г7а); финализатор, добавленный в закрытую область, выполняется сразу; приобретение и регистрация — под одной маской (Г7б);
-  - [JS] закрытие владельца замаскировано (`withOwner`); регистрация аренд под маской — после Р36.
-- Go: [Go] срез финализаторов забирается и обнуляется под `o.mu` (`owner.go:118-119`), повторное закрытие пусто; `add` после начала C5 выполняет финализатор сразу, после Р27 — с исходом области.
-- Исключение: процесс убит (`os.Exit`, фатальная ошибка Go — Г8).
+  - [E] `Scope.close` moves to `Closed` before the finalizers and does nothing when repeated (G7a); a finalizer added to a closed scope runs at once; acquisition and registration are under one mask (G7b);
+  - [JS] closing an owner is masked (`withOwner`); lease registration runs under the mask ([leases](#js-leases-register-their-release-outside-the-mask)).
+- Go: [Go] the finalizer slice is taken and cleared under `o.mu` (`owner.go:118-119`), a repeated close is empty; `add` after C5 has started runs the finalizer at once, with the scope's outcome ([late finalizers in Go](#go-a-finalizer-added-during-closing-runs-at-once)).
+- Exception: the process is killed (`os.Exit`, a fatal Go error — G8).
 
-**R2 (порядок).** Финализаторы `F(π)` выполняются в порядке, обратном добавлению. Первый начинается только после того, как закончились все `K(π)`, все `W(π)`, все дети групп `π` и осели все `P(π)`.
+**R2 (order).** The finalizers of `F(π)` run in the reverse order of addition. The first starts only after all of `K(π)` and `W(π)` have finished, all children of the groups of `π` have finished, and all of `P(π)` have settled.
 
-- JS: [JS] фазы `close`, хуки групп в C1; [E] LIFO и последовательная стратегия `Scope` по умолчанию (Г7а), `interruptAll` ждёт каждого (Г7г).
-- Go: [Go] фазы `closeWithCause`; после Р27 — приём финализаторов до C5, после Р31 — группы в C1.
+- JS: [JS] the phases of `close`, group hooks in C1; [E] LIFO and the default sequential strategy of `Scope` (G7a), `interruptAll` waits for each (G7d).
+- Go: [Go] the phases of `closeWithCause`; finalizers are admitted until C5 ([late finalizers in Go](#go-a-finalizer-added-during-closing-runs-at-once)), groups stop in C1 ([fiber groups in Go](#go-a-fiber-group-is-stopped-by-a-finalizer)).
 
-**R3 (дети не переживают владельца).** Если закрытие `π` закончилось (C6), то не может сделать шаг ни один файбер из `K(π)` и `W(π)`, ни ребёнок группы `π`, ни ветвь комбинатора, начатого в `π`.
+**R3 (children do not outlive their owner).** If closing `π` has finished (C6), then no fiber of `K(π)` or `W(π)`, no child of a group of `π`, and no branch of a combinator started in `π` can take a step.
 
-- JS: [JS] C2–C3; после Р35 регистрацию ребёнка и наблюдателя не разрывает прерывание. [E] ветви `Effect.all` и `raceAll` ожидаются, в том числе при прерывании родителя (Г7г).
-- Go: [Go] `WaitGroup` на детей и супервизоров, `stop` после каждой ветви; дети групп — после Р31.
-- Не входит: внешняя работа после прерывания вызова. C4 ждёт её только как Promise; что делает foreign-код — Г9.
+- JS: [JS] C2–C3; an interruption cannot split the registration of a child and its watcher ([`fiberSpawn`](#js-fiberspawn-is-interruptible-midway)). [E] the branches of `Effect.all` and `raceAll` are awaited, including when the parent is interrupted (G7d).
+- Go: [Go] a `WaitGroup` over children and supervisors, `stop` after each branch; children of groups through the C1 hook ([fiber groups in Go](#go-a-fiber-group-is-stopped-by-a-finalizer)).
+- Out of scope: foreign work after the call is interrupted. C4 waits for it only as a Promise; what foreign code does is G9.
 
-**R4 (дефект ребёнка не теряется).** Пусть ребёнок `k ∈ K(π)` закончился с `fail c`, где в `c` есть `Die` или `Fail`. Тогда вызван `g (Failure c sd)`, а если `g` упал с `c_g`, то `c_g ∈ D` корня, и корень это видит: раннер — кодом 1, тест — падением теста. Для `parallel*` в результат входят причины без `Int` всех ветвей, упавших до конца группы (`⊕`).
+**R4 (a child's defect is not lost).** Suppose a child `k ∈ K(π)` finished with `fail c`, where `c` has a `Die` or a `Fail`. Then `g (Failure c sd)` was called, and if `g` failed with `c_g`, then `c_g ∈ D` of the root, and the root sees it: the runner as exit code 1, a test as a test failure. For `parallel*` the result includes the causes without `Int` of all branches that failed before the group ended (`⊕`).
 
-- JS: [JS] наблюдатель (`owner.ts:156-168`) и `reportDefect`; у каждого ребёнка есть наблюдатель после Р35; тесты — после Р33. [E] `forEachConcurrent` (Г7г).
-- Go: [Go] обратный вызов `fork` в `FiberSpawn`; `all` — после Р29; тесты и `Events.listen` — после Р33 и Р34.
-- По контракту не входят: исходы проигравших `race`/`timeout`; падения детей группы после её закрытия; `resource_auto` (Р39).
+- JS: [JS] the watcher (`owner.ts:156-168`) and `reportDefect`; every child has a watcher ([`fiberSpawn`](#js-fiberspawn-is-interruptible-midway)); tests ([supervisor defects in tests](#a-supervisor-defect-is-lost-in-flick-test)). [E] `forEachConcurrent` (G7d).
+- Go: [Go] the `fork` callback in `FiberSpawn`; `all` ([`parallel` in Go](#go-parallel-keeps-only-the-first-failure)); tests and `Events.listen` ([supervisor defects in tests](#a-supervisor-defect-is-lost-in-flick-test), [listener supervisors](#go-a-failing-eventslisten-supervisor-is-dropped)).
+- Excluded by contract: the outcomes of `race`/`timeout` losers; failures of group children after the group closed; `resource_auto` ([its refresh fiber](#the-refresh-fiber-of-resource_auto)).
 
-**R5 (покрытая ошибка не возвращается головой).** Пусть `try e with ā` типизирован с остатком `ε'` (правило (Try) ядра) и его вычисление кончилось `fail c`. Тогда `head(c)`, если она есть, — `Fail v` с `v : Errors ε'`. В частности, ветвь, покрывающая `E`, гарантирует `head(c) ≠ Fail (E …)`. Вторичные `Fail` с ошибками `E` в `c` могут остаться, но ни одна безопасная операция не отдаёт их как `Errors ε'` (I_ε, §2.4).
+**R5 (a covered error does not come back as the head).** Suppose `try e with ā` is typed with residual `ε'` (the core's (Try) rule) and its evaluation ended with `fail c`. Then `head(c)`, if any, is `Fail v` with `v : Errors ε'`. In particular, a branch covering `E` guarantees `head(c) ≠ Fail (E …)`. Secondary `Fail`s with `E` errors may remain in `c`, but no safe operation returns them as `Errors ε'` (I_ε, §2.4).
 
-- JS: [JS] `tryWith` (`cause.ts:39-54`) над [E] `catchCauseFilter`; I_ε — после Р26.
-- Go: [Go] `Try` (`cause.go:105-125`); I_ε — после Р26.
-- Формулировка роадмапа «отсутствие её `fail` в канале ожидаемых ошибок» верна только для головы. Причина `Fail B, Fail A` с ветвью для `A` уходит целиком: это контракт spec/07.
+- JS: [JS] `tryWith` (`cause.ts:39-54`) over [E] `catchCauseFilter`; I_ε ([secondary `Fail`](#a-secondary-fail-gets-the-type-of-the-residual)).
+- Go: [Go] `Try` (`cause.go:105-125`); I_ε (same).
+- The stronger reading "its `fail` is absent from the channel of expected errors" holds only for the head. The cause `Fail B, Fail A` with a branch for `A` propagates whole: this is the spec/05 contract.
 
-**R6 (слой).** В одном выполнении `provide L` — с вложенными `provide`, которые разделяют его memo-карту, — каждый мемоизуемый слой с одной идентичностью строится не более одного раза. Его область `σ` закрывается после того, как закрылись все владельцы-потребители, получившие из него сервисы через эту карту.
+**R6 (layer).** In one run of `provide L` — together with nested `provide`s that share its memo map — each memoizable layer with a given identity is built at most once. Its scope `σ` closes after all consuming owners that got services from it through this map have closed.
 
-- JS: [E] MemoMap по идентичности и счётчик наблюдателей (Г7д); [JS] сборка идёт в `owner.resources` владельца `provide`.
+- JS: [E] the MemoMap by identity and the observer counter (G7e); [JS] the build goes into the `owner.resources` of the `provide` owner.
 - Go: [Go] `memoMap.getOrBuild`, `observers`.
-- Потребитель, который получил сервисы не через карту, а через окружение, — ребёнок внешнего владельца, запущенный изнутри `provide` (Р37), — пользовался бы сервисом после закрытия `σ`; ни один рантайм этого не держит. R6 опирается на посылку «файбер берёт сервис из `θ` `provide` владельца `πₚ` только до закрытия `πₚ`»: запрос `ask_S`, на который отвечает окружение, отвечает кадр `provide`, чей владелец ещё не дошёл до (C5). Её даёт типизация: `regions.md` §2.7 (`Fiber.Provided`, `FLICK-G003`), пункт 3 T4. Сильнее типизация не даёт: ребёнок наследует всё окружение места запуска, а `Provided r ϱ` касается только сервисов его строки `r`, поэтому файбер может работать и после закрытия `provide`, сервисы которого он не берёт (Р142). В Lean это гипотеза Г11 (`G11`); модель ядра доказывает её как `T4_3` (`formal/Formal/T43Main.lean`).
+- A consumer that got the services not through the map but through the environment — a child of an outer owner started from inside `provide` ([the `provide` escape](#a-provide-service-outlives-the-release-of-its-layer)) — would use the service after `σ` closed; neither runtime prevents this. R6 rests on the premise "a fiber takes a service from the `θ` of a `provide` owner `πₚ` only before `πₚ` closes": a request `ask_S` answered by the environment is answered by a `provide` frame whose owner has not yet reached (C5). Typing gives it: `regions.md` §2.7 (`Fiber.Provided`, `FLICK-G003`), point 3 of T4. Typing gives nothing stronger: a child inherits the whole environment of the spawn site, and `Provided r ϱ` concerns only the services of its row `r`, so a fiber may keep running after a `provide` closes whose services it does not take ([the premise is per request](#the-provide-liveness-premise-is-stronger-than-typing-gives)). In Lean this is hypothesis G11 (`G11`); the core model proves it as `T4_3` (`formal/Formal/T43Main.lean`).
 
-**R7 (`Ref.modify` линеаризуем).** У каждого выполнения `Ref.modify ℓ g` есть точка линеаризации внутри его интервала, и история операций над `ℓ` эквивалентна последовательной.
+**R7 (`Ref.modify` is linearizable).** Each execution of `Ref.modify ℓ g` has a linearization point inside its interval, and the history of operations on `ℓ` is equivalent to a sequential one.
 
-- JS: [JS] одна нить, `g` чистая и синхронная (`builtins.ts:42-60`); ячейка — свой класс, не `Effect.Ref`.
-- Go: [Go] мьютекс ячейки на весь `modify` (`sync.go:30-37`).
+- JS: [JS] one thread, `g` pure and synchronous (`builtins.ts:42-60`); the cell is its own class, not `Effect.Ref`.
+- Go: [Go] the cell's mutex is held for the whole `modify` (`sync.go:30-37`).
 
-**R8 (законы причин).** Законы §2.2, `recover` из §2.3 и то, что `pretty`/`report` из §2.5 зависят только от списка причин. Паритет JS и Go опирается на то, что оба рантайма строят один и тот же список:
+**R8 (cause laws).** The laws of §2.2, `recover` of §2.3, and that `pretty`/`report` of §2.5 depend only on the list of reasons. JS–Go parity rests on both runtimes building the same list:
 
-- `⊕` там, где Effect вызывает `causeCombine`: закрытие области (C6), `parallel`, `Cause.combine`, `bracket`, `ensuring`, `on_exit`;
-- `⧺` там, где `causeFromReasons`: `race_success`, финализаторы области между собой.
+- `⊕` where Effect calls `causeCombine`: closing a scope (C6), `parallel`, `Cause.combine`, `bracket`, `ensuring`, `on_exit`;
+- `⧺` where it calls `causeFromReasons`: `race_success`, scope finalizers among themselves.
 
-Сверено с Effect 4.0.5: дерева нет, и Sequential/Parallel из AC роадмапа сводятся к одной `⊕` («a tree of sequential/parallel causes is not part of the contract», spec/07).
+Effect 4.0.5 has no tree, so the Sequential/Parallel distinction reduces to a single `⊕` ("a tree of sequential/parallel causes is not part of the contract", spec/05).
 
-- JS: [E] `FX/internal/core.ts:278-345` (Г7е).
-- Go: [Go] `cause.go` после Р30: `nub` с `Equals` для `Fail`, номером файбера для `Int` и идентичностью для `Die`.
+- JS: [E] `FX/internal/core.ts:278-345` (G7f).
+- Go: [Go] `cause.go`: `nub` with `Equals` for `Fail`, the fiber number for `Int`, and value equality for `Die` except thrown defects, which compare by identity ([combining causes in Go](#go-combining-causes-without-nub), [defects by value](#go-two-defects-with-the-same-string-are-two-reasons)).
 
-## 5. Гипотезы
+## 5. Hypotheses
 
-Действуют Г1–Г6 (`core.md`, `regions.md`). Добавляются:
+G1–G6 hold (`core.md`, `regions.md`). Added:
 
-- **Г7 (Effect 4.0.5).** Свойства с меткой [E]:
-  - а) `Scope.close` идемпотентен и переходит в `Closed` до финализаторов; при стратегии по умолчанию финализаторы последовательны и выполняются с конца; добавление в закрытую область выполняет финализатор сразу, с исходом области (`FX/internal/effect.ts:3940-4032, 4082-4091`);
-  - б) `acquireRelease` регистрирует освобождение под той же маской, что и приобретение (4143-4161); обработчики `onExit` замаскированы (4180-4185);
-  - в) выход из маски с ожидающим запросом прерывает сразу (4570-4576);
-  - г) `Fiber.interruptAll` прерывает и ждёт каждого (925-936). `forEachConcurrent` прерывает и ждёт ветви и соединяет поздние причины без `Int` через `⊕` (5140-5181). `raceAll` и `raceFirst` прерывают и ждут проигравших в замаскированном `onExit`, а если упали все — `⧺` (1614-1700);
-  - д) MemoMap: ключ — идентичность слоя, наблюдатели считаются, последний закрывает область; вложенная карта читает родителя (`FX/Layer.ts:253-275, 418-469, 781`);
-  - е) `causeCombine`, `dedupeReasons`, `causeFromReasons` — как в §2.1;
-  - ж) прерывание, которое пропустило обработчик, убирает из причины `Fail` и добавляет `Int` (`FX/internal/core.ts:611-622`). Go повторяет это в каждом обработчике восстановления (Р43). На типах это не сказывается: голова остаётся из `ε` или пропадает.
+- **G7 (Effect 4.0.5).** The properties labelled [E]:
+  - a) `Scope.close` is idempotent and moves to `Closed` before the finalizers; with the default strategy the finalizers run sequentially from the end; adding to a closed scope runs the finalizer at once, with the scope's outcome (`FX/internal/effect.ts:3940-4032, 4082-4091`);
+  - b) `acquireRelease` registers the release under the same mask as the acquisition (4143-4161); `onExit` handlers are masked (4180-4185);
+  - c) leaving a mask with a pending request interrupts at once (4570-4576);
+  - d) `Fiber.interruptAll` interrupts and waits for each fiber (925-936). `forEachConcurrent` interrupts and waits for the branches and joins late causes without `Int` with `⊕` (5140-5181). `raceAll` and `raceFirst` interrupt and wait for the losers in a masked `onExit`, and if all failed — `⧺` (1614-1700);
+  - e) MemoMap: the key is the layer's identity, observers are counted, the last one closes the scope; a nested map reads its parent (`FX/Layer.ts:253-275, 418-469, 781`);
+  - f) `causeCombine`, `dedupeReasons`, `causeFromReasons` — as in §2.1;
+  - g) an interruption that skipped a handler removes the `Fail`s from the cause and adds an `Int` (`FX/internal/core.ts:611-622`). Go repeats this in every recovery handler ([skipped handlers](#an-interruption-that-skips-a-handler-erases-fail-effect)). Types are unaffected: the head stays from `ε` or disappears.
 
-  Гипотезу проверяют тесты рантайма и `just effect-bump` при смене версии; X4 и X5 повторят проверку трассами.
-- **Г8 (Go).** Модель памяти Go: разблокировка мьютекса и закрытие канала дают happens-before. `recover` ловит только не-фатальные паники. Переполнение стека, гонка по `map`, нехватка памяти и `os.Exit` завершают процесс без финализаторов. `runtime.Goexit` в чужом коде не закрывает `done` и нарушает Г9.
-- **Г9 (внешние вызовы).** Promise внешнего `async`-вызова оседает, иначе C4 не кончается. Foreign-код не запускает работу, которую не отслеживает `P` и которая держит регион, — как Г4 для удержания. После прерывания вызова Go закрывает `done`, когда внешняя работа кончилась.
-- **Г10 (обработчики кончаются).** Супервизоры, финализаторы и хуки закрытия завершаются, иначе не кончаются C1, C3 или C5. Это живость, а не безопасность: R1–R7 говорят о шагах, которые случились.
+  The runtime tests check the hypothesis, and `just effect-bump` checks it again when the version changes; the runtime trace (`FLICK_TRACE`, `just stress`) and the cause-law properties (`cause_laws.fl`) exercise it on real runs.
+- **G8 (Go).** The Go memory model: unlocking a mutex and closing a channel give happens-before. `recover` catches only non-fatal panics. Stack overflow, a race on a `map`, running out of memory and `os.Exit` end the process without finalizers. `runtime.Goexit` in foreign code does not close `done` and breaks G9.
+- **G9 (foreign calls).** The Promise of a foreign `async` call settles; otherwise C4 does not finish. Foreign code does not start work that `P` does not track and that holds the region — like G4 for retention. After a call is interrupted, Go closes `done` when the foreign work has finished.
+- **G10 (handlers terminate).** Supervisors, finalizers and closing hooks terminate; otherwise C1, C3 or C5 does not finish. This is liveness, not safety: R1–R7 speak about steps that happened.
 
-## 6. Теорема T5
+## 6. Theorem T5
 
-**T5 (контракт рантайма).** Пусть `e₀` — программа (`core.md` §2.6), выполнены Г1–Г10 и `⟨{f₀ ↦ e₀}, {π₀ ↦ open}, ∅, ∅, ∅⟩ →* C` при любой допустимой перестановке (§3.1). Тогда на пути к `C` выполнены R1–R7. Посылку Р37 для R6 — сервис берётся из окружения только у живого `provide` — даёт типизация программы (`regions.md` §2.7, Р142).
+**T5 (the runtime contract).** Let `e₀` be a program (`core.md` §2.6), let G1–G10 hold, and let `⟨{f₀ ↦ e₀}, {π₀ ↦ open}, ∅, ∅, ∅⟩ →* C` under any admissible interleaving (§3.1). Then R1–R7 hold on the path to `C`. The premise of R6 — a service is taken from the environment only of a live `provide` — is given by the typing of the program (`regions.md` §2.7, [the premise is per request](#the-provide-liveness-premise-is-stronger-than-typing-gives)).
 
-Lean (P3): `T5` (`formal/Formal/RT/T5.lean`) — для любого ядра (`Core`, параметр) и любой перестановки: R1–R4 (`R1`–`R4`), R6 (`R6`), R7 (`R7`) в каждой достижимой конфигурации (`Reach`) и R5 (`R5`). Гипотезы — параметры: Г7(а)–(ж) без (в), Г8, Г9 — поля `Hyp` (`formal/Formal/RT/Hyp.lean`), посылка Р37 — `G11`: на запрос сервиса из окружения отвечает `provide` живого владельца; её даёт правило типизации `regions.md` §2.7, пункт 3 T4, в модели ядра это `T4_3` (Р142). Г7(в) не нужна: в модели нет маски, и прерывание доставляется в любой точке пользовательского кода, это больше перестановок, чем в §3.2. Г10 и живостные части Г8, Г9 в безопасность не входят. Упрощения модели — `formal/README.md`.
+Lean: `T5` (`formal/Formal/RT/T5.lean`) — for any core (`Core`, a parameter) and any interleaving: R1–R4 (`R1`–`R4`), R6 (`R6`), R7 (`R7`) in every reachable configuration (`Reach`), and R5 (`R5`). The hypotheses are parameters: G7(a)–(g) except (c), G8 and G9 are fields of `Hyp` (`formal/Formal/RT/Hyp.lean`); the premise of R6 is `G11`: a request for a service from the environment is answered by the `provide` of a live owner. The typing rule of `regions.md` §2.7, point 3 of T4, gives it; in the core model it is `T4_3`. G7(c) is not needed: the model has no mask, and interruption is delivered at any point of user code, which is more interleavings than §3.2 allows. G10 and the liveness parts of G8 and G9 are not part of safety. The model's simplifications are listed in `formal/README.md`.
 
-R8 — не утверждение о перестановках, а свойство функций `⊕`, `⧺`, `recover`, `pretty` и `report`. X5 проверяет его на обоих рантаймах. Lean: `R8` (`formal/Formal/RT/Cause.lean`).
+R8 is not a statement about interleavings but a property of the functions `⊕`, `⧺`, `recover`, `pretty` and `report`. `tests/run/runtime/cause_laws.fl` checks it on both runtimes. Lean: `R8` (`formal/Formal/RT/Cause.lean`).
 
-Инварианты достижимых конфигураций:
+Invariants of reachable configurations:
 
-- **И1 (состояния монотонны).** `st(π)` проходит `open → closing → finalizing → closed` и не возвращается. Переход из `open` — только (C0); из `closing` — только (C5), после (C1)–(C4).
-- **И2 (приём).** `K(π)` и `W(π)` растут только при `st = open` (Spawn), `H(π)` и `F(π)` — только при `st ∈ {open, closing}`.
-- **И3 (регистрация неразрывна).** Если ребёнок `k` запущен по (Spawn), то в той же атомарной группе шагов `k ∈ K(π)` и его наблюдатель `w ∈ W(π)`. В JS — после Р35, в Go — под `o.mu`.
-- **И4 (кто приобретает в `π`).** Шаги (Fin-Add), (Acquire) и (Ext) с `π_f = π` делает только файбер, у которого `π` — текущий владелец: тело `π`, `k ∈ K(π)`, `w ∈ W(π)`, ребёнок группы `π`, ветвь комбинатора, начатого таким файбером, финализатор или хук `π`. Для супервизора это требует Р28; для чужих регионов — Г6 (`within`).
-- **И5 (голова).** Каждое значение `Failure ε` и `Exit ε τ` удовлетворяет I_ε; после Р26.
-- **И6 (карта).** Для `m[L] = ⟨θ_L, σ, n⟩` число `n` равно числу финализаторов-наблюдателей `L` в `F` владельцев, которые ещё не прошли (C5); `σ` закрыта тогда и только тогда, когда `n` упало до 0.
+- **I1 (states are monotone).** `st(π)` goes `open → closing → finalizing → closed` and never goes back. The transition out of `open` is only (C0); out of `closing` only (C5), after (C1)–(C4).
+- **I2 (admission).** `K(π)` and `W(π)` grow only while `st = open` (Spawn); `H(π)` and `F(π)` only while `st ∈ {open, closing}`.
+- **I3 (registration is indivisible).** If a child `k` is started by (Spawn), then in the same atomic group of steps `k ∈ K(π)` and its watcher `w ∈ W(π)`. In JS through the mask of `fiberSpawn` ([`fiberSpawn`](#js-fiberspawn-is-interruptible-midway)), in Go under `o.mu`.
+- **I4 (who acquires in `π`).** The steps (Fin-Add), (Acquire) and (Ext) with `π_f = π` are taken only by a fiber whose current owner is `π`: the body of `π`, `k ∈ K(π)`, `w ∈ W(π)`, a child of a group of `π`, a branch of a combinator started by such a fiber, a finalizer or hook of `π`. For the supervisor this requires the watcher to run in the spawn owner ([supervisor owner in Go](#go-the-supervisor-acquires-into-the-scope-of-the-spawner)); for foreign regions it requires G6 (`within`).
+- **I5 (head).** Every `Failure ε` and `Exit ε τ` value satisfies I_ε ([secondary `Fail`](#a-secondary-fail-gets-the-type-of-the-residual)).
+- **I6 (map).** For `m[L] = ⟨θ_L, σ, n⟩`, the number `n` equals the number of observer finalizers of `L` in the `F` of owners that have not yet passed (C5); `σ` is closed if and only if `n` has dropped to 0.
 
-Lean (`formal/Formal/RT/`, P3b): И1 — `Inv.stJ` и условия `Good` событий `close`, `fins`, `closed`; И2 — `Inv.empty` и `Good` событий `spawn`, `fin`, `gkid`, `branch`; И3 — `Inv.spawnJ`; все вместе — `Inv`, сохраняемый каждым шагом (`Inv.step`, `Inv.reach`). И4 в Lean не моделируется: действие называет владельца номером, и модель проверяет только его состояние, а R1–R4 без И4 обходятся (см. R3).
+Lean (`formal/Formal/RT/`): I1 — `Inv.stJ` and the `Good` conditions of the events `close`, `fins`, `closed`; I2 — `Inv.empty` and `Good` of the events `spawn`, `fin`, `gkid`, `branch`; I3 — `Inv.spawnJ`; all together — `Inv`, preserved by every step (`Inv.step`, `Inv.reach`). I4 is not modelled in Lean: an action names its owner by number, and the model checks only that owner's state; R1–R4 do without I4 (see R3).
 
-Наброски:
+Sketches:
 
 - **R1.**
-  - По И2 финализатор попадает в `F(π)` при `st ∈ {open, closing}` или выполняется сразу по (Fin-Now).
-  - (C5) забирает `F(π)` целиком и выполняет каждый элемент один раз; по И1 (C5) происходит один раз.
-  - (C0) достигается при любом исходе тела: (C0) применим к любому `w`, а прерывание тела по (Int-Deliver) даёт `fail [Int …]`, то есть тоже `w`.
-  - Закрытие замаскировано, поэтому (C5) не прерывается. Между приобретением и регистрацией нет точки прерывания: (Acquire) под маской.
-  - Lean: `R1`, `Inv.r1` (`formal/Formal/RT/Props.lean`). Без Г7(а) и Г7(б) в модели есть шаги, которые его нарушают: `Step.addDrop`, `Step.acqDrop`, `Step.acqLost`.
+  - By I2 a finalizer enters `F(π)` while `st ∈ {open, closing}`, or runs at once by (Fin-Now).
+  - (C5) takes the whole `F(π)` and runs each element once; by I1, (C5) happens once.
+  - (C0) is reached for any outcome of the body: (C0) applies to any `w`, and interrupting the body by (Int-Deliver) gives `fail [Int …]`, which is also a `w`.
+  - Closing is masked, so (C5) is not interrupted. There is no interruption point between acquisition and registration: (Acquire) is under a mask.
+  - Lean: `R1`, `Inv.r1` (`formal/Formal/RT/Props.lean`). Without G7(a) and G7(b) the model has steps that break it: `Step.addDrop`, `Step.acqDrop`, `Step.acqLost`.
 - **R2.**
-  - (C5) идёт после (C1)–(C4) по построению.
-  - По И1 и И2 после (C0) в `K(π)` и `W(π)` ничего не добавляется, поэтому ожидание пустоты кончается ровно тогда, когда закончились все, кто был. Дети групп кончаются в (C1).
-  - `F` — стек (Fin-Add).
-  - Финализатор, который во время (C1)–(C4) добавляет ещё работающий ребёнок, попадает в `F` (И2), а не выполняется сразу. Это и нарушал Go до Р27.
-  - Lean: `R2`, `Inv.r2`. Номера финализаторов растут с регистрацией, поэтому «обратный порядок» — убывание номеров. Условие на детей доказано для всех, кто начат в `π`, включая ветви комбинаторов.
+  - (C5) comes after (C1)–(C4) by construction.
+  - By I1 and I2 nothing is added to `K(π)` and `W(π)` after (C0), so waiting for emptiness ends exactly when everyone who was there has finished. Children of groups finish in (C1).
+  - `F` is a stack (Fin-Add).
+  - A finalizer that a still-running child adds during (C1)–(C4) goes into `F` (I2) instead of running at once. Go enforces this with its `finalizing` state ([late finalizers in Go](#go-a-finalizer-added-during-closing-runs-at-once)).
+  - Lean: `R2`, `Inv.r2`. Finalizer numbers grow with registration, so "reverse order" is decreasing numbers. The condition on children is proved for everything started in `π`, including combinator branches.
 - **R3.**
-  - По И3 каждый ребёнок в `K(π)`. (C2) посылает запрос каждому, (C3) ждёт детей и наблюдателей.
-  - Ветви комбинатора ждёт сам комбинатор. Комбинатор — файбер, которого ждёт `π`: как тело, ребёнка или наблюдателя.
-  - Индукция по вложенности: файбер, начатый в `π`, принадлежит одному из этих множеств (И4).
-  - Lean: `R3`, `Inv.r3`. Вместо И4 — `Guard`: каждый работающий файбер ждёт кто-то из перечисленных, а ветвь — комбинатор, которого держит `par`-кадр (Г7(г)). Индукция по номеру файбера — `Inv.noRun` (`formal/Formal/RT/NoRun.lean`).
-- **R4.** По И3 у каждого ребёнка есть наблюдатель. Наблюдатель замаскирован, (C3) его ждёт, поэтому (Watch) выполнится до закрытия `π`. Падение `g` попадает в `D` корня; раннер читает `D` в конце (код 1), тест — после своего закрытия (Р33). Для `parallel` — (Par).
-  - Lean: `R4`, `Inv.r4`, `Inv.r4_closed` (с R3: после закрытия `π` каждое падение ребёнка дошло до супервизора), `parResult_keeps` для `parallel` при Г7(е).
+  - By I3 every child is in `K(π)`. (C2) sends each a request, (C3) waits for children and watchers.
+  - The branches of a combinator are awaited by the combinator itself. The combinator is a fiber that `π` waits for: as the body, a child or a watcher.
+  - Induction on nesting: a fiber started in `π` belongs to one of these sets (I4).
+  - Lean: `R3`, `Inv.r3`. Instead of I4 there is `Guard`: every running fiber is awaited by one of those listed, and a branch by the combinator that the `par` frame holds (G7(d)). Induction on the fiber number is `Inv.noRun` (`formal/Formal/RT/NoRun.lean`).
+- **R4.** By I3 every child has a watcher. The watcher is masked and (C3) waits for it, so (Watch) runs before `π` closes. A failure of `g` goes into the root's `D`; the runner reads `D` at the end (code 1), a test after its own closing ([supervisor defects in tests](#a-supervisor-defect-is-lost-in-flick-test)). For `parallel` — (Par).
+  - Lean: `R4`, `Inv.r4`, `Inv.r4_closed` (with R3: after `π` closes, every child failure has reached the supervisor), `parResult_keeps` for `parallel` under G7(f).
 - **R5.**
-  - Из (Try) ядра: остаток `ε'` содержит каждую ошибку тела, не покрытую ветвями.
-  - `recover` отдаёт `fail c` с прежней головой, только если голова не подошла ни одной ветви, а значит, её тип в `ε'`.
-  - Если в `c` есть `Die`: в `dies c` нет `Fail`.
-  - Остальное — И5: ни одна операция не делает вторичную `Fail` головой. `from_reasons` могла бы, но после Р26 вторичные `Fail` ей не достаются.
-  - Lean: `R5` (`formal/Formal/RT/Recover.lean`); I_ε — `Iε`, его сохранение `⊕`, `⧺`, закрытием и Г7(ж) — `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep`.
+  - From the core's (Try): the residual `ε'` contains every error of the body not covered by the branches.
+  - `recover` returns `fail c` with the same head only if the head matched no branch, so its type is in `ε'`.
+  - If `c` has a `Die`: `dies c` has no `Fail`.
+  - The rest is I5: no operation makes a secondary `Fail` the head. `from_reasons` could, but secondary `Fail`s reach it only as `Die`s ([secondary `Fail`](#a-secondary-fail-gets-the-type-of-the-residual)).
+  - Lean: `R5` (`formal/Formal/RT/Recover.lean`); I_ε is `Iε`, and its preservation by `⊕`, `⧺`, closing and G7(g) is `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep`.
 - **R6.**
-  - Мемоизуемый `L` строится только при `L ∉ m`. Запись вставляется до построения — под замком в Go, на одной нити в JS, — поэтому второй запрос ждёт.
-  - По И6 `σ` закрывается, когда последний владелец-потребитель прошёл (C5). Потребитель закрывается после своих детей (R2).
-  - Файбер, который получил `θ` не через карту, по `regions.md` §2.7 берёт из него сервисы только до закрытия `πₚ` (посылка Р37, пункт 3 T4, Р142); закончиться до закрытия `πₚ` он не обязан.
-  - Lean: `R6` (`formal/Formal/RT/T5.lean`): `Good6` — повторная сборка только после освобождения прежней и освобождение только после наблюдателей всех потребителей; `GoodUse` — сервис не используется после освобождения, при `G11`. И6 — `Inv6.obsIn`: наблюдатель записи либо в её `obs` (то есть `n` — их число), либо уже выполнен (C5) своего владельца.
-- **R7.** По §3.7 шаг `Ref.modify` атомарен; точка линеаризации — момент этого шага.
-  - Lean: `R7` (`formal/Formal/RT/RefLin.lean`): каждый `modify ℓ` прочёл значение последнего `make` или `modify` той же `ℓ`, память — воспроизведение журнала. Без Г8 в модели есть `Local.modRead` и `Step.modWrite`, и R7 нарушается.
+  - A memoizable `L` is built only when `L ∉ m`. The entry is inserted before the build — under a lock in Go, on the single thread in JS — so a second request waits.
+  - By I6, `σ` closes when the last consuming owner has passed (C5). A consumer closes after its children (R2).
+  - A fiber that got `θ` not through the map takes services from it, by `regions.md` §2.7, only before `πₚ` closes (the premise of R6, point 3 of T4, [per request](#the-provide-liveness-premise-is-stronger-than-typing-gives)); it need not finish before `πₚ` closes.
+  - Lean: `R6` (`formal/Formal/RT/T5.lean`): `Good6` — a rebuild only after the previous build is released, and a release only after the observers of all consumers; `GoodUse` — a service is not used after its release, under `G11`. I6 is `Inv6.obsIn`: an entry's observer is either in its `obs` (so `n` is their count) or its owner's (C5) has already run it.
+- **R7.** By §3.7 the `Ref.modify` step is atomic; the linearization point is the moment of that step.
+  - Lean: `R7` (`formal/Formal/RT/RefLin.lean`): each `modify ℓ` read the value of the last `make` or `modify` of the same `ℓ`; memory is a replay of the log. Without G8 the model has `Local.modRead` and `Step.modWrite`, and R7 fails.
 
-### 6.1 Трассы (X4)
+### 6.1 Traces
 
-T5 говорит о путях, а рантаймы показывают только вывод. Поэтому оба рантайма пишут трассу: при `FLICK_TRACE=<файл>` каждый шаг контракта владельцев — одна JSON-строка. События и поля одни на JS и Go (список — `runtime-go/flickrt/trace.go`):
+T5 speaks about paths, but the runtimes show only output. So both runtimes write a trace: with `FLICK_TRACE=<file>`, each step of the owner contract is one JSON line. Events and fields are the same in JS and Go (the list is in `runtime-go/flickrt/trace.go`):
 
-- владелец `main`, `scope` или `provide` открылся, его фазы C0–C6;
-- ребёнок: регистрация с наблюдателем, конец с исходом, вызов супервизора, конец наблюдателя, отказ в закрытом владельце, запрос C2;
-- финализатор, который добавил Flick (`acquire_release`, `Scope.add_finalizer`, `add_finalizer_exit`): в стек или сразу (Fin-Now), и его запуск;
-- внешний вызов, которого ждёт владелец, и его оседание;
-- сборка мемоизуемого слоя и её освобождение, конец `main`.
+- an owner `main`, `scope` or `provide` opened, and its phases C0–C6;
+- a child: registration with its watcher, end with an outcome, the supervisor call, the end of the watcher, refusal in a closed owner, the C2 request;
+- a finalizer added by Flick (`acquire_release`, `Scope.add_finalizer`, `add_finalizer_exit`): onto the stack or at once (Fin-Now), and its run;
+- a foreign call the owner waits for, and its settling;
+- the build of a memoizable layer and its release, the end of `main`.
 
-Выключенная трасса стоит одну проверку на точку.
+A disabled trace costs one check per point.
 
-Монитор `flick-model/src/rt/monitor.rs` проигрывает трассу и сообщает первый шаг, которого λRT не допускает, с предшествующими шагами того же владельца. Он проверяет И1–И3, R1–R4, а R6 и И6 — насколько их видно без memo-карт: каждая сборка освобождена не больше одного раза и освобождена к концу `main`. И4 трасса не проверяет: в ней нет файбера, сделавшего шаг. И5 и R5 проверяет X5 (`cause_laws.fl`), R7 не трассируется, хуки C1 тоже.
+The monitor `flick-model/src/rt/monitor.rs` replays a trace and reports the first step λRT does not admit, with the preceding steps of the same owner. It checks I1–I3, R1–R4, and R6 and I6 as far as they are visible without memo maps: each build is released at most once and is released by the end of `main`. The trace does not check I4: it does not record which fiber took a step. The cause-law properties (`cause_laws.fl`) check I5 and R5; R7 is not traced, nor are the C1 hooks.
 
-Проекция `flick-model/src/rt/project.rs` — то, в чём JS и Go обязаны совпасть. Владельцы названы местом в дереве: каждый среди братьев по порядку открытия. Для каждого — вид, докуда дошло закрытие, исходы детей, финализаторы и порядок их запуска. В проекцию не входят номера файберов, общий порядок шагов, внешние вызовы (Go ставит вызов в `P` только после его прерывания, §1.3) и запросы C2 (их получает только ребёнок, который ещё не кончился).
+The projection `flick-model/src/rt/project.rs` is what JS and Go must agree on. Owners are named by their place in the tree: each among its siblings by order of opening. For each: the kind, how far closing got, the outcomes of children, the finalizers and the order they ran in. The projection excludes fiber numbers, the global order of steps, foreign calls (Go puts a call into `P` only after it is interrupted, §1.3) and C2 requests (only a child that has not yet finished receives one).
 
-`flick/tests/e2e.rs` пишет трассу каждого запуска и проверяет монитором каждую. У кейсов `tests/run/runtime/` проекция обоих профилей Go должна совпасть с проекцией отладочного JS. У остальных портируемых кейсов проекции законно различаются: стандартная библиотека каждого рантайма строит свои слои и добавляет свои финализаторы. Монитор их трассы проходят.
+`flick/tests/e2e.rs` writes the trace of every run and checks each with the monitor. For the cases in `tests/run/runtime/`, the projection of both Go profiles must equal the projection of debug JS. For the other portable cases the projections legitimately differ: each runtime's standard library builds its own layers and adds its own finalizers. Their traces pass the monitor.
 
-Ограничения (`shortcut:` в коде):
+Limitations (`shortcut:` in the code):
 
-- финализаторы, которые добавляет сам Effect (слои, каналы, серверы), JS не видит. Поэтому R1 и R2 проверяются на финализаторах Flick, и Go свои внутренние тоже не пишет;
-- владелец, открытый файбером вне дерева `main` (внутренний владелец Go), — корень проекции (`stdlib/http/lifecycle`);
-- доставка прерывания не трассируется, только запрос C2.
+- JS does not see finalizers that Effect itself adds (layers, channels, servers). So R1 and R2 are checked on Flick finalizers, and Go does not write its internal ones either;
+- an owner opened by a fiber outside the `main` tree (an internal Go owner) is a root of the projection (`stdlib/http/lifecycle`);
+- interruption delivery is not traced, only the C2 request.
 
-`just stress` запускает каждый кейс `tests/run/runtime/` N раз на обоих рантаймах с `FLICK_STRESS=<сид>` и проверяет каждую трассу монитором. В Go точки прерывания и старт файбера уступают или спят случайно, turns выключены. В JS `main` идёт под планировщиком, который тасует задачи раунда в пределах приоритета и случайно уступает. Нарушение печатается с кейсом, рантаймом, сидом и командой повтора. В CI рецепта нет.
+`just stress` runs every case of `tests/run/runtime/` N times on both runtimes with `FLICK_STRESS=<seed>` and checks every trace with the monitor. In Go, interruption points and fiber start yield or sleep at random, and turns are off. In JS, `main` runs under a scheduler that shuffles the tasks of a round within a priority and yields at random. A violation is printed with the case, the runtime, the seed and the command to reproduce it. CI does not run the recipe.
 
-## 7. Расхождения
+## 7. Known divergences
 
-Р26–Р34 и Р37 подтверждены пробами: программа принята чекером на `bea06b9e`, а вывод на Node или Go противоречит свойству или другому рантайму. Р35 и Р36 найдены чтением кода; их подтверждают юнит-тесты рантайма, которые падают до исправления. Остальные — неполнота, гипотеза о библиотеке или неточность прозы.
+The divergences that come with a probe program were confirmed by the probe: the checker accepts the program, and the output on Node or Go contradicts the property or the other runtime. The `fiberSpawn` and lease divergences were found by reading the code; runtime unit tests that fail without the fix confirm them. The rest are incompleteness, a hypothesis about the library, or imprecise prose.
 
-Статус: внесены Р26–Р38, Р40, Р41, Р43, Р80–Р82 и Р160; у каждого исправления есть тест или фикстура, которые падают до него. Р39, Р42, Р44, Р45 и В4 записаны.
+Every fixed divergence has a test or fixture that fails without the fix. Those resolved as "recorded" are documented here and left as they are.
 
-Фикстуры `tests/run/runtime/close_phases.fl`, `cause_lists.fl` и `cause_laws.fl` входят в `portable.txt`: их вывод на Node и Go совпадает.
+The fixtures `tests/run/runtime/close_phases.fl`, `cause_lists.fl` and `cause_laws.fl` are in `portable.txt`: their output on Node and Go agrees.
 
-Общие определения проб:
+Shared definitions of the probes:
 
 ```flick
 module App.Main exposing (main)
@@ -551,7 +551,7 @@ report : forall e. Failure e ->{} Unit
 let report f = say ("supervised " ++ show (Cause.has_fails f, Cause.has_dies f, Cause.has_interrupts f))
 ```
 
-**Р26. Вторичная `Fail` получает тип остатка.**
+### A secondary `Fail` gets the type of the residual
 
 ```flick
 type error A = A Float
@@ -584,19 +584,19 @@ let main () =
   | None -> ()
 ```
 
-- Что происходит: программа принята, Node печатает `primary: B b`, затем `flipped: undefined`. Исчерпывающий `match` по `Errors {B}` получил `A 1` и вернул `undefined` как `String`; нарушены T1 ядра и R5.
-  - `Cause.map bang f` с `bang : Errors {B} -> Errors {B}` вызывает `bang` на `A 1`, а `Exit.map_error` и `Exit.map_both` — так же.
-  - На Go `Failure.rethrow` и `Cause.from_reasons` недоступны (`FLICK-P012`). Но `Cause.map`, `Exit.map_error`, `Exit.map_both` и `Cause.reasons` есть и обходят все `Fail` (`exit.go` `CauseMap`, `ExitMapError`, `CauseReasons`). Причину `Fail B, Fail A` под типом `{B}` там даёт `parallel` после Р29.
-- Причина: привязки повторяют `Cause.map` и `Cause.reasons` Effect, а те не отличают голову от вторичных `Fail` (`runtime/src/effect/Cause.ts:33-47`, `runtime/src/effect/Exit.ts`, Go `exit.go`). Нарушен I_ε.
-- Решение — привязки, как требует spec/07:
-  - функция `Cause.map`, `Exit.map_error`, `Exit.map_both` применяется только к голове, вторичные `Fail` остаются как есть;
-  - `Cause.reasons` отдаёт вторичные `Fail` как `Die` с той же ошибкой: для типизированного представления это дефекты. `from_reasons` от такого списка восстанавливает причину, в которой восстановление заблокировано, — консервативно и безопасно.
+- Divergence: the program is accepted, and Node prints `primary: B b`, then `flipped: undefined`. An exhaustive `match` over `Errors {B}` received `A 1` and returned `undefined` as a `String`; the core's T1 and R5 are broken.
+  - `Cause.map bang f` with `bang : Errors {B} -> Errors {B}` calls `bang` on `A 1`, and so do `Exit.map_error` and `Exit.map_both`.
+  - On Go, `Failure.rethrow` and `Cause.from_reasons` are unavailable (`FLICK-P012`). But `Cause.map`, `Exit.map_error`, `Exit.map_both` and `Cause.reasons` exist and visit every `Fail` (`exit.go` `CauseMap`, `ExitMapError`, `CauseReasons`). There, `parallel` produces the cause `Fail B, Fail A` at type `{B}` once it keeps late failures ([`parallel` in Go](#go-parallel-keeps-only-the-first-failure)).
+- Cause: the bindings mirror Effect's `Cause.map` and `Cause.reasons`, which do not distinguish the head from secondary `Fail`s (`runtime/src/effect/Cause.ts:33-47`, `runtime/src/effect/Exit.ts`, Go `exit.go`). I_ε is broken.
+- Resolution — the bindings, as spec/05 requires:
+  - the function of `Cause.map`, `Exit.map_error`, `Exit.map_both` applies only to the head; secondary `Fail`s stay as they are;
+  - `Cause.reasons` returns secondary `Fail`s as `Die`s with the same error: for the typed view they are defects. `from_reasons` over such a list rebuilds a cause in which recovery is blocked — conservative and safe.
 
-  Сама причина не меняется: `Failure.rethrow`, `inspect` и рендер видят исходный список.
+  The cause itself does not change: `Failure.rethrow`, `inspect` and rendering see the original list.
 
-  Внесено в оба рантайма (`effect/Cause.ts` `flickReasons`, `mapHead`; `effect/Exit.ts`; Go `mapErrors`, `CauseReasons`). Фикстура — `cause_lists.fl` (`Cause.map`, `Exit.map_error` над `Fail B, Fail A`); тесты — `runtime/test/cause.test.ts`, `cause_test.go` `TestTheTypedViewOfACauseSeesItsHeadOnly`.
+  Fixed in both runtimes (`effect/Cause.ts` `flickReasons`, `mapHead`; `effect/Exit.ts`; Go `mapErrors`, `CauseReasons`). Fixture: `cause_lists.fl` (`Cause.map`, `Exit.map_error` over `Fail B, Fail A`); tests: `runtime/test/cause.test.ts`, `cause_test.go` `TestTheTypedViewOfACauseSeesItsHeadOnly`.
 
-**Р27. Go: финализатор, добавленный во время закрытия, выполняется сразу.**
+### Go: a finalizer added during closing runs at once
 
 ```flick
 main : Unit ->{; AppError} Unit
@@ -617,11 +617,11 @@ let main () =
   say "after scope"
 ```
 
-- Что происходит: на Node — `body done`, `open late`, `child uses late`, `child done with late`, `supervised (false, false, true)`, `close late`, `after scope`. На Go `close late` идёт сразу после `open late`, до `child uses late`: ребёнок пользуется освобождённым ресурсом. Нарушает R2.
-- Причина: `closeWithCause` в C0 ставит `open = false`, а `add` при `!open` выполняет финализатор на месте (`owner.go:65-77, 113`). Один флаг закрывает и приём детей (C0), и приём финализаторов, который должен жить до C5 (И2). Заодно `add` в закрытого владельца передаёт `exit = nil`, а не исход области (Г7а).
-- Решение — Go: приём детей и приём финализаторов — разные состояния, как в JS; `add` выполняет финализатор сразу только с начала C5 и передаёт сохранённый исход. Строки `supervised` на Go нет по другой причине — Р32. Внесено (`Owner.finalizing`, `exit`); фикстура — `close_phases.fl` `late_acquire`.
+- Divergence: on Node — `body done`, `open late`, `child uses late`, `child done with late`, `supervised (false, false, true)`, `close late`, `after scope`. On Go, `close late` came right after `open late`, before `child uses late`: the child used a released resource. Breaks R2.
+- Cause: `closeWithCause` set `open = false` in C0, and `add` with `!open` ran the finalizer on the spot (`owner.go:65-77, 113`). One flag closed both the admission of children (C0) and the admission of finalizers, which must last until C5 (I2). Also, `add` into a closed owner passed `exit = nil` instead of the scope's outcome (G7a).
+- Resolution — Go: admission of children and admission of finalizers are separate states, as in JS; `add` runs a finalizer at once only from the start of C5 and passes the saved outcome. Fixed (`Owner.finalizing`, `exit`); fixture: `close_phases.fl` `late_acquire`. Go lacked the `supervised` line for a different reason ([mask exit in Go](#go-leaving-a-mask-does-not-deliver-a-pending-interruption)).
 
-**Р28. Go: супервизор приобретает в область того, кто запустил ребёнка.**
+### Go: the supervisor acquires into the scope of the spawner
 
 ```flick
 main : Unit ->{; AppError} Unit
@@ -641,11 +641,11 @@ let main () =
   say "after"
 ```
 
-- Что происходит: на Node `close sup` идёт после `outer body done`, на Go — сразу после `inner done`. Ресурс региона `outer` освобождён при закрытии `inner`, пока `outer` жив; его дескриптор мог уйти в ячейку `outer`. Нарушает R1, R2 и через Г6 — T4.
-- Причина: наблюдатель — копия файбера, который вызвал `spawn` (`watcher := *fb`, `concurrency.go:119-121`), с его владельцем. JS выполняет супервизор `inside(owner, …)` (`owner.ts:163`), как требует тип `Failure e ->{Scope s | r} Unit`.
-- Решение — Go: владелец наблюдателя — `owner` из `spawn`. Внесено; фикстура — `close_phases.fl` `supervisor_owner`.
+- Divergence: on Node, `close sup` comes after `outer body done`; on Go it came right after `inner done`. A resource of region `outer` was released when `inner` closed, while `outer` was alive; its handle could have escaped into a cell of `outer`. Breaks R1, R2 and, through G6, T4.
+- Cause: the watcher was a copy of the fiber that called `spawn` (`watcher := *fb`, `concurrency.go:119-121`), with that fiber's owner. JS runs the supervisor `inside(owner, …)` (`owner.ts:163`), as the type `Failure e ->{Scope s | r} Unit` requires.
+- Resolution — Go: the watcher's owner is the `owner` passed to `spawn`. Fixed; fixture: `close_phases.fl` `supervisor_owner`.
 
-**Р29. Go: `parallel` оставляет только первую неудачу.**
+### Go: `parallel` keeps only the first failure
 
 ```flick
 type error Boom = Boom Float
@@ -664,11 +664,11 @@ let main () =
   | None -> say "ok"
 ```
 
-- Что происходит: Node — `distinct 2`, Go — `distinct 1`. С `late 1 30` во второй ветви обе печатают `same 1`: Effect соединяет через `⊕`, и `nub` убирает равную ошибку. `race_success` при двух неудачах даёт 2 на обоих (`⧺`). Нарушают R4 для поздних дефектов ветвей и паритет.
-- Причина: `all` бросает первую неудачу после `stop`, не глядя на исходы остановленных (`concurrency.go:194-200`). Effect добавляет их причины без `Int` (Г7г).
-- Решение — Go: как `forEachConcurrent` — `c₁ ⊕ c₂' ⊕ …` по порядку окончания, с `nub` из Р30. Внесено; фикстура — `cause_lists.fl` (`parallel 2 1, race 2`).
+- Divergence: Node printed `distinct 2`, Go `distinct 1`. With `late 1 30` in the second branch both print `same 1`: Effect joins with `⊕`, and `nub` removes the equal error. `race_success` with two failures gives 2 on both (`⧺`). Breaks R4 for late defects of branches, and parity.
+- Cause: `all` threw the first failure after `stop` without looking at the outcomes of the stopped branches (`concurrency.go:194-200`). Effect adds their causes without `Int` (G7d).
+- Resolution — Go: like `forEachConcurrent`, `c₁ ⊕ c₂' ⊕ …` in order of finishing, with `nub` ([combining causes in Go](#go-combining-causes-without-nub)). Fixed; fixture: `cause_lists.fl` (`parallel 2 1, race 2`).
 
-**Р30. Go: `⊕` без `nub`.**
+### Go: combining causes without `nub`
 
 ```flick
 type error Boom = Boom Float
@@ -682,11 +682,11 @@ let main () =
   say (show (List.length (Cause.reasons same), List.length (Cause.reasons other), List.length (Cause.reasons assoc)))
 ```
 
-- Что происходит: Node — `(1, 2, 2)`, Go — `(2, 2, 3)`. Нарушает R8: (⊕-Idem) и паритет; через Р29 — и вывод `parallel`.
-- Причина: `Sequential` и `Parallel` — просто узлы дерева (`cause.go:39-50`).
-- Решение — Go: `Sequential` и `Parallel` — `⊕` с `nub`: `Fail` сравниваются `Equals`, `Int` — по номеру файбера, `Die` — по идентичности, потому что в Go дефект — текст, а в JS два дефекта с одним текстом различны. `⧺` (`concat`) остаётся у `race`, `race_all`, `Exit.as_void_all`, `failsToDies` и между финализаторами области, как в Effect. Внесено; фикстура — `cause_lists.fl`, тест — `cause_test.go` `TestCombineKeepsEachReasonOnce`.
+- Divergence: Node printed `(1, 2, 2)`, Go `(2, 2, 3)`. Breaks R8: (⊕-Idem) and parity; through `parallel` ([`parallel` in Go](#go-parallel-keeps-only-the-first-failure)), also its output.
+- Cause: `Sequential` and `Parallel` were plain tree nodes (`cause.go:39-50`).
+- Resolution — Go: `Sequential` and `Parallel` are `⊕` with `nub`: `Fail`s compare by `Equals`, `Int`s by fiber number, `Die`s by identity, because in Go a defect is text while in JS two defects with the same text are different (refined for defects by value: [defects by value](#go-two-defects-with-the-same-string-are-two-reasons)). `⧺` (`concat`) stays for `race`, `race_all`, `Exit.as_void_all`, `failsToDies` and between scope finalizers, as in Effect. Fixed; fixture: `cause_lists.fl`; test: `cause_test.go` `TestCombineKeepsEachReasonOnce`.
 
-**Р31. Go: группа файберов останавливается финализатором.**
+### Go: a fiber group is stopped by a finalizer
 
 ```flick
 main : Unit ->{; AppError} Unit
@@ -706,11 +706,11 @@ let main () =
   say "after"
 ```
 
-- Что происходит: Node — `open g`, `body done`, `group child done with g`, `close g`. Go — `close g` до `group child done with g`. Нарушает R2.
-- Причина: `newGroup` регистрирует останов группы как финализатор (`fibergroup.go:26-38`). Приобретения её детей добавлены позже и выполняются раньше, пока дети работают. JS регистрирует хук закрытия (C1, `stdlib/fibers.ts:66-88`). Кроме того, ребёнок, добавленный в закрытую группу, в Go запускается и прерывается, но не ожидается (`fibergroup.go:71-75`); в JS тело не выполняется.
-- Решение — Go: у `Owner` появляются хуки C1, группа регистрирует останов хуком; `run` в закрытую группу не запускает тело, а ребёнка, вокруг которого группа закрылась во время добавления, дожидается вызывающий. Внесено (`Owner.onClose`, `fibergroup.go`); фикстура — `close_phases.fl` `group_close`.
+- Divergence: Node — `open g`, `body done`, `group child done with g`, `close g`. Go printed `close g` before `group child done with g`. Breaks R2.
+- Cause: `newGroup` registered the group stop as a finalizer (`fibergroup.go:26-38`). The acquisitions of its children were added later and ran earlier, while the children were still working. JS registers a closing hook (C1, `stdlib/fibers.ts:66-88`). Also, a child added to a closed group was started and interrupted in Go, but not awaited (`fibergroup.go:71-75`); in JS the body does not run.
+- Resolution — Go: `Owner` has C1 hooks, and a group registers its stop as a hook; `run` into a closed group does not run the body, and a child around which the group closed while it was being added is awaited by the caller. Fixed (`Owner.onClose`, `fibergroup.go`); fixture: `close_phases.fl` `group_close`.
 
-**Р32. Go: выход из маски не доставляет ожидающее прерывание.**
+### Go: leaving a mask does not deliver a pending interruption
 
 ```flick
 main : Unit ->{; AppError} Unit
@@ -729,11 +729,11 @@ let main () =
   }
 ```
 
-- Что происходит: Node — `block done`, `supervised (false, false, true)`, `interrupted`. Go — `block done`, `after block`, `interrupted`: ребёнок доработал после запроса и закончился успехом, супервизор не вызван. То же в пробе Р27: на Go нет строки `supervised`.
-- Причина: `masked` восстанавливает глубину через `defer`, без проверки (`fiber.go:99-104`). Следующая точка прерывания в Go — следующий `Run`, а прямой вызов `say` ею не является. Effect прерывает на выходе из маски (Г7в), модель — по (Unmask).
-- Решение — Go: `Uninterruptible` и `UninterruptibleMask`/`InterruptibleMask` после тела делают `Check`, если глубина вернулась к нулю. Внутренние маски (финализаторы, закрытие, `ensuring`, `on_exit`) оставляют запрос до следующей точки прерывания: проверка там прервала бы закрытие. Внесено; фикстура — `close_phases.fl` `unmask`.
+- Divergence: Node — `block done`, `supervised (false, false, true)`, `interrupted`. Go printed `block done`, `after block`, `interrupted`: the child kept working after the request and ended with success, and the supervisor was not called. The same shows in the [late-finalizer probe](#go-a-finalizer-added-during-closing-runs-at-once): Go has no `supervised` line.
+- Cause: `masked` restored the depth with `defer`, without a check (`fiber.go:99-104`). The next interruption point in Go is the next `Run`, and a direct call to `say` is not one. Effect interrupts on leaving the mask (G7c), the model by (Unmask).
+- Resolution — Go: `Uninterruptible` and `UninterruptibleMask`/`InterruptibleMask` run `Check` after the body if the depth is back to zero. Internal masks (finalizers, closing, `ensuring`, `on_exit`) leave the request until the next interruption point: a check there would interrupt the closing. Fixed; fixture: `close_phases.fl` `unmask`.
 
-**Р33. Дефект супервизора теряется в `flick test`.**
+### A supervisor defect is lost in `flick test`
 
 ```flick
 module App.Sup exposing (tests)
@@ -752,26 +752,26 @@ let tests = [
 ]
 ```
 
-- Что происходит: `flick test --emit js` и `--emit go` — `✓ a supervisor that dies`, код 0. Тот же код в `main` завершает программу с кодом 1 («a defect of a supervisor»). Нарушает R4.
-- Причина: приёмник дефектов глобальный (`owner.ts:38-43`, Go `reported`), и читает его только раннер `main` (`entry.ts:164`, Go `platform.go:146`). Тестовый раннер (`ownedExits`, Go `testing.go`) его не читает.
-- Решение — оба рантайма: тест — свой корень. Владелец получает приёмник дефектов от внешнего владельца, тест — свой. Дефекты супервизоров, пришедшие за время теста, соединяются с исходом тела, и тест падает с видом `defect`. Внесено (`Owner.defects` в JS и Go, `stdlib/testing.ts`, `testing.go`); тесты — «a supervisor that dies» в `flick/tests/test_command.rs`, `testing_test.go` `TestASupervisorThatFailsFailsItsTest`.
+- Divergence: `flick test --emit js` and `--emit go` printed `✓ a supervisor that dies`, exit code 0. The same code in `main` ends the program with code 1 ("a defect of a supervisor"). Breaks R4.
+- Cause: the defect sink was global (`owner.ts:38-43`, Go `reported`), and only the `main` runner read it (`entry.ts:164`, Go `platform.go:146`). The test runner (`ownedExits`, Go `testing.go`) did not.
+- Resolution — both runtimes: a test is its own root. An owner gets its defect sink from the enclosing owner; a test has its own. Supervisor defects that arrive during the test are joined with the outcome of the body, and the test fails with kind `defect`. Fixed (`Owner.defects` in JS and Go, `stdlib/testing.ts`, `testing.go`); tests: "a supervisor that dies" in `flick/tests/test_command.rs`, `testing_test.go` `TestASupervisorThatFailsFailsItsTest`.
 
-**Р34. Go: падение супервизора `Events.listen` отбрасывается.**
+### Go: a failing `Events.listen` supervisor is dropped
 
-- Что происходит (чтение кода): `l.fail` выполняет супервизор в `catch` и отбрасывает его падение (`events.go:25-33`, там же пометка `shortcut`). JS отдаёт его в `reportDefect` (`stdlib/callbacks.ts:85-91`). Кроме того, один файбер `supervising` с общей `mask` используют и горутина обработчика, и горутины `send` при переполнении очереди — гонка по `mask` (`fiber.go:42`), если супервизор маскирует. Нарушает R4.
-- Решение — Go: падение супервизора идёт в приёмник корня; каждый вызов супервизора получает своё состояние файбера и владельца `owner`, как `within` в JS. Внесено; тест — `owner_test.go` `TestAFailingListenerSupervisorIsReported`.
+- Divergence (found by reading the code): `l.fail` ran the supervisor in `catch` and dropped its failure (`events.go:25-33`, with a `shortcut` note there). JS passes it to `reportDefect` (`stdlib/callbacks.ts:85-91`). Also, one `supervising` fiber with a shared `mask` was used both by the handler goroutine and by the `send` goroutines on queue overflow — a race on `mask` (`fiber.go:42`) if the supervisor masks. Breaks R4.
+- Resolution — Go: a supervisor failure goes to the root's sink; each supervisor call gets its own fiber state and the owner `owner`, like `within` in JS. Fixed; test: `owner_test.go` `TestAFailingListenerSupervisorIsReported`.
 
-**Р35. JS: `fiberSpawn` прерываем посередине.**
+### JS: `fiberSpawn` is interruptible midway
 
-- Что происходит (чтение кода): `fiberSpawn` не замаскирован (`owner.ts:145-172`). Прерывание вызывающего файбера на границе шага после `forkDetach` (154) оставляет ребёнка вне `children` и без наблюдателя: он переживает владельца, его падение теряется. Прерывание после `children.add` (155), но до форка наблюдателя, оставляет ребёнка без супервизора. Нарушает И3 и через неё R3 и R4. В Go регистрация идёт под `o.mu` целиком.
-- Решение — JS: тело `fiberSpawn` под `Effect.uninterruptible`. Внесено; тест — `runtime/test/spawn.test.ts` «an interrupted spawner…»: вызывающий прерывается в момент `children.add`, и без маски супервизор не вызывается.
+- Divergence (found by reading the code): `fiberSpawn` was not masked (`owner.ts:145-172`). Interrupting the calling fiber at a step boundary after `forkDetach` (154) left the child outside `children` and without a watcher: it outlived its owner and its failure was lost. Interrupting after `children.add` (155) but before the watcher was forked left the child without a supervisor. Breaks I3 and through it R3 and R4. In Go the whole registration is under `o.mu`.
+- Resolution — JS: the body of `fiberSpawn` runs under `Effect.uninterruptible`. Fixed; test: `runtime/test/spawn.test.ts` "an interrupted spawner…": the caller is interrupted at the moment of `children.add`, and without the mask the supervisor is not called.
 
-**Р36. JS: аренды регистрируют освобождение вне маски.**
+### JS: leases register their release outside the mask
 
-- Что происходит (чтение кода): `ScopedRef.set` (`effect/ScopedRef.ts:44-47`) сначала заменяет `ref.current`, затем вызывает `retire` для прежнего держателя; между ними — граница шага, где прерывание оставляет прежний держатель без освобождения. Тот же порядок в `Resource` (`effect/Resource.ts:25-61`) и `ScopedCache` (`effect/ScopedCache.ts:13-21`); прерывание, ожидавшее на выходе из `acquireHolder`, выбрасывает уже приобретённый держатель. Нарушает R1. В Go этих модулей нет.
-- Решение — JS: регистрация держателя, замена значения и `retire` — под одной маской, как `acquireRelease` в Effect (Г7б). Само приобретение остаётся прерываемым: маска вызывающего передаётся в `acquireHolder` через `restore`, как в `ScopedRef.set` Effect. Внесено. Окно между возвратом держателя и `retire` не содержит пользовательского кода, и тест его не достигает; `runtime/test/leases.test.ts` закрепляет «ровно один раз» при прерывании `set` во время приобретения.
+- Divergence (found by reading the code): `ScopedRef.set` (`effect/ScopedRef.ts:44-47`) first replaced `ref.current`, then called `retire` on the previous holder; between them was a step boundary where an interruption left the previous holder unreleased. `Resource` (`effect/Resource.ts:25-61`) and `ScopedCache` (`effect/ScopedCache.ts:13-21`) had the same order; an interruption pending at the exit of `acquireHolder` threw away an already acquired holder. Breaks R1. Go has none of these modules.
+- Resolution — JS: registering the holder, replacing the value and `retire` run under one mask, like `acquireRelease` in Effect (G7b). The acquisition itself stays interruptible: the caller's mask is passed into `acquireHolder` through `restore`, as in Effect's `ScopedRef.set`. Fixed. The window between returning the holder and `retire` contains no user code, and the test cannot reach it; `runtime/test/leases.test.ts` pins "exactly once" when `set` is interrupted during acquisition.
 
-**Р37. Сервис `provide` переживает освобождение слоя.**
+### A `provide` service outlives the release of its layer
 
 ```flick
 service Greeter =
@@ -799,86 +799,86 @@ let main () =
   }
 ```
 
-- Что происходит: программа принята; Node и Go одинаково печатают `release greeter` до `hello, child`. Ребёнок внешнего владельца унаследовал окружение `provide` и пользуется сервисом после закрытия слоя. Нарушает R6; через сервис, который держит внешний объект, закрытый финализатором слоя, это то же «использование после закрытия», что в T4, но без региона в типе. Так же ведёт себя `Scope.add_finalizer` внешнего региона изнутри `provide`.
-- Причина: строки сервисов не входят в ⌈·⌉ (`regions.md` §2.1, Р20), а `Fiber.spawn` берёт строку задачи `r` из места вызова (`builtins/Fiber.fl` `spawn`). Ничто не связывает время жизни окружения `provide` с владельцем, которому передаётся работа.
-- Решение — чекер, внесено (`regions.md` §2.7). Закрыть одной лексической проверкой нельзя: сервис может прийти из строки вызывающей функции, тогда связь «владелец — `provide`» видна только у её вызывающего. Поэтому `provide` вводит регион для порядка §2.4, схема каждой константы с `retention owner` требует `Fiber.Provided r s` для строки удерживаемой работы, а обязательство, которое стадия не снимает, переходит в её строку и дальше, к тому, кто её исполняет; сигнатура называет его ограничением `Fiber.Provided {S} s`. Рантайм не меняется. Фикстуры: `tests/check/fail/regions/provide_escape.fl` (программа выше и `Scope.add_finalizer` внешнего региона), `tests/check/pass/regions/provide_owner.fl`.
+- Divergence: the program was accepted; Node and Go alike print `release greeter` before `hello, child`. A child of the outer owner inherited the environment of `provide` and used the service after the layer closed. Breaks R6; through a service holding an external object closed by the layer's finalizer, this is the same "use after close" as in T4, but without a region in the type. `Scope.add_finalizer` of an outer region from inside `provide` behaves the same way.
+- Cause: service rows are not part of ⌈·⌉ (`regions.md` §2.1, [service implementations hold no captures](regions.md#service-implementations-hold-no-captures)), and `Fiber.spawn` takes the task row `r` from the call site (`builtins/Fiber.fl` `spawn`). Nothing tied the lifetime of the `provide` environment to the owner the work is handed to.
+- Resolution — the checker (`regions.md` §2.7). A single lexical check cannot close it: the service may come from the row of the calling function, and then the owner–`provide` relation is visible only at that function's caller. So `provide` introduces a region for the order of §2.4, the scheme of every constant with `retention owner` requires `Fiber.Provided r s` for the row of the retained work, and an obligation a stage does not discharge passes into its row and on to whoever runs it; a signature names it with the constraint `Fiber.Provided {S} s`. The runtime does not change. Fixtures: `tests/check/fail/regions/provide_escape.fl` (the program above and `Scope.add_finalizer` of an outer region), `tests/check/pass/regions/provide_owner.fl`.
 
-**Р38. Хук закрытия, добавленный после C1, не выполняется.**
+### A closing hook added after C1 does not run
 
-- Что происходит (чтение кода): `close` обходит `owner.closing` один раз (`owner.ts:58-61`). Хук, добавленный во время C3 — например, супервизор создаёт `FiberSet` в регионе закрывающегося владельца, — пропускается. Тогда группу останавливает её собственный финализатор Effect в C5, по месту в стеке, как в Р31. Нарушает R2 в редком случае.
-- Решение — JS и Go: после C3 выполнить хуки, добавленные с начала закрытия, и дождаться их; новых детей в `K` после C0 быть не может (И2). Внесено; тесты — `runtime/test/scope.test.ts` «a closing hook a supervisor adds…», `owner_test.go` `TestAHookAddedWhileClosingRuns`.
+- Divergence (found by reading the code): `close` walked `owner.closing` once (`owner.ts:58-61`). A hook added during C3 — for example, a supervisor creating a `FiberSet` in the region of the closing owner — was skipped. The group was then stopped by its own Effect finalizer in C5, by its place in the stack, as in the [Go group divergence](#go-a-fiber-group-is-stopped-by-a-finalizer). Breaks R2 in a rare case.
+- Resolution — JS and Go: after C3, run the hooks added since closing began and wait for them; no new children can enter `K` after C0 (I2). Fixed; tests: `runtime/test/scope.test.ts` "a closing hook a supervisor adds…", `owner_test.go` `TestAHookAddedWhileClosingRuns`.
 
-**Р39. Фибер обновления `resource_auto`.**
+### The refresh fiber of `resource_auto`
 
-- `Effect.resource_auto` обновляет ресурс фибером `forkScoped` (`stdlib/effect-core.ts:92`). Для владельца это финализатор, а не ребёнок, и его падение никуда не идёт.
-- Неполнота поверхности Effect, не языка. Решение — записать: R4 его исключает; если `resource_auto` станет частью безопасного API, обновление пойдёт через `Fiber.spawn` с супервизором.
+- `Effect.resource_auto` refreshes the resource with a `forkScoped` fiber (`stdlib/effect-core.ts:92`). For the owner this is a finalizer, not a child, and its failure goes nowhere.
+- An incompleteness of the Effect surface, not of the language. Resolution: recorded; R4 excludes it. If `resource_auto` becomes part of the safe API, the refresh will go through `Fiber.spawn` with a supervisor.
 
-**Р40. Вложенные `provide` разделяют сборку.**
+### Nested `provide`s share a build
 
-- Проба p10: слой `dep` в `provide dep { provide dep { … } }` строится один раз, в двух соседних `provide` — дважды; одинаково на Node и Go.
-- `reference/runtime.md` «Layers»: «two `provide`s build it twice»; spec/07: «Independent `provide`s build independent instances». Вложенные `provide` не независимы: внутренний читает memo-карту внешнего (§3.5).
-- Неточность прозы. Решение — справочник и spec/07: соседние `provide` строят заново, вложенный берёт сборку внешнего по идентичности. Внесено в английскую и русскую версии `reference/runtime.md` и spec/07.
+- A probe: the layer `dep` in `provide dep { provide dep { … } }` is built once, in two sibling `provide`s twice; the same on Node and Go.
+- `reference/runtime.md` "Layers" said "two `provide`s build it twice"; spec/05 says "Independent `provide`s build independent instances". Nested `provide`s are not independent: the inner one reads the outer one's memo map (§3.5).
+- Imprecise prose. Resolution: `reference/runtime.md` and spec/05 state that sibling `provide`s build anew, and a nested one takes the outer build by identity.
 
-**Р41. `regions.md` §3.2–3.3 и λRT.**
+### Region closing as one step versus closing phases
 
-- `regions.md` закрывает регион одним шагом: дети, финализаторы, затем `Λ(π) := closed`, а `op_H` на закрытом регионе застревает. Оба рантайма ставят «закрыт» до финализаторов (Effect `Closed`, Go `open = false`) и выполняют финализатор, добавленный в закрытую область, сразу (Fin-Now), а хуки идут до детей (C1).
-- Не противоречие, а уточнение: §3.3 здесь — детализация того шага. Застревание `op_H` остаётся моделью «использования после закрытия»: T4 доказывает, что оно недостижимо, а (Fin-Now) достижим только из финализатора или внешнего обратного вызова. Решение — `regions.md` §3.3 ссылается на λRT. Внесено.
+- `regions.md` closes a region in one step: children, finalizers, then `Λ(π) := closed`, and `op_H` on a closed region gets stuck. Both runtimes set "closed" before the finalizers (Effect `Closed`, Go `open = false`) and run a finalizer added to a closed scope at once (Fin-Now), and the hooks come before the children (C1).
+- Not a contradiction but a refinement: §3.3 here details that one step. Getting stuck on `op_H` remains the model of "use after close": T4 proves it unreachable, and (Fin-Now) is reachable only from a finalizer or a foreign callback. Resolution: `regions.md` §3.3 refers to λRT.
 
-**Р42. Тест закрывает область с успехом; `shutdown` по моменту наблюдателя.**
+### A test closes its scope with success, and the shutdown flag is timed by the watcher
 
-- `ownedExits` закрывает владельца с `Exit.void` (`owner.ts:116`), и `Scope.add_finalizer_exit` в тесте видит успех, даже когда тело упало.
-- `shutdown` в `Failure` вычисляется, когда наблюдатель увидел конец ребёнка (`owner.ts:162`): ребёнок, прерванный программой перед самым закрытием, помечен как остановленный закрытием.
-- Неполнота диагностики. Решение — записать.
+- `ownedExits` closes the owner with `Exit.void` (`owner.ts:116`), so `Scope.add_finalizer_exit` in a test sees success even when the body failed.
+- `shutdown` in `Failure` is computed when the watcher sees the child end (`owner.ts:162`): a child interrupted by the program right before closing is marked as stopped by the closing.
+- An incompleteness of diagnostics. Resolution: recorded.
 
-**Р43. Прерывание, пропустившее обработчик, стирает `Fail` (Effect).**
+### An interruption that skips a handler erases `Fail` (Effect)
 
-- Г7ж: если падение проходит через прерванный прерываемый файбер, Effect пропускает обработчики, убирает `Fail` и добавляет `Int` (`FX/internal/core.ts:611-622`). Go сохраняет исходную причину.
-- На типах не сказывается, на выводе может: программа, печатающая `Cause.reasons` такого падения, разойдётся.
-- X5 проверил пробой, и в Go это хуже, чем потеря `Int`. Ребёнок падает с `Fail` сразу после `Effect.uninterruptible`, а его прерывают, пока он в маске. Проверка Р32 стоит только после успешного тела, поэтому на Go `try` ловит `Fail`, обработчик выполняется, и ребёнок кончается успехом: запрос прерывания потерян. На Node обработчик пропущен, исход — `[Int]`.
-- Решение — Go: `skipHandler` в `try` и `onCause` (`catch_cause`, `catch_defect`, `tap_*`, `or_die`…) делает то же, что Effect, если файбер прерван и прерываем. Внесено; `cause_test.go` и `tests/run/runtime/cause_laws.fl`. Затем то же в остальных обработчиках восстановления (`caught` в `cause.go`): `Effect.exit`, `match_cause`, `all` с исходами и результатами, `eventually`, `partition`/`validate`, `first_success_of`, `retry`/`repeat` и планы исполнения. Пробы на Node и Go — `tests/run/runtime/interrupt_skips.fl`; до исправления на Go `Effect.exit` и `match_cause` запускали обработчик, и ребёнок кончался успехом. Границы, которые обязаны выполниться (`on_exit`, освобождение, метрики), причину видят, как и в Effect, где пропуск останавливает маска.
+- G7g: if a failure passes through an interrupted interruptible fiber, Effect skips the handlers, removes the `Fail`s and adds an `Int` (`FX/internal/core.ts:611-622`). Go kept the original cause.
+- Types are unaffected; output can be: a program printing `Cause.reasons` of such a failure diverges.
+- A probe built for the cause-law tests showed that in Go this was worse than a lost `Int`. A child fails with a `Fail` right after `Effect.uninterruptible` and is interrupted while inside the mask. The mask-exit check ([mask exit in Go](#go-leaving-a-mask-does-not-deliver-a-pending-interruption)) ran only after a successful body, so on Go `try` caught the `Fail`, the handler ran, and the child ended with success: the interruption request was lost. On Node the handler is skipped and the outcome is `[Int]`.
+- Resolution — Go: `skipHandler` in `try` and `onCause` (`catch_cause`, `catch_defect`, `tap_*`, `or_die`…) does what Effect does when the fiber is interrupted and interruptible. Fixed; `cause_test.go` and `tests/run/runtime/cause_laws.fl`. The same applies in the other recovery handlers (`caught` in `cause.go`): `Effect.exit`, `match_cause`, `all` with exits and results, `eventually`, `partition`/`validate`, `first_success_of`, `retry`/`repeat` and execution plans. Probes on Node and Go: `tests/run/runtime/interrupt_skips.fl`; without the fix, Go's `Effect.exit` and `match_cause` ran the handler and the child ended with success. Boundaries that must run (`on_exit`, release, metrics) see the cause, as in Effect, where the mask stops the skip.
 
-**Р44. Внешний вызов, прерванный после C4, не ждётся.**
+### A foreign call interrupted after C4 is not awaited
 
-- Promise попадает в `P(π)` при старте вызова (JS) или при его прерывании (Go). Если ребёнок группы, остановленный в C5 по старому порядку, или финализатор, вернувший прерываемость, прерывает внешний вызов после C4, его Promise уже никто не ждёт.
-- После Р31 и Р38 группы останавливаются до C4, и случай сводится к финализатору, который сам вызывает `interruptible`. Решение — записать как часть Г9.
+- A Promise enters `P(π)` when the call starts (JS) or when it is interrupted (Go). If a group child stopped in C5 (under the old order) or a finalizer that restored interruptibility interrupts a foreign call after C4, nobody waits for its Promise any more.
+- Since groups stop in C1 hooks, before C4 ([Go groups](#go-a-fiber-group-is-stopped-by-a-finalizer), [hooks added after C1](#a-closing-hook-added-after-c1-does-not-run)), the case reduces to a finalizer that itself calls `interruptible`. Resolution: recorded as part of G9.
 
-**Р45. Go: найденная запись memo-карты не проверяет приём наблюдателя.**
+### Go: a found memo-map entry does not check observer admission
 
-- `getOrBuild` в ветке «уже построено» игнорирует отказ `observe` (`layer.go:141`): потребитель с закрытой областью получает сервисы без счёта и может пережить сборку. После Р27 область потребителя принимает финализаторы до C5, и ветка достижима только из финализатора.
-- Неполнота. Решение — записать.
+- `getOrBuild` in the "already built" branch ignores a refusal from `observe` (`layer.go:141`): a consumer with a closed scope gets the services without being counted and can outlive the build. Since the consumer's scope admits finalizers until C5 ([late finalizers in Go](#go-a-finalizer-added-during-closing-runs-at-once)), the branch is reachable only from a finalizer.
+- Incompleteness. Resolution: recorded.
 
-**Р80. Go: два дефекта с одной строкой — две причины.**
+### Go: two defects with the same string are two reasons
 
-- `sameReason` сравнивал `Die` по указателю (`cause.go:78`), а Effect — `Equal.equals` дефекта, то есть строку по значению. `Cause.combine (Cause.die "x") (Cause.die "x")` даёт одну причину на Node и две на Go: `Cause.die` каждый раз строит новый `*Cause`.
-- Нарушение (⊕-Idem) и паритета §2.5. Решение — `Die` по значению, кроме брошенного: паника, `Stream.die`, переполнение очереди событий и незавершённый запрос — `Error` в JS, их Go помечает `thrown`. Внесено; `cause_test.go` и `tests/run/runtime/cause_laws.fl`.
+- `sameReason` compared `Die` by pointer (`cause.go:78`), while Effect uses `Equal.equals` of the defect, that is, a string by value. `Cause.combine (Cause.die "x") (Cause.die "x")` gave one reason on Node and two on Go: `Cause.die` builds a new `*Cause` each time.
+- Breaks (⊕-Idem) and the parity of §2.5. Resolution: `Die` compares by value, except a thrown defect: a panic, `Stream.die`, an event queue overflow and an unfinished request are an `Error` in JS, and Go marks them `thrown`. Fixed; `cause_test.go` and `tests/run/runtime/cause_laws.fl`.
 
-**Р81. Go: типизированная ошибка, ставшая дефектом, теряет значение.**
+### Go: a typed error turned into a defect loses its value
 
-- JS кладёт в дефект само значение ошибки: `failsToDies` в `try`, вторичная `Fail` в `Cause.reasons`, `Effect.or_die`, `Stream.or_die`. `Cause.find_defect` описывает его конструктором (`describeDefect`), `Failure.inspect` — `die A`. Go хранил только текст `describe v`, поэтому `find_defect` давал JSON значения, а два дефекта одного значения различались бы по тексту, а не по `Equal.equals`.
-- Нарушение паритета §2.5. Решение — `dieOf` хранит значение рядом с текстом; `find_defect`, `catch_defect`, `tap_defect`, `Failure.inspect` и `Cause.pretty` читают его, как JS. Внесено; `cause_test.go` и `tests/run/runtime/cause_laws.fl`.
+- JS puts the error value itself into the defect: `failsToDies` in `try`, a secondary `Fail` in `Cause.reasons`, `Effect.or_die`, `Stream.or_die`. `Cause.find_defect` describes it by its constructor (`describeDefect`), `Failure.inspect` as `die A`. Go stored only the text `describe v`, so `find_defect` gave the value's JSON, and two defects of the same value would differ by text rather than by `Equal.equals`.
+- Breaks the parity of §2.5. Resolution: `dieOf` stores the value next to the text; `find_defect`, `catch_defect`, `tap_defect`, `Failure.inspect` and `Cause.pretty` read it, as JS does. Fixed; `cause_test.go` and `tests/run/runtime/cause_laws.fl`.
 
-**Р82. Go: пустая причина — не падение.**
+### Go: an empty cause is not a failure
 
-- Go обозначал `nil` и «падения нет», и пустую причину `∅`. Поэтому `try Failure.rethrow Cause.empty with …` завершался успехом со значением `nil` любого типа, а `Exit.fail_cause Cause.empty` был успешным исходом. В Effect `failCause(empty)` падает, `try` отдаёт причину дальше (§2.3, «иначе»), а `report(∅)` — `pretty(∅)`, так как `hasInterruptsOnly` пустой причины ложно.
-- Нарушение (Try) и паритета. Решение — `Failure` всегда держит причину: пустая — это `emptyCause`, единица `⊕`; `report` и `conclude` считают прерыванием только причину, где `Int` есть. Внесено; `cause_test.go` и `tests/run/runtime/cause_laws.fl` (`recover` на пустой причине).
+- Go used `nil` both for "no failure" and for the empty cause `∅`. So `try Failure.rethrow Cause.empty with …` succeeded with a `nil` value of any type, and `Exit.fail_cause Cause.empty` was a successful outcome. In Effect `failCause(empty)` fails, `try` passes the cause on (§2.3, "otherwise"), and `report(∅)` is `pretty(∅)`, since `hasInterruptsOnly` of an empty cause is false.
+- Breaks (Try) and parity. Resolution: a `Failure` always holds a cause: the empty one is `emptyCause`, the unit of `⊕`; `report` and `conclude` treat as an interruption only a cause that contains an `Int`. Fixed; `cause_test.go` and `tests/run/runtime/cause_laws.fl` (`recover` on the empty cause).
 
-Р160 нашла механизация в Lean (`formal/Formal/RT/`, P3b).
+### A hook added during C4 does not run
 
-**Р160. Хук, добавленный во время C4, не выполняется.**
+Found by the Lean development `formal/Formal/RT/`.
 
-- Что происходит (чтение кода и модель): после Р38 JS и Go выполняют хуки, добавленные с начала закрытия, после C3, а затем только ждут внешних Promise (C4: `settle`, `owner.ts:100-101`; Go `closeWithCause`). Хук, добавленный в `H(π)` во время C4, не выполняется: группа, созданная в это время, останавливается своим финализатором Effect в C5, как в Р31. Lean-доказательство R2 и R3 упирается в это место: (C5) должен начинаться при `H(π) = ∅`.
-- Достижимость: добавить хук в `π` во время C4 может только файбер, у которого `π` — текущий владелец. По И4 это тело, дети, наблюдатели, дети групп и ветви, начатые в `π`, а они к C4 закончены. Остаются нарушение И4 (Г6) и внешний вызов, который при оседании добавляет хук: так делают тесты исправления.
-- Решение — JS и Go: после C4 выполнить хуки, добавленные с тех пор, и снова дождаться внешних вызовов; повторять, пока хуки добавляются, и только затем начинать C5. Так совпадает с посылкой `H(π) = ∅` у `Step.fins` в модели. В Go проверка «хуков нет» и `finalizing := true` идут под одним `o.mu`, так что хук, добавленный позже, выполняется сразу. Внесено; тесты — `runtime/test/scope.test.ts` «a closing hook added while foreign calls settle…», `owner_test.go` `TestAHookAddedWhileCallsSettleRuns`, оба падают до исправления.
+- Divergence (found by reading the code and the model): JS and Go ran the hooks added since closing began after C3, and then only waited for foreign Promises (C4: `settle`, `owner.ts:100-101`; Go `closeWithCause`). A hook added to `H(π)` during C4 did not run: a group created at that time was stopped by its own Effect finalizer in C5, as in the [Go group divergence](#go-a-fiber-group-is-stopped-by-a-finalizer). The Lean proof of R2 and R3 depends on this point: (C5) must start with `H(π) = ∅`.
+- Reachability: only a fiber whose current owner is `π` can add a hook to `π` during C4. By I4 these are the body, children, watchers, group children and branches started in `π`, and by C4 they have finished. What remains is a violation of I4 (G6) and a foreign call that adds a hook when it settles: the tests of the fix do exactly this.
+- Resolution — JS and Go: after C4, run the hooks added since, and wait for foreign calls again; repeat while hooks are being added, and only then start C5. This matches the premise `H(π) = ∅` of `Step.fins` in the model. In Go the check "no hooks" and `finalizing := true` happen under one `o.mu`, so a hook added later runs at once. Fixed; tests: `runtime/test/scope.test.ts` "a closing hook added while foreign calls settle…", `owner_test.go` `TestAHookAddedWhileCallsSettleRuns`, both fail without the fix.
 
-Р142 нашла механизация P2 (`formal/Formal/`, P2c′).
+### The provide-liveness premise is stronger than typing gives
 
-**Р142. Посылка Р37 сильнее того, что даёт типизация.**
+Found by the Lean development of the core (`formal/Formal/`).
 
-- Что происходит: R6, набросок §6 и гипотеза Г11 в Lean (`G11`, `GoodUse`) требовали, чтобы каждый файбер с `θ` из `provide` владельца `πₚ` работал только до закрытия `πₚ`. Ребёнок наследует всё окружение места запуска (§3.5), а правило `regions.md` §2.7 связывает с владельцем только поставщиков сервисов строки задачи. Программа `provide L1 { scope outer { provide L2 { Fiber.spawn outer (task { …; ask S1 }) } } }`, где `L1` даёт `S1`, а `L2` — `S2`, принята: `Provided {S1} outer` снят, поставщик `S1` охватывает `outer`. Ребёнок работает после закрытия `L2` и берёт `S1`; `GoodUse` видит в его окружении освобождённую сборку `L2` и сообщает нарушение, хотя `S1` дал живой `L1`.
-- Причина: посылка записана о файбере целиком, а типизация (пункт 3 T4) — о запросах сервиса.
-- Решение — документ и модель λRT: посылка — «на запрос `ask_S` из окружения отвечает `provide` живого владельца». Этот раздел исправлен; `G11` и `GoodUse` в `formal/Formal/RT/` должны говорить о записи окружения, которая отвечает на запрос, — это правка P3. P2 доказывает посылку в этой форме (`formal/README.md`). Статус: документ внесён, посылка доказана (`T4_3`, P2c′2), модель λRT — у P3.
+- Divergence: R6, the sketch in §6 and hypothesis G11 in Lean (`G11`, `GoodUse`) required every fiber with a `θ` from the `provide` of owner `πₚ` to run only until `πₚ` closes. A child inherits the whole environment of the spawn site (§3.5), and the rule of `regions.md` §2.7 ties to the owner only the providers of the services in the task row. The program `provide L1 { scope outer { provide L2 { Fiber.spawn outer (task { …; ask S1 }) } } }`, where `L1` gives `S1` and `L2` gives `S2`, is accepted: `Provided {S1} outer` is discharged, since the provider of `S1` encloses `outer`. The child runs after `L2` closes and takes `S1`; `GoodUse` saw the released build of `L2` in its environment and reported a violation, although `S1` came from the live `L1`.
+- Cause: the premise was stated about the whole fiber, while typing (point 3 of T4) speaks about service requests.
+- Resolution — this document and the λRT model: the premise is "a request `ask_S` from the environment is answered by the `provide` of a live owner". R6 and §6 state it this way; `G11` and `GoodUse` in `formal/Formal/RT/` speak of the environment entry that answers the request. The Lean core development proves the premise in this form (`T4_3`).
 
-**В4. Go: HTTP-обработчики.**
+### Go: HTTP handlers
 
-- Чтение кода. Обработчик без своего `scope` приобретает во владельца сервера (`http.go:56`); эти финализаторы добавлены после финализатора сервера и выполняются раньше, до того как `Shutdown` дождётся запросов. Дефект обработчика становится только кодом ответа и никуда не сообщается (`http.go:65-68`). После `Close` по истечении ожидания обработчики не ждутся.
-- Вне λRT: сервер — источник файберов, а не часть контракта. Решение — записать; фикстура `tests/run/stdlib/http/lifecycle.fl` оборачивает обработчик в `scope`.
+- Found by reading the code. A handler without its own `scope` acquires into the server's owner (`http.go:56`); these finalizers are added after the server's finalizer and run before it, before `Shutdown` has waited for the requests. A handler's defect becomes only a response code and is reported nowhere (`http.go:65-68`). After `Close` on a wait timeout, handlers are not awaited.
+- Outside λRT: the server is a source of fibers, not part of the contract. Resolution: recorded; the fixture `tests/run/stdlib/http/lifecycle.fl` wraps the handler in a `scope`.
