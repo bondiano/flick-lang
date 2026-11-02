@@ -1,8 +1,9 @@
 // URLs of a type that derives `Url`: a constructor is a path segment, its
 // fields the segments after it, and a final record field the query. A segment
 // is a scalar, or a constructor without fields written as a word; the last
-// may be an `Option`, absent from the URL for `None`. A parsed value is
-// checked by the type's own schema, so refined fields stay valid.
+// may be an `Option`, absent from the URL for `None`, or a value of another
+// route type, the rest of the path. A parsed value is checked by the type's
+// own schema, so refined fields stay valid.
 import { Option, Result } from "effect";
 
 import { type AnySchema, schemaValidate } from "./schema/index.ts";
@@ -17,8 +18,15 @@ interface Words {
   readonly [WORDS]: ReadonlyArray<readonly [word: string, tag: string]>;
 }
 
-/** A segment: a scalar field's schema, or the words of a type's constructors. */
-type Segment = AnySchema | Words;
+const NESTED: unique symbol = Symbol("flick/route-nested");
+
+/** The last segment of another route type: the rest of the path. */
+interface Nested {
+  readonly [NESTED]: () => UrlCodec;
+}
+
+/** A segment: a scalar field's schema, the words of a type's constructors, or a nested route. */
+type Segment = AnySchema | Words | Nested;
 
 /**
  * A constructor: its tag, its path segment ("" for the root), its segment
@@ -45,7 +53,12 @@ export const routeCodec = (schema: AnySchema, routes: ReadonlyArray<Route>): Url
 /** A segment of the constructors with these words and tags. */
 export const routeWords = (words: ReadonlyArray<readonly [string, string]>): Words => Object.freeze({ [WORDS]: words });
 
+/** The segment of a nested route type, its `T$url` read when first used. */
+export const routeNested = (url: () => UrlCodec): Nested => Object.freeze({ [NESTED]: url });
+
 const isWords = (segment: Segment): segment is Words => typeof segment === "object" && segment !== null && WORDS in segment;
+
+const isNested = (segment: Segment): segment is Nested => typeof segment === "object" && segment !== null && NESTED in segment;
 
 type Fields = Readonly<Record<string, unknown>>;
 
@@ -64,34 +77,41 @@ export const coerce = (schema: AnySchema, text: string): Option.Option<unknown> 
   return Option.none();
 };
 
-/** The text of a segment's field. */
-const segmentText = (segment: Segment, field: unknown): string => {
-  if (!isWords(segment)) return String(field);
+/** The texts of a segment's field: one, or a nested route's path. */
+const segmentTexts = (segment: Segment, field: unknown): ReadonlyArray<string> => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler checked the field is of the nested type
+  if (isNested(segment)) return printParts(segment[NESTED](), field as Fields)[0];
+  if (!isWords(segment)) return [String(field)];
   const found = segment[WORDS].find(([, tag]) => tag === Reflect.get(Object(field), "_tag"));
   if (found === undefined) throw new TypeError("a constructor of another type");
-  return found[0];
+  return [found[0]];
 };
 
 /** The field of a segment's text. */
-const segmentField = (segment: Segment, text: string): Option.Option<unknown> => {
+const segmentField = (segment: Exclude<Segment, Nested>, text: string): Option.Option<unknown> => {
   if (!isWords(segment)) return coerce(segment, text);
   const found = segment[WORDS].find(([word]) => word === text);
   return found === undefined ? Option.none() : Option.some({ _tag: found[1] });
 };
 
-/** `Route.print url value`: the path and query of `value`. */
-export const routePrint = (codec: UrlCodec, value: Fields): string => {
+/** The path's segments of `value`, unencoded, and its route. */
+const printParts = (codec: UrlCodec, value: Fields): readonly [ReadonlyArray<string>, Route] => {
   const route = codec.routes.find(([tag]) => tag === value["_tag"]);
   if (route === undefined) throw new TypeError("a value of another type");
-  const [, path, segments, query, optional] = route;
+  const [, path, segments, , optional] = route;
   const texts = segments.flatMap((segment, i) => {
     const field = value[`_${i}`];
-    if (!optional || i < segments.length - 1) return [segmentText(segment, field)];
+    if (!optional || i < segments.length - 1) return segmentTexts(segment, field);
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler checked the last segment is an `Option`
     const option = field as Option.Option<unknown>;
-    return Option.isSome(option) ? [segmentText(segment, option.value)] : [];
+    return Option.isSome(option) ? segmentTexts(segment, option.value) : [];
   });
-  const parts = [...(path === "" ? [] : [path]), ...texts];
+  return [[...(path === "" ? [] : [path]), ...texts], route];
+};
+
+/** `Route.print url value`: the path and query of `value`. */
+export const routePrint = (codec: UrlCodec, value: Fields): string => {
+  const [parts, [, , segments, query]] = printParts(codec, value);
   // a lone surrogate has no UTF-8 form: it prints as U+FFFD
   const url = `/${parts.map((p) => encodeURIComponent(p.toWellFormed())).join("/")}`;
   if (query === null) return url;
@@ -109,18 +129,32 @@ export const routePrint = (codec: UrlCodec, value: Fields): string => {
 
 /** The segment fields of a route from the segments after its path, if they match. */
 const segmentFields = (segments: ReadonlyArray<Segment>, optional: boolean, rest: ReadonlyArray<string>): Option.Option<unknown[]> => {
+  const last = segments.at(-1);
+  if (last !== undefined && isNested(last)) {
+    // the fixed segments, then the nested route takes the rest of the path
+    const fixed = segments.length - 1;
+    if (rest.length < fixed) return Option.none();
+    const fields = segmentFields(segments.slice(0, fixed), false, rest.slice(0, fixed));
+    if (Option.isNone(fields)) return fields;
+    const tail = rest.slice(fixed);
+    if (optional && tail.length === 0) return Option.some([...fields.value, Option.none()]);
+    const nested = matchParts(last[NESTED](), tail, new URLSearchParams());
+    if (nested === undefined) return Option.none();
+    return Option.some([...fields.value, optional ? Option.some(nested) : nested]);
+  }
   const missing = optional && rest.length === segments.length - 1;
   if (rest.length !== segments.length && !missing) return Option.none();
   const fields: unknown[] = [];
   for (const [i, segment] of segments.entries()) {
-    const last = optional && i === segments.length - 1;
-    if (last && missing) {
+    const isLast = optional && i === segments.length - 1;
+    if (isLast && missing) {
       fields.push(Option.none());
       continue;
     }
-    const field = segmentField(segment, rest[i] ?? "");
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only the last segment nests
+    const field = segmentField(segment as Exclude<Segment, Nested>, rest[i] ?? "");
     if (Option.isNone(field)) return Option.none();
-    fields.push(last ? field : field.value);
+    fields.push(isLast ? field : field.value);
   }
   return Option.some(fields);
 };
@@ -141,6 +175,11 @@ export const routeParse = (codec: UrlCodec, text: string): unknown => {
       return p;
     }
   });
+  return matchParts(codec, parts, url.searchParams);
+};
+
+/** The checked value of the first route matching these path segments and query. */
+const matchParts = (codec: UrlCodec, parts: ReadonlyArray<string>, search: URLSearchParams): unknown => {
   for (const [tag, path, segments, query, optional] of codec.routes) {
     const rest = path === "" ? parts : parts[0] === path ? parts.slice(1) : undefined;
     if (rest === undefined) continue;
@@ -152,7 +191,7 @@ export const routeParse = (codec: UrlCodec, text: string): unknown => {
       const record: Record<string, unknown> = {};
       let matched = true;
       for (const [label, schema, maybe] of query) {
-        const param = url.searchParams.get(label);
+        const param = search.get(label);
         const field = param === null ? Option.none() : coerce(schema, param);
         if (maybe) record[label] = field;
         else if (Option.isSome(field)) record[label] = field.value;

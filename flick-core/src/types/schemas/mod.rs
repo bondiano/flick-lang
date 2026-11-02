@@ -24,6 +24,7 @@ mod plan;
 mod url;
 
 pub use form::FormField;
+pub(super) use url::kebab;
 pub use url::{UrlRoute, UrlSegment};
 
 use crate::diagnostics::codes;
@@ -103,6 +104,11 @@ impl Checker<'_> {
             let binders = self.decl_binders(decl, name);
             let scheme = witness_scheme(&module, name, &binders, &params);
             self.companion(name, "schema", &binders, scheme);
+            // a route may nest a route type of the group declared after it
+            if params.is_empty() && derives(decl, self.text, "Url") {
+                let url = Type::app(Type::prim("Url"), Type::con(&module, name));
+                self.companion(name, "url", &[], url);
+            }
             witnesses.push(params);
         }
         let group: Vec<String> = deriving.iter().map(|(_, n)| n.clone()).collect();

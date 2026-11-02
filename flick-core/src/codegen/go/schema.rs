@@ -141,6 +141,13 @@ impl<'a> Gen<'a> {
                     .collect();
                 call(a, "flickrt.RouteWords", [list(a, "[]string{", words, "}")])
             }
+            // lazily: the nested type may be initialized after this one
+            UrlSegment::Nested { module, ty } => {
+                self.reads(module);
+                let url = names::var(module, &companion_name(ty, "url")).to_doc(a);
+                let get = closure(a, "func() flickrt.Value", [docvec![a, "return ", url]]);
+                call(a, "flickrt.RouteNested", [get])
+            }
         }
     }
 

@@ -147,7 +147,7 @@ impl Checker<'_> {
     }
 
     /// The companions of each exported type of this module, `T$schema`,
-    /// `T$parse`, `T$value`, `T$json`, `T$table`, as values beside it.
+    /// `T$parse`, `T$value`, `T$json`, `T$table`, `T$url`, as values beside it.
     fn export_companions(&self, interface: &mut Interface) {
         let types: Vec<String> = interface
             .exports
@@ -162,6 +162,7 @@ impl Checker<'_> {
                 "value",
                 "json",
                 "table",
+                "url",
                 "api",
                 "endpoints",
             ] {
