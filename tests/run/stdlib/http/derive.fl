@@ -1,0 +1,173 @@
+// A record that derives `HttpApi` is a group whose fields are endpoints:
+// the label is the field, the group the type's name in snake case, each
+// part is decoded by the value named after its type (`credentials`) or the
+// JSON codec of its schema, and each error is sent as its `Problem`
+// instance says. `Users.api` takes the security scheme, the session and
+// the two checks of its `Authed` and `MaybeAuthed` endpoints; a client
+// requests `Users.endpoints`.
+module App.Main exposing (main)
+
+import HttpApi.Derive exposing (..)
+
+type error Unauthorized = Unauthorized String
+  deriving Schema
+
+type error NotFound = NotFound String
+  deriving Schema
+
+instance Problem Unauthorized =
+  let problem = { status = 401; body = Codec.json (schema Unauthorized) }
+
+instance Problem NotFound =
+  let problem = { status = 404; body = Codec.json (schema NotFound) }
+
+/// Who calls, if anyone.
+service Session =
+  user : Unit ->{} Option String
+
+type alias Credentials = { authorization : Option String }
+  deriving Schema
+
+/// A request without the header is anonymous.
+credentials : PureCodec Json Credentials
+let credentials = codec (schema Credentials) {
+  authorization = optional_field "authorization" String.json;
+}
+
+type alias Name = { name : String }
+  deriving Schema
+
+type alias Note = { text : String }
+  deriving Schema
+
+type alias Users = {
+  me : Authed (Get "/me" { headers : Credentials } String {Unauthorized});
+  greet : MaybeAuthed (Get "/greet" { headers : Credentials } String {Unauthorized});
+  post : Authed
+    (Post "/notes" { headers : Credentials; payload : Note } (Created Note) {Unauthorized});
+} deriving HttpApi
+
+/// A group of its own: a group with guarded endpoints guards each.
+type alias Public = {
+  profile : Get "/profiles/:name" { path : Name } Name {NotFound};
+  forget : Delete "/notes" {} Unit {};
+} deriving HttpApi
+
+session : Option String -> Session.Impl
+let session name = { user = fun () -> name }
+
+check : HttpApi.Request Unit Unit Credentials Unit ->{; Unauthorized} Session.Impl
+let check request =
+  match request.headers.authorization with
+  | Some "Token ada" -> session (Some "ada")
+  | _ -> from_result (Err (Unauthorized "no session"))
+
+maybe : HttpApi.Request Unit Unit Credentials Unit ->{; Unauthorized} Session.Impl
+let maybe request =
+  match request.headers.authorization with
+  | Some "Token ada" -> session (Some "ada")
+  | _ -> session None
+
+token : HttpApi.Security
+let token = HttpApi.api_key "Token" { key = "authorization"; location = HttpApi.InHeader }
+
+user : Unit ->{Session;} String
+let user () = Option.with_default "stranger" (Session.user ())
+
+/// The request of an endpoint with only `headers`.
+asking : Option String -> HttpApi.Request Unit Unit Credentials Unit
+let asking authorization = {
+  path = ();
+  query = ();
+  headers = { authorization = authorization };
+  payload = ();
+}
+
+/// What a call of a guarded endpoint answers.
+answer :
+  String ->
+  Option String ->
+  HttpApi.Endpoint l (HttpApi.Request Unit Unit Credentials Unit ->{r; Unauthorized} String) ->{}
+  String
+let answer base authorization endpoint =
+  try HttpApi.call base endpoint (asking authorization) with
+  | Unauthorized why -> "401 " ++ why
+  | HttpApi.ClientError e -> "client error " ++ e.message
+
+profile : String -> String ->{} String
+let profile base name =
+  let request = { path = { name = name }; query = (); headers = (); payload = () }
+  try (HttpApi.call base Public.endpoints.profile request).name with
+  | NotFound who -> "404 " ++ who
+  | HttpApi.ClientError e -> "client error " ++ e.message
+
+post : String ->{} String
+let post base =
+  let note = {
+    path = ();
+    query = ();
+    headers = { authorization = Some "Token ada" };
+    payload = { text = "hi" };
+  }
+  try (HttpApi.call base Users.endpoints.post note).text with
+  | Unauthorized why -> "401 " ++ why
+  | HttpApi.ClientError e -> "client error " ++ e.message
+
+forget : String ->{} String
+let forget base =
+  try
+    HttpApi.call base Public.endpoints.forget { path = (); query = (); headers = (); payload = () }
+    "done"
+  with
+  | HttpApi.ClientError e -> "client error " ++ e.message
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let options : HttpApi.ServeOptions = {
+    host = "127.0.0.1";
+    port = 0;
+    openapi = None;
+    swagger = None;
+    scalar = None;
+  }
+  let api =
+    HttpApi.api "Users"
+    |> HttpApi.add_group (Users.api token Session check maybe)
+    |> HttpApi.add_group Public.api
+  let handlers = {
+    users = {
+      me = fun _ -> user ();
+      greet = fun _ -> "hello " ++ user ();
+      post = fun request -> { text = user () ++ ": " ++ request.payload.text };
+    };
+    public = {
+      profile = fun request ->
+        if request.path.name == "ada" then
+          request.path
+        else
+          from_result (Err (NotFound request.path.name));
+      forget = fun _ -> Platform.stdout_line "forgetting";
+    };
+  }
+  try
+    scope s {
+      let server = HttpApi.listen options api handlers
+      let base = "http://127.0.0.1:" ++ show (HttpApi.port server)
+      Platform.stdout_line ("me as ada: " ++ answer base (Some "Token ada") Users.endpoints.me)
+      Platform.stdout_line ("me anonymous: " ++ answer base None Users.endpoints.me)
+      Platform.stdout_line ("greet anonymous: " ++ answer base None Users.endpoints.greet)
+      Platform.stdout_line ("profile ada: " ++ profile base "ada")
+      Platform.stdout_line ("profile bob: " ++ profile base "bob")
+      Platform.stdout_line ("post as ada: " ++ post base)
+      Platform.stdout_line ("forget: " ++ forget base)
+    }
+  with
+  | HttpApi.ServeError message -> Platform.stdout_line ("serve error " ++ message)
+  match HttpApi.openapi api with
+  | Ok written ->
+    let document = String.replace_all "\n" "" (String.replace_all " " "" written)
+    documented : String -> String
+    let documented status =
+      status ++ " documented: " ++ show (String.contains ("\"" ++ status ++ "\"") document)
+    Platform.stdout_line (String.join ", " (List.map documented ["201", "204", "401", "404"]))
+  | Err (Codec.ExportError message) -> Platform.stdout_line ("document: " ++ message)

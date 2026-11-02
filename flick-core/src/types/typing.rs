@@ -95,6 +95,8 @@ pub struct Typing {
     pub schemas: Vec<SchemaItem>,
     /// The server functions whose witnesses are all known.
     pub server_fns: Vec<ServerFn>,
+    /// The records that derive `HttpApi`.
+    pub http_apis: Vec<super::http_api::HttpApiItem>,
     /// `codec` blocks: the fields' labels in the order written.
     pub codecs: HashMap<Range, CodecBlock>,
     #[cfg(feature = "ide")]

@@ -395,6 +395,11 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
     // Effect: HttpApi
     #[cfg(feature = "server-stdlib")]
     ("HttpApi", builtin_source!("builtins/HttpApi.fl")),
+    #[cfg(feature = "server-stdlib")]
+    (
+        "HttpApi.Derive",
+        builtin_source!("builtins/HttpApi/Derive.fl"),
+    ),
     // end of Effect: HttpApi
     // Effect: RPC (unstable in Effect 4.0.5)
     #[cfg(feature = "server-stdlib")]

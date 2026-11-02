@@ -156,7 +156,15 @@ impl Checker<'_> {
             .map(|e| e.entity.name.clone())
             .collect();
         for ty in types {
-            for member in ["schema", "parse", "value", "json", "table"] {
+            for member in [
+                "schema",
+                "parse",
+                "value",
+                "json",
+                "table",
+                "api",
+                "endpoints",
+            ] {
                 let entity = self
                     .env
                     .entity(Namespace::Value, &super::companion_name(&ty, member));

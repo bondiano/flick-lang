@@ -1,0 +1,78 @@
+/// An API as a type: a record that derives `HttpApi` is a group whose
+/// fields are its endpoints, `field : Get "/path/:id" req res {E1, E2}`. The
+/// field names the endpoint and the type's name in snake case the group;
+/// `req` is a record of the parts the request has, of `path`, `query`,
+/// `headers` and `payload`; `res` is the success, sent with 200,
+/// `Created res` with 201 and `Unit` with 204 and no body; each error of
+/// the row is sent as its `Problem` instance says.
+///
+/// ```flick
+/// type alias Users = {
+///   current_user : Authed (Get "/api/user" { headers : Credentials } UserBody {Unauthorized});
+///   profile : Get "/api/profiles/:username" { path : ProfilePath } ProfileBody {NotFound};
+/// } deriving HttpApi
+/// ```
+///
+/// The type has the companions `Users.endpoints`, the record of its
+/// endpoints, which `HttpApi.call` requests, and `Users.api`, the group,
+/// which `HttpApi.add_group` adds to an API. With `Authed` or `MaybeAuthed`
+/// endpoints, `Users.api` takes the security scheme, the service those
+/// endpoints get and how a request makes it, required and optional, as
+/// `HttpApi.with_auth` and `HttpApi.with_optional_auth` do.
+///
+/// A part is decoded by the value named after its type in snake case in the
+/// type's module, `update_user_body` for `UpdateUserBody`, when that is a
+/// `PureCodec Json` of it, else by the JSON codec of its schema.
+module HttpApi.Derive exposing (..)
+
+import HttpApi exposing (ErrorCases, Request, Security, error_case)
+
+/// What `deriving HttpApi` makes of a record: its companions `api` and
+/// `endpoints`.
+type HttpApi a
+
+/// An endpoint at `path` of a record that derives `HttpApi`; `Post`,
+/// `Put`, `Patch` and `Delete` are the other methods.
+type Get (path : Symbol) req res (e : ErrorRow)
+
+type Post (path : Symbol) req res (e : ErrorRow)
+
+type Put (path : Symbol) req res (e : ErrorRow)
+
+type Patch (path : Symbol) req res (e : ErrorRow)
+
+type Delete (path : Symbol) req res (e : ErrorRow)
+
+/// The success `a`, sent with 201.
+type Created a
+
+/// The endpoint needs the service its group's check makes; without valid
+/// credentials the check fails, and the handler does not run.
+type Authed endpoint
+
+/// The endpoint gets the service of its group's optional check, which also
+/// serves anonymous requests.
+type MaybeAuthed endpoint
+
+/// How an error of an endpoint is answered: its status and its JSON body.
+class Problem e =
+  problem : { status : Int; body : PureCodec Json e }
+
+/// The cases and the error `t`, as its `Problem` instance says.
+problem_case : forall t e. Problem t => ErrorCases e -> ErrorCases {t | e}
+let problem_case cases =
+  let answer = problem
+  error_case answer.status answer.body cases
+
+/// What a group serves for an endpoint.
+type alias Handler p q h b (r : ServiceRow) (e : ErrorRow) s = Request p q h b ->{r; e} s
+
+/// A group with `Authed` or `MaybeAuthed` endpoints, `g`, given the security
+/// scheme, the service `a` they get and how a request with the headers `h`
+/// makes it, failing with the errors `e` every such endpoint declares.
+type alias Secured (a : ServiceRow) (r : ServiceRow) h (e : ErrorRow) g =
+  Security ->
+    ServiceTag a ->
+    Handler Unit Unit h Unit r e (ServiceImpl a) ->
+    Handler Unit Unit h Unit r e (ServiceImpl a) ->
+    g

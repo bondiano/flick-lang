@@ -8,6 +8,8 @@ use super::{Decl, Interface, Module, Namespace};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
+use crate::types::http_api::snake;
 
 /// Warnings for the private `let`s of `module` that the declarations it
 /// exports, its types and its instances never reach, however indirectly;
@@ -45,17 +47,23 @@ pub(super) fn dead_values(
             }
         })
         .collect();
+    let codecs = api_codecs(&decls, module.text);
     let mut reached: BTreeSet<&str> = BTreeSet::new();
     let mut live: Vec<bool> = private.iter().map(Option::is_none).collect();
     let mut queue: Vec<usize> = (0..decls.len()).filter(|&i| live[i]).collect();
     while let Some(i) = queue.pop() {
-        for r in references
+        let named = references
             .iter()
             .filter(|r| r.top == i && r.qualifier.is_none())
-        {
-            if reached.insert(r.name.as_str()) {
+            .map(|r| r.name.as_str());
+        let used = codecs
+            .iter()
+            .filter(|(top, _)| *top == i)
+            .map(|(_, n)| n.as_str());
+        for name in named.chain(used) {
+            if reached.insert(name) {
                 for (j, def) in private.iter().enumerate() {
-                    if !live[j] && def.is_some_and(|d| d.name == r.name) {
+                    if !live[j] && def.is_some_and(|d| d.name == name) {
                         live[j] = true;
                         queue.push(j);
                     }
@@ -105,4 +113,30 @@ fn removal(module: &Module, decl: &Node, signature: Option<&Def>) -> Edit {
         span: Span::new(module.file, start, end),
         replacement: String::new(),
     }
+}
+
+/// The codecs a record that derives `HttpApi` uses by name: the value named
+/// after each type its fields write, by declaration.
+fn api_codecs(decls: &[&Node], text: &str) -> Vec<(usize, String)> {
+    let mut out = Vec::new();
+    for (i, decl) in decls.iter().enumerate() {
+        let derives = decl
+            .nodes()
+            .filter(|n| n.kind == K::DerivingClause)
+            .flat_map(Node::child_tokens)
+            .any(|t| t.kind == K::Con && t.text(text) == "HttpApi");
+        if !derives {
+            continue;
+        }
+        let mut stack: Vec<&Node> = decl.nodes().collect();
+        while let Some(node) = stack.pop() {
+            stack.extend(node.nodes());
+            if node.kind == K::NameType
+                && let Some(last) = node.child_tokens().filter(|t| t.kind == K::Con).last()
+            {
+                out.push((i, snake(last.text(text))));
+            }
+        }
+    }
+    out
 }

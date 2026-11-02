@@ -1,0 +1,53 @@
+module App.Api exposing (..)
+
+import HttpApi.Derive exposing (..)
+
+type alias Item = { id : String }
+  deriving Schema
+
+type alias Opaque = { id : String }
+
+type error Gone = Gone
+  deriving Schema
+
+type error Teapot = Teapot
+  deriving Schema
+
+instance Problem Gone =
+  let problem = { status = 410; body = Codec.json (schema Gone) }
+
+type alias Params = {
+  item : Get "/items/:id/:rev" { path : Item } Item {Gone};
+} deriving HttpApi
+
+type alias Parts = {
+  item : Get "/items" { body : Item } Item {};
+} deriving HttpApi
+
+type alias Codecless = {
+  item : Get "/items" {} Opaque {};
+} deriving HttpApi
+
+type alias Problemless = {
+  item : Get "/items" {} Item {Teapot};
+} deriving HttpApi
+
+type alias Mixed = {
+  item : Authed (Get "/items" {} Item {Gone});
+  other : Get "/other" {} Item {};
+} deriving HttpApi
+
+type alias NotAnEndpoint = {
+  item : Item;
+} deriving HttpApi
+
+type Variant = Variant
+  deriving HttpApi
+
+//~ FLICK-D011 @20:3-20:59 endpoint `item`: the path `/items/:id/:rev` has the parameters `id`, `rev`, and its `path` part the fields `id`
+//~ FLICK-D011 @24:3-24:46 endpoint `item`: `body` is not a part of a request: `path`, `query`, `headers` or `payload`
+//~ FLICK-D011 @28:3-28:35 `Opaque` has no codec: name a `PureCodec Json` of it after it in its module, or derive `Schema`
+//~ FLICK-D011 @32:3-32:39 endpoint `item`: the error `Teapot` has no `HttpApi.Derive.Problem` instance, its status and body
+//~ FLICK-D011 @38:3-38:19 every endpoint of a group with `Authed` endpoints is `Authed` or `MaybeAuthed`: put the others in a group of their own
+//~ FLICK-D011 @41:3-41:14 endpoint `item` is `Get`, `Post`, `Put`, `Patch` or `Delete` of `HttpApi.Derive` with a path, the request, the success and the errors
+//~ FLICK-D011 @45:3-45:19 `Variant` derives `HttpApi`: it is a record of endpoints, `field : Get "/path" { … } Response {Errors}`

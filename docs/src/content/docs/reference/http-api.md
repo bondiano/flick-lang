@@ -113,6 +113,51 @@ Here `credentials` decodes a request without the header as `None`
 `HttpApi.api_key "Token" { key = "authorization"; location = HttpApi.InHeader }`.
 Both targets serve it alike.
 
+### An API as a type
+
+A record that derives `HttpApi` is a group whose fields are its endpoints,
+written with the types of `HttpApi.Derive`:
+
+```flick
+import HttpApi.Derive exposing (..)
+
+type alias Users = {
+  me : Authed (Get "/me" { headers : Credentials } String {Unauthorized});
+  profile : MaybeAuthed (Get "/profiles/:name" { headers : Credentials; path : Name } Profile {Unauthorized, NotFound});
+  post : Authed (Post "/notes" { headers : Credentials; payload : Note } (Created Note) {Unauthorized});
+} deriving HttpApi
+```
+
+- The field names the endpoint, and the type's name in snake case the group
+  (`users`).
+- `Get`, `Post`, `Put`, `Patch` and `Delete` take the path, the request as a
+  record of the parts it has (`path`, `query`, `headers`, `payload`) or `{}`,
+  the success and the errors. Each `:name` of the path is a field of the
+  `path` part.
+- The success is sent with 200, `Created a` with 201, and `Unit` with 204
+  and no body.
+- A part or a success is decoded by the value named after its type in snake
+  case in the type's module (`credentials` for `Credentials`), a refined
+  type's `T.json`, a built-in type's `String.json`, or else the JSON codec of
+  its schema.
+- Each error has an `instance Problem E = let problem = { status = 404; body = … }`.
+
+The type has two companions: `Users.endpoints`, the record of its endpoints,
+which `HttpApi.call` requests, and `Users.api`, the group. With `Authed` and
+`MaybeAuthed` endpoints, `Users.api` takes the security scheme, the service
+and its two checks, required and optional, and applies `with_auth`,
+`with_optional_auth` and `authenticated` as above; every endpoint of such a
+group is `Authed` or `MaybeAuthed`, and they read the same `headers`.
+
+```flick
+let api =
+  HttpApi.api "Notes"
+  |> HttpApi.add_group (Users.api token Session check maybe)
+  |> HttpApi.add_group Public.api
+```
+
+A record that cannot be served as written is `FLICK-D011`.
+
 ## Serving
 
 ```flick
