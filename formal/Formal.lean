@@ -110,3 +110,8 @@ import Formal.Elab.CoreCg
 import Formal.Elab.CoreCgOps
 import Formal.Elab.CoreCgFrames
 import Formal.Elab.CoreRel
+import Formal.Elab.CoreHead
+import Formal.Elab.CoreStep
+import Formal.Elab.CoreSim
+import Formal.Elab.CoreLoad
+import Formal.Elab.CoreRun
