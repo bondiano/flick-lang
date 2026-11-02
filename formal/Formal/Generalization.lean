@@ -5,7 +5,7 @@ import Formal.Effects
 
 (Let-Gen) types its right-hand side with `P` and with the generalized
 variables fresh: the store typing is shifted past them (`Ψ.map (Ty.up k)`), so
-no cell type mentions them. Л3 (`ctx_typing`) says that a hole under such a
+no cell type mentions them. L3 (`ctx_typing`) says that a hole under such a
 right-hand side is pure, and lemma 3.1 that a pure computation does not touch
 the store.
 -/

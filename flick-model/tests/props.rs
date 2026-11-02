@@ -7,7 +7,8 @@
 //! are run too: each state has `⊢ Λ`, and no run uses a capability after
 //! its region closed (T4.1), which the leaks reach. A change may leak a
 //! region by each path of its §4 but the fourth. The generator makes none
-//! of the forms of the recorded incompletenesses Р23 and Р25. The forms of
+//! of the forms of the recorded incompletenesses of `docs/formal/regions.md`: an empty cell and
+//! the region of a task argument. The forms of
 //! the holes of TypeScript (`docs/formal/ts-holes.md` §4) are checked
 //! by both and not run: the machine has no natives for their foreign
 //! values. Not part of `just test`: `just model` runs them, and
@@ -164,7 +165,7 @@ fn leaks_reach_a_use_after_close() {
     assert_eq!(seen, 11);
 }
 
-/// Р130: `(fun g x -> g x) (try … with _ -> as4)`, the λ of `v1` after
+/// A signed `let` keeps its signature when it steps: `(fun g x -> g x) (try … with _ -> as4)`, the λ of `v1` after
 /// its `let` with a signature stepped, whose argument needs the runtime
 /// arrow of the signature. A case the model properties found.
 #[test]

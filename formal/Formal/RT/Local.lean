@@ -72,14 +72,14 @@ inductive Local (K : Core T V) (L : Lib V) (C : Conf T V) : Fiber T V → Fiber 
   /-- (Par): every branch is done -/
   | parDone {φ ks s} : φ.code = .waitPar → φ.stack = .par ks :: s → (∀ k ∈ ks, Done C.Φ k) →
       Local K L C φ { φ with code := .out (parResult L K.unit (exits C.Φ ks)), stack := s }
-  /-- without Г7(г): `parallel` returns before its branches end -/
+  /-- without G7(d): `parallel` returns before its branches end -/
   | parEarly {φ ks s} : L.joinWaits = false → φ.code = .waitPar → φ.stack = .par ks :: s →
       Local K L C φ { φ with code := .out (.fail []), stack := s }
   | provBody {φ πp m b} : φ.code = .provC πp m [] b → Local K L C φ { φ with code := .tm b }
   | provFailed {φ πp m Ly c Ls b m' e c'} : φ.code = .provC πp m ((Ly, c) :: Ls) b →
       L.memo = true → lookup C.M Ly C.n m = some (m', e) → e.st = .failed c' →
       Local K L C φ { φ with code := .out (.fail c') }
-  /-- without Г8: `Ref.modify` reads, and writes in a later step -/
+  /-- without G8: `Ref.modify` reads, and writes in a later step -/
   | modRead {φ e e' l g v} : L.refAtomic = false → φ.code = .tm e → K.step e (.modify l g) e' →
       C.μ l = some v →
       Local K L C φ { φ with code := .modw l g v, stack := .resume e' :: φ.stack }

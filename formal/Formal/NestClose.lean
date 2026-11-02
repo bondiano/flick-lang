@@ -1,7 +1,7 @@
 import Formal.NestScope
 
 /-!
-# Closing a region keeps `⊢ Λ`; Л5
+# Closing a region keeps `⊢ Λ`; L5
 -/
 
 namespace Flick
@@ -30,7 +30,7 @@ theorem Cfg.at_setRgn_dead {Λ : List Rgn} {μ : List Tm} {m : Tm} {p j : Nat} {
   simp only [setRgn, List.getElem?_set_self (getElem?_lt hg), Option.some.injEq] at h₁
   subst h₁; rw [hl] at h₂; cases h₂
 
-/-- **Л5 (nesting).** When the body of `π` and its children are finished, no live
+/-- **L5 (nesting).** When the body of `π` and its children are finished, no live
 region but `π` has `π` among its ancestors: every region created in `π` is closed. -/
 theorem Nest.nested {c : Cfg} {home i E π w g} (hn : Nest Ψ c anc B home)
     (hi : c.at i = some (plug E (.inside π w))) (hE : OkE E) (hw : Final w)

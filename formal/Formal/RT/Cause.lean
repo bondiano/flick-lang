@@ -215,7 +215,7 @@ inductive CTree (V : Type) where
   | seq (a b : CTree V)
   | par (a b : CTree V)
 
-/-- `reasons()`: both node kinds combine with `⊕` (Р30). -/
+/-- `reasons()`: both node kinds combine with `⊕` (`docs/formal/runtime.md#go-combining-causes-without-nub`). -/
 def CTree.reasons : CTree V → Cause V
   | .leaf c => c
   | .seq a b => comb a.reasons b.reasons

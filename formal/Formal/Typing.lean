@@ -8,7 +8,7 @@ import Formal.DictOps
 namespace Flick
 
 /-- Values `v` of core.md §1.3 and §3.1. A partially applied constructor is a
-spine with a `ctor` head (Р100). A constant of arity 2 applied once is a value,
+spine with a `ctor` head (`docs/formal/core.md#a-partial-constructor-application-is-a-value`). A constant of arity 2 applied once is a value,
 and so is a saturated `Layer.*` application. -/
 inductive Value : Tm → Prop
   | lam : Value (.lam b)
@@ -116,7 +116,7 @@ inductive Shp : Bool → Ty → Tm → Prop
 def Exh (t : Ty) (ps : List Pat) : Prop :=
   ∀ v, Shp S true t v → ∃ p ∈ ps, (matchP p v).isSome
 
-/-- The coverage premise of (Match), or of (Match-Val) (Р29). -/
+/-- The coverage premise of (Match), or of (Match-Val) (`docs/formal/core.md#the-residual-match-after-a-false-guard-fails-exh`). -/
 def Covers (t : Ty) (ps : List Pat) (e : Tm) : Prop :=
   Exh S t ps ∨ (Value e ∧ ∃ p ∈ ps, (matchP p e).isSome)
 

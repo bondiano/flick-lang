@@ -9,7 +9,7 @@ The types of `Elab` in the core of `Formal/` with regions and dictionary records
 `var ↦ tvar`, `app ↦ tapp`, `con c ↦ adt`, `Bool ↦ base bool`, `Int ↦ base int`,
 `arr φ a b q ↦ ⟦a⟧ →⟦φ⟧^⌈⟦q⟧⌉ ⟦b⟧`,
 `cnil ↦ caps ∅`, `cun ↦ caps (∪)`, `D_{C τ̄} ↦ dict (cls C |τ̄|) τ̄`. A stage `R` is `rt ∅ ε` with
-`ε` every name (`allNames`, Р210).
+`ε` every name (`allNames`, `docs/formal/elaboration.md#from`_result-could-not-raise-in-the-core).
 The translation commutes with substitution (`trT_subst`, `trTT_subst`, `trS_subst`) and with
 `⌈·⌉` (`trT_reach`): a capture variable is an ordinary variable on both sides.
 
@@ -18,7 +18,7 @@ the number of parameters, so that projecting a superclass slot of `D_{C τ̄}` i
 list `τ̄`, as the law `slot` asks. A structural dictionary is a family over the record type
 (`struct_C : D_{C τ₁} →P … →P D_{C τ}` for each `τ`), and so is a primitive one over its
 constraint; the model's `Dict.strct C` and `Dict.prim p` do not show them, so their globals
-are named by the type too (Р195).
+are named by the type too (`docs/formal/elaboration.md#structural-and-primitive-dictionaries-are-families-indexed-by-type`).
 -/
 
 namespace Flick.Elab
@@ -41,7 +41,7 @@ structure Names where
 variable (N : Names)
 
 /-- Every name, as a row of errors: the stage `R` of the source has no row of errors, and
-`⟦R⟧` lets a body raise any error type whose values reach nothing (Р210). -/
+`⟦R⟧` lets a body raise any error type whose values reach nothing (`docs/formal/elaboration.md#from`_result-could-not-raise-in-the-core). -/
 def allNames : Row
   | .nm _ => True
   | _ => False

@@ -98,7 +98,7 @@ func TestTheTypedViewOfACauseSeesItsHeadOnly(t *testing.T) {
 }
 
 // A failure in a fiber asked to stop skips `try` while the fiber is
-// interruptible: its typed failures go, its interruption comes (Р43).
+// interruptible: its typed failures go, its interruption comes (`docs/formal/runtime.md#an-interruption-that-skips-a-handler-erases-fail-effect`).
 func TestAnInterruptedFiberSkipsTheHandler(t *testing.T) {
 	fb := rootFiber()
 	fb.state.interrupt(5)
@@ -142,7 +142,7 @@ func TestSequentialAndParallelAreOneCombination(t *testing.T) {
 	}
 }
 
-// The empty cause still fails, as Effect's `Cause.empty` (Р82).
+// The empty cause still fails, as Effect's `Cause.empty` (`docs/formal/runtime.md#go-an-empty-cause-is-not-a-failure`).
 func TestTheEmptyCauseFails(t *testing.T) {
 	if _, c := catch(func() Value { return FailureRethrow(nil, CauseEmpty) }); c == nil || len(c.reasons()) != 0 {
 		t.Errorf("rethrowing the empty failure fails without reasons: %v", c)
@@ -160,7 +160,7 @@ func TestTheEmptyCauseFails(t *testing.T) {
 }
 
 // A typed error that became a defect is that value, as in JS: told by its
-// constructor and equal to the same value (docs/formal/runtime.md Р81).
+// constructor and equal to the same value (docs/formal/runtime.md#go-a-typed-error-turned-into-a-defect-loses-its-value).
 func TestATypedErrorAsADefectIsItsValue(t *testing.T) {
 	a := func(n float64) *Cause { return &Cause{kind: causeFail, err: NewData(Tag("App.A#1"), n)} }
 	reasons := CauseReasons(failureOf(Sequential(a(1), a(2)))).([]Value)

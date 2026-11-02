@@ -184,7 +184,7 @@ impl Checker<'_> {
     /// (App) on a redex `(λx. e) v` of a configuration: `x` takes the type
     /// of `v`, as the binder whose signature the substitution dropped gave
     /// it. Inferring the λ first would take a parameter it applies for a
-    /// pure arrow (Р7), which the source did not.
+    /// pure arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`), which the source did not.
     pub(super) fn redex(
         &mut self,
         x: &str,

@@ -4,7 +4,7 @@
 // few enough to repeat. `⊕` is `Cause.combine`, `⧺` is `Cause.from_reasons`
 // over both lists; a cause is seen as its list of reasons. (Seq=Par) has
 // no surface here: `cause_test.go` checks it. Last, a failure of a fiber
-// asked to stop skips `try` (Г7ж, Р43).
+// asked to stop skips `try` (G7g, `docs/formal/runtime.md#an-interruption-that-skips-a-handler-erases-fail-effect`).
 module App.Main exposing (main)
 
 type error A = A Float

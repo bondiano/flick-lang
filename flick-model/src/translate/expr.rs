@@ -120,7 +120,7 @@ impl Tr {
             ExprKind::Await(x) => Term::Await(rc(self.expr(x))),
             ExprKind::Task(x) => Term::Task(rc(self.expr(x))),
             ExprKind::Provide(l, x) => Term::Provide(rc(self.expr(l)), rc(self.expr(x))),
-            // a lift does nothing in the model (§3.4); its correctness is Г2
+            // a lift does nothing in the model (§3.4); its correctness is G2
             ExprKind::Lift(x, _) => self.expr(x),
             ExprKind::Label(_) => stuck("`Record.label`"),
             ExprKind::Generate { .. } | ExprKind::Each { .. } | ExprKind::Yield(_) => {
@@ -132,7 +132,7 @@ impl Tr {
                 Term::Scope(s, rc(self.expr(body)))
             }
             // shortcut: the model acquires into the innermost `scope`, not the
-            // owner a `Within` names (`regions.md` §1.4, Г6); a program that
+            // owner a `Within` names (`regions.md` §1.4, G6); a program that
             // acquires into an outer region from a nested one is rejected
             ExprKind::Within(_, inner) => self.expr(inner),
             ExprKind::CodecBlock(..) => stuck("a `codec` block"),

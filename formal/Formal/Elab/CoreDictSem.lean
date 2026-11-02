@@ -15,8 +15,8 @@ namespace Flick.Elab
 
 /-- The bodies of the globals of dictionaries: an instance is `λ^l. drec …` with the slot
 `N.slot i` the translation of `slots[i]` over the premises, `struct_C^τ` is `λ^n. drec …`
-with the slot `struct_S^τ (δ̄.$slotᵢ)` (Р180), a primitive dictionary is a value. The run
-erases the type of a structural and a primitive global (Р196). -/
+with the slot `struct_S^τ (δ̄.$slotᵢ)` (`docs/formal/elaboration.md#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries`), a primitive dictionary is a value. The run
+erases the type of a structural and a primitive global (`docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type`). -/
 structure RealRun (P : Prog) (N : Names) (root : Roots) : Prop where
   inst : ∀ {I ins}, P.insts I = some ins → ∃ r,
     root.glob (N.inst I) =
@@ -111,7 +111,7 @@ theorem slot_body (hR : RealRun P N root) {g l c : Nat} {r : Flick.Tm} {lab : La
       simp only [id, Nat.sub_add_cancel (Nat.le_of_not_lt hk), if_neg hk]
       simp [args, trDt, List.getD, List.getElem?_eq_none (by omega : ds.length ≤ k)]
 
-/-- **`≈` keeps the values of a dictionary** (Р197). -/
+/-- **`≈` keeps the values of a dictionary** (`docs/formal/elaboration.md#slot-rules-of-equivalence-take-closed-derivations`). -/
 theorem eqv_sem (hR : RealRun P N root) {d d' : Dict} (h : Eqv P d d') :
     SemEq root (trDt N id d) (trDt N id d') := by
   induction h with

@@ -66,8 +66,8 @@ theorem steps_all {root : Roots} {c c' : Cfg} (hroot : RootTy S root)
 /-- **T4.3 (regions.md §5.3).** In every configuration a program reaches, an `ask_S`
 of a thread (the main thread or a child of a live region) answered by a `with` frame
 of the `provide` region `q`, inherited or not, finds `q` live: no fiber uses a
-service of a `provide` after its region closed. This is the premise Г11 of T5 in the
-form of Р142. -/
+service of a `provide` after its region closed. This is the premise G11 of T5 in the
+form of the liveness premise of `provide` (`runtime.md`). -/
 theorem T4_3 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :

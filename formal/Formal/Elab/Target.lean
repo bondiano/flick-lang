@@ -5,7 +5,7 @@ import Formal.Elab.Hyp
 # Elaboration: the target λFlick⁺ as an interface (elaboration.md §0.1, §2.1, §2.2)
 
 The target is abstract: `Target` gives its typing `⊢⁺` of elaborated terms and its run as
-fields, and the laws T6 needs as fields too. `Elab/Core*.lean` instantiate it with λFlick⁺ (Р54).
+fields, and the laws T6 needs as fields too. `Elab/Core*.lean` instantiate it with λFlick⁺ (`docs/formal/elaboration.md#dictionaries-need-polymorphic-fields-and-higher-rank-parameters`).
 
 Types of elaborated terms: monotypes `⟦τ⟧ = τ`, arrows `a →φ^q b` and dictionary types `D_Q`.
 A context entry is `∀ᾱ. t`; a record of `D_Q` with `∀`-fields shows only through its laws:
@@ -50,7 +50,7 @@ def TSch.subst (σ : Nat → Ty) (s : TSch) : TSch := ⟨s.k, s.ty.subst (lift s
 /-- `⌈s⌉` below its binders. -/
 def TSch.reach (s : TSch) (n : Nat) : Prop := s.ty.reach (n + s.k)
 
-/-- `⟦∀ᾱ. Q̄ ⇒ τ⟧_q = ∀ᾱ. D_Q̄ →P^q τ` (Р187). -/
+/-- `⟦∀ᾱ. Q̄ ⇒ τ⟧_q = ∀ᾱ. D_Q̄ →P^q τ` (`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`). -/
 def Scheme.tr (s : Scheme) : TSch := ⟨s.k, dicts s.q s.ctx (.mono s.ty)⟩
 
 /-- What `e` holds in `Γ`; dictionary variables hold nothing. -/
@@ -104,7 +104,7 @@ structure Target (P : Prog) where
     (k ≠ 0 → φ₁ = .P) → (φ₁ = .P ∨ φ₁ = φ) → Has (⟨k, t⟩ :: Γ) Δ b u φ →
     Has Γ Δ (.let_ e b) u φ
   /-- the abstraction over dictionaries: a pure function of a pure body, whose arrows show
-  what the body holds (Р187) -/
+  what the body holds (`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`) -/
   lamD : ∀ {Γ Δ qs e t q φ}, Has Γ (qs ++ Δ) e t φ → (qs ≠ [] → φ = .P) →
     (qs ≠ [] → ∀ n, heldT Γ e n → t.reach n ∨ q.reach n) →
     Has Γ Δ (.lamD qs.length e) (dicts q qs t) φ
@@ -122,16 +122,16 @@ structure Target (P : Prog) where
   dap : ∀ {Γ Δ f x a t q φ}, Has Γ Δ (.dict f) (.arr .P a t q) φ → Has Γ Δ (.dict x) a φ →
     Has Γ Δ (.dict (.ap f x)) t φ
   /-- the program's instances: `I : ∀β̄. D_ctx →P D_head`, by (Instance) of §2.5 with the
-  slots of К7 -/
+  slots of K7 -/
   inst : ∀ {Γ Δ I ins σ φ}, P.insts I = some ins →
     Has Γ Δ (.dict (.inst I))
       (dicts .cnil (ins.ctx.map (·.subst σ)) (.dict ⟨ins.cls, ins.head.map (·.subst σ)⟩)) φ
   /-- (Struct): `struct_C^τ : D_{C τ₁θ} →P … →P D_{C τθ}` at any instance `θ` of its type: the
-  run erases `τ` (Р196, Р201) -/
+  run erases `τ` (`docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type`, `docs/formal/elaboration.md#structural-dictionaries-were-typed-only-at-their-own-record-type`) -/
   strct : ∀ {Γ Δ C τ ts θ φ}, P.structC C = true → P.fields τ = some ts →
     Has Γ Δ (.dict (.strct C τ))
       (dicts .cnil (ts.map fun t => ⟨C, [t.subst θ]⟩) (.dict ⟨C, [τ.subst θ]⟩)) φ
-  /-- (Prim), at any instance `θ` of the constraint (Р201) -/
+  /-- (Prim), at any instance `θ` of the constraint (`docs/formal/elaboration.md#structural-dictionaries-were-typed-only-at-their-own-record-type`) -/
   prim : ∀ {Γ Δ q p θ φ}, P.primC q.cls = true → P.prims q = some p →
     Has Γ Δ (.dict (.prim p q)) (.dict (q.subst θ)) φ
   /-- States of a run, the loading of a term, steps, observable results. -/

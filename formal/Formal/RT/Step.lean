@@ -79,7 +79,7 @@ inductive Step (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
         Φ := setF C f { φ with code := .tm (K.plug t o.x),
                                                 stack := .then (.ok K.unit) :: .resume e' :: φ.stack },
         J := .now π C.n :: .reg π C.n :: C.J, n := C.n + 1 }
-  /-- without Г7(а): a finalizer added to a closed area is dropped -/
+  /-- without G7(a): a finalizer added to a closed area is dropped -/
   | addDrop {C f φ e e' π t o} : C.Φ f = some (.run φ) → φ.code = .tm e →
       K.step e (.addFin π t) e' → C.Λ π = some o → o.st.live = false → L.lateRuns = false →
       Step K L C { C with
@@ -103,7 +103,7 @@ inductive Step (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
       Step K L C { C with
         Φ := setF C f { φ with stack := s },
         J := .reg π C.n :: C.J, n := C.n + 1 }
-  /-- without Г7(б): interrupted before the registration -/
+  /-- without G7(b): interrupted before the registration -/
   | acqLost {C f φ v π rel s g} : C.Φ f = some (.run φ) → φ.code = .out (.ok v) →
       φ.stack = .acq π rel :: s → φ.q = some g → L.acqAtomic = false →
       Step K L C { C with
@@ -229,7 +229,7 @@ inductive Step (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
         Φ := setF C f { φ with code := .waitExt C.n, stack := .resume e' :: φ.stack },
         Λ := upd C.Λ φ.cur (some { o with P := C.n :: o.P }),
         X := upd C.X C.n (some φ.cur), J := .ext φ.cur C.n :: C.J, n := C.n + 1 }
-  /-- without Г9: the call is not tracked by `P` -/
+  /-- without G9: the call is not tracked by `P` -/
   | extU {C f φ e e'} : C.Φ f = some (.run φ) → φ.code = .tm e → K.step e .ext e' →
       L.extTracked = false →
       Step K L C { C with

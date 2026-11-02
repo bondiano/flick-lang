@@ -3,7 +3,7 @@ import Formal.Elab.Run
 import Formal.Elab.SugarBase
 
 /-!
-# Elaboration: closing the premises by types and dictionaries (Р199)
+# Elaboration: closing the premises by types and dictionaries (`docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context`)
 
 `Closes P Δ θ ρ` closes the premises `Δ` of an elaboration by types `θ` and closed dictionaries
 `ρ` (Lemma 6.1). `T6a_close`: an elaboration under `Δl ++ Δ`, with `Δ` closed, has in any
@@ -11,7 +11,7 @@ target the type `τθ` under `Δl θ`, with the premises of `Δ` replaced by the
 (`Tm.dsubst`). A `letSig` adds its own premises in front, so the closed ones are those from
 `L` on, `L` the number of premises bound inside (`dsub`). The closed premises are ground, so
 the shift of a `letSig` keeps them closed; structural and primitive dictionaries are typed at
-the instance `θ` of their type (Р201). For a skeleton whose holes lie outside every
+the instance `θ` of their type (`docs/formal/elaboration.md#structural-dictionaries-were-typed-only-at-their-own-record-type`). For a skeleton whose holes lie outside every
 abstraction over dictionaries (`Tm.Skel`), closing the filling is filling with the closed
 dictionaries (`fill_dsubst`).
 -/

@@ -15,7 +15,7 @@ use crate::syntax::{Const, Env, Name, Path, RegionOp, Term};
 #[derive(Clone, Debug)]
 pub struct Region {
     pub live: bool,
-    /// The region it was made in, which closes after it (Л5).
+    /// The region it was made in, which closes after it (L5).
     pub parent: Option<usize>,
     /// `F(π)`, run last first.
     pub finalizers: Vec<Finalizer>,
@@ -117,7 +117,7 @@ impl Machine<'_> {
     }
 
     /// The region a step that needs `Scope ϱ` acquires into: the
-    /// innermost `inside` around it. Г6 makes the owner lexical; the
+    /// innermost `inside` around it. G6 makes the owner lexical; the
     /// generator never runs a step of an outer `Scope` in an inner `scope`.
     fn owner(&self) -> Option<usize> {
         self.frames.iter().rev().find_map(|f| match f {

@@ -44,7 +44,7 @@ def KidsDone (π : Nat) (J : List (Ev V)) : Prop :=
 def Hist (Good : Ev V → List (Ev V) → Prop) (J : List (Ev V)) : Prop :=
   ∀ J₁ e J₂, J = J₁ ++ e :: J₂ → Good e J₂
 
-/-- What each event of the closing contract requires of the past: И1, И2, R1, R2. -/
+/-- What each event of the closing contract requires of the past: I1, I2, R1, R2. -/
 def Good : Ev V → List (Ev V) → Prop
   | .run π i, J => .fin π i ∈ J ∧ ¬ Started i J ∧ (∀ j, .run π j ∈ J → i < j) ∧
       .fins π ∈ J ∧ .closed π ∉ J ∧ KidsDone π J
@@ -114,10 +114,10 @@ structure Inv (C : Conf T V) : Prop where
   evIds : ∀ e ∈ C.J, ∀ i ∈ e.ids, i < C.n
   hist : Hist Good C.J
   root : ∃ o, C.Λ 0 = some o ∧ o.st = .open
-  /-- И1: the state of an owner is what its closing events say -/
+  /-- I1: the state of an owner is what its closing events say -/
   stJ : ∀ π o, C.Λ π = some o → (o.st = .open ↔ .close π ∉ C.J) ∧
     (o.st.live = true ↔ .fins π ∉ C.J) ∧ (o.st = .closed ↔ .closed π ∈ C.J)
-  /-- И2: an owner past (C5) accepts nothing -/
+  /-- I2: an owner past (C5) accepts nothing -/
   empty : ∀ π o, C.Λ π = some o → o.st.live = false →
     o.K = [] ∧ o.W = [] ∧ o.P = [] ∧ o.H = [] ∧ o.F = []
   /-- `F` before (C5), `fs` after: newest first, registered, not started -/
@@ -134,7 +134,7 @@ structure Inv (C : Conf T V) : Prop where
   frames : ∀ j φ, C.Φ j = some (.run φ) → ∀ fr ∈ φ.stack, FrOk C j fr
   held : ∀ j φ, C.Φ j = some (.run φ) → (φ.stack.filterMap Frame.held).Nodup
   groups : ∀ γ g, C.G γ = some g → GroupOk C γ g
-  /-- И3 -/
+  /-- I3 -/
   spawnJ : ∀ π k w, .spawn π k w ∈ C.J →
     (∃ o, C.Λ π = some o ∧ (k ∈ o.K ∨ DoneJ k C.J) ∧ (w ∈ o.W ∨ DoneJ w C.J))
   startJ : ∀ π k, StartedIn π k C.J → ∃ s, C.Φ k = some s ∧ ∀ φ, s = .run φ → φ.base = π

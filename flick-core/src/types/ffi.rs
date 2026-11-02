@@ -266,7 +266,7 @@ impl Checker<'_> {
             after.is_some_and(|after| !mentions(&after, name))
         });
         // work kept until the owner closes runs with the caller's services,
-        // which must outlive the owner too (Р37)
+        // which must outlive the owner too (`docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer`)
         let provided: Vec<&str> = constraints
             .iter()
             .filter_map(|c| match super::classes::split(c)? {

@@ -1,7 +1,7 @@
 import Formal.Shapes
 
 /-!
-# Canonical forms (Л1)
+# Canonical forms (L1)
 -/
 
 namespace Flick
@@ -94,7 +94,7 @@ theorem Const.arity_of_resKind {c : Const} (h₁ : c.resKind = 1) (h₂ : c.arit
     c.arity = 2 := by
   cases c <;> simp [Const.resKind, Const.arity, Const.layer] at h₁ h₂ ⊢
 
-/-- Л1 for functions. -/
+/-- L1 for functions. -/
 theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.arrow a ψ t C) φ)) :
     (∃ b, v = .lam b) ∨ (∃ f, v = .fix f) ∨ (∃ K, v.head = .ctor K) ∨ (∃ c, v = .const c) ∨
@@ -111,7 +111,7 @@ theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
     exact .inr (.inr (.inr (.inr ⟨_, _, rfl, Const.arity_of_resKind hk.symm hc, hw⟩)))
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
-/-- Л1 for references. -/
+/-- L1 for references. -/
 theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.ref t) φ)) :
     ∃ l, v = .loc l ∧ Ψ[l]? = some t := by
   have hk := h.vkind hv rfl
@@ -123,7 +123,7 @@ theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
     have := Const.resKind_cases ‹Const›; omega
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
-/-- Л1 for computations. -/
+/-- L1 for computations. -/
 theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.eff r ε t C) φ)) :
     ∃ e t₀ ψ, v = .task e ∧ Typ S Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (.rt r ε) ∧ Le t₀ t := by
@@ -161,7 +161,7 @@ theorem canonical_int {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex 
   | adt _ _ h => subst hT; simp [Ty.hd] at h
   | _ => cases hT
 
-/-- Л1 for owners. -/
+/-- L1 for owners. -/
 theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.owner s) φ)) :
     ∃ p, v = .own p ∧ s = .rg p := by
   have hk := h.vkind hv rfl
@@ -173,7 +173,7 @@ theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (
     have := Const.resKind_cases ‹Const›; omega
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
-/-- Л1 for capabilities. -/
+/-- L1 for capabilities. -/
 theorem canonical_hnd {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.hnd s) φ)) :
     ∃ p, v = .cap p ∧ s = .rg p := by
   have hk := h.vkind hv rfl
@@ -185,7 +185,7 @@ theorem canonical_hnd {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
     have := Const.resKind_cases ‹Const›; omega
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
-/-- Л1 for records: field lookup and update succeed. -/
+/-- L1 for records: field lookup and update succeed. -/
 theorem Shp.field {fl R v l t} (h : Shp S fl R v) (hf : fl = true) (hR : R.field l = some t) :
     (∃ w, v.field l = some w) ∧ ∀ w, ∃ v', v.setField l w = some v' := by
   induction h with

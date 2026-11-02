@@ -432,7 +432,7 @@ def Const.ty (S : Sig) : Const → CArg → Ty
 
 /-- Side conditions of a constant at an instance: `Layer.merge` has disjoint
 outputs; a finalizer and a child outlive their owner, with everything they hold
-(Р140). -/
+(`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`). -/
 def Const.ok (Θ : Facts) : Const → CArg → Prop
   | .merge, ι => ∀ N, ¬ (ι.o (.nm N) ∧ ι.o' (.nm N))
   | .addFin, ι => Outl Θ ι.C ι.s ∧ ∀ N a, ¬ ι.r (.need N a)

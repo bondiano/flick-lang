@@ -9,7 +9,7 @@ use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
 use crate::types::Copies;
 
 /// What crosses `f` as a copy: an import outside the runtime may change
-/// Flick data in place (`docs/formal/ts-holes.md` Р26).
+/// Flick data in place (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`).
 fn copies(f: &Foreign) -> Option<&Copies> {
     let trusted = f
         .module

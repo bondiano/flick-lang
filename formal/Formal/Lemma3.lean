@@ -1,7 +1,7 @@
 import Formal.Context
 
 /-!
-# Л3: the effect of a context (core.md §4)
+# L3: the effect of a context (core.md §4)
 -/
 
 namespace Flick
@@ -44,7 +44,7 @@ theorem plug_has {e : Tm} {s : Site} : ∀ (E : List Frame), e.Has s → (plug E
   | [], h => h
   | F :: E, h => plug_has E (F.plug_has h)
 
-/-- **Л3.** The hole of a well-typed context is well-typed, its stage is bounded
+/-- **L3.** The hole of a well-typed context is well-typed, its stage is bounded
 as in `ERel`, and any term of its type can replace it. Under `K` frames of
 (Let-Gen) right-hand sides the hole is `K` variables deep, with the facts of
 their schemes, and pure; otherwise it has the facts of the context and the

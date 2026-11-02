@@ -7,11 +7,11 @@ A concrete program of `Elab`: the classes `Eq`, `Applicative`, `Monad`, `Alterna
 `Iterable` with the methods of `Sugar`, and the instances
 
 - `Eq Int` (`I0`), and `Eq` structural on the record `Rec = {x : Int}` (`struct_Eq`);
-- `Applicative`/`Monad` of `Eff` (`I1`, `I2`), lazy (Р188);
+- `Applicative`/`Monad` of `Eff` (`I1`, `I2`), lazy (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`);
 - `Applicative`/`Monad`/`Alternative` of `OptQ` (`I3`, `I4`, `I5`), an eager `Option`;
 - `Iterable ListQ` (`I6`).
 
-Classes over containers are over `m : CRow → Type → Type` (Р188), so the `Option` and
+Classes over containers are over `m : CRow → Type → Type` (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`), so the `Option` and
 `List` of the instances are `OptQ q a` and `ListQ q a` with a phantom `CRow` parameter. The
 source's own `Option` (`optTy`, constructor `3`) stays as it is. `Functor` is left out: no
 sugar uses it.
@@ -151,7 +151,7 @@ def tsize : Ty → Nat
   | .cnil => 1
   | .cun q q' => tsize q + tsize q' + 1
 
-/-- The order of К5: `Monad` and `Alternative` above `Applicative`, then the size. -/
+/-- The order of K5: `Monad` and `Alternative` above `Applicative`, then the size. -/
 def measure (q : Cn) : Nat :=
   (if q.cls = cMonad ∨ q.cls = cAlt then 10 else 0) + (q.args.map tsize).sum
 

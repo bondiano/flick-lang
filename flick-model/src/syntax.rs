@@ -157,7 +157,7 @@ impl Const {
         }
     }
 
-    /// Whether a full application is a value, as `Layer.*` is (Л1).
+    /// Whether a full application is a value, as `Layer.*` is (L1).
     pub fn builds_value(&self) -> bool {
         matches!(
             self,
@@ -239,7 +239,7 @@ pub enum Term {
     /// `own π`: the owner of region `π`.
     Own(usize),
     /// `cap π n`: object `n` the foreign binding `Path` gave. Of a region
-    /// when the binding acquires into one; without, an object of Г4, as
+    /// when the binding acquires into one; without, an object of G4, as
     /// the one `Resource.acquire_release` holds, or a fiber.
     Cap(Path, Option<usize>, usize),
     /// `inside π e`: the body of a `scope` run in region `π`; its types

@@ -6,10 +6,10 @@ import Formal.Lemma3
 A typing derivation may name a run-time region before it exists: the type of a
 hole is chosen by the derivation. `kill n` sends every region `≥ n` to `Unit`, so a
 derivation renamed by it names only regions that exist (`Young`-free). A term
-writes only regions that exist (`Tm.Below`), so `kill n` fits it, and Л3 carries
+writes only regions that exist (`Tm.Below`), so `kill n` fits it, and L3 carries
 the renaming through the whole derivation (`Refill`). A new scope then gets a region
 no type of the derivation mentions, a new cell a type without regions created
-later (Л6), and the facts of a scope hold of the order of creation (`Facts.age`).
+later (L6), and the facts of a scope hold of the order of creation (`Facts.age`).
 -/
 
 namespace Flick

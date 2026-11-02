@@ -80,7 +80,7 @@ impl Checker<'_> {
     }
 
     /// `Gen(Γ, τ)`: the type metas of `t` deeper than the current level.
-    /// Rows are not quantified: they are settled to the least (Р11).
+    /// Rows are not quantified: they are settled to the least (`docs/formal/core.md#unknown-call-rows-in-a-generalized-binding-close-to-none`).
     pub(super) fn generalize(&mut self, t: &Type) -> Scheme {
         let mut ms = BTreeSet::new();
         self.metas(t, &mut ms);

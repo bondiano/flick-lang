@@ -113,7 +113,7 @@ impl Gen<'_> {
 
     /// `let c : Ref (a -> b) = Ref.make (f : a -> b)` before `e : t`.
     /// `Ref.make` takes the function at a variable's type, where a λ takes
-    /// its least stage (Р7): the annotation types it while it is checked,
+    /// its least stage (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`): the annotation types it while it is checked,
     /// but a state of the machine has the λ without it, so the stage is
     /// the least, `P`.
     pub(super) fn function_cell(&mut self, cx: &Cx, t: &Type, budget: &Stage, size: u32) -> Term {

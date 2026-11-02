@@ -3,7 +3,7 @@ import Formal.Held
 import Formal.Cut
 
 /-!
-# Substitution lemma (Л2)
+# Substitution lemma (L2)
 
 A variable with scheme `∀ᾱ. Θ' ⇒ τ` stands for a pure term typed at `τ` with `ᾱ`
 fresh: `Γ`, `Θ` and `Ψ` shifted past them and `Θ'` assumed. The type

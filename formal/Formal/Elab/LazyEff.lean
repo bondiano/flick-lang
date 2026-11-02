@@ -3,7 +3,7 @@ import Formal.Elab.CoreLaws
 import Formal.Elab.Exh
 
 /-!
-# Р188: the lazy `Monad Eff` is typed in the core
+# Prelude schemes with `CRow` qualifiers: the lazy `Monad Eff` is typed in the core
 
 `Eff` of the model is a nominal type of the core, `Eff q b`, whose constructor `MkEff` has
 the field `eff ∅ ∅ b {q}`: the hidden qualifier of the computation is the parameter `q` of

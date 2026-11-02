@@ -319,7 +319,7 @@ export const optionalArg = <A>(option: Option<A>): A | undefined => (option._tag
 /**
  * `value` as Flick data JS can no longer change: arrays and plain objects
  * are copied all the way down, and any other object goes through `other`
- * (`docs/formal/ts-holes.md` Р26). A frozen object is a constant such as
+ * (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`). A frozen object is a constant such as
  * `none`, kept with its identity.
  * shortcut: a plain JS object typed `JsValue` inside data is copied too; type the copy if a binding needs its identity.
  */

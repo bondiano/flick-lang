@@ -170,7 +170,7 @@ func causeOf(r any) *Cause {
 
 // skipHandler is Effect's failure in a fiber asked to stop while it is
 // interruptible: it skips the handler, its typed failures dropped and the
-// interruption added (FX/internal/core.ts:611-622, Р43). Each recovery
+// interruption added (FX/internal/core.ts:611-622, `docs/formal/runtime.md#an-interruption-that-skips-a-handler-erases-fail-effect`). Each recovery
 // handler calls it; a boundary that must run (`on_exit`, a release, a
 // metric) does not, as Effect's mask stops the skipping there.
 func skipHandler(fb *Fiber, c *Cause) {

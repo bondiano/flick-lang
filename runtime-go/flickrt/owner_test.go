@@ -26,7 +26,7 @@ func TestAHookAddedWhileClosingRuns(t *testing.T) {
 }
 
 // A hook added while the foreign calls settle (C4) still runs before the
-// finalizers (Р160).
+// finalizers (`docs/formal/runtime.md#a-hook-added-during-c4-does-not-run`).
 func TestAHookAddedWhileCallsSettleRuns(t *testing.T) {
 	var order []string
 	Run(rootFiber(), Eff(func(fb *Fiber) Value {

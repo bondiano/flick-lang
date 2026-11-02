@@ -354,7 +354,7 @@ impl Gen<'_> {
             (w, Type::app(Type::con(MODULE, "Wrapper"), region(&rh)))
         };
         Some(match self.pick(8) {
-            // with a qualifier written, or inferred as a local function's (Р21)
+            // with a qualifier written, or inferred as a local function's (`docs/formal/regions.md#local-signatures-infer-only-the-outer-qualifier`)
             0 => {
                 let allowed = if self.pick(2) == 0 { &mine } else { &all };
                 let sig = if self.pick(2) == 0 {
@@ -406,7 +406,7 @@ impl Gen<'_> {
                 };
                 (None, self.nested(cx, budget, size, value), held)
             }
-            // Г4: what `acquire_release` gives holds its region (Р18)
+            // G4: what `acquire_release` gives holds its region (`docs/formal/regions.md#acquired-values-carry-their-region`)
             _ => {
                 let into = BTreeSet::from([acquires_into(budget)?]);
                 let held = Type::Bounded(Rc::new(Type::con(MODULE, "Raw")), caps(&into));
@@ -509,7 +509,7 @@ pub(super) fn leak(g: &mut Gen, path: usize, e: impl Fn(&Name) -> Term) -> Term 
             let child = spawn(var(&o), task(use_(&h)), Term::unit());
             stmt(Term::Scope(o, Rc::new(scoped(child))), e(&x))
         }
-        // what a foreign acquisition gives (Г4)
+        // what a foreign acquisition gives (G4)
         _ => let_(&x, None, Term::Scope(s.clone(), Rc::new(acquire())), e(&x)),
     }
 }

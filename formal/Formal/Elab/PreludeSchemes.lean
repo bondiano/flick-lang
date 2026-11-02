@@ -6,10 +6,10 @@ import Formal.Elab.Syntax
 # Elaboration: the schemes of the Prelude
 
 The checker's types of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List`
-translated by Р188 (`docs/formal/elaboration.md`) in `flick-model/src/translate/lean.rs`.
+translated with `CRow` qualifiers (`docs/formal/elaboration.md`) in `flick-model/src/translate/lean.rs`.
 A `def` takes the numbers of the classes of its context and of the type constructors it
 names. A tuple is `tup` nested to the left, a closed record `rec_ℓ̄` of its fields.
-The exports the model cannot write close the file, each with its reason (Р230).
+The exports the model cannot write close the file, each with its reason (`docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names`).
 -/
 
 namespace Flick.Elab.PreludeSchemes
@@ -1189,7 +1189,7 @@ end Flick.Elab.PreludeSchemes
 /-! ## Skipped
 
 `row`: a row of services or errors outside an arrow and `Eff`; `rank`: `∀` of a
-parameter other than `∀v. a^v → …` (Р194); `region`: a region parameter.
+parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`); `region`: a region parameter.
 -/
 
 -- skip Prelude.parallel_results (row): forall c r e a. List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)

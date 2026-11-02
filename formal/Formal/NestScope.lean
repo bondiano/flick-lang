@@ -1,12 +1,12 @@
 import Formal.NestRedex
 
 /-!
-# Creating and closing a region keeps `⊢ Λ`; Л5
+# Creating and closing a region keeps `⊢ Λ`; L5
 
 A new region `π` gets as ancestors the regions of the place of its `scope` and
 itself; its home is the thread of the `scope`. Closing `π` drops it from what live
 work may name: no live region but `π` has `π` among its ancestors (`Nest.nested`,
-Л5), since such a region has its `inside` form in the body of `π` or in a child
+L5), since such a region has its `inside` form in the body of `π` or in a child
 of a region inside `π`, and these are finished.
 -/
 

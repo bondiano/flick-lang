@@ -32,7 +32,7 @@ theorem Tm.Within.move {v : Tm} {A₁ A₂ C : Nat → Prop} (hn : v.NoIns) (h :
   · rintro ⟨h₁, h₂⟩; exact ⟨(hA x (hl l t hl' ht x h₂)).mp h₁, h₂⟩
   · rintro ⟨h₁, h₂⟩; exact ⟨(hA x (hl l t hl' ht x h₂)).mpr h₁, h₂⟩
 
-/-- What a typed value writes is bounded by its type (Л4). -/
+/-- What a typed value writes is bounded by its type (L4). -/
 theorem Typ.sites {Θ : Facts} {v : Tm} {T : Ty} {φ : Stage} (hv : Value v)
     (h : Typ S Ψ Θ [] v (.ex T φ)) :
     (∀ p, v.Has (.rgn p) → T.reach (.r p)) ∧

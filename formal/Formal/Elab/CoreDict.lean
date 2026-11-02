@@ -167,7 +167,7 @@ theorem has_inst (hR : Real P S N) {Γ Δ I ins σ φ} (hI : P.insts I = some in
   have := has_glob (Γ := Γ) (Δ := Δ) (φ := φ) hg hcl σ fun _ _ => .dict .inst
   simpa [instTy, TTy.subst_dicts, TTy.subst, Cn.subst, Ty.subst] using this
 
-/-- `struct_C^τ` at an instance `θ` of its closed scheme (Р201). -/
+/-- `struct_C^τ` at an instance `θ` of its closed scheme (`docs/formal/elaboration.md#structural-dictionaries-were-typed-only-at-their-own-record-type`). -/
 theorem has_strct (hR : Real P S N) {Γ Δ C τ ts θ φ} (hC : P.structC C = true)
     (hf : P.fields τ = some ts) :
     Has S N Γ Δ (.dict (.strct C τ))

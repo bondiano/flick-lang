@@ -2,11 +2,11 @@
 //! invariants and properties of docs/formal/runtime.md §4 and §6 that a
 //! trace shows.
 //!
-//! - И1: the phases of an owner's close come once each, C0 to C6 in order.
-//! - И2: children are admitted only while the owner is open (Spawn), and
+//! - I1: the phases of an owner's close come once each, C0 to C6 in order.
+//! - I2: children are admitted only while the owner is open (Spawn), and
 //!   finalizers join its stack only before C5 (Fin-Add); later they run at
 //!   once (Fin-Now).
-//! - И3: a child is registered with its watcher once, then ends, its
+//! - I3: a child is registered with its watcher once, then ends, its
 //!   supervisor is called on a failure, and its watcher is done, once each.
 //! - R1: each finalizer starts exactly once, and those of the stack before
 //!   the owner's close ends.
@@ -15,12 +15,12 @@
 //! - R3: after its close no step of the owner or its children happens.
 //! - R4: a child that failed or was interrupted reaches its supervisor
 //!   before its watcher is done.
-//! - R6 and И6, as far as a trace without memo maps shows them: a layer's
+//! - R6 and I6, as far as a trace without memo maps shows them: a layer's
 //!   build is released at most once, and every one is released when main
 //!   has ended.
 //!
-//! Not checked here: И4 (who acquires into an owner: the trace does not
-//! name the fiber of a step), И5 (the typed head, R5: `cause_laws.fl`),
+//! Not checked here: I4 (who acquires into an owner: the trace does not
+//! name the fiber of a step), I5 (the typed head, R5: `cause_laws.fl`),
 //! R7 (`Ref` is not traced), and the hooks of C1, which are not traced.
 
 use std::collections::BTreeMap;
@@ -152,7 +152,7 @@ fn step(state: &mut State, e: &Event) -> Step {
 
 fn open(state: &mut State, e: &Event) -> Step {
     if state.owners.contains_key(&e.owner) {
-        return fail("И1", format!("owner {} opens twice", e.owner));
+        return fail("I1", format!("owner {} opens twice", e.owner));
     }
     if e.parent != 0 {
         match state.owners.get(&e.parent) {
@@ -165,7 +165,7 @@ fn open(state: &mut State, e: &Event) -> Step {
             }
             None => {
                 return fail(
-                    "И1",
+                    "I1",
                     format!("an owner opens inside {}, which never opened", e.parent),
                 );
             }
@@ -183,12 +183,12 @@ fn open(state: &mut State, e: &Event) -> Step {
 fn phase(state: &mut State, e: &Event) -> Step {
     let Some(o) = state.owners.get_mut(&e.owner) else {
         return fail(
-            "И1",
+            "I1",
             format!("a close of owner {}, which never opened", e.owner),
         );
     };
     let Some(n) = PHASES.iter().position(|p| *p == e.phase) else {
-        return fail("И1", format!("no phase {}", e.phase));
+        return fail("I1", format!("no phase {}", e.phase));
     };
     if n != o.phase {
         let at = if o.phase == 0 {
@@ -197,7 +197,7 @@ fn phase(state: &mut State, e: &Event) -> Step {
             PHASES[o.phase - 1]
         };
         return fail(
-            "И1",
+            "I1",
             format!(
                 "{} after {at}: the phases come once each, in order",
                 e.phase
@@ -253,7 +253,7 @@ fn exit(state: &mut State) -> Step {
 fn owner_step(state: &mut State, e: &Event) -> Step {
     let Some(o) = state.owners.get_mut(&e.owner) else {
         return fail(
-            "И1",
+            "I1",
             format!("a step of owner {}, which never opened", e.owner),
         );
     };
@@ -267,20 +267,20 @@ fn owner_step(state: &mut State, e: &Event) -> Step {
     match e.name.as_str() {
         "spawn" => {
             if o.phase > 0 {
-                return fail("И2", "a child admitted while the owner closes");
+                return fail("I2", "a child admitted while the owner closes");
             }
             if o.children.insert(e.fiber, Child::default()).is_some() {
-                return fail("И3", format!("child {} registered twice", e.fiber));
+                return fail("I3", format!("child {} registered twice", e.fiber));
             }
             Ok(())
         }
-        "refuse" if o.phase == 0 => fail("И2", "a spawn refused while the owner is open"),
+        "refuse" if o.phase == 0 => fail("I2", "a spawn refused while the owner is open"),
         "refuse" => Ok(()),
         "interrupt" => match o.children.get(&e.fiber) {
-            _ if o.phase != 3 => fail("И1", "children are interrupted only in C2"),
+            _ if o.phase != 3 => fail("I1", "children are interrupted only in C2"),
             Some(c) if !c.watched => Ok(()),
             _ => fail(
-                "И3",
+                "I3",
                 format!("C2 interrupts {}, no running child of the owner", e.fiber),
             ),
         },
@@ -289,7 +289,7 @@ fn owner_step(state: &mut State, e: &Event) -> Step {
             let now = e.name == "now";
             if now != (o.phase >= 6) {
                 return fail(
-                    "И2",
+                    "I2",
                     format!(
                         "`{}` in phase {}: before C5 a finalizer joins the stack, after it runs at once",
                         e.name, o.phase
@@ -297,7 +297,7 @@ fn owner_step(state: &mut State, e: &Event) -> Step {
                 );
             }
             if e.place != i64::try_from(o.finalizers.len()).unwrap_or(i64::MAX) + 1 {
-                return fail("И2", format!("finalizer {} out of order", e.place));
+                return fail("I2", format!("finalizer {} out of order", e.place));
             }
             o.finalizers.insert(e.place, Finalizer { now, ran: false });
             Ok(())
@@ -319,14 +319,14 @@ fn owner_step(state: &mut State, e: &Event) -> Step {
                 format!("foreign call {} settles, but it is not pending", e.call),
             ),
         },
-        other => fail("И1", format!("unknown event `{other}`")),
+        other => fail("I1", format!("unknown event `{other}`")),
     }
 }
 
 fn child_step(o: &mut Owner, e: &Event) -> Step {
     let Some(c) = o.children.get_mut(&e.fiber) else {
         return fail(
-            "И3",
+            "I3",
             format!(
                 "{} of child {}, which was never registered",
                 e.name, e.fiber
@@ -334,7 +334,7 @@ fn child_step(o: &mut Owner, e: &Event) -> Step {
         );
     };
     match e.name.as_str() {
-        "end" if c.exit.is_some() => fail("И3", "a child ends twice"),
+        "end" if c.exit.is_some() => fail("I3", "a child ends twice"),
         "end" => {
             c.exit = Some(e.exit.clone());
             Ok(())
@@ -347,7 +347,7 @@ fn child_step(o: &mut Owner, e: &Event) -> Step {
             Ok(())
         }
         _ if c.exit.is_none() || c.watched => {
-            fail("И3", "a watcher done before its child ended, or twice")
+            fail("I3", "a watcher done before its child ended, or twice")
         }
         _ if c.exit.as_deref() != Some("ok") && !c.supervised => fail(
             "R4",
@@ -475,7 +475,7 @@ mod tests {
     fn a_closing_owner_admits_no_child_and_a_closed_one_no_step() {
         let mut trace = vec![r#"{"e":"open","o":1,"p":0,"k":"scope"}"#, CLOSE[0]];
         trace.push(r#"{"e":"spawn","o":1,"f":2}"#);
-        assert_eq!(checked(&trace).map_err(|v| v.rule), Err("И2"));
+        assert_eq!(checked(&trace).map_err(|v| v.rule), Err("I2"));
         let mut trace = vec![r#"{"e":"open","o":1,"p":0,"k":"scope"}"#];
         trace.extend(CLOSE);
         trace.push(r#"{"e":"track","o":1,"t":3}"#);

@@ -110,7 +110,7 @@ def withs : List Frame → Tm → Tm
   | [], e => e
   | F :: E, e => withs E (F.wrap e)
 
-/-- Pure steps `→ₚ` of core.md §3.3, with `bind` and `join` (Р101). -/
+/-- Pure steps `→ₚ` of core.md §3.3, with `bind` and `join` (`docs/formal/core.md#bind`_s-and-join-steps-are-pure). -/
 inductive PHead : Tm → Tm → Prop
   | beta : Value v → PHead (.app (.lam b) v) (b.subst (inst [v]))
   | fix : Value v → PHead (.app (.fix f) v) (f.subst (inst [v, .fix f]))

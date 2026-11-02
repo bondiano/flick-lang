@@ -1,7 +1,7 @@
 // A failure of a fiber asked to stop, while it is interruptible, skips every
 // recovery handler on its way out: `Effect.exit`, `match_cause`, `retry`, a
 // race and a stream's `catch_cause` see neither the failure nor run, and the
-// fiber ends with its interruption alone (docs/formal/runtime.md Г7ж, Р43).
+// fiber ends with its interruption alone (docs/formal/runtime.md G7g, `docs/formal/runtime.md#an-interruption-that-skips-a-handler-erases-fail-effect`).
 module App.Main exposing (main)
 
 type error A = A Float

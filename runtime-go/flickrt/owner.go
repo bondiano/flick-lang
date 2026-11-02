@@ -235,7 +235,7 @@ func (o *Owner) closeWithCause(fb *Fiber, exit, cause *Cause) *Cause {
 	o.tracePhase("C3")
 	// a supervisor may have made a fiber group while the children ended
 	cause = Sequential(cause, o.runHooks(fb))
-	// a settling foreign call may add a hook, and a hook may leave one: repeat until neither (Р160)
+	// a settling foreign call may add a hook, and a hook may leave one: repeat until neither (`docs/formal/runtime.md#a-hook-added-during-c4-does-not-run`)
 	for {
 		o.settle()
 		o.mu.Lock()

@@ -1,6 +1,6 @@
 //! The checker's schemes of the exports of the Prelude and of the modules
 //! the sugar may take as terms of `Elab.Scheme` in Lean
-//! (`formal/Formal/Elab/PreludeSchemes.lean`), by the translation of Р188
+//! (`formal/Formal/Elab/PreludeSchemes.lean`), by the translation of the Prelude schemes with `CRow` qualifiers
 //! (`docs/formal/elaboration.md`):
 //!
 //! 1. `(T ā)^q` is `T q ā` (`appQ`) for a type with hidden storage and for
@@ -18,7 +18,7 @@
 //!    order, then the new variables in the order they appear.
 //!
 //! A scheme the model cannot write is a line of the skipped list, with its
-//! reason (Р230).
+//! reason (`docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names`).
 
 mod tr;
 
@@ -33,7 +33,7 @@ use self::tr::{Tr, Ty, occurs};
 const MODULES: [&str; 5] = ["Prelude", "Seq", "Option", "Result", "List"];
 
 /// Families by a row of errors: the variable of the row is their index
-/// (`from_result`, Р230).
+/// (`from_result`, `docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names`).
 const ROW_FAMILIES: [(&str, &str); 1] = [("Prelude", "from_result")];
 
 /// Identifiers of the checker that are Lean keywords.
@@ -44,7 +44,7 @@ const KEYWORDS: [&str; 4] = ["show", "from", "at", "fun"];
 enum Skip {
     /// a row of services or errors outside an arrow and `Eff`
     Row,
-    /// `∀` of a parameter other than `∀v. a^v → …` (Р194)
+    /// `∀` of a parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`)
     Rank,
     /// a region parameter
     Region,
@@ -242,10 +242,10 @@ pub fn prelude_schemes() -> String {
          /-!\n\
          # Elaboration: the schemes of the Prelude\n\n\
          The checker's types of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List`\n\
-         translated by Р188 (`docs/formal/elaboration.md`) in `flick-model/src/translate/lean.rs`.\n\
+         translated with `CRow` qualifiers (`docs/formal/elaboration.md`) in `flick-model/src/translate/lean.rs`.\n\
          A `def` takes the numbers of the classes of its context and of the type constructors it\n\
          names. A tuple is `tup` nested to the left, a closed record `rec_ℓ̄` of its fields.\n\
-         The exports the model cannot write close the file, each with its reason (Р230).\n\
+         The exports the model cannot write close the file, each with its reason (`docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names`).\n\
          -/\n\n\
          namespace Flick.Elab.PreludeSchemes\n",
     );
@@ -276,7 +276,7 @@ pub fn prelude_schemes() -> String {
         out.push_str(
             "\n/-! ## Skipped\n\n\
              `row`: a row of services or errors outside an arrow and `Eff`; `rank`: `∀` of a\n\
-             parameter other than `∀v. a^v → …` (Р194); `region`: a region parameter.\n\
+             parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`); `region`: a region parameter.\n\
              -/\n\n",
         );
         out.push_str(&skipped);

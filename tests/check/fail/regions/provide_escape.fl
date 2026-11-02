@@ -1,5 +1,5 @@
 // The services a `provide` builds end with it: work kept by an owner that
-// outlives the `provide` cannot use them (Р37).
+// outlives the `provide` cannot use them (`docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer`).
 module App.ProvideEscape exposing (..)
 
 service Greeter =

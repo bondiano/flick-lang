@@ -15,7 +15,7 @@ variable {V T : Type}
 /-- Some reason of `c` is a defect. -/
 def hasDie (c : Cause V) : Bool := c.any fun | .die _ => true | _ => false
 
-/-- `dies c`: every `Fail v` becomes `Die v` (`failsToDies`, Р81). -/
+/-- `dies c`: every `Fail v` becomes `Die v` (`failsToDies`, `docs/formal/runtime.md#go-a-typed-error-turned-into-a-defect-loses-its-value`). -/
 def dies (c : Cause V) : Cause V := c.map fun | .fail v => .die v | r => r
 
 /-- The result of `recover`: an arm's handler or a failure. -/
@@ -88,7 +88,7 @@ theorem Iε_append {H₁ H₂ H : V → Prop} (h₁ : ∀ v, H₁ v → H v) (h�
   | none => rw [e] at hv; exact h₂ _ (hb _ hv)
 
 omit [DecidableEq V] in
-/-- A cause without `Fail` (hooks and finalizers, Р16) satisfies every I_ε. -/
+/-- A cause without `Fail` (hooks and finalizers, `docs/formal/regions.md#owner-retention-requires-outlives`) satisfies every I_ε. -/
 theorem Iε_none {H : V → Prop} {c : Cause V} (h : head c = none) : Iε H c :=
   fun _ hv => by rw [h] at hv; cases hv
 
@@ -99,7 +99,7 @@ theorem Iε_close {H : V → Prop} {x cH cF : Cause V} (hx : Iε H x) (hH : head
     (Iε_none hF)
 
 omit [DecidableEq V] in
-/-- An operation that keeps the head or drops it keeps I_ε; Г7(ж) is one (`Hyp.g7zh`). -/
+/-- An operation that keeps the head or drops it keeps I_ε; G7(g) is one (`Hyp.g7zh`). -/
 theorem Iε_keep {H : V → Prop} {c c' : Cause V} (h : head c' = none ∨ head c' = head c)
     (hc : Iε H c) : Iε H c' := by
   rcases h with h | h

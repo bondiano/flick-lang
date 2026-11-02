@@ -2,7 +2,7 @@ import Formal.Fresh
 import Formal.Soundness
 
 /-!
-# Л4 and Л6: what a value reaches through the store, and the types of old cells
+# L4 and L6: what a value reaches through the store, and the types of old cells
 
 `reach_μ(e)` of regions.md §5.2 is `Reaches μ e`: the run-time regions `e` writes
 down (in `cap π`, `own π`, `inside π e` and inside the bodies of `λ` and `task`),
@@ -19,7 +19,7 @@ inductive Reaches (μ : List Tm) : Tm → Nat → Prop
   | here : e.Has (.rgn p) → Reaches μ e p
   | cell : e.Has (.loc l) → μ[l]? = some v → Reaches μ v p → Reaches μ e p
 
-/-- **Л4.** If `·;Ψ ⊢ v : τ` and `⊢ μ : Ψ`, then `reach_μ(v) ⊆ ⌈τ⌉`. The cases of
+/-- **L4.** If `·;Ψ ⊢ v : τ` and `⊢ μ : Ψ`, then `reach_μ(v) ⊆ ⌈τ⌉`. The cases of
 `regions.md` §5.2 are those of `Typ.holds`; a location reaches the cell's value,
 which is typed at `Ψ(ℓ)` exactly, so it reaches within `⌈Ψ(ℓ)⌉ ⊆ ⌈τ⌉`. -/
 theorem lemma_4 {Ψ μ p} (hμ : StoreTy S Ψ μ) {e : Tm} (hr : Reaches μ e p) :
@@ -40,7 +40,7 @@ theorem lemma_4_cell {Ψ : List Ty} {μ : List Tm} {l : Nat} {v : Tm} {t : Ty} {
   let ⟨hvv, hvt⟩ := hμ.2 l v t hv ht
   lemma_4 hμ hr hvv hvt
 
-/-- **Л6 (old cells).** In every configuration reached by a program, the type of each
+/-- **L6 (old cells).** In every configuration reached by a program, the type of each
 cell names only regions that already exist, and later configurations keep the type
 of every cell: a region created after a cell is not in its type. -/
 theorem lemma_6 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))

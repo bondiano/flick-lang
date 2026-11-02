@@ -7,7 +7,7 @@ import Formal.Elab.SugarBase
 rest of a block after `<-` is the pure continuation of `flat_map`, a guard needs
 `Alternative m`, a group `and` needs `Applicative m` and ends either in `pure e` (`map2`
 alone) or in the rest (`flat_map` over the tuple). `do_elab`: the desugared block elaborates
-at the container and element type of the block, with the row its desugaring shows (Р188);
+at the container and element type of the block, with the row its desugaring shows (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`);
 `T6a_do`: T6(a) covers it.
 -/
 
@@ -16,7 +16,7 @@ namespace Flick.Elab
 variable {P : Prog} (S : Sugar P)
 
 /-- The typing of `do { s̄; r }` at the stage `φ`, a block of the container `m` with elements
-of type `b`. The rows of the values are not indices: the core has no (≤-Cap) on them (Р188),
+of type `b`. The rows of the values are not indices: the core has no (≤-Cap) on them (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`),
 so a block has the row its desugaring shows, and each premise takes any row. -/
 inductive DoOk : List Scheme → List Cn → List Stmt → Exp → Ty → Ty → Stage → Prop
   | ret {Γ Δ r m q b φ r'} : Elab P Γ Δ r (appQ m q b) φ r' → DoOk Γ Δ [] r m b φ

@@ -2,7 +2,7 @@ import Formal.Elab.T6a
 import Formal.Elab.Basic
 
 /-!
-# Elaboration: the algebra of closing types (Р199)
+# Elaboration: the algebra of closing types (`docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context`)
 
 Closing the premises of an elaboration by types `θ` moves `θ` under binders: a scheme
 substitutes `lift k θ`, an instantiation commutes with it (`lift_inst`), a shift `up k` of

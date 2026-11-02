@@ -217,7 +217,7 @@ fn let_mono_keeps_the_result_of_a_runtime_step_monomorphic() {
     rejected_by(infer(&task(let_("f", cell_id(), both))), "≡");
 }
 
-/// (Let-Sig) and Р1: a `∀` over a runtime step is `FLICK-T013`.
+/// (Let-Sig), also under an annotation with `∀`: a `∀` over a runtime step is `FLICK-T013`.
 #[test]
 fn let_sig_rule() {
     let id = poly(Type::fun(a(), Stage::Pure, a()));
@@ -315,7 +315,7 @@ fn task_and_await() {
     rejected_by(infer(&task(await_(int(1)))), "≡");
 }
 
-/// (Task) with a generic value (`regions.md` §2.1, Р62): `a^{≤c}` is
+/// (Task) with a generic value (`regions.md` §2.1, `docs/formal/regions.md#a-bounded-variable-reaches-what-the-variable-reaches`): `a^{≤c}` is
 /// within `c`, a bare `a` is a capture the bare `Eff` does not allow.
 #[test]
 fn task_holds_a_type_variable() {
@@ -368,7 +368,7 @@ fn try_takes_off_what_an_unguarded_arm_covers() {
     );
 }
 
-/// Р3: an arm `e` whose use asks for `A` is not a full arm when the body
+/// A `try` arm typed by its use (`docs/formal/core.md`): an arm `e` whose use asks for `A` is not a full arm when the body
 /// also raises `B`.
 #[test]
 fn try_arm_variable_is_errors_of_the_body() {
@@ -425,7 +425,7 @@ fn provide_gives_the_services_of_its_layer() {
     assert!(infer(&konst(Const::LayerSucceed(log()), vec![extra])).is_err());
 }
 
-/// Р9: the alternatives of an or-pattern bind a name at one type.
+/// The alternatives of an or-pattern bind a name at one type.
 #[test]
 fn or_pattern_alternatives_are_equal() {
     let alt = |c: &str| Pat::Con(con(c, "Job", 1), Rc::from([Pat::Var("f".into())]));

@@ -3,12 +3,12 @@ import Formal.Elab.Syntax
 /-!
 # Elaboration: the source and `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (elaboration.md §2.2, §2.4)
 
-Source types are the `Ty` of constraints, with the arrow `a →φ^q b` (Р186); `Bool` is
+Source types are the `Ty` of constraints, with the arrow `a →φ^q b` (`docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor`); `Bool` is
 `con 2`, `Int` is `con 4` and `Option a` is `app (con 3) a`. Schemes bind `var 0 … var (k-1)`, capture
 variables among them; under a binder of `k` variables the context is shifted by `k`, as
 `Typ.letGen` does in the core. Terms are Curry-style with de Bruijn variables; a premise `δ`
 is an index into `Δ`. (Lam) and (Let-Sig-Dict) show what a closure holds, as (Lam) of
-`regions.md` (Р185); qualifiers match exactly, there is no (≤-Cap).
+`regions.md` (`docs/formal/elaboration.md#t6a-without-captures-does-not-carry-over-to-the-core-with-regions`); qualifiers match exactly, there is no (≤-Cap).
 -/
 
 namespace Flick.Elab
@@ -105,8 +105,8 @@ variable (P : Prog)
 
 /-- `Γ; Δ ⊢ e : τ ! φ ⇝ e'` of §2.4. Values take any stage, and an application, a `let` or a
 `match` runs at one stage `φ`: the arrow applied and the right side of a `let` run at
-`ψ ⊑ φ` (the stage part of (Sub), Р182). A closure shows what it holds in its arrow, a
-function of dictionaries in the qualifier of its scheme (Р187). -/
+`ψ ⊑ φ` (the stage part of (Sub), `docs/formal/elaboration.md#let-sig-dict-lost-the-effect-of-the-right-hand-side`). A closure shows what it holds in its arrow, a
+function of dictionaries in the qualifier of its scheme (`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`). -/
 inductive Elab : List Scheme → List Cn → Exp → Ty → Stage → Tm → Prop
   /-- (Var-Dict) -/
   | var {Γ Δ x σ ts ds φ} : Γ[x]? = some σ → ts.length = σ.k →
@@ -128,7 +128,7 @@ inductive Elab : List Scheme → List Cn → Exp → Ty → Stage → Tm → Pro
       Elab Γ Δ (.lam b) (.arr φ a t q) ψ (.lam b')
   | let_ {Γ Δ e b a t φ e' b'} : Elab Γ Δ e a φ e' → Elab (⟨0, [], a, .cnil⟩ :: Γ) Δ b t φ b' →
       Elab Γ Δ (.let_ e b) t φ (.let_ e' b')
-  /-- (Let-Sig-Dict), with the premise of Р55 -/
+  /-- (Let-Sig-Dict), with the premise that the right-hand side is pure -/
   | letSig {Γ Δ σ e b t φ₁ φ e' b'} :
       Elab (Γ.map (·.subst (up σ.k))) (σ.ctx ++ Δ.map (·.subst (up σ.k))) e σ.ty φ₁ e' →
       (σ.ctx ≠ [] ∨ σ.k ≠ 0 → φ₁ = .P) → (φ₁ = .P ∨ φ₁ = φ) →

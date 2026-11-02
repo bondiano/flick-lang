@@ -1,7 +1,7 @@
 import Formal.Substitution
 
 /-!
-# Values are pure (Л1, last clause)
+# Values are pure (L1, last clause)
 
 Every value has a type below the given one that it has with `P`; for a
 constructor spine that type has only pure arrows.
@@ -146,7 +146,7 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     exact ⟨_, .refl, .drec hc hk hr hn hh, by simp [Tm.head], by simp, by simp⟩
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
-/-- Л1, last clause: a value has its type with any stage. -/
+/-- L1, last clause: a value has its type with any stage. -/
 theorem Typ.valueAny {Ψ Θ Γ v T φ} (h : Typ S Ψ Θ Γ v (.ex T φ)) (hv : Value v) (ψ : Stage) :
     Typ S Ψ Θ Γ v (.ex T ψ) := by
   obtain ⟨_, l, t, -⟩ := h.pureTy hv rfl
