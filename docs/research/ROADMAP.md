@@ -441,6 +441,8 @@ component search (props : SearchProps) =
 - AC: `[lint]` с жёсткими `max-function-*` и `no-let-assert`; `check --warnings-as-errors` и `fmt --check` для contract, server и client в `flick/tests/examples.rs`.
 - AC: каждое правило, которого не хватило при написании, — отдельный пункт W17+ с кодом в `diagnostics/codes.rs` и фикстурой.
 
+**W17. Импорт таблицы, названной только в `sql { … }`, — использование.** ✅ (линтер `R012` считал такой импорт неиспользуемым, хотя без него запрос не компилируется, и под `--warnings-as-errors` модуль запросов нельзя было собрать; имена таблиц `T` и `M.T` внутри `sql { … }` теперь ссылки, столбцы и псевдонимы — нет; фикстура `tests/check/projects/sql_table_imports`)
+
 **W20. Контракт.** ✅ (`examples/conduit/contract`, пакет с исходниками `@conduit/contract`: `Conduit.Model` — ответы как на проводе, `Conduit.Input` — запросы, где каждое поле может отсутствовать, чтобы сервер отвечал 422 по полю, а обновление отличало отсутствие от `null`; `Conduit.Problem` — ошибки 401/403/404/409/422 с телом RealWorld через `Codec.entries`; `Conduit.Api` — 18 точек `HttpApi` с заголовком `Authorization`, сервисы обработчиков — забота сервера, поэтому `with_auth` навешивает сервер; тесты кодеков на js и go)
 - AC: `Conduit.Model`, `Conduit.Input`, `Conduit.Problem`, `Conduit.Api` — записи и точки `HttpApi` по `openapi.yml`; проверка тел ошибок и терпимого разбора запросов на обоих таргетах. Сверка OpenAPI со спецификацией — при W23, когда сервер соберёт API с `with_auth`.
 

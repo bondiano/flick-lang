@@ -1,0 +1,20 @@
+// A table named only inside `sql { … }` is a use of its import; a table no
+// query names is still an unused import.
+module App.Store exposing (names, count_people)
+
+import Sql exposing (Pg)
+import App.Schema exposing (People, Pets)
+//                                  ^^^^ FLICK-R012 `Pets` is imported but never used
+import App.Schema as Schema
+
+names : Sql.Template Pg {} { name : String }
+let names = sql {
+  from p in People
+  select p.name
+}
+
+count_people : Sql.Template Pg {} { n : BigInt }
+let count_people = sql {
+  from p in Schema.People
+  select { n = count_all }
+}
