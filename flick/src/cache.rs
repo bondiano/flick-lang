@@ -6,6 +6,7 @@
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::{env, fs, io};
 
 use flick_core::build::Artifact;
@@ -104,7 +105,10 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
             files_under(&sibling_root(root, &name), &mut files);
         }
     }
-    files.retain(|p| p.extension().is_some_and(|e| e == "fl"));
+    files.retain(|p| {
+        p.extension()
+            .is_some_and(|e| e == "fl" || e == "go" || e == "mjs")
+    });
     files.extend(
         [project::CONFIG_FILE, "package.json", "pnpm-lock.yaml"]
             .map(|file| project.root.join(file)),
@@ -182,6 +186,69 @@ pub fn store(root: &Path, key: &str, artifacts: &[Artifact]) {
     }
 }
 
+/// Whether all cached text files still have the bytes we published.
+pub fn artifacts_current(out_dir: &Path, artifacts: &[Artifact]) -> bool {
+    artifacts.iter().all(|artifact| {
+        fs::read(out_dir.join(&artifact.path))
+            .is_ok_and(|bytes| bytes == artifact.contents.as_bytes())
+    })
+}
+
+/// A Go executable is reusable only with the same toolchain and unchanged bytes.
+fn go_stamp(out_dir: &Path, executable: &str) -> Option<String> {
+    let mut command = Command::new("go");
+    command
+        .args([
+            "env",
+            "GOVERSION",
+            "GOOS",
+            "GOARCH",
+            "GOAMD64",
+            "GOARM",
+            "GO386",
+            "GOEXPERIMENT",
+            "CGO_ENABLED",
+        ])
+        .env("GOFLAGS", "-mod=mod")
+        .env("GOTOOLCHAIN", "local");
+    if env::var_os("CGO_ENABLED").is_none() {
+        command.env("CGO_ENABLED", "0");
+    }
+    let version = command.output().ok()?;
+    if !version.status.success() {
+        return None;
+    }
+    let mut key = Key::default();
+    key.add("toolchain", version.stdout);
+    key.add("binary", fs::read(out_dir.join(executable)).ok()?);
+    Some(key.finish())
+}
+
+fn go_stamp_path(root: &Path, key: &str, executable: &str) -> PathBuf {
+    root.join(cache::DIR)
+        .join("cache")
+        .join(format!("{key}-{executable}.go-stamp"))
+}
+
+pub fn go_current(root: &Path, key: &str, out_dir: &Path, executable: &str) -> bool {
+    let path = go_stamp_path(root, key, executable);
+    fs::read_to_string(path)
+        .ok()
+        .zip(go_stamp(out_dir, executable))
+        .is_some_and(|(saved, current)| saved == current)
+}
+
+pub fn mark_go(root: &Path, key: &str, out_dir: &Path, executable: &str) {
+    let Some(stamp) = go_stamp(out_dir, executable) else {
+        return;
+    };
+    let path = go_stamp_path(root, key, executable);
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(path, stamp);
+}
+
 /// Removes obsolete build-owned files and records a successful publication.
 pub fn record(root: &Path, out_dir: &Path, files: Vec<String>) -> io::Result<()> {
     let path = root.join(cache::MANIFEST);
@@ -227,6 +294,17 @@ pub fn manifest(root: &Path) -> Manifest {
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_default()
+}
+
+pub fn outputs_current(root: &Path, out_dir: &Path, files: &[String]) -> bool {
+    let dir = out_dir
+        .strip_prefix(root)
+        .unwrap_or(out_dir)
+        .to_string_lossy();
+    manifest(root)
+        .outputs
+        .iter()
+        .any(|(output, recorded)| output == &dir && recorded == files)
 }
 
 #[cfg(test)]

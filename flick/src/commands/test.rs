@@ -12,17 +12,18 @@ use std::process::{Child, Command, ExitCode, Stdio};
 use std::time::{Duration, SystemTime};
 use std::{env, fs, io, thread};
 
-use flick_core::build::go;
+use flick_core::build::{Artifact, go};
 use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::project::config::Emit;
 use flick_core::project::{self, Project};
 use flick_core::source::SourceMap;
 
-use super::build::{BuildPlan, emit, release, write};
+use super::build::{BuildPlan, Emission, artifacts, release, write, write_artifacts};
 use super::check::select;
 use crate::args::{Color, GlobalArguments, Reporter, TestArguments, TestEmitArgument};
+use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{child, report, toolchain};
+use crate::{builtins, cache, child, report, toolchain};
 use flick_core::build::Extras;
 
 /// Where the test build goes, inside the project.
@@ -48,15 +49,24 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
 
 /// Builds the test run and writes its runner.
 fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf, ()> {
+    let progress = Progress::new(if matches!(options.reporter, Reporter::Json) {
+        Mode::Hidden
+    } else {
+        Mode::for_cli(global)
+    });
     let mut sources = SourceMap::default();
     let host = FsHost::new();
     let fail = |sources: &SourceMap, diagnostics: Vec<Diagnostic>| {
         report::render(global, sources, &diagnostics);
         Err(())
     };
+    progress.stage("Resolving project");
     let (project, roots) = match select(&host, &mut sources, global.project.as_deref(), &[]) {
         Ok(selected) => selected,
-        Err(diagnostic) => return fail(&sources, vec![diagnostic]),
+        Err(diagnostic) => {
+            drop(progress);
+            return fail(&sources, vec![diagnostic]);
+        }
     };
     let Some(project) = project else {
         return Err(());
@@ -66,15 +76,44 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         .iter()
         .map(|p| project::normalize(&host.cwd.join(p)))
         .collect();
+    let mut selected = wanted.clone();
+    selected.sort();
+    selected.dedup();
+    let settings = format!(
+        "test {:?} {:?} {:?}",
+        selected,
+        match options.emit {
+            Some(TestEmitArgument::Go) => "go",
+            Some(TestEmitArgument::Js) => "js",
+            None => "default",
+        },
+        release(options.profile, Some(&project.config.build)),
+    );
+    let key = cache::key(&project, &roots, &settings);
+    let out = project.root.join(OUT_DIR);
+    progress.stage("Checking test cache");
+    if let Some(runner) = cached_prepare(&project, &key, &out, &progress) {
+        return Ok(runner);
+    }
+    progress.stage("Preparing compiler");
+    builtins::prepare();
+    progress.stage("Compiling Flick modules");
     let (diagnostics, compilation) = project::compile(&host, &mut sources, Some(&project), &roots);
     let errors = diagnostics.iter().any(|d| d.severity == Severity::Error);
-    if !diagnostics.is_empty() {
+    let progress = if diagnostics.is_empty() {
+        progress
+    } else {
+        drop(progress);
         report::render(global, &sources, &diagnostics);
-    }
-    if errors {
-        return Err(());
-    }
-    let out = project.root.join(OUT_DIR);
+        if errors {
+            return Err(());
+        }
+        Progress::new(if matches!(options.reporter, Reporter::Json) {
+            Mode::Hidden
+        } else {
+            Mode::for_cli(global)
+        })
+    };
     let _ = fs::remove_dir_all(&out);
     let suites: Vec<(String, String)> = compilation
         .modules
@@ -90,6 +129,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     // with no suite, the go target has no program: the node runner reports the empty run
     let go = go && !suites.is_empty();
     if !go && let Some(problem) = toolchain::check_runtime(&project.root) {
+        drop(progress);
         return fail(&sources, vec![problem]);
     }
     let output = BuildPlan {
@@ -105,19 +145,95 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         extras: Extras::default(),
         release: release(options.profile, Some(&project.config.build)),
     };
-    let emitted = emit(&host, &sources, Some(&project), &compilation, &output);
+    progress.stage(if go {
+        "Emitting Go"
+    } else {
+        "Emitting JavaScript"
+    });
+    let mut emitted = artifacts(&host, &sources, Some(&project), &compilation, &output);
+    write_artifacts(&output, &mut emitted, &progress);
     if !emitted.diagnostics.is_empty() {
+        drop(progress);
         return fail(&sources, emitted.diagnostics);
     }
     if go {
+        if diagnostics.is_empty()
+            && cache::key(&project, &roots, &settings) == key
+            && cache::read_unchanged(&project, &roots, &host.cwd, &sources)
+        {
+            cache::store(&project.root, &key, &emitted.artifacts);
+            cache::mark_go(&project.root, &key, &out, &go::executable(go::TEST));
+        }
+        drop(progress);
         return Ok(out.join(go::executable(go::TEST)));
     }
+    progress.stage("Writing test runner");
     let runner = out.join("test.js");
     if let Err(err) = write(&runner, &runner_source(&suites)) {
+        drop(progress);
         eprintln!("error: cannot write `{}`: {err}", runner.display());
         return Err(());
     }
+    if diagnostics.is_empty()
+        && cache::key(&project, &roots, &settings) == key
+        && cache::read_unchanged(&project, &roots, &host.cwd, &sources)
+    {
+        emitted.artifacts.push(Artifact {
+            path: "test.js".to_owned(),
+            contents: runner_source(&suites),
+        });
+        cache::store(&project.root, &key, &emitted.artifacts);
+    }
+    drop(progress);
     Ok(runner)
+}
+
+fn cached_prepare(
+    project: &Project,
+    key: &str,
+    out: &Path,
+    progress: &Progress,
+) -> Option<PathBuf> {
+    let artifacts = cache::load(&project.root, key)?;
+    let go = artifacts.iter().any(|a| a.path == "go/test/go.mod");
+    let runner = out.join(if go {
+        go::executable(go::TEST)
+    } else {
+        "test.js".to_owned()
+    });
+    if cache::artifacts_current(out, &artifacts)
+        && (!go || cache::go_current(&project.root, key, out, &go::executable(go::TEST)))
+    {
+        progress.stage("Reusing test build");
+        return Some(runner);
+    }
+    progress.stage("Restoring cached test artifacts");
+    let output = BuildPlan {
+        out_dir: out.to_path_buf(),
+        entries: Vec::new(),
+        typescript: false,
+        go,
+        suites: if go {
+            vec!["cached".to_owned()]
+        } else {
+            Vec::new()
+        },
+        extras: Extras::default(),
+        release: false,
+    };
+    let mut emitted = Emission {
+        artifacts,
+        diagnostics: Vec::new(),
+    };
+    write_artifacts(&output, &mut emitted, progress);
+    if emitted.diagnostics.is_empty() {
+        if go {
+            cache::mark_go(&project.root, key, out, &go::executable(go::TEST));
+        }
+        Some(runner)
+    } else {
+        None
+    }
 }
 
 /// The runner: imports each suite's `tests` and runs them all.
@@ -173,6 +289,12 @@ fn runner_command(
         Reporter::Json => "json",
     };
     command.args(["--reporter", reporter]);
+    if matches!(options.reporter, Reporter::Human)
+        && matches!(Mode::for_cli(global), Mode::Live { .. })
+        && io::stdout().is_terminal()
+    {
+        command.args(["--progress", "live"]);
+    }
     let color = matches!(options.reporter, Reporter::Human)
         && match global.color {
             Color::Always => true,

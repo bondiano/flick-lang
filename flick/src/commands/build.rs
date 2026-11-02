@@ -19,6 +19,7 @@ use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
 use crate::{cache, toolchain};
 
+mod cached;
 mod progress;
 
 pub struct BuildCommand {
@@ -119,9 +120,14 @@ impl Command for BuildCommand {
                 diagnostics: vec![problem],
             };
         }
+        let initial_key = project.as_ref().map(|p| {
+            let output = self.plan(&host, Some(p), self.entries(p));
+            self.key(p, &roots, &output)
+        });
         let cached = project
             .as_ref()
-            .and_then(|p| self.cached(p, &roots, &host, &progress));
+            .zip(initial_key.as_ref())
+            .and_then(|(p, key)| self.cached(p, &host, &progress, key));
         if let Some(diagnostics) = cached {
             return Outcome {
                 sources,
@@ -170,8 +176,21 @@ impl Command for BuildCommand {
             && !output.extras.schema_aot
         {
             progress.stage("Saving build cache");
-            if cache::read_unchanged(p, &roots, &host.cwd, &sources) {
-                cache::store(&p.root, &self.key(p, &roots, &output), &emitted.artifacts);
+            let key = self.key(p, &roots, &output);
+            if initial_key.as_ref() == Some(&key)
+                && cache::read_unchanged(p, &roots, &host.cwd, &sources)
+            {
+                cache::store(&p.root, &key, &emitted.artifacts);
+                if output.go {
+                    for (name, _) in &output.entries {
+                        cache::mark_go(
+                            &p.root,
+                            &key,
+                            &output.out_dir,
+                            &build::go::executable(name),
+                        );
+                    }
+                }
             }
         }
         Outcome {
@@ -268,80 +287,6 @@ impl BuildCommand {
         );
         cache::key(project, roots, &settings)
     }
-
-    /// The artifacts of an earlier build with the same key, written again.
-    fn cached(
-        &self,
-        project: &Project,
-        roots: &[PathBuf],
-        host: &FsHost,
-        progress: &Progress,
-    ) -> Option<Vec<Diagnostic>> {
-        let output = self.plan(host, Some(project), self.entries(project));
-        if output.extras.schema_aot {
-            return None;
-        }
-        progress.stage("Checking build cache");
-        let artifacts = cache::load(&project.root, &self.key(project, roots, &output))?;
-        progress.stage("Restoring cached artifacts");
-        self.record(&output, None, &output.entries);
-        let mut emitted = Emission {
-            artifacts,
-            diagnostics: Vec::new(),
-        };
-        self.publish(Some(project), &output, &mut emitted, progress);
-        Some(emitted.diagnostics)
-    }
-
-    /// Cache hits and fresh builds have the same publication and ownership policy.
-    fn publish(
-        &self,
-        project: Option<&Project>,
-        output: &BuildPlan,
-        emitted: &mut Emission,
-        progress: &Progress,
-    ) {
-        write_artifacts(output, emitted, progress);
-        if self.generation
-            || emitted
-                .diagnostics
-                .iter()
-                .any(|d| d.severity == Severity::Error)
-        {
-            return;
-        }
-        let Some(project) = project else {
-            return;
-        };
-        let mut paths: Vec<String> = emitted.artifacts.iter().map(|a| a.path.clone()).collect();
-        if output.go {
-            paths.extend(
-                output
-                    .entries
-                    .iter()
-                    .map(|(name, _)| build::go::executable(name)),
-            );
-        }
-        if output.extras.schema_aot {
-            paths.extend(
-                output
-                    .entries
-                    .iter()
-                    .map(|(name, _)| build::schema_aot_file(name)),
-            );
-        }
-        progress.stage("Recording build outputs");
-        if let Err(err) = cache::record(&project.root, &output.out_dir, paths) {
-            emitted.diagnostics.push(Diagnostic::new(
-                codes::P013,
-                Severity::Error,
-                format!(
-                    "cannot record artifacts in `{}`: {err}",
-                    output.out_dir.display()
-                ),
-            ));
-        }
-    }
 }
 
 /// Whether the build optimizes: `--profile`, else `build.profile`.
@@ -387,7 +332,7 @@ pub fn emit(
     emitted
 }
 
-fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progress: &Progress) {
+pub(super) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progress: &Progress) {
     if emitted
         .diagnostics
         .iter()
@@ -399,7 +344,7 @@ fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progress: &Progre
     progress.stage("Writing artifacts");
     for artifact in &emitted.artifacts {
         let path = out_dir.join(&artifact.path);
-        if let Err(err) = write(&path, &artifact.contents) {
+        if let Err(err) = write_if_changed(&path, &artifact.contents) {
             emitted.diagnostics.push(Diagnostic::new(
                 codes::P013,
                 Severity::Error,
@@ -467,6 +412,13 @@ pub fn write(path: &Path, contents: &str) -> io::Result<()> {
         fs::create_dir_all(dir)?;
     }
     fs::write(path, contents)
+}
+
+pub fn write_if_changed(path: &Path, contents: &str) -> io::Result<()> {
+    if fs::read(path).is_ok_and(|bytes| bytes == contents.as_bytes()) {
+        return Ok(());
+    }
+    write(path, contents)
 }
 
 /// [`emit`] without writing anything.

@@ -364,7 +364,7 @@ type testOptions struct {
 	jobs             int
 	seed             int64
 	seeded, watched  bool
-	color            bool
+	color, progress  bool
 }
 
 func parseTestArgs(args []string) testOptions {
@@ -389,6 +389,8 @@ func parseTestArgs(args []string) testOptions {
 			o.reporter = value
 		case "--color":
 			o.color = value == "always"
+		case "--progress":
+			o.progress = value == "live"
 		case "--watched":
 			o.watched = true
 			continue
@@ -504,8 +506,39 @@ func RunTests(fb *Fiber, suites []Suite) {
 	slots := make(chan struct{}, o.jobs)
 	var wg sync.WaitGroup
 	human := o.reporter != "json"
+	live := human && o.progress
 	completed := 0
 	var started time.Time
+	active := make(map[int]string)
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	frame := 0
+	clear := func() {
+		if live {
+			fmt.Fprint(stdout, "\r\x1b[2K")
+			stdout.Flush()
+		}
+	}
+	draw := func() {
+		if !live || len(active) == 0 {
+			return
+		}
+		name := ""
+		for i := range selected {
+			if current, ok := active[i]; ok {
+				name = current
+				break
+			}
+		}
+		runes := []rune(name)
+		if len(runes) > 22 {
+			name = string(runes[:22])
+		}
+		fmt.Fprintf(stdout, "\r\x1b[2K  %s Tests  %d/%d complete · %d running · %s  %.1fs", frames[frame%len(frames)], completed, len(selected), len(active), name, time.Since(started).Seconds())
+		stdout.Flush()
+		frame++
+	}
+	var progressStop chan struct{}
+	var progressDone chan struct{}
 	if human {
 		title, reset := "", ""
 		if o.color {
@@ -516,6 +549,25 @@ func RunTests(fb *Fiber, suites []Suite) {
 		stdout.Flush()
 		outMu.Unlock()
 		started = time.Now()
+	}
+	if live {
+		progressStop = make(chan struct{})
+		progressDone = make(chan struct{})
+		go func() {
+			defer close(progressDone)
+			ticker := time.NewTicker(80 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					outMu.Lock()
+					draw()
+					outMu.Unlock()
+				case <-progressStop:
+					return
+				}
+			}
+		}()
 	}
 	for i, t := range selected {
 		slots <- struct{}{}
@@ -529,23 +581,39 @@ func RunTests(fb *Fiber, suites []Suite) {
 			if human {
 				started = time.Now()
 			}
+			if live {
+				outMu.Lock()
+				active[i] = t.name
+				draw()
+				outMu.Unlock()
+			}
 			result := runOne(fb, t, seed)
 			results[i] = result
 			if human {
 				elapsed := time.Since(started)
 				outMu.Lock()
+				if live {
+					delete(active, i)
+					clear()
+				}
 				completed++
 				writeTestResult(result, completed, len(selected), elapsed, o.color)
+				draw()
 				outMu.Unlock()
 			}
 		}()
 	}
 	wg.Wait()
+	if live {
+		close(progressStop)
+		<-progressDone
+	}
 	var elapsed time.Duration
 	if human {
 		elapsed = time.Since(started)
 	}
 	outMu.Lock()
+	clear()
 	code := 0
 	if fb.state.requested.Load() {
 		fmt.Fprintln(stdout, "interrupted: every running test closed its scope")

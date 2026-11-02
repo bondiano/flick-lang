@@ -228,6 +228,7 @@ export interface TestOptions {
   readonly watched?: boolean;
   readonly color?: boolean;
   readonly write?: (text: string) => void;
+  readonly progress?: boolean;
 }
 
 /** Options of `flick test`, from the runner's arguments. */
@@ -239,6 +240,7 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     reporter: string;
     watched: boolean;
     color: boolean;
+    progress: boolean;
   } = {
     filter: "",
     jobs: 1,
@@ -246,6 +248,7 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     reporter: "human",
     watched: false,
     color: false,
+    progress: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -255,6 +258,7 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     else if (flag === "--seed") options.seed = Number(value);
     else if (flag === "--reporter") options.reporter = value;
     else if (flag === "--color") options.color = value === "always";
+    else if (flag === "--progress") options.progress = value === "live";
     else if (flag === "--watched") {
       options.watched = true;
       continue;
@@ -340,20 +344,41 @@ export const runTests = async (
   const human = options.reporter !== "json";
   const color = options.color ?? false;
   let completed = 0;
+  const live = human && options.progress === true;
+  const active = new Map<number, string>();
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  let frame = 0;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const clear = (): void => {
+    if (live) write("\r\x1b[2K");
+  };
+  const draw = (): void => {
+    if (!live || active.size === 0) return;
+    const name = active.values().next().value ?? "";
+    const short = Array.from(name).slice(0, 22).join("");
+    const elapsed = ((performance.now() - started) / 1000).toFixed(1);
+    write(`\r\x1b[2K  ${frames[frame++ % frames.length]} Tests  ${completed}/${selected.length} complete · ${active.size} running · ${short}  ${elapsed}s`);
+  };
   if (human) {
     const title = color ? "\x1b[1;36mflick test\x1b[0m" : "flick test";
     write(`  ${title}  ${selected.length} tests\n\n`);
   }
   const started = human ? performance.now() : 0;
+  if (live) timer = setInterval(draw, 80);
   const fiber = Effect.runFork(
     Effect.forEach(
       selected,
-      (t) =>
+      (t, index) =>
         human
           ? Effect.suspend(() => {
               const testStarted = performance.now();
+              active.set(index, t.name);
+              draw();
               return Effect.map(runOne(t, seed), (result) => {
+                active.delete(index);
+                clear();
                 write(humanResult(result, ++completed, selected.length, performance.now() - testStarted, color));
+                draw();
                 return result;
               });
             })
@@ -372,6 +397,8 @@ export const runTests = async (
   const exit = await new Promise<Exit.Exit<Array<TestResult>>>((resolve) => fiber.addObserver(resolve));
   process.off("SIGINT", stop);
   if (options.watched) process.stdin.off("end", stop).destroy();
+  if (timer !== undefined) clearInterval(timer);
+  clear();
   if (Exit.isFailure(exit)) {
     write(interrupted ? "interrupted: every running test closed its scope\n" : `${Cause.pretty(exit.cause)}\n`);
     process.exitCode = interrupted ? 130 : 1;

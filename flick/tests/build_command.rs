@@ -1,3 +1,5 @@
+#[path = "build_command/cache.rs"]
+mod cache;
 mod common;
 
 use std::fs;
@@ -101,8 +103,6 @@ fn build_progress_preserves_stream_contracts() {
             "Resolving project",
             "Checking build cache",
             "Restoring cached artifacts",
-            "Writing artifacts",
-            "Recording build outputs",
         ][..],
     ] {
         let out = flick_in(&dir, &["build"]);

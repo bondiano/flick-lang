@@ -5,6 +5,7 @@
 
 mod common;
 
+use std::fs;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
@@ -46,6 +47,37 @@ fn lines(child: &mut Child) -> mpsc::Receiver<String> {
         }
     });
     rx
+}
+
+#[test]
+#[ignore = "needs Go"]
+fn unchanged_go_build_reuses_and_restores_its_executable() {
+    let main = "module App.Main exposing (main)\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
+    let dir = project(
+        "go_build_noop",
+        &[("flick.toml", APP), ("src/App/Main.fl", main)],
+    );
+    let binary = dir.join("dist").join(executable("main"));
+    assert!(flick_in(&dir, &["build", "--emit", "go"]).status.success());
+    let before = fs::metadata(&binary)
+        .expect("binary")
+        .modified()
+        .expect("mtime");
+    let repeated = flick_in(&dir, &["build", "--emit", "go"]);
+    assert!(repeated.status.success(), "{repeated:?}");
+    assert!(!String::from_utf8_lossy(&repeated.stderr).contains("Building Go executable"));
+    assert_eq!(
+        fs::metadata(&binary)
+            .expect("binary")
+            .modified()
+            .expect("mtime"),
+        before
+    );
+    fs::remove_file(&binary).expect("remove binary");
+    let restored = flick_in(&dir, &["build", "--emit", "go"]);
+    assert!(restored.status.success(), "{restored:?}");
+    assert!(String::from_utf8_lossy(&restored.stderr).contains("Building Go executable"));
+    assert!(binary.is_file());
 }
 
 #[test]

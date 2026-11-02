@@ -73,6 +73,7 @@ fn main() -> ExitCode {
             | Commands::Init(_)
             | Commands::Clean(_)
             | Commands::Build(_)
+            | Commands::Test(_)
             | Commands::Install(_)
             | Commands::Add(_)
             | Commands::Remove(_)

@@ -43,6 +43,15 @@ func TestParseTestArgsColor(t *testing.T) {
 	}
 }
 
+func TestParseTestArgsProgress(t *testing.T) {
+	if !parseTestArgs([]string{"--progress", "live"}).progress {
+		t.Fatal("live progress was not enabled")
+	}
+	if parseTestArgs([]string{"--progress", "plain"}).progress {
+		t.Fatal("plain progress enabled live rendering")
+	}
+}
+
 func TestWriteTestResultFlushes(t *testing.T) {
 	outMu.Lock()
 	previous := stdout

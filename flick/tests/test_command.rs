@@ -197,6 +197,84 @@ fn filter_jobs_and_seed_select_results() {
     assert_eq!(zero.status.code(), Some(2), "{zero:?}");
 }
 
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn test_preparation_reports_phases_without_changing_json() {
+    let dir = project("progress");
+    fs::write(
+        dir.join("test/Test/Sample.fl"),
+        "module Test.Sample exposing (tests)\n\ntests : List Test.Test\nlet tests = [Test.test \"adds\" (fun () -> Test.equal 2 (1 + 1))]\n",
+    )
+    .expect("write suite");
+    for emit in ["js", "go"] {
+        let out = flick_in(&dir, &["test", "--emit", emit, "--filter", "adds"]);
+        assert!(out.status.success(), "{emit}: {out:?}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(!stderr.contains(['\r', '\x1b']), "{emit}: {stderr}");
+        for phase in [
+            "Preparing compiler",
+            "Resolving project",
+            "Compiling Flick modules",
+            "Writing artifacts",
+        ] {
+            assert!(stderr.contains(phase), "{emit}: {stderr}");
+        }
+        assert!(
+            stderr.contains(if emit == "go" {
+                "Building Go executable"
+            } else {
+                "Writing test runner"
+            }),
+            "{emit}: {stderr}"
+        );
+        assert!(
+            String::from_utf8_lossy(&out.stdout).contains("✓ [1/1]"),
+            "{emit}: {out:?}"
+        );
+
+        let runner = dir.join(".flick/test").join(if emit == "go" {
+            "flick-test"
+        } else {
+            "test.js"
+        });
+        let before = fs::metadata(&runner)
+            .expect("runner")
+            .modified()
+            .expect("mtime");
+        let repeated = flick_in(&dir, &["test", "--emit", emit, "--filter", "adds"]);
+        assert!(repeated.status.success(), "{emit}: {repeated:?}");
+        assert!(String::from_utf8_lossy(&repeated.stderr).contains("Reusing test build"));
+        assert_eq!(
+            fs::metadata(&runner)
+                .expect("runner")
+                .modified()
+                .expect("mtime"),
+            before
+        );
+        assert!(String::from_utf8_lossy(&repeated.stdout).contains("✓ [1/1]"));
+        fs::remove_file(&runner).expect("remove runner");
+        let restored = flick_in(&dir, &["test", "--emit", emit, "--filter", "adds"]);
+        assert!(restored.status.success(), "{emit}: {restored:?}");
+        assert!(runner.is_file(), "{emit}: runner restored");
+
+        let json = flick_in(
+            &dir,
+            &[
+                "test",
+                "--emit",
+                emit,
+                "--filter",
+                "adds",
+                "--reporter",
+                "json",
+            ],
+        );
+        assert!(json.status.success(), "{emit}: {json:?}");
+        assert!(json.stderr.is_empty(), "{emit}: {json:?}");
+        assert_eq!(results(&json)["passed"], 1, "{emit}: {json:?}");
+    }
+}
+
 const SLOW: &str = r#"module Test.Slow exposing (tests)
 
 sleep : Float ->{} Unit
