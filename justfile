@@ -137,6 +137,12 @@ e2e-postgres:
 conduit-api:
     cargo test -p flick --test conduit -- --ignored
 
+# Build and run Conduit with PostgreSQL through Docker Compose.
+conduit-run:
+    cargo build -p flick
+    cd examples/conduit/server && ../../../target/debug/flick build --emit go
+    cd examples/conduit/server && docker compose up --build
+
 # Mutation-fuzz the parser (the nightly CI job runs 1 000 000 inputs)
 fuzz iterations="1000000":
     FLICK_FUZZ_ITERATIONS={{iterations}} cargo test --release -p flick-core --test fuzz

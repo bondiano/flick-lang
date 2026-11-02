@@ -1,0 +1,7 @@
+.flick
+node_modules
+dist/flick-main
+src
+test
+flick.toml
+package.json

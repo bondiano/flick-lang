@@ -232,10 +232,11 @@ impl Checking<'_> {
         let mut diagnostics = loaded.parse.diagnostics.clone();
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);
         diagnostics.extend(resolved);
-        // a module with syntax errors is checked for its other errors, but keeps
-        // untyped exports: importers trust them
+        // Keep the resolved exports before checking: a failed module may leave
+        // store-local type variables in its inferred schemes. Importers must
+        // not read those variables with their own unification store.
         let broken = !loaded.parse.diagnostics.is_empty();
-        let untyped = broken.then(|| interface.clone());
+        let untyped = interface.clone();
         let (checked, typing) =
             types::check_typed(&module, lookup, types::builtins(), options, &mut interface);
         let checked = types::beside_syntax_errors(&loaded.parse.tree, checked);
@@ -253,7 +254,7 @@ impl Checking<'_> {
             diagnostics,
             #[cfg(feature = "ide")]
             typing: Arc::new(typing),
-            exported: untyped.unwrap_or_else(|| interface.clone()),
+            exported: if clean { interface.clone() } else { untyped },
             interface,
             ir,
         }
@@ -268,7 +269,7 @@ struct Output {
     typing: Arc<types::Typing>,
     /// The checked interface, which editors see.
     interface: Interface,
-    /// What importers see: without types when the module has syntax errors.
+    /// What importers see: without types when the module has errors.
     exported: Interface,
     ir: Option<ir::Module>,
 }

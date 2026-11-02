@@ -152,6 +152,27 @@ fn named_paths_still_check_their_imports() {
 }
 
 #[test]
+fn an_invalid_import_does_not_export_its_open_type_variables() {
+    let host = memory(&[
+        (
+            "src/A/Bad.fl",
+            "module A.Bad exposing (x)\nf : forall a. Unit ->{;} Option a\nlet f () = None\nlet x = f ()\n",
+        ),
+        (
+            "src/A/Use.fl",
+            "module A.Use exposing (y)\nimport A.Bad exposing (x)\ny : Option Int\nlet y = x\n",
+        ),
+    ]);
+    let diagnostics = run_library(&host, &["src/A/Use.fl"]);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.contains("the type of `x` is not fully known")),
+        "{diagnostics:?}"
+    );
+}
+
+#[test]
 fn test_modules_see_sources_but_not_the_reverse() {
     let host = memory(&[
         (
