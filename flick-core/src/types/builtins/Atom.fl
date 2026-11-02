@@ -88,6 +88,13 @@ search_param : String -> Browser String
 foreign pure search_param from "@flick-lang/runtime" "atomSearchParam"
   arity 1
 
+/// The text the browser keeps under `key` in its local storage, `None`
+/// without one: a write of `Some text` keeps it there, of `None` removes
+/// it, and a change from another tab shows here too.
+stored : String -> Browser (Option String)
+foreign pure stored from "@flick-lang/runtime" "atomStored"
+  arity 1
+
 /// The page as a value of a type that derives `Url`: the browser's URL
 /// parsed by `url`, `fallback` when no route matches. A write navigates:
 /// it pushes the value's URL to the history, and the back button gives
