@@ -4,12 +4,12 @@ import Formal.Elab.DoNotation
 import Formal.Elab.Comprehension
 
 /-!
-# λFlick⁺ as a `Target`: T6(a) for the core (P4a3)
+# λFlick⁺ as a `Target`: T6(a) for the core
 
 `typingTarget` is the typing of the core of `Formal/` with dictionary records as the laws of
 `Target`, each law one rule of the core (`CoreLaws.lean`, `CoreDict.lean`), under the
 hypotheses `Real` on the core's signature. Its run is empty; the run of the core with the
-fields of `Rel` is P4a4. T6(a), its sugar forms and the closed case are its instances.
+fields of `Rel` is in `CoreRun.lean`. T6(a), its sugar forms and the closed case are its instances.
 -/
 
 namespace Flick.Elab

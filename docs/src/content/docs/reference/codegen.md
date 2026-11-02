@@ -2,7 +2,7 @@
 title: "Code generation"
 ---
 
-`flick build` compiles each module to an ES module (see [TypeScript generation and the FFI boundary](../../spec/08-typescript-and-ffi/), [The Flick compiler and Content Mapper integration](../../spec/11-compiler/)). This page
+`flick build` compiles each module to an ES module (see [TypeScript generation and the FFI boundary](../../spec/06-typescript-and-ffi/), [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). This page
 describes the debug profile, which is the reference lowering: every other
 profile must behave the same way.
 
@@ -239,7 +239,7 @@ build machine ships with it.
 `flick build --emit ts` (or `emit = "ts"` in `flick.toml`) writes the same
 modules as `.ts` files, importing each other with the `.ts` extension. Each
 module declares the TypeScript form of the types it exports and annotates its
-exported values with their projected types (see [Public TypeScript interfaces](../../spec/08-typescript-and-ffi/#public-typescript-interfaces)):
+exported values with their projected types (see [Public TypeScript interfaces](../../spec/06-typescript-and-ffi/#public-typescript-interfaces)):
 
 | Flick | TypeScript |
 | - | - |
@@ -311,7 +311,9 @@ lowerings above are available in both profiles; runtime recursion stays a
 chain of `Effect.gen` or `Effect.suspend` steps. Nothing reassociates
 arithmetic (`(a + b) + c`), folds `x * 0`, runs or memoizes a task,
 merges two `Layer` builds, moves a service lookup across `provide` or
-drops a schema check.
+drops a schema check. The automatic fiber schedule, and so the winner of a
+race between branches ready at once, may differ between the profiles; the
+cancellation points, explicit yields and finalizers of the program do not.
 
 ## Go target
 
@@ -492,8 +494,3 @@ runner's options, seeds and output. Building needs Go 1.23 or later on
 toolchain, and the executable it builds needs nothing installed. It is
 built without cgo, so no C compiler is needed either, unless
 `CGO_ENABLED` is set.
-
-## Not compiled yet
-
-`sql` and `cli` blocks are checked but not compiled: `flick build` reports
-`FLICK-P012`.

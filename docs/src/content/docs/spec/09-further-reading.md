@@ -1,12 +1,10 @@
 ---
-title: "14. Sources"
+title: "Further reading"
 ---
 
-The sources below describe existing mechanisms. The status of decisions about Flick's syntax, source types and semantics is given in the project sections.
+Background on the mechanisms Flick builds on or compares with. The rules of Flick itself are in the chapters of this specification.
 
-- [Content Mappers PR](https://github.com/microsoft/typescript-go/pull/4712) — the starting point for TS integration.
-
-- [ets-go](https://github.com/mikearnaldi/ets-go) — an example of a separate syntax on top of TS and Effect.
+- [Content Mappers PR](https://github.com/microsoft/typescript-go/pull/4712) — the typescript-go mechanism behind the TS projection of Flick sources.
 
 - [The Effect type](https://effect.website/docs/v4/getting-started/the-effect-type) — deferred computations, results, errors and dependencies.
 
@@ -20,15 +18,11 @@ The sources below describe existing mechanisms. The status of decisions about Fl
 
 - [Koka](https://koka-lang.github.io/koka/doc/book.html) — call effects and effect-polymorphic functions.
 
-- [PureScript type classes](https://book.purescript.org/chapter6.html) — classes, instances and dictionaries.
-
-- [TypeScript for functional programmers](https://www.typescriptlang.org/docs/handbook/typescript-in-5-minutes-func.html) — the expressiveness and limits of TS.
+- [PureScript type classes](https://book.purescript.org/chapter6.html) — classes, instances and dictionaries; [coherence and orphan instances](https://github.com/purescript/documentation/blob/master/language/Type-Classes.md).
 
 - [OCaml polymorphism](https://ocaml.org/manual/5.4/polymorphism.html) — value restriction, mutation and variance.
 
-- [GHC higher rank](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rank_polymorphism.html) and [functional dependencies](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/functional_dependencies.html) — variants of expressiveness for the type core.
-
-- [PureScript type classes](https://github.com/purescript/documentation/blob/master/language/Type-Classes.md) — coherence and orphan instances.
+- [GHC higher-rank polymorphism](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rank_polymorphism.html) and [functional dependencies](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/functional_dependencies.html) — annotated polymorphic arguments, the limits of inference, and dependencies between class parameters.
 
 - [Elm ports](https://guide.elm-lang.org/interop/ports.html), [PureScript FFI](https://book.purescript.org/chapter10.html), [ReScript bindings](https://rescript-lang.org/docs/manual/bind-to-js-function/) — different JavaScript interop contracts.
 
@@ -40,10 +34,8 @@ The sources below describe existing mechanisms. The status of decisions about Fl
 
 - [Layer memoization](https://effect.website/docs/v4/requirements-management/layer-memoization), [Fiber API](https://effect.website/docs/v4/api/effect/Fiber) and [Effect.ts](https://github.com/Effect-TS/effect/blob/main/packages/effect/src/Effect.ts) — sharing, cancellation and finalizer contracts.
 
-- [Higher-rank polymorphism GHC](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rank_polymorphism.html) — annotated polymorphic arguments and the limits of inference.
-
 - [ECMAScript numeric types](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html) — the exact semantics of Float and BigInt.
 
-- [Effect Cause](https://effect.website/docs/v4/data-types/cause) and [the verified source snapshot](https://github.com/Effect-TS/effect/tree/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f) — the reference for runtime contracts; changing the dependency requires re-verification.
+- [Effect Cause](https://effect.website/docs/v4/data-types/cause) — fail, die, interrupt and their sequential and parallel combinations.
 
 - [Effect Running Effects](https://effect.website/docs/v4/getting-started/running-effects), [Chunk](https://effect.website/docs/v4/data-types/chunk) and [Scheduler](https://effect.website/docs/v4/api/effect/Scheduler) — callback boundaries, collections and cooperative yielding.

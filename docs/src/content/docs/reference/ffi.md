@@ -2,7 +2,7 @@
 title: "Foreign functions"
 ---
 
-A `foreign` declaration binds a JS function to a Flick signature (see [TypeScript generation and the FFI boundary](../../spec/08-typescript-and-ffi/)). The
+A `foreign` declaration binds a JS function to a Flick signature (see [TypeScript generation and the FFI boundary](../../spec/06-typescript-and-ffi/)). The
 signature is the contract; the mode says how the call runs, and metadata
 lines below the declaration adapt the call.
 

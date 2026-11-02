@@ -1,7 +1,7 @@
 import Formal.Elab.CoreStep
 
 /-!
-# λFlick⁺ as a `Target`: `Rel` is a weak simulation (P4a4c)
+# λFlick⁺ as a `Target`: `Rel` is a weak simulation
 
 A step of the main thread or of a child of a live region is matched from a related
 configuration (`cstep_sim`); pure steps of a child are steps of the configuration

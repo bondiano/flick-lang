@@ -171,7 +171,7 @@ impl Checker<'_> {
     }
 
     /// (Let-Sig) with `σ` a `∀`: the value is checked with rigid variables,
-    /// and a runtime step while it is built is `FLICK-T013` (Р1).
+    /// and a runtime step while it is built is `FLICK-T013` (`docs/formal/core.md#an-annotation-with-forall-bypasses-let-sig`).
     pub(super) fn check_forall(&mut self, e: &Term, s: &Scheme) -> Check<()> {
         self.check_qualified_forall(e, s, Caps::default())
     }
@@ -251,7 +251,7 @@ impl Checker<'_> {
         Ok(self.close_over(&lam, Type::fun(p, inner, r?), None))
     }
 
-    /// (App): `φ₁ ⊔ φ₂ ⊔ φ`. A callee of unknown type is a pure arrow (Р7).
+    /// (App): `φ₁ ⊔ φ₂ ⊔ φ`. A callee of unknown type is a pure arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`).
     /// A constructor with all its fields is (Con).
     fn app(&mut self, f: &Term, a: &Term) -> Check<Type> {
         if let (true, Term::Lam(x, body)) = (self.config, f) {
@@ -353,7 +353,7 @@ impl Checker<'_> {
     }
 
     /// A local signature of a function: its own qualifier is inferred, a
-    /// fresh capture row, unless written (`regions.md` §2.6, Р21).
+    /// fresh capture row, unless written (`regions.md` §2.6, `docs/formal/regions.md#local-signatures-infer-only-the-outer-qualifier`).
     fn local_signature(&mut self, s: &Scheme) -> Scheme {
         let s = &self.in_scopes(s);
         match &s.body {

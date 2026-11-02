@@ -6,7 +6,7 @@ import Formal.RT.Props
 # λRT: T5 (runtime.md §6)
 
 R1–R4, R6 and R7 hold on every path from a program, for every core, under the hypotheses
-about the libraries (`Hyp`); the last part of R6 also needs Г11, the premise of Р37. R5 and
+about the libraries (`Hyp`); the last part of R6 also needs G11, the liveness premise of `provide`. R5 and
 R8 are about the functions of §2 and hold outright.
 -/
 
@@ -21,7 +21,7 @@ def GoodUse : Ev V → List (Ev V) → Prop
 
 /-- **R6.** (a) A memo map builds a layer again only after releasing its build; (b) a build
 is released only after the observer of every consumer has run, i.e. every consumer owner
-reached (C5); (c) with Г11, no service is used after its layer's area is released. -/
+reached (C5); (c) with G11, no service is used after its layer's area is released. -/
 def R6 (J : List (Ev V)) : Prop := Hist Good6 J ∧ Hist GoodUse J
 
 theorem Inv6.step (h : Hyp L) (I : Inv C) (I6 : Inv6 C) (hs : Step K L C C') : Inv6 C' :=
@@ -70,7 +70,7 @@ theorem reach_all (h : Hyp L) {e₀ : T} (h11 : G11 K L e₀) (hr : Reach K L e�
     exact ⟨I.step h hs, I6.step h I hs, use_step I I6 hu (h11 _ hp) hs, h7.step h hs⟩
 
 /-- **T5 (the runtime contract).** On every path from a program `e₀` — any core, any
-interleaving of §3.1 — under the hypotheses about the libraries (Г7, Г8, Г9) and Г11, the
+interleaving of §3.1 — under the hypotheses about the libraries (G7, G8, G9) and G11, the
 reachable configuration satisfies R1–R4, R6 and R7; R5 and R8 hold of the functions of §2. -/
 theorem T5 (h : Hyp L) {e₀ : T} (h11 : G11 K L e₀) (hr : Reach K L e₀ C) :
     R1 C.J ∧ R2 C.J ∧ R3 C ∧ R4 C ∧ R6 C.J ∧ R7 C ∧

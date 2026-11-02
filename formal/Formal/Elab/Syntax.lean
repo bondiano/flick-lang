@@ -1,10 +1,10 @@
 /-!
 # Elaboration: classes, instances, dictionaries, entailment (elaboration.md §1.1, §2.1–§2.3)
 
-A model of its own, like `Formal/RT/`: it imports nothing from the core of P1. Constraint
+A model of its own, like `Formal/RT/`: it imports nothing from the core (`Formal/Syntax.lean`). Constraint
 types are first-order terms; a dictionary term is `d ::= δ | d.$slot | I d̄ | struct_C d̄ |
 prim_Q ℓ̄`, with application as a binary spine. A structural dictionary carries its record type
-and a primitive one its constraint (Р196): the run of the target picks its global by them.
+and a primitive one its constraint (`docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type`): the run of the target picks its global by them.
 -/
 
 namespace Flick.Elab
@@ -16,7 +16,7 @@ inductive Stage where
   deriving DecidableEq
 
 /-- Types: variables, constructors, application, and the arrow `a →φ^q b` of `Fun` in the
-checker (Р186). Its qualifier `q` is a capture row written as a type: a variable, `cnil`
+checker (`docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor`). Its qualifier `q` is a capture row written as a type: a variable, `cnil`
 (`∅`) or a union `cun`. Capture variables are ordinary variables. -/
 inductive Ty where
   | var (n : Nat)
@@ -64,7 +64,7 @@ def params (ts : List Ty) : Nat → Ty := fun n => ts.getD n (.con 0)
 
 /-- Dictionary terms of §2.2; `ap` applies an instance or `struct_C^τ` to a dictionary.
 `strct C τ` is `struct_C` for the record `τ`, `prim p q` is `prim_q` with the labels `p`
-(Р196). -/
+(`docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type`). -/
 inductive Dict where
   | var (k : Nat)
   | slot (d : Dict) (i : Nat)
@@ -90,7 +90,7 @@ def args (ds : List Dict) : Nat → Dict := fun k => ds.getD k (.var 0)
 
 /-- A scheme `∀ᾱ. Q̄ ⇒ τ`: `k` binders `var 0 … var (k-1)`; the variables from `var k` on are
 free. `q` is the qualifier of its dictionary arrows, what the right side of its `let` holds
-(Р187); nothing reads it for methods and constants of Γ₀. -/
+(`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`); nothing reads it for methods and constants of Γ₀. -/
 structure Scheme where
   k : Nat
   ctx : List Cn
@@ -145,26 +145,26 @@ inductive Ent (Δ : List Cn) : List Cn → List Dict → Prop
       Ent Δ [Q] [apps (.inst I) ds]
 
 /-- `≈` of §4.2: the least congruence with the slot rule of an instance, and of a structural
-dictionary (Р180), both for closed derivations of the arguments (Р197); a structural or primitive dictionary of a type is `≈` the one of its
-instance, as the run erases the type (Р196). -/
+dictionary (`docs/formal/elaboration.md#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries`), both for closed derivations of the arguments (`docs/formal/elaboration.md#slot-rules-of-equivalence-take-closed-derivations`); a structural or primitive dictionary of a type is `≈` the one of its
+instance, as the run erases the type (`docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type`). -/
 inductive Eqv : Dict → Dict → Prop
   | refl {d} : Eqv d d
   | symm {d e} : Eqv d e → Eqv e d
   | trans {d e f} : Eqv d e → Eqv e f → Eqv d f
   | slot {d e i} : Eqv d e → Eqv (.slot d i) (.slot e i)
   | ap {d d' e e'} : Eqv d d' → Eqv e e' → Eqv (.ap d e) (.ap d' e')
-  /-- `(I d̄).$slotᵢ ≈ sᵢ[δ̄ := d̄]`, `d̄` closed derivations of the context (Р197) -/
+  /-- `(I d̄).$slotᵢ ≈ sᵢ[δ̄ := d̄]`, `d̄` closed derivations of the context (`docs/formal/elaboration.md#slot-rules-of-equivalence-take-closed-derivations`) -/
   | instSlot {I ins i s σ ds} : P.insts I = some ins → ins.slots[i]? = some s →
       Ent P [] (ins.ctx.map (·.subst σ)) ds →
       Eqv (.slot (apps (.inst I) ds) i) (s.subst (args ds))
-  /-- `(struct_C d̄).$slotᵢ ≈ struct_S (d̄.$slotᵢ)` (Р180), `d̄` closed derivations (Р197) -/
+  /-- `(struct_C d̄).$slotᵢ ≈ struct_S (d̄.$slotᵢ)` (`docs/formal/elaboration.md#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries`), `d̄` closed derivations (`docs/formal/elaboration.md#slot-rules-of-equivalence-take-closed-derivations`) -/
   | strctSlot {C τ ts i S ds} : P.structC C = true → (P.supers C)[i]? = some S →
       P.fields τ = some ts → Ent P [] (ts.map fun t => ⟨C, [t]⟩) ds →
       Eqv (.slot (apps (.strct C τ) ds) i) (apps (.strct S.cls τ) (ds.map (.slot · i)))
-  /-- `struct_C^τ ≈ struct_C^{τθ}` (Р196) -/
+  /-- `struct_C^τ ≈ struct_C^{τθ}` (`docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type`) -/
   | strctSub {C τ ts θ} : P.structC C = true → P.fields τ = some ts →
       Eqv (.strct C τ) (.strct C (τ.subst θ))
-  /-- `prim_q ℓ̄ ≈ prim_{qθ} ℓ̄` (Р196) -/
+  /-- `prim_q ℓ̄ ≈ prim_{qθ} ℓ̄` (`docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type`) -/
   | primSub {p q θ} : P.primC q.cls = true → P.prims q = some p →
       Eqv (.prim p q) (.prim p (q.subst θ))
 

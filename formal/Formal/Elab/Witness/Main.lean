@@ -2,7 +2,7 @@ import Formal.Elab.Witness.Root
 import Formal.Elab.CoreRun
 
 /-!
-# Witness: T6 on a concrete program (W2)
+# Witness: T6 on a concrete program
 
 The hypotheses of T6(a) and T6(b) for the core — `Real`, `RealRun`, `RootTy`, `Coherent` and
 `Sugar` — hold together for the program of `Prog.lean`: `witness_T6a`, `witness_T6a_do` and

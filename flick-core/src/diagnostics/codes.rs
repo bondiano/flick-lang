@@ -268,7 +268,7 @@ codes! {
     P009 = Project 9, "dependency is not installed";
     P010 = Project 10, "invalid package interface";
     P011 = Project 11, "invalid entry module";
-    P012 = Project 12, "construct is not compiled yet";
+    P012 = Project 12, "construct is not compiled for this target";
     P013 = Project 13, "cannot write build output";
     P014 = Project 14, "package built against another interface of a dependency";
     P015 = Project 15, "incompatible toolchain or runtime";

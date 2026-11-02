@@ -1,7 +1,7 @@
 import Formal.Elab.Witness.Unc
 
 /-!
-# Witness: the bodies of the instances typed at their globals (W2)
+# Witness: the bodies of the instances typed at their globals
 
 An instance is the record `drec (N.cls C 1) …` of its slot (the global of the superclass's
 instance) and its methods, each typed at its field by `field_inst`.

@@ -254,7 +254,7 @@ impl<'p> Machine<'p> {
             }
             Frame::AppR(func) => return Self::apply(func, v),
             // a λ keeps its signature as `fix x. λ`, `x` not free in it: a
-            // state types it against σ, as the source did (Р130)
+            // state types it against σ, as the source did (`docs/formal/core.md#stepping-a-signed-let-loses-its-signature`)
             Frame::Let(x, Some(sig), e2) if matches!(v, Term::Lam(..)) => {
                 let fix = Term::Fix(x.clone(), Some(sig), Rc::new(v));
                 Control::Eval(subst(&e2, &[(x, fix)]))
@@ -440,7 +440,7 @@ impl<'p> Machine<'p> {
     }
 
     /// The steps of the constants (§3.4), and of the natives that stand
-    /// for foreign bindings under hypothesis Г1.
+    /// for foreign bindings under hypothesis G1.
     fn delta(&mut self, c: &Const, args: &[Term]) -> Step {
         Ok(match (c, args) {
             (Const::RefMake, [v]) => {

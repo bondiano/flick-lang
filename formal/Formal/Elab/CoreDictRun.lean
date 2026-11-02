@@ -1,17 +1,17 @@
 import Formal.Elab.CoreEval
 
 /-!
-# λFlick⁺ as a `Target`: the run of dictionaries (P4a4)
+# λFlick⁺ as a `Target`: the run of dictionaries
 
-`trDt N δ d` is the translation of a dictionary, a function of the term since Р196 (`TrD.eq`).
+`trDt N δ d` is the translation of a dictionary, a function of the term, which carries its type (`TrD.eq`).
 `RealRun P N root` is what the bodies of the globals do: the global of an instance is
 `λ^l. drec …` whose slot `N.slot i` is the translation of the slot over the premises, that of
-`struct_C^τ` has the slot `struct_S^τ (δ̄.$slotᵢ)` (Р180), a primitive one is a value, and the
-type of a structural or primitive global is erased (Р196).
+`struct_C^τ` has the slot `struct_S^τ (δ̄.$slotᵢ)` (`docs/formal/elaboration.md#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries`), a primitive one is a value, and the
+type of a structural or primitive global is erased (`docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type`).
 
 Under it a closed derivation evaluates (`ent_eval`): an instance applied to the values of its
 arguments is a record value, without projecting a slot. `≈` keeps the values of a dictionary
-(`eqv_sem`): the slot rules take closed derivations (Р197), so their arguments have values,
+(`eqv_sem`): the slot rules take closed derivations (`docs/formal/elaboration.md#slot-rules-of-equivalence-take-closed-derivations`), so their arguments have values,
 and the translation of a dictionary is a term of `var`, `glob`, application and projection,
 whose values depend only on the values of its variables (`trDt_sem`).
 -/

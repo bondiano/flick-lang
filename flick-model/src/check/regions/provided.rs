@@ -1,4 +1,4 @@
-//! `Fiber.Provided R ϱ` (`docs/formal/regions.md` §2.7, Р37): work an
+//! `Fiber.Provided R ϱ` (`docs/formal/regions.md` §2.7, `docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer`): work an
 //! owner keeps runs with the services of the place that registered it, so
 //! each service of `R` comes from a provider that outlives `ϱ`.
 //!

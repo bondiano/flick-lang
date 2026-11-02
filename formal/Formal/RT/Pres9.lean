@@ -1,6 +1,6 @@
 import Formal.RT.NoRun
 
-/-! Preservation of the journal invariant `Hist Good` (И1, И2, R1, R2). -/
+/-! Preservation of the journal invariant `Hist Good` (I1, I2, R1, R2). -/
 
 -- The step tactics share one `simp` set across ~50 rules; not every rule needs every lemma.
 set_option linter.unusedSimpArgs false

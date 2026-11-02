@@ -5,7 +5,7 @@ import Formal.RT.Reach
 
 `cell ℓ J` replays the journal: the value the last `make`/`modify` of `ℓ` left. R7 says each
 `modify` read exactly that value, so the history of `ℓ` is sequential, and the journal's
-value is the memory's. Without Г8 the model has `Local.modRead` and `Step.modWrite`, which
+value is the memory's. Without G8 the model has `Local.modRead` and `Step.modWrite`, which
 read and write in two steps, and R7 fails.
 -/
 

@@ -1,6 +1,6 @@
 // A task given to `FiberSet.run`, `FiberHandle.run` or `FiberMap.run` runs
 // at the owner of the group, which comes after it: an acquisition in it goes
-// to the group's region, not to the innermost scope (Р25).
+// to the group's region, not to the innermost scope (`docs/formal/regions.md#scope-region-of-a-task-argument-is-resolved-after-the-call`).
 module App.SetAfterTask exposing (..)
 
 type alias Path = String

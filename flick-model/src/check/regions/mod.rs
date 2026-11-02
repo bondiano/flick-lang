@@ -81,7 +81,7 @@ impl Checker<'_> {
         out
     }
 
-    /// `⌈τ⌉` with each atom `α^{≤C}` apart (Р62): a type variable under a
+    /// `⌈τ⌉` with each atom `α^{≤C}` apart (`docs/formal/regions.md#a-bounded-variable-reaches-what-the-variable-reaches`): a type variable under a
     /// bound reaches what `α` does, no more than `C`.
     pub(super) fn reach_bounded(&self, t: &Type) -> (Caps, Vec<(Var, Caps)>) {
         let mut out = Caps::default();
@@ -139,7 +139,7 @@ impl Checker<'_> {
                 }
             },
             // `Errors {E ῡ} ≡ E ῡ` (`core.md` §1.5) reaches what its errors
-            // do; a variable of the row is no capture (Р60)
+            // do; a variable of the row is no capture (`docs/formal/regions.md#errors-reaches-its-payloads`)
             Type::Errors(r) => {
                 for args in r.elems.values() {
                     args.iter().for_each(|a| go(a, out));
@@ -165,7 +165,7 @@ impl Checker<'_> {
         matches!(self.resolve(t), Type::Con(p) if p.module.as_ref() == "Prelude" && SCALARS.contains(&p.name.as_ref()))
     }
 
-    /// A qualifier on a value that can hold nothing adds nothing (Р24).
+    /// A qualifier on a value that can hold nothing adds nothing (`docs/formal/regions.md#a-value-bound-survives-an-unknown-type-position`).
     fn holds_nothing(&self, t: &Type) -> bool {
         self.scalar(t)
             || (!matches!(self.resolve(t), Type::Var(_))

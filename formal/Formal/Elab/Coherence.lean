@@ -5,8 +5,8 @@ import Formal.Elab.Basic
 
 `closed_rep`: after `ρ`, every derived dictionary is `≈` a closed derivation of the
 substituted constraint. `slot_ok`: projecting a superclass slot from a closed dictionary is
-`≈` a closed derivation of the superclass (well-founded induction by К5). `closed_unique`:
-closed derivations are unique (К1, К5, К6). Lemma 6.1, Lemma 6.2 and T6(b) follow.
+`≈` a closed derivation of the superclass (well-founded induction by K5). `closed_unique`:
+closed derivations are unique (K1, K5, K6). Lemma 6.1, Lemma 6.2 and T6(b) follow.
 -/
 
 namespace Flick.Elab
@@ -101,7 +101,7 @@ theorem map_eq_mem {α β : Type} {f g : α → β} {l : List α} (h : l.map f =
     · exact h.1
     · exact ih h.2 x hx
 
-/-- К5: equal heads fix the context. -/
+/-- K5: equal heads fix the context. -/
 theorem ctx_agree (h : Coherent P lt) {I : Nat} {ins : Inst} {σ σ' : Nat → Ty}
     (hI : P.insts I = some ins) (heq : ins.head.map (·.subst σ) = ins.head.map (·.subst σ')) :
     ins.ctx.map (·.subst σ) = ins.ctx.map (·.subst σ') := by
@@ -111,7 +111,7 @@ theorem ctx_agree (h : Coherent P lt) {I : Nat} {ins : Inst} {σ σ' : Nat → T
   obtain ⟨hd, hmem, hocc⟩ := h.k5vars hI hc ht hn
   exact Ty.agree_of_eq (map_eq_mem heq hd hmem) n hocc
 
-/-- Closed derivations are unique (К1, К5, К6). -/
+/-- Closed derivations are unique (K1, K5, K6). -/
 theorem closed_unique (h : Coherent P lt) {qs : List Cn} {ds₁ : List Dict}
     (h₁ : Ent P [] qs ds₁) : ∀ {ds₂}, Ent P [] qs ds₂ → ds₁ = ds₂ := by
   induction h₁ with
@@ -198,7 +198,7 @@ theorem slot_ok (h : Coherent P lt) (Q : Cn) : SlotOK P Q := by
       have : S₀.subst (params [τ]) = ⟨S₀.cls, [τ]⟩ := by
         simp [Cn.subst, hSa, Ty.subst, params]
       rw [this]; exact .strct hSC hf he'
-  · -- the slot of an instance: К7, then the context
+  · -- the slot of an instance: K7, then the context
     have hQ : Q = Cn.subst σ ⟨ins.cls, ins.head⟩ := by
       cases Q with
       | mk c a => simp only [Cn.subst, Cn.mk.injEq]; exact ⟨hcls.symm, hargs⟩
@@ -237,7 +237,7 @@ theorem Ty.subst_var (t : Ty) : t.subst .var = t := by
   induction t <;> simp_all [Ty.subst]
 
 /-- **Lemma 6.2 (cache).** A constraint without variables solved without premises: its
-derivation in any `Δ` is, after `ρ`, `≈` that solution (Р181). -/
+derivation in any `Δ` is, after `ρ`, `≈` that solution (`docs/formal/elaboration.md#lemma-62-needs-the-substitution`). -/
 theorem lemma_6_2 (h : Coherent P lt) {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat → Dict}
     (hρ : Closes P Δ θ ρ) {Q : Cn} (hg : ∀ t ∈ Q.args, t.Ground) {d₀ d : Dict}
     (h₀ : Ent P [] [Q] [d₀]) (he : Ent P Δ [Q] [d]) : Eqv P (d.subst ρ) d₀ := by

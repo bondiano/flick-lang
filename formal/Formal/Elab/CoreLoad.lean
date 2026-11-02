@@ -1,7 +1,7 @@
 import Formal.Elab.CoreSim
 
 /-!
-# λFlick⁺ as a `Target`: `≈` dictionaries are related (P4a4c)
+# λFlick⁺ as a `Target`: `≈` dictionaries are related
 
 `≈` relates open dictionaries too, through `trans` and junk intermediate terms. Its
 congruence closure of closed pairs, `DSim`, is transitive, so `Eqv ⇒ DSim` when the slots of

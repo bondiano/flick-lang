@@ -1,7 +1,7 @@
 import Formal.Closed
 
 /-!
-# Composition of renamings and substitutions (P4a4)
+# Composition of renamings and substitutions
 
 The four fusion laws of de Bruijn renaming and substitution, each by induction on the term
 with the law for the lifted maps (`liftR_comp`, `liftS_rename`, `liftS_rename'`,

@@ -1,4 +1,5 @@
-//! Rules 1–4 of Р188 on one checker type: `Tr::ty`, then `Tr::resolve`.
+//! Rules 1–4 of the translation of Prelude schemes
+//! (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`) on one checker type: `Tr::ty`, then `Tr::resolve`.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
@@ -8,7 +9,7 @@ use flick_core::types::{self as fc, show_type};
 use super::Skip;
 
 /// Types with hidden storage, with the number of their leading rows, which
-/// the model drops: its `Eff q b` runs with empty rows (Р188).
+/// the model drops: its `Eff q b` runs with empty rows (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`).
 const STORED: [(&str, usize); 2] = [("Seq", 0), ("Eff", 2)];
 
 /// A type of `Elab`, its variables by name.

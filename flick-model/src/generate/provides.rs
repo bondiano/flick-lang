@@ -1,4 +1,4 @@
-//! Path 10 of `docs/formal/regions.md` §4 (§2.7, Р37): a child or a
+//! Path 10 of `docs/formal/regions.md` §4 (§2.7, `docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer`): a child or a
 //! finalizer an owner keeps uses a service, which comes from a provider
 //! that must outlive the owner. The forms the rules accept, and the leaks
 //! a `mutate` makes: the owner's `scope` around the `provide` that builds

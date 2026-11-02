@@ -1,6 +1,6 @@
 import Formal.RT.Agree
 
-/-! Preservation of the invariants that tie the journal to fibers and groups (R3, R4, И3). -/
+/-! Preservation of the invariants that tie the journal to fibers and groups (R3, R4, I3). -/
 
 -- The step tactics share one `simp` set across ~50 rules; not every rule needs every lemma.
 set_option linter.unusedSimpArgs false

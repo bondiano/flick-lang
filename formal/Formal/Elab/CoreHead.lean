@@ -2,7 +2,7 @@ import Formal.Elab.CoreRel
 import Formal.Elab.CoreDictSem
 
 /-!
-# λFlick⁺ as a `Target`: head steps of related terms (P4a4c)
+# λFlick⁺ as a `Target`: head steps of related terms
 
 A pure or runtime head step of a term related by a congruence rule is matched by the same
 rule on the other side, with related results, store and regions (`phead_sim`, `rhead_sim`).

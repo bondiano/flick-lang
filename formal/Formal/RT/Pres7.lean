@@ -1,6 +1,6 @@
 import Formal.RT.Pres6
 
-/-! Preservation of И3, of the watcher's link to R4 and of the Promises of `P` (R2). -/
+/-! Preservation of I3, of the watcher's link to R4 and of the Promises of `P` (R2). -/
 
 -- The step tactics share one `simp` set across ~50 rules; not every rule needs every lemma.
 set_option linter.unusedSimpArgs false

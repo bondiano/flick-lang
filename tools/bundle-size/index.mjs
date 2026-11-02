@@ -26,7 +26,7 @@ export const PROGRAMS = [
   { name: "pure", source: "tools/bundle-size/pure.fl", budget: 12 },
   // the same program with `effect = "none"`, a project of its own: no Effect at all
   { name: "none", source: "tools/bundle-size/none", budget: 2, effectFree: true },
-  // UI programs render views on atoms: at most 81 KB and 18 KB for effect/reactivity (U8),
+  // UI programs render views on atoms: at most 81 KB and 18 KB for effect/reactivity,
   // and 5 KB for the spans of actions and the debug log of writes;
   // the registry keeps `Stream`, which `effect/reactivity` imports for stream atoms
   { name: "counter", source: "tests/run/ui/counter.fl", budget: 104, unused: ["effect/dist/Graph.js"] },
@@ -46,8 +46,8 @@ export const PROGRAMS = [
     budget: 32,
     unused: ["effect/dist/Graph.js", "react-dom/cjs/react-dom-server.browser.production.js", "react-dom/cjs/react-dom-server-legacy.browser.production.js"],
   },
-  // the client entry of a project with a server entry keeps no server module (F1), and of a
-  // server function only its call: not its body, what the body uses or the Node server (F2)
+  // the client entry of a project with a server entry keeps no server module, and of a
+  // server function only its call: not its body, what the body uses or the Node server
   {
     name: "fullstack",
     source: "tools/bundle-size/fullstack",

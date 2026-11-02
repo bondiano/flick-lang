@@ -3,7 +3,7 @@ import Formal.Elab.CoreEval
 import Formal.Elab.CoreCgFrames
 
 /-!
-# λFlick⁺ as a `Target`: the relation `Rel` of the run (P4a4b)
+# λFlick⁺ as a `Target`: the relation `Rel` of the run
 
 The base pairs `DP S root a b` are the dictionaries the two sides compute: `a` is closed, typed
 at a pure stage and not yet a value, `b` is closed, and they have the same values (`SemEq`).

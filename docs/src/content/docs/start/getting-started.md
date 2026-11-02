@@ -3,8 +3,13 @@ title: Getting started
 description: Install the toolchain, create an application and run it.
 ---
 
-Flick compiles to ES modules that run on Node.js 24.18 or later with the
-Flick runtime and Effect 4.0.5. Packages are installed with pnpm.
+A local application needs the Flick compiler, Node.js 24.18 or later and
+pnpm. Download a `flick` archive for your platform from the
+[releases](https://github.com/bondiano/flick-lang/releases), or build it from
+a source checkout as described in [Ecosystem](../../ecosystem/).
+
+Flick compiles to ES modules that run with the Flick runtime and
+Effect 4.0.5. Packages are installed with pnpm. Create a project and run it:
 
 ```sh
 flick new my-app

@@ -1,5 +1,5 @@
 // Flick data crosses a binding outside the runtime as a copy
-// (docs/formal/ts-holes.md Р26): JS that changes what it got or gave in
+// (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`): JS that changes what it got or gave in
 // place leaves the Flick value as it was.
 import assert from "node:assert/strict";
 import { test } from "node:test";

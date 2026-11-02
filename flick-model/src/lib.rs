@@ -3,7 +3,7 @@
 //! to one, and a translation of flick-core's checked IR into λFlick, so
 //! the model runs the programs of `tests/run` and their output can be
 //! compared with the JS and Go builds (`tests/run.rs`), and a generator of
-//! well-typed programs that the properties of X2 run both checkers and the
+//! well-typed programs that the model properties run both checkers and the
 //! machine on (`tests/props.rs`).
 //!
 //! Not part of `just test`: `just model` runs it.

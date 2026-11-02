@@ -1,10 +1,10 @@
 ---
-title: "9. Schema and standard data types"
+title: "Schema and standard data types"
 ---
 
 ## The boundary between the language core and the library
 
-The core defines pure/runtime, nominal types, HKT, classes, captures and full deriving Schema. `Schema`, `Ref`, `Option`, `Result`, `Redacted`, `BigDecimal`, `Duration` and `Chunk` are library types with the native Effect ABI. In the first version only numbers (`Int`, `Float`, `BigInt`) have special literals; Schema/SQL/UI have a chosen DSL, and the other modules use ordinary functions.
+The core defines pure/runtime, nominal types, HKT, classes, captures and full deriving Schema. `Schema`, `Ref`, `Option`, `Result`, `Redacted`, `BigDecimal`, `Duration` and `Chunk` are library types with the native Effect ABI on the JS target; on the Go target they are values of `runtime-go/flickrt`. Only numbers (`Int`, `Float`, `BigInt`) have special literals; Schema/SQL/UI have a DSL, and the other modules use ordinary functions.
 
 | Source type | Representation in Effect and TS |
 | - | - |
@@ -21,15 +21,7 @@ The core defines pure/runtime, nominal types, HKT, classes, captures and full de
 
 The order of generic parameters of the source API may differ from TS; this does not require repacking the value. Source metadata preserves kinds, rows and purity guarantees that `.d.ts` does not have.
 
-| Capability | Benefit | Cost |
-| - | - | - |
-| Library combinators | A simple core and explicit values | More boilerplate |
-| Types and structural deriving | One source for the structure of ADTs and records | Generation must account for recursion, generics and unsupported fields |
-| Refinement types with a runtime check | Domain constraints are visible in types | Safe constructors and rules for trusted FFI are needed |
-| A DSL for the external format | Renames, defaults and transformations are kept together | Extra grammar and diagnostics |
-| Arbitrary type-level computation | Very expressive libraries | A substantial complication of the checker and of compile time |
-
-Deriving covers the whole supported data language. Library Schema combinators and the codec DSL remain the ways to customize and extend. This does not require introducing arbitrary type families.
+Schemas come from library combinators, structural deriving, refined types with a runtime check and a codec DSL for the external format; there is no arbitrary type-level computation. Deriving covers the whole supported data language. Library Schema combinators and the codec DSL are the ways to customize and extend it. The reference is [Schemas and codecs](../../reference/schema/).
 
 ## The type of a value and its external format
 
@@ -65,13 +57,13 @@ Codec.encode_result :
 
 The codec's captures are preserved on a partially applied function; the provenance of the returned `a`/`i` is checked separately and is not erased by a generic witness. SchemaError carries a safe diagnostic, not the live source input, which could carry a scoped capability out.
 
-`PureCodec` is an opaque certificate of pure synchronous execution, not an alias over empty service rows. `Codec none none i a` may perform async/runtime actions. The certificate is created by checked pure combinators, deriving and explicitly trusted FFI. An external Effect Schema without such a contract gets the general Codec. Pure decoding accepts only a source Unknown with an inert structural representation; arbitrary JS first goes through the runtime import from section 8.
+`PureCodec` is an opaque certificate of pure synchronous execution, not an alias over empty service rows. `Codec none none i a` may perform async/runtime actions. The certificate is created by checked pure combinators, deriving and explicitly trusted FFI. An external Effect Schema without such a contract gets the general Codec. Pure decoding accepts only a source Unknown with an inert structural representation; arbitrary JS first goes through the runtime import `Js.snapshot` ([FFI](../../reference/ffi/#js-values)).
 
 `Schema a` in this source API is also a certified pure domain witness; this is a narrower contract than an arbitrary external Schema. `PureCodec` and `Schema` use the same Effect Schema runtime object, and the extra guarantee is stored in the source interface. Effectful Schema interpreters remain available through runtime arrows. [Effect v4 Schema](https://effect.website/docs/v4/schema/getting-started).
 
 ## Types and Schema from one declaration
 
-The chosen grammar is `refined type`, `deriving Schema`, `schema T` and `codec witness { ... }`. A refinement is a nominal type with a closed constructor, a pure predicate, a safe `parse` and access to the underlying value. The predicate returns Bool and does not normalize the value; false is a validation failure, and an unexpected defect remains a defect. Trim/lowercase/parse live in the codec transformation. `Checks.email` is a concrete library check, not a promise to validate every email address.
+The grammar is `refined type`, `deriving Schema`, `schema T` and `codec witness { ... }`. A refinement is a nominal type with a closed constructor, a pure predicate, a safe `parse` and access to the underlying value. The predicate returns Bool and does not normalize the value; false is a validation failure, and an unexpected defect remains a defect. Trim/lowercase/parse live in the codec transformation. `Checks.email` is a concrete library check, not a promise to validate every email address.
 
 ```flick
 refined type Email = String where Checks.email
@@ -110,11 +102,9 @@ A field's policy is set by the codec DSL; it cannot be derived from `Option a` a
 | `field "x" (option_as_null codec)` | null | null means None; missing is an error |
 | `optional_field "x" codec` | The key is absent | missing means None; a present value is checked by the codec |
 | `field "x" (option_as_nullish codec)` | Canonical null | missing/null collapse to None; undefined only in an explicitly chosen JS format |
-| Tagged Option codec | An explicit None branch | A checked discriminant and payload |
+| `field "x" (Codec.tagged_option codec)` | `{"_tag": "None"}` | A checked discriminant and payload |
 
-`undefined` is not part of `Json`. If missing and null must be distinguished, a separate ADT is used.
-
-If the application distinguishes missing from null, a separate ADT or another explicitly richer model is needed, not collapsing both into a single `None`.
+`undefined` is not part of `Json`. If the application distinguishes missing from null, a separate ADT or another explicitly richer model is needed, not collapsing both into a single `None`.
 
 ```flick
 type alias Preferences = {
@@ -132,7 +122,7 @@ let preferences_json =
   }
 ```
 
-`optional_field` and `on_missing` are accepted DSL names. A missing quota gets 0 by exactly one call of the pure factory per corresponding decode; null and an invalid value are not replaced by the default. Float.json_finite rejects a non-finite value on encode too. To exclude it in the domain, the field is declared with a refinement type.
+`optional_field` and `on_missing` are names of the DSL. A missing quota gets 0 by exactly one call of the pure factory per corresponding decode; null and an invalid value are not replaced by the default. Float.json_finite rejects a non-finite value on encode too. To exclude it in the domain, the field is declared with a refinement type.
 
 A constructor default, a decode default and omission on encode are independent policies. `on_missing` takes a pure factory; a separate `on_missing_effect` adds its services to `rd`, and expected errors are explicitly represented as SchemaError. Encode does not omit a value because it equals the default, without a separate policy. An effectful default does not give a PureCodec/Schema certificate. [Effect constructor defaults](https://effect.website/docs/v4/schema/default-constructors).
 
@@ -142,9 +132,9 @@ For a codec that looks a user up by ID, the type may be `Codec {Directory} none 
 
 Effect supports [effectful schema transformations](https://effect.website/docs/v4/schema/transformations). The language keeps the independent decode/encode requirements; empty rows of the general `Codec` do not turn it into a `PureCodec`.
 
-### Full deriving Schema
+### Deriving Schema
 
-`deriving Schema` is a chosen part of the language. The compiler builds a runtime witness from the typed definition, passes parameters explicitly and generates Effect Schema/combinators. It does not try to recover an erased type from an arbitrary JS value.
+For `deriving Schema` the compiler builds a runtime witness from the typed definition, passes parameters explicitly and generates Effect Schema/combinators. It does not try to recover an erased type from an arbitrary JS value.
 
 | Data shape | What is derived |
 | - | - |
@@ -180,9 +170,9 @@ let pair_of_schema make_schema =
   schema PairOf make_schema
 ```
 
-`List` here is the chosen immutable source API over a dense JS array. `make_schema` is applied at different types and uses higher-rank checking. `Schema a` is a witness value that is passed around, not a hidden class constraint.
+`List` here is the immutable source API over a dense JS array. `make_schema` is applied at different types and uses higher-rank checking. `Schema a` is a witness value that is passed around, not a hidden class constraint.
 
-Ordinary recursive data is finite; shared subtrees are allowed, and a cycle on the active decoding path gives SchemaError. Cyclic-graph codecs are not part of the first version. Recursive and mutually recursive schemas use lazy references; irregular recursion uses lazy instantiation by the actual parameter, without infinite eager unfolding. If such a contract cannot be expressed as a finite JSON Schema, the strict exporter rejects it.
+Ordinary recursive data is finite; shared subtrees are allowed, and a cycle on the active decoding path gives SchemaError. There are no codecs for cyclic graphs. Recursive and mutually recursive schemas use lazy references; irregular recursion uses lazy instantiation by the actual parameter, without infinite eager unfolding. If such a contract cannot be expressed as a finite JSON Schema, the strict exporter rejects it.
 
 Effect provides [lazy recursive and mutually recursive schemas](https://effect.website/docs/v4/schema/advanced-usage). Derivation from Flick definitions and checking of the witness parameters remain the work of the Flick compiler.
 
@@ -192,32 +182,31 @@ The full DSL includes renaming, ADT discriminants, composition, pure/fallible/ef
 
 Completeness of deriving means there is no artificial restriction to simple records only. It does not mean that parametricity can be checked from a function type, that serialization of a live resource can be derived from a resource handle, or that the permissibility of disclosure can be chosen from `Redacted`. Such fields require an explicitly given checked witness, an opaque predicate or a separate codec. For `Ref` and resources a snapshot is a runtime operation; secrets require a declared policy.
 
-A data schema and a wire codec remain different values. An imported Effect Schema with unknown effects gets the general `Codec`; a purity certificate is not assigned automatically. Arbitrary, JSON Schema and other external interpreters have their own conditions of applicability: for example, an arbitrary predicate does not automatically give a constructive generator. An unsupported export must require an override or give a precise diagnostic, not replace the promised type with a universal JSON schema.
+A data schema and a wire codec remain different values. An imported Effect Schema with unknown effects gets the general `Codec`; a purity certificate is not assigned automatically. Arbitrary, JSON Schema and other external interpreters have their own conditions of applicability: for example, an arbitrary predicate does not automatically give a constructive generator. An unsupported export gives a precise diagnostic; it never replaces the promised type with a universal JSON schema.
 
 ### Schema exporters and compiling execution
 
-Extensible schema integrations and strict diagnostics for an unsupported wire contract are chosen. There are two different tasks here.
+Schema integrations give strict diagnostics for an unsupported wire contract. There are two different tasks here.
 
-**Schema export and interpretation.** The first version includes:
+**Schema export and interpretation.**
 
-| Target | Fixed contract | Limitation |
+| Target | Contract | Limitation |
 | - | - | - |
-| JSON Schema Draft 2020-12 | Strict export of an explicitly chosen JSON wire codec | An unsupported acceptance rule gives ExportError with a path |
-| Standard Schema V1 | A sync or Promise adapter after the decoding services are satisfied | Owner/cancellation and JS input import remain explicit |
-| Arbitrary | A structural generator | An unsupported refinement requires an explicit generator |
-| Diagnostic formatter | Structured issues, paths and redaction | Does not reveal Redacted or an arbitrary opaque payload |
-| OpenAPI 3.1 | Strict export of an `HttpApi` value: paths, methods, parameters, bodies, responses, errors and security; the schemas are the same strict JSON Schema 2020-12 | An unrepresentable endpoint schema gives ExportError with the path `group.endpoint -> field` |
-| Other targets | Plugins after the first version | Separate versions and a capability matrix |
+| JSON Schema Draft 2020-12 | `Codec.json_schema root codec`: strict export of an explicitly chosen JSON wire codec | An unsupported acceptance rule gives ExportError with a path |
+| Standard Schema V1 | `Codec.standard` validates a `PureCodec` synchronously; `Codec.standard_async` is made at run time and validates with the services and under the scope of where it was made | Owner/cancellation and JS input import remain explicit |
+| Arbitrary | `Schema.arbitrary`: a structural generator for property tests | A refined type requires an explicit generator (`Schema.with_generator`) |
+| Diagnostics | `SchemaError`: structured issues with a message and a path | Never holds the input; does not reveal Redacted or an arbitrary opaque payload |
+| OpenAPI 3.1 | `HttpApi.openapi`: strict export of an `HttpApi` value: paths, methods, parameters, bodies, responses, errors and security; the schemas are the same strict JSON Schema 2020-12 ([HttpApi](../../reference/http-api/#clients-and-documents)) | An unrepresentable endpoint schema gives ExportError with the path `group.endpoint.part -> field` |
 
-Native [JSON Schema generation](https://effect.website/docs/v4/schema/json-schema) permits a best-effort approximation. The Flick strict exporter checks exact expressibility of the chosen wire contract: an unsupported predicate, an opaque format, effectful acceptance or inexpressible recursion give ExportError with a node/path. Silent `{}` and `any` are forbidden. An explicit override is bound to a specific node. A simpler wire-shape witness can be exported separately, but it cannot be called the full validation contract of an effectful codec.
+Native [JSON Schema generation](https://effect.website/docs/v4/schema/json-schema) permits a best-effort approximation. The Flick strict exporter checks exact expressibility of the chosen wire contract: an unsupported predicate, an opaque format, effectful acceptance or inexpressible recursion give ExportError with a node/path. Silent `{}` and `any` are forbidden. A simpler wire-shape witness can be exported separately, but it cannot be called the full validation contract of an effectful codec.
 
-For example: `Profile.session -> JSON Schema: scoped resource has no wire codec`. The fix is a codec, an explicit data projection, or excluding the field from the chosen external representation. For statically known schemas this is a build diagnostic; for dynamically built ones it is a typed result of the export operation.
+For example: `Profile.session -> JSON Schema: scoped resource has no wire codec`. The fix is a codec, an explicit data projection, or excluding the field from the chosen external representation. `flick schema export` reports it when it writes a document; for a schema built at run time it is a typed result of the export operation.
 
 The [Effect Standard Schema adapter](https://effect.website/docs/v4/schema/standard-schema) requires satisfied decoding services and permits sync/Promise validation. The Flick adapter belongs to the owner of the provided services; a late validate after closing returns a controlled error. A call with arbitrary JS input is a runtime boundary with the chosen import contract. PureCodec permits a sync path after a safe import; the general Codec takes the Promise path. A universal runSync is not used.
 
 **Optimizing Effect Schema execution.** v4 has [JIT and AOT schema compilers](https://effect.website/docs/v4/schema/compilers). They generate JS for the supported part of the AST and leave the other nodes to the interpreter. AOT produces a static module; the API is still experimental.
 
-The interpreter is the mandatory baseline; AOT is an opt-in build optimization of the first version. Implicit runtime JIT is not enabled. An unsupported AOT node stays interpreted if the semantics are preserved; this does not allow approximation in wire export. The registry of compiled parsers is installed by explicit initialization of the entry point.
+The interpreter is the mandatory baseline; AOT is an opt-in build optimization: `flick build --schema-aot` (or `schema-aot = true`) writes the static module `schemas.aot.js`, which the entry runner installs before `main` starts. Implicit runtime JIT is not enabled. A codec made later or an unsupported node stays interpreted, with the same outcome on every input; this does not allow approximation in wire export.
 
 A fast path may repeat checks/getters on invalid input when building a detailed diagnostic; pure schema optimizations require a consistent inert data ABI. The Effect compiler skips fast paths that could repeat defaults, transformations or other effects. The Flick adapter preserves these conditions.
 
@@ -226,19 +215,17 @@ Email.parse : String -> Result SchemaError Email
 Email.value : Email -> String
 ```
 
-A constant can be checked at compile time if the compiler supports the specific check. An arbitrary value requires a check at run time. Types are erased when JS is generated; the mere presence of the name `Email` does not check an external object.
+A constant can be checked at compile time if the compiler knows the specific check (`FLICK-D006` when it fails). An arbitrary value requires a check at run time. Types are erased when JS is generated; the mere presence of the name `Email` does not check an external object.
 
 ## What not to promise through a refinement
 
 Checking an immutable value can justify its nominal type. Checking that "the user exists in the DB" depends on the state of the outside world and does not guarantee existence after the result is returned. Such operations remain runtime calls, inside a transaction if necessary.
 
-The Codec type does not prove an isomorphism. A separate library contract `lawful` fixes the successful subdomain, the chosen Eq and the permitted canonical wire form; the laws are checked by the component's tests, not by an arbitrary proof of the checker. Defaults, lookup and normalization do not get a round trip automatically.
-
-Defaults, normalization, partial transformations and effectful lookup do not get a round-trip law automatically. A one-way migration, projection or masked output may provide only a decoder/encoder. The compiler checks types and requirements but does not prove arbitrary user-defined laws.
+The Codec type does not prove an isomorphism: round-trip laws are checked by tests, not by the checker. Defaults, normalization, partial transformations and effectful lookup do not get a round-trip law automatically. A one-way migration, projection or masked output may provide only a decoder/encoder. The compiler checks types and requirements but does not prove arbitrary user-defined laws.
 
 ## Ref and type generalization
 
-`Ref` is conveniently provided by ordinary library functions. The language must understand their runtime arrow and apply the generalization rule from section 5.
+`Ref` is conveniently provided by ordinary library functions. The checker uses their runtime arrows and applies the [generalization rule](../03-types-and-classes/#generalization-in-the-presence-of-ref).
 
 ```text
 Ref.make : forall c a. a^c ->{} Ref (a^c)
@@ -275,7 +262,7 @@ let increment counter =
 
 `modify` performs one state-changing operation; separate `get` and `set` do not form one atomic operation. The callback of an ordinary `Ref.modify` is pure. A modification with a runtime callback requires a different synchronization contract. [Effect Ref](https://effect.website/docs/v4/state-management/ref).
 
-Canonical Eq/Hash over the contents of a Ref are absent in the first version: a mutation could change the hash of a key. An explicit identity operation or a wrapper with a once-allocated identity key is a separate API; it does not compare the stored value. `deriving Hash` for a record with a Ref and no such wrapper/witness gives a diagnostic.
+There is no `Eq` or `Hash` over the contents of a Ref: a mutation could change the hash of a key. `Ref.same` tells whether two cells are the same cell; it does not compare the stored value. Deriving `Eq` or `Hash` for a type with a `Ref` field is `FLICK-C013`.
 
 ## Eq and Hash as language classes
 
@@ -286,7 +273,7 @@ class Eq a => Hash a =
 
 The law: if `eq x y`, the hashes coincide. The converse is false: collisions are allowed. Derived `Eq` and `Hash` must use the same semantics of fields. Typing a user-defined instance does not prove this law. [Effect Hash](https://effect.website/docs/v4/trait/hash).
 
-Canonical Eq/Hash map to consistent native Effect protocols. For alternatives, an `EqHash a` witness with both methods is provided, along with the constructors `HashSet.with witness` / `HashMap.with witness`. The collection stores the witness, and the adapter packs the keys into native protocol wrappers and unwraps them on output. Insertion/lookup always use the same witness; it cannot be changed on a populated collection. A union of collections with different witnesses requires an explicit rehash into the chosen witness. This keeps the Effect collection engine at the price of wrappers. [Effect structural Equal](https://effect.website/docs/v4/trait/equal).
+Canonical Eq/Hash map to consistent native Effect protocols. For alternatives, an `EqHash w a` witness with both methods is provided, along with the constructors `HashSet.with witness` / `HashMap.with witness`; the identity `w` of the witness is part of the collection's type ([hash collections](../../reference/stdlib/#hash-collections)). The collection stores the witness, and the adapter packs the keys into native protocol wrappers and unwraps them on output. Insertion/lookup always use the same witness; it cannot be changed on a populated collection. A union of collections with different witnesses requires an explicit rehash into the chosen witness. This keeps the Effect collection engine at the price of wrappers. [Effect structural Equal](https://effect.website/docs/v4/trait/equal).
 
 ## Option and representation compatibility
 
@@ -298,27 +285,21 @@ A pure function over `Option` is generated as an ordinary JS function. Importing
 
 ## The main collection and the List representation
 
-The name **`List a`** and the representation **dense JS array with an immutable source API** are chosen. All `[a, b]` and `[]` create a List; there is no hidden overloading of the literal by expected type. A separate `Chunk a` uses the native Effect Chunk. Mutable foreign arrays are represented by `Js.Array a` through a runtime API; there is no second equivalent Array name in the prelude.
+The main collection is **`List a`**, a **dense JS array with an immutable source API** (on the Go target, a Go slice). All `[a, b]` and `[]` create a List; there is no hidden overloading of the literal by expected type. A separate `Chunk a` uses the native Effect Chunk. Mutable foreign arrays are the `Array a` of the module `Js.Array`, through a runtime API; there is no second equivalent Array name in the prelude.
 
-| Representation | Strengths | Cost |
-| - | - | - |
-| A JS array with an immutable API: the chosen List | A direct JS ABI, indexed access and ordinary loops; simple code generation | Prepending, immutable update and concatenation usually copy O(n) elements |
-| Cons-list `Nil / Cons` | O(1) prepend, head and tail; tail sharing; familiar ML pattern matching | Indexed access is O(n); more objects and GC load; translation to JS arrays is needed |
-| Effect `Chunk` | A ready-made immutable collection for repeated concatenation | An extra structure and operation cost; for many tasks a plain array is simpler |
-
-List has O(1) length/index and an ordinary loop traversal; prepend, immutable update, tail and concat usually copy O(n) elements. O(1) cons/tail are not promised. A recursive traversal with repeated `slice(1)` can become quadratic; the standard traversals use indexed loops. A future cons-list will be a separate type with a different representation, not a change to the List ABI.
+The array gives a direct JS ABI, indexed access and ordinary loops. List has O(1) length/index and an ordinary loop traversal; prepend, immutable update, tail and concat usually copy O(n) elements. O(1) cons/tail are not promised. A recursive traversal with repeated `slice(1)` can become quadratic; the standard traversals use indexed loops.
 
 The main literal always means List. Chunk, mutable JS arrays and other containers are created by explicit constructors/conversions. Missing elements of a sparse JS array do not pass as an ordinary List without an adapter.
 
 TS `ReadonlyArray` does not guarantee actual immutability. FFI must copy, transfer ownership, or work with an opaque mutable handle. A shallow copy suffices only for the sequence itself: nested records also require a consistent contract. Unsafe inputs must not reach the trusted pure API.
 
-The [Effect Chunk documentation](https://effect.website/docs/v4/data-types/chunk) recommends Chunk primarily for frequent concatenation and separately warns of extra costs in other scenarios. All these collections remain a library over the same Effect backend.
+The [Effect Chunk documentation](https://effect.website/docs/v4/data-types/chunk) recommends Chunk primarily for frequent concatenation and separately warns of extra costs in other scenarios. All these collections are library types.
 
 ## Redacted and external serialization
 
 `Redacted a` is useful as an opaque type with masked output and explicit extraction of the value. It does not encrypt data. Hiding in logs does not mean a ban on serialization.
 
-In [Effect Schema v4](https://effect.website/docs/v4/schema/effect-data-types), the canonical JSON encoding of Redacted may reveal the inner value; the setting `disallowJsonEncode: true` is available. Accepted for the language: deriving does not create a revealing external codec without opt-in. The ban, intentional transfer of a secret and a masked projection are set explicitly; a masked projection is a one-way encoder and does not promise a round trip.
+In [Effect Schema v4](https://effect.website/docs/v4/schema/effect-data-types), the canonical JSON encoding of Redacted may reveal the inner value. In Flick a `Redacted` value has no JSON form without an explicit policy: `Codec.json` of a schema with a `Redacted` field fails to encode and decode it. `Redacted.json_reveal codec` transfers the secret intentionally, and `Redacted.json_masked` is a masked projection: a one-way encoder that does not promise a round trip.
 
 ```text
 Redacted.make : a ->{} Redacted a
@@ -329,7 +310,7 @@ The canonical Effect `Redacted` is used, whose contents external code can erase 
 
 ## The numeric model
 
-The decision is made: there are three numeric types with one meaning on every backend. `Int` is a 32-bit signed integer, `Float` is IEEE 754 binary64 (the JS `number`), `BigInt` is an integer of any size. `BigDecimal`, `Duration` and other special types remain library types with their own operations. Operators are fixed and resolved by the operand type after inference; there is no class hierarchy behind them.
+There are three numeric types with one meaning on every backend. `Int` is a 32-bit signed integer, `Float` is IEEE 754 binary64 (the JS `number`), `BigInt` is an integer of any size. `BigDecimal`, `Duration` and other special types remain library types with their own operations. Operators are fixed and resolved by the operand type after inference; there is no class hierarchy behind them.
 
 | Aspect | Contract |
 | - | - |
@@ -349,13 +330,7 @@ A backend implements `Int` as its native 32-bit integer, with the zero-divisor a
 
 ### Eq, Hash and Ord for Float
 
-| Equality | NaN equals NaN | +0 equals -0 | Cost |
-| - | - | - | - |
-| JS strict equality | No | Yes | Non-reflexivity complicates the Eq laws and the behavior of keys |
-| `Object.is` | Yes | No | A consistent hash and an adapter relative to canonical Effect equality are needed |
-| Canonical Effect equality: chosen | Yes | Yes | A separate function is needed for exact JS `===` |
-
-The canonical `Eq Float` and the operator `==` use SameValueZero: NaN equals NaN, +0 equals -0. This matches the checked [Effect Equal](https://github.com/Effect-TS/effect/blob/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f/packages/effect/src/Equal.ts#L187-L205); the [native Hash.number](https://github.com/Effect-TS/effect/blob/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f/packages/effect/src/Hash.ts#L311-L350) is consistent with it. `Float.strict_equal` provides JS `===`, `Float.same_value` provides Object.is. Hash is not a stable external identifier across runtime versions.
+The canonical `Eq Float` and the operator `==` use SameValueZero: NaN equals NaN, +0 equals -0, so `Eq` is reflexive and agrees with a hash. This matches the checked [Effect Equal](https://github.com/Effect-TS/effect/blob/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f/packages/effect/src/Equal.ts#L187-L205); the [native Hash.number](https://github.com/Effect-TS/effect/blob/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f/packages/effect/src/Hash.ts#L311-L350) is consistent with it. `Float.strict_equal` provides JS `===`, `Float.same_value` provides Object.is. Hash is not a stable external identifier across runtime versions.
 
 `Ord Float.compare` defines a total order: −Infinity < finite numbers < +Infinity < NaN; signed zeros compare as EQ, all NaNs as EQ. `compare x y = EQ` is equivalent to canonical Eq. Generic sorting and `Ord.less` use this order. The primitive Float/BigInt `<`, `<=`, `>`, `>=` keep JS semantics: for example, any such comparison of a Float with NaN is false. This is an explicit distinction between numeric operators and a lawful Ord, not a hidden change of JS arithmetic.
 
@@ -363,12 +338,10 @@ Even if Eq considers +0 and -0 equal, the compiler is not entitled to replace on
 
 ## BigDecimal and Duration
 
-BigDecimal is a separate native Effect type with an integer coefficient and a scale. The first version does not introduce `dec` literals and does not overload Float arithmetic. Values are created from a string or a pair of BigInt/checked scale; the path through Float explicitly acknowledges the binary64 rounding that has already happened. [Effect BigDecimal](https://effect.website/docs/v4/data-types/bigdecimal).
+BigDecimal is a separate native Effect type with an integer coefficient and a scale. There are no `dec` literals and no overloading of Float arithmetic. Values are created from a string (`BigDecimal.from_string`), from an integer, or from a BigInt with a checked scale (`BigDecimal.from_bigint`); the path through Float (`BigDecimal.from_number`) explicitly acknowledges the binary64 rounding that has already happened. [Effect BigDecimal](https://effect.website/docs/v4/data-types/bigdecimal).
 
-The source decimal API has no hidden global precision. Exact addition/subtraction/multiplication preserve a finite decimal result; an unrepresentable scale gives a checked DecimalError. `divide_to_scale` necessarily takes a finite integer safe-integer scale and a rounding policy: TowardZero, Floor, Ceiling, HalfEven, HalfAwayFromZero or Exact. Division by zero is a DecimalError; Exact rejects a result that requires rounding. The result is `Result DecimalError BigDecimal`, and the native representation is preserved. The adapter computes the quotient/remainder without an intermediate Float; native division with its own defaults is not substituted for this contract. Unsafe native operations remain explicitly named bindings.
+The source decimal API has no hidden global precision. Exact addition/subtraction/multiplication preserve a finite decimal result; an unrepresentable scale of a product gives a checked DecimalError. `divide_to_scale` necessarily takes a finite integer safe-integer scale and a `RoundingMode`: toward or away from zero, `Floor`, `Ceiling`, a `Half…` mode for ties, or `Exact`. Division by zero is a DecimalError; Exact rejects a result that requires rounding. The result is `Result DecimalError BigDecimal`, and the native representation is preserved. The adapter computes the quotient/remainder without an intermediate Float; native division with its own defaults is not substituted for this contract. Unsafe native operations remain explicitly named bindings.
 
-Duration is a native non-negative duration, including the explicitly chosen `Duration.infinity`; it is not a timestamp or a calendar period. The first version uses ordinary checked constructors nanos(BigInt), millis(Float), seconds(Float), without `ms`/`s` literals. A negative value, NaN, an implicit infinity and overflow in unit conversion give `Result DurationError Duration`. The exact nanosecond form starts from BigInt; Float-based forms keep the chosen JS rounding and do not promise greater precision. A lossy conversion to Float is named explicitly; infinity is not silently turned into a finite number. [Effect Duration](https://effect.website/docs/v4/data-types/duration).
+Duration is a native non-negative duration, including the explicitly chosen `Duration.infinity`; it is not a timestamp or a calendar period. Its constructors are ordinary checked functions, `Duration.nanos` and `Duration.micros` over BigInt, `Duration.millis`, `Duration.seconds` and larger units over Float; there are no `ms`/`s` literals. A negative value, NaN, an implicit infinity and overflow in unit conversion give `Result DurationError Duration`. The exact nanosecond form starts from BigInt; Float-based forms keep the chosen JS rounding and do not promise greater precision. A lossy conversion to Float is named explicitly; infinity is not silently turned into a finite number. [Effect Duration](https://effect.website/docs/v4/data-types/duration).
 
-For BigDecimal/Duration, consistent native Schema, Eq, Hash, Ord and Show are available through checked adapters. Special literals and numeric operator overloading are deferred beyond the first version. Checked library constructors leave a single numeric syntax for Float/BigInt and do not require a new runtime.
-
-The first target release includes full deriving Schema, explicit codecs, nominal refinements with a runtime check, native Effect types, a library Ref, the Eq/Hash bridge and runtime access to Redacted. A compiler spike may implement these mechanisms in stages, but completeness of deriving remains a language requirement.
+BigDecimal has `Eq`, `Ord`, `Hash` and `Show` and a JSON codec; Duration has `Eq`, `Ord` and `Show` and JSON codecs (`Duration.json_millis`, `json_nanos`, `json_string`). Neither has special literals or numeric operator overloading: checked library constructors leave a single numeric syntax for Float/BigInt.

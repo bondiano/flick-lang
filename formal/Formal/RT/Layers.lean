@@ -1,11 +1,11 @@
 import Formal.RT.Reach
 
 /-!
-# λRT: layers and memo maps (R6, И6; runtime.md §3.5)
+# λRT: layers and memo maps (R6, I6; runtime.md §3.5)
 
 An entry of a memo map keeps the ids of its observers (`Ent.obs`), so `n` of §3.5 is their
 number. `Inv6` adds to `Inv` what R6 needs: a build that is not released has its entry
-(R6a), an observer of an entry either is in its `obs` or has run (И6), and every observer
+(R6a), an observer of an entry either is in its `obs` or has run (I6), and every observer
 is a finalizer of its consumer.
 -/
 
@@ -27,7 +27,7 @@ structure Inv6 (C : Conf T V) : Prop where
   hist : Hist Good6 C.J
   live : ∀ m Ly σ, .build m Ly σ ∈ C.J → .release m Ly σ ∈ C.J ∨
     ∃ mm e, C.M m = some mm ∧ mm.ents Ly = some e ∧ e.σ = σ
-  /-- И6: an observer of an entry is in its `obs` until its consumer's (C5) runs it -/
+  /-- I6: an observer of an entry is in its `obs` until its consumer's (C5) runs it -/
   obsIn : ∀ m mm Ly e, C.M m = some mm → mm.ents Ly = some e →
     ∀ π i, .obs π m Ly e.σ i ∈ C.J → i ∈ e.obs ∨ .run π i ∈ C.J
   obsFin : ∀ π m Ly σ i, .obs π m Ly σ i ∈ C.J → .fin π i ∈ C.J

@@ -2,7 +2,7 @@
 title: "Standard library"
 ---
 
-The standard library is Flick code over the runtime adapter (see [Higher-order functions and collection traversal](../../spec/06-higher-order/), [Schema and standard data types](../../spec/09-schema/), [The Flick CLI](../../spec/12-cli/)).
+The standard library is Flick code over the runtime adapter (see [Higher-order functions and collection traversal](../../spec/04-higher-order/), [Schema and standard data types](../../spec/07-schema/), [Compiler CLI](../cli/)).
 Its modules are built into the compiler: a program names them qualified
 without an import (`List.map`, `Ref.make`), or imports names from them like
 from any module (`import File exposing (FileSystem, OpenError)`). The
@@ -72,6 +72,39 @@ and `Monad`.
 | `Test`, `Gen` | tests and generators, see below |
 | `Schedule` | Effect's schedules: `recurs`, `spaced`, `exponential`, `fibonacci`, `up_to`, `while`, `tap`, … |
 | `Effect` | what Effect's `Effect` offers beyond the language: `retry` (typed failures only), `repeat`, `schedule`, `sleep`, … |
+
+### More modules
+
+Thinner wrappers of Effect modules, each documented in its source under
+`flick-core/src/types/builtins/`:
+
+| Module | Contents |
+| - | - |
+| `Clock`, `Random` | the fiber's sources of time and randomness; default services, so reading them needs no service row |
+| `Console`, `Logger`, `LogLevel`, `ErrorReporter` | the fiber's console, what happens to each log message, log levels ordered by severity, and where unhandled failures are reported |
+| `Cause` | build, combine and read how a computation failed, over Flick's opaque `Failure e` |
+| `Cron` | sets of times, optionally in a time zone; `Schedule.cron` runs by one |
+| `ByteSize` | an exact, non-negative number of bytes in decimal or binary units |
+| `Cache` | values looked up by key on demand, at most once at a time per key, with a capacity and a time to live |
+| `Semaphore`, `PartitionedSemaphore` | permits that limit how many tasks run at once; the partitioned one shares a pool fairly by key |
+| `PubSub` | messages published to every subscriber; a subscription belongs to a `scope` |
+| `SynchronizedRef`, `SubscriptionRef` | references whose updates may run tasks; the subscription one publishes each new value |
+| `FiberHandle`, `FiberMap` | at most one child at a time, or one per key, owned by a `scope` |
+| `LayerMap`, `LayerRef` | layers built on first use and shared while in use: by key, or one refreshable layer |
+| `ExecutionPlan` | steps that each provide a task's services, tried in order until one succeeds |
+| `Request`, `RequestResolver` | requests answered in batches by a resolver |
+| `Scheduler` | how fibers take turns |
+| `Sink`, `ChannelSchema` | what consumes a stream, and channels that decode or encode each chunk with a codec |
+| `Tx`, `TxRef`, `TxQueue`, `TxPriorityQueue`, `TxPubSub`, `TxHashMap`, `TxHashSet`, `TxChunk`, `TxDeferred`, `TxSemaphore`, `TxReentrantLock`, `TxSubscriptionRef` | transactional values, read and changed inside `Tx.atomically` |
+| `Order`, `Equivalence`, `Predicate`, `Filter`, `Function` | orders, equivalences, predicates, filters and function helpers as values |
+| `Combiner`, `Reducer` | ways to combine two values, and with a start value to fold a list |
+| `Optic` | lenses, prisms and other optics that read a part of a structure and rebuild it |
+| `Graph`, `Trie`, `HashRing` | immutable graphs with their algorithms, maps from string keys with prefix queries, consistent hashing onto weighted nodes |
+| `JsonPatch`, `JsonPointer` | the differences between two JSON values (RFC 6902) and JSON Pointers (RFC 6901) |
+| `Net` | network addresses and DNS records as JSON |
+| `Terminal`, `PlatformError` | the terminal as a service, and how the platform services fail |
+| `Formatter`, `Inspectable` | the text and JSON form Effect gives inert data |
+| `Version` | the release of Effect the program runs on |
 
 Every export of the pinned Effect is wrapped or decided in a manifest that
 a linter checks, see [effect-surface.md](../effect-surface/).

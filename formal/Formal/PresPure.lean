@@ -23,7 +23,7 @@ theorem exh_bool : Exh S (.base .bool) [.lit (.bool true), .lit (.bool false)] :
   obtain ⟨b, rfl⟩ := this hs rfl rfl
   cases b <;> simp [matchP]
 
-/-- After a failed arm, the remaining arms still cover the value (Р29). -/
+/-- After a failed arm, the remaining arms still cover the value (`docs/formal/core.md#the-residual-match-after-a-false-guard-fails-exh`). -/
 theorem Covers.tail {t p ps v} (hc : Covers S t (p :: ps) v) (hv : Value v)
     (hs : Shp S true t v) (hm : matchP p v = none) : Covers S t ps v := by
   have key : ∀ {q}, q ∈ p :: ps → (matchP q v).isSome → Covers S t ps v := by

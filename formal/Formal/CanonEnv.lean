@@ -81,7 +81,7 @@ theorem env_append_typ {Ψ Θ Γ φ θ₂ ρ₂} (h₂ : Typ S Ψ Θ Γ θ₂ (.
       refine .econs hv₀ (hθe.append hθ₂) hv (ih hθ (ρ := Row.union _ ρ₂) fun n => Iff.rfl) fun n => ?_
       rw [hρ, hρ₁]; simp only [Row.union]; exact or_assoc
 
-/-- Л1 for errors: a value of `Errors ε` is a constructor of an error in `ε`, at a
+/-- L1 for errors: a value of `Errors ε` is a constructor of an error in `ε`, at a
 type whose `⌈·⌉` is within the atoms of `ε`. -/
 theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.errors ε) φ)) :
     ∃ K k ts T U, v.head = .ctor K ∧ S.ctor K = some (k, ts, T) ∧ ε (.nm T) ∧ U.hd = .adt T ∧

@@ -16,7 +16,7 @@ by the laws of `runTarget` (`has_do`), so the runs of the core give the same obs
 `witness_T6b_closed`: any two elaborations of one closed source term in the empty context of
 premises run alike. Their typings come from T6(a) for `runTarget`.
 
-`witness_T6b_open` (Р199): the same under premises `Δ`, closed by any types `θ` and closed
+`witness_T6b_open` (`docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context`): the same under premises `Δ`, closed by any types `θ` and closed
 dictionaries `ρ` to ground constraints. The typings of the closed fillings come from
 `T6a_close` for `runTarget`; the premises left are syntactic: the skeleton has its holes outside
 the abstractions over dictionaries (`Tm.Skel`).
@@ -110,7 +110,7 @@ theorem witness_T6b_closed {e : Exp} {τ : Ty} {φ : Stage} (s : Tm) {qs : List 
     (by rw [hid]; exact T6a (runTarget real realRun rootTy) he₂)
   rwa [hid, hid] at this
 
-/-- **T6(b) for the witness under premises** (Р199): two elaborations of one source term under
+/-- **T6(b) for the witness under premises** (`docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context`): two elaborations of one source term under
 `Δ`, whose dictionaries fill one skeleton, run alike once `Δ` is closed by types `θ` and closed
 dictionaries `ρ` to ground constraints. No premise of typing: `T6a_close` gives both. -/
 theorem witness_T6b_open {e : Exp} {τ : Ty} {φ : Stage} (s : Tm) {Δ : List Cn} {θ : Nat → Ty}

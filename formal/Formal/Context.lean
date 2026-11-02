@@ -2,7 +2,7 @@ import Formal.Frames
 import Formal.Cut
 
 /-!
-# Typing through evaluation contexts (Л3)
+# Typing through evaluation contexts (L3)
 -/
 
 namespace Flick
@@ -73,7 +73,7 @@ def FLook (S : Sig) (Ψ : List Ty) (Θ : Facts) (F : Frame) : Prop :=
 theorem FLook.none {Ψ Θ F} (h : ∀ N, F.lookup N = none) : FLook S Ψ Θ F :=
   fun N _ _ hv => by rw [h N] at hv; cases hv
 
-/-- One frame of Л3: the hole is `k` type variables deep, and pure if `k ≠ 0`;
+/-- One frame of L3: the hole is `k` type variables deep, and pure if `k ≠ 0`;
 at depth `0` it has the facts of the frame. -/
 def FrameTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (F : Frame) (r : Tm) (t : Ty) (φ : Stage) : Prop :=
   ∃ k Θ' t' φ', Typ S (Ψ.map (Ty.up k)) Θ' [] r (.ex t' φ') ∧ FRel F φ' φ ∧

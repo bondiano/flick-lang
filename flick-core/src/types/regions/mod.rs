@@ -61,7 +61,7 @@ pub struct State {
     pub needs: Vec<Need>,
     /// While an `Eff` argument is checked: tasks in it that acquire into a
     /// region not known yet, with the innermost scope, until the call has
-    /// all its arguments, since a later one may name the region (Р25).
+    /// all its arguments, since a later one may name the region (`docs/formal/regions.md#scope-region-of-a-task-argument-is-resolved-after-the-call`).
     pub defaults: Option<Vec<(Type, usize)>>,
     /// The functions around the expression being checked, innermost last,
     /// with the reader each lends to its lazy `for`s.
@@ -683,7 +683,7 @@ fn push_atom(out: &mut Norm, t: &Type) {
 
 /// `t` without the service and error rows of its arrows and `Eff`s: a row
 /// holds no captures, and an `Eff` holds what its result holds
-/// (`docs/formal/regions.md` §2.1, Р64).
+/// (`docs/formal/regions.md` §2.1, `docs/formal/regions.md#a-scope-in-a-local-function-row-is-not-a-capture`).
 fn without_rows(t: &Type) -> Type {
     match t {
         Type::Fun { param, result, .. } => Type::Fun {

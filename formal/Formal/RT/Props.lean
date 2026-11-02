@@ -89,7 +89,7 @@ theorem mem_comb {a b : Cause V} {r : Reason V} (h : r ∈ a ∨ r ∈ b) : r �
     · next hb => subst hb; simpa using h
     · exact mem_nub.2 (List.mem_append.2 h)
 
-/-- R4 for `parallel` (Par): with Г7(е), the result keeps every reason of the first failure
+/-- R4 for `parallel` (Par): with G7(f), the result keeps every reason of the first failure
 and every reason but `Int` of the branches that failed after it. -/
 theorem parResult_keeps {L : Lib V} (h : Hyp L) (unit : V) (xs : List (Out V)) {c : Cause V}
     (hc : Out.fail c ∈ xs) {r : Reason V} (hr : r ∈ noInt c) :

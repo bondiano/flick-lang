@@ -1,4 +1,4 @@
-// C1: what a render costs with atom reads as effects (`Effect.gen` run by
+// What a render costs with atom reads as effects (`Effect.gen` run by
 // `runSync`, as the compiler emits now) against plain calls (a `Sync`
 // stage). Run: `node runtime/bench/render-stage.ts`.
 import { Effect } from "effect";

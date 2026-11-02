@@ -1,5 +1,5 @@
 ---
-title: "4. Values of computations and their execution"
+title: "Values of computations and their execution"
 ---
 
 ## Two different kinds of functions
@@ -9,7 +9,7 @@ make_request : UserId -> Eff {Users} {NotFound} User
 get_user : UserId ->{Users; NotFound} User
 ```
 
-`make_request` purely builds a description. `get_user` performs the operation when called, in the source semantics. Both functions may have the same TS representation `(id) => Effect<User, E, R>`, so this distinction must be kept in the typed IR and in module interfaces. It cannot be recovered from the generated TS type alone. A Sync function (`->{Atom.Read;}`, [section 3](../03-direct-calls/#sync-stages)) is a third kind: it performs its reads when called, yet its representation is `(id) => User`, without an Effect.
+`make_request` purely builds a description. `get_user` performs the operation when called, in the source semantics. Both functions may have the same TS representation `(id) => Effect<User, E, R>`, so the typed IR and module interfaces keep this distinction. It cannot be recovered from the generated TS type alone. A Sync function (`->{Atom.Read;}`, [Sync stages](../01-direct-calls/#sync-stages)) is a third kind: it performs its reads when called, yet its representation is `(id) => User`, without an Effect.
 
 ## Task and running a stored value
 
@@ -27,9 +27,9 @@ let load_user user_id =
 
 `task` defers the body and returns an `Eff`. `identity request` merely passes the value along. `await` runs the stored computation in the current fiber and unwraps one layer: if the successful result was itself another `Eff`, it remains a value. Creating a task does not start a new fiber by itself and does not remember the result: two `await`s usually mean two executions of the body. Ordinary lexical values are captured at construction time; service lookup happens at execution time in the current environment, unless the author explicitly saved a separate service. Captured scoped values additionally restrict the lifetime of the task itself.
 
-Starting the application is a separate external boundary. `await` inside the language does not turn into a nested `Effect.runPromise`. Initialization of a source module stays pure; IO begins at the entry point. Top-level `task` values are allowed because their bodies are deferred. A static FFI import requires a trusted contract of pure initialization of the external module: ESM may execute code on import. A module with effectful initialization is loaded through an explicit runtime operation.
+Starting the application is a separate external boundary. `await` inside the language does not turn into a nested `Effect.runPromise`. Initialization of a source module stays pure; IO begins at the entry point. Top-level `task` values are allowed because their bodies are deferred. A `foreign` import trusts that the external module initializes purely: ESM may execute code on import.
 
-The evaluation order is strict, left to right, taking each currying stage into account. `f x y` means `(f x) y`: first `f` and `x` are evaluated, then the application `f x` is performed, then `y` is evaluated and the second application is performed. If the first arrow is runtime, its effect completes before the second argument is evaluated. The body of a `task` is evaluated at run time; running it again goes through its body anew. Resource sharing, caching and memoization are specified by explicit operations. Purity does not guarantee termination or the absence of a defect: moving a pure expression across a run boundary also requires a proof that behavior is preserved.
+The evaluation order is strict, left to right, taking each currying stage into account. `f x y` means `(f x) y`: first `f` and `x` are evaluated, then the application `f x` is performed, then `y` is evaluated and the second application is performed. If the first arrow is runtime, its effect completes before the second argument is evaluated. The body of a `task` is evaluated at run time; running it again goes through its body anew. Resource sharing, caching and memoization are explicit operations, such as `Effect.cached`. Purity does not guarantee termination or the absence of a defect: moving a pure expression across a run boundary also requires a proof that behavior is preserved.
 
 ### Re-running and the value of await
 
@@ -43,13 +43,13 @@ let load_twice id =
   (first, second)
 ```
 
-The call `Users.get` happens twice. Storing `request` does not make it a cache and does not create a Promise. To obtain a result once and reuse it, write `let user = Users.get id` and then use the ready `user`. Memoization of a computation is a separate runtime operation with explicitly specified sharing.
+The call `Users.get` happens twice. Storing `request` does not make it a cache and does not create a Promise. To obtain a result once and reuse it, write `let user = Users.get id` and then use the ready `user`. Memoizing a computation is a separate runtime operation with explicit sharing.
 
 `await` is needed only for an already existing `Eff` value. An ordinary runtime call `let user = Users.get id` stays direct and needs no additional `await`.
 
 ## Purity is separate from error and service rows
 
-The checker needs a separate marker for a pure expression and a runtime computation, for example `Pure` and `Runtime(r, e)`, or an equivalent model. Empty `r` and `e` do not make a runtime computation pure.
+The checker tells a pure expression from a runtime computation independently of the rows: empty `r` and `e` do not make a runtime computation pure.
 
 `none` denotes an empty row of requirements or errors. The absence of services and typed failures does not rule out IO, state, a defect or interruption. `provide` supplies a dependency but does not erase the very fact of execution through the runtime.
 
@@ -88,4 +88,4 @@ let load_name_pair first_id second_id =
 
 In the direct style, `parallel (Users.get first_id) (Users.get second_id)` would first evaluate both arguments. Deferred blocks let the `parallel` operation itself control when execution begins.
 
-The names and the main contract are fixed: `task` is a description, `await` is execution in the current fiber, and the entry point is the external run boundary. Running a nested `Eff` requires the next explicit `await`; there is no automatic recursive flatten.
+The contract: `task` is a description, `await` is execution in the current fiber, and the entry point is the external run boundary. Running a nested `Eff` requires the next explicit `await`; there is no automatic recursive flatten.

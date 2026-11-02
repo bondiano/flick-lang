@@ -1,4 +1,4 @@
-// Stress (`just stress`, X4): with FLICK_STRESS set to a seed, the runner
+// Stress (`just stress`): with FLICK_STRESS set to a seed, the runner
 // runs main under a scheduler that shuffles the tasks of each round, within
 // a priority, and makes fibers yield at random, so the runs of a program
 // take interleavings a plain run never does; the monitor of λRT checks the

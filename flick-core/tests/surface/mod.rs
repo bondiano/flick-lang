@@ -153,8 +153,8 @@ impl Manifest {
         for (name, why) in file.excluded {
             add(name, Status::Excluded(why), &mut self.problems);
         }
-        for (name, stage) in file.pending {
-            add(name, Status::Pending(stage), &mut self.problems);
+        for (name, why) in file.pending {
+            add(name, Status::Pending(why), &mut self.problems);
         }
     }
 }
@@ -285,20 +285,12 @@ fn check(
                 Binding::Reviewed(_) | Binding::Flick => {}
             }
         }
-        Status::Pending(stage) => {
-            let owned = stage
-                .strip_prefix('M')
-                .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
-            if !owned {
-                out.push(format!(
-                    "{key}: pending without an owning stage (`M<n>`), got `{stage}`"
-                ));
-            }
-        }
-        Status::Language(why) | Status::Excluded(why) if why.trim().is_empty() => {
+        Status::Language(why) | Status::Excluded(why) | Status::Pending(why)
+            if why.trim().is_empty() =>
+        {
             out.push(format!("{key}: {} without a reason", status.label()));
         }
-        Status::Language(_) | Status::Excluded(_) => {}
+        Status::Language(_) | Status::Excluded(_) | Status::Pending(_) => {}
     }
     out
 }

@@ -1,6 +1,6 @@
 // A child or finalizer keeps the services of the place that registers it
 // until its owner closes: each comes from a provider that outlives the
-// owner (Р37).
+// owner (`docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer`).
 module App.ProvideOwner exposing (..)
 
 service Greeter =

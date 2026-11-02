@@ -1,5 +1,5 @@
 ---
-title: "3. Direct effectful calls"
+title: "Direct effectful calls"
 ---
 
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.
@@ -33,7 +33,7 @@ The result of the expression `Users.get id` is a `User`, and the effect of compu
 
 `let` binds the value of the expression without any additional transformation: a value of type `Eff` stays `Eff`, `Option` stays `Option`, `List` stays `List`, `Result` stays `Result`. The effect of the right-hand side is determined by the original signature of the called function.
 
-Function blocks and `match` are delimited by indentation. `in` is not needed; the last expression is the result of the block. A standalone intermediate expression must have type `Unit`; any other result is discarded explicitly with `ignore`. Curly braces are used for records and the special blocks `task`, `scope`, `sql`, `ui`. Inside them, line breaks separate bindings and expressions; `;` is allowed for compact notation. Arguments and fields are evaluated left to right. Self-recursion is marked with `let rec`; mutual recursion of functions uses `rec { ... }`, where each definition has its own full signature. Recursive values with immediate evaluation are forbidden in the first version.
+Function blocks and `match` are delimited by indentation. `in` is not needed; the last expression is the result of the block. A standalone intermediate expression must have type `Unit`; any other result is discarded explicitly with `ignore`. Curly braces delimit records and the blocks of `task`, `scope`, `provide`, `sql`, `ui`, `cli`, `codec`, `do`, `for` and `rec` (see [Layout](../../reference/grammar/#layout)). Inside them, line breaks separate bindings and expressions; `;` is allowed for compact notation. Arguments and fields are evaluated left to right. Self-recursion is marked with `let rec`; mutual recursion of functions uses `rec { ... }`, where each definition has its own full signature. A recursive value that would be evaluated while it is defined is an error (`FLICK-T012`).
 
 ## A full signature above every function
 
@@ -90,6 +90,6 @@ quadrupled : Unit ->{Atom.Read;} Float
 let quadrupled () = twice doubled ()
 ```
 
-The lift of the previous section covers every pair of stages: a pure function is called as a Sync one is; a Sync function in a runtime position becomes an Effect that calls it with the fiber's services (`doubled` above); a runtime function in a Sync position, or a runtime call in a Sync stage (`twice doubled ()`), runs its effect at once with the services of the context. A runtime call there that suspends is a defect, as a render that awaits is today. Sync functions of the same type unify only with Sync ones.
+The lift of the previous section covers every pair of stages: a pure function is called as a Sync one is; a Sync function in a runtime position becomes an Effect that calls it with the fiber's services (`doubled` above); a runtime function in a Sync position, or a runtime call in a Sync stage (`twice doubled ()`), runs its effect at once with the services of the context. A runtime call there that suspends is a defect, as is a render that awaits. Sync functions of the same type unify only with Sync ones.
 
 New free type variables in a function signature are implicitly universally quantified; the kind is inferred from the position. In a nested signature, the variable names of the outer signature denote the same variables. The signature is checked and does not cancel the value restriction, the invariance of mutable containers or lifetime restrictions. Polymorphic recursion is allowed only with an explicitly written full `forall` on the recursive function: the checker checks the body against the signature but does not infer it. Instantiation remains predicative. The type of an instance method is checked against the class signature after substituting its parameters; new requirements on the calling code cannot be added silently.

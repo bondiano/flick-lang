@@ -1,5 +1,5 @@
 // A local function whose row names `Scope s` holds nothing of `s`: a row is
-// no capture, so a task may use it inside the scope (regions.md Р64).
+// no capture, so a task may use it inside the scope (docs/formal/regions.md).
 module App.ScopeRow exposing (..)
 
 scoped_row : Unit ->{} Unit

@@ -1,6 +1,6 @@
 // A layer whose outputs end in a variable of the signature provides all of
 // that variable: the body may need every service `o` stands for
-// (docs/formal/core.md Р6).
+// (docs/formal/core.md, `provide` discharges listed outputs).
 module App.ProvideVariable exposing (..)
 
 with_layer : Layer none none o -> Eff o none Float ->{} Float

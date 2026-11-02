@@ -39,7 +39,7 @@ theorem steps_nest {root : Roots} {c c' : Cfg} (hroot : RootTy S root)
     exact ⟨X₁ ++ X₂, anc₂, B₂, home₂, by simpa using hc₂, by simpa using hn₂⟩
 
 /-- `⊢ Λ` in every configuration a program reaches. The ancestors `anc` of the
-live regions are live (`Nest.live`): this is Л5, a region closes only after every
+live regions are live (`Nest.live`): this is L5, a region closes only after every
 region created in its body or in its children (`Nest.nested`). -/
 theorem reach_nest {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)

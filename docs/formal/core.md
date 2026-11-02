@@ -1,97 +1,97 @@
-# λFlick: ядро без регионов
+# λFlick: the core without regions
 
-Сверено с кодом на `b0e958a3`. Модель — источник истины для семантики ядра. Где проза спецификации или чекер расходятся с ней, расхождение и решение по нему записаны в §5.
+The model is the source of truth for the semantics of the core. Where the spec prose or the checker diverges from it, the divergence and its resolution are recorded in §5.
 
-Ссылки: `spec/NN` — `docs/src/content/docs/spec/NN-*.md`, `reference/X` — `docs/src/content/docs/reference/X.md`. Пути чекера даны от `flick-core/src/types/`.
+References: `spec/NN` is `docs/src/content/docs/spec/NN-*.md`, `reference/X` is `docs/src/content/docs/reference/X.md`. Checker paths are relative to `flick-core/src/types/`.
 
-## 0. Область
+## 0. Scope
 
-Ядро — то, во что сводится поверхностный язык без классов, регионов и захватов. В него входят:
+The core is what the surface language reduces to once classes, regions and captures are removed. It contains:
 
-- λ и применение;
-- `let` с обобщением;
-- ADT и `match`;
-- точные записи с хвостом строки;
+- λ and application;
+- `let` with generalization;
+- ADTs and `match`;
+- exact records with a row tail;
 - `Ref`;
 - `task`/`await`, `try … with`, `provide`;
-- чистая и эффектная стрелки, строки сервисов `r` и ошибок `e`.
+- the pure and the effectful arrow, service rows `r` and error rows `e`.
 
-Источником ожидаемой ошибки служит `raise`, дефекта — `todo`.
+The source of an expected error is `raise`; the source of a defect is `todo`.
 
-| Не входит | Где | Как ядро это учитывает |
+| Not included | Where | How the core accounts for it |
 | - | - | - |
-| Регионы, захваты `T^c`, `scope`, `NoCapture` | `regions.md` | Типы ядра — типы чекера со стёртыми квалификаторами `Captured`/`Bounded`. `close_over`, `value_bound` и `hold` в правилах не участвуют |
-| Классы, словари, `do`, `for`, `?` | `elaboration.md` | Ядро получает программу с уже вставленными словарями; в схемах нет ограничений |
-| Файберы, `parallel`, `race`, `spawn`, Cause, прерывание, мемоизация слоёв | `runtime.md` (λRT) | В ядре одна нить исполнения; исход «прерывание» появляется только в λRT |
-| Sync-стадия `->{Atom.Read;}` | — | Для типов это рантайм-стрелка `R⟨{Atom.Read}; none⟩`. Sync — способ компиляции такой стрелки, а не отдельный вид стадии |
-| Вложенный `∀` в параметре (высший ранг) | позже | Ядро предикативно и ранга 1. Правило обобщения действует и там: проверку против `∀` делает одна ветка `check_value` (Р1) |
-| `foreign` | гипотеза Г1 (§4) | Привязки входят в Γ₀ со своими типами |
+| Regions, captures `T^c`, `scope`, `NoCapture` | `regions.md` | Core types are checker types with the `Captured`/`Bounded` qualifiers erased. `close_over`, `value_bound` and `hold` take no part in the rules |
+| Classes, dictionaries, `do`, `for`, `?` | `elaboration.md` | The core receives a program with dictionaries already inserted; schemes carry no constraints |
+| Fibers, `parallel`, `race`, `spawn`, Cause, interruption, layer memoization | `runtime.md` (λRT) | The core has one thread of execution; the "interrupted" outcome appears only in λRT |
+| The Sync stage `->{Atom.Read;}` | — | For typing this is the runtime arrow `R⟨{Atom.Read}; none⟩`. Sync is a way of compiling such an arrow, not a separate kind of stage |
+| Nested `∀` in a parameter (higher rank) | later | The core is predicative and rank 1. The generalization rule applies there too: checking against `∀` is done by a single branch of `check_value` (see [an annotation with `forall`](#an-annotation-with-forall-bypasses-let-sig)) |
+| `foreign` | hypothesis G1 (§4) | Bindings enter Γ₀ with their declared types |
 
-## 1. Синтаксис
+## 1. Syntax
 
-### 1.1 Виды
+### 1.1 Kinds
 
 ```text
 κ ::= Type | SRow | ERow | Row Type | κ → κ
 ```
 
-`SRow` — `ServiceRow`, `ERow` — `ErrorRow`, `Row Type` — строка полей записи. Три вида строк не смешиваются. Ниже все типы считаются правильно образованными по видам.
+`SRow` is `ServiceRow`, `ERow` is `ErrorRow`, `Row Type` is a row of record fields. The three row kinds never mix. Below, all types are assumed well-kinded.
 
-Чекер: `kinds.rs`, `convert/kinds.rs`, `convert/rows.rs` `Checker::row`, `row_kind`.
+Checker: `kinds.rs`, `convert/kinds.rs`, `convert/rows.rs` `Checker::row`, `row_kind`.
 
-### 1.2 Типы и строки
+### 1.2 Types and rows
 
 ```text
-τ ::= α                           переменная
-    | T τ₁ … τₙ                   номинальный тип: ADT, ошибка, Unit, Bool, Never, Int,
-                                  Float, String, List, Option, Result, кортеж
-    | τ →φ τ                      стрелка стадии φ
-    | Eff ρ ρ τ                   вычисление: сервисы, ошибки, результат
+τ ::= α                           variable
+    | T τ₁ … τₙ                   nominal type: ADT, error, Unit, Bool, Never, Int,
+                                  Float, String, List, Option, Result, tuple
+    | τ →φ τ                      arrow of stage φ
+    | Eff ρ ρ τ                   computation: services, errors, result
     | Ref τ
-    | Layer ρ ρ ρ                 входы, ошибки, выходы
-    | {ℓ₁ : τ₁, …, ℓₙ : τₙ | ρ}    точная запись; без хвоста — закрытая
-    | Errors ρ                    ошибки строки как тип
-    | S.Impl                      запись реализации сервиса S
+    | Layer ρ ρ ρ                 inputs, errors, outputs
+    | {ℓ₁ : τ₁, …, ℓₙ : τₙ | ρ}    exact record; closed without a tail
+    | Errors ρ                    the errors of a row as a type
+    | S.Impl                      implementation record of service S
 
-φ ::= P                           чистая стадия:   a -> b
-    | R⟨ρ; ρ⟩                     рантайм-стадия:  a ->{r; e} b
+φ ::= P                           pure stage:      a -> b
+    | R⟨ρ; ρ⟩                     runtime stage:   a ->{r; e} b
 
 ρ ::= α | none | {a₁, …, aₙ} | {a₁, …, aₙ | ρ} | ρ + ρ
 
-a ::= S τ̄                         элемент SRow: сервис
-    | E τ̄                         элемент ERow: тип, объявленный `type error`
-    | ℓ : τ                       элемент Row Type: поле
+a ::= S τ̄                         SRow element: a service
+    | E τ̄                         ERow element: a type declared with `type error`
+    | ℓ : τ                       Row Type element: a field
 
 σ ::= τ | ∀α:κ. σ
 ```
 
-Как это пишется в языке:
+How this is written in the language:
 
-- `a -> b` — `a →P b`;
-- `a ->{r; e} b` — `a →R⟨r;e⟩ b`;
-- `->{}` — `→R⟨none;none⟩`.
+- `a -> b` is `a →P b`;
+- `a ->{r; e} b` is `a →R⟨r;e⟩ b`;
+- `->{}` is `→R⟨none;none⟩`.
 
-Вид строки у `φ`, `Eff` и `Layer` задаёт её позиция. `none` — пустая строка любого вида.
+The kind of a row in `φ`, `Eff` and `Layer` is fixed by its position. `none` is the empty row of any kind.
 
-**Равенство строк ≡** (SRow, ERow):
+**Row equality ≡** (SRow, ERow):
 
-- `+` ассоциативно и коммутативно, `none` — его единица;
-- `{ā | ρ} ≡ {ā} + ρ` и `ρ + ρ ≡ ρ`;
-- элемент определяется именем `Module.Name`, и в строке не больше одного элемента с данным именем. `{N τ̄} + {N τ̄'}` правильно образована только при `τ̄ = τ̄'` и тогда равна `{N τ̄}`.
+- `+` is associative and commutative, with unit `none`;
+- `{ā | ρ} ≡ {ā} + ρ` and `ρ + ρ ≡ ρ`;
+- an element is identified by its name `Module.Name`, and a row has at most one element with a given name. `{N τ̄} + {N τ̄'}` is well-formed only when `τ̄ = τ̄'`, and then equals `{N τ̄}`.
 
-Нормальная форма строки — пара: множество элементов по именам и множество переменных.
+The normal form of a row is a pair: a set of elements keyed by name and a set of variables.
 
-**Вложение:** `ρ ⊆ ρ'` ⇔ `ρ' ≡ ρ + ρ''` для некоторой `ρ''`. На нормальных формах это вложение обоих множеств.
+**Inclusion:** `ρ ⊆ ρ'` ⇔ `ρ' ≡ ρ + ρ''` for some `ρ''`. On normal forms this is inclusion of both sets.
 
-Строка полей устроена иначе. Метки уникальны, порядок не важен, повтор метки — ошибка (`FLICK-T014`), а не слияние. Вложения нет, только равенство: подтипов по ширине нет.
+A field row works differently. Labels are unique, order does not matter, and a repeated label is an error (`FLICK-T014`), not a merge. There is no inclusion, only equality: there is no width subtyping.
 
-Чекер:
+Checker:
 
-- `unify.rs` `Store::normalize` — нормальная форма;
-- `rows.rs` `Checker::unify_row_types`, `merge_same_names` — один элемент на имя;
+- `unify.rs` `Store::normalize`: the normal form;
+- `rows.rs` `Checker::unify_row_types`, `merge_same_names`: one element per name;
 - `convert/rows.rs` `element_label`.
 
-### 1.3 Выражения, паттерны, значения
+### 1.3 Expressions, patterns, values
 
 ```text
 e ::= x | c | K
@@ -112,134 +112,134 @@ a ::= p → e | p when e → e
 p ::= _ | x | K p₁ … pₙ | {ℓ₁ = p₁, …, ℓₖ = pₖ, ..} | p | p | n
 ```
 
-Обозначения:
+Notation:
 
-- `c` — константы Γ₀ (§1.5);
-- `K` — конструкторы объявленных ADT и ошибок;
-- `n` — литерал;
-- кортеж — ADT с конструктором `(,…,)`;
-- паттерн записи перечисляет часть полей.
+- `c` ranges over the constants of Γ₀ (§1.5);
+- `K` ranges over constructors of declared ADTs and errors;
+- `n` is a literal;
+- a tuple is an ADT with constructor `(,…,)`;
+- a record pattern lists a subset of the fields.
 
-Значения:
+Values:
 
 ```text
-v ::= λx. e | K v₁ … vₖ | {ℓ₁ = v₁, …, ℓₙ = vₙ} | task e | n    k не больше арности K
-    | c v₁ … vₖ                   k меньше арности c
+v ::= λx. e | K v₁ … vₖ | {ℓ₁ = v₁, …, ℓₙ = vₙ} | task e | n    k at most the arity of K
+    | c v₁ … vₖ                   k less than the arity of c
 ```
 
-`task e` — значение при любом `e`. Вычисление в ядре само является значением: его тело не вычисляется до `await`. Формы времени исполнения (`fix`, локации, `env`, `with`, `handle`) описаны в §3.1.
+`task e` is a value for any `e`. A computation in the core is itself a value: its body is not evaluated until `await`. Runtime-only forms (`fix`, locations, `env`, `with`, `handle`) are described in §3.1.
 
-### 1.4 Сведение поверхности
+### 1.4 Reduction of the surface
 
-Нормативно сведение описывает `elaboration.md`. Здесь — соответствие, по которому читаются правила.
+The reduction is specified normatively in `elaboration.md`. This table gives the correspondence used to read the rules.
 
-| Поверхность | Ядро |
+| Surface | Core |
 | - | - |
-| `f : σ` над `let f x y = b` | `let f : σ = λx. λy. b` (`let rec` при `rec`) |
-| Новые переменные сигнатуры | `∀` над всей сигнатурой |
-| Выражение `s` в блоке перед `rest` | `let _ : Unit = s in rest` |
-| `let p = e` с паттерном | `match e with p → rest` |
+| `f : σ` above `let f x y = b` | `let f : σ = λx. λy. b` (`let rec` with `rec`) |
+| Fresh variables of a signature | `∀` over the whole signature |
+| Expression `s` in a block before `rest` | `let _ : Unit = s in rest` |
+| `let p = e` with a pattern | `match e with p → rest` |
 | `if c then a else b` | `match c with True → a \| False → b` |
-| Аннотация `let x : σ = e`, выражение `(e : σ)` | `let x : σ = e in …`, `let x : σ = e in x` |
+| Annotation `let x : σ = e`, expression `(e : σ)` | `let x : σ = e in …`, `let x : σ = e in x` |
 | `from_result r` | `match r with Err v → raise v \| Ok v → v` |
-| Операция `S.op` с `op : τ₁ →R⟨r;ε⟩ τ₂` | `λx. (ask_S ()).op x : τ₁ →R⟨{S} + r; ε⟩ τ₂`; у каждой рантайм-стадии операции свой `ask_S` |
+| Operation `S.op` with `op : τ₁ →R⟨r;ε⟩ τ₂` | `λx. (ask_S ()).op x : τ₁ →R⟨{S} + r; ε⟩ τ₂`; each runtime stage of the operation has its own `ask_S` |
 | `Layer.succeed S impl` | `Layer.succeed_S impl` |
-| `x \|> f`, операторы | `f x`, константы |
+| `x \|> f`, operators | `f x`, constants |
 
-### 1.5 Константы Γ₀
+### 1.5 Constants Γ₀
 
 ```text
 Ref.make        : ∀α. α →R⟨none;none⟩ Ref α
 Ref.get         : ∀α. Ref α →R⟨none;none⟩ α
 Ref.set         : ∀α. Ref α →P α →R⟨none;none⟩ Unit
 raise           : ∀ε α. Errors ε →R⟨none;ε⟩ α
-ask_S           : Unit →R⟨{S};none⟩ S.Impl                    для каждого сервиса S
+ask_S           : Unit →R⟨{S};none⟩ S.Impl                    for every service S
 Layer.succeed_S : S.Impl →P Layer none none {S}
 Layer.effect_S  : ∀r ε. Eff r ε S.Impl →P Layer r ε {S}
 Layer.merge     : ∀i₁ e₁ o₁ i₂ e₂ o₂.
                   Layer i₁ e₁ o₁ →P Layer i₂ e₂ o₂ →P Layer (i₁+i₂) (e₁+e₂) (o₁+o₂)
-                  если в o₁ и o₂ нет общего имени
+                  if o₁ and o₂ share no name
 <, <=, >, >=    : ∀α. α →P α →P Bool                       α ∈ {Int, Float, BigInt, String}
 ```
 
-Откуда константы:
+Where the constants come from:
 
-- `Ref.*`, `from_result`, `Layer.*` — типы из `builtins/Ref.fl`, `builtins/Prelude.fl` и `builtins/Layer.fl`, у которых стёрты захваты.
-- `ask_S` — поиск сервиса, который делает сгенерированная операция (`services.rs` `operation_type`, `require`). Каждая операция обязана иметь рантайм-стрелку (`has_runtime_arrow`, `FLICK-E006`).
-- Условие `merge` проверяет `services.rs` `merge_conflicts` (`FLICK-E004`).
-- Сравнения порядка проверяет `settle.rs` `settle_operators` после вывода: неизвестный `α` становится `Int`, жёсткий требует `Ord α`, любой другой — `FLICK-T003` (Р58).
+- `Ref.*`, `from_result`, `Layer.*`: the types from `builtins/Ref.fl`, `builtins/Prelude.fl` and `builtins/Layer.fl` with captures erased.
+- `ask_S`: the service lookup performed by a generated operation (`services.rs` `operation_type`, `require`). Every operation must have a runtime arrow (`has_runtime_arrow`, `FLICK-E006`).
+- The `merge` side condition is checked by `services.rs` `merge_conflicts` (`FLICK-E004`).
+- Order comparisons are checked by `settle.rs` `settle_operators` after inference: an unknown `α` becomes `Int`, a rigid one requires `Ord α`, anything else is `FLICK-T003` (see [order comparison on functions](#order-comparison-on-functions)).
 
-Конструкторы:
+Constructors:
 
-- `K` из `type T ᾱ = … | K τ₁ … τₙ | …` имеет тип `∀ᾱ. τ₁ →P … →P τₙ →P T ᾱ`.
-- `E` из `type error E ᾱ = E τ̄` имеет тип `∀ᾱ. τ̄ →P E ᾱ`. Здесь `E ᾱ` — одновременно тип вида `Type` и элемент `ERow` с именем `E`.
-- Поля ошибки не держат `Ref`, `Eff`, `Layer`, рантайм-функций и `Unknown` (`services.rs` `check_error_payload`, `FLICK-E005`). Ядру этот запрет не нужен, он нужен регионам, но действует всегда.
+- `K` from `type T ᾱ = … | K τ₁ … τₙ | …` has type `∀ᾱ. τ₁ →P … →P τₙ →P T ᾱ`.
+- `E` from `type error E ᾱ = E τ̄` has type `∀ᾱ. τ̄ →P E ᾱ`. Here `E ᾱ` is at once a type of kind `Type` and an `ERow` element named `E`.
+- Error fields may not hold `Ref`, `Eff`, `Layer`, runtime functions or `Unknown` (`services.rs` `check_error_payload`, `FLICK-E005`). The core does not need this restriction, regions do, but it always applies.
 
-`Errors ρ` — проекция строки в тип:
+`Errors ρ` is the projection of a row to a type:
 
 - `Errors none ≡ Never`;
 - `Errors {E τ̄} ≡ E τ̄` (`unify.rs` `project`, `unify_errors`).
 
-При двух и более элементах или строке с переменной `Errors ρ` в исходном языке непрозрачен. Его значения появляются только в ветви `x`/`_` у `try` и уходят в `raise` или в обобщённый код (Р5).
+With two or more elements, or with a row variable, `Errors ρ` is opaque in the source language. Its values appear only in the `x`/`_` branch of a `try` and flow into `raise` or into generic code (see [`Errors` of a row with two or more elements](#errors-of-a-row-with-two-or-more-elements)).
 
-### 1.6 Словари (временно)
+### 1.6 Dictionaries (provisional)
 
-Временная часть, её заменит `elaboration.md` (M4). Эталон `flick-model` проверяет программы, в которые flick-core уже вставил словари. Для этого ядру нужны формы:
+This part is provisional; `elaboration.md` gives the normative account of classes. The reference checker `flick-model` checks programs into which flick-core has already inserted dictionaries. For that the core needs these forms:
 
 ```text
 τ ::= …
-    | C.Dict τ̄                    словарь класса C при параметрах τ̄
-    | α τ                         применение переменной вида κ → κ
-    | Eff ρ ρ                     Eff без результата, вида Type → Type
+    | C.Dict τ̄                    dictionary of class C at parameters τ̄
+    | α τ                         application of a variable of kind κ → κ
+    | Eff ρ ρ                     Eff without a result, of kind Type → Type
 
-σ ::= … | ∀ᾱ. C̄ ⇒ τ              читается как ∀ᾱ. C₁.Dict τ̄₁ →P … →P Cₙ.Dict τ̄ₙ →P τ
+σ ::= … | ∀ᾱ. C̄ ⇒ τ              read as ∀ᾱ. C₁.Dict τ̄₁ →P … →P Cₙ.Dict τ̄ₙ →P τ
 ```
 
-- `C.Dict τ̄` — номинальный тип. Его поля — методы класса и `$S : S.Dict τ̄'` для каждого суперкласса `S`. Метод `m : ∀ᾱ β̄. C ᾱ ⇒ υ` класса `C ᾱ` даёт поле `m : ∀β̄. υ[ᾱ := τ̄]`: собственное ограничение класса снято.
-- `(Eff ρ ρ') τ ≡ Eff ρ ρ' τ`. Это нужно инстансам вида `Functor (Eff r e)`, где `f := Eff r e`.
-- `S.Impl ≡ {op₁ : σ₁, …, opₙ : σₙ}` — закрытая запись операций `S`. Так определяет псевдоним `S.Impl` чекер (`services.rs` `impl_def`). Поле полиморфной операции имеет тип `σᵢ`.
+- `C.Dict τ̄` is a nominal type. Its fields are the class methods and `$S : S.Dict τ̄'` for every superclass `S`. A method `m : ∀ᾱ β̄. C ᾱ ⇒ υ` of class `C ᾱ` gives the field `m : ∀β̄. υ[ᾱ := τ̄]`: the class's own constraint is removed.
+- `(Eff ρ ρ') τ ≡ Eff ρ ρ' τ`. Instances such as `Functor (Eff r e)`, with `f := Eff r e`, need this.
+- `S.Impl ≡ {op₁ : σ₁, …, opₙ : σₙ}` is the closed record of the operations of `S`. This is how the checker defines the alias `S.Impl` (`services.rs` `impl_def`). The field of a polymorphic operation has type `σᵢ`.
 
 ```text
-Γ ⊢ e : D ! φ      ℓ : ∀β̄. υ — поле D      ῡ — монотипы
-──────────────────────────────────────────────────── (Field-Impl)        D ::= S.Impl | C.Dict τ̄
+Γ ⊢ e : D ! φ      ℓ : ∀β̄. υ is a field of D      ῡ monotypes
+──────────────────────────────────────────────────────── (Field-Impl)        D ::= S.Impl | C.Dict τ̄
 Γ ⊢ e.ℓ : υ[β̄ := ῡ] ! φ
 ```
 
-(Field-Impl) формализует В2: `render_impl.render 7` принимают и эталон, и чекер.
+(Field-Impl) formalizes [calling an implementation field with a class constraint](#an-implementation-field-with-a-class-constraint-cannot-be-called-directly): both the reference checker and flick-core accept `render_impl.render 7`.
 
-Выбора инстанса нет: IR уже вставил словари (`Dicts`, `Abstract`, `Method`, `Instance`). Глобал инстанса имеет схему `∀ᾱ. C₁.Dict τ̄₁ →P … →P C.Dict τ̄`: параметры — словари контекста. Метод по умолчанию `$default_C_m` имеет схему метода `m`. Когерентность и выбор инстанса — M4.
+There is no instance selection: the IR has already inserted dictionaries (`Dicts`, `Abstract`, `Method`, `Instance`). An instance global has the scheme `∀ᾱ. C₁.Dict τ̄₁ →P … →P C.Dict τ̄`: its parameters are the context dictionaries. A default method `$default_C_m` has the scheme of method `m`. Coherence and instance selection are covered in `elaboration.md` §4.
 
-Эталон:
+Reference checker:
 
 - `flick-model/src/check/expr.rs` `field`, `method`, `implementation`, `dictionary`;
-- `check/unify.rs` `resolve` — `Eff ρ ρ'` как `EffOf`;
-- `decls.rs` `finish` — схемы методов по умолчанию;
+- `check/unify.rs` `resolve`: `Eff ρ ρ'` as `EffOf`;
+- `decls.rs` `finish`: schemes of default methods;
 - `translate/types.rs` `scheme`, `constraint`.
 
-## 2. Статика
+## 2. Statics
 
-### 2.1 Эффект стадии
+### 2.1 Stage effect
 
-Суждение `Γ ⊢ e : τ ! φ` значит: у `e` тип `τ`, и шаги рантайма, которые делает вычисление `e` на текущей стадии, укладываются в `φ`. Тела `λ` и `task` к текущей стадии не относятся: они вычисляются позже.
+The judgment `Γ ⊢ e : τ ! φ` means: `e` has type `τ`, and the runtime steps that evaluating `e` performs at the current stage fit within `φ`. The bodies of `λ` and `task` do not belong to the current stage: they are evaluated later.
 
 ```text
 P ⊑ φ
-R⟨r;e⟩ ⊑ R⟨r';e'⟩   ⇔   r ⊆ r'  и  e ⊆ e'
+R⟨r;e⟩ ⊑ R⟨r';e'⟩   ⇔   r ⊆ r'  and  e ⊆ e'
 
 P ⊔ φ = φ ⊔ P = φ
 R⟨r;e⟩ ⊔ R⟨r';e'⟩ = R⟨r + r'; e + e'⟩
 ```
 
-`R⟨none;none⟩ ⋢ P`: пустые строки не делают стадию чистой (spec/04 «Purity is separate from error and service rows»). Рантайм-шаг там, где разрешено только `P`, не выводится. Это `FLICK-E001`.
+`R⟨none;none⟩ ⋢ P`: empty rows do not make a stage pure (spec/02 "Purity is separate from error and service rows"). A runtime step where only `P` is allowed is not derivable. This is `FLICK-E001`.
 
-Чекер:
+Checker:
 
-- `effects.rs` `Stage` — стадия: `pure` хранит, почему рантайм запрещён, `services`/`errors` — верхние границы строк;
-- `Checker::perform` — вызов добавляет ограничение `actual ⊆ declared` или даёт `FLICK-E001`;
+- `effects.rs` `Stage`: the stage; `pure` records why runtime is forbidden, `services`/`errors` are the upper bounds of the rows;
+- `Checker::perform`: a call adds the constraint `actual ⊆ declared` or reports `FLICK-E001`;
 - `sub_row`;
-- решатель `effects/solve.rs` (`grow`, `close_rows`, `report_rows` → `FLICK-E002`) ищет наименьшее решение: неизвестная строка, которой ничего не потребовалось, становится `none`.
+- the solver `effects/solve.rs` (`grow`, `close_rows`, `report_rows` → `FLICK-E002`) looks for the least solution: an unknown row that nothing required becomes `none`.
 
-### 2.2 Подтипы
+### 2.2 Subtyping
 
 ```text
                       τ₁' ≤ τ₁    φ ⊑ φ'    τ₂ ≤ τ₂'             r ⊆ r'    e ⊆ e'    τ ≤ τ'
@@ -247,30 +247,30 @@ R⟨r;e⟩ ⊔ R⟨r';e'⟩ = R⟨r + r'; e + e'⟩
  τ ≤ τ                 τ₁ →φ τ₂  ≤  τ₁' →φ' τ₂'                   Eff r e τ  ≤  Eff r' e' τ'
 ```
 
-Других правил нет. `Ref`, `List`, записи, ADT и `Layer` инвариантны, внутри них типы сравниваются по `≡` (Р8).
+There are no other rules. `Ref`, `List`, records, ADTs and `Layer` are invariant; inside them types are compared by `≡` (see [only arrows and `Eff` have subtyping](#only-arrows-and-eff-have-subtyping)).
 
-`≤-Fun` с `φ = P` и `φ' = R⟨…⟩` — подъём (lift) чистой функции в рантайм-позицию. Обратного нет, потому что `R⟨…⟩ ⋢ P`. При исполнении (§3) подъём в модели ничего не делает. В IR это узел `Lift`, и его корректность — гипотеза Г2.
+`≤-Fun` with `φ = P` and `φ' = R⟨…⟩` is the lift of a pure function into a runtime position. There is no converse, because `R⟨…⟩ ⋢ P`. At run time (§3) the lift does nothing in the model. In the IR it is the `Lift` node, and its correctness is hypothesis G2.
 
-Чекер:
+Checker:
 
-- `effects.rs` `Checker::subsume`, `subsume_at`: параметр контравариантен, результат и строки ковариантны, пара «рантайм вместо чистой» — несовпадение, остальное — `unify`;
+- `effects.rs` `Checker::subsume`, `subsume_at`: the parameter is contravariant, the result and the rows are covariant, the pair "runtime where pure is expected" is a mismatch, everything else goes to `unify`;
 - `report.rs` `Checker::expect`;
 - `typing/stages.rs` `lift`.
 
-### 2.3 Правила
+### 2.3 Rules
 
 ```text
-x : ∀ᾱ.τ ∈ Γ      τ̄ — монотипы                Γ ⊢ e : τ ! φ    τ ≤ τ'    φ ⊑ φ'
+x : ∀ᾱ.τ ∈ Γ      τ̄ monotypes                 Γ ⊢ e : τ ! φ    τ ≤ τ'    φ ⊑ φ'
 ────────────────────────── (Var)            ───────────────────────────────── (Sub)
 Γ ⊢ x : τ[ᾱ := τ̄] ! P                        Γ ⊢ e : τ' ! φ'
 ```
 
-(Const) и конструкторы — как (Var) по Γ₀ и объявлениям.
+(Const) and constructors are like (Var), using Γ₀ and the declarations.
 
-Чекер:
+Checker:
 
 - (Var): `calls.rs` `Checker::name`, `name_type`, `use_local`; `toplevel.rs` `top_value`; `qualified.rs` `qualified`, `record_entity`; `unify.rs` `Checker::instantiate`.
-- (Sub): см. §2.2. Чекер применяет подтипы там, где сверяет выражение с ожидаемым типом (`expect`), в остальных местах — равенство.
+- (Sub): see §2.2. The checker applies subtyping where it checks an expression against an expected type (`expect`); elsewhere it uses equality.
 
 ```text
 Γ, x : τ₁ ⊢ e : τ₂ ! φ                     Γ ⊢ e₁ : τ₁ →φ τ₂ ! φ₁    Γ ⊢ e₂ : τ₁ ! φ₂
@@ -278,10 +278,10 @@ x : ∀ᾱ.τ ∈ Γ      τ̄ — монотипы                Γ ⊢ e : τ
 Γ ⊢ λx. e : τ₁ →φ τ₂ ! P                    Γ ⊢ e₁ e₂ : τ₂ ! φ₁ ⊔ φ₂ ⊔ φ
 ```
 
-Чекер:
+Checker:
 
-- (Lam): `infer.rs` `lambda`, `function`, `function_with`, `curry`; `effects.rs` `body_stage`, `open_stage`, `stage_effects`. Против ожидаемого типа λ берёт его стрелки. Без ожидаемого типа последняя стрелка рантаймовая ровно тогда, когда тело сделало рантайм-вызов: это наименьшая `φ`. Каждый параметр — стадия.
-- (App): `calls.rs` `apply`, `pipe`; `effects.rs` `call_effects`, `perform`. Если тип вызываемого ещё неизвестен, чекер берёт `φ = P` (Р7).
+- (Lam): `infer.rs` `lambda`, `function`, `function_with`, `curry`; `effects.rs` `body_stage`, `open_stage`, `stage_effects`. Against an expected type, a λ takes its arrows from it. Without an expected type, the last arrow is a runtime arrow exactly when the body made a runtime call: this is the least `φ`. Every parameter is a stage.
+- (App): `calls.rs` `apply`, `pipe`; `effects.rs` `call_effects`, `perform`. If the callee's type is still unknown, the checker takes `φ = P` (see [a callee of unknown type](#a-callee-of-unknown-type-is-a-pure-arrow)).
 
 ```text
 Γ ⊢ e₁ : τ₁ ! P      Γ, x : Gen(Γ, τ₁) ⊢ e₂ : τ ! φ
@@ -301,17 +301,17 @@ x : ∀ᾱ.τ ∈ Γ      τ̄ — монотипы                Γ ⊢ e : τ
 Γ ⊢ let rec f : σ = λx. e₁ in e₂ : τ ! φ'
 ```
 
-В (Let-Rec) `σ° = σ`, если сигнатура начинается с явного `∀` по всем своим переменным. Иначе `σ° = τ_f` с жёсткими `ᾱ`: рекурсивные вызовы мономорфны.
+In (Let-Rec), `σ° = σ` if the signature starts with an explicit `∀` over all its variables. Otherwise `σ° = τ_f` with rigid `ᾱ`: recursive calls are monomorphic.
 
-Чекер:
+Checker:
 
 - (Let-Gen), (Let-Mono): §2.5.
-- (Let-Sig): `bindings.rs` `check_signed`, `polymorphic_runtime` (`FLICK-T013`); `infer.rs` `check_value`, ветка `Forall`; `unify.rs` `skolemize`. Побег жёсткой переменной — `FLICK-T007`, требование конкретного типа — `FLICK-T008`. Посылку `ᾱ ≠ ∅ ⇒ φ₁ = P` проверяет `polymorphic_runtime`: для сигнатуры — из `polymorphic_signature`, для аннотации и аргумента высшего ранга — из ветки `Forall` у `check_value` (Р1).
+- (Let-Sig): `bindings.rs` `check_signed`, `polymorphic_runtime` (`FLICK-T013`); `infer.rs` `check_value`, the `Forall` branch; `unify.rs` `skolemize`. An escaping rigid variable is `FLICK-T007`, a demand for a concrete type is `FLICK-T008`. The premise `ᾱ ≠ ∅ ⇒ φ₁ = P` is checked by `polymorphic_runtime`: for a signature it is called from `polymorphic_signature`, for an annotation and a higher-rank argument from the `Forall` branch of `check_value` (see [an annotation with `forall`](#an-annotation-with-forall-bypasses-let-sig)).
 - (Let-Rec): `bindings.rs` `local_let`; `recursion.rs` `new_rec`, `finish_recs` (`FLICK-T015`).
-- Утверждение `let _ : Unit = s`: `bindings.rs` `block_then`, `statement` (`FLICK-T011`).
+- The statement `let _ : Unit = s`: `bindings.rs` `block_then`, `statement` (`FLICK-T011`).
 
 ```text
-ℓᵢ различны    Γ ⊢ eᵢ : τᵢ ! φᵢ
+ℓᵢ distinct    Γ ⊢ eᵢ : τᵢ ! φᵢ
 ──────────────────────────────────────────────────────────────────── (Rec)
 Γ ⊢ {ℓ₁ = e₁, …, ℓₙ = eₙ} : {ℓ₁ : τ₁, …, ℓₙ : τₙ} ! φ₁ ⊔ … ⊔ φₙ
 
@@ -320,21 +320,21 @@ x : ∀ᾱ.τ ∈ Γ      τ̄ — монотипы                Γ ⊢ e : τ
 Γ ⊢ e.ℓ : τ ! φ                     Γ ⊢ {e with ℓ = e'} : {ℓ : τ | ρ} ! φ ⊔ φ'
 ```
 
-`ρ` вида `Row Type` — переменная или конкретный остаток: закрытая `{ℓ : τ, m : υ}` — это `{ℓ : τ | {m : υ}}`. `with` не меняет тип записи.
+`ρ` of kind `Row Type` is a variable or a concrete remainder: the closed `{ℓ : τ, m : υ}` is `{ℓ : τ | {m : υ}}`. `with` does not change the type of the record.
 
-Чекер: `records.rs` `record` (`FLICK-T014`), `field`, `known_field`, `record_update`; `rows.rs` `unify_row_types`.
+Checker: `records.rs` `record` (`FLICK-T014`), `field`, `known_field`, `record_update`; `rows.rs` `unify_row_types`.
 
 ```text
 Γ ⊢ e : τ ! φ₀
-для каждой ветви i:   ⊢ pᵢ : τ ⇒ Δᵢ     Γ, Δᵢ ⊢ gᵢ : Bool ! ψᵢ     Γ, Δᵢ ⊢ eᵢ : τ' ! φᵢ
-Exh(τ, {pᵢ | у ветви i нет when})
+for every branch i:   ⊢ pᵢ : τ ⇒ Δᵢ     Γ, Δᵢ ⊢ gᵢ : Bool ! ψᵢ     Γ, Δᵢ ⊢ eᵢ : τ' ! φᵢ
+Exh(τ, {pᵢ | branch i has no when})
 ──────────────────────────────────────────────────────────────────── (Match)
 Γ ⊢ match e with p₁ [when g₁] → e₁ | … : τ' ! φ₀ ⊔ ⊔ᵢ (ψᵢ ⊔ φᵢ)
 ```
 
-У ветви без `when` `ψᵢ = P`.
+For a branch without `when`, `ψᵢ = P`.
 
-Чекер: `infer.rs` `match_expr`, `arm`; паттерны и `Exh` — §2.4.
+Checker: `infer.rs` `match_expr`, `arm`; patterns and `Exh` are in §2.4.
 
 ```text
 Γ ⊢ e : τ ! φ    φ ⊑ R⟨r; ε⟩               Γ ⊢ e : Eff r ε τ ! φ
@@ -342,38 +342,38 @@ Exh(τ, {pᵢ | у ветви i нет when})
 Γ ⊢ task e : Eff r ε τ ! P                  Γ ⊢ await e : τ ! φ ⊔ R⟨r; ε⟩
 ```
 
-`await` снимает ровно один слой: `τ` может само быть `Eff`.
+`await` removes exactly one layer: `τ` may itself be an `Eff`.
 
-Чекер:
+Checker:
 
-- (Task): `handlers.rs` `task`. Тело проверяется на своей стадии с границами ожидаемого `Eff` либо с выводимыми строками.
-- (Await): `calls.rs` `prefix`, ветка `AwaitKw` (`FLICK-T003` для не-`Eff`).
+- (Task): `handlers.rs` `task`. The body is checked at its own stage, bounded by the expected `Eff` or with inferred rows.
+- (Await): `calls.rs` `prefix`, the `AwaitKw` branch (`FLICK-T003` for a non-`Eff`).
 
 ```text
 Γ ⊢ e : τ ! R⟨r; ε_b⟩
-для каждой ветви pᵢ [when gᵢ] → eᵢ:
-    θᵢ = E ῡ         если pᵢ = E p̄ — паттерн конструктора ошибки E
-    θᵢ = Errors ε_b  если pᵢ — x или _
+for every branch pᵢ [when gᵢ] → eᵢ:
+    θᵢ = E ῡ         if pᵢ = E p̄ is a pattern of error constructor E
+    θᵢ = Errors ε_b  if pᵢ is x or _
     ⊢ pᵢ : θᵢ ⇒ Δᵢ     Γ, Δᵢ ⊢ gᵢ : Bool ! ψᵢ     Γ, Δᵢ ⊢ eᵢ : τ ! φᵢ
 ε_b ⊆ H + ε'
 ──────────────────────────────────────────────────────────────── (Try)
 Γ ⊢ try e with ā : τ ! R⟨r; ε'⟩ ⊔ ⊔ᵢ (ψᵢ ⊔ φᵢ)
 
-H = ε_b, если есть ветвь x или _ без when;
-иначе H = { E ῡ | ветвь E p̄ без when и Exh(E ῡ, {E p̄}) }
+H = ε_b, if there is an x or _ branch without when;
+otherwise H = { E ῡ | a branch E p̄ without when and Exh(E ῡ, {E p̄}) }
 ```
 
-(Try-Pure): если `Γ ⊢ e : τ ! P`, ветви типизируются так же с `ε_b = none`, и результат — `τ ! ⊔ᵢ (ψᵢ ⊔ φᵢ)`.
+(Try-Pure): if `Γ ⊢ e : τ ! P`, the branches are typed the same way with `ε_b = none`, and the result is `τ ! ⊔ᵢ (ψᵢ ⊔ φᵢ)`.
 
-Что следует из правила:
+Consequences of the rule:
 
-- Сервисы тела проходят наружу.
-- Ветви вычисляются вне кадра `try` (§3.5), поэтому их эффекты относятся к объемлющей стадии, и их ошибки этот же `try` не ловит.
-- Ветвь с `when` или неполным паттерном полезной нагрузки ошибку из строки не снимает (spec/07 «Expected errors»).
+- The body's services pass outward.
+- The branches are evaluated outside the `try` frame (§3.5), so their effects belong to the enclosing stage, and this same `try` does not catch their errors.
+- A branch with `when`, or with a non-exhaustive payload pattern, does not remove the error from the row (spec/05 "Expected errors").
 
-Чекер:
+Checker:
 
-- `handlers.rs` `try_expr`: тело проверяется в копии стадии с ошибками `raised`. Ветвь `x`/`_` (функция `catch_all`, также в скобках и с аннотацией) проверяется против `Errors caught` со своей строкой `caught` и ограничением `raised ⊆ caught`: `caught` — это `ε_b` правила. Ветвь ошибки покрывает её при `!guarded && covers_all(pat)`. Затем добавляется ограничение `raised ⊆ {handled | errors}`. Паттерн не-ошибки — `FLICK-E007`.
+- `handlers.rs` `try_expr`: the body is checked in a copy of the stage whose errors are `raised`. An `x`/`_` branch (function `catch_all`, also in parentheses and with an annotation) is checked against `Errors caught` with its own row `caught` and the constraint `raised ⊆ caught`: `caught` is the `ε_b` of the rule. An error branch covers its error when `!guarded && covers_all(pat)`. Then the constraint `raised ⊆ {handled | errors}` is added. A non-error pattern is `FLICK-E007`.
 - `exhaust.rs` `covers_all`.
 
 ```text
@@ -382,21 +382,21 @@ H = ε_b, если есть ветвь x или _ без when;
 Γ ⊢ provide eₗ e : τ ! φₗ ⊔ R⟨rᵢ + r; εₗ + ε⟩
 ```
 
-`R⟨rᵢ; εₗ⟩` входит в результат всегда: `provide` — рантайм-шаг и при пустых строках (spec/04). Ошибки тела проходят наружу как есть.
+`R⟨rᵢ; εₗ⟩` is always part of the result: `provide` is a runtime step even with empty rows (spec/02). The body's errors pass outward unchanged.
 
-Чекер: `handlers.rs` `provide` — сначала `perform(inputs, errors)`, затем ограничение `needed ⊆ {provided | services}`. Отклонение — Р6.
+Checker: `handlers.rs` `provide`: first `perform(inputs, errors)`, then the constraint `needed ⊆ {provided | services}`. For row variables among the outputs see [`provide` and output row variables](#provide-discharges-only-the-listed-outputs-of-a-layer-not-a-row-variable).
 
 ```text
 ──────────────────── (Todo)
 Γ ⊢ todo : τ ! P
 ```
 
-Чекер: `debug.rs` `todo` (предупреждение `FLICK-T022`).
+Checker: `debug.rs` `todo` (warning `FLICK-T022`).
 
-### 2.4 Паттерны и исчерпываемость
+### 2.4 Patterns and exhaustiveness
 
 ```text
-⊢ _ : τ ⇒ ·          ⊢ x : τ ⇒ x : τ          ⊢ n : T_n ⇒ ·    (T_n — тип литерала)
+⊢ _ : τ ⇒ ·          ⊢ x : τ ⇒ x : τ          ⊢ n : T_n ⇒ ·    (T_n is the type of the literal)
 
 K : ∀ᾱ. τ₁ →P … →P τₙ →P T ᾱ      ⊢ pᵢ : τᵢ[ᾱ := ῡ] ⇒ Δᵢ
 ───────────────────────────────────────────────────
@@ -411,96 +411,96 @@ K : ∀ᾱ. τ₁ →P … →P τₙ →P T ᾱ      ⊢ pᵢ : τᵢ[ᾱ := �
 ⊢ p₁ | p₂ : τ ⇒ Δ
 ```
 
-Правила:
+Rules:
 
-- Имена в `Δᵢ` различны, переменные паттерна мономорфны.
-- Альтернативы or-паттерна связывают одни и те же имена с равными типами (`or_pattern` сравнивает их `unify`, Р9).
-- `Exh(τ, Π)`: каждое замкнутое значение типа `τ` сопоставляется с каким-то `p ∈ Π`.
-- В `match` `Π` — паттерны ветвей без `when`; если покрытия нет — `FLICK-T009`. Недостижимая ветвь — предупреждение `FLICK-T010`, на типизацию оно не влияет.
-- Паттерны `let` и параметров λ должны быть неопровержимы: `Exh(τ, {p})`.
+- The names in the `Δᵢ` are distinct; pattern variables are monomorphic.
+- The alternatives of an or-pattern bind the same names at equal types (`or_pattern` compares them with `unify`; see [or-pattern alternatives](#or-pattern-alternatives-are-compared-by-subtyping)).
+- `Exh(τ, Π)`: every closed value of type `τ` matches some `p ∈ Π`.
+- In `match`, `Π` is the set of branch patterns without `when`; if they do not cover, `FLICK-T009`. An unreachable branch is the warning `FLICK-T010`, which does not affect typing.
+- Patterns of `let` and of λ parameters must be irrefutable: `Exh(τ, {p})`.
 
-Чекер:
+Checker:
 
 - `patterns.rs` `bind_pattern`, `constructor_pattern` (`FLICK-T018`), `record_pattern`, `or_pattern`;
-- `exhaust.rs` `exhaustive`, `useful` (алгоритм полезности Маранже), `covers_all`;
+- `exhaust.rs` `exhaustive`, `useful` (Maranget's usefulness algorithm), `covers_all`;
 - `irrefutable.rs`.
 
-### 2.5 Обобщение
+### 2.5 Generalization
 
 ```text
 Gen(Γ, τ) = ∀ᾱ. τ,      ᾱ = ftv(τ) ∖ ftv(Γ)
 ```
 
-Для форм времени исполнения `Γ` включает `Ψ` (§3.6): `ᾱ ∉ ftv(Ψ)` (Р103).
+For runtime forms `Γ` includes `Ψ` (§3.6): `ᾱ ∉ ftv(Ψ)` (see [store typing](#a-store-typing-of-closed-types-is-not-preserved)).
 
-(Let-Gen) требует `φ₁ = P`. Результат рантайм-шага мономорфен (Let-Mono), а (Let-Sig) не даёт `∀` над эффектной правой частью. Так формулируется правило spec/05 «Generalization in the presence of Ref»:
+(Let-Gen) requires `φ₁ = P`. The result of a runtime step is monomorphic (Let-Mono), and (Let-Sig) does not allow `∀` over an effectful right-hand side. This is how the rule of spec/03 "Generalization in the presence of Ref" is formalized:
 
-- «Provably pure construction» — выражение, для которого выводится `! P`. Это значения, применения конструкторов, записи, чистые вызовы вроде `make_identity ()`, а также `match` и `try` без рантайм-шагов. `λ` и `task` чисты при любом теле: в заключении их правил стоит `P`.
-- «Not free in the environment» — `∖ ftv(Γ)`. Жёсткие переменные из Γ тоже не обобщаются.
-- «The result of a runtime binding is not generalized even with `->{}`»: `R⟨none;none⟩ ≠ P`, поэтому (Let-Gen) неприменимо к `Ref.make None`.
-- «A full signature does not cancel these checks» — посылка `ᾱ ≠ ∅ ⇒ φ₁ = P` в (Let-Sig).
+- "Provably pure construction" is an expression for which `! P` is derivable. These are values, constructor applications, records, pure calls such as `make_identity ()`, and `match` and `try` without runtime steps. `λ` and `task` are pure for any body: the conclusion of their rules has `P`.
+- "Not free in the environment" is `∖ ftv(Γ)`. Rigid variables from Γ are not generalized either.
+- "The result of a runtime binding is not generalized even with `->{}`": `R⟨none;none⟩ ≠ P`, so (Let-Gen) does not apply to `Ref.make None`.
+- "A full signature does not cancel these checks" is the premise `ᾱ ≠ ∅ ⇒ φ₁ = P` of (Let-Sig).
 
-Чекер обобщает не больше, чем `Gen`. Меньше обобщённых переменных — те же гарантии T3, только принятых программ меньше. Отличия:
+The checker generalizes no more than `Gen`. Fewer generalized variables give the same T3 guarantees and only accept fewer programs. The differences:
 
-1. «Не свободны в Γ» определяется по уровням. `Store::level`: мета глубже текущего уровня в Γ не входит. Результат рантайм-привязки опускается на уровень окружения (`Store::lower`).
-2. Переменные числовых литералов не обобщаются: тип литерала выбирается позже.
-3. Переменные нерешённых ограничений классов не обобщаются. Схема без сигнатуры не получает ограничений (Р10).
-4. Переменные значения, которое держит незакрытое обязательство по захватам, не обобщаются. Это относится к регионам.
-5. Неизвестные строки вызовов внутри привязки до обобщения закрываются `none`, а не квантифицируются (`effects/solve.rs` `settle_rows`): чекер выбирает наименьшее решение (Р11).
-6. `let (a, b) = …` и `let assert` всегда мономорфны. Функция без сигнатуры — `FLICK-T004`.
+1. "Not free in Γ" is decided by levels. `Store::level`: a meta deeper than the current level is not in Γ. The result of a runtime binding is lowered to the level of the environment (`Store::lower`).
+2. Variables of numeric literals are not generalized: the literal's type is chosen later.
+3. Variables of unsolved class constraints are not generalized. A scheme without a signature gets no constraints (see [class constraints and generalization](#class-constraints-and-generalization)).
+4. Variables of a value that holds an open capture obligation are not generalized. This belongs to regions.
+5. Unknown call rows inside a binding are closed with `none` before generalization rather than quantified (`effects/solve.rs` `settle_rows`): the checker picks the least solution (see [unknown call rows](#unknown-call-rows-in-a-generalized-binding-close-to-none)).
+6. `let (a, b) = …` and `let assert` are always monomorphic. A function without a signature is `FLICK-T004`.
 
-Чекер:
+Checker:
 
-- Признак `φ₁ ≠ P` — флаг `Checker::runtime`. Ставит его только `perform`. `function_with` (λ), `task` и `for` сохраняют флаг и восстанавливают его после тела.
-- `bindings.rs` `unsigned` → `generalize.rs` `Checker::generalize`; это единственный вызов `generalize`.
-- `bindings.rs` `check_signed` и `polymorphic_runtime` (`FLICK-T013`), `pattern_let`.
+- The condition `φ₁ ≠ P` is the flag `Checker::runtime`. Only `perform` sets it. `function_with` (λ), `task` and `for` save the flag and restore it after the body.
+- `bindings.rs` `unsigned` → `generalize.rs` `Checker::generalize`; this is the only call of `generalize`.
+- `bindings.rs` `check_signed` and `polymorphic_runtime` (`FLICK-T013`), `pattern_let`.
 
-Атомы `foreign pure` создают как состояние, поэтому для них два отдельных правила (Р4). Локальная привязка без типа не обобщает переменные внутри типа атома (`ui.rs` `lower_atoms` перед `generalize`): тип фиксируют её использования. Тип атома с квантифицированной переменной у значения — `FLICK-U005` (`ui.rs` `polymorphic_atom`): на верхнем уровне без сигнатуры (`unsigned`), с сигнатурой (`polymorphic_signature`) и при проверке против `∀` (`check_value`).
+`foreign pure` atoms are created as state, so they have two separate rules (see [stateful atoms](#atommake-and-atomfresh-create-state-but-are-foreign-pure)). A local binding without a type does not generalize variables inside an atom type (`ui.rs` `lower_atoms` before `generalize`): its uses fix the type. An atom type with a quantified variable on a value is `FLICK-U005` (`ui.rs` `polymorphic_atom`): at the top level without a signature (`unsigned`), with a signature (`polymorphic_signature`), and when checked against `∀` (`check_value`).
 
-Примеры spec/05 в модели. Фикстуры: `tests/check/pass/types/generalization.fl`, `tests/check/fail/types/generalization.fl`.
+The spec/03 examples in the model. Fixtures: `tests/check/pass/types/generalization.fl`, `tests/check/fail/types/generalization.fl`.
 
-| Пример | Правило | Итог |
+| Example | Rule | Outcome |
 | - | - | - |
-| `make_empty : ∀a. Unit ->{} Ref (Option a)` | Let-Sig, правая часть — λ, `P` | принят |
-| `let numbers = make_empty ()` в `use_separate_cells` | Let-Mono: вызов через `→R` | у каждой ячейки свой тип |
-| `identity_again : ∀a. a -> a` = `make_identity ()` | Let-Sig, чистое применение, `P` | принят |
-| `fresh_cell : ∀a. Eff none none (Ref (Option a))` = `task {…}` | Task, `P` | принят; каждый `await` создаёт свою ячейку |
-| `let shared = task { cell }` внутри `capture_cell` | Let-Gen, но `α ∈ ftv(Γ)`, так как `cell : Ref (Option α)` | `shared` мономорфен |
-| `let empty = logged_none ()` | Let-Mono | `(empty, empty)` как `(Option Float, Option String)` отвергнут |
-| `invalid` | Let-Mono для `cell` | отвергнут |
-| `shared : ∀a. Ref (Option a) = Ref.make None` на верхнем уровне | Let-Sig требует `P`, верхний уровень тоже | отвергнут (`FLICK-T013`, `FLICK-E001`) |
+| `make_empty : ∀a. Unit ->{} Ref (Option a)` | Let-Sig, the right-hand side is a λ, `P` | accepted |
+| `let numbers = make_empty ()` in `use_separate_cells` | Let-Mono: a call through `→R` | each cell has its own type |
+| `identity_again : ∀a. a -> a` = `make_identity ()` | Let-Sig, a pure application, `P` | accepted |
+| `fresh_cell : ∀a. Eff none none (Ref (Option a))` = `task {…}` | Task, `P` | accepted; every `await` creates its own cell |
+| `let shared = task { cell }` inside `capture_cell` | Let-Gen, but `α ∈ ftv(Γ)` because `cell : Ref (Option α)` | `shared` is monomorphic |
+| `let empty = logged_none ()` | Let-Mono | `(empty, empty)` as `(Option Float, Option String)` rejected |
+| `invalid` | Let-Mono for `cell` | rejected |
+| `shared : ∀a. Ref (Option a) = Ref.make None` at the top level | Let-Sig requires `P`, at the top level too | rejected (`FLICK-T013`, `FLICK-E001`) |
 
-### 2.6 Модуль и программа
+### 2.6 Module and program
 
-Объявления верхнего уровня — вложенные `let`/`let rec` в порядке зависимостей. Правая часть каждого типизируется с `! P`, потому что инициализация модуля чиста (`effects.rs` `Stage::default`, `FLICK-E001`).
+Top-level declarations are nested `let`/`let rec` in dependency order. Each right-hand side is typed with `! P`, because module initialization is pure (`effects.rs` `Stage::default`, `FLICK-E001`).
 
-Чекер:
+Checker:
 
 - `toplevel.rs` `check_item`, `check_definition`;
-- значение, тип которого к концу остался неизвестным, — `FLICK-T013` (`unknown_types`);
-- рекурсия только явная (`recursion`): иначе `FLICK-T017`, значение в цикле — `FLICK-T012`.
+- a value whose type is still unknown at the end is `FLICK-T013` (`unknown_types`);
+- recursion is explicit only (`recursion`): otherwise `FLICK-T017`; a value in a cycle is `FLICK-T012`.
 
-Программа:
+A program is:
 
-- замкнутое `e₀` (обычно `main ()`) с `· ⊢ e₀ : τ ! φ₀` и замкнутыми строками в `φ₀ ⊑ R⟨r₀; ε₀⟩`;
-- корневое окружение `Σ₀`: для каждого `S` из `r₀` есть `Σ₀(S)` с `· ⊢ Σ₀(S) : S.Impl ! P`. Его собирает раннер.
+- a closed `e₀` (usually `main ()`) with `· ⊢ e₀ : τ ! φ₀` and closed rows in `φ₀ ⊑ R⟨r₀; ε₀⟩`;
+- a root environment `Σ₀`: for every `S` in `r₀` there is `Σ₀(S)` with `· ⊢ Σ₀(S) : S.Impl ! P`. The runner assembles it.
 
-## 3. Динамика
+## 3. Dynamics
 
-### 3.1 Конфигурации
+### 3.1 Configurations
 
-Конфигурация — `⟨μ, e⟩`. `μ` — память, конечное отображение локаций в значения. `Σ₀` фиксировано на весь прогон.
+A configuration is `⟨μ, e⟩`. `μ` is the store, a finite map from locations to values. `Σ₀` is fixed for the whole run.
 
-Исходы:
+Outcomes:
 
-- значение `v`;
-- ожидаемая ошибка `raise v`;
-- дефект `die`;
-- бесконечное вычисление.
+- a value `v`;
+- an expected error `raise v`;
+- a defect `die`;
+- divergence.
 
-Прерывания в ядре нет: нить одна, а `task`/`await` выполняются в текущей (spec/04). Прерывание добавляет λRT.
+The core has no interruption: there is one thread, and `task`/`await` run on the current one (spec/02). λRT adds interruption.
 
-Формы, которых нет в исходном языке:
+Forms absent from the source language:
 
 ```text
 v ::= … | ℓ | fix f. λx. e | env θ
@@ -508,9 +508,9 @@ e ::= … | bind_S e | join e e | with θ e | handle v with ā
 θ ::= {S₁ ↦ v₁, …, Sₙ ↦ vₙ}
 ```
 
-### 3.2 Контексты
+### 3.2 Contexts
 
-Порядок строгий, слева направо, с учётом каждой стадии каррирования (spec/03, spec/04):
+Evaluation is strict, left to right, and respects every currying stage (spec/01, spec/02):
 
 ```text
 E ::= □ | E e | v E
@@ -521,52 +521,52 @@ E ::= □ | E e | v E
     | bind_S E | join E e | join v E | with θ E
 ```
 
-Внутрь `λ`, `task`, ветвей и тела `provide` контексты не заходят. `F` — однокадровый контекст: одна из форм выше с `□` вместо `E`.
+Contexts do not enter `λ`, `task`, branches or the body of `provide`. `F` is a single-frame context: one of the forms above with `□` in place of `E`.
 
-`lookup(E, S)` — `θ(S)` самого внутреннего кадра `with θ` в `E`, у которого `S ∈ dom θ`. Если такого кадра нет — `Σ₀(S)`.
+`lookup(E, S)` is `θ(S)` of the innermost frame `with θ` in `E` with `S ∈ dom θ`. If there is no such frame, it is `Σ₀(S)`.
 
-### 3.3 Чистые шаги
+### 3.3 Pure steps
 
 ```text
 (λx. e) v                       →ₚ  e[x := v]
 (fix f. λx. e) v                →ₚ  e[f := fix f. λx. e, x := v]
-let x = v in e                  →ₚ  e[x := v]                      и так же let x : σ = v in e
+let x = v in e                  →ₚ  e[x := v]                      and likewise let x : σ = v in e
 let rec f : σ = λx. e₁ in e₂    →ₚ  e₂[f := fix f. λx. e₁]
 {…, ℓ = v, …}.ℓ                 →ₚ  v
 {{…, ℓ = v, …} with ℓ = v'}     →ₚ  {…, ℓ = v', …}
-match v with p → e | ā          →ₚ  e[δ]                           если match(p, v) = δ
-                                →ₚ  match v with ā                 иначе
+match v with p → e | ā          →ₚ  e[δ]                           if match(p, v) = δ
+                                →ₚ  match v with ā                 otherwise
 match v with p when g → e | ā   →ₚ  match g[δ] with True → e[δ] | False → match v with ā
-                                                                   если match(p, v) = δ
-                                →ₚ  match v with ā                 иначе
+                                                                   if match(p, v) = δ
+                                →ₚ  match v with ā                 otherwise
 try v with ā                    →ₚ  v
 with θ v                        →ₚ  v
 bind_S v                        →ₚ  env {S ↦ v}
 join (env θ₁) (env θ₂)          →ₚ  env (θ₁ ∪ θ₂)
 ```
 
-`bind_S` и `join` не трогают память, сервисы и ошибки, а (Bind) и (Join) не требуют `R⟨…⟩`, поэтому их шаги чистые (Р101).
+`bind_S` and `join` do not touch the store, services or errors, and (Bind) and (Join) do not require `R⟨…⟩`, so their steps are pure (see [`bind_S` and `join` steps are pure](#bind_s-and-join-steps-are-pure)).
 
 ```text
 match(_, v)                          = ∅
 match(x, v)                          = [x := v]
 match(K p₁ … pₙ, K v₁ … vₙ)          = match(p₁, v₁) ∪ … ∪ match(pₙ, vₙ)
 match({ℓ₁ = p₁, …, ..}, {…, ℓ₁ = v₁, …}) = ⋃ᵢ match(pᵢ, vᵢ)
-match(p₁ | p₂, v)                    = match(p₁, v), если определено, иначе match(p₂, v)
+match(p₁ | p₂, v)                    = match(p₁, v) if defined, otherwise match(p₂, v)
 match(n, n)                          = ∅
-в остальных случаях не определено
+undefined in all other cases
 ```
 
-### 3.4 Шаги рантайма
+### 3.4 Runtime steps
 
 ```text
-⟨μ, E[e]⟩                         →  ⟨μ, E[e']⟩                  если e →ₚ e'
+⟨μ, E[e]⟩                         →  ⟨μ, E[e']⟩                  if e →ₚ e'
 ⟨μ, E[Ref.make v]⟩                →  ⟨μ[ℓ ↦ v], E[ℓ]⟩            ℓ ∉ dom μ
 ⟨μ, E[Ref.get ℓ]⟩                 →  ⟨μ, E[μ(ℓ)]⟩
 ⟨μ, E[Ref.set ℓ v]⟩               →  ⟨μ[ℓ ↦ v], E[()]⟩
 ⟨μ, E[await (task e)]⟩            →  ⟨μ, E[e]⟩
 ⟨μ, E[ask_S ()]⟩                  →  ⟨μ, E[lookup(E, S)]⟩
-⟨μ, E[provide v e]⟩               →  ⟨μ, E[provide build(v) e]⟩   v — значение типа Layer
+⟨μ, E[provide v e]⟩               →  ⟨μ, E[provide build(v) e]⟩   v a value of type Layer
 ⟨μ, E[provide (env θ) e]⟩         →  ⟨μ, E[with θ e]⟩
 
 build(Layer.succeed_S v) = env {S ↦ v}
@@ -574,44 +574,44 @@ build(Layer.effect_S v)  = bind_S (await v)
 build(Layer.merge v₁ v₂) = join build(v₁) build(v₂)
 ```
 
-Что отсюда видно:
+What this shows:
 
-- `await` выполняет тело заново при каждом вызове. `task` — не кэш и не Promise (spec/04 «Re-running and the value of await»).
-- Лексические значения попадают в `task e` подстановкой при построении. Сервисы ищутся при выполнении, через `lookup(E, S)` в текущем окружении.
-- Слой строится в окружении вокруг `provide`, до тела. Если построение упало, тело не начинается (§3.5).
-- Слой строится один раз на каждое выполнение `provide`. Мемоизацию между построениями и освобождение описывает λRT.
-- Подъём чистой функции ничего не делает: `(λx. e) v` редуцируется одинаково при любой стадии стрелки.
+- `await` runs the body anew on every call. `task` is neither a cache nor a Promise (spec/02 "Re-running and the value of await").
+- Lexical values enter `task e` by substitution when it is built. Services are looked up at execution time, through `lookup(E, S)` in the current environment.
+- A layer is built in the environment around `provide`, before the body. If building fails, the body does not start (§3.5).
+- A layer is built once per execution of `provide`. Memoization across builds and release are described by λRT.
+- Lifting a pure function does nothing: `(λx. e) v` reduces the same way whatever the stage of the arrow.
 
-### 3.5 Ошибки и дефекты
+### 3.5 Errors and defects
 
 ```text
-⟨μ, E[F[raise v]]⟩                →  ⟨μ, E[raise v]⟩              F — не try □ with ā
+⟨μ, E[F[raise v]]⟩                →  ⟨μ, E[raise v]⟩              F is not try □ with ā
 ⟨μ, E[try (raise v) with ā]⟩      →  ⟨μ, E[handle v with ā]⟩
-⟨μ, E[handle v with p → e | ā]⟩   →  ⟨μ, E[e[δ]]⟩                 если match(p, v) = δ
-                                  →  ⟨μ, E[handle v with ā]⟩      иначе
+⟨μ, E[handle v with p → e | ā]⟩   →  ⟨μ, E[e[δ]]⟩                 if match(p, v) = δ
+                                  →  ⟨μ, E[handle v with ā]⟩      otherwise
 ⟨μ, E[handle v with p when g → e | ā]⟩
                                   →  ⟨μ, E[match g[δ] with True → e[δ] | False → handle v with ā]⟩
-                                                                  если match(p, v) = δ
-                                  →  ⟨μ, E[handle v with ā]⟩      иначе
+                                                                  if match(p, v) = δ
+                                  →  ⟨μ, E[handle v with ā]⟩      otherwise
 ⟨μ, E[handle v with ·]⟩           →  ⟨μ, E[raise v]⟩
 ⟨μ, E[todo]⟩                      →  die
 ```
 
-Как это работает:
+How it works:
 
-- `raise v` поднимается через кадры до ближайшего `try`. Кадр `with θ` при этом снимается, и окружение восстанавливается.
-- Ветви `handle` вычисляются уже вне `try`.
-- `handle v with ·` перебрасывает ошибку: это операционная сторона остатка `ε'` в (Try).
-- `die` не ловится: обычный обработчик — не универсальный catch (spec/07).
-- `⟨μ, raise v⟩` без `try` — конечное состояние.
+- `raise v` propagates through frames up to the nearest `try`. A `with θ` frame is removed on the way, which restores the environment.
+- The branches of `handle` are evaluated already outside the `try`.
+- `handle v with ·` rethrows the error: this is the operational side of the remainder `ε'` in (Try).
+- `die` is not caught: an ordinary handler is not a universal catch (spec/05).
+- `⟨μ, raise v⟩` without a `try` is a final state.
 
-### 3.6 Типизация форм времени исполнения
+### 3.6 Typing of runtime forms
 
-Ψ — типы памяти: `Loc ⇀ τ` с монотипами. Их свободные переменные типа — свободные переменные вывода конфигурации; (Let-Gen) их не обобщает (Р103).
+Ψ is a store typing: `Loc ⇀ τ` with monotypes. Their free type variables are free inference variables of the configuration's derivation; (Let-Gen) does not generalize them (see [store typing](#a-store-typing-of-closed-types-is-not-preserved)).
 
-`⊢ μ : Ψ` ⇔ `dom μ = dom Ψ` и `·;Ψ ⊢ μ(ℓ) : Ψ(ℓ) ! P` для каждого `ℓ`.
+`⊢ μ : Ψ` ⇔ `dom μ = dom Ψ` and `·;Ψ ⊢ μ(ℓ) : Ψ(ℓ) ! P` for every `ℓ`.
 
-Правила §2 читаются с `Ψ` в контексте. Добавляются:
+The rules of §2 are read with `Ψ` in the context. In addition:
 
 ```text
 Ψ(ℓ) = τ                               σ = ∀ᾱ. τ₁ →φ τ₂    Γ, ᾱ, f : σ°, x : τ₁ ⊢ e : τ₂ ! φ
@@ -638,119 +638,117 @@ E : ∀ᾱ. τ̄ →P E ᾱ    Γ ⊢ w̄ : τ̄[ᾱ := ῡ] ! P    E ῡ ∈ ε
 ──────────────────────────────────────────── (Errors-Val)
 Γ ⊢ E w̄ : Errors ε ! P
 
-Γ ⊢ v : Errors ε_b ! P    v = E w̄    ветви ā — как в (Try)    E ∈ H + ε'
+Γ ⊢ v : Errors ε_b ! P    v = E w̄    branches ā as in (Try)    E ∈ H + ε'
 ────────────────────────────────────────────────────────────────── (Handle)
 Γ ⊢ handle v with ā : τ ! R⟨none; ε'⟩ ⊔ ⊔ᵢ (ψᵢ ⊔ φᵢ)
 ```
 
-(Handle) требует не всю строку `ε_b ⊆ H + ε'`, а только ошибку самого `v`: после неудачной ветви `H` остатка меньше (Р102). Из `try (raise v)` посылка следует из `ε_b ⊆ H + ε'` правила (Try).
+(Handle) does not require the whole row `ε_b ⊆ H + ε'`, only the error of `v` itself: after a failed branch the remainder has a smaller `H` (see [(Handle) after a failed branch](#handle-required-the-whole-error-row-after-a-failed-branch)). Coming from `try (raise v)`, the premise follows from `ε_b ⊆ H + ε'` of (Try).
 
-`Env ρ` — тип только времени исполнения. (Errors-Val) типизирует только значения. В исходном языке значение `Errors ρ` с двумя и более элементами вводит лишь ветвь `x`/`_` (Р5).
+`Env ρ` is a runtime-only type. (Errors-Val) types values only. In the source language, a value of `Errors ρ` with two or more elements is introduced only by an `x`/`_` branch (see [`Errors` of a row with two or more elements](#errors-of-a-row-with-two-or-more-elements)).
 
-Лемма о `build`: если `Γ ⊢ v : Layer rᵢ εₗ ρₒ ! P`, то `Γ ⊢ build(v) : Env ρₒ ! R⟨rᵢ; εₗ⟩`. Доказывается индукцией по `v`.
+Lemma on `build`: if `Γ ⊢ v : Layer rᵢ εₗ ρₒ ! P`, then `Γ ⊢ build(v) : Env ρₒ ! R⟨rᵢ; εₗ⟩`. Proof by induction on `v`.
 
-Остаток `match` после ложного охранника может не покрывать тип разбираемого значения. У `match Some 1 with | None → a | Some x when p → b | Some _ → c` остаток `match Some 1 with | Some _ → c` не проходит `Exh(Option Int, …)`. Для значения достаточно покрыть само значение (Р29):
+The remainder of a `match` after a false guard may not cover the type of the scrutinee. For `match Some 1 with | None → a | Some x when p → b | Some _ → c` the remainder `match Some 1 with | Some _ → c` fails `Exh(Option Int, …)`. For a value it is enough to cover the value itself (see [the residual match](#the-residual-match-after-a-false-guard-fails-exh)):
 
 ```text
-Γ ⊢ v : τ ! P    ⊢ pᵢ : τ ⇒ Δᵢ, gᵢ и eᵢ — как в (Match)    v сопоставляется с pⱼ без when
+Γ ⊢ v : τ ! P    ⊢ pᵢ : τ ⇒ Δᵢ, gᵢ and eᵢ as in (Match)    v matches some pⱼ without when
 ───────────────────────────────────────────────────────────────── (Match-Val)
 Γ ⊢ match v with p₁ [when g₁] → e₁ | … : τ' ! ⊔ᵢ (ψᵢ ⊔ φᵢ)
 ```
 
-В исходной программе (Match-Val) не применяется: `match 1 with | 1 → …` по-прежнему отвергается.
+(Match-Val) does not apply to source programs: `match 1 with | 1 → …` is still rejected.
 
-Чекер flick-core форм времени исполнения не видит. Эталон типизирует их в `flick-model/src/check/runtime.rs` (`check_config`), (Match-Val) — в `handlers.rs` `match_`, только при проверке конфигурации.
+The flick-core checker never sees runtime forms. The reference checker types them in `flick-model/src/check/runtime.rs` (`check_config`), and (Match-Val) in `handlers.rs` `match_`, only when checking a configuration.
 
-## 4. Теоремы
+## 4. Theorems
 
-Гипотезы:
+Hypotheses:
 
-- **Г1 (FFI).** Вызов `foreign pure` — шаг `→ₚ`: он не меняет `μ`, не ищет сервисы, не даёт `raise`, но может дать `die`. Вызов `foreign` с рантайм-стрелкой укладывается в её строки. Значения:
-  - значение, которое привязка возвращает (и которое внешний код передаёт колбэку), имеет объявленный тип; `Never` в результате значит, что вызов не возвращается;
-  - доверенная привязка (`@flick-lang/runtime`) не меняет и не удерживает данные Flick, которые получила. Недоверенная получает и отдаёт их копией, так что для неё это обеспечивает кодоген (`ts-holes.md` Р26).
+- **G1 (FFI).** A `foreign pure` call is a `→ₚ` step: it does not change `μ`, does not look up services, does not produce `raise`, but may produce `die`. A `foreign` call with a runtime arrow stays within that arrow's rows. Values:
+  - a value the binding returns (and one the foreign code passes to a callback) has the declared type; `Never` in the result means the call does not return;
+  - a trusted binding (`@flick-lang/runtime`) does not modify or retain the Flick data it receives. An untrusted one receives and returns them as copies, so for it the code generator ensures this ([Flick data copied at the foreign boundary](ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary)).
 
-  Что ещё на границе с TypeScript остаётся на этой гипотезе, перечисляет `ts-holes.md` §3.
-- **Г2 (кодоген).** Сгенерированный JS и Go реализуют шаги §3, и узел `Lift` в них — тождество модели. Это проверяют дифференциальные тесты, а не доказательство.
-- **Г3 (раннер).** `Σ₀` покрывает `r₀`.
+  What else at the TypeScript boundary rests on this hypothesis is listed in `ts-holes.md` §3.
+- **G2 (code generation).** The generated JS and Go implement the steps of §3, and the `Lift` node in them is the identity of the model. This is checked by differential tests, not by proof.
+- **G3 (runner).** `Σ₀` covers `r₀`.
 
-Леммы:
+Lemmas:
 
-- **Л1 (канонические формы).** Пусть `·;Ψ ⊢ v : τ ! φ`. Тогда:
-  - при `τ = τ₁ →φ' τ₂` значение `v` — λ, `fix` или неполное применение константы или конструктора (Р100);
-  - при `Eff r ε τ'` — `task e`;
-  - при `Ref τ'` — `ℓ`, и `Ψ(ℓ) = τ'`;
-  - при `Layer …` — применение `Layer.*`;
-  - при `T ῡ` — `K v̄` с конструктором `K` типа `T`;
-  - при записи — запись с теми же метками;
-  - при `Errors ε` — `E w̄` с `E ῡ ∈ ε`.
+- **L1 (canonical forms).** Let `·;Ψ ⊢ v : τ ! φ`. Then:
+  - for `τ = τ₁ →φ' τ₂`, `v` is a λ, a `fix`, or a partial application of a constant or a constructor (see [partial constructor application](#a-partial-constructor-application-is-a-value));
+  - for `Eff r ε τ'`, `task e`;
+  - for `Ref τ'`, `ℓ` with `Ψ(ℓ) = τ'`;
+  - for `Layer …`, an application of `Layer.*`;
+  - for `T ῡ`, `K v̄` with a constructor `K` of type `T`;
+  - for a record, a record with the same labels;
+  - for `Errors ε`, `E w̄` with `E ῡ ∈ ε`.
 
-  Кроме того, любое значение типизируется с `P`.
-- **Л2 (подстановка).** Если `Γ, x : ∀ᾱ.τ₁ ⊢ e : τ ! φ`, `Γ, ᾱ ⊢ v : τ₁ ! P` и `ᾱ ∉ ftv(Γ) ∪ ftv(Ψ)`, то `Γ ⊢ e[x := v] : τ ! φ`.
-- **Л3 (эффект контекста).** Если `·;Ψ ⊢ E[e] : τ ! φ`, то `·;Ψ ⊢ e : τ' ! φ'` для некоторого `τ'`. При этом `φ'` укладывается в `φ`, расширенное сервисами кадров `with` в `E` и ошибками, которые снимают кадры `try` в `E`. Без таких кадров `φ' ⊑ φ`.
+  Moreover, every value is typed with `P`.
+- **L2 (substitution).** If `Γ, x : ∀ᾱ.τ₁ ⊢ e : τ ! φ`, `Γ, ᾱ ⊢ v : τ₁ ! P` and `ᾱ ∉ ftv(Γ) ∪ ftv(Ψ)`, then `Γ ⊢ e[x := v] : τ ! φ`.
+- **L3 (context effect).** If `·;Ψ ⊢ E[e] : τ ! φ`, then `·;Ψ ⊢ e : τ' ! φ'` for some `τ'`. Here `φ'` fits within `φ` extended by the services of the `with` frames in `E` and by the errors removed by the `try` frames in `E`. Without such frames `φ' ⊑ φ`.
 
-**T1 (типобезопасность).** Пусть `e₀`, `Σ₀` — программа (§2.6) и `⟨∅, e₀⟩ →* ⟨μ, e⟩`. Тогда верно одно из трёх:
+**T1 (type safety).** Let `e₀`, `Σ₀` be a program (§2.6) and `⟨∅, e₀⟩ →* ⟨μ, e⟩`. Then exactly one of the following holds:
 
-1. `e` — значение, и `·;Ψ ⊢ e : τ ! P` для некоторого `Ψ` с `⊢ μ : Ψ`;
-2. `e = raise v` и `· ⊢ v : Errors ε₀`: это ожидаемая ошибка из строки `ε₀`;
-3. конфигурация делает шаг `⟨μ, e⟩ → ⟨μ', e'⟩` или `⟨μ, e⟩ → die`.
+1. `e` is a value, and `·;Ψ ⊢ e : τ ! P` for some `Ψ` with `⊢ μ : Ψ`;
+2. `e = raise v` and `· ⊢ v : Errors ε₀`: an expected error from the row `ε₀`;
+3. the configuration takes a step `⟨μ, e⟩ → ⟨μ', e'⟩` or `⟨μ, e⟩ → die`.
 
-Исход «прерывание» добавляет λRT.
+λRT adds the "interrupted" outcome.
 
-T1 следует из двух утверждений:
+T1 follows from two statements:
 
-- **Progress.** Пусть `·;Ψ ⊢ e : τ ! φ` и `⊢ μ : Ψ`, а сервисы `φ` есть в `Σ₀` с учётом кадров `with`. Тогда `e` — значение, или `e = raise v`, или конфигурация делает шаг (в том числе в `die`). Основные случаи:
-  - `match`: по Л1 и `Exh` найдётся ветвь. Охранник `False` передаёт значение следующей ветви, а `Exh` по ветвям без `when` гарантирует, что найдётся сопоставимая.
-  - `ask_S`: по Л3 `S` либо в ближайшем кадре `with`, либо в `r₀ ⊆ dom Σ₀`.
-  - `await v`: по Л1 `v = task e`.
-  - `Ref.get ℓ`: по Л1 и `⊢ μ : Ψ` локация `ℓ ∈ dom μ`.
-- **Preservation.** Пусть `·;Ψ ⊢ e : τ ! φ`, `⊢ μ : Ψ` и `⟨μ, e⟩ → ⟨μ', e'⟩`. Тогда найдётся `Ψ' ⊇ Ψ` с `⊢ μ' : Ψ'` и `·;Ψ' ⊢ e' : τ ! φ'`, где `φ' ⊑ φ`.
-  - `Ψ'` отличается от `Ψ` только после шага `Ref.make`: тогда `Ψ' = Ψ[ℓ ↦ τ']` с монотипом `τ'` (Р103).
-  - Случай `let` с обобщением разобран в T3.
-  - Случай `try (raise v)`: значение `v` пришло из тела с `v : Errors ε'`, `ε' ⊆ ε_b`, и (Errors-Val) даёт `v : Errors ε_b` для (Handle).
-  - Случай ложного охранника: остаток `match v with ā` типизирует (Match-Val).
+- **Progress.** Let `·;Ψ ⊢ e : τ ! φ` and `⊢ μ : Ψ`, and let the services of `φ` be in `Σ₀`, taking `with` frames into account. Then `e` is a value, or `e = raise v`, or the configuration takes a step (possibly to `die`). The main cases:
+  - `match`: by L1 and `Exh` a branch exists. A `False` guard passes the value to the next branch, and `Exh` over the branches without `when` guarantees that a matching one is found.
+  - `ask_S`: by L3, `S` is either in the nearest `with` frame or in `r₀ ⊆ dom Σ₀`.
+  - `await v`: by L1, `v = task e`.
+  - `Ref.get ℓ`: by L1 and `⊢ μ : Ψ`, the location `ℓ ∈ dom μ`.
+- **Preservation.** Let `·;Ψ ⊢ e : τ ! φ`, `⊢ μ : Ψ` and `⟨μ, e⟩ → ⟨μ', e'⟩`. Then there is `Ψ' ⊇ Ψ` with `⊢ μ' : Ψ'` and `·;Ψ' ⊢ e' : τ ! φ'`, where `φ' ⊑ φ`.
+  - `Ψ'` differs from `Ψ` only after a `Ref.make` step: then `Ψ' = Ψ[ℓ ↦ τ']` with a monotype `τ'` (see [store typing](#a-store-typing-of-closed-types-is-not-preserved)).
+  - The `let` case with generalization is treated in T3.
+  - The case `try (raise v)`: the value `v` came from the body with `v : Errors ε'`, `ε' ⊆ ε_b`, and (Errors-Val) gives `v : Errors ε_b` for (Handle).
+  - The false-guard case: the remainder `match v with ā` is typed by (Match-Val).
 
-Progress и Preservation проверяются на эталоне свойством `progress_and_preservation_hold` (`flick-model/tests/props.rs`, X2). Каждое состояние машины, прочитанное как `⟨μ, E[e]⟩`, снова типизируется при `φ' ⊑ φ₀`; исход не застревает, а `raise v` в конце — ошибка из `ε₀`. Программы с регионами исполняются так же, состояние — `⟨Λ, μ, E[e]⟩` (`regions.md` §3.3).
+Progress and Preservation are checked on the reference checker by the property `progress_and_preservation_hold` (`flick-model/tests/props.rs`, part of the model properties, `just model`). Every machine state, read as `⟨μ, E[e]⟩`, is retyped with `φ' ⊑ φ₀`; the run does not get stuck, and a final `raise v` is an error from `ε₀`. Programs with regions run the same way, with state `⟨Λ, μ, E[e]⟩` (`regions.md` §3.3).
 
-**T2 (строки эффектов).**
+**T2 (effect rows).**
 
-- **(a) Чистота.** Если `·;Ψ ⊢ e : τ ! P`, то любое вычисление `⟨μ, e⟩ →* ⟨μ', e'⟩` состоит только из шагов `→ₚ`:
+- **(a) Purity.** If `·;Ψ ⊢ e : τ ! P`, then every evaluation `⟨μ, e⟩ →* ⟨μ', e'⟩` consists only of `→ₚ` steps:
   - `μ' = μ`;
-  - нет ни одного шага `Ref.*`, `await`, `ask_S`, `provide`;
-  - `e'` — не `raise v`.
+  - there is no `Ref.*`, `await`, `ask_S` or `provide` step;
+  - `e'` is not `raise v`.
 
-  Возможны `die` и бесконечное вычисление. Обоснование: шаги §3.4–3.5 происходят на редексах, которым правила дают только `R⟨…⟩` — это константы с `→R`, (Await) и (Provide). По Л3 эффект редекса тогда был бы `⊑ P`, что невозможно, а Preservation сохраняет `P`.
-- **(b) Строки.** Пусть `·;Ψ ⊢ e : τ ! R⟨r; ε⟩`. Тогда в любом вычислении из `⟨μ, e⟩`:
-  - каждый шаг `ask_S`, нашедший `S` в `Σ₀`, а не в кадре `with` самого вычисления, имеет `S ∈ r`;
-  - если вычисление закончилось `raise v`, то `· ⊢ v : Errors ε`, то есть конструктор `v` — элемент `ε`.
+  `die` and divergence are possible. Justification: the steps of §3.4–3.5 happen on redexes that the rules type only with `R⟨…⟩`: constants with `→R`, (Await) and (Provide). By L3 the redex's effect would then be `⊑ P`, which is impossible, and Preservation keeps `P`.
+- **(b) Rows.** Let `·;Ψ ⊢ e : τ ! R⟨r; ε⟩`. Then in every evaluation from `⟨μ, e⟩`:
+  - every `ask_S` step that finds `S` in `Σ₀`, rather than in a `with` frame of the evaluation itself, has `S ∈ r`;
+  - if the evaluation ends in `raise v`, then `· ⊢ v : Errors ε`, that is, the constructor of `v` is an element of `ε`.
 
-  Для `· ⊢ v : Eff r ε τ` то же верно для `await v`. Формально это утверждение о семантике, где шаг `ask_S` помечен меткой `S`, когда поиск дошёл до `Σ₀`.
+  For `· ⊢ v : Eff r ε τ` the same holds for `await v`. Formally this is a statement about a semantics where an `ask_S` step is labelled `S` when the lookup reaches `Σ₀`.
 
-  Следствие: при `ε = none` вычисление не заканчивается ожидаемой ошибкой. Дефект и бесконечное вычисление остаются возможны (spec/07 «Expected errors»).
+  Corollary: with `ε = none` the evaluation does not end in an expected error. A defect and divergence remain possible (spec/05 "Expected errors").
 
-**T3 (обобщение).**
+**T3 (generalization).**
 
-- **Лемма 3.1.** Пока вычисляется подтерм с `Γ ⊢ e : τ ! P`, то есть пока редекс лежит внутри `e`, память `μ` не расширяется. Это следствие T2(a).
-- **Теорема.** Для каждой достижимой конфигурации `⟨μ, e⟩` программы найдётся `Ψ` с `⊢ μ : Ψ` и `·;Ψ ⊢ e : τ ! φ`, где каждое `Ψ(ℓ)` — монотип, заданный при выделении `ℓ`, и у следующих конфигураций `Ψ` только растёт. Отсюда:
-  1. `Ref.get ℓ` возвращает значение типа `Ψ(ℓ)`, а `Ref.set ℓ v` пишет значение типа `Ψ(ℓ)`: одна ячейка не используется при двух типах.
-  2. Значение привязки со схемой `∀ᾱ.τ₁`, где `ᾱ ≠ ∅`, не достигает ячейки, тип которой зависит от `ᾱ`. У ячеек, выделенных до привязки, типы без `ᾱ`, потому что `ᾱ ∉ ftv(Γ) ∪ ftv(Ψ)`. Выделить новую ячейку во время вычисления правой части запрещает посылка `P` (лемма 3.1).
+- **Lemma 3.1.** While a subterm with `Γ ⊢ e : τ ! P` is being evaluated, that is, while the redex lies inside `e`, the store `μ` does not grow. This follows from T2(a).
+- **Theorem.** For every reachable configuration `⟨μ, e⟩` of a program there is `Ψ` with `⊢ μ : Ψ` and `·;Ψ ⊢ e : τ ! φ`, where each `Ψ(ℓ)` is a monotype fixed when `ℓ` is allocated, and `Ψ` only grows along subsequent configurations. Hence:
+  1. `Ref.get ℓ` returns a value of type `Ψ(ℓ)`, and `Ref.set ℓ v` writes a value of type `Ψ(ℓ)`: a single cell is never used at two types.
+  2. The value of a binding with scheme `∀ᾱ.τ₁`, `ᾱ ≠ ∅`, never reaches a cell whose type depends on `ᾱ`. Cells allocated before the binding have types without `ᾱ`, because `ᾱ ∉ ftv(Γ) ∪ ftv(Ψ)`. Allocating a new cell while the right-hand side is evaluated is ruled out by the premise `P` (Lemma 3.1).
 
-Ключ доказательства — случай `let` в Preservation:
+The key to the proof is the `let` case of Preservation:
 
-- шаг внутри правой части при (Let-Gen): по лемме 3.1 `Ψ' = Ψ`, `e₁'` снова типизируется с `P`, и `Gen(Γ, τ₁)` не меняется;
-- шаг `let x = v in e₂ → e₂[x := v]`: Л2, где `ᾱ ∉ ftv(Ψ)`, так как `Gen` не обобщает `ftv(Ψ)`;
-- (Let-Sig) — так же.
+- a step inside the right-hand side under (Let-Gen): by Lemma 3.1 `Ψ' = Ψ`, `e₁'` is again typed with `P`, and `Gen(Γ, τ₁)` does not change;
+- the step `let x = v in e₂ → e₂[x := v]`: L2, where `ᾱ ∉ ftv(Ψ)` because `Gen` does not generalize `ftv(Ψ)`;
+- (Let-Sig): the same.
 
-Без посылки `P` первый случай ломается. `Ref.make None` делает шаг к `ℓ` с `Ψ(ℓ) = Option α`, где `α` обобщена, и тело использует `ℓ` при двух типах. Программа `invalid` из spec/05 доходит до `String.trim 42` и застревает; в JS это `TypeError` (так вела себя форма Р1 до исправления).
+Without the premise `P` the first case breaks. `Ref.make None` steps to `ℓ` with `Ψ(ℓ) = Option α`, where `α` is generalized, and the body uses `ℓ` at two types. The program `invalid` from spec/03 reaches `String.trim 42` and gets stuck; in JS it is a `TypeError` (the failure shown in [an annotation with `forall`](#an-annotation-with-forall-bypasses-let-sig)).
 
-T3 говорит о `Ref`. Состояние, которое создаёт FFI, покрывает гипотеза Г1; для атомов, которые её нарушают, чекер проверяет отдельное правило `FLICK-U005` (Р4).
+T3 is about `Ref`. State created through the FFI is covered by hypothesis G1; for atoms that violate it the checker enforces a separate rule, `FLICK-U005` (see [stateful atoms](#atommake-and-atomfresh-create-state-but-are-foreign-pure)).
 
-## 5. Расхождения
+## 5. Known divergences
 
-Р1–Р4 и Р9 нарушали T1–T3 или гипотезы Г1 и Г2, Р30 — T1. Каждое было подтверждено пробой: программа принята чекером на `b0e958a3` и при сборке в JS ведёт себя так, как указано. Остальные расхождения — неполнота чекера относительно модели или неточность прозы.
+The first four divergences below and the or-pattern one broke T1–T3 or hypotheses G1 and G2, and the numeric-literal one broke T1. Each was confirmed by a probe: the checker accepted the program, and its JS build behaved as described. The remaining divergences are incompleteness of the checker relative to the model or imprecise prose. Every checker fix has a fixture.
 
-Статус: Р1–Р4, Р9, Р12, Р13, Р29, Р30, Р100–Р103 и В1 внесены, у каждого исправления чекера есть фикстура. Р5–Р8, Р10, Р11 внесены (Р6 в чекер, остальные в спеку), Р58 и Р130 — в модель, В2 — в чекер.
-
-Общие определения для Р2 и Р3:
+Shared definitions for the two `try` divergences:
 
 ```flick
 type error A = A Float
@@ -762,7 +760,7 @@ let f b =
   if b then from_result (Err (C "not a number")) else from_result (Err (B "x"))
 ```
 
-**Р1. `∀` в аннотации обходит (Let-Sig).**
+### An annotation with `forall` bypasses (Let-Sig)
 
 ```flick
 hole : Unit ->{} String
@@ -774,11 +772,13 @@ let hole () =
   | None -> ""
 ```
 
-- Что происходит: программа принята. В Node — `TypeError: self.trim is not a function`. То же для `(Ref.make None : forall a. Ref (Option a))` и для `use_poly (Ref.make None)` с параметром высшего ранга `use_poly : (forall a. Ref (Option a)) ->{} String`. Нарушает T3.
-- Причина: посылку `ᾱ ≠ ∅ ⇒ φ₁ = P` проверял только `polymorphic_runtime`, и только для сигнатур. Ни `unsigned` с аннотацией, ни `check_value` при проверке против `Forall` её не проверяли.
-- Решение — чекер, внесено. `check_value` в ветке `Forall` сохраняет `Checker::runtime` вокруг проверки и, если на текущей стадии был рантайм-вызов, вызывает `polymorphic_runtime` (`FLICK-T013`) — ту же проверку, что у сигнатур. Фикстура: три формы в `tests/check/fail/types/generalization.fl`.
+- Divergence: the program was accepted. In Node it failed with `TypeError: self.trim is not a function`. The same held for `(Ref.make None : forall a. Ref (Option a))` and for `use_poly (Ref.make None)` with the higher-rank parameter `use_poly : (forall a. Ref (Option a)) ->{} String`. This violated T3.
+- Cause: the premise `ᾱ ≠ ∅ ⇒ φ₁ = P` was checked only by `polymorphic_runtime`, and only for signatures. Neither `unsigned` with an annotation nor `check_value` checking against `Forall` checked it.
+- Resolution (checker): `check_value` in the `Forall` branch saves `Checker::runtime` around the check and, if the current stage made a runtime call, calls `polymorphic_runtime` (`FLICK-T013`), the same check as for signatures. Fixture: the three forms in `tests/check/fail/types/generalization.fl`.
 
-**Р2. Ветвь `x` в `try`, которой использование задало тип `Errors {A, B}`, снимает всю строку тела.**
+### A catch-all try branch typed by its use discharges the whole row
+
+A branch `x` of a `try` whose use gives it the type `Errors {A, B}` removed the whole row of the body.
 
 ```flick
 rethrow : Errors {A, B} ->{; A, B} String
@@ -793,11 +793,13 @@ let g () =
   | e -> rethrow e
 ```
 
-- Что происходит: `g` принята, хотя тело бросает `C`. Функция `h : Unit ->{} String` с `try g () with | A _ -> "a" | B _ -> "b"` в Node завершается ошибкой `C`. Нарушает T2(b).
-- Причина: если тип ветви имел вид `Errors …`, `try_expr` ставил `all`, не сверив этот тип с `Errors raised`.
-- Решение — чекер, внесено вместе с Р3.
+- Divergence: `g` was accepted although the body raises `C`. A function `h : Unit ->{} String` with `try g () with | A _ -> "a" | B _ -> "b"` ended in Node with error `C`. This violated T2(b).
+- Cause: if the branch type had the form `Errors …`, `try_expr` marked the branch as catching everything without checking that type against `Errors raised`.
+- Resolution (checker): fixed together with the next divergence.
 
-**Р3. Переменная в `try`, которой использование задало тип `A`, считается полной ветвью для `A`, а в рантайме ловит любую ошибку.**
+### A try variable typed by its use counts as a full branch
+
+A variable in a `try` whose use gives it the type `A` counted as a complete branch for `A`, but at run time caught any error.
 
 ```flick
 payload : A -> Float
@@ -814,10 +816,12 @@ let g () =
   | e -> payload e
 ```
 
-- Что происходит: программа принята. В Node `g ()` получает `C "not a number"` и возвращает `undefined` как `Float`. Нарушает T1.
-- Решение — чекер, внесено. Тип ветви `x`/`_` задаётся синтаксисом паттерна, как в (Try): ветвь проверяется против `Errors caught`, и ошибки тела обязаны входить в `caught` (`raised ⊆ caught`). `payload e` делает `caught = {A}`, и на паттерне — `FLICK-E002`: «the expected type `Errors {A}` does not allow errors `B`, `C`»; `rethrow e` из Р2 — то же для `C`. Если тело бросает только `A`, `payload e` принимается, как в модели (`Errors {A} ≡ A`). Фикстуры: `tests/check/fail/effects/handlers.fl`, `tests/check/pass/effects/errors.fl`.
+- Divergence: the program was accepted. In Node `g ()` received `C "not a number"` and returned `undefined` as a `Float`. This violated T1.
+- Resolution (checker): the type of an `x`/`_` branch is fixed by the pattern syntax, as in (Try): the branch is checked against `Errors caught`, and the body's errors must be contained in `caught` (`raised ⊆ caught`). `payload e` makes `caught = {A}`, and the pattern reports `FLICK-E002`: "the expected type `Errors {A}` does not allow errors `B`, `C`"; `rethrow e` from the previous divergence reports the same for `C`. If the body raises only `A`, `payload e` is accepted, as in the model (`Errors {A} ≡ A`). Fixtures: `tests/check/fail/effects/handlers.fl`, `tests/check/pass/effects/errors.fl`.
 
-**Р4. `Atom.make` и `Atom.fresh` объявлены `foreign pure`, но создают состояние, и локальная привязка обобщается.**
+### `Atom.make` and `Atom.fresh` create state but are foreign pure
+
+`Atom.make` and `Atom.fresh` are declared `foreign pure` but create state, and a local binding of one was generalized.
 
 ```flick
 poke : Unit ->{Atom.Read, Atom.Write;} String
@@ -829,18 +833,18 @@ let poke () =
   | None -> ""
 ```
 
-- Что происходит: программа принята. Нарушена гипотеза Г1, а через неё T3. `FLICK-U005` (`ui.rs` `polymorphic_atoms`) проверял только верхний уровень.
-- Решение — чекер, внесено. Локальная привязка без типа не обобщает переменные внутри типа атома (`ui.rs` `lower_atoms`), так что в примере выше `Some 42` и `String.trim v` дают `FLICK-T003`. Тип атома с квантифицированной переменной — `FLICK-U005` (`ui.rs` `polymorphic_atom`) на верхнем уровне, у сигнатуры, аннотации и аргумента высшего ранга, на любом уровне; `polymorphic_atoms` удалена. Ошибка U005 для локальной привязки без типа была бы ложной: тип атома там часто уточняют следующие строки (`let model = Atom.make None`). Фикстура: локальные формы в `tests/check/fail/ui/atom_poly.fl`.
-- Почему не сделать `make`/`fresh` рантайм-стрелками: атомы верхнего уровня строятся при инициализации модуля, а она чиста.
+- Divergence: the program was accepted. This violated hypothesis G1, and through it T3. `FLICK-U005` (`ui.rs` `polymorphic_atoms`) checked only the top level.
+- Resolution (checker): a local binding without a type does not generalize variables inside an atom type (`ui.rs` `lower_atoms`), so in the example above `Some 42` and `String.trim v` give `FLICK-T003`. An atom type with a quantified variable is `FLICK-U005` (`ui.rs` `polymorphic_atom`) at the top level and for a signature, an annotation or a higher-rank argument at any level; `polymorphic_atoms` was removed. Reporting U005 for a local binding without a type would be a false positive: the atom type there is often refined by the following lines (`let model = Atom.make None`). Fixture: the local forms in `tests/check/fail/ui/atom_poly.fl`.
+- Why `make`/`fresh` are not runtime arrows: top-level atoms are built during module initialization, and that is pure.
 
-**Р5. `Errors ρ` при двух и более элементах.**
+### `Errors` of a row with two or more elements
 
-- Спека: spec/05 «Notation and joining of rows» называет такой тип «a sum of the nominal errors».
-- Чекер: проекция есть только для `none` и одного элемента. `match e with | A _ -> … | B _ -> …` при `e : Errors {A, B}` — `FLICK-T003`.
-- Модели сумма не нужна: значения `Errors ρ` в исходном языке даёт только ветвь `x`/`_`, а для доказательства хватает (Errors-Val) на значениях времени исполнения.
-- Решение — спека, внесено (spec/05 «Notation and joining of rows»). Было записать: «`Errors ρ` с двумя и более элементами или с переменной — непрозрачный тип. Его значение приходит из ветви `x`/`_` у `try` и уходит в `from_result`, `Failure.rethrow` и обобщённый код. Чтобы разобрать его по ошибкам, нужен `try` с ветвями по ошибкам над `from_result (Err e)`.» Сумма с паттернами по элементам — возможное расширение: правило ввода и паттерн по элементу закрытой строки.
+- Spec: spec/03 "Notation and joining of rows" called such a type "a sum of the nominal errors".
+- Checker: a projection exists only for `none` and for a single element. `match e with | A _ -> … | B _ -> …` with `e : Errors {A, B}` is `FLICK-T003`.
+- The model does not need the sum: in the source language values of `Errors ρ` come only from an `x`/`_` branch, and for the proof (Errors-Val) on runtime values suffices.
+- Resolution (spec, spec/03 "Notation and joining of rows"): "`Errors ρ` with two or more elements or with a variable is an opaque type. Its value comes from the `x`/`_` branch of a `try` and flows into `from_result`, `Failure.rethrow` and generic code. To take it apart by error, use a `try` with error branches over `from_result (Err e)`." A sum with patterns on elements is a possible extension: an introduction rule and a pattern on an element of a closed row.
 
-**Р6. `provide` снимает только перечисленные элементы выходов слоя, но не переменную.**
+### `provide` discharges only the listed outputs of a layer, not a row variable
 
 ```flick
 with_layer : Layer none none o -> Eff o none Float ->{} Float
@@ -850,22 +854,24 @@ let with_layer layer t =
   }
 ```
 
-- Что происходит: `FLICK-E002`: «does not allow service `o`». По (Provide) тело может требовать всю `ρₒ`. Это неполнота, не дыра.
-- Решение — чекер, внесено (`handlers.rs` `provide`, фикстура `tests/check/pass/effects/provide_variable.fl`). В `provide` остаток строится из нормальной формы выходов вместе с хвостами-переменными. Брать только жёсткие и квантифицированные переменные, но не мета: незнакомый пока тип слоя не должен расти от того, что требует тело.
+- Divergence: `FLICK-E002`: "does not allow service `o`". By (Provide) the body may require the whole `ρₒ`. This was incompleteness, not a soundness hole.
+- Resolution (checker, `handlers.rs` `provide`, fixture `tests/check/pass/effects/provide_variable.fl`): in `provide` the remainder is built from the normal form of the outputs together with their variable tails. Only rigid and quantified variables are taken, not metas: a layer type that is not yet known must not grow because of what the body requires.
 
-**Р7. Вызываемый неизвестного типа считается чистой стрелкой.**
+### A callee of unknown type is a pure arrow
 
-- Что происходит: `(fun h -> h ()) f` с `f : Unit ->{Log;} Unit` — `FLICK-T003` «expected `Unit -> _`».
-- В модели (App) допускает любую `φ`, но у `λh. h ()` нет главного типа: `(Unit →P τ) →P τ` и `(Unit →R⟨r;ε⟩ τ) →R⟨r;ε⟩ τ` несравнимы, а переменных стадии в ядре нет.
-- Решение — спека, внесено. Записано в `reference/effects.md`: параметр неизвестного типа, применённый к аргументу, считается чистой функцией; эффектный колбэк получает тип из ожидаемого типа или из сигнатуры.
+- Divergence: `(fun h -> h ()) f` with `f : Unit ->{Log;} Unit` is `FLICK-T003` "expected `Unit -> _`".
+- In the model (App) admits any `φ`, but `λh. h ()` has no principal type: `(Unit →P τ) →P τ` and `(Unit →R⟨r;ε⟩ τ) →R⟨r;ε⟩ τ` are incomparable, and the core has no stage variables.
+- Resolution (spec): `reference/effects.md` states that a parameter of unknown type applied to an argument is treated as a pure function; an effectful callback gets its type from the expected type or from a signature.
 
-**Р8. Подтипы есть только у `->` и `Eff`.**
+### Only arrows and `Eff` have subtyping
 
-- Что происходит: `List (Eff {Log} none Unit)` не проходит за `List (Eff {Log, Clock} none Unit)` (`FLICK-T003`). Модель (§2.2) задаёт то же самое.
-- Спека («A signature gives an upper bound»; `reference/effects.md` «A runtime arrow and an Eff accept a value that needs fewer services and errors») не говорит, что под другими конструкторами строки должны совпадать.
-- Решение — спека, внесено в `reference/effects.md`. Ковариантность неизменяемых конструкторов требует вывода вариантности, который spec/05 откладывает.
+- Divergence: `List (Eff {Log} none Unit)` does not pass as `List (Eff {Log, Clock} none Unit)` (`FLICK-T003`). The model (§2.2) specifies the same.
+- The spec ("A signature gives an upper bound"; `reference/effects.md` "A runtime arrow and an Eff accept a value that needs fewer services and errors") did not say that rows under other constructors must be equal.
+- Resolution (spec): stated in `reference/effects.md`. Covariance of immutable constructors needs variance inference, which spec/03 defers.
 
-**Р9. Альтернативы or-паттерна сравниваются подтипами, а IR не применяет записанный при этом lift.**
+### Or-pattern alternatives are compared by subtyping
+
+The alternatives of an or-pattern were compared by subtyping, and the IR did not apply the lift recorded by that comparison.
 
 ```flick
 type Job = Loud (Unit ->{} String) | Quiet (Unit -> String)
@@ -876,40 +882,40 @@ let run job =
   | Loud f | Quiet f -> f ()
 ```
 
-- Что происходит: `run (Quiet hello)` в Node падает с `Fiber.runLoop: Not a valid effect`. `patterns.rs` `or_pattern` сравнивал альтернативы через `expect`. В модели подъём — тождество, поэтому нарушена гипотеза Г2, а не правила.
-- Решение — чекер, внесено. Альтернативы связывают имена с равными типами (`unify`), как в §2.4. Фикстура: `tests/check/fail/types/matching.fl`.
+- Divergence: `run (Quiet hello)` crashed in Node with `Fiber.runLoop: Not a valid effect`. `patterns.rs` `or_pattern` compared the alternatives through `expect`. In the model the lift is the identity, so this violated hypothesis G2, not the rules.
+- Resolution (checker): the alternatives bind names at equal types (`unify`), as in §2.4. Fixture: `tests/check/fail/types/matching.fl`.
 
-**Р10. Ограничения классов при обобщении.**
+### Class constraints and generalization
 
-- Спека: spec/05 и spec/13 исключают из обобщения только переменные «ambiguous constraints».
-- Чекер: мономорфными остаются переменные любого нерешённого ограничения и числовых литералов; схема без сигнатуры никогда не получает ограничений.
-- Решение — спека, внесено в spec/05 «Generalization in the presence of Ref»: «у привязки без сигнатуры нет ограничений классов: переменные нерешённых ограничений и числовых литералов остаются мономорфными; полиморфизм с ограничениями — только через сигнатуру».
+- Spec: spec/03 excluded from generalization only the variables of "ambiguous constraints".
+- Checker: the variables of any unsolved constraint and of numeric literals stay monomorphic; a scheme without a signature never gets constraints.
+- Resolution (spec, spec/03 "Generalization in the presence of Ref"): "a binding without a signature has no class constraints: variables of unsolved constraints and of numeric literals stay monomorphic; constrained polymorphism requires a signature".
 
-**Р11. Неизвестные строки вызовов внутри обобщаемой привязки закрываются `none`, а `Gen` квантифицировал бы их.**
+### Unknown call rows in a generalized binding close to none
 
-- Это выбор наименьшего решения и неполнота относительно модели. Модель принимает его как сужение `Gen` (§2.5, п. 5).
-- Решение — спека, внесено: фраза в `reference/types.md` «Generalization», аналогичная той, что `reference/effects.md` уже говорит про конец объявления.
+Unknown call rows inside a generalized binding are closed with `none`, whereas `Gen` would quantify them.
 
-**Р12. spec/05: тип `Some 42`.**
+- This is the choice of the least solution and incompleteness relative to the model. The model accepts it as a narrowing of `Gen` (§2.5, item 5).
+- Resolution (spec): a sentence in `reference/types.md` "Generalization", analogous to what `reference/effects.md` already says about the end of a declaration.
 
-- Спека: «`Some 42` fixes the cell's content as `Option Float`» и «`numbers` … stores only `Option Float`».
-- На деле целый литерал без контекста — `Int` (`reference/types.md` «Numbers and operators»), и фикстура ждёт «expected `String`, found `Int`».
-- Решение — спека, внесено: `Option Int` в обоих местах, в английской и русской версиях.
+### The type of `Some 42` in spec/03
 
-**Р13. spec/05 «What variance additionally allows»: какой пример отвергается.**
+- Spec: "`Some 42` fixes the cell's content as `Option Float`" and "`numbers` … stores only `Option Float`".
+- In fact an integer literal without context is `Int` (`reference/types.md` "Numbers and operators"), and the fixture expects "expected `String`, found `Int`".
+- Resolution (spec): `Option Int` in both places, in the English and the Russian versions.
 
-- Спека: «The example `logged_none` above is deliberately rejected».
-- На деле отвергается `use_logged_none`, а сама `logged_none` принимается.
-- Решение — спека, внесено.
+### Which example spec/03 rejects under variance
 
-Р29 и Р30 нашёл генератор X2 (`flick-model/tests/props.rs`).
+- Spec, "What variance additionally allows": "The example `logged_none` above is deliberately rejected".
+- In fact `use_logged_none` is rejected, while `logged_none` itself is accepted.
+- Resolution (spec): corrected.
 
-**Р29. Остаток `match` после ложного охранника не проходит `Exh`.**
+### The residual match after a false guard fails Exh
 
-- Что происходит: `match Some 0 with | None → a | Some x when false → b | Some _ → c` делает шаг к `match Some 0 with | Some _ → c`, а (Match) требует `Exh(Option Int, {Some _})`. Preservation по правилам §2.3 не выполняется, хотя шаг безопасен: значение сопоставляется с оставшейся ветвью.
-- Решение — модель: правило (Match-Val) §3.6 для значения в позиции разбора. Внесено; эталон применяет его только к конфигурациям, свойство `progress_and_preservation_hold` без него падает.
+- Divergence: `match Some 0 with | None → a | Some x when false → b | Some _ → c` steps to `match Some 0 with | Some _ → c`, and (Match) requires `Exh(Option Int, {Some _})`. Preservation under the rules of §2.3 fails, although the step is safe: the value matches the remaining branch.
+- Resolution (model): the rule (Match-Val) of §3.6 for a value in scrutinee position. The reference checker applies it only to configurations; without it the property `progress_and_preservation_hold` fails.
 
-**Р30. Переменная числового литерала принимала стрелку.**
+### A numeric literal variable accepted an arrow
 
 ```flick
 literal_call : Float -> Float
@@ -922,11 +928,11 @@ let literal_element () =
   | _ -> 0
 ```
 
-- Что происходит: обе принимались, модель обе отвергает: литерал — число, а не функция. Во второй `b : Int` — функция; в Node `literal_element ()` возвращает `0` (`b + 1 | 0`). Нарушает T1.
-- Причина: переменная литерала может стать только числом, и унификация её со стрелкой не проходит, но ошибку отбрасывали `calls.rs` `apply` (вызываемый неизвестного типа) и `infer.rs` `curry` (λ при неизвестном ожидаемом типе).
-- Решение — чекер, внесено: `FLICK-T003` «this is not a function» и «expected `Int`, found a function». Фикстуры: `tests/check/fail/types/misc.fl` `literal_call`, `literal_element`.
+- Divergence: both were accepted, and the model rejects both: a literal is a number, not a function. In the second, `b : Int` is a function; in Node `literal_element ()` returned `0` (`b + 1 | 0`). This violated T1.
+- Cause: a literal variable can only become a number, and unifying it with an arrow fails, but the error was discarded by `calls.rs` `apply` (a callee of unknown type) and `infer.rs` `curry` (a λ with an unknown expected type).
+- Resolution (checker): `FLICK-T003` "this is not a function" and "expected `Int`, found a function". Fixtures: `tests/check/fail/types/misc.fl` `literal_call`, `literal_element`.
 
-**Р58. Сравнение порядка над функцией.**
+### Order comparison on functions
 
 ```flick
 let program () =
@@ -934,38 +940,32 @@ let program () =
   | { a = f } -> f < f
 ```
 
-- Что происходит: `flick-core` отвергает (`FLICK-T003` «`<` works on `Int` or `Float` or `BigInt` or `String`, not on `_ -> Int`»), а эталон принимал: §1.5 не называл типы сравнений, и `flick-model` давал `<` тип `∀α. α → α → Bool`. Генератор порождает `<` только над `Int`; противоречие нашла мутация, подставившая переменную-функцию.
-- Решение — модель, внесено. Строка `<, <=, >, >=` в §1.5 и отложенная проверка операнда в `flick-model` (`check/constants.rs` `ordered_operand`), как `settle_operators`; тест `comparisons_order_numbers_and_strings_only`.
+- Divergence: `flick-core` rejects it (`FLICK-T003` "`<` works on `Int` or `Float` or `BigInt` or `String`, not on `_ -> Int`"), while the reference checker accepted it: §1.5 did not name the comparison types, and `flick-model` gave `<` the type `∀α. α → α → Bool`. The generator produces `<` only over `Int`; the contradiction was found by a mutation that substituted a function variable.
+- Resolution (model): the `<, <=, >, >=` line in §1.5 and a deferred operand check in `flick-model` (`check/constants.rs` `ordered_operand`), like `settle_operators`; test `comparisons_order_numbers_and_strings_only`.
 
-Р100 нашла механизация в Lean (`formal/`, P1a).
+### A partial constructor application is a value
 
-**Р100. Неполное применение конструктора не было значением.**
+- Divergence: the value grammar of §1.3 gave `K v₁ … vₙ` without fixing `n`, and L1 for arrows listed only λ, `fix` and a partial application of a constant. But a `K` of arity above zero and `K v₁` are functions: `let f = Some in f 1` substitutes `Some` as a value. Without this, L1 for arrows is false, and Progress gets stuck on `let f = Some in …`.
+- Resolution (model): the grammar has `K v₁ … vₖ` with `k` at most the arity of `K`, and L1 for arrows includes a partial constructor application. Lean: `Value.ctorApp`, `canonical_arrow` (`formal/Formal/CanonForms.lean`).
 
-- Что происходит: грамматика значений §1.3 давала `K v₁ … vₙ` без указания `n`, а Л1 для стрелки перечисляла только λ, `fix` и неполное применение константы. Но `K` с арностью больше нуля и `K v₁` — функции: `let f = Some in f 1` подставляет `Some` как значение. Без этого Л1 для стрелки неверна, а Progress застревает на `let f = Some in …`.
-- Решение — модель, внесено: в грамматике `K v₁ … vₖ` при `k` не больше арности `K`, в Л1 для стрелки — и неполное применение конструктора. Lean: `Value.ctorApp`, `canonical_arrow` (`formal/Formal/CanonForms.lean`).
+### `bind_S` and `join` steps are pure
 
-Р101 и Р102 нашла механизация в Lean (P1b).
+- Divergence: §3.4 listed `bind_S v` and `join (env θ₁) (env θ₂)` as runtime steps, while (Bind) and (Join) do not require `R⟨…⟩`. The term `bind_S v` is typed with `P`, and its evaluation takes a non-`→ₚ` step: T2(a) in the form "only `→ₚ` steps" is false for it. Source programs have no such terms; they appear from `build` under `provide`, where the stage is already a runtime stage.
+- Resolution (model): the `bind_S` and `join` steps are in §3.3. They do not change `μ`, do not look up services and do not raise errors, so T2(a) is not weakened. Lean: `PHead.bind`, `PHead.join` (`formal/Formal/Semantics.lean`), `T2a` (`formal/Formal/Effects.lean`).
 
-**Р101. Шаги `bind_S` и `join` стояли среди шагов рантайма, а их правила чистые.**
+### (Handle) required the whole error row after a failed branch
 
-- Что происходит: §3.4 давал `bind_S v` и `join (env θ₁) (env θ₂)` как шаги рантайма, а (Bind) и (Join) не требуют `R⟨…⟩`. Терм `bind_S v` типизируется с `P`, и его вычисление делает не-`→ₚ` шаг: T2(a) в формулировке «только шаги `→ₚ`» для него неверна. В исходной программе таких термов нет, они появляются из `build` под `provide`, где стадия уже рантаймовая.
-- Решение — модель, внесено: шаги `bind_S` и `join` перенесены в §3.3. Они не меняют `μ`, не ищут сервисы и не бросают ошибок, так что T2(a) не ослабляется. Lean: `PHead.bind`, `PHead.join` (`formal/Formal/Semantics.lean`), `T2a` (`formal/Formal/Effects.lean`).
+- Divergence: for `try e with | A _ -> 0 | B _ -> 1`, where the body `e` raises `A` or `B`, `ε_b = {A, B}`, the branches remove `H = {A, B}`, and `ε' = none`. Suppose the body raised `B "x"`: `handle (B "x") with A _ → 0 | B _ → 1` steps to `handle (B "x") with B _ → 1`, whose remainder has `H = {B}`, and the premise `ε_b ⊆ H + ε'` of (Handle) fails. Preservation under the rules of §3.6 breaks, although the step is safe: the error of the value itself is `B`. This is the `try` counterpart of [the residual match](#the-residual-match-after-a-false-guard-fails-exh).
+- Resolution (model): the premise of (Handle) is `E ∈ H + ε'` for the constructor `E` of the value `v`. Coming from `try (raise v)`, it follows from the premise of (Try); after a failed branch `E p̄` without `when` with `Exh(E, {E p̄})`, it holds because the branch did not match, so `v` is not an `E`. The reference checker already checked it this way: `check/runtime.rs` types `handle v` as `try (raise v)`, and `raise v` carries only the error of `v`. Lean: `Typ.handle` with `HCov` (`formal/Formal/Typing.lean`, `Rules.lean`), `HCov.tail` (`formal/Formal/PresRt.lean`).
 
-**Р102. (Handle) требовал всю строку ошибок после неудачной ветви.**
+### A store typing of closed types is not preserved
 
-- Что происходит: у `try e with | A _ -> 0 | B _ -> 1`, где тело `e` бросает `A` или `B`, `ε_b = {A, B}`, ветви снимают `H = {A, B}`, `ε' = none`. Пусть тело бросило `B "x"`: `handle (B "x") with A _ → 0 | B _ → 1` делает шаг к `handle (B "x") with B _ → 1`, а у остатка `H = {B}`, и посылка `ε_b ⊆ H + ε'` (Handle) не выполняется. Preservation по правилам §3.6 ломается, хотя шаг безопасен: ошибка самого значения — `B`. Это аналог Р29 для `try`.
-- Решение — модель, внесено: посылка (Handle) — `E ∈ H + ε'` для конструктора `E` значения `v`. Из `try (raise v)` она следует из посылки (Try), после неудачной ветви `E p̄` без `when` с `Exh(E, {E p̄})` — потому что ветвь не сопоставилась, значит, `v` — не `E`. Эталон уже проверял так: `check/runtime.rs` типизирует `handle v` как `try (raise v)`, а `raise v` несёт только ошибку `v`. Lean: `Typ.handle` с `HCov` (`formal/Formal/Typing.lean`, `Rules.lean`), `HCov.tail` (`formal/Formal/PresRt.lean`).
+- Divergence: §3.6 required closed `Ψ(ℓ)`, and T3 required the same type `τ` for all reachable configurations. The closed term `Ref.make (λx. x)` has type `Ref (α → α)`: (Let-Gen) does not apply because of the runtime stage, and `α` is free. After the step, `Ψ(ℓ)` is either open or, after substituting a closed type, the type of the configuration is no longer `τ`. "Without loss of generality" relied on a type-substitution lemma that the document did not have.
+- Resolution (model): the `Ψ(ℓ)` are monotypes, possibly with free inference variables, and `Gen` with `Ψ` in the context does not generalize `ftv(Ψ)`. So the premise `ᾱ ∉ ftv(Ψ)` of L2 holds by construction. Lean: (Let-Gen) shifts `Γ` and `Ψ` past the generalized variables (`Typ.letGen`, `formal/Formal/Rules.lean`); the type-substitution lemma is `Typ.substT` (`formal/Formal/TySubst.lean`).
 
-Р103 нашла механизация в Lean (P1c).
+### Stepping a signed let loses its signature
 
-**Р103. `Ψ` из замкнутых типов не сохраняется вместе с типом программы.**
-
-- Что происходит: §3.6 требовал замкнутые `Ψ(ℓ)`, а T3 — тот же тип `τ` у всех достижимых конфигураций. У замкнутого терма `Ref.make (λx. x)` тип `Ref (α → α)`: (Let-Gen) неприменимо из-за рантайм-стадии, и `α` свободна. После шага `Ψ(ℓ)` либо открыт, либо, после подстановки замкнутого типа, тип конфигурации уже не `τ`. «Без ограничения общности» опиралось на лемму о подстановке типов, которой в документе не было.
-- Решение — модель, внесено: `Ψ(ℓ)` — монотипы, возможно со свободными переменными вывода, а `Gen` с `Ψ` в контексте не обобщает `ftv(Ψ)`. Так посылка `ᾱ ∉ ftv(Ψ)` Л2 выполняется по построению. Lean: (Let-Gen) сдвигает `Γ` и `Ψ` за обобщаемые переменные (`Typ.letGen`, `formal/Formal/Rules.lean`), лемма о подстановке типов — `Typ.substT` (`formal/Formal/TySubst.lean`).
-
-Р130 нашёл генератор X2, когда стал исполнять программы с сервисами, `provide` и регионами (`regions.md` §3.3).
-
-**Р130. После шага `let x : σ = v` состояние теряет `σ`, и чекер эталона его не выводит.**
+After the step on `let x : σ = v` the state loses `σ`, and the reference checker cannot infer it. The case arose in generated programs with services, `provide` and regions (`regions.md` §3.3).
 
 ```text
 v1 : forall a b r e. (a ->{r; e} b) -> a ->{r; e} b
@@ -974,18 +974,18 @@ let v1 g x = (g x)
        with | _ -> as4) …)
 ```
 
-- Что происходит: шаг §3.3 даёт `(λg. λx. g x) (try … with _ → as4)` с `as4 : Unit →R⟨none;none⟩ (Unit, Int)`. В программе `try` проверялся против `a →R⟨r;e⟩ b` из `σ`, а в состоянии `λg` без сигнатуры. Эталон выводит аргумент без ожидаемого типа: `λx2` берёт `P` (Р7), и ветвь с `as4` — `(⊑)` на шаге 32 (`progress_and_preservation_hold`).
-- Неполнота эталона, не документа: по правилам §2 `λg` типизируется с параметром рантайм-стрелки, и Preservation верна. Эталон выводит, а у `λg. λx. g x` нет главного типа (Р7).
-- Решение — модель, внесено. Шаг `let x : σ = λy. e₁ in e₂` в эталоне даёт `e₂[x := fix x. λy. e₁]`: `x ∉ fv(λy. e₁)`, значение то же, а (Fix) §3.6 проверяет его против `σ`, как исходная программа (`flick-model/src/eval/mod.rs`). Тест: `a_function_keeps_its_signature` (`flick-model/tests/props.rs`).
+- Divergence: the step of §3.3 gives `(λg. λx. g x) (try … with _ → as4)` with `as4 : Unit →R⟨none;none⟩ (Unit, Int)`. In the program the `try` was checked against `a →R⟨r;e⟩ b` from `σ`, but in the state `λg` has no signature. The reference checker infers the argument without an expected type: `λx2` takes `P` (see [a callee of unknown type](#a-callee-of-unknown-type-is-a-pure-arrow)), and the branch with `as4` fails `(⊑)` at step 32 of `progress_and_preservation_hold`.
+- This is incompleteness of the reference checker, not of the document: under the rules of §2, `λg` is typed with a runtime-arrow parameter, and Preservation holds. The reference checker infers, and `λg. λx. g x` has no principal type.
+- Resolution (model): in the reference checker the step `let x : σ = λy. e₁ in e₂` gives `e₂[x := fix x. λy. e₁]`: `x ∉ fv(λy. e₁)`, the value is the same, and (Fix) of §3.6 checks it against `σ`, like the source program (`flick-model/src/eval/mod.rs`). Test: `a_function_keeps_its_signature` (`flick-model/tests/props.rs`).
 
-Вне ядра, найдено попутно:
+### Outside the core
 
-**В1. Операция сервиса с ограничением класса теряет словарь.**
+#### A service operation with a class constraint loses its dictionary
 
-- Что происходит: при `service Render = render : Show a => a ->{} String` вызов `Render.render 42` компилируется в `$rt.operation($s_Render, "render", 1)(42)`, без словаря `Show`. Причина: `services.rs` `operation_type` отбрасывал ограничения схемы.
-- Решение — чекер и кодоген, внесено. `operation_type` запрашивает словари ограничений, как `instantiate`. IR даёт `Dicts(Operation)`, и кодоген передаёт словари рантайму: `$rt.operation(tag, name, arity, [d…])` в JS, `flickrt.OperationGiven(key, name, arity, d…)` в Go. Рантайм применяет их к реализации после поиска сервиса. Фикстура: e2e `tests/run/codegen/service_dictionary.fl`, на JS и Go.
+- Divergence: with `service Render = render : Show a => a ->{} String`, the call `Render.render 42` compiled to `$rt.operation($s_Render, "render", 1)(42)`, without the `Show` dictionary. Cause: `services.rs` `operation_type` dropped the constraints of the scheme.
+- Resolution (checker and code generator): `operation_type` requests the dictionaries of the constraints, like `instantiate`. The IR produces `Dicts(Operation)`, and the code generator passes the dictionaries to the runtime: `$rt.operation(tag, name, arity, [d…])` in JS, `flickrt.OperationGiven(key, name, arity, d…)` in Go. The runtime applies them to the implementation after the service lookup. Fixture: e2e `tests/run/codegen/service_dictionary.fl`, on JS and Go.
 
-**В2. Поле реализации с ограничением класса нельзя вызвать напрямую.**
+#### An implementation field with a class constraint cannot be called directly
 
-- Что происходит: `render_impl.render 7` при `render_impl : Render.Impl` — `FLICK-T003` «this is not a function: it has type `forall a. Show a => a ->{} String`». `records.rs` `field` возвращает тип поля, не инстанцируя `∀`. Неполнота, не дыра: программа отвергается.
-- Решение — чекер, внесено: `records.rs` `field` инстанцирует схему поля, как `instantiate` у имени, и запрашивает словари её ограничений; IR оборачивает поле в `Dicts`, и кодоген передаёт их, как любому значению со словарями. Фикстура: e2e `tests/run/codegen/service_dictionary.fl` (`render_impl.render 7`, `render_impl.pair`), на JS и Go.
+- Divergence: `render_impl.render 7` with `render_impl : Render.Impl` was `FLICK-T003` "this is not a function: it has type `forall a. Show a => a ->{} String`". `records.rs` `field` returned the field type without instantiating `∀`. This was incompleteness, not a soundness hole: the program was rejected.
+- Resolution (checker): `records.rs` `field` instantiates the field's scheme, as `instantiate` does for a name, and requests the dictionaries of its constraints; the IR wraps the field in `Dicts`, and the code generator passes them as for any value with dictionaries. Fixture: e2e `tests/run/codegen/service_dictionary.fl` (`render_impl.render 7`, `render_impl.pair`), on JS and Go.

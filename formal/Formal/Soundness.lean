@@ -272,7 +272,7 @@ theorem CfgTy.init {e₀ t φ₀} (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ�
     ⟨Tm.Asc.of_noIns hb.noIns, fun _ _ h => by simp at h, fun _ _ h => by simp at h⟩⟩
 
 /-- **T1.** A program `· ⊢ e₀ : τ ! φ₀` (a term without run-time regions, at a type and
-a stage without them) whose services `Σ₀` provides (Г3) reaches
+a stage without them) whose services `Σ₀` provides (G3) reaches
 only configurations whose main thread is a value, `raise v` with `v : Errors ε₀`,
 makes a step, or is blocked (waits for a child of a region it closes, or uses a
 region that is not live); every child of a live region is finished, makes a step,

@@ -76,7 +76,7 @@ spawn_given :
   Fiber.Owner s -> (Eff {FileSystem} {ReadError} String)^c ->{FileSystem; none} Unit
 let spawn_given owner work = ignore (Fiber.spawn owner report work)
 
-// a cell made empty takes a resource of its scope later (Р23)
+// a cell made empty takes a resource of its scope later (`docs/formal/regions.md#a-cell-created-empty-accepts-a-resource-of-its-scope`)
 empty_cell : Path ->{FileSystem; OpenError, ReadError} String
 let empty_cell path = scope inner {
   let cell = Ref.make None

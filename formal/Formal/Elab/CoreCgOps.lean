@@ -1,7 +1,7 @@
 import Formal.Elab.CoreCg
 
 /-!
-# λFlick⁺ as a `Target`: the operations of the run on related terms (P4a4b)
+# λFlick⁺ as a `Target`: the operations of the run on related terms
 
 Related values give related results of the operations the steps use: a field (`Cg.field`),
 an update (`Cg.setField`), a match (`Cg.matchP`), an environment (`Cg.envLookup`,

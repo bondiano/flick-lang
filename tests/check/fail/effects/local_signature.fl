@@ -1,6 +1,6 @@
 // A local function without a signature is FLICK-T004 alone: the rows of the
 // enclosing declaration, still gathering its calls, stay open, so the
-// service called after it fits the signature (X3).
+// service called after it fits the signature.
 module App.LocalSignature exposing (..)
 
 service Log =

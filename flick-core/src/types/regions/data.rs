@@ -236,7 +236,7 @@ impl Checker<'_> {
             // qualifier stays part of its type. Under a value bound, which
             // alone gives what the value reaches (§2.1), a qualifier not
             // inferred yet says nothing either when the bound expected is
-            // not inferred yet: the holds above grow it by the value (Р23)
+            // not inferred yet: the holds above grow it by the value (`docs/formal/regions.md#a-cell-created-empty-accepts-a-resource-of-its-scope`)
             let inferred = |checker: &Self, captures: &Type| {
                 let held = checker.store.normalize(captures);
                 let open = |t: &Type| matches!(checker.store.resolve(t), Type::Meta(_));

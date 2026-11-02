@@ -1,4 +1,4 @@
-//! `λRT` on traces (docs/formal/runtime.md, X4). With `FLICK_TRACE` set, both
+//! `λRT` on traces (docs/formal/runtime.md). With `FLICK_TRACE` set, both
 //! runtimes write the steps of the owner contract as JSON lines
 //! (`runtime-go/flickrt/trace.go` lists the events, `runtime/src/trace.ts`
 //! writes the same). [`monitor::check`] replays a trace and reports the

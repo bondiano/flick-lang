@@ -1,4 +1,4 @@
-//! `Fiber.Provided r s` (`regions.md` §2.7, Р37): a child or finalizer of
+//! `Fiber.Provided r s` (`regions.md` §2.7, `docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer`): a child or finalizer of
 //! the owner of region `s` runs with the services of the place that
 //! registered it, so each service of `r` comes from a provider that
 //! outlives `s`. A service a `provide` builds ends with that `provide`.

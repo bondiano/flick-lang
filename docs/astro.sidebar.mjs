@@ -42,5 +42,5 @@ export const sidebar = [
       { slug: "contributing/implementation-decisions" },
     ],
   },
-  { label: "Play", items: [{ slug: "play" }, { slug: "transpile" }] },
+  { label: "Play", translations: { ru: "Песочница" }, items: [{ slug: "play" }, { slug: "transpile" }] },
 ];

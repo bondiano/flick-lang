@@ -4,7 +4,7 @@ import Formal.NestClose
 # What the types of a redex give `⊢ Λ`
 
 The hole of a run-time step is typed with the facts of the order of creation; a
-finalizer or a child holds only regions that outlive its owner (Р140); the body of
+finalizer or a child holds only regions that outlive its owner (`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`); the body of
 a closing region shows no `π`; a service holds no region.
 -/
 

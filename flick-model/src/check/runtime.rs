@@ -1,7 +1,7 @@
 //! The forms of the run time (`docs/formal/core.md` §3.6): what a
 //! configuration `⟨μ, E[e]⟩` holds besides source forms, typed so that
 //! Preservation can be checked on every state the machine passes through
-//! (X2). `Ψ` is a meta per cell, made before anything else is checked, so
+//! (the model properties). `Ψ` is a meta per cell, made before anything else is checked, so
 //! `Gen` never quantifies a cell's type (T3). The forms of regions and
 //! `⊢ Λ` are those of `docs/formal/regions.md` §3.4.
 
@@ -184,7 +184,7 @@ impl Checker<'_> {
     /// (App) on a redex `(λx. e) v` of a configuration: `x` takes the type
     /// of `v`, as the binder whose signature the substitution dropped gave
     /// it. Inferring the λ first would take a parameter it applies for a
-    /// pure arrow (Р7), which the source did not.
+    /// pure arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`), which the source did not.
     pub(super) fn redex(
         &mut self,
         x: &str,

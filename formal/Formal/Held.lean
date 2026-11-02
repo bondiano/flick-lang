@@ -1,11 +1,11 @@
 import Formal.SubAdm
 
 /-!
-# A typed value holds no more than its type shows (Л4, syntactic part)
+# A typed value holds no more than its type shows (L4, syntactic part)
 
 `held Ψ Γ v ⊆ ⌈τ⌉` for a value `v : τ`: its free variables, the regions it writes
 down and the cell types of its locations are all within `⌈τ⌉` (regions.md §5.2).
-The cases are those of Л4: (Lam), (Task) and the fixpoint by their premise;
+The cases are those of L4: (Lam), (Task) and the fixpoint by their premise;
 (Cap), (Own) and a location by their type; a constructor spine because its fields
 mention only its parameters (`Sig.ctor_reach`); a partial application of a
 constant because each constant shows its first argument in the rest of its type;
@@ -165,7 +165,7 @@ theorem HeldC.closed {Ψ Γ e T} (hf : ∀ i, ¬ e.Free i) (hs : ∀ s, ¬ e.Has
   ⟨(held_none hf hs).of_none _, fun K h => (hh K h).elim, fun c h => (hc c h).elim,
     fun c e₀ h => (ha c e₀ h).elim⟩
 
-/-- **Л4, syntactic.** A value holds no more than its type shows. -/
+/-- **L4, syntactic.** A value holds no more than its type shows. -/
 theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     Value e → ∀ {T φ}, J = .ex T φ → HeldC S Ψ Γ e T := by
   induction h with

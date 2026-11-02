@@ -208,7 +208,7 @@ pub struct ForeignInfo {
 
 /// Where a foreign call may pass Flick data, which an import outside the
 /// runtime gets as a copy: JS may change an array or object in place
-/// (`docs/formal/ts-holes.md` Р26).
+/// (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`).
 #[derive(Debug, Clone, Default)]
 pub struct Copies {
     /// For each JS argument.

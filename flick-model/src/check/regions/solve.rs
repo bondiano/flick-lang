@@ -90,7 +90,7 @@ impl Checker<'_> {
     }
 
     /// What `h` holds beyond what it allows, and the capture row that may
-    /// grow to allow it. A type never inferred holds nothing (Р31).
+    /// grow to allow it. A type never inferred holds nothing (`docs/formal/regions.md#bounded-qualifiers-are-compared-after-the-type-is-inferred`).
     fn excess(&self, h: &Hold) -> (Caps, Option<u32>) {
         let mut held = Caps::default();
         let mut bounded = Vec::new();
@@ -105,14 +105,14 @@ impl Checker<'_> {
             allowed = allowed.union(&c);
             allowed.atoms.extend(b.into_iter().map(|(a, _)| a));
         }
-        // `α^{≤C}` reaches `α`, and is within what allows `C` (§2.1, Р62)
+        // `α^{≤C}` reaches `α`, and is within what allows `C` (§2.1, `docs/formal/regions.md#a-bounded-variable-reaches-what-the-variable-reaches`)
         for (a, c) in bounded {
             if !allowed.atoms.contains(&a) {
                 held = held.union(&self.zonk_caps(&c));
             }
         }
         // an atom is a region or a type variable; a meta of a type never
-        // inferred holds nothing (Р31). A capture variable of a signature
+        // inferred holds nothing (`docs/formal/regions.md#bounded-qualifiers-are-compared-after-the-type-is-inferred`). A capture variable of a signature
         // grows a row, for `Outlives`
         let mut missing = Caps::default();
         for a in &held.atoms {

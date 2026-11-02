@@ -2,7 +2,7 @@
 title: "Project"
 ---
 
-A project is a directory with `flick.toml` (see [The Flick CLI](../../spec/12-cli/)). Commands find the nearest
+A project is a directory with `flick.toml` (see [Compiler CLI](../cli/)). Commands find the nearest
 `flick.toml` from the working directory upwards; `--project <path>` selects a
 project directory or a configuration file explicitly.
 

@@ -1,4 +1,4 @@
-// Stress of the runtime contract (X4, docs/formal/runtime.md §6.1): each
+// Stress of the runtime contract (docs/formal/runtime.md §6.1): each
 // portable case whose path starts with one of `prefixes` is built for both
 // targets and run `runs` times on each with FLICK_STRESS set to the run's
 // seed, so that checkpoints, forks and Effect's scheduler take other

@@ -2,11 +2,11 @@ import Formal.Elab.Witness.Bodies
 import Formal.Elab.Exh
 
 /-!
-# Witness: the bodies of `Seq` and of `iter` (W2)
+# Witness: the bodies of `Seq` and of `iter`
 
 `Seq q a` and `ListQ q a` are lists of the core, `SNil | SCons a (Seq q a)`, whose `CRow`
 parameter `q` is phantom: the model does not need `Seq` to be lazy, and its schemes are those of
-Р188. `Seq.flat_map`, `each_φ`, `to_list` and `iter` are fixpoints that match the list by one
+the `CRow` qualifiers of the Prelude schemes. `Seq.flat_map`, `each_φ`, `to_list` and `iter` are fixpoints that match the list by one
 arm per constructor (`exh_ctors`). `flat_map k` appends `k x` to the rest by a second fixpoint.
 -/
 

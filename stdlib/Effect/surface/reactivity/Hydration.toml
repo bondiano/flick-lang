@@ -1,6 +1,6 @@
 [excluded]
-DehydratedAtom = "server rendering binds dehydration and hydration (R3)"
-DehydratedAtomValue = "server rendering binds dehydration and hydration (R3)"
-dehydrate = "server rendering binds dehydration and hydration (R3)"
-hydrate = "server rendering binds dehydration and hydration (R3)"
-toValues = "server rendering binds dehydration and hydration (R3)"
+DehydratedAtom = "the runtime dehydrates and hydrates the registry for server rendering; programs do not call it"
+DehydratedAtomValue = "the runtime dehydrates and hydrates the registry for server rendering; programs do not call it"
+dehydrate = "the runtime dehydrates and hydrates the registry for server rendering; programs do not call it"
+hydrate = "the runtime dehydrates and hydrates the registry for server rendering; programs do not call it"
+toValues = "the runtime dehydrates and hydrates the registry for server rendering; programs do not call it"

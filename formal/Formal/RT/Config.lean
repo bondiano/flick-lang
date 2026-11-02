@@ -9,7 +9,7 @@ where the label `a` says what the code asks of the runtime and `e'` is the conti
 relation will do, so every theorem holds for every program of every core.
 
 The parts of a step that Effect 4.0.5 or the Go memory model implement are fields of
-`Lib`; `Hyp` (`Hyp.lean`) states Г7–Г9 about them.
+`Lib`; `Hyp` (`Hyp.lean`) states G7–G9 about them.
 -/
 
 namespace Flick.RT
@@ -93,13 +93,13 @@ inductive St where
   | open | closing | finalizing | closed
   deriving DecidableEq
 
-/-- `open` or `closing`: the owner accepts hooks and finalizers (И2). -/
+/-- `open` or `closing`: the owner accepts hooks and finalizers (I2). -/
 def St.live : St → Bool
   | .open | .closing => true
   | _ => false
 
 /-- The phase of a closing (§3.3): `hooks false` is C1; `stop γ b` a group's hook waiting for
-the group's children; `kids` is C2–C3; `hooks true` runs the hooks added since C1 (Р38) and
+the group's children; `kids` is C2–C3; `hooks true` runs the hooks added since C1 (`docs/formal/runtime.md#a-closing-hook-added-after-c1-does-not-run`) and
 waits for `P` (C4); `fins` is C5. -/
 inductive Phase where
   | hooks (late : Bool)

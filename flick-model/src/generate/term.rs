@@ -2,7 +2,7 @@
 //! takes fits `φ`, so it has its type at that stage by the rules of §2.3.
 //! A `let` only comes where the source has a block, so `print` can write
 //! it. Parameters, patterns, cells and a `let` without a signature hold
-//! data: a function there would be typed by the guess of Р7, which the
+//! data: a function there would be typed by the guess for a callee of unknown type, which the
 //! rules do not make.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -432,7 +432,7 @@ fn forms(cx: &Cx, t: &Type, budget: &Stage, block: bool) -> Vec<Form> {
     let mut forms = vec![Form::Leaf, Form::Intro, Form::Match, Form::Call];
     // data only where the type is inferred, not checked: under a
     // projection, and of the task `await` runs; a λ there takes its least
-    // arrow (Р7), not the one the position wants
+    // arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`), not the one the position wants
     if plain(t) {
         forms.push(Form::Field);
     }

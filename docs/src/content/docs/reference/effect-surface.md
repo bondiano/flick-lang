@@ -2,7 +2,7 @@
 title: "Effect coverage"
 ---
 
-The standard library wraps the pinned Effect release (see [The boundary of the language core](../../spec/07-errors-and-concurrency/#the-boundary-of-the-language-core)): every public export of the entrypoints `effect`, `effect/cli`, `effect/devtools`,
+The standard library wraps the pinned Effect release (see [The boundary of the language core](../../spec/05-errors-and-concurrency/#the-boundary-of-the-language-core)): every public export of the entrypoints `effect`, `effect/cli`, `effect/devtools`,
 `effect/http`, `effect/http-api`, `effect/observability`, `effect/process`, `effect/reactivity` and `effect/rpc` has a typed wrapper or an explicit
 decision, and a linter in `cargo test` checks that nothing is lost when
 Effect moves.
@@ -43,7 +43,7 @@ gen = "a runtime function body: direct calls"
 isSchedule = "TS-only: a type guard; Flick values are typed statically"
 
 [pending]
-cron = "M20"
+cron = "cron expressions need a parser of their own"
 ```
 
 | Status | Value | Meaning |
@@ -51,7 +51,7 @@ cron = "M20"
 | `wrapped` | `"<Flick.Name> <fingerprint>"` | a typed symbol of the standard library, reviewed against that fingerprint |
 | `language` | the construct | covered by the language: `Effect.gen` by direct calls, `Context.Service` by `service`, `Data.TaggedError` by `type error`, `Layer.provide` by `provide`, `Match` by `match` |
 | `excluded` | the reason | TypeScript-only (`HKT`, `Types`, type guards, type extractors) or against an invariant (`unsafe*`, `Mutable*`, a fork without an owner, running an effect outside the entry runner, control flow through the error channel) |
-| `pending` | the owning stage, `M<n>` | temporarily unwrapped |
+| `pending` | what is missing | temporarily unwrapped |
 
 `"*"` stands for every export of the module without an entry of its own.
 
@@ -66,7 +66,7 @@ cron = "M20"
   under `tests/run/stdlib/` refers to (resolved by the checker);
 - a foreign binding of a `wrapped` symbol without `reviewed
   "effect@<pinned> …"`, or reviewed against another release;
-- `pending` without an owning stage, a snapshot of another release than
+- a `language`, `excluded` or `pending` decision without a reason, a snapshot of another release than
   `runtime/package.json` pins.
 
 `just effect-coverage` prints the counts by status and module; CI adds them

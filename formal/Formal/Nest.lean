@@ -9,7 +9,7 @@ regions `B ℓ` each cell may hold, and the thread `home π` whose `inside π` f
 is that of `π`:
 
 - the ancestors of a region are earlier regions, and those of a live region are
-  live and nested (`Chain`); this is Л5: a region closes after every region
+  live and nested (`Chain`); this is L5: a region closes after every region
   created in it;
 - every thread is at the place of its base: the main thread names no region, a
   child of `ϱ` names the ancestors of `ϱ`; the `inside` forms of a thread are

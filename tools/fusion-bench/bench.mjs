@@ -1,4 +1,4 @@
-// D14: what fusion saves. The same pipeline as the compiler emits it in
+// What fusion saves. The same pipeline as the compiler emits it in
 // debug (a generator, then a generator per combinator, then a list) and in
 // release (one loop pushing into the list):
 //

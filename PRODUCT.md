@@ -8,7 +8,7 @@ web
 
 ## Users
 
-The documentation primarily serves TypeScript and Effect developers evaluating Flick, learning its syntax, and trying real programs. The owner confirmed this audience. English and Russian documentation are existing supported locales and remain supported.
+The documentation primarily serves TypeScript and Effect developers evaluating Flick, learning its syntax, and trying real programs. English and Russian documentation are existing supported locales and remain supported.
 
 ## Product Purpose
 
@@ -27,15 +27,15 @@ The repository contains an Astro/Starlight documentation site, a Rust compiler e
 - Preserve the existing English and Russian documentation and working reference URLs.
 - Organize documentation into Learn, Guides, API, and Ecosystem.
 - Provide working Play and Transpile surfaces using the real compiler.
-- The owner requires interactive widgets to be implemented in Flick itself. JavaScript/TypeScript is limited to browser/compiler interoperability and framework mounting, not widget state or behavior.
+- Interactive widgets are implemented in Flick itself. JavaScript/TypeScript is limited to browser/compiler interoperability and framework mounting, not widget state or behavior.
 - Use actual compiler/runtime capabilities and checked source material; do not invent adoption, performance benchmarks, roadmap completion, or package availability.
 - Preserve error reporting and worker isolation when running visitor-authored programs.
 
 ## Brand Commitments
 
-The product name is Flick. The owner requested a distinctive logo, beautiful documentation, and a gentle animated background. Their explicit visual references are Effector documentation, effect.website, and v1001.reatom.dev. Effect's Play and Flow's Try are interaction references for Play and Transpile. The owner chose visual mockups before implementation.
+The product name is Flick. The identity calls for a distinctive logo, beautiful documentation, and a gentle animated background. Visual references are Effector documentation, effect.website, and v1001.reatom.dev. Effect's Play and Flow's Try are interaction references for Play and Transpile.
 
-The owner prefers distinctive visual wordplay like the logos at [Tonsky](https://tonsky.me/design/) and [Evil Martians](https://evilmartians.com/opensource), not a childish cartoon mascot. The approved identity is the sharp violet woodpecker shaped like a lowercase `f`: a continuous curved head/neck and tapered stem, two backward coral-tipped crest points, an angular eye, a coral beak, and a same-violet three-tip horizontal wing with restrained shallow relief. This mark replaces the earlier toggle and geometric-F/spark concepts across the README, repository assets, documentation site, and editor icon. Theme-aware wordmarks pair the same bird with a lowercase Geist `flick` in graphite on light backgrounds and light ink on dark backgrounds. The documentation site's Signal UI palette, typography, layout, and atmospheric dot field remain unchanged.
+The identity favors distinctive visual wordplay like the logos at [Tonsky](https://tonsky.me/design/) and [Evil Martians](https://evilmartians.com/opensource), not a childish cartoon mascot. The identity is the sharp violet woodpecker shaped like a lowercase `f`: a continuous curved head/neck and tapered stem, two backward coral-tipped crest points, an angular eye, a coral beak, and a same-violet three-tip horizontal wing with restrained shallow relief. This mark replaces the earlier toggle and geometric-F/spark concepts across the README, repository assets, documentation site, and editor icon. Theme-aware wordmarks pair the same bird with a lowercase Geist `flick` in graphite on light backgrounds and light ink on dark backgrounds. The documentation site's Signal UI palette, typography, layout, and atmospheric dot field remain unchanged.
 
 ## Evidence on Hand
 

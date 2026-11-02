@@ -139,7 +139,7 @@ impl Checker<'_> {
                 fs.iter()
                     .try_for_each(|(l, p)| self.bind_pattern(p, &types[l], out))
             }
-            // the alternatives bind the same names at one type (Р9)
+            // the alternatives bind the same names at one type (`docs/formal/core.md#or-pattern-alternatives-are-compared-by-subtyping`)
             Pat::Or(ps) => {
                 let mut first: Option<Vec<(Name, Type)>> = None;
                 for p in ps.iter() {

@@ -15,7 +15,7 @@ and `--help`; `flick help <command>` prints a command's help and
 | `new <dir> [--template app\|cli\|fullstack\|lib]` | creates a project: `flick.toml`, `package.json`, an example module and its test; `cli` makes `main` a [`cli` block](../cli-dsl/); `fullstack` is a server entry and a browser page (`target = "client"`) sharing the calls of a [`server fn`](../server-fn/) module, writes guarded by `Server.authenticated`, with Vite for the page |
 | `init [--template app\|cli\|fullstack\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`) |
 | `check [paths] [--watch] [--fix]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left |
-| `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files; shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
+| `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--promise-facade] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files (`--emit go`: a Go executable per entry, see [Go target](../codegen/#go-target)); `--emit-dts` adds `.d.ts` files and `--promise-facade` Promise façades `A/B.promise.js` (see [TypeScript](../codegen/#typescript)); shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
 | `build [paths] --inputs` | prints a conservative JSON input inventory (`key`, `files`, `roots`, `modules`) without writing build artifacts or cache entries |
 | `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | builds JavaScript and runs the `main` of the entry `name` (the only one when left out); `--devtools` sends its spans to the Effect DevTools ([observability](../observability/#devtools)) |
 | `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | rebuilds on changes and replaces the running app; in a project with several entries and none named, it runs every entry that is not a client's and, if one is, Vite (`node_modules/.bin/vite`) for the pages, which replaces a changed module in the page keeping the labelled atoms' values |
@@ -27,12 +27,16 @@ and `--help`; `flick help <command>` prints a command's help and
 | `deps [--why <pkg>]` | the installed graph, and the Flick modules of each direct dependency |
 | `pack --out-dir <dir>` | a release build and its npm tarball; refuses `todo` and `echo` (`FLICK-P024`), and warns when the public API breaks importers since the latest tag |
 | `diff [ref]` | the public API changes since a git revision (the latest tag by default), each `MAJOR` (removed or changed) or `MINOR` (added), and the version they call for from `package.json` |
-| `ffi import`, `ffi check` | bindings from `.d.ts`, see [ffi.md](../ffi/) |
-| `schema export <M.codec> --target json-schema-2020-12 --out <file>` | the strict JSON Schema of a codec |
+| `ffi import <pkg> --out <dir> [--select a,b]` | reads the `.d.ts` of an installed package and writes `<dir>/<Pkg>/Generated.fl` with a coverage report; `--select` imports only the named exports (see [Importing a package's `.d.ts`](../ffi/#importing-a-packages-dts)) |
+| `ffi check [paths]` | checks generated and reviewed bindings and their policies against the installed packages; without paths the source root |
+| `schema export <M.codec> --target json-schema-2020-12 --out <file>` | the strict JSON Schema of a `PureCodec Json a` |
+| `schema export <M.api> --target openapi-3.1 --out <file>` | an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes (see [Clients and documents](../http-api/#clients-and-documents)) |
 | `doc --out-dir <dir>` | Markdown pages of the public API: types, kinds, constraints, effects, captures |
 | `explain <code>` | the explanation of a diagnostic code |
 | `doctor` | the compiler, Node.js, pnpm, the installed runtime and Effect, the optional adapters |
 | `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | one representation of a module |
+| `lsp --stdio` | the [language server](../editor/#language-server); stdio is its only transport |
+| `content-mapper [--declarations <paths>…]` | serves TypeScript's [Content Mapper](../editor/#content-mapper) requests for `.fl` files on stdio, started by `@flick-lang/content-mapper`; `--declarations` instead writes the projection of each `.fl` file under the paths beside it as `Name.d.fl.ts` and exits |
 
 `check`, `build` and the build steps of `run`, `dev` and `test` install
 nothing, run no `main` and load no foreign module. An installed
@@ -104,7 +108,14 @@ With `--diagnostics json` stderr is NDJSON, one event per line, every event
 with `schema-version`: `diagnostic`, `log` (service messages),
 `application-stderr` (the app's or the tests' stderr) and
 `package-manager-output` (pnpm), the last three as
-`{ "type", "channel", "text" }` without ANSI codes.
+`{ "type", "channel", "text" }` without ANSI codes. A `diagnostic` has
+`code` (`FLICK-…`), `severity` (`error`, `warning`, `note`), `message`, `path` and
+`range` (`start`, `end`: UTF-8 byte offsets, end exclusive; both `null`
+without a location), then `related` locations with their messages and
+`fixes` (a message and edits, each a `path`, a `range` and a `replacement`).
+In human mode the app's stderr passes through as it is.
+`test --reporter json` writes its object to stdout, and the stdout of
+`flick lsp` carries only the protocol.
 
 `--silent` is an alias for `--quiet`, accepted before or after the command.
 It suppresses service output, not warnings or errors, and leaves useful stdout
@@ -121,7 +132,7 @@ its JSON inventory on success, without progress or a summary.
 
 | Code | Meaning |
 | - | - |
-| `0` | success |
+| `0` | success; for `fmt --check`, every file is formatted |
 | `1` | errors in the code, failed tests, an unformatted file, a failed app or cleanup |
 | `2` | a wrong invocation or configuration, a missing or wrong dependency or toolchain |
 | `3` | an internal error of Flick |

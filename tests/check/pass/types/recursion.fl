@@ -61,7 +61,7 @@ let sum items =
   go items 0
 
 // a local function under a full `forall` uses itself at its own scheme,
-// which holds no captures of the function it is in (found by X2)
+// which holds no captures of the function it is in (found by the model properties)
 nested_depth : Nested Float -> Float
 let nested_depth value =
   go : forall a. Nested a -> Float -> Float

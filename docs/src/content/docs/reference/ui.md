@@ -2,7 +2,7 @@
 title: "User interfaces"
 ---
 
-`Ui` (see [Type-level programming and eDSLs](../../spec/10-type-programming-and-edsl/)) describes a user interface and the handlers of
+`Ui` (see [Type-level programming and eDSLs](../../spec/08-type-programming-and-edsl/)) describes a user interface and the handlers of
 its events. A handler's task writes atoms (`Atom.Write`) and nothing else:
 it provides any other service itself and handles its own errors, so a
 `Ui` carries no rows. Building one is pure: it runs no
@@ -669,7 +669,7 @@ and a handler is a supervised task that writes them. There is no
 `Msg → update` loop, and none is planned: what Elm puts in commands is a
 task of an action, run by the Effect fibers, scopes and event policies that
 already exist. Sources that write atoms on their own, Elm's subscriptions,
-are among the [prioritized gaps](#prioritized-gaps) below.
+are among the [limitations](#limitations) below.
 
 ### Comparison with Elmish
 
@@ -724,19 +724,18 @@ Regression coverage is kept with the behavior:
   imports a compiled Flick module while rejecting `react-dom` imports,
   rather than checking only the runtime's TypeScript entry point.
 
-### Prioritized gaps
+### Limitations
 
-These capabilities are **not implemented**. The order accounts for future
-React Native, Ink and React Three Fiber support: moving DOM tags alone
-does not create another backend.
+These capabilities are **not implemented**. Supporting React Native, Ink or
+React Three Fiber needs more than moving DOM tags: each needs the host
+primitives and an adapter below.
 
-| Priority | Capability | Minimum contract and reason |
-| - | - | - |
-| P1 | Keyed subscriptions of atoms | Start and stop sources by stable identity, reject late events and use scope-owned cleanup. Timers, sockets, terminal input and animation sources write atoms without waiting for a UI handler to finish. |
-| P1 | Typed host primitives and events | Separate HTML constructors from renderer-specific `View`/`Text`, Ink host nodes and R3F scene nodes. Styles, numeric props and event snapshots must not assume DOM `target.value` or `preventDefault`. |
-| P1 | Real Native / Ink / R3F adapters | Build on `Renderer` and host primitives: registration/mounting, updates, synchronous detachment and resource shutdown. Define R3F's frame-loop/invalidation relationship with atoms explicitly; do not send 60 messages per second unnecessarily. |
-| P2 | Typed React interop | Foreign-component children/slots, scoped refs, Context/providers and lifecycle with defined resource release. Currently only opaque `Ui.component` with props is available. |
-| P2 | Atom diagnostics and development | Tracing of atom writes and actions, and state-preserving HMR. Build on the registry of the root, not on a global mutable singleton. |
+| Capability | Minimum contract and reason |
+| - | - |
+| Keyed subscriptions of atoms | Start and stop sources by stable identity, reject late events and use scope-owned cleanup. Timers, sockets, terminal input and animation sources write atoms without waiting for a UI handler to finish. |
+| Typed host primitives and events | Separate HTML constructors from renderer-specific `View`/`Text`, Ink host nodes and R3F scene nodes. Styles, numeric props and event snapshots must not assume DOM `target.value` or `preventDefault`. |
+| Real Native / Ink / R3F adapters | Build on `Renderer` and host primitives: registration/mounting, updates, synchronous detachment and resource shutdown. Define R3F's frame-loop/invalidation relationship with atoms explicitly; do not send 60 messages per second unnecessarily. |
+| Typed React interop | Foreign-component children/slots, scoped refs, Context/providers and lifecycle with defined resource release. Currently only opaque `Ui.component` with props is available. |
 
 Existing Effect, fibers/scopes, bounded event
 policies, supervision, escaping checks and the safe text channel are not

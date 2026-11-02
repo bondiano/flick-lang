@@ -268,5 +268,5 @@ let count_rows table =
     (Codec.json (schema Count))
 ```
 
-Not in the first version: correlated and `LATERAL` subqueries, recursive
+Not supported: correlated and `LATERAL` subqueries, recursive
 CTEs, window functions, `RIGHT` and `FULL` joins, DDL.

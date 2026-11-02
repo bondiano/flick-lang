@@ -12,7 +12,7 @@
 //! The judgement `Γ ⊢ e : τ ! φ` is `infer`/`check` returning `τ`, with
 //! `φ` accumulated in `self.stage`. The forms of the run time (§3.6),
 //! which the translation never makes, are typed in `runtime.rs`, so that
-//! Preservation can be checked on the states of the machine (X2).
+//! Preservation can be checked on the states of the machine (the model properties, `just model`).
 
 mod constants;
 mod dicts;

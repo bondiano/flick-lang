@@ -2,7 +2,7 @@
 title: "Modules and names"
 ---
 
-One `.fl` file is one module (see [The Flick compiler and Content Mapper integration](../../spec/11-compiler/)). The module header names it and lists
+One `.fl` file is one module. The module header names it and lists
 what it exports; imports bring other modules' exports into scope.
 
 ```flick
@@ -100,6 +100,40 @@ may refer to itself and to other types of the file:
 ```flick
 type Tree a = Leaf | Node a (Forest a)
 type alias Forest a = List (Tree a)
+```
+
+Functions that call themselves or each other are declared with `let rec` or
+in one `rec { … }` group (see [Recursion](../types/#recursion)). Modules are
+not values: there are no first-class modules or functors.
+
+## Initialization and entry modules
+
+Loading a module evaluates its top-level values, so they are built purely:
+an effectful call there is `FLICK-E001`, a top-level `task` is fine because
+its body is deferred (see [Stages](../effects/#stages)), and of foreign
+functions only a `pure` one may run at load (see [Modes](../ffi/#modes)).
+Importing a module, a library's included, runs nothing else.
+
+An app names its entry modules in `flick.toml`, `entry` or `entries` (see
+[Entry points](../project/#entry-points)). Each exports `main`, its own or
+re-exported. A pure `main : Unit -> Unit` is called directly; a runtime
+`main` takes and returns `Unit`, needs no service and fails only with
+`AppError` (`FLICK-P026` otherwise), so it provides its layers and handles
+other errors itself.
+
+An entry marked `target = "client"` runs in a browser: nothing its `main`
+reaches may need `Server` (`FLICK-E009`, with the path to it), so its bundle
+holds no server module and no secret. Such code reaches the server through
+a [`server fn`](../server-fn/): the client calls it by name and needs no
+service for it, while a server entry serves it with `Server.handler`.
+`flick new --template fullstack` writes such a pair, and `flick dev` runs the
+server entry and Vite for the page:
+
+```toml
+[project]
+kind = "app"
+runner = "Runner.Node"
+entries = { server = "App.Server", web = { module = "App.Web", runner = "Runner.Browser", target = "client" } }
 ```
 
 ## Shadowing and ambiguity

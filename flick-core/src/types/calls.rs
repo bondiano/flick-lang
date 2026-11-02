@@ -175,7 +175,7 @@ impl Checker<'_> {
                     let calls = self.stage.calls;
                     let since = self.diagnostics.len();
                     // a task acquiring into a region a later argument names
-                    // waits for it (Р25)
+                    // waits for it (`docs/formal/regions.md#scope-region-of-a-task-argument-is-resolved-after-the-call`)
                     let eff = self.eff_parts(&param).is_some();
                     let outer = eff.then(|| self.regions.defaults.replace(Vec::new()));
                     let argument = self.check_value(arg, &param);

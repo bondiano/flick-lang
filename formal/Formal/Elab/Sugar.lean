@@ -13,17 +13,17 @@ A tuple of the values of a group `p₁ <- e₁ and … and pₙ <- eₙ` is nest
 constant `unc n : (a₁ → … → aₙ → r) → T_n → r` for each `n ≥ 1`.
 
 The schemes are the checker's types of the Prelude (`Prelude.fl`, `Seq.fl`) translated by
-Р188: a type with hidden storage (`Eff`, `Seq`) and the variable of a class over containers
+With `CRow` qualifiers (`elaboration.md`, Prelude schemes): a type with hidden storage (`Eff`, `Seq`) and the variable of a class over containers
 take the qualifier of the value as their first argument, `(T ā)^q ↦ T q ā` (`appQ`), and data
 without storage drops it. The core has no (≤-Cap) on that argument, so a qualifier the
 caller supplies is a variable of the scheme, and one the result shows names what the
-arguments it holds reach (`elaboration.md` Р188).
+arguments it holds reach (`elaboration.md`, Prelude schemes).
 
 The schemes of the Prelude names are generated from the checker (`PreludeSchemes`, `just
 formal-schemes`). `bindTy`, `map2Ty` and `eachSch` are their forms the proofs use; the witness
 holds them to the generated ones by `rfl` (`Witness/Prog.lean`, `eachSch_R`). `pair`, `unc n`
-and `each_P` have no Prelude name and stay written here (Р184, README simplification 9);
-`from_result` is a family over closed rows of errors (`frSch`, Р210).
+and `each_P` have no Prelude name and stay written here (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`, README simplification 9);
+`from_result` is a family over closed rows of errors (`frSch`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
 -/
 
 namespace Flick.Elab
@@ -43,7 +43,7 @@ def nest (tup : Nat) : Ty → List Ty → Ty
 def vars (n : Nat) : List Ty := (List.range n).map .var
 
 /-- `T q a`: a type with hidden storage, or a class variable over containers, with the
-qualifier `q` of its value (Р188). -/
+qualifier `q` of its value (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`). -/
 abbrev appQ (m q a : Ty) : Ty := .app (.app m q) a
 
 /-- The type of `flat_map` for the container `m`:
@@ -65,7 +65,7 @@ def uncSch (tup n : Nat) : Scheme :=
     (.arr .P (nest tup (.var 0) (vars n).tail) (.var n) (.var (n + 1))), .cnil⟩
 
 /-- `each_φ : ∀c d a. (a →φ^c Unit) →P (Seq d a →φ^c Unit)`, the loop of `for … do` at the
-stage `φ` (Р184). `each_P` has no Prelude name; `each_R` is `Seq.each_effect` (`eachSch_R`). -/
+stage `φ` (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`). `each_P` has no Prelude name; `each_R` is `Seq.each_effect` (`eachSch_R`). -/
 def eachSch (unit seq : Nat) (φ : Stage) : Scheme :=
   ⟨3, [], arrP (.arr φ (.var 2) (.con unit) (.var 0))
     (.arr φ (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil⟩
@@ -76,7 +76,7 @@ theorem eachSch_R (unit seq : Nat) :
 /-- `from_result_n : ∀a. Result (Errors (con n)) a →R a`, `from_result` at the closed row of
 errors `con n`. The core has no row variables, and its `raise` adds what the error reaches to
 the row, so the checker's `∀e a` becomes a family over closed rows, as `each_φ` is over stages
-(Р210). `frSch_gen`: a member is the generated scheme at `e := con n`. -/
+(`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). `frSch_gen`: a member is the generated scheme at `e := con n`. -/
 def frSch (result errors n : Nat) : Scheme :=
   ⟨1, [], .arr .R (.app (.app (.con result) (.app (.con errors) (.con n))) (.var 0)) (.var 0) .cnil,
     .cnil⟩
@@ -125,11 +125,11 @@ structure Sugar (P : Prog) where
   hNothing : P.methods nothing = some (alternative, PreludeSchemes.nothing alternative)
   /-- `iter : ∀f d a. Iterable f ⇒ f d a →P Seq (d ∪ a) a` (`∀d a. (f a)^d → (Seq a)^d`) -/
   hIter : P.methods iter = some (iterable, PreludeSchemes.iter iterable seq)
-  /-- `pair : ∀a b. a →P b →P (a, b)`, a constant of the model: no Prelude name (Р184,
+  /-- `pair : ∀a b. a →P b →P (a, b)`, a constant of the model: no Prelude name (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`,
   README simplification 9) -/
   hPair : P.consts pair = some ⟨2, [], arrP (.var 0) (arrP (.var 1)
     (.app (.app (.con tup) (.var 0)) (.var 1))), .cnil⟩
-  /-- `unc n`, a constant of the model: no Prelude name (Р184, README simplification 9) -/
+  /-- `unc n`, a constant of the model: no Prelude name (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`, README simplification 9) -/
   hUnc : ∀ n, 0 < n → P.consts (unc n) = some (uncSch tup n)
   hNone : P.consts noneC = some ⟨1, [], optTy (.var 0), .cnil⟩
   /-- `Seq.flat_map : ∀c d a b e. bindTy Seq c d a b e` (`Seq.fl`) -/
@@ -144,7 +144,7 @@ structure Sugar (P : Prog) where
   hEach : ∀ φ, P.consts (each φ) = some (eachSch unit seq φ)
   hUnitV : P.consts unitV = some ⟨0, [], .con unit, .cnil⟩
   /-- `from_result_n : ∀a. Result (Errors (con n)) a →R a` (`core.md` §1.4), the generated
-  scheme at a closed row (`frSch_gen`, Р210) -/
+  scheme at a closed row (`frSch_gen`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`) -/
   hFromResult : ∀ n, P.consts (fromResult n) = some (frSch result errors n)
 
 variable {P : Prog} (S : Sugar P)
@@ -198,7 +198,7 @@ inductive Clause where
   | guard (c : Exp)
   | let_ (e : Exp)
 
-/-- `G⟦c̄ ; e⟧` of §3.2, with `iter` on each source (Р183). -/
+/-- `G⟦c̄ ; e⟧` of §3.2, with `iter` on each source (`docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter`). -/
 def Sugar.gen : List Clause → Exp → Exp
   | [], e => .app (.const S.singleton) e
   | .gen s :: cs, e =>
@@ -206,7 +206,7 @@ def Sugar.gen : List Clause → Exp → Exp
   | .guard c :: cs, e => .ite c (Sugar.gen cs e) (.const S.empty)
   | .let_ x :: cs, e => .let_ x (Sugar.gen cs e)
 
-/-- `L⟦c̄ ; e⟧` of §3.2 at the stage `φ` (Р184). -/
+/-- `L⟦c̄ ; e⟧` of §3.2 at the stage `φ` (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`). -/
 def Sugar.loop (φ : Stage) : List Clause → Exp → Exp
   | [], e => e
   | .gen s :: cs, e =>

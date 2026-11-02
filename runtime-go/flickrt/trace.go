@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 )
 
-// The runtime trace of docs/formal/runtime.md (X4): with FLICK_TRACE set
+// The runtime trace of docs/formal/runtime.md: with FLICK_TRACE set
 // to a file, each step of the owner contract λRT names is written there as
 // one JSON object per line, in the order the steps happened. The JS
 // runtime writes the same events (runtime/src/trace.ts); flick-model's

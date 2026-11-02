@@ -27,7 +27,7 @@ pub mod types;
 
 #[cfg(test)]
 mod builtin_source;
-/// Version of the Flick language this core targets (spec header: "Flick 0.7").
+/// Version of the Flick language this core targets (the spec index states it).
 pub const LANGUAGE_VERSION: &str = "0.7";
 
 /// Checks one source file on its own: syntax, names and types; its imports

@@ -1,14 +1,14 @@
 import Formal.Elab.CoreTy
 
 /-!
-# λFlick⁺ as a `Target`: the terms (P4a3)
+# λFlick⁺ as a `Target`: the terms
 
 `Tr N γ δ e e'`: the elaborated term `e` is the core term `e'`. The variables of `Γ` and the
 premises of `Δ` go into one context of the core, through the maps `γ` and `δ`: `lam` pushes
 one variable, `lamD l` pushes `l` premises (the `i`-th argument is the premise `i`). Methods
 and slots are projections, instances, constants and the compiler's dictionaries are globals,
 `if` and `match` on `Option` are `match_` with a last arm `_`. The translation is a relation
-only in the globals of structural and primitive dictionaries (Р195).
+only in the globals of structural and primitive dictionaries (`docs/formal/elaboration.md#structural-and-primitive-dictionaries-are-families-indexed-by-type`).
 
 `Corr Γc Γ Δ γ δ`: the context of the core gives `⟦Γ[x]⟧` at `γ x` and `D_{Δ[k]}` at `δ k`,
 and nothing where `Γ` and `Δ` give nothing. A translation has no run-time sites

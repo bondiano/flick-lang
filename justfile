@@ -22,7 +22,7 @@ test:
 
 # The reference model of λFlick: its unit tests, the cases of
 # tests/run/model.txt checked and run against their `.stdout`, and the
-# properties of X2 on generated programs (`PROPTEST_CASES` sets how many)
+# model properties on generated programs (`PROPTEST_CASES` sets how many)
 model:
     cargo test -p flick-model -- --include-ignored
 

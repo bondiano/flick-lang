@@ -3,7 +3,7 @@ title: Ecosystem
 description: The compiler, Effect-based runtime, browser compiler, web integration and editor tools available in the Flick repository.
 ---
 
-Flick is an ML-family language that compiles to JavaScript on Effect. It is not a replacement JavaScript runtime or a replacement for Effect: the compiler checks Flick programs, generated ES modules use the Flick runtime adapter, and that adapter builds on Effect.
+Flick is an ML-family language that compiles to JavaScript on Effect, or to a standalone Go executable (see [Go target](../reference/codegen/#go-target)). It is not a replacement JavaScript runtime or a replacement for Effect: the compiler checks Flick programs, generated ES modules use the Flick runtime adapter, and that adapter builds on Effect.
 
 You can explore the language in [Play](/play/) and inspect generated JavaScript in [Transpile](/transpile/). For exact signatures and contracts, use the [API & reference index](../api/).
 

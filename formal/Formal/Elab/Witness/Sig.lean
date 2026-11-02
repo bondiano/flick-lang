@@ -3,7 +3,7 @@ import Formal.Elab.Witness.Closed
 import Formal.Elab.LazyEff
 
 /-!
-# Witness: the names and the signature of the core, `Real` (W1)
+# Witness: the names and the signature of the core, `Real`
 
 `N` names the core's types, records, labels and globals; `Sg` declares the constructors
 (`MkEff : eff ∅ ∅ b {q} → Eff q b`, the lists `Seq q a` and `ListQ q a` and the option
