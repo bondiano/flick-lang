@@ -77,3 +77,16 @@ foreign pure property from "@flick-lang/runtime" "testProperty"
 /// Tests under a common name prefix.
 group : String -> List Test -> Test
 foreign pure group from "@flick-lang/runtime" "testGroup"
+
+/// A test of a suite, which gets the services `o` of its layer.
+type Spec (o : ServiceRow)
+
+/// Tests that share what `layer` makes: it is built once, before the first
+/// of them that runs, and released after the last, the `beforeAll` and
+/// `afterAll` of the suite. A failed build fails each of its tests.
+suite : forall e o. String -> Layer none e o -> List (Spec o) -> Test
+foreign pure suite from "@flick-lang/runtime" "testSuite"
+
+/// An effectful test of a suite: `effect_test` with the suite's services.
+it : forall o e. String -> (forall s. Eff {Scope s | o} e Unit) -> Spec o
+foreign pure it from "@flick-lang/runtime" "testEffect"

@@ -223,6 +223,28 @@ let tests =
 | `Test.clock_test name task` | как `effect_test`, но на собственных часах, которые начинаются с 0 и идут только от `Test.adjust duration` и `Test.set_time millis`: сон, таймаут или расписание повторов ждут виртуального времени, так что тест часового backoff проходит сразу |
 | `Test.property name gen check` | выполняет `check` на 100 значениях `gen`, полученных из начального значения генератора данного запуска; `Gen.function result` (для аргумента с `Hash`) порождает чистые функции, нужные законам над функциями |
 | `Test.group name tests` | добавляет `name >` перед именами из `tests` |
+| `Test.suite name layer specs` | тесты, которые делят то, что делает `layer`: он строится один раз перед первым запущенным из них и освобождается после последнего — `beforeAll` и `afterAll` набора; каждый `Test.it name task` — это `effect_test` с сервисами слоя, а неудачная сборка проваливает каждый из них |
+
+Набор сквозных тестов один раз запускает то, что им нужно, например базу
+в контейнере, и шлёт запросы в собственный роутер сервера через
+`HttpApi.Inject.call` (см. [HttpApi](/ru/reference/http-api/#клиенты-и-документы)):
+
+```flick
+let services = Layer.merge Postgres.layer (Layer.merge (Server.keys "test") Crypto.system)
+
+tests : List Test.Test
+let tests = [
+  Test.suite "the API" services [
+    Test.it "signing up answers a token" (task {
+      let user = (send (at None () { user = ada }) Api.Public.endpoints.register).user
+      Test.expect (Test.is_true "a token" (user.token != ""))
+    }),
+  ],
+]
+```
+
+Так `examples/conduit/server/test` проверяет API RealWorld; его PostgreSQL
+запускается из Flick через `ChildProcess`.
 
 `flick test` собирает проект вместе с корневым каталогом тестов в `.flick/test/`
 и запускает все тесты. Полное имя теста имеет вид `Module > group > name`.

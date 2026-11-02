@@ -119,7 +119,7 @@ const resume = <A, E>(exit: Exit.Exit<A, E>): Effect.Effect<A, E> =>
   Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(exit.cause);
 
 /** Runs `effect` with `owner` as the owner of what it acquires and spawns. */
-const inside = <A, E, R>(owner: Owner, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, Scope.Scope>> =>
+export const inside = <A, E, R>(owner: Owner, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, Scope.Scope>> =>
   effect.pipe(Effect.provideService(Scope.Scope, owner.resources), Effect.provideService(CurrentOwner, owner));
 
 /**

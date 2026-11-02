@@ -266,3 +266,4 @@ testPure TestPure
 testEffect TestEffect
 testProperty TestProperty
 testGroup TestGroup
+testSuite TestSuite
