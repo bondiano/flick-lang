@@ -63,6 +63,7 @@ let sign_up name =
 username : String ->{; SchemaError} Username
 let username name = from_result (Route.Username.parse name)
 
+/// The slug of an article, for a path.
 slug : Article ->{; SchemaError} Slug
 let slug article = from_result (Route.Slug.parse article.slug)
 
@@ -77,6 +78,7 @@ let draft title tags = {
   };
 }
 
+/// `author` publishes an article with a title and tags.
 publish :
   User ->
   String ->
@@ -85,6 +87,7 @@ publish :
 let publish author title tags =
   (send (at (Some author) () (draft title tags)) Api.Articles.endpoints.create_article).article
 
+/// Signing up and in, and profiles.
 accounts : List (Test.Spec {Database, Keys, Crypto.Crypto})
 let accounts = [
   Test.it
@@ -160,6 +163,7 @@ let accounts = [
     }),
 ]
 
+/// Articles, favorites, comments and the feed.
 publishing : List (Test.Spec {Database, Keys, Crypto.Crypto})
 let publishing = [
   Test.it
@@ -273,5 +277,6 @@ let publishing = [
     }),
 ]
 
+/// The suite: one PostgreSQL for all of its tests.
 tests : List Test.Test
 let tests = [Test.suite "the API over PostgreSQL" services (accounts ++ publishing)]

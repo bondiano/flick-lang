@@ -48,6 +48,7 @@ type alias ArticlePreview = {
   author : Profile;
 } deriving Schema
 
+/// A comment with its author as the reader sees them.
 type alias Comment = {
   id : Int;
   createdAt : String;
@@ -56,12 +57,15 @@ type alias Comment = {
   author : Profile;
 } deriving Schema
 
+/// The answer of the signed-in user.
 type alias UserBody = { user : User }
   deriving Schema
 
+/// The answer of a profile.
 type alias ProfileBody = { profile : Profile }
   deriving Schema
 
+/// The answer of one article.
 type alias ArticleBody = { article : Article }
   deriving Schema
 
@@ -69,12 +73,15 @@ type alias ArticleBody = { article : Article }
 type alias ArticlesBody = { articles : List ArticlePreview; articlesCount : Int }
   deriving Schema
 
+/// The answer of a new comment.
 type alias CommentBody = { comment : Comment }
   deriving Schema
 
+/// The comments of an article.
 type alias CommentsBody = { comments : List Comment }
   deriving Schema
 
+/// The tags in use.
 type alias TagsBody = { tags : List String }
   deriving Schema
 

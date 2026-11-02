@@ -19,6 +19,18 @@ type Listing = Global | Following | Tagged String
 type Feed = Feed (Option String) Listing Int
   deriving Eq, Hash, Show
 
+/// A page of every article, or of those of `tag`.
+list :
+  Option String ->
+  Option String ->
+  Option Float ->{; HttpApi.ClientError, Unauthorized}
+  ArticlesBody
+let list jwt tag offset =
+  let query = { tag = tag; author = None; favorited = None; limit = Some 10; offset = offset }
+  Session.call
+    { path = (); query = query; headers = Session.credentials jwt; payload = () }
+    Api.Articles.endpoints.list_articles
+
 /// The articles of a feed.
 load : Feed -> Eff none {HttpApi.ClientError, Unauthorized} ArticlesBody
 let load feed = task {
@@ -31,16 +43,8 @@ let load feed = task {
       Session.call
         { path = (); query = query; headers = Session.credentials jwt; payload = () }
         Api.Articles.endpoints.feed
-    | _ ->
-      let tag =
-        match listing with
-        | Tagged t -> Some t
-        | Global -> None
-        | Following -> None
-      let query = { tag = tag; author = None; favorited = None; limit = Some 10; offset = offset }
-      Session.call
-        { path = (); query = query; headers = Session.credentials jwt; payload = () }
-        Api.Articles.endpoints.list_articles
+    | Global -> list jwt None offset
+    | Tagged t -> list jwt (Some t) offset
 }
 
 /// Every feed as a query that a change of articles loads again.

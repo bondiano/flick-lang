@@ -17,6 +17,7 @@ let user account token = {
   image = account.image;
 }
 
+/// A user as others see them.
 profile : Account -> Bool -> Profile
 let profile account following = {
   username = account.username;
@@ -25,9 +26,11 @@ let profile account following = {
   following = following;
 }
 
+/// A count of the database as a number of the wire.
 whole : BigInt -> Int
 let whole n = Int.truncate (BigInt.to_number n)
 
+/// An article as the reader sees it, with its tags.
 article : Articles.Row -> List String -> Article
 let article row tags = {
   slug = row.slug;
@@ -47,6 +50,7 @@ let article row tags = {
   };
 }
 
+/// A comment as the reader sees it.
 comment : Comments.Row -> Comment
 let comment row = {
   id = whole row.id;

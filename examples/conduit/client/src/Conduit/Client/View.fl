@@ -97,6 +97,7 @@ let navbar user =
     ],
   ]
 
+/// The footer of every page.
 footer : Ui
 let footer =
   Ui.footer { class_name = "" } [

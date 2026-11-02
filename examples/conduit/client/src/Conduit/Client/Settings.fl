@@ -10,6 +10,7 @@ import Conduit.Client.Route as Route exposing (Page(..))
 import Conduit.Client.Session as Session
 import Conduit.Client.View as View
 
+/// The fields of the settings form.
 picture : Atom.Writable String
 let picture = Atom.make ""
 
@@ -29,6 +30,7 @@ let password = Atom.make ""
 cleared : String -> Option (Option String)
 let cleared text = if String.trim text == "" then Some None else Some (Some text)
 
+/// Saves the settings and shows the profile; or lists their problems.
 save : Action.Action Unit
 let save =
   Action.exhaust (fun _ -> task {
@@ -57,6 +59,7 @@ let save =
     | Err found -> Atom.set View.form_problems found
   })
 
+/// Forgets the token and goes home.
 sign_out : Action.Action Ui.ClickSnapshot
 let sign_out =
   Action.exhaust (fun _ -> task {

@@ -7,9 +7,11 @@ module Conduit.Input exposing (..)
 
 import Conduit.Route exposing (CommentId, Slug, Username)
 
+/// The fields of a sign-up.
 type alias NewUser = { username : Option String; email : Option String; password : Option String }
   deriving Schema
 
+/// The fields of a sign-in.
 type alias Login = { email : Option String; password : Option String }
   deriving Schema
 
@@ -22,6 +24,7 @@ type alias UpdateUser = {
   image : Option (Option String);
 } deriving Schema
 
+/// The fields of a new article; its tags are optional.
 type alias NewArticle = {
   title : Option String;
   description : Option String;
@@ -37,24 +40,31 @@ type alias UpdateArticle = {
   tagList : Option (Option (List String));
 } deriving Schema
 
+/// The text of a new comment.
 type alias NewComment = { body : Option String }
   deriving Schema
 
+/// The body of `POST /api/users`.
 type alias NewUserBody = { user : NewUser }
   deriving Schema
 
+/// The body of `POST /api/users/login`.
 type alias LoginBody = { user : Login }
   deriving Schema
 
+/// The body of `PUT /api/user`.
 type alias UpdateUserBody = { user : UpdateUser }
   deriving Schema
 
+/// The body of `POST /api/articles`.
 type alias NewArticleBody = { article : NewArticle }
   deriving Schema
 
+/// The body of `PUT /api/articles/:slug`.
 type alias UpdateArticleBody = { article : UpdateArticle }
   deriving Schema
 
+/// The body of `POST /api/articles/:slug/comments`.
 type alias NewCommentBody = { comment : NewComment }
   deriving Schema
 
@@ -79,15 +89,19 @@ type alias Credentials = { authorization : Option String }
 type alias ProfilePath = { username : Username }
   deriving Schema
 
+/// The article of a path.
 type alias ArticlePath = { slug : Slug }
   deriving Schema
 
+/// The comment of a path, under its article.
 type alias CommentPath = { slug : Slug; comment_id : CommentId }
   deriving Schema
 
+/// A list of texts.
 texts : PureCodec Json (List String)
 let texts = Codec.list String.json
 
+/// Decodes a sign-up, every field optional.
 new_user : PureCodec Json NewUser
 let new_user = codec (schema NewUser) {
   username = optional_field "username" String.json;
@@ -95,12 +109,14 @@ let new_user = codec (schema NewUser) {
   password = optional_field "password" String.json;
 }
 
+/// Decodes a sign-in, every field optional.
 login : PureCodec Json Login
 let login = codec (schema Login) {
   email = optional_field "email" String.json;
   password = optional_field "password" String.json;
 }
 
+/// Decodes an update: a missing field keeps its value, `null` clears it.
 update_user : PureCodec Json UpdateUser
 let update_user = codec (schema UpdateUser) {
   email = optional_field "email" (option_as_null String.json);
@@ -110,6 +126,7 @@ let update_user = codec (schema UpdateUser) {
   image = optional_field "image" (option_as_null String.json);
 }
 
+/// Decodes a new article, every field optional.
 new_article : PureCodec Json NewArticle
 let new_article = codec (schema NewArticle) {
   title = optional_field "title" String.json;
@@ -118,6 +135,7 @@ let new_article = codec (schema NewArticle) {
   tagList = optional_field "tagList" texts;
 }
 
+/// Decodes a change of an article: a missing field keeps its value.
 update_article : PureCodec Json UpdateArticle
 let update_article = codec (schema UpdateArticle) {
   title = optional_field "title" String.json;
@@ -126,41 +144,49 @@ let update_article = codec (schema UpdateArticle) {
   tagList = optional_field "tagList" (option_as_null texts);
 }
 
+/// Decodes a new comment.
 new_comment : PureCodec Json NewComment
 let new_comment = codec (schema NewComment) {
   body = optional_field "body" String.json;
 }
 
+/// The codec of `NewUserBody`, which `deriving HttpApi` finds by its name.
 new_user_body : PureCodec Json NewUserBody
 let new_user_body = codec (schema NewUserBody) {
   user = field "user" new_user;
 }
 
+/// The codec of `LoginBody`.
 login_body : PureCodec Json LoginBody
 let login_body = codec (schema LoginBody) {
   user = field "user" login;
 }
 
+/// The codec of `UpdateUserBody`.
 update_user_body : PureCodec Json UpdateUserBody
 let update_user_body = codec (schema UpdateUserBody) {
   user = field "user" update_user;
 }
 
+/// The codec of `NewArticleBody`.
 new_article_body : PureCodec Json NewArticleBody
 let new_article_body = codec (schema NewArticleBody) {
   article = field "article" new_article;
 }
 
+/// The codec of `UpdateArticleBody`.
 update_article_body : PureCodec Json UpdateArticleBody
 let update_article_body = codec (schema UpdateArticleBody) {
   article = field "article" update_article;
 }
 
+/// The codec of `NewCommentBody`.
 new_comment_body : PureCodec Json NewCommentBody
 let new_comment_body = codec (schema NewCommentBody) {
   comment = field "comment" new_comment;
 }
 
+/// The query of the list, its numbers as text in the URL.
 list_query : PureCodec Json ListQuery
 let list_query = codec (schema ListQuery) {
   tag = optional_field "tag" String.json;
@@ -170,27 +196,32 @@ let list_query = codec (schema ListQuery) {
   offset = optional_field "offset" Codec.number_from_string;
 }
 
+/// The query of the feed.
 page : PureCodec Json Page
 let page = codec (schema Page) {
   limit = optional_field "limit" Codec.number_from_string;
   offset = optional_field "offset" Codec.number_from_string;
 }
 
+/// The `Authorization` header, absent for a visitor.
 credentials : PureCodec Json Credentials
 let credentials = codec (schema Credentials) {
   authorization = optional_field "authorization" String.json;
 }
 
+/// The `:username` of a path.
 profile_path : PureCodec Json ProfilePath
 let profile_path = codec (schema ProfilePath) {
   username = field "username" Username.json;
 }
 
+/// The `:slug` of a path.
 article_path : PureCodec Json ArticlePath
 let article_path = codec (schema ArticlePath) {
   slug = field "slug" Slug.json;
 }
 
+/// The `:slug` and `:comment_id` of a path.
 comment_path : PureCodec Json CommentPath
 let comment_path = codec (schema CommentPath) {
   slug = field "slug" Slug.json;

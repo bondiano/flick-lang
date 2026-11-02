@@ -7,8 +7,10 @@ module Conduit.Server.Validate exposing (..)
 import Conduit.Input exposing (NewArticle, NewUser, Login, UpdateArticle, UpdateUser)
 import Conduit.Problem exposing (Problems)
 
+/// A sign-up with every field there.
 type alias Registration = { username : String; email : String; password : String }
 
+/// A sign-in with every field there.
 type alias Credentials = { email : String; password : String }
 
 /// A change of the user: each field to set, `None` to keep. `Some None` clears.
@@ -20,8 +22,10 @@ type alias Change = {
   image : Option (Option String);
 }
 
+/// A new article with every field there.
 type alias Draft = { title : String; description : String; body : String; tags : List String }
 
+/// A change of an article: `None` keeps a field.
 type alias Edit = {
   title : Option String;
   description : Option String;
@@ -29,6 +33,7 @@ type alias Edit = {
   tags : Option (List String);
 }
 
+/// What RealWorld says of a field missing or blank.
 blank_message : String
 let blank_message = "can't be blank"
 
@@ -64,6 +69,7 @@ let updated field given =
 shortest : Int
 let shortest = 8
 
+/// A password of 8 to 64 characters.
 secret : Result Problems String -> Result Problems String
 let secret checked =
   match checked with
@@ -86,6 +92,7 @@ let is_email text =
       && not (String.ends_with "." host)
   | _ -> false
 
+/// An email: a name, `@` and a domain with a dot.
 email : Result Problems String -> Result Problems String
 let email checked =
   match checked with
@@ -111,6 +118,7 @@ let check result = Result.map (fun _ -> ()) result
 valid : Problems -> a -> Result Problems a
 let valid problems value = if List.is_empty problems then Ok value else Err problems
 
+/// The problems of a sign-up, or the sign-up.
 registration : NewUser -> Result Problems Registration
 let registration input =
   let username = required "username" input.username
@@ -120,6 +128,7 @@ let registration input =
   | (Ok u, Ok e, Ok p) -> Ok { username = u; email = e; password = p }
   | _ -> Err (problems_of [check username, check address, check password])
 
+/// The problems of a sign-in, or the sign-in.
 credentials : Login -> Result Problems Credentials
 let credentials input =
   let address = email (required "email" input.email)
@@ -132,6 +141,7 @@ let credentials input =
 cleared : Option (Option String) -> Option (Option String)
 let cleared field = Option.map present field
 
+/// The problems of an update of a user, or the update.
 change : UpdateUser -> Result Problems Change
 let change input =
   let username = updated "username" input.username
@@ -165,6 +175,7 @@ let tags given =
     []
     given
 
+/// The problems of a new article, or the article.
 draft : NewArticle -> Result Problems Draft
 let draft input =
   let title = required "title" input.title
@@ -183,6 +194,7 @@ let retag given =
   | Some None -> Err [("tagList", ["can't be null"])]
   | None -> Ok None
 
+/// The problems of a change of an article, or the change.
 edit : UpdateArticle -> Result Problems Edit
 let edit input =
   let title = optional "title" input.title

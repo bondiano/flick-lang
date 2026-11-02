@@ -10,6 +10,7 @@ import Database exposing (Database)
 unique_violation : String
 let unique_violation = "23505"
 
+/// The rows of a query.
 rows : Sql.Template Pg {} a ->{Database;} List a
 let rows query = Effect.or_die (task { Database.query (Sql.bind query {}) })
 
@@ -17,6 +18,7 @@ let rows query = Effect.or_die (task { Database.query (Sql.bind query {}) })
 first : Sql.Template Pg {} a ->{Database;} Option a
 let first query = List.head (rows query)
 
+/// Runs a statement.
 run : Sql.Template Pg {} a ->{Database;} Unit
 let run query = Effect.or_die (task { ignore (Database.execute (Sql.bind query {})) })
 

@@ -28,15 +28,19 @@ let signed user page =
   | Some me -> page me
   | None -> Ui.render redirect Login
 
+/// The global feed, or the reader's, which a visitor signs in for.
+home : Route.Listing -> Option User -> Ui
+let home listing user =
+  let shown = if listing.feed == Some "following" then Following else Global
+  match (shown, user) with
+  | (Following, None) -> Ui.render redirect Login
+  | _ -> Ui.render Home.page { listing = shown; number = Option.with_default 1 listing.page }
+
 /// The page `page` shows.
 body : Page -> Option User -> Ui
 let body page user =
   match page with
-  | Home listing ->
-    let shown = if listing.feed == Some "following" then Following else Global
-    match (shown, user) with
-    | (Following, None) -> Ui.render redirect Login
-    | _ -> Ui.render Home.page { listing = shown; number = Option.with_default 1 listing.page }
+  | Home listing -> home listing user
   | Tag tag query ->
     Ui.render Home.page { listing = Tagged tag; number = Option.with_default 1 query.page }
   | Login -> Auth.sign_in_page
@@ -55,6 +59,7 @@ let waiting page =
   | Home listing -> listing.feed == Some "following"
   | _ -> false
 
+/// The navbar, the page and the footer, around the current page.
 component shell () =
   // a new page starts without the problems of the last form
   let _clear =
@@ -80,6 +85,7 @@ component shell () =
     ]
   }
 
+/// Mounts the client in `#app`.
 main : Unit ->{; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with

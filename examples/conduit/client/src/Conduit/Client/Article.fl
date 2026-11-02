@@ -32,6 +32,7 @@ let slug_of text =
   | Ok slug -> slug
   | Err _ -> from_result (Err (NotFound [("article", ["not found"])]))
 
+/// Each article as a reader sees it, which a change of articles loads again.
 articles :
   Atom.Family Key (Atom.Atom (Atom.Async ArticleBody {HttpApi.ClientError, NotFound, Unauthorized}))
 let articles =
@@ -47,6 +48,7 @@ let articles =
         })
   )
 
+/// The comments of each article, which a new or deleted comment loads again.
 comments :
   Atom.Family
     Key
@@ -75,6 +77,7 @@ let toggle_follow following request =
   else
     Session.call request Api.Users.endpoints.follow
 
+/// Follows the author, or stops; a visitor signs up first.
 follow : Action.Action (Profile, Ui.ClickSnapshot)
 let follow =
   Action.exhaust (fun (author, _) -> task {
@@ -106,6 +109,7 @@ let follow_button author =
       Ui.text (" " ++ label ++ author.username),
     ])
 
+/// Deletes the reader's article and goes home.
 remove : Action.Action (String, Ui.ClickSnapshot)
 let remove =
   Action.exhaust (fun (slug, _) -> task {
@@ -153,6 +157,7 @@ let actions article reader =
 draft : Atom.Writable String
 let draft = Atom.make ""
 
+/// Posts the comment written, then clears it; or lists its problems.
 post : Action.Action (String, Unit)
 let post =
   Action.exhaust (fun (slug, _) -> task {
@@ -173,6 +178,7 @@ let post =
       Atom.set View.form_problems (Session.unreachable (HttpApi.ClientError e))
   })
 
+/// Deletes a comment of the reader.
 delete_comment : Action.Action ((String, Int), Ui.ClickSnapshot)
 let delete_comment =
   Action.exhaust (fun ((slug, id), _) -> task {

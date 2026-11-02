@@ -59,11 +59,13 @@ let own what author =
   if (Auth.signed_in ()).account.id != author then
     from_result (Err (Forbidden (Problem.problem what "forbidden")))
 
+/// A page of the articles `filter` keeps, and how many it keeps in all.
 listed : Articles.Filter -> Option Float -> Option Float ->{Session, Database;} ArticlesBody
 let listed filter limit offset =
   let (rows, total) = Articles.page (Auth.reader ()) filter (Slug.page limit offset)
   { articles = List.map Model.preview (List.map_effect shown rows); articlesCount = total }
 
+/// The articles, by tag, author or favorite, newest first, 20 a page by default.
 list_articles : Request Unit ListQuery Unit ->{Session, Database | r; Unauthorized} ArticlesBody
 let list_articles request =
   let q = request.query
@@ -72,15 +74,18 @@ let list_articles request =
     q.limit
     q.offset
 
+/// The articles of the authors the reader follows.
 feed : Request Unit Page Unit ->{Session, Database | r; Unauthorized} ArticlesBody
 let feed request =
   let me = (Auth.signed_in ()).account.id
   listed { Articles.everything with feed = Some me } request.query.limit request.query.offset
 
+/// The article of `:slug`.
 get_article :
   Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ArticleBody
 let get_article request = { article = shown (found (Route.Slug.value request.path.slug)) }
 
+/// Publishes an article: its slug is made from its title.
 create_article :
   Request Unit Unit NewArticleBody ->{Session, Database, Crypto.Crypto | r; Unauthorized, Unprocessable}
   ArticleBody
@@ -95,6 +100,7 @@ let create_article request =
   | Some row -> { article = shown row }
   | None -> Effect.die "a new article is not there"
 
+/// Changes an article of the reader: a new title gives a new slug.
 update_article :
   Request ArticlePath Unit UpdateArticleBody ->{Session, Database | r; Unauthorized, Forbidden, NotFound, Unprocessable}
   ArticleBody
@@ -113,6 +119,7 @@ let update_article request =
   | None -> ()
   { article = shown (found row.slug) }
 
+/// Deletes an article of the reader.
 delete_article :
   Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, Forbidden, NotFound} Unit
 let delete_article request =
@@ -120,6 +127,7 @@ let delete_article request =
   own "article" row.author_id
   Articles.delete row.id
 
+/// The reader favors the article.
 favorite :
   Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ArticleBody
 let favorite request =
@@ -127,6 +135,7 @@ let favorite request =
   Articles.favorite (Auth.signed_in ()).account.id row.id
   { article = shown (found row.slug) }
 
+/// The reader takes their favorite back.
 unfavorite :
   Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ArticleBody
 let unfavorite request =
@@ -134,12 +143,14 @@ let unfavorite request =
   Articles.unfavorite (Auth.signed_in ()).account.id row.id
   { article = shown (found row.slug) }
 
+/// The comments of the article.
 list_comments :
   Request ArticlePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} CommentsBody
 let list_comments request =
   let row = found (Route.Slug.value request.path.slug)
   { comments = List.map Present.comment (Comments.of_article (Auth.reader ()) row.id) }
 
+/// Adds the reader's comment to the article.
 add_comment :
   Request ArticlePath Unit NewCommentBody ->{Session, Database | r; Unauthorized, NotFound, Unprocessable}
   CommentBody
@@ -151,6 +162,7 @@ let add_comment request =
   | Some comment -> { comment = Present.comment comment }
   | None -> Effect.die "a new comment is not there"
 
+/// Deletes a comment of the reader.
 delete_comment :
   Request CommentPath Unit Unit ->{Session, Database | r; Unauthorized, Forbidden, NotFound} Unit
 let delete_comment request =
@@ -166,5 +178,6 @@ let delete_comment request =
     Comments.delete c.id
   | None -> from_result (Err missing)
 
+/// The tags in use.
 tags : Request Unit Unit Unit ->{Database | r;} TagsBody
 let tags _ = { tags = Articles.all_tags () }

@@ -30,9 +30,11 @@ service Session =
 service Keys =
   secret : Unit ->{} List Int
 
+/// What a token says: the user's id and when it expires.
 type alias Claims = { sub : String; exp : Float }
   deriving Schema
 
+/// The codec of the claims.
 claims : PureCodec Json Claims
 let claims = Codec.json (schema Claims)
 
@@ -51,6 +53,7 @@ let issue account =
       }
     })
 
+/// The 401 of a token, with why.
 refuse : String ->{; Unauthorized} a
 let refuse reason = from_result (Err (Unauthorized (Problem.problem "token" reason)))
 
@@ -83,6 +86,7 @@ let known header =
   | Some found -> { account = found; token = token }
   | None -> refuse "is invalid"
 
+/// The session of a request: who signed it, if anyone.
 session : Option Signed -> Session.Impl
 let session signed = { current = fun () -> signed }
 

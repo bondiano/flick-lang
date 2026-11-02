@@ -18,6 +18,7 @@ import Conduit.Client.Route as Route exposing (Page(..))
 import Conduit.Client.Session as Session
 import Conduit.Client.View as View
 
+/// The fields of the article being written.
 title : Atom.Writable String
 let title = Atom.make ""
 
@@ -66,6 +67,7 @@ let load jwt slug =
     fill found
   | Err _ -> fill None
 
+/// Adds the tag written, once, and clears its field.
 add_tag : Action.Action Unit
 let add_tag =
   Action.exhaust (fun _ -> task {
@@ -77,46 +79,54 @@ let add_tag =
     Atom.set tag ""
   })
 
+/// Removes a tag of the article.
 remove_tag : Action.Action (String, Ui.ClickSnapshot)
 let remove_tag =
   Action.exhaust (fun (gone, _) -> task { Atom.update tags (List.filter (fun t -> t != gone)) })
 
-/// The article written: a new one, or the one at `slug`.
+/// The fields of the editor, as an article's.
+written :
+  Unit ->{Atom.Write;} { title : Option String; description : Option String; body : Option String }
+let written () = {
+  title = Some (Atom.current title);
+  description = Some (Atom.current description);
+  body = Some (Atom.current body);
+}
+
+/// Sends the article: a new one, or a change of the one at `slug`.
+send :
+  Option String ->{Atom.Write; Unprocessable, Unauthorized, Forbidden, NotFound, HttpApi.ClientError}
+  Article
+let send slug =
+  let jwt = Atom.current Session.token
+  let fields = written ()
+  match Option.map Paths.Slug.parse slug with
+  | Some (Ok path) ->
+    let change = {
+      article = {
+        title = fields.title;
+        description = fields.description;
+        body = fields.body;
+        tagList = Some (Some (Atom.current tags));
+      };
+    }
+    (Session.call (Session.at jwt { slug = path } change) Api.Articles.endpoints.update_article).article
+  | _ ->
+    let draft = {
+      article = {
+        title = fields.title;
+        description = fields.description;
+        body = fields.body;
+        tagList = Some (Atom.current tags);
+      };
+    }
+    (Session.call (Session.at jwt () draft) Api.Articles.endpoints.create_article).article
+
+/// The article written, shown once saved; else the problems the server named.
 publish : Option String ->{Atom.Write;} Unit
 let publish slug =
-  let jwt = Atom.current Session.token
-  let written = {
-    title = Some (Atom.current title);
-    description = Some (Atom.current description);
-    body = Some (Atom.current body);
-  }
   let outcome : Result Problems Article =
-    try
-      match Option.map Paths.Slug.parse slug with
-      | Some (Ok path) ->
-        let change = {
-          article = {
-            title = written.title;
-            description = written.description;
-            body = written.body;
-            tagList = Some (Some (Atom.current tags));
-          };
-        }
-        Ok
-          (Session.call
-            (Session.at jwt { slug = path } change)
-            Api.Articles.endpoints.update_article).article
-      | _ ->
-        let draft = {
-          article = {
-            title = written.title;
-            description = written.description;
-            body = written.body;
-            tagList = Some (Atom.current tags);
-          };
-        }
-        Ok (Session.call (Session.at jwt () draft) Api.Articles.endpoints.create_article).article
-    with
+    try Ok (send slug) with
     | Unprocessable found -> Err found
     | Unauthorized found -> Err found
     | Forbidden found -> Err found
@@ -128,9 +138,11 @@ let publish slug =
     Atom.set Route.current (Article article.slug)
   | Err found -> Atom.set View.form_problems found
 
+/// Publishes from the form: Enter in a field.
 submitted : Action.Action (Option String, Unit)
 let submitted = Action.exhaust (fun (slug, _) -> task { publish slug })
 
+/// Publishes from its button.
 clicked : Action.Action (Option String, Ui.ClickSnapshot)
 let clicked = Action.exhaust (fun (slug, _) -> task { publish slug })
 

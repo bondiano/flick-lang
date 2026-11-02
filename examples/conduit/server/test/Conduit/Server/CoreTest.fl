@@ -27,6 +27,7 @@ let bio_of bio =
     (fun c -> c.bio)
     (Validate.change { email = None; username = None; password = None; bio = bio; image = None })
 
+/// The checks of the pure core.
 tests : List Test.Test
 let tests = [
   Test.test "a registration names each field it misses or gets wrong" (fun () ->

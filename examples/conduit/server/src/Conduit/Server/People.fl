@@ -9,8 +9,10 @@ import Conduit.Server.Schema exposing (Follows, Users)
 /// A user as stored.
 type alias Account = Users
 
+/// A user to store: the password already hashed.
 type alias NewAccount = { username : String; email : String; password_hash : String }
 
+/// The user of an id.
 by_id : BigInt ->{Database;} Option Account
 let by_id id =
   Db.first
@@ -20,6 +22,7 @@ let by_id id =
       select u
     })
 
+/// The user of an email.
 by_email : String ->{Database;} Option Account
 let by_email email =
   Db.first
@@ -29,6 +32,7 @@ let by_email email =
       select u
     })
 
+/// The user of a name.
 by_username : String ->{Database;} Option Account
 let by_username username =
   Db.first
@@ -60,6 +64,7 @@ let taken except username email =
   (if other except name then ["username"] else [])
     ++ (if other except address then ["email"] else [])
 
+/// Stores a new user: their id.
 insert : NewAccount ->{Database;} BigInt
 let insert account =
   Db.insert_id
@@ -101,6 +106,7 @@ let follows reader author =
       })
   Option.map (fun row -> row.n > 0n) found |> Option.with_default false
 
+/// The reader follows the author; twice is once.
 follow : BigInt -> BigInt ->{Database;} Unit
 let follow reader author =
   Db.run_once
@@ -109,6 +115,7 @@ let follow reader author =
       values { follower_id = $reader; followed_id = $author }
     })
 
+/// The reader stops following the author.
 unfollow : BigInt -> BigInt ->{Database;} Unit
 let unfollow reader author =
   Db.run

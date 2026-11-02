@@ -10,6 +10,7 @@ import Conduit.Client.Route as Route exposing (Page(..))
 import Conduit.Client.Session as Session
 import Conduit.Client.View as View
 
+/// The fields of the sign-in and sign-up forms.
 username : Atom.Writable String
 let username = Atom.make ""
 
@@ -62,6 +63,7 @@ let failed send =
   | Ok user -> keep user
   | Err found -> Atom.set View.form_problems found
 
+/// Signs in with the email and password written.
 sign_in : Action.Action Unit
 let sign_in =
   Action.exhaust (fun _ -> task {
@@ -71,6 +73,7 @@ let sign_in =
     )
   })
 
+/// Signs up with the name, email and password written.
 sign_up : Action.Action Unit
 let sign_up =
   Action.exhaust (fun _ -> task {
@@ -84,41 +87,60 @@ let sign_up =
     )
   })
 
+/// What a form page shows beside its fields.
+type alias Layout = { heading : String; other : Ui; submit : Action.Action Unit; label : String }
+
 /// The page of a form: its heading, the link to the other one, its
 /// problems and its fields.
-layout : String -> Ui -> Action.Action Unit -> String -> List Ui -> Ui
-let layout heading other submit label fields =
+layout : Layout -> List Ui -> Ui
+let layout page fields =
   Ui.div { class_name = "auth-page" } [
     Ui.div { class_name = "container page" } [
       Ui.div { class_name = "row" } [
         Ui.div { class_name = "col-md-6 offset-md-3 col-xs-12" } [
-          View.classed "text-xs-center" (Ui.heading_at Ui.H1 [Ui.text heading]),
-          View.classed "text-xs-center" (Ui.paragraph [other]),
+          View.classed "text-xs-center" (Ui.heading_at Ui.H1 [Ui.text page.heading]),
+          View.classed "text-xs-center" (Ui.paragraph [page.other]),
           Ui.render View.errors (),
           Ui.form
-            { on_submit = submit }
+            { on_submit = page.submit }
             (fields
               ++ [
                 View.classed
                   "btn btn-lg btn-primary pull-xs-right"
-                  (Ui.submit { disabled = false } [Ui.text label]),
+                  (Ui.submit { disabled = false } [Ui.text page.label]),
               ]),
         ],
       ],
     ],
   ]
 
+/// The page of `/login`.
 sign_in_page : Ui
 let sign_in_page =
-  layout "Sign in" (Route.to Register [Ui.text "Need an account?"]) sign_in "Sign in" [
-    field "email" Ui.EmailInput "Email" email,
-    field "password" Ui.PasswordInput "Password" password,
-  ]
+  layout
+    {
+      heading = "Sign in";
+      other = Route.to Register [Ui.text "Need an account?"];
+      submit = sign_in;
+      label = "Sign in";
+    }
+    [
+      field "email" Ui.EmailInput "Email" email,
+      field "password" Ui.PasswordInput "Password" password,
+    ]
 
+/// The page of `/register`.
 sign_up_page : Ui
 let sign_up_page =
-  layout "Sign up" (Route.to Login [Ui.text "Have an account?"]) sign_up "Sign up" [
-    field "username" Ui.TextInput "Username" username,
-    field "email" Ui.EmailInput "Email" email,
-    field "password" Ui.PasswordInput "Password" password,
-  ]
+  layout
+    {
+      heading = "Sign up";
+      other = Route.to Login [Ui.text "Have an account?"];
+      submit = sign_up;
+      label = "Sign up";
+    }
+    [
+      field "username" Ui.TextInput "Username" username,
+      field "email" Ui.EmailInput "Email" email,
+      field "password" Ui.PasswordInput "Password" password,
+    ]
