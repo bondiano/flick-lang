@@ -203,6 +203,8 @@ type transformed struct {
 	back func(*Fiber, Value) Value
 	// refusal is why the JSON Schema exporter has no form for it; "" writes the codec's
 	refusal string
+	// typed is the schema of its values, from `transform_as`; nil takes any value
+	typed *Schema
 }
 
 func (t *transformed) accepts(in Value) bool { return t.from.accepts(in) }
@@ -234,6 +236,13 @@ func issuesOf(err Value) []issue {
 		messages = append(messages, i.(*Record).Get("message").(string))
 	}
 	return fail(strings.Join(messages, "; "))
+}
+
+// CodecTransformAs is `transform_as`: `transform` whose values are those of the schema.
+func CodecTransformAs(typed, decode, encode, from Value) Value {
+	t := CodecTransformPure(decode, encode, from).(*transformed)
+	t.typed = sch(typed)
+	return t
 }
 
 func CodecTransformResult(decode, encode, from Value) Value {

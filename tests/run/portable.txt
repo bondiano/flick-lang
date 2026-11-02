@@ -115,6 +115,8 @@ stdlib/http/api
 stdlib/http/api_bodies
 stdlib/http/auth
 stdlib/http/spa
+stdlib/http/error_cases
+stdlib/http/error_cases_opaque
 stdlib/http/redaction_context
 stdlib/http/router_patterns
 stdlib/http/spans

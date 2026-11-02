@@ -109,6 +109,7 @@ let profile_json =
 | `Codec.json schema` | каноническая форма JSON: записи как объекты, варианты как `{"_tag": "Name", "_0": …}`, `Option` как значение или `null`, `Unit` как `null`, `BigInt` как строка |
 | `String.json`, `Float.json_finite`, `Float.json`, `BigInt.json`, `Codec.bool`, `Codec.list` | кодеки примитивов; `Float.json_finite` отклоняет `NaN` и бесконечности при кодировании и декодировании, `Float.json` записывает их как строки |
 | `Codec.transform`, `Codec.transform_result`, `Codec.transform_effect` | чистые преобразования, преобразования с возможной ошибкой и эффектные преобразования |
+| `Codec.transform_as schema decode encode codec` | `transform`, значения которого — значения `schema`: объединение или ошибки эндпоинта `HttpApi` отличают их от других по конструкторам, а простой `transform` этого не может |
 | `Codec.check predicate message` | проверка всего декодированного значения |
 | `Redacted.json_reveal codec`, `Redacted.json_masked` | явные политики для `Redacted`: раскрыть содержимое или использовать одностороннее представление `"<redacted>"` |
 

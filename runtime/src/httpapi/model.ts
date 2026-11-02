@@ -1,7 +1,7 @@
 // `HttpApi` values: endpoints, groups and APIs as frozen data. Labels are
 // the names the compiler passes for `Record.Label`; the codecs are Flick's
 // (Effect Schema codecs of the JSON wire form).
-import type { Context } from "effect";
+import { type Context, Schema } from "effect";
 import type { AnySchema } from "../schema/schemas.ts";
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "QUERY";
@@ -179,8 +179,20 @@ export const httpApiSecuritySetCookie = (security: Security, e: Endpoint): Endpo
   }
   return update(e, { successExtras: [...e.successExtras, { kind: "cookie", key: security.key }] });
 };
-export const httpApiWithErrors = (errors: ReadonlyArray<ErrorCase>, e: Endpoint): Endpoint =>
-  update(e, { errors: [...e.errors, ...errors] });
+/** A value no error type has: a codec that takes it takes anything. */
+const PROBE = Object.freeze({ _tag: "flick/opaque-probe" });
+
+/**
+ * `HttpApi.with_errors cases endpoint`. Of several cases each must tell its
+ * errors from the others', or a response would take the first case's status.
+ */
+export const httpApiWithErrors = (errors: ReadonlyArray<ErrorCase>, e: Endpoint): Endpoint => {
+  const all = [...e.errors, ...errors];
+  if (all.length > 1 && all.some((c) => Schema.is(c.codec)(PROBE))) {
+    throw new TypeError(`the errors of ${e.name} cannot be told apart: give the codec of each a type with Codec.transform_as`);
+  }
+  return update(e, { errors: all });
+};
 export const httpApiDescribe = (description: string, e: Endpoint): Endpoint => update(e, { description });
 /** `HttpApi.errors`: no case. */
 export const httpApiErrors: ReadonlyArray<ErrorCase> = Object.freeze([]);

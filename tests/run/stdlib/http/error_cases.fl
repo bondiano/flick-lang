@@ -1,0 +1,101 @@
+// Two errors of an endpoint with the same body, as RealWorld writes all of
+// them: with `Codec.transform_as` each codec knows the errors it encodes, so
+// the server answers each with its own status and the client reads it back
+// as the error it was.
+module App.Main exposing (main)
+
+type alias Problems = List (String, List String)
+
+type error Conflict = Conflict Problems
+  deriving Eq, Show, Schema
+
+type error Unprocessable = Unprocessable Problems
+  deriving Eq, Show, Schema
+
+type alias Body = { errors : Problems }
+  deriving Schema
+
+body : PureCodec Json Body
+let body = codec (schema Body) {
+  errors = field "errors" (Codec.entries (Codec.list String.json));
+}
+
+conflict : PureCodec Json Conflict
+let conflict =
+  Codec.transform_as
+    (schema Conflict)
+    (fun b -> Conflict b.errors)
+    (fun (Conflict p) -> { errors = p })
+    body
+
+unprocessable : PureCodec Json Unprocessable
+let unprocessable =
+  Codec.transform_as
+    (schema Unprocessable)
+    (fun b -> Unprocessable b.errors)
+    (fun (Unprocessable p) -> { errors = p })
+    body
+
+type alias Name = { name : String }
+  deriving Schema
+
+register :
+  HttpApi.Endpoint
+    "register"
+    (HttpApi.Request Unit Unit Unit Name ->{r; Conflict, Unprocessable} String)
+let register =
+  HttpApi.endpoint HttpApi.Post "/users" (Record.label : Record.Label "register")
+  |> HttpApi.with_payload (Codec.json (schema Name))
+  |> HttpApi.with_success 201 (Codec.json Schema.string)
+  |> HttpApi.with_errors
+    (HttpApi.errors |> HttpApi.error_case 409 conflict |> HttpApi.error_case 422 unprocessable)
+
+type alias Handlers = {
+  register : HttpApi.Request Unit Unit Unit Name ->{; Conflict, Unprocessable} String;
+}
+
+api : HttpApi.Api none { users : Handlers }
+let api =
+  HttpApi.api "Users"
+  |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "users") |> HttpApi.add register)
+
+handle : HttpApi.Request Unit Unit Unit Name ->{; Conflict, Unprocessable} String
+let handle request =
+  match request.payload.name with
+  | "" -> from_result (Err (Unprocessable [("username", ["can't be blank"])]))
+  | "ada" -> from_result (Err (Conflict [("username", ["has already been taken"])]))
+  | name -> "welcome " ++ name
+
+post_raw : String -> String ->{} String
+foreign async post_raw from "./raw.mjs" "post"
+
+/// The outcome of registering `name`.
+ask : String -> String ->{} String
+let ask base name =
+  let request = { path = (); query = (); headers = (); payload = { name = name } }
+  try HttpApi.call base register request with
+  | Conflict p -> "conflict " ++ show p
+  | Unprocessable p -> "unprocessable " ++ show p
+  | HttpApi.ClientError e -> "client error " ++ e.message
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let options : HttpApi.ServeOptions = {
+    host = "127.0.0.1";
+    port = 0;
+    openapi = None;
+    swagger = None;
+    scalar = None;
+  }
+  try
+    scope s {
+      let server = HttpApi.listen options api { users = { register = handle } }
+      let base = "http://127.0.0.1:" ++ show (HttpApi.port server)
+      Platform.stdout_line (ask base "bob")
+      Platform.stdout_line (ask base "ada")
+      Platform.stdout_line (ask base "")
+      Platform.stdout_line ("raw blank: " ++ post_raw (base ++ "/users") "{\"name\":\"\"}")
+      Platform.stdout_line ("raw taken: " ++ post_raw (base ++ "/users") "{\"name\":\"ada\"}")
+    }
+  with
+  | HttpApi.ServeError message -> Platform.stdout_line ("serve error " ++ message)

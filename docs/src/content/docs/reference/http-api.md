@@ -62,6 +62,14 @@ case has, a new `Conflict` say, is a type error before anything runs.
 `http_error status` declares it. A streamed form's handler may also fail
 with the stream's `MultipartError`, sent with the status it names.
 
+Of several cases, the server answers an error with the first case whose
+codec has it, so each codec must know its errors: a derived `Codec.json
+(schema E)` does, and so does `Codec.transform_as (schema E)` for a body of
+your own. Errors that share a body, as RealWorld's `{"errors": {…}}`, need
+it. A codec of a plain `Codec.transform` takes any value, and an endpoint with
+such a case among others is refused when it is made, as its errors cannot
+be told apart.
+
 ### Authentication
 
 `HttpApi.with_auth scheme Service check` makes the service `Service` for the

@@ -243,19 +243,17 @@ func serveEndpoint(fb *Fiber, e *apiEndpoint, handler Value, services *env, r Va
 // codecHas is whether the value is one of the codec's type: a variant of
 // its type, or a value it encodes.
 func codecHas(fb *Fiber, c codec, v Value) (has bool) {
-	if w, ok := c.(*wire); ok {
-		if s := w.s.resolved(); s.kind == kindAdt {
-			d, ok := v.(*Data)
-			if !ok {
-				return false
-			}
-			found := false
-			for _, variant := range s.variants {
-				found = found || variant.Tag == d.Tag
-			}
-			if !found {
-				return false
-			}
+	if s := codecType(c); s != nil && s.kind == kindAdt {
+		d, ok := v.(*Data)
+		if !ok {
+			return false
+		}
+		found := false
+		for _, variant := range s.variants {
+			found = found || variant.Tag == d.Tag
+		}
+		if !found {
+			return false
 		}
 	}
 	defer func() {
@@ -265,6 +263,26 @@ func codecHas(fb *Fiber, c codec, v Value) (has bool) {
 	}()
 	_, issues := c.encode(fb, v)
 	return issues == nil
+}
+
+// codecType is the schema of a codec's values, when it has one.
+func codecType(c codec) *Schema {
+	switch t := c.(type) {
+	case *wire:
+		return t.s.resolved()
+	case *transformed:
+		if t.typed != nil {
+			return t.typed.resolved()
+		}
+	}
+	return nil
+}
+
+// codecOpaque is whether a codec takes any value: a transformation without
+// the schema of its values cannot tell one error from another.
+func codecOpaque(c codec) bool {
+	t, ok := c.(*transformed)
+	return ok && t.typed == nil
 }
 
 // apiFailed is the response of a typed error: the first declared case
