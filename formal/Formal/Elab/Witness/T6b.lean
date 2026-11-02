@@ -1,0 +1,108 @@
+import Formal.Elab.Witness.Main
+
+/-!
+# Witness: T6(b) on a concrete term, without hypotheses of typing
+
+`witness_T6b` takes the typings `RHas` of both fillings as premises. Here they are proved.
+
+`witness_T6b_example`: the block `do { x <- pure (); pure x }` over the lazy `Eff`, elaborated
+under the premise `Monad Eff` (closed by the instance `I2`). Its skeleton has three dictionary
+holes, `flat_map` and the two `pure`. One filling takes `Applicative Eff` for both `pure` from
+the instance `I1`, the other from the slot of the premise `Monad Eff`. Both fillings are typed
+by the laws of `runTarget` (`has_do`), so the runs of the core give the same observations.
+
+`witness_T6b_closed`: any two elaborations of one closed source term in the empty context of
+premises run alike. Their typings come from T6(a) for `runTarget`. With premises (`Δ ≠ []`)
+the typing of the closed filling needs the substitution of the premises in `RHas`, which the
+model does not prove (README, P4a4, Р199); the example above does it by hand.
+-/
+
+namespace Flick.Elab.Witness
+
+open Flick.Elab
+
+/-- `do { x <- pure (); pure x }` elaborated, with the dictionary of `flat_map` at hole `0` and
+those of the two `pure` at holes `1` and `2`. -/
+def doSkel : Tm := .app (.app (.meth (.hole 0) 3) (.lam (.app (.meth (.hole 1) 1) (.var 0))))
+  (.app (.meth (.hole 2) 1) (.const 8))
+
+def effMonad : Cn := ⟨cMonad, [.con 5]⟩
+def effApp : Cn := ⟨cApp, [.con 5]⟩
+
+/-- The row of the block, `(∅ ∪ ∅) ∪ (∅ ∪ Unit)`, and its type `Eff row Unit`. -/
+def doRow : Ty := .cun (.cun .cnil .cnil) (.cun .cnil (.con 1))
+def doTy : TTy := .mono (appQ (.con 5) doRow (.con 1))
+
+/-- The filled block is typed by the laws of any target, from the typings of its dictionaries. -/
+theorem has_do (X : Target P) {dM dA dA' : Dict} (hM : DTyp P [] dM (.dict effMonad))
+    (hA : DTyp P [] dA (.dict effApp)) (hA' : DTyp P [] dA' (.dict effApp)) :
+    X.Has [] [] (doSkel.fill [dM, dA, dA']) doTy .P := by
+  have hpure : ∀ Γ d, DTyp P [] d (.dict effApp) →
+      X.Has Γ [] (.meth (.dict d) 1) (.mono (arrP (.con 1) (appQ (.con 5) .cnil (.con 1)))) .P :=
+    fun Γ d h => X.meth (m := 1) (θ := inst [.con 5, .cnil, .con 1]) rfl rfl (h.target X Γ .P)
+  have hk : X.Has [] [] (.lam (.app (.meth (.dict dA) 1) (.var 0)))
+      (.mono (.arr .P (.con 1) (appQ (.con 5) .cnil (.con 1)) .cnil)) .P :=
+    X.lam (X.app (hpure _ _ hA) (X.var (s := ⟨0, .mono (.con 1)⟩) (ts := []) rfl rfl) (.inl rfl))
+      (fun _ ⟨_, _, _, hs, _⟩ => by simp at hs)
+  have hx : X.Has [] [] (.app (.meth (.dict dA') 1) (.const 8))
+      (.mono (appQ (.con 5) .cnil (.con 1))) .P :=
+    X.app (hpure _ _ hA') (X.const (s := ⟨0, [], .con 1, .cnil⟩) (ts := []) rfl rfl) (.inl rfl)
+  exact X.app (X.app (X.meth (m := 3) (θ := inst [.con 5, .cnil, .cnil, .con 1, .con 1, .cnil])
+    rfl rfl (hM.target X [] .P)) hk (.inl rfl)) hx (.inl rfl)
+
+/-- The premise `Monad Eff`, closed by the instance `I2`. -/
+def ρEff : Nat → Dict := fun _ => .inst 2
+
+theorem dtyp_inst2 : DTyp P [] (.inst 2) (.dict effMonad) :=
+  DTyp.inst (σ := Ty.var) (ins := ⟨cMonad, [.con 5], [], [.inst 1]⟩) rfl
+theorem dtyp_inst1 : DTyp P [] (.inst 1) (.dict effApp) :=
+  DTyp.inst (σ := Ty.var) (ins := ⟨cApp, [.con 5], [], []⟩) rfl
+theorem dtyp_slot : DTyp P [] (.slot (.inst 2) 0) (.dict effApp) := .slot dtyp_inst2 rfl
+
+theorem ent_inst (I : Nat) {Δ Q ins} (h : insts I = some ins) (hc : ins.cls = Q.cls)
+    (ha : Q.args = ins.head) (hx : ins.ctx = []) : Ent P Δ [Q] [.inst I] := by
+  have := Ent.inst (P := P) (Δ := Δ) (Q := Q) (σ := Ty.var) (ds := []) h hc
+    (by rw [ha]; simp [Ty.subst_var])
+    (by rw [hx]; exact .nil)
+  exact this
+
+/-- **T6(b) on a concrete term**: `pure` from the instance `I1` and from the slot of `Monad Eff`
+give the same observations of the run of the core. No premise. -/
+theorem witness_T6b_example :
+    All2 (Eqv P) ([Dict.var 0, .inst 1, .inst 1].map (·.subst ρEff))
+        ([Dict.var 0, .slot (.var 0) 0, .slot (.var 0) 0].map (·.subst ρEff)) ∧
+      (runTarget real realRun rootTy).exprs.run (doSkel, doTy, .P)
+          ([Dict.var 0, .inst 1, .inst 1].map (·.subst ρEff)) =
+        (runTarget real realRun rootTy).exprs.run (doSkel, doTy, .P)
+          ([Dict.var 0, .slot (.var 0) 0, .slot (.var 0) 0].map (·.subst ρEff)) :=
+  witness_T6b doSkel (Δ := [effMonad]) (θ := Ty.var) (qs := [effMonad, effApp, effApp])
+    (fun k Q hk => by
+      cases k with
+      | zero => cases hk; exact ent_inst 2 rfl rfl rfl rfl
+      | succ k => simp at hk)
+    (.cons (.given (.given rfl)) (.cons (ent_inst 1 rfl rfl rfl rfl)
+      (.cons (ent_inst 1 rfl rfl rfl rfl) .nil)))
+    (.cons (.given (.given rfl)) (.cons (.given (.super (.given rfl) rfl))
+      (.cons (.given (.super (.given rfl) rfl)) .nil)))
+    (has_do (runTarget real realRun rootTy) dtyp_inst2 dtyp_inst1 dtyp_inst1)
+    (has_do (runTarget real realRun rootTy) dtyp_inst2 dtyp_slot dtyp_slot)
+
+theorem Dict.subst_var (d : Dict) : d.subst .var = d := by
+  induction d <;> simp_all [Dict.subst]
+
+/-- **T6(b) for closed terms of the witness**: two elaborations of one source term in the empty
+contexts, whose dictionaries fill one skeleton, run alike. No premise of typing: T6(a) for
+`runTarget` gives both. -/
+theorem witness_T6b_closed {e : Exp} {τ : Ty} {φ : Stage} (s : Tm) {qs : List Cn}
+    {ds₁ ds₂ : List Dict} (h₁ : Ent P [] qs ds₁) (h₂ : Ent P [] qs ds₂)
+    (he₁ : Elab P [] [] e τ φ (s.fill ds₁)) (he₂ : Elab P [] [] e τ φ (s.fill ds₂)) :
+    All2 (Eqv P) ds₁ ds₂ ∧
+      (runTarget real realRun rootTy).exprs.run (s, .mono τ, φ) ds₁ =
+        (runTarget real realRun rootTy).exprs.run (s, .mono τ, φ) ds₂ := by
+  have hid : ∀ ds : List Dict, ds.map (·.subst .var) = ds := fun ds => by simp [Dict.subst_var]
+  have := witness_T6b s (Δ := []) (θ := Ty.var) (ρ := .var) (fun _ _ h => by simp at h) h₁ h₂
+    (by rw [hid]; exact T6a (runTarget real realRun rootTy) he₁)
+    (by rw [hid]; exact T6a (runTarget real realRun rootTy) he₂)
+  rwa [hid, hid] at this
+
+end Flick.Elab.Witness
