@@ -1,0 +1,132 @@
+/// A profile: the user, the reader's follow or their own settings link, and
+/// the articles they wrote or favored.
+module Conduit.Client.Profile exposing (page)
+
+import Conduit.Api as Api
+import Conduit.Model exposing (ArticlesBody, ProfileBody)
+import Conduit.Problem exposing (NotFound(..), Unauthorized(..))
+import Conduit.Route as Paths
+import Conduit.Client.Article as Article
+import Conduit.Client.Route as Route exposing (Page(..), Tab(..))
+import Conduit.Client.Session as Session
+import Conduit.Client.View as View
+
+/// A profile as a reader sees it: their token, and the name.
+type Key = Key (Option String) String
+  deriving Eq, Hash, Show
+
+/// The articles of a profile: written, or favored when `favorites`.
+type Listed = Listed (Option String) String Bool
+  deriving Eq, Hash, Show
+
+profiles :
+  Atom.Family Key (Atom.Atom (Atom.Async ProfileBody {HttpApi.ClientError, NotFound, Unauthorized}))
+let profiles =
+  Atom.family (fun key ->
+    match key with
+    | Key jwt name ->
+      Atom.query
+        ["profiles"]
+        (task {
+          match Paths.Username.parse name with
+          | Ok username ->
+            Session.call (Session.at jwt { username = username } ()) Api.Users.endpoints.get_profile
+          | Err _ -> from_result (Err (NotFound [("profile", ["not found"])]))
+        })
+  )
+
+listed :
+  Atom.Family Listed (Atom.Atom (Atom.Async ArticlesBody {HttpApi.ClientError, Unauthorized}))
+let listed =
+  Atom.family (fun key ->
+    match key with
+    | Listed jwt name favorites ->
+      Atom.query
+        ["articles"]
+        (task {
+          let query = {
+            tag = None;
+            author = if favorites then None else Some name;
+            favorited = if favorites then Some name else None;
+            limit = Some 10;
+            offset = None;
+          }
+          Session.call
+            { path = (); query = query; headers = Session.credentials jwt; payload = () }
+            Api.Articles.endpoints.list_articles
+        })
+  )
+
+/// A tab of a profile, `active` when it is the one shown.
+profile_tab : Bool -> Page -> String -> Ui
+let profile_tab active target label =
+  View.classed
+    "nav-item"
+    (Ui.item [View.link (if active then "nav-link active" else "nav-link") target [Ui.text label]])
+
+/// The tabs of a profile's articles.
+article_tabs : String -> Bool -> Ui
+let article_tabs name favorites =
+  Ui.div { class_name = "articles-toggle" } [
+    View.classed
+      "nav nav-pills outline-active"
+      (Ui.list [
+        profile_tab (not favorites) (Profile name None) "My Articles",
+        profile_tab favorites (Profile name (Some Favorites)) "Favorited Articles",
+      ]),
+  ]
+
+/// The articles of a profile's tab.
+component articles (key : Listed) = ui {
+  match Atom.get (Atom.at listed key) with
+  | Atom.Loaded body -> View.articles body.articles
+  | Atom.Loading -> div { class_name = "article-preview" } [text "Loading articles..."]
+  | Atom.Failed _ -> div { class_name = "article-preview" } [text "The articles cannot be loaded."]
+}
+
+/// The profile of `name`, on its tab of favored articles when `favorites`.
+component page (props : { name : String; favorites : Bool }) = ui {
+  let jwt = Atom.value Session.token
+  let reader = Session.signed_in ()
+  match Atom.get (Atom.at profiles (Key jwt props.name)) with
+  | Atom.Loaded body ->
+    let profile = body.profile
+    let action =
+      match reader with
+      | Some me when me.username == profile.username ->
+        View.link "btn btn-sm btn-outline-secondary action-btn" Settings [
+          icon { class_name = "ion-gear-a" },
+          text " Edit Profile Settings",
+        ]
+      | _ -> Article.follow_button profile
+    div { class_name = "profile-page" } [
+      div { class_name = "user-info" } [
+        div { class_name = "container" } [
+          div { class_name = "row" } [
+            div { class_name = "col-xs-12 col-md-10 offset-md-1" } [
+              View.avatar "user-img" profile.image,
+              heading_at Ui.H4 [text profile.username],
+              paragraph [text (Option.with_default "" profile.bio)],
+              action,
+            ],
+          ],
+        ],
+      ],
+      div { class_name = "container" } [
+        div { class_name = "row" } [
+          div { class_name = "col-xs-12 col-md-10 offset-md-1" } [
+            article_tabs profile.username props.favorites,
+            Ui.render articles (Listed jwt profile.username props.favorites),
+          ],
+        ],
+      ],
+    ]
+  | Atom.Loading ->
+    div { class_name = "profile-page" } [
+      div { class_name = "container" } [text "Loading profile..."],
+    ]
+  | Atom.Failed _ ->
+    div { class_name = "profile-page" } [
+      div { class_name = "container" } [text "The profile cannot be found."],
+    ]
+}

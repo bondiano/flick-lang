@@ -9,5 +9,6 @@ packages:
   - editors/vscode
   - examples/conduit/contract
   - examples/conduit/server
+  - examples/conduit/client
 overrides:
   "@effect/platform-node-shared": 4.0.5

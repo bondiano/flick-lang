@@ -579,7 +579,9 @@ A browser state such as the URL has no value on a server. Its type,
 it the value the server renders with `Atom.on_server`, or read it with
 `Atom.client_only`, which is `None` on the server and while hydrating.
 `Atom.search_param name` is the URL's search parameter `name`; a write
-updates the URL.
+updates the URL. `Atom.stored key` is the text the browser's local storage
+keeps under `key`, `None` without one: a write of `Some text` keeps it, of
+`None` removes it, and a write in another tab shows too.
 
 ```flick
 query : Atom.Writable String
@@ -587,6 +589,9 @@ let query = Atom.on_server "" (Atom.search_param "q")
 
 tab : Atom.Atom (Option String)
 let tab = Atom.client_only (Atom.search_param "tab")
+
+token : Atom.Writable (Option String)
+let token = Atom.on_server None (Atom.stored "jwtToken")
 ```
 
 ### Streaming

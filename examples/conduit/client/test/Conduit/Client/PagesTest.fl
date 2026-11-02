@@ -1,0 +1,47 @@
+/// The pure core of the client: the URL of each page, which the spec's
+/// routes are, read back as the same page, and dates as people read them.
+module Conduit.Client.PagesTest exposing (tests)
+
+import Conduit.Client.Route exposing (Page(..), Tab(..), home)
+import Conduit.Client.View as View
+
+/// Each page and its URL in the RealWorld spec.
+pages : List (Page, String)
+let pages = [
+  (home, "/"),
+  (Home { feed = Some "following"; page = None }, "/?feed=following"),
+  (Home { feed = None; page = Some 2 }, "/?page=2"),
+  (Tag "dragons" { page = Some 3 }, "/tag/dragons?page=3"),
+  (Login, "/login"),
+  (Register, "/register"),
+  (Editor None, "/editor"),
+  (Editor (Some "how-to"), "/editor/how-to"),
+  (Settings, "/settings"),
+  (Profile "ada" None, "/profile/ada"),
+  (Profile "ada" (Some Favorites), "/profile/ada/favorites"),
+  (Article "how-to", "/article/how-to"),
+]
+
+tests : List Test.Test
+let tests = [
+  Test.test "each page has the URL of the spec, and that URL is the page" (fun () ->
+    Test.all
+      (List.map
+        (fun (page, url) ->
+          Test.all [
+            Test.equal url (Route.print Page.url page),
+            Test.equal (Some page) (Route.parse Page.url url),
+          ]
+        )
+        pages)
+  ),
+  Test.test "an unknown address is no page" (fun () ->
+    Test.equal None (Route.parse Page.url "/nowhere/at/all")
+  ),
+  Test.test "dates read as people write them" (fun () ->
+    Test.all [
+      Test.equal "March 1, 2024" (View.date "2024-03-01T09:30:00.000Z"),
+      Test.equal "not a date" (View.date "not a date"),
+    ]
+  ),
+]

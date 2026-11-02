@@ -1,0 +1,17 @@
+schema-version = 1
+
+# The Conduit client in the browser: a single-page app over the contract's
+# endpoints, built for js and served by Vite in development and by the Go
+# server (`STATIC_DIR`) in production.
+[project]
+kind = "app"
+entries = { web = { module = "Conduit.Client.Main", runner = "Runner.Browser", target = "client" } }
+source-dir = "src"
+test-dir = "test"
+
+[dependencies]
+contract = { path = "../contract" }
+
+[build]
+out-dir = "dist/flick"
+emit = "js"

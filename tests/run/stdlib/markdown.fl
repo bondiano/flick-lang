@@ -1,0 +1,31 @@
+// `Markdown.to_html`: the everyday CommonMark subset into HTML in which
+// every text is escaped, so markup, event attributes and `javascript:`
+// links in the source stay text.
+module App.Main exposing (main)
+
+source : String
+let source =
+  String.join "\n" [
+    "# Training *dragons*",
+    "",
+    "It takes **patience** and `fire`,",
+    "a [guide](https://example.org/a?b=1&c=2) and [a trap](javascript:alert(1)).",
+    "",
+    "- scales",
+    "- wings",
+    "",
+    "1. feed",
+    "2. fly",
+    "",
+    "> quoted",
+    "> twice",
+    "",
+    "```",
+    "<script>alert(1)</script>",
+    "```",
+    "---",
+    "<img src=x onerror=alert(1)> & \"quotes\"",
+  ]
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (Markdown.to_html source)

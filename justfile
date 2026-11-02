@@ -137,11 +137,21 @@ e2e-postgres:
 conduit-api:
     cargo test -p flick --test conduit -- --ignored
 
-# Build and run Conduit with PostgreSQL through Docker Compose.
+# Build and run Conduit, the client and the server, with PostgreSQL through
+# Docker Compose; it answers at http://127.0.0.1:8000
 conduit-run:
-    cargo build -p flick
-    cd examples/conduit/server && ../../../target/debug/flick build --emit go
+    CARGO_TARGET_DIR=target/own cargo build -p flick
+    cd examples/conduit && ../../target/own/debug/flick build --package server
+    cd examples/conduit/client && FLICK_BIN=../../../target/own/debug/flick pnpm build
     cd examples/conduit/server && docker compose up --build
+
+# The Conduit client against the official RealWorld Playwright suite, served
+# by the Go server over a fresh PostgreSQL: needs Docker, Go and Chromium
+# (`CHROMIUM=$(which chromium) just conduit-e2e`, or `pnpm --dir
+# examples/conduit/client exec playwright install chromium`)
+conduit-e2e:
+    CARGO_TARGET_DIR=target/own cargo build -p flick
+    cd examples/conduit && PATH="$PWD/../../target/own/debug:$PATH" ../../target/own/debug/flick script e2e
 
 # Mutation-fuzz the parser (the nightly CI job runs 1 000 000 inputs)
 fuzz iterations="1000000":

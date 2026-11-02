@@ -1,0 +1,189 @@
+/// The editor of a new article, or of one the reader wrote. Tags are added
+/// with Enter in a form of their own, so Enter there adds a tag rather than
+/// publishing the article.
+module Conduit.Client.Editor exposing (page)
+
+import Conduit.Api as Api
+import Conduit.Model exposing (Article)
+import Conduit.Problem exposing (
+  Forbidden(..),
+  NotFound(..),
+  Problems,
+  Unauthorized(..),
+  Unprocessable(..),
+)
+import Conduit.Route as Paths
+import Conduit.Client.Auth as Auth
+import Conduit.Client.Route as Route exposing (Page(..))
+import Conduit.Client.Session as Session
+import Conduit.Client.View as View
+
+title : Atom.Writable String
+let title = Atom.make ""
+
+description : Atom.Writable String
+let description = Atom.make ""
+
+body : Atom.Writable String
+let body = Atom.make ""
+
+/// The tag being written, and the tags of the article.
+tag : Atom.Writable String
+let tag = Atom.make ""
+
+tags : Atom.Writable (List String)
+let tags = Atom.make []
+
+/// The fields of `article`, or empty ones for a new article.
+fill : Option Article ->{Atom.Write;} Unit
+let fill article =
+  match article with
+  | Some a ->
+    Atom.set title a.title
+    Atom.set description a.description
+    Atom.set body a.body
+    Atom.set tags a.tagList
+  | None ->
+    Atom.set title ""
+    Atom.set description ""
+    Atom.set body ""
+    Atom.set tags []
+  Atom.set tag ""
+
+/// The article at `slug`, to edit.
+load : Option String -> String ->{Atom.Write;} Unit
+let load jwt slug =
+  match Paths.Slug.parse slug with
+  | Ok path ->
+    let found =
+      try
+        Some
+          (Session.call (Session.at jwt { slug = path } ()) Api.Articles.endpoints.get_article).article
+      with
+      | NotFound _ -> None
+      | Unauthorized _ -> None
+      | HttpApi.ClientError _ -> None
+    fill found
+  | Err _ -> fill None
+
+add_tag : Action.Action Unit
+let add_tag =
+  Action.exhaust (fun _ -> task {
+    let entered = String.trim (Atom.current tag)
+    if entered != "" then
+      Atom.update tags (fun ts ->
+        if List.any (fun t -> t == entered) ts then ts else ts ++ [entered]
+      )
+    Atom.set tag ""
+  })
+
+remove_tag : Action.Action (String, Ui.ClickSnapshot)
+let remove_tag =
+  Action.exhaust (fun (gone, _) -> task { Atom.update tags (List.filter (fun t -> t != gone)) })
+
+/// The article written: a new one, or the one at `slug`.
+publish : Option String ->{Atom.Write;} Unit
+let publish slug =
+  let jwt = Atom.current Session.token
+  let written = {
+    title = Some (Atom.current title);
+    description = Some (Atom.current description);
+    body = Some (Atom.current body);
+  }
+  let outcome : Result Problems Article =
+    try
+      match Option.map Paths.Slug.parse slug with
+      | Some (Ok path) ->
+        let change = {
+          article = {
+            title = written.title;
+            description = written.description;
+            body = written.body;
+            tagList = Some (Some (Atom.current tags));
+          };
+        }
+        Ok
+          (Session.call
+            (Session.at jwt { slug = path } change)
+            Api.Articles.endpoints.update_article).article
+      | _ ->
+        let draft = {
+          article = {
+            title = written.title;
+            description = written.description;
+            body = written.body;
+            tagList = Some (Atom.current tags);
+          };
+        }
+        Ok (Session.call (Session.at jwt () draft) Api.Articles.endpoints.create_article).article
+    with
+    | Unprocessable found -> Err found
+    | Unauthorized found -> Err found
+    | Forbidden found -> Err found
+    | NotFound found -> Err found
+    | HttpApi.ClientError e -> Err (Session.unreachable (HttpApi.ClientError e))
+  match outcome with
+  | Ok article ->
+    ignore (Atom.mutation ["articles"] (fun () -> ()) ())
+    Atom.set Route.current (Article article.slug)
+  | Err found -> Atom.set View.form_problems found
+
+submitted : Action.Action (Option String, Unit)
+let submitted = Action.exhaust (fun (slug, _) -> task { publish slug })
+
+clicked : Action.Action (Option String, Ui.ClickSnapshot)
+let clicked = Action.exhaust (fun (slug, _) -> task { publish slug })
+
+/// The tags written, each with its remove button.
+component chosen () = ui { View.classed "tag-list" (list (List.map classed_tag (Atom.value tags))) }
+
+/// A tag of the article with its remove icon.
+classed_tag : String -> Ui
+let classed_tag t =
+  View.classed
+    "tag-default tag-pill"
+    (Ui.item [
+      Ui.button { disabled = false; on_click = Action.with remove_tag t } [
+        Ui.icon { class_name = "ion-close-round" },
+      ],
+      Ui.text (" " ++ t),
+    ])
+
+/// The editor of a new article, or of the one at `slug`.
+component page (slug : Option String) =
+  let _fill =
+    Ui.on_mount
+      (task {
+        match slug with
+        | Some existing -> load (Atom.current Session.token) existing
+        | None -> fill None
+      })
+  ui {
+    div { class_name = "editor-page" } [
+      div { class_name = "container page" } [
+        div { class_name = "row" } [
+          div { class_name = "col-md-10 offset-md-1 col-xs-12" } [
+            Ui.render View.errors (),
+            form { on_submit = Action.with submitted slug } [
+              Auth.field "title" Ui.TextInput "Article Title" title,
+              Auth.field "description" Ui.TextInput "What's this article about?" description,
+              Auth.area "body" "Write your article (in markdown)" body,
+            ],
+            form { on_submit = add_tag } [
+              fieldset { class_name = "form-group" } [
+                Ui.with_host
+                  { Ui.host with class_name = Some "form-control"; name = Some "tags" }
+                  (Ui.field { bind = tag; placeholder = "Enter tags"; on_input = None }),
+                Ui.render chosen (),
+              ],
+            ],
+            View.classed
+              "btn btn-lg pull-xs-right btn-primary"
+              (button { disabled = false; on_click = Action.with clicked slug } [
+                text "Publish Article",
+              ]),
+          ],
+        ],
+      ],
+    ]
+  }

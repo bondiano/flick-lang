@@ -46,6 +46,7 @@ title: "Стандартная библиотека"
 | `Chunk` | `Chunk` из Effect для многократной конкатенации |
 | `Js.Array` | изменяемые массивы JS, доступные через эффектные операции; списки копируются на входе и выходе |
 | `String` | `split`, `join`, `slice`, `index_of`, `to_number`, … над кодовыми единицами UTF-16 |
+| `Markdown` | `to_html`: повседневное подмножество CommonMark (заголовки, абзацы, списки, цитаты, блоки кода, линии, `code`, жирный, курсив, ссылки) в HTML, где каждый текст экранирован, а ссылки ведут только на `http`, `https`, `mailto` и относительные URL, так что скрипт из исходника остаётся текстом; `escape` |
 | `Int` | `to_float`, `from_float`, `truncate`, `parse`, побитовые `bit_*` и `shift_*`, проверяемые `checked_add`, `checked_div`, …, возвращающие `Result ArithmeticError Int`, и `unsafe_div`, `unsafe_rem` |
 | `Float` | `strict_equal` (`===`), `same_value` (`Object.is`), округление, `parse`, `is_nan`, `is_finite`, … |
 | `BigInt` | преобразования и проверяемые `divide`, `remainder` |

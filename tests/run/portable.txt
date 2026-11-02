@@ -117,6 +117,7 @@ stdlib/http/api_bodies
 stdlib/http/auth
 stdlib/http/derive
 stdlib/http/inject
+stdlib/markdown
 stdlib/http/spa
 stdlib/http/error_cases
 stdlib/http/error_cases_opaque

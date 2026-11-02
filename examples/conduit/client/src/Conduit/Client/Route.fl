@@ -1,0 +1,38 @@
+/// The pages of the client as a type that derives `Url`: each value is a
+/// page and its URL, so a link names its page and the router parses the
+/// address bar into one. These are the routes the RealWorld spec gives:
+/// `/`, `/?feed=following`, `/?page=2`, `/tag/dragons`, `/login`,
+/// `/register`, `/editor`, `/editor/<slug>`, `/settings`, `/profile/<name>`,
+/// `/profile/<name>/favorites` and `/article/<slug>`.
+module Conduit.Client.Route exposing (..)
+
+/// The tab of a profile beside its own articles.
+type Tab = Favorites
+  deriving Eq, Hash, Show, Schema
+
+/// The query of a feed: the followed authors' one, and the page from 1.
+type alias Listing = { feed : Option String; page : Option Int }
+
+/// A page of the client.
+type Page =
+  | Home Listing
+  | Tag String { page : Option Int }
+  | Login
+  | Register
+  | Editor (Option String)
+  | Settings
+  | Profile String (Option Tab)
+  | Article String
+  deriving Eq, Hash, Show, Schema, Url
+
+/// The global feed.
+home : Page
+let home = Home { feed = None; page = None }
+
+/// The page the browser shows; writing it navigates.
+current : Atom.Writable Page
+let current = Atom.route Page.url home
+
+/// A link to `target`, which navigates without a reload.
+to : Page -> List Ui -> Ui
+let to target children = Ui.route_link { route = current; url = Page.url; to = target } children

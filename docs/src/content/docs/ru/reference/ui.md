@@ -614,7 +614,10 @@ let page n =
 `Atom.value`. Задайте значение для сервера через `Atom.on_server` или
 читайте состояние через `Atom.client_only`, который возвращает `None`
 на сервере и во время гидратации. `Atom.search_param name` — параметр
-запроса `name` в URL; запись в него обновляет URL.
+запроса `name` в URL; запись в него обновляет URL. `Atom.stored key` —
+текст, который локальное хранилище браузера держит под `key`, или `None`:
+запись `Some text` сохраняет его, `None` — удаляет, а запись из другой
+вкладки тоже видна.
 
 ```flick
 query : Atom.Writable String
@@ -622,6 +625,9 @@ let query = Atom.on_server "" (Atom.search_param "q")
 
 tab : Atom.Atom (Option String)
 let tab = Atom.client_only (Atom.search_param "tab")
+
+token : Atom.Writable (Option String)
+let token = Atom.on_server None (Atom.stored "jwtToken")
 ```
 
 ### Потоковый рендер

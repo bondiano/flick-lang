@@ -1,0 +1,61 @@
+/// Who uses the client: the token the browser keeps under `jwtToken`, and
+/// the user it signs in, which the API answers for it. Every request goes
+/// through `call`, which sends the token as `Authorization: Token <jwt>`.
+module Conduit.Client.Session exposing (..)
+
+import Conduit.Api as Api
+import Conduit.Input exposing (Credentials)
+import Conduit.Model exposing (User)
+import Conduit.Problem exposing (Problems, Unauthorized(..))
+
+/// The token the browser keeps; none on a server or before signing in.
+token : Atom.Writable (Option String)
+let token = Atom.on_server None (Atom.stored "jwtToken")
+
+/// The `Authorization` header of a token.
+credentials : Option String -> Credentials
+let credentials jwt = { authorization = Option.map (fun t -> "Token " ++ t) jwt }
+
+/// A request with only the headers of `jwt`.
+asking : Option String -> HttpApi.Request Unit Unit Credentials Unit
+let asking jwt = { path = (); query = (); headers = credentials jwt; payload = () }
+
+/// A request of `jwt` with a path and a payload.
+at : Option String -> p -> b -> HttpApi.Request p Unit Credentials b
+let at jwt path payload = { path = path; query = (); headers = credentials jwt; payload = payload }
+
+/// Sends `request` to `endpoint` of the API on this page's origin.
+call :
+  forall l p q h b r e s.
+  HttpApi.Request p q h b ->
+  HttpApi.Endpoint l (HttpApi.Request p q h b ->{r; e} s) ->{; HttpApi.ClientError | e}
+  s
+let call request endpoint = HttpApi.call "/api" endpoint request
+
+/// The user a token signs in, if it still does.
+user : Atom.Family (Option String) (Atom.Atom (Atom.Async (Option User) {HttpApi.ClientError}))
+let user =
+  Atom.family (fun jwt ->
+    Atom.query
+      ["user"]
+      (task {
+        match jwt with
+        | None -> None
+        | Some _ ->
+          try Some (call (asking jwt) Api.Users.endpoints.current_user).user with
+          | Unauthorized _ -> None
+      })
+  )
+
+/// The signed-in user, if one is and the API answered for them.
+signed_in : Unit ->{Atom.Read;} Option User
+let signed_in () =
+  match Atom.get (Atom.at user (Atom.value token)) with
+  | Atom.Loaded found -> found
+  | _ -> None
+
+/// The problems of an answer the server did not give as a declared error.
+unreachable : HttpApi.ClientError -> Problems
+let unreachable failure =
+  match failure with
+  | HttpApi.ClientError e -> [("", ["the server answered " ++ show e.status ++ ": " ++ e.message])]

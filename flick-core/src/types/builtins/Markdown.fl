@@ -1,0 +1,190 @@
+/// Markdown into HTML that is safe to show: every text is escaped and only
+/// the markup made here is HTML, so a script, an event attribute or a
+/// `javascript:` link in the source stays text. The subset is CommonMark's
+/// everyday one: `#` headings, paragraphs, `-`, `*`, `+` and `1.` lists,
+/// `>` quotes, fenced code, `---` rules, and inline `code`, `**strong**`,
+/// `*emphasis*` and `[links](https://…)` to `http`, `https`, `mailto` and
+/// relative URLs.
+module Markdown exposing (to_html, escape)
+
+/// `text` with `&`, `<`, `>`, `"` and `'` as entities.
+escape : String -> String
+let escape text =
+  text
+  |> String.replace_all "&" "&amp;"
+  |> String.replace_all "<" "&lt;"
+  |> String.replace_all ">" "&gt;"
+  |> String.replace_all "\"" "&quot;"
+  |> String.replace_all "'" "&#39;"
+
+/// The HTML of the Markdown `source`.
+to_html : String -> String
+let to_html source = String.join "" (blocks (String.lines source))
+
+/// Whether `url` may be followed: a relative URL or one of the safe schemes.
+safe_url : String -> Bool
+let safe_url url =
+  let lower = String.to_lower (String.trim url)
+  let schemes = ["http://", "https://", "mailto:"]
+  List.any (fun s -> String.starts_with s lower) schemes
+    || not (String.contains ":" lower) && not (String.contains "\\" lower)
+
+/// The level of a `#` heading and its text.
+heading : String -> Option (Int, String)
+let heading line =
+  let marks = List.take_while (fun c -> c == "#") (String.chars line)
+  let level = List.length marks
+  let rest = String.slice level (String.length line) line
+  if level >= 1 && level <= 6 && (rest == "" || String.starts_with " " rest) then
+    Some (level, String.trim rest)
+  else
+    None
+
+/// The text of a list item, and whether the list is ordered.
+item : String -> Option (Bool, String)
+let item line =
+  let text = String.trim_start line
+  if List.any (fun m -> String.starts_with m text) ["- ", "* ", "+ "] then
+    Some (false, String.slice 2 (String.length text) text)
+  else
+    let digits = List.take_while (fun c -> String.contains c "0123456789") (String.chars text)
+    let n = List.length digits
+    let after = String.slice n (String.length text) text
+    if n >= 1 && String.starts_with ". " after then
+      Some (true, String.slice 2 (String.length after) after)
+    else
+      None
+
+/// A line of `---`, `***` or `___`.
+is_rule : String -> Bool
+let is_rule line =
+  let text = String.replace_all " " "" line
+  String.length text >= 3 && List.any (fun m -> String.replace_all m "" text == "") ["-", "*", "_"]
+
+is_blank : String -> Bool
+let is_blank line = String.trim line == ""
+
+/// Whether a line starts a block of its own rather than going on a paragraph.
+starts_block : String -> Bool
+let starts_block line =
+  is_blank line
+    || String.starts_with "```" (String.trim_start line)
+    || String.starts_with ">" (String.trim_start line)
+    || Option.is_some (heading line)
+    || Option.is_some (item line)
+    || is_rule line
+
+/// The quoted line without its `>`.
+unquote : String -> String
+let unquote line =
+  let text = String.trim_start line
+  let rest = String.slice 1 (String.length text) text
+  if String.starts_with " " rest then String.slice 1 (String.length rest) rest else rest
+
+/// The HTML of each block of `lines`.
+blocks : List String -> List String
+let rec blocks lines =
+  match lines with
+  | [] -> []
+  | [line, ...rest] ->
+    if is_blank line then
+      blocks rest
+    else if String.starts_with "```" (String.trim_start line) then
+      let (code, after) =
+        List.span (fun l -> not (String.starts_with "```" (String.trim_start l))) rest
+      let html = "<pre><code>" ++ escape (String.join "\n" code) ++ "</code></pre>"
+      ([html] ++ blocks (List.drop 1 after))
+    else if String.starts_with ">" (String.trim_start line) then
+      let (quoted, after) = List.span (fun l -> String.starts_with ">" (String.trim_start l)) lines
+      let inner = blocks (List.map unquote quoted)
+      (["<blockquote>" ++ String.join "" inner ++ "</blockquote>"] ++ blocks after)
+    else if is_rule line then
+      (["<hr>"] ++ blocks rest)
+    else
+      match (heading line, item line) with
+      | (Some (level, text), _) ->
+        let tag = "h" ++ show level
+        (["<" ++ tag ++ ">" ++ inline text ++ "</" ++ tag ++ ">"] ++ blocks rest)
+      | (None, Some (ordered, _)) ->
+        let (items, after) =
+          List.span (fun l -> Option.map (fun (o, _) -> o) (item l) == Some ordered) lines
+        let tag = if ordered then "ol" else "ul"
+        let each =
+          List.map
+            (fun l ->
+              "<li>"
+                ++ inline (Option.with_default "" (Option.map (fun (_, t) -> t) (item l)))
+                ++ "</li>"
+            )
+            items
+        (["<" ++ tag ++ ">" ++ String.join "" each ++ "</" ++ tag ++ ">"] ++ blocks after)
+      | (None, None) ->
+        let (more, after) = List.span (fun l -> not (starts_block l)) rest
+        let text = String.join " " (List.map String.trim ([line] ++ more))
+        (["<p>" ++ inline text ++ "</p>"] ++ blocks after)
+
+/// The HTML of the inline markup of a line.
+inline : String -> String
+let inline text = String.join "" (spans (String.chars text))
+
+/// The characters before the first `close`, and those after it, if any.
+until : String -> List String -> Option (List String, List String)
+let rec until close chars =
+  match chars with
+  | [] -> None
+  | [c, ...rest] ->
+    if c == close then
+      Some ([], rest)
+    else
+      Option.map (fun (inside, after) -> ([c] ++ inside, after)) (until close rest)
+
+/// The characters before the first `**`, and those after it, if any.
+until_double : List String -> Option (List String, List String)
+let rec until_double chars =
+  match chars with
+  | [] -> None
+  | [c, ...rest] ->
+    match rest with
+    | [d, ...after] when c == "*" && d == "*" -> Some ([], after)
+    | _ -> Option.map (fun (inside, after) -> ([c] ++ inside, after)) (until_double rest)
+
+/// A link `[text](url)` at the start of `chars`, after its `[`: its text,
+/// its URL and the rest.
+link : List String -> Option (List String, String, List String)
+let link chars =
+  match until "]" chars with
+  | Some (label, ["(", ...rest]) ->
+    Option.map (fun (target, after) -> (label, String.join "" target, after)) (until ")" rest)
+  | _ -> None
+
+/// `content` in the element `tag`.
+wrap : String -> String -> String
+let wrap tag content = "<" ++ tag ++ ">" ++ content ++ "</" ++ tag ++ ">"
+
+/// The HTML of each inline piece of `chars`.
+spans : List String -> List String
+let rec spans chars =
+  match chars with
+  | [] -> []
+  | ["`", ...rest] ->
+    match until "`" rest with
+    | Some (code, after) -> [wrap "code" (escape (String.join "" code))] ++ spans after
+    | None -> ["`"] ++ spans rest
+  | ["*", "*", ...rest] ->
+    match until_double rest with
+    | Some (strong, after) when strong != [] ->
+      [wrap "strong" (String.join "" (spans strong))] ++ spans after
+    | _ -> ["**"] ++ spans rest
+  | [mark, ...rest] when mark == "*" || mark == "_" ->
+    match until mark rest with
+    | Some (em, after) when em != [] -> [wrap "em" (String.join "" (spans em))] ++ spans after
+    | _ -> [mark] ++ spans rest
+  | ["[", ...rest] ->
+    match link rest with
+    | Some (label, url, after) ->
+      let shown = String.join "" (spans label)
+      let html =
+        if safe_url url then "<a href=\"" ++ escape url ++ "\">" ++ shown ++ "</a>" else shown
+      [html] ++ spans after
+    | None -> ["["] ++ spans rest
+  | [c, ...rest] -> [escape c] ++ spans rest
