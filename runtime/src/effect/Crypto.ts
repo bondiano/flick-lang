@@ -57,6 +57,28 @@ export const flickDigest = (
 ): Effect.Effect<Array<number>, CryptoError> =>
   bytes(system.digest(ALGORITHMS[constructorName(algorithm._tag)] ?? "SHA-256", Uint8Array.from(data)));
 
+const cryptoError = (message: string): CryptoError => ({ _tag: CRYPTO_ERROR, _0: message });
+
+export const flickPbkdf2 = (
+  algorithm: Readonly<{ _tag: string }>,
+  iterations: number,
+  length: number,
+  salt: ReadonlyArray<number>,
+  password: ReadonlyArray<number>,
+): Effect.Effect<Array<number>, CryptoError> =>
+  iterations <= 0 || length <= 0
+    ? Effect.fail(cryptoError("Crypto.pbkdf2: iterations and length must be positive"))
+    : Effect.tryPromise({
+        try: async () => {
+          const subtle = globalThis.crypto.subtle;
+          const key = await subtle.importKey("raw", Uint8Array.from(password), "PBKDF2", false, ["deriveBits"]);
+          const hash = ALGORITHMS[constructorName(algorithm._tag)] ?? "SHA-256";
+          const bits = await subtle.deriveBits({ name: "PBKDF2", hash, salt: Uint8Array.from(salt), iterations }, key, length * 8);
+          return Array.from(new Uint8Array(bits));
+        },
+        catch: (cause) => cryptoError(`Crypto.pbkdf2: ${String(cause)}`),
+      });
+
 export const flickRandom = (): Effect.Effect<number> => system.random;
 export const flickRandomBoolean = (): Effect.Effect<boolean> => system.randomBoolean;
 // Flick's `Int` is 32-bit, so the draw is over that range rather than the safe integers.

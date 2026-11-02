@@ -12,6 +12,7 @@ flickGetShards HashRingGetShards
 [@flick-lang/runtime/effect/Crypto]
 flickRandomBytes CryptoRandomBytes
 flickDigest CryptoDigest
+flickPbkdf2 CryptoPbkdf2
 flickRandom CryptoRandom
 flickRandomBoolean CryptoRandomBoolean
 flickRandomInt CryptoRandomInt

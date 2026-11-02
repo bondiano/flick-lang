@@ -52,7 +52,7 @@ and `Monad`.
 | `BigDecimal` | Effect's `BigDecimal`: `from_string`, exact `add`, `subtract`, checked `multiply`, `divide_to_scale` |
 | `Duration` | Effect's `Duration`: checked `nanos`, `millis`, `seconds`, `minutes`, explicit `infinity` |
 | `Bytes` | bytes as lists of numbers from 0 to 255: `from_string` and `to_string` (UTF-8, `None` when not UTF-8), `to_base64url` and `from_base64url`, and `equal`, whose time depends only on the lengths |
-| `Crypto` | the `Crypto` service over Web Crypto (`Crypto.system`): `random_bytes`, `digest` (SHA-1, SHA-256, SHA-384, SHA-512), `hmac` over `digest` (RFC 2104), random numbers, UUIDs and ULIDs |
+| `Crypto` | the `Crypto` service over Web Crypto (`Crypto.system`): `random_bytes`, `digest` (SHA-1, SHA-256, SHA-384, SHA-512), `hmac` over `digest` (RFC 2104), random numbers, UUIDs and ULIDs; `pbkdf2` (RFC 8018), and `hash_password` / `verify_password`: PBKDF2-HMAC-SHA256 with 600000 rounds and a random salt, stored as `$pbkdf2-sha256$i=<rounds>$<salt>$<hash>` in URL-safe base64 and checked in constant time |
 | `EqHash`, `HashSet`, `HashMap` | hash collections that keep their witness |
 | `Loop` | `loop` over a `Step` and `Trampoline`, for stack-safe pure recursion |
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write`, `args`, `env` |

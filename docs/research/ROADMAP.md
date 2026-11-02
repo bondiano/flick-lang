@@ -400,7 +400,7 @@ component search (props : SearchProps) =
 **W3. `Crypto.hmac` и байты строки.** ✅ (`Crypto.hmac` — HMAC на Flick поверх `digest`, без нового кода рантайма; модуль `Bytes`: `from_string`/`to_string` — UTF-8 (одиночный суррогат — U+FFFD, как `TextEncoder`; не UTF-8 — `None`), `to_base64url`/`from_base64url`, `equal` за время, зависящее только от длин; run-кейс `stdlib/effect/hmac` на векторах RFC 4231 на обоих таргетах)
 - AC: HMAC-SHA256/384/512, сравнение за постоянное время, UTF-8-байты строки и обратно; сверено с тестовыми векторами RFC 4231 на обоих таргетах.
 
-**W4. Хеширование паролей.** ⬜
+**W4. Хеширование паролей.** ✅ (`Crypto.pbkdf2` — Web Crypto `deriveBits` на JS и PBKDF2 поверх `crypto/hmac` в `flickrt` на Go, без зависимостей; `Crypto.hash_password`/`verify_password` на Flick: 600000 раундов SHA-256, соль 16 байт, `$pbkdf2-sha256$i=…$соль$хеш` в URL-safe base64, сравнение `Bytes.equal`; хеш, записанный Python `hashlib`, проверяется на обоих таргетах; run-кейс `stdlib/effect/password` на векторах RFC 7914 и RFC 6070)
 - AC: `Crypto.Password.hash`/`verify` — PBKDF2-HMAC-SHA256 со случайной солью, строка формата PHC с параметрами; хеш одного таргета проверяется другим.
 
 **W5. Модуль `Jwt`.** ⬜
