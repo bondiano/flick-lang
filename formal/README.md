@@ -13,8 +13,8 @@ lake build --wfail      # or: nix shell nixpkgs#lean4 -c lake build --wfail
 
 `--wfail` makes a `sorry` (reported as a warning) fail the build; CI runs the same
 command in the `lean` job. `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
-`T4_3`, `T1_regions`, `T5`, `T6a`, `T6a_core`, `T6b`, `T6b_core`, `witness_T6b_example` and
-`witness_T6b_closed` lists only Lean's standard `propext`,
+`T4_3`, `T1_regions`, `T5`, `T6a`, `T6a_core`, `T6a_close`, `T6b`, `T6b_core`,
+`witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` lists only Lean's standard `propext`,
 `Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
 (`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
 
@@ -432,7 +432,8 @@ instantiate it.
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
 | §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
 | T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
-| the hypotheses of T6 hold together: a witness program | `P`, `S`, `N`, `Sg`, `root`, `coherent`, `real`, `rootTy`, `realRun`, `witness_T6a`, `witness_T6a_do`, `witness_T6b`, `witness_T6b_example`, `witness_T6b_closed` (`Elab/Witness/`, `T6b.lean`); the bodies `seqFlatMap`, `seqEach`, `seqToList`, `iterL` (`Seq.lean`), `uncB`, `frBody`, `eqRec` (`Unc.lean`); arms for every constructor are exhaustive, `exh_ctors` (`Elab/Exh.lean`) |
+| Р199: an elaboration with its premises closed by `θ`, `ρ` | `T6a_close`, `ent_close`, `Tm.dsubst`, `Tm.Skel`, `fill_dsubst` (`Elab/Close.lean`); `lift_inst`, `up_lift`, `heldS_subst`, `Cn.Ground`, `Prog.ConstsClosed` (`Elab/CloseTy.lean`) |
+| the hypotheses of T6 hold together: a witness program | `P`, `S`, `N`, `Sg`, `root`, `coherent`, `real`, `rootTy`, `realRun`, `witness_T6a`, `witness_T6a_do`, `witness_T6b`, `witness_T6b_example`, `witness_T6b_closed`, `witness_T6b_open` (`Elab/Witness/`, `T6b.lean`), `consts_closed` (`Consts.lean`); the bodies `seqFlatMap`, `seqEach`, `seqToList`, `iterL` (`Seq.lean`), `uncB`, `frBody`, `eqRec` (`Unc.lean`); arms for every constructor are exhaustive, `exh_ctors` (`Elab/Exh.lean`) |
 | Р188: the lazy `Monad Eff` in the core, `Eff q b` with the field `eff ∅ ∅ b {q}` | `effT`, `effField`, `effPure`, `effMap2`, `effBind`, `typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr` (`Elab/LazyEff.lean`) |
 | the run of dictionaries in the core: closed derivations evaluate, `≈` keeps values | `RealRun`, `ent_eval`, `eqv_sem` (`Elab/CoreDictSem.lean`); `Eval`, `SemEq` (`Elab/CoreEval.lean`); `PStep`, `decomp_eq` (`Decomp.lean`) |
 | λFlick⁺ as `Target` with the run of the core: `Rel`, `load_rel`, `step_rel`, `final_rel`; T6(b) for the core | `Cg`, `DP`, `CfgR` (`Elab/CoreCg*.lean`, `Elab/CoreRel.lean`); `phead_sim`, `rhead_sim`, `thread_sim`, `cstep_sim`, `final_sim` (`Elab/CoreHead.lean`, `Elab/CoreStep.lean`, `Elab/CoreSim.lean`); `DSim`, `eqv_dsim`, `DTyp`, `dsim_cg` (`Elab/CoreLoad.lean`); `trE`, `RHas`, `runTarget`, `T6b_core` (`Elab/CoreRun.lean`) |
@@ -520,7 +521,10 @@ Simplifications:
     field binds the method's own variables first (`rot`) and needs the method scheme closed.
     `struct_C` and `prim_p` are families over the record type and the constraint, so their
     dictionary terms carry them, `Dict.strct C τ` and `Dict.prim p q`, and the translation
-    `Tr` picks the global `N.strct C τ` (`N.prim p q`) from the term (Р195, Р196). `if` is `match c with true → a | _ → b`, and `match e with None → n |
+    `Tr` picks the global `N.strct C τ` (`N.prim p q`) from the term (Р195, Р196). The laws
+    `strct` and `prim` type them at any instance `θ` of the type, `struct_C^τ : D_{C τ₁θ} →P …
+    →P D_{C τθ}` and `prim_q : D_{qθ}`: the global has a closed scheme and the run erases the
+    type, and closing premises by types needs it (Р201). `if` is `match c with true → a | _ → b`, and `match e with None → n |
     Some y → s` is `match e with Some y → s | _ → n`, exhaustive by `_` without declaring
     `None`. `typingTarget` has an empty run; `runTarget` (P4a4) has the run of the core,
     and its `Has` adds to the core's typing the typing `DTyp` of the dictionaries of the term
@@ -567,11 +571,12 @@ under the premise `Monad Eff` closed by `I2`, with `Applicative Eff` for `pure` 
 `I1` in one filling and from the slot of `Monad Eff` in the other; both typings `RHas` are proved
 by the laws of `runTarget` (`has_do`), and the observations of the runs are equal.
 `witness_T6b_closed` is T6(b) for any two elaborations of one source term in the empty contexts
-(`Δ = []`), typed by T6(a) for `runTarget`. With premises it is not stated: the typing `RHas` of
-the closed filling `s[d̄ρ]` from an elaboration under `Δ` needs the substitution of the premises
-by `ρ` (and of the types by `θ`) in the core's typing and in `DTyp`, which the model does not
-prove (Р199: `Has` does not type the dictionaries in the empty context); the example does it by
-hand for one term. The schemes of `Sugar` come from
+(`Δ = []`), typed by T6(a) for `runTarget`. `witness_T6b_open` is the same under premises `Δ`
+closed by any types `θ` and closed dictionaries `ρ` to ground constraints (Р199): the typings
+`RHas` of the closed fillings `s[d̄ρ]` come from `T6a_close`, T6(a) with the premises closed, for
+`runTarget`. It needs the skeleton's holes outside the abstractions over dictionaries
+(`Tm.Skel`), the constants of `Γ₀` closed (`consts_closed`), and `struct_C^τ` typed at `τθ`
+(Р201). The schemes of `Sugar` come from
 `PreludeSchemes.lean`, generated from the checker's `Prelude.fl` and `Seq.fl` by the
 translation of Р188 (`flick-model/src/translate/lean.rs`, `just formal-schemes`; a golden test
 of `cargo test -p flick-model` holds the file to the checker). The witness's own schemes are
@@ -807,7 +812,8 @@ five places.
     (`DTy.core`). `trE` is the function `Tr` is (`Tr.eq`); `load e = ⟨[], [], trE id id e⟩`.
   - *Deviation:* the typing of the core of the whole term does not show its dictionaries in
     the empty context, so `runTarget` types terms with `RHas`, the core's `Has` together with
-    `DTyp` of every dictionary of the term; the laws of `Target` give both (Р199).
+    `DTyp` of every dictionary of the term; the laws of `Target` give both (Р199). Closing the
+    premises of an elaboration gives `RHas` of the closed filling (`T6a_close`).
   - `runTarget hR hRun hroot : Target P` with `Real`, `RealRun` and `RootTy`; `T6b_core` is
     `T6b_target` for it. `#print axioms T6b_core`: `propext`, `Classical.choice`,
     `Quot.sound`.

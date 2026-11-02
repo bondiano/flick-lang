@@ -118,5 +118,7 @@ import Formal.Elab.CoreLoad
 import Formal.Elab.CoreRun
 import Formal.Elab.Exh
 import Formal.Elab.LazyEff
+import Formal.Elab.CloseTy
+import Formal.Elab.Close
 import Formal.Elab.Witness.Main
 import Formal.Elab.Witness.T6b

@@ -1,4 +1,6 @@
 import Formal.Elab.Witness.Main
+import Formal.Elab.Witness.Consts
+import Formal.Elab.Close
 
 /-!
 # Witness: T6(b) on a concrete term, without hypotheses of typing
@@ -12,9 +14,12 @@ the instance `I1`, the other from the slot of the premise `Monad Eff`. Both fill
 by the laws of `runTarget` (`has_do`), so the runs of the core give the same observations.
 
 `witness_T6b_closed`: any two elaborations of one closed source term in the empty context of
-premises run alike. Their typings come from T6(a) for `runTarget`. With premises (`Δ ≠ []`)
-the typing of the closed filling needs the substitution of the premises in `RHas`, which the
-model does not prove (README, P4a4, Р199); the example above does it by hand.
+premises run alike. Their typings come from T6(a) for `runTarget`.
+
+`witness_T6b_open` (Р199): the same under premises `Δ`, closed by any types `θ` and closed
+dictionaries `ρ` to ground constraints. The typings of the closed fillings come from
+`T6a_close` for `runTarget`; the premises left are syntactic: the skeleton has its holes outside
+the abstractions over dictionaries (`Tm.Skel`).
 -/
 
 namespace Flick.Elab.Witness
@@ -104,5 +109,23 @@ theorem witness_T6b_closed {e : Exp} {τ : Ty} {φ : Stage} (s : Tm) {qs : List 
     (by rw [hid]; exact T6a (runTarget real realRun rootTy) he₁)
     (by rw [hid]; exact T6a (runTarget real realRun rootTy) he₂)
   rwa [hid, hid] at this
+
+/-- **T6(b) for the witness under premises** (Р199): two elaborations of one source term under
+`Δ`, whose dictionaries fill one skeleton, run alike once `Δ` is closed by types `θ` and closed
+dictionaries `ρ` to ground constraints. No premise of typing: `T6a_close` gives both. -/
+theorem witness_T6b_open {e : Exp} {τ : Ty} {φ : Stage} (s : Tm) {Δ : List Cn} {θ : Nat → Ty}
+    {ρ : Nat → Dict} (hρ : Closes P Δ θ ρ) (hg : ∀ (k : Nat) (Q : Cn), Δ[k]? = some Q →
+      (Q.subst θ).Ground) {qs : List Cn} {ds₁ ds₂ : List Dict} (h₁ : Ent P Δ qs ds₁)
+    (h₂ : Ent P Δ qs ds₂) (hs : s.Skel qs.length 0)
+    (he₁ : Elab P [] Δ e τ φ (s.fill ds₁)) (he₂ : Elab P [] Δ e τ φ (s.fill ds₂)) :
+    All2 (Eqv P) (ds₁.map (·.subst ρ)) (ds₂.map (·.subst ρ)) ∧
+      (runTarget real realRun rootTy).exprs.run (s, .mono (τ.subst θ), φ) (ds₁.map (·.subst ρ)) =
+        (runTarget real realRun rootTy).exprs.run (s, .mono (τ.subst θ), φ)
+          (ds₂.map (·.subst ρ)) := by
+  have o : ∀ {ds : List Dict}, Ent P Δ qs ds → Elab P [] Δ e τ φ (s.fill ds) →
+      RHas P Sg N [] [] (s.fill (ds.map (·.subst ρ))) (.mono (τ.subst θ)) φ := fun hE he => by
+    have := T6a_close (runTarget real realRun rootTy) consts_closed he (Δl := []) rfl hρ hg
+    rwa [fill_dsubst (by rw [hE.get.1]; exact hs)] at this
+  exact witness_T6b s hρ h₁ h₂ (o h₁ he₁) (o h₂ he₂)
 
 end Flick.Elab.Witness
