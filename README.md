@@ -48,7 +48,7 @@ possible `AppError` explicit. Generated programs are ordinary ES modules.
 ## Try it from source
 
 From a checkout, install the [pinned Rust toolchain](./rust-toolchain.toml),
-Node.js **24.18.0 or newer**, and **pnpm 12.14.0**. Go 1.23 or newer is
+Node.js **24.18.0 or newer**, and **pnpm 12.16.1**. Go 1.23 or newer is
 needed only for the Go target (`--emit go`, `just go-test`), and Lean 4
 (the version in [`formal/lean-toolchain`](./formal/lean-toolchain)) only for
 the proofs in [`formal/`](./formal/README.md):

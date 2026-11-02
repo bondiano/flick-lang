@@ -12,7 +12,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 pub const COMPILER: &str = env!("CARGO_PKG_VERSION");
 pub const RUNTIME: &str = "0.1.0";
 pub const EFFECT: &str = "4.0.5";
-pub const PNPM: &str = "12.14.0";
+pub const PNPM: &str = "12.16.1";
 pub const NODE: &str = "24.18.0";
 /// The TypeScript release `flick content-mapper` is verified against: the
 /// first with Content Mappers.
