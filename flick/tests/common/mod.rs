@@ -1,5 +1,8 @@
 //! Runs the built `flick` binary from the repository root.
 
+#[allow(dead_code, reason = "not every test file uses it")]
+pub mod postgres;
+
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 use std::{fs, path};

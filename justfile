@@ -132,6 +132,11 @@ stress runs="20" +prefixes="runtime/":
 e2e-postgres:
     cargo test -p flick --test sql_postgres -- --ignored
 
+# The Conduit example's Go server against the official RealWorld API suite:
+# needs Docker, Go and hurl (`nix shell nixpkgs#hurl -c just conduit-api`)
+conduit-api:
+    cargo test -p flick --test conduit -- --ignored
+
 # Mutation-fuzz the parser (the nightly CI job runs 1 000 000 inputs)
 fuzz iterations="1000000":
     FLICK_FUZZ_ITERATIONS={{iterations}} cargo test --release -p flick-core --test fuzz
