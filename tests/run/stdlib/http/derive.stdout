@@ -1,0 +1,9 @@
+me as ada: ada
+me anonymous: 401 no session
+greet anonymous: hello stranger
+profile ada: ada
+profile bob: 404 bob
+post as ada: ada: hi
+forgetting
+forget: done
+201 documented: true, 204 documented: true, 401 documented: true, 404 documented: true

@@ -120,6 +120,48 @@ let me =
 `HttpApi.api_key "Token" { key = "authorization"; location = HttpApi.InHeader }`.
 Оба таргета обслуживают это одинаково.
 
+### API как тип
+
+Запись, выводящая `HttpApi`, — это группа, поля которой — её эндпоинты,
+записанные типами из `HttpApi.Derive`:
+
+```flick
+import HttpApi.Derive exposing (..)
+
+type alias Users = {
+  me : Authed (Get "/me" { headers : Credentials } String {Unauthorized});
+  profile : MaybeAuthed (Get "/profiles/:name" { headers : Credentials; path : Name } Profile {Unauthorized, NotFound});
+  post : Authed (Post "/notes" { headers : Credentials; payload : Note } (Created Note) {Unauthorized});
+} deriving HttpApi
+```
+
+- Поле называет эндпоинт, а имя типа в snake case — группу (`users`).
+- `Get`, `Post`, `Put`, `Patch` и `Delete` принимают путь, запрос — запись из
+  его частей (`path`, `query`, `headers`, `payload`) или `{}`, успешный ответ и
+  ошибки. Каждый `:name` пути — поле части `path`.
+- Успешный ответ отправляется с 200, `Created a` — с 201, а `Unit` — с 204 и
+  без тела.
+- Часть или ответ декодирует значение, названное по типу в snake case в
+  модуле типа (`credentials` для `Credentials`), `T.json` уточнённого типа,
+  `String.json` встроенного, а иначе JSON-кодек его схемы.
+- У каждой ошибки есть `instance Problem E = let problem = { status = 404; body = … }`.
+
+У типа два компаньона: `Users.endpoints`, запись его эндпоинтов, которые
+запрашивает `HttpApi.call`, и `Users.api`, группа. С эндпоинтами `Authed` и
+`MaybeAuthed` `Users.api` принимает схему безопасности, сервис и две его
+проверки, обязательную и необязательную, и применяет `with_auth`,
+`with_optional_auth` и `authenticated`, как выше; каждый эндпоинт такой
+группы — `Authed` или `MaybeAuthed`, и они читают одни и те же `headers`.
+
+```flick
+let api =
+  HttpApi.api "Notes"
+  |> HttpApi.add_group (Users.api token Session check maybe)
+  |> HttpApi.add_group Public.api
+```
+
+Запись, которую нельзя обслужить в таком виде, — `FLICK-D011`.
+
 ## Обслуживание запросов
 
 ```flick

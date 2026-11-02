@@ -3,6 +3,8 @@
 /// `{"errors": {"email": ["is invalid"]}}`.
 module Conduit.Problem exposing (..)
 
+import HttpApi.Derive exposing (Problem)
+
 /// What is wrong, by field or resource, in order.
 type alias Problems = List (String, List String)
 
@@ -77,3 +79,18 @@ let unprocessable =
     (fun b -> Unprocessable b.errors)
     (fun (Unprocessable p) -> { errors = p })
     body
+
+instance Problem Unauthorized =
+  let problem = { status = 401; body = unauthorized }
+
+instance Problem Forbidden =
+  let problem = { status = 403; body = forbidden }
+
+instance Problem NotFound =
+  let problem = { status = 404; body = not_found }
+
+instance Problem Conflict =
+  let problem = { status = 409; body = conflict }
+
+instance Problem Unprocessable =
+  let problem = { status = 422; body = unprocessable }

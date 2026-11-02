@@ -30,7 +30,7 @@ use crate::iface::{Entity, Interface, Namespace};
 use crate::project::{Analysis, Analyzed};
 use crate::resolve::declarations;
 use crate::source::{FileId, SourceMap};
-use crate::syntax::cst::Node;
+use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{self, Dict, Ref};
 
@@ -134,7 +134,10 @@ impl Ide<'_> {
             && let Some(node) = tree::find(&m.tree, range)
             && let Some(token) = tree::last_name(node)
             // the keyword of `schema T` stands for `T` too
-            && (token.start <= offset && offset <= token.end || node.kind == K::SchemaExpr)
+            && (token.start <= offset && offset <= token.end
+                || tree::path_to(&m.tree, offset)
+                    .iter()
+                    .any(|n| n.kind == K::SchemaExpr && n.range() == range))
         {
             let at = (token.start, token.end);
             let symbol = match r {
@@ -251,8 +254,43 @@ impl Ide<'_> {
                     (names.first()?.start, names.last()?.end),
                 ));
             }
+            // `Api.Users.api` on `Api`: the qualifier up to the cursor, when
+            // the whole one is no module
+            let upto = names
+                .iter()
+                .position(|t| offset <= t.end)
+                .map_or(names.len(), |i| i + 1);
+            if upto < names.len()
+                && let Some(module) = self.qualifier_module(m, &names[..upto])
+            {
+                return Some((
+                    Symbol::Module(module),
+                    (names.first()?.start, names[upto - 1].end),
+                ));
+            }
         }
         None
+    }
+
+    /// The module the qualifier `names` stands for, by an import's alias or
+    /// as written, if the analysis knows it.
+    fn qualifier_module(&self, m: &Analyzed, names: &[Token]) -> Option<String> {
+        let text = self.text(m.file);
+        let qualifier = names
+            .iter()
+            .map(|t| t.text(text))
+            .collect::<Vec<_>>()
+            .join(".");
+        let module = m
+            .tree
+            .nodes()
+            .find(|n| {
+                n.kind == K::ImportDecl
+                    && tree::name_of(n, K::Con, text) == Some(qualifier.as_str())
+            })
+            .and_then(|n| n.nodes().find(|p| p.kind == K::ModulePath))
+            .map_or(qualifier, |p| p.text(text).split_whitespace().collect());
+        self.interface(&module).is_some().then_some(module)
     }
 
     /// A declaration's own name, a binder, or a name in `exposing`.

@@ -1,7 +1,7 @@
-/// The API the server serves: the contract's endpoints in three groups.
-/// Signing up and in and the tags need no user; the other endpoints get a
-/// `Session` from the request's token, which those that change something
-/// require and those that only read take if it is there.
+/// The API the server serves: the contract's three groups. Signing up and
+/// in and the tags need no user; the other endpoints get a `Session` from
+/// the request's token, which the contract's `Authed` endpoints require and
+/// its `MaybeAuthed` ones take if it is there.
 module Conduit.Server.Routes exposing (api, handlers)
 
 import Conduit.Api as Api
@@ -13,38 +13,6 @@ import Conduit.Server.Session as Auth exposing (Session)
 token : HttpApi.Security
 let token = HttpApi.api_key "Token" { key = "authorization"; location = HttpApi.InHeader }
 
-let public =
-  HttpApi.group (Record.label : Record.Label "public")
-  |> HttpApi.add Api.register
-  |> HttpApi.add Api.login
-  |> HttpApi.add Api.tags
-
-let users =
-  HttpApi.authenticated
-    Session
-    (HttpApi.group (Record.label : Record.Label "users")
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.current_user)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.update_user)
-      |> HttpApi.add (HttpApi.with_optional_auth token Session Auth.maybe Api.get_profile)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.follow)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.unfollow))
-
-let articles =
-  HttpApi.authenticated
-    Session
-    (HttpApi.group (Record.label : Record.Label "articles")
-      |> HttpApi.add (HttpApi.with_optional_auth token Session Auth.maybe Api.list_articles)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.feed)
-      |> HttpApi.add (HttpApi.with_optional_auth token Session Auth.maybe Api.get_article)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.create_article)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.update_article)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.delete_article)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.favorite)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.unfavorite)
-      |> HttpApi.add (HttpApi.with_optional_auth token Session Auth.maybe Api.list_comments)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.add_comment)
-      |> HttpApi.add (HttpApi.with_auth token Session Auth.check Api.delete_comment))
-
 let api =
   HttpApi.api "Conduit"
   |> HttpApi.info {
@@ -52,9 +20,9 @@ let api =
     description = "The RealWorld Conduit API, served by Flick on the go target";
     servers = [];
   }
-  |> HttpApi.add_group public
-  |> HttpApi.add_group users
-  |> HttpApi.add_group articles
+  |> HttpApi.add_group Api.Public.api
+  |> HttpApi.add_group (Api.Users.api token Session Auth.check Auth.maybe)
+  |> HttpApi.add_group (Api.Articles.api token Session Auth.check Auth.maybe)
 
 let handlers = {
   public = { register = Accounts.register; login = Accounts.login; tags = Publishing.tags };

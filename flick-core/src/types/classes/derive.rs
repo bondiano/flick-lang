@@ -17,6 +17,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
 use crate::types::cli::CLI;
 use crate::types::env::{Form, Instance};
+use crate::types::http_api::HTTP_API_DERIVE;
 use crate::types::kinds::Kind;
 use crate::types::ty::{Binder, PRELUDE, Type};
 
@@ -188,6 +189,7 @@ impl<'n> Checker<'_> {
                 }
                 // witnesses, not classes: see `types::schemas`
                 Some((module, _)) if module == PRELUDE && matches!(*last, "Schema" | "Url" | "Form") => {}
+                Some((module, _)) if module == HTTP_API_DERIVE && *last == "HttpApi" => {}
                 None => {}
                 Some(_) => self.error(
                     codes::C013,

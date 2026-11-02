@@ -35,6 +35,7 @@ mod exports;
 mod ffi;
 mod generalize;
 mod handlers;
+pub mod http_api;
 mod infer;
 mod instances;
 mod irrefutable;
