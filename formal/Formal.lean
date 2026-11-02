@@ -106,3 +106,12 @@ import Formal.Elab.CoreT6a
 import Formal.Elab.CoreEval
 import Formal.Elab.CoreDictRun
 import Formal.Elab.CoreDictSem
+import Formal.Elab.CoreCg
+import Formal.Elab.CoreCgOps
+import Formal.Elab.CoreCgFrames
+import Formal.Elab.CoreRel
+import Formal.Elab.CoreHead
+import Formal.Elab.CoreStep
+import Formal.Elab.CoreSim
+import Formal.Elab.CoreLoad
+import Formal.Elab.CoreRun
