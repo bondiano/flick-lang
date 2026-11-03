@@ -5,7 +5,7 @@
 //! the `std` package the host hands over with [`set_std`] before any
 //! module is checked.
 
-#[cfg(all(not(feature = "embedded-std"), feature = "native-project"))]
+#[cfg(feature = "native-project")]
 use std::env;
 #[cfg(feature = "native-project")]
 use std::path::Path;
@@ -46,16 +46,21 @@ pub fn has_std() -> bool {
     !std_sources().is_empty()
 }
 
-/// The modules of `std`: those set, else the ones built in, else those of
-/// the package at `FLICK_STD_PATH`, else none.
+/// The modules of `std`: those set, else those of the package at
+/// `FLICK_STD_PATH`, else the ones built in, else none. The variable comes
+/// before what is built in: a workspace build unifies the playground's
+/// `embedded-std` into every binary.
 fn std_sources() -> &'static [(&'static str, &'static str)] {
     STD.get_or_init(|| {
+        #[cfg(feature = "native-project")]
+        if let Some(sources) = env::var_os("FLICK_STD_PATH")
+            .filter(|dir| !dir.is_empty())
+            .and_then(|dir| read_std(Path::new(&dir)).ok())
+        {
+            return leak(sources);
+        }
         #[cfg(feature = "embedded-std")]
         return super::builtin_sources::STD;
-        #[cfg(all(not(feature = "embedded-std"), feature = "native-project"))]
-        return env::var_os("FLICK_STD_PATH")
-            .and_then(|dir| read_std(Path::new(&dir)).ok())
-            .map_or(&[], leak);
         #[allow(unreachable_code, reason = "a host without a project hands std over")]
         &[]
     })
