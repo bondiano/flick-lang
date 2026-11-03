@@ -65,7 +65,7 @@ impl Checker<'_> {
     }
 
     /// `C` with every solved meta replaced: a type meta in an atom by
-    /// what its type reaches (`regions.md` §2.1, Подстановка).
+    /// what its type reaches (`regions.md` §2.1, the reach bound).
     pub(super) fn zonk_caps(&self, c: &Caps) -> Caps {
         let mut out = Caps::default();
         for a in &c.atoms {

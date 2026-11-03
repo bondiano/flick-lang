@@ -245,8 +245,6 @@ the build. Search uses Pagefind's supported main-thread mode: its 1.5
 blob-worker initializer loses the absolute index URL. Revisit this when
 upgrading Pagefind; it does not affect program-worker isolation.
 `pnpm -C docs test` exercises linking and executing a real compiled program.
-The visual contract of the site is recorded in `PRODUCT.md`, `DESIGN.md`
-and `.impeccable/`.
 
 </details>
 
