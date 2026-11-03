@@ -7,6 +7,7 @@ use flick_core::project::{self, Project};
 use flick_core::source::SourceMap;
 use flick_core::{resolve, syntax};
 
+use crate::builtins;
 use crate::command::Outcome;
 use crate::sources::{self, FsHost};
 use crate::{cache, toolchain};
@@ -97,6 +98,7 @@ pub fn describe(
     files.dedup();
     let mut key = Key::default();
     key.add("compiler", toolchain::COMPILER);
+    key.add("std", builtins::std_hash());
     if let Ok(meta) = env::current_exe().and_then(fs::metadata) {
         key.add(
             "compiler-binary",

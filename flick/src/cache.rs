@@ -14,6 +14,7 @@ use flick_core::project::cache::{self, Key, Manifest};
 use flick_core::project::{self, Project, config};
 use flick_core::source::SourceMap;
 
+use crate::builtins;
 use crate::commands::inputs::{declared_name, sibling_root};
 use crate::toolchain;
 
@@ -46,6 +47,7 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
     }
     key.add("config", format!("{:?}", project.config));
     key.add("compiler", toolchain::COMPILER);
+    key.add("std", builtins::std_hash());
     // a compiler rebuilt without a new version still changes the key
     if let Ok(meta) = env::current_exe().and_then(fs::metadata) {
         key.add(
