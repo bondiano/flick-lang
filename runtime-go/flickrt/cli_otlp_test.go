@@ -47,7 +47,7 @@ func TestCliTraceExports(t *testing.T) {
 		"/v1/traces": {`"name":"pay"`, `"name":"checkout"`, `"status":{"code":2,"message":"\"declined\""}`,
 			`{"name":"exception","timeUnixNano":`, `"exception.type","value":{"stringValue":"Error"}`, `"exception.stacktrace"`},
 		"/v1/logs": {`"severityNumber":13,"severityText":"Warn"`, `"body":{"stringValue":"low stock"}`,
-			`"key":"effect.fiberId"`, `"traceId":`, `"scope":{"name":"effect","version":"4.0.5"}`},
+			`"key":"effect.fiberId"`, `"traceId":`, `"scope":{"name":"effect","version":"4.1.2"}`},
 		"/v1/metrics": {`"scope":{"name":"shop"}`, `"name":"cli_otlp_test_orders","description":"Orders placed","unit":"1"`,
 			`"sum":{"aggregationTemporality":2,"isMonotonic":true,"dataPoints":[`, `"asDouble":2}`},
 	} {
@@ -57,7 +57,7 @@ func TestCliTraceExports(t *testing.T) {
 			}
 		}
 	}
-	if want := "OTel-OTLP-Exporter-JavaScript-Effect-OtlpLogger/4.0.5"; agents["/v1/logs"] != want {
+	if want := "OTel-OTLP-Exporter-JavaScript-Effect-OtlpLogger/4.1.2"; agents["/v1/logs"] != want {
 		t.Errorf("user agent %q, want %q", agents["/v1/logs"], want)
 	}
 }

@@ -31,7 +31,7 @@ func onInterruptDone(fb *Fiber, f func(fb *Fiber) Value) Value {
 	v, c := catch(func() Value { return f(fb) })
 	if c != nil {
 		if c.has(causeInterrupt) {
-			c = Sequential(c, doneCause(Unit))
+			c = finalized(c, doneCause(Unit))
 		}
 		panic(&Failure{c})
 	}

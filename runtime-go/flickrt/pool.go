@@ -341,7 +341,7 @@ func PoolUse(fb *Fiber, f, self Value) Value {
 			return masked(fb, outer, func() Value { return Run(fb, Apply(fb, f, item.exit.value)) })
 		})
 		_, released := catch(func() Value { p.release(fb, item); return Unit })
-		if cause = Sequential(cause, released); cause != nil {
+		if cause = finalized(cause, released); cause != nil { // as Effect's Pool.use
 			panic(&Failure{cause})
 		}
 		return out

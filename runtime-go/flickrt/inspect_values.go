@@ -40,7 +40,7 @@ func InspectableToStringUnknown(indent, data Value) Value {
 func InspectableToJson(data Value) Value { return data }
 
 // VersionCurrent is the version of Effect the runtime follows.
-func VersionCurrent() Value { return "4.0.5" }
+func VersionCurrent() Value { return "4.1.2" }
 
 // formatSpaced is Effect's `Formatter.format` of a value as the JS target
 // holds it, by `space` spaces: an array or an object of more than one

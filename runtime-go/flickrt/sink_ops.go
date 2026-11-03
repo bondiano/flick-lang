@@ -121,7 +121,7 @@ func sinkOnExit(self *Sink, f func(fb *Fiber, exit *Exit)) *Sink {
 		_, fc := catch(func() Value {
 			return masked(fb, fb.state.mask+1, func() Value { f(fb, &Exit{value: v, cause: c}); return nil })
 		})
-		if c = Sequential(c, fc); c != nil {
+		if c = finalized(c, fc); c != nil { // as Effect's onExit
 			panic(&Failure{c})
 		}
 		return v, l

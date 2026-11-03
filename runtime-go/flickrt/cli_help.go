@@ -35,12 +35,15 @@ type cliExampleDoc struct {
 	description *string
 }
 
+// cliHelpDoc is HelpDoc. shortcut: no commandPath or globalFlagsScope,
+// which only the "summary" and "none" modes of defaultFormatter read and
+// Flick cannot choose; add them when `Cli.default_formatter` takes modes.
 type cliHelpDoc struct {
-	description, usage string
-	flags, globalFlags []cliFlagDoc
-	args               []cliArgDoc
-	subcommands        []cliGroupDoc
-	examples           []cliExampleDoc
+	description, usage                 string
+	flags, inheritedFlags, globalFlags []cliFlagDoc
+	args                               []cliArgDoc
+	subcommands                        []cliGroupDoc
+	examples                           []cliExampleDoc
 }
 
 func cliOptional(s string) *string {
@@ -128,7 +131,6 @@ func cliHelpFor(root *cliCommand, path []string, builtIns []*cliGlobal) *cliHelp
 	for _, f := range doc.flags {
 		seen[f.name] = true
 	}
-	shared := []cliFlagDoc{}
 	if len(commands) > 1 {
 		for _, ancestor := range commands[:len(commands)-1] {
 			for _, p := range ancestor.context.flags {
@@ -136,11 +138,10 @@ func cliHelpFor(root *cliCommand, path []string, builtIns []*cliGlobal) *cliHelp
 					continue
 				}
 				seen[p.single.name] = true
-				shared = append(shared, cliToFlagDoc(p))
+				doc.inheritedFlags = append(doc.inheritedFlags, cliToFlagDoc(p))
 			}
 		}
 	}
-	doc.flags = append(shared, doc.flags...)
 	for _, g := range cliGlobalsOn(root, path, builtIns) {
 		if !g.param.single.hidden {
 			d := cliToFlagDoc(g.param)
@@ -245,6 +246,9 @@ func cliFormatHelp(doc *cliHelpDoc, c cliColors) string {
 	}
 	if len(doc.flags) > 0 {
 		s = append(s, c.bold("FLAGS"), cliTable(cliFlagRows(doc.flags, c), -1), "")
+	}
+	if len(doc.inheritedFlags) > 0 {
+		s = append(s, c.bold("INHERITED FLAGS"), cliTable(cliFlagRows(doc.inheritedFlags, c), -1), "")
 	}
 	if len(doc.globalFlags) > 0 {
 		s = append(s, c.bold("GLOBAL FLAGS"), cliTable(cliFlagRows(doc.globalFlags, c), -1), "")

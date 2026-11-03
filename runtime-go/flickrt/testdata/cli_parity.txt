@@ -1,0 +1,361 @@
+$ tool
+DESCRIPTION
+  Project tools
+
+USAGE
+  tool <subcommand> [flags]
+
+FLAGS
+  --verbose, -v       Verbose output
+  --profile string    Profile name
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --dry                                                               Show the plan
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+
+SUBCOMMANDS
+  greet     Prints a greeting
+  sum       Adds
+  remote    Manage remotes
+error: Help requested
+
+$ tool --help
+(stdout of $ tool)
+
+$ tool greet --help
+DESCRIPTION
+  Prints a greeting
+
+USAGE
+  tool greet [flags] <name>
+
+ARGUMENTS
+  name string    Who to greet
+
+FLAGS
+  --loud, -l            Print in capitals
+  --times, -n string    How many times
+  --level [=string]     
+
+INHERITED FLAGS
+  --verbose, -v       Verbose output
+  --profile string    Profile name
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --dry                                                               Show the plan
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+
+EXAMPLES
+  # Greet Ada
+  tool greet Ada
+
+$ tool remote add --help
+USAGE
+  tool remote add [flags] <url>
+
+ARGUMENTS
+  url string    
+
+INHERITED FLAGS
+  --verbose, -v           Verbose output
+  --profile string        Profile name
+  --remote-name string    The remote
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --dry                                                               Show the plan
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+  --force                                                             Skip checks
+
+$ tool sum -h
+USAGE
+  tool sum [flags] <numbers...>
+
+ARGUMENTS
+  numbers... string    
+
+FLAGS
+  --tag string    A tag
+
+INHERITED FLAGS
+  --verbose, -v       Verbose output
+  --profile string    Profile name
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --dry                                                               Show the plan
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+
+$ tool --version
+tool v1.0.0
+
+$ tool greet Ada
+greet level=None loud=false name=Ada times=1
+
+$ tool -v --profile p greet -l --times 3 --level Ada
+greet level=Some(auto) loud=true name=Ada times=3
+
+$ tool greet --level=x Ada
+greet level=Some(x) loud=false name=Ada times=1
+
+$ tool greet --loud --loud Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --loud: "2 occurrences". Expected: at most 1 value
+
+$ tool greet -n 2 --times 3 Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --times: "2 occurrences". Expected: at most 1 value
+
+$ tool greet --level --level=b Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --level: "2 occurrences". Expected: at most 1 value
+
+$ tool --verbose -v greet Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --verbose: "2 occurrences". Expected: at most 1 value
+
+$ tool --profile a greet --profile b Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --profile: "2 occurrences". Expected: at most 1 value
+
+$ tool sum --tag a --tag b 1 2
+sum numbers=[1,2] tag=[a,b]
+
+$ tool sum 1 x
+(stdout of $ tool sum -h)
+error: Invalid value for argument <numbers>: "x". Expected: not an Int: x
+
+$ tool greet --times x Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --times: "x". Expected: not an Int: x
+
+$ tool greet --=x
+greet level=None loud=false name=--=x times=1
+
+$ tool --=x
+(stdout of $ tool)
+error: Unknown subcommand "--=x" for "tool"
+
+$ tool greet -ln=3 Ada
+greet level=None loud=true name=Ada times=3
+
+$ tool greet --no-loud Ada
+(stdout of $ tool greet Ada)
+
+$ tool greet --no-loud=true Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --loud: "true". Expected: omit the value and use --no-loud=true by itself to set --loud to false
+
+$ tool greet --no-loud yes Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --loud: "yes". Expected: omit the value and use --no-loud by itself to set --loud to false
+
+$ tool greet --no-times Ada
+(stdout of $ tool greet --help)
+error: Unrecognized flag: --no-times in command tool greet
+
+$ tool greet --lod Ada
+(stdout of $ tool greet --help)
+error: Unrecognized flag: --lod in command tool greet
+
+  Did you mean this?
+    --loud
+
+$ tool greet --times
+(stdout of $ tool greet --help)
+error: Missing value for flag --times. Expected: string
+
+$ tool greet
+(stdout of $ tool greet --help)
+error: Missing required argument: name
+
+$ tool greet Ada Bob
+(stdout of $ tool greet --help)
+error: Unexpected positional argument: "Bob"
+
+$ tool gret
+(stdout of $ tool)
+error: Unknown subcommand "gret" for "tool"
+
+  Did you mean this?
+    greet
+
+$ tool remote
+DESCRIPTION
+  Manage remotes
+
+USAGE
+  tool remote <subcommand> [flags]
+
+FLAGS
+  --remote-name string    The remote
+
+INHERITED FLAGS
+  --verbose, -v       Verbose output
+  --profile string    Profile name
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --dry                                                               Show the plan
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+  --force                                                             Skip checks
+
+SUBCOMMANDS
+  add    Add one
+error: Help requested
+
+$ tool remote add u
+add url=u
+
+$ tool remote --remote-name up add u
+(stdout of $ tool remote add u)
+
+$ tool remote --force add u
+force at tool remote add
+
+$ tool greet --force Ada
+(stdout of $ tool greet --help)
+error: Unrecognized flag: --force in command tool greet
+
+$ tool --dry greet Ada
+dry at tool greet
+
+$ tool --dry --dry greet Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --dry: "2 occurrences". Expected: at most 1 value
+
+$ tool --dry=maybe greet Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --dry: "maybe". Expected "true" | "yes" | "on" | "1" | "y" | "false" | "no" | "off" | "0" | "n"
+
+$ tool --log-level debug greet Ada
+(stdout of $ tool greet Ada)
+
+$ tool --log-level bogus greet Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --log-level: "bogus". Expected: "all" | "trace" | "debug" | "info" | "warn" | "warning" | "error" | "fatal" | "none"
+
+$ tool --log-level info --log-level warn greet Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --log-level: "2 occurrences". Expected: at most 1 value
+
+$ tool --log-level
+(stdout of $ tool)
+error: Missing value for flag --log-level. Expected: all | trace | debug | info | warn | warning | error | fatal | none
+
+$ tool --completions nope
+(stdout of $ tool)
+error: Invalid value for flag --completions: "nope". Expected: "bash" | "zsh" | "fish" | "powershell" | "sh" | "pwsh"
+
+$ tool --trace=nah greet Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --trace: "nah". Expected "true" | "yes" | "on" | "1" | "y" | "false" | "no" | "off" | "0" | "n"
+
+$ tool --trace --trace greet Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --trace: "2 occurrences". Expected: at most 1 value
+
+$ tool --wizard=maybe greet Ada
+(stdout of $ tool greet --help)
+error: Invalid value for flag --wizard: "maybe". Expected "true" | "yes" | "on" | "1" | "y" | "false" | "no" | "off" | "0" | "n"
+
+help []
+DESCRIPTION
+  Project tools
+
+USAGE
+  tool <subcommand> [flags]
+
+FLAGS
+  --verbose, -v       Verbose output
+  --profile string    Profile name
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --dry                                                               Show the plan
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+
+SUBCOMMANDS
+  greet     Prints a greeting
+  sum       Adds
+  remote    Manage remotes
+
+help [greet]
+DESCRIPTION
+  Prints a greeting
+
+USAGE
+  tool greet [flags] <name>
+
+ARGUMENTS
+  name string    Who to greet
+
+FLAGS
+  --loud, -l            Print in capitals
+  --times, -n string    How many times
+  --level [=string]     
+
+INHERITED FLAGS
+  --verbose, -v       Verbose output
+  --profile string    Profile name
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --dry                                                               Show the plan
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+
+EXAMPLES
+  # Greet Ada
+  tool greet Ada
+
+help [remote add]
+USAGE
+  tool remote add [flags] <url>
+
+ARGUMENTS
+  url string    
+
+INHERITED FLAGS
+  --verbose, -v           Verbose output
+  --profile string        Profile name
+  --remote-name string    The remote
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --dry                                                               Show the plan
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+  --force                                                             Skip checks

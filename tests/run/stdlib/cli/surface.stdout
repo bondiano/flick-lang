@@ -1,9 +1,69 @@
 $ -e region=eu -e tier=web --token s3 -t a --at 2026-10-23T10:00:00Z prod
-deploy prod env [("region", "eu"), ("tier", "web")] token s3 level info
-  color never at Some 1792749600000 tags ["a"] owner ops
+DESCRIPTION
+  Deploys a build
+
+USAGE
+  deploy [flags] <target>
+
+ARGUMENTS
+  target string    Where to deploy
+
+FLAGS
+  --env, -e key=value    Variables
+  --level string         Log level
+  --color [=string]      When to color
+  --at string            When to deploy
+  --tags, -t string      One or two tags
+  --owner string         Who deploys
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --license                                                           Prints the license
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+
+EXAMPLES
+  # Deploys to prod in eu
+  deploy -e region=eu prod
+
+  deploy prod
+CliError: Missing required flag: --owner
 $ -t a -t b --level debug prod --color
-deploy prod env [] token - level debug
-  color auto at None tags ["a", "b"] owner ops
+DESCRIPTION
+  Deploys a build
+
+USAGE
+  deploy [flags] <target>
+
+ARGUMENTS
+  target string    Where to deploy
+
+FLAGS
+  --env, -e key=value    Variables
+  --level string         Log level
+  --color [=string]      When to color
+  --at string            When to deploy
+  --tags, -t string      One or two tags
+  --owner string         Who deploys
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --license                                                           Prints the license
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+
+EXAMPLES
+  # Deploys to prod in eu
+  deploy -e region=eu prod
+
+  deploy prod
+CliError: Missing required flag: --owner
 $ -t a --color=always --owner me prod
 deploy prod env [] token - level info
   color always at None tags ["a"] owner me
@@ -142,8 +202,38 @@ CliError: Invalid value for flag --at: "yesterday". Expected: not a date: yester
 $ --license
 MIT, deploy 0.0.0
 $ d -t x staging
-deploy staging env [] token - level info
-  color never at None tags ["x"] owner ops
+DESCRIPTION
+  Deploys a build
+
+USAGE
+  tool deploy [flags] <target>
+
+ARGUMENTS
+  target string    Where to deploy
+
+FLAGS
+  --env, -e key=value    Variables
+  --level string         Log level
+  --color [=string]      When to color
+  --at string            When to deploy
+  --tags, -t string      One or two tags
+  --owner string         Who deploys
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
+  --license                                                           Prints the license
+
+EXAMPLES
+  # Deploys to prod in eu
+  deploy -e region=eu prod
+
+  deploy prod
+CliError: Missing required flag: --owner
 $ secret
 secret ran
 $ --dir $TMP --notes $TMP/notes.txt --data $TMP/data.yaml --out $TMP/new.txt --any $TMP word
@@ -229,6 +319,7 @@ deploy v9.9.9
 help_doc usage tool deploy [flags] <target> flags ["env:key=value", "level:string", "color:[=string]", "at:string", "tags:string", "owner:string"] args ["target:string"]
 examples ["deploy -e region=eu prod / Some \"Deploys to prod in eu\"", "deploy prod / None"]
 global flags ["help", "version", "wizard", "completions", "log-level", "trace", "license"]
+inherited flags []
 subcommands [["deploy Some \"d\" Some \"Ships it\""]]
 groups [None]
 DESCRIPTION

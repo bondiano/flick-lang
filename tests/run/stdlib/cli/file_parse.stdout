@@ -18,5 +18,5 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
   --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
-CliError: Invalid value for flag --data: "$TMP/bad.toml". Expected: Failed to parse '.toml' file content: SyntaxError: Expected ',' at line 2, column 13
+CliError: Invalid value for flag --data: "$TMP/bad.toml". Expected: Failed to parse '.toml' file content: EncodingError: Expected ',' at line 2, column 13
 files ok

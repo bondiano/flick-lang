@@ -206,7 +206,7 @@ func (c *scopedCache) await(fb *Fiber, key Value, e *scopedEntry, outer int) Val
 	if last {
 		stop(fb, lookup)
 		if lookup.cause.has(causeDie) {
-			cause = Sequential(cause, lookup.cause)
+			cause = finalized(cause, lookup.cause) // as Effect's onExit in awaitEntry
 		}
 	}
 	if cause != nil {
@@ -376,7 +376,8 @@ func ScopedCacheRefresh(fb *Fiber, key, self Value) Value {
 		h, _ := v.(*holder)
 		e.finish(h, cause)
 		if cause.has(causeInterrupt) {
-			panic(&Failure{e.scope.close(fb, cause)})
+			// ScopedCache.ts closes and then fails, outside `onExit`: no election
+			panic(&Failure{Sequential(cause, e.scope.closeFinalizers(fb, cause))})
 		}
 		c.mu.Lock()
 		if c.closed {

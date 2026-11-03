@@ -257,7 +257,7 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 		}
 		for pending--; pending > 0; pending-- {
 			if rest := withoutInterrupts(nextEnded(fb, ended, nil).cause); rest != nil {
-				failed = Sequential(failed, rest)
+				failed = Sequential(failed, rest).electDefects() // as Effect 4.1's forEachConcurrent
 			}
 		}
 		panic(&Failure{failed})
@@ -341,7 +341,7 @@ func race(fb *Fiber, a, b Value, success bool) Value {
 		}
 		failed = concat(failed, c.cause)
 	}
-	panic(&Failure{failed})
+	panic(&Failure{failed.electDefects()}) // as Effect's raceAll when every branch failed
 }
 
 func RaceSuccess(fb *Fiber, a, b Value) Value { return race(fb, a, b, true) }
@@ -454,7 +454,7 @@ func InterruptibleMask(fb *Fiber, f Value) Value   { return regionMask(fb, 0, f)
 func EffectEnsuring(fb *Fiber, finalizer, task Value) Value {
 	v, c := catch(func() Value { return Run(fb, task) })
 	_, f := catch(func() Value { return uninterruptible(fb, finalizer) })
-	if c = Sequential(c, f); c != nil {
+	if c = finalized(c, f); c != nil {
 		panic(&Failure{c})
 	}
 	return v

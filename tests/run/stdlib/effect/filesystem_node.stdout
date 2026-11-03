@@ -8,7 +8,7 @@ truncate: cha
 utimes: true
 glob recursive: ["one.txt", "sub/deep.txt"]
 glob braces: ["a.txt", "b.txt"]
-glob extglob: ["a.txt", "b.txt"]
+glob extglob: []
 glob exclude: ["one.txt"]
 open: true
 indirect: true

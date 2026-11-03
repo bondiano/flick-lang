@@ -8,7 +8,7 @@
 "a: [1, 2,]\nb: {x: 1,}"	{"a":[1,2],"b":{"x":1}}
 "a: [1, 2"	SyntaxError: Expected ',' at flow offset 5
 "a: {x: 1 y}"	{"a":{"x":"1 y"}}
-"a: {x: 1, x: 2}"	SyntaxError: Duplicate key 'x' at flow offset 9
+"a: {x: 1, x: 2}"	SyntaxError: Duplicate key 'x' at flow offset 11
 "a: 0x1F\nb: 0o17\nc: -0x10\nd: 1_000\ne: .5\nf: 1e3\ng: +12\nh: 012\ni: 1.\nj: .inf\nk: -.Inf\nl: .NaN\nm: TRUE\nn: False\no: NULL"	{"a":31,"b":15,"c":-16,"d":1000,"e":0.5,"f":1000,"g":12,"h":"012","i":"1.","j":null,"k":null,"l":null,"m":true,"n":false,"o":null}
 "a: \"esc \\t \\n \\\" \\\\ \\x41 \\u00e9 \\U0001F600 \\N \\_ \\L \\P \\0 \\e \\/ \\ \""	{"a":"esc \t \n \" \\ A é 😀        \u0000 \u001b /  "}
 "a: \"\\uD83D\\uDE00\""	{"a":"😀"}
@@ -64,8 +64,8 @@
 "url: http://example.com:8080/path\ntime: 12:30:45"	{"url":"http://example.com:8080/path","time":"12:30:45"}
 "a: [x: 1]"	{"a":["x: 1"]}
 "a:\n  - b: 1\n    c: 2\n  - d: 3"	{"a":[{"b":1,"c":2},{"d":3}]}
-"a:\n  -   b: 1\n      c: 2"	SyntaxError: Invalid colon in plain scalar at line 3
-"a: |\n   x\n  y"	{"a":" x\ny"}
+"a:\n  -   b: 1\n      c: 2"	{"a":[{"b":1,"c":2}]}
+"a: |\n   x\n  y"	SyntaxError: Expected block scalar indentation of 3 spaces at line 3
 "a: -1\nb: - 1"	{"a":-1,"b":"- 1"}
 "- a\n-b"	SyntaxError: Unexpected content at line 2
 "a: '"	SyntaxError: Unterminated quoted YAML scalar

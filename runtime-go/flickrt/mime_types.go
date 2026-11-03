@@ -1,4 +1,4 @@
-// Code generated from effect@4.0.5 http/internal/mimeTypes.js (mime 4.1.0, MIT License, Copyright (c) 2023 Robert Kieffer). DO NOT EDIT.
+// Code generated from effect@4.1.2 http/internal/mimeTypes.js (mime 4.1.0, MIT License, Copyright (c) 2023 Robert Kieffer). DO NOT EDIT.
 
 package flickrt
 
@@ -319,6 +319,8 @@ text/uri-list uri uris urls
 text/vcard vcard
 text/vtt vtt
 text/wgsl wgsl
+text/x-python py
+text/x-shellscript sh
 text/xml *xml
 text/yaml yaml yml
 video/3gpp 3gp 3gpp

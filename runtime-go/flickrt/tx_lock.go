@@ -133,7 +133,7 @@ func withAcquired(fb *Fiber, acquire, release func(*Fiber), task Value) Value {
 			return Unit
 		})
 	})
-	if cause = Sequential(cause, released); cause != nil {
+	if cause = finalized(cause, released); cause != nil { // as Effect's ensuring
 		panic(&Failure{cause})
 	}
 	return out

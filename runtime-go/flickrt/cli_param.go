@@ -102,6 +102,9 @@ func cliSingleParse(s *cliSingle) cliParseFn {
 			if len(values) == 0 {
 				return nil, nil, cliMissingOption(s.name)
 			}
+			if len(values) > 1 {
+				return nil, nil, cliInvalid(s.name, itoa(len(values))+" occurrences", "at most 1 value", "flag")
+			}
 			text = values[0]
 		} else {
 			if len(a.arguments) == 0 {
@@ -227,6 +230,10 @@ func cliConfigFallback(config Value) func(*Fiber, *cliError) (Value, *cliError) 
 
 func cliPromptFallback(prompt Value) func(*Fiber, *cliError) (Value, *cliError) {
 	return func(fb *Fiber, missingErr *cliError) (Value, *cliError) {
+		// skipped when the terminal cannot prompt (Effect 4.0.7)
+		if !cliTerminal().canPrompt {
+			return nil, missingErr
+		}
 		if v, ok := promptFallback(fb, prompt); ok {
 			return v, nil
 		}

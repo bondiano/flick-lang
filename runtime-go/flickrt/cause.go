@@ -129,6 +129,34 @@ func (c *Cause) failsToDies() *Cause {
 	return out
 }
 
+// electDefects is Effect's `causeElectDefects`: in a cause with a defect,
+// each typed failure but a pull's end is a defect too, its trace kept.
+func (c *Cause) electDefects() *Cause {
+	if !c.has(causeDie) || !c.has(causeFail) {
+		return c
+	}
+	var out *Cause
+	for _, r := range c.reasons() {
+		if r.kind == causeFail && !isDoneReason(r) {
+			d := dieOf(r.err)
+			d.trace = r.trace
+			r = d
+		}
+		out = concat(out, r)
+	}
+	return out
+}
+
+// finalized is Effect's `combineFinalizerCause`: what ended with `cause`
+// (nil: a success) and then a finalizer that failed with `fin`, the failure
+// of both with its defects elected.
+func finalized(cause, fin *Cause) *Cause {
+	if cause == nil || fin == nil {
+		return Sequential(cause, fin)
+	}
+	return Sequential(cause, fin).electDefects()
+}
+
 // dieOf is a typed error as a defect: the error itself, as JS keeps it,
 // so the defect is told and compared as that value.
 func dieOf(err Value) *Cause { return &Cause{kind: causeDie, defect: describe(err), err: err} }

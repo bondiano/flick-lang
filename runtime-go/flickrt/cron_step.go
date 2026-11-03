@@ -28,35 +28,62 @@ func (c *Cron) step(now *DateTime, reverse bool) (out float64, found bool) {
 	zoned := makeZoned(now, c.tz, false, "")
 	tick, table, boundary := 1.0, c.next, c.first
 	needsStep := func(next, current int) bool { return next > current }
-	disambiguation := "compatible"
 	if reverse {
 		tick, table, boundary = -1, c.prev, c.last
 		needsStep = func(next, current int) bool { return next < current }
-		disambiguation = "later"
 	}
 	utc := c.tz.loc != nil && c.tz.id == "UTC"
-	wall := func(current *jsDate, disambiguation string) *DateTime {
-		if math.IsNaN(current.t) {
+	// Flick's crons keep Effect's default `onDstOverlap`, "earlier": the
+	// first occurrence of a repeated wall time
+	const disambiguation = "compatible"
+	wall := func(wallMillis float64) *DateTime {
+		if math.IsNaN(wallMillis) {
 			panic(rangeError("Invalid date"))
 		}
-		return makeZoned(&DateTime{ms: current.t}, zoned.zone, true, disambiguation)
+		return makeZoned(&DateTime{ms: wallMillis}, zoned.zone, true, disambiguation)
 	}
+	resolve := func(wallMillis float64) float64 { return wall(wallMillis).ms }
 	adjustDst := func(current *jsDate) {
-		if utc {
+		if utc || reverse {
 			return
 		}
-		adjusted := wall(current, disambiguation).toDate().t
-		drift := current.t - adjusted
-		if reverse && drift != 0 {
-			current.setTime(adjusted)
-		} else if !reverse && drift > 0 {
+		if drift := current.t - wall(current.t).toDate().t; drift > 0 {
 			current.setTime(current.t + drift)
 		}
 	}
-	// repeated wall times resolve to their first occurrence, so when the
-	// search starts in the second one, matches inside that fold are past
-	isBeforeStart := func(current *jsDate) bool {
-		return !reverse && !utc && wall(current, "compatible").ms <= zoned.ms
+	// a wall time at or before the start (after it in reverse) resolves
+	// out of the search: inside a fold, its other occurrence was the start's
+	isOutOfRange := func(wallMillis float64) bool {
+		switch {
+		case utc:
+			return false
+		case reverse:
+			return resolve(wallMillis) >= zoned.ms
+		}
+		return resolve(wallMillis) <= zoned.ms
+	}
+	foldSeconds := math.NaN()
+	// skipOutOfRange moves past the out-of-range candidates of a fold: the
+	// first in range by bisection over the fold's length, else one tick
+	skipOutOfRange := func(current *jsDate) {
+		if math.IsNaN(foldSeconds) {
+			offsetAt := func(ms float64) float64 { return (&DateTime{ms, zoned.zone}).zonedOffset() }
+			foldSeconds = math.Floor((offsetAt(zoned.ms-86_400_000) - offsetAt(zoned.ms+86_400_000)) / 1000)
+		}
+		after := func(seconds float64) float64 { return current.t + tick*seconds*1000 }
+		outOfRange, inRange := 0.0, 1.0
+		if foldSeconds > 0 && !isOutOfRange(after(foldSeconds)) {
+			inRange = foldSeconds
+			for inRange-outOfRange > 1 {
+				mid := outOfRange + math.Floor((inRange-outOfRange)/2)
+				if isOutOfRange(after(mid)) {
+					outOfRange = mid
+				} else {
+					inRange = mid
+				}
+			}
+		}
+		current.setTime(after(inRange))
 	}
 	b := func(f int) float64 { return float64(boundary[f]) }
 	has := func(f int) bool { return len(c.fields[f]) != 0 }
@@ -66,7 +93,16 @@ func (c *Cron) step(now *DateTime, reverse bool) (out float64, found bool) {
 		adjustDst(current)
 	}
 	result := zoned.mutate(func(current *jsDate) {
-		current.setSeconds(current.seconds()+tick, 0)
+		if !utc {
+			if shift := zoned.ms - resolve(current.t); reverse && shift > 0 || !reverse && shift < 0 {
+				current.setTime(current.t + shift)
+			}
+		}
+		offset := tick
+		if reverse && current.millis() > 0 {
+			offset = 0
+		}
+		current.setSeconds(current.seconds()+offset, 0)
 		for i := 0; i < 10_000; i++ {
 			if math.IsNaN(current.t) {
 				panic(cronNotFound{})
@@ -150,8 +186,8 @@ func (c *Cron) step(now *DateTime, reverse bool) (out float64, found bool) {
 					continue
 				}
 			}
-			if isBeforeStart(current) {
-				current.setSeconds(current.seconds() + 1)
+			if isOutOfRange(current.t) {
+				skipOutOfRange(current)
 				i = -1 // skipped fold candidates do not count against the search budget
 				continue
 			}
@@ -245,6 +281,10 @@ func ScheduleCron(cron Value) Value {
 				return noDelay, nil, true
 			}
 			next, found := c.step(&DateTime{ms: timeClip(now)}, false)
+			// a run a fraction of a nanosecond away is the one after it (Effect 4.1.2)
+			if found && zeroMillis(next-now) {
+				next, found = c.step(&DateTime{ms: timeClip(next)}, false)
+			}
 			if !found {
 				panic(Defect{"Unable to find cron date"})
 			}

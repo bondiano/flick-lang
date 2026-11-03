@@ -130,7 +130,7 @@ func RequestResolverAround(before, after, self Value) Value {
 			_, released := catch(func() Value {
 				return masked(fb, outer+1, func() Value { return Run(fb, Apply(fb, Apply(fb, after, entries), a)) })
 			})
-			if cause = Sequential(cause, released); cause != nil {
+			if cause = finalized(cause, released); cause != nil { // as Effect's acquireUseRelease
 				panic(&Failure{cause})
 			}
 		}

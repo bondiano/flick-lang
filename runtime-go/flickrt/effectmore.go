@@ -30,7 +30,7 @@ func raceAll(fb *Fiber, tasks []Value, first bool) Value {
 		}
 		failed = concat(failed, c.cause)
 	}
-	panic(&Failure{failed})
+	panic(&Failure{failed.electDefects()}) // as Effect's raceAll
 }
 
 func RaceAll(fb *Fiber, tasks Value) Value      { return raceAll(fb, List(tasks), false) }

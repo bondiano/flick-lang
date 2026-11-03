@@ -55,6 +55,13 @@ func fromMillis(ms float64) *Duration {
 	return &Duration{tag: durationMillis, millis: ms}
 }
 
+// zeroMillis is `Duration.isZero(Duration.millis(ms))`: under half a
+// nanosecond rounds to zero.
+func zeroMillis(ms float64) bool {
+	d := fromMillis(ms)
+	return d == dur(DurationZero) || d.tag == durationNanos && d.nanos.Sign() == 0
+}
+
 // fromNanos is Effect's `make` of a BigInt of nanoseconds.
 func fromNanos(n *big.Int) *Duration {
 	if n.Sign() == 0 {

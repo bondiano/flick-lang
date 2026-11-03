@@ -175,3 +175,63 @@ func TestATypedErrorAsADefectIsItsValue(t *testing.T) {
 		t.Errorf("defects of different values are two: %d", n)
 	}
 }
+
+// Effect 4.1 elects defects where it joins a failure with a finalizer's, a
+// late branch's or every racer's: each typed failure but a pull's end is
+// then a defect; elsewhere, as in `Cause.combine`, the kinds stay.
+func TestElectDefects(t *testing.T) {
+	fail := &Cause{kind: causeFail, err: "boom"}
+	die := &Cause{kind: causeDie, defect: "d"}
+	kinds := func(c *Cause) (out []causeKind) {
+		for _, r := range c.reasons() {
+			out = append(out, r.kind)
+		}
+		return out
+	}
+	if got := kinds(Sequential(fail, die).electDefects()); len(got) != 2 || got[0] != causeDie || got[1] != causeDie {
+		t.Errorf("a failure beside a defect is one: %v", got)
+	}
+	if fail.electDefects() != fail {
+		t.Error("a failure without a defect stays")
+	}
+	if c := Sequential(doneCause(Unit), die).electDefects(); !isDoneCause(c) {
+		t.Error("a pull's end stays typed")
+	}
+	if !finalized(Sequential(fail, die), nil).has(causeFail) {
+		t.Error("a finalizer that succeeds leaves the body's cause as it is")
+	}
+	if !finalized(nil, Sequential(fail, die)).has(causeFail) {
+		t.Error("after a success, the finalizer's cause is not elected")
+	}
+	if !Sequential(fail, die).has(causeFail) {
+		t.Error("Cause.combine does not elect")
+	}
+
+	fb := rootFiber()
+	dies := Eff(func(*Fiber) Value { panic(Defect{"late"}) })
+	fails := Eff(func(*Fiber) Value { return Fail("boom") })
+	check := func(what string, c *Cause) {
+		t.Helper()
+		if c == nil || c.has(causeFail) || len(c.reasons()) != 2 {
+			t.Errorf("%s: the failure and the defect are two defects: %v", what, kinds(c))
+		}
+	}
+	// a Flick region joins with `Cause.combine`, as owner.ts does: no election
+	if c := failure(func() {
+		Scope(fb, func(fb *Fiber, _, _ Value) Value { AddFinalizer(fb, dies); return Fail("boom") })
+	}); c == nil || !c.has(causeFail) || len(c.reasons()) != 2 {
+		t.Errorf("scope: the failure and the defect stay as they are: %v", kinds(c))
+	}
+	check("owned", failure(func() {
+		owned(fb, func(fb *Fiber, _ *Owner) Value { AddFinalizer(fb, dies); return Fail("boom") })
+	}))
+	check("ensuring", failure(func() { EffectEnsuring(fb, dies, fails) }))
+	failed := make(chan struct{})
+	check("forEachConcurrent", failure(func() {
+		ParallelPair(fb,
+			Eff(func(*Fiber) Value { close(failed); return Fail("boom") }),
+			Eff(func(*Fiber) Value { <-failed; panic(Defect{"late"}) }))
+	}))
+	check("race", failure(func() { RaceSuccess(fb, fails, dies) }))
+	check("raceAll", failure(func() { RaceAll(fb, []Value{fails, dies}) }))
+}

@@ -21,11 +21,11 @@ func otlpResource(service string) string {
 		version = `,{"key":"service.version","value":{"stringValue":` + QuoteJSON(v) + `}}`
 	}
 	return `{"attributes":[{"key":"telemetry.sdk.name","value":{"stringValue":"effect"}},` +
-		`{"key":"telemetry.sdk.language","value":{"stringValue":"go"}},{"key":"telemetry.sdk.version","value":{"stringValue":"4.0.5"}},` +
+		`{"key":"telemetry.sdk.language","value":{"stringValue":"go"}},{"key":"telemetry.sdk.version","value":{"stringValue":"4.1.2"}},` +
 		`{"key":"service.name","value":{"stringValue":` + QuoteJSON(service) + `}}` + version + `],"droppedAttributesCount":0}`
 }
 
-const otlpScope = `{"name":"effect","version":"4.0.5"}`
+const otlpScope = `{"name":"effect","version":"4.1.2"}`
 
 // withAttr is the attributes with `key` set: a key they have keeps its
 // place, as in a JS object.

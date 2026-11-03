@@ -146,7 +146,7 @@ func Main(run func(*Fiber)) {
 		fb.state.interrupt(0)
 	}()
 	_, cause := catch(func() Value {
-		return owned(fb, func(fb *Fiber, owner *Owner) Value {
+		return region(fb, func(fb *Fiber, owner *Owner) Value {
 			if tracing {
 				traceOpen(owner, nil, "main")
 			}

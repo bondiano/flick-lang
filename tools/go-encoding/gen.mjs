@@ -5,6 +5,7 @@
 // these, line by line: the input as JSON, a tab, then the result.
 // Run from the repository root: `node tools/go-encoding/gen.mjs`.
 import { writeFileSync } from "node:fs";
+import { Result } from "../../runtime/node_modules/effect/dist/index.js";
 import { Ini, Toml, Yaml } from "../../runtime/node_modules/effect/dist/encoding/index.js";
 
 const ini = [
@@ -201,5 +202,6 @@ const write = (name, parse, inputs) =>
     `${inputs.map((s) => `${JSON.stringify(s)}\t${run(parse)(s)}`).join("\n")}\n`,
   );
 write("ini", Ini.parse, ini);
-write("toml", Toml.parse, toml);
+// as `Primitive.fileParse` does: since Effect 4.1 `Toml.parse` gives a `Result`
+write("toml", (input) => Result.getOrThrow(Toml.parse(input)), toml);
 write("yaml", Yaml.parse, yaml);

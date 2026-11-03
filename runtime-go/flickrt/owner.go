@@ -169,14 +169,10 @@ func (f finalizer) call(closer *Fiber, exit *Cause) *Cause {
 }
 
 // close closes the owner, uninterruptibly, after its body ended with `exit`
-// (nil on success): the cause the region ends with.
+// (nil on success): the cause the region ends with, joined as Effect's
+// `onExit(body, exit => Scope.close(scope, exit))` joins them.
 func (o *Owner) close(fb *Fiber, exit *Cause) *Cause {
-	return o.closeWithCause(fb, exit, exit)
-}
-
-// closeFinalizers closes a nested owner without returning its parent's body again.
-func (o *Owner) closeFinalizers(fb *Fiber, exit *Cause) *Cause {
-	return o.closeWithCause(fb, exit, nil)
+	return finalized(exit, o.closeFinalizers(fb, exit))
 }
 
 // onClose adds a hook the owner runs when it begins to close, before it
@@ -209,8 +205,9 @@ func (o *Owner) runHooks(fb *Fiber) (cause *Cause) {
 	}
 }
 
-// closeWithCause separates the exit finalizers observe from the result they extend.
-func (o *Owner) closeWithCause(fb *Fiber, exit, cause *Cause) *Cause {
+// closeFinalizers closes the owner with the exit its finalizers observe:
+// the cause they fail with, without the body's.
+func (o *Owner) closeFinalizers(fb *Fiber, exit *Cause) (cause *Cause) {
 	o.mu.Lock()
 	o.open = false
 	o.tracePhase("C0")
@@ -259,8 +256,22 @@ func (o *Owner) closeWithCause(fb *Fiber, exit, cause *Cause) *Cause {
 	return Sequential(cause, released)
 }
 
-// owned runs `body` in a fiber whose owner is a fresh one, then closes it.
+// owned runs `body` in a fiber whose owner is a fresh one, then closes it
+// as Effect's `scoped` does.
 func owned(fb *Fiber, body func(fb *Fiber, owner *Owner) Value) Value {
+	return ownedWith(fb, (*Owner).close, body)
+}
+
+// region is `owned` for a lexical region of Flick (`scope`, `provide`,
+// `main`): its owner's close joins the body's cause and the finalizers'
+// with `Cause.combine`, as owner.ts does, electing no defect.
+func region(fb *Fiber, body func(fb *Fiber, owner *Owner) Value) Value {
+	return ownedWith(fb, func(o *Owner, fb *Fiber, exit *Cause) *Cause {
+		return Sequential(exit, o.closeFinalizers(fb, exit))
+	}, body)
+}
+
+func ownedWith(fb *Fiber, close func(*Owner, *Fiber, *Cause) *Cause, body func(fb *Fiber, owner *Owner) Value) Value {
 	owner := newOwner()
 	if fb.owner != nil {
 		owner.defects = fb.owner.defects
@@ -268,7 +279,7 @@ func owned(fb *Fiber, body func(fb *Fiber, owner *Owner) Value) Value {
 	inner := *fb
 	inner.owner = owner
 	out, cause := catch(func() Value { return body(&inner, owner) })
-	if cause = owner.close(fb, cause); cause != nil {
+	if cause = close(owner, fb, cause); cause != nil {
 		panic(&Failure{cause})
 	}
 	return out
@@ -277,7 +288,7 @@ func owned(fb *Fiber, body func(fb *Fiber, owner *Owner) Value) Value {
 // Scope is `scope [s] { body }`: `body` receives the owner `s` and the one
 // around it.
 func Scope(fb *Fiber, body func(fb *Fiber, owner, outer Value) Value) Value {
-	return owned(fb, func(inner *Fiber, owner *Owner) Value {
+	return region(fb, func(inner *Fiber, owner *Owner) Value {
 		if tracing {
 			traceOpen(owner, fb.owner, "scope")
 		}
@@ -308,7 +319,7 @@ func Bracket(fb *Fiber, acquire, use, release Value) Value {
 	_, released := catch(func() Value {
 		return masked(fb, inside+1, func() Value { return Run(fb, Apply(fb, release, v)) })
 	})
-	if cause = Sequential(cause, released); cause != nil {
+	if cause = finalized(cause, released); cause != nil { // as Effect's acquireUseRelease
 		panic(&Failure{cause})
 	}
 	return out
