@@ -21,7 +21,7 @@ This path introduces the ideas in the order you need them. The
   then focus on function stages, error rows and lexical scopes. The runtime
   foundation is familiar; the source language and some ownership contracts
   are different.
-- **I know an ML-family language.** Skim the syntax and types, then start
+- **I know an ML-family language.** Skim the [syntax](./syntax/) and types, then start
   with effects and services. Do not assume an empty effect row means a
   function is pure.
 
