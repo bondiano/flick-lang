@@ -13,13 +13,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          for manifest in flick/Cargo.toml editors/zed/Cargo.toml editors/zed/extension.toml; do
-            version=$(grep -m1 '^version = ' "$manifest" | cut -d'"' -f2)
-            if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-              echo "::error file=$manifest::version $version, tag $GITHUB_REF_NAME"
+          check() {
+            if [ "v$2" != "$GITHUB_REF_NAME" ]; then
+              echo "::error file=$1::version $2, tag $GITHUB_REF_NAME"
               exit 1
             fi
+          }
+          for manifest in flick/Cargo.toml editors/zed/Cargo.toml editors/zed/extension.toml; do
+            check "$manifest" "$(grep -m1 '^version = ' "$manifest" | cut -d'"' -f2)"
           done
+          for manifest in runtime/package.json tools/astro-flick/package.json editors/vscode/package.json editors/tree-sitter-flick/tree-sitter.json; do
+            check "$manifest" "$(jq -r '.version // .metadata.version' "$manifest")"
+          done
+          # the runtime version `flick new` pins
+          check flick/src/toolchain.rs "$(grep -m1 'pub const RUNTIME' flick/src/toolchain.rs | cut -d'"' -f2)"
 
   checks:
     uses: ./.github/workflows/ci.yml
@@ -58,8 +65,28 @@ jobs:
           path: flick-${{ matrix.target }}.*
           if-no-files-found: error
 
+  npm:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # version comes from `packageManager` in package.json
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C runtime build
+      - run: |
+          pnpm -C runtime publish --no-git-checks
+          pnpm -C tools/astro-flick publish --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   release:
-    needs: [checks, build]
+    needs: [checks, build, npm]
     runs-on: ubuntu-latest
     permissions:
       contents: write

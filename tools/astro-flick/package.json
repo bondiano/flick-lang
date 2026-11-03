@@ -3,8 +3,16 @@
   "version": "0.1.0",
   "description": "Flick modules in Astro and Vite: `import { main } from \"./App.fl\"` compiles with `flick build`",
   "license": "MIT",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bondiano/flick-lang.git",
+    "directory": "tools/astro-flick"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
+  "files": ["index.mjs", "vite.mjs", "client.d.ts"],
   "exports": {
     ".": "./index.mjs",
     "./vite": "./vite.mjs",
