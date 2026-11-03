@@ -1,6 +1,6 @@
 // The browser's local storage as a state: `Atom.stored`.
 import { Option } from "effect";
-import * as Atom from "effect/reactivity/Atom";
+import * as Atom from "./effect/reactivity/Atom.ts";
 
 /** `Atom.stored key`: the text the browser's local storage keeps under `key`. */
 export const atomStored = (key: string): Atom.Writable<Option.Option<string>> => {
