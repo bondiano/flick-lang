@@ -147,8 +147,11 @@ pub struct GlobalArguments {
     /// The workspace member to run on, the name of its directory; at the
     /// root of a workspace `check`, `build`, `test`, `fmt`, `clean` and
     /// `install` otherwise run on every member.
+    // its own id: `ffi import` has a positional `package` that would
+    // otherwise fill this global too
     #[arg(
-        long,
+        id = "member",
+        long = "package",
         short = 'p',
         global = true,
         value_name = "NAME",
