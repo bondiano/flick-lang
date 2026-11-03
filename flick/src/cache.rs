@@ -150,9 +150,6 @@ fn dependency_files(root: &Path) -> Vec<PathBuf> {
                 .ok()
                 .and_then(|p| p.get("flick").cloned());
             let dir_of = |key: &str| Some(flick.as_ref()?.get(key)?.as_str()?.to_owned());
-            if let Some(iface_dir) = dir_of("iface-dir") {
-                files_under(&dir.join(iface_dir), &mut out);
-            }
             // a source package is compiled with the project: its modules are inputs
             if let Some(source_dir) = dir_of("source-dir") {
                 let mut sources = Vec::new();

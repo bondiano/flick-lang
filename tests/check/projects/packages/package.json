@@ -1,5 +1,5 @@
 {
   "name": "packages",
-  "dependencies": { "old": "1.0.0", "plain": "1.0.0" },
+  "dependencies": { "plain": "1.0.0" },
   "devDependencies": { "not-installed": "2.0.0" }
 }

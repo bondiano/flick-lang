@@ -3,3 +3,6 @@ schema-version = 1
 [project]
 kind = "lib"
 source-dir = "src"
+
+[dependencies]
+text = { path = "text" }

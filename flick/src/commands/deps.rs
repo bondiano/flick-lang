@@ -15,7 +15,6 @@ use flick_core::source::SourceMap;
 use super::libraries;
 use super::run::find_project;
 use crate::args::GlobalArguments;
-use crate::cache::files_under;
 use crate::child;
 use crate::command::Outcome;
 use crate::fetch;
@@ -179,9 +178,6 @@ pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
         }
         Err(err) => return failure(codes::P016, format!("cannot run pnpm: {err}")),
     }
-    if matches!(command, Command::List) {
-        interfaces(root);
-    }
     let diagnostics = if pnpm::writes(command) {
         toolchain::check_runtime(root).into_iter().collect()
     } else {
@@ -190,49 +186,5 @@ pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
     Outcome {
         sources: SourceMap::default(),
         diagnostics,
-    }
-}
-
-/// The Flick interfaces each direct dependency provides.
-fn interfaces(root: &Path) {
-    let Ok(text) = fs::read_to_string(root.join("package.json")) else {
-        return;
-    };
-    let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&text) else {
-        return;
-    };
-    println!("\nFlick interfaces:");
-    for field in ["dependencies", "devDependencies"] {
-        let Some(deps) = manifest.get(field).and_then(|d| d.as_object()) else {
-            continue;
-        };
-        for name in deps.keys() {
-            let dir = root.join("node_modules").join(name);
-            let package: Option<serde_json::Value> = fs::read_to_string(dir.join("package.json"))
-                .ok()
-                .and_then(|t| serde_json::from_str(&t).ok());
-            let iface = package.as_ref().and_then(|p| {
-                p.get("flick")?
-                    .get("iface-dir")?
-                    .as_str()
-                    .map(str::to_owned)
-            });
-            let line = match (&package, iface) {
-                (None, _) => "not installed".to_owned(),
-                (Some(_), None) => "JavaScript only: bind it with `flick ffi import`".to_owned(),
-                (Some(_), Some(dir_name)) => {
-                    let mut files = Vec::new();
-                    files_under(&dir.join(&dir_name), &mut files);
-                    let modules: Vec<String> = files
-                        .iter()
-                        .filter(|f| f.extension().is_some_and(|e| e == "iface"))
-                        .filter_map(|f| f.strip_prefix(dir.join(&dir_name)).ok())
-                        .map(|f| f.with_extension("").to_string_lossy().replace('/', "."))
-                        .collect();
-                    format!("Flick modules {}", modules.join(", "))
-                }
-            };
-            println!("  {name}: {line}");
-        }
     }
 }

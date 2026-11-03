@@ -195,23 +195,10 @@ The fingerprint of an interface is a 64-bit FNV-1a hash, as 16 hex digits,
 of its JSON without `dependencies`, `source` and the `at` of exports:
 moving a declaration changes nothing for importers. Equal fingerprints mean that code
 compiled against one interface is valid against the other. `dependencies`
-records the fingerprint of every imported module's interface at build time;
-when an installed package's module was built against an interface other than
-the installed one of its dependency, the importer reports `FLICK-P014`.
+records the fingerprint of every imported module's interface at build time.
 
 ## Location in a package
 
-A package names the directory of its interfaces in `package.json`, and module
-`A.B` is described by `<iface-dir>/A/B.iface`:
-
-```json
-{ "name": "@acme/text", "flick": { "iface-dir": "iface" } }
-```
-
-The compiled module sits next to its interface, and code importing it
-imports `<package>/<iface-dir>/A/B.js`: with the field above, module
-`Text.Shout` of `@acme/text` is `@acme/text/iface/Text/Shout.js`. A package
-that declares `exports` must export that path. `flick build` writes
-`A/B.iface` next to `A/B.js` in the output directory, so the output directory
-serves as `iface-dir`; `flick pack` writes the `package.json` field. Nobody
-edits them by hand.
+`flick build` writes `A/B.iface` next to `A/B.js` in the output directory.
+Dependents never read another package's interfaces: they compile a Flick
+library from its sources (see [project.md](../project/#flick-dependencies)).

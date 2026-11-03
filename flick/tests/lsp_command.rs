@@ -388,12 +388,11 @@ fn definition_reaches_into_installed_packages() {
             ("src/App/Main.fl", main),
             (
                 "node_modules/@acme/greeting/package.json",
-                "{ \"name\": \"@acme/greeting\", \"version\": \"1.0.0\", \"flick\": { \"iface-dir\": \"dist\" } }",
+                "{ \"name\": \"@acme/greeting\", \"version\": \"1.0.0\", \"flick\": { \"source-dir\": \"src\" } }",
             ),
         ],
     );
     let package = app.join("node_modules/@acme/greeting");
-    copy_tree(&lib.join("dist"), &package.join("dist"));
     copy_tree(&lib.join("src"), &package.join("src"));
     let file = app.join("src/App/Main.fl");
     let doc = json!({ "uri": uri(&file) });
@@ -412,17 +411,6 @@ fn definition_reaches_into_installed_packages() {
     assert_eq!(
         published["range"]["start"],
         json!({ "line": 3, "character": 0 })
-    );
-    lsp.close();
-    // without its sources the package's interface is opened at the declaration
-    fs::remove_dir_all(package.join("src")).expect("remove");
-    let mut lsp = Lsp::start(&app);
-    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": main } }));
-    let _ = lsp.diagnostics(&uri(&file));
-    let interface = go(&mut lsp);
-    assert_eq!(
-        interface["uri"],
-        uri(&package.join("dist/Lib/Greeting.iface"))
     );
     lsp.close();
 }

@@ -81,8 +81,6 @@ pub enum Symbol {
 pub struct Ide<'a> {
     pub analysis: &'a Analysis,
     pub sources: &'a SourceMap,
-    /// The directory of an installed package.
-    pub package_dir: &'a dyn Fn(&str) -> Option<PathBuf>,
 }
 
 impl Ide<'_> {
@@ -99,28 +97,10 @@ impl Ide<'_> {
         if let Some(m) = self.analysis.module(module) {
             return Some(m.interface.clone());
         }
-        self.analysis
-            .compilation
-            .package_modules
+        types::builtins()
             .iter()
-            .find(|m| m.module == module)
-            .map(|m| m.interface.clone())
-            .or_else(|| {
-                types::builtins()
-                    .iter()
-                    .find(|i| i.module == module)
-                    .cloned()
-            })
-    }
-
-    /// The package that provides `module`.
-    fn package_of(&self, module: &str) -> Option<&str> {
-        self.analysis
-            .compilation
-            .package_modules
-            .iter()
-            .find(|m| m.module == module)
-            .map(|m| m.package.as_str())
+            .find(|i| i.module == module)
+            .cloned()
     }
 
     /// The symbol at `offset` of `file`, with the range of the name there.

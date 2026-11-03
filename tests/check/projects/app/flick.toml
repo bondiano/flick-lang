@@ -12,3 +12,6 @@ profile = "debug"
 emit = "js"
 emit-dts = false
 schema-aot = false
+
+[dependencies]
+text = { path = "text" }

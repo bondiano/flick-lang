@@ -180,19 +180,11 @@ pub fn projection_of(
     projection::project(module, text, &fingerprint, &lookup, &package, specifier)
 }
 
-/// The interface of `module`: the analysis's own, a package's or a built-in.
+/// The interface of `module`: the analysis's own or a built-in.
 pub fn interface_of(analysis: &Analysis, module: &str) -> Option<Interface> {
     analysis
         .module(module)
         .map(|a| a.interface.clone())
-        .or_else(|| {
-            analysis
-                .compilation
-                .package_modules
-                .iter()
-                .find(|p| p.module == module)
-                .map(|p| p.interface.clone())
-        })
         .or_else(|| builtins().iter().find(|i| i.module == module).cloned())
 }
 

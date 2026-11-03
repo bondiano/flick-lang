@@ -56,7 +56,7 @@ max-params = 5
 | `build.solver-steps` | instance resolution steps per definition | `100000` |
 | `build.solver-depth` | depth of nested class constraints | `256` |
 | `build.labels` | what a release build labels `Module.name` for debugging tools: `"all"` (atoms, views, actions), `"components"` (views and actions) or `"none"`; debug labels all; `flick build --labels` overrides it | `"all"` |
-| `build.effect` | what runs effects: `"effect"`, or `"none"` for plain JavaScript that imports only `@flick-lang/runtime/core`: then `main` is `Unit -> Unit`, a runtime call is `FLICK-E001`, and a `task`, a refined type, a schema or a built-in module outside `Prelude`, `List`, `Option`, `Result`, `String`, `Float` and `Bool` is `FLICK-E008`. A library on Effect also writes, under `_core/` of its output, the modules that need no Effect, which an app with `"none"` imports; a module of a package without that is `FLICK-E008`, and a library built with `"none"` cannot be imported on Effect (`FLICK-P027`) | `"effect"` |
+| `build.effect` | what runs effects: `"effect"`, or `"none"` for plain JavaScript that imports only `@flick-lang/runtime/core`: then `main` is `Unit -> Unit`, a runtime call is `FLICK-E001`, and a `task`, a refined type, a schema or a built-in module outside `Prelude`, `List`, `Option`, `Result`, `String`, `Float` and `Bool` is `FLICK-E008`. A library on Effect also writes, under `_core/` of its output, the modules that need no Effect; a library a project depends on is compiled with the project's `effect` | `"effect"` |
 | `build.ui` | the module that renders and mounts views in place of React: it exports every name `Ui` and `Action` bind from `@flick-lang/runtime/ui` and `@flick-lang/runtime/ui/react`; a relative path is relative to the project's root | React |
 | `sql.dialect` | the SQL dialect of `sql table` and `sql { … }` (see [sql.md](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` and `"oracle"` are recognized but not supported yet | `"postgresql"` |
 | `lint.allow` | warning codes not reported, such as `"FLICK-T021"`; errors cannot be turned off | `[]` |
@@ -134,22 +134,48 @@ runs a script, and `dev` and the other commands need a member, `--package <name>
 In a member, commands run on that member as usual, and `--package` picks
 another.
 
-## Path dependencies
+## Flick dependencies
 
-A project compiles a Flick library from its sources with a dependency by
-path, relative to its `flick.toml`:
+A project compiles the Flick libraries it depends on from their sources.
+`[dependencies]` names each with one source: a directory relative to the
+`flick.toml`, a tag of a git repository (with the library's directory in it,
+`subdir`), or a gzipped tarball with its sha256:
 
 ```toml
 [dependencies]
 contract = { path = "../contract" }
+std = { git = "https://github.com/bondiano/flick-lang", tag = "std-v0.1.0", subdir = "packages/std" }
+text = { url = "https://example.com/text-1.0.0.tgz", sha256 = "<64 hexadecimal digits>" }
 ```
 
-The directory holds a `flick.toml` of `kind = "lib"`; its `source-dir` is
-where the modules are, and its own path dependencies come along. The library
-is compiled like a [source package](#packages): for the target the project
-emits, without its warnings, after the project's own modules. A change to its
-sources or its `flick.toml` rebuilds the project, and `--watch` follows them.
-npm dependencies stay in `package.json`.
+The library's directory holds a `flick.toml` of `kind = "lib"`; its
+`source-dir` is where the modules are, and its own dependencies come along.
+A library others fetch says what it is and which compilers build it, the
+last a semver requirement:
+
+```toml
+[package]
+name = "text"
+version = "1.0.0"
+flick = ">=0.1, <0.2"
+```
+
+`flick install` fetches each git or url library the manifests name, directly
+or through a library, into the package store (`FLICK_STORE`, else
+`flick/pkg` in the user's cache directory), where each sits under the hash of
+its files, and pins it in `flick.lock`: the commit of a git tag and that
+hash. Commit `flick.lock`: a build reads the store through it and fetches
+nothing. `flick install --offline` uses only the store, `--locked` fails
+rather than change the lock, `flick update <name>` fetches a library again,
+`flick add <name> --git URL --tag T [--subdir S]` (or `--url U --sha256 H`,
+or `--path DIR`) adds one and `flick remove <name>` drops it.
+
+A library is compiled like a [source package](#packages): for the target the
+project emits, without its warnings, after the project's own modules, as
+another package, so instances of its classes and types are its own. A change
+to a path library's sources or its `flick.toml`, or to `flick.lock`, rebuilds
+the project, and `--watch` follows them. npm dependencies stay in
+`package.json`.
 
 ## Scripts
 
@@ -178,19 +204,10 @@ they import, transitively. Outside a project paths are required.
 
 ## Packages
 
-Package names, versions and dependencies live in `package.json`; pnpm installs
-them. Flick only reads the installed tree: for each dependency of
-`package.json` it reads `node_modules/<name>/package.json`. A package with Flick
-modules names the directory of their interfaces:
-
-```json
-{ "name": "@acme/text", "flick": { "iface-dir": "iface" } }
-```
-
-Module `Acme.Text` of that package is described by `iface/Acme/Text.iface`;
-the format is in [iface.md](../iface/).
-
-A source package names the directory of its sources instead:
+npm packages live in `package.json`; pnpm installs them. Flick reads the
+installed tree: for each dependency of `package.json` it reads
+`node_modules/<name>/package.json`. An npm package with Flick modules is a
+source package, which names the directory of its sources:
 
 ```json
 { "name": "@acme/contract", "flick": { "source-dir": "src" } }
@@ -200,7 +217,7 @@ Each dependent compiles its modules for the target it emits, js or go, as
 modules of that package. So a JS client and a Go server that both depend on it
 share its types, and its constructors have the same tags on both sides. A
 source package needs no build of its own; within a repository, a
-[path dependency](#path-dependencies) names it without `node_modules`. Its modules are checked
+[path dependency](#flick-dependencies) names it without `node_modules`. Its modules are checked
 for the target of the dependent, so on go an import of a js-only module is
 `FLICK-P030`. The dependent does not report the package's warnings. Its own
 modules come first: a module the project declares is not looked up in the
@@ -210,5 +227,6 @@ package.
 | - | - |
 | an imported module is found nowhere while a dependency is not installed | `FLICK-P009`: run `flick install` (exit code `2`) |
 | an imported module is found nowhere | `FLICK-R003`: add the package with `flick add <package>` |
-| an `.iface` file is malformed, has another `iface-version` or compiler version, or describes another module | `FLICK-P010` (exit code `2`) |
-| a package module was built against another interface of a dependency than the installed one | `FLICK-P014` |
+| a dependency names no source, or two, or `[package]` is not semver | `FLICK-P032` |
+| a library's `flick` requirement leaves this compiler out | `FLICK-P033` |
+| a git or url library is not in `flick.lock` or in the store | `FLICK-P034`: run `flick install` |

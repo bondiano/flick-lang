@@ -305,7 +305,6 @@ fn staged_manifest(
     };
     object.insert("type".into(), "module".into());
     object.insert("files".into(), serde_json::json!(["dist"]));
-    object.insert("flick".into(), serde_json::json!({ "iface-dir": "dist" }));
     object
         .entry("exports")
         .or_insert(serde_json::json!({ "./*": "./dist/*" }));

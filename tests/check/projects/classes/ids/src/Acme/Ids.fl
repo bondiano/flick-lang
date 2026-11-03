@@ -1,0 +1,7 @@
+module Acme.Ids exposing (ExternalId, Convert)
+
+opaque type ExternalId = ExternalId String
+
+class Convert input output
+
+instance Convert String ExternalId

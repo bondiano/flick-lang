@@ -8,8 +8,6 @@ import Form
 //     ^^^^ FLICK-P030 `Form` is available on the js target only, and this project emits go
 import Reactivity.AsyncResult
 //     ^^^^^^^^^^^^^^^^^^^^^^ FLICK-P030 `Reactivity.AsyncResult` is available on the js target only, and this project emits go
-import Acme.Text
-//     ^^^^^^^^^ FLICK-P030 the package module `Acme.Text` is built for the js target only, and this project emits go
 
 main : Unit -> Unit
 let main () = ()

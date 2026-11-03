@@ -7,7 +7,7 @@ use flick_core::ide::{Ide, Outline};
 use flick_core::source::FileId;
 use serde_json::{Value, json};
 
-use super::requests::{ide, package_dir};
+use super::requests::ide;
 use super::{Snapshot, protocol};
 
 /// The line and UTF-16 column of `offset`.
@@ -92,8 +92,7 @@ pub(super) fn signature_help(ide: &Ide, file: FileId, offset: u32) -> Value {
 
 /// The symbols of `snapshot` that match `query`, as LSP symbol information.
 pub(super) fn symbols(snapshot: &Snapshot, query: &str) -> Vec<Value> {
-    let dir = package_dir(&snapshot.root);
-    let ide = ide(snapshot, &dir);
+    let ide = ide(snapshot);
     ide.workspace_symbols(query)
         .into_iter()
         .map(|(file, o)| {

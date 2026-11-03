@@ -24,9 +24,7 @@ pub use config::Config;
 pub(crate) use load::js_only;
 #[cfg(feature = "ide")]
 pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
-pub use load::{
-    Compilation, Compiled, MainKind, ModuleCache, PackageModule, check, compile, main_kind,
-};
+pub use load::{Compilation, Compiled, MainKind, ModuleCache, check, compile, main_kind};
 #[cfg(feature = "native-project")]
 pub use packages::project_name;
 use std::io;

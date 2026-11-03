@@ -31,19 +31,10 @@ pub(super) type Reply = Result<Value, (i64, String)>;
 const INVALID_PARAMS: i64 = -32602;
 pub(super) const REQUEST_FAILED: i64 = -32803;
 
-/// The directory of an installed package of the project at `root`.
-pub(super) fn package_dir(root: &Path) -> impl Fn(&str) -> Option<PathBuf> + '_ {
-    move |package| {
-        let dir = root.join("node_modules").join(package);
-        dir.exists().then_some(dir)
-    }
-}
-
-pub(super) fn ide<'a>(snapshot: &'a Snapshot, dir: &'a dyn Fn(&str) -> Option<PathBuf>) -> Ide<'a> {
+pub(super) fn ide(snapshot: &Snapshot) -> Ide<'_> {
     Ide {
         analysis: &snapshot.analysis,
         sources: &snapshot.sources,
-        package_dir: dir,
     }
 }
 
@@ -113,8 +104,7 @@ impl Server {
         let Some(file) = snapshot.file(&path) else {
             return Ok(Value::Null);
         };
-        let dir = package_dir(&snapshot.root);
-        let ide = ide(snapshot, &dir);
+        let ide = ide(snapshot);
         match method {
             "textDocument/hover" => {
                 Ok(ide
@@ -180,8 +170,7 @@ impl Server {
                 }));
             }
         }
-        let dir = package_dir(&snapshot.root);
-        for action in ide(snapshot, &dir).actions(file, start, end) {
+        for action in ide(snapshot).actions(file, start, end) {
             actions.push(json!({
                 "title": action.title,
                 "kind": action.kind,
@@ -237,8 +226,7 @@ impl Server {
         let Some(file) = snapshot.file(&path) else {
             return Ok(json!([]));
         };
-        let dir = package_dir(&snapshot.root);
-        let items: Vec<Value> = ide(&snapshot, &dir)
+        let items: Vec<Value> = ide(&snapshot)
             .complete(file, u32::try_from(offset).unwrap_or(0), dotted)
             .into_iter()
             .map(|c| {

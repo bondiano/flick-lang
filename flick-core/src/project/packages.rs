@@ -1,15 +1,12 @@
-//! Package graph over the installed `node_modules`: pnpm installs, Flick only
-//! reads. A package with Flick modules
-//! names its interface directory in `package.json`:
-//! `"flick": { "iface-dir": "iface" }`, and module `A.B` is `iface/A/B.iface`.
-//! A source package names its source directory instead,
-//! `"flick": { "source-dir": "src" }`: each dependent compiles its modules,
+//! The libraries a project compiles from their sources. An npm package of
+//! `node_modules`, which pnpm installs, is one when its `package.json` names
+//! its source directory, `"flick": { "source-dir": "src" }`: each dependent
+//! compiles its modules,
 //! for whichever target it emits, as modules of that package. A library of
 //! `[dependencies]` is a source package too, with the `source-dir` of its own
 //! `flick.toml`, and so are its dependencies: a path names its directory, and
 //! a git or url source is found through `flick.lock` in the package store.
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -19,7 +16,6 @@ use super::lock::{LOCK_FILE, Lock};
 use super::store;
 use super::{Host, Project};
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::iface::{self, Interface};
 use crate::source::SourceMap;
 
 #[derive(Debug, Default)]
@@ -32,9 +28,6 @@ pub(super) struct Packages {
 struct Package {
     name: String,
     installed: bool,
-    /// The `iface-dir` as written, and resolved.
-    layout: Option<String>,
-    iface_dir: Option<PathBuf>,
     /// The resolved `source-dir` of a source package.
     source_dir: Option<PathBuf>,
 }
@@ -53,8 +46,6 @@ struct Manifest {
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 struct FlickField {
-    /// Where a package of Flick modules keeps their interfaces.
-    iface_dir: Option<String>,
     /// Where a source package keeps the modules its dependents compile.
     source_dir: Option<String>,
     /// The compiler a project pins; `flick` itself reads it.
@@ -102,41 +93,17 @@ impl Packages {
                 let dir = root.join("node_modules").join(name);
                 let installed = manifest(host, &dir.join("package.json"), diagnostics);
                 let flick = installed.as_ref().and_then(|m| m.flick.as_ref());
-                let layout = flick.and_then(|f| f.iface_dir.clone());
                 let source_dir = flick
                     .and_then(|f| f.source_dir.as_ref())
                     .map(|s| super::normalize(&dir.join(s)));
                 Package {
                     name: name.clone(),
                     installed: installed.is_some(),
-                    iface_dir: layout.as_ref().map(|l| dir.join(l)),
-                    layout,
                     source_dir,
                 }
             });
         packages.extend(installed.collect::<Vec<_>>());
         Packages { packages }
-    }
-
-    /// The import specifier of the compiled JS of module `A.B` of `package`:
-    /// it sits next to its interface, `<package>/<iface-dir>/A/B.js`.
-    pub fn js_specifier(&self, package: &str, file: &str) -> String {
-        let dir = self
-            .packages
-            .iter()
-            .find(|p| p.name == package)
-            .and_then(|p| p.layout.as_deref())
-            .unwrap_or(".");
-        let dir: Vec<&str> = dir
-            .split('/')
-            .filter(|part| !part.is_empty() && *part != ".")
-            .collect();
-        [package]
-            .into_iter()
-            .chain(dir)
-            .chain([file])
-            .collect::<Vec<_>>()
-            .join("/")
     }
 
     /// The source directory of each source package, in dependency order.
@@ -153,50 +120,6 @@ impl Packages {
             .filter(|p| !p.installed)
             .map(|p| p.name.as_str())
             .collect()
-    }
-
-    /// Installed packages that provide `module`, with its interface.
-    pub fn find(
-        &self,
-        host: &dyn Host,
-        module: &str,
-        diagnostics: &mut Vec<Diagnostic>,
-    ) -> Vec<(String, Interface)> {
-        if !super::is_module_name(module) {
-            diagnostics.push(Diagnostic::new(
-                codes::P010,
-                Severity::Error,
-                format!("invalid installed interface module reference `{module}`"),
-            ));
-            return Vec::new();
-        }
-        let mut found = Vec::new();
-        // a source package's modules are compiled, not read from interfaces
-        for package in self.packages.iter().filter(|p| p.source_dir.is_none()) {
-            let Some(dir) = &package.iface_dir else {
-                continue;
-            };
-            let path = dir.join(super::module_path(module)).with_extension("iface");
-            let Ok(bytes) = host.read(&path) else {
-                continue;
-            };
-            let invalid = |reason: String| {
-                Diagnostic::new(
-                    codes::P010,
-                    Severity::Error,
-                    format!(
-                        "invalid interface `{}` of package `{}`: {reason}",
-                        host.display(&path),
-                        package.name
-                    ),
-                )
-            };
-            match iface::read(&bytes, module) {
-                Ok(interface) => found.push((package.name.clone(), interface)),
-                Err(reason) => diagnostics.push(invalid(reason)),
-            }
-        }
-        found
     }
 }
 
@@ -358,8 +281,6 @@ impl Libraries<'_> {
         out.push(Package {
             name: dependency.name.clone(),
             installed: true,
-            layout: None,
-            iface_dir: None,
             source_dir: Some(super::normalize(&at.join(&library.source_dir))),
         });
         Some((at, library.dependencies))
@@ -391,50 +312,4 @@ fn manifest(host: &dyn Host, path: &Path, diagnostics: &mut Vec<Diagnostic>) -> 
             Some(Manifest::default())
         }
     }
-}
-
-/// A package module built against another interface of a module than the
-/// one installed: its compiled code may no longer fit.
-pub(super) fn stale(
-    interfaces: &BTreeMap<String, Interface>,
-    owners: &BTreeMap<String, String>,
-) -> Vec<Diagnostic> {
-    let mut out = Vec::new();
-    for (module, package) in owners {
-        let Some(interface) = interfaces.get(module) else {
-            continue;
-        };
-        for (dependency, recorded) in &interface.dependencies {
-            let Some(installed) = interfaces.get(dependency) else {
-                out.push(Diagnostic::new(
-                    codes::P014,
-                    Severity::Error,
-                    format!(
-                        "`{module}` of package `{package}` depends on `{dependency}`, whose installed interface cannot be found"
-                    ),
-                ));
-                continue;
-            };
-            let actual = iface::fingerprint(installed);
-            if actual != *recorded {
-                let from = owners
-                    .get(dependency)
-                    .map_or(String::new(), |p| format!(" of `{p}`"));
-                out.push(
-                    Diagnostic::new(
-                        codes::P014,
-                        Severity::Error,
-                        format!(
-                            "`{module}` of package `{package}` was built against another interface of `{dependency}`{from}: fingerprint {recorded}, installed {actual}"
-                        ),
-                    )
-                    .with_fix(|| (
-                        format!("install the versions `{package}` was built with, or a release of `{package}` built against the installed one"),
-                        Vec::new(),
-                    )),
-                );
-            }
-        }
-    }
-    out
 }

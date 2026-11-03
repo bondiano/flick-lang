@@ -4,7 +4,7 @@
 
 use super::Loader;
 use crate::diagnostics::{Diagnostic, codes};
-use crate::iface::Target;
+
 use crate::project::config::Emit;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
@@ -89,14 +89,6 @@ impl Loader<'_> {
                 let builtin = types::builtins().iter().any(|i| i.module == name);
                 if builtin && js_only(name) {
                     found.push(js_only_error(name, import.span));
-                } else if let Some(i) = self.from_packages.get(name)
-                    && !builtin
-                    && !i.targets.contains(&Target::Go)
-                {
-                    let message = format!(
-                        "the package module `{name}` is built for the js target only, and this project emits go"
-                    );
-                    found.push(Diagnostic::error(codes::P030, message, import.span));
                 }
             }
         }

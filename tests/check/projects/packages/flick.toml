@@ -2,4 +2,3 @@ schema-version = 1
 
 [project]
 kind = "lib"
-#~ FLICK-P010 invalid interface `node_modules/old/iface/Old/Api.iface` of package `old`: `iface-version` 4 is not supported

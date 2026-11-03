@@ -177,7 +177,6 @@ impl Fixture {
         Ide {
             analysis: &self.analysis,
             sources: &self.sources,
-            package_dir: &|_| None,
         }
     }
 

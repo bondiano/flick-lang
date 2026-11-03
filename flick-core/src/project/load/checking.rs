@@ -11,7 +11,7 @@ use tracing::debug;
 
 #[cfg(feature = "ide")]
 use super::Analyzed;
-use super::{Loaded, Loader};
+use super::{Loaded, Loader, Root};
 use crate::clock::timed;
 use crate::diagnostics::{Diagnostic, Severity};
 use crate::ir;
@@ -212,7 +212,11 @@ impl Checking<'_> {
             syntax: &loaded.syntax,
         };
         let (mut interface, resolved) = resolve::resolve(&module, lookup);
-        let local = |name: &str| self.by_name.contains_key(name);
+        // a library's modules are another package's: they own their own instances
+        let local = |name: &str| {
+            (self.by_name.get(name))
+                .is_some_and(|&i| package_of(&self.modules[i].root) == package_of(&loaded.root))
+        };
         let build = self.project.map(|p| &p.config.build);
         let options = types::Options {
             local: &local,
@@ -362,4 +366,12 @@ fn parallel<T: Send>(items: &[usize], f: impl Fn(usize) -> T + Sync) -> Vec<T> {
 #[cfg(target_arch = "wasm32")]
 fn parallel<T>(items: &[usize], f: impl Fn(usize) -> T) -> Vec<T> {
     items.iter().map(|&i| f(i)).collect()
+}
+
+/// The library a module of `root` belongs to; `None` for the project's own.
+fn package_of(root: &Root) -> Option<&str> {
+    match root {
+        Root::Package(name) => Some(name),
+        _ => None,
+    }
 }

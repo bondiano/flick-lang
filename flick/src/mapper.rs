@@ -224,14 +224,7 @@ fn write_elsewhere(written: &mut HashMap<PathBuf, String>, snapshot: &Snapshot, 
     let analysis = &snapshot.analysis;
     let fingerprint = "external";
     let lookup = |m: &str| interface_of(analysis, m);
-    let interfaces = builtins().iter().chain(
-        analysis
-            .compilation
-            .package_modules
-            .iter()
-            .map(|p| &p.interface),
-    );
-    for interface in interfaces {
+    for interface in builtins() {
         let specifier = |m: &str| projection::relative(&interface.module, m);
         let Projected { file, text, .. } =
             projection::project_interface(interface, fingerprint, &lookup, &|_| None, &specifier);
