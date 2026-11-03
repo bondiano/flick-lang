@@ -7,9 +7,13 @@ pub mod cache;
 pub mod config;
 mod load;
 #[cfg(feature = "native-project")]
+pub mod lock;
+#[cfg(feature = "native-project")]
 mod packages;
 #[cfg(feature = "native-project")]
 pub mod pnpm;
+#[cfg(feature = "native-project")]
+pub mod store;
 #[cfg(feature = "native-project")]
 pub mod workspace;
 

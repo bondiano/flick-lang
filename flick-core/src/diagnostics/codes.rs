@@ -292,6 +292,9 @@ codes! {
     P029 = Project 29, "Go toolchain cannot build the program";
     P030 = Project 30, "module not available on the go target";
     P031 = Project 31, "invalid workspace or path dependency";
+    P032 = Project 32, "invalid dependency or package";
+    P033 = Project 33, "package needs another version of Flick";
+    P034 = Project 34, "dependency is not installed";
 }
 
 #[cfg(test)]

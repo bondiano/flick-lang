@@ -1,5 +1,5 @@
-//! `flick.toml`: the schema version, `[project]`, `[build]`, `[sql]`, `[lint]`,
-//! `[dependencies]`, `[workspace]` and `[scripts]`. Unknown keys are errors so
+//! `flick.toml`: the schema version, `[project]`, `[package]`, `[build]`,
+//! `[sql]`, `[lint]`, `[dependencies]`, `[workspace]` and `[scripts]`. Unknown keys are errors so
 //! that a typo never silently means a default.
 
 use crate::codegen::Labels;
@@ -7,6 +7,8 @@ use crate::diagnostics::Code;
 use crate::source::Span;
 use crate::types::{self, Dialect, Thresholds};
 
+#[cfg(feature = "native-project")]
+mod deps;
 #[cfg(feature = "native-project")]
 mod parse;
 #[cfg(feature = "native-project")]
@@ -32,13 +34,74 @@ pub struct Script {
     pub steps: Vec<String>,
 }
 
-/// A Flick library this project compiles from its sources:
-/// `[dependencies] name = { path = "…" }`.
+/// A Flick library this project compiles from its sources, under
+/// `[dependencies]`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dependency {
     pub name: String,
-    /// The library's directory, relative to the manifest.
-    pub path: String,
+    pub source: Source,
+    pub span: Span,
+}
+
+impl Dependency {
+    /// The library's directory relative to the manifest, for a path
+    /// dependency.
+    pub fn path(&self) -> Option<&str> {
+        match &self.source {
+            Source::Path(path) => Some(path),
+            _ => None,
+        }
+    }
+}
+
+/// Where the sources of a dependency come from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Source {
+    /// `{ path = "…" }`: a directory, relative to the manifest.
+    Path(String),
+    /// `{ git = "…", tag = "…", subdir = "…" }`: a tag of a repository, the
+    /// library at `subdir` of it.
+    Git {
+        url: String,
+        tag: String,
+        subdir: Option<String>,
+    },
+    /// `{ url = "…", sha256 = "…" }`: a gzipped tarball of the library.
+    Url { url: String, sha256: String },
+}
+
+impl Source {
+    /// How `flick.lock` names the source, without what pins it.
+    pub fn key(&self) -> String {
+        match self {
+            Source::Path(path) => format!("path+{path}"),
+            Source::Git { url, tag, subdir } => {
+                let subdir = subdir
+                    .as_ref()
+                    .map_or(String::new(), |s| format!("&subdir={s}"));
+                format!("git+{url}?tag={tag}{subdir}")
+            }
+            Source::Url { url, .. } => format!("url+{url}"),
+        }
+    }
+
+    /// The directory of the library inside its fetched sources.
+    pub fn subdir(&self) -> Option<&str> {
+        match self {
+            Source::Git { subdir, .. } => subdir.as_deref(),
+            _ => None,
+        }
+    }
+}
+
+/// `[package]`: the name and version a library is published under, and the
+/// versions of Flick that compile it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Package {
+    pub name: String,
+    pub version: String,
+    /// `flick = "…"`: a semver requirement on the compiler.
+    pub flick: Option<String>,
     pub span: Span,
 }
 
@@ -52,6 +115,8 @@ pub struct Config {
     pub entries: Vec<Entry>,
     /// `[dependencies]`, by name.
     pub dependencies: Vec<Dependency>,
+    /// `[package]`, which a library others fetch has.
+    pub package: Option<Package>,
     pub build: Build,
     /// `[sql] dialect`: what `sql table` and `sql { … }` are checked against.
     pub sql_dialect: &'static Dialect,

@@ -278,7 +278,7 @@ fn a_project_depends_on_libraries_by_path() {
     let deps: Vec<_> = config
         .dependencies
         .iter()
-        .map(|d| (d.name.as_str(), d.path.as_str()))
+        .map(|d| (d.name.as_str(), d.path().unwrap_or_default()))
         .collect();
     assert_eq!(deps, [("contract", "../contract")]);
 }

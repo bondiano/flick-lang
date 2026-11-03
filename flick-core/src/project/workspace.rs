@@ -121,7 +121,7 @@ fn ordered(
         let deps: Vec<PathBuf> = config
             .dependencies
             .iter()
-            .map(|d| normalize(&member.join(&d.path)))
+            .filter_map(|d| Some(normalize(&member.join(d.path()?))))
             .filter(|d| members.contains(d))
             .collect();
         needs.push(deps);

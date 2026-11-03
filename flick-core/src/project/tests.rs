@@ -65,6 +65,7 @@ fn library(sources: &mut SourceMap) -> Project {
             test_dir: "test".into(),
             entries: Vec::new(),
             dependencies: Vec::new(),
+            package: None,
             build: Build::default(),
             sql_dialect: Default::default(),
             allow: Vec::new(),

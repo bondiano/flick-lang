@@ -5,15 +5,18 @@
 //! A source package names its source directory instead,
 //! `"flick": { "source-dir": "src" }`: each dependent compiles its modules,
 //! for whichever target it emits, as modules of that package. A library of
-//! `[dependencies] name = { path = "…" }` is a source package too, with the
-//! `source-dir` of its own `flick.toml`, and so are its path dependencies.
+//! `[dependencies]` is a source package too, with the `source-dir` of its own
+//! `flick.toml`, and so are its dependencies: a path names its directory, and
+//! a git or url source is found through `flick.lock` in the package store.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use super::config::{self, Dependency, Kind};
+use super::config::{self, Dependency, Kind, Source};
+use super::lock::{LOCK_FILE, Lock};
+use super::store;
 use super::{Host, Project};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::{self, Interface};
@@ -76,15 +79,16 @@ impl Packages {
         let root = &project.root;
         let mut packages = Vec::new();
         let dependencies = &project.config.dependencies;
-        path_packages(
+        let fetched = Fetched::load(host, sources, root, dependencies, diagnostics);
+        Libraries {
             host,
-            sources,
-            root,
-            root,
-            dependencies,
-            &mut packages,
-            diagnostics,
-        );
+            sources: &mut *sources,
+            project: root,
+            fetched: &fetched,
+            out: &mut packages,
+            diagnostics: &mut *diagnostics,
+        }
+        .add(root, dependencies);
         let Some(project) = manifest(host, &root.join("package.json"), diagnostics) else {
             return Packages { packages };
         };
@@ -196,30 +200,116 @@ impl Packages {
     }
 }
 
-/// The libraries `dependencies` of the manifest in `dir` name by path, then
-/// theirs, each once; `project` is the root of the project being loaded.
-fn path_packages(
-    host: &dyn Host,
-    sources: &mut SourceMap,
-    project: &Path,
-    dir: &Path,
-    dependencies: &[Dependency],
-    out: &mut Vec<Package>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    let mut found = Vec::new();
-    for dependency in dependencies {
-        let at = super::normalize(&dir.join(&dependency.path));
+/// What `flick.lock` pins and where the package store keeps it.
+struct Fetched {
+    lock: Lock,
+    store: Option<PathBuf>,
+}
+
+impl Fetched {
+    /// The lock of the project at `root`, read when a dependency is fetched.
+    fn load(
+        host: &dyn Host,
+        sources: &mut SourceMap,
+        root: &Path,
+        dependencies: &[Dependency],
+        diagnostics: &mut Vec<Diagnostic>,
+    ) -> Fetched {
+        let mut lock = Lock::default();
+        let path = root.join(LOCK_FILE);
+        let fetches = dependencies.iter().any(|d| d.path().is_none());
+        if let Some(bytes) = fetches.then(|| host.read(&path).ok()).flatten() {
+            let (id, utf8) = sources.add_bytes(host.display(&path), bytes);
+            match utf8.map_or_else(|| Lock::parse(&sources.get(id).text, id), Err) {
+                Ok(read) => lock = read,
+                Err(diagnostic) => diagnostics.push(diagnostic),
+            }
+        }
+        Fetched {
+            lock,
+            store: store::store_dir(),
+        }
+    }
+
+    /// The directory of the library `dependency` names, from the manifest in
+    /// `dir`.
+    fn dir(&self, dir: &Path, dependency: &Dependency) -> Result<PathBuf, Diagnostic> {
+        if let Source::Path(path) = &dependency.source {
+            return Ok(super::normalize(&dir.join(path)));
+        }
+        let missing = |what: &str| {
+            Diagnostic::error(
+                codes::P034,
+                format!(
+                    "dependency `{}` is not {what}: run `flick install`",
+                    dependency.name
+                ),
+                dependency.span,
+            )
+        };
+        let locked = (self.lock)
+            .find(&dependency.name, &dependency.source)
+            .ok_or_else(|| missing("in `flick.lock`"))?;
+        let store = self.store.as_ref().ok_or_else(|| missing("fetched"))?;
+        let fetched = locked.dir(store);
+        Ok(match dependency.source.subdir() {
+            Some(subdir) => fetched.join(subdir),
+            None => fetched,
+        })
+    }
+}
+
+/// The libraries of a project as its manifests name them.
+struct Libraries<'a> {
+    host: &'a dyn Host,
+    sources: &'a mut SourceMap,
+    /// The root of the project being loaded.
+    project: &'a Path,
+    fetched: &'a Fetched,
+    out: &'a mut Vec<Package>,
+    diagnostics: &'a mut Vec<Diagnostic>,
+}
+
+impl Libraries<'_> {
+    /// The libraries `dependencies` of the manifest in `dir` name, then
+    /// theirs, each once.
+    fn add(&mut self, dir: &Path, dependencies: &[Dependency]) {
+        let mut found = Vec::new();
+        for dependency in dependencies {
+            if let Some(library) = self.library(dir, dependency) {
+                found.push(library);
+            }
+        }
+        for (at, dependencies) in found {
+            self.add(&at, &dependencies);
+        }
+    }
+
+    /// The library `dependency` names, with its directory and dependencies.
+    fn library(
+        &mut self,
+        dir: &Path,
+        dependency: &Dependency,
+    ) -> Option<(PathBuf, Vec<Dependency>)> {
+        let (host, sources, out) = (self.host, &mut *self.sources, &mut *self.out);
+        let diagnostics = &mut *self.diagnostics;
+        let at = match self.fetched.dir(dir, dependency) {
+            Ok(at) => at,
+            Err(diagnostic) => {
+                diagnostics.push(diagnostic);
+                return None;
+            }
+        };
         let error = |message: String| Diagnostic::error(codes::P031, message, dependency.span);
-        if at == project {
+        if at == self.project {
             diagnostics.push(error(format!(
                 "dependency `{}` is the project itself: path dependencies must not form a cycle",
                 dependency.name
             )));
-            continue;
+            return None;
         }
         if out.iter().any(|p| p.name == dependency.name) {
-            continue;
+            return None;
         }
         let file = at.join(super::CONFIG_FILE);
         let Ok(bytes) = host.read(&file) else {
@@ -229,7 +319,7 @@ fn path_packages(
                 super::CONFIG_FILE,
                 host.display(&at)
             )));
-            continue;
+            return None;
         };
         let (id, utf8) = sources.add_bytes(host.display(&file), bytes);
         let parsed = match utf8 {
@@ -240,16 +330,30 @@ fn path_packages(
             Ok(library) => library,
             Err(diagnostic) => {
                 diagnostics.push(diagnostic);
-                continue;
+                return None;
             }
         };
         if library.kind != Kind::Lib {
             diagnostics.push(error(format!(
-                "dependency `{}` at `{}` is an app: a path dependency is a `kind = \"lib\"`",
+                "dependency `{}` at `{}` is an app: a dependency is a `kind = \"lib\"`",
                 dependency.name,
                 host.display(&at)
             )));
-            continue;
+            return None;
+        }
+        if let Some(requirement) = library.package.as_ref().and_then(|p| p.flick.as_ref())
+            && !compiles_with(requirement, crate::VERSION)
+        {
+            diagnostics.push(Diagnostic::error(
+                codes::P033,
+                format!(
+                    "dependency `{}` needs flick {requirement}, and this is flick {}",
+                    dependency.name,
+                    crate::VERSION
+                ),
+                dependency.span,
+            ));
+            return None;
         }
         out.push(Package {
             name: dependency.name.clone(),
@@ -258,10 +362,18 @@ fn path_packages(
             iface_dir: None,
             source_dir: Some(super::normalize(&at.join(&library.source_dir))),
         });
-        found.push((at, library.dependencies));
+        Some((at, library.dependencies))
     }
-    for (at, dependencies) in found {
-        path_packages(host, sources, project, &at, &dependencies, out, diagnostics);
+}
+
+/// Whether the semver requirement `requirement` includes `version`.
+fn compiles_with(requirement: &str, version: &str) -> bool {
+    match (
+        semver::VersionReq::parse(requirement),
+        semver::Version::parse(version),
+    ) {
+        (Ok(requirement), Ok(version)) => requirement.matches(&version),
+        _ => false,
     }
 }
 

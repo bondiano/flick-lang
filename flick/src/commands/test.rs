@@ -328,7 +328,7 @@ pub fn watched_roots(project: &Project) -> Vec<PathBuf> {
         .config
         .dependencies
         .iter()
-        .map(|d| project::normalize(&project.root.join(&d.path)));
+        .filter_map(|d| Some(project::normalize(&project.root.join(d.path()?))));
     [
         project.source_root(),
         project.test_root(),

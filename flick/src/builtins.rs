@@ -10,6 +10,7 @@ use flick_core::iface::Interface;
 use flick_core::types;
 
 use crate::toolchain;
+use flick_core::project::store;
 
 const PREFIX: &str = "builtins-";
 
@@ -53,12 +54,7 @@ pub fn prepare() {
 /// depend on the checker as much as on the sources, so the name follows
 /// the executable, not only the version.
 fn location() -> Option<(PathBuf, String)> {
-    let dir = env::var_os("XDG_CACHE_HOME")
-        .filter(|d| !d.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| env::var_os("LOCALAPPDATA").map(PathBuf::from))
-        .or_else(|| env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache")))?
-        .join("flick");
+    let dir = store::cache_dir()?;
     let exe = fs::metadata(env::current_exe().ok()?).ok()?;
     let modified = exe.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
     let name = format!(

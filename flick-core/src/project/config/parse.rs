@@ -6,7 +6,8 @@ use std::{mem, ops};
 use serde::Deserialize;
 use toml::{Spanned, de};
 
-use super::{Build, Config, Dependency, Entry, Kind, MAIN_ENTRY, Manifest, Script};
+use super::deps::{RawDependency, RawPackage, dependencies, package};
+use super::{Build, Config, Entry, Kind, MAIN_ENTRY, Manifest, Script};
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::source::{FileId, Span};
 use crate::types::{Dialect, Thresholds, dialect};
@@ -29,15 +30,10 @@ struct Raw {
     sql: Option<Spanned<RawSql>>,
     lint: Option<Spanned<RawLint>>,
     dependencies: Option<Spanned<BTreeMap<String, Spanned<RawDependency>>>>,
+    package: Option<Spanned<RawPackage>>,
     workspace: Option<RawWorkspace>,
     #[serde(default)]
     scripts: BTreeMap<String, Spanned<RawScript>>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawDependency {
-    path: String,
 }
 
 #[derive(Deserialize)]
@@ -159,6 +155,7 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
             ("sql", raw.sql.map(|s| s.span())),
             ("lint", raw.lint.map(|l| l.span())),
             ("dependencies", raw.dependencies.map(|d| d.span())),
+            ("package", raw.package.map(|p| p.span())),
         ];
         if let Some((table, at)) = settings.into_iter().find_map(|(t, at)| Some((t, at?))) {
             return Err(Diagnostic::error(
@@ -272,23 +269,26 @@ fn config(
         complexity: threshold(&lint.max_complexity, "max-complexity", defaults.complexity)?,
         params: threshold(&lint.max_params, "max-params", defaults.params)?,
     };
-    let dependencies = raw
-        .dependencies
-        .map(Spanned::into_inner)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(name, value)| Dependency {
-            name,
-            span: span(value.span()),
-            path: value.into_inner().path,
-        })
-        .collect();
+    let dependencies = dependencies(
+        raw.dependencies
+            .map(Spanned::into_inner)
+            .unwrap_or_default(),
+        span,
+    )?;
+    let package = match raw.package {
+        Some(raw) => {
+            let at = span(raw.span());
+            Some(package(raw, at)?)
+        }
+        None => None,
+    };
     Ok(Config {
         kind: project.kind,
         source_dir: project.source_dir,
         test_dir: project.test_dir,
         entries,
         dependencies,
+        package,
         build: raw.build.map(Spanned::into_inner).unwrap_or_default(),
         sql_dialect,
         allow,

@@ -109,8 +109,13 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
             .is_some_and(|e| e == "fl" || e == "go" || e == "mjs")
     });
     files.extend(
-        [project::CONFIG_FILE, "package.json", "pnpm-lock.yaml"]
-            .map(|file| project.root.join(file)),
+        [
+            project::CONFIG_FILE,
+            project::lock::LOCK_FILE,
+            "package.json",
+            "pnpm-lock.yaml",
+        ]
+        .map(|file| project.root.join(file)),
     );
     files.extend(dependency_files(&project.root));
     library_files(&project.root, &project.config.dependencies, &mut files);
@@ -164,10 +169,14 @@ fn dependency_files(root: &Path) -> Vec<PathBuf> {
 }
 
 /// The configuration and modules of the libraries `dependencies` of the
-/// manifest in `dir` name by path, and of theirs.
+/// manifest in `dir` name by path, and of theirs; a fetched library never
+/// changes but with `flick.lock`.
 fn library_files(dir: &Path, dependencies: &[config::Dependency], out: &mut Vec<PathBuf>) {
     for dependency in dependencies {
-        let at = project::normalize(&dir.join(&dependency.path));
+        let Some(path) = dependency.path() else {
+            continue;
+        };
+        let at = project::normalize(&dir.join(path));
         let file = at.join(project::CONFIG_FILE);
         if out.contains(&file) {
             continue;
