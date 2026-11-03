@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import * as CoreArray from "../src/core/Array.ts";
@@ -203,12 +203,16 @@ const iterableCases: Record<string, Array<Case>> = {
   flickRepeat: finite.map((n) => (m) => over(m.flickRepeat(n))),
 };
 
-const builtins = new URL("../../flick-core/src/types/builtins/", import.meta.url);
+/** A built-in module's file: of the core package, else of std. */
+const builtin = (file: string): URL => {
+  const core = new URL(`../../packages/core/src/${file}`, import.meta.url);
+  return existsSync(core) ? core : new URL(`../../packages/std/src/${file}`, import.meta.url);
+};
 
 /** The JS names the `.fl` files bind from `@flick-lang/runtime/effect/<module>`. */
 const bound = (files: ReadonlyArray<string>, module: string): Array<string> => {
   const re = new RegExp(`foreign \\w+ \\w+ from "@flick-lang/runtime/effect/${module}" "(\\w+)"`, "g");
-  const names = files.flatMap((f) => [...readFileSync(new URL(f, builtins), "utf8").matchAll(re)].map((m) => m[1] ?? ""));
+  const names = files.flatMap((f) => [...readFileSync(builtin(f), "utf8").matchAll(re)].map((m) => m[1] ?? ""));
   return [...new Set(names)].toSorted();
 };
 

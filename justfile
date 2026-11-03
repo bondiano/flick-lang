@@ -41,8 +41,8 @@ feature-check:
 
 # Exercise minimal and independently enabled compiler capabilities
 feature-test:
-    cargo test -p flick-core --no-default-features --lib --test features
-    for feature in build-artifacts source-maps typescript diagnostic-fixes native-project terminal-diagnostics builtin-docs server-stdlib ide terminal-diagnostics,diagnostic-fixes; do cargo test -p flick-core --no-default-features --test features --features "$feature" || exit $?; done
+    cargo test -p flick-core --no-default-features --features embedded-std --lib --test features
+    for feature in build-artifacts source-maps typescript diagnostic-fixes native-project terminal-diagnostics builtin-docs server-stdlib ide terminal-diagnostics,diagnostic-fixes; do cargo test -p flick-core --no-default-features --test features --features "embedded-std,$feature" || exit $?; done
 
 # The Go runtime of the go target: vet and its unit tests.
 go-test:
