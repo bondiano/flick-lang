@@ -53,9 +53,10 @@ func TestCtrlBreakInterruptsMain(t *testing.T) {
 }
 
 // Windows errnos are not Unix's: a missing directory still reads as Node's
-// ENOENT, whichever separator the path uses.
+// ENOENT, whichever separator the path uses, and so does a name Windows
+// rejects.
 func TestWindowsFileErrorsReadAsNodes(t *testing.T) {
-	for _, path := range []string{`missing/dir/file.txt`, `missing\dir\file.txt`} {
+	for _, path := range []string{`missing/dir/file.txt`, `missing\dir\file.txt`, `@(a|b).txt`} {
 		_, err := os.Open(path)
 		want := "ENOENT: no such file or directory, open '" + path + "'"
 		if got := nodeMessage(err, "open", path); got != want {

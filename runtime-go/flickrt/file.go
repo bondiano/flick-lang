@@ -37,9 +37,15 @@ var nodeErrors = map[syscall.Errno][2]string{
 // errnos are not these, by what the error means.
 func nodeError(err error) ([2]string, bool) {
 	var errno syscall.Errno
-	if runtime.GOOS != "windows" && errors.As(err, &errno) {
-		if e, ok := nodeErrors[errno]; ok {
-			return e, true
+	if errors.As(err, &errno) {
+		if runtime.GOOS != "windows" {
+			if e, ok := nodeErrors[errno]; ok {
+				return e, true
+			}
+		} else if errno == 123 || errno == 161 {
+			// libuv reports ERROR_INVALID_NAME and ERROR_BAD_PATHNAME (a name
+			// with `|`, `*`, `?`…) as ENOENT
+			return nodeErrors[syscall.ENOENT], true
 		}
 	}
 	switch {
