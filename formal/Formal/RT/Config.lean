@@ -8,7 +8,7 @@ where the label `a` says what the code asks of the runtime and `e'` is the conti
 `Core.plug e' w` continues `e'` with the outcome `w` (or applies a function to it). Any
 relation will do, so every theorem holds for every program of every core.
 
-The parts of a step that Effect 4.0.5 or the Go memory model implement are fields of
+The parts of a step that Effect 4.1.2 or the Go memory model implement are fields of
 `Lib`; `Hyp` (`Hyp.lean`) states G7–G9 about them.
 -/
 
@@ -81,6 +81,8 @@ structure Lib (V : Type) where
   /-- `causeCombine` and `causeFromReasons` -/
   combine : Cause V → Cause V → Cause V
   concat : Cause V → Cause V → Cause V
+  /-- `causeElectDefects`, applied to the join of late `forEachConcurrent` failures -/
+  elect : Cause V → Cause V
   /-- what an interruption that skips a handler makes of the cause -/
   skip : Cause V → Cause V
   /-- `Ref.modify` is one step (the cell's mutex in Go) -/

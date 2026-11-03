@@ -25,11 +25,13 @@ def noInt (c : Cause V) : Cause V := c.filter fun | .int _ => false | _ => true
 def failsOf (xs : List (Out V)) : List (Cause V) :=
   xs.filterMap fun | .fail c => some c | .ok _ => none
 
-/-- The result of `parallel` (Par), from the exits in input order. -/
+/-- The result of `parallel` (Par), from the exits in input order: a late failure with
+reasons other than `Int` gives `elect (a ⊕ noInt c')`. -/
 def parResult (L : Lib V) (unit : V) (xs : List (Out V)) : Out V :=
   match failsOf xs with
   | [] => .ok unit
-  | c :: cs => .fail (cs.foldl (fun a c' => L.combine a (noInt c')) c)
+  | c :: cs => .fail (cs.foldl (fun a c' =>
+      if (noInt c').isEmpty then a else L.elect (L.combine a (noInt c'))) c)
 
 /-- The result of (C6). -/
 def closeResult (L : Lib V) (w : Out V) (cH cF : Cause V) : Out V :=

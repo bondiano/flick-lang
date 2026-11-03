@@ -6,7 +6,7 @@ References:
 
 - JS — `runtime/src/X.ts`;
 - Go — `runtime-go/flickrt/X.go`;
-- Effect — `FX/…`, that is, `node_modules/.pnpm/effect@4.0.5/node_modules/effect/src/…`;
+- Effect — `FX/…`, that is, `node_modules/.pnpm/effect@4.1.2/node_modules/effect/src/…`;
 - everything else — as in `core.md`.
 
 The probe programs of §7 are built with `flick build --emit js` and `--emit go` and run on Node and as a Go executable. Resources come from `tests/run/runtime/resources.{mjs,go}`: `open name` prints `open name` and registers a release that prints `close name`.
@@ -76,7 +76,7 @@ A fiber is `⟨e, m, q, π, θ⟩`:
 | `K`, `W` | `children`, `watchers` (`owner.ts:20-21`) | `children`, `watchers`; a `WaitGroup` counts both children and supervisors |
 | `P` | `pending`, `track` (`owner.ts:31-35`) | `pending`, `track` (`owner.go:22-26`), only after a foreign call is interrupted |
 | `H` | `closing` (`owner.ts:25`) | `hooks`, `onClose` |
-| `F` | Effect's `Scope.Closeable`: a `Map` in insertion order, closed from the end (`FX/internal/effect.ts:3982-4003`) | the `finalizers` slice |
+| `F` | Effect's `Scope.Closeable`: a `Map` in insertion order, closed from the end (`FX/internal/effect.ts:4050-4073`) | the `finalizers` slice |
 | Root | the runner's owner (`entry.ts`), `reportDefect` (`owner.ts:38-43`) | `Main`, `reported` (`concurrency.go:102-105`) |
 
 ### 1.4 Configuration and forms
@@ -105,15 +105,17 @@ e ::= … | inside π e                  body of a scope (regions.md)
 
 ### 2.1 Two operations
 
-Effect 4.0.5 stores a cause as a flat list `reasons`; it has no Sequential/Parallel tree (spec/05 "A complex Cause"). Lists are joined in two ways:
+Effect 4.1.2 stores a cause as a flat list `reasons`; it has no Sequential/Parallel tree (spec/05 "A complex Cause"). Lists are joined in two ways:
 
 ```text
-c ⧺ c'      concatenation        FX causeFromReasons over the concatenation: race_success, scope finalizers
-c ⊕ c'      nub (c ⧺ c')         FX causeCombine (internal/core.ts:306-322)
+c ⧺ c'      concatenation        FX causeFromReasons over the concatenation: scope finalizers
+c ⊕ c'      nub (c ⧺ c')         FX causeCombine (internal/core.ts:308-324)
 ∅ = []
 ```
 
-`nub` keeps the first occurrence of each reason up to `≈` (`dedupeReasons`, `internal/core.ts:282-303`). If one argument is empty, `causeCombine` returns the other without normalizing it.
+`nub` keeps the first occurrence of each reason up to `≈` (`dedupeReasons`, `internal/core.ts:284-305`). If one argument is empty, `causeCombine` returns the other without normalizing it.
+
+Some joins elect defects (`elect` of §2.3): a late failure of `forEachConcurrent` gives `elect(c ⊕ c')`, a finalizer of `onExit`, `ensuring` or `acquireRelease` that fails after a failure gives `elect(c ⊕ c')`, and `raceAll`/`raceFirst` with every branch failed give `elect(c₁ ⧺ … ⧺ cₙ)`. `Cause.combine` and the finalizers of a scope among themselves do not elect.
 
 In Effect, `≈` is `Equal.equals` together with `Hash.hash`; annotations take part. For Flick values:
 
@@ -160,6 +162,8 @@ try (fail c) with ā   →   recover(c, ā)
 
 `dies c` is `c` with every `Fail v` replaced by `Die v`. Both runtimes keep the value: JS `failsToDies` (`cause.ts:19-22`), Go `failsToDies` through `dieOf` ([typed errors as defects](#go-a-typed-error-turned-into-a-defect-loses-its-value)).
 
+`elect c` is `dies c` if `c` has a `Die` and a `Fail`, otherwise `c` (`causeElectDefects`, `FX/internal/effect.ts:184-191`; Effect also spares its internal `Done` signals, which Flick causes do not hold). So `elect c = dies c` when `c` has a `Die`, and the first two lines of `recover` are `fail (elect c)`: Effect's `findRecoverableError` (199-200). `elect` keeps the head or removes it. Lean: `elect`, `recover_die` (`formal/Formal/RT/Recover.lean`).
+
 A branch sees only `head(c)`. Secondary `Fail`s of other types stay in `c` if no branch matched, and disappear with `c` if one did. The "Outcomes" table of `reference/runtime.md` lists special cases of `recover`. JS: `tryWith` (`cause.ts:39-54`) over `Effect.catchCauseFilter`; Go: `Try` (`cause.go:105-125`).
 
 ### 2.4 The typed head
@@ -171,7 +175,7 @@ The type `Failure ε` (and `Exit ε τ`) promises less than the whole list: only
 I_ε is preserved by:
 
 - `raise`, `Cause.fail`, `from_result` — a list of one reason;
-- `⊕` and `⧺` at type `Failure (ε + ε')` — by (⊕-Head);
+- `⊕` and `⧺` at type `Failure (ε + ε')` — by (⊕-Head); `elect` keeps the head or removes it;
 - `try` with residual `ε'` (the core's (Try) rule): a head that matched no branch belongs to `ε'`. This is R5;
 - closing a scope: `x ⊕ c_H ⊕ c_F`, and finalizers and hooks have no typed errors (`regions.md`, [owner retention requires Outlives](regions.md#owner-retention-requires-outlives));
 - `parallel`: the head belongs to the first branch that failed;
@@ -198,7 +202,7 @@ JS: `entry.ts:44-76` (`pretty`, `conclude`). Go: `cause.go:159-189` (`pretty`, `
 
 Parity (`tests/run/portable.txt`) compares `stdout`, `stderr` and the exit code: the `report` of the main cause and everything the program prints from `Cause.*`. Hence what must agree:
 
-- the order and number of reasons after `⊕` and `⧺`. So Go must repeat `nub` where JS goes through `causeCombine`, and must not repeat it where JS goes through `causeFromReasons` ([`parallel` in Go](#go-parallel-keeps-only-the-first-failure), [combining causes in Go](#go-combining-causes-without-nub));
+- the order and number of reasons after `⊕` and `⧺`. So Go must repeat `nub` where JS goes through `causeCombine`, must not repeat it where JS goes through `causeFromReasons`, and must elect where Effect elects (§2.1) ([`parallel` in Go](#go-parallel-keeps-only-the-first-failure), [combining causes in Go](#go-combining-causes-without-nub));
 - `Int`s are not visible in `pretty`, but are visible in `Cause.reasons`, `Cause.interruptors`, `Cause.has_interrupts`.
 
 ## 3. Steps
@@ -223,14 +227,14 @@ JS runs fibers on one thread and switches on `yield*` and on the operation budge
 (Mask)         mask e   at depth m     →  unmask m e   at depth m + 1
 (Unmask)       unmask m v              →  v   at depth m; if m = 0 and q ≠ ·, (Int-Deliver) at once
 (Unmask-Fail)  unmask m (fail c)       →  fail c   at depth m
-(OnExit)       onexit w h              →  mask h, then w; a failure of h with c_h gives fail (cause(w) ⊕ c_h)
+(OnExit)       onexit w h              →  mask h, then w; a failure of h with c_h gives fail c_h after a value, fail elect(c ⊕ c_h) after fail c
 ```
 
 Here `w` is a value or `fail c`, `cause(v) = ∅`, `cause(fail c) = c`.
 
 Interruption points:
 
-- JS — any Effect step boundary with `m = 0` (`FX/internal/effect.ts:4570-4576`);
+- JS — any Effect step boundary with `m = 0` (`FX/internal/effect.ts:4644-4650`);
 - Go — `Check` (`fiber.go:70-74`): every `Run`, the head of the effect loop, and blocking waits (`wait`, `sleep`, `all`, `race`, semaphore permits, foreign calls).
 
 The model takes the JS points. Go has fewer, so Go admits a subset of the interleavings. The exception is (Unmask): leaving a mask with a pending request must interrupt at once ([mask exit in Go](#go-leaving-a-mask-does-not-deliver-a-pending-interruption)).
@@ -282,7 +286,7 @@ JS — `close` (`owner.ts:54-70`), Go — `closeWithCause` (`owner.go:111-130`):
 | - | - | - |
 | C0 | `owner.open = false` | `o.open = false` under `o.mu` |
 | C1 | a loop over `owner.closing`; again after C3 ([hooks added after C1](#a-closing-hook-added-after-c1-does-not-run)) | `hooks`, run in order; again after C3 |
-| C2 | `Fiber.interruptAll([...owner.children])`: interrupts and waits (`FX/internal/effect.ts:925-936`) | `interrupt` over a snapshot of the children; the wait is in C3 |
+| C2 | `Fiber.interruptAll([...owner.children])`: interrupts and waits (`FX/internal/effect.ts:971-982`) | `interrupt` over a snapshot of the children; the wait is in C3 |
 | C3 | a loop of `Fiber.await` over `watchers` | `watchers.Wait()` |
 | C4 | `settle` (`owner.ts:45-51`), then the hooks added meanwhile ([hooks added during C4](#a-hook-added-during-c4-does-not-run)) | `settle` (`owner.go:29-42`), then the same |
 | C5 | `Scope.close(owner.resources, exit)`: Effect sets `Closed` before the finalizers, runs them sequentially from the end and collects the outcomes with `exitAsVoidAll`, that is, `⧺` | a loop from the end, `Sequential`; finalizer admission ends here, with `finalizing` ([late finalizers in Go](#go-a-finalizer-added-during-closing-runs-at-once)) |
@@ -300,18 +304,18 @@ The branches of a combinator are owned by the combinator, not by `K(π)`. Their 
 (Par)       parallel* t₁ … tₙ: branches kᵢ, at most limit at a time
             all ok vᵢ       →  (v₁, …, vₙ) in input order
             first fail c₁   →  start no new ones; q(kⱼ) := f for the live ones; wait for all;
-                               fail (c₁ ⊕ c₂' ⊕ …), where cⱼ' are the causes without Int of the branches that failed later
+                               fail elect(… elect(c₁ ⊕ c₂') ⊕ …), where cⱼ' are the causes without Int of the branches that failed later
 (Par-Res)   parallel_results: a branch's Fail → Err (head); a Die or Int stops the group, as in (Par)
 (Par-Exit)  parallel_exits: the outcome of each branch; external interruption — as in (Par)
 (Race)      race_first a b: the first finished branch k with any outcome; q(other) := f; wait for it; the outcome of k
-            race_success a b: the first ok; if both failed — fail (c₁ ⧺ c₂) in order of finishing
+            race_success a b: the first ok; if both failed — fail elect(c₁ ⧺ c₂) in order of finishing
 (Timeout)   timeout ms t = race_first t (sleep ms; fail [Fail TimeoutError]);
             timeout_option ms t — the same with None instead of TimeoutError
 ```
 
 The outcomes of losers do not enter the result. This is the spec/05 "Race and timeout" contract, not a loss, and R4 excludes them. A loser is interrupted and awaited before the return: its finalizers have run.
 
-- JS: `concurrency.ts:10-45` over `Effect.all`, that is, `forEachConcurrent` (`FX/internal/effect.ts:5098-5252`; late causes without `Int` are joined with `⊕` at 5140-5146). `race.ts` is over `raceAll`/`raceFirst` (`FX/internal/effect.ts:1614-1700`, `⧺` at 1641-1643); `timeout` is over `raceFirst` (3895-3915).
+- JS: `concurrency.ts:10-45` over `Effect.all`, that is, `forEachConcurrent` (`FX/internal/effect.ts:5135-5290`; late causes without `Int` are joined with `elect(⊕)` at 5209-5217). `race.ts` is over `raceAll`/`raceFirst` (`FX/internal/effect.ts:1674-1760`, `elect(⧺)` at 1701-1703); `timeout` is over `raceFirst` (3961-3981).
 - Go: `all` (`concurrency.go:159-207`), `race` (248-275), `timeoutAfter` (282-301).
 
 In Effect a synchronous winner can win before the second branch starts; Go starts both. The model admits both behaviours: starting the second branch is a step that may not get to happen.
@@ -367,7 +371,7 @@ A `flick test` test is its own root: the body and the closing run in `ownedExits
 Labels:
 
 - **[JS]** — held by the JS runtime's own code;
-- **[E]** — held by Effect 4.0.5; this is a hypothesis about the library, its item in G7;
+- **[E]** — held by Effect 4.1.2; this is a hypothesis about the library, its item in G7;
 - **[Go]** — held by the Go runtime's own code.
 
 **R1 (exactly once).** Suppose `acquire_release π a rel` returned `v`, or `add_finalizer π t` ran. Then for any outcome of the body of `π` — a value, `fail c` with any reasons, an interruption — `rel v` (`t`) starts exactly once, and before closing `π` ends.
@@ -389,7 +393,7 @@ Labels:
 - Go: [Go] a `WaitGroup` over children and supervisors, `stop` after each branch; children of groups through the C1 hook ([fiber groups in Go](#go-a-fiber-group-is-stopped-by-a-finalizer)).
 - Out of scope: foreign work after the call is interrupted. C4 waits for it only as a Promise; what foreign code does is G9.
 
-**R4 (a child's defect is not lost).** Suppose a child `k ∈ K(π)` finished with `fail c`, where `c` has a `Die` or a `Fail`. Then `g (Failure c sd)` was called, and if `g` failed with `c_g`, then `c_g ∈ D` of the root, and the root sees it: the runner as exit code 1, a test as a test failure. For `parallel*` the result includes the causes without `Int` of all branches that failed before the group ended (`⊕`).
+**R4 (a child's defect is not lost).** Suppose a child `k ∈ K(π)` finished with `fail c`, where `c` has a `Die` or a `Fail`. Then `g (Failure c sd)` was called, and if `g` failed with `c_g`, then `c_g ∈ D` of the root, and the root sees it: the runner as exit code 1, a test as a test failure. For `parallel*` the result includes the causes without `Int` of all branches that failed before the group ended (`elect(⊕)`); a `Fail` may come as a `Die`.
 
 - JS: [JS] the watcher (`owner.ts:156-168`) and `reportDefect`; every child has a watcher ([`fiberSpawn`](#js-fiberspawn-is-interruptible-midway)); tests ([supervisor defects in tests](#a-supervisor-defect-is-lost-in-flick-test)). [E] `forEachConcurrent` (G7d).
 - Go: [Go] the `fork` callback in `FiberSpawn`; `all` ([`parallel` in Go](#go-parallel-keeps-only-the-first-failure)); tests and `Events.listen` ([supervisor defects in tests](#a-supervisor-defect-is-lost-in-flick-test), [listener supervisors](#go-a-failing-eventslisten-supervisor-is-dropped)).
@@ -414,28 +418,30 @@ Labels:
 
 **R8 (cause laws).** The laws of §2.2, `recover` of §2.3, and that `pretty`/`report` of §2.5 depend only on the list of reasons. JS–Go parity rests on both runtimes building the same list:
 
-- `⊕` where Effect calls `causeCombine`: closing a scope (C6), `parallel`, `Cause.combine`, `bracket`, `ensuring`, `on_exit`;
-- `⧺` where it calls `causeFromReasons`: `race_success`, scope finalizers among themselves.
+- `⊕` where Effect calls `causeCombine`: closing a scope (C6), `Cause.combine`;
+- `elect(⊕)` where it calls `causeElectDefects` over `causeCombine`: `parallel` (each late cause), `bracket`, `ensuring`, `on_exit` (a finalizer failing after a failure);
+- `⧺` where it calls `causeFromReasons`: scope finalizers among themselves;
+- `elect(⧺)`: `race_success` with every branch failed.
 
-Effect 4.0.5 has no tree, so the Sequential/Parallel distinction reduces to a single `⊕` ("a tree of sequential/parallel causes is not part of the contract", spec/05).
+Effect 4.1.2 has no tree, so the Sequential/Parallel distinction reduces to a single `⊕` ("a tree of sequential/parallel causes is not part of the contract", spec/05).
 
-- JS: [E] `FX/internal/core.ts:278-345` (G7f).
+- JS: [E] `FX/internal/core.ts:280-347`, `FX/internal/effect.ts:184-191` (G7f).
 - Go: [Go] `cause.go`: `nub` with `Equals` for `Fail`, the fiber number for `Int`, and value equality for `Die` except thrown defects, which compare by identity ([combining causes in Go](#go-combining-causes-without-nub), [defects by value](#go-two-defects-with-the-same-string-are-two-reasons)).
 
 ## 5. Hypotheses
 
 G1–G6 hold (`core.md`, `regions.md`). Added:
 
-- **G7 (Effect 4.0.5).** The properties labelled [E]:
-  - a) `Scope.close` is idempotent and moves to `Closed` before the finalizers; with the default strategy the finalizers run sequentially from the end; adding to a closed scope runs the finalizer at once, with the scope's outcome (`FX/internal/effect.ts:3940-4032, 4082-4091`);
-  - b) `acquireRelease` registers the release under the same mask as the acquisition (4143-4161); `onExit` handlers are masked (4180-4185);
-  - c) leaving a mask with a pending request interrupts at once (4570-4576);
-  - d) `Fiber.interruptAll` interrupts and waits for each fiber (925-936). `forEachConcurrent` interrupts and waits for the branches and joins late causes without `Int` with `⊕` (5140-5181). `raceAll` and `raceFirst` interrupt and wait for the losers in a masked `onExit`, and if all failed — `⧺` (1614-1700);
+- **G7 (Effect 4.1.2).** The properties labelled [E]:
+  - a) `Scope.close` is idempotent and moves to `Closed` before the finalizers; with the default strategy the finalizers run sequentially from the end; adding to a closed scope runs the finalizer at once, with the scope's outcome (`FX/internal/effect.ts:4006-4102, 4152-4161`);
+  - b) `acquireRelease` registers the release under the same mask as the acquisition (4213-4231); `onExit` handlers are masked (4250-4255);
+  - c) leaving a mask with a pending request interrupts at once (4644-4650);
+  - d) `Fiber.interruptAll` interrupts and waits for each fiber (971-982). `forEachConcurrent` interrupts and waits for the branches and joins late causes without `Int` with `elect(⊕)` (5209-5252). `raceAll` and `raceFirst` interrupt and wait for the losers in a masked `onExit`, and if all failed — `elect(⧺)` (1674-1760);
   - e) MemoMap: the key is the layer's identity, observers are counted, the last one closes the scope; a nested map reads its parent (`FX/Layer.ts:253-275, 418-469, 781`);
-  - f) `causeCombine`, `dedupeReasons`, `causeFromReasons` — as in §2.1;
-  - g) an interruption that skipped a handler removes the `Fail`s from the cause and adds an `Int` (`FX/internal/core.ts:611-622`). Go repeats this in every recovery handler ([skipped handlers](#an-interruption-that-skips-a-handler-erases-fail-effect)). Types are unaffected: the head stays from `ε` or disappears.
+  - f) `causeCombine`, `dedupeReasons`, `causeFromReasons` — as in §2.1; `causeElectDefects` is `elect` of §2.3 (`FX/internal/effect.ts:184-191`), and `onExit` joins a failing finalizer with `elect(⊕)` after a failure (4042-4048);
+  - g) an interruption that skipped a handler removes the `Fail`s from the cause and adds an `Int` (`FX/internal/core.ts:613-624`). Go repeats this in every recovery handler ([skipped handlers](#an-interruption-that-skips-a-handler-erases-fail-effect)). Types are unaffected: the head stays from `ε` or disappears.
 
-  The runtime tests check the hypothesis, and `just effect-bump` checks it again when the version changes; the runtime trace (`FLICK_TRACE`, `just stress`) and the cause-law properties (`cause_laws.fl`) exercise it on real runs.
+  The runtime tests check the hypothesis; the runtime trace (`FLICK_TRACE`, `just stress`) and the cause-law properties (`cause_laws.fl`) exercise it on real runs.
 - **G8 (Go).** The Go memory model: unlocking a mutex and closing a channel give happens-before. `recover` catches only non-fatal panics. Stack overflow, a race on a `map`, running out of memory and `os.Exit` end the process without finalizers. `runtime.Goexit` in foreign code does not close `done` and breaks G9.
 - **G9 (foreign calls).** The Promise of a foreign `async` call settles; otherwise C4 does not finish. Foreign code does not start work that `P` does not track and that holds the region — like G4 for retention. After a call is interrupted, Go closes `done` when the foreign work has finished.
 - **G10 (handlers terminate).** Supervisors, finalizers and closing hooks terminate; otherwise C1, C3 or C5 does not finish. This is liveness, not safety: R1–R7 speak about steps that happened.
@@ -485,7 +491,7 @@ Sketches:
   - `recover` returns `fail c` with the same head only if the head matched no branch, so its type is in `ε'`.
   - If `c` has a `Die`: `dies c` has no `Fail`.
   - The rest is I5: no operation makes a secondary `Fail` the head. `from_reasons` could, but secondary `Fail`s reach it only as `Die`s ([secondary `Fail`](#a-secondary-fail-gets-the-type-of-the-residual)).
-  - Lean: `R5` (`formal/Formal/RT/Recover.lean`); I_ε is `Iε`, and its preservation by `⊕`, `⧺`, closing and G7(g) is `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep`.
+  - Lean: `R5` (`formal/Formal/RT/Recover.lean`); I_ε is `Iε`, and its preservation by `⊕`, `⧺`, closing, G7(g) and `elect` is `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep` (with `Hyp.g7zh`, `head_elect`).
 - **R6.**
   - A memoizable `L` is built only when `L ∉ m`. The entry is inserted before the build — under a lock in Go, on the single thread in JS — so a second request waits.
   - By I6, `σ` closes when the last consuming owner has passed (C5). A consumer closes after its children (R2).
@@ -666,7 +672,7 @@ let main () =
 
 - Divergence: Node printed `distinct 2`, Go `distinct 1`. With `late 1 30` in the second branch both print `same 1`: Effect joins with `⊕`, and `nub` removes the equal error. `race_success` with two failures gives 2 on both (`⧺`). Breaks R4 for late defects of branches, and parity.
 - Cause: `all` threw the first failure after `stop` without looking at the outcomes of the stopped branches (`concurrency.go:194-200`). Effect adds their causes without `Int` (G7d).
-- Resolution — Go: like `forEachConcurrent`, `c₁ ⊕ c₂' ⊕ …` in order of finishing, with `nub` ([combining causes in Go](#go-combining-causes-without-nub)). Fixed; fixture: `cause_lists.fl` (`parallel 2 1, race 2`).
+- Resolution — Go: like `forEachConcurrent`, `elect(… elect(c₁ ⊕ c₂') ⊕ …)` in order of finishing, with `nub` ([combining causes in Go](#go-combining-causes-without-nub)). Fixed; fixture: `cause_lists.fl` (`parallel 2 1, race 2`).
 
 ### Go: combining causes without `nub`
 
@@ -684,7 +690,7 @@ let main () =
 
 - Divergence: Node printed `(1, 2, 2)`, Go `(2, 2, 3)`. Breaks R8: (⊕-Idem) and parity; through `parallel` ([`parallel` in Go](#go-parallel-keeps-only-the-first-failure)), also its output.
 - Cause: `Sequential` and `Parallel` were plain tree nodes (`cause.go:39-50`).
-- Resolution — Go: `Sequential` and `Parallel` are `⊕` with `nub`: `Fail`s compare by `Equals`, `Int`s by fiber number, `Die`s by identity, because in Go a defect is text while in JS two defects with the same text are different (refined for defects by value: [defects by value](#go-two-defects-with-the-same-string-are-two-reasons)). `⧺` (`concat`) stays for `race`, `race_all`, `Exit.as_void_all`, `failsToDies` and between scope finalizers, as in Effect. Fixed; fixture: `cause_lists.fl`; test: `cause_test.go` `TestCombineKeepsEachReasonOnce`.
+- Resolution — Go: `Sequential` and `Parallel` are `⊕` with `nub`: `Fail`s compare by `Equals`, `Int`s by fiber number, `Die`s by identity, because in Go a defect is text while in JS two defects with the same text are different (refined for defects by value: [defects by value](#go-two-defects-with-the-same-string-are-two-reasons)). `⧺` (`concat`) stays for `race`, `race_all` (under `elect`), `Exit.as_void_all`, `failsToDies` and between scope finalizers, as in Effect. Fixed; fixture: `cause_lists.fl`; test: `cause_test.go` `TestCombineKeepsEachReasonOnce`.
 
 ### Go: a fiber group is stopped by a finalizer
 
@@ -832,7 +838,7 @@ let main () =
 
 ### An interruption that skips a handler erases `Fail` (Effect)
 
-- G7g: if a failure passes through an interrupted interruptible fiber, Effect skips the handlers, removes the `Fail`s and adds an `Int` (`FX/internal/core.ts:611-622`). Go kept the original cause.
+- G7g: if a failure passes through an interrupted interruptible fiber, Effect skips the handlers, removes the `Fail`s and adds an `Int` (`FX/internal/core.ts:613-624`). Go kept the original cause.
 - Types are unaffected; output can be: a program printing `Cause.reasons` of such a failure diverges.
 - A probe built for the cause-law tests showed that in Go this was worse than a lost `Int`. A child fails with a `Fail` right after `Effect.uninterruptible` and is interrupted while inside the mask. The mask-exit check ([mask exit in Go](#go-leaving-a-mask-does-not-deliver-a-pending-interruption)) ran only after a successful body, so on Go `try` caught the `Fail`, the handler ran, and the child ended with success: the interruption request was lost. On Node the handler is skipped and the outcome is `[Int]`.
 - Resolution — Go: `skipHandler` in `try` and `onCause` (`catch_cause`, `catch_defect`, `tap_*`, `or_die`…) does what Effect does when the fiber is interrupted and interruptible. Fixed; `cause_test.go` and `tests/run/runtime/cause_laws.fl`. The same applies in the other recovery handlers (`caught` in `cause.go`): `Effect.exit`, `match_cause`, `all` with exits and results, `eventually`, `partition`/`validate`, `first_success_of`, `retry`/`repeat` and execution plans. Probes on Node and Go: `tests/run/runtime/interrupt_skips.fl`; without the fix, Go's `Effect.exit` and `match_cause` ran the handler and the child ended with success. Boundaries that must run (`on_exit`, release, metrics) see the cause, as in Effect, where the mask stops the skip.

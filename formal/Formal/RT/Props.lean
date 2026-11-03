@@ -89,11 +89,29 @@ theorem mem_comb {a b : Cause V} {r : Reason V} (h : r ∈ a ∨ r ∈ b) : r �
     · next hb => subst hb; simpa using h
     · exact mem_nub.2 (List.mem_append.2 h)
 
-/-- R4 for `parallel` (Par): with G7(f), the result keeps every reason of the first failure
-and every reason but `Int` of the branches that failed after it. -/
+/-- `r` is in `c`, a `Fail v` possibly elected to `Die v`. -/
+def Kept (r : Reason V) (c : Cause V) : Prop := r ∈ c ∨ ∃ v, r = .fail v ∧ .die v ∈ c
+
+theorem kept_elect_comb {a b : Cause V} {r : Reason V} (h : Kept r a ∨ Kept r b) :
+    Kept r (elect (comb a b)) := by
+  have hm : ∀ x, x ∈ a ∨ x ∈ b → Kept x (elect (comb a b)) :=
+    fun _ hx => mem_elect (mem_comb hx)
+  have hd : ∀ v, .die v ∈ a ∨ .die v ∈ b → Kept (.fail v) (elect (comb a b)) := fun v hv => by
+    rcases hm _ hv with h' | ⟨_, h', _⟩
+    · exact .inr ⟨v, rfl, h'⟩
+    · cases h'
+  rcases h with (h | ⟨v, rfl, h⟩) | (h | ⟨v, rfl, h⟩)
+  · exact hm r (.inl h)
+  · exact hd v (.inl h)
+  · exact hm r (.inr h)
+  · exact hd v (.inr h)
+
+/-- R4 for `parallel` (Par): with G7(d, f), the result keeps every reason of the first
+failure and every reason but `Int` of the branches that failed after it, a `Fail` possibly
+elected to a `Die`. -/
 theorem parResult_keeps {L : Lib V} (h : Hyp L) (unit : V) (xs : List (Out V)) {c : Cause V}
     (hc : Out.fail c ∈ xs) {r : Reason V} (hr : r ∈ noInt c) :
-    ∃ c', parResult L unit xs = .fail c' ∧ r ∈ c' := by
+    ∃ c', parResult L unit xs = .fail c' ∧ Kept r c' := by
   unfold parResult
   have hmem : c ∈ failsOf xs := List.mem_filterMap.2 ⟨_, hc, rfl⟩
   generalize failsOf xs = cs at hmem
@@ -101,19 +119,28 @@ theorem parResult_keeps {L : Lib V} (h : Hyp L) (unit : V) (xs : List (Out V)) {
   | nil => cases hmem
   | cons c₁ cs =>
     refine ⟨_, rfl, ?_⟩
-    have key : ∀ (a : Cause V) (l : List (Cause V)), (r ∈ a ∨ ∃ c ∈ l, r ∈ noInt c) →
-        r ∈ l.foldl (fun a c' => L.combine a (noInt c')) a := by
+    have key : ∀ (a : Cause V) (l : List (Cause V)), (Kept r a ∨ ∃ c ∈ l, r ∈ noInt c) →
+        Kept r (l.foldl (fun a c' =>
+          if (noInt c').isEmpty then a else L.elect (L.combine a (noInt c'))) a) := by
       intro a l
       induction l generalizing a with
       | nil => rintro (h' | ⟨_, h', _⟩); exact h'; cases h'
       | cons d l ih =>
         rintro (h' | ⟨c', hc', hr'⟩)
-        · exact ih (L.combine a (noInt d)) (.inl (by rw [h.g7e_combine]; exact mem_comb (.inl h')))
+        · refine ih _ (.inl ?_)
+          dsimp only
+          split
+          · exact h'
+          · rw [h.g7e_elect, h.g7e_combine]; exact kept_elect_comb (.inl h')
         · rcases List.mem_cons.1 hc' with rfl | hc'
-          · exact ih (L.combine a (noInt c')) (.inl (by rw [h.g7e_combine]; exact mem_comb (.inr hr')))
+          · refine ih _ (.inl ?_)
+            dsimp only
+            rw [if_neg (by simp [List.isEmpty_iff, List.ne_nil_of_mem hr']),
+              h.g7e_elect, h.g7e_combine]
+            exact kept_elect_comb (.inr (.inl hr'))
           · exact ih _ (.inr ⟨c', hc', hr'⟩)
     rcases List.mem_cons.1 hmem with rfl | hmem
-    · exact key _ _ (.inl (List.mem_filter.1 hr).1)
+    · exact key _ _ (.inl (.inl (List.mem_filter.1 hr).1))
     · exact key _ _ (.inr ⟨c, hmem, hr⟩)
 
 end Par

@@ -1,7 +1,7 @@
 /-!
 # λRT: the algebra of causes (runtime.md §1.1, §2.1–§2.2)
 
-A cause is a flat list of reasons, as in Effect 4.0.5. `c ⊕ c'` is `nub (c ⧺ c')`
+A cause is a flat list of reasons, as in Effect 4.1.2. `c ⊕ c'` is `nub (c ⧺ c')`
 (`causeCombine`), with an empty argument returned unchanged; `c ⧺ c'` is list
 concatenation (`causeFromReasons`). `≈` of §2.1 is equality of reasons: `V` stands for
 the values Flick puts into a cause, with a thrown `Error` told apart by its identity.

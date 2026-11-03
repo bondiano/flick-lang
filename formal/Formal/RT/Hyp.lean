@@ -3,7 +3,7 @@ import Formal.RT.Step
 /-!
 # λRT: hypotheses about the libraries (runtime.md §5)
 
-G7(a)–(g) are about Effect 4.0.5 and G8, G9 about Go and foreign code. Each is a field of
+G7(a)–(g) are about Effect 4.1.2 and G8, G9 about Go and foreign code. Each is a field of
 `Hyp` about the part of a step that `Lib` leaves open; without it the model has the rule
 that breaks the property (`Step.addDrop`, `Step.acqLost`, `Local.parEarly`, …). `T5` takes
 `Hyp` as a parameter, nothing here is an axiom.
@@ -36,6 +36,8 @@ structure Hyp (L : Lib V) : Prop where
   /-- G7(f): `causeCombine` and `causeFromReasons` are `⊕` and `⧺` of §2.1 -/
   g7e_combine : ∀ a b, L.combine a b = comb a b
   g7e_concat : ∀ a b, L.concat a b = a ++ b
+  /-- G7(d), G7(f): `causeElectDefects` is `elect` of §2.3 -/
+  g7e_elect : ∀ c, L.elect c = elect c
   /-- G7(g): an interruption that skips a handler keeps the head or drops it -/
   g7zh : ∀ c, head (L.skip c) = none ∨ head (L.skip c) = head c
   /-- G8: the mutex of a cell makes `Ref.modify` one step -/

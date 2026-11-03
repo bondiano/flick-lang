@@ -18,6 +18,23 @@ def hasDie (c : Cause V) : Bool := c.any fun | .die _ => true | _ => false
 /-- `dies c`: every `Fail v` becomes `Die v` (`failsToDies`, `docs/formal/runtime.md#go-a-typed-error-turned-into-a-defect-loses-its-value`). -/
 def dies (c : Cause V) : Cause V := c.map fun | .fail v => .die v | r => r
 
+/-- `elect c` of §2.3 (`causeElectDefects`, Effect 4.1.2): `dies c` if `c` has a `Die` and a
+`Fail`, else `c`. Effect applies it to the joins of `forEachConcurrent`, races and finalizers. -/
+def elect (c : Cause V) : Cause V := if hasDie c && (head c).isSome then dies c else c
+
+theorem elect_of_noDie {c : Cause V} (h : hasDie c = false) : elect c = c := by simp [elect, h]
+
+/-- Electing keeps every reason, a `Fail v` possibly as `Die v`. -/
+theorem mem_elect {c : Cause V} {r : Reason V} (h : r ∈ c) :
+    r ∈ elect c ∨ ∃ v, r = .fail v ∧ .die v ∈ elect c := by
+  unfold elect
+  split
+  · cases r with
+    | fail v => exact .inr ⟨v, rfl, List.mem_map.2 ⟨_, h, rfl⟩⟩
+    | die d => exact .inl (List.mem_map.2 ⟨_, h, rfl⟩)
+    | int f => exact .inl (List.mem_map.2 ⟨_, h, rfl⟩)
+  · exact .inl h
+
 /-- The result of `recover`: an arm's handler or a failure. -/
 inductive Recovered (T V : Type) where
   | handled (t : T)
@@ -36,6 +53,17 @@ theorem head_dies (c : Cause V) : head (dies c) = none := by
   induction c with
   | nil => rfl
   | cons r c ih => cases r <;> simpa [dies, head] using ih
+
+/-- `elect` keeps the head or removes it, so it keeps I_ε (`Iε_keep`). -/
+theorem head_elect (c : Cause V) : head (elect c) = none ∨ head (elect c) = head c := by
+  unfold elect; split
+  · exact .inl (head_dies c)
+  · exact .inr rfl
+
+/-- With a `Die`, `recover` fails with `elect c` (`findRecoverableError`). -/
+theorem recover_die (arms : V → Option T) {c : Cause V} (h : hasDie c = true) :
+    recover arms c = .fail (elect c) := by
+  simp [recover, elect, h]
 
 /-- **I_ε** (§2.4): if the cause has a `Fail`, its head has type `Errors ε`. -/
 def Iε (Has : V → Prop) (c : Cause V) : Prop := ∀ v, head c = some v → Has v
