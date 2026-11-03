@@ -80,7 +80,9 @@ use builtins::builtin_env;
 pub(crate) use builtins::check_sources;
 #[cfg(feature = "native-project")]
 pub use builtins::read_std;
-pub use builtins::{builtin_sources, builtins, has_std, install_builtins, set_std};
+pub use builtins::{
+    StdPackage, builtin_sources, builtins, has_std, install_builtins, set_std, std_go_bindings,
+};
 pub use classes::{Dict, STRUCTURAL, which};
 #[cfg(feature = "ide")]
 pub(crate) use classes::{Match, match_type};

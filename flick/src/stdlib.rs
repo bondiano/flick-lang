@@ -65,9 +65,9 @@ pub fn prepare(explicit: Option<&str>) -> Result<(), String> {
         Some(project) => in_project(&project)?,
         None => outside_project()?,
     };
-    let modules = types::read_std(&dir)
+    let package = types::read_std(&dir)
         .map_err(|e| format!("cannot read `std` at `{}`: {e}", dir.display()))?;
-    types::set_std(modules);
+    types::set_std(package);
     Ok(())
 }
 

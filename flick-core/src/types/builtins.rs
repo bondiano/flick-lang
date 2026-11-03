@@ -24,55 +24,71 @@ use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::syntax;
 
-static STD: OnceLock<&'static [(&'static str, &'static str)]> = OnceLock::new();
+/// The files of the `std` package, as `(name, text)`.
+type Files = &'static [(&'static str, &'static str)];
 
-fn leak(sources: Vec<(String, String)>) -> &'static [(&'static str, &'static str)] {
-    let leaked: Vec<(&'static str, &'static str)> = sources
+/// What the compiler reads of the `std` package: its modules, in the order of
+/// its `src/modules.txt`, and the tables of `src/go/` that bind its foreign
+/// declarations on the go target.
+#[derive(Debug, Default)]
+pub struct StdPackage {
+    pub modules: Vec<(String, String)>,
+    pub go_bindings: Vec<(String, String)>,
+}
+
+static STD: OnceLock<(Files, Files)> = OnceLock::new();
+
+fn leak(files: Vec<(String, String)>) -> Files {
+    let leaked: Vec<(&'static str, &'static str)> = files
         .into_iter()
-        .map(|(module, text)| (&*module.leak(), &*text.leak()))
+        .map(|(name, text)| (&*name.leak(), &*text.leak()))
         .collect();
     leaked.leak()
 }
 
-/// Uses `sources`, as `(module, text)` in the order of the package's
-/// `modules.txt`, as the modules of `std`; false once they are set.
-pub fn set_std(sources: Vec<(String, String)>) -> bool {
-    STD.set(leak(sources)).is_ok()
+/// Uses `package` as `std`; false once it is set.
+pub fn set_std(package: StdPackage) -> bool {
+    STD.set((leak(package.modules), leak(package.go_bindings)))
+        .is_ok()
 }
 
 /// Whether the modules of `std` are known: set, built in or found at
 /// `FLICK_STD_PATH`.
 pub fn has_std() -> bool {
-    !std_sources().is_empty()
+    !std_files().0.is_empty()
 }
 
-/// The modules of `std`: those set, else those of the package at
+/// The tables that bind the foreign declarations of `std` on the go target.
+pub fn std_go_bindings() -> Files {
+    std_files().1
+}
+
+/// The files of `std`: those set, else those of the package at
 /// `FLICK_STD_PATH`, else the ones built in, else none. The variable comes
 /// before what is built in: a workspace build unifies the playground's
 /// `embedded-std` into every binary.
-fn std_sources() -> &'static [(&'static str, &'static str)] {
-    STD.get_or_init(|| {
+fn std_files() -> (Files, Files) {
+    *STD.get_or_init(|| {
         #[cfg(feature = "native-project")]
-        if let Some(sources) = env::var_os("FLICK_STD_PATH")
+        if let Some(package) = env::var_os("FLICK_STD_PATH")
             .filter(|dir| !dir.is_empty())
             .and_then(|dir| read_std(Path::new(&dir)).ok())
         {
-            return leak(sources);
+            return (leak(package.modules), leak(package.go_bindings));
         }
         #[cfg(feature = "embedded-std")]
-        return super::builtin_sources::STD;
+        return (super::builtin_sources::STD, super::builtin_sources::STD_GO);
         #[allow(unreachable_code, reason = "a host without a project hands std over")]
-        &[]
+        (&[], &[])
     })
 }
 
-/// The modules of the `std` package in `dir`, in the order of its
-/// `src/modules.txt`.
+/// The `std` package in `dir`.
 #[cfg(feature = "native-project")]
-pub fn read_std(dir: &Path) -> io::Result<Vec<(String, String)>> {
+pub fn read_std(dir: &Path) -> io::Result<StdPackage> {
     let sources = dir.join("src");
     let order = fs::read_to_string(sources.join("modules.txt"))?;
-    order
+    let modules = order
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
@@ -80,14 +96,29 @@ pub fn read_std(dir: &Path) -> io::Result<Vec<(String, String)>> {
             let file = sources.join(format!("{}.fl", module.replace('.', "/")));
             Ok((module.to_owned(), fs::read_to_string(file)?))
         })
-        .collect()
+        .collect::<io::Result<_>>()?;
+    let mut go_bindings = Vec::new();
+    if let Ok(entries) = fs::read_dir(sources.join("go")) {
+        for entry in entries {
+            let path = entry?.path();
+            if path.extension().is_some_and(|e| e == "txt") {
+                let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
+                go_bindings.push((name.unwrap_or_default(), fs::read_to_string(&path)?));
+            }
+        }
+    }
+    go_bindings.sort();
+    Ok(StdPackage {
+        modules,
+        go_bindings,
+    })
 }
 
 /// Names and sources of the built-in modules, in dependency order: the
 /// core modules, then those of `std`.
 pub fn builtin_sources() -> &'static [(&'static str, &'static str)] {
     static ALL: OnceLock<Vec<(&str, &str)>> = OnceLock::new();
-    ALL.get_or_init(|| CORE.iter().chain(std_sources()).copied().collect())
+    ALL.get_or_init(|| CORE.iter().chain(std_files().0).copied().collect())
 }
 
 static BUILTINS: OnceLock<Vec<Interface>> = OnceLock::new();

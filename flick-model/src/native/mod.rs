@@ -1,6 +1,6 @@
 //! Natives: the foreign bindings of the standard library that the model
 //! runs, by JS module and export, as the Go backend binds them
-//! (`flick-core/src/codegen/go/bindings/`). Each is a step under
+//! (`packages/std/src/go/`). Each is a step under
 //! hypothesis G1 of `docs/formal/core.md` §4. A native returns a term, not
 //! only a value, so one that calls a Flick function hands the call back to
 //! the machine.

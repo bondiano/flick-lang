@@ -48,3 +48,7 @@ pub(super) const CORE: &[(&str, &str)] = &[
 // `STD`: the modules of `packages/std`, in the order of its `modules.txt`
 #[cfg(feature = "embedded-std")]
 include!(concat!(env!("OUT_DIR"), "/std_sources.rs"));
+
+// `STD_GO`: the go binding tables of `packages/std/src/go`
+#[cfg(feature = "embedded-std")]
+include!(concat!(env!("OUT_DIR"), "/std_go.rs"));

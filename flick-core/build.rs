@@ -40,7 +40,36 @@ fn main() -> io::Result<()> {
             strip_tree(&sources, &output.join(package))?;
         }
     }
-    std_sources(&output, docs)
+    std_sources(&output, docs)?;
+    std_go_bindings(&output)
+}
+
+/// `std_go.rs`: `STD_GO`, the tables of `packages/std/src/go`, by file name.
+fn std_go_bindings(output: &Path) -> io::Result<()> {
+    let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("Cargo supplies it"));
+    let dir = manifest.join("../packages/std/src/go");
+    println!("cargo:rerun-if-changed={}", dir.display());
+    let mut files: Vec<PathBuf> = fs::read_dir(&dir)?
+        .map(|e| e.map(|e| e.path()))
+        .collect::<io::Result<_>>()?;
+    files.retain(|p| p.extension().is_some_and(|e| e == "txt"));
+    files.sort();
+    let mut out = String::from("pub(super) const STD_GO: &[(&str, &str)] = &[\n");
+    for path in files {
+        println!("cargo:rerun-if-changed={}", path.display());
+        let name = path
+            .file_name()
+            .expect("a file")
+            .to_string_lossy()
+            .into_owned();
+        let _ = writeln!(
+            out,
+            "    ({name:?}, include_str!({:?})),",
+            path.display().to_string()
+        );
+    }
+    out.push_str("];\n");
+    fs::write(output.join("std_go.rs"), out)
 }
 
 /// `std_sources.rs`: `STD`, the modules of `packages/std` in the order of its
