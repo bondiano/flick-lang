@@ -22,6 +22,15 @@ pub(crate) fn check_text(
     name: &str,
     text: &str,
 ) -> Result<(super::Module, Interface), Vec<Diagnostic>> {
+    check_text_with(name, text, types::builtins())
+}
+
+/// [`check_text`] against the built-in modules `builtins`.
+pub(crate) fn check_text_with(
+    name: &str,
+    text: &str,
+    builtins: &[Interface],
+) -> Result<(super::Module, Interface), Vec<Diagnostic>> {
     let mut sources = SourceMap::default();
     let file = sources.add(format!("{name}.fl"), text);
     let parse = syntax::parse(text, file);
@@ -34,7 +43,7 @@ pub(crate) fn check_text(
         tree: &parse.tree,
         syntax: &syntax,
     };
-    let builtin = |name: &str| types::builtins().iter().find(|i| i.module == name).cloned();
+    let builtin = |name: &str| builtins.iter().find(|i| i.module == name).cloned();
     let (mut interface, mut diagnostics) = resolve::resolve(&module, &builtin);
     let local = |n: &str| n == module_name;
     let options = types::Options {
@@ -45,13 +54,7 @@ pub(crate) fn check_text(
         thresholds: types::Thresholds::default(),
         effects: true,
     };
-    let (more, typing) = types::check_typed(
-        &module,
-        &builtin,
-        types::builtins(),
-        options,
-        &mut interface,
-    );
+    let (more, typing) = types::check_typed(&module, &builtin, builtins, options, &mut interface);
     diagnostics.extend(parse.diagnostics);
     diagnostics.extend(more);
     // lowering needs a module without errors; a lint does not stop it

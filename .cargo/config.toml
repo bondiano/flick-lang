@@ -1,0 +1,4 @@
+# The std package of this repository for every build, test and run here,
+# instead of the one a released compiler fetches by its tag.
+[env]
+FLICK_STD_PATH = { value = "packages/std", relative = true }

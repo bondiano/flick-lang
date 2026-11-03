@@ -1,0 +1,130 @@
+/// Lists: dense immutable arrays. Traversals are index loops, so none of
+/// them is quadratic; prepending, `tail` and concatenation copy. Effect's
+/// `Array` and, for finite lists, its `Iterable` are wrapped here; the
+/// functions on lists known to be non-empty are in `NonEmpty`.
+module List exposing (
+  map,
+  map_effect,
+  map_indexed,
+  each_effect,
+  fold_left,
+  fold_right,
+  fold_effect,
+  filter,
+  filter_map,
+  flat_map,
+  find,
+  find_index,
+  any,
+  all,
+  partition,
+  sort_by,
+  sort,
+  contains,
+  maximum,
+  minimum,
+  length,
+  is_empty,
+  get,
+  set,
+  head,
+  last,
+  singleton,
+  repeat,
+  range,
+  initialize,
+  reverse,
+  append,
+  concat,
+  take,
+  drop,
+  slice,
+  zip,
+  unzip,
+  sum,
+  product,
+  empty,
+  take_right,
+  drop_right,
+  take_while,
+  drop_while,
+  take_while_filter,
+  drop_while_filter,
+  span,
+  split_at,
+  split,
+  split_where,
+  chunks_of,
+  window,
+  chop,
+  tail,
+  init,
+  pad,
+  rotate,
+  insert_at,
+  remove,
+  modify,
+  replace,
+  intersperse,
+  append_all,
+  find_last,
+  find_last_index,
+  find_first_with_index,
+  count_by,
+  contains_with,
+  dedupe_with,
+  dedupe,
+  dedupe_adjacent_with,
+  dedupe_adjacent,
+  difference_with,
+  difference,
+  intersection_with,
+  intersection,
+  union_with,
+  union,
+  group_with,
+  group,
+  group_by,
+  join,
+  cartesian,
+  cartesian_with,
+  zip_with,
+  map_accum,
+  scan,
+  scan_right,
+  extend,
+  filter_map_while,
+  get_somes,
+  get_failures,
+  get_successes,
+  separate,
+  partition_map,
+  unfold,
+  lift_option,
+  lift_predicate,
+  lift_result,
+  sort_with,
+  repeat_all,
+  match_,
+  match_left,
+  match_right,
+)
+
+import List.Core exposing (..)
+import List.Slice exposing (..)
+import List.Search exposing (..)
+import List.Transform exposing (..)
+
+@lang list_map
+/// Applies a pure function to each element.
+map : forall c a b. (a -> b)^c -> (List a -> List b)^c
+foreign pure map from "@flick-lang/runtime" "listMap"
+  reviewed "effect@4.1.2 sha256:1f6394368959203b"
+  arity 2
+  retention call
+
+/// Runs a runtime function on each element, one after another from the
+/// first.
+map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
+foreign effect map_effect from "@flick-lang/runtime" "listMapEffect"
+  retention call

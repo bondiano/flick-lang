@@ -4,8 +4,9 @@ use std::collections::{HashMap, HashSet};
 
 use super::{Instance, TypeDef};
 use crate::iface::{Entity, Interface, Namespace};
+use crate::types::lang;
 use crate::types::services::impl_def;
-use crate::types::ty::{PRELUDE, Type};
+use crate::types::ty::Type;
 
 /// What every module knows of the built-in modules, learned once and shared
 /// by the environments of all modules instead of rebuilt for each.
@@ -47,7 +48,7 @@ impl Builtins {
             &mut self.parents,
             interface,
         );
-        if interface.module == PRELUDE {
+        if interface.module == lang::prelude() {
             for export in &interface.exports {
                 self.prelude.insert(
                     (export.entity.namespace, export.entity.name.clone()),

@@ -1,0 +1,11 @@
+module App.Lang exposing (Count, size)
+
+@lang int
+type Count = Count Int
+
+size : Count -> Int
+let size c =
+  match c with
+  | Count n -> n
+
+//~ FLICK-R016 @3:1-3:10 `@lang` marks what the compiler relies on, in the built-in modules only

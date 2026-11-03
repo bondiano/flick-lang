@@ -9,6 +9,7 @@ use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, Stmt};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::{self, Lang};
 use crate::types::{Range, bind_key, guard_key};
 
 impl Lower<'_> {
@@ -45,7 +46,7 @@ impl Lower<'_> {
                     None => Expr::new(ExprKind::Lit(Lit::Bool(true)), span),
                 };
                 let then = self.do_rest(rest, span);
-                let nothing = self.prelude_method(guard_key(first), "nothing");
+                let nothing = self.prelude_method(guard_key(first), Lang::Nothing);
                 Expr::new(
                     ExprKind::If(Box::new(condition), Box::new(then), Box::new(nothing)),
                     span,
@@ -62,7 +63,7 @@ impl Lower<'_> {
                     (None, Some(first))
                 };
                 let at = self.span(first);
-                let flat_map = self.prelude_method(bind_key(first), "flat_map");
+                let flat_map = self.prelude_method(bind_key(first), Lang::FlatMap);
                 // the value cannot see the names its pattern binds
                 let value = match value {
                     Some(v) => self.expr(v),
@@ -96,7 +97,8 @@ impl Lower<'_> {
     }
 
     /// The method `name` through the dictionary the checker recorded at `key`.
-    pub(super) fn prelude_method(&mut self, key: Range, name: &str) -> Expr {
+    pub(super) fn prelude_method(&mut self, key: Range, method: Lang) -> Expr {
+        let name = lang::item(method).name.as_str();
         let span = Span::new(self.file, key.0, key.1);
         let mut dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
         assert!(

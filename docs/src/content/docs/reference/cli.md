@@ -92,19 +92,25 @@ exit code.
 
 ## Dependencies
 
-Dependency commands delegate to pnpm. Every command that changes the
-manifest, the lockfile or the tree first checks that `pnpm --version` is
-the version `packageManager` pins (`FLICK-P016`, exit code 2, nothing
+`install` and `update` first fetch the Flick libraries `flick.lock` pins,
+and `add` with `--git`, `--url` or `--path` and `remove` change
+`[dependencies]` (see [project.md](../project/#flick-dependencies)). For npm
+packages the dependency commands delegate to pnpm. Every command that changes
+`package.json`, its lockfile or the tree first checks that `pnpm --version`
+is the version `packageManager` pins (`FLICK-P016`, exit code 2, nothing
 changed). `install --locked` without `pnpm-lock.yaml`, or with one out of
 date, is `FLICK-P017` with exit code 2.
 
-`pack` builds the project's modules in the release profile into a staging
-package, with the runner of each entry of an app, which the staged
+`pack` builds the project in the release profile and refuses a `todo` or
+`echo` left in it (`FLICK-P024`). A library with `[package]` packs its sources:
+`<name>-<version>.tgz` holds its `flick.toml`, its source directory and its
+readme and license under `package/`, without times or owners, so the same
+sources give the same bytes; stdout shows the sha256 a `url` dependency
+names. An app packs a staging package, with the runner of each entry, which the staged
 `package.json` names in `bin` (see [project.md](../project/#entry-points)), checks that every module has its `.iface` (and
 `.d.ts` with `emit-dts`), that interfaces in the package agree on each
 other's fingerprints and that the paths `exports` names exist
-(`FLICK-P020`), and writes the tarball with `pnpm pack`. The staged
-`package.json` declares `"flick": { "iface-dir": "dist" }`.
+(`FLICK-P020`), and writes the tarball with `pnpm pack`.
 
 ## Streams and exit codes
 

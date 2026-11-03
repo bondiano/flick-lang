@@ -22,6 +22,7 @@ use super::inline::{exits, simple};
 use super::walk::droppable;
 use crate::ir::{Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::source::Span;
+use crate::types::lang::{self, Lang};
 
 /// Fuses combinators of `e` and below into the `for`s they take; `fresh`
 /// numbers the names it binds.
@@ -118,11 +119,22 @@ fn fusable(e: &Expr, strict: bool) -> bool {
     )
 }
 
+/// The combinators a `for` takes in: lazy on sequences, strict on lists.
+const COMBINATORS: [Lang; 6] = [
+    Lang::SeqMap,
+    Lang::SeqFilter,
+    Lang::SeqFlatMap,
+    Lang::SeqTake,
+    Lang::ListMap,
+    Lang::ListFilter,
+];
+
 /// A combinator applied to a `for`, rewritten into it.
 fn combinator(e: &mut Expr, fresh: &mut usize) -> bool {
     let span = e.span;
     // `Seq.to_list (for …)`
-    if let Some(("Seq", "to_list", mut args)) = call(e, 1)
+    if let Some((module, name, mut args)) = call(e, 1)
+        && lang::is(Lang::SeqToList, module, name)
         && fusable(args[0], false)
     {
         let mut generate = mem::replace(args.remove(0), unit(span));
@@ -135,11 +147,10 @@ fn combinator(e: &mut Expr, fresh: &mut usize) -> bool {
     let Some((module, name, mut args)) = call(e, 2) else {
         return false;
     };
-    let lazy = match (module, name) {
-        ("Seq", "map" | "filter" | "flat_map" | "take") => true,
-        ("List" | "List.Core", "map" | "filter") => false,
-        _ => return false,
+    let Some(step) = COMBINATORS.into_iter().find(|&c| lang::is(c, module, name)) else {
+        return false;
     };
+    let lazy = !matches!(step, Lang::ListMap | Lang::ListFilter);
     if !fusable(args[1], !lazy) {
         return false;
     }
@@ -147,13 +158,12 @@ fn combinator(e: &mut Expr, fresh: &mut usize) -> bool {
     if !lazy && !generated_total(args[1]) && !lambda_total(args[0]) {
         return false;
     }
-    let name = name.to_owned();
     let mut generate = mem::replace(&mut *args.pop().expect("two"), unit(span));
     let f = mem::replace(&mut *args.pop().expect("two"), unit(span));
     let ExprKind::Generate { body, limit, .. } = &mut generate.kind else {
         unreachable!("fusable")
     };
-    if name == "take" {
+    if step == Lang::SeqTake {
         *limit = Some(Box::new(f));
         *e = generate;
         return true;
@@ -163,9 +173,9 @@ fn combinator(e: &mut Expr, fresh: &mut usize) -> bool {
     let function = Function::of(f, yields(body) == 1, fresh, &mut hoisted);
     let element = |value: Expr, fresh: &mut usize| -> Expr {
         let at = value.span;
-        match name.as_str() {
-            "map" => yield_of(function.apply(value)),
-            "filter" => {
+        match step {
+            Lang::SeqMap | Lang::ListMap => yield_of(function.apply(value)),
+            Lang::SeqFilter | Lang::ListFilter => {
                 let v = fresh_name(fresh);
                 let local = || Expr::new(ExprKind::Local(v.clone()), at);
                 let test = function.apply(local());

@@ -8,6 +8,7 @@
     { "include": "#cli" },
     { "include": "#strings" },
     { "include": "#numbers" },
+    { "include": "#attributes" },
     { "include": "#definitions" },
     { "include": "#keywords" },
     { "include": "#names" },
@@ -92,6 +93,11 @@
       "begin": "\\{",
       "end": "\\}",
       "patterns": [{ "include": "$self" }, { "include": "#braces" }]
+    },
+    "attributes": {
+      "comment": "`@lang int`: an attribute of the declaration that follows",
+      "name": "entity.other.attribute-name.flick",
+      "match": "@[a-z_][A-Za-z0-9_]*"
     },
     "definitions": {
       "patterns": [

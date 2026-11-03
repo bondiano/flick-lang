@@ -13,6 +13,10 @@
       "required": false,
       "types": [
         {
+          "type": "attribute",
+          "named": true
+        },
+        {
           "type": "boolean",
           "named": true
         },
@@ -75,6 +79,10 @@
       "multiple": true,
       "required": false,
       "types": [
+        {
+          "type": "attribute",
+          "named": true
+        },
         {
           "type": "boolean",
           "named": true
@@ -149,6 +157,10 @@
       "required": false,
       "types": [
         {
+          "type": "attribute",
+          "named": true
+        },
+        {
           "type": "boolean",
           "named": true
         },
@@ -212,6 +224,10 @@
       "multiple": true,
       "required": false,
       "types": [
+        {
+          "type": "attribute",
+          "named": true
+        },
         {
           "type": "boolean",
           "named": true
@@ -398,6 +414,10 @@
   {
     "type": "assert",
     "named": false
+  },
+  {
+    "type": "attribute",
+    "named": true
   },
   {
     "type": "await",

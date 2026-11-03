@@ -13,6 +13,7 @@ use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cli::{self, Clause, Multi, Param};
 use crate::syntax::cst::{Node, Token};
+use crate::types::lang::Lang;
 
 /// The module of the combinators.
 pub const CLI: &str = "Cli";
@@ -60,7 +61,7 @@ impl Checker<'_> {
         let block = cli::block(node, self.text);
         self.cli_shape(node, &block.clauses);
         let span = |t: Token| (t.start, t.end);
-        let name_ty = Type::prim("String");
+        let name_ty = Type::lang(Lang::String);
         let mut spec = self.cli_call("command", span(block.keyword), &[Arg::Made(name_ty)]);
         let start = block.keyword.start;
         let mut handler = None;
@@ -88,7 +89,7 @@ impl Checker<'_> {
                 Clause::Subcommand(w, e, _) => self.cli_call(
                     "subcommand",
                     span(*w),
-                    &[Arg::Node(e), Arg::Made(Type::prim("String"))],
+                    &[Arg::Node(e), Arg::Made(Type::lang(Lang::String))],
                 ),
                 Clause::Param(p) => {
                     let (call, field) = self.cli_param(p);
@@ -204,16 +205,13 @@ impl Checker<'_> {
         let expected = Type::apps(Type::con(CLI, "Multi"), [value, field]);
         self.expect(&multi, &expected, self.span(p.ty));
         let name = p.name.text(self.text).to_owned();
-        let label = Type::app(
-            Type::con(super::classes::RECORD, "Label"),
-            Type::Symbol(name),
-        );
-        let strings = Type::app(Type::prim("List"), Type::prim("String"));
+        let label = Type::app(Type::lang(Lang::Label), Type::Symbol(name));
+        let strings = Type::app(Type::lang(Lang::List), Type::lang(Lang::String));
         let mut args = vec![Arg::Made(label)];
         if p.flag {
             args.push(Arg::Made(strings));
         }
-        args.push(Arg::Made(Type::prim("String")));
+        args.push(Arg::Made(Type::lang(Lang::String)));
         args.push(Arg::Made(multi));
         let function = if p.flag { "flag" } else { "arg" };
         (

@@ -14,6 +14,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::ddl::{self, Migration, Table};
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 /// The module of `Migration`.
 const MIGRATE: &str = "Database.Migrate";
@@ -44,7 +45,7 @@ impl Checker<'_> {
             };
             self.error(code, Span::new(self.file, p.range.0, p.range.1), p.message);
         }
-        let list = Type::app(Type::prim("List"), Type::con(MIGRATE, "Migration"));
+        let list = Type::app(Type::lang(Lang::List), Type::con(MIGRATE, "Migration"));
         let entity = self.env.entity(Namespace::Value, "migrations");
         self.env.set_value(entity, list);
         self.env.declare(Namespace::Value, "migrations");

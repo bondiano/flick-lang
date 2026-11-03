@@ -13,6 +13,7 @@ use crate::numeric;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
+use crate::types::lang::Lang;
 
 /// The shape of a pattern as far as matching is concerned.
 #[derive(Debug, Clone, PartialEq)]
@@ -83,7 +84,7 @@ impl Checker<'_> {
                             numeric::integer_value(text).map(|v| if negative { -v } else { v });
                         self.number_literal(self.span(node), value, false, true)
                     } else {
-                        Type::prim("Float")
+                        Type::lang(Lang::Float)
                     }
                 } else {
                     super::infer::literal_type(Some(last.kind))
@@ -107,7 +108,7 @@ impl Checker<'_> {
                 Pat::Ctor(ctor, Vec::new())
             }
             K::UnitPat => {
-                self.pattern_type(&Type::prim("Unit"), ty, node);
+                self.pattern_type(&Type::lang(Lang::Unit), ty, node);
                 Pat::Ctor(Ctor::Unit, Vec::new())
             }
             K::TuplePat => {
@@ -135,7 +136,11 @@ impl Checker<'_> {
             K::ListPat => {
                 let (bare, captures) = self.whnf_captured(ty);
                 let item = self.list_item(&bare).unwrap_or_else(|| self.fresh());
-                self.pattern_type(&Type::app(Type::prim("List"), item.clone()), &bare, node);
+                self.pattern_type(
+                    &Type::app(Type::lang(Lang::List), item.clone()),
+                    &bare,
+                    node,
+                );
                 let projected = captures
                     .as_ref()
                     .map_or_else(|| item.clone(), |captures| self.data_field(&item, captures));
@@ -145,7 +150,7 @@ impl Checker<'_> {
                     .iter()
                     .map(|c| self.bind_pattern(c, &projected))
                     .collect();
-                let list = Type::app(Type::prim("List"), item);
+                let list = Type::app(Type::lang(Lang::List), item);
                 let list = match captures {
                     Some(captures) => Type::Bounded {
                         ty: Box::new(list),

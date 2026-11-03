@@ -1,0 +1,10 @@
+module App.Attributes exposing (Color(..), main)
+
+@inline
+main : Unit ->{} Unit
+let main () = ()
+
+type Color = @lang crimson Red | Green
+
+//~ FLICK-S014 @3:1-3:8 unknown attribute `@inline`: the only attribute is `@lang`
+//~ FLICK-S014 @7:14-7:27 unknown lang item `crimson`

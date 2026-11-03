@@ -53,7 +53,7 @@ fn isolation_projects() -> [(PathBuf, String, &'static str); 2] {
                 ),
                 (
                     "node_modules/@acme/value/package.json",
-                    "{ \"name\": \"@acme/value\", \"version\": \"1.0.0\", \"flick\": { \"iface-dir\": \"dist\" } }",
+                    "{ \"name\": \"@acme/value\", \"version\": \"1.0.0\", \"flick\": { \"source-dir\": \"src\" } }",
                 ),
             ],
         );

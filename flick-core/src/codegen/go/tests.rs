@@ -165,11 +165,11 @@ fn a_missing_local_go_foreign_reports_a_target_diagnostic() {
 }
 
 /// The `[module]` and export (binding name under `[global M]`) pairs of
-/// `bindings/js_only.txt`.
+/// `js_only.txt`.
 fn js_only_exports() -> HashSet<(String, String)> {
     let mut module = "";
     let mut out = HashSet::new();
-    for line in include_str!("bindings/js_only.txt").lines().map(str::trim) {
+    for line in include_str!("js_only.txt").lines().map(str::trim) {
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
@@ -213,7 +213,7 @@ fn go_bindings_cover_builtins() {
         });
     assert!(
         missing.is_empty(),
-        "foreigns with no go binding, not in bindings/js_only.txt:\n{report}"
+        "foreigns with no go binding, not in js_only.txt:\n{report}"
     );
 }
 

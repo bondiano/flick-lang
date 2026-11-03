@@ -2,7 +2,7 @@
 // with Effect's, called the way compiled Flick calls them: the declared arity
 // first, then the remaining arguments one at a time.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { Number as Num } from "effect";
@@ -65,7 +65,9 @@ const agree = (core: Module, effect: Module, cases: Cases): void => {
 
 /** The JS names `file` binds from `@flick-lang/runtime/effect/<module>`. */
 const bound = (file: string, module: string): Array<string> => {
-  const text = readFileSync(new URL(`../../flick-core/src/types/builtins/${file}`, import.meta.url), "utf8");
+  const core = new URL(`../../packages/core/src/${file}`, import.meta.url);
+  const at = existsSync(core) ? core : new URL(`../../packages/std/src/${file}`, import.meta.url);
+  const text = readFileSync(at, "utf8");
   const re = new RegExp(`foreign \\w+ \\w+ from "@flick-lang/runtime/effect/${module}" "(\\w+)"`, "g");
   return [...text.matchAll(re)].map((m) => m[1] ?? "").toSorted();
 };

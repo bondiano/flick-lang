@@ -148,38 +148,18 @@ pub fn emit(
     #[cfg(not(feature = "source-maps"))]
     let _ = sources;
     let mut diagnostics = Vec::new();
-    if !settings.core_only {
-        effects::check_packages(
-            &compilation.package_modules,
-            settings.backend,
-            &mut diagnostics,
-        );
-    }
     let modules = &compilation.modules;
-    let provider = |m: &str| {
-        compilation
-            .package_modules
-            .iter()
-            .find(|module| module.module == m)
-    };
     let ext = if settings.typescript { "ts" } else { "js" };
     let is_builtin = |m: &str| types::builtin_sources().iter().any(|(n, _)| *n == m);
     let path = |m: &str| {
         let file = format!("{}.{ext}", m.replace('.', "/"));
-        match provider(m) {
-            // a package's module sits next to its interface in `iface-dir`
-            Some(module) => format!(
-                "npm:{}.js",
-                effects::package_path(&module.js_specifier, m, &module.interface, settings.backend)
-            ),
-            None if is_builtin(m) => format!("{BUILTIN_DIR}/{file}"),
-            None => file,
+        if is_builtin(m) {
+            format!("{BUILTIN_DIR}/{file}")
+        } else {
+            file
         }
     };
-    let package = |m: &str| match provider(m) {
-        Some(module) => Some(module.package.clone()),
-        None => own_package(modules, settings, m),
-    };
+    let package = |m: &str| own_package(modules, settings, m);
     #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
     let published_interfaces = published_interfaces(compilation, settings);
     let interface_of = |m: &str| {
@@ -190,7 +170,7 @@ pub fn emit(
             .iter()
             .find(|module| module.name == m)
             .map(|module| module.interface.clone());
-        own.or_else(|| provider(m).map(|module| module.interface.clone()))
+        own
     };
     let foreign = |module: &str, spec: &str| foreign_specifier(settings, &path, module, spec);
     let any_interface = |m: &str| {
@@ -285,13 +265,6 @@ fn published_interfaces<'a>(
             .iter()
             .find(|module| module.name == name)
             .map(|module| module.interface.clone())
-            .or_else(|| {
-                compilation
-                    .package_modules
-                    .iter()
-                    .find(|module| module.module == name)
-                    .map(|module| module.interface.clone())
-            })
     };
     let published_interfaces: BTreeMap<&str, Interface> = modules
         .iter()
@@ -328,12 +301,6 @@ fn published_interfaces<'a>(
         let fingerprints: BTreeMap<&str, String> = published_interfaces
             .iter()
             .map(|(name, interface)| (*name, iface::fingerprint(interface)))
-            .chain(compilation.package_modules.iter().map(|module| {
-                (
-                    module.module.as_str(),
-                    iface::fingerprint(&module.interface),
-                )
-            }))
             .collect();
         for module in modules {
             let published = published_interfaces
@@ -431,12 +398,6 @@ fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact
             (module.name.as_str(), artifacts, imports, needs.is_empty())
         })
         .collect();
-    let package = |m: &str| {
-        compilation
-            .package_modules
-            .iter()
-            .find(|module| module.module == m)
-    };
     let mut core: HashSet<&str> = compiled.iter().filter(|c| c.3).map(|c| c.0).collect();
     // a module is out with what it imports
     loop {
@@ -444,12 +405,12 @@ fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact
             .iter()
             .filter(|(name, _, imports, _)| {
                 core.contains(name)
-                    && !imports.iter().all(|i| match package(i) {
-                        Some(module) => effects::importable(&module.interface, Backend::None),
-                        None if compilation.modules.iter().any(|m| &m.name == i) => {
+                    && !imports.iter().all(|i| {
+                        if compilation.modules.iter().any(|m| &m.name == i) {
                             core.contains(i.as_str())
+                        } else {
+                            effects::in_core(i)
                         }
-                        None => effects::in_core(i),
                     })
             })
             .map(|c| c.0)

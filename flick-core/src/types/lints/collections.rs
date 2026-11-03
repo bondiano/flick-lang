@@ -12,6 +12,7 @@ use super::single;
 use crate::diagnostics::codes;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::sugar_lints::is_list_module;
 
 impl Checker<'_> {
     pub(super) fn collection_lints(&mut self, node: &Node) {
@@ -215,7 +216,7 @@ impl Checker<'_> {
     /// The name of the `List` function `head` refers to.
     fn list_function(&self, head: &Node) -> Option<String> {
         match self.typing.names.get(&unparen(head).range())? {
-            Ref::Value { module, name } if module.starts_with("List") => Some(name.clone()),
+            Ref::Value { module, name } if is_list_module(module) => Some(name.clone()),
             _ => None,
         }
     }

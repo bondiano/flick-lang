@@ -4,7 +4,8 @@ use super::{Witness, companion_name};
 use crate::iface::{Entity, Namespace};
 use crate::types::Checker;
 use crate::types::kinds::Kind;
-use crate::types::ty::{PRELUDE, Type};
+use crate::types::lang;
+use crate::types::ty::Type;
 use crate::types::typing::SchemaPlan;
 
 pub(super) struct PlanContext<'a> {
@@ -92,7 +93,7 @@ impl Checker<'_> {
             return no_witness("its type is not known");
         };
         let arg = |i: usize| self.plan(args[i], path, ctx);
-        if module == PRELUDE {
+        if module == lang::prelude() {
             match (name.as_str(), args.len()) {
                 (
                     "Int" | "Float" | "String" | "Bool" | "BigInt" | "Unit" | "Never" | "Unknown",
@@ -167,7 +168,8 @@ impl Checker<'_> {
                 None => Err((path.to_owned(), format!("`{f}` has no witness"))),
             },
             Type::Con { module, name }
-                if module == PRELUDE && matches!(name.as_str(), "List" | "Option" | "Redacted") =>
+                if module == lang::prelude()
+                    && matches!(name.as_str(), "List" | "Option" | "Redacted") =>
             {
                 Ok(SchemaPlan::Constructor(name.clone()))
             }

@@ -40,6 +40,7 @@ fn top_decl(p: &mut Parser) {
 /// and at the top level.
 fn member(p: &mut Parser) {
     match p.current() {
+        K::At => attribute(p),
         K::LetKw => let_decl(p),
         K::TypeKw | K::OpaqueKw | K::RefinedKw => type_decl(p),
         // `unboxed type` and `untagged type`: the words are names elsewhere
@@ -308,6 +309,9 @@ fn variants(p: &mut Parser) {
 /// `Con field…`; a field is an atomic type, so `Some (List a)` needs the parentheses.
 fn variant(p: &mut Parser) {
     let m = p.start();
+    if p.at(K::At) {
+        attribute(p);
+    }
     if p.expect(K::Con) {
         if p.at_word("of") {
             let of = p.raw();
@@ -323,6 +327,19 @@ fn variant(p: &mut Parser) {
         }
     }
     p.complete(m, K::Variant);
+}
+
+/// `@name argument…`: an attribute of the declaration on the next line,
+/// or of the constructor after it. Its arguments are lowercase words, so a
+/// keyword such as `none` reads as one.
+fn attribute(p: &mut Parser) {
+    let m = p.start();
+    p.bump();
+    p.expect(K::Ident);
+    while p.at(K::Ident) || p.current().is_keyword() {
+        p.bump_as(K::Ident);
+    }
+    p.complete(m, K::Attribute);
 }
 
 fn deriving(p: &mut Parser) {

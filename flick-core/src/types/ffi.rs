@@ -17,12 +17,13 @@ use std::slice;
 use super::Checker;
 use super::env::Form;
 use super::kinds::Kind;
-use super::ty::{PRELUDE, Stage, Type};
+use super::ty::{Stage, Type};
 use super::typing::{Copies, ForeignInfo, range};
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::{self, Lang};
 
 /// What a foreign function keeps of its arguments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,7 +78,7 @@ impl Checker<'_> {
         self.check_meta(&info, &params, &body, span);
         info.result.unit = self
             .call_result(&body, arity)
-            .is_some_and(|r| r.is_prim("Unit"));
+            .is_some_and(|r| r.is_lang(Lang::Unit));
         info.callbacks = params
             .iter()
             .take(arity)
@@ -181,7 +182,10 @@ impl Checker<'_> {
     fn check_meta(&mut self, info: &ForeignInfo, params: &[Type], body: &Type, span: Span) {
         let arity = info.js_arity();
         let stages = &info.stages;
-        if arity == 0 && !stages.is_empty() && !params.first().is_some_and(|p| p.is_prim("Unit")) {
+        if arity == 0
+            && !stages.is_empty()
+            && !params.first().is_some_and(|p| p.is_lang(Lang::Unit))
+        {
             self.error(
                 codes::F001,
                 span,
@@ -198,7 +202,7 @@ impl Checker<'_> {
         for &i in &info.optional {
             if !params
                 .get(i)
-                .is_some_and(|p| self.whnf(p).spine().0.is_prim("Option"))
+                .is_some_and(|p| self.whnf(p).spine().0.is_lang(Lang::Option))
                 || i >= arity
             {
                 self.error(
@@ -208,7 +212,8 @@ impl Checker<'_> {
                 );
             }
         }
-        if info.variadic && (arity == 0 || !self.whnf(&params[arity - 1]).spine().0.is_prim("List"))
+        if info.variadic
+            && (arity == 0 || !self.whnf(&params[arity - 1]).spine().0.is_lang(Lang::List))
         {
             self.error(
                 codes::F001,
@@ -219,7 +224,7 @@ impl Checker<'_> {
         if info.result.nullable
             && !self
                 .call_result(body, arity)
-                .is_some_and(|r| self.whnf(&r).spine().0.is_prim("Option"))
+                .is_some_and(|r| self.whnf(&r).spine().0.is_lang(Lang::Option))
         {
             self.error(
                 codes::F001,
@@ -242,13 +247,12 @@ impl Checker<'_> {
         };
         let outlived: Vec<&str> = constraints
             .iter()
-            .filter_map(|c| match super::classes::split(c)? {
-                (("Fiber", "Outlives"), args) => match args.first()? {
+            .filter_map(
+                |c| match super::classes::args_of(c, Lang::Outlives)?.first()? {
                     Type::Var(v) => Some(v.as_str()),
                     _ => None,
                 },
-                _ => None,
-            })
+            )
             .collect();
         let kept = vars.iter().find(|v| {
             let name = slice::from_ref(&v.name);
@@ -269,13 +273,12 @@ impl Checker<'_> {
         // which must outlive the owner too (`docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer`)
         let provided: Vec<&str> = constraints
             .iter()
-            .filter_map(|c| match super::classes::split(c)? {
-                (("Fiber", "Provided"), args) => match args.first()? {
+            .filter_map(
+                |c| match super::classes::args_of(c, Lang::Provided)?.first()? {
                     Type::Var(v) => Some(v.as_str()),
                     _ => None,
                 },
-                _ => None,
-            })
+            )
             .collect();
         let outlived: Vec<String> = outlived.iter().map(|v| (*v).to_owned()).collect();
         let held = self.params_of(body);
@@ -365,7 +368,7 @@ impl Checker<'_> {
             Type::App { head, .. } => self.holds_data(&head),
             Type::Forall { body, .. } => self.holds_data(&body),
             Type::Con { module, name } => {
-                (module == PRELUDE && name == "List")
+                lang::is(Lang::List, &module, &name)
                     || matches!(
                         self.env.type_def(&module, &name).map(|d| &d.form),
                         Some(Form::Adt { .. } | Form::Error | Form::Alias { .. })
@@ -392,7 +395,7 @@ impl Checker<'_> {
     fn catch_mapping(&mut self, mapping: &Node, body: &Type) {
         let span = self.span(mapping);
         let error = self.fresh();
-        let expected = Type::pure_fun(Type::prim("JsValue"), error.clone());
+        let expected = Type::pure_fun(Type::lang(Lang::JsValue), error.clone());
         let actual = self.infer(mapping);
         if let Err(m) = self.unify(&actual, &expected) {
             self.mismatch(&m, &actual, &expected, span);

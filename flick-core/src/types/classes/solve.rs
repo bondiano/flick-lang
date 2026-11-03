@@ -7,7 +7,7 @@
 use std::mem;
 
 use super::matching::{Match, Subst, match_type};
-use super::{Dict, RECORD, has_metas, split, super_slot, vars};
+use super::{Dict, RECORD_CLASSES, has_metas, split, super_slot, vars, which};
 use crate::numeric::{Num, default_num};
 use crate::types::Checker;
 use crate::types::env::Instance;
@@ -97,7 +97,7 @@ impl Checker<'_> {
                 if fractional && !num.fractional() {
                     return false;
                 }
-                let ty = Type::prim(num.name());
+                let ty = Type::lang(num.lang());
                 wanted
                     .iter()
                     .filter(|c| c.contains(&mut |t| *t == Type::Meta(m)))
@@ -105,7 +105,7 @@ impl Checker<'_> {
             };
             let fallback = default_num(fractional);
             let num = Num::ALL.iter().find(|n| fits(n)).unwrap_or(&fallback);
-            let _ = self.unify(&Type::Meta(m), &Type::prim(num.name()));
+            let _ = self.unify(&Type::Meta(m), &Type::lang(num.lang()));
         }
         !open.is_empty()
     }
@@ -225,8 +225,8 @@ impl Checker<'_> {
             }
             return self.entail(&improved, givens, chain);
         }
-        let outcome = if module == RECORD {
-            self.primitive(c, &name, &args, givens, chain)
+        let outcome = if let Some(class) = which(&RECORD_CLASSES, &module, &name) {
+            self.primitive(c, class, &args, givens, chain)
         } else if Self::structural(&module, &name)
             && matches!(args.first(), Some(Type::Record(_) | Type::Tuple(_)))
         {

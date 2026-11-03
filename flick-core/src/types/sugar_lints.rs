@@ -15,6 +15,7 @@ use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::{self, Lang};
 
 /// The `Seq` functions whose result never ends.
 const INFINITE: [&str; 4] = ["from", "repeat", "iterate", "cycle"];
@@ -30,6 +31,12 @@ const FOLLOWS: [&str; 8] = [
     "drop",
     "drop_while",
 ];
+
+/// Whether `module` holds `List` functions: the module of `List.map` or
+/// one of its submodules.
+pub(super) fn is_list_module(module: &str) -> bool {
+    lang::module_of(Lang::ListMap).is_some_and(|list| module.starts_with(list))
+}
 
 impl Checker<'_> {
     pub(super) fn sugar_lints(&mut self, node: &Node) {
@@ -116,7 +123,7 @@ impl Checker<'_> {
                         let unit = self
                             .sugar_type(statement)
                             .and_then(|t| self.eff_parts(&t))
-                            .is_some_and(|(_, _, a)| self.whnf(&a).is_prim("Unit"));
+                            .is_some_and(|(_, _, a)| self.whnf(&a).is_lang(Lang::Unit));
                         let prefix = if unit { "await " } else { "ignore await " };
                         edits.push(self.edit(start, start, prefix));
                     }
@@ -326,7 +333,7 @@ impl Checker<'_> {
             return false;
         };
         matches!(self.typing.names.get(&head.range()),
-            Some(Ref::Value { module, name }) if module == "Prelude" && name == "from_result")
+            Some(Ref::Value { module, name }) if lang::is(Lang::FromResult, module, name))
             && words(self.source_of(unparen(arg))) == format!("Err {}", self.source_of(e).trim())
     }
 
@@ -336,7 +343,7 @@ impl Checker<'_> {
         match (node.kind, &parts[..]) {
             (K::AppExpr, [head, f]) => {
                 let found = match self.typing.names.get(&head.range()) {
-                    Some(Ref::Value { module, name: n }) => module.starts_with("List") && n == name,
+                    Some(Ref::Value { module, name: n }) => is_list_module(module) && n == name,
                     _ => false,
                 };
                 found.then(|| unparen(f))
@@ -359,7 +366,9 @@ impl Checker<'_> {
     /// The name of the `Seq` function `head` refers to.
     fn seq_function(&self, head: &Node) -> Option<String> {
         match self.typing.names.get(&unparen(head).range())? {
-            Ref::Value { module, name } if module == "Seq" => Some(name.clone()),
+            Ref::Value { module, name } if lang::module_of(Lang::SeqMap) == Some(module) => {
+                Some(name.clone())
+            }
             _ => None,
         }
     }
@@ -371,7 +380,7 @@ impl Checker<'_> {
             return None;
         };
         match self.typing.names.get(&head.range())? {
-            Ref::Method { module, name } if module == "Prelude" && name == "pure" => Some(value),
+            Ref::Method { module, name } if lang::is(Lang::Pure, module, name) => Some(value),
             _ => None,
         }
     }

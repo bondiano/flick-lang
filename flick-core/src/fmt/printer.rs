@@ -252,7 +252,7 @@ fn edge(n: &Node, last: bool) -> Option<(K, K)> {
 fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
     let tight_braces = |parent: K| matches!(parent, K::EffectAnnot | K::RowType);
     match (a, b) {
-        (K::LParen | K::LBracket | K::Caret | K::Dollar | K::DotDotDot, _)
+        (K::LParen | K::LBracket | K::Caret | K::Dollar | K::At | K::DotDotDot, _)
         | (_, K::RParen | K::RBracket | K::Comma | K::Semi | K::Caret | K::Dot | K::Question)
         | (K::LBrace, K::RBrace) => false,
         (K::Dot, _) => a_parent == K::ForallType,

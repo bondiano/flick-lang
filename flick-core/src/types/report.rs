@@ -5,6 +5,7 @@ use super::ty::Type;
 use super::unify::Mismatch;
 use crate::diagnostics::{Code, Diagnostic, Edit, codes};
 use crate::source::Span;
+use crate::types::lang::Lang;
 
 impl Checker<'_> {
     /// An error whose `detail`, when there is one, is a help line under it.
@@ -97,7 +98,7 @@ impl Checker<'_> {
     }
 
     fn mismatch_hint(&self, a: &Type, b: &Type, actual: &str, expected: &str) -> String {
-        let errors = |ty: &Type| ty.spine().0.is_prim("Errors");
+        let errors = |ty: &Type| ty.spine().0.is_lang(Lang::Errors);
         match (a, b) {
             (Type::Fun { effects: e1, .. }, Type::Fun { effects: e2, .. })
                 if e1.is_some() != e2.is_some() =>

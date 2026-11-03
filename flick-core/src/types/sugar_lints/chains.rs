@@ -8,6 +8,7 @@ use super::{Checker, Ref, block_statements, unparen, words};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::{self, Lang};
 
 /// `var <- source`: one step of a chain.
 struct Step<'n> {
@@ -92,9 +93,9 @@ impl Checker<'_> {
     /// `Result.bind`.
     fn binds(&self, head: &Node) -> bool {
         match self.typing.names.get(&unparen(head).range()) {
-            Some(Ref::Method { module, name }) => module == "Prelude" && name == "flat_map",
+            Some(Ref::Method { module, name }) => lang::is(Lang::FlatMap, module, name),
             Some(Ref::Value { module, name }) => {
-                matches!(module.as_str(), "Option" | "Result") && name == "bind"
+                lang::is(Lang::OptionBind, module, name) || lang::is(Lang::ResultBind, module, name)
             }
             _ => false,
         }
@@ -125,7 +126,7 @@ impl Checker<'_> {
             };
             let prelude = kept.nodes().next().is_some_and(|pattern| {
                 matches!(self.typing.names.get(&pattern.range()),
-                    Some(Ref::Constructor(c)) if c.module == "Prelude")
+                    Some(Ref::Constructor(c)) if c.module == lang::prelude())
             });
             (passes && prelude).then_some((Step { var, source }, body))
         })

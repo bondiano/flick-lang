@@ -6,6 +6,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
+use crate::types::lang::Lang;
 use crate::types::let_parts;
 
 impl Lower<'_> {
@@ -20,13 +21,13 @@ impl Lower<'_> {
                 |t| literal::string_value(t.text(self.text)),
             );
         let message = format!("{}: {message}", self.location(node));
-        debug_call("todo_at", string(message, span), span)
+        debug_call(Lang::TodoAt, string(message, span), span)
     }
 
     /// `echo e`, or a bare `echo` as a function.
     pub(super) fn echo(&mut self, node: &Node, operand: Option<&Node>) -> Expr {
         let span = self.span(node);
-        let echo = debug_call("echo_at", string(self.location(node), span), span);
+        let echo = debug_call(Lang::EchoAt, string(self.location(node), span), span);
         match operand {
             Some(operand) => apply(echo, self.expr(operand), span),
             None => echo,
@@ -56,7 +57,7 @@ impl Lower<'_> {
         let message = format!("{}: {message}", self.location(decl));
         let missed = self.hidden("value");
         let fail = apply(
-            debug_call("assert_at", string(message, span), span),
+            debug_call(Lang::AssertAt, string(message, span), span),
             Expr::new(ExprKind::Local(missed.clone()), span),
             span,
         );
@@ -99,13 +100,7 @@ fn apply(func: Expr, arg: Expr, span: Span) -> Expr {
     )
 }
 
-fn debug_call(name: &str, arg: Expr, span: Span) -> Expr {
-    let func = Expr::new(
-        ExprKind::Global {
-            module: "Flick.Debug".into(),
-            name: name.into(),
-        },
-        span,
-    );
+fn debug_call(function: Lang, arg: Expr, span: Span) -> Expr {
+    let func = Expr::new(ExprKind::lang(function), span);
     apply(func, arg, span)
 }

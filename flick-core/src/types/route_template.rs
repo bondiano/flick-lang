@@ -19,6 +19,7 @@ use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
     /// The `Symbol` of a route template where one is expected, or the type
@@ -139,7 +140,7 @@ impl Checker<'_> {
             return Err(format!("`{name}` has a query, which is no part of a path"));
         }
         let constructor = self.template_constructor(head);
-        if field_head.is_prim("Option") {
+        if field_head.is_lang(Lang::Option) {
             let inner = field_args.first().copied().cloned().unwrap_or(Type::Error);
             return match constructor.as_ref().map(|c| c.name.as_str()) {
                 Some("None") if args.is_empty() => Ok(()),
@@ -183,7 +184,7 @@ impl Checker<'_> {
                 "a field of `{name}` is `{field_ty}`: write it as `{field_ty}`, or as one of its constructors"
             ));
         }
-        if field_module == super::ty::PRELUDE || !field_args.is_empty() {
+        if field_module == lang::prelude() || !field_args.is_empty() {
             return Err(format!(
                 "a parameter of a path is named after its type: give the `{field_ty}` field of `{name}` a type of its own, `refined type Username = String where …`"
             ));

@@ -4,6 +4,7 @@ use super::Projection;
 use crate::iface::{Interface, Namespace};
 use crate::ir::tests::check_text;
 use crate::types;
+use crate::types::lang::Lang;
 
 /// The declarations and each exported value's type, or why it has none.
 fn project(text: &str) -> String {
@@ -123,21 +124,21 @@ fn capture_projection_preserves_outer_data_binders_but_not_stored_regions() {
     );
 
     let stored = Type::app(
-        Type::prim("Ref"),
+        Type::lang(Lang::Ref),
         qualified(
-            Type::pure_fun(Type::prim("Float"), Type::prim("Float")),
+            Type::pure_fun(Type::lang(Lang::Float), Type::lang(Lang::Float)),
             Type::Var("r".to_owned()),
         ),
     );
     let scoped = scheme(
         vec![binder("r", Kind::Region), binder("c", Kind::CaptureRow)],
-        qualified(Type::pure_fun(Type::prim("Unit"), stored), c),
+        qualified(Type::pure_fun(Type::lang(Lang::Unit), stored), c),
     );
     assert!(projection.value(&scoped).is_err());
     assert!(
         projection
             .value(&qualified(
-                Type::prim("Float"),
+                Type::lang(Lang::Float),
                 Type::Var("unknown".to_owned()),
             ))
             .is_err()
@@ -151,11 +152,11 @@ fn ui_is_the_runtime_ui_imported_only_where_used() {
     let path = |m: &str| m.to_owned();
     let projection = Projection::new("App.Shapes", &lookup, &package);
     assert_eq!(
-        projection.value(&types::Type::prim("Float")),
+        projection.value(&types::Type::lang(Lang::Float)),
         Ok("number".to_owned())
     );
     assert!(!projection.imports(&path).contains("$Ui"));
-    let view = types::Type::pure_fun(types::Type::prim("Bool"), types::Type::prim("Ui"));
+    let view = types::Type::pure_fun(types::Type::lang(Lang::Bool), types::Type::lang(Lang::Ui));
     assert_eq!(
         projection.value(&view),
         Ok("(arg: boolean) => $Ui".to_owned())

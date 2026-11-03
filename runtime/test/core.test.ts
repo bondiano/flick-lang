@@ -2,7 +2,7 @@
 // name the built-in modules of such a build bind and every helper compiled
 // code calls, and none of its modules imports Effect.
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 
 const repo = new URL("../../", import.meta.url);
@@ -15,7 +15,12 @@ const builtins = (): Array<string> => {
   return [...(list[1] ?? "").matchAll(/"([\w.]+)"/g)].map((m) => m[1] ?? "");
 };
 
-const source = (module: string): string => read(`flick-core/src/types/builtins/${module.replaceAll(".", "/")}.fl`);
+/** The source of a built-in module: of the core package, else of std. */
+const source = (module: string): string => {
+  const file = `${module.replaceAll(".", "/")}.fl`;
+  const core = new URL(`packages/core/src/${file}`, repo);
+  return existsSync(core) ? readFileSync(core, "utf8") : read(`packages/std/src/${file}`);
+};
 
 const exportsOf = async (path: string): Promise<Set<string>> => {
   const module: unknown = await import(path);

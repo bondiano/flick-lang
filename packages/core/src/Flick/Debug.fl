@@ -1,0 +1,21 @@
+/// What `todo`, `echo` and a failing `let assert` compile to. Programs
+/// write the keywords, not these names; the warnings for `todo` and `echo`
+/// keep them out of packages.
+module Flick.Debug exposing (todo_at, echo_at, assert_at)
+
+@lang todo_at
+/// Fails with `message`, which says where the `todo` is and what it stands
+/// for.
+todo_at : String -> a
+foreign pure todo_at from "@flick-lang/runtime" "flickTodo"
+
+@lang echo_at
+/// Writes `location` and `value` to stderr, and returns `value`.
+echo_at : String -> a -> a
+foreign pure echo_at from "@flick-lang/runtime" "flickEcho"
+
+@lang assert_at
+/// Fails with `message`, which says where the `let assert` is, and the
+/// `value` its pattern did not match.
+assert_at : String -> a -> b
+foreign pure assert_at from "@flick-lang/runtime" "flickAssert"

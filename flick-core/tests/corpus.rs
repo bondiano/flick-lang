@@ -299,7 +299,7 @@ fn fl_sources_are_formatted() {
         "tools",
         "docs/src/playground",
         "docs/src/widgets",
-        "flick-core/src/types/builtins",
+        "packages",
         "flick/src/commands/templates",
     ];
     let excluded = ["tests/check/fail", "tests/check/projects"].map(|d| root().join(d));

@@ -116,7 +116,7 @@ fn comments_keywords_and_operators() {
 
 #[test]
 fn stray_characters_and_tabs() {
-    assert_eq!(kinds("a @€ b").1, ["FLICK-S003 @€"]);
+    assert_eq!(kinds("a #€ b").1, ["FLICK-S003 #€"]);
     assert_eq!(kinds("\tx").1, ["FLICK-S009 \t"]);
     assert_eq!(kinds("Foo _ _x").0[1].0, K::Underscore);
 }

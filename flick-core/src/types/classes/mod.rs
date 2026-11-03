@@ -16,20 +16,44 @@ use std::collections::HashMap;
 
 use super::Checker;
 use super::env::{Form, Fundep};
-use super::ty::{PRELUDE, Type};
+use super::ty::Type;
 use crate::source::Span;
+use crate::types::lang::{self, Lang};
 use crate::types::regions;
 #[cfg(feature = "ide")]
 pub(crate) use matching::{Match, match_type};
 pub use solve::Outcome;
 
-/// The module of the row primitives.
-pub const RECORD: &str = "Record";
-/// The module of the closed numeric classes.
-pub const NUMERIC: &str = "Numeric";
+/// The row primitives: the compiler solves them from the fields of known
+/// records.
+pub const RECORD_CLASSES: [Lang; 7] = [
+    Lang::HasField,
+    Lang::Lacks,
+    Lang::Remove,
+    Lang::Project,
+    Lang::UnionDisjoint,
+    Lang::MapFields,
+    Lang::Labels,
+];
+/// The closed numeric classes, whose module has every instance.
+pub const NUMERIC_CLASSES: [Lang; 3] = [Lang::Numeric, Lang::Integer, Lang::Floating];
 
 /// Classes whose instances for records and tuples the compiler owns.
-const STRUCTURAL: [&str; 4] = ["Eq", "Ord", "Hash", "Show"];
+pub const STRUCTURAL: [Lang; 4] = [Lang::Eq, Lang::Ord, Lang::Hash, Lang::Show];
+
+/// The lang item among `items` that `module.name` is.
+pub fn which(items: &[Lang], module: &str, name: &str) -> Option<Lang> {
+    items
+        .iter()
+        .copied()
+        .find(|&item| lang::is(item, module, name))
+}
+
+/// The arguments of the constraint `c` when its class is `item`.
+pub fn args_of(c: &Type, item: Lang) -> Option<Vec<&Type>> {
+    let ((module, name), args) = split(c)?;
+    lang::is(item, module, name).then_some(args)
+}
 
 /// The dictionary a class constraint resolved to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,7 +156,7 @@ pub fn split(c: &Type) -> Option<((&str, &str), Vec<&Type>)> {
 impl Checker<'_> {
     /// Requires `constraint` at `span`.
     pub fn want(&mut self, constraint: Type, span: Span) {
-        if let Some((("Fiber", "Outlives"), args)) = split(&constraint)
+        if let Some(args) = args_of(&constraint, Lang::Outlives)
             && let [captures, owner] = args[..]
         {
             let outlives = regions::Outlives {
@@ -144,7 +168,7 @@ impl Checker<'_> {
             self.regions.outlives.push(outlives);
             return;
         }
-        if let Some((("Fiber", "Provided"), args)) = split(&constraint)
+        if let Some(args) = args_of(&constraint, Lang::Provided)
             && let [row, owner] = args[..]
         {
             self.want_provided(row.clone(), owner.clone(), span);
@@ -211,7 +235,7 @@ impl Checker<'_> {
 
     /// Whether `class` is one whose records and tuples the compiler serves.
     fn structural(module: &str, name: &str) -> bool {
-        module == PRELUDE && STRUCTURAL.contains(&name)
+        which(&STRUCTURAL, module, name).is_some()
     }
 }
 

@@ -1,0 +1,548 @@
+@lang instances
+/// Instances of the built-in classes for the built-in types. Records and
+/// tuples have theirs from the compiler; every module sees all of them.
+module Instances
+
+eq_prim : a -> a -> Bool
+foreign pure eq_prim from "@flick-lang/runtime" "equals"
+
+compare_prim : a -> a -> Ordering
+foreign pure compare_prim from "@flick-lang/runtime" "compare"
+
+hash_prim : a -> Int
+foreign pure hash_prim from "@flick-lang/runtime" "hash"
+
+show_prim : a -> String
+foreign pure show_prim from "@flick-lang/runtime" "show"
+
+eq_list : (a -> a -> Bool) -> List a -> List a -> Bool
+foreign pure eq_list from "@flick-lang/runtime" "listEquals"
+
+compare_list : (a -> a -> Ordering) -> List a -> List a -> Ordering
+foreign pure compare_list from "@flick-lang/runtime" "listCompare"
+
+hash_list : (a -> Int) -> List a -> Int
+foreign pure hash_list from "@flick-lang/runtime" "listHash"
+
+show_list : (a -> String) -> List a -> String
+foreign pure show_list from "@flick-lang/runtime" "listShow"
+
+instance Eq Int =
+  eq : Int -> Int -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq Float =
+  eq : Float -> Float -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq BigInt =
+  eq : BigInt -> BigInt -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq String =
+  eq : String -> String -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq Bool =
+  eq : Bool -> Bool -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq Unit =
+  eq : Unit -> Unit -> Bool
+  let eq _x _y = true
+
+instance Eq Ordering =
+  eq : Ordering -> Ordering -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq a => Eq (List a) =
+  eq : List a -> List a -> Bool
+  let eq xs ys = eq_list eq xs ys
+
+instance Eq a => Eq (Option a) =
+  eq : Option a -> Option a -> Bool
+  let eq x y =
+    match (x, y) with
+    | (Some a, Some b) -> eq a b
+    | (None, None) -> true
+    | _ -> false
+
+instance (Eq e, Eq a) => Eq (Result e a) =
+  eq : Result e a -> Result e a -> Bool
+  let eq x y =
+    match (x, y) with
+    | (Ok a, Ok b) -> eq a b
+    | (Err a, Err b) -> eq a b
+    | _ -> false
+
+@lang ord_lt
+/// `x < y` on a type variable with `Ord`: what its comparison operators call.
+ord_lt : Ord a => a -> a -> Bool
+let ord_lt x y = compare x y == LT
+
+@lang ord_le
+ord_le : Ord a => a -> a -> Bool
+let ord_le x y = compare x y != GT
+
+@lang ord_gt
+ord_gt : Ord a => a -> a -> Bool
+let ord_gt x y = compare x y == GT
+
+@lang ord_ge
+ord_ge : Ord a => a -> a -> Bool
+let ord_ge x y = compare x y != LT
+
+instance Ord Int =
+  compare : Int -> Int -> Ordering
+  let compare x y = compare_prim x y
+
+instance Ord Float =
+  compare : Float -> Float -> Ordering
+  let compare x y = compare_prim x y
+
+instance Ord BigInt =
+  compare : BigInt -> BigInt -> Ordering
+  let compare x y = compare_prim x y
+
+instance Ord String =
+  compare : String -> String -> Ordering
+  let compare x y = compare_prim x y
+
+instance Ord Bool =
+  compare : Bool -> Bool -> Ordering
+  let compare x y = compare_prim x y
+
+instance Ord Unit =
+  compare : Unit -> Unit -> Ordering
+  let compare _x _y = EQ
+
+instance Ord a => Ord (List a) =
+  compare : List a -> List a -> Ordering
+  let compare xs ys = compare_list compare xs ys
+
+instance Ord a => Ord (Option a) =
+  compare : Option a -> Option a -> Ordering
+  let compare x y =
+    match (x, y) with
+    | (Some a, Some b) -> compare a b
+    | (None, None) -> EQ
+    | (None, _) -> LT
+    | _ -> GT
+
+instance Hash Int =
+  hash : Int -> Int
+  let hash x = hash_prim x
+
+instance Hash Float =
+  hash : Float -> Int
+  let hash x = hash_prim x
+
+instance Hash BigInt =
+  hash : BigInt -> Int
+  let hash x = hash_prim x
+
+instance Hash String =
+  hash : String -> Int
+  let hash x = hash_prim x
+
+instance Hash Bool =
+  hash : Bool -> Int
+  let hash x = hash_prim x
+
+instance Hash Unit =
+  hash : Unit -> Int
+  let hash _x = 0
+
+instance Hash a => Hash (List a) =
+  hash : List a -> Int
+  let hash xs = hash_list hash xs
+
+instance Hash a => Hash (Option a) =
+  hash : Option a -> Int
+  let hash x =
+    match x with
+    | Some a -> hash a
+    | None -> 0
+
+instance Show Int =
+  show : Int -> String
+  let show x = show_prim x
+
+instance Show Float =
+  show : Float -> String
+  let show x = show_prim x
+
+instance Show BigInt =
+  show : BigInt -> String
+  let show x = show_prim x
+
+instance Show String =
+  show : String -> String
+  let show x = show_prim x
+
+instance Show Bool =
+  show : Bool -> String
+  let show x = show_prim x
+
+instance Show Unit =
+  show : Unit -> String
+  let show _x = "()"
+
+instance Show Ordering =
+  show : Ordering -> String
+  let show x = show_prim x
+
+instance Show a => Show (List a) =
+  show : List a -> String
+  let show xs = show_list show xs
+
+instance Show a => Show (Option a) =
+  show : Option a -> String
+  let show x =
+    match x with
+    | Some a -> "Some " ++ show a
+    | None -> "None"
+
+instance (Show e, Show a) => Show (Result e a) =
+  show : Result e a -> String
+  let show x =
+    match x with
+    | Ok a -> "Ok " ++ show a
+    | Err e -> "Err " ++ show e
+
+instance (Ord e, Ord a) => Ord (Result e a) =
+  compare : Result e a -> Result e a -> Ordering
+  let compare x y =
+    match (x, y) with
+    | (Err a, Err b) -> compare a b
+    | (Ok a, Ok b) -> compare a b
+    | (Err _, _) -> LT
+    | _ -> GT
+
+instance (Hash e, Hash a) => Hash (Result e a) =
+  hash : Result e a -> Int
+  let hash x =
+    match x with
+    | Ok a -> hash a
+    | Err e -> 1 + hash e
+
+instance Hash Ordering =
+  hash : Ordering -> Int
+  let hash x = hash_prim x
+
+instance Ord Ordering =
+  compare : Ordering -> Ordering -> Ordering
+  let compare x y = compare_prim (rank x) (rank y)
+
+rank : Ordering -> Int
+let rank o =
+  match o with
+  | LT -> 0
+  | EQ -> 1
+  | GT -> 2
+
+map_list : forall c d a b. (forall v. a^v -> b)^c -> ((List a)^d -> (List b)^(c + d))^c
+foreign pure map_list from "@flick-lang/runtime" "listMap"
+  arity 2
+  retention call
+
+fold_list : forall c a b. (b -> a -> b)^c -> (b^c -> (List a -> b)^c)^c
+foreign pure fold_list from "@flick-lang/runtime" "listFold"
+  arity 3
+  retention call
+
+traverse_list : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
+foreign effect traverse_list from "@flick-lang/runtime" "listMapEffect"
+  retention call
+
+flat_map_list :
+  forall c d a b. (forall v. a^v -> (List b)^(c + v))^c -> ((List a)^d -> (List b)^(c + d))^c
+foreign pure flat_map_list from "@flick-lang/runtime" "listFlatMap"
+  arity 2
+  retention call
+
+pure_eff : forall c a r e. a^c -> (Eff r e a)^c
+foreign pure pure_eff from "@flick-lang/runtime" "succeed"
+  retention call
+
+flat_map_eff :
+  forall c d r e a b.
+  (forall v. a^v -> (Eff r e b)^(c + v))^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+foreign pure flat_map_eff from "@flick-lang/runtime" "flatMapEff"
+  arity 2
+  retention call
+
+map_eff : forall c d r e a b. (forall v. a^v -> b)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+foreign pure map_eff from "@flick-lang/runtime" "mapEff"
+  arity 2
+  retention call
+
+map2_option :
+  forall c d a b x.
+  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+  ((Option a)^d -> ((Option b)^d -> (Option x)^(c + d))^(c + d))^c
+foreign pure map2_option from "@flick-lang/runtime" "optionMap2"
+  arity 3
+  retention call
+
+map2_result :
+  forall c d e a b x.
+  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+  ((Result e a)^d -> ((Result e b)^d -> (Result e x)^(c + d))^(c + d))^c
+foreign pure map2_result from "@flick-lang/runtime" "resultMap2"
+  arity 3
+  retention call
+
+map2_list :
+  forall c d a b x.
+  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+  ((List a)^d -> ((List b)^d -> (List x)^(c + d))^(c + d))^c
+foreign pure map2_list from "@flick-lang/runtime" "listMap2"
+  arity 3
+  retention call
+
+map2_eff :
+  forall c d r e a b x.
+  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+  ((Eff r e a)^d -> ((Eff r e b)^d -> (Eff r e x)^(c + d))^(c + d))^c
+foreign pure map2_eff from "@flick-lang/runtime" "map2Eff"
+  arity 3
+  retention call
+
+seq_of_list : List a -> Seq a
+foreign pure seq_of_list from "@flick-lang/runtime" "seqOfList"
+
+seq_of_list_held : forall d a. (List a)^d -> (Seq a)^d
+foreign pure seq_of_list_held from "@flick-lang/runtime" "seqOfList"
+  retention call
+
+map_seq : forall c d a b. (forall v. a^v -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+foreign pure map_seq from "@flick-lang/runtime" "seqMap"
+  arity 2
+  retention call
+
+flat_map_seq :
+  forall c d a b. (forall v. a^v -> (Seq b)^(c + v))^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+foreign pure flat_map_seq from "@flick-lang/runtime" "seqFlatMap"
+  arity 2
+  retention call
+
+fold_seq : forall c a b. (b -> a -> b)^c -> (b^c -> (Seq a -> b)^c)^c
+foreign pure fold_seq from "@flick-lang/runtime" "seqFold"
+  arity 3
+  retention call
+
+map2_seq :
+  forall c d a b x.
+  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+  ((Seq a)^d -> ((Seq b)^d -> (Seq x)^(c + d))^(c + d))^c
+foreign pure map2_seq from "@flick-lang/runtime" "seqMap2"
+  arity 3
+  retention call
+
+append_seq : forall d a. (Seq a)^d -> ((Seq a)^d -> (Seq a)^d)^d
+foreign pure append_seq from "@flick-lang/runtime" "seqAppend"
+  arity 2
+  retention call
+
+instance Functor Option =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c
+  let map f value =
+    match value with
+    | None -> None
+    | Some x -> Some (f x)
+
+instance Foldable Option =
+  fold : forall c a b. (b -> a -> b)^c -> (b^c -> (Option a -> b)^c)^c
+  let fold f init value =
+    match value with
+    | None -> init
+    | Some x -> f init x
+
+instance Traversable Option =
+  traverse : forall c a b r e. (a ->{r; e} b)^c -> (Option a ->{r; e} Option b)^c
+  let traverse f value =
+    match value with
+    | None -> None
+    | Some x -> Some (f x)
+
+instance Applicative Option =
+  pure : forall c a. a^c -> (Option a)^c
+  let pure x = Some x
+  map2 :
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((Option a)^d -> ((Option b)^d -> (Option x)^(c + d))^(c + d))^c
+  let map2 f = map2_option f
+
+instance Monad Option =
+  flat_map :
+    forall c d a b.
+    (forall v. a^v -> (Option b)^(c + v))^c -> ((Option a)^d -> (Option b)^(c + d))^c
+  let flat_map f value =
+    match value with
+    | None -> None
+    | Some x -> f x
+
+instance Functor (Result e) =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((Result e a)^d -> (Result e b)^(c + d))^c
+  let map f value =
+    match value with
+    | Err e -> Err e
+    | Ok x -> Ok (f x)
+
+instance Foldable (Result e) =
+  fold : forall c a b. (b -> a -> b)^c -> (b^c -> (Result e a -> b)^c)^c
+  let fold f init value =
+    match value with
+    | Err _ -> init
+    | Ok x -> f init x
+
+instance Traversable (Result e) =
+  traverse : forall c a b r x. (a ->{r; x} b)^c -> (Result e a ->{r; x} Result e b)^c
+  let traverse f value =
+    match value with
+    | Err e -> Err e
+    | Ok a -> Ok (f a)
+
+instance Applicative (Result e) =
+  pure : forall c a. a^c -> (Result e a)^c
+  let pure x = Ok x
+  map2 :
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((Result e a)^d -> ((Result e b)^d -> (Result e x)^(c + d))^(c + d))^c
+  let map2 f = map2_result f
+
+instance Monad (Result e) =
+  flat_map :
+    forall c d a b.
+    (forall v. a^v -> (Result e b)^(c + v))^c -> ((Result e a)^d -> (Result e b)^(c + d))^c
+  let flat_map f value =
+    match value with
+    | Err e -> Err e
+    | Ok x -> f x
+
+instance Functor List =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((List a)^d -> (List b)^(c + d))^c
+  let map f xs = map_list f xs
+
+instance Foldable List =
+  fold : forall c a b. (b -> a -> b)^c -> (b^c -> (List a -> b)^c)^c
+  let fold f init xs = fold_list f init xs
+
+instance Traversable List =
+  traverse : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
+  let traverse f xs = traverse_list f xs
+
+instance Applicative List =
+  pure : forall c a. a^c -> (List a)^c
+  let pure x = [x]
+  map2 :
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((List a)^d -> ((List b)^d -> (List x)^(c + d))^(c + d))^c
+  let map2 f = map2_list f
+
+instance Monad List =
+  flat_map :
+    forall c d a b. (forall v. a^v -> (List b)^(c + v))^c -> ((List a)^d -> (List b)^(c + d))^c
+  let flat_map f xs = flat_map_list f xs
+
+instance Functor (Eff r e) =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+  let map f eff = map_eff f eff
+
+instance Applicative (Eff r e) =
+  pure : forall c a. a^c -> (Eff r e a)^c
+  let pure x = pure_eff x
+  map2 :
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((Eff r e a)^d -> ((Eff r e b)^d -> (Eff r e x)^(c + d))^(c + d))^c
+  let map2 f = map2_eff f
+
+instance Monad (Eff r e) =
+  flat_map :
+    forall c d a b.
+    (forall v. a^v -> (Eff r e b)^(c + v))^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+  let flat_map f eff = flat_map_eff f eff
+
+instance Alternative Option =
+  nothing : forall a. Option a
+  let nothing = None
+  or_else : forall a. Option a -> Option a -> Option a
+  let or_else first second =
+    match first with
+    | None -> second
+    | Some _ -> first
+
+instance Alternative List =
+  nothing : forall a. List a
+  let nothing = []
+  or_else : forall a. List a -> List a -> List a
+  let or_else xs ys = xs ++ ys
+
+instance Semigroup String =
+  combine : String -> String -> String
+  let combine x y = x ++ y
+
+instance Monoid String =
+  empty : String
+  let empty = ""
+
+instance Semigroup (List a) =
+  combine : List a -> List a -> List a
+  let combine xs ys = xs ++ ys
+
+instance Monoid (List a) =
+  empty : List a
+  let empty = []
+
+instance Iterable List =
+  iter : forall d a. (List a)^d -> (Seq a)^d
+  let iter xs = seq_of_list_held xs
+
+instance Iterable Seq =
+  iter : forall d a. (Seq a)^d -> (Seq a)^d
+  let iter xs = xs
+
+instance Functor Seq =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+  let map f = map_seq f
+
+instance Foldable Seq =
+  fold : forall c a b. (b -> a -> b)^c -> (b^c -> (Seq a -> b)^c)^c
+  let fold f = fold_seq f
+
+instance Applicative Seq =
+  pure : forall c a. a^c -> (Seq a)^c
+  let pure x = seq_of_list_held [x]
+  map2 :
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((Seq a)^d -> ((Seq b)^d -> (Seq x)^(c + d))^(c + d))^c
+  let map2 f = map2_seq f
+
+instance Monad Seq =
+  flat_map :
+    forall c d a b. (forall v. a^v -> (Seq b)^(c + v))^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+  let flat_map f xs = flat_map_seq f xs
+
+instance Alternative Seq =
+  nothing : forall a. Seq a
+  let nothing = seq_of_list []
+  or_else : forall a. Seq a -> Seq a -> Seq a
+  let or_else xs ys = append_seq xs ys
+
+instance Eq SchemaError =
+  eq : SchemaError -> SchemaError -> Bool
+  let eq x y =
+    match (x, y) with
+    | (SchemaError a, SchemaError b) -> eq a b
+
+instance Show SchemaError =
+  show : SchemaError -> String
+  let show x =
+    match x with
+    | SchemaError issues -> "SchemaError " ++ show issues

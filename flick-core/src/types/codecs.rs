@@ -13,6 +13,7 @@ use crate::source::SourceMap;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::{self, literal};
+use crate::types::lang::Lang;
 
 impl Checker<'_> {
     /// `schema T`: the witness `T` derives.
@@ -59,7 +60,7 @@ impl Checker<'_> {
         let schema = self.infer(head);
         self.expect(
             &schema,
-            &Type::app(Type::prim("Schema"), decoded.clone()),
+            &Type::app(Type::lang(Lang::Schema), decoded.clone()),
             self.span(head),
         );
         let fields: Vec<(String, &Node, &Node)> = node
@@ -153,7 +154,7 @@ impl Checker<'_> {
             }
             given.push(label.clone());
             let rd = self.fresh();
-            let codec = Type::apps(Type::prim("FieldCodec"), [rd.clone(), ty]);
+            let codec = Type::apps(Type::lang(Lang::FieldCodec), [rd.clone(), ty]);
             self.check(value, &codec);
             rows.push(rd);
             if let Some(wire) = wire_name(value, self.text) {
@@ -181,8 +182,8 @@ impl Checker<'_> {
     ) -> Type {
         let pure_wanted = expected
             .map(|e| self.whnf(e))
-            .is_some_and(|e| e.spine().0.is_prim("PureCodec"));
-        let json = Type::prim("Json");
+            .is_some_and(|e| e.spine().0.is_lang(Lang::PureCodec));
+        let json = Type::lang(Lang::Json);
         if pure_wanted || rows.iter().all(|r| self.empty_row(r)) {
             for (r, (label, _, value)) in rows.iter().zip(fields) {
                 if self.unify(r, &Type::empty_row()).is_err() {
@@ -194,7 +195,7 @@ impl Checker<'_> {
                     );
                 }
             }
-            return Type::apps(Type::prim("PureCodec"), [json, decoded]);
+            return Type::apps(Type::lang(Lang::PureCodec), [json, decoded]);
         }
         let services = rows
             .iter()
@@ -202,7 +203,7 @@ impl Checker<'_> {
             .reduce(|a, b| Type::Union(Box::new(a), Box::new(b)))
             .unwrap_or_else(Type::empty_row);
         Type::apps(
-            Type::prim("Codec"),
+            Type::lang(Lang::Codec),
             [services, Type::empty_row(), json, decoded],
         )
     }

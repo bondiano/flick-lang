@@ -12,6 +12,7 @@ use super::ty::{Binder, Row, Type};
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
+use crate::types::lang::Lang;
 use crate::{diagnostics, source};
 
 /// The definition of `S.Impl` for the service definition `def`.
@@ -173,7 +174,7 @@ impl Checker<'_> {
             format!("{}.{name}", entity.module),
             service,
         )]));
-        Some(Type::app(Type::prim("ServiceTag"), row))
+        Some(Type::app(Type::lang(Lang::ServiceTag), row))
     }
 
     /// Two layers merged into one must not build the same service: which
@@ -183,7 +184,9 @@ impl Checker<'_> {
             let layer = this.whnf(layer);
             let (head, args) = layer.spine();
             match args[..] {
-                [_, _, outputs] if head.is_prim("Layer") => this.store.normalize(outputs).entries,
+                [_, _, outputs] if head.is_lang(Lang::Layer) => {
+                    this.store.normalize(outputs).entries
+                }
                 _ => Vec::new(),
             }
         };
@@ -260,9 +263,9 @@ impl Checker<'_> {
         }
         let (head, args) = ty.spine();
         if let Type::Con { module, name } = head {
-            if ["Ref", "Eff", "Layer", "Unknown"]
-                .iter()
-                .any(|n| head.is_prim(n))
+            if [Lang::Ref, Lang::Eff, Lang::Layer, Lang::Unknown]
+                .into_iter()
+                .any(|n| head.is_lang(n))
             {
                 return Some(ty.clone());
             }

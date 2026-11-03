@@ -14,6 +14,7 @@ use crate::iface::Namespace;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
+use crate::types::lang::Lang;
 
 mod kinds;
 mod rows;
@@ -155,7 +156,7 @@ impl Checker<'_> {
                 }
                 (ty, kind)
             }
-            K::UnitType => (Type::prim("Unit"), Kind::Type),
+            K::UnitType => (Type::lang(Lang::Unit), Kind::Type),
             K::HoleType => self.hole(span, expected),
             K::TupleType => (
                 Type::Tuple(

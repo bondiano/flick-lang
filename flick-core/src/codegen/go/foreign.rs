@@ -12,43 +12,16 @@ use super::layout::{call, closure, signature, single};
 use super::{Gen, names};
 use crate::ir::{Foreign, ForeignMode};
 use crate::source::Span;
-
-/// The binding tables, by area: under `[module]` (or `[global Module]` for
-/// a JS global, which may mean different things for different types), an
-/// export (or binding name) and its function of package `flickrt`.
-const TABLES: &[&str] = &[
-    include_str!("bindings/runtime.txt"),
-    include_str!("bindings/effect.txt"),
-    include_str!("bindings/platform.txt"),
-    include_str!("bindings/stream.txt"),
-    include_str!("bindings/cli.txt"),
-    include_str!("bindings/cli_prompt.txt"),
-    include_str!("bindings/datetime.txt"),
-    include_str!("bindings/http.txt"),
-    include_str!("bindings/layer.txt"),
-    include_str!("bindings/globals.txt"),
-    include_str!("bindings/schema.txt"),
-    include_str!("bindings/net.txt"),
-    include_str!("bindings/clock.txt"),
-    include_str!("bindings/schedule.txt"),
-    include_str!("bindings/queue.txt"),
-    include_str!("bindings/channel.txt"),
-    include_str!("bindings/sink.txt"),
-    include_str!("bindings/tx.txt"),
-    include_str!("bindings/structures.txt"),
-    include_str!("bindings/graph.txt"),
-    include_str!("bindings/time.txt"),
-    include_str!("bindings/observability.txt"),
-    include_str!("bindings/resources.txt"),
-    include_str!("bindings/rest.txt"),
-    include_str!("bindings/effect2.txt"),
-];
+use crate::types;
 
 fn table() -> &'static HashMap<(String, String), String> {
     static TABLE: OnceLock<HashMap<(String, String), String>> = OnceLock::new();
     TABLE.get_or_init(|| {
         let mut out = HashMap::new();
-        for text in TABLES {
+        // the tables of `std`, by area: under `[module]` (or `[global Module]`
+        // for a JS global, which may mean different things for different
+        // types), an export (or binding name) and its function of `flickrt`
+        for (_, text) in types::std_go_bindings() {
             let mut module = "";
             for line in text.lines().map(str::trim) {
                 if line.is_empty() || line.starts_with('#') {

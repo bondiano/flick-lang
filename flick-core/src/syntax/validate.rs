@@ -1,5 +1,5 @@
 //! Checks on the finished tree that need more than one token of context:
-//! the names a pattern binds. Like Rust, every alternative of an or-pattern
+//! the names a pattern binds, and the words of an attribute. Like Rust, every alternative of an or-pattern
 //! binds the same names, and no name is bound twice by one pattern or by the
 //! parameters of one function.
 
@@ -7,6 +7,7 @@ use super::cst::{Node, Token};
 use super::kind::SyntaxKind as K;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
+use crate::types::lang::Lang;
 
 pub fn check(tree: &Node, src: &str, file: FileId) -> Vec<Diagnostic> {
     let mut v = Validator {
@@ -46,11 +47,32 @@ impl Validator<'_> {
                     self.group(&[pattern]);
                 }
             }
+            K::Attribute => self.attribute(node),
             _ => {}
         }
         for child in node.nodes() {
             self.walk(child);
         }
+    }
+
+    /// `@lang item`, the only attribute, with an item the compiler knows.
+    fn attribute(&mut self, node: &Node) {
+        let words: Vec<Token> = idents(node).collect();
+        let message = match &words[..] {
+            [name, ..] if name.text(self.src) != "lang" => format!(
+                "unknown attribute `@{}`: the only attribute is `@lang`",
+                name.text(self.src)
+            ),
+            [_, item] if Lang::from_name(item.text(self.src)).is_some() => return,
+            [_, item] => format!("unknown lang item `{}`", item.text(self.src)),
+            _ => "`@lang` names one lang item".to_owned(),
+        };
+        let (start, end) = node.range();
+        self.errors.push(Diagnostic::error(
+            codes::S014,
+            message,
+            Span::new(self.file, start, end),
+        ));
     }
 
     /// Patterns whose bindings share one scope.

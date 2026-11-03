@@ -5,6 +5,7 @@
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::types::Checker;
+use crate::types::lang::Lang;
 use crate::types::ty::{Row, Type};
 use crate::types::typing::SchemaPlan;
 
@@ -24,7 +25,7 @@ impl Checker<'_> {
         match self.form_fields(name, plan) {
             Ok(fields) => {
                 let this = Type::con(&self.env.module, name);
-                self.companion(name, "form", &[], Type::app(Type::prim("Form"), this));
+                self.companion(name, "form", &[], Type::app(Type::lang(Lang::Form), this));
                 let field = Type::con("Form", "Field");
                 let record = fields.iter().map(|(l, ..)| (l.clone(), field.clone()));
                 let ty = Type::Record(Row::closed(record.collect()));

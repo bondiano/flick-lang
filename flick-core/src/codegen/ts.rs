@@ -10,7 +10,8 @@ use std::fmt::Write;
 
 use super::names;
 use crate::iface::{Interface, Namespace};
-use crate::types::{Form, Kind, PRELUDE, Type, TypeDef, passes_dictionary};
+use crate::types::lang::{self, Lang};
+use crate::types::{Form, Kind, Type, TypeDef, passes_dictionary};
 
 /// The runtime package generated code imports.
 const RUNTIME: &str = "@flick-lang/runtime";
@@ -18,38 +19,45 @@ const RUNTIME: &str = "@flick-lang/runtime";
 /// The runtime module whose `Ui` a Flick `Ui` value is.
 const RUNTIME_UI: &str = "@flick-lang/runtime/ui/react";
 
-/// Prelude types TypeScript has natively.
-const PRIMITIVES: &[(&str, &str)] = &[
-    ("Int", "number"),
-    ("Float", "number"),
-    ("String", "string"),
-    ("Bool", "boolean"),
-    ("BigInt", "bigint"),
-    ("Unit", "undefined"),
-    ("Never", "never"),
-    ("Unknown", "unknown"),
-    ("Json", "unknown"),
+/// Built-in types TypeScript has natively.
+const PRIMITIVES: &[(Lang, &str)] = &[
+    (Lang::Int, "number"),
+    (Lang::Float, "number"),
+    (Lang::String, "string"),
+    (Lang::Bool, "boolean"),
+    (Lang::BigInt, "bigint"),
+    (Lang::Unit, "undefined"),
+    (Lang::Never, "never"),
+    (Lang::Unknown, "unknown"),
+    (Lang::Json, "unknown"),
 ];
 
-/// The module of `Stream`, which is Effect's `Stream` in TypeScript.
-const STREAM: &str = "Stream.Core";
-
-/// Prelude types projected to native Effect or TypeScript types, or not at all.
-const NATIVE: &[&str] = &[
-    "List",
-    "Option",
-    "Result",
-    "Eff",
-    "Layer",
-    "Errors",
-    "ServiceTag",
-    "ServiceImpl",
-    "Scope",
-    "Schema",
-    "PureCodec",
-    "Codec",
-    "Ui",
+/// Built-in types projected to native Effect or TypeScript types, or not at
+/// all; `Stream` is Effect's `Stream`.
+const NATIVE: &[Lang] = &[
+    Lang::List,
+    Lang::Option,
+    Lang::Result,
+    Lang::Eff,
+    Lang::Layer,
+    Lang::Errors,
+    Lang::ServiceTag,
+    Lang::ServiceImpl,
+    Lang::Scope,
+    Lang::Schema,
+    Lang::PureCodec,
+    Lang::Codec,
+    Lang::Ui,
+    Lang::Stream,
 ];
+
+/// The built-in type `module.name` that is never declared, being native
+/// to TypeScript or Effect.
+fn native(module: &str, name: &str) -> Option<Lang> {
+    (PRIMITIVES.iter().map(|&(item, _)| item))
+        .chain(NATIVE.iter().copied())
+        .find(|&item| lang::is(item, module, name))
+}
 
 pub struct Projection<'a> {
     pub module: &'a str,
@@ -271,41 +279,44 @@ impl Projection<'_> {
             ));
         };
         let arg = |i: usize| self.ty(args[i], vars);
-        if module == STREAM && name == "Stream" && args.len() == 3 {
-            let r = self.row(args[0], vars)?;
-            let e = self.row(args[1], vars)?;
-            return Ok(format!("$Stream.Stream<{}, {e}, {r}>", arg(2)?));
-        }
-        if module == PRELUDE {
-            if let Some((_, ts)) = PRIMITIVES.iter().find(|(n, _)| n == name) {
+        let seq = lang::is(Lang::Seq, module, name).then_some(Lang::Seq);
+        if let Some(item) = native(module, name).or(seq) {
+            if let Some((_, ts)) = PRIMITIVES.iter().find(|&&(p, _)| p == item) {
                 return Ok((*ts).to_owned());
             }
-            match (name.as_str(), args.len()) {
-                ("List", 1) => return Ok(format!("ReadonlyArray<{}>", arg(0)?)),
-                ("Ui", 0) => {
+            match (item, args.len()) {
+                (Lang::Stream, 3) => {
+                    let r = self.row(args[0], vars)?;
+                    let e = self.row(args[1], vars)?;
+                    return Ok(format!("$Stream.Stream<{}, {e}, {r}>", arg(2)?));
+                }
+                (Lang::List, 1) => return Ok(format!("ReadonlyArray<{}>", arg(0)?)),
+                (Lang::Ui, 0) => {
                     self.ui.set(true);
                     return Ok("$Ui".to_owned());
                 }
-                ("Seq", 1) => return Ok(format!("Iterable<{}>", arg(0)?)),
-                ("Option", 1) => return Ok(format!("$Option.Option<{}>", arg(0)?)),
-                ("Result", 2) => return Ok(format!("$Result.Result<{}, {}>", arg(1)?, arg(0)?)),
-                ("Eff", 3) => {
+                (Lang::Seq, 1) => return Ok(format!("Iterable<{}>", arg(0)?)),
+                (Lang::Option, 1) => return Ok(format!("$Option.Option<{}>", arg(0)?)),
+                (Lang::Result, 2) => {
+                    return Ok(format!("$Result.Result<{}, {}>", arg(1)?, arg(0)?));
+                }
+                (Lang::Eff, 3) => {
                     let r = self.row(args[0], vars)?;
                     let e = self.row(args[1], vars)?;
                     return Ok(effect(&arg(2)?, &e, &r));
                 }
-                ("Layer", 3) => {
+                (Lang::Layer, 3) => {
                     let ri = self.row(args[0], vars)?;
                     let e = self.row(args[1], vars)?;
                     let ro = self.row(args[2], vars)?;
                     return Ok(format!("$Layer.Layer<{ro}, {e}, {ri}>"));
                 }
-                ("Errors", 1) => return self.row(args[0], vars),
-                ("Schema", 1) => return Ok(format!("$Schema.Codec<{0}, {0}>", arg(0)?)),
-                ("PureCodec", 2) => {
+                (Lang::Errors, 1) => return self.row(args[0], vars),
+                (Lang::Schema, 1) => return Ok(format!("$Schema.Codec<{0}, {0}>", arg(0)?)),
+                (Lang::PureCodec, 2) => {
                     return Ok(format!("$Schema.Codec<{}, {}>", arg(1)?, arg(0)?));
                 }
-                ("Codec", 4) => {
+                (Lang::Codec, 4) => {
                     let rd = self.row(args[0], vars)?;
                     let re = self.row(args[1], vars)?;
                     return Ok(format!(
@@ -314,7 +325,7 @@ impl Projection<'_> {
                         arg(2)?
                     ));
                 }
-                ("ServiceTag" | "ServiceImpl" | "Scope", _) => {
+                (Lang::ServiceTag | Lang::ServiceImpl | Lang::Scope, _) => {
                     return Err(format!("`{name}` has no TypeScript form"));
                 }
                 _ => {}

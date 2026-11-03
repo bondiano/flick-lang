@@ -8,6 +8,7 @@ use crate::diagnostics::codes;
 use crate::diagnostics::suggest::closest;
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
+use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
     /// Records what a top-level name refers to; `ty` is its type at the use.
@@ -34,7 +35,7 @@ impl Checker<'_> {
                 name: entity.name.clone(),
             },
         };
-        if entity.module == super::classes::RECORD && entity.name == "label" {
+        if lang::is(Lang::RecordLabel, &entity.module, &entity.name) {
             self.record_label(span, ty.clone());
         }
         self.record_name(span, r);

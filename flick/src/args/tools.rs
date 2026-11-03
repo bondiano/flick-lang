@@ -3,6 +3,7 @@
 use clap::{Args, Subcommand, ValueEnum};
 
 use super::ProfileArgument;
+use flick_core::project::config::Source;
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Template {
@@ -80,13 +81,56 @@ pub struct InstallArguments {
 
 #[derive(Args)]
 pub struct AddArguments {
-    /// npm package specs, such as `date-fns` or `date-fns@4`.
+    /// npm package specs, such as `date-fns` or `date-fns@4`; with a source
+    /// option, the name of one Flick library.
     #[arg(required = true)]
     pub packages: Vec<String>,
 
     /// Add to `devDependencies`.
-    #[arg(long)]
+    #[arg(long, conflicts_with_all = ["git", "url", "path"])]
     pub dev: bool,
+
+    /// A Flick library from a tag of this git repository.
+    #[arg(long, value_name = "URL", requires = "tag", conflicts_with_all = ["url", "path"])]
+    pub git: Option<String>,
+
+    /// The tag of `--git`.
+    #[arg(long, requires = "git")]
+    pub tag: Option<String>,
+
+    /// The directory of the library in the repository of `--git`.
+    #[arg(long, requires = "git")]
+    pub subdir: Option<String>,
+
+    /// A Flick library from a gzipped tarball at this URL.
+    #[arg(long, value_name = "URL", requires = "sha256", conflicts_with = "path")]
+    pub url: Option<String>,
+
+    /// The sha256 of the tarball of `--url`.
+    #[arg(long, requires = "url")]
+    pub sha256: Option<String>,
+
+    /// A Flick library in this directory.
+    #[arg(long, value_name = "DIR")]
+    pub path: Option<String>,
+}
+
+impl AddArguments {
+    /// The source of the Flick library to add, when an option names one.
+    pub fn source(&self) -> Option<Source> {
+        if let Some(path) = &self.path {
+            return Some(Source::Path(path.clone()));
+        }
+        if let (Some(url), Some(tag)) = (&self.git, &self.tag) {
+            return Some(Source::Git {
+                url: url.clone(),
+                tag: tag.clone(),
+                subdir: self.subdir.clone(),
+            });
+        }
+        let (url, sha256) = (self.url.clone()?, self.sha256.clone()?);
+        Some(Source::Url { url, sha256 })
+    }
 }
 
 #[derive(Args)]

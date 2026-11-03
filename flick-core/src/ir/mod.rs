@@ -21,6 +21,7 @@ use crate::iface::Interface;
 use crate::numeric::{Arith, Num};
 use crate::source::Span;
 pub use crate::types::Stage;
+use crate::types::lang::{self, Lang};
 use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, SchemaItem, Type};
 
 #[derive(Debug, Clone)]
@@ -230,6 +231,22 @@ pub fn operation_arity(stages: &[Stage]) -> usize {
         .iter()
         .position(|&s| s != Stage::Pure)
         .map_or(stages.len(), |i| i + 1)
+}
+
+impl ExprKind {
+    /// The built-in value the lang item `item` names.
+    pub fn lang(item: Lang) -> ExprKind {
+        let item = lang::item(item);
+        ExprKind::Global {
+            module: item.module.clone(),
+            name: item.name.clone(),
+        }
+    }
+
+    /// Whether this is the built-in value the lang item `item` names.
+    pub fn is_lang(&self, item: Lang) -> bool {
+        matches!(self, ExprKind::Global { module, name } if lang::is(item, module, name))
+    }
 }
 
 impl Expr {
@@ -577,5 +594,7 @@ impl Pat {
     }
 }
 
+#[cfg(test)]
+mod lang_tests;
 #[cfg(test)]
 pub(crate) mod tests;

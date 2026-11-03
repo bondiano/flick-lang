@@ -15,6 +15,7 @@ use super::ty::{Norm, Row, Type};
 use super::typing::passes_dictionary;
 use crate::numeric::Num;
 use crate::source::Span;
+use crate::types::lang::{self, Lang};
 
 #[derive(Debug, Clone)]
 enum MetaState {
@@ -120,7 +121,7 @@ impl Store {
             Type::Error | Type::Skolem(_) => true,
             t => Num::ALL
                 .into_iter()
-                .any(|n| t.is_prim(n.name()) && (n.fractional() || !fractional)),
+                .any(|n| t.is_lang(n.lang()) && (n.fractional() || !fractional)),
         }
     }
 
@@ -423,14 +424,13 @@ impl Checker<'_> {
     fn project(&self, t: &Type) -> Option<Type> {
         let (head, args) = t.spine();
         if let ([label, field], Type::Con { module, name }) = (&args[..], head)
-            && module == super::classes::RECORD
-            && name == "Field"
+            && lang::is(Lang::Field, module, name)
             && let Type::Symbol(label) = self.store.resolve(label)
         {
             return Some(Type::Record(Row::closed(vec![(label, (*field).clone())])));
         }
         let [row] = args[..] else { return None };
-        if !head.is_prim("Errors") && !head.is_prim("ServiceImpl") {
+        if !head.is_lang(Lang::Errors) && !head.is_lang(Lang::ServiceImpl) {
             return None;
         }
         let norm = self.store.normalize(row);
@@ -438,10 +438,10 @@ impl Checker<'_> {
             return None;
         }
         let entry = norm.entries.into_iter().next().map(|(_, ty)| ty);
-        if head.is_prim("Errors") {
-            return Some(entry.unwrap_or_else(|| Type::prim("Never")));
+        if head.is_lang(Lang::Errors) {
+            return Some(entry.unwrap_or_else(|| Type::lang(Lang::Never)));
         }
-        if head.is_prim("ServiceImpl") {
+        if head.is_lang(Lang::ServiceImpl) {
             let service = entry?;
             let (head, args) = service.spine();
             let Type::Con { module, name } = head else {
@@ -458,7 +458,7 @@ impl Checker<'_> {
     fn unify_errors(&mut self, projection: &Type, other: &Type) -> Option<Unified> {
         let (head, args) = projection.spine();
         let [row] = args[..] else { return None };
-        if !head.is_prim("Errors") {
+        if !head.is_lang(Lang::Errors) {
             return None;
         }
         let norm = self.store.normalize(row);
@@ -469,7 +469,7 @@ impl Checker<'_> {
         if matches!(other, Type::Meta(_) | Type::Error) {
             return None;
         }
-        if other.is_prim("Never") {
+        if other.is_lang(Lang::Never) {
             return Some(self.bind(m, &Type::empty_row()));
         }
         Some(match self.error_label(other) {
@@ -566,7 +566,8 @@ impl Checker<'_> {
                 // an argument that is no error explains itself better than the application
                 self.unify(h1, h2).map_err(|m| match m {
                     Mismatch::Types(x, y)
-                        if x.spine().0.is_prim("Errors") || y.spine().0.is_prim("Errors") =>
+                        if x.spine().0.is_lang(Lang::Errors)
+                            || y.spine().0.is_lang(Lang::Errors) =>
                     {
                         Mismatch::Types(x, y)
                     }

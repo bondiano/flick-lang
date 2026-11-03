@@ -1,0 +1,91 @@
+/// Children of a `scope`: a child runs until its owner's scope closes, and
+/// its supervisor observes how it failed. Effect's `Fiber` over them.
+module Fiber exposing (
+  Owner,
+  Fiber,
+  Outlives,
+  Provided,
+  spawn,
+  join,
+  await_,
+  await_all,
+  join_all,
+  interrupt,
+  interrupt_as,
+  interrupt_all,
+  interrupt_all_as,
+)
+
+@lang owner
+/// The owner of a `scope`; `scope s { … }` names it `s`.
+type Owner (s : Region)
+
+/// A running child that fails with an error of `e` or succeeds with `a`.
+type Fiber (e : ErrorRow) a
+
+@lang outlives
+/// The captures `c` end no earlier than the region `s`. The compiler
+/// decides it from the scopes; a program cannot declare instances of it.
+class Outlives (c : CaptureRow) (s : Region)
+
+@lang provided
+/// The services `r` come from providers that end no earlier than the
+/// region `s`: a child of its owner runs with them after the code that
+/// started it. The compiler decides it from the `provide`s and scopes; a
+/// signature names it for an owner and services its caller gives.
+class Provided (r : ServiceRow) (s : Region)
+
+/// Starts `task` as a child of `owner`; `supervisor` observes its failure.
+/// Both may hold only what outlives the owner.
+spawn :
+  forall s c r e a.
+  (Outlives c s, Provided r s) =>
+  Owner s ->
+  (Failure e ->{Scope s | r; none} Unit)^c ->
+  (Eff {Scope s | r} e a)^c ->{r; none}
+  Fiber e a
+foreign effect spawn from "@flick-lang/runtime" "fiberSpawn"
+  retention owner
+
+/// Waits for the child: its result, or its failure with the original cause.
+join : Fiber e a ->{; e} a
+foreign effect join from "@flick-lang/runtime" "fiberJoin"
+  reviewed "effect@4.1.2 sha256:397c57c3ab8ccb72"
+
+/// Waits for the child and gives how it ended, without failing.
+await_ : Fiber e a ->{} Exit e a
+foreign effect await_ from "@flick-lang/runtime/effect/Fiber" "flickAwait"
+  reviewed "effect@4.1.2 sha256:aa39e3b85d3974ab"
+
+/// Waits for every child; how each ended, in order.
+await_all : List (Fiber e a) ->{} List (Exit e a)
+foreign effect await_all from "@flick-lang/runtime/effect/Fiber" "flickAwaitAll"
+  reviewed "effect@4.1.2 sha256:4354c9187b891885"
+
+/// Waits for every child: their results in order, or the first failure.
+join_all : List (Fiber e a) ->{; e} List a
+foreign effect join_all from "@flick-lang/runtime/effect/Fiber" "flickJoinAll"
+  reviewed "effect@4.1.2 sha256:93cd83981814beab"
+
+/// Interrupts the child and waits until it ended; its supervisor sees the
+/// interruption.
+interrupt : Fiber e a ->{} Unit
+foreign effect interrupt from "@flick-lang/runtime/effect/Fiber" "flickInterrupt"
+  reviewed "effect@4.1.2 sha256:b4dea4597062574b"
+
+/// `interrupt`, naming the fiber id of the interruption.
+interrupt_as : Option Float -> Fiber e a ->{} Unit
+foreign effect interrupt_as from "@flick-lang/runtime/effect/Fiber" "flickInterruptAs"
+  arity 1
+  reviewed "effect@4.1.2 sha256:463d52162c7cfb42"
+
+/// Interrupts every child and waits until they ended.
+interrupt_all : List (Fiber e a) ->{} Unit
+foreign effect interrupt_all from "@flick-lang/runtime/effect/Fiber" "flickInterruptAll"
+  reviewed "effect@4.1.2 sha256:1dcaa52c1653c261"
+
+/// `interrupt_all`, naming the fiber id of the interruption.
+interrupt_all_as : Float -> List (Fiber e a) ->{} Unit
+foreign effect interrupt_all_as from "@flick-lang/runtime/effect/Fiber" "flickInterruptAllAs"
+  arity 1
+  reviewed "effect@4.1.2 sha256:77c88f3e42b05419"

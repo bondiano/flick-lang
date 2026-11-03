@@ -1,0 +1,9 @@
+schema-version = 1
+
+[package]
+name = "core"
+version = "0.1.0"
+flick = ">=0.1, <0.2"
+
+[project]
+kind = "lib"

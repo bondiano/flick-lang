@@ -4,6 +4,7 @@ use super::Lower;
 use crate::ir::{Expr, ExprKind, Stage};
 use crate::syntax::cst::Node;
 use crate::types::Question;
+use crate::types::lang::Lang;
 
 impl Lower<'_> {
     /// `e?`: `from_result e` on a `Result`, an `Unwrap` on an `Option`.
@@ -13,13 +14,7 @@ impl Lower<'_> {
         let kind = match self.typing.questions.get(&node.range()) {
             Some(Question::Option) => ExprKind::Unwrap(Box::new(operand)),
             Some(Question::Result) => ExprKind::App {
-                func: Box::new(Expr::new(
-                    ExprKind::Global {
-                        module: "Prelude".to_owned(),
-                        name: "from_result".to_owned(),
-                    },
-                    span,
-                )),
+                func: Box::new(Expr::new(ExprKind::lang(Lang::FromResult), span)),
                 arg: Box::new(operand),
                 stage: Stage::Runtime,
                 arg_first: false,

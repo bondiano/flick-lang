@@ -12,6 +12,7 @@ use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 /// Where an expression stands: aggregates belong to `select`, `having`
 /// and `order_by` only.
@@ -102,7 +103,7 @@ impl Checker<'_> {
             K::PrefixExpr if children.len() == 1 => {
                 let mut v = self.sql_value(cx, scope, children[0], place);
                 if node.has_token(K::NotKw) {
-                    self.expect(&v.ty, &Type::prim("Bool"), self.span(children[0]));
+                    self.expect(&v.ty, &Type::lang(Lang::Bool), self.span(children[0]));
                     v.sql = format!("(NOT {})", v.sql);
                 } else {
                     self.sql_numeric(&v, children[0], "-");
@@ -149,7 +150,7 @@ impl Checker<'_> {
         match parts[..] {
             ["count_all"] => {
                 self.sql_aggregate_allowed(place, node);
-                let mut v = Val::plain("COUNT(*)".into(), Type::prim("BigInt"));
+                let mut v = Val::plain("COUNT(*)".into(), Type::lang(Lang::BigInt));
                 v.agg = true;
                 v
             }
@@ -255,7 +256,7 @@ impl Checker<'_> {
         };
         let l = self.sql_value(cx, scope, lhs, place);
         let r = self.sql_value(cx, scope, rhs, place);
-        let bool_ = Type::prim("Bool");
+        let bool_ = Type::lang(Lang::Bool);
         let (sql_op, result) = match op.kind {
             K::AndAnd | K::OrOr => {
                 self.expect(&l.ty, &bool_, self.span(lhs));
@@ -276,9 +277,9 @@ impl Checker<'_> {
                 (sql_op, bool_)
             }
             K::PlusPlus => {
-                self.expect(&l.ty, &Type::prim("String"), self.span(lhs));
-                self.expect(&r.ty, &Type::prim("String"), self.span(rhs));
-                ("||", Type::prim("String"))
+                self.expect(&l.ty, &Type::lang(Lang::String), self.span(lhs));
+                self.expect(&r.ty, &Type::lang(Lang::String), self.span(rhs));
+                ("||", Type::lang(Lang::String))
             }
             K::Plus | K::Minus | K::Star | K::Slash | K::Percent => {
                 self.expect(&r.ty, &l.ty, self.span(rhs));
@@ -384,7 +385,7 @@ impl Checker<'_> {
                 };
                 Val {
                     sql: format!("({} {test})", v.sql),
-                    ty: Type::prim("Bool"),
+                    ty: Type::lang(Lang::Bool),
                     null: false,
                     form: None,
                     param: None,
@@ -411,7 +412,7 @@ impl Checker<'_> {
                 } else {
                     Val {
                         sql: format!("({} IS NOT DISTINCT FROM {})", a.sql, b.sql),
-                        ty: Type::prim("Bool"),
+                        ty: Type::lang(Lang::Bool),
                         null: false,
                         agg: a.agg || b.agg,
                         bare,
@@ -437,7 +438,7 @@ impl Checker<'_> {
             let Some(sub) = self.sql_subquery(cx, args[0]) else {
                 return Val::error();
             };
-            return Val::plain(format!("EXISTS ({})", sub.sql), Type::prim("Bool"));
+            return Val::plain(format!("EXISTS ({})", sub.sql), Type::lang(Lang::Bool));
         }
         let v = self.sql_value(cx, scope, args[0], place);
         let Some(sub) = self.sql_subquery(cx, args[1]) else {
@@ -456,7 +457,7 @@ impl Checker<'_> {
         Val {
             sql: format!("({} IN ({}))", v.sql, sub.sql),
             null,
-            ty: Type::prim("Bool"),
+            ty: Type::lang(Lang::Bool),
             form: None,
             param: None,
             ..v
@@ -480,7 +481,7 @@ impl Checker<'_> {
         let (sql, ty, null, form) = match name {
             "count" => (
                 format!("COUNT({})", v.sql),
-                Type::prim("BigInt"),
+                Type::lang(Lang::BigInt),
                 false,
                 None,
             ),

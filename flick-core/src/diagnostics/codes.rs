@@ -113,6 +113,7 @@ codes! {
     S011 = Syntax 11, "unknown foreign metadata";
     S012 = Syntax 12, "inconsistent pattern bindings";
     S013 = Syntax 13, "`<-` outside a `do` block";
+    S014 = Syntax 14, "unknown attribute";
     R001 = Resolve 1, "module name does not match the file path";
     R002 = Resolve 2, "two files declare the same module";
     R003 = Resolve 3, "unknown module";
@@ -128,6 +129,7 @@ codes! {
     R013 = Resolve 13, "unused variable";
     R014 = Resolve 14, "unused private definition";
     R015 = Resolve 15, "local shadows another local";
+    R016 = Resolve 16, "lang item outside the built-in modules";
     T001 = Types 1, "unknown name";
     T002 = Types 2, "kind mismatch";
     T003 = Types 3, "type mismatch";
@@ -290,6 +292,9 @@ codes! {
     P029 = Project 29, "Go toolchain cannot build the program";
     P030 = Project 30, "module not available on the go target";
     P031 = Project 31, "invalid workspace or path dependency";
+    P032 = Project 32, "invalid dependency or package";
+    P033 = Project 33, "package needs another version of Flick";
+    P034 = Project 34, "dependency is not installed";
 }
 
 #[cfg(test)]

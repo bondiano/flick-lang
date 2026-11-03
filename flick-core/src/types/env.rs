@@ -8,12 +8,13 @@ use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
 
 use super::kinds::Kind;
-use super::ty::{Binder, PRELUDE, Type};
+use super::ty::{Binder, Type};
 use crate::iface::{Entity, Export, Interface, Namespace};
 use crate::resolve::{ItemKind, ModuleSyntax};
 
 mod shared;
 
+use crate::types::lang;
 pub use shared::Builtins;
 use shared::learn_exports;
 
@@ -220,7 +221,7 @@ impl<'b> Env<'b> {
             parents: HashMap::new(),
             scope: HashMap::new(),
             open: HashMap::new(),
-            prelude: module != PRELUDE,
+            prelude: module != lang::prelude(),
             ambiguous: HashSet::new(),
             qualifiers: HashMap::new(),
             imported: HashSet::new(),

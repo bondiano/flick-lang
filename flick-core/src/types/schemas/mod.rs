@@ -31,6 +31,7 @@ use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 use plan::PlanContext;
 
 /// A witness parameter: the type variable it is for, and whether it is over
@@ -65,8 +66,8 @@ impl Checker<'_> {
                     .find(|(p, _)| decl.nodes().any(|n| ptr::eq(n, *p)))
             {
                 let result = Type::apps(
-                    Type::prim("Result"),
-                    [Type::prim("SchemaError"), this.clone()],
+                    Type::lang(Lang::Result),
+                    [Type::lang(Lang::SchemaError), this.clone()],
                 );
                 self.companion(
                     &name,
@@ -106,7 +107,7 @@ impl Checker<'_> {
             self.companion(name, "schema", &binders, scheme);
             // a route may nest a route type of the group declared after it
             if params.is_empty() && derives(decl, self.text, "Url") {
-                let url = Type::app(Type::prim("Url"), Type::con(&module, name));
+                let url = Type::app(Type::lang(Lang::Url), Type::con(&module, name));
                 self.companion(name, "url", &[], url);
             }
             witnesses.push(params);
@@ -122,8 +123,8 @@ impl Checker<'_> {
                 Ok(plan) => {
                     if decl.has_token(K::RefinedKw) {
                         let codec = Type::apps(
-                            Type::prim("PureCodec"),
-                            [Type::prim("Json"), Type::con(&module, name)],
+                            Type::lang(Lang::PureCodec),
+                            [Type::lang(Lang::Json), Type::con(&module, name)],
                         );
                         self.companion(name, "json", &[], codec);
                     }
@@ -332,7 +333,7 @@ impl Checker<'_> {
 fn witness_scheme(module: &str, name: &str, binders: &[Binder], params: &[Witness]) -> Type {
     let all = binders.iter().map(|b| Type::Var(b.name.clone()));
     let result = Type::app(
-        Type::prim("Schema"),
+        Type::lang(Lang::Schema),
         Type::apps(Type::con(module, name), all),
     );
     params.iter().rev().fold(result, |acc, w| {
@@ -345,12 +346,15 @@ fn witness_scheme(module: &str, name: &str, binders: &[Binder], params: &[Witnes
                 }],
                 constraints: Vec::new(),
                 body: Box::new(Type::pure_fun(
-                    Type::app(Type::prim("Schema"), x.clone()),
-                    Type::app(Type::prim("Schema"), Type::app(Type::Var(w.var.clone()), x)),
+                    Type::app(Type::lang(Lang::Schema), x.clone()),
+                    Type::app(
+                        Type::lang(Lang::Schema),
+                        Type::app(Type::Var(w.var.clone()), x),
+                    ),
                 )),
             }
         } else {
-            Type::app(Type::prim("Schema"), Type::Var(w.var.clone()))
+            Type::app(Type::lang(Lang::Schema), Type::Var(w.var.clone()))
         };
         Type::pure_fun(param, acc)
     })

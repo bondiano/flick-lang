@@ -3,6 +3,8 @@
 //! variant here and one more form in each backend.
 
 use crate::syntax::literal;
+use crate::types::Type;
+use crate::types::lang::{self, Lang};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Num {
@@ -36,16 +38,27 @@ impl Num {
     /// The type an operand nothing determines becomes comes first.
     pub const ALL: [Num; 3] = [Num::Int, Num::Float, Num::BigInt];
 
-    pub fn name(self) -> &'static str {
+    /// The lang item of its type.
+    pub fn lang(self) -> Lang {
         match self {
-            Num::Int => "Int",
-            Num::Float => "Float",
-            Num::BigInt => "BigInt",
+            Num::Int => Lang::Int,
+            Num::Float => Lang::Float,
+            Num::BigInt => Lang::BigInt,
         }
+    }
+
+    /// The name of its type.
+    pub fn name(self) -> &'static str {
+        &lang::item(self.lang()).name
     }
 
     pub fn of(name: &str) -> Option<Num> {
         Num::ALL.into_iter().find(|n| n.name() == name)
+    }
+
+    /// The numeric type `ty` is, if it is one.
+    pub fn of_type(ty: &Type) -> Option<Num> {
+        Num::ALL.into_iter().find(|n| ty.is_lang(n.lang()))
     }
 
     pub fn kind(self) -> NumKind {

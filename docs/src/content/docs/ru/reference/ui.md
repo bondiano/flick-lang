@@ -742,8 +742,8 @@ HTML-конструкторы остаются привязанными к DOM: 
 [коде запуска для React](https://github.com/bondiano/flick-lang/blob/main/runtime/src/ui/react/index.ts),
 [DOM-адаптере](https://github.com/bondiano/flick-lang/blob/main/runtime/src/ui/index.ts)
 и встроенных модулях
-[`Ui`](https://github.com/bondiano/flick-lang/blob/main/flick-core/src/types/builtins/Ui.fl)
-и [`Ui.Dom`](https://github.com/bondiano/flick-lang/blob/main/flick-core/src/types/builtins/Ui/Dom.fl).
+[`Ui`](https://github.com/bondiano/flick-lang/blob/main/packages/std/src/Ui.fl)
+и [`Ui.Dom`](https://github.com/bondiano/flick-lang/blob/main/packages/std/src/Ui/Dom.fl).
 Для этих возможностей есть регрессионные тесты:
 
 - [`runtime/test/ui-roots.test.ts`](https://github.com/bondiano/flick-lang/blob/main/runtime/test/ui-roots.test.ts)

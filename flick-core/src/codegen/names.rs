@@ -1,6 +1,7 @@
 //! JS names of what the IR refers to, and constructor ids.
 
-use crate::types::{Constructor, PRELUDE};
+use crate::types::Constructor;
+use crate::types::lang::{self, Lang};
 
 /// Words a Flick name may spell that JS reserves, and the names generated
 /// code relies on.
@@ -154,16 +155,15 @@ pub enum Native {
 }
 
 pub fn native(c: &Constructor) -> Option<Native> {
-    if c.module != PRELUDE {
-        return None;
-    }
-    match (c.ty.as_str(), c.name.as_str()) {
-        ("Option", "Some") => Some(Native::Some),
-        ("Option", "None") => Some(Native::None),
-        ("Result", "Ok") => Some(Native::Ok),
-        ("Result", "Err") => Some(Native::Err),
-        _ => None,
-    }
+    [
+        (Lang::Some, Native::Some),
+        (Lang::None, Native::None),
+        (Lang::Ok, Native::Ok),
+        (Lang::Err, Native::Err),
+    ]
+    .into_iter()
+    .find(|&(item, _)| lang::is(item, &c.module, &c.name))
+    .map(|(_, native)| native)
 }
 
 fn fnv(text: &str) -> u32 {

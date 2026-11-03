@@ -3,10 +3,12 @@ use std::thread;
 use std::time::Duration;
 
 use clap::Parser;
+use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::pnpm;
+use flick_core::source::SourceMap;
 
 use crate::args::{CommandArguments, Commands, FfiCommands, GlobalArguments, SchemaCommands};
-use crate::command::{Command, finish as report, run_command};
+use crate::command::{Command, Outcome, finish as report, run_command};
 use crate::commands::{
     BuildCommand, CheckCommand, FfiCheckCommand, FfiImportCommand, FmtCommand, ScaffoldCommand,
 };
@@ -17,11 +19,13 @@ mod cache;
 mod child;
 mod command;
 mod commands;
+mod fetch;
 mod lsp;
 mod mapper;
 mod progress;
 mod report;
 mod sources;
+mod stdlib;
 mod toolchain;
 mod workspace;
 
@@ -65,6 +69,29 @@ fn dependency_command(cmd: Commands) -> pnpm::Command {
 
 fn main() -> ExitCode {
     let args = CommandArguments::parse();
+    // what installs or edits the dependencies, or checks no module, needs no `std`
+    let needs_std = !matches!(
+        args.cmd,
+        Commands::Fmt(_)
+            | Commands::New(_)
+            | Commands::Init(_)
+            | Commands::Clean(_)
+            | Commands::Install(_)
+            | Commands::Add(_)
+            | Commands::Remove(_)
+            | Commands::Update(_)
+            | Commands::Deps(_)
+            | Commands::Explain(_)
+            | Commands::Doctor
+    );
+    if needs_std && let Err(message) = stdlib::prepare(args.global.project.as_deref()) {
+        let diagnostic = Diagnostic::new(codes::P034, Severity::Error, message);
+        let outcome = Outcome {
+            sources: SourceMap::default(),
+            diagnostics: vec![diagnostic],
+        };
+        return report(outcome, &args.global);
+    }
     if !matches!(
         args.cmd,
         Commands::Fmt(_)
@@ -164,6 +191,9 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::Run(options) => commands::run(&options, global),
         Commands::Dev(options) => commands::dev(&options, global),
         Commands::Clean(options) => report(commands::clean(&options, global), global),
+        Commands::Add(o) if o.source().is_some() => {
+            report(commands::add_library(&o, global), global)
+        }
         Commands::Install(_)
         | Commands::Add(_)
         | Commands::Remove(_)

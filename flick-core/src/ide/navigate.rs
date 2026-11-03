@@ -3,9 +3,6 @@
 //! or its `.iface`. A companion (`T.parse`, `T.schema`, `T$table`) leads to
 //! its type, an instance's method to the instance.
 
-use std::fs;
-use std::path::PathBuf;
-
 use super::{Ide, Location, Symbol, Target, tree};
 use crate::iface::Entity;
 use crate::resolve::declarations;
@@ -23,7 +20,7 @@ pub struct Source {
 }
 
 impl Ide<'_> {
-    /// The source of `module`, if the analysis, the compiler or a package has it.
+    /// The source of `module`, if the analysis or the compiler has it.
     pub fn source(&self, module: &str) -> Option<Source> {
         if let Some(m) = self.analysis.module(module) {
             return Some(Source {
@@ -39,38 +36,7 @@ impl Ide<'_> {
                 tree: parse(text, FileId::default()).tree,
             });
         }
-        let path = self.package_source(module)?;
-        let text = fs::read_to_string(&path).ok()?;
-        let tree = parse(&text, FileId::default()).tree;
-        Some(Source {
-            target: Target::Path(path),
-            text,
-            tree,
-        })
-    }
-
-    /// The published `.fl` of a package's module, when it is there.
-    fn package_source(&self, module: &str) -> Option<PathBuf> {
-        let dir = (self.package_dir)(self.package_of(module)?)?;
-        let relative = self.interface(module)?.source?;
-        let path = dir.join(relative);
-        path.exists().then_some(path)
-    }
-
-    /// The `.iface` of a package's module.
-    fn package_iface(&self, module: &str) -> Option<PathBuf> {
-        let dir = (self.package_dir)(self.package_of(module)?)?;
-        let manifest: serde_json::Value =
-            serde_json::from_str(&fs::read_to_string(dir.join("package.json")).ok()?).ok()?;
-        let iface_dir = manifest
-            .get("flick")?
-            .get("iface-dir")?
-            .as_str()?
-            .to_owned();
-        Some(
-            dir.join(iface_dir)
-                .join(format!("{}.iface", module.replace('.', "/"))),
-        )
+        None
     }
 
     pub fn definition(&self, symbol: &Symbol) -> Option<Location> {
@@ -137,13 +103,7 @@ impl Ide<'_> {
                 .find(|d| d.namespace == entity.namespace && d.name == entity.name)?;
             return Some(at(source.target, found.span.start, found.span.end));
         }
-        // a package without its sources: the declaration in its interface
-        let path = self.package_iface(&entity.module)?;
-        let text = fs::read_to_string(&path).ok()?;
-        let needle = format!("\"name\": \"{}\"", entity.name);
-        let start = u32::try_from(text.find(&needle)?).ok()?;
-        let len = u32::try_from(needle.len()).ok()?;
-        Some(at(Target::Path(path), start, start + len))
+        None
     }
 
     /// The `let` of `method` in the instance `instance`, or its `deriving`.

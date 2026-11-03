@@ -9,7 +9,8 @@ use super::Gen;
 use super::layout::{Code, block, call, statement};
 use crate::ir::{BinOp, Expr, ExprKind, Lit};
 use crate::numeric::{Arith, Num};
-use crate::types::{PRELUDE, Type};
+use crate::types::Type;
+use crate::types::lang::Lang;
 
 /// A type whose values are Go's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,19 +55,16 @@ impl Native {
 
     /// The type of values of type `ty`, when it is one of these.
     pub(super) fn of(ty: Option<&Type>) -> Option<Native> {
-        let Some(Type::Con { module, name }) = ty else {
-            return None;
-        };
-        if module != PRELUDE {
-            return None;
-        }
-        match name.as_str() {
-            "Int" => Some(Native::Int),
-            "Float" => Some(Native::Float),
-            "Bool" => Some(Native::Bool),
-            "String" => Some(Native::String),
-            _ => None,
-        }
+        let ty = ty?;
+        [
+            (Lang::Int, Native::Int),
+            (Lang::Float, Native::Float),
+            (Lang::Bool, Native::Bool),
+            (Lang::String, Native::String),
+        ]
+        .into_iter()
+        .find(|&(item, _)| ty.is_lang(item))
+        .map(|(_, native)| native)
     }
 }
 

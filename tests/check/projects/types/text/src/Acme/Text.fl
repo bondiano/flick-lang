@@ -1,0 +1,6 @@
+module Acme.Text exposing (Text, trim)
+
+opaque type Text = Text String
+
+trim : String -> String
+let trim s = s

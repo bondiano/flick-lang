@@ -11,6 +11,7 @@ use crate::numeric::{self, Arith, Num};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::Dict;
+use crate::types::lang::{self, Lang};
 
 /// Folds `e` itself, its operands already folded; whether it changed.
 pub fn fold(e: &mut Expr) -> bool {
@@ -29,7 +30,10 @@ pub fn fold(e: &mut Expr) -> bool {
             ExprKind::Method {
                 dict: Dict::Instance { module, name, args },
                 name: method,
-            } if module == "Instances" && args.is_empty() && method == "show" => {
+            } if *module == lang::item(Lang::Instances).module
+                && args.is_empty()
+                && *method == lang::item(Lang::ShowMethod).name =>
+            {
                 constant(arg).and_then(|c| show(name, c)).map(Const::String)
             }
             _ => None,
@@ -201,11 +205,8 @@ pub fn constant(e: &Expr) -> Option<Const> {
         ExprKind::Lit(Lit::String(s)) => Some(Const::String(s.clone())),
         ExprKind::Lit(Lit::Bool(b)) => Some(Const::Bool(*b)),
         ExprKind::Neg(_, inner) => consteval::prefix(K::Minus, constant(inner)?),
-        ExprKind::Global { module, name } if module == "Float" => match name.as_str() {
-            "infinity" => Some(Const::Number(f64::INFINITY)),
-            "nan" => Some(Const::Number(f64::NAN)),
-            _ => None,
-        },
+        kind if kind.is_lang(Lang::FloatInfinity) => Some(Const::Number(f64::INFINITY)),
+        kind if kind.is_lang(Lang::FloatNan) => Some(Const::Number(f64::NAN)),
         _ => None,
     }
 }

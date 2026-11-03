@@ -35,8 +35,6 @@ impl Host for Memory {
     }
 }
 
-#[cfg(all(feature = "native-project", feature = "build-artifacts"))]
-const LIB: &str = "schema-version = 1\n[project]\nkind = \"lib\"\n";
 fn memory(files: &[(&str, &str)]) -> Memory {
     Memory(
         files
@@ -65,6 +63,7 @@ fn library(sources: &mut SourceMap) -> Project {
             test_dir: "test".into(),
             entries: Vec::new(),
             dependencies: Vec::new(),
+            package: None,
             build: Build::default(),
             sql_dialect: Default::default(),
             allow: Vec::new(),
@@ -252,7 +251,6 @@ fn standalone_compilation_checks_the_real_import_graph() {
             .collect::<Vec<_>>(),
         ["A.Main", "A.Util"]
     );
-    assert!(compilation.package_modules.is_empty());
 
     for (body, expected) in [
         ("import Missing\ny : Int\nlet y = 1\n", codes::R003),
@@ -491,46 +489,5 @@ fn main_may_need_the_services_its_runner_provides() {
     assert!(
         matches!(&diagnostics[..], [d] if d.starts_with("FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Cloudflare.Main`")),
         "{diagnostics:?}"
-    );
-}
-
-#[cfg(all(feature = "native-project", feature = "build-artifacts"))]
-#[test]
-fn a_package_dependency_still_conflicts_with_a_later_local_import() {
-    use crate::iface::{self, Interface};
-
-    let core = Interface {
-        module: "Core".into(),
-        ..Interface::default()
-    };
-    let api = Interface {
-        module: "Api".into(),
-        dependencies: BTreeMap::from([("Core".into(), iface::fingerprint(&core))]),
-        ..Interface::default()
-    };
-    let host = memory(&[
-        ("flick.toml", LIB),
-        ("package.json", r#"{"dependencies":{"lib":"1"}}"#),
-        (
-            "node_modules/lib/package.json",
-            r#"{"flick":{"iface-dir":"iface"}}"#,
-        ),
-        ("node_modules/lib/iface/Api.iface", &iface::write(&api)),
-        ("node_modules/lib/iface/Core.iface", &iface::write(&core)),
-        (
-            "src/Core.fl",
-            "module Core exposing (answer)\nanswer : Float\nlet answer = 1\n",
-        ),
-        (
-            "src/Main.fl",
-            "module Main exposing (answer)\nimport Api\nimport Core\nanswer : Float\nlet answer = 1\n",
-        ),
-    ]);
-    let diagnostics = run(&host, &["src/Main.fl"]);
-    assert!(
-        diagnostics
-            .iter()
-            .any(|d| d.starts_with("FLICK-R002") && d.contains("package `lib`")),
-        "{diagnostics:?}",
     );
 }

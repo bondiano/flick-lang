@@ -14,6 +14,7 @@ use flick_core::project::cache::{self, Key, Manifest};
 use flick_core::project::{self, Project, config};
 use flick_core::source::SourceMap;
 
+use crate::builtins;
 use crate::commands::inputs::{declared_name, sibling_root};
 use crate::toolchain;
 
@@ -46,6 +47,7 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
     }
     key.add("config", format!("{:?}", project.config));
     key.add("compiler", toolchain::COMPILER);
+    key.add("std", builtins::std_hash());
     // a compiler rebuilt without a new version still changes the key
     if let Ok(meta) = env::current_exe().and_then(fs::metadata) {
         key.add(
@@ -109,8 +111,13 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
             .is_some_and(|e| e == "fl" || e == "go" || e == "mjs")
     });
     files.extend(
-        [project::CONFIG_FILE, "package.json", "pnpm-lock.yaml"]
-            .map(|file| project.root.join(file)),
+        [
+            project::CONFIG_FILE,
+            project::lock::LOCK_FILE,
+            "package.json",
+            "pnpm-lock.yaml",
+        ]
+        .map(|file| project.root.join(file)),
     );
     files.extend(dependency_files(&project.root));
     library_files(&project.root, &project.config.dependencies, &mut files);
@@ -145,9 +152,6 @@ fn dependency_files(root: &Path) -> Vec<PathBuf> {
                 .ok()
                 .and_then(|p| p.get("flick").cloned());
             let dir_of = |key: &str| Some(flick.as_ref()?.get(key)?.as_str()?.to_owned());
-            if let Some(iface_dir) = dir_of("iface-dir") {
-                files_under(&dir.join(iface_dir), &mut out);
-            }
             // a source package is compiled with the project: its modules are inputs
             if let Some(source_dir) = dir_of("source-dir") {
                 let mut sources = Vec::new();
@@ -164,10 +168,14 @@ fn dependency_files(root: &Path) -> Vec<PathBuf> {
 }
 
 /// The configuration and modules of the libraries `dependencies` of the
-/// manifest in `dir` name by path, and of theirs.
+/// manifest in `dir` name by path, and of theirs; a fetched library never
+/// changes but with `flick.lock`.
 fn library_files(dir: &Path, dependencies: &[config::Dependency], out: &mut Vec<PathBuf>) {
     for dependency in dependencies {
-        let at = project::normalize(&dir.join(&dependency.path));
+        let Some(path) = dependency.path() else {
+            continue;
+        };
+        let at = project::normalize(&dir.join(path));
         let file = at.join(project::CONFIG_FILE);
         if out.contains(&file) {
             continue;

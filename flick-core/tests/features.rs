@@ -181,12 +181,14 @@ fn optional_server_imports_and_sugar_have_real_availability_diagnostics() {
             assert!(compilation.modules.is_empty());
         }
     }
+    // the server modules are part of the std package either way: the
+    // feature only turns on the syntax that needs them
     let (diagnostics, _, _) =
         compile("module Main exposing (answer)\nimport File\nanswer : Int\nlet answer = 42\n");
     let missing = diagnostics
         .iter()
         .any(|d| d.severity == Severity::Error && d.code == codes::R003);
-    assert_eq!(missing, !cfg!(feature = "server-stdlib"), "{diagnostics:?}");
+    assert!(!missing, "{diagnostics:?}");
 }
 
 #[cfg(feature = "typescript")]

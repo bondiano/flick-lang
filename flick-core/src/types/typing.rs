@@ -22,6 +22,7 @@ use crate::numeric::Num;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 mod stages;
 
@@ -371,10 +372,8 @@ pub fn default_method(class: &str, method: &str) -> String {
 
 /// Constraints that are solved by the region checker and pass no dictionary.
 pub fn passes_dictionary(constraint: &Type) -> bool {
-    !matches!(
-        super::classes::split(constraint),
-        Some((("Fiber", "Outlives" | "Provided"), _))
-    )
+    let class = |item| super::classes::args_of(constraint, item).is_some();
+    !class(Lang::Outlives) && !class(Lang::Provided)
 }
 
 impl Checker<'_> {

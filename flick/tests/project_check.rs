@@ -100,7 +100,7 @@ fn configuration_and_missing_dependencies_exit_with_2() {
     ]);
     let (status, codes) = codes(&out);
     assert_eq!(status, Some(2));
-    assert_eq!(codes, ["FLICK-P009", "FLICK-P009", "FLICK-P010"]);
+    assert_eq!(codes, ["FLICK-P009", "FLICK-P009"]);
     let human = String::from_utf8_lossy(
         &flick(&["check", "--project", "tests/check/projects/packages"]).stderr,
     )

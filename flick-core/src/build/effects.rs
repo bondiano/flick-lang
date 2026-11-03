@@ -3,10 +3,7 @@
 //! without Effect. A foreign module with no such version cannot be built.
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::iface::Interface;
 use crate::ir::{self, ItemKind};
-use crate::project::PackageModule;
-use crate::project::config::Backend;
 use crate::types::NO_EFFECTS;
 
 /// Where a library on Effect writes its build without Effect, beside its
@@ -83,70 +80,6 @@ pub fn check(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
 /// Whether the built-in module `name` has a build without Effect.
 pub fn in_core(name: &str) -> bool {
     BUILTINS.contains(&name)
-}
-
-/// Where the build without Effect of a package's module is, if it has one.
-fn core_of(interface: &Interface) -> Option<&str> {
-    interface.abi.as_ref()?.core.as_deref()
-}
-
-/// The module `module` of a package, at `js` on Effect, as a build on
-/// `backend` imports it.
-pub fn package_path(js: &str, module: &str, interface: &Interface, backend: Backend) -> String {
-    match (backend, core_of(interface)) {
-        (Backend::None, Some(dir)) => {
-            let file = module.replace('.', "/");
-            let base = js.strip_suffix(&file).unwrap_or(js);
-            format!("{base}{dir}{file}")
-        }
-        _ => js.to_owned(),
-    }
-}
-
-/// Whether a build on `backend` can import a package's module of `interface`.
-pub fn importable(interface: &Interface, backend: Backend) -> bool {
-    match backend {
-        Backend::None => core_of(interface).is_some(),
-        Backend::Effect => core_of(interface) != Some(""),
-    }
-}
-
-/// A diagnostic for each module of a package a build on `backend` cannot
-/// import: one without a build without Effect, or, on Effect, one built only
-/// without it, whose Option and Result are not Effect's.
-pub fn check_packages(
-    package_modules: &[PackageModule],
-    backend: Backend,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    for PackageModule {
-        module,
-        package,
-        interface,
-        ..
-    } in package_modules
-    {
-        if importable(interface, backend) {
-            continue;
-        }
-        let diagnostic = match backend {
-            Backend::None => Diagnostic::new(
-                codes::E008,
-                Severity::Error,
-                format!(
-                    "`{module}` of `{package}` needs Effect, but {NO_EFFECTS}: a library on Effect builds without it the modules that need no Effect"
-                ),
-            ),
-            Backend::Effect => Diagnostic::new(
-                codes::P027,
-                Severity::Error,
-                format!(
-                    "`{module}` of `{package}` is built only with `effect = \"none\"`, whose data is not Effect's: build `{package}` on Effect, which also builds it without Effect"
-                ),
-            ),
-        };
-        diagnostics.push(diagnostic);
-    }
 }
 
 /// E008 when the program uses the built-in module `name`, which needs Effect.

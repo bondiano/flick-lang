@@ -11,7 +11,7 @@ use flick_core::project::{self, workspace::Workspace};
 use flick_core::source::{FileId, SourceMap};
 use serde_json::{Value, json};
 
-use super::requests::{REQUEST_FAILED, Reply, ide, location, package_dir};
+use super::requests::{REQUEST_FAILED, Reply, ide, location};
 use super::{Context, Server, Snapshot, analyze, canonical, features, overlay};
 
 /// The workspace `dir` lies in, read through the open buffers.
@@ -127,8 +127,7 @@ impl Server {
             let Some(file) = snapshot.file(path) else {
                 return Ok(None);
             };
-            let dir = package_dir(&snapshot.root);
-            let ide = ide(snapshot, &dir);
+            let ide = ide(snapshot);
             let (symbol, found) = if let Some(name) = rename {
                 let (symbol, ..) = ide
                     .renamable(file, offset)
@@ -184,8 +183,7 @@ impl Server {
                 &member.join(project::CONFIG_FILE),
                 &mut self.caches,
             );
-            let dir = package_dir(&snapshot.root);
-            for (f, (start, end)) in ide(&snapshot, &dir).references(symbol) {
+            for (f, (start, end)) in ide(&snapshot).references(symbol) {
                 let text = &snapshot.sources.get(f).text;
                 if old.is_some_and(|old| text.get(start as usize..end as usize) != Some(old)) {
                     return Err((

@@ -10,6 +10,7 @@ use crate::project::config::{self, Backend, Emit, Kind};
 use crate::project::{Project, is_module_name, module_path};
 use crate::resolve::Interface;
 use crate::source::Span;
+use crate::types::lang::Lang;
 use crate::types::{self, Effects, NO_EFFECTS, Type, show_type};
 
 /// How the runner starts `main`.
@@ -42,7 +43,7 @@ pub fn main_kind(t: &Type) -> Result<MainKind, String> {
     else {
         return Err(shape());
     };
-    if !param.is_prim("Unit") || !result.is_prim("Unit") {
+    if !param.is_lang(Lang::Unit) || !result.is_lang(Lang::Unit) {
         return Err(shape());
     }
     let Some(effects) = effects else {
@@ -63,7 +64,7 @@ pub fn main_kind(t: &Type) -> Result<MainKind, String> {
     }
     match errors {
         Type::Var(_) => {}
-        Type::Row(row) if row.entries.iter().all(|(_, e)| e.is_prim("AppError")) => {}
+        Type::Row(row) if row.entries.iter().all(|(_, e)| e.is_lang(Lang::AppError)) => {}
         _ => {
             return Err(format!(
                 "entry `main` can fail with `{}`; the runner reports only `AppError`, so handle the others inside `main`",

@@ -14,8 +14,6 @@ mod checking_tests;
 mod entry;
 #[cfg(feature = "ide")]
 mod ide;
-#[cfg(feature = "native-project")]
-mod packages;
 mod runner;
 mod target;
 mod unknown;
@@ -84,10 +82,8 @@ struct Loader<'a> {
     packages: Packages,
     modules: Vec<Loaded>,
     by_name: BTreeMap<String, usize>,
+    /// The built-in modules a run reads, by name.
     from_packages: BTreeMap<String, Interface>,
-    #[cfg(feature = "native-project")]
-    /// The package that provides each module of `from_packages`.
-    owners: BTreeMap<String, String>,
     diagnostics: Vec<Diagnostic>,
     /// With `Some`, the IR of each module that checks without errors.
     lowered: Option<Vec<Option<ir::Module>>>,
@@ -98,20 +94,10 @@ struct Loader<'a> {
     cache: Option<&'a mut ModuleCache>,
 }
 
-/// The modules of a build and the package modules they use.
+/// The modules of a build: the project's and those of its libraries.
 #[derive(Default)]
 pub struct Compilation {
     pub modules: Vec<Compiled>,
-    pub package_modules: Vec<PackageModule>,
-}
-
-/// An installed module, retaining its defining package and compiled JS location.
-pub struct PackageModule {
-    pub module: String,
-    pub package: String,
-    pub interface: Interface,
-    /// The import specifier of its compiled JS, without the extension.
-    pub js_specifier: String,
 }
 
 /// A module that checked cleanly, lowered to the IR.
@@ -179,8 +165,6 @@ fn run(
         modules: Vec::new(),
         by_name: BTreeMap::new(),
         from_packages: BTreeMap::new(),
-        #[cfg(feature = "native-project")]
-        owners: BTreeMap::new(),
         diagnostics,
         lowered: (mode != Mode::Check).then(Vec::new),
         #[cfg(feature = "ide")]
@@ -212,8 +196,6 @@ fn run(
     }
     loader.check_entry(&interfaces);
     loader.check_targets();
-    #[cfg(feature = "native-project")]
-    loader.check_packages();
     let failed = loader
         .diagnostics
         .iter()
@@ -241,8 +223,6 @@ fn run(
             .collect(),
         _ => Vec::new(),
     };
-    #[cfg(feature = "native-project")]
-    let package_modules = loader.package_modules();
     let mut diagnostics = loader.reported();
     // by path, not by load order, which follows the order of imports
     diagnostics.sort_by_cached_key(|d| {
@@ -254,13 +234,7 @@ fn run(
     });
     Output {
         diagnostics,
-        compilation: Compilation {
-            modules: compiled,
-            #[cfg(feature = "native-project")]
-            package_modules,
-            #[cfg(not(feature = "native-project"))]
-            package_modules: Vec::new(),
-        },
+        compilation: Compilation { modules: compiled },
         #[cfg(feature = "ide")]
         analyzed: loader.ide.take().unwrap_or_default(),
     }
@@ -453,8 +427,6 @@ impl Loader<'_> {
             }
         }
         let local = self.by_name.get(name).copied();
-        #[cfg(feature = "native-project")]
-        self.load_package_interfaces(name, span);
         if local.is_none() && !self.from_packages.contains_key(name) {
             match types::builtins().iter().find(|i| i.module == name) {
                 Some(builtin) => {

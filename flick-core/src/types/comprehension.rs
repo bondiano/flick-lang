@@ -15,6 +15,7 @@ use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 /// The services of a stage that reads atoms.
 fn reader() -> Type {
@@ -113,9 +114,9 @@ impl Checker<'_> {
         }
         self.locals.truncate(mark);
         if strict {
-            return Type::app(Type::prim("List"), item);
+            return Type::app(Type::lang(Lang::List), item);
         }
-        let seq = Type::app(Type::prim("Seq"), item);
+        let seq = Type::app(Type::lang(Lang::Seq), item);
         let seq = self.close_over(seq, held, expected.cloned(), "sequence", self.span(node));
         match region {
             Some(region) if expected.is_none() => self.read_through(seq, &region),
@@ -131,7 +132,7 @@ impl Checker<'_> {
         for clause in clauses {
             self.for_clause(clause);
         }
-        let unit = Type::prim("Unit");
+        let unit = Type::lang(Lang::Unit);
         if let Some(body) = body {
             self.check(body, &unit);
         }
@@ -149,7 +150,7 @@ impl Checker<'_> {
                 let (pattern, source) = (children.next(), children.next());
                 let (start, end) = bind_key(clause);
                 let span = Span::new(self.file, start, end);
-                let iter = self.prelude_method("iter", span);
+                let iter = self.prelude_method(Lang::Iter, span);
                 let Type::Fun { param, result, .. } = self.whnf(&iter) else {
                     return;
                 };
@@ -165,7 +166,7 @@ impl Checker<'_> {
             }
             K::GuardStmt => {
                 if let Some(condition) = clause.nodes().next() {
-                    self.check(condition, &Type::prim("Bool"));
+                    self.check(condition, &Type::lang(Lang::Bool));
                 }
             }
             K::LetDecl => self.local_let(clause, None, &[]),
@@ -180,7 +181,7 @@ impl Checker<'_> {
     /// `a` of `Seq a`.
     pub fn seq_item(&self, t: &Type) -> Option<Type> {
         match self.whnf(t) {
-            Type::App { head, arg } if self.whnf(&head).is_prim("Seq") => Some(*arg),
+            Type::App { head, arg } if self.whnf(&head).is_lang(Lang::Seq) => Some(*arg),
             _ => None,
         }
     }

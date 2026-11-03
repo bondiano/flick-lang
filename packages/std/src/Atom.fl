@@ -1,0 +1,271 @@
+/// Reactive state. An atom describes a value; the registry a program
+/// provides (`Atom.layer`) holds the values of the atoms read through it.
+/// A view reads atoms through `Read` while it renders and renders again
+/// only when one of them changes; a derived atom does the same for its
+/// value. The task of an action writes them through `Write`. `Registry`,
+/// which roots and server markup read atoms from, is Effect's
+/// `Reactivity.Atom.Registry`, re-exported.
+module Atom exposing (.., Registry)
+
+import Reactivity.Atom exposing (Registry)
+
+/// A value to read.
+type alias Atom a = Reactivity.Atom.Atom a
+
+/// A state: a value to read and write.
+type alias Writable a = Reactivity.Atom.Writable a
+
+@lang atom_read
+/// Reading atoms: the reader depends on what it read.
+service Read =
+  get : forall a d. (Atom a)^d ->{} a
+
+/// Writing atoms: the task of an action, or a request on a server, writes
+/// states through it; a render, whose only service is `Read`, cannot. A
+/// write names its place in the source, `Module:line`, which a debug log
+/// of it shows; `""` is none.
+service Write =
+  set : forall a d. String -> (Writable a)^d -> a ->{} Unit
+  update : forall a d. String -> (Writable a)^d -> (a -> a) ->{} Unit
+  modify : forall a b d. String -> (Writable a)^d -> (a -> (b, a)) ->{} b
+  current : forall a d. (Atom a)^d ->{} a
+  refresh : forall a d. (Atom a)^d ->{} Unit
+
+/// A fresh registry: the values of atoms, which views read and `Write`
+/// writes. Provide one per root, and on a server one per request.
+layer : Layer none none {Registry, Write}
+foreign pure layer from "@flick-lang/runtime/effect/reactivity/Atom" "atomLayer"
+
+/// A state holding `value`, whatever its type. A registry keeps its value
+/// while it lives, read or not, so a write before the first read stays.
+make : a -> Writable a
+foreign pure make from "@flick-lang/runtime" "atomState"
+  arity 1
+
+/// A state of the component instance whose `setup` makes it, holding
+/// `value` first: each instance has its own, which cannot leave it and
+/// which the registry forgets when the instance unmounts.
+local : forall s a. a ->{Setup s;} (Writable a)^{s}
+let local value = Setup.own (fresh value)
+
+/// A state the registry keeps only while something holds it.
+fresh : a -> Writable a
+foreign pure fresh from "@flick-lang/runtime" "atomLocal"
+  arity 1
+
+/// The state `atom`, coded by `wire` so a server can hand its value to
+/// the client. Its key is the name of the top-level binding it defines,
+/// `Module.name`, which the compiler gives; anywhere else it is an error.
+serializable : PureCodec Json a -> Writable a -> Writable a
+let serializable wire atom = Reactivity.Atom.serializable "Atom.serializable" wire atom
+
+/// One serializable state per key, made by `f` the first time: the key of
+/// each is `Module.name/key`.
+serializable_family : PureCodec Json a -> (String -> Writable a) -> String -> Writable a
+let serializable_family wire f =
+  Reactivity.Atom.serializable_family "Atom.serializable_family" wire f
+
+/// A state the browser holds, such as the URL. A server has no browser, so
+/// a view reads one only through `on_server` or `client_only`, which say
+/// what the server renders; a root that hydrates server markup renders
+/// that too, then the browser's value.
+type Browser a
+
+/// The browser state `atom`, read as `value` on a server and while a root
+/// hydrates.
+on_server : a -> Browser a -> Writable a
+foreign pure on_server from "@flick-lang/runtime" "atomOnServer"
+  arity 2
+
+/// The value of the browser state `atom`: `None` on a server and while a
+/// root hydrates, `Some` after.
+client_only : Browser a -> Atom (Option a)
+foreign pure client_only from "@flick-lang/runtime" "atomClientOnly"
+  arity 1
+
+/// The search parameter `name` of the page's URL, `""` when it has none;
+/// a write updates the URL.
+search_param : String -> Browser String
+foreign pure search_param from "@flick-lang/runtime" "atomSearchParam"
+  arity 1
+
+/// The text the browser keeps under `key` in its local storage, `None`
+/// without one: a write of `Some text` keeps it there, of `None` removes
+/// it, and a change from another tab shows here too.
+stored : String -> Browser (Option String)
+foreign pure stored from "@flick-lang/runtime" "atomStored"
+  arity 1
+
+/// The page as a value of a type that derives `Url`: the browser's URL
+/// parsed by `url`, `fallback` when no route matches. A write navigates:
+/// it pushes the value's URL to the history, and the back button gives
+/// the earlier value. A server reads the URL `serving` gave its registry,
+/// so the markup and the hydrating root agree.
+route : Url a -> a -> Writable a
+foreign pure route from "@flick-lang/runtime" "atomRoute"
+  arity 2
+
+/// The URL the registry renders, which `route` reads on a server: a
+/// handler sets the request's URL before it renders the page.
+serving : String ->{Write;} Unit
+foreign effect serving from "@flick-lang/runtime" "atomServing"
+
+/// An atom computed by `compute` from the atoms it reads, again when one
+/// of them changes.
+derived : (Unit ->{Read;} a) -> Atom a
+foreign pure derived from "@flick-lang/runtime" "atomDerived"
+  arity 1
+
+/// A state read as an atom.
+readonly : forall d a. (Writable a)^d -> (Atom a)^d
+foreign pure readonly from "@flick-lang/runtime/effect/reactivity/Atom" "flickReadonly"
+  retention call
+
+/// The value of `atom`; the reader renders or computes again when it changes.
+get : forall d a. (Atom a)^d ->{Read;} a
+let get atom = Read.get atom
+
+/// The value of the state `atom`, read as `get` reads.
+value : forall d a. (Writable a)^d ->{Read;} a
+let value atom = Read.get (readonly atom)
+
+/// Replaces the value of `atom`; whoever read it renders or computes again.
+set : forall d a. (Writable a)^d -> a ->{Write;} Unit
+let set atom new_value = Write.set "" atom new_value
+
+/// Replaces the value of `atom` by `f` of it.
+update : forall d a. (Writable a)^d -> (a -> a) ->{Write;} Unit
+let update atom f = Write.update "" atom f
+
+/// Replaces the value of `atom` by the second part of `f` of it and gives
+/// the first.
+modify : forall d a b. (Writable a)^d -> (a -> (b, a)) ->{Write;} b
+let modify atom f = Write.modify "" atom f
+
+/// `set` at `place`: the compiler calls it for `set` with its place.
+set_at : forall d a. String -> (Writable a)^d -> a ->{Write;} Unit
+let set_at place atom new_value = Write.set place atom new_value
+
+/// `update` at `place`.
+update_at : forall d a. String -> (Writable a)^d -> (a -> a) ->{Write;} Unit
+let update_at place atom f = Write.update place atom f
+
+/// `modify` at `place`.
+modify_at : forall d a b. String -> (Writable a)^d -> (a -> (b, a)) ->{Write;} b
+let modify_at place atom f = Write.modify place atom f
+
+/// The value of the state `atom` now, in a task: a task reads without
+/// depending on what it read.
+current : forall d a. (Writable a)^d ->{Write;} a
+let current atom = Write.current (readonly atom)
+
+/// Computes `atom` again: a task atom runs its task anew.
+refresh : forall d a. (Atom a)^d ->{Write;} Unit
+let refresh atom = Write.refresh atom
+
+/// The result of a task an atom runs: still loading, loaded, or failed.
+type Async a (e : ErrorRow) = Loading | Loaded a | Failed (Failure e)
+
+/// An atom of the result of `task`, run by the registry that first reads
+/// it and run anew by `Atom.refresh`. A view reads it like any
+/// atom and matches its three cases.
+task : Eff none e a -> Atom (Async a e)
+foreign pure task from "@flick-lang/runtime" "atomTask"
+
+/// A task atom that a `mutation` of one of `keys` runs anew, in the
+/// registry where it succeeds: the list of orders a placed order changes.
+query : List String -> Eff none e a -> Atom (Async a e)
+foreign pure query from "@flick-lang/runtime" "atomQuery"
+  arity 2
+
+/// The task atom of `load` of the route's value, run anew when the route
+/// changes: a page's data. Made serializable, the result a server loaded
+/// for the requested URL is where the client starts.
+loader : forall d r e a. (Writable r)^d -> (r -> Eff none e a) -> (Atom (Async a e))^d
+foreign pure loader from "@flick-lang/runtime" "atomLoader"
+  arity 2
+  retention call
+
+/// The latest element of `stream`, `Loading` until the first; a
+/// `mutation` of one of `keys` starts it anew. It has no mutation of its
+/// own: what changes it comes through the stream.
+query_stream : List String -> Stream.Core.Stream none e a -> Atom (Async a e)
+foreign pure query_stream from "@flick-lang/runtime" "atomQueryStream"
+  arity 2
+
+/// `f`, after which, when it succeeds, every `query` of one of `keys` the
+/// registry reads runs anew: `let place = Atom.mutation ["orders"] Shop.place`.
+mutation : forall p r e s. List String -> (p ->{r; e} s) -> p ->{Write | r; e} s
+foreign effect mutation from "@flick-lang/runtime" "atomMutation"
+  arity 3
+
+/// What `ready` does while a task loads: a view of `Ui.suspended` shows
+/// its fallback, any other reader fails.
+pending : Unit ->{} a
+foreign effect pending from "@flick-lang/runtime" "atomPending"
+
+/// The value of a loaded task atom, its failure as an error of `e`. Read
+/// in a view of `Ui.suspended`, which shows its fallback while the task
+/// loads and its failure view when it failed.
+ready : Atom (Async a e) ->{Read; e} a
+let ready atom =
+  match get atom with
+  | Loaded value -> value
+  | Failed failure -> Failure.rethrow failure
+  | Loading -> pending ()
+
+/// The task atom `atom`, whose loaded value `wire` codes so a server can
+/// hand it to the client: the client starts from it instead of running
+/// the task again. One still loading or failed is not handed over. Its key
+/// is the name of the top-level binding it defines, as for `serializable`.
+serializable_task : PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
+let serializable_task wire atom = serializable_task_at "Atom.serializable_task" wire atom
+
+/// `serializable_task` under the key the compiler gives.
+serializable_task_at : String -> PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
+foreign pure serializable_task_at from "@flick-lang/runtime" "atomSerializableTask"
+
+/// `serializable_task` whose failure of one typed error, coded by
+/// `error_wire`, is handed over too: the client shows the server's
+/// `NotFound` instead of asking again. A defect or an interruption is never
+/// handed over, so no stack or secret leaves the server; the client runs
+/// the task again.
+serializable_result :
+  PureCodec Json a -> PureCodec Json x -> Atom (Async a {x | none}) -> Atom (Async a {x | none})
+let serializable_result wire error_wire atom =
+  serializable_result_at "Atom.serializable_result" wire error_wire atom
+
+/// `serializable_result` under the key the compiler gives.
+serializable_result_at :
+  String ->
+  PureCodec Json a ->
+  PureCodec Json x ->
+  Atom (Async a {x | none}) ->
+  Atom (Async a {x | none})
+foreign pure serializable_result_at from "@flick-lang/runtime" "atomSerializableResult"
+
+/// Atoms by key: `at family key` makes the atom of `key` the first time
+/// and gives the same one for every equal key after, so a view takes the
+/// atoms of its items from a family, not from `make` while it renders. Keys
+/// compare by `Eq` and `Hash`, so a key holds no function. A family holds
+/// its atoms weakly: a state stays while a registry keeps its value, until
+/// `forget` lets it go.
+type Family k a
+
+/// The family of the atoms `f` makes.
+family : Hash k => (k -> a) -> Family k a
+foreign pure family from "@flick-lang/runtime" "atomFamily"
+  arity 1
+
+/// The atom of `key`, made by the family's function the first time.
+at : Family k a -> k -> a
+foreign pure at from "@flick-lang/runtime" "atomAt"
+  arity 2
+
+/// Forgets the atom of `key`: the next `at` makes a new one, and the
+/// registry drops the old state's value once no view reads it. Forget the
+/// key of an item the program deletes, or its state stays as long as the
+/// registry does.
+forget : Family k a -> k ->{Write;} Unit
+foreign effect forget from "@flick-lang/runtime" "atomForget"
+  arity 2
