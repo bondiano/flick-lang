@@ -26,5 +26,5 @@ The first public release.
 - **Editors:** VS Code and Zed extensions and a tree-sitter grammar in
   [`editors/`](./editors/README.md).
 - **Documentation:** the guide, reference and specification at
-  [flick-lang.dev](https://flick-lang.dev) with an in-browser playground,
+  [bondiano.github.io/flick-lang](https://bondiano.github.io/flick-lang/) with an in-browser playground,
   and the formal semantics with Lean proofs in [`formal/`](./formal/README.md).

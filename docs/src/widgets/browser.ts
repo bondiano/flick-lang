@@ -1,6 +1,9 @@
 // Platform/compiler interop only. Widget state and event policies live in Flick.
 export const isRussian = (): boolean => document.documentElement.lang === "ru";
 
+// The site path of the locale, under the deployment base.
+export const localePrefix = (ru: boolean): string => `${import.meta.env.BASE_URL.replace(/\/$/, "")}${ru ? "/ru" : ""}`;
+
 export const preferences = () => ({
   ru: isRussian(),
   dark: document.documentElement.dataset.theme === "dark",
@@ -35,7 +38,7 @@ let index: Promise<SearchIndex> | undefined;
 
 export const search = async (query: string) => {
   // The production-only Pagefind module does not exist in source, so a static import cannot resolve it.
-  const path = "/pagefind/pagefind.js";
+  const path = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/pagefind/pagefind.js`;
   const pagefind = await (index ??= import(/* @vite-ignore */ path).then((module: SearchModule) => {
     // shortcut: Pagefind 1.5 gives blob workers relative URLs; re-enable workers when its initializer preserves absolute paths.
     return module.createInstance({ noWorker: true });

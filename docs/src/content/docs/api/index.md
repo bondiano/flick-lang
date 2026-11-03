@@ -7,7 +7,7 @@ Use this index when you need an exact rule, a signature or a tool's contract. Th
 
 Flick is an ML-family language that compiles to JavaScript on Effect. Its language types, built-in modules and runtime adapter are related, but they are not interchangeable API layers. In particular, a Flick runtime arrow describes services and expected errors; it is not a JavaScript `Promise` signature.
 
-To experiment before looking up a rule, open [Play](/play/) or compare source and generated JavaScript in [Transpile](/transpile/). For a local application, start with [Getting started](../start/getting-started/).
+To experiment before looking up a rule, open [Play](../play/) or compare source and generated JavaScript in [Transpile](../transpile/). For a local application, start with [Getting started](../start/getting-started/).
 
 ## Language
 

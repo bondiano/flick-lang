@@ -1,7 +1,8 @@
 ---
 const { label = "Flick home" } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
-<a class="flick-brand" href={Astro.props.href ?? "/"} aria-label={label}>
-  <img class="brand-light" src="/flick-wordmark.svg" width="600" height="240" alt="" aria-hidden="true" />
-  <img class="brand-dark" src="/flick-wordmark-dark.svg" width="600" height="240" alt="" aria-hidden="true" />
+<a class="flick-brand" href={Astro.props.href ?? `${base}/`} aria-label={label}>
+  <img class="brand-light" src={`${base}/flick-wordmark.svg`} width="600" height="240" alt="" aria-hidden="true" />
+  <img class="brand-dark" src={`${base}/flick-wordmark-dark.svg`} width="600" height="240" alt="" aria-hidden="true" />
 </a>

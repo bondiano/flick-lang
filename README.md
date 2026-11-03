@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://flick-lang.dev">Documentation</a> ·
+  <a href="https://bondiano.github.io/flick-lang/">Documentation</a> ·
   <a href="./docs/src/content/docs/learn/index.md">Learn</a> ·
   <a href="./docs/src/content/docs/start/getting-started.md">Get started</a> ·
   <a href="./examples/">Examples</a> ·

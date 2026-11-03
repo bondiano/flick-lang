@@ -5,7 +5,7 @@ description: The compiler, Effect-based runtime, browser compiler, web integrati
 
 Flick is an ML-family language that compiles to JavaScript on Effect, or to a standalone Go executable (see [Go target](../reference/codegen/#go-target)). It is not a replacement JavaScript runtime or a replacement for Effect: the compiler checks Flick programs, generated ES modules use the Flick runtime adapter, and that adapter builds on Effect.
 
-You can explore the language in [Play](/play/) and inspect generated JavaScript in [Transpile](/transpile/). For exact signatures and contracts, use the [API & reference index](../api/).
+You can explore the language in [Play](../play/) and inspect generated JavaScript in [Transpile](../transpile/). For exact signatures and contracts, use the [API & reference index](../api/).
 
 ## What is available, and where?
 
@@ -47,7 +47,7 @@ flick build
 
 `flick-wasm` exposes checking, compilation preview and a build result containing JavaScript modules and diagnostics. It uses the shared compiler core, with built-in library sources available to the compiler. Its browser host represents one source module, not a local project's file system or installed npm dependency tree.
 
-[Play](/play/) is the place to try supported browser examples; [Transpile](/transpile/) is the place to inspect generated JavaScript. Compilation and execution are different steps: compiling to JavaScript does not make Node.js filesystem APIs, a PostgreSQL connection or arbitrary foreign packages available in a browser. The repository's `just docs-wasm` task builds the compiler and its browser bindings for the documentation site.
+[Play](../play/) is the place to try supported browser examples; [Transpile](../transpile/) is the place to inspect generated JavaScript. Compilation and execution are different steps: compiling to JavaScript does not make Node.js filesystem APIs, a PostgreSQL connection or arbitrary foreign packages available in a browser. The repository's `just docs-wasm` task builds the compiler and its browser bindings for the documentation site.
 
 ## Runtime and the Effect foundation
 

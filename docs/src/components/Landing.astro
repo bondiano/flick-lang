@@ -12,7 +12,9 @@ import { initial_view } from "../widgets/Hero.fl";
 
 const { locale = "en" } = Astro.props;
 const ru = locale === "ru";
-const prefix = ru ? "/ru" : "";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const origin = Astro.site?.origin ?? "";
+const prefix = `${base}${ru ? "/ru" : ""}`;
 const text = (en: string, russian: string) => ru ? russian : en;
 const title = text("Flick — Less ceremony. More effect.", "Flick — ML-язык на основе Effect");
 const description = text("An ML-family language with higher-kinded types, typed effects and regions, compiled to JavaScript on Effect. Learn Flick and try it in your browser.", "Flick — язык семейства ML с типами высших порядков, типизированными эффектами и проверкой времени жизни ресурсов. Компилируется в JavaScript и использует Effect.");
@@ -36,27 +38,27 @@ const sections = [
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={`https://flick-lang.dev${prefix}/`} />
-    <link rel="alternate" hreflang="en" href="https://flick-lang.dev/" />
-    <link rel="alternate" hreflang="ru" href="https://flick-lang.dev/ru/" />
+    <link rel="canonical" href={`${origin}${prefix}/`} />
+    <link rel="alternate" hreflang="en" href={`${origin}${base}/`} />
+    <link rel="alternate" hreflang="ru" href={`${origin}${base}/ru/`} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content={`https://flick-lang.dev${prefix}/`} />
+    <meta property="og:url" content={`${origin}${prefix}/`} />
     <meta property="og:site_name" content="Flick" />
     <meta property="og:locale" content={locale} />
-    <meta property="og:image" content="https://flick-lang.dev/social.png" />
+    <meta property="og:image" content={`${origin}${base}/social.png`} />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Flick" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://flick-lang.dev/social.png" />
+    <meta name="twitter:image" content={`${origin}${base}/social.png`} />
     <meta name="twitter:image:alt" content="Flick" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
-    <link rel="preload" href={ru ? "/fonts/geist-cyrillic.woff2" : "/fonts/geist-latin.woff2"} as="font" type="font/woff2" crossorigin />
+    <link rel="icon" type="image/x-icon" href={`${base}/favicon.ico`} sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+    <link rel="apple-touch-icon" href={`${base}/apple-touch-icon.png`} sizes="180x180" />
+    <link rel="preload" href={`${base}/fonts/geist-${ru ? "cyrillic" : "latin"}.woff2`} as="font" type="font/woff2" crossorigin />
     <ThemeInit />
   </head>
   <body class="flick-home">

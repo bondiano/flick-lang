@@ -228,7 +228,7 @@ let tests =
 
 Набор сквозных тестов один раз запускает то, что им нужно, например базу
 в контейнере, и шлёт запросы в собственный роутер сервера через
-`HttpApi.Inject.call` (см. [HttpApi](/ru/reference/http-api/#клиенты-и-документы)):
+`HttpApi.Inject.call` (см. [HttpApi](../http-api/#клиенты-и-документы)):
 
 ```flick
 let services = Layer.merge Postgres.layer (Layer.merge (Server.keys "test") Crypto.system)

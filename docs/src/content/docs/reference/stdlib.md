@@ -219,7 +219,7 @@ let tests =
 
 A suite of end-to-end tests starts what they need once, such as a database
 in a container, and sends requests to the server's own router with
-`HttpApi.Inject.call` (see [HttpApi](/reference/http-api/#clients-and-documents)):
+`HttpApi.Inject.call` (see [HttpApi](../http-api/#clients-and-documents)):
 
 ```flick
 let services = Layer.merge Postgres.layer (Layer.merge (Server.keys "test") Crypto.system)

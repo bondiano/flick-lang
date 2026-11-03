@@ -15,6 +15,10 @@ foreign async search from "./browser.ts" "search"
   arity 1
   catch JsError.from_js
 
+locale_prefix : Bool -> String
+foreign pure locale_prefix from "./browser.ts" "localePrefix"
+  arity 1
+
 close_search : Unit ->{} Unit
 foreign sync close_search from "./browser.ts" "closeSearch"
   arity 0
@@ -51,7 +55,7 @@ let hit result = ui {
 
 view : Atom.Writable Model -> Model -> Ui
 let view model m =
-  let prefix = if m.ru then "/ru" else ""
+  let prefix = locale_prefix m.ru
   ui {
     div { class_name = "search-widget" } [
       div { class_name = "search-heading" } [

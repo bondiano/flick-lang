@@ -137,7 +137,7 @@ type alias Users = {
   derives `Url`, declared in another module, with the type of each
   parameter in place of a value: `Post (Profiles Username (Some Follow))`
   is `/profiles/:username/follow` (see
-  [Routes as the paths of an API](/reference/route/#routes-as-the-paths-of-an-api)).
+  [Routes as the paths of an API](../route/#routes-as-the-paths-of-an-api)).
 - The success is sent with 200, `Created a` with 201, and `Unit` with 204
   and no body.
 - A part or a success is decoded by the value named after its type in snake

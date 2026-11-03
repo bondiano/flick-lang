@@ -9,12 +9,13 @@ import { shell } from "../widgets/Controls.fl";
 
 const route = Astro.props.locale === undefined ? Astro.locals.starlightRoute : undefined;
 const ru = Astro.props.locale === "ru" || route?.lang === "ru";
-const prefix = ru ? "/ru" : "";
-const current = Astro.url.pathname;
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const prefix = `${base}${ru ? "/ru" : ""}`;
+const current = Astro.url.pathname.slice(base.length) || "/";
 const unlocalized = current.replace(/^\/ru(?=\/|$)/, "") || "/";
 const notFound = route?.entry.id === "404";
-const english = notFound ? "/" : unlocalized;
-const russian = notFound ? "/ru/" : `/ru${unlocalized === "/" ? "/" : unlocalized}`;
+const english = `${base}${notFound ? "/" : unlocalized}`;
+const russian = notFound ? `${base}/ru/` : `${base}/ru${unlocalized === "/" ? "/" : unlocalized}`;
 const links = [
   [ru ? "Изучение" : "Learn", "/learn/"], [ru ? "Руководства" : "Guides", "/guides/"], [ru ? "Справочник" : "API", "/api/"], [ru ? "Экосистема" : "Ecosystem", "/ecosystem/"],
 ];
