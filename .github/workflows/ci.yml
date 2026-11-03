@@ -50,11 +50,12 @@ jobs:
         run: nix flake check --all-systems --no-build
       - name: Build the package and its tests
         run: nix build .#flick --no-link
+      # the std of this checkout, as a released compiler would fetch it by tag
       - name: Smoke-test the binary
         run: |
           out=$(nix build .#flick --no-link --print-out-paths)
           "$out/bin/flick" --version
-          "$out/bin/flick" --project examples/first-slice check
+          FLICK_STD_PATH="$PWD/packages/std" "$out/bin/flick" --project examples/first-slice check
       - name: Dev shell versions
         run: |
           nix develop --command bash -euo pipefail -c '
