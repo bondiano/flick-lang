@@ -140,17 +140,14 @@ sibling's does:
 count : Atom.Writable Float
 let count = Atom.make 0
 
-counter_view : Ui.View Unit
-let counter_view =
-  Ui.view (fun () ->
-    ui {
-      button
-        {
-          disabled = false;
-          on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
-        }
-        [text (Atom.value count |> show)]
-    })
+component counter_view () = ui {
+  button
+    {
+      disabled = false;
+      on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
+    }
+    [text (Atom.value count |> show)]
+}
 ```
 
 `Ui.render view props` places a view in a `Ui`. The compiler names each
@@ -345,13 +342,11 @@ user : Atom.Atom (Atom.Async String {Offline})
 let user = Atom.task (task { fetch_name () })
 
 // matching the three cases by hand
-user_view : Ui.View Unit
-let user_view =
-  Ui.view (fun () ->
-    match Atom.get user with
-    | Atom.Loading -> ui { text "…" }
-    | Atom.Loaded name -> ui { text name }
-    | Atom.Failed _ -> ui { text "offline" })
+component user_view () =
+  match Atom.get user with
+  | Atom.Loading -> ui { text "…" }
+  | Atom.Loaded name -> ui { text name }
+  | Atom.Failed _ -> ui { text "offline" }
 
 // the same with `Ui.awaiting`, rendered as `Ui.render awaited user`
 awaited : Ui.View (Atom.Atom (Atom.Async String {Offline}))

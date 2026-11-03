@@ -7,6 +7,15 @@ description: Установите инструменты, создайте пр�
 и pnpm. Скачайте архив `flick` для своей платформы со страницы
 [релизов](https://github.com/bondiano/flick-lang/releases) или соберите
 компилятор из исходников по разделу [Экосистема](../../ecosystem/).
+В архиве один исполняемый файл `flick`; добавьте его в `PATH`:
+
+```sh
+tar -xzf flick-x86_64-unknown-linux-gnu.tar.gz
+install -m 755 flick ~/.local/bin/
+flick --version
+```
+
+В Windows распакуйте `.zip` и добавьте каталог с `flick.exe` в `PATH`.
 
 Flick создаёт ES-модули JavaScript. Они используют среду выполнения Flick
 и Effect 4.1.2; зависимости устанавливаются через pnpm.
@@ -20,15 +29,21 @@ flick run
 ```
 
 `flick new` создаёт `flick.toml`, `package.json` с закреплёнными версиями
-среды выполнения и Effect, а также `src/App/Main.fl`:
+среды выполнения и Effect, `src/App/Main.fl`, импортируемый им модуль
+`src/App/Greeting.fl` и его тест `test/App/GreetingTest.fl`:
 
 ```flick
 module App.Main exposing (main)
 
+import App.Greeting exposing (greet)
+
 main : Unit ->{; AppError} Unit
 let main () =
-  Platform.stdout_line "Hello from Flick"
+  let name = Platform.args () |> List.head |> Option.with_default "world"
+  Platform.stdout_line (greet name)
 ```
+
+`flick run -- Ada` выводит `Hello, Ada!`.
 
 Для проверки типов без запуска выполните `flick check`. Команда
 `flick build` сохраняет JavaScript в `dist/`, а `flick test` запускает

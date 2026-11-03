@@ -30,7 +30,7 @@ export const sidebar = [
   {
     label: "Specification",
     translations: { ru: "Спецификация" },
-    items: [{ slug: "spec" }, { autogenerate: { directory: "spec" } }],
+    items: [{ autogenerate: { directory: "spec" } }],
   },
   {
     label: "Ecosystem",

@@ -12,7 +12,7 @@ title: "Покрытие Effect"
 ## Снимок
 
 `stdlib/Effect/snapshot.json` описывает API установленной версии Effect.
-Снимок записывается командой `node tools/dts-importer/surface.mjs > stdlib/Effect/snapshot.json`
+Снимок записывается командой `node tools/dts-importer/index.mjs surface > stdlib/Effect/snapshot.json`
 и содержит все точки входа из её `package.json`. Для девяти оборачиваемых
 точек входа в нём перечислены все экспорты каждого модуля в виде `Module.name`.
 У каждого экспорта указаны категория (`value`, `type` или `value+type`)

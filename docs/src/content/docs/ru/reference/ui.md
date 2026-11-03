@@ -156,17 +156,14 @@ let example = ui { div { class_name = "badges" } [badge { label = "new" }] }
 count : Atom.Writable Float
 let count = Atom.make 0
 
-counter_view : Ui.View Unit
-let counter_view =
-  Ui.view (fun () ->
-    ui {
-      button
-        {
-          disabled = false;
-          on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
-        }
-        [text (Atom.value count |> show)]
-    })
+component counter_view () = ui {
+  button
+    {
+      disabled = false;
+      on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
+    }
+    [text (Atom.value count |> show)]
+}
 ```
 
 `Ui.render view props` вставляет представление в `Ui`. Компилятор даёт
@@ -368,13 +365,11 @@ user : Atom.Atom (Atom.Async String {Offline})
 let user = Atom.task (task { fetch_name () })
 
 // три случая вручную
-user_view : Ui.View Unit
-let user_view =
-  Ui.view (fun () ->
-    match Atom.get user with
-    | Atom.Loading -> ui { text "…" }
-    | Atom.Loaded name -> ui { text name }
-    | Atom.Failed _ -> ui { text "offline" })
+component user_view () =
+  match Atom.get user with
+  | Atom.Loading -> ui { text "…" }
+  | Atom.Loaded name -> ui { text name }
+  | Atom.Failed _ -> ui { text "offline" }
 
 // то же через `Ui.awaiting`, рендер — `Ui.render awaited user`
 awaited : Ui.View (Atom.Atom (Atom.Async String {Offline}))
@@ -521,7 +516,7 @@ let main () =
 не нужен `react-dom`. Для DOM используются `Ui.Dom.mount` и `Ui.Dom.container`;
 алиасов этих функций в `Ui` нет.
 
-<div id="серверное-представление-при-открытии"></div>
+## Серверное представление при открытии
 
 `Ui.Server.render ui` возвращает разметку `ui`; представления читают атомы
 из предоставленного реестра. Создавайте для каждого запроса собственный
@@ -704,6 +699,8 @@ HTML-конструкторы остаются привязанными к DOM: 
 компоненты через `Ui.component`. Адаптер рендерера без DOM не должен
 импортировать DOM-подпуть.
 
+## Атомы, а не программа TEA
+
 Состояние интерфейса Flick хранится в атомах: представление строится
 из атомов, которые читает, а обработчик — задача под управлением
 супервизора, которая их изменяет. Цикла `Msg → update` нет и он
@@ -728,7 +725,7 @@ HTML-конструкторы остаются привязанными к DOM: 
 В Flick обновления объединяет React 19, но он не гарантирует расписания
 по кадрам анимации, как у Elmish.
 
-<div id="выполненные-оптимизации-и-свидетельства"></div>
+### Выполненные оптимизации и свидетельства
 
 - Представление перерисовывается только при изменении прочитанного атома.
   React 19 объединяет ожидающие рендеры, а не фиксирует изменения синхронно

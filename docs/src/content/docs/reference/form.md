@@ -36,14 +36,15 @@ let check_name =
   })
 
 page : Ui
-let page =
-  Ui.fragment
+let page = ui {
+  fragment
     [
       Form.input signup Signup.fields.name "Name" (Some check_name),
       Form.input signup Signup.fields.age "Age" None,
       Form.input signup Signup.fields.nick "Nickname" None,
-      Ui.button { disabled = false; on_click = send } [Ui.text "Send"],
+      button { disabled = false; on_click = send } [text "Send"],
     ]
+}
 ```
 
 ## What a type derives
