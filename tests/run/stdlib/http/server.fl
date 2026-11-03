@@ -96,7 +96,8 @@ let seen request =
 /// network for `/forwarded/loopback`, another network otherwise.
 forwarded : ServerRequest ->{RouteContext;} ServerResponse
 let forwarded request =
-  let proxies = if Http.Router.param "by" == Some "loopback" then ["127.0.0.0/8"] else ["10.0.0.0/8"]
+  let proxies =
+    if Http.Router.param "by" == Some "loopback" then ["127.0.0.0/8"] else ["10.0.0.0/8"]
   Http.Middleware.x_forwarded_headers proxies seen request
 
 broken : ServerRequest ->{; Boom} ServerResponse
