@@ -229,6 +229,8 @@ Now the adapter owns a nominal type and can give it canonical instances. `unboxe
 
 Ownership is determined by the **package** (`FLICK-C006`): an instance can be declared by the package of the class or by the package of the external nominal constructor of the **first parameter of the head**. A transparent alias and a structural record do not create an owner. For MPTC, ownership of only a later parameter is not enough: the package of `LocalEmail` does not get the right to declare a foreign `Convert String LocalEmail`. For that, an explicit codec/dictionary, a wrapper of the first parameter or an instance at the owner of the class is needed. A binding does not change the identity of a foreign type.
 
+A package is a project or one of the libraries it compiles from their sources (a path, git or url dependency, or an npm package with `source-dir`); the core modules and `std` are one package, the built-in one. An instance is visible wherever its class and its head type are: a library's instances come with it into every dependent, and two libraries that each own one side cannot both declare the instance, since only the owner of the class or of the first type may. So every program sees at most one instance for each head, whichever libraries it combines.
+
 The set of instances a module sees is determined by its dependency graph, not by the order or form of `import`; conflicts are diagnosed when the whole accessible graph is checked.
 
 ## Generalization in the presence of Ref
