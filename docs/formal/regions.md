@@ -236,7 +236,7 @@ for each occurrence αᵢ^D in τ:   ⌈τᵢ⌉ ⊆ D[c̄ := C̄]
 Γ ⊢ x : τ[ᾱ := τ̄, c̄ := C̄] ! P
 ```
 
-A value bound bounds the whole substituted value. `a^{}` with `a := File s` is rejected at the call site: `FLICK-G001` "the expected type `File s` holds no captures" (probe p90).
+A value bound bounds the whole substituted value. `a^{}` with `a := File s` is rejected at the call site: `FLICK-G001` "the expected type `File s` holds no captures".
 
 Checker: `unify.rs` `Checker::instantiate`; the bound condition is a `Hold` from `subsume_bound` with `Visible::Now`; `Outlives` constraints are `classes/mod.rs` `want`.
 
@@ -302,7 +302,7 @@ Checker:
 - (Err-Decl): `services.rs` `check_error_payload`, `live_part` (`FLICK-E005`);
 - (Err-Raise): `effects.rs` `perform` puts the error row of each call into `regions.raised`, and `regions/solve.rs` `check_raised` looks for the region of the `scope` in it (`FLICK-E005`).
 
-A signature region in the error row is not checked: `∀s. File s →R⟨none; {Wrapped (File s)}⟩ Unit` is accepted. Each call site inside a `scope` substitutes the region of that `scope` and is checked (probes p5, p5b: `FLICK-E005` at the call), so at the level of a program this is equivalent to (Err-Raise).
+A signature region in the error row is not checked: `∀s. File s →R⟨none; {Wrapped (File s)}⟩ Unit` is accepted. Each call site inside a `scope` substitutes the region of that `scope` and is checked (`FLICK-E005` at the call), so at the level of a program this is equivalent to (Err-Raise).
 
 ### 2.6 Qualifier inference and generalization
 
@@ -311,7 +311,7 @@ A qualifier without an expected type is a variable of kind `CRow`. Each `Hold` o
 - A variable at a level outside a `scope` does not accept the region of that `scope`. Such a constraint stays unsatisfied and yields `FLICK-G002`.
 - An obligation with a written bound reports `FLICK-G001`.
 
-Generalization (`core.md` §2.5) does not quantify the variables of a value whose obligation is still open. Otherwise `let f = fun () -> use h` would get `∀c. (Unit → Unit)^c`, and instantiating `c := ∅` would erase the capture (probe p4: `FLICK-G002`).
+Generalization (`core.md` §2.5) does not quantify the variables of a value whose obligation is still open. Otherwise `let f = fun () -> use h` would get `∀c. (Unit → Unit)^c`, and instantiating `c := ∅` would erase the capture (`FLICK-G002`).
 
 A local signature need not name the regions its function holds: the outer qualifier is inferred. The qualifiers of later stages added by `implicit_captures` are written bounds ([local signatures](#local-signatures-infer-only-the-outer-qualifier)).
 
@@ -445,13 +445,13 @@ The table of spec/05 "Static regions and captures": the model rule, the countere
 | Path | Rule | Counterexample | Check |
 | - | - | - | - |
 | Direct result, nested record or ADT | (Scope): `s ∉ fr(τ)`; ⌈·⌉ is transitive over arguments | `scope { File.open_scoped path }`, `Wrapper (File s)`, a record with a closure | `escape.fl` `result`, `wrapper`, `in_record` (`FLICK-G002`) |
-| Closure or `Eff` | (Lam), (Task), (≤-Cap); generalization does not quantify an open obligation | `bad_callback`, `bad_deferred`; `let f = fun () -> use h` after `scope`; a task that hides a capture behind the region of its result or row | `escape.fl` `bad_callback`, `bad_deferred` (`FLICK-G001`); `eff_result.fl` ([reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result)); probes p4, p4b |
-| Passing, including through a contravariant parameter | (≤-Cap) on the whole value | a callback with a bare parameter as `((Unit → Unit)^{s} → Unit)`; a closure with `s` in its parameter as a bare parameter | probes p33, p34, p92, p93 (`FLICK-G001`/`G002`) |
+| Closure or `Eff` | (Lam), (Task), (≤-Cap); generalization does not quantify an open obligation | `bad_callback`, `bad_deferred`; `let f = fun () -> use h` after `scope`; a task that hides a capture behind the region of its result or row | `escape.fl` `bad_callback`, `bad_deferred` (`FLICK-G001`); `eff_result.fl` ([reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result)); a probe |
+| Passing, including through a contravariant parameter | (≤-Cap) on the whole value | a callback with a bare parameter as `((Unit → Unit)^{s} → Unit)`; a closure with `s` in its parameter as a bare parameter | probes (`FLICK-G001`/`G002`) |
 | Module interfaces | a top-level signature is mandatory for functions and is checked as written; `.iface` stores qualifiers | a call of `reader` from another module that escapes the `scope` | `tests/check/projects/regions` (`FLICK-G001`, `FLICK-G002`); outside the Lean model, which has no modules (`core.md` §2.6) |
-| Existential and opaque packaging | (Con), (Proj) | `Sealed (File s)`; `opaque type Sealed = Sealed (Unit ->{} Unit)` around a closure over `h` | `escape.fl` `sealed`; probe p20 (`FLICK-G002`) |
+| Existential and opaque packaging | (Con), (Proj) | `Sealed (File s)`; `opaque type Sealed = Sealed (Unit ->{} Unit)` around a closure over `h` | `escape.fl` `sealed`; a probe (`FLICK-G002`) |
 | Write to an outer `Ref` or cache | invariance of `Ref (α^c)`; the cell type is closed at allocation | `Ref.set cell (Some file)`; `Ref (Unit ->{} String)` against `Ref ((Unit ->{} String)^{s})`; a top-level atom | `escape.fl` `outer_cell`, `outer_callback`; `qualifiers.fl` `invariant` (`FLICK-T003`); `ref_capacity.fl`; `instance.fl` |
-| Error, `Exit`, diagnostics | (Err-Decl), (Err-Raise); `Failure`, `RawCause` are inert | `Wrapped file` under `try` inside `scope`; `type error Leak (s : Region)`; a generic `boom : ∀a. a →R⟨none;{Wrapped a}⟩ Unit` with a handle | `escape.fl` `raised`; `qualifiers.fl` `Leak` (`FLICK-E005`); probe p5 |
-| Child and finalizer | (Spawn), §2.4 | a child of an outer owner holds an inner region; a given `c` without `Outlives` | `qualifiers.fl` `spawn_outer`, `spawn_given` (`FLICK-G003`); `retention.fl` ([owner retention](#owner-retention-requires-outlives)); `children.fl` ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)); probe p53 |
+| Error, `Exit`, diagnostics | (Err-Decl), (Err-Raise); `Failure`, `RawCause` are inert | `Wrapped file` under `try` inside `scope`; `type error Leak (s : Region)`; a generic `boom : ∀a. a →R⟨none;{Wrapped a}⟩ Unit` with a handle | `escape.fl` `raised`; `qualifiers.fl` `Leak` (`FLICK-E005`); a probe |
+| Child and finalizer | (Spawn), §2.4 | a child of an outer owner holds an inner region; a given `c` without `Outlives` | `qualifiers.fl` `spawn_outer`, `spawn_given` (`FLICK-G003`); `retention.fl` ([owner retention](#owner-retention-requires-outlives)); `children.fl` ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)); a probe |
 | A layer service in a child of an outer owner | (Spawn-Svc), (Provided), §2.7 | `Fiber.spawn outer` or `Scope.add_finalizer` of an outer region from inside a `provide` with a layer service ([provide services must not outlive their layer](runtime.md#a-provide-service-outlives-the-release-of-its-layer)) | `provide_escape.fl` (`FLICK-G003`); path 10 of the model's program generator (`flick-model/src/generate/provides.rs`) |
 | Foreign call | G4: the signature is a retention contract; what is retained under `retention owner` requires `Outlives` (`FLICK-F002`) | an acquired value outside its `scope`, including through a generic function; a lease value from `use` | `acquired.fl` ([acquired values](#acquired-values-carry-their-region), [value bounds](#a-value-bound-survives-an-unknown-type-position)), `leases.fl` ([leases](#leases-instead-of-early-close)), `fail/ffi/owner_retention.fl` |
 
@@ -795,7 +795,7 @@ Divergence: `⌈Errors ρ⌉ = ∅` contradicted `Errors {E} ≡ E`.
 
 Divergence: the premise `τᵢ' ≤ τᵢ` of (Con), read with (≤-Cap), would reject a hidden field.
 
-- Symptom: in `Sealed (fun () -> use h)` the field is declared as bare `Unit ->{} Unit`. (≤-Cap) on the whole value (§2.2) requires `{s} ⊆ ∅`, and (Con) does not derive. The table of §4 (probe p20) and the checker accept the constructor and reject only the escape from the `scope` by `⌈Sealed^C⌉ ∋ s`.
+- Symptom: in `Sealed (fun () -> use h)` the field is declared as bare `Unit ->{} Unit`. (≤-Cap) on the whole value (§2.2) requires `{s} ⊆ ∅`, and (Con) does not derive. The table of §4 and the checker accept the constructor and reject only the escape from the `scope` by `⌈Sealed^C⌉ ∋ s`.
 - Imprecise document. Resolution: the premise of (Con) reads as `≤` without the field qualifier: the capture of the field value goes into the data's `C`, which is what the last premise requires. The model checks a field with hidden storage against `τᵢ^{c}` with a fresh `c` (`regions/mod.rs` `construct`); the checker's constructor schemes state the same explicitly: `Some : ∀a c. a^{≤c} → (Option a)^{c}`.
 
 ### A bounded variable reaches what the variable reaches

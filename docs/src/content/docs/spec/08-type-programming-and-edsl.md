@@ -92,7 +92,7 @@ Props are exact records: a missing field, an unknown one or a wrong type is an e
 
 ### Atoms, views and components
 
-State lives in atoms: `Atom.make value` is a state, `Atom.derived` an atom computed from the atoms it reads, and `Atom.set`/`Atom.update` write through the service `Atom.Write`. A view (`Ui.view`, of type `Ui.View p`) is a component whose render reads atoms through `Atom.Read` and renders again only when an atom it read changes. A render is a Sync stage: a write, another service or an error in it is `FLICK-U004`. Nothing is made while rendering: an atom, an action or a view made in a render is `FLICK-U006`.
+State lives in atoms: `Atom.make value` is a state, `Atom.derived` an atom computed from the atoms it reads, and `Atom.set`/`Atom.update` write through the service `Atom.Write`. A view (a `component`, of type `Ui.View p`) is a component whose render reads atoms through `Atom.Read` and renders again only when an atom it read changes. A render is a Sync stage: a write, another service or an error in it is `FLICK-U004`. Nothing is made while rendering: an atom, an action or a view made in a render is `FLICK-U006`.
 
 `component name (props : P) = body` declares a view of type `Ui.View P`, which `Ui.render name props` places. The body is a block: its last expression is the render, run again whenever an atom it read or its props change; the statements before it are the setup of each instance, run once when the instance mounts with the service `Setup s` of the instance's region. `Atom.local` makes an atom of the instance there, and the `Action` makers its actions.
 

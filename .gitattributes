@@ -1,9 +1,6 @@
 stdlib/Effect/snapshot.json linguist-generated=true
-tools/dts-importer/test/fixtures/**/*.snapshot.json linguist-generated=true
 tools/dts-importer/test/fixtures/*.snapshot.json linguist-generated=true
 runtime/test/fixtures/openapi-3.1.schema.json linguist-vendored=true
-# Impeccable generates self-contained specimens in one schema-v2 sidecar.
-.impeccable/design.json linguist-generated=true
 tests/run/portable.txt merge=union
 # corpora tools/go-unicode/graphemes.mjs and tools/go-collate/gen.mjs write from Node
 runtime-go/flickrt/testdata/graphemes.txt linguist-generated=true

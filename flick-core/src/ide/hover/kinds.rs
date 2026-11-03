@@ -1,3 +1,5 @@
+use std::ptr;
+
 use super::{Ide, as_written, tree};
 use crate::source::FileId;
 use crate::syntax::kind::SyntaxKind as K;
@@ -85,10 +87,7 @@ impl Ide<'_> {
         let word = token.text(self.text(file));
         let (code, note) = if word == "Row"
             && path.iter().any(|n| {
-                n.kind == K::AppType
-                    && n.nodes()
-                        .next()
-                        .is_some_and(|head| std::ptr::eq(head, *name))
+                n.kind == K::AppType && n.nodes().next().is_some_and(|head| ptr::eq(head, *name))
             }) {
             ("Row k".to_owned(), ROW_KIND_DESCRIPTION)
         } else {

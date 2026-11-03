@@ -1,6 +1,6 @@
 module Search exposing (main)
 
-import Elements exposing (attributes, icon, route)
+import Elements exposing (attributes, route)
 import JsError exposing (JsError(..))
 
 type alias Hit = { title : String; excerpt : String; url : String }
@@ -62,10 +62,10 @@ let view model m =
           [("aria-label", if m.ru then "Закрыть поиск" else "Close search")]
           (button
             { disabled = false; on_click = Ui.Event.latest (fun _ -> task { close_search () }) }
-            [icon "close"]),
+            [Elements.icon "close"]),
       ],
       div { class_name = "search-field" } [
-        icon "search",
+        Elements.icon "search",
         attributes
           [
             ("aria-label", if m.ru then "Поисковый запрос" else "Search query"),

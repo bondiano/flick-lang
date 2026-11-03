@@ -34,6 +34,7 @@ From this directory, `flick run <name>` runs the steps of
 | - | - |
 | `lint` | `flick fmt --check` and `flick check --warnings-as-errors` over all three packages, under tight `[lint]` thresholds |
 | `test` | every package's tests; the server's API suite starts its own PostgreSQL in Docker |
+| `build` | builds every package |
 | `db`, `migrate` | a PostgreSQL on port 54329, and the migrations applied to it |
 | `api` | the RealWorld Hurl suite against a fresh server and database (needs `hurl`) |
 | `e2e` | the RealWorld Playwright suite against the client as the server serves it (needs Chromium: set `CHROMIUM`, or `pnpm --dir client exec playwright install chromium`) |

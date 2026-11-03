@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 2;
+pub const IFACE_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -250,8 +250,8 @@ impl Interface {
 #[serde(rename_all = "kebab-case")]
 struct File {
     iface_version: u32,
-    /// Flick language version of the compiler that wrote the file.
-    language: String,
+    /// Version of the compiler that wrote the file.
+    compiler: String,
     #[serde(flatten)]
     interface: Interface,
 }
@@ -260,7 +260,7 @@ struct File {
 pub fn write(interface: &Interface) -> String {
     let file = File {
         iface_version: IFACE_VERSION,
-        language: crate::LANGUAGE_VERSION.to_owned(),
+        compiler: crate::VERSION.to_owned(),
         interface: interface.clone(),
     };
     serde_json::to_string_pretty(&file).expect("an interface serializes") + "\n"
@@ -275,11 +275,11 @@ pub fn read(bytes: &[u8], module: &str) -> Result<Interface, String> {
             file.iface_version
         ));
     }
-    if file.language != crate::LANGUAGE_VERSION {
+    if file.compiler != crate::VERSION {
         return Err(format!(
-            "it was written for Flick {}, this compiler is Flick {}",
-            file.language,
-            crate::LANGUAGE_VERSION
+            "it was written by flick {}, this is flick {}",
+            file.compiler,
+            crate::VERSION
         ));
     }
     if file.interface.module != module {
@@ -399,11 +399,14 @@ mod tests {
                 .expect_err("rejected")
                 .contains("`iface-version` 7")
         );
-        let other = json.replace(crate::LANGUAGE_VERSION, "9.9");
+        let other = json.replace(
+            &format!("\"compiler\": \"{}\"", crate::VERSION),
+            "\"compiler\": \"9.9.9\"",
+        );
         assert!(
             read(other.as_bytes(), "A")
                 .expect_err("rejected")
-                .contains("Flick 9.9")
+                .contains("flick 9.9.9")
         );
         assert!(read(b"{", "A").is_err());
     }

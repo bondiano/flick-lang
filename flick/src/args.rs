@@ -11,7 +11,7 @@ pub use tools::*;
 
 /// The Flick compiler and toolchain.
 #[derive(Parser)]
-#[command(name = "flick", version = version())]
+#[command(name = "flick", version)]
 pub struct CommandArguments {
     #[command(flatten)]
     pub global: GlobalArguments,
@@ -37,8 +37,8 @@ pub enum Commands {
     New(NewArguments),
     /// Add a project to the working directory; existing files are kept.
     Init(InitArguments),
-    /// Build the app as JavaScript and run its `main`, or run a script of
-    /// `[scripts]` that is not an entry's name.
+    /// Build the app (JavaScript, or Go when the project emits go) and run its
+    /// `main`, or run a script of `[scripts]` that is not an entry's name.
     Run(RunArguments),
     /// Rebuild on changes and replace the running app after its shutdown.
     Dev(RunArguments),
@@ -50,7 +50,7 @@ pub enum Commands {
     /// Add npm packages to the dependencies.
     Add(AddArguments),
     /// Remove direct dependencies.
-    Remove(PackagesArguments),
+    Remove(RemoveArguments),
     /// Update dependencies within the ranges of `package.json`.
     Update(PackagesArguments),
     /// Show the installed dependencies and their Flick interfaces.
@@ -145,8 +145,8 @@ pub struct GlobalArguments {
     pub project: Option<String>,
 
     /// The workspace member to run on, the name of its directory; at the
-    /// root of a workspace `check`, `build`, `test`, `fmt` and `clean`
-    /// otherwise run on every member.
+    /// root of a workspace `check`, `build`, `test`, `fmt`, `clean` and
+    /// `install` otherwise run on every member.
     #[arg(
         long,
         short = 'p',
@@ -325,12 +325,4 @@ pub enum Color {
     Auto,
     Always,
     Never,
-}
-
-fn version() -> String {
-    format!(
-        "{} (Flick {})",
-        env!("CARGO_PKG_VERSION"),
-        flick_core::LANGUAGE_VERSION
-    )
 }

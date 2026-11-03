@@ -210,5 +210,5 @@ package.
 | - | - |
 | an imported module is found nowhere while a dependency is not installed | `FLICK-P009`: run `flick install` (exit code `2`) |
 | an imported module is found nowhere | `FLICK-R003`: add the package with `flick add <package>` |
-| an `.iface` file is malformed, has another `iface-version` or language version, or describes another module | `FLICK-P010` (exit code `2`) |
+| an `.iface` file is malformed, has another `iface-version` or compiler version, or describes another module | `FLICK-P010` (exit code `2`) |
 | a package module was built against another interface of a dependency than the installed one | `FLICK-P014` |

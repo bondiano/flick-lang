@@ -2,7 +2,7 @@
 title: "Flick Specification"
 ---
 
-This specification is the normative description of the Flick language: language version 0.7, as implemented by this compiler (`LANGUAGE_VERSION` in `flick-core/src/lib.rs`). Its chapters state the rules every program follows, with the reasoning a reader needs to apply them. The [reference](../reference/grammar/) pages describe the same language in more detail: the exact grammar, the diagnostics of the checker, the standard library and the code each target generates. Where a chapter and a reference page cover one topic, the chapter states the rule and links the page.
+This specification is the normative description of the Flick language as implemented by this compiler. Its chapters state the rules every program follows, with the reasoning a reader needs to apply them. The [reference](../reference/grammar/) pages describe the same language in more detail: the exact grammar, the diagnostics of the checker, the standard library and the code each target generates. Where a chapter and a reference page cover one topic, the chapter states the rule and links the page.
 
 ## Design goals
 

@@ -140,7 +140,7 @@ explicit policy.
 2. Provide a DOM container and use `Ui.Dom.container` to find it. The UI
    adapter uses React 19 and React DOM, which are application-installed
    optional peer dependencies of the runtime.
-3. Keep the state in atoms (`Atom.make`) and write views with `Ui.view`:
+3. Keep the state in atoms (`Atom.make`) and write views as `component`s:
    a view's render reads atoms with `Atom.value` and returns a `Ui`.
    It runs no handler and performs no DOM access.
 4. Choose an event policy deliberately: `Ui.Event.exhaust`, `latest`,

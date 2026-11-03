@@ -7,6 +7,15 @@ A local application needs the Flick compiler, Node.js 24.18 or later and
 pnpm. Download a `flick` archive for your platform from the
 [releases](https://github.com/bondiano/flick-lang/releases), or build it from
 a source checkout as described in [Ecosystem](../../ecosystem/).
+Each archive holds the single `flick` binary; put it on your `PATH`:
+
+```sh
+tar -xzf flick-x86_64-unknown-linux-gnu.tar.gz
+install -m 755 flick ~/.local/bin/
+flick --version
+```
+
+On Windows, extract the `.zip` and add the folder with `flick.exe` to `PATH`.
 
 Flick compiles to ES modules that run with the Flick runtime and
 Effect 4.1.2. Packages are installed with pnpm. Create a project and run it:
@@ -19,15 +28,21 @@ flick run
 ```
 
 `flick new` writes `flick.toml`, `package.json` with the pinned runtime and
-Effect, and `src/App/Main.fl`:
+Effect, `src/App/Main.fl`, the module `src/App/Greeting.fl` it imports and
+its test `test/App/GreetingTest.fl`:
 
 ```flick
 module App.Main exposing (main)
 
+import App.Greeting exposing (greet)
+
 main : Unit ->{; AppError} Unit
 let main () =
-  Platform.stdout_line "Hello from Flick"
+  let name = Platform.args () |> List.head |> Option.with_default "world"
+  Platform.stdout_line (greet name)
 ```
+
+`flick run -- Ada` prints `Hello, Ada!`.
 
 `flick check` type-checks without running anything, `flick build` writes the
 JavaScript to `dist/`, `flick test` runs the tests of the test root and

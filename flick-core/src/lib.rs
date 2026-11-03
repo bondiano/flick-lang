@@ -27,8 +27,8 @@ pub mod types;
 
 #[cfg(test)]
 mod builtin_source;
-/// Version of the Flick language this core targets (the spec index states it).
-pub const LANGUAGE_VERSION: &str = "0.7";
+/// Version of the compiler; `.iface` files record it.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Checks one source file on its own: syntax, names and types; its imports
 /// are not loaded, so names from them are taken on trust. A whole program goes

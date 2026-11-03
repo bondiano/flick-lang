@@ -16,10 +16,10 @@ use flick_core::source::{FileId, SourceMap};
 use serde_json::{Value, json};
 use wasm_bindgen::prelude::*;
 
-/// Flick language version this build targets, e.g. `"0.7"`.
+/// Version of the compiler in this build, e.g. `"0.1.0"`.
 #[wasm_bindgen]
-pub fn language_version() -> String {
-    flick_core::LANGUAGE_VERSION.to_owned()
+pub fn compiler_version() -> String {
+    flick_core::VERSION.to_owned()
 }
 
 /// The diagnostics of `source` as a JSON array of the events

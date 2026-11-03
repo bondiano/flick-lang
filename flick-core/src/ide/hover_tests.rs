@@ -45,7 +45,7 @@ let example = Block (Statements [Neg (Num 1)])
         ("Leaf 1", "Leaf :"),
         ("Block (", "Block :"),
     ] {
-        let start = source.find(needle).expect("hover target") as u32;
+        let start = u32::try_from(source.find(needle).expect("hover target")).expect("small");
         let (markdown, range) = ide.hover(file, start + 1).expect(needle);
         assert!(markdown.contains(expected), "{needle}: {markdown}");
         let name = needle.split([' ', '=']).next().expect("name");
@@ -58,7 +58,11 @@ let example = Block (Statements [Neg (Num 1)])
         if name == "Block" {
             assert!(markdown.contains("Statements"), "{markdown}");
         }
-        assert_eq!(range, (start, start + name.len() as u32), "{needle}");
+        assert_eq!(
+            range,
+            (start, start + u32::try_from(name.len()).expect("small")),
+            "{needle}"
+        );
     }
 }
 

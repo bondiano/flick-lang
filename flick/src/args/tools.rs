@@ -90,6 +90,13 @@ pub struct AddArguments {
 }
 
 #[derive(Args)]
+pub struct RemoveArguments {
+    /// Package names.
+    #[arg(required = true)]
+    pub packages: Vec<String>,
+}
+
+#[derive(Args)]
 pub struct PackagesArguments {
     /// Package names.
     pub packages: Vec<String>,

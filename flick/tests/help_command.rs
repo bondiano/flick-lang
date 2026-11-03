@@ -4,7 +4,7 @@ use common::{flick, stdout};
 
 #[test]
 fn version() {
-    insta::assert_snapshot!(stdout(&["--version"]), @"flick 0.1.0 (Flick 0.7)");
+    insta::assert_snapshot!(stdout(&["--version"]), @"flick 0.1.0");
 }
 
 #[test]

@@ -1,6 +1,6 @@
 module Copy exposing (mount)
 
-import Elements exposing (attributes, icon)
+import Elements exposing (attributes)
 import JsError exposing (JsError(..))
 
 type alias Input = { id : String; source : String; ru : Bool }
@@ -41,7 +41,10 @@ let view input model m =
               Atom.set model { copied = problem == ""; problem = problem }
             });
         }
-        [icon (if m.copied then "check" else "copy"), span { class_name = "sr-only" } [text label]])
+        [
+          Elements.icon (if m.copied then "check" else "copy"),
+          span { class_name = "sr-only" } [text label],
+        ])
   }
 
 report : Failure e ->{} Unit

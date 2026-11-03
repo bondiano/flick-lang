@@ -257,6 +257,8 @@ let clock_layer =
 работают `Atom.Registry.get`, `Atom.Registry.Impl` и
 `Layer.succeed Atom.Registry impl`.
 
+## Слои и `provide`
+
 `Layer inputs errors outputs` создаёт сервисы `outputs`, используя сервисы
 `inputs`, и может завершиться с ошибками `errors`. В `provide layer { body }`
 слой строится до выполнения тела. Сервисы, созданные слоем, доступны телу;

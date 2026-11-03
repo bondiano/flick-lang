@@ -72,7 +72,7 @@ test("a crashed compiler rejects active and queued callers and permits explicit 
     assert.ok(replacement);
     assert.equal(replacement.messages.length, 1);
     assert.equal(replacement.messages[0]!.action, "load");
-    replacement.reply(replacement.messages[0]!.id, "0.7");
+    replacement.reply(replacement.messages[0]!.id, "0.1.0");
     await recovered;
   } finally {
     globalThis.Worker = original;

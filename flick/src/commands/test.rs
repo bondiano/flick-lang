@@ -48,6 +48,7 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
 }
 
 /// Builds the test run and writes its runner.
+#[allow(clippy::too_many_lines)]
 fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf, ()> {
     let progress = Progress::new(if matches!(options.reporter, Reporter::Json) {
         Mode::Hidden

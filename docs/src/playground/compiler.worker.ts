@@ -1,5 +1,5 @@
 // The compiler's JS glue and WASM are loaded only inside this persistent worker.
-import init, { build, compile as compileModule, language_version } from "./wasm/flick_wasm.js";
+import init, { build, compile as compileModule, compiler_version } from "./wasm/flick_wasm.js";
 
 export interface Diagnostic {
   readonly code: string;
@@ -59,7 +59,7 @@ const generated = (source: string, profile: string) => {
 onmessage = async (event: MessageEvent<Request>) => {
   const request = event.data;
   try {
-    const version = await (ready ??= init().then(() => language_version()));
+    const version = await (ready ??= init().then(() => compiler_version()));
     let result: Result;
     switch (request.action) {
       case "load":

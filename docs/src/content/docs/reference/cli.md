@@ -18,7 +18,7 @@ and `--help`; `flick help <command>` prints a command's help and
 | `check [paths] [--watch] [--fix]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left |
 | `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--promise-facade] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files (`--emit go`: a Go executable per entry, see [Go target](../codegen/#go-target)); `--emit-dts` adds `.d.ts` files and `--promise-facade` Promise façades `A/B.promise.js` (see [TypeScript](../codegen/#typescript)); shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
 | `build [paths] --inputs` | prints a conservative JSON input inventory (`key`, `files`, `roots`, `modules`) without writing build artifacts or cache entries |
-| `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | builds JavaScript and runs the `main` of the entry `name` (the only one when left out); a `name` that is not an entry runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails, with `args` as their `"$@"`; a client entry (`target = "client"`) builds with Vite and serves the page with Vite preview; `--devtools` sends server entry spans to the Effect DevTools ([observability](../observability/#devtools)) |
+| `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | builds JavaScript (a Go executable when `emit = "go"`) and runs the `main` of the entry `name` (the only one when left out); a `name` that is not an entry runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails, with `args` as their `"$@"`; a client entry (`target = "client"`) builds with Vite and serves the page with Vite preview; `--devtools` sends server entry spans to the Effect DevTools ([observability](../observability/#devtools)) |
 | `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | rebuilds on changes and replaces the running app; in a project with several entries and none named, it runs every entry that is not a client's and, if one is, Vite (`node_modules/.bin/vite`) for the pages, which replaces a changed module in the page keeping the labelled atoms' values |
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile] [--emit js\|go]` | runs the tests of the test root, on Node or as a Go executable |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | writes the canonical layout ([formatting](../grammar/#formatting)); without paths the source and test roots |
@@ -34,7 +34,7 @@ and `--help`; `flick help <command>` prints a command's help and
 | `schema export <M.api> --target openapi-3.1 --out <file>` | an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes (see [Clients and documents](../http-api/#clients-and-documents)) |
 | `doc --out-dir <dir>` | Markdown pages of the public API: types, kinds, constraints, effects, captures |
 | `explain <code>` | the explanation of a diagnostic code |
-| `doctor` | the compiler, Node.js, pnpm, the installed runtime and Effect, the optional adapters |
+| `doctor` | the compiler, Node.js, pnpm, the TypeScript Content Mapper, the installed runtime and Effect, the optional adapters |
 | `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | one representation of a module |
 | `lsp --stdio` | the [language server](../editor/#language-server); stdio is its only transport |
 | `content-mapper [--declarations <paths>…]` | serves TypeScript's [Content Mapper](../editor/#content-mapper) requests for `.fl` files on stdio, started by `@flick-lang/content-mapper`; `--declarations` instead writes the projection of each `.fl` file under the paths beside it as `Name.d.fl.ts` and exits |
@@ -72,7 +72,8 @@ creation and deletion; one unrelated timestamp cannot hide another edit.
 
 ## Running and replacing an app
 
-`run` and `dev` always build JavaScript, whatever `emit` says. Each build
+`run` and `dev` build JavaScript, or a Go executable per entry when
+`emit = "go"`. Each build
 goes into an atomically reserved generation `.flick/run/<pid>-<n>/`, never
 written again once its process starts, so a late `import()` sees the files
 it started with. The CLI owns the generation from construction through

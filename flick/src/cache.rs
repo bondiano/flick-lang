@@ -46,7 +46,6 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
     }
     key.add("config", format!("{:?}", project.config));
     key.add("compiler", toolchain::COMPILER);
-    key.add("language", flick_core::LANGUAGE_VERSION);
     // a compiler rebuilt without a new version still changes the key
     if let Ok(meta) = env::current_exe().and_then(fs::metadata) {
         key.add(
