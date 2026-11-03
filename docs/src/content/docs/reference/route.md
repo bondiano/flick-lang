@@ -85,7 +85,7 @@ snake case, so it is a type of its own, such as a refined type; an `Option`
 field is written `None` or `Some …`, a field of words or of a nested route
 type as one of its constructors. The route type is declared in another
 module. This is how the endpoints of `deriving HttpApi` name their paths
-(see [HttpApi](/reference/http-api/#an-api-as-a-type)); a template that is
+(see [HttpApi](../http-api/#an-api-as-a-type)); a template that is
 no path is `FLICK-D009`.
 
 ## The current page

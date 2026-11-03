@@ -1,5 +1,7 @@
 ---
 import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
 <StarlightPage
@@ -12,8 +14,8 @@ import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
     hero: {
       tagline: "Check the address or use search to find a page.",
       actions: [
-        { text: "Documentation", link: "/learn/" },
-        { text: "Документация на русском", link: "/ru/learn/", variant: "secondary" },
+        { text: "Documentation", link: `${base}/learn/` },
+        { text: "Документация на русском", link: `${base}/ru/learn/`, variant: "secondary" },
       ],
     },
   }}
