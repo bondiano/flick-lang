@@ -41,7 +41,10 @@ let view input model m =
               Atom.set model { copied = problem == ""; problem = problem }
             });
         }
-        [Elements.icon (if m.copied then "check" else "copy"), span { class_name = "sr-only" } [text label]])
+        [
+          Elements.icon (if m.copied then "check" else "copy"),
+          span { class_name = "sr-only" } [text label],
+        ])
   }
 
 report : Failure e ->{} Unit
