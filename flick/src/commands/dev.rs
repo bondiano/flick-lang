@@ -9,8 +9,7 @@
 //! client's, and Vite for its pages: the bundler builds the client's
 //! modules itself and replaces them in the page as they change.
 
-use std::path::Path;
-use std::process::{Command as Process, ExitCode};
+use std::process::ExitCode;
 use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
@@ -19,7 +18,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::source::SourceMap;
 use signal_hook::consts::SIGTERM;
 
-use super::run::{Generation, build_into_generation, dev_entries, find_project, launch};
+use super::run::{Generation, build_into_generation, dev_entries, find_project, launch, vite};
 use super::test::{watch_snapshot, watched_roots};
 use crate::args::{GlobalArguments, RunArguments};
 use crate::child::{self, Running};
@@ -57,22 +56,6 @@ impl Live {
             .copied()
             .unwrap_or(0)
     }
-}
-
-/// Vite in the project's `node_modules`, serving its pages; `None` with a
-/// note when it is not installed.
-fn vite(root: &Path, global: &GlobalArguments) -> Option<Running> {
-    let bin = root.join("node_modules/.bin/vite");
-    if !bin.exists() {
-        report::log(
-            global,
-            "dev: the client entries need Vite: install it with `pnpm install`",
-        );
-        return None;
-    }
-    let mut command = Process::new(bin);
-    command.current_dir(root);
-    child::spawn(&mut command, global, "vite-stderr").ok()
 }
 
 pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {

@@ -285,6 +285,49 @@ pub fn launch(
     }
 }
 
+/// The client package's local Vite executable.
+fn vite_binary(root: &Path, global: &GlobalArguments) -> Option<PathBuf> {
+    let bin = root.join("node_modules/.bin/vite");
+    if !bin.exists() {
+        report::log(
+            global,
+            "the client entry needs Vite: install it with `pnpm install`",
+        );
+        return None;
+    }
+    Some(bin)
+}
+
+/// Vite serves a client entry and rebuilds its modules during development.
+pub fn vite(root: &Path, global: &GlobalArguments) -> Option<Running> {
+    let bin = vite_binary(root, global)?;
+    let mut command = Process::new(bin);
+    command.current_dir(root);
+    child::spawn(&mut command, global, "vite-stderr").ok()
+}
+
+/// Build a client page and serve the result without Vite's dev optimizer.
+fn run_client(root: &Path, global: &GlobalArguments, signals: &AtomicUsize) -> u8 {
+    let Some(bin) = vite_binary(root, global) else {
+        return 2;
+    };
+    let mut build = Process::new(&bin);
+    build.arg("build").current_dir(root);
+    let Ok(running) = child::spawn(&mut build, global, "vite-stderr") else {
+        return 2;
+    };
+    let code = finish(running, signals);
+    if code != 0 {
+        return code;
+    }
+    let mut preview = Process::new(bin);
+    preview.arg("preview").current_dir(root);
+    let Ok(running) = child::spawn(&mut preview, global, "vite-stderr") else {
+        return 2;
+    };
+    finish(running, signals)
+}
+
 pub fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
     let signals = child::signals();
     let project = match find_project(global) {
@@ -294,6 +337,17 @@ pub fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
             return report::exit_code(&diagnostics);
         }
     };
+    // A client entry needs a page and browser APIs; Node cannot run its
+    // generated runner. Vite builds and previews that entry instead.
+    if let Ok(name) = chosen_entry(&project, options)
+        && project
+            .config
+            .entries
+            .iter()
+            .any(|entry| entry.name == name && entry.client)
+    {
+        return ExitCode::from(run_client(&project.root, global, &signals));
+    }
     let (generation, name) = match build_generation(&project, options, global) {
         Ok(g) => g,
         Err(code) => return ExitCode::from(code),
