@@ -77,7 +77,7 @@ and `Monad`.
 ### More modules
 
 Thinner wrappers of Effect modules, each documented in its source under
-`flick-core/src/types/builtins/`:
+`packages/std/src/`:
 
 | Module | Contents |
 | - | - |

@@ -36,7 +36,11 @@ fn main() -> io::Result<()> {
     if cfg!(feature = "builtin-docs") {
         return Ok(());
     }
-    strip_tree(Path::new("src/types/builtins"), &output.join("builtins"))
+    for package in ["core", "std"] {
+        let sources = Path::new("../packages").join(package).join("src");
+        strip_tree(&sources, &output.join(package))?;
+    }
+    Ok(())
 }
 
 /// `go_runtime.rs`: the files of the go target's runtime, the package
