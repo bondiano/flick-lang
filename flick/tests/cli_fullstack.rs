@@ -113,6 +113,6 @@ fn dev_serves_the_shared_calls_and_refuses_an_unauthenticated_write() {
     let status = child.wait().expect("wait");
     let err = read_all(child.stderr.take().expect("stderr"));
     // without `pnpm install` there is no Vite: the server runs alone
-    assert!(err.contains("the client entries need Vite"), "{err}");
+    assert!(err.contains("the client entry needs Vite"), "{err}");
     assert_eq!(status.code(), Some(143), "{err}");
 }
