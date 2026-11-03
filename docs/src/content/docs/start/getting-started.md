@@ -4,16 +4,17 @@ description: Install the toolchain, create an application and run it.
 ---
 
 A local application needs the Flick compiler, Node.js 24.18 or later and
-pnpm. Download a `flick` archive for your platform from the
-[releases](https://github.com/bondiano/flick-lang/releases), or build it from
-a source checkout as described in [Ecosystem](../../ecosystem/).
-Each archive holds the single `flick` binary; put it on your `PATH`:
+pnpm. On macOS or Linux, install the latest release into `~/.local/bin`:
 
 ```sh
-tar -xzf flick-x86_64-unknown-linux-gnu.tar.gz
-install -m 755 flick ~/.local/bin/
+curl -fsSL https://bondiano.github.io/flick-lang/install.sh | sh
 flick --version
 ```
+
+or with Homebrew: `brew install bondiano/tap/flick`. You can also download a
+`flick` archive for your platform from the
+[releases](https://github.com/bondiano/flick-lang/releases), or build it from
+a source checkout as described in [Ecosystem](../../ecosystem/).
 
 On Windows, extract the `.zip` and add the folder with `flick.exe` to `PATH`.
 
