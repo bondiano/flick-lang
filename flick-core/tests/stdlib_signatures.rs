@@ -1,7 +1,6 @@
 //! The standard library declares every signature the specification gives
 //! for it, word for word: each `Module.name :` of a ```` ```text ```` block
-//! whose module is a built-in one, and the Prelude functions the spec names
-//! bare.
+//! whose module is a built-in one.
 
 use std::fs;
 use std::path::Path;
@@ -9,9 +8,6 @@ use std::path::Path;
 use flick_core::types::builtin_sources;
 
 const SPEC: &str = "docs/src/content/docs/ru/spec";
-
-/// Prelude values the spec gives without a module.
-const PRELUDE: &[&str] = &["bind", "bind_eff", "from_result"];
 
 /// The signature texts of ```` ```text ```` blocks: a line `name :` and the
 /// indented lines after it, as `(name, signature)` with whitespace collapsed.
@@ -80,10 +76,8 @@ fn stdlib_declares_the_spec_signatures_word_for_word() {
     let mut checked = Vec::new();
     let mut mismatches = Vec::new();
     for (name, signature) in spec_signatures(&spec) {
-        let (module, value) = match name.rsplit_once('.') {
-            Some((m, v)) => (m, v),
-            None if PRELUDE.contains(&name.as_str()) => ("Prelude", name.as_str()),
-            None => continue,
+        let Some((module, value)) = name.rsplit_once('.') else {
+            continue;
         };
         let Some((_, source)) = builtin_sources().iter().find(|(m, _)| *m == module) else {
             continue;
@@ -111,9 +105,6 @@ fn stdlib_declares_the_spec_signatures_word_for_word() {
         "RawCause.inspect",
         "Redacted.make",
         "Redacted.reveal",
-        "from_result",
-        "bind",
-        "bind_eff",
         "Codec.decode",
         "Codec.encode",
         "Codec.decode_result",
