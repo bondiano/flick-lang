@@ -280,3 +280,42 @@ fn install_fetches_a_tarball_of_the_named_hash() {
     assert!(out.status.success(), "{out:?}");
     assert_eq!(check(&app, &store), (Some(0), Vec::new()));
 }
+
+#[test]
+fn add_pins_a_library_and_remove_drops_it() {
+    let repo = repository("add-geo-repo");
+    let store = project("add-store", &[]);
+    let bare = "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n";
+    let app = project(
+        "add-app",
+        &[("flick.toml", bare), ("src/App/Main.fl", MAIN)],
+    );
+    let url = format!("file://{}", repo.display());
+    let bad = run(&app, &store, &["add", "geo", "--git", &url, "--tag", "v9"]);
+    assert!(!bad.status.success());
+    assert_eq!(
+        fs::read_to_string(app.join("flick.toml")).expect("manifest"),
+        bare,
+        "a failed add changes nothing"
+    );
+    let added = run(
+        &app,
+        &store,
+        &[
+            "add", "geo", "--git", &url, "--tag", "v1.0.0", "--subdir", "lib",
+        ],
+    );
+    assert!(added.status.success(), "{added:?}");
+    assert_eq!(check(&app, &store), (Some(0), Vec::new()));
+    let listed = run(&app, &store, &["deps"]);
+    assert!(
+        String::from_utf8_lossy(&listed.stdout).contains("geo 1.0.0"),
+        "{listed:?}"
+    );
+    let removed = run(&app, &store, &["remove", "geo"]);
+    assert!(removed.status.success(), "{removed:?}");
+    let manifest = fs::read_to_string(app.join("flick.toml")).expect("manifest");
+    assert!(!manifest.contains("geo ="), "{manifest}");
+    let lock = fs::read_to_string(app.join("flick.lock")).expect("lock");
+    assert!(!lock.contains("geo"), "{lock}");
+}

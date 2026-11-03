@@ -12,6 +12,7 @@ use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::project::pnpm::{self, Command};
 use flick_core::source::SourceMap;
 
+use super::libraries;
 use super::run::find_project;
 use crate::args::GlobalArguments;
 use crate::cache::files_under;
@@ -75,6 +76,13 @@ fn check_pnpm(root: &Path, wanted: &str) -> Option<Outcome> {
     }
 }
 
+fn done() -> Outcome {
+    Outcome {
+        sources: SourceMap::default(),
+        diagnostics: Vec::new(),
+    }
+}
+
 /// Fetches the Flick dependencies for `install` and `update`; the failure.
 fn fetch(project: &Project, command: &Command) -> Option<Outcome> {
     let (update, options) = match command {
@@ -114,14 +122,30 @@ pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
     if let Some(failed) = fetch(&project, command) {
         return failed;
     }
+    let npm_remove;
+    let command = match command {
+        Command::Remove { packages } => match libraries::remove(&project, packages) {
+            Ok(rest) if rest.is_empty() => return done(),
+            Ok(rest) => {
+                npm_remove = Command::Remove { packages: rest };
+                &npm_remove
+            }
+            Err(failed) => return failed,
+        },
+        Command::List => {
+            libraries::print_locked(&project);
+            command
+        }
+        command => command,
+    };
     // a project without npm packages needs no pnpm
     if !root.join("package.json").exists()
-        && matches!(command, Command::Install { .. } | Command::Update { .. })
+        && matches!(
+            command,
+            Command::Install { .. } | Command::Update { .. } | Command::List
+        )
     {
-        return Outcome {
-            sources: SourceMap::default(),
-            diagnostics: Vec::new(),
-        };
+        return done();
     }
     if pnpm::writes(command) {
         if let Some(problem) = check_pnpm(root, &pinned(root)) {

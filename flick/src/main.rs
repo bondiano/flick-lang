@@ -165,6 +165,9 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::Run(options) => commands::run(&options, global),
         Commands::Dev(options) => commands::dev(&options, global),
         Commands::Clean(options) => report(commands::clean(&options, global), global),
+        Commands::Add(o) if o.source().is_some() => {
+            report(commands::add_library(&o, global), global)
+        }
         Commands::Install(_)
         | Commands::Add(_)
         | Commands::Remove(_)
