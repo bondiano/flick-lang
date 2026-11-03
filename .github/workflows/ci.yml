@@ -35,6 +35,39 @@ jobs:
       - run: just bundle-size >> "$GITHUB_STEP_SUMMARY"
       - run: just e2e-postgres
 
+  # the flake: evaluate every supported platform, build the package with the
+  # core test targets, and hold the dev shell to the versions the repository
+  # pins (rust-toolchain.toml and package.json)
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Evaluate every supported platform
+        run: nix flake check --all-systems --no-build
+      - name: Build the package and its tests
+        run: nix build .#flick --no-link
+      - name: Smoke-test the binary
+        run: |
+          out=$(nix build .#flick --no-link --print-out-paths)
+          "$out/bin/flick" --version
+          "$out/bin/flick" --project examples/first-slice check
+      - name: Dev shell versions
+        run: |
+          nix develop --command bash -euo pipefail -c '
+            want_rust=$(sed -n "s/^channel = \"\(.*\)\"/\1/p" rust-toolchain.toml)
+            test "$(rustc --version | cut -d" " -f2)" = "$want_rust"
+            node -e "const [major, minor] = process.versions.node.split(\".\").map(Number); if (major < 24 || (major === 24 && minor < 18)) throw new Error(\"node >= 24.18 required\")"
+            want_pnpm=$(node -p "require(\"./package.json\").packageManager.split(\"@\")[1].split(\"+\")[0]")
+            test "$(pnpm --version)" = "$want_pnpm"
+            go version
+            just --version
+            cargo machete --version
+          '
+
   # the reference model of λFlick (flick-model) against tests/run/model.txt,
   # and the model properties on generated programs; it needs neither Node nor Go
   model:
