@@ -2,7 +2,7 @@
 /// API under `/api` and, given a directory, the client's built files, the
 /// client's own routes answered with its `index.html`. Its settings come
 /// from the environment: `PORT` (8000), `DATABASE_URL`, `JWT_SECRET` and
-/// `STATIC_DIR`.
+/// `STATIC_DIR` (`client/dist` from the example root).
 module Conduit.Server.Main exposing (main)
 
 import Database exposing (Database)
@@ -11,7 +11,7 @@ import Conduit.Server.Schema as Schema
 import Conduit.Server.Session exposing (Keys)
 
 /// What the server reads from its environment.
-type alias Settings = { port : Float; database : String; secret : String; files : Option String }
+type alias Settings = { port : Float; database : String; secret : String; files : String }
 
 /// The settings of the environment, or which one is wrong.
 settings : Unit ->{; Config.ConfigError} Settings
@@ -19,7 +19,7 @@ let settings () = {
   port = Config.get (Config.with_default 8000 (Config.port "PORT"));
   database = Config.get (Config.string "DATABASE_URL");
   secret = Config.get (Config.non_empty_string "JWT_SECRET");
-  files = Config.get (Config.option (Config.string "STATIC_DIR"));
+  files = Config.get (Config.with_default "client/dist" (Config.non_empty_string "STATIC_DIR"));
 }
 
 /// Migrates the database, then serves until the process is stopped.
@@ -36,9 +36,12 @@ let serve config =
       port = config.port;
       gracefulShutdownTimeout = None;
     }
-    let server = Http.Server.serve options (Server.router config.files)
-    Platform.stdout_line
-      ("Conduit listens on " ++ Http.Server.format_address (Http.Server.address server))
+    let server = Http.Server.serve options (Server.router (Some config.files))
+    let url =
+      match Http.Server.address server with
+      | Http.Server.TcpAddress _ port -> "http://0.0.0.0:" ++ show port
+      | Http.Server.UnixAddress path -> "unix://" ++ path
+    Platform.stdout_line ("Conduit listens on " ++ url)
     Effect.never ()
   }
 
