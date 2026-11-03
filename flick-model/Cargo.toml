@@ -12,7 +12,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-flick-core = { path = "../flick-core", default-features = false }
+flick-core = { path = "../flick-core", default-features = false, features = ["embedded-std"] }
 serde_json = "1.0.154"
 
 [dev-dependencies]

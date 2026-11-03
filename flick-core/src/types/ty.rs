@@ -143,8 +143,11 @@ fn closed_labels(row: &Type) -> Option<Vec<&str>> {
 pub fn sync_rows(services: &Type, errors: &Type) -> bool {
     closed_labels(services).is_some_and(|l| {
         !l.is_empty()
-            && l.iter()
-                .all(|l| SYNC_SERVICES.iter().any(|&s| lang::item(s).label == *l))
+            && l.iter().all(|l| {
+                SYNC_SERVICES
+                    .iter()
+                    .any(|&s| lang::table().find(s).is_some_and(|i| i.label == *l))
+            })
     }) && closed_labels(errors).is_some_and(|l| l.is_empty())
 }
 
