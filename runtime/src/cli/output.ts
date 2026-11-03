@@ -31,6 +31,7 @@ export interface FlickHelpDoc {
   readonly description: string;
   readonly usage: string;
   readonly flags: ReadonlyArray<FlickFlagDoc>;
+  readonly inheritedFlags: ReadonlyArray<FlickFlagDoc>;
   readonly globalFlags: ReadonlyArray<FlickFlagDoc>;
   readonly args: ReadonlyArray<FlickArgDoc>;
   readonly subcommands: ReadonlyArray<{
@@ -73,6 +74,7 @@ export const fromEffectDoc = (doc: HelpDoc.HelpDoc): FlickHelpDoc => ({
   description: doc.description,
   usage: doc.usage,
   flags: doc.flags.map(flag),
+  inheritedFlags: (doc.inheritedFlags ?? []).map(flag),
   globalFlags: (doc.globalFlags ?? []).map(flag),
   args: (doc.args ?? []).map((a) => ({
     name: a.name,
@@ -100,6 +102,7 @@ export const toEffectDoc = (doc: FlickHelpDoc): HelpDoc.HelpDoc => ({
   description: doc.description,
   usage: doc.usage,
   flags: doc.flags.map(unflag),
+  inheritedFlags: doc.inheritedFlags.map(unflag),
   globalFlags: doc.globalFlags.map(unflag),
   annotations: Context.empty(),
   args: doc.args.map((a) => ({

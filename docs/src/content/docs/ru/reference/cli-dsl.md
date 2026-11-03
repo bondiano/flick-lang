@@ -105,7 +105,9 @@ let greet =
 | `Cli.action name help act` | переключатель `--name`, запускающий `act` вместо любого обработчика |
 
 `Cli.help_doc path command` возвращает запись `Cli.HelpDoc` со справкой,
-которую `--help` показывает для подкоманды по пути `path`. `Cli.help`
+которую `--help` показывает для подкоманды по пути `path`. Флаги команд
+выше по пути лежат в `inheritedFlags` и показываются в разделе
+`INHERITED FLAGS`. `Cli.help`
 возвращает текст этой справки, а `Cli.completions shell command` — скрипт
 автодополнения.
 

@@ -324,6 +324,7 @@ type alias HelpDoc = {
   description : String;
   usage : String;
   flags : List FlagDoc;
+  inheritedFlags : List FlagDoc;
   globalFlags : List FlagDoc;
   args : List ArgDoc;
   subcommands : List SubcommandGroupDoc;

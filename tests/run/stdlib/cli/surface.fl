@@ -290,6 +290,7 @@ let main () =
   Platform.stdout_line ("help_doc " ++ show_help doc)
   Platform.stdout_line ("examples " ++ show (List.map show_example doc.examples))
   Platform.stdout_line ("global flags " ++ show (List.map flag_name doc.globalFlags))
+  Platform.stdout_line ("inherited flags " ++ show (List.map flag_name doc.inheritedFlags))
   let parent = Cli.help_doc [] tool
   Platform.stdout_line ("subcommands " ++ show (List.map show_group parent.subcommands))
   Platform.stdout_line ("groups " ++ show (List.map group_name parent.subcommands))
