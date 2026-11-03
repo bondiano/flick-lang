@@ -103,6 +103,12 @@ component sidebar () = ui {
   div { class_name = "sidebar" } [
     paragraph [text "Popular Tags"],
     div { class_name = "tag-list" } links,
+    div { class_name = "sidebar-note" } [
+      paragraph [
+        text "conduit is RealWorld's Conduit, written end to end in Flick: ",
+        text "one typed contract, two targets, no glue.",
+      ],
+    ],
   ]
 }
 

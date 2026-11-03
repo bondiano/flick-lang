@@ -1,0 +1,348 @@
+/* ============================================================================
+ * ARTICLE PREVIEW — ink-ruled print stock
+ * ========================================================================== */
+
+.article-preview {
+  background: var(--stock);
+  border: var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.6rem;
+  margin-bottom: 1.25rem;
+  transition: border-color 0.2s var(--ease-out), transform 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
+}
+
+.article-preview:hover {
+  border-color: var(--fluoro);
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 -1px color-mix(in srgb, var(--ink) 18%, transparent),
+    10px 12px 28px -16px rgba(var(--shadow-ink), 0.45);
+}
+
+.article-preview .article-meta {
+  margin: 0 0 1rem;
+}
+
+.article-preview .preview-link {
+  text-decoration: none;
+}
+
+.article-preview .preview-link h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.012em;
+  line-height: 1.22;
+  margin: 0 0 0.45rem;
+  transition: color 0.2s var(--ease-out);
+}
+
+.article-preview:hover .preview-link h1 {
+  color: var(--fluoro);
+}
+
+.article-preview .preview-link p {
+  color: color-mix(in srgb, var(--ink) 70%, var(--paper));
+  margin-bottom: 0.75rem;
+}
+
+.article-preview .preview-link span {
+  display: inline-block;
+  margin-bottom: 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 62%, var(--paper));
+}
+
+.article-preview:hover .preview-link span {
+  color: var(--rubric);
+}
+
+.article-preview .preview-link ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.article-preview .preview-link ul li {
+  display: inline-flex;
+}
+
+.empty-feed-message {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--ink) 35%, transparent);
+  color: color-mix(in srgb, var(--ink) 66%, var(--paper));
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  background: transparent;
+}
+
+.empty-feed-message a {
+  color: var(--rubric);
+  font-weight: 700;
+}
+
+/* ============================================================================
+ * ARTICLE META
+ * ========================================================================== */
+
+.article-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 0.6rem;
+  gap: 0.75rem;
+}
+
+.article-meta img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  flex: none;
+}
+
+.article-meta > .btn {
+  margin-left: auto;
+}
+
+.article-meta .info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.article-meta .info .author {
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.article-meta .info .author:hover {
+  color: var(--rubric);
+}
+
+.article-meta .info .date {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 62%, var(--paper));
+}
+
+/* ============================================================================
+ * TAGS
+ * ========================================================================== */
+
+.tag-default {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.4rem 0.78rem;
+  color: color-mix(in srgb, var(--ink) 76%, var(--paper));
+  background: color-mix(in srgb, var(--ink) 8%, var(--paper));
+  text-decoration: none;
+  transition: background-color 0.2s var(--ease-out), color 0.2s var(--ease-out);
+}
+
+/* one tag language everywhere: tinted pill, fluoro rolls over on hover */
+.tag-default:hover,
+.tag-default.tag-outline:hover {
+  background: var(--fluoro);
+  color: var(--ink);
+}
+
+ul.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+ul.tag-list li {
+  display: inline-flex;
+}
+
+/* ============================================================================
+ * HOME PAGE — the press proof
+ * ========================================================================== */
+
+.home-page .banner {
+  padding: 5.5rem 0 5rem;
+  border-bottom: var(--rule-strong);
+  background: var(--paper);
+  position: relative;
+  overflow: hidden;
+}
+
+/* the halftone raster fading off the right edge — riso's own material */
+.home-page .banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--fluoro) 32%, transparent) 1.2px,
+    transparent 1.4px
+  );
+  background-size: 15px 15px;
+  -webkit-mask-image: linear-gradient(to left, black 0%, transparent 62%);
+  mask-image: linear-gradient(to left, black 0%, transparent 62%);
+}
+
+/* a registration mark: press furniture anchoring the raster field */
+.home-page .banner::before {
+  content: '';
+  position: absolute;
+  top: 22%;
+  right: 7%;
+  width: 130px;
+  height: 130px;
+  border: 1.5px solid color-mix(in srgb, var(--fluoro) 60%, transparent);
+  border-radius: 50%;
+  background:
+    linear-gradient(
+        color-mix(in srgb, var(--fluoro) 60%, transparent),
+        color-mix(in srgb, var(--fluoro) 60%, transparent)
+      )
+      center / 1.5px 100% no-repeat,
+    linear-gradient(
+        color-mix(in srgb, var(--fluoro) 60%, transparent),
+        color-mix(in srgb, var(--fluoro) 60%, transparent)
+      )
+      center / 100% 1.5px no-repeat;
+  pointer-events: none;
+}
+
+@media (max-width: 899px) {
+  .home-page .banner::before {
+    display: none;
+  }
+}
+
+.home-page .banner .container {
+  position: relative;
+  z-index: 1;
+}
+
+.logo-font {
+  font-family: var(--font-display);
+  font-weight: 400;
+}
+
+.home-page .banner h1 {
+  font-size: clamp(4.5rem, 13vw, 11rem);
+  line-height: 0.92;
+  letter-spacing: 0.015em;
+  color: var(--fluoro);
+  text-transform: lowercase;
+  margin: 0 0 1.4rem;
+  animation: register 0.7s var(--ease-out) both;
+}
+
+/* the misregistration settling into register on first paint */
+@keyframes register {
+  from {
+    text-shadow: 10px 10px 0 color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+  to {
+    text-shadow: 4px 4px 0 color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+}
+
+.home-page .banner p {
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--ink) 75%, var(--paper));
+  margin: 0;
+}
+
+.home-page .sidebar {
+  position: sticky;
+  top: calc(var(--nav-h) + 1.5rem);
+  align-self: start;
+}
+
+.home-page .sidebar p {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 66%, var(--paper));
+  margin: 0.25rem 0 0.9rem;
+}
+
+.home-page .sidebar .tag-list {
+  gap: 0.5rem;
+}
+
+@media (max-width: 767px) {
+  .home-page .sidebar {
+    position: static;
+  }
+}
+
+.home-page .sidebar-note {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: var(--rule);
+}
+
+.home-page .sidebar-note p {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.65;
+  color: color-mix(in srgb, var(--ink) 66%, var(--paper));
+  margin: 0;
+}
+
+/* ============================================================================
+ * PAGINATION — numbered plates
+ * ========================================================================== */
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+}
+
+.page-item {
+  display: inline-flex;
+}
+
+.page-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--stock);
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 0.2s var(--ease-out), color 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out);
+}
+
+.page-link:hover {
+  border-color: var(--fluoro);
+  color: var(--rubric);
+}
+
+.page-item.active .page-link {
+  background: var(--fluoro);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+

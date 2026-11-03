@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-03T00:00:00Z",
+  "title": "Design System: conduit",
+  "extensions": {
+    "colorMeta": {
+      "fluoro":   { "role": "primary",  "displayName": "Fluoro Ink",   "canonical": "#ff4a1c" },
+      "rubric":   { "role": "primary",  "displayName": "Rubric",        "canonical": "#c93405" },
+      "ink":      { "role": "neutral",  "displayName": "Ink",           "canonical": "#1b1b1f" },
+      "paper":    { "role": "neutral",  "displayName": "Paper",         "canonical": "#f8f4ea" },
+      "stock":    { "role": "neutral",  "displayName": "Card Stock",    "canonical": "#fffdf7" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Press Display", "purpose": "Brand wordmark, page names (lowercase)." },
+      "article": { "displayName": "Reading Serif", "purpose": "Article bodies, max 74ch." },
+      "mono":    { "displayName": "Colophon Mono", "purpose": "Code blocks, sidebar colophon note." }
+    },
+    "shadows": [
+      { "name": "print-ghost", "value": "4px 4px 0 -1px color-mix(in srgb, #1b1b1f 18%, transparent), 10px 12px 28px -16px rgba(91,27,31,0.45)", "purpose": "Hover lift of preview cards: the misregistration made physical." },
+      { "name": "text-ghost", "value": "text-shadow: 4px 4px 0 color-mix(in srgb, #1b1b1f 18%, transparent)", "purpose": "Display type at rest; animates from 10px on load." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "All state transitions and the register-settle." },
+      { "name": "register", "value": "0.7s ease-out both", "purpose": "Hero wordmark settling into register on first paint; collapses under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" },
+      { "name": "registration-mark", "value": "900px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Preview card",
+      "kind": "card",
+      "refersTo": "card-preview",
+      "description": "Ink-ruled print stock for an article preview; lifts with a print ghost on hover.",
+      "html": "<div class=\"article-preview\"><div class=\"article-meta\"><img alt=\"\" /><div class=\"info\"><a class=\"author\">bob</a><span class=\"date\">Nov 3, 2026</span></div><button class=\"btn btn-sm btn-outline-primary pull-xs-right\">♥ 0</button></div><a class=\"preview-link\"><h1>Hot state, warm page</h1><p>excerpt</p><span>Read more...</span></a></div>",
+      "css": ".article-preview{background:#fffdf7;border:2px solid #1b1b1f;border-radius:4px;padding:1.5rem 1.6rem;transition:all .2s cubic-bezier(.16,1,.3,1)} .article-preview:hover{border-color:#ff4a1c;transform:translate(-2px,-2px);box-shadow:4px 4px 0 -1px rgba(27,27,31,.18),10px 12px 28px -16px rgba(91,27,31,.45)}"
+    },
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The fluoro stamp: loud ink fill, ink text, uppercase label.",
+      "html": "<button class=\"btn btn-primary\">Publish Article</button>",
+      "css": ".btn{display:inline-flex;gap:.4rem;padding:.5rem 1.1rem;border:2px solid #1b1b1f;border-radius:8px;font-weight:700;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase} .btn-primary{background:#ff4a1c;color:#1b1b1f} .btn-primary:hover{background:#ff5e32}"
+    },
+    {
+      "name": "Tag pill",
+      "kind": "chip",
+      "refersTo": "chip-tag",
+      "description": "One tag language everywhere; fluoro rolls over on hover.",
+      "html": "<a class=\"tag-pill tag-default\">flick</a>",
+      "css": ".tag-default{display:inline-flex;border-radius:999px;padding:.4rem .78rem;font-size:.72rem;font-weight:600;background:rgba(27,27,31,.08);color:rgba(27,27,31,.76)} .tag-default:hover{background:#ff4a1c;color:#1b1b1f}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Press Proof",
+    "overview": "Conduit is printed, not rendered: a warm-paper Medium clone pulled through a two-ink risograph press. One fluoro-orange ink does all the shouting; one indigo-black ink does all the structure. The signature is misregistration — orange display type carrying a faint indigo ghost — and every hover is the second ink rolling over the first.",
+    "keyCharacteristics": ["Two inks, one paper; a third color is a bug", "Ink bands frame paper content", "Misregistration is the only ornament", "Sharp-cut cards, soft dies only on small controls"],
+    "rules": [
+      { "name": "The Two-Ink Rule", "body": "Every color is fluoro or ink mixed with paper; a third hue never enters the page.", "section": "colors" },
+      { "name": "The Reaction Rule", "body": "Orange is a reaction, ink is structure: resting text is ink; the loud ink appears on hover, active, brand, and stamp.", "section": "colors" },
+      { "name": "The Lowercase Rule", "body": "Anton sets the brand and page names in lowercase; uppercase is reserved for small UI labels.", "section": "typography" }
+    ],
+    "dos": ["Mix every tint from the two inks and paper", "Keep article measure at or under 74ch", "Theme browser surfaces: selection, scrollbar, focus rings"],
+    "donts": ["No third color, including the old RealWorld green", "No rounding cards past 4px", "No soft shadows on resting elements", "Never rename the spec's classes, names, placeholders, or text labels"]
+  }
+}

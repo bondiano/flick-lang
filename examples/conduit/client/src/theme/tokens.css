@@ -1,0 +1,229 @@
+/*
+ * Conduit — the two-ink risograph world.
+ *
+ * THESIS: a Medium clone printed as a two-ink zine — warm paper, one
+ * fluoro-orange ink, near-black indigo ink — refusing the stock
+ * white-and-green RealWorld theme every other implementation ships.
+ *
+ * OWN-WORLD: Anton poster display (the orange stamp), Figtree UI text,
+ * Source Serif 4 article bodies, IBM Plex Mono for code. Hairline indigo
+ * rules, 1.5px ink borders on print-stock cards, misregistration shadows,
+ * a masked halftone raster. States stamp themselves: favorites and active
+ * pages fill with fluoro ink, destructive actions tear (dashed).
+ *
+ * FIRST VIEWPORT: the home banner is the press proof — a giant lowercase
+ * "conduit" in fluoro ink settling into register over a fading halftone
+ * raster, feed cards as ink-ruled print stock beneath.
+ *
+ * SIGNATURE: two-ink misregistration (orange type carrying a faint indigo
+ * ghost) on the brand and the hero; every hover is the second ink rolling
+ * over the first.
+ *
+ * REACH: dark-ink bands (article banner, profile, footer) frame warm
+ * paper content on every route; the same two inks carry buttons, forms,
+ * tags, pagination and errors.
+ *
+ * RISK: two inks demand discipline — any third color is a bug.
+ *
+ * Every selector the vendored e2e suite relies on keeps its class name;
+ * this file replaces the vendored RealWorld theme for this client only.
+ * The footer is pinned by the #app flex frame at the bottom.
+ */
+
+/* ============================================================================
+ * TOKENS
+ * ========================================================================== */
+
+:root {
+  --paper: #f8f4ea; /* warm uncoated stock */
+  --stock: #fffdf7; /* card stock, one step brighter than the page */
+  --ink: #1b1b1f; /* indigo-black print ink */
+  --fluoro: #ff4a1c; /* the loud ink: fills, display, stamps */
+  --fluoro-press: #ff5e32; /* pressed state of the loud ink, kept light so ink text stays 4.5:1+ */
+  --rubric: #c93405; /* the loud ink at text weight (5:1 on paper) */
+  --shadow-ink: 91, 27, 31; /* shadow tint = ink + a little fluoro */
+
+  --font-display: 'Anton', 'Arial Narrow', Impact, sans-serif;
+  --font-ui: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --rule: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  --rule-strong: 2px solid var(--ink);
+  --radius: 4px; /* print stock is cut, not rounded */
+  --radius-ctl: 8px; /* controls keep a softer die */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --nav-h: 68px;
+
+}
+
+/* ============================================================================
+ * RESET & BASE
+ * ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The press frame: navbar and footer hold the edges, content floats on
+   paper between them; the footer is pinned to the bottom of the viewport. */
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+#app > footer {
+  margin-top: auto;
+}
+
+ul,
+ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* the spec's form groups are fieldsets; kill the browser's groove frame */
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0 0 1rem;
+}
+
+img {
+  max-width: 100%;
+  border-style: none;
+}
+
+a {
+  color: inherit;
+  text-decoration-color: color-mix(in srgb, var(--fluoro) 55%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--fluoro);
+  text-decoration-color: currentColor;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+textarea {
+  resize: vertical;
+}
+
+hr {
+  border: 0;
+  border-top: var(--rule);
+  margin: 2rem 0;
+}
+
+::selection {
+  background: var(--fluoro);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--fluoro);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 30%, transparent) transparent;
+}
+/* ============================================================================
+ * LAYOUT: CONTAINER & GRID
+ * ========================================================================== */
+
+.container {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1.75rem;
+}
+
+[class*='col-'] {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+/* floats inside columns (pull-xs-right) must not collapse the column */
+[class*='col-']::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+
+@media (min-width: 768px) {
+  /* longhand end-span: the `grid-column: span N` shorthand would set the
+     start line instead and collapse offset columns to one track */
+  .col-md-3 { grid-column-end: span 3; }
+  .col-md-6 { grid-column-end: span 6; }
+  .col-md-8 { grid-column-end: span 8; }
+  .col-md-9 { grid-column-end: span 9; }
+  .col-md-10 { grid-column-end: span 10; }
+  .col-md-12 { grid-column-end: span 12; }
+  .offset-md-1 { grid-column-start: 2; }
+  .offset-md-2 { grid-column-start: 3; }
+  .offset-md-3 { grid-column-start: 4; }
+}
+
+.container.page {
+  margin-top: 2.5rem;
+  margin-bottom: 4rem;
+}
+

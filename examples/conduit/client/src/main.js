@@ -1,8 +1,9 @@
-// The page's script and the RealWorld theme: Vite builds
+// The page's script and the Conduit press theme: Vite builds
 // `Conduit/Client/Main.fl` with `flick build`, and runs the new program in
 // place of the old one when a module changes, the top-level atoms keeping
-// their values.
-import "../../vendor/realworld/assets/theme/styles.css";
+// their values. The theme is the client's own two-ink stylesheet; the
+// vendored RealWorld theme stays untouched in vendor/.
+import './theme.css';
 
 import { hotCarry, hotDispose, run } from "@flick-lang/runtime/runner/browser";
 

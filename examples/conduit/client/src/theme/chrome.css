@@ -1,0 +1,297 @@
+/* ============================================================================
+ * NAVBAR — the masthead
+ * ========================================================================== */
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: var(--rule-strong);
+}
+
+.navbar > .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: var(--nav-h);
+}
+
+.navbar-brand {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--fluoro);
+  text-decoration: none;
+  text-shadow: 2px 2px 0 color-mix(in srgb, var(--ink) 15%, transparent);
+  transition: text-shadow 0.25s var(--ease-out), transform 0.25s var(--ease-out);
+}
+
+.navbar-brand:hover {
+  color: var(--fluoro);
+  text-shadow: 3px 3px 0 color-mix(in srgb, var(--ink) 22%, transparent);
+  transform: translateY(-1px);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.navbar-nav {
+  margin-left: auto;
+}
+
+.navbar-nav .nav-item + .nav-item {
+  margin-left: 0.35rem;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-ctl);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 70%, var(--paper));
+  text-decoration: none;
+  transition: color 0.2s var(--ease-out), background-color 0.2s var(--ease-out);
+}
+
+.nav-link:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.nav-link .user-pic {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
+}
+
+.nav-link:hover .user-pic {
+  border-color: var(--fluoro);
+}
+
+.navbar-light .navbar-brand,
+.navbar-light .navbar-brand:focus,
+.navbar-light .navbar-brand:hover {
+  color: var(--fluoro);
+}
+
+.navbar-light .navbar-nav .nav-link {
+  color: color-mix(in srgb, var(--ink) 70%, var(--paper));
+}
+
+.navbar-light .navbar-nav .nav-link:focus,
+.navbar-light .navbar-nav .nav-link:hover,
+.navbar-light .navbar-nav .active > .nav-link {
+  color: var(--ink);
+}
+
+/* ============================================================================
+ * BUTTONS — stamps and outlines
+ * ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.1rem;
+  border: var(--rule-strong);
+  border-radius: var(--radius-ctl);
+  background: var(--stock);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.2s var(--ease-out), color 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out), transform 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px -2px rgba(var(--shadow-ink), 0.35);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn:focus,
+.btn.focus {
+  outline: none;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--fluoro);
+  outline-offset: 2px;
+}
+
+.btn:disabled,
+.btn.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-primary {
+  background: var(--fluoro);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-primary:hover {
+  background: var(--fluoro-press);
+  color: var(--ink);
+}
+
+.btn-secondary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.btn-secondary:hover {
+  background: var(--ink);
+  color: var(--fluoro);
+}
+
+.btn-outline-primary,
+.btn-outline-secondary {
+  background: transparent;
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-outline-primary:hover {
+  background: var(--fluoro);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-outline-secondary:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* destructive actions tear along the perf — same ink, dashed rule */
+.btn-outline-danger {
+  background: transparent;
+  border: 1.5px dashed var(--rubric);
+  color: var(--rubric);
+}
+
+.btn-outline-danger:hover {
+  background: var(--fluoro);
+  border-style: solid;
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-lg {
+  padding: 0.75rem 1.7rem;
+  font-size: 0.9rem;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.72rem;
+}
+
+/* ============================================================================
+ * FORMS
+ * ========================================================================== */
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border: var(--rule-strong);
+  border-radius: var(--radius-ctl);
+  background: var(--stock);
+  color: var(--ink);
+  font-size: 1rem;
+  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+
+.form-control::placeholder {
+  color: color-mix(in srgb, var(--ink) 55%, var(--paper));
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--fluoro);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fluoro) 22%, transparent);
+}
+
+.form-control:disabled {
+  background: color-mix(in srgb, var(--ink) 5%, var(--paper));
+  cursor: not-allowed;
+}
+
+.form-control-lg {
+  padding: 0.8rem 1rem;
+  font-size: 1.05rem;
+}
+
+/* ============================================================================
+ * FEED TOGGLE — tabs ruled in the second ink
+ * ========================================================================== */
+
+.feed-toggle,
+.articles-toggle {
+  border-bottom: var(--rule-strong);
+  margin-bottom: 1.5rem;
+}
+
+.nav-pills {
+  gap: 0.25rem;
+}
+
+.nav-pills .nav-link {
+  border-radius: 0;
+  padding: 0.65rem 0.95rem 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.nav-pills.outline-active .nav-link {
+  color: color-mix(in srgb, var(--ink) 66%, var(--paper));
+  background: transparent;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+
+.nav-pills.outline-active .nav-link:hover {
+  color: var(--ink);
+  background: transparent;
+  border-bottom-color: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.nav-pills.outline-active .nav-link.active {
+  color: var(--ink);
+  border-bottom-color: var(--fluoro);
+}
+

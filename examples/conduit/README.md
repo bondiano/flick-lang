@@ -27,6 +27,20 @@ repository.
 just conduit-run          # builds both, starts PostgreSQL and the server: http://127.0.0.1:8000
 ```
 
+To run the server binary directly from this directory against an existing
+PostgreSQL on port 54329, build the browser files first:
+
+```sh
+pnpm --dir client build
+flick build --package server
+DATABASE_URL=postgres://postgres:conduit@localhost:54329/postgres \
+  JWT_SECRET=conduit-api PORT=8037 server/dist/flick-main
+```
+
+Open `http://127.0.0.1:8037/`. The server serves `client/dist` by default;
+set `STATIC_DIR` to another built client directory if needed. It listens on
+`0.0.0.0` so it is also reachable on the machine's IPv4 addresses.
+
 From this directory, `flick run <name>` runs the steps of
 [`flick.toml`](flick.toml):
 
@@ -182,6 +196,10 @@ frontend on the js target, rendered with React:
   reload.
 - Article bodies go through `Markdown.to_html`, which escapes every text:
   the spec's XSS tests pass by construction.
+- The look is the client's own two-ink press theme
+  ([`theme.css`](client/src/theme.css)): warm paper, one fluoro ink and one
+  indigo ink, Anton/Figtree/Source Serif/Plex Mono. The classes the spec's
+  tests find by are unchanged; the vendored theme stays untouched.
 
 ## Tests at a glance
 
