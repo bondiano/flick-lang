@@ -77,6 +77,7 @@ impl Command for BuildCommand {
         Some(summary::text(built.as_ref(), outcome, took, color))
     }
 
+    #[allow(clippy::too_many_lines)]
     fn run(&self) -> Outcome {
         let progress = self.progress();
         let mut sources = SourceMap::default();

@@ -10,4 +10,5 @@ mod query;
 mod select;
 mod table;
 
+#[cfg(feature = "ide")]
 pub(crate) use table::base_type;

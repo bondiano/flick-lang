@@ -143,8 +143,8 @@ fn tokens(text: &str) -> Vec<Token<'_>> {
         if b[start].is_ascii() {
             out.push(Token {
                 text: &text[start..i],
-                start: start as u32,
-                end: i as u32,
+                start: u32::try_from(start).unwrap_or(u32::MAX),
+                end: u32::try_from(i).unwrap_or(u32::MAX),
                 depth,
             });
         }
@@ -243,16 +243,11 @@ mod tests {
     #[test]
     fn finds_declarations_without_matching_comments_or_strings() {
         let js = "// export function count() {}\nconst note = 'export const count = 0';\nexport function count() {}\n";
-        assert_eq!(
-            js_name(js, "count"),
-            Some((
-                js.rfind("count").unwrap() as u32,
-                js.rfind("count").unwrap() as u32 + 5
-            ))
-        );
+        let at = u32::try_from(js.rfind("count").expect("count")).expect("small");
+        assert_eq!(js_name(js, "count"), Some((at, at + 5)));
         assert_eq!(js_name(js, "missing"), None);
         let go = "// var count = 0\nvar count = 1\n";
-        let start = go.rfind("count").unwrap() as u32;
+        let start = u32::try_from(go.rfind("count").expect("count")).expect("small");
         assert_eq!(go_name(go, "count"), Some((start, start + 5)));
     }
 }

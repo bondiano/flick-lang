@@ -300,6 +300,7 @@ impl Loader<'_> {
     }
 
     /// The source directory of each source package the project depends on.
+    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
     fn package_sources(&self) -> Vec<(String, PathBuf)> {
         #[cfg(feature = "native-project")]
         return self
