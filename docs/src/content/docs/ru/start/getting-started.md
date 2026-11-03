@@ -4,16 +4,18 @@ description: Установите инструменты, создайте пр�
 ---
 
 Для локального приложения нужны компилятор Flick, Node.js 24.18 или новее
-и pnpm. Скачайте архив `flick` для своей платформы со страницы
-[релизов](https://github.com/bondiano/flick-lang/releases) или соберите
-компилятор из исходников по разделу [Экосистема](../../ecosystem/).
-В архиве один исполняемый файл `flick`; добавьте его в `PATH`:
+и pnpm. В macOS и Linux последний релиз ставится в `~/.local/bin` одной
+командой:
 
 ```sh
-tar -xzf flick-x86_64-unknown-linux-gnu.tar.gz
-install -m 755 flick ~/.local/bin/
+curl -fsSL https://bondiano.github.io/flick-lang/install.sh | sh
 flick --version
 ```
+
+или через Homebrew: `brew install bondiano/tap/flick`. Можно также скачать
+архив `flick` для своей платформы со страницы
+[релизов](https://github.com/bondiano/flick-lang/releases) или собрать
+компилятор из исходников по разделу [Экосистема](../../ecosystem/).
 
 В Windows распакуйте `.zip` и добавьте каталог с `flick.exe` в `PATH`.
 

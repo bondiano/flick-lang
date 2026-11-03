@@ -83,6 +83,7 @@ fn the_root_goes_through_the_members_dependencies_first() {
 }
 
 #[test]
+#[ignore = "needs Node and the installed runtime"]
 fn a_path_dependency_is_rebuilt_when_its_sources_change() {
     let dir = workspace("workspace_run");
     let out = flick_in(&dir, &["run", "-p", "app", "main"]);
@@ -95,6 +96,7 @@ fn a_path_dependency_is_rebuilt_when_its_sources_change() {
 }
 
 #[test]
+#[ignore = "needs Node and the installed runtime"]
 fn scripts_run_their_steps_in_order_until_one_fails() {
     let dir = workspace("workspace_scripts");
     let out = flick_in(dir.join("app"), &["run", "both", "--", "a", "b"]);

@@ -47,9 +47,17 @@ possible `AppError` explicit. Generated programs are ordinary ES modules.
 
 ## Install
 
-Download the `flick` archive for your platform from the
-[releases](https://github.com/bondiano/flick-lang/releases) and put the
-binary on your `PATH`. A project also needs Node.js 24.18 or newer and
+On macOS or Linux:
+
+```sh
+curl -fsSL https://bondiano.github.io/flick-lang/install.sh | sh
+# or
+brew install bondiano/tap/flick
+```
+
+On Windows, download the `flick` archive from the
+[releases](https://github.com/bondiano/flick-lang/releases) and put
+`flick.exe` on your `PATH`. A project also needs Node.js 24.18 or newer and
 pnpm:
 
 ```sh

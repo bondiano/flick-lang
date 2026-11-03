@@ -94,6 +94,77 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
+      # install.sh and the Homebrew formula verify the archives against these
+      - run: for archive in flick-*; do sha256sum "$archive" > "$archive.sha256"; done
       - run: gh release create "$GITHUB_REF_NAME" flick-* --repo "$GITHUB_REPOSITORY" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
+
+  homebrew:
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - uses: actions/checkout@v4
+        with:
+          repository: bondiano/homebrew-tap
+          path: tap
+          ssh-key: ${{ secrets.HOMEBREW_TAP_KEY }}
+      - name: Update Formula/flick.rb
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          base=https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME
+          sha() { sha256sum "flick-$1.tar.gz" | cut -d' ' -f1; }
+          mkdir -p tap/Formula
+          cat > tap/Formula/flick.rb <<EOF
+          class Flick < Formula
+            desc "Compiler and toolchain for the Flick language"
+            homepage "https://bondiano.github.io/flick-lang/"
+            version "$version"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "$base/flick-aarch64-apple-darwin.tar.gz"
+                sha256 "$(sha aarch64-apple-darwin)"
+              end
+              on_intel do
+                url "$base/flick-x86_64-apple-darwin.tar.gz"
+                sha256 "$(sha x86_64-apple-darwin)"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "$base/flick-aarch64-unknown-linux-gnu.tar.gz"
+                sha256 "$(sha aarch64-unknown-linux-gnu)"
+              end
+              on_intel do
+                url "$base/flick-x86_64-unknown-linux-gnu.tar.gz"
+                sha256 "$(sha x86_64-unknown-linux-gnu)"
+              end
+            end
+
+            def install
+              bin.install "flick"
+            end
+
+            def caveats
+              "Flick projects also need Node.js 24.18 or later and pnpm."
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/flick --version")
+            end
+          end
+          EOF
+      - name: Push the formula
+        working-directory: tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/flick.rb
+          git commit -m "flick $GITHUB_REF_NAME"
+          git push
