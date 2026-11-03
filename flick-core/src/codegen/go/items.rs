@@ -11,10 +11,18 @@ use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::source::Span;
+use crate::types::cli::CLI;
 use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
+use crate::types::{STRUCTURAL, which};
 
-/// The classes whose instances the runtime derives.
-const DERIVED: &[&str] = &["Eq", "Ord", "Hash", "Show", "Value"];
+/// The classes besides the structural ones whose instances the runtime
+/// derives.
+const DERIVED: &[(&str, &str)] = &[(CLI, "Value")];
+
+/// Whether the runtime derives the instances of `module.class`.
+fn derives(module: &str, class: &str) -> bool {
+    which(&STRUCTURAL, module, class).is_some() || DERIVED.contains(&(module, class))
+}
 
 /// The declarations of a module, each with whether it holds a `//line`
 /// directive; the statements of its init function.
@@ -206,8 +214,8 @@ impl<'a> Gen<'a> {
             .map(|(class, dict)| (class.clone(), self.dict(dict)))
             .collect();
         if let Some((fields, constructors)) = &info.derived {
-            let class = &info.class.1;
-            if !DERIVED.contains(&class.as_str()) {
+            let (module, class) = &info.class;
+            if !derives(module, class) {
                 self.unsupported(span, &format!("`deriving {class}`"));
                 self.emit("d := flickrt.NewDict()");
                 return;

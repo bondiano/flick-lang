@@ -4,9 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::kinds::Kind;
-
-/// Module of the built-in types and constructors every module sees.
-pub const PRELUDE: &str = "Prelude";
+use super::lang::{self, Lang};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -91,7 +89,7 @@ pub struct Effects {
 }
 
 /// Services whose operations run at once, without the Effect runtime.
-pub const SYNC_SERVICES: [&str; 2] = ["Atom.Read", "Prelude.Setup"];
+pub const SYNC_SERVICES: [Lang; 2] = [Lang::AtomRead, Lang::Setup];
 
 /// How a stage of a function runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -143,9 +141,11 @@ fn closed_labels(row: &Type) -> Option<Vec<&str>> {
 
 /// Whether `services` and `errors` make a Sync stage.
 pub fn sync_rows(services: &Type, errors: &Type) -> bool {
-    closed_labels(services)
-        .is_some_and(|l| !l.is_empty() && l.iter().all(|l| SYNC_SERVICES.contains(l)))
-        && closed_labels(errors).is_some_and(|l| l.is_empty())
+    closed_labels(services).is_some_and(|l| {
+        !l.is_empty()
+            && l.iter()
+                .all(|l| SYNC_SERVICES.iter().any(|&s| lang::item(s).label == *l))
+    }) && closed_labels(errors).is_some_and(|l| l.is_empty())
 }
 
 /// Entries sorted by label, each label once. A field row labels entries with
@@ -240,12 +240,15 @@ impl Type {
         }
     }
 
-    pub fn prim(name: &str) -> Type {
-        Type::con(PRELUDE, name)
+    /// The type constructor the lang item `item` names.
+    pub fn lang(item: Lang) -> Type {
+        let item = lang::item(item);
+        Type::con(&item.module, &item.name)
     }
 
-    pub fn is_prim(&self, name: &str) -> bool {
-        matches!(self, Type::Con { module, name: n } if module == PRELUDE && n == name)
+    /// Whether this is the type constructor the lang item `item` names.
+    pub fn is_lang(&self, item: Lang) -> bool {
+        matches!(self, Type::Con { module, name } if lang::is(item, module, name))
     }
 
     pub fn app(head: Type, arg: Type) -> Type {
@@ -437,7 +440,7 @@ impl Type {
 
 #[cfg(test)]
 mod tests {
-    use super::Type;
+    use super::{Lang, Type};
 
     #[test]
     fn substitution_preserves_capture_qualification_kind() {
@@ -448,13 +451,13 @@ mod tests {
                 value,
             };
             let substituted = ty.substitute(&[
-                ("a".into(), Type::prim("Float")),
+                ("a".into(), Type::lang(Lang::Float)),
                 ("c".into(), Type::empty_row()),
             ]);
             assert_eq!(
                 substituted,
                 Type::Captured {
-                    ty: Box::new(Type::prim("Float")),
+                    ty: Box::new(Type::lang(Lang::Float)),
                     captures: Box::new(Type::empty_row()),
                     value,
                 }

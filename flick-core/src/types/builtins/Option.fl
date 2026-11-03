@@ -42,6 +42,7 @@ let map f value =
   | None -> None
   | Some x -> Some (f x)
 
+@lang option_bind
 /// `f x` for `Some x`.
 bind : forall c a b. (a -> Option b)^c -> (Option a -> Option b)^c
 let bind f value =

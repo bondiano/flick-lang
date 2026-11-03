@@ -1,21 +1,11 @@
-//! Row primitives of the module `Record`. The compiler solves them from the
+//! The row primitives of records. The compiler solves them from the
 //! fields of known records; a program cannot declare instances of them.
 
 use super::solve::{Givens, Outcome};
 use super::{Dict, has_metas};
 use crate::types::Checker;
+use crate::types::lang::Lang;
 use crate::types::ty::{Row, Type};
-
-/// The primitives; all of them live in [`super::RECORD`].
-pub const PRIMITIVES: [&str; 7] = [
-    "HasField",
-    "Lacks",
-    "Remove",
-    "Project",
-    "UnionDisjoint",
-    "Map",
-    "Labels",
-];
 
 /// What is known about the rest of a record's fields.
 enum Rest {
@@ -39,7 +29,7 @@ impl Checker<'_> {
     pub(super) fn primitive(
         &mut self,
         c: &Type,
-        name: &str,
+        class: Lang,
         args: &[Type],
         givens: &Givens,
         chain: &mut Vec<Type>,
@@ -62,16 +52,15 @@ impl Checker<'_> {
             ),
         };
         let solved = |this: &Self| primitive(this.show(c), Vec::new());
-        match (name, args) {
-            ("HasField", [Type::Symbol(label), Type::Record(row), field]) => match row.get(label) {
-                Some(t) if self.unify(field, t).is_ok() => solved(self),
-                Some(t) => {
-                    let shown = self.show(t);
-                    refuse(format!("field `{label}` has type `{shown}`"))
+        match (class, args) {
+            (Lang::HasField, [Type::Symbol(label), Type::Record(row), field]) => {
+                match row.get(label) {
+                    Some(t) if self.unify(field, t).is_ok() => solved(self),
+                    Some(t) => refuse(format!("field `{label}` has type `{}`", self.show(t))),
+                    None => elsewhere(row, format!("the record has no field `{label}`")),
                 }
-                None => elsewhere(row, format!("the record has no field `{label}`")),
-            },
-            ("Lacks", [Type::Symbol(label), Type::Record(row)]) => {
+            }
+            (Lang::Lacks, [Type::Symbol(label), Type::Record(row)]) => {
                 if row.get(label).is_some() {
                     return refuse(format!("the record already has field `{label}`"));
                 }
@@ -83,7 +72,7 @@ impl Checker<'_> {
                     )),
                 }
             }
-            ("Remove", [Type::Symbol(label), Type::Record(row), out]) => {
+            (Lang::Remove, [Type::Symbol(label), Type::Record(row), out]) => {
                 if row.get(label).is_none() {
                     return elsewhere(row, format!("the record has no field `{label}`"));
                 }
@@ -99,7 +88,7 @@ impl Checker<'_> {
                 });
                 self.result(c, out, &removed)
             }
-            ("Project", [Type::Record(row), Type::Record(out)]) => {
+            (Lang::Project, [Type::Record(row), Type::Record(out)]) => {
                 if matches!(rest(out), Rest::Unknown) {
                     return Outcome::Stuck;
                 }
@@ -119,10 +108,10 @@ impl Checker<'_> {
                 let labels = out.entries.iter().map(|(l, _)| l.clone());
                 primitive(self.show(c), labels.collect())
             }
-            ("UnionDisjoint", [Type::Record(a), Type::Record(b), out]) => {
+            (Lang::UnionDisjoint, [Type::Record(a), Type::Record(b), out]) => {
                 self.union_disjoint(c, (a, b), out, givens, chain)
             }
-            ("Map", [f, Type::Record(row), out]) => match rest(row) {
+            (Lang::MapFields, [f, Type::Record(row), out]) => match rest(row) {
                 Rest::Closed => {
                     let entries = row
                         .entries
@@ -136,7 +125,7 @@ impl Checker<'_> {
                     refuse("the record is open, so its other fields are not known".to_owned())
                 }
             },
-            ("Labels", [Type::Record(row)]) => match rest(row) {
+            (Lang::Labels, [Type::Record(row)]) => match rest(row) {
                 Rest::Closed => solved(self),
                 Rest::Unknown => Outcome::Stuck,
                 Rest::Open => {
@@ -194,7 +183,7 @@ impl Checker<'_> {
     ) -> Outcome {
         for (label, _) in &closed.entries {
             let lacks = Type::apps(
-                Type::con(super::RECORD, "Lacks"),
+                Type::lang(Lang::Lacks),
                 [Type::Symbol(label.clone()), Type::Record(open.clone())],
             );
             match self.entail(&lacks, givens, chain) {

@@ -12,9 +12,8 @@ use crate::resolve::declarations;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::dialect::ColumnType;
-use crate::types::{
-    Dialect, Form, Match, PRELUDE, SqlTable, Type, base_type, match_type, show_type,
-};
+use crate::types::lang::{self, Lang};
+use crate::types::{Dialect, Form, Match, SqlTable, Type, base_type, match_type, show_type};
 
 /// Column attributes: their words, what they mean and the attributes they
 /// cannot be written with.
@@ -98,7 +97,7 @@ fn words(column: &Node, text: &str, dialect: &'static Dialect, before: u32) -> W
 fn row(info: &SqlTable) -> String {
     let fields = info.columns.iter().map(|c| {
         let ty = if c.nullable {
-            Type::app(Type::prim("Option"), c.ty.clone())
+            Type::app(Type::lang(Lang::Option), c.ty.clone())
         } else {
             c.ty.clone()
         };
@@ -291,12 +290,12 @@ impl Ide<'_> {
             return Vec::new();
         };
         let target = Type::apps(
-            Type::prim("PureCodec"),
+            Type::lang(Lang::PureCodec),
             [base_type(m.typing.sql_dialect, sql.kind), ty],
         );
         let mut candidates: BTreeMap<String, Type> = BTreeMap::new();
         let mut interfaces = vec![m.interface.clone()];
-        interfaces.extend(self.interface(PRELUDE));
+        interfaces.extend(self.interface(lang::prelude()));
         for import in m.tree.nodes().filter(|n| n.kind == K::ImportDecl) {
             let Some(path) = import.nodes().find(|n| n.kind == K::ModulePath) else {
                 continue;

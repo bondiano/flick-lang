@@ -7,6 +7,7 @@ use super::ty::Type;
 use crate::diagnostics::codes;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 /// The range of `[a..b]`, if `list` is one.
 pub fn range_list(list: &Node) -> Option<&Node> {
@@ -19,7 +20,7 @@ pub fn range_list(list: &Node) -> Option<&Node> {
 
 impl Checker<'_> {
     pub fn range_expr(&mut self, node: &Node, strict: bool) -> Type {
-        let number = Type::prim("Int");
+        let number = Type::lang(Lang::Int);
         let bounds: Vec<&Node> = node.nodes().collect();
         for bound in &bounds {
             self.check(bound, &number);
@@ -31,7 +32,7 @@ impl Checker<'_> {
                 "`[a..]` would never end: take a part of the sequence, as in `Seq.to_list (Seq.take n (a..))`",
             );
         }
-        let collection = if strict { "List" } else { "Seq" };
-        Type::app(Type::prim(collection), number)
+        let collection = if strict { Lang::List } else { Lang::Seq };
+        Type::app(Type::lang(collection), number)
     }
 }

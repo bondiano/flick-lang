@@ -2,13 +2,14 @@
 
 use std::mem;
 
-use super::{Need, SCOPE, Scope};
+use super::{Need, Scope, scope};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
 use crate::types::convert::TyVar;
 use crate::types::kinds::Kind;
+use crate::types::lang::Lang;
 use crate::types::ty::{Row, Type};
 use crate::types::typing::range;
 
@@ -49,7 +50,7 @@ impl Checker<'_> {
                 ty: region.clone(),
                 kind: Kind::Region,
             });
-            let owner = Type::app(Type::con("Fiber", "Owner"), region.clone());
+            let owner = Type::app(Type::lang(Lang::Owner), region.clone());
             self.push_local(name, owner);
         }
         let needed = self.fresh();
@@ -96,7 +97,7 @@ impl Checker<'_> {
             return services.clone();
         };
         let mut norm = self.store.normalize(services);
-        let Some(needed) = norm.get(SCOPE).cloned() else {
+        let Some(needed) = norm.get(scope()).cloned() else {
             return services.clone();
         };
         let own = self.regions.open[self.stage.scopes.min(self.regions.open.len())..].to_vec();
@@ -142,7 +143,7 @@ impl Checker<'_> {
             span,
             site: self.stage.site,
         });
-        norm.entries.retain(|(label, _)| label != SCOPE);
+        norm.entries.retain(|(label, _)| label != scope());
         norm.into_type()
     }
 
@@ -161,7 +162,7 @@ impl Checker<'_> {
     /// a task checked against `Eff {Scope s | r} e a` acquires into `s`.
     fn declared_scope(&self) -> Option<Type> {
         let declared = self.store.normalize(&self.stage.services);
-        let scope = declared.get(SCOPE)?;
+        let scope = declared.get(scope())?;
         let [region] = scope.spine().1[..] else {
             return None;
         };
@@ -188,8 +189,8 @@ impl Checker<'_> {
             if !provided {
                 let row = Type::Row(Row {
                     entries: vec![(
-                        SCOPE.to_owned(),
-                        Type::app(Type::prim("Scope"), need.region.clone()),
+                        scope().to_owned(),
+                        Type::app(Type::lang(Lang::Scope), need.region.clone()),
                     )],
                     tail: None,
                 });

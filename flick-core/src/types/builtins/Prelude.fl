@@ -1,42 +1,67 @@
+@lang prelude
 /// Built-in types and constructors; every module
 /// sees them without an import.
 module Prelude exposing (..)
 
+@lang unit
 type Unit
+@lang never
 type Never
+@lang bool
 type Bool
+@lang int
 type Int
+@lang float
 type Float
+@lang bigint
 type BigInt
+@lang string
 type String
+@lang unknown
 type Unknown
 
+@lang js_value
 /// Any JS value, as it comes from foreign code: getters, proxies, cycles
 /// and all. `Js.snapshot` turns supported data into an `Unknown`.
 type JsValue
+@lang list
 type List a
 
+@lang seq
 /// A lazy sequence that starts over on each iteration: see the module `Seq`.
 type Seq a
+@lang ref
 type Ref a
+@lang redacted
 type Redacted a
+@lang schema
 type Schema a
+@lang url
 /// The URLs of a type that derives `Url`: see the module `Route`.
 type Url a
+@lang form
 /// The form of a record type that derives `Form`: see the module `Form`.
 type Form a
+@lang pure_codec
 type PureCodec i a
+@lang eff
 type Eff (r : ServiceRow) (e : ErrorRow) a
+@lang layer
 type Layer (ri : ServiceRow) (e : ErrorRow) (ro : ServiceRow)
+@lang codec
 type Codec (rd : ServiceRow) (re : ServiceRow) i a
+@lang errors
 type Errors (e : ErrorRow)
 
+@lang ui
 /// A user interface: see the module `Ui`.
 type Ui
 
+@lang service_tag
 /// A service named as a value, as in `Layer.succeed Clock clock_impl`.
 type ServiceTag (r : ServiceRow)
 
+@lang scope
 /// The owner of what a `scope` acquires: an operation that acquires a
 /// resource of region `s` needs `Scope s`, which the innermost `scope`
 /// provides. It has no operations of its own.
@@ -46,6 +71,7 @@ service Scope (s : Region)
 /// `Ui.on_mount` and `Ui.watch` describe.
 type Lifecycle
 
+@lang setup
 /// The setup of a component instance, region `s`: it runs once when the
 /// instance mounts, and what it makes lives as long as the instance.
 service Setup (s : Region) =
@@ -55,29 +81,37 @@ service Setup (s : Region) =
   /// Runs `work` from the instance's mount to its unmount.
   start : forall c. Lifecycle^c ->{} Unit
 
+@lang service_impl
 /// The implementation record of the one service of `r`:
 /// `ServiceImpl {Clock}` is `Clock.Impl`.
 type ServiceImpl (r : ServiceRow)
 
-type Option a = None | Some a
+@lang option
+type Option a = @lang none None | @lang some Some a
 
-type Result e a = Err e | Ok a
+@lang result
+type Result e a = @lang err Err e | @lang ok Ok a
 
 type Ordering = LT | EQ | GT
 
+@lang eq
 /// Canonical equality; `Eq Float` is SameValueZero, like `==`.
 class Eq a =
   eq : a -> a -> Bool
 
+@lang ord
 /// A total order that agrees with `Eq`.
 class Eq a => Ord a =
   compare : a -> a -> Ordering
 
+@lang hash
 /// Equal values have equal hashes.
 class Eq a => Hash a =
   hash : a -> Int
 
+@lang show
 class Show a =
+  @lang show_method
   show : a -> String
 
 /// Containers whose elements a pure function maps. A container may apply
@@ -98,24 +132,30 @@ class Functor f => Traversable (f : Type -> Type) =
   traverse : forall c a b r e. (a ->{r; e} b)^c -> (f a ->{r; e} f b)^c
 
 class Functor f => Applicative (f : Type -> Type) =
+  @lang pure
   pure : forall c a. a^c -> (f a)^c
+  @lang map2
   /// `f` of the values of both, in order: for `List`, every pair.
   map2 :
     forall c d a b x.
     (forall u v. a^u -> (b^v -> x)^(c + u))^c -> ((f a)^d -> ((f b)^d -> (f x)^(c + d))^(c + d))^c
 
 class Applicative m => Monad (m : Type -> Type) =
+  @lang flat_map
   flat_map : forall c d a b. (forall v. a^v -> (m b)^(c + v))^c -> ((m a)^d -> (m b)^(c + d))^c
 
 /// Applicative containers with a choice: `nothing` holds no value, and
 /// `or_else` keeps the first that holds one (`List` keeps both).
 class Applicative f => Alternative (f : Type -> Type) =
+  @lang nothing
   nothing : forall a. f a
   or_else : forall a. f a -> f a -> f a
 
+@lang iterable
 /// Sources of `x <- source` in `for`: containers JS iterates as they are,
 /// so `iter` costs nothing.
 class Iterable (f : Type -> Type) =
+  @lang iter
   iter : forall d a. (f a)^d -> (Seq a)^d
 
 /// Values with an associative `combine`.
@@ -126,10 +166,12 @@ class Semigroup a =
 class Semigroup a => Monoid a =
   empty : a
 
+@lang exit
 /// How a computation ended: its value, or how it failed (`Exit.value`,
 /// `Exit.failure`).
 type Exit (e : ErrorRow) a
 
+@lang failure
 /// How a computation failed, as a supervisor or `Exit.failure` sees it:
 /// opaque, read through `Failure.primary` and `Failure.inspect`.
 type Failure (e : ErrorRow)
@@ -143,25 +185,30 @@ type CauseReport
 /// The error of a computation that ran out of time.
 type error TimeoutError
 
+@lang json
 /// A JSON value: what a JSON codec reads and writes.
 type Json
 
 /// What a schema check found wrong, and where: `profile.email`.
 type alias SchemaIssue = { message : String; path : String }
 
+@lang schema_error
 /// Decoding or encoding failed; the issues name the paths, never the value.
 type error SchemaError = SchemaError (List SchemaIssue)
 
+@lang field_codec
 /// One field of a `codec` block: its wire name, its codec and its policy for
 /// a missing key; decoding it may need the services `rd`.
 type FieldCodec (rd : ServiceRow) a
 
+@lang app_error
 /// The error an application fails with through `App.fail`.
 type error AppError = AppError { message : String; details : Option String }
 
 identity : a -> a
 let identity value = value
 
+@lang from_result
 /// Fails with the error of an `Err`: `Result NotFound a` has the error row
 /// `{NotFound}`.
 from_result : Result (Errors e) a ->{; e} a

@@ -15,6 +15,7 @@ type alias Atom a = Reactivity.Atom.Atom a
 /// A state: a value to read and write.
 type alias Writable a = Reactivity.Atom.Writable a
 
+@lang atom_read
 /// Reading atoms: the reader depends on what it read.
 service Read =
   get : forall a d. (Atom a)^d ->{} a

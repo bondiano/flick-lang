@@ -1,9 +1,6 @@
 //! TypeScript declarations of the types a module exports.
 
-use super::{
-    NATIVE, PRELUDE, PRIMITIVES, Projection, STREAM, Vars, generic, key, params, type_args,
-    uncaptured,
-};
+use super::{Projection, Vars, generic, key, native, params, type_args, uncaptured};
 use crate::codegen::names;
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::types::{Constructor, Form, Kind, Rep, Type};
@@ -41,9 +38,7 @@ impl Projection<'_> {
     /// A Prelude type TypeScript or Effect has, never declared; Effect's
     /// `Stream` too.
     fn native(&self, name: &str) -> bool {
-        (self.module == PRELUDE
-            && (PRIMITIVES.iter().any(|(n, _)| *n == name) || NATIVE.contains(&name)))
-            || (self.module == STREAM && name == "Stream")
+        native(self.module, name).is_some()
     }
 
     fn declaration(

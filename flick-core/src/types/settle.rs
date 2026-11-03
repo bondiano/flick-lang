@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 use std::mem;
 
-use super::classes::split;
+use super::classes::{NUMERIC_CLASSES, split, which};
 use super::env::{Form, TypeDef};
 use super::ty::Type;
 use super::typing::Identity;
@@ -14,6 +14,7 @@ use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::numeric::{Num, default_num};
 use crate::source::Span;
+use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
     /// The type of a number literal: any numeric type, a `Float` one when it
@@ -71,11 +72,11 @@ impl Checker<'_> {
             if op.domain != Domain::Concat && matches!(head, Type::Skolem(_)) {
                 let key = super::typing::range(op.span);
                 if op.domain == Domain::Numeric || numeric_given(&op.givens, &ty) {
-                    let class = numeric_class("Numeric", ty.clone());
+                    let class = numeric_class(Lang::Numeric, ty.clone());
                     self.want_under(class, op.span, op.givens.clone());
                     self.typing.generic_numeric.insert(key);
                 } else {
-                    let class = Type::app(Type::prim("Ord"), ty.clone());
+                    let class = Type::app(Type::lang(Lang::Ord), ty.clone());
                     self.want_under(class, op.span, op.givens.clone());
                     self.typing.generic_ordered.insert(key);
                 }
@@ -85,7 +86,7 @@ impl Checker<'_> {
             let fits = match head {
                 Type::Error => true,
                 Type::Meta(_) => {
-                    let _ = self.unify(&ty, &Type::prim(allowed[0]));
+                    let _ = self.unify(&ty, &Type::lang(allowed[0]));
                     true
                 }
                 head => op.domain.allows(head),
@@ -93,13 +94,13 @@ impl Checker<'_> {
             if op.domain == Domain::Numeric
                 && let Some(num) = Num::ALL
                     .into_iter()
-                    .find(|n| self.whnf(&ty).is_prim(n.name()))
+                    .find(|n| self.whnf(&ty).is_lang(n.lang()))
             {
                 self.typing
                     .numeric
                     .insert(super::typing::range(op.span), num);
             }
-            if op.op == "++" && ty.spine().0.is_prim("List") {
+            if op.op == "++" && ty.spine().0.is_lang(Lang::List) {
                 self.typing
                     .list_concat
                     .insert(super::typing::range(op.span));
@@ -115,7 +116,7 @@ impl Checker<'_> {
                 let shown = self.show(&ty);
                 let allowed = allowed
                     .iter()
-                    .map(|a| format!("`{a}`"))
+                    .map(|a| format!("`{}`", lang::item(*a).name))
                     .collect::<Vec<_>>()
                     .join(" or ");
                 let (code, detail) = match ty {
@@ -160,7 +161,7 @@ impl Checker<'_> {
             Type::Error => return,
             Type::Meta(_) => {
                 let num = default_num(literal.fractional);
-                let _ = self.unify(&ty, &Type::prim(num.name()));
+                let _ = self.unify(&ty, &Type::lang(num.lang()));
                 num
             }
             // on a type variable, a method of its `Numeric` or `Floating`
@@ -176,9 +177,9 @@ impl Checker<'_> {
                     return;
                 }
                 let class = if literal.fractional {
-                    "Floating"
+                    Lang::Floating
                 } else {
-                    "Numeric"
+                    Lang::Numeric
                 };
                 self.want_under(
                     numeric_class(class, ty.clone()),
@@ -191,7 +192,7 @@ impl Checker<'_> {
                 return;
             }
             head => {
-                let found = Num::ALL.into_iter().find(|n| head.is_prim(n.name()));
+                let found = Num::of_type(head);
                 if let Some(num) = found {
                     num
                 } else {
@@ -232,13 +233,15 @@ impl Checker<'_> {
 /// Whether `givens` hold a numeric class of `ty`.
 fn numeric_given(givens: &[Type], ty: &Type) -> bool {
     givens.iter().any(|g| {
-        split(g).is_some_and(|((module, _), args)| module == "Numeric" && args.first() == Some(&ty))
+        split(g).is_some_and(|((module, name), args)| {
+            which(&NUMERIC_CLASSES, module, name).is_some() && args.first() == Some(&ty)
+        })
     })
 }
 
 /// The constraint `class ty` of the closed numeric classes.
-fn numeric_class(class: &str, ty: Type) -> Type {
-    Type::apps(Type::con("Numeric", class), [ty])
+fn numeric_class(class: Lang, ty: Type) -> Type {
+    Type::apps(Type::lang(class), [ty])
 }
 
 impl Checker<'_> {
@@ -247,9 +250,9 @@ impl Checker<'_> {
     fn identity(&mut self, ty: &Type) -> Option<Identity> {
         let ty = self.whnf(ty);
         let (head, _) = ty.spine();
-        if ["Int", "String", "Bool", "BigInt"]
-            .iter()
-            .any(|p| head.is_prim(p))
+        if [Lang::Int, Lang::String, Lang::Bool, Lang::BigInt]
+            .into_iter()
+            .any(|p| head.is_lang(p))
         {
             return Some(Identity::Value);
         }

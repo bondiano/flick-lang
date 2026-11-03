@@ -8,10 +8,11 @@ use super::Checker;
 use super::bindings::{let_parts, signature_name};
 use super::ty::Type;
 use crate::diagnostics::codes;
-use crate::iface::{Entity, Namespace};
+
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::{self, Lang};
 
 /// Where the `flat_map` of a statement is recorded: the `<-` of a binding,
 /// the empty range at the start of an expression statement.
@@ -78,10 +79,10 @@ impl Checker<'_> {
             }
             K::GuardStmt => {
                 if let Some(condition) = first.nodes().next() {
-                    self.check(condition, &Type::prim("Bool"));
+                    self.check(condition, &Type::lang(Lang::Bool));
                 }
                 let (start, end) = guard_key(first);
-                let nothing = self.prelude_method("nothing", Span::new(self.file, start, end));
+                let nothing = self.prelude_method(Lang::Nothing, Span::new(self.file, start, end));
                 let ty = self.do_rest(node, rest, expected);
                 self.expect(&nothing, &ty, self.span(first));
                 ty
@@ -122,7 +123,7 @@ impl Checker<'_> {
         };
         let (start, end) = bind_key(statement);
         let span = Span::new(self.file, start, end);
-        let method = self.prelude_method("flat_map", span);
+        let method = self.prelude_method(Lang::FlatMap, span);
         let Type::Fun {
             param: continuation,
             result,
@@ -180,12 +181,8 @@ impl Checker<'_> {
 
     /// A method of a Prelude class at `span`, instantiated, with the
     /// dictionary its class needs recorded there.
-    pub(super) fn prelude_method(&mut self, name: &str, span: Span) -> Type {
-        let entity = Entity {
-            module: "Prelude".to_owned(),
-            namespace: Namespace::Value,
-            name: name.to_owned(),
-        };
+    pub(super) fn prelude_method(&mut self, method: Lang, span: Span) -> Type {
+        let entity = lang::item(method).entity();
         let Some(scheme) = self.env.value(&entity).cloned() else {
             return Type::Error;
         };

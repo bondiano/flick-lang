@@ -12,6 +12,7 @@ use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::types::Checker;
 use crate::types::env::{Abi, Form};
+use crate::types::lang::Lang;
 use crate::types::ty::Type;
 use crate::types::typing::SchemaPlan;
 
@@ -66,7 +67,7 @@ impl Checker<'_> {
         match self.url_routes(name, plan, witnesses) {
             Ok(routes) => {
                 let this = Type::con(&self.env.module, name);
-                self.companion(name, "url", &[], Type::app(Type::prim("Url"), this));
+                self.companion(name, "url", &[], Type::app(Type::lang(Lang::Url), this));
                 Some(routes)
             }
             Err((path, message)) => {

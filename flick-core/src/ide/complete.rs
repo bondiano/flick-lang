@@ -14,7 +14,8 @@ use crate::resolve::declarations;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, PRELUDE, Type, show_type};
+use crate::types::lang;
+use crate::types::{Form, Type, show_type};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CompletionKind {
@@ -160,7 +161,7 @@ impl Ide<'_> {
                 }
             }
         }
-        if let Some(prelude) = self.interface(PRELUDE) {
+        if let Some(prelude) = self.interface(lang::prelude()) {
             for c in exports(&prelude) {
                 add(PRELUDE_NAMES, c);
             }

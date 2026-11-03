@@ -12,6 +12,7 @@ use super::query::{Cx, Param};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 impl Cx {
     /// A placeholder for the value of `$name` at `at`, of type `captured`;
@@ -74,7 +75,7 @@ impl Checker<'_> {
         // an `Option t` stands for `t` or `NULL`
         let resolved = self.whnf(&self.zonk(&captured));
         let (head, args) = resolved.spine();
-        let nullable = *head == Type::prim("Option") && args.len() == 1;
+        let nullable = *head == Type::lang(Lang::Option) && args.len() == 1;
         let ty = if nullable {
             args[0].clone()
         } else {

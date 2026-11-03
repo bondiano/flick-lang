@@ -28,9 +28,12 @@ use super::unify::Mismatch;
 use crate::diagnostics;
 use crate::diagnostics::codes;
 use crate::source::Span;
+use crate::types::lang::{self, Lang};
 
 /// The service a `scope` provides to the operations that acquire resources.
-pub const SCOPE: &str = "Prelude.Scope";
+pub fn scope() -> &'static str {
+    &lang::item(Lang::Scope).label
+}
 
 /// Regions and captures of the declaration being checked.
 #[derive(Debug, Default)]
@@ -197,8 +200,13 @@ impl Checker<'_> {
                 let (head, args) = t.spine();
                 // an `Eff` holds what its result holds, as a function does: a
                 // capture shown only in the result is lost when the result is dropped
-                let opaque = ["Layer", "ServiceTag", "ServiceImpl", "Errors"];
-                if opaque.iter().any(|n| head.is_prim(n)) {
+                let opaque = [
+                    Lang::Layer,
+                    Lang::ServiceTag,
+                    Lang::ServiceImpl,
+                    Lang::Errors,
+                ];
+                if opaque.into_iter().any(|n| head.is_lang(n)) {
                     return;
                 }
                 let kinds = match head {
@@ -691,7 +699,7 @@ fn without_rows(t: &Type) -> Type {
             effects: None,
             result: Box::new(without_rows(result)),
         },
-        Type::App { .. } if t.spine().0.is_prim("Eff") => t
+        Type::App { .. } if t.spine().0.is_lang(Lang::Eff) => t
             .spine()
             .1
             .last()

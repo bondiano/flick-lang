@@ -14,6 +14,7 @@ use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 type Clauses<'n> = [(String, &'n Node)];
 
@@ -44,7 +45,7 @@ impl Checker<'_> {
     /// `WHERE`-like conditions: a `Bool` without aggregates.
     fn sql_condition(&mut self, cx: &mut Cx, scope: &Scope, node: &Node, place: Place) -> Val {
         let v = self.sql_value(cx, scope, node, place);
-        self.expect(&v.ty, &Type::prim("Bool"), self.span(node));
+        self.expect(&v.ty, &Type::lang(Lang::Bool), self.span(node));
         v
     }
 
@@ -235,7 +236,7 @@ impl Checker<'_> {
                     continue;
                 };
                 let v = self.sql_value(cx, scope, n, Place::Row);
-                self.expect(&v.ty, &Type::prim("Int"), self.span(n));
+                self.expect(&v.ty, &Type::lang(Lang::Int), self.span(n));
                 let _ = write!(text, " {} {}", word.to_uppercase(), v.sql);
             }
         }

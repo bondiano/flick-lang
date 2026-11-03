@@ -10,6 +10,7 @@ use crate::numeric::Arith;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::{self, Lang};
 use crate::types::{Dict, Identity, Range, Ref, is_pattern, let_parts};
 
 impl Lower<'_> {
@@ -97,7 +98,7 @@ impl Lower<'_> {
                         return self.within(node.range(), wait);
                     }
                     _ if self.typing.generic_numeric.contains(&node.range()) => {
-                        let negate = self.prelude_method(node.range(), "negate");
+                        let negate = self.prelude_method(node.range(), Lang::Negate);
                         return apply(negate, [operand], span);
                     }
                     _ => ExprKind::Neg(self.num(node.range()), operand),
@@ -223,7 +224,7 @@ impl Lower<'_> {
                     .unwrap_or_else(|| panic!("`{last}` is a local in scope"))
                     .to_owned(),
             ),
-            Ref::Value { module, name } if module == "Record" && name == "label" => {
+            Ref::Value { module, name } if lang::is(Lang::RecordLabel, module, name) => {
                 ExprKind::Label(self.typing.labels.get(&key).cloned().unwrap_or_default())
             }
             Ref::Value { module, name } if module == "Atom" && completed(name) => {

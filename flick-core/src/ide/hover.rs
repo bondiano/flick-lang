@@ -17,6 +17,7 @@ pub(super) mod companions;
 mod kinds;
 mod types;
 
+use crate::types::lang::Lang;
 use kinds::kind_description;
 
 /// `node` as its source lays it out, one written line per line, its
@@ -177,7 +178,7 @@ impl Ide<'_> {
             K::SchemaKw => ("schema …", "The `Schema` of a type that derives it."),
             K::AwaitKw => {
                 let ran = match ty.spine() {
-                    (h, args) if h.is_prim("Eff") && args.len() == 3 => show_type(args[2]),
+                    (h, args) if h.is_lang(Lang::Eff) && args.len() == 3 => show_type(args[2]),
                     _ => shown.clone(),
                 };
                 return Some((
@@ -191,7 +192,7 @@ impl Ide<'_> {
                     "Evaluates its operand and discards its value of type `{shown}`; \
                      its effects and errors are kept."
                 );
-                if ty.spine().0.is_prim("Eff") {
+                if ty.spine().0.is_lang(Lang::Eff) {
                     note.push_str(
                         " The computation is not run: `ignore (await …)` runs it \
                          and discards its result.",

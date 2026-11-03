@@ -10,6 +10,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Range;
+use crate::types::lang::{self, Lang};
 
 impl Lower<'_> {
     /// `lhs op rhs` on a type variable, by the methods of its `Numeric` or
@@ -28,9 +29,10 @@ impl Lower<'_> {
             return Some(apply(method, args, span));
         }
         if self.typing.generic_ordered.contains(&key) {
+            let function = lang::item(ord_function(op)?);
             let global = ExprKind::Global {
-                module: "Instances".to_owned(),
-                name: ord_function(op)?.to_owned(),
+                module: function.module.clone(),
+                name: function.name.clone(),
             };
             let dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
             return Some(apply(
@@ -46,9 +48,9 @@ impl Lower<'_> {
     pub(super) fn generic_literal(&mut self, node: &Node, span: Span) -> Expr {
         let text = node.child_tokens().next().map_or("", |t| t.text(self.text));
         let (make, num) = if numeric::is_integer_literal(text) {
-            ("from_int", Num::Int)
+            (Lang::FromInt, Num::Int)
         } else {
-            ("from_float", Num::Float)
+            (Lang::FromFloat, Num::Float)
         };
         let lit = Box::new(Expr::new(
             ExprKind::Lit(number(Some(num), text, false)),
@@ -92,30 +94,30 @@ pub(super) fn arith_of(op: K) -> Option<Arith> {
 }
 
 /// The method of `Numeric` an operator on a type variable calls.
-fn arith_method(op: K) -> Option<&'static str> {
+fn arith_method(op: K) -> Option<Lang> {
     Some(match op {
-        K::Plus => "add",
-        K::Minus => "sub",
-        K::Star => "mul",
-        K::Slash => "div",
-        K::Percent => "rem",
-        K::StarStar => "pow",
-        K::Lt => "lt",
-        K::Le => "le",
-        K::Gt => "gt",
-        K::Ge => "ge",
+        K::Plus => Lang::Add,
+        K::Minus => Lang::Sub,
+        K::Star => Lang::Mul,
+        K::Slash => Lang::Div,
+        K::Percent => Lang::Rem,
+        K::StarStar => Lang::Pow,
+        K::Lt => Lang::Lt,
+        K::Le => Lang::Le,
+        K::Gt => Lang::Gt,
+        K::Ge => Lang::Ge,
         _ => return None,
     })
 }
 
-/// The function of `Instances` a comparison on a type variable with only
+/// The built-in function a comparison on a type variable with only
 /// `Ord` calls.
-fn ord_function(op: K) -> Option<&'static str> {
+fn ord_function(op: K) -> Option<Lang> {
     Some(match op {
-        K::Lt => "ord_lt",
-        K::Le => "ord_le",
-        K::Gt => "ord_gt",
-        K::Ge => "ord_ge",
+        K::Lt => Lang::OrdLt,
+        K::Le => Lang::OrdLe,
+        K::Gt => Lang::OrdGt,
+        K::Ge => Lang::OrdGe,
         _ => return None,
     })
 }

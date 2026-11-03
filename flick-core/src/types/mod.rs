@@ -40,6 +40,7 @@ mod infer;
 mod instances;
 mod irrefutable;
 mod kinds;
+pub mod lang;
 #[cfg(test)]
 mod lint_tests;
 mod lints;
@@ -75,8 +76,10 @@ mod unify;
 pub use applicative_do::{and_keys, group_key, pure_argument};
 pub use bindings::{LetParts, let_parts, signature_name};
 use builtins::builtin_env;
+#[cfg(test)]
+pub(crate) use builtins::check_sources;
 pub use builtins::{builtin_sources, builtins, install_builtins};
-pub use classes::Dict;
+pub use classes::{Dict, STRUCTURAL, which};
 #[cfg(feature = "ide")]
 pub(crate) use classes::{Match, match_type};
 pub use component::{instance_key as component_instance, parts as component_parts};
@@ -96,7 +99,7 @@ pub use schemas::{FormField, UrlRoute, UrlSegment, companion_name, witness_entit
 #[cfg(feature = "ide")]
 pub(crate) use sql::base_type;
 pub use sql::dialect::{self, Dialect};
-pub use ty::{Binder, Effects, PRELUDE, Row, SYNC_SERVICES, Stage, Type, stage_of};
+pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
     CodecBlock, Constructor, Copies, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
     SchemaItem, SchemaPlan, ServerFn, SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing,
@@ -107,7 +110,6 @@ use convert::TyVar;
 use env::{Builtins, Env};
 use kinds::KindStore;
 use std::collections::HashMap;
-use std::ptr;
 use std::sync::Arc;
 use unify::Store;
 
@@ -118,6 +120,7 @@ use crate::resolve::Module;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 /// Bounds of instance resolution for one definition; exceeding them is a
 /// diagnostic, never a success.
@@ -218,13 +221,28 @@ fn run(
     interface: &mut Interface,
 ) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
     let owned;
-    let builtins = if ptr::eq(builtins, self::builtins()) {
+    let builtins = if builtins::are_builtins(builtins) {
         builtin_env()
     } else {
         owned = Builtins::new(builtins);
         &owned
     };
-    run_in(module, imported, builtins, options, interface)
+    let (mut diagnostics, typing, evidence) =
+        run_in(module, imported, builtins, options, interface);
+    // only the built-in modules, which `run_in` checks directly, mark lang items
+    let marks = lang::attributes(module.tree);
+    for attribute in marks
+        .into_iter()
+        .filter(|a| lang::lang_of(a, module.text).is_some())
+    {
+        let (start, end) = attribute.range();
+        diagnostics.push(Diagnostic::error(
+            codes::R016,
+            "`@lang` marks what the compiler relies on, in the built-in modules only".to_owned(),
+            Span::new(module.file, start, end),
+        ));
+    }
+    (diagnostics, typing, evidence)
 }
 
 /// [`run`] over built-in modules already learned.
@@ -358,19 +376,19 @@ enum Domain {
 }
 
 impl Domain {
-    /// The built-in types it accepts, by name; `List` means any list. An
-    /// operand type nothing determined becomes the first.
-    fn names(self) -> Vec<&'static str> {
-        let numeric = Num::ALL.into_iter().map(Num::name);
+    /// The built-in types it accepts; `List` means any list. An operand
+    /// type nothing determined becomes the first.
+    fn names(self) -> Vec<Lang> {
+        let numeric = Num::ALL.into_iter().map(Num::lang);
         match self {
             Domain::Numeric => numeric.collect(),
-            Domain::Ordered => numeric.chain(["String"]).collect(),
-            Domain::Concat => vec!["String", "List"],
+            Domain::Ordered => numeric.chain([Lang::String]).collect(),
+            Domain::Concat => vec![Lang::String, Lang::List],
         }
     }
 
     fn allows(self, head: &Type) -> bool {
-        self.names().iter().any(|name| head.is_prim(name))
+        self.names().into_iter().any(|item| head.is_lang(item))
     }
 }
 

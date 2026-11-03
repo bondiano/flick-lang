@@ -14,6 +14,7 @@ use crate::numeric;
 use crate::source;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 impl Checker<'_> {
     pub fn check(&mut self, node: &Node, expected: &Type) {
@@ -225,7 +226,7 @@ impl Checker<'_> {
             },
             K::NameExpr => self.name(node),
             K::ParenExpr => self.infer(children[0]),
-            K::UnitExpr => Type::prim("Unit"),
+            K::UnitExpr => Type::lang(Lang::Unit),
             K::TupleExpr => {
                 let tuple = Type::Tuple(children.iter().map(|c| self.infer(c)).collect());
                 let captures = self.captures_of(&tuple);
@@ -249,7 +250,7 @@ impl Checker<'_> {
                     captures.entries.extend(held.entries);
                     captures.tails.extend(held.tails);
                 }
-                self.data_value(&Type::app(Type::prim("List"), item), captures)
+                self.data_value(&Type::app(Type::lang(Lang::List), item), captures)
             }
             K::AnnotExpr => {
                 let ty = children
@@ -303,7 +304,7 @@ impl Checker<'_> {
     pub fn list_item(&self, t: &Type) -> Option<Type> {
         let (bare, captures) = self.whnf_captured(t);
         match bare {
-            Type::App { head, arg } if self.whnf(&head).is_prim("List") => Some(
+            Type::App { head, arg } if self.whnf(&head).is_lang(Lang::List) => Some(
                 captures
                     .as_ref()
                     .map_or_else(|| *arg.clone(), |c| self.data_field(&arg, c)),
@@ -317,7 +318,7 @@ impl Checker<'_> {
         let t = self.whnf(t);
         let (head, args) = t.spine();
         match args[..] {
-            [r, e, a] if head.is_prim("Eff") => Some((r.clone(), e.clone(), a.clone())),
+            [r, e, a] if head.is_lang(Lang::Eff) => Some((r.clone(), e.clone(), a.clone())),
             _ => None,
         }
     }
@@ -325,10 +326,10 @@ impl Checker<'_> {
     fn if_expr(&mut self, node: &Node, expected: &Type) {
         let children: Vec<&Node> = node.nodes().collect();
         if let Some(condition) = children.first() {
-            self.check(condition, &Type::prim("Bool"));
+            self.check(condition, &Type::lang(Lang::Bool));
         }
         let Some(&otherwise) = children.get(2) else {
-            let (unit, span) = (Type::prim("Unit"), self.span(node));
+            let (unit, span) = (Type::lang(Lang::Unit), self.span(node));
             let keyword = node.child_tokens().find(|t| t.kind == K::IfKw);
             let keyword = keyword.map_or(span, |t| self.token_span(t));
             let why = |_: &str| "an `if` without `else` is `Unit`".to_string();
@@ -608,7 +609,7 @@ impl Checker<'_> {
                 K::Guard => {
                     guarded = true;
                     if let Some(condition) = child.nodes().next() {
-                        self.check(condition, &Type::prim("Bool"));
+                        self.check(condition, &Type::lang(Lang::Bool));
                     }
                 }
                 K::Block => self.check(child, result),
@@ -640,14 +641,14 @@ impl Checker<'_> {
 /// The type of a literal; a number literal's is [`Checker::number`]'s.
 pub fn literal_type(token: Option<K>) -> Type {
     match token {
-        Some(K::Number) => Type::prim("Float"),
-        Some(K::BigInt) => Type::prim("BigInt"),
-        Some(K::String) => Type::prim("String"),
-        Some(K::TrueKw | K::FalseKw) => Type::prim("Bool"),
+        Some(K::Number) => Type::lang(Lang::Float),
+        Some(K::BigInt) => Type::lang(Lang::BigInt),
+        Some(K::String) => Type::lang(Lang::String),
+        Some(K::TrueKw | K::FalseKw) => Type::lang(Lang::Bool),
         _ => Type::Error,
     }
 }
 
 pub fn eff(services: Type, errors: Type, result: Type) -> Type {
-    Type::apps(Type::prim("Eff"), [services, errors, result])
+    Type::apps(Type::lang(Lang::Eff), [services, errors, result])
 }

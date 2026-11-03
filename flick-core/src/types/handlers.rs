@@ -15,6 +15,7 @@ use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 impl Checker<'_> {
     /// `task { body }`: the body runs when the `Eff` is awaited, so its calls
@@ -84,7 +85,7 @@ impl Checker<'_> {
             {
                 // it receives every error the body raises, whatever its uses ask for
                 let caught = self.fresh();
-                let errors = Type::app(Type::prim("Errors"), caught.clone());
+                let errors = Type::app(Type::lang(Lang::Errors), caught.clone());
                 let (_, guarded, span) = self.arm(arm, &errors, &ty);
                 if self.stage.pure.is_none() {
                     self.sites.push(Site::Expected(errors));
@@ -98,7 +99,7 @@ impl Checker<'_> {
             let covers = !guarded && self.covers_all(&pat);
             let error = self.whnf(&error);
             if let Type::Meta(_) = error {
-                let _ = self.unify(&error, &Type::app(Type::prim("Errors"), raised.clone()));
+                let _ = self.unify(&error, &Type::app(Type::lang(Lang::Errors), raised.clone()));
                 all |= covers;
                 continue;
             }
@@ -146,7 +147,7 @@ impl Checker<'_> {
         let actual = self.infer(layer);
         let (inputs, errors, outputs) = (self.fresh(), self.fresh(), self.fresh());
         let shape = Type::apps(
-            Type::prim("Layer"),
+            Type::lang(Lang::Layer),
             [inputs.clone(), errors.clone(), outputs.clone()],
         );
         if self.unify(&self.whnf(&actual), &shape).is_err() {

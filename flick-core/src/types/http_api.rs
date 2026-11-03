@@ -13,7 +13,7 @@ use super::classes::Dict;
 use super::classes::Outcome;
 use super::env::Form;
 use super::kinds::Kind;
-use super::ty::{Binder, PRELUDE, Row, Type, error_label};
+use super::ty::{Binder, Row, Type, error_label};
 use super::typing::{Constructor, Range, range};
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
@@ -21,6 +21,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal::string_value;
+use crate::types::lang::{self, Lang};
 
 /// The module of the endpoint types a record that derives `HttpApi` uses.
 pub const HTTP_API_DERIVE: &str = "HttpApi.Derive";
@@ -324,7 +325,7 @@ impl Checker<'_> {
             _ => (200, *success),
         };
         let success_ty = self.annotation(success);
-        let success_codec = if success_ty.is_prim("Unit") {
+        let success_codec = if success_ty.is_lang(Lang::Unit) {
             None
         } else {
             Some((status, self.codec(success)?))
@@ -374,7 +375,7 @@ impl Checker<'_> {
         label: &str,
         request: &Node,
     ) -> Result<([Type; 4], Vec<(&'static str, Codec)>), String> {
-        let unit = Type::prim("Unit");
+        let unit = Type::lang(Lang::Unit);
         let mut parts = [unit.clone(), unit.clone(), unit.clone(), unit];
         let mut codecs = Vec::new();
         let fields: Vec<&Node> = match request.kind {
@@ -454,7 +455,7 @@ impl Checker<'_> {
             (module.clone(), snake(name)),
             (module.clone(), super::companion_name(name, "json")),
         ];
-        if module == PRELUDE {
+        if module == lang::prelude() {
             candidates.push(((*name).to_owned(), "json".to_owned()));
         }
         let found = candidates.into_iter().find(|(module, name)| {

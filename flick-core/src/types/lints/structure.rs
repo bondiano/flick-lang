@@ -9,6 +9,7 @@ use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 /// The expressions each of which nests what is inside it one level deeper.
 const NESTS: [K; 7] = [
@@ -150,7 +151,7 @@ impl Checker<'_> {
         if let Type::Captured { ty: inner, .. } = ty {
             ty = *inner;
         }
-        if reads && ty.is_prim("Ui") {
+        if reads && ty.is_lang(Lang::Ui) {
             self.diagnostics.push(
                 Diagnostic::new(
                     codes::U007,

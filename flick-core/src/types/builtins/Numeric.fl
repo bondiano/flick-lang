@@ -5,25 +5,41 @@
 /// operators and number literals use its methods.
 module Numeric exposing (..)
 
+@lang numeric
 class Ord a => Numeric a =
+  @lang add
   add : a -> a -> a
+  @lang sub
   sub : a -> a -> a
+  @lang mul
   mul : a -> a -> a
+  @lang div
   div : a -> a -> a
+  @lang rem
   rem : a -> a -> a
+  @lang pow
   pow : a -> a -> a
+  @lang negate
   negate : a -> a
+  @lang from_int
   from_int : Int -> a
   to_float : a -> Float
+  @lang lt
   lt : a -> a -> Bool
+  @lang le
   le : a -> a -> Bool
+  @lang gt
   gt : a -> a -> Bool
+  @lang ge
   ge : a -> a -> Bool
 
+@lang integer
 class Numeric a => Integer a =
   to_bigint : a -> BigInt
 
+@lang floating
 class Numeric a => Floating a =
+  @lang from_float
   from_float : Float -> a
 
 bigint_of : Int -> BigInt

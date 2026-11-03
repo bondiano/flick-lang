@@ -16,6 +16,7 @@ succeed : ServiceTag r -> ServiceImpl r -> Layer none none r
 foreign pure succeed from "@flick-lang/runtime" "layerSucceed"
   reviewed "effect@4.1.2 sha256:607ec49d4694de5a"
 
+@lang layer_merge
 /// Both layers' services; they must not build the same service.
 merge : Layer i1 e1 o1 -> Layer i2 e2 o2 -> Layer (i1 + i2) (e1 + e2) (o1 + o2)
 foreign pure merge from "@flick-lang/runtime" "layerMerge"

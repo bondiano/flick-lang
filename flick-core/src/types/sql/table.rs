@@ -15,6 +15,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal::string_value;
+use crate::types::lang::{self, Lang};
 
 pub const SQL: &str = "Sql";
 
@@ -22,7 +23,8 @@ pub const SQL: &str = "Sql";
 pub fn base_type(dialect: &Dialect, kind: &str) -> Type {
     match dialect.flick_type(kind) {
         "BigDecimal" => Type::con("BigDecimal", "BigDecimal"),
-        other => Type::prim(other),
+        // the dialect names prelude types
+        other => Type::con(&lang::item(Lang::Prelude).module, other),
     }
 }
 
@@ -34,7 +36,7 @@ fn row_type(table: &SqlTable) -> Type {
             .iter()
             .map(|c| {
                 let ty = if c.nullable {
-                    Type::app(Type::prim("Option"), c.ty.clone())
+                    Type::app(Type::lang(Lang::Option), c.ty.clone())
                 } else {
                     c.ty.clone()
                 };
@@ -102,7 +104,7 @@ impl Checker<'_> {
             }
             if let Some(token) = node.child_tokens().find(|t| t.kind == K::Ident) {
                 let shown = if column.nullable {
-                    Type::app(Type::prim("Option"), ty)
+                    Type::app(Type::lang(Lang::Option), ty)
                 } else {
                     ty
                 };
@@ -256,7 +258,8 @@ impl Checker<'_> {
                 let base = base_type(self.options.sql, &column.kind);
                 let codec = node.nodes().skip_while(|n| !is_type(n.kind)).nth(1);
                 if let Some(codec) = codec {
-                    let expected = Type::apps(Type::prim("PureCodec"), [base, column.ty.clone()]);
+                    let expected =
+                        Type::apps(Type::lang(Lang::PureCodec), [base, column.ty.clone()]);
                     self.check(codec, &expected);
                     self.settle_operators();
                 } else if self.unify(&column.ty, &base).is_err() {

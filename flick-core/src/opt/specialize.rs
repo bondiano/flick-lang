@@ -13,8 +13,29 @@ use crate::source::Span;
 use crate::types::Dict;
 
 use super::Generics;
+use crate::types::lang::{self, Lang};
 
-const NUMERIC: &str = "Numeric";
+/// The module of the numeric classes and their instances.
+fn numeric() -> &'static str {
+    &lang::item(Lang::Numeric).module
+}
+
+/// The methods of the numeric classes the specializer turns into operators.
+const METHODS: [Lang; 13] = [
+    Lang::Add,
+    Lang::Sub,
+    Lang::Mul,
+    Lang::Div,
+    Lang::Rem,
+    Lang::Pow,
+    Lang::Lt,
+    Lang::Le,
+    Lang::Gt,
+    Lang::Ge,
+    Lang::Negate,
+    Lang::FromInt,
+    Lang::FromFloat,
+];
 
 /// A generic function by module and name: its dictionary parameters and body.
 type Generic = (Vec<String>, Expr);
@@ -168,7 +189,7 @@ fn calls(
 /// `d` as a numeric instance without context, a superclass of one included.
 fn known(d: &Dict) -> Option<Dict> {
     match d {
-        Dict::Instance { module, args, .. } if module == NUMERIC && args.is_empty() => {
+        Dict::Instance { module, args, .. } if module == numeric() && args.is_empty() => {
             Some(d.clone())
         }
         Dict::Super { dict, class } => {
@@ -178,7 +199,7 @@ fn known(d: &Dict) -> Option<Dict> {
             let num = name.rsplit(' ').next()?;
             let class = class.rsplit('.').next().unwrap_or(class);
             Some(Dict::Instance {
-                module: NUMERIC.to_owned(),
+                module: numeric().to_owned(),
                 name: format!("{class} {num}"),
                 args: Vec::new(),
             })
@@ -247,8 +268,8 @@ pub fn operator(e: &mut Expr) -> bool {
                 None => None,
             },
             _ => match method_of(func) {
-                Some((num, "negate")) => Some(ExprKind::Neg(num, arg.clone())),
-                Some((num, "from_int" | "from_float")) => literal(num, arg),
+                Some((num, Lang::Negate)) => Some(ExprKind::Neg(num, arg.clone())),
+                Some((num, Lang::FromInt | Lang::FromFloat)) => literal(num, arg),
                 _ => None,
             },
         },
@@ -262,7 +283,7 @@ pub fn operator(e: &mut Expr) -> bool {
 }
 
 /// The numeric type and method name of a method of a numeric instance.
-fn method_of(e: &Expr) -> Option<(Num, &str)> {
+fn method_of(e: &Expr) -> Option<(Num, Lang)> {
     let ExprKind::Method {
         dict:
             Dict::Instance {
@@ -275,26 +296,27 @@ fn method_of(e: &Expr) -> Option<(Num, &str)> {
     else {
         return None;
     };
-    if module != NUMERIC || !args.is_empty() {
+    if module != numeric() || !args.is_empty() {
         return None;
     }
-    Some((Num::of(instance.rsplit(' ').next()?)?, name.as_str()))
+    let method = METHODS.into_iter().find(|&m| lang::item(m).name == *name)?;
+    Some((Num::of(instance.rsplit(' ').next()?)?, method))
 }
 
 /// The operator a binary method of `Numeric` is on `num`.
-fn binary(method: &str, num: Num) -> Option<BinOp> {
+fn binary(method: Lang, num: Num) -> Option<BinOp> {
     let arith = |a| BinOp::Arith(a, num);
     Some(match method {
-        "add" => arith(Arith::Add),
-        "sub" => arith(Arith::Sub),
-        "mul" => arith(Arith::Mul),
-        "div" => arith(Arith::Div),
-        "rem" => arith(Arith::Rem),
-        "pow" => arith(Arith::Pow),
-        "lt" => BinOp::Lt,
-        "le" => BinOp::Le,
-        "gt" => BinOp::Gt,
-        "ge" => BinOp::Ge,
+        Lang::Add => arith(Arith::Add),
+        Lang::Sub => arith(Arith::Sub),
+        Lang::Mul => arith(Arith::Mul),
+        Lang::Div => arith(Arith::Div),
+        Lang::Rem => arith(Arith::Rem),
+        Lang::Pow => arith(Arith::Pow),
+        Lang::Lt => BinOp::Lt,
+        Lang::Le => BinOp::Le,
+        Lang::Gt => BinOp::Gt,
+        Lang::Ge => BinOp::Ge,
         _ => return None,
     })
 }

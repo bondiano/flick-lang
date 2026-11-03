@@ -10,6 +10,7 @@ use super::ty::Type;
 use crate::diagnostics::codes;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 impl Checker<'_> {
     /// Checks the representation a type declaration names and records it.
@@ -118,19 +119,19 @@ impl Checker<'_> {
         let Type::Con { module, name } = t.spine().0 else {
             return None;
         };
-        if t.is_prim("Int") || t.is_prim("Float") {
+        if t.is_lang(Lang::Int) || t.is_lang(Lang::Float) {
             return Some(JsClass::Number);
         }
-        if t.is_prim("String") {
+        if t.is_lang(Lang::String) {
             return Some(JsClass::String);
         }
-        if t.is_prim("Bool") {
+        if t.is_lang(Lang::Bool) {
             return Some(JsClass::Boolean);
         }
-        if t.is_prim("BigInt") {
+        if t.is_lang(Lang::BigInt) {
             return Some(JsClass::Bigint);
         }
-        if t.spine().0.is_prim("List") {
+        if t.spine().0.is_lang(Lang::List) {
             return Some(JsClass::Array);
         }
         // an unboxed wrapper is its field

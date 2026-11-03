@@ -12,6 +12,7 @@ use crate::ir::Label;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 impl Checker<'_> {
     /// A foreign component takes props only inside `ui`, through `Ui.component`.
@@ -31,7 +32,7 @@ impl Checker<'_> {
                 return Type::Fun {
                     param: arg,
                     effects: None,
-                    result: Box::new(Type::prim("Ui")),
+                    result: Box::new(Type::lang(Lang::Ui)),
                 };
             }
         }

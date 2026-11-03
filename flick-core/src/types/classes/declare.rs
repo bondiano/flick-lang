@@ -6,9 +6,8 @@
 
 use std::collections::HashSet;
 
-use super::prims::PRIMITIVES;
 use super::solve::Outcome;
-use super::{Dict, NUMERIC, RECORD, split, vars};
+use super::{Dict, NUMERIC_CLASSES, RECORD_CLASSES, split, vars, which};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::Span;
@@ -17,7 +16,8 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::convert::{Free, is_type};
 use crate::types::env::Instance;
 use crate::types::kinds::Kind;
-use crate::types::ty::{Binder, PRELUDE, Type};
+use crate::types::lang::{self, Lang};
+use crate::types::ty::{Binder, Type};
 use crate::types::typing::range;
 use crate::types::{Checker, Constructor, Form, InstanceInfo, env, passes_dictionary};
 
@@ -183,7 +183,7 @@ impl<'n> Checker<'_> {
             return false;
         };
         let name = &instance.name;
-        if cm == RECORD && PRIMITIVES.contains(&cn.as_str()) {
+        if which(&RECORD_CLASSES, &cm, &cn).is_some() {
             self.error(
                 codes::C012,
                 span,
@@ -191,7 +191,9 @@ impl<'n> Checker<'_> {
             );
             return false;
         }
-        if cm == NUMERIC && instance.module != NUMERIC {
+        if which(&NUMERIC_CLASSES, &cm, &cn).is_some()
+            && instance.module != lang::item(Lang::Numeric).module
+        {
             self.error(
                 codes::C012,
                 span,
@@ -200,7 +202,9 @@ impl<'n> Checker<'_> {
             return false;
         }
         // `for` iterates its sources as JS and Go containers, without `iter`
-        if cm == PRELUDE && cn == "Iterable" && instance.module != "Instances" {
+        if lang::is(Lang::Iterable, &cm, &cn)
+            && instance.module != lang::item(Lang::Instances).module
+        {
             self.error(
                 codes::C012,
                 span,

@@ -10,12 +10,13 @@
 
 use std::mem;
 
-use super::{SCOPE, Scope};
+use super::{Scope, scope};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::types::Checker;
-use crate::types::classes::split;
+use crate::types::classes::args_of;
+use crate::types::lang::Lang;
 use crate::types::ty::{Norm, Row, Type};
 
 /// Labels of the obligations in a services row: the prefix, then the
@@ -149,7 +150,7 @@ impl Checker<'_> {
         let norm = self.store.normalize(&want.row);
         let mut keep = Vec::new();
         for (label, ty) in norm.entries {
-            if label == SCOPE || label.starts_with(PROVIDED) || want.settled.contains(&label) {
+            if label == scope() || label.starts_with(PROVIDED) || want.settled.contains(&label) {
                 continue;
             }
             want.settled.push(label.clone());
@@ -239,8 +240,8 @@ impl Checker<'_> {
 
     /// Whether a given `Provided R owner` has a row `R` that `names`.
     fn given(&self, at: &Lexical, owner: &Type, names: impl Fn(&Norm) -> bool) -> bool {
-        at.givens.iter().any(|g| match split(g) {
-            Some((("Fiber", "Provided"), args)) => match args[..] {
+        at.givens.iter().any(|g| match args_of(g, Lang::Provided) {
+            Some(args) => match args[..] {
                 [row, region] => {
                     self.store.resolve(region) == *owner && names(&self.store.normalize(row))
                 }
@@ -328,6 +329,6 @@ fn obligation(label: &str, service: Type, owner: &Type) -> (String, Type) {
         entries: vec![(label.to_owned(), service)],
         tail: None,
     });
-    let ty = Type::apps(Type::con("Fiber", "Provided"), [row, owner.clone()]);
+    let ty = Type::apps(Type::lang(Lang::Provided), [row, owner.clone()]);
     (format!("{PROVIDED}{label}"), ty)
 }

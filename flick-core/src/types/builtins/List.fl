@@ -115,6 +115,7 @@ import List.Slice exposing (..)
 import List.Search exposing (..)
 import List.Transform exposing (..)
 
+@lang list_map
 /// Applies a pure function to each element.
 map : forall c a b. (a -> b)^c -> (List a -> List b)^c
 foreign pure map from "@flick-lang/runtime" "listMap"

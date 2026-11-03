@@ -2,6 +2,7 @@
 //! (the built-in types every module sees) and small modules a program may
 //! qualify without an import (`Ref.make`, `String.trim`, `Layer.succeed`, …).
 
+use std::ptr;
 use std::sync::OnceLock;
 
 use tracing::debug;
@@ -31,9 +32,15 @@ pub fn builtins() -> &'static [Interface] {
 }
 
 fn check_builtins() -> Vec<Interface> {
+    check_sources(SOURCES)
+}
+
+/// Checks the built-in modules `modules`, as `(module, text)` in
+/// dependency order.
+pub(crate) fn check_sources(modules: &[(&str, &str)]) -> Vec<Interface> {
     let mut done: Vec<Interface> = Vec::new();
     let mut known = Builtins::default();
-    for &(name, text) in SOURCES {
+    for &(name, text) in modules {
         let mut sources = SourceMap::default();
         let file = sources.add(format!("<builtin>/{name}.fl"), text);
         let parse = syntax::parse(text, file);
@@ -50,7 +57,7 @@ fn check_builtins() -> Vec<Interface> {
         let (mut interface, mut diagnostics) = resolve::resolve(&module, &imported);
         diagnostics.extend(parse.diagnostics);
         // the built-in modules are one package
-        let local = |name: &str| SOURCES.iter().any(|(n, _)| *n == name);
+        let local = |name: &str| modules.iter().any(|(n, _)| *n == name);
         let options = super::Options {
             local: &local,
             limits: super::Limits::default(),
@@ -76,6 +83,14 @@ fn check_builtins() -> Vec<Interface> {
 /// they are already in use.
 pub fn install_builtins(interfaces: Vec<Interface>) -> bool {
     BUILTINS.set(interfaces).is_ok()
+}
+
+/// Whether `interfaces` are the built-in modules [`builtins`] holds, without
+/// checking them when they are not checked yet.
+pub(super) fn are_builtins(interfaces: &[Interface]) -> bool {
+    BUILTINS
+        .get()
+        .is_some_and(|b| ptr::eq(b.as_slice(), interfaces))
 }
 
 /// What every module knows of the built-in modules.

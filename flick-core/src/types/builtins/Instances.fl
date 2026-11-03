@@ -1,3 +1,4 @@
+@lang instances
 /// Instances of the built-in classes for the built-in types. Records and
 /// tuples have theirs from the compiler; every module sees all of them.
 module Instances
@@ -74,16 +75,20 @@ instance (Eq e, Eq a) => Eq (Result e a) =
     | (Err a, Err b) -> eq a b
     | _ -> false
 
+@lang ord_lt
 /// `x < y` on a type variable with `Ord`: what its comparison operators call.
 ord_lt : Ord a => a -> a -> Bool
 let ord_lt x y = compare x y == LT
 
+@lang ord_le
 ord_le : Ord a => a -> a -> Bool
 let ord_le x y = compare x y != GT
 
+@lang ord_gt
 ord_gt : Ord a => a -> a -> Bool
 let ord_gt x y = compare x y == GT
 
+@lang ord_ge
 ord_ge : Ord a => a -> a -> Bool
 let ord_ge x y = compare x y != LT
 

@@ -12,6 +12,7 @@ use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 mod header;
 
@@ -143,7 +144,7 @@ impl Checker<'_> {
     /// An expression statement before the last one: its value must be `()`.
     fn statement(&mut self, node: &Node) {
         let ty = self.infer(node);
-        if self.unify(&ty, &Type::prim("Unit")).is_err() {
+        if self.unify(&ty, &Type::lang(Lang::Unit)).is_err() {
             let shown = self.show(&ty);
             let span = self.span(node);
             self.diagnostics.push(

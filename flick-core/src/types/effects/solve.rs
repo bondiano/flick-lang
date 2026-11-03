@@ -51,7 +51,7 @@ impl Checker<'_> {
         let Some(region) = self.subrows[i].provides.clone() else {
             return actual;
         };
-        let Some(scope) = actual.get(regions::SCOPE).cloned() else {
+        let Some(scope) = actual.get(regions::scope()).cloned() else {
             return actual;
         };
         if let [owner] = scope.spine().1[..] {
@@ -60,7 +60,9 @@ impl Checker<'_> {
                 let _ = self.unify(&owner, &region);
             }
             if self.store.resolve(&owner) == self.store.resolve(&region) {
-                actual.entries.retain(|(label, _)| label != regions::SCOPE);
+                actual
+                    .entries
+                    .retain(|(label, _)| label != regions::scope());
             }
         }
         actual
@@ -188,7 +190,7 @@ impl Checker<'_> {
                             self.mismatch(&m, ty, bound, c.span);
                         }
                     }
-                    None if label == regions::SCOPE => self.no_owner(c.span),
+                    None if label == regions::scope() => self.no_owner(c.span),
                     None if label.starts_with(regions::PROVIDED) => {
                         if let [service, owner] = ty.spine().1[..] {
                             let service = self.show(service);

@@ -8,15 +8,18 @@ module Seq exposing (..)
 of_list : List a -> Seq a
 foreign pure of_list from "@flick-lang/runtime" "seqOfList"
 
+@lang seq_from
 /// `n`, `n + 1`, … without end.
 from : Int -> Seq Int
 foreign pure from from "@flick-lang/runtime" "seqFrom"
 
+@lang seq_range
 /// `[from, from + 1, …]` below `until`, as `List.range`.
 range : Int -> Int -> Seq Int
 foreign pure range from "@flick-lang/runtime" "seqRange"
   arity 2
 
+@lang seq_range_to
 /// The numbers from `start` up to `end`, `end` too: what `start..end` is.
 range_to : Int -> Int -> Seq Int
 foreign pure range_to from "@flick-lang/runtime" "seqRangeTo"
@@ -53,11 +56,13 @@ foreign pure append from "@flick-lang/runtime" "seqAppend"
   arity 2
   retention call
 
+@lang seq_map
 map : forall c d a b. (forall v. a^v -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
 foreign pure map from "@flick-lang/runtime" "seqMap"
   arity 2
   retention call
 
+@lang seq_filter
 filter : forall c d a. (a -> Bool)^c -> ((Seq a)^d -> (Seq a)^(c + d))^c
 foreign pure filter from "@flick-lang/runtime" "seqFilter"
   arity 2
@@ -68,11 +73,13 @@ foreign pure filter_map from "@flick-lang/runtime" "seqFilterMap"
   arity 2
   retention call
 
+@lang seq_flat_map
 flat_map : forall c d a b. (forall v. a^v -> (Seq b)^(c + v))^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
 foreign pure flat_map from "@flick-lang/runtime" "seqFlatMap"
   arity 2
   retention call
 
+@lang seq_take
 /// At most `n` elements, `n` truncated as by `List.take`; pulls none
 /// after the last, so it ends an infinite sequence.
 take : forall d a. Int -> ((Seq a)^d -> (Seq a)^d)
@@ -131,6 +138,7 @@ foreign pure windows from "@flick-lang/runtime" "seqWindows"
   arity 2
   retention call
 
+@lang seq_to_list
 /// All the elements: never ends on an infinite sequence.
 to_list : forall d a. (Seq a)^d -> List a
 foreign pure to_list from "@flick-lang/runtime" "seqToList"

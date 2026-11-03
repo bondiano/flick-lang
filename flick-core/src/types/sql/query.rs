@@ -14,6 +14,7 @@ use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 
 /// A table in the scope of a query.
 #[derive(Debug, Clone)]
@@ -529,7 +530,7 @@ impl Checker<'_> {
 /// `Option t` for a value that may be `NULL`.
 pub fn optional(ty: Type, null: bool) -> Type {
     if null {
-        Type::app(Type::prim("Option"), ty)
+        Type::app(Type::lang(Lang::Option), ty)
     } else {
         ty
     }

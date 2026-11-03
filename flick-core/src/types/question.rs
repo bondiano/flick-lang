@@ -8,6 +8,7 @@ use super::ty::Type;
 use super::typing::range;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::syntax::cst::Node;
+use crate::types::lang::Lang;
 
 /// What a `?` does, by the operand it takes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +27,7 @@ impl Checker<'_> {
         let (head, args) = resolved.spine();
         let head = self.whnf(head);
         match args[..] {
-            [item] if head.is_prim("Option") => {
+            [item] if head.is_lang(Lang::Option) => {
                 let item = item.clone();
                 let Some(returns) = self.stage.returns.clone() else {
                     self.error(
@@ -36,7 +37,7 @@ impl Checker<'_> {
                     );
                     return item;
                 };
-                let some = Type::app(Type::prim("Option"), self.fresh());
+                let some = Type::app(Type::lang(Lang::Option), self.fresh());
                 if self.unify(&returns, &some).is_err() {
                     let shown = self.show(&returns);
                     let message = format!(
@@ -49,7 +50,7 @@ impl Checker<'_> {
                 self.typing.questions.insert(range(span), Question::Option);
                 item
             }
-            [_, value] if head.is_prim("Result") => {
+            [_, value] if head.is_lang(Lang::Result) => {
                 let value = value.clone();
                 if self.stage.pure.is_some() || self.stage.sync {
                     self.error(
@@ -61,9 +62,9 @@ impl Checker<'_> {
                 }
                 let errors = self.fresh();
                 let result = Type::apps(
-                    Type::prim("Result"),
+                    Type::lang(Lang::Result),
                     [
-                        Type::app(Type::prim("Errors"), errors.clone()),
+                        Type::app(Type::lang(Lang::Errors), errors.clone()),
                         value.clone(),
                     ],
                 );

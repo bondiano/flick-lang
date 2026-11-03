@@ -13,6 +13,7 @@ use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
     pub fn push_local(&mut self, name: &str, ty: Type) {
@@ -231,7 +232,7 @@ impl Checker<'_> {
             self.stub_fix(since, head, args, &unknown);
         }
         if let [first, second] = &params[..]
-            && self.is_builtin(head, "Layer", "merge")
+            && self.is_builtin(head, Lang::LayerMerge)
         {
             let span = Span::new(self.file, head.range().0, args[1].range().1);
             self.merge_conflicts(first, second, span);
@@ -266,7 +267,10 @@ impl Checker<'_> {
     }
 
     /// `head` names the value `name` of the built-in module `module`.
-    fn is_builtin(&self, head: &Node, module: &str, name: &str) -> bool {
+    fn is_builtin(&self, head: &Node, item: Lang) -> bool {
+        let Some(item) = lang::table().find(item) else {
+            return false;
+        };
         let parts: Vec<&str> = head
             .child_tokens()
             .filter(|t| t.kind != K::Dot)
@@ -274,11 +278,11 @@ impl Checker<'_> {
             .collect();
         head.kind == K::NameExpr
             && parts.len() == 2
-            && parts[1] == name
+            && parts[1] == item.name
             && self
                 .env
                 .qualified_module(parts[0])
-                .is_some_and(|(m, _)| m == module)
+                .is_some_and(|(m, _)| m == item.module)
     }
 
     pub fn binary(&mut self, node: &Node, children: &[&Node]) -> Type {
@@ -289,7 +293,7 @@ impl Checker<'_> {
             return Type::Error;
         };
         let span = self.span(node);
-        let bool_ = Type::prim("Bool");
+        let bool_ = Type::lang(Lang::Bool);
         match op.kind {
             K::PipeGt => {
                 // at the `|>`, the type after the stage: hover and inlay hints show it
@@ -387,14 +391,14 @@ impl Checker<'_> {
         };
         match op.kind {
             K::NotKw => {
-                let bool_ = Type::prim("Bool");
+                let bool_ = Type::lang(Lang::Bool);
                 self.check(operand, &bool_);
                 bool_
             }
             K::IgnoreKw => {
                 let ty = self.infer(operand);
                 self.note_type(self.token_span(op), &ty);
-                Type::prim("Unit")
+                Type::lang(Lang::Unit)
             }
             K::AwaitKw => {
                 let ty = self.infer(operand);

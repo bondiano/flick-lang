@@ -13,6 +13,7 @@ use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
+use crate::types::lang::Lang;
 
 impl Checker<'_> {
     /// A polymorphic type over a value computed by a runtime call is
@@ -129,7 +130,7 @@ impl Checker<'_> {
         // an operand of an arithmetic operator nothing determined becomes
         // the operator's first allowed type once the declaration is settled
         // a number literal's type may still be settled otherwise, so it stays open
-        let settled: Vec<(u32, &str)> = (self.operators.iter())
+        let settled: Vec<(u32, Lang)> = (self.operators.iter())
             .filter_map(|op| match self.zonk(&op.ty) {
                 Type::Meta(m) if !self.store.is_numeric(m) => Some((m, op.domain.names()[0])),
                 _ => None,
@@ -139,7 +140,7 @@ impl Checker<'_> {
         let subst: Vec<(u32, Type)> = metas
             .into_iter()
             .map(|m| match settled.iter().find(|(x, _)| *x == m) {
-                Some((_, prim)) => (m, Type::prim(prim)),
+                Some((_, item)) => (m, Type::lang(*item)),
                 None => (m, Type::Var(names.next().expect("names are endless"))),
             })
             .collect();
@@ -313,9 +314,9 @@ fn kind_of(ty: &Type, m: u32) -> Kind {
         }
         Type::App { .. } => {
             let (head, args) = t.spine();
-            let rows: &[Kind] = if head.is_prim("Eff") {
+            let rows: &[Kind] = if head.is_lang(Lang::Eff) {
                 &[Kind::ServiceRow, Kind::ErrorRow]
-            } else if head.is_prim("Layer") {
+            } else if head.is_lang(Lang::Layer) {
                 &[Kind::ServiceRow, Kind::ErrorRow, Kind::ServiceRow]
             } else {
                 &[]

@@ -32,6 +32,7 @@ fold_effect : forall c a b r e. (b -> a ->{r; e} b)^c -> (b -> (List a ->{r; e} 
 foreign effect fold_effect from "@flick-lang/runtime" "listFoldEffect"
   retention call
 
+@lang list_filter
 /// The elements that satisfy `p`, in order.
 filter : forall c a. (a -> Bool)^c -> (List a -> List a)^c
 foreign pure filter from "@flick-lang/runtime" "listFilter"

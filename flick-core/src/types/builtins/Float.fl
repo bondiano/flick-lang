@@ -13,9 +13,11 @@ foreign pure same_value from "@flick-lang/runtime" "numberSameValue"
 pi : Float
 foreign pure pi from global "Math.PI"
 
+@lang float_infinity
 infinity : Float
 foreign pure infinity from global "Infinity"
 
+@lang float_nan
 nan : Float
 foreign pure nan from global "NaN"
 

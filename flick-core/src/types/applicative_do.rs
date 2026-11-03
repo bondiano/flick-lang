@@ -13,6 +13,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::env::Found;
+use crate::types::lang::{self, Lang};
 
 /// The key of the `map2` of each `and` of a group: its token.
 pub fn and_keys(group: &Node) -> Vec<(u32, u32)> {
@@ -150,7 +151,7 @@ impl Checker<'_> {
             let (start, end) = group_key(group);
             Span::new(self.file, start, end)
         };
-        let method = self.prelude_method("flat_map", span);
+        let method = self.prelude_method(Lang::FlatMap, span);
         let Type::Fun {
             param: continuation,
             result,
@@ -222,7 +223,7 @@ impl Checker<'_> {
     /// The value types, containers and callback captures of `map2`,
     /// instantiated at `span`, whose dictionary is recorded there.
     fn map2_parts(&mut self, span: Span) -> Option<(Type, Type, Type, Type, Type, Type, Type)> {
-        let method = self.prelude_method("map2", span);
+        let method = self.prelude_method(Lang::Map2, span);
         let Type::Fun { param, result, .. } = self.whnf(&method) else {
             return None;
         };
@@ -287,14 +288,14 @@ impl Checker<'_> {
             Some((qualifier, "pure")) => self
                 .env
                 .qualified_module(qualifier)
-                .is_some_and(|(module, _)| module == "Prelude"),
+                .is_some_and(|(module, _)| module == lang::prelude()),
             Some(_) => false,
             None => {
                 name == "pure"
                     && !bound.iter().any(|b| b == "pure")
                     && !self.locals.iter().any(|l| l.name == "pure")
                     && matches!(self.env.find(Namespace::Value, "pure"),
-                        Found::Entity(e) if e.module == "Prelude")
+                        Found::Entity(e) if lang::is(Lang::Pure, &e.module, &e.name))
             }
         }
     }

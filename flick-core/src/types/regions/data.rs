@@ -6,8 +6,20 @@ use crate::source::Span;
 use crate::types::Checker;
 use crate::types::env::Form;
 use crate::types::kinds::Kind;
+use crate::types::lang::Lang;
 use crate::types::ty::{Norm, Type};
 use crate::types::unify::Unified;
+
+/// The primitive types, which hold no captures.
+const SCALARS: [Lang; 7] = [
+    Lang::Int,
+    Lang::Float,
+    Lang::BigInt,
+    Lang::String,
+    Lang::Bool,
+    Lang::Unit,
+    Lang::Never,
+];
 
 impl Checker<'_> {
     pub fn bound_head(&self, t: &Type) -> Type {
@@ -85,13 +97,10 @@ impl Checker<'_> {
                 let Type::Con { module, name } = head else {
                     return true;
                 };
-                if head.is_prim("List") {
+                if head.is_lang(Lang::List) {
                     return args.iter().any(|t| self.hidden_fields(t, seen));
                 }
-                if ["Int", "Float", "BigInt", "String", "Bool", "Unit", "Never"]
-                    .iter()
-                    .any(|n| head.is_prim(n))
-                {
+                if SCALARS.into_iter().any(|n| head.is_lang(n)) {
                     return false;
                 }
                 let Some(Form::Adt { constructors, .. }) =
@@ -457,9 +466,7 @@ impl Checker<'_> {
     pub(in crate::types) fn scalar(&self, t: &Type) -> bool {
         match self.whnf(t) {
             Type::Meta(m) => self.store.is_numeric(m),
-            t => ["Int", "Float", "BigInt", "String", "Bool", "Unit", "Never"]
-                .iter()
-                .any(|name| t.is_prim(name)),
+            t => SCALARS.into_iter().any(|item| t.is_lang(item)),
         }
     }
 }

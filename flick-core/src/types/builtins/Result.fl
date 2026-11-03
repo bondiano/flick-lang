@@ -39,6 +39,7 @@ let map_err f result =
   | Err e -> Err (f e)
   | Ok x -> Ok x
 
+@lang result_bind
 /// `f x` for `Ok x`.
 bind : forall c e a b. (a -> Result e b)^c -> (Result e a -> Result e b)^c
 let bind f result =

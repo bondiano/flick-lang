@@ -8,7 +8,7 @@ use std::ptr;
 
 use super::declare::Declared;
 use super::solve::Outcome;
-use super::{Dict, STRUCTURAL, has_metas};
+use super::{Dict, STRUCTURAL, has_metas, which};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
@@ -19,7 +19,8 @@ use crate::types::cli::CLI;
 use crate::types::env::{Form, Instance};
 use crate::types::http_api::HTTP_API_DERIVE;
 use crate::types::kinds::Kind;
-use crate::types::ty::{Binder, PRELUDE, Type};
+use crate::types::lang::{self, Lang};
+use crate::types::ty::{Binder, Type};
 
 impl<'n> Checker<'_> {
     pub(super) fn derive(
@@ -45,7 +46,7 @@ impl<'n> Checker<'_> {
         let Some(fields) = self.fields_of(decl, &name, &def.form, refined) else {
             return Vec::new();
         };
-        let has_eq = classes.iter().any(|(_, c)| c == "Eq");
+        let has_eq = classes.iter().any(|(m, c)| lang::is(Lang::Eq, m, c));
         let mut kinds = Vec::new();
         let mut kind = def.kind.clone();
         while let Kind::Arrow(param, result) = kind {
@@ -67,7 +68,7 @@ impl<'n> Checker<'_> {
             if class_module == CLI && !self.cli_value_derivable(decl, &name, &def.form, span) {
                 continue;
             }
-            if (class == "Hash" || class == "Ord") && !has_eq {
+            if which(&[Lang::Hash, Lang::Ord], &class_module, &class).is_some() && !has_eq {
                 self.error(
                     codes::C013,
                     span,
@@ -176,11 +177,10 @@ impl<'n> Checker<'_> {
             }
             match found {
                 Some((module, def))
-                    if module == PRELUDE
-                        && matches!(def.form, Form::Class { .. })
-                        && STRUCTURAL.contains(last) =>
+                    if matches!(def.form, Form::Class { .. })
+                        && which(&STRUCTURAL, &module, last).is_some() =>
                 {
-                    out.push((PRELUDE.to_owned(), (*last).to_owned()));
+                    out.push((module, (*last).to_owned()));
                 }
                 Some((module, def))
                     if module == CLI && *last == "Value" && matches!(def.form, Form::Class { .. }) =>
@@ -188,7 +188,8 @@ impl<'n> Checker<'_> {
                     out.push((CLI.to_owned(), "Value".to_owned()));
                 }
                 // witnesses, not classes: see `types::schemas`
-                Some((module, _)) if module == PRELUDE && matches!(*last, "Schema" | "Url" | "Form") => {}
+                Some((module, _))
+                    if which(&[Lang::Schema, Lang::Url, Lang::Form], &module, last).is_some() => {}
                 Some((module, _)) if module == HTTP_API_DERIVE && *last == "HttpApi" => {}
                 None => {}
                 Some(_) => self.error(

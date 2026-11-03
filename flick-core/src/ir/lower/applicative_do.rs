@@ -8,6 +8,7 @@ use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 use crate::types::{and_keys, group_key, pure_argument};
 
 impl Lower<'_> {
@@ -38,7 +39,7 @@ impl Lower<'_> {
         let mut held: Vec<String> = vec![self.hidden("$and")];
         for (i, (key, value)) in keys.into_iter().zip(values).enumerate() {
             let at = Span::new(self.file, key.0, key.1);
-            let map2 = self.prelude_method(key, "map2");
+            let map2 = self.prelude_method(key, Lang::Map2);
             let last = i + 2 == binds.len();
             let earlier = if i == 0 {
                 Pat::Bind(held[0].clone())
@@ -83,7 +84,7 @@ impl Lower<'_> {
         }
         let key = group_key(group);
         let at = Span::new(self.file, key.0, key.1);
-        let flat_map = self.prelude_method(key, "flat_map");
+        let flat_map = self.prelude_method(key, Lang::FlatMap);
         let mark = self.scope.len();
         let patterns: Vec<Pat> = binds.iter().map(|(p, _)| self.bind_pattern(*p)).collect();
         let body = self.do_rest(rest, span);
