@@ -28,9 +28,15 @@ const run = (name: string, { signal, env }: RunOptions = {}): Promise<Run> =>
     });
     let stdout = "";
     let stderr = "";
+    let sent = false;
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk;
-      if (signal && stdout.includes("ready\n")) child.kill(signal);
+      // once: a second signal after the runtime removed its handlers would
+      // kill the child with the default action
+      if (signal && !sent && stdout.includes("ready\n")) {
+        sent = true;
+        child.kill(signal);
+      }
     });
     child.stderr.on("data", (chunk: Buffer) => {
       stderr += chunk;
