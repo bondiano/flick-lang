@@ -1,5 +1,5 @@
 // `vite` serves the client and builds it with `flick build`; in development
-// the API goes to the Go server (`flick script dev` starts both).
+// the API goes to the Go server (`flick run dev` starts both).
 import { flickVite } from "@flick-lang/astro/vite";
 import { defineConfig } from "vite";
 

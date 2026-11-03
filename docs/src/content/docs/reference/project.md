@@ -128,9 +128,9 @@ members = ["contract", "server"]
 
 A root without `[project]` is no project itself, and takes only
 `[workspace]` and `[scripts]`. There, `flick check`, `build`, `test`, `fmt`
-and `clean` without paths go through every member, each after the members it
-depends on by path, and fail if one does; `flick run`, `dev` and the other
-commands need a member, `--package <name>` (`-p`), the name of its directory.
+and `clean` without paths, and `flick install`, go through every member, each
+after the members it depends on by path, and fail if one does; `flick run`
+runs a script, and `dev` and the other commands need a member, `--package <name>` (`-p`), the name of its directory.
 In a member, commands run on that member as usual, and `--package` picks
 another.
 
@@ -165,8 +165,9 @@ test = "flick test"
 ci = ["@lint", "@test"]
 ```
 
-`flick script ci` runs one, looking in the project's `flick.toml`, then in
-the workspace root's; `flick script` lists them. The steps stop at the first
+`flick run ci` runs one, looking in the project's `flick.toml`, then in
+the workspace root's; an entry of the project with the same name runs
+instead. The steps stop at the first
 that fails, with its exit code. Arguments after `--` are each step's `"$@"`.
 
 ## `flick check`

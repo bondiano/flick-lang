@@ -330,7 +330,18 @@ fn run_client(root: &Path, global: &GlobalArguments, signals: &AtomicUsize) -> u
 
 pub fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
     let signals = child::signals();
-    let project = match find_project(global) {
+    let found = find_project(global);
+    // A name that is not an entry of the project names a script.
+    if options.entry.is_none()
+        && let Some(name) = &options.name
+        && !found
+            .as_ref()
+            .is_ok_and(|p| p.config.entries.iter().any(|e| &e.name == name))
+        && let Some(code) = super::script(name, &options.args, global)
+    {
+        return code;
+    }
+    let project = match found {
         Ok(p) => p,
         Err((sources, diagnostics)) => {
             report::render(global, &sources, &diagnostics);

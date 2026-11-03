@@ -27,7 +27,7 @@ repository.
 just conduit-run          # builds both, starts PostgreSQL and the server: http://127.0.0.1:8000
 ```
 
-From this directory, `flick script <name>` runs the steps of
+From this directory, `flick run <name>` runs the steps of
 [`flick.toml`](flick.toml):
 
 | Script | What it does |
@@ -188,5 +188,5 @@ frontend on the js target, rendered with React:
 | - | - | - |
 | unit | `contract/test`, `server/test/…/CoreTest.fl`, `client/test` | `flick test` |
 | API, in process | `server/test/…/ApiTest.fl` | `flick test` (Docker) |
-| API, over HTTP | RealWorld Hurl | `flick script api`, `just conduit-api` |
-| frontend | RealWorld Playwright, `fullstack` mode | `flick script e2e`, `just conduit-e2e` |
+| API, over HTTP | RealWorld Hurl | `flick run api`, `just conduit-api` |
+| frontend | RealWorld Playwright, `fullstack` mode | `flick run e2e`, `just conduit-e2e` |

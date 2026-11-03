@@ -18,13 +18,12 @@ and `--help`; `flick help <command>` prints a command's help and
 | `check [paths] [--watch] [--fix]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left |
 | `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--promise-facade] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files (`--emit go`: a Go executable per entry, see [Go target](../codegen/#go-target)); `--emit-dts` adds `.d.ts` files and `--promise-facade` Promise façades `A/B.promise.js` (see [TypeScript](../codegen/#typescript)); shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
 | `build [paths] --inputs` | prints a conservative JSON input inventory (`key`, `files`, `roots`, `modules`) without writing build artifacts or cache entries |
-| `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | builds JavaScript and runs the `main` of the entry `name` (the only one when left out); a client entry (`target = "client"`) builds with Vite and serves the page with Vite preview; `--devtools` sends server entry spans to the Effect DevTools ([observability](../observability/#devtools)) |
+| `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | builds JavaScript and runs the `main` of the entry `name` (the only one when left out); a `name` that is not an entry runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails, with `args` as their `"$@"`; a client entry (`target = "client"`) builds with Vite and serves the page with Vite preview; `--devtools` sends server entry spans to the Effect DevTools ([observability](../observability/#devtools)) |
 | `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | rebuilds on changes and replaces the running app; in a project with several entries and none named, it runs every entry that is not a client's and, if one is, Vite (`node_modules/.bin/vite`) for the pages, which replaces a changed module in the page keeping the labelled atoms' values |
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile] [--emit js\|go]` | runs the tests of the test root, on Node or as a Go executable |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | writes the canonical layout ([formatting](../grammar/#formatting)); without paths the source and test roots |
 | `clean [--cache]` | removes the build artifacts; `--cache` also the build cache |
-| `script [name] -- args` | runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails; without a name lists the scripts |
-| `install [--locked] [--offline]` | installs with pnpm (`--frozen-lockfile`, `--offline`) |
+| `install [--locked] [--offline]` | installs with pnpm (`--frozen-lockfile`, `--offline`); at a workspace root, each member's |
 | `add <pkg>… [--dev]`, `remove <pkg>…`, `update [pkg]…` | changes dependencies with pnpm |
 | `deps [--why <pkg>]` | the installed graph, and the Flick modules of each direct dependency |
 | `pack --out-dir <dir>` | a release build and its npm tarball; refuses `todo` and `echo` (`FLICK-P024`), and warns when the public API breaks importers since the latest tag |
@@ -41,7 +40,8 @@ and `--help`; `flick help <command>` prints a command's help and
 | `content-mapper [--declarations <paths>…]` | serves TypeScript's [Content Mapper](../editor/#content-mapper) requests for `.fl` files on stdio, started by `@flick-lang/content-mapper`; `--declarations` instead writes the projection of each `.fl` file under the paths beside it as `Name.d.fl.ts` and exits |
 
 At the root of a workspace without `[project]`, `check`, `build`, `test`,
-`fmt` and `clean` without paths run on every member, dependencies first.
+`fmt` and `clean` without paths, and `install`, run on every member,
+dependencies first.
 
 `check`, `build` and the build steps of `run`, `dev` and `test` install
 nothing, run no `main` and load no foreign module. An installed

@@ -1,5 +1,5 @@
 // The RealWorld Playwright suite, vendored unchanged, against the client
-// as the Go server serves it (`flick script e2e` starts both and a fresh
+// as the Go server serves it (`flick run e2e` starts both and a fresh
 // database). `fullstack`: the tests drive everything through the pages
 // and make their own users.
 import { defineConfig } from "@playwright/test";

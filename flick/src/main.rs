@@ -80,7 +80,6 @@ fn main() -> ExitCode {
             | Commands::Deps(_)
             | Commands::Explain(_)
             | Commands::Doctor
-            | Commands::Script(_)
             // after its logging starts
             | Commands::Lsp(_)
     ) {
@@ -165,7 +164,6 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::Run(options) => commands::run(&options, global),
         Commands::Dev(options) => commands::dev(&options, global),
         Commands::Clean(options) => report(commands::clean(&options, global), global),
-        Commands::Script(options) => commands::script(&options, global),
         Commands::Install(_)
         | Commands::Add(_)
         | Commands::Remove(_)

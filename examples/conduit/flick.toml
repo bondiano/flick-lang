@@ -2,12 +2,12 @@ schema-version = 1
 
 # The Conduit workspace: the contract, which the client and the server
 # compile from its sources, the Go server and the browser client. At this
-# root `flick check`, `build`, `test`, `fmt` and `clean` go through each,
-# the contract first; `--package server` picks one.
+# root `flick check`, `build`, `test`, `fmt`, `clean` and `install` go
+# through each, the contract first; `--package server` picks one.
 [workspace]
 members = ["contract", "server", "client"]
 
-# `flick script <name>`. The database scripts need Docker, and so does
+# `flick run <name>`. The database scripts need Docker, and so does
 # `test`, whose API suite starts a PostgreSQL of its own; `api` also needs
 # Go and hurl, and runs the RealWorld API suite against a fresh server;
 # `e2e` runs the RealWorld Playwright suite against the client as the

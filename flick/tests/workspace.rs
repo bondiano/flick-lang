@@ -1,6 +1,6 @@
 //! Workspaces: commands at the root go through the members, `--package`
 //! picks one, a path dependency is compiled from its sources and rebuilt
-//! when they change, and `flick script` runs the steps of `[scripts]`.
+//! when they change, and `flick run` runs the steps of `[scripts]`.
 
 mod common;
 
@@ -97,17 +97,15 @@ fn a_path_dependency_is_rebuilt_when_its_sources_change() {
 #[test]
 fn scripts_run_their_steps_in_order_until_one_fails() {
     let dir = workspace("workspace_scripts");
-    let out = flick_in(dir.join("app"), &["script", "both", "--", "a", "b"]);
+    let out = flick_in(dir.join("app"), &["run", "both", "--", "a", "b"]);
     assert!(out.status.success(), "{out:?}");
     assert_eq!(text(&out.stdout), "hello a b\nsecond\n");
-    let out = flick_in(&dir, &["script", "fail"]);
+    let out = flick_in(&dir, &["run", "fail"]);
     assert_eq!(out.status.code(), Some(3), "{out:?}");
     assert!(!text(&out.stdout).contains("never"));
-    let out = flick_in(&dir, &["script", "spin"]);
+    let out = flick_in(&dir, &["run", "spin"]);
     assert!(text(&out.stderr).contains("run each other"), "{out:?}");
-    let out = flick_in(&dir, &["script"]);
-    assert!(
-        text(&out.stdout).contains("both: @hello && echo second"),
-        "{out:?}"
-    );
+    // an entry of the project wins over a script of the same name
+    let out = flick_in(dir.join("app"), &["run", "other"]);
+    assert_eq!(text(&out.stdout).trim(), "other", "{out:?}");
 }

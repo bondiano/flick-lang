@@ -151,7 +151,7 @@ conduit-run:
 # examples/conduit/client exec playwright install chromium`)
 conduit-e2e:
     CARGO_TARGET_DIR=target/own cargo build -p flick
-    cd examples/conduit && PATH="$PWD/../../target/own/debug:$PATH" ../../target/own/debug/flick script e2e
+    cd examples/conduit && PATH="$PWD/../../target/own/debug:$PATH" ../../target/own/debug/flick run e2e
 
 # Mutation-fuzz the parser (the nightly CI job runs 1 000 000 inputs)
 fuzz iterations="1000000":
