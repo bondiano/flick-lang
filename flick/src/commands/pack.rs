@@ -1,6 +1,7 @@
-//! `flick pack`: a release build of the project's modules into a staging
-//! package, checked for completeness, and an npm tarball of it made by
-//! pnpm. Each public module has its ESM and `.iface`, with `.d.ts` when the
+//! `flick pack`: a release build of the project, which must have no `todo`
+//! or `echo` left. A library with `[package]` packs its sources, which
+//! dependents fetch and compile (see `tarball`); an app packs a staging npm
+//! package, checked for completeness, made into a tarball by pnpm. Each public module has its ESM and `.iface`, with `.d.ts` when the
 //! project emits them; its interface owns any alternate backend implementation.
 //! Dependencies have the recorded fingerprints and manifest exports exist.
 //! Importing a module runs nothing, as its top level is pure; an app also
@@ -21,6 +22,7 @@ use flick_core::source::SourceMap;
 use super::build::{BuildCommand, write};
 use super::diff;
 use super::run::find_project;
+use super::tarball;
 use crate::args::{
     BuildArguments, EmitArgument, GlobalArguments, OutDirArguments, ProfileArgument,
 };
@@ -28,6 +30,8 @@ use crate::cache::files_under;
 use crate::child;
 use crate::command::{Command, Outcome};
 use crate::report;
+use flick_core::project::Project;
+use flick_core::project::config::Kind;
 
 fn failure(code: Code, message: String) -> Outcome {
     Outcome {
@@ -91,6 +95,9 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
             "warning: the public API breaks importers since {tag}; `flick diff {tag}` lists the changes"
         );
     }
+    if project.config.kind == Kind::Lib {
+        return library(&project, &options.out_dir);
+    }
     let problems = incomplete(&stage.join("dist"), dts);
     if !problems.is_empty() {
         return Outcome {
@@ -132,6 +139,28 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
             format!("pnpm pack failed with exit code {}", child::code(s)),
         ),
         Err(err) => failure(codes::P016, format!("cannot run pnpm: {err}")),
+    }
+}
+
+/// The source tarball of the library `project`, with its sha256 on stdout.
+fn library(project: &Project, out_dir: &str) -> Outcome {
+    let Some(package) = &project.config.package else {
+        return failure(
+            codes::P032,
+            "`flick pack` packs a library with `[package] name` and `version`".to_owned(),
+        );
+    };
+    match tarball::write(
+        project,
+        &package.name,
+        &package.version,
+        &global_path(out_dir),
+    ) {
+        Ok((file, sha)) => {
+            println!("{sha}  {}", file.display());
+            Outcome::default()
+        }
+        Err(err) => failure(codes::P013, format!("cannot write the tarball: {err}")),
     }
 }
 

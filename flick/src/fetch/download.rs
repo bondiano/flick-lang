@@ -170,7 +170,7 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<String>) -> io::Result<()> {
     Ok(())
 }
 
-fn hex(bytes: &[u8]) -> String {
+pub fn hex(bytes: &[u8]) -> String {
     bytes.iter().fold(String::new(), |mut out, b| {
         let _ = write!(out, "{b:02x}");
         out

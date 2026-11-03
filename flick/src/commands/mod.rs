@@ -16,6 +16,7 @@ mod run;
 mod scaffold;
 mod script;
 mod summary;
+mod tarball;
 mod test;
 mod tools;
 

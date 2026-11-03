@@ -12,7 +12,6 @@ use std::time::{Duration, Instant};
 use std::{fs, thread};
 
 use common::{APP, project};
-use flick_core::build::runner_path;
 
 const FOREVER: &str =
     "import { Effect } from \"@flick-lang/runtime\";\nexport const forever = () => Effect.never;\n";
@@ -360,17 +359,20 @@ fn dev_starts_the_next_version_after_foreign_work_settles() {
 }
 
 #[test]
-#[ignore = "needs Node, pnpm and the installed runtime"]
-fn pack_writes_a_complete_package_that_runs_nothing_on_import() {
-    let config = "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\nemit-dts = true\n";
+fn pack_writes_the_sources_of_a_library() {
+    let config = "schema-version = 1\n\n[package]\nname = \"@acme/greeting\"\nversion = \"1.2.3\"\n\n[project]\nkind = \"lib\"\n";
     let source = "module Lib.Greeting exposing (greet)\n\ngreet : String -> String\nlet greet name = \"Hello, \" ++ name\n";
-    let manifest = "{ \"name\": \"@acme/greeting\", \"version\": \"1.2.3\" }\n";
     let dir = project(
         "pack_lib",
         &[
             ("flick.toml", config),
             ("src/Lib/Greeting.fl", source),
-            ("package.json", manifest),
+            ("src/Lib/greeting.mjs", "export const x = 1;\n"),
+            ("README.md", "# greeting\n"),
+            (
+                "test/Lib/GreetingTest.fl",
+                "module Lib.GreetingTest exposing ()\n",
+            ),
         ],
     );
     let out = run(&dir, &["pack", "--out-dir", "artifacts"]);
@@ -382,50 +384,31 @@ fn pack_writes_a_complete_package_that_runs_nothing_on_import() {
         .output()
         .expect("tar");
     let listing = String::from_utf8_lossy(&listing.stdout);
-    for file in [
-        "package/dist/Lib/Greeting.js",
-        "package/dist/Lib/Greeting.iface",
-        "package/dist/Lib/Greeting.d.ts",
-        "package/dist/_core/Lib/Greeting.js",
-        "package/package.json",
-    ] {
-        assert!(listing.contains(file), "{file} in\n{listing}");
-    }
-    assert!(
-        !listing.contains(runner_path(false)),
-        "a library has no runner"
-    );
-    let probe = dir.join(".flick/pack/probe.mjs");
-    fs::write(
-        &probe,
-        "const m = await import(\"./dist/Lib/Greeting.js\");\nconst core = await import(\"./dist/_core/Lib/Greeting.js\");\nconsole.log(typeof m.greet);\nconsole.log(m.greet(\"Flick\"));\nconsole.log(core.greet(\"Flick\"));\n",
-    )
-    .expect("write");
-    let imported = Command::new("node").arg(&probe).output().expect("node");
+    let files: Vec<&str> = listing.lines().collect();
     assert_eq!(
-        String::from_utf8_lossy(&imported.stdout),
-        "function\nHello, Flick\nHello, Flick\n",
-        "{imported:?}"
+        files,
+        [
+            "package/README.md",
+            "package/flick.toml",
+            "package/src/Lib/Greeting.fl",
+            "package/src/Lib/greeting.mjs",
+        ]
     );
-
-    // an export the package lacks is refused before any tarball
-    let broken = "{ \"name\": \"@acme/broken\", \"version\": \"1.0.0\", \"exports\": { \".\": \"./dist/Lib/Missing.js\" } }\n";
-    fs::write(dir.join("package.json"), broken).expect("write");
-    let out = run(&dir, &["pack", "--out-dir", "artifacts"]);
-    assert_eq!(out.status.code(), Some(1), "{out:?}");
-    assert!(String::from_utf8_lossy(&out.stderr).contains("FLICK-P020"));
-    assert!(!dir.join("artifacts/acme-broken-1.0.0.tgz").exists());
+    // the same sources give the same bytes, so the published hash holds
+    let printed = String::from_utf8_lossy(&out.stdout).into_owned();
+    let again = run(&dir, &["pack", "--out-dir", "artifacts"]);
+    assert_eq!(String::from_utf8_lossy(&again.stdout), printed);
 
     // `todo` and `echo` stay out of packages
-    fs::write(dir.join("package.json"), manifest).expect("write");
     let unfinished = source.replace("\"Hello, \" ++ name", "echo (todo \"greet\")");
     fs::write(dir.join("src/Lib/Greeting.fl"), unfinished).expect("write");
-    let out = run(&dir, &["pack", "--out-dir", "artifacts"]);
+    let out = run(&dir, &["pack", "--out-dir", "artifacts2"]);
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     let stderr = String::from_utf8_lossy(&out.stderr);
     for code in ["FLICK-T022", "FLICK-T023", "FLICK-P024"] {
         assert!(stderr.contains(code), "{code} in {stderr}");
     }
+    assert!(!dir.join("artifacts2").exists());
 }
 
 #[test]
