@@ -1,7 +1,8 @@
-//! `install`, `add`, `remove`, `update` and `deps` through pnpm. Every
-//! command that writes checks first that the pnpm on `PATH` is the version
-//! `package.json` pins, so a wrong pnpm changes nothing. Flick keeps no
-//! lockfile of its own.
+//! `install`, `add`, `remove`, `update` and `deps`. `install` and `update`
+//! fetch the Flick dependencies `flick.lock` pins first; the npm packages of
+//! `package.json` go through pnpm, and every command that writes checks
+//! first that the pnpm on `PATH` is the version `package.json` pins, so a
+//! wrong pnpm changes nothing.
 
 use std::fs;
 use std::path::Path;
@@ -16,7 +17,10 @@ use crate::args::GlobalArguments;
 use crate::cache::files_under;
 use crate::child;
 use crate::command::Outcome;
+use crate::fetch;
 use crate::toolchain;
+use flick_core::project::Project;
+use tracing::info;
 
 fn failure(code: Code, message: String) -> Outcome {
     Outcome {
@@ -71,6 +75,31 @@ fn check_pnpm(root: &Path, wanted: &str) -> Option<Outcome> {
     }
 }
 
+/// Fetches the Flick dependencies for `install` and `update`; the failure.
+fn fetch(project: &Project, command: &Command) -> Option<Outcome> {
+    let (update, options) = match command {
+        Command::Install { locked, offline } => (
+            Vec::new(),
+            fetch::Options {
+                locked: *locked,
+                offline: *offline,
+            },
+        ),
+        Command::Update { packages } => (packages.clone(), fetch::Options::default()),
+        _ => return None,
+    };
+    let dependencies = &project.config.dependencies;
+    match fetch::install(&project.root, dependencies, &update, options) {
+        Ok(fetched) => {
+            for name in fetched {
+                info!("fetched {name}");
+            }
+            None
+        }
+        Err(message) => Some(failure(codes::P034, message)),
+    }
+}
+
 pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
     let project = match find_project(global) {
         Ok(p) => p,
@@ -82,6 +111,18 @@ pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
         }
     };
     let root = &project.root;
+    if let Some(failed) = fetch(&project, command) {
+        return failed;
+    }
+    // a project without npm packages needs no pnpm
+    if !root.join("package.json").exists()
+        && matches!(command, Command::Install { .. } | Command::Update { .. })
+    {
+        return Outcome {
+            sources: SourceMap::default(),
+            diagnostics: Vec::new(),
+        };
+    }
     if pnpm::writes(command) {
         if let Some(problem) = check_pnpm(root, &pinned(root)) {
             return problem;

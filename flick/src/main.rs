@@ -17,6 +17,7 @@ mod cache;
 mod child;
 mod command;
 mod commands;
+mod fetch;
 mod lsp;
 mod mapper;
 mod progress;
