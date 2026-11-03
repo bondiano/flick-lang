@@ -225,3 +225,26 @@ let render = Ui.render
   (operator)
   (constructor)
   (member))
+
+==================
+Attributes
+==================
+
+@lang int
+type Option a = @lang none None | Some a
+
+---
+
+(source_file
+  (attribute)
+  (identifier)
+  (keyword)
+  (constructor)
+  (identifier)
+  (operator)
+  (attribute)
+  (keyword)
+  (constructor)
+  (operator)
+  (constructor)
+  (identifier))

@@ -115,6 +115,8 @@ pub enum SyntaxKind {
     StarStar,
     Caret,
     Dollar,
+    /// `@`, which starts an attribute: `@lang int`.
+    At,
     /// Postfix `?`: the value of an `Option` or a `Result`, or an early exit.
     Question,
     Underscore,
@@ -140,6 +142,8 @@ pub enum SyntaxKind {
     Variant,
     Refinement,
     DerivingClause,
+    /// `@name argument…` before a declaration or a constructor.
+    Attribute,
     KindDecl,
     SqlTableDecl,
     SqlMigrationDecl,
@@ -369,6 +373,7 @@ pub fn describe(kind: SyntaxKind) -> &'static str {
         K::Arrow => "`->`",
         K::LArrow => "`<-`",
         K::Question => "`?`",
+        K::At => "`@`",
         K::Pipe => "`|`",
         K::Eof => "end of file",
         K::LayoutSep => "a new line",

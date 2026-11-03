@@ -89,3 +89,17 @@ fn puts_members_and_metadata_on_their_own_lines() {
     }
     "#);
 }
+
+/// An attribute keeps its own line and stays tight after `@`.
+#[test]
+fn keeps_attributes() {
+    let src = "@ lang  int\ntype Int\nclass Monad m =\n  @lang pure\n  pure : a -> m a\ntype Option a = @lang none None | @lang some Some a\n";
+    insta::assert_snapshot!(fmt(src), @r"
+    @lang int
+    type Int
+    class Monad m =
+      @lang pure
+      pure : a -> m a
+    type Option a = @lang none None | @lang some Some a
+    ");
+}

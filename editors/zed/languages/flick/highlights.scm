@@ -11,6 +11,7 @@
   (#eq? @_not "not")) @keyword.operator
 (operator) @operator
 
+(attribute) @attribute
 (constructor) @type
 (member) @property
 (identifier) @variable

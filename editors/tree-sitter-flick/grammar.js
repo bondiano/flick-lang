@@ -28,6 +28,7 @@ module.exports = grammar({
     source_file: $ => repeat($._token),
 
     _token: $ => choice(
+      $.attribute,
       $._foreign,
       $._from,
       $._component,
@@ -61,6 +62,8 @@ module.exports = grammar({
     // `component name` declares a component; elsewhere the word is a name
     _component: $ => seq(alias('component', $.keyword), $.identifier),
     boolean: _ => choice('true', 'false'),
+    // `@lang int`: the attribute's name; its arguments are plain identifiers
+    attribute: _ => token(seq('@', /[a-z_][A-Za-z0-9_]*/)),
     operator: _ => choice(...OPERATORS),
 
     // `.name` is a field or module member even when it spells a keyword
