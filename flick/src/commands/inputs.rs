@@ -97,7 +97,6 @@ pub fn describe(
     files.dedup();
     let mut key = Key::default();
     key.add("compiler", toolchain::COMPILER);
-    key.add("language", flick_core::LANGUAGE_VERSION);
     if let Ok(meta) = env::current_exe().and_then(fs::metadata) {
         key.add(
             "compiler-binary",

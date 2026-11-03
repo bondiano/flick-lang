@@ -11,7 +11,7 @@ pub use tools::*;
 
 /// The Flick compiler and toolchain.
 #[derive(Parser)]
-#[command(name = "flick", version = version())]
+#[command(name = "flick", version)]
 pub struct CommandArguments {
     #[command(flatten)]
     pub global: GlobalArguments,
@@ -325,12 +325,4 @@ pub enum Color {
     Auto,
     Always,
     Never,
-}
-
-fn version() -> String {
-    format!(
-        "{} (Flick {})",
-        env!("CARGO_PKG_VERSION"),
-        flick_core::LANGUAGE_VERSION
-    )
 }

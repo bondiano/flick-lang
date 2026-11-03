@@ -67,14 +67,7 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
             failed.push(format!("{what}: {detail}"));
         }
     };
-    line(
-        Some(true),
-        "compiler",
-        format!(
-            "flick {COMPILER}, language {}",
-            flick_core::LANGUAGE_VERSION
-        ),
-    );
+    line(Some(true), "compiler", format!("flick {COMPILER}"));
     match version_of("node") {
         Some(v) => line(
             Some(at_least(&v, NODE)),

@@ -74,7 +74,7 @@ Use matching compiler and runtime versions.
 - [Ecosystem](./docs/src/content/docs/ecosystem/index.md) — compiler, browser
   playground, JavaScript interop and editor tooling.
 - [Specification](./docs/src/content/docs/spec/index.md) — the normative
-  description of the language (version 0.7); the formal semantics and its
+  description of the language; the formal semantics and its
   Lean proofs are in [`docs/formal/`](./docs/formal/) and
   [`formal/`](./formal/README.md).
 

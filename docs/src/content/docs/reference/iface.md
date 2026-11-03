@@ -7,16 +7,15 @@ needs, so an importer never re-reads, re-parses or re-checks the module's
 source (see [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). It is versioned JSON. `.d.ts` is only a projection for
 TypeScript; `.iface` is the source of truth for Flick importers.
 
-Until 0.1.0 the schema grows with the compiler: every change bumps
-`iface-version`, and a compiler rejects any version but its own with
-`FLICK-P010`. Release 0.1.0 freezes the version it ships with.
+Release 0.1.0 ships `iface-version` 3. Every change of the schema bumps it,
+and a compiler rejects any version but its own with `FLICK-P010`.
 
-## Version 2
+## Version 3
 
 ```json
 {
-  "iface-version": 2,
-  "language": "0.7",
+  "iface-version": 3,
+  "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [
     { "module": "App.Shapes", "namespace": "type", "name": "Shape", "decl": "adt" },
@@ -37,7 +36,7 @@ number by hand cannot recover missing capture information.
 | Field | Meaning |
 | - | - |
 | `iface-version` | schema version; must equal the compiler's |
-| `language` | Flick language version of the compiler that wrote the file; must equal the reader's |
+| `compiler` | version of the compiler that wrote the file; must equal the reader's |
 | `module` | full name of the described module |
 | `exports` | the module's interface, in the order of its `exposing` list |
 | `hidden` | constructors of exported types that are not exported, so an import of one gets a precise `FLICK-R005`; omitted when empty |
