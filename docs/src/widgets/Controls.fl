@@ -1,6 +1,6 @@
 module Controls exposing (main, shell)
 
-import Elements exposing (attributes, icon)
+import Elements exposing (attributes)
 
 type alias Model = { ru : Bool; dark : Bool }
 
@@ -28,7 +28,7 @@ let view model m =
           (button
             { disabled = false; on_click = Ui.Event.latest (fun _ -> task { open_search () }) }
             [
-              icon "search",
+              Elements.icon "search",
               span { class_name = "search-word" } [text search_label],
               span { class_name = "search-shortcut" } [text "⌘ K"],
             ]),
@@ -47,8 +47,8 @@ let view model m =
                 });
             }
             [
-              span { class_name = "theme-light-icon" } [icon "moon"],
-              span { class_name = "theme-dark-icon" } [icon "sun"],
+              span { class_name = "theme-light-icon" } [Elements.icon "moon"],
+              span { class_name = "theme-dark-icon" } [Elements.icon "sun"],
             ]),
       ],
       span { class_name = "icon-control mobile-menu-control" } [
@@ -58,7 +58,7 @@ let view model m =
             ("popoverTarget", "flick-navigation"),
           ]
           (button { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) } [
-            icon "menu",
+            Elements.icon "menu",
           ]),
       ],
     ]

@@ -1,6 +1,6 @@
 module Hero exposing (main, initial_view)
 
-import Elements exposing (attributes, icon)
+import Elements exposing (attributes)
 import JsError exposing (JsError(..))
 
 type alias Line = { stream : String; text : String }
@@ -229,7 +229,7 @@ let view model m =
                       ))
                     });
                 }
-                [icon (if m.copied then "check" else "copy")]),
+                [Elements.icon (if m.copied then "check" else "copy")]),
           ],
         ],
         div { class_name = "hero-editor-file" } [
@@ -251,7 +251,7 @@ let view model m =
                     else
                       (if m.ru then "Запустить Flick" else "Run Flick")
                   ),
-                icon "play",
+                Elements.icon "play",
               ],
           ],
         ],
