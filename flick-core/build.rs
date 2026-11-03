@@ -33,14 +33,43 @@ fn main() -> io::Result<()> {
     let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo supplies OUT_DIR"));
     go_runtime(&output)?;
     go_packages(&output)?;
-    if cfg!(feature = "builtin-docs") {
-        return Ok(());
+    let docs = cfg!(feature = "builtin-docs");
+    if !docs {
+        for package in ["core", "std"] {
+            let sources = Path::new("../packages").join(package).join("src");
+            strip_tree(&sources, &output.join(package))?;
+        }
     }
-    for package in ["core", "std"] {
-        let sources = Path::new("../packages").join(package).join("src");
-        strip_tree(&sources, &output.join(package))?;
+    std_sources(&output, docs)
+}
+
+/// `std_sources.rs`: `STD`, the modules of `packages/std` in the order of its
+/// `modules.txt`, each its file as written, or without its docs.
+fn std_sources(output: &Path, docs: bool) -> io::Result<()> {
+    let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("Cargo supplies it"));
+    let sources = manifest.join("../packages/std/src");
+    let order = sources.join("modules.txt");
+    println!("cargo:rerun-if-changed={}", order.display());
+    let mut out = String::from("pub(super) const STD: &[(&str, &str)] = &[\n");
+    for module in fs::read_to_string(&order)?
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+    {
+        let file = format!("{}.fl", module.replace('.', "/"));
+        let path = if docs {
+            sources.join(&file)
+        } else {
+            output.join("std").join(&file)
+        };
+        let _ = writeln!(
+            out,
+            "    ({module:?}, include_str!({:?})),",
+            path.display().to_string()
+        );
     }
-    Ok(())
+    out.push_str("];\n");
+    fs::write(output.join("std_sources.rs"), out)
 }
 
 /// `go_runtime.rs`: the files of the go target's runtime, the package

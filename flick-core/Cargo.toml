@@ -32,6 +32,8 @@ native-project = ["dep:toml", "dep:semver"]
 terminal-diagnostics = ["dep:annotate-snippets"]
 builtin-docs = []
 server-stdlib = []
+# std in the binary, for a host with no packages: the playground
+embedded-std = []
 
 [dev-dependencies]
 insta = "1.49.0"

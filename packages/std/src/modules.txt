@@ -1,0 +1,241 @@
+# The modules of std in the order they are checked: each sees the ones
+# before it, and the core modules before all of them.
+
+Platform
+App
+Layer
+Fiber
+RawCause
+Failure
+Exit
+Markdown
+Chunk.Core
+Chunk.Ops
+Chunk
+Js.Array
+Js
+JsError
+BigInt
+Redacted
+BigDecimal
+Duration
+EqHash
+HashSet
+HashMap
+Loop
+Log
+File
+Resource
+Events
+Gen
+Checks
+Schema
+Route
+Codec
+Json
+Sql
+Database
+Database.Migrate
+Test
+Runner.Node
+Runner.Browser
+# Effect: values and classes
+RegExp
+Combiner
+Reducer
+Ordering
+Order
+Equivalence
+Hash
+Optic
+JsonPointer
+JsonPatch
+Inspectable
+Formatter
+Version
+ByteSize
+Bytes
+Crypto
+# end of Effect: values and classes
+# Effect: lists and records
+Bool
+Predicate
+Filter
+Function
+# end of Effect: lists and records
+# Effect: collections
+Trie
+HashRing
+Graph.Types
+Graph.Build
+Graph.Query
+Graph.Algorithms
+Graph.Walk
+Graph
+# end of Effect: collections
+# Effect: time
+DateTime
+Cron
+Clock
+Jwt
+Random
+# end of Effect: time
+# Effect: concurrency
+SynchronizedRef
+SubscriptionRef
+Deferred
+Latch
+Semaphore
+PartitionedSemaphore
+Queue
+PubSub
+Cache
+ScopedCache
+ScopedRef
+RcRef
+RcMap
+Pool
+# end of Effect: concurrency
+# Effect: transactions
+Tx
+TxRef
+TxChunk
+TxDeferred
+TxHashMap
+TxHashSet
+TxPriorityQueue
+TxQueue
+TxPubSub
+TxReentrantLock
+TxSemaphore
+TxSubscriptionRef
+# end of Effect: transactions
+# Effect: schema
+Check
+Arbitrary
+JsonSchema
+Differ
+Net
+# end of Effect: schema
+# Effect: platform and observability
+PlatformError
+Path
+LogLevel
+Console
+FileSystem
+Terminal
+Stdio
+Logger
+ConfigProvider
+Metric
+Tracer
+# end of Effect: platform and observability
+# Effect: context, layers and requests
+Context
+Scope
+Layer.Trace
+LayerMap
+LayerRef
+ErrorReporter
+Request
+RequestResolver
+# end of Effect: context, layers and requests
+# Effect: effects, schedules and fibers
+Schedule
+Cause
+Scheduler
+References
+ExecutionPlan
+Effect.Core
+Effect.Collections
+Effect.Errors
+Effect.Concurrency
+Effect.Observe
+Effect
+FiberHandle
+FiberMap
+FiberSet
+# end of Effect: effects, schedules and fibers
+# Effect: streams, sinks and channels
+Channel.Core
+Channel.Transform
+Channel.Control
+Channel.Run
+Channel
+ChannelSchema
+# end of Effect: streams, sinks and channels
+# Effect: streams, Stream
+Stream.Core
+Sink
+Stream.Transform
+Stream.Combine
+Stream.Errors
+Stream.Run
+Stream.Pipe
+Stream.Platform
+Stream
+# end of Effect: streams, Stream
+# Effect: child processes
+ChildProcess
+# Effect: reactivity (unstable in Effect 4.1.2)
+Reactivity.AsyncResult
+Reactivity.Atom
+# UI on atoms: `Atom` over the reactivity modules, then `Ui`
+Atom
+Ui
+Ui.Event
+Ui.Dom
+Ui.Server
+Form
+Action
+# Effect: HTTP
+Http.Method
+Http.Status
+Http.Headers
+Http.UrlParams
+Http.Url
+Http.Mime
+Http.Cookies
+Http.Etag
+Http.Codecs
+Http.Body
+Http.ClientError
+Http.ClientRequest
+Http.ClientResponse
+Http.Client
+Http.FetchClient
+Http.ServerError
+Http.ServerRequest
+Http.ServerResponse
+Http.Multipart
+Http.Platform
+Http.Middleware
+Http.Router
+Http.Server
+Http.StaticServer
+Http.TraceContext
+Runner.Cloudflare
+# end of Effect: HTTP
+# Effect: HttpApi
+HttpApi
+HttpApi.Derive
+HttpApi.Mount
+HttpApi.Inject
+# end of Effect: HttpApi
+# Effect: RPC (unstable in Effect 4.1.2)
+Rpc
+Server
+# after `Server`: a secret is read only on a server
+Config
+# end of Effect: RPC
+# Effect: observability (unstable in Effect 4.1.2)
+Otlp
+Prometheus
+# end of Effect: observability
+# Effect: devtools (unstable in Effect 4.1.2)
+DevTools
+# end of Effect: devtools
+# Effect: CLI
+Cli.Prompt
+Cli
+# end of Effect: CLI

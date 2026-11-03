@@ -35,7 +35,6 @@ impl Host for Memory {
     }
 }
 
-#[cfg(all(feature = "native-project", feature = "build-artifacts"))]
 fn memory(files: &[(&str, &str)]) -> Memory {
     Memory(
         files

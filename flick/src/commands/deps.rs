@@ -18,6 +18,7 @@ use crate::args::GlobalArguments;
 use crate::child;
 use crate::command::Outcome;
 use crate::fetch;
+use crate::stdlib;
 use crate::toolchain;
 use flick_core::project::Project;
 use tracing::info;
@@ -95,8 +96,8 @@ fn fetch(project: &Project, command: &Command) -> Option<Outcome> {
         Command::Update { packages } => (packages.clone(), fetch::Options::default()),
         _ => return None,
     };
-    let dependencies = &project.config.dependencies;
-    match fetch::install(&project.root, dependencies, &update, options) {
+    let dependencies = stdlib::with_std(&project.config.dependencies);
+    match fetch::install(&project.root, &dependencies, &update, options) {
         Ok(fetched) => {
             for name in fetched {
                 info!("fetched {name}");

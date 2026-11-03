@@ -78,7 +78,9 @@ pub use bindings::{LetParts, let_parts, signature_name};
 use builtins::builtin_env;
 #[cfg(test)]
 pub(crate) use builtins::check_sources;
-pub use builtins::{builtin_sources, builtins, install_builtins};
+#[cfg(feature = "native-project")]
+pub use builtins::read_std;
+pub use builtins::{builtin_sources, builtins, has_std, install_builtins, set_std};
 pub use classes::{Dict, STRUCTURAL, which};
 #[cfg(feature = "ide")]
 pub(crate) use classes::{Match, match_type};

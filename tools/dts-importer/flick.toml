@@ -3,3 +3,7 @@ schema-version = 1
 # index.mjs owns the runner and imports both exported entry functions.
 [project]
 kind = "lib"
+
+# std of this repository, not the release a compiler fetches
+[dependencies]
+std = { path = "../../packages/std" }

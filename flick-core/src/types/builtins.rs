@@ -1,13 +1,22 @@
 //! Built-in modules, written in Flick and checked by this checker: `Prelude`
 //! (the built-in types every module sees) and small modules a program may
 //! qualify without an import (`Ref.make`, `String.trim`, `Layer.succeed`, …).
+//! The core modules are part of the compiler; the modules of `std` come from
+//! the `std` package the host hands over with [`set_std`] before any
+//! module is checked.
 
+#[cfg(all(not(feature = "embedded-std"), feature = "native-project"))]
+use std::env;
+#[cfg(feature = "native-project")]
+use std::path::Path;
 use std::ptr;
 use std::sync::OnceLock;
+#[cfg(feature = "native-project")]
+use std::{fs, io};
 
 use tracing::debug;
 
-use super::builtin_sources::SOURCES;
+use super::builtin_sources::CORE;
 use super::env::Builtins;
 use crate::clock::timed;
 use crate::iface::Interface;
@@ -15,9 +24,65 @@ use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::syntax;
 
-/// Names and sources of the built-in modules, in dependency order.
+static STD: OnceLock<&'static [(&'static str, &'static str)]> = OnceLock::new();
+
+fn leak(sources: Vec<(String, String)>) -> &'static [(&'static str, &'static str)] {
+    let leaked: Vec<(&'static str, &'static str)> = sources
+        .into_iter()
+        .map(|(module, text)| (&*module.leak(), &*text.leak()))
+        .collect();
+    leaked.leak()
+}
+
+/// Uses `sources`, as `(module, text)` in the order of the package's
+/// `modules.txt`, as the modules of `std`; false once they are set.
+pub fn set_std(sources: Vec<(String, String)>) -> bool {
+    STD.set(leak(sources)).is_ok()
+}
+
+/// Whether the modules of `std` are known: set, built in or found at
+/// `FLICK_STD_PATH`.
+pub fn has_std() -> bool {
+    !std_sources().is_empty()
+}
+
+/// The modules of `std`: those set, else the ones built in, else those of
+/// the package at `FLICK_STD_PATH`, else none.
+fn std_sources() -> &'static [(&'static str, &'static str)] {
+    STD.get_or_init(|| {
+        #[cfg(feature = "embedded-std")]
+        return super::builtin_sources::STD;
+        #[cfg(all(not(feature = "embedded-std"), feature = "native-project"))]
+        return env::var_os("FLICK_STD_PATH")
+            .and_then(|dir| read_std(Path::new(&dir)).ok())
+            .map_or(&[], leak);
+        #[allow(unreachable_code, reason = "a host without a project hands std over")]
+        &[]
+    })
+}
+
+/// The modules of the `std` package in `dir`, in the order of its
+/// `src/modules.txt`.
+#[cfg(feature = "native-project")]
+pub fn read_std(dir: &Path) -> io::Result<Vec<(String, String)>> {
+    let sources = dir.join("src");
+    let order = fs::read_to_string(sources.join("modules.txt"))?;
+    order
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(|module| {
+            let file = sources.join(format!("{}.fl", module.replace('.', "/")));
+            Ok((module.to_owned(), fs::read_to_string(file)?))
+        })
+        .collect()
+}
+
+/// Names and sources of the built-in modules, in dependency order: the
+/// core modules, then those of `std`.
 pub fn builtin_sources() -> &'static [(&'static str, &'static str)] {
-    SOURCES
+    static ALL: OnceLock<Vec<(&str, &str)>> = OnceLock::new();
+    ALL.get_or_init(|| CORE.iter().chain(std_sources()).copied().collect())
 }
 
 static BUILTINS: OnceLock<Vec<Interface>> = OnceLock::new();
@@ -32,7 +97,7 @@ pub fn builtins() -> &'static [Interface] {
 }
 
 fn check_builtins() -> Vec<Interface> {
-    check_sources(SOURCES)
+    check_sources(builtin_sources())
 }
 
 /// Checks the built-in modules `modules`, as `(module, text)` in
@@ -109,7 +174,7 @@ mod tests {
             .iter()
             .map(|i| i.module.as_str())
             .collect();
-        let sources: Vec<&str> = super::SOURCES.iter().map(|(n, _)| *n).collect();
+        let sources: Vec<&str> = super::builtin_sources().iter().map(|(n, _)| *n).collect();
         assert_eq!(names, sources);
         assert_eq!(names.iter().collect::<BTreeSet<_>>().len(), names.len());
         assert_eq!(names[..2], ["Prelude", "Instances"]);

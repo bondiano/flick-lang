@@ -198,7 +198,8 @@ impl Libraries<'_> {
     /// theirs, each once.
     fn add(&mut self, dir: &Path, dependencies: &[Dependency]) {
         let mut found = Vec::new();
-        for dependency in dependencies {
+        // `std` is built in: the host hands its modules to the checker
+        for dependency in dependencies.iter().filter(|d| d.name != "std") {
             if let Some(library) = self.library(dir, dependency) {
                 found.push(library);
             }

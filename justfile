@@ -1,3 +1,7 @@
+# Every flick run here uses the std of this repository, not the release a
+# compiler fetches by its tag.
+export FLICK_STD_PATH := justfile_directory() + "/packages/std"
+
 # Show available recipes
 [private]
 default:

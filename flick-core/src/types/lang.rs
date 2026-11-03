@@ -7,7 +7,6 @@
 use std::cell::Cell;
 use std::sync::OnceLock;
 
-use super::builtin_sources::SOURCES;
 use crate::iface::{Entity, Namespace};
 use crate::source::SourceMap;
 use crate::syntax::{self, cst::Node, kind::SyntaxKind as K};
@@ -235,7 +234,7 @@ pub fn table() -> &'static Table {
     if let Some(table) = OVERRIDE.with(Cell::get) {
         return table;
     }
-    TABLE.get_or_init(|| Table::of(SOURCES))
+    TABLE.get_or_init(|| Table::of(super::builtin_sources()))
 }
 
 #[cfg(test)]
