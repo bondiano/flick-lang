@@ -168,7 +168,8 @@ test("host build and dev profiles override project settings and respect an expli
   assert.deepEqual(labels, [null, "Profile.state", "Profile.state"]);
 });
 
-test("a running Astro host reloads external dependencies, configuration, deletions and creations", { timeout: 60_000 }, async (t) => {
+// each of its seven rebuilds runs the debug compiler, about 13 s apiece
+test("a running Astro host reloads external dependencies, configuration, deletions and creations", { timeout: 180_000 }, async (t) => {
   const dir = fixture(t, "host");
   const { file, shared, config, settings, answer } = project(path.join(dir, "project"));
   const site = path.join(dir, "site");
@@ -197,6 +198,9 @@ const label = state.label?.[0] ?? "none";
     integrations: [flick({ binary, profile: "release" })],
     server: { host: "127.0.0.1", port: 0 },
   });
+  // an after hook also runs on a timeout, which would skip a finally block
+  // and leave the server holding the test process open
+  t.after(() => server.stop());
   const url = `http://127.0.0.1:${server.address.port}/`;
   const client = async () => {
     const response = await fetch(new URL(`/@fs/${file.replaceAll(path.sep, "/")}?import`, url));
@@ -225,32 +229,28 @@ const label = state.label?.[0] ?? "none";
     assert.equal(response.status, status, html);
     assert.fail(`expected answer ${answer}, label ${label}: ${html}`);
   };
-  try {
-    await page(1, "none");
-    const initialClient = await client();
-    writeFileSync(shared, answer(2));
-    await page(2, "none");
-    const editedClient = await client();
-    assert.notEqual(editedClient, initialClient, "source edits invalidate client transforms");
-    writeFileSync(config, settings("all"));
-    await page(2, "Ui.Widget.state");
-    const configuredClient = await client();
-    assert.notEqual(configuredClient, editedClient, "configuration edits invalidate client transforms");
-    rmSync(shared);
-    await page(undefined, undefined, 500);
-    writeFileSync(shared, answer(3));
-    await page(3, "Ui.Widget.state");
-    await client();
-    const nearerConfig = path.join(dir, "project/src/flick.toml");
-    writeFileSync(nearerConfig, settings("none", "."));
-    await page(3, "none");
-    await client();
-    rmSync(nearerConfig);
-    await page(3, "Ui.Widget.state");
-    await client();
-  } finally {
-    await server.stop();
-  }
+  await page(1, "none");
+  const initialClient = await client();
+  writeFileSync(shared, answer(2));
+  await page(2, "none");
+  const editedClient = await client();
+  assert.notEqual(editedClient, initialClient, "source edits invalidate client transforms");
+  writeFileSync(config, settings("all"));
+  await page(2, "Ui.Widget.state");
+  const configuredClient = await client();
+  assert.notEqual(configuredClient, editedClient, "configuration edits invalidate client transforms");
+  rmSync(shared);
+  await page(undefined, undefined, 500);
+  writeFileSync(shared, answer(3));
+  await page(3, "Ui.Widget.state");
+  await client();
+  const nearerConfig = path.join(dir, "project/src/flick.toml");
+  writeFileSync(nearerConfig, settings("none", "."));
+  await page(3, "none");
+  await client();
+  rmSync(nearerConfig);
+  await page(3, "Ui.Widget.state");
+  await client();
 });
 
 test("editors get the types of each import beside it, before and after a build", async (t) => {
