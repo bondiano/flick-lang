@@ -37,15 +37,15 @@ pub enum Commands {
     New(NewArguments),
     /// Add a project to the working directory; existing files are kept.
     Init(InitArguments),
-    /// Build the app as JavaScript and run its `main`.
+    /// Build the app as JavaScript and run its `main`, or run a script of
+    /// `[scripts]` that is not an entry's name.
     Run(RunArguments),
     /// Rebuild on changes and replace the running app after its shutdown.
     Dev(RunArguments),
     /// Remove the build artifacts of the project.
     Clean(CleanArguments),
-    /// Run a script of `[scripts]`, or list them.
-    Script(ScriptArguments),
-    /// Install the dependencies with the pinned pnpm.
+    /// Install the dependencies with the pinned pnpm; at a workspace root,
+    /// of every member.
     Install(InstallArguments),
     /// Add npm packages to the dependencies.
     Add(AddArguments),

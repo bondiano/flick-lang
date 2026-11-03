@@ -1,10 +1,9 @@
-//! `flick script`: the scripts of `[scripts]`, shell commands run in order
-//! in the directory of their `flick.toml`, with this `flick` first on `PATH`.
+//! `flick run <script>`: the scripts of `[scripts]`, shell commands run in
+//! order in the directory of their `flick.toml`, with this `flick` first on
+//! `PATH`.
 
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use std::fmt::Write as _;
-use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, ExitCode};
 use std::{env, fs};
@@ -13,7 +12,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::{self, Host, config};
 use flick_core::source::SourceMap;
 
-use crate::args::{GlobalArguments, ScriptArguments};
+use crate::args::GlobalArguments;
 use crate::command::{Outcome, finish};
 use crate::report;
 use crate::sources::FsHost;
@@ -24,24 +23,15 @@ struct Scripts {
     scripts: BTreeMap<String, Vec<String>>,
 }
 
-pub fn script(options: &ScriptArguments, global: &GlobalArguments) -> ExitCode {
+/// Runs script `name`; `None` when no manifest has one.
+pub fn script(name: &str, args: &[String], global: &GlobalArguments) -> Option<ExitCode> {
     let mut sources = SourceMap::default();
     let found = match manifests(&mut sources, global) {
         Ok(found) => found,
-        Err(diagnostic) => return failed(sources, diagnostic, global),
+        Err(diagnostic) => return Some(failed(sources, diagnostic, global)),
     };
-    let Some(name) = &options.name else {
-        return list(&found);
-    };
-    let Some(owner) = found.iter().find(|m| m.scripts.contains_key(name)) else {
-        let message = format!("no script `{name}` in `[scripts]` of this project or its workspace");
-        return failed(
-            sources,
-            Diagnostic::new(codes::P005, Severity::Error, message),
-            global,
-        );
-    };
-    match run(owner, name, &options.args, &mut Vec::new(), global) {
+    let owner = found.iter().find(|m| m.scripts.contains_key(name))?;
+    Some(match run(owner, name, args, &mut Vec::new(), global) {
         Ok(()) => ExitCode::SUCCESS,
         Err(Failure::Step(code)) => code,
         Err(Failure::Cycle(message)) => failed(
@@ -49,7 +39,7 @@ pub fn script(options: &ScriptArguments, global: &GlobalArguments) -> ExitCode {
             Diagnostic::new(codes::P005, Severity::Error, message),
             global,
         ),
-    }
+    })
 }
 
 /// The manifests with scripts from the project's directory upwards, the
@@ -91,23 +81,6 @@ fn manifests(
         }
     }
     Ok(out)
-}
-
-/// Prints each script with its steps, by manifest.
-fn list(found: &[Scripts]) -> ExitCode {
-    let mut out = String::new();
-    for manifest in found {
-        let _ = writeln!(
-            out,
-            "{}:",
-            manifest.dir.join(project::CONFIG_FILE).display()
-        );
-        for (name, steps) in &manifest.scripts {
-            let _ = writeln!(out, "  {name}: {}", steps.join(" && "));
-        }
-    }
-    let _ = io::stdout().lock().write_all(out.as_bytes());
-    ExitCode::SUCCESS
 }
 
 enum Failure {

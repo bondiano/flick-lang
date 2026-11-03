@@ -36,8 +36,8 @@ pub struct InitArguments {
 
 #[derive(Args)]
 pub struct RunArguments {
-    /// The entry of the project to run, a name of `entries`; needed when
-    /// it has several.
+    /// The entry of the project to run, a name of `entries`, needed when
+    /// it has several; else a script of `[scripts]` (only for `run`).
     #[arg(value_name = "NAME")]
     pub name: Option<String>,
 
@@ -54,18 +54,7 @@ pub struct RunArguments {
     #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "ws://localhost:34437")]
     pub devtools: Option<String>,
 
-    /// Arguments of the application, after `--`.
-    #[arg(last = true)]
-    pub args: Vec<String>,
-}
-
-#[derive(Args)]
-pub struct ScriptArguments {
-    /// The script to run; without one, every script is listed.
-    #[arg(value_name = "NAME")]
-    pub name: Option<String>,
-
-    /// Arguments of the script's commands, their `"$@"`, after `--`.
+    /// Arguments of the application, or the script's `"$@"`, after `--`.
     #[arg(last = true)]
     pub args: Vec<String>,
 }

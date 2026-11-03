@@ -1,7 +1,7 @@
 //! Which projects a command runs on in a workspace: the member
 //! `--package` names, or, at the root of a workspace without a project of
-//! its own, every member that `check`, `build`, `test`, `fmt` and `clean`
-//! go through.
+//! its own, every member that `check`, `build`, `test`, `fmt`, `clean` and
+//! `install` go through.
 
 use std::path::Path;
 
@@ -78,7 +78,7 @@ fn runs_on_every_member(cmd: &Commands) -> bool {
         Commands::Build(o) => o.paths.is_empty() && !o.watch,
         Commands::Test(o) => o.paths.is_empty() && !o.watch,
         Commands::Fmt(o) => o.paths.is_empty() && !o.stdin,
-        Commands::Clean(_) => true,
+        Commands::Clean(_) | Commands::Install(_) => true,
         _ => false,
     }
 }
