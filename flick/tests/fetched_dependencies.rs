@@ -319,3 +319,40 @@ fn add_pins_a_library_and_remove_drops_it() {
     let lock = fs::read_to_string(app.join("flick.lock")).expect("lock");
     assert!(!lock.contains("geo"), "{lock}");
 }
+
+/// `flick <args>` in `dir` with the package store `store`, without the
+/// std of the working tree, as a released compiler runs.
+fn released(dir: &Path, store: &Path, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args(args)
+        .current_dir(dir)
+        .env("FLICK_STORE", store)
+        .env("XDG_CACHE_HOME", store.join("cache"))
+        .env_remove("FLICK_STD_PATH")
+        .output()
+        .expect("flick runs")
+}
+
+#[test]
+fn a_released_std_is_fetched_by_its_tarball() {
+    let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std");
+    let store = project("std-tarball-store", &[]);
+    let out = store.join("dist");
+    let packed = released(&std, &store, &["pack", "--out-dir", &out.to_string_lossy()]);
+    assert!(packed.status.success(), "{packed:?}");
+    let line = String::from_utf8_lossy(&packed.stdout).into_owned();
+    let (sha, file) = line.trim().split_once("  ").expect("sha and path");
+    let url = serve_once(fs::read(file).expect("tarball"));
+    let manifest = format!(
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[dependencies]\nstd = {{ url = \"{url}\", sha256 = \"{sha}\" }}\n"
+    );
+    let main = "module App.Main exposing (later)\n\nlater : Result Duration.DurationError Duration.Duration\nlet later = Duration.seconds 2\n";
+    let app = project(
+        "std-tarball-app",
+        &[("flick.toml", &manifest), ("src/App/Main.fl", main)],
+    );
+    let installed = released(&app, &store, &["install"]);
+    assert!(installed.status.success(), "{installed:?}");
+    let checked = released(&app, &store, &["check"]);
+    assert!(checked.status.success(), "{checked:?}");
+}

@@ -77,6 +77,15 @@ fn overridden() -> bool {
 
 /// The directory of the `std` the project depends on.
 fn in_project(project: &Project) -> Result<PathBuf, String> {
+    // the std package itself
+    if project
+        .config
+        .package
+        .as_ref()
+        .is_some_and(|p| p.name == NAME)
+    {
+        return Ok(project.root.clone());
+    }
     let dependencies = with_std(&project.config.dependencies);
     let std = dependencies
         .iter()

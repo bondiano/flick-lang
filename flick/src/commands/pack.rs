@@ -30,8 +30,10 @@ use crate::cache::files_under;
 use crate::child;
 use crate::command::{Command, Outcome};
 use crate::report;
+use crate::stdlib;
 use flick_core::project::Project;
 use flick_core::project::config::Kind;
+use flick_core::types;
 
 fn failure(code: Code, message: String) -> Outcome {
     Outcome {
@@ -51,6 +53,17 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
         }
     };
     let root = &project.root;
+    // std's modules are built in, so a build of them as a project's would
+    // clash with themselves: checking them as built in is the build
+    if project
+        .config
+        .package
+        .as_ref()
+        .is_some_and(|p| p.name == stdlib::NAME)
+    {
+        let _ = types::builtins();
+        return library(&project, &options.out_dir);
+    }
     let stage = root.join(cache::DIR).join("pack");
     let _ = fs::remove_dir_all(&stage);
     let dts = project.config.build.emit_dts;
@@ -98,6 +111,20 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
     if project.config.kind == Kind::Lib {
         return library(&project, &options.out_dir);
     }
+    app(&project, &stage, dts, &runners, &options.out_dir, global)
+}
+
+/// The staged npm package of the app `project`, built into `stage`, as a
+/// tarball by pnpm.
+fn app(
+    project: &Project,
+    stage: &Path,
+    dts: bool,
+    runners: &[(String, String)],
+    out_dir: &str,
+    global: &GlobalArguments,
+) -> Outcome {
+    let root = &project.root;
     let problems = incomplete(&stage.join("dist"), dts);
     if !problems.is_empty() {
         return Outcome {
@@ -105,11 +132,11 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
             diagnostics: problems,
         };
     }
-    let manifest = match staged_manifest(root, &runners) {
+    let manifest = match staged_manifest(root, runners) {
         Ok(m) => m,
         Err(outcome) => return outcome,
     };
-    if let Some(missing) = missing_exports(&manifest, &stage) {
+    if let Some(missing) = missing_exports(&manifest, stage) {
         return failure(codes::P020, missing);
     }
     if let Err(err) = write(&stage.join("package.json"), &format!("{manifest:#}\n")) {
@@ -118,7 +145,7 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
             format!("cannot write the staged `package.json`: {err}"),
         );
     }
-    let out = global_path(&options.out_dir);
+    let out = global_path(out_dir);
     if let Err(err) = fs::create_dir_all(&out) {
         return failure(
             codes::P013,
@@ -129,7 +156,7 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
     process
         .args(["pack", "--pack-destination"])
         .arg(&out)
-        .current_dir(&stage);
+        .current_dir(stage);
     match child::spawn_tool(&mut process, global, "package-manager-output")
         .and_then(|r| r.wait(&child::signals()))
     {

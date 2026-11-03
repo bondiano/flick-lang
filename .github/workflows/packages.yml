@@ -1,0 +1,55 @@
+name: Packages
+
+# A tag `<package>-v<version>`, such as `std-v0.1.0`, releases the package of
+# `packages/<package>`: its source tarball, which a project names by
+# `{ url, sha256 }` or fetches by the tag with `{ git, tag, subdir }`. The
+# compiler's own tags, `v<version>`, do not match.
+on:
+  push:
+    tags: ["*-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package and version of the tag
+        id: tag
+        run: |
+          package="${GITHUB_REF_NAME%-v*}"
+          version="${GITHUB_REF_NAME##*-v}"
+          manifest="packages/$package/flick.toml"
+          if [ ! -f "$manifest" ]; then
+            echo "::error::no package \`$package\` in packages/"
+            exit 1
+          fi
+          declared="$(sed -n 's/^version = "\(.*\)"/\1/p' "$manifest" | head -1)"
+          if [ "$declared" != "$version" ]; then
+            echo "::error file=$manifest::version $declared, tag $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build -p flick --release --locked
+      # packing checks the package with the compiler of this commit, which its
+      # `flick` requirement must include
+      - name: Pack
+        id: pack
+        working-directory: packages/${{ steps.tag.outputs.package }}
+        env:
+          FLICK_STD_PATH: ${{ github.workspace }}/packages/std
+        run: |
+          line="$(../../target/release/flick pack --out-dir dist)"
+          echo "$line"
+          echo "sha256=${line%%  *}" >> "$GITHUB_OUTPUT"
+          echo "file=${line#*  }" >> "$GITHUB_OUTPUT"
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "${{ steps.pack.outputs.file }}" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "sha256 \`${{ steps.pack.outputs.sha256 }}\`"
