@@ -3,13 +3,13 @@ title: "Runtime adapter"
 ---
 
 `@flick-lang/runtime` is what compiled code runs on (see [Errors, services, resources and concurrency](../../spec/05-errors-and-concurrency/), [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). It is a thin
-adapter over Effect `4.0.5`: generated modules import only this package, and
+adapter over Effect `4.1.2`: generated modules import only this package, and
 the adapter fixes the contracts below so that they hold whatever Effect does
 by default.
 
 ## Effect release
 
-The adapter was verified against exactly Effect `4.0.5`. The entry runner
+The adapter was verified against exactly Effect `4.1.2`. The entry runner
 checks the installed release before `main` starts; another release ends
 the run with exit code `2`. The capability matrix of the Effect operations
 the adapter relies on is checked by the runtime's tests and by
@@ -17,7 +17,7 @@ the adapter relies on is checked by the runtime's tests and by
 would keep all of Effect in a browser bundle.
 
 ```text
-error: the Flick runtime requires effect 4.0.5, found 4.1.0
+error: the Flick runtime requires effect 4.1.2, found 4.1.0
 ```
 
 ## Owners and scopes

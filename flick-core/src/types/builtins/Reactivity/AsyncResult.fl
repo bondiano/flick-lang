@@ -1,4 +1,4 @@
-/// Effect's `AsyncResult` (unstable in Effect 4.0.5): the value of an atom
+/// Effect's `AsyncResult` (unstable in Effect 4.1.2): the value of an atom
 /// an effect computes. It is not there yet, it succeeded, or it failed, and
 /// each case may be waiting for a run that has started again.
 module Reactivity.AsyncResult exposing (..)

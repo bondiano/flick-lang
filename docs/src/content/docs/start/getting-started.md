@@ -9,7 +9,7 @@ pnpm. Download a `flick` archive for your platform from the
 a source checkout as described in [Ecosystem](../../ecosystem/).
 
 Flick compiles to ES modules that run with the Flick runtime and
-Effect 4.0.5. Packages are installed with pnpm. Create a project and run it:
+Effect 4.1.2. Packages are installed with pnpm. Create a project and run it:
 
 ```sh
 flick new my-app

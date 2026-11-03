@@ -1,4 +1,4 @@
-/// Effect's reactive atoms (`effect/reactivity`, unstable in Effect 4.0.5).
+/// Effect's reactive atoms (`effect/reactivity`, unstable in Effect 4.1.2).
 /// An atom only describes a value: a `Registry` holds the values of the
 /// atoms read through it, computes a derived atom again when an atom it
 /// read changes, and drops a value nobody reads, after its idle time. The
