@@ -11,12 +11,12 @@ foreign pure with from "@flick-lang/runtime" "hashSetWith"
 /// The empty set of the canonical instances.
 empty : Hash a => HashSet EqHash.Canonical a
 foreign pure empty from "@flick-lang/runtime" "hashSetEmpty"
-  reviewed "effect@4.0.5 sha256:22723cbf3c1d2ee6"
+  reviewed "effect@4.1.2 sha256:22723cbf3c1d2ee6"
 
 /// The set of the elements under the witness.
 from_list : EqHash.EqHash w a -> List a -> HashSet w a
 foreign pure from_list from "@flick-lang/runtime" "hashSetFromList"
-  reviewed "effect@4.0.5 sha256:72aa0394a4d8e14b"
+  reviewed "effect@4.1.2 sha256:72aa0394a4d8e14b"
 
 /// The set of the elements of a sequence, such as a `for`.
 from_seq : forall d w a. EqHash.EqHash w a -> (Seq a)^d -> HashSet w a
@@ -29,22 +29,22 @@ let to_seq set = Seq.of_list (to_list set)
 /// The set with the element.
 insert : a -> HashSet w a -> HashSet w a
 foreign pure insert from "@flick-lang/runtime" "hashSetInsert"
-  reviewed "effect@4.0.5 sha256:685ff8e555d33295"
+  reviewed "effect@4.1.2 sha256:685ff8e555d33295"
 
 /// The set without the element.
 remove : a -> HashSet w a -> HashSet w a
 foreign pure remove from "@flick-lang/runtime" "hashSetRemove"
-  reviewed "effect@4.0.5 sha256:51f9698e83ee1647"
+  reviewed "effect@4.1.2 sha256:51f9698e83ee1647"
 
 /// Whether the set has the element.
 member : a -> HashSet w a -> Bool
 foreign pure member from "@flick-lang/runtime" "hashSetMember"
-  reviewed "effect@4.0.5 sha256:38bc7a908c24a15d"
+  reviewed "effect@4.1.2 sha256:38bc7a908c24a15d"
 
 /// The number of elements.
 size : HashSet w a -> Int
 foreign pure size from "@flick-lang/runtime" "hashSetSize"
-  reviewed "effect@4.0.5 sha256:baf9439a9d5ec5ce"
+  reviewed "effect@4.1.2 sha256:baf9439a9d5ec5ce"
 
 /// The elements, in no particular order.
 to_list : HashSet w a -> List a
@@ -53,7 +53,7 @@ foreign pure to_list from "@flick-lang/runtime" "hashSetToList"
 /// Both sets: their witness must be the same.
 union : HashSet w a -> HashSet w a -> HashSet w a
 foreign pure union from "@flick-lang/runtime" "hashSetUnion"
-  reviewed "effect@4.0.5 sha256:cbd6a5ae54ea1313"
+  reviewed "effect@4.1.2 sha256:cbd6a5ae54ea1313"
 
 /// The same elements under another witness.
 rehash : EqHash.EqHash v a -> HashSet w a -> HashSet v a
@@ -62,60 +62,60 @@ foreign pure rehash from "@flick-lang/runtime" "hashSetRehash"
 /// Whether the set has no elements.
 is_empty : HashSet w a -> Bool
 foreign pure is_empty from "@flick-lang/runtime/effect/HashSet" "flickIsEmpty"
-  reviewed "effect@4.0.5 sha256:8de48d5cd5df227b"
+  reviewed "effect@4.1.2 sha256:8de48d5cd5df227b"
 
 /// `intersection that set`: the elements of `set` that `that` has too.
 intersection : HashSet w a -> HashSet w a -> HashSet w a
 foreign pure intersection from "@flick-lang/runtime/effect/HashSet" "flickIntersection"
-  reviewed "effect@4.0.5 sha256:0d6b9af93baf3068"
+  reviewed "effect@4.1.2 sha256:0d6b9af93baf3068"
 
 /// `difference that set`: the elements of `set` that `that` lacks.
 difference : HashSet w a -> HashSet w a -> HashSet w a
 foreign pure difference from "@flick-lang/runtime/effect/HashSet" "flickDifference"
-  reviewed "effect@4.0.5 sha256:0f8d3f2e806deac1"
+  reviewed "effect@4.1.2 sha256:0f8d3f2e806deac1"
 
 /// `is_subset that set`: whether `that` has every element of `set`.
 is_subset : HashSet w a -> HashSet w a -> Bool
 foreign pure is_subset from "@flick-lang/runtime/effect/HashSet" "flickIsSubset"
-  reviewed "effect@4.0.5 sha256:f95f211b5e6524d3"
+  reviewed "effect@4.1.2 sha256:f95f211b5e6524d3"
 
 /// Each element mapped by `f`, into a set of the witness given.
 map : forall c v w a b. EqHash.EqHash v b -> (a -> b)^c -> (HashSet w a -> HashSet v b)^c
 foreign pure map from "@flick-lang/runtime/effect/HashSet" "flickMap"
   arity 3
   retention call
-  reviewed "effect@4.0.5 sha256:8c4389feb6082d7c"
+  reviewed "effect@4.1.2 sha256:8c4389feb6082d7c"
 
 /// The elements for which `f` holds.
 filter : forall c w a. (a -> Bool)^c -> (HashSet w a -> HashSet w a)^c
 foreign pure filter from "@flick-lang/runtime/effect/HashSet" "flickFilter"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:cceadac97d43a2dc"
+  reviewed "effect@4.1.2 sha256:cceadac97d43a2dc"
 
 /// Whether `f` holds for some element.
 some : forall c w a. (a -> Bool)^c -> (HashSet w a -> Bool)^c
 foreign pure some from "@flick-lang/runtime/effect/HashSet" "flickSome"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:67c675c78c075f7e"
+  reviewed "effect@4.1.2 sha256:67c675c78c075f7e"
 
 /// Whether `f` holds for every element.
 every : forall c w a. (a -> Bool)^c -> (HashSet w a -> Bool)^c
 foreign pure every from "@flick-lang/runtime/effect/HashSet" "flickEvery"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:445bad072e617cfb"
+  reviewed "effect@4.1.2 sha256:445bad072e617cfb"
 
 /// Folds the elements in no particular order.
 reduce : forall c w a z. z -> (z -> a -> z)^c -> (HashSet w a -> z)^c
 foreign pure reduce from "@flick-lang/runtime/effect/HashSet" "flickReduce"
   arity 3
   retention call
-  reviewed "effect@4.0.5 sha256:fd8b28545e7a21a4"
+  reviewed "effect@4.1.2 sha256:fd8b28545e7a21a4"
 
 /// A set as a JSON array of its elements, rebuilt with the canonical
 /// instances; a repeated element is kept once.
 json : Hash a => PureCodec Json a -> PureCodec Json (HashSet EqHash.Canonical a)
 foreign pure json from "@flick-lang/runtime/effect/Schema" "flickHashSetJson"
-  reviewed "effect@4.0.5 sha256:066988b9d5f59b15"
+  reviewed "effect@4.1.2 sha256:066988b9d5f59b15"

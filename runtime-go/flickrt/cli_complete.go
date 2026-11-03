@@ -79,6 +79,15 @@ func completeFlagForms(f completeFlag, negate bool) []string {
 	return forms
 }
 
+// completeNegatedName is descriptor.ts's negatedName: the long name that
+// sets a boolean to false. Flick's flags keep Effect's default, `no-name`.
+func completeNegatedName(f completeFlag) (string, bool) {
+	if f.typ.tag != "Boolean" {
+		return "", false
+	}
+	return "no-" + f.name, true
+}
+
 // completeFuncName is `_${path.map(sanitize).join("_")}`.
 func completeFuncName(path []string) string {
 	parts := make([]string, len(path))

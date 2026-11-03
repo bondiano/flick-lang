@@ -57,10 +57,11 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// one allocation for what a request's fiber needs
 		q := &servedRequest{fiber: serving}
-		q.source.r, q.source.marks, q.source.head = r, &q.marks, requestHead(r)
+		q.source.r, q.source.head = r, requestHead(r)
 		q.request = ServerRequest{src: &q.source, method: r.Method, url: r.RequestURI, originalURL: r.RequestURI}
 		q.state.id, q.state.signal = fibers.Add(1), make(chan struct{})
 		q.fiber.state = &q.state
+		q.fiber.env = serving.env.with(requestStateKey, &q.marks)
 		stop := context.AfterFunc(r.Context(), q.interrupt)
 		out, cause := catch(func() Value { return Run(&q.fiber, Apply(&q.fiber, handler, &q.request)) })
 		if cause != nil {
@@ -70,7 +71,7 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 		pre := len(q.marks.preResponse) > 0
 		q.marks.mu.Unlock()
 		if pre {
-			if sent, failed := catch(func() Value { return q.request.preResponded(&q.fiber, out) }); failed == nil {
+			if sent, failed := catch(func() Value { return q.request.preResponded(&q.fiber, &q.marks, out) }); failed == nil {
 				out = sent
 			} else {
 				out = causeResponse(failed)

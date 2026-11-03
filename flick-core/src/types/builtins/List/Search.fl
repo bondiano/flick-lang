@@ -8,42 +8,42 @@ find_last : forall c a. (a -> Bool)^c -> (List a -> Option a)^c
 foreign pure find_last from "@flick-lang/runtime/effect/Array" "findLast"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:3e1ffdb3d63e475f"
+  reviewed "effect@4.1.2 sha256:3e1ffdb3d63e475f"
 
 /// The index of the last element that satisfies `p`.
 find_last_index : forall c a. (a -> Bool)^c -> (List a -> Option Int)^c
 foreign pure find_last_index from "@flick-lang/runtime/effect/Array" "findLastIndex"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:60671cf447ac27fe"
+  reviewed "effect@4.1.2 sha256:60671cf447ac27fe"
 
 /// The first element that satisfies `p`, with its index.
 find_first_with_index : forall c a. (a -> Bool)^c -> (List a -> Option (a, Int))^c
 foreign pure find_first_with_index from "@flick-lang/runtime/effect/Array" "findFirstWithIndex"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:2c3ff7b37d76bcd1"
+  reviewed "effect@4.1.2 sha256:2c3ff7b37d76bcd1"
 
 /// How many elements satisfy `p`.
 count_by : forall c a. (a -> Bool)^c -> (List a -> Int)^c
 foreign pure count_by from "@flick-lang/runtime/effect/Array" "countBy"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:b2f09cf6564eb521"
+  reviewed "effect@4.1.2 sha256:b2f09cf6564eb521"
 
 /// Whether an element is `same` as `x`.
 contains_with : forall c a. (a -> a -> Bool)^c -> (a -> List a -> Bool)^c
 foreign pure contains_with from "@flick-lang/runtime/effect/Array" "containsWith"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:a905b752122d8264"
+  reviewed "effect@4.1.2 sha256:a905b752122d8264"
 
 /// The first of each set of elements that are `same`, in order.
 dedupe_with : forall c a. (a -> a -> Bool)^c -> (List a -> List a)^c
 foreign pure dedupe_with from "@flick-lang/runtime/effect/Array" "dedupeWith"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:844a2faacd8c857f"
+  reviewed "effect@4.1.2 sha256:844a2faacd8c857f"
 
 /// The first of each set of equal elements, in order.
 dedupe : Eq a => List a -> List a
@@ -54,7 +54,7 @@ dedupe_adjacent_with : forall c a. (a -> a -> Bool)^c -> (List a -> List a)^c
 foreign pure dedupe_adjacent_with from "@flick-lang/runtime/effect/Array" "dedupeAdjacentWith"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:1181d539d087bfa9"
+  reviewed "effect@4.1.2 sha256:1181d539d087bfa9"
 
 /// The list without an element equal to the one before it.
 dedupe_adjacent : Eq a => List a -> List a
@@ -65,7 +65,7 @@ difference_with : forall c a. (a -> a -> Bool)^c -> (List a -> List a -> List a)
 foreign pure difference_with from "@flick-lang/runtime/effect/Array" "differenceWith"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:4afcd61244bc46d6"
+  reviewed "effect@4.1.2 sha256:4afcd61244bc46d6"
 
 /// `xs |> difference ys`: the elements of `xs` not in `ys`.
 difference : Eq a => List a -> List a -> List a
@@ -76,7 +76,7 @@ intersection_with : forall c a. (a -> a -> Bool)^c -> (List a -> List a -> List 
 foreign pure intersection_with from "@flick-lang/runtime/effect/Array" "intersectionWith"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:77e65f4896025372"
+  reviewed "effect@4.1.2 sha256:77e65f4896025372"
 
 /// `xs |> intersection ys`: the elements of `xs` also in `ys`.
 intersection : Eq a => List a -> List a -> List a
@@ -88,7 +88,7 @@ union_with : forall c a. List a -> (a -> a -> Bool)^c -> (List a -> List a)^c
 foreign pure union_with from "@flick-lang/runtime/effect/Array" "unionWith"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:a10e448aef35d8ce"
+  reviewed "effect@4.1.2 sha256:a10e448aef35d8ce"
 
 /// `xs |> union ys`: the elements of both, each once.
 union : Eq a => List a -> List a -> List a
@@ -110,10 +110,10 @@ group_by : forall c a. (a -> String)^c -> (List a -> Record.ReadonlyRecord (NonE
 foreign pure group_by from "@flick-lang/runtime/effect/Array" "groupBy"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:e61e2d5be7063971"
+  reviewed "effect@4.1.2 sha256:e61e2d5be7063971"
 
 /// The strings joined with `separator` between them.
 join : String -> List String -> String
 foreign pure join from "@flick-lang/runtime/effect/Array" "join"
   arity 1
-  reviewed "effect@4.0.5 sha256:2a4c74123b36ad16"
+  reviewed "effect@4.1.2 sha256:2a4c74123b36ad16"

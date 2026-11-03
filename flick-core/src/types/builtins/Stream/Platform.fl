@@ -9,19 +9,19 @@ import Stream.Core exposing (Stream)
 decode_text : forall c r e. (Stream r e (List Int))^c -> (Stream r e String)^c
 foreign pure decode_text from "@flick-lang/runtime/effect/Stream" "flickDecodeText"
   retention call
-  reviewed "effect@4.0.5 sha256:5871a80d125209cb"
+  reviewed "effect@4.1.2 sha256:5871a80d125209cb"
 
 /// Each string encoded as UTF-8 bytes.
 encode_text : forall c r e. (Stream r e String)^c -> (Stream r e (List Int))^c
 foreign pure encode_text from "@flick-lang/runtime/effect/Stream" "flickEncodeText"
   retention call
-  reviewed "effect@4.0.5 sha256:6e8bfde1a02ed5eb"
+  reviewed "effect@4.1.2 sha256:6e8bfde1a02ed5eb"
 
 /// Lines of the text, split at `\n` or `\r\n` across chunks.
 split_lines : forall c r e. (Stream r e String)^c -> (Stream r e String)^c
 foreign pure split_lines from "@flick-lang/runtime/effect/Stream" "splitLines"
   retention call
-  reviewed "effect@4.0.5 sha256:364a68b0860b56e7"
+  reviewed "effect@4.1.2 sha256:364a68b0860b56e7"
 
 /// Chunks of bytes up to `limit`; past it, `on_limit` instead of the rest.
 limit_bytes :
@@ -33,17 +33,17 @@ limit_bytes :
 foreign pure limit_bytes from "@flick-lang/runtime/effect/Stream" "flickLimitBytes"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:b79f079a4928d76f"
+  reviewed "effect@4.1.2 sha256:b79f079a4928d76f"
 
 /// The current value of the reference, then each new one.
 from_subscription_ref : SubscriptionRef.SubscriptionRef a -> Stream none none a
 foreign pure from_subscription_ref from "@flick-lang/runtime/effect/SubscriptionRef" "changes"
-  reviewed "effect@4.0.5 sha256:602266e1b3d1aff7"
+  reviewed "effect@4.1.2 sha256:602266e1b3d1aff7"
 
 /// The current value of the cell, then each committed new one.
 from_tx_subscription_ref : TxSubscriptionRef.TxSubscriptionRef a -> Stream none none a
 foreign pure from_tx_subscription_ref from "@flick-lang/runtime/effect/TxSubscriptionRef" "changesStream"
-  reviewed "effect@4.0.5 sha256:0656486945f6204f"
+  reviewed "effect@4.1.2 sha256:0656486945f6204f"
 
 /// A change under a watched path: the path of what changed, relative to
 /// a watched directory.
@@ -65,7 +65,7 @@ watch :
   WatchOptions -> String -> Stream {FileSystem.FileSystem} {PlatformError.PlatformError} WatchEvent
 foreign pure watch from "@flick-lang/runtime/effect/Stream" "flickWatch"
   arity 2
-  reviewed "effect@4.0.5 sha256:e72be4f6c861122c"
+  reviewed "effect@4.1.2 sha256:c7982553317a7697"
 
 /// `watch` through `backend` where it gives a stream.
 watch_with :
@@ -75,7 +75,7 @@ watch_with :
   Stream {FileSystem.FileSystem} {PlatformError.PlatformError} WatchEvent
 foreign pure watch_with from "@flick-lang/runtime/effect/Stream" "flickWatchWith"
   arity 3
-  reviewed "effect@4.0.5 sha256:22f38a5c95d1031b"
+  reviewed "effect@4.1.2 sha256:22f38a5c95d1031b"
 
 /// Where `read_file` starts and how much it reads (`None`: from the start,
 /// all of it, in chunks of 64 KiB).
@@ -91,10 +91,10 @@ read_file :
   ReadOptions -> String -> Stream {FileSystem.FileSystem} {PlatformError.PlatformError} (List Int)
 foreign pure read_file from "@flick-lang/runtime/effect/Stream" "flickReadFile"
   arity 2
-  reviewed "effect@4.0.5 sha256:e72be4f6c861122c"
+  reviewed "effect@4.1.2 sha256:c7982553317a7697"
 
 /// The bytes of stdin in chunks, until it ends. It needs the streams of
 /// `Stdio.node`; another implementation fails with `NotFound`.
 stdin : Stream {Stdio.Stdio} {PlatformError.PlatformError} (List Int)
 foreign pure stdin from "@flick-lang/runtime/effect/Stream" "flickStdin"
-  reviewed "effect@4.0.5 sha256:92ea6c7dce0e93e7"
+  reviewed "effect@4.1.2 sha256:92ea6c7dce0e93e7"

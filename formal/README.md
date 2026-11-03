@@ -333,7 +333,7 @@ is a parameter of it.
 | §2.1 `nub`, `⊕`, `⧺` | `nub`, `comb`, `++` (`RT/Cause.lean`) |
 | §2.2 normal form, laws, `head`; Go's tree | `NF`, `head`, `head_comb`, `CTree` (`RT/Cause.lean`) |
 | R8 | `R8` (`RT/Cause.lean`) |
-| §2.3 `dies`, `recover` | `dies`, `recover` (`RT/Recover.lean`) |
+| §2.3 `dies`, `elect`, `recover` | `dies`, `elect`, `recover`, `recover_die`, `head_elect` (`RT/Recover.lean`) |
 | §2.4 I_ε and what keeps it | `Iε`, `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep` (`RT/Recover.lean`) |
 | R5 | `R5` (`RT/Recover.lean`) |
 | §1.2–§1.4 fibers, owners, configurations, run-time forms | `Fiber`, `Code`, `Frame`, `Owner`, `Phase`, `Conf` (`RT/Config.lean`) |

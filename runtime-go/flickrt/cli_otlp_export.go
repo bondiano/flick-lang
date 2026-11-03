@@ -138,7 +138,7 @@ func otlpPost(ctx context.Context, url, label, body string) error {
 			return err
 		}
 		request.Header.Set("content-type", "application/json")
-		request.Header.Set("user-agent", "OTel-OTLP-Exporter-JavaScript-Effect-"+label+"/4.0.5")
+		request.Header.Set("user-agent", "OTel-OTLP-Exporter-JavaScript-Effect-"+label+"/4.1.2")
 		response, err := http.DefaultClient.Do(request)
 		delay := time.Second
 		if err == nil {

@@ -1,5 +1,5 @@
 // The `Array` bindings of `List` without Effect: the semantics of
-// `effect/Array` (4.0.5) on plain data, curried as the bindings call them.
+// `effect/Array` (4.1.2) on plain data, curried as the bindings call them.
 // A callback of the program takes one argument, or two uncurried; the index
 // Effect passes besides is never read by it, so it is not passed.
 import { item } from "../internal.ts";
@@ -86,7 +86,11 @@ export const intersectionWith =
 export const unionWith =
   <A>(that: List<A>, eq: Eqv<A>) =>
   (self: List<A>): List<A> =>
-    self.length === 0 ? that : that.length === 0 ? self : dedupe(self.concat(that), eq);
+    self.length === 0 || that.length === 0
+      ? self.length === 0
+        ? that
+        : self
+      : self.concat(that.filter((b) => !self.some((a) => eq(a, b))));
 
 export const groupBy =
   <A>(f: (a: A) => string) =>

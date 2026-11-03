@@ -1,5 +1,5 @@
 // The `String` bindings of the standard library without Effect: the
-// semantics of `effect/String` (4.0.5) on plain data, curried as the
+// semantics of `effect/String` (4.1.2) on plain data, curried as the
 // bindings call them.
 import { constructorName } from "../tags.ts";
 import { EQ, GT, LT, fromNullable, none, type Option, type Ordering, some } from "./data.ts";

@@ -24,7 +24,7 @@ make :
   } ->{Scope s | r;}
   Pool s e a
 foreign effect make from "@flick-lang/runtime/effect/Pool" "flickMake"
-  reviewed "effect@4.0.5 sha256:875466331abc2dab"
+  reviewed "effect@4.1.2 sha256:875466331abc2dab"
 
 /// `make` with `min` to `max` items, where an item beyond `min` is released
 /// after `timeToLive` (by `timeToLiveStrategy`; `None`: `Usage`).
@@ -41,21 +41,21 @@ make_with_ttl :
   } ->{Scope s | r;}
   Pool s e a
 foreign effect make_with_ttl from "@flick-lang/runtime/effect/Pool" "flickMakeWithTtl"
-  reviewed "effect@4.0.5 sha256:02cbce8f61aa83d9"
+  reviewed "effect@4.1.2 sha256:02cbce8f61aa83d9"
 
 /// An item, waiting for one to be free; the innermost `scope` (or the one
 /// of region `t`) holds it until it closes.
 get : forall s t e a. Pool s e a ->{Scope t; e} a^{t}
 foreign effect get from "@flick-lang/runtime/effect/Pool" "get"
   retention call
-  reviewed "effect@4.0.5 sha256:8a6e6eaddc6c9d40"
+  reviewed "effect@4.1.2 sha256:8a6e6eaddc6c9d40"
 
 /// Runs `f` with an item, given back when `f` ends.
 use : forall c s r e e2 a b. (a ->{r; e2} b)^c -> (Pool s e a ->{r; e + e2} b)^c
 foreign effect use from "@flick-lang/runtime/effect/Pool" "use"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:ccf766ed3107bea9"
+  reviewed "effect@4.1.2 sha256:ccf766ed3107bea9"
 
 /// Releases `item`, the very value `get` gave, once its tasks are done;
 /// the pool acquires another when it needs one.
@@ -63,7 +63,7 @@ invalidate : forall s e a. a -> Pool s e a ->{} Unit
 foreign effect invalidate from "@flick-lang/runtime/effect/Pool" "invalidate"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:aaab56e8f35086ca"
+  reviewed "effect@4.1.2 sha256:aaab56e8f35086ca"
 
 /// Keeps the borrowed `item` for this task alone until the innermost
 /// `scope` (or the one of region `t`) closes; with a `concurrency` of one
@@ -72,4 +72,4 @@ reserve : forall s t e a. a -> Pool s e a ->{Scope t;} Unit
 foreign effect reserve from "@flick-lang/runtime/effect/Pool" "reserve"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:a2deed232381ff9a"
+  reviewed "effect@4.1.2 sha256:a2deed232381ff9a"

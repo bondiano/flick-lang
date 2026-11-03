@@ -26,7 +26,7 @@ errors second and success last**. A runtime function such as
 Effect. A pure `String -> User` stays a plain JavaScript function.
 
 The current [runtime adapter](../../reference/runtime/) pins Effect
-**4.0.5**. Generated modules import `@flick-lang/runtime`, not a second
+**4.1.2**. Generated modules import `@flick-lang/runtime`, not a second
 independent effect engine. The adapter also defines Flick-specific
 contracts for lexical owners, supervision, foreign promises and shutdown;
 sharing Effect does not make every low-level API interchangeable.

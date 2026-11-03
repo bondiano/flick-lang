@@ -1,7 +1,7 @@
 [wrapped]
 Key = "Terminal.Key 9ad26c458111c41d"
 QuitError = "Terminal.QuitError f2f6b83cfa75dc8b"
-Terminal = "Terminal.Terminal 53f60ec0037ec04f"
+Terminal = "Terminal.Terminal 3cb7418d241dbb23"
 UserInput = "Terminal.UserInput f0490ca6f80df3db"
 
 [language]
@@ -9,3 +9,4 @@ make = "`service`: `Layer.succeed Terminal` with a `Terminal.Impl` record of the
 
 [excluded]
 isQuitError = "TS-only: a type guard; Flick values are typed statically"
+Size = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

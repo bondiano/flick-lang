@@ -1,172 +1,111 @@
 package flickrt
 
-import (
-	"strings"
-	"unicode"
+// The bracket classes of Effect's internal/glob.ts: `[...]` with `!` or `^`
+// negation, ranges, `\` escapes and POSIX classes, over code points.
+
+type fsGlobTokenKind uint8
+
+const (
+	fsGlobChar fsGlobTokenKind = iota
+	fsGlobAny
+	fsGlobStar
+	fsGlobClass
 )
 
-type fsGlobRange struct{ lo, hi rune }
-
-type fsGlobClass struct {
-	ranges []fsGlobRange
-	posix  []string
-	negate bool
+// fsGlobToken is one token of a wildcard segment; `ranges` holds inclusive
+// code point pairs of a class.
+type fsGlobToken struct {
+	kind    fsGlobTokenKind
+	code    rune
+	ranges  []rune
+	negated bool
 }
 
-func fsGlobParseClass(pattern string) (fsGlobToken, int, bool) {
-	class := &fsGlobClass{}
-	i := 1
-	if i < len(pattern) && (pattern[i] == '!' || pattern[i] == '^') {
-		class.negate = true
+var fsGlobPosixClasses = map[string][]rune{
+	"alnum":  {'0', '9', 'A', 'Z', 'a', 'z'},
+	"alpha":  {'A', 'Z', 'a', 'z'},
+	"blank":  {0x09, 0x09, 0x20, 0x20},
+	"cntrl":  {0x00, 0x1f, 0x7f, 0x7f},
+	"digit":  {'0', '9'},
+	"graph":  {0x21, 0x7e},
+	"lower":  {'a', 'z'},
+	"print":  {0x20, 0x7e},
+	"punct":  {0x21, 0x2f, 0x3a, 0x40, 0x5b, 0x60, 0x7b, 0x7e},
+	"space":  {0x09, 0x0d, 0x20, 0x20},
+	"upper":  {'A', 'Z'},
+	"word":   {'0', '9', 'A', 'Z', 0x5f, 0x5f, 'a', 'z'},
+	"xdigit": {'0', '9', 'A', 'F', 'a', 'f'},
+}
+
+// fsGlobParsePosix is parsePosixClass: the class `[:name:]` at `open`,
+// whose name is at most six characters, and the index of its `]`.
+func fsGlobParsePosix(chars []rune, open int) ([]rune, int, bool) {
+	for i := open + 2; i < len(chars) && i <= open+8; i++ {
+		if chars[i] == ':' && i+1 < len(chars) && chars[i+1] == ']' {
+			ranges, ok := fsGlobPosixClasses[string(chars[open+2:i])]
+			return ranges, i + 1, ok
+		}
+	}
+	return nil, 0, false
+}
+
+// fsGlobParseClass is parseClass: the class opening at `open` and the index
+// of its `]`, or false when it does not close within the segment.
+func fsGlobParseClass(chars []rune, open int) (fsGlobToken, int, bool) {
+	i := open + 1
+	negated := i < len(chars) && (chars[i] == '!' || chars[i] == '^')
+	if negated {
 		i++
 	}
-	start, closed := i, false
-	for i < len(pattern) {
-		if pattern[i] == ']' && i > start {
+	ranges := []rune{}
+	for first := true; i < len(chars); i, first = i+1, false {
+		char := chars[i]
+		if char == '/' {
+			return fsGlobToken{}, 0, false
+		}
+		if char == ']' && !first {
+			return fsGlobToken{kind: fsGlobClass, ranges: ranges, negated: negated}, i, true
+		}
+		if char == '[' && i+1 < len(chars) && chars[i+1] == ':' {
+			if posix, end, ok := fsGlobParsePosix(chars, i); ok {
+				ranges = append(ranges, posix...)
+				i = end
+				continue
+			}
+		}
+		if char == '\\' && i+1 < len(chars) {
 			i++
-			closed = true
-			break
+			char = chars[i]
 		}
-		if strings.HasPrefix(pattern[i:], "[:") {
-			if end := strings.Index(pattern[i+2:], ":]"); end >= 0 {
-				kind := pattern[i+2 : i+2+end]
-				if strings.Contains("|alnum|alpha|ascii|blank|cntrl|digit|graph|lower|print|punct|space|upper|word|xdigit|", "|"+kind+"|") {
-					class.posix = append(class.posix, kind)
-					i += end + 4
-					continue
-				}
+		if i+2 < len(chars) && chars[i+1] == '-' && chars[i+2] != ']' {
+			next := i + 2
+			if chars[next] == '/' {
+				return fsGlobToken{}, 0, false
 			}
+			if chars[next] == '\\' && next+1 < len(chars) {
+				next++
+			}
+			ranges = append(ranges, char, chars[next])
+			i = next
+			continue
 		}
-		lo, size := fsGlobRune(pattern[i:])
-		i += size
-		hi := lo
-		if i+1 < len(pattern) && pattern[i] == '-' && pattern[i+1] != ']' {
-			hi, size = fsGlobRune(pattern[i+1:])
-			i += 1 + size
-		}
-		if lo <= hi {
-			class.ranges = append(class.ranges, fsGlobRange{lo, hi})
-		}
+		ranges = append(ranges, char, char)
 	}
-	if !closed {
-		return fsGlobToken{}, 0, false
-	}
-	if !class.negate && len(class.posix) == 0 && len(class.ranges) == 1 && class.ranges[0].lo == class.ranges[0].hi {
-		return fsGlobToken{op: '=', char: class.ranges[0].lo}, i, false
-	}
-	return fsGlobToken{op: '[', class: class}, i, true
+	return fsGlobToken{}, 0, false
 }
 
-func (class *fsGlobClass) match(ch rune, nocase, unicodeCase bool) bool {
-	if len(class.ranges) == 0 && len(class.posix) == 0 {
-		// minimatch emits the never-matching `$.` for a class with nothing in
-		// it, even when negated (`[!z-a]`).
-		return false
-	}
-	for _, interval := range class.ranges {
-		if ch >= interval.lo && ch <= interval.hi || nocase && fsGlobFoldInRange(ch, interval.lo, interval.hi, unicodeCase) {
-			return !class.negate
-		}
-	}
-	if len(class.posix) != 0 {
-		current := ch
-		for {
-			for _, kind := range class.posix {
-				if fsGlobPosixClass(kind, current) {
-					return !class.negate
-				}
-			}
-			if !nocase || !unicodeCase {
-				break
-			}
-			current = unicode.SimpleFold(current)
-			if current == ch {
-				break
-			}
-		}
-	}
-	return class.negate
-}
-
-// fsGlobFoldInRange tests the case-fold orbit of `ch` against the original
-// interval; canonicalization is not monotone, so the endpoints cannot be
-// folded. Non-Unicode members must canonicalize to the same value (the ASCII
-// guard), while Unicode (`/iu`) uses the simple fold orbit directly.
-func fsGlobFoldInRange(ch, lo, hi rune, unicodeCase bool) bool {
-	target := fsGlobCanonical(ch)
-	current := ch
-	for range 256 {
-		if current >= lo && current <= hi && (unicodeCase || fsGlobCanonical(current) == target) {
-			return true
-		}
-		next := unicode.SimpleFold(current)
-		if next == ch {
-			return false
-		}
-		current = next
-	}
-	return false
-}
-
-// fsGlobEqual is JS case-insensitive equality: `EqualFold` for the Unicode
-// (`/iu`) form, non-Unicode Canonicalize otherwise.
-func fsGlobEqual(a, b rune, nocase, unicodeCase bool) bool {
-	if a == b {
+func (token fsGlobToken) match(code rune) bool {
+	switch token.kind {
+	case fsGlobChar:
+		return token.code == code
+	case fsGlobAny:
 		return true
-	}
-	if !nocase {
-		return false
-	}
-	if unicodeCase {
-		return strings.EqualFold(string(a), string(b))
-	}
-	return fsGlobCanonical(a) == fsGlobCanonical(b)
-}
-
-// fsGlobCanonical is ES's non-Unicode Canonicalize: upper case only when the
-// single-code-unit result stays non-ASCII; non-ASCII never folds into ASCII.
-func fsGlobCanonical(ch rune) rune {
-	if ch < 128 {
-		return unicode.ToUpper(ch)
-	}
-	upper, ok := unicodeData().upper[ch]
-	if !ok || len(upper) != 1 || upper[0] < 128 || upper[0] > 0xffff {
-		return ch
-	}
-	return upper[0]
-}
-
-func fsGlobPosixClass(kind string, ch rune) bool {
-	switch kind {
-	case "alnum":
-		return unicode.IsLetter(ch) || unicode.Is(unicode.Nl, ch) || unicode.IsDigit(ch)
-	case "alpha":
-		return unicode.IsLetter(ch) || unicode.Is(unicode.Nl, ch)
-	case "ascii":
-		return ch <= 127
-	case "blank":
-		return unicode.Is(unicode.Zs, ch) || ch == '\t'
-	case "cntrl":
-		return unicode.IsControl(ch)
-	case "digit":
-		return unicode.IsDigit(ch)
-	case "graph":
-		return unicode.IsGraphic(ch) && !unicode.Is(unicode.Zs, ch)
-	case "lower":
-		return unicode.IsLower(ch)
-	case "print":
-		// Node's print is \p{C}, including Cn missing from Go 1.23's table.
-		return !unicode.IsGraphic(ch) && !unicode.Is(unicode.Z, ch)
-	case "punct":
-		return unicode.IsPunct(ch)
-	case "space":
-		return unicode.Is(unicode.Z, ch) || strings.ContainsRune("\t\r\n\v\f", ch)
-	case "upper":
-		return unicode.IsUpper(ch)
-	case "word":
-		return unicode.IsLetter(ch) || unicode.Is(unicode.Nl, ch) || unicode.IsDigit(ch) || unicode.Is(unicode.Pc, ch)
-	case "xdigit":
-		return ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'f' || ch >= 'A' && ch <= 'F'
+	case fsGlobClass:
+		found := false
+		for i := 0; i < len(token.ranges) && !found; i += 2 {
+			found = code >= token.ranges[i] && code <= token.ranges[i+1]
+		}
+		return found != token.negated
 	}
 	return false
 }

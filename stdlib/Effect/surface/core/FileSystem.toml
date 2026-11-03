@@ -3,7 +3,7 @@ WatchOptions = "Stream.WatchOptions 6727c05f75ae8672"
 WatchEvent = "Stream.WatchEvent 2c7d662fcce675d7"
 WatchBackend = "Stream.WatchBackend 22f38a5c95d1031b"
 File = "FileSystem.File e5908aede5e43a55"
-FileSystem = "FileSystem.FileSystem e72be4f6c861122c"
+FileSystem = "FileSystem.FileSystem c7982553317a7697"
 OpenFlag = "FileSystem.OpenFlag 90628869dc3717b3"
 SeekMode = "FileSystem.SeekMode 4a890edccef0ce8a"
 
@@ -15,3 +15,4 @@ layerNoop = "`service`: `Layer.succeed FileSystem` with a `FileSystem.Impl` reco
 [excluded]
 FileTypeId = "TS-only: a type identifier"
 isFile = "TS-only: a type guard; Flick values are typed statically"
+DirectoryEntry = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

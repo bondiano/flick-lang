@@ -39,7 +39,7 @@ func fromTransformBracket(f func(fb *Fiber, upstream Pull, scope, forked *Owner)
 		forked := forkScope(fb, scope)
 		onError := func(fb *Fiber, c *Cause) *Failure {
 			_, closed := catch(func() Value { closeScope(fb, forked, doneExit(c).cause); return nil })
-			return &Failure{Sequential(c, closed)}
+			return &Failure{finalized(c, closed)} // as Effect's onError
 		}
 		var p Pull
 		if _, c := catch(func() Value { p = f(fb, upstream, scope, forked); return nil }); c != nil {

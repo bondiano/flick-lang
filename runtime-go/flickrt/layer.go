@@ -254,7 +254,7 @@ func buildWith(fb *Fiber, l *Layer, memo *MemoMap, scope *Owner) Services {
 // Provide runs `body` with the services `layer` builds added to the
 // fiber's; the body's owner holds what the layer acquired.
 func Provide(fb *Fiber, layer, body Value) Value {
-	return owned(fb, func(inner *Fiber, owner *Owner) Value {
+	return region(fb, func(inner *Fiber, owner *Owner) Value {
 		if tracing {
 			traceOpen(owner, fb.owner, "provide")
 		}

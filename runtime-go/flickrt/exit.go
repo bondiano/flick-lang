@@ -334,12 +334,12 @@ func handledExit(fb *Fiber, task Value) *Exit {
 }
 
 // withExit runs `task`, then `after` of its exit uninterruptibly; a
-// failure of `after` joins the task's.
+// failure of `after` joins the task's, as Effect's `onExit` joins them.
 func withExit(fb *Fiber, task Value, after func(*Exit) Value) Value {
 	e := exitOf(fb, task)
 	if task := after(e); task != nil {
 		_, c := catch(func() Value { return uninterruptible(fb, task) })
-		e = &Exit{e.value, Sequential(e.cause, c)}
+		e = &Exit{e.value, finalized(e.cause, c)}
 	}
 	if e.cause != nil {
 		panic(&Failure{e.cause})

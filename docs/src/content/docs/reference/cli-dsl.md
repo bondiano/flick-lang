@@ -98,8 +98,9 @@ Only the combinators reach these:
 | `Cli.action name help act` | the switch `--name`, which runs `act` instead of any handler |
 
 `Cli.help_doc path command` is the `Cli.HelpDoc` record `--help` shows after
-the subcommands `path`, `Cli.help` its text, and `Cli.completions shell
-command` the completion script. Interactive questions are `Cli.Prompt`:
+the subcommands `path` (the flags of the commands above it in
+`inheritedFlags`, shown under `INHERITED FLAGS`), `Cli.help` its text, and
+`Cli.completions shell command` the completion script. Interactive questions are `Cli.Prompt`:
 values such as `Cli.Prompt.text`, `Cli.Prompt.select` or `Cli.Prompt.custom`,
 asked by `Cli.Prompt.run` on the service `Cli.Prompt.Tty` (`Cli.Prompt.node`
 is the process's terminal; a fake is a `Layer.succeed Tty` record), one key

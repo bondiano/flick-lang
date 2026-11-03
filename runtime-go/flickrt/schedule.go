@@ -133,10 +133,10 @@ func ScheduleFibonacci(one Value) Value {
 	oneMillis := millisOf(dur(one))
 	return &Schedule{func(*Fiber) scheduleStep {
 		a, b := 0.0, oneMillis
+		// as Effect 4.1: the first delay is `one`, then 1, 2, 3, 5 times it
 		return func(*Fiber, float64, Value) (Value, *Duration, bool) {
-			next := a + b
-			a, b = b, next
-			d := fromMillis(next)
+			d := fromMillis(b)
+			a, b = b, a+b
 			return d, d, false
 		}
 	}}
@@ -160,7 +160,7 @@ func ScheduleFixed(interval Value) Value {
 			switch {
 			case behind:
 				delay = 0
-			case boundary == 0:
+			case zeroMillis(boundary):
 				delay = window
 			}
 			lastRun = m.now + delay
@@ -178,7 +178,11 @@ func ScheduleWindowed(interval Value) Value {
 		if window == 0 {
 			return m.attempt - 1, noDelay, false
 		}
-		return m.attempt - 1, fromMillis(window - math.Mod(m.elapsed, window)), false
+		delay := window - math.Mod(m.elapsed, window)
+		if zeroMillis(delay) {
+			delay = window
+		}
+		return m.attempt - 1, fromMillis(delay), false
 	}))
 }
 

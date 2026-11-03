@@ -66,14 +66,15 @@ func cliDocRecord(doc *cliHelpDoc) Value {
 		examples[i] = Rec("command", e.command, "description", cliOptionOf(e.description))
 	}
 	return Rec("description", doc.description, "usage", doc.usage, "flags", cliFlagDocs(doc.flags),
-		"globalFlags", cliFlagDocs(doc.globalFlags), "args", args, "subcommands", groups, "examples", examples)
+		"inheritedFlags", cliFlagDocs(doc.inheritedFlags), "globalFlags", cliFlagDocs(doc.globalFlags), "args", args, "subcommands", groups, "examples", examples)
 }
 
 // cliDocOf is toEffectDoc.
 func cliDocOf(v Value) *cliHelpDoc {
 	r := record(v)
 	doc := &cliHelpDoc{description: r.Get("description").(string), usage: r.Get("usage").(string),
-		flags: cliFlagDocsOf(r.Get("flags")), globalFlags: cliFlagDocsOf(r.Get("globalFlags"))}
+		flags: cliFlagDocsOf(r.Get("flags")), inheritedFlags: cliFlagDocsOf(r.Get("inheritedFlags")),
+		globalFlags: cliFlagDocsOf(r.Get("globalFlags"))}
 	for _, x := range List(r.Get("args")) {
 		a := record(x)
 		doc.args = append(doc.args, cliArgDoc{a.Get("name").(string), a.Get("type_").(string),

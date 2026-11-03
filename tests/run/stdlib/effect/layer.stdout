@@ -36,7 +36,7 @@ exit failed false
 finalizer ran
 launched
 launch interrupted true
-failed build causes Some (true, true, 2)
+failed build causes Some (false, true, 2)
 failed build cleanup count 1
 span Some "boot"
 ended Some "boot" failed false

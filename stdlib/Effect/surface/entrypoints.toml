@@ -5,12 +5,14 @@
 "effect/ai" = { excluded = "AI provider clients are outside the 0.1.0 standard library" }
 "effect/cli" = { modules = "cli" }
 "effect/cluster" = { excluded = "distributed entities and sharding are outside 0.1.0" }
+"effect/crypto" = { excluded = "keys, ciphers, signatures and key derivation are outside 0.1.0; Flick's `Crypto` draws random values and digests over Web Crypto" }
 "effect/devtools" = { modules = "devtools" }
 "effect/encoding" = { excluded = "byte encodings are outside the 0.1.0 standard library" }
 "effect/eventlog" = { excluded = "event-sourcing infrastructure is outside 0.1.0" }
 "effect/graphql" = { excluded = "GraphQL is outside the 0.1.0 standard library" }
 "effect/http" = { modules = "http" }
 "effect/http-api" = { modules = "http-api" }
+"effect/jose" = { excluded = "JOSE keys, JWS and JWE are outside 0.1.0; Flick's `Jwt` signs and verifies HS256 tokens over `Crypto`" }
 "effect/net" = { excluded = "sockets and networking below HTTP are outside 0.1.0" }
 "effect/observability" = { modules = "observability" }
 "effect/persistence" = { excluded = "persistence backends are outside 0.1.0" }

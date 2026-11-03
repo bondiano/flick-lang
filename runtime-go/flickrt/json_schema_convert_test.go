@@ -2,7 +2,7 @@ package flickrt
 
 import "testing"
 
-// The expected texts are Effect 4.0.5's output for the same inputs.
+// The expected texts are Effect 4.1.2's output for the same inputs.
 
 func parsedJSON(t *testing.T, text string) Value {
 	t.Helper()

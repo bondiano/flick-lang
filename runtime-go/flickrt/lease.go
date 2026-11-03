@@ -35,7 +35,8 @@ func acquireHolder(fb *Fiber, acquire Value, outer int) *holder {
 	inner.owner = scope
 	v, cause := catch(func() Value { return masked(&inner, outer, func() Value { return Run(&inner, acquire) }) })
 	if cause != nil {
-		panic(&Failure{scope.close(fb, cause)})
+		// lease.ts closes and then fails, outside `onExit`: no election
+		panic(&Failure{Sequential(cause, scope.closeFinalizers(fb, cause))})
 	}
 	return &holder{value: v, scope: scope}
 }
@@ -89,7 +90,7 @@ func (h *holder) lease(fb *Fiber, use func(*Fiber, Value) Value, closed func(*Fi
 			return Unit
 		})
 	})
-	if cause = Sequential(cause, released); cause != nil {
+	if cause = finalized(cause, released); cause != nil { // lease.ts: acquireUseRelease
 		panic(&Failure{cause})
 	}
 	return out

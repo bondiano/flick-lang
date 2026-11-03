@@ -7,7 +7,7 @@ windowed: 3
 duration: 2
 jittered: 2
 exponential: ["1ms", "3ms", "9ms", "27ms"]
-fibonacci: ["1ms", "2ms", "3ms", "5ms"]
+fibonacci: ["1ms", "1ms", "2ms", "3ms"]
 during: 4
 max: 2
 min: 4

@@ -1,648 +1,333 @@
 package flickrt
 
 import (
-	"runtime"
+	"slices"
 	"strings"
-	"unicode/utf16"
-	"unicode/utf8"
 )
 
-type fsGlobToken struct {
-	op    byte
-	char  rune
-	class *fsGlobClass
-	alts  [][]fsGlobToken
-	tail  []fsGlobToken
-	empty bool
+// Effect's internal/glob.ts compilation: brace expansion, then every
+// expanded pattern's segment nodes laid out in one array, so a match state
+// is an index into `nodes`.
+
+type fsGlobNodeKind uint8
+
+const (
+	fsGlobGlobstar fsGlobNodeKind = iota
+	fsGlobLiteral
+	fsGlobWildcard
+	fsGlobEnd
+)
+
+type fsGlobNode struct {
+	kind fsGlobNodeKind
+	// value is a Literal's name
+	value      string
+	tokens     []fsGlobToken
+	leadingDot bool
+	// affixes is set when the segment is `prefix*suffix`
+	affixes        bool
+	prefix, suffix string
+	// directoryOnly is an End that accepts only directories
+	directoryOnly bool
 }
 
-type fsGlobPart struct {
-	literal   string
-	tokens    []fsGlobToken
-	magic     bool
-	unicode   bool
-	recursive bool
-	fast      byte
-	qmarks    int
-	extLower  string
-	extUnits  int
+type fsGlobCompiled struct {
+	nodes   []fsGlobNode
+	initial []int
+	dot     bool
 }
 
 const (
-	fsGlobFastStar byte = iota + 1
-	fsGlobFastStarExt
-	fsGlobFastQmarks
+	fsGlobMaxExpansions     = 10_000
+	fsGlobMaxExpandedLength = 1 << 22
+	fsGlobMaxBraceDepth     = 64
 )
 
-func fsGlobCompilePart(pattern string) fsGlobPart {
-	if pattern == "**" {
-		return fsGlobPart{recursive: true, magic: true}
-	}
-	fast, qmarks, ext := fsGlobFastShape(pattern)
-	tokens, magic := fsGlobParse(pattern)
-	fsGlobFlatten(&tokens)
-	unicodeMode := fsGlobUnicode(tokens)
-	if !unicodeMode {
-		if encoded := fsGlobUTF16(pattern); encoded != pattern {
-			tokens, magic = fsGlobParse(encoded)
-			fsGlobFlatten(&tokens)
-		}
-	}
-	var literal strings.Builder
-	if !magic {
-		for i := 0; i < len(tokens); i++ {
-			ch := tokens[i].char
-			if ch >= 0xd800 && ch <= 0xdbff && i+1 < len(tokens) && tokens[i+1].char >= 0xdc00 && tokens[i+1].char <= 0xdfff {
-				ch = utf16.DecodeRune(ch, tokens[i+1].char)
-				i++
+func fsGlobCompile(patterns []string, dot bool) *fsGlobCompiled {
+	compiled := &fsGlobCompiled{dot: dot}
+	starts := []int{}
+	for _, pattern := range patterns {
+		for _, expanded := range fsGlobExpandBraces(pattern) {
+			start := len(compiled.nodes)
+			if compiled.compilePattern(expanded) {
+				starts = append(starts, start)
 			}
-			literal.WriteRune(ch)
 		}
 	}
-	fsGlobFillNegs(tokens, nil)
-	part := fsGlobPart{literal: literal.String(), tokens: tokens, magic: magic, unicode: unicodeMode, fast: fast, qmarks: qmarks}
-	if (runtime.GOOS == "windows" || runtime.GOOS == "darwin") && (fast == fsGlobFastStarExt || fast == fsGlobFastQmarks) {
-		part.extLower = ToLowerCase(ext).(string)
-		if fast == fsGlobFastQmarks {
-			part.extUnits = fsGlobUTF16Units(ext)
-		}
-	}
-	return part
+	compiled.initial = compiled.closure(starts)
+	return compiled
 }
 
-// fsGlobFastShape is minimatch's parse-time fast-test dispatch: these shapes
-// compare lowercased strings rather than using regex `/i` case canonicalization.
-func fsGlobFastShape(pattern string) (byte, int, string) {
-	stars := 0
-	for stars < len(pattern) && pattern[stars] == '*' {
-		stars++
-	}
-	if stars != 0 {
-		if stars == len(pattern) {
-			return fsGlobFastStar, 0, ""
-		}
-		if rest := pattern[stars:]; fsGlobExtOnly(rest) {
-			return fsGlobFastStarExt, 0, rest
-		}
-	}
-	marks := 0
-	for marks < len(pattern) && pattern[marks] == '?' {
-		marks++
-	}
-	if marks != 0 {
-		if rest := pattern[marks:]; fsGlobExtOnly(rest) {
-			return fsGlobFastQmarks, marks, rest
-		}
-	}
-	return 0, 0, ""
+// fsGlobUnc rejects UNC paths rather than collapsing them into local
+// absolute paths.
+func fsGlobUnc(path string) bool {
+	return strings.HasPrefix(path, "//") && len(path) > 2 && path[2] != '/'
 }
 
-func fsGlobExtOnly(text string) bool {
-	for _, ch := range text {
-		if strings.ContainsRune("+@!?*[(", ch) {
-			return false
+func fsGlobDrive(s string) bool {
+	return len(s) >= 2 && s[1] == ':' && (s[0] >= 'a' && s[0] <= 'z' || s[0] >= 'A' && s[0] <= 'Z')
+}
+
+// fsGlobRoot is the root of an absolute path: `""` or a drive such as `C:/`.
+func fsGlobRoot(name string) bool {
+	return name == "" || len(name) == 3 && name[2] == '/' && fsGlobDrive(name)
+}
+
+func fsGlobAbsolute(path string) bool {
+	return strings.HasPrefix(path, "/") || len(path) > 2 && path[2] == '/' && fsGlobDrive(path)
+}
+
+// compilePattern appends the pattern's nodes, or nothing when it can match
+// no path.
+func (c *fsGlobCompiled) compilePattern(pattern string) bool {
+	if pattern == "" || fsGlobUnc(pattern) {
+		return false
+	}
+	raw := fsGlobSplitSegments(pattern)
+	if globstar := slices.Index(raw, "**"); globstar != -1 {
+		for _, segment := range raw[globstar+1:] {
+			if segment == "." || segment == ".." {
+				return false
+			}
 		}
 	}
+	segments, directory := fsGlobNormalize(raw)
+	if len(segments) == 0 {
+		return false
+	}
+	for _, segment := range segments {
+		if segment != "**" {
+			c.nodes = append(c.nodes, fsGlobCompileSegment(fsGlobChars(segment)))
+		} else if n := len(c.nodes); n == 0 || c.nodes[n-1].kind != fsGlobGlobstar {
+			c.nodes = append(c.nodes, fsGlobNode{kind: fsGlobGlobstar})
+		}
+	}
+	c.nodes = append(c.nodes, fsGlobNode{kind: fsGlobEnd, directoryOnly: directory})
 	return true
 }
 
-// fsGlobUTF16Units counts JS string length; surrogates count two code units.
-func fsGlobUTF16Units(text string) int {
-	units := 0
-	for len(text) != 0 {
-		ch, size := decode(text)
-		text = text[size:]
-		if ch > 0xffff {
-			units += 2
+// fsGlobChars is JS `Array.from`: the code points, lone surrogates included.
+func fsGlobChars(s string) []rune {
+	out := make([]rune, 0, len(s))
+	for len(s) > 0 {
+		r, n := decode(s)
+		out = append(out, r)
+		s = s[n:]
+	}
+	return out
+}
+
+func fsGlobSplitSegments(pattern string) []string {
+	segments := []string{}
+	start := 0
+	for i := 0; i < len(pattern); i++ {
+		if pattern[i] == '\\' {
+			i++
+		} else if pattern[i] == '/' {
+			segments = append(segments, pattern[start:i])
+			start = i + 1
+		}
+	}
+	return append(segments, pattern[start:])
+}
+
+// fsGlobNormalize keeps absolute roots and a lone `.`; a trailing `/` or
+// `/.` marks a directory.
+func fsGlobNormalize(raw []string) ([]string, bool) {
+	segments := []string{}
+	i := 0
+	if len(raw) > 1 && (raw[0] == "" || len(raw[0]) == 2 && fsGlobDrive(raw[0])) {
+		if raw[0] == "" {
+			segments = append(segments, "")
 		} else {
-			units++
+			segments = append(segments, raw[0]+"/")
+		}
+		i = 1
+	}
+	directory := false
+	for ; i < len(raw); i++ {
+		if raw[i] == "" || raw[i] == "." {
+			directory = i == len(raw)-1 && len(segments) > 0
+		} else {
+			segments = append(segments, raw[i])
+			directory = false
 		}
 	}
-	return units
+	if len(segments) == 0 && slices.Contains(raw, ".") {
+		segments = append(segments, ".")
+	}
+	return segments, directory
 }
 
-func fsGlobUnicode(tokens []fsGlobToken) bool {
-	for _, token := range tokens {
-		if token.class != nil {
-			for _, class := range token.class.posix {
-				if class != "ascii" && class != "xdigit" {
-					return true
-				}
-			}
-		}
-		for _, alternative := range token.alts {
-			if fsGlobUnicode(alternative) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// JS regexes consume UTF-16 code units unless a Unicode POSIX class sets /u.
-func fsGlobUTF16(text string) string {
-	astral := strings.IndexFunc(text, func(ch rune) bool { return ch > 0xffff })
-	if astral < 0 {
-		return text
-	}
-	var out strings.Builder
-	out.Grow(len(text) + 2)
-	out.WriteString(text[:astral])
-	for _, ch := range text[astral:] {
-		if ch <= 0xffff {
-			out.WriteRune(ch)
-			continue
-		}
-		hi, lo := utf16.EncodeRune(ch)
-		for _, unit := range [2]rune{hi, lo} {
-			out.WriteByte(byte(0xe0 | unit>>12))
-			out.WriteByte(byte(0x80 | unit>>6&0x3f))
-			out.WriteByte(byte(0x80 | unit&0x3f))
-		}
-	}
-	return out.String()
-}
-
-func fsGlobRune(text string) (rune, int) {
-	if len(text) >= 3 && text[0] == 0xed && text[1] >= 0xa0 && text[1] <= 0xbf && text[2]&0xc0 == 0x80 {
-		return rune(text[0]&0xf)<<12 | rune(text[1]&0x3f)<<6 | rune(text[2]&0x3f), 3
-	}
-	return utf8.DecodeRuneInString(text)
-}
-
-func fsGlobParse(pattern string) ([]fsGlobToken, bool) {
-	// An empty positive extglob as the whole pattern is literal in minimatch.
-	if len(pattern) == 3 && pattern[1:] == "()" && strings.ContainsRune("?*+@", rune(pattern[0])) {
-		return fsGlobParseLiteral(pattern), false
-	}
-	tokens, end := fsGlobParseSequence(pattern, 0, 0, 0, 0)
-	if end != len(pattern) {
-		return fsGlobParseLiteral(pattern), false
-	}
-	return tokens, fsGlobHasMagic(tokens)
-}
-
-func fsGlobParseLiteral(pattern string) []fsGlobToken {
+func fsGlobCompileSegment(chars []rune) fsGlobNode {
 	tokens := []fsGlobToken{}
-	for _, ch := range pattern {
-		tokens = append(tokens, fsGlobToken{op: '=', char: ch})
-	}
-	return tokens
-}
-
-func fsGlobHasMagic(tokens []fsGlobToken) bool {
-	for _, token := range tokens {
-		if token.alts != nil || token.op == '*' || token.op == '?' || token.op == '[' {
-			return true
-		}
-	}
-	return false
-}
-
-// parse a sequence of plain tokens and groups until `)` or the end; returns
-// the tokens and the index just past the last one consumed.
-func fsGlobParseSequence(pattern string, start, depth, groupDepth int, parent byte) ([]fsGlobToken, int) {
-	tokens := []fsGlobToken{}
-	for i := start; i < len(pattern); {
-		ch, size := fsGlobRune(pattern[i:])
-		adopted := fsGlobCanAdopt(parent, byte(ch))
-		if strings.ContainsRune("?*+@!", ch) && i+1 < len(pattern) && pattern[i+1] == '(' && (groupDepth <= 2 || adopted) {
-			inner := groupDepth
-			if !adopted {
-				inner++
+	literal := []byte{}
+	magic := false
+	// once a class fails to close, every later `[` in the segment is literal
+	classes := true
+	for i := 0; i < len(chars); i++ {
+		char := chars[i]
+		switch {
+		case char == '\\' && i+1 < len(chars):
+			i++
+			literal = encodeRune(literal, chars[i])
+			tokens = append(tokens, fsGlobToken{kind: fsGlobChar, code: chars[i]})
+		case char == '*':
+			magic = true
+			if len(tokens) == 0 || tokens[len(tokens)-1].kind != fsGlobStar {
+				tokens = append(tokens, fsGlobToken{kind: fsGlobStar})
 			}
-			group, end, ok := fsGlobParseGroup(pattern, i, inner)
-			if ok {
-				tokens = append(tokens, group)
-				i = end
-				continue
-			}
-		}
-		if ch == '[' {
-			if token, consumed, _ := fsGlobParseClass(pattern[i:]); consumed != 0 {
+		case char == '?':
+			magic = true
+			tokens = append(tokens, fsGlobToken{kind: fsGlobAny})
+		case char == '[' && classes:
+			if token, end, ok := fsGlobParseClass(chars, i); ok {
+				magic = true
 				tokens = append(tokens, token)
-				i += consumed
-				continue
+				i = end
+			} else {
+				classes = false
+				literal = append(literal, '[')
+				tokens = append(tokens, fsGlobToken{kind: fsGlobChar, code: '['})
 			}
+		default:
+			literal = encodeRune(literal, char)
+			tokens = append(tokens, fsGlobToken{kind: fsGlobChar, code: char})
 		}
-		if ch == ')' && depth > 0 {
-			return tokens, i
-		}
-		if ch == '|' && depth > 0 {
-			return tokens, i
-		}
-		if ch == '*' {
-			if len(tokens) == 0 || tokens[len(tokens)-1].op != '*' || tokens[len(tokens)-1].alts != nil {
-				tokens = append(tokens, fsGlobToken{op: '*'})
+	}
+	if !magic {
+		return fsGlobNode{kind: fsGlobLiteral, value: string(literal)}
+	}
+	node := fsGlobNode{kind: fsGlobWildcard, tokens: tokens, leadingDot: tokens[0].kind == fsGlobChar && tokens[0].code == '.'}
+	node.prefix, node.suffix, node.affixes = fsGlobAffixes(tokens)
+	return node
+}
+
+// fsGlobAffixes splits `prefix*suffix`; lone surrogates stay on the token
+// path, as a prefix test would match them against half of a pair.
+func fsGlobAffixes(tokens []fsGlobToken) (string, string, bool) {
+	var prefix, suffix []byte
+	star := false
+	for _, token := range tokens {
+		switch {
+		case token.kind == fsGlobStar && !star:
+			star = true
+		case token.kind == fsGlobChar && (token.code < 0xd800 || token.code > 0xdfff):
+			if star {
+				suffix = encodeRune(suffix, token.code)
+			} else {
+				prefix = encodeRune(prefix, token.code)
 			}
-		} else if ch == '?' {
-			tokens = append(tokens, fsGlobToken{op: '?'})
+		default:
+			return "", "", false
+		}
+	}
+	return string(prefix), string(suffix), star
+}
+
+// fsGlobMatchWildcard backtracks only to the last `*`.
+func fsGlobMatchWildcard(node *fsGlobNode, name string, dot bool) bool {
+	if name == "." || name == ".." || strings.HasPrefix(name, ".") && !dot && !node.leadingDot {
+		return false
+	}
+	if node.affixes {
+		return len(name) >= len(node.prefix)+len(node.suffix) && strings.HasPrefix(name, node.prefix) && strings.HasSuffix(name, node.suffix)
+	}
+	tokens := node.tokens
+	t, c, star, resume := 0, 0, -1, 0
+	for c < len(name) {
+		if t < len(tokens) && tokens[t].kind == fsGlobStar {
+			star, resume = t, c
+			t++
+			continue
+		}
+		code, width := decode(name[c:])
+		if t < len(tokens) && tokens[t].match(code) {
+			t++
+			c += width
+		} else if star != -1 {
+			t = star + 1
+			_, width := decode(name[resume:])
+			resume += width
+			c = resume
 		} else {
-			tokens = append(tokens, fsGlobToken{op: '=', char: ch})
-		}
-		i += size
-	}
-	return tokens, len(pattern)
-}
-
-func fsGlobParseGroup(pattern string, start, groupDepth int) (fsGlobToken, int, bool) {
-	op := pattern[start]
-	group := fsGlobToken{op: op, alts: [][]fsGlobToken{}}
-	alternative, end := fsGlobParseSequence(pattern, start+2, 1, groupDepth, op)
-	group.alts = append(group.alts, alternative)
-	for end < len(pattern) {
-		if pattern[end] == '|' {
-			next := end + 1
-			if next < len(pattern) && pattern[next] == ')' {
-				group.alts = append(group.alts, nil)
-				group.finishEmpty()
-				return group, next + 1, true
-			}
-			alternative, end = fsGlobParseSequence(pattern, next, 1, groupDepth, op)
-			group.alts = append(group.alts, alternative)
-			continue
-		}
-		if pattern[end] == ')' {
-			// minimatch demotes an empty positive group with nothing around it.
-			if op != '!' && len(group.alts) == 1 && len(group.alts[0]) == 0 && start == 0 && end == len(pattern)-1 {
-				return fsGlobToken{}, 0, false
-			}
-			group.finishEmpty()
-			return group, end + 1, true
-		}
-		// something followed the closing `)` of a nested group: treat the
-		// whole construct as a literal.
-		return fsGlobToken{}, 0, false
-	}
-	return fsGlobToken{}, 0, false
-}
-
-// finishEmpty is minimatch's `#emptyExt`: a negative group whose content ends
-// at a nested group (or at `|`/`)`) closes with `acc == ""`, so its regex uses
-// `starNoEmpty` and ignores the body. `#flatten` resets it when this group is
-// usurped, which happens exactly when its normalized type is no longer `!`.
-func (group *fsGlobToken) finishEmpty() {
-	if group.op != '!' {
-		return
-	}
-	last := group.alts[len(group.alts)-1]
-	// Syntax only: fsGlobFlatten applies native adopt/usurp and resets it.
-	group.empty = len(last) == 0 || last[len(last)-1].alts != nil
-}
-
-// fsGlobFlatten applies minimatch's #flatten to a parsed token tree: children
-// first, then adopt/adoptWithSpace/usurp on each sole nested group, up to the
-// same ten passes. This mutates the actual types and bodies the matcher uses.
-func fsGlobFlatten(tokens *[]fsGlobToken) {
-	for i := range *tokens {
-		fsGlobFlattenToken(&(*tokens)[i])
-	}
-}
-
-func fsGlobFlattenToken(group *fsGlobToken) {
-	if group.alts == nil {
-		return
-	}
-	for j := range group.alts {
-		for k := range group.alts[j] {
-			fsGlobFlattenToken(&group.alts[j][k])
-		}
-	}
-	for {
-		changed := false
-		for j := 0; j < len(group.alts); j++ {
-			alternative := group.alts[j]
-			if len(alternative) != 1 || alternative[0].alts == nil {
-				continue
-			}
-			child := alternative[0]
-			if fsGlobAdoptable(group.op, child.op) {
-				group.alts = fsGlobSplice(group.alts, j, child.alts)
-				changed = true
-				break
-			}
-			if fsGlobAdoptableWithSpace(group.op, child.op) {
-				insert := append(append([][]fsGlobToken{}, child.alts...), nil)
-				group.alts = fsGlobSplice(group.alts, j, insert)
-				changed = true
-				break
-			}
-			if len(group.alts) == 1 {
-				if usurped, ok := fsGlobUsurpType(group.op, child.op); ok {
-					group.op = usurped
-					group.alts = child.alts
-					group.empty = false
-					changed = true
-					break
-				}
-			}
-		}
-		if !changed {
-			break
-		}
-	}
-}
-
-func fsGlobSplice(alts [][]fsGlobToken, at int, insert [][]fsGlobToken) [][]fsGlobToken {
-	out := make([][]fsGlobToken, 0, len(alts)-1+len(insert))
-	out = append(out, alts[:at]...)
-	out = append(out, insert...)
-	return append(out, alts[at+1:]...)
-}
-
-// fsGlobAdoptable is minimatch's adoptionMap; fsGlobCanAdopt is adoptionAnyMap.
-func fsGlobAdoptable(parent, child byte) bool {
-	switch parent {
-	case '!':
-		return child == '@'
-	case '?':
-		return child == '?' || child == '@'
-	case '@':
-		return child == '@'
-	case '*':
-		return child == '*' || child == '+' || child == '?' || child == '@'
-	case '+':
-		return child == '+' || child == '@'
-	}
-	return false
-}
-
-// fsGlobAdoptableWithSpace is minimatch's adoptionWithSpaceMap: the adopted
-// group also gains an empty alternative.
-func fsGlobAdoptableWithSpace(parent, child byte) bool {
-	switch parent {
-	case '!', '@':
-		return child == '?'
-	case '+':
-		return child == '?' || child == '*'
-	}
-	return false
-}
-
-// fsGlobCanAdopt is minimatch's adoptionAnyMap.
-func fsGlobCanAdopt(parent, child byte) bool {
-	switch parent {
-	case '!', '?', '@':
-		return child == '?' || child == '@'
-	case '*':
-		return child == '*' || child == '+' || child == '?' || child == '@'
-	case '+':
-		return child == '+' || child == '@' || child == '?' || child == '*'
-	}
-	return false
-}
-
-// fsGlobUsurpType is minimatch's usurpMap.
-func fsGlobUsurpType(group, child byte) (byte, bool) {
-	switch group {
-	case '!':
-		if child == '!' {
-			return '@', true
-		}
-	case '?':
-		if child == '*' || child == '+' {
-			return '*', true
-		}
-	case '@':
-		if strings.ContainsRune("!?@*+", rune(child)) {
-			return child, true
-		}
-	case '+':
-		if child == '?' || child == '*' {
-			return '*', true
-		}
-	}
-	return 0, false
-}
-
-// Minimatch's negative lookahead includes the rest of its enclosing sequences.
-// The continuation is built only where a reachable negative consumes it, so a
-// pattern of many positive groups does not copy a suffix per group.
-func fsGlobFillNegs(tokens, suffix []fsGlobToken) {
-	for i := len(tokens) - 1; i >= 0; i-- {
-		group := &tokens[i]
-		if group.alts == nil {
-			continue
-		}
-		if group.op == '!' {
-			if group.empty {
-				// an emptyExt negative ignores its body, so no continuation is read
-				continue
-			}
-			rest := fsGlobContinuation(tokens[i+1:], suffix)
-			// minimatch's adoption turns a lone trailing `*` of a leading
-			// negative group into `starNoEmpty` inside the lookahead.
-			group.tail = rest
-			if i == 0 && len(rest) == 1 && rest[0].op == '*' && rest[0].alts == nil {
-				group.tail = []fsGlobToken{{op: 'N'}}
-			}
-			for _, alternative := range group.alts {
-				fsGlobFillNegs(alternative, rest)
-			}
-			continue
-		}
-		if !fsGlobHasNegative(group.alts) {
-			continue
-		}
-		rest := fsGlobContinuation(tokens[i+1:], suffix)
-		for _, alternative := range group.alts {
-			fsGlobFillNegs(alternative, rest)
-		}
-	}
-}
-
-func fsGlobContinuation(after, suffix []fsGlobToken) []fsGlobToken {
-	rest := make([]fsGlobToken, 0, len(after)+len(suffix))
-	rest = append(rest, after...)
-	return append(rest, suffix...)
-}
-
-func fsGlobHasNegative(alternatives [][]fsGlobToken) bool {
-	for _, alternative := range alternatives {
-		for _, token := range alternative {
-			if token.alts == nil {
-				continue
-			}
-			if token.op == '!' && !token.empty {
-				return true
-			}
-			if fsGlobHasNegative(token.alts) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func fsGlobMatchJoined(first, last []fsGlobToken, name string, start, end int, nocase, unicodeCase bool) bool {
-	for split := start; ; {
-		if fsGlobMatchTokens(first, name, start, split, nocase, unicodeCase) && fsGlobMatchTokens(last, name, split, end, nocase, unicodeCase) {
-			return true
-		}
-		if split == end {
 			return false
 		}
-		_, size := fsGlobRune(name[split:end])
-		split += size
 	}
+	for t < len(tokens) && tokens[t].kind == fsGlobStar {
+		t++
+	}
+	return t == len(tokens)
 }
 
-func (part fsGlobPart) match(name string) bool {
-	if !part.magic {
-		return part.literal == name
-	}
-	if name == "." || name == ".." {
-		return false
-	}
-	nocase := runtime.GOOS == "windows" || runtime.GOOS == "darwin"
-	if nocase {
-		switch part.fast {
-		case fsGlobFastStar:
-			return len(name) != 0 && name[0] != '.'
-		case fsGlobFastStarExt:
-			if len(name) == 0 || name[0] == '.' {
-				return false
-			}
-			return strings.HasSuffix(ToLowerCase(name).(string), part.extLower)
-		case fsGlobFastQmarks:
-			if fsGlobUTF16Units(name) != part.qmarks+part.extUnits || len(name) == 0 || name[0] == '.' {
-				return false
-			}
-			return strings.HasSuffix(ToLowerCase(name).(string), part.extLower)
+// closure adds the successor of each `**`, which also matches zero
+// segments; states come back sorted and unique.
+func (c *fsGlobCompiled) closure(states []int) []int {
+	for i := 0; i < len(states); i++ {
+		if c.nodes[states[i]].kind == fsGlobGlobstar {
+			states = append(states, states[i]+1)
 		}
 	}
-	if !part.unicode {
-		name = fsGlobUTF16(name)
-	}
-	return fsGlobMatchTokens(part.tokens, name, 0, len(name), nocase, part.unicode)
+	slices.Sort(states)
+	return slices.Compact(states)
 }
 
-func fsGlobMatchTokens(tokens []fsGlobToken, name string, start, limit int, nocase, unicodeCase bool) bool {
-	if len(tokens) == 0 {
-		return start == limit
-	}
-	token, rest := tokens[0], tokens[1:]
-	if token.op == '!' && token.empty {
-		// minimatch's `(?!\.)[^/]+?`: the body is ignored, one or more units.
-		if start == 0 && start < limit && name[start] == '.' {
-			return false
-		}
-		end := start
-		for end < limit {
-			_, size := fsGlobRune(name[end:limit])
-			end += size
-			if fsGlobMatchTokens(rest, name, end, limit, nocase, unicodeCase) {
-				return true
+// step is the states reached by matching a literal or wildcard segment and
+// those reached by a `**` consuming `name`.
+func (c *fsGlobCompiled) step(states []int, name string) (explicit, globstar []int) {
+	// only a literal segment can name the root of an absolute path
+	root := fsGlobRoot(name)
+	for _, state := range states {
+		node := &c.nodes[state]
+		switch node.kind {
+		case fsGlobGlobstar:
+			if !root && name != "." && name != ".." && (c.dot || !strings.HasPrefix(name, ".")) {
+				globstar = append(globstar, state)
 			}
-		}
-		return false
-	}
-	if token.alts != nil {
-		if token.op == '!' {
-			if start == 0 && start < limit && name[start] == '.' {
-				return false
+		case fsGlobLiteral:
+			if node.value == name {
+				explicit = append(explicit, state+1)
 			}
-			for _, alternative := range token.alts {
-				if fsGlobMatchJoined(alternative, token.tail, name, start, len(name), nocase, unicodeCase) {
-					return false
-				}
+		case fsGlobWildcard:
+			if !root && fsGlobMatchWildcard(node, name, c.dot) {
+				explicit = append(explicit, state+1)
 			}
-		}
-		for end := start; ; {
-			if (token.op == '!' || fsGlobMatchGroup(token, name, start, end, nocase, unicodeCase)) && fsGlobMatchTokens(rest, name, end, limit, nocase, unicodeCase) {
-				return true
-			}
-			if end >= limit {
-				return false
-			}
-			_, size := fsGlobRune(name[end:limit])
-			end += size
 		}
 	}
-	if token.op == 'N' {
-		// The `starNoEmpty` of a negative lookahead's tail: one or more units.
-		end := start
-		if end >= limit {
-			return false
-		}
-		_, size := fsGlobRune(name[end:limit])
-		end += size
-		for {
-			if fsGlobMatchTokens(rest, name, end, limit, nocase, unicodeCase) {
-				return true
-			}
-			if end >= limit {
-				return false
-			}
-			_, size = fsGlobRune(name[end:limit])
-			end += size
-		}
-	}
-	if token.op == '*' {
-		if start == 0 && start < limit && name[start] == '.' {
-			return false
-		}
-		for end := start; ; {
-			if fsGlobMatchTokens(rest, name, end, limit, nocase, unicodeCase) {
-				return true
-			}
-			if end >= limit {
-				return false
-			}
-			_, size := fsGlobRune(name[end:limit])
-			end += size
-		}
-	}
-	if start >= limit {
-		return false
-	}
-	ch, size := fsGlobRune(name[start:limit])
-	matches := false
-	switch token.op {
-	case '=':
-		matches = fsGlobEqual(ch, token.char, nocase, unicodeCase)
-	case '?':
-		matches = start != 0 || ch != '.'
-	case '[':
-		matches = (start != 0 || ch != '.') && token.class.match(ch, nocase, unicodeCase)
-	}
-	return matches && fsGlobMatchTokens(rest, name, start+size, limit, nocase, unicodeCase)
+	return c.closure(explicit), c.closure(globstar)
 }
 
-func fsGlobMatchGroup(group fsGlobToken, name string, start, end int, nocase, unicodeCase bool) bool {
-	if group.op == '?' && start == end {
-		return true
+func fsGlobUnion(explicit, globstar []int) []int {
+	if len(globstar) == 0 {
+		return explicit
 	}
-	if group.op == '*' || group.op == '+' {
-		return fsGlobMatchRepeat(group.alts, name, start, end, group.op == '+', nocase, unicodeCase)
-	}
-	for _, alternative := range group.alts {
-		if fsGlobMatchTokens(alternative, name, start, end, nocase, unicodeCase) {
+	states := slices.Concat(explicit, globstar)
+	slices.Sort(states)
+	return slices.Compact(states)
+}
+
+func (c *fsGlobCompiled) accepts(states []int, directory bool) bool {
+	for _, state := range states {
+		if node := c.nodes[state]; node.kind == fsGlobEnd && (directory || !node.directoryOnly) {
 			return true
 		}
 	}
 	return false
 }
 
-func fsGlobMatchRepeat(alternatives [][]fsGlobToken, name string, start, end int, required, nocase, unicodeCase bool) bool {
-	if start == end {
-		if !required {
+func (c *fsGlobCompiled) canDescend(states []int) bool {
+	for _, state := range states {
+		if c.nodes[state].kind != fsGlobEnd {
 			return true
 		}
-		for _, alternative := range alternatives {
-			if fsGlobMatchTokens(alternative, name, start, end, nocase, unicodeCase) {
-				return true
-			}
-		}
-		return false
 	}
-	for split := start; split < end; {
-		_, size := fsGlobRune(name[split:end])
-		split += size
-		for _, alternative := range alternatives {
-			if fsGlobMatchTokens(alternative, name, start, split, nocase, unicodeCase) && fsGlobMatchRepeat(alternatives, name, split, end, false, nocase, unicodeCase) {
-				return true
-			}
+	return false
+}
+
+func (c *fsGlobCompiled) needsDirectory(states []int) bool {
+	for _, state := range states {
+		if node := c.nodes[state]; node.kind == fsGlobEnd && node.directoryOnly {
+			return true
 		}
 	}
 	return false

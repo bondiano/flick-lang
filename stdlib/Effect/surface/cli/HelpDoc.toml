@@ -2,6 +2,6 @@
 ArgDoc = "Cli.ArgDoc e5949ba92a81fa7f"
 ExampleDoc = "Cli.ExampleDoc 86cde5959d6491fa"
 FlagDoc = "Cli.FlagDoc 2a1ab9679feb4e11"
-HelpDoc = "Cli.HelpDoc 765206af2d25ce95"
+HelpDoc = "Cli.HelpDoc d67efcd7d4d83aff"
 SubcommandDoc = "Cli.SubcommandDoc 9ac4743af5fd2cf1"
 SubcommandGroupDoc = "Cli.SubcommandGroupDoc 563d7995fc737660"

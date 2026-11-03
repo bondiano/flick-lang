@@ -164,7 +164,7 @@ wasm:
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm
-    cargo install wasm-bindgen-cli --version 0.2.129 --locked --root target/tools
+    cargo install wasm-bindgen-cli --version 0.2.130 --locked --root target/tools
     target/tools/bin/wasm-bindgen --target web --out-dir docs/src/playground/wasm target/wasm32-unknown-unknown/release/flick_wasm.wasm
 
 # Serve the documentation site; its playground is a Flick program

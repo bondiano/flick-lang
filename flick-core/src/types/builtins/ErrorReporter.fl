@@ -24,15 +24,15 @@ type alias LayerOptions = { mergeWithExisting : Bool }
 make : Events.Listener s Report -> ErrorReporter s
 foreign pure make from "@flick-lang/runtime/effect/ErrorReporter" "flickMake"
   retention owner
-  reviewed "effect@4.0.5 sha256:9f9f7bbdfa054642"
+  reviewed "effect@4.1.2 sha256:9f9f7bbdfa054642"
 
 /// Installs `reporters` for the body of a `provide`.
 layer : List (ErrorReporter s) -> LayerOptions -> Layer none none none
 foreign pure layer from "@flick-lang/runtime/effect/ErrorReporter" "flickLayer"
   retention owner
-  reviewed "effect@4.0.5 sha256:a4bfb912e10f9fd1"
+  reviewed "effect@4.1.2 sha256:a4bfb912e10f9fd1"
 
 /// Reports `failure` to the reporters installed.
 report : Failure e ->{} Unit
 foreign effect report from "@flick-lang/runtime/effect/ErrorReporter" "flickReport"
-  reviewed "effect@4.0.5 sha256:0410343a98c91ca0"
+  reviewed "effect@4.1.2 sha256:0410343a98c91ca0"

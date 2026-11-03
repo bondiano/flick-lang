@@ -10,14 +10,14 @@ type Console
 current : Unit ->{} Console
 foreign effect current from "@flick-lang/runtime/effect/Console" "flickCurrent"
   arity 0
-  reviewed "effect@4.0.5 sha256:2f4fb053b0d4b28f"
+  reviewed "effect@4.1.2 sha256:2f4fb053b0d4b28f"
 
 /// Runs `task` with `console` as its console.
 with_console : forall c r e a. Console -> (Eff r e a)^c ->{r; e} a
 foreign effect with_console from "@flick-lang/runtime/effect/Console" "flickWithConsole"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:3345981d2ef15a19"
+  reviewed "effect@4.1.2 sha256:3345981d2ef15a19"
 
 /// A console of Node.js that writes everything to stderr.
 to_stderr : Unit ->{} Console
@@ -27,68 +27,68 @@ foreign sync to_stderr from "@flick-lang/runtime/effect/Console" "flickToStderr"
 /// Writes the message to stdout.
 log : String ->{} Unit
 foreign effect log from "@flick-lang/runtime/effect/Console" "log"
-  reviewed "effect@4.0.5 sha256:1408b75890bf104c"
+  reviewed "effect@4.1.2 sha256:1408b75890bf104c"
 
 info : String ->{} Unit
 foreign effect info from "@flick-lang/runtime/effect/Console" "info"
-  reviewed "effect@4.0.5 sha256:c76d7ed281b33d8d"
+  reviewed "effect@4.1.2 sha256:c76d7ed281b33d8d"
 
 debug : String ->{} Unit
 foreign effect debug from "@flick-lang/runtime/effect/Console" "debug"
-  reviewed "effect@4.0.5 sha256:0c38ab8aaac10804"
+  reviewed "effect@4.1.2 sha256:0c38ab8aaac10804"
 
 /// Writes the message to stderr.
 warn : String ->{} Unit
 foreign effect warn from "@flick-lang/runtime/effect/Console" "warn"
-  reviewed "effect@4.0.5 sha256:36267abc1fe794e0"
+  reviewed "effect@4.1.2 sha256:36267abc1fe794e0"
 
 /// Writes the message to stderr.
 error : String ->{} Unit
 foreign effect error from "@flick-lang/runtime/effect/Console" "error"
-  reviewed "effect@4.0.5 sha256:b175efdcdcf2086a"
+  reviewed "effect@4.1.2 sha256:b175efdcdcf2086a"
 
 /// Writes `Trace: message` and the JS stack to stderr.
 trace : String ->{} Unit
 foreign effect trace from "@flick-lang/runtime/effect/Console" "trace"
-  reviewed "effect@4.0.5 sha256:8b8eaea960699247"
+  reviewed "effect@4.1.2 sha256:8b8eaea960699247"
 
 /// Writes `Assertion failed: message` to stderr unless the condition holds.
 assert : Bool -> String ->{} Unit
 foreign effect assert from "@flick-lang/runtime/effect/Console" "assert"
   arity 2
-  reviewed "effect@4.0.5 sha256:f5386f4582b3a37d"
+  reviewed "effect@4.1.2 sha256:f5386f4582b3a37d"
 
 /// Clears the terminal, when stdout is one.
 clear : Unit ->{} Unit
 foreign effect clear from "@flick-lang/runtime/effect/Console" "flickClear"
   arity 0
-  reviewed "effect@4.0.5 sha256:2be2fad90e91cf33"
+  reviewed "effect@4.1.2 sha256:2be2fad90e91cf33"
 
 /// Counts the calls with the label and writes `label: n`.
 count : String ->{} Unit
 foreign effect count from "@flick-lang/runtime/effect/Console" "count"
-  reviewed "effect@4.0.5 sha256:ca22653431fb5c3f"
+  reviewed "effect@4.1.2 sha256:ca22653431fb5c3f"
 
 /// Restarts the count of the label.
 count_reset : String ->{} Unit
 foreign effect count_reset from "@flick-lang/runtime/effect/Console" "countReset"
-  reviewed "effect@4.0.5 sha256:593bd2e21392d345"
+  reviewed "effect@4.1.2 sha256:593bd2e21392d345"
 
 /// Writes the value as the JS console inspects it.
 dir : a ->{} Unit
 foreign effect dir from "@flick-lang/runtime/effect/Console" "dir"
-  reviewed "effect@4.0.5 sha256:ea8b715f44567bea"
+  reviewed "effect@4.1.2 sha256:ea8b715f44567bea"
 
 /// `dir`, as XML where the console knows how.
 dirxml : a ->{} Unit
 foreign effect dirxml from "@flick-lang/runtime/effect/Console" "dirxml"
-  reviewed "effect@4.0.5 sha256:72284f08f2844c4a"
+  reviewed "effect@4.1.2 sha256:72284f08f2844c4a"
 
 /// Writes the list of records as a table, with only the given columns.
 table : Option (List String) -> List a ->{} Unit
 foreign effect table from "@flick-lang/runtime/effect/Console" "flickTable"
   arity 2
-  reviewed "effect@4.0.5 sha256:867e596d96cae736"
+  reviewed "effect@4.1.2 sha256:867e596d96cae736"
 
 /// Options of a group: its label and whether it starts collapsed.
 type alias GroupOptions = { label : Option String; collapsed : Bool }
@@ -96,30 +96,30 @@ type alias GroupOptions = { label : Option String; collapsed : Bool }
 /// Indents what the console writes until the scope of region `s` closes.
 group : forall s. GroupOptions ->{Scope s;} Unit
 foreign effect group from "@flick-lang/runtime/effect/Console" "flickGroup"
-  reviewed "effect@4.0.5 sha256:7a1e604473cf5f21"
+  reviewed "effect@4.1.2 sha256:7a1e604473cf5f21"
 
 /// Runs `task` in a group.
 with_group : forall c r e a. GroupOptions -> (Eff r e a)^c ->{r; e} a
 foreign effect with_group from "@flick-lang/runtime/effect/Console" "flickWithGroup"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:5d344934fb46954f"
+  reviewed "effect@4.1.2 sha256:5d344934fb46954f"
 
 /// Starts the timer of the label; the scope of region `s` ends it, writing
 /// `label: <elapsed>`.
 time : forall s. String ->{Scope s;} Unit
 foreign effect time from "@flick-lang/runtime/effect/Console" "time"
-  reviewed "effect@4.0.5 sha256:98ff0a1f2599c827"
+  reviewed "effect@4.1.2 sha256:98ff0a1f2599c827"
 
 /// Writes `label: <elapsed> message` for a running timer.
 time_log : String -> String ->{} Unit
 foreign effect time_log from "@flick-lang/runtime/effect/Console" "timeLog"
   arity 2
-  reviewed "effect@4.0.5 sha256:74bd15e1b169e4c4"
+  reviewed "effect@4.1.2 sha256:74bd15e1b169e4c4"
 
 /// Runs `task` under the timer of the label.
 with_time : forall c r e a. String -> (Eff r e a)^c ->{r; e} a
 foreign effect with_time from "@flick-lang/runtime/effect/Console" "withTime"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:2458e104c9bcca10"
+  reviewed "effect@4.1.2 sha256:2458e104c9bcca10"

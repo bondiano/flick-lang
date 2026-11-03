@@ -1,0 +1,2 @@
+[excluded]
+"*" = "outside 0.1.0: a module new in Effect 4.1, not yet in Flick's standard library"

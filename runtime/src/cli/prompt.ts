@@ -111,6 +111,7 @@ const terminalOf = (tty: TtyImpl): Terminal.Terminal =>
   Terminal.make({
     columns: Effect.suspend(() => tty.columns(undefined)),
     rows: Effect.suspend(() => tty.rows(undefined)),
+    size: Effect.die("Cli.Prompt asks Tty for its columns and rows"),
     readInput: Effect.die("Cli.Prompt reads keys from Tty.read_key"),
     readLine: Effect.die("Cli.Prompt reads keys from Tty.read_key"),
     display: (text) => Effect.asVoid(tty.display(text)),

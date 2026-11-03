@@ -1,0 +1,25 @@
+// Writes runtime-go/flickrt/mime_types.go: the media types of Effect's
+// http/internal/mimeTypes.js, one a line with its extensions, in the order
+// Effect has them. Run from the repository root after moving the Effect
+// pin: `node tools/go-mime/gen.mjs`.
+import { readFileSync, writeFileSync } from "node:fs";
+
+const effect = new URL("../../runtime/node_modules/effect/", import.meta.url);
+const { version } = JSON.parse(readFileSync(new URL("package.json", effect), "utf8"));
+// the module is internal, out of reach of the package's exports
+const { default: types } = await import(new URL("dist/http/internal/mimeTypes.js", effect).href);
+const source = readFileSync(new URL("dist/http/internal/mimeTypes.js", effect), "utf8");
+const mime = /copied from mime ([\d.]+)/.exec(source)?.[1];
+
+const lines = Object.entries(types).map(([type, extensions]) => [type, ...extensions].join(" "));
+writeFileSync(
+  new URL("../../runtime-go/flickrt/mime_types.go", import.meta.url),
+  `// Code generated from effect@${version} http/internal/mimeTypes.js (mime ${mime}, MIT License, Copyright (c) 2023 Robert Kieffer). DO NOT EDIT.
+
+package flickrt
+
+// mimeTypes is each media type and its extensions, the first the usual
+// one; a starred extension maps to another type by default.
+const mimeTypes = \`${lines.join("\n")}\`
+`,
+);

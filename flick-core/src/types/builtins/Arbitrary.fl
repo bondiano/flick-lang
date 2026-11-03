@@ -60,80 +60,80 @@ type CheckResult (e : ErrorRow) a =
 /// Values of the schema.
 from_schema : Schema a -> Arbitrary a
 foreign pure from_schema from "@flick-lang/runtime/effect/Arbitrary" "schema"
-  reviewed "effect@4.0.5 sha256:b3d6dd17bee4b1d1"
+  reviewed "effect@4.1.2 sha256:b3d6dd17bee4b1d1"
 
 /// Values of the schema, shrinking by the options.
 from_schema_with : SchemaOptions a -> Schema a -> Arbitrary a
 foreign pure from_schema_with from "@flick-lang/runtime/effect/Arbitrary" "flickSchema"
-  reviewed "effect@4.0.5 sha256:b3d6dd17bee4b1d1"
+  reviewed "effect@4.1.2 sha256:b3d6dd17bee4b1d1"
 
 /// Always `value`.
 constant : a -> Arbitrary a
 foreign pure constant from "@flick-lang/runtime/effect/Arbitrary" "Constant"
-  reviewed "effect@4.0.5 sha256:d5b6d788a8786bef"
+  reviewed "effect@4.1.2 sha256:d5b6d788a8786bef"
 
 /// Lists of the item's values, within the bounds.
 list : ArrayOptions -> Arbitrary a -> Arbitrary (List a)
 foreign pure list from "@flick-lang/runtime/effect/Arbitrary" "flickArray"
-  reviewed "effect@4.0.5 sha256:e09d73273525c6dc"
+  reviewed "effect@4.1.2 sha256:e09d73273525c6dc"
 
 /// One value of each generator, in order.
 all : List (Arbitrary a) -> Arbitrary (List a)
 foreign pure all from "@flick-lang/runtime/effect/Arbitrary" "all"
-  reviewed "effect@4.0.5 sha256:bd5b1360a00c3f03"
+  reviewed "effect@4.1.2 sha256:bd5b1360a00c3f03"
 
 /// Two values, one of each generator, drawn and shrunk independently.
 zip2 : Arbitrary a -> Arbitrary b -> Arbitrary (a, b)
 foreign pure zip2 from "@flick-lang/runtime/effect/Arbitrary" "flickZip2"
-  reviewed "effect@4.0.5 sha256:bd5b1360a00c3f03"
+  reviewed "effect@4.1.2 sha256:bd5b1360a00c3f03"
 
 /// Three values, one of each generator, drawn and shrunk independently.
 zip3 : Arbitrary a -> Arbitrary b -> Arbitrary c -> Arbitrary (a, b, c)
 foreign pure zip3 from "@flick-lang/runtime/effect/Arbitrary" "flickZip3"
-  reviewed "effect@4.0.5 sha256:bd5b1360a00c3f03"
+  reviewed "effect@4.1.2 sha256:bd5b1360a00c3f03"
 
 /// Four values, one of each generator, drawn and shrunk independently.
 zip4 : Arbitrary a -> Arbitrary b -> Arbitrary c -> Arbitrary d -> Arbitrary (a, b, c, d)
 foreign pure zip4 from "@flick-lang/runtime/effect/Arbitrary" "flickZip4"
-  reviewed "effect@4.0.5 sha256:bd5b1360a00c3f03"
+  reviewed "effect@4.1.2 sha256:bd5b1360a00c3f03"
 
 /// Each value mapped by `f`.
 map : (a -> b) -> Arbitrary a -> Arbitrary b
 foreign pure map from "@flick-lang/runtime/effect/Arbitrary" "map"
   arity 1
-  reviewed "effect@4.0.5 sha256:8df5e62214140afe"
+  reviewed "effect@4.1.2 sha256:8df5e62214140afe"
 
 /// The values for which `f` holds; the others are discarded.
 filter : (a -> Bool) -> Arbitrary a -> Arbitrary a
 foreign pure filter from "@flick-lang/runtime/effect/Arbitrary" "filter"
   arity 1
-  reviewed "effect@4.0.5 sha256:d4f04279dfa87b59"
+  reviewed "effect@4.1.2 sha256:d4f04279dfa87b59"
 
 /// The `Ok` values of `f`; an `Err` discards the value.
 filter_map : (a -> Result x b) -> Arbitrary a -> Arbitrary b
 foreign pure filter_map from "@flick-lang/runtime/effect/Arbitrary" "filterMap"
   arity 1
-  reviewed "effect@4.0.5 sha256:766c5eae97943724"
+  reviewed "effect@4.1.2 sha256:766c5eae97943724"
 
 /// A value of the generator `f` gives for each value.
 flat_map : (a -> Arbitrary b) -> Arbitrary a -> Arbitrary b
 foreign pure flat_map from "@flick-lang/runtime/effect/Arbitrary" "flatMap"
   arity 1
-  reviewed "effect@4.0.5 sha256:22f13bed7791dea1"
+  reviewed "effect@4.1.2 sha256:22f13bed7791dea1"
 
 /// Draws values; drawing from the system's randomness without a seed.
 sample : SampleOptions -> Arbitrary a ->{; SampleError} List a
 foreign effect sample from "@flick-lang/runtime/effect/Arbitrary" "flickSampleEffect"
-  reviewed "effect@4.0.5 sha256:fe703ac99706d073"
+  reviewed "effect@4.1.2 sha256:fe703ac99706d073"
 
 /// Runs the property on generated values and shrinks the first failure.
 check : forall c r e a. CheckOptions -> (a ->{r; e} Bool)^c -> Arbitrary a ->{r;} CheckResult e a
 foreign effect check from "@flick-lang/runtime/effect/Arbitrary" "flickCheckEffect"
   retention call
-  reviewed "effect@4.0.5 sha256:20e42afa9a0d1275"
+  reviewed "effect@4.1.2 sha256:20e42afa9a0d1275"
 
 /// The report of a failed check: inputs, failure and replay; `None` when
 /// it passed.
 format_check_failure : CheckResult e a -> Option String
 foreign pure format_check_failure from "@flick-lang/runtime/effect/Arbitrary" "flickFormatCheckFailure"
-  reviewed "effect@4.0.5 sha256:d7a91c9cd25717cb"
+  reviewed "effect@4.1.2 sha256:d7a91c9cd25717cb"

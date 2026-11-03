@@ -47,53 +47,53 @@ let make_array length value = ArrayNode length value
 /// path has nothing.
 make : (Path ->{; SourceError} Option Node) -> ConfigProvider
 foreign pure make from "@flick-lang/runtime/effect/ConfigProvider" "flickMake"
-  reviewed "effect@4.0.5 sha256:e9b7766d049ef1b6"
+  reviewed "effect@4.1.2 sha256:e9b7766d049ef1b6"
 
 /// `provider |> or_else fallback`: `fallback` where `provider` has nothing.
 or_else : ConfigProvider -> ConfigProvider -> ConfigProvider
 foreign pure or_else from "@flick-lang/runtime/effect/ConfigProvider" "orElse"
   arity 1
-  reviewed "effect@4.0.5 sha256:d5aba5e4aebd72d7"
+  reviewed "effect@4.1.2 sha256:d5aba5e4aebd72d7"
 
 /// Each path mapped by `f` before the provider reads it.
 map_input : (Path -> Path) -> ConfigProvider -> ConfigProvider
 foreign pure map_input from "@flick-lang/runtime/effect/ConfigProvider" "mapInput"
   arity 1
-  reviewed "effect@4.0.5 sha256:6425f1edb0a645ae"
+  reviewed "effect@4.1.2 sha256:6425f1edb0a645ae"
 
 /// Keys read in `CONSTANT_CASE`: `apiKey` as `API_KEY`.
 constant_case : ConfigProvider -> ConfigProvider
 foreign pure constant_case from "@flick-lang/runtime/effect/ConfigProvider" "constantCase"
-  reviewed "effect@4.0.5 sha256:2f46091dcd4ea1e1"
+  reviewed "effect@4.1.2 sha256:2f46091dcd4ea1e1"
 
 /// Every path read under the prefix.
 nested : String -> ConfigProvider -> ConfigProvider
 foreign pure nested from "@flick-lang/runtime/effect/ConfigProvider" "nested"
   arity 1
-  reviewed "effect@4.0.5 sha256:1056ffd9131572e0"
+  reviewed "effect@4.1.2 sha256:1056ffd9131572e0"
 
 /// Values from a JSON-like value: records, arrays and scalars.
 from_unknown : Options -> Unknown -> ConfigProvider
 foreign pure from_unknown from "@flick-lang/runtime/effect/ConfigProvider" "flickFromUnknown"
   arity 2
-  reviewed "effect@4.0.5 sha256:dcfa01ea8839fb66"
+  reviewed "effect@4.1.2 sha256:dcfa01ea8839fb66"
 
 /// Values from environment variables given as pairs; `A_B` is the path `A`, `B`.
 from_env_record : Options -> List (String, String) -> ConfigProvider
 foreign pure from_env_record from "@flick-lang/runtime/effect/ConfigProvider" "flickFromEnvRecord"
   arity 2
-  reviewed "effect@4.0.5 sha256:f12a72b2b741c5e7"
+  reviewed "effect@4.1.2 sha256:f12a72b2b741c5e7"
 
 /// The environment variables of the process.
 from_env : Options ->{} ConfigProvider
 foreign sync from_env from "@flick-lang/runtime/effect/ConfigProvider" "fromEnv"
-  reviewed "effect@4.0.5 sha256:069a8cae256d0b24"
+  reviewed "effect@4.1.2 sha256:069a8cae256d0b24"
 
 /// Values from the text of a `.env` file.
 from_dot_env_contents : DotEnvOptions -> String -> ConfigProvider
 foreign pure from_dot_env_contents from "@flick-lang/runtime/effect/ConfigProvider" "flickFromDotEnvContents"
   arity 2
-  reviewed "effect@4.0.5 sha256:d273b5253ceaeb98"
+  reviewed "effect@4.1.2 sha256:d273b5253ceaeb98"
 
 /// Values from a `.env` file, by default `.env`.
 from_dot_env :
@@ -118,16 +118,16 @@ from_dir :
   { rootPath : Option String; preserveEmptyStrings : Bool } ->{FileSystem.FileSystem;}
   ConfigProvider
 foreign effect from_dir from "@flick-lang/runtime/effect/ConfigProvider" "flickFromDir"
-  reviewed "effect@4.0.5 sha256:2df6220667d4e4fc"
+  reviewed "effect@4.1.2 sha256:2df6220667d4e4fc"
 
 /// Makes the provider the one of the body of a `provide`.
 layer : ConfigProvider -> Layer none none none
 foreign pure layer from "@flick-lang/runtime/effect/ConfigProvider" "layer"
-  reviewed "effect@4.0.5 sha256:a5ab9efbc17a9258"
+  reviewed "effect@4.1.2 sha256:a5ab9efbc17a9258"
 
 /// Adds the provider to the current one: as a fallback, or as the primary
 /// source when `asPrimary` holds.
 layer_add : { asPrimary : Bool } -> ConfigProvider -> Layer none none none
 foreign pure layer_add from "@flick-lang/runtime/effect/ConfigProvider" "flickLayerAdd"
   arity 2
-  reviewed "effect@4.0.5 sha256:460e0b3f7d4ce362"
+  reviewed "effect@4.1.2 sha256:460e0b3f7d4ce362"

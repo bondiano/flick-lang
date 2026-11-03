@@ -122,7 +122,7 @@ unchecked type assertion only with its reason beside it) and runs the tests.
 stripping, after building `dist/`, and checks the adapter's
 contracts directly on Effect: the recovery table of `try … with`, inert cause
 reports, the two-phase close of owners, children and supervisors,
-concurrency, races and layers, the Effect `4.0.5` pin and its capability
+concurrency, races and layers, the Effect `4.1.2` pin and its capability
 matrix, codecs against their compiled decoders. Entry runner tests start
 `runtime/fixtures/entry.ts` in a child process and send it signals.
 

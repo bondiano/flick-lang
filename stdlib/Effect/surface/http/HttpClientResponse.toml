@@ -1,5 +1,5 @@
 [wrapped]
-HttpClientResponse = "Http.ClientResponse.ClientResponse a2b908d0e087ea71"
+HttpClientResponse = "Http.ClientResponse.ClientResponse 37f765a464b7a0fa"
 filterStatus = "Http.ClientResponse.filter_status 82ece8d5b24b992d"
 filterStatusOk = "Http.ClientResponse.filter_status_ok bd1f82503727157f"
 schemaBodyJson = "Http.ClientResponse.schema_body_json a6fc2625f3292603"
@@ -15,3 +15,4 @@ matchStatus = "`match` on `Http.ClientResponse.status`, with `when` guards for r
 [excluded]
 TypeId = "TS-only: a type identifier"
 fromWeb = "TS-only: converts a Fetch API `Response` object of JS code; a Flick test double answers with `Http.ServerResponse.to_client_response`"
+toWeb = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

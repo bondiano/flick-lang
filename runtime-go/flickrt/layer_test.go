@@ -55,8 +55,14 @@ func TestLayerFromBuildCause(t *testing.T) {
 				if len(reasons) != test.wantReasons {
 					t.Fatalf("got %d reasons, want %d: %s", len(reasons), test.wantReasons, pretty(cause))
 				}
-				if reasons[0] != primary {
+				// a failed build closes its own scope as Effect's `onExit` does, electing the
+				// cleanup's defect; `provide` joins its body's cause with `Cause.combine`
+				elected := test.buildFails && test.cleanupFails
+				switch first := reasons[0]; {
+				case !elected && first != primary:
 					t.Error("the original failure is not the first reason")
+				case elected && (first.kind != causeDie || first.err != primary.err):
+					t.Error("beside the cleanup's defect, the original failure is not the first reason, elected to a defect")
 				}
 				if test.cleanupFails && reasons[1] != cleanup {
 					t.Error("the cleanup failure is not the second reason")

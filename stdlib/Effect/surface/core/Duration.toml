@@ -60,3 +60,6 @@ negate = "invariant: Flick durations are never negative (checked constructors); 
 negativeInfinity = "invariant: Flick durations are never negative (checked constructors)"
 isNegative = "invariant: Flick durations are never negative (checked constructors), so it would always be false"
 abs = "invariant: Flick durations are never negative (checked constructors), so it would be the identity"
+formatIso = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+fromIso = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+toMicros = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

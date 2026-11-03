@@ -9,7 +9,7 @@ clear = "FiberMap.clear 8f198f7500242507"
 size = "FiberMap.size 42ae4b52db567a98"
 join = "FiberMap.join e53d549b25e4c0fd"
 awaitEmpty = "FiberMap.await_empty 1b6002d5015f7c15"
-FiberMap = "FiberMap.FiberMap e68d23b23dc2117b"
+FiberMap = "FiberMap.FiberMap 06a371613a8a7bd2"
 
 [excluded]
 isFiberMap = "TS-only: a type guard; Flick values are typed statically"

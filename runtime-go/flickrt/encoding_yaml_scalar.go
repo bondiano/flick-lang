@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // The scalars, indicators and flow collections of Effect's encoding/Yaml
@@ -37,9 +38,10 @@ func closingQuote(input string, quote byte, start int) int {
 }
 
 // findIndicator is the index of the comment `#` or the mapping `:` of a
-// line, outside quotes and flow collections; -1 for none.
-func findIndicator(input string, indicator byte) int {
-	depth, tokenStart := 0, true
+// line, outside quotes and flow collections; -1 for none. `depth` is the
+// number of flow collections already open before `input`.
+func findIndicator(input string, indicator byte, depth int) int {
+	tokenStart := true
 	for i := 0; i < len(input); {
 		c, n := decode(input[i:])
 		switch {
@@ -95,8 +97,8 @@ func lastCodePoint(s string) rune {
 	return r
 }
 
-func stripComment(input string) string {
-	if i := findIndicator(input, '#'); i != -1 {
+func stripComment(input string, depth int) string {
+	if i := findIndicator(input, '#', depth); i != -1 {
 		return strings.TrimRightFunc(input[:i], isJSSpace)
 	}
 	return input
@@ -109,6 +111,15 @@ func foldLineBreak(blankLines int) string {
 		return " "
 	}
 	return strings.Repeat("\n", blankLines)
+}
+
+var yamlFlowLineBreak = regexp.MustCompile(`[ \t]*\n(?:[ \t]*\n)*[ \t]*`)
+
+// foldFlowLines folds the line breaks of a multi-line plain flow scalar.
+func foldFlowLines(input string) string {
+	return yamlFlowLineBreak.ReplaceAllStringFunc(input, func(m string) string {
+		return foldLineBreak(strings.Count(m, "\n") - 1)
+	})
 }
 
 func endsWithEscape(text string) bool {
@@ -262,11 +273,58 @@ func parseYamlKey(input string) string {
 	return stringOfJSON(v)
 }
 
-// yamlFlow is Effect's FlowParser of a one-line `[…]` or `{…}`.
+// yamlMapping is Effect's MappingBuilder: explicit keys take precedence
+// over merged keys, and earlier merge sources over later ones.
+type yamlMapping struct {
+	out *Record
+	// keys added by the merge key, which an explicit key may still
+	// override; nil before one
+	merged map[string]bool
+}
+
+func newYamlMapping() *yamlMapping { return &yamlMapping{out: &Record{}} }
+
+func (m *yamlMapping) set(key string, value Value, fail func(string)) {
+	if has(m.out, key) {
+		if !m.merged[key] {
+			fail("Duplicate key '" + key + "'")
+		}
+		delete(m.merged, key)
+	}
+	m.out.put(key, value)
+}
+
+func (m *yamlMapping) merge(value Value, fail func(string)) {
+	if m.merged != nil {
+		fail("Duplicate key '<<'")
+	}
+	m.merged = map[string]bool{}
+	sources, ok := value.([]Value)
+	if !ok {
+		sources = []Value{value}
+	}
+	for _, source := range sources {
+		mapping, ok := source.(*Record)
+		if !ok {
+			fail("Merge key values must be mappings")
+		}
+		for i, key := range mapping.keys {
+			if !has(m.out, key) {
+				m.out.put(key, mapping.vals[i])
+				m.merged[key] = true
+			}
+		}
+	}
+}
+
+// yamlFlow is Effect's FlowParser of a `[…]` or `{…}`: while a collection
+// is open, the end of the line goes on with `nextLine`.
 type yamlFlow struct {
-	in      string
-	i       int
-	anchors map[string]Value
+	in       string
+	i        int
+	depth    int
+	anchors  map[string]Value
+	nextLine func(depth int) (string, bool)
 }
 
 func (p *yamlFlow) parse() Value {
@@ -281,10 +339,16 @@ func (p *yamlFlow) parse() Value {
 func (p *yamlFlow) parseValue() Value {
 	p.skipWhitespace()
 	switch c := p.peek(); c {
-	case '[':
-		return p.parseSequence()
-	case '{':
-		return p.parseMapping()
+	case '[', '{':
+		p.depth++
+		var collection Value
+		if c == '[' {
+			collection = p.parseSequence()
+		} else {
+			collection = p.parseMapping()
+		}
+		p.depth--
+		return collection
 	case '"', '\'':
 		return parseYamlScalar(p.readQuoted(byte(c)))
 	case '*':
@@ -295,8 +359,21 @@ func (p *yamlFlow) parseValue() Value {
 			p.fail("Unknown alias '*" + name + "'")
 		}
 		return v
+	case '&':
+		p.i++
+		name := p.readUntil(func(r rune) bool { return isJSSpace(r) || strings.ContainsRune(",[]{}", r) })
+		if name == "" || p.peek() == '[' || p.peek() == '{' {
+			p.fail("Invalid anchor")
+		}
+		p.skipWhitespace()
+		if p.peek() == '&' {
+			p.fail("Multiple anchors on one node")
+		}
+		v := p.parseValue()
+		p.anchors[name] = v
+		return v
 	}
-	return parseYamlScalar(p.readUntil(func(r rune) bool { return strings.ContainsRune(",]}", r) }))
+	return parseYamlScalar(foldFlowLines(p.readUntil(func(r rune) bool { return strings.ContainsRune(",]}", r) })))
 }
 
 func (p *yamlFlow) parseSequence() []Value {
@@ -325,30 +402,33 @@ func (p *yamlFlow) parseSequence() []Value {
 
 func (p *yamlFlow) parseMapping() *Record {
 	p.expect('{')
-	out := &Record{}
+	mapping := newYamlMapping()
 	p.skipWhitespace()
 	if p.peek() == '}' {
 		p.i++
-		return out
+		return mapping.out
 	}
 	for {
+		p.skipWhitespace()
+		quoted := p.peek() == '"' || p.peek() == '\''
 		key := p.parseKey()
 		p.skipWhitespace()
 		p.expect(':')
-		if has(out, key) {
-			p.fail("Duplicate key '" + key + "'")
+		if value := p.parseValue(); !quoted && key == "<<" {
+			mapping.merge(value, p.fail)
+		} else {
+			mapping.set(key, value, p.fail)
 		}
-		out.put(key, p.parseValue())
 		p.skipWhitespace()
 		if p.peek() == '}' {
 			p.i++
-			return out
+			return mapping.out
 		}
 		p.expect(',')
 		p.skipWhitespace()
 		if p.peek() == '}' {
 			p.i++
-			return out
+			return mapping.out
 		}
 	}
 }
@@ -358,7 +438,7 @@ func (p *yamlFlow) parseKey() string {
 	if c := p.peek(); c == '"' || c == '\'' {
 		return parseYamlKey(p.readQuoted(byte(c)))
 	}
-	return strings.TrimFunc(p.readUntil(func(r rune) bool { return r == ':' }), isJSSpace)
+	return strings.TrimFunc(foldFlowLines(p.readUntil(func(r rune) bool { return r == ':' })), isJSSpace)
 }
 
 func (p *yamlFlow) readQuoted(quote byte) string {
@@ -373,18 +453,15 @@ func (p *yamlFlow) readQuoted(quote byte) string {
 
 func (p *yamlFlow) readUntil(stop func(rune) bool) string {
 	start := p.i
-	for p.i < len(p.in) {
-		r, n := decode(p.in[p.i:])
-		if stop(r) {
-			break
-		}
+	for r := p.peek(); r != -1 && !stop(r); r = p.peek() {
+		_, n := decode(p.in[p.i:])
 		p.i += n
 	}
 	return p.in[start:p.i]
 }
 
 func (p *yamlFlow) skipWhitespace() {
-	for isSpaceAt(p.in, p.i) {
+	for isJSSpace(p.peek()) {
 		_, n := decode(p.in[p.i:])
 		p.i += n
 	}
@@ -398,6 +475,11 @@ func (p *yamlFlow) expect(c rune) {
 }
 
 func (p *yamlFlow) peek() rune {
+	if p.i == len(p.in) && p.depth > 0 {
+		if line, ok := p.nextLine(p.depth); ok {
+			p.in += "\n" + line
+		}
+	}
 	if p.i >= len(p.in) {
 		return -1
 	}
@@ -407,4 +489,31 @@ func (p *yamlFlow) peek() rune {
 
 func (p *yamlFlow) fail(message string) {
 	panic(encodingError("SyntaxError: " + message + " at flow offset " + strconv.Itoa(utf16Len(p.in[:p.i]))))
+}
+
+// appendCodePoint is `out + String.fromCodePoint(r)`: a low surrogate
+// after a high one joins it as a pair.
+func appendCodePoint(out []byte, r rune) []byte {
+	if r >= 0xDC00 && r <= 0xDFFF && len(out) >= 3 {
+		if hi, n := decode(string(out[len(out)-3:])); n == 3 && hi >= 0xD800 && hi <= 0xDBFF {
+			return utf8.AppendRune(out[:len(out)-3], 0x10000+(hi-0xD800)<<10+r-0xDC00)
+		}
+	}
+	return encodeRune(out, r)
+}
+
+// hexCodePoint is the code point of `length` hex digits at the start of
+// `s`, or ok false; past U+10FFFF it throws fromCodePoint's RangeError.
+func hexCodePoint(s string, length int) (rune, bool) {
+	if len(s) < length {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(s[:length], 16, 32)
+	if err != nil {
+		return 0, false
+	}
+	if n > 0x10FFFF {
+		panic(encodingError("RangeError: Invalid code point " + strconv.FormatUint(n, 10)))
+	}
+	return rune(n), true
 }

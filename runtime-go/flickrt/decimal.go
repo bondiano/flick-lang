@@ -25,6 +25,20 @@ func dec(v Value) *Decimal { return v.(*Decimal) }
 
 func pow10(n int64) *big.Int { return new(big.Int).Exp(bigTen, big.NewInt(n), nil) }
 
+// Effect 4.1 bounds a parsed scale and the alignment of two scales.
+const (
+	maxDecimalScale     = 10_000
+	maxDecimalAlignment = 2 * maxDecimalScale
+)
+
+// powerOfTen is Effect's: 10^n for aligning scales, a RangeError past the bound.
+func powerOfTen(n int64) *big.Int {
+	if n > maxDecimalAlignment {
+		panic(rangeError("Scale alignment must not exceed " + strconv.Itoa(maxDecimalAlignment) + " digits, got " + strconv.FormatInt(n, 10)))
+	}
+	return pow10(n)
+}
+
 var decimalTag = Tag("BigDecimal.DecimalError.DecimalError")
 
 func decimalError(message string) Value { return Err(NewData(decimalTag, message)) }
@@ -54,9 +68,9 @@ func (d *Decimal) normalize() *Decimal {
 func (d *Decimal) rescale(scale int64) *Decimal {
 	switch {
 	case scale > d.scale:
-		return &Decimal{new(big.Int).Mul(d.value, pow10(scale-d.scale)), scale}
+		return &Decimal{new(big.Int).Mul(d.value, powerOfTen(scale-d.scale)), scale}
 	case scale < d.scale:
-		return &Decimal{new(big.Int).Quo(d.value, pow10(d.scale-scale)), scale}
+		return &Decimal{new(big.Int).Quo(d.value, powerOfTen(d.scale-scale)), scale}
 	}
 	return d
 }
@@ -106,17 +120,26 @@ func parseDecimal(s string) (*Decimal, bool) {
 	}
 	digits, offset := base, int64(0)
 	if dot := strings.IndexByte(base, '.'); dot >= 0 {
-		digits = base[:dot] + base[dot+1:]
-		offset = int64(len(base) - dot - 1)
+		trail := base[dot+1:]
+		if strings.TrimLeft(trail, "0123456789") != "" {
+			return nil, false
+		}
+		digits = base[:dot] + trail
+		offset = int64(len(trail))
 	}
 	if !finiteInt.MatchString(digits) {
 		return nil, false
 	}
 	scale := offset - exp
-	if !safeScale(float64(scale)) {
+	v, _ := new(big.Int).SetString(strings.TrimPrefix(digits, "+"), 10)
+	// as Effect 4.1: a scale `format` can print back
+	normalized := scale
+	if v.Sign() != 0 {
+		normalized -= int64(len(digits) - len(strings.TrimRight(digits, "0")))
+	}
+	if scale > maxDecimalScale || normalized < -maxDecimalScale {
 		return nil, false
 	}
-	v, _ := new(big.Int).SetString(strings.TrimPrefix(digits, "+"), 10)
 	return &Decimal{v, scale}, true
 }
 
@@ -323,6 +346,9 @@ func DecimalFloor(scale, d Value) Value {
 
 // decRound is Effect's `BigDecimal.round`.
 func decRound(d *Decimal, s int64, mode string) *Decimal {
+	if d.scale <= s {
+		return d
+	}
 	five := func(sign int64) *Decimal { return &Decimal{big.NewInt(5 * sign), s + 1} }
 	halfCeil := func() *Decimal { return decFloor(decSum(d, five(1)), s) }
 	halfFloor := func() *Decimal { return decCeil(decSum(d, five(-1)), s) }

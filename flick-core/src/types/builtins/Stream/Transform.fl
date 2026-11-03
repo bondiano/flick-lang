@@ -14,14 +14,14 @@ map : forall c r e a b. (a -> b)^c -> ((Stream r e a)^c -> (Stream r e b)^c)^c
 foreign pure map from "@flick-lang/runtime/effect/Stream" "map"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:fdb463fe8e574a24"
+  reviewed "effect@4.1.2 sha256:fdb463fe8e574a24"
 
 /// Each element replaced by `value`.
 as_ : forall c r e a b. b -> (Stream r e a)^c -> (Stream r e b)^c
 foreign pure as_ from "@flick-lang/runtime/effect/Stream" "as"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:02da9fa6dee3e577"
+  reviewed "effect@4.1.2 sha256:02da9fa6dee3e577"
 
 /// The elements mapped by `onElement` and the error by `onError`.
 map_both :
@@ -31,7 +31,7 @@ map_both :
 foreign pure map_both from "@flick-lang/runtime/effect/Stream" "mapBoth"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:99059bd9dd788b16"
+  reviewed "effect@4.1.2 sha256:99059bd9dd788b16"
 
 /// The error mapped by `f`.
 map_error :
@@ -39,7 +39,7 @@ map_error :
 foreign pure map_error from "@flick-lang/runtime/effect/Stream" "mapError"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:8c3b6e500a5b7049"
+  reviewed "effect@4.1.2 sha256:8c3b6e500a5b7049"
 
 /// Each chunk of elements mapped by `f`.
 map_chunks :
@@ -48,7 +48,7 @@ map_chunks :
 foreign pure map_chunks from "@flick-lang/runtime/effect/Stream" "mapArray"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:28f2cbca5320c2cc"
+  reviewed "effect@4.1.2 sha256:28f2cbca5320c2cc"
 
 /// Each element mapped by the task `f` gives, one at a time.
 map_effect :
@@ -57,7 +57,7 @@ map_effect :
 foreign pure map_effect from "@flick-lang/runtime/effect/Stream" "mapEffect"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:77d4a816f5aa00b0"
+  reviewed "effect@4.1.2 sha256:77d4a816f5aa00b0"
 
 /// `map_effect` running at most `concurrency` tasks at once (`None`: no
 /// bound) as children of the stream's run; `unordered` emits each result
@@ -70,7 +70,7 @@ map_effect_par :
 foreign pure map_effect_par from "@flick-lang/runtime/effect/Stream" "flickMapEffectPar"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:77d4a816f5aa00b0"
+  reviewed "effect@4.1.2 sha256:77d4a816f5aa00b0"
 
 /// Each chunk mapped by the task `f` gives.
 map_chunks_effect :
@@ -80,20 +80,20 @@ map_chunks_effect :
 foreign pure map_chunks_effect from "@flick-lang/runtime/effect/Stream" "mapArrayEffect"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:88e3be9c90adc528"
+  reviewed "effect@4.1.2 sha256:88e3be9c90adc528"
 
 /// Runs each task element, emitting its value.
 flatten_effect :
   forall c r e r2 e2 a. (Stream r e (Eff r2 e2 a))^c -> (Stream (r + r2) (e + e2) a)^c
 foreign pure flatten_effect from "@flick-lang/runtime/effect/Stream" "flattenEffect"
   retention call
-  reviewed "effect@4.0.5 sha256:2d0b839349412fa5"
+  reviewed "effect@4.1.2 sha256:2d0b839349412fa5"
 
 /// The elements as `Ok` and the error, which ends the stream, as `Err`.
 result : forall c r e a. (Stream r e a)^c -> (Stream r none (Result (Errors e) a))^c
 foreign pure result from "@flick-lang/runtime/effect/Stream" "result"
   retention call
-  reviewed "effect@4.0.5 sha256:82abdedf7bc768ae"
+  reviewed "effect@4.1.2 sha256:82abdedf7bc768ae"
 
 /// Runs `f` on each element, keeping it.
 tap :
@@ -102,7 +102,7 @@ tap :
 foreign pure tap from "@flick-lang/runtime/effect/Stream" "tap"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:362dadb0f8d68319"
+  reviewed "effect@4.1.2 sha256:362dadb0f8d68319"
 
 /// Runs `onElement` on each element and `onError` on the error.
 tap_both :
@@ -115,21 +115,21 @@ tap_both :
 foreign pure tap_both from "@flick-lang/runtime/effect/Stream" "tapBoth"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:bf8eb9e24bae54d6"
+  reviewed "effect@4.1.2 sha256:bf8eb9e24bae54d6"
 
 /// The elements `p` keeps.
 filter : forall c r e a. (a -> Bool)^c -> ((Stream r e a)^c -> (Stream r e a)^c)^c
 foreign pure filter from "@flick-lang/runtime/effect/Stream" "filter"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:bfdd19dbff32db04"
+  reviewed "effect@4.1.2 sha256:bfdd19dbff32db04"
 
 /// The values the filter passes.
 filter_map : forall c r e a b x. Filter.Filter a b x -> (Stream r e a)^c -> (Stream r e b)^c
 foreign pure filter_map from "@flick-lang/runtime/effect/Stream" "filterMap"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:df3407f9469ea106"
+  reviewed "effect@4.1.2 sha256:df3407f9469ea106"
 
 /// The elements the task `p` keeps.
 filter_effect :
@@ -138,7 +138,7 @@ filter_effect :
 foreign pure filter_effect from "@flick-lang/runtime/effect/Stream" "filterEffect"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:a16f3669646bc715"
+  reviewed "effect@4.1.2 sha256:a16f3669646bc715"
 
 /// The values the effectful filter passes.
 filter_map_effect :
@@ -147,28 +147,28 @@ filter_map_effect :
 foreign pure filter_map_effect from "@flick-lang/runtime/effect/Stream" "filterMapEffect"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:132ca3c46ed6c160"
+  reviewed "effect@4.1.2 sha256:132ca3c46ed6c160"
 
 /// The first `n` elements.
 take : forall c r e a. Int -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure take from "@flick-lang/runtime/effect/Stream" "take"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:fb668b929485f75f"
+  reviewed "effect@4.1.2 sha256:fb668b929485f75f"
 
 /// The last `n` elements, once the stream ends.
 take_right : forall c r e a. Int -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure take_right from "@flick-lang/runtime/effect/Stream" "takeRight"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:880a5b8e12c14062"
+  reviewed "effect@4.1.2 sha256:880a5b8e12c14062"
 
 /// The elements up to and including the first that `p` holds for.
 take_until : forall c r e a. (a -> Bool)^c -> ((Stream r e a)^c -> (Stream r e a)^c)^c
 foreign pure take_until from "@flick-lang/runtime/effect/Stream" "takeUntil"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:7ed866f33e58b123"
+  reviewed "effect@4.1.2 sha256:7ed866f33e58b123"
 
 /// `take_until` with a task as the test.
 take_until_effect :
@@ -177,21 +177,21 @@ take_until_effect :
 foreign pure take_until_effect from "@flick-lang/runtime/effect/Stream" "takeUntilEffect"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:dbdcf4cad4fc8d46"
+  reviewed "effect@4.1.2 sha256:dbdcf4cad4fc8d46"
 
 /// The elements while `p` holds.
 take_while : forall c r e a. (a -> Bool)^c -> ((Stream r e a)^c -> (Stream r e a)^c)^c
 foreign pure take_while from "@flick-lang/runtime/effect/Stream" "takeWhile"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:e8bc196bda8be5c8"
+  reviewed "effect@4.1.2 sha256:e8bc196bda8be5c8"
 
 /// The values while the filter passes them.
 take_while_filter : forall c r e a b x. Filter.Filter a b x -> (Stream r e a)^c -> (Stream r e b)^c
 foreign pure take_while_filter from "@flick-lang/runtime/effect/Stream" "takeWhileFilter"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:8ae5185dbe646f62"
+  reviewed "effect@4.1.2 sha256:8ae5185dbe646f62"
 
 /// `take_while` with a task as the test.
 take_while_effect :
@@ -200,28 +200,28 @@ take_while_effect :
 foreign pure take_while_effect from "@flick-lang/runtime/effect/Stream" "takeWhileEffect"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:67f463cc50e52e02"
+  reviewed "effect@4.1.2 sha256:67f463cc50e52e02"
 
 /// All but the first `n` elements.
 drop : forall c r e a. Int -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure drop from "@flick-lang/runtime/effect/Stream" "drop"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:e772811d3910dd42"
+  reviewed "effect@4.1.2 sha256:e772811d3910dd42"
 
 /// All but the last `n` elements.
 drop_right : forall c r e a. Int -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure drop_right from "@flick-lang/runtime/effect/Stream" "dropRight"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:a31ec33da2e96469"
+  reviewed "effect@4.1.2 sha256:a31ec33da2e96469"
 
 /// The elements after the first that `p` holds for.
 drop_until : forall c r e a. (a -> Bool)^c -> ((Stream r e a)^c -> (Stream r e a)^c)^c
 foreign pure drop_until from "@flick-lang/runtime/effect/Stream" "dropUntil"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:f52e54b1a908cd89"
+  reviewed "effect@4.1.2 sha256:f52e54b1a908cd89"
 
 /// `drop_until` with a task as the test.
 drop_until_effect :
@@ -230,21 +230,21 @@ drop_until_effect :
 foreign pure drop_until_effect from "@flick-lang/runtime/effect/Stream" "dropUntilEffect"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:7ef7779124af55ec"
+  reviewed "effect@4.1.2 sha256:7ef7779124af55ec"
 
 /// The elements from the first that `p` does not hold for.
 drop_while : forall c r e a. (a -> Bool)^c -> ((Stream r e a)^c -> (Stream r e a)^c)^c
 foreign pure drop_while from "@flick-lang/runtime/effect/Stream" "dropWhile"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:eb7fda888bd9d369"
+  reviewed "effect@4.1.2 sha256:eb7fda888bd9d369"
 
 /// The elements from the first the filter refuses.
 drop_while_filter : forall c r e a b x. Filter.Filter a b x -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure drop_while_filter from "@flick-lang/runtime/effect/Stream" "dropWhileFilter"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:98e1e99abf6e9145"
+  reviewed "effect@4.1.2 sha256:98e1e99abf6e9145"
 
 /// `drop_while` with a task as the test.
 drop_while_effect :
@@ -253,34 +253,34 @@ drop_while_effect :
 foreign pure drop_while_effect from "@flick-lang/runtime/effect/Stream" "dropWhileEffect"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:33c83715d7d50050"
+  reviewed "effect@4.1.2 sha256:33c83715d7d50050"
 
 /// The stream if `test` gives true when it starts, else no elements.
 when_ : forall c r e a r2 e2. Eff r2 e2 Bool -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
 foreign pure when_ from "@flick-lang/runtime/effect/Stream" "when"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:f51043225e5528d2"
+  reviewed "effect@4.1.2 sha256:f51043225e5528d2"
 
 /// The chunks of the stream as elements.
 chunks : forall c r e a. (Stream r e a)^c -> (Stream r e (NonEmpty.NonEmpty a))^c
 foreign pure chunks from "@flick-lang/runtime/effect/Stream" "chunks"
   retention call
-  reviewed "effect@4.0.5 sha256:100f86ab67decc05"
+  reviewed "effect@4.1.2 sha256:100f86ab67decc05"
 
 /// The same elements in chunks of `size`.
 rechunk : forall c r e a. Int -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure rechunk from "@flick-lang/runtime/effect/Stream" "rechunk"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:434dc53c53b2bf55"
+  reviewed "effect@4.1.2 sha256:434dc53c53b2bf55"
 
 /// The windows of `size` consecutive elements, one step apart.
 sliding : forall c r e a. Int -> (Stream r e a)^c -> (Stream r e (NonEmpty.NonEmpty a))^c
 foreign pure sliding from "@flick-lang/runtime/effect/Stream" "sliding"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:5a97e752d7a7068a"
+  reviewed "effect@4.1.2 sha256:5a97e752d7a7068a"
 
 /// The windows of `size` elements, `step` apart.
 sliding_size :
@@ -288,7 +288,7 @@ sliding_size :
 foreign pure sliding_size from "@flick-lang/runtime/effect/Stream" "slidingSize"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:a9d9385b6ac8bc2e"
+  reviewed "effect@4.1.2 sha256:a9d9385b6ac8bc2e"
 
 /// The runs of elements between those `p` holds for, which are dropped.
 split :
@@ -296,14 +296,14 @@ split :
 foreign pure split from "@flick-lang/runtime/effect/Stream" "split"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:5b15ec540d3c1422"
+  reviewed "effect@4.1.2 sha256:5b15ec540d3c1422"
 
 /// Groups of `n` elements; the last may be shorter.
 grouped : forall c r e a. Int -> (Stream r e a)^c -> (Stream r e (NonEmpty.NonEmpty a))^c
 foreign pure grouped from "@flick-lang/runtime/effect/Stream" "grouped"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:adae9da96733848f"
+  reviewed "effect@4.1.2 sha256:adae9da96733848f"
 
 /// Groups of at most `n` elements, each emitted at the latest after the
 /// duration.
@@ -312,7 +312,7 @@ grouped_within :
 foreign pure grouped_within from "@flick-lang/runtime/effect/Stream" "groupedWithin"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:d94761e87d624ea5"
+  reviewed "effect@4.1.2 sha256:d94761e87d624ea5"
 
 /// Runs of consecutive elements with the same key.
 group_adjacent_by :
@@ -320,7 +320,7 @@ group_adjacent_by :
 foreign pure group_adjacent_by from "@flick-lang/runtime/effect/Stream" "groupAdjacentBy"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:989fcbbd67eec70d"
+  reviewed "effect@4.1.2 sha256:989fcbbd67eec70d"
 
 /// `f` maps each element to a state and the elements to emit, from
 /// `initial`.
@@ -329,7 +329,7 @@ map_accum :
 foreign pure map_accum from "@flick-lang/runtime/effect/Stream" "flickMapAccum"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:37dd7eb0af82452e"
+  reviewed "effect@4.1.2 sha256:37dd7eb0af82452e"
 
 /// `map_accum` over the chunks.
 map_accum_chunks :
@@ -338,7 +338,7 @@ map_accum_chunks :
 foreign pure map_accum_chunks from "@flick-lang/runtime/effect/Stream" "flickMapAccumArray"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:ee374c009622335b"
+  reviewed "effect@4.1.2 sha256:ee374c009622335b"
 
 /// `map_accum` with a task as the step.
 map_accum_effect :
@@ -347,7 +347,7 @@ map_accum_effect :
 foreign pure map_accum_effect from "@flick-lang/runtime/effect/Stream" "flickMapAccumEffect"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:e09dde677326a6a9"
+  reviewed "effect@4.1.2 sha256:e09dde677326a6a9"
 
 /// `map_accum_chunks` with a task as the step.
 map_accum_chunks_effect :
@@ -358,14 +358,14 @@ map_accum_chunks_effect :
 foreign pure map_accum_chunks_effect from "@flick-lang/runtime/effect/Stream" "flickMapAccumArrayEffect"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:38fa106ad0783e69"
+  reviewed "effect@4.1.2 sha256:38fa106ad0783e69"
 
 /// `initial`, then each state `f` folds from the previous one and an element.
 scan : forall c r e a s. s -> (s -> a -> s)^c -> ((Stream r e a)^c -> (Stream r e s)^c)^c
 foreign pure scan from "@flick-lang/runtime/effect/Stream" "flickScan"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:d38e4352cb50294c"
+  reviewed "effect@4.1.2 sha256:d38e4352cb50294c"
 
 /// `scan` with a task as the step.
 scan_effect :
@@ -374,32 +374,32 @@ scan_effect :
 foreign pure scan_effect from "@flick-lang/runtime/effect/Stream" "flickScanEffect"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:d6c81bf16667bbf6"
+  reviewed "effect@4.1.2 sha256:d6c81bf16667bbf6"
 
 /// One list of all the elements, once the stream ends.
 collect : forall c r e a. (Stream r e a)^c -> (Stream r e (List a))^c
 foreign pure collect from "@flick-lang/runtime/effect/Stream" "collect"
   retention call
-  reviewed "effect@4.0.5 sha256:e95e19e746ee9b74"
+  reviewed "effect@4.1.2 sha256:e95e19e746ee9b74"
 
 /// The elements so far, after each chunk.
 accumulate : forall c r e a. (Stream r e a)^c -> (Stream r e (NonEmpty.NonEmpty a))^c
 foreign pure accumulate from "@flick-lang/runtime/effect/Stream" "accumulate"
   retention call
-  reviewed "effect@4.0.5 sha256:01868329faa0e7f2"
+  reviewed "effect@4.1.2 sha256:01868329faa0e7f2"
 
 /// The elements that differ (`==`) from the one before.
 changes : forall c r e a. (Stream r e a)^c -> (Stream r e a)^c
 foreign pure changes from "@flick-lang/runtime/effect/Stream" "changes"
   retention call
-  reviewed "effect@4.0.5 sha256:cb31fe48dd881a3e"
+  reviewed "effect@4.1.2 sha256:cb31fe48dd881a3e"
 
 /// The elements that `same` tells apart from the one before.
 changes_with : forall c r e a. (a -> a -> Bool)^c -> ((Stream r e a)^c -> (Stream r e a)^c)^c
 foreign pure changes_with from "@flick-lang/runtime/effect/Stream" "changesWith"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:a52dfca89f6342d2"
+  reviewed "effect@4.1.2 sha256:a52dfca89f6342d2"
 
 /// `changes_with` with a task as the test.
 changes_with_effect :
@@ -408,14 +408,14 @@ changes_with_effect :
 foreign pure changes_with_effect from "@flick-lang/runtime/effect/Stream" "changesWithEffect"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:f7cb933893b92a17"
+  reviewed "effect@4.1.2 sha256:f7cb933893b92a17"
 
 /// `separator` between the elements.
 intersperse : forall c r e a. a -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure intersperse from "@flick-lang/runtime/effect/Stream" "intersperse"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:33035124839c27d1"
+  reviewed "effect@4.1.2 sha256:33035124839c27d1"
 
 /// `start`, the elements with `middle` between them, and `end`.
 intersperse_affixes :
@@ -423,14 +423,14 @@ intersperse_affixes :
 foreign pure intersperse_affixes from "@flick-lang/runtime/effect/Stream" "intersperseAffixes"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:6b7120763aad61ea"
+  reviewed "effect@4.1.2 sha256:6b7120763aad61ea"
 
 /// The last element of each burst, once the duration passes without one.
 debounce : forall c r e a. Duration.Duration -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure debounce from "@flick-lang/runtime/effect/Stream" "debounce"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:373a119aa53afb3c"
+  reviewed "effect@4.1.2 sha256:373a119aa53afb3c"
 
 /// The chunks paced to `units` of `cost` per `duration`, with `burst`
 /// units more at once (`None`: 0); `Shape` delays a chunk over the budget,
@@ -449,7 +449,7 @@ throttle :
 foreign pure throttle from "@flick-lang/runtime/effect/Stream" "flickThrottle"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:95ccf7c414b423c8"
+  reviewed "effect@4.1.2 sha256:95ccf7c414b423c8"
 
 /// `throttle` with a task as the cost.
 throttle_effect :
@@ -465,7 +465,7 @@ throttle_effect :
 foreign pure throttle_effect from "@flick-lang/runtime/effect/Stream" "flickThrottleEffect"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:3741a791c300a874"
+  reviewed "effect@4.1.2 sha256:3741a791c300a874"
 
 /// Elements read ahead into a buffer of `capacity` (`None`: no bound),
 /// with the strategy for a full one (`None`: `Suspend`).
@@ -477,7 +477,7 @@ buffer :
 foreign pure buffer from "@flick-lang/runtime/effect/Stream" "flickBuffer"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:9427fddd1f0e3a14"
+  reviewed "effect@4.1.2 sha256:9427fddd1f0e3a14"
 
 /// `buffer` counting chunks instead of elements.
 buffer_chunks :
@@ -488,4 +488,4 @@ buffer_chunks :
 foreign pure buffer_chunks from "@flick-lang/runtime/effect/Stream" "flickBufferArray"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:f38b23430caa3046"
+  reviewed "effect@4.1.2 sha256:f38b23430caa3046"

@@ -295,7 +295,7 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
     // end of Effect: streams, Stream
     // Effect: child processes
     ("ChildProcess", builtin_source!("builtins/ChildProcess.fl")),
-    // Effect: reactivity (unstable in Effect 4.0.5)
+    // Effect: reactivity (unstable in Effect 4.1.2)
     (
         "Reactivity.AsyncResult",
         builtin_source!("builtins/Reactivity/AsyncResult.fl"),
@@ -412,7 +412,7 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
         builtin_source!("builtins/HttpApi/Inject.fl"),
     ),
     // end of Effect: HttpApi
-    // Effect: RPC (unstable in Effect 4.0.5)
+    // Effect: RPC (unstable in Effect 4.1.2)
     #[cfg(feature = "server-stdlib")]
     ("Rpc", builtin_source!("builtins/Rpc.fl")),
     #[cfg(feature = "server-stdlib")]
@@ -421,13 +421,13 @@ pub(super) const SOURCES: &[(&str, &str)] = &[
     #[cfg(feature = "server-stdlib")]
     ("Config", builtin_source!("builtins/Config.fl")),
     // end of Effect: RPC
-    // Effect: observability (unstable in Effect 4.0.5)
+    // Effect: observability (unstable in Effect 4.1.2)
     #[cfg(feature = "server-stdlib")]
     ("Otlp", builtin_source!("builtins/Otlp.fl")),
     #[cfg(feature = "server-stdlib")]
     ("Prometheus", builtin_source!("builtins/Prometheus.fl")),
     // end of Effect: observability
-    // Effect: devtools (unstable in Effect 4.0.5)
+    // Effect: devtools (unstable in Effect 4.1.2)
     #[cfg(feature = "server-stdlib")]
     ("DevTools", builtin_source!("builtins/DevTools.fl")),
     // end of Effect: devtools

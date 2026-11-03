@@ -12,7 +12,7 @@ make :
   { lookup : k ->{r; e} a; capacity : Int; timeToLive : Option Duration.Duration } ->{r;}
   Cache k e a
 foreign effect make from "@flick-lang/runtime/effect/Cache" "flickMake"
-  reviewed "effect@4.0.5 sha256:ffe1e721ace2dcf5"
+  reviewed "effect@4.1.2 sha256:ffe1e721ace2dcf5"
 
 /// `make`, the time to live of each entry computed from how its lookup
 /// ended and its key.
@@ -21,80 +21,80 @@ make_with :
   { capacity : Int; timeToLive : Option (Exit e a -> k -> Duration.Duration) } ->{r;}
   Cache k e a
 foreign effect make_with from "@flick-lang/runtime/effect/Cache" "flickMakeWith"
-  reviewed "effect@4.0.5 sha256:0ca432dd6d6be594"
+  reviewed "effect@4.1.2 sha256:0ca432dd6d6be594"
 
 /// The value of `key`, looking it up once if it is missing or expired;
 /// a failed lookup is cached too.
 get : k -> Cache k e a ->{; e} a
 foreign effect get from "@flick-lang/runtime/effect/Cache" "get"
   arity 1
-  reviewed "effect@4.0.5 sha256:2786a8584b9b86b4"
+  reviewed "effect@4.1.2 sha256:2786a8584b9b86b4"
 
 /// The value of `key` if it is cached, waiting for a lookup under way,
 /// without a new one; fails as the cached lookup did.
 get_option : k -> Cache k e a ->{; e} Option a
 foreign effect get_option from "@flick-lang/runtime/effect/Cache" "getOption"
   arity 1
-  reviewed "effect@4.0.5 sha256:2b29cfe7af2a10a1"
+  reviewed "effect@4.1.2 sha256:2b29cfe7af2a10a1"
 
 /// The value of `key` if a lookup of it has succeeded and not expired.
 get_success : k -> Cache k e a ->{} Option a
 foreign effect get_success from "@flick-lang/runtime/effect/Cache" "getSuccess"
   arity 1
-  reviewed "effect@4.0.5 sha256:a5888e0ccc2004b3"
+  reviewed "effect@4.1.2 sha256:a5888e0ccc2004b3"
 
 /// Caches `value` for `key`.
 set : k -> a -> Cache k e a ->{} Unit
 foreign effect set from "@flick-lang/runtime/effect/Cache" "set"
   arity 2
-  reviewed "effect@4.0.5 sha256:64319bbf356250c6"
+  reviewed "effect@4.1.2 sha256:64319bbf356250c6"
 
 /// Whether `key` is cached.
 has : k -> Cache k e a ->{} Bool
 foreign effect has from "@flick-lang/runtime/effect/Cache" "has"
   arity 1
-  reviewed "effect@4.0.5 sha256:8399dfedc2dca11d"
+  reviewed "effect@4.1.2 sha256:8399dfedc2dca11d"
 
 /// Drops `key`.
 invalidate : k -> Cache k e a ->{} Unit
 foreign effect invalidate from "@flick-lang/runtime/effect/Cache" "invalidate"
   arity 1
-  reviewed "effect@4.0.5 sha256:fbc8b81fc750f59d"
+  reviewed "effect@4.1.2 sha256:fbc8b81fc750f59d"
 
 /// Drops `key` if its value satisfies `f`; whether it did.
 invalidate_when : forall c k e a. k -> (a -> Bool)^c -> (Cache k e a ->{} Bool)^c
 foreign effect invalidate_when from "@flick-lang/runtime/effect/Cache" "invalidateWhen"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:49c0b90f54bf0654"
+  reviewed "effect@4.1.2 sha256:49c0b90f54bf0654"
 
 /// Looks `key` up again, cached or not, starting its time to live anew.
 refresh : k -> Cache k e a ->{; e} a
 foreign effect refresh from "@flick-lang/runtime/effect/Cache" "refresh"
   arity 1
-  reviewed "effect@4.0.5 sha256:71aa32951a25a4f1"
+  reviewed "effect@4.1.2 sha256:71aa32951a25a4f1"
 
 /// Drops every key.
 invalidate_all : Cache k e a ->{} Unit
 foreign effect invalidate_all from "@flick-lang/runtime/effect/Cache" "invalidateAll"
-  reviewed "effect@4.0.5 sha256:be7d7a1d0f9e8300"
+  reviewed "effect@4.1.2 sha256:be7d7a1d0f9e8300"
 
 /// The number of cached keys.
 size : Cache k e a ->{} Int
 foreign effect size from "@flick-lang/runtime/effect/Cache" "size"
-  reviewed "effect@4.0.5 sha256:33ff37d1763aa946"
+  reviewed "effect@4.1.2 sha256:33ff37d1763aa946"
 
 /// The cached keys.
 keys : Cache k e a ->{} List k
 foreign effect keys from "@flick-lang/runtime/effect/Cache" "flickKeys"
-  reviewed "effect@4.0.5 sha256:4b37001514520f43"
+  reviewed "effect@4.1.2 sha256:4b37001514520f43"
 
 /// The values of successful lookups.
 values : Cache k e a ->{} List a
 foreign effect values from "@flick-lang/runtime/effect/Cache" "flickValues"
-  reviewed "effect@4.0.5 sha256:4578e0f7f9a4cfcc"
+  reviewed "effect@4.1.2 sha256:4578e0f7f9a4cfcc"
 
 /// The keys and values of successful lookups.
 entries : Cache k e a ->{} List (k, a)
 foreign effect entries from "@flick-lang/runtime/effect/Cache" "flickEntries"
-  reviewed "effect@4.0.5 sha256:af1fc37cbc7d72aa"
+  reviewed "effect@4.1.2 sha256:af1fc37cbc7d72aa"

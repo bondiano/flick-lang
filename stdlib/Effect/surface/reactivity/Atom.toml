@@ -73,5 +73,7 @@ withServerValue = "server values of an atom are not bound; server rendering seri
 withServerValueInitial = "server values of an atom are not bound; server rendering serializes the registry instead"
 writable = "a write callback mutates through `WriteContext`; Flick writes a `state` atom with `set`, `update` and `modify`"
 
+InitialValueOptions = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+
 [language]
 withReactivity = "`Atom.query`/`Atom.query_stream`: a task or stream atom a mutation of its keys runs anew"

@@ -12,22 +12,22 @@ type alias Options = { url : String; service_name : String }
 /// `/v1/traces`, `/v1/logs` and `/v1/metrics`.
 layer : Options -> Layer none none none
 foreign pure layer from "@flick-lang/runtime/effect/observability/Otlp" "otlpLayer"
-  reviewed "effect@4.0.5 sha256:d572158125d5099d"
+  reviewed "effect@4.1.2 sha256:540123a8e341e149"
 
 /// Spans, sent to `url` (`http://localhost:4318/v1/traces`).
 traces : Options -> Layer none none none
 foreign pure traces from "@flick-lang/runtime/effect/observability/Otlp" "otlpTraces"
-  reviewed "effect@4.0.5 sha256:b9be076a3b681501"
+  reviewed "effect@4.1.2 sha256:b9be076a3b681501"
 
 /// Log records, sent to `url` (`http://localhost:4318/v1/logs`).
 logs : Options -> Layer none none none
 foreign pure logs from "@flick-lang/runtime/effect/observability/Otlp" "otlpLogs"
-  reviewed "effect@4.0.5 sha256:84bff042d5561fc1"
+  reviewed "effect@4.1.2 sha256:84bff042d5561fc1"
 
 /// Metrics, sent to `url` (`http://localhost:4318/v1/metrics`).
 metrics : Options -> Layer none none none
 foreign pure metrics from "@flick-lang/runtime/effect/observability/Otlp" "otlpMetrics"
-  reviewed "effect@4.0.5 sha256:03304a237d1ab870"
+  reviewed "effect@4.1.2 sha256:03304a237d1ab870"
 
 /// How the exporters write what they send.
 type Serialization
@@ -35,12 +35,12 @@ type Serialization
 /// OTLP's JSON, the default.
 json : Serialization
 foreign pure json from "@flick-lang/runtime/effect/observability/Otlp" "otlpJson"
-  reviewed "effect@4.0.5 sha256:83cbfbfb44846be1"
+  reviewed "effect@4.1.2 sha256:83cbfbfb44846be1"
 
 /// OTLP's protobuf: smaller, and only a program that names it bundles it.
 protobuf : Serialization
 foreign pure protobuf from "@flick-lang/runtime/effect/observability/Otlp" "otlpProtobuf"
-  reviewed "effect@4.0.5 sha256:926974a98b1e4f51"
+  reviewed "effect@4.1.2 sha256:926974a98b1e4f51"
 
 /// Everything an exporter can be told: the service's version and resource
 /// attributes, headers of each request (an API key, say), gzip for bodies
@@ -79,22 +79,22 @@ let settings url service_name = {
 /// `layer` as `settings` say.
 layer_with : Settings -> Layer none none none
 foreign pure layer_with from "@flick-lang/runtime/effect/observability/Otlp" "otlpLayerWith"
-  reviewed "effect@4.0.5 sha256:d572158125d5099d"
+  reviewed "effect@4.1.2 sha256:540123a8e341e149"
 
 /// `traces` as `settings` say.
 traces_with : Settings -> Layer none none none
 foreign pure traces_with from "@flick-lang/runtime/effect/observability/Otlp" "otlpTracesWith"
-  reviewed "effect@4.0.5 sha256:b9be076a3b681501"
+  reviewed "effect@4.1.2 sha256:b9be076a3b681501"
 
 /// `logs` as `settings` say.
 logs_with : Settings -> Layer none none none
 foreign pure logs_with from "@flick-lang/runtime/effect/observability/Otlp" "otlpLogsWith"
-  reviewed "effect@4.0.5 sha256:84bff042d5561fc1"
+  reviewed "effect@4.1.2 sha256:84bff042d5561fc1"
 
 /// `metrics` as `settings` say; `max_batch_size` does not apply.
 metrics_with : Settings -> Layer none none none
 foreign pure metrics_with from "@flick-lang/runtime/effect/observability/Otlp" "otlpMetricsWith"
-  reviewed "effect@4.0.5 sha256:03304a237d1ab870"
+  reviewed "effect@4.1.2 sha256:03304a237d1ab870"
 
 /// A tracer sending spans to `url` (`http://localhost:4318/v1/traces`) in
 /// batches, for `Tracer.with_tracer`: unlike `traces`, only the tasks given
@@ -102,7 +102,7 @@ foreign pure metrics_with from "@flick-lang/runtime/effect/observability/Otlp" "
 /// the scope owning it closes.
 tracer : forall s. Options ->{Scope s;} Tracer.Tracer^{s}
 foreign effect tracer from "@flick-lang/runtime/effect/observability/Otlp" "otlpTracer"
-  reviewed "effect@4.0.5 sha256:d1c64b3295e045bb"
+  reviewed "effect@4.1.2 sha256:d1c64b3295e045bb"
 
 /// Traces, logs and metrics as the current configuration says, in JSON:
 /// a signal is exported only when `OTEL_TRACES_EXPORTER`,
@@ -116,4 +116,4 @@ foreign effect tracer from "@flick-lang/runtime/effect/observability/Otlp" "otlp
 /// environment by default.
 from_config : Option String -> Layer none none none
 foreign pure from_config from "@flick-lang/runtime/effect/observability/Otlp" "otlpFromConfig"
-  reviewed "effect@4.0.5 sha256:c36eb5f55d8fd9d9"
+  reviewed "effect@4.1.2 sha256:fdb3406c244d1111"

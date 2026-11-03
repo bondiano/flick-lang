@@ -1,5 +1,5 @@
 // Effect's `effect/reactivity` atoms for the bindings of the standard
-// library (unstable in Effect 4.0.5). A state atom is built from its value
+// library (unstable in Effect 4.1.2). A state atom is built from its value
 // alone, so a function or an effect as the value stays a value; the
 // registry is the Flick service `Reactivity.Atom.Registry`, whose operations
 // read and write through Effect's registry.

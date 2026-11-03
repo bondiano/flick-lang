@@ -34,7 +34,7 @@ make :
   StaticOptions ->{; PlatformError.PlatformError}
   (ServerRequest ->{; HttpServerError} ServerResponse)
 foreign effect make from "@flick-lang/runtime/effect/http/HttpStaticServer" "flickMake"
-  reviewed "effect@4.0.5 sha256:e59cebe7d680fe43"
+  reviewed "effect@4.1.2 sha256:e59cebe7d680fe43"
 
 /// A route of `GET` below the prefix to the handler of the files.
 route :

@@ -34,7 +34,7 @@ fn new_creates_a_project_and_init_refuses_before_writing() {
     for pin in [
         "\"pnpm@",
         "\"@flick-lang/runtime\": \"0.1.0\"",
-        "\"effect\": \"4.0.5\"",
+        "\"effect\": \"4.1.2\"",
         "\"compiler\": \"0.1.0\"",
     ] {
         assert!(manifest.contains(pin), "{pin} in {manifest}");
@@ -376,7 +376,7 @@ fn the_installed_runtime_and_effect_are_in_the_cache_key() {
     assert_eq!(cached(&dir), 2, "the runtime version is in the key");
     fs::write(
         runtime.join("node_modules/effect/package.json"),
-        "{ \"name\": \"effect\", \"version\": \"4.0.5\" }",
+        "{ \"name\": \"effect\", \"version\": \"4.1.2\" }",
     )
     .expect("write");
     build();

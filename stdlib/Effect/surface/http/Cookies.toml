@@ -1,5 +1,5 @@
 [wrapped]
-Cookie = "Http.Cookies.Cookie 0933207c35e90cae"
+Cookie = "Http.Cookies.Cookie 0f91a2590a4c6757"
 Cookies = "Http.Cookies.Cookies 11fd4e6d22a3d7d7"
 CookiesError = "Http.Cookies.CookiesError 88041eb04a6506f1"
 CookiesErrorReason = "Http.Cookies.CookiesErrorReason a559584f100288bd"
@@ -32,3 +32,5 @@ isCookiesError = "TS-only: a type guard; Flick values are typed statically"
 makeCookieUnsafe = "invariant: `*Unsafe` throws on an invalid cookie; `make_cookie` fails with `CookiesError`"
 setAllUnsafe = "invariant: `*Unsafe` throws on an invalid cookie; `set_all` fails with `CookiesError`"
 setUnsafe = "invariant: `*Unsafe` throws on an invalid cookie; `set` fails with `CookiesError`"
+mergeIntoArray = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+toRequestCookieHeader = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

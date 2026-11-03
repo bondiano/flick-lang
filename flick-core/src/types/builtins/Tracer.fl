@@ -68,65 +68,65 @@ with_span : forall c r e a. String -> SpanOptions -> (Eff r e a)^c ->{r; e} a
 foreign effect with_span from "@flick-lang/runtime/effect/Tracer" "flickWithSpan"
   arity 2
   retention call
-  reviewed "effect@4.0.5 sha256:2322647873d3b1f2"
+  reviewed "effect@4.1.2 sha256:2322647873d3b1f2"
 
 /// The span the current task runs in.
 parent_span : Unit ->{} Option Span
 foreign effect parent_span from "@flick-lang/runtime/effect/Tracer" "flickParentSpan"
   arity 0
-  reviewed "effect@4.0.5 sha256:cf54a4aa00b09ecb"
+  reviewed "effect@4.1.2 sha256:cf54a4aa00b09ecb"
 
 /// A span of another process, to use as a parent or a link.
 external_span : { spanId : String; traceId : String; sampled : Bool } -> Span
 foreign pure external_span from "@flick-lang/runtime/effect/Tracer" "flickExternalSpan"
-  reviewed "effect@4.0.5 sha256:42e3d31f68f2c0bb"
+  reviewed "effect@4.1.2 sha256:42e3d31f68f2c0bb"
 
 span_id : Span -> String
 foreign pure span_id from "@flick-lang/runtime/effect/Tracer" "flickSpanId"
-  reviewed "effect@4.0.5 sha256:1767571c38aa0f5b"
+  reviewed "effect@4.1.2 sha256:1767571c38aa0f5b"
 
 trace_id : Span -> String
 foreign pure trace_id from "@flick-lang/runtime/effect/Tracer" "flickTraceId"
-  reviewed "effect@4.0.5 sha256:1767571c38aa0f5b"
+  reviewed "effect@4.1.2 sha256:1767571c38aa0f5b"
 
 sampled : Span -> Bool
 foreign pure sampled from "@flick-lang/runtime/effect/Tracer" "flickSampled"
-  reviewed "effect@4.0.5 sha256:1767571c38aa0f5b"
+  reviewed "effect@4.1.2 sha256:1767571c38aa0f5b"
 
 /// The name of a span of the tracer; `None` for an external one.
 span_name : Span -> Option String
 foreign pure span_name from "@flick-lang/runtime/effect/Tracer" "flickSpanName"
-  reviewed "effect@4.0.5 sha256:516a3c9b0ebd1a4d"
+  reviewed "effect@4.1.2 sha256:516a3c9b0ebd1a4d"
 
 /// The kind of a span of the tracer; `None` for an external one.
 span_kind : Span -> Option SpanKind
 foreign pure span_kind from "@flick-lang/runtime/effect/Tracer" "flickSpanKind"
-  reviewed "effect@4.0.5 sha256:f59c0ac11d26ed69"
+  reviewed "effect@4.1.2 sha256:f59c0ac11d26ed69"
 
 /// The parent of a span of the tracer.
 parent : Span -> Option Span
 foreign pure parent from "@flick-lang/runtime/effect/Tracer" "flickParent"
-  reviewed "effect@4.0.5 sha256:516a3c9b0ebd1a4d"
+  reviewed "effect@4.1.2 sha256:516a3c9b0ebd1a4d"
 
 /// The links of a span of the tracer.
 links : Span -> List SpanLink
 foreign pure links from "@flick-lang/runtime/effect/Tracer" "flickLinks"
-  reviewed "effect@4.0.5 sha256:8ed28030a8e8e278"
+  reviewed "effect@4.1.2 sha256:8ed28030a8e8e278"
 
 /// Whether the span still runs; it changes when it ends.
 status : Span ->{} SpanStatus
 foreign sync status from "@flick-lang/runtime/effect/Tracer" "flickStatus"
-  reviewed "effect@4.0.5 sha256:99ae427def19dcb4"
+  reviewed "effect@4.1.2 sha256:99ae427def19dcb4"
 
 /// The attributes of the span so far, as text.
 attributes : Span ->{} List (String, String)
 foreign sync attributes from "@flick-lang/runtime/effect/Tracer" "flickAttributes"
-  reviewed "effect@4.0.5 sha256:516a3c9b0ebd1a4d"
+  reviewed "effect@4.1.2 sha256:516a3c9b0ebd1a4d"
 
 /// Effect's tracer, which keeps spans in memory only.
 native_tracer : Tracer
 foreign pure native_tracer from "@flick-lang/runtime/effect/Tracer" "nativeTracer"
-  reviewed "effect@4.0.5 sha256:c95d10bdbe12721c"
+  reviewed "effect@4.1.2 sha256:c95d10bdbe12721c"
 
 /// Runs `task` with the tracer making its spans; a tracer of a scope, such
 /// as `Otlp.tracer`'s, only inside it.
@@ -134,18 +134,18 @@ with_tracer : forall c d r e a. Tracer^d -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer from "@flick-lang/runtime/effect/Tracer" "flickWithTracer"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:40a85ade38165224"
+  reviewed "effect@4.1.2 sha256:40a85ade38165224"
 
 /// Runs `task` with the level its spans get when they name none.
 with_trace_level : forall c r e a. LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
 foreign effect with_trace_level from "@flick-lang/runtime/effect/Tracer" "flickWithTraceLevel"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:6856a540a66c3ea7"
+  reviewed "effect@4.1.2 sha256:6856a540a66c3ea7"
 
 /// Runs `task` tracing only the spans of at least the level.
 with_minimum_trace_level : forall c r e a. LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
 foreign effect with_minimum_trace_level from "@flick-lang/runtime/effect/Tracer" "flickWithMinimumTraceLevel"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:e13b9b3cea1437ac"
+  reviewed "effect@4.1.2 sha256:e13b9b3cea1437ac"

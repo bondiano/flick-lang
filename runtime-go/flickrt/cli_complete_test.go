@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// completeTestCommand mirrors the descriptor in the node script that produced
-// testdata/complete_*.txt with Effect 4.0.5's own generators.
+// completeTestCommand mirrors the descriptor of tools/go-cli/complete.mjs, which
+// writes testdata/complete_*.txt with the pinned Effect's own generators.
 func completeTestCommand() completeCommand {
 	deploy := completeCommand{
 		name: "deploy", description: "Deploy it",

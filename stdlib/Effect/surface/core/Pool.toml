@@ -14,3 +14,5 @@ State = "TS-only: the internal state of the data structure, never handed to a ca
 PoolItem = "TS-only: the internal state of the data structure, never handed to a caller"
 Strategy = "invariant: shared mutable state outside `Ref`: a strategy reads and writes the mutable fields of the pool's items"
 makeWithStrategy = "invariant: shared mutable state outside `Ref`: a custom strategy reads and writes the mutable fields of the pool's items"
+Stats = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+stats = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

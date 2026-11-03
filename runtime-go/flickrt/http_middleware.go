@@ -1,6 +1,11 @@
 package flickrt
 
-import "strings"
+import (
+	"net/netip"
+	"regexp"
+	"strconv"
+	"strings"
+)
 
 // Http.Middleware as Effect's HttpMiddleware and HttpEffect: each binding
 // takes the handler and the request at once and answers it. What Effect
@@ -19,17 +24,38 @@ func handle(fb *Fiber, handler Value, request Value) Value {
 	return Run(fb, Apply(fb, handler, request))
 }
 
-func (q *ServerRequest) appendPreResponse(h preResponse) {
-	m := q.src.marks
+const requestStateKey = "effect/http/HttpEffect/CurrentRequestState"
+
+// requestState is the state of the request the fiber handles, if any.
+func requestState(fb *Fiber) *requestMarks {
+	if v, ok := fb.env.get(requestStateKey); ok {
+		return v.(*requestMarks)
+	}
+	return nil
+}
+
+// withRequestState is the fiber with a fresh request state, as Effect's
+// `toHandled` gives the request it handles.
+func withRequestState(fb *Fiber) (*Fiber, *requestMarks) {
+	m := &requestMarks{}
+	inner := *fb
+	inner.env = fb.env.with(requestStateKey, m)
+	return &inner, m
+}
+
+func appendPreResponse(fb *Fiber, h preResponse) {
+	m := requestState(fb)
+	if m == nil {
+		return
+	}
 	m.mu.Lock()
 	m.preResponse = append(m.preResponse, h)
 	m.mu.Unlock()
 }
 
 // preResponded is the response after the handlers registered for the
-// request's source, in order.
-func (q *ServerRequest) preResponded(fb *Fiber, response Value) Value {
-	m := q.src.marks
+// handled request, in order.
+func (q *ServerRequest) preResponded(fb *Fiber, m *requestMarks, response Value) Value {
 	m.mu.Lock()
 	hs := m.preResponse
 	m.mu.Unlock()
@@ -46,13 +72,13 @@ func flickPreResponse(f Value) preResponse {
 	}
 }
 
-func MiddlewareAppendPreResponseHandler(_ *Fiber, f, request Value) Value {
-	requestOf(request).appendPreResponse(flickPreResponse(f))
+func MiddlewareAppendPreResponseHandler(fb *Fiber, f, request Value) Value {
+	appendPreResponse(fb, flickPreResponse(f))
 	return Unit
 }
 
 func MiddlewareWithPreResponseHandler(fb *Fiber, f, handler, request Value) Value {
-	requestOf(request).appendPreResponse(flickPreResponse(f))
+	appendPreResponse(fb, flickPreResponse(f))
 	return handle(fb, handler, request)
 }
 
@@ -61,11 +87,12 @@ func MiddlewareWithPreResponseHandler(fb *Fiber, f, handler, request Value) Valu
 // as the response of its cause, then fails the call.
 func MiddlewareToHandled(fb *Fiber, send, handler, request Value) Value {
 	q := requestOf(request)
-	out, cause := catch(func() Value { return handle(fb, handler, request) })
+	inner, m := withRequestState(fb)
+	out, cause := catch(func() Value { return handle(inner, handler, request) })
 	if cause != nil {
 		out = causeResponse(cause)
 	}
-	Run(fb, Apply(fb, Apply(fb, send, request), q.preResponded(fb, out)))
+	Run(fb, Apply(fb, Apply(fb, send, request), q.preResponded(inner, m, out)))
 	if cause != nil {
 		panic(&Failure{cause})
 	}
@@ -75,12 +102,13 @@ func MiddlewareToHandled(fb *Fiber, send, handler, request Value) Value {
 // MiddlewareLogger logs each answered request at the info level, unless
 // `with_logger_disabled` turned the logger off for it.
 func MiddlewareLogger(fb *Fiber, handler, request Value) Value {
-	q := requestOf(request)
 	out, cause := catch(func() Value { return handle(fb, handler, request) })
-	m := q.src.marks
-	m.mu.Lock()
-	off := m.loggerOff
-	m.mu.Unlock()
+	off := false
+	if m := requestState(fb); m != nil {
+		m.mu.Lock()
+		off = m.loggerOff
+		m.mu.Unlock()
+	}
 	if !off {
 		message := "Sent HTTP response"
 		if cause != nil && (cause.has(causeFail) || cause.has(causeDie)) {
@@ -95,10 +123,11 @@ func MiddlewareLogger(fb *Fiber, handler, request Value) Value {
 }
 
 func MiddlewareWithLoggerDisabled(fb *Fiber, handler, request Value) Value {
-	m := requestOf(request).src.marks
-	m.mu.Lock()
-	m.loggerOff = true
-	m.mu.Unlock()
+	if m := requestState(fb); m != nil {
+		m.mu.Lock()
+		m.loggerOff = true
+		m.mu.Unlock()
+	}
 	return handle(fb, handler, request)
 }
 
@@ -193,20 +222,133 @@ func MiddlewareWithTracerHeaderFilter(fb *Fiber, f, task Value) Value {
 	return withEnv(fb, headerFilterKey, f, task)
 }
 
-// MiddlewareXForwardedHeaders takes the host and the client's address of
-// the `X-Forwarded-*` headers, when a proxy sets the host.
-func MiddlewareXForwardedHeaders(fb *Fiber, handler, request Value) Value {
-	q := requestOf(request)
-	if host, _ := q.header("x-forwarded-host"); host != "" {
-		q = q.modified()
-		q.headers = q.headerRecord().set("host", host)
-		q.remote = None
-		if forwarded, ok := q.header("x-forwarded-for"); ok {
-			first, _, _ := strings.Cut(forwarded, ",")
-			q.remote = Some(Trim(first))
+// MiddlewareXForwardedHeaders takes the client's address, the host and the
+// protocol from the `X-Forwarded-*` headers when the peer is one of the
+// proxies (CIDRs), as Effect's `xForwardedHeaders` does: from the last
+// `X-Forwarded-For` entry back, the first that is not a proxy is the client,
+// and the host and protocol lists count only with one value an entry.
+func MiddlewareXForwardedHeaders(fb *Fiber, proxies, handler, request Value) Value {
+	var networks []netip.Prefix
+	for _, cidr := range stringsOf(proxies) {
+		network, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			panic(Defect{"NetAddressError: invalid IP network " + strconv.Quote(cidr)})
+		}
+		networks = append(networks, network.Masked())
+	}
+	trusted := func(a netip.Addr) bool {
+		for _, network := range networks {
+			if network.Contains(a) {
+				return true
+			}
+		}
+		return false
+	}
+	return handle(fb, handler, applyXForwarded(requestOf(request), trusted))
+}
+
+func applyXForwarded(q *ServerRequest, trusted func(netip.Addr) bool) *ServerRequest {
+	peerValue := q.peerAddress()
+	peerText := optionString(peerValue)
+	if peerText == nil {
+		return q
+	}
+	peer, ok := forwardedAddress(*peerText)
+	if !ok || !trusted(peer) {
+		return q
+	}
+	forwarded, ok := q.header("x-forwarded-for")
+	if !ok {
+		return q
+	}
+	addresses := splitForwarded(forwarded)
+	for i := len(addresses) - 1; i >= 0; i-- {
+		address, ok := forwardedAddress(addresses[i])
+		if !ok {
+			return q
+		}
+		if i > 0 && trusted(address) {
+			continue
+		}
+		c := q.modified()
+		c.remote = Some(address.String())
+		c.peer = peerValue
+		if host, ok := alignedForwarded(q, "x-forwarded-host", len(addresses), i); ok && validForwardedHost(host) {
+			c.headers = q.headerRecord().set("host", host)
+		}
+		if protocol, ok := alignedForwarded(q, "x-forwarded-proto", len(addresses), i); ok {
+			if protocol = strings.ToLower(protocol); protocol == "http" || protocol == "https" {
+				c.protocol = protocol
+			}
+		}
+		return c
+	}
+	return q
+}
+
+func splitForwarded(value string) []string {
+	parts := strings.Split(value, ",")
+	for i, p := range parts {
+		parts[i] = Trim(p).(string)
+	}
+	return parts
+}
+
+// alignedForwarded is the value of a hop in a list header that has one
+// value an `X-Forwarded-For` entry.
+func alignedForwarded(q *ServerRequest, name string, length, i int) (string, bool) {
+	value, ok := q.header(name)
+	if !ok {
+		return "", false
+	}
+	values := splitForwarded(value)
+	if len(values) != length {
+		return "", false
+	}
+	return values[i], true
+}
+
+// forwardedAddress is an IP address, bracketed or with a port, IPv4-mapped
+// IPv6 as IPv4.
+func forwardedAddress(text string) (netip.Addr, bool) {
+	if text == "" {
+		return netip.Addr{}, false
+	}
+	inner := text
+	if strings.HasPrefix(inner, "[") && strings.HasSuffix(inner, "]") {
+		inner = inner[1 : len(inner)-1]
+	}
+	if a, err := netip.ParseAddr(inner); err == nil {
+		return a.Unmap(), true
+	}
+	if ap, err := netip.ParseAddrPort(text); err == nil {
+		return ap.Addr().Unmap(), true
+	}
+	return netip.Addr{}, false
+}
+
+var forwardedHostShape = regexp.MustCompile(`(?i)^(?:\[[0-9a-f:.]+\]|[a-z0-9._-]+)(?::\d{1,5})?$`)
+
+// validForwardedHost is a host and port a URL can have: no path, user or list.
+func validForwardedHost(host string) bool {
+	if !forwardedHostShape.MatchString(host) {
+		return false
+	}
+	name, port := host, ""
+	if i := strings.LastIndex(host, ":"); i >= 0 && !strings.HasSuffix(host, "]") {
+		name, port = host[:i], host[i+1:]
+	}
+	if port != "" {
+		if n, err := strconv.Atoi(port); err != nil || n > 65535 {
+			return false
 		}
 	}
-	return handle(fb, handler, q)
+	if strings.HasPrefix(name, "[") {
+		a, err := netip.ParseAddr(strings.Trim(name, "[]"))
+		return err == nil && a.Is6()
+	}
+	_, ok := parseURL("http://" + host)
+	return ok
 }
 
 // MiddlewareSearchParamsParser parses the query of the original URL, which
@@ -271,7 +413,7 @@ func MiddlewareCors(fb *Fiber, options, handler, request Value) Value {
 		}
 		return newResponse(204, "", false, h, nil, nil, false)
 	}
-	q.appendPreResponse(func(_ *Fiber, request, response Value) Value {
+	appendPreResponse(fb, func(_ *Fiber, request, response Value) Value {
 		h := common(requestOf(request))
 		if recordField(h, "vary") != nil {
 			h = h.set("vary", varyWith(responseOf(response).headerRecord(), "Origin"))

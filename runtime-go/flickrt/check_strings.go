@@ -225,7 +225,7 @@ func CheckUUID(version Value) Value {
 }
 
 var (
-	CheckULID         Value = patternCheck(`^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$`, "")
+	CheckULID         Value = patternCheck(`^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$`, "")
 	CheckGUID         Value = patternCheck(`^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$`, "a GUID")
 	CheckBase64       Value = patternCheck(`^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$`, "a base64 encoded string")
 	CheckBase64Url    Value = patternCheck(`^([0-9a-zA-Z-_]{4})*(([0-9a-zA-Z-_]{2}(==)?)|([0-9a-zA-Z-_]{3}(=)?))?$`, "a base64url encoded string")

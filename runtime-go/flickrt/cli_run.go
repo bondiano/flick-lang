@@ -168,7 +168,7 @@ func cliRunParsed(fb *Fiber, root *cliCommand, args []string, env *cliEnv) *cliE
 		}
 		_, v, err := g.param.parse(fb, empty)
 		if err != nil {
-			return err
+			return cliShowHelp(path, []*cliError{err})
 		}
 		if g == cliWizardGlobal {
 			return cliWizard(fb, root, args, ctx)
@@ -192,7 +192,7 @@ func cliRunParsed(fb *Fiber, root *cliCommand, args []string, env *cliEnv) *cliE
 		}
 		_, v, err := g.param.parse(fb, empty)
 		if err != nil {
-			return err
+			return cliShowHelp(path, []*cliError{err})
 		}
 		switch g {
 		case cliLogLevelGlobal:
@@ -257,7 +257,7 @@ func CliRunWith(fb *Fiber, settings, spec, args Value) Value {
 			env.trace = true
 		}
 	}
-	env.format = cliDefaultFormat(fileIsTerminal(os.Stdout) && os.Getenv("NO_COLOR") == "")
+	env.format = cliDefaultFormat(cliTerminal().canColor)
 	if f, ok := some(s.Get("formatter")); ok {
 		formatHelp, formatVersion := record(f).Get("formatHelpDoc"), record(f).Get("formatVersion")
 		env.format = cliFormatter{
@@ -273,10 +273,29 @@ func CliRunWith(fb *Fiber, settings, spec, args Value) Value {
 	return Unit
 }
 
+// cliCapabilities is Effect's `TerminalCapabilities` of the process.
+type cliCapabilities struct{ canColor, canPrompt bool }
+
+// cliTerminal is TerminalCapabilities' `fromProcess`: TERM=dumb can do
+// nothing; NO_COLOR wins over FORCE_COLOR (not "0" or "false"), which
+// colors off a terminal; a prompt needs a terminal on stdin and stdout.
+func cliTerminal() cliCapabilities {
+	if os.Getenv("TERM") == "dumb" {
+		return cliCapabilities{}
+	}
+	force := os.Getenv("FORCE_COLOR")
+	forcing := force != "" && force != "0" && !strings.EqualFold(force, "false")
+	stdout := fileIsTerminal(os.Stdout)
+	return cliCapabilities{
+		canColor:  os.Getenv("NO_COLOR") == "" && (forcing || stdout),
+		canPrompt: fileIsTerminal(os.Stdin) && stdout,
+	}
+}
+
 // CliRunVersion is `Cli.run_version version command args`: every built-in flag.
 func CliRunVersion(fb *Fiber, version, spec, args Value) Value {
 	env := &cliEnv{version: version.(string), builtIns: cliAllBuiltIns, trace: true, log: cliStdoutLog,
-		format: cliDefaultFormat(fileIsTerminal(os.Stdout) && os.Getenv("NO_COLOR") == "")}
+		format: cliDefaultFormat(cliTerminal().canColor)}
 	if err := cliRun(fb, spec.(*cliSpec), cliStrings(args), env); err != nil {
 		return Fail(cliFlickError(err))
 	}

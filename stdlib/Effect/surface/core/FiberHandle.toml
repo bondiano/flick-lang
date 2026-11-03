@@ -6,7 +6,7 @@ get = "FiberHandle.get a7a0c777d9a6de40"
 clear = "FiberHandle.clear 7fe537025eeec2f4"
 join = "FiberHandle.join caaa432c5d4304c0"
 awaitEmpty = "FiberHandle.await_empty 7328e8a70fedd0b0"
-FiberHandle = "FiberHandle.FiberHandle 3f3cc1b58603dd88"
+FiberHandle = "FiberHandle.FiberHandle e832e6164e5f4970"
 
 [excluded]
 isFiberHandle = "TS-only: a type guard; Flick values are typed statically"

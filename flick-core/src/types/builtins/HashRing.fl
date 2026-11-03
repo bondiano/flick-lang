@@ -10,35 +10,35 @@ type HashRing a
 /// the number of points a node of weight 1 takes on the ring.
 make : { baseWeight : Option Int } -> (a -> String) -> HashRing a
 foreign pure make from "@flick-lang/runtime/effect/HashRing" "flickMake"
-  reviewed "effect@4.0.5 sha256:b3f579cc8b7cb11f"
+  reviewed "effect@4.1.2 sha256:b3f579cc8b7cb11f"
 
 /// The ring with the node added, or its weight replaced (default 1).
 add : { weight : Option Float } -> a -> HashRing a -> HashRing a
 foreign pure add from "@flick-lang/runtime/effect/HashRing" "flickAdd"
-  reviewed "effect@4.0.5 sha256:e2fa54cf4ca24789"
+  reviewed "effect@4.1.2 sha256:e2fa54cf4ca24789"
 
 /// `add` of each node, all with the same weight.
 add_many : { weight : Option Float } -> List a -> HashRing a -> HashRing a
 foreign pure add_many from "@flick-lang/runtime/effect/HashRing" "flickAddMany"
-  reviewed "effect@4.0.5 sha256:f1f3be499d77f7bc"
+  reviewed "effect@4.1.2 sha256:f1f3be499d77f7bc"
 
 /// The ring without the node of that key.
 remove : a -> HashRing a -> HashRing a
 foreign pure remove from "@flick-lang/runtime/effect/HashRing" "flickRemove"
-  reviewed "effect@4.0.5 sha256:ee463ac747bcee19"
+  reviewed "effect@4.1.2 sha256:ee463ac747bcee19"
 
 /// Whether the ring has a node of that key.
 has : a -> HashRing a -> Bool
 foreign pure has from "@flick-lang/runtime/effect/HashRing" "flickHas"
-  reviewed "effect@4.0.5 sha256:51520b8f167d0c0f"
+  reviewed "effect@4.1.2 sha256:51520b8f167d0c0f"
 
 /// The node the input hashes to; `None` for an empty ring.
 get : String -> HashRing a -> Option a
 foreign pure get from "@flick-lang/runtime/effect/HashRing" "flickGet"
-  reviewed "effect@4.0.5 sha256:89547da67ed27e82"
+  reviewed "effect@4.1.2 sha256:89547da67ed27e82"
 
 /// The node of each of `count` shards, spread by weight; `None` for an
 /// empty ring.
 get_shards : Int -> HashRing a -> Option (List a)
 foreign pure get_shards from "@flick-lang/runtime/effect/HashRing" "flickGetShards"
-  reviewed "effect@4.0.5 sha256:0511a769213f28e7"
+  reviewed "effect@4.1.2 sha256:0511a769213f28e7"

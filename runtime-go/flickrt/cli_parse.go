@@ -32,7 +32,9 @@ func cliLex(argv []string) ([]cliToken, []string) {
 		case len(arg) == 0 || arg[0] != '-' || cliNegativeNumber.MatchString(arg) || arg == "-":
 			tokens = append(tokens, cliToken{kind: "value", name: arg})
 		case len(arg) > 1 && arg[1] == '-':
-			if i := indexByte(arg, '='); i >= 0 {
+			if i := indexByte(arg, '='); i == 2 {
+				tokens = append(tokens, cliToken{kind: "value", name: arg}) // `--=x` names no flag
+			} else if i >= 0 {
 				v := arg[i+1:]
 				tokens = append(tokens, cliToken{kind: "long", name: arg[2:i], raw: arg, value: &v})
 			} else {
@@ -41,8 +43,16 @@ func cliLex(argv []string) ([]cliToken, []string) {
 		default:
 			flags := arg[1:]
 			if i := indexByte(flags, '='); i >= 0 {
-				v := flags[i+1:]
-				tokens = append(tokens, cliToken{kind: "short", name: flags[:i], raw: "-" + flags[:i], value: &v})
+				// `-ab=x` is `-a -b=x`
+				chars, v := utf16Chars(flags[:i]), flags[i+1:]
+				last := ""
+				if len(chars) > 0 {
+					chars, last = chars[:len(chars)-1], chars[len(chars)-1]
+				}
+				for _, ch := range chars {
+					tokens = append(tokens, cliToken{kind: "short", name: ch, raw: "-" + ch})
+				}
+				tokens = append(tokens, cliToken{kind: "short", name: last, raw: "-" + last, value: &v})
 				continue
 			}
 			for _, ch := range utf16Chars(flags) {

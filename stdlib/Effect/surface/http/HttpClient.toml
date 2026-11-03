@@ -33,7 +33,7 @@ tapError = "Http.Client.tap_error 284f8c3731ffaa09"
 tapRequest = "Http.Client.tap_request 0227e56caf2bacf1"
 transform = "Http.Client.transform 048667a8cb1e7860"
 transformResponse = "Http.Client.transform_response fb7f187e4c1d5237"
-withCookiesRef = "Http.Client.with_cookies_ref 0f1f1f2bb4f50de1"
+withCookiesRef = "Http.Client.with_cookies_ref 29915d4c60acd6cc"
 withScope = "Http.Client.with_scope d35002632b8689ef"
 
 [language]
@@ -45,3 +45,9 @@ Retry = "TS-only: type-level computation of the result type of `retry`'s options
 WithRateLimiter = "TS-only: the options of `withRateLimiter`, over `RateLimiter` of `effect/persistence`, an entrypoint excluded from 0.1.0"
 isHttpClient = "TS-only: a type guard; Flick values are typed statically"
 withRateLimiter = "TS-only: limits a client by a `RateLimiter` of `effect/persistence`, an entrypoint excluded from 0.1.0"
+WithCircuitBreaker = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+circuitBreakerClassifier = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+isTransientError = "TS-only: a type guard; Flick values are typed statically"
+isTransientResponse = "TS-only: a type guard; Flick values are typed statically"
+timeout = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"
+withCircuitBreaker = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

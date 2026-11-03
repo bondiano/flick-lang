@@ -6,18 +6,18 @@ module Redacted exposing (make, reveal, equivalent, json_reveal, json_masked)
 /// The value, kept out of logs and output.
 make : a ->{} Redacted a
 foreign sync make from "@flick-lang/runtime" "redactedMake"
-  reviewed "effect@4.0.5 sha256:9f57fa63eab8298e"
+  reviewed "effect@4.1.2 sha256:9f57fa63eab8298e"
 
 /// The value inside: an explicit decision to let it out.
 reveal : Redacted a ->{} a
 foreign sync reveal from "@flick-lang/runtime" "redactedReveal"
-  reviewed "effect@4.0.5 sha256:7db6ee381d3b5fc2"
+  reviewed "effect@4.1.2 sha256:7db6ee381d3b5fc2"
 
 /// Whether the contents of both are equivalent by `is_equivalent`, without
 /// letting them out.
 equivalent : (a -> a -> Bool) -> Redacted a -> Redacted a ->{} Bool
 foreign sync equivalent from "@flick-lang/runtime/effect/Redacted" "flickEquivalent"
-  reviewed "effect@4.0.5 sha256:5508d5211d1a1370"
+  reviewed "effect@4.1.2 sha256:5508d5211d1a1370"
 
 instance Show (Redacted a) =
   show : Redacted a -> String
@@ -26,7 +26,7 @@ instance Show (Redacted a) =
 /// The content's own wire form: an explicit decision to let the secret out.
 json_reveal : PureCodec Json a -> PureCodec Json (Redacted a)
 foreign pure json_reveal from "@flick-lang/runtime" "codecRedactedReveal"
-  reviewed "effect@4.0.5 sha256:23b065aaa71ea9cb"
+  reviewed "effect@4.1.2 sha256:23b065aaa71ea9cb"
 
 /// Written as `"<redacted>"`, and never decoded: a one-way projection.
 json_masked : PureCodec Json (Redacted a)

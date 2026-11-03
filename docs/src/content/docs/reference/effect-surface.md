@@ -83,7 +83,7 @@ reviewed bindings agree with the new snapshot.
 
 ## Unstable modules
 
-Effect marks `effect/reactivity` `@stability unstable` in 4.0.5, and so are
+Effect marks `effect/reactivity` `@stability unstable` in 4.1.2, and so are
 its bindings: `Reactivity.Atom` (atoms, the service `Registry` that holds
 their values, and its `layer`) and `Reactivity.AsyncResult` (the value of an
 atom a task computes). Their API may change with any Effect release; the UI
@@ -140,7 +140,7 @@ Flick `type error`) sits in the same file, named `flick<Name>`.
 /// Recurs forever, each step the duration after the previous one ended.
 spaced : Duration.Duration -> Schedule none none i Float
 foreign pure spaced from "@flick-lang/runtime/effect/Schedule" "spaced"
-  reviewed "effect@4.0.5 sha256:498f22b480d2397e"
+  reviewed "effect@4.1.2 sha256:498f22b480d2397e"
 
 retry :
   forall c r e a r2 e2 o.
@@ -148,7 +148,7 @@ retry :
 foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:508d9e1864f6c9d3"
+  reviewed "effect@4.1.2 sha256:508d9e1864f6c9d3"
 ```
 
 Names are snake case; the subject comes last, so `task |> Effect.retry

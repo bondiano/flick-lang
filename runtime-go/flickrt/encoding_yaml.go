@@ -7,8 +7,9 @@ import (
 
 // parseYaml is Effect's encoding/Yaml `parse` (based on `yaml` 2.9.0): one
 // document of block and flow collections, plain, quoted and block
-// scalars, anchors and aliases. As Effect's, it reads no tags, compact
-// nested sequences, multi-line flow collections or complex keys.
+// scalars, anchors, aliases and merge keys (`<<`). As Effect's, it reads
+// no tags, compact nested sequences, multi-line quoted scalars in flow
+// collections or complex keys.
 func parseYaml(input string) (v Value, err string) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -25,10 +26,9 @@ func parseYaml(input string) (v Value, err string) {
 	lines := make([]yamlLine, len(raws))
 	for i, raw := range raws {
 		indent := len(raw) - len(strings.TrimLeft(raw, " "))
-		if indent < len(raw) && raw[indent] == '\t' {
-			return nil, "SyntaxError: Tabs cannot be used for YAML indentation at line " + strconv.Itoa(i+1)
-		}
-		lines[i] = yamlLine{raw, stripComment(raw[indent:]), indent, i + 1}
+		// rejected where the line is read as structure; block scalar content may hold tabs
+		tabIndent := indent < len(raw) && raw[indent] == '\t'
+		lines[i] = yamlLine{raw, stripComment(raw[indent:], 0), indent, i + 1, tabIndent}
 	}
 	p := &yamlParser{lines: lines, anchors: map[string]Value{}}
 	return p.parse(), ""
@@ -37,6 +37,7 @@ func parseYaml(input string) (v Value, err string) {
 type yamlLine struct {
 	raw, text      string // text: without indentation and comment
 	indent, number int
+	tabIndent      bool
 }
 
 type yamlParser struct {
@@ -83,39 +84,41 @@ func (p *yamlParser) parseNode(indent, parentIndent int) Value {
 	if isSequenceEntry(line.text) {
 		return p.parseSequence(indent)
 	}
-	if findIndicator(line.text, ':') != -1 {
-		return p.parseMapping(indent, &Record{})
+	if findIndicator(line.text, ':', 0) != -1 {
+		return p.parseMapping(indent, newYamlMapping())
 	}
 	p.index++
 	return p.parseNodeValue(line.text, parentIndent, false)
 }
 
-func (p *yamlParser) parseMapping(indent int, out *Record) *Record {
+func (p *yamlParser) parseMapping(indent int, mapping *yamlMapping) *Record {
 	for {
 		p.skipIgnored()
 		line := p.at(p.index)
 		if line == nil || line.indent < indent {
-			return out
+			return mapping.out
 		}
 		if line.indent > indent {
 			p.fail(line, "Unexpected indentation of "+strconv.Itoa(line.indent)+" spaces")
 		}
-		separator := findIndicator(line.text, ':')
+		separator := findIndicator(line.text, ':', 0)
 		if separator == -1 {
-			return out
+			return mapping.out
 		}
 		p.index++
-		p.parseMappingEntry(out, line.text, separator, indent, line)
+		p.parseMappingEntry(mapping, line.text, separator, indent, line)
 	}
 }
 
-func (p *yamlParser) parseMappingEntry(out *Record, text string, separator, indent int, line *yamlLine) {
-	key := parseYamlKey(strings.TrimFunc(text[:separator], isJSSpace))
+func (p *yamlParser) parseMappingEntry(mapping *yamlMapping, text string, separator, indent int, line *yamlLine) {
+	rawKey := strings.TrimFunc(text[:separator], isJSSpace)
 	value := p.parseNodeValue(strings.TrimLeftFunc(text[separator+1:], isJSSpace), indent, true)
-	if has(out, key) {
-		p.fail(line, "Duplicate key '"+key+"'")
+	fail := func(message string) { p.fail(line, message) }
+	if rawKey == "<<" {
+		mapping.merge(value, fail)
+	} else {
+		mapping.set(parseYamlKey(rawKey), value, fail)
 	}
-	out.put(key, value)
 }
 
 func (p *yamlParser) parseSequence(indent int) []Value {
@@ -137,12 +140,18 @@ func (p *yamlParser) parseSequence(indent int) []Value {
 		if isSequenceEntry(item) {
 			p.fail(line, "Compact nested block sequences are not supported")
 		}
-		if separator := findIndicator(item, ':'); separator == -1 {
+		if separator := findIndicator(item, ':', 0); separator == -1 {
 			out = append(out, p.parseNodeValue(item, indent, false))
 		} else {
-			mapping := &Record{}
-			p.parseMappingEntry(mapping, item, separator, indent+2, line)
-			out = append(out, p.parseMapping(indent+2, mapping))
+			// the mapping is indented to its first key, which may sit more than one space after the dash
+			dash := line.text[:len(line.text)-len(item)]
+			if strings.Contains(dash[1:], "\t") {
+				p.fail(line, "Tabs cannot be used for YAML indentation")
+			}
+			mappingIndent := indent + utf16Len(dash)
+			mapping := newYamlMapping()
+			p.parseMappingEntry(mapping, item, separator, mappingIndent, line)
+			out = append(out, p.parseMapping(mappingIndent, mapping))
 		}
 	}
 }
@@ -235,9 +244,32 @@ func (p *yamlParser) parseValue(value string, parentIndent int, allowIndentless 
 		}
 		return v
 	case text[0] == '[' || text[0] == '{':
-		return (&yamlFlow{in: text, anchors: p.anchors}).parse()
+		return p.parseFlowValue(text, parentIndent)
 	}
 	return p.parsePlainValue(text, parentIndent)
+}
+
+// parseFlowValue is a flow collection, which goes on over the next lines
+// while it is open.
+func (p *yamlParser) parseFlowValue(text string, parentIndent int) Value {
+	nextLine := func(depth int) (string, bool) {
+		next := p.at(p.index)
+		if next == nil || next.indent == 0 && isDocumentMarker(next.text) {
+			return "", false
+		}
+		// continuation lines are more indented than the parent; a closing bracket may sit at its indentation
+		content := !isBlank(next.text)
+		if content && next.indent < parentIndent {
+			return "", false
+		}
+		if content && next.indent == parentIndent && next.text[0] != ']' && next.text[0] != '}' {
+			return "", false
+		}
+		p.index++
+		// strip comments again knowing the open collections, so quoted `#` after a comma is kept
+		return stripComment(next.raw[next.indent:], depth), true
+	}
+	return (&yamlFlow{in: text, anchors: p.anchors, nextLine: nextLine}).parse()
 }
 
 // plainComment is the index of /(?:^|[ \t])#/ in `s`, -1 for none.
@@ -259,13 +291,14 @@ func (p *yamlParser) parsePlainValue(value string, parentIndent int) Value {
 		p.fail(first, "Invalid colon in plain scalar")
 	}
 	out := value
-	terminated := findIndicator(first.raw, '#') != -1
+	terminated := findIndicator(first.raw, '#', 0) != -1
 	for !terminated {
 		blankLines := p.skipBlankLines()
 		next := p.at(p.index)
 		if next == nil || next.indent <= parentIndent {
 			break
 		}
+		p.rejectTabIndent(next)
 		// quotes in plain continuations are literal
 		content := next.raw[next.indent:]
 		comment := plainComment(content)
@@ -280,6 +313,7 @@ func (p *yamlParser) parsePlainValue(value string, parentIndent int) Value {
 		if hasValueColon(text) {
 			p.fail(next, "Invalid colon in plain scalar")
 		}
+		p.rejectTabIndentedBlankLines(blankLines, parentIndent)
 		out += foldLineBreak(blankLines) + text
 		p.index++
 		terminated = comment != -1
@@ -307,13 +341,16 @@ func (p *yamlParser) parseQuotedValue(value string, parentIndent int) Value {
 		if quote == '"' && endsWithEscape(line) {
 			out += line[:len(line)-1]
 		} else {
-			out += trimFoldedEnd(line, quote) + foldLineBreak(p.skipBlankLines())
+			blankLines := p.skipBlankLines()
+			p.rejectTabIndentedBlankLines(blankLines, parentIndent)
+			out += trimFoldedEnd(line, quote) + foldLineBreak(blankLines)
 		}
 		next := p.at(p.index)
 		p.index++
 		if next == nil {
 			panic(encodingError("SyntaxError: Unterminated quoted YAML scalar"))
 		}
+		p.rejectTabIndent(next)
 		if !isBlank(next.raw) && next.indent <= parentIndent {
 			p.fail(next, "Invalid quoted scalar indentation")
 		}
@@ -326,33 +363,44 @@ func (p *yamlParser) parseBlockScalar(indicator string, parentIndent int) string
 	keep, strip := strings.Contains(indicator, "+"), strings.Contains(indicator, "-")
 	start := p.index
 	end := start
-	const unset = int(^uint(0) >> 1)
-	contentIndent := unset
+	contentIndent := -1 // unset; an indentation is at least 0
 	if digits := strings.Trim(indicator[1:], "+-"); digits != "" {
 		contentIndent = parentIndent + int(digits[0]-'0')
 	}
+	hasContent := false
 	for ; end < len(p.lines); end++ {
 		line := &p.lines[end]
-		if blank := isBlank(line.raw); !blank && line.indent <= parentIndent {
-			break
-		} else if !blank {
-			contentIndent = min(contentIndent, line.indent)
+		// only spaces make a line empty; a tab after the indentation is content
+		if strings.Trim(line.raw, " ") == "" {
+			continue
 		}
-	}
-	if contentIndent == unset {
-		contentIndent = parentIndent + 1
+		if contentIndent == -1 && line.indent > parentIndent {
+			// the first non-empty line sets the indentation, which no leading empty line may exceed
+			for i := start; i < end; i++ {
+				if p.lines[i].indent > line.indent {
+					p.fail(&p.lines[i], "Leading empty lines cannot be more indented than the block scalar content")
+				}
+			}
+			contentIndent = line.indent
+		}
+		if contentIndent != -1 && line.indent >= contentIndent {
+			hasContent = true
+			continue
+		}
+		p.rejectTabIndent(line)
+		// a less indented line or comment ends the scalar
+		if line.indent <= parentIndent || line.text == "" {
+			break
+		}
+		p.fail(line, "Expected block scalar indentation of "+strconv.Itoa(contentIndent)+" spaces")
 	}
 
-	content := make([]string, 0, end-start)
-	for i := start; i < end; i++ {
-		line := &p.lines[i]
-		switch {
-		case isBlank(line.raw):
-			content = append(content, "")
-		case line.indent < contentIndent:
-			p.fail(line, "Expected block scalar indentation of "+strconv.Itoa(contentIndent)+" spaces")
-		default:
-			content = append(content, line.raw[contentIndent:])
+	// white space past the indentation is content only once the scalar has a content line
+	content := make([]string, end-start)
+	if hasContent {
+		for i := range content {
+			raw := p.lines[start+i].raw
+			content[i] = raw[min(contentIndent, len(raw)):]
 		}
 	}
 	p.index = end
@@ -381,7 +429,7 @@ func (p *yamlParser) parseBlockScalar(indicator string, parentIndent int) string
 				blankLines++
 				continue
 			}
-			moreIndented := strings.HasPrefix(line, " ")
+			moreIndented := line[0] == ' ' || line[0] == '\t'
 			hardBreak := moreIndented || started && previousMoreIndented
 			switch {
 			case !started:
@@ -438,7 +486,22 @@ func (p *yamlParser) skipIgnored() {
 				p.fail(line, "Multiple YAML documents are not supported")
 			}
 		default:
+			p.rejectTabIndent(line)
 			return
+		}
+	}
+}
+
+func (p *yamlParser) rejectTabIndent(line *yamlLine) {
+	if line.tabIndent {
+		p.fail(line, "Tabs cannot be used for YAML indentation")
+	}
+}
+
+func (p *yamlParser) rejectTabIndentedBlankLines(count, parentIndent int) {
+	for i := p.index - count; i < p.index; i++ {
+		if line := &p.lines[i]; line.indent <= parentIndent {
+			p.rejectTabIndent(line)
 		}
 	}
 }

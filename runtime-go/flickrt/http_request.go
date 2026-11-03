@@ -23,14 +23,15 @@ type ServerRequest struct {
 	originalURL string
 	headers     *Record    // nil: the source's
 	remote      Value      // nil: the source's
+	peer        Value      // nil: the remote address; set where a proxy's headers gave that
+	protocol    string     // "": as the original URL has it
 	inflate     *inflation // the decompression middleware's, if any
 }
 
 type requestSource struct {
 	r       *http.Request  // a request a server got, or
 	client  *ClientRequest // the client request it was made of
-	marks   *requestMarks
-	head    string // a served request's raw head, when its connection was marked
+	head    string         // a served request's raw head, when its connection was marked
 	hdrOnce sync.Once
 	hdrs    *Record
 	once    sync.Once
@@ -98,26 +99,27 @@ func (q *ServerRequest) header(name string) (string, bool) {
 	return v, ok
 }
 
-// read is the body's bytes, read once: a served request's up to the
-// largest size `with_max_body_size` gives, when it is first read.
+// read is the body's bytes, read once: up to the largest size
+// `with_max_body_size` gives when it is first read, a served request's and
+// (as since Effect 4.1) one made of a client request's.
 func (s *requestSource) read(fb *Fiber) ([]byte, error) {
 	s.once.Do(func() {
+		limit := int64(-1)
+		if fb != nil {
+			if v, ok := fb.env.get(maxBodySizeKey); ok && v.(*big.Int).IsInt64() {
+				limit = v.(*big.Int).Int64()
+			}
+		}
 		switch {
 		case s.client != nil:
 			s.body, _, s.err = s.client.body.bytes(fb)
+		case limit >= 0:
+			s.body, s.err = io.ReadAll(io.LimitReader(s.r.Body, limit+1))
 		default:
-			var r io.Reader = s.r.Body
-			limit := int64(-1)
-			if fb != nil {
-				if v, ok := fb.env.get(maxBodySizeKey); ok && v.(*big.Int).IsInt64() {
-					limit = v.(*big.Int).Int64()
-					r = io.LimitReader(r, limit+1)
-				}
-			}
-			s.body, s.err = io.ReadAll(r)
-			if s.err == nil && limit >= 0 && int64(len(s.body)) > limit {
-				s.body, s.err = nil, errString("maxBytes exceeded")
-			}
+			s.body, s.err = io.ReadAll(s.r.Body)
+		}
+		if s.err == nil && limit >= 0 && int64(len(s.body)) > limit {
+			s.body, s.err = nil, errString("maxBytes exceeded")
 		}
 	})
 	return s.body, s.err
@@ -225,11 +227,30 @@ func (q *ServerRequest) toURL() Value {
 	if !ok {
 		host = "localhost"
 	}
-	protocol := "http"
-	if p, _ := q.header("x-forwarded-proto"); p == "https" {
-		protocol = "https"
+	protocol := q.protocol
+	if protocol == "" {
+		protocol = "http"
+		if len(q.originalURL) >= 6 && strings.EqualFold(q.originalURL[:6], "https:") {
+			protocol = "https"
+		}
+	}
+	// a path stays on the host, as Effect resolves `.` ++ path: `//x` names no other host
+	if strings.HasPrefix(q.url, "/") {
+		if u, ok := parseURL(protocol + "://" + host + q.url); ok {
+			return Some(*u)
+		}
+		return None
 	}
 	return resolveURL(q.url, protocol, host)
+}
+
+// peerAddress is the address of the connection's other end: the remote
+// address, unless a proxy's headers replaced that.
+func (q *ServerRequest) peerAddress() Value {
+	if q.peer != nil {
+		return q.peer
+	}
+	return RequestRemoteAddress(q)
 }
 
 // resolveURL is `new URL(url, protocol://host)` for a URL a request gives:
@@ -307,7 +328,7 @@ func RequestFromClientRequest(c Value) Value {
 		original = urlOf(u).href()
 	}
 	return &ServerRequest{
-		src:    &requestSource{client: cr, marks: &cr.marks},
+		src:    &requestSource{client: cr},
 		method: cr.method, url: removeHost(original), originalURL: original,
 	}
 }

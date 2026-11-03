@@ -118,7 +118,7 @@ import List.Transform exposing (..)
 /// Applies a pure function to each element.
 map : forall c a b. (a -> b)^c -> (List a -> List b)^c
 foreign pure map from "@flick-lang/runtime" "listMap"
-  reviewed "effect@4.0.5 sha256:1f6394368959203b"
+  reviewed "effect@4.1.2 sha256:1f6394368959203b"
   arity 2
   retention call
 

@@ -191,7 +191,7 @@ func compression(fb *Fiber, options, handler, request Value, web bool) Value {
 		pair := l.([]Value)
 		levels[algorithmOf[ConstructorName(pair[0].(*Data).Tag)]] = int(pair[1].(int32))
 	}
-	requestOf(request).appendPreResponse(func(fb *Fiber, request, response Value) Value {
+	appendPreResponse(fb, func(fb *Fiber, request, response Value) Value {
 		r := responseOf(response)
 		if r.status < 200 || r.status == 204 || r.status == 206 || r.status == 304 {
 			return response

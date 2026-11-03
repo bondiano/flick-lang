@@ -6,14 +6,17 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 )
 
-// parseToml is Effect's encoding/Toml `parse` (based on `toml` 4.1.2). An
-// offset date-time is the ISO string JSON writes of its `Date`; local
-// dates and times stay strings.
+// parseToml is Effect's encoding/Toml `parse` (based on `toml` 4.1.2) under
+// `Result.getOrThrow`: an error is its EncodingError. An offset date-time
+// is the ISO string JSON writes of its `Date`; local dates and times stay
+// strings.
 func parseToml(input string) (v Value, err string) {
-	p := &tomlParser{in: strings.TrimPrefix(input, "\uFEFF"), line: 1, column: 1, explicit: map[*Record]bool{}}
+	p := &tomlParser{
+		in: strings.TrimPrefix(input, "\uFEFF"), line: 1, column: 1,
+		explicit: map[*Record]bool{}, dotted: map[*Record]bool{}, inline: map[tomlSlot]bool{},
+	}
 	p.root = &Record{}
 	p.current = p.root
 	defer func() {
@@ -40,6 +43,19 @@ type tomlParser struct {
 	line, column  int
 	root, current *Record
 	explicit      map[*Record]bool
+	// tables defined by dotted keys; a header cannot define them again
+	dotted map[*Record]bool
+	// Effect's inlineValues: the values of key/value pairs are complete, so
+	// headers and dotted keys cannot extend them. A value is never replaced
+	// once assigned, so its slot stands for it; a scalar is marked too, as
+	// it fails as a non-table either way.
+	inline map[tomlSlot]bool
+}
+
+// tomlSlot is the key of a table holding a value.
+type tomlSlot struct {
+	table *Record
+	key   string
 }
 
 func (p *tomlParser) parse() *Record {
@@ -77,7 +93,7 @@ func (p *tomlParser) parseHeader() {
 	p.finishStatement()
 
 	table := p.resolveTable(path, array)
-	if !array && p.explicit[table] {
+	if !array && (p.explicit[table] || p.dotted[table]) {
 		p.fail("Cannot redefine table '" + strings.Join(path, ".") + "'")
 	}
 	if !array {
@@ -90,7 +106,11 @@ func (p *tomlParser) resolveTable(path []string, array bool) *Record {
 	table := p.root
 	for i, key := range path {
 		value := lookup(table, key)
-		if i == len(path)-1 && array {
+		last := i == len(path)-1
+		if p.inline[tomlSlot{table, key}] {
+			p.fail("Cannot redefine existing key '" + strings.Join(path[:i+1], ".") + "'")
+		}
+		if last && array {
 			if value == nil {
 				value = []Value{}
 			}
@@ -106,7 +126,7 @@ func (p *tomlParser) resolveTable(path []string, array bool) *Record {
 			value = &Record{}
 			table.put(key, value)
 		}
-		if list, ok := value.([]Value); ok {
+		if list, ok := value.([]Value); ok && !last {
 			value = nil
 			if len(list) > 0 {
 				value = list[len(list)-1]
@@ -124,22 +144,24 @@ func (p *tomlParser) resolveTable(path []string, array bool) *Record {
 func (p *tomlParser) assign(target *Record, keys []string, value Value) {
 	table := target
 	for i, key := range keys[:len(keys)-1] {
-		switch existing := lookup(table, key).(type) {
-		case nil:
+		existing := lookup(table, key)
+		if existing == nil {
 			child := &Record{}
 			table.put(key, child)
 			table = child
-		case *Record:
-			table = existing
-		default:
+		} else if t, ok := existing.(*Record); ok && !p.explicit[t] && !p.inline[tomlSlot{table, key}] {
+			table = t
+		} else {
 			p.fail("Cannot redefine existing key '" + strings.Join(keys[:i+1], ".") + "'")
 		}
+		p.dotted[table] = true
 	}
 	key := keys[len(keys)-1]
 	if has(table, key) {
 		p.fail("Cannot redefine existing key '" + strings.Join(keys, ".") + "'")
 	}
 	table.put(key, value)
+	p.inline[tomlSlot{table, key}] = true
 }
 
 func isTomlBareKey(c rune) bool {
@@ -162,9 +184,9 @@ func (p *tomlParser) parseKeyPath(stop rune) []string {
 				p.advance(1)
 			}
 			key = p.in[start:p.i]
-		}
-		if key == "" {
-			p.fail("Expected a key")
+			if key == "" {
+				p.fail("Expected a key")
+			}
 		}
 		keys = append(keys, key)
 		p.skipInlineWhitespace()
@@ -181,8 +203,10 @@ func (p *tomlParser) parseKeyPath(stop rune) []string {
 
 var (
 	tomlSpacedDateTime = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})?)`)
-	tomlOffsetDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$`)
-	tomlLocalDateTime  = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?$|^\d{4}-\d{2}-\d{2}$|^\d{2}:\d{2}:\d{2}(?:\.\d+)?$`)
+	tomlDateTime       = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})[Tt](\d{2}:\d{2}:\d{2}(?:\.\d+)?)([Zz]|[+-]\d{2}:\d{2})?$`)
+	tomlLocalDate      = regexp.MustCompile(`^(\d{4})-(\d{2})-(\d{2})$`)
+	tomlLocalTime      = regexp.MustCompile(`^(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$`)
+	tomlNumericOffset  = regexp.MustCompile(`^[+-](\d{2}):(\d{2})$`)
 	tomlSpecial        = regexp.MustCompile(`^[+-]?(?:inf|nan)$`)
 	tomlHex            = regexp.MustCompile(`^0x[0-9A-Fa-f](?:_?[0-9A-Fa-f])*$`)
 	tomlOctal          = regexp.MustCompile(`^0o[0-7](?:_?[0-7])*$`)
@@ -223,7 +247,7 @@ func (p *tomlParser) parseValue() Value {
 	if v, ok := p.parseDate(token); ok {
 		return v
 	}
-	if n, ok := tomlNumber(token); ok {
+	if n, ok := p.parseNumber(token); ok {
 		return n
 	}
 	p.fail("Invalid value '" + token + "'")
@@ -231,20 +255,74 @@ func (p *tomlParser) parseValue() Value {
 }
 
 func (p *tomlParser) parseDate(token string) (Value, bool) {
-	if tomlOffsetDateTime.MatchString(token) {
-		ms := parseJsDate(strings.Replace(strings.Replace(token, "t", "T", 1), "z", "Z", 1))
-		if math.IsNaN(ms) {
+	if m := tomlDateTime.FindStringSubmatch(token); m != nil {
+		date, time, offset := m[1], m[2], m[3]
+		// `Date` cannot represent a leap second, so offset date-times reject `:60`
+		offsetValid := offset == "" || isValidTomlOffset(offset) && time[6:8] != "60"
+		if !isValidTomlDate(date) || !isValidTomlTime(time) || !offsetValid {
 			p.fail("Invalid date-time '" + token + "'")
 		}
-		return newJsDate(ms).isoString(), true
+		if offset == "" {
+			return date + "T" + time, true
+		}
+		return newJsDate(parseJsDate(date + "T" + time + strings.ToUpper(offset))).isoString(), true
 	}
-	if tomlLocalDateTime.MatchString(token) {
-		return strings.Replace(token, "t", "T", 1), true
+	if tomlLocalDate.MatchString(token) {
+		if !isValidTomlDate(token) {
+			p.fail("Invalid date-time '" + token + "'")
+		}
+		return token, true
+	}
+	if tomlLocalTime.MatchString(token) {
+		if !isValidTomlTime(token) {
+			p.fail("Invalid date-time '" + token + "'")
+		}
+		return token, true
 	}
 	return nil, false
 }
 
-func tomlNumber(token string) (float64, bool) {
+// tomlFields is the numbers of the groups of `pattern` in `s`.
+func tomlFields(pattern *regexp.Regexp, s string) []int {
+	m := pattern.FindStringSubmatch(s)
+	out := make([]int, len(m)-1)
+	for i, field := range m[1:] {
+		out[i], _ = strconv.Atoi(field)
+	}
+	return out
+}
+
+var tomlDaysInMonth = [12]int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+
+func isValidTomlDate(date string) bool {
+	f := tomlFields(tomlLocalDate, date)
+	year, month, day := f[0], f[1], f[2]
+	if month < 1 || month > 12 {
+		return false
+	}
+	days := tomlDaysInMonth[month-1]
+	if month == 2 && year%4 == 0 && (year%100 != 0 || year%400 == 0) {
+		days = 29
+	}
+	return day >= 1 && day <= days
+}
+
+func isValidTomlTime(time string) bool {
+	f := tomlFields(tomlLocalTime, time)
+	return f[0] <= 23 && f[1] <= 59 && f[2] <= 60
+}
+
+// isValidTomlOffset is true of `Z` too.
+func isValidTomlOffset(offset string) bool {
+	if !tomlNumericOffset.MatchString(offset) {
+		return true
+	}
+	f := tomlFields(tomlNumericOffset, offset)
+	return f[0] <= 23 && f[1] <= 59
+}
+
+// parseNumber is a number token's value; an integer must be a safe one.
+func (p *tomlParser) parseNumber(token string) (float64, bool) {
 	normalized := strings.ReplaceAll(token, "_", "")
 	switch {
 	case tomlSpecial.MatchString(token):
@@ -255,13 +333,23 @@ func tomlNumber(token string) (float64, bool) {
 			return math.Inf(-1), true
 		}
 		return math.Inf(1), true
-	case tomlHex.MatchString(token):
-		return parseIntRadix(normalized[2:], 16), true
-	case tomlOctal.MatchString(token):
-		return parseIntRadix(normalized[2:], 8), true
-	case tomlBinary.MatchString(token):
-		return parseIntRadix(normalized[2:], 2), true
-	case tomlInteger.MatchString(token) || tomlFloat.MatchString(token):
+	case tomlHex.MatchString(token) || tomlOctal.MatchString(token) || tomlBinary.MatchString(token) || tomlInteger.MatchString(token):
+		var n float64
+		switch normalized[:min(2, len(normalized))] {
+		case "0x":
+			n = parseIntRadix(normalized[2:], 16)
+		case "0o":
+			n = parseIntRadix(normalized[2:], 8)
+		case "0b":
+			n = parseIntRadix(normalized[2:], 2)
+		default:
+			n, _ = strconv.ParseFloat(normalized, 64)
+		}
+		if math.Abs(n) > 1<<53-1 { // Number.isSafeInteger
+			p.fail("Integer out of range '" + token + "'")
+		}
+		return n, true
+	case tomlFloat.MatchString(token):
 		n, _ := strconv.ParseFloat(normalized, 64) // out of range is ±Infinity, as Number gives
 		return n, true
 	}
@@ -276,29 +364,15 @@ func parseIntRadix(digits string, radix int) float64 {
 	return f
 }
 
-// appendCodePoint is `out + String.fromCodePoint(r)`: a low surrogate
-// after a high one joins it as a pair.
-func appendCodePoint(out []byte, r rune) []byte {
-	if r >= 0xDC00 && r <= 0xDFFF && len(out) >= 3 {
-		if hi, n := decode(string(out[len(out)-3:])); n == 3 && hi >= 0xD800 && hi <= 0xDBFF {
-			return utf8.AppendRune(out[:len(out)-3], 0x10000+(hi-0xD800)<<10+r-0xDC00)
-		}
-	}
-	return encodeRune(out, r)
-}
-
-// hexCodePoint is the code point of `length` hex digits at the start of
-// `s`, or ok false; past U+10FFFF it throws fromCodePoint's RangeError.
-func hexCodePoint(s string, length int) (rune, bool) {
+// tomlCodePoint is the code point of `length` hex digits at the start of
+// `s`, or ok false for a surrogate or one past U+10FFFF.
+func tomlCodePoint(s string, length int) (rune, bool) {
 	if len(s) < length {
 		return 0, false
 	}
 	n, err := strconv.ParseUint(s[:length], 16, 32)
-	if err != nil {
+	if err != nil || n >= 0xD800 && n <= 0xDFFF || n > 0x10FFFF {
 		return 0, false
-	}
-	if n > 0x10FFFF {
-		panic(encodingError("RangeError: Invalid code point " + strconv.FormatUint(n, 10)))
 	}
 	return rune(n), true
 }
@@ -316,7 +390,7 @@ func (p *tomlParser) parseBasicString(multiline bool) string {
 	for !p.done() {
 		if multiline && strings.HasPrefix(p.rest(), `"""`) {
 			p.advance(3)
-			return string(out)
+			return string(out) + p.closingQuotes('"')
 		}
 		c := p.peek()
 		if !multiline && c == '"' {
@@ -355,11 +429,11 @@ func (p *tomlParser) parseBasicString(multiline bool) string {
 			if escape == 'u' {
 				length = 4
 			}
-			r, ok := hexCodePoint(p.rest(), length)
+			r, ok := tomlCodePoint(p.rest(), length)
 			if !ok {
 				p.fail("Invalid unicode escape")
 			}
-			out = appendCodePoint(out, r)
+			out = encodeRune(out, r)
 			p.advance(length)
 		} else {
 			p.fail("Invalid escape '\\" + p.in[start:min(p.i, len(p.in))] + "'")
@@ -381,7 +455,7 @@ func (p *tomlParser) parseLiteralString(multiline bool) string {
 		if multiline && strings.HasPrefix(p.rest(), "'''") {
 			out := p.in[start:p.i]
 			p.advance(3)
-			return out
+			return out + p.closingQuotes('\'')
 		}
 		if !multiline && p.peek() == '\'' {
 			out := p.in[start:p.i]
@@ -395,6 +469,17 @@ func (p *tomlParser) parseLiteralString(multiline bool) string {
 	}
 	p.fail("Unterminated literal string")
 	return ""
+}
+
+// closingQuotes is up to two quotes ending a multi-line string's content
+// right before its closing delimiter.
+func (p *tomlParser) closingQuotes(quote rune) string {
+	n := 0
+	for n < 2 && p.peek() == quote {
+		n++
+		p.advance(1)
+	}
+	return strings.Repeat(string(quote), n)
 }
 
 // skipNewline skips the line break right after a multi-line string opens.
@@ -497,7 +582,9 @@ func (p *tomlParser) expect(c rune) {
 }
 
 // advance moves past `count` characters, ASCII but for a single one; as
-// in JS, past the end it still counts columns.
+// in JS, past the end it still counts columns. A control character fails
+// as Effect's does; its "Bare carriage return" is unreachable, a lone CR
+// failing as a control character first.
 func (p *tomlParser) advance(count int) {
 	for range count {
 		if p.done() {
@@ -506,6 +593,9 @@ func (p *tomlParser) advance(count int) {
 			continue
 		}
 		r, n := decode(p.rest())
+		if r < 0x20 && r != '\t' && r != '\n' && !(r == '\r' && strings.HasPrefix(p.rest(), "\r\n")) || r == 0x7F {
+			p.fail("Invalid control character")
+		}
 		if r == '\n' {
 			p.line++
 			p.column = 1
@@ -532,5 +622,5 @@ func (p *tomlParser) done() bool { return p.i >= len(p.in) }
 func (p *tomlParser) rest() string { return p.in[min(p.i, len(p.in)):] }
 
 func (p *tomlParser) fail(message string) {
-	panic(encodingError("SyntaxError: " + message + " at line " + strconv.Itoa(p.line) + ", column " + strconv.Itoa(p.column)))
+	panic(encodingError("EncodingError: " + message + " at line " + strconv.Itoa(p.line) + ", column " + strconv.Itoa(p.column)))
 }

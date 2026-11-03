@@ -4,7 +4,7 @@
 import * as effect from "effect";
 import effectPackage from "effect/package.json" with { type: "json" };
 
-export const EFFECT_VERSION = "4.0.5";
+export const EFFECT_VERSION = "4.1.2";
 
 /** Operations of the capability matrix, by Effect module. */
 const MATRIX: Readonly<Record<string, ReadonlyArray<string>>> = {

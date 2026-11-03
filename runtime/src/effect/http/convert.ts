@@ -10,14 +10,15 @@ import { tag } from "../../tags.ts";
 /** A Flick type of nullary constructors and the JS strings Effect uses. */
 export const enumeration = <T extends string>(type: string, names: ReadonlyArray<readonly [string, T]>) => {
   const toJs = new Map(names.map(([name, js]) => [tag(`${type}.${name}`), js]));
-  const toFlick = new Map(names.map(([name, js]) => [js, Object.freeze({ _tag: tag(`${type}.${name}`) })]));
+  const toFlick = new Map<string, Data>(names.map(([name, js]) => [js, Object.freeze({ _tag: tag(`${type}.${name}`) })]));
   return {
     js: (value: Data): T => {
       const js = toJs.get(value._tag);
       if (js === undefined) throw new TypeError(`not a ${type}: ${value._tag}`);
       return js;
     },
-    flick: (js: T): Data => {
+    // Effect types a request's method as any string since 4.1
+    flick: (js: string): Data => {
       const value = toFlick.get(js);
       if (value === undefined) throw new TypeError(`not a ${type}: ${js}`);
       return value;

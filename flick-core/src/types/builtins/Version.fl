@@ -1,9 +1,9 @@
 /// Effect's `Version`: the release of Effect the program runs on.
 module Version exposing (..)
 
-/// The version Effect reports, as `"4.0.5"`; JS code may change it, so
+/// The version Effect reports, as `"4.1.2"`; JS code may change it, so
 /// reading it is runtime.
 current : Unit ->{} String
 foreign sync current from "@flick-lang/runtime/effect/Version" "getCurrentVersion"
   arity 0
-  reviewed "effect@4.0.5 sha256:4fb6f20c9643e6bd"
+  reviewed "effect@4.1.2 sha256:4fb6f20c9643e6bd"

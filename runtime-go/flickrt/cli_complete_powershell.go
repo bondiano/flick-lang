@@ -69,13 +69,17 @@ func completePsValueFields(t completeType) string {
 }
 
 func completePsFlagEntry(f completeFlag) string {
+	negation := ""
+	if n, ok := completeNegatedName(f); ok {
+		negation = "negation = " + completeQuotePs("--"+n) + "; "
+	}
 	optional := ""
 	if f.optionalValue {
 		optional = "optionalValue = $true; "
 	}
 	return "@{ name = " + completeQuotePs(f.name) + "; forms = " + completePsArray(completeFlagForms(f, false)) + "; " +
 		"takesValue = $" + strconv.FormatBool(f.typ.tag != "Boolean") + "; " +
-		optional + completePsValueFields(f.typ) + "; " +
+		negation + optional + completePsValueFields(f.typ) + "; " +
 		"description = " + completePsOptional(f.description) + " }"
 }
 
@@ -209,10 +213,10 @@ const completePowerShellTail = `
       foreach ($form in $flag.forms) {
         & $add $form 'ParameterName' $flag.description $typed ''
       }
-      if (-not $flag.takesValue) {
+      if ($flag.negation) {
         $tooltip = $null
         if ($flag.description) { $tooltip = 'Disable ' + $flag.name }
-        & $add ('--no-' + $flag.name) 'ParameterName' $tooltip $typed ''
+        & $add $flag.negation 'ParameterName' $tooltip $typed ''
       }
     }
   }
@@ -283,14 +287,19 @@ const completePowerShellTail = `
       foreach ($form in $forms) {
         $pending = $null
         $flag = $lookup[$form]
-        if ($null -eq $flag) {
-          if ($form.StartsWith('--no-')) {
-            $name = $form.Substring(5)
-            $flag = $lookup['--' + $name]
-            if ($null -ne $flag -and -not $flag.takesValue -and $flag.name -ceq $name) { $used[$name] = $true }
+        # As in the CLI parser, a negation wins over an alias but not over a
+        # canonical name.
+        if ($null -eq $flag -or $form -cne ('--' + $flag.name)) {
+          $negated = $null
+          foreach ($candidate in $context.flags) {
+            if ($candidate.negation -ceq $form) { $negated = $candidate }
           }
-          continue
+          if ($null -ne $negated) {
+            $used[$negated.name] = $true
+            continue
+          }
         }
+        if ($null -eq $flag) { continue }
         $used[$flag.name] = $true
         # A flag with an optional value only takes a value attached with '='.
         if (-not $hasValue -and -not $flag.optionalValue) { $pending = $flag }

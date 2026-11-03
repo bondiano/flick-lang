@@ -185,7 +185,7 @@ func channelMerge(left, right *Channel, strategy string) *Channel {
 					_, closed := catch(func() Value { closeScope(fb, scope, exit.cause); return nil })
 					switch {
 					case exit.cause != nil:
-						onExit(side, Sequential(exit.cause, closed))
+						onExit(side, finalized(exit.cause, closed)) // as Effect's onExitPrimitive
 					case closed != nil:
 						onExit(side, closed)
 					default:

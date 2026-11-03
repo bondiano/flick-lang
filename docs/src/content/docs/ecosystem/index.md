@@ -15,7 +15,7 @@ The [source repository](https://github.com/bondiano/flick-lang) contains the too
 | --- | --- |
 | Native compiler and CLI | Rust crate `flick`, sharing `flick-core` with the browser compiler. Build it from the checkout; the repository also has a tagged-release workflow for native archives. |
 | Browser compiler | Rust crate `flick-wasm`, built to WebAssembly with wasm-bindgen. Used by this site's browser tools, not presented here as a public npm compiler package. |
-| Runtime adapter | Workspace package `@flick-lang/runtime` in `runtime/`, with JavaScript and TypeScript declarations. Its manifest pins Effect `4.0.5`; use the matching compiler/runtime versions. |
+| Runtime adapter | Workspace package `@flick-lang/runtime` in `runtime/`, with JavaScript and TypeScript declarations. Its manifest pins Effect `4.1.2`; use the matching compiler/runtime versions. |
 | Astro/Vite integration | Private workspace package `@flick-lang/astro` in `tools/astro-flick/`. This site depends on it with `workspace:*`. |
 | TypeScript declaration importer | Private workspace package `@flick-lang/dts-importer` in `tools/dts-importer/`. Requires its local build and an installed package whose declarations can be read. |
 | Editor support | Sources under `editors/` for VS Code, Zed and tree-sitter; the language server is part of the native `flick` binary. |

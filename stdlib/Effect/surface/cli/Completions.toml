@@ -2,7 +2,10 @@
 ArgumentDescriptor = "Cli.completions 9855364d06914f31"
 ArgumentType = "Cli.completions fbc574d358453495"
 CommandDescriptor = "Cli.completions 0563f4f4a233670b"
-FlagDescriptor = "Cli.completions 27a83735fa89a008"
+FlagDescriptor = "Cli.completions 3a8133f196bb16f3"
 FlagType = "Cli.completions 08bd9f4cb896500d"
 Shell = "Cli.Shell 9c3499cfb17f074b"
 generate = "Cli.completions a9819eb64f8a0291"
+
+[excluded]
+fromCommand = "outside 0.1.0: new in Effect 4.1, not yet in Flick's standard library"

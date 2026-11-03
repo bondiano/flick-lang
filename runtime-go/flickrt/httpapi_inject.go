@@ -23,7 +23,7 @@ func HttpApiInject(fb *Fiber, handler, base, endpoint, request Value) Value {
 		}
 		r := httptest.NewRequest(method, target, body)
 		r.Header = header
-		source := &requestSource{r: r, marks: &requestMarks{}}
+		source := &requestSource{r: r}
 		q := &ServerRequest{src: source, method: r.Method, url: r.RequestURI, originalURL: r.RequestURI}
 		out, c := catch(func() Value { return Run(fb, Apply(fb, handler, q)) })
 		if c != nil {
