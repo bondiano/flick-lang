@@ -2,7 +2,7 @@
 
 use std::mem;
 
-use super::{Done, K, Parser, decl, pattern, types};
+use super::{Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
 
 /// A statement of a block: `let`, a local signature or an expression.
@@ -324,6 +324,7 @@ fn todo(p: &mut Parser) -> K {
 fn atom(p: &mut Parser) -> Option<Done> {
     let m = p.start();
     let kind = match p.current() {
+        K::Ident if plugin::at_block(p) => plugin::block(p),
         K::Ident => name_or_server(p),
         K::Con => {
             con_path(p);

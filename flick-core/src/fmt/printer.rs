@@ -134,7 +134,7 @@ impl<'a> Printer<'a> {
             K::TypeDecl | K::KindDecl | K::ErrorDecl => self.type_decl(n),
             K::ClassDecl | K::InstanceDecl | K::ServiceDecl => self.class(n),
             K::ForeignDecl => self.foreign(n),
-            K::SqlMigrationDecl => self.as_written(n),
+            K::SqlMigrationDecl | K::PluginExpr => self.as_written(n),
             _ => self.generic(n),
         }
     }

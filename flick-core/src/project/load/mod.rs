@@ -14,6 +14,7 @@ mod checking_tests;
 mod entry;
 #[cfg(feature = "ide")]
 mod ide;
+mod plugins;
 mod precompiled;
 mod runner;
 mod target;
@@ -231,6 +232,7 @@ fn run(
     }
     let edges = loader.load_imports();
     loader.import_cycles(&edges);
+    loader.plugins();
     if let Some(lowered) = &mut loader.lowered {
         lowered.resize_with(loader.modules.len(), || None);
     }

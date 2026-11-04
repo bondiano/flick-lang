@@ -91,6 +91,9 @@ fn module_header(p: &mut Parser) {
 fn import(p: &mut Parser) {
     let m = p.start();
     p.bump();
+    if p.at_word("plugin") && p.nth(1) == K::String {
+        return super::plugin::import(p, m);
+    }
     module_path(p);
     if p.eat(K::AsKw) {
         p.expect(K::Con);
@@ -101,7 +104,7 @@ fn import(p: &mut Parser) {
     p.complete(m, K::ImportDecl);
 }
 
-fn exposing(p: &mut Parser) {
+pub(super) fn exposing(p: &mut Parser) {
     let m = p.start();
     p.bump();
     if p.at(K::LParen) {
@@ -376,23 +379,7 @@ fn sql_migration(p: &mut Parser) {
     p.bump();
     p.bump();
     if p.expect(K::Number) && p.expect(K::String) {
-        let opener = p.raw();
-        if p.expect(K::LBrace) {
-            let body = p.start();
-            let mut depth = 0u32;
-            loop {
-                match p.raw().kind {
-                    K::Eof => break,
-                    K::RBrace if depth == 0 => break,
-                    K::LBrace => depth += 1,
-                    K::RBrace => depth -= 1,
-                    _ => {}
-                }
-                p.bump();
-            }
-            p.complete(body, K::Block);
-            p.expect_closer(K::RBrace, opener);
-        }
+        super::plugin::raw_braces(p);
     }
     p.complete(m, K::SqlMigrationDecl);
 }

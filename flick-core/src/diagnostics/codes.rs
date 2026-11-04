@@ -295,6 +295,7 @@ codes! {
     P032 = Project 32, "invalid dependency or package";
     P033 = Project 33, "package needs another version of Flick";
     P034 = Project 34, "dependency is not installed";
+    P035 = Project 35, "plugin cannot be loaded";
 }
 
 #[cfg(test)]
