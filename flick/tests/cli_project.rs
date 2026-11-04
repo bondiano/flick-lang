@@ -75,6 +75,43 @@ fn every_code_has_an_explanation() {
     assert_eq!(code(&flick_in(&dir, &["explain", "FLICK-Z999"])), Some(2));
 }
 
+#[test]
+fn explain_reads_a_plugins_code_in_its_package() {
+    let dir = project(
+        "cli_explain_plugin",
+        &[
+            (
+                "app/flick.toml",
+                &format!("{APP}\n[dependencies]\ntool = {{ path = \"../tool\" }}\n"),
+            ),
+            ("app/src/App/Main.fl", MAIN),
+            ("tool/explain/X001.md", "What X001 means.\n"),
+            ("tool/explain/secret.md", "not a code\n"),
+        ],
+    );
+    let app = dir.join("app");
+    let out = flick_in(&app, &["explain", "tool/x001"]);
+    assert_eq!(code(&out), Some(0), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "tool/X001\n\nWhat X001 means.\n"
+    );
+    for wrong in [
+        "tool/X002",
+        "tool/../tool/explain/secret",
+        "tool/secret",
+        "other/X001",
+    ] {
+        let out = flick_in(&app, &["explain", wrong]);
+        assert_eq!(code(&out), Some(2), "{wrong}: {out:?}");
+        assert!(
+            stderr(&out).contains("FLICK-P018"),
+            "{wrong}: {}",
+            stderr(&out)
+        );
+    }
+}
+
 /// The number of cached builds.
 fn cached(dir: &Path) -> usize {
     fs::read_dir(dir.join(".flick/cache")).map_or(0, Iterator::count)

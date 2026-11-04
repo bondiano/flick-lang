@@ -13,6 +13,18 @@ break programs.
   WebAssembly components of `flick:plugin` (`flick-plugin` crate, wasmtime
   with fuel and memory limits in release builds) or Rust values linked in.
   See [plugins](https://bondiano.github.io/flick-lang/reference/plugins/).
+  A head takes arguments, strings and `( … )`, before its body
+  (`h "x" (e) { … }`); a plugin reports under codes of its own, shown under
+  its package (`std/L001`, explained by `flick explain std/L001`), and
+  answers editors' completions, hovers and highlights in its blocks. The
+  interface is `flick:plugin@0.2.0`.
+- **Breaking:** `cli "name" { … }` is the plugin of `std`: a file that
+  writes one imports it, `import Cli exposing (plugin cli)`. Without the
+  import the block is `FLICK-P037`, which `flick check --fix` fixes. Its
+  rules are `std/L001`…`std/L007` (formerly `FLICK-L001`…`FLICK-L007`) and
+  `std/L009` for a malformed clause, which was `FLICK-S007`; the formatter
+  prints the block as written. It now checks in every build of the compiler,
+  the browser's too (`FLICK-L008` is retired).
 - **Builds:** the built-in modules are lowered in one pass (a small build
   takes about a quarter of the time); the checked modules of libraries are
   saved between runs.

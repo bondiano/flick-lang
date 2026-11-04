@@ -283,6 +283,7 @@ fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
                 tree: parsed.tree,
                 typing: typing.into(),
                 interface,
+                editing: Vec::new(),
             }],
             compilation: Compilation::default(),
             diagnostics,

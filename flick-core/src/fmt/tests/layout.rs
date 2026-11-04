@@ -193,22 +193,16 @@ fn keeps_comments_in_place() {
     "#);
 }
 
-/// `sql`, `cli`, `do` and `for` blocks put one clause or statement per line.
+/// `sql`, `do` and `for` blocks put one clause or statement per line.
 #[test]
 fn lays_out_blocks_in_braces() {
-    let src = "let query =\n  sql params {\n    from user in Users\n    left_join account in Accounts\n      on account.user_id == user.id\n    where user.id == params.user_id\n    select { name = user.name; balance = account.balance }\n  }\nlet command = cli \"greet\" {\n  description \"Greets\"\n  /// Who to greet\n  arg name : String = \"world\"\n  handle fun { name } -> Platform.stdout_line (\"Hello, \" ++ name) }\nlet workflow = do { x <- ask; let y = x + 1; pure y }\nlet evens = [for x <- xs if x > 0 yield x * 2]\n";
+    let src = "let query =\n  sql params {\n    from user in Users\n    left_join account in Accounts\n      on account.user_id == user.id\n    where user.id == params.user_id\n    select { name = user.name; balance = account.balance }\n  }\nlet workflow = do { x <- ask; let y = x + 1; pure y }\nlet evens = [for x <- xs if x > 0 yield x * 2]\n";
     insta::assert_snapshot!(fmt(src), @r#"
     let query = sql params {
       from user in Users
       left_join account in Accounts on account.user_id == user.id
       where user.id == params.user_id
       select { name = user.name; balance = account.balance }
-    }
-    let command = cli "greet" {
-      description "Greets"
-      /// Who to greet
-      arg name : String = "world"
-      handle fun { name } -> Platform.stdout_line ("Hello, " ++ name)
     }
     let workflow = do {
       x <- ask

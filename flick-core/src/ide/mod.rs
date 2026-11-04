@@ -3,7 +3,6 @@
 //! Positions are UTF-8 byte offsets; the language server converts them.
 
 mod actions;
-mod cli;
 mod complete;
 mod enrich;
 mod fields;
@@ -11,6 +10,7 @@ mod hints;
 mod hover;
 mod locals;
 mod navigate;
+mod plugins;
 mod rename;
 mod sql;
 mod sql_table;

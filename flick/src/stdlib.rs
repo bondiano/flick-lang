@@ -62,7 +62,7 @@ pub fn prepare(explicit: Option<&str>) -> Result<(), String> {
         .ok()
         .flatten();
     let dir = match project {
-        Some(project) => in_project(&project)?,
+        Some(project) => in_project(&project, NAME)?,
         None => outside_project()?,
     };
     let package = types::read_std(&dir)
@@ -75,46 +75,58 @@ fn overridden() -> bool {
     env::var_os("FLICK_STD_PATH").is_some_and(|d| !d.is_empty())
 }
 
-/// The directory of the `std` the project depends on.
-fn in_project(project: &Project) -> Result<PathBuf, String> {
-    // the std package itself
-    if project
-        .config
-        .package
-        .as_ref()
-        .is_some_and(|p| p.name == NAME)
+/// The directory of the package `name`, `std` or a dependency of the
+/// project the working directory or `explicit` names.
+pub fn package_dir(name: &str, explicit: Option<&str>) -> Result<PathBuf, String> {
+    if name == NAME
+        && let Some(dir) = env::var_os("FLICK_STD_PATH").filter(|d| !d.is_empty())
     {
+        return Ok(PathBuf::from(dir));
+    }
+    let host = FsHost::new();
+    let mut sources = SourceMap::default();
+    let project = project::discover(&host, &mut sources, &host.cwd, explicit.map(Path::new))
+        .ok()
+        .flatten();
+    match project {
+        Some(project) => in_project(&project, name),
+        None if name == NAME => outside_project(),
+        None => Err(format!("`{name}` is no dependency here: no project")),
+    }
+}
+
+/// The directory of the package `name` the project depends on, or of the
+/// project itself.
+fn in_project(project: &Project, name: &str) -> Result<PathBuf, String> {
+    if (project.config.package.as_ref()).is_some_and(|p| p.name == name) {
         return Ok(project.root.clone());
     }
     let dependencies = with_std(&project.config.dependencies);
-    let std = dependencies
-        .iter()
-        .find(|d| d.name == NAME)
-        .expect("with_std adds it unless overridden");
-    if let Source::Path(path) = &std.source {
+    let dependency = (dependencies.iter())
+        .find(|d| d.name == name)
+        .ok_or_else(|| format!("the project has no dependency `{name}`"))?;
+    if let Source::Path(path) = &dependency.source {
         return Ok(project::normalize(&project.root.join(path)));
     }
-    stored(&project.root, std).ok_or_else(|| {
+    stored(&project.root, dependency).ok_or_else(|| {
         format!(
-            "`std` from `{}` is not installed: run `flick install`",
-            std.source.key()
+            "`{name}` from `{}` is not installed: run `flick install`",
+            dependency.source.key()
         )
     })
 }
 
-/// The directory of `std` the lock at `root` pins, when the store has it.
-fn stored(root: &Path, std: &Dependency) -> Option<PathBuf> {
+/// The directory of `dependency` the lock at `root` pins, when the store
+/// has it.
+fn stored(root: &Path, dependency: &Dependency) -> Option<PathBuf> {
     let text = fs::read_to_string(root.join(LOCK_FILE)).ok()?;
     let mut sources = SourceMap::default();
     let file = sources.add(LOCK_FILE.to_owned(), &text);
     let locked = Lock::parse(&text, file)
         .ok()?
-        .find(NAME, &std.source)?
+        .find(&dependency.name, &dependency.source)?
         .dir(&store::store_dir()?);
-    let dir = std
-        .source
-        .subdir()
-        .map_or(locked.clone(), |s| locked.join(s));
+    let dir = (dependency.source.subdir()).map_or(locked.clone(), |s| locked.join(s));
     dir.exists().then_some(dir)
 }
 

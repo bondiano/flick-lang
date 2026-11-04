@@ -94,10 +94,10 @@ as record labels: `{ echo = … }`.
 | `codec` | a codec built field by field | `codec Codec.json { name = … }` |
 | `sql` | a typed SQL query, or `sql table` for a table | `sql { from u in Users select u }` |
 | `ui` | a UI block | `ui { … }` |
-| `cli` | a command-line interface | `cli "deploy" { flag dry_run : Bool … }` |
 
-See [schema.md](../schema/), [sql.md](../sql/), [ui.md](../ui/) and
-[cli-dsl.md](../cli-dsl/).
+See [schema.md](../schema/), [sql.md](../sql/) and [ui.md](../ui/). A
+command-line interface, `cli "deploy" { … }`, is a block of the plugin of
+`std`, not a keyword: see [cli-dsl.md](../cli-dsl/).
 
 ## In the editor
 
@@ -112,7 +112,7 @@ with what the keyword does:
 | `provide`, `try` | the value of the block, with the services or errors it removes |
 | `match`, `if` | `match … with : String`: the value of the arm or branch taken |
 | `fun` | `fun … -> … : Float -> Float`: the function |
-| `sql`, `codec`, `cli`, `ui`, `schema` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
+| `sql`, `codec`, `ui`, `schema` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
 | `await` | `await … : Float`: the result, with the `Eff` it runs |
 | `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit`: the type of what is discarded, with a warning when it is an `Eff` that is not run |
 

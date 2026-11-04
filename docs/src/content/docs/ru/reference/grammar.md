@@ -41,7 +41,7 @@ title: "Грамматика Flick"
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false schema codec
-sql ui cli in when for yield do
+sql ui in when for yield do
 ```
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
@@ -59,8 +59,8 @@ sql ui cli in when for yield do
   применение функции, поэтому предложение можно продолжить на следующей строке;
 - `table` сразу после `sql` на верхнем уровне и `via` после типа столбца
   `sql table` (см. [SQL](../sql/));
-- слова предложений CLI в начале предложения внутри `cli { … }`: `description`,
-  `flag`, `arg`, `subcommand`, `handle`;
+- `cli` перед строкой и `{`: блок плагина пакета `std`, который читает его
+  предложения (см. [приложения командной строки](../cli-dsl/));
 - `and` между связками группы `do`, `x <- a and y <- b`;
 - `component` перед именем объявления верхнего уровня (см.
   [ui.md](../ui/#компоненты)).
@@ -169,7 +169,7 @@ let examples =
 выражение блока задаёт его значение
 (см. [Прямые эффектные вызовы](../../spec/01-direct-calls/)).
 Фигурные скобки ограничивают записи и блоки `task`, `scope`, `provide`,
-`sql`, `ui`, `cli`, `codec` и `rec`.
+`sql`, `ui`, `codec`, `rec` и плагинов.
 
 1. Объявления верхнего уровня начинаются в столбце 1. Строка с большим
    отступом продолжает текущее объявление.
@@ -411,16 +411,14 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
-            | "cli" String "{" cli_clause { cli_clause } "}"
-            | head "{" { token } "}"        // голова, которую импорт открывает как `plugin head`
+            | head { String | "(" { token } ")" } "{" { token } "}"
+                                            // голова, которую импорт открывает как `plugin head`, или `cli`
 do_stmt     = bind { "and" bind } | "if" expr | statement
 bind        = or_pattern "<-" expr
 clause_list = for_clause { ";" | line break | before "if" … for_clause }
 for_clause  = or_pattern "<-" expr | "if" expr | let_decl
 clause      = ("from" | "join" | "left_join") name "in" expr
             | clause_word expr { "," expr }
-cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
-            | ("description" | "subcommand" | "handle") expr
 ```
 
 `do { … }` выполняет утверждения через `Monad` из прелюдии: `p <- e` —
@@ -468,9 +466,10 @@ cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
 В `provide e { … }` и `codec e { … }` скобка `{` завершает выражение
 перед блоком.
 
-В `cli "name" { … }` парсер проверяет только форму предложений.
-Псевдонимы у `arg`, повторяющиеся имена и типы параметров проверяются
-при развёртывании CLI
+Блок плагина хранит аргументы и тело токенами, их читает плагин (см.
+[плагины](../plugins/)). `cli "name" { … }` — блок плагина пакета `std`: он
+читает предложения и проверяет псевдонимы у `arg` и повторяющиеся имена, а
+опции проверяют типы `Cli`
 (см. [CLI eDSL: флаги, аргументы и подкоманды](../../spec/08-type-programming-and-edsl/#cli-edsl-флаги-аргументы-и-подкоманды)).
 Комментарий `///` непосредственно над предложением `flag`, `arg`
 или `subcommand` задаёт текст справки для него.
@@ -593,7 +592,7 @@ let describe shape =
 - значение после `=` (`let`, поля записей, синонимы типов), после `->` (`fun`,
   ветви `match`) или после `<-` переносится на следующую строку с отступом.
   Записи, списки, кортежи, `fun` и блоки в фигурных скобках (`task`, `ui`,
-  `scope`, `provide`, `do`, `for`, `sql`, `cli`, `codec`) остаются после `=`
+  `scope`, `provide`, `do`, `for`, `sql`, `codec`) остаются после `=`
   и разбиваются внутри: `let config = {` … `}`. Несколько инструкций всегда
   начинаются со следующей строки, как и `match`, `try` и не помещающийся `if`;
 - инструкции идут по одной на строку; блок в фигурных скобках с одним

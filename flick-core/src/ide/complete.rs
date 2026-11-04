@@ -72,7 +72,7 @@ impl Ide<'_> {
     /// of what comes before a `.`.
     pub fn complete(&self, file: FileId, offset: u32, dotted: bool) -> Vec<Completion> {
         if let Some(items) = self
-            .cli_complete(file, offset, dotted)
+            .plugin_complete(file, offset, dotted)
             .or_else(|| self.sql_complete(file, offset, dotted))
         {
             return items;

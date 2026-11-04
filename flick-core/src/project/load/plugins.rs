@@ -10,14 +10,15 @@ use std::sync::Arc;
 
 use flick_plugin::{Arena, Block, VERSION};
 
-use super::{Loader, Root};
+use super::unimported::unimported;
+use super::{Loaded, Loader, Root};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::expansion::{Expanded, Expansion};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
-use crate::plugin::{Expander, Failure};
+use crate::plugin::{EditorBlock, Expander, Failure, first_party};
 use crate::project::Host;
-use crate::source::{FileId, Span};
+use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types;
@@ -39,71 +40,48 @@ impl Loader<'_> {
         let mut plugins: Plugins = HashMap::new();
         let mut diagnostics = Vec::new();
         let mut found = Vec::new();
+        let mut editing = Vec::new();
         for (i, m) in self.modules.iter().enumerate() {
             let text = &self.sources.get(m.file).text;
-            let mut heads: HashMap<String, String> = HashMap::new();
-            for import in m.syntax.imports.iter().filter(|i| !i.plugins.is_empty()) {
-                let module = &import.module;
-                let refuse = |why: String| {
-                    (import.plugins.iter())
-                        .map(move |item| Diagnostic::error(codes::P035, why.clone(), item.span))
-                };
-                // a module of a package may come from the package cache
-                let saved = self.precompiled.package_of(module);
-                let root = self.by_name.get(module).map(|&j| &self.modules[j].root);
-                let package = match (root, saved) {
-                    (Some(Root::Package(name)), _) => name.clone(),
-                    (None, Some(name)) => name.to_owned(),
-                    (Some(_), _) => {
-                        diagnostics.extend(refuse(format!(
-                            "`{module}` is a module of this project: only a package provides a plugin"
-                        )));
-                        continue;
-                    }
-                    (None, None) if types::builtins().iter().any(|b| b.module == *module) => {
-                        diagnostics.extend(refuse(format!(
-                            "`{module}` is a built-in module, which provides no plugin"
-                        )));
-                        continue;
-                    }
-                    // the module is reported as unknown
-                    (None, None) => continue,
-                };
-                let plugin = plugins
-                    .entry(package.clone())
-                    .or_insert_with(|| self.host.plugin(&package, self.component(&package)));
-                if let Err(why) = plugin {
-                    diagnostics.extend(refuse(format!(
-                        "the plugin of package `{package}` cannot be loaded: {why}"
-                    )));
-                    continue;
-                }
-                for item in &import.plugins {
-                    heads.insert(item.name.clone(), package.clone());
-                }
-            }
-            if heads.is_empty() {
+            let heads = self.heads(m, &mut plugins, &mut diagnostics);
+            let mut blocks = Vec::new();
+            blocks_under(&m.parse.tree, &mut blocks);
+            if blocks.is_empty() {
                 continue;
             }
             let shared: Arc<str> = Arc::from(text.as_str());
-            let mut blocks = Vec::new();
-            blocks_under(&m.parse.tree, &mut blocks);
             for node in blocks {
-                let head = node.child_tokens().find(|t| t.kind == K::Ident);
-                let Some(package) = head.and_then(|h| heads.get(h.text(text))) else {
+                let Some(token) = node.child_tokens().find(|t| t.kind == K::Ident) else {
                     continue;
                 };
-                if let Some(source) = BlockSource::new(Arc::clone(&shared), m.file, node) {
+                let head = token.text(text);
+                let Some(package) = heads.get(head) else {
+                    // a head of the compiler's own plugins, not imported
+                    if let Some((_, module)) = first_party::HEADS.iter().find(|(h, _)| *h == head) {
+                        let span = (token.start, token.end);
+                        diagnostics.push(unimported(m.file, &m.parse.tree, span, head, module));
+                    }
+                    continue;
+                };
+                let Some(source) = BlockSource::new(Arc::clone(&shared), m.file, node) else {
+                    continue;
+                };
+                if source.closed() {
                     found.push(Found {
                         module: i,
                         node: node.clone(),
                         source,
                         package: package.clone(),
                     });
+                } else if let Some(Ok(plugin)) = plugins.get(package) {
+                    editing.push((i, EditorBlock::new(&source, &[], plugin)));
                 }
             }
         }
-        let rendered = self.expand_found(&plugins, &mut found, &mut diagnostics);
+        let rendered = self.expand_found(&plugins, &mut found, &mut diagnostics, &mut editing);
+        for (i, block) in editing {
+            self.modules[i].editing.push(block);
+        }
         let mut by_module: BTreeMap<usize, Vec<Expanded>> = BTreeMap::new();
         for (f, rendered) in found.into_iter().zip(rendered) {
             if let Some(rendered) = rendered {
@@ -126,6 +104,64 @@ impl Loader<'_> {
         self.diagnostics.extend(diagnostics);
     }
 
+    /// The heads the imports of `m` expose, each with the package of its
+    /// plugin, loading each plugin once; why one does not load goes to
+    /// `diagnostics`.
+    fn heads(
+        &self,
+        m: &Loaded,
+        plugins: &mut Plugins,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) -> HashMap<String, String> {
+        let mut heads: HashMap<String, String> = HashMap::new();
+        for import in m.syntax.imports.iter().filter(|i| !i.plugins.is_empty()) {
+            let module = &import.module;
+            let refuse = |why: String| {
+                (import.plugins.iter())
+                    .map(move |item| Diagnostic::error(codes::P035, why.clone(), item.span))
+            };
+            // a module of a package may come from the package cache
+            let saved = self.precompiled.package_of(module);
+            let root = self.by_name.get(module).map(|&j| &self.modules[j].root);
+            let package = match (root, saved) {
+                (Some(Root::Package(name)), _) => name.clone(),
+                (None, Some(name)) => name.to_owned(),
+                (None, None) if types::is_std_module(module) => "std".to_owned(),
+                (Some(_), _) => {
+                    diagnostics.extend(refuse(format!(
+                        "`{module}` is a module of this project: only a package provides a plugin"
+                    )));
+                    continue;
+                }
+                (None, None) if types::builtins().iter().any(|b| b.module == *module) => {
+                    diagnostics.extend(refuse(format!(
+                        "`{module}` is a built-in module, which provides no plugin"
+                    )));
+                    continue;
+                }
+                // the module is reported as unknown
+                (None, None) => continue,
+            };
+            let plugin =
+                plugins.entry(package.clone()).or_insert_with(|| {
+                    match first_party::plugin(&package) {
+                        Some(plugin) => Ok(plugin),
+                        None => self.host.plugin(&package, self.component(&package)),
+                    }
+                });
+            if let Err(why) = plugin {
+                diagnostics.extend(refuse(format!(
+                    "the plugin of package `{package}` cannot be loaded: {why}"
+                )));
+                continue;
+            }
+            for item in &import.plugins {
+                heads.insert(item.name.clone(), package.clone());
+            }
+        }
+        heads
+    }
+
     /// The code each block of `found` stands for, from its plugin: each
     /// plugin collects from its blocks of a group, in the order of their
     /// modules' names and places, then expands each. A call whose result
@@ -135,6 +171,7 @@ impl Loader<'_> {
         plugins: &Plugins,
         found: &mut [Found],
         diagnostics: &mut Vec<Diagnostic>,
+        editing: &mut Vec<(usize, EditorBlock)>,
     ) -> Vec<Option<Rendered>> {
         let mut groups: BTreeMap<(String, String), Vec<(String, usize)>> = BTreeMap::new();
         for (j, f) in found.iter().enumerate() {
@@ -167,6 +204,10 @@ impl Loader<'_> {
                     continue;
                 }
             };
+            for &j in &members {
+                let editor = EditorBlock::new(&found[j].source, &state, plugin);
+                editing.push((found[j].module, editor));
+            }
             for (&j, block) in members.iter().zip(&blocks) {
                 let f = &mut found[j];
                 match results.expand(plugin.as_ref(), block, &state, &mut f.source) {
@@ -185,9 +226,13 @@ impl Loader<'_> {
                         if refused.is_empty() && f.source.diagnostics.is_empty() {
                             diagnostics.push(failure(f, &package, "gave no code for this block"));
                         }
-                        let (file, start) = (f.source.file(), f.source.start());
-                        diagnostics
-                            .extend(refused.iter().map(|d| refusal(file, start, &package, d)));
+                        // the errors the compiler found in its holes say why
+                        let parsed = f.source.diagnostics.is_empty();
+                        diagnostics.extend(
+                            (refused.iter())
+                                .filter(|d| parsed || d.code.is_some())
+                                .map(|d| refusal(f, &package, d)),
+                        );
                     }
                     Err(Failure::Broken(why)) => {
                         diagnostics.push(failure(f, &package, &format!("failed: {why}")));
@@ -323,14 +368,25 @@ fn failure(found: &Found, package: &str, what: &str) -> Diagnostic {
     )
 }
 
-/// `P036` for what the plugin `package` found wrong, at a span of the body
-/// that starts at `start`.
-fn refusal(file: FileId, start: u32, package: &str, d: &flick_plugin::Diagnostic) -> Diagnostic {
-    Diagnostic::error(
-        codes::P036,
-        format!("plugin `{package}`: {}", d.message),
-        Span::new(file, start + d.span.start, start + d.span.end),
-    )
+/// What the plugin `package` found wrong at a span of the block of `found`,
+/// the whole of its frame meaning the whole block: under the plugin's own
+/// code, or `P036` without one.
+fn refusal(found: &Found, package: &str, d: &flick_plugin::Diagnostic) -> Diagnostic {
+    let (file, start) = (found.source.file(), found.source.start());
+    let (from, to) = if (d.span.start, d.span.end) == (0, found.source.end() - start) {
+        found.node.range()
+    } else {
+        (start + d.span.start, start + d.span.end)
+    };
+    let span = Span::new(file, from, to);
+    match (d.code.as_deref()).and_then(|code| codes::plugin(package, code)) {
+        Some(code) => Diagnostic::error(code, d.message.clone(), span),
+        None => Diagnostic::error(
+            codes::P036,
+            format!("plugin `{package}`: {}", d.message),
+            span,
+        ),
+    }
 }
 
 impl Loader<'_> {

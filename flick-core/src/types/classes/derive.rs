@@ -8,14 +8,13 @@ use std::ptr;
 
 use super::declare::Declared;
 use super::solve::Outcome;
-use super::{Dict, STRUCTURAL, has_metas, which};
+use super::{CLI, Dict, STRUCTURAL, has_metas, which};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
-use crate::types::cli::CLI;
 use crate::types::env::{Form, Instance};
 use crate::types::http_api::HTTP_API_DERIVE;
 use crate::types::kinds::Kind;

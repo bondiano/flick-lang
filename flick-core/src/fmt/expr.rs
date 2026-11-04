@@ -65,7 +65,6 @@ fn hugs(n: &Node) -> bool {
         | K::ProvideExpr
         | K::DoExpr
         | K::SqlExpr
-        | K::CliExpr
         | K::CodecExpr => true,
         _ => false,
     }
@@ -263,13 +262,9 @@ impl<'a> Printer<'a> {
             K::RecordExpr | K::RecordUpdate | K::RecordType | K::RecordPat => {
                 self.record(n, suffix)
             }
-            K::TaskExpr
-            | K::UiExpr
-            | K::ScopeExpr
-            | K::ProvideExpr
-            | K::DoExpr
-            | K::SqlExpr
-            | K::CliExpr => self.braced(n, suffix),
+            K::TaskExpr | K::UiExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr | K::SqlExpr => {
+                self.braced(n, suffix)
+            }
             _ => {
                 let doc = self.node(n);
                 let suffix = self.suffix(suffix);

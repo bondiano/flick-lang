@@ -131,14 +131,19 @@ impl Wasm {
         };
         let mut store = Store::new(engine, state);
         store.limiter(|s| &mut s.limits);
-        let result = match self.compiled() {
-            Ok((component, linker)) => store
+        let result = self.compiled().and_then(|(component, linker)| {
+            let plugin = store
                 .set_fuel(FUEL)
                 .and_then(|()| Plugin::instantiate(&mut store, component, linker))
-                .and_then(|plugin| call(&plugin, &mut store))
-                .map_err(|e| why(&e)),
-            Err(e) => Err(e.clone()),
-        };
+                .map_err(|e| {
+                    format!(
+                        "cannot be instantiated, maybe built for another version of \
+                         `flick:plugin` than {}: {e}",
+                        flick_plugin::VERSION
+                    )
+                })?;
+            call(&plugin, &mut store).map_err(|e| why(&e))
+        });
         (result, store.into_data().source)
     }
 }
@@ -186,5 +191,45 @@ impl Expander for Wasm {
             )),
             Err(why) => Err(Failure::Broken(why)),
         }
+    }
+
+    fn complete(
+        &self,
+        block: &flick_plugin::Block,
+        state: &[u8],
+        offset: u32,
+    ) -> Vec<flick_plugin::Completion> {
+        let block = convert::to_block(block);
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_complete(store, &block, state, offset)
+        });
+        result.map_or_else(
+            |_| Vec::new(),
+            |found| found.into_iter().map(convert::from_completion).collect(),
+        )
+    }
+
+    fn hover(
+        &self,
+        block: &flick_plugin::Block,
+        state: &[u8],
+        offset: u32,
+    ) -> Option<flick_plugin::Hover> {
+        let block = convert::to_block(block);
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_hover(store, &block, state, offset)
+        });
+        result.ok().flatten().map(convert::from_hover)
+    }
+
+    fn highlight(&self, block: &flick_plugin::Block, state: &[u8]) -> Vec<flick_plugin::Highlight> {
+        let block = convert::to_block(block);
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_highlight(store, &block, state)
+        });
+        result.map_or_else(
+            |_| Vec::new(),
+            |found| found.into_iter().map(convert::from_highlight).collect(),
+        )
     }
 }

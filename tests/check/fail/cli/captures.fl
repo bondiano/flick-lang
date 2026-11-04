@@ -1,6 +1,8 @@
 // A command whose handler holds a file of a scope cannot leave that scope.
 module App.Captures exposing (leak)
 
+import Cli exposing (plugin cli)
+
 type File (s : Region)
 
 open_file : forall s. String ->{Scope s;} File s
@@ -19,4 +21,4 @@ let leak () =
       handle fun {} -> Platform.stdout_line (read_file file)
     }
   }
-//~ FLICK-G001 @18:5-20:6 holds region `s`
+//~ FLICK-G001 @20:5-22:6 holds region `s`

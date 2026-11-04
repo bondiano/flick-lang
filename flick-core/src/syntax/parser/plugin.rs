@@ -1,10 +1,11 @@
 //! Blocks of plugins: `import Sql exposing (plugin sql)` makes `sql` start
-//! a block in the rest of the file, and `sql { … }` keeps its body as
-//! tokens for the plugin of `Sql`'s package to read. A head only the same
+//! a block in the rest of the file, and `sql "x" (T) { … }` keeps its
+//! arguments and body as tokens for the plugin of `Sql`'s package to read. A head only the same
 //! file imports counts, so `f { a = 1 }` stays a call with a record wherever
 //! no import says so.
 
 use super::{K, Parser, SyntaxKind};
+use crate::plugin::first_party::HEADS;
 
 /// Whether an exposed item `plugin head` starts here.
 pub(super) fn at_head(p: &Parser) -> bool {
@@ -20,22 +21,56 @@ pub(super) fn head(p: &mut Parser) {
     p.bump();
 }
 
-/// Whether a plugin block starts here: a head an import exposed, then `{`.
+/// Whether a plugin block starts here: a head an import exposed, or one of
+/// the compiler's own plugins, its arguments (strings and `( … )`) on the
+/// same line, then `{`.
 pub(super) fn at_block(p: &Parser) -> bool {
-    !p.no_brace && p.nth(1) == K::LBrace && p.plugin_heads.contains(&p.text_of(p.raw()))
+    let head = p.text_of(p.raw());
+    let known = p.plugin_heads.contains(&head) || HEADS.iter().any(|(h, _)| *h == head);
+    if p.no_brace || !known {
+        return false;
+    }
+    let mut depth = 0u32;
+    for i in p.pos + 1..p.toks.len() {
+        if p.sep_at(i).is_some() {
+            return false;
+        }
+        match p.toks[i].kind {
+            K::LParen => depth += 1,
+            K::RParen if depth > 0 => depth -= 1,
+            K::LBrace if depth == 0 => return true,
+            _ if depth > 0 => {}
+            K::String => {}
+            _ => return false,
+        }
+    }
+    false
 }
 
-/// `head { … }`, the body kept as tokens.
+/// `head args { … }`, the arguments and the body kept as tokens.
 pub(super) fn block(p: &mut Parser) -> SyntaxKind {
     p.bump();
+    loop {
+        match p.raw().kind {
+            K::String => p.bump(),
+            K::LParen => raw_group(p, K::LParen, K::RParen, K::PluginArgs),
+            _ => break,
+        }
+    }
     raw_braces(p);
     K::PluginExpr
 }
 
 /// `{ … }` with the tokens between kept flat in a `Block`, braces balanced.
 pub(super) fn raw_braces(p: &mut Parser) {
+    raw_group(p, K::LBrace, K::RBrace, K::Block);
+}
+
+/// `open … close` with the tokens between kept flat in a node `kind`,
+/// `open` and `close` balanced.
+fn raw_group(p: &mut Parser, open: SyntaxKind, close: SyntaxKind, kind: SyntaxKind) {
     let opener = p.raw();
-    if !p.expect(K::LBrace) {
+    if !p.expect(open) {
         return;
     }
     let body = p.start();
@@ -43,13 +78,13 @@ pub(super) fn raw_braces(p: &mut Parser) {
     loop {
         match p.raw().kind {
             K::Eof => break,
-            K::RBrace if depth == 0 => break,
-            K::LBrace => depth += 1,
-            K::RBrace => depth -= 1,
+            k if k == close && depth == 0 => break,
+            k if k == open => depth += 1,
+            k if k == close => depth -= 1,
             _ => {}
         }
         p.bump();
     }
-    p.complete(body, K::Block);
-    p.expect_closer(K::RBrace, opener);
+    p.complete(body, kind);
+    p.expect_closer(close, opener);
 }

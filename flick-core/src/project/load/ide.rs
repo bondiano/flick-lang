@@ -11,6 +11,7 @@ use super::{Compilation, Loaded, Mode, ModuleCache, Root, run};
 use crate::diagnostics::Diagnostic;
 use crate::iface::{Interface, fingerprint};
 use crate::ir;
+use crate::plugin::EditorBlock;
 use crate::project::{Host, Project};
 use crate::source::{FileId, SourceMap};
 use crate::syntax::cst::Node;
@@ -25,6 +26,8 @@ pub struct Analyzed {
     pub tree: Node,
     pub typing: Arc<Typing>,
     pub interface: Interface,
+    /// Its plugin blocks, whose plugins editors ask.
+    pub editing: Vec<EditorBlock>,
 }
 
 impl Analyzed {
@@ -41,6 +44,7 @@ impl Analyzed {
                 .map_or_else(|| loaded.parse.tree.clone(), |e| e.source_tree.clone()),
             typing,
             interface,
+            editing: loaded.editing.clone(),
         }
     }
 }

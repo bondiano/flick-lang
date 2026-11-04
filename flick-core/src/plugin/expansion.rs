@@ -4,6 +4,7 @@
 //! user's code inside blocks parsed in place, and the way back from a place
 //! in generated code to the place in the module it stands for.
 
+use std::iter::Peekable;
 use std::mem;
 
 use crate::diagnostics::{Diagnostic, Related, Severity, codes};
@@ -70,11 +71,16 @@ impl Expansion {
             match splice(&out, file, at, &block.rendered, &block.source, &block.node) {
                 Ok(node) => {
                     let start = block.source.start();
-                    origins.extend(
-                        block.rendered.origins.iter().map(|&((s, e), o)| {
-                            ((at + s, at + e), (start + o.start, start + o.end))
-                        }),
-                    );
+                    let frame = block.source.end() - start;
+                    origins.extend(block.rendered.origins.iter().map(|&((s, e), o)| {
+                        // the whole frame is the whole block, its head with it
+                        let origin = if (o.start, o.end) == (0, frame) {
+                            range
+                        } else {
+                            (start + o.start, start + o.end)
+                        };
+                        ((at + s, at + e), origin)
+                    }));
                     holes.extend(
                         block
                             .rendered
@@ -235,30 +241,44 @@ fn parse_holes(node: &mut Node, holes: &[((u32, u32), Node)]) {
             .map(|(_, t)| t)
             .collect();
         trees.sort_by_key(|t| t.range());
-        let Some(Element::Node(body)) = n
-            .children
-            .iter_mut()
-            .find(|c| matches!(c, Element::Node(b) if b.kind == K::Block))
-        else {
-            continue;
-        };
-        let mut children = Vec::new();
         let mut next = trees.into_iter().peekable();
-        for token in mem::take(&mut body.children) {
-            let Element::Token(t) = token else {
-                children.push(token);
-                continue;
-            };
-            match next.peek() {
-                Some(tree) if tree.range().0 <= t.start && t.end <= tree.range().1 => {
-                    if tree.range().1 == t.end {
-                        children.push(Element::Node((*tree).clone()));
-                        next.next();
-                    }
-                }
-                _ => children.push(Element::Token(t)),
-            }
-        }
-        body.children = children;
+        n.children = in_place(mem::take(&mut n.children), &mut next);
     }
+}
+
+/// `elements` of a block with the tokens of each tree `next` gives replaced
+/// by the tree: its string arguments, and inside `( … )` and the body.
+fn in_place<'t>(
+    elements: Vec<Element>,
+    next: &mut Peekable<impl Iterator<Item = &'t Node>>,
+) -> Vec<Element> {
+    let mut children = Vec::new();
+    for element in elements {
+        let t = match element {
+            Element::Token(t) => t,
+            Element::Node(mut raw) if matches!(raw.kind, K::PluginArgs | K::Block) => {
+                raw.children = in_place(mem::take(&mut raw.children), next);
+                children.push(Element::Node(raw));
+                continue;
+            }
+            other @ Element::Node(_) => {
+                children.push(other);
+                continue;
+            }
+        };
+        // a tree that took no token of the block is none of its own
+        while next.peek().is_some_and(|tree| tree.range().1 <= t.start) {
+            next.next();
+        }
+        match next.peek() {
+            Some(tree) if tree.range().0 <= t.start && t.end <= tree.range().1 => {
+                if tree.range().1 == t.end {
+                    children.push(Element::Node((*tree).clone()));
+                    next.next();
+                }
+            }
+            _ => children.push(Element::Token(t)),
+        }
+    }
+    children
 }

@@ -1,7 +1,9 @@
 //! Registry of diagnostic codes. A code is `FLICK-<area letter><3 digits>`; the
 //! area letter is the code's range. Codes are never reused: a code that stops
 //! being emitted stays registered and is marked retired in its explanation.
+//! A plugin's codes are its own, shown under its package: `std/L001`.
 
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::{fmt, str};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -18,6 +20,9 @@ pub enum Area {
     Ui,
     Cli,
     Project,
+    /// The codes of plugins, outside the registry: the number of one is its
+    /// place among the codes plugins gave in this process.
+    Plugin,
 }
 
 impl Area {
@@ -50,6 +55,8 @@ impl Area {
             Area::Ui => 'U',
             Area::Cli => 'L',
             Area::Project => 'P',
+            // never shown: a plugin's code is spelled whole
+            Area::Plugin => '?',
         }
     }
 }
@@ -62,8 +69,48 @@ pub struct Code {
 
 impl fmt::Display for Code {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "FLICK-{}{:03}", self.area.letter(), self.number)
+        match self.area {
+            Area::Plugin => f.write_str(plugin_codes()[usize::from(self.number)]),
+            area => write!(f, "FLICK-{}{:03}", area.letter(), self.number),
+        }
     }
+}
+
+// shortcut: a plugin's codes are interned for the process, a few strings per
+// plugin; make `Code` carry its text if that ever grows without bound.
+static PLUGIN_CODES: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
+
+fn plugin_codes() -> MutexGuard<'static, Vec<&'static str>> {
+    PLUGIN_CODES.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The code `code` a plugin of `package` gives, shown as `<package>/<code>`;
+/// `None` when `code` is not capital letters and three digits, such as
+/// `L001`, or plugins gave too many codes.
+pub fn plugin(package: &str, code: &str) -> Option<Code> {
+    if !code.is_ascii() {
+        return None;
+    }
+    let (letters, digits) = code.split_at(code.len().checked_sub(3)?);
+    let well_formed = (1..=4).contains(&letters.len())
+        && letters.bytes().all(|b| b.is_ascii_uppercase())
+        && digits.bytes().all(|b| b.is_ascii_digit());
+    if !well_formed {
+        return None;
+    }
+    let whole = format!("{package}/{code}");
+    let mut codes = plugin_codes();
+    let number = if let Some(i) = codes.iter().position(|c| *c == whole) {
+        i
+    } else {
+        codes.push(whole.leak());
+        codes.len() - 1
+    };
+    let number = u16::try_from(number).ok()?;
+    Some(Code {
+        area: Area::Plugin,
+        number,
+    })
 }
 
 impl str::FromStr for Code {
@@ -297,6 +344,7 @@ codes! {
     P034 = Project 34, "dependency is not installed";
     P035 = Project 35, "plugin cannot be loaded";
     P036 = Project 36, "plugin gave no code for a block";
+    P037 = Project 37, "plugin block without its import";
 }
 
 #[cfg(test)]
@@ -320,6 +368,27 @@ mod tests {
     fn area_letters_are_distinct() {
         let letters: HashSet<_> = Area::ALL.iter().map(|a| a.letter()).collect();
         assert_eq!(letters.len(), Area::ALL.len());
+    }
+
+    #[test]
+    fn a_plugins_code_shows_under_its_package() {
+        let code = plugin("std", "L001").expect("well formed");
+        assert_eq!(code.to_string(), "std/L001");
+        assert_eq!(plugin("std", "L001"), Some(code));
+        assert_ne!(plugin("other", "L001"), Some(code));
+        for bad in [
+            "",
+            "L01",
+            "l001",
+            "L0012",
+            "FLICK-L001",
+            "../001",
+            "ABCDE001",
+            "Lé01",
+            "é",
+        ] {
+            assert_eq!(plugin("std", bad), None, "{bad}");
+        }
     }
 
     #[test]

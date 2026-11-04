@@ -59,7 +59,6 @@ pub enum SyntaxKind {
     CodecKw,
     SqlKw,
     UiKw,
-    CliKw,
     InKw,
     WhenKw,
     ForKw,
@@ -217,13 +216,13 @@ pub enum SyntaxKind {
     /// `$name` inside `sql { … }`: a value of the program as a placeholder.
     SqlCapture,
     UiExpr,
-    CliExpr,
-    CliClause,
     CodecExpr,
     SchemaExpr,
     /// `head { … }` of a head an import exposes as `plugin head`: the body is
     /// kept as tokens, which the plugin reads.
     PluginExpr,
+    /// `( … )` among the arguments of a plugin block's head, kept as tokens.
+    PluginArgs,
 
     // nodes: patterns
     WildcardPat,
@@ -347,7 +346,6 @@ pub fn keyword(text: &str) -> Option<SyntaxKind> {
         "codec" => K::CodecKw,
         "sql" => K::SqlKw,
         "ui" => K::UiKw,
-        "cli" => K::CliKw,
         "in" => K::InKw,
         "when" => K::WhenKw,
         "for" => K::ForKw,

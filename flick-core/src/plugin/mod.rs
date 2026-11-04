@@ -4,11 +4,14 @@
 //! the block, the user's code inside keeping its own place in the file.
 
 pub mod expansion;
+pub mod first_party;
 pub mod render;
 pub mod source;
 pub mod splice;
 
-use flick_plugin::{Arena, Block, Diagnostic, Plugin};
+use std::sync::Arc;
+
+use flick_plugin::{Arena, Block, Completion, Diagnostic, Highlight, Hover, Plugin};
 
 use source::BlockSource;
 
@@ -25,6 +28,53 @@ pub trait Expander: Send + Sync {
         state: &[u8],
         source: &mut BlockSource,
     ) -> Result<Arena, Failure>;
+    /// What an editor may insert at `offset` of `block`; none when the
+    /// plugin fails.
+    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
+        let _ = (block, state, offset);
+        Vec::new()
+    }
+    /// What an editor shows at `offset` of `block`.
+    fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
+        let _ = (block, state, offset);
+        None
+    }
+    /// How an editor colors the words of `block` that are the plugin's.
+    fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
+        let _ = (block, state);
+        Vec::new()
+    }
+}
+
+/// A plugin block as editors ask its plugin about it: completions and
+/// hovers, even while the block does not expand.
+#[derive(Clone)]
+pub struct EditorBlock {
+    /// Where its frame starts in the module text; offsets of the block
+    /// count from here.
+    pub start: u32,
+    pub block: Block,
+    /// What its plugin collected from its group.
+    pub state: Arc<[u8]>,
+    pub plugin: Arc<dyn Expander>,
+}
+
+impl EditorBlock {
+    /// The block of `source`, for editors.
+    pub fn new(source: &BlockSource, state: &[u8], plugin: &Arc<dyn Expander>) -> Self {
+        EditorBlock {
+            start: source.start(),
+            block: source.block(),
+            state: Arc::from(state),
+            plugin: Arc::clone(plugin),
+        }
+    }
+
+    /// Whether `offset` of the module text is in the block, its end included.
+    pub fn holds(&self, offset: u32) -> bool {
+        let len = u32::try_from(self.block.text.len()).unwrap_or(u32::MAX);
+        self.start <= offset && offset - self.start <= len
+    }
 }
 
 /// Why a plugin gave no code for a block.
@@ -72,6 +122,18 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         self.plugin
             .expand(block, state, source)
             .map_err(Failure::Refused)
+    }
+
+    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
+        self.plugin.complete(block, state, offset)
+    }
+
+    fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
+        self.plugin.hover(block, state, offset)
+    }
+
+    fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
+        self.plugin.highlight(block, state)
     }
 }
 

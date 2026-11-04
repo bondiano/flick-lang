@@ -188,7 +188,7 @@ let x : Float = "hi"
 | обратные вызовы FFI, импорт `.d.ts` и проверенные привязки | `tests/run/ffi/`, `runtime/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
 | SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `runtime/test/sql.test.ts`, `flick/tests/sql_postgres.rs` над `tests/postgres/` |
 | UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `runtime/test/ui-*.test.ts` |
-| блок `cli` | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, тесты в `flick-core/src/ir/lower/cli.rs` |
+| блок `cli` | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (вызовы, которые он означает), `flick/tests/lsp_editor/cli.rs` |
 | подсказки, языковой сервер и проекция TypeScript | `flick-core/src/ide/tests.rs`, `flick/tests/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
 | CLI: `check`/`build` не запускают код, поколения запуска, `dev`, кеш, pnpm, коды выхода, NDJSON | `flick/tests/{cli_project,cli_run,check_command}.rs` |
 | фасады `.d.ts` и `pack` | `flick/tests/dts_command.rs`, `flick/tests/cli_run.rs` |

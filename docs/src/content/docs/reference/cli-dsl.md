@@ -7,7 +7,12 @@ subcommands and a handler that needs services `r` and fails with errors `e`
 (see [CLI eDSL: flags, arguments and subcommands](../../spec/08-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands)). Building one parses and runs nothing; `Cli.run`
 parses the arguments with Effect's CLI and only then runs the handler.
 
+The block `cli "name" { … }` is the plugin `cli` of the `std` package (see
+[plugins](../plugins/)): a file that writes one imports it.
+
 ```flick
+import Cli exposing (plugin cli)
+
 greet : Cli.Command none none
 let greet =
   cli "greet" {
@@ -66,8 +71,11 @@ predicate.
 
 ## Combinators
 
-The block is sugar: it elaborates into a pipeline of the same functions,
-which programs may use directly, and both forms compile to the same IR.
+The block is sugar: it stands for calls of the same functions, which
+programs may use directly. Each clause is applied to the spec before it,
+and `Cli.handled spec handler` ends a command with a handler: the spec comes
+first, so the handler is checked against the options its clauses make. A
+pipeline written by hand reads as well:
 
 ```flick
 greet : Cli.Command none none
@@ -146,13 +154,16 @@ resource of a `scope` runs inside that scope and cannot leave it
 
 | Rule | Code |
 | - | - |
-| a field, long name or alias used twice, or one of `--help`, `-h`, `--version`, `--completions` | `FLICK-L001` |
-| `= default` on an `Option` | `FLICK-L002` |
-| an `arg` of many values before the last `arg` | `FLICK-L003` |
-| `description` or `handle` twice | `FLICK-L004` |
-| a command without `handle` and without subcommands | `FLICK-L005` |
-| an `arg` beside subcommands | `FLICK-L006` |
-| other names on an `arg` | `FLICK-L007` |
+| a field, long name or alias used twice, or one of `--help`, `-h`, `--version`, `--completions` | `std/L001` |
+| `= default` on an `Option` | `std/L002` |
+| an `arg` of many values before the last `arg` | `std/L003` |
+| `description` or `handle` twice | `std/L004` |
+| a command without `handle` and without subcommands | `std/L005` |
+| an `arg` beside subcommands | `std/L006` |
+| other names on an `arg` | `std/L007` |
+| a clause that is not one of the five, or a block without its name | `std/L009` |
+| a block in a file that does not import `plugin cli` | `FLICK-P037`, fixed by `flick check --fix` |
 
-A type without `Cli.Value` is `FLICK-C001`, a default of the wrong type
+The codes `std/…` are the plugin's; `flick explain std/L001` shows what
+each means. A type without `Cli.Value` is `FLICK-C001`, a default of the wrong type
 `FLICK-T003`.

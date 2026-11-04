@@ -21,9 +21,10 @@ struct Declared {
 }
 
 impl Ide<'_> {
-    /// Hover on what the checker types beside names: CLI, SQL, field labels.
+    /// Hover on what the checker types beside names: plugin blocks, SQL,
+    /// field labels.
     pub(super) fn embedded_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
-        self.cli_hover(file, offset)
+        self.plugin_hover(file, offset)
             .or_else(|| self.sql_hover(file, offset))
             .or_else(|| self.field_hover(file, offset))
     }

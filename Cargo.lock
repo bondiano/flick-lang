@@ -580,6 +580,7 @@ version = "0.1.0"
 dependencies = [
  "annotate-snippets",
  "flick-plugin",
+ "flick-plugin-cli",
  "flick-pretty",
  "flick-test-pairs",
  "insta",
@@ -606,6 +607,13 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "wit-bindgen",
+]
+
+[[package]]
+name = "flick-plugin-cli"
+version = "0.1.0"
+dependencies = [
+ "flick-plugin",
 ]
 
 [[package]]

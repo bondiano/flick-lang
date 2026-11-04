@@ -5,7 +5,6 @@
 
 mod applicative_do;
 mod atoms;
-mod cli;
 mod comprehension;
 mod debug;
 mod do_notation;

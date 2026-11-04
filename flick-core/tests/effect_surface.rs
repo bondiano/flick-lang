@@ -14,6 +14,8 @@ use flick_core::ffi::check::reviewed;
 #[cfg(feature = "ide")]
 use flick_core::iface::Decl;
 #[cfg(feature = "ide")]
+use flick_core::ir::{Expr, ExprKind, ItemKind};
+#[cfg(feature = "ide")]
 use flick_core::project::{self, Host};
 #[cfg(feature = "ide")]
 use flick_core::source::SourceMap;
@@ -112,8 +114,24 @@ fn used_names() -> BTreeSet<String> {
                 });
             }
         }
+        // and by the code plugins gave, which only the IR holds
+        for module in &analysis.compilation.modules {
+            for item in &module.ir.items {
+                if let ItemKind::Value { body, .. } = &item.kind {
+                    globals(body, &mut used);
+                }
+            }
+        }
     }
     used
+}
+
+#[cfg(feature = "ide")]
+fn globals(e: &Expr, used: &mut BTreeSet<String>) {
+    if let ExprKind::Global { module, name } = &e.kind {
+        used.insert(format!("{module}.{name}"));
+    }
+    e.each_child(&mut |child| globals(child, used));
 }
 
 #[cfg(feature = "ide")]

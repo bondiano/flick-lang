@@ -39,7 +39,7 @@ This specification is the normative description of the Flick language as impleme
 - **RPC and HTTP APIs:** `Rpc` and `HttpApi` describe a contract once as values that client and server share; a missing or extra handler is a type error ([RPC](../reference/rpc/), [HTTP APIs](../reference/http-api/)).
 - **Routes and forms:** `deriving Url` makes a page's URL a typed value, `deriving Form` a record a text form ([routes](../reference/route/), [forms](../reference/form/)).
 - **Observability:** traces, logs and metrics through ordinary runtime functions, exported by OTLP, DevTools or Prometheus ([observability](../reference/observability/)).
-- **Command-line applications:** `cli "name" { ... }` on Effect CLI, with an exact record of options ([command-line applications](../reference/cli-dsl/)).
+- **Command-line applications:** `cli "name" { ... }`, a plugin of `std`, on Effect CLI, with an exact record of options ([command-line applications](../reference/cli-dsl/)).
 - **Compiler:** a Rust core, a typed IR, a language server over the source, a versioned JSON `.iface` per module ([Compiler architecture](../contributing/implementation-decisions/#compiler-architecture)).
 - **Backends:** `[build] emit` selects `"js"` (the default), `"ts"` or `"go"`; importing a module the target does not support is a compile error ([Go target](../reference/codegen/#go-target)).
 - **Optimization:** the debug profile is the reference lowering; the release profile runs typed passes on the IR ([release profile](../reference/codegen/#release-profile)).

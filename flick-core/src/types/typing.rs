@@ -428,7 +428,6 @@ impl Checker<'_> {
             K::UiExpr => K::UiKw,
             K::SqlExpr => K::SqlKw,
             K::CodecExpr => K::CodecKw,
-            K::CliExpr => K::CliKw,
             K::SchemaExpr => K::SchemaKw,
             _ => return,
         };

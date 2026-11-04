@@ -2,7 +2,6 @@
 //! concrete tree and its trivia-free AST view. Grammar: `docs/src/content/docs/reference/grammar.md`.
 
 pub mod ast;
-pub mod cli;
 pub mod cst;
 pub mod ddl;
 pub mod kind;

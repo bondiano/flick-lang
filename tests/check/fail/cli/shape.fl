@@ -2,11 +2,13 @@
 // a handler or subcommands, no arguments beside subcommands.
 module App.Shape exposing (defaults, many, twice, empty, mixed)
 
+import Cli exposing (plugin cli)
+
 defaults : Cli.Command none none
 let defaults =
   cli "defaults" {
     flag region : Option String = Some "eu"
-//                                ^^^^^^^^^ FLICK-L002 takes no `= default`
+//                                ^^^^^^^^^ std/L002 takes no `= default`
     handle fun { region } -> ()
   }
 
@@ -14,7 +16,7 @@ many : Cli.Command none none
 let many =
   cli "many" {
     arg files : List String
-//              ^^^^^^^^^^^ FLICK-L003 only the last one can
+//              ^^^^^^^^^^^ std/L003 only the last one can
     arg target : String
     handle fun { files; target } -> ()
   }
@@ -24,7 +26,7 @@ let twice =
   cli "twice" {
     description "one"
     description "two"
-//  ^^^^^^^^^^^ FLICK-L004 `description` is given twice
+//  ^^^^^^^^^^^ std/L004 `description` is given twice
     handle fun {} -> ()
   }
 
@@ -33,12 +35,12 @@ let empty =
   cli "empty" {
     description "nothing to do"
   }
-//~ FLICK-L005 @33:3-35:4 needs `handle` or at least one `subcommand`
+//~ std/L005 @35:3-37:4 needs `handle` or at least one `subcommand`
 
 mixed : Cli.Command none none
 let mixed =
   cli "mixed" {
     arg name : String
-//  ^^^ FLICK-L006 takes no `arg`
+//  ^^^ std/L006 takes no `arg`
     subcommand twice
   }
