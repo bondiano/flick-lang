@@ -46,6 +46,14 @@ break programs.
   moves with its head. A block inside the user's code of another expands in
   a round of its own. Editors highlight the heads of plugins as macros, and
   `cli` is no keyword of the grammars any more.
+- **Plugins, interface `0.6.0`:** a class marked `@derive` (or `@derive
+  std`) is derived by a plugin: `deriving C { args }` and `deriving instance
+  C (M.T a)` call its `derive`, whose declarations follow the type. A class
+  without a derive is `FLICK-C013`, "has no derive".
+- **Breaking:** `deriving Cli.Value` is the plugin of `std`'s now, through
+  `Cli.choice` and `Cli.refined`; a type it cannot derive is `std/L010`
+  (was `FLICK-C013`), and on the go target a refined type's predicate is
+  checked. The runtimes derive no `Value` any more.
 - **Plugins:** `flick fmt` lays out blocks with the plugins of the project's
   packages; a component built for another version of `flick:plugin` is
   `FLICK-P035` on its import, naming both versions.

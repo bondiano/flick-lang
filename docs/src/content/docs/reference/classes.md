@@ -187,6 +187,24 @@ are derived only together with `Eq`, so all of them use the same fields. A
 transparent alias already has its form's instances. Failures are
 `FLICK-C013`.
 
+A class marked `@derive` is derived by the plugin of its package, or of the
+package the attribute names, `@derive std` (see
+[plugins](../plugins/#derives)). `deriving C { … }` passes the derive its
+arguments, and `deriving instance C (M.T a)` derives for a type of another
+module of the package. `Cli.Value` is such a class. Any other class is
+`FLICK-C013`: the class has no derive.
+
+```flick
+@derive
+class Arbitrary a =
+  arbitrary : a
+
+type Point = Point Float Float
+  deriving Arbitrary
+
+deriving instance Arbitrary (Shapes.Shape)
+```
+
 ## Dictionaries
 
 Each solved constraint records its dictionary at the place that required it:

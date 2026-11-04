@@ -134,9 +134,38 @@ and with the span of the block it stands for:
 The compiler checks the arena before it uses it: names must lex as names,
 numbers be finite, holes lie in the body and be used once, and its size and
 depth are bounded. The arena version is the version of the interface,
-`0.5.0`. A component built for another version does not load: the import
+`0.6.0`. A component built for another version does not load: the import
 that exposes its heads is `FLICK-P035`, naming the version it was built for
 and the one the compiler speaks, until it is rebuilt.
+
+## Derives
+
+A class marked `@derive` is derived by a plugin: that of the class's
+package, or of the package the attribute names, `@derive std`.
+
+```flick
+@derive
+class Arbitrary a =
+  arbitrary : a
+```
+
+A type that names such a class in `deriving`, maybe with arguments
+`deriving Arbitrary { depth = 3 }`, and a `deriving instance Arbitrary
+(Shapes.Shape)` for a type of another module of the package, call
+`derive(target, class, args, module, state)` of the plugin:
+
+- `target` is the type's declaration, a block, and what it declares at spans
+  of it: its name, parameters, constructors with the types of their fields,
+  the type an alias stands for and the base of a refined type;
+- `class` is the class's full name, `Pairs.Arbitrary`;
+- `args` the `{ … }` after the class;
+- `module` every type the module declares.
+
+The plugin gives declarations, an instance and what goes with it, which
+follow the type's declaration, or take the place of `deriving instance`.
+Their errors are on the class in `deriving`. A type of another module is
+named qualified, `Shapes.Square`, and its spans are no holes; the instance
+is still the module's, under the rule of orphans (`FLICK-C006`).
 
 ## Writing one in Rust
 
