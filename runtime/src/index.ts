@@ -22,6 +22,7 @@ export * from "./route.ts";
 export * from "./sync.ts";
 export * from "./schema/arbitrary.ts";
 export * from "./schema/index.ts";
+export * from "./schema/derived.ts";
 export * from "./stdlib/callbacks.ts";
 export * from "./stdlib/decimal.ts";
 export * from "./stdlib/file.ts";

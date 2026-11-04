@@ -6,6 +6,7 @@
 // own schema, so refined fields stay valid.
 import { Option, Result } from "effect";
 
+import { tagOf } from "./schema/derived.ts";
 import { type AnySchema, schemaValidate } from "./schema/index.ts";
 
 /** A query field: its label, its schema, and whether it is an `Option`. */
@@ -55,6 +56,28 @@ export const routeWords = (words: ReadonlyArray<readonly [string, string]>): Wor
 
 /** The segment of a nested route type, its `T$url` read when first used. */
 export const routeNested = (url: () => UrlCodec): Nested => Object.freeze({ [NESTED]: url });
+
+/** `Route.path c path segments query optional`: a constructor given as a value. */
+export const routePath = (
+  constructor: unknown,
+  path: string,
+  segments: ReadonlyArray<Segment>,
+  query: Option.Option<ReadonlyArray<QueryField>>,
+  optional: boolean,
+): Route => [tagOf(constructor), path, segments, Option.getOrNull(query), optional];
+
+/** `Route.segment schema`: a segment is the schema of its field. */
+export const routeSegment = (schema: AnySchema): Segment => schema;
+
+/** `Route.words words`: each word with its constructor. */
+export const routeWordsOf = (words: ReadonlyArray<readonly [string, unknown]>): Words =>
+  routeWords(words.map(([word, constructor]) => [word, tagOf(constructor)] as const));
+
+/** `Route.nested get`. */
+export const routeNestedOf = (get: (unit: undefined) => UrlCodec): Nested => routeNested(() => get(undefined));
+
+/** `Route.query label schema optional`. */
+export const routeQuery = (label: string, schema: AnySchema, optional: boolean): QueryField => [label, schema, optional];
 
 const isWords = (segment: Segment): segment is Words => typeof segment === "object" && segment !== null && WORDS in segment;
 

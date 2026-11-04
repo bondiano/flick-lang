@@ -11,6 +11,22 @@ chunkToList ChunkToList
 chunkSize ChunkSize
 routePrint RoutePrint
 routeParse *RouteParse
+schemaField SchemaField
+schemaRecordOf SchemaRecordOf
+schemaItem SchemaItem
+schemaTupleOf SchemaTupleOf
+schemaCase SchemaCase
+schemaAdtOf SchemaAdtOf
+schemaLazyOf SchemaLazyOf
+schemaRecursive SchemaRecursive
+schemaUnboxed SchemaUnboxed
+schemaRefinedOf SchemaRefinedOf
+routePath RoutePath
+routeSegment RouteSegment
+routeWordsOf RouteWordsOf
+routeNestedOf RouteNestedOf
+routeQuery RouteQuery
+routeCodec RouteCodecOf
 
 [@flick-lang/runtime/effect/Schema]
 Literal CodecLiteral

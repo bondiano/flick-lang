@@ -1,0 +1,305 @@
+point same: {"label":"a","x":3}
+point schema same: {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "label": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "x": {
+      "type": "integer",
+      "minimum": -2147483648,
+      "maximum": 2147483647
+    }
+  },
+  "required": [
+    "label",
+    "x"
+  ],
+  "additionalProperties": false
+}
+point bad same: ["label: a missing key"]
+shape same: {"_tag":"Rect","_0":1,"_1":2}
+shape schema same: {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "_tag": {
+          "const": "Circle"
+        },
+        "_0": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "_tag",
+        "_0"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "_tag": {
+          "const": "Rect"
+        },
+        "_0": {
+          "type": "number"
+        },
+        "_1": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "_tag",
+        "_0",
+        "_1"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "_tag": {
+          "const": "Dot"
+        }
+      },
+      "required": [
+        "_tag"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}
+shape bad same: ["_tag: expected one of Circle, Rect, Dot"]
+expr same: {"_tag":"Neg","_0":{"_tag":"Block","_0":{"_tag":"Statements","_0":[{"_tag":"Num","_0":1},{"_tag":"Neg","_0":{"_tag":"Num","_0":2}}]}}}
+expr schema same: {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "_tag": {
+          "const": "Num"
+        },
+        "_0": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "_tag",
+        "_0"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "_tag": {
+          "const": "Neg"
+        },
+        "_0": {
+          "$ref": "#/$defs/Expr"
+        }
+      },
+      "required": [
+        "_tag",
+        "_0"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "_tag": {
+          "const": "Block"
+        },
+        "_0": {
+          "$ref": "#/$defs/Statements"
+        }
+      },
+      "required": [
+        "_tag",
+        "_0"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "Expr": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "_tag": {
+              "const": "Num"
+            },
+            "_0": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "_tag",
+            "_0"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "_tag": {
+              "const": "Neg"
+            },
+            "_0": {
+              "$ref": "#/$defs/Expr"
+            }
+          },
+          "required": [
+            "_tag",
+            "_0"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "_tag": {
+              "const": "Block"
+            },
+            "_0": {
+              "$ref": "#/$defs/Statements"
+            }
+          },
+          "required": [
+            "_tag",
+            "_0"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Statements": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "_tag": {
+              "const": "Statements"
+            },
+            "_0": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Expr"
+              }
+            }
+          },
+          "required": [
+            "_tag",
+            "_0"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
+tree same: {"_tag":"Branch","_0":[{"_tag":"Leaf","_0":1},{"_tag":"Branch","_0":[{"_tag":"Leaf","_0":2}]}]}
+tree schema same: {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "_tag": {
+          "const": "Leaf"
+        },
+        "_0": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "_tag",
+        "_0"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "_tag": {
+          "const": "Branch"
+        },
+        "_0": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tree"
+          }
+        }
+      },
+      "required": [
+        "_tag",
+        "_0"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "Tree": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "_tag": {
+              "const": "Leaf"
+            },
+            "_0": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "_tag",
+            "_0"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "_tag": {
+              "const": "Branch"
+            },
+            "_0": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Tree"
+              }
+            }
+          },
+          "required": [
+            "_tag",
+            "_0"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
+port same: 8080
+port bad same: ["(root): not a valid Port"]
+port schema same: no JSON Schema
+user id same: "u1"
+url same: /search?page=2&q=atoms
+url home same: /
+parse same: Some "{\"_tag\":\"User\",\"_0\":42}"
+parse query same: Some "{\"_tag\":\"Search\",\"_0\":{\"page\":null,\"q\":\"x\"}}"
+parse bad same: None

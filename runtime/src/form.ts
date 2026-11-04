@@ -25,6 +25,12 @@ export interface FormSpec {
 export const formSpec = (schema: AnySchema, name: string, fields: ReadonlyArray<FieldSpec>): FormSpec =>
   Object.freeze({ schema, name, fields });
 
+/** `Form.spec label schema optional`. */
+export const formFieldSpec = (label: string, schema: AnySchema, optional: boolean): FieldSpec => [label, schema, optional];
+
+/** `Form.unsafe_field label`: a field is its label at run time. */
+export const formUnsafeField = (label: string): string => label;
+
 /** `Form.Draft a`: the text and the error of each field. */
 export interface Draft {
   readonly spec: FormSpec;
