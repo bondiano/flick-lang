@@ -87,12 +87,22 @@ depth are bounded. The arena version is the version of the interface,
 
 ## Writing one in Rust
 
+`flick new demo --template plugin` makes a library with a plugin: the module
+programs import (`src/Tagged.fl`), the crate of the plugin (`plugin/`), the
+explanations of its codes (`explain/`) and the script `flick run plugin`,
+which builds the component `plugin.wasm` the manifest names with
+`[package] plugin`. Its plugin is `tagged "name" { value }`, which stands for
+`{ tag = "name"; value = value }`:
+
 ```rust
-use flick_plugin::{Arena, Block, Builder, Compiler, Diagnostic, Expr, Plugin, Span};
+use flick_plugin::{Arena, Block, Builder, Compiler, Diagnostic, Plugin, TokenKind, flick};
 
-pub struct Echo;
+pub struct Tagged;
 
-impl Plugin for Echo {
+#[cfg(feature = "guest")]
+flick_plugin::export!(Tagged);
+
+impl Plugin for Tagged {
     fn collect(&self, _: &[Block]) -> Vec<u8> {
         Vec::new()
     }
@@ -103,21 +113,60 @@ impl Plugin for Echo {
         _: &[u8],
         compiler: &mut dyn Compiler,
     ) -> Result<Arena, Vec<Diagnostic>> {
-        let end = u32::try_from(block.text.len()).unwrap_or(u32::MAX);
-        let hole = compiler.parse_expr(block.body, end).map_err(|d| vec![d])?;
-        let mut b = Builder::new(Span { start: 0, end });
-        let root = b.at(hole.span).expr(Expr::Hole(hole.span));
-        Ok(b.finish(root))
+        let tag = match block.arguments() {
+            [t] if t.kind == TokenKind::String => t.span,
+            _ => {
+                let message = "`tagged` takes its tag: `tagged \"name\" { value }`";
+                return Err(vec![Diagnostic::error(message, block.whole()).with_code("T001")]);
+            }
+        };
+        let mut body = block.body();
+        let value = body.expr(compiler).map_err(|d| vec![d])?;
+        let mut b = Builder::new(block.whole());
+        let record = flick!(b, { tag = #tag; value = #value });
+        Ok(b.finish(record))
     }
 }
-
-#[cfg(feature = "guest")]
-flick_plugin::export!(Echo);
 ```
 
-Built with `crate-type = ["cdylib"]`, the `guest` feature of `flick-plugin`
-and `--target wasm32-wasip2`, the crate is a component; the library names it
-with `[package] plugin = "echo.wasm"`, a path inside the library.
+`flick!(b, code)` builds the code it is given, written in Flick, when the
+plugin is compiled; what is not Flick the arena holds is an error of
+`cargo build`. `#x` and `#(expr)` put a value of the plugin in place, by
+where it stands:
+
+| Value | In an expression | In a type |
+| - | - | - |
+| `Span` | the user's code there, a hole | the user's type there |
+| `&str`, `String` | a text | a type-level text, as in `Record.Label "x"` |
+| `Name("M.f")` | a name | a name |
+| `Wildcard` | — | `_` |
+| a `NodeId` built before | that node | that node |
+
+`#(..xs)` puts each item of a collection in a list, in the arguments of an
+application or in the fields of a record (`(label, value)` pairs);
+`flick!(b @ span, code)` gives the nodes their origin, and
+`flick!(b, type T)` builds a type. Fixed names are written as they are:
+`flick!(b, Cli.flag (Record.label : Record.Label #field) [#(..&aliases)] #help #multi #spec)`.
+
+A block is read with a cursor over the tokens of its body: `eat(":")`,
+`ident()`, `strings()`, and `expr(compiler)` or `ty(compiler)`, which ask
+the compiler for the user's code from the next token on and go past it.
+`block.arguments()` are the tokens of the head's arguments, and
+`block.docs_above(offset, " ")` the `///` lines above what starts at
+`offset`.
+
+The template's tests show what the plugin makes of a block, through
+`flick_core::plugin::testing::expand`:
+
+```rust
+let found = expand(&Tagged, "module M exposing (x)\n\nimport Tagged exposing (plugin tagged)\n\nlet x = tagged \"a\" { 1.0 + 2.0 }\n");
+assert_eq!(found, [Ok("{ tag = \"a\"; value = (1.0 + 2.0) }".to_owned())]);
+```
+
+In a program, `flick expand` prints the code each block of the project, or
+of the files given, stands for, the user's code in place. Built with
+`crate-type = ["cdylib"]`, the `guest` feature of `flick-plugin` and
+`--target wasm32-wasip2`, as the script does, the crate is a component.
 
 ## Limits and caches
 

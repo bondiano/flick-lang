@@ -13,7 +13,7 @@ title: "Командная строка"
 
 | Команда | Действие |
 | - | - |
-| `new <dir> [--template app\|cli\|fullstack\|lib]` | создаёт проект: `flick.toml`, `package.json`, пример модуля и его тест; `cli` делает `main` [блоком `cli`](../cli-dsl/); `fullstack` — серверный вход и страница браузера (`target = "client"`), общие вызовы модуля [`server fn`](../server-fn/), запись под `Server.authenticated`, Vite для страницы |
+| `new <dir> [--template app\|cli\|fullstack\|lib\|plugin]` | создаёт проект: `flick.toml`, `package.json`, пример модуля и его тест; `cli` делает `main` [блоком `cli`](../cli-dsl/); `plugin` — библиотека с [плагином](../plugins/), его крейт в `plugin/` и `flick run plugin` для сборки; `fullstack` — серверный вход и страница браузера (`target = "client"`), общие вызовы модуля [`server fn`](../server-fn/), запись под `Server.authenticated`, Vite для страницы |
 | `init [--template app\|cli\|fullstack\|lib]` | создаёт те же файлы в рабочем каталоге; перед записью сообщает обо всех файлах, которые уже существуют (`FLICK-P019`) |
 | `check [paths] [--watch] [--fix]` | проверяет код; если пути не указаны, проверяет корневые каталоги исходников и тестов; `--fix` применяет к этим файлам исправления, не меняющие смысла программы (например, убирает избыточную аннотацию типа, `FLICK-T021`), и сообщает об оставшихся проблемах |
 | `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--promise-facade] [--schema-aot] [--out-dir] [--watch]` | записывает ESM, карты исходников и файлы `.iface` (`--emit go` — исполняемый файл Go для каждого входа, см. [Go-target](../codegen/#go-target)); `--emit-dts` добавляет файлы `.d.ts`, а `--promise-facade` — Promise-фасады `A/B.promise.js` (см. [TypeScript](../codegen/#typescript)); показывает в stderr этапы сборки, затем число модулей и раннеры входов либо число и расположение ошибок; `--silent`/`--quiet` и `--diagnostics json` отключают прогресс и итог |
@@ -33,7 +33,8 @@ title: "Командная строка"
 | `schema export <M.codec> --target json-schema-2020-12 --out <file>` | выводит строгую JSON Schema кодека `PureCodec Json a` |
 | `schema export <M.api> --target openapi-3.1 --out <file>` | выводит значение `HttpApi.Api` как документ OpenAPI 3.1 — тот же, что строит `HttpApi.openapi` (см. [Клиенты и документы](../http-api/#клиенты-и-документы)) |
 | `doc --out-dir <dir>` | создаёт Markdown-страницы публичного API: типы, кинды, ограничения, эффекты, захваты |
-| `explain <code>` | объясняет сообщение диагностики по его коду |
+| `explain <code>` | объясняет сообщение диагностики по его коду, в том числе код плагина, как `std/L001` |
+| `expand [paths]` | код, который означает каждый блок [плагина](../plugins/) проекта или файлов |
 | `doctor` | показывает сведения о компиляторе, Node.js, pnpm, Content Mapper для TypeScript, установленной среде выполнения и Effect, а также о необязательных адаптерах |
 | `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | выводит одно представление модуля |
 | `lsp --stdio` | запускает [языковой сервер](../editor/#языковой-сервер); stdio — его единственный транспорт |

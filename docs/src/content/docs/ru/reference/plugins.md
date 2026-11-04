@@ -85,12 +85,22 @@ span'ы собственных слов плагина, как ключевые 
 
 ## Как написать плагин на Rust
 
+`flick new demo --template plugin` создаёт библиотеку с плагином: модуль,
+который импортируют программы (`src/Tagged.fl`), крейт плагина (`plugin/`),
+объяснения его кодов (`explain/`) и скрипт `flick run plugin`, который
+собирает компонент `plugin.wasm` — его называет манифест в
+`[package] plugin`. Плагин шаблона — `tagged "name" { value }`, который
+означает `{ tag = "name"; value = value }`:
+
 ```rust
-use flick_plugin::{Arena, Block, Builder, Compiler, Diagnostic, Expr, Plugin, Span};
+use flick_plugin::{Arena, Block, Builder, Compiler, Diagnostic, Plugin, TokenKind, flick};
 
-pub struct Echo;
+pub struct Tagged;
 
-impl Plugin for Echo {
+#[cfg(feature = "guest")]
+flick_plugin::export!(Tagged);
+
+impl Plugin for Tagged {
     fn collect(&self, _: &[Block]) -> Vec<u8> {
         Vec::new()
     }
@@ -101,21 +111,58 @@ impl Plugin for Echo {
         _: &[u8],
         compiler: &mut dyn Compiler,
     ) -> Result<Arena, Vec<Diagnostic>> {
-        let end = u32::try_from(block.text.len()).unwrap_or(u32::MAX);
-        let hole = compiler.parse_expr(block.body, end).map_err(|d| vec![d])?;
-        let mut b = Builder::new(Span { start: 0, end });
-        let root = b.at(hole.span).expr(Expr::Hole(hole.span));
-        Ok(b.finish(root))
+        let tag = match block.arguments() {
+            [t] if t.kind == TokenKind::String => t.span,
+            _ => {
+                let message = "`tagged` takes its tag: `tagged \"name\" { value }`";
+                return Err(vec![Diagnostic::error(message, block.whole()).with_code("T001")]);
+            }
+        };
+        let mut body = block.body();
+        let value = body.expr(compiler).map_err(|d| vec![d])?;
+        let mut b = Builder::new(block.whole());
+        let record = flick!(b, { tag = #tag; value = #value });
+        Ok(b.finish(record))
     }
 }
-
-#[cfg(feature = "guest")]
-flick_plugin::export!(Echo);
 ```
 
-С `crate-type = ["cdylib"]`, фичей `guest` крейта `flick-plugin` и
-`--target wasm32-wasip2` крейт собирается в компонент; библиотека называет его
-в `[package] plugin = "echo.wasm"` — путём внутри библиотеки.
+`flick!(b, code)` строит переданный ему код, написанный на Flick, при
+компиляции плагина: то, что не является Flick из арены, — ошибка
+`cargo build`. `#x` и `#(expr)` подставляют значение плагина по месту:
+
+| Значение | В выражении | В типе |
+| - | - | - |
+| `Span` | код пользователя там, дыра | тип пользователя там |
+| `&str`, `String` | текст | текст на уровне типов, как в `Record.Label "x"` |
+| `Name("M.f")` | имя | имя |
+| `Wildcard` | — | `_` |
+| построенный раньше `NodeId` | этот узел | этот узел |
+
+`#(..xs)` подставляет каждый элемент коллекции в список, в аргументы
+применения или в поля записи (пары `(label, value)`);
+`flick!(b @ span, code)` задаёт узлам origin, а `flick!(b, type T)` строит
+тип. Постоянные имена пишутся как есть:
+`flick!(b, Cli.flag (Record.label : Record.Label #field) [#(..&aliases)] #help #multi #spec)`.
+
+Блок читают курсором по токенам тела: `eat(":")`, `ident()`, `strings()`, а
+`expr(compiler)` и `ty(compiler)` просят у компилятора код пользователя со
+следующего токена и проходят за него. `block.arguments()` — токены
+аргументов головы, `block.docs_above(offset, " ")` — строки `///` над тем,
+что начинается в `offset`.
+
+Тесты шаблона показывают, что плагин делает из блока, через
+`flick_core::plugin::testing::expand`:
+
+```rust
+let found = expand(&Tagged, "module M exposing (x)\n\nimport Tagged exposing (plugin tagged)\n\nlet x = tagged \"a\" { 1.0 + 2.0 }\n");
+assert_eq!(found, [Ok("{ tag = \"a\"; value = (1.0 + 2.0) }".to_owned())]);
+```
+
+В программе `flick expand` печатает код, который означает каждый блок
+проекта или переданных файлов, с кодом пользователя на месте. С
+`crate-type = ["cdylib"]`, фичей `guest` крейта `flick-plugin` и
+`--target wasm32-wasip2`, как в скрипте, крейт собирается в компонент.
 
 ## Лимиты и кэши
 
