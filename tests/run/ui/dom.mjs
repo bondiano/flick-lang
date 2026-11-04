@@ -63,7 +63,22 @@ export const release = () => {
   pending = undefined;
 };
 
-export const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+const tick = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 20ms, then until the page stays the same for three ticks: a busy machine renders late. */
+export const settle = () => quiet(20);
+
+const page = () => dom?.window.document.body?.innerHTML ?? "";
+
+const quiet = async (ms) => {
+  await tick(ms);
+  for (let last = page(), still = 0; still < 3; ) {
+    await tick(10);
+    const now = page();
+    still = now === last ? still + 1 : 0;
+    last = now;
+  }
+};
 
 export const text = () => root.textContent;
 

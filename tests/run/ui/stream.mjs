@@ -8,10 +8,18 @@ let rest = [];
 let runs = 0;
 const errors = [];
 
+let pending = 0;
+
 /** The user's name, after a while; counts how often a task asked for it. */
 export const later = () => {
   runs += 1;
-  return new Promise((resolve) => setTimeout(() => resolve("ada"), 10));
+  pending += 1;
+  return new Promise((resolve) =>
+    setTimeout(() => {
+      pending -= 1;
+      resolve("ada");
+    }, 10),
+  );
 };
 
 export const taskRuns = () => runs;
@@ -51,11 +59,26 @@ export const streamShell = async (joined) => {
 /** The chunks after the shell; React reveals a boundary at most every 300 ms. */
 export const streamRest = async () => {
   await append(dom.window.document.body, rest.join(""));
-  await new Promise((resolve) => setTimeout(resolve, 700));
+  await quiet(700);
   return undefined;
 };
 
-export const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+const tick = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 20ms, then until no check is running and the page stays the same for three ticks: a busy machine renders late. */
+export const settle = () => quiet(20);
+
+const page = () => dom?.window.document.body?.innerHTML ?? "";
+
+const quiet = async (ms) => {
+  await tick(ms);
+  for (let last = page(), still = 0; still < 3; ) {
+    await tick(10);
+    const now = page();
+    still = pending === 0 && now === last ? still + 1 : 0;
+    last = now;
+  }
+};
 
 export const text = () => dom.window.document.getElementById("app")?.textContent ?? "";
 
