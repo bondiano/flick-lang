@@ -10,6 +10,7 @@ use flick_plugin::{Arena, Block};
 use flick_test_pairs::Pairs;
 
 mod forms;
+mod names;
 
 use super::{check, compile};
 use crate::diagnostics::{Diagnostic, Severity};

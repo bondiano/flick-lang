@@ -96,7 +96,7 @@ fn every_form_of_a_block_expands_and_its_declarations_are_the_modules() {
             export.entity.name
         );
         if export.entity.name == "point" {
-            assert!(main[start as usize..end as usize].starts_with("table Point"));
+            assert_eq!(&main[start as usize..end as usize], "Point");
         }
     }
 }

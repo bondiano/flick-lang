@@ -6,7 +6,11 @@
 //!   and `let point : Point = { x = 1.0 }`;
 //! - `traced let f x = …`: the user's declaration, and `let f_name = "f"`;
 //! - `variants Color { Red; Green }`: `type Color = Red | Green deriving Show`;
-//! - `shows Box`: `instance Show Box = let show _ = "Box"`.
+//! - `shows Box`: `instance Show Box = let show _ = "Box"`;
+//! - `capture { e }`: `(fun x -> { held = e; own = x; shown = show
+//!   Pairs.version }) "shadow"`, whose `x`, `show` and `Pairs` are not the
+//!   user's;
+//! - `companion Box { e }`: `let Box.label = e`, a companion of `Box`.
 
 use flick_plugin::{
     Arena, Block, Builder, Case, Compiler, Decl, Diagnostic, Expr, Name, Place, TokenKind, flick,
@@ -18,10 +22,10 @@ pub fn expand(
     block: &Block,
     compiler: &mut dyn Compiler,
 ) -> Option<Result<Arena, Vec<Diagnostic>>> {
-    let expression = matches!(block.head.as_str(), "named" | "text_of");
+    let expression = matches!(block.head.as_str(), "named" | "text_of" | "capture");
     let declaration = matches!(
         block.head.as_str(),
-        "define" | "table" | "traced" | "variants" | "shows"
+        "define" | "table" | "traced" | "variants" | "shows" | "companion"
     );
     if !expression && !declaration {
         return None;
@@ -42,13 +46,40 @@ pub fn expand(
             let raw = block.arguments().first().map(|t| block.text_of(t.span));
             Ok(b.expr(Expr::Text(string_value(raw.unwrap_or("")))))
         }
+        "capture" => capture(block, compiler, &mut b),
         "define" => define(block, compiler, &mut b),
+        "companion" => companion(block, compiler, &mut b),
         "table" => table(block, compiler, &mut b),
         "traced" => traced(block, compiler, &mut b),
         "variants" => Ok(variants(block, &mut b)),
         _ => Ok(shows(block, &mut b)),
     };
     Some(made.map(|root| b.finish(root)))
+}
+
+/// A generated local around the user's code, and generated names the
+/// user's locals could hide.
+fn capture(
+    block: &Block,
+    compiler: &mut dyn Compiler,
+    b: &mut Builder,
+) -> Result<u32, Vec<Diagnostic>> {
+    let held = block.body().expr(compiler).map_err(|d| vec![d])?;
+    Ok(flick!(b, (fun x -> { held = #held; own = x; shown = show Pairs.version }) "shadow"))
+}
+
+/// `let Owner.label = e`.
+fn companion(
+    block: &Block,
+    compiler: &mut dyn Compiler,
+    b: &mut Builder,
+) -> Result<u32, Vec<Diagnostic>> {
+    let owner = (block.cursor().next())
+        .filter(|t| t.kind == TokenKind::Con)
+        .ok_or_else(|| vec![Diagnostic::error("expected a type", block.whole())])?;
+    let value = block.body().expr(compiler).map_err(|d| vec![d])?;
+    let name = format!("{}.label", block.text_of(owner.span));
+    Ok(flick!(b @ owner.span, let #(name) = #value))
 }
 
 /// `let name = e`.
@@ -107,21 +138,23 @@ fn shows(block: &Block, b: &mut Builder) -> u32 {
     flick!(b, instance Show #(Name(name)) { let show _ = #name })
 }
 
-/// `type alias Point = { x : Float; … }` and `let point = { x = 1.0; … }`.
+/// `type alias Point = { x : Float; … }`, with the block's documentation,
+/// and `let point = { x = 1.0; … }`, both declared at the name `Point` of
+/// the block.
 fn table(
     block: &Block,
     compiler: &mut dyn Compiler,
     b: &mut Builder,
 ) -> Result<u32, Vec<Diagnostic>> {
-    let name = (block.arguments().first())
+    let token = (block.arguments().first())
         .filter(|t| t.kind == TokenKind::Con)
-        .map(|t| block.text_of(t.span).to_owned())
         .ok_or_else(|| {
             vec![Diagnostic::error(
                 "expected the table's name",
                 block.whole(),
             )]
         })?;
+    let (at, name) = (token.span, block.text_of(token.span).to_owned());
     let mut c = block.body();
     let (mut types, mut values) = (Vec::new(), Vec::new());
     while let Some(field) = c.ident() {
@@ -135,9 +168,10 @@ fn table(
         types.push((label.clone(), ty));
         values.push((label, value));
     }
-    let alias = flick!(b, type alias #(name) = { #(..types) });
+    let alias = flick!(b @ at, type alias #(name) = { #(..types) });
+    let alias = b.doc(&block.docs, alias);
     let mut lower = name.clone();
     lower[..1].make_ascii_lowercase();
-    let value = flick!(b, let #(lower) : #(Name(&name)) = { #(..values) });
+    let value = flick!(b @ at, let #(lower) : #(Name(&name)) = { #(..values) });
     Ok(b.group(vec![alias, value]))
 }
