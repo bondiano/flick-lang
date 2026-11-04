@@ -20,7 +20,7 @@ use crate::project::Host;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::literal::string_value;
+use crate::types;
 
 /// The plugin of each package a module imports, or why it does not load.
 type Plugins = HashMap<String, Result<Arc<dyn Expander>, String>>;
@@ -42,24 +42,44 @@ impl Loader<'_> {
         for (i, m) in self.modules.iter().enumerate() {
             let text = &self.sources.get(m.file).text;
             let mut heads: HashMap<String, String> = HashMap::new();
-            for import in m.parse.tree.nodes().filter(|n| n.kind == K::PluginImport) {
-                let Some(name) = import.child_tokens().find(|t| t.kind == K::String) else {
-                    continue;
+            for import in m.syntax.imports.iter().filter(|i| !i.plugins.is_empty()) {
+                let module = &import.module;
+                let refuse = |why: String| {
+                    (import.plugins.iter())
+                        .map(move |item| Diagnostic::error(codes::P035, why.clone(), item.span))
                 };
-                let package = string_value(name.text(text));
+                // a module of a package may come from the package cache
+                let saved = self.precompiled.package_of(module);
+                let root = self.by_name.get(module).map(|&j| &self.modules[j].root);
+                let package = match (root, saved) {
+                    (Some(Root::Package(name)), _) => name.clone(),
+                    (None, Some(name)) => name.to_owned(),
+                    (Some(_), _) => {
+                        diagnostics.extend(refuse(format!(
+                            "`{module}` is a module of this project: only a package provides a plugin"
+                        )));
+                        continue;
+                    }
+                    (None, None) if types::builtins().iter().any(|b| b.module == *module) => {
+                        diagnostics.extend(refuse(format!(
+                            "`{module}` is a built-in module, which provides no plugin"
+                        )));
+                        continue;
+                    }
+                    // the module is reported as unknown
+                    (None, None) => continue,
+                };
                 let plugin = plugins
                     .entry(package.clone())
                     .or_insert_with(|| self.host.plugin(&package, self.component(&package)));
                 if let Err(why) = plugin {
-                    diagnostics.push(Diagnostic::error(
-                        codes::P035,
-                        format!("plugin \"{package}\" cannot be loaded: {why}"),
-                        Span::new(m.file, name.start, name.end),
-                    ));
+                    diagnostics.extend(refuse(format!(
+                        "the plugin of package `{package}` cannot be loaded: {why}"
+                    )));
                     continue;
                 }
-                for head in exposed(import, text) {
-                    heads.insert(head, package.clone());
+                for item in &import.plugins {
+                    heads.insert(item.name.clone(), package.clone());
                 }
             }
             if heads.is_empty() {
@@ -280,17 +300,6 @@ fn group(root: &Root) -> String {
         Root::Package(name) => format!("package {name}"),
         Root::Other(_) => "other".into(),
     }
-}
-
-/// The names a plugin import exposes.
-fn exposed(import: &Node, text: &str) -> Vec<String> {
-    import
-        .nodes()
-        .filter(|n| n.kind == K::Exposing)
-        .flat_map(Node::tokens)
-        .filter(|t| t.kind == K::Ident)
-        .map(|t| t.text(text).to_owned())
-        .collect()
 }
 
 /// The plugin blocks under `node`.

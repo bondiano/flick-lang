@@ -1,27 +1,23 @@
-//! Blocks of plugins: `import plugin "package" exposing (head)` makes `head`
-//! start a block in the rest of the file, and `head { … }` keeps its body as
-//! tokens for the plugin to read. A head only the same file imports counts,
-//! so `f { a = 1 }` stays a call with a record wherever no import says so.
+//! Blocks of plugins: `import Sql exposing (plugin sql)` makes `sql` start
+//! a block in the rest of the file, and `sql { … }` keeps its body as
+//! tokens for the plugin of `Sql`'s package to read. A head only the same
+//! file imports counts, so `f { a = 1 }` stays a call with a record wherever
+//! no import says so.
 
-use super::{K, Marker, Parser, SyntaxKind};
+use super::{K, Parser, SyntaxKind};
 
-/// `plugin "package" exposing (head, …)` after `import`, whose marker is `m`.
-pub(super) fn import(p: &mut Parser, m: Marker) {
+/// Whether an exposed item `plugin head` starts here.
+pub(super) fn at_head(p: &Parser) -> bool {
+    p.at_word("plugin") && p.nth(1) == K::Ident
+}
+
+/// `plugin head` in the exposed items of an import: `head` starts plugin
+/// blocks from here on.
+pub(super) fn head(p: &mut Parser) {
     p.bump_as(K::PluginKw);
+    let head = p.text_of(p.raw());
+    p.plugin_heads.push(head);
     p.bump();
-    let from = p.pos;
-    if p.at(K::ExposingKw) {
-        super::decl::exposing(p);
-    } else {
-        p.error_expected("`exposing` and the heads of the plugin");
-    }
-    let heads: Vec<&str> = p.toks[from..p.pos]
-        .iter()
-        .filter(|t| t.kind == K::Ident)
-        .map(|&t| p.text_of(t))
-        .collect();
-    p.plugin_heads.extend(heads);
-    p.complete(m, K::PluginImport);
 }
 
 /// Whether a plugin block starts here: a head an import exposed, then `{`.

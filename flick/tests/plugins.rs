@@ -1,6 +1,6 @@
 //! Plugins of dependencies: a library names the WebAssembly component of
-//! its plugin with `[package] plugin`, and a module that imports it gets
-//! its blocks expanded.
+//! its plugin with `[package] plugin`, and a module that imports one of the
+//! library's modules with `plugin head` gets its blocks expanded.
 
 mod common;
 
@@ -25,9 +25,16 @@ plugin = \"pairs.wasm\"
 kind = \"lib\"
 ";
 
+/// The module of the library a program imports the plugin's heads with.
+const PAIRS: &str = "module Pairs exposing (version)
+
+version : Float
+let version = 1.0
+";
+
 const MAIN: &str = "module App.Main exposing (main)
 
-import plugin \"pairs\" exposing (pairs)
+import Pairs exposing (plugin pairs)
 
 point : { x : Float; blocks : Float }
 let point = pairs { x = 1.0 }
@@ -41,7 +48,7 @@ mod without {
     use std::process::Command;
 
     use super::common::project;
-    use super::{APP, LIB, MAIN};
+    use super::{APP, LIB, MAIN, PAIRS};
 
     #[test]
     fn a_build_without_wasm_plugins_says_so() {
@@ -51,6 +58,7 @@ mod without {
                 ("app/flick.toml", APP),
                 ("app/src/App/Main.fl", MAIN),
                 ("lib/flick.toml", LIB),
+                ("lib/src/Pairs.fl", PAIRS),
             ],
         );
         let out = Command::new(env!("CARGO_BIN_EXE_flick"))
@@ -72,7 +80,7 @@ mod wasm {
     use std::process::{Command, Output};
 
     use super::common::project;
-    use super::{APP, LIB, MAIN};
+    use super::{APP, LIB, MAIN, PAIRS};
 
     /// The test plugin as a component, which `just wasm-plugins` builds.
     fn component() -> PathBuf {
@@ -94,6 +102,7 @@ mod wasm {
                 ("app/flick.toml", APP),
                 ("app/src/App/Main.fl", main),
                 ("lib/flick.toml", LIB),
+                ("lib/src/Pairs.fl", PAIRS),
             ],
         );
         fs::copy(component(), root.join("lib/pairs.wasm")).expect("copy the component");
@@ -145,7 +154,7 @@ mod wasm {
 
     #[test]
     fn a_plugin_runs_within_its_fuel_and_memory() {
-        let main = "module App.Main exposing (main, a, b)\n\nimport plugin \"pairs\" exposing (spin, hog)\n\nlet a = spin {}\nlet b = hog {}\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
+        let main = "module App.Main exposing (main, a, b)\n\nimport Pairs exposing (plugin spin, plugin hog)\n\nlet a = spin {}\nlet b = hog {}\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
         let root = app("plugins-limits", main);
         let checked = flick(&root, &["check"]);
         let stderr = String::from_utf8_lossy(&checked.stderr);

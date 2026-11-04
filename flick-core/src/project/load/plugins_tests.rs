@@ -14,9 +14,9 @@ use crate::diagnostics::{Diagnostic, Severity};
 use crate::ir;
 use crate::plugin::source::BlockSource;
 use crate::plugin::{Expander, Failure, Native};
-use crate::project::config::{Build, Config, Kind};
+use crate::project::config::{Build, Config, Dependency, Kind, Source};
 use crate::project::{Host, Project};
-use crate::source::SourceMap;
+use crate::source::{FileId, SourceMap, Span};
 use crate::types::Thresholds;
 
 /// The `pairs` plugin, counting the calls it answers.
@@ -100,7 +100,10 @@ impl Host for Memory {
 }
 
 const HEAD: &str =
-    "module App.Main exposing (point)\n\nimport plugin \"pairs\" exposing (pairs, bad)\n\n";
+    "module App.Main exposing (point)\n\nimport Pairs exposing (plugin pairs, plugin bad)\n\n";
+
+/// A library of the project, a path dependency with one module.
+const LIBRARY: &str = "schema-version = 1\n\n[project]\nkind = \"lib\"\n";
 
 fn library(sources: &mut SourceMap) -> Project {
     Project {
@@ -111,7 +114,14 @@ fn library(sources: &mut SourceMap) -> Project {
             source_dir: "src".into(),
             test_dir: "test".into(),
             entries: Vec::new(),
-            dependencies: Vec::new(),
+            dependencies: ["pairs", "other"]
+                .into_iter()
+                .map(|name| Dependency {
+                    name: name.into(),
+                    source: Source::Path(format!("../{name}")),
+                    span: Span::new(FileId::default(), 0, 0),
+                })
+                .collect(),
             package: None,
             build: Build::default(),
             sql_dialect: Default::default(),
@@ -133,6 +143,16 @@ fn host(main: &str) -> Memory {
         store: Some(RefCell::default()),
     };
     host.write("/p/src/App/Main.fl", main);
+    host.write("/pairs/flick.toml", LIBRARY);
+    host.write(
+        "/pairs/src/Pairs.fl",
+        "module Pairs exposing (version)\n\nversion : Float\nlet version = 1.0\n",
+    );
+    host.write("/other/flick.toml", LIBRARY);
+    host.write(
+        "/other/src/Other.fl",
+        "module Other exposing (o)\n\no : Float\nlet o = 1.0\n",
+    );
     host
 }
 
@@ -216,10 +236,27 @@ fn errors_land_on_the_users_code_or_on_the_block() {
 
 #[test]
 fn a_plugin_that_does_not_load_is_reported_once_on_its_import() {
-    let main = "module App.Main exposing (x)\n\nimport plugin \"other\" exposing (other)\n\nlet x = other { a = 1 }\n";
+    let main = "module App.Main exposing (x)\n\nimport Other exposing (plugin other)\n\nlet x = other { a = 1 }\n";
     assert_eq!(
         report(main),
-        ["FLICK-P035 `\"other\"`: plugin \"other\" cannot be loaded: no such plugin"]
+        [
+            "FLICK-P035 `plugin other`: the plugin of package `other` cannot be loaded: no such plugin"
+        ]
+    );
+    // a module of the project or a built-in one has no plugin
+    let main = "module App.Main exposing (x)\n\nimport App.Main exposing (plugin mine)\nimport List exposing (plugin list)\n\nlet x = 1\n";
+    let found = report(main);
+    assert!(
+        found
+            .iter()
+            .any(|f| f.contains("`plugin mine`: `App.Main` is a module of this project")),
+        "{found:?}"
+    );
+    assert!(
+        found
+            .iter()
+            .any(|f| f.contains("`plugin list`: `List` is a built-in module")),
+        "{found:?}"
     );
 }
 
@@ -244,7 +281,7 @@ fn editors_see_the_users_code_inside_a_block() {
         analysis: &analysis,
         sources: &sources,
     };
-    let file = analysis.modules[0].file;
+    let file = analysis.module("App.Main").expect("the module").file;
     let inside = u32::try_from(main.rfind("base").expect("used")).expect("short");
     let (shown, _) = ide
         .hover(file, inside + 1)
@@ -262,7 +299,7 @@ fn editors_see_the_users_code_inside_a_block() {
 /// `main` with blocks `p`, `q` and more, each `pairs { label = value }`.
 fn blocks(fields: &[(&str, &str)]) -> String {
     let mut main =
-        String::from("module App.Main exposing (..)\n\nimport plugin \"pairs\" exposing (pairs)\n");
+        String::from("module App.Main exposing (..)\n\nimport Pairs exposing (plugin pairs)\n");
     for (i, (label, value)) in fields.iter().enumerate() {
         let _ = write!(
             main,
@@ -319,7 +356,7 @@ fn a_saved_expansion_that_does_not_read_is_made_again() {
 fn an_editor_session_keeps_plugin_results_in_memory() {
     use super::{ModuleCache, analyze_with};
 
-    let other = "module App.Other exposing (o)\n\nimport plugin \"pairs\" exposing (pairs)\n\no : { v : Float; blocks : Float }\nlet o = pairs { v = 1.0 }\n";
+    let other = "module App.Other exposing (o)\n\nimport Pairs exposing (plugin pairs)\n\no : { v : Float; blocks : Float }\nlet o = pairs { v = 1.0 }\n";
     let mut host = host(&blocks(&[("x", "1.0")]));
     host.store = None;
     host.write("/p/src/App/Other.fl", other);

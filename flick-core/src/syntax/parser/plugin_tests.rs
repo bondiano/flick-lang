@@ -3,7 +3,7 @@ use crate::fmt;
 use crate::source::SourceMap;
 use crate::syntax::cst::{Element, Token};
 
-const IMPORT: &str = "import plugin \"pairs\" exposing (pairs)\n\n";
+const IMPORT: &str = "import Pairs exposing (Pair, plugin pairs)\n\n";
 
 fn parse_str(src: &str) -> Parse {
     let mut map = SourceMap::default();
@@ -53,8 +53,16 @@ fn a_head_is_a_plugin_block_only_where_the_file_imports_it() {
     let src = format!("{IMPORT}let x = pairs {{ a = {{ b = 1 }}; c = 2 }}\nlet y = pairs\n");
     let parsed = parse_str(&src);
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
-    let import = find(&parsed.tree, K::PluginImport).expect("a plugin import");
-    assert!(import.has_token(K::PluginKw));
+    let import = find(&parsed.tree, K::ImportDecl).expect("an import");
+    let items: Vec<String> = find(import, K::Exposing)
+        .expect("exposed items")
+        .nodes()
+        .map(|item| text_of(&src, item))
+        .collect();
+    assert_eq!(items, ["Pair", "plugin pairs"]);
+    assert!(
+        find(import, K::Exposing).is_some_and(|e| e.tokens().iter().any(|t| t.kind == K::PluginKw))
+    );
     let block = find(&parsed.tree, K::PluginExpr).expect("a plugin block");
     assert_eq!(text_of(&src, block), "pairs { a = { b = 1 }; c = 2 }");
     // the body is kept as tokens, braces balanced
@@ -128,12 +136,15 @@ fn the_formatter_keeps_plugin_imports_and_blocks() {
     let src = format!("{IMPORT}x : Int\nlet x = pairs {{ a = 1;   b : Int = 2 }}\n");
     let formatted = fmt::format(&src, FileId::default()).expect("formats");
     assert_eq!(formatted, src);
+    // `plugin` stays a name wherever it does not start an exposed head
+    let named = parse_str("let plugin = 1\nlet x = plugin\n");
+    assert!(named.diagnostics.is_empty(), "{:?}", named.diagnostics);
     let parsed = parse_str(&src);
     let imports = parsed
         .tree
         .children
         .iter()
-        .filter(|c| matches!(c, Element::Node(n) if n.kind == K::PluginImport))
+        .filter(|c| matches!(c, Element::Node(n) if n.kind == K::ImportDecl))
         .count();
     assert_eq!(imports, 1);
 }

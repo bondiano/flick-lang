@@ -91,9 +91,6 @@ fn module_header(p: &mut Parser) {
 fn import(p: &mut Parser) {
     let m = p.start();
     p.bump();
-    if p.at_word("plugin") && p.nth(1) == K::String {
-        return super::plugin::import(p, m);
-    }
     module_path(p);
     if p.eat(K::AsKw) {
         p.expect(K::Con);
@@ -104,7 +101,7 @@ fn import(p: &mut Parser) {
     p.complete(m, K::ImportDecl);
 }
 
-pub(super) fn exposing(p: &mut Parser) {
+fn exposing(p: &mut Parser) {
     let m = p.start();
     p.bump();
     if p.at(K::LParen) {
@@ -115,10 +112,11 @@ pub(super) fn exposing(p: &mut Parser) {
     p.complete(m, K::Exposing);
 }
 
-/// `name`, `Type`, `Type(..)` or `..`.
+/// `name`, `Type`, `Type(..)`, `..` or `plugin head`.
 fn expose_item(p: &mut Parser) {
     let m = p.start();
     match p.current() {
+        K::Ident if super::plugin::at_head(p) => super::plugin::head(p),
         K::Ident | K::DotDot => p.bump(),
         K::Con => {
             p.bump();
