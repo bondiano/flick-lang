@@ -19,7 +19,7 @@ instance Problem Gone =
 
 type alias Profiles = {
   profile : Get "/profiles/:name" { path : Name } (Created Name) {Gone};
-  forget : Delete "/profiles" {} Unit {};
+  forget : Delete "/profiles" {} () {};
 } deriving HttpApi
 
 profile : HttpApi.Endpoint "profile" (Handler Name Unit Unit Unit r {Gone} Name)

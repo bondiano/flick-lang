@@ -235,7 +235,10 @@ impl Reader<'_> {
                     "`{part}` is not a part of a request: `path`, `query`, `headers` or `payload`"
                 )));
             };
-            checked.push((known, span));
+            // a part written twice is the record's error, `FLICK-T014`
+            if !checked.iter().any(|(p, _)| *p == known) {
+                checked.push((known, span));
+            }
         }
         let entries = self.inside(errors, "{").ok_or_else(|| {
             fail("the errors are a row of error types, `{NotFound, Conflict}`, or `{}`")
@@ -267,7 +270,12 @@ impl Reader<'_> {
             [head, inner] if self.last_name(head) == "Created" => (inner, true),
             _ => (span, false),
         };
-        let unit = matches!(self.block.text_of(self.bare(span)).trim(), "Unit" | "()");
+        // `Unit`, `()`, `(Unit)`: no body
+        let text: String = self.block.text_of(span).split_whitespace().collect();
+        let unit = matches!(
+            text.trim_start_matches('(').trim_end_matches(')'),
+            "Unit" | ""
+        );
         (!unit).then_some((span, created))
     }
 }
