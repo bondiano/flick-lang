@@ -14,6 +14,9 @@ pub enum Template {
     /// module; `flick dev` runs both.
     Fullstack,
     Lib,
+    /// A library with a plugin: blocks `tagged "name" { value }` of the
+    /// programs that import it, the plugin's crate in `plugin/`.
+    Plugin,
 }
 
 #[derive(Args)]

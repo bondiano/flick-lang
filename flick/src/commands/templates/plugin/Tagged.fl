@@ -1,0 +1,5 @@
+/// The values `tagged "name" { value }` makes: `value` with the tag `name`.
+/// A module imports the plugin with `import Tagged exposing (plugin tagged)`.
+module Tagged exposing (Tagged)
+
+type alias Tagged a = { tag : String; value : a }

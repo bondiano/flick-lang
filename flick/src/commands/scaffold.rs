@@ -42,6 +42,28 @@ const FULLSTACK: [(&str, &str); 8] = [
     ),
 ];
 
+/// The files of the `plugin` template besides the manifests; `NAME` is the
+/// package's, `COMPILER` this compiler's version.
+const PLUGIN: [(&str, &str); 6] = [
+    ("src/Tagged.fl", include_str!("templates/plugin/Tagged.fl")),
+    // the toolchain of this compiler, with the target of components
+    (
+        "rust-toolchain.toml",
+        include_str!("../../../rust-toolchain.toml"),
+    ),
+    (
+        "plugin/Cargo.toml",
+        include_str!("templates/plugin/Cargo.toml"),
+    ),
+    ("plugin/src/lib.rs", include_str!("templates/plugin/lib.rs")),
+    ("explain/T001.md", include_str!("templates/plugin/T001.md")),
+    ("explain/T002.md", include_str!("templates/plugin/T002.md")),
+];
+
+/// The `[package]` and `[scripts]` of the `plugin` template: the component
+/// `flick run plugin` builds is the package's plugin.
+const PLUGIN_PACKAGE: &str = "[package]\nname = \"NAME\"\nversion = \"0.1.0\"\nplugin = \"plugin.wasm\"\n\n[scripts]\nplugin = [\n  \"cargo build --manifest-path plugin/Cargo.toml --features guest --target wasm32-wasip2 --release\",\n  \"cp plugin/target/wasm32-wasip2/release/CRATE.wasm plugin.wasm\",\n]\n\n";
+
 pub struct ScaffoldCommand {
     pub dir: PathBuf,
     pub template: Template,
@@ -51,14 +73,22 @@ pub struct ScaffoldCommand {
 
 /// The files of a project named `name`.
 fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
-    let app = template != Template::Lib;
+    let app = !matches!(template, Template::Lib | Template::Plugin);
     let project = match template {
-        Template::Lib => "kind = \"lib\"\n",
+        Template::Lib | Template::Plugin => "kind = \"lib\"\n",
         Template::Fullstack => FULLSTACK_ENTRIES,
         Template::App | Template::Cli => "kind = \"app\"\nentry = \"App.Main\"\n",
     };
+    let package = if template == Template::Plugin {
+        let crate_name = format!("{name}_plugin").replace('-', "_");
+        PLUGIN_PACKAGE
+            .replace("NAME", name)
+            .replace("CRATE", &crate_name)
+    } else {
+        String::new()
+    };
     let config = format!(
-        "schema-version = 1\n\n[project]\n{project}source-dir = \"src\"\ntest-dir = \"test\"\n\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\nemit = \"js\"\n"
+        "schema-version = 1\n\n{package}[project]\n{project}source-dir = \"src\"\ntest-dir = \"test\"\n\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\nemit = \"js\"\n"
     );
     let mut package = serde_json::json!({
         "name": name,
@@ -81,7 +111,15 @@ fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
         ("package.json", format!("{package:#}\n")),
         (".gitignore", "node_modules/\ndist/\n.flick/\n".to_owned()),
     ];
-    if template == Template::Fullstack {
+    if template == Template::Plugin {
+        out[2].1.push_str("plugin/target/\n");
+        out.extend(PLUGIN.iter().map(|(path, text)| {
+            (
+                *path,
+                text.replace("NAME", name).replace("COMPILER", COMPILER),
+            )
+        }));
+    } else if template == Template::Fullstack {
         out.extend(
             FULLSTACK
                 .iter()
@@ -202,6 +240,9 @@ impl Command for ScaffoldCommand {
             shown(&self.dir)
         );
         println!("Next: flick install");
+        if self.template == Template::Plugin {
+            println!("Then: flick run plugin, which builds the plugin's component");
+        }
         Outcome::default()
     }
 }
@@ -212,6 +253,7 @@ fn kind(template: Template) -> &'static str {
         Template::Cli => "command-line app",
         Template::Fullstack => "full-stack app",
         Template::Lib => "library",
+        Template::Plugin => "library with a plugin",
     }
 }
 

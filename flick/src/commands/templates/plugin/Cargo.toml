@@ -1,0 +1,21 @@
+[package]
+name = "NAME-plugin"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# its own workspace, whatever holds the package
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# the plugin as a WebAssembly component, which `flick run plugin` builds
+guest = ["flick-plugin/guest"]
+
+[dependencies]
+flick-plugin = { git = "https://github.com/bondiano/flick-lang", tag = "vCOMPILER" }
+
+[dev-dependencies]
+flick-core = { git = "https://github.com/bondiano/flick-lang", tag = "vCOMPILER" }
