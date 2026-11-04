@@ -9,6 +9,7 @@ use crate::diagnostics::Severity;
 #[cfg(feature = "server-stdlib")]
 use crate::diagnostics::codes;
 use crate::iface::Interface;
+use crate::plugin::derive::builtin_expansion;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::{syntax, types};
@@ -37,13 +38,15 @@ pub(crate) fn check_text_with(
     let parse = syntax::parse(text, file);
     let syntax = resolve::module_syntax(&parse.tree, text, file);
     let module_name = syntax.header.as_ref().map_or(name, |h| h.name.as_str());
+    let (expansion, derived) = builtin_expansion(text, file, &parse.tree, module_name, &syntax);
+    assert!(derived.is_empty(), "{derived:?}");
     let module = Module {
         name: module_name,
         file,
-        text,
-        tree: &parse.tree,
+        text: expansion.as_ref().map_or(text, |e| &e.text),
+        tree: expansion.as_ref().map_or(&parse.tree, |e| &e.tree),
         syntax: &syntax,
-        generated: resolve::NO_GENERATED,
+        generated: expansion.as_ref().map_or(resolve::NO_GENERATED, |e| e.len),
     };
     let builtin = |name: &str| builtins.iter().find(|i| i.module == name).cloned();
     let (mut interface, mut diagnostics) = resolve::resolve(&module, &builtin);

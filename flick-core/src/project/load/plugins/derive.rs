@@ -10,23 +10,15 @@ use flick_plugin::{Block, DeriveTarget, Place};
 use super::super::{Loaded, Loader, Root};
 use super::{Found, Plugins, Results, aliases, failure, refusal};
 use crate::diagnostics::{Diagnostic, codes};
-use crate::plugin::derive::{Derived, derived_classes, target};
+use crate::plugin::derive::{Derived, Named, builtin_derived, derived_classes, named, target};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::{BlockSource, token_kind};
 use crate::plugin::{Expander, Failure, first_party};
 use crate::source::{FileId, Span};
-use crate::syntax::cst::{Element, Node, Token};
+use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::parse;
 use crate::types::{self, is_type};
-
-/// A class a `deriving` names, its arguments and where it is written.
-struct Named<'n> {
-    qualifier: String,
-    name: String,
-    args: Option<&'n Node>,
-    span: (u32, u32),
-}
 
 impl Loader<'_> {
     /// The derive blocks of every loaded module, with the code their plugins
@@ -42,7 +34,8 @@ impl Loader<'_> {
             let tree = &m.parse.tree;
             let wanted = tree.nodes().any(|n| {
                 n.kind == K::DerivingDecl
-                    || n.kind == K::TypeDecl && n.nodes().any(|c| c.kind == K::DerivingClause)
+                    || matches!(n.kind, K::TypeDecl | K::ErrorDecl)
+                        && n.nodes().any(|c| c.kind == K::DerivingClause)
             });
             if !wanted {
                 continue;
@@ -50,7 +43,9 @@ impl Loader<'_> {
             let text = &self.sources.get(m.file).text;
             let shared: Arc<str> = Arc::from(text.as_str());
             let heads = m.syntax.heads();
-            let declared: Vec<&Node> = tree.nodes().filter(|n| n.kind == K::TypeDecl).collect();
+            let declared: Vec<&Node> = (tree.nodes())
+                .filter(|n| matches!(n.kind, K::TypeDecl | K::ErrorDecl))
+                .collect();
             let summary: Vec<DeriveTarget> = (declared.iter())
                 .filter_map(|d| {
                     let source = BlockSource::declaration(
@@ -72,10 +67,12 @@ impl Loader<'_> {
             };
             for decl in tree.nodes() {
                 let (classes, keep) = match decl.kind {
-                    K::TypeDecl => match decl.nodes().find(|c| c.kind == K::DerivingClause) {
-                        Some(clause) => (named(clause, text), true),
-                        None => continue,
-                    },
+                    K::TypeDecl | K::ErrorDecl => {
+                        match decl.nodes().find(|c| c.kind == K::DerivingClause) {
+                            Some(clause) => (named(clause, text), true),
+                            None => continue,
+                        }
+                    }
                     K::DerivingDecl => (named(decl, text), false),
                     _ => continue,
                 };
@@ -105,14 +102,13 @@ impl Loader<'_> {
                             .any(|e| e.name == name || e.name.is_empty())
                     })
                     .find_map(|i| marked(&i.module))
-            })?
+            })
+            // the Prelude's, as `Schema`, which every module sees
+            .or_else(|| marked("Prelude"))?
         } else {
-            let import = m
-                .syntax
-                .imports
-                .iter()
-                .find(|i| i.qualifier() == qualifier)?;
-            marked(&import.module)?
+            let import = (m.syntax.imports.iter()).find(|i| i.qualifier() == qualifier);
+            // a built-in module is seen qualified without an import
+            marked(import.map_or(qualifier, |i| i.module.as_str()))?
         };
         let package = derived.package.or_else(|| self.package_of(&module))?;
         Some((package, format!("{module}.{name}")))
@@ -125,10 +121,7 @@ impl Loader<'_> {
             let m = &self.modules[j];
             return derived_classes(&m.parse.tree, &self.sources.get(m.file).text);
         }
-        match types::builtin_sources().iter().find(|(n, _)| *n == module) {
-            Some((_, text)) => derived_classes(&parse(text, FileId::default()).tree, text),
-            None => Vec::new(),
-        }
+        builtin_derived(module).to_vec()
     }
 
     /// The package `module` belongs to, when it is one's.
@@ -359,43 +352,6 @@ impl Call<'_, '_> {
         diagnostics.append(&mut found.source.diagnostics);
         (found, rendered)
     }
-}
-
-/// The classes `node`, a `deriving` clause or a `deriving instance`, names.
-fn named<'n>(node: &'n Node, text: &str) -> Vec<Named<'n>> {
-    let mut out = Vec::new();
-    let mut path: Vec<Token> = Vec::new();
-    let mut finish = |path: &mut Vec<Token>, args: Option<&'n Node>| {
-        let parts: Vec<&str> = (path.iter())
-            .filter(|t| t.kind != K::Dot)
-            .map(|t| t.text(text))
-            .collect();
-        if let (Some((name, qualifier)), Some(first), Some(last)) =
-            (parts.split_last(), path.first(), path.last())
-        {
-            out.push(Named {
-                qualifier: qualifier.join("."),
-                name: (*name).to_owned(),
-                args,
-                span: (first.start, last.end),
-            });
-        }
-        path.clear();
-    };
-    for element in &node.children {
-        match element {
-            Element::Token(t) if matches!(t.kind, K::Con | K::Dot) => path.push(*t),
-            Element::Token(t) if t.kind == K::Comma => finish(&mut path, None),
-            Element::Node(n) if n.kind == K::DerivingArgs => {
-                finish(&mut path, Some(n));
-            }
-            // the type of `deriving instance` ends the class
-            Element::Node(n) if is_type(n.kind) => break,
-            _ => {}
-        }
-    }
-    finish(&mut path, None);
-    out
 }
 
 /// The `{ … }` of a class in `deriving`, as a block whose body is its text.

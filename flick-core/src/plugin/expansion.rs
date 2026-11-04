@@ -333,7 +333,7 @@ fn replace_blocks(node: &mut Node, spliced: &mut Spliced) {
         };
         if matches!(
             n.kind,
-            K::PluginExpr | K::PluginDecl | K::TypeDecl | K::DerivingDecl
+            K::PluginExpr | K::PluginDecl | K::TypeDecl | K::ErrorDecl | K::DerivingDecl
         ) {
             let range = n.range();
             let (mut code, mut found, mut keep) = (Vec::new(), false, false);

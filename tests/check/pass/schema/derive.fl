@@ -53,7 +53,7 @@ type Phantom a = Phantom Float
   deriving Schema
 
 phantom : Schema (Phantom String)
-let phantom = schema Phantom
+let phantom = schema Phantom Schema.string
 
 type error NotFound = NotFound String
   deriving Schema

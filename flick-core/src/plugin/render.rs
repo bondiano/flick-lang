@@ -12,7 +12,7 @@ pub use decl::DECL_PLACEHOLDER;
 
 use crate::source::FileId;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::lexer::lex;
+use crate::syntax::lexer::{lex, lex_generated};
 
 /// The most nodes, the deepest nesting and the longest text of generated code.
 const MAX_NODES: usize = 100_000;
@@ -383,7 +383,7 @@ enum Names {
 
 impl Names {
     fn accept(self, name: &str) -> bool {
-        let (tokens, errors) = lex(name, FileId::default());
+        let (tokens, errors) = lex_generated(name, FileId::default());
         if !errors.is_empty() || tokens.is_empty() {
             return false;
         }

@@ -51,18 +51,23 @@ let expr =
       Schema.unsafe_case Num [Schema.item Schema.number],
       Schema.unsafe_case Neg [Schema.item self],
       Schema.unsafe_case Block [
-        Schema.item (Schema.lazy "Statements" (fun () ->
-          Schema.unsafe_adt "Statements" [
-            Schema.unsafe_case Statements [Schema.item (Schema.list self)],
-          ])),
+        Schema.item
+          (Schema.lazy "Statements" (fun () ->
+            Schema.unsafe_adt "Statements" [
+              Schema.unsafe_case Statements [Schema.item (Schema.list self)],
+            ]
+          )),
       ],
-    ])
+    ]
+  )
 
 tree : Schema a -> Schema (Tree a)
 let rec tree item =
   Schema.unsafe_adt "Tree" [
     Schema.unsafe_case Leaf [Schema.item item],
-    Schema.unsafe_case Branch [Schema.item (Schema.list (Schema.lazy "Tree" (fun () -> tree item)))],
+    Schema.unsafe_case Branch [
+      Schema.item (Schema.list (Schema.lazy "Tree" (fun () -> tree item))),
+    ],
   ]
 
 port : Schema Port
@@ -77,10 +82,11 @@ let page =
     Schema.unsafe_case Home [],
     Schema.unsafe_case User [Schema.item Schema.number],
     Schema.unsafe_case Search [
-      Schema.item (Schema.unsafe_record [
-        Schema.field "page" (Schema.option Schema.number),
-        Schema.field "q" Schema.string,
-      ]),
+      Schema.item
+        (Schema.unsafe_record [
+          Schema.field "page" (Schema.option Schema.number),
+          Schema.field "q" Schema.string,
+        ]),
     ],
   ]
 
@@ -89,10 +95,15 @@ let page_url =
   Route.codec page [
     Route.path Home "" [] None false,
     Route.path User "user" [Route.segment Schema.number] None false,
-    Route.path Search "search" [] (Some [
-      Route.query "page" Schema.number true,
-      Route.query "q" Schema.string false,
-    ]) false,
+    Route.path
+      Search
+      "search"
+      []
+      (Some [
+        Route.query "page" Schema.number true,
+        Route.query "q" Schema.string false,
+      ])
+      false,
   ]
 
 /// The JSON of `value`, or why it has none.
@@ -125,33 +136,48 @@ let parsed url text = show (Option.map (json page) (Route.parse url text))
 /// `what` of the derived witness and of the one written by hand.
 same : String -> String -> String -> String
 let same what derived written =
-  if derived == written then what ++ " same: " ++ derived else what ++ " differ: " ++ derived ++ " / " ++ written
+  if derived == written then
+    what ++ " same: " ++ derived
+  else
+    what ++ " differ: " ++ derived ++ " / " ++ written
 
 main : Unit ->{; AppError} Unit
 let main () =
   let p = { x = 3; label = Some "a" }
   Platform.stdout_line (same "point" (json (schema Point) p) (json point p))
-  Platform.stdout_line (same "point schema" (exported "Point" (schema Point)) (exported "Point" point))
-  Platform.stdout_line (same "point bad" (decoded (schema Point) "{\"x\": 1.5}") (decoded point "{\"x\": 1.5}"))
+  Platform.stdout_line
+    (same "point schema" (exported "Point" (schema Point)) (exported "Point" point))
+  Platform.stdout_line
+    (same "point bad" (decoded (schema Point) "{\"x\": 1.5}") (decoded point "{\"x\": 1.5}"))
   let r = Rect 1 2
   Platform.stdout_line (same "shape" (json (schema Shape) r) (json shape r))
-  Platform.stdout_line (same "shape schema" (exported "Shape" (schema Shape)) (exported "Shape" shape))
   Platform.stdout_line
-    (same "shape bad" (decoded (schema Shape) "{\"_tag\": \"Square\"}") (decoded shape "{\"_tag\": \"Square\"}"))
+    (same "shape schema" (exported "Shape" (schema Shape)) (exported "Shape" shape))
+  Platform.stdout_line
+    (same
+      "shape bad"
+      (decoded (schema Shape) "{\"_tag\": \"Square\"}")
+      (decoded shape "{\"_tag\": \"Square\"}"))
   let e = Neg (Block (Statements [Num 1, Neg (Num 2)]))
   Platform.stdout_line (same "expr" (json (schema Expr) e) (json expr e))
   Platform.stdout_line (same "expr schema" (exported "Expr" (schema Expr)) (exported "Expr" expr))
   let t = Branch [Leaf 1, Branch [Leaf 2]]
-  Platform.stdout_line (same "tree" (json (schema Tree Schema.number) t) (json (tree Schema.number) t))
   Platform.stdout_line
-    (same "tree schema" (exported "Tree" (schema Tree Schema.number)) (exported "Tree" (tree Schema.number)))
+    (same "tree" (json (schema Tree Schema.number) t) (json (tree Schema.number) t))
+  Platform.stdout_line
+    (same
+      "tree schema"
+      (exported "Tree" (schema Tree Schema.number))
+      (exported "Tree" (tree Schema.number)))
   Platform.stdout_line (same "port" (decoded (schema Port) "8080") (decoded port "8080"))
   Platform.stdout_line (same "port bad" (decoded (schema Port) "70000") (decoded port "70000"))
   Platform.stdout_line (same "port schema" (exported "Port" (schema Port)) (exported "Port" port))
-  Platform.stdout_line (same "user id" (json (schema UserId) (UserId "u1")) (json user_id (UserId "u1")))
+  Platform.stdout_line
+    (same "user id" (json (schema UserId) (UserId "u1")) (json user_id (UserId "u1")))
   let search = Search { q = "atoms"; page = Some 2 }
   Platform.stdout_line (same "url" (Route.print Page.url search) (Route.print page_url search))
   Platform.stdout_line (same "url home" (Route.print Page.url Home) (Route.print page_url Home))
   Platform.stdout_line (same "parse" (parsed Page.url "/user/42") (parsed page_url "/user/42"))
-  Platform.stdout_line (same "parse query" (parsed Page.url "/search?q=x") (parsed page_url "/search?q=x"))
+  Platform.stdout_line
+    (same "parse query" (parsed Page.url "/search?q=x") (parsed page_url "/search?q=x"))
   Platform.stdout_line (same "parse bad" (parsed Page.url "/nowhere") (parsed page_url "/nowhere"))

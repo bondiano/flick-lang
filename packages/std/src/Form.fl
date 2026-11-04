@@ -19,7 +19,22 @@
 /// such as a taken name, runs on input with `Ui.Event.latest`, which
 /// interrupts it when the user types again, and gives its verdict with
 /// `report`.
-module Form exposing (Field, Draft, InputProps, Spec, draft, text, problem, id, validate, report, input, spec, make, unsafe_field)
+module Form exposing (
+  Field,
+  Draft,
+  InputProps,
+  Spec,
+  draft,
+  text,
+  problem,
+  id,
+  validate,
+  report,
+  input,
+  spec,
+  make,
+  unsafe_field,
+)
 
 /// A field of a form's record: `Signup.fields.name`.
 type Field

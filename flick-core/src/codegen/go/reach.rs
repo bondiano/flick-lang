@@ -30,9 +30,6 @@ pub fn defined(item: &Item) -> Vec<String> {
             if matches!(s.plan, SchemaPlan::Refined { .. }) {
                 out.push(companion_name(&s.ty, "json"));
             }
-            if s.url.is_some() {
-                out.push(companion_name(&s.ty, "url"));
-            }
             out
         }
         ItemKind::Constructor(_) => Vec::new(),

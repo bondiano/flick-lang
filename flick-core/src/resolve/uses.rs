@@ -262,7 +262,8 @@ impl Walker<'_> {
         let Some((&name, qualifier)) = parts.split_last() else {
             return;
         };
-        let namespace = if name.starts_with(|c: char| c.is_ascii_uppercase()) {
+        // a companion `T$schema` of generated code is a value, its token one
+        let namespace = if last.kind == K::Con {
             con_namespace
         } else if con_namespace == Namespace::Type {
             return;

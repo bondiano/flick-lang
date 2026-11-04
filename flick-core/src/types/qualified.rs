@@ -49,6 +49,13 @@ impl Checker<'_> {
         name: &str,
         span: Span,
     ) -> Type {
+        // generated code names a companion by its type, a module of the
+        // type's name notwithstanding: `Path.schema` of a type `Path`
+        if span.start >= self.generated
+            && let Some(ty) = self.companion_of(qualifier, name, span)
+        {
+            return ty;
+        }
         // a service in scope with this operation wins over a module of its name
         let operation = match self.env.find_type(qualifier) {
             super::env::Found::Entity(e) => self.env.type_def(&e.module, &e.name).is_some_and(
@@ -111,19 +118,26 @@ impl Checker<'_> {
             return ty;
         }
         // `Email.parse`: a companion of a type
-        if let super::env::Found::Entity(e) = self.env.find_type(qualifier) {
-            let entity = Entity {
-                module: e.module.clone(),
-                namespace: Namespace::Value,
-                name: super::companion_name(&e.name, name),
-            };
-            if let Some(scheme) = self.env.value(&entity).cloned() {
-                let ty = self.instantiate(&scheme, span);
-                self.record_entity(&entity, &ty, span);
-                return ty;
-            }
+        if let Some(ty) = self.companion_of(qualifier, name, span) {
+            return ty;
         }
         self.service_member(qualifier, name, span)
+    }
+
+    /// `T.member`, the companion `T$member` of the type `T` in scope.
+    fn companion_of(&mut self, qualifier: &str, name: &str, span: Span) -> Option<Type> {
+        let super::env::Found::Entity(e) = self.env.find_type(qualifier) else {
+            return None;
+        };
+        let entity = Entity {
+            module: e.module.clone(),
+            namespace: Namespace::Value,
+            name: super::companion_name(&e.name, name),
+        };
+        let scheme = self.env.value(&entity).cloned()?;
+        let ty = self.instantiate(&scheme, span);
+        self.record_entity(&entity, &ty, span);
+        Some(ty)
     }
 
     /// `Service.operation`, or the error for a qualifier that names nothing.

@@ -38,13 +38,17 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
     let text = &sources.get(file).text;
     let parse = syntax::parse(text, file);
     let syntax = resolve::module_syntax(&parse.tree, text, file);
+    let name = syntax.header.as_ref().map_or("", |h| h.name.as_str());
+    // the witnesses its `deriving` names, which std's plugin writes
+    let (expansion, derived) =
+        plugin::derive::builtin_expansion(text, file, &parse.tree, name, &syntax);
     let module = resolve::Module {
-        name: syntax.header.as_ref().map_or("", |h| h.name.as_str()),
+        name,
         file,
-        text,
-        tree: &parse.tree,
+        text: expansion.as_ref().map_or(text, |e| &e.text),
+        tree: expansion.as_ref().map_or(&parse.tree, |e| &e.tree),
         syntax: &syntax,
-        generated: resolve::NO_GENERATED,
+        generated: expansion.as_ref().map_or(resolve::NO_GENERATED, |e| e.len),
     };
     // a lone file imports only built-in modules
     let builtin = |name: &str| types::builtins().iter().find(|i| i.module == name).cloned();
@@ -59,6 +63,7 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
         effects: true,
     };
     let mut diagnostics = parse.diagnostics;
+    diagnostics.extend(derived);
     diagnostics.extend(resolved);
     let checked = types::check(
         &module,
@@ -68,6 +73,9 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
         &mut interface,
     );
     diagnostics.extend(types::beside_syntax_errors(&parse.tree, checked));
+    if let Some(expansion) = &expansion {
+        expansion.restore(&mut diagnostics, None);
+    }
     diagnostics.sort_by_key(|d| d.span.map(|s| (s.start, s.end)));
     diagnostics
 }
