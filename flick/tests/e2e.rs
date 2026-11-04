@@ -13,6 +13,8 @@
 //!
 //! Each pass prints how long it took, and `times.tsv` under the output
 //! directory keeps the build and run time of every case (`times`).
+//! `FLICK_E2E_SHARD=k/n` runs the k-th of n shards of the cases, every pass
+//! of each, for CI jobs side by side.
 //!
 //! Every run writes its trace (`FLICK_TRACE`), which the monitor of `λRT`
 //! checks; for the cases of tests/run/runtime the Go runs must project it
@@ -22,7 +24,6 @@ mod times;
 mod trace;
 
 use std::collections::HashMap;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
@@ -181,6 +182,39 @@ fn portable(root: &Path) -> Vec<String> {
     cases
 }
 
+/// The cases under `root` that `FLICK_E2E_ONLY` and `FLICK_E2E_SHARD`
+/// select, sorted, and whether they are a shard.
+fn selected(root: &Path) -> (Vec<PathBuf>, bool) {
+    let mut paths = Vec::new();
+    cases(root, &mut paths);
+    if let Ok(only) = env::var("FLICK_E2E_ONLY") {
+        paths.retain(|p| only.split(',').any(|o| p.to_string_lossy().contains(o)));
+    }
+    paths.sort();
+    let sharded = shard(&mut paths);
+    assert!(!paths.is_empty(), "no cases under {}", root.display());
+    (paths, sharded)
+}
+
+/// Keeps the shard `FLICK_E2E_SHARD` names, `k/n`: every n-th of the sorted
+/// cases from the k-th on. Whether there is one.
+fn shard(paths: &mut Vec<PathBuf>) -> bool {
+    let Some(spec) = env::var("FLICK_E2E_SHARD").ok().filter(|s| !s.is_empty()) else {
+        return false;
+    };
+    let (k, n) = spec
+        .split_once('/')
+        .and_then(|(k, n)| Some((k.parse::<usize>().ok()?, n.parse::<usize>().ok()?)))
+        .filter(|&(k, n)| (1..=n).contains(&k))
+        .unwrap_or_else(|| panic!("FLICK_E2E_SHARD is `k/n` with 1 <= k <= n, not `{spec}`"));
+    let mut i = 0;
+    paths.retain(|_| {
+        i += 1;
+        (i - 1) % n == k - 1
+    });
+    true
+}
+
 /// How many cases run at once.
 fn jobs() -> usize {
     env::var("FLICK_E2E_JOBS")
@@ -258,13 +292,7 @@ fn run_cases() {
         "runtime is not installed: run `pnpm install --frozen-lockfile` in the repository root"
     );
     let root = repo.join("tests/run");
-    let mut paths = Vec::new();
-    cases(&root, &mut paths);
-    if let Ok(only) = env::var("FLICK_E2E_ONLY") {
-        paths.retain(|p| only.split(',').any(|o| p.to_string_lossy().contains(o)));
-    }
-    paths.sort();
-    assert!(!paths.is_empty(), "no cases under {}", root.display());
+    let (paths, sharded) = selected(&root);
 
     // Under target/, so `@flick-lang/runtime` resolves from the repository root
     // node_modules exactly as it would in a project.
@@ -354,8 +382,11 @@ fn run_cases() {
     report.extend(typecheck(&repo, &out_root.join("debug/ts")));
     report.extend(typecheck(&repo, &out_root.join("release/ts")));
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
-    // the sum of the builds: with the same jobs in both profiles it compares them
-    metrics(&out_root, passes[0].built(), passes[2].built());
+    // the sizes and build times of the whole corpus only compare in one run
+    if !sharded {
+        // the sum of the builds: with the same jobs in both profiles it compares them
+        times::metrics(&out_root, passes[0].built(), passes[2].built());
+    }
 }
 
 #[test]
@@ -399,62 +430,6 @@ assert.equal(app.app.kind, "component");
         .output()
         .expect("Node is installed");
     assert!(imported.status.success(), "{imported:?}");
-}
-
-/// How much longer the release builds of the corpus may take than the debug
-/// ones.
-const RELEASE_TIME_BUDGET: f64 = 2.0;
-
-/// The JS size and build time of the corpus in both profiles: release must
-/// be smaller and within its time budget. CI shows the numbers in the job
-/// summary.
-fn metrics(out_root: &Path, debug_time: Duration, release_time: Duration) {
-    let size = |profile: &str| js_size(&out_root.join(profile).join("js"));
-    let (debug, release) = (size("debug"), size("release"));
-    let line = format!(
-        "e2e corpus: JS {debug} bytes in debug, {release} in release ({:+.1}%); build {:.2}s in debug, {:.2}s in release",
-        percent(release, debug),
-        debug_time.as_secs_f64(),
-        release_time.as_secs_f64(),
-    );
-    println!("{line}");
-    if let Ok(summary) = env::var("GITHUB_STEP_SUMMARY") {
-        let mut file = fs::OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(summary)
-            .expect("summary");
-        writeln!(file, "{line}").expect("write summary");
-    }
-    assert!(release < debug, "{line}");
-    assert!(
-        release_time.as_secs_f64() <= debug_time.as_secs_f64() * RELEASE_TIME_BUDGET,
-        "{line}"
-    );
-}
-
-/// How much `new` differs from `old`, in percent.
-fn percent(new: u64, old: u64) -> f64 {
-    let (new, old) = (
-        u32::try_from(new).unwrap_or(u32::MAX),
-        u32::try_from(old).unwrap_or(u32::MAX),
-    );
-    (f64::from(new) / f64::from(old) - 1.0) * 100.0
-}
-
-/// Bytes of the compiled modules under `dir`, the built-in ones left out.
-fn js_size(dir: &Path) -> u64 {
-    let mut total = 0;
-    for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
-        let path = entry.path();
-        if path.is_dir() && !path.ends_with("_flick") {
-            total += js_size(&path);
-        } else if path.extension().is_some_and(|e| e == "js") && !path.ends_with(runner_path(false))
-        {
-            total += entry.metadata().map_or(0, |m| m.len());
-        }
-    }
-    total
 }
 
 /// `tsc --noEmit` over everything `--emit ts` wrote under `dir`.

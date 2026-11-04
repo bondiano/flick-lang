@@ -11,6 +11,11 @@ slow-timeout = { period = "60s" }
 filter = "test(=run_cases) | test(=passing_fixtures_compile_to_valid_js)"
 threads-required = "num-cpus"
 
+# the time of each pass, which run_cases prints
+[[profile.default.overrides]]
+filter = "test(=run_cases)"
+success-output = "final"
+
 [profile.ci]
 fail-fast = false
 

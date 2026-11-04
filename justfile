@@ -23,9 +23,11 @@ fmt:
     cargo fmt --all
 
 # Run the test suites; the reference model has its own recipe, `model`
-test:
+test: unit feature-test
+
+# The tests of the workspace crates but the reference model
+unit:
     cargo test --workspace --exclude flick-model
-    just feature-test
 
 # The reference model of λFlick: its unit tests, the cases of
 # tests/run/model.txt checked and run against their `.stdout`, and the
@@ -51,16 +53,31 @@ feature-test:
 go-test:
     cd runtime-go && go vet ./... && go test ./...
 
-e2e: docs-wasm
+# The e2e set: the JS packages, the e2e suites, the cases of tests/run, the
+# Go runtime and the language tests; CI runs the parts as jobs side by side
+e2e: e2e-js e2e-tests e2e-cases go-test language
+
+# What the e2e suites run against: the compiler in the `e2e` profile, the JS
+# packages, the runtime and the `.d.ts` importer
+e2e-prepare:
     cargo build -p flick --profile e2e
     pnpm install --frozen-lockfile
+    pnpm -C runtime build
+    FLICK_BIN={{flick}} pnpm -C tools/dts-importer build
+
+# The JS packages, with the playground's compiler: typecheck, lint, tests
+e2e-js: docs-wasm e2e-prepare
     pnpm -r typecheck
     pnpm -r lint
     FLICK_BIN={{flick}} pnpm -r test
-    cargo test --profile e2e -p flick --test e2e --test e2e_numbers --test go_main --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path --test source_packages --test workspace -- --ignored
-    cargo test --profile e2e -p flick-core --test consteval_node -- --ignored
-    just go-test
-    just language
+
+# The e2e suites of the compiler but the cases of tests/run, under nextest
+e2e-tests: e2e-prepare
+    cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core --test e2e --test e2e_numbers --test go_main --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path --test source_packages --test workspace --test consteval_node -E 'not test(=run_cases)'
+
+# The cases of tests/run: all of them, or the shard `k/n` of them
+e2e-cases shard="": e2e-prepare
+    FLICK_E2E_SHARD={{shard}} cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick --test e2e -E 'test(=run_cases)'
 
 # The language tests of tests/language on Node and as a Go executable, with
 # one seed: both must pass and write the same report
@@ -134,8 +151,8 @@ stress runs="20" +prefixes="runtime/":
     pnpm -C runtime build
     node tools/stress/index.mjs target/debug/flick target/debug/examples/rt_trace {{runs}} {{prefixes}}
 
-# Run SQL queries against PostgreSQL in Docker (after `just e2e` installs the runtime)
-e2e-postgres:
+# Run SQL queries against PostgreSQL in Docker
+e2e-postgres: e2e-prepare
     cargo test --profile e2e -p flick --test sql_postgres -- --ignored
 
 # The Conduit example's Go server against the official RealWorld API suite:
