@@ -102,6 +102,7 @@ lang_items! {
     UnionDisjoint = "union_disjoint",
     MapFields = "map_fields",
     Labels = "labels",
+    PathParams = "path_params",
     // what scopes and fibers own
     Owner = "owner",
     Outlives = "outlives",
@@ -147,6 +148,7 @@ lang_items! {
     ListMap = "list_map",
     ListFilter = "list_filter",
     RecordLabel = "record_label",
+    WireCodec = "wire_codec",
     FloatInfinity = "float_infinity",
     FloatNan = "float_nan",
     LayerMerge = "layer_merge",

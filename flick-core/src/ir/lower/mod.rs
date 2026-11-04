@@ -18,6 +18,7 @@ mod question;
 mod ranges;
 mod server_fn;
 mod sql;
+mod wire;
 
 use std::collections::{HashMap, HashSet};
 use std::iter;

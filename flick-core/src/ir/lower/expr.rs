@@ -226,6 +226,9 @@ impl Lower<'_> {
             Ref::Value { module, name } if lang::is(Lang::RecordLabel, module, name) => {
                 ExprKind::Label(self.typing.labels.get(&key).cloned().unwrap_or_default())
             }
+            Ref::Value { module, name } if lang::is(Lang::WireCodec, module, name) => {
+                self.wire_codec(key, span)
+            }
             Ref::Value { module, name } if module == "Atom" && completed(name) => {
                 self.atom_call(name, node, span)
             }

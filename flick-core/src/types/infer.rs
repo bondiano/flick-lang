@@ -253,12 +253,12 @@ impl Checker<'_> {
                 self.data_value(&Type::app(Type::lang(Lang::List), item), captures)
             }
             K::AnnotExpr => {
-                let ty = children
-                    .iter()
-                    .skip(1)
-                    .find(|c| is_type(c.kind))
-                    .map_or(Type::Error, |t| self.annotation(t));
+                let annotation = children.iter().skip(1).find(|c| is_type(c.kind));
+                let ty = annotation.map_or(Type::Error, |t| self.annotation(t));
                 self.check(children[0], &ty);
+                if let Some(annotation) = annotation {
+                    self.wire_codec(children[0], annotation, &ty);
+                }
                 ty
             }
             K::FieldExpr => self.field(node, children[0]),

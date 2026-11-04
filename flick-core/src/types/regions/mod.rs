@@ -232,8 +232,12 @@ impl Checker<'_> {
                         _ => None,
                     };
                     // an error cannot carry a region, so its row holds none; a
-                    // service row is needed again wherever the value runs
-                    if matches!(param, Some(Kind::ErrorRow | Kind::ServiceRow)) {
+                    // service row is needed again wherever the value runs; a
+                    // symbol is text
+                    if matches!(
+                        param,
+                        Some(Kind::ErrorRow | Kind::ServiceRow | Kind::Symbol)
+                    ) {
                         continue;
                     }
                     match self.store.resolve(arg) {
