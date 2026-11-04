@@ -141,9 +141,9 @@ type alias Users = {
 - The success is sent with 200, `Created a` with 201, and `Unit` with 204
   and no body.
 - A part or a success is decoded by the value named after its type in snake
-  case in the type's module (`credentials` for `Credentials`), a refined
-  type's `T.json`, a built-in type's `String.json`, or else the JSON codec of
-  its schema.
+  case in the type's module (`credentials` for `Credentials`) when that is a
+  `PureCodec Json` of the type, a refined type's `T.json`, a built-in type's
+  `String.json`, or else the JSON codec of its schema.
 - Each error has an `instance Problem E = let problem = { status = 404; body = … }`.
 
 The type has two companions: `Users.endpoints`, the record of its endpoints,
@@ -151,7 +151,9 @@ which `HttpApi.call` requests, and `Users.api`, the group. With `Authed` and
 `MaybeAuthed` endpoints, `Users.api` takes the security scheme, the service
 and its two checks, required and optional, and applies `with_auth`,
 `with_optional_auth` and `authenticated` as above; every endpoint of such a
-group is `Authed` or `MaybeAuthed`, and they read the same `headers`.
+group is `Authed` or `MaybeAuthed`, and they read the same `headers`. A
+check gets only the headers, `HttpApi.Request Unit Unit Credentials Unit`,
+and fails with errors every such endpoint declares.
 
 ```flick
 let api =
@@ -164,7 +166,12 @@ let api =
 server serves and documents it; a client then calls with the prefix in its
 base, `HttpApi.call "/api" Users.endpoints.me request`.
 
-A record that cannot be served as written is `FLICK-D011`.
+std's plugin writes both companions in Flick, with `HttpApi.Derive.at`
+and the functions above, so the checker finds what does not fit, on the
+endpoint's field: a record it cannot read as endpoints is `std/D011`, a part
+or a success with no codec `FLICK-D011`, an error without a `Problem`
+instance or a path whose parameters are not the fields of its `path` part
+`FLICK-C001`.
 
 ## Serving
 
