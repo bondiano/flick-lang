@@ -1,15 +1,17 @@
 use std::io::Write;
+use std::path::Path;
 use std::{fs, io};
 
 use clap::CommandFactory;
 use clap::error::ErrorKind;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::fmt;
+use flick_core::project::{self, FormatPlugins, Project};
 use flick_core::source::{FileId, SourceMap, Span};
 
 use crate::args::{CommandArguments, FmtArguments};
 use crate::command::{Command, Outcome};
-use crate::sources;
+use crate::sources::{self, FsHost};
 
 pub struct FmtCommand {
     options: FmtArguments,
@@ -34,19 +36,23 @@ impl FmtCommand {
     fn files(&self) -> Outcome {
         let mut outcome = Outcome::default();
         let mut paths = Vec::new();
-        if self.options.paths.is_empty() {
+        let host = sources::FsHost::new();
+        let project = if self.options.paths.is_empty() {
             // without paths: the project's source and test roots
-            let host = sources::FsHost::new();
             match super::check::select(&host, &mut outcome.sources, self.project.as_deref(), &[]) {
-                Ok((_, roots)) => {
+                Ok((project, roots)) => {
                     paths.extend(roots.iter().map(|r| r.to_string_lossy().into_owned()));
+                    project
                 }
                 Err(d) => {
                     outcome.diagnostics.push(d);
                     return outcome;
                 }
             }
-        }
+        } else {
+            self.project_at(&host, &mut outcome.sources, &host.cwd)
+        };
+        let mut plugins = FormatPlugins::new(&host, &mut outcome.sources, project.as_ref());
         for path in &self.options.paths {
             sources::source_files(path, &mut paths);
         }
@@ -59,7 +65,8 @@ impl FmtCommand {
                 }
             };
             let text = &outcome.sources.get(file).text;
-            match fmt::format(text, file) {
+            let found = plugins.of(text, file);
+            match fmt::format_with(text, file, &|head| found.get(head).cloned()) {
                 Ok(out) if out == *text => {}
                 Ok(out) if self.options.check => {
                     let unformatted = not_formatted(&outcome.sources, file, &out);
@@ -80,6 +87,16 @@ impl FmtCommand {
         outcome
     }
 
+    /// The project at `dir` whose packages' plugins lay out blocks, when
+    /// there is one; a broken manifest leaves blocks as written, for
+    /// `flick check` to report.
+    fn project_at(&self, host: &FsHost, sources: &mut SourceMap, dir: &Path) -> Option<Project> {
+        let explicit = self.project.as_deref().map(Path::new);
+        project::discover(host, sources, dir, explicit)
+            .ok()
+            .flatten()
+    }
+
     fn stdin(&self) -> Outcome {
         let mut outcome = Outcome::default();
         let path = self.options.stdin_filepath.as_deref().unwrap_or("<stdin>");
@@ -90,9 +107,16 @@ impl FmtCommand {
                 return outcome;
             }
         };
+        let host = sources::FsHost::new();
+        let at = host.cwd.join(path);
+        let dir = at
+            .parent()
+            .map_or_else(|| host.cwd.clone(), Path::to_path_buf);
+        let project = self.project_at(&host, &mut outcome.sources, &dir);
+        let mut plugins = FormatPlugins::new(&host, &mut outcome.sources, project.as_ref());
         let text = &outcome.sources.get(file).text;
-        // shortcut: only the plugin of std lays out blocks here, others stay as written; load the project's packages as check does when another plugin needs it
-        match fmt::format(text, file) {
+        let found = plugins.of(text, file);
+        match fmt::format_with(text, file, &|head| found.get(head).cloned()) {
             Ok(out) if self.options.check => {
                 if out != *text {
                     let unformatted = not_formatted(&outcome.sources, file, &out);

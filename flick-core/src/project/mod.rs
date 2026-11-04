@@ -26,8 +26,8 @@ pub(crate) use load::js_only;
 #[cfg(feature = "ide")]
 pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
 pub use load::{
-    CachedModule, Compilation, Compiled, Fresh, MainKind, ModuleCache, PackageCache, check,
-    check_with, compile, compile_with, main_kind,
+    CachedModule, Compilation, Compiled, FormatPlugins, Fresh, MainKind, ModuleCache, PackageCache,
+    check, check_with, compile, compile_with, main_kind,
 };
 #[cfg(feature = "native-project")]
 pub use packages::project_name;

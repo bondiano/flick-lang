@@ -13,8 +13,8 @@ use crate::ir;
 use crate::plugin::testing::expand;
 #[cfg(feature = "ide")]
 use crate::project::load::analyze;
-use crate::project::load::{check, compile};
-use crate::source::SourceMap;
+use crate::project::load::{FormatPlugins, check, compile};
+use crate::source::{FileId, SourceMap};
 
 const IMPORT: &str = "module App.Main exposing (..)\n\nimport Pairs exposing (plugin named, plugin text_of, plugin define, plugin table, plugin traced, plugin variants, plugin shows)\n\n";
 
@@ -186,4 +186,23 @@ fn the_code_of_a_declaration_shows_as_declarations() {
             "instance (Show Box) =\n  let show _ = \"Box\"",
         ]
     );
+}
+
+#[test]
+fn the_formatter_finds_the_plugins_of_the_projects_packages() {
+    let main = format!("{IMPORT}define answer {{ 42.0 }}\n");
+    let host = host(&main);
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let mut plugins = FormatPlugins::new(&host, &mut sources, Some(&project));
+    let found = plugins.of(&main, FileId::default());
+    let mut heads: Vec<&str> = found.keys().map(String::as_str).collect();
+    heads.sort_unstable();
+    assert_eq!(
+        heads,
+        ["define", "named", "shows", "table", "text_of", "traced", "variants"]
+    );
+    // without the project, a package's plugin is unknown
+    let mut alone = FormatPlugins::new(&host, &mut sources, None);
+    assert!(alone.of(&main, FileId::default()).is_empty());
 }

@@ -194,6 +194,21 @@ mod wasm {
     }
 
     #[test]
+    fn flick_fmt_asks_the_plugins_of_the_projects_packages() {
+        let main = MAIN.replace(
+            "let point = pairs { x = 1.0 }",
+            "let point =\n    pairs {\n      x = 1.0\n    }",
+        );
+        let root = app("plugins-fmt", &main);
+        let written = flick(&root, &["fmt"]);
+        assert!(written.status.success(), "{written:?}");
+        // `pairs` gives no layout: the block keeps its lines, which move with its head
+        assert_eq!(trace(&root), ["collect pairs", "format pairs pairs"]);
+        let text = fs::read_to_string(root.join("app/src/App/Main.fl")).expect("read");
+        assert!(text.contains("let point = pairs {\n  x = 1.0\n}"), "{text}");
+    }
+
+    #[test]
     fn a_missing_component_is_reported_on_the_import() {
         let root = app("plugins-missing", MAIN);
         fs::remove_file(root.join("lib/pairs.wasm")).expect("remove");

@@ -13,6 +13,7 @@ mod checking;
 #[cfg(test)]
 mod checking_tests;
 mod entry;
+mod format_plugins;
 #[cfg(feature = "ide")]
 mod ide;
 mod plugins;
@@ -27,6 +28,7 @@ mod unknown;
 
 pub use checking::ModuleCache;
 pub use entry::{MainKind, main_kind};
+pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
 pub use precompiled::{CachedModule, Fresh, PackageCache};
