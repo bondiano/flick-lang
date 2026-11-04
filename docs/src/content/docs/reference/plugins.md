@@ -54,9 +54,18 @@ import it needs: `FLICK-P037`, whose fix `flick check --fix` applies.
 The plugin is the one of the package the imported module belongs to; a
 module of the project or a built-in one has none. The code a plugin gives
 is resolved in the file's scope: its imports, the imported module among
-them, and the Prelude. A plugin should name what it uses with qualified
-names, such as `Pairs.make`; another module it needs is imported by the
-user.
+them, the Prelude and the module's own declarations. A plugin should name
+what it uses with qualified names, such as `Pairs.make`; another module it
+needs is imported by the user. Its names are its own:
+
+- a local of the code, as `x` in `fun x -> …`, is seen only by that code,
+  and a local of the user's, around the block or in it, only by the user's
+  code: neither captures the other;
+- `Pairs.make` names the module `Pairs` by its path, even in a file that
+  imports it as `import Pairs as P`, and a module the file renames to
+  `Pairs` does not take its place;
+- a name the module declares too is still `FLICK-R008` on the block: what
+  a block declares is the module's.
 
 ## What a plugin gives
 
@@ -91,6 +100,13 @@ The code of a block that is an expression is an expression; that of a
 declaration is declarations, which take the block's place among the module's
 and are the module's like any other: exported with `exposing`, seen by its
 importers, a signature above the block for the first of them with its name.
+A `let` or a signature may declare a companion `Users.table` of a type
+`Users` of the module, exported with the type and named `Users.table` by
+importers; the `///` lines above a declaration's block are the block's
+`docs`, which the plugin gives to what it declares. Going to the definition
+of a generated name goes to the span the plugin gave its declaration, the
+user's name in the block or the whole block, and renaming one is renaming
+it in its block.
 The code is an arena of core syntax, each node after the nodes it refers to
 and with the span of the block it stands for:
 
@@ -99,12 +115,12 @@ and with the span of the block it stands for:
 | expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole |
 | type | name, application, record, function, type-level text (`"name"`), `_`, hole |
 | pattern | variable, wildcard, constructor, record, hole |
-| declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, `instance` with members, a group of several, hole |
+| declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, `instance` with members, a group of several, documentation of one, hole |
 
 The compiler checks the arena before it uses it: names must lex as names,
 numbers be finite, holes lie in the body and be used once, and its size and
 depth are bounded. The arena version is the version of the interface,
-`0.3.0`; a component built for another version does not load.
+`0.4.0`; a component built for another version does not load.
 
 ## Writing one in Rust
 
@@ -173,7 +189,9 @@ Code that starts as a declaration builds one, its name written or
 `flick!(b, type alias #(name) = { #(..fields) })`,
 `flick!(b, type Color = Red | Rgb Float Float deriving Show)` and
 `flick!(b, instance Show #(Name(t)) { let show _ = #t })`; `b.group(ids)`
-gives several, and a `Span` in a declaration's place is the user's.
+gives several, `b.doc(&block.docs, id)` documents one, `let #("Users.table")`
+declares a companion, and a `Span` in a declaration's place is the user's.
+`flick!(b @ name, let …)` declares it at the user's `name`, where editors go.
 
 A block is read with a cursor over its tokens, `block.cursor()` from the
 first or `block.body()` from the body: `eat(":")`, `ident()`, `strings()`,
@@ -232,11 +250,8 @@ dropped.
 ## Not yet
 
 Permissions, warnings of plugins and checks after typing come later. A
-plugin block inside the user's code of another block is not a block. Generated
-names are not hygienic: one the module declares too is `FLICK-R008` on the
-block, and a name of a declaration's code is found at the block. Generated
-declarations have no `///` documentation, and a companion such as
-`Users.table` cannot be declared: a plugin names its values plainly.
-`collect` sees the modules the run loads, so `flick check one.fl` gives it
+plugin block inside the user's code of another block is not a block. A
+built-in module the file hides by an alias, as `import Other as List`, is
+hidden from generated code too. `collect` sees the modules the run loads, so `flick check one.fl` gives it
 fewer blocks than a whole build. A package whose modules have plugin blocks
 is checked again in each build.
