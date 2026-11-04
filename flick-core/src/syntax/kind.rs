@@ -144,6 +144,12 @@ pub enum SyntaxKind {
     Variant,
     Refinement,
     DerivingClause,
+    /// `{ … }` after a class in `deriving`: the arguments of its derive,
+    /// tokens its plugin reads.
+    DerivingArgs,
+    /// `deriving instance C (T a)`: an instance a class's derive makes for a
+    /// type of another module.
+    DerivingDecl,
     /// `@name argument…` before a declaration or a constructor.
     Attribute,
     KindDecl,

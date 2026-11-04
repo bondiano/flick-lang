@@ -36,6 +36,7 @@ fn top_decl(p: &mut Parser) {
         K::ServiceKw => service_decl(p),
         K::ClassKw => class_decl(p),
         K::InstanceKw => instance_decl(p),
+        K::DerivingKw if p.nth(1) == K::InstanceKw => deriving_decl(p),
         K::ForeignKw => foreign_decl(p),
         K::SqlKw if p.nth(1) == K::Ident && word_at(p, 1, "migration") => sql_migration(p),
         K::SqlKw if p.nth(1) == K::Ident => sql_table(p),
@@ -366,11 +367,32 @@ fn deriving(p: &mut Parser) {
     }
     let m = p.start();
     p.bump();
-    expr::con_path(p);
+    derived(p);
     while p.eat(K::Comma) {
-        expr::con_path(p);
+        derived(p);
     }
     p.complete(m, K::DerivingClause);
+}
+
+/// A class of `deriving`, maybe with the arguments of its derive:
+/// `Schema { rename = "snake_case" }`.
+fn derived(p: &mut Parser) {
+    expr::con_path(p);
+    if p.at(K::LBrace) {
+        let m = p.start();
+        super::plugin::raw_braces(p);
+        p.complete(m, K::DerivingArgs);
+    }
+}
+
+/// `deriving instance C (T a)`.
+fn deriving_decl(p: &mut Parser) {
+    let m = p.start();
+    p.bump();
+    p.bump();
+    derived(p);
+    super::types::type_(p);
+    p.complete(m, K::DerivingDecl);
 }
 
 /// `sql table Name "table" { column : sql type words as T [via codec] }`.
