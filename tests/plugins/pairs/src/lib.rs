@@ -1,6 +1,8 @@
 //! A plugin for the compiler's tests. `pairs { k = e; k : T = e }` stands
 //! for the record `{ k = e; k = (e : T); blocks = n }`, where `n` is the
-//! number of `pairs` blocks of the group, which `collect` counts. `bad {}`
+//! number of `pairs` blocks of the group, which `collect` counts; each
+//! argument of the head, as in `pairs "a" (1 + 2) { … }`, adds a field
+//! `arg0`, `arg1`, … of its value. `bad {}`
 //! stands for `(1.0 : String)`, an error in generated code. `spin {}` never
 //! ends and `hog {}` takes all memory: the limits of a plugin's calls.
 
@@ -55,8 +57,12 @@ impl Plugin for Pairs {
             });
             return Ok(b.finish(wrong));
         }
-        let mut fields = Vec::new();
-        let mut rest: &[Token] = &block.tokens;
+        let mut fields = arguments(block, compiler, &mut b)?;
+        let at_body = block
+            .tokens
+            .iter()
+            .take_while(|t| t.span.start < block.body);
+        let mut rest: &[Token] = &block.tokens[at_body.count()..];
         while let Some((name, after)) = rest.split_first() {
             let label = word(block, name, TokenKind::Ident)
                 .ok_or_else(|| vec![refuse(name, "expected a name")])?;
@@ -104,6 +110,39 @@ impl Plugin for Pairs {
         let record = b.expr(Expr::Record(fields));
         Ok(b.finish(record))
     }
+}
+
+/// A field `arg<i>` for each argument of the head: a string, or `( … )`.
+fn arguments(
+    block: &Block,
+    compiler: &mut dyn Compiler,
+    b: &mut Builder,
+) -> Result<Vec<Field>, Vec<Diagnostic>> {
+    let mut fields = Vec::new();
+    let mut depth = 0u32;
+    let mut start = None;
+    for t in block
+        .tokens
+        .iter()
+        .take_while(|t| t.span.start < block.body)
+    {
+        start = start.or(Some(t.span.start));
+        if punct(block, Some(t), "(") {
+            depth += 1;
+        } else if punct(block, Some(t), ")") {
+            depth -= 1;
+        }
+        if depth == 0
+            && let Some(from) = start.take()
+        {
+            let value = compiler.parse_expr(from, t.span.end).map_err(|d| vec![d])?;
+            fields.push(Field {
+                label: format!("arg{}", fields.len()),
+                value: b.at(value.span).expr(Expr::Hole(value.span)),
+            });
+        }
+    }
+    Ok(fields)
 }
 
 fn word<'b>(block: &'b Block, token: &Token, kind: TokenKind) -> Option<&'b str> {

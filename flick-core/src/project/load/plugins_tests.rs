@@ -387,3 +387,25 @@ fn an_editor_session_keeps_plugin_results_in_memory() {
     let third = analyze(&host);
     assert!(!Arc::ptr_eq(&typing(&second), &typing(&third)));
 }
+
+#[test]
+fn a_head_gives_its_arguments_to_the_plugin() {
+    let tagged = |tag: &str| {
+        format!(
+            "{HEAD}point : {{ x : Float; arg0 : String; arg1 : Float; blocks : Float }}\nlet point = pairs \"{tag}\" (1.0 + 2.0) {{ x = 1.0 }}\n"
+        )
+    };
+    let host = host(&tagged("a"));
+    compiled(&host);
+    assert_eq!(host.calls(), (1, 1));
+    // the arguments are part of the block: another one is expanded again
+    host.write("/p/src/App/Main.fl", &tagged("b"));
+    compiled(&host);
+    assert_eq!(host.calls(), (2, 2));
+    // an error in an argument lands on it
+    let found = report(&format!(
+        "{HEAD}point : {{ x : Float; arg0 : Float; blocks : Float }}\nlet point = pairs \"no\" {{ x = 1.0 }}\n"
+    ));
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("`\"no\"`"), "{found:?}");
+}

@@ -148,3 +148,33 @@ fn the_formatter_keeps_plugin_imports_and_blocks() {
         .count();
     assert_eq!(imports, 1);
 }
+
+#[test]
+fn a_head_takes_strings_and_parenthesized_arguments_before_its_body() {
+    let src = format!("{IMPORT}let x = pairs \"a\" (f (g 1)) \"b\" {{ c = 1 }}\n");
+    let parsed = parse_str(&src);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    let block = find(&parsed.tree, K::PluginExpr).expect("a plugin block");
+    assert_eq!(
+        text_of(&src, block),
+        "pairs \"a\" (f (g 1)) \"b\" { c = 1 }"
+    );
+    let args = block
+        .nodes()
+        .find(|n| n.kind == K::PluginArgs)
+        .expect("arguments");
+    assert_eq!(text_of(&src, args), "f (g 1)");
+    let body = block.nodes().find(|n| n.kind == K::Block).expect("a body");
+    assert_eq!(text_of(&src, body), "c = 1");
+    let formatted = fmt::format(&src, FileId::default()).expect("formats");
+    assert_eq!(formatted, src);
+
+    // without `{` after them, the arguments are applied to a name
+    let applied = format!("{IMPORT}let x = pairs \"a\" (1)\nlet y = pairs \"a\"\n");
+    let parsed = parse_str(&applied);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    assert!(find(&parsed.tree, K::PluginExpr).is_none());
+    // anything but a string or `( … )` before `{` is no argument
+    let other = parse_str(&format!("{IMPORT}let x = pairs a {{ b = 1 }}\n"));
+    assert!(find(&other.tree, K::PluginExpr).is_none());
+}

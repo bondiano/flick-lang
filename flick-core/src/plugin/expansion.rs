@@ -4,6 +4,7 @@
 //! user's code inside blocks parsed in place, and the way back from a place
 //! in generated code to the place in the module it stands for.
 
+use std::iter::Peekable;
 use std::mem;
 
 use crate::diagnostics::{Diagnostic, Related, Severity, codes};
@@ -235,30 +236,38 @@ fn parse_holes(node: &mut Node, holes: &[((u32, u32), Node)]) {
             .map(|(_, t)| t)
             .collect();
         trees.sort_by_key(|t| t.range());
-        let Some(Element::Node(body)) = n
-            .children
-            .iter_mut()
-            .find(|c| matches!(c, Element::Node(b) if b.kind == K::Block))
-        else {
-            continue;
-        };
-        let mut children = Vec::new();
         let mut next = trees.into_iter().peekable();
-        for token in mem::take(&mut body.children) {
-            let Element::Token(t) = token else {
-                children.push(token);
-                continue;
-            };
-            match next.peek() {
-                Some(tree) if tree.range().0 <= t.start && t.end <= tree.range().1 => {
-                    if tree.range().1 == t.end {
-                        children.push(Element::Node((*tree).clone()));
-                        next.next();
-                    }
-                }
-                _ => children.push(Element::Token(t)),
+        // the arguments come before the body, as the holes do
+        for child in &mut n.children {
+            if let Element::Node(raw) = child
+                && matches!(raw.kind, K::PluginArgs | K::Block)
+            {
+                raw.children = in_place(mem::take(&mut raw.children), &mut next);
             }
         }
-        body.children = children;
     }
+}
+
+/// `tokens` with the tokens of each tree `next` gives replaced by the tree.
+fn in_place<'t>(
+    tokens: Vec<Element>,
+    next: &mut Peekable<impl Iterator<Item = &'t Node>>,
+) -> Vec<Element> {
+    let mut children = Vec::new();
+    for token in tokens {
+        let Element::Token(t) = token else {
+            children.push(token);
+            continue;
+        };
+        match next.peek() {
+            Some(tree) if tree.range().0 <= t.start && t.end <= tree.range().1 => {
+                if tree.range().1 == t.end {
+                    children.push(Element::Node((*tree).clone()));
+                    next.next();
+                }
+            }
+            _ => children.push(Element::Token(t)),
+        }
+    }
+    children
 }

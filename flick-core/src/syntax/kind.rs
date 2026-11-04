@@ -224,6 +224,8 @@ pub enum SyntaxKind {
     /// `head { … }` of a head an import exposes as `plugin head`: the body is
     /// kept as tokens, which the plugin reads.
     PluginExpr,
+    /// `( … )` among the arguments of a plugin block's head, kept as tokens.
+    PluginArgs,
 
     // nodes: patterns
     WildcardPat,

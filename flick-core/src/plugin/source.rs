@@ -1,6 +1,7 @@
 //! A plugin block as its plugin sees it, and the holes it asks the compiler
-//! to parse: the body's text and tokens with offsets from the start of the
-//! body, and the user's expressions and types parsed where they stand.
+//! to parse: the text and tokens of the head's arguments and the body, with
+//! offsets from the first argument (or from the body, without arguments),
+//! and the user's expressions and types parsed where they stand.
 
 use std::sync::Arc;
 
@@ -18,10 +19,14 @@ pub struct BlockSource {
     text: Arc<str>,
     file: FileId,
     head: String,
-    /// Where the body starts and ends in the module text.
+    /// Where the frame starts (at the first argument, or at the body) and
+    /// where the body ends, in the module text.
     start: u32,
     end: u32,
-    /// The body's tokens, trivia included, at their places in the text.
+    /// Where the body starts in the frame.
+    body: u32,
+    /// The tokens of the arguments and the body, trivia included and `{`
+    /// left out, at their places in the text.
     tokens: Vec<Token>,
     /// What parsing the holes the plugin asked for reported.
     pub diagnostics: Vec<Diagnostic>,
@@ -29,21 +34,28 @@ pub struct BlockSource {
 
 impl BlockSource {
     /// The block `node`, a `PluginExpr` of the module text `text`; `None`
-    /// for a block without its closing brace.
+    /// for a block without its closing brace. Its frame starts at the first
+    /// argument of the head, or at the body without arguments.
     pub fn new(text: Arc<str>, file: FileId, node: &Node) -> Option<Self> {
-        let head = node.child_tokens().find(|t| t.kind == K::Ident)?;
+        let mut direct = node.child_tokens().filter(|t| !t.kind.is_trivia());
+        let head = direct.next().filter(|t| t.kind == K::Ident)?;
+        let first = direct.next()?;
         let open = node.child_tokens().find(|t| t.kind == K::LBrace)?;
         let close = node.child_tokens().find(|t| t.kind == K::RBrace)?;
-        let tokens = node
-            .nodes()
-            .find(|n| n.kind == K::Block)
-            .map(Node::tokens)
-            .unwrap_or_default();
+        let start = if first.kind == K::LBrace {
+            open.end
+        } else {
+            first.start
+        };
+        let tokens = (node.tokens().into_iter())
+            .filter(|t| start <= t.start && t.end <= close.start && t.start != open.start)
+            .collect();
         Some(BlockSource {
             head: head.text(&text).to_owned(),
             text,
             file,
-            start: open.end,
+            start,
+            body: open.end - start,
             end: close.start,
             tokens,
             diagnostics: Vec::new(),
@@ -54,7 +66,8 @@ impl BlockSource {
         &self.head
     }
 
-    /// Where the body starts in the module text.
+    /// Where the frame starts in the module text: spans the plugin gives
+    /// count from here.
     pub fn start(&self) -> u32 {
         self.start
     }
@@ -63,7 +76,7 @@ impl BlockSource {
         self.file
     }
 
-    /// The column the body starts at and the indent of its line, in
+    /// The column the frame starts at and the indent of its line, in
     /// characters: where the holes stand, which their layout depends on.
     pub fn layout(&self) -> (u32, u32) {
         let start = self.start as usize;
@@ -90,7 +103,7 @@ impl BlockSource {
         Block {
             head: self.head.clone(),
             text: self.text[self.start as usize..self.end as usize].to_owned(),
-            body: 0,
+            body: self.body,
             tokens,
         }
     }
