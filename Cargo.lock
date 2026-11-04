@@ -614,7 +614,9 @@ dependencies = [
 name = "flick-plugin-cli"
 version = "0.1.0"
 dependencies = [
+ "flick-core",
  "flick-plugin",
+ "insta",
 ]
 
 [[package]]

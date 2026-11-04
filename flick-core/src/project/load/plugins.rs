@@ -16,7 +16,7 @@ use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::expansion::{Expanded, Expansion};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
-use crate::plugin::{EditorBlock, Expander, Failure, first_party};
+use crate::plugin::{EditorBlock, Expander, Failure, blocks_under, first_party};
 use crate::project::Host;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -344,17 +344,6 @@ fn group(root: &Root) -> String {
         Root::Test => "test".into(),
         Root::Package(name) => format!("package {name}"),
         Root::Other(_) => "other".into(),
-    }
-}
-
-/// The plugin blocks under `node`.
-fn blocks_under<'n>(node: &'n Node, out: &mut Vec<&'n Node>) {
-    for child in node.nodes() {
-        if child.kind == K::PluginExpr {
-            out.push(child);
-        } else {
-            blocks_under(child, out);
-        }
     }
 }
 

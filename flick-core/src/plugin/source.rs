@@ -86,6 +86,11 @@ impl BlockSource {
         self.closed
     }
 
+    /// The text of the module the block is in.
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
     pub fn file(&self) -> FileId {
         self.file
     }

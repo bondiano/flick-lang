@@ -8,12 +8,16 @@ pub mod first_party;
 pub mod render;
 pub mod source;
 pub mod splice;
+pub mod testing;
 
 use std::sync::Arc;
 
 use flick_plugin::{Arena, Block, Completion, Diagnostic, Highlight, Hover, Plugin};
 
 use source::BlockSource;
+
+use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
 
 /// A plugin as the compiler runs it: linked into the compiler, or loaded.
 pub trait Expander: Send + Sync {
@@ -134,6 +138,17 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
 
     fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
         self.plugin.highlight(block, state)
+    }
+}
+
+/// The plugin blocks under `node`, not those inside them.
+pub fn blocks_under<'n>(node: &'n Node, out: &mut Vec<&'n Node>) {
+    for child in node.nodes() {
+        if child.kind == K::PluginExpr {
+            out.push(child);
+        } else {
+            blocks_under(child, out);
+        }
     }
 }
 
