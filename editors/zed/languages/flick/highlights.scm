@@ -29,6 +29,9 @@
   (#eq? @_foreign "foreign"))
 (_ (keyword) @_component . (identifier) @function
   (#eq? @_component "component"))
+; the head of a plugin's blocks, as an import exposes it
+(_ (keyword) @_plugin . (identifier) @function.macro
+  (#eq? @_plugin "plugin"))
 
 ["(" ")" "[" "]" "{" "}"] @punctuation.bracket
 (operator ["," ";"]) @punctuation.delimiter

@@ -19,39 +19,69 @@ pub struct Fragment {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+/// The heads of plugin blocks a fragment's module imports: blocks inside
+/// the fragment start with them.
+pub type Heads<'t> = &'t [&'t str];
+
 /// The longest expression `tokens`, tokens of the module text `text` from
 /// some token of a block on, start with; `None` when none starts there.
-pub fn parse_expr_at(text: &str, file: FileId, tokens: &[Token]) -> Option<Fragment> {
-    fragment(text, file, tokens, expr::expr)
+pub fn parse_expr_at<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, expr::expr)
 }
 
 /// [`parse_expr_at`] for a type.
-pub fn parse_type_at(text: &str, file: FileId, tokens: &[Token]) -> Option<Fragment> {
-    fragment(text, file, tokens, type_)
+pub fn parse_type_at<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, type_)
 }
 
 /// [`parse_expr_at`] for a pattern.
-pub fn parse_pat_at(text: &str, file: FileId, tokens: &[Token]) -> Option<Fragment> {
-    fragment(text, file, tokens, pattern::pattern)
+pub fn parse_pat_at<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, pattern::pattern)
 }
 
 /// The declaration `tokens` start with, its tree the declaration itself.
-pub fn parse_decl_at(text: &str, file: FileId, tokens: &[Token]) -> Option<Fragment> {
-    let mut found = fragment(text, file, tokens, |p| Some(decl::declaration(p)))?;
+pub fn parse_decl_at<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+) -> Option<Fragment> {
+    let mut found = fragment(text, file, tokens, heads, |p| Some(decl::declaration(p)))?;
     let inner = found.tree.nodes().next()?.clone();
     found.tree = inner;
     Some(found)
 }
 
 /// The declarations `tokens` hold, in a `SourceFile`.
-pub fn parse_decls_at(text: &str, file: FileId, tokens: &[Token]) -> Option<Fragment> {
-    fragment(text, file, tokens, |p| Some(decl::declarations(p)))
-}
-
-fn fragment(
-    text: &str,
+pub fn parse_decls_at<'t>(
+    text: &'t str,
     file: FileId,
     tokens: &[Token],
+    heads: Heads<'t>,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, |p| Some(decl::declarations(p)))
+}
+
+fn fragment<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
     parse: fn(&mut Parser) -> Option<Done>,
 ) -> Option<Fragment> {
     let raw: Vec<RawToken> = tokens
@@ -65,6 +95,7 @@ fn fragment(
         .collect();
     let last = raw.last()?.end;
     let mut p = Parser::new(text, file, &raw);
+    p.plugin_heads.extend(heads);
     place(&mut p, text, last);
     // a fragment that starts a line is a block of its own, as a body is
     if p.raw().line_start {

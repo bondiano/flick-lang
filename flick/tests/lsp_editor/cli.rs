@@ -154,6 +154,25 @@ fn cli_completion_recovers_partial_clauses_without_hiding_flick_expressions() {
             );
         }
     }
+    // a closed block inside another is a block of its own, which answers
+    let text = format!(
+        "{SOURCE}\nlet editing = cli \"editing\" {{\n  subcommand cli \"nested\" {{ fl }}\n}}\n"
+    );
+    let cursor = text.find("{ fl").expect("the nested block") + 4;
+    lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 100 }, "contentChanges": [{ "text": text }] }));
+    let reply = lsp.request(
+        "textDocument/completion",
+        &json!({ "textDocument": doc, "position": position(&text, cursor) }),
+    );
+    let items = reply["result"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{reply}"));
+    assert!(
+        items
+            .iter()
+            .any(|item| item["label"] == "flag" && item["kind"] == 14),
+        "{reply}"
+    );
     lsp.close();
 }
 
@@ -199,6 +218,8 @@ fn cli_semantic_tokens_distinguish_clauses_parameters_and_handler_locals() {
         ("tasks :", "tasks", "parameter"),
         ("Minutes\n    ///", "Minutes", "type"),
         ("description)", "description", "variable"),
+        ("cli)", "cli", "macro"),
+        ("cli \"child\"", "cli", "macro"),
     ] {
         let point = position(SOURCE, SOURCE.find(needle).expect("occurs"));
         assert!(

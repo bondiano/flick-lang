@@ -7,10 +7,13 @@
 
 mod code;
 mod editor;
+mod layout;
 mod read;
 mod shape;
 
-use flick_plugin::{Arena, Block, Compiler, Completion, Diagnostic, Highlight, Hover, Plugin};
+use flick_plugin::{
+    Arena, Block, Compiler, Completion, Diagnostic, Highlight, Hover, Piece, Plugin,
+};
 
 pub struct Cli;
 
@@ -44,6 +47,10 @@ impl Plugin for Cli {
 
     fn highlight(&self, block: &Block, _: &[u8]) -> Vec<Highlight> {
         editor::highlight(block)
+    }
+
+    fn format(&self, block: &Block, _: &[u8], compiler: &mut dyn Compiler) -> Option<Vec<Piece>> {
+        layout::format(block, compiler)
     }
 }
 

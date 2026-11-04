@@ -323,7 +323,11 @@ fn replace_blocks(node: &mut Node, spliced: &mut Vec<((u32, u32), Vec<Node>)>) {
         if matches!(n.kind, K::PluginExpr | K::PluginDecl) {
             let range = n.range();
             if let Some(i) = spliced.iter().position(|(r, _)| *r == range) {
-                children.extend(spliced.swap_remove(i).1.into_iter().map(Element::Node));
+                // the user's code in its code has blocks of its own
+                for mut code in spliced.swap_remove(i).1 {
+                    replace_blocks(&mut code, spliced);
+                    children.push(Element::Node(code));
+                }
                 continue;
             }
         } else {
@@ -354,6 +358,8 @@ fn parse_holes(node: &mut Node, holes: &[((u32, u32), Node)]) {
         trees.sort_by_key(|t| t.range());
         let mut next = trees.into_iter().peekable();
         n.children = in_place(mem::take(&mut n.children), &mut next);
+        // the blocks inside that code
+        parse_holes(n, holes);
     }
 }
 

@@ -8,7 +8,11 @@ use std::mem;
 use std::path::Path;
 use std::sync::Arc;
 
-use flick_plugin::{Arena, Block, Place, VERSION};
+use flick_plugin::Block;
+
+mod results;
+
+use results::Results;
 
 use super::unimported::unimported;
 use super::{Loaded, Loader, Root};
@@ -17,12 +21,14 @@ use crate::plugin::expansion::{Expanded, Expansion};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
 use crate::plugin::{EditorBlock, Expander, Failure, blocks_under, first_party};
-use crate::project::Host;
 use crate::resolve::Import;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types;
+
+/// How many blocks deep a block may be nested in the user's code of others.
+const ROUNDS: usize = 8;
 
 /// The plugin of each package a module imports, or why it does not load.
 type Plugins = HashMap<String, Result<Arc<dyn Expander>, String>>;
@@ -36,55 +42,116 @@ struct Found {
 }
 
 impl Loader<'_> {
-    /// Expands the plugin blocks of every loaded module.
+    /// Expands the plugin blocks of every loaded module, in rounds: the
+    /// blocks of the modules first, then those inside the user's code of
+    /// the blocks the round before expanded, at most [`ROUNDS`] deep.
     pub(super) fn expand_plugins(&mut self) {
         let mut plugins: Plugins = HashMap::new();
         let mut diagnostics = Vec::new();
-        let mut found = Vec::new();
+        let mut round = Vec::new();
         let mut editing = Vec::new();
+        let mut heads = Vec::new();
         for (i, m) in self.modules.iter().enumerate() {
-            let text = &self.sources.get(m.file).text;
-            let heads = self.heads(m, &mut plugins, &mut diagnostics);
+            heads.push(self.heads(m, &mut plugins, &mut diagnostics));
             let mut blocks = Vec::new();
             blocks_under(&m.parse.tree, &mut blocks);
             if blocks.is_empty() {
                 continue;
             }
-            let shared: Arc<str> = Arc::from(text.as_str());
+            let shared: Arc<str> = Arc::from(self.sources.get(m.file).text.as_str());
+            let imported = m.syntax.heads();
+            let new = |node: &Node| {
+                BlockSource::new(Arc::clone(&shared), m.file, node, Arc::clone(&imported))
+            };
+            let mut sink = Sink {
+                plugins: &plugins,
+                heads: &heads[i],
+                found: &mut round,
+                editing: &mut editing,
+            };
             for node in blocks {
-                let Some(token) = node.child_tokens().find(|t| t.kind == K::Ident) else {
-                    continue;
-                };
-                let head = token.text(text);
-                let Some(package) = heads.get(head) else {
-                    // a head of the compiler's own plugins, not imported
-                    if let Some((_, module)) = first_party::HEADS.iter().find(|(h, _)| *h == head) {
-                        let span = (token.start, token.end);
-                        diagnostics.push(unimported(m.file, &m.parse.tree, span, head, module));
-                    }
-                    continue;
-                };
-                let Some(source) = BlockSource::new(Arc::clone(&shared), m.file, node) else {
-                    continue;
-                };
-                if source.closed() {
-                    found.push(Found {
-                        module: i,
-                        node: node.clone(),
-                        source,
-                        package: package.clone(),
-                    });
-                } else if let Some(Ok(plugin)) = plugins.get(package) {
-                    editing.push((i, EditorBlock::new(&source, &[], plugin)));
-                }
+                sink.take(self, i, node, new(node), &mut diagnostics);
             }
         }
-        let rendered = self.expand_found(&plugins, &mut found, &mut diagnostics, &mut editing);
+        let previous = self.cache.as_mut().map(|c| mem::take(&mut c.plugins));
+        let mut results = Results {
+            host: self.host,
+            previous: previous.unwrap_or_default(),
+            kept: HashMap::new(),
+        };
+        let mut expanded = Vec::new();
+        for _ in 0..ROUNDS {
+            if round.is_empty() {
+                break;
+            }
+            let rendered = self.expand_found(
+                &plugins,
+                &mut results,
+                &mut round,
+                &mut diagnostics,
+                &mut editing,
+            );
+            let mut next = Vec::new();
+            for (f, rendered) in round.iter().zip(&rendered) {
+                let Some(rendered) = rendered else {
+                    continue;
+                };
+                // the user's code of the block, where blocks of its own are
+                let trees: Vec<Node> = (rendered.holes.iter())
+                    .filter_map(|&(_, hole)| f.source.hole_tree(hole))
+                    .collect();
+                let mut blocks = Vec::new();
+                for tree in &trees {
+                    if matches!(tree.kind, K::PluginExpr | K::PluginDecl) {
+                        blocks.push(tree);
+                    } else {
+                        blocks_under(tree, &mut blocks);
+                    }
+                }
+                let mut sink = Sink {
+                    plugins: &plugins,
+                    heads: &heads[f.module],
+                    found: &mut next,
+                    editing: &mut editing,
+                };
+                for node in blocks {
+                    sink.take(
+                        self,
+                        f.module,
+                        node,
+                        f.source.nested(node),
+                        &mut diagnostics,
+                    );
+                }
+            }
+            expanded.extend(mem::take(&mut round).into_iter().zip(rendered));
+            round = next;
+        }
+        diagnostics.extend(round.iter().map(|f| {
+            failure(
+                f,
+                &f.package,
+                &format!("is nested in more than {ROUNDS} blocks"),
+            )
+        }));
+        if let Some(cache) = &mut self.cache {
+            cache.plugins = results.kept;
+        }
         for (i, block) in editing {
             self.modules[i].editing.push(block);
         }
+        self.place_expanded(expanded, &mut diagnostics);
+        self.diagnostics.extend(diagnostics);
+    }
+
+    /// The expansion of each module with blocks `expanded` gave code for.
+    fn place_expanded(
+        &mut self,
+        expanded: Vec<(Found, Option<Rendered>)>,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) {
         let mut by_module: BTreeMap<usize, Vec<Expanded>> = BTreeMap::new();
-        for (f, rendered) in found.into_iter().zip(rendered) {
+        for (f, rendered) in expanded {
             if let Some(rendered) = rendered {
                 by_module.entry(f.module).or_default().push(Expanded {
                     node: f.node,
@@ -102,7 +169,6 @@ impl Loader<'_> {
             diagnostics.extend(failed);
             self.modules[i].expansion = expansion.map(Arc::new);
         }
-        self.diagnostics.extend(diagnostics);
     }
 
     /// The heads the imports of `m` expose, each with the package of its
@@ -168,8 +234,9 @@ impl Loader<'_> {
     /// modules' names and places, then expands each. A call whose result
     /// this or an earlier run already has is not made again.
     fn expand_found(
-        &mut self,
+        &self,
         plugins: &Plugins,
+        results: &mut Results,
         found: &mut [Found],
         diagnostics: &mut Vec<Diagnostic>,
         editing: &mut Vec<(usize, EditorBlock)>,
@@ -182,12 +249,6 @@ impl Loader<'_> {
                 .or_default();
             entry.push((m.name.clone(), j));
         }
-        let previous = self.cache.as_mut().map(|c| mem::take(&mut c.plugins));
-        let mut results = Results {
-            host: self.host,
-            previous: previous.unwrap_or_default(),
-            kept: HashMap::new(),
-        };
         let mut rendered: Vec<Option<Rendered>> = found.iter().map(|_| None).collect();
         for ((_, package), mut members) in groups {
             let Some(Ok(plugin)) = plugins.get(&package) else {
@@ -243,102 +304,59 @@ impl Loader<'_> {
                 diagnostics.append(&mut f.source.diagnostics);
             }
         }
-        if let Some(cache) = &mut self.cache {
-            cache.plugins = results.kept;
-        }
         rendered
     }
 }
 
-/// What plugins gave for the calls of a run: those the last run kept in
-/// memory first, then those the host saved, and the ones this run made.
-struct Results<'h> {
-    host: &'h dyn Host,
-    previous: HashMap<Vec<u8>, Vec<u8>>,
-    /// What this run used, for the next.
-    kept: HashMap<Vec<u8>, Vec<u8>>,
+/// Where the blocks of a round go: those to expand, and those only editors
+/// see while they are not closed.
+struct Sink<'a> {
+    plugins: &'a Plugins,
+    /// The heads of the module the blocks are in, by the package of each.
+    heads: &'a HashMap<String, String>,
+    found: &'a mut Vec<Found>,
+    editing: &'a mut Vec<(usize, EditorBlock)>,
 }
 
-impl Results<'_> {
-    fn get(&mut self, key: &[u8]) -> Option<Vec<u8>> {
-        let value = (self.previous.remove(key))
-            .or_else(|| self.kept.get(key).cloned())
-            .or_else(|| self.host.cached(key))?;
-        self.kept.insert(key.to_vec(), value.clone());
-        Some(value)
-    }
-
-    fn put(&mut self, key: Vec<u8>, value: Vec<u8>) {
-        self.host.save(&key, &value);
-        self.kept.insert(key, value);
-    }
-
-    /// What `plugin` collects from `blocks`, their heads and texts in order.
-    fn collect(&mut self, plugin: &dyn Expander, blocks: &[Block]) -> Result<Vec<u8>, String> {
-        let shown = blocks
-            .iter()
-            .flat_map(|b| [b.head.as_bytes(), b.text.as_bytes()]);
-        let id = [
-            b"collect".as_slice(),
-            VERSION.as_bytes(),
-            plugin.id().as_bytes(),
-        ];
-        let key = key(id.into_iter().chain(shown));
-        if let Some(state) = self.get(&key) {
-            return Ok(state);
-        }
-        let state = plugin.collect(blocks)?;
-        self.put(key, state.clone());
-        Ok(state)
-    }
-
-    /// The code `plugin` gives for `block`, keyed by the block's text, where
-    /// its holes stand and the state collected. An expansion whose holes did
-    /// not all parse is not kept: a cached one would not report them.
-    fn expand(
+impl Sink<'_> {
+    /// The block `node` of the module `i`, read as `source`; a head of the
+    /// compiler's own plugins the module does not import is `FLICK-P037`.
+    fn take(
         &mut self,
-        plugin: &dyn Expander,
-        block: &Block,
-        state: &[u8],
-        source: &mut BlockSource,
-    ) -> Result<Arena, Failure> {
-        let (column, indent) = source.layout();
-        let (column, indent) = (column.to_le_bytes(), indent.to_le_bytes());
-        let key = key([
-            b"expand".as_slice(),
-            VERSION.as_bytes(),
-            plugin.id().as_bytes(),
-            block.head.as_bytes(),
-            block.text.as_bytes(),
-            block.docs.as_bytes(),
-            &[u8::from(block.place == Place::Declaration)],
-            &column,
-            &indent,
-            state,
-        ]);
-        // a value that does not read as an arena is not one: made again
-        if let Some(arena) = self.get(&key).and_then(|v| serde_json::from_slice(&v).ok()) {
-            return Ok(arena);
+        loader: &Loader,
+        i: usize,
+        node: &Node,
+        source: Option<BlockSource>,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) {
+        let m = &loader.modules[i];
+        let text = &loader.sources.get(m.file).text;
+        let Some(token) = node.child_tokens().find(|t| t.kind == K::Ident) else {
+            return;
+        };
+        let head = token.text(text);
+        let Some(package) = self.heads.get(head) else {
+            if let Some((_, module)) = first_party::HEADS.iter().find(|(h, _)| *h == head) {
+                let span = (token.start, token.end);
+                diagnostics.push(unimported(m.file, &m.parse.tree, span, head, module));
+            }
+            return;
+        };
+        let Some(source) = source else {
+            return;
+        };
+        if source.closed() {
+            self.found.push(Found {
+                module: i,
+                node: node.clone(),
+                source,
+                package: package.clone(),
+            });
+        } else if let Some(Ok(plugin)) = self.plugins.get(package) {
+            self.editing
+                .push((i, EditorBlock::new(&source, &[], plugin)));
         }
-        let arena = plugin.expand(block, state, source)?;
-        if source.diagnostics.is_empty()
-            && let Ok(value) = serde_json::to_vec(&arena)
-        {
-            self.put(key, value);
-        }
-        Ok(arena)
     }
-}
-
-/// The parts, each after its length, as one key.
-fn key<'a>(parts: impl IntoIterator<Item = &'a [u8]>) -> Vec<u8> {
-    let mut out = Vec::new();
-    for part in parts {
-        let len = u64::try_from(part.len()).expect("a part fits in u64");
-        out.extend_from_slice(&len.to_le_bytes());
-        out.extend_from_slice(part);
-    }
-    out
 }
 
 /// The group a module's blocks are collected with.

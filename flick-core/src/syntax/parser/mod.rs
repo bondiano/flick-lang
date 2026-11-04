@@ -23,7 +23,7 @@ use SyntaxKind as K;
 use build::{Event, build};
 
 pub use fragment::{
-    Fragment, parse_decl_at, parse_decls_at, parse_expr_at, parse_pat_at, parse_type_at,
+    Fragment, Heads, parse_decl_at, parse_decls_at, parse_expr_at, parse_pat_at, parse_type_at,
 };
 
 use super::cst::Node;
@@ -38,8 +38,15 @@ pub struct Parse {
 }
 
 pub fn parse(text: &str, file: FileId) -> Parse {
+    parse_with_heads(text, file, &[])
+}
+
+/// [`parse`] of a part of a file whose imports expose the plugin heads
+/// `heads`, as a declaration the formatter laid out.
+pub fn parse_with_heads<'t>(text: &'t str, file: FileId, heads: Heads<'t>) -> Parse {
     let (raw, mut diagnostics) = lex(text, file);
     let mut p = Parser::new(text, file, &raw);
+    p.plugin_heads.extend(heads);
     decl::source_file(&mut p);
     diagnostics.append(&mut p.errors);
     let tree = build(&raw, p.events);

@@ -12,7 +12,7 @@ mod layout;
 fn fmt(text: &str) -> String {
     let mut map = SourceMap::default();
     let file = map.add("t.fl", text);
-    let (once, kept) = format_reporting(text, file).unwrap_or_else(|d| panic!("{d:?}"));
+    let (once, kept) = format_reporting(text, file, &|_| None).unwrap_or_else(|d| panic!("{d:?}"));
     assert!(kept.is_empty(), "left as written: {kept:?}\n{once}");
     assert_eq!(
         format(&once, file).as_deref(),
@@ -39,7 +39,7 @@ fn leaves_a_declaration_with_a_comment_it_cannot_place_as_written() {
     let src = "f : A -> // why\n    B\nlet  x  =  1\n";
     let mut map = SourceMap::default();
     let file = map.add("t.fl", src);
-    let (out, kept) = format_reporting(src, file).expect("formats");
+    let (out, kept) = format_reporting(src, file, &|_| None).expect("formats");
     assert_eq!(out, "f : A -> // why\n    B\nlet x = 1\n");
     assert_eq!(kept, [(0, 21)]);
     assert_eq!(format(&out, file).as_deref(), Ok(out.as_str()));
@@ -92,7 +92,7 @@ fn the_repository_formats_canonically_and_idempotently() {
             continue;
         }
         let name = path.display();
-        match format_reporting(&text, file) {
+        match format_reporting(&text, file, &|_| None) {
             Err(e) => problems.push(format!("{name}: {}", e[0].message)),
             Ok((out, kept)) => {
                 for (start, _) in kept {

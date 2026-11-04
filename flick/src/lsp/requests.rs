@@ -2,17 +2,20 @@
 //! fixes and formatting, answered from the current analysis; built-in
 //! modules are materialized as read-only `.fl` files for every editor.
 
+use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::sync::Arc;
 
 use flick_core::diagnostics::Edit;
 use flick_core::diagnostics::codes::Area;
 use flick_core::fmt;
 use flick_core::ide::{CompletionKind, Ide, Location, TOKEN_TYPES, Target};
+use flick_core::plugin::Expander;
 use flick_core::source::{FileId, SourceMap};
 use flick_core::syntax::{self, cst::Node, kind::SyntaxKind as K, lexer};
 use flick_core::types::builtin_sources;
@@ -43,8 +46,18 @@ impl Server {
         match method {
             "initialize" => Ok(capabilities()),
             "textDocument/formatting" => {
-                let (_, text) = self.document(params)?;
-                let Ok(formatted) = fmt::format(&text, FileId::default()) else {
+                let (path, text) = self.document(params)?;
+                // the plugins of the module's blocks, as the analysis loaded them
+                let snapshot = self.snapshot_for(&path);
+                let plugins: HashMap<String, Arc<dyn Expander>> = (snapshot.file(&path))
+                    .and_then(|file| snapshot.analysis.modules.iter().find(|m| m.file == file))
+                    .map(|m| m.editing.iter())
+                    .into_iter()
+                    .flatten()
+                    .map(|b| (b.block.head.clone(), Arc::clone(&b.plugin)))
+                    .collect();
+                let plugin_of = |head: &str| plugins.get(head).cloned();
+                let Ok(formatted) = fmt::format_with(&text, FileId::default(), &plugin_of) else {
                     return Ok(Value::Null);
                 };
                 let end = u32::try_from(text.len()).unwrap_or(u32::MAX);

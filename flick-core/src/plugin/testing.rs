@@ -8,9 +8,9 @@ use flick_plugin::{Block, HoleKind, Place, Plugin};
 use super::blocks_under;
 use super::render::{DECL_PLACEHOLDER, Rendered, render};
 use super::source::BlockSource;
-use crate::fmt;
 use crate::source::FileId;
 use crate::syntax;
+use crate::{fmt, resolve};
 
 /// The code `rendered` is, the user's code in place of each hole (spans of
 /// `frame`, the text of its block), laid out by the formatter where it can:
@@ -100,8 +100,9 @@ pub fn expand(plugin: &impl Plugin, source: &str) -> Vec<Result<String, Vec<Stri
     let mut nodes = Vec::new();
     blocks_under(&parse.tree, &mut nodes);
     let text: Arc<str> = Arc::from(source);
+    let heads = resolve::module_syntax(&parse.tree, source, file).heads();
     let mut sources: Vec<BlockSource> = (nodes.into_iter())
-        .filter_map(|n| BlockSource::new(Arc::clone(&text), file, n))
+        .filter_map(|n| BlockSource::new(Arc::clone(&text), file, n, Arc::clone(&heads)))
         .filter(BlockSource::closed)
         .collect();
     let blocks: Vec<Block> = sources.iter().map(BlockSource::block).collect();

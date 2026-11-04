@@ -1,0 +1,13 @@
+// A `cli` block inside another: a subcommand written in place.
+module App.Nested exposing (tool)
+
+import Cli exposing (plugin cli)
+
+tool : Cli.Command none none
+let tool = cli "tool" {
+  description "Project tools"
+  subcommand cli "greet" {
+    arg name : String
+    handle fun { name } -> Platform.stdout_line name
+  }
+}

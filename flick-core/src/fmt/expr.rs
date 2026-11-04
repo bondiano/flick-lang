@@ -66,6 +66,7 @@ fn hugs(n: &Node) -> bool {
         | K::DoExpr
         | K::SqlExpr
         | K::CodecExpr => true,
+        K::PluginExpr => n.has_token(K::LBrace),
         _ => false,
     }
 }

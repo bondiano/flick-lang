@@ -33,6 +33,8 @@ pub struct BlockSource {
     tokens: Vec<Token>,
     /// The `///` lines right above a declaration.
     docs: String,
+    /// The heads the module imports, which start blocks in the holes.
+    heads: Arc<[String]>,
     /// What parsing the holes the plugin asked for reported.
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -42,7 +44,7 @@ impl BlockSource {
     /// `text`. Its frame starts at the first argument of the head, or at the
     /// body without arguments, and ends at `}`, or at the end of the node for
     /// a block without a body or not closed.
-    pub fn new(text: Arc<str>, file: FileId, node: &Node) -> Option<Self> {
+    pub fn new(text: Arc<str>, file: FileId, node: &Node, heads: Arc<[String]>) -> Option<Self> {
         let head = node.child_tokens().find(|t| !t.kind.is_trivia())?;
         if head.kind != K::Ident {
             return None;
@@ -77,6 +79,7 @@ impl BlockSource {
         };
         Some(BlockSource {
             docs,
+            heads,
             head: head.text(&text).to_owned(),
             text,
             file,
@@ -88,6 +91,16 @@ impl BlockSource {
             tokens,
             diagnostics: Vec::new(),
         })
+    }
+
+    /// The block `node` inside the user's code of this one.
+    pub fn nested(&self, node: &Node) -> Option<Self> {
+        Self::new(
+            Arc::clone(&self.text),
+            self.file,
+            node,
+            Arc::clone(&self.heads),
+        )
     }
 
     /// Where the block stands.
@@ -207,12 +220,14 @@ impl BlockSource {
         let first = self.tokens.iter().position(|t| t.start >= from)?;
         let last = self.tokens.iter().rposition(|t| t.end <= to)? + 1;
         let tokens = self.tokens.get(first..last)?;
-        match kind {
-            HoleKind::Expr => parse_expr_at(&self.text, self.file, tokens),
-            HoleKind::Ty => parse_type_at(&self.text, self.file, tokens),
-            HoleKind::Pat => parse_pat_at(&self.text, self.file, tokens),
-            HoleKind::Decl => parse_decl_at(&self.text, self.file, tokens),
-        }
+        let heads: Vec<&str> = self.heads.iter().map(String::as_str).collect();
+        let parse = match kind {
+            HoleKind::Expr => parse_expr_at,
+            HoleKind::Ty => parse_type_at,
+            HoleKind::Pat => parse_pat_at,
+            HoleKind::Decl => parse_decl_at,
+        };
+        parse(&self.text, self.file, tokens, &heads)
     }
 
     fn relative(&self, start: u32, end: u32) -> Span {

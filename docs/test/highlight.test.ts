@@ -38,3 +38,29 @@ test("CLI clauses and parameter names are scoped without leaking through nested 
     highlighter.dispose();
   }
 });
+
+test("plugin heads in imports and server functions are scoped, `cli` elsewhere is a name", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [],
+    langs: [{ ...grammar, name: "flick" }],
+  });
+  try {
+    const language = highlighter.getLanguage("flick");
+    const scopes = (line: string, word: string): readonly string[] => {
+      const result = language.tokenizeLine(line, null);
+      const at = line.indexOf(word);
+      assert.ok(at >= 0, word);
+      const token = result.tokens.find((token) => token.startIndex <= at && at < token.endIndex);
+      assert.ok(token, `${word} in ${line}`);
+      return token.scopes;
+    };
+    const imported = "import Pairs exposing (Pair, plugin pairs)";
+    assert.ok(scopes(imported, "plugin").includes("keyword.other.flick"));
+    assert.ok(scopes(imported, "pairs").includes("entity.name.function.macro.flick"));
+    assert.ok(scopes("server fn ping n = n", "fn").includes("keyword.other.flick"));
+    assert.ok(!scopes("let tool = cli", "cli").includes("keyword.other.flick"));
+  } finally {
+    highlighter.dispose();
+  }
+});

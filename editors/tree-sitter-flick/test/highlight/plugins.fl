@@ -1,0 +1,7 @@
+import Pairs exposing (Pair, plugin pairs)
+//                                   ^ function.macro
+server fn ping n = n
+// <- keyword
+//     ^ keyword
+let row = pairs { x = 1 }
+//        ^ variable

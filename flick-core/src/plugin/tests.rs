@@ -212,7 +212,7 @@ fn a_block_shows_its_plugin_the_body_and_parses_holes() {
     let file = map.add("Main.fl", SRC);
     let parsed = parse(SRC, file);
     let block = find(&parsed.tree, K::PluginExpr).expect("a block");
-    let mut source = BlockSource::new(Arc::from(SRC), file, block).expect("closed");
+    let mut source = BlockSource::new(Arc::from(SRC), file, block, Arc::from([])).expect("closed");
     let shown = source.block();
     assert_eq!(shown.head, "pairs");
     assert_eq!(shown.text, " a = f 1; b : Int = 2 ");
@@ -239,7 +239,7 @@ fn a_splice_keeps_the_block_range_and_the_holes_ranges() {
     let file = map.add("Main.fl", SRC);
     let parsed = parse(SRC, file);
     let block = find(&parsed.tree, K::PluginExpr).expect("a block");
-    let mut source = BlockSource::new(Arc::from(SRC), file, block).expect("closed");
+    let mut source = BlockSource::new(Arc::from(SRC), file, block, Arc::from([])).expect("closed");
     let body = source.block().text;
     let len = u32::try_from(body.len()).expect("short");
     let at = |word: &str| u32::try_from(body.find(word).expect("there")).expect("short");

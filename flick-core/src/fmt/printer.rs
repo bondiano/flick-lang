@@ -5,6 +5,7 @@
 use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::comments::{Comment, Comments};
+use super::plugins::Layouts;
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -17,6 +18,8 @@ pub(super) struct Printer<'a> {
     pub a: &'a DocumentArena<'a>,
     pub text: &'a str,
     pub comments: Comments<'a>,
+    /// What the plugins of the file's blocks lay them out as.
+    pub layouts: &'a Layouts,
     /// The column the declarations being laid out start at: 0 at the top
     /// level, one level in for the members of a class or a `rec` group.
     pub column: usize,
@@ -45,11 +48,17 @@ pub(super) struct Item<'a> {
 }
 
 impl<'a> Printer<'a> {
-    pub fn new(a: &'a DocumentArena<'a>, text: &'a str, comments: Comments<'a>) -> Self {
+    pub fn new(
+        a: &'a DocumentArena<'a>,
+        text: &'a str,
+        comments: Comments<'a>,
+        layouts: &'a Layouts,
+    ) -> Self {
         Printer {
             a,
             text,
             comments,
+            layouts,
             column: 0,
             tail_inline: false,
             inline_body: false,
@@ -133,7 +142,8 @@ impl<'a> Printer<'a> {
             K::TypeDecl | K::KindDecl | K::ErrorDecl => self.type_decl(n),
             K::ClassDecl | K::InstanceDecl | K::ServiceDecl => self.class(n),
             K::ForeignDecl => self.foreign(n),
-            K::SqlMigrationDecl | K::PluginExpr | K::PluginDecl => self.as_written(n),
+            K::SqlMigrationDecl => self.as_written(n),
+            K::PluginExpr | K::PluginDecl => self.plugin_block(n),
             _ => self.generic(n),
         }
     }

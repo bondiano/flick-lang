@@ -193,10 +193,10 @@ fn keeps_comments_in_place() {
     "#);
 }
 
-/// `sql`, `do` and `for` blocks put one clause or statement per line.
+/// `sql`, `cli`, `do` and `for` blocks put one clause or statement per line.
 #[test]
 fn lays_out_blocks_in_braces() {
-    let src = "let query =\n  sql params {\n    from user in Users\n    left_join account in Accounts\n      on account.user_id == user.id\n    where user.id == params.user_id\n    select { name = user.name; balance = account.balance }\n  }\nlet workflow = do { x <- ask; let y = x + 1; pure y }\nlet evens = [for x <- xs if x > 0 yield x * 2]\n";
+    let src = "let query =\n  sql params {\n    from user in Users\n    left_join account in Accounts\n      on account.user_id == user.id\n    where user.id == params.user_id\n    select { name = user.name; balance = account.balance }\n  }\nlet command = cli \"greet\" {\n  description \"Greets\"\n  /// Who to greet\n  arg name : String = \"world\"\n  handle fun { name } -> Platform.stdout_line (\"Hello, \" ++ name) }\nlet workflow = do { x <- ask; let y = x + 1; pure y }\nlet evens = [for x <- xs if x > 0 yield x * 2]\n";
     insta::assert_snapshot!(fmt(src), @r#"
     let query = sql params {
       from user in Users
@@ -204,11 +204,32 @@ fn lays_out_blocks_in_braces() {
       where user.id == params.user_id
       select { name = user.name; balance = account.balance }
     }
+    let command = cli "greet" {
+      description "Greets"
+      /// Who to greet
+      arg name : String = "world"
+      handle fun { name } -> Platform.stdout_line ("Hello, " ++ name)
+    }
     let workflow = do {
       x <- ask
       let y = x + 1
       pure y
     }
     let evens = [for x <- xs if x > 0 yield x * 2]
+    "#);
+}
+
+/// A block its plugin does not lay out keeps its lines, which move with
+/// its head; the declaration around it is laid out.
+#[test]
+fn moves_a_block_without_a_layout_with_its_head() {
+    let src = "import Pairs exposing (plugin pairs)\n\nlet x =\n      pairs {\n        a = 1\n          + 2\n      }\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    import Pairs exposing (plugin pairs)
+
+    let x = pairs {
+      a = 1
+        + 2
+    }
     "#);
 }

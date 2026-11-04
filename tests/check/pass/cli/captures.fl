@@ -16,6 +16,8 @@ foreign sync read_file from "./files.js" "read"
 show : List String ->{; Cli.CliError} Unit
 let show args = scope {
   let file = open_file "config"
-  let command = cli "show" { handle fun {} -> Platform.stdout_line (read_file file) }
+  let command = cli "show" {
+    handle fun {} -> Platform.stdout_line (read_file file)
+  }
   Cli.run command args
 }

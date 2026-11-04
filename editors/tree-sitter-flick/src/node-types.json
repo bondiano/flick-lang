@@ -433,10 +433,6 @@
     "named": false
   },
   {
-    "type": "cli",
-    "named": false
-  },
-  {
     "type": "codec",
     "named": false
   },
