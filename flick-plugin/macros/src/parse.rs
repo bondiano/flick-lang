@@ -291,7 +291,8 @@ impl Parser {
                     return Ok(e);
                 }
                 let mut items = vec![Item::One(e)];
-                while p.eat_punct(',') {
+                // a trailing `,` ends the tuple, as it ends a list
+                while p.eat_punct(',') && p.peek().is_some() {
                     items.push(p.item(Role::Expr)?);
                 }
                 p.end()?;

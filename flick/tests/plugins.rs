@@ -169,6 +169,46 @@ mod wasm {
     }
 
     #[test]
+    fn a_component_of_another_version_is_reported_with_both() {
+        let root = app("plugins-version", MAIN);
+        let path = root.join("lib/pairs.wasm");
+        let ours = format!("flick:plugin/compiler@{}", flick_plugin::VERSION);
+        let old = format!("flick:plugin/compiler@{}", "0.3.0");
+        assert_eq!(ours.len(), old.len(), "the same length keeps the binary");
+        let mut bytes = fs::read(&path).expect("read the component");
+        let mut found = false;
+        while let Some(at) = bytes.windows(ours.len()).position(|w| w == ours.as_bytes()) {
+            bytes[at..at + old.len()].copy_from_slice(old.as_bytes());
+            found = true;
+        }
+        assert!(found, "the component names its interface");
+        fs::write(&path, bytes).expect("write the component");
+        let checked = flick(&root, &["check"]);
+        let stderr = String::from_utf8_lossy(&checked.stderr);
+        assert!(
+            stderr.contains("FLICK-P035")
+                && stderr.contains("built for `flick:plugin@0.3.0`")
+                && stderr.contains(&format!("speaks `{}`", flick_plugin::VERSION)),
+            "{stderr}"
+        );
+    }
+
+    #[test]
+    fn flick_fmt_asks_the_plugins_of_the_projects_packages() {
+        let main = MAIN.replace(
+            "let point = pairs { x = 1.0 }",
+            "let point =\n    pairs {\n      x = 1.0\n    }",
+        );
+        let root = app("plugins-fmt", &main);
+        let written = flick(&root, &["fmt"]);
+        assert!(written.status.success(), "{written:?}");
+        // `pairs` gives no layout: the block keeps its lines, which move with its head
+        assert_eq!(trace(&root), ["collect pairs", "format pairs pairs"]);
+        let text = fs::read_to_string(root.join("app/src/App/Main.fl")).expect("read");
+        assert!(text.contains("let point = pairs {\n  x = 1.0\n}"), "{text}");
+    }
+
+    #[test]
     fn a_missing_component_is_reported_on_the_import() {
         let root = app("plugins-missing", MAIN);
         fs::remove_file(root.join("lib/pairs.wasm")).expect("remove");

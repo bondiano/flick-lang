@@ -115,7 +115,8 @@ impl Ide<'_> {
         foreign_modes(&m.tree, text, &mut out);
         contextual_keywords(&m.tree, &mut out);
         heads(&m.tree, &mut out);
-        out.sort_unstable();
+        // of tokens at one place the head of a plugin's blocks wins
+        out.sort_unstable_by_key(|&(start, end, kind)| (start, kind != MACRO, end, kind));
         out.dedup_by_key(|t| t.0);
         out
     }

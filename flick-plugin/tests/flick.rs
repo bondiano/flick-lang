@@ -60,7 +60,7 @@ fn spreads_records_lambdas_and_fields() {
     let made = kinds(|b| {
         let built = flick!(b, ());
         flick!(b, f [#(..&holes), "x"] { a = #built; b = (fun { a; b = _ } -> a.c) } (1, #(..&holes)));
-        flick!(b, ty (#(Name("M.T")) -> { #(..fields) }));
+        flick!(b, type (#(Name("M.T")) -> { #(..fields) }));
     });
     let tail = &made[made.len() - 5..];
     assert_eq!(
@@ -156,5 +156,22 @@ fn declarations_are_built_as_written() {
     assert!(matches!(decls[5], Decl::Signature { name, .. } if name == "size"));
     assert!(
         matches!(decls[6], Decl::Instance { context, members, .. } if context.len() == 1 && members.len() == 2)
+    );
+}
+
+#[test]
+fn type_starts_a_type_without_an_equals_and_ty_is_a_name() {
+    let made = kinds(|b| {
+        flick!(b, ty);
+        flick!(b, type { a : Int });
+        flick!(b, type Color = Red);
+        flick!(b, (x, y,));
+    });
+    assert_eq!(made[0], Kind::Expr(Expr::Name("ty".into())));
+    assert!(matches!(made[2], Kind::Ty(Ty::Record(_))), "{made:?}");
+    assert!(matches!(made[3], Kind::Decl(Decl::Adt { .. })), "{made:?}");
+    assert!(
+        matches!(&made[6], Kind::Expr(Expr::Tuple(items)) if items.len() == 2),
+        "{made:?}"
     );
 }

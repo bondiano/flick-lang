@@ -77,3 +77,36 @@ fn editors_see_the_users_code_of_a_nested_block() {
     let (shown, _) = ide.hover(file, at).expect("a hover in the innermost block");
     assert!(shown.contains("Float"), "{shown}");
 }
+
+#[test]
+fn a_block_nested_in_eight_expands_and_one_in_nine_is_refused() {
+    let nest = |depth: usize| {
+        let mut code = "1.0".to_owned();
+        for _ in 0..=depth {
+            code = format!("pairs {{ x = {code} }}");
+        }
+        code
+    };
+    let report = |depth: usize| {
+        let main = format!(
+            "module App.Main exposing (..)\n\nimport Pairs exposing (plugin pairs)\n\nlet deep = {}\n",
+            nest(depth)
+        );
+        let host = host(&main);
+        let mut sources = SourceMap::default();
+        let project = library(&mut sources);
+        let found = check(&host, &mut sources, Some(&project), &roots());
+        found.iter().map(|d| show(&sources, d)).collect::<Vec<_>>()
+    };
+    let eight = report(8);
+    assert!(
+        eight.iter().all(|d| !d.contains("nested in more")),
+        "{eight:#?}"
+    );
+    let nine = report(9);
+    assert!(
+        nine.iter()
+            .any(|d| d.contains("nested in more than 8 blocks")),
+        "{nine:#?}"
+    );
+}

@@ -27,7 +27,7 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types;
 
-/// How many blocks deep a block may be nested in the user's code of others.
+/// How many blocks a block may be nested in, in the user's code of others.
 const ROUNDS: usize = 8;
 
 /// The plugin of each package a module imports, or why it does not load.
@@ -80,7 +80,8 @@ impl Loader<'_> {
             kept: HashMap::new(),
         };
         let mut expanded = Vec::new();
-        for _ in 0..ROUNDS {
+        // the blocks of the modules, then those nested in 1 to ROUNDS blocks
+        for _ in 0..=ROUNDS {
             if round.is_empty() {
                 break;
             }

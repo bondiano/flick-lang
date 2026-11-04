@@ -8,6 +8,7 @@
 use std::fs;
 use std::mem;
 use std::path::Path;
+use std::str;
 use std::sync::{Arc, OnceLock};
 
 use flick_core::plugin::source::BlockSource;
@@ -33,12 +34,43 @@ const MEMORY: usize = 64 << 20;
 /// The plugin of `package` in the component at `path`.
 pub fn load(package: &str, path: &Path) -> Result<Arc<dyn Expander>, String> {
     let bytes = fs::read(path).map_err(|e| format!("cannot read `{}`: {e}", path.display()))?;
+    match interface_version(&bytes) {
+        Some(version) if version == flick_plugin::VERSION => {}
+        Some(version) => {
+            return Err(format!(
+                "`{}` was built for `flick:plugin@{version}`, and this flick speaks `{}`: \
+                 rebuild it, as `flick run plugin` in its package does",
+                path.display(),
+                flick_plugin::VERSION
+            ));
+        }
+        None => {
+            return Err(format!(
+                "`{}` is no component of `flick:plugin`",
+                path.display()
+            ));
+        }
+    }
     let id = format!("{package} {}", fetch::hex(&Sha256::digest(&bytes)));
     Ok(Arc::new(Wasm {
         id,
         bytes,
         compiled: OnceLock::new(),
     }))
+}
+
+/// The version of `flick:plugin` a component imports the compiler of, as
+/// its import `flick:plugin/compiler@0.5.0` names it, read without compiling
+/// it: a build from caches calls no plugin.
+fn interface_version(bytes: &[u8]) -> Option<&str> {
+    const NAME: &[u8] = b"flick:plugin/compiler@";
+    let at = bytes.windows(NAME.len()).position(|w| w == NAME)? + NAME.len();
+    let len = (bytes[at..].iter())
+        .take_while(|b| b.is_ascii_digit() || **b == b'.')
+        .count();
+    str::from_utf8(&bytes[at..at + len])
+        .ok()
+        .filter(|v| !v.is_empty())
 }
 
 struct Wasm {

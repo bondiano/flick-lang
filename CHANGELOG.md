@@ -30,7 +30,8 @@ break programs.
   ping x = …`). Their code is declarations of the module (`let`,
   signatures, `type alias`, types and instances), exported and imported like
   the others; the user's patterns and declarations are holes too.
-  `flick!` builds declarations, and its type form is now `flick!(b, ty T)`.
+  `flick!` builds declarations, and a type is `flick!(b, type T)`, told from
+  `type N = …` by its `=`.
 - **Plugins, interface `0.4.0`:** the names of a plugin's code are its own:
   its locals and the user's do not capture each other, and `Pairs.make`
   names the module `Pairs` whatever the file calls it. A plugin declares
@@ -45,6 +46,9 @@ break programs.
   moves with its head. A block inside the user's code of another expands in
   a round of its own. Editors highlight the heads of plugins as macros, and
   `cli` is no keyword of the grammars any more.
+- **Plugins:** `flick fmt` lays out blocks with the plugins of the project's
+  packages; a component built for another version of `flick:plugin` is
+  `FLICK-P035` on its import, naming both versions.
 - **Breaking:** `cli "name" { … }` is the plugin of `std`: a file that
   writes one imports it, `import Cli exposing (plugin cli)`. Without the
   import the block is `FLICK-P037`, which `flick check --fix` fixes. Its

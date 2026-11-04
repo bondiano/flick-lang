@@ -3,7 +3,7 @@
 //! `instance C a => C (T a) { let m x = e; m : T }`. A name a declaration
 //! declares is written as it is, or `#(expr)` for one the plugin makes.
 
-use proc_macro2::{Delimiter, TokenStream as Tokens, TokenTree};
+use proc_macro2::{Delimiter, Spacing, TokenStream as Tokens, TokenTree};
 use quote::quote;
 
 use super::Parser;
@@ -14,9 +14,18 @@ impl Parser {
     /// Whether a declaration starts here.
     pub fn at_decl(&self) -> bool {
         self.at_word("let")
-            || self.at_word("type")
+            || self.at_word("type") && !self.at_type()
             || self.at_word("instance")
             || self.at_signature()
+    }
+
+    /// `type T`, a type: unlike `type N = …` and `type alias N = …`, it has
+    /// no `=` of its own.
+    pub fn at_type(&self) -> bool {
+        let alias = matches!(self.nth(1), Some(TokenTree::Ident(i)) if i == "alias");
+        let equals = (self.tokens[self.pos..].iter())
+            .any(|t| matches!(t, TokenTree::Punct(p) if p.as_char() == '=' && p.spacing() == Spacing::Alone));
+        self.at_word("type") && !alias && !equals
     }
 
     /// `name :` or `#(name) :`.
