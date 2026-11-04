@@ -54,6 +54,17 @@ break programs.
   `FLICK-D001`, `FLICK-D009`, `FLICK-D010`), on the class in `deriving`. A
   phantom parameter takes a witness too, and a field of an alias of another
   module names that alias's own witness, so the alias derives `Schema`.
+- **Breaking:** `deriving HttpApi` is a derive of `std`'s plugin, which
+  writes `T.endpoints` and `T.api` in Flick with `HttpApi.Derive.at`,
+  `wire_codec`, `with_header_auth` and `with_optional_header_auth`. What it
+  cannot read as endpoints is `std/D011`, on the endpoint; a part with no
+  codec stays `FLICK-D011`, on its type, and a value named after a type is
+  its codec only when it is a `PureCodec Json` of it. An error without a
+  `Problem` instance, and a path whose `:name` parameters are not the fields
+  of its `path` part, are `FLICK-C001`. A group's check gets the request's
+  headers alone.
+- **Plugins, interface `0.8.0`:** a row of types, `{NotFound, Conflict}`, in
+  a plugin's types, and a type may stand in several places of its code.
 - **Plugins, interface `0.7.0`:** `let rec` and `forall` types in a plugin's
   declarations.
 - **Plugins, interface `0.6.0`:** a class marked `@derive` (or `@derive

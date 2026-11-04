@@ -34,7 +34,6 @@ mod exports;
 mod ffi;
 mod generalize;
 mod handlers;
-pub mod http_api;
 mod infer;
 mod instances;
 mod irrefutable;
@@ -71,6 +70,7 @@ mod ty;
 mod typing;
 mod ui;
 mod unify;
+pub mod wire;
 
 pub use applicative_do::{and_keys, group_key, pure_argument};
 pub use bindings::{LetParts, let_parts, signature_name};
@@ -314,6 +314,7 @@ fn run_in(
     }
     checker.module(module.tree);
     checker.report_holes();
+    checker.unannotated_codecs();
     checker.fill(interface);
     checker.typing.declarations = Arc::new(checker.declarations());
     checker.sugar_lints(module.tree);

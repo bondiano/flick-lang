@@ -27,7 +27,7 @@ pub use solve::Outcome;
 
 /// The row primitives: the compiler solves them from the fields of known
 /// records.
-pub const RECORD_CLASSES: [Lang; 7] = [
+pub const RECORD_CLASSES: [Lang; 8] = [
     Lang::HasField,
     Lang::Lacks,
     Lang::Remove,
@@ -35,6 +35,7 @@ pub const RECORD_CLASSES: [Lang; 7] = [
     Lang::UnionDisjoint,
     Lang::MapFields,
     Lang::Labels,
+    Lang::PathParams,
 ];
 /// The closed numeric classes, whose module has every instance.
 pub const NUMERIC_CLASSES: [Lang; 3] = [Lang::Numeric, Lang::Integer, Lang::Floating];

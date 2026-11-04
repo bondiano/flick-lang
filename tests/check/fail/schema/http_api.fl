@@ -44,10 +44,15 @@ type alias NotAnEndpoint = {
 type Variant = Variant
   deriving HttpApi
 
-//~ FLICK-D011 @20:3-20:59 endpoint `item`: the path `/items/:id/:rev` has the parameters `id`, `rev`, and its `path` part the fields `id`
-//~ FLICK-D011 @24:3-24:46 endpoint `item`: `body` is not a part of a request: `path`, `query`, `headers` or `payload`
-//~ FLICK-D011 @28:3-28:35 `Opaque` has no codec: name a `PureCodec Json` of it after it in its module, or derive `Schema`
-//~ FLICK-D011 @32:3-32:39 endpoint `item`: the error `Teapot` has no `HttpApi.Derive.Problem` instance, its status and body
-//~ FLICK-D011 @38:3-38:19 every endpoint of a group with `Authed` endpoints is `Authed` or `MaybeAuthed`: put the others in a group of their own
-//~ FLICK-D011 @41:3-41:14 endpoint `item` is `Get`, `Post`, `Put`, `Patch` or `Delete` of `HttpApi.Derive` with a path, the request, the success and the errors
-//~ FLICK-D011 @45:3-45:19 `Variant` derives `HttpApi`: it is a record of endpoints, `field : Get "/path" { … } Response {Errors}`
+type alias Twice = {
+  item : Get "/items/:id" { path : Item; path : Item } Item {};
+} deriving HttpApi
+
+//~ FLICK-C001 @20:3-20:59 `PathParams "/items/:id/:rev" { id : String }` does not hold: the path `/items/:id/:rev` has the parameters `id`, `rev`, and its `path` part the fields `id`
+//~ std/D011 @24:3-24:46 `Parts.item`: `body` is not a part of a request: `path`, `query`, `headers` or `payload`
+//~ FLICK-D011 @28:26-28:32 `Opaque` has no codec: name a `PureCodec Json` of it after it in its module, or derive `Schema`
+//~ FLICK-C001 @32:3-32:39 no instance for `Problem Teapot`; instances of `Problem`: `Problem Gone`
+//~ std/D011 @38:12-38:19 `Mixed`: every endpoint of a group with `Authed` endpoints is `Authed` or `MaybeAuthed`: put the others in a group of their own
+//~ std/D011 @41:3-41:14 `NotAnEndpoint.item`: an endpoint is `Get`, `Post`, `Put`, `Patch` or `Delete` of `HttpApi.Derive` with a path, the request, the success and the errors
+//~ std/D011 @45:12-45:19 `Variant`: it derives `HttpApi`, so it is a record of endpoints, `field : Get "/path" { … } Response {Errors}`
+//~ FLICK-T014 @48:42-48:46 field `path` is given more than once; labels of a record are unique

@@ -234,6 +234,7 @@ macro_rules! wit_conversions {
                             }
                             $crate::Ty::Record(f) => w::Ty::Record(to_fields(f)),
                             $crate::Ty::Forall { vars, body } => w::Ty::Forall(w::ForallTy { vars, body }),
+                            $crate::Ty::Row(entries) => w::Ty::Row(entries),
                             $crate::Ty::Function { input, output } => {
                                 w::Ty::Function(w::Arrow { input, output })
                             }
@@ -303,6 +304,7 @@ macro_rules! wit_conversions {
                             w::Ty::Record(f) => $crate::Ty::Record(from_fields(f)),
                             w::Ty::Function(a) => $crate::Ty::Function { input: a.input, output: a.output },
                             w::Ty::Forall(f) => $crate::Ty::Forall { vars: f.vars, body: f.body },
+                            w::Ty::Row(entries) => $crate::Ty::Row(entries),
                             w::Ty::Text(s) => $crate::Ty::Text(s),
                             w::Ty::Wildcard => $crate::Ty::Wildcard,
                             w::Ty::Hole(s) => $crate::Ty::Hole(from_span(s)),

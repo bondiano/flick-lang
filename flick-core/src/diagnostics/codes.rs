@@ -279,7 +279,7 @@ codes! {
     D008 = Schema 8, "codec has no strict JSON Schema";
     D009 = Schema 9, "type has no URL form";
     D010 = Schema 10, "type has no form";
-    D011 = Schema 11, "record is no HTTP API";
+    D011 = Schema 11, "type has no wire codec";
     Q001 = Sql 1, "unknown column";
     Q002 = Sql 2, "unknown table alias";
     Q003 = Sql 3, "ambiguous column";

@@ -31,7 +31,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.7.0";
+pub const VERSION: &str = "0.8.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -166,6 +166,8 @@ pub enum Ty {
         vars: Vec<String>,
         body: NodeId,
     },
+    /// A row of types, as the errors `{NotFound, Conflict}`; `{}` without.
+    Row(Vec<NodeId>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -132,7 +132,31 @@ impl Checker<'_> {
                     refuse("the record is open, so its other fields are not known".to_owned())
                 }
             },
+            (Lang::PathParams, [Type::Symbol(path), part]) => self.params_of_path(c, path, part),
             _ => unknown(),
+        }
+    }
+
+    /// `PathParams path part`: the `:name` segments of `path` are the fields
+    /// of the record `part`, or there are none and `part` is no record.
+    fn params_of_path(&self, c: &Type, path: &str, part: &Type) -> Outcome {
+        let refuse = |reason: String| Outcome::Missing(c.clone(), Some(reason));
+        let fields = match self.whnf(part) {
+            Type::Record(row) => match rest(&row) {
+                Rest::Closed => row.entries.into_iter().map(|(l, _)| l).collect(),
+                Rest::Unknown => return Outcome::Stuck,
+                Rest::Open => {
+                    return refuse(
+                        "the record is open, so its other fields are not known".to_owned(),
+                    );
+                }
+            },
+            t if has_metas(&t) => return Outcome::Stuck,
+            _ => Vec::new(),
+        };
+        match path_params(path, fields) {
+            None => primitive(self.show(c), Vec::new()),
+            Some(why) => refuse(why),
         }
     }
 
@@ -207,6 +231,35 @@ impl Checker<'_> {
         let shown = self.show(computed);
         Outcome::Missing(c.clone(), Some(format!("the result is `{shown}`")))
     }
+}
+
+/// Why the `:name` segments of `path` are not `fields`, if they are not.
+fn path_params(path: &str, mut fields: Vec<String>) -> Option<String> {
+    let mut params: Vec<&str> = (path.split('/'))
+        .filter_map(|s| s.strip_prefix(':'))
+        .collect();
+    params.sort_unstable();
+    fields.sort_unstable();
+    if params == fields {
+        return None;
+    }
+    let listed = |names: &[&str]| {
+        if names.is_empty() {
+            "none".to_owned()
+        } else {
+            names
+                .iter()
+                .map(|n| format!("`{n}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        }
+    };
+    let fields: Vec<&str> = fields.iter().map(String::as_str).collect();
+    Some(format!(
+        "the path `{path}` has the parameters {}, and its `path` part the fields {}",
+        listed(&params),
+        listed(&fields)
+    ))
 }
 
 fn primitive(constraint: String, labels: Vec<String>) -> Outcome {

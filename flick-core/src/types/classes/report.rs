@@ -1,10 +1,11 @@
 //! Diagnostics for unresolved class constraints and resolution budgets.
 
 use super::solve::Outcome;
-use super::{Wanted, split};
+use super::{Wanted, args_of, split};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::Span;
 use crate::types::Checker;
+use crate::types::lang::Lang;
 use crate::types::ty::Type;
 
 impl Checker<'_> {
@@ -19,6 +20,8 @@ impl Checker<'_> {
                 Outcome::Missing(part, reason) => {
                     self.missing(&constraint, &part, reason.as_deref(), w.span);
                 }
+                // a route that is no path has its error where it is written
+                Outcome::Stuck if args_of(&constraint, Lang::PathParams).is_some() => {}
                 Outcome::Stuck => {
                     let shown = self.show(&constraint);
                     let candidates = self.candidates(&constraint);

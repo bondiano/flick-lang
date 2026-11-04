@@ -56,9 +56,11 @@ pub fn render(
         Place::Declaration => Role::Decl,
     };
     out.node(arena.root, role, 0)?;
-    let mut holes: Vec<Span> = out.holes.iter().map(|(_, h)| h.span).collect();
-    holes.sort_by_key(|s| (s.start, s.end));
-    if holes.windows(2).any(|w| w[1].start < w[0].end) {
+    let mut holes: Vec<Hole> = out.holes.iter().map(|(_, h)| *h).collect();
+    holes.sort_by_key(|h| (h.span.start, h.span.end));
+    // a type may stand in several places, as in a signature and an annotation
+    holes.dedup_by(|b, a| a == b && a.kind == HoleKind::Ty);
+    if holes.windows(2).any(|w| w[1].span.start < w[0].span.end) {
         return Err("two holes overlap or one is used twice".into());
     }
     Ok(Rendered {
@@ -196,6 +198,16 @@ impl Printer<'_> {
                 self.push(". ");
                 self.node(*body, Role::Ty, d)?;
                 self.push(")");
+            }
+            Ty::Row(entries) => {
+                self.push("{");
+                for (i, e) in entries.iter().enumerate() {
+                    if i > 0 {
+                        self.push(", ");
+                    }
+                    self.node(*e, Role::Ty, d)?;
+                }
+                self.push("}");
             }
         }
         Ok(())

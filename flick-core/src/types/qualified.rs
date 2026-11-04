@@ -3,7 +3,7 @@
 
 use super::Checker;
 use super::ty::Type;
-use super::typing::{Constructor, Ref};
+use super::typing::{Constructor, Ref, range};
 use crate::diagnostics::codes;
 use crate::diagnostics::suggest::closest;
 use crate::iface::{Entity, Namespace};
@@ -37,6 +37,9 @@ impl Checker<'_> {
         };
         if lang::is(Lang::RecordLabel, &entity.module, &entity.name) {
             self.record_label(span, ty.clone());
+        }
+        if lang::is(Lang::WireCodec, &entity.module, &entity.name) {
+            self.typing.pending_wire.push((range(span), span));
         }
         self.record_name(span, r);
     }

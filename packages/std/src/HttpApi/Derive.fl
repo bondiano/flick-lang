@@ -29,11 +29,12 @@
 /// `PureCodec Json` of it, else by the JSON codec of its schema.
 module HttpApi.Derive exposing (..)
 
-import HttpApi exposing (ErrorCases, Request, Security, error_case)
+import HttpApi exposing (Endpoint, ErrorCases, Request, Security, error_case, with_success)
 
 /// What `deriving HttpApi` makes of a record: its companions `api` and
-/// `endpoints`.
-type HttpApi a
+/// `endpoints`, which std's plugin writes with the functions below.
+@derive std
+class HttpApi a
 
 /// An endpoint at `path` of a record that derives `HttpApi`; `Post`,
 /// `Put`, `Patch` and `Delete` are the other methods.
@@ -71,6 +72,11 @@ let problem_case cases =
 /// What a group serves for an endpoint.
 type alias Handler p q h b (r : ServiceRow) (e : ErrorRow) s = Request p q h b ->{r; e} s
 
+/// What a group serves for an `Authed` or `MaybeAuthed` endpoint: its
+/// handler also gets the service `a` the group's check makes.
+type alias Guarded p q h b (a : ServiceRow) (r : ServiceRow) (e : ErrorRow) s =
+  Request p q h b ->{a + r; e} s
+
 /// A group with `Authed` or `MaybeAuthed` endpoints, `g`, given the security
 /// scheme, the service `a` they get and how a request with the headers `h`
 /// makes it, failing with the errors `e` every such endpoint declares.
@@ -80,3 +86,75 @@ type alias Secured (a : ServiceRow) (r : ServiceRow) h (e : ErrorRow) g =
     Handler Unit Unit h Unit r e (ServiceImpl a) ->
     Handler Unit Unit h Unit r e (ServiceImpl a) ->
     g
+
+@lang wire_codec
+/// The codec of a part or the success of a derived endpoint, written
+/// `(wire_codec : PureCodec Json T)`: the compiler puts in its place the
+/// value named after `T` in snake case in `T`'s module when that is a
+/// `PureCodec Json T`, else `T.json` of a refined type or `String.json` of
+/// a type of the Prelude, else the JSON codec of `T`'s schema.
+wire_codec : PureCodec Json t
+// never run: each use is one of the codecs above
+let wire_codec = Codec.json (Schema.recursive "wire_codec" (fun itself -> itself))
+
+@lang path_params
+/// The `:name` parameters of the path `path` are the fields of the record
+/// `p`, or there are none and `p` is no record: the compiler knows.
+class PathParams (path : Symbol) p
+
+/// The endpoint `method` serves at `path` as `label`, its parts, success
+/// and errors added by `parts`; the `:name` parameters of the path are the
+/// fields of its `path` part. The path is a string, or a route type's
+/// constructor: `Profiles Username None` is `"/profiles/:username"`.
+at :
+  PathParams path p =>
+  HttpApi.Method ->
+  Record.Label path ->
+  Record.Label l ->
+  (Endpoint l (Request Unit Unit Unit Unit ->{r; none} Unit) ->
+    Endpoint l (Request p q h b ->{r; e} s)) ->
+  Endpoint l (Request p q h b ->{r; e} s)
+let at method path label parts = parts (HttpApi.endpoint method (path_text path) label)
+
+/// The path a label stands for.
+path_text : Record.Label path -> String
+foreign pure path_text from "@flick-lang/runtime" "identity"
+
+/// The success `s2`, sent with 200.
+ok :
+  PureCodec Json s2 ->
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e} s2)
+let ok success endpoint = with_success 200 success endpoint
+
+/// The success `s2`, sent with 201.
+created :
+  PureCodec Json s2 ->
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e} s2)
+let created success endpoint = with_success 201 success endpoint
+
+/// The request with only its headers, which is what a group's check reads.
+headers_of : Request p q h b -> Request Unit Unit h Unit
+let headers_of request = { path = (); query = (); headers = request.headers; payload = () }
+
+/// `HttpApi.with_auth` with a check of the headers, failing with errors the
+/// endpoint declares.
+with_header_auth :
+  Security ->
+  ServiceTag a ->
+  Handler Unit Unit h Unit r e (ServiceImpl a) ->
+  Endpoint l (Request p q h b ->{a + r; e} s) ->
+  Endpoint l (Request p q h b ->{a + r; e} s)
+let with_header_auth security tag check endpoint =
+  HttpApi.with_auth security tag (fun request -> check (headers_of request)) endpoint
+
+/// `HttpApi.with_optional_auth` with a check of the headers.
+with_optional_header_auth :
+  Security ->
+  ServiceTag a ->
+  Handler Unit Unit h Unit r e (ServiceImpl a) ->
+  Endpoint l (Request p q h b ->{a + r; e} s) ->
+  Endpoint l (Request p q h b ->{a + r; e} s)
+let with_optional_header_auth security tag check endpoint =
+  HttpApi.with_optional_auth security tag (fun request -> check (headers_of request)) endpoint
