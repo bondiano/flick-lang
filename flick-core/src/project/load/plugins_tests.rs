@@ -409,3 +409,18 @@ fn a_head_gives_its_arguments_to_the_plugin() {
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found[0].contains("`\"no\"`"), "{found:?}");
 }
+
+#[test]
+fn a_plugin_reports_under_its_own_codes() {
+    let coded = |code: &str| {
+        report(&format!(
+            "module App.Main exposing (x)\n\nimport Pairs exposing (plugin coded)\n\nlet x = coded {{ {code} }}\n"
+        ))
+    };
+    assert_eq!(coded("X001"), ["pairs/X001 ` X001 `: refused"]);
+    // a code of another shape is no code of the plugin's
+    assert_eq!(
+        coded("FLICK-P001"),
+        ["FLICK-P036 ` FLICK-P001 `: plugin `pairs`: refused"]
+    );
+}

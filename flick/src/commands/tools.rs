@@ -11,9 +11,13 @@ use flick_core::source::SourceMap;
 use crate::args::{ExplainArguments, GlobalArguments};
 use crate::command::Outcome;
 use crate::sources::FsHost;
+use crate::stdlib;
 use crate::toolchain::{self, COMPILER, EFFECT, NODE, PNPM, RUNTIME};
 
 pub fn explain(options: &ExplainArguments) -> Outcome {
+    if let Some((package, code)) = options.code.trim().split_once('/') {
+        return explain_plugin(package, code, &options.code);
+    }
     let wanted = options.code.trim().to_uppercase();
     let wanted = if wanted.starts_with("FLICK-") {
         wanted
@@ -33,6 +37,35 @@ pub fn explain(options: &ExplainArguments) -> Outcome {
                 format!("`{}` is not a diagnostic code of Flick", options.code),
             )],
         },
+    }
+}
+
+/// `flick explain <package>/<code>`: the text of a code of a package's
+/// plugin, in its `explain/<code>.md`.
+fn explain_plugin(package: &str, code: &str, written: &str) -> Outcome {
+    let code = code.to_uppercase();
+    let unknown = |why: String| Outcome {
+        sources: SourceMap::default(),
+        diagnostics: vec![Diagnostic::new(
+            codes::P018,
+            Severity::Error,
+            format!("`{written}` is not a diagnostic code of a plugin: {why}"),
+        )],
+    };
+    // the code names a file: only the shape a plugin's codes have
+    if codes::plugin(package, &code).is_none() {
+        return unknown("a code is capital letters and three digits".to_owned());
+    }
+    let dir = match stdlib::package_dir(package, None) {
+        Ok(dir) => dir,
+        Err(why) => return unknown(why),
+    };
+    match fs::read_to_string(dir.join("explain").join(format!("{code}.md"))) {
+        Ok(text) => {
+            println!("{package}/{code}\n\n{}", text.trim_end());
+            Outcome::default()
+        }
+        Err(_) => unknown(format!("`{package}` explains no `{code}`")),
     }
 }
 

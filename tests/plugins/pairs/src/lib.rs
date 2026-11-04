@@ -3,7 +3,8 @@
 //! number of `pairs` blocks of the group, which `collect` counts; each
 //! argument of the head, as in `pairs "a" (1 + 2) { … }`, adds a field
 //! `arg0`, `arg1`, … of its value. `bad {}`
-//! stands for `(1.0 : String)`, an error in generated code. `spin {}` never
+//! stands for `(1.0 : String)`, an error in generated code; `coded { X001 }`
+//! refuses with the code its body names. `spin {}` never
 //! ends and `hog {}` takes all memory: the limits of a plugin's calls.
 
 use std::hint::black_box;
@@ -47,6 +48,10 @@ impl Plugin for Pairs {
                 }
             }
             _ => {}
+        }
+        if block.head == "coded" {
+            let code = block.text.trim();
+            return Err(vec![Diagnostic::error("refused", whole).with_code(code)]);
         }
         if block.head == "bad" {
             let one = b.expr(Expr::Number(1.0));

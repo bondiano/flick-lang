@@ -323,14 +323,18 @@ fn failure(found: &Found, package: &str, what: &str) -> Diagnostic {
     )
 }
 
-/// `P036` for what the plugin `package` found wrong, at a span of the body
-/// that starts at `start`.
+/// What the plugin `package` found wrong, at a span of the block whose frame
+/// starts at `start`: under the plugin's own code, or `P036` without one.
 fn refusal(file: FileId, start: u32, package: &str, d: &flick_plugin::Diagnostic) -> Diagnostic {
-    Diagnostic::error(
-        codes::P036,
-        format!("plugin `{package}`: {}", d.message),
-        Span::new(file, start + d.span.start, start + d.span.end),
-    )
+    let span = Span::new(file, start + d.span.start, start + d.span.end);
+    match (d.code.as_deref()).and_then(|code| codes::plugin(package, code)) {
+        Some(code) => Diagnostic::error(code, d.message.clone(), span),
+        None => Diagnostic::error(
+            codes::P036,
+            format!("plugin `{package}`: {}", d.message),
+            span,
+        ),
+    }
 }
 
 impl Loader<'_> {
