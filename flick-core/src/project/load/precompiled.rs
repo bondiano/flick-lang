@@ -120,10 +120,17 @@ impl Precompiled {
     #[cfg(feature = "native-project")]
     /// What to save after a clean run: for each package with a module the
     /// run compiled from source, its saved modules and those.
-    pub(super) fn fresh(&self, compiled: &[Compiled], sources: &SourceMap) -> Vec<Fresh> {
+    pub(super) fn fresh(
+        &self,
+        compiled: &[Compiled],
+        sources: &SourceMap,
+        expanded: &[&str],
+    ) -> Vec<Fresh> {
         let mut by_package: BTreeMap<&str, BTreeMap<String, CachedModule>> = BTreeMap::new();
         for c in compiled {
-            let Some(package) = c.package.as_deref() else {
+            // shortcut: a package with plugin blocks is checked each time; its
+            // key would also need its plugin, not only its sources
+            let Some(package) = c.package.as_deref().filter(|p| !expanded.contains(p)) else {
                 continue;
             };
             let Some((_, dir)) = self.packages.get(package) else {
@@ -302,7 +309,14 @@ impl Loader<'_> {
         #[cfg(feature = "native-project")]
         {
             let fresh = if save {
-                self.precompiled.fresh(compiled, self.sources)
+                let expanded: Vec<&str> = (self.modules.iter())
+                    .filter(|m| m.expansion.is_some())
+                    .filter_map(|m| match &m.root {
+                        super::Root::Package(name) => Some(name.as_str()),
+                        _ => None,
+                    })
+                    .collect();
+                self.precompiled.fresh(compiled, self.sources, &expanded)
             } else {
                 Vec::new()
             };

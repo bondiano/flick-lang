@@ -18,6 +18,7 @@ pub mod store;
 pub mod workspace;
 
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
 pub use config::Config;
 #[cfg(all(test, feature = "build-artifacts"))]
@@ -37,6 +38,7 @@ mod tests;
 
 #[cfg(feature = "native-project")]
 use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::plugin::Expander;
 use crate::source::FileId;
 #[cfg(feature = "native-project")]
 use crate::source::SourceMap;
@@ -49,6 +51,11 @@ pub trait Host {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
     /// The path as diagnostics show it.
     fn display(&self, path: &Path) -> String;
+    /// The plugin of the package `package`, which a module imports, or why
+    /// there is none.
+    fn plugin(&self, package: &str) -> Result<Arc<dyn Expander>, String> {
+        Err(format!("no dependency provides plugin \"{package}\""))
+    }
 }
 
 #[derive(Debug)]

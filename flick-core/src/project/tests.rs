@@ -108,7 +108,9 @@ fn a_plugin_that_does_not_load_is_reported_on_its_import() {
     let found = report(&host, &mut sources, Some(&project), &["src/App/Main.fl"]);
     assert_eq!(
         found,
-        ["FLICK-P035 src/App/Main.fl `\"pairs\"`: plugin \"pairs\" cannot be loaded"]
+        [
+            "FLICK-P035 src/App/Main.fl `\"pairs\"`: plugin \"pairs\" cannot be loaded: no dependency provides plugin \"pairs\""
+        ]
     );
 }
 

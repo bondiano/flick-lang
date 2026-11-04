@@ -296,6 +296,7 @@ codes! {
     P033 = Project 33, "package needs another version of Flick";
     P034 = Project 34, "dependency is not installed";
     P035 = Project 35, "plugin cannot be loaded";
+    P036 = Project 36, "plugin gave no code for a block";
 }
 
 #[cfg(test)]

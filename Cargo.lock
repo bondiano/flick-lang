@@ -342,6 +342,7 @@ dependencies = [
  "annotate-snippets",
  "flick-plugin",
  "flick-pretty",
+ "flick-test-pairs",
  "insta",
  "semver",
  "serde",
@@ -373,6 +374,13 @@ version = "0.1.0"
 dependencies = [
  "typed-arena",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "flick-test-pairs"
+version = "0.1.0"
+dependencies = [
+ "flick-plugin",
 ]
 
 [[package]]

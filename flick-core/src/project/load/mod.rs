@@ -15,6 +15,8 @@ mod entry;
 #[cfg(feature = "ide")]
 mod ide;
 mod plugins;
+#[cfg(test)]
+mod plugins_tests;
 mod precompiled;
 mod runner;
 mod target;
@@ -33,6 +35,7 @@ use super::packages::Packages;
 use super::{Host, Project, module_name, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::ir;
+use crate::plugin::expansion::Expansion;
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
 use crate::syntax::{self, Parse};
@@ -58,6 +61,8 @@ struct Loaded {
     syntax: ModuleSyntax,
     /// From the header, else from the path; empty for neither.
     name: String,
+    /// The module with its plugin blocks expanded, when it has any.
+    expansion: Option<Expansion>,
 }
 
 /// How far a run goes past checking.
@@ -232,7 +237,7 @@ fn run(
     }
     let edges = loader.load_imports();
     loader.import_cycles(&edges);
-    loader.plugins();
+    loader.expand_plugins();
     if let Some(lowered) = &mut loader.lowered {
         lowered.resize_with(loader.modules.len(), || None);
     }
@@ -432,6 +437,7 @@ impl Loader<'_> {
             parse,
             syntax,
             name,
+            expansion: None,
         });
         Ok(Some(index))
     }
