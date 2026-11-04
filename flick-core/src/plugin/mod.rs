@@ -3,6 +3,7 @@
 //! rendered as text after the module's own, parsed and spliced in place of
 //! the block, the user's code inside keeping its own place in the file.
 
+pub mod derive;
 pub mod expansion;
 pub mod first_party;
 pub mod render;
@@ -12,7 +13,9 @@ pub mod testing;
 
 use std::sync::Arc;
 
-use flick_plugin::{Arena, Block, Completion, Diagnostic, Highlight, Hover, Piece, Plugin};
+use flick_plugin::{
+    Arena, Block, Completion, DeriveTarget, Diagnostic, Highlight, Hover, Piece, Plugin,
+};
 
 use source::BlockSource;
 
@@ -53,6 +56,24 @@ pub trait Expander: Send + Sync {
     fn format(&self, block: &Block, state: &[u8], source: &mut BlockSource) -> Option<Vec<Piece>> {
         let _ = (block, state, source);
         None
+    }
+    /// The instance of `class` for `target` as declarations; `source`, the
+    /// target's declaration, parses the holes the plugin asks for.
+    fn derive(
+        &self,
+        target: &DeriveTarget,
+        class: &str,
+        args: Option<&Block>,
+        module: &[DeriveTarget],
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Result<Arena, Failure> {
+        let _ = (args, module, state, source);
+        let message = format!("`{class}` has no derive in this plugin");
+        Err(Failure::Refused(vec![Diagnostic::error(
+            message,
+            target.decl.whole(),
+        )]))
     }
 }
 
@@ -148,6 +169,20 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
 
     fn format(&self, block: &Block, state: &[u8], source: &mut BlockSource) -> Option<Vec<Piece>> {
         self.plugin.format(block, state, source)
+    }
+
+    fn derive(
+        &self,
+        target: &DeriveTarget,
+        class: &str,
+        args: Option<&Block>,
+        module: &[DeriveTarget],
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Result<Arena, Failure> {
+        (self.plugin)
+            .derive(target, class, args, module, state, source)
+            .map_err(Failure::Refused)
     }
 }
 

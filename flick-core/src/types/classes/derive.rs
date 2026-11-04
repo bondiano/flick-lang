@@ -1,17 +1,15 @@
 //! `deriving Eq, Ord, Hash, Show`: an instance over the fields of every
 //! constructor, requiring the class of each type parameter. `Hash` and `Ord`
 //! are derived only together with `Eq`, so all of them use the same fields.
-//! `deriving Cli.Value` parses a choice among nullary constructors, or the
-//! base of a refined type through its predicate.
+//! A class marked `@derive` is derived by its plugin, before checking.
 
 use std::ptr;
 
 use super::declare::Declared;
 use super::solve::Outcome;
-use super::{CLI, Dict, STRUCTURAL, has_metas, which};
+use super::{Dict, STRUCTURAL, has_metas, which};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::iface::{Entity, Namespace};
-use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
@@ -64,9 +62,6 @@ impl<'n> Checker<'_> {
             .collect();
         let mut out = Vec::new();
         for (class_module, class) in classes {
-            if class_module == CLI && !self.cli_value_derivable(decl, &name, &def.form, span) {
-                continue;
-            }
             if which(&[Lang::Hash, Lang::Ord], &class_module, &class).is_some() && !has_eq {
                 self.error(
                     codes::C013,
@@ -175,16 +170,13 @@ impl<'n> Checker<'_> {
                     .insert((token.start, token.end), named);
             }
             match found {
+                // its plugin derived the instance, written after the declaration
+                Some((_, def)) if matches!(def.form, Form::Class { derive: true, .. }) => {}
                 Some((module, def))
                     if matches!(def.form, Form::Class { .. })
                         && which(&STRUCTURAL, &module, last).is_some() =>
                 {
                     out.push((module, (*last).to_owned()));
-                }
-                Some((module, def))
-                    if module == CLI && *last == "Value" && matches!(def.form, Form::Class { .. }) =>
-                {
-                    out.push((CLI.to_owned(), "Value".to_owned()));
                 }
                 // witnesses, not classes: see `types::schemas`
                 Some((module, _))
@@ -195,32 +187,12 @@ impl<'n> Checker<'_> {
                     codes::C013,
                     self.span(clause),
                     format!(
-                        "`{last}` cannot be derived: deriving covers `Eq`, `Ord`, `Hash`, `Show` and `Cli.Value`"
+                        "the class `{last}` has no derive: deriving covers `Eq`, `Ord`, `Hash`, `Show` and the classes marked `@derive`"
                     ),
                 ),
             }
         }
         out
-    }
-
-    /// `Cli.Value` is derived for constructors without fields, a choice
-    /// among their names, or for a refined type, whose base parses.
-    fn cli_value_derivable(&mut self, decl: &Node, name: &str, form: &Form, span: Span) -> bool {
-        let ok = match form {
-            Form::Adt { constructors, .. } => constructors
-                .iter()
-                .all(|c| self.constructor_fields(c).is_empty()),
-            Form::Nominal => decl.has_token(K::RefinedKw),
-            _ => false,
-        };
-        if !ok {
-            self.error(
-                codes::C013,
-                span,
-                format!("cannot derive `Cli.Value` for `{name}`: it is derived for a choice among constructors without fields, or for a refined type"),
-            );
-        }
-        ok
     }
 
     /// The field types of a constructor of this module, over the type's parameters.

@@ -83,7 +83,7 @@ pub use builtins::{
     StdPackage, builtin_sources, builtins, check_each, has_std, install_builtins, is_std_module,
     set_std, std_go_bindings,
 };
-pub use classes::{CLI, Dict, STRUCTURAL, which};
+pub use classes::{Dict, STRUCTURAL, which};
 #[cfg(feature = "ide")]
 pub(crate) use classes::{Match, match_type};
 pub use component::{instance_key as component_instance, parts as component_parts};
@@ -120,6 +120,7 @@ use unify::Store;
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::iface::Interface;
 use crate::numeric::Num;
+use crate::plugin::derive::{Derived, derived_classes};
 use crate::resolve::Module;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
@@ -276,6 +277,7 @@ fn run_in(
         file: module.file,
         text: module.text,
         generated: module.generated,
+        derived: derived_classes(module.tree, module.text),
         env,
         store: Store::default(),
         kinds: KindStore::default(),
@@ -434,6 +436,8 @@ struct Checker<'a> {
     text: &'a str,
     /// Where generated code starts in `text`.
     generated: u32,
+    /// The classes the module marks `@derive`.
+    derived: Vec<Derived>,
     env: Env<'a>,
     store: Store,
     kinds: KindStore,

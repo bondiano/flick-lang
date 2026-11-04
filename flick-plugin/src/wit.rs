@@ -119,6 +119,36 @@ macro_rules! wit_conversions {
                 }
             }
 
+            pub fn to_target(t: &$crate::DeriveTarget) -> w::DeriveTarget {
+                w::DeriveTarget {
+                    decl: to_block(&t.decl),
+                    name: t.name.clone(),
+                    params: t.params.clone(),
+                    cases: t.cases.iter().map(|c| w::CaseTarget {
+                        name: c.name.clone(),
+                        fields: c.fields.iter().copied().map(to_span).collect(),
+                    }).collect(),
+                    alias: t.alias.map(to_span),
+                    refined: t.refined.map(to_span),
+                    local: t.local,
+                }
+            }
+
+            pub fn from_target(t: w::DeriveTarget) -> $crate::DeriveTarget {
+                $crate::DeriveTarget {
+                    decl: from_block(t.decl),
+                    name: t.name,
+                    params: t.params,
+                    cases: t.cases.into_iter().map(|c| $crate::CaseTarget {
+                        name: c.name,
+                        fields: c.fields.into_iter().map(from_span).collect(),
+                    }).collect(),
+                    alias: t.alias.map(from_span),
+                    refined: t.refined.map(from_span),
+                    local: t.local,
+                }
+            }
+
             pub fn to_piece(p: $crate::Piece) -> w::Piece {
                 match p {
                     $crate::Piece::Text(t) => w::Piece::Text(t),

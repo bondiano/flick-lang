@@ -1,10 +1,9 @@
 // The data ABI of compiled Flick code on Effect: Option and Result are
 // native Effect values; everything else is the data of `core/data.ts`,
 // which compiled code without Effect uses alone.
-import { Effect, Equal, Hash, Option, Result } from "effect";
+import { Equal, Hash, Option, Result } from "effect";
 
-import { type Dict, type FieldDict, copyThrough, derive as deriveData } from "./core/data.ts";
-import { item } from "./internal.ts";
+import { copyThrough, derive as deriveData } from "./core/data.ts";
 
 export {
   type Data,
@@ -36,49 +35,8 @@ export const equals = (a: unknown, b: unknown): boolean => Equal.equals(a, b);
 
 export const hash = (a: unknown): number => Hash.hash(a);
 
-/** `GreenLight` on the command line: `green-light`. */
-const kebab = (name: string): string => name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
-
-type ConstructorInfo = readonly [tag: string, name: string, arity: number, rep?: string];
-
-/** The parser of a field of `Cli.Value`. */
-const parseOf = (d: FieldDict) => (text: string) =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Cli.Value` dictionaries are made on Effect
-  d.parse(text) as Effect.Effect<Result.Result<unknown, string>>;
-
-/**
- * A derived instance of class `name`, as `core/data.ts` derives it; `Cli.Value`
- * of a refined type also gets its predicate and its name.
- */
-export const derive = (
-  name: string,
-  fields: () => ReadonlyArray<FieldDict>,
-  constructors: ReadonlyArray<ConstructorInfo> | null,
-  supers: object | null,
-  check?: (value: unknown) => boolean,
-  typeName?: string,
-): Dict => {
-  if (name !== "Value") return deriveData(name, fields, constructors, supers);
-  let cache: ReadonlyArray<FieldDict> | undefined;
-  const dict = (k: number): FieldDict => item((cache ??= fields()), k);
-  const self: Dict = {};
-  Object.setPrototypeOf(self, supers);
-  self.parse = (text: string): Effect.Effect<Result.Result<unknown, string>> => {
-    if (constructors === null) {
-      return Effect.map(parseOf(dict(0))(text), (parsed) =>
-        Result.isSuccess(parsed) && check !== undefined && !check(parsed.success)
-          ? Result.fail(`not a valid ${typeName ?? "value"}: ${text}`)
-          : parsed,
-      );
-    }
-    const choice = constructors.find((c) => kebab(c[1]) === text);
-    const names = constructors.map((c) => kebab(c[1])).join(", ");
-    return Effect.succeed(
-      choice === undefined ? Result.fail(`expected one of ${names}, got ${text}`) : Result.succeed({ _tag: choice[0] }),
-    );
-  };
-  return self;
-};
+/** A derived instance of class `name`, as `core/data.ts` derives it. */
+export const derive = deriveData;
 
 /** `nullable`: `null` and `undefined` are `None`. */
 export const fromNullable = <A>(value: A | null | undefined): Option.Option<A> =>

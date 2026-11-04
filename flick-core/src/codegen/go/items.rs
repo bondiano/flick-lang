@@ -11,16 +11,12 @@ use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::source::Span;
-use crate::types::{CLI, STRUCTURAL, which};
 use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
-
-/// The classes besides the structural ones whose instances the runtime
-/// derives.
-const DERIVED: &[(&str, &str)] = &[(CLI, "Value")];
+use crate::types::{STRUCTURAL, which};
 
 /// Whether the runtime derives the instances of `module.class`.
 fn derives(module: &str, class: &str) -> bool {
-    which(&STRUCTURAL, module, class).is_some() || DERIVED.contains(&(module, class))
+    which(&STRUCTURAL, module, class).is_some()
 }
 
 /// The declarations of a module, each with whether it holds a `//line`

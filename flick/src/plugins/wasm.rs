@@ -285,6 +285,31 @@ impl Expander for Wasm {
         )
     }
 
+    fn derive(
+        &self,
+        target: &flick_plugin::DeriveTarget,
+        class: &str,
+        args: Option<&flick_plugin::Block>,
+        module: &[flick_plugin::DeriveTarget],
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Result<flick_plugin::Arena, Failure> {
+        let target = convert::to_target(target);
+        let args = args.map(convert::to_block);
+        let module: Vec<_> = module.iter().map(convert::to_target).collect();
+        let (result, back) = self.run(mem::take(source), |plugin, store| {
+            plugin.call_derive(store, &target, class, args.as_ref(), &module, state)
+        });
+        *source = back;
+        match result {
+            Ok(Ok(arena)) => Ok(convert::from_arena(arena)),
+            Ok(Err(found)) => Err(Failure::Refused(
+                found.into_iter().map(convert::from_diagnostic).collect(),
+            )),
+            Err(why) => Err(Failure::Broken(why)),
+        }
+    }
+
     fn format(
         &self,
         block: &flick_plugin::Block,

@@ -35,6 +35,9 @@ pub struct BlockSource {
     docs: String,
     /// The heads the module imports, which start blocks in the holes.
     heads: Arc<[String]>,
+    /// A declaration of another module, read by a derive: no span of it is
+    /// a place of this module.
+    foreign: bool,
     /// What parsing the holes the plugin asked for reported.
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -80,6 +83,7 @@ impl BlockSource {
         Some(BlockSource {
             docs,
             heads,
+            foreign: false,
             head: head.text(&text).to_owned(),
             text,
             file,
@@ -91,6 +95,39 @@ impl BlockSource {
             tokens,
             diagnostics: Vec::new(),
         })
+    }
+
+    /// The declaration `node` as the block a derive reads: its whole text, a
+    /// declaration of the module whose holes are its types. A declaration
+    /// of another module, `holes` false, has none.
+    pub fn declaration(
+        text: Arc<str>,
+        file: FileId,
+        node: &Node,
+        heads: Arc<[String]>,
+        holes: bool,
+    ) -> Self {
+        let (start, end) = node.range();
+        BlockSource {
+            docs: docs_above(&text, start),
+            head: String::new(),
+            file,
+            start,
+            end,
+            body: end - start,
+            closed: true,
+            place: Place::Declaration,
+            tokens: if holes { node.tokens() } else { Vec::new() },
+            diagnostics: Vec::new(),
+            heads,
+            foreign: !holes,
+            text,
+        }
+    }
+
+    /// Whether this is a declaration of another module.
+    pub fn foreign(&self) -> bool {
+        self.foreign
     }
 
     /// The block `node` inside the user's code of this one.
@@ -256,7 +293,7 @@ impl Compiler for BlockSource {
     }
 }
 
-fn token_kind(kind: K) -> TokenKind {
+pub(crate) fn token_kind(kind: K) -> TokenKind {
     match kind {
         K::Ident => TokenKind::Ident,
         K::Con => TokenKind::Con,

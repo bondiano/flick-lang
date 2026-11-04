@@ -261,16 +261,8 @@ impl Gen<'_> {
             let entries: Vec<String> = supers.iter().map(|e| format!("{e},")).collect();
             format!("{{\n{}}}", indent(&entries))
         };
-        // `Cli.Value` of a refined type parses the base, then checks the predicate
-        let refined = match (class.as_str(), constructors.as_str()) {
-            ("Value", "null") => {
-                let ty = info.name.rsplit(' ').next().unwrap_or_default();
-                format!(", {}, {}", companion_name(ty, "check"), names::string(ty))
-            }
-            _ => String::new(),
-        };
         format!(
-            "{derive}({}, () => [{}], {constructors}, {supers}{refined})",
+            "{derive}({}, () => [{}], {constructors}, {supers})",
             names::string(class),
             fields.join(", ")
         )

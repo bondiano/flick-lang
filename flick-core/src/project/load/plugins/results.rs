@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use flick_plugin::{Arena, Block, Place, VERSION};
+use flick_plugin::{Arena, Block, DeriveTarget, Place, VERSION};
 
 use crate::plugin::source::BlockSource;
 use crate::plugin::{Expander, Failure};
@@ -84,6 +84,42 @@ impl Results<'_> {
             return Ok(arena);
         }
         let arena = plugin.expand(block, state, source)?;
+        if source.diagnostics.is_empty()
+            && let Ok(value) = serde_json::to_vec(&arena)
+        {
+            self.put(key, value);
+        }
+        Ok(arena)
+    }
+}
+
+impl Results<'_> {
+    /// The instance `plugin` derives of `class` for `target`, keyed as an
+    /// expansion is, by everything the call reads.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn derive(
+        &mut self,
+        plugin: &dyn Expander,
+        target: &DeriveTarget,
+        class: &str,
+        args: Option<&Block>,
+        module: &[DeriveTarget],
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Result<Arena, Failure> {
+        let summary = serde_json::to_vec(&(target, args, module)).unwrap_or_default();
+        let key = key([
+            b"derive".as_slice(),
+            VERSION.as_bytes(),
+            plugin.id().as_bytes(),
+            class.as_bytes(),
+            &summary,
+            state,
+        ]);
+        if let Some(arena) = self.get(&key).and_then(|v| serde_json::from_slice(&v).ok()) {
+            return Ok(arena);
+        }
+        let arena = plugin.derive(target, class, args, module, state, source)?;
         if source.diagnostics.is_empty()
             && let Ok(value) = serde_json::to_vec(&arena)
         {

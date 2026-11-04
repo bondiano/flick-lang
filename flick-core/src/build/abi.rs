@@ -89,7 +89,6 @@ fn derived_method(class: &str) -> &'static str {
         "Eq" => "eq",
         "Ord" => "compare",
         "Hash" => "hash",
-        "Value" => "parse",
         _ => "show",
     }
 }

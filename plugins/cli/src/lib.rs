@@ -6,13 +6,14 @@
 //! shape of the command.
 
 mod code;
+mod derive;
 mod editor;
 mod layout;
 mod read;
 mod shape;
 
 use flick_plugin::{
-    Arena, Block, Compiler, Completion, Diagnostic, Highlight, Hover, Piece, Plugin,
+    Arena, Block, Compiler, Completion, DeriveTarget, Diagnostic, Highlight, Hover, Piece, Plugin,
 };
 
 pub struct Cli;
@@ -52,6 +53,18 @@ impl Plugin for Cli {
     fn format(&self, block: &Block, _: &[u8], compiler: &mut dyn Compiler) -> Option<Vec<Piece>> {
         layout::format(block, compiler)
     }
+
+    fn derive(
+        &self,
+        target: &DeriveTarget,
+        class: &str,
+        _: Option<&Block>,
+        _: &[DeriveTarget],
+        _: &[u8],
+        _: &mut dyn Compiler,
+    ) -> Result<Arena, Vec<Diagnostic>> {
+        derive::derive(target, class)
+    }
 }
 
 #[cfg(test)]
@@ -60,9 +73,10 @@ mod tests {
 
     use crate::read::MALFORMED;
 
-    /// Every code the plugin reports, as `shape` and `read` give them.
-    const CODES: [&str; 8] = [
-        "L001", "L002", "L003", "L004", "L005", "L006", "L007", "L009",
+    /// Every code the plugin reports, as `shape`, `read` and `derive` give
+    /// them.
+    const CODES: [&str; 9] = [
+        "L001", "L002", "L003", "L004", "L005", "L006", "L007", "L009", "L010",
     ];
 
     #[test]
@@ -73,9 +87,14 @@ mod tests {
             let path = explain.join(format!("{code}.md"));
             assert!(path.exists(), "no {}", path.display());
         }
-        let sources = [include_str!("shape.rs"), include_str!("read.rs")].concat();
-        for n in 1..=9 {
-            let code = format!("\"L00{n}\"");
+        let sources = [
+            include_str!("shape.rs"),
+            include_str!("read.rs"),
+            include_str!("derive.rs"),
+        ]
+        .concat();
+        for n in 1..=10 {
+            let code = format!("\"L{n:03}\"");
             assert_eq!(
                 sources.contains(&code),
                 CODES.iter().any(|c| format!("\"{c}\"") == code),
