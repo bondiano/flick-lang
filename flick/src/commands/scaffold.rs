@@ -53,7 +53,7 @@ const PLUGIN: [(&str, &str); 6] = [
     ),
     (
         "plugin/Cargo.toml",
-        include_str!("templates/plugin/Cargo.toml"),
+        include_str!("templates/plugin/Cargo.toml.template"),
     ),
     ("plugin/src/lib.rs", include_str!("templates/plugin/lib.rs")),
     ("explain/T001.md", include_str!("templates/plugin/T001.md")),
