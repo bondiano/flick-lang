@@ -31,7 +31,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.6.0";
+pub const VERSION: &str = "0.7.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -161,6 +161,11 @@ pub enum Ty {
     Wildcard,
     /// The user's type at this span of the body.
     Hole(Span),
+    /// `forall a b. body`.
+    Forall {
+        vars: Vec<String>,
+        body: NodeId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -186,12 +191,15 @@ pub struct Case {
 /// A declaration of the module.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Decl {
-    /// `let name params : ty = body`; the parameters are patterns.
+    /// `let [rec] name params : ty = body`; the parameters are patterns, and
+    /// a `rec` one may name itself.
     Let {
         name: String,
         params: Vec<NodeId>,
         ty: Option<NodeId>,
         body: NodeId,
+        #[serde(default)]
+        rec: bool,
     },
     /// `name : ty`.
     Signature { name: String, ty: NodeId },

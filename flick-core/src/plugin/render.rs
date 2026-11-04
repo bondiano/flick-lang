@@ -184,6 +184,19 @@ impl Printer<'_> {
             Ty::Text(text) => self.string(text),
             Ty::Wildcard => self.push("_"),
             Ty::Hole(span) => self.hole(HoleKind::Ty, *span, "Hole")?,
+            Ty::Forall { vars, body } => {
+                if vars.is_empty() {
+                    return Err("a `forall` of no variables".into());
+                }
+                self.push("(forall");
+                for v in vars {
+                    self.push(" ");
+                    self.name(v, Names::Label)?;
+                }
+                self.push(". ");
+                self.node(*body, Role::Ty, d)?;
+                self.push(")");
+            }
         }
         Ok(())
     }

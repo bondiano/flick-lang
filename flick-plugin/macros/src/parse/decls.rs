@@ -71,6 +71,10 @@ impl Parser {
 
     fn let_decl(&mut self) -> Result<Tokens, Error> {
         self.bump();
+        let rec = self.at_word("rec");
+        if rec {
+            self.bump();
+        }
         let name = self.declared()?;
         let mut params = Vec::new();
         while !self.at_punct(':') && !self.at_punct('=') {
@@ -97,7 +101,7 @@ impl Parser {
             let __p = #params;
             let __t = #ty;
             let __e = #body;
-            __b.decl(::flick_plugin::Decl::Let { name: __n, params: __p, ty: __t, body: __e })
+            __b.decl(::flick_plugin::Decl::Let { name: __n, params: __p, ty: __t, body: __e, rec: #rec })
         }))
     }
 

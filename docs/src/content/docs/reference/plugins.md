@@ -134,7 +134,7 @@ and with the span of the block it stands for:
 The compiler checks the arena before it uses it: names must lex as names,
 numbers be finite, holes lie in the body and be used once, and its size and
 depth are bounded. The arena version is the version of the interface,
-`0.6.0`. A component built for another version does not load: the import
+`0.7.0`. A component built for another version does not load: the import
 that exposes its heads is `FLICK-P035`, naming the version it was built for
 and the one the compiler speaks, until it is rebuilt.
 

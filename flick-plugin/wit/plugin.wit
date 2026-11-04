@@ -1,4 +1,4 @@
-package flick:plugin@0.6.0;
+package flick:plugin@0.7.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -64,7 +64,11 @@ interface types {
     /// `_`: the type the checker infers.
     wildcard,
     hole(span),
+    /// `forall a b. body`.
+    forall(forall-ty),
   }
+
+  record forall-ty { vars: list<string>, body: node-id }
 
   variant pat {
     var(string),
@@ -74,7 +78,7 @@ interface types {
     hole(span),
   }
 
-  record let-decl { name: string, params: list<node-id>, ty: option<node-id>, body: node-id }
+  record let-decl { name: string, params: list<node-id>, ty: option<node-id>, body: node-id, %rec: bool }
   record signature { name: string, ty: node-id }
   record alias { name: string, params: list<string>, ty: node-id }
   /// A constructor of a type and the types of its fields.

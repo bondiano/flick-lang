@@ -175,3 +175,14 @@ fn type_starts_a_type_without_an_equals_and_ty_is_a_name() {
         "{made:?}"
     );
 }
+
+#[test]
+fn let_rec_builds_a_recursive_let() {
+    let made = kinds(|b| {
+        flick!(b, let rec go x = go x);
+    });
+    assert!(
+        matches!(made.last(), Some(Kind::Decl(Decl::Let { rec: true, .. }))),
+        "{made:?}"
+    );
+}

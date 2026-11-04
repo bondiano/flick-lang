@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use flick_plugin::{
-    Arena, Builder, Compiler, Expr, Field, HoleKind, Kind, Node as PluginNode, NodeId, Pat, Place,
-    Span, Ty,
+    Arena, Builder, Compiler, Decl, Expr, Field, HoleKind, Kind, Node as PluginNode, NodeId, Pat,
+    Place, Span, Ty,
 };
 
 use super::render::render;
@@ -274,4 +274,29 @@ fn a_splice_keeps_the_block_range_and_the_holes_ranges() {
         .map(|&(_, start, end)| &SRC[start as usize..end as usize])
         .collect();
     assert_eq!(users, ["f", "1", "2", "Int"]);
+}
+
+#[test]
+fn renders_a_recursive_let_and_a_forall() {
+    let mut b = Builder::new(span(0, 10));
+    let item = b.ty(Ty::Name("x".into()));
+    let schema = b.ty(Ty::Name("Schema".into()));
+    let applied = b.ty(Ty::Apply {
+        function: schema,
+        arguments: vec![item],
+    });
+    let forall = b.ty(Ty::Forall {
+        vars: vec!["x".into()],
+        body: applied,
+    });
+    let body = b.expr(Expr::Name("go".into()));
+    let made = b.decl(Decl::Let {
+        name: "go".into(),
+        params: Vec::new(),
+        ty: Some(forall),
+        body,
+        rec: true,
+    });
+    let rendered = render(&b.finish(made), 10, Place::Declaration, &[]).expect("renders");
+    assert_eq!(rendered.text, "let rec go : (forall x. (Schema x)) = go");
 }

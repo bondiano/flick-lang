@@ -233,6 +233,7 @@ macro_rules! wit_conversions {
                                 w::Ty::Apply(w::Apply { function, arguments })
                             }
                             $crate::Ty::Record(f) => w::Ty::Record(to_fields(f)),
+                            $crate::Ty::Forall { vars, body } => w::Ty::Forall(w::ForallTy { vars, body }),
                             $crate::Ty::Function { input, output } => {
                                 w::Ty::Function(w::Arrow { input, output })
                             }
@@ -248,8 +249,8 @@ macro_rules! wit_conversions {
                             $crate::Pat::Hole(s) => w::Pat::Hole(to_span(s)),
                         }),
                         $crate::Kind::Decl(d) => w::Kind::Decl(match d {
-                            $crate::Decl::Let { name, params, ty, body } => {
-                                w::Decl::Let(w::LetDecl { name, params, ty, body })
+                            $crate::Decl::Let { name, params, ty, body, rec } => {
+                                w::Decl::Let(w::LetDecl { name, params, ty, body, rec })
                             }
                             $crate::Decl::Signature { name, ty } => {
                                 w::Decl::Signature(w::Signature { name, ty })
@@ -301,6 +302,7 @@ macro_rules! wit_conversions {
                             w::Ty::Apply(a) => $crate::Ty::Apply { function: a.function, arguments: a.arguments },
                             w::Ty::Record(f) => $crate::Ty::Record(from_fields(f)),
                             w::Ty::Function(a) => $crate::Ty::Function { input: a.input, output: a.output },
+                            w::Ty::Forall(f) => $crate::Ty::Forall { vars: f.vars, body: f.body },
                             w::Ty::Text(s) => $crate::Ty::Text(s),
                             w::Ty::Wildcard => $crate::Ty::Wildcard,
                             w::Ty::Hole(s) => $crate::Ty::Hole(from_span(s)),
@@ -313,7 +315,7 @@ macro_rules! wit_conversions {
                             w::Pat::Hole(s) => $crate::Pat::Hole(from_span(s)),
                         }),
                         w::Kind::Decl(d) => $crate::Kind::Decl(match d {
-                            w::Decl::Let(l) => $crate::Decl::Let { name: l.name, params: l.params, ty: l.ty, body: l.body },
+                            w::Decl::Let(l) => $crate::Decl::Let { name: l.name, params: l.params, ty: l.ty, body: l.body, rec: l.rec },
                             w::Decl::Signature(s) => $crate::Decl::Signature { name: s.name, ty: s.ty },
                             w::Decl::Alias(a) => $crate::Decl::Alias { name: a.name, params: a.params, ty: a.ty },
                             w::Decl::Adt(a) => $crate::Decl::Adt {

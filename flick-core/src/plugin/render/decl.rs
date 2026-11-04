@@ -26,8 +26,9 @@ impl Printer<'_> {
                 params,
                 ty,
                 body,
+                rec,
             } => {
-                self.push("let ");
+                self.push(if *rec { "let rec " } else { "let " });
                 self.value(name)?;
                 for &p in params {
                     self.push(" ");

@@ -46,6 +46,8 @@ break programs.
   moves with its head. A block inside the user's code of another expands in
   a round of its own. Editors highlight the heads of plugins as macros, and
   `cli` is no keyword of the grammars any more.
+- **Plugins, interface `0.7.0`:** `let rec` and `forall` types in a plugin's
+  declarations.
 - **Plugins, interface `0.6.0`:** a class marked `@derive` (or `@derive
   std`) is derived by a plugin: `deriving C { args }` and `deriving instance
   C (M.T a)` call its `derive`, whose declarations follow the type. A class
