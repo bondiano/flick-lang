@@ -9,9 +9,9 @@ permissions:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: |
           check() {
             if [ "v$2" != "$GITHUB_REF_NAME" ]; then
@@ -39,14 +39,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { target: aarch64-apple-darwin, os: macos-14 }
-          - { target: x86_64-apple-darwin, os: macos-14 }
+          - { target: aarch64-apple-darwin, os: macos-15 }
+          - { target: x86_64-apple-darwin, os: macos-15 }
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
           - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
           - { target: x86_64-pc-windows-msvc, os: windows-latest }
           - { target: aarch64-pc-windows-msvc, os: windows-11-arm }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup target add ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
@@ -59,7 +59,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: Compress-Archive -Path target/${{ matrix.target }}/release/flick.exe -DestinationPath flick-${{ matrix.target }}.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
           path: flick-${{ matrix.target }}.*
@@ -67,12 +67,12 @@ jobs:
 
   npm:
     needs: [build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # version comes from `packageManager` in package.json
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24.18.0
           cache: pnpm
@@ -87,11 +87,11 @@ jobs:
 
   release:
     needs: [checks, build, npm]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
       # install.sh and the Homebrew formula verify the archives against these
@@ -102,12 +102,12 @@ jobs:
 
   homebrew:
     needs: [release]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: bondiano/homebrew-tap
           path: tap

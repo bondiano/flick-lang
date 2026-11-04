@@ -7,10 +7,10 @@ on:
 
 jobs:
   fuzz:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       - run: just fuzz 1000000

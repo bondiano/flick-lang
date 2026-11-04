@@ -8,24 +8,24 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # installs the toolchain, components and targets from rust-toolchain.toml
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: runtime-go/go.mod
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       - run: cargo install cargo-machete --version 0.9.2 --locked
       - run: |
           rustup target add wasm32-wasip2
           just zed
           CARGO_TARGET_DIR=target/zed cargo test --manifest-path editors/zed/Cargo.toml --locked
       # version comes from `packageManager` in package.json
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24.18.0
           cache: pnpm
@@ -39,9 +39,9 @@ jobs:
   # core test targets, and hold the dev shell to the versions the repository
   # pins (rust-toolchain.toml and package.json)
   nix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
@@ -72,20 +72,20 @@ jobs:
   # the reference model of λFlick (flick-model) against tests/run/model.txt,
   # and the model properties on generated programs; it needs neither Node nor Go
   model:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       - run: just model
 
   # the Lean 4 mechanization of λFlick in formal/; elan installs the toolchain
   # pinned in formal/lean-toolchain; --wfail turns a `sorry` (a warning) into a failure
   lean:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: formal
@@ -101,15 +101,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-14, windows-latest]
+        os: [ubuntu-26.04, ubuntu-26.04-arm, macos-15, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       # the expected outputs keep their LF line ends on windows
       - run: git config --global core.autocrlf false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: runtime-go/go.mod
       - name: Go runtime
