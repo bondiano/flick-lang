@@ -53,6 +53,32 @@ fn builtin_facade_definition_opens_real_source() {
 }
 
 #[test]
+fn builtin_prelude_opens_without_lang_diagnostics() {
+    let source = "module App.Main exposing (greet)\n\ngreet : String\nlet greet = \"hi\"\n";
+    let dir = project(
+        "lsp_builtin_prelude",
+        &[("flick.toml", LIB), ("src/App/Main.fl", source)],
+    );
+    let main = dir.join("src/App/Main.fl");
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&main), "languageId": "flick", "version": 1, "text": source } }));
+    assert!(lsp.diagnostics(&uri(&main)).is_empty());
+
+    let definition = lsp.request(
+        "textDocument/definition",
+        &json!({ "textDocument": { "uri": uri(&main) }, "position": at(source, "String") }),
+    );
+    let builtin_uri = definition["result"]["uri"].as_str().expect("source URI");
+    assert!(builtin_uri.ends_with("/Prelude.fl"), "{definition}");
+    let path = builtin_uri.strip_prefix("file://").expect("file URI");
+    let builtin_text = fs::read_to_string(path).expect("built-in source");
+    assert!(builtin_text.contains("@lang prelude"));
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": builtin_uri, "languageId": "flick", "version": 1, "text": builtin_text } }));
+    assert_eq!(lsp.diagnostics(builtin_uri), Vec::<Value>::new());
+    lsp.close();
+}
+
+#[test]
 fn sql_completion_and_hover() {
     let source = include_str!("../../../tests/check/pass/sql/balances.fl");
     let dir = project(

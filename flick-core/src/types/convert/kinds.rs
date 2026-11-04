@@ -9,6 +9,13 @@ use crate::types::Checker;
 use crate::types::env::Form;
 use crate::types::kinds::Kind;
 
+/// `a Type`, `an ErrorRow`.
+pub(super) fn with_article(kind: &Kind) -> String {
+    let text = kind.to_string();
+    let vowel = text.starts_with(['A', 'E', 'I', 'O', 'U']);
+    format!("{} {text}", if vowel { "an" } else { "a" })
+}
+
 impl Checker<'_> {
     /// A kind written in a type parameter or a `forall`-free position.
     pub fn kind(&mut self, node: &Node) -> Kind {

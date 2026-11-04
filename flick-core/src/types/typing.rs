@@ -108,6 +108,10 @@ pub struct Typing {
     /// `ignore` and `await` the type of the operand, at `|>` the type after
     /// the stage.
     pub types: HashMap<Range, Type>,
+    #[cfg(feature = "ide")]
+    /// Checked signatures by the range of their type syntax, including
+    /// signatures written on instance methods.
+    pub signature_types: HashMap<Range, Type>,
     /// The type each type name refers to: its module and name.
     pub type_names: HashMap<Range, (String, String)>,
     /// Pending types also feed compiler diagnostics.

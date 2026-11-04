@@ -271,7 +271,7 @@ fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         effects: true,
     };
     let (checked, typing) =
-        types::check_typed(&module, &imported, dependencies, options, &mut interface);
+        types::check_builtin_typed(&module, &imported, dependencies, options, &mut interface);
     diagnostics.extend(checked);
     Snapshot {
         analysis: Analysis {

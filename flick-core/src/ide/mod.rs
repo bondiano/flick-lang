@@ -318,6 +318,9 @@ impl Ide<'_> {
         if let Some(symbol) = instance_member(m, &path, token.start, name) {
             return Some((symbol, at));
         }
+        if let Some(symbol) = service_member(m, &path, token.start, name, text) {
+            return Some((symbol, at));
+        }
         match node.kind {
             K::VarPat => Some((
                 Symbol::Local {
@@ -352,6 +355,28 @@ impl Ide<'_> {
             _ => None,
         }
     }
+}
+
+/// An operation's own name in its service declaration.
+fn service_member(
+    m: &Analyzed,
+    path: &[&Node],
+    start: u32,
+    name: &str,
+    text: &str,
+) -> Option<Symbol> {
+    let i = path.iter().rposition(|n| n.kind == K::Members)?;
+    let decl = path.get(i.checked_sub(1)?)?;
+    let member = path.get(i + 1)?;
+    let own = member.child_tokens().find(|t| t.kind == K::Ident)?;
+    if decl.kind != K::ServiceDecl || member.kind != K::Signature || own.start != start {
+        return None;
+    }
+    Some(Symbol::Operation {
+        module: m.name.clone(),
+        service: tree::name_of(decl, K::Con, text)?.to_owned(),
+        name: name.to_owned(),
+    })
 }
 
 /// A method's own name in an `instance`: at its signature or its `let`.
@@ -400,3 +425,5 @@ mod migration_tests;
 mod pattern_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod variable_hover_tests;

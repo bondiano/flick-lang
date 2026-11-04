@@ -44,21 +44,23 @@ fn documentation(source: &Source, name: &str) -> Option<String> {
         .tree
         .nodes()
         .filter(|n| n.kind == K::ClassDecl)
-        .find_map(|class| {
-            let members = class.nodes().find(|n| n.kind == K::Members)?;
-            let signature = members.nodes().find(|n| {
-                n.kind == K::Signature && tree::name_of(n, K::Ident, &source.text) == Some(name)
-            })?;
-            doc::leading_doc(members, signature, &source.text).or_else(|| {
-                // The first member's leading trivia precedes the Members node.
-                if ptr::eq(members.nodes().next()?, signature) {
-                    doc::leading_doc(class, members, &source.text)
-                } else {
-                    None
-                }
-            })
-        })
+        .find_map(|decl| member_documentation(decl, name, &source.text))
         .or_else(|| doc::comments(&source.text).remove(name))
+}
+
+fn member_documentation(decl: &Node, name: &str, text: &str) -> Option<String> {
+    let members = decl.nodes().find(|n| n.kind == K::Members)?;
+    let signature = members
+        .nodes()
+        .find(|n| n.kind == K::Signature && tree::name_of(n, K::Ident, text) == Some(name))?;
+    doc::leading_doc(members, signature, text).or_else(|| {
+        // The first member's leading trivia precedes the Members node.
+        if ptr::eq(members.nodes().next()?, signature) {
+            doc::leading_doc(decl, members, text)
+        } else {
+            None
+        }
+    })
 }
 
 impl Ide<'_> {
@@ -117,6 +119,30 @@ impl Ide<'_> {
             .map_or_else(String::new, |doc| format!("{doc}\n\n"));
         let _ = write!(note, "from `instance {instance}` in `{module}`");
         Some((format!("{method} : {ty}"), Some(note)))
+    }
+
+    fn operation_hover(
+        &self,
+        module: &str,
+        service: &str,
+        name: &str,
+    ) -> Option<(String, Option<String>)> {
+        let source = self.source(module)?;
+        let decl = source.tree.nodes().find(|d| {
+            d.kind == K::ServiceDecl && tree::name_of(d, K::Con, &source.text) == Some(service)
+        })?;
+        let sig = decl
+            .nodes()
+            .filter(|n| n.kind == K::Members)
+            .flat_map(Node::nodes)
+            .find(|s| tree::name_of(s, K::Ident, &source.text) == Some(name))?;
+        let ty = as_written(sig.nodes().next()?, &source.text);
+        let note = member_documentation(decl, name, &source.text)
+            .map_or_else(String::new, |doc| format!("{doc}\n\n"));
+        Some((
+            format!("{service}.{name} : {ty}"),
+            Some(format!("{note}an operation of `{service}`")),
+        ))
     }
 
     /// A keyword at `offset` that opens an expression: the type of the whole
@@ -422,23 +448,7 @@ impl Ide<'_> {
                 module,
                 service,
                 name,
-            } => {
-                let source = self.source(module)?;
-                let decl = source.tree.nodes().find(|d| {
-                    d.kind == K::ServiceDecl
-                        && tree::name_of(d, K::Con, &source.text) == Some(service.as_str())
-                })?;
-                let sig = decl
-                    .nodes()
-                    .filter(|n| n.kind == K::Members)
-                    .flat_map(Node::nodes)
-                    .find(|s| tree::name_of(s, K::Ident, &source.text) == Some(name.as_str()))?;
-                let ty = as_written(sig.nodes().next()?, &source.text);
-                (
-                    format!("{service}.{name} : {ty}"),
-                    Some(format!("an operation of `{service}`")),
-                )
-            }
+            } => self.operation_hover(module, service, name)?,
             Symbol::InstanceMethod {
                 module,
                 instance,
