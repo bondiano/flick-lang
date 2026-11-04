@@ -6,7 +6,9 @@
 use std::collections::BTreeMap;
 #[cfg(feature = "native-project")]
 use std::collections::HashMap;
+#[cfg(feature = "native-project")]
 use std::hash::{DefaultHasher, Hash, Hasher};
+#[cfg(feature = "native-project")]
 use std::mem;
 use std::path::{Path, PathBuf};
 
@@ -14,7 +16,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{Compiled, Loader, Mode, module_path};
+#[cfg(feature = "native-project")]
 use crate::diagnostics::{Diagnostic, Severity, codes};
+#[cfg(feature = "native-project")]
 use crate::ir;
 #[cfg(feature = "native-project")]
 use crate::project::Project;
@@ -23,6 +27,7 @@ use crate::project::cache::Key;
 #[cfg(feature = "native-project")]
 use crate::project::packages::{Library, Packages};
 use crate::resolve::Interface;
+#[cfg(feature = "native-project")]
 use crate::source::{FileId, SourceMap};
 use crate::types;
 
@@ -112,6 +117,7 @@ impl Precompiled {
         })
     }
 
+    #[cfg(feature = "native-project")]
     /// What to save after a clean run: for each package with a module the
     /// run compiled from source, its saved modules and those.
     pub(super) fn fresh(&self, compiled: &[Compiled], sources: &SourceMap) -> Vec<Fresh> {
@@ -182,6 +188,7 @@ fn key_of(
     Some(key)
 }
 
+#[cfg(feature = "native-project")]
 /// `compiled`, checked from `text`, to save, unless its IR has spans in
 /// another file.
 fn cached(compiled: &Compiled, dir: &Path, text: &str) -> Option<CachedModule> {
@@ -201,6 +208,7 @@ fn cached(compiled: &Compiled, dir: &Path, text: &str) -> Option<CachedModule> {
     })
 }
 
+#[cfg(feature = "native-project")]
 /// The hash of a source text; saved modules are only read by the binary
 /// that saved them, whose hasher does not change.
 fn hash(text: &str) -> u64 {
@@ -209,6 +217,7 @@ fn hash(text: &str) -> u64 {
     hasher.finish()
 }
 
+#[cfg(feature = "native-project")]
 /// Sets the file of every span in `value` to `to`; false when one is not in
 /// `from`.
 fn move_spans(value: &mut Value, from: Option<&Value>, to: &Value) -> bool {
@@ -227,6 +236,7 @@ fn move_spans(value: &mut Value, from: Option<&Value>, to: &Value) -> bool {
     }
 }
 
+#[cfg(feature = "native-project")]
 fn is_span(fields: &serde_json::Map<String, Value>) -> bool {
     fields.len() == 3
         && ["file", "start", "end"]
@@ -276,24 +286,35 @@ impl Loader<'_> {
 
     /// What to save of the modules of source packages in `compiled`, when
     /// `save`; a build also compiles the saved modules it used.
+    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
     pub(super) fn finish_packages(
         &mut self,
         compiled: &mut Vec<Compiled>,
         mode: Mode,
         save: bool,
     ) -> Vec<Fresh> {
-        let fresh = if save {
-            self.precompiled.fresh(compiled, self.sources)
-        } else {
-            Vec::new()
-        };
-        if mode != Mode::Check {
-            let saved = self.saved_compiled();
-            compiled.extend(saved);
+        // without a project of packages nothing is saved: the browser build
+        // carries none of the serialization of the IR
+        #[cfg(not(feature = "native-project"))]
+        let _ = (compiled, mode, save);
+        #[cfg(not(feature = "native-project"))]
+        return Vec::new();
+        #[cfg(feature = "native-project")]
+        {
+            let fresh = if save {
+                self.precompiled.fresh(compiled, self.sources)
+            } else {
+                Vec::new()
+            };
+            if mode != Mode::Check {
+                let saved = self.saved_compiled();
+                compiled.extend(saved);
+            }
+            fresh
         }
-        fresh
     }
 
+    #[cfg(feature = "native-project")]
     /// The saved modules the run used, compiled: each in its file again,
     /// which a source map points into.
     fn saved_compiled(&mut self) -> Vec<Compiled> {
