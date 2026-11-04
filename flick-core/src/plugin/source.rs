@@ -31,6 +31,8 @@ pub struct BlockSource {
     /// The tokens of the arguments and the body, trivia included and `{`
     /// left out, at their places in the text.
     tokens: Vec<Token>,
+    /// The `///` lines right above a declaration.
+    docs: String,
     /// What parsing the holes the plugin asked for reported.
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -69,7 +71,12 @@ impl BlockSource {
         } else {
             Place::Expression
         };
+        let docs = match place {
+            Place::Declaration => docs_above(&text, head.start),
+            Place::Expression => String::new(),
+        };
         Some(BlockSource {
+            docs,
             head: head.text(&text).to_owned(),
             text,
             file,
@@ -147,6 +154,7 @@ impl BlockSource {
             body: self.body,
             place: self.place,
             tokens,
+            docs: self.docs.clone(),
         }
     }
 
@@ -242,4 +250,16 @@ fn token_kind(kind: K) -> TokenKind {
         k if k.is_keyword() => TokenKind::Keyword,
         _ => TokenKind::Punct,
     }
+}
+
+/// The `///` lines right above the line of `offset`, each without `///`
+/// and one space.
+fn docs_above(text: &str, offset: u32) -> String {
+    let line = text[..offset as usize].rfind('\n').map_or(0, |i| i + 1);
+    let mut lines: Vec<&str> = (text[..line].lines().rev())
+        .map_while(|l| l.trim_start().strip_prefix("///"))
+        .map(|d| d.strip_prefix(' ').unwrap_or(d))
+        .collect();
+    lines.reverse();
+    lines.join("\n")
 }

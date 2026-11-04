@@ -31,14 +31,22 @@ pub struct Rendered {
 }
 
 /// `arena` as text, for a block whose body is `body_len` bytes long and that
-/// stands at `place`: an expression, or declarations.
-pub fn render(arena: &Arena, body_len: u32, place: Place) -> Result<Rendered, String> {
+/// stands at `place`: an expression, or declarations. `aliases` are the
+/// modules the file imports only under another name, each with that name:
+/// generated code names a module by its path, which the file may not.
+pub fn render(
+    arena: &Arena,
+    body_len: u32,
+    place: Place,
+    aliases: &[(String, String)],
+) -> Result<Rendered, String> {
     if arena.nodes.len() > MAX_NODES {
         return Err(format!("more than {MAX_NODES} nodes"));
     }
     let mut out = Printer {
         arena,
         body_len,
+        aliases,
         text: String::new(),
         origins: Vec::new(),
         holes: Vec::new(),
@@ -71,6 +79,7 @@ enum Role {
 struct Printer<'a> {
     arena: &'a Arena,
     body_len: u32,
+    aliases: &'a [(String, String)],
     text: String,
     origins: Vec<((u32, u32), Span)>,
     holes: Vec<(u32, Hole)>,
@@ -282,7 +291,22 @@ impl Printer<'_> {
         if !names.accept(name) {
             return Err(format!("`{name}` is not {}", names.describe()));
         }
-        self.push(name);
+        // shortcut: a built-in module hidden by an alias, as `import Other as List`, stays hidden; give generated code its own qualifiers if a plugin needs one
+        let imports = self.aliases;
+        let renamed = (imports.iter())
+            .filter_map(|(module, alias)| {
+                let rest = name.strip_prefix(module.as_str())?.strip_prefix('.')?;
+                Some((module.len(), alias, rest))
+            })
+            .max_by_key(|(len, ..)| *len);
+        match renamed {
+            Some((_, alias, rest)) => {
+                self.push(alias);
+                self.push(".");
+                self.push(rest);
+            }
+            None => self.push(name),
+        }
         Ok(())
     }
 

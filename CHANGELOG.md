@@ -31,6 +31,14 @@ break programs.
   signatures, `type alias`, types and instances), exported and imported like
   the others; the user's patterns and declarations are holes too.
   `flick!` builds declarations, and its type form is now `flick!(b, ty T)`.
+- **Plugins, interface `0.4.0`:** the names of a plugin's code are its own:
+  its locals and the user's do not capture each other, and `Pairs.make`
+  names the module `Pairs` whatever the file calls it. A plugin declares
+  companions such as `Users.table`, exported with their type, and documents
+  what it declares with the `///` lines above its block (`block.docs`,
+  `b.doc`), which hovers, completions and `flick doc` show. Editors go to a
+  generated name at the span its plugin gave it, outline it, and refuse to
+  rename it outside its block.
 - **Breaking:** `cli "name" { … }` is the plugin of `std`: a file that
   writes one imports it, `import Cli exposing (plugin cli)`. Without the
   import the block is `FLICK-P037`, which `flick check --fix` fixes. Its

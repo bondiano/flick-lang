@@ -13,25 +13,40 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, show_type};
 
 /// The `///` comment right above each top-level declaration, and above
-/// each constructor on a line of its own (`| Circle Float`), by name.
+/// each constructor on a line of its own (`| Circle Float`), by name. A
+/// `let` takes the lines only right above it, as generated code writes it.
 pub fn comments(text: &str) -> HashMap<String, String> {
     let mut out = HashMap::new();
     let mut pending: Vec<&str> = Vec::new();
+    let mut adjacent = false;
     for line in text.lines() {
         if let Some(doc) = line.trim_start().strip_prefix("///") {
             pending.push(doc.strip_prefix(' ').unwrap_or(doc));
+            adjacent = true;
             continue;
         }
+        let name = declared(line).or_else(|| variant(line));
         if !pending.is_empty()
-            && let Some(name) = declared(line).or_else(|| variant(line))
+            && let Some(name) = name.or_else(|| adjacent.then(|| defined(line)).flatten())
         {
             out.entry(name).or_insert_with(|| pending.join("\n"));
         }
+        adjacent = false;
         if !line.trim().is_empty() {
             pending.clear();
         }
     }
     out
+}
+
+/// The value a top-level `let [rec] name …` defines.
+fn defined(line: &str) -> Option<String> {
+    let mut words = line.strip_prefix("let ")?.split_whitespace();
+    let name = words
+        .next()
+        .filter(|w| *w != "rec")
+        .or_else(|| words.next())?;
+    Some(name.to_owned())
 }
 
 /// The `///` documentation immediately before the module header.
@@ -271,5 +286,7 @@ mod tests {
         assert_eq!(docs.get("add").map(String::as_str), Some("Adds.\nTwice."));
         assert_eq!(docs.get("User").map(String::as_str), Some("A user."));
         assert!(!docs.contains_key("x"));
+        let docs = comments("/// Made.\nlet rec made = 1\n");
+        assert_eq!(docs.get("made").map(String::as_str), Some("Made."));
     }
 }

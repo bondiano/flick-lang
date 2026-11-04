@@ -168,6 +168,7 @@ pub fn check_each(
             text,
             tree: &parse.tree,
             syntax: &module_syntax,
+            generated: resolve::NO_GENERATED,
         };
         // a facade re-exports the names of the modules before it
         let imported = |m: &str| done.iter().find(|i| i.module == m).cloned();

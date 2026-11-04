@@ -31,7 +31,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.3.0";
+pub const VERSION: &str = "0.4.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -84,6 +84,9 @@ pub struct Block {
     pub body: u32,
     pub place: Place,
     pub tokens: Vec<Token>,
+    /// The `///` lines right above a declaration's head, each without `///`
+    /// and one space, joined by `\n`; empty for an expression.
+    pub docs: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -216,6 +219,8 @@ pub enum Decl {
     Group(Vec<NodeId>),
     /// The user's declaration at this span of the block.
     Hole(Span),
+    /// A declaration with its documentation, lines joined by `\n`.
+    Doc { text: String, decl: NodeId },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

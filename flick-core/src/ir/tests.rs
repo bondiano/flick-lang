@@ -43,6 +43,7 @@ pub(crate) fn check_text_with(
         text,
         tree: &parse.tree,
         syntax: &syntax,
+        generated: resolve::NO_GENERATED,
     };
     let builtin = |name: &str| builtins.iter().find(|i| i.module == name).cloned();
     let (mut interface, mut diagnostics) = resolve::resolve(&module, &builtin);

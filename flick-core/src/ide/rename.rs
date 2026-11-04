@@ -86,6 +86,16 @@ impl Ide<'_> {
                 let Some(module) = self.analysis.module(&e.module) else {
                     return Err(format!("`{}` is declared outside the project", e.name));
                 };
+                if let Some(expansion) = &module.expansion
+                    && let Some(d) = (expansion.declarations().into_iter())
+                        .find(|d| d.namespace == e.namespace && d.name == e.name)
+                {
+                    let plugin = expansion.plugin_at(d.span).unwrap_or("a plugin");
+                    return Err(format!(
+                        "`{}` is declared by plugin `{plugin}`: rename it in its block",
+                        e.name.replace('$', ".")
+                    ));
+                }
                 // instances and calls name a method through the class, which
                 // references do not follow yet: renaming only the signature breaks them
                 let text = &self.sources.get(module.file).text;

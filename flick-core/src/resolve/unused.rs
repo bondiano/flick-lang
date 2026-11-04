@@ -62,6 +62,8 @@ impl Scope<'_> {
             .filter_map(|r| r.qualifier.as_deref())
             .flat_map(|q| q.match_indices('.').map(|(i, _)| &q[..i]).chain([q]))
             .collect();
+        // `T.member`, a companion, uses the type `T`
+        names.extend(qualifiers.iter().filter(|q| !q.contains('.')));
         for (import, interface) in self.imports() {
             let Some(interface) = interface else {
                 continue;

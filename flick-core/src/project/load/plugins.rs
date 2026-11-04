@@ -8,7 +8,7 @@ use std::mem;
 use std::path::Path;
 use std::sync::Arc;
 
-use flick_plugin::{Arena, Block, VERSION};
+use flick_plugin::{Arena, Block, Place, VERSION};
 
 use super::unimported::unimported;
 use super::{Loaded, Loader, Root};
@@ -18,6 +18,7 @@ use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
 use crate::plugin::{EditorBlock, Expander, Failure, blocks_under, first_party};
 use crate::project::Host;
+use crate::resolve::Import;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -213,7 +214,8 @@ impl Loader<'_> {
                 match results.expand(plugin.as_ref(), block, &state, &mut f.source) {
                     Ok(arena) => {
                         let len = u32::try_from(block.text.len()).expect("source fits in u32");
-                        match render(&arena, len, block.place) {
+                        let aliases = aliases(&self.modules[f.module].syntax.imports);
+                        match render(&arena, len, block.place, &aliases) {
                             Ok(code) => rendered[j] = Some(code),
                             Err(why) => diagnostics.push(failure(
                                 f,
@@ -308,6 +310,8 @@ impl Results<'_> {
             plugin.id().as_bytes(),
             block.head.as_bytes(),
             block.text.as_bytes(),
+            block.docs.as_bytes(),
+            &[u8::from(block.place == Place::Declaration)],
             &column,
             &indent,
             state,
@@ -390,4 +394,16 @@ impl Loader<'_> {
             None
         }
     }
+}
+
+/// The modules `imports` name only by an alias, each with it.
+fn aliases(imports: &[Import]) -> Vec<(String, String)> {
+    (imports.iter())
+        .filter(|i| {
+            !imports
+                .iter()
+                .any(|j| j.module == i.module && j.alias.is_none())
+        })
+        .filter_map(|i| Some((i.module.clone(), i.alias.clone()?)))
+        .collect()
 }

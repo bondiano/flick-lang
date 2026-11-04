@@ -48,6 +48,18 @@ impl Builder {
         self.decl(Decl::Group(decls))
     }
 
+    /// `decl` with the documentation `text`, which may be several lines;
+    /// an empty text is no documentation.
+    pub fn doc(&mut self, text: &str, decl: NodeId) -> NodeId {
+        if text.is_empty() {
+            return decl;
+        }
+        self.decl(Decl::Doc {
+            text: text.to_owned(),
+            decl,
+        })
+    }
+
     pub fn pat(&mut self, pat: Pat) -> NodeId {
         self.push(Kind::Pat(pat))
     }
@@ -136,6 +148,7 @@ impl Kind {
                     .collect(),
                 Decl::Group(decls) => decls.clone(),
                 Decl::Hole(_) => Vec::new(),
+                Decl::Doc { decl, .. } => vec![*decl],
             },
         }
     }

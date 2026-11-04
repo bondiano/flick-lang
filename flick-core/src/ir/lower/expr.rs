@@ -136,8 +136,8 @@ impl Lower<'_> {
                         .any(|o| o.scope == key && o.outside == outside)
                 };
                 let (inner, outside) = (uses(false), uses(true));
-                let owner = match self.token_text(node, K::Ident) {
-                    Some(name) => Some(self.bind(&name)),
+                let owner = match node.child_tokens().find(|t| t.kind == K::Ident) {
+                    Some(name) => Some(self.bind(name.text(self.text), name.start)),
                     None => inner.then(|| self.hidden("$owner")),
                 };
                 let outer = outside.then(|| self.hidden("$outer"));
@@ -219,7 +219,7 @@ impl Lower<'_> {
         let mut dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
         let kind = match r {
             Ref::Local => ExprKind::Local(
-                self.local(&last)
+                self.local(&last, key.0)
                     .unwrap_or_else(|| panic!("`{last}` is a local in scope"))
                     .to_owned(),
             ),
@@ -437,8 +437,10 @@ impl Lower<'_> {
             return Stmt::Let(pat, value);
         };
         let dicts = self.givens(decl);
+        let at =
+            (decl.nodes().find(|n| n.kind == K::VarPat)).map_or(decl.range().0, |n| n.range().0);
         if parts.rec {
-            let unique = self.bind(&name);
+            let unique = self.bind(&name, at);
             let value = self.definition(decl);
             return Stmt::Fun {
                 name: unique,
@@ -448,7 +450,7 @@ impl Lower<'_> {
             };
         }
         let value = self.definition(decl);
-        let unique = self.bind(&name);
+        let unique = self.bind(&name, at);
         if parts.params.is_empty() && dicts.is_empty() {
             Stmt::Let(Pat::Bind(unique), value)
         } else {

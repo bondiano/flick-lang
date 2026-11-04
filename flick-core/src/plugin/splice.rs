@@ -16,7 +16,7 @@ use flick_plugin::HoleKind;
 use crate::source::FileId;
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::lexer::lex;
+use crate::syntax::lexer::lex_generated;
 use crate::syntax::{Fragment, parse_decls_at, parse_expr_at};
 
 use super::render::{DECL_PLACEHOLDER, Rendered};
@@ -101,7 +101,7 @@ fn generated(
     if text.get(at as usize..end as usize) != Some(rendered.text.as_str()) {
         return Err("the generated code is not where it was placed".into());
     }
-    let (raw, errors) = lex(&rendered.text, file);
+    let (raw, errors) = lex_generated(&rendered.text, file);
     if !errors.is_empty() {
         return Err("the generated code does not lex".into());
     }

@@ -56,7 +56,13 @@ pub struct Module<'a> {
     pub text: &'a str,
     pub tree: &'a Node,
     pub syntax: &'a ModuleSyntax,
+    /// Where the code plugins generated starts in `text`, [`NO_GENERATED`]
+    /// without any: a local is seen only by names on its side of it.
+    pub generated: u32,
 }
+
+/// [`Module::generated`] of a module without generated code.
+pub const NO_GENERATED: u32 = u32::MAX;
 
 /// Resolves one module against the interfaces of its imports; `imported`
 /// returns `None` for a module that could not be loaded, whose names are then
@@ -71,7 +77,7 @@ pub fn resolve(
     diagnostics.extend(defs::alias_cycles(module.tree, module.text, module.file));
     let scope = scope::Scope::new(module, &defs, imported, &mut diagnostics);
     let interface = scope.exports(&mut diagnostics);
-    let (references, unused) = uses::references(module.tree, module.text, module.file);
+    let (references, unused) = uses::references(module);
     for reference in &references {
         scope.check_use(reference, &mut diagnostics);
     }

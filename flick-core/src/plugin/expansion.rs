@@ -10,8 +10,9 @@ use std::mem;
 use flick_plugin::{Hole, Place};
 
 use crate::diagnostics::{Diagnostic, Related, Severity, codes};
-use crate::iface::Interface;
+use crate::iface::{Interface, Namespace};
 use crate::ir;
+use crate::resolve;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
@@ -168,7 +169,53 @@ impl Expansion {
             origins,
             blocks: done,
         };
+        diagnostics.extend(expansion.stray_companions());
         (Some(expansion), diagnostics)
+    }
+
+    /// The top-level names the code of the module's blocks declares, each at
+    /// what it stands for in the module: its block, or the user's name there
+    /// the plugin gave as its origin.
+    pub fn declarations(&self) -> Vec<resolve::Declared> {
+        (resolve::declarations(&self.tree, &self.text, self.file).into_iter())
+            .filter(|d| d.span.start >= self.len)
+            .map(|d| resolve::Declared {
+                span: self.place(d.span),
+                ..d
+            })
+            .collect()
+    }
+
+    /// The plugin whose code declares what stands at `span` of the module,
+    /// which a block of it declares.
+    pub fn plugin_at(&self, span: Span) -> Option<&str> {
+        (self.blocks.iter())
+            .find(|b| b.range.0 <= span.start && span.end <= b.range.1)
+            .map(|b| b.plugin.as_str())
+    }
+
+    /// Each companion `Owner.member` the code of a block declares whose
+    /// owner is no type of the module.
+    fn stray_companions(&self) -> Vec<Diagnostic> {
+        let declared = resolve::declarations(&self.tree, &self.text, self.file);
+        let is_type = |name: &str| {
+            (declared.iter()).any(|d| d.namespace == Namespace::Type && d.name == name)
+        };
+        (declared.iter())
+            .filter(|d| d.namespace == Namespace::Value && !d.signature)
+            .filter_map(|d| Some((d, d.name.split_once('$')?)))
+            .filter(|(_, (owner, _))| !is_type(owner))
+            .filter_map(|(d, (owner, member))| {
+                let block = (self.blocks.iter())
+                    .find(|b| b.code.0 <= d.span.start && d.span.start < b.code.1)?;
+                let message = format!(
+                    "plugin `{}` declares `{owner}.{member}`, but `{owner}` is no type of this module",
+                    block.plugin
+                );
+                let (start, end) = block.range;
+                Some(Diagnostic::error(codes::P036, message, Span::new(self.file, start, end)))
+            })
+            .collect()
     }
 
     /// Where the module's text declares the names of `interface`: a name the

@@ -309,6 +309,7 @@ mod tests {
             text,
             tree: &parse.tree,
             syntax: &syntax,
+            generated: resolve::NO_GENERATED,
         };
         let (mut interface, mut diagnostics) = resolve::resolve(&module, &|_| None);
         let local = |name: &str| name == "App.Shapes";

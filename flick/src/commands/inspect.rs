@@ -196,7 +196,10 @@ pub fn doc(options: &OutDirArguments, explicit: Option<&str>) -> Outcome {
     let out = checked.host.cwd.join(&options.out_dir);
     let mut index = String::from("# API\n\n");
     for module in checked.compilation.modules.iter().filter(|m| !m.test) {
-        let page = doc::page(&module.interface, &checked.sources.get(module.file).text);
+        // the expanded text has the documentation of generated declarations
+        let text =
+            (module.expansion.as_ref()).map_or(&checked.sources.get(module.file).text, |e| &e.text);
+        let page = doc::page(&module.interface, text);
         let file = format!("{}.md", module.name);
         if let Err(err) = write(&out.join(&file), &page) {
             return failure(

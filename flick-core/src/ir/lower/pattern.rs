@@ -16,7 +16,7 @@ impl Lower<'_> {
         match node.kind {
             K::VarPat => {
                 let name = self.token_text(node, K::Ident).unwrap_or_default();
-                Pat::Bind(self.binder(&name))
+                Pat::Bind(self.binder(&name, node.range().0))
             }
             K::ParenPat | K::AnnotPat => self.pattern(children[0]),
             K::LitPat => {
@@ -57,7 +57,7 @@ impl Lower<'_> {
                         let label = self.token_text(field, K::Ident)?;
                         let pat = match field.nodes().next() {
                             Some(p) => self.pattern(p),
-                            None => Pat::Bind(self.binder(&label)),
+                            None => Pat::Bind(self.binder(&label, field.range().0)),
                         };
                         Some((label, pat))
                     })
@@ -88,12 +88,12 @@ impl Lower<'_> {
     }
 
     /// A name a pattern binds: fresh, or the first alternative's.
-    fn binder(&mut self, name: &str) -> String {
+    fn binder(&mut self, name: &str, at: u32) -> String {
         if let Some(reuse) = &self.reuse
-            && let Some((_, unique)) = reuse.iter().find(|(n, _)| n == name)
+            && let Some((_, _, unique)) = reuse.iter().find(|(n, _, _)| n == name)
         {
             return unique.clone();
         }
-        self.bind(name)
+        self.bind(name, at)
     }
 }

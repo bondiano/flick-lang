@@ -27,6 +27,7 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
             text,
             tree: &parse.tree,
             syntax: &syntax,
+            generated: resolve::NO_GENERATED,
         };
         let imported = |m: &str| done.get(m).cloned();
         let (mut interface, mut diagnostics) = resolve::resolve(&module, &imported);

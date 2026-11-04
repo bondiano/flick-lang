@@ -257,6 +257,7 @@ fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         text,
         tree: &parsed.tree,
         syntax: &module_syntax,
+        generated: resolve::NO_GENERATED,
     };
     let imported = |name: &str| dependencies.iter().find(|i| i.module == name).cloned();
     let (mut interface, mut diagnostics) = resolve::resolve(&module, &imported);

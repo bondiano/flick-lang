@@ -28,7 +28,7 @@ impl Printer<'_> {
                 body,
             } => {
                 self.push("let ");
-                self.name(name, Names::Label)?;
+                self.value(name)?;
                 for &p in params {
                     self.push(" ");
                     self.node(p, Role::Pat, d)?;
@@ -41,7 +41,7 @@ impl Printer<'_> {
                 self.node(*body, Role::Expr, d)?;
             }
             Decl::Signature { name, ty } => {
-                self.name(name, Names::Label)?;
+                self.value(name)?;
                 self.push(" : ");
                 self.node(*ty, Role::Ty, d)?;
             }
@@ -63,6 +63,17 @@ impl Printer<'_> {
                 members,
             } => self.instance(context, *head, members, d)?,
             Decl::Hole(span) => self.decl_hole(*span)?,
+            Decl::Doc { text, decl } => {
+                for line in text.lines() {
+                    if line.contains(['\r', '\u{2028}', '\u{2029}']) {
+                        return Err("a line of documentation that does not end where it is".into());
+                    }
+                    self.push("/// ");
+                    self.push(line);
+                    self.push("\n");
+                }
+                self.node(*decl, Role::Decl, d)?;
+            }
         }
         Ok(())
     }
@@ -152,6 +163,20 @@ impl Printer<'_> {
             self.name(p, Names::Label)?;
         }
         Ok(())
+    }
+
+    /// The value a `let` or a signature declares: a name, or `Owner.member`,
+    /// a companion of the type `Owner`, which only generated code writes as
+    /// `Owner$member`.
+    fn value(&mut self, name: &str) -> Result<(), String> {
+        match name.split_once('.') {
+            Some((owner, member)) => {
+                self.declared(owner, Names::Constructor)?;
+                self.push("$");
+                self.name(member, Names::Label)
+            }
+            None => self.name(name, Names::Label),
+        }
     }
 
     /// A name a declaration declares: of `names`, without a module.

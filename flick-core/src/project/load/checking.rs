@@ -231,6 +231,10 @@ impl Checking<'_> {
             text: self.text_of(loaded),
             tree,
             syntax: &loaded.syntax,
+            generated: loaded
+                .expansion
+                .as_ref()
+                .map_or(resolve::NO_GENERATED, |e| e.len),
         };
         let (mut interface, resolved) = resolve::resolve(&module, lookup);
         // a library's modules are another package's: they own their own instances

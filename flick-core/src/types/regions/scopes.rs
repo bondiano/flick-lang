@@ -43,15 +43,15 @@ impl Checker<'_> {
         self.regions.open.push(index);
         self.regions.nest.push(index);
         let (locals, tyvars) = (self.locals.len(), self.tyvars.len());
-        if let Some(name) = name {
-            let name = name.text(self.text);
+        if let Some(token) = name {
+            let name = token.text(self.text);
             self.tyvars.push(TyVar {
                 name: name.to_owned(),
                 ty: region.clone(),
                 kind: Kind::Region,
             });
             let owner = Type::app(Type::lang(Lang::Owner), region.clone());
-            self.push_local(name, owner);
+            self.push_local(name, token.start, owner);
         }
         let needed = self.fresh();
         let mut stage = self.stage.clone();

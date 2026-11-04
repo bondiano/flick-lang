@@ -216,6 +216,7 @@ mod tests {
             text,
             tree: &parse.tree,
             syntax: &syntax,
+            generated: resolve::NO_GENERATED,
         };
         let builtin = |name: &str| types::builtins().iter().find(|i| i.module == name).cloned();
         let (mut interface, _) = resolve::resolve(&module, &builtin);

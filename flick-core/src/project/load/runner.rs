@@ -72,6 +72,7 @@ impl Loader<'_> {
             text,
             tree: &parse.tree,
             syntax: &syntax,
+            generated: resolve::NO_GENERATED,
         };
         let lookup = |name: &str| match self.by_name.get(name) {
             Some(&i) => interfaces.get(i).cloned().flatten(),

@@ -3,7 +3,10 @@
 //! or its `.iface`. A companion (`T.parse`, `T.schema`, `T$table`) leads to
 //! its type, an instance's method to the instance.
 
+use std::collections::HashMap;
+
 use super::{Ide, Location, Symbol, Target, tree};
+use crate::doc;
 use crate::iface::Entity;
 use crate::resolve::declarations;
 use crate::source::FileId;
@@ -17,16 +20,31 @@ pub struct Source {
     pub target: Target,
     pub text: String,
     pub tree: Node,
+    /// The code its plugin blocks stand for, after `text`.
+    pub generated: String,
+}
+
+impl Source {
+    /// The `///` comments of its declarations, those of generated code too.
+    pub fn docs(&self) -> HashMap<String, String> {
+        let mut docs = doc::comments(&self.generated);
+        docs.extend(doc::comments(&self.text));
+        docs
+    }
 }
 
 impl Ide<'_> {
     /// The source of `module`, if the analysis or the compiler has it.
     pub fn source(&self, module: &str) -> Option<Source> {
         if let Some(m) = self.analysis.module(module) {
+            let text = &self.sources.get(m.file).text;
             return Some(Source {
                 target: Target::File(m.file),
-                text: self.sources.get(m.file).text.clone(),
+                text: text.clone(),
                 tree: m.tree.clone(),
+                generated: (m.expansion.as_ref())
+                    .map(|e| e.text[text.len()..].to_owned())
+                    .unwrap_or_default(),
             });
         }
         if let Some((_, text)) = builtin_sources().iter().find(|(n, _)| *n == module) {
@@ -34,6 +52,7 @@ impl Ide<'_> {
                 target: Target::Builtin(module.to_owned()),
                 text: (*text).to_owned(),
                 tree: parse(text, FileId::default()).tree,
+                generated: String::new(),
             });
         }
         None
@@ -98,8 +117,13 @@ impl Ide<'_> {
                 Target::File(f) => f,
                 _ => FileId::default(),
             };
+            let generated = || {
+                let m = self.analysis.module(&entity.module)?;
+                m.expansion.as_ref().map(|e| e.declarations())
+            };
             let found = declarations(&source.tree, &source.text, file)
                 .into_iter()
+                .chain(generated().into_iter().flatten())
                 .find(|d| d.namespace == entity.namespace && d.name == entity.name)?;
             return Some(at(source.target, found.span.start, found.span.end));
         }

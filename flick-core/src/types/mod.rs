@@ -275,6 +275,7 @@ fn run_in(
     let mut checker = Checker {
         file: module.file,
         text: module.text,
+        generated: module.generated,
         env,
         store: Store::default(),
         kinds: KindStore::default(),
@@ -351,6 +352,8 @@ pub fn beside_syntax_errors(tree: &Node, checked: Vec<Diagnostic>) -> Vec<Diagno
 #[derive(Debug, Clone)]
 struct Local {
     name: String,
+    /// Whether a plugin generated it: only generated names see it.
+    generated: bool,
     ty: Type,
     /// A function of a recursive group used before its type is proved, by
     /// index into [`Checker::recs`].
@@ -429,6 +432,8 @@ struct NumLiteral {
 struct Checker<'a> {
     file: FileId,
     text: &'a str,
+    /// Where generated code starts in `text`.
+    generated: u32,
     env: Env<'a>,
     store: Store,
     kinds: KindStore,
