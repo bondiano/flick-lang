@@ -605,6 +605,7 @@ dependencies = [
 name = "flick-plugin"
 version = "0.1.0"
 dependencies = [
+ "flick-plugin-macros",
  "serde",
  "wit-bindgen",
 ]
@@ -614,6 +615,14 @@ name = "flick-plugin-cli"
 version = "0.1.0"
 dependencies = [
  "flick-plugin",
+]
+
+[[package]]
+name = "flick-plugin-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]

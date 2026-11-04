@@ -1,9 +1,7 @@
 //! The clauses of a block, read from its tokens, the user's types and
 //! expressions in them parsed by the compiler.
 
-use flick_plugin::{Block, Compiler, Diagnostic, Hole, Span, Token, TokenKind};
-
-use crate::{len, text};
+use flick_plugin::{Block, Compiler, Diagnostic, Span, Token, TokenKind};
 
 /// How the values of a `flag` or `arg` make its field, from the written type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,6 +82,16 @@ pub struct Command {
     pub clauses: Vec<Clause>,
 }
 
+impl Command {
+    /// Its `flag` and `arg` clauses, in order.
+    pub fn params(&self) -> impl Iterator<Item = &Param> {
+        self.clauses.iter().filter_map(|c| match c {
+            Clause::Param(p) => Some(p),
+            _ => None,
+        })
+    }
+}
+
 /// The words a clause starts with.
 pub const WORDS: [&str; 5] = ["description", "flag", "arg", "subcommand", "handle"];
 
@@ -91,64 +99,45 @@ pub const WORDS: [&str; 5] = ["description", "flag", "arg", "subcommand", "handl
 pub const MALFORMED: &str = "L009";
 
 pub fn command(block: &Block, compiler: &mut dyn Compiler) -> Result<Command, Vec<Diagnostic>> {
-    let end = len(block);
-    let arguments = (block.tokens.iter())
-        .take_while(|t| t.span.start < block.body)
-        .count();
-    let (head, mut rest) = block.tokens.split_at(arguments);
-    let name = match head {
+    let name = match block.arguments() {
         [t] if t.kind == TokenKind::String => t.span,
         _ => {
             return Err(malformed(
-                Span { start: 0, end },
+                block.whole(),
                 "a `cli` block names its command: `cli \"name\" { … }`",
             ));
         }
     };
+    let mut c = block.body();
     let mut clauses = Vec::new();
-    while let Some((word, after)) = rest.split_first() {
-        rest = after;
-        if is(block, Some(word), ";") {
+    while let Some(word) = c.next() {
+        let w = c.text(word);
+        if w == ";" {
             continue;
         }
-        let w = text(block, word.span);
         if word.kind != TokenKind::Ident || !WORDS.contains(&w) {
             return Err(malformed(
                 word.span,
                 "expected a clause: `description`, `flag`, `arg`, `subcommand` or `handle`",
             ));
         }
-        let help = help(&block.text, word.span.start, " ");
+        let help = block.docs_above(word.span.start, " ");
         let clause = if let "flag" | "arg" = w {
-            let Some((name, after)) = rest
-                .split_first()
-                .filter(|(t, _)| t.kind == TokenKind::Ident)
-            else {
+            let Some(name) = c.ident() else {
                 return Err(malformed(
                     word.span,
                     &format!("`{w}` takes a name: `{w} name : T`"),
                 ));
             };
-            rest = after;
-            let aliases: Vec<Span> = (rest.iter())
-                .take_while(|t| t.kind == TokenKind::String)
-                .map(|t| t.span)
-                .collect();
-            rest = &rest[aliases.len()..];
-            if !is(block, rest.first(), ":") {
-                return Err(malformed(
-                    name.span,
-                    &format!("expected `: T` after `{w} {}`", text(block, name.span)),
-                ));
+            let aliases = c.strings();
+            if c.eat(":").is_none() {
+                let message = format!("expected `: T` after `{w} {}`", c.text(name));
+                return Err(malformed(name.span, &message));
             }
-            let ty = span(compiler.parse_type(start(rest.get(1), end), end))?;
-            rest = past(rest, ty.end);
-            let default = if is(block, rest.first(), "=") {
-                let value = span(compiler.parse_expr(start(rest.get(1), end), end))?;
-                rest = past(rest, value.end);
-                Some(value)
-            } else {
-                None
+            let ty = c.ty(compiler).map_err(|d| vec![d])?;
+            let default = match c.eat("=") {
+                Some(_) => Some(c.expr(compiler).map_err(|d| vec![d])?),
+                None => None,
             };
             Clause::Param(Param {
                 flag: w == "flag",
@@ -161,8 +150,7 @@ pub fn command(block: &Block, compiler: &mut dyn Compiler) -> Result<Command, Ve
                 help,
             })
         } else {
-            let value = span(compiler.parse_expr(start(rest.first(), end), end))?;
-            rest = past(rest, value.end);
+            let value = c.expr(compiler).map_err(|d| vec![d])?;
             match w {
                 "description" => Clause::Description {
                     word: word.span,
@@ -188,25 +176,6 @@ fn malformed(span: Span, message: &str) -> Vec<Diagnostic> {
     vec![Diagnostic::error(message, span).with_code(MALFORMED)]
 }
 
-fn span(hole: Result<Hole, Diagnostic>) -> Result<Span, Vec<Diagnostic>> {
-    hole.map(|h| h.span).map_err(|d| vec![d])
-}
-
-/// Where `token` starts, or `end` without one.
-fn start(token: Option<&Token>, end: u32) -> u32 {
-    token.map_or(end, |t| t.span.start)
-}
-
-pub fn is(block: &Block, token: Option<&Token>, punct: &str) -> bool {
-    token.is_some_and(|t| t.kind == TokenKind::Punct && text(block, t.span) == punct)
-}
-
-/// The tokens of `rest` after `end`.
-fn past(rest: &[Token], end: u32) -> &[Token] {
-    let skip = rest.iter().take_while(|t| t.span.end <= end).count();
-    &rest[skip..]
-}
-
 /// The multiplicity the type written at `ty` asks for.
 fn multi(block: &Block, ty: Span, default: bool) -> Multi {
     let tokens: Vec<&Token> = (block.tokens.iter())
@@ -227,30 +196,14 @@ fn multi(block: &Block, ty: Span, default: bool) -> Multi {
 /// it: `NonEmpty.NonEmpty a` is `NonEmpty`, applied. A function type has
 /// none.
 fn head<'b>(block: &'b Block, tokens: &[&Token]) -> (Option<&'b str>, bool) {
+    let text = |t: &Token| block.text_of(t.span);
     let named = |t: &Token| matches!(t.kind, TokenKind::Con | TokenKind::Ident);
-    if tokens.iter().any(|t| text(block, t.span) == "->")
-        || !tokens.first().is_some_and(|t| named(t))
-    {
+    if tokens.iter().any(|t| text(t) == "->") || !tokens.first().is_some_and(|t| named(t)) {
         return (None, false);
     }
     let mut i = 0;
-    while i + 2 < tokens.len() && text(block, tokens[i + 1].span) == "." && named(tokens[i + 2]) {
+    while i + 2 < tokens.len() && text(tokens[i + 1]) == "." && named(tokens[i + 2]) {
         i += 2;
     }
-    (Some(text(block, tokens[i].span)), i + 1 < tokens.len())
-}
-
-/// The `///` lines right above the clause at `start`, joined by `sep`.
-pub fn help(text: &str, start: u32, sep: &str) -> String {
-    let start = (start as usize).min(text.len());
-    let line_start = text[..start].rfind('\n').unwrap_or(0);
-    let mut lines: Vec<&str> = Vec::new();
-    for line in text[..line_start].lines().rev() {
-        match line.trim_start().strip_prefix("///") {
-            Some(doc) => lines.push(doc.trim()),
-            None => break,
-        }
-    }
-    lines.reverse();
-    lines.join(sep)
+    (Some(text(tokens[i])), i + 1 < tokens.len())
 }

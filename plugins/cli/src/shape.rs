@@ -7,7 +7,6 @@ use std::collections::BTreeMap;
 use flick_plugin::{Block, Diagnostic, Span};
 
 use crate::read::{Clause, Command, Multi, Param};
-use crate::{len, text};
 
 /// Long and short names Effect's CLI reserves.
 const RESERVED: [&str; 4] = ["help", "h", "version", "completions"];
@@ -39,23 +38,18 @@ pub fn check(block: &Block, command: &Command) -> Vec<Diagnostic> {
         };
     let mut fields: Vec<&str> = Vec::new();
     let mut seen: Vec<&str> = Vec::new();
-    let params: Vec<&Param> = (command.clauses.iter())
-        .filter_map(|c| match c {
-            Clause::Param(p) => Some(p),
-            _ => None,
-        })
-        .collect();
+    let params: Vec<&Param> = command.params().collect();
     for clause in &command.clauses {
         let word = clause.word();
         if let Clause::Description { .. } | Clause::Handle { .. } = clause {
-            let w = text(block, word);
+            let w = block.text_of(word);
             if seen.contains(&w) {
                 error("L004", word, format!("`{w}` is given twice"));
             }
             seen.push(w);
         }
         let Clause::Param(p) = clause else { continue };
-        let field = text(block, p.name);
+        let field = block.text_of(p.name);
         if fields.contains(&field) {
             error(
                 "L001",
@@ -70,7 +64,7 @@ pub fn check(block: &Block, command: &Command) -> Vec<Diagnostic> {
             for &alias in &p.aliases {
                 taken(
                     &mut error,
-                    unquoted(text(block, alias)).to_owned(),
+                    unquoted(block.text_of(alias)).to_owned(),
                     alias,
                     "the alias",
                 );
@@ -131,10 +125,7 @@ fn command_shape(
     if !subcommand && !handled {
         error(
             "L005",
-            Span {
-                start: 0,
-                end: len(block),
-            },
+            block.whole(),
             "a command needs `handle` or at least one `subcommand`".to_owned(),
         );
     }

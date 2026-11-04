@@ -3,9 +3,6 @@
 
 use flick_plugin::{Block, Completion, Highlight, HighlightKind, Hover, Token, TokenKind};
 
-use crate::read::help;
-use crate::text;
-
 // Name, syntax, insertion snippet, and help shared by completion and hover.
 const CLAUSES: &[(&str, &str, &str, &str)] = &[
     (
@@ -62,7 +59,7 @@ pub fn hover(block: &Block, offset: u32) -> Option<Hover> {
     if token.kind != TokenKind::Ident {
         return None;
     }
-    let word = text(block, token.span);
+    let word = block.text_of(token.span);
     if at_clause(block, token.span.start)
         && let Some((_, syntax, _, help)) = CLAUSES.iter().find(|(name, ..)| *name == word)
     {
@@ -73,11 +70,12 @@ pub fn hover(block: &Block, offset: u32) -> Option<Hover> {
     }
     // the name of a `flag` or an `arg`
     let clause = block.tokens[i.checked_sub(1)?];
-    if !matches!(text(block, clause.span), "flag" | "arg") || !at_clause(block, clause.span.start) {
+    if !matches!(block.text_of(clause.span), "flag" | "arg") || !at_clause(block, clause.span.start)
+    {
         return None;
     }
     let mut markdown = format!("```flick\n{word} : {}\n```", written_type(block, i)?);
-    let docs = help(&block.text, clause.span.start, "\n");
+    let docs = block.docs_above(clause.span.start, "\n");
     if !docs.is_empty() {
         markdown.push_str("\n\n");
         markdown.push_str(&docs);
@@ -98,7 +96,7 @@ pub fn highlight(block: &Block) -> Vec<Highlight> {
         .skip_while(|t| t.span.start < block.body);
     let mut tokens = body.peekable();
     while let Some(t) = tokens.next() {
-        let word = text(block, t.span);
+        let word = block.text_of(t.span);
         if t.kind != TokenKind::Ident || !CLAUSES.iter().any(|(name, ..)| *name == word) {
             continue;
         }
@@ -154,12 +152,12 @@ fn indent(block: &Block) -> Option<usize> {
 /// the end of its line, its spaces collapsed.
 fn written_type(block: &Block, name: usize) -> Option<String> {
     let rest = &block.tokens[name + 1..];
-    let colon = rest.iter().position(|t| text(block, t.span) == ":")?;
+    let colon = rest.iter().position(|t| block.text_of(t.span) == ":")?;
     let mut end: Option<&Token> = None;
     let mut last_end = rest[colon].span.end;
     for t in &rest[colon + 1..] {
         let between = &block.text[last_end as usize..t.span.start as usize];
-        if between.contains('\n') || matches!(text(block, t.span), "=" | ";") {
+        if between.contains('\n') || matches!(block.text_of(t.span), "=" | ";") {
             break;
         }
         end = Some(t);

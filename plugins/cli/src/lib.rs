@@ -10,9 +10,7 @@ mod editor;
 mod read;
 mod shape;
 
-use flick_plugin::{
-    Arena, Block, Compiler, Completion, Diagnostic, Highlight, Hover, Plugin, Span,
-};
+use flick_plugin::{Arena, Block, Compiler, Completion, Diagnostic, Highlight, Hover, Plugin};
 
 pub struct Cli;
 
@@ -47,19 +45,6 @@ impl Plugin for Cli {
     fn highlight(&self, block: &Block, _: &[u8]) -> Vec<Highlight> {
         editor::highlight(block)
     }
-}
-
-/// The text of `span` in the block.
-fn text(block: &Block, span: Span) -> &str {
-    block
-        .text
-        .get(span.start as usize..span.end as usize)
-        .unwrap_or("")
-}
-
-/// The length of the block's text.
-fn len(block: &Block) -> u32 {
-    u32::try_from(block.text.len()).unwrap_or(u32::MAX)
 }
 
 #[cfg(test)]

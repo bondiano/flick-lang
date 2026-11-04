@@ -17,6 +17,13 @@ impl Builder {
         }
     }
 
+    /// The builder itself: what `flick!` builds in, whether it is given
+    /// the builder or a `&mut` of it.
+    #[doc(hidden)]
+    pub fn as_builder(&mut self) -> &mut Self {
+        self
+    }
+
     /// The origin of the nodes pushed from now on.
     pub fn at(&mut self, origin: Span) -> &mut Self {
         self.origin = origin;
