@@ -15,6 +15,7 @@ use super::out_dir::overlap;
 use super::summary::{self, Built};
 use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
 use crate::command::{Command, Outcome};
+use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
 use crate::{cache, toolchain};
@@ -136,8 +137,11 @@ impl Command for BuildCommand {
             };
         }
         progress.stage("Compiling Flick modules");
-        let (mut diagnostics, mut compilation) =
-            project::compile(&host, &mut sources, project.as_ref(), &roots);
+        let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
+            let (diagnostics, compilation, fresh) =
+                project::compile_with(&host, &mut sources, project.as_ref(), &roots, saved);
+            ((diagnostics, compilation), fresh)
+        });
         if diagnostics.iter().any(|d| d.severity == Severity::Error) {
             return Outcome {
                 sources,

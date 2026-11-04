@@ -37,13 +37,14 @@ let main () =
   say (show failed)
   let gate = Latch.make false
   scope owner {
-    let _ =
-      Fiber.spawn owner quiet (task { Latch.when_open gate (task { say "through the gate" }) })
+    let through =
+      Fiber.spawn owner quiet (task { Latch.when_open gate (task { "through the gate" }) })
     nap 5
     say ("open before: " ++ show (Latch.is_open gate))
     say ("opened: " ++ show (Latch.open gate))
     say ("opened again: " ++ show (Latch.open gate))
-    nap 5
+    // the fiber the gate lets through runs on its own, on Go beside this one
+    say (Fiber.join through)
   }
   let count = Ref.make 0
   let bump = task { Ref.modify count (fun n -> ((), n + 1)) }

@@ -92,7 +92,7 @@ pub struct Effects {
 pub const SYNC_SERVICES: [Lang; 2] = [Lang::AtomRead, Lang::Setup];
 
 /// How a stage of a function runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Stage {
     /// `->`: at once, with nothing.
     Pure,

@@ -1,5 +1,5 @@
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::{env, fs};
 
 use flick_core::diagnostics::Severity;
 use flick_core::project::cache::Key;
@@ -99,12 +99,10 @@ pub fn describe(
     let mut key = Key::default();
     key.add("compiler", toolchain::COMPILER);
     key.add("std", builtins::std_hash());
-    if let Ok(meta) = env::current_exe().and_then(fs::metadata) {
-        key.add(
-            "compiler-binary",
-            format!("{} {:?}", meta.len(), meta.modified().ok()),
-        );
-    }
+    key.add(
+        "compiler-binary",
+        toolchain::fingerprint().unwrap_or_default(),
+    );
     if let Some(project) = project {
         for package in ["@flick-lang/runtime", "effect"] {
             key.add(

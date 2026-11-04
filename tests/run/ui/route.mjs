@@ -4,12 +4,19 @@ import { JSDOM } from "jsdom";
 
 let dom;
 let runs = 0;
+let pending = 0;
 const errors = [];
 
 /** The name of user `id`, after a while; counts how often a loader asked. */
 export const name = (id) => {
   runs += 1;
-  return new Promise((resolve) => setTimeout(() => resolve(`user ${id}`), 10));
+  pending += 1;
+  return new Promise((resolve) =>
+    setTimeout(() => {
+      pending -= 1;
+      resolve(`user ${id}`);
+    }, 10),
+  );
 };
 
 export const loads = () => runs;
@@ -46,7 +53,18 @@ export const back = async () => {
 
 export const path = () => dom.window.location.pathname;
 
-export const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+const tick = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 50ms, then until no name is loading and the page stays the same: a busy machine renders late. */
+export const settle = async () => {
+  await tick(50);
+  for (let last = text(), quiet = 0; quiet < 3; ) {
+    await tick(10);
+    const now = text();
+    quiet = pending === 0 && now === last ? quiet + 1 : 0;
+    last = now;
+  }
+};
 
 export const text = () => dom.window.document.getElementById("app")?.textContent ?? "";
 

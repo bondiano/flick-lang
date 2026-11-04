@@ -17,6 +17,8 @@ pub use print::print;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+
 use crate::iface::Interface;
 use crate::numeric::{Arith, Num};
 use crate::source::Span;
@@ -24,7 +26,7 @@ pub use crate::types::Stage;
 use crate::types::lang::{self, Lang};
 use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, SchemaItem, Type};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Module {
     pub name: String,
     /// Top-level definitions in source order; code generation orders them
@@ -37,20 +39,20 @@ pub struct Module {
 }
 
 /// What a labelled top-level value is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Label {
     Atom,
     /// A view or an action, labelled in release too by default.
     Component,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Item {
     pub kind: ItemKind,
     pub span: Span,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ItemKind {
     /// `let name … = …`; a definition with class constraints takes their
     /// dictionaries first.
@@ -81,7 +83,7 @@ pub enum ItemKind {
 }
 
 /// A `foreign` declaration: a JS calling convention, not a portable one.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Foreign {
     pub name: String,
     pub mode: ForeignMode,
@@ -101,7 +103,7 @@ pub struct Foreign {
     pub catch: Option<Expr>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ForeignMode {
     /// A plain JS function.
     Pure,
@@ -113,7 +115,7 @@ pub enum ForeignMode {
     Effect,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
@@ -122,7 +124,7 @@ pub struct Expr {
     pub ty: Option<Arc<Type>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExprKind {
     Lit(Lit),
     /// A local by its unique name in the enclosing top-level definition.
@@ -441,7 +443,7 @@ impl Expr {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Param {
     pub pat: Pat,
     /// The stage of the arrow of this parameter.
@@ -451,7 +453,7 @@ pub struct Param {
     pub ty: Option<Arc<Type>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Stmt {
     Let(Pat, Expr),
     /// A local function; `rec` when it may call itself.
@@ -464,14 +466,14 @@ pub enum Stmt {
     Expr(Expr),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Arm {
     pub pat: Pat,
     pub guard: Option<Expr>,
     pub body: Expr,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Lit {
     Int(i32),
     Float(f64),
@@ -483,7 +485,7 @@ pub enum Lit {
     Unit,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Pat {
     Wild,
     Bind(String),
@@ -498,7 +500,7 @@ pub enum Pat {
     Or(Vec<Pat>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BinOp {
     Or,
     And,

@@ -12,6 +12,7 @@ mod prims;
 mod report;
 mod solve;
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::Checker;
@@ -56,7 +57,7 @@ pub fn args_of(c: &Type, item: Lang) -> Option<Vec<&Type>> {
 }
 
 /// The dictionary a class constraint resolved to.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Dict {
     /// An instance applied to the dictionaries of its context.
     Instance {

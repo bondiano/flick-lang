@@ -5,8 +5,7 @@
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use std::time::UNIX_EPOCH;
-use std::{env, fs, process};
+use std::{fs, process};
 
 use flick_core::iface::Interface;
 use flick_core::types;
@@ -61,14 +60,7 @@ pub fn prepare() {
 /// and the hash of the sources of `std`, which a project picks.
 fn location() -> Option<(PathBuf, String, String)> {
     let dir = store::cache_dir()?;
-    let exe = fs::metadata(env::current_exe().ok()?).ok()?;
-    let modified = exe.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
-    let binary = format!(
-        "{PREFIX}{}-{:x}-{:x}-",
-        toolchain::COMPILER,
-        exe.len(),
-        modified.as_nanos()
-    );
+    let binary = format!("{PREFIX}{}-", toolchain::fingerprint()?);
     let name = format!("{binary}{}.json", &std_hash()[..16]);
     Some((dir, binary, name))
 }

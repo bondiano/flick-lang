@@ -16,9 +16,10 @@ let main () =
   let start = Clock.monotonic_time_nanos ()
   Effect.sleep (Result.with_default Duration.zero (Duration.millis 2))
   let stop = Clock.monotonic_time_nanos ()
+  // Node fires timers by a loop clock of whole milliseconds, up to 1ms early
   Platform.stdout_line
     ("clock: "
-      ++ show (millis > 1700000000000, nanos > 1700000000000000000n, stop - start >= 2000000n))
+      ++ show (millis > 1700000000000, nanos > 1700000000000000000n, stop - start >= 1000000n))
   let same = Clock.clock_with (fun clock -> later clock millis nanos stop)
   Platform.stdout_line ("clock_with: " ++ show same)
   let now = DateTime.to_epoch_millis (DateTime.now ())
