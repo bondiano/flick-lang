@@ -198,8 +198,16 @@ pub struct DiffArguments {
 
 #[derive(Args)]
 pub struct ExplainArguments {
-    /// A diagnostic code, such as `FLICK-T003`.
+    /// A diagnostic code, such as `FLICK-T003`, or one of a plugin, such as
+    /// `std/L001`.
     pub code: String,
+}
+
+#[derive(Args)]
+pub struct ExpandArguments {
+    /// Files or directories whose plugin blocks to show; by default the
+    /// project's source and test roots.
+    pub paths: Vec<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]

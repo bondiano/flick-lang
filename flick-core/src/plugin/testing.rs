@@ -12,15 +12,17 @@ use crate::fmt;
 use crate::source::FileId;
 use crate::syntax;
 
-/// The code `rendered` is, the user's code of `block` in place of each hole,
-/// laid out by the formatter where it can.
-pub fn shown(rendered: &Rendered, block: &Block) -> String {
+/// The code `rendered` is, the user's code in place of each hole (spans of
+/// `frame`, the text of its block), laid out by the formatter where it can.
+pub fn shown(rendered: &Rendered, frame: &str) -> String {
     let mut code = String::new();
     let mut at = 0;
     for &(offset, hole) in &rendered.holes {
         // the placeholder is `(hole)` or `(Hole)`, `offset` at its word
         let offset = offset as usize;
-        let user = block.text_of(hole.span);
+        let user = frame
+            .get(hole.span.start as usize..hole.span.end as usize)
+            .unwrap_or("");
         let text = user.len() > 1 && user.starts_with('"') && user.ends_with('"');
         let atomic = !user.contains(char::is_whitespace) && !user.starts_with('-');
         if atomic || text && !user.contains('\n') {
@@ -103,7 +105,7 @@ pub fn expand(plugin: &impl Plugin, source: &str) -> Vec<Result<String, Vec<Stri
                 .collect();
             match expanded {
                 Ok(arena) => match render(&arena, block.whole().end) {
-                    Ok(rendered) if errors.is_empty() => return Ok(shown(&rendered, block)),
+                    Ok(rendered) if errors.is_empty() => return Ok(shown(&rendered, &block.text)),
                     Ok(_) => {}
                     Err(why) => errors.push(format!("gave code that is not valid: {why}")),
                 },

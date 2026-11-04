@@ -66,6 +66,9 @@ pub enum Commands {
     Doc(OutDirArguments),
     /// Explain a diagnostic code.
     Explain(ExplainArguments),
+    /// Print the code each plugin block of the files stands for, as its
+    /// plugin gives it.
+    Expand(ExpandArguments),
     /// Check the compiler, Node.js, pnpm and the runtime.
     Doctor,
     /// Print a representation of a module: AST, typed IR, JS, TS, interface

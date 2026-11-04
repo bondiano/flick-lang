@@ -99,7 +99,7 @@ impl Loader<'_> {
             let text = &self.sources.get(m.file).text;
             let (expansion, failed) = Expansion::build(text, m.file, &m.parse.tree, blocks);
             diagnostics.extend(failed);
-            self.modules[i].expansion = expansion;
+            self.modules[i].expansion = expansion.map(Arc::new);
         }
         self.diagnostics.extend(diagnostics);
     }

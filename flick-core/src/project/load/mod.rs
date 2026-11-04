@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::io;
 use std::mem;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 mod checking;
 #[cfg(test)]
@@ -65,7 +66,7 @@ struct Loaded {
     /// From the header, else from the path; empty for neither.
     name: String,
     /// The module with its plugin blocks expanded, when it has any.
-    expansion: Option<Expansion>,
+    expansion: Option<Arc<Expansion>>,
     /// Its plugin blocks, as editors ask their plugins about them.
     editing: Vec<EditorBlock>,
 }
