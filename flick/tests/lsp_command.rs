@@ -221,6 +221,55 @@ fn diagnostics_match_flick_check_in_utf16() {
 }
 
 #[test]
+fn restoring_a_signature_clears_diagnostics_without_saving_or_restarting() {
+    let full = "module App.MaybeT exposing (MaybeT(..), run)
+
+type MaybeT (m : Type -> Type) a = MaybeT (m (Option a))
+
+run : forall c m a. (MaybeT m a)^c -> (m (Option a))^c
+let run (MaybeT action) = action
+";
+    let signature = "run : forall c m a. (MaybeT m a)^c -> (m (Option a))^c\n";
+    let dir = project(
+        "lsp_signature_recovery",
+        &[("flick.toml", LIB), ("src/App/MaybeT.fl", full)],
+    );
+    let file = dir.join("src/App/MaybeT.fl");
+    let file_uri = uri(&file);
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({
+            "textDocument": { "uri": file_uri, "languageId": "flick", "version": 1, "text": full }
+        }),
+    );
+    assert!(lsp.diagnostics(&file_uri).is_empty());
+
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({
+            "textDocument": { "uri": file_uri, "version": 2 },
+            "contentChanges": [{ "text": full.replace(signature, "") }]
+        }),
+    );
+    let broken = lsp.diagnostics(&file_uri);
+    assert!(
+        broken.iter().any(|d| d["code"] == "FLICK-T004"),
+        "{broken:?}"
+    );
+
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({
+            "textDocument": { "uri": file_uri, "version": 3 },
+            "contentChanges": [{ "text": full }]
+        }),
+    );
+    assert!(lsp.diagnostics(&file_uri).is_empty());
+    lsp.close();
+}
+
+#[test]
 fn hover_definition_completion_rename_and_formatting() {
     let fixed = MAIN.replace("(count + \"x\")", "count");
     let dir = project(
