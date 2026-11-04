@@ -91,6 +91,15 @@ empty list leaves the user's code to the usual completion), `hover(block,
 state, offset)` what a span means, and `highlight(block, state)` the spans
 of the plugin's own words, as keywords or parameters.
 
+The formatter asks `format(block, state)` for the layout of a block: pieces
+of the plugin's words, new lines, a level in or out, and holes, the user's
+code, which the formatter lays out as any other. The compiler writes the head
+before them, `{` before a layout that starts in the body, and `}` after it,
+and keeps the layout only when the declaration parses back to the same code.
+Without one, or for a block with comments other than `///` lines, the block
+stays as written, its lines moving with its head. `flick fmt` asks the plugin
+of `std`; an editor asks the plugins its analysis loaded.
+
 A block shows its head; its `place`, an expression or a declaration; its
 text, from its first argument (or from the body, without arguments) to the
 closing `}` or its end; `body`, where the body starts in that text (its
@@ -125,7 +134,7 @@ and with the span of the block it stands for:
 The compiler checks the arena before it uses it: names must lex as names,
 numbers be finite, holes lie in the body and be used once, and its size and
 depth are bounded. The arena version is the version of the interface,
-`0.4.0`; a component built for another version does not load.
+`0.5.0`; a component built for another version does not load.
 
 ## Writing one in Rust
 
@@ -204,7 +213,8 @@ first or `block.body()` from the body: `eat(":")`, `ident()`, `strings()`,
 compiler for the user's code from the next token on and go past it.
 `block.arguments()` are the tokens of the head's arguments, and
 `block.docs_above(offset, " ")` the `///` lines above what starts at
-`offset`.
+`offset`. `Plugin::format` gives `Piece::Text`, `Line`, `Indent`, `Dedent`
+and `Hole(hole)`, a hole as the cursor's `expr` and `ty` find them.
 
 The template's tests show what the plugin makes of a block, through
 `flick_core::plugin::testing::expand`:
@@ -256,6 +266,7 @@ dropped.
 
 Permissions, warnings of plugins and checks after typing come later. A
 built-in module the file hides by an alias, as `import Other as List`, is
-hidden from generated code too. `collect` sees the modules the run loads, so `flick check one.fl` gives it
+hidden from generated code too. `flick fmt` lays out blocks of
+`std`'s plugin only, other blocks as written. `collect` sees the modules the run loads, so `flick check one.fl` gives it
 fewer blocks than a whole build. A package whose modules have plugin blocks
 is checked again in each build.

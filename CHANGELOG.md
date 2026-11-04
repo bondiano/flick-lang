@@ -39,6 +39,12 @@ break programs.
   `b.doc`), which hovers, completions and `flick doc` show. Editors go to a
   generated name at the span its plugin gave it, outline it, and refuse to
   rename it outside its block.
+- **Plugins, interface `0.5.0`:** a plugin lays out its blocks for the
+  formatter (`format`, pieces of its words, lines, levels and the user's code
+  in holes), and `cli` does again, a clause a line; a block without a layout
+  moves with its head. A block inside the user's code of another expands in
+  a round of its own. Editors highlight the heads of plugins as macros, and
+  `cli` is no keyword of the grammars any more.
 - **Breaking:** `cli "name" { … }` is the plugin of `std`: a file that
   writes one imports it, `import Cli exposing (plugin cli)`. Without the
   import the block is `FLICK-P037`, which `flick check --fix` fixes. Its

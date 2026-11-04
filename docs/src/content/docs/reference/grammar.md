@@ -554,7 +554,7 @@ fits; otherwise it breaks, outermost construct first:
 - a value after `=` (`let`, record fields, type aliases), after `->` (`fun`,
   match arms) or after `<-` goes to the next line, one level in. Records,
   lists, tuples, `fun` and blocks in braces (`task`, `ui`, `scope`,
-  `provide`, `do`, `for`, `sql`, `codec`) stay after the `=` and break
+  `provide`, `do`, `for`, `sql`, `codec`, a plugin's) stay after the `=` and break
   inside instead: `let config = {` … `}`. Several statements always start on
   the next line, and so do `match`, `try` and an `if` that does not fit;
 - statements go one per line; a block in braces with one expression may stay
