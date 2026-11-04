@@ -2,9 +2,10 @@
 title: "Plugins"
 ---
 
-A plugin owns blocks `head { … }` and `head "x" (e) { … }` of the modules
-that import it and gives
-back the code each block stands for. The compiler checks, compiles and
+A plugin owns blocks of the modules that import it, expressions such as
+`head { … }`, `head "x" (e) { … }` and `head Shape`, and declarations such
+as `head table Name "t" { … }` and `head fn ping x = …`, and gives back the
+code each block stands for: an expression, or declarations of the module. The compiler checks, compiles and
 shows that code in place of the block, while the user's code inside the
 block keeps its own place in the file: errors, hovers and renames land on
 it.
@@ -25,17 +26,30 @@ point : { x : Float; label : String; blocks : Float }
 let point = pairs { x = 1.0 + 2.0; label : String = "a" }
 ```
 
-A head is a plugin block only in a file that imports it, and only before
-`{`: elsewhere `pairs { x = 1 }` is still a call with a record, and every
-file still parses on its own. Between the head and `{`, on the head's line,
-come its arguments: strings and `( … )`, as in `pairs "a" (1.0 + 2.0) { … }`.
-The arguments and the body are kept as tokens, brackets balanced, for the
-plugin to read.
+A head is a plugin block only in a file that imports it: elsewhere
+`pairs { x = 1 }` is still a call with a record, and every file still parses
+on its own. A head is no value, so what follows it on its line is its
+arguments, words, names, numbers, strings, paths such as `App.Api.place` and
+`( … )`, then maybe a body `{ … }`:
+
+| Form | Where | Example |
+| - | - | - |
+| `head args { body }` | an expression | `pairs "a" (1.0 + 2.0) { x = 1.0 }`, `sql p { … }` |
+| `head args` | an expression | `schema Shape`, `server App.Api.place` |
+| `head args { body }` | the start of a declaration | `sql table Users "users" { … }` |
+| `head args rest` | the start of a declaration | `server fn ping (n : Int) = n + 1` |
+
+The arguments, the body and the rest are kept as tokens, brackets balanced,
+for the plugin to read. The rest of a declaration runs to the next
+declaration, a line at column 1 that is not a closing bracket. Raw text, such
+as SQL with `'quotes'` and `-- comments`, is a raw or multi-line string
+argument, `head migration 1 "init" r#"…"#`, which `flick_plugin::string_value`
+gives the value of.
 
 The compiler comes with the plugin of `std`, whose head is `cli` (see
-[command-line applications](../cli-dsl/)). Its head is a block even in a file
-that does not import it, so the compiler can say which import it needs:
-`FLICK-P037`, whose fix `flick check --fix` applies.
+[command-line applications](../cli-dsl/)). `cli "x" { … }`, with its body, is
+a block even in a file that does not import it, so the compiler can say which
+import it needs: `FLICK-P037`, whose fix `flick check --fix` applies.
 
 The plugin is the one of the package the imported module belongs to; a
 module of the project or a built-in one has none. The code a plugin gives
@@ -63,27 +77,34 @@ empty list leaves the user's code to the usual completion), `hover(block,
 state, offset)` what a span means, and `highlight(block, state)` the spans
 of the plugin's own words, as keywords or parameters.
 
-A block shows its head; its text, from its first argument (or from the body,
-without arguments) to the closing `}`; `body`, where the body starts in that
-text; and the tokens of the arguments and the body, `{` left out. All spans
-count from the start of the text. The user's expressions and types in it,
-the holes, are parsed by the compiler: `parse-expr(start, end)` and
-`parse-type(start, end)` give the longest expression or type from `start`
-on, with the layout of where it stands in the file.
+A block shows its head; its `place`, an expression or a declaration; its
+text, from its first argument (or from the body, without arguments) to the
+closing `}` or its end; `body`, where the body starts in that text (its
+length without one); and the tokens of the arguments, the body and the rest,
+`{` left out. All spans count from the start of the text. The user's code in
+it, the holes, is parsed by the compiler: `parse-expr(start, end)`,
+`parse-type`, `parse-pat` and `parse-decl` give the longest expression, type
+or pattern from `start` on, or the declaration there, with the layout of
+where it stands in the file.
 
-The code is an arena of core syntax, each node after the nodes it refers
-to and with the span of the body it stands for:
+The code of a block that is an expression is an expression; that of a
+declaration is declarations, which take the block's place among the module's
+and are the module's like any other: exported with `exposing`, seen by its
+importers, a signature above the block for the first of them with its name.
+The code is an arena of core syntax, each node after the nodes it refers to
+and with the span of the block it stands for:
 
 | Kind | Nodes |
 | - | - |
 | expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole |
 | type | name, application, record, function, type-level text (`"name"`), `_`, hole |
-| pattern | variable, wildcard, constructor, record |
+| pattern | variable, wildcard, constructor, record, hole |
+| declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, `instance` with members, a group of several, hole |
 
 The compiler checks the arena before it uses it: names must lex as names,
 numbers be finite, holes lie in the body and be used once, and its size and
 depth are bounded. The arena version is the version of the interface,
-`0.2.0`; a component built for another version does not load.
+`0.3.0`; a component built for another version does not load.
 
 ## Writing one in Rust
 
@@ -145,12 +166,19 @@ where it stands:
 `#(..xs)` puts each item of a collection in a list, in the arguments of an
 application or in the fields of a record (`(label, value)` pairs);
 `flick!(b @ span, code)` gives the nodes their origin, and
-`flick!(b, type T)` builds a type. Fixed names are written as they are:
+`flick!(b, ty T)` builds a type. Fixed names are written as they are:
 `flick!(b, Cli.flag (Record.label : Record.Label #field) [#(..&aliases)] #help #multi #spec)`.
+Code that starts as a declaration builds one, its name written or
+`#(expr)`: `flick!(b, let #(name) x : Float = f x)`, `flick!(b, size : Int)`,
+`flick!(b, type alias #(name) = { #(..fields) })`,
+`flick!(b, type Color = Red | Rgb Float Float deriving Show)` and
+`flick!(b, instance Show #(Name(t)) { let show _ = #t })`; `b.group(ids)`
+gives several, and a `Span` in a declaration's place is the user's.
 
-A block is read with a cursor over the tokens of its body: `eat(":")`,
-`ident()`, `strings()`, and `expr(compiler)` or `ty(compiler)`, which ask
-the compiler for the user's code from the next token on and go past it.
+A block is read with a cursor over its tokens, `block.cursor()` from the
+first or `block.body()` from the body: `eat(":")`, `ident()`, `strings()`,
+`rest()`, and `expr(compiler)`, `ty`, `pat` or `decl`, which ask the
+compiler for the user's code from the next token on and go past it.
 `block.arguments()` are the tokens of the head's arguments, and
 `block.docs_above(offset, " ")` the `///` lines above what starts at
 `offset`.
@@ -203,9 +231,12 @@ dropped.
 
 ## Not yet
 
-Declarations and modifiers, raw-text blocks, permissions, warnings of
-plugins and checks after typing come later. A plugin block inside the
-user's code of another block is not a block. `collect`
-sees the modules the run loads, so `flick check one.fl` gives it fewer
-blocks than a whole build. Generated names are not hygienic. A package whose
-modules have plugin blocks is checked again in each build.
+Permissions, warnings of plugins and checks after typing come later. A
+plugin block inside the user's code of another block is not a block. Generated
+names are not hygienic: one the module declares too is `FLICK-R008` on the
+block, and a name of a declaration's code is found at the block. Generated
+declarations have no `///` documentation, and a companion such as
+`Users.table` cannot be declared: a plugin names its values plainly.
+`collect` sees the modules the run loads, so `flick check one.fl` gives it
+fewer blocks than a whole build. A package whose modules have plugin blocks
+is checked again in each build.

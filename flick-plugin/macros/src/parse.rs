@@ -9,6 +9,7 @@
 //!   `A -> B`, `{ l : T; … }`;
 //! - patterns: names, `_`, `Con p …`, `{ l; l = p }`.
 
+mod decls;
 mod types;
 
 use proc_macro2::{Delimiter, Literal, Span, TokenStream as Tokens, TokenTree};
@@ -327,6 +328,7 @@ impl Parser {
             Role::Expr => self.expr()?,
             Role::Ty => self.ty()?,
             Role::Pat => self.pat()?,
+            Role::Decl => self.decl()?,
         }))
     }
 
@@ -357,6 +359,7 @@ impl Parser {
                     Role::Pat => Role::Pat.node(
                         &quote!(::flick_plugin::Pat::Var(::std::string::String::from(#label))),
                     ),
+                    Role::Decl => return self.error("a declaration is no record"),
                 };
                 pushes.push(quote!({
                     let __v = #value;

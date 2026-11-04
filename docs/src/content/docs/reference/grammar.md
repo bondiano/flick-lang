@@ -225,6 +225,7 @@ ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
             | service | class | instance | foreign | sql_table | component
+            | head { head_arg } ("{" { token } "}" | { token })   // a plugin's, to the next decl
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
@@ -386,8 +387,10 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
-            | head { String | "(" { token } ")" } "{" { token } "}"
-                                            // a head an import exposes as `plugin head`, or `cli`
+            | head { head_arg } ["{" { token } "}"]
+                                            // a head an import exposes as `plugin head`, with an
+                                            // argument or a body; `cli` with its body
+head_arg    = name | Con | Number | String | "." | "(" { token } ")"   // on the head's line
 do_stmt     = bind { "and" bind } | "if" expr | statement
 bind        = or_pattern "<-" expr
 clause_list = for_clause { ";" | line break | before "if" … for_clause }

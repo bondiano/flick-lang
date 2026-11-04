@@ -1,7 +1,7 @@
 //! Building an [`Arena`]: each node is pushed after the nodes it refers to,
 //! with the origin last set by [`Builder::at`].
 
-use crate::{Arena, Expr, Kind, Node, NodeId, Pat, Span, Ty};
+use crate::{Arena, Decl, Expr, Kind, Node, NodeId, Pat, Span, Ty};
 
 pub struct Builder {
     nodes: Vec<Node>,
@@ -36,6 +36,16 @@ impl Builder {
 
     pub fn ty(&mut self, ty: Ty) -> NodeId {
         self.push(Kind::Ty(ty))
+    }
+
+    pub fn decl(&mut self, decl: Decl) -> NodeId {
+        self.push(Kind::Decl(decl))
+    }
+
+    /// The declarations `decls`, in order: the code of a block that gives
+    /// several.
+    pub fn group(&mut self, decls: Vec<NodeId>) -> NodeId {
+        self.decl(Decl::Group(decls))
     }
 
     pub fn pat(&mut self, pat: Pat) -> NodeId {
@@ -103,9 +113,29 @@ impl Kind {
                 Ty::Function { input, output } => vec![*input, *output],
             },
             Kind::Pat(pat) => match pat {
-                Pat::Var(_) | Pat::Wildcard => Vec::new(),
+                Pat::Var(_) | Pat::Wildcard | Pat::Hole(_) => Vec::new(),
                 Pat::Con { arguments, .. } => arguments.clone(),
                 Pat::Record(entries) => fields(entries),
+            },
+            Kind::Decl(decl) => match decl {
+                Decl::Let {
+                    params, ty, body, ..
+                } => params.iter().copied().chain(*ty).chain([*body]).collect(),
+                Decl::Signature { ty, .. } | Decl::Alias { ty, .. } => vec![*ty],
+                Decl::Adt { cases, .. } => cases
+                    .iter()
+                    .flat_map(|c| c.fields.iter().copied())
+                    .collect(),
+                Decl::Instance {
+                    context,
+                    head,
+                    members,
+                } => (context.iter().copied())
+                    .chain([*head])
+                    .chain(members.iter().copied())
+                    .collect(),
+                Decl::Group(decls) => decls.clone(),
+                Decl::Hole(_) => Vec::new(),
             },
         }
     }

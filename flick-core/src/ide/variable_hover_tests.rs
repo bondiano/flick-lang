@@ -30,7 +30,8 @@ service Setup (s : Region) =
     let tokens = ide.analysis.by_file(file).expect("module").tree.tokens();
     let check_kind = |start: usize, end: usize, expected: &[(&str, &str)]| {
         for token in &tokens {
-            if token.kind != K::Ident || token.start < start as u32 || token.end > end as u32 {
+            if token.kind != K::Ident || (token.start as usize) < start || token.end as usize > end
+            {
                 continue;
             }
             let name = token.text(source);
@@ -85,7 +86,10 @@ service Setup (s : Region) =
         let start = u32::try_from(source.find(&format!("  {name} :")).expect("operation") + 2)
             .expect("small");
         let (markdown, range) = ide.hover(file, start).expect("operation hover");
-        assert_eq!(range, (start, start + name.len() as u32));
+        assert_eq!(
+            range,
+            (start, start + u32::try_from(name.len()).expect("small"))
+        );
         assert!(
             markdown.contains(&format!("Setup.{name} : forall")),
             "{markdown}"
@@ -116,8 +120,8 @@ let equal expected actual = Pass
     for token in ide.analysis.by_file(file).expect("module").tree.tokens() {
         if token.kind != K::Ident
             || token.text(source) != "a"
-            || token.start < signature as u32
-            || token.end > end as u32
+            || (token.start as usize) < signature
+            || token.end as usize > end
         {
             continue;
         }
@@ -171,7 +175,8 @@ instance Foldable (Result e) =
         ),
     ] {
         for token in &tokens {
-            if token.kind != K::Ident || token.start < start as u32 || token.end > end as u32 {
+            if token.kind != K::Ident || (token.start as usize) < start || token.end as usize > end
+            {
                 continue;
             }
             let kind = match token.text(source) {
@@ -210,7 +215,8 @@ foreign pure clock_test from \"runtime\" \"clockTest\"
     let signature = source.find("clock_test :").expect("signature");
     let end = source.find("\nforeign pure").expect("definition");
     for token in ide.analysis.by_file(file).expect("module").tree.tokens() {
-        if token.kind != K::Ident || token.start < signature as u32 || token.end > end as u32 {
+        if token.kind != K::Ident || (token.start as usize) < signature || token.end as usize > end
+        {
             continue;
         }
         let (kind, phrase) = match token.text(source) {

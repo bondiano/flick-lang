@@ -213,7 +213,7 @@ impl Loader<'_> {
                 match results.expand(plugin.as_ref(), block, &state, &mut f.source) {
                     Ok(arena) => {
                         let len = u32::try_from(block.text.len()).expect("source fits in u32");
-                        match render(&arena, len) {
+                        match render(&arena, len, block.place) {
                             Ok(code) => rendered[j] = Some(code),
                             Err(why) => diagnostics.push(failure(
                                 f,

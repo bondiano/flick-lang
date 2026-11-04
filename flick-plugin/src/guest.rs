@@ -40,6 +40,18 @@ impl Compiler for Imports {
             .map(convert::from_hole)
             .map_err(convert::from_diagnostic)
     }
+
+    fn parse_pat(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic> {
+        compiler::parse_pat(start, end)
+            .map(convert::from_hole)
+            .map_err(convert::from_diagnostic)
+    }
+
+    fn parse_decl(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic> {
+        compiler::parse_decl(start, end)
+            .map(convert::from_hole)
+            .map_err(convert::from_diagnostic)
+    }
 }
 
 #[doc(hidden)]

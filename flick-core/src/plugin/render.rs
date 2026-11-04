@@ -1,9 +1,14 @@
 //! Generated code as text: an arena of core syntax printed on one line,
 //! every compound in parentheses so that neither layout nor precedence
-//! matters, with where each node and each hole ended up. The arena comes
-//! from a plugin, or from a cache of one, so everything is checked first.
+//! matters, with where each node and each hole ended up; declarations each
+//! on a line of their own. The arena comes from a plugin, or from a cache
+//! of one, so everything is checked first.
 
-use flick_plugin::{Arena, Expr, Field, Hole, HoleKind, Kind, NodeId, Pat, Span, Ty};
+mod decl;
+
+use flick_plugin::{Arena, Expr, Field, Hole, HoleKind, Kind, NodeId, Pat, Place, Span, Ty};
+
+pub use decl::DECL_PLACEHOLDER;
 
 use crate::source::FileId;
 use crate::syntax::kind::SyntaxKind as K;
@@ -25,8 +30,9 @@ pub struct Rendered {
     pub holes: Vec<(u32, Hole)>,
 }
 
-/// `arena` as text, for a block whose body is `body_len` bytes long.
-pub fn render(arena: &Arena, body_len: u32) -> Result<Rendered, String> {
+/// `arena` as text, for a block whose body is `body_len` bytes long and that
+/// stands at `place`: an expression, or declarations.
+pub fn render(arena: &Arena, body_len: u32, place: Place) -> Result<Rendered, String> {
     if arena.nodes.len() > MAX_NODES {
         return Err(format!("more than {MAX_NODES} nodes"));
     }
@@ -37,7 +43,11 @@ pub fn render(arena: &Arena, body_len: u32) -> Result<Rendered, String> {
         origins: Vec::new(),
         holes: Vec::new(),
     };
-    out.node(arena.root, Role::Expr, 0)?;
+    let role = match place {
+        Place::Expression => Role::Expr,
+        Place::Declaration => Role::Decl,
+    };
+    out.node(arena.root, role, 0)?;
     let mut holes: Vec<Span> = out.holes.iter().map(|(_, h)| h.span).collect();
     holes.sort_by_key(|s| (s.start, s.end));
     if holes.windows(2).any(|w| w[1].start < w[0].end) {
@@ -55,6 +65,7 @@ enum Role {
     Expr,
     Ty,
     Pat,
+    Decl,
 }
 
 struct Printer<'a> {
@@ -84,6 +95,7 @@ impl Printer<'_> {
             (Kind::Expr(expr), Role::Expr) => self.expr(expr, depth)?,
             (Kind::Ty(ty), Role::Ty) => self.ty(ty, depth)?,
             (Kind::Pat(pat), Role::Pat) => self.pat(pat, depth)?,
+            (Kind::Decl(decl), Role::Decl) => self.decl(decl, depth)?,
             (_, role) => return Err(format!("node {id} is not a {role:?}")),
         }
         if self.text.len() > MAX_TEXT {
@@ -185,6 +197,7 @@ impl Printer<'_> {
                 self.push(")");
             }
             Pat::Record(fields) => self.record(fields, " = ", Role::Pat, d)?,
+            Pat::Hole(span) => self.hole(HoleKind::Pat, *span, "hole")?,
         }
         Ok(())
     }

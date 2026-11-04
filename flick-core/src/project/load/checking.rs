@@ -265,7 +265,7 @@ impl Checking<'_> {
         // store-local type variables in its inferred schemes. Importers must
         // not read those variables with their own unification store.
         let broken = !loaded.parse.diagnostics.is_empty();
-        let untyped = interface.clone();
+        let mut untyped = interface.clone();
         let (checked, typing) =
             types::check_typed(&module, lookup, types::builtins(), options, &mut interface);
         let checked = types::beside_syntax_errors(tree, checked);
@@ -282,6 +282,8 @@ impl Checking<'_> {
         }
         if let Some(expansion) = &loaded.expansion {
             expansion.restore(&mut diagnostics, ir.as_mut());
+            expansion.place_interface(&mut interface);
+            expansion.place_interface(&mut untyped);
         }
         // editors find and rename names of the module's own text only
         #[cfg(feature = "ide")]

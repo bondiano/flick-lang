@@ -1,6 +1,6 @@
 //! `flick!` builds the nodes its Flick says, the same a builder would.
 
-use flick_plugin::{Builder, Expr, Field, Kind, Name, Pat, Span, Ty, Wildcard, flick};
+use flick_plugin::{Builder, Decl, Expr, Field, Kind, Name, Pat, Span, Ty, Wildcard, flick};
 
 fn span(start: u32, end: u32) -> Span {
     Span { start, end }
@@ -60,7 +60,7 @@ fn spreads_records_lambdas_and_fields() {
     let made = kinds(|b| {
         let built = flick!(b, ());
         flick!(b, f [#(..&holes), "x"] { a = #built; b = (fun { a; b = _ } -> a.c) } (1, #(..&holes)));
-        flick!(b, type (#(Name("M.T")) -> { #(..fields) }));
+        flick!(b, ty (#(Name("M.T")) -> { #(..fields) }));
     });
     let tail = &made[made.len() - 5..];
     assert_eq!(
@@ -111,4 +111,50 @@ fn an_origin_is_set_for_the_nodes() {
     let root = flick!(b @ &word, Cli.group x);
     let arena = b.finish(root);
     assert!(arena.nodes.iter().all(|n| n.origin == word));
+}
+
+#[test]
+fn declarations_are_built_as_written() {
+    let body = span(4, 6);
+    let made = kinds(|b| {
+        flick!(b, let #("double") x (#body) : Float = f x);
+        flick!(b, twice : Float -> Float);
+        flick!(b, type alias Point a = { x : a });
+        flick!(b, type Color = Red | Rgb Float Float deriving Show, Cli.Value);
+        flick!(b, instance Show a => Show (Box a) { let show _ = "box"; size : Int });
+    });
+    let decls: Vec<&Decl> = (made.iter())
+        .filter_map(|k| match k {
+            Kind::Decl(d) => Some(d),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        matches!(decls[0], Decl::Let { name, params, ty: Some(_), .. } if name == "double" && params.len() == 2)
+    );
+    assert!(made.contains(&Kind::Pat(Pat::Hole(body))));
+    assert!(matches!(decls[1], Decl::Signature { name, .. } if name == "twice"));
+    assert!(
+        matches!(decls[2], Decl::Alias { name, params, .. } if name == "Point" && params == &["a"])
+    );
+    let Decl::Adt {
+        cases, deriving, ..
+    } = decls[3]
+    else {
+        panic!("{:?}", decls[3]);
+    };
+    assert_eq!(
+        cases
+            .iter()
+            .map(|c| (c.name.as_str(), c.fields.len()))
+            .collect::<Vec<_>>(),
+        [("Red", 0), ("Rgb", 2)]
+    );
+    assert_eq!(deriving, &["Show", "Cli.Value"]);
+    // the members come before their instance
+    assert!(matches!(decls[4], Decl::Let { name, .. } if name == "show"));
+    assert!(matches!(decls[5], Decl::Signature { name, .. } if name == "size"));
+    assert!(
+        matches!(decls[6], Decl::Instance { context, members, .. } if context.len() == 1 && members.len() == 2)
+    );
 }

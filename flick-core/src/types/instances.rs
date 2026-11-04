@@ -20,6 +20,7 @@ use crate::syntax::kind::SyntaxKind as K;
 impl Checker<'_> {
     /// Checks the methods of `instance`; the methods it takes from the
     /// class's defaults, with how many dictionaries of their own each takes.
+    #[allow(clippy::too_many_lines)]
     pub(super) fn instance_methods(
         &mut self,
         decl: &Node,

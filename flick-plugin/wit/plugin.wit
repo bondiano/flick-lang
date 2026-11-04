@@ -1,4 +1,4 @@
-package flick:plugin@0.2.0;
+package flick:plugin@0.3.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -10,12 +10,18 @@ interface types {
   /// A token of the body, trivia left out.
   record token { kind: token-kind, span: span }
 
-  /// A block `head args { body }`: the text from its first argument (or from
-  /// its body, without arguments) to the closing `}`, where the body starts in
-  /// it, and the tokens of the arguments and the body, `{` left out.
-  record block { head: string, text: string, body: u32, tokens: list<token> }
+  /// Where a block stands: in an expression, whose code is an expression,
+  /// or as a declaration of the module, whose code is declarations.
+  enum place { expression, declaration }
 
-  enum hole-kind { expr, ty }
+  /// A block `head args { body }`, `head args` or, as a declaration, `head
+  /// args rest`: the text from its first argument (or from its body, without
+  /// arguments) to the closing `}` or its end, where the body starts in it
+  /// (its length without one), and the tokens of the arguments, the body and
+  /// the rest, `{` left out.
+  record block { head: string, text: string, body: u32, place: place, tokens: list<token> }
+
+  enum hole-kind { expr, ty, pat, decl }
 
   /// User code in the body that the compiler parsed: an expression or a type.
   record hole { kind: hole-kind, span: span }
@@ -64,9 +70,31 @@ interface types {
     wildcard,
     con(con-pat),
     %record(list<field>),
+    hole(span),
   }
 
-  variant kind { expr(expr), ty(ty), pat(pat) }
+  record let-decl { name: string, params: list<node-id>, ty: option<node-id>, body: node-id }
+  record signature { name: string, ty: node-id }
+  record alias { name: string, params: list<string>, ty: node-id }
+  /// A constructor of a type and the types of its fields.
+  record %case { name: string, fields: list<node-id> }
+  record adt { name: string, params: list<string>, cases: list<%case>, deriving: list<string> }
+  record instance { context: list<node-id>, head: node-id, members: list<node-id> }
+
+  /// A declaration of the module.
+  variant decl {
+    %let(let-decl),
+    signature(signature),
+    alias(alias),
+    adt(adt),
+    instance(instance),
+    /// Declarations in order: the code of a block that gives several.
+    group(list<node-id>),
+    /// The user's declaration at this span.
+    hole(span),
+  }
+
+  variant kind { expr(expr), ty(ty), pat(pat), decl(decl) }
 
   /// A node of generated code and the span of the body it stands for.
   record node { kind: kind, origin: span }
@@ -102,6 +130,10 @@ interface compiler {
   parse-expr: func(start: u32, end: u32) -> result<hole, diagnostic>;
   /// The longest type of the body from `start` on, before `end`.
   parse-type: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// The longest pattern of the body from `start` on, before `end`.
+  parse-pat: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// The declaration of the block from `start` on, before `end`.
+  parse-decl: func(start: u32, end: u32) -> result<hole, diagnostic>;
 }
 
 world plugin {

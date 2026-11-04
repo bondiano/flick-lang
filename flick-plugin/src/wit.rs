@@ -26,6 +26,10 @@ macro_rules! wit_conversions {
                     head: b.head.clone(),
                     text: b.text.clone(),
                     body: b.body,
+                    place: match b.place {
+                        $crate::Place::Expression => w::Place::Expression,
+                        $crate::Place::Declaration => w::Place::Declaration,
+                    },
                     tokens: b.tokens.iter().map(|t| w::Token {
                         kind: match t.kind {
                             $crate::TokenKind::Ident => w::TokenKind::Ident,
@@ -45,6 +49,10 @@ macro_rules! wit_conversions {
                     head: b.head,
                     text: b.text,
                     body: b.body,
+                    place: match b.place {
+                        w::Place::Expression => $crate::Place::Expression,
+                        w::Place::Declaration => $crate::Place::Declaration,
+                    },
                     tokens: b.tokens.into_iter().map(|t| $crate::Token {
                         kind: match t.kind {
                             w::TokenKind::Ident => $crate::TokenKind::Ident,
@@ -64,6 +72,8 @@ macro_rules! wit_conversions {
                     kind: match h.kind {
                         $crate::HoleKind::Expr => w::HoleKind::Expr,
                         $crate::HoleKind::Ty => w::HoleKind::Ty,
+                        $crate::HoleKind::Pat => w::HoleKind::Pat,
+                        $crate::HoleKind::Decl => w::HoleKind::Decl,
                     },
                     span: to_span(h.span),
                 }
@@ -74,6 +84,8 @@ macro_rules! wit_conversions {
                     kind: match h.kind {
                         w::HoleKind::Expr => $crate::HoleKind::Expr,
                         w::HoleKind::Ty => $crate::HoleKind::Ty,
+                        w::HoleKind::Pat => $crate::HoleKind::Pat,
+                        w::HoleKind::Decl => $crate::HoleKind::Decl,
                     },
                     span: from_span(h.span),
                 }
@@ -181,6 +193,31 @@ macro_rules! wit_conversions {
                             $crate::Pat::Wildcard => w::Pat::Wildcard,
                             $crate::Pat::Con { name, arguments } => w::Pat::Con(w::ConPat { name, arguments }),
                             $crate::Pat::Record(f) => w::Pat::Record(to_fields(f)),
+                            $crate::Pat::Hole(s) => w::Pat::Hole(to_span(s)),
+                        }),
+                        $crate::Kind::Decl(d) => w::Kind::Decl(match d {
+                            $crate::Decl::Let { name, params, ty, body } => {
+                                w::Decl::Let(w::LetDecl { name, params, ty, body })
+                            }
+                            $crate::Decl::Signature { name, ty } => {
+                                w::Decl::Signature(w::Signature { name, ty })
+                            }
+                            $crate::Decl::Alias { name, params, ty } => {
+                                w::Decl::Alias(w::Alias { name, params, ty })
+                            }
+                            $crate::Decl::Adt { name, params, cases, deriving } => {
+                                w::Decl::Adt(w::Adt {
+                                    name,
+                                    params,
+                                    cases: cases.into_iter().map(|c| w::Case { name: c.name, fields: c.fields }).collect(),
+                                    deriving,
+                                })
+                            }
+                            $crate::Decl::Instance { context, head, members } => {
+                                w::Decl::Instance(w::Instance { context, head, members })
+                            }
+                            $crate::Decl::Group(d) => w::Decl::Group(d),
+                            $crate::Decl::Hole(s) => w::Decl::Hole(to_span(s)),
                         }),
                     },
                     origin: to_span(n.origin),
@@ -220,6 +257,21 @@ macro_rules! wit_conversions {
                             w::Pat::Wildcard => $crate::Pat::Wildcard,
                             w::Pat::Con(c) => $crate::Pat::Con { name: c.name, arguments: c.arguments },
                             w::Pat::Record(f) => $crate::Pat::Record(from_fields(f)),
+                            w::Pat::Hole(s) => $crate::Pat::Hole(from_span(s)),
+                        }),
+                        w::Kind::Decl(d) => $crate::Kind::Decl(match d {
+                            w::Decl::Let(l) => $crate::Decl::Let { name: l.name, params: l.params, ty: l.ty, body: l.body },
+                            w::Decl::Signature(s) => $crate::Decl::Signature { name: s.name, ty: s.ty },
+                            w::Decl::Alias(a) => $crate::Decl::Alias { name: a.name, params: a.params, ty: a.ty },
+                            w::Decl::Adt(a) => $crate::Decl::Adt {
+                                name: a.name,
+                                params: a.params,
+                                cases: a.cases.into_iter().map(|c| $crate::Case { name: c.name, fields: c.fields }).collect(),
+                                deriving: a.deriving,
+                            },
+                            w::Decl::Instance(i) => $crate::Decl::Instance { context: i.context, head: i.head, members: i.members },
+                            w::Decl::Group(d) => $crate::Decl::Group(d),
+                            w::Decl::Hole(s) => $crate::Decl::Hole(from_span(s)),
                         }),
                     },
                     origin: from_span(n.origin),

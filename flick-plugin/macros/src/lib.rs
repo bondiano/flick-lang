@@ -4,7 +4,8 @@
 //! there, a string a text, a `NodeId` a node built before, `Name("M.f")` a
 //! name. `#(..xs)` puts each item of `xs` in a list, the arguments of an
 //! application or the fields of a record. `flick!(b @ span, code)` gives the
-//! nodes the origin `span`, and `flick!(b, type T)` builds a type.
+//! nodes the origin `span`, and `flick!(b, ty T)` builds a type. Code that
+//! starts as a declaration builds one: `flick!(b, let #(name) x = e)`.
 //!
 //! The code is parsed when the plugin is compiled: what is not Flick the
 //! arena holds is an error of `cargo build`.
@@ -49,9 +50,11 @@ fn expand(input: Tokens) -> Result<Tokens, Error> {
         ));
     }
     let mut p = Parser::new(code.to_vec(), Span::call_site());
-    let node = if p.at_word("type") {
+    let node = if p.at_word("ty") {
         p.bump();
         p.ty()?
+    } else if p.at_decl() {
+        p.decl()?
     } else {
         p.expr()?
     };

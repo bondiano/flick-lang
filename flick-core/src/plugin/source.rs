@@ -1,17 +1,18 @@
 //! A plugin block as its plugin sees it, and the holes it asks the compiler
-//! to parse: the text and tokens of the head's arguments and the body, with
-//! offsets from the first argument (or from the body, without arguments),
-//! and the user's expressions and types parsed where they stand.
+//! to parse: the text and tokens of the head's arguments, the body and the
+//! rest of a declaration, with offsets from the first argument (or from the
+//! body, without arguments), and the user's expressions, types, patterns
+//! and declarations parsed where they stand.
 
 use std::sync::Arc;
 
-use flick_plugin::{Block, Compiler, Hole, HoleKind, Span, Token as PluginToken, TokenKind};
+use flick_plugin::{Block, Compiler, Hole, HoleKind, Place, Span, Token as PluginToken, TokenKind};
 
 use crate::diagnostics::Diagnostic;
 use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::{Fragment, parse_expr_at, parse_type_at};
+use crate::syntax::{Fragment, parse_decl_at, parse_expr_at, parse_pat_at, parse_type_at};
 
 /// A plugin block of a module and what its plugin asked of it.
 #[derive(Default)]
@@ -23,9 +24,10 @@ pub struct BlockSource {
     /// where the body ends, in the module text.
     start: u32,
     end: u32,
-    /// Where the body starts in the frame.
+    /// Where the body starts in the frame; its length without a body.
     body: u32,
     closed: bool,
+    place: Place,
     /// The tokens of the arguments and the body, trivia included and `{`
     /// left out, at their places in the text.
     tokens: Vec<Token>,
@@ -34,36 +36,56 @@ pub struct BlockSource {
 }
 
 impl BlockSource {
-    /// The block `node`, a `PluginExpr` of the module text `text`; `None`
-    /// for a block without `{`. Its frame starts at the first argument of
-    /// the head, or at the body without arguments, and ends at `}`, or at
-    /// the end of the node for a block not closed.
+    /// The block `node`, a `PluginExpr` or a `PluginDecl` of the module text
+    /// `text`. Its frame starts at the first argument of the head, or at the
+    /// body without arguments, and ends at `}`, or at the end of the node for
+    /// a block without a body or not closed.
     pub fn new(text: Arc<str>, file: FileId, node: &Node) -> Option<Self> {
-        let mut direct = node.child_tokens().filter(|t| !t.kind.is_trivia());
-        let head = direct.next().filter(|t| t.kind == K::Ident)?;
-        let first = direct.next()?;
-        let open = node.child_tokens().find(|t| t.kind == K::LBrace)?;
+        let head = node.child_tokens().find(|t| !t.kind.is_trivia())?;
+        if head.kind != K::Ident {
+            return None;
+        }
+        let all = node.tokens();
+        let first = (all.iter()).find(|t| !t.kind.is_trivia() && t.start > head.start)?;
+        // the braces of the body, not of an argument or of the rest
+        let open = node.child_tokens().find(|t| t.kind == K::LBrace);
         let close = node.child_tokens().find(|t| t.kind == K::RBrace);
-        let end = close.map_or(node.range().1, |c| c.start);
-        let start = if first.kind == K::LBrace {
-            open.end
-        } else {
-            first.start
+        let (_, node_end) = node.range();
+        let start = match open {
+            Some(o) if o.start == first.start => o.end,
+            _ => first.start,
         };
-        let tokens = (node.tokens().into_iter())
-            .filter(|t| start <= t.start && t.end <= end && t.start != open.start)
+        let (end, body, closed) = match (open, close) {
+            (Some(o), Some(c)) => (c.start, o.end, true),
+            (Some(o), None) => (node_end, o.end, false),
+            (None, _) => (node_end, node_end, true),
+        };
+        let tokens = (all.into_iter())
+            .filter(|t| start <= t.start && t.end <= end)
+            .filter(|t| open.is_none_or(|o| t.start != o.start))
             .collect();
+        let place = if node.kind == K::PluginDecl {
+            Place::Declaration
+        } else {
+            Place::Expression
+        };
         Some(BlockSource {
             head: head.text(&text).to_owned(),
             text,
             file,
             start,
-            body: open.end - start,
+            body: body - start,
             end,
-            closed: close.is_some(),
+            closed,
+            place,
             tokens,
             diagnostics: Vec::new(),
         })
+    }
+
+    /// Where the block stands.
+    pub fn place(&self) -> Place {
+        self.place
     }
 
     pub fn head(&self) -> &str {
@@ -123,6 +145,7 @@ impl BlockSource {
             head: self.head.clone(),
             text: self.text[self.start as usize..self.end as usize].to_owned(),
             body: self.body,
+            place: self.place,
             tokens,
         }
     }
@@ -150,6 +173,8 @@ impl BlockSource {
         let what = match kind {
             HoleKind::Expr => "an expression",
             HoleKind::Ty => "a type",
+            HoleKind::Pat => "a pattern",
+            HoleKind::Decl => "a declaration",
         };
         let Some(fragment) = self.fragment(kind, start, end) else {
             return Err(refuse(&format!("expected {what} here")));
@@ -177,6 +202,8 @@ impl BlockSource {
         match kind {
             HoleKind::Expr => parse_expr_at(&self.text, self.file, tokens),
             HoleKind::Ty => parse_type_at(&self.text, self.file, tokens),
+            HoleKind::Pat => parse_pat_at(&self.text, self.file, tokens),
+            HoleKind::Decl => parse_decl_at(&self.text, self.file, tokens),
         }
     }
 
@@ -195,6 +222,14 @@ impl Compiler for BlockSource {
 
     fn parse_type(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
         self.parse(HoleKind::Ty, start, end)
+    }
+
+    fn parse_pat(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
+        self.parse(HoleKind::Pat, start, end)
+    }
+
+    fn parse_decl(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
+        self.parse(HoleKind::Decl, start, end)
     }
 }
 
