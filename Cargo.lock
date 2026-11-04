@@ -340,6 +340,7 @@ name = "flick-core"
 version = "0.1.0"
 dependencies = [
  "annotate-snippets",
+ "flick-plugin",
  "flick-pretty",
  "insta",
  "semver",

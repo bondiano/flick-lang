@@ -1,0 +1,360 @@
+//! Generated code as text: an arena of core syntax printed on one line,
+//! every compound in parentheses so that neither layout nor precedence
+//! matters, with where each node and each hole ended up. The arena comes
+//! from a plugin, or from a cache of one, so everything is checked first.
+
+use flick_plugin::{Arena, Expr, Field, Hole, HoleKind, Kind, NodeId, Pat, Span, Ty};
+
+use crate::source::FileId;
+use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::lexer::lex;
+
+/// The most nodes, the deepest nesting and the longest text of generated code.
+const MAX_NODES: usize = 100_000;
+const MAX_DEPTH: u32 = 200;
+const MAX_TEXT: usize = 1 << 20;
+
+/// Generated code as text.
+#[derive(Debug, PartialEq)]
+pub struct Rendered {
+    pub text: String,
+    /// The range of `text` each node took, by every place it is used, and the
+    /// span of the body it comes from.
+    pub origins: Vec<((u32, u32), Span)>,
+    /// The offset in `text` of the placeholder of each hole, and the hole.
+    pub holes: Vec<(u32, Hole)>,
+}
+
+/// `arena` as text, for a block whose body is `body_len` bytes long.
+pub fn render(arena: &Arena, body_len: u32) -> Result<Rendered, String> {
+    if arena.nodes.len() > MAX_NODES {
+        return Err(format!("more than {MAX_NODES} nodes"));
+    }
+    let mut out = Printer {
+        arena,
+        body_len,
+        text: String::new(),
+        origins: Vec::new(),
+        holes: Vec::new(),
+    };
+    out.node(arena.root, Role::Expr, 0)?;
+    let mut holes: Vec<Span> = out.holes.iter().map(|(_, h)| h.span).collect();
+    holes.sort_by_key(|s| (s.start, s.end));
+    if holes.windows(2).any(|w| w[1].start < w[0].end) {
+        return Err("two holes overlap or one is used twice".into());
+    }
+    Ok(Rendered {
+        text: out.text,
+        origins: out.origins,
+        holes: out.holes,
+    })
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Role {
+    Expr,
+    Ty,
+    Pat,
+}
+
+struct Printer<'a> {
+    arena: &'a Arena,
+    body_len: u32,
+    text: String,
+    origins: Vec<((u32, u32), Span)>,
+    holes: Vec<(u32, Hole)>,
+}
+
+impl Printer<'_> {
+    fn node(&mut self, id: NodeId, role: Role, depth: u32) -> Result<(), String> {
+        if depth > MAX_DEPTH {
+            return Err(format!("nested deeper than {MAX_DEPTH}"));
+        }
+        let node = self
+            .arena
+            .nodes
+            .get(id as usize)
+            .ok_or_else(|| format!("no node {id}"))?;
+        if node.kind.children().iter().any(|&child| child >= id) {
+            return Err(format!("node {id} refers to a node after it"));
+        }
+        self.within(node.origin, "the origin of a node")?;
+        let start = self.offset();
+        match (&node.kind, role) {
+            (Kind::Expr(expr), Role::Expr) => self.expr(expr, depth)?,
+            (Kind::Ty(ty), Role::Ty) => self.ty(ty, depth)?,
+            (Kind::Pat(pat), Role::Pat) => self.pat(pat, depth)?,
+            (_, role) => return Err(format!("node {id} is not a {role:?}")),
+        }
+        if self.text.len() > MAX_TEXT {
+            return Err(format!("longer than {MAX_TEXT} bytes"));
+        }
+        self.origins.push(((start, self.offset()), node.origin));
+        Ok(())
+    }
+
+    fn expr(&mut self, expr: &Expr, depth: u32) -> Result<(), String> {
+        let d = depth + 1;
+        match expr {
+            Expr::Name(name) => self.name(name, Names::Value)?,
+            Expr::Number(n) => self.number(*n)?,
+            Expr::Text(text) => self.string(text),
+            Expr::Boolean(b) => self.push(if *b { "true" } else { "false" }),
+            Expr::Unit => self.push("()"),
+            Expr::Apply {
+                function,
+                arguments,
+            } => self.apply(*function, arguments, Role::Expr, d)?,
+            Expr::Lambda { params, body } => {
+                if params.is_empty() {
+                    return Err("a lambda without parameters".into());
+                }
+                self.push("(fun");
+                for &p in params {
+                    self.push(" ");
+                    self.node(p, Role::Pat, d)?;
+                }
+                self.push(" -> ");
+                self.node(*body, Role::Expr, d)?;
+                self.push(")");
+            }
+            Expr::Record(fields) => self.record(fields, " = ", Role::Expr, d)?,
+            Expr::Get { record, label } => {
+                self.push("(");
+                self.node(*record, Role::Expr, d)?;
+                self.push(").");
+                self.name(label, Names::Label)?;
+            }
+            Expr::Items(items) => self.sequence("[", items, "]", d)?,
+            Expr::Tuple(items) => {
+                if items.len() < 2 {
+                    return Err("a tuple of fewer than two items".into());
+                }
+                self.sequence("(", items, ")", d)?;
+            }
+            Expr::Annot { expr, ty } => {
+                self.push("(");
+                self.node(*expr, Role::Expr, d)?;
+                self.push(" : ");
+                self.node(*ty, Role::Ty, d)?;
+                self.push(")");
+            }
+            Expr::Hole(span) => self.hole(HoleKind::Expr, *span, "hole")?,
+        }
+        Ok(())
+    }
+
+    fn ty(&mut self, ty: &Ty, depth: u32) -> Result<(), String> {
+        let d = depth + 1;
+        match ty {
+            Ty::Name(name) => self.name(name, Names::Type)?,
+            Ty::Apply {
+                function,
+                arguments,
+            } => self.apply(*function, arguments, Role::Ty, d)?,
+            Ty::Record(fields) => self.record(fields, " : ", Role::Ty, d)?,
+            Ty::Function { input, output } => {
+                self.push("(");
+                self.node(*input, Role::Ty, d)?;
+                self.push(" -> ");
+                self.node(*output, Role::Ty, d)?;
+                self.push(")");
+            }
+            Ty::Hole(span) => self.hole(HoleKind::Ty, *span, "Hole")?,
+        }
+        Ok(())
+    }
+
+    fn pat(&mut self, pat: &Pat, depth: u32) -> Result<(), String> {
+        let d = depth + 1;
+        match pat {
+            Pat::Var(name) => self.name(name, Names::Label)?,
+            Pat::Wildcard => self.push("_"),
+            Pat::Con { name, arguments } if arguments.is_empty() => {
+                self.name(name, Names::Constructor)?;
+            }
+            Pat::Con { name, arguments } => {
+                self.push("(");
+                self.name(name, Names::Constructor)?;
+                for &a in arguments {
+                    self.push(" ");
+                    self.node(a, Role::Pat, d)?;
+                }
+                self.push(")");
+            }
+            Pat::Record(fields) => self.record(fields, " = ", Role::Pat, d)?,
+        }
+        Ok(())
+    }
+
+    /// `(f a b)`, or `f` alone without arguments.
+    fn apply(&mut self, f: NodeId, args: &[NodeId], role: Role, d: u32) -> Result<(), String> {
+        if args.is_empty() {
+            return self.node(f, role, d);
+        }
+        self.push("(");
+        self.node(f, role, d)?;
+        for &a in args {
+            self.push(" ");
+            self.node(a, role, d)?;
+        }
+        self.push(")");
+        Ok(())
+    }
+
+    fn record(&mut self, fields: &[Field], sep: &str, role: Role, d: u32) -> Result<(), String> {
+        if fields.is_empty() {
+            return Err("an empty record".into());
+        }
+        self.push("{ ");
+        for (i, field) in fields.iter().enumerate() {
+            if i > 0 {
+                self.push("; ");
+            }
+            self.name(&field.label, Names::Label)?;
+            self.push(sep);
+            self.node(field.value, role, d)?;
+        }
+        self.push(" }");
+        Ok(())
+    }
+
+    fn sequence(
+        &mut self,
+        open: &str,
+        items: &[NodeId],
+        close: &str,
+        d: u32,
+    ) -> Result<(), String> {
+        self.push(open);
+        for (i, &item) in items.iter().enumerate() {
+            if i > 0 {
+                self.push(", ");
+            }
+            self.node(item, Role::Expr, d)?;
+        }
+        self.push(close);
+        Ok(())
+    }
+
+    /// The placeholder of a hole: a name in parentheses, which the splice
+    /// replaces by the user's code at `span`.
+    fn hole(&mut self, kind: HoleKind, span: Span, placeholder: &str) -> Result<(), String> {
+        self.within(span, "a hole")?;
+        if span.start == span.end {
+            return Err("an empty hole".into());
+        }
+        self.push("(");
+        let at = self.offset();
+        self.holes.push((at, Hole { kind, span }));
+        self.push(placeholder);
+        self.push(")");
+        Ok(())
+    }
+
+    fn within(&self, span: Span, what: &str) -> Result<(), String> {
+        if span.start <= span.end && span.end <= self.body_len {
+            Ok(())
+        } else {
+            Err(format!(
+                "{what} at {}..{} is outside the body",
+                span.start, span.end
+            ))
+        }
+    }
+
+    fn name(&mut self, name: &str, names: Names) -> Result<(), String> {
+        if !names.accept(name) {
+            return Err(format!("`{name}` is not {}", names.describe()));
+        }
+        self.push(name);
+        Ok(())
+    }
+
+    /// A finite number; a negative one as `(-n)`.
+    fn number(&mut self, n: f64) -> Result<(), String> {
+        if !n.is_finite() {
+            return Err(format!("{n} is no number of Flick"));
+        }
+        let digits = format!("{:?}", n.abs());
+        let (tokens, errors) = lex(&digits, FileId::default());
+        if !errors.is_empty() || tokens.len() != 1 || tokens[0].kind != K::Number {
+            return Err(format!("{n} is no number of Flick"));
+        }
+        if n.is_sign_negative() {
+            self.push("(-");
+            self.push(&digits);
+            self.push(")");
+        } else {
+            self.push(&digits);
+        }
+        Ok(())
+    }
+
+    fn string(&mut self, text: &str) {
+        self.push("\"");
+        for c in text.chars() {
+            match c {
+                '"' => self.push("\\\""),
+                '\\' => self.push("\\\\"),
+                '\n' => self.push("\\n"),
+                '\t' => self.push("\\t"),
+                '\r' => self.push("\\r"),
+                c if c.is_control() => self.push(&format!("\\u{{{:x}}}", u32::from(c))),
+                c => self.text.push(c),
+            }
+        }
+        self.push("\"");
+    }
+
+    fn push(&mut self, s: &str) {
+        self.text.push_str(s);
+    }
+
+    fn offset(&self) -> u32 {
+        u32::try_from(self.text.len()).expect("generated code fits in u32")
+    }
+}
+
+/// What a name may be where it stands.
+#[derive(Clone, Copy)]
+enum Names {
+    /// A value, maybe qualified: `x`, `List.map`, `Just`, `Maybe.Just`.
+    Value,
+    /// A type or a type variable: `Int`, `Sql.Table`, `a`.
+    Type,
+    /// A constructor, maybe qualified.
+    Constructor,
+    /// A record label or a variable.
+    Label,
+}
+
+impl Names {
+    fn accept(self, name: &str) -> bool {
+        let (tokens, errors) = lex(name, FileId::default());
+        if !errors.is_empty() || tokens.is_empty() {
+            return false;
+        }
+        let kinds: Vec<K> = tokens.iter().map(|t| t.kind).collect();
+        let (last, path) = kinds.split_last().expect("a token");
+        // `Con.Con.` before the last part
+        let qualified = path.len() % 2 == 0
+            && path
+                .chunks(2)
+                .all(|pair| pair[0] == K::Con && pair[1] == K::Dot);
+        match self {
+            Names::Label => kinds == [K::Ident],
+            Names::Value | Names::Type => qualified && matches!(last, K::Ident | K::Con),
+            Names::Constructor => qualified && *last == K::Con,
+        }
+    }
+
+    fn describe(self) -> &'static str {
+        match self {
+            Names::Value => "a name",
+            Names::Type => "a type name",
+            Names::Constructor => "a constructor name",
+            Names::Label => "a lowercase name",
+        }
+    }
+}

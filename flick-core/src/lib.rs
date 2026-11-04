@@ -17,6 +17,7 @@ pub mod iface;
 pub mod ir;
 pub mod numeric;
 pub mod opt;
+pub mod plugin;
 pub mod project;
 #[cfg(feature = "ide")]
 pub mod projection;

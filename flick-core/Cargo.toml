@@ -45,6 +45,7 @@ toml = "1.1.8"
 
 [dependencies]
 annotate-snippets = { version = "0.12.17", optional = true }
+flick-plugin = { path = "../flick-plugin" }
 flick-pretty = { path = "../flick-pretty" }
 semver = { version = "1.0.26", optional = true }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
