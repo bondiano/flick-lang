@@ -66,7 +66,11 @@ A type that derives `Url` derives `Schema` too. Each constructor is a path:
 - A final record field is the query. Its fields have the same types, or an
   `Option` of one, which may be missing from the URL.
 - Any other field, a generic type or two constructors with the same URLs are
-  `FLICK-D009`, which names the field.
+  `std/D009`, which names the field.
+
+The plugin of `std` writes `Page.url` with `Route.codec Page.schema
+[Route.path Home "" [] None false, …]`, a segment `Route.segment`,
+`Route.words` or `Route.nested`, a query `Route.query`.
 
 `Route.print Page.url value` gives the path and query, percent-encoded as
 UTF-8. `Route.parse Page.url text` gives `Some value`, or `None` when no

@@ -52,8 +52,9 @@ let page = ui {
 A record type (a `type alias` of a record) that derives `Form` derives
 `Schema` too. Each field is typed from text: a `String`, a `Float`, a
 `Bool`, a refined type over one of them, or an `Option` of one, which is
-`None` when its input is empty. Any other field is `FLICK-D010`, which names
-the field.
+`None` when its input is empty. Any other field is `std/D010`, which names
+the field. The plugin of `std` writes both with `Form.make`, `Form.spec` and
+`Form.unsafe_field`.
 
 - `Signup.form : Form Signup` is what `Form.draft` takes.
 - `Signup.fields` is a record with a `Form.Field` per field. A misspelt

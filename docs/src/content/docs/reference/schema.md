@@ -32,14 +32,16 @@ it is `FLICK-D006`.
 
 ## Deriving
 
-`deriving Schema` defines the witness `schema T`:
+`deriving Schema` defines the witness `schema T`. The plugin of `std` writes
+it in Flick, with the combinators of `Schema` below, which `flick expand`
+shows:
 
 | Declaration | Witness |
 | - | - |
 | `type Shape = …`, an alias of a record or tuple, a `type error` | `Schema Shape` |
 | `type Tree a = …` | `Schema a -> Schema (Tree a)` |
 | `type alias PairOf f = { count : f Float }` | `(forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)` |
-| a parameter the representation does not use (phantom) | no witness for it |
+| a phantom parameter, which the representation does not use | a witness all the same |
 
 ```flick
 tree_schema : Schema a -> Schema (Tree a)
@@ -49,11 +51,28 @@ let tree_schema item_schema =
 
 Every field needs a witness: a primitive, `List`, `Option`, `Result`,
 `Redacted`, a tuple or a closed record of them, a type parameter, or a type
-that derives `Schema` itself. A reference to a type of the same module is
-lazy, so recursive and mutually recursive types work. A function, a `Ref`, a
-scoped resource or a runtime description (`Eff`, `Layer`, a codec) has no
-witness: `FLICK-D001` names the path of the field, as `Session.handler`.
-`schema T` of a type that does not derive `Schema` is `FLICK-D001` too.
+that derives `Schema` itself. An alias of the module is written out; a type
+of another module, an alias among them, names its own witness, so it
+derives `Schema` too. A reference to a type of the same module is lazy, so
+recursive and mutually recursive types work. A function, a `Ref`, a scoped
+resource or a runtime description (`Eff`, `Layer`, a codec) has no witness:
+`std/D001` names the path of the field, as `Session.handler`. `schema T` of
+a type that does not derive `Schema` is `FLICK-D001`.
+
+The combinators the derive writes are values of `Schema` a program may use:
+
+| Combinator | Witness |
+| - | - |
+| `Schema.int`, `Schema.number`, `Schema.string`, … | a primitive |
+| `Schema.unsafe_record [Schema.field "x" s, …]` | a record, its fields in label order |
+| `Schema.unsafe_tuple [Schema.item s, …]` | a tuple |
+| `Schema.unsafe_adt "Shape" [Schema.unsafe_case Circle [Schema.item s], …]` | a variant type, its constructors given as values |
+| `Schema.lazy "T" (fun _ -> s)` | a reference named `T` in JSON Schema, made on first use |
+| `Schema.recursive "T" (fun self -> s)` | a recursive type, `self` the reference to it |
+| `Schema.unsafe_unboxed s`, `Schema.unsafe_refined "T" known s T.parse` | an `unboxed type`, a refined one |
+
+Nothing checks that an `unsafe_` combinator's parts are those of its type:
+the derive writes them under the witness's signature.
 
 ## The codec DSL
 
