@@ -166,7 +166,9 @@ fn editors_see_the_users_code_inside_a_declaration() {
 
 #[test]
 fn the_code_of_a_declaration_shows_as_declarations() {
-    let source = format!("{IMPORT}table Point {{ x : Float = 1.0 }}\n\ntraced let double x =\n  x * 2.0\n\nshows Box\n");
+    let source = format!(
+        "{IMPORT}table Point {{ x : Float = 1.0 }}\n\ntraced let double x =\n  x * 2.0\n\nshows Box\n"
+    );
     let shown: Vec<String> = (expand(&Pairs, &source).into_iter())
         .map(|found| found.unwrap_or_else(|e| panic!("{e:?}")))
         .collect();
