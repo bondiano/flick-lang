@@ -51,7 +51,7 @@ pub fn expand(
         "companion" => companion(block, compiler, &mut b),
         "table" => table(block, compiler, &mut b),
         "traced" => traced(block, compiler, &mut b),
-        "variants" => Ok(variants(block, &mut b)),
+        "variants" => variants(block, &mut b),
         _ => Ok(shows(block, &mut b)),
     };
     Some(made.map(|root| b.finish(root)))
@@ -102,21 +102,20 @@ fn traced(
 ) -> Result<u32, Vec<Diagnostic>> {
     let user = block.cursor().decl(compiler).map_err(|d| vec![d])?;
     let name = (block.tokens.iter())
-        .filter(|t| t.kind == TokenKind::Ident)
+        .find(|t| t.kind == TokenKind::Ident)
         .map(|t| block.text_of(t.span))
-        .next()
-        .unwrap_or("it");
+        .ok_or_else(|| vec![Diagnostic::error("expected a name", block.whole())])?;
     let kept = b.decl(Decl::Hole(user));
     let traced = flick!(b, let #(format!("{name}_name")) = #name);
     Ok(b.group(vec![kept, traced]))
 }
 
 /// `type Color = Red | Green deriving Show`.
-fn variants(block: &Block, b: &mut Builder) -> u32 {
-    let name = block
-        .cursor()
-        .next()
-        .map(|t| block.text_of(t.span).to_owned());
+fn variants(block: &Block, b: &mut Builder) -> Result<u32, Vec<Diagnostic>> {
+    let name = (block.cursor().next())
+        .filter(|t| t.kind == TokenKind::Con)
+        .map(|t| block.text_of(t.span).to_owned())
+        .ok_or_else(|| vec![Diagnostic::error("expected the type's name", block.whole())])?;
     let cases = (block.body())
         .filter(|t| t.kind == TokenKind::Con)
         .map(|t| Case {
@@ -124,12 +123,12 @@ fn variants(block: &Block, b: &mut Builder) -> u32 {
             fields: Vec::new(),
         })
         .collect();
-    b.decl(Decl::Adt {
-        name: name.unwrap_or_default(),
+    Ok(b.decl(Decl::Adt {
+        name,
         params: Vec::new(),
         cases,
         deriving: vec!["Show".into()],
-    })
+    }))
 }
 
 /// `instance Show Box = let show _ = "Box"`.

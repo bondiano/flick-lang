@@ -196,7 +196,7 @@ where it stands:
 `#(..xs)` puts each item of a collection in a list, in the arguments of an
 application or in the fields of a record (`(label, value)` pairs);
 `flick!(b @ span, code)` gives the nodes their origin, and
-`flick!(b, ty T)` builds a type. Fixed names are written as they are:
+`flick!(b, type T)` builds a type. Fixed names are written as they are:
 `flick!(b, Cli.flag (Record.label : Record.Label #field) [#(..&aliases)] #help #multi #spec)`.
 Code that starts as a declaration builds one, its name written or
 `#(expr)`: `flick!(b, let #(name) x : Float = f x)`, `flick!(b, size : Int)`,

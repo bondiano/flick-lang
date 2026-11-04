@@ -30,7 +30,8 @@ break programs.
   ping x = …`). Their code is declarations of the module (`let`,
   signatures, `type alias`, types and instances), exported and imported like
   the others; the user's patterns and declarations are holes too.
-  `flick!` builds declarations, and its type form is now `flick!(b, ty T)`.
+  `flick!` builds declarations, and a type is `flick!(b, type T)`, told from
+  `type N = …` by its `=`.
 - **Plugins, interface `0.4.0`:** the names of a plugin's code are its own:
   its locals and the user's do not capture each other, and `Pairs.make`
   names the module `Pairs` whatever the file calls it. A plugin declares

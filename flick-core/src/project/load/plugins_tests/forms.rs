@@ -126,6 +126,12 @@ fn errors_land_on_the_users_code_of_a_declaration_or_on_the_block() {
         found.iter().any(|f| f.contains("`define clash { 2.0 }`")),
         "{found:?}"
     );
+    // a block without the name it declares: what the plugin says
+    let found = report("variants red { Red }\n");
+    assert!(
+        found.iter().any(|f| f.contains("expected the type's name")),
+        "{found:?}"
+    );
     // a head where it does not stand: what the plugin says
     let found = report("x : String\nlet x = define y { 1.0 }\n");
     assert!(

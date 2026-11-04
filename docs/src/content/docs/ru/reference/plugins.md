@@ -190,7 +190,7 @@ impl Plugin for Tagged {
 
 `#(..xs)` подставляет каждый элемент коллекции в список, в аргументы
 применения или в поля записи (пары `(label, value)`);
-`flick!(b @ span, code)` задаёт узлам origin, а `flick!(b, ty T)` строит
+`flick!(b @ span, code)` задаёт узлам origin, а `flick!(b, type T)` строит
 тип. Постоянные имена пишутся как есть:
 `flick!(b, Cli.flag (Record.label : Record.Label #field) [#(..&aliases)] #help #multi #spec)`.
 Код, который начинается как объявление, строит объявление; его имя пишется
