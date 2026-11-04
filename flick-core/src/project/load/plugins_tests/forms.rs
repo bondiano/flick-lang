@@ -200,7 +200,9 @@ fn the_formatter_finds_the_plugins_of_the_projects_packages() {
     heads.sort_unstable();
     assert_eq!(
         heads,
-        ["define", "named", "shows", "table", "text_of", "traced", "variants"]
+        [
+            "define", "named", "shows", "table", "text_of", "traced", "variants"
+        ]
     );
     // without the project, a package's plugin is unknown
     let mut alone = FormatPlugins::new(&host, &mut sources, None);
