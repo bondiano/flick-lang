@@ -11,4 +11,4 @@ pub mod literal;
 mod parser;
 mod validate;
 
-pub use parser::{Parse, parse};
+pub use parser::{Fragment, Parse, parse, parse_expr_at, parse_type_at};

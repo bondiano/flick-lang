@@ -28,6 +28,8 @@ use crate::types;
 #[derive(Default)]
 pub struct ModuleCache {
     entries: HashMap<PathBuf, (Key, Output)>,
+    /// What plugins gave in the last run, by the key of each call.
+    pub(super) plugins: HashMap<Vec<u8>, Vec<u8>>,
 }
 
 impl ModuleCache {
@@ -166,7 +168,8 @@ impl Checking<'_> {
         };
         let key = Key {
             file: loaded.file,
-            text: self.sources.get(loaded.file).text.clone(),
+            // the code of its blocks too, which other modules' blocks change
+            text: self.text_of(loaded).to_owned(),
             config: self.project.map(|p| p.config.clone()),
             lower: self.lower,
             imports: loaded
@@ -208,12 +211,25 @@ impl Checking<'_> {
         output
     }
 
+    /// The text checking reads: the module's own, followed by the code of
+    /// its plugin blocks.
+    fn text_of<'l>(&'l self, loaded: &'l Loaded) -> &'l str {
+        loaded
+            .expansion
+            .as_ref()
+            .map_or(&self.sources.get(loaded.file).text, |e| &e.text)
+    }
+
     fn check(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {
+        let tree = loaded
+            .expansion
+            .as_ref()
+            .map_or(&loaded.parse.tree, |e| &e.tree);
         let module = resolve::Module {
             name: &loaded.name,
             file: loaded.file,
-            text: &self.sources.get(loaded.file).text,
-            tree: &loaded.parse.tree,
+            text: self.text_of(loaded),
+            tree,
             syntax: &loaded.syntax,
         };
         let (mut interface, resolved) = resolve::resolve(&module, lookup);
@@ -252,7 +268,7 @@ impl Checking<'_> {
         let untyped = interface.clone();
         let (checked, typing) =
             types::check_typed(&module, lookup, types::builtins(), options, &mut interface);
-        let checked = types::beside_syntax_errors(&loaded.parse.tree, checked);
+        let checked = types::beside_syntax_errors(tree, checked);
         let clean =
             !broken && resolved_cleanly && !checked.iter().any(|d| d.severity == Severity::Error);
         diagnostics.extend(checked);
@@ -264,6 +280,22 @@ impl Checking<'_> {
                 Err(d) => diagnostics.extend(d),
             }
         }
+        if let Some(expansion) = &loaded.expansion {
+            expansion.restore(&mut diagnostics, ir.as_mut());
+        }
+        // editors find and rename names of the module's own text only
+        #[cfg(feature = "ide")]
+        let typing = match &loaded.expansion {
+            Some(expansion) => {
+                let mut typing = typing;
+                typing.names.retain(|&(start, _), _| start < expansion.len);
+                typing
+                    .type_names
+                    .retain(|&(start, _), _| start < expansion.len);
+                typing
+            }
+            None => typing,
+        };
         Output {
             diagnostics,
             #[cfg(feature = "ide")]

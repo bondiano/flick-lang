@@ -17,10 +17,11 @@ use std::fs;
 use std::io::{self, BufReader, Write};
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use std::process::{self, ExitCode};
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 
 use flick_core::diagnostics::Diagnostic;
+use flick_core::plugin::Expander;
 use flick_core::project::config::Emit;
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, ModuleCache};
 use flick_core::source::{FileId, SourceMap};
@@ -28,7 +29,7 @@ use flick_core::{resolve, syntax, types};
 use serde_json::Value;
 use tracing::{debug, debug_span, error, info, info_span, warn};
 
-use crate::{builtins, sources};
+use crate::{builtins, plugins, sources};
 use diagnostics::{lsp_diagnostic, publish};
 
 static BUILTIN_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -77,6 +78,18 @@ impl Host for Overlay<'_> {
             .map_or(path, |(original, _)| *original)
             .display()
             .to_string()
+    }
+
+    fn plugin(&self, package: &str, component: Option<&Path>) -> Result<Arc<dyn Expander>, String> {
+        plugins::plugin(package, component)
+    }
+
+    fn cached(&self, key: &[u8]) -> Option<Vec<u8>> {
+        plugins::cached(key)
+    }
+
+    fn save(&self, key: &[u8], value: &[u8]) {
+        plugins::save(key, value);
     }
 }
 

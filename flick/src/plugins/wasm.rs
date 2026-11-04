@@ -1,0 +1,190 @@
+//! Plugins built as WebAssembly components, run by wasmtime. Every call
+//! runs in a fresh instance with a budget of fuel and memory: calls stay
+//! pure, so their results can be cached, and a plugin can neither hang the
+//! compiler nor take its memory. Imports other than the compiler's trap.
+//! A component is compiled once per process, on its first call: a build
+//! whose blocks all come from the cache never compiles it.
+
+use std::fs;
+use std::mem;
+use std::path::Path;
+use std::sync::{Arc, OnceLock};
+
+use flick_core::plugin::source::BlockSource;
+use flick_core::plugin::{Expander, Failure};
+use flick_plugin::Compiler;
+use sha2::{Digest, Sha256};
+use wasmtime::component::{Component, HasSelf, Linker};
+use wasmtime::{Config, Engine, Store, StoreLimits, StoreLimitsBuilder, Trap};
+
+use crate::fetch;
+
+wasmtime::component::bindgen!({
+    world: "plugin",
+    path: "../flick-plugin/wit",
+});
+
+flick_plugin::wit_conversions!(flick::plugin::types);
+
+/// What one call may compute and the memory it may take.
+const FUEL: u64 = 1_000_000_000;
+const MEMORY: usize = 64 << 20;
+
+/// The plugin of `package` in the component at `path`.
+pub fn load(package: &str, path: &Path) -> Result<Arc<dyn Expander>, String> {
+    let bytes = fs::read(path).map_err(|e| format!("cannot read `{}`: {e}", path.display()))?;
+    let id = format!("{package} {}", fetch::hex(&Sha256::digest(&bytes)));
+    Ok(Arc::new(Wasm {
+        id,
+        bytes,
+        compiled: OnceLock::new(),
+    }))
+}
+
+struct Wasm {
+    id: String,
+    bytes: Vec<u8>,
+    compiled: OnceLock<Result<(Component, Linker<State>), String>>,
+}
+
+/// What a call of a plugin reaches: the block whose holes it asks for.
+struct State {
+    source: BlockSource,
+    limits: StoreLimits,
+}
+
+impl flick::plugin::types::Host for State {}
+
+impl flick::plugin::compiler::Host for State {
+    fn parse_expr(
+        &mut self,
+        start: u32,
+        end: u32,
+    ) -> Result<flick::plugin::types::Hole, flick::plugin::types::Diagnostic> {
+        (self.source.parse_expr(start, end))
+            .map(convert::to_hole)
+            .map_err(convert::to_diagnostic)
+    }
+
+    fn parse_type(
+        &mut self,
+        start: u32,
+        end: u32,
+    ) -> Result<flick::plugin::types::Hole, flick::plugin::types::Diagnostic> {
+        (self.source.parse_type(start, end))
+            .map(convert::to_hole)
+            .map_err(convert::to_diagnostic)
+    }
+}
+
+fn engine() -> Result<&'static Engine, String> {
+    static ENGINE: OnceLock<Result<Engine, String>> = OnceLock::new();
+    ENGINE
+        .get_or_init(|| {
+            let mut config = Config::new();
+            config.consume_fuel(true);
+            // the same results on every machine, which caches rely on
+            config.cranelift_nan_canonicalization(true);
+            Engine::new(&config).map_err(|e| e.to_string())
+        })
+        .as_ref()
+        .map_err(Clone::clone)
+}
+
+impl Wasm {
+    fn compiled(&self) -> Result<&(Component, Linker<State>), String> {
+        self.compiled
+            .get_or_init(|| {
+                let engine = engine()?;
+                let component = Component::new(engine, &self.bytes)
+                    .map_err(|e| format!("is not a component: {e}"))?;
+                let mut linker = Linker::new(engine);
+                // every import traps, then the compiler's own replace theirs
+                linker.allow_shadowing(true);
+                linker
+                    .define_unknown_imports_as_traps(&component)
+                    .and_then(|()| {
+                        Plugin::add_to_linker::<State, HasSelf<State>>(&mut linker, |s| s)
+                    })
+                    .map_err(|e| format!("cannot be linked: {e}"))?;
+                Ok((component, linker))
+            })
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+
+    /// Runs `call` on a fresh instance with `source`, which comes back.
+    fn run<R>(
+        &self,
+        source: BlockSource,
+        call: impl FnOnce(&Plugin, &mut Store<State>) -> wasmtime::Result<R>,
+    ) -> (Result<R, String>, BlockSource) {
+        let state = State {
+            source,
+            limits: StoreLimitsBuilder::new()
+                .memory_size(MEMORY)
+                .trap_on_grow_failure(true)
+                .build(),
+        };
+        let Ok(engine) = engine() else {
+            return (Err("no engine".into()), state.source);
+        };
+        let mut store = Store::new(engine, state);
+        store.limiter(|s| &mut s.limits);
+        let result = match self.compiled() {
+            Ok((component, linker)) => store
+                .set_fuel(FUEL)
+                .and_then(|()| Plugin::instantiate(&mut store, component, linker))
+                .and_then(|plugin| call(&plugin, &mut store))
+                .map_err(|e| why(&e)),
+            Err(e) => Err(e.clone()),
+        };
+        (result, store.into_data().source)
+    }
+}
+
+/// Why a call failed, in words.
+fn why(error: &wasmtime::Error) -> String {
+    match error.downcast_ref::<Trap>() {
+        Some(Trap::OutOfFuel) => "ran out of its fuel".into(),
+        Some(Trap::AllocationTooLarge) => "ran out of its memory".into(),
+        _ if format!("{error:?}").contains("forcing trap when growing memory") => {
+            "ran out of its memory".into()
+        }
+        _ => format!("trapped: {error}"),
+    }
+}
+
+impl Expander for Wasm {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn collect(&self, blocks: &[flick_plugin::Block]) -> Result<Vec<u8>, String> {
+        let blocks: Vec<_> = blocks.iter().map(convert::to_block).collect();
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_collect(store, &blocks)
+        });
+        result
+    }
+
+    fn expand(
+        &self,
+        block: &flick_plugin::Block,
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Result<flick_plugin::Arena, Failure> {
+        let block = convert::to_block(block);
+        let (result, back) = self.run(mem::take(source), |plugin, store| {
+            plugin.call_expand(store, &block, state)
+        });
+        *source = back;
+        match result {
+            Ok(Ok(arena)) => Ok(convert::from_arena(arena)),
+            Ok(Err(found)) => Err(Failure::Refused(
+                found.into_iter().map(convert::from_diagnostic).collect(),
+            )),
+            Err(why) => Err(Failure::Broken(why)),
+        }
+    }
+}

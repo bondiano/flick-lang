@@ -185,7 +185,10 @@ fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
         }
     }
     for t in node.child_tokens() {
-        if matches!(t.kind, K::AndKw | K::ComponentKw | K::ServerKw | K::FnKw) {
+        if matches!(
+            t.kind,
+            K::AndKw | K::ComponentKw | K::ServerKw | K::FnKw | K::PluginKw
+        ) {
             out.push((t.start, t.end, KEYWORD));
         }
     }

@@ -12,13 +12,17 @@
 mod build;
 mod decl;
 mod expr;
+mod fragment;
 mod pattern;
+mod plugin;
 mod types;
 
 use std::{iter, mem};
 
 use SyntaxKind as K;
 use build::{Event, build};
+
+pub use fragment::{Fragment, parse_expr_at, parse_type_at};
 
 use super::cst::Node;
 use super::kind::{SyntaxKind, describe};
@@ -99,6 +103,8 @@ pub(crate) struct Parser<'t> {
     sql_depth: u32,
     /// Inside `sql table`: `via` ends the type of a column.
     sql_table: bool,
+    /// The heads of plugin blocks the imports so far exposed.
+    plugin_heads: Vec<&'t str>,
     depth: u32,
 }
 
@@ -167,6 +173,7 @@ impl<'t> Parser<'t> {
             no_brace: false,
             sql_depth: 0,
             sql_table: false,
+            plugin_heads: Vec::new(),
             depth: 0,
         }
     }
@@ -581,5 +588,7 @@ impl<'t> Parser<'t> {
     }
 }
 
+#[cfg(test)]
+mod plugin_tests;
 #[cfg(test)]
 mod tests;

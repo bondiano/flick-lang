@@ -75,6 +75,8 @@ pub enum SyntaxKind {
     ServerKw,
     /// `fn` after `server`, a keyword only there.
     FnKw,
+    /// `plugin` after `import`, a keyword only there.
+    PluginKw,
 
     // punctuation and operators
     LParen,
@@ -218,6 +220,12 @@ pub enum SyntaxKind {
     CliClause,
     CodecExpr,
     SchemaExpr,
+    /// `import plugin "package" exposing (head)`: the heads of the blocks a
+    /// plugin owns in this file.
+    PluginImport,
+    /// `head { … }` of a head a plugin import exposes: the body is kept as
+    /// tokens, which the plugin reads.
+    PluginExpr,
 
     // nodes: patterns
     WildcardPat,

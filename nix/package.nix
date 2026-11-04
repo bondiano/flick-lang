@@ -38,6 +38,10 @@ rustPlatform.buildRustPackage {
     "--package"
     "flick"
   ];
+  # plugins built as WebAssembly components, as in the released binaries;
+  # the tests below are of flick-core, which has no such feature
+  buildFeatures = [ "wasm-plugins" ];
+  checkFeatures = [ ];
 
   # The full suite needs node, pnpm, Docker and network access (CI runs it).
   # These targets are self-contained: the checker fixtures (including their

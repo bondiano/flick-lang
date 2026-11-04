@@ -100,6 +100,21 @@ fn report(
 }
 
 #[test]
+fn a_plugin_that_does_not_load_is_reported_on_its_import() {
+    let main = "module App.Main exposing (x)\n\nimport plugin \"pairs\" exposing (pairs)\n\nlet x = pairs { a = 1 }\n";
+    let host = memory(&[("src/App/Main.fl", main)]);
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let found = report(&host, &mut sources, Some(&project), &["src/App/Main.fl"]);
+    assert_eq!(
+        found,
+        [
+            "FLICK-P035 src/App/Main.fl `\"pairs\"`: plugin \"pairs\" cannot be loaded: no dependency provides plugin \"pairs\""
+        ]
+    );
+}
+
+#[test]
 fn diagnostics_do_not_depend_on_import_order() {
     let left = "module A.Left exposing (..)\nfind : Float\nlet find = 1\ntype T = | T\n";
     let right = "module A.Right exposing (..)\nfind : Float\nlet find = 2\ntype T = | T\n";

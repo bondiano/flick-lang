@@ -18,6 +18,7 @@ pub mod store;
 pub mod workspace;
 
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
 pub use config::Config;
 #[cfg(all(test, feature = "build-artifacts"))]
@@ -37,6 +38,7 @@ mod tests;
 
 #[cfg(feature = "native-project")]
 use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::plugin::Expander;
 use crate::source::FileId;
 #[cfg(feature = "native-project")]
 use crate::source::SourceMap;
@@ -49,6 +51,22 @@ pub trait Host {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
     /// The path as diagnostics show it.
     fn display(&self, path: &Path) -> String;
+    /// The plugin of the package `package`, which a module imports, or why
+    /// there is none; `component` is the WebAssembly component the package
+    /// names for it.
+    fn plugin(&self, package: &str, component: Option<&Path>) -> Result<Arc<dyn Expander>, String> {
+        let _ = component;
+        Err(format!("no dependency provides plugin \"{package}\""))
+    }
+    /// What a plugin gave for the call `key` in an earlier run.
+    fn cached(&self, key: &[u8]) -> Option<Vec<u8>> {
+        let _ = key;
+        None
+    }
+    /// Keeps what a plugin gave for the call `key` for later runs.
+    fn save(&self, key: &[u8], value: &[u8]) {
+        let _ = (key, value);
+    }
 }
 
 #[derive(Debug)]

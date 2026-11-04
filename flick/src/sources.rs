@@ -3,11 +3,15 @@
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::{env, fs, io};
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::plugin::Expander;
 use flick_core::project::Host;
 use flick_core::source::{FileId, SourceMap};
+
+use crate::plugins;
 
 /// The file system, with paths shown relative to the working directory.
 pub struct FsHost {
@@ -32,6 +36,18 @@ impl Host for FsHost {
             .unwrap_or(path)
             .display()
             .to_string()
+    }
+
+    fn plugin(&self, package: &str, component: Option<&Path>) -> Result<Arc<dyn Expander>, String> {
+        plugins::plugin(package, component)
+    }
+
+    fn cached(&self, key: &[u8]) -> Option<Vec<u8>> {
+        plugins::cached(key)
+    }
+
+    fn save(&self, key: &[u8], value: &[u8]) {
+        plugins::save(key, value);
     }
 }
 

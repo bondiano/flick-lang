@@ -34,7 +34,11 @@ impl Analyzed {
             path: loaded.path.clone(),
             file: loaded.file,
             test: loaded.root == Root::Test,
-            tree: loaded.parse.tree.clone(),
+            // the user's code inside plugin blocks parsed in place
+            tree: loaded
+                .expansion
+                .as_ref()
+                .map_or_else(|| loaded.parse.tree.clone(), |e| e.source_tree.clone()),
             typing,
             interface,
         }

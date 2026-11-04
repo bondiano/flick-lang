@@ -37,7 +37,7 @@ export const sidebar = [
     translations: { ru: "Экосистема" },
     items: [
       { slug: "ecosystem" },
-      ...["cli", "project", "editor", "codegen", "iface"].map((f) => ({ slug: `reference/${f}` })),
+      ...["cli", "project", "plugins", "editor", "codegen", "iface"].map((f) => ({ slug: `reference/${f}` })),
       { slug: "contributing/testing" },
       { slug: "contributing/implementation-decisions" },
     ],

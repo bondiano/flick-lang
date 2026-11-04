@@ -4,6 +4,19 @@ All notable changes to Flick are recorded here. The project follows
 [Semantic Versioning](https://semver.org/); before 1.0 a minor release may
 break programs.
 
+## Unreleased
+
+- **Plugins:** `import plugin "pkg" exposing (head)` makes `head { … }` a
+  block a plugin of a dependency expands: the user's code inside keeps its
+  place for errors and editors, the plugin's code is checked in place of
+  the block, and what plugins give is cached per block. Plugins are
+  WebAssembly components of `flick:plugin` (`flick-plugin` crate, wasmtime
+  with fuel and memory limits in release builds) or Rust values linked in.
+  See [plugins](https://bondiano.github.io/flick-lang/reference/plugins/).
+- **Builds:** the built-in modules are lowered in one pass (a small build
+  takes about a quarter of the time); the checked modules of libraries are
+  saved between runs.
+
 ## 0.1.0 — 2026-11-03
 
 The first public release.

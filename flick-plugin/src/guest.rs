@@ -1,0 +1,90 @@
+//! The glue of a plugin built as a WebAssembly component:
+//! `flick_plugin::export!(MyPlugin);` in the plugin's crate exports a
+//! [`Plugin`] value through the world of `wit/plugin.wit`, and the compiler's
+//! calls come back to it as a [`Compiler`].
+
+use crate::{Compiler, Diagnostic, Hole, Plugin};
+
+#[allow(
+    clippy::same_length_and_capacity,
+    clippy::too_many_arguments,
+    missing_docs
+)]
+#[doc(hidden)]
+pub mod bindings {
+    wit_bindgen::generate!({
+        world: "plugin",
+        path: "wit",
+        pub_export_macro: true,
+        export_macro_name: "export_component",
+        default_bindings_module: "flick_plugin::guest::bindings",
+    });
+}
+
+crate::wit_conversions!(bindings::flick::plugin::types);
+
+use bindings::flick::plugin::{compiler, types};
+
+/// The compiler, through the imports of the component.
+struct Imports;
+
+impl Compiler for Imports {
+    fn parse_expr(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic> {
+        compiler::parse_expr(start, end)
+            .map(convert::from_hole)
+            .map_err(convert::from_diagnostic)
+    }
+
+    fn parse_type(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic> {
+        compiler::parse_type(start, end)
+            .map(convert::from_hole)
+            .map_err(convert::from_diagnostic)
+    }
+}
+
+#[doc(hidden)]
+pub fn collect(plugin: &impl Plugin, blocks: Vec<types::Block>) -> Vec<u8> {
+    let blocks: Vec<_> = blocks.into_iter().map(convert::from_block).collect();
+    plugin.collect(&blocks)
+}
+
+#[doc(hidden)]
+pub fn expand(
+    plugin: &impl Plugin,
+    block: types::Block,
+    state: &[u8],
+) -> Result<types::Arena, Vec<types::Diagnostic>> {
+    plugin
+        .expand(&convert::from_block(block), state, &mut Imports)
+        .map(convert::to_arena)
+        .map_err(|found| found.into_iter().map(convert::to_diagnostic).collect())
+}
+
+/// Exports the plugin `$plugin`, a value of a type implementing [`Plugin`],
+/// as the component a crate of type `cdylib` builds for `wasm32-wasip2`.
+#[macro_export]
+macro_rules! export {
+    ($plugin:expr) => {
+        struct FlickPluginComponent;
+
+        impl $crate::guest::bindings::Guest for FlickPluginComponent {
+            fn collect(
+                blocks: ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Block>,
+            ) -> ::std::vec::Vec<u8> {
+                $crate::guest::collect(&$plugin, blocks)
+            }
+
+            fn expand(
+                block: $crate::guest::bindings::flick::plugin::types::Block,
+                state: ::std::vec::Vec<u8>,
+            ) -> ::std::result::Result<
+                $crate::guest::bindings::flick::plugin::types::Arena,
+                ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic>,
+            > {
+                $crate::guest::expand(&$plugin, block, &state)
+            }
+        }
+
+        $crate::guest::bindings::export_component!(FlickPluginComponent with_types_in $crate::guest::bindings);
+    };
+}

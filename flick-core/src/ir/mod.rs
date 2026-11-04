@@ -347,7 +347,36 @@ impl Expr {
     }
 }
 
+impl Module {
+    /// Calls `f` on the span of every item and expression.
+    pub fn each_span_mut(&mut self, f: &mut dyn FnMut(&mut Span)) {
+        for item in &mut self.items {
+            f(&mut item.span);
+            match &mut item.kind {
+                ItemKind::Value { body, .. }
+                | ItemKind::Destructure { body, .. }
+                | ItemKind::Refined { check: body, .. } => body.each_span_mut(f),
+                ItemKind::Instance { methods, .. } => {
+                    for (_, body) in methods {
+                        body.each_span_mut(f);
+                    }
+                }
+                ItemKind::Foreign(_)
+                | ItemKind::Constructor(_)
+                | ItemKind::Service { .. }
+                | ItemKind::Schema(_) => {}
+            }
+        }
+    }
+}
+
 impl Expr {
+    /// Calls `f` on the span of this expression and of every one inside.
+    pub fn each_span_mut(&mut self, f: &mut dyn FnMut(&mut Span)) {
+        f(&mut self.span);
+        self.each_child_mut(&mut |child| child.each_span_mut(f));
+    }
+
     /// Calls `f` on each direct subexpression, mutably, in evaluation order.
     pub fn each_child_mut(&mut self, f: &mut dyn FnMut(&mut Expr)) {
         match &mut self.kind {

@@ -180,6 +180,14 @@ conduit-e2e:
 fuzz iterations="1000000":
     FLICK_FUZZ_ITERATIONS={{iterations}} cargo test --release -p flick-core --test fuzz
 
+# The test plugin built as a WebAssembly component, and the plugin tests of
+# the compiler with wasmtime, which release builds include
+wasm-plugins:
+    cargo build -p flick-test-pairs --features guest --target wasm32-wasip2 --release
+    cargo clippy -p flick-test-pairs --features guest --target wasm32-wasip2 -- -D warnings
+    cargo clippy -p flick --features wasm-plugins --all-targets -- -D warnings
+    cargo test -p flick --features wasm-plugins --test plugins
+
 # Build the wasm module the in-browser demo loads and hold it to its size budget
 wasm:
     cargo build -p flick-wasm --target wasm32-unknown-unknown --release
