@@ -19,7 +19,22 @@
 /// such as a taken name, runs on input with `Ui.Event.latest`, which
 /// interrupts it when the user types again, and gives its verdict with
 /// `report`.
-module Form exposing (Field, Draft, InputProps, draft, text, problem, id, validate, report, input)
+module Form exposing (
+  Field,
+  Draft,
+  InputProps,
+  Spec,
+  draft,
+  text,
+  problem,
+  id,
+  validate,
+  report,
+  input,
+  spec,
+  make,
+  unsafe_field,
+)
 
 /// A field of a form's record: `Signup.fields.name`.
 type Field
@@ -99,3 +114,19 @@ let input form field label on_input =
     label = label;
     on_input = on_input;
   }
+
+/// A field of a form as `deriving Form` writes it: its label, its schema and
+/// whether it may be empty.
+type Spec
+
+spec : String -> Schema a -> Bool -> Spec
+foreign pure spec from "@flick-lang/runtime" "formFieldSpec"
+
+/// The form of the record type `name`, of `fields`.
+make : Schema a -> String -> List Spec -> Form a
+foreign pure make from "@flick-lang/runtime" "formSpec"
+
+/// The field labeled `label`, unchecked: `deriving Form` writes one for
+/// each field of the record.
+unsafe_field : String -> Field
+foreign pure unsafe_field from "@flick-lang/runtime" "formUnsafeField"

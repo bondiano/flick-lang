@@ -46,6 +46,16 @@ break programs.
   moves with its head. A block inside the user's code of another expands in
   a round of its own. Editors highlight the heads of plugins as macros, and
   `cli` is no keyword of the grammars any more.
+- **Breaking:** `deriving Schema`, `Url` and `Form` are derives of `std`'s
+  plugin, written in Flick with new combinators (`Schema.unsafe_record`,
+  `Schema.unsafe_adt`, `Schema.lazy`, `Schema.recursive`, `Route.codec`,
+  `Form.make`, …); the JSON, JSON Schema, routes and forms are the same.
+  What they cannot derive is `std/D001`, `std/D009`, `std/D010` (were
+  `FLICK-D001`, `FLICK-D009`, `FLICK-D010`), on the class in `deriving`. A
+  phantom parameter takes a witness too, and a field of an alias of another
+  module names that alias's own witness, so the alias derives `Schema`.
+- **Plugins, interface `0.7.0`:** `let rec` and `forall` types in a plugin's
+  declarations.
 - **Plugins, interface `0.6.0`:** a class marked `@derive` (or `@derive
   std`) is derived by a plugin: `deriving C { args }` and `deriving instance
   C (M.T a)` call its `derive`, whose declarations follow the type. A class

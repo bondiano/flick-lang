@@ -97,6 +97,7 @@ schema/contracts
 schema/policies
 schema/route
 schema/route_nested
+schema/combinators
 stdlib/http/headers
 stdlib/http/values
 stdlib/effect/codec

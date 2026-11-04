@@ -16,7 +16,6 @@ use super::env::{Abi, Rep};
 use super::sql::dialect::Dialect;
 pub use super::sql_plan::{SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue};
 use super::ty::{Stage, Type};
-use super::{FormField, UrlRoute};
 use crate::iface::Interface;
 use crate::ir::Label;
 use crate::numeric::Num;
@@ -262,10 +261,6 @@ pub struct SchemaItem {
     /// How many witnesses of its parameters it takes.
     pub witnesses: usize,
     pub plan: SchemaPlan,
-    /// The routes of `T$url` when the type derives `Url`.
-    pub url: Option<Vec<UrlRoute>>,
-    /// The fields of `T$form` when the type derives `Form`.
-    pub form: Option<Vec<FormField>>,
 }
 
 /// How a witness is built from the witnesses of its parts.

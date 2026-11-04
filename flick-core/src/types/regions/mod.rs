@@ -149,6 +149,18 @@ pub struct Hold {
     pub span: Span,
 }
 
+/// The types whose values hold nothing of their arguments: a witness
+/// describes values of its type, holding none of them.
+const HOLD_NOTHING: [Lang; 7] = [
+    Lang::Layer,
+    Lang::ServiceTag,
+    Lang::ServiceImpl,
+    Lang::Errors,
+    Lang::Schema,
+    Lang::Url,
+    Lang::Form,
+];
+
 impl Checker<'_> {
     /// What a value of `t` may hold, as a capture row: regions and type
     /// variables as entries, capture rows not inferred yet as tails. A
@@ -200,13 +212,7 @@ impl Checker<'_> {
                 let (head, args) = t.spine();
                 // an `Eff` holds what its result holds, as a function does: a
                 // capture shown only in the result is lost when the result is dropped
-                let opaque = [
-                    Lang::Layer,
-                    Lang::ServiceTag,
-                    Lang::ServiceImpl,
-                    Lang::Errors,
-                ];
-                if opaque.into_iter().any(|n| head.is_lang(n)) {
+                if HOLD_NOTHING.into_iter().any(|n| head.is_lang(n)) {
                     return;
                 }
                 let kinds = match head {

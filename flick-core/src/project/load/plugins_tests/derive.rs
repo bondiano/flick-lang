@@ -119,3 +119,27 @@ fn deriving_instance_of_a_type_no_import_declares_is_c013() {
         "{shown:#?}"
     );
 }
+
+#[test]
+fn a_class_of_a_module_not_imported_is_not_derived() {
+    let main = "module App.Main exposing (..)
+
+import App.Shapes
+
+type Point = Point Float Float
+  deriving Pairs.Arbitrary
+";
+    let shapes = SHAPES.replace("exposing (..)\n", "exposing (..)\n\nimport Pairs\n");
+    let host = host(main);
+    host.write("/pairs/src/Pairs.fl", PAIRS);
+    host.write("/p/src/App/Shapes.fl", &shapes);
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let found = check(&host, &mut sources, Some(&project), &roots());
+    let shown: Vec<String> = found.iter().map(|d| show(&sources, d)).collect();
+    // the clause's error alone: no plugin ran to write code that names `Pairs`
+    let unknown = shown
+        .iter()
+        .filter(|s| s.contains("unknown module `Pairs`"));
+    assert_eq!(unknown.count(), 1, "{shown:#?}");
+}

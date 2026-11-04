@@ -3,9 +3,7 @@
 
 use super::{Gen, names};
 use crate::ir::Expr;
-use crate::types::{
-    Constructor, Rep, SchemaItem, SchemaPlan, UrlRoute, UrlSegment, companion_name,
-};
+use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, companion_name};
 
 impl Gen<'_> {
     /// `T$check`, `T$parse` and `T$value` of a refined type.
@@ -37,112 +35,7 @@ impl Gen<'_> {
             let json = format!("{}({name})", self.rt("schemaJsonCodec"));
             out.push(self.export(&companion_name(&item.ty, "json"), &json));
         }
-        if let Some(routes) = &item.url {
-            let url = self.url(&name, &item.ty, routes);
-            out.push(self.export(&companion_name(&item.ty, "url"), &url));
-        }
-        if let Some(fields) = &item.form {
-            let specs: Vec<String> = fields
-                .iter()
-                .map(|(l, p, optional)| {
-                    format!("[{}, {}, {optional}]", names::string(l), self.plan(p))
-                })
-                .collect();
-            let form = format!(
-                "{}({name}, {}, [{}])",
-                self.rt("formSpec"),
-                names::string(&item.ty),
-                specs.join(", ")
-            );
-            out.push(self.export(&companion_name(&item.ty, "form"), &form));
-            // a field is its label at run time
-            let labels: Vec<String> = fields
-                .iter()
-                .map(|(l, ..)| format!("{}: {}", names::string(l), names::string(l)))
-                .collect();
-            let record = format!("{{ {} }}", labels.join(", "));
-            out.push(self.export(&companion_name(&item.ty, "fields"), &record));
-        }
         out.join("\n")
-    }
-
-    /// `T$url`: per constructor its tag, path, segment witnesses and query.
-    fn url(&mut self, schema: &str, ty: &str, routes: &[UrlRoute]) -> String {
-        let package = (self.options.package)(self.module);
-        let routes: Vec<String> = routes
-            .iter()
-            .map(|r| {
-                let constructor = Constructor {
-                    module: self.module.to_owned(),
-                    ty: ty.to_owned(),
-                    name: r.constructor.clone(),
-                    arity: r.segments.len() + usize::from(r.query.is_some()),
-                    rep: Rep::Tagged,
-                };
-                let tag = names::tag(&constructor, package.as_deref());
-                let segments: Vec<String> = r.segments.iter().map(|s| self.segment(s)).collect();
-                let query = r.query.as_ref().map_or("null".to_owned(), |query| {
-                    let fields: Vec<String> = query
-                        .iter()
-                        .map(|(l, p, optional)| {
-                            format!("[{}, {}, {optional}]", names::string(l), self.plan(p))
-                        })
-                        .collect();
-                    format!("[{}]", fields.join(", "))
-                });
-                format!(
-                    "[{}, {}, [{}], {query}, {}]",
-                    names::string(&tag),
-                    names::string(&r.path),
-                    segments.join(", "),
-                    r.optional
-                )
-            })
-            .collect();
-        format!(
-            "{}({schema}, [{}])",
-            self.rt("routeCodec"),
-            routes.join(", ")
-        )
-    }
-
-    /// A segment of a route: a witness, or the words and tags of a type's
-    /// constructors.
-    fn segment(&mut self, segment: &UrlSegment) -> String {
-        match segment {
-            UrlSegment::Value(plan) => self.plan(plan),
-            UrlSegment::Words {
-                module,
-                ty,
-                constructors,
-            } => {
-                let package = (self.options.package)(module);
-                let words: Vec<String> = constructors
-                    .iter()
-                    .map(|name| {
-                        let constructor = Constructor {
-                            module: module.clone(),
-                            ty: ty.clone(),
-                            name: name.clone(),
-                            arity: 0,
-                            rep: Rep::Tagged,
-                        };
-                        let tag = names::tag(&constructor, package.as_deref());
-                        format!(
-                            "[{}, {}]",
-                            names::string(&UrlSegment::word(name)),
-                            names::string(&tag)
-                        )
-                    })
-                    .collect();
-                format!("{}([{}])", self.rt("routeWords"), words.join(", "))
-            }
-            // lazily: the nested type may be declared after this one
-            UrlSegment::Nested { module, ty } => {
-                let url = self.global(module, &companion_name(ty, "url"));
-                format!("{}({} {url})", self.rt("routeNested"), self.arrow(""))
-            }
-        }
     }
 
     fn plan(&mut self, plan: &SchemaPlan) -> String {
@@ -280,13 +173,6 @@ pub fn schema_names(item: &SchemaItem) -> Vec<String> {
     let mut out = vec![companion_name(&item.ty, "schema")];
     if matches!(item.plan, SchemaPlan::Refined { .. }) {
         out.push(companion_name(&item.ty, "json"));
-    }
-    if item.url.is_some() {
-        out.push(companion_name(&item.ty, "url"));
-    }
-    if item.form.is_some() {
-        out.push(companion_name(&item.ty, "form"));
-        out.push(companion_name(&item.ty, "fields"));
     }
     out
 }

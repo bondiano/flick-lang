@@ -35,11 +35,14 @@ type Ref a
 @lang redacted
 type Redacted a
 @lang schema
+@derive std
 type Schema a
 @lang url
+@derive std
 /// The URLs of a type that derives `Url`: see the module `Route`.
 type Url a
 @lang form
+@derive std
 /// The form of a record type that derives `Form`: see the module `Form`.
 type Form a
 @lang pure_codec

@@ -43,16 +43,14 @@ impl Checker<'_> {
     }
 
     fn name_type(&mut self, node: &Node) -> Type {
-        let parts: Vec<&str> = node
-            .child_tokens()
-            .filter(|t| t.kind != K::Dot)
-            .map(|t| t.text(self.text))
-            .collect();
+        let tokens: Vec<_> = node.child_tokens().filter(|t| t.kind != K::Dot).collect();
+        let parts: Vec<&str> = tokens.iter().map(|t| t.text(self.text)).collect();
         let Some((&name, qualifier)) = parts.split_last() else {
             return Type::Error;
         };
         let span = self.span(node);
-        let namespace = if name.starts_with(|c: char| c.is_ascii_uppercase()) {
+        // a companion `T$schema` of generated code is a value, its token one
+        let namespace = if tokens.last().is_some_and(|t| t.kind == K::Con) {
             Namespace::Constructor
         } else {
             Namespace::Value

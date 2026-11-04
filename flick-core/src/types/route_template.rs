@@ -13,7 +13,7 @@ use super::Checker;
 use super::env::{Form, Found};
 use super::http_api::snake;
 use super::kinds::Kind;
-use super::schemas::{companion_name, kebab};
+use super::schemas::companion_name;
 use super::ty::Type;
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
@@ -206,4 +206,18 @@ fn applied(node: &Node) -> Option<(&Node, Vec<&Node>)> {
         }
         _ => None,
     }
+}
+
+/// `GreenLight` as `green-light`: the word of a constructor in a URL.
+fn kebab(name: &str) -> String {
+    let mut out = String::new();
+    let mut previous_lower = false;
+    for c in name.chars() {
+        if c.is_uppercase() && previous_lower {
+            out.push('-');
+        }
+        previous_lower = c.is_lowercase() || c.is_ascii_digit();
+        out.extend(c.to_lowercase());
+    }
+    out
 }

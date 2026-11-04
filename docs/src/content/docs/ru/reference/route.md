@@ -66,7 +66,11 @@ let profile =
 - Последнее поле-запись — query. Его поля тех же типов или `Option` одного
   из них; такого параметра в URL может не быть.
 - Другое поле, обобщённый тип или два конструктора с одинаковыми URL —
-  `FLICK-D009` с путём поля.
+  `std/D009` с путём поля.
+
+Плагин `std` пишет `Page.url` как `Route.codec Page.schema [Route.path Home ""
+[] None false, …]`: сегмент — `Route.segment`, `Route.words` или
+`Route.nested`, параметр query — `Route.query`.
 
 `Route.print Page.url value` даёт путь и query, закодированные как UTF-8.
 `Route.parse Page.url text` даёт `Some value` или `None`, если ни один

@@ -26,8 +26,9 @@ impl Printer<'_> {
                 params,
                 ty,
                 body,
+                rec,
             } => {
-                self.push("let ");
+                self.push(if *rec { "let rec " } else { "let " });
                 self.value(name)?;
                 for &p in params {
                     self.push(" ");
@@ -172,8 +173,17 @@ impl Printer<'_> {
         match name.split_once('.') {
             Some((owner, member)) => {
                 self.declared(owner, Names::Constructor)?;
+                // a member may spell a keyword, as `schema`: `Owner$member` is one name
+                let word = member.starts_with(|c: char| c.is_ascii_lowercase() || c == '_')
+                    && member
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '_');
+                if !word {
+                    return Err(format!("`{member}` is not a lowercase name"));
+                }
                 self.push("$");
-                self.name(member, Names::Label)
+                self.push(member);
+                Ok(())
             }
             None => self.name(name, Names::Label),
         }

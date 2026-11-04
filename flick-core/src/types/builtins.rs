@@ -21,6 +21,7 @@ use super::builtin_sources::CORE;
 use super::env::Builtins;
 use crate::clock::timed;
 use crate::iface::Interface;
+use crate::plugin::derive::builtin_expansion;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::syntax;
@@ -162,13 +163,19 @@ pub fn check_each(
         let file = sources.add(format!("<builtin>/{name}.fl"), text);
         let parse = syntax::parse(text, file);
         let module_syntax = resolve::module_syntax(&parse.tree, text, file);
+        // the witnesses its `deriving` names, which std's plugin writes
+        let (expansion, derived) = builtin_expansion(text, file, &parse.tree, name, &module_syntax);
+        assert!(
+            derived.is_empty(),
+            "built-in module {name} does not derive: {derived:?}"
+        );
         let module = Module {
             name,
             file,
-            text,
-            tree: &parse.tree,
+            text: expansion.as_ref().map_or(text, |e| &e.text),
+            tree: expansion.as_ref().map_or(&parse.tree, |e| &e.tree),
             syntax: &module_syntax,
-            generated: resolve::NO_GENERATED,
+            generated: expansion.as_ref().map_or(resolve::NO_GENERATED, |e| e.len),
         };
         // a facade re-exports the names of the modules before it
         let imported = |m: &str| done.iter().find(|i| i.module == m).cloned();
@@ -187,6 +194,9 @@ pub fn check_each(
         let (checked, typing, _) =
             super::run_in(&module, &imported, &known, options, &mut interface);
         diagnostics.extend(checked);
+        if let Some(expansion) = &expansion {
+            expansion.restore(&mut diagnostics, None);
+        }
         assert!(
             diagnostics.is_empty(),
             "built-in module {name} does not check: {diagnostics:?}"

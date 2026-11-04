@@ -13,7 +13,7 @@
 /// Route.print Page$url (User 42)           -- "/user/42"
 /// Route.parse Page$url "/search?q=atoms"   -- Some (Search { q = "atoms"; page = None })
 /// ```
-module Route exposing (print, parse)
+module Route exposing (..)
 
 /// The path and query of a value. Text is percent-encoded as UTF-8; a
 /// lone surrogate, which has no UTF-8 form, prints as U+FFFD.
@@ -25,3 +25,37 @@ foreign pure print from "@flick-lang/runtime" "routePrint"
 parse : Url a -> String -> Option a
 foreign pure parse from "@flick-lang/runtime" "routeParse"
   nullable
+
+/// A constructor of a route type as `deriving Url` writes it: the
+/// constructor, its path segment (`""` for `/`), its segments, its query and
+/// whether its last segment may be missing.
+type Path
+
+path : c -> String -> List Segment -> Option (List Query) -> Bool -> Path
+foreign pure path from "@flick-lang/runtime" "routePath"
+
+/// A segment of a path after the constructor's.
+type Segment
+
+/// A segment of a field's value.
+segment : Schema a -> Segment
+foreign pure segment from "@flick-lang/runtime" "routeSegment"
+
+/// A segment of a field of a type whose constructors have no fields: each
+/// word with its constructor.
+words : List (String, c) -> Segment
+foreign pure words from "@flick-lang/runtime" "routeWordsOf"
+
+/// The last segment, another route type's: the rest of the path.
+nested : (Unit -> Url a) -> Segment
+foreign pure nested from "@flick-lang/runtime" "routeNestedOf"
+
+/// A query parameter: its label, its schema, and whether it may be missing.
+type Query
+
+query : String -> Schema a -> Bool -> Query
+foreign pure query from "@flick-lang/runtime" "routeQuery"
+
+/// The URLs of the type of `schema`, a path for each constructor.
+codec : Schema a -> List Path -> Url a
+foreign pure codec from "@flick-lang/runtime" "routeCodec"

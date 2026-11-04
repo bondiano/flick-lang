@@ -581,6 +581,7 @@ dependencies = [
  "annotate-snippets",
  "flick-plugin",
  "flick-plugin-cli",
+ "flick-plugin-derive",
  "flick-pretty",
  "flick-test-pairs",
  "insta",
@@ -612,6 +613,15 @@ dependencies = [
 
 [[package]]
 name = "flick-plugin-cli"
+version = "0.1.0"
+dependencies = [
+ "flick-core",
+ "flick-plugin",
+ "insta",
+]
+
+[[package]]
+name = "flick-plugin-derive"
 version = "0.1.0"
 dependencies = [
  "flick-core",

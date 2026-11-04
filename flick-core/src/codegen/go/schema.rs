@@ -9,9 +9,7 @@ use super::items::Decls;
 use super::layout::{call, closure, list, signature, single, statement};
 use super::{Gen, Shape, names};
 use crate::source::Span;
-use crate::types::{
-    Constructor, Rep, SchemaItem, SchemaPlan, UrlRoute, UrlSegment, companion_name,
-};
+use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, companion_name};
 
 impl<'a> Gen<'a> {
     /// `T$schema`: its declaration, and the statement of the module's init
@@ -24,10 +22,6 @@ impl<'a> Gen<'a> {
         init: &mut Vec<Document<'a>>,
     ) {
         let a = self.a;
-        if item.form.is_some() {
-            self.unsupported(span, "a schema deriving `Form`");
-            return;
-        }
         let name = companion_name(&item.ty, "schema");
         let context = (item.witnesses > 0).then(|| self.context.replace("fb"));
         let body = self.plan(&item.plan, span);
@@ -45,13 +39,6 @@ impl<'a> Gen<'a> {
                 let codec = call(a, "flickrt.SchemaJsonCodec", [docvec![a, var]]);
                 init.push(statement(a, docvec![a, json, " = ", codec]));
             }
-            // a route type has no parameters: the type checker refuses a generic one
-            if let Some(routes) = &item.url {
-                let url = a.alloc_str(&names::var(self.module, &companion_name(&item.ty, "url")));
-                decls.push((docvec![a, "var ", url, " flickrt.Value"], false));
-                let codec = self.url(&item.ty, routes, var, span);
-                init.push(statement(a, docvec![a, url, " = ", codec]));
-            }
         } else {
             let ws: Vec<String> = (0..item.witnesses).map(|i| format!("w{i}")).collect();
             let decl = docvec![
@@ -64,90 +51,6 @@ impl<'a> Gen<'a> {
                 single(a, docvec![a, "return ", body])
             ];
             decls.push((decl, false));
-        }
-    }
-
-    /// `T$url`: per constructor its tag, path, segment witnesses and query;
-    /// a nil query is a constructor without a final record field.
-    fn url(&mut self, ty: &str, routes: &[UrlRoute], schema: &'a str, span: Span) -> Document<'a> {
-        let a = self.a;
-        let routes: Vec<Document<'a>> = routes
-            .iter()
-            .map(|r| {
-                let constructor = Constructor {
-                    module: self.module.to_owned(),
-                    ty: ty.to_owned(),
-                    name: r.constructor.clone(),
-                    arity: r.segments.len() + usize::from(r.query.is_some()),
-                    rep: Rep::Tagged,
-                };
-                let tag = self.string(&self.tag(&constructor));
-                let segments: Vec<Document<'a>> =
-                    r.segments.iter().map(|s| self.segment(s, span)).collect();
-                let segments = list(a, "[]flickrt.Value{", segments, "}");
-                let optional = a.text(if r.optional { "true" } else { "false" });
-                let query = match &r.query {
-                    None => a.text("nil"),
-                    Some(fields) => {
-                        let fields: Vec<Document<'a>> = fields
-                            .iter()
-                            .map(|(l, p, optional)| {
-                                let optional = if *optional { "true" } else { "false" };
-                                let p = self.plan(p, span);
-                                list(a, "{", [self.string(l), p, a.text(optional)], "}")
-                            })
-                            .collect();
-                        list(a, "[]flickrt.QueryField{", fields, "}")
-                    }
-                };
-                list(
-                    a,
-                    "{",
-                    [tag, self.string(&r.path), segments, query, optional],
-                    "}",
-                )
-            })
-            .collect();
-        let routes = list(a, "[]flickrt.Route{", routes, "}");
-        call(a, "flickrt.RouteCodec", [a.text(schema), routes])
-    }
-
-    /// A segment of a route: a witness, or the words and tags of a type's
-    /// constructors.
-    fn segment(&mut self, segment: &UrlSegment, span: Span) -> Document<'a> {
-        let a = self.a;
-        match segment {
-            UrlSegment::Value(plan) => self.plan(plan, span),
-            UrlSegment::Words {
-                module,
-                ty,
-                constructors,
-            } => {
-                let words: Vec<Document<'a>> = constructors
-                    .iter()
-                    .flat_map(|name| {
-                        let constructor = Constructor {
-                            module: module.clone(),
-                            ty: ty.clone(),
-                            name: name.clone(),
-                            arity: 0,
-                            rep: Rep::Tagged,
-                        };
-                        [
-                            self.string(&UrlSegment::word(name)),
-                            self.string(&self.tag(&constructor)),
-                        ]
-                    })
-                    .collect();
-                call(a, "flickrt.RouteWords", [list(a, "[]string{", words, "}")])
-            }
-            // lazily: the nested type may be initialized after this one
-            UrlSegment::Nested { module, ty } => {
-                self.reads(module);
-                let url = names::var(module, &companion_name(ty, "url")).to_doc(a);
-                let get = closure(a, "func() flickrt.Value", [docvec![a, "return ", url]]);
-                call(a, "flickrt.RouteNested", [get])
-            }
         }
     }
 

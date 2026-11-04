@@ -286,7 +286,8 @@ fn collect(node: &Node, text: &str, found: &mut Vec<(Lang, Namespace, Option<Str
     let mut pending: Option<Lang> = None;
     for child in node.nodes() {
         match child.kind {
-            K::Attribute => pending = lang_of(child, text),
+            // `@derive` beside `@lang` marks the same declaration
+            K::Attribute => pending = lang_of(child, text).or(pending),
             K::Members => collect(child, text, found),
             K::TypeDecl => {
                 for variant in child.nodes().filter(|n| n.kind == K::Variant) {

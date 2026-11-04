@@ -123,6 +123,7 @@ impl Kind {
                     .collect(),
                 Ty::Record(entries) => fields(entries),
                 Ty::Function { input, output } => vec![*input, *output],
+                Ty::Forall { body, .. } => vec![*body],
             },
             Kind::Pat(pat) => match pat {
                 Pat::Var(_) | Pat::Wildcard | Pat::Hole(_) => Vec::new(),

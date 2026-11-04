@@ -53,7 +53,8 @@ let page = ui {
 Тип-запись (`type alias` записи) с `deriving Form` выводит и `Schema`.
 Каждое поле читается из текста: `String`, `Float`, `Bool`, уточнённый тип
 над одним из них или `Option` одного из них — `None`, когда поле ввода
-пусто. Другое поле — `FLICK-D010` с путём поля.
+пусто. Другое поле — `std/D010` с путём поля. Плагин `std` пишет оба значения
+через `Form.make`, `Form.spec` и `Form.unsafe_field`.
 
 - `Signup.form : Form Signup` принимает `Form.draft`.
 - `Signup.fields` — запись с `Form.Field` на каждое поле. Опечатка в имени

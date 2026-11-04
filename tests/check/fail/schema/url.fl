@@ -2,31 +2,31 @@ module App.Url exposing (..)
 
 type Page = Front | Tags (List String)
   deriving Schema, Url
-//~ FLICK-D009 @4:3-4:23 `Page.Tags[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them, a type whose constructors have no fields or one that derives `Url`; only the last may be an `Option`
+//~ std/D009 @4:20-4:23 `Page.Tags[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them, a type whose constructors have no fields or one that derives `Url`; only the last may be an `Option`
 
 type Lookup = Lookup { tags : List String }
   deriving Schema, Url
-//~ FLICK-D009 @8:3-8:23 `Lookup.Lookup[0].tags`: a query parameter is a segment's type or an `Option` of one
+//~ std/D009 @8:20-8:23 `Lookup.Lookup[0].tags`: a query parameter is a segment's type or an `Option` of one
 
 type alias Query = { q : String }
   deriving Schema, Url
-//~ FLICK-D009 @12:3-12:23 `Query`: a route type is a variant type
+//~ std/D009 @12:20-12:23 `Query`: a route type is a variant type
 
 type Root = Index | Home
   deriving Schema, Url
-//~ FLICK-D009 @16:3-16:23 `Root.Home`: its URLs are those of `Index`
+//~ std/D009 @16:20-16:23 `Root.Home`: its URLs are those of `Index`
 
 type Bare = Bare Float
   deriving Url
-//~ FLICK-D009 @19:1-20:15 `Bare`: a type that derives `Url` derives `Schema` too
+//~ std/D009 @20:12-20:15 `Bare`: a type that derives `Url` derives `Schema` too
 
 type Middle = Middle (Option String) Float
   deriving Schema, Url
-//~ FLICK-D009 @24:3-24:23 `Middle.Middle[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them, a type whose constructors have no fields or one that derives `Url`; only the last may be an `Option`
+//~ std/D009 @24:20-24:23 `Middle.Middle[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them, a type whose constructors have no fields or one that derives `Url`; only the last may be an `Option`
 
 type Shape = Dot | Circle Float
   deriving Schema
 
 type Drawing = Drawing Shape
   deriving Schema, Url
-//~ FLICK-D009 @31:3-31:23 `Drawing.Drawing[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them, a type whose constructors have no fields or one that derives `Url`; only the last may be an `Option`
+//~ std/D009 @31:20-31:23 `Drawing.Drawing[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them, a type whose constructors have no fields or one that derives `Url`; only the last may be an `Option`
