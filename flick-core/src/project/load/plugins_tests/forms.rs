@@ -4,10 +4,13 @@
 
 use std::path::PathBuf;
 
+use flick_test_pairs::Pairs;
+
 use super::{host, library, show};
 #[cfg(feature = "ide")]
 use crate::ide::Ide;
 use crate::ir;
+use crate::plugin::testing::expand;
 #[cfg(feature = "ide")]
 use crate::project::load::analyze;
 use crate::project::load::{check, compile};
@@ -159,4 +162,20 @@ fn editors_see_the_users_code_inside_a_declaration() {
         .hover(file, inside + 1)
         .expect("a hover inside the block");
     assert!(shown.contains("Float"), "{shown}");
+}
+
+#[test]
+fn the_code_of_a_declaration_shows_as_declarations() {
+    let source = format!("{IMPORT}table Point {{ x : Float = 1.0 }}\n\ntraced let double x =\n  x * 2.0\n\nshows Box\n");
+    let shown: Vec<String> = (expand(&Pairs, &source).into_iter())
+        .map(|found| found.unwrap_or_else(|e| panic!("{e:?}")))
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            "type alias Point = { x : Float }\nlet point : Point = { x = 1.0 }",
+            "let double x = x * 2.0\nlet double_name = \"double\"",
+            "instance (Show Box) =\n  let show _ = \"Box\"",
+        ]
+    );
 }
