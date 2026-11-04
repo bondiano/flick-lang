@@ -172,7 +172,7 @@ fn generated_code_is_checked_before_it_is_rendered() {
     assert!(refused(Arena { nodes: deep, root }).contains("deeper"));
 }
 
-const SRC: &str = "module App.Main exposing (x)\n\nimport plugin \"pairs\" exposing (pairs)\n\nlet x =\n  pairs { a = f 1; b : Int = 2 }\n";
+const SRC: &str = "module App.Main exposing (x)\n\nimport Pairs exposing (plugin pairs)\n\nlet x =\n  pairs { a = f 1; b : Int = 2 }\n";
 
 fn find(node: &Node, kind: K) -> Option<&Node> {
     if node.kind == kind {

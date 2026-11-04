@@ -26,6 +26,9 @@ pub struct Import {
     pub span: Span,
     pub alias: Option<String>,
     pub exposing: Vec<Item>,
+    /// The heads of plugin blocks it exposes, `plugin head`, each with the
+    /// span of its item.
+    pub plugins: Vec<Item>,
 }
 
 impl Import {
@@ -82,6 +85,7 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     .find(|t| t.kind == K::Con)
                     .map(|t| t.text(text).to_owned()),
                 exposing: exposing.map(|e| items(e, text, file)).unwrap_or_default(),
+                plugins: exposing.map(|e| plugins(e, text, file)).unwrap_or_default(),
             }),
             _ => {}
         }
@@ -108,6 +112,23 @@ fn items(exposing: &Node, text: &str, file: FileId) -> Vec<Item> {
             Some(Item {
                 kind,
                 name,
+                span: span(item, file),
+            })
+        })
+        .collect()
+}
+
+/// The items `plugin head` of `exposing`, by head.
+fn plugins(exposing: &Node, text: &str, file: FileId) -> Vec<Item> {
+    exposing
+        .nodes()
+        .filter_map(|item| {
+            let mut tokens = item.child_tokens();
+            tokens.next().filter(|t| t.kind == K::PluginKw)?;
+            let head = tokens.next().filter(|t| t.kind == K::Ident)?;
+            Some(Item {
+                kind: ItemKind::Value,
+                name: head.text(text).to_owned(),
                 span: span(item, file),
             })
         })

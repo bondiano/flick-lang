@@ -100,16 +100,17 @@ fn report(
 }
 
 #[test]
-fn a_plugin_that_does_not_load_is_reported_on_its_import() {
-    let main = "module App.Main exposing (x)\n\nimport plugin \"pairs\" exposing (pairs)\n\nlet x = pairs { a = 1 }\n";
-    let host = memory(&[("src/App/Main.fl", main)]);
+fn a_plugin_of_a_project_module_is_reported_on_its_item() {
+    let main = "module App.Main exposing (x)\n\nimport App.Pairs exposing (plugin pairs)\n\nlet x = pairs { a = 1 }\n";
+    let pairs = "module App.Pairs exposing (y)\n\nlet y = 1\n";
+    let host = memory(&[("src/App/Main.fl", main), ("src/App/Pairs.fl", pairs)]);
     let mut sources = SourceMap::default();
     let project = library(&mut sources);
     let found = report(&host, &mut sources, Some(&project), &["src/App/Main.fl"]);
     assert_eq!(
         found,
         [
-            "FLICK-P035 src/App/Main.fl `\"pairs\"`: plugin \"pairs\" cannot be loaded: no dependency provides plugin \"pairs\""
+            "FLICK-P035 src/App/Main.fl `plugin pairs`: `App.Pairs` is a module of this project: only a package provides a plugin"
         ]
     );
 }

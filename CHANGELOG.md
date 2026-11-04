@@ -6,8 +6,8 @@ break programs.
 
 ## Unreleased
 
-- **Plugins:** `import plugin "pkg" exposing (head)` makes `head { … }` a
-  block a plugin of a dependency expands: the user's code inside keeps its
+- **Plugins:** `import Sql exposing (plugin sql)` makes `sql { … }` a block
+  the plugin of `Sql`'s package expands: the user's code inside keeps its
   place for errors and editors, the plugin's code is checked in place of
   the block, and what plugins give is cached per block. Plugins are
   WebAssembly components of `flick:plugin` (`flick-plugin` crate, wasmtime

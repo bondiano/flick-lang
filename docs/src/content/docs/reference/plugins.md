@@ -11,13 +11,14 @@ it.
 ## Using a plugin
 
 A library provides the plugin; the project depends on the library as on
-any other (see [project.md](../project/)), and a module imports the plugin
-and the heads it exposes:
+any other (see [project.md](../project/)). A module imports a module of the
+library and exposes the plugin's heads with `plugin`, beside the module's
+own names:
 
 ```flick
 module App.Main exposing (point)
 
-import plugin "pairs" exposing (pairs)
+import Pairs exposing (Pair, plugin pairs)
 
 point : { x : Float; label : String; blocks : Float }
 let point = pairs { x = 1.0 + 2.0; label : String = "a" }
@@ -28,9 +29,12 @@ before `{`: elsewhere `pairs { x = 1 }` is still a call with a record, and
 every file still parses on its own. The body of a block is kept as tokens,
 braces balanced, for the plugin to read.
 
-The code a plugin gives is resolved in the file's scope: its imports and
-the Prelude. A plugin should name what it uses with qualified names; a
-module it needs is imported by the user.
+The plugin is the one of the package the imported module belongs to; a
+module of the project or a built-in one has none. The code a plugin gives
+is resolved in the file's scope: its imports, the imported module among
+them, and the Prelude. A plugin should name what it uses with qualified
+names, such as `Pairs.make`; another module it needs is imported by the
+user.
 
 ## What a plugin gives
 

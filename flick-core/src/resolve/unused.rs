@@ -71,7 +71,9 @@ impl Scope<'_> {
                 .iter()
                 .filter(|item| !used(item, interface, &names))
                 .collect();
-            if !qualifiers.contains(import.qualifier()) && unused.len() == import.exposing.len() {
+            // blocks of the plugins it exposes use it
+            let whole = unused.len() == import.exposing.len() && import.plugins.is_empty();
+            if !qualifiers.contains(import.qualifier()) && whole {
                 // importing a module brings its instances, which may be the point
                 if !interface
                     .instances
