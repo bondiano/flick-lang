@@ -34,5 +34,5 @@ filter_map_or_else: 5
 filter_or_fail: Odd 3
 filter_map_or_fail: 40
 bracket: file used, ["released file"]
-resource_auto: (1, true)
+resource_auto: (true, true)
 tx: (1, None)
