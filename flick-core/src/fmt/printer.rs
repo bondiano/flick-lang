@@ -119,7 +119,6 @@ impl<'a> Printer<'a> {
             | K::ProvideExpr
             | K::DoExpr
             | K::SqlExpr
-            | K::CliExpr
             | K::RecGroup
             | K::SqlTableDecl => self.braced(n, &[]),
             K::ForExpr => self.for_(n),

@@ -122,6 +122,7 @@ let main () =
 const CLI_MAIN: &str = "module App.Main exposing (main)
 
 import App.Greeting exposing (greet)
+import Cli exposing (plugin cli)
 
 command : Cli.Command none none
 let command = cli \"NAME\" {

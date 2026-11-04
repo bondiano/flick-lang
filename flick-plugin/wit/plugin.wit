@@ -87,6 +87,11 @@ interface types {
 
   /// What an editor shows over a span of a block, as Markdown.
   record hover { markdown: string, span: span }
+
+  enum highlight-kind { keyword, parameter }
+
+  /// How an editor colors a span of a block that is not the user's code.
+  record highlight { span: span, kind: highlight-kind }
 }
 
 /// What the compiler offers a plugin while it expands a block.
@@ -101,7 +106,7 @@ interface compiler {
 
 world plugin {
   import compiler;
-  use types.{block, arena, diagnostic, completion, hover};
+  use types.{block, arena, diagnostic, completion, hover, highlight};
 
   /// What the plugin learns from all its blocks of a group, before any expands.
   export collect: func(blocks: list<block>) -> list<u8>;
@@ -111,4 +116,6 @@ world plugin {
   export complete: func(block: block, state: list<u8>, offset: u32) -> list<completion>;
   /// What an editor shows at `offset` of the block.
   export hover: func(block: block, state: list<u8>, offset: u32) -> option<hover>;
+  /// How an editor colors the words of the block that are the plugin's.
+  export highlight: func(block: block, state: list<u8>) -> list<highlight>;
 }

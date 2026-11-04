@@ -208,6 +208,19 @@ pub struct Hover {
     pub span: Span,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HighlightKind {
+    Keyword,
+    Parameter,
+}
+
+/// How an editor colors a span of a block that is not the user's code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Highlight {
+    pub span: Span,
+    pub kind: HighlightKind,
+}
+
 /// What the compiler offers a plugin while it expands a block.
 pub trait Compiler {
     /// The longest expression of the body from `start` on, before `end`.
@@ -237,6 +250,11 @@ pub trait Plugin {
     fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
         let _ = (block, state, offset);
         None
+    }
+    /// How an editor colors the words of `block` that are the plugin's.
+    fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
+        let _ = (block, state);
+        Vec::new()
     }
 }
 

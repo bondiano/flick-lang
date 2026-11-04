@@ -42,8 +42,14 @@ pub fn without_docs(text: &str) -> Result<String, Error> {
     if !diagnostics.is_empty() {
         return Err(Error::Lexical(diagnostics));
     }
-    if let Some(token) = tokens.iter().find(|token| token.kind == K::CliKw) {
-        return Err(Error::CliHelp(Span::new(file, token.start, token.end)));
+    // `cli "name" { … }` takes the help of its clauses from their `///`
+    let words: Vec<_> = tokens.iter().filter(|t| !t.kind.is_trivia()).collect();
+    if let Some(w) = words.windows(2).find(|w| {
+        w[0].kind == K::Ident
+            && &text[w[0].start as usize..w[0].end as usize] == "cli"
+            && w[1].kind == K::String
+    }) {
+        return Err(Error::CliHelp(Span::new(file, w[0].start, w[0].end)));
     }
     let mut stripped = String::with_capacity(text.len());
     let mut copied = 0;

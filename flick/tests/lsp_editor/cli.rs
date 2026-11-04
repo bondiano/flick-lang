@@ -2,6 +2,8 @@ use super::*;
 
 const SOURCE: &str = "module App.Main exposing (..)
 
+import Cli exposing (plugin cli)
+
 refined type Minutes = Float
   where fun n -> n >= 0
   deriving Cli.Value

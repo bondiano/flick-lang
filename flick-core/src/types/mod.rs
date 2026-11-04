@@ -19,7 +19,6 @@ mod builtin_sources;
 mod builtins;
 mod calls;
 mod classes;
-pub mod cli;
 mod codecs;
 mod component;
 mod comprehension;
@@ -81,10 +80,10 @@ pub(crate) use builtins::check_sources;
 #[cfg(feature = "native-project")]
 pub use builtins::read_std;
 pub use builtins::{
-    StdPackage, builtin_sources, builtins, check_each, has_std, install_builtins, set_std,
-    std_go_bindings,
+    StdPackage, builtin_sources, builtins, check_each, has_std, install_builtins, is_std_module,
+    set_std, std_go_bindings,
 };
-pub use classes::{Dict, STRUCTURAL, which};
+pub use classes::{CLI, Dict, STRUCTURAL, which};
 #[cfg(feature = "ide")]
 pub(crate) use classes::{Match, match_type};
 pub use component::{instance_key as component_instance, parts as component_parts};

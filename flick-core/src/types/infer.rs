@@ -296,7 +296,6 @@ impl Checker<'_> {
                 ty
             }
             K::SqlExpr => self.sql_expr(node, None),
-            K::CliExpr => self.cli_expr(node),
             _ => Type::Error,
         }
     }

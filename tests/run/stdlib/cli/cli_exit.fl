@@ -1,6 +1,8 @@
 // Invalid input fails `main` with the CLI's text: exit code 1, the handler never runs.
 module App.Main exposing (main)
 
+import Cli exposing (plugin cli)
+
 count : Cli.Command none none
 let count = cli "count" {
   flag times : Float = 1

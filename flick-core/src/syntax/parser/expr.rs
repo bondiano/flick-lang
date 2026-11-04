@@ -227,7 +227,6 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::ProvideKw
         | K::SqlKw
         | K::UiKw
-        | K::CliKw
         | K::CodecKw
         | K::SchemaKw => true,
         K::LBrace => !p.no_brace,
@@ -403,12 +402,6 @@ fn atom(p: &mut Parser) -> Option<Done> {
             p.sql_depth -= 1;
             K::SqlExpr
         }
-        K::CliKw => {
-            p.bump();
-            p.expect(K::String);
-            p.braces(K::Block, cli_clause, |_| false);
-            K::CliExpr
-        }
         K::SchemaKw => {
             p.bump();
             con_path(p);
@@ -512,38 +505,6 @@ fn sql_clause(p: &mut Parser) {
         }
     }
     p.complete(m, K::SqlClause);
-}
-
-const CLI_CLAUSES: [&str; 5] = ["description", "flag", "arg", "subcommand", "handle"];
-
-/// `flag name "alias" : T = default`, `arg name : T`, `subcommand E`, ….
-fn cli_clause(p: &mut Parser) {
-    let m = p.start();
-    let word = if p.at(K::Ident) {
-        p.text_of(p.raw())
-    } else {
-        ""
-    };
-    if !CLI_CLAUSES.contains(&word) {
-        p.error_expected("a CLI clause (`flag`, `arg`, `subcommand`, `handle`, …)");
-        p.recover();
-        p.complete(m, K::Error);
-        return;
-    }
-    p.bump();
-    if matches!(word, "flag" | "arg") {
-        p.expect(K::Ident);
-        while p.eat(K::String) {}
-        if p.expect(K::Colon) {
-            types::type_(p);
-            if p.eat(K::Eq) {
-                expr(p);
-            }
-        }
-    } else {
-        expr(p);
-    }
-    p.complete(m, K::CliClause);
 }
 
 fn do_expr(p: &mut Parser) -> K {

@@ -108,7 +108,6 @@ impl Lower<'_> {
             K::Block => return self.block(node),
             K::ComponentExpr => return self.component(node, &children),
             K::SqlExpr => return self.sql_block(node),
-            K::CliExpr => return self.cli_block(node),
             // `Ui` names and implicit component applications were resolved by the checker.
             K::UiExpr => {
                 return match children.iter().find(|n| n.kind == K::Block) {

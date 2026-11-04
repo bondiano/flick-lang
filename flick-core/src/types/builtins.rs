@@ -59,6 +59,11 @@ pub fn has_std() -> bool {
     !std_files().0.is_empty()
 }
 
+/// Whether `module` is a module of `std`.
+pub fn is_std_module(module: &str) -> bool {
+    std_files().0.iter().any(|(name, _)| *name == module)
+}
+
 /// The tables that bind the foreign declarations of `std` on the go target.
 pub fn std_go_bindings() -> Files {
     std_files().1

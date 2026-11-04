@@ -3,6 +3,7 @@
 module App.Main exposing (main, first_note)
 
 import App.Notes as Notes
+import Cli exposing (plugin cli)
 
 /// `NOTES_FILE`, or `notes.txt` in the working directory.
 notes_file : Unit ->{; AppError} String

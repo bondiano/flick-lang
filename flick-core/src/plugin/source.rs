@@ -25,6 +25,7 @@ pub struct BlockSource {
     end: u32,
     /// Where the body starts in the frame.
     body: u32,
+    closed: bool,
     /// The tokens of the arguments and the body, trivia included and `{`
     /// left out, at their places in the text.
     tokens: Vec<Token>,
@@ -34,21 +35,23 @@ pub struct BlockSource {
 
 impl BlockSource {
     /// The block `node`, a `PluginExpr` of the module text `text`; `None`
-    /// for a block without its closing brace. Its frame starts at the first
-    /// argument of the head, or at the body without arguments.
+    /// for a block without `{`. Its frame starts at the first argument of
+    /// the head, or at the body without arguments, and ends at `}`, or at
+    /// the end of the node for a block not closed.
     pub fn new(text: Arc<str>, file: FileId, node: &Node) -> Option<Self> {
         let mut direct = node.child_tokens().filter(|t| !t.kind.is_trivia());
         let head = direct.next().filter(|t| t.kind == K::Ident)?;
         let first = direct.next()?;
         let open = node.child_tokens().find(|t| t.kind == K::LBrace)?;
-        let close = node.child_tokens().find(|t| t.kind == K::RBrace)?;
+        let close = node.child_tokens().find(|t| t.kind == K::RBrace);
+        let end = close.map_or(node.range().1, |c| c.start);
         let start = if first.kind == K::LBrace {
             open.end
         } else {
             first.start
         };
         let tokens = (node.tokens().into_iter())
-            .filter(|t| start <= t.start && t.end <= close.start && t.start != open.start)
+            .filter(|t| start <= t.start && t.end <= end && t.start != open.start)
             .collect();
         Some(BlockSource {
             head: head.text(&text).to_owned(),
@@ -56,7 +59,8 @@ impl BlockSource {
             file,
             start,
             body: open.end - start,
-            end: close.start,
+            end,
+            closed: close.is_some(),
             tokens,
             diagnostics: Vec::new(),
         })
@@ -70,6 +74,16 @@ impl BlockSource {
     /// count from here.
     pub fn start(&self) -> u32 {
         self.start
+    }
+
+    /// Where the frame ends in the module text: at `}`.
+    pub fn end(&self) -> u32 {
+        self.end
+    }
+
+    /// Whether the block has its `}`: one without is only for editors.
+    pub fn closed(&self) -> bool {
+        self.closed
     }
 
     pub fn file(&self) -> FileId {

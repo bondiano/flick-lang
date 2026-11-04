@@ -42,6 +42,9 @@ pub const NUMERIC_CLASSES: [Lang; 3] = [Lang::Numeric, Lang::Integer, Lang::Floa
 /// Classes whose instances for records and tuples the compiler owns.
 pub const STRUCTURAL: [Lang; 4] = [Lang::Eq, Lang::Ord, Lang::Hash, Lang::Show];
 
+/// The module of `Cli.Value`, whose instances the runtime derives.
+pub const CLI: &str = "Cli";
+
 /// The lang item among `items` that `module.name` is.
 pub fn which(items: &[Lang], module: &str, name: &str) -> Option<Lang> {
     items

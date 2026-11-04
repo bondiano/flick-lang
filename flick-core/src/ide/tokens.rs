@@ -7,6 +7,7 @@ use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::{FOREIGN_MODES, SyntaxKind as K};
 use crate::types::{Ref, Type};
+use flick_plugin::HighlightKind;
 
 /// The token types, in the order of the legend the server announces.
 pub const TOKEN_TYPES: [&str; 8] = [
@@ -45,7 +46,7 @@ const FOLDED: [K; 15] = [
     K::DoExpr,
     K::SqlExpr,
     K::UiExpr,
-    K::CliExpr,
+    K::PluginExpr,
     K::RecGroup,
 ];
 
@@ -93,6 +94,19 @@ impl Ide<'_> {
             out.push((d.span.start, d.span.end, kind));
         }
         binders(&m.tree, &mut out);
+        for b in &m.editing {
+            let len = u32::try_from(b.block.text.len()).unwrap_or(u32::MAX);
+            for h in b.plugin.highlight(&b.block, &b.state) {
+                // a plugin's span outside its block is none
+                if h.span.start <= h.span.end && h.span.end <= len {
+                    let kind = match h.kind {
+                        HighlightKind::Keyword => KEYWORD,
+                        HighlightKind::Parameter => PARAMETER,
+                    };
+                    out.push((b.start + h.span.start, b.start + h.span.end, kind));
+                }
+            }
+        }
         foreign_modes(&m.tree, text, &mut out);
         contextual_keywords(&m.tree, &mut out);
         out.sort_unstable();
@@ -173,17 +187,8 @@ fn foreign_modes(tree: &Node, text: &str, out: &mut Vec<(u32, u32, u32)>) {
     }
 }
 
-/// Contextual keywords and the names of CLI flags and arguments.
+/// Contextual keywords.
 fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
-    if node.kind == K::CliClause {
-        let mut tokens = node.child_tokens();
-        if let Some(word) = tokens.next() {
-            out.push((word.start, word.end, KEYWORD));
-        }
-        if let Some(name) = tokens.next().filter(|t| t.kind == K::Ident) {
-            out.push((name.start, name.end, PARAMETER));
-        }
-    }
     for t in node.child_tokens() {
         if matches!(
             t.kind,

@@ -178,3 +178,17 @@ fn a_head_takes_strings_and_parenthesized_arguments_before_its_body() {
     let other = parse_str(&format!("{IMPORT}let x = pairs a {{ b = 1 }}\n"));
     assert!(find(&other.tree, K::PluginExpr).is_none());
 }
+
+#[test]
+fn a_head_of_the_compilers_own_plugins_is_a_block_without_its_import() {
+    // so the compiler can name the import it needs
+    let parsed = parse_str("let c = cli \"x\" { handle f }\nlet d = cli \"x\"\n");
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    let block = find(&parsed.tree, K::PluginExpr).expect("a plugin block");
+    assert_eq!(
+        text_of("let c = cli \"x\" { handle f }", block),
+        "cli \"x\" { handle f }"
+    );
+    let names = parsed.tree.nodes().filter(|n| n.kind == K::LetDecl).nth(1);
+    assert!(find(names.expect("let d"), K::PluginExpr).is_none());
+}

@@ -15,7 +15,9 @@ use flick_core::diagnostics::{Diagnostic, codes};
 #[cfg(feature = "native-project")]
 use flick_core::project::{self, Host};
 use flick_core::source;
-use flick_core::source::{SourceFile, SourceMap};
+use flick_core::source::{FileId, SourceFile, SourceMap};
+#[cfg(feature = "native-project")]
+use flick_core::syntax::{self, cst::Node, kind::SyntaxKind};
 
 /// 1-based `line:col-line:col`, columns in characters, end exclusive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,7 +93,10 @@ fn annotations(text: &str, comment_prefix: &str) -> Result<Vec<Expected>, String
 }
 
 fn annotation(code: &str, pos: Option<Pos>, message: &str) -> Result<Expected, String> {
-    codes::lookup(code).ok_or_else(|| format!("`{code}` is not a registered diagnostic code"))?;
+    let plugin = (code.split_once('/')).is_some_and(|(p, c)| codes::plugin(p, c).is_some());
+    if !plugin && codes::lookup(code).is_none() {
+        return Err(format!("`{code}` is not a registered diagnostic code"));
+    }
     Ok(Expected {
         code: code.to_owned(),
         pos,
@@ -204,7 +209,7 @@ fn check_fixture(path: &Path, should_fail: bool) -> Vec<String> {
     );
     let mut actual: Vec<_> = utf8.into_iter().collect();
     if actual.is_empty() {
-        actual = flick_core::check(&sources, file);
+        actual = lone(&mut sources, path, file);
     }
     let expected = match parse_annotations(&sources.get(file).text) {
         Ok(expected) => expected,
@@ -215,6 +220,31 @@ fn check_fixture(path: &Path, should_fail: bool) -> Vec<String> {
         (false, false) => vec!["  pass fixture must not contain annotations".into()],
         _ => diff(&sources, &actual.iter().collect::<Vec<_>>(), expected),
     }
+}
+
+/// The diagnostics of checking the file at `path` on its own. One with
+/// plugin blocks goes through the loader, as `flick check file.fl` does,
+/// which expands them.
+#[cfg(feature = "native-project")]
+fn lone(sources: &mut SourceMap, path: &Path, file: FileId) -> Vec<Diagnostic> {
+    let tree = syntax::parse(&sources.get(file).text, file).tree;
+    if !has_blocks(&tree) {
+        return flick_core::check(sources, file);
+    }
+    let host = FixtureHost {
+        root: path.parent().unwrap_or(path).to_path_buf(),
+    };
+    project::check(&host, sources, None, &[path.to_path_buf()])
+}
+
+#[cfg(feature = "native-project")]
+fn has_blocks(node: &Node) -> bool {
+    node.kind == SyntaxKind::PluginExpr || node.nodes().any(has_blocks)
+}
+
+#[cfg(not(feature = "native-project"))]
+fn lone(sources: &mut SourceMap, _: &Path, file: FileId) -> Vec<Diagnostic> {
+    flick_core::check(sources, file)
 }
 
 #[test]

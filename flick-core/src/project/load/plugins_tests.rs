@@ -294,6 +294,8 @@ fn editors_see_the_users_code_inside_a_block() {
         .collect();
     // the declaration, its signature and the use inside the block
     assert_eq!(places.len(), 3, "{places:?}");
+    let tokens = ide.semantic_tokens(file);
+    assert!(tokens.iter().any(|t| t.0 == inside), "{tokens:?}");
 }
 
 /// `main` with blocks `p`, `q` and more, each `pairs { label = value }`.
@@ -417,10 +419,36 @@ fn a_plugin_reports_under_its_own_codes() {
             "module App.Main exposing (x)\n\nimport Pairs exposing (plugin coded)\n\nlet x = coded {{ {code} }}\n"
         ))
     };
-    assert_eq!(coded("X001"), ["pairs/X001 ` X001 `: refused"]);
+    // a span of the whole block is the block, its head with it
+    assert_eq!(coded("X001"), ["pairs/X001 `coded { X001 }`: refused"]);
     // a code of another shape is no code of the plugin's
     assert_eq!(
         coded("FLICK-P001"),
-        ["FLICK-P036 ` FLICK-P001 `: plugin `pairs`: refused"]
+        ["FLICK-P036 `coded { FLICK-P001 }`: plugin `pairs`: refused"]
     );
+}
+
+/// The IR of `App.Main` with `greet` and `tool` as `body` writes them.
+fn cli_ir(body: &str) -> String {
+    const HANDLER: &str = "fun { loud; times; name } -> Platform.stdout_line (String.join \"\\n\" (List.repeat times (if loud then String.to_upper name else name)))";
+    let main = format!(
+        "module App.Main exposing (greet, tool)\n\nimport Cli exposing (plugin cli)\n\nversion : Cli.Command none none\nlet version = Cli.command \"version\" |> Cli.handle (fun {{}} -> Platform.stdout_line \"0.1.0\")\n\n{}\n",
+        body.replace("HANDLER", HANDLER)
+    );
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let (diagnostics, compilation) = compile(&host(&main), &mut sources, Some(&project), &roots());
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    ir::print(&compilation.modules[0].ir)
+}
+
+#[test]
+fn a_cli_block_is_the_calls_of_cli_it_spells_out() {
+    let block = cli_ir(
+        "greet : Cli.Command none none\nlet greet = cli \"greet\" {\n  description \"Prints a greeting\"\n  /// Print in capitals\n  flag loud : Bool\n  /// How many\n  /// times\n  flag times \"n\" : Int = 1\n  arg name : String\n  handle HANDLER\n}\n\ntool : Cli.Command none none\nlet tool = cli \"tool\" { flag verbose \"v\" : Bool; subcommand greet; subcommand version }",
+    );
+    let calls = cli_ir(
+        "greet : Cli.Command none none\nlet greet =\n  Cli.handled\n    (Cli.arg (Record.label : Record.Label \"name\") \"\" (Cli.required : Cli.Multi String String)\n      (Cli.flag (Record.label : Record.Label \"times\") [\"n\"] \"How many times\" (Cli.default 1)\n        (Cli.flag (Record.label : Record.Label \"loud\") [] \"Print in capitals\" Cli.switch\n          (Cli.description \"Prints a greeting\" (Cli.command \"greet\")))))\n    (HANDLER)\n\ntool : Cli.Command none none\nlet tool =\n  Cli.group\n    (Cli.subcommand version \"\"\n      (Cli.subcommand greet \"\"\n        (Cli.flag (Record.label : Record.Label \"verbose\") [\"v\"] \"\" Cli.switch (Cli.command \"tool\"))))",
+    );
+    assert_eq!(block, calls);
 }

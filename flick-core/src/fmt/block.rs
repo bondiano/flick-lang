@@ -32,7 +32,6 @@ pub(super) fn hugs(n: &Node) -> bool {
             | K::ProvideExpr
             | K::DoExpr
             | K::SqlExpr
-            | K::CliExpr
             | K::CodecExpr
             | K::FunExpr
     ) || n.kind == K::ForExpr && n.has_token(K::LBrace)

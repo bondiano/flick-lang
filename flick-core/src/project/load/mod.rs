@@ -21,6 +21,7 @@ mod plugins_tests;
 mod precompiled;
 mod runner;
 mod target;
+mod unimported;
 mod unknown;
 
 pub use checking::ModuleCache;
@@ -36,6 +37,7 @@ use super::packages::Packages;
 use super::{Host, Project, module_name, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::ir;
+use crate::plugin::EditorBlock;
 use crate::plugin::expansion::Expansion;
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
@@ -64,6 +66,8 @@ struct Loaded {
     name: String,
     /// The module with its plugin blocks expanded, when it has any.
     expansion: Option<Expansion>,
+    /// Its plugin blocks, as editors ask their plugins about them.
+    editing: Vec<EditorBlock>,
 }
 
 /// How far a run goes past checking.
@@ -439,6 +443,7 @@ impl Loader<'_> {
             syntax,
             name,
             expansion: None,
+            editing: Vec::new(),
         });
         Ok(Some(index))
     }

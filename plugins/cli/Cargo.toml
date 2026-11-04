@@ -1,0 +1,15 @@
+[package]
+name = "flick-plugin-cli"
+description = "The plugin of std for `cli \"name\" { … }` blocks: command lines as calls of `Cli`"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+flick-plugin = { path = "../../flick-plugin" }

@@ -11,9 +11,8 @@ use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::source::Span;
-use crate::types::cli::CLI;
+use crate::types::{CLI, STRUCTURAL, which};
 use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
-use crate::types::{STRUCTURAL, which};
 
 /// The classes besides the structural ones whose instances the runtime
 /// derives.

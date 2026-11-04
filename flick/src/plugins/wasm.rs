@@ -221,4 +221,15 @@ impl Expander for Wasm {
         });
         result.ok().flatten().map(convert::from_hover)
     }
+
+    fn highlight(&self, block: &flick_plugin::Block, state: &[u8]) -> Vec<flick_plugin::Highlight> {
+        let block = convert::to_block(block);
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_highlight(store, &block, state)
+        });
+        result.map_or_else(
+            |_| Vec::new(),
+            |found| found.into_iter().map(convert::from_highlight).collect(),
+        )
+    }
 }

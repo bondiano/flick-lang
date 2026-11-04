@@ -277,6 +277,12 @@ foreign pure handle from "@flick-lang/runtime/cli" "specHandle"
   retention call
   reviewed "effect@4.1.2 sha256:3be9ad830ea5e5f6"
 
+/// [`handle`] with the spec first, so the handler is checked against the
+/// options the spec makes: what the block `cli "name" { … }` stands for.
+handled :
+  forall c r e o r2 e2. (Spec r e o)^c -> ((o ->{r2; e2} Unit)^c -> (Command (r + r2) (e + e2))^c)^c
+let handled spec handler = handle handler spec
+
 /// The command without a handler of its own: it needs subcommands, and run
 /// without one it prints its help and fails with `CliError`.
 group : forall c r e o. (Spec r e o)^c -> (Command r e)^c

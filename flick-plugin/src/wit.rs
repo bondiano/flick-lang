@@ -105,6 +105,26 @@ macro_rules! wit_conversions {
                 }
             }
 
+            pub fn to_highlight(h: $crate::Highlight) -> w::Highlight {
+                w::Highlight {
+                    span: to_span(h.span),
+                    kind: match h.kind {
+                        $crate::HighlightKind::Keyword => w::HighlightKind::Keyword,
+                        $crate::HighlightKind::Parameter => w::HighlightKind::Parameter,
+                    },
+                }
+            }
+
+            pub fn from_highlight(h: w::Highlight) -> $crate::Highlight {
+                $crate::Highlight {
+                    span: from_span(h.span),
+                    kind: match h.kind {
+                        w::HighlightKind::Keyword => $crate::HighlightKind::Keyword,
+                        w::HighlightKind::Parameter => $crate::HighlightKind::Parameter,
+                    },
+                }
+            }
+
             pub fn to_hover(h: $crate::Hover) -> w::Hover {
                 w::Hover { markdown: h.markdown, span: to_span(h.span) }
             }

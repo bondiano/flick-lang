@@ -174,7 +174,6 @@ impl Ide<'_> {
             ),
             K::SqlKw => ("sql { … }", "A typed SQL query."),
             K::CodecKw => ("codec … { … }", "A codec built field by field."),
-            K::CliKw => ("cli … { … }", "A command-line interface."),
             K::SchemaKw => ("schema …", "The `Schema` of a type that derives it."),
             K::AwaitKw => {
                 let ran = match ty.spine() {

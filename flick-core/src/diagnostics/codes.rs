@@ -344,6 +344,7 @@ codes! {
     P034 = Project 34, "dependency is not installed";
     P035 = Project 35, "plugin cannot be loaded";
     P036 = Project 36, "plugin gave no code for a block";
+    P037 = Project 37, "plugin block without its import";
 }
 
 #[cfg(test)]

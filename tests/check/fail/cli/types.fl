@@ -1,6 +1,8 @@
 // The options record is exact, values need `Cli.Value`, defaults their type.
 module App.Types exposing (typo, unparsed, wrong_default)
 
+import Cli exposing (plugin cli)
+
 type Color = Red | Green
 
 typo : Cli.Command none none

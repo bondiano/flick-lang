@@ -5,6 +5,7 @@
 //! no import says so.
 
 use super::{K, Parser, SyntaxKind};
+use crate::plugin::first_party::HEADS;
 
 /// Whether an exposed item `plugin head` starts here.
 pub(super) fn at_head(p: &Parser) -> bool {
@@ -20,10 +21,13 @@ pub(super) fn head(p: &mut Parser) {
     p.bump();
 }
 
-/// Whether a plugin block starts here: a head an import exposed, its
-/// arguments (strings and `( … )`) on the same line, then `{`.
+/// Whether a plugin block starts here: a head an import exposed, or one of
+/// the compiler's own plugins, its arguments (strings and `( … )`) on the
+/// same line, then `{`.
 pub(super) fn at_block(p: &Parser) -> bool {
-    if p.no_brace || !p.plugin_heads.contains(&p.text_of(p.raw())) {
+    let head = p.text_of(p.raw());
+    let known = p.plugin_heads.contains(&head) || HEADS.iter().any(|(h, _)| *h == head);
+    if p.no_brace || !known {
         return false;
     }
     let mut depth = 0u32;

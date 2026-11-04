@@ -3,6 +3,8 @@
 // `--help`, `--version` and completions.
 module App.Main exposing (main)
 
+import Cli exposing (plugin cli)
+
 type Color = Red | GreenLight
   deriving Cli.Value, Show
 
