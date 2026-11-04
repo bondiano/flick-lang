@@ -275,7 +275,18 @@ impl Call<'_, '_> {
             );
             (target(decl, text, source.block(), None)?, source)
         } else {
-            loader.foreign(m, decl, self.heads)?
+            let Some(found) = loader.foreign(m, decl, self.heads) else {
+                let ty = decl.nodes().find(|n| is_type(n.kind)).and_then(first_name);
+                let (start, end) = ty.unwrap_or(decl).range();
+                let message = "`deriving instance` derives for a type declared by a module this one imports, as `Shapes.Shape`";
+                diagnostics.push(Diagnostic::error(
+                    codes::C013,
+                    message,
+                    Span::new(m.file, start, end),
+                ));
+                return None;
+            };
+            found
         };
         let args = class.args.map(|a| arguments(a, text, &class.name));
         let found = Found {

@@ -98,3 +98,24 @@ fn deriving_instance_of_a_class_without_derive_is_c013() {
         "{shown:#?}"
     );
 }
+
+#[test]
+fn deriving_instance_of_a_type_no_import_declares_is_c013() {
+    let main = MAIN.replace(
+        "deriving instance Pairs.Arbitrary (App.Shapes.Shape)",
+        "deriving instance Pairs.Arbitrary (App.Shapes.Missing)",
+    );
+    let host = host(&main);
+    host.write("/pairs/src/Pairs.fl", PAIRS);
+    host.write("/p/src/App/Shapes.fl", SHAPES);
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let found = check(&host, &mut sources, Some(&project), &roots());
+    let shown: Vec<String> = found.iter().map(|d| show(&sources, d)).collect();
+    assert!(
+        shown
+            .iter()
+            .any(|s| s.starts_with("FLICK-C013 `App.Shapes.Missing`")),
+        "{shown:#?}"
+    );
+}
