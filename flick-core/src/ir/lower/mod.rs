@@ -42,6 +42,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         module: module.name,
         text: module.text,
         file: module.file,
+        generated: module.generated,
         typing,
         definition: String::new(),
         scope: Vec::new(),
@@ -91,15 +92,21 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
     }
 }
 
+/// A local in scope: its source name, whether a plugin generated it, and
+/// its unique name.
+type Bound = (String, bool, String);
+
 struct Lower<'a> {
     module: &'a str,
     text: &'a str,
     file: FileId,
+    /// Where generated code starts in `text`.
+    generated: u32,
     typing: &'a Typing,
     /// The top-level value being lowered, which names its serializable atom.
     definition: String,
-    /// Locals in scope: the source name and its unique name.
-    scope: Vec<(String, String)>,
+    /// Locals in scope.
+    scope: Vec<Bound>,
     /// How often each source name was bound in the current definition.
     used: HashMap<String, u32>,
     /// Ranges whose lift or dictionaries are applied already: a block and
@@ -107,7 +114,7 @@ struct Lower<'a> {
     consumed: HashSet<(Range, bool)>,
     /// While a later alternative of an or-pattern is lowered: the names
     /// the first one bound.
-    reuse: Option<Vec<(String, String)>>,
+    reuse: Option<Vec<Bound>>,
     /// Each `scope` some call acquires through: the locals of its owner and
     /// of the owner around it.
     owners: HashMap<Range, (Option<String>, Option<String>)>,
@@ -126,8 +133,8 @@ impl Lower<'_> {
             .map(|t| t.text(self.text).to_owned())
     }
 
-    /// Binds a source name to a fresh unique name.
-    fn bind(&mut self, name: &str) -> String {
+    /// Binds a source name, written at `at`, to a fresh unique name.
+    fn bind(&mut self, name: &str, at: u32) -> String {
         let count = self.used.entry(name.to_owned()).or_insert(0);
         let unique = if *count == 0 {
             name.to_owned()
@@ -135,23 +142,26 @@ impl Lower<'_> {
             format!("{name}${count}")
         };
         *count += 1;
-        self.scope.push((name.to_owned(), unique.clone()));
+        let generated = at >= self.generated;
+        self.scope
+            .push((name.to_owned(), generated, unique.clone()));
         unique
     }
 
     /// A fresh unique name no source name refers to.
     fn hidden(&mut self, name: &str) -> String {
-        let unique = self.bind(name);
+        let unique = self.bind(name, 0);
         self.scope.pop();
         unique
     }
 
-    fn local(&self, name: &str) -> Option<&str> {
-        self.scope
-            .iter()
-            .rev()
-            .find(|(n, _)| n == name)
-            .map(|(_, u)| u.as_str())
+    /// The unique name of the local `name` a name at `at` refers to: only
+    /// generated names see generated locals.
+    fn local(&self, name: &str, at: u32) -> Option<&str> {
+        let generated = at >= self.generated;
+        (self.scope.iter().rev())
+            .find(|(n, g, _)| n == name && *g == generated)
+            .map(|(_, _, u)| u.as_str())
     }
 
     fn givens(&self, node: &Node) -> Vec<String> {

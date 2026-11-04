@@ -16,9 +16,11 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
-    pub fn push_local(&mut self, name: &str, ty: Type) {
+    /// Binds `name`, written at `at`, to `ty`.
+    pub fn push_local(&mut self, name: &str, at: u32, ty: Type) {
         self.locals.push(Local {
             name: name.to_owned(),
+            generated: at >= self.generated,
             ty,
             rec: None,
         });
@@ -59,7 +61,8 @@ impl Checker<'_> {
             return self.qualified(&qualifier.join("."), namespace, name, span);
         }
         if namespace == Namespace::Value
-            && let Some(i) = self.locals.iter().rposition(|l| l.name == name)
+            && let Some(i) = (self.locals.iter())
+                .rposition(|l| l.name == name && l.generated == (span.start >= self.generated))
         {
             self.record_name(span, Ref::Local);
             return self.use_local(i, span);

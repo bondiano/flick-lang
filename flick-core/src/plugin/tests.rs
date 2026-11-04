@@ -21,7 +21,7 @@ fn span(start: u32, end: u32) -> Span {
 fn text(build: impl FnOnce(&mut Builder) -> NodeId) -> Result<String, String> {
     let mut b = Builder::new(span(0, 0));
     let root = build(&mut b);
-    render(&b.finish(root), 100, Place::Expression).map(|r| r.text)
+    render(&b.finish(root), 100, Place::Expression, &[]).map(|r| r.text)
 }
 
 fn field(label: &str, value: NodeId) -> Field {
@@ -125,7 +125,7 @@ fn every_kind_of_node_renders_in_parentheses() {
 
 #[test]
 fn generated_code_is_checked_before_it_is_rendered() {
-    let refused = |arena: Arena| render(&arena, 10, Place::Expression).expect_err("refused");
+    let refused = |arena: Arena| render(&arena, 10, Place::Expression, &[]).expect_err("refused");
     let node = |kind: Kind| PluginNode {
         kind,
         origin: span(0, 1),
@@ -254,7 +254,7 @@ fn a_splice_keeps_the_block_range_and_the_holes_ranges() {
     let record = b
         .at(span(0, len))
         .expr(Expr::Record(vec![field("a", a), field("b", annot)]));
-    let rendered = render(&b.finish(record), len, Place::Expression).expect("renders");
+    let rendered = render(&b.finish(record), len, Place::Expression, &[]).expect("renders");
     let expanded = format!("{SRC}\n{}", rendered.text);
     let place = u32::try_from(SRC.len() + 1).expect("short");
     let tree = splice(&expanded, file, place, &rendered, &source, block).expect("splices");

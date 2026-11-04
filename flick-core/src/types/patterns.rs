@@ -61,9 +61,9 @@ impl Checker<'_> {
             K::VarPat => {
                 if let Some(name) = node.child_tokens().find(|t| t.kind == K::Ident) {
                     self.note_type(span, ty);
-                    let name = name.text(self.text).to_owned();
                     self.locals.push(Local {
-                        name,
+                        name: name.text(self.text).to_owned(),
+                        generated: name.start >= self.generated,
                         ty: ty.clone(),
                         rec: None,
                     });
@@ -276,6 +276,7 @@ impl Checker<'_> {
                 } else {
                     self.locals.push(Local {
                         name: label.clone(),
+                        generated: node.range().0 >= self.generated,
                         ty: field_ty,
                         rec: None,
                     });

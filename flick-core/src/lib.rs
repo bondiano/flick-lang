@@ -44,6 +44,7 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
         text,
         tree: &parse.tree,
         syntax: &syntax,
+        generated: resolve::NO_GENERATED,
     };
     // a lone file imports only built-in modules
     let builtin = |name: &str| types::builtins().iter().find(|i| i.module == name).cloned();

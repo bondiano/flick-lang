@@ -116,7 +116,7 @@ pub fn expand(plugin: &impl Plugin, source: &str) -> Vec<Result<String, Vec<Stri
                 })
                 .collect();
             match expanded {
-                Ok(arena) => match render(&arena, block.whole().end, block.place) {
+                Ok(arena) => match render(&arena, block.whole().end, block.place, &[]) {
                     Ok(rendered) if errors.is_empty() => {
                         return Ok(shown(&rendered, &block.text, block.place));
                     }

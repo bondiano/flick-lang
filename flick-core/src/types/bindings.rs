@@ -178,6 +178,8 @@ impl Checker<'_> {
             self.pattern_let(decl, &parts, Some(rest));
             return;
         };
+        let binder = decl.nodes().find(|n| n.kind == K::VarPat);
+        let at = binder.unwrap_or(decl).range().0;
         let signature = sig
             .and_then(|s| s.nodes().find(|n| is_type(n.kind)))
             .map(|t| self.signature(t));
@@ -186,6 +188,7 @@ impl Checker<'_> {
                 let rec = (!explicit).then(|| self.new_rec(&name));
                 self.locals.push(Local {
                     name: name.clone(),
+                    generated: at >= self.generated,
                     ty: scheme.clone(),
                     rec,
                 });
@@ -201,22 +204,19 @@ impl Checker<'_> {
             }
             self.polymorphic_signature(&name, &scheme, runtime, decl, &parts);
             let ty = self.inferred_captures(scheme, captures, self.span(decl));
-            self.push_local(&name, ty);
+            self.push_local(&name, at, ty);
         } else {
             if parts.rec {
                 let ty = self.fresh();
-                self.push_local(&name, ty);
+                self.push_local(&name, at, ty);
             }
             let ty = self.unsigned(decl, &parts, &name);
             if parts.rec {
                 self.locals.pop();
             }
-            self.push_local(&name, ty);
+            self.push_local(&name, at, ty);
         }
-        if let (Some(binder), Some(local)) = (
-            decl.nodes().find(|n| n.kind == K::VarPat),
-            self.locals.last(),
-        ) {
+        if let (Some(binder), Some(local)) = (binder, self.locals.last()) {
             let ty = local.ty.clone();
             self.note_type(self.span(binder), &ty);
         }

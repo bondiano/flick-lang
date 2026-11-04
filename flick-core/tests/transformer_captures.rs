@@ -20,6 +20,7 @@ fn check(text: &str, imported: &[Interface]) -> (Interface, Vec<Diagnostic>) {
         text,
         tree: &parsed.tree,
         syntax: &syntax,
+        generated: resolve::NO_GENERATED,
     };
     let lookup = |name: &str| {
         imported

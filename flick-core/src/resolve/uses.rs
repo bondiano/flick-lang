@@ -2,8 +2,8 @@
 //! bound locally by a parameter, pattern, `let` or `scope`; and the local
 //! names nothing refers to.
 
-use super::Namespace;
 use super::defs::{binders, is_pattern};
+use super::{Module, Namespace};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
@@ -28,16 +28,17 @@ pub(super) struct Unused {
     pub punned: bool,
 }
 
-pub(super) fn references(tree: &Node, text: &str, file: FileId) -> (Vec<Reference>, Vec<Unused>) {
+pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
     let mut walker = Walker {
-        text,
-        file,
+        text: module.text,
+        file: module.file,
+        generated: module.generated,
         locals: Vec::new(),
         out: Vec::new(),
         unused: Vec::new(),
         top: 0,
     };
-    for (i, decl) in tree.nodes().enumerate() {
+    for (i, decl) in module.tree.nodes().enumerate() {
         walker.top = i;
         walker.walk(decl);
     }
@@ -46,6 +47,8 @@ pub(super) fn references(tree: &Node, text: &str, file: FileId) -> (Vec<Referenc
 
 struct Local<'a> {
     name: &'a str,
+    /// Whether a plugin generated it: only generated names see it.
+    generated: bool,
     /// `None` for a name whose uses are not counted: a top-level `let`, a
     /// region of `scope`.
     binder: Option<(Token, bool)>,
@@ -55,6 +58,7 @@ struct Local<'a> {
 struct Walker<'a> {
     text: &'a str,
     file: FileId,
+    generated: u32,
     locals: Vec<Local<'a>>,
     out: Vec<Reference>,
     unused: Vec<Unused>,
@@ -119,6 +123,7 @@ impl Walker<'_> {
                 let name = node.child_tokens().find(|t| t.kind == K::Ident);
                 self.locals.extend(name.map(|t| Local {
                     name: t.text(self.text),
+                    generated: t.start >= self.generated,
                     binder: None,
                     used: false,
                 }));
@@ -178,6 +183,7 @@ impl Walker<'_> {
         punned(pattern, &mut puns);
         self.locals.extend(names.into_iter().map(|t| Local {
             name: t.text(self.text),
+            generated: t.start >= self.generated,
             binder: Some((t, puns.contains(&t.start))),
             used: false,
         }));
@@ -217,6 +223,7 @@ impl Walker<'_> {
             binders(pattern, &mut names);
             self.locals.extend(names.into_iter().map(|t| Local {
                 name: t.text(self.text),
+                generated: t.start >= self.generated,
                 binder: None,
                 used: false,
             }));
@@ -266,7 +273,9 @@ impl Walker<'_> {
             // every binder of the name in scope counts as used: the branches
             // of an or-pattern bind it once each
             let mut found = false;
-            for local in self.locals.iter_mut().filter(|l| l.name == name) {
+            let generated = first.start >= self.generated;
+            let seen = |l: &&mut Local| l.name == name && l.generated == generated;
+            for local in self.locals.iter_mut().filter(seen) {
                 local.used = true;
                 found = true;
             }
