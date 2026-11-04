@@ -32,6 +32,8 @@ struct Package {
     source_dir: Option<PathBuf>,
     /// For a library of `[dependencies]`, what its modules depend on.
     library: Option<Library>,
+    /// The component of the plugin a library provides.
+    plugin: Option<PathBuf>,
 }
 
 /// What the modules of a library of `[dependencies]` depend on besides the
@@ -112,6 +114,7 @@ impl Packages {
                     installed: installed.is_some(),
                     source_dir,
                     library: None,
+                    plugin: None,
                 }
             });
         packages.extend(installed.collect::<Vec<_>>());
@@ -135,6 +138,14 @@ impl Packages {
                 p.library.as_ref()?,
             ))
         })
+    }
+
+    /// The component of the plugin the library `name` provides.
+    pub fn plugin(&self, name: &str) -> Option<&Path> {
+        self.packages
+            .iter()
+            .find(|p| p.name == name)
+            .and_then(|p| p.plugin.as_deref())
     }
 
     /// Declared dependencies missing from `node_modules`.
@@ -321,6 +332,9 @@ impl Libraries<'_> {
                 checksum,
                 dependencies,
             }),
+            plugin: (library.package.as_ref())
+                .and_then(|p| p.plugin.as_ref())
+                .map(|plugin| at.join(plugin)),
         });
         Some((at, library.dependencies))
     }

@@ -102,6 +102,9 @@ pub struct Package {
     pub version: String,
     /// `flick = "…"`: a semver requirement on the compiler.
     pub flick: Option<String>,
+    /// `plugin = "…"`: the WebAssembly component of the plugin the library
+    /// provides, relative to its directory.
+    pub plugin: Option<String>,
     pub span: Span,
 }
 

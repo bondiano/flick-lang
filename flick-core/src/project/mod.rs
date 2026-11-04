@@ -52,8 +52,10 @@ pub trait Host {
     /// The path as diagnostics show it.
     fn display(&self, path: &Path) -> String;
     /// The plugin of the package `package`, which a module imports, or why
-    /// there is none.
-    fn plugin(&self, package: &str) -> Result<Arc<dyn Expander>, String> {
+    /// there is none; `component` is the WebAssembly component the package
+    /// names for it.
+    fn plugin(&self, package: &str, component: Option<&Path>) -> Result<Arc<dyn Expander>, String> {
+        let _ = component;
         Err(format!("no dependency provides plugin \"{package}\""))
     }
     /// What a plugin gave for the call `key` in an earlier run.

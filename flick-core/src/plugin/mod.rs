@@ -13,7 +13,7 @@ use flick_plugin::{Arena, Block, Diagnostic, Plugin};
 use source::BlockSource;
 
 /// A plugin as the compiler runs it: linked into the compiler, or loaded.
-pub trait Expander {
+pub trait Expander: Send + Sync {
     /// What tells this plugin and its version apart, for caches.
     fn id(&self) -> &str;
     /// What the plugin learns from all its blocks of a group.
@@ -54,7 +54,7 @@ impl<P: Plugin> Native<P> {
     }
 }
 
-impl<P: Plugin> Expander for Native<P> {
+impl<P: Plugin + Send + Sync> Expander for Native<P> {
     fn id(&self) -> &str {
         &self.id
     }

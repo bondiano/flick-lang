@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::ops;
+use std::path::{Component, Path};
 
 use serde::Deserialize;
 use toml::Spanned;
@@ -28,6 +29,7 @@ pub(super) struct RawPackage {
     name: String,
     version: String,
     flick: Option<String>,
+    plugin: Option<String>,
 }
 
 /// The dependencies of `[dependencies]`, each with one source.
@@ -90,6 +92,7 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
         name,
         version,
         flick,
+        plugin,
     } = raw.into_inner();
     let error = |message: String| Diagnostic::error(codes::P032, message, at);
     semver::Version::parse(&version).map_err(|e| {
@@ -104,10 +107,21 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
             ))
         })?;
     }
+    // a fetched library names a file of its own, not one beside it
+    if let Some(plugin) = &plugin
+        && !Path::new(plugin)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
+    {
+        return Err(error(format!(
+            "`plugin = \"{plugin}\"` must be a path inside the package, without `..`"
+        )));
+    }
     Ok(Package {
         name,
         version,
         flick,
+        plugin,
         span: at,
     })
 }

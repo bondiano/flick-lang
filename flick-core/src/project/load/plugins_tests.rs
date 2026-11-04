@@ -81,7 +81,7 @@ impl Host for Memory {
         path.display().to_string()
     }
 
-    fn plugin(&self, package: &str) -> Result<Arc<dyn Expander>, String> {
+    fn plugin(&self, package: &str, _: Option<&Path>) -> Result<Arc<dyn Expander>, String> {
         match package {
             "pairs" => Ok(self.plugin.clone()),
             _ => Err("no such plugin".into()),

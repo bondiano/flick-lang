@@ -5,6 +5,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::mem;
+use std::path::Path;
 use std::sync::Arc;
 
 use flick_plugin::{Arena, Block, VERSION};
@@ -48,7 +49,7 @@ impl Loader<'_> {
                 let package = string_value(name.text(text));
                 let plugin = plugins
                     .entry(package.clone())
-                    .or_insert_with(|| self.host.plugin(&package));
+                    .or_insert_with(|| self.host.plugin(&package, self.component(&package)));
                 if let Err(why) = plugin {
                     diagnostics.push(Diagnostic::error(
                         codes::P035,
@@ -321,4 +322,18 @@ fn refusal(file: FileId, start: u32, package: &str, d: &flick_plugin::Diagnostic
         format!("plugin `{package}`: {}", d.message),
         Span::new(file, start + d.span.start, start + d.span.end),
     )
+}
+
+impl Loader<'_> {
+    /// The component of the plugin of the dependency `package`.
+    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
+    fn component(&self, package: &str) -> Option<&Path> {
+        #[cfg(feature = "native-project")]
+        return self.packages.plugin(package);
+        #[cfg(not(feature = "native-project"))]
+        {
+            let _ = package;
+            None
+        }
+    }
 }

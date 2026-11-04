@@ -308,3 +308,19 @@ fn rejects_invalid_workspaces_and_scripts() {
         assert_eq!(err.code, code, "{text}: {}", err.message);
     }
 }
+
+#[test]
+fn a_package_names_its_plugin_inside_itself() {
+    let package = |plugin: &str| {
+        parse_text(&format!(
+            "schema-version = 1\n[package]\nname = \"pairs\"\nversion = \"1.0.0\"\nplugin = \"{plugin}\"\n[project]\nkind = \"lib\"\n"
+        ))
+    };
+    let config = package("plugin/pairs.wasm").expect("valid");
+    let plugin = config.package.and_then(|p| p.plugin);
+    assert_eq!(plugin.as_deref(), Some("plugin/pairs.wasm"));
+    for outside in ["../pairs.wasm", "/tmp/pairs.wasm", "a/../../b.wasm"] {
+        let refused = package(outside).expect_err(outside);
+        assert_eq!(refused.code, codes::P032, "{outside}");
+    }
+}

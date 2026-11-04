@@ -23,6 +23,7 @@ mod fetch;
 mod lsp;
 mod mapper;
 mod package_cache;
+mod plugins;
 mod progress;
 mod report;
 mod sources;

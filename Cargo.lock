@@ -323,6 +323,7 @@ dependencies = [
  "flate2",
  "flick-core",
  "flick-model",
+ "flick-plugin",
  "flick-wasm",
  "insta",
  "rustix",
