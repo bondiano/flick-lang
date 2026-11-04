@@ -1,4 +1,4 @@
-package flick:plugin@0.5.0;
+package flick:plugin@0.6.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -131,6 +131,23 @@ interface types {
   /// compiler lays out. The compiler writes the head before it, `{` before
   /// a layout that starts in the body, and `}` after it.
   variant piece { text(string), line, indent, dedent, hole(hole) }
+
+  /// A constructor of a derive's target and the types of its fields.
+  record case-target { name: string, fields: list<span> }
+
+  /// A type a class's derive makes an instance for: its declaration as a
+  /// block, and what it declares at spans of that block; its name and
+  /// constructors are qualified for a type of another module, which is not
+  /// `local` and whose spans are no holes.
+  record derive-target {
+    decl: block,
+    name: string,
+    params: list<string>,
+    cases: list<case-target>,
+    alias: option<span>,
+    refined: option<span>,
+    local: bool,
+  }
 }
 
 /// What the compiler offers a plugin while it expands a block.
@@ -149,7 +166,7 @@ interface compiler {
 
 world plugin {
   import compiler;
-  use types.{block, arena, diagnostic, completion, hover, highlight, piece};
+  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target};
 
   /// What the plugin learns from all its blocks of a group, before any expands.
   export collect: func(blocks: list<block>) -> list<u8>;
@@ -164,4 +181,14 @@ world plugin {
   /// The layout of the block, the compiler parsing its holes; none keeps it
   /// as written.
   export format: func(block: block, state: list<u8>) -> option<list<piece>>;
+  /// The instance of `class` for `target` as declarations; `args` is the
+  /// `{ … }` after the class in `deriving`, `module` every type of the
+  /// target's module.
+  export derive: func(
+    target: derive-target,
+    class: string,
+    args: option<block>,
+    module: list<derive-target>,
+    state: list<u8>,
+  ) -> result<arena, list<diagnostic>>;
 }

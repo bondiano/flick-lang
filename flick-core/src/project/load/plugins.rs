@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use flick_plugin::Block;
 
+mod derive;
 mod results;
 
 use results::Results;
@@ -39,6 +40,11 @@ struct Found {
     node: Node,
     source: BlockSource,
     package: String,
+    /// A type declaration whose derived code goes after it.
+    keep: bool,
+    /// What the whole block stands for in the module: the block, or the
+    /// class a `deriving` names.
+    whole: Span,
 }
 
 impl Loader<'_> {
@@ -128,6 +134,7 @@ impl Loader<'_> {
             expanded.extend(mem::take(&mut round).into_iter().zip(rendered));
             round = next;
         }
+        expanded.extend(self.derive_blocks(&mut plugins, &mut results, &mut diagnostics));
         diagnostics.extend(round.iter().map(|f| {
             failure(
                 f,
@@ -159,6 +166,8 @@ impl Loader<'_> {
                     rendered,
                     source: f.source,
                     plugin: f.package,
+                    keep: f.keep,
+                    whole: (f.whole.start, f.whole.end),
                 });
             }
         }
@@ -347,11 +356,14 @@ impl Sink<'_> {
             return;
         };
         if source.closed() {
+            let (start, end) = node.range();
             self.found.push(Found {
                 module: i,
                 node: node.clone(),
+                whole: Span::new(source.file(), start, end),
                 source,
                 package: package.clone(),
+                keep: false,
             });
         } else if let Some(Ok(plugin)) = self.plugins.get(package) {
             self.editing
@@ -372,11 +384,10 @@ fn group(root: &Root) -> String {
 
 /// `P036` on the block of `found`: its plugin `package` `what`.
 fn failure(found: &Found, package: &str, what: &str) -> Diagnostic {
-    let (start, end) = found.node.range();
     Diagnostic::error(
         codes::P036,
         format!("plugin `{package}` {what}"),
-        Span::new(found.source.file(), start, end),
+        found.whole,
     )
 }
 
@@ -384,13 +395,18 @@ fn failure(found: &Found, package: &str, what: &str) -> Diagnostic {
 /// the whole of its frame meaning the whole block: under the plugin's own
 /// code, or `P036` without one.
 fn refusal(found: &Found, package: &str, d: &flick_plugin::Diagnostic) -> Diagnostic {
-    let (file, start) = (found.source.file(), found.source.start());
-    let (from, to) = if (d.span.start, d.span.end) == (0, found.source.end() - start) {
-        found.node.range()
+    let start = found.source.start();
+    // a declaration of another module has no place here but the block
+    let whole = (d.span.start, d.span.end) == (0, found.source.end() - start);
+    let span = if whole || found.source.foreign() {
+        found.whole
     } else {
-        (start + d.span.start, start + d.span.end)
+        Span::new(
+            found.source.file(),
+            start + d.span.start,
+            start + d.span.end,
+        )
     };
-    let span = Span::new(file, from, to);
     match (d.code.as_deref()).and_then(|code| codes::plugin(package, code)) {
         Some(code) => Diagnostic::error(code, d.message.clone(), span),
         None => Diagnostic::error(

@@ -28,6 +28,12 @@ pub struct Expanded {
     pub rendered: Rendered,
     pub source: BlockSource,
     pub plugin: String,
+    /// The node stays, its code after it: a type declaration and what a
+    /// derive gives for it.
+    pub keep: bool,
+    /// What the whole of its code stands for: the block, or the class a
+    /// `deriving` names.
+    pub whole: (u32, u32),
 }
 
 pub struct Expansion {
@@ -116,10 +122,11 @@ impl Expansion {
                 Ok(nodes) => {
                     let start = block.source.start();
                     let frame = block.source.end() - start;
+                    let foreign = block.source.foreign();
                     origins.extend(block.rendered.origins.iter().map(|&((s, e), o)| {
                         // the whole frame is the whole block, its head with it
-                        let origin = if (o.start, o.end) == (0, frame) {
-                            range
+                        let origin = if (o.start, o.end) == (0, frame) || foreign {
+                            block.whole
                         } else {
                             (start + o.start, start + o.end)
                         };
@@ -134,14 +141,14 @@ impl Expansion {
                     );
                     let end = u32::try_from(out.len()).expect("source fits in u32");
                     done.push(Block {
-                        range,
+                        range: block.whole,
                         code: (at, end),
                         plugin: block.plugin,
                         frame: (block.source.start(), block.source.end()),
                         place: block.source.place(),
                         holes: block.rendered.holes.clone(),
                     });
-                    spliced.push((range, nodes));
+                    spliced.push((range, nodes, block.keep));
                 }
                 Err(why) => diagnostics.push(Diagnostic::error(
                     codes::P036,
@@ -310,21 +317,37 @@ impl Expansion {
     }
 }
 
+/// The code of each block and whether the block stays before it, by range.
+type Spliced = Vec<((u32, u32), Vec<Node>, bool)>;
+
 /// Replaces each block under `node` by its code from `spliced`, by range:
 /// an expression by its tree, a declaration of the module by its
-/// declarations.
-fn replace_blocks(node: &mut Node, spliced: &mut Vec<((u32, u32), Vec<Node>)>) {
+/// declarations; a type declaration a derive gives code for stays, its
+/// code after it.
+fn replace_blocks(node: &mut Node, spliced: &mut Spliced) {
     let mut children = Vec::with_capacity(node.children.len());
     for child in mem::take(&mut node.children) {
         let Element::Node(mut n) = child else {
             children.push(child);
             continue;
         };
-        if matches!(n.kind, K::PluginExpr | K::PluginDecl) {
+        if matches!(
+            n.kind,
+            K::PluginExpr | K::PluginDecl | K::TypeDecl | K::DerivingDecl
+        ) {
             let range = n.range();
-            if let Some(i) = spliced.iter().position(|(r, _)| *r == range) {
+            let (mut code, mut found, mut keep) = (Vec::new(), false, false);
+            while let Some(i) = spliced.iter().position(|(r, ..)| *r == range) {
+                let (_, nodes, kept) = spliced.remove(i);
+                (found, keep) = (true, keep || kept);
+                code.extend(nodes);
+            }
+            if found {
+                if keep {
+                    children.push(Element::Node(n));
+                }
                 // the user's code in its code has blocks of its own
-                for mut code in spliced.swap_remove(i).1 {
+                for mut code in code {
                     replace_blocks(&mut code, spliced);
                     children.push(Element::Node(code));
                 }

@@ -227,6 +227,7 @@ impl Checker<'_> {
                     fundeps: Vec::new(),
                     methods: Vec::new(),
                     defaults: Vec::new(),
+                    derive: false,
                 },
                 result,
             ),
@@ -535,6 +536,7 @@ impl Checker<'_> {
                     fundeps,
                     methods,
                     defaults,
+                    derive: self.derived.iter().any(|d| d.class == p.name),
                 };
                 let members = members.into_iter().map(|(n, t)| (n, quantify(t))).collect();
                 self.declare_methods(&p.name, members);

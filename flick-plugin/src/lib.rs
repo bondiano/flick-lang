@@ -31,7 +31,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.5.0";
+pub const VERSION: &str = "0.6.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -285,6 +285,32 @@ pub struct Completion {
     pub snippet: Option<String>,
 }
 
+/// A type a class's derive makes an instance for: its declaration as a
+/// block, a declaration of the module, and what it declares, at spans of
+/// that block. A type of another module (`deriving instance`) is not
+/// `local`: its spans are no holes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeriveTarget {
+    pub decl: Block,
+    /// Its name, qualified for a type of another module: `Other.Color`.
+    pub name: String,
+    pub params: Vec<String>,
+    /// Its constructors, qualified as its name is, with their fields' types.
+    pub cases: Vec<CaseTarget>,
+    /// The type a `type alias` stands for.
+    pub alias: Option<Span>,
+    /// The base type of a `refined type`.
+    pub refined: Option<Span>,
+    pub local: bool,
+}
+
+/// A constructor of a derive's target and the types of its fields.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CaseTarget {
+    pub name: String,
+    pub fields: Vec<Span>,
+}
+
 /// A piece of the layout a plugin gives a block, from its first argument
 /// (or its body) on: the compiler writes the head before it, `{` before a
 /// layout that starts in the body, and `}` after it.
@@ -360,6 +386,22 @@ pub trait Plugin {
     fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
         let _ = (block, state);
         Vec::new()
+    }
+    /// The instance of `class` for `target`, and what goes with it, as
+    /// declarations; `args` is the `{ … }` after the class in `deriving`,
+    /// and `module` every type the module of `target` declares.
+    fn derive(
+        &self,
+        target: &DeriveTarget,
+        class: &str,
+        args: Option<&Block>,
+        module: &[DeriveTarget],
+        state: &[u8],
+        compiler: &mut dyn Compiler,
+    ) -> Result<Arena, Vec<Diagnostic>> {
+        let _ = (args, module, state, compiler);
+        let message = format!("`{class}` has no derive in this plugin");
+        Err(vec![Diagnostic::error(message, target.decl.whole())])
     }
     /// The layout of `block`, the user's code in it found through
     /// `compiler`; none keeps the block as written.

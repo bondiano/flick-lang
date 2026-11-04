@@ -31,4 +31,4 @@ let wrong_default =
 
 type Box = Box Float
   deriving Cli.Value
-//^^^^^^^^^^^^^^^^^^ FLICK-C013 cannot derive `Cli.Value` for `Box`
+//         ^^^^^^^^^ std/L010 cannot derive `Cli.Value` for `Box`

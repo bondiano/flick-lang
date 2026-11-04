@@ -115,6 +115,24 @@ pub fn format(
     Some(pieces.into_iter().map(convert::to_piece).collect())
 }
 
+#[doc(hidden)]
+pub fn derive(
+    plugin: &impl Plugin,
+    target: types::DeriveTarget,
+    class: &str,
+    args: Option<types::Block>,
+    module: Vec<types::DeriveTarget>,
+    state: &[u8],
+) -> Result<types::Arena, Vec<types::Diagnostic>> {
+    let module: Vec<_> = module.into_iter().map(convert::from_target).collect();
+    let args = args.map(convert::from_block);
+    let target = convert::from_target(target);
+    plugin
+        .derive(&target, class, args.as_ref(), &module, state, &mut Imports)
+        .map(convert::to_arena)
+        .map_err(|found| found.into_iter().map(convert::to_diagnostic).collect())
+}
+
 /// Exports the plugin `$plugin`, a value of a type implementing [`Plugin`],
 /// as the component a crate of type `cdylib` builds for `wasm32-wasip2`.
 #[macro_export]
@@ -169,6 +187,19 @@ macro_rules! export {
                 ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Piece>,
             > {
                 $crate::guest::format(&$plugin, block, &state)
+            }
+
+            fn derive(
+                target: $crate::guest::bindings::flick::plugin::types::DeriveTarget,
+                class: ::std::string::String,
+                args: ::std::option::Option<$crate::guest::bindings::flick::plugin::types::Block>,
+                module: ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::DeriveTarget>,
+                state: ::std::vec::Vec<u8>,
+            ) -> ::std::result::Result<
+                $crate::guest::bindings::flick::plugin::types::Arena,
+                ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic>,
+            > {
+                $crate::guest::derive(&$plugin, target, &class, args, module, &state)
             }
         }
 

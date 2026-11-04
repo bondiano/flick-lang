@@ -209,6 +209,23 @@ type Tree a = Leaf | Node (Tree a) a (Tree a)
 одни и те же поля. Прозрачный псевдоним уже использует экземпляры классов
 своей формы. Нарушения этих правил вызывают `FLICK-C013`.
 
+Класс с `@derive` выводит плагин его пакета или пакета, который назван в
+атрибуте, — `@derive std` (см. [плагины](../plugins/#derive)).
+`deriving C { … }` передаёт derive аргументы, а `deriving instance C (M.T a)`
+выводит экземпляр для типа другого модуля пакета. Таков `Cli.Value`. Любой
+другой класс — `FLICK-C013`: у класса нет derive.
+
+```flick
+@derive
+class Arbitrary a =
+  arbitrary : a
+
+type Point = Point Float Float
+  deriving Arbitrary
+
+deriving instance Arbitrary (Shapes.Shape)
+```
+
 ## Словари
 
 Для каждого разрешённого ограничения компилятор сохраняет словарь в том

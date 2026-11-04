@@ -25,4 +25,4 @@ type Label = Label String
 //~ FLICK-C013 @9:3-9:16 derive `Eq` together with `Hash`
 //~ FLICK-C013 @12:3-12:14 `Point` is a transparent alias
 //~ FLICK-C013 @15:3-15:16 a field of type `Float -> Float` has no `Show` instance
-//~ FLICK-C013 @21:3-21:18 `Pretty` cannot be derived
+//~ FLICK-C013 @21:3-21:18 the class `Pretty` has no derive

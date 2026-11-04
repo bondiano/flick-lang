@@ -20,8 +20,31 @@ type error CliError = CliError String
   deriving Eq, Show
 
 /// Parsing a parameter's text into a value; the error is shown to the user.
+/// `deriving Cli.Value` makes one for a choice among constructors without
+/// fields, by their names in kebab case, and for a refined type.
+@derive
 class Value a =
   parse : String ->{} Result String a
+
+/// The `Value` of a choice: the value whose name is the text.
+choice : List (String, a) -> String ->{} Result String a
+let choice choices text =
+  match List.find (fun (name, _) -> name == text) choices with
+  | Some (_, value) -> Ok value
+  | None ->
+    let names = String.join ", " (List.map (fun (name, _) -> name) choices)
+    Err ("expected one of " ++ names ++ ", got " ++ text)
+
+/// The `Value` of the refined type `name`: its base parsed, then checked by
+/// `check`, the type's `parse`.
+refined : Value b => String -> (b -> Result e a) -> String ->{} Result String a
+let refined name check text =
+  match parse text with
+  | Ok base ->
+    match check base with
+    | Ok value -> Ok value
+    | Err _ -> Err ("not a valid " ++ name ++ ": " ++ text)
+  | Err why -> Err why
 
 instance Value String =
   parse : String ->{} Result String String

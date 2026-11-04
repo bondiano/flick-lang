@@ -6,9 +6,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use flick_plugin::{Arena, Block};
+use flick_plugin::{Arena, Block, DeriveTarget};
 use flick_test_pairs::Pairs;
 
+mod derive;
 mod forms;
 mod names;
 mod nested;
@@ -48,6 +49,19 @@ impl Expander for Counting {
     ) -> Result<Arena, Failure> {
         self.expands.fetch_add(1, Ordering::Relaxed);
         self.inner.expand(block, state, source)
+    }
+
+    fn derive(
+        &self,
+        target: &DeriveTarget,
+        class: &str,
+        args: Option<&Block>,
+        module: &[DeriveTarget],
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Result<Arena, Failure> {
+        self.inner
+            .derive(target, class, args, module, state, source)
     }
 }
 
