@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 use super::Ide;
 use super::complete::{Completion, CompletionKind, exports};
 use crate::diagnostics::Edit;
-use crate::doc;
 use crate::iface::{Entity, Namespace};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
@@ -36,7 +35,7 @@ impl Ide<'_> {
                 .or_insert_with_key(|m| {
                     let source = self.source(m)?;
                     Some(Known {
-                        docs: doc::comments(&source.text),
+                        docs: source.docs(),
                         params: params(&source.tree, &source.text),
                     })
                 })

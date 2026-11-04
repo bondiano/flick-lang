@@ -315,6 +315,13 @@ impl Ide<'_> {
         let token = tree::name_token_at(node, offset)?;
         let at = (token.start, token.end);
         let name = token.text(text);
+        // the name of a declaration a plugin block gives, written in the block
+        let generated = m.expansion.as_ref().map(|e| e.declarations());
+        if let Some(d) = (generated.iter().flatten())
+            .find(|d| d.name == name && d.span.start <= token.start && token.end <= d.span.end)
+        {
+            return Some((entity(&m.name, d.namespace, &d.name), at));
+        }
         if let Some(symbol) = instance_member(m, &path, token.start, name) {
             return Some((symbol, at));
         }

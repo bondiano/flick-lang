@@ -45,7 +45,7 @@ fn documentation(source: &Source, name: &str) -> Option<String> {
         .nodes()
         .filter(|n| n.kind == K::ClassDecl)
         .find_map(|decl| member_documentation(decl, name, &source.text))
-        .or_else(|| doc::comments(&source.text).remove(name))
+        .or_else(|| source.docs().remove(name))
 }
 
 fn member_documentation(decl: &Node, name: &str, text: &str) -> Option<String> {

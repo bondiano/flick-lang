@@ -27,10 +27,13 @@ impl Ide<'_> {
         let Some(m) = self.module(file) else {
             return Vec::new();
         };
-        let decls: Vec<Declared> = declarations(&m.tree, self.text(file), file)
+        let generated = m.expansion.as_ref().map(|e| e.declarations());
+        let mut decls: Vec<Declared> = declarations(&m.tree, self.text(file), file)
             .into_iter()
+            .chain(generated.into_iter().flatten())
             .filter(|d| !d.signature)
             .collect();
+        decls.sort_by_key(|d| d.span.start);
         let tops: Vec<(u32, u32)> = m.tree.nodes().map(Node::range).collect();
         let enclosing = |d: &Declared| {
             tops.iter()
@@ -39,7 +42,8 @@ impl Ide<'_> {
                 .unwrap_or((d.span.start, d.span.end))
         };
         let outline = |d: &Declared, children| Outline {
-            name: d.name.clone(),
+            // a companion as the user names it
+            name: d.name.replace('$', "."),
             kind: kind(d),
             range: enclosing(d),
             selection: (d.span.start, d.span.end),
