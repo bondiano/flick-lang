@@ -8,7 +8,7 @@ use std::mem;
 use std::path::Path;
 use std::sync::Arc;
 
-use flick_plugin::{Arena, Block, VERSION};
+use flick_plugin::{Arena, Block, Place, VERSION};
 
 use super::unimported::unimported;
 use super::{Loaded, Loader, Root};
@@ -310,6 +310,8 @@ impl Results<'_> {
             plugin.id().as_bytes(),
             block.head.as_bytes(),
             block.text.as_bytes(),
+            block.docs.as_bytes(),
+            &[u8::from(block.place == Place::Declaration)],
             &column,
             &indent,
             state,

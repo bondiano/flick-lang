@@ -379,6 +379,7 @@ impl Loader<'_> {
                 imports: module.imports.clone(),
                 ir,
                 interface: module.interface.clone(),
+                expansion: None,
             });
         }
         out

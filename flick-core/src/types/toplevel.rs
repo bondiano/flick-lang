@@ -41,6 +41,13 @@ struct Item<'a> {
     rec: Option<usize>,
 }
 
+impl TopLevel<'_> {
+    /// Whether the module declares the value `name` at its top level.
+    pub fn declares(&self, name: &str) -> bool {
+        self.by_name.contains_key(name)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum State {
     Waiting,

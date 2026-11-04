@@ -16,11 +16,22 @@ pub struct RawToken {
 }
 
 pub fn lex(text: &str, file: FileId) -> (Vec<RawToken>, Vec<Diagnostic>) {
+    lex_with(text, file, false)
+}
+
+/// [`lex`] of code a plugin generated, where `Owner$member`, the companion
+/// `Owner.member` of a type, is one name: no source writes it.
+pub fn lex_generated(text: &str, file: FileId) -> (Vec<RawToken>, Vec<Diagnostic>) {
+    lex_with(text, file, true)
+}
+
+fn lex_with(text: &str, file: FileId, generated: bool) -> (Vec<RawToken>, Vec<Diagnostic>) {
     let mut lexer = Lexer {
         src: text.as_bytes(),
         text,
         pos: 0,
         file,
+        generated,
         tokens: Vec::new(),
         errors: Vec::new(),
     };
@@ -42,6 +53,7 @@ struct Lexer<'a> {
     text: &'a str,
     pos: usize,
     file: FileId,
+    generated: bool,
     tokens: Vec<RawToken>,
     errors: Vec<Diagnostic>,
 }
@@ -124,10 +136,14 @@ impl Lexer<'_> {
                 K::Number
             }
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
-                while is_ident_byte(self.peek(0)) {
+                while is_ident_byte(self.peek(0))
+                    || (self.generated && self.peek(0) == b'$' && is_ident_byte(self.peek(1)))
+                {
                     self.pos += 1;
                 }
                 let text = &self.text[start..self.pos];
+                // `Owner$member` is named by its member
+                let b = text.rsplit('$').next().map_or(b, |m| m.as_bytes()[0]);
                 if text == "_" {
                     K::Underscore
                 } else if b.is_ascii_uppercase() {

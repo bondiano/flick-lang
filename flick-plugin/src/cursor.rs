@@ -189,6 +189,7 @@ mod tests {
             text: text.into(),
             body: at("{") + 1,
             place: Place::Expression,
+            docs: String::new(),
             tokens: vec![
                 token(TokenKind::String, 0, 3),
                 token(TokenKind::Ident, flag, flag + 4),

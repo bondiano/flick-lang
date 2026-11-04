@@ -147,7 +147,8 @@ impl Checker<'_> {
     }
 
     /// The companions of each exported type of this module, `T$schema`,
-    /// `T$parse`, `T$value`, `T$json`, `T$table`, `T$url`, as values beside it.
+    /// `T$parse`, `T$value`, `T$json`, `T$table`, `T$url`, and those a plugin
+    /// declares, as values beside it.
     fn export_companions(&self, interface: &mut Interface) {
         let types: Vec<String> = interface
             .exports
@@ -155,6 +156,28 @@ impl Checker<'_> {
             .filter(|e| e.entity.namespace == Namespace::Type && e.entity.module == self.env.module)
             .map(|e| e.entity.name.clone())
             .collect();
+        // only generated code declares a top-level `T$member`
+        let mut declared: Vec<&Entity> = (self.env.own_values())
+            .map(|(e, _)| e)
+            .filter(|e| {
+                e.namespace == Namespace::Value
+                    && self.top.declares(&e.name)
+                    && (e.name.split_once('$')).is_some_and(|(ty, _)| types.iter().any(|t| t == ty))
+                    && !interface.exports.iter().any(|x| x.entity == **e)
+            })
+            .collect();
+        declared.sort();
+        for entity in declared {
+            interface.exports.push(Export {
+                entity: entity.clone(),
+                decl: Decl::Let,
+                parent: None,
+                scheme: None,
+                definition: None,
+                blocked: None,
+                at: None,
+            });
+        }
         for ty in types {
             for member in [
                 "schema",

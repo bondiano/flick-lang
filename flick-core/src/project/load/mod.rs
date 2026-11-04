@@ -134,6 +134,8 @@ pub struct Compiled {
     pub imports: Vec<String>,
     pub ir: ir::Module,
     pub interface: Interface,
+    /// The module with its plugin blocks expanded, when it has any.
+    pub expansion: Option<Arc<Expansion>>,
 }
 
 /// Checks `roots` (absolute `.fl` paths) and their transitive imports.
@@ -276,6 +278,7 @@ fn run(
                     imports: m.syntax.imports.iter().map(|i| i.module.clone()).collect(),
                     ir: ir?,
                     interface: interface?,
+                    expansion: m.expansion.clone(),
                 })
             })
             .collect(),

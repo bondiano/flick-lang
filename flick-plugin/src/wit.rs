@@ -30,6 +30,7 @@ macro_rules! wit_conversions {
                         $crate::Place::Expression => w::Place::Expression,
                         $crate::Place::Declaration => w::Place::Declaration,
                     },
+                    docs: b.docs.clone(),
                     tokens: b.tokens.iter().map(|t| w::Token {
                         kind: match t.kind {
                             $crate::TokenKind::Ident => w::TokenKind::Ident,
@@ -53,6 +54,7 @@ macro_rules! wit_conversions {
                         w::Place::Expression => $crate::Place::Expression,
                         w::Place::Declaration => $crate::Place::Declaration,
                     },
+                    docs: b.docs,
                     tokens: b.tokens.into_iter().map(|t| $crate::Token {
                         kind: match t.kind {
                             w::TokenKind::Ident => $crate::TokenKind::Ident,
@@ -218,6 +220,7 @@ macro_rules! wit_conversions {
                             }
                             $crate::Decl::Group(d) => w::Decl::Group(d),
                             $crate::Decl::Hole(s) => w::Decl::Hole(to_span(s)),
+                            $crate::Decl::Doc { text, decl } => w::Decl::Doc(w::Doc { text, decl }),
                         }),
                     },
                     origin: to_span(n.origin),
@@ -272,6 +275,7 @@ macro_rules! wit_conversions {
                             w::Decl::Instance(i) => $crate::Decl::Instance { context: i.context, head: i.head, members: i.members },
                             w::Decl::Group(d) => $crate::Decl::Group(d),
                             w::Decl::Hole(s) => $crate::Decl::Hole(from_span(s)),
+                            w::Decl::Doc(d) => $crate::Decl::Doc { text: d.text, decl: d.decl },
                         }),
                     },
                     origin: from_span(n.origin),

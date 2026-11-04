@@ -1,4 +1,4 @@
-package flick:plugin@0.3.0;
+package flick:plugin@0.4.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -18,8 +18,9 @@ interface types {
   /// args rest`: the text from its first argument (or from its body, without
   /// arguments) to the closing `}` or its end, where the body starts in it
   /// (its length without one), and the tokens of the arguments, the body and
-  /// the rest, `{` left out.
-  record block { head: string, text: string, body: u32, place: place, tokens: list<token> }
+  /// the rest, `{` left out. `docs` are the `///` lines right above a
+  /// declaration, each without `///` and one space, joined by newlines.
+  record block { head: string, text: string, body: u32, place: place, tokens: list<token>, docs: string }
 
   enum hole-kind { expr, ty, pat, decl }
 
@@ -80,6 +81,8 @@ interface types {
   record %case { name: string, fields: list<node-id> }
   record adt { name: string, params: list<string>, cases: list<%case>, deriving: list<string> }
   record instance { context: list<node-id>, head: node-id, members: list<node-id> }
+  /// A declaration and its documentation, lines joined by newlines.
+  record doc { text: string, decl: node-id }
 
   /// A declaration of the module.
   variant decl {
@@ -92,6 +95,7 @@ interface types {
     group(list<node-id>),
     /// The user's declaration at this span.
     hole(span),
+    doc(doc),
   }
 
   variant kind { expr(expr), ty(ty), pat(pat), decl(decl) }
