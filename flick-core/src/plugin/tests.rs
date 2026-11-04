@@ -300,3 +300,48 @@ fn renders_a_recursive_let_and_a_forall() {
     let rendered = render(&b.finish(made), 10, Place::Declaration, &[]).expect("renders");
     assert_eq!(rendered.text, "let rec go : (forall x. (Schema x)) = go");
 }
+
+#[test]
+fn renders_a_row_of_types() {
+    let mut b = Builder::new(span(0, 10));
+    let found = b.ty(Ty::Name("NotFound".into()));
+    let conflict = b.ty(Ty::Name("Conflict".into()));
+    let errors = b.ty(Ty::Row(vec![found, conflict]));
+    let none = b.ty(Ty::Row(Vec::new()));
+    let cases = b.ty(Ty::Name("ErrorCases".into()));
+    let both = b.ty(Ty::Apply {
+        function: cases,
+        arguments: vec![errors, none],
+    });
+    let body = b.expr(Expr::Name("cases".into()));
+    let made = b.decl(Decl::Let {
+        name: "go".into(),
+        params: Vec::new(),
+        ty: Some(both),
+        body,
+        rec: false,
+    });
+    let rendered = render(&b.finish(made), 10, Place::Declaration, &[]).expect("renders");
+    assert_eq!(
+        rendered.text,
+        "let go : (ErrorCases {NotFound, Conflict} {}) = cases"
+    );
+}
+
+#[test]
+fn a_type_may_stand_twice_and_an_expression_once() {
+    let mut b = Builder::new(span(0, 10));
+    let pair = b.ty(Ty::Name("Pair".into()));
+    let user = b.ty(Ty::Hole(span(1, 4)));
+    let ty = b.ty(Ty::Apply {
+        function: pair,
+        arguments: vec![user, user],
+    });
+    let made = b.decl(Decl::Signature {
+        name: "p".into(),
+        ty,
+    });
+    let rendered = render(&b.finish(made), 10, Place::Declaration, &[]).expect("renders");
+    assert_eq!(rendered.text, "p : (Pair (Hole) (Hole))");
+    assert_eq!(rendered.holes.len(), 2);
+}

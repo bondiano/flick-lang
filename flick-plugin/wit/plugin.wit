@@ -1,4 +1,4 @@
-package flick:plugin@0.7.0;
+package flick:plugin@0.8.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -66,6 +66,8 @@ interface types {
     hole(span),
     /// `forall a b. body`.
     forall(forall-ty),
+    /// A row of types, as the errors `{NotFound, Conflict}`.
+    row(list<node-id>),
   }
 
   record forall-ty { vars: list<string>, body: node-id }

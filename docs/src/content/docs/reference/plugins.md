@@ -132,9 +132,10 @@ and with the span of the block it stands for:
 | declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, `instance` with members, a group of several, documentation of one, hole |
 
 The compiler checks the arena before it uses it: names must lex as names,
-numbers be finite, holes lie in the body and be used once, and its size and
-depth are bounded. The arena version is the version of the interface,
-`0.7.0`. A component built for another version does not load: the import
+numbers be finite, holes lie in the body and not overlap, an expression or a
+pattern be used once (a type may stand in several places, as in a signature
+and an annotation), and its size and depth are bounded. The arena version is the version of the interface,
+`0.8.0`. A component built for another version does not load: the import
 that exposes its heads is `FLICK-P035`, naming the version it was built for
 and the one the compiler speaks, until it is rebuilt.
 

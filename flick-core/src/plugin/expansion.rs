@@ -4,6 +4,7 @@
 //! user's code inside blocks parsed in place, and the way back from a place
 //! in generated code to the place in the module it stands for.
 
+use std::collections::HashSet;
 use std::iter::Peekable;
 use std::mem;
 
@@ -292,6 +293,9 @@ impl Expansion {
             }
             true
         });
+        // a type the code uses twice is checked twice, and its errors are one
+        let mut seen = HashSet::new();
+        diagnostics.retain(|d| seen.insert((d.code, d.span, d.message.clone())));
         if let Some(ir) = ir {
             ir.each_span_mut(&mut |s| *s = self.place(*s));
         }
@@ -379,6 +383,7 @@ fn parse_holes(node: &mut Node, holes: &[((u32, u32), Node)]) {
             .map(|(_, t)| t)
             .collect();
         trees.sort_by_key(|t| t.range());
+        trees.dedup_by_key(|t| t.range());
         let mut next = trees.into_iter().peekable();
         n.children = in_place(mem::take(&mut n.children), &mut next);
         // the blocks inside that code
