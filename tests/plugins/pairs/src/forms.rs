@@ -9,8 +9,8 @@
 //! - `shows Box`: `instance Show Box = let show _ = "Box"`.
 
 use flick_plugin::{
-    Arena, Block, Builder, Case, Compiler, Decl, Diagnostic, Expr, Field, Pat, Place, TokenKind,
-    Ty, string_value,
+    Arena, Block, Builder, Case, Compiler, Decl, Diagnostic, Expr, Name, Place, TokenKind, flick,
+    string_value,
 };
 
 /// The code of `block` when its head is one of these; `None` otherwise.
@@ -60,13 +60,7 @@ fn define(
     let name = (block.cursor().ident())
         .ok_or_else(|| vec![Diagnostic::error("expected a name", block.whole())])?;
     let value = block.body().expr(compiler).map_err(|d| vec![d])?;
-    let value = b.expr(Expr::Hole(value));
-    Ok(b.decl(Decl::Let {
-        name: block.text_of(name.span).to_owned(),
-        params: Vec::new(),
-        ty: None,
-        body: value,
-    }))
+    Ok(flick!(b, let #(block.text_of(name.span)) = #value))
 }
 
 /// The user's declaration, and `let f_name = "f"`.
@@ -82,13 +76,7 @@ fn traced(
         .next()
         .unwrap_or("it");
     let kept = b.decl(Decl::Hole(user));
-    let text = b.expr(Expr::Text(name.to_owned()));
-    let traced = b.decl(Decl::Let {
-        name: format!("{name}_name"),
-        params: Vec::new(),
-        ty: None,
-        body: text,
-    });
+    let traced = flick!(b, let #(format!("{name}_name")) = #name);
     Ok(b.group(vec![kept, traced]))
 }
 
@@ -115,26 +103,8 @@ fn variants(block: &Block, b: &mut Builder) -> u32 {
 
 /// `instance Show Box = let show _ = "Box"`.
 fn shows(block: &Block, b: &mut Builder) -> u32 {
-    let name = block.text.trim().to_owned();
-    let class = b.ty(Ty::Name("Show".into()));
-    let shown = b.ty(Ty::Name(name.clone()));
-    let head = b.ty(Ty::Apply {
-        function: class,
-        arguments: vec![shown],
-    });
-    let ignored = b.pat(Pat::Wildcard);
-    let text = b.expr(Expr::Text(name));
-    let show = b.decl(Decl::Let {
-        name: "show".into(),
-        params: vec![ignored],
-        ty: None,
-        body: text,
-    });
-    b.decl(Decl::Instance {
-        context: Vec::new(),
-        head,
-        members: vec![show],
-    })
+    let name = block.text.trim();
+    flick!(b, instance Show #(Name(name)) { let show _ = #name })
 }
 
 /// `type alias Point = { x : Float; … }` and `let point = { x = 1.0; … }`.
@@ -162,30 +132,12 @@ fn table(
         c.eat("=").ok_or_else(|| at("expected `=`"))?;
         let value = c.expr(compiler).map_err(|d| vec![d])?;
         c.eat(";");
-        types.push(Field {
-            label: label.clone(),
-            value: b.ty(Ty::Hole(ty)),
-        });
-        values.push(Field {
-            label,
-            value: b.expr(Expr::Hole(value)),
-        });
+        types.push((label.clone(), ty));
+        values.push((label, value));
     }
-    let record = b.ty(Ty::Record(types));
-    let alias = b.decl(Decl::Alias {
-        name: name.clone(),
-        params: Vec::new(),
-        ty: record,
-    });
-    let row = b.expr(Expr::Record(values));
-    let annotation = b.ty(Ty::Name(name.clone()));
-    let mut lower = name;
+    let alias = flick!(b, type alias #(name) = { #(..types) });
+    let mut lower = name.clone();
     lower[..1].make_ascii_lowercase();
-    let value = b.decl(Decl::Let {
-        name: lower,
-        params: Vec::new(),
-        ty: Some(annotation),
-        body: row,
-    });
+    let value = flick!(b, let #(lower) : #(Name(&name)) = { #(..values) });
     Ok(b.group(vec![alias, value]))
 }

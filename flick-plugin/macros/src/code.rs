@@ -17,6 +17,7 @@ pub enum Role {
     Expr,
     Ty,
     Pat,
+    Decl,
 }
 
 impl Role {
@@ -25,6 +26,7 @@ impl Role {
             Role::Expr => quote!(expr),
             Role::Ty => quote!(ty),
             Role::Pat => quote!(pat),
+            Role::Decl => quote!(decl),
         }
     }
 
@@ -33,6 +35,7 @@ impl Role {
             Role::Expr => quote!(::flick_plugin::Expr),
             Role::Ty => quote!(::flick_plugin::Ty),
             Role::Pat => quote!(::flick_plugin::Pat),
+            Role::Decl => quote!(::flick_plugin::Decl),
         }
     }
 
@@ -78,13 +81,18 @@ pub fn literal(l: &Literal, role: Role) -> Result<Tokens, Error> {
             Role::Expr | Role::Ty => {
                 Ok(role.node(&quote!(#kind::Text(::std::string::String::from(#l)))))
             }
-            Role::Pat => Err((l.span(), "a pattern holds no text".to_owned())),
+            Role::Pat | Role::Decl => Err((
+                l.span(),
+                "only an expression or a type is a text".to_owned(),
+            )),
         };
     }
     let n = Literal::f64_unsuffixed(number(l)?);
     match role {
         Role::Expr => Ok(role.node(&quote!(#kind::Number(#n)))),
-        Role::Ty | Role::Pat => Err((l.span(), "a number is an expression".to_owned())),
+        Role::Ty | Role::Pat | Role::Decl => {
+            Err((l.span(), "a number is an expression".to_owned()))
+        }
     }
 }
 
