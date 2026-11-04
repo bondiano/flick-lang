@@ -56,8 +56,35 @@ export const log = (line) => {
   return undefined;
 };
 
-/** Whether `name` is taken; a short name takes longer, so an uninterrupted check would answer last. */
-export const taken = (name) =>
-  new Promise((resolve) => setTimeout(() => resolve(name === "root"), name.length <= 3 ? 60 : 10));
+let pending = 0;
 
-export const settle = () => new Promise((resolve) => setTimeout(resolve, 80));
+/** Whether `name` is taken; a short name takes longer, so an uninterrupted check would answer last. */
+export const taken = (name) => {
+  pending += 1;
+  return new Promise((resolve) =>
+    setTimeout(
+      () => {
+        pending -= 1;
+        resolve(name === "root");
+      },
+      name.length <= 3 ? 60 : 10,
+    ),
+  );
+};
+
+const tick = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 80ms, then until no check is running and the page stays the same for three ticks: a busy machine renders late. */
+export const settle = () => quiet(80);
+
+const page = () => dom?.window.document.body?.innerHTML ?? "";
+
+const quiet = async (ms) => {
+  await tick(ms);
+  for (let last = page(), still = 0; still < 3; ) {
+    await tick(10);
+    const now = page();
+    still = pending === 0 && now === last ? still + 1 : 0;
+    last = now;
+  }
+};
