@@ -121,8 +121,5 @@ fn past(rest: &[Token], end: u32) -> &[Token] {
 }
 
 fn refuse(token: &Token, message: &str) -> Diagnostic {
-    Diagnostic {
-        message: message.into(),
-        span: token.span,
-    }
+    Diagnostic::error(message, token.span)
 }

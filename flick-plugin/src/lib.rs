@@ -19,7 +19,7 @@ pub use builder::Builder;
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.1.0";
+pub const VERSION: &str = "0.2.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -45,11 +45,15 @@ pub struct Token {
     pub span: Span,
 }
 
-/// A block `head { body }`: the text of its body and the tokens in it.
+/// A block `head args { body }`: the text from its first argument (or from
+/// its body, without arguments) to the closing `}`, where the body starts in
+/// it, and the tokens of the arguments and the body, `{` left out. All spans
+/// count from the start of `text`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Block {
     pub head: String,
     pub text: String,
+    pub body: u32,
     pub tokens: Vec<Token>,
 }
 
@@ -117,6 +121,10 @@ pub enum Ty {
         input: NodeId,
         output: NodeId,
     },
+    /// A type-level string, as in `Record.Label "name"`.
+    Text(String),
+    /// `_`: the type the checker infers.
+    Wildcard,
     /// The user's type at this span of the body.
     Hole(Span),
 }
@@ -154,9 +162,49 @@ pub struct Arena {
     pub root: NodeId,
 }
 
+/// An error in a block; `code` is the plugin's own, such as `L001`, which
+/// the compiler shows under the plugin's package: `std/L001`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Diagnostic {
     pub message: String,
+    pub span: Span,
+    pub code: Option<String>,
+}
+
+impl Diagnostic {
+    /// An error without a code of the plugin.
+    pub fn error(message: impl Into<String>, span: Span) -> Self {
+        Diagnostic {
+            message: message.into(),
+            span,
+            code: None,
+        }
+    }
+
+    /// This error under the plugin's code `code`, such as `L001`.
+    #[must_use]
+    pub fn with_code(self, code: &str) -> Self {
+        Diagnostic {
+            code: Some(code.to_owned()),
+            ..self
+        }
+    }
+}
+
+/// What an editor may insert at an offset of a block.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Completion {
+    pub label: String,
+    pub detail: Option<String>,
+    pub documentation: Option<String>,
+    /// The text to insert, with `${1:placeholder}` stops.
+    pub snippet: Option<String>,
+}
+
+/// What an editor shows over a span of a block, as Markdown.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Hover {
+    pub markdown: String,
     pub span: Span,
 }
 
@@ -180,6 +228,16 @@ pub trait Plugin {
         state: &[u8],
         compiler: &mut dyn Compiler,
     ) -> Result<Arena, Vec<Diagnostic>>;
+    /// What an editor may insert at `offset` of `block`.
+    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
+        let _ = (block, state, offset);
+        Vec::new()
+    }
+    /// What an editor shows at `offset` of `block`.
+    fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
+        let _ = (block, state, offset);
+        None
+    }
 }
 
 #[cfg(test)]

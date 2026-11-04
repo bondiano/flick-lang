@@ -160,6 +160,8 @@ impl Printer<'_> {
                 self.node(*output, Role::Ty, d)?;
                 self.push(")");
             }
+            Ty::Text(text) => self.string(text),
+            Ty::Wildcard => self.push("_"),
             Ty::Hole(span) => self.hole(HoleKind::Ty, *span, "Hole")?,
         }
         Ok(())

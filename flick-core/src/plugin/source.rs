@@ -90,6 +90,7 @@ impl BlockSource {
         Block {
             head: self.head.clone(),
             text: self.text[self.start as usize..self.end as usize].to_owned(),
+            body: 0,
             tokens,
         }
     }
@@ -113,10 +114,7 @@ impl BlockSource {
         start: u32,
         end: u32,
     ) -> Result<Hole, flick_plugin::Diagnostic> {
-        let refuse = |message: &str| flick_plugin::Diagnostic {
-            message: message.to_owned(),
-            span: Span { start, end },
-        };
+        let refuse = |message: &str| flick_plugin::Diagnostic::error(message, Span { start, end });
         let what = match kind {
             HoleKind::Expr => "an expression",
             HoleKind::Ty => "a type",

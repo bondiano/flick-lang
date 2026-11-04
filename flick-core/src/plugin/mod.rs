@@ -8,7 +8,7 @@ pub mod render;
 pub mod source;
 pub mod splice;
 
-use flick_plugin::{Arena, Block, Diagnostic, Plugin};
+use flick_plugin::{Arena, Block, Completion, Diagnostic, Hover, Plugin};
 
 use source::BlockSource;
 
@@ -25,6 +25,17 @@ pub trait Expander: Send + Sync {
         state: &[u8],
         source: &mut BlockSource,
     ) -> Result<Arena, Failure>;
+    /// What an editor may insert at `offset` of `block`; none when the
+    /// plugin fails.
+    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
+        let _ = (block, state, offset);
+        Vec::new()
+    }
+    /// What an editor shows at `offset` of `block`.
+    fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
+        let _ = (block, state, offset);
+        None
+    }
 }
 
 /// Why a plugin gave no code for a block.
@@ -72,6 +83,14 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         self.plugin
             .expand(block, state, source)
             .map_err(Failure::Refused)
+    }
+
+    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
+        self.plugin.complete(block, state, offset)
+    }
+
+    fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
+        self.plugin.hover(block, state, offset)
     }
 }
 

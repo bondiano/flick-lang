@@ -84,7 +84,7 @@ impl Kind {
                 Expr::Annot { expr, ty } => vec![*expr, *ty],
             },
             Kind::Ty(ty) => match ty {
-                Ty::Name(_) | Ty::Hole(_) => Vec::new(),
+                Ty::Name(_) | Ty::Text(_) | Ty::Wildcard | Ty::Hole(_) => Vec::new(),
                 Ty::Apply {
                     function,
                     arguments,

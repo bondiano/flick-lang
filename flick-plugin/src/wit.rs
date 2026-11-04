@@ -25,6 +25,7 @@ macro_rules! wit_conversions {
                 w::Block {
                     head: b.head.clone(),
                     text: b.text.clone(),
+                    body: b.body,
                     tokens: b.tokens.iter().map(|t| w::Token {
                         kind: match t.kind {
                             $crate::TokenKind::Ident => w::TokenKind::Ident,
@@ -43,6 +44,7 @@ macro_rules! wit_conversions {
                 $crate::Block {
                     head: b.head,
                     text: b.text,
+                    body: b.body,
                     tokens: b.tokens.into_iter().map(|t| $crate::Token {
                         kind: match t.kind {
                             w::TokenKind::Ident => $crate::TokenKind::Ident,
@@ -78,11 +80,37 @@ macro_rules! wit_conversions {
             }
 
             pub fn to_diagnostic(d: $crate::Diagnostic) -> w::Diagnostic {
-                w::Diagnostic { message: d.message, span: to_span(d.span) }
+                w::Diagnostic { message: d.message, span: to_span(d.span), code: d.code }
             }
 
             pub fn from_diagnostic(d: w::Diagnostic) -> $crate::Diagnostic {
-                $crate::Diagnostic { message: d.message, span: from_span(d.span) }
+                $crate::Diagnostic { message: d.message, span: from_span(d.span), code: d.code }
+            }
+
+            pub fn to_completion(c: $crate::Completion) -> w::Completion {
+                w::Completion {
+                    label: c.label,
+                    detail: c.detail,
+                    documentation: c.documentation,
+                    snippet: c.snippet,
+                }
+            }
+
+            pub fn from_completion(c: w::Completion) -> $crate::Completion {
+                $crate::Completion {
+                    label: c.label,
+                    detail: c.detail,
+                    documentation: c.documentation,
+                    snippet: c.snippet,
+                }
+            }
+
+            pub fn to_hover(h: $crate::Hover) -> w::Hover {
+                w::Hover { markdown: h.markdown, span: to_span(h.span) }
+            }
+
+            pub fn from_hover(h: w::Hover) -> $crate::Hover {
+                $crate::Hover { markdown: h.markdown, span: from_span(h.span) }
             }
 
             fn to_fields(fields: Vec<$crate::Field>) -> Vec<w::Field> {
@@ -124,6 +152,8 @@ macro_rules! wit_conversions {
                             $crate::Ty::Function { input, output } => {
                                 w::Ty::Function(w::Arrow { input, output })
                             }
+                            $crate::Ty::Text(s) => w::Ty::Text(s),
+                            $crate::Ty::Wildcard => w::Ty::Wildcard,
                             $crate::Ty::Hole(s) => w::Ty::Hole(to_span(s)),
                         }),
                         $crate::Kind::Pat(q) => w::Kind::Pat(match q {
@@ -161,6 +191,8 @@ macro_rules! wit_conversions {
                             w::Ty::Apply(a) => $crate::Ty::Apply { function: a.function, arguments: a.arguments },
                             w::Ty::Record(f) => $crate::Ty::Record(from_fields(f)),
                             w::Ty::Function(a) => $crate::Ty::Function { input: a.input, output: a.output },
+                            w::Ty::Text(s) => $crate::Ty::Text(s),
+                            w::Ty::Wildcard => $crate::Ty::Wildcard,
                             w::Ty::Hole(s) => $crate::Ty::Hole(from_span(s)),
                         }),
                         w::Kind::Pat(q) => $crate::Kind::Pat(match q {

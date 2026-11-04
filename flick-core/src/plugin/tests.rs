@@ -106,6 +106,21 @@ fn every_kind_of_node_renders_in_parentheses() {
         b.expr(Expr::Annot { expr: e, ty: t })
     });
     assert_eq!(holes, Ok("((hole) : (Hole))".into()));
+    let label = text(|b| {
+        let e = name(b, "Record.label");
+        let label = b.ty(Ty::Name("Record.Label".into()));
+        let loud = b.ty(Ty::Text("lo\"ud".into()));
+        let wild = b.ty(Ty::Wildcard);
+        let ty = b.ty(Ty::Apply {
+            function: label,
+            arguments: vec![loud, wild],
+        });
+        b.expr(Expr::Annot { expr: e, ty })
+    });
+    assert_eq!(
+        label,
+        Ok(r#"(Record.label : (Record.Label "lo\"ud" _))"#.into())
+    );
 }
 
 #[test]
