@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_call:
 
+# a newer push to a pull request replaces the run of the older one
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint:
     runs-on: ubuntu-26.04
@@ -239,8 +244,10 @@ jobs:
 
   # the go target on the other platforms it supports: the runtime's tests and
   # the portable cases of the parity harness, built and run without Node.
-  # Linux x64 runs them in e2e-cases
+  # Linux x64 runs them in e2e-cases; pull requests leave the others to the
+  # full set, the runs on main, the nightly run and releases
   go:
+    if: ${{ github.event_name != 'pull_request' }}
     strategy:
       fail-fast: false
       matrix:
