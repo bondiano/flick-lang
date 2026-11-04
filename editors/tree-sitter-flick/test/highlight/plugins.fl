@@ -3,5 +3,5 @@ import Pairs exposing (Pair, plugin pairs)
 server fn ping n = n
 // <- keyword
 //     ^ keyword
-let row = pair 1
+let row = pairs { x = 1 }
 //        ^ variable

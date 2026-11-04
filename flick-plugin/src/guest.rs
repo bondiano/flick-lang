@@ -105,6 +105,16 @@ pub fn highlight(plugin: &impl Plugin, block: types::Block, state: &[u8]) -> Vec
     .collect()
 }
 
+#[doc(hidden)]
+pub fn format(
+    plugin: &impl Plugin,
+    block: types::Block,
+    state: &[u8],
+) -> Option<Vec<types::Piece>> {
+    let pieces = plugin.format(&convert::from_block(block), state, &mut Imports)?;
+    Some(pieces.into_iter().map(convert::to_piece).collect())
+}
+
 /// Exports the plugin `$plugin`, a value of a type implementing [`Plugin`],
 /// as the component a crate of type `cdylib` builds for `wasm32-wasip2`.
 #[macro_export]
@@ -150,6 +160,15 @@ macro_rules! export {
                 state: ::std::vec::Vec<u8>,
             ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Highlight> {
                 $crate::guest::highlight(&$plugin, block, &state)
+            }
+
+            fn format(
+                block: $crate::guest::bindings::flick::plugin::types::Block,
+                state: ::std::vec::Vec<u8>,
+            ) -> ::std::option::Option<
+                ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Piece>,
+            > {
+                $crate::guest::format(&$plugin, block, &state)
             }
         }
 

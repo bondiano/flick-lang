@@ -12,7 +12,7 @@ pub mod testing;
 
 use std::sync::Arc;
 
-use flick_plugin::{Arena, Block, Completion, Diagnostic, Highlight, Hover, Plugin};
+use flick_plugin::{Arena, Block, Completion, Diagnostic, Highlight, Hover, Piece, Plugin};
 
 use source::BlockSource;
 
@@ -47,6 +47,12 @@ pub trait Expander: Send + Sync {
     fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
         let _ = (block, state);
         Vec::new()
+    }
+    /// The layout of `block`, whose holes `source` parses; none keeps it as
+    /// written, as when the plugin fails.
+    fn format(&self, block: &Block, state: &[u8], source: &mut BlockSource) -> Option<Vec<Piece>> {
+        let _ = (block, state, source);
+        None
     }
 }
 
@@ -138,6 +144,10 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
 
     fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
         self.plugin.highlight(block, state)
+    }
+
+    fn format(&self, block: &Block, state: &[u8], source: &mut BlockSource) -> Option<Vec<Piece>> {
+        self.plugin.format(block, state, source)
     }
 }
 

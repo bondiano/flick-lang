@@ -34,7 +34,7 @@ pub(super) fn hugs(n: &Node) -> bool {
             | K::SqlExpr
             | K::CodecExpr
             | K::FunExpr
-    ) || n.kind == K::ForExpr && n.has_token(K::LBrace)
+    ) || matches!(n.kind, K::ForExpr | K::PluginExpr) && n.has_token(K::LBrace)
 }
 
 fn is_expression(n: &Node) -> bool {

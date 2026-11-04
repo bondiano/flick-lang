@@ -119,6 +119,26 @@ macro_rules! wit_conversions {
                 }
             }
 
+            pub fn to_piece(p: $crate::Piece) -> w::Piece {
+                match p {
+                    $crate::Piece::Text(t) => w::Piece::Text(t),
+                    $crate::Piece::Line => w::Piece::Line,
+                    $crate::Piece::Indent => w::Piece::Indent,
+                    $crate::Piece::Dedent => w::Piece::Dedent,
+                    $crate::Piece::Hole(h) => w::Piece::Hole(to_hole(h)),
+                }
+            }
+
+            pub fn from_piece(p: w::Piece) -> $crate::Piece {
+                match p {
+                    w::Piece::Text(t) => $crate::Piece::Text(t),
+                    w::Piece::Line => $crate::Piece::Line,
+                    w::Piece::Indent => $crate::Piece::Indent,
+                    w::Piece::Dedent => $crate::Piece::Dedent,
+                    w::Piece::Hole(h) => $crate::Piece::Hole(from_hole(h)),
+                }
+            }
+
             pub fn to_highlight(h: $crate::Highlight) -> w::Highlight {
                 w::Highlight {
                     span: to_span(h.span),

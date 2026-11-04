@@ -31,7 +31,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.4.0";
+pub const VERSION: &str = "0.5.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -285,6 +285,23 @@ pub struct Completion {
     pub snippet: Option<String>,
 }
 
+/// A piece of the layout a plugin gives a block, from its first argument
+/// (or its body) on: the compiler writes the head before it, `{` before a
+/// layout that starts in the body, and `}` after it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Piece {
+    /// The plugin's own words, on the current line.
+    Text(String),
+    /// A new line at the current indent.
+    Line,
+    /// One level more indent for the lines after it.
+    Indent,
+    /// One level less.
+    Dedent,
+    /// The user's code there, which the compiler lays out.
+    Hole(Hole),
+}
+
 /// What an editor shows over a span of a block, as Markdown.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Hover {
@@ -343,6 +360,17 @@ pub trait Plugin {
     fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
         let _ = (block, state);
         Vec::new()
+    }
+    /// The layout of `block`, the user's code in it found through
+    /// `compiler`; none keeps the block as written.
+    fn format(
+        &self,
+        block: &Block,
+        state: &[u8],
+        compiler: &mut dyn Compiler,
+    ) -> Option<Vec<Piece>> {
+        let _ = (block, state, compiler);
+        None
     }
 }
 

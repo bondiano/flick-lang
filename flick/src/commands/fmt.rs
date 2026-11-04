@@ -91,6 +91,7 @@ impl FmtCommand {
             }
         };
         let text = &outcome.sources.get(file).text;
+        // shortcut: only the plugin of std lays out blocks here, others stay as written; load the project's packages as check does when another plugin needs it
         match fmt::format(text, file) {
             Ok(out) if self.options.check => {
                 if out != *text {

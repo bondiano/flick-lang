@@ -252,4 +252,18 @@ impl Expander for Wasm {
             |found| found.into_iter().map(convert::from_highlight).collect(),
         )
     }
+
+    fn format(
+        &self,
+        block: &flick_plugin::Block,
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Option<Vec<flick_plugin::Piece>> {
+        let block = convert::to_block(block);
+        let (result, back) = self.run(mem::take(source), |plugin, store| {
+            plugin.call_format(store, &block, state)
+        });
+        *source = back;
+        Some(result.ok()??.into_iter().map(convert::from_piece).collect())
+    }
 }

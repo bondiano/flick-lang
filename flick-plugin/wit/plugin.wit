@@ -1,4 +1,4 @@
-package flick:plugin@0.4.0;
+package flick:plugin@0.5.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -124,6 +124,13 @@ interface types {
 
   /// How an editor colors a span of a block that is not the user's code.
   record highlight { span: span, kind: highlight-kind }
+
+  /// A piece of the layout of a block from its first argument (or its body)
+  /// on: the plugin's words, a new line at the current indent, one level in
+  /// or out for the lines after, or the user's code at a hole, which the
+  /// compiler lays out. The compiler writes the head before it, `{` before
+  /// a layout that starts in the body, and `}` after it.
+  variant piece { text(string), line, indent, dedent, hole(hole) }
 }
 
 /// What the compiler offers a plugin while it expands a block.
@@ -142,7 +149,7 @@ interface compiler {
 
 world plugin {
   import compiler;
-  use types.{block, arena, diagnostic, completion, hover, highlight};
+  use types.{block, arena, diagnostic, completion, hover, highlight, piece};
 
   /// What the plugin learns from all its blocks of a group, before any expands.
   export collect: func(blocks: list<block>) -> list<u8>;
@@ -154,4 +161,7 @@ world plugin {
   export hover: func(block: block, state: list<u8>, offset: u32) -> option<hover>;
   /// How an editor colors the words of the block that are the plugin's.
   export highlight: func(block: block, state: list<u8>) -> list<highlight>;
+  /// The layout of the block, the compiler parsing its holes; none keeps it
+  /// as written.
+  export format: func(block: block, state: list<u8>) -> option<list<piece>>;
 }

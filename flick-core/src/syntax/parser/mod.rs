@@ -38,8 +38,15 @@ pub struct Parse {
 }
 
 pub fn parse(text: &str, file: FileId) -> Parse {
+    parse_with_heads(text, file, &[])
+}
+
+/// [`parse`] of a part of a file whose imports expose the plugin heads
+/// `heads`, as a declaration the formatter laid out.
+pub fn parse_with_heads<'t>(text: &'t str, file: FileId, heads: Heads<'t>) -> Parse {
     let (raw, mut diagnostics) = lex(text, file);
     let mut p = Parser::new(text, file, &raw);
+    p.plugin_heads.extend(heads);
     decl::source_file(&mut p);
     diagnostics.append(&mut p.errors);
     let tree = build(&raw, p.events);

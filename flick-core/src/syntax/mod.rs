@@ -12,5 +12,5 @@ mod validate;
 
 pub use parser::{
     Fragment, Heads, Parse, parse, parse_decl_at, parse_decls_at, parse_expr_at, parse_pat_at,
-    parse_type_at,
+    parse_type_at, parse_with_heads,
 };

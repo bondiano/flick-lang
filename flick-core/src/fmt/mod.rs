@@ -57,41 +57,58 @@ use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::FileId;
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::parse;
+use crate::syntax::{parse, parse_with_heads};
 
 mod block;
 mod comments;
 mod decl;
 mod expr;
+mod plugins;
 mod printer;
 mod program;
 mod record;
 mod types;
 
 use comments::Comments;
+pub use plugins::PluginOf;
 use printer::{Printer, nodes};
 use program::program;
 
 /// The line width the layout aims at.
 pub const WIDTH: usize = 100;
 
-/// Formats a file; syntax errors are returned instead of output.
+/// Formats a file; syntax errors are returned instead of output. Blocks
+/// of `std`'s plugin are laid out as it says, others as written.
 pub fn format(text: &str, file: FileId) -> Result<String, Vec<Diagnostic>> {
-    format_reporting(text, file).map(|(out, _)| out)
+    format_with(text, file, &|_| None)
+}
+
+/// [`format`], the blocks of each head `plugin_of` knows laid out by its
+/// plugin.
+pub fn format_with(
+    text: &str,
+    file: FileId,
+    plugin_of: PluginOf,
+) -> Result<String, Vec<Diagnostic>> {
+    format_reporting(text, file, plugin_of).map(|(out, _)| out)
 }
 
 /// The byte ranges of the declarations left as written.
 type Kept = Vec<(u32, u32)>;
 
 /// The formatted file, and the declarations left as written.
-fn format_reporting(text: &str, file: FileId) -> Result<(String, Kept), Vec<Diagnostic>> {
+fn format_reporting(
+    text: &str,
+    file: FileId,
+    plugin_of: PluginOf,
+) -> Result<(String, Kept), Vec<Diagnostic>> {
     let mut parsed = parse(text, file);
     if !parsed.diagnostics.is_empty() {
         return Err(parsed.diagnostics);
     }
     let expected = program(&parsed.tree, text);
     drop_empty_rows(&mut parsed.tree);
-    let (out, kept) = source_file(&parsed.tree, text, file);
+    let (out, kept) = source_file(&parsed.tree, text, file, plugin_of);
     let again = parse(&out, file);
     let same = again.diagnostics.is_empty()
         && program(&again.tree, &out) == expected
@@ -106,9 +123,12 @@ fn format_reporting(text: &str, file: FileId) -> Result<(String, Kept), Vec<Diag
     Ok((out, kept))
 }
 
-fn source_file(tree: &Node, text: &str, file: FileId) -> (String, Kept) {
+fn source_file(tree: &Node, text: &str, file: FileId, plugin_of: PluginOf) -> (String, Kept) {
+    let layouts = plugins::layouts(tree, text, file, plugin_of);
+    let heads = plugins::heads(tree, text, file);
+    let heads: Vec<&str> = heads.iter().map(String::as_str).collect();
     let arena = DocumentArena::new();
-    let mut p = Printer::new(&arena, text, Comments::new(tree, text));
+    let mut p = Printer::new(&arena, text, Comments::new(tree, text), &layouts);
     let declarations = nodes(tree);
     let mut out = String::with_capacity(text.len() + text.len() / 8);
     let mut kept = Vec::new();
@@ -123,7 +143,7 @@ fn source_file(tree: &Node, text: &str, file: FileId) -> (String, Kept) {
         let saved = p.comments.save();
         let laid_out = p.node(declaration).to_pretty_string(WIDTH);
         let misplaced = p.comments.misplaced || p.comments.any_before(end);
-        if !misplaced && verify(declaration, text, &laid_out, file) {
+        if !misplaced && verify(declaration, text, &laid_out, file, &heads) {
             out.push_str(&laid_out);
         } else {
             p.comments.restore(saved);
@@ -157,9 +177,10 @@ fn separate(out: &mut String, blank: bool) {
     }
 }
 
-/// Whether `laid_out`, parsed alone, is the declaration it was made from.
-fn verify(declaration: &Node, text: &str, laid_out: &str, file: FileId) -> bool {
-    let again = parse(laid_out, file);
+/// Whether `laid_out`, parsed alone with the plugin heads `heads` of its
+/// file, is the declaration it was made from.
+fn verify(declaration: &Node, text: &str, laid_out: &str, file: FileId, heads: &[&str]) -> bool {
+    let again = parse_with_heads(laid_out, file, heads);
     let items = nodes(&again.tree);
     again.diagnostics.is_empty()
         && matches!(items.as_slice(), [one] if program(one, laid_out) == program(declaration, text))
