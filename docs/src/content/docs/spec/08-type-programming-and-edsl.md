@@ -130,6 +130,8 @@ A handler field has the opaque type `Ui.Handler snapshot`, which only a policy m
 A command-line application is a value `Cli.Command r e`: a pure description of flags, positional arguments, subcommands and a handler that needs services `r` and may fail with errors `e`. Building a command parses and runs nothing.
 
 ```flick
+import Cli exposing (plugin cli)
+
 greet : Cli.Command none none
 let greet = cli "greet" {
   description "Prints a greeting"
@@ -146,7 +148,7 @@ let greet = cli "greet" {
 }
 ```
 
-`cli "name" { … }` is sugar over the combinators `Cli.command`, `Cli.flag`, `Cli.arg`, `Cli.description`, `Cli.subcommand` and `Cli.handle`; both forms compile to the same IR. The block consists of clauses, one per line or separated by `;`; the clause words are special only at the start of a clause:
+`cli "name" { … }` is the block of the plugin of `std` (see [Plugins](../../reference/plugins/)), which a file imports. It is sugar over the combinators `Cli.command`, `Cli.flag`, `Cli.arg`, `Cli.description`, `Cli.subcommand` and `Cli.handled`, the calls it stands for. The block consists of clauses, one per line or separated by `;`; the clause words are special only at the start of a clause:
 
 | Clause | Meaning |
 | - | - |
@@ -158,7 +160,7 @@ let greet = cli "greet" {
 
 A `///` comment right above a `flag`, `arg` or `subcommand` is its help text. The handler gets an exact record with a field per `flag` and `arg`, so a typo in its pattern is an ordinary type error. The type decides parsing and multiplicity: `Bool` is a switch, `T` is required unless it has a default, `Option T` is optional and takes no default, `List T` and `NonEmpty T` repeat (for an `arg`, only the last). A value is parsed by the class `Cli.Value T`. The services and errors of a command are the union of the rows of its handler and subcommands; a command keeps the captures of its handler (`FLICK-G001`).
 
-`Cli.run command args` parses the arguments with Effect's CLI and only then runs the handler in the current fiber. `--help`, `--version` and `--completions` run no handler; invalid input fails with `Cli.CliError` and runs no handler. Duplicate names, a default on `Option`, a many-valued `arg` before the last, a repeated `description` or `handle`, a command with neither a handler nor subcommands, and an `arg` beside subcommands are compile errors (`FLICK-L001`–`FLICK-L007`). See [Command-line applications](../../reference/cli-dsl/).
+`Cli.run command args` parses the arguments with Effect's CLI and only then runs the handler in the current fiber. `--help`, `--version` and `--completions` run no handler; invalid input fails with `Cli.CliError` and runs no handler. Duplicate names, a default on `Option`, a many-valued `arg` before the last, a repeated `description` or `handle`, a command with neither a handler nor subcommands, and an `arg` beside subcommands are compile errors of the plugin (`std/L001`–`std/L007`). See [Command-line applications](../../reference/cli-dsl/).
 
 ## `do` and library combinators
 

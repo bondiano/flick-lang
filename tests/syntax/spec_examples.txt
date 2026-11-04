@@ -48,7 +48,7 @@ a2291a048bb87a34  05-errors-and-concurrency:236  bad_deferred :
 ff39f2dd8833d1d9  08-type-programming-and-edsl:32  type alias BalanceRow = {
 0d6f75c0a06b0061  08-type-programming-and-edsl:76  type alias SaveButtonProps c = {
 2c80c55aef7a08d4  08-type-programming-and-edsl:104  component counter (start : Float) =
-00192b9044d9fe7a  08-type-programming-and-edsl:139  greet : Cli.Command none none
+65d70b27c2164cf0  08-type-programming-and-edsl:139  import Cli exposing (plugin cli)
 668add0bc080fbe5  07-schema:69  refined type Email = String where Checks.email
 79692889cfb7adad  07-schema:112  type alias Preferences = {
 d58e74639bc698be  07-schema:159  type Tree a =

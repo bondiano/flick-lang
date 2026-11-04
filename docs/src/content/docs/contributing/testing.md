@@ -174,7 +174,7 @@ Where to look for the tests of a behavior, and where a new one goes:
 | FFI callbacks, `.d.ts` import and reviewed bindings | `tests/run/ffi/`, `runtime/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
 | SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `runtime/test/sql.test.ts`, `flick/tests/sql_postgres.rs` over `tests/postgres/` |
 | UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `runtime/test/ui-*.test.ts` |
-| the `cli` block | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, the tests in `flick-core/src/ir/lower/cli.rs` |
+| the `cli` block | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (the calls it stands for), `flick/tests/lsp_editor/cli.rs` |
 | hover, the language server and the TypeScript projection | `flick-core/src/ide/tests.rs`, `flick/tests/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
 | the CLI: no code run by `check`/`build`, run generations, `dev`, cache, pnpm, exit codes, NDJSON | `flick/tests/{cli_project,cli_run,check_command}.rs` |
 | `.d.ts` façades and `pack` | `flick/tests/dts_command.rs`, `flick/tests/cli_run.rs` |

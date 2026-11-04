@@ -38,7 +38,7 @@ Qualified names are written without spaces around `.`: `Users.get`,
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false schema codec
-sql ui cli in when for yield do
+sql ui in when for yield do
 ```
 
 Contextual words are ordinary names everywhere except in one position:
@@ -56,8 +56,8 @@ Contextual words are ordinary names everywhere except in one position:
   application, so a clause may continue on the next line;
 - `table` right after `sql` at the top level, and `via` after the type of a
   column of a `sql table` (see [sql.md](../sql/));
-- CLI clause words at the start of a clause inside `cli { … }`: `description`,
-  `flag`, `arg`, `subcommand`, `handle`;
+- `cli` before a string and `{`: a block of the plugin of `std`, which reads
+  its clauses (see [command-line applications](../cli-dsl/));
 - `and` between the bindings of a `do` group, `x <- a and y <- b`;
 - `component` before the name of a top-level declaration (see
   [ui.md](../ui/#components)).
@@ -154,7 +154,7 @@ a range, `1.5` a number. Bitwise operations are the functions `Float.bit_*`.
 Function bodies, match arms and the members of `class`, `instance` and
 `service` are delimited by indentation; there is no `in` and the last
 expression of a block is its value (see [Direct effectful calls](../../spec/01-direct-calls/)). Braces delimit records and the
-blocks of `task`, `scope`, `provide`, `sql`, `ui`, `cli`, `codec` and `rec`.
+blocks of `task`, `scope`, `provide`, `sql`, `ui`, `codec`, `rec` and plugins.
 
 1. Top-level declarations start at column 1. A line indented further continues
    the current declaration.
@@ -386,16 +386,14 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
-            | "cli" String "{" cli_clause { cli_clause } "}"
-            | head "{" { token } "}"        // a head an import exposes as `plugin head`
+            | head { String | "(" { token } ")" } "{" { token } "}"
+                                            // a head an import exposes as `plugin head`, or `cli`
 do_stmt     = bind { "and" bind } | "if" expr | statement
 bind        = or_pattern "<-" expr
 clause_list = for_clause { ";" | line break | before "if" … for_clause }
 for_clause  = or_pattern "<-" expr | "if" expr | let_decl
 clause      = ("from" | "join" | "left_join") name "in" expr
             | clause_word expr { "," expr }
-cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
-            | ("description" | "subcommand" | "handle") expr
 ```
 
 `do { … }` sequences its statements through the Prelude's `Monad`:
@@ -436,9 +434,11 @@ only in a signature or annotation. `if` is an expression; without `else` it is `
 result of an intermediate statement (see [Direct effectful calls](../../spec/01-direct-calls/)). `await e` runs a stored `Eff` once in
 the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/02-computations/)). In
 `provide e { … }` and `codec e { … }` the `{` ends the head expression.
-In `cli "name" { … }` the parser fixes only the clause shapes; aliases on an
-`arg`, duplicate names and the option types are checked by CLI elaboration
-(see [CLI eDSL: flags, arguments and subcommands](../../spec/08-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands)). A `///` comment right above a `flag`, `arg` or
+A plugin block keeps its arguments and body as tokens for its plugin, which
+reads them (see [plugins](../plugins/)). `cli "name" { … }` is the block of
+the plugin of `std`: it reads the clauses, and checks aliases on an `arg` and
+duplicate names, while the types of `Cli` check the options (see [CLI eDSL:
+flags, arguments and subcommands](../../spec/08-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands)). A `///` comment right above a `flag`, `arg` or
 `subcommand` clause is its help text.
 
 ```flick
@@ -551,7 +551,7 @@ fits; otherwise it breaks, outermost construct first:
 - a value after `=` (`let`, record fields, type aliases), after `->` (`fun`,
   match arms) or after `<-` goes to the next line, one level in. Records,
   lists, tuples, `fun` and blocks in braces (`task`, `ui`, `scope`,
-  `provide`, `do`, `for`, `sql`, `cli`, `codec`) stay after the `=` and break
+  `provide`, `do`, `for`, `sql`, `codec`) stay after the `=` and break
   inside instead: `let config = {` … `}`. Several statements always start on
   the next line, and so do `match`, `try` and an `if` that does not fit;
 - statements go one per line; a block in braces with one expression may stay
