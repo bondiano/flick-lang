@@ -360,6 +360,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "flick-plugin"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "flick-pretty"
 version = "0.1.0"
 dependencies = [

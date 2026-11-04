@@ -1,0 +1,91 @@
+package flick:plugin@0.1.0;
+
+/// What a plugin and the compiler exchange.
+interface types {
+  /// A UTF-8 byte range in the body of a block.
+  record span { start: u32, end: u32 }
+
+  enum token-kind { ident, con, number, %string, keyword, punct }
+
+  /// A token of the body, trivia left out.
+  record token { kind: token-kind, span: span }
+
+  /// A block `head { body }`: the text of its body and the tokens in it.
+  record block { head: string, text: string, tokens: list<token> }
+
+  enum hole-kind { expr, ty }
+
+  /// User code in the body that the compiler parsed: an expression or a type.
+  record hole { kind: hole-kind, span: span }
+
+  /// The index of a node in its arena; a node refers only to nodes before it.
+  type node-id = u32;
+
+  record field { label: string, value: node-id }
+  record apply { function: node-id, arguments: list<node-id> }
+  record lambda { params: list<node-id>, body: node-id }
+  record get { %record: node-id, label: string }
+  record annot { expr: node-id, ty: node-id }
+  record arrow { input: node-id, output: node-id }
+  record con-pat { name: string, arguments: list<node-id> }
+
+  variant expr {
+    name(string),
+    number(f64),
+    text(string),
+    boolean(bool),
+    unit,
+    apply(apply),
+    lambda(lambda),
+    %record(list<field>),
+    get(get),
+    items(list<node-id>),
+    %tuple(list<node-id>),
+    annot(annot),
+    hole(span),
+  }
+
+  variant ty {
+    name(string),
+    apply(apply),
+    %record(list<field>),
+    function(arrow),
+    hole(span),
+  }
+
+  variant pat {
+    var(string),
+    wildcard,
+    con(con-pat),
+    %record(list<field>),
+  }
+
+  variant kind { expr(expr), ty(ty), pat(pat) }
+
+  /// A node of generated code and the span of the body it stands for.
+  record node { kind: kind, origin: span }
+
+  record arena { nodes: list<node>, root: node-id }
+
+  record diagnostic { message: string, span: span }
+}
+
+/// What the compiler offers a plugin while it expands a block.
+interface compiler {
+  use types.{hole, diagnostic};
+
+  /// The longest expression of the body from `start` on, before `end`.
+  parse-expr: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// The longest type of the body from `start` on, before `end`.
+  parse-type: func(start: u32, end: u32) -> result<hole, diagnostic>;
+}
+
+world plugin {
+  import compiler;
+  use types.{block, arena, diagnostic};
+
+  /// What the plugin learns from all its blocks of a group, before any expands.
+  export collect: func(blocks: list<block>) -> list<u8>;
+  /// The code a block stands for, given what `collect` learned.
+  export expand: func(block: block, state: list<u8>) -> result<arena, list<diagnostic>>;
+}
