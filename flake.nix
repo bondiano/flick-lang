@@ -112,6 +112,7 @@
               go
               just
               cargo-machete
+              cargo-nextest
               jq
             ];
 

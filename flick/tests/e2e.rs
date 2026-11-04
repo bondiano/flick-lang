@@ -11,10 +11,14 @@
 //! skipped for it. `FLICK_E2E_GO_ONLY` runs only those, without Node: the
 //! platform jobs of CI.
 //!
+//! Each pass prints how long it took, and `times.tsv` under the output
+//! directory keeps the build and run time of every case (`times`).
+//!
 //! Every run writes its trace (`FLICK_TRACE`), which the monitor of `λRT`
 //! checks; for the cases of tests/run/runtime the Go runs must project it
 //! to what the JS debug run projects it to (`trace`).
 
+mod times;
 mod trace;
 
 use std::collections::HashMap;
@@ -29,6 +33,7 @@ use std::{env, fs, thread};
 use flick_core::build::go::executable;
 use flick_core::build::runner_path;
 use flick_core::project::config::MAIN_ENTRY;
+use times::{Pass, Timing};
 
 fn cases(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("readable tests/run") {
@@ -50,12 +55,24 @@ fn compare(what: &str, expected: &str, actual: &str) -> Option<String> {
         .then(|| format!("  {what}:\n    expected: {expected:?}\n    actual:   {actual:?}"))
 }
 
-/// A case run: the mismatch report, if any, how long the build took, and
-/// the projection of its trace when the runtimes must agree on it.
+/// A case run: the mismatch report, if any, how long the build and the
+/// program took, and the projection of its trace when the runtimes must
+/// agree on it.
 struct Ran {
     problem: Option<String>,
     built: Duration,
+    executed: Duration,
     projection: Option<String>,
+}
+
+impl Ran {
+    fn timing(&self, rel: &Path) -> Timing {
+        Timing {
+            case: rel.to_path_buf(),
+            built: self.built,
+            ran: self.executed,
+        }
+    }
 }
 
 /// Builds and runs one case, as JS, TypeScript or Go, in a profile.
@@ -82,6 +99,7 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
         return Ran {
             problem: Some(report),
             built: build_time,
+            executed: Duration::ZERO,
             projection: None,
         };
     }
@@ -93,10 +111,12 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
             .arg(out_dir.join(runner_path(emit == "ts")));
         node
     };
+    let started = Instant::now();
     let output = command
         .env("FLICK_TRACE", out_dir.join(trace::FILE))
         .output()
         .expect("the program runs: `node` (Node.js >= 24.18.0) is on PATH for JS");
+    let run_time = started.elapsed();
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stderr_problem = match expected(case, "stderr.contains") {
         Some(lines) => lines
@@ -137,6 +157,7 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
     Ran {
         problem: (!problems.is_empty()).then(|| problems.join("\n")),
         built: build_time,
+        executed: run_time,
         projection: traced.ok().filter(|_| trace::compared(rel)),
     }
 }
@@ -196,6 +217,37 @@ fn parallel<T: Sync, R: Send>(items: &[T], jobs: usize, f: impl Fn(&T) -> R + Sy
         .collect()
 }
 
+/// One pass of `f` over `cases` on `jobs` threads: what `f` reports of
+/// each case, in order, and how long the pass and each case took.
+fn pass<R: Send>(
+    emit: &'static str,
+    profile: &'static str,
+    cases: &[PathBuf],
+    jobs: usize,
+    f: impl Fn(&PathBuf) -> (R, Timing) + Sync,
+) -> (Vec<R>, Pass) {
+    let started = Instant::now();
+    let (results, cases) = parallel(cases, jobs, f).into_iter().unzip();
+    let wall = started.elapsed();
+    let timed = Pass {
+        emit,
+        profile,
+        wall,
+        cases,
+    };
+    (results, timed)
+}
+
+fn assert_go() {
+    assert!(
+        Command::new("go")
+            .arg("version")
+            .output()
+            .is_ok_and(|o| o.status.success()),
+        "the go target needs Go: `go` is not on PATH (Go >= 1.23)"
+    );
+}
+
 #[test]
 #[ignore = "needs Node and `pnpm install`; run `just e2e`"]
 fn run_cases() {
@@ -218,7 +270,7 @@ fn run_cases() {
     // node_modules exactly as it would in a project.
     let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("e2e");
     let mut report = Vec::new();
-    let mut times = Vec::new();
+    let mut passes = Vec::new();
     let jobs = jobs();
     // what the JS debug run of each case projects its trace to
     let mut projections: HashMap<PathBuf, String> = HashMap::new();
@@ -230,21 +282,21 @@ fn run_cases() {
         ("ts", "release"),
     ];
     for &(emit, profile) in if go_only { &[][..] } else { &node_runs } {
-        let results = parallel(&paths, jobs, |case| {
+        let (results, timed) = pass(emit, profile, &paths, jobs, |case| {
             let rel = case.strip_prefix(&root).expect("case under root");
             let out_dir = out_root
                 .join(profile)
                 .join(emit)
                 .join(rel.with_extension(""));
             let ran = run_case(case, rel, &out_dir, emit, profile);
+            let timing = ran.timing(rel);
             let problem = ran
                 .problem
                 .map(|p| format!("{} ({emit}, {profile}):\n{p}", rel.display()));
-            (problem, ran.built, ran.projection)
+            ((problem, ran.projection), timing)
         });
-        // the sum of the builds: with the same jobs in both profiles it compares them
-        times.push(results.iter().map(|(_, built, _)| *built).sum::<Duration>());
-        for (case, (problem, _, projection)) in paths.iter().zip(results) {
+        passes.push(timed);
+        for (case, (problem, projection)) in paths.iter().zip(results) {
             report.extend(problem);
             if let (("js", "debug"), Some(p)) = ((emit, profile), projection) {
                 projections.insert(case.clone(), p);
@@ -257,36 +309,33 @@ fn run_cases() {
         portable.contains(&rel.with_extension("").to_string_lossy().replace('\\', "/"))
     });
     if !go_cases.is_empty() {
-        assert!(
-            Command::new("go")
-                .arg("version")
-                .output()
-                .is_ok_and(|o| o.status.success()),
-            "the go target needs Go: `go` is not on PATH (Go >= 1.23)"
-        );
+        assert_go();
     }
     for profile in ["debug", "release"] {
-        let results = parallel(&go_cases, jobs, |case| {
+        let (problems, timed) = pass("go", profile, &go_cases, jobs, |case| {
             let rel = case.strip_prefix(&root).expect("case under root");
             let out_dir = out_root
                 .join(profile)
                 .join("go")
                 .join(rel.with_extension(""));
             let ran = run_case(case, rel, &out_dir, "go", profile);
+            let timing = ran.timing(rel);
             let differs = match (projections.get(case), &ran.projection) {
                 (Some(js), Some(go)) => trace::differ(js, go),
                 _ => None,
             };
             let problems: Vec<String> = ran.problem.into_iter().chain(differs).collect();
-            (!problems.is_empty()).then(|| {
+            let problem = (!problems.is_empty()).then(|| {
                 format!(
                     "{} (go, {profile}):\n{}",
                     rel.display(),
                     problems.join("\n")
                 )
-            })
+            });
+            (problem, timing)
         });
-        report.extend(results.into_iter().flatten());
+        report.extend(problems.into_iter().flatten());
+        passes.push(timed);
     }
     for case in &skipped {
         let rel = case.strip_prefix(&root).expect("case under root");
@@ -297,6 +346,7 @@ fn run_cases() {
         go_cases.len(),
         skipped.len()
     );
+    times::report(&out_root, &passes, jobs);
     if go_only {
         assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
         return;
@@ -304,7 +354,8 @@ fn run_cases() {
     report.extend(typecheck(&repo, &out_root.join("debug/ts")));
     report.extend(typecheck(&repo, &out_root.join("release/ts")));
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
-    metrics(&out_root, times[0], times[2]);
+    // the sum of the builds: with the same jobs in both profiles it compares them
+    metrics(&out_root, passes[0].built(), passes[2].built());
 }
 
 #[test]
