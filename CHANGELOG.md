@@ -23,6 +23,14 @@ break programs.
   plugin makes of blocks for its tests, `flick expand` prints the code of a
   program's blocks, and `flick new --template plugin` makes a library with a
   plugin.
+- **Plugins, interface `0.3.0`:** a block without a body (`schema Shape`,
+  raw text as `head r#"…"#`), heads with names and numbers among their
+  arguments (`sql p { … }`), and blocks that are declarations: `head table
+  Name "t" { … }`, or a head before the rest of a declaration (`server fn
+  ping x = …`). Their code is declarations of the module (`let`,
+  signatures, `type alias`, types and instances), exported and imported like
+  the others; the user's patterns and declarations are holes too.
+  `flick!` builds declarations, and its type form is now `flick!(b, ty T)`.
 - **Breaking:** `cli "name" { … }` is the plugin of `std`: a file that
   writes one imports it, `import Cli exposing (plugin cli)`. Without the
   import the block is `FLICK-P037`, which `flick check --fix` fixes. Its

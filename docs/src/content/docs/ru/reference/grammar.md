@@ -245,6 +245,7 @@ ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
             | service | class | instance | foreign | sql_table | component
+            | head { head_arg } ("{" { token } "}" | { token })   // плагина, до следующего decl
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
@@ -411,8 +412,10 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
-            | head { String | "(" { token } ")" } "{" { token } "}"
-                                            // голова, которую импорт открывает как `plugin head`, или `cli`
+            | head { head_arg } ["{" { token } "}"]
+                                            // голова, которую импорт открывает как `plugin head`, с
+                                            // аргументом или телом; `cli` с телом
+head_arg    = name | Con | Number | String | "." | "(" { token } ")"   // на строке головы
 do_stmt     = bind { "and" bind } | "if" expr | statement
 bind        = or_pattern "<-" expr
 clause_list = for_clause { ";" | line break | before "if" … for_clause }
