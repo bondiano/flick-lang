@@ -46,6 +46,9 @@ break programs.
   moves with its head. A block inside the user's code of another expands in
   a round of its own. Editors highlight the heads of plugins as macros, and
   `cli` is no keyword of the grammars any more.
+- **Plugins:** `flick fmt` lays out blocks with the plugins of the project's
+  packages; a component built for another version of `flick:plugin` is
+  `FLICK-P035` on its import, naming both versions.
 - **Breaking:** `cli "name" { … }` is the plugin of `std`: a file that
   writes one imports it, `import Cli exposing (plugin cli)`. Without the
   import the block is `FLICK-P037`, which `flick check --fix` fixes. Its
