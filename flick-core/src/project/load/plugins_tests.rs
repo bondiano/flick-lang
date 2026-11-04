@@ -1,24 +1,77 @@
-use std::collections::BTreeMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
+use std::fmt::Write as _;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
+use flick_plugin::{Arena, Block};
 use flick_test_pairs::Pairs;
 
 use super::{check, compile};
 use crate::diagnostics::{Diagnostic, Severity};
 use crate::ir;
-use crate::plugin::{Expander, Native};
+use crate::plugin::source::BlockSource;
+use crate::plugin::{Expander, Failure, Native};
 use crate::project::config::{Build, Config, Kind};
 use crate::project::{Host, Project};
 use crate::source::SourceMap;
 use crate::types::Thresholds;
 
-struct Memory(BTreeMap<PathBuf, String>);
+/// The `pairs` plugin, counting the calls it answers.
+struct Counting {
+    inner: Native<Pairs>,
+    collects: AtomicUsize,
+    expands: AtomicUsize,
+}
+
+impl Expander for Counting {
+    fn id(&self) -> &str {
+        self.inner.id()
+    }
+
+    fn collect(&self, blocks: &[Block]) -> Result<Vec<u8>, String> {
+        self.collects.fetch_add(1, Ordering::Relaxed);
+        self.inner.collect(blocks)
+    }
+
+    fn expand(
+        &self,
+        block: &Block,
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Result<Arena, Failure> {
+        self.expands.fetch_add(1, Ordering::Relaxed);
+        self.inner.expand(block, state, source)
+    }
+}
+
+struct Memory {
+    files: RefCell<BTreeMap<PathBuf, String>>,
+    plugin: Arc<Counting>,
+    /// What plugins gave, when this host keeps it.
+    store: Option<RefCell<HashMap<Vec<u8>, Vec<u8>>>>,
+}
+
+impl Memory {
+    /// The calls the plugin answered so far: collects, then expands.
+    fn calls(&self) -> (usize, usize) {
+        let count = |c: &AtomicUsize| c.load(Ordering::Relaxed);
+        (count(&self.plugin.collects), count(&self.plugin.expands))
+    }
+
+    fn write(&self, path: &str, text: &str) {
+        self.files
+            .borrow_mut()
+            .insert(PathBuf::from(path), text.to_owned());
+    }
+}
 
 impl Host for Memory {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
-        self.0
+        self.files
+            .borrow()
             .get(path)
             .map(|text| text.clone().into_bytes())
             .ok_or_else(|| ErrorKind::NotFound.into())
@@ -30,8 +83,18 @@ impl Host for Memory {
 
     fn plugin(&self, package: &str) -> Result<Arc<dyn Expander>, String> {
         match package {
-            "pairs" => Ok(Arc::new(Native::new("pairs", Pairs))),
+            "pairs" => Ok(self.plugin.clone()),
             _ => Err("no such plugin".into()),
+        }
+    }
+
+    fn cached(&self, key: &[u8]) -> Option<Vec<u8>> {
+        self.store.as_ref()?.borrow().get(key).cloned()
+    }
+
+    fn save(&self, key: &[u8], value: &[u8]) {
+        if let Some(store) = &self.store {
+            store.borrow_mut().insert(key.to_vec(), value.to_vec());
         }
     }
 }
@@ -60,10 +123,17 @@ fn library(sources: &mut SourceMap) -> Project {
 }
 
 fn host(main: &str) -> Memory {
-    Memory(BTreeMap::from([(
-        PathBuf::from("/p/src/App/Main.fl"),
-        main.to_owned(),
-    )]))
+    let host = Memory {
+        files: RefCell::default(),
+        plugin: Arc::new(Counting {
+            inner: Native::new("pairs", Pairs),
+            collects: AtomicUsize::new(0),
+            expands: AtomicUsize::new(0),
+        }),
+        store: Some(RefCell::default()),
+    };
+    host.write("/p/src/App/Main.fl", main);
+    host
 }
 
 fn roots() -> Vec<PathBuf> {
@@ -187,4 +257,96 @@ fn editors_see_the_users_code_inside_a_block() {
         .collect();
     // the declaration, its signature and the use inside the block
     assert_eq!(places.len(), 3, "{places:?}");
+}
+
+/// `main` with blocks `p`, `q` and more, each `pairs { label = value }`.
+fn blocks(fields: &[(&str, &str)]) -> String {
+    let mut main =
+        String::from("module App.Main exposing (..)\n\nimport plugin \"pairs\" exposing (pairs)\n");
+    for (i, (label, value)) in fields.iter().enumerate() {
+        let _ = write!(
+            main,
+            "\nb{i} : {{ {label} : Float; blocks : Float }}\nlet b{i} = pairs {{ {label} = {value} }}\n"
+        );
+    }
+    main
+}
+
+fn compiled(host: &Memory) {
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let (diagnostics, _) = compile(host, &mut sources, Some(&project), &roots());
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+}
+
+#[test]
+fn a_plugin_is_called_again_only_for_what_changed() {
+    let host = host(&blocks(&[("x", "1.0"), ("y", "2.0")]));
+    compiled(&host);
+    assert_eq!(host.calls(), (1, 2));
+    // the same build again: every result is the one saved
+    compiled(&host);
+    assert_eq!(host.calls(), (1, 2));
+    // one block changed: collect again, which learns the same, and expand it
+    host.write("/p/src/App/Main.fl", &blocks(&[("x", "1.0"), ("y", "3.0")]));
+    compiled(&host);
+    assert_eq!(host.calls(), (2, 3));
+    // a new block changes what collect learns: each block of the group again
+    host.write(
+        "/p/src/App/Main.fl",
+        &blocks(&[("x", "1.0"), ("y", "3.0"), ("z", "4.0")]),
+    );
+    compiled(&host);
+    assert_eq!(host.calls(), (3, 6));
+}
+
+#[test]
+fn a_saved_expansion_that_does_not_read_is_made_again() {
+    let host = host(&blocks(&[("x", "1.0")]));
+    compiled(&host);
+    let store = host.store.as_ref().expect("a store");
+    for (key, value) in store.borrow_mut().iter_mut() {
+        if key.get(8..14) == Some(b"expand".as_slice()) {
+            *value = b"not an arena".to_vec();
+        }
+    }
+    compiled(&host);
+    assert_eq!(host.calls(), (1, 2));
+}
+
+#[cfg(feature = "ide")]
+#[test]
+fn an_editor_session_keeps_plugin_results_in_memory() {
+    use super::{ModuleCache, analyze_with};
+
+    let other = "module App.Other exposing (o)\n\nimport plugin \"pairs\" exposing (pairs)\n\no : { v : Float; blocks : Float }\nlet o = pairs { v = 1.0 }\n";
+    let mut host = host(&blocks(&[("x", "1.0")]));
+    host.store = None;
+    host.write("/p/src/App/Other.fl", other);
+    let roots = [
+        PathBuf::from("/p/src/App/Main.fl"),
+        PathBuf::from("/p/src/App/Other.fl"),
+    ];
+    let mut cache = ModuleCache::default();
+    let mut analyze = |host: &Memory| {
+        let mut sources = SourceMap::default();
+        let project = library(&mut sources);
+        let analysis = analyze_with(host, &mut sources, Some(&project), &roots, &mut cache);
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        analysis
+    };
+    let first = analyze(&host);
+    assert_eq!(host.calls(), (1, 2));
+    let second = analyze(&host);
+    assert_eq!(host.calls(), (1, 2));
+    let typing = |a: &super::Analysis| Arc::clone(&a.module("App.Other").expect("other").typing);
+    assert!(Arc::ptr_eq(&typing(&first), &typing(&second)));
+    // a new block in Main changes what Other's block stands for
+    host.write("/p/src/App/Main.fl", &blocks(&[("x", "1.0"), ("y", "2.0")]));
+    let third = analyze(&host);
+    assert!(!Arc::ptr_eq(&typing(&second), &typing(&third)));
 }

@@ -62,6 +62,19 @@ impl BlockSource {
         self.file
     }
 
+    /// The column the body starts at and the indent of its line, in
+    /// characters: where the holes stand, which their layout depends on.
+    pub fn layout(&self) -> (u32, u32) {
+        let start = self.start as usize;
+        let line = self.text[..start].rfind('\n').map_or(0, |i| i + 1);
+        let before = &self.text[line..start];
+        let count = |s: &str| u32::try_from(s.chars().count()).expect("columns fit in u32");
+        (
+            count(before),
+            count(&before[..before.len() - before.trim_start().len()]),
+        )
+    }
+
     /// The block as the plugin reads it.
     pub fn block(&self) -> Block {
         let tokens = self

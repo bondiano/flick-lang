@@ -28,6 +28,8 @@ use crate::types;
 #[derive(Default)]
 pub struct ModuleCache {
     entries: HashMap<PathBuf, (Key, Output)>,
+    /// What plugins gave in the last run, by the key of each call.
+    pub(super) plugins: HashMap<Vec<u8>, Vec<u8>>,
 }
 
 impl ModuleCache {

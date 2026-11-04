@@ -56,6 +56,15 @@ pub trait Host {
     fn plugin(&self, package: &str) -> Result<Arc<dyn Expander>, String> {
         Err(format!("no dependency provides plugin \"{package}\""))
     }
+    /// What a plugin gave for the call `key` in an earlier run.
+    fn cached(&self, key: &[u8]) -> Option<Vec<u8>> {
+        let _ = key;
+        None
+    }
+    /// Keeps what a plugin gave for the call `key` for later runs.
+    fn save(&self, key: &[u8], value: &[u8]) {
+        let _ = (key, value);
+    }
 }
 
 #[derive(Debug)]
