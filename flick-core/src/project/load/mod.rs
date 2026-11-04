@@ -15,7 +15,8 @@ mod entry;
 #[cfg(feature = "ide")]
 mod ide;
 mod plugins;
-#[cfg(test)]
+// the plugin of a module is its package's, which needs packages
+#[cfg(all(test, feature = "native-project"))]
 mod plugins_tests;
 mod precompiled;
 mod runner;
