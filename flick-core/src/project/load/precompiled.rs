@@ -1,0 +1,351 @@
+//! Modules of source packages that earlier runs checked and lowered. A host
+//! keeps them under a key of everything their checking depends on and
+//! hands them back; a run takes their interfaces and IR instead of parsing
+//! and checking their sources again.
+
+use std::collections::BTreeMap;
+#[cfg(feature = "native-project")]
+use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::mem;
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use super::{Compiled, Loader, Mode, module_path};
+use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::ir;
+#[cfg(feature = "native-project")]
+use crate::project::Project;
+#[cfg(feature = "native-project")]
+use crate::project::cache::Key;
+#[cfg(feature = "native-project")]
+use crate::project::packages::{Library, Packages};
+use crate::resolve::Interface;
+use crate::source::{FileId, SourceMap};
+use crate::types;
+
+/// A module of a source package as a run checked and lowered it.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CachedModule {
+    pub name: String,
+    /// Its path under the source directory of its package.
+    pub path: PathBuf,
+    pub imports: Vec<String>,
+    pub interface: Interface,
+    /// The IR with its spans in file 0; a run moves them to the module's file.
+    ir: Value,
+    /// A hash of the text it was checked from, which its spans point into.
+    source: u64,
+}
+
+/// What a host keeps of source packages between runs.
+pub struct PackageCache<'a> {
+    /// What checking any package depends on besides its sources and the
+    /// project: the compiler and its `std`, as the host identifies them.
+    pub salt: &'a str,
+    /// What identifies the sources of the package in a source directory: the
+    /// checksum `flick.lock` pins for a fetched one, else its files.
+    pub identity: &'a dyn Fn(&Path, Option<&str>) -> Option<String>,
+    /// The modules an earlier run saved under a key.
+    pub saved: &'a dyn Fn(&str) -> Option<Vec<CachedModule>>,
+}
+
+/// The modules of a package after a run that checked some of them from
+/// their sources, to save under the package's key.
+pub struct Fresh {
+    pub key: String,
+    pub modules: Vec<CachedModule>,
+}
+
+/// The saved modules a run may use.
+#[derive(Default)]
+pub(super) struct Precompiled {
+    /// The key and source directory of each package that has one.
+    packages: BTreeMap<String, (String, PathBuf)>,
+    /// The saved modules by name, with their package.
+    saved: BTreeMap<String, (String, CachedModule)>,
+    /// The saved modules the run used, in the order it took them.
+    used: Vec<String>,
+}
+
+impl Precompiled {
+    /// The libraries of `packages` with their keys and saved modules. A
+    /// library's key covers the compiler, the configuration of the project,
+    /// its sources and the keys of the libraries it depends on.
+    #[cfg(feature = "native-project")]
+    pub(super) fn new(packages: &Packages, project: &Project, cache: &PackageCache) -> Self {
+        let libraries: HashMap<&str, _> = packages
+            .libraries()
+            .map(|(name, dir, library)| (name, (dir, library)))
+            .collect();
+        let config = format!("{:?}", project.config);
+        let mut keys: HashMap<String, Option<String>> = HashMap::new();
+        let mut out = Precompiled::default();
+        for &name in libraries.keys() {
+            if let Some(key) = key_of(name, &libraries, &config, cache, &mut keys) {
+                let dir = libraries[name].0.to_path_buf();
+                out.packages.insert(name.to_owned(), (key, dir));
+            }
+        }
+        for (package, (key, _)) in &out.packages {
+            for module in (cache.saved)(key).unwrap_or_default() {
+                out.saved
+                    .insert(module.name.clone(), (package.clone(), module));
+            }
+        }
+        out
+    }
+
+    /// The package of the saved module `name`.
+    pub(super) fn package_of(&self, name: &str) -> Option<&str> {
+        self.saved.get(name).map(|(package, _)| package.as_str())
+    }
+
+    /// Whether the saved module `name` belongs to the package in `dir`.
+    fn covers(&self, dir: &Path, name: &str) -> bool {
+        self.saved.get(name).is_some_and(|(package, _)| {
+            self.packages
+                .get(package)
+                .is_some_and(|(_, at)| at.as_path() == dir)
+        })
+    }
+
+    /// What to save after a clean run: for each package with a module the
+    /// run compiled from source, its saved modules and those.
+    pub(super) fn fresh(&self, compiled: &[Compiled], sources: &SourceMap) -> Vec<Fresh> {
+        let mut by_package: BTreeMap<&str, BTreeMap<String, CachedModule>> = BTreeMap::new();
+        for c in compiled {
+            let Some(package) = c.package.as_deref() else {
+                continue;
+            };
+            let Some((_, dir)) = self.packages.get(package) else {
+                continue;
+            };
+            if let Some(module) = cached(c, dir, &sources.get(c.file).text) {
+                by_package
+                    .entry(package)
+                    .or_default()
+                    .insert(module.name.clone(), module);
+            }
+        }
+        by_package
+            .into_iter()
+            .map(|(package, mut modules)| {
+                for (owner, module) in self.saved.values() {
+                    if owner == package {
+                        modules
+                            .entry(module.name.clone())
+                            .or_insert_with(|| module.clone());
+                    }
+                }
+                Fresh {
+                    key: self.packages[package].0.clone(),
+                    modules: modules.into_values().collect(),
+                }
+            })
+            .collect()
+    }
+}
+
+/// The key of library `name`, once for each library; `None` when its
+/// sources or a library it depends on cannot be identified.
+#[cfg(feature = "native-project")]
+fn key_of(
+    name: &str,
+    libraries: &HashMap<&str, (&Path, &Library)>,
+    config: &str,
+    cache: &PackageCache,
+    keys: &mut HashMap<String, Option<String>>,
+) -> Option<String> {
+    if let Some(known) = keys.get(name) {
+        return known.clone();
+    }
+    // a cycle of libraries gets no key
+    keys.insert(name.to_owned(), None);
+    let &(dir, library) = libraries.get(name)?;
+    let mut key = Key::default();
+    key.add("salt", cache.salt);
+    key.add("config", config);
+    key.add("name", name);
+    key.add(
+        "sources",
+        (cache.identity)(dir, library.checksum.as_deref())?,
+    );
+    for dependency in &library.dependencies {
+        let found = key_of(dependency, libraries, config, cache, keys)?;
+        key.add(format!("dependency {dependency}"), found);
+    }
+    let key = key.finish();
+    keys.insert(name.to_owned(), Some(key.clone()));
+    Some(key)
+}
+
+/// `compiled`, checked from `text`, to save, unless its IR has spans in
+/// another file.
+fn cached(compiled: &Compiled, dir: &Path, text: &str) -> Option<CachedModule> {
+    let mut ir = serde_json::to_value(&compiled.ir).ok()?;
+    let own = serde_json::to_value(compiled.file).ok()?;
+    let zero = serde_json::to_value(FileId::default()).ok()?;
+    if !move_spans(&mut ir, Some(&own), &zero) {
+        return None;
+    }
+    Some(CachedModule {
+        name: compiled.name.clone(),
+        path: compiled.path.strip_prefix(dir).ok()?.to_path_buf(),
+        imports: compiled.imports.clone(),
+        interface: compiled.interface.clone(),
+        ir,
+        source: hash(text),
+    })
+}
+
+/// The hash of a source text; saved modules are only read by the binary
+/// that saved them, whose hasher does not change.
+fn hash(text: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    text.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// Sets the file of every span in `value` to `to`; false when one is not in
+/// `from`.
+fn move_spans(value: &mut Value, from: Option<&Value>, to: &Value) -> bool {
+    match value {
+        Value::Object(fields) if is_span(fields) => {
+            let file = fields.get_mut("file").expect("a span has a file");
+            if from.is_some_and(|from| file != from) {
+                return false;
+            }
+            *file = to.clone();
+            true
+        }
+        Value::Object(fields) => fields.values_mut().all(|v| move_spans(v, from, to)),
+        Value::Array(items) => items.iter_mut().all(|v| move_spans(v, from, to)),
+        _ => true,
+    }
+}
+
+fn is_span(fields: &serde_json::Map<String, Value>) -> bool {
+    fields.len() == 3
+        && ["file", "start", "end"]
+            .iter()
+            .all(|k| fields.contains_key(*k))
+}
+
+impl Loader<'_> {
+    /// Uses the saved module `name` of the package in `dir`, and what it
+    /// imports, instead of loading their sources; false when none is saved.
+    pub(super) fn use_saved(&mut self, dir: &Path, name: &str) -> bool {
+        if !self.precompiled.covers(dir, name) {
+            return false;
+        }
+        if self.from_packages.contains_key(name) {
+            return true;
+        }
+        let (_, module) = &self.precompiled.saved[name];
+        let imports = module.imports.clone();
+        self.from_packages
+            .insert(name.to_owned(), module.interface.clone());
+        self.precompiled.used.push(name.to_owned());
+        for import in imports {
+            self.find_in_packages(&import);
+        }
+        true
+    }
+
+    /// Finds `name`, imported by a saved module, as a module of a source
+    /// package or a built-in one.
+    fn find_in_packages(&mut self, name: &str) {
+        if self.by_name.contains_key(name) || self.from_packages.contains_key(name) {
+            return;
+        }
+        for (_, dir) in self.package_sources() {
+            if !self.use_saved(&dir, name) {
+                let _ = self.load(&dir.join(module_path(name)));
+            }
+        }
+        if !self.by_name.contains_key(name)
+            && !self.from_packages.contains_key(name)
+            && let Some(builtin) = types::builtins().iter().find(|i| i.module == name)
+        {
+            self.from_packages.insert(name.to_owned(), builtin.clone());
+        }
+    }
+
+    /// What to save of the modules of source packages in `compiled`, when
+    /// `save`; a build also compiles the saved modules it used.
+    pub(super) fn finish_packages(
+        &mut self,
+        compiled: &mut Vec<Compiled>,
+        mode: Mode,
+        save: bool,
+    ) -> Vec<Fresh> {
+        let fresh = if save {
+            self.precompiled.fresh(compiled, self.sources)
+        } else {
+            Vec::new()
+        };
+        if mode != Mode::Check {
+            let saved = self.saved_compiled();
+            compiled.extend(saved);
+        }
+        fresh
+    }
+
+    /// The saved modules the run used, compiled: each in its file again,
+    /// which a source map points into.
+    fn saved_compiled(&mut self) -> Vec<Compiled> {
+        let used = mem::take(&mut self.precompiled.used);
+        let mut out = Vec::new();
+        for name in used {
+            let (package, module) = &self.precompiled.saved[&name];
+            let dir = &self.precompiled.packages[package].1;
+            let path = dir.join(&module.path);
+            let bytes = match self.host.read(&path) {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    let message = format!("cannot read `{}`: {err}", self.host.display(&path));
+                    self.diagnostics
+                        .push(Diagnostic::new(codes::P001, Severity::Error, message));
+                    continue;
+                }
+            };
+            let (file, _) = self.sources.add_bytes(self.host.display(&path), bytes);
+            // spans into another text would point past it
+            if hash(&self.sources.get(file).text) != module.source {
+                let message = format!(
+                    "`{}` changed since its package was checked: `flick install` restores the package store",
+                    self.host.display(&path)
+                );
+                self.diagnostics
+                    .push(Diagnostic::new(codes::P034, Severity::Error, message));
+                continue;
+            }
+            let mut ir = module.ir.clone();
+            let to = serde_json::to_value(file).expect("a file id serializes");
+            move_spans(&mut ir, None, &to);
+            let ir = match serde_json::from_value::<ir::Module>(ir) {
+                Ok(ir) => ir,
+                Err(err) => {
+                    let message = format!("the saved IR of `{name}` does not load: {err}");
+                    self.diagnostics
+                        .push(Diagnostic::new(codes::P001, Severity::Error, message));
+                    continue;
+                }
+            };
+            out.push(Compiled {
+                name: module.name.clone(),
+                path,
+                file,
+                test: false,
+                package: Some(package.clone()),
+                imports: module.imports.clone(),
+                ir,
+                interface: module.interface.clone(),
+            });
+        }
+        out
+    }
+}

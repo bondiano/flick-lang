@@ -21,6 +21,7 @@ use flick_core::source::SourceMap;
 use super::build::{BuildPlan, Emission, artifacts, release, write, write_artifacts};
 use super::check::select;
 use crate::args::{Color, GlobalArguments, Reporter, TestArguments, TestEmitArgument};
+use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
 use crate::{builtins, cache, child, report, toolchain};
@@ -99,7 +100,11 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     progress.stage("Preparing compiler");
     builtins::prepare();
     progress.stage("Compiling Flick modules");
-    let (diagnostics, compilation) = project::compile(&host, &mut sources, Some(&project), &roots);
+    let (diagnostics, compilation) = package_cache::with_saved(|saved| {
+        let (diagnostics, compilation, fresh) =
+            project::compile_with(&host, &mut sources, Some(&project), &roots, saved);
+        ((diagnostics, compilation), fresh)
+    });
     let errors = diagnostics.iter().any(|d| d.severity == Severity::Error);
     let progress = if diagnostics.is_empty() {
         progress

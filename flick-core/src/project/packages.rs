@@ -30,6 +30,17 @@ struct Package {
     installed: bool,
     /// The resolved `source-dir` of a source package.
     source_dir: Option<PathBuf>,
+    /// For a library of `[dependencies]`, what its modules depend on.
+    library: Option<Library>,
+}
+
+/// What the modules of a library of `[dependencies]` depend on besides the
+/// project: its sources, which `flick.lock` pins by checksum when they are
+/// fetched, and the libraries it depends on.
+#[derive(Debug)]
+pub struct Library {
+    pub checksum: Option<String>,
+    pub dependencies: Vec<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -100,6 +111,7 @@ impl Packages {
                     name: name.clone(),
                     installed: installed.is_some(),
                     source_dir,
+                    library: None,
                 }
             });
         packages.extend(installed.collect::<Vec<_>>());
@@ -111,6 +123,18 @@ impl Packages {
         self.packages
             .iter()
             .filter_map(|p| Some((p.name.as_str(), p.source_dir.as_deref()?)))
+    }
+
+    /// Each library of `[dependencies]`, with its source directory, in
+    /// dependency order.
+    pub fn libraries(&self) -> impl Iterator<Item = (&str, &Path, &Library)> {
+        self.packages.iter().filter_map(|p| {
+            Some((
+                p.name.as_str(),
+                p.source_dir.as_deref()?,
+                p.library.as_ref()?,
+            ))
+        })
     }
 
     /// Declared dependencies missing from `node_modules`.
@@ -279,10 +303,24 @@ impl Libraries<'_> {
             ));
             return None;
         }
+        let checksum = match &dependency.source {
+            Source::Path(_) => None,
+            source => (self.fetched.lock)
+                .find(&dependency.name, source)
+                .map(|locked| locked.checksum.clone()),
+        };
+        let dependencies = (library.dependencies.iter())
+            .filter(|d| d.name != "std")
+            .map(|d| d.name.clone())
+            .collect();
         out.push(Package {
             name: dependency.name.clone(),
             installed: true,
             source_dir: Some(super::normalize(&at.join(&library.source_dir))),
+            library: Some(Library {
+                checksum,
+                dependencies,
+            }),
         });
         Some((at, library.dependencies))
     }

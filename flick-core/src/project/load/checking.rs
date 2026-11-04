@@ -11,6 +11,7 @@ use tracing::debug;
 
 #[cfg(feature = "ide")]
 use super::Analyzed;
+use super::precompiled::Precompiled;
 use super::{Loaded, Loader, Root};
 use crate::clock::timed;
 use crate::diagnostics::{Diagnostic, Severity};
@@ -104,6 +105,8 @@ impl Loader<'_> {
                     .diagnostics
                     .iter()
                     .any(|d| d.severity == Severity::Error),
+            lower_packages_only: self.lower_packages_only,
+            precompiled: &self.precompiled,
             cache: self.cache.as_deref(),
         }
     }
@@ -143,6 +146,8 @@ struct Checking<'a> {
     from_packages: &'a BTreeMap<String, Interface>,
     project: Option<&'a Project>,
     lower: bool,
+    lower_packages_only: bool,
+    precompiled: &'a Precompiled,
     cache: Option<&'a ModuleCache>,
 }
 
@@ -213,9 +218,13 @@ impl Checking<'_> {
         };
         let (mut interface, resolved) = resolve::resolve(&module, lookup);
         // a library's modules are another package's: they own their own instances
-        let local = |name: &str| {
-            (self.by_name.get(name))
-                .is_some_and(|&i| package_of(&self.modules[i].root) == package_of(&loaded.root))
+        let local = |name: &str| match self.by_name.get(name) {
+            Some(&i) => package_of(&self.modules[i].root) == package_of(&loaded.root),
+            // a saved module of the same package is as local as its source
+            None => self
+                .precompiled
+                .package_of(name)
+                .is_some_and(|p| package_of(&loaded.root) == Some(p)),
         };
         let build = self.project.map(|p| &p.config.build);
         let options = types::Options {
@@ -248,7 +257,8 @@ impl Checking<'_> {
             !broken && resolved_cleanly && !checked.iter().any(|d| d.severity == Severity::Error);
         diagnostics.extend(checked);
         let mut ir = None;
-        if clean && self.lower {
+        let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
+        if clean && self.lower && lowers {
             match ir::lower(&module, &typing) {
                 Ok(lowered) => ir = Some(lowered),
                 Err(d) => diagnostics.extend(d),

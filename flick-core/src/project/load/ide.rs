@@ -66,7 +66,7 @@ pub fn analyze(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> Analysis {
-    let output = run(host, sources, project, roots, Mode::Analyze, None);
+    let output = run(host, sources, project, roots, Mode::Analyze, None, None);
     Analysis {
         modules: output.analyzed,
         compilation: output.compilation,
@@ -82,7 +82,15 @@ pub fn analyze_with(
     roots: &[PathBuf],
     cache: &mut ModuleCache,
 ) -> Analysis {
-    let output = run(host, sources, project, roots, Mode::Analyze, Some(cache));
+    let output = run(
+        host,
+        sources,
+        project,
+        roots,
+        Mode::Analyze,
+        Some(cache),
+        None,
+    );
     Analysis {
         modules: output.analyzed,
         compilation: output.compilation,

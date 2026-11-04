@@ -3,6 +3,7 @@
 //! code against an ABI it does not know.
 
 use std::path::Path;
+use std::time::UNIX_EPOCH;
 use std::{env, fs, io, process};
 
 use flick_core::build;
@@ -21,6 +22,19 @@ pub const TYPESCRIPT_GO: &str = "7.1.0-beta";
 pub const REACT: &str = "19.3.1";
 /// Vite of the `fullstack` template.
 pub const VITE: &str = "8.3.5";
+
+/// This compiler as caches tell binaries apart: its version, and the size
+/// and modification time of its executable, which a rebuild without a new
+/// version still changes.
+pub fn fingerprint() -> Option<String> {
+    let exe = fs::metadata(env::current_exe().ok()?).ok()?;
+    let modified = exe.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
+    Some(format!(
+        "{COMPILER}-{:x}-{:x}",
+        exe.len(),
+        modified.as_nanos()
+    ))
+}
 
 /// The version of an installed package, from `root/node_modules`.
 pub fn installed(root: &Path, package: &str) -> Option<String> {

@@ -9,6 +9,7 @@ use flick_core::source::{FileId, SourceMap};
 
 use crate::args::CheckArguments;
 use crate::command::{Command, Outcome};
+use crate::package_cache;
 use crate::sources::{self, FsHost};
 
 pub struct CheckCommand {
@@ -69,7 +70,9 @@ impl CheckCommand {
                 );
             }
         };
-        let diagnostics = project::check(host, &mut sources, project.as_ref(), &roots);
+        let diagnostics = package_cache::with_saved(|saved| {
+            project::check_with(host, &mut sources, project.as_ref(), &roots, saved)
+        });
         (
             Outcome {
                 sources,

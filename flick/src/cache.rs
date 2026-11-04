@@ -48,13 +48,10 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
     key.add("config", format!("{:?}", project.config));
     key.add("compiler", toolchain::COMPILER);
     key.add("std", builtins::std_hash());
-    // a compiler rebuilt without a new version still changes the key
-    if let Ok(meta) = env::current_exe().and_then(fs::metadata) {
-        key.add(
-            "compiler-binary",
-            format!("{} {:?}", meta.len(), meta.modified().ok()),
-        );
-    }
+    key.add(
+        "compiler-binary",
+        toolchain::fingerprint().unwrap_or_default(),
+    );
     for package in ["@flick-lang/runtime", "effect"] {
         let version = toolchain::resolved(&project.root, package).unwrap_or_default();
         key.add(format!("version {package}"), version);

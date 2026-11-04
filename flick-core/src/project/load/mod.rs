@@ -14,6 +14,7 @@ mod checking_tests;
 mod entry;
 #[cfg(feature = "ide")]
 mod ide;
+mod precompiled;
 mod runner;
 mod target;
 mod unknown;
@@ -22,6 +23,7 @@ pub use checking::ModuleCache;
 pub use entry::{MainKind, main_kind};
 #[cfg(feature = "ide")]
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
+pub use precompiled::{CachedModule, Fresh, PackageCache};
 #[cfg(all(test, feature = "build-artifacts"))]
 pub(crate) use target::js_only;
 
@@ -34,6 +36,7 @@ use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
 use crate::syntax::{self, Parse};
 use crate::types;
+use precompiled::Precompiled;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Root {
@@ -70,6 +73,8 @@ enum Mode {
 struct Output {
     diagnostics: Vec<Diagnostic>,
     compilation: Compilation,
+    /// The modules of source packages to save, after a clean run.
+    fresh: Vec<Fresh>,
     #[cfg(feature = "ide")]
     analyzed: Vec<Analyzed>,
 }
@@ -87,6 +92,10 @@ struct Loader<'a> {
     diagnostics: Vec<Diagnostic>,
     /// With `Some`, the IR of each module that checks without errors.
     lowered: Option<Vec<Option<ir::Module>>>,
+    /// Lowers only the modules of source packages, to save them.
+    lower_packages_only: bool,
+    /// Modules of source packages saved by earlier runs.
+    precompiled: Precompiled,
     #[cfg(feature = "ide")]
     /// With `Some`, what editors need of each module that parses.
     ide: Option<Vec<Analyzed>>,
@@ -122,7 +131,20 @@ pub fn check(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> Vec<Diagnostic> {
-    run(host, sources, project, roots, Mode::Check, None).diagnostics
+    run(host, sources, project, roots, Mode::Check, None, None).diagnostics
+}
+
+/// [`check`], taking the modules of source packages `packages` saved and
+/// giving those to save.
+pub fn check_with(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+    packages: Option<&PackageCache>,
+) -> (Vec<Diagnostic>, Vec<Fresh>) {
+    let output = run(host, sources, project, roots, Mode::Check, None, packages);
+    (output.diagnostics, output.fresh)
 }
 
 /// [`check`], also lowering every module to the IR when nothing has errors.
@@ -136,8 +158,21 @@ pub fn compile(
         diagnostics,
         compilation,
         ..
-    } = run(host, sources, project, roots, Mode::Compile, None);
+    } = run(host, sources, project, roots, Mode::Compile, None, None);
     (diagnostics, compilation)
+}
+
+/// [`compile`], taking the modules of source packages `packages` saved and
+/// giving those to save.
+pub fn compile_with(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+    packages: Option<&PackageCache>,
+) -> (Vec<Diagnostic>, Compilation, Vec<Fresh>) {
+    let output = run(host, sources, project, roots, Mode::Compile, None, packages);
+    (output.diagnostics, output.compilation, output.fresh)
 }
 
 fn run(
@@ -147,6 +182,7 @@ fn run(
     roots: &[PathBuf],
     mode: Mode,
     cache: Option<&mut ModuleCache>,
+    saved: Option<&PackageCache>,
 ) -> Output {
     #[cfg(feature = "native-project")]
     let mut diagnostics = Vec::new();
@@ -154,8 +190,15 @@ fn run(
     let packages = project.map_or_else(Packages::default, |p| {
         Packages::load(host, sources, p, &mut diagnostics)
     });
+    #[cfg(feature = "native-project")]
+    let precompiled = project
+        .zip(saved)
+        .map(|(p, saved)| Precompiled::new(&packages, p, saved))
+        .unwrap_or_default();
     #[cfg(not(feature = "native-project"))]
-    let diagnostics = Vec::new();
+    let (diagnostics, precompiled) = (Vec::new(), Precompiled::default());
+    // a check lowers the modules of source packages only to save them
+    let lower_packages_only = mode == Mode::Check && saved.is_some();
     let mut loader = Loader {
         host,
         sources,
@@ -166,7 +209,9 @@ fn run(
         by_name: BTreeMap::new(),
         from_packages: BTreeMap::new(),
         diagnostics,
-        lowered: (mode != Mode::Check).then(Vec::new),
+        lowered: (mode != Mode::Check || lower_packages_only).then(Vec::new),
+        lower_packages_only,
+        precompiled,
         #[cfg(feature = "ide")]
         ide: (mode == Mode::Analyze).then(Vec::new),
         cache,
@@ -200,7 +245,7 @@ fn run(
         .diagnostics
         .iter()
         .any(|d| d.severity == Severity::Error);
-    let compiled = match loader.lowered.take() {
+    let mut compiled = match loader.lowered.take() {
         Some(lowered) if !failed => lowered
             .into_iter()
             .zip(interfaces)
@@ -223,6 +268,7 @@ fn run(
             .collect(),
         _ => Vec::new(),
     };
+    let fresh = loader.finish_packages(&mut compiled, mode, saved.is_some() && !failed);
     let mut diagnostics = loader.reported();
     // by path, not by load order, which follows the order of imports
     diagnostics.sort_by_cached_key(|d| {
@@ -235,6 +281,7 @@ fn run(
     Output {
         diagnostics,
         compilation: Compilation { modules: compiled },
+        fresh,
         #[cfg(feature = "ide")]
         analyzed: loader.ide.take().unwrap_or_default(),
     }
@@ -422,6 +469,9 @@ impl Loader<'_> {
         };
         if !self.by_name.contains_key(name) {
             for dir in dirs {
+                if self.use_saved(&dir, name) {
+                    continue;
+                }
                 // absent files are simply not candidates
                 let _ = self.load(&dir.join(module_path(name)));
             }
