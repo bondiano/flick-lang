@@ -11,6 +11,7 @@ use flick_test_pairs::Pairs;
 
 mod forms;
 mod names;
+mod nested;
 
 use super::{check, compile};
 use crate::diagnostics::{Diagnostic, Severity};

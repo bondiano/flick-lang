@@ -90,14 +90,14 @@ fn a_hole_is_the_longest_expression_where_it_stands() {
     let src = format!("{IMPORT}let x = pairs {{ a = f 1 2; b = 3 }}\n");
     let (_, tokens) = body(&src);
     let file = FileId::default();
-    let hole = parse_expr_at(&src, file, &from(&src, &tokens, "f")).expect("an expression");
+    let hole = parse_expr_at(&src, file, &from(&src, &tokens, "f"), &[]).expect("an expression");
     assert!(hole.diagnostics.is_empty(), "{:?}", hole.diagnostics);
     assert_eq!(text_of(&src, &hole.tree), "f 1 2");
     assert_eq!(&src[..hole.end as usize].rsplit(' ').next(), &Some("2"));
 
     let src = format!("{IMPORT}let x =\n  pairs {{\n    a = f 1\n      2\n    b = 3\n  }}\n");
     let (_, tokens) = body(&src);
-    let hole = parse_expr_at(&src, file, &from(&src, &tokens, "f")).expect("an expression");
+    let hole = parse_expr_at(&src, file, &from(&src, &tokens, "f"), &[]).expect("an expression");
     assert!(hole.diagnostics.is_empty(), "{:?}", hole.diagnostics);
     // deeper lines continue it, the next field's line ends it
     assert_eq!(text_of(&src, &hole.tree), "f 1\n      2");
@@ -105,7 +105,7 @@ fn a_hole_is_the_longest_expression_where_it_stands() {
     // a hole on a line of its own is a block of its own
     let src = format!("{IMPORT}let x = pairs {{\n  f 1\n    2\n  g\n}}\n");
     let (_, tokens) = body(&src);
-    let hole = parse_expr_at(&src, file, &from(&src, &tokens, "f")).expect("an expression");
+    let hole = parse_expr_at(&src, file, &from(&src, &tokens, "f"), &[]).expect("an expression");
     assert_eq!(text_of(&src, &hole.tree), "f 1\n    2");
 }
 
@@ -114,7 +114,7 @@ fn a_type_hole_ends_where_the_type_does() {
     let src = format!("{IMPORT}let x = pairs {{ b : List Int = 2 }}\n");
     let (_, tokens) = body(&src);
     let hole =
-        parse_type_at(&src, FileId::default(), &from(&src, &tokens, "List")).expect("a type");
+        parse_type_at(&src, FileId::default(), &from(&src, &tokens, "List"), &[]).expect("a type");
     assert!(hole.diagnostics.is_empty(), "{:?}", hole.diagnostics);
     assert_eq!(text_of(&src, &hole.tree), "List Int");
 }
@@ -123,7 +123,7 @@ fn a_type_hole_ends_where_the_type_does() {
 fn no_hole_starts_at_punctuation() {
     let src = format!("{IMPORT}let x = pairs {{ a = 1; b = 2 }}\n");
     let (_, tokens) = body(&src);
-    let hole = parse_expr_at(&src, FileId::default(), &from(&src, &tokens, ";"));
+    let hole = parse_expr_at(&src, FileId::default(), &from(&src, &tokens, ";"), &[]);
     assert!(
         hole.as_ref().is_none_or(|h| !h.diagnostics.is_empty()),
         "{:?}",
@@ -272,10 +272,10 @@ fn a_hole_is_a_pattern_or_a_declaration_where_it_stands() {
     let block = find(&parsed.tree, K::PluginDecl).expect("a declaration");
     let tokens = block.tokens();
     let file = FileId::default();
-    let pat = parse_pat_at(&src, file, &from(&src, &tokens, "(")).expect("a pattern");
+    let pat = parse_pat_at(&src, file, &from(&src, &tokens, "("), &[]).expect("a pattern");
     assert!(pat.diagnostics.is_empty(), "{:?}", pat.diagnostics);
     assert_eq!(text_of(&src, &pat.tree), "(n : Int)");
-    let decl = parse_decl_at(&src, file, &from(&src, &tokens, "let")).expect("a declaration");
+    let decl = parse_decl_at(&src, file, &from(&src, &tokens, "let"), &[]).expect("a declaration");
     assert!(decl.diagnostics.is_empty(), "{:?}", decl.diagnostics);
     assert_eq!(decl.tree.kind, K::LetDecl);
     assert_eq!(text_of(&src, &decl.tree), "let f (n : Int) x =\n  n + x");

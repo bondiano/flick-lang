@@ -23,7 +23,7 @@ use SyntaxKind as K;
 use build::{Event, build};
 
 pub use fragment::{
-    Fragment, parse_decl_at, parse_decls_at, parse_expr_at, parse_pat_at, parse_type_at,
+    Fragment, Heads, parse_decl_at, parse_decls_at, parse_expr_at, parse_pat_at, parse_type_at,
 };
 
 use super::cst::Node;

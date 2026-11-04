@@ -17,7 +17,7 @@ use crate::source::FileId;
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::lexer::lex_generated;
-use crate::syntax::{Fragment, parse_decls_at, parse_expr_at};
+use crate::syntax::{Fragment, Heads, parse_decls_at, parse_expr_at};
 
 use super::render::{DECL_PLACEHOLDER, Rendered};
 use super::source::BlockSource;
@@ -94,7 +94,7 @@ fn generated(
     at: u32,
     rendered: &Rendered,
     source: &BlockSource,
-    parse: fn(&str, FileId, &[Token]) -> Option<Fragment>,
+    parse: for<'t> fn(&'t str, FileId, &[Token], Heads<'t>) -> Option<Fragment>,
 ) -> Result<Node, String> {
     let len = u32::try_from(rendered.text.len()).expect("generated code fits in u32");
     let end = at + len;
@@ -113,7 +113,8 @@ fn generated(
             end: t.end + at,
         })
         .collect();
-    let parsed = parse(text, file, &tokens).ok_or("the generated code does not parse")?;
+    // generated code has no blocks of its own
+    let parsed = parse(text, file, &tokens, &[]).ok_or("the generated code does not parse")?;
     if !parsed.diagnostics.is_empty() || parsed.end != end {
         return Err("the generated code does not parse".into());
     }

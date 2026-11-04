@@ -1,5 +1,7 @@
 //! The module header and imports of a parsed file.
 
+use std::sync::Arc;
+
 use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -29,6 +31,15 @@ pub struct Import {
     /// The heads of plugin blocks it exposes, `plugin head`, each with the
     /// span of its item.
     pub plugins: Vec<Item>,
+}
+
+impl ModuleSyntax {
+    /// The heads of plugin blocks its imports expose.
+    pub fn heads(&self) -> Arc<[String]> {
+        (self.imports.iter())
+            .flat_map(|i| i.plugins.iter().map(|p| p.name.clone()))
+            .collect()
+    }
 }
 
 impl Import {

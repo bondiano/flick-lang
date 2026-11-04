@@ -80,6 +80,11 @@ into the compiler. It has two calls, both pure:
 - `expand(block, state)` gives the code of one block, or what it finds
   wrong at spans of the block.
 
+A block inside the user's code of another, as `subcommand cli "x" { … }`
+in a `cli` block, is expanded after it, in a round of its own: `collect`
+learns from the blocks of a round together, and a block nested in more than
+eight is `FLICK-P036`.
+
 Editors also ask a plugin about its blocks, even ones that do not expand:
 `complete(block, state, offset)` gives what to insert at an offset (an
 empty list leaves the user's code to the usual completion), `hover(block,
@@ -250,7 +255,6 @@ dropped.
 ## Not yet
 
 Permissions, warnings of plugins and checks after typing come later. A
-plugin block inside the user's code of another block is not a block. A
 built-in module the file hides by an alias, as `import Other as List`, is
 hidden from generated code too. `collect` sees the modules the run loads, so `flick check one.fl` gives it
 fewer blocks than a whole build. A package whose modules have plugin blocks
