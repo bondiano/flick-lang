@@ -43,6 +43,7 @@ stdlib/cli/file_parse
 stdlib/cli/prompt
 stdlib/cli/surface
 stdlib/cli/trace
+stdlib/cli/value
 stdlib/collections
 stdlib/core_more
 stdlib/decimals

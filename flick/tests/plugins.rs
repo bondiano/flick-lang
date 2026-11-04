@@ -209,6 +209,20 @@ mod wasm {
     }
 
     #[test]
+    fn a_wasm_plugin_derives_the_instances_of_its_class() {
+        let main = "module App.Main exposing (main)\n\nimport Pairs\n\ntype Point = Point Float Float\n  deriving Pairs.Arbitrary\n\npoint : Point\nlet point = Pairs.arbitrary\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
+        let root = app("plugins-derive", main);
+        let pairs = "module Pairs exposing (..)\n\n@derive\nclass Arbitrary a =\n  arbitrary : a\n\ninstance Arbitrary Float =\n  let arbitrary = 0.0\n";
+        fs::write(root.join("lib/src/Pairs.fl"), pairs).expect("write");
+        let checked = flick(&root, &["check"]);
+        assert!(checked.status.success(), "{checked:?}");
+        assert_eq!(
+            trace(&root),
+            ["collect pairs", "derive pairs Pairs.Arbitrary Point"]
+        );
+    }
+
+    #[test]
     fn a_missing_component_is_reported_on_the_import() {
         let root = app("plugins-missing", MAIN);
         fs::remove_file(root.join("lib/pairs.wasm")).expect("remove");

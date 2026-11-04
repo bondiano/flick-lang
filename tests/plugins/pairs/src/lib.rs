@@ -7,13 +7,16 @@
 //! stands for `(1.0 : String)`, an error in generated code; `coded { X001 }`
 //! refuses with the code its body names. `spin {}` never
 //! ends and `hog {}` takes all memory: the limits of a plugin's calls.
+//! `deriving Pairs.Arbitrary` is in `derive`.
 
+mod derive;
 mod forms;
 
 use std::hint::black_box;
 
 use flick_plugin::{
-    Arena, Block, Builder, Compiler, Diagnostic, NodeId, Plugin, Span, Token, TokenKind, flick,
+    Arena, Block, Builder, Compiler, DeriveTarget, Diagnostic, NodeId, Plugin, Span, Token,
+    TokenKind, flick,
 };
 
 pub struct Pairs;
@@ -92,6 +95,18 @@ impl Plugin for Pairs {
         let count = state.try_into().map_or(0, u32::from_le_bytes);
         let record = flick!(b @ whole, { #(..fields); blocks = #(f64::from(count)) });
         Ok(b.finish(record))
+    }
+
+    fn derive(
+        &self,
+        target: &DeriveTarget,
+        class: &str,
+        _: Option<&Block>,
+        _: &[DeriveTarget],
+        _: &[u8],
+        _: &mut dyn Compiler,
+    ) -> Result<Arena, Vec<Diagnostic>> {
+        derive::derive(target, class)
     }
 }
 

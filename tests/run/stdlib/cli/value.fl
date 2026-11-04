@@ -1,0 +1,33 @@
+// `deriving Cli.Value`, which the plugin of std derives: a choice among
+// constructors without fields by their names in kebab case, and a refined
+// type, whose base is parsed and whose predicate is checked.
+module App.Main exposing (main)
+
+import Cli exposing (plugin cli)
+
+type Color = Red | GreenLight
+  deriving Cli.Value, Show
+
+refined type Port = Float where fun n -> n > 0 && n < 65536
+  deriving Cli.Value
+
+/// The text a value of `T` parses to, or why it does not.
+shown : Show a => Result String a -> String
+let shown parsed =
+  match parsed with
+  | Ok value -> "ok " ++ show value
+  | Err why -> "error " ++ why
+
+port : Result String Port -> String
+let port parsed =
+  match parsed with
+  | Ok p -> "ok " ++ show (Port.value p)
+  | Err why -> "error " ++ why
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (shown (Cli.parse "green-light" : Result String Color))
+  Platform.stdout_line (shown (Cli.parse "blue" : Result String Color))
+  Platform.stdout_line (port (Cli.parse "8080" : Result String Port))
+  Platform.stdout_line (port (Cli.parse "70000" : Result String Port))
+  Platform.stdout_line (port (Cli.parse "eighty" : Result String Port))
