@@ -43,7 +43,7 @@ downloads that exact release, not the latest one.
 ## Language server
 
 `flick lsp --stdio` serves diagnostics (errors and warnings, as `flick
-check` reports them, when a document is opened or saved), hover with the source type and the
+check` reports them, when a document is opened, changed or saved), hover with the source type and the
 `///` documentation of public and private values (including inferred locals
 and the `ignore` keyword), generic type aliases and decoded `codec` fields,
 definition, type definition, references, completion,

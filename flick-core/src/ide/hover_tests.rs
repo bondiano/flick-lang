@@ -560,6 +560,43 @@ let save path =
 }
 
 #[test]
+fn instance_method_without_written_signature_has_hover_type() {
+    let classes = "module Mtl.Classes exposing (MonadTrans(..))
+
+class MonadTrans (t : (Type -> Type) -> Type -> Type) =
+  lift : forall c m a. Monad m => (m a)^c -> (t m a)^c
+";
+    let maybe = "module Mtl.MaybeT exposing (MaybeT(..))
+
+import Mtl.Classes exposing (MonadTrans(..))
+
+type MaybeT (m : Type -> Type) a = MaybeT (m (Option a))
+
+instance MonadTrans MaybeT =
+  let lift action = MaybeT (map Some action)
+";
+    let f = fixture_of(&[
+        ("src/Mtl/Classes.fl", classes),
+        ("src/Mtl/MaybeT.fl", maybe),
+    ]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    let file = f.file("Mtl.MaybeT");
+    let start = f.at("Mtl.MaybeT", "let lift", 0) + 4;
+    let (markdown, range) = ide.hover(file, start + 1).expect("lift hover");
+    assert_eq!(range, (start, start + 4));
+    assert!(
+        markdown.contains("lift : forall c m a. Monad m => (m a)^c -> (MaybeT m a)^c"),
+        "{markdown}"
+    );
+    assert!(markdown.contains("from `instance MonadTrans MaybeT`"));
+}
+
+#[test]
 fn generated_url_companion_hover_keeps_its_type_and_navigation() {
     let source = "module App.Pages exposing (home)
 

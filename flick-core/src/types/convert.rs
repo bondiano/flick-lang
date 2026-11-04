@@ -19,6 +19,8 @@ use crate::types::lang::Lang;
 mod kinds;
 mod rows;
 
+use kinds::with_article;
+
 /// What a type variable that is not in scope means.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Free {
@@ -88,7 +90,10 @@ impl Checker<'_> {
             },
         };
         let ty = self.default_kinds(&ty);
-        (self.implicit_captures(&ty), explicit)
+        let ty = self.implicit_captures(&ty);
+        #[cfg(feature = "ide")]
+        self.typing.signature_types.insert(node.range(), ty.clone());
+        (ty, explicit)
     }
 
     /// A local type annotation; its unknown variables are inferred.
@@ -527,11 +532,4 @@ impl Checker<'_> {
         )
         .then_some((entity.module, entity.name))
     }
-}
-
-/// `a Type`, `an ErrorRow`.
-pub(super) fn with_article(kind: &Kind) -> String {
-    let text = kind.to_string();
-    let vowel = text.starts_with(['A', 'E', 'I', 'O', 'U']);
-    format!("{} {text}", if vowel { "an" } else { "a" })
 }

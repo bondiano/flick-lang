@@ -70,6 +70,7 @@ fn signature_quick_fix_makes_the_module_check() {
         fixed.insert_str(at, edit["newText"].as_str().expect("text"));
     }
     lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 2 }, "contentChanges": [{ "text": fixed }] }));
+    assert_eq!(lsp.diagnostics(&uri(&file)), Vec::<Value>::new(), "{fixed}");
     lsp.notify(
         "textDocument/didSave",
         &json!({ "textDocument": { "uri": uri(&file) } }),
@@ -79,11 +80,12 @@ fn signature_quick_fix_makes_the_module_check() {
     // a binding the checker rejects gets no signature to insert
     let broken = format!("{fixed}\nlet broken x = x + \"a\"\n");
     lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 3 }, "contentChanges": [{ "text": broken }] }));
+    let reported = lsp.diagnostics(&uri(&file));
     lsp.notify(
         "textDocument/didSave",
         &json!({ "textDocument": { "uri": uri(&file) } }),
     );
-    let reported = lsp.diagnostics(&uri(&file));
+    assert_eq!(lsp.diagnostics(&uri(&file)), reported);
     let t004 = reported
         .iter()
         .find(|d| d["code"] == "FLICK-T004")
@@ -97,7 +99,7 @@ fn signature_quick_fix_makes_the_module_check() {
 }
 
 #[test]
-fn rec_quick_fix_and_diagnostics_wait_for_save() {
+fn rec_quick_fix_and_diagnostics_update_on_change() {
     let text = "module App.Fib exposing (..)\n\nfib : Float -> Float\nlet fib n = if n < 2 then n else fib (n - 1) + fib (n - 2)\n";
     let dir = project(
         "lsp_rec_fix",
@@ -124,10 +126,12 @@ fn rec_quick_fix_and_diagnostics_wait_for_save() {
     );
     assert!(fixed.contains("let rec fib n ="), "{fixed}");
 
-    // an edit alone publishes nothing: the first report is the saved, fixed text
+    // The incomplete edit reports an error, then the completed edit clears it.
     let typing = text.replace("fib (n - 2)", "fib (n -");
     lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 2 }, "contentChanges": [{ "text": typing }] }));
+    assert!(!lsp.diagnostics(&uri(&file)).is_empty());
     lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 3 }, "contentChanges": [{ "text": fixed }] }));
+    assert_eq!(lsp.diagnostics(&uri(&file)), Vec::<Value>::new());
     lsp.notify(
         "textDocument/didSave",
         &json!({ "textDocument": { "uri": uri(&file) } }),

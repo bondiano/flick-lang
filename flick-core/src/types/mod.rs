@@ -217,6 +217,20 @@ pub fn check_typed(
     (diagnostics, typing)
 }
 
+/// Checks a built-in module for editor queries against the built-in modules
+/// before it, allowing the compiler's `@lang` marks in its source.
+pub fn check_builtin_typed(
+    module: &Module,
+    imported: &dyn Fn(&str) -> Option<Interface>,
+    dependencies: &[Interface],
+    options: Options,
+    interface: &mut Interface,
+) -> (Vec<Diagnostic>, Typing) {
+    let known = Builtins::new(dependencies);
+    let (diagnostics, typing, _) = run_in(module, imported, &known, options, interface);
+    (diagnostics, typing)
+}
+
 fn run(
     module: &Module,
     imported: &dyn Fn(&str) -> Option<Interface>,

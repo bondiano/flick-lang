@@ -75,6 +75,13 @@ impl Checker<'_> {
                         .filter(|s| s.kind == K::Signature && self.pairs(s, member))
                         .and_then(|s| s.nodes().find(|n| is_type(n.kind)));
                     let expected = self.method_type(&cm, &name, &info.params, &args);
+                    // A class fixes this type even when the instance omits its
+                    // optional signature. Keep it at the definition for IDE hover.
+                    if sig.is_none()
+                        && let (Some(expected), Some(binder)) = (&expected, parts.pattern)
+                    {
+                        self.note_type(self.span(binder), expected);
+                    }
                     match (sig, expected) {
                         (Some(sig), expected) => {
                             let (scheme, _) = self.signature(sig);

@@ -271,7 +271,7 @@ fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         effects: true,
     };
     let (checked, typing) =
-        types::check_typed(&module, &imported, dependencies, options, &mut interface);
+        types::check_builtin_typed(&module, &imported, dependencies, options, &mut interface);
     diagnostics.extend(checked);
     Snapshot {
         analysis: Analysis {
@@ -417,16 +417,9 @@ impl Server {
                 {
                     self.docs.insert(path.clone(), text.to_owned());
                 }
-                // like Gleam, diagnostics wait for a save so half-typed code
-                // is not flagged; requests re-analyze the new text lazily
-                let context = Context::of(&self.docs, &path);
-                if self
-                    .snapshot
-                    .as_ref()
-                    .is_some_and(|s| s.context == context || s.file(&path).is_some())
-                {
-                    self.snapshot = None;
-                }
+                // Publish the new result, including an empty diagnostic list
+                // when a previously reported error has just been fixed.
+                self.refresh(&path);
                 return;
             }
             "textDocument/didClose" => {
