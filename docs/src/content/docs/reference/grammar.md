@@ -219,6 +219,7 @@ let between x =
 file        = [module_header] { import } { decl }
 module_header = "module" ModulePath ["exposing" exposing]
 import      = "import" ModulePath ["as" Con] ["exposing" exposing]
+            | "import" "plugin" String "exposing" exposing   // see plugins.md
 exposing    = "(" item { "," item } [","] ")"
 item        = name | Con | Con "(..)" | ".."
 ModulePath  = Con { "." Con }
@@ -387,6 +388,7 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
             | "cli" String "{" cli_clause { cli_clause } "}"
+            | head "{" { token } "}"        // a head a plugin import exposes
 do_stmt     = bind { "and" bind } | "if" expr | statement
 bind        = or_pattern "<-" expr
 clause_list = for_clause { ";" | line break | before "if" … for_clause }

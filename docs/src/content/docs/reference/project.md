@@ -160,6 +160,16 @@ version = "1.0.0"
 flick = ">=0.1, <0.2"
 ```
 
+A library that provides a plugin names its WebAssembly component, a path
+inside the library (see [plugins.md](../plugins/)):
+
+```toml
+[package]
+name = "pairs"
+version = "1.0.0"
+plugin = "pairs.wasm"
+```
+
 `flick install` fetches each git or url library the manifests name, directly
 or through a library, into the package store (`FLICK_STORE`, else
 `flick/pkg` in the user's cache directory), where each sits under the hash of
@@ -230,3 +240,5 @@ package.
 | a dependency names no source, or two, or `[package]` is not semver | `FLICK-P032` |
 | a library's `flick` requirement leaves this compiler out | `FLICK-P033` |
 | a git or url library is not in `flick.lock` or in the store | `FLICK-P034`: run `flick install` |
+| a plugin a module imports cannot be found or loaded | `FLICK-P035` |
+| a plugin gave no code for a block, or failed | `FLICK-P036` |
