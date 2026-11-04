@@ -24,7 +24,7 @@ type alias Paths = {
 
 type alias Wrong = {
   missing : Get (Profiles Username (Some Follow)) {} Unit {};
-  //~ FLICK-D011 @26:3-26:61 endpoint `missing`: the path `/profiles/:username/follow` has the parameters `username`, and its `path` part the fields none
+  //~ FLICK-C001 @26:3-26:61 `PathParams "/profiles/:username/follow" Unit` does not hold: the path `/profiles/:username/follow` has the parameters `username`, and its `path` part the fields none
   short : Get (Profiles Username) {} Unit {};
   //~ FLICK-D009 @28:15-28:34 `Profiles` has 2 field(s), each written as its type, `None` or `Some …`: here 1
   bare : Get (Search String) {} Unit {};

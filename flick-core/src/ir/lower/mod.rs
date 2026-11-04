@@ -9,7 +9,6 @@ mod comprehension;
 mod debug;
 mod do_notation;
 mod expr;
-mod http_api;
 mod lambda;
 mod literals;
 mod numeric;
@@ -279,7 +278,6 @@ impl Lower<'_> {
                 span,
             });
         }
-        self.http_api(decl, span, items);
         let abi = self.typing.abis.get(&ty).cloned().unwrap_or_default();
         for (i, variant) in decl.nodes().filter(|n| n.kind == K::Variant).enumerate() {
             let Some(name) = self.token_text(variant, K::Con) else {

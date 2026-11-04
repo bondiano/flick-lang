@@ -9,7 +9,7 @@ use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::http_api::snake;
+use crate::types::wire::snake;
 
 /// Warnings for the private `let`s of `module` that the declarations it
 /// exports, its types and its instances never reach, however indirectly;

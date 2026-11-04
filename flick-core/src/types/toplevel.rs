@@ -79,7 +79,6 @@ impl<'a> Checker<'a> {
             }
         }
         self.collect(&decls);
-        self.declare_http_apis(&decls);
         for i in 0..self.top.items.len() {
             self.check_item(i);
         }

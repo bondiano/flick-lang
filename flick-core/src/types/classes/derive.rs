@@ -14,7 +14,6 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
 use crate::types::env::{Form, Instance};
-use crate::types::http_api::HTTP_API_DERIVE;
 use crate::types::kinds::Kind;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Binder, Type};
@@ -181,7 +180,6 @@ impl<'n> Checker<'_> {
                 // witnesses, not classes: see `types::schemas`
                 Some((module, _))
                     if which(&[Lang::Schema, Lang::Url, Lang::Form], &module, last).is_some() => {}
-                Some((module, _)) if module == HTTP_API_DERIVE && *last == "HttpApi" => {}
                 None => {}
                 Some(_) => self.error(
                     codes::C013,

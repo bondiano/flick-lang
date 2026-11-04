@@ -212,8 +212,18 @@ pub fn builtin_expansion(
                     .find(|d| d.class == class.name)
                     .map(|d| (m.to_owned(), d.package.clone()))
             };
+            // as the loader finds it: the module, an import exposing it, the Prelude
             let found = if class.qualifier.is_empty() {
-                marked(module).or_else(|| marked("Prelude"))
+                marked(module)
+                    .or_else(|| {
+                        (syntax.imports.iter())
+                            .filter(|i| {
+                                (i.exposing.iter())
+                                    .any(|e| e.name == class.name || e.name.is_empty())
+                            })
+                            .find_map(|i| marked(&i.module))
+                    })
+                    .or_else(|| marked("Prelude"))
             } else {
                 let import = syntax
                     .imports
@@ -237,11 +247,17 @@ pub fn builtin_expansion(
             let arena = match plugin.derive(&target, &full, None, &summary, &[], &mut source) {
                 Ok(arena) => arena,
                 Err(Failure::Refused(found)) => {
-                    // a plugin's code under its package, as the loader gives it
+                    // a plugin's code under its package, where it says, as the loader gives it
+                    let (start, end) = (source.start(), source.end());
                     diagnostics.extend(found.into_iter().map(|d| {
+                        let at = if (d.span.start, d.span.end) == (0, end - start) {
+                            whole
+                        } else {
+                            Span::new(file, start + d.span.start, start + d.span.end)
+                        };
                         match d.code.as_deref().and_then(|c| codes::plugin(&package, c)) {
-                            Some(code) => Diagnostic::error(code, d.message, whole),
-                            None => Diagnostic::error(codes::P036, d.message, whole),
+                            Some(code) => Diagnostic::error(code, d.message, at),
+                            None => Diagnostic::error(codes::P036, d.message, at),
                         }
                     }));
                     continue;

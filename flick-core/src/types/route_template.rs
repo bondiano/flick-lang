@@ -11,10 +11,10 @@
 
 use super::Checker;
 use super::env::{Form, Found};
-use super::http_api::snake;
 use super::kinds::Kind;
 use super::schemas::companion_name;
 use super::ty::Type;
+use super::wire::snake;
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::syntax::cst::Node;
@@ -31,7 +31,15 @@ impl Checker<'_> {
         Some(match self.route_template(node)? {
             Ok(path) => Type::Symbol(path),
             Err(message) => {
-                self.error(codes::D009, self.span(node), message);
+                // at the route as written, without the parentheses generated code puts around it
+                let mut at = node;
+                while at.kind == K::ParenType
+                    && at.range().0 >= self.generated
+                    && let Some(inner) = at.nodes().next()
+                {
+                    at = inner;
+                }
+                self.error(codes::D009, self.span(at), message);
                 Type::Error
             }
         })

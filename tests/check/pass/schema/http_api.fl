@@ -1,0 +1,26 @@
+// A record of endpoints. A value named after a type is its codec only when
+// it is a `PureCodec Json` of it: `name` is a `String`, so `Name` is
+// decoded by the JSON codec of its schema.
+module App.Api exposing (..)
+
+import HttpApi.Derive exposing (..)
+
+type alias Name = { name : String }
+  deriving Schema
+
+name : String
+let name = "ada"
+
+type error Gone = Gone
+  deriving Schema
+
+instance Problem Gone =
+  let problem = { status = 410; body = Codec.json (schema Gone) }
+
+type alias Profiles = {
+  profile : Get "/profiles/:name" { path : Name } (Created Name) {Gone};
+  forget : Delete "/profiles" {} Unit {};
+} deriving HttpApi
+
+profile : HttpApi.Endpoint "profile" (Handler Name Unit Unit Unit r {Gone} Name)
+let profile = Profiles.endpoints.profile

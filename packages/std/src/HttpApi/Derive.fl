@@ -32,8 +32,9 @@ module HttpApi.Derive exposing (..)
 import HttpApi exposing (Endpoint, ErrorCases, Request, Security, error_case, with_success)
 
 /// What `deriving HttpApi` makes of a record: its companions `api` and
-/// `endpoints`.
-type HttpApi a
+/// `endpoints`, which std's plugin writes with the functions below.
+@derive std
+class HttpApi a
 
 /// An endpoint at `path` of a record that derives `HttpApi`; `Post`,
 /// `Put`, `Patch` and `Delete` are the other methods.
