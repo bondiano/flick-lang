@@ -112,6 +112,30 @@ fn explain_reads_a_plugins_code_in_its_package() {
     }
 }
 
+#[test]
+fn expand_prints_the_code_of_each_plugin_block() {
+    let main = "module App.Main exposing (main)\n\nimport Cli exposing (plugin cli)\n\ntool : Cli.Command none none\nlet tool = cli \"tool\" {\n  flag loud : Bool\n  handle fun { loud } -> Platform.stdout_line (show loud)\n}\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
+    let dir = project(
+        "cli_expand",
+        &[("flick.toml", APP), ("src/App/Main.fl", main)],
+    );
+    let out = flick_in(&dir, &["expand"]);
+    assert_eq!(code(&out), Some(0), "{out:?}");
+    let shown = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        shown.starts_with("src/App/Main.fl:6:12: plugin `std`\n"),
+        "{shown}"
+    );
+    assert!(
+        shown.contains("(Cli.switch : (Cli.Multi _ Bool))"),
+        "{shown}"
+    );
+    assert!(
+        shown.contains("Platform.stdout_line (show loud)"),
+        "{shown}"
+    );
+}
+
 /// The number of cached builds.
 fn cached(dir: &Path) -> usize {
     fs::read_dir(dir.join(".flick/cache")).map_or(0, Iterator::count)

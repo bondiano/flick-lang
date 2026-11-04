@@ -12,6 +12,7 @@ use crate::diagnostics::Diagnostic;
 use crate::iface::{Interface, fingerprint};
 use crate::ir;
 use crate::plugin::EditorBlock;
+use crate::plugin::expansion::Expansion;
 use crate::project::{Host, Project};
 use crate::source::{FileId, SourceMap};
 use crate::syntax::cst::Node;
@@ -28,6 +29,8 @@ pub struct Analyzed {
     pub interface: Interface,
     /// Its plugin blocks, whose plugins editors ask.
     pub editing: Vec<EditorBlock>,
+    /// The module with its plugin blocks expanded, when it has any.
+    pub expansion: Option<Arc<Expansion>>,
 }
 
 impl Analyzed {
@@ -45,6 +48,7 @@ impl Analyzed {
             typing,
             interface,
             editing: loaded.editing.clone(),
+            expansion: loaded.expansion.clone(),
         }
     }
 }

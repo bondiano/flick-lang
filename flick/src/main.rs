@@ -211,6 +211,7 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         }
         Commands::Doc(o) => report(commands::doc(&o, project), global),
         Commands::Explain(o) => report(commands::explain(&o), global),
+        Commands::Expand(o) => report(commands::expand(&o, project), global),
         Commands::Doctor => report(commands::doctor(global), global),
         Commands::Inspect(o) => report(commands::inspect(&o, project), global),
         Commands::Lsp(_) => lsp::serve(),

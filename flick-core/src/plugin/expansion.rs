@@ -7,6 +7,8 @@
 use std::iter::Peekable;
 use std::mem;
 
+use flick_plugin::Hole;
+
 use crate::diagnostics::{Diagnostic, Related, Severity, codes};
 use crate::ir;
 use crate::source::{FileId, Span};
@@ -16,6 +18,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use super::render::Rendered;
 use super::source::BlockSource;
 use super::splice::splice;
+use super::testing::shown;
 
 /// A block and the code its plugin gave for it.
 pub struct Expanded {
@@ -44,9 +47,39 @@ struct Block {
     range: (u32, u32),
     code: (u32, u32),
     plugin: String,
+    /// Where its frame is in the module text, and the holes of its code.
+    frame: (u32, u32),
+    holes: Vec<(u32, Hole)>,
+}
+
+/// A block and the code its plugin gave, as Flick text with the user's code
+/// in place.
+pub struct Shown {
+    pub range: (u32, u32),
+    pub plugin: String,
+    pub code: String,
 }
 
 impl Expansion {
+    /// Each expanded block, as [`shown`] shows it.
+    pub fn shown(&self) -> Vec<Shown> {
+        (self.blocks.iter())
+            .map(|b| {
+                let rendered = Rendered {
+                    text: self.text[b.code.0 as usize..b.code.1 as usize].to_owned(),
+                    origins: Vec::new(),
+                    holes: b.holes.clone(),
+                };
+                let frame = &self.text[b.frame.0 as usize..b.frame.1 as usize];
+                Shown {
+                    range: b.range,
+                    plugin: b.plugin.clone(),
+                    code: shown(&rendered, frame),
+                }
+            })
+            .collect()
+    }
+
     /// The module `text` of `file`, parsed into `tree`, with `blocks`
     /// expanded; a block whose code cannot be placed is reported and left
     /// out. `None` when no block is left.
@@ -93,6 +126,8 @@ impl Expansion {
                         range,
                         code: (at, end),
                         plugin: block.plugin,
+                        frame: (block.source.start(), block.source.end()),
+                        holes: block.rendered.holes.clone(),
                     });
                     spliced.push((range, node));
                 }

@@ -8,14 +8,24 @@
 //! WebAssembly components; plugins linked into the compiler implement
 //! [`Plugin`] directly.
 
+// the paths `flick!` writes, inside this crate too
+extern crate self as flick_plugin;
+
 mod builder;
+mod cursor;
 #[cfg(feature = "guest")]
 pub mod guest;
+mod splice;
 mod wit;
 
 use serde::{Deserialize, Serialize};
 
 pub use builder::Builder;
+pub use cursor::Cursor;
+pub use flick_plugin_macros::flick;
+#[doc(hidden)]
+pub use splice::__private;
+pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
@@ -26,6 +36,12 @@ pub const VERSION: &str = "0.2.0";
 pub struct Span {
     pub start: u32,
     pub end: u32,
+}
+
+impl From<&Span> for Span {
+    fn from(span: &Span) -> Self {
+        *span
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

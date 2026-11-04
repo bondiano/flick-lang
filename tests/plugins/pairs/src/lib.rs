@@ -10,7 +10,7 @@
 use std::hint::black_box;
 
 use flick_plugin::{
-    Arena, Block, Builder, Compiler, Diagnostic, Expr, Field, Plugin, Span, Token, TokenKind, Ty,
+    Arena, Block, Builder, Compiler, Diagnostic, NodeId, Plugin, Span, Token, TokenKind, flick,
 };
 
 pub struct Pairs;
@@ -33,8 +33,7 @@ impl Plugin for Pairs {
         state: &[u8],
         compiler: &mut dyn Compiler,
     ) -> Result<Arena, Vec<Diagnostic>> {
-        let len = u32::try_from(block.text.len()).unwrap_or(u32::MAX);
-        let whole = Span { start: 0, end: len };
+        let whole = block.whole();
         let mut b = Builder::new(whole);
         match block.head.as_str() {
             "spin" => loop {
@@ -54,65 +53,38 @@ impl Plugin for Pairs {
             return Err(vec![Diagnostic::error("refused", whole).with_code(code)]);
         }
         if block.head == "bad" {
-            let one = b.expr(Expr::Number(1.0));
-            let text = b.ty(Ty::Name("String".into()));
-            let wrong = b.expr(Expr::Annot {
-                expr: one,
-                ty: text,
-            });
+            let wrong = flick!(b, (1.0 : String));
             return Ok(b.finish(wrong));
         }
         let mut fields = arguments(block, compiler, &mut b)?;
-        let at_body = block
-            .tokens
-            .iter()
-            .take_while(|t| t.span.start < block.body);
-        let mut rest: &[Token] = &block.tokens[at_body.count()..];
-        while let Some((name, after)) = rest.split_first() {
-            let label = word(block, name, TokenKind::Ident)
-                .ok_or_else(|| vec![refuse(name, "expected a name")])?;
-            rest = after;
-            let ty = if punct(block, rest.first(), ":") {
-                let start = rest.get(1).map_or(len, |t| t.span.start);
-                let hole = compiler.parse_type(start, len).map_err(|d| vec![d])?;
-                rest = past(rest, hole.span.end);
-                Some(hole)
-            } else {
-                None
+        let mut c = block.body();
+        while let Some(name) = c.next() {
+            if name.kind != TokenKind::Ident {
+                return Err(vec![refuse(name, "expected a name")]);
+            }
+            let ty = match c.eat(":") {
+                Some(_) => Some(c.ty(compiler).map_err(|d| vec![d])?),
+                None => None,
             };
-            if !punct(block, rest.first(), "=") {
-                return Err(vec![refuse(rest.first().unwrap_or(name), "expected `=`")]);
+            if c.eat("=").is_none() {
+                return Err(vec![refuse(c.peek().unwrap_or(name), "expected `=`")]);
             }
-            let start = rest.get(1).map_or(len, |t| t.span.start);
-            let value = compiler.parse_expr(start, len).map_err(|d| vec![d])?;
-            rest = past(rest, value.span.end);
-            if punct(block, rest.first(), ";") {
-                rest = &rest[1..];
-            }
-            let mut node = b.at(value.span).expr(Expr::Hole(value.span));
-            if let Some(ty) = ty {
-                let annotation = b.at(ty.span).ty(Ty::Hole(ty.span));
+            let value = c.expr(compiler).map_err(|d| vec![d])?;
+            c.eat(";");
+            // a pair with a type stands for its name to its value
+            let node = if let Some(ty) = ty {
                 let pair = Span {
                     start: name.span.start,
-                    end: value.span.end,
+                    end: value.end,
                 };
-                node = b.at(pair).expr(Expr::Annot {
-                    expr: node,
-                    ty: annotation,
-                });
-            }
-            fields.push(Field {
-                label: label.to_owned(),
-                value: node,
-            });
+                flick!(b @ pair, (#value : #ty))
+            } else {
+                flick!(b @ value, #value)
+            };
+            fields.push((c.text(name).to_owned(), node));
         }
         let count = state.try_into().map_or(0, u32::from_le_bytes);
-        let blocks = b.at(whole).expr(Expr::Number(f64::from(count)));
-        fields.push(Field {
-            label: "blocks".into(),
-            value: blocks,
-        });
-        let record = b.expr(Expr::Record(fields));
+        let record = flick!(b @ whole, { #(..fields); blocks = #(f64::from(count)) });
         Ok(b.finish(record))
     }
 }
@@ -122,48 +94,30 @@ fn arguments(
     block: &Block,
     compiler: &mut dyn Compiler,
     b: &mut Builder,
-) -> Result<Vec<Field>, Vec<Diagnostic>> {
+) -> Result<Vec<(String, NodeId)>, Vec<Diagnostic>> {
     let mut fields = Vec::new();
     let mut depth = 0u32;
     let mut start = None;
-    for t in block
-        .tokens
-        .iter()
-        .take_while(|t| t.span.start < block.body)
-    {
+    for t in block.arguments() {
         start = start.or(Some(t.span.start));
-        if punct(block, Some(t), "(") {
-            depth += 1;
-        } else if punct(block, Some(t), ")") {
-            depth -= 1;
+        match block.text_of(t.span) {
+            "(" => depth += 1,
+            ")" => depth -= 1,
+            _ => {}
         }
         if depth == 0
             && let Some(from) = start.take()
         {
-            let value = compiler.parse_expr(from, t.span.end).map_err(|d| vec![d])?;
-            fields.push(Field {
-                label: format!("arg{}", fields.len()),
-                value: b.at(value.span).expr(Expr::Hole(value.span)),
-            });
+            let value = compiler
+                .parse_expr(from, t.span.end)
+                .map_err(|d| vec![d])?
+                .span;
+            fields.push((format!("arg{}", fields.len()), flick!(b @ value, #value)));
         }
     }
     Ok(fields)
 }
 
-fn word<'b>(block: &'b Block, token: &Token, kind: TokenKind) -> Option<&'b str> {
-    (token.kind == kind).then(|| &block.text[token.span.start as usize..token.span.end as usize])
-}
-
-fn punct(block: &Block, token: Option<&Token>, text: &str) -> bool {
-    token.is_some_and(|t| word(block, t, TokenKind::Punct) == Some(text))
-}
-
-/// The tokens of `rest` after `end`.
-fn past(rest: &[Token], end: u32) -> &[Token] {
-    let skip = rest.iter().take_while(|t| t.span.end <= end).count();
-    &rest[skip..]
-}
-
-fn refuse(token: &Token, message: &str) -> Diagnostic {
+fn refuse(token: Token, message: &str) -> Diagnostic {
     Diagnostic::error(message, token.span)
 }

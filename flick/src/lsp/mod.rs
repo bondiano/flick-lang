@@ -284,6 +284,7 @@ fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
                 typing: typing.into(),
                 interface,
                 editing: Vec::new(),
+                expansion: None,
             }],
             compilation: Compilation::default(),
             diagnostics,

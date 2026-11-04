@@ -13,3 +13,7 @@ workspace = true
 
 [dependencies]
 flick-plugin = { path = "../../flick-plugin" }
+
+[dev-dependencies]
+flick-core = { path = "../../flick-core" }
+insta = "1.49.0"

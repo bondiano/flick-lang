@@ -13,7 +13,7 @@ and `--help`; `flick help <command>` prints a command's help and
 
 | Command | What it does |
 | - | - |
-| `new <dir> [--template app\|cli\|fullstack\|lib]` | creates a project: `flick.toml`, `package.json`, an example module and its test; `cli` makes `main` a [`cli` block](../cli-dsl/); `fullstack` is a server entry and a browser page (`target = "client"`) sharing the calls of a [`server fn`](../server-fn/) module, writes guarded by `Server.authenticated`, with Vite for the page |
+| `new <dir> [--template app\|cli\|fullstack\|lib\|plugin]` | creates a project: `flick.toml`, `package.json`, an example module and its test; `cli` makes `main` a [`cli` block](../cli-dsl/); `plugin` is a library with a [plugin](../plugins/), its crate in `plugin/` and `flick run plugin` to build it; `fullstack` is a server entry and a browser page (`target = "client"`) sharing the calls of a [`server fn`](../server-fn/) module, writes guarded by `Server.authenticated`, with Vite for the page |
 | `init [--template app\|cli\|fullstack\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`) |
 | `check [paths] [--watch] [--fix]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left |
 | `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--promise-facade] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files (`--emit go`: a Go executable per entry, see [Go target](../codegen/#go-target)); `--emit-dts` adds `.d.ts` files and `--promise-facade` Promise façades `A/B.promise.js` (see [TypeScript](../codegen/#typescript)); shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
@@ -33,7 +33,8 @@ and `--help`; `flick help <command>` prints a command's help and
 | `schema export <M.codec> --target json-schema-2020-12 --out <file>` | the strict JSON Schema of a `PureCodec Json a` |
 | `schema export <M.api> --target openapi-3.1 --out <file>` | an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes (see [Clients and documents](../http-api/#clients-and-documents)) |
 | `doc --out-dir <dir>` | Markdown pages of the public API: types, kinds, constraints, effects, captures |
-| `explain <code>` | the explanation of a diagnostic code |
+| `explain <code>` | the explanation of a diagnostic code, a plugin's too, as `std/L001` |
+| `expand [paths]` | the code each [plugin](../plugins/) block of the project or of the files stands for |
 | `doctor` | the compiler, Node.js, pnpm, the TypeScript Content Mapper, the installed runtime and Effect, the optional adapters |
 | `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | one representation of a module |
 | `lsp --stdio` | the [language server](../editor/#language-server); stdio is its only transport |

@@ -1,4 +1,5 @@
-//! `flick new --template cli`: a project whose `main` is a `cli` block.
+//! `flick new --template cli`: a project whose `main` is a `cli` block, and
+//! `--template plugin`: a library with a plugin.
 //! Running it needs Node and the workspace's runtime: that test is ignored
 //! by default and part of `just e2e`.
 
@@ -50,4 +51,35 @@ fn the_cli_template_tests_prints_its_help_and_runs_its_handler() {
         "HELLO, ADA!\n",
         "{out:?}"
     );
+}
+
+/// `flick new --template plugin`: a library and the crate of its plugin,
+/// which builds against the interface of this compiler's release.
+#[test]
+fn the_plugin_template_checks_and_pins_this_compiler() {
+    let root = project("plugin_template", &[]);
+    fs::create_dir_all(&root).expect("dir");
+    let out = flick_in(&root, &["new", "tagged", "--template", "plugin"]);
+    assert!(out.status.success(), "{out:?}");
+    let dir = root.join("tagged");
+    for args in [&["check", "--warnings-as-errors"][..], &["fmt", "--check"]] {
+        let out = flick_in(&dir, args);
+        assert!(out.status.success(), "{args:?} failed: {out:?}");
+    }
+    let config = fs::read_to_string(dir.join("flick.toml")).expect("manifest");
+    assert!(config.contains("plugin = \"plugin.wasm\""), "{config}");
+    assert!(
+        config.contains("release/tagged_plugin.wasm plugin.wasm"),
+        "{config}"
+    );
+    let crate_manifest = fs::read_to_string(dir.join("plugin/Cargo.toml")).expect("crate");
+    let tag = format!("tag = \"v{}\"", env!("CARGO_PKG_VERSION"));
+    assert!(crate_manifest.contains(&tag), "{crate_manifest}");
+    for file in [
+        "plugin/src/lib.rs",
+        "explain/T001.md",
+        "rust-toolchain.toml",
+    ] {
+        assert!(dir.join(file).exists(), "no {file}");
+    }
 }

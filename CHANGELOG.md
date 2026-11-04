@@ -17,7 +17,12 @@ break programs.
   (`h "x" (e) { … }`); a plugin reports under codes of its own, shown under
   its package (`std/L001`, explained by `flick explain std/L001`), and
   answers editors' completions, hovers and highlights in its blocks. The
-  interface is `flick:plugin@0.2.0`.
+  interface is `flick:plugin@0.2.0`. Writing one: `flick!` builds a
+  plugin's code written in Flick (`flick!(b, Cli.default (#d : #ty))`), a
+  `Cursor` reads a block, `flick_core::plugin::testing::expand` shows what a
+  plugin makes of blocks for its tests, `flick expand` prints the code of a
+  program's blocks, and `flick new --template plugin` makes a library with a
+  plugin.
 - **Breaking:** `cli "name" { … }` is the plugin of `std`: a file that
   writes one imports it, `import Cli exposing (plugin cli)`. Without the
   import the block is `FLICK-P037`, which `flick check --fix` fixes. Its
