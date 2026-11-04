@@ -28,3 +28,14 @@ module_name_repetitions = "allow"
 lto = "thin"
 codegen-units = 1
 strip = true
+
+# The compiler the e2e suites build their thousands of programs with:
+# optimized, yet quick to build and with the checks of a debug build.
+[profile.e2e]
+inherits = "release"
+lto = false
+codegen-units = 16
+strip = false
+debug-assertions = true
+overflow-checks = true
+incremental = true

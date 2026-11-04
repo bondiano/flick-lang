@@ -11,14 +11,19 @@
 //! skipped for it. `FLICK_E2E_GO_ONLY` runs only those, without Node: the
 //! platform jobs of CI.
 //!
+//! Each pass prints how long it took, and `times.tsv` under the output
+//! directory keeps the build and run time of every case (`times`).
+//! `FLICK_E2E_SHARD=k/n` runs the k-th of n shards of the cases, every pass
+//! of each, for CI jobs side by side.
+//!
 //! Every run writes its trace (`FLICK_TRACE`), which the monitor of `λRT`
 //! checks; for the cases of tests/run/runtime the Go runs must project it
 //! to what the JS debug run projects it to (`trace`).
 
+mod times;
 mod trace;
 
 use std::collections::HashMap;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
@@ -29,6 +34,7 @@ use std::{env, fs, thread};
 use flick_core::build::go::executable;
 use flick_core::build::runner_path;
 use flick_core::project::config::MAIN_ENTRY;
+use times::{Pass, Timing};
 
 fn cases(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("readable tests/run") {
@@ -50,12 +56,24 @@ fn compare(what: &str, expected: &str, actual: &str) -> Option<String> {
         .then(|| format!("  {what}:\n    expected: {expected:?}\n    actual:   {actual:?}"))
 }
 
-/// A case run: the mismatch report, if any, how long the build took, and
-/// the projection of its trace when the runtimes must agree on it.
+/// A case run: the mismatch report, if any, how long the build and the
+/// program took, and the projection of its trace when the runtimes must
+/// agree on it.
 struct Ran {
     problem: Option<String>,
     built: Duration,
+    executed: Duration,
     projection: Option<String>,
+}
+
+impl Ran {
+    fn timing(&self, rel: &Path) -> Timing {
+        Timing {
+            case: rel.to_path_buf(),
+            built: self.built,
+            ran: self.executed,
+        }
+    }
 }
 
 /// Builds and runs one case, as JS, TypeScript or Go, in a profile.
@@ -82,6 +100,7 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
         return Ran {
             problem: Some(report),
             built: build_time,
+            executed: Duration::ZERO,
             projection: None,
         };
     }
@@ -93,10 +112,12 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
             .arg(out_dir.join(runner_path(emit == "ts")));
         node
     };
+    let started = Instant::now();
     let output = command
         .env("FLICK_TRACE", out_dir.join(trace::FILE))
         .output()
         .expect("the program runs: `node` (Node.js >= 24.18.0) is on PATH for JS");
+    let run_time = started.elapsed();
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stderr_problem = match expected(case, "stderr.contains") {
         Some(lines) => lines
@@ -137,6 +158,7 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
     Ran {
         problem: (!problems.is_empty()).then(|| problems.join("\n")),
         built: build_time,
+        executed: run_time,
         projection: traced.ok().filter(|_| trace::compared(rel)),
     }
 }
@@ -158,6 +180,39 @@ fn portable(root: &Path) -> Vec<String> {
         );
     }
     cases
+}
+
+/// The cases under `root` that `FLICK_E2E_ONLY` and `FLICK_E2E_SHARD`
+/// select, sorted, and whether they are a shard.
+fn selected(root: &Path) -> (Vec<PathBuf>, bool) {
+    let mut paths = Vec::new();
+    cases(root, &mut paths);
+    if let Ok(only) = env::var("FLICK_E2E_ONLY") {
+        paths.retain(|p| only.split(',').any(|o| p.to_string_lossy().contains(o)));
+    }
+    paths.sort();
+    let sharded = shard(&mut paths);
+    assert!(!paths.is_empty(), "no cases under {}", root.display());
+    (paths, sharded)
+}
+
+/// Keeps the shard `FLICK_E2E_SHARD` names, `k/n`: every n-th of the sorted
+/// cases from the k-th on. Whether there is one.
+fn shard(paths: &mut Vec<PathBuf>) -> bool {
+    let Some(spec) = env::var("FLICK_E2E_SHARD").ok().filter(|s| !s.is_empty()) else {
+        return false;
+    };
+    let (k, n) = spec
+        .split_once('/')
+        .and_then(|(k, n)| Some((k.parse::<usize>().ok()?, n.parse::<usize>().ok()?)))
+        .filter(|&(k, n)| (1..=n).contains(&k))
+        .unwrap_or_else(|| panic!("FLICK_E2E_SHARD is `k/n` with 1 <= k <= n, not `{spec}`"));
+    let mut i = 0;
+    paths.retain(|_| {
+        i += 1;
+        (i - 1) % n == k - 1
+    });
+    true
 }
 
 /// How many cases run at once.
@@ -196,6 +251,37 @@ fn parallel<T: Sync, R: Send>(items: &[T], jobs: usize, f: impl Fn(&T) -> R + Sy
         .collect()
 }
 
+/// One pass of `f` over `cases` on `jobs` threads: what `f` reports of
+/// each case, in order, and how long the pass and each case took.
+fn pass<R: Send>(
+    emit: &'static str,
+    profile: &'static str,
+    cases: &[PathBuf],
+    jobs: usize,
+    f: impl Fn(&PathBuf) -> (R, Timing) + Sync,
+) -> (Vec<R>, Pass) {
+    let started = Instant::now();
+    let (results, cases) = parallel(cases, jobs, f).into_iter().unzip();
+    let wall = started.elapsed();
+    let timed = Pass {
+        emit,
+        profile,
+        wall,
+        cases,
+    };
+    (results, timed)
+}
+
+fn assert_go() {
+    assert!(
+        Command::new("go")
+            .arg("version")
+            .output()
+            .is_ok_and(|o| o.status.success()),
+        "the go target needs Go: `go` is not on PATH (Go >= 1.23)"
+    );
+}
+
 #[test]
 #[ignore = "needs Node and `pnpm install`; run `just e2e`"]
 fn run_cases() {
@@ -206,19 +292,13 @@ fn run_cases() {
         "runtime is not installed: run `pnpm install --frozen-lockfile` in the repository root"
     );
     let root = repo.join("tests/run");
-    let mut paths = Vec::new();
-    cases(&root, &mut paths);
-    if let Ok(only) = env::var("FLICK_E2E_ONLY") {
-        paths.retain(|p| only.split(',').any(|o| p.to_string_lossy().contains(o)));
-    }
-    paths.sort();
-    assert!(!paths.is_empty(), "no cases under {}", root.display());
+    let (paths, sharded) = selected(&root);
 
     // Under target/, so `@flick-lang/runtime` resolves from the repository root
     // node_modules exactly as it would in a project.
     let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("e2e");
     let mut report = Vec::new();
-    let mut times = Vec::new();
+    let mut passes = Vec::new();
     let jobs = jobs();
     // what the JS debug run of each case projects its trace to
     let mut projections: HashMap<PathBuf, String> = HashMap::new();
@@ -230,21 +310,21 @@ fn run_cases() {
         ("ts", "release"),
     ];
     for &(emit, profile) in if go_only { &[][..] } else { &node_runs } {
-        let results = parallel(&paths, jobs, |case| {
+        let (results, timed) = pass(emit, profile, &paths, jobs, |case| {
             let rel = case.strip_prefix(&root).expect("case under root");
             let out_dir = out_root
                 .join(profile)
                 .join(emit)
                 .join(rel.with_extension(""));
             let ran = run_case(case, rel, &out_dir, emit, profile);
+            let timing = ran.timing(rel);
             let problem = ran
                 .problem
                 .map(|p| format!("{} ({emit}, {profile}):\n{p}", rel.display()));
-            (problem, ran.built, ran.projection)
+            ((problem, ran.projection), timing)
         });
-        // the sum of the builds: with the same jobs in both profiles it compares them
-        times.push(results.iter().map(|(_, built, _)| *built).sum::<Duration>());
-        for (case, (problem, _, projection)) in paths.iter().zip(results) {
+        passes.push(timed);
+        for (case, (problem, projection)) in paths.iter().zip(results) {
             report.extend(problem);
             if let (("js", "debug"), Some(p)) = ((emit, profile), projection) {
                 projections.insert(case.clone(), p);
@@ -257,36 +337,33 @@ fn run_cases() {
         portable.contains(&rel.with_extension("").to_string_lossy().replace('\\', "/"))
     });
     if !go_cases.is_empty() {
-        assert!(
-            Command::new("go")
-                .arg("version")
-                .output()
-                .is_ok_and(|o| o.status.success()),
-            "the go target needs Go: `go` is not on PATH (Go >= 1.23)"
-        );
+        assert_go();
     }
     for profile in ["debug", "release"] {
-        let results = parallel(&go_cases, jobs, |case| {
+        let (problems, timed) = pass("go", profile, &go_cases, jobs, |case| {
             let rel = case.strip_prefix(&root).expect("case under root");
             let out_dir = out_root
                 .join(profile)
                 .join("go")
                 .join(rel.with_extension(""));
             let ran = run_case(case, rel, &out_dir, "go", profile);
+            let timing = ran.timing(rel);
             let differs = match (projections.get(case), &ran.projection) {
                 (Some(js), Some(go)) => trace::differ(js, go),
                 _ => None,
             };
             let problems: Vec<String> = ran.problem.into_iter().chain(differs).collect();
-            (!problems.is_empty()).then(|| {
+            let problem = (!problems.is_empty()).then(|| {
                 format!(
                     "{} (go, {profile}):\n{}",
                     rel.display(),
                     problems.join("\n")
                 )
-            })
+            });
+            (problem, timing)
         });
-        report.extend(results.into_iter().flatten());
+        report.extend(problems.into_iter().flatten());
+        passes.push(timed);
     }
     for case in &skipped {
         let rel = case.strip_prefix(&root).expect("case under root");
@@ -297,6 +374,7 @@ fn run_cases() {
         go_cases.len(),
         skipped.len()
     );
+    times::report(&out_root, &passes, jobs);
     if go_only {
         assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
         return;
@@ -304,7 +382,11 @@ fn run_cases() {
     report.extend(typecheck(&repo, &out_root.join("debug/ts")));
     report.extend(typecheck(&repo, &out_root.join("release/ts")));
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
-    metrics(&out_root, times[0], times[2]);
+    // the sizes and build times of the whole corpus only compare in one run
+    if !sharded {
+        // the sum of the builds: with the same jobs in both profiles it compares them
+        times::metrics(&out_root, passes[0].built(), passes[2].built());
+    }
 }
 
 #[test]
@@ -348,62 +430,6 @@ assert.equal(app.app.kind, "component");
         .output()
         .expect("Node is installed");
     assert!(imported.status.success(), "{imported:?}");
-}
-
-/// How much longer the release builds of the corpus may take than the debug
-/// ones.
-const RELEASE_TIME_BUDGET: f64 = 2.0;
-
-/// The JS size and build time of the corpus in both profiles: release must
-/// be smaller and within its time budget. CI shows the numbers in the job
-/// summary.
-fn metrics(out_root: &Path, debug_time: Duration, release_time: Duration) {
-    let size = |profile: &str| js_size(&out_root.join(profile).join("js"));
-    let (debug, release) = (size("debug"), size("release"));
-    let line = format!(
-        "e2e corpus: JS {debug} bytes in debug, {release} in release ({:+.1}%); build {:.2}s in debug, {:.2}s in release",
-        percent(release, debug),
-        debug_time.as_secs_f64(),
-        release_time.as_secs_f64(),
-    );
-    println!("{line}");
-    if let Ok(summary) = env::var("GITHUB_STEP_SUMMARY") {
-        let mut file = fs::OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(summary)
-            .expect("summary");
-        writeln!(file, "{line}").expect("write summary");
-    }
-    assert!(release < debug, "{line}");
-    assert!(
-        release_time.as_secs_f64() <= debug_time.as_secs_f64() * RELEASE_TIME_BUDGET,
-        "{line}"
-    );
-}
-
-/// How much `new` differs from `old`, in percent.
-fn percent(new: u64, old: u64) -> f64 {
-    let (new, old) = (
-        u32::try_from(new).unwrap_or(u32::MAX),
-        u32::try_from(old).unwrap_or(u32::MAX),
-    );
-    (f64::from(new) / f64::from(old) - 1.0) * 100.0
-}
-
-/// Bytes of the compiled modules under `dir`, the built-in ones left out.
-fn js_size(dir: &Path) -> u64 {
-    let mut total = 0;
-    for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
-        let path = entry.path();
-        if path.is_dir() && !path.ends_with("_flick") {
-            total += js_size(&path);
-        } else if path.extension().is_some_and(|e| e == "js") && !path.ends_with(runner_path(false))
-        {
-            total += entry.metadata().map_or(0, |m| m.len());
-        }
-    }
-    total
 }
 
 /// `tsc --noEmit` over everything `--emit ts` wrote under `dir`.

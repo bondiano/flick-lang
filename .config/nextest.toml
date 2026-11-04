@@ -1,0 +1,23 @@
+# cargo-nextest runs every test in a process of its own, so the test
+# binaries of the e2e suite run side by side instead of one after another.
+# The `ci` profile writes JUnit with the time of every test to
+# target/nextest/ci/junit.xml.
+
+[profile.default]
+slow-timeout = { period = "60s" }
+
+# these keep a pool of their own, one case per CPU
+[[profile.default.overrides]]
+filter = "test(=run_cases) | test(=passing_fixtures_compile_to_valid_js)"
+threads-required = "num-cpus"
+
+# the time of each pass, which run_cases prints
+[[profile.default.overrides]]
+filter = "test(=run_cases)"
+success-output = "final"
+
+[profile.ci]
+fail-fast = false
+
+[profile.ci.junit]
+path = "junit.xml"

@@ -28,9 +28,8 @@ use crate::iface;
 use crate::iface::{Interface, Namespace};
 use crate::project::config::{Backend, MAIN_ENTRY};
 use crate::project::{Compilation, Compiled, MainKind, main_kind, normalize};
-use crate::resolve::{self, Module};
 use crate::source::{FileId, SourceMap, Span};
-use crate::{ir, opt, syntax, types};
+use crate::{ir, opt, types};
 
 /// Directory of the built-in modules inside the output.
 pub const BUILTIN_DIR: &str = "_flick";
@@ -834,43 +833,11 @@ fn specifier(from: &Path, target: &Path) -> String {
 pub fn builtin_modules() -> &'static [ir::Module] {
     static MODULES: OnceLock<Vec<ir::Module>> = OnceLock::new();
     MODULES.get_or_init(|| {
-        let interfaces = types::builtins();
-        types::builtin_sources()
-            .iter()
-            .enumerate()
-            .map(|(i, (name, text))| {
-                let mut sources = SourceMap::default();
-                let file = sources.add(format!("<builtin>/{name}.fl"), *text);
-                let parse = syntax::parse(text, file);
-                let module_syntax = resolve::module_syntax(&parse.tree, text, file);
-                let module = Module {
-                    name,
-                    file,
-                    text,
-                    tree: &parse.tree,
-                    syntax: &module_syntax,
-                };
-                let imported = |m: &str| interfaces[..i].iter().find(|x| x.module == m).cloned();
-                let (mut interface, _) = resolve::resolve(&module, &imported);
-                let local = |n: &str| types::builtin_sources().iter().any(|(m, _)| *m == n);
-                let options = types::Options {
-                    local: &local,
-                    limits: types::Limits::default(),
-                    sql: Default::default(),
-                    no_let_assert: false,
-                    thresholds: types::Thresholds::default(),
-                    effects: true,
-                };
-                let (_, typing) = types::check_typed(
-                    &module,
-                    &imported,
-                    &interfaces[..i],
-                    options,
-                    &mut interface,
-                );
-                ir::lower(&module, &typing).expect("built-in modules compile")
-            })
-            .collect()
+        let mut lowered = Vec::new();
+        types::check_each(types::builtin_sources(), |module, typing| {
+            lowered.push(ir::lower(module, typing).expect("built-in modules compile"));
+        });
+        lowered
     })
 }
 

@@ -6,6 +6,10 @@ on:
   workflow_dispatch:
 
 jobs:
+  # the full set: CI with the go target on every platform
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   fuzz:
     runs-on: ubuntu-26.04
     steps:

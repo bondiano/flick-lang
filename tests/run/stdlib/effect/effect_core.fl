@@ -207,11 +207,20 @@ let resources () =
     let _ = if n >= 2 then Latch.open refreshed else false
     n
   }
+  // a busy machine may refresh it before the first use, and the latch opens
+  // before the refresh replaces the value: the first use sees an acquisition,
+  // and the resource comes to hold a later one
   let seen = scope {
     let auto = Effect.resource_auto (Schedule.spaced ms1) acquire
     let first = Resource.use auto (fun v -> v)
     Latch.await_ refreshed
-    (first, Resource.use auto (fun v -> v) > first)
+    let later =
+      Effect.eventually
+        (task {
+          let n = Resource.use auto (fun v -> v)
+          if n >= 2 then n else from_result (Err (Boom n))
+        })
+    (first >= 1, later >= 2)
   }
   Platform.stdout_line ("resource_auto: " ++ show seen)
 
