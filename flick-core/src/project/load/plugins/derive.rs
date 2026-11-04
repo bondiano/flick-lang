@@ -106,9 +106,13 @@ impl Loader<'_> {
             // the Prelude's, as `Schema`, which every module sees
             .or_else(|| marked("Prelude"))?
         } else {
-            let import = (m.syntax.imports.iter()).find(|i| i.qualifier() == qualifier);
-            // a built-in module is seen qualified without an import
-            marked(import.map_or(qualifier, |i| i.module.as_str()))?
+            match (m.syntax.imports.iter()).find(|i| i.qualifier() == qualifier) {
+                Some(import) => marked(&import.module)?,
+                // a built-in module is seen qualified without an import; another is not
+                None => (builtin_derived(qualifier).iter())
+                    .find(|d| d.class == name)
+                    .map(|d| (qualifier.to_owned(), d.clone()))?,
+            }
         };
         let package = derived.package.or_else(|| self.package_of(&module))?;
         Some((package, format!("{module}.{name}")))
