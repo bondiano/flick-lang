@@ -1,13 +1,19 @@
 //! A plugin for the compiler's tests. `pairs { k = e; k : T = e }` stands
 //! for the record `{ k = e; k = (e : T); blocks = n }`, where `n` is the
 //! number of `pairs` blocks of the group, which `collect` counts. `bad {}`
-//! stands for `(1.0 : String)`, an error in generated code.
+//! stands for `(1.0 : String)`, an error in generated code. `spin {}` never
+//! ends and `hog {}` takes all memory: the limits of a plugin's calls.
+
+use std::hint::black_box;
 
 use flick_plugin::{
     Arena, Block, Builder, Compiler, Diagnostic, Expr, Field, Plugin, Span, Token, TokenKind, Ty,
 };
 
 pub struct Pairs;
+
+#[cfg(feature = "guest")]
+flick_plugin::export!(Pairs);
 
 impl Plugin for Pairs {
     fn collect(&self, blocks: &[Block]) -> Vec<u8> {
@@ -27,6 +33,19 @@ impl Plugin for Pairs {
         let len = u32::try_from(block.text.len()).unwrap_or(u32::MAX);
         let whole = Span { start: 0, end: len };
         let mut b = Builder::new(whole);
+        match block.head.as_str() {
+            "spin" => loop {
+                black_box(block);
+            },
+            "hog" => {
+                let mut held = Vec::new();
+                loop {
+                    held.push(vec![1u8; 1 << 20]);
+                    black_box(&held);
+                }
+            }
+            _ => {}
+        }
         if block.head == "bad" {
             let one = b.expr(Expr::Number(1.0));
             let text = b.ty(Ty::Name("String".into()));

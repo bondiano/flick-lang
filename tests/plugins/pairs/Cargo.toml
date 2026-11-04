@@ -11,5 +11,12 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# the plugin as a WebAssembly component
+guest = ["flick-plugin/guest"]
+
 [dependencies]
 flick-plugin = { path = "../../../flick-plugin" }

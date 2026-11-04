@@ -9,6 +9,9 @@
 //! [`Plugin`] directly.
 
 mod builder;
+#[cfg(feature = "guest")]
+pub mod guest;
+mod wit;
 
 use serde::{Deserialize, Serialize};
 

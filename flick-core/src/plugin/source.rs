@@ -13,6 +13,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::{Fragment, parse_expr_at, parse_type_at};
 
 /// A plugin block of a module and what its plugin asked of it.
+#[derive(Default)]
 pub struct BlockSource {
     text: Arc<str>,
     file: FileId,

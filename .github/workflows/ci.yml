@@ -159,6 +159,16 @@ jobs:
           name: junit-${{ github.job }}-${{ matrix.shard }}
           path: target/nextest/ci/junit.xml
 
+  # plugins built as WebAssembly components, run by wasmtime
+  plugins:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v4
+      - run: just wasm-plugins
+
   postgres:
     runs-on: ubuntu-26.04
     steps:

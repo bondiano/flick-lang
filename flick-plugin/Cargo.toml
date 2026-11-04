@@ -11,5 +11,10 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# the glue of a plugin built as a WebAssembly component
+guest = ["dep:wit-bindgen"]
+
 [dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
+wit-bindgen = { version = "0.63.0", optional = true }

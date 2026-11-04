@@ -4,6 +4,8 @@
 //! plugin answers, which the tests count.
 
 mod cache;
+#[cfg(feature = "wasm-plugins")]
+mod wasm;
 
 use std::env;
 use std::fs::OpenOptions;
@@ -32,6 +34,12 @@ pub fn plugin(package: &str, component: Option<&Path>) -> Result<Arc<dyn Expande
     })
 }
 
+#[cfg(feature = "wasm-plugins")]
+fn load(package: &str, component: &Path) -> Result<Arc<dyn Expander>, String> {
+    wasm::load(package, component)
+}
+
+#[cfg(not(feature = "wasm-plugins"))]
 fn load(package: &str, component: &Path) -> Result<Arc<dyn Expander>, String> {
     let _ = component;
     Err(format!(

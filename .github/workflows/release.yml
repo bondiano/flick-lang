@@ -51,7 +51,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: release-${{ matrix.target }}
-      - run: cargo build -p flick --release --locked --target ${{ matrix.target }}
+      - run: cargo build -p flick --release --locked --features wasm-plugins --target ${{ matrix.target }}
       - name: Package
         if: runner.os != 'Windows'
         run: tar -czf flick-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release flick

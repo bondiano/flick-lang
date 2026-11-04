@@ -38,6 +38,8 @@ rustPlatform.buildRustPackage {
     "--package"
     "flick"
   ];
+  # plugins built as WebAssembly components, as in the released binaries
+  buildFeatures = [ "wasm-plugins" ];
 
   # The full suite needs node, pnpm, Docker and network access (CI runs it).
   # These targets are self-contained: the checker fixtures (including their
