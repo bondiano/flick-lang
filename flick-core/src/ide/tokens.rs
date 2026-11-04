@@ -2,6 +2,7 @@
 
 use super::{Ide, hints::strip, tree};
 use crate::iface::{Decl, Namespace};
+use crate::plugin::blocks_under;
 use crate::resolve::declarations;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
@@ -10,7 +11,7 @@ use crate::types::{Ref, Type};
 use flick_plugin::HighlightKind;
 
 /// The token types, in the order of the legend the server announces.
-pub const TOKEN_TYPES: [&str; 8] = [
+pub const TOKEN_TYPES: [&str; 9] = [
     "namespace",
     "type",
     "enumMember",
@@ -19,6 +20,7 @@ pub const TOKEN_TYPES: [&str; 8] = [
     "method",
     "parameter",
     "keyword",
+    "macro",
 ];
 
 const NAMESPACE: u32 = 0;
@@ -30,9 +32,11 @@ const METHOD: u32 = 5;
 const PARAMETER: u32 = 6;
 /// A word that is a keyword only where it stands.
 const KEYWORD: u32 = 7;
+/// The head of a plugin's blocks.
+const MACRO: u32 = 8;
 
 /// Nodes worth folding when they span several lines.
-const FOLDED: [K; 15] = [
+const FOLDED: [K; 16] = [
     K::LetDecl,
     K::TypeDecl,
     K::ServiceDecl,
@@ -47,6 +51,7 @@ const FOLDED: [K; 15] = [
     K::SqlExpr,
     K::UiExpr,
     K::PluginExpr,
+    K::PluginDecl,
     K::RecGroup,
 ];
 
@@ -109,6 +114,7 @@ impl Ide<'_> {
         }
         foreign_modes(&m.tree, text, &mut out);
         contextual_keywords(&m.tree, &mut out);
+        heads(&m.tree, &mut out);
         out.sort_unstable();
         out.dedup_by_key(|t| t.0);
         out
@@ -199,6 +205,22 @@ fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
     }
     for child in node.nodes() {
         contextual_keywords(child, out);
+    }
+}
+
+/// The head of each plugin block, and each head an import exposes.
+fn heads(tree: &Node, out: &mut Vec<(u32, u32, u32)>) {
+    let mut blocks = Vec::new();
+    blocks_under(tree, &mut blocks);
+    let exposed = (tree.nodes())
+        .filter(|n| n.kind == K::ImportDecl)
+        .flat_map(|i| i.nodes().filter(|n| n.kind == K::Exposing))
+        .flat_map(Node::nodes)
+        .filter(|item| item.has_token(K::PluginKw));
+    for node in blocks.into_iter().chain(exposed) {
+        if let Some(head) = node.child_tokens().find(|t| t.kind == K::Ident) {
+            out.push((head.start, head.end, MACRO));
+        }
     }
 }
 

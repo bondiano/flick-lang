@@ -31,6 +31,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "_plugin"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_server_fn"
+        },
+        {
+          "type": "SYMBOL",
           "name": "parens"
         },
         {
@@ -300,10 +308,6 @@
         },
         {
           "type": "STRING",
-          "value": "cli"
-        },
-        {
-          "type": "STRING",
           "value": "in"
         },
         {
@@ -422,6 +426,47 @@
         {
           "type": "SYMBOL",
           "name": "identifier"
+        }
+      ]
+    },
+    "_plugin": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "plugin"
+          },
+          "named": true,
+          "value": "keyword"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        }
+      ]
+    },
+    "_server_fn": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "server"
+          },
+          "named": true,
+          "value": "keyword"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "fn"
+          },
+          "named": true,
+          "value": "keyword"
         }
       ]
     },

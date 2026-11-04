@@ -199,6 +199,8 @@ fn cli_semantic_tokens_distinguish_clauses_parameters_and_handler_locals() {
         ("tasks :", "tasks", "parameter"),
         ("Minutes\n    ///", "Minutes", "type"),
         ("description)", "description", "variable"),
+        ("cli)", "cli", "macro"),
+        ("cli \"child\"", "cli", "macro"),
     ] {
         let point = position(SOURCE, SOURCE.find(needle).expect("occurs"));
         assert!(

@@ -248,3 +248,28 @@ type Option a = @lang none None | Some a
   (operator)
   (constructor)
   (identifier))
+
+==================
+Plugins
+==================
+
+import Sql exposing (Table, plugin sql)
+server fn ping n = n
+
+---
+
+(source_file
+  (keyword)
+  (constructor)
+  (keyword)
+  (parens
+    (constructor)
+    (operator)
+    (keyword)
+    (identifier))
+  (keyword)
+  (keyword)
+  (identifier)
+  (identifier)
+  (operator)
+  (identifier))

@@ -7,7 +7,7 @@ const KEYWORDS = [
   'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
   'instance', 'deriving', 'forall', 'not', 'none',
-  'schema', 'codec', 'sql', 'ui', 'cli', 'in', 'when', 'for', 'yield', 'do',
+  'schema', 'codec', 'sql', 'ui', 'in', 'when', 'for', 'yield', 'do',
 ];
 
 const OPERATORS = [
@@ -32,6 +32,8 @@ module.exports = grammar({
       $._foreign,
       $._from,
       $._component,
+      $._plugin,
+      $._server_fn,
       $.parens,
       $.brackets,
       $.braces,
@@ -61,6 +63,9 @@ module.exports = grammar({
     _from: $ => seq(alias('from', $.keyword), optional(alias('global', $.keyword))),
     // `component name` declares a component; elsewhere the word is a name
     _component: $ => seq(alias('component', $.keyword), $.identifier),
+    // `plugin head` in an import's `exposing`, and `server fn`
+    _plugin: $ => seq(alias('plugin', $.keyword), $.identifier),
+    _server_fn: $ => seq(alias('server', $.keyword), alias('fn', $.keyword)),
     boolean: _ => choice('true', 'false'),
     // `@lang int`: the attribute's name; its arguments are plain identifiers
     attribute: _ => token(seq('@', /[a-z_][A-Za-z0-9_]*/)),
