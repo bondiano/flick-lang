@@ -141,10 +141,11 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
     }
 }
 
-/// The plugin blocks under `node`, not those inside them.
+/// The plugin blocks under `node`, expressions and declarations, not those
+/// inside them.
 pub fn blocks_under<'n>(node: &'n Node, out: &mut Vec<&'n Node>) {
     for child in node.nodes() {
-        if child.kind == K::PluginExpr {
+        if matches!(child.kind, K::PluginExpr | K::PluginDecl) {
             out.push(child);
         } else {
             blocks_under(child, out);

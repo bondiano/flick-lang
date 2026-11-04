@@ -1,10 +1,11 @@
-//! User code inside a plugin block: the longest expression or type that
-//! starts at a token of the body, parsed with the layout of where it stands
-//! in the file. The compiler parses the holes a plugin asks for this way.
+//! User code inside a plugin block: the longest expression, type or pattern
+//! that starts at a token of the body, or a declaration, parsed with the
+//! layout of where it stands in the file. The compiler parses the holes a
+//! plugin asks for this way, and the declarations a plugin gives.
 
 use super::build::build;
 use super::types::type_;
-use super::{Ctx, Done, Parser, expr};
+use super::{Ctx, Done, Parser, decl, expr, pattern};
 use crate::diagnostics::Diagnostic;
 use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
@@ -27,6 +28,24 @@ pub fn parse_expr_at(text: &str, file: FileId, tokens: &[Token]) -> Option<Fragm
 /// [`parse_expr_at`] for a type.
 pub fn parse_type_at(text: &str, file: FileId, tokens: &[Token]) -> Option<Fragment> {
     fragment(text, file, tokens, type_)
+}
+
+/// [`parse_expr_at`] for a pattern.
+pub fn parse_pat_at(text: &str, file: FileId, tokens: &[Token]) -> Option<Fragment> {
+    fragment(text, file, tokens, pattern::pattern)
+}
+
+/// The declaration `tokens` start with, its tree the declaration itself.
+pub fn parse_decl_at(text: &str, file: FileId, tokens: &[Token]) -> Option<Fragment> {
+    let mut found = fragment(text, file, tokens, |p| Some(decl::declaration(p)))?;
+    let inner = found.tree.nodes().next()?.clone();
+    found.tree = inner;
+    Some(found)
+}
+
+/// The declarations `tokens` hold, in a `SourceFile`.
+pub fn parse_decls_at(text: &str, file: FileId, tokens: &[Token]) -> Option<Fragment> {
+    fragment(text, file, tokens, |p| Some(decl::declarations(p)))
 }
 
 fn fragment(

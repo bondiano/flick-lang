@@ -169,14 +169,85 @@ fn a_head_takes_strings_and_parenthesized_arguments_before_its_body() {
     let formatted = fmt::format(&src, FileId::default()).expect("formats");
     assert_eq!(formatted, src);
 
-    // without `{` after them, the arguments are applied to a name
-    let applied = format!("{IMPORT}let x = pairs \"a\" (1)\nlet y = pairs \"a\"\n");
-    let parsed = parse_str(&applied);
+    // a head is no value: a name argument is one too
+    let named = parse_str(&format!("{IMPORT}let x = pairs a {{ b = 1 }}\n"));
+    assert!(named.diagnostics.is_empty(), "{:?}", named.diagnostics);
+    let block = find(&named.tree, K::PluginExpr).expect("a plugin block");
+    assert!(block.nodes().any(|n| n.kind == K::Block));
+}
+
+#[test]
+fn a_head_with_arguments_and_no_body_is_a_block() {
+    let src = format!(
+        "{IMPORT}let x = f (pairs Shape) (pairs App.Api.place)\nlet y = pairs \"a\" 1 (2)\nlet z = pairs\nlet w = pairs + 1\n"
+    );
+    let parsed = parse_str(&src);
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
-    assert!(find(&parsed.tree, K::PluginExpr).is_none());
-    // anything but a string or `( … )` before `{` is no argument
-    let other = parse_str(&format!("{IMPORT}let x = pairs a {{ b = 1 }}\n"));
-    assert!(find(&other.tree, K::PluginExpr).is_none());
+    let blocks: Vec<String> = (parsed.tree.nodes())
+        .flat_map(|d| {
+            let mut found = Vec::new();
+            collect(d, K::PluginExpr, &mut found);
+            found
+        })
+        .map(|b| text_of(&src, b))
+        .collect();
+    assert_eq!(
+        blocks,
+        ["pairs Shape", "pairs App.Api.place", "pairs \"a\" 1 (2)"]
+    );
+    // the raw text of a block is a string argument, which lexes whatever it holds
+    let raw = format!(
+        "{IMPORT}let ddl = pairs r#\"\n  create table t (name text default 'a') -- why\n\"#\n"
+    );
+    let parsed = parse_str(&raw);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    let block = find(&parsed.tree, K::PluginExpr).expect("a plugin block");
+    assert!(text_of(&raw, block).ends_with("-- why\n\"#"));
+    // the compiler's own heads need their body, so a value `cli` stays one
+    let value = parse_str("let x = cli y\n");
+    assert!(find(&value.tree, K::PluginExpr).is_none());
+}
+
+/// Every node of `kind` under `node`.
+fn collect<'n>(node: &'n Node, kind: SyntaxKind, out: &mut Vec<&'n Node>) {
+    if node.kind == kind {
+        out.push(node);
+    }
+    for child in node.nodes() {
+        collect(child, kind, out);
+    }
+}
+
+#[test]
+fn a_head_starts_a_declaration_of_words_a_body_or_the_rest() {
+    let src = format!(
+        "{IMPORT}pairs table Name \"t\" {{\n  x : Float\n}}\n\npairs fn ping (n : Int) =\n  let m = n + 1\n  m\n\npairs migration 1 \"init\" r#\"create table t ();\"#\n\npairs : Float\nlet after = 1\n"
+    );
+    let parsed = parse_str(&src);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    let decls: Vec<&Node> = (parsed.tree.nodes())
+        .filter(|n| n.kind == K::PluginDecl)
+        .collect();
+    let texts: Vec<String> = decls.iter().map(|d| text_of(&src, d)).collect();
+    assert_eq!(
+        texts,
+        [
+            "pairs table Name \"t\" {\n  x : Float\n}",
+            "pairs fn ping (n : Int) =\n  let m = n + 1\n  m",
+            "pairs migration 1 \"init\" r#\"create table t ();\"#",
+        ]
+    );
+    assert!(decls[0].nodes().any(|n| n.kind == K::Block));
+    let rest = decls[1]
+        .nodes()
+        .find(|n| n.kind == K::PluginRest)
+        .expect("the rest");
+    assert_eq!(text_of(&src, rest), "=\n  let m = n + 1\n  m");
+    // a signature of the head's name is a signature, and what follows parses
+    assert!(parsed.tree.nodes().any(|n| n.kind == K::Signature));
+    assert!(parsed.tree.nodes().any(|n| n.kind == K::LetDecl));
+    let formatted = fmt::format(&src, FileId::default()).expect("formats");
+    assert_eq!(formatted, src);
 }
 
 #[test]
@@ -191,4 +262,21 @@ fn a_head_of_the_compilers_own_plugins_is_a_block_without_its_import() {
     );
     let names = parsed.tree.nodes().filter(|n| n.kind == K::LetDecl).nth(1);
     assert!(find(names.expect("let d"), K::PluginExpr).is_none());
+}
+
+#[test]
+fn a_hole_is_a_pattern_or_a_declaration_where_it_stands() {
+    let src = format!("{IMPORT}pairs let f (n : Int) x =\n  n + x\n\nlet after = 1\n");
+    let parsed = parse_str(&src);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    let block = find(&parsed.tree, K::PluginDecl).expect("a declaration");
+    let tokens = block.tokens();
+    let file = FileId::default();
+    let pat = parse_pat_at(&src, file, &from(&src, &tokens, "(")).expect("a pattern");
+    assert!(pat.diagnostics.is_empty(), "{:?}", pat.diagnostics);
+    assert_eq!(text_of(&src, &pat.tree), "(n : Int)");
+    let decl = parse_decl_at(&src, file, &from(&src, &tokens, "let")).expect("a declaration");
+    assert!(decl.diagnostics.is_empty(), "{:?}", decl.diagnostics);
+    assert_eq!(decl.tree.kind, K::LetDecl);
+    assert_eq!(text_of(&src, &decl.tree), "let f (n : Int) x =\n  n + x");
 }

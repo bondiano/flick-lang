@@ -1,6 +1,6 @@
 //! Module header, imports and declarations.
 
-use super::{Ctx, K, Parser, expr, pattern, types};
+use super::{Ctx, Done, K, Parser, expr, pattern, types};
 use crate::diagnostics::codes;
 use crate::syntax::kind::FOREIGN_MODES;
 
@@ -8,6 +8,22 @@ pub(super) fn source_file(p: &mut Parser) {
     let m = p.start();
     p.items(top_decl, false, |_| false);
     p.complete(m, K::SourceFile);
+}
+
+/// The declarations of a fragment, in a `SourceFile`: the code a plugin
+/// gives for a block that stands as declarations.
+pub(super) fn declarations(p: &mut Parser) -> Done {
+    let m = p.start();
+    p.items(top_decl, false, |_| false);
+    p.complete(m, K::SourceFile)
+}
+
+/// One declaration of a fragment, in a `SourceFile`: what the user wrote in
+/// a block that stands as a declaration.
+pub(super) fn declaration(p: &mut Parser) -> Done {
+    let m = p.start();
+    top_decl(p);
+    p.complete(m, K::SourceFile)
 }
 
 fn top_decl(p: &mut Parser) {
@@ -32,6 +48,7 @@ fn top_decl(p: &mut Parser) {
             p.bump_as(K::FnKw);
             let_rest(p, m, false);
         }
+        K::Ident if super::plugin::at_declaration(p) => super::plugin::declaration(p),
         _ => member(p),
     }
 }

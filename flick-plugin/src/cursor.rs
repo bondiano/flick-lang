@@ -29,6 +29,15 @@ impl Block {
         &self.tokens[..n]
     }
 
+    /// A cursor at the first token: the arguments, the body, then the rest
+    /// of a declaration.
+    pub fn cursor(&self) -> Cursor<'_> {
+        Cursor {
+            block: self,
+            rest: &self.tokens,
+        }
+    }
+
     /// A cursor at the first token of the body.
     pub fn body(&self) -> Cursor<'_> {
         Cursor {
@@ -115,6 +124,25 @@ impl<'b> Cursor<'b> {
         Ok(hole.span)
     }
 
+    /// The user's pattern from the next token on, the longest one, past it.
+    pub fn pat(&mut self, compiler: &mut dyn Compiler) -> Result<Span, Diagnostic> {
+        let hole = compiler.parse_pat(self.start(), self.block.whole().end)?;
+        self.skip_to(hole.span.end);
+        Ok(hole.span)
+    }
+
+    /// The user's declaration from the next token on, past it.
+    pub fn decl(&mut self, compiler: &mut dyn Compiler) -> Result<Span, Diagnostic> {
+        let hole = compiler.parse_decl(self.start(), self.block.whole().end)?;
+        self.skip_to(hole.span.end);
+        Ok(hole.span)
+    }
+
+    /// The tokens left.
+    pub fn rest(&self) -> &'b [Token] {
+        self.rest
+    }
+
     /// The tokens from here up to `end`.
     pub fn until(&self, end: u32) -> &'b [Token] {
         let n = self.rest.iter().take_while(|t| t.span.end <= end).count();
@@ -142,7 +170,7 @@ impl Iterator for Cursor<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Block, Span, Token, TokenKind};
+    use crate::{Block, Place, Span, Token, TokenKind};
 
     fn token(kind: TokenKind, start: u32, end: u32) -> Token {
         Token {
@@ -160,6 +188,7 @@ mod tests {
             head: "cli".into(),
             text: text.into(),
             body: at("{") + 1,
+            place: Place::Expression,
             tokens: vec![
                 token(TokenKind::String, 0, 3),
                 token(TokenKind::Ident, flag, flag + 4),

@@ -223,6 +223,12 @@ pub enum SyntaxKind {
     PluginExpr,
     /// `( … )` among the arguments of a plugin block's head, kept as tokens.
     PluginArgs,
+    /// A plugin block that stands as a declaration of the module: `head args
+    /// { … }`, or `head args` and the rest of the declaration.
+    PluginDecl,
+    /// The rest of a declaration after a plugin head and its arguments, kept
+    /// as tokens up to the next declaration.
+    PluginRest,
 
     // nodes: patterns
     WildcardPat,

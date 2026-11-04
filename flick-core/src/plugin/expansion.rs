@@ -7,9 +7,10 @@
 use std::iter::Peekable;
 use std::mem;
 
-use flick_plugin::Hole;
+use flick_plugin::{Hole, Place};
 
 use crate::diagnostics::{Diagnostic, Related, Severity, codes};
+use crate::iface::Interface;
 use crate::ir;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
@@ -17,7 +18,7 @@ use crate::syntax::kind::SyntaxKind as K;
 
 use super::render::Rendered;
 use super::source::BlockSource;
-use super::splice::splice;
+use super::splice::{splice, splice_decls};
 use super::testing::shown;
 
 /// A block and the code its plugin gave for it.
@@ -47,8 +48,10 @@ struct Block {
     range: (u32, u32),
     code: (u32, u32),
     plugin: String,
-    /// Where its frame is in the module text, and the holes of its code.
+    /// Where its frame is in the module text, where it stands, and the
+    /// holes of its code.
     frame: (u32, u32),
+    place: Place,
     holes: Vec<(u32, Hole)>,
 }
 
@@ -74,7 +77,7 @@ impl Expansion {
                 Shown {
                     range: b.range,
                     plugin: b.plugin.clone(),
-                    code: shown(&rendered, frame),
+                    code: shown(&rendered, frame, b.place),
                 }
             })
             .collect()
@@ -101,8 +104,15 @@ impl Expansion {
             let at = u32::try_from(out.len()).expect("source fits in u32");
             out.push_str(&block.rendered.text);
             let range = block.node.range();
-            match splice(&out, file, at, &block.rendered, &block.source, &block.node) {
-                Ok(node) => {
+            let placed = match block.source.place() {
+                Place::Expression => {
+                    splice(&out, file, at, &block.rendered, &block.source, &block.node)
+                        .map(|node| vec![node])
+                }
+                Place::Declaration => splice_decls(&out, file, at, &block.rendered, &block.source),
+            };
+            match placed {
+                Ok(nodes) => {
                     let start = block.source.start();
                     let frame = block.source.end() - start;
                     origins.extend(block.rendered.origins.iter().map(|&((s, e), o)| {
@@ -127,9 +137,10 @@ impl Expansion {
                         code: (at, end),
                         plugin: block.plugin,
                         frame: (block.source.start(), block.source.end()),
+                        place: block.source.place(),
                         holes: block.rendered.holes.clone(),
                     });
-                    spliced.push((range, node));
+                    spliced.push((range, nodes));
                 }
                 Err(why) => diagnostics.push(Diagnostic::error(
                     codes::P036,
@@ -158,6 +169,17 @@ impl Expansion {
             blocks: done,
         };
         (Some(expansion), diagnostics)
+    }
+
+    /// Where the module's text declares the names of `interface`: a name the
+    /// code of a block declares, at the block.
+    pub fn place_interface(&self, interface: &mut Interface) {
+        for export in &mut interface.exports {
+            if let Some([start, end]) = export.at {
+                let placed = self.place(Span::new(self.file, start, end));
+                export.at = Some([placed.start, placed.end]);
+            }
+        }
     }
 
     /// The span of the module a span of the expansion stands for.
@@ -241,21 +263,28 @@ impl Expansion {
     }
 }
 
-/// Replaces each block under `node` by its code from `spliced`, by range.
-fn replace_blocks(node: &mut Node, spliced: &mut Vec<((u32, u32), Node)>) {
-    for child in &mut node.children {
-        let Element::Node(n) = child else {
+/// Replaces each block under `node` by its code from `spliced`, by range:
+/// an expression by its tree, a declaration of the module by its
+/// declarations.
+fn replace_blocks(node: &mut Node, spliced: &mut Vec<((u32, u32), Vec<Node>)>) {
+    let mut children = Vec::with_capacity(node.children.len());
+    for child in mem::take(&mut node.children) {
+        let Element::Node(mut n) = child else {
+            children.push(child);
             continue;
         };
-        if n.kind == K::PluginExpr {
+        if matches!(n.kind, K::PluginExpr | K::PluginDecl) {
             let range = n.range();
             if let Some(i) = spliced.iter().position(|(r, _)| *r == range) {
-                *n = spliced.swap_remove(i).1;
+                children.extend(spliced.swap_remove(i).1.into_iter().map(Element::Node));
+                continue;
             }
-            continue;
+        } else {
+            replace_blocks(&mut n, spliced);
         }
-        replace_blocks(n, spliced);
+        children.push(Element::Node(n));
     }
+    node.children = children;
 }
 
 /// Replaces the tokens of the user's code inside each block under `node` by
@@ -265,7 +294,7 @@ fn parse_holes(node: &mut Node, holes: &[((u32, u32), Node)]) {
         let Element::Node(n) = child else {
             continue;
         };
-        if n.kind != K::PluginExpr {
+        if !matches!(n.kind, K::PluginExpr | K::PluginDecl) {
             parse_holes(n, holes);
             continue;
         }
@@ -291,7 +320,9 @@ fn in_place<'t>(
     for element in elements {
         let t = match element {
             Element::Token(t) => t,
-            Element::Node(mut raw) if matches!(raw.kind, K::PluginArgs | K::Block) => {
+            Element::Node(mut raw)
+                if matches!(raw.kind, K::PluginArgs | K::Block | K::PluginRest) =>
+            {
                 raw.children = in_place(mem::take(&mut raw.children), next);
                 children.push(Element::Node(raw));
                 continue;

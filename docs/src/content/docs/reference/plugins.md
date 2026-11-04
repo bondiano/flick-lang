@@ -145,7 +145,7 @@ where it stands:
 `#(..xs)` puts each item of a collection in a list, in the arguments of an
 application or in the fields of a record (`(label, value)` pairs);
 `flick!(b @ span, code)` gives the nodes their origin, and
-`flick!(b, type T)` builds a type. Fixed names are written as they are:
+`flick!(b, ty T)` builds a type. Fixed names are written as they are:
 `flick!(b, Cli.flag (Record.label : Record.Label #field) [#(..&aliases)] #help #multi #spec)`.
 
 A block is read with a cursor over the tokens of its body: `eat(":")`,

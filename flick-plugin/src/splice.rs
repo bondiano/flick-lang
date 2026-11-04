@@ -1,16 +1,20 @@
 //! What `flick!` puts where its code says `#x`: a value of the plugin, as
-//! an expression, a type or a pattern by where it stands.
+//! an expression, a type, a pattern or a declaration by where it stands.
 
-use crate::{Builder, Expr, NodeId, Pat, Span, Ty};
+use crate::{Builder, Decl, Expr, NodeId, Pat, Span, Ty};
 
 /// A value `flick!` puts in place of `#x`. A `Span` is the user's code
-/// there (a hole), a string a text, a [`NodeId`] the node built before, a
+/// there (a hole of the kind its place asks for), a string a text, a [`NodeId`] the node built before, a
 /// [`Name`] a name and [`Wildcard`] `_`; a value in a place it cannot stand,
 /// as a text in a pattern, is a bug of the plugin and panics.
 pub trait Splice {
     fn expr(&self, b: &mut Builder) -> NodeId;
     fn ty(&self, b: &mut Builder) -> NodeId;
     fn pat(&self, b: &mut Builder) -> NodeId;
+    /// As a declaration: only the user's (a `Span`) or one built before.
+    fn decl(&self, _: &mut Builder) -> NodeId {
+        misplaced("this value", "a declaration")
+    }
 }
 
 /// A name of the code, such as `Name("Cli.switch")`: a variable, a value
@@ -33,8 +37,11 @@ impl Splice for Span {
     fn ty(&self, b: &mut Builder) -> NodeId {
         b.ty(Ty::Hole(*self))
     }
-    fn pat(&self, _: &mut Builder) -> NodeId {
-        misplaced("the user's code", "a pattern")
+    fn pat(&self, b: &mut Builder) -> NodeId {
+        b.pat(Pat::Hole(*self))
+    }
+    fn decl(&self, b: &mut Builder) -> NodeId {
+        b.decl(Decl::Hole(*self))
     }
 }
 
@@ -60,6 +67,9 @@ impl Splice for String {
     fn pat(&self, b: &mut Builder) -> NodeId {
         self.as_str().pat(b)
     }
+    fn decl(&self, b: &mut Builder) -> NodeId {
+        self.as_str().decl(b)
+    }
 }
 
 /// A node built before, used as it is.
@@ -71,6 +81,9 @@ impl Splice for NodeId {
         *self
     }
     fn pat(&self, _: &mut Builder) -> NodeId {
+        *self
+    }
+    fn decl(&self, _: &mut Builder) -> NodeId {
         *self
     }
 }
@@ -139,6 +152,9 @@ impl<T: Splice + ?Sized> Splice for &T {
     }
     fn pat(&self, b: &mut Builder) -> NodeId {
         (**self).pat(b)
+    }
+    fn decl(&self, b: &mut Builder) -> NodeId {
+        (**self).decl(b)
     }
 }
 

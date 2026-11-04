@@ -15,6 +15,7 @@ mod builder;
 mod cursor;
 #[cfg(feature = "guest")]
 pub mod guest;
+mod literal;
 mod splice;
 mod wit;
 
@@ -23,13 +24,14 @@ use serde::{Deserialize, Serialize};
 pub use builder::Builder;
 pub use cursor::Cursor;
 pub use flick_plugin_macros::flick;
+pub use literal::string_value;
 #[doc(hidden)]
 pub use splice::__private;
 pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.2.0";
+pub const VERSION: &str = "0.3.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -61,15 +63,26 @@ pub struct Token {
     pub span: Span,
 }
 
-/// A block `head args { body }`: the text from its first argument (or from
-/// its body, without arguments) to the closing `}`, where the body starts in
-/// it, and the tokens of the arguments and the body, `{` left out. All spans
-/// count from the start of `text`.
+/// Where a block stands: in an expression, whose code is an expression, or
+/// as a declaration of the module, whose code is declarations.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Place {
+    #[default]
+    Expression,
+    Declaration,
+}
+
+/// A block `head args { body }`, `head args` or, as a declaration, `head
+/// args rest`: the text from its first argument (or from its body, without
+/// arguments) to the closing `}` or its end, where the body starts in it
+/// (its length without one), and the tokens of the arguments, the body and
+/// the rest, `{` left out. All spans count from the start of `text`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Block {
     pub head: String,
     pub text: String,
     pub body: u32,
+    pub place: Place,
     pub tokens: Vec<Token>,
 }
 
@@ -77,6 +90,8 @@ pub struct Block {
 pub enum HoleKind {
     Expr,
     Ty,
+    Pat,
+    Decl,
 }
 
 /// User code in the body that the compiler parsed: an expression or a type.
@@ -154,6 +169,53 @@ pub enum Pat {
         arguments: Vec<NodeId>,
     },
     Record(Vec<Field>),
+    /// The user's pattern at this span of the block.
+    Hole(Span),
+}
+
+/// A constructor of a type and the types of its fields.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Case {
+    pub name: String,
+    pub fields: Vec<NodeId>,
+}
+
+/// A declaration of the module.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Decl {
+    /// `let name params : ty = body`; the parameters are patterns.
+    Let {
+        name: String,
+        params: Vec<NodeId>,
+        ty: Option<NodeId>,
+        body: NodeId,
+    },
+    /// `name : ty`.
+    Signature { name: String, ty: NodeId },
+    /// `type alias Name params = ty`.
+    Alias {
+        name: String,
+        params: Vec<String>,
+        ty: NodeId,
+    },
+    /// `type Name params = A fields | … deriving C, …`.
+    Adt {
+        name: String,
+        params: Vec<String>,
+        cases: Vec<Case>,
+        deriving: Vec<String>,
+    },
+    /// `instance context => head = members`, the members `let`s and
+    /// signatures.
+    Instance {
+        context: Vec<NodeId>,
+        head: NodeId,
+        members: Vec<NodeId>,
+    },
+    /// Declarations in order: the code of a block that gives several.
+    Group(Vec<NodeId>),
+    /// The user's declaration at this span of the block.
+    Hole(Span),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -161,6 +223,7 @@ pub enum Kind {
     Expr(Expr),
     Ty(Ty),
     Pat(Pat),
+    Decl(Decl),
 }
 
 /// A node of generated code and the span of the body it stands for.
@@ -243,6 +306,10 @@ pub trait Compiler {
     fn parse_expr(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic>;
     /// The longest type of the body from `start` on, before `end`.
     fn parse_type(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic>;
+    /// The longest pattern of the body from `start` on, before `end`.
+    fn parse_pat(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic>;
+    /// The declaration of the block from `start` on, before `end`.
+    fn parse_decl(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic>;
 }
 
 /// A plugin: what it learns from all its blocks of a group, and the code

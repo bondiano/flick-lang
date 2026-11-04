@@ -10,4 +10,7 @@ pub mod literal;
 mod parser;
 mod validate;
 
-pub use parser::{Fragment, Parse, parse, parse_expr_at, parse_type_at};
+pub use parser::{
+    Fragment, Parse, parse, parse_decl_at, parse_decls_at, parse_expr_at, parse_pat_at,
+    parse_type_at,
+};

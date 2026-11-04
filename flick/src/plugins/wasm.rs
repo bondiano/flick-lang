@@ -75,6 +75,26 @@ impl flick::plugin::compiler::Host for State {
             .map(convert::to_hole)
             .map_err(convert::to_diagnostic)
     }
+
+    fn parse_pat(
+        &mut self,
+        start: u32,
+        end: u32,
+    ) -> Result<flick::plugin::types::Hole, flick::plugin::types::Diagnostic> {
+        (self.source.parse_pat(start, end))
+            .map(convert::to_hole)
+            .map_err(convert::to_diagnostic)
+    }
+
+    fn parse_decl(
+        &mut self,
+        start: u32,
+        end: u32,
+    ) -> Result<flick::plugin::types::Hole, flick::plugin::types::Diagnostic> {
+        (self.source.parse_decl(start, end))
+            .map(convert::to_hole)
+            .map_err(convert::to_diagnostic)
+    }
 }
 
 fn engine() -> Result<&'static Engine, String> {

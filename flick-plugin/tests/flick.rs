@@ -60,7 +60,7 @@ fn spreads_records_lambdas_and_fields() {
     let made = kinds(|b| {
         let built = flick!(b, ());
         flick!(b, f [#(..&holes), "x"] { a = #built; b = (fun { a; b = _ } -> a.c) } (1, #(..&holes)));
-        flick!(b, type (#(Name("M.T")) -> { #(..fields) }));
+        flick!(b, ty (#(Name("M.T")) -> { #(..fields) }));
     });
     let tail = &made[made.len() - 5..];
     assert_eq!(

@@ -9,6 +9,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use flick_plugin::{Arena, Block};
 use flick_test_pairs::Pairs;
 
+mod forms;
+
 use super::{check, compile};
 use crate::diagnostics::{Diagnostic, Severity};
 use crate::ir;
