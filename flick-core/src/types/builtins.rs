@@ -16,6 +16,7 @@ use std::{fs, io};
 
 use tracing::debug;
 
+use super::Typing;
 use super::builtin_sources::CORE;
 use super::env::Builtins;
 use crate::clock::timed;
@@ -139,6 +140,16 @@ fn check_builtins() -> Vec<Interface> {
 /// Checks the built-in modules `modules`, as `(module, text)` in
 /// dependency order.
 pub(crate) fn check_sources(modules: &[(&str, &str)]) -> Vec<Interface> {
+    check_each(modules, |_, _| {})
+}
+
+/// [`check_sources`], also giving each module with its typing to `each`.
+/// What the modules before it export grows by one module at a time instead
+/// of being learned again for each module.
+pub fn check_each(
+    modules: &[(&str, &str)],
+    mut each: impl FnMut(&Module, &Typing),
+) -> Vec<Interface> {
     let mut done: Vec<Interface> = Vec::new();
     let mut known = Builtins::default();
     for &(name, text) in modules {
@@ -167,12 +178,14 @@ pub(crate) fn check_sources(modules: &[(&str, &str)]) -> Vec<Interface> {
             thresholds: super::Thresholds::default(),
             effects: true,
         };
-        let (checked, _, _) = super::run_in(&module, &imported, &known, options, &mut interface);
+        let (checked, typing, _) =
+            super::run_in(&module, &imported, &known, options, &mut interface);
         diagnostics.extend(checked);
         assert!(
             diagnostics.is_empty(),
             "built-in module {name} does not check: {diagnostics:?}"
         );
+        each(&module, &typing);
         known.add(&interface);
         done.push(interface);
     }
