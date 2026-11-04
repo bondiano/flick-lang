@@ -2,6 +2,9 @@
 # compiler fetches by its tag.
 export FLICK_STD_PATH := justfile_directory() + "/packages/std"
 
+# The compiler the e2e suites run, built in the `e2e` profile
+flick := justfile_directory() + "/target/e2e/flick"
+
 # Show available recipes
 [private]
 default:
@@ -49,28 +52,28 @@ go-test:
     cd runtime-go && go vet ./... && go test ./...
 
 e2e: docs-wasm
-    cargo build -p flick
+    cargo build -p flick --profile e2e
     pnpm install --frozen-lockfile
     pnpm -r typecheck
     pnpm -r lint
-    pnpm -r test
-    cargo test -p flick --test e2e --test e2e_numbers --test go_main --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path --test source_packages --test workspace -- --ignored
-    cargo test -p flick-core --test consteval_node -- --ignored
+    FLICK_BIN={{flick}} pnpm -r test
+    cargo test --profile e2e -p flick --test e2e --test e2e_numbers --test go_main --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path --test source_packages --test workspace -- --ignored
+    cargo test --profile e2e -p flick-core --test consteval_node -- --ignored
     just go-test
     just language
 
 # The language tests of tests/language on Node and as a Go executable, with
 # one seed: both must pass and write the same report
 language seed="42":
-    cargo build -p flick
-    cd tests/language && ../../target/debug/flick test --emit js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
-    cd tests/language && ../../target/debug/flick test --emit go --seed {{seed}} --reporter json > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
+    cargo build -p flick --profile e2e
+    cd tests/language && {{flick}} test --emit js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
+    cd tests/language && {{flick}} test --emit go --seed {{seed}} --reporter json > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
     diff -u target/language-js.txt target/language-go.txt
     cat target/language-go.txt
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size:
-    node tools/bundle-size/index.mjs "$(cargo build -p flick --message-format=json-render-diagnostics | jq -r 'select(.executable != null) | .executable')"
+    node tools/bundle-size/index.mjs "$(cargo build -p flick --profile e2e --message-format=json-render-diagnostics | jq -r 'select(.executable != null) | .executable')"
 
 # Time the language server on a file: opens, hovers and a hover after an edit
 lsp-bench file="examples/mtl/src/Mtl/StateT.fl" +positions="22:5":
@@ -133,7 +136,7 @@ stress runs="20" +prefixes="runtime/":
 
 # Run SQL queries against PostgreSQL in Docker (after `just e2e` installs the runtime)
 e2e-postgres:
-    cargo test -p flick --test sql_postgres -- --ignored
+    cargo test --profile e2e -p flick --test sql_postgres -- --ignored
 
 # The Conduit example's Go server against the official RealWorld API suite:
 # needs Docker, Go and hurl (`nix shell nixpkgs#hurl -c just conduit-api`)

@@ -13,7 +13,7 @@ import { renderToString } from "react-dom/server";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
-const flick = path.join(process.env.CARGO_TARGET_DIR ?? path.join(repo, "target"), "debug/flick");
+const flick = process.env.FLICK_BIN ?? path.join(process.env.CARGO_TARGET_DIR ?? path.join(repo, "target"), "debug/flick");
 
 test("the playground hydrates the markup its page renders on the server", async () => {
   const out = path.join(repo, "target/tmp/playground-hydration");

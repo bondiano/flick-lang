@@ -9,6 +9,7 @@ import { packages, resolve } from "../src/playground/loader.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
+const flick = process.env.FLICK_BIN ?? path.join(repo, "target/debug/flick");
 
 test("paths resolve like the output directory", () => {
   assert.equal(resolve("App/Main.js", "../_flick/List.js"), "_flick/List.js");
@@ -30,7 +31,7 @@ test("a linked build runs as `flick build` output does", () => {
     path.join(dir, "Main.fl"),
     "module Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () =\n  Platform.stdout_line (show (List.map (fun x -> x * 2) [1, 2, 3]))\n",
   );
-  execFileSync(path.join(repo, "target/debug/flick"), ["build", "Main.fl", "--out-dir", "out"], { cwd: dir });
+  execFileSync(flick, ["build", "Main.fl", "--out-dir", "out"], { cwd: dir });
   const out = execFileSync("node", [path.join(here, "run-linked.ts"), path.join(dir, "out"), "flick-main.js"], { cwd: here, encoding: "utf8" });
   assert.equal(out, "[2, 4, 6]\n");
 });
@@ -44,7 +45,7 @@ test("source-map text survives a compiled and linked release build", () => {
     path.join(dir, "Main.fl"),
     `module Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line ${JSON.stringify(text)}\n`,
   );
-  execFileSync(path.join(repo, "target/debug/flick"), ["build", "Main.fl", "--profile", "release", "--out-dir", "out"], { cwd: dir });
+  execFileSync(flick, ["build", "Main.fl", "--profile", "release", "--out-dir", "out"], { cwd: dir });
   const out = execFileSync("node", [path.join(here, "run-linked.ts"), path.join(dir, "out"), "flick-main.js"], { cwd: here, encoding: "utf8" });
   assert.equal(out, `${text}\n`);
 });
