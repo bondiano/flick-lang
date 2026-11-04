@@ -125,7 +125,7 @@ impl JsClass {
 }
 
 /// How the values of one constructor are represented.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Rep {
     #[default]
     Tagged,

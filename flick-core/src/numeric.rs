@@ -5,8 +5,9 @@
 use crate::syntax::literal;
 use crate::types::Type;
 use crate::types::lang::{self, Lang};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Num {
     Int,
     Float,
@@ -24,7 +25,7 @@ pub enum NumKind {
 }
 
 /// The arithmetic operators.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Arith {
     Add,
     Sub,

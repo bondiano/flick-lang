@@ -15,9 +15,10 @@ use crate::types::env::{Abi, Form};
 use crate::types::lang::Lang;
 use crate::types::ty::Type;
 use crate::types::typing::SchemaPlan;
+use serde::{Deserialize, Serialize};
 
 /// A constructor of a type that derives `Url`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UrlRoute {
     pub constructor: String,
     /// The first segment, in kebab case; empty for the root.
@@ -32,7 +33,7 @@ pub struct UrlRoute {
 }
 
 /// A segment of a route.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum UrlSegment {
     /// A scalar field, by its witness.
     Value(SchemaPlan),

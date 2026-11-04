@@ -4,6 +4,7 @@
 //! into a runtime position, and which dictionaries a use of a constrained
 //! value receives.
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::sync::Arc;
@@ -171,7 +172,7 @@ pub enum Ref {
     ServiceTag(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Constructor {
     pub module: String,
     pub ty: String,
@@ -190,7 +191,7 @@ pub enum Identity {
 
 /// How a `foreign` is called: its arrows, the dictionaries it takes and
 /// what its metadata says.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ForeignInfo {
     pub stages: Vec<bool>,
     pub dicts: usize,
@@ -212,7 +213,7 @@ pub struct ForeignInfo {
 /// Where a foreign call may pass Flick data, which an import outside the
 /// runtime gets as a copy: JS may change an array or object in place
 /// (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Copies {
     /// For each JS argument.
     pub args: Vec<bool>,
@@ -249,7 +250,7 @@ pub struct ServerFn {
 }
 
 /// The witness `T$schema` of a type that derives `Schema`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SchemaItem {
     pub ty: String,
     /// The type declaration.
@@ -264,7 +265,7 @@ pub struct SchemaItem {
 }
 
 /// How a witness is built from the witnesses of its parts.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SchemaPlan {
     /// A primitive: `Int`, `Float`, `String`, `Bool`, `Unit`, ….
     Prim(String),
@@ -310,7 +311,7 @@ pub struct CodecBlock {
 }
 
 /// How the JS result of a foreign call becomes a Flick value.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct ResultAdapter {
     /// `nullable`: `null` and `undefined` are `None`.
     pub nullable: bool,
@@ -331,7 +332,7 @@ pub struct Owner {
 }
 
 /// How a function becomes the one of another stage its position expects.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Lift {
     /// A function: the stage of this stage and the one expected, and how its
     /// result lifts.
@@ -344,7 +345,7 @@ pub enum Lift {
     Eff(Box<Lift>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstanceInfo {
     pub module: String,
     /// The head as written: what `Dict::Instance` names it by.

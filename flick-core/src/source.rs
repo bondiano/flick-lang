@@ -1,15 +1,18 @@
 //! Source files, UTF-8 byte spans and line index: diagnostics carry UTF-8 byte
 //! ranges; editors convert them to their own position encoding.
 
+use serde::{Deserialize, Serialize};
 use std::{iter, ops};
 
 use crate::diagnostics::{Diagnostic, codes};
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
 pub struct FileId(u32);
 
 /// Half-open UTF-8 byte range `start..end` in one file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Span {
     pub file: FileId,
     pub start: u32,
