@@ -67,8 +67,8 @@ e2e-prepare:
 
 # The JS packages, with the playground's compiler: typecheck, lint, tests
 e2e-js: docs-wasm e2e-prepare
-    pnpm -r typecheck
-    pnpm -r lint
+    FLICK_BIN={{flick}} pnpm -r typecheck
+    FLICK_BIN={{flick}} pnpm -r lint
     FLICK_BIN={{flick}} pnpm -r test
 
 # The e2e suites of the compiler but the cases of tests/run, under nextest

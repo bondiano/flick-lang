@@ -40,6 +40,8 @@ jobs:
           go-version-file: runtime-go/go.mod
           cache-dependency-path: runtime-go/go.sum
       - uses: extractions/setup-just@v4
+      # some tests run pnpm; its version comes from `packageManager`
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 24.18.0
