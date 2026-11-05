@@ -83,11 +83,10 @@ func (p *pool) onAcquire(fb *Fiber, item *poolItem) {
 	}
 }
 
-// finalize closes the item's owner with how its acquisition ended.
-//
-// shortcut: a failing finalizer is dropped, where Effect logs it at UnhandledLogLevel; log it once Logger's references are on the go target
+// finalize closes the item's owner with how its acquisition ended; a
+// finalizer that fails is logged as no one handles it.
 func (p *pool) finalize(fb *Fiber, item *poolItem) {
-	item.scope.close(fb, item.exit.cause)
+	logUnhandled(fb, "Unhandled error in pool finalizer", item.scope.closeFinalizers(fb, item.exit.cause))
 	if item.shutdown != nil {
 		item.shutdown.release(1)
 	}

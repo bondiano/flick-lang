@@ -72,12 +72,11 @@ func closeEntries(fb *Fiber, entries []*scopedEntry) {
 	}
 }
 
-// closeEvicted closes the owner of an entry the capacity evicted.
-//
-// shortcut: a failing finalizer is dropped, where Effect logs it at UnhandledLogLevel; log it once Logger's references are on the go target
+// closeEvicted closes the owner of an entry the capacity evicted; a
+// finalizer that fails is logged as no one handles it.
 func closeEvicted(fb *Fiber, entries []*scopedEntry) {
 	for _, e := range entries {
-		e.scope.close(fb, nil)
+		logUnhandled(fb, "Unhandled error in ScopedCache finalizer", e.scope.close(fb, nil))
 	}
 }
 
