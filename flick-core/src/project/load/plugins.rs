@@ -21,7 +21,7 @@ use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::expansion::{Expanded, Expansion};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
-use crate::plugin::{EditorBlock, Expander, Failure, blocks_under, first_party};
+use crate::plugin::{EditorBlock, Expander, Failure, blocks_under, first_party, placed};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -395,26 +395,10 @@ fn failure(found: &Found, package: &str, what: &str) -> Diagnostic {
 /// the whole of its frame meaning the whole block: under the plugin's own
 /// code, or `P036` without one.
 fn refusal(found: &Found, package: &str, d: &flick_plugin::Diagnostic) -> Diagnostic {
-    let start = found.source.start();
+    let source = &found.source;
+    let frame = Span::new(source.file(), source.start(), source.end());
     // a declaration of another module has no place here but the block
-    let whole = (d.span.start, d.span.end) == (0, found.source.end() - start);
-    let span = if whole || found.source.foreign() {
-        found.whole
-    } else {
-        Span::new(
-            found.source.file(),
-            start + d.span.start,
-            start + d.span.end,
-        )
-    };
-    match (d.code.as_deref()).and_then(|code| codes::plugin(package, code)) {
-        Some(code) => Diagnostic::error(code, d.message.clone(), span),
-        None => Diagnostic::error(
-            codes::P036,
-            format!("plugin `{package}`: {}", d.message),
-            span,
-        ),
-    }
+    placed(d, package, frame, found.whole, source.foreign())
 }
 
 impl Loader<'_> {

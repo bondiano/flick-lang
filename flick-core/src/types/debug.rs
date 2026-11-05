@@ -5,6 +5,7 @@ use std::mem;
 use super::Checker;
 use super::kinds::Kind;
 use super::ty::Type;
+use super::typing::range;
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::source::Span;
 use crate::syntax::cst::{Node, Token};
@@ -59,9 +60,14 @@ impl Checker<'_> {
         (hole, expected.clone())
     }
 
-    /// A warning for each `_` in a type, with the type inferred for it.
+    /// A warning for each `_` in a type, with the type inferred for it; one
+    /// of generated code is a fact for its plugin's `check` too.
     pub(super) fn report_holes(&mut self) {
         for (span, hole) in mem::take(&mut self.holes) {
+            if span.start >= self.generated {
+                let fact = self.fact(&hole);
+                self.typing.wildcards.push((range(span), fact));
+            }
             let shown = self.show(&hole);
             self.diagnostics.push(
                 Diagnostic::new(codes::T024, Severity::Warning, format!("`_` is `{shown}`"))

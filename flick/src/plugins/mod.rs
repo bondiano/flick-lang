@@ -15,7 +15,9 @@ use std::sync::Arc;
 
 use flick_core::plugin::source::BlockSource;
 use flick_core::plugin::{Expander, Failure};
-use flick_plugin::{Arena, Block, Completion, DeriveTarget, Highlight, Hover, Piece};
+use flick_plugin::{
+    Arena, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
+};
 
 pub use cache::{cached, save};
 
@@ -118,5 +120,15 @@ impl Expander for Traced {
     fn format(&self, block: &Block, state: &[u8], source: &mut BlockSource) -> Option<Vec<Piece>> {
         self.trace(&format!("format {} {}", self.inner.id(), block.head));
         self.inner.format(block, state, source)
+    }
+
+    fn check(
+        &self,
+        block: &Block,
+        state: &[u8],
+        facts: &[Fact],
+    ) -> Result<Vec<Diagnostic>, String> {
+        self.trace(&format!("check {} {}", self.inner.id(), block.head));
+        self.inner.check(block, state, facts)
     }
 }

@@ -72,6 +72,9 @@ break programs.
   of a record derives `Schema` for it), and `server name` of a value that
   is no `server fn` stays `FLICK-E010`. `FLICK-E012` and the `server-stdlib`
   feature are gone: every build has the plugin.
+- **Plugins, interface `0.10.0`:** `check` after checking: a plugin gets the
+  type the checker found for each `_` of its code, at the span it gave it,
+  with the fields of a closed record, and may add errors under its codes.
 - **Plugins, interface `0.9.0`:** a declaration block sees the signature
   right above it, and code with a type of it, `signed(span)`, takes it from
   the module; a block knows its `module`; `parse-body` parses a body as

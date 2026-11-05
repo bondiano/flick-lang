@@ -153,6 +153,22 @@ mod wasm {
     }
 
     #[test]
+    fn a_wasm_plugin_checks_its_code_with_the_types_found() {
+        let main = "module App.Main exposing (main, x)\n\nimport Pairs exposing (plugin typed)\n\nx : Float\nlet x = typed { 1.0 + 2.0 }\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
+        let root = app("plugins-check", main);
+        let checked = flick(&root, &["check"]);
+        let stderr = String::from_utf8_lossy(&checked.stderr);
+        assert!(!checked.status.success(), "{stderr}");
+        assert!(stderr.contains("pairs/X002"), "{stderr}");
+        assert!(stderr.contains("`_` is `Float`"), "{stderr}");
+        assert!(
+            trace(&root).iter().any(|l| l == "check pairs typed"),
+            "{:?}",
+            trace(&root)
+        );
+    }
+
+    #[test]
     fn a_plugin_runs_within_its_fuel_and_memory() {
         let main = "module App.Main exposing (main, a, b)\n\nimport Pairs exposing (plugin spin, plugin hog)\n\nlet a = spin {}\nlet b = hog {}\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
         let root = app("plugins-limits", main);
@@ -173,8 +189,10 @@ mod wasm {
         let root = app("plugins-version", MAIN);
         let path = root.join("lib/pairs.wasm");
         let ours = format!("flick:plugin/compiler@{}", flick_plugin::VERSION);
-        let old = format!("flick:plugin/compiler@{}", "0.3.0");
-        assert_eq!(ours.len(), old.len(), "the same length keeps the binary");
+        // an older version of the same length keeps the binary
+        let version = format!("0.0.{}", "1".repeat(flick_plugin::VERSION.len() - 4));
+        let old = format!("flick:plugin/compiler@{version}");
+        assert_eq!(ours.len(), old.len());
         let mut bytes = fs::read(&path).expect("read the component");
         let mut found = false;
         while let Some(at) = bytes.windows(ours.len()).position(|w| w == ours.as_bytes()) {
@@ -187,7 +205,7 @@ mod wasm {
         let stderr = String::from_utf8_lossy(&checked.stderr);
         assert!(
             stderr.contains("FLICK-P035")
-                && stderr.contains("built for `flick:plugin@0.3.0`")
+                && stderr.contains(&format!("built for `flick:plugin@{version}`"))
                 && stderr.contains(&format!("speaks `{}`", flick_plugin::VERSION)),
             "{stderr}"
         );

@@ -333,4 +333,18 @@ impl Expander for Wasm {
         *source = back;
         Some(result.ok()??.into_iter().map(convert::from_piece).collect())
     }
+
+    fn check(
+        &self,
+        block: &flick_plugin::Block,
+        state: &[u8],
+        facts: &[flick_plugin::Fact],
+    ) -> Result<Vec<flick_plugin::Diagnostic>, String> {
+        let block = convert::to_block(block);
+        let facts: Vec<_> = facts.iter().map(convert::to_fact).collect();
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_check(store, &block, state, &facts)
+        });
+        Ok(result?.into_iter().map(convert::from_diagnostic).collect())
+    }
 }

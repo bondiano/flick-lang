@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use flick_plugin::{Arena, Block, DeriveTarget};
+use flick_plugin::{Arena, Block, DeriveTarget, Diagnostic as PluginDiagnostic, Fact};
 use flick_test_pairs::Pairs;
 
 mod derive;
@@ -62,6 +62,15 @@ impl Expander for Counting {
     ) -> Result<Arena, Failure> {
         self.inner
             .derive(target, class, args, module, state, source)
+    }
+
+    fn check(
+        &self,
+        block: &Block,
+        state: &[u8],
+        facts: &[Fact],
+    ) -> Result<Vec<PluginDiagnostic>, String> {
+        self.inner.check(block, state, facts)
     }
 }
 

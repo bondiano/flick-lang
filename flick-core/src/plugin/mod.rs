@@ -14,11 +14,13 @@ pub mod testing;
 use std::sync::Arc;
 
 use flick_plugin::{
-    Arena, Block, Completion, DeriveTarget, Diagnostic, Highlight, Hover, Piece, Plugin,
+    Arena, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece, Plugin,
 };
 
 use source::BlockSource;
 
+use crate::diagnostics::{self, codes};
+use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -74,6 +76,17 @@ pub trait Expander: Send + Sync {
             message,
             target.decl.whole(),
         )]))
+    }
+    /// What only the types of `block`'s code show is wrong with it, from
+    /// `facts`, the types of the `_` of its code; why the plugin failed.
+    fn check(
+        &self,
+        block: &Block,
+        state: &[u8],
+        facts: &[Fact],
+    ) -> Result<Vec<Diagnostic>, String> {
+        let _ = (block, state, facts);
+        Ok(Vec::new())
     }
 }
 
@@ -183,6 +196,46 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         (self.plugin)
             .derive(target, class, args, module, state, source)
             .map_err(Failure::Refused)
+    }
+
+    fn check(
+        &self,
+        block: &Block,
+        state: &[u8],
+        facts: &[Fact],
+    ) -> Result<Vec<Diagnostic>, String> {
+        Ok(self.plugin.check(block, state, facts))
+    }
+}
+
+/// What the plugin `package` found wrong at a span of a block whose frame
+/// is `frame` in its module, under the plugin's own code or `P036` without
+/// one: the whole frame, or any span of a declaration of another module
+/// (`foreign`), is `whole`, what the block stands for.
+pub(crate) fn placed(
+    d: &Diagnostic,
+    package: &str,
+    frame: Span,
+    whole: Span,
+    foreign: bool,
+) -> diagnostics::Diagnostic {
+    let all = (d.span.start, d.span.end) == (0, frame.end - frame.start);
+    let span = if all || foreign {
+        whole
+    } else {
+        Span::new(
+            frame.file,
+            frame.start + d.span.start,
+            frame.start + d.span.end,
+        )
+    };
+    match (d.code.as_deref()).and_then(|code| codes::plugin(package, code)) {
+        Some(code) => diagnostics::Diagnostic::error(code, d.message.clone(), span),
+        None => diagnostics::Diagnostic::error(
+            codes::P036,
+            format!("plugin `{package}`: {}", d.message),
+            span,
+        ),
     }
 }
 

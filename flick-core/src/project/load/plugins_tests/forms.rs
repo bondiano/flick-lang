@@ -16,7 +16,7 @@ use crate::project::load::analyze;
 use crate::project::load::{FormatPlugins, check, compile};
 use crate::source::{FileId, SourceMap};
 
-const IMPORT: &str = "module App.Main exposing (..)\n\nimport Pairs exposing (plugin named, plugin text_of, plugin define, plugin table, plugin traced, plugin variants, plugin shows, plugin signed)\n\n";
+const IMPORT: &str = "module App.Main exposing (..)\n\nimport Pairs exposing (plugin named, plugin text_of, plugin define, plugin table, plugin traced, plugin variants, plugin shows, plugin signed, plugin typed)\n\n";
 
 const FORMS: &str = "shape : String
 let shape = named Shape
@@ -150,6 +150,13 @@ fn errors_land_on_the_users_code_of_a_declaration_or_on_the_block() {
             .any(|f| f.contains("needs a signature right above it")),
         "{found:?}"
     );
+    // what a plugin's `check` finds from the types of its code: at its `_`
+    let found = report("x : Float\nlet x = typed { 1.0 + 2.0 }\n");
+    assert_eq!(
+        found,
+        ["pairs/X002 `1.0 + 2.0`: `_` is `Float`"],
+        "{found:?}"
+    );
     // a head where it does not stand: what the plugin says
     let found = report("x : String\nlet x = define y { 1.0 }\n");
     assert!(
@@ -220,7 +227,7 @@ fn the_formatter_finds_the_plugins_of_the_projects_packages() {
     assert_eq!(
         heads,
         [
-            "define", "named", "shows", "signed", "table", "text_of", "traced", "variants"
+            "define", "named", "shows", "signed", "table", "text_of", "traced", "typed", "variants"
         ]
     );
     // without the project, a package's plugin is unknown

@@ -207,6 +207,24 @@ macro_rules! wit_conversions {
                 }
             }
 
+            pub fn to_fact(f: &$crate::Fact) -> w::Fact {
+                let ty = |t: &$crate::FactType| w::FactType { shown: t.shown.clone(), exact: t.exact.clone() };
+                w::Fact {
+                    span: to_span(f.span),
+                    ty: ty(&f.ty),
+                    fields: f.fields.as_ref().map(|fs| fs.iter().map(|x| w::FactField { label: x.label.clone(), ty: ty(&x.ty) }).collect()),
+                }
+            }
+
+            pub fn from_fact(f: w::Fact) -> $crate::Fact {
+                let ty = |t: w::FactType| $crate::FactType { shown: t.shown, exact: t.exact };
+                $crate::Fact {
+                    span: from_span(f.span),
+                    ty: ty(f.ty),
+                    fields: f.fields.map(|fs| fs.into_iter().map(|x| $crate::FactField { label: x.label, ty: ty(x.ty) }).collect()),
+                }
+            }
+
             pub fn to_hover(h: $crate::Hover) -> w::Hover {
                 w::Hover { markdown: h.markdown, span: to_span(h.span) }
             }
