@@ -143,9 +143,26 @@ numbers be finite, holes lie in the body and not overlap, an expression or a
 pattern be used once (a type may stand in several places, as in a signature
 and an annotation), and its size and depth are bounded. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,
-`0.9.0`. A component built for another version does not load: the import
+`0.10.0`. A component built for another version does not load: the import
 that exposes its heads is `FLICK-P035`, naming the version it was built for
 and the one the compiler speaks, until it is rebuilt.
+
+## Checks with types
+
+A plugin's code is checked like the user's, so a mistake there is reported
+on what it stands for. What only the types show, such as a field a record
+lacks, the plugin says itself after checking: each `_` of its code, a type
+the checker infers, is a fact with the span the plugin gave it, and `check`
+gets them, the type as written (`shown`), qualified with aliases expanded
+(`exact`, none while it has errors or unknowns) and, for a closed record,
+its fields. `check` only adds errors; a block whose code has no `_` is not
+asked.
+
+```rust
+fn check(&self, block: &Block, _: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
+    facts.iter().map(|f| Diagnostic::error(format!("`_` is `{}`", f.ty.shown), f.span)).collect()
+}
+```
 
 ## Derives
 
@@ -294,6 +311,7 @@ what `collect` learns, and every block of its group is expanded again.
 | a head of the compiler's own plugins whose import the file lacks | `FLICK-P037` on the head, with the import as its fix |
 | an error in the user's code inside a block | the usual one, at that code |
 | an error in the code a plugin gave | the usual one, on the code it stands for, with a note naming the plugin |
+| what a plugin's `check` finds | `<package>/X001` at the span it names; `FLICK-P036` when `check` fails |
 
 A span of the whole text of a block is the whole block, its head with it.
 A plugin's code is capital letters and three digits; the compiler puts the
@@ -304,7 +322,7 @@ dropped.
 
 ## Not yet
 
-Permissions, warnings of plugins and checks after typing come later. A
+Permissions and warnings of plugins come later. A
 built-in module the file hides by an alias, as `import Other as List`, is
 hidden from generated code too. `collect` sees the modules the run loads, so `flick check one.fl` gives it
 fewer blocks than a whole build. A package whose modules have plugin blocks
