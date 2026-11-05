@@ -1,8 +1,6 @@
 [wrapped]
 LogLevel = "LogLevel.LogLevel a48abb0d82f8178a"
 Severity = "LogLevel.Severity e9f6319cae7af0d3"
-values = "LogLevel.values dd1f953033fab26f"
-getOrdinal = "LogLevel.get_ordinal 280a33d80234f9a5"
 isEnabled = "LogLevel.is_enabled c68766ed87e3755d"
 isGreaterThan = "LogLevel.is_greater_than 6d01956b9822116b"
 isGreaterThanOrEqualTo = "LogLevel.is_greater_than_or_equal_to 1f3b565858715fd8"
@@ -10,5 +8,7 @@ isLessThan = "LogLevel.is_less_than 543dbb98246cdb23"
 isLessThanOrEqualTo = "LogLevel.is_less_than_or_equal_to 371988eb8e39fd3e"
 
 [language]
-Order = "class `Ord`: `instance Ord LogLevel` orders by severity (`compare`, `<`)"
-Equivalence = "class `Eq`: `instance Eq LogLevel` (`==`)"
+values = "the companion `LogLevel.all` of the enum `LogLevel`, from least to most severe"
+getOrdinal = "class `Ord`: the constructors of `LogLevel` are declared by severity"
+Order = "class `Ord`: `LogLevel` derives it, by severity (`compare`, `<`)"
+Equivalence = "class `Eq`: `LogLevel` derives it (`==`)"

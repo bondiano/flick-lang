@@ -20,9 +20,9 @@ scoped
 the scope closed the group
 true
 back on stdout
-values: [All, Fatal, Error, Warn, Info, Debug, Trace, None] Warn
-ordinal info < warn: true
-sorted: [All, Debug, Info, Fatal, None]
+values: [All, Trace, Debug, Info, Warn, Error, Fatal, Off] Warn
+compare info warn: LT
+sorted: [All, Debug, Info, Fatal, Off]
 warn > info: true
 warn >= warn: true
 debug < trace: false

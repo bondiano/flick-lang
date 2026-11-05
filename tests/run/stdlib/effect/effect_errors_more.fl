@@ -88,9 +88,9 @@ let logged () =
   let causes = Logger.make (fun (o : Logger.Options) -> o.cause)
   provide (Logger.batched collect { mergeWithExisting = false } causes) {
     Effect.log_info "plain"
-    Effect.ignore_ (Some LogLevel.info) boom
-    Effect.ignore_ (Some LogLevel.debug) boom
-    Effect.ignore_cause (Some LogLevel.warn) broken
+    Effect.ignore_ (Some LogLevel.Info) boom
+    Effect.ignore_ (Some LogLevel.Debug) boom
+    Effect.ignore_cause (Some LogLevel.Warn) broken
   }
   let described = List.map_effect (fun c -> RawCause.describe (RawCause.inspect c)) (Ref.get seen)
   say ("logged: " ++ show described)
@@ -101,8 +101,8 @@ let logged () =
   }
   let structured = Logger.map (fun (s : Logger.Structured) -> s.cause) Logger.format_structured
   provide (Logger.batched keep { mergeWithExisting = false } structured) {
-    Effect.ignore_ (Some LogLevel.error) boom
-    Effect.ignore_cause (Some LogLevel.error) broken
+    Effect.ignore_ (Some LogLevel.Error) boom
+    Effect.ignore_cause (Some LogLevel.Error) broken
   }
   say ("structured: " ++ show (Ref.get texts))
 

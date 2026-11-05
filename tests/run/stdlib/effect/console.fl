@@ -6,12 +6,12 @@ type alias Row = { name : String; size : Float }
 
 levels : List LogLevel.Severity
 let levels = [
-  LogLevel.fatal,
-  LogLevel.error,
-  LogLevel.warn,
-  LogLevel.info,
-  LogLevel.debug,
-  LogLevel.trace,
+  LogLevel.Fatal,
+  LogLevel.Error,
+  LogLevel.Warn,
+  LogLevel.Info,
+  LogLevel.Debug,
+  LogLevel.Trace,
 ]
 
 main : Unit ->{; AppError} Unit
@@ -60,35 +60,33 @@ let main () =
   let same = Console.with_console quiet (task { Console.current () })
   Console.dir (same == quiet)
   Console.log "back on stdout"
-  let warn_level = LogLevel.warn
-  Platform.stdout_line ("values: " ++ show LogLevel.values ++ " " ++ show warn_level)
-  Platform.stdout_line
-    ("ordinal info < warn: "
-      ++ show (LogLevel.get_ordinal LogLevel.info < LogLevel.get_ordinal LogLevel.warn))
+  let warn_level = LogLevel.Warn
+  Platform.stdout_line ("values: " ++ show LogLevel.all ++ " " ++ show warn_level)
+  Platform.stdout_line ("compare info warn: " ++ show (compare LogLevel.Info LogLevel.Warn))
   Platform.stdout_line
     ("sorted: "
       ++ show
-        (List.sort [LogLevel.debug, LogLevel.fatal, LogLevel.all, LogLevel.none_, LogLevel.info]))
+        (List.sort [LogLevel.Debug, LogLevel.Fatal, LogLevel.All, LogLevel.Off, LogLevel.Info]))
   Platform.stdout_line
-    ("warn > info: " ++ show (LogLevel.warn |> LogLevel.is_greater_than LogLevel.info))
+    ("warn > info: " ++ show (LogLevel.Warn |> LogLevel.is_greater_than LogLevel.Info))
   Platform.stdout_line
-    ("warn >= warn: " ++ show (LogLevel.warn |> LogLevel.is_greater_than_or_equal_to LogLevel.warn))
+    ("warn >= warn: " ++ show (LogLevel.Warn |> LogLevel.is_greater_than_or_equal_to LogLevel.Warn))
   Platform.stdout_line
-    ("debug < trace: " ++ show (LogLevel.debug |> LogLevel.is_less_than LogLevel.trace))
+    ("debug < trace: " ++ show (LogLevel.Debug |> LogLevel.is_less_than LogLevel.Trace))
   Platform.stdout_line
     ("error <= fatal: "
-      ++ show (LogLevel.error |> LogLevel.is_less_than_or_equal_to LogLevel.fatal))
+      ++ show (LogLevel.Error |> LogLevel.is_less_than_or_equal_to LogLevel.Fatal))
   Platform.stdout_line
     ("eq: "
       ++ show (
-        LogLevel.info == LogLevel.info,
-        LogLevel.info == LogLevel.debug,
-        LogLevel.name LogLevel.trace,
+        warn_level == LogLevel.Warn,
+        warn_level == LogLevel.Debug,
+        LogLevel.value LogLevel.Trace,
       ))
   Platform.stdout_line
     ("enabled: "
       ++ show (
         List.length levels,
-        LogLevel.is_enabled LogLevel.info,
-        LogLevel.is_enabled LogLevel.debug,
+        LogLevel.is_enabled LogLevel.Info,
+        LogLevel.is_enabled LogLevel.Debug,
       ))
