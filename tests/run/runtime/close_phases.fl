@@ -60,6 +60,9 @@ let supervisor_owner () = scope outer {
 group_close : Unit ->{} Unit
 let group_close () = scope s {
   let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
+  // the child and the body take turns through these, not through timers
+  let opened : Deferred.Deferred none Unit = Deferred.make ()
+  let said : Deferred.Deferred none Unit = Deferred.make ()
   let _f =
     FiberSet.run
       { propagateInterruption = false; startImmediately = true }
@@ -67,13 +70,18 @@ let group_close () = scope s {
         Effect.uninterruptible
           (task {
             let _r = open_res "group"
-            nap 50
+            let _ = Deferred.succeed () opened
+            Deferred.await_ said
+            // still running as the owner closes
+            nap 40
             say "group child done"
           })
       })
       set
-  nap 10
+  Deferred.await_ opened
   say "body done"
+  let _ = Deferred.succeed () said
+  ()
 }
 
 unmask : Unit ->{} Unit
