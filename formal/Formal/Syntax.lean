@@ -126,9 +126,8 @@ inductive Ty
   | dict (c : Nat) (args : Ty)
 
 /-- `⌈τ⌉` of regions.md §2.1: the atoms a value of type `τ` may reach. Rows of
-services are not in it; a row of errors contributes its atoms, what its errors reach, and
-not its row variables: an error carries no regions, so the instance of an error-row
-variable reaches nothing (`Row.substE`). -/
+services are not in it; a row of errors contributes its atoms and its variables, which
+bound what the errors of an unknown row reach. -/
 def Ty.reach : Ty → Caps
   | .tvar n => fun a => a = .v n
   | .rg p => fun a => a = .r p
@@ -139,7 +138,7 @@ def Ty.reach : Ty → Caps
   | .tapp f a => fun x => f.reach x ∨ a.reach x
   | .rcons _ t r => fun x => t.reach x ∨ r.reach x
   | .eff _ _ t C => fun x => t.reach x ∨ C x
-  | .errors e => fun x => e (.atm x)
+  | .errors e => fun x => e (.atm x) ∨ e (.rv x)
   | .hnd s => s.reach
   | .owner s => s.reach
   | _ => Caps.none
@@ -170,17 +169,9 @@ def Row.substT (σ : Atom → Ty) (r : Row) : Row
   | .need n a => ∃ b, r (.need n b) ∧ (σ b).reach a
   | .rv a => ∃ b, r (.rv b) ∧ (σ b).asRow (.rv a)
 
-/-- A row of errors after a substitution: as `Row.substT`, but a row variable brings in only
-the names and row variables of its instance, not its atoms. An error carries no regions
-(`docs/formal/regions.md` §2.5, (Err-Decl) and (Err-Raise)), so what instantiates an
-error-row variable reaches nothing. -/
-def Row.substE (σ : Atom → Ty) (e : Row) : Row
-  | .atm a => ∃ b, e (.atm b) ∧ (σ b).reach a
-  | x => e.substT σ x
-
 def Stage.substT (σ : Atom → Ty) : Stage → Stage
   | .pure => .pure
-  | .rt r e => .rt (r.substT σ) (e.substE σ)
+  | .rt r e => .rt (r.substT σ) (e.substT σ)
 
 /-- Parallel substitution of variables and run-time regions. Types have no binders. -/
 def Ty.substT (σ : Atom → Ty) : Ty → Ty
@@ -195,9 +186,9 @@ def Ty.substT (σ : Atom → Ty) : Ty → Ty
   | .tapp f a => .tapp (f.substT σ) (a.substT σ)
   | .rnil => .rnil
   | .rcons l t r => .rcons l (t.substT σ) (r.substT σ)
-  | .eff r e t C => .eff (r.substT σ) (e.substE σ) (t.substT σ) (C.substT σ)
-  | .layer i e o => .layer (i.substT σ) (e.substE σ) (o.substT σ)
-  | .errors e => .errors (e.substE σ)
+  | .eff r e t C => .eff (r.substT σ) (e.substT σ) (t.substT σ) (C.substT σ)
+  | .layer i e o => .layer (i.substT σ) (e.substT σ) (o.substT σ)
+  | .errors e => .errors (e.substT σ)
   | .env r => .env (r.substT σ)
   | .hnd s => .hnd (s.substT σ)
   | .owner s => .owner (s.substT σ)

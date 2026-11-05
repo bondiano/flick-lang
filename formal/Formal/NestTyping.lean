@@ -80,7 +80,7 @@ theorem close_move {Θ : Facts} {p : Nat} {w : Tm} {T : Ty} {φ : Stage} {A : Na
     · exact hW.moveT hv hb fun x hx => iff x fun h => ht (h ▸ hx)
     · have hv' := raise_errors hv hb
       have : v.Within Ψ B anc A := Tm.Within.moveT hv hv' hW fun x hx => iff x fun h => hε (by
-        subst h; exact Stage.le_err hφ' _ hx)
+        subst h; exact hx.imp (Stage.le_err hφ' _) (Stage.le_err hφ' _))
       exact this
   | errVal hv => exact absurd hv inside_not_value
 

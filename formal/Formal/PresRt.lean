@@ -206,7 +206,7 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
           · exact .inl h'
       have hε : ¬ (Ty.errors ε).reach (.r Λ.length) := fun h => by
         obtain ⟨_, _, rfl, _, he'⟩ := Stage.rt_le hφr
-        have h' := he' _ h
+        have h' := h.imp (he' _) (he' _)
         simp only [Stage.substT, Stage.rt.injEq] at hφ
         rw [← hφ.2] at h'
         exact Row.kill_fresh _ _ h'

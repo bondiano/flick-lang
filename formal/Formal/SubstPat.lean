@@ -38,7 +38,7 @@ theorem Le.substT {a b : Ty} (σ : Atom → Ty) (h : Le a b) : Le (a.substT σ) 
   induction h with
   | refl => exact .refl
   | arrow _ hφ _ hc ih₁ ih₂ => exact .arrow ih₁ (Stage.le_substT σ hφ) ih₂ (sub hc)
-  | eff hr he _ hc ih => exact .eff (hr.substT σ) (he.substE σ) ih (sub hc)
+  | eff hr he _ hc ih => exact .eff (hr.substT σ) (he.substT σ) ih (sub hc)
 
 theorem Shp.of_substT {σ : Atom → Ty} :
     ∀ {t : Ty} {v : Tm}, Shp S true (t.substT σ) v → Shp S true t v
@@ -81,7 +81,7 @@ theorem PatTy.substT {fl p t Δ} (σ : Atom → Ty) (h : PatTy S fl p t Δ) :
   | or _ _ ih₁ ih₂ => exact .or ih₁ ih₂
 
 theorem HPat.substT {ε₀ p θ Δ} (σ : Atom → Ty) (h : HPat S ε₀ p θ Δ) :
-    HPat S (ε₀.substE σ) p (θ.substT σ) (Δ.map (Ty.substT σ)) := by
+    HPat S (ε₀.substT σ) p (θ.substT σ) (Δ.map (Ty.substT σ)) := by
   cases h with
   | wild => exact .wild
   | var => exact .var
@@ -97,19 +97,23 @@ theorem Ty.no_rg_substT {t : Ty} {σ : Atom → Ty} {p : Nat}
 
 /-- What a `handle` lets through: all but the names of the raised row. -/
 theorem Row.passes_substT {ε₀ ε' : Row} (σ : Atom → Ty) (h : ∀ x, ε₀ x → (∃ N, x = .nm N) ∨ ε' x) :
-    ∀ x, ε₀.substE σ x → (∃ N, x = .nm N) ∨ ε'.substE σ x := by
+    ∀ x, ε₀.substT σ x → (∃ N, x = .nm N) ∨ ε'.substT σ x := by
   have key : ∀ {y}, ε₀ y → (∀ N, y ≠ .nm N) → ε' y := fun hy hn =>
     (h _ hy).resolve_left fun ⟨N, h'⟩ => hn N h'
   intro x hx
   cases x with
   | nm N => exact .inl ⟨N, rfl⟩
-  | atm a => obtain ⟨b, hb, h'⟩ := hx; exact .inr ⟨b, key hb (by simp), h'⟩
+  | atm a =>
+    refine .inr ?_
+    rcases hx with ⟨b, hb, h'⟩ | ⟨b, hb, h'⟩
+    · exact .inl ⟨b, key hb (by simp), h'⟩
+    · exact .inr ⟨b, key hb (by simp), h'⟩
   | ob _ a | need _ a | rv a =>
     obtain ⟨b, hb, h'⟩ := hx; exact .inr ⟨b, key hb (by simp), h'⟩
 
 theorem Catches.substT {ε₀ : Row} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom → Ty)
     (h : ∀ n, H n → Catches S ε₀ p θ n ∨ H' n) :
-    ∀ n, H.substE σ n → Catches S (ε₀.substE σ) p (θ.substT σ) n ∨ H'.substE σ n := by
+    ∀ n, H.substT σ n → Catches S (ε₀.substT σ) p (θ.substT σ) n ∨ H'.substT σ n := by
   intro n hn
   cases n with
   | nm N =>
@@ -121,7 +125,13 @@ theorem Catches.substT {ε₀ : Row} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom
     · rcases h _ hb with h | h
       · exact h.elim
       · exact .inr (.inr ⟨b, h, h'⟩)
-  | atm a | ob _ a | need _ a | rv a =>
+  | atm a =>
+    rcases hn with ⟨b, hb, h'⟩ | ⟨b, hb, h'⟩ <;> rcases h _ hb with h | h
+    · exact h.elim
+    · exact .inr (.inl ⟨b, h, h'⟩)
+    · exact h.elim
+    · exact .inr (.inr ⟨b, h, h'⟩)
+  | ob _ a | need _ a | rv a =>
     obtain ⟨b, hb, h'⟩ := hn
     rcases h _ hb with h | h
     · exact h.elim

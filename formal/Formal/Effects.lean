@@ -87,12 +87,6 @@ theorem Steps.mono {root : Roots} {Q Q' : Lbl → Prop} {Λ μ e Λ' μ' e'}
   | refl => exact .refl
   | step h₁ hl _ ih => exact .step h₁ (hQ _ hl) ih
 
-theorem Row.kill_subE (ε : Row) (n : Nat) : Row.Sub (ε.substE (kill n)) ε := by
-  intro x hx
-  cases x with
-  | atm a => obtain ⟨b, hb, h⟩ := hx; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
-  | _ => rw [Row.substE_of_ne (by simp)] at hx; exact Row.kill_sub ε n _ hx
-
 /-- **T2(b), rows.** From `·;Ψ ⊢ e : τ ! R⟨r; ε⟩`, every `ask_S` that reaches `Σ₀`
 has `S ∈ r`, and a computation that ends in `raise v` has `v : Errors ε`. -/
 theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
@@ -114,7 +108,7 @@ theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : S
       (hs'.mono fun _ hq N hl => Row.kill_sub _ _ _ (hq N hl)), fun v he hv => ?_⟩
     obtain ⟨Ψ', hv'⟩ := hr v he hv
     obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hsub⟩ := canonical_errors hv hv'
-    exact ⟨Ψ', .errVal hv ht hU (hsub.trans (Row.kill_subE _ _))⟩
+    exact ⟨Ψ', .errVal hv ht hU (hsub.trans (Row.kill_sub _ _))⟩
 
 /-- T2(b) for `await v` with `v : Eff r ε τ`. -/
 theorem T2b_await {root Ψ Λ μ v r ε t C Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)

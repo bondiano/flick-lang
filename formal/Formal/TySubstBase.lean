@@ -19,7 +19,7 @@ variable {S : Sig}
 def J.substT (σ : Atom → Ty) : J → J
   | .ex t φ => .ex (t.substT σ) (φ.substT σ)
   | .alts t t' φ => .alts (t.substT σ) (t'.substT σ) (φ.substT σ)
-  | .halts ε H t φ => .halts (ε.substE σ) (H.substE σ) (t.substT σ) (φ.substT σ)
+  | .halts ε H t φ => .halts (ε.substT σ) (H.substT σ) (t.substT σ) (φ.substT σ)
   | .dfs fs => .dfs (fs.map fun f => (f.1, f.2.substT σ))
 
 /-- A substitution that fits a term: it keeps the regions the term writes and the
@@ -127,25 +127,9 @@ theorem Row.up_comm (r : Row) (k : Nat) (σ : Atom → Ty) :
     (r.substT (shiftV k)).substT (liftT k σ) = (r.substT σ).substT (shiftV k) := by
   rw [Row.substT_comp, Row.substT_comp]; congr 1; funext a; exact shift_lift k σ a
 
-/-- A shift brings no atom into a row through a variable. -/
-theorem shiftV_noAtm (k : Nat) : ∀ b a, ¬ (shiftV k b).asRow (.atm a) := by
-  intro b a h; cases b <;> simp [shiftV, Ty.asRow_tvar, Ty.asRow_rg] at h
-
-theorem Row.upE_comm (r : Row) (k : Nat) (σ : Atom → Ty) :
-    (r.substT (shiftV k)).substE (liftT k σ) = (r.substE σ).substT (shiftV k) := by
-  rw [← Row.substE_eq (shiftV_noAtm k), ← Row.substE_eq (shiftV_noAtm k), Row.substE_comp,
-    Row.substE_comp]
-  congr 1; funext a; exact shift_lift k σ a
-
 theorem Row.err_substT (E : Name) (U : Ty) (σ : Atom → Ty) :
     (Row.err E U).substT σ = Row.err E (U.substT σ) := by
   simp [Row.err, Row.ofCaps_substT, Ty.reach_caps]
-
-theorem Row.err_substE (E : Name) (U : Ty) (σ : Atom → Ty) :
-    (Row.err E U).substE σ = Row.err E (U.substT σ) := by
-  funext x; apply propext
-  cases x <;> simp [Row.err, Row.union, Row.single, Row.ofCaps, Row.substE, Row.substT,
-    Ty.reach_substT]
 
 /-- What a term holds is kept by a substitution that fits it. -/
 theorem held_substT {Ψ : List Ty} {Γ : List Scheme} {e : Tm} {T : Ty} {σ : Atom → Ty} (hσ : Fits σ e)
