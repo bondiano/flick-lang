@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"time"
 )
@@ -36,6 +35,21 @@ func (q *outputQueue) Write(b []byte) (int, error) {
 	q.wake()
 	q.mu.Unlock()
 	return len(b), nil
+}
+
+// pipe is the write end of a pipe for a child, whose read end the queue
+// gathers from until every writer closed it.
+func (q *outputQueue) pipe() (*os.File, error) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		io.Copy(q, r)
+		r.Close()
+		q.close()
+	}()
+	return w, nil
 }
 
 func (q *outputQueue) close() {
@@ -93,7 +107,7 @@ type process struct {
 	command  *procCommand
 	cmds     []*exec.Cmd
 	out, err *outputQueue
-	exited   chan struct{} // closed when the last command ended
+	exited   chan struct{} // closed when the last command's process ended, whoever still holds its pipes
 	state    *os.ProcessState
 	waitErr  error
 }
@@ -120,26 +134,48 @@ func (p *process) wait(fb *Fiber) Value {
 	return int32(p.state.ExitCode())
 }
 
-// terminate signals the process groups, last first, and waits for the
-// process to end: `forceAfter`, then SIGKILL and a second more, or only a
-// second without it.
+// terminate signals the process groups, last first, and waits as Effect's
+// spawner does: for the process to end with no limit, then a second for
+// the rest of its groups; with `forceAfter`, SIGKILL follows if the process
+// or its groups still run by then.
 func (p *process) terminate(fb *Fiber, signal string, forceAfter time.Duration) Value {
 	for i := len(p.cmds) - 1; i >= 0; i-- {
 		if err := processKill(p.cmds[i], signal); err != nil && p.running() {
 			return Fail(processError(systemTagOf(err), "kill", None, p.command))
 		}
 	}
-	grace := time.Second
-	if forceAfter > 0 {
-		grace = forceAfter
-	}
-	if !p.awaitExit(fb, grace) && forceAfter > 0 {
+	if forceAfter == 0 {
+		wait(fb, p.exited)
+		p.settle(fb, time.Second)
+	} else if !p.settle(fb, forceAfter) {
 		for _, c := range p.cmds {
 			processKill(c, "SIGKILL")
 		}
-		p.awaitExit(fb, time.Second)
+		p.settle(fb, time.Second)
 	}
+	wait(fb, p.exited)
 	return Unit
+}
+
+// settle waits, at most `limit`, for the process to end and then for the
+// rest of its process groups, which it polls; whether all ended.
+func (p *process) settle(fb *Fiber, limit time.Duration) bool {
+	deadline := time.Now().Add(limit)
+	if !p.awaitExit(fb, limit) {
+		return false
+	}
+	for _, c := range p.cmds {
+		for processGroupAlive(c) {
+			left := time.Until(deadline)
+			if left <= 0 {
+				return false
+			}
+			tick, stop := liveClock{}.timer(min(left, 10*time.Millisecond))
+			wait(fb, tick)
+			stop()
+		}
+	}
+	return true
 }
 
 // awaitExit waits for the end of the process, at most `limit`.
@@ -182,9 +218,21 @@ func (p *process) start(fb *Fiber) Value {
 			}
 		}
 		processGroup(cmd)
+		// The children get pipes the runtime reads and writes itself, so
+		// that `cmd.Wait` waits for the process alone and not for whoever
+		// else holds its pipes, as Effect's exit code does.
 		switch {
 		case command.stdin != nil:
-			cmd.Stdin = strings.NewReader(*command.stdin)
+			r, w, err := os.Pipe()
+			if err != nil {
+				return Fail(processError(systemTagOf(err), "spawn", None, p.command))
+			}
+			closeAfter = append(closeAfter, r)
+			go func(text string) {
+				io.WriteString(w, text)
+				w.Close()
+			}(*command.stdin)
+			cmd.Stdin = r
 		case stdin != nil:
 			cmd.Stdin = stdin
 		}
@@ -193,15 +241,27 @@ func (p *process) start(fb *Fiber) Value {
 		case lastOne && command.inherit:
 			idle()
 			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+			p.out.close()
+			p.err.close()
 		case lastOne:
-			cmd.Stdout, cmd.Stderr = p.out, p.err
+			stdout, err := p.out.pipe()
+			if err != nil {
+				return Fail(processError(systemTagOf(err), "spawn", None, p.command))
+			}
+			closeAfter = append(closeAfter, stdout)
+			stderr, err := p.err.pipe()
+			if err != nil {
+				return Fail(processError(systemTagOf(err), "spawn", None, p.command))
+			}
+			closeAfter = append(closeAfter, stderr)
+			cmd.Stdout, cmd.Stderr = stdout, stderr
 		default:
 			r, w, err := os.Pipe()
 			if err != nil {
 				return Fail(processError(systemTagOf(err), "spawn", None, p.command))
 			}
 			closeAfter = append(closeAfter, r, w)
-			cmd.Stdout, cmd.Stderr, stdin = w, io.Discard, r
+			cmd.Stdout, stdin = w, r // its stderr, unset, goes to the null device
 		}
 		if err := cmd.Start(); err != nil {
 			for _, started := range p.cmds {
@@ -223,8 +283,6 @@ func (p *process) start(fb *Fiber) Value {
 				p.state, p.waitErr = cmd.ProcessState, err
 			}
 		}
-		p.out.close()
-		p.err.close()
 		close(p.exited)
 	}()
 	return Unit
