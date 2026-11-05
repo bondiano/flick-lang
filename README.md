@@ -7,22 +7,25 @@
 </h1>
 
 <p align="center">
-  <strong>Functional programming. Explicit effects. JavaScript.</strong>
+  <strong>Functional programming. Explicit effects. JavaScript and Go.</strong>
 </p>
 
 <p align="center">
   <a href="https://bondiano.github.io/flick-lang/">Documentation</a> ·
+  <a href="./docs/src/content/docs/start/why.md">Why Flick</a> ·
   <a href="./docs/src/content/docs/learn/index.md">Learn</a> ·
   <a href="./docs/src/content/docs/start/getting-started.md">Get started</a> ·
   <a href="./examples/">Examples</a> ·
   <a href="./editors/README.md">Editor setup</a>
 </p>
 
-Flick is an ML-family language that compiles to JavaScript and TypeScript,
-with [Effect](https://effect.website/) at its runtime foundation, and to Go
-for a standalone executable.
+Flick is an ML-family language for the browser, the server and the command
+line. It compiles to JavaScript and TypeScript, where effects run on
+[Effect](https://effect.website/), and to Go for a standalone executable.
 Pattern matching, higher-kinded types and type classes meet typed effects,
 errors and services, with regions to keep scoped resources from escaping.
+[Why Flick](./docs/src/content/docs/start/why.md) says what it is for, and
+who it is not for yet.
 
 ## A little Flick
 
