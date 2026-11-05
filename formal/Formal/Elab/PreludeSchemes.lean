@@ -164,6 +164,16 @@ def parallel_all (int list eff : Nat) : Scheme :=
   ⟨4, [],
     .arr .P (.con int) (.arr (.R (.var 1) (.var 2)) (.app (.con list) (.app (.app (.con eff) (.var 0)) (.var 3))) (.app (.con list) (.var 3)) .cnil) .cnil, .cnil⟩
 
+/-- `Prelude.parallel_results : forall c r e a. List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)` -/
+def parallel_results (list eff result errors : Nat) : Scheme :=
+  ⟨4, [],
+    .arr (.R (.var 1) .cnil) (.app (.con list) (.app (.app (.con eff) (.var 0)) (.var 3))) (.app (.con list) (.app (.app (.con result) (.app (.con errors) (.var 2))) (.var 3))) .cnil, .cnil⟩
+
+/-- `Prelude.parallel_exits : forall c r e a. List (Eff r e a)^c ->{r; none} List (Exit e a)` -/
+def parallel_exits (list eff exit : Nat) : Scheme :=
+  ⟨4, [],
+    .arr (.R (.var 1) .cnil) (.app (.con list) (.app (.app (.con eff) (.var 0)) (.var 3))) (.app (.con list) (.app (.app (.con exit) (.var 2)) (.var 3))) .cnil, .cnil⟩
+
 /-- `Prelude.race_success : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c` -/
 def race_success (eff : Nat) : Scheme :=
   ⟨5, [],
@@ -173,6 +183,11 @@ def race_success (eff : Nat) : Scheme :=
 def race_first (eff : Nat) : Scheme :=
   ⟨5, [],
     .arr .P (.app (.app (.con eff) (.var 0)) (.var 3)) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con eff) (.var 4)) (.var 3)) (.var 3) (.cun (.cun (.var 0) (.var 3)) (.cun (.var 4) (.var 3)))) .cnil, .cnil⟩
+
+/-- `Prelude.timeout : forall c r e a. Float -> (Eff r e a)^c ->{r; TimeoutError | e} a` -/
+def timeout (float timeouterror eff : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.con float) (.arr (.R (.var 1) (.run (.rnm timeouterror (.con timeouterror)) (.var 2))) (.app (.app (.con eff) (.var 0)) (.var 3)) (.var 3) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.timeout_option : forall c r e a. Float -> (Eff r e a)^c ->{r; e} Option a` -/
 def timeout_option (float eff option : Nat) : Scheme :=
@@ -189,6 +204,21 @@ def bind_eff (eff : Nat) : Scheme :=
   ⟨5, [],
     .arr .P (.app (.app (.con eff) (.var 0)) (.var 2)) (.arr .P (.arr .P (.var 2) (.app (.app (.con eff) (.var 1)) (.var 3)) (.var 4)) (.app (.app (.con eff) (.cun (.cun (.var 0) (.var 2)) (.cun (.cun (.var 1) (.var 3)) (.var 4)))) (.var 3)) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
 
+/-- `Prelude.field : forall a. String -> PureCodec Json a -> FieldCodec none a` -/
+def field (string purecodec json fieldcodec : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con string) (.arr .P (.app (.app (.con purecodec) (.con json)) (.var 0)) (.app (.app (.con fieldcodec) .cnil) (.var 0)) .cnil) .cnil, .cnil⟩
+
+/-- `Prelude.optional_field : forall a. String -> PureCodec Json a -> FieldCodec none (Option a)` -/
+def optional_field (string purecodec json fieldcodec option : Nat) : Scheme :=
+  ⟨1, [],
+    .arr .P (.con string) (.arr .P (.app (.app (.con purecodec) (.con json)) (.var 0)) (.app (.app (.con fieldcodec) .cnil) (.app (.con option) (.var 0))) .cnil) .cnil, .cnil⟩
+
+/-- `Prelude.field_effect : forall rd a. String -> Codec rd none Json a -> FieldCodec rd a` -/
+def field_effect (string codec json fieldcodec : Nat) : Scheme :=
+  ⟨2, [],
+    .arr .P (.con string) (.arr .P (.app (.app (.app (.app (.con codec) (.var 0)) .cnil) (.con json)) (.var 1)) (.app (.app (.con fieldcodec) (.var 0)) (.var 1)) .cnil) .cnil, .cnil⟩
+
 /-- `Prelude.option_as_null : forall a. PureCodec Json a -> PureCodec Json (Option a)` -/
 def option_as_null (purecodec json option : Nat) : Scheme :=
   ⟨1, [],
@@ -198,6 +228,16 @@ def option_as_null (purecodec json option : Nat) : Scheme :=
 def option_as_nullish (purecodec json option : Nat) : Scheme :=
   ⟨1, [],
     .arr .P (.app (.app (.con purecodec) (.con json)) (.var 0)) (.app (.app (.con purecodec) (.con json)) (.app (.con option) (.var 0))) .cnil, .cnil⟩
+
+/-- `Prelude.on_missing : forall c rd a. (Unit -> a)^c -> (FieldCodec rd a -> FieldCodec rd a)^c` -/
+def on_missing (unit fieldcodec : Nat) : Scheme :=
+  ⟨3, [],
+    .arr .P (.arr .P (.con unit) (.var 2) (.var 0)) (.arr .P (.app (.app (.con fieldcodec) (.var 1)) (.var 2)) (.app (.app (.con fieldcodec) (.var 1)) (.var 2)) (.var 0)) .cnil, .cnil⟩
+
+/-- `Prelude.on_missing_effect : forall c r rd a. (Unit ->{r; SchemaError} a)^c -> (FieldCodec rd a -> FieldCodec (rd + r) a)^c` -/
+def on_missing_effect (schemaerror unit fieldcodec : Nat) : Scheme :=
+  ⟨4, [],
+    .arr .P (.arr (.R (.var 1) (.rnm schemaerror (.con schemaerror))) (.con unit) (.var 3) (.var 0)) (.arr .P (.app (.app (.con fieldcodec) (.var 2)) (.var 3)) (.app (.app (.con fieldcodec) (.run (.var 2) (.var 1))) (.var 3)) (.var 0)) .cnil, .cnil⟩
 
 /-- `Prelude.ignore_extra_fields : forall a. PureCodec Json a -> PureCodec Json a` -/
 def ignore_extra_fields (purecodec json : Nat) : Scheme :=
@@ -1180,19 +1220,3 @@ def List.match_right (rec_onEmpty_onNonEmpty unit list : Nat) : Scheme :=
     .arr .P (.app (.app (.con rec_onEmpty_onNonEmpty) (.arr .P (.con unit) (.var 0) .cnil)) (.arr .P (.app (.con list) (.var 1)) (.arr .P (.var 1) (.var 0) (.var 1)) .cnil)) (.arr .P (.app (.con list) (.var 1)) (.var 0) (.cun (.var 1) (.var 0))) .cnil, .cnil⟩
 
 end Flick.Elab.PreludeSchemes
-
-/-! ## Skipped
-
-`row`: a row of services or errors outside an arrow and `Eff`, or a row of an arrow
-with a named element or a union; `rank`: `∀` of a
-parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`); `region`: a region parameter.
--/
-
--- skip Prelude.parallel_results (row): forall c r e a. List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)
--- skip Prelude.parallel_exits (row): forall c r e a. List (Eff r e a)^c ->{r; none} List (Exit e a)
--- skip Prelude.timeout (row): forall c r e a. Float -> (Eff r e a)^c ->{r; TimeoutError | e} a
--- skip Prelude.field (row): forall a. String -> PureCodec Json a -> FieldCodec none a
--- skip Prelude.optional_field (row): forall a. String -> PureCodec Json a -> FieldCodec none (Option a)
--- skip Prelude.field_effect (row): forall rd a. String -> Codec rd none Json a -> FieldCodec rd a
--- skip Prelude.on_missing (row): forall c rd a. (Unit -> a)^c -> (FieldCodec rd a -> FieldCodec rd a)^c
--- skip Prelude.on_missing_effect (row): forall c r rd a. (Unit ->{r; SchemaError} a)^c -> (FieldCodec rd a -> FieldCodec (rd + r) a)^c

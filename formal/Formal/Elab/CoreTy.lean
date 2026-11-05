@@ -8,7 +8,9 @@ import Formal.Elab.Sugar
 The types of `Elab` in the core of `Formal/` with regions and dictionary records:
 `var ↦ tvar`, `app ↦ tapp`, `con c ↦ adt`, `Bool ↦ base bool`, `Int ↦ base int`,
 `arr φ a b q ↦ ⟦a⟧ →⟦φ⟧^(⌈⟦q⟧⌉ ∪ vars φ) ⟦b⟧`,
-`cnil ↦ caps ∅`, `cun ↦ caps (∪)`, `D_{C τ̄} ↦ dict (cls C |τ̄|) τ̄`. A stage `R r e` is
+`cnil ↦ caps ∅`, `cun ↦ caps (∪)`, `rnm c t ↦ row ({c} ∪ ⌈⟦t⟧⌉)` (`Row.err`),
+`run r r' ↦ row (⟦r⟧ ∪ ⟦r'⟧)` with each side what it stands for as a row,
+`D_{C τ̄} ↦ dict (cls C |τ̄|) τ̄`. A stage `R r e` is
 `rt ⟦r⟧ (⟦e⟧ ∪ ε)`, a row `⟦r⟧` what the type `⟦r⟧` stands for as a row (`Ty.asRow`: a variable is
 a row variable), `ε` every name (`allNames`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). The qualifier of a translated
 arrow also counts the variables of its rows, as `⌈·⌉` of the source does.
@@ -70,6 +72,8 @@ def trT : Ty → Flick.Ty
       (trT b) fun x => (trT q).reach x ∨ (Stage.R r e).atoms x
   | .cnil => .caps Caps.none
   | .cun q q' => .caps fun a => (trT q).reach a ∨ (trT q').reach a
+  | .rnm c t => .row (Row.err (N.con c) (trT t))
+  | .run r r' => .row (Row.union (trT r).asRow (trT r').asRow)
 
 /-- `⟦P⟧ = pure`, `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ allNames)`. -/
 def trStage : Stage → Flick.Stage
@@ -142,6 +146,12 @@ theorem trT_reach (t : Ty) (a : Atom) : (trT N t).reach a ↔ ∃ n, a = .v n �
       ex_or]
   | cnil => simp [trT, Flick.Ty.reach, Caps.none, Ty.Occurs]
   | cun q q' ihq ihq' => simp only [trT, Flick.Ty.reach, ihq, ihq', Ty.Occurs, ex_or]
+  | rnm c t iht => simp [trT, Flick.Ty.reach, Row.err, Row.union, Row.single, Row.ofCaps, iht, Ty.Occurs]
+  | run r r' ihr ihr' =>
+    simp only [Ty.Occurs, ← ex_or, ← ihr, ← ihr']
+    rw [Ty.reach_asRow (trT N r), Ty.reach_asRow (trT N r')]
+    simp only [trT, Flick.Ty.reach, Row.union]
+    grind
 
 theorem trT_reach_v {t : Ty} {n : Nat} (h : t.Occurs n) : (trT N t).reach (.v n) :=
   (trT_reach N t _).2 ⟨n, rfl, h⟩
@@ -190,8 +200,9 @@ theorem Ty.occurs_subst_iff (σ : Nat → Ty) (t : Ty) (n : Nat) :
   induction t using Ty.ind with
   | var m => simp [Ty.subst, Ty.Occurs]
   | con | cnil => simp [Ty.subst, Ty.Occurs]
-  | app t u iht ihu | cun t u iht ihu =>
+  | app t u iht ihu | cun t u iht ihu | run t u iht ihu =>
     simp only [Ty.subst, Ty.Occurs, iht, ihu]; grind
+  | rnm c t iht => simp only [Ty.subst, Ty.Occurs, iht]
   | arr φ a b q iha ihb ihq ihφ =>
     cases φ with
     | P => simp only [Ty.subst, Stage.subst, Ty.Occurs, Stage.Occurs, iha, ihb, ihq]; grind
@@ -238,6 +249,11 @@ theorem trT_subst (t : Ty) (σ : Nat → Ty) : trT N (t.subst σ) = (trT N t).su
   | cnil => simp [Ty.subst, trT, Flick.Ty.substT]
   | cun q q' ihq ihq' =>
     simp only [Ty.subst, trT, Flick.Ty.substT, ihq, ihq', Caps.substT_or, Ty.reach_caps]
+  | rnm c t iht =>
+    simp only [Ty.subst, trT, Flick.Ty.substT, iht, Row.err, Row.union_substT, Row.single_substT,
+      Row.ofCaps_substT, Ty.reach_caps]
+  | run r r' ihr ihr' =>
+    simp only [Ty.subst, trT, Flick.Ty.substT, ihr, ihr', Row.union_substT, Ty.asRow_substT]
 
 theorem trStage_subst (φ : Stage) (σ : Nat → Ty) :
     trStage N (φ.subst σ) = (trStage N φ).substT (trσ N σ) := by

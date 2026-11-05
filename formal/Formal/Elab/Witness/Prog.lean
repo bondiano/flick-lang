@@ -149,7 +149,8 @@ def tsize : Ty → Nat
   | .app t u => tsize t + tsize u + 1
   | .arr _ a b q => tsize a + tsize b + tsize q + 1
   | .cnil => 1
-  | .cun q q' => tsize q + tsize q' + 1
+  | .cun q q' | .run q q' => tsize q + tsize q' + 1
+  | .rnm _ t => tsize t + 1
 
 /-- The order of K5: `Monad` and `Alternative` above `Applicative`, then the size. -/
 def measure (q : Cn) : Nat :=

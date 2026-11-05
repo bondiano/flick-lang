@@ -28,7 +28,8 @@ theorem Ty.occurs_subst {σ : Nat → Ty} {m n : Nat} {t : Ty} (ht : t.Occurs m)
   induction t using Ty.ind with
   | var => cases ht; exact hs
   | con | cnil => cases ht
-  | app _ _ ih₁ ih₂ | cun _ _ ih₁ ih₂ => exact ht.imp ih₁ ih₂
+  | app _ _ ih₁ ih₂ | cun _ _ ih₁ ih₂ | run _ _ ih₁ ih₂ => exact ht.imp ih₁ ih₂
+  | rnm _ _ ih => exact ih ht
   | arr φ _ _ _ ih₁ ih₂ ih₃ ihφ =>
     refine ht.imp ih₁ (Or.imp ih₂ (Or.imp ih₃ fun h => ?_))
     cases φ with

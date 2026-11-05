@@ -11,14 +11,17 @@ namespace Flick.Elab
 
 mutual
 /-- The stages: `P`, and `R` with its rows of services and of errors, each written as a type:
-a row variable is a variable, the empty row `cnil` (`docs/formal/elaboration.md`). -/
+a row variable is a variable, the empty row `cnil`, a named element `rnm`, a union `run`
+(`docs/formal/elaboration.md`). -/
 inductive Stage where
   | P
   | R (r e : Ty)
 
 /-- Types: variables, constructors, application, and the arrow `a →φ^q b` of `Fun` in the
 checker (`docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor`). Its qualifier `q` is a capture row written as a type: a variable, `cnil`
-(`∅`) or a union `cun`. Capture variables are ordinary variables. -/
+(`∅`) or a union `cun`. Capture variables are ordinary variables. A row of services or errors
+is a type too: a variable, `cnil`, the row `{t}` of one service or error type `t` whose
+constructor is `c` (`rnm c t`), or a union `ρ₁ + ρ₂` (`run`). -/
 inductive Ty where
   | var (n : Nat)
   | con (c : Nat)
@@ -26,6 +29,8 @@ inductive Ty where
   | arr (φ : Stage) (a b q : Ty)
   | cnil
   | cun (q q' : Ty)
+  | rnm (c : Nat) (t : Ty)
+  | run (r r' : Ty)
 end
 
 deriving instance DecidableEq for Stage, Ty
@@ -39,7 +44,9 @@ def Stage.All (m : Ty → Prop) : Stage → Prop
 theorem Ty.ind {motive : Ty → Prop} (var : ∀ n, motive (.var n)) (con : ∀ c, motive (.con c))
     (app : ∀ t u, motive t → motive u → motive (.app t u))
     (arr : ∀ φ a b q, motive a → motive b → motive q → φ.All motive → motive (.arr φ a b q))
-    (cnil : motive .cnil) (cun : ∀ q q', motive q → motive q' → motive (.cun q q')) : ∀ t, motive t := by
+    (cnil : motive .cnil) (cun : ∀ q q', motive q → motive q' → motive (.cun q q'))
+    (rnm : ∀ c t, motive t → motive (.rnm c t))
+    (run : ∀ r r', motive r → motive r' → motive (.run r r')) : ∀ t, motive t := by
   intro t
   induction t using Ty.rec (motive_1 := Stage.All motive) with
   | P => trivial
@@ -50,6 +57,8 @@ theorem Ty.ind {motive : Ty → Prop} (var : ∀ n, motive (.var n)) (con : ∀ 
   | arr φ a b q ihφ iha ihb ihq => exact arr φ a b q iha ihb ihq ihφ
   | cnil => exact cnil
   | cun q q' ihq ihq' => exact cun q q' ihq ihq'
+  | rnm c t iht => exact rnm c t iht
+  | run r r' ihr ihr' => exact run r r' ihr ihr'
 
 mutual
 def Ty.subst (σ : Nat → Ty) : Ty → Ty
@@ -59,6 +68,8 @@ def Ty.subst (σ : Nat → Ty) : Ty → Ty
   | .arr φ a b q => .arr (φ.subst σ) (a.subst σ) (b.subst σ) (q.subst σ)
   | .cnil => .cnil
   | .cun q q' => .cun (q.subst σ) (q'.subst σ)
+  | .rnm c t => .rnm c (t.subst σ)
+  | .run r r' => .run (r.subst σ) (r'.subst σ)
 
 def Stage.subst (σ : Nat → Ty) : Stage → Stage
   | .P => .P
@@ -74,6 +85,8 @@ def Ty.Occurs (n : Nat) : Ty → Prop
   | .arr φ a b q => a.Occurs n ∨ b.Occurs n ∨ q.Occurs n ∨ φ.Occurs n
   | .cnil => False
   | .cun q q' => q.Occurs n ∨ q'.Occurs n
+  | .rnm _ t => t.Occurs n
+  | .run r r' => r.Occurs n ∨ r'.Occurs n
 
 def Stage.Occurs (n : Nat) : Stage → Prop
   | .P => False
@@ -83,7 +96,7 @@ end
 @[simp] theorem Stage.occurs_P (n : Nat) : Stage.P.Occurs n ↔ False := Iff.rfl
 
 /-- `⌈t⌉`: `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈arr φ a b q⌉ = ⌈a⌉ ∪ ⌈b⌉ ∪ ⌈q⌉` with the
-variables of the rows of `φ`, the rest by union. It is exactly the set of variables of `t`. -/
+variables of the rows of `φ`, `⌈rnm c t⌉ = ⌈t⌉`, the rest by union. It is exactly the set of variables of `t`. -/
 abbrev Ty.reach (t : Ty) (n : Nat) : Prop := t.Occurs n
 
 /-- A ground type has no variables. -/

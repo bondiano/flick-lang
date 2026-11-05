@@ -87,6 +87,14 @@ theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
     rw [iht (fun n hn => h n (.inl hn)) (fun b hb => hc b (.inl hb)),
       ihu (fun n hn => h n (.inr hn)) (fun b hb => hc b (.inr hb))]
   | cun q q' _ _ => exact congrArg Flick.Ty.caps (caps_congr hc)
+  | rnm _ _ _ | run _ _ _ _ =>
+    simp only [trT, Flick.Ty.substT]
+    congr 1
+    refine Row.substT_congr fun b hb => ?_
+    rcases hb with hb | hb | ⟨M, hb | hb⟩
+    · exact hc b (Or.inl hb)
+    · exact hc b (Or.inr hb)
+    all_goals simp [Row.err, Row.union, Row.single, Row.ofCaps] at hb
   | arr φ a b q iha ihb _ _ =>
     have hst : (trStage N φ).substT σ = (trStage N φ).substT σ' := by
       cases φ with

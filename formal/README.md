@@ -463,7 +463,7 @@ and `Target`. See [The core as the target](#the-core-as-the-target).
 | `Δ ⊩ Q ⇝ d ⇒ ⟦Δ⟧ ⊢⁺ d : D_Q`; T6(a) | `ent_typed`, `T6a` (`Elab/T6a.lean`) |
 | §3.1 `do` | `Stmt`, `Sugar.desugarDo`, `DoOk`, `do_elab`, `T6a_do` (`Elab/Sugar.lean`, `Elab/DoNotation.lean`) |
 | §3.2 `for`, §3.3 `?`, §3.4 blocks | `Clause`, `Sugar.gen`, `Sugar.loop`, `GenOk`, `LoopOk`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`, `T6a_sugar` (`Elab/Sugar.lean`, `Elab/Comprehension.lean`) |
-| Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`); the schemes of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List` generated from the checker, those the model cannot write listed as skipped with a reason (`Elab/PreludeSchemes.lean`, [Prelude scheme generator with skip list](../docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names)) |
+| Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`); the schemes of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List` generated from the checker, those the model cannot write listed as skipped with a reason, none today (`Elab/PreludeSchemes.lean`, [Prelude scheme generator with skip list](../docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names)) |
 | "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim`, then `T6b_target` (`Elab/Run.lean`) |
 | §0.1 `⟦·⟧` into the core with regions: types, stages with rows, schemes | `Names`, `trT`, `trTT`, `trD`, `trS`, `trStage`, `trT_arr`, `Stage.qual`, `trT_subst`, `trStage_subst`, `trT_reach` (`Elab/CoreTy.lean`) |
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
@@ -529,8 +529,11 @@ Simplifications:
    `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
    hypotheses on the program. The schemes of the Prelude names are generated from the
    checker (`PreludeSchemes.lean`), with the rows of their arrows: `->{r; e}` is the stage
-   `R r e` and its row variables are binders of the scheme (`traverse`, `Seq.each_effect`); a
-   row with a named element or a union is skipped (`timeout`). `pair`, `unc n` and `each_P` have no Prelude name and are
+   `R r e` and its row variables are binders of the scheme (`traverse`, `Seq.each_effect`). A
+   row is a type: a variable, `cnil`, the row `{t}` of one service or error type `t` with
+   constructor `c` (`rnm c t`) or a union `ρ₁ + ρ₂` (`run`), so `timeout` is at
+   `R r ({TimeoutError} + e)`; a row may be the argument of a type (`FieldCodec (rd + r) a`,
+   `Exit e a`), which the model writes as data. `pair`, `unc n` and `each_P` have no Prelude name and are
    written in `Sugar.lean`. `from_result` is a family `from_result_n` over error types, one
    `con n` each, at the stage `R⟨∅; con n⟩` (`frSch`, equal to the generated scheme at `e := con n`
    by `frSch_gen`): its `raise` adds the atom `e` to the row, which the row variable `⟦e⟧`
@@ -554,8 +557,10 @@ Simplifications:
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
 10. The core instance. `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ε)` with `ε` every name (`allNames`): a row
-    of the source is a type, a row variable `var n` or `cnil`, and `⟦r⟧` is what `⟦r⟧` stands
-    for as a row (`Ty.asRow`), the row variable `n`; every error name stays in the row, so a
+    of the source is a type, and `⟦r⟧` is what `⟦r⟧` stands for as a row (`Ty.asRow`): a row
+    variable `var n` is the row variable `n`, `cnil` the empty row, `rnm c t` the name `N.con c`
+    with the atoms of `⌈⟦t⟧⌉` (`Row.err`, what an error of `t` reaches), `run r r'` the union of
+    what `⟦r⟧` and `⟦r'⟧` stand for; every error name stays in the row, so a
     runtime body may raise any error type that reaches nothing. The source compares stages
     by equality and its `⌈·⌉` counts the variables of the rows of an arrow, so the qualifier
     of a translated `R r e` arrow counts them too (`Stage.qual`); a `P` arrow translates as
@@ -598,10 +603,11 @@ Simplifications:
 
 - **Types** (`Elab/Syntax.lean`). `Ty` has `arr (φ : Stage) (a b q : Ty)`, `cnil` and
   `cun (q q' : Ty)` ([source arrow is a separate type form](../docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor)); `Stage` is `P` or `R r e` with the rows
-  written as types, mutual with `Ty` (`Ty.ind` is its induction). The qualifier `q` is a capture row written
+  written as types, mutual with `Ty` (`Ty.ind` is its induction): a row of services or errors
+  is a variable, `cnil`, a named element `rnm c t` or a union `run r r'`, compared by equality. The qualifier `q` is a capture row written
   as a type: a variable, `cnil`, or a union. Substitution is structural, so `DecidableEq`,
   `Ty.agree_of_eq` and K1 work without semantic sets. `Ty.reach` is the occurrence of a
-  variable: `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈app⌉ = ⌈cun⌉ = ∪` and
+  variable: `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈rnm c t⌉ = ⌈t⌉`, `⌈app⌉ = ⌈cun⌉ = ⌈run⌉ = ∪` and
   `⌈arr φ a b q⌉ = ⌈a⌉ ∪ ⌈b⌉ ∪ ⌈q⌉` with the variables of the rows of `φ`. Capture and row variables are ordinary variables, so
   (Var), (Method) and (Const) instantiate them through `ts` with no new rule. Schemes
   have no `Outlives` facts: `⟦·⟧` drops `Fiber.Outlives` (§2.1).
@@ -688,8 +694,9 @@ for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
 
 - **Types** (`CoreTy.lean`). `var ↦ tvar`, `app ↦ tapp`, `Bool ↦ base bool`,
   other constructors `↦ adt (N.con c)`, `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉` (at `R r e` with
-  the variables of the rows), `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ allNames)`
-  (simplification 10).
+  the variables of the rows), `cnil ↦ caps ∅`, `cun ↦ caps (∪)`,
+  `rnm c t ↦ row ({N.con c} ∪ ⌈⟦t⟧⌉)`, `run r r' ↦ row (⟦r⟧ ∪ ⟦r'⟧)` with each side as a row
+  (`Ty.asRow`); `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ allNames)` (simplification 10).
   `trT_subst`/`trTT_subst`/`trS_subst` and `trT_reach` are the two commutations. The
   names of the core are a parameter `Names`, not a fixed encoding.
   `D_{C τ̄} ↦ dict (N.cls C |τ̄|) ⟦τ̄⟧`: the class name carries the number of parameters,

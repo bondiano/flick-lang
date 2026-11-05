@@ -23,9 +23,10 @@ theorem Ty.subst_agree {t : Ty} {σ σ' : Nat → Ty} (h : ∀ n, t.Occurs n →
   | app t u iht ihu =>
     simp only [Ty.subst]
     rw [iht fun n hn => h n (.inl hn), ihu fun n hn => h n (.inr hn)]
-  | cun t u iht ihu =>
+  | cun t u iht ihu | run t u iht ihu =>
     simp only [Ty.subst]
     rw [iht fun n hn => h n (.inl hn), ihu fun n hn => h n (.inr hn)]
+  | rnm c t iht => simp only [Ty.subst]; rw [iht h]
   | arr φ a b q iha ihb ihq ihφ =>
     simp only [Ty.subst]
     rw [iha fun n hn => h n (.inl hn), ihb fun n hn => h n (.inr (.inl hn)),
@@ -53,6 +54,14 @@ theorem Ty.agree_of_eq {t : Ty} {σ σ' : Nat → Ty} (h : t.subst σ = t.subst 
     intro n hn; rcases hn with hn | hn
     · exact iht h.1 n hn
     · exact ihu h.2 n hn
+  | run t u iht ihu =>
+    simp only [Ty.subst, Ty.run.injEq] at h
+    intro n hn; rcases hn with hn | hn
+    · exact iht h.1 n hn
+    · exact ihu h.2 n hn
+  | rnm c t iht =>
+    simp only [Ty.subst, Ty.rnm.injEq, true_and] at h
+    exact iht h
   | arr φ a b q iha ihb ihq ihφ =>
     simp only [Ty.subst, Ty.arr.injEq] at h
     intro n hn; rcases hn with hn | hn | hn | hn

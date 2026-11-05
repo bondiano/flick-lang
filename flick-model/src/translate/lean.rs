@@ -6,7 +6,9 @@
 //! 1. `(T ā)^q` is `T q ā` (`appQ`) for a type with hidden storage and for
 //!    a variable over containers; data without storage and a type variable
 //!    drop `q`; `(A → B)^q` is `.arr φ A B q`, without `q` `.cnil`; an arrow
-//!    with rows `{r; e}` is at the stage `R r e`, a row a variable or `.cnil`.
+//!    with rows `{r; e}` is at the stage `R r e`; a row is a variable,
+//!    `.cnil`, a named element `.rnm c t` or a union `.run`, also as an
+//!    argument of a type.
 //! 2. `∀v. a^v → …` of a parameter is instantiated `v := a`.
 //! 3. A qualifier in a negative position is a variable: a single variable
 //!    of the checker stays itself at its first such position, the rest are
@@ -32,19 +34,12 @@ use self::tr::{Tr, Ty, occurs};
 /// The modules whose exports the model takes, in this order.
 const MODULES: [&str; 5] = ["Prelude", "Seq", "Option", "Result", "List"];
 
-/// Families by a row of errors: the variable of the row is their index
-/// (`from_result`, `docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names`).
-const ROW_FAMILIES: [(&str, &str); 1] = [("Prelude", "from_result")];
-
 /// Identifiers of the checker that are Lean keywords.
 const KEYWORDS: [&str; 4] = ["show", "from", "at", "fun"];
 
 /// Why an export has no `def`.
 #[derive(Debug)]
 enum Skip {
-    /// a row of services or errors outside an arrow and `Eff`, or a row of
-    /// an arrow with a named element or a union
-    Row,
     /// `∀` of a parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`)
     Rank,
     /// a region parameter
@@ -55,7 +50,6 @@ enum Skip {
 impl fmt::Display for Skip {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Skip::Row => f.write_str("row"),
             Skip::Rank => f.write_str("rank"),
             Skip::Region => f.write_str("region"),
             Skip::Other(why) => write!(f, "other: {why}"),
@@ -90,6 +84,12 @@ fn lean(t: &Ty, vars: &[String], out: &mut String) {
             out.push(')');
         }
     };
+    let bin = |op: &str, a: &Ty, b: &Ty, out: &mut String| {
+        out.push_str(op);
+        arg(a, out);
+        out.push(' ');
+        arg(b, out);
+    };
     match t {
         Ty::Var(v) => {
             let i = vars.iter().position(|w| w == v).expect("bound");
@@ -98,12 +98,7 @@ fn lean(t: &Ty, vars: &[String], out: &mut String) {
         Ty::Con(c) => {
             let _ = write!(out, ".con {}", ident(c));
         }
-        Ty::App(a, b) => {
-            out.push_str(".app ");
-            arg(a, out);
-            out.push(' ');
-            arg(b, out);
-        }
+        Ty::App(a, b) => bin(".app ", a, b, out),
         Ty::Arr(rows, a, b, q) => {
             match rows {
                 Some((r, e)) => {
@@ -123,11 +118,11 @@ fn lean(t: &Ty, vars: &[String], out: &mut String) {
             }
         }
         Ty::Nil => out.push_str(".cnil"),
-        Ty::Un(a, b) => {
-            out.push_str(".cun ");
+        Ty::Un(a, b) => bin(".cun ", a, b, out),
+        Ty::RUn(a, b) => bin(".run ", a, b, out),
+        Ty::Nm(c, a) => {
+            let _ = write!(out, ".rnm {} ", ident(c));
             arg(a, out);
-            out.push(' ');
-            arg(b, out);
         }
         Ty::Pos(_) => unreachable!("resolved"),
     }
@@ -145,16 +140,10 @@ fn def(module: &str, name: &str, scheme: &fc::Type, class: Option<&str>) -> Resu
         } => (&vars[..], &constraints[..], &**body),
         t => (&[][..], &[][..], t),
     };
-    let family = ROW_FAMILIES.contains(&(module, name));
     let mut tr = Tr::default();
     for b in vars {
         match &b.kind {
-            Kind::Type | Kind::CaptureRow => {}
-            Kind::ServiceRow | Kind::ErrorRow => {
-                if !family {
-                    tr.rows.insert(b.name.clone());
-                }
-            }
+            Kind::Type | Kind::CaptureRow | Kind::ServiceRow | Kind::ErrorRow => {}
             Kind::Arrow(..) => {
                 tr.containers.insert(b.name.clone());
             }
@@ -285,9 +274,8 @@ pub fn prelude_schemes() -> String {
     if !skipped.is_empty() {
         out.push_str(
             "\n/-! ## Skipped\n\n\
-             `row`: a row of services or errors outside an arrow and `Eff`, or a row of an arrow\n\
-             with a named element or a union; `rank`: `∀` of a\n\
-             parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`); `region`: a region parameter.\n\
+             `rank`: `∀` of a parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`);\n\
+             `region`: a region parameter.\n\
              -/\n\n",
         );
         out.push_str(&skipped);
