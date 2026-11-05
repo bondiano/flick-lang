@@ -1,0 +1,41 @@
+/// Well-typed expressions: an `Expr a` evaluates to an `a`, so `eval`
+/// needs no type checks at run time and no "impossible" branches.
+module Interp.Expr exposing (Expr(..), eval, pretty)
+
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+  | Plus : Expr (Int -> Int -> Int)
+  | Less : Expr (Int -> Int -> Bool)
+  | Not : Expr (Bool -> Bool)
+  | If (Expr Bool) (Expr a) (Expr a) : Expr a
+  /// The argument's type `b` is hidden: an `Apply` of any argument is an
+  /// `Expr a`.
+  | Apply (Expr (b -> a)) (Expr b) : Expr a
+  /// An ordinary constructor next to the refined ones.
+  | Named String (Expr a)
+
+/// The value of an expression; each branch learns what `a` is.
+eval : forall a. Expr a -> a
+let rec eval e =
+  match e with
+  | IntLit n -> n
+  | BoolLit b -> b
+  | Plus -> fun x y -> x + y
+  | Less -> fun x y -> x < y
+  | Not -> fun b -> not b
+  | If c t f -> if eval c then eval t else eval f
+  | Apply f x -> (eval f) (eval x)
+  | Named _ inner -> eval inner
+
+pretty : forall a. Expr a -> String
+let rec pretty e =
+  match e with
+  | IntLit n -> show n
+  | BoolLit b -> show b
+  | Plus -> "(+)"
+  | Less -> "(<)"
+  | Not -> "not"
+  | If c t f -> "if " ++ pretty c ++ " then " ++ pretty t ++ " else " ++ pretty f
+  | Apply f x -> "(" ++ pretty f ++ " " ++ pretty x ++ ")"
+  | Named name _ -> name

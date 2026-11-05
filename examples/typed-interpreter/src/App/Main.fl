@@ -1,0 +1,17 @@
+/// Checks a few untyped terms and evaluates the well-typed ones.
+module App.Main exposing (main)
+
+import Interp.Check exposing (Term(..))
+import Interp.Value exposing (results)
+
+terms : List Term
+let terms = [
+  TmPlus (TmInt 1) (TmInt 2),
+  TmIf (TmLess (TmInt 1) (TmInt 2)) (TmInt 10) (TmInt 20),
+  TmNot (TmLess (TmInt 3) (TmInt 2)),
+  TmPlus (TmInt 1) (TmBool true),
+  TmIf (TmInt 0) (TmInt 1) (TmInt 2),
+]
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (String.join "\n" (results terms))

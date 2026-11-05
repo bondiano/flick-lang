@@ -1,0 +1,40 @@
+/// A value of any type with its `Show`: the dictionary travels in the
+/// value, so a list can mix types.
+module Interp.Value exposing (Showable(..), run, results)
+
+import Interp.Check exposing (Term, Typed(..), check)
+import Interp.Expr exposing (eval)
+import Interp.Ty exposing (Ty(..))
+
+type Showable =
+  | Show a => Showable a : Showable
+
+/// The value of a typed expression as a `Showable`, where its type has a
+/// `Show`.
+showable : forall a. Ty a -> a -> Option Showable
+let showable t x =
+  match t with
+  | TInt -> Some (Showable x)
+  | TBool -> Some (Showable x)
+  | TFun _ _ -> None
+
+/// What a term evaluates to, or why it has no type.
+run : Term -> Result String Showable
+let run term =
+  match check term with
+  | Ok (Typed t e) ->
+    match showable t (eval e) with
+    | Some value -> Ok value
+    | None -> Err "a function has no `Show`"
+  | Err why -> Err why
+
+/// The results of the terms, shown.
+results : List Term -> List String
+let results terms =
+  List.map
+    (fun term ->
+      match run term with
+      | Ok (Showable x) -> show x
+      | Err why -> "type error: " ++ why
+    )
+    terms
