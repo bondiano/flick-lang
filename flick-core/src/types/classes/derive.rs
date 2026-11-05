@@ -153,7 +153,7 @@ impl<'n> Checker<'_> {
             Form::Alias {
                 body, opaque: true, ..
             } => return Some(vec![body.clone()]),
-            Form::Nominal if decl.has_token(K::RefinedKw) => {
+            Form::Nominal { .. } if decl.has_token(K::RefinedKw) => {
                 let base = refined
                     .iter()
                     .find(|(predicate, _)| decl.nodes().any(|n| ptr::eq(n, *predicate)));

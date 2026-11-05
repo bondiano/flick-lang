@@ -1,7 +1,7 @@
 //! The types and kinds of a module's exports, as `.iface` stores them.
 
 use super::Checker;
-use super::env::{Form, Operation, TypeDef};
+use super::env::{Abi, Form, Operation, TypeDef};
 use super::ty::Type;
 use crate::iface::{Decl, Entity, Export, Interface, Namespace};
 
@@ -50,7 +50,12 @@ impl Checker<'_> {
         };
         let mut d = d.clone();
         d.form = match d.form {
-            _ if nominal => Form::Nominal,
+            // an opaque enum keeps what its values are: its literals
+            Form::Adt {
+                abi: Abi::Literal(literals),
+                ..
+            } if nominal => Form::Nominal { literals },
+            _ if nominal => Form::NOMINAL,
             Form::Alias { params, body, .. } => Form::Alias {
                 params,
                 body: self.exported(&body),
@@ -92,7 +97,7 @@ impl Checker<'_> {
         let ty = |(name, d): (&str, &TypeDef)| Export {
             entity: self.env.entity(Namespace::Type, name),
             decl: match d.form {
-                Form::Nominal => Decl::Abstract,
+                Form::Nominal { .. } => Decl::Abstract,
                 Form::Adt { .. } => Decl::Adt,
                 Form::Error => Decl::Error,
                 Form::Alias { .. } => Decl::Alias,

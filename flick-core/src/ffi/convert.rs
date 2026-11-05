@@ -1,8 +1,9 @@
 //! TypeScript shapes to Flick types, or the reason one has none.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
+use super::enums::{self, Literals};
 use super::import::{Status, flick_name};
 use super::{ExportPolicy, Param, Shape, Signature};
 
@@ -42,6 +43,8 @@ pub(super) struct Convert {
     pub strict: bool,
     /// Opaque types the converted types name.
     pub handles: BTreeSet<String>,
+    /// Enums the converted types name, with their literals.
+    pub enums: BTreeMap<String, Literals>,
     /// Type variables the converted types use.
     pub vars: BTreeSet<String>,
     /// A parameter is a callback.
@@ -116,7 +119,7 @@ impl Convert {
             ));
         }
         let empty: Vec<String> = match inner {
-            Shape::Union { types } => types
+            Shape::Union { types, .. } => types
                 .iter()
                 .filter(|t| matches!(t, Shape::Undefined | Shape::Null | Shape::Void))
                 .map(|t| format!("`{}`", t.text()))
@@ -143,7 +146,7 @@ impl Convert {
             }
             (Shape::Function { signatures }, _) => self.callback(signatures)?,
             (ty, _) => match nullable(ty) {
-                Some(inner) if matches!(ty, Shape::Union { types } if !types.contains(&Shape::Null)) =>
+                Some(inner) if matches!(ty, Shape::Union { types, .. } if !types.contains(&Shape::Null)) =>
                 {
                     optional = true;
                     self.ty(inner, Pos::Param)?
@@ -229,11 +232,23 @@ impl Convert {
                     "type parameter `{name}` is bounded by `{bound}`, which a Flick type variable cannot say"
                 ));
             }
-            Shape::Union { .. } => {
-                return not_here(&format!(
-                    "the union `{}` has no single Flick type; pick one member in a reviewed binding",
-                    shape.text()
-                ));
+            Shape::Union { types, alias } => {
+                let shown = shape.text();
+                let Some(texts) = enums::literals(types) else {
+                    return not_here(&format!(
+                        "the union `{shown}` has no single Flick type; pick one member in a reviewed binding"
+                    ));
+                };
+                if let Some(reason) = enums::refused(&shown, &texts) {
+                    return not_here(&reason);
+                }
+                let Some(name) = alias.as_ref().filter(|a| is_type_name(a)) else {
+                    return not_here(&format!(
+                        "the union `{shown}` has no name: a `type` alias of literals is an enum"
+                    ));
+                };
+                self.enums.insert(name.clone(), texts);
+                name.clone()
             }
             Shape::Tuple { elements } => {
                 let parts = elements
@@ -283,7 +298,7 @@ impl Convert {
 
 /// `T | undefined`, `T | null`, `T | null | undefined` → `T`.
 pub(super) fn nullable(shape: &Shape) -> Option<&Shape> {
-    let Shape::Union { types } = shape else {
+    let Shape::Union { types, .. } = shape else {
         return None;
     };
     let rest: Vec<&Shape> = types

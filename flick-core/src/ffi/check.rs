@@ -171,7 +171,7 @@ pub fn required(export: &ExportShape) -> Vec<(&'static str, &'static str)> {
         if promise && !out.iter().any(|(m, _)| *m == "catch") {
             out.push(("catch", "returns a Promise, which may reject"));
         }
-        let empty = matches!(result, Shape::Union { types }
+        let empty = matches!(result, Shape::Union { types, .. }
             if types.iter().any(|t| matches!(t, Shape::Undefined | Shape::Null)));
         if empty && !out.iter().any(|(m, _)| *m == "nullable") {
             out.push(("nullable", "may return `undefined` or `null`"));

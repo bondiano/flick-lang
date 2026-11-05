@@ -7,10 +7,11 @@
 //! a promise's rejection, a nullable result and a callback's retention all
 //! need a policy, and `any` is `JsValue`, or refused in strict mode.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
 use super::convert::{Blocked, Convert, arrow_operand, mentions, var_name};
+use super::enums::{Enums, Literals};
 use super::{ExportKind, ExportPolicy, ExportShape, Policy, Signature, Surface};
 use crate::syntax::kind::keyword;
 
@@ -114,6 +115,7 @@ pub fn generate(
     let mut entries = Vec::new();
     let mut items = Vec::new();
     let mut handles = BTreeSet::new();
+    let mut enums = Enums::default();
     for export in chosen {
         for (name, outcome) in bindings(export, &policy.of(&export.name), policy.strict) {
             let outcome = if taken.insert(name.clone()) {
@@ -124,11 +126,12 @@ pub fn generate(
                 )))
             };
             let outcome = outcome.and_then(|b| {
-                match b.handles.iter().find(|h| surface.ambiguous.contains(h)) {
+                let mut named = b.handles.iter().chain(b.enums.keys());
+                match named.find(|h| surface.ambiguous.contains(h)) {
                     Some(h) => Err(Blocked::unsupported(format!(
                         "`{h}` names more than one TypeScript type: bind them by hand under distinct names"
                     ))),
-                    None => Ok(b),
+                    None => enums.admit(&b.enums, &policy.enums).map(|()| b),
                 }
             });
             let provenance = format!("{} {}", surface.provenance(), export.fingerprint);
@@ -183,6 +186,7 @@ pub fn generate(
             "\n/// A JS `{handle}`, opaque to Flick.\ntype {handle}\n"
         );
     }
+    text.push_str(&enums.text());
     for item in items {
         text.push('\n');
         text.push_str(&item);
@@ -200,6 +204,7 @@ struct Binding {
     mode: &'static str,
     metadata: Vec<String>,
     handles: BTreeSet<String>,
+    enums: BTreeMap<String, Literals>,
     notes: Vec<String>,
 }
 
@@ -269,6 +274,7 @@ fn binding(sig: &Signature, policy: &ExportPolicy, strict: bool) -> Result<Bindi
     let mut c = Convert {
         strict,
         handles: BTreeSet::new(),
+        enums: BTreeMap::new(),
         vars: BTreeSet::new(),
         callback: false,
     };
@@ -302,6 +308,7 @@ fn binding(sig: &Signature, policy: &ExportPolicy, strict: bool) -> Result<Bindi
         mode,
         metadata,
         handles: c.handles,
+        enums: c.enums,
         notes,
     })
 }

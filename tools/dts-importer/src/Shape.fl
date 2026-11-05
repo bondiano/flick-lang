@@ -102,9 +102,8 @@ let rec sites v =
   | JArray items -> List.flat_map sites items
   | JObject fields ->
     let here =
-      match
-        (List.find (fun (k, _) -> k == "name") fields, List.find (fun (k, _) -> k == "site") fields)
-      with
+      let name = List.find (fun (k, _) -> k == "name" || k == "alias") fields
+      match (name, List.find (fun (k, _) -> k == "site") fields) with
       | (Some (_, JString n), Some (_, JString s)) -> [(n, s)]
       | _ -> []
     List.concat [here, List.flat_map (fun (_, x) -> sites x) fields]
@@ -118,6 +117,17 @@ let rec unsited v =
   | JObject fields ->
     JObject
       (List.filter_map (fun (k, x) -> if k == "site" then None else Some (k, unsited x)) fields)
+  | other -> other
+
+/// The value without the aliases of unions, as the fingerprint sees it: a
+/// union that gains a name changes no binding a review vouches for.
+unaliased : Value -> Value
+let rec unaliased v =
+  match v with
+  | JArray items -> JArray (List.map unaliased items)
+  | JObject fields ->
+    JObject
+      (List.filter_map (fun (k, x) -> if k == "alias" then None else Some (k, unaliased x)) fields)
   | other -> other
 
 rec {
@@ -135,10 +145,18 @@ rec {
         else if Ts.type_has "TypeParameter" t then
           parameter_shape c t
         else if Ts.type_has "Union" t then
-          JObject [
-            ("k", JString "union"),
-            ("types", JArray (List.map (shape c (depth + 1)) (Ts.members t))),
-          ]
+          let alias =
+            match symbol_name (Ts.alias_symbol t) with
+            | Some a -> [("alias", JString a), ("site", site t)]
+            | None -> []
+          JObject
+            (List.concat [
+              [
+                ("k", JString "union"),
+                ("types", JArray (List.map (shape c (depth + 1)) (Ts.members t))),
+              ],
+              alias,
+            ])
         else if Ts.type_has "Object" t then
           object_shape c depth t
         else
@@ -279,7 +297,8 @@ let export_of c exported =
   Option.map
     (fun sited ->
       let body = List.map (fun (k, x) -> (k, unsited x)) sited
-      let fingerprinted = JsonText.render (JObject (List.concat [[("name", JString name)], body]))
+      let fingerprinted =
+        JsonText.render (unaliased (JObject (List.concat [[("name", JString name)], body])))
       {
         name = name;
         local = local_name exported symbol;

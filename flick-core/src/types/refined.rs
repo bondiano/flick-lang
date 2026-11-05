@@ -25,12 +25,16 @@ impl Checker<'_> {
         let Some(constant) = consteval::eval(arg, self.text) else {
             return;
         };
-        // an enum's literals travel in its interface: of any module
-        if let Some(Form::Adt {
-            abi: Abi::Literal(literals),
-            ..
-        }) = self.env.type_def(&module, ty).map(|d| &d.form)
-        {
+        // an enum's literals travel in its interface, an opaque one's too
+        let literals = match self.env.type_def(&module, ty).map(|d| &d.form) {
+            Some(Form::Adt {
+                abi: Abi::Literal(literals),
+                ..
+            }) => Some(literals.clone()),
+            Some(Form::Nominal { literals }) if !literals.is_empty() => Some(literals.clone()),
+            _ => None,
+        };
+        if let Some(literals) = literals {
             let known = match &constant {
                 Const::String(s) => literals.contains(&EnumLit::String(s.clone())),
                 Const::Number(n) => literals

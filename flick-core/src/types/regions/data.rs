@@ -428,7 +428,7 @@ impl Checker<'_> {
         }
         let complete = matches!(head.spine().0, Type::Con { module, name }
             if matches!(self.env.type_def(module, name).map(|d| &d.form),
-                Some(Form::Nominal)));
+                Some(Form::Nominal { .. })));
         let ty = match ty {
             Type::Fun {
                 param,

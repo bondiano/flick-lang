@@ -286,6 +286,7 @@ exported values with their projected types (see [Public TypeScript interfaces](.
 | an exported function whose last stage is Sync, `a ->{Atom.Read;} b` | `(arg: A) => Effect.Effect<B, never, Atom.Read>`: a Flick caller still gets the value at once; a TypeScript one gets an Effect that reads the fiber's services, so a direct call no longer fails |
 | `Stream r e a` | Effect `Stream.Stream<A, E, R>`, the value itself |
 | a variant type, an error | a union of `{ readonly _tag: "<constructor id>"; readonly _0: … }` |
+| an enum; an opaque one | the union of its literals, `"GET" \| "POST"`; `string` or `number` branded with its qualified name |
 | an opaque, abstract or built-in nominal type, a service | an interface branded with its qualified name |
 | `service S` | an interface branded with its name, and in `.d.ts` `$s_S: Context.Service<S, { op: … }>`, the key TypeScript provides an implementation by (`Effect.provideService(program, $s_S, impl)`) |
 | a class over types | the interface of its dictionary; a constrained value takes it first |

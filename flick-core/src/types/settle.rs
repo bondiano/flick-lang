@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::mem;
 
 use super::classes::{NUMERIC_CLASSES, split, which};
-use super::env::{Abi, Form, TypeDef};
+use super::env::{Abi, Form};
 use super::ty::Type;
 use super::typing::Identity;
 use super::{Checker, Domain, NumLiteral};
@@ -259,11 +259,14 @@ impl Checker<'_> {
         let Type::Con { module, name } = head else {
             return None;
         };
-        let Some(TypeDef {
-            form: Form::Adt { constructors, abi },
-            ..
-        }) = self.env.type_def(module, name)
-        else {
+        let form = self.env.type_def(module, name).map(|d| &d.form);
+        // an enum's values are its literals, an opaque one's too
+        if let Some(Form::Nominal { literals }) = form
+            && !literals.is_empty()
+        {
+            return Some(Identity::Value);
+        }
+        let Some(Form::Adt { constructors, abi }) = form else {
             return None;
         };
         // an enum's values are its literals

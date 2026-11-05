@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: cbf60c941dd38110
+source_hash: 66d656f376fafc55
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -271,6 +271,8 @@ untagged type Key = ByNumber Float | ByName String | ByPath (List String)
 
 The value of an `unboxed type` is the field of its single constructor with one field. `opaque unboxed type` hides the constructor from importers in the same way as `opaque type`. An `untagged type` is the field of each constructor; the fields are distinguishable by JS type (`Float`, `String`, `Bool`, `BigInt`, one list/tuple), and the checker rejects an overlap (`FLICK-T020`). Pattern matching checks `typeof`/`Array.isArray` instead of `_tag`. Derived `Eq`, `Ord`, `Hash`, `Show` work on the representation; the wire form of `deriving Schema` for an `unboxed type` is the form of the field, and an `untagged type` has no derived witness. The TS projection is the type of the field or the union of the types of the fields.
 
+An enum is an `untagged type` whose constructors are literals (`Get = "GET"`). Each value is its literal, a string or an integer, and `==` and `match` compare the literals. Its TS projection is the union of its literals; an opaque enum's is `string` or `number` branded with its qualified name. A `.d.ts` import makes an enum of a `type` alias whose members are all string literals or all integers.
+
 A JS callback is one of **four explicit families**. A runtime arrow with empty rows does not prove synchrony, and a `void` callback never runs an Effect implicitly.
 
 | Family | What JS gets | Who controls execution | Where to use |
@@ -334,6 +336,7 @@ Direct FFI and data validation solve different problems. Passing a trusted `HTML
 | Runtime function | A function with an `Effect<A, E, R>` result |
 | Constrained value | Takes the dictionary of each class first, typed as the interface of the dictionary |
 | Opaque or abstract nominal type, service | An interface branded with its qualified name |
+| Enum | The union of its literals; an opaque one is `string` or `number` branded with its qualified name |
 | Higher-kinded variable, region, open record | No projection: `FLICK-F004` under `--emit-dts` |
 
 A curried export preserves the stages of the source function. For `f x y` the first stage `f x` is executed before `y` is evaluated, while JS first evaluates all arguments of an ordinary call. So an uncurried worker `f$n` exists only for a function whose stages before the last only make closures; if the first stage could diverge, fail or perform a runtime operation, joining the stages could change behavior.
