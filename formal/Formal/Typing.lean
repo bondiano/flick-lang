@@ -153,6 +153,26 @@ inductive PatTy : Bool → Pat → Ty → List Ty → Prop
       PatTy true (.rfield l p r) R (Δ₁ ++ Δ₂)
   | or : PatTy true p t Δ → PatTy true q t Δ → PatTy true (.or p q) t Δ
 
+/-- A substitution that fits a term: it keeps the regions the term writes and the
+`provide` regions of its `with` frames, and if the term has a run-time form, it brings
+in no run-time region, sends each atom to an atom or to a type without one and brings no
+name into a row. -/
+def Fits (σ : Atom → Ty) (e : Tm) : Prop :=
+  (∀ p, (e.Has (.rgn p) ∨ e.Has (.prov p)) → σ (.r p) = .rg p) ∧
+    (e.Has .ins → ∀ b p, (σ b).reach (.r p) → b = .r p) ∧
+    (e.Has .ins → ∀ b a, (σ b).reach a → σ b = a.ty) ∧
+    (e.Has .ins → NoNames σ)
+
+theorem Fits.rename_iff (σ : Atom → Ty) (ξ : Nat → Nat) (e : Tm) :
+    Fits σ (e.rename ξ) ↔ Fits σ e := by
+  simp only [Fits, Tm.has_rename]
+
+/-- The patterns of a constructor's fields at the fields' types, and what they bind. -/
+inductive PatsTy : List Pat → List Ty → List Ty → Prop
+  | nil : PatsTy [] [] []
+  | cons {q qs a us Δ₁ Δ₂} : PatTy S true q a Δ₁ → PatsTy qs us Δ₂ →
+      PatsTy (q :: qs) (a :: us) (Δ₁ ++ Δ₂)
+
 /-- The head of an ordinary constructor's pattern, at `T us`. -/
 theorem PatTy.head_plain {K k ts T us} (hK : S.ctor K = some (k, ts, T)) (hres : S.res K = idTs k)
     (hk : us.length = k) : PatTy S false (.ctor K) (Sig.ctorTy ts T us) [] := by

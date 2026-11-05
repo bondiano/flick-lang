@@ -62,6 +62,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
   | anil => intro _ _ _ _ hJ; cases hJ
   | acons => intro _ _ _ _ hJ; cases hJ
   | aguard => intro _ _ _ _ hJ; cases hJ
+  | aref => intro _ _ _ _ hJ; cases hJ
   | hnil => intro _ _ _ _ hJ; cases hJ
   | hcons => intro _ _ _ _ hJ; cases hJ
   | hguard => intro _ _ _ _ hJ; cases hJ

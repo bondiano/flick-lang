@@ -30,16 +30,6 @@ theorem Ty.Opaque.of_substT {t : Ty} (σ : Atom → Ty) (h : (t.substT σ).Opaqu
   | base | adt | rnil | rcons => simp [Ty.Opaque, Ty.hd, Ty.substT] at h
   | _ => simp [Ty.Opaque, Ty.hd]
 
-theorem Le.substT {a b : Ty} (σ : Atom → Ty) (h : Le a b) : Le (a.substT σ) (b.substT σ) := by
-  have sub : ∀ {x y : Ty}, Caps.Sub x.reach y.reach →
-      Caps.Sub (x.substT σ).reach (y.substT σ).reach := fun hc a ha => by
-    obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ a).mp ha
-    exact (Ty.reach_substT σ _ a).mpr ⟨b, hc b hb, h'⟩
-  induction h with
-  | refl => exact .refl
-  | arrow _ hφ _ hc ih₁ ih₂ => exact .arrow ih₁ (Stage.le_substT σ hφ) ih₂ (sub hc)
-  | eff hr he _ hc ih => exact .eff (hr.substT σ) (he.substT σ) ih (sub hc)
-
 theorem Shp.of_substT {σ : Atom → Ty} :
     ∀ {t : Ty} {v : Tm}, Shp S true (t.substT σ) v → Shp S true t v
   | .base _, _, h | .adt _, _, h | .rnil, _, h => h

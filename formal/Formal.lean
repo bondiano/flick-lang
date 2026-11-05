@@ -17,6 +17,8 @@ import Formal.SubstPat
 import Formal.TySubstBase
 import Formal.TySubst
 import Formal.RowSubst
+import Formal.SubOk
+import Formal.SubstArm
 import Formal.Substitution
 import Formal.Canonical
 import Formal.Shapes
@@ -32,6 +34,7 @@ import Formal.Fresh
 import Formal.StepFrame
 import Formal.Progress
 import Formal.ProgressMain
+import Formal.SpineMatch
 import Formal.PresPure
 import Formal.ScopeStep
 import Formal.PresRt

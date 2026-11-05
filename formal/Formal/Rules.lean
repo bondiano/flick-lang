@@ -110,6 +110,24 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | aguard : PatTy S true p t Δ → Typ Ψ Θ (Δ.map .mono ++ Γ) g (.ex (.base .bool) φ) →
       Typ Ψ Θ (Δ.map .mono ++ Γ) b (.ex t' φ) → Typ Ψ Θ Γ r (.alts t t' φ) →
       Typ Ψ Θ Γ (.aguard p g b r) (.alts t t' φ)
+  /-- An arm on a constructor `K` of a GADT, which builds `T rs` over its `k`
+  variables, with the patterns `qs` of its fields: under each instance `θ` of those
+  variables and of the ones around that makes `T rs` the matched type and fits the
+  arm, the fields' patterns bind `Δ θ` and the arm has the result's type. No such
+  `θ`: no value of the matched type is built by `K`, and the arm is dead. A dead arm
+  still names only the variables and cells around it. The matched type is a type
+  `T …`, as for the patterns of ordinary constructors. -/
+  | aref {qs : List Pat} {ts : List Ty} {Δ : (Atom → Ty) → List Ty} :
+      S.ctor K = some (k, ts, T₀) → t.hd = .adt T₀ → b.NoIns →
+      (∀ i, b.Free i → i < (Pat.spine K qs).binds + Γ.length) →
+      (∀ l, b.Has (.loc l) → l < Ψ.length) →
+      (∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+        PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ)) →
+      (∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+        Typ ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
+          ((Δ θ).map .mono ++ (Γ.map (Scheme.up k)).map (Scheme.substT θ)) b
+          (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ))) →
+      Typ Ψ Θ Γ r (.alts t t' φ) → Typ Ψ Θ Γ (.acons (Pat.spine K qs) b r) (.alts t t' φ)
   | todo : Typ Ψ Θ Γ .todo (.ex t φ)
   | task : Typ Ψ Θ Γ e (.ex t ψ) → ψ.le (.rt r ε) → e.NoIns →
       Caps.Sub (held Ψ Γ (.task e)) (Ty.eff r ε t C).reach → Le (.eff r ε t C) T →

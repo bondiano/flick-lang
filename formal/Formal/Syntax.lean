@@ -283,6 +283,9 @@ inductive Pat
   | or (p q : Pat)
   deriving DecidableEq, Repr
 
+/-- `K q₁ … qₙ`: the pattern of a constructor and of its fields. -/
+def Pat.spine (K : Name) (qs : List Pat) : Pat := qs.foldl .app (.ctor K)
+
 def Pat.binds : Pat → Nat
   | .var => 1
   | .app p q => p.binds + q.binds

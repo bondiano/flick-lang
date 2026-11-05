@@ -22,16 +22,6 @@ def J.substT (σ : Atom → Ty) : J → J
   | .halts ε H t φ => .halts (ε.substT σ) (H.substT σ) (t.substT σ) (φ.substT σ)
   | .dfs fs => .dfs (fs.map fun f => (f.1, f.2.substT σ))
 
-/-- A substitution that fits a term: it keeps the regions the term writes and the
-`provide` regions of its `with` frames, and if the term has a run-time form, it brings
-in no run-time region, sends each atom to an atom or to a type without one and brings no
-name into a row. -/
-def Fits (σ : Atom → Ty) (e : Tm) : Prop :=
-  (∀ p, (e.Has (.rgn p) ∨ e.Has (.prov p)) → σ (.r p) = .rg p) ∧
-    (e.Has .ins → ∀ b p, (σ b).reach (.r p) → b = .r p) ∧
-    (e.Has .ins → ∀ b a, (σ b).reach a → σ b = a.ty) ∧
-    (e.Has .ins → NoNames σ)
-
 theorem Fits.sub {σ : Atom → Ty} {e e' : Tm} (h : Fits σ e) (hs : ∀ s, e'.Has s → e.Has s) :
     Fits σ e' :=
   ⟨fun p hp => h.1 p (hp.imp (hs _) (hs _)), fun hi => h.2.1 (hs _ hi), fun hi => h.2.2.1 (hs _ hi),
@@ -146,6 +136,62 @@ theorem held_substT {Ψ : List Ty} {Γ : List Scheme} {e : Tm} {T : Ty} {σ : At
     obtain ⟨t₀, ht₀, rfl⟩ := ht
     obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ _).mp ha
     exact (Ty.reach_substT σ _ _).mpr ⟨b, h b (.inr (.inr ⟨l, t₀, hl, ht₀, hb⟩)), h'⟩
+
+/-- An arm on a constructor of a GADT under `σ`: a unifier `θ` of the new problem,
+after `σ` lifted past the constructor's variables, is a unifier of the old one, which
+types the arm under the same contexts. -/
+theorem Typ.aref_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name} {k : Nat}
+    {ts : List Ty} {T₀ : Name} {qs : List Pat} {b r : Tm} {t t' : Ty} {φ : Stage}
+    {Δ : (Atom → Ty) → List Ty} (hK : S.ctor K = some (k, ts, T₀)) (hU : t.hd = .adt T₀)
+    (hn : b.NoIns) (hfr : ∀ i, b.Free i → i < (Pat.spine K qs).binds + Γ.length)
+    (hlc : ∀ l, b.Has (.loc l) → l < Ψ.length)
+    (hpA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+      PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ))
+    (hbA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+      Typ S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
+        ((Δ θ).map .mono ++ (Γ.map (Scheme.up k)).map (Scheme.substT θ)) b
+        (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ)))
+    (σ : Atom → Ty) (hσ : Fits σ b)
+    (hr : Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) r
+      (.alts (t.substT σ) (t'.substT σ) (φ.substT σ))) :
+    Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ))
+      (.acons (Pat.spine K qs) b r) (.alts (t.substT σ) (t'.substT σ) (φ.substT σ)) := by
+  have fits : ∀ θ, Fits θ b → Fits (fun a => (liftT k σ a).substT θ) b := fun θ h =>
+    ⟨fun p hp => by simp [liftT, hσ.1 p hp, Ty.up, Ty.substT, shiftV, h.1 p hp],
+      fun hi => (hn hi).elim, fun hi => (hn hi).elim, fun hi => (hn hi).elim⟩
+  have cl : (Ty.tcon T₀ (S.res K)).substT (liftT k σ) = Ty.tcon T₀ (S.res K) := by
+    rw [Ty.tcon_substT, S.res_closed K k ts T₀ _ hK fun i hi => by simp [liftT, hi]]
+  have unif : ∀ θ, (Ty.tcon T₀ (S.res K)).substT θ = ((t.substT σ).up k).substT θ →
+      (Ty.tcon T₀ (S.res K)).substT (fun a => (liftT k σ a).substT θ) =
+        (t.up k).substT (fun a => (liftT k σ a).substT θ) := fun θ hu => by
+    rw [← Ty.substT_comp, ← Ty.substT_comp, cl, Ty.up_comm]; exact hu
+  have ets : ∀ θ, ts.map (Ty.substT (fun a => (liftT k σ a).substT θ)) = ts.map (Ty.substT θ) :=
+    fun θ => by
+      have := congrArg (List.map (Ty.substT θ))
+        (S.ctor_closed K k ts T₀ (liftT k σ) hK fun i hi => by simp [liftT, hi])
+      simpa [List.map_map, Function.comp_def, Ty.substT_comp] using this
+  have eΨ : ∀ θ, ((Ψ.map (Ty.substT σ)).map (Ty.up k)).map (Ty.substT θ) =
+      (Ψ.map (Ty.up k)).map (Ty.substT fun a => (liftT k σ a).substT θ) := fun θ => by
+    rw [← shift_comm]; simp only [List.map_map, Function.comp_def, Ty.substT_comp]
+  have eΓ : ∀ θ, ((Γ.map (Scheme.substT σ)).map (Scheme.up k)).map (Scheme.substT θ) =
+      (Γ.map (Scheme.up k)).map (Scheme.substT fun a => (liftT k σ a).substT θ) := fun θ => by
+    rw [← shift_comm']; simp only [List.map_map, Function.comp_def, Scheme.substT_comp]
+  have eΘ : ∀ θ, ((Θ.substT σ).substT (shiftV k)).substT θ =
+      (Θ.substT (shiftV k)).substT fun a => (liftT k σ a).substT θ := fun θ => by
+    rw [← Facts.up_comm, Facts.substT_comp (Θ.substT (shiftV k)) (liftT k σ) θ]
+  have eT : ∀ θ, ((t'.substT σ).up k).substT θ =
+      (t'.up k).substT fun a => (liftT k σ a).substT θ := fun θ => by
+    rw [← Ty.up_comm, Ty.substT_comp]
+  have eP : ∀ θ, ((φ.substT σ).substT (shiftV k)).substT θ =
+      (φ.substT (shiftV k)).substT fun a => (liftT k σ a).substT θ := fun θ => by
+    simp only [Stage.substT_comp]; congr 1; funext a
+    rw [← Ty.substT_comp, shift_lift]; rfl
+  refine .aref (Δ := fun θ => Δ fun a => (liftT k σ a).substT θ) hK (Ty.hd_substT σ hU) hn
+    (by simpa using hfr) (by simpa using hlc)
+    (fun θ hθ hu => by have := hpA _ (fits θ hθ) (unif θ hu); rwa [ets] at this)
+    (fun θ hθ hu => by
+      have := hbA _ (fits θ hθ) (unif θ hu)
+      rw [eΨ, eΘ, eΓ, eT, eP]; exact this) hr
 
 theorem Tm.NoIns.of_has {e e' : Tm} (h : e.NoIns) (hs : ∀ s, e'.Has s → e.Has s) : e'.NoIns :=
   fun h' => h (hs _ h')

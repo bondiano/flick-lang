@@ -40,6 +40,13 @@ theorem Entails.union {Θ₁ Θ₂ : Facts} (h : Entails Θ₁ Θ₂) (F : Facts
     · exact .inr ⟨C'', .inl h₃, h₄⟩
   · exact .inr ⟨C', .inr h₁, h₂⟩
 
+theorem Entails.substT {Θ₁ Θ₂ : Facts} (h : Entails Θ₁ Θ₂) (σ : Atom → Ty) :
+    Entails (Θ₁.substT σ) (Θ₂.substT σ) := by
+  intro C s hC x hx
+  rcases hC x hx with h' | ⟨C', ⟨C₀, s₀, h₀, rfl, rfl⟩, h₂⟩
+  · exact .inl h'
+  · exact (h C₀ s₀ fun y hy => .inr ⟨C₀, h₀, hy⟩).substT σ x h₂
+
 theorem Entails.trans {Θ₁ Θ₂ Θ₃ : Facts} (h₁ : Entails Θ₁ Θ₂) (h₂ : Entails Θ₂ Θ₃) :
     Entails Θ₁ Θ₃ := fun C s h => h₂ C s (h₁ C s h)
 
@@ -102,6 +109,9 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | anil => intro _ _; exact .anil
   | acons hp _ _ ih₁ ih₂ => intro _ hΘ; exact .acons hp (ih₁ hΘ) (ih₂ hΘ)
   | aguard hp _ _ _ ih₁ ih₂ ih₃ => intro _ hΘ; exact .aguard hp (ih₁ hΘ) (ih₂ hΘ) (ih₃ hΘ)
+  | aref hK hU hn hfr hlc hpA _ _ ihA ihr =>
+    intro _ hΘ
+    exact .aref hK hU hn hfr hlc hpA (fun θ hθ hu => ihA θ hθ hu ((hΘ.substT _).substT θ)) (ihr hΘ)
   | todo => intro _ _; exact .todo
   | task _ hψ hn hc hT ih => intro _ hΘ; exact .task (ih hΘ) hψ hn hc hT
   | await _ hφ hT ih => intro _ hΘ; exact .await (ih hΘ) hφ hT

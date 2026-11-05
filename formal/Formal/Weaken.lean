@@ -11,6 +11,25 @@ variable {S : Sig}
 theorem PatTy.binds {fl p t Δ} (h : PatTy S fl p t Δ) : Δ.length = p.binds := by
   induction h <;> simp_all [Pat.binds]
 
+theorem Pat.spine_binds (K : Name) (qs : List Pat) :
+    (Pat.spine K qs).binds = (qs.map Pat.binds).sum := by
+  have key : ∀ (qs : List Pat) (p : Pat), (qs.foldl .app p).binds = p.binds + (qs.map Pat.binds).sum := by
+    intro qs
+    induction qs with
+    | nil => intro p; simp
+    | cons q qs ih => intro p; simp only [List.foldl, ih, Pat.binds, List.map_cons, List.sum_cons]; omega
+  simpa [Pat.spine, Pat.binds] using key qs (.ctor K)
+
+theorem PatsTy.binds {qs us Δ} (h : PatsTy S qs us Δ) : Δ.length = (qs.map Pat.binds).sum := by
+  induction h with
+  | nil => rfl
+  | cons hq _ ih => simp [hq.binds, ih]
+
+/-- The arm of a GADT binds what its patterns bind, under any instance. -/
+theorem PatsTy.spine_binds {K qs us Δ} (h : PatsTy S qs us Δ) :
+    (Δ.map Scheme.mono).length = (Pat.spine K qs).binds := by
+  simp [h.binds, Pat.spine_binds]
+
 theorem getElem?_lt {α} {l : List α} {i : Nat} {a : α} (h : l[i]? = some a) : i < l.length := by
   obtain ⟨hi, _⟩ := List.getElem?_eq_some_iff.mp h
   exact hi
@@ -24,6 +43,7 @@ theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l)
     · simpa using ih₁ l h
     · exact ih₂ l h
   | scope _ _ _ _ _ _ ih => intro l h; simpa using ih l h
+  | aref _ _ _ _ hlc _ _ _ _ ih => intro l h; exact h.elim (hlc l) (ih l)
   | _ => intro l h; (try simp only [Tm.Has] at h) <;> grind
 
 theorem HPat.binds {ε₀ p θ Δ} (h : HPat S ε₀ p θ Δ) : Δ.length = p.binds := by
@@ -62,6 +82,10 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
     · have := ih₁ _ h; simp [hp.binds] at this; omega
     · have := ih₂ _ h; simp [hp.binds] at this; omega
     · exact ih₃ i h
+  | aref _ _ _ hfr _ _ _ _ _ ih₂ =>
+    intro i h; rcases h with h | h
+    · have := hfr _ h; omega
+    · exact ih₂ i h
   | hcons hp _ _ _ ih₁ ih₂ =>
     intro i h; rcases h with h | h
     · have := ih₁ _ h; simp [hp.binds] at this; omega
@@ -107,6 +131,10 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | anil => exact .anil
   | acons hp _ _ ih₁ ih₂ => exact .acons hp (ih₁ X) (ih₂ X)
   | aguard hp _ _ _ ih₁ ih₂ ih₃ => exact .aguard hp (ih₁ X) (ih₂ X) (ih₃ X)
+  | aref hK hU hn hfr hlc hpA _ _ ihA ihr =>
+    refine .aref hK hU hn hfr (fun l h => by simp only [List.length_append]; have := hlc l h; omega) hpA
+      (fun θ hθ hu => ?_) (ihr X)
+    rw [List.map_append, List.map_append]; exact ihA θ hθ hu _
   | todo => exact .todo
   | task he hψ hn hc hT ih => exact .task (ih X) hψ hn (Caps.Sub.trans (held_weaken X he.locs) hc) hT
   | await _ hφ hT ih => exact .await (ih X) hφ hT
@@ -152,6 +180,13 @@ theorem RenOk.up {Γ Γ' ξ} (h : RenOk Γ Γ' ξ) (k : Nat) :
   obtain ⟨s, hs, rfl⟩ := hi
   exact ⟨s, h _ _ hs, rfl⟩
 
+theorem RenOk.map {Γ Γ' ξ} (h : RenOk Γ Γ' ξ) (f : Scheme → Scheme) :
+    RenOk (Γ.map f) (Γ'.map f) ξ := by
+  intro i t hi
+  simp only [List.getElem?_map, Option.map_eq_some_iff] at hi ⊢
+  obtain ⟨s, hs, rfl⟩ := hi
+  exact ⟨s, h _ _ hs, rfl⟩
+
 theorem RenOk.lift {Γ Γ' ξ} (h : RenOk Γ Γ' ξ) (Δ : List Scheme) {n} (hn : Δ.length = n) :
     RenOk (Δ ++ Γ) (Δ ++ Γ') (liftR n ξ) := by
   intro i t hi
@@ -172,6 +207,20 @@ theorem held_rename {Ψ Γ Γ' ξ} (hξ : RenOk Γ Γ' ξ) {e : Tm}
     exact .inl ⟨i, _, hi, hs', ha⟩
   · exact .inr (.inl ⟨p, (Tm.has_rename _ _ _).mp hp, rfl⟩)
   · exact .inr (.inr ⟨l, t, (Tm.has_rename _ _ _).mp hle, ht, hr⟩)
+
+theorem RenOk.frees {Γ Γ' ξ} (h : RenOk Γ Γ' ξ) {e : Tm} (hf : ∀ i, e.Free i → i < Γ.length) :
+    ∀ i, (e.rename ξ).Free i → i < Γ'.length := by
+  intro i hi
+  obtain ⟨j, hj, rfl⟩ := Tm.free_rename ξ e i hi
+  exact getElem?_lt (h _ _ (List.getElem?_eq_getElem (hf j hj)))
+
+/-- Renaming under `n` binders keeps a term within its context. -/
+theorem RenOk.frees_lift {Γ Γ' ξ} (h : RenOk Γ Γ' ξ) {e : Tm} {n : Nat}
+    (hf : ∀ i, e.Free i → i < n + Γ.length) :
+    ∀ i, (e.rename (liftR n ξ)).Free i → i < n + Γ'.length := by
+  have hl := h.lift (List.replicate n (Scheme.mono .rnil)) (n := n) (by simp)
+  intro i hi
+  simpa using hl.frees (fun j hj => by simpa using hf j hj) i hi
 
 theorem Tm.NoIns.rename {e : Tm} (ξ : Nat → Nat) (h : e.NoIns) : (e.rename ξ).NoIns :=
   fun h' => h ((Tm.has_rename _ _ _).mp h')
@@ -214,6 +263,13 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | anil => intro _ _ _; exact .anil
   | acons hp _ _ ih₁ ih₂ =>
     intro _ _ hξ; exact .acons hp (ih₁ (hξ.lift _ (by simpa using hp.binds))) (ih₂ hξ)
+  | aref hK hU hn hfr hlc hpA _ _ ihA ihr =>
+    intro _ _ hξ
+    exact .aref hK hU (hn.rename _) (hξ.frees_lift hfr) (fun l h => hlc l ((Tm.has_rename _ _ _).mp h))
+      (fun θ hθ hu => hpA θ ((Fits.rename_iff _ _ _).mp hθ) hu)
+      (fun θ hθ hu => ihA θ ((Fits.rename_iff _ _ _).mp hθ) hu
+        (((hξ.up _).map _).lift _ (hpA θ ((Fits.rename_iff _ _ _).mp hθ) hu).spine_binds))
+      (ihr hξ)
   | aguard hp _ _ _ ih₁ ih₂ ih₃ =>
     intro _ _ hξ
     exact .aguard hp (ih₁ (hξ.lift _ (by simpa using hp.binds)))

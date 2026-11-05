@@ -8,6 +8,11 @@ namespace Flick
 
 variable {S : Sig}
 
+theorem acons_progress {v p b r} (hv : Value v) : ∃ e', PHead (.match_ v (.acons p b r)) e' := by
+  cases hm : matchP p v with
+  | none => exact ⟨_, .matchNo hv hm⟩
+  | some δ => exact ⟨_, .matchYes hv hm⟩
+
 theorem match_progress {Ψ Θ v A t t' φ} (hv : Value v) (he : Typ S Ψ Θ [] v (.ex t φ))
     (hA : Typ S Ψ Θ [] A (.alts t t' φ)) (hc : Covers S t A.unguarded v) :
     ∃ e', PHead (.match_ v A) e' := by
@@ -25,6 +30,7 @@ theorem match_progress {Ψ Θ v A t t' φ} (hv : Value v) (he : Typ S Ψ Θ [] v
     cases hm : matchP p v with
     | none => exact ⟨_, .guardNo hv hm⟩
     | some δ => exact ⟨_, .guardYes hv hm⟩
+  | aref => exact acons_progress hv
 
 theorem handle_progress {Ψ Θ Λ μ v A ε₀ H t φ} (hv : Value v)
     (hA : Typ S Ψ Θ [] A (.halts ε₀ H t φ)) : ∃ Λ' μ' e', RHead Λ μ (.handle v A) Λ' μ' e' := by

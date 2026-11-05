@@ -68,6 +68,10 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     have g := ih₁ σ (hσ.sub fun _ h => .inl h); rw [ctx_substT] at g
     have b := ih₂ σ (hσ.sub fun _ h => .inr (.inl h)); rw [ctx_substT] at b
     exact .aguard (hp.substT σ) g b (ih₃ σ (hσ.sub fun _ h => .inr (.inr h)))
+  | aref hK hU hn hfr hlc hpA hbA _ _ ihr =>
+    intro σ hσ
+    exact Typ.aref_substT hK hU hn hfr hlc hpA hbA σ (hσ.sub fun _ h => .inl h)
+      (ihr σ (hσ.sub fun _ h => .inr h))
   | todo => intro _ _; exact .todo
   | task _ hψ hn hc hT ih =>
     intro σ hσ
