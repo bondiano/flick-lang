@@ -154,23 +154,15 @@ fn shared_browser_and_sql_programs_compile_without_server_modules() {
 }
 
 #[test]
-fn optional_server_imports_and_sugar_have_real_availability_diagnostics() {
-    let server = "module Main exposing (ping)\nping : Unit ->{} Unit\nserver fn ping () = ()\n";
+fn server_fns_and_cli_blocks_are_plugins_of_std_in_every_build() {
+    let server = "module Main exposing (ping)\nimport Server exposing (plugin server)\n\
+        ping : Unit ->{Server.Server;} Unit\nserver fn ping () = ()\n";
     let (diagnostics, _, compilation) = compile(server);
-    let errors: Vec<_> = diagnostics
-        .iter()
-        .filter(|d| d.severity == Severity::Error)
-        .collect();
-    if cfg!(feature = "server-stdlib") {
-        assert!(errors.is_empty(), "{diagnostics:?}");
-        assert!(compilation.modules[0].interface.exports_value("ping"));
-    } else {
-        assert!(
-            errors.iter().any(|d| d.code == codes::E012),
-            "{diagnostics:?}"
-        );
-        assert!(compilation.modules.is_empty());
-    }
+    assert!(
+        diagnostics.iter().all(|d| d.severity != Severity::Error),
+        "{diagnostics:?}"
+    );
+    assert!(compilation.modules[0].interface.exports_value("ping"));
     // `cli` is a plugin of std, which every build has
     let cli = "module Main exposing (command)\nimport Cli exposing (plugin cli)\n\
         let command = cli \"hello\" { handle fun _ -> Platform.stdout_line \"hello\" }\n";
@@ -180,8 +172,7 @@ fn optional_server_imports_and_sugar_have_real_availability_diagnostics() {
         "{diagnostics:?}"
     );
     assert!(compilation.modules[0].interface.exports_value("command"));
-    // the server modules are part of the std package either way: the
-    // feature only turns on the syntax that needs them
+    // the server modules are part of the std package
     let (diagnostics, _, _) =
         compile("module Main exposing (answer)\nimport File\nanswer : Int\nlet answer = 42\n");
     let missing = diagnostics

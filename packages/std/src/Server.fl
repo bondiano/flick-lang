@@ -43,10 +43,6 @@ authenticated :
 foreign pure authenticated from "@flick-lang/runtime/effect/server/Functions" "serverAuthenticated"
   arity 3
 
-/// How the calls of a `server fn` go: the compiler makes one for each from
-/// its name and the witnesses of its payload, success and errors.
-type Procedure
-
 /// Where `handler` is mounted and the calls of every `server fn` go:
 /// `Http.Router.route (Some Http.Method.POST) Server.path handler`.
 path : String
@@ -58,25 +54,3 @@ let path = "/_flick/fn"
 handler : forall s r. List (Function r) ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s}
 foreign effect handler from "@flick-lang/runtime/effect/server/FunctionsNode" "serverHandler"
   retention owner
-
-/// The procedure of the `server fn` named `name`, made by the compiler.
-procedure : String -> Schema p -> Schema s -> List (Schema e) -> Procedure
-foreign pure procedure from "@flick-lang/runtime/effect/server/Functions" "serverProcedure"
-  arity 4
-
-/// A call of the procedure, made by the compiler: to `FLICK_SERVER_URL`
-/// on Node, to the page's origin in a browser, at `path`.
-call : forall p e s. Procedure -> p ->{; Rpc.ClientError | e} s
-foreign effect call from "@flick-lang/runtime/effect/server/Functions" "serverCall"
-  arity 2
-
-/// The implementation of a procedure, made by the compiler.
-function : forall p r e s. Procedure -> (p ->{r; e} s) -> Function r
-foreign pure function from "@flick-lang/runtime/effect/server/Functions" "serverFunction"
-  arity 2
-
-/// The implementation of a procedure whose errors have `Unauthorized`,
-/// made by the compiler.
-guarded : forall p r e s. Procedure -> (p ->{r; e} s) -> Guarded r
-foreign pure guarded from "@flick-lang/runtime/effect/server/Functions" "serverFunction"
-  arity 2

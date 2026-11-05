@@ -65,7 +65,7 @@ impl Lower<'_> {
             K::Literal => ExprKind::Lit(self.literal(node)),
             K::UnitExpr => ExprKind::Lit(Lit::Unit),
             // the checker resolved `server name` to the implementation
-            K::NameExpr | K::ServerExpr => return self.name(node),
+            K::NameExpr => return self.name(node),
             K::ParenExpr | K::AnnotExpr => return self.expr(children[0]),
             K::TupleExpr => ExprKind::Tuple(children.iter().map(|c| self.expr(c)).collect()),
             K::ListExpr => return self.list(node, &children),

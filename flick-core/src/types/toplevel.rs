@@ -104,7 +104,6 @@ impl<'a> Checker<'a> {
         self.check_instances(&declared);
         self.solve_rows();
         self.makers(&decls);
-        self.server_fns(&decls);
         self.servers(&decls);
         self.made_in_render(&decls);
         self.labelled(&decls);
@@ -252,10 +251,7 @@ impl<'a> Checker<'a> {
         for name in &names {
             self.env.declare(Namespace::Value, name);
             self.top.by_name.insert(name.clone(), index);
-            if super::server_fn::is_server_fn(decl) {
-                // the body is checked against the signature, callers see the call
-                self.declare_server_fn(decl, name, scheme.as_ref().map(|(s, _)| s));
-            } else if let Some((scheme, _)) = &scheme {
+            if let Some((scheme, _)) = &scheme {
                 let entity = self.env.entity(Namespace::Value, name);
                 self.env.set_value(entity, scheme.clone());
             }
@@ -386,6 +382,17 @@ impl<'a> Checker<'a> {
     pub fn signature_span(&self, name: &str) -> Option<Span> {
         let i = *self.top.by_name.get(name)?;
         self.top.items[i].sig.map(|sig| self.span(sig))
+    }
+
+    /// The type the signature of the top-level value `name` writes, without
+    /// the parentheses a plugin's code puts around the user's.
+    pub fn signature_type_span(&self, name: &str) -> Option<Span> {
+        let i = *self.top.by_name.get(name)?;
+        let mut ty = self.top.items[i].sig?.nodes().find(|n| is_type(n.kind))?;
+        while ty.kind == K::ParenType {
+            ty = ty.nodes().next()?;
+        }
+        Some(self.span(ty))
     }
 
     /// The type of a top-level value of this module at a use.

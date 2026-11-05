@@ -5,6 +5,7 @@ module App.Shop exposing (..)
 
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
+import Server exposing (plugin server)
 
 type alias Order = { item : String; count : Float }
   deriving Schema

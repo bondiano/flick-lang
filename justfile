@@ -42,12 +42,12 @@ formal-schemes:
 # Check each capability independently, without workspace feature unification
 feature-check:
     cargo clippy -p flick-core --all-targets --no-default-features -- -D warnings
-    for feature in build-artifacts source-maps typescript diagnostic-fixes native-project terminal-diagnostics builtin-docs server-stdlib ide terminal-diagnostics,diagnostic-fixes; do cargo clippy -p flick-core --all-targets --no-default-features --features "$feature" -- -D warnings || exit $?; done
+    for feature in build-artifacts source-maps typescript diagnostic-fixes native-project terminal-diagnostics builtin-docs ide terminal-diagnostics,diagnostic-fixes; do cargo clippy -p flick-core --all-targets --no-default-features --features "$feature" -- -D warnings || exit $?; done
 
 # Exercise minimal and independently enabled compiler capabilities
 feature-test:
     cargo test -p flick-core --no-default-features --features embedded-std --lib --test features
-    for feature in build-artifacts source-maps typescript diagnostic-fixes native-project terminal-diagnostics builtin-docs server-stdlib ide terminal-diagnostics,diagnostic-fixes; do cargo test -p flick-core --no-default-features --test features --features "embedded-std,$feature" || exit $?; done
+    for feature in build-artifacts source-maps typescript diagnostic-fixes native-project terminal-diagnostics builtin-docs ide terminal-diagnostics,diagnostic-fixes; do cargo test -p flick-core --no-default-features --test features --features "embedded-std,$feature" || exit $?; done
 
 # The Go runtime of the go target: vet and its unit tests.
 go-test:

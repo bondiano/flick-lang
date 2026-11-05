@@ -69,10 +69,7 @@ fn bodies(item: &mut Item) -> Vec<&mut Expr> {
         ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => vec![body],
         ItemKind::Refined { check, .. } => vec![check],
         ItemKind::Instance { methods, .. } => methods.iter_mut().map(|(_, m)| m).collect(),
-        ItemKind::Foreign(_)
-        | ItemKind::Constructor(_)
-        | ItemKind::Service { .. }
-        | ItemKind::Schema(_) => Vec::new(),
+        ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => Vec::new(),
     }
 }
 
@@ -299,7 +296,7 @@ fn item_globals(item: &Item, module: &str, out: &mut BTreeSet<String>) {
                 walk(c);
             }
         }
-        ItemKind::Constructor(_) | ItemKind::Service { .. } | ItemKind::Schema(_) => {}
+        ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }
 }
 

@@ -211,21 +211,20 @@ impl Expansion {
     }
 
     /// Each companion `Owner.member` the code of a block declares whose
-    /// owner is no type of the module.
+    /// owner is no type of the module, nor a value: `f$server` of a
+    /// `server fn` is one.
     fn stray_companions(&self) -> Vec<Diagnostic> {
         let declared = resolve::declarations(&self.tree, &self.text, self.file);
-        let is_type = |name: &str| {
-            (declared.iter()).any(|d| d.namespace == Namespace::Type && d.name == name)
-        };
+        let owned = |name: &str| (declared.iter()).any(|d| d.name == name && !d.signature);
         (declared.iter())
             .filter(|d| d.namespace == Namespace::Value && !d.signature)
             .filter_map(|d| Some((d, d.name.split_once('$')?)))
-            .filter(|(_, (owner, _))| !is_type(owner))
+            .filter(|(_, (owner, _))| !owned(owner))
             .filter_map(|(d, (owner, member))| {
                 let block = (self.blocks.iter())
                     .find(|b| b.code.0 <= d.span.start && d.span.start < b.code.1)?;
                 let message = format!(
-                    "plugin `{}` declares `{owner}.{member}`, but `{owner}` is no type of this module",
+                    "plugin `{}` declares `{owner}.{member}`, but `{owner}` is no type or value of this module",
                     block.plugin
                 );
                 let (start, end) = block.range;

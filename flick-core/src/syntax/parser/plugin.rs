@@ -8,7 +8,7 @@
 //! no import says so.
 
 use super::{K, Parser, SyntaxKind};
-use crate::plugin::first_party::HEADS;
+use crate::plugin::first_party::{BARE, HEADS};
 
 /// Whether an exposed item `plugin head` starts here.
 pub(super) fn at_head(p: &Parser) -> bool {
@@ -27,10 +27,11 @@ pub(super) fn head(p: &mut Parser) {
 /// Whether a plugin block starts here: a head an import exposed with its
 /// arguments on the same line, then `{ … }` or not; or one of the
 /// compiler's own heads with its arguments and `{ … }`, so that a value of
-/// that name elsewhere stays one.
+/// that name elsewhere stays one, or before a name for one of [`BARE`].
 pub(super) fn at_block(p: &Parser) -> bool {
     let head = p.text_of(p.raw());
-    let imported = p.plugin_heads.contains(&head);
+    let imported = p.plugin_heads.contains(&head)
+        || BARE.contains(&head) && matches!(p.nth(1), K::Ident | K::Con);
     if !imported && !HEADS.iter().any(|(h, _)| *h == head) {
         return false;
     }
@@ -88,9 +89,12 @@ fn arguments(p: &mut Parser) {
 }
 
 /// Whether a declaration of a plugin starts here: a head an import exposed
-/// at the start of a declaration, not its signature.
+/// at the start of a declaration, not its signature; or one of [`BARE`]
+/// before `fn`.
 pub(super) fn at_declaration(p: &Parser) -> bool {
-    p.plugin_heads.contains(&p.text_of(p.raw())) && p.nth(1) != K::Colon
+    let head = p.text_of(p.raw());
+    let bare = BARE.contains(&head) && p.nth(1) == K::Ident && super::decl::word_at(p, 1, "fn");
+    (p.plugin_heads.contains(&head) || bare) && p.nth(1) != K::Colon
 }
 
 /// `head args { … }`, or `head args` and the rest of the declaration up to

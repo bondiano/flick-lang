@@ -54,7 +54,6 @@ capabilities with `--no-default-features --features <names>`.
 | `native-project` | Project discovery, TOML/FFI-policy parsing, installed packages, disk-cache contracts and pnpm adapters; activates `toml`. |
 | `terminal-diagnostics` | Human-readable diagnostic rendering; activates `annotate-snippets`. |
 | `builtin-docs` | Documentation comments in embedded builtin sources. Without it, build-time lexing removes those comments, not user-program documentation or string contents. |
-| `server-stdlib` | The optional server/runner/CLI/exporter builtin group. |
 
 Shared in-memory project/configuration types, `Host`-backed source loading,
 type checking, JSON primary diagnostics and both debug/release profiles remain
@@ -62,8 +61,7 @@ available without defaults. Unsupported TypeScript output requests report an
 error instead of silently producing JavaScript. Without `diagnostic-fixes`,
 JSON diagnostic events omit `fixes`.
 
-`flick-wasm` disables the core's default features and forwards only its default
-`server-stdlib` feature, preserving existing server-code Transpile support.
+`flick-wasm` disables the core's default features.
 Use `just wasm` or `just docs-wasm` for this smaller browser compiler.
 Build the package separately: Cargo unifies dependency features in workspace
 builds, where the native CLI enables the complete core.

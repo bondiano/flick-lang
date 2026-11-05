@@ -154,7 +154,6 @@ impl<'a> Gen<'a> {
                 stmts.push(statement(a, docvec![a, value, " = flickrt.RefinedValue"]));
                 init.push(statement(a, block(a, stmts)));
             }
-            ItemKind::Schema(s) => self.schema(s, item.span, decls, init),
         }
     }
 

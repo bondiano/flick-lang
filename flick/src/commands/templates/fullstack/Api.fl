@@ -4,6 +4,7 @@ module App.Api exposing (Session, list, add)
 
 import App.Store exposing (Store)
 import App.Todo exposing (Todo)
+import Server exposing (plugin server)
 
 /// Who calls: what `Server.authenticated` makes of a call's cookie.
 service Session =

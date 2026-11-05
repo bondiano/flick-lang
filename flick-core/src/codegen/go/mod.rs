@@ -24,7 +24,6 @@ mod names;
 mod pattern;
 mod reach;
 mod runtime;
-mod schema;
 
 pub use runtime::{GO_MOD, GO_SUM, PACKAGES, Package, RUNTIME};
 
@@ -139,11 +138,6 @@ fn shape(kind: &ItemKind) -> Shape {
                 }
             }
         }
-        ItemKind::Schema(s) if s.witnesses > 0 => Shape::Func {
-            dicts: 0,
-            params: s.witnesses,
-            effects: 0,
-        },
         ItemKind::Instance { info, .. } if !info.context.is_empty() => Shape::Func {
             dicts: info.context.len(),
             params: 0,
@@ -355,7 +349,7 @@ fn visit(
     }
     state.insert(i, false);
     let mut used = Vec::new();
-    reach::uses(&module.name, &module.items[i], &mut used);
+    reach::uses(&module.items[i], &mut used);
     for key in used.iter().filter(|(m, _)| *m == module.name) {
         if let Some(&(_, j)) = index.get(key) {
             visit(module, j, index, state, out);

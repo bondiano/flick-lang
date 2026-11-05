@@ -12,14 +12,14 @@ use flick_plugin::Place;
 use super::expansion::{Expanded, Expansion};
 use super::render::render;
 use super::source::BlockSource;
-use super::{Failure, first_party};
+use super::{Failure, blocks_under, first_party};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::ModuleSyntax;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::parse;
-use crate::types::{builtin_sources, is_type};
+use crate::types::{builtin_sources, is_std_module, is_type};
 
 /// A class a module declares with `@derive`, or a type such as `Schema`
 /// whose companions a plugin derives, and the package its attribute names,
@@ -178,9 +178,10 @@ pub fn named<'n>(node: &'n Node, text: &str) -> Vec<Named<'n>> {
     out
 }
 
-/// The expansion of a built-in module `module`'s derives: the code std's
-/// plugin gives for each type that names a class it derives, after the
-/// type's declaration; `None` without one.
+/// The expansion of a built-in module `module`'s derives and blocks: the
+/// code std's plugin gives for each type that names a class it derives,
+/// after the type's declaration, and for each of its blocks the module
+/// imports, as `cli` and `server`; `None` without one.
 pub fn builtin_expansion(
     text: &str,
     file: FileId,
@@ -207,10 +208,14 @@ pub fn builtin_expansion(
             continue;
         };
         for class in named(clause, text) {
+            // `@derive` alone: the plugin of the class's package
             let marked = |m: &str| {
                 (builtin_derived(m).iter())
                     .find(|d| d.class == class.name)
-                    .map(|d| (m.to_owned(), d.package.clone()))
+                    .map(|d| {
+                        let own = is_std_module(m).then(|| "std".to_owned());
+                        (m.to_owned(), d.package.clone().or(own))
+                    })
             };
             // as the loader finds it: the module, an import exposing it, the Prelude
             let found = if class.qualifier.is_empty() {
@@ -244,28 +249,9 @@ pub fn builtin_expansion(
             };
             let full = format!("{owner}.{}", class.name);
             let whole = Span::new(file, class.span.0, class.span.1);
-            let arena = match plugin.derive(&target, &full, None, &summary, &[], &mut source) {
-                Ok(arena) => arena,
-                Err(Failure::Refused(found)) => {
-                    // a plugin's code under its package, where it says, as the loader gives it
-                    let (start, end) = (source.start(), source.end());
-                    diagnostics.extend(found.into_iter().map(|d| {
-                        let at = if (d.span.start, d.span.end) == (0, end - start) {
-                            whole
-                        } else {
-                            Span::new(file, start + d.span.start, start + d.span.end)
-                        };
-                        match d.code.as_deref().and_then(|c| codes::plugin(&package, c)) {
-                            Some(code) => Diagnostic::error(code, d.message, at),
-                            None => Diagnostic::error(codes::P036, d.message, at),
-                        }
-                    }));
-                    continue;
-                }
-                Err(Failure::Broken(why)) => {
-                    diagnostics.push(Diagnostic::error(codes::P036, why, whole));
-                    continue;
-                }
+            let made = plugin.derive(&target, &full, None, &summary, &[], &mut source);
+            let Some(arena) = made_or(made, &package, &source, whole, &mut diagnostics) else {
+                continue;
             };
             let len = source.end() - source.start();
             match render(&arena, len, Place::Declaration, &[]) {
@@ -281,6 +267,15 @@ pub fn builtin_expansion(
             }
         }
     }
+    std_blocks(
+        &shared,
+        file,
+        tree,
+        module,
+        &heads,
+        &mut blocks,
+        &mut diagnostics,
+    );
     if blocks.is_empty() {
         return (None, diagnostics);
     }
@@ -288,4 +283,107 @@ pub fn builtin_expansion(
     let (expansion, failed) = Expansion::build(text, file, tree, blocks);
     diagnostics.extend(failed);
     (expansion, diagnostics)
+}
+
+/// The code of each block of std's plugin in `tree` whose head the module
+/// imports, as the loader expands it, into `blocks`.
+fn std_blocks(
+    shared: &Arc<str>,
+    file: FileId,
+    tree: &Node,
+    module: &str,
+    heads: &Arc<[String]>,
+    blocks: &mut Vec<Expanded>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(plugin) = first_party::plugin("std") else {
+        return;
+    };
+    let mut nodes = Vec::new();
+    blocks_under(tree, &mut nodes);
+    let own = |n: &&Node| {
+        let head = n.child_tokens().find(|t| t.kind == K::Ident);
+        head.is_some_and(|h| {
+            let head = h.text(shared);
+            heads.iter().any(|i| i == head) && first_party::HEADS.iter().any(|(h, _)| *h == head)
+        })
+    };
+    let mut found: Vec<(Node, BlockSource)> = (nodes.into_iter())
+        .filter(own)
+        .filter_map(|n| {
+            let source = BlockSource::new(Arc::clone(shared), file, n, Arc::clone(heads))?;
+            Some((n.clone(), source.in_module(module, tree)))
+        })
+        .filter(|(_, s)| s.closed())
+        .collect();
+    if found.is_empty() {
+        return;
+    }
+    let read: Vec<Block> = found.iter().map(|(_, s)| s.block()).collect();
+    let state = match plugin.collect(&read) {
+        Ok(state) => state,
+        Err(why) => {
+            let (start, end) = found[0].0.range();
+            diagnostics.push(Diagnostic::error(
+                codes::P036,
+                why,
+                Span::new(file, start, end),
+            ));
+            return;
+        }
+    };
+    for ((node, mut source), block) in found.drain(..).zip(&read) {
+        let (start, end) = node.range();
+        let whole = Span::new(file, start, end);
+        let made = plugin.expand(block, &state, &mut source);
+        diagnostics.append(&mut source.diagnostics);
+        let Some(arena) = made_or(made, "std", &source, whole, diagnostics) else {
+            continue;
+        };
+        match render(&arena, block.whole().end, source.place(), &[]) {
+            Ok(rendered) => blocks.push(Expanded {
+                node,
+                rendered,
+                source,
+                plugin: "std".into(),
+                keep: false,
+                whole: (start, end),
+            }),
+            Err(why) => diagnostics.push(Diagnostic::error(codes::P036, why, whole)),
+        }
+    }
+}
+
+/// The code a plugin of `package` gave, or what it said, under its
+/// package's codes, at its spans in `source` or the whole of it at `whole`,
+/// as the loader gives it.
+fn made_or<T>(
+    made: Result<T, Failure>,
+    package: &str,
+    source: &BlockSource,
+    whole: Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<T> {
+    match made {
+        Ok(made) => Some(made),
+        Err(Failure::Refused(found)) => {
+            let (start, end) = (source.start(), source.end());
+            diagnostics.extend(found.into_iter().map(|d| {
+                let at = if (d.span.start, d.span.end) == (0, end - start) {
+                    whole
+                } else {
+                    Span::new(source.file(), start + d.span.start, start + d.span.end)
+                };
+                match d.code.as_deref().and_then(|c| codes::plugin(package, c)) {
+                    Some(code) => Diagnostic::error(code, d.message, at),
+                    None => Diagnostic::error(codes::P036, d.message, at),
+                }
+            }));
+            None
+        }
+        Err(Failure::Broken(why)) => {
+            diagnostics.push(Diagnostic::error(codes::P036, why, whole));
+            None
+        }
+    }
 }

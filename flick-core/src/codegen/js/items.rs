@@ -5,7 +5,6 @@ use std::collections::{BTreeSet, HashMap};
 use std::mem;
 
 use super::expr::arrow_body;
-use super::schema::{plan_uses, schema_names};
 use super::{Callee, Gen, Target, indent, names};
 use crate::ir::{Expr, ExprKind, Item, ItemKind};
 use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
@@ -109,7 +108,6 @@ impl Gen<'_> {
             }
             ItemKind::Instance { info, methods } => self.instance(info, methods),
             ItemKind::Refined { name, check } => self.refined(name, check),
-            ItemKind::Schema(item) => self.schema(item),
         }
     }
 
@@ -330,7 +328,6 @@ fn defined(item: &Item) -> Vec<String> {
             .iter()
             .map(|m| companion_name(name, m))
             .collect(),
-        ItemKind::Schema(item) => schema_names(item),
     }
 }
 
@@ -353,11 +350,6 @@ fn item_uses(item: &Item, module: &str, out: &mut BTreeSet<String>) {
             }
         }
         ItemKind::Refined { check, .. } => expr_uses(check, module, out),
-        ItemKind::Schema(item) => {
-            let mut uses = Vec::new();
-            plan_uses(&item.plan, module, &mut uses);
-            out.extend(uses);
-        }
         ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }
 }

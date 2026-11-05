@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
-use crate::types::{Dict, SchemaPlan, companion_name, default_method};
+use crate::types::{Dict, companion_name, default_method};
 
 /// A top-level name: its module, and the value, foreign or instance name.
 pub type Key = (String, String);
@@ -25,19 +25,12 @@ pub fn defined(item: &Item) -> Vec<String> {
             pattern.binders(&mut out);
             out.into_iter().map(str::to_owned).collect()
         }
-        ItemKind::Schema(s) => {
-            let mut out = vec![companion_name(&s.ty, "schema")];
-            if matches!(s.plan, SchemaPlan::Refined { .. }) {
-                out.push(companion_name(&s.ty, "json"));
-            }
-            out
-        }
         ItemKind::Constructor(_) => Vec::new(),
     }
 }
 
 /// The top-level names `item` refers to.
-pub fn uses(module: &str, item: &Item, out: &mut Vec<Key>) {
+pub fn uses(item: &Item, out: &mut Vec<Key>) {
     match &item.kind {
         ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => expr_uses(body, out),
         ItemKind::Instance { info, methods } => {
@@ -63,7 +56,6 @@ pub fn uses(module: &str, item: &Item, out: &mut Vec<Key>) {
             }
         }
         ItemKind::Refined { check, .. } => expr_uses(check, out),
-        ItemKind::Schema(s) => plan_uses(module, &s.plan, out),
         ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }
 }
@@ -131,46 +123,8 @@ pub fn reachable(
             continue;
         };
         if seen.insert(at) {
-            uses(
-                &modules[at.0].name,
-                &modules[at.0].items[at.1],
-                &mut pending,
-            );
+            uses(&modules[at.0].items[at.1], &mut pending);
         }
     }
     (seen, missing)
-}
-
-/// The schemas of other types a schema plan is built of.
-fn plan_uses(module: &str, plan: &SchemaPlan, out: &mut Vec<Key>) {
-    match plan {
-        SchemaPlan::List(p)
-        | SchemaPlan::Option(p)
-        | SchemaPlan::Redacted(p)
-        | SchemaPlan::Applied(_, p) => plan_uses(module, p, out),
-        SchemaPlan::Result(a, b) => {
-            plan_uses(module, a, out);
-            plan_uses(module, b, out);
-        }
-        SchemaPlan::Tuple(items) => items.iter().for_each(|p| plan_uses(module, p, out)),
-        SchemaPlan::Record(fields) => fields.iter().for_each(|(_, p)| plan_uses(module, p, out)),
-        SchemaPlan::Adt { variants, .. } => {
-            for p in variants.iter().flat_map(|(_, fields)| fields) {
-                plan_uses(module, p, out);
-            }
-        }
-        SchemaPlan::Named {
-            module, ty, args, ..
-        } => {
-            out.push((module.clone(), companion_name(ty, "schema")));
-            for p in args {
-                plan_uses(module, p, out);
-            }
-        }
-        SchemaPlan::Refined { name, base, .. } => {
-            out.push((module.to_owned(), companion_name(name, "check")));
-            plan_uses(module, base, out);
-        }
-        SchemaPlan::Prim(_) | SchemaPlan::Param(_) | SchemaPlan::Constructor(_) => {}
-    }
 }

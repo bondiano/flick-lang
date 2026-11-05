@@ -5,6 +5,7 @@ module App.Auth exposing (..)
 
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
+import Server exposing (plugin server)
 
 service Session =
   user : Unit ->{} String
@@ -23,5 +24,5 @@ let unguarded () = Server.handler [server whoami]
 
 unlisted : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{} ServerResponse)^{s}
 let unlisted () = Server.handler (Server.authenticated Session check [server leaky])
-//~ FLICK-E011 @22:36-22:49 server fn `whoami` lists `Server.Unauthorized`, so only `Server.authenticated` serves it
-//~ FLICK-E011 @25:71-25:83 server fn `leaky` does not list `Server.Unauthorized`, so `Server.authenticated` cannot guard it
+//~ FLICK-E011 @23:36-23:49 server fn `whoami` lists `Server.Unauthorized`, so only `Server.authenticated` serves it
+//~ FLICK-E011 @26:71-26:83 server fn `leaky` does not list `Server.Unauthorized`, so `Server.authenticated` cannot guard it

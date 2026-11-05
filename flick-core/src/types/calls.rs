@@ -98,6 +98,10 @@ impl Checker<'_> {
                 })
             }
             super::env::Found::Missing => {
+                if let Some(value) = name.strip_suffix("$server") {
+                    self.not_a_server_fn(value, span);
+                    return Type::Error;
+                }
                 let what = match namespace {
                     Namespace::Constructor => "constructor",
                     _ => "value",

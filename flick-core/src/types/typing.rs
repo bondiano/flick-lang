@@ -91,11 +91,6 @@ pub struct Typing {
     pub foreigns: HashMap<Range, ForeignInfo>,
     /// Instances declared or derived in this module.
     pub instances: Vec<InstanceInfo>,
-    /// Witnesses of the types that derive `Schema`, and of what each
-    /// server function sends.
-    pub schemas: Vec<SchemaItem>,
-    /// The server functions whose witnesses are all known.
-    pub server_fns: Vec<ServerFn>,
     /// The codec each use of `HttpApi.Derive.wire_codec` stands for.
     pub wire_codecs: HashMap<Range, super::wire::WireCodec>,
     /// The uses of `wire_codec` an annotation has not given a codec yet.
@@ -240,68 +235,6 @@ impl Copies {
                 .flatten()
                 .any(|(args, result)| *result || args.contains(&true))
     }
-}
-
-/// A `server fn`: its declaration, its name and how many errors it sends.
-#[derive(Debug, Clone)]
-pub struct ServerFn {
-    pub decl: Range,
-    pub name: String,
-    /// How many parameters it takes; several are sent as one tuple.
-    pub params: usize,
-    pub errors: usize,
-    /// Whether it lists `Server.Unauthorized`, so `Server.authenticated` serves it.
-    pub guarded: bool,
-}
-
-/// The witness `T$schema` of a type that derives `Schema`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SchemaItem {
-    pub ty: String,
-    /// The type declaration.
-    pub decl: Range,
-    /// How many witnesses of its parameters it takes.
-    pub witnesses: usize,
-    pub plan: SchemaPlan,
-}
-
-/// How a witness is built from the witnesses of its parts.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum SchemaPlan {
-    /// A primitive: `Int`, `Float`, `String`, `Bool`, `Unit`, ….
-    Prim(String),
-    List(Box<SchemaPlan>),
-    Option(Box<SchemaPlan>),
-    Result(Box<SchemaPlan>, Box<SchemaPlan>),
-    Redacted(Box<SchemaPlan>),
-    Tuple(Vec<SchemaPlan>),
-    /// Fields in label order.
-    Record(Vec<(String, SchemaPlan)>),
-    /// The constructors of a variant type or an error, with their fields.
-    Adt {
-        name: String,
-        variants: Vec<(String, Vec<SchemaPlan>)>,
-    },
-    /// The witness of the `i`-th parameter.
-    Param(usize),
-    /// The polymorphic witness of the `i`-th parameter applied to a schema.
-    Applied(usize, Box<SchemaPlan>),
-    /// A built-in witness over type constructors: `List`, `Option`, `Redacted`.
-    Constructor(String),
-    /// The witness of a type with one, given the witnesses of its arguments;
-    /// `lazy` within the module's group, which may be recursive.
-    Named {
-        module: String,
-        ty: String,
-        args: Vec<SchemaPlan>,
-        lazy: bool,
-    },
-    /// A refined type: its base and the check exporters know, if any.
-    Refined {
-        name: String,
-        base: Box<SchemaPlan>,
-        known: Option<String>,
-    },
 }
 
 /// A `codec` block: the name of what it decodes, for issue paths, and its
