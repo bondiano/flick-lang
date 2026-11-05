@@ -113,17 +113,33 @@ pub fn specialize(module: &mut Module, generics: Generics) {
 }
 
 /// The parameters and body of the function `name` of `module` when it
-/// takes dictionaries and its body names only what `exported` allows of
-/// `module`, so a copy in another module can reach all it uses.
+/// takes dictionaries, or of the method `<instance>#<method>` and the
+/// dictionaries of its instance's context, when its body names only what
+/// `exported` allows of `module`, so a copy in another module can reach all
+/// it uses.
 pub fn names_only(module: &Module, name: &str, exported: &dyn Fn(&str) -> bool) -> Option<Generic> {
-    let (dicts, body) = module.items.iter().find_map(|item| match &item.kind {
-        ItemKind::Value {
-            name: n,
-            dicts,
-            body,
-        } if n == name && !dicts.is_empty() => Some((dicts, body)),
-        _ => None,
-    })?;
+    // `<instance>#<method>`: a method of an instance, over its context
+    let method = name.split_once('#');
+    let (dicts, body) = module
+        .items
+        .iter()
+        .find_map(|item| match (&item.kind, method) {
+            (
+                ItemKind::Value {
+                    name: n,
+                    dicts,
+                    body,
+                },
+                None,
+            ) if n == name && !dicts.is_empty() => Some((dicts, body)),
+            (ItemKind::Instance { info, methods }, Some((instance, method)))
+                if info.name == instance =>
+            {
+                let (_, body) = methods.iter().find(|(m, _)| m == method)?;
+                Some((&info.context, body))
+            }
+            _ => None,
+        })?;
     let mut reachable = true;
     visit(body, &mut |e| {
         if let ExprKind::Global { module: m, name } = &e.kind {
@@ -217,7 +233,7 @@ fn instance_suffix(d: &Dict) -> String {
 
 /// `e` with each dictionary parameter in `given` replaced by its instance,
 /// and each method of a numeric instance by the operator of its type.
-fn instantiate(e: &mut Expr, given: &[(&str, &Dict)]) {
+pub(super) fn instantiate(e: &mut Expr, given: &[(&str, &Dict)]) {
     e.each_child_mut(&mut |c| instantiate(c, given));
     match &mut e.kind {
         ExprKind::Method { dict, .. } => *dict = resolve(dict, given),

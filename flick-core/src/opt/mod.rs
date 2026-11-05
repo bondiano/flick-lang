@@ -1,6 +1,8 @@
 //! The release optimizer: typed IR passes that keep every observable
 //! contract of the debug lowering. Rules: `docs/src/content/docs/reference/codegen.md`.
 //!
+//! - [`devirt`]: a default an instance takes as its own method, the code of
+//!   methods of known instances, and a `match` of a known constructor;
 //! - [`specialize`]: a copy of a function of the module for the numeric
 //!   instances it is called with, whose methods become operators;
 //! - [`inline`]: known full applications of small pure functions of the
@@ -18,6 +20,7 @@
 //! task, merges layers, moves a service lookup across `provide` or drops a
 //! runtime call: only pure code is rewritten.
 
+mod devirt;
 mod fold;
 mod fuse;
 mod inline;
@@ -49,12 +52,15 @@ pub type Generics<'a> = &'a dyn Fn(&str, &str) -> Option<(Vec<String>, Expr)>;
 /// `generics` what [`specialize`] may copy from other modules.
 pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool, generics: Generics) {
     let mut fresh = 0;
+    devirt::defaults(module, &devirt::Lookup::new(module, generics), &mut fresh);
     specialize::specialize(module, generics);
     for _ in 0..ROUNDS {
         constants(module);
+        let lookup = devirt::Lookup::new(module, generics);
         let candidates = inline::candidates(&module.name, &module.items, exported);
         for item in &mut module.items {
             for body in bodies(item) {
+                devirt::methods(body, &lookup, &mut fresh, 0);
                 inline::inline(body, &module.name, &candidates, &mut fresh);
                 fuse::fuse(body, &mut fresh);
                 simplify(body);
@@ -85,7 +91,7 @@ pub fn simplify(e: &mut Expr) {
 fn pass(e: &mut Expr) -> bool {
     let mut changed = false;
     e.each_child_mut(&mut |c| changed |= pass(c));
-    changed |= specialize::operator(e) | fold::fold(e) | inline::beta(e);
+    changed |= specialize::operator(e) | fold::fold(e) | inline::beta(e) | devirt::known_match(e);
     if let ExprKind::Block(stmts, result) = &mut e.kind {
         changed |= flatten(stmts, result);
         changed |= sroa::split(stmts, result);

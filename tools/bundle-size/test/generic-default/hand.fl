@@ -1,0 +1,41 @@
+// The program of `derived.fl` with `Default Point` written by hand.
+module App.Main exposing (main)
+
+import Generic exposing (Generic(..), Sum(..), Con(..), Field(..))
+
+/// A value of each type: the first constructor, each field its default.
+class Default a =
+  default : a
+  default : (Generic a rep, GDefault rep) => a
+  let default = from_rep gdefault
+
+class GDefault rep =
+  gdefault : rep
+
+instance GDefault Unit =
+  let gdefault = ()
+
+instance (Default a, GDefault rest) => GDefault (Field l a, rest) =
+  let gdefault = (Field default, gdefault)
+
+instance GDefault fields => GDefault (Con n fields) =
+  let gdefault = Con gdefault
+
+instance GDefault a => GDefault (Sum a b) =
+  let gdefault = Inl gdefault
+
+instance Default Float =
+  let default = 0
+
+instance Default String =
+  let default = "-"
+
+type Point = Point Float Float
+
+instance Default Point =
+  let default = Point 0 0
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let Point x y = (default : Point)
+  Platform.stdout_line (show (x + y))
