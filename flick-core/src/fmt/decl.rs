@@ -113,7 +113,11 @@ impl<'a> Printer<'a> {
         }
         let flat = a.join(docs.iter().map(|d| d.1), a.text(" | "));
         let flat = docvec![a, head, " ", flat];
-        if !commented && self.fits(flat) {
+        // the constructors of a GADT read as a table of what each builds
+        let indexed = variants
+            .iter()
+            .any(|v| v.nodes().any(|n| n.kind == K::VariantResult));
+        if !commented && !indexed && self.fits(flat) {
             return flat;
         }
         let lines = docs

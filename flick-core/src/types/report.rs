@@ -186,14 +186,27 @@ impl Checker<'_> {
             Mismatch::Escape(skolem) => {
                 if !self.region_escape(*skolem, &head, span) {
                     let name = self.store.skolem_name(*skolem).to_owned();
+                    let scope = if self.gadt.existentials.contains(skolem) {
+                        "the branch that matched the constructor hiding it"
+                    } else {
+                        "the scope of its `forall`"
+                    };
                     self.error(
                         codes::T007,
                         span,
-                        format!(
-                            "{head}: the type variable `{name}` would escape the scope of its `forall`"
-                        ),
+                        format!("{head}: the type variable `{name}` would escape {scope}"),
                     );
                 }
+            }
+            Mismatch::Untouchable(t) => {
+                let t = self.show(t);
+                self.error(
+                    codes::T057,
+                    span,
+                    format!(
+                        "{head}: a type from outside this branch would become `{t}` by what the branch learned about the matched value; annotate it"
+                    ),
+                );
             }
             Mismatch::Polymorphic(t) => {
                 let t = self.show(t);

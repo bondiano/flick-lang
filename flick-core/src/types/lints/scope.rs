@@ -236,7 +236,7 @@ impl Checker<'_> {
             .collect();
         let hidden: Vec<String> = constructors
             .iter()
-            .filter(|c| !written.contains(&c.as_str()))
+            .filter(|c| !written.contains(&c.as_str()) && self.builds(module, name, c, &ty))
             .map(|c| format!("`{c}`"))
             .collect();
         if hidden.is_empty() {

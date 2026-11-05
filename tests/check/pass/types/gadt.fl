@@ -1,0 +1,58 @@
+// GADTs: an `eval` whose branches learn the type of the result and need
+// no arm for what the type rules out, an existential variable, ordinary
+// and refining constructors in one type, and `TypeEq`.
+module App.Gadt exposing (..)
+
+import TypeEq exposing (TypeEq(..))
+
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+  | Add (Expr Int) (Expr Int) : Expr Int
+  | If (Expr Bool) (Expr a) (Expr a) : Expr a
+  | Pair (Expr a) (Expr b) : Expr (a, b)
+  | Apply (Expr (b -> a)) (Expr b) : Expr a
+  | Lit a
+
+eval : forall a. Expr a -> a
+let rec eval e =
+  match e with
+  | IntLit n -> n
+  | BoolLit b -> b
+  | Add x y -> eval x + eval y
+  | If c t f -> if eval c then eval t else eval f
+  | Pair x y -> (eval x, eval y)
+  | Apply f x -> (eval f) (eval x)
+  | Lit x -> x
+
+/// The constructors of `Expr Bool`: no `IntLit`, `Add` or `Pair` arm.
+negate : Expr Bool -> Expr Bool
+let rec negate e =
+  match e with
+  | BoolLit b -> BoolLit (not b)
+  | If c t f -> If c (negate t) (negate f)
+  | Apply _ _ -> If e (BoolLit false) (BoolLit true)
+  | Lit b -> Lit (not b)
+
+type Ty a =
+  | TInt : Ty Int
+  | TStr : Ty String
+
+describe : forall a. Ty a -> a -> String
+let describe t x =
+  match t with
+  | TInt -> show (x * 2)
+  | TStr -> x ++ "!"
+
+equal_types : forall a b. Ty a -> Ty b -> Option (TypeEq a b)
+let equal_types a b =
+  match (a, b) with
+  | (TInt, TInt) -> Some Refl
+  | (TStr, TStr) -> Some Refl
+  | _ -> None
+
+coerce : forall a b. Ty a -> Ty b -> a -> Option b
+let coerce a b x =
+  match equal_types a b with
+  | Some eq -> Some (TypeEq.cast eq x)
+  | None -> None

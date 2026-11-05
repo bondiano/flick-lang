@@ -157,6 +157,19 @@ fn type_lists_variants_and_alias_names_a_type() {
 }
 
 #[test]
+fn a_gadt_constructor_names_what_it_builds() {
+    assert_eq!(
+        sexp("type E a = I Int : E Int | L a"),
+        "(TypeDecl type E (TypeParam a) = (Variant I (NameType Int) (VariantResult : \
+         (AppType (NameType E) (NameType Int)))) | (Variant L (NameType a)))"
+    );
+    assert_eq!(
+        errors("type error E = E Int : E\nkind K = A : K\nuntagged type M = G = \"g\" : M\n"),
+        ["FLICK-S015 :", "FLICK-S015 :", "FLICK-S015 :"]
+    );
+}
+
+#[test]
 fn dedented_closers_close_their_bracket() {
     let src = "let f =\n  g (fun x ->\n    x\n)\n";
     assert!(sexp(src).contains("(ParenExpr ( (FunExpr fun (VarPat x) -> (Block (NameExpr x))) ))"));

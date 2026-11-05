@@ -6,6 +6,14 @@ break programs.
 
 ## Unreleased
 
+- **GADTs:** a constructor names the type it builds after `:`,
+  `| IntLit Int : Expr Int`; variables of its fields that the result does
+  not mention are existential. A `match` arm learns the type of the matched
+  value under a complete signature (`eval : forall a. Expr a -> a` returns
+  `n` in the `IntLit` arm), needs no arm for a constructor its type rules
+  out, and hover shows `Int (= a)` there. The core module `TypeEq` has
+  `Refl : TypeEq a a` and `TypeEq.cast`. New codes: `FLICK-S015`,
+  `FLICK-T056`, `FLICK-T057`, `FLICK-T058`.
 - **Enums:** `untagged type Method = Get = "GET" | Post = "POST"` is an
   enum: each value is its literal at run time, all strings or all `Int`s.
   `match` and `==` compare the value, derived `Ord` follows the order of

@@ -1,6 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
-source_hash: 64cfc1c043faff7d
+source_hash: 819647cbf8a8bcdc
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
@@ -15,6 +15,7 @@ Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `compon
 | Row primitives `HasField`, `Lacks`, `Remove`, `Project`, `UnionDisjoint`, `Map`, `Labels` | Access, absence, removal, projection, disjoint merge, mapping every field type, canonical labels | Solved by the compiler from known records; a program cannot declare instances of them |
 | Multiparameter classes, superclasses, functional dependencies | Relations between an AST, its projections and its parameters | Coverage, non-overlap and a solver budget |
 | Opaque indexed types | Scope, phase, nullability and a checked query | No public constructor to bypass them |
+| GADTs and `TypeEq` | Typed ASTs and interpreters, evidence that two types are one | Refinement only in a `match` branch under a complete signature; indices are types, finite kinds and `Symbol` |
 | Higher-rank callbacks and captures | Fresh DSL scopes and callbacks | Explicit `forall`; captures are preserved |
 
 The row primitives are described in [Row primitives](../../reference/classes/#row-primitives). HKT alone does not compute which fields appear after a JOIN, and higher-rank types alone do not transform a record: operations over the structure of types are what the DSLs need.

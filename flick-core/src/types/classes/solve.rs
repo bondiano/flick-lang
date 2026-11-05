@@ -38,11 +38,15 @@ impl Checker<'_> {
             let mut left = Vec::new();
             let mut progress = false;
             for mut w in pending {
-                let givens = self.closure(&w.givens);
-                let c = self.canon(&w.constraint);
-                progress |= c != w.constraint;
-                w.constraint = c;
-                match self.entail(&w.constraint, &givens, &mut Vec::new()) {
+                // under the equalities of the GADT branches it is from
+                let outcome = self.under(&w.givens, |this| {
+                    let givens = this.closure(&w.givens);
+                    let c = this.canon(&w.constraint);
+                    progress |= c != w.constraint;
+                    w.constraint = c;
+                    this.entail(&w.constraint, &givens, &mut Vec::new())
+                });
+                match outcome {
                     Outcome::Solved(dict) => {
                         progress = true;
                         self.record_dict(w.span, w.order, dict.clone());

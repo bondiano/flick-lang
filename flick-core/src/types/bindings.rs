@@ -279,6 +279,8 @@ impl Checker<'_> {
             rec.skolems.clone_from(&skolems);
         }
         let saved = mem::take(&mut self.runtime);
+        let complete = !scheme.contains(&mut |t| matches!(t, Type::Meta(_)));
+        let signed = mem::replace(&mut self.gadt.signed, complete);
         if parts.params.is_empty() {
             if let Some(b) = parts.body {
                 self.check(b, &body);
@@ -286,6 +288,7 @@ impl Checker<'_> {
         } else {
             self.function(&parts.params, parts.body, Some(&body), decl);
         }
+        self.gadt.signed = signed;
         let runtime = mem::replace(&mut self.runtime, saved);
         self.classes.givens.truncate(assumed);
         self.tyvars.truncate(mark);
@@ -309,6 +312,7 @@ impl Checker<'_> {
         }
         self.store.level += 1;
         let saved = mem::take(&mut self.runtime);
+        let signed = mem::take(&mut self.gadt.signed);
         let errors = self.diagnostics.len();
         let mut redundant = None;
         let ty = match (parts.params.is_empty(), parts.header) {
@@ -325,6 +329,7 @@ impl Checker<'_> {
             (true, None) => parts.body.map_or(Type::Error, |b| self.infer(b)),
         };
         let runtime = mem::replace(&mut self.runtime, saved);
+        self.gadt.signed = signed;
         self.store.level -= 1;
         let is_fun = matches!(self.whnf(&ty), Type::Fun { .. });
         // a plugin's code needs no signature: no one reads it
@@ -388,7 +393,8 @@ impl Checker<'_> {
         } else if let Some(header) = redundant {
             self.redundant_annotation(decl, parts, header);
         }
-        if runtime || function {
+        // a type in a GADT branch may hold by its equalities only
+        if runtime || function || !self.store.equalities.is_empty() {
             self.store.lower(&ty);
             ty
         } else {

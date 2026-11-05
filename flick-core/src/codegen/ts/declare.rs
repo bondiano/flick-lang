@@ -3,7 +3,7 @@
 use super::{Projection, Vars, generic, jsdoc, key, native, params, type_args, uncaptured};
 use crate::codegen::names;
 use crate::iface::{Decl, Export, Interface, Namespace};
-use crate::types::{Abi, Constructor, EnumLit, Form, Kind, Rep, Type};
+use crate::types::{Abi, Binder, Constructor, EnumLit, Form, Kind, Rep, Type, built, is_indexed};
 
 impl Projection<'_> {
     /// Declarations of the types `interface` exports; a type without a
@@ -132,45 +132,50 @@ impl Projection<'_> {
     }
 
     /// `export type T<A> = { readonly _tag: "…"; readonly _0: A } | …`; an
-    /// `unboxed` or `untagged` type is the union of its fields.
+    /// `unboxed` or `untagged` type is the union of its fields. A constructor
+    /// of a GADT is a case of every instance: TypeScript has no refinement.
     fn variants(
         &self,
         name: &str,
         constructors: &[&Export],
         tagged: bool,
     ) -> Result<String, String> {
-        let mut params: Vec<String> = Vec::new();
-        let mut cases = Vec::new();
-        for c in constructors {
-            let scheme = c.scheme.as_ref().ok_or("a constructor has no type")?;
-            let (vars, ty) = match scheme {
-                Type::Forall { vars, body, .. } => (vars.as_slice(), &**body),
-                other => (&[][..], other),
-            };
-            let scope: Vars = vars
-                .iter()
-                .map(|b| {
-                    let ts = match b.kind {
-                        Kind::Region => None,
-                        Kind::CaptureRow => Some("never".to_owned()),
-                        _ => Some(generic(&b.name)),
-                    };
-                    (b.name.clone(), ts)
-                })
-                .collect();
-            let mut ty = uncaptured(ty, &scope)?;
-            let mut fields = Vec::new();
-            while let Type::Fun { param, result, .. } = ty {
-                fields.push(self.ty(param, &scope)?);
-                ty = uncaptured(result, &scope)?;
-            }
-            if params.is_empty() {
-                params = ty
+        let schemes = constructors
+            .iter()
+            .map(|c| c.scheme.as_ref().ok_or("a constructor has no type"))
+            .collect::<Result<Vec<_>, _>>()?;
+        let split = |scheme: &'_ Type| match scheme {
+            Type::Forall { vars, body, .. } => (vars.clone(), (**body).clone()),
+            other => (Vec::new(), other.clone()),
+        };
+        let indexed = |scheme: &Type| is_indexed(scheme, self.module, name);
+        // the parameters as an ordinary constructor names them
+        let params: Vec<String> = match schemes.iter().find(|s| !indexed(s)) {
+            Some(scheme) => {
+                let (vars, body) = split(scheme);
+                let scope = scope_of(&vars, None);
+                built(&body)
                     .spine()
                     .1
                     .iter()
                     .map(|a| self.ty(a, &scope))
-                    .collect::<Result<_, _>>()?;
+                    .collect::<Result<_, _>>()?
+            }
+            None => {
+                let arity = schemes.first().map_or(0, |s| built(&split(s).1).spine().1.len());
+                (0..arity).map(|i| format!("T{i}")).collect()
+            }
+        };
+        let mut cases = Vec::new();
+        for (c, scheme) in constructors.iter().zip(&schemes) {
+            let (vars, ty) = split(scheme);
+            let args: Vec<Type> = built(&ty).spine().1.into_iter().cloned().collect();
+            let scope = scope_of(&vars, indexed(scheme).then_some((&args[..], &params[..])));
+            let mut ty = uncaptured(&ty, &scope)?;
+            let mut fields = Vec::new();
+            while let Type::Fun { param, result, .. } = ty {
+                fields.push(self.ty(param, &scope)?);
+                ty = uncaptured(result, &scope)?;
             }
             if !tagged {
                 cases.extend(fields);
@@ -283,4 +288,27 @@ impl Projection<'_> {
             None => format!("{}.{name}", self.module),
         }
     }
+}
+
+/// What a constructor's type variables are in TypeScript. Those of a GADT
+/// constructor, with the arguments of what it builds and the type's
+/// parameters, are the parameter they stand for, or `unknown`.
+fn scope_of(vars: &[Binder], indexed: Option<(&[Type], &[String])>) -> Vars {
+    vars.iter()
+        .map(|b| {
+            let ts = match b.kind {
+                Kind::Region => None,
+                Kind::CaptureRow => Some("never".to_owned()),
+                _ => Some(match indexed {
+                    None => generic(&b.name),
+                    Some((args, params)) => args
+                        .iter()
+                        .position(|a| matches!(a, Type::Var(v) if *v == b.name))
+                        .and_then(|i| params.get(i).cloned())
+                        .unwrap_or_else(|| "unknown".to_owned()),
+                }),
+            };
+            (b.name.clone(), ts)
+        })
+        .collect()
 }

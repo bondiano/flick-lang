@@ -3,6 +3,8 @@
 //! unknown at the end is the empty row, the least solution. Then every
 //! constraint either holds or names what its bound lacks.
 
+use std::mem;
+
 use super::Site;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
@@ -24,6 +26,8 @@ pub struct SubRow {
     /// services around the scope; one of a region not known yet is the
     /// scope's own.
     pub provides: Option<Type>,
+    /// The equalities of the GADT branches the call is in.
+    pub givens: Vec<Type>,
 }
 
 /// What one bound lacks.
@@ -72,6 +76,13 @@ impl Checker<'_> {
     /// Adds to the declared row of constraint `i` one label or row variable
     /// it lacks, if that row is open; `true` when it did.
     fn grow_one(&mut self, i: usize) -> bool {
+        let givens = mem::take(&mut self.subrows[i].givens);
+        let grown = self.under(&givens, |this| this.grow_row(i));
+        self.subrows[i].givens = givens;
+        grown
+    }
+
+    fn grow_row(&mut self, i: usize) -> bool {
         let actual = self.actual(i);
         let declared = self.store.normalize(&self.subrows[i].declared);
         let open = declared.tails.iter().find_map(|t| match t {

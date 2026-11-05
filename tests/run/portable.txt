@@ -22,6 +22,7 @@ codegen/eval_order
 codegen/exports
 codegen/for_comprehension
 codegen/functor
+codegen/gadt
 codegen/generic
 codegen/given_shadow
 codegen/fusion

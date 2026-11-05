@@ -1,0 +1,7 @@
+/// A GADT another module matches, through its interface.
+module App.Expr exposing (Expr(..))
+
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+  | Wrap b (b -> a) : Expr a

@@ -1,7 +1,7 @@
 //! Patterns: their types, the names they bind, and their shape for the
 //! exhaustiveness check.
 
-use std::iter;
+use std::{iter, mem};
 
 use super::ty::{Row, Type};
 use super::{Checker, Local};
@@ -213,7 +213,10 @@ impl Checker<'_> {
         let mut pats = Vec::new();
         for (i, alternative) in alternatives.iter().enumerate() {
             let inner = self.locals.len();
+            // alternatives would learn different things: none refines
+            let refining = mem::take(&mut self.gadt.refining);
             pats.push(self.bind_pattern(alternative, ty));
+            self.gadt.refining = refining;
             if i == 0 {
                 continue;
             }
@@ -319,7 +322,10 @@ impl Checker<'_> {
             }
             Some(arity)
         });
-        let mut current = if let Type::Forall { vars, body, .. } = &scheme
+        let indexed = self.indexed_pattern(&scheme, self.env.parent(&entity), ty, node);
+        let mut current = if let Some(body) = &indexed {
+            body.clone()
+        } else if let Type::Forall { vars, body, .. } = &scheme
             && let Some(arity) = adt_params
         {
             let subst: Vec<(String, Type)> = vars
@@ -355,7 +361,9 @@ impl Checker<'_> {
             }
             return Pat::Wild;
         }
-        self.pattern_type(&self.whnf(&current), &self.whnf(ty), node);
+        if indexed.is_none() {
+            self.pattern_type(&self.whnf(&current), &self.whnf(ty), node);
+        }
         let mut args_pats = Vec::new();
         for (arg, param) in args
             .iter()

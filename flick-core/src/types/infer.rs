@@ -580,7 +580,7 @@ impl Checker<'_> {
             .iter()
             .any(|d| d.severity == Severity::Error)
         {
-            self.exhaustive(node, &arms);
+            self.exhaustive(node, &arms, &scrutinee);
         }
         result
     }
@@ -596,7 +596,12 @@ impl Checker<'_> {
         let mut pat = super::patterns::Pat::Wild;
         let mut guarded = false;
         let mut span = self.span(arm);
+        let frame = self.enter_arm();
         for child in arm.nodes() {
+            // an arm that matches nothing is not checked: its patterns contradict
+            if self.gadt.dead {
+                break;
+            }
             match child.kind {
                 K::Guard => {
                     guarded = true;
@@ -607,10 +612,13 @@ impl Checker<'_> {
                 K::Block => self.check(child, result),
                 kind if super::patterns::is_pattern(kind) => {
                     span = self.span(child);
-                    pat = self.bind_pattern(child, scrutinee);
+                    pat = self.bind_arm_pattern(child, scrutinee);
                 }
                 _ => {}
             }
+        }
+        if self.leave_arm(frame) {
+            self.typing.dead_arms.insert(super::typing::range(self.span(arm)));
         }
         self.locals.truncate(mark);
         (pat, guarded, span)

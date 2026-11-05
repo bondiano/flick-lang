@@ -15,6 +15,11 @@ type Shape = Circle Point Float | Rect { origin : Point; size : Point } | Empty
 
 type Option a = None | Some a
 
+type Expr a =
+  | IntLit Int : Expr Int
+  | Apply (Expr (b -> a)) (Expr b) : Expr a
+  | Lit a
+
 type alias Wrapped (f : Type -> Type) a = {
   value : f a;
 } deriving Schema

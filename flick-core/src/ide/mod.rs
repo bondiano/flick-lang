@@ -412,6 +412,8 @@ mod companion_tests;
 #[cfg(test)]
 mod enum_hover_tests;
 #[cfg(test)]
+mod gadt_hover_tests;
+#[cfg(test)]
 mod hints_tests;
 #[cfg(test)]
 mod hover_tests;
