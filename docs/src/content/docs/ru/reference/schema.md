@@ -1,5 +1,6 @@
 ---
 title: "Схемы и кодеки"
+source_hash: d0d615be24713e6f
 ---
 
 Схема описывает структуру значений типа и доступна во время выполнения.
@@ -49,6 +50,9 @@ refined type Email = String where Checks.email
 | фантомный параметр, который не используется в представлении типа | схема параметра всё равно нужна |
 
 ```flick
+# type Tree a = Leaf | Node (Tree a) a (Tree a)
+#   deriving Schema
+#
 tree_schema : Schema a -> Schema (Tree a)
 let tree_schema item_schema =
   Tree.schema item_schema
@@ -90,6 +94,10 @@ let tree_schema item_schema =
 
 ```flick
 import Codec exposing (plugin codec)
+# refined type Email = String where Checks.non_empty
+#   deriving Schema
+# type alias Profile = { email : Email; nickname : Option String }
+#   deriving Schema
 
 profile_json : PureCodec Json Profile
 let profile_json =

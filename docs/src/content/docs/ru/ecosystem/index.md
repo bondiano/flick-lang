@@ -1,6 +1,7 @@
 ---
 title: Экосистема
 description: Компилятор Flick, среда выполнения на Effect, интеграции с браузером, Astro, Vite и редакторами.
+source_hash: 7728fda6f4dcfa72
 ---
 
 Flick компилируется в JavaScript на Effect или в самостоятельный исполняемый файл Go (см. [Go-target](../reference/codegen/#go-target)). Компилятор проверяет исходный код,

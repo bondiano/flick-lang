@@ -9,6 +9,7 @@ problem lands under the input of the field its path names.
 
 ```flick
 module App.Signup exposing (..)
+# import App.Api
 
 refined type Name = String where Checks.non_empty
   deriving Eq, Show, Schema

@@ -1,5 +1,6 @@
 ---
 title: "Values of computations and their execution"
+source_hash: 970be240a91155c2
 ---
 
 ## Two different kinds of functions
@@ -14,6 +15,12 @@ get_user : UserId ->{Users; NotFound} User
 ## Task and running a stored value
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 load_user : UserId ->{Users; NotFound} User
 let load_user user_id =
   let request = task {
@@ -34,6 +41,12 @@ The evaluation order is strict, left to right, taking each currying stage into a
 ### Re-running and the value of await
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 load_twice :
   UserId ->{Users; NotFound} (User, User)
 let load_twice id =
@@ -75,6 +88,12 @@ This is consistent with Effect: its requirements reflect contextual dependencies
 ## Example of concurrent execution
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 load_name_pair : UserId -> UserId ->{Users; NotFound} (String, String)
 let load_name_pair first_id second_id =
   let first = task { Users.get first_id }

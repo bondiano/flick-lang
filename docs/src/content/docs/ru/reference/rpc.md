@@ -1,5 +1,6 @@
 ---
 title: "Типизированные RPC"
+source_hash: 258f7bb549302298
 ---
 
 Опишите процедуру один раз и используйте это описание по обе стороны
@@ -57,7 +58,7 @@ let handlers =
   {
     get_user = fun id ->
       if id == 1 then { id = 1; name = "Ada" } else from_result (Err (NotFound { id = id }));
-    count_to = fun n -> Stream.from_list (List.range 1 (n + 1));
+    count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
   }
 
 main : Unit ->{; AppError} Unit
@@ -159,7 +160,7 @@ runner = "Runner.Browser"
 entries = { app = { module = "App.Page", target = "client" }, worker = { module = "App.Worker", target = "client" } }
 ```
 
-```flick
+```flick ignore
 // App.Worker
 main : Unit ->{; AppError} Unit
 let main () = Rpc.serve_worker group handlers
@@ -185,6 +186,20 @@ let main () =
 `FLICK-G001`.
 
 ```flick
+# import Http.Router exposing (RouteContext)
+# import Http.ServerRequest exposing (ServerRequest)
+# import Http.ServerResponse exposing (ServerResponse)
+# double : Rpc.Rpc "double" (Float ->{r;} Float)
+# let double =
+#   Rpc.make (Record.label : Record.Label "double")
+#   |> Rpc.with_payload (Codec.json Schema.number)
+#   |> Rpc.with_success (Codec.json Schema.number)
+# type alias Handlers r = { double : Float ->{r;} Float }
+# users : Rpc.Group r (Handlers r)
+# let users = Rpc.group |> Rpc.add double
+# hello : ServerRequest ->{RouteContext;} ServerResponse
+# let hello _ = Http.ServerResponse.text "hello" Http.ServerResponse.defaults
+#
 serve_both : Http.Server.ServeOptions -> Handlers none ->{
   Http.Platform.HttpPlatform,
   Http.Etag.Generator;
@@ -195,6 +210,7 @@ let serve_both options handlers =
   scope s {
     rpc : (ServerRequest ->{} ServerResponse)^{s}
     let rpc = Rpc.handler Rpc.ndjson users handlers
+#     app : (ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse)^{s}
     let app =
       Http.Router.router Http.Router.config
         [
@@ -272,6 +288,13 @@ let require_authorization_header call =
 общие для соединения.
 
 ```flick
+# service Session =
+#   user : Unit ->{} String
+# type error Unauthorized = Unauthorized { reason : String }
+#   deriving Schema
+# check : Rpc.Call Unit ->{; Unauthorized} Session.Impl
+# let check _ = { user = fun () -> "ada" }
+#
 me : Rpc.Rpc "me" (Unit ->{Session; Unauthorized} String)
 let me =
   Rpc.make (Record.label : Record.Label "me")

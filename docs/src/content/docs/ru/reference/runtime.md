@@ -1,5 +1,6 @@
 ---
 title: "Адаптер среды выполнения"
+source_hash: cdf358f5658d6948
 ---
 
 Скомпилированный код работает через `@flick-lang/runtime` (см. [Ошибки, сервисы, ресурсы и конкурентность](../../spec/05-errors-and-concurrency/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).

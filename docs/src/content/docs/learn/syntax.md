@@ -82,6 +82,8 @@ lines below it. There is no `in` and no `return`: the last line of a block
 is its value.
 
 ```flick
+# type alias User = { name : String; age : Int }
+#
 describe : User -> String
 let describe user =
   let years = show user.age
@@ -139,6 +141,8 @@ the same way in the Prelude.
 A `match` must cover every value; the compiler names a case you missed.
 
 ```flick
+# type Shape = Circle Float | Rect Float Float | Empty
+#
 area : Shape -> Float
 let area shape =
   match shape with
@@ -179,6 +183,8 @@ before `;`, the expected errors after it. A runtime function makes such calls
 directly, as it calls a pure function.
 
 ```flick
+# type alias User = { name : String; age : Int }
+#
 type error NotFound = NotFound String
 
 service Users =
@@ -200,6 +206,12 @@ let greet_or_guest id =
 `await` runs it:
 
 ```flick
+# type error NotFound = NotFound String
+# service Users =
+#   get : String ->{; NotFound} String
+# greet : String ->{Users; NotFound} String
+# let greet id = Users.get id
+#
 twice : String ->{Users; NotFound} (String, String)
 let twice id =
   let request = task { greet id }

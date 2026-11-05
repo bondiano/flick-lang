@@ -1,5 +1,6 @@
 ---
 title: "Пользовательские интерфейсы"
+source_hash: 11d958069c0e5661
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
@@ -204,6 +205,9 @@ component counter_view () = ui {
 и может создавать всё, что ей нужно.
 
 ```flick
+# items : Atom.Writable (List Float)
+# let items = Atom.make []
+#
 drafts : Atom.Family Float (Atom.Writable String)
 let drafts = Atom.family (fun _ -> Atom.make "")
 
@@ -361,6 +365,10 @@ component search () =
 задачи `Async a none` оно не вызывается.
 
 ```flick
+# type error Offline = Offline
+# fetch_name : Unit ->{; Offline} String
+# let fetch_name () = "Ada"
+#
 user : Atom.Atom (Atom.Async String {Offline})
 let user = Atom.task (task { fetch_name () })
 
@@ -387,6 +395,8 @@ let awaited = Ui.awaiting (fun _ -> ui { text "offline" }) (ui { text "…" }) (
 Поверх [серверной функции](../server-fn/):
 
 ```flick
+# import Shop exposing (Order, OutOfStock)
+#
 orders : Atom.Atom (Atom.Async (List Order) {Rpc.ClientError})
 let orders = Atom.query ["orders"] (task { Shop.orders () })
 
@@ -419,6 +429,9 @@ let place = Atom.mutation ["orders"] Shop.place
 при размонтировании он прерывает их и ждёт их завершения.
 
 ```flick
+# count : Atom.Writable Float
+# let count = Atom.make 0
+#
 increment : Action.Action Ui.ClickSnapshot
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 ```
@@ -471,6 +484,7 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 mount :
   forall c r.
   Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Atom.Registry, Atom.Write | r; none} Never
+# let mount = Ui.Dom.mount
 ```
 
 `Ui.Dom.mount container supervisor ui` отображает `ui` один раз; входящие
@@ -481,6 +495,12 @@ mount :
 программа:
 
 ```flick
+# count : Atom.Writable Float
+# let count = Atom.make 0
+# component counter_view () = ui { text (Atom.value count |> show) }
+# report : Failure none ->{} Unit
+# let report _ = ()
+#
 main : Unit ->{; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
@@ -525,6 +545,10 @@ let main () =
 нельзя (`FLICK-E002`). На сервере обработчики не запускаются.
 
 ```flick
+# count : Atom.Writable Float
+# let count = Atom.make 0
+# component counter_view () = ui { text (Atom.value count |> show) }
+#
 request : Float ->{} String
 let request n =
   provide Atom.layer {
@@ -588,6 +612,10 @@ let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.m
 пропущенное значение.
 
 ```flick
+# count : Atom.Writable Float
+# let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
+# component counter_view () = ui { text (Atom.value count |> show) }
+#
 page : Float ->{} String
 let page n =
   provide Atom.layer {
@@ -641,6 +669,10 @@ JSON-скриптами: атомы оболочки — перед ней, зн
 пришедшие после монтирования, по мере их прихода.
 
 ```flick
+# fetch_name : Unit ->{} String
+# let fetch_name () = "Ada"
+# let page = ui { text "…" }
+#
 user : Atom.Atom (Atom.Async String none)
 let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { fetch_name () }))
 
@@ -660,6 +692,8 @@ HTML. Внешний компонент, который умеет отобра�
 ни React, ни `react-dom/server`.
 
 ```flick
+# type alias Order = { customer : String }
+#
 receipt : Order -> String
 let receipt order =
   Ui.Server.to_html (ui { div { class_name = "mail" } [paragraph [text ("Спасибо, " ++ order.customer)]] })

@@ -6,6 +6,7 @@ import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 
 import { sidebar } from "./astro.sidebar.mjs";
+import { flickBlocks } from "./flick-blocks.mjs";
 
 // the newest compiler of this checkout, unless FLICK_BIN names another
 const local = ["release", "debug"]
@@ -43,6 +44,13 @@ export default defineConfig({
   },
   integrations: [
     flick({ binary: process.env.FLICK_BIN ?? local ?? "flick" }),
+    {
+      name: "flick-blocks",
+      hooks: {
+        // Sätteri, Astro's Markdown processor, takes mdast plugins as Starlight adds its own
+        "astro:config:setup": ({ config }) => config.markdown.processor.options.mdastPlugins.push(flickBlocks),
+      },
+    },
     starlight({
       title: "Flick",
       description: "An ML language with higher-kinded types, typed effects and regions, on Effect",

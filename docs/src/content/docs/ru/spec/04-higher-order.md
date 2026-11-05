@@ -5,6 +5,14 @@ title: "Функции высшего порядка и обход коллек�
 ## Чистый и эффектный обход
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# normalize_name : String -> String
+# let normalize_name name = String.trim name
+#
 normalize_names : List String -> List String
 let normalize_names raw_names =
   List.map normalize_name raw_names

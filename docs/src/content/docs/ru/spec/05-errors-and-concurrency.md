@@ -9,6 +9,11 @@ title: "Ошибки, сервисы, ресурсы и конкурентнос
 Ошибка объявляется через `type error`. Её единственный конструктор называется так же, как сама ошибка. Поля перечисляются как у варианта ADT: `type error NotFound = NotFound UserId`. Ошибка без полей записывается как `type error Timeout`.
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 type error NotFound = NotFound UserId
 
 load_optional : UserId ->{Users; none} Option User
@@ -29,6 +34,9 @@ let load_optional id =
 type error RetryExhausted e = RetryExhausted e Float
 
 retry : Float -> Eff r e a ->{r; RetryExhausted (Errors e)} a
+# let retry times body =
+#   try await body with
+#   | cause -> from_result (Err (RetryExhausted cause times))
 ```
 
 Обработчик может удалить ошибку из строки, только если полностью покрывает её номинальный вариант. Условие ветки или образец, который подходит лишь части данных ошибки, оставляет её в строке. Требования и ошибки самого обработчика добавляются к результату. Удаление из строки относится к выбранной ожидаемой ошибке и не доказывает, что такой же тег отсутствует среди вторичных сбоев в полной причине завершения.
@@ -78,6 +86,21 @@ users_live :
 Блок `provide layer { ... }` устанавливает окружение до выполнения тела:
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# service Config =
+#   url : Unit ->{} String
+# type error ConnectError = ConnectError
+# users_live : Layer {Config} {ConnectError} {Users}
+# let users_live = Layer.effect Users (task { from_result (Err ConnectError) })
+# load_name : UserId ->{Users, Log; NotFound} String
+# let load_name id = (Users.get id).name
+#
 application : UserId ->{Config, Log; NotFound, ConnectError} String
 let application id =
   provide users_live {
@@ -148,11 +171,17 @@ fetch_config :
 `Result` переводится в типизированную ошибку выполнения функцией прелюдии `from_result : Result (Errors e) a ->{; e} a`. Для `Result NotFound User` используется строка из одного элемента `{NotFound}`. В случае `Result String a` сначала нужно преобразовать строку в объявленную номинальную ошибку. Операция не перехватывает дефекты или прерывания. Обычный `try ... with` обрабатывает ожидаемые ошибки, а отдельный API `Exit`/`Failure` — полный исход. [Разделение ошибок Effect](https://effect.website/docs/v4/error-management/two-error-types).
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 type error NotFound = NotFound UserId
 type error DbUnavailable = DbUnavailable String
 
 find_user :
   UserId ->{Users; NotFound, DbUnavailable} User
+# let find_user id = Users.get id
 
 find_optional :
   UserId ->{Users; DbUnavailable} Option User
@@ -211,6 +240,8 @@ Failure.rethrow :
 ## Финализация и границы ресурса
 
 ```flick
+# import File exposing (File, Path, FileSystem, OpenError, ReadError)
+#
 read_config :
   Path ->{FileSystem; OpenError, ReadError} String
 let read_config path =
@@ -232,7 +263,9 @@ let read_config path =
 
 Каждый `scope s { ... }` создаёт свежий регион `s` и его владельца в среде выполнения. В `scope { ... }` имя региона выводится и остаётся скрытым. Дескриптор ресурса области имеет тип вроде `File s`. Компилятор передаёт владельца лексически: один обычный поиск в Context не подходит, потому что во вложенной области он мог бы выбрать другой scope.
 
-```flick
+```flick fail
+# import File exposing (File, Path, FileSystem, OpenError, ReadError)
+#
 bad_deferred :
   Path ->{FileSystem; OpenError} Eff {FileSystem} {ReadError} String
 let bad_deferred path =
@@ -247,6 +280,8 @@ let bad_deferred path =
 Чтобы вернуть задачу, нужно перенести получение ресурса внутрь отложенного выполнения:
 
 ```flick
+# import File exposing (File, Path, FileSystem, OpenError, ReadError)
+#
 deferred_read :
   Path -> Eff {FileSystem} {OpenError, ReadError} String
 let deferred_read path =
@@ -262,7 +297,9 @@ let deferred_read path =
 
 Та же проверка действует для обычной функции обратного вызова:
 
-```flick
+```flick fail
+# import File exposing (File, Path, FileSystem, OpenError, ReadError)
+#
 bad_callback :
   Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
 let bad_callback path =
@@ -329,6 +366,12 @@ scoped_callback :
 ## Конкурентные операции с разными контрактами
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 load_pair : UserId -> UserId ->{Users; NotFound} (User, User)
 let load_pair first_id second_id =
   parallel

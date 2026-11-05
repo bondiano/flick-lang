@@ -29,7 +29,7 @@ Snapshot tests use [`insta`](https://insta.rs); review changes with
 
 Annotation forms:
 
-```flick
+```flick fail
 let x : Float = "hi"
 //               ^^^^ FLICK-T012 expected `Float`
 //~ FLICK-E003 @4:1-6:9 effect row is not closed
@@ -128,7 +128,12 @@ matrix, codecs against their compiled decoders. Entry runner tests start
 
 ## Syntax corpus and fuzzing — `flick-core/tests/{corpus,fuzz}.rs`
 
-- Every ```` ```flick ```` block of `docs/` must parse without diagnostics.
+- Every ```` ```flick ```` block of `docs/` must parse without diagnostics,
+  and each block of the site's pages must check on its own
+  (`docs_examples_check`), its imports taken on trust: hidden lines, `#`
+  alone or starting with `# `, declare what it uses and are left off the
+  page. A `flick ignore` block is only parsed; a `flick fail` block must
+  report an error.
   The blocks of the Russian specification (`ru/spec`), the original text, are
   pinned by fingerprint in `tests/syntax/spec_examples.txt`: a new or edited
   example fails the test until its parse is reviewed and the printed line is

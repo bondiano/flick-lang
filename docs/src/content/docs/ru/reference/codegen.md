@@ -1,5 +1,6 @@
 ---
 title: "Генерация кода"
+source_hash: 941bfb1920f687de
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -107,6 +108,16 @@ untagged type Key = ByNumber Float | ByName String | ByPath (List String)
 используют `yield*`, а чистые остаются обычными вызовами:
 
 ```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# normalize_name : String -> String
+# let normalize_name name = String.trim name
+#
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
   let user = Users.get id

@@ -1,5 +1,6 @@
 ---
 title: "Формы"
+source_hash: f070f09c7ee16517
 ---
 
 Форма — тип-запись, которую пользователь заполняет текстом. `deriving Form`
@@ -10,6 +11,7 @@ title: "Формы"
 
 ```flick
 module App.Signup exposing (..)
+# import App.Api
 
 refined type Name = String where Checks.non_empty
   deriving Eq, Show, Schema

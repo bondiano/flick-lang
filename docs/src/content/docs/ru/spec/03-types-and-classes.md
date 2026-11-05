@@ -142,6 +142,11 @@ let render_twice render =
 Эффектная функция обратного вызова тоже может быть полиморфной:
 
 ```flick
+# type alias User = { name : String }
+#   deriving Schema
+# type alias Settings = { theme : String }
+#   deriving Schema
+#
 decode_pair :
   (forall a. Schema a -> Unknown ->{r; SchemaError} a) ->
   Unknown -> Unknown ->{r; SchemaError} (User, Settings)
@@ -192,6 +197,8 @@ let project_name value =
 У класса может быть несколько параметров любого кинда и суперклассы. `Show a` выбирает реализацию для одного типа; у `Functor f` один параметр с киндом `Type -> Type`. Отношению между независимыми типами нужны несколько параметров:
 
 ```flick
+# type ConversionError = ConversionError String
+#
 class Convert input output =
   convert : input -> Result ConversionError output
 ```
@@ -211,6 +218,15 @@ class Collection c a | c -> a =
 Зависимость `c -> a` читается: «конкретный тип коллекции определяет единственный тип элемента». Например, возможны заголовки экземпляров `Collection UserSet User` и `Collection NameSet String`.
 
 ```flick
+# class Collection c a | c -> a =
+#   empty : c
+#   insert : forall captures. a^captures -> (c -> c)^captures
+# type alias User = { name : String }
+# type UserSet = UserSet (List User)
+# instance Collection UserSet User =
+#   let empty = UserSet []
+#   let insert user set = set
+#
 empty_users : UserSet
 let empty_users =
   empty
@@ -237,6 +253,8 @@ let empty_users =
 Пусть `Hash` определён стандартной библиотекой, а `ExternalId` — SDK. Пакет адаптера, не владеющий ни классом, ни исходным типом, не может объявить `Hash ExternalId`: экземпляры-сироты запрещены.
 
 ```flick
+# import Sdk exposing (ExternalId)
+#
 unboxed type LocalExternalId =
   | LocalExternalId ExternalId
 ```
@@ -255,7 +273,7 @@ unboxed type LocalExternalId =
 
 Обобщение означает, что тип привязанного значения можно заново инстанцировать при каждом использовании. У `identity : forall a. a -> a` два вызова могут независимо выбрать `Float` и `String`. У одной изменяемой ячейки должен оставаться один тип содержимого. Явная сигнатура `forall` не может сделать небезопасное совместное использование состояния допустимым.
 
-```flick
+```flick fail
 invalid : Unit ->{} String
 let invalid () =
   let cell = Ref.make None

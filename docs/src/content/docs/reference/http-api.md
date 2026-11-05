@@ -86,6 +86,10 @@ Service group` takes the service off what serving the group needs; an endpoint
 of the group without `with_auth` for it is a defect when the group is made.
 
 ```flick
+# type error Unauthorized = Unauthorized { errors : { token : List String } }
+#   deriving Schema
+# import App.Auth exposing (credentials, token)
+#
 service Session =
   user : Unit ->{} Option String
 
@@ -120,6 +124,22 @@ written with the types of `HttpApi.Derive`:
 
 ```flick
 import HttpApi.Derive exposing (..)
+# type alias Credentials = { authorization : Option String }
+#   deriving Schema
+# type alias Name = { name : String }
+#   deriving Schema
+# type alias Profile = { name : String; bio : String }
+#   deriving Schema
+# type alias Note = { body : String }
+#   deriving Schema
+# type error Unauthorized = Unauthorized
+#   deriving Schema
+# instance Problem Unauthorized =
+#   let problem = { status = 401; body = Codec.json Unauthorized.schema }
+# type error NotFound = NotFound
+#   deriving Schema
+# instance Problem NotFound =
+#   let problem = { status = 404; body = Codec.json NotFound.schema }
 
 type alias Users = {
   me : Authed (Get "/me" { headers : Credentials } String {Unauthorized});
@@ -156,10 +176,30 @@ check gets only the headers, `HttpApi.Request Unit Unit Credentials Unit`,
 and fails with errors every such endpoint declares.
 
 ```flick
+# import HttpApi.Derive exposing (..)
+# import App.Auth exposing (token, check, maybe)
+# service Session =
+#   user : Unit ->{} String
+# type alias Credentials = { authorization : Option String }
+#   deriving Schema
+# type error Unauthorized = Unauthorized
+#   deriving Schema
+# instance Problem Unauthorized =
+#   let problem = { status = 401; body = Codec.json Unauthorized.schema }
+# type alias Users = {
+#   me : Authed (Get "/me" { headers : Credentials } String {Unauthorized});
+# } deriving HttpApi
+# type alias Public = {
+#   ping : Get "/ping" {} String {};
+# } deriving HttpApi
+#
+# let example = task {
 let api =
   HttpApi.api "Notes"
   |> HttpApi.add_group (Users.api token Session check maybe)
   |> HttpApi.add_group Public.api
+# ()
+# }
 ```
 
 `HttpApi.Mount.under "/api" api` puts every endpoint under a prefix, as the
@@ -176,7 +216,12 @@ instance or a path whose parameters are not the fields of its `path` part
 ## Serving
 
 ```flick
+# import App.Users exposing (api, options, find_user)
+#
+# let example = task {
 let server = HttpApi.listen options api { users = { get_user = find_user } }
+# ()
+# }
 ```
 
 `listen` needs `Scope s` and serves until that scope closes: then it stops
@@ -201,12 +246,18 @@ HTML (the client's own routes), and `Http.Middleware.cors` around the router
 for a dev server on another origin.
 
 ```flick
+# import App.Notes exposing (api, handlers, options)
+#
+# let example = task {
 let files = Http.StaticServer.route { Http.StaticServer.static_options "dist" with spa = true } ""
+# app : Http.Middleware.Handler none {Http.ServerError.HttpServerError}
 let app =
   Http.Middleware.cors
     { Http.Middleware.cors_options with allowedOrigins = ["http://localhost:5173"] }
     (Http.Router.router Http.Router.config [HttpApi.route "/api/*" api handlers, files])
 let server = Http.Server.serve options app
+# ()
+# }
 ```
 
 ## Clients and documents

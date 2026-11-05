@@ -1,5 +1,6 @@
 ---
 title: "Further reading"
+source_hash: 232889f021cf1d06
 ---
 
 Background on the mechanisms Flick builds on or compares with. The rules of Flick itself are in the chapters of this specification.

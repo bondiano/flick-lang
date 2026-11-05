@@ -1,5 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
+source_hash: fa4e115f960ab79c
 ---
 
 ## Expected errors
@@ -9,6 +10,11 @@ Errors have nominal identity and a payload. `try ... with` handles the selected 
 An error is declared with `type error`. Its single constructor has the same name as the error itself and lists the fields like an ADT variant: `type error NotFound = NotFound UserId`. An error without fields is written `type error Timeout`.
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 type error NotFound = NotFound UserId
 
 load_optional : UserId ->{Users; none} Option User
@@ -27,6 +33,9 @@ An error can have parameters. `type error RetryExhausted e = RetryExhausted e Fl
 type error RetryExhausted e = RetryExhausted e Float
 
 retry : Float -> Eff r e a ->{r; RetryExhausted (Errors e)} a
+# let retry times body =
+#   try await body with
+#   | cause -> from_result (Err (RetryExhausted cause times))
 ```
 
 Removing an error from a row is allowed only when the selected typed recovery fully covers its nominal variant. A guard or a partial pattern on the payload leaves the error possible. The requirements/errors of the handler are added to the result. Row subtraction applies to the selected recoverable error; it does not prove the absence of such a tag among secondary raw failures.
@@ -76,6 +85,21 @@ users_live :
 The block `provide layer { ... }` establishes the environment before the body runs:
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# service Config =
+#   url : Unit ->{} String
+# type error ConnectError = ConnectError
+# users_live : Layer {Config} {ConnectError} {Users}
+# let users_live = Layer.effect Users (task { from_result (Err ConnectError) })
+# load_name : UserId ->{Users, Log; NotFound} String
+# let load_name id = (Users.get id).name
+#
 application : UserId ->{Config, Log; NotFound, ConnectError} String
 let application id =
   provide users_live {
@@ -144,11 +168,17 @@ fetch_config :
 Converting a `Result` to a typed failure is the Prelude function `from_result : Result (Errors e) a ->{; e} a`. For `Result NotFound User` the singleton row `{NotFound}` is used. `Result String a` requires first converting the string to a declared nominal error. The operation does not catch defects or interruption. An ordinary `try ... with` handles expected failures; the separate `Exit`/`Failure` API handles the full outcome. [Separation of Effect errors](https://effect.website/docs/v4/error-management/two-error-types).
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 type error NotFound = NotFound UserId
 type error DbUnavailable = DbUnavailable String
 
 find_user :
   UserId ->{Users; NotFound, DbUnavailable} User
+# let find_user id = Users.get id
 
 find_optional :
   UserId ->{Users; DbUnavailable} Option User
@@ -205,6 +235,8 @@ One Layer identity is reused within one graph build, and a `provide` nested in t
 ## Finalization and resource boundaries
 
 ```flick
+# import File exposing (File, Path, FileSystem, OpenError, ReadError)
+#
 read_config :
   Path ->{FileSystem; OpenError, ReadError} String
 let read_config path =
@@ -224,7 +256,9 @@ For safe scoped APIs the checker verifies direct and indirect escape: the result
 
 Every `scope s { ... }` creates a fresh region `s` and a runtime owner. In `scope { ... }` the name is inferred and stays hidden. A scoped handle has a type such as `File s`. The owner is passed by the compiler lexically; it is not implemented by a single ordinary Context lookup, which in a nested region could pick a different scope.
 
-```flick
+```flick fail
+# import File exposing (File, Path, FileSystem, OpenError, ReadError)
+#
 bad_deferred :
   Path ->{FileSystem; OpenError} Eff {FileSystem} {ReadError} String
 let bad_deferred path =
@@ -239,6 +273,8 @@ This is an error (`FLICK-G001`): the task captures `file`, yet it is being retur
 The correct fix is to move the acquisition inside the deferred execution:
 
 ```flick
+# import File exposing (File, Path, FileSystem, OpenError, ReadError)
+#
 deferred_read :
   Path -> Eff {FileSystem} {OpenError, ReadError} String
 let deferred_read path =
@@ -254,7 +290,9 @@ Now every `await` gets its own region and resource. The returned string may outl
 
 The same check applies to an ordinary callback:
 
-```flick
+```flick fail
+# import File exposing (File, Path, FileSystem, OpenError, ReadError)
+#
 bad_callback :
   Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
 let bad_callback path =
@@ -315,6 +353,12 @@ There is no nursery that merges child errors into the scope body's error row. St
 ## Concurrent operations with different contracts
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 load_pair : UserId -> UserId ->{Users; NotFound} (User, User)
 let load_pair first_id second_id =
   parallel

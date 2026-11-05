@@ -5,6 +5,16 @@ title: "Прямые эффектные вызовы"
 Эффектная функция вызывается в обычном выражении, а `let` связывает его результат. Для записи последовательности операций достаточно обычных выражений и привязок значений.
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# normalize_name : String -> String
+# let normalize_name name = String.trim name
+#
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
   let user = Users.get id
@@ -44,6 +54,15 @@ load_name :
 Каждая именованная функция имеет полную сигнатуру непосредственно над определением. Правило одинаково для публичных, внутренних и локальных функций, методов экземпляров классов и функций, полученных частичным применением. В заголовке `let` остаются имена аргументов; второй стиль с типами параметров и результата в заголовке не используется.
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# type alias UserView = { id : UserId; title : String }
+#
 render : Show a => a -> String
 let render value =
   show value
@@ -84,6 +103,9 @@ let hello =
 Эффектная стрелка, у которой строка сервисов закрыта и состоит из синхронных сервисов (сейчас это только `Atom.Read`), а строка ошибок пуста, — *синхронная* стадия (Sync): `Atom a ->{Atom.Read;} a`, render у `Ui.view`, вычисление `Atom.derived`. Её тело компилируется в обычную JS-функцию без `Effect.gen`. Вызовы других Sync-функций и операций `Atom.Read` — обычные вызовы: они читают сервисы контекста, который среда выполнения установила вокруг вызова (читателя рендера или производного атома). Стадия определяется там, где стрелка записана. Поэтому переменная строки, которая позже решилась в `Atom.Read`, как в `forall r. (a ->{r} b) -> …`, сохраняет эффектную стадию, с которой скомпилирована её функция. Внешняя (foreign) функция возвращает Effect, поэтому её стрелки никогда не Sync.
 
 ```flick
+# count : Atom.Writable Float
+# let count = Atom.make 0
+#
 doubled : Unit ->{Atom.Read;} Float
 let doubled () = Atom.value count * 2
 

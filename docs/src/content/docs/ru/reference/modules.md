@@ -1,5 +1,6 @@
 ---
 title: "Модули и имена"
+source_hash: 83da33e2854e729d
 ---
 
 Каждый файл `.fl` — отдельный модуль.
@@ -11,6 +12,9 @@ module App.Users exposing (User, load_user)
 
 import App.Domain exposing (User, UserId)
 import Effect.Log as Log
+#
+# load_user : User -> User
+# let load_user user = user
 ```
 
 ## Имена модулей и файлы
@@ -88,6 +92,9 @@ import Effect.Log as Log
 module App.Users exposing (User, load_user)
 
 import App.Domain exposing (User)
+#
+# load_user : User -> User
+# let load_user user = user
 ```
 
 ## Определения верхнего уровня

@@ -44,6 +44,9 @@ shows:
 | a phantom parameter, which the representation does not use | a witness all the same |
 
 ```flick
+# type Tree a = Leaf | Node (Tree a) a (Tree a)
+#   deriving Schema
+#
 tree_schema : Schema a -> Schema (Tree a)
 let tree_schema item_schema =
   Tree.schema item_schema
@@ -81,6 +84,10 @@ A `codec` block is the plugin `codec` of `std`, which a file imports from
 
 ```flick
 import Codec exposing (plugin codec)
+# refined type Email = String where Checks.non_empty
+#   deriving Schema
+# type alias Profile = { email : Email; nickname : Option String }
+#   deriving Schema
 
 profile_json : PureCodec Json Profile
 let profile_json =

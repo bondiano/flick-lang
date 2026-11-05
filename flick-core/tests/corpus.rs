@@ -4,11 +4,12 @@
 //! idempotently without changing the AST (every `.fl` of the repository is
 //! also checked by `fmt`'s own corpus test). `tests/syntax/*.fl` must parse
 //! without diagnostics. The repository's `.fl` sources must already be
-//! formatted.
+//! formatted. The blocks of the site's pages must also check on their own.
 
 use std::path::{Path, PathBuf};
 use std::{env, fs, panic};
 
+use flick_core::diagnostics::Severity;
 use flick_core::fmt;
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
@@ -19,17 +20,54 @@ fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
-/// `(first line number, text)` of each ```` ```flick ```` block.
-fn flick_blocks(markdown: &str) -> Vec<(usize, String)> {
+/// What a block's info string asks of the checker: ```` ```flick ```` must
+/// check without errors, ```` ```flick ignore ```` is only parsed, and
+/// ```` ```flick fail ```` must report at least one error.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Check,
+    Ignore,
+    Fail,
+}
+
+/// The mode of a block whose info string is ```` ```flick ```` and `words`.
+fn mode(words: &str) -> Mode {
+    words
+        .split_whitespace()
+        .fold(Mode::Check, |mode, word| match word {
+            "ignore" => Mode::Ignore,
+            "fail" => Mode::Fail,
+            _ => mode,
+        })
+}
+
+/// A block line as it is compiled: a hidden line, `#` alone or starting with
+/// `# `, loses that prefix.
+fn compiled(line: &str) -> &str {
+    // shortcut: a raw string line starting with `# ` would be hidden too; no example has one, mark such a block `ignore`
+    if line == "#" {
+        ""
+    } else {
+        line.strip_prefix("# ").unwrap_or(line)
+    }
+}
+
+/// `(first line number, compiled text, mode)` of each ```` ```flick ````
+/// block; hidden lines stay in place, so line numbers match the markdown.
+fn flick_blocks(markdown: &str) -> Vec<(usize, String, Mode)> {
     let mut blocks = Vec::new();
-    let mut current: Option<(usize, String)> = None;
+    let mut current: Option<(usize, String, Mode)> = None;
     for (index, line) in markdown.lines().enumerate() {
         match &mut current {
-            None if line.trim_start() == "```flick" => current = Some((index + 2, String::new())),
-            None => {}
+            None => {
+                let info = line.trim_start().strip_prefix("```flick");
+                if let Some(words) = info.filter(|w| w.is_empty() || w.starts_with(' ')) {
+                    current = Some((index + 2, String::new(), mode(words)));
+                }
+            }
             Some(_) if line.trim_start() == "```" => blocks.extend(current.take()),
-            Some((_, text)) => {
-                text.push_str(line);
+            Some((_, text, _)) => {
+                text.push_str(compiled(line));
                 text.push('\n');
             }
         }
@@ -77,7 +115,7 @@ fn spec_blocks() -> Vec<(String, String)> {
                 .into_owned();
             flick_blocks(&markdown)
                 .into_iter()
-                .map(move |(line, text)| (format!("{chapter}:{line}"), text))
+                .map(move |(line, text, _)| (format!("{chapter}:{line}"), text))
         })
         .collect()
 }
@@ -197,7 +235,7 @@ fn corpus() -> Vec<(String, String)> {
     md_files(&root().join("docs"), &mut docs);
     for path in docs {
         let markdown = fs::read_to_string(&path).expect("readable markdown");
-        for (line, text) in flick_blocks(&markdown) {
+        for (line, text, _) in flick_blocks(&markdown) {
             entries.push((format!("{}:{line}", path.display()), text));
         }
     }
@@ -211,7 +249,7 @@ fn docs_examples_parse() {
     let mut errors = Vec::new();
     for path in docs {
         let markdown = fs::read_to_string(&path).expect("readable markdown");
-        for (line, text) in flick_blocks(&markdown) {
+        for (line, text, _) in flick_blocks(&markdown) {
             errors.extend(parse_errors(&format!("{}:{line}", path.display()), &text));
         }
     }
@@ -219,6 +257,56 @@ fn docs_examples_parse() {
         errors.is_empty(),
         "docs examples fail to parse:\n{}",
         errors.join("\n")
+    );
+}
+
+/// Every block of the site's pages checks on its own, imports taken on trust:
+/// hidden lines declare the names a fragment uses.
+#[test]
+fn docs_examples_check() {
+    let mut pages = Vec::new();
+    md_files(&root().join("docs/src/content/docs"), &mut pages);
+    pages.sort();
+    let mut failures = Vec::new();
+    let mut checked = 0;
+    for path in pages {
+        let markdown = fs::read_to_string(&path).expect("readable markdown");
+        let page = path
+            .strip_prefix(root())
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+        for (line, text, mode) in flick_blocks(&markdown) {
+            if mode == Mode::Ignore {
+                continue;
+            }
+            checked += 1;
+            let mut sources = SourceMap::default();
+            let file = sources.add(format!("{page}:{line}"), text.as_str());
+            let errors: Vec<_> = flick_core::check(&sources, file)
+                .into_iter()
+                .filter(|d| d.severity == Severity::Error)
+                .collect();
+            if mode == Mode::Fail && errors.is_empty() {
+                failures.push(format!(
+                    "{page}:{line}: a `fail` block checks without errors"
+                ));
+            }
+            if mode == Mode::Check {
+                failures.extend(errors.iter().map(|d| {
+                    let at = d
+                        .span
+                        .map_or(0, |s| sources.get(file).line_col(s.start).0 as usize);
+                    format!("{page}:{}: {} {}", line + at, d.code, d.message)
+                }));
+            }
+        }
+    }
+    assert!(checked > 300, "only {checked} docs examples were checked");
+    assert!(
+        failures.is_empty(),
+        "docs examples do not check (declare free names on hidden `# ` lines):\n{}",
+        failures.join("\n")
     );
 }
 

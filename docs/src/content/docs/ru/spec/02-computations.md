@@ -14,6 +14,12 @@ get_user : UserId ->{Users; NotFound} User
 ## Task и выполнение сохранённого значения
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 load_user : UserId ->{Users; NotFound} User
 let load_user user_id =
   let request = task {
@@ -38,6 +44,12 @@ let load_user user_id =
 ### Повторный запуск и значение await
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 load_twice :
   UserId ->{Users; NotFound} (User, User)
 let load_twice id =
@@ -79,6 +91,12 @@ let load_twice id =
 ## Пример конкурентного выполнения
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+#
 load_name_pair : UserId -> UserId ->{Users; NotFound} (String, String)
 let load_name_pair first_id second_id =
   let first = task { Users.get first_id }

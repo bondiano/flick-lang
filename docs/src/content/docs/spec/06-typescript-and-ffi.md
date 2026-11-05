@@ -1,5 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
+source_hash: c393f4bd1733a620
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -58,6 +59,8 @@ A constructor carries zero, one or several fields. The fields are listed after t
 The right-hand side of `type` always lists variants, and the leading `|` is optional: `type Wrapper = Wrap Float` is an ADT with a single constructor. A transparent alias, including a record type, is declared with `type alias`: `type alias UserId = Float`. `opaque type alias` hides the representation outside the module, and `opaque type` with variants hides the constructors. `alias` is a keyword only immediately after `type`.
 
 ```flick
+# type alias Point = { x : Float; y : Float }
+#
 type Shape = Circle Point Float | Rect Float Float | Empty
 
 area : Shape -> Float
@@ -91,6 +94,16 @@ Branches are checked top to bottom, alternatives left to right; the first matchi
 ## An effectful function
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# normalize_name : String -> String
+# let normalize_name name = String.trim name
+#
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
   let user = Users.get id
@@ -153,6 +166,8 @@ export declare function lookup(
 With the policy `undefined = "none"` and `catch = "JsError"`, the importer produces:
 
 ```flick
+# import JsError exposing (JsError)
+#
 lookup : String ->{; JsError} Option String
 foreign async lookup from "package" "lookup"
   arity 1
@@ -181,6 +196,11 @@ A callback with unknown retention does not accept a scoped handle or a closure c
 The modes are `pure`, `sync`, `async`, `effect` and `blocked` (see [FFI](#ffi)). The full source signature stands above the declaration; `arity`, `this`, `catch`, the nullable mapping, retention and cancellation are set by binding metadata.
 
 ```flick
+# import File exposing (Path)
+# import JsError as FsError exposing (JsError)
+# type alias FsError = JsError
+# import App.Http exposing (Http, HttpError, UserId, User)
+#
 hypot : Float -> Float -> Float
 foreign pure hypot from global "Math.hypot"
   arity 2

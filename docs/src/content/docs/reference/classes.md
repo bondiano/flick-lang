@@ -38,6 +38,11 @@ cell) but no `Hash`.
 ## Instances
 
 ```flick
+# class Show a =
+#   show : a -> String
+# show_items : Show a => List a -> String
+# let show_items items = String.join ", " (List.map show items)
+#
 instance Show a => Show (List a) =
   let show items = "[" ++ show_items items ++ "]"
 ```
@@ -106,6 +111,9 @@ independently; unrelated constraints and unseeded cycles add nothing.
 Aliases are expanded first. This admits ordinary capability lifting:
 
 ```flick
+# class MonadState (m : Type -> Type) s | m -> s
+# type ReaderT r (m : Type -> Type) a = ReaderT (r -> m a)
+#
 instance MonadState m s => MonadState (ReaderT r m) s
 ```
 
@@ -119,12 +127,17 @@ package, each dependency another, the built-in modules a third. A transparent
 alias or a record does not give ownership; a nominal wrapper does:
 
 ```flick
+# import Sdk exposing (ExternalId, hash_external)
+#
 unboxed type LocalExternalId = LocalExternalId ExternalId
 
 instance Hash LocalExternalId =
   let hash id =
     match id with
     | LocalExternalId raw -> hash_external raw
+#
+# instance Eq LocalExternalId =
+#   let eq (LocalExternalId a) (LocalExternalId b) = hash_external a == hash_external b
 ```
 
 `unboxed` keeps the `ExternalId` itself at run time: the wrapper costs
@@ -242,6 +255,8 @@ unboxed: the representation costs one `Sum` per constructor but the last
 and a pair per field. A type without constructors has none (`FLICK-C013`).
 
 ```flick
+# import Generic exposing (Generic(..), Field(..))
+#
 class GCount rep =
   gcount : rep -> Int
 
@@ -262,6 +277,20 @@ kind `Type`. A default signature that needs `Generic` gives the type its
 derives for every type:
 
 ```flick
+# import Generic exposing (Generic(..), Sum(..), Con(..), Field(..))
+#
+# class GDefault rep =
+#   gdefault : rep
+#
+# instance GDefault Unit =
+#   let gdefault = ()
+#
+# instance (Default a, GDefault rest) => GDefault (Field l a, rest) =
+#   let gdefault = (Field default, gdefault)
+#
+# instance GDefault fields => GDefault (Con n fields) =
+#   let gdefault = Con gdefault
+#
 class Default a =
   default : a
   default : (Generic a rep, GDefault rep) => a

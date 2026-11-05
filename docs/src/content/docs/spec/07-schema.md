@@ -1,5 +1,6 @@
 ---
 title: "Schema and standard data types"
+source_hash: 88e2b5f877ec9125
 ---
 
 ## The boundary between the language core and the library
@@ -72,7 +73,7 @@ refined type Email = String where Checks.email
 type alias Profile = {
   email : Email;
   nickname : Option String;
-} deriving Eq, Hash, Schema
+} deriving Schema
 
 profile_schema : Schema Profile
 let profile_schema =

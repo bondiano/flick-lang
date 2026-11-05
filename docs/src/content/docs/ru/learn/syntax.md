@@ -1,6 +1,7 @@
 ---
 title: Синтаксис за пять минут
 description: Все конструкции синтаксиса Flick, по одному короткому примеру на каждую.
+source_hash: 694f173df2457c69
 ---
 
 Краткий обзор, чтобы читать код на Flick. Точные правила описаны в
@@ -81,6 +82,8 @@ add(1, 2)      // та же ошибка
 Нет ни `in`, ни `return`: значение блока — его последняя строка.
 
 ```flick
+# type alias User = { name : String; age : Int }
+#
 describe : User -> String
 let describe user =
   let years = show user.age
@@ -139,6 +142,8 @@ type Tree a = Leaf | Node (Tree a) a (Tree a)
 случай.
 
 ```flick
+# type Shape = Circle Float | Rect Float Float | Empty
+#
 area : Shape -> Float
 let area shape =
   match shape with
@@ -179,6 +184,8 @@ let sign n = if n < 0 then "negative" else if n == 0 then "zero" else "positive"
 вызывает другие такие функции напрямую, как чистые.
 
 ```flick
+# type alias User = { name : String; age : Int }
+#
 type error NotFound = NotFound String
 
 service Users =
@@ -200,6 +207,12 @@ let greet_or_guest id =
 `await` запускает:
 
 ```flick
+# type error NotFound = NotFound String
+# service Users =
+#   get : String ->{; NotFound} String
+# greet : String ->{Users; NotFound} String
+# let greet id = Users.get id
+#
 twice : String ->{Users; NotFound} (String, String)
 let twice id =
   let request = task { greet id }
