@@ -121,7 +121,7 @@ impl Checker<'_> {
             .collect();
         for name in cyclic {
             if let Some(def) = self.env.type_def_mut(&name) {
-                def.form = Form::Nominal;
+                def.form = Form::NOMINAL;
             }
         }
     }
@@ -187,7 +187,7 @@ impl Checker<'_> {
             .collect();
         let has_body = decl.nodes().any(|n| is_type(n.kind));
         let (form, result) = match decl.kind {
-            K::TypeDecl if decl.has_token(K::RefinedKw) => (Form::Nominal, result),
+            K::TypeDecl if decl.has_token(K::RefinedKw) => (Form::NOMINAL, result),
             K::TypeDecl if !variants.is_empty() => (
                 Form::Adt {
                     constructors: variants,
@@ -203,7 +203,7 @@ impl Checker<'_> {
                 },
                 self.kinds.fresh(),
             ),
-            K::TypeDecl => (Form::Nominal, result),
+            K::TypeDecl => (Form::NOMINAL, result),
             K::SqlTableDecl => (
                 Form::Alias {
                     params: Vec::new(),

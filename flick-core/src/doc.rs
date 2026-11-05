@@ -266,7 +266,7 @@ fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) 
                 members.join(" | ")
             );
         }
-        Form::Nominal | Form::KindMember => {
+        Form::Nominal { .. } | Form::KindMember => {
             if e.decl == Decl::Opaque {
                 out.push_str("\nOpaque.\n");
             }

@@ -3,7 +3,7 @@
 use super::{Projection, Vars, generic, key, native, params, type_args, uncaptured};
 use crate::codegen::names;
 use crate::iface::{Decl, Export, Interface, Namespace};
-use crate::types::{Constructor, Form, Kind, Rep, Type};
+use crate::types::{Abi, Constructor, EnumLit, Form, Kind, Rep, Type};
 
 impl Projection<'_> {
     /// Declarations of the types `interface` exports; a type without a
@@ -96,10 +96,17 @@ impl Projection<'_> {
                     .iter()
                     .filter_map(|c| interface.find(Namespace::Constructor, c))
                     .collect();
+                if let Abi::Literal(literals) = abi {
+                    let all = exported.len() == constructors.len();
+                    return Ok(Some(self.enumeration(name, literals, all)));
+                }
                 if exported.len() < constructors.len() {
                     return Ok(Some(brand(&generics)));
                 }
                 self.variants(name, &exported, abi.is_tagged()).map(Some)
+            }
+            (Form::Nominal { literals }, _) if !literals.is_empty() => {
+                Ok(Some(self.enumeration(name, literals, false)))
             }
             (Form::Error, _) => {
                 let constructors: Vec<&Export> = interface
@@ -242,6 +249,25 @@ impl Projection<'_> {
             type_args(&shown),
             members.join("; ")
         ))
+    }
+
+    /// An enum: the union of its literals, or, its constructors hidden, a
+    /// brand over the type of its literals.
+    fn enumeration(&self, name: &str, literals: &[EnumLit], open: bool) -> String {
+        let literal = |l: &EnumLit| match l {
+            EnumLit::String(s) => names::string(s),
+            EnumLit::Int(n) => n.to_string(),
+        };
+        if open {
+            let cases: Vec<String> = literals.iter().map(literal).collect();
+            return format!("export type {name} = {};", cases.join(" | "));
+        }
+        let base = match literals.first() {
+            Some(EnumLit::Int(_)) => "number",
+            _ => "string",
+        };
+        let tag = names::string(&self.brand(name));
+        format!("export type {name} = {base} & {{ readonly \"~flick/brand\": {tag} }};")
     }
 
     /// The brand of a nominal type: its qualified identity.

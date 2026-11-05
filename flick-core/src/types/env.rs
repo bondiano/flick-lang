@@ -30,8 +30,12 @@ pub struct TypeDef {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "form", rename_all = "kebab-case")]
 pub enum Form {
-    /// Equal only to itself: built-in, abstract, opaque or refined.
-    Nominal,
+    /// Equal only to itself: built-in, abstract, opaque or refined. An
+    /// opaque enum keeps its literals, what its values are.
+    Nominal {
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        literals: Vec<EnumLit>,
+    },
     /// A variant type with every constructor, exported or not, and how its
     /// values are represented in JS.
     Adt {

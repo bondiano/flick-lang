@@ -6,11 +6,18 @@
 use std::mem;
 
 use super::Checker;
-use super::env::{Abi, EnumLit};
+use super::env::{Abi, EnumLit, Form};
 use crate::diagnostics::codes;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal::{bigint_digits, bigint_digits_value, string_value};
+
+impl Form {
+    /// A nominal type of no literals.
+    pub const NOMINAL: Form = Form::Nominal {
+        literals: Vec::new(),
+    };
+}
 
 /// The literal written after a constructor's `=`, if it has one.
 pub(super) fn literal_of(variant: &Node) -> Option<&Node> {

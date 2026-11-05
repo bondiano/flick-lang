@@ -167,3 +167,23 @@ fn ui_is_the_runtime_ui_imported_only_where_used() {
             .contains("import type { Ui as $Ui } from \"@flick-lang/runtime/ui/react\";")
     );
 }
+
+#[test]
+fn an_enum_is_the_union_of_its_literals_or_a_brand_over_them() {
+    let out = project(
+        "module App.Shapes exposing (Method(..), Level, pick, level)\n\
+         untagged type Method = Get = \"GET\" | Post = \"POST\"\n\
+         opaque untagged type Level = Low = 0 | High = 1\n\
+         pick : Method\nlet pick = Post\n\
+         level : Level\nlet level = Low\n",
+    );
+    assert!(
+        out.contains("export type Method = \"GET\" | \"POST\";"),
+        "{out}"
+    );
+    assert!(
+        out.contains("export type Level = number & { readonly \"~flick/brand\": \"@acme/shapes/App.Shapes.Level\" };"),
+        "{out}"
+    );
+    assert!(out.contains("pick: Method"), "{out}");
+}
