@@ -1,0 +1,49 @@
+// A default signature repeats its method's signature with constraints of
+// its own: same type, no constraints of the method's, none on the method's
+// variables, one per method, and a default to go with it; an instance that
+// takes the default satisfies them.
+module App.DefaultSignatures exposing (..)
+
+class Describe a =
+  describe : a -> String
+  describe : Show a => a -> Float
+  let describe x = show x
+
+class Tagged a =
+  tagged : Show b => a -> b -> String
+  tagged : (Show a, Show b) => a -> b -> String
+  let tagged x y = show x ++ show y
+
+class Paired a =
+  paired : a -> b -> String
+  paired : Show b => a -> b -> String
+  let paired _ y = show y
+
+class Twice a =
+  twice : a -> String
+  twice : Show a => a -> String
+  twice : Eq a => a -> String
+  let twice x = show x
+
+class Lone a =
+  lone : a -> String
+  lone : Show a => a -> String
+
+class Shown a =
+  shown : a -> String
+  shown : Show a => a -> String
+  let shown x = show x
+
+type Opaque = Opaque
+
+instance Shown Opaque
+
+//~ FLICK-C010 @9:3-9:34 the default signature of `describe` must have its type, `a -> String`, with constraints before it
+//~ FLICK-C001 @10:20-10:24 cannot deduce `Show a` from the constraints in scope
+//~ FLICK-C010 @14:3-14:48 `tagged` has constraints of its own: a default signature is for a method without them
+//~ FLICK-C001 @15:20-15:24 cannot deduce `Show a` from the constraints in scope
+//~ FLICK-C010 @19:3-19:38 the default signature of `paired` constrains `b`, a variable of the method: an instance knows only the class's parameters
+//~ FLICK-C001 @20:20-20:24 cannot deduce `Show b` from the constraints in scope
+//~ FLICK-C010 @25:3-25:30 `twice` has a default signature already
+//~ FLICK-C011 @30:3-30:31 `lone` has a default signature but no default: define `let lone = …` in the class
+//~ FLICK-C001 @39:10-39:22 `Shown Opaque` takes `shown` from its class's default, which needs `Show Opaque`

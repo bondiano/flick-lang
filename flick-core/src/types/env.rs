@@ -63,6 +63,10 @@ pub enum Form {
         /// Methods with a default definition in the class body.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         defaults: Vec<String>,
+        /// The scheme a default definition has where the class body repeats
+        /// its method's signature with constraints of the default's own.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        default_sigs: Vec<(String, Type)>,
         /// Marked `@derive`: the plugin of a package derives its instances.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         derive: bool,

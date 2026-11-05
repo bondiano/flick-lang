@@ -46,8 +46,11 @@ pub fn uses(item: &Item, out: &mut Vec<Key>) {
                 expr_uses(m, out);
             }
             let (module, class) = &info.class;
-            for (name, _) in &info.defaults {
+            for (name, _, extra) in &info.defaults {
                 out.push((module.clone(), default_method(class, name)));
+                for d in extra {
+                    dict_uses(d, out);
+                }
             }
         }
         ItemKind::Foreign(f) => {

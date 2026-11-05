@@ -192,15 +192,20 @@ impl Gen<'_> {
                         None => entries.push(format!("{name}: {v}")),
                     }
                 }
-                for (name, own) in &info.defaults {
+                for (name, own, extra) in &info.defaults {
                     let (module, class) = &info.class;
                     let value = self.global(module, &default_method(class, name));
+                    let dicts: Vec<String> = ["this".to_owned()]
+                        .into_iter()
+                        .chain(extra.iter().map(|d| self.dict(d)))
+                        .collect();
+                    let dicts = dicts.join(", ");
                     let own: Vec<String> = (0..*own).map(|i| format!("$o{i}")).collect();
                     let call = if own.is_empty() {
-                        format!("{value}(this)")
+                        format!("{value}({dicts})")
                     } else {
                         let list = own.join(", ");
-                        format!("{} {value}(this, {list})", self.arrow(&list))
+                        format!("{} {value}({dicts}, {list})", self.arrow(&list))
                     };
                     entries.push(format!("get {name}() {{\n  return {call};\n}}"));
                 }
@@ -344,6 +349,9 @@ fn item_uses(item: &Item, module: &str, out: &mut BTreeSet<String>) {
                 for d in fields {
                     dict_uses(d, module, out);
                 }
+            }
+            for d in info.defaults.iter().flat_map(|(_, _, extra)| extra) {
+                dict_uses(d, module, out);
             }
             for (_, m) in methods {
                 expr_uses(m, module, out);

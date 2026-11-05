@@ -227,6 +227,7 @@ impl Checker<'_> {
                     fundeps: Vec::new(),
                     methods: Vec::new(),
                     defaults: Vec::new(),
+                    default_sigs: Vec::new(),
                     derive: false,
                 },
                 result,
@@ -322,8 +323,8 @@ impl Checker<'_> {
                     Type::con(&self.env.module, &p.name),
                     p.params.iter().map(|b| Type::Var(b.name.clone())),
                 );
-                let members = self.members(decl, &[head]);
-                Body::Class(supers, fundeps, members)
+                let (members, defaults) = self.class_members(decl, head);
+                Body::Class(supers, fundeps, members, defaults)
             }
             _ => Body::None,
         }
@@ -455,7 +456,7 @@ impl Checker<'_> {
                     self.env.declare(Namespace::Constructor, &name);
                 }
             }
-            Body::Class(supers, fundeps, members) => {
+            Body::Class(supers, fundeps, members, signed) => {
                 let (methods, defaults) = method_names(p.node, self.text, &members);
                 def.form = Form::Class {
                     params: params.iter().map(|b| b.name.clone()).collect(),
@@ -463,10 +464,10 @@ impl Checker<'_> {
                     fundeps,
                     methods,
                     defaults,
+                    default_sigs: Vec::new(),
                     derive: self.derived.iter().any(|d| d.class == p.name),
                 };
-                let members = members.into_iter().map(|(n, t)| (n, quantify(t))).collect();
-                self.declare_methods(&p.name, members);
+                self.class_schemes(&p.name, members, signed, &quantify);
             }
             Body::Members(members) => {
                 let operations = members
@@ -511,6 +512,12 @@ enum Body {
     /// Constructors with their payload types.
     Variants(Vec<(String, Vec<Type>)>),
     Members(Vec<(String, Type)>),
-    /// Superclasses, functional dependencies and methods.
-    Class(Vec<Type>, Vec<Fundep>, Vec<(String, Type)>),
+    /// Superclasses, functional dependencies, methods and default
+    /// signatures.
+    Class(
+        Vec<Type>,
+        Vec<Fundep>,
+        Vec<(String, Type)>,
+        Vec<(String, Type)>,
+    ),
 }

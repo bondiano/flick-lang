@@ -463,7 +463,7 @@ impl Checker<'_> {
         d: &Declared,
         supers: Vec<(String, Dict)>,
         fields: Option<Vec<Dict>>,
-        defaults: Vec<(String, usize)>,
+        defaults: Vec<(String, usize, Vec<Dict>)>,
     ) {
         let Some(((cm, cn), _)) = split(&d.instance.head) else {
             return;

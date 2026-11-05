@@ -1,0 +1,33 @@
+// A default signature: the class body repeats a method's signature with
+// constraints only its default needs, which each instance that takes the
+// default satisfies; an instance with its own definition needs none.
+module App.Main exposing (main)
+
+class Describe a =
+  describe : a -> String
+  describe : Show a => a -> String
+  let describe x = "<" ++ show x ++ ">"
+  tagged : String -> a -> String
+  let tagged tag x = tag ++ " " ++ describe x
+
+type Box = Box Float
+  deriving Show
+
+type Opaque = Opaque
+
+instance Describe Box
+
+instance Describe Float
+
+instance Describe Opaque =
+  let describe _ = "opaque"
+
+/// Each needs only `Describe`, though its default needs `Show`.
+both : Describe a => a -> a -> String
+let both x y = describe x ++ " " ++ tagged "and" y
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (describe (Box 1))
+  Platform.stdout_line (both 2.5 (3 : Float))
+  Platform.stdout_line (tagged "is" Opaque)

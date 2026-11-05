@@ -47,6 +47,10 @@ pub fn print(module: &Module) -> String {
                     let fields: Vec<String> = fields.iter().map(dict).collect();
                     let _ = write!(s, " derived [{}]", fields.join(", "));
                 }
+                for (name, _, extra) in info.defaults.iter().filter(|(_, _, e)| !e.is_empty()) {
+                    let extra: Vec<String> = extra.iter().map(dict).collect();
+                    let _ = write!(s, " default {name} [{}]", extra.join(", "));
+                }
                 for (name, value) in methods {
                     let _ = write!(s, "\n  {name} = {}", expr(value));
                 }

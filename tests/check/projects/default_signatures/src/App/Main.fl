@@ -1,0 +1,19 @@
+// An instance in another module takes the default and satisfies its
+// signature's constraints, or says which one it lacks.
+module App.Main exposing (shown)
+
+import App.Describe exposing (Describe(..))
+
+type Box = Box Float
+  deriving Show
+
+type Opaque = Opaque
+
+instance Describe Box
+
+instance Describe Opaque
+
+shown : String
+let shown = describe (Box 1)
+
+//~ FLICK-C001 @14:10-14:25 `Describe Opaque` takes `describe` from its class's default, which needs `Show Opaque`

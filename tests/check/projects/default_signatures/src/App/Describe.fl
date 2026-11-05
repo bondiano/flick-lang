@@ -1,0 +1,8 @@
+// A class whose default has a signature of its own, for instances of
+// other modules, which read it from this module's interface.
+module App.Describe exposing (Describe(..))
+
+class Describe a =
+  describe : a -> String
+  describe : Show a => a -> String
+  let describe x = "<" ++ show x ++ ">"

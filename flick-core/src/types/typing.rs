@@ -288,8 +288,9 @@ pub struct InstanceInfo {
     /// whose one field is its representation).
     pub derived: Option<(Vec<Dict>, Option<Vec<Constructor>>)>,
     /// Methods taken from the class's defaults, with how many dictionaries
-    /// of their own each takes.
-    pub defaults: Vec<(String, usize)>,
+    /// of their own each takes, and the dictionaries its default signature
+    /// needs, which it takes after the class's.
+    pub defaults: Vec<(String, usize, Vec<Dict>)>,
 }
 
 /// The top-level value a class's default definition of `method` compiles

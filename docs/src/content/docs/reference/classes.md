@@ -67,6 +67,26 @@ instance Pretty Float =
   let pretty n = show n
 ```
 
+A default may need more than the class: the class body then repeats the
+method's signature with those constraints before it, a default signature,
+and the default is checked against it. An instance that takes the default
+must satisfy them, for its types (`FLICK-C001` on the instance names the one
+it lacks); one that defines the method needs none of them. The default
+signature has the method's type exactly and constrains only the class's
+parameters and variables of its own, as `rep` in
+`(Generic a rep, GDefault rep) => a`: the method itself may have no
+constraints of its own, and a method has at most one (`FLICK-C010`). A
+default signature without its `let` is `FLICK-C011`.
+
+```flick
+class Describe a =
+  describe : a -> String
+  describe : Show a => a -> String
+  let describe x = "<" ++ show x ++ ">"
+
+instance Describe Float   // takes the default: `Show Float` holds
+```
+
 Instances are canonical. The checker rejects an instance when:
 
 | Rule | Code |

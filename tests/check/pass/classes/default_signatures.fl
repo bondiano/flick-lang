@@ -1,0 +1,19 @@
+// A default signature: the class body repeats a method's signature with
+// constraints only its default needs; an instance taking the default
+// satisfies them, one defining the method needs none of them.
+module App.DefaultSignatures exposing (..)
+
+class Describe a =
+  describe : a -> String
+  describe : Show a => a -> String
+  let describe x = "<" ++ show x ++ ">"
+
+type Opaque = Opaque
+
+instance Describe Float
+
+instance Describe Opaque =
+  let describe _ = "opaque"
+
+both : (String, String)
+let both = (describe 1.5, describe Opaque)
