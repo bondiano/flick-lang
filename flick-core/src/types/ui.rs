@@ -110,13 +110,19 @@ impl Checker<'_> {
                 .then(|| let_parts(decl, self.text))
                 .filter(|p| !p.is_function())
                 .and_then(|p| p.name);
+            // a binding whose scheme takes a dictionary, as `CallSite =>`,
+            // makes its atoms where it is used, as a function does
+            let constrained = binding.as_ref().is_some_and(|b| {
+                let entity = self.env.entity(Namespace::Value, b);
+                matches!(self.env.value(&entity), Some(Type::Forall { constraints, .. }) if !constraints.is_empty())
+            });
             let mut defined = false;
             for (range, name, in_function) in keyed.found {
                 let message = match &binding {
                     None => format!(
                         "`Atom.{name}` takes its key from the top-level binding it defines: define the atom with a top-level `let` without parameters"
                     ),
-                    Some(_) if in_function => format!(
+                    Some(_) if in_function || constrained => format!(
                         "`Atom.{name}` inside a function would give its key to every atom the function makes: define the atom with a top-level `let`"
                     ),
                     Some(_) if keyed.applied.get(&range) != Some(&key_arity(&name)) => format!(

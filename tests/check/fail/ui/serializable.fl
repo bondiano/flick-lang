@@ -30,3 +30,8 @@ let partial = Atom.serializable numbers
 pair : (Atom.Writable Float, Atom.Writable Float)
 let pair = (Atom.serializable numbers (Atom.make 1), Atom.serializable numbers (Atom.make 2))
 //                                                   ^^^^^^^^^^^^^^^^^ FLICK-U003 a second serializable atom in `pair` would share its key `App.Serializable.pair`
+
+/// Its scheme takes `CallSite`: each use would make an atom of its own key.
+anywhere : CallSite.CallSite => Atom.Writable Float
+let anywhere = Atom.serializable numbers (Atom.make 0)
+//             ^^^^^^^^^^^^^^^^^ FLICK-U003 `Atom.serializable` inside a function would give its key to every atom
