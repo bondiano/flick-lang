@@ -5,9 +5,9 @@ import Formal.Elab.CloseTy
 /-!
 # Witness: the constants of `Γ₀` have closed schemes
 
-`consts_closed`: every constant of the witness, the families `unc n` and `from_result_n`
-included, mentions only the variables it binds, so closing the premises by types keeps its
-instantiations (`T6a_close`).
+`consts_closed`: every constant of the witness, the family `unc n` included, mentions only
+the variables it binds, so closing the premises by types keeps its instantiations
+(`T6a_close`).
 -/
 
 namespace Flick.Elab.Witness
@@ -70,8 +70,11 @@ theorem constSch_lt {c : Nat} {s : Scheme} (h : constSch c = some s) :
         · cases hn
         · cases hn
       · cases h
-    · cases h
-      exact ⟨rfl, fun n hn => by simp [frSch, Ty.Occurs, Stage.Occurs] at hn ⊢; omega⟩
+    · split at h
+      · cases h
+        exact ⟨rfl, fun n hn => by
+          simp [PreludeSchemes.from_result, Ty.Occurs, Stage.Occurs] at hn ⊢; omega⟩
+      · cases h
 
 /-- **The constants of the witness have closed schemes.** -/
 theorem consts_closed : P.ConstsClosed := by

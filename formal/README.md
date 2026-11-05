@@ -542,10 +542,10 @@ Simplifications:
    constructor `c` (`rnm c t`) or a union `ρ₁ + ρ₂` (`run`), so `timeout` is at
    `R r ({TimeoutError} + e)`; a row may be the argument of a type (`FieldCodec (rd + r) a`,
    `Exit e a`), which the model writes as data. `pair`, `unc n` and `each_P` have no Prelude name and are
-   written in `Sugar.lean`. `from_result` is a family `from_result_n` over error types, one
-   `con n` each, at the stage `R⟨∅; con n⟩` (`frSch`, equal to the generated scheme at `e := con n`
-   by `frSch_gen`): its `raise` adds the atom `e` to the row, which the row variable `⟦e⟧`
-   does not give, and `e?` takes the member at `e`'s error type (`tryResult_elab`, at that stage). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
+   written in `Sugar.lean`. `from_result : ∀e a. Result (Errors e) a →R⟨∅; e⟩ a` is the
+   generated scheme, and `e?` takes it at the row of errors of `e` (`tryResult_elab`, at the
+   stage `R⟨∅; ε⟩`): its `raise` of `Errors e` adds the atom `e` to the row, which the stage
+   gives (simplification 10). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
    hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
    qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and
    data without storage drops it. That argument is invariant, so a qualifier the caller
@@ -564,12 +564,14 @@ Simplifications:
    the rows of the loop ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
-10. The core instance. `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ε)` with `ε` every name (`allNames`): a row
+10. The core instance. `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ⌈⟦e⟧⌉ ∪ ε)` with `ε` every name (`allNames`): a row
     of the source is a type, and `⟦r⟧` is what `⟦r⟧` stands for as a row (`Ty.asRow`): a row
     variable `var n` is the row variable `n`, `cnil` the empty row, `rnm c t` the name `N.con c`
     with the atoms of `⌈⟦t⟧⌉` (`Row.err`, what an error of `t` reaches), `run r r'` the union of
-    what `⟦r⟧` and `⟦r'⟧` stand for; every error name stays in the row, so a
-    runtime body may raise any error type that reaches nothing. The source compares stages
+    what `⟦r⟧` and `⟦r'⟧` stand for. The atoms `⌈⟦e⟧⌉` bound what the errors of `e` reach
+    (`errRow`): a raised `Errors e`, data of the nominal type `Errors`, reaches the variable
+    `e`. Every error name stays in the row, so a runtime body may raise any error type that
+    reaches only what `e` reaches. The source compares stages
     by equality and its `⌈·⌉` counts the variables of the rows of an arrow, so the qualifier
     of a translated `R r e` arrow counts them too (`Stage.qual`); a `P` arrow translates as
     before (`trT_arr`). A substitution acts on the rows of a stage, and `T6a_close` closes the
@@ -594,13 +596,12 @@ Simplifications:
     the lazy `Monad Eff` ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)), an eager `Option` monad `OptQ q a` and `Iterable` of
     `ListQ q a` (data without storage gets a phantom `CRow` parameter as an instance of a class
     over containers). Every global has a body typed by the rules of the core, none is `todo`;
-    the bodies are honest but narrower than the checker's in three places. `Seq q a` is an
+    the bodies are honest but narrower than the checker's in two places. `Seq q a` is an
     eager list `SNil | SCons a (Seq q a)` with a phantom `q`: `Seq.flat_map`, `each_φ`,
     `to_list` and `iter` are fixpoints over it, and the laziness of the checker's `Seq` is not
     modelled (T6 needs only the types of [Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes), and the witness has no infinite or effectful
     sequence). `Rec` has one field, so the `&&` of the structural `eq` over its fields is one
-    comparison by the slot dictionary `D_{Eq Int}`. `from_result_n` is a member at one
-    error type (simplification 9). `eq` on `Int` is the constant `intEq`, and `unc n` is
+    comparison by the slot dictionary `D_{Eq Int}`. `eq` on `Int` is the constant `intEq`, and `unc n` is
     built by a Lean function of `n` and typed by induction. A match has one arm per
     constructor and no `_` (`exh_ctors`, `Exh.lean`), also in the lazy `Monad Eff`.
 
@@ -704,7 +705,7 @@ for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
   other constructors `↦ adt (N.con c)`, `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉` (at `R r e` with
   the variables of the rows), `cnil ↦ caps ∅`, `cun ↦ caps (∪)`,
   `rnm c t ↦ row ({N.con c} ∪ ⌈⟦t⟧⌉)`, `run r r' ↦ row (⟦r⟧ ∪ ⟦r'⟧)` with each side as a row
-  (`Ty.asRow`); `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ allNames)` (simplification 10).
+  (`Ty.asRow`); `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ⌈⟦e⟧⌉ ∪ allNames)` (simplification 10).
   `trT_subst`/`trTT_subst`/`trS_subst` and `trT_reach` are the two commutations. The
   names of the core are a parameter `Names`, not a fixed encoding.
   `D_{C τ̄} ↦ dict (N.cls C |τ̄|) ⟦τ̄⟧`: the class name carries the number of parameters,

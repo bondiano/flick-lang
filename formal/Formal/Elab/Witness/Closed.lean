@@ -87,6 +87,19 @@ theorem asRow_trT_atoms {t : Ty} {b : Atom}
   · exact .inr h
   all_goals simp at h
 
+/-- What a translated row of errors names is among the variables of the source row. -/
+theorem errRow_trT_atoms {t : Ty} {b : Atom}
+    (h : errRow (trT N t) (.atm b) ∨ errRow (trT N t) (.rv b) ∨
+      (∃ M, errRow (trT N t) (.ob M b) ∨ errRow (trT N t) (.need M b)) ∨
+      ∃ c, errRow (trT N t) (.obv b c) ∨ errRow (trT N t) (.obv c b)) :
+    ∃ n, b = .v n ∧ t.Occurs n := by
+  simp only [errRow, Row.union, Row.ofCaps, or_false] at h
+  rcases h with (h | h) | h | ⟨M, h | h⟩ | ⟨c, h | h⟩
+  · exact asRow_trT_atoms N (.inl h)
+  · exact (trT_reach N t b).1 h
+  · exact asRow_trT_atoms N (.inr (.inl h))
+  all_goals simp at h
+
 theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
     (h : ∀ n, t.Occurs n → σ (.v n) = σ' (.v n)) : (trT N t).substT σ = (trT N t).substT σ' := by
   have hc : ∀ b, (trT N t).reach b → σ b = σ' b := by
@@ -119,7 +132,7 @@ theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
         rw [Row.substT_congr fun x hx => stage x (let ⟨n, e, h⟩ := asRow_trT_atoms N hx; ⟨n, e, .inl h⟩),
           Row.substT_congr (r := Row.union _ allNames) fun x hx => stage x ?_]
         simp only [Row.union, allNames, or_false] at hx
-        obtain ⟨n, e, h⟩ := asRow_trT_atoms N hx
+        obtain ⟨n, e, h⟩ := errRow_trT_atoms N hx
         exact ⟨n, e, .inr h⟩
     rw [trT_arr] at hc ⊢
     simp only [Flick.Ty.substT]

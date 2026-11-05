@@ -11,8 +11,9 @@ The types of `Elab` in the core of `Formal/` with regions and dictionary records
 `cnil ↦ caps ∅`, `cun ↦ caps (∪)`, `rnm c t ↦ row ({c} ∪ ⌈⟦t⟧⌉)` (`Row.err`),
 `run r r' ↦ row (⟦r⟧ ∪ ⟦r'⟧)` with each side what it stands for as a row,
 `D_{C τ̄} ↦ dict (cls C |τ̄|) τ̄`. A stage `R r e` is
-`rt ⟦r⟧ (⟦e⟧ ∪ ε)`, a row `⟦r⟧` what the type `⟦r⟧` stands for as a row (`Ty.asRow`: a variable is
-a row variable), `ε` every name (`allNames`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). The qualifier of a translated
+`rt ⟦r⟧ (⟦e⟧ ∪ ⌈⟦e⟧⌉ ∪ ε)`, a row `⟦r⟧` what the type `⟦r⟧` stands for as a row (`Ty.asRow`: a
+variable is a row variable), `⌈⟦e⟧⌉` what its errors reach (`errRow`), `ε` every name
+(`allNames`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). The qualifier of a translated
 arrow also counts the variables of its rows, as `⌈·⌉` of the source does.
 The translation commutes with substitution (`trT_subst`, `trTT_subst`, `trS_subst`) and with
 `⌈·⌉` (`trT_reach`): a capture variable is an ordinary variable on both sides.
@@ -44,14 +45,23 @@ structure Names where
 
 variable (N : Names)
 
-/-- Every name, as a row of errors: the stage `R` of the source has no row of errors, and
-`⟦R⟧` lets a body raise any error type whose values reach nothing (`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). -/
+/-- Every name, as a row of errors: `⟦R⟧` lets a body raise any error type whose values
+reach what the row reaches, such as `Errors e`, data of the type `Errors` (`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). -/
 def allNames : Row
   | .nm _ => True
   | _ => False
 
 @[simp] theorem allNames_substT (σ : Atom → Flick.Ty) : allNames.substT σ = allNames := by
   funext x; cases x <;> simp [Row.substT, allNames]
+
+/-- A row of errors of the source in the core: what it stands for as a row and the atoms
+it reaches, which bound what its errors reach; so a raised `Errors e` of a row variable `e`,
+which reaches `e`, is in the row. -/
+def errRow (t : Flick.Ty) : Row := Row.union t.asRow (Row.ofCaps t.reach)
+
+theorem errRow_substT (t : Flick.Ty) (σ : Atom → Flick.Ty) :
+    (errRow t).substT σ = errRow (t.substT σ) := by
+  simp [errRow, Ty.asRow_substT, Row.ofCaps_substT, Ty.reach_caps]
 
 /-- The variables of the rows of a stage, as atoms. -/
 def Stage.atoms (φ : Stage) : Caps := fun a => ∃ n, a = .v n ∧ φ.Occurs n
@@ -68,17 +78,17 @@ def trT : Ty → Flick.Ty
   | .con c => if c = 2 then .base .bool else if c = 4 then .base .int else .adt (N.con c)
   | .app t u => .tapp (trT t) (trT u)
   | .arr .P a b q => .arrow (trT a) .pure (trT b) (trT q).reach
-  | .arr (.R r e) a b q => .arrow (trT a) (.rt (trT r).asRow (Row.union (trT e).asRow allNames))
+  | .arr (.R r e) a b q => .arrow (trT a) (.rt (trT r).asRow (Row.union (errRow (trT e)) allNames))
       (trT b) fun x => (trT q).reach x ∨ (Stage.R r e).atoms x
   | .cnil => .caps Caps.none
   | .cun q q' => .caps fun a => (trT q).reach a ∨ (trT q').reach a
   | .rnm c t => .row (Row.err (N.con c) (trT t))
   | .run r r' => .row (Row.union (trT r).asRow (trT r').asRow)
 
-/-- `⟦P⟧ = pure`, `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ allNames)`. -/
+/-- `⟦P⟧ = pure`, `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ⌈⟦e⟧⌉ ∪ allNames)`. -/
 def trStage : Stage → Flick.Stage
   | .P => .pure
-  | .R r e => .rt (trT N r).asRow (Row.union (trT N e).asRow allNames)
+  | .R r e => .rt (trT N r).asRow (Row.union (errRow (trT N e)) allNames)
 
 theorem trT_arr (φ : Stage) (a b q : Ty) :
     trT N (.arr φ a b q) = .arrow (trT N a) (trStage N φ) (trT N b) (φ.qual (trT N q).reach) := by
@@ -236,7 +246,7 @@ theorem trT_subst (t : Ty) (σ : Nat → Ty) : trT N (t.subst σ) = (trT N t).su
       cases φ with
       | P => rfl
       | R r e =>
-        simp [Stage.subst, trStage, Flick.Stage.substT, ihφ.1, ihφ.2, Ty.asRow_substT]
+        simp [Stage.subst, trStage, Flick.Stage.substT, ihφ.1, ihφ.2, Ty.asRow_substT, errRow_substT]
     have hq : (φ.subst σ).qual (trT N (q.subst σ)).reach =
         Caps.substT (trσ N σ) (φ.qual (trT N q).reach) := by
       rw [ihq, ← Ty.reach_caps]
@@ -259,7 +269,8 @@ theorem trStage_subst (φ : Stage) (σ : Nat → Ty) :
     trStage N (φ.subst σ) = (trStage N φ).substT (trσ N σ) := by
   cases φ with
   | P => rfl
-  | R r e => simp [Stage.subst, trStage, Flick.Stage.substT, trT_subst, Ty.asRow_substT]
+  | R r e =>
+    simp [Stage.subst, trStage, Flick.Stage.substT, trT_subst, Ty.asRow_substT, errRow_substT]
 
 theorem trD_subst (q : Cn) (σ : Nat → Ty) : trD N (q.subst σ) = (trD N q).substT (trσ N σ) := by
   simp only [trD, Cn.subst, Flick.Ty.substT, Flick.Ty.spine_substT, List.map_map, List.length_map]

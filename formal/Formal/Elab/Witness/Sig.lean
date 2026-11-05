@@ -194,7 +194,11 @@ theorem constSch_ok {c s} (h : constSch c = some s) : s.ctx = [] ∧ ∀ n, s.ty
     · split at h
       · cases h; exact ⟨rfl, uncSch_lt _⟩
       · cases h
-    · cases h; exact ⟨rfl, fun n hn => by simp [frSch, Ty.Occurs, Stage.Occurs] at hn ⊢; omega⟩
+    · split at h
+      · cases h
+        exact ⟨rfl, fun n hn => by
+          simp [PreludeSchemes.from_result, Ty.Occurs, Stage.Occurs] at hn ⊢; omega⟩
+      · cases h
   all_goals
     first
     | (cases h; done)
