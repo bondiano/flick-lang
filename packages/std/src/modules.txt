@@ -32,6 +32,7 @@ Checks
 Schema
 Route
 Codec
+Codec.Derive
 Json
 Sql
 Database

@@ -207,6 +207,20 @@ export const codecBlock = (name: string, fields: ReadonlyArray<readonly [string,
   return registerCodec(codecFields(name, labelled, false));
 };
 
+/** The fields of a `codec` block, in the written order. */
+type BlockFields = ReadonlyArray<readonly [string, FieldSpec]>;
+
+/** `Codec.Derive.fields`. */
+export const codecFieldsEmpty: BlockFields = Object.freeze([]);
+
+/** `Codec.Derive.field label spec rest`: the fields `rest`, then this one. */
+export const codecField = (label: string, spec: FieldSpec, rest: BlockFields): BlockFields =>
+  Object.freeze([...rest, [label, spec] as const]);
+
+/** `Codec.Derive.record name schema fields`: the codec of a `codec` block. */
+export const codecRecord = (name: string, _schema: AnySchema, fields: BlockFields): AnySchema =>
+  codecBlock(name, fields);
+
 /** A refined type's `parse`: its check as a `Result`. */
 export const refinedParse =
   <A>(name: string, check: (value: A) => boolean) =>
