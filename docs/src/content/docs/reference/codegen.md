@@ -50,6 +50,7 @@ for the zero divisor.
 | ADT value | `{ _tag, _0, _1, … }`, fields in declaration order |
 | `unboxed type T = C f` | the field itself |
 | `untagged type T = A f \| B g …` | the field of its constructor, told apart by its JS type |
+| `untagged type T = A = "a" \| B = "b"` | the literal of its constructor, a string or a number |
 | `type error E = E …` | the same shape: errors are values of their one constructor |
 | `Option`, `Result` | native Effect `Option` (`Some`/`None`, `value`) and `Result` (`Success`/`Failure`, `success`/`failure`) |
 | `Ref` | a runtime cell, equal only to itself |
@@ -82,6 +83,29 @@ untagged type Key = ByNumber Float | ByName String | ByPath (List String)
 
 `opaque unboxed type Token = Token String` hides the constructor from
 importers as `opaque type` does, and keeps the string itself at run time.
+
+An enum is an `untagged type` whose constructors are literals: each value
+is its literal at run time, all strings or all `Int`s, distinct
+(`FLICK-T020`; an `Int` out of range is `FLICK-T003`). A constructor has no
+fields, the type no parameters, and `Get "GET"` without its `=` gets the
+hint to write it. A `match` compares the value, as `==` does; derived `Ord`
+follows the order of declaration and `Show` gives the constructor's name.
+The compiler gives each enum its instance of `Enum.Enum t b`, a program
+declares none (`FLICK-C012`), and its methods are the companions
+`T.value`, `T.parse` (an `Err` for an unknown literal; of a constant it is
+checked at compile time, `FLICK-D006`) and `T.all`, in the order of
+declaration. `opaque untagged type` keeps the constructors to the module
+and the companions open.
+
+```flick
+untagged type Method = Get = "GET" | Post = "POST" | Delete = "DELETE"
+  deriving Eq, Ord, Show
+
+untagged type Priority = Low = 1 | High = 2
+
+literals : Enum.Enum t String => List t -> List String
+let literals values = List.map Enum.value values   -- literals Method.all is ["GET", "POST", "DELETE"]
+```
 
 `==` is canonical structural equality: SameValueZero on numbers, so
 `NaN == NaN` and `0 == -0`; `Float.strict_equal` is `===` and
