@@ -145,6 +145,7 @@ macro_rules! wit_conversions {
                     cases: t.cases.iter().map(|c| w::CaseTarget {
                         name: c.name.clone(),
                         fields: c.fields.iter().copied().map(to_span).collect(),
+                        literal: c.literal.map(to_span),
                     }).collect(),
                     alias: t.alias.map(to_span),
                     refined: t.refined.map(to_span),
@@ -160,6 +161,7 @@ macro_rules! wit_conversions {
                     cases: t.cases.into_iter().map(|c| $crate::CaseTarget {
                         name: c.name,
                         fields: c.fields.into_iter().map(from_span).collect(),
+                        literal: c.literal.map(from_span),
                     }).collect(),
                     alias: t.alias.map(from_span),
                     refined: t.refined.map(from_span),
@@ -208,7 +210,7 @@ macro_rules! wit_conversions {
             }
 
             pub fn to_fact(f: &$crate::Fact) -> w::Fact {
-                let ty = |t: &$crate::FactType| w::FactType { shown: t.shown.clone(), exact: t.exact.clone() };
+                let ty = |t: &$crate::FactType| w::FactType { shown: t.shown.clone(), exact: t.exact.clone(), literal_of: t.literal_of.clone() };
                 w::Fact {
                     span: to_span(f.span),
                     ty: ty(&f.ty),
@@ -217,7 +219,7 @@ macro_rules! wit_conversions {
             }
 
             pub fn from_fact(f: w::Fact) -> $crate::Fact {
-                let ty = |t: w::FactType| $crate::FactType { shown: t.shown, exact: t.exact };
+                let ty = |t: w::FactType| $crate::FactType { shown: t.shown, exact: t.exact, literal_of: t.literal_of };
                 $crate::Fact {
                     span: from_span(f.span),
                     ty: ty(f.ty),

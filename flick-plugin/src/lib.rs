@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 pub use builder::Builder;
 pub use cursor::Cursor;
 pub use flick_plugin_macros::flick;
-pub use literal::string_value;
+pub use literal::{literal_text, string_value};
 pub use reach::{ReachError, Request, Response};
 #[doc(hidden)]
 pub use splice::__private;
@@ -33,7 +33,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.12.0";
+pub const VERSION: &str = "0.13.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -335,11 +335,13 @@ pub struct DeriveTarget {
     pub local: bool,
 }
 
-/// A constructor of a derive's target and the types of its fields.
+/// A constructor of a derive's target, the types of its fields and the
+/// literal of an enum's constructor: `"GET"` of `Get = "GET"`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaseTarget {
     pub name: String,
     pub fields: Vec<Span>,
+    pub literal: Option<Span>,
 }
 
 /// A piece of the layout a plugin gives a block, from its first argument
@@ -365,6 +367,8 @@ pub enum Piece {
 pub struct FactType {
     pub shown: String,
     pub exact: Option<String>,
+    /// The exact base type of an enum, `String` or `Int`.
+    pub literal_of: Option<String>,
 }
 
 /// A field of a record a fact's type is.
