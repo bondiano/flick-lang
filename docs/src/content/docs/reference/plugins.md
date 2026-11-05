@@ -316,7 +316,8 @@ modules reach nothing, and neither do `complete`, `hover`, `highlight` and
 An answer over HTTP is kept as a snapshot, the JSON file
 `.flick/plugin-snapshots/<package>/<hash>.json` in the project, which is
 committed: the hash is over the method, the URL and the body. Headers are
-not part of it, so a token goes in a header, never in the URL. A run asks
+not part of it, so a token goes in a header, never in the URL; a changed
+header changes no snapshot. A run asks
 the network only for a request no snapshot answers, follows no redirect,
 waits at most 30 seconds and takes at most 16 MiB; an answer with a status
 of 500 or more is not kept. With `--offline`, or `CI` set, and in the
