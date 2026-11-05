@@ -66,3 +66,31 @@ fn a_changed_std_is_checked_again() {
     let after = check(&app, &std, &cache);
     assert!(after.status.success(), "{after:?}");
 }
+
+#[test]
+fn lsp_in_source_checkout_uses_local_std_without_cargo_env() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("workspace root");
+    let cache = Path::new(env!("CARGO_TARGET_TMPDIR")).join("checkout_std_lsp_cache");
+    for dir in [repo.to_path_buf(), repo.join("examples/first-slice")] {
+        let output = Command::new(env!("CARGO_BIN_EXE_flick"))
+            .args(["lsp", "--stdio"])
+            .current_dir(&dir)
+            .env_remove("FLICK_STD_PATH")
+            .env_remove("RUST_LOG")
+            .env("XDG_CACHE_HOME", &cache)
+            .output()
+            .expect("flick lsp runs");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("language server started"),
+            "{dir:?}: {stderr}"
+        );
+        assert!(!stderr.contains("panicked"), "{dir:?}: {stderr}");
+        assert!(
+            output.stdout.is_empty(),
+            "protocol stdout stays empty on EOF"
+        );
+    }
+}
