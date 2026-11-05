@@ -47,8 +47,10 @@ const GEO: &str = "module Geo exposing (Point, origin, shifted)
 
 import Geo.Shift exposing (by)
 
+/// A point on the plane.
 type alias Point = { x : Float; y : Float }
 
+/// Where it starts.
 origin : Point
 let origin = { x = 0.0; y = 0.0 }
 
@@ -198,6 +200,35 @@ fn a_changed_library_project_or_compiler_checks_again() {
     assert_eq!(flick(&root, "cache", &["check"]), Some(0));
     fs::write(root.join("lib/src/Geo.fl"), BROKEN).expect("write");
     assert_eq!(flick(&root, "cache", &["check"]), Some(1));
+}
+
+#[test]
+fn the_declarations_of_a_saved_library_keep_its_docs() {
+    let (root, _) = fetched("package-cache-docs");
+    assert_eq!(flick(&root, "cache", &["check"]), Some(0));
+    // the build reads the docs from the saved interface, not the sources
+    let cache = root.join("cache");
+    let mut saved = 0;
+    for (path, bytes) in files(&cache) {
+        let text = String::from_utf8(bytes).expect("saved modules are JSON");
+        if text.contains("Where it starts.") {
+            let text = text.replace("Where it starts.", "Where it starts, as saved.");
+            fs::write(cache.join(path), text).expect("write");
+            saved += 1;
+        }
+    }
+    assert_eq!(saved, 1);
+    let build = ["build", "--emit-dts", "--out-dir", "out"];
+    assert_eq!(flick(&root, "cache", &build), Some(0));
+    let dts = fs::read_to_string(root.join("app/out/Geo.d.ts")).expect("declarations");
+    assert!(
+        dts.contains("/** A point on the plane. */\nexport interface Point {"),
+        "{dts}"
+    );
+    assert!(
+        dts.contains("/** Where it starts, as saved. */\nexport declare const origin:"),
+        "{dts}"
+    );
 }
 
 /// The files under `dir` with their contents, by relative path.

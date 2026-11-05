@@ -4,6 +4,8 @@
 //! Node and `pnpm install`: run with `--ignored` (part of `just e2e`).
 
 mod common;
+#[path = "dts_command/hover.rs"]
+mod hover;
 
 use std::fs;
 use std::path::{Path, PathBuf};

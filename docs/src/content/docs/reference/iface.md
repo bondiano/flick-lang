@@ -40,6 +40,7 @@ number by hand cannot recover missing capture information.
 | `module` | full name of the described module |
 | `exports` | the module's interface, in the order of its `exposing` list |
 | `hidden` | constructors of exported types that are not exported, so an import of one gets a precise `FLICK-R005`; omitted when empty |
+| `docs` | the `///` comment of each export the module declares, by name, which its `.d.ts` carries as JSDoc; omitted when empty |
 | `instances` | the instances of the module and of every module it depends on, except built-in ones; omitted when empty |
 | `abi` | how the compiled code represents what the module defines, see [ABI](#abi); written by `flick build`, absent from `flick check` |
 | `dependencies` | the fingerprint of each imported module's interface the module was built against; omitted when empty |
@@ -192,8 +193,8 @@ dependencies, and resolves constraints with them.
 ### Fingerprints
 
 The fingerprint of an interface is a 64-bit FNV-1a hash, as 16 hex digits,
-of its JSON without `dependencies`, `source` and the `at` of exports:
-moving a declaration changes nothing for importers. Equal fingerprints mean that code
+of its JSON without `dependencies`, `source`, `docs` and the `at` of exports:
+moving or documenting a declaration changes nothing for importers. Equal fingerprints mean that code
 compiled against one interface is valid against the other. `dependencies`
 records the fingerprint of every imported module's interface at build time.
 

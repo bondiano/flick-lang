@@ -1,13 +1,13 @@
 use std::fmt::Write;
 
-use super::Projection;
+use super::{Projection, declaration_file};
 use crate::iface::{Interface, Namespace};
 use crate::ir::tests::check_text;
 use crate::types;
 use crate::types::lang::Lang;
 
-/// The declarations and each exported value's type, or why it has none.
-fn project(text: &str) -> String {
+/// The interface of `text`, and a lookup of it beside the built-in modules.
+fn checked(text: &str) -> (Interface, impl Fn(&str) -> Option<Interface>) {
     let (_, interface) = check_text("App.Shapes", text).expect("checks");
     let own = interface.clone();
     let lookup = move |m: &str| -> Option<Interface> {
@@ -16,6 +16,12 @@ fn project(text: &str) -> String {
         }
         types::builtins().iter().find(|i| i.module == m).cloned()
     };
+    (interface, lookup)
+}
+
+/// The declarations and each exported value's type, or why it has none.
+fn project(text: &str) -> String {
+    let (interface, lookup) = checked(text);
     let package = |_: &str| Some("@acme/shapes".to_owned());
     let projection = Projection::new("App.Shapes", &lookup, &package);
     let (declarations, refused) = projection.declarations(&interface);
@@ -186,4 +192,33 @@ fn an_enum_is_the_union_of_its_literals_or_a_brand_over_them() {
         "{out}"
     );
     assert!(out.contains("pick: Method"), "{out}");
+}
+
+#[test]
+fn doc_comments_are_jsdoc_and_records_are_interfaces() {
+    let (interface, lookup) = checked(
+        "module App.Shapes exposing (..)\n\
+         /// A shape.\n\
+         type Shape =\n\
+         \x20 /// A circle by its radius.\n\
+         \x20 | Circle Float\n\
+         \x20 | Rect Float Float\n\
+         /// A point on the plane.\n\
+         ///\n\
+         /// `x` grows to the right; a */ stays inside.\n\
+         type alias Point = { x : Float; y : Float }\n\
+         type alias Box a = { value : a; label : String }\n\
+         type alias Size = Float\n\
+         type alias Pair = (Float, Float)\n\
+         type alias Measure = Shape -> Float\n\
+         /// An opaque token.\n\
+         opaque type Token = Token String\n\
+         /// The area of a shape.\n\
+         area : Shape -> Float\nlet area s = 1\n",
+    );
+    let package = |_: &str| Some("@acme/shapes".to_owned());
+    let projection = Projection::new("App.Shapes", &lookup, &package);
+    let (dts, refused) = declaration_file(&projection, &interface, &|m: &str| m.to_owned());
+    assert!(refused.is_empty(), "{refused:?}");
+    insta::assert_snapshot!(dts);
 }

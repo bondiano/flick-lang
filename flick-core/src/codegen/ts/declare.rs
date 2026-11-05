@@ -1,6 +1,6 @@
 //! TypeScript declarations of the types a module exports.
 
-use super::{Projection, Vars, generic, key, native, params, type_args, uncaptured};
+use super::{Projection, Vars, generic, jsdoc, key, native, params, type_args, uncaptured};
 use crate::codegen::names;
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::types::{Abi, Constructor, EnumLit, Form, Kind, Rep, Type};
@@ -20,7 +20,7 @@ impl Projection<'_> {
                 continue;
             }
             match self.declaration(interface, export) {
-                Ok(Some(d)) => out.push(d),
+                Ok(Some(d)) => out.push(jsdoc(interface, name) + &d),
                 Ok(None) => {}
                 Err(reason) => refused.push((name.clone(), reason)),
             }
@@ -85,11 +85,17 @@ impl Projection<'_> {
                     .map(|p| (p.clone(), Some(generic(p))))
                     .collect();
                 let shown: Vec<String> = params.iter().map(|p| generic(p)).collect();
+                let object = matches!(body, Type::Record(_));
                 let body = self.ty(body, &vars)?;
-                Ok(Some(format!(
-                    "export type {name}{} = {body};",
-                    type_args(&shown)
-                )))
+                // a record is an interface, which TypeScript names on hover; unlike
+                // the alias it has no implicit index signature, so it is no
+                // `Record<string, unknown>`, which no generated or runtime type asks
+                // of it (exported values keep their inline object types)
+                Ok(Some(if object {
+                    format!("export interface {name}{} {body}", type_args(&shown))
+                } else {
+                    format!("export type {name}{} = {body};", type_args(&shown))
+                }))
             }
             (Form::Adt { constructors, abi }, _) => {
                 let exported: Vec<&Export> = constructors
