@@ -12,6 +12,7 @@ codegen/classes
 codegen/closures
 codegen/deep_recursion
 codegen/defaults
+codegen/derive_default
 codegen/default_signatures
 codegen/defect
 codegen/do_notation

@@ -254,6 +254,26 @@ count : (Generic a rep, GCount rep) => a -> Int
 let count x = gcount (to_rep x)
 ```
 
+A class of one parameter with a default for each method is derived too: the
+instance takes every default, requiring the class of each type parameter of
+kind `Type`. A default signature that needs `Generic` gives the type its
+`Generic` instance as well, so a class written once over the representation
+derives for every type:
+
+```flick
+class Default a =
+  default : a
+  default : (Generic a rep, GDefault rep) => a
+  let default = from_rep gdefault
+
+type Pair a = Pair a a
+  deriving Default    // instance Default a => Default (Pair a)
+```
+
+Where a type lacks what a default needs, as a `GDefault` of one of its
+fields, the clause is `FLICK-C013`, as is a class with a method without a
+default or with more than one parameter.
+
 ## Dictionaries
 
 Each solved constraint records its dictionary at the place that required it:

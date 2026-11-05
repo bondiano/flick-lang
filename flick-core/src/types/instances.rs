@@ -115,9 +115,16 @@ impl Checker<'_> {
             .filter(|m| !defined.contains(m) && !info.defaults.contains(m))
             .map(|m| format!("`{m}`"))
             .collect();
-        let head = decl
-            .nodes()
-            .find(|n| is_type(n.kind))
+        // a type that derives the class takes every default: at its `deriving`
+        let written = decl.kind == K::InstanceDecl;
+        let head = (decl.nodes())
+            .find(|n| {
+                if written {
+                    is_type(n.kind)
+                } else {
+                    n.kind == K::DerivingClause
+                }
+            })
             .map_or_else(|| self.span(decl), |h| self.span(h));
         let defaulted: Vec<String> = (info.defaults.iter())
             .filter(|m| !defined.contains(m))
@@ -127,7 +134,7 @@ impl Checker<'_> {
             .into_iter()
             .map(|m| {
                 let own = self.own_dictionaries(&cm, &m);
-                let extra = self.default_dictionaries(instance, &info, &m, head);
+                let extra = self.default_dictionaries(instance, &info, &m, (head, written));
                 (m, own, extra)
             })
             .collect();
@@ -147,13 +154,14 @@ impl Checker<'_> {
     /// The dictionaries the default signature of `method` needs beyond the
     /// class's, for `instance`: its constraints with the instance's types for
     /// the class's parameters, solved under the instance's context; none
-    /// without a default signature.
+    /// without a default signature. `written` tells an `instance` from a
+    /// `deriving` at `at`.
     pub(super) fn default_dictionaries(
         &mut self,
         instance: &Instance,
         info: &ClassInfo,
         method: &str,
-        at: Span,
+        (at, written): (Span, bool),
     ) -> Vec<Dict> {
         let Some((
             _,
@@ -186,13 +194,16 @@ impl Checker<'_> {
             }
             let shown = self.show(&self.canon(&wanted));
             let name = &instance.name;
-            self.error(
-                codes::C001,
-                at,
-                format!(
+            if written {
+                let message = format!(
                     "`{name}` takes `{method}` from its class's default, which needs `{shown}`"
-                ),
-            );
+                );
+                self.error(codes::C001, at, message);
+            } else {
+                let message =
+                    format!("cannot derive `{name}`: the default of `{method}` needs `{shown}`");
+                self.error(codes::C013, at, message);
+            }
             dicts.push(Dict::Error);
         }
         dicts

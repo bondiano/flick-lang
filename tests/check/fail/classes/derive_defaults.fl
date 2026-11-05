@@ -1,0 +1,48 @@
+// `deriving` a class of defaults gives an instance without methods: one
+// whose default needs what a type lacks, a class with a method without a
+// default and a class of two parameters derive nothing.
+module App.DeriveDefaults exposing (..)
+
+import Generic exposing (Generic(..), Con(..))
+
+class Default a =
+  default : a
+  default : (Generic a rep, GDefault rep) => a
+  let default = from_rep gdefault
+
+class GDefault rep =
+  gdefault : rep
+
+instance GDefault Unit =
+  let gdefault = ()
+
+instance GDefault fields => GDefault (Con n fields) =
+  let gdefault = Con gdefault
+
+type Empty = Empty
+  deriving Default
+
+type Point = Point Float
+  deriving Default
+
+class Pretty a =
+  pretty : a -> String
+  verbose : a -> String
+  let verbose x = pretty x
+
+type Plain = Plain
+  deriving Pretty
+
+class Convert a b =
+  convert : a -> b
+
+type Unit2 = Unit2
+  deriving Convert
+
+empty : Empty
+let empty = default
+
+
+//~ FLICK-C013 @26:3-26:19 cannot derive `Default Point`: the default of `default` needs `GDefault (Con "Point" (Field "_0" Float, Unit))`
+//~ FLICK-C013 @34:3-34:18 the class `Pretty` has no derive: `pretty` has no default; deriving covers `Eq`, `Ord`, `Hash`, `Show`, `Generic`, the classes marked `@derive` and those of one parameter with a default for each method
+//~ FLICK-C013 @40:3-40:19 the class `Convert` has no derive: it has more than one parameter, and a derived class has one; deriving covers `Eq`, `Ord`, `Hash`, `Show`, `Generic`, the classes marked `@derive` and those of one parameter with a default for each method
