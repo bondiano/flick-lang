@@ -31,7 +31,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.9.0";
+pub const VERSION: &str = "0.10.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -357,6 +357,30 @@ pub enum Piece {
     Hole(Hole),
 }
 
+/// A type the checker found, as it shows it and qualified with aliases
+/// expanded; `exact` is none for a type with errors or still unknown parts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FactType {
+    pub shown: String,
+    pub exact: Option<String>,
+}
+
+/// A field of a record a fact's type is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FactField {
+    pub label: String,
+    pub ty: FactType,
+}
+
+/// The type of a `_` of a block's code, at the span its code gave it, and
+/// its fields when it is a closed record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Fact {
+    pub span: Span,
+    pub ty: FactType,
+    pub fields: Option<Vec<FactField>>,
+}
+
 /// What an editor shows over a span of a block, as Markdown.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Hover {
@@ -448,6 +472,13 @@ pub trait Plugin {
     ) -> Option<Vec<Piece>> {
         let _ = (block, state, compiler);
         None
+    }
+    /// What is wrong with `block` that only the types of its code show:
+    /// `facts` are the types of the `_` of its code, at the spans it gave
+    /// them. It only adds errors.
+    fn check(&self, block: &Block, state: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
+        let _ = (block, state, facts);
+        Vec::new()
     }
 }
 

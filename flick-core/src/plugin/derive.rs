@@ -12,7 +12,7 @@ use flick_plugin::Place;
 use super::expansion::{Expanded, Expansion};
 use super::render::render;
 use super::source::BlockSource;
-use super::{Failure, blocks_under, first_party};
+use super::{Failure, blocks_under, first_party, placed};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::ModuleSyntax;
 use crate::source::{FileId, Span};
@@ -368,18 +368,12 @@ fn made_or<T>(
     match made {
         Ok(made) => Some(made),
         Err(Failure::Refused(found)) => {
-            let (start, end) = (source.start(), source.end());
-            diagnostics.extend(found.into_iter().map(|d| {
-                let at = if (d.span.start, d.span.end) == (0, end - start) {
-                    whole
-                } else {
-                    Span::new(source.file(), start + d.span.start, start + d.span.end)
-                };
-                match d.code.as_deref().and_then(|c| codes::plugin(package, c)) {
-                    Some(code) => Diagnostic::error(code, d.message, at),
-                    None => Diagnostic::error(codes::P036, d.message, at),
-                }
-            }));
+            let frame = Span::new(source.file(), source.start(), source.end());
+            diagnostics.extend(
+                found
+                    .iter()
+                    .map(|d| placed(d, package, frame, whole, false)),
+            );
             None
         }
         Err(Failure::Broken(why)) => {

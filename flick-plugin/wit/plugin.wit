@@ -1,4 +1,4 @@
-package flick:plugin@0.9.0;
+package flick:plugin@0.10.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -148,6 +148,14 @@ interface types {
   /// What an editor shows over a span of a block, as Markdown.
   record hover { markdown: string, span: span }
 
+  /// A type the checker found, as it shows it and qualified with aliases
+  /// expanded; `exact` is none for one with errors or still unknown parts.
+  record fact-type { shown: string, exact: option<string> }
+  record fact-field { label: string, ty: fact-type }
+  /// The type of a `_` of a block's code, at the span its code gave it, and
+  /// its fields when it is a closed record.
+  record fact { span: span, ty: fact-type, fields: option<list<fact-field>> }
+
   enum highlight-kind { keyword, parameter }
 
   /// How an editor colors a span of a block that is not the user's code.
@@ -198,7 +206,7 @@ interface compiler {
 
 world plugin {
   import compiler;
-  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target};
+  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact};
 
   /// What the plugin learns from all its blocks of a group, before any expands.
   export collect: func(blocks: list<block>) -> list<u8>;
@@ -223,4 +231,7 @@ world plugin {
     module: list<derive-target>,
     state: list<u8>,
   ) -> result<arena, list<diagnostic>>;
+  /// What is wrong with `block` that only the types of its code show, from
+  /// the types of the `_` of its code; it only adds errors.
+  export check: func(block: block, state: list<u8>, facts: list<fact>) -> list<diagnostic>;
 }

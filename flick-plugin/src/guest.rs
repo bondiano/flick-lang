@@ -139,6 +139,21 @@ pub fn derive(
         .map_err(|found| found.into_iter().map(convert::to_diagnostic).collect())
 }
 
+#[doc(hidden)]
+pub fn check(
+    plugin: &impl Plugin,
+    block: types::Block,
+    state: &[u8],
+    facts: Vec<types::Fact>,
+) -> Vec<types::Diagnostic> {
+    let facts: Vec<_> = facts.into_iter().map(convert::from_fact).collect();
+    (plugin
+        .check(&convert::from_block(block), state, &facts)
+        .into_iter())
+    .map(convert::to_diagnostic)
+    .collect()
+}
+
 /// Exports the plugin `$plugin`, a value of a type implementing [`Plugin`],
 /// as the component a crate of type `cdylib` builds for `wasm32-wasip2`.
 #[macro_export]
@@ -206,6 +221,14 @@ macro_rules! export {
                 ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic>,
             > {
                 $crate::guest::derive(&$plugin, target, &class, args, module, &state)
+            }
+
+            fn check(
+                block: $crate::guest::bindings::flick::plugin::types::Block,
+                state: ::std::vec::Vec<u8>,
+                facts: ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Fact>,
+            ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic> {
+                $crate::guest::check(&$plugin, block, &state, facts)
             }
         }
 

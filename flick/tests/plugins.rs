@@ -173,8 +173,10 @@ mod wasm {
         let root = app("plugins-version", MAIN);
         let path = root.join("lib/pairs.wasm");
         let ours = format!("flick:plugin/compiler@{}", flick_plugin::VERSION);
-        let old = format!("flick:plugin/compiler@{}", "0.3.0");
-        assert_eq!(ours.len(), old.len(), "the same length keeps the binary");
+        // an older version of the same length keeps the binary
+        let version = format!("0.0.{}", "1".repeat(flick_plugin::VERSION.len() - 4));
+        let old = format!("flick:plugin/compiler@{version}");
+        assert_eq!(ours.len(), old.len());
         let mut bytes = fs::read(&path).expect("read the component");
         let mut found = false;
         while let Some(at) = bytes.windows(ours.len()).position(|w| w == ours.as_bytes()) {
@@ -187,7 +189,7 @@ mod wasm {
         let stderr = String::from_utf8_lossy(&checked.stderr);
         assert!(
             stderr.contains("FLICK-P035")
-                && stderr.contains("built for `flick:plugin@0.3.0`")
+                && stderr.contains(&format!("built for `flick:plugin@{version}`"))
                 && stderr.contains(&format!("speaks `{}`", flick_plugin::VERSION)),
             "{stderr}"
         );
