@@ -33,3 +33,26 @@ fn a_match_of_a_known_constructor_is_the_arm_it_takes() {
     assert_eq!(line(&js, "pick"), "export const pick = 2;");
     assert_eq!(line(&js, "pair"), "export const pair = 4;");
 }
+
+#[test]
+fn a_known_default_is_taken_apart_where_it_is_and_named_elsewhere() {
+    let js = release(&format!(
+        "{DEFAULT}  deriving Default\n\n\
+         type Shape = Rect Point Point | Circle Float\n  deriving Default\n\n\
+         sum : Float\nlet sum =\n  let Point x y = (default : Point)\n  x + y\n\n\
+         whole : Point\nlet whole = default\n\n\
+         kind : String\nlet kind =\n  match (default : Shape) with\n  | Circle _ -> \"circle\"\n  | Rect _ _ -> \"rect\"\n"
+    ));
+    assert_eq!(line(&js, "sum"), "export const sum = 0;");
+    // the shared value, not a copy of it
+    assert_eq!(
+        line(&js, "whole"),
+        "export const whole = $i_Default_Point$default;"
+    );
+    assert_eq!(line(&js, "kind"), "export const kind = \"rect\";");
+    // a default that uses another default is a value too
+    assert!(
+        line(&js, "$i_Default_Shape$default").contains("Rect#"),
+        "{js}"
+    );
+}

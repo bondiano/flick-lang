@@ -93,6 +93,7 @@ fn pass(e: &mut Expr) -> bool {
     e.each_child_mut(&mut |c| changed |= pass(c));
     changed |= specialize::operator(e) | fold::fold(e) | inline::beta(e) | devirt::known_match(e);
     if let ExprKind::Block(stmts, result) = &mut e.kind {
+        changed |= devirt::known_lets(stmts);
         changed |= flatten(stmts, result);
         changed |= sroa::split(stmts, result);
         changed |= propagate(stmts, result);

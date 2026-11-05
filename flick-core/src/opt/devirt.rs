@@ -26,13 +26,23 @@ const DEPTH: usize = 16;
 pub struct Lookup<'a> {
     module: String,
     own: HashMap<(String, String), (Vec<String>, Expr)>,
+    /// The defaults instances of this module take, without dictionaries of
+    /// their own: the context, the class and those of the default signature.
+    taken: HashMap<(String, String), Taken>,
     values: HashMap<String, (Vec<String>, Expr)>,
     generics: Generics<'a>,
+}
+
+struct Taken {
+    context: Vec<String>,
+    class: (String, String),
+    extra: Vec<Dict>,
 }
 
 impl<'a> Lookup<'a> {
     pub fn new(module: &Module, generics: Generics<'a>) -> Self {
         let mut own = HashMap::new();
+        let mut taken = HashMap::new();
         let mut values = HashMap::new();
         for item in &module.items {
             match &item.kind {
@@ -40,6 +50,14 @@ impl<'a> Lookup<'a> {
                     for (m, code) in methods {
                         let key = (info.name.clone(), m.clone());
                         own.insert(key, (info.context.clone(), code.clone()));
+                    }
+                    for (m, _, extra) in info.defaults.iter().filter(|(_, n, _)| *n == 0) {
+                        let entry = Taken {
+                            context: info.context.clone(),
+                            class: info.class.clone(),
+                            extra: extra.clone(),
+                        };
+                        taken.insert((info.name.clone(), m.clone()), entry);
                     }
                 }
                 ItemKind::Value { name, dicts, body } if !dicts.is_empty() => {
@@ -51,6 +69,7 @@ impl<'a> Lookup<'a> {
         Lookup {
             module: module.name.clone(),
             own,
+            taken,
             values,
             generics,
         }
@@ -64,21 +83,52 @@ impl<'a> Lookup<'a> {
         (self.generics)(module, name)
     }
 
-    /// The code of `method` of the instance `dict`, its context given.
+    /// The code of `method` of the instance `dict`, its context given: its
+    /// own, or the default it takes.
     fn method(&self, dict: &Dict, method: &str) -> Option<Expr> {
         let Dict::Instance { module, name, args } = dict else {
             return None;
         };
-        let (context, mut code) = if *module == self.module {
-            self.own.get(&(name.clone(), method.to_owned())).cloned()?
-        } else {
+        let key = (name.clone(), method.to_owned());
+        let (context, mut code) = if *module != self.module {
             (self.generics)(module, &format!("{name}#{method}"))?
+        } else if let Some(own) = self.own.get(&key) {
+            own.clone()
+        } else {
+            let taken = self.taken.get(&key)?;
+            (taken.context.clone(), self.default(dict, method, taken)?)
         };
         // a method with constraints of its own takes their dictionaries
         if matches!(code.kind, ExprKind::Abstract(..)) || context.len() != args.len() {
             return None;
         }
         let given: Vec<(&str, &Dict)> = context.iter().map(String::as_str).zip(args).collect();
+        instantiate(&mut code, &given);
+        Some(code)
+    }
+
+    /// The code of the default `taken` of the instance `dict`, over the
+    /// instance's context.
+    fn default(&self, dict: &Dict, method: &str, taken: &Taken) -> Option<Expr> {
+        let Dict::Instance { module, name, .. } = dict else {
+            return None;
+        };
+        let (class_module, class) = &taken.class;
+        let (params, mut code) = self.value(class_module, &default_method(class, method))?;
+        let this = Dict::Instance {
+            module: module.clone(),
+            name: name.clone(),
+            args: taken
+                .context
+                .iter()
+                .map(|c| Dict::Given(c.clone()))
+                .collect(),
+        };
+        let dicts: Vec<Dict> = [this].into_iter().chain(taken.extra.clone()).collect();
+        if params.len() != dicts.len() {
+            return None;
+        }
+        let given: Vec<(&str, &Dict)> = params.iter().map(String::as_str).zip(&dicts).collect();
         instantiate(&mut code, &given);
         Some(code)
     }
@@ -92,7 +142,6 @@ pub fn defaults(module: &mut Module, lookup: &Lookup, fresh: &mut usize) {
         let ItemKind::Instance { info, methods: own } = &mut item.kind else {
             continue;
         };
-        let (class_module, class) = info.class.clone();
         let this = Dict::Instance {
             module: info.module.clone(),
             name: info.name.clone(),
@@ -104,24 +153,15 @@ pub fn defaults(module: &mut Module, lookup: &Lookup, fresh: &mut usize) {
         };
         let mut kept = Vec::new();
         for (name, n, extra) in mem::take(&mut info.defaults) {
-            let made = (n == 0)
-                .then(|| lookup.value(&class_module, &default_method(&class, &name)))
-                .flatten()
-                .and_then(|(params, code)| {
-                    let dicts: Vec<Dict> =
-                        [this.clone()].into_iter().chain(extra.clone()).collect();
-                    (params.len() == dicts.len()).then_some((params, code, dicts))
-                })
-                .and_then(|(params, mut code, dicts)| {
-                    *fresh += 1;
-                    rename(&mut code, &format!("$v{fresh}"));
-                    let given: Vec<(&str, &Dict)> =
-                        params.iter().map(String::as_str).zip(&dicts).collect();
-                    instantiate(&mut code, &given);
-                    methods(&mut code, lookup, fresh, 0);
-                    super::simplify(&mut code);
-                    (matches!(code.kind, ExprKind::Lambda { .. }) || data(&code)).then_some(code)
-                });
+            let made = (n == 0).then(|| lookup.method(&this, &name)).flatten();
+            let made = made.and_then(|mut code| {
+                *fresh += 1;
+                rename(&mut code, &format!("$v{fresh}"));
+                settle_parts(&mut code, lookup, fresh, 0);
+                methods(&mut code, lookup, fresh, 0);
+                super::simplify(&mut code);
+                (matches!(code.kind, ExprKind::Lambda { .. }) || data(&code)).then_some(code)
+            });
             match made {
                 Some(code) => own.push((name, code)),
                 None => kept.push((name, n, extra)),
@@ -131,42 +171,128 @@ pub fn defaults(module: &mut Module, lookup: &Lookup, fresh: &mut usize) {
     }
 }
 
-/// Puts the code of methods of known instances in `e` where it is small
-/// data, or a function of one parameter matching it applied to a known
-/// constructor; whether anything changed.
+/// Puts the code of methods of known instances in `e` where it is taken
+/// apart (a `match`, a field, the pattern of a `let`, the argument of a
+/// method matching its parameter) and is small data, and anywhere it is a
+/// literal; elsewhere the method stays, a name of one shared value. Whether
+/// anything changed.
 pub fn methods(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -> bool {
     let mut changed = false;
     e.each_child_mut(&mut |c| changed |= methods(c, lookup, fresh, depth));
     if depth > DEPTH {
         return changed;
     }
-    if let ExprKind::Method { dict, name } = &e.kind
-        && let Some(mut code) = lookup.method(dict, name)
-    {
-        methods(&mut code, lookup, fresh, depth + 1);
-        if data(&code) && size(&code) <= DATA {
-            code.span = e.span;
-            *e = code;
-            return true;
+    match &mut e.kind {
+        ExprKind::Match(taken, _) | ExprKind::Field(taken, _) => {
+            changed |= settle(taken, lookup, fresh, depth);
         }
-    }
-    // a value with a shape to take apart, not a name of one
-    if let ExprKind::App { func, arg, .. } = &mut e.kind
-        && data(arg)
-        && matches!(
-            arg.kind,
-            ExprKind::App { .. } | ExprKind::Tuple(_) | ExprKind::Record(_)
-        )
-        && let ExprKind::Method { dict, name } = &func.kind
-        && let Some(mut code) = lookup.method(dict, name)
-        && takes_apart(&code)
-    {
-        *fresh += 1;
-        rename(&mut code, &format!("$m{fresh}"));
-        **func = code;
-        return true;
+        ExprKind::Block(stmts, _) => {
+            for stmt in stmts {
+                if let Stmt::Let(pat, value) = stmt
+                    && !matches!(pat, Pat::Bind(_) | Pat::Wild)
+                {
+                    changed |= settle(value, lookup, fresh, depth);
+                }
+            }
+        }
+        ExprKind::App { func, arg, .. } => {
+            if let ExprKind::Method { dict, name } = &func.kind
+                && let Some(mut code) = lookup.method(dict, name)
+                && takes_apart(&code)
+            {
+                changed |= settle(arg, lookup, fresh, depth);
+                // a value with a shape to take apart, not a name of one
+                let shaped = matches!(
+                    arg.kind,
+                    ExprKind::App { .. } | ExprKind::Tuple(_) | ExprKind::Record(_)
+                );
+                if data(arg) && shaped {
+                    *fresh += 1;
+                    rename(&mut code, &format!("$m{fresh}"));
+                    **func = code;
+                    return true;
+                }
+            }
+        }
+        ExprKind::Method { .. } => {
+            let mut copy = e.clone();
+            if settle(&mut copy, lookup, fresh, depth) && literal(&copy) {
+                *e = copy;
+                return true;
+            }
+        }
+        _ => {}
     }
     changed
+}
+
+/// Replaces `e`, when it is a method of a known instance, with its code
+/// where that is data no bigger than [`DATA`], the methods in it settled
+/// first; and settles the parts of data. Whether anything changed.
+fn settle(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -> bool {
+    if depth > DEPTH {
+        return false;
+    }
+    let ExprKind::Method { dict, name } = &e.kind else {
+        return settle_parts(e, lookup, fresh, depth);
+    };
+    let Some(mut code) = lookup.method(dict, name) else {
+        return false;
+    };
+    *fresh += 1;
+    rename(&mut code, &format!("$s{fresh}"));
+    settle_parts(&mut code, lookup, fresh, depth + 1);
+    methods(&mut code, lookup, fresh, depth + 1);
+    super::simplify(&mut code);
+    if !data(&code) || size(&code) > DATA {
+        return false;
+    }
+    code.span = e.span;
+    *e = code;
+    true
+}
+
+/// Settles the fields of `e` when it is built of constructors, tuples,
+/// records and lists.
+fn settle_parts(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -> bool {
+    let mut changed = false;
+    let built = constructed(e);
+    match &mut e.kind {
+        ExprKind::Tuple(items) | ExprKind::List(items) => {
+            for item in items {
+                changed |= settle(item, lookup, fresh, depth);
+            }
+        }
+        ExprKind::Record(fields) => {
+            for (_, v) in fields {
+                changed |= settle(v, lookup, fresh, depth);
+            }
+        }
+        ExprKind::App { func, arg, .. } if built => {
+            changed |= settle(arg, lookup, fresh, depth);
+            changed |= settle_parts(func, lookup, fresh, depth);
+        }
+        _ => {}
+    }
+    changed
+}
+
+/// Whether `e` applies a constructor.
+fn constructed(e: &Expr) -> bool {
+    let mut head = e;
+    while let ExprKind::App { func, .. } = &head.kind {
+        head = func;
+    }
+    matches!(head.kind, ExprKind::Con(_))
+}
+
+/// A value as cheap to copy as to name: a literal, a constructor.
+fn literal(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Lit(Lit::String(s)) => s.len() <= 32,
+        ExprKind::Lit(_) | ExprKind::Con(_) => true,
+        _ => false,
+    }
 }
 
 /// `fun x -> match x with …`.
@@ -219,6 +345,33 @@ pub fn known_match(e: &mut Expr) -> bool {
         }
     }
     false
+}
+
+/// The `let`s of `stmts` whose pattern takes data apart, as `let`s of the
+/// names it binds to the parts; whether there was one.
+pub fn known_lets(stmts: &mut Vec<Stmt>) -> bool {
+    let taken_apart = |s: &Stmt| matches!(s, Stmt::Let(pat, value) if !matches!(pat, Pat::Bind(_)) && data(value));
+    if !stmts.iter().any(taken_apart) {
+        return false;
+    }
+    let mut changed = false;
+    let mut out = Vec::with_capacity(stmts.len());
+    for stmt in mem::take(stmts) {
+        if let Stmt::Let(pat, value) = &stmt
+            && taken_apart(&stmt)
+        {
+            let mut binds = Vec::new();
+            // a pattern that does not match keeps its failure
+            if matches(pat, value, &mut binds) == Some(true) {
+                out.extend(binds.into_iter().map(|(x, v)| Stmt::Let(Pat::Bind(x), v)));
+                changed = true;
+                continue;
+            }
+        }
+        out.push(stmt);
+    }
+    *stmts = out;
+    changed
 }
 
 /// Whether `pat` matches the data `e`, binding its names; `None` when that
