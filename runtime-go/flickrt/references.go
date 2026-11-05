@@ -18,6 +18,14 @@ func unhandledLogLevel(fb *Fiber) (string, bool) {
 	return "", false
 }
 
+// logUnhandled logs `message` with a failure no one handles, if any, at
+// the unhandled log level: Effect's `ignoreCause` with `log: "Unhandled"`.
+func logUnhandled(fb *Fiber, message string, cause *Cause) {
+	if level, ok := unhandledLogLevel(fb); ok && cause != nil {
+		logWith(fb, level, []Value{message}, cause)
+	}
+}
+
 func ReferencesWithUnhandledLogLevel(fb *Fiber, level, task Value) Value {
 	return withEnv(fb, unhandledLogLevelKey, level, task)
 }

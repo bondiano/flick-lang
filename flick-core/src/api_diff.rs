@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::iface::{Export, Interface, Namespace};
-use crate::types::{Instance, show_type};
+use crate::types::{Binder, Form, Instance, Row, Type, TypeDef, show_type};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Change {
@@ -106,15 +106,7 @@ fn exports(old: &Interface, new: &Interface) -> Vec<Change> {
         i.exports
             .iter()
             .filter(|e| !e.entity.name.contains('$'))
-            .map(|e| {
-                (
-                    key(e),
-                    Export {
-                        at: None,
-                        ..e.clone()
-                    },
-                )
-            })
+            .map(|e| (key(e), e.clone()))
             .collect()
     };
     let (old, new) = (public(old), public(new));
@@ -122,8 +114,7 @@ fn exports(old: &Interface, new: &Interface) -> Vec<Change> {
     for (k, o) in &old {
         match new.get(k) {
             None => out.push(Change::Removed(label(o))),
-            // shortcut: renaming a type variable reads as a change; compare up to renaming when it matters
-            Some(n) if o != n => out.push(Change::Changed {
+            Some(n) if canonical(o) != canonical(n) => out.push(Change::Changed {
                 name: label(o),
                 was: shape(o),
                 now: shape(n),
@@ -140,43 +131,170 @@ fn exports(old: &Interface, new: &Interface) -> Vec<Change> {
 }
 
 /// The instances the module declares, compared by head and context: a move
-/// in the source is no change.
+/// in the source, or a renamed variable, is no change.
 fn instances(old: &Interface, new: &Interface) -> Vec<Change> {
-    let own = |i: &Interface| -> BTreeMap<String, Vec<String>> {
-        i.instances
-            .iter()
-            .filter(|inst| inst.module == i.module)
-            .map(|inst: &Instance| {
-                let mut context: Vec<String> = inst.context.iter().map(show_type).collect();
-                context.sort();
-                (show_type(&inst.head), context)
-            })
-            .collect()
-    };
     let (old, new) = (own(old), own(new));
     let mut out = Vec::new();
-    for (head, was) in &old {
-        let name = format!("instance {head}");
-        match new.get(head) {
+    for (key, (inst, was)) in &old {
+        let name = format!("instance {}", show_type(&inst.head));
+        match new.get(key) {
             None => out.push(Change::Removed(name)),
             // a constraint fewer takes nothing from an importer
-            Some(now) if now.iter().all(|c| was.contains(c)) && now != was => {
+            Some((_, now)) if now.iter().all(|c| was.contains(c)) && now != was => {
                 out.push(Change::Added(format!("{name} with fewer constraints")));
             }
-            Some(now) if now != was => out.push(Change::Changed {
+            Some((then, now)) if now != was => out.push(Change::Changed {
                 name,
-                was: was.join(", "),
-                now: now.join(", "),
+                was: context(inst),
+                now: context(then),
             }),
             Some(_) => {}
         }
     }
     out.extend(
-        new.keys()
-            .filter(|head| !old.contains_key(*head))
-            .map(|head| Change::Added(format!("instance {head}"))),
+        (new.iter())
+            .filter(|(key, _)| !old.contains_key(*key))
+            .map(|(_, (inst, _))| Change::Added(format!("instance {}", show_type(&inst.head)))),
     );
     out
+}
+
+/// The instances `i` declares, by head with their variables renamed, with
+/// their contexts so renamed, sorted.
+fn own(i: &Interface) -> BTreeMap<String, (&Instance, Vec<String>)> {
+    (i.instances.iter())
+        .filter(|inst| inst.module == i.module)
+        .map(|inst| {
+            let names = bind(inst.vars.iter().map(|v| &v.name), &mut 0);
+            let renamed = |t: &Type| show_type(&rename(t, &names, &mut names.len()));
+            let mut context: Vec<String> = inst.context.iter().map(renamed).collect();
+            context.sort();
+            (renamed(&inst.head), (inst, context))
+        })
+        .collect()
+}
+
+/// The context of `inst` as it reads, sorted.
+fn context(inst: &Instance) -> String {
+    let mut context: Vec<String> = inst.context.iter().map(show_type).collect();
+    context.sort();
+    context.join(", ")
+}
+
+/// `e` as it is compared: without its place in the source, its variables
+/// named by the order they are bound in, so renaming one is no change.
+fn canonical(e: &Export) -> Export {
+    let next = &mut 0;
+    let scheme = e.scheme.as_ref().map(|t| rename(t, &[], next));
+    let definition = e.definition.as_ref().map(|d| {
+        let mut form = d.form.clone();
+        let names = match &mut form {
+            Form::Alias { params, .. }
+            | Form::Service { params, .. }
+            | Form::Class { params, .. } => {
+                let names = bind(params.iter(), next);
+                *params = names.iter().map(|(_, fresh)| fresh.clone()).collect();
+                names
+            }
+            _ => Vec::new(),
+        };
+        let mut types = |t: &mut Type| *t = rename(t, &names, next);
+        match &mut form {
+            Form::Alias { body, .. } => types(body),
+            Form::Service { operations, .. } => {
+                for o in operations {
+                    types(&mut o.ty);
+                }
+            }
+            Form::Class {
+                supers,
+                default_sigs,
+                ..
+            } => {
+                supers
+                    .iter_mut()
+                    .chain(default_sigs.iter_mut().map(|(_, t)| t))
+                    .for_each(types);
+            }
+            _ => {}
+        }
+        TypeDef {
+            kind: d.kind.clone(),
+            form,
+        }
+    });
+    Export {
+        at: None,
+        scheme,
+        definition,
+        ..e.clone()
+    }
+}
+
+/// A fresh name for each of `names`, counted from `next`: `'n`, which no
+/// program writes, so it captures none of them.
+fn bind<'a>(
+    names: impl IntoIterator<Item = &'a String>,
+    next: &mut usize,
+) -> Vec<(String, String)> {
+    (names.into_iter())
+        .map(|name| {
+            *next += 1;
+            (name.clone(), format!("'{next}"))
+        })
+        .collect()
+}
+
+/// `ty` with its free variables renamed by `names` and those its `forall`s
+/// bind given fresh names.
+fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
+    match ty {
+        Type::Var(name) => (names.iter().find(|(n, _)| n == name))
+            .map_or_else(|| ty.clone(), |(_, fresh)| Type::Var(fresh.clone())),
+        Type::Forall {
+            vars,
+            constraints,
+            body,
+        } => {
+            let bound = bind(vars.iter().map(|v| &v.name), next);
+            // first, so a name bound here shadows an outer one
+            let inner: Vec<(String, String)> = bound.iter().chain(names).cloned().collect();
+            Type::Forall {
+                vars: (vars.iter().zip(&bound))
+                    .map(|(v, (_, fresh))| Binder {
+                        name: fresh.clone(),
+                        kind: v.kind.clone(),
+                    })
+                    .collect(),
+                constraints: constraints
+                    .iter()
+                    .map(|c| rename(c, &inner, next))
+                    .collect(),
+                body: Box::new(rename(body, &inner, next)),
+            }
+        }
+        // the entry of a variable's captures or errors is labelled by its name
+        Type::Row(row) => {
+            let mut entries: Vec<(String, Type)> = (row.entries.iter())
+                .map(|(label, t)| (relabel(label, names), rename(t, names, next)))
+                .collect();
+            entries.sort_by(|a, b| a.0.cmp(&b.0));
+            Type::Row(Row {
+                entries,
+                tail: row.tail.as_ref().map(|t| Box::new(rename(t, names, next))),
+            })
+        }
+        _ => ty.map_children(&mut |t| rename(t, names, next)),
+    }
+}
+
+/// `label` of a row entry, `^a` or `~a` for a variable `a`, after `names`.
+fn relabel(label: &str, names: &[(String, String)]) -> String {
+    let Some((sigil @ ("^" | "~"), name)) = label.split_at_checked(1) else {
+        return label.to_owned();
+    };
+    (names.iter().find(|(n, _)| n == name))
+        .map_or_else(|| label.to_owned(), |(_, fresh)| format!("{sigil}{fresh}"))
 }
 
 fn label(e: &Export) -> String {
@@ -310,5 +428,33 @@ mod tests {
             "{thing}instance Show (Box a) =\n  let show _ = \"box\"\n\ninstance Show Thing =\n  let show _ = \"thing\"\n"
         ));
         assert_eq!(bump(&diff(slice::from_ref(&base), &[moved])), Bump::Patch);
+    }
+
+    #[test]
+    fn a_renamed_type_variable_is_no_change() {
+        let api = |a: &str, b: &str| {
+            interface(&format!(
+                "module Lib exposing (..)\n\nf : {a} -> {b} -> {a}\nlet f x _ = x\n\n\
+                 type Box {a} = Box {a}\n\ntype alias Pair {a} = ({a}, {a})\n\n\
+                 class Sized {a} =\n  size : {a} -> Float\n\n\
+                 instance Show (Box {a}) =\n  let show _ = \"box\"\n"
+            ))
+        };
+        let old = api("a", "b");
+        assert_eq!(diff(slice::from_ref(&old), &[api("item", "other")]), []);
+        assert_eq!(
+            diff(slice::from_ref(&old), &[api("b", "a")]),
+            [],
+            "names swapped"
+        );
+        let changes = diff(slice::from_ref(&old), &[api("a", "a")]);
+        assert_eq!(
+            changes[0].changes,
+            [Change::Changed {
+                name: "value f".into(),
+                was: "forall a b. a -> (b -> a)^{a}".into(),
+                now: "forall a. a -> (a -> a)^{a}".into(),
+            }]
+        );
     }
 }
