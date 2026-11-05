@@ -464,14 +464,13 @@ def Const.ty (S : Sig) : Const → CArg → Ty
       (.rt (Row.union ι.r (Row.obs ι.r ι.s)) Row.none) (.base .unit) ι.s.reach) Caps.none
   | .intEq, _ => .arrow (.base .int) .pure (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none
 
-/-- Side conditions of a constant at an instance: `Layer.merge` has disjoint
-outputs; a finalizer and a child outlive their owner, with everything they hold
-(`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`). The outputs of
-`Layer.merge` are named: disjointness of names is not kept by instantiating a row
-variable. The work of a finalizer or a child has no uses: uses come only from `with`
-frames. -/
+/-- Side conditions of a constant at an instance: a finalizer and a child outlive their
+owner, with everything they hold
+(`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`). The work of a
+finalizer or a child has no uses: uses come only from `with` frames. `Layer.merge` has
+none: soundness does not need its outputs disjoint, and the disjointness the checker
+sees on names is not kept by instantiating a row variable. -/
 def Const.ok (Θ : Facts) : Const → CArg → Prop
-  | .merge, ι => (∀ N, ¬ (ι.o (.nm N) ∧ ι.o' (.nm N))) ∧ ι.o.Named ∧ ι.o'.Named
   | .addFin, ι => Outl Θ ι.C ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
   | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
   | _, _ => True
