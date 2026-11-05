@@ -83,7 +83,7 @@ Mount the handler on `Http.Router` as a POST of `Server.path`:
 #
 # route : (ServerRequest ->{} ServerResponse) -> Http.Router.Route none none
 let route functions =
-  Http.Router.route (Some Http.Method.POST) Server.path (fun request -> functions request)
+  Http.Router.route (Some Http.Method.POST) Server.path functions
 ```
 
 ## What crosses the network
