@@ -42,6 +42,7 @@ type Field
 /// A form being filled in: the text and the error of each field.
 type Draft a
 
+@maker
 /// Empty texts and no errors. Its atoms live as long as the program, so a
 /// draft is defined with a top-level `let`.
 draft : Form a -> Draft a

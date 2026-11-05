@@ -68,6 +68,30 @@ lang_items! {
     Scope = "scope",
     Setup = "setup",
     AtomRead = "atom_read",
+    // what `ui` and atoms are made of, which their checks name
+    Atom = "atom",
+    AtomWritable = "atom_writable",
+    AtomBrowser = "atom_browser",
+    AtomFamily = "atom_family",
+    ReactivityAtom = "reactivity_atom",
+    ReactivityWritable = "reactivity_writable",
+    AtomWrite = "atom_write",
+    AtomRegistry = "atom_registry",
+    UiView = "ui_view",
+    UiHandler = "ui_handler",
+    UiComponent = "ui_component",
+    Action = "action",
+    View = "view",
+    EventExhaust = "event_exhaust",
+    EventLatest = "event_latest",
+    EventQueue = "event_queue",
+    EventConcurrent = "event_concurrent",
+    ActionQueue = "action_queue",
+    ActionConcurrent = "action_concurrent",
+    Serializable = "serializable",
+    SerializableFamily = "serializable_family",
+    SerializableTask = "serializable_task",
+    SerializableResult = "serializable_result",
     ServiceImpl = "service_impl",
     Option = "option",
     Result = "result",
@@ -269,6 +293,12 @@ pub fn item(lang: Lang) -> &'static Item {
 /// The module that declares `lang`, if a built-in module does.
 pub fn module_of(lang: Lang) -> Option<&'static str> {
     table().find(lang).map(|item| item.module.as_str())
+}
+
+/// `module.name` of `lang`, as a service row spells it, if the modules
+/// declare it.
+pub fn label(lang: Lang) -> Option<&'static str> {
+    table().find(lang).map(|item| item.label.as_str())
 }
 
 /// The module whose names every module sees unqualified.

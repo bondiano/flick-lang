@@ -185,6 +185,7 @@ Reactivity.AsyncResult
 Reactivity.Atom
 # UI on atoms: `Atom` over the reactivity modules, then `Ui`
 Atom
+Ui.Safe
 Ui
 Ui.Event
 Ui.Dom
