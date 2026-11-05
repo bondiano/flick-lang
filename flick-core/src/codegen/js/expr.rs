@@ -475,6 +475,13 @@ impl Gen<'_> {
     }
 
     pub(super) fn constructor(&mut self, c: &Constructor) -> String {
+        // TypeScript types the literal as itself, so `Get == Post` would not
+        // check: it names the constructor, typed as the program's values are
+        if let Rep::Literal(literal) = &c.rep
+            && !self.options.typescript
+        {
+            return names::enum_literal(literal);
+        }
         match names::native(c) {
             Some(names::Native::Some) => self.rt("some"),
             Some(names::Native::None) => self.rt("none"),

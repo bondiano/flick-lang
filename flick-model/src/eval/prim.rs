@@ -27,6 +27,13 @@ pub fn run(p: Prim, args: &[Term]) -> Result<Term, String> {
         (Prim::Same | Prim::NotSame, [Term::Lit(a), Term::Lit(b)]) => {
             lit(Lit::Bool(lit_eq(a, b) == (p == Prim::Same)))
         }
+        // the values of an enum, which the builds compare as their literals
+        (
+            Prim::Same | Prim::NotSame,
+            [Term::Apply(Head::Con(a), x), Term::Apply(Head::Con(b), y)],
+        ) if x.is_empty() && y.is_empty() && a.ty == b.ty => {
+            lit(Lit::Bool((a.name == b.name) == (p == Prim::Same)))
+        }
         (Prim::Lt | Prim::Le | Prim::Gt | Prim::Ge, [Term::Lit(a), Term::Lit(b)]) => {
             let order = order(a, b).ok_or_else(|| format!("`<` of {a:?} and {b:?}"))?;
             lit(Lit::Bool(match (p, order) {

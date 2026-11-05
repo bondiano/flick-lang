@@ -313,9 +313,13 @@ impl<'a> Gen<'a> {
 
     fn constructor_info(&mut self, c: &Constructor) -> Document<'a> {
         let a = self.a;
-        let class = match c.rep {
+        let class = match &c.rep {
             Rep::Typeof(class) => class.name(),
             _ => "",
+        };
+        let literal = match &c.rep {
+            Rep::Literal(l) => a.text(a.alloc_str(&super::expr::enum_literal(l))),
+            _ => a.text("nil"),
         };
         let unboxed = if c.rep == Rep::Unboxed {
             "true"
@@ -328,6 +332,7 @@ impl<'a> Gen<'a> {
             docvec![a, "Arity: ", c.arity],
             docvec![a, "Unboxed: ", unboxed],
             docvec![a, "Class: ", self.string(class)],
+            docvec![a, "Literal: ", literal],
         ];
         list(a, "{", fields, "}")
     }

@@ -15,7 +15,8 @@ use crate::types::lang::Lang;
 impl Checker<'_> {
     /// Checks the representation a type declaration names and records it.
     pub(super) fn check_abi(&mut self, decl: &Node, name: &str) {
-        if decl.kind != K::TypeDecl {
+        // an enum, or a literal written as a field, reported where it is read
+        if self.enum_literals(decl, name) || decl.kind != K::TypeDecl {
             return;
         }
         let Some(word) = decl
@@ -102,6 +103,11 @@ impl Checker<'_> {
             }
             Abi::Untagged(classes)
         };
+        self.record_abi(name, abi);
+    }
+
+    /// Keeps the representation of the type `name`.
+    pub(super) fn record_abi(&mut self, name: &str, abi: Abi) {
         self.typing.abis.insert(name.to_owned(), abi.clone());
         if let Some(def) = self.env.type_def_mut(name)
             && let Form::Adt { abi: slot, .. } = &mut def.form

@@ -65,11 +65,18 @@ impl Gen<'_> {
                 }
             }
             Pat::Con(c, args) if c.rep != Rep::Tagged => {
-                if let Rep::Typeof(class) = c.rep {
-                    t.conds.push(match class {
-                        JsClass::Array => format!("Array.isArray({subject})"),
-                        class => format!("typeof {subject} === {}", names::string(class.name())),
-                    });
+                match &c.rep {
+                    Rep::Typeof(JsClass::Array) => {
+                        t.conds.push(format!("Array.isArray({subject})"));
+                    }
+                    Rep::Typeof(class) => t.conds.push(format!(
+                        "typeof {subject} === {}",
+                        names::string(class.name())
+                    )),
+                    Rep::Literal(l) => t
+                        .conds
+                        .push(format!("{subject} === {}", names::enum_literal(l))),
+                    Rep::Tagged | Rep::Unboxed => {}
                 }
                 for arg in args {
                     self.test(arg, subject, t);
@@ -167,7 +174,16 @@ impl Gen<'_> {
                 let head = case.map_or("default:".to_owned(), |tag| format!("case {tag}:"));
                 body.push(format!("{head} {{\n{}}}", indent(&stmts)));
             }
-            out.push(format!("switch ({subject}._tag) {{\n{}}}", indent(&body)));
+            // an enum's constructors are their literals: the switch is on the value
+            let by_value = arms
+                .iter()
+                .any(|a| matches!(&a.pat, Pat::Con(c, _) if matches!(c.rep, Rep::Literal(_))));
+            let on = if by_value {
+                subject.to_owned()
+            } else {
+                format!("{subject}._tag")
+            };
+            out.push(format!("switch ({on}) {{\n{}}}", indent(&body)));
         } else {
             for (i, arm) in arms.iter().enumerate() {
                 // the match is exhaustive: its last arm without a guard needs no test
@@ -217,6 +233,7 @@ impl Gen<'_> {
                 Pat::Con(c, args) if c.rep == Rep::Tagged && args.iter().all(plain) => {
                     Some(names::string(&self.shape(c, args.len()).0))
                 }
+                Pat::Con(c, _) if let Rep::Literal(l) = &c.rep => Some(names::enum_literal(l)),
                 p if plain(p) && i + 1 == arms.len() => None,
                 _ => return None,
             };

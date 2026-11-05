@@ -318,7 +318,8 @@ fn variants(p: &mut Parser) {
     }
 }
 
-/// `Con field…`; a field is an atomic type, so `Some (List a)` needs the parentheses.
+/// `Con field…`, or `Con = literal`; a field is an atomic type, so
+/// `Some (List a)` needs the parentheses.
 fn variant(p: &mut Parser) {
     let m = p.start();
     if p.at(K::At) {
@@ -336,6 +337,19 @@ fn variant(p: &mut Parser) {
         }
         while types::at_atom_start(p) {
             types::capture(p);
+        }
+        // `Get = "GET"`: the literal that is the value of an `untagged type`
+        if p.eat(K::Eq) {
+            let literal = p.start();
+            if p.at(K::Minus) && p.nth(1) == K::Number {
+                p.bump();
+            }
+            if matches!(p.current(), K::String | K::Number) {
+                p.bump();
+            } else {
+                p.error_expected("the literal of the constructor, a string or a number");
+            }
+            p.complete(literal, K::LitPat);
         }
     }
     p.complete(m, K::Variant);

@@ -16,6 +16,7 @@ codegen/derive_default
 codegen/default_signatures
 codegen/defect
 codegen/do_notation
+codegen/enums
 codegen/errors
 codegen/eval_order
 codegen/exports

@@ -30,6 +30,8 @@ pub struct Declared<'n> {
     pub fields: Option<Vec<Type>>,
     /// For `deriving Generic`, what its methods convert.
     pub generic: Option<GenericInfo>,
+    /// For the instance of `Enum` of an enum, the enum.
+    pub enumerates: Option<String>,
 }
 
 impl<'n> Checker<'_> {
@@ -96,18 +98,22 @@ impl<'n> Checker<'_> {
                 K::InstanceDecl => {
                     if let Some(instance) = self.instance_head(decl) {
                         let span = self.span(decl);
-                        if self.admit(&instance, span) {
+                        if !self.written_enum(&instance, span) && self.admit(&instance, span) {
                             out.push(Declared {
                                 decl,
                                 span,
                                 instance,
                                 fields: None,
                                 generic: None,
+                                enumerates: None,
                             });
                         }
                     }
                 }
-                K::TypeDecl | K::ErrorDecl => out.extend(self.derive(decl, refined)),
+                K::TypeDecl | K::ErrorDecl => {
+                    out.extend(self.derive(decl, refined));
+                    out.extend(self.enum_instance(decl));
+                }
                 _ => {}
             }
         }
@@ -440,7 +446,7 @@ impl<'n> Checker<'_> {
             }
             let (derived, defaults) = if let Some(fields) = &d.fields {
                 (Some(self.derived_fields(d, fields)), Vec::new())
-            } else if d.generic.is_some() {
+            } else if d.generic.is_some() || d.enumerates.is_some() {
                 (None, Vec::new())
             } else {
                 (None, self.instance_methods(d.decl, &d.instance))
@@ -496,6 +502,7 @@ impl Checker<'_> {
             derived,
             defaults,
             generic: d.generic.clone(),
+            enumerates: d.enumerates.clone(),
         };
         self.typing.instances.push(info);
     }

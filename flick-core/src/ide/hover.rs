@@ -18,6 +18,7 @@ mod kinds;
 mod types;
 
 use crate::types::lang::Lang;
+use companions::enum_literal;
 use kinds::kind_description;
 
 /// `node` as its source lays it out, one written line per line, its
@@ -421,6 +422,16 @@ impl Ide<'_> {
                             format!("{} : {}", e.name, show_type(ty))
                         }
                     },
+                };
+                // a constructor of an enum shows the literal it is
+                let literal = (e.namespace == Namespace::Constructor)
+                    .then(|| export.and_then(|x| x.parent.as_deref()))
+                    .flatten()
+                    .and_then(|ty| interface.find(Namespace::Type, ty))
+                    .and_then(|t| enum_literal(t.definition.as_ref()?, &e.name));
+                let code = match literal {
+                    Some(literal) => format!("{code}\n{} = {literal}", e.name),
+                    None => code,
                 };
                 let doc = source
                     .and_then(|source| documentation(&source, &e.name))

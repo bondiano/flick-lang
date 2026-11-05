@@ -6,7 +6,7 @@ use std::fmt::Write;
 
 use super::{Ide, documentation, tree};
 use crate::source::FileId;
-use crate::types::{Ref, show_type};
+use crate::types::{Abi, EnumLit, Form, Ref, TypeDef, show_type};
 
 impl Ide<'_> {
     pub(super) fn companion_hover(
@@ -63,5 +63,21 @@ pub(in crate::ide) fn companion_note(member: &str) -> Option<&'static str> {
              endpoint, for `HttpApi.call` on the client."
         }
         _ => return None,
+    })
+}
+
+/// The literal the constructor `name` of the enum `def` is, as written.
+pub(super) fn enum_literal(def: &TypeDef, name: &str) -> Option<String> {
+    let Form::Adt {
+        constructors,
+        abi: Abi::Literal(literals),
+    } = &def.form
+    else {
+        return None;
+    };
+    let i = constructors.iter().position(|c| c == name)?;
+    Some(match literals.get(i)? {
+        EnumLit::String(s) => serde_json::to_string(s).ok()?,
+        EnumLit::Int(n) => n.to_string(),
     })
 }

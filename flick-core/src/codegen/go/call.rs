@@ -6,6 +6,7 @@ use std::{iter, mem, slice};
 
 use flick_pretty::{Document, DocumentArena, docvec};
 
+use super::expr::enum_literal;
 use super::layout::{Code, block, call, closure, signature, single, statement};
 use super::{Gen, Shape, names};
 use crate::codegen::tail::Target;
@@ -249,7 +250,11 @@ impl<'a> Gen<'a> {
         {
             ExprKind::Con(c) => {
                 let tag = a.alloc_str(&names::string(&self.tag(c)));
-                let make: Call<'a> = match c.rep {
+                let make: Call<'a> = match &c.rep {
+                    Rep::Literal(l) => {
+                        let lit = a.alloc_str(&enum_literal(l));
+                        Box::new(move |_, _: &[Code<'a>]| a.text(lit).into())
+                    }
                     Rep::Tagged if c.arity == 0 => Box::new(move |_, _: &[Code<'a>]| {
                         call(a, "flickrt.Nullary", [a.text(tag)]).into()
                     }),

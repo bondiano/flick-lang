@@ -295,6 +295,10 @@ pub struct InstanceInfo {
     /// writes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub generic: Option<GenericInfo>,
+    /// For the instance of `Enum` of an enum, the enum: its methods are the
+    /// enum's companions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enumerates: Option<String>,
 }
 
 /// The constructors of a type that derives `Generic`, each with the labels

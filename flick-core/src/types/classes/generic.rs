@@ -87,6 +87,7 @@ impl<'n> Checker<'_> {
             instance,
             fields: None,
             generic: Some(info),
+            enumerates: None,
         })
     }
 

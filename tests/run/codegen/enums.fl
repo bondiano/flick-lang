@@ -1,0 +1,41 @@
+// Enums: an `untagged type` whose constructors are literals. Each value is
+// its literal at run time; `match`, `==`, the derived `Ord` (in the order
+// of declaration), `Show` (the constructor's name) and `Hash` work on it,
+// and its companions `value`, `parse` and `all` are its instance of `Enum`.
+module App.Main exposing (main)
+
+import Enum exposing (Enum)
+
+untagged type Method = Get = "GET" | Post = "POST" | Delete = "DELETE"
+  deriving Eq, Ord, Show, Hash
+
+untagged type Priority = High = 2 | Low = 1 | Lowest = -1
+  deriving Eq, Ord, Show
+
+name : Method -> String
+let name m =
+  match m with
+  | Get -> "get"
+  | Post -> "post"
+  | Delete -> "delete"
+
+/// The literals of any enum of strings.
+literals : Enum t String => List t -> List String
+let literals values = List.map Enum.value values
+
+/// Whether `literal` is none of `Method`'s, which no constant shows.
+unknown : String -> Bool
+let unknown literal = Result.is_err (Method.parse literal)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (List.map name [Delete, Get, Post]))
+  Platform.stdout_line (show [Get, Post, Delete])
+  Platform.stdout_line
+    (show (List.map (fun m -> m == Post) [Get, Post], compare Post Delete, compare Delete Get))
+  Platform.stdout_line (show (List.map (compare Low) [Lowest, High, Low]))
+  Platform.stdout_line (show (hash Get == hash Get, hash Get == hash Post))
+  Platform.stdout_line (show (Method.value Delete, Priority.value Lowest))
+  Platform.stdout_line (show (Method.parse "POST", Priority.parse 2))
+  Platform.stdout_line (show (unknown "PATCH"))
+  Platform.stdout_line (show (Method.all, literals Method.all))

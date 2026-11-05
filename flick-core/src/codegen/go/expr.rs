@@ -11,7 +11,7 @@ use super::layout::{Code, call, if_else, list, statement};
 use super::{Gen, names};
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
-use crate::types::Lift;
+use crate::types::{EnumLit, Lift};
 
 /// A literal as Go: numbers typed as the runtime holds them.
 pub(super) fn literal(lit: &Lit) -> String {
@@ -27,6 +27,14 @@ pub(super) fn literal(lit: &Lit) -> String {
         Lit::String(s) => names::string(s),
         Lit::Bool(b) => b.to_string(),
         Lit::Unit => "flickrt.Unit".to_owned(),
+    }
+}
+
+/// The literal an enum's constructor is, as Go holds it.
+pub(super) fn enum_literal(literal: &EnumLit) -> String {
+    match literal {
+        EnumLit::Int(n) => self::literal(&Lit::Int(*n)),
+        EnumLit::String(s) => self::literal(&Lit::String(s.clone())),
     }
 }
 

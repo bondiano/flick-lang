@@ -1,7 +1,7 @@
 //! JS names of what the IR refers to, and constructor ids.
 
-use crate::types::Constructor;
 use crate::types::lang::{self, Lang};
+use crate::types::{Constructor, EnumLit};
 
 /// Words a Flick name may spell that JS reserves, and the names generated
 /// code relies on.
@@ -170,6 +170,14 @@ fn fnv(text: &str) -> u32 {
     text.bytes().fold(0x811c_9dc5, |h, b| {
         (h ^ u32::from(b)).wrapping_mul(0x0100_0193)
     })
+}
+
+/// The literal of an enum's constructor, as JS writes it.
+pub fn enum_literal(literal: &EnumLit) -> String {
+    match literal {
+        EnumLit::String(s) => string(s),
+        EnumLit::Int(n) => n.to_string(),
+    }
 }
 
 /// A string literal in JS: JSON with the marker characters of the emitter
