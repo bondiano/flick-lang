@@ -63,7 +63,7 @@ pub fn prepare(explicit: Option<&str>) -> Result<(), String> {
         .flatten();
     let dir = match project {
         Some(project) => in_project(&project, NAME)?,
-        None => outside_project()?,
+        None => checkout_std(&host.cwd).map_or_else(outside_project, Ok)?,
     };
     let package = types::read_std(&dir)
         .map_err(|e| format!("cannot read `std` at `{}`: {e}", dir.display()))?;
@@ -90,9 +90,22 @@ pub fn package_dir(name: &str, explicit: Option<&str>) -> Result<PathBuf, String
         .flatten();
     match project {
         Some(project) => in_project(&project, name),
-        None if name == NAME => outside_project(),
+        None if name == NAME => checkout_std(&host.cwd).map_or_else(outside_project, Ok),
         None => Err(format!("`{name}` is no dependency here: no project")),
     }
+}
+
+/// A source checkout uses its own `std` when a CLI or editor starts without
+/// Cargo's `FLICK_STD_PATH` environment. The release package can lag behind
+/// the compiler being developed in this checkout.
+fn checkout_std(cwd: &Path) -> Option<PathBuf> {
+    cwd.ancestors().find_map(|root| {
+        let std = root.join("packages/std");
+        (root.join("flick-core/Cargo.toml").is_file()
+            && root.join(".cargo/config.toml").is_file()
+            && std.join("src/modules.txt").is_file())
+        .then_some(std)
+    })
 }
 
 /// The directory of the package `name` the project depends on, or of the
@@ -100,6 +113,12 @@ pub fn package_dir(name: &str, explicit: Option<&str>) -> Result<PathBuf, String
 fn in_project(project: &Project, name: &str) -> Result<PathBuf, String> {
     if (project.config.package.as_ref()).is_some_and(|p| p.name == name) {
         return Ok(project.root.clone());
+    }
+    if name == NAME
+        && !project.config.dependencies.iter().any(|d| d.name == NAME)
+        && let Some(std) = checkout_std(&project.root)
+    {
+        return Ok(std);
     }
     let dependencies = with_std(&project.config.dependencies);
     let dependency = (dependencies.iter())

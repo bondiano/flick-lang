@@ -10,7 +10,7 @@ use std::fmt::Write;
 use serde::Serialize;
 
 use crate::codegen::ident;
-use crate::codegen::ts::Projection;
+use crate::codegen::ts::{Projection, jsdoc};
 use crate::iface::{Decl, Interface, Namespace};
 use crate::project::Analyzed;
 use crate::syntax::kind::SyntaxKind as K;
@@ -94,11 +94,12 @@ fn render(
     let mut body = String::new();
     let mut pending: Vec<(usize, [u32; 2], bool)> = Vec::new();
     for line in &types {
-        // `export interface Name…` or `export type Name…`
-        let name = line.split_whitespace().nth(2).unwrap_or("");
+        // `export interface Name…` or `export type Name…`, after its JSDoc
+        let decl = line.rsplit('\n').next().unwrap_or(line);
+        let name = decl.split_whitespace().nth(2).unwrap_or("");
         let name = name.split(['<', ' ', '=', '{']).next().unwrap_or("");
         if let Some(at) = at(interface, Namespace::Type, name) {
-            let offset = body.len() + line.find(name).unwrap_or(0);
+            let offset = body.len() + line.len() - decl.len() + decl.find(name).unwrap_or(0);
             pending.push((offset, at, true));
             pending.push((offset + name.len(), at, true));
         }
@@ -121,6 +122,7 @@ fn render(
         let ty = projection
             .value(scheme)
             .unwrap_or_else(|reason| format!("unknown /* {reason} */"));
+        body.push_str(&jsdoc(interface, &entity.name));
         let start = body.len() + "export declare const ".len();
         let _ = write!(body, "export declare const {ident}: ");
         let ty_start = body.len();

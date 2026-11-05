@@ -70,8 +70,17 @@ let main () =
     with
     | Rpc.ServeError _ -> "refused unframed"
   Platform.stdout_line unframed
+  // nothing listens on the port of a server whose scope has ended; a fixed
+  // closed port can hang instead of refusing (WSL2's mirrored networking)
   let gone =
-    try show (Rpc.call_with options "tcp://127.0.0.1:9" double 1) with
+    try
+      let url = scope s {
+        let server = Rpc.listen_tcp Rpc.defaults group handlers
+        "tcp://127.0.0.1:" ++ show (Rpc.port server)
+      }
+      show (Rpc.call_with options url double 1)
+    with
+    | Rpc.ServeError message -> "serve: " ++ message
     | Rpc.ClientError _ -> "no server"
     | NotFound _ -> "not found"
   Platform.stdout_line gone

@@ -3,7 +3,7 @@ source: flick-core/src/iface.rs
 expression: json
 ---
 {
-  "iface-version": 4,
+  "iface-version": 5,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [
@@ -759,8 +759,8 @@ expression: json
         }
       },
       "at": [
-        861,
-        866
+        881,
+        886
       ]
     },
     {
@@ -834,6 +834,9 @@ expression: json
       "parent": "Id"
     }
   ],
+  "docs": {
+    "later": "A thunk of `h`."
+  },
   "instances": [
     {
       "module": "App.Shapes",

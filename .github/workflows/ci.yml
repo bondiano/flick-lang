@@ -27,10 +27,9 @@ jobs:
       # installs the toolchain, components and targets from rust-toolchain.toml
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - uses: extractions/setup-just@v4
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-machete@0.9.2
+          tool: just@1.59.0,cargo-machete@0.9.2
       - run: |
           rustup target add wasm32-wasip2
           just zed
@@ -47,7 +46,9 @@ jobs:
         with:
           go-version-file: runtime-go/go.mod
           cache-dependency-path: runtime-go/go.sum
-      - uses: extractions/setup-just@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
       # some tests run pnpm; its version comes from `packageManager`
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -62,7 +63,9 @@ jobs:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - uses: extractions/setup-just@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
       - run: just feature-test
 
   # the JS packages, the playground's compiler, the Go runtime, the language
@@ -80,10 +83,9 @@ jobs:
         with:
           go-version-file: runtime-go/go.mod
           cache-dependency-path: runtime-go/go.sum
-      - uses: extractions/setup-just@v4
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest@0.9.148
+          tool: just@1.59.0,cargo-nextest@0.9.148
       # version comes from `packageManager` in package.json
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -114,10 +116,9 @@ jobs:
         with:
           go-version-file: runtime-go/go.mod
           cache-dependency-path: runtime-go/go.sum
-      - uses: extractions/setup-just@v4
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest@0.9.148
+          tool: just@1.59.0,cargo-nextest@0.9.148
       # version comes from `packageManager` in package.json
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -150,10 +151,9 @@ jobs:
         with:
           go-version-file: runtime-go/go.mod
           cache-dependency-path: runtime-go/go.sum
-      - uses: extractions/setup-just@v4
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest@0.9.148
+          tool: just@1.59.0,cargo-nextest@0.9.148
       # version comes from `packageManager` in package.json
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -174,7 +174,9 @@ jobs:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - uses: extractions/setup-just@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
       - run: just wasm-plugins
 
   postgres:
@@ -190,10 +192,9 @@ jobs:
         with:
           go-version-file: runtime-go/go.mod
           cache-dependency-path: runtime-go/go.sum
-      - uses: extractions/setup-just@v4
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest@0.9.148
+          tool: just@1.59.0,cargo-nextest@0.9.148
       # version comes from `packageManager` in package.json
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -244,7 +245,9 @@ jobs:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - uses: extractions/setup-just@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
       - run: just model
 
   # the Lean 4 mechanization of λFlick in formal/; elan installs the toolchain

@@ -45,6 +45,7 @@ pub fn declarations(tree: &Node, text: &str, file: FileId) -> Vec<Declared> {
 pub use crate::iface::{Decl, Entity, Export, Hidden, Interface, Namespace};
 
 use crate::diagnostics::Diagnostic;
+use crate::doc;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 
@@ -76,7 +77,12 @@ pub fn resolve(
     let defs = defs::defined(all.clone());
     diagnostics.extend(defs::alias_cycles(module.tree, module.text, module.file));
     let scope = scope::Scope::new(module, &defs, imported, &mut diagnostics);
-    let interface = scope.exports(&mut diagnostics);
+    let mut interface = scope.exports(&mut diagnostics);
+    let mut docs = doc::comments(module.text);
+    interface.docs = (interface.exports.iter())
+        .filter(|e| e.entity.module == interface.module)
+        .filter_map(|e| Some((e.entity.name.clone(), docs.remove(&e.entity.name)?)))
+        .collect();
     let (references, unused) = uses::references(module);
     for reference in &references {
         scope.check_use(reference, &mut diagnostics);
