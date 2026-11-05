@@ -141,11 +141,14 @@ pub(super) fn grants(
     raw: BTreeMap<String, Spanned<RawGrants>>,
     span: &dyn Fn(ops::Range<usize>) -> Span,
 ) -> Result<BTreeMap<String, Grants>, Diagnostic> {
-    let name = |n: &str| {
-        !n.is_empty()
-            && (n.bytes())
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"-.".contains(&b))
+    // labels of lower-case letters, digits and inner `-`, between dots
+    let label = |l: &str| {
+        !l.is_empty()
+            && !l.starts_with('-')
+            && !l.ends_with('-')
+            && (l.bytes()).all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
     };
+    let name = |n: &str| n.split('.').all(label);
     let host = |h: &str| match h.split_once(':') {
         Some((n, port)) => name(n) && port.parse::<u16>().is_ok(),
         None => name(h),

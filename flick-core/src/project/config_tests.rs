@@ -351,6 +351,10 @@ fn a_project_grants_a_plugin_files_hosts_and_variables() {
         "net = [\"https://db.example.com\"]",
         "net = [\"Db.example.com\"]",
         "net = [\"localhost:http\"]",
+        "net = [\".\"]",
+        "net = [\"-\"]",
+        "net = [\"a..b\"]",
+        "net = [\"db-.example.com\"]",
         "env = [\"A-B\"]",
         "exec = [\"sh\"]",
     ] {

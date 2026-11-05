@@ -319,6 +319,10 @@ impl Call<'_, '_> {
         collecting.reach = Reach::new(gate.clone());
         found.source.reach = Reach::new(gate);
         let collected = results.collect(job.plugin, &[], &mut collecting);
+        // what the host refused, whatever the plugin made of it
+        for (code, message) in collecting.reach.problems {
+            diagnostics.push(Diagnostic::error(code, message, found.whole));
+        }
         let state = match collected {
             Ok(state) => state,
             Err(why) => {
@@ -335,9 +339,7 @@ impl Call<'_, '_> {
             &state,
             &mut found.source,
         );
-        // what the host refused, whatever the plugin made of it
-        let refused = collecting.reach.problems.into_iter();
-        for (code, message) in refused.chain(found.source.reach.problems.drain(..)) {
+        for (code, message) in found.source.reach.problems.drain(..) {
             diagnostics.push(Diagnostic::error(code, message, found.whole));
         }
         let rendered = match made {
