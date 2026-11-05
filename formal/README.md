@@ -120,7 +120,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | T1 | `T1` (`Soundness.lean`) |
 | T2(a), T2(b) | `T2a`, `T2b`, `T2b_await` (`Effects.lean`) |
 | lemma 3.1, T3 | `lemma_3_1`, `T3` (`Generalization.lean`) |
-| a polymorphic use; a use of a row-polymorphic function at a row of services; a `_` arm that removes a row variable of errors; a `provide` of a layer whose outputs are a row variable; a scope that acquires and uses, as checks | `Examples.lean` |
+| a polymorphic use; a use of a row-polymorphic function at a row of services; a `_` arm that removes a row variable of errors; a `provide` of a layer whose outputs are a row variable; a `Layer.merge` of such a layer; a scope that acquires and uses, as checks | `Examples.lean` |
 
 ## Representation
 
@@ -199,8 +199,7 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    any other variable, and (Var) instantiates it by a row (`Ty.row`); constants are typed
    at any rows (`CArg`). Kinds are not checked. A row variable stands for names, atoms and
    variables, never for obligations or uses; the rows that must be named are the outputs of
-   `Layer.merge`, and those of `provide` when its body has obligations (`Row.Named`, items 8
-   and 21). `⌈Errors ε⌉` counts the row
+   `provide` when its body has obligations (`Row.Named`, item 21). `⌈Errors ε⌉` counts the row
    variables of `ε`, as `regions.md` §2.1 and the checker do (`regions/mod.rs`
    `error_row_captures`): an instance shows what its errors reach, and `⌈·⌉` must commute
    with it, so a closure over an error of an unknown row holds that row. What still keeps a
@@ -242,11 +241,13 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    it.
 8. **Environments.** `Env ρ` means "binds exactly `ρ`", as (Env), (Bind) and (Join)
    give it: T4.3 needs that a `with` frame answers `S` exactly when its row has `S`. `with θ e` and `econs` require
-   `θ` and the bound values to be values. The disjointness of `Layer.merge` is kept
-   (`Const.ok`) though soundness does not need it. The outputs `Layer.merge` joins are
-   named, without row variables (`Row.Named`): the checker compares the names it sees, and
-   instantiating a row variable may make them overlap, so the condition is not kept by a
-   substitution. The services a `provide` gives may be a row variable, which its body may
+   `θ` and the bound values to be values. `Layer.merge` has no side condition, which widens
+   `core.md` §1.5: the checker rejects outputs that share a name it sees (`services.rs`
+   `merge_conflicts`, `FLICK-E004`), the model does not, so the theorems cover a superset of
+   what the checker accepts there. Soundness does not need disjoint outputs (the first
+   binding of a name wins, `Tm.envAppend`), and disjointness of the names the checker sees is
+   not kept by instantiating a row variable, so the outputs `Layer.merge` joins may be row
+   variables (`Examples.lean`). The services a `provide` gives may be a row variable, which its body may
    require (`core.md`, [`provide` and output row variables](../docs/formal/core.md#provide-discharges-only-the-listed-outputs-of-a-layer-not-a-row-variable); `with_layer` in `Examples.lean`).
 9. **Allocation is deterministic:** `Ref.make v` takes `ℓ = μ.length`, `scope` takes
    `π = Λ.length`.
