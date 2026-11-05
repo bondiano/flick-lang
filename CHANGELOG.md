@@ -80,6 +80,15 @@ break programs.
   field whose codec decodes another type than the record's is `std/D012`.
   A block is a `Codec` of services when a field calls `field_effect` or
   `on_missing_effect`. `schema` and `codec` are no keywords.
+- **Plugins, interface `0.12.0`:** a plugin reaches files, variables of the
+  environment and hosts over HTTP that the project grants in
+  `[plugins.<package>]` (`fs-read`, `net`, `env`), through
+  `compiler.read_file`, `env` and `fetch`; anything else is `FLICK-P038`,
+  naming the line to add. Answers over HTTP are kept as snapshots under
+  `.flick/plugin-snapshots/`, which a project commits; `--offline`, now a
+  global option, and `CI` read only those, and a missing one is
+  `FLICK-P039`. A kept result holds while what its call read is the same.
+  `Plugin::collect` takes the compiler.
 - **Plugins, interface `0.11.0`:** `hover` gets the facts of the block's
   code, as `check` does, once it checked.
 - **Plugins, interface `0.10.0`:** `check` after checking: a plugin gets the

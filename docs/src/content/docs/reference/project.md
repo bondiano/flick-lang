@@ -65,6 +65,7 @@ max-params = 5
 | `lint.max-nesting` | how deep `if`, `match`, `fun`, `do`, `task` and `for` nest before `FLICK-T037` warns | `4` |
 | `lint.max-complexity` | branches of a function (cyclomatic complexity) past which `FLICK-T038` warns | `10` |
 | `lint.max-params` | parameters of a function past which `FLICK-T039` warns | `5` |
+| `plugins.<package>` | what the plugin of a dependency may reach for the project's blocks: `fs-read` (paths from the project's root), `net` (`host` or `host:port`) and `env` (names); not at a workspace root (see [Reaching outside](../plugins/#reaching-outside)) | nothing |
 
 Errors in the configuration exit with code `2`:
 
