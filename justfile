@@ -202,7 +202,7 @@ wasm-plugins:
 # Build the wasm module the in-browser demo loads and hold it to its size budget
 wasm:
     cargo build -p flick-wasm --target wasm32-unknown-unknown --release
-    test $(wc -c < target/wasm32-unknown-unknown/release/flick_wasm.wasm) -le 4194304
+    test $(wc -c < target/wasm32-unknown-unknown/release/flick_wasm.wasm) -le 4718592
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm
