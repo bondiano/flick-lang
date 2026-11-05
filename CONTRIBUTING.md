@@ -96,6 +96,15 @@ block, for syntax that does not compile yet; `flick fail` must report an
 error, for an example of one. Give both locales the same hidden lines and
 markers.
 
+English is the original of each page, except under `spec/`, where the
+Russian text is. A translation records in its frontmatter `source_hash`, the
+hash of the original it was made from; `node docs/scripts/parity.mjs`
+(part of `pnpm -C docs test`) reports a page without its pair and a
+translation whose original has changed since. After bringing a translation
+up to date, record it with
+`node docs/scripts/parity.mjs --stamp docs/src/content/docs/ru/<page>.md`
+(a translated chapter of the specification is `docs/src/content/docs/spec/<page>.md`).
+
 The main entry points are Learn, Guides, API and Ecosystem. `/play/` runs a
 single Flick module in an isolated browser worker; `/transpile/` shows its
 real debug or release JavaScript without executing it. Both use the

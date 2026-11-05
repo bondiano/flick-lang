@@ -1,5 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
+source_hash: 64cfc1c043faff7d
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.

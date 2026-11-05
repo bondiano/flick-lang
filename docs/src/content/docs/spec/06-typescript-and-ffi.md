@@ -1,5 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
+source_hash: c393f4bd1733a620
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.

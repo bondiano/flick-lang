@@ -1,5 +1,6 @@
 ---
 title: "Типизированные HTTP API"
+source_hash: db3e11dcdd9035aa
 ---
 
 `HttpApi` позволяет описать HTTP API значениями программы: эндпоинты

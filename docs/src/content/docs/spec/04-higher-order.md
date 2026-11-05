@@ -1,5 +1,6 @@
 ---
 title: "Higher-order functions and collection traversal"
+source_hash: 005865772d77c367
 ---
 
 ## Pure and effectful traversal

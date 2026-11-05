@@ -1,6 +1,7 @@
 ---
 title: Flick и Effect
 description: Как Flick использует Effect, чем отличается от TypeScript и какой вариант выбрать для проекта.
+source_hash: a8bb0046b156d5a1
 ---
 
 **Effect — библиотека TypeScript. Flick — отдельный язык семейства ML,

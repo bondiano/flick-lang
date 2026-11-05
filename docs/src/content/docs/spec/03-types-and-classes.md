@@ -1,5 +1,6 @@
 ---
 title: "Types and classes"
+source_hash: cd26725b3922c07b
 ---
 
 ## Computations and kinds

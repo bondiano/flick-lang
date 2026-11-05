@@ -1,5 +1,6 @@
 ---
 title: "Values of computations and their execution"
+source_hash: 970be240a91155c2
 ---
 
 ## Two different kinds of functions
