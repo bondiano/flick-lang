@@ -100,3 +100,77 @@ let make_cell () =
     let fixed = fs::read_to_string(dir.join("src/App/Kinds.fl")).expect("source");
     assert_eq!(fixed, text.replace("kinds : List Kind =", "kinds ="));
 }
+
+#[test]
+fn fix_rewrites_the_flick_blocks_of_a_markdown_page() {
+    let page = r#"---
+title: Kinds
+---
+
+Prose with two trailing spaces  
+and `let kinds : List Kind = [A, B]` inline.
+
+```flick
+# type Kind = A | B
+#
+let kinds : List Kind = [A, B]
+```
+
+```flick
+# firsts : Option Float -> Option Float
+let firsts o =
+  do {
+    y <- o
+    pure y
+  }
+# let more = 1
+```
+
+```flick ignore
+let kinds : List Kind = [A, B]
+```
+
+```flick keep
+# type Kind = A | B
+let kinds : List Kind = [A, B]
+```
+
+```flick fail
+# type Kind = A | B
+let kinds : List Kind = [A, B]
+let wrong : Int = "no"
+```
+
+```flick
+# let shown = 1
+let wrong : Int = "no"
+```
+"#;
+    let dir = common::project("check_fix_page", &[("page.md", page)]);
+    let run = || common::flick_in(&dir, &["check", "--fix", "--color", "never", "page.md"]);
+    let out = run();
+    let fixed = fs::read_to_string(dir.join("page.md")).expect("page");
+    // only the default blocks change, and the line count with them; `keep`
+    // is checked but left as written
+    let expected = page
+        .replace("#\nlet kinds : List Kind =", "#\nlet kinds =")
+        .replace("  do {\n    y <- o\n    pure y\n  }\n", "  o\n");
+    assert_eq!(fixed, expected, "{out:?}");
+    // the error left in the last block, at its line and column of the page
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8(out.stderr).expect("utf-8 stderr");
+    let at = fixed.rfind("let wrong").expect("the line");
+    let line = 1 + fixed[..at].matches('\n').count();
+    assert!(
+        stderr.contains(&format!("--> page.md:{line}:19")),
+        "{stderr}"
+    );
+    assert_eq!(stderr.matches("error[").count(), 1, "{stderr}");
+    // a second run has nothing left to fix
+    let again = run();
+    assert_eq!(
+        fs::read_to_string(dir.join("page.md")).expect("page"),
+        fixed
+    );
+    assert_eq!(String::from_utf8(again.stderr).expect("utf-8"), stderr);
+}

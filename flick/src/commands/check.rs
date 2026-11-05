@@ -12,6 +12,8 @@ use crate::command::{Command, Outcome};
 use crate::package_cache;
 use crate::sources::{self, FsHost};
 
+mod pages;
+
 pub struct CheckCommand {
     options: CheckArguments,
     project: Option<String>,
@@ -25,8 +27,30 @@ impl CheckCommand {
 
 impl Command for CheckCommand {
     fn run(&self) -> Outcome {
+        let (pages, paths): (Vec<String>, Vec<String>) =
+            (self.options.paths.iter().cloned()).partition(|p| pages::is_page(p));
+        // Markdown pages alone check no Flick sources, not the whole project
+        let mut outcome = if paths.is_empty() && !pages.is_empty() {
+            Outcome::default()
+        } else {
+            self.check_files(&paths)
+        };
+        for page in &pages {
+            let diagnostics = pages::check(&mut outcome.sources, page, self.options.fix);
+            outcome.diagnostics.extend(diagnostics);
+        }
+        outcome
+    }
+}
+
+/// How many times `--fix` checks and fixes again at most.
+const FIX_PASSES: usize = 10;
+
+impl CheckCommand {
+    /// The diagnostics of the Flick files of `paths`, fixed first with `--fix`.
+    fn check_files(&self, paths: &[String]) -> Outcome {
         let host = FsHost::new();
-        let (mut outcome, mut roots) = self.check(&host);
+        let (mut outcome, mut roots) = self.check(&host, paths);
         if !self.options.fix {
             return outcome;
         }
@@ -38,26 +62,16 @@ impl Command for CheckCommand {
             if !changed {
                 break;
             }
-            (outcome, roots) = self.check(&host);
+            (outcome, roots) = self.check(&host, paths);
         }
         outcome.diagnostics.extend(errors);
         outcome
     }
-}
 
-/// How many times `--fix` checks and fixes again at most.
-const FIX_PASSES: usize = 10;
-
-impl CheckCommand {
-    /// The diagnostics of the selected files, and those files.
-    fn check(&self, host: &FsHost) -> (Outcome, Vec<PathBuf>) {
+    /// The diagnostics of the files selected by `paths`, and those files.
+    fn check(&self, host: &FsHost, paths: &[String]) -> (Outcome, Vec<PathBuf>) {
         let mut sources = SourceMap::default();
-        let (project, roots) = match select(
-            host,
-            &mut sources,
-            self.project.as_deref(),
-            &self.options.paths,
-        ) {
+        let (project, roots) = match select(host, &mut sources, self.project.as_deref(), paths) {
             Ok(selected) => selected,
             Err(diagnostic) => {
                 let diagnostics = vec![diagnostic];
@@ -114,9 +128,18 @@ fn apply_fixes(outcome: &Outcome, roots: &[PathBuf], cwd: &Path) -> (bool, Vec<D
     (changed, errors)
 }
 
-/// `text` with `fixes`, each made whole or not at all: one with an edit
-/// that overlaps an edit of a fix already taken is left out.
+/// `text` with `fixes`, each made whole or not at all.
 fn fixed(text: &str, fixes: Vec<&[Edit]>) -> String {
+    let mut out = text.to_owned();
+    for edit in taken(fixes) {
+        out.replace_range(edit.span.range(), &edit.replacement);
+    }
+    out
+}
+
+/// The edits of `fixes`, last first, each fix whole or not at all: one with
+/// an edit that overlaps an edit of a fix already taken is left out.
+fn taken(fixes: Vec<&[Edit]>) -> Vec<&Edit> {
     let overlaps = |a: &Edit, b: &Edit| {
         a.span.start < b.span.end && b.span.start < a.span.end
             || a.span.start == b.span.start && a.span.end == b.span.end
@@ -128,11 +151,7 @@ fn fixed(text: &str, fixes: Vec<&[Edit]>) -> String {
         }
     }
     taken.sort_by_key(|e| Reverse((e.span.start, e.span.end)));
-    let mut out = text.to_owned();
-    for edit in taken {
-        out.replace_range(edit.span.range(), &edit.replacement);
-    }
-    out
+    taken
 }
 
 /// The project and the root files a command works on: `paths`, or without
