@@ -122,7 +122,10 @@ impl Checker<'_> {
                     None => format!(
                         "`Atom.{name}` takes its key from the top-level binding it defines: define the atom with a top-level `let` without parameters"
                     ),
-                    Some(_) if in_function || constrained => format!(
+                    Some(b) if constrained => format!(
+                        "`Atom.{name}` in `{b}`, whose type takes a dictionary, would make an atom at each use of `{b}`: drop the constraint from its signature"
+                    ),
+                    Some(_) if in_function => format!(
                         "`Atom.{name}` inside a function would give its key to every atom the function makes: define the atom with a top-level `let`"
                     ),
                     Some(_) if keyed.applied.get(&range) != Some(&key_arity(&name)) => format!(
