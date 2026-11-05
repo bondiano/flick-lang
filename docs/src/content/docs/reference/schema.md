@@ -32,7 +32,7 @@ it is `FLICK-D006`.
 
 ## Deriving
 
-`deriving Schema` defines the witness `schema T`. The plugin of `std` writes
+`deriving Schema` defines the witness `T.schema`. The plugin of `std` writes
 it in Flick, with the combinators of `Schema` below, which `flick expand`
 shows:
 
@@ -46,7 +46,7 @@ shows:
 ```flick
 tree_schema : Schema a -> Schema (Tree a)
 let tree_schema item_schema =
-  schema Tree item_schema
+  Tree.schema item_schema
 ```
 
 Every field needs a witness: a primitive, `List`, `Option`, `Result`,
@@ -56,7 +56,7 @@ of another module, an alias among them, names its own witness, so it
 derives `Schema` too. A reference to a type of the same module is lazy, so
 recursive and mutually recursive types work. A function, a `Ref`, a scoped
 resource or a runtime description (`Eff`, `Layer`, a codec) has no witness:
-`std/D001` names the path of the field, as `Session.handler`. `schema T` of
+`std/D001` names the path of the field, as `Session.handler`. `T.schema` of
 a type that does not derive `Schema` is `FLICK-D001`.
 
 The combinators the derive writes are values of `Schema` a program may use:
@@ -76,19 +76,27 @@ the derive writes them under the witness's signature.
 
 ## The codec DSL
 
+A `codec` block is the plugin `codec` of `std`, which a file imports from
+`Codec`. A type's witness is `T.schema`.
+
 ```flick
+import Codec exposing (plugin codec)
+
 profile_json : PureCodec Json Profile
 let profile_json =
-  codec (schema Profile) {
+  codec Profile.schema {
     email = field "email_address" Email.json;
     nickname = field "nickname" (option_as_null String.json);
   }
 ```
 
 A `codec` block over the schema of a record gives every field exactly once:
-a missing field is `FLICK-D002`, one given twice `FLICK-D003`, one the record
-does not have `FLICK-D004`, and two fields with the same wire name
-`FLICK-D005`. A block over a schema that is not of a record is `FLICK-D007`.
+a missing field is `std/D002`, one given twice `std/D003`, one the record
+does not have `std/D004`, and two fields with the same wire name
+`std/D005`. A block over a schema that is not of a record is `std/D007`, and
+a field whose codec decodes another type than the record's is `std/D012`.
+The block is a `PureCodec`, or a `Codec` of the services a field needs when
+one calls `field_effect` or `on_missing_effect`.
 Keys the block does not name are refused unless the codec goes through
 `ignore_extra_fields`.
 

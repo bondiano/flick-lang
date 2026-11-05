@@ -63,7 +63,7 @@ The codec's captures are preserved on a partially applied function; the provenan
 
 ## Types and Schema from one declaration
 
-The grammar is `refined type`, `deriving Schema`, `schema T` and `codec witness { ... }`. A refinement is a nominal type with a closed constructor, a pure predicate, a safe `parse` and access to the underlying value. The predicate returns Bool and does not normalize the value; false is a validation failure, and an unexpected defect remains a defect. Trim/lowercase/parse live in the codec transformation. `Checks.email` is a concrete library check, not a promise to validate every email address.
+The grammar is `refined type`, `deriving Schema`, the witness `T.schema` and std's plugin `codec witness { ... }`. A refinement is a nominal type with a closed constructor, a pure predicate, a safe `parse` and access to the underlying value. The predicate returns Bool and does not normalize the value; false is a validation failure, and an unexpected defect remains a defect. Trim/lowercase/parse live in the codec transformation. `Checks.email` is a concrete library check, not a promise to validate every email address.
 
 ```flick
 refined type Email = String where Checks.email
@@ -76,7 +76,7 @@ type alias Profile = {
 
 profile_schema : Schema Profile
 let profile_schema =
-  schema Profile
+  Profile.schema
 
 profile_json : PureCodec Json Profile
 let profile_json =
@@ -114,7 +114,7 @@ type alias Preferences = {
 
 preferences_json : PureCodec Json Preferences
 let preferences_json =
-  codec (schema Preferences) {
+  codec Preferences.schema {
     nickname = optional_field "nickname" String.json;
     quota =
       field "quota" Float.json_finite
@@ -157,7 +157,7 @@ type Tree a =
 
 tree_schema : Schema a -> Schema (Tree a)
 let tree_schema item_schema =
-  schema Tree item_schema
+  Tree.schema item_schema
 
 type alias PairOf f = {
   count : f Float;
@@ -167,7 +167,7 @@ type alias PairOf f = {
 pair_of_schema :
   (forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)
 let pair_of_schema make_schema =
-  schema PairOf make_schema
+  PairOf.schema make_schema
 ```
 
 `List` here is the immutable source API over a dense JS array. `make_schema` is applied at different types and uses higher-rank checking. `Schema a` is a witness value that is passed around, not a hidden class constraint.

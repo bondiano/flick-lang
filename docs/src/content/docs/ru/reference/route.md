@@ -26,7 +26,7 @@ profile : Atom.Atom (Atom.Async String {NotFound})
 let profile =
   Atom.serializable_result
     (Codec.json Schema.string)
-    (Codec.json (schema NotFound))
+    (Codec.json NotFound.schema)
     (Atom.loader page (fun p -> task {
       match p with
       | User id -> App.Api.user_name id
@@ -78,7 +78,7 @@ let profile =
 уточнённых типов. Origin и фрагмент он пропускает. Печать и разбор
 обратимы для всякого значения, чей текст — корректный Unicode:
 `tests/run/schema/route.fl` проверяет это `Arbitrary.check` над
-`schema Page`.
+`Page.schema`.
 
 ## Маршруты как пути API
 

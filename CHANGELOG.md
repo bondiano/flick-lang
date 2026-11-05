@@ -23,7 +23,7 @@ break programs.
   plugin makes of blocks for its tests, `flick expand` prints the code of a
   program's blocks, and `flick new --template plugin` makes a library with a
   plugin.
-- **Plugins, interface `0.3.0`:** a block without a body (`schema Shape`,
+- **Plugins, interface `0.3.0`:** a block without a body (`Shape.schema`,
   raw text as `head r#"…"#`), heads with names and numbers among their
   arguments (`sql p { … }`), and blocks that are declarations: `head table
   Name "t" { … }`, or a head before the rest of a declaration (`server fn
@@ -72,6 +72,16 @@ break programs.
   of a record derives `Schema` for it), and `server name` of a value that
   is no `server fn` stays `FLICK-E010`. `FLICK-E012` and the `server-stdlib`
   feature are gone: every build has the plugin.
+- **Breaking:** `schema T` is `T.schema`, the witness a type's companion
+  names; `flick check --fix` rewrites it. `codec s { … }` is the plugin
+  `codec` of `std`: a file that has one imports `Codec exposing (plugin
+  codec)`, which the fix of `FLICK-P037` adds. Its diagnostics are
+  `std/D002` to `std/D005` and `std/D007` with the texts they had, and a
+  field whose codec decodes another type than the record's is `std/D012`.
+  A block is a `Codec` of services when a field calls `field_effect` or
+  `on_missing_effect`. `schema` and `codec` are no keywords.
+- **Plugins, interface `0.11.0`:** `hover` gets the facts of the block's
+  code, as `check` does, once it checked.
 - **Plugins, interface `0.10.0`:** `check` after checking: a plugin gets the
   type the checker found for each `_` of its code, at the span it gave it,
   with the fields of a closed record, and may add errors under its codes.

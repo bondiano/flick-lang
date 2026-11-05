@@ -63,7 +63,7 @@ Codec.encode_result :
 
 ## Типы и Schema из одного объявления
 
-Для схем предусмотрены конструкции `refined type`, `deriving Schema`, `schema T` и `codec witness { ... }`. Уточняющий тип — номинальный тип с закрытым конструктором, чистым предикатом, безопасной функцией `parse` и доступом к исходному значению. Предикат возвращает Bool и не нормализует значение: false означает ошибку проверки, а неожиданный дефект остаётся дефектом. Обрезку пробелов, приведение к нижнему регистру и разбор значений выполняют при преобразовании в кодеке. `Checks.email` — конкретная библиотечная проверка, а не гарантия полной проверки всех адресов электронной почты.
+Для схем предусмотрены конструкции `refined type`, `deriving Schema`, свидетель `T.schema` и плагин std `codec witness { ... }`. Уточняющий тип — номинальный тип с закрытым конструктором, чистым предикатом, безопасной функцией `parse` и доступом к исходному значению. Предикат возвращает Bool и не нормализует значение: false означает ошибку проверки, а неожиданный дефект остаётся дефектом. Обрезку пробелов, приведение к нижнему регистру и разбор значений выполняют при преобразовании в кодеке. `Checks.email` — конкретная библиотечная проверка, а не гарантия полной проверки всех адресов электронной почты.
 
 ```flick
 refined type Email = String where Checks.email
@@ -76,7 +76,7 @@ type alias Profile = {
 
 profile_schema : Schema Profile
 let profile_schema =
-  schema Profile
+  Profile.schema
 
 profile_json : PureCodec Json Profile
 let profile_json =
@@ -116,7 +116,7 @@ type alias Preferences = {
 
 preferences_json : PureCodec Json Preferences
 let preferences_json =
-  codec (schema Preferences) {
+  codec Preferences.schema {
     nickname = optional_field "nickname" String.json;
     quota =
       field "quota" Float.json_finite
@@ -163,7 +163,7 @@ type Tree a =
 
 tree_schema : Schema a -> Schema (Tree a)
 let tree_schema item_schema =
-  schema Tree item_schema
+  Tree.schema item_schema
 
 type alias PairOf f = {
   count : f Float;
@@ -173,7 +173,7 @@ type alias PairOf f = {
 pair_of_schema :
   (forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)
 let pair_of_schema make_schema =
-  schema PairOf make_schema
+  PairOf.schema make_schema
 ```
 
 `List` здесь — API Flick для неизменяемой коллекции на основе JS-массива без пропусков. `make_schema` применяется к разным типам и проверяется с полиморфизмом высших рангов. `Schema a` — явно передаваемое значение-свидетельство, а не скрытое ограничение класса.

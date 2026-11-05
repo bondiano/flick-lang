@@ -37,7 +37,7 @@ Qualified names are written without spaces around `.`: `Users.get`,
 ```text
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
-instance deriving foreign from forall not none true false schema codec
+instance deriving foreign from forall not none true false
 sql ui in when for yield do
 ```
 
@@ -154,7 +154,7 @@ a range, `1.5` a number. Bitwise operations are the functions `Float.bit_*`.
 Function bodies, match arms and the members of `class`, `instance` and
 `service` are delimited by indentation; there is no `in` and the last
 expression of a block is its value (see [Direct effectful calls](../../spec/01-direct-calls/)). Braces delimit records and the
-blocks of `task`, `scope`, `provide`, `sql`, `ui`, `codec`, `rec` and plugins.
+blocks of `task`, `scope`, `provide`, `sql`, `ui`, `rec` and plugins.
 
 1. Top-level declarations start at column 1. A line indented further continues
    the current declaration.
@@ -385,7 +385,6 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "do" "{" do_stmt { ";" | line break … } "}"
             | "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
-            | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
             | head { head_arg } ["{" { token } "}"]
                                             // a head an import exposes as `plugin head`, with an
@@ -436,7 +435,7 @@ too). `f x?` is `f (x?)`; write `(f x)?`.
 only in a signature or annotation. `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). `ignore e` discards a non-`Unit`
 result of an intermediate statement (see [Direct effectful calls](../../spec/01-direct-calls/)). `await e` runs a stored `Eff` once in
 the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/02-computations/)). In
-`provide e { … }` and `codec e { … }` the `{` ends the head expression.
+`provide e { … }` the `{` ends the head expression.
 A plugin block keeps its arguments and body as tokens for its plugin, which
 reads them (see [plugins](../plugins/)). `cli "name" { … }` is the block of
 the plugin of `std`: it reads the clauses, and checks aliases on an `arg` and
@@ -554,7 +553,7 @@ fits; otherwise it breaks, outermost construct first:
 - a value after `=` (`let`, record fields, type aliases), after `->` (`fun`,
   match arms) or after `<-` goes to the next line, one level in. Records,
   lists, tuples, `fun` and blocks in braces (`task`, `ui`, `scope`,
-  `provide`, `do`, `for`, `sql`, `codec`, a plugin's) stay after the `=` and break
+  `provide`, `do`, `for`, `sql`, a plugin's) stay after the `=` and break
   inside instead: `let config = {` … `}`. Several statements always start on
   the next line, and so do `match`, `try` and an `if` that does not fit;
 - statements go one per line; a block in braces with one expression may stay

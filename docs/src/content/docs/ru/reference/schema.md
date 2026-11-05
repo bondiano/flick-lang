@@ -37,7 +37,7 @@ refined type Email = String where Checks.email
 
 ## Автоматический вывод схем
 
-`deriving Schema` создаёт схему, доступную через `schema T`. Её пишет на Flick
+`deriving Schema` создаёт схему, доступную через `T.schema`. Её пишет на Flick
 плагин `std` комбинаторами `Schema` из таблицы ниже; `flick expand` её
 показывает:
 
@@ -51,7 +51,7 @@ refined type Email = String where Checks.email
 ```flick
 tree_schema : Schema a -> Schema (Tree a)
 let tree_schema item_schema =
-  schema Tree item_schema
+  Tree.schema item_schema
 ```
 
 Для каждого поля должна быть схема. Поддерживаются примитивы, `List`,
@@ -64,7 +64,7 @@ let tree_schema item_schema =
 
 Для функции, `Ref`, ресурса с областью владения или описания для среды
 выполнения (`Eff`, `Layer`, кодека) схемы нет. В таком случае `std/D001`
-указывает путь к полю, например `Session.handler`. Выражение `schema T`
+указывает путь к полю, например `Session.handler`. Выражение `T.schema`
 для типа без `deriving Schema` приводит к `FLICK-D001`.
 
 Комбинаторы, которыми пишет вывод, — значения `Schema`, ими может
@@ -85,20 +85,28 @@ let tree_schema item_schema =
 
 ## DSL кодеков
 
+Блок `codec` — плагин `codec` пакета `std`, который файл импортирует из
+`Codec`. Свидетель типа — `T.schema`.
+
 ```flick
+import Codec exposing (plugin codec)
+
 profile_json : PureCodec Json Profile
 let profile_json =
-  codec (schema Profile) {
+  codec Profile.schema {
     email = field "email_address" Email.json;
     nickname = field "nickname" (option_as_null String.json);
   }
 ```
 
 В блоке `codec` для схемы записи нужно указать каждое поле ровно один раз.
-Пропущенное поле приводит к `FLICK-D002`, повторное — к `FLICK-D003`,
-поле, которого нет в записи, — к `FLICK-D004`. Если у двух полей совпадают
-имена в формате передачи, возникает `FLICK-D005`. Блок для схемы, которая
-не описывает запись, приводит к `FLICK-D007`.
+Пропущенное поле приводит к `std/D002`, повторное — к `std/D003`,
+поле, которого нет в записи, — к `std/D004`. Если у двух полей совпадают
+имена в формате передачи, возникает `std/D005`. Блок для схемы, которая
+не описывает запись, приводит к `std/D007`, а поле, кодек которого
+декодирует не тот тип, что у поля записи, — к `std/D012`. Блок — это
+`PureCodec` или, если поле вызывает `field_effect` или `on_missing_effect`,
+`Codec` нужных им сервисов.
 При декодировании неизвестные ключи отклоняются, если к кодеку не применён
 `ignore_extra_fields`.
 

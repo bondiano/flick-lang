@@ -40,7 +40,7 @@ title: "Грамматика Flick"
 ```text
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
-instance deriving foreign from forall not none true false schema codec
+instance deriving foreign from forall not none true false
 sql ui in when for yield do
 ```
 
@@ -169,7 +169,7 @@ let examples =
 выражение блока задаёт его значение
 (см. [Прямые эффектные вызовы](../../spec/01-direct-calls/)).
 Фигурные скобки ограничивают записи и блоки `task`, `scope`, `provide`,
-`sql`, `ui`, `codec`, `rec` и плагинов.
+`sql`, `ui`, `rec` и плагинов.
 
 1. Объявления верхнего уровня начинаются в столбце 1. Строка с большим
    отступом продолжает текущее объявление.
@@ -410,7 +410,6 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "do" "{" do_stmt { ";" | line break … } "}"
             | "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
-            | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
             | head { head_arg } ["{" { token } "}"]
                                             // голова, которую импорт открывает как `plugin head`, с
@@ -466,7 +465,7 @@ clause      = ("from" | "join" | "left_join") name "in" expr
 `await e` один раз запускает сохранённый `Eff` в текущем файбере,
 а `task { … }` создаёт вычисление, не выполняя его
 (см. [Значения вычислений и их выполнение](../../spec/02-computations/)).
-В `provide e { … }` и `codec e { … }` скобка `{` завершает выражение
+В `provide e { … }` скобка `{` завершает выражение
 перед блоком.
 
 Блок плагина хранит аргументы и тело токенами, их читает плагин (см.
@@ -595,7 +594,7 @@ let describe shape =
 - значение после `=` (`let`, поля записей, синонимы типов), после `->` (`fun`,
   ветви `match`) или после `<-` переносится на следующую строку с отступом.
   Записи, списки, кортежи, `fun` и блоки в фигурных скобках (`task`, `ui`,
-  `scope`, `provide`, `do`, `for`, `sql`, `codec`, блок плагина) остаются после `=`
+  `scope`, `provide`, `do`, `for`, `sql`, блок плагина) остаются после `=`
   и разбиваются внутри: `let config = {` … `}`. Несколько инструкций всегда
   начинаются со следующей строки, как и `match`, `try` и не помещающийся `if`;
 - инструкции идут по одной на строку; блок в фигурных скобках с одним

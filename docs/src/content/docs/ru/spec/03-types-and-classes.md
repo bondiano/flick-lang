@@ -146,8 +146,8 @@ decode_pair :
   (forall a. Schema a -> Unknown ->{r; SchemaError} a) ->
   Unknown -> Unknown ->{r; SchemaError} (User, Settings)
 let decode_pair decode user_input settings_input =
-  let user = decode (schema User) user_input
-  let settings = decode (schema Settings) settings_input
+  let user = decode User.schema user_input
+  let settings = decode Settings.schema settings_input
   (user, settings)
 ```
 

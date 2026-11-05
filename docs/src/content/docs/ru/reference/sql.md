@@ -337,7 +337,7 @@ backend держит программа и как долго.
 let count_rows table =
   Sql.unsafe_query
     [Sql.unsafe_text "select count(*)::int as n from ", Sql.ident table]
-    (Codec.json (schema Count))
+    (Codec.json Count.schema)
 ```
 
 Не поддерживаются коррелированные подзапросы, подзапросы `LATERAL`,
