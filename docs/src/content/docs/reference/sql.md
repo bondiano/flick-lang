@@ -51,7 +51,10 @@ never written.
 A column of another type needs `via codec`, a `PureCodec` from the Flick
 type of its SQL type (`FLICK-Q011` otherwise). `Sql.codec decode encode`
 makes one; `decode` may refuse a value with a `SchemaError`. A `Float` never
-holds a `bigint` or a `numeric` without such a checked codec.
+holds a `bigint` or a `numeric` without such a checked codec. An enum of the
+column's Flick type needs none: `role : text not null as Role` reads the
+column through `Role.parse`, so a value the enum does not know is a
+`DecodeError`.
 
 The compiler never connects to a database: tables are written, or come
 from the module's migrations (below).

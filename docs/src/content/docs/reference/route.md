@@ -53,7 +53,9 @@ A type that derives `Url` derives `Schema` too. Each constructor is a path:
 - Each field after it is a segment: a `String`, a `Float`, a `Bool` or a
   refined type over one of them, or a type whose constructors have no
   fields, written as the constructor's name in kebab case (`Favorites` is
-  `favorites`). Such a type gives the words of a nested path:
+  `favorites`), or an enum, written as its literal (`Get = "GET"` is
+  `GET`), which must hold no `/`, `?` or `#`. Such a type gives the words
+  of a nested path:
   `type Tab = Favorites` and `Profile String (Option Tab)` above.
 - The last segment may be an `Option` of one: `None` leaves it out of the
   URL, so one constructor has the URLs with and without it.

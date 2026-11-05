@@ -66,7 +66,7 @@ A value of type `T` is parsed by the class `Cli.Value T`: instances exist for
 `Redacted String`, `DateTime.DateTime` (ISO 8601) and `(String, String)`
 (`key=value`, split at the first `=`). `deriving Cli.Value` makes one for a type of constructors
 without fields — a choice among their names in kebab case, `GreenLight` is
-`green-light` — and for a refined type, which parses its base and checks its
+`green-light`, or among an enum's literals — and for a refined type, which parses its base and checks its
 predicate.
 
 ## Combinators
