@@ -1,0 +1,28 @@
+/// A value of an enum, or a literal the enum does not know: what an outside
+/// API may send beyond the values a program knows. `Unknown "GET"` is never
+/// `Known Get`: `parse` knows every literal of the enum.
+module Open exposing (Open(..), parse, value, schema)
+
+import Enum
+
+type Open t b = Known t | Unknown b
+  deriving Eq, Show
+
+/// `Known` the value of a literal of the enum, `Unknown` any other literal.
+parse : Enum.Enum t b => b -> Open t b
+let parse literal =
+  match Enum.parse literal with
+  | Ok known -> Known known
+  | Err _ -> Unknown literal
+
+/// The literal of the value, known or not.
+value : Enum.Enum t b => Open t b -> b
+let value open_ =
+  match open_ with
+  | Known known -> Enum.value known
+  | Unknown literal -> literal
+
+/// The schema whose wire form is the literal of `base`: any literal decodes,
+/// a known one as `Known`.
+schema : Enum.Enum t b => Schema b -> Schema (Open t b)
+let schema base = Codec.to_schema (Codec.transform parse value (Codec.json base))

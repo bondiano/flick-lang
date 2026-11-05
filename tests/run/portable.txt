@@ -102,6 +102,7 @@ schema/policies
 schema/route
 schema/route_nested
 schema/combinators
+schema/enums
 stdlib/http/headers
 stdlib/http/values
 stdlib/effect/codec

@@ -33,6 +33,7 @@ Checks
 Schema
 Route
 Codec
+Open
 Codec.Derive
 Json
 Sql

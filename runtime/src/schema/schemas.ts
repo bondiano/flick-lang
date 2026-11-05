@@ -177,6 +177,30 @@ export const schemaAdt = (name: string, variants: ReadonlyArray<Variant>): AnySc
   );
 };
 
+/** An enum: its values are its literals, and so is its wire form; with `tags`, the wire form of a variant type, `{ _tag }` of each literal's constructor. */
+export const schemaEnum = (literals: ReadonlyArray<string | number>, tags: ReadonlyArray<string> | null): AnySchema => {
+  const type = Schema.Union(literals.map((l) => Schema.Literal(l)));
+  if (tags === null) return withJson(type, () => type);
+  return withJson(type, () =>
+    annotate(
+      Schema.Union(
+        literals.map((l, i) => {
+          const tag = tags[i] ?? "";
+          return annotate(
+            mapped(
+              Schema.Literal(l),
+              () => l,
+              () => ({ _tag: tag }),
+            )(Schema.Struct({ _tag: Schema.Literal(tag) })),
+            { "flick/variant": tag },
+          );
+        }),
+      ),
+      { expected: "an object with a `_tag`", "flick/tags": tags, "flick/oneOf": true },
+    ),
+  );
+};
+
 /** A refined type: `base` and a pure predicate; `known` names a check exporters know. */
 export const schemaRefined = (
   name: string,

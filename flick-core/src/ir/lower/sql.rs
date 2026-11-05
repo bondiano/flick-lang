@@ -80,9 +80,10 @@ impl Lower<'_> {
             .columns
             .iter()
             .map(|c| {
-                let codec = match c.via.zip(decl).and_then(|(r, d)| find(d, r)) {
-                    Some(node) => self.expr(node),
-                    None => lit(Lit::Unit, span),
+                let codec = match (c.via.zip(decl).and_then(|(r, d)| find(d, r)), &c.enumerates) {
+                    (Some(node), _) => self.expr(node),
+                    (None, Some((module, ty))) => enum_codec(module, ty, span),
+                    (None, None) => lit(Lit::Unit, span),
                 };
                 record(
                     vec![
@@ -194,6 +195,25 @@ fn string(s: &str, span: Span) -> Expr {
 fn record(fields: Vec<(&str, Expr)>, span: Span) -> Expr {
     let fields = fields.into_iter().map(|(l, e)| (l.to_owned(), e)).collect();
     Expr::new(ExprKind::Record(fields), span)
+}
+
+/// `Sql.codec T.parse T.value` of the enum `ty` of `module`: a value read
+/// from the database is one of its literals, or an error.
+fn enum_codec(module: &str, ty: &str, span: Span) -> Expr {
+    let companion = |member: &str| {
+        let global = ExprKind::Global {
+            module: module.to_owned(),
+            name: companion_name(ty, member),
+        };
+        Expr::new(global, span)
+    };
+    let app = ExprKind::App {
+        func: Box::new(call("codec", companion("parse"), span)),
+        arg: Box::new(companion("value")),
+        stage: Stage::Pure,
+        arg_first: false,
+    };
+    Expr::new(app, span)
 }
 
 fn call(name: &str, arg: Expr, span: Span) -> Expr {

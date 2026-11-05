@@ -1,0 +1,67 @@
+// Enums on the wire: their literals by default, the form of a variant type
+// with `wire = "tag"`, and the JSON Schema of each; in a URL, a segment of
+// an enum is its literal.
+module App.Main exposing (main)
+
+import Open exposing (Open)
+
+untagged type Method = Get = "GET" | Post = "POST" | Delete = "DELETE"
+  deriving Eq, Show, Schema
+
+untagged type Status = Ok200 = 200 | Missing = 404
+  deriving Eq, Show, Schema
+
+untagged type Level = Low = "low" | High = "high"
+  deriving Eq, Show, Schema { wire = "tag" }
+
+type alias Call = { method : Method; status : Status; level : Level }
+  deriving Schema
+
+type Api = Calls Method | Code Status Float
+  deriving Eq, Show, Schema, Url
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+encoded : Schema a -> a -> String
+let encoded s value =
+  match Codec.encode_result (Codec.json s) value with
+  | Ok json -> Json.stringify json
+  | Err (SchemaError issues) -> "encode: " ++ show (List.map (fun i -> i.message) issues)
+
+decoded : Show a => Schema a -> String -> String
+let decoded s text =
+  match Json.parse text with
+  | Err _ -> "not JSON"
+  | Ok input ->
+    match Codec.decode_result (Codec.json s) input with
+    | Ok value -> "ok " ++ show value
+    | Err _ -> "refused " ++ text
+
+exported : String -> Schema a -> String
+let exported name s =
+  match Codec.json_schema name (Codec.json s) with
+  | Ok text -> text
+  | Err _ -> "no JSON Schema"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say (encoded Call.schema { method = Post; status = Missing; level = High })
+  for text <- [
+    "{\"method\": \"DELETE\", \"status\": 200, \"level\": {\"_tag\": \"Low\"}}",
+    "{\"method\": \"PUT\", \"status\": 200, \"level\": {\"_tag\": \"Low\"}}",
+    "{\"method\": \"GET\", \"status\": 500, \"level\": {\"_tag\": \"Low\"}}",
+    "{\"method\": \"GET\", \"status\": 200, \"level\": \"low\"}",
+  ] do
+    say (decoded Call.schema text)
+  say (exported "Method" Method.schema)
+  say (exported "Status" Status.schema)
+  say (exported "Level" Level.schema)
+  for api <- [Calls Delete, Code Missing 2] do say (Route.print Api.url api)
+  for url <- ["/calls/POST", "/calls/post", "/code/200/1"] do
+    say (url ++ " -> " ++ show (Route.parse Api.url url))
+  let open_methods : Schema (Open Method String) = Open.schema Schema.string
+  for text <- ["\"POST\"", "\"PATCH\""] do say (decoded open_methods text)
+  say (encoded open_methods (Open.Known Delete))
+  say (encoded open_methods (Open.Unknown "PATCH"))
+  say (show (Open.parse "GET" : Open Method String))

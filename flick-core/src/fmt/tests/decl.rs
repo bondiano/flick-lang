@@ -103,3 +103,14 @@ fn keeps_attributes() {
     type Option a = @lang none None | @lang some Some a
     ");
 }
+
+/// The arguments of a derive are its plugin's words, kept as written; the
+/// rest of the declaration is laid out.
+#[test]
+fn keeps_the_arguments_of_a_derive() {
+    let src = "untagged type Level = Low = \"low\" | High = \"high\" deriving   Eq,Schema {wire = \"tag\"}\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    untagged type Level = Low = "low" | High = "high"
+      deriving Eq, Schema {wire = "tag"}
+    "#);
+}

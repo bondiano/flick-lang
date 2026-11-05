@@ -317,6 +317,13 @@ func (b *arbASTs) ofCodec(c codec) *arbAST {
 	switch k := c.(type) {
 	case *wire:
 		return b.of(k.s, true)
+	case *enumCodec:
+		// shortcut: the decoded side of an enum, also of its `{ _tag }` wire form; draw the objects when a program generates that wire form
+		members := make([]*arbAST, len(k.values))
+		for i, v := range k.values {
+			members[i] = literalNode(v)
+		}
+		return &arbAST{tag: astUnion, members: members}
 	case *checkedCodec:
 		base := b.ofCodec(k.from)
 		convert := base.convert

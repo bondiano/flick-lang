@@ -194,7 +194,8 @@ const body = (ast: SchemaAST.AST, path: string, defs: Defs): JsonSchema => {
     case "Union": {
       // an absent key is no wire value
       const members = ast.types.filter((t) => t._tag !== "Undefined");
-      const literals = members.flatMap((t) => (t._tag === "Literal" ? [t.literal] : []));
+      // a literal encoded otherwise is written as its wire end
+      const literals = members.flatMap((t) => (t._tag === "Literal" && !wireEnd(t) ? [t.literal] : []));
       if (literals.length === members.length) return { enum: literals };
       return { [notes["flick/oneOf"] ? "oneOf" : "anyOf"]: members.map((t) => schemaOf(t, path, defs)) };
     }

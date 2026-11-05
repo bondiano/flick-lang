@@ -81,6 +81,7 @@ impl Checker<'_> {
                 write: c.write().index().to_owned(),
                 via: None,
                 ty: base_type(dialect, sql.kind),
+                enumerates: None,
             });
         }
         self.declare_table(SqlTable {

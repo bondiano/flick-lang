@@ -14,5 +14,7 @@
 [{ name = "Ada" }]
 2
 0
+[{ id = 1n }]
 DbError 23514 Some "balance_not_negative"
+DecodeError role: (root): not a valid Role
 DecodeError amount: expected a bigint column, the database sent type 25

@@ -225,6 +225,7 @@ impl Checker<'_> {
             write: write.to_owned(),
             via,
             ty,
+            enumerates: None,
         })
     }
 
@@ -262,6 +263,14 @@ impl Checker<'_> {
                         Type::apps(Type::lang(Lang::PureCodec), [base, column.ty.clone()]);
                     self.check(codec, &expected);
                     self.settle_operators();
+                } else if let Some(enumerates) = self.enum_over(&column.ty, &base) {
+                    let table =
+                        (self.typing.sql_tables.iter_mut()).find(|t| t.decl == decl.range());
+                    if let Some(c) =
+                        table.and_then(|t| t.columns.iter_mut().find(|c| c.name == column.name))
+                    {
+                        c.enumerates = Some(enumerates);
+                    }
                 } else if self.unify(&column.ty, &base).is_err() {
                     let (shown, base) = (self.show(&column.ty), self.show(&base));
                     let at = node.nodes().find(|n| is_type(n.kind)).unwrap_or(node);

@@ -3,7 +3,7 @@
 
 use std::mem;
 
-use flick_plugin::{DeriveTarget, TokenKind};
+use flick_plugin::{DeriveTarget, TokenKind, literal_text};
 
 use crate::ty::{self, Ty};
 
@@ -16,6 +16,8 @@ pub enum Form {
         abi: Abi,
         /// `type error E = E …`.
         error: bool,
+        /// The value of each constructor's literal, of an enum.
+        literals: Vec<String>,
     },
     Alias {
         body: Ty,
@@ -35,6 +37,10 @@ pub enum Abi {
     Tagged,
     Unboxed,
     Untagged,
+    /// An enum, of `Int` literals or of `String` ones.
+    Literal {
+        int: bool,
+    },
 }
 
 /// The kind of a parameter, for its witness.
@@ -109,7 +115,14 @@ pub fn read(target: &DeriveTarget) -> Result<Local, String> {
                 Ok((c.name.clone(), fields))
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let abi = if has("unboxed") {
+        let written: Vec<&str> = (target.cases.iter())
+            .filter_map(|c| c.literal.map(|s| block.text_of(s)))
+            .collect();
+        let abi = if let Some(first) = written.first() {
+            Abi::Literal {
+                int: !first.ends_with('"'),
+            }
+        } else if has("unboxed") {
             Abi::Unboxed
         } else if has("untagged") {
             Abi::Untagged
@@ -120,6 +133,7 @@ pub fn read(target: &DeriveTarget) -> Result<Local, String> {
             cases,
             abi,
             error: has("error"),
+            literals: written.into_iter().map(literal_text).collect(),
         }
     };
     let mut params: Vec<(String, Kind)> = (target.params.iter())

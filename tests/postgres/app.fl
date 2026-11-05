@@ -1,7 +1,8 @@
 // Against a real PostgreSQL: the queries of the SQL subset, a typed
 // LEFT JOIN bound and run directly and as a deferred `Eff`, values that
-// stay data, schema drift as `DecodeError` and a violated constraint as
-// `DbError`. Run by `flick/tests/sql_postgres.rs`.
+// stay data, an enum column read through its literals, schema drift as
+// `DecodeError` and a violated constraint as `DbError`. Run by
+// `flick/tests/sql_postgres.rs`.
 module App.Main exposing (main)
 
 import Sql exposing (Pg, EncodeError, DbError, DecodeError)
@@ -166,6 +167,29 @@ let filtered name = sql {
   select u.name
 }
 
+untagged type Role = Admin = "admin" | Guest = "guest"
+  deriving Eq, Show
+
+/// `roles.role` holds a role the program does not know, `root`.
+sql table Roles "roles" {
+  id : bigint primary key as BigInt
+  role : text not null as Role
+}
+
+having : Sql.Template Pg { role : Role } { id : BigInt }
+let having = sql p {
+  from r in Roles
+  where r.role == p.role
+  select r.id
+}
+
+roles : Sql.Template Pg {} { role : Role }
+let roles = sql {
+  from r in Roles
+  order_by r.id
+  select r.role
+}
+
 drift : Sql.Template Pg {} { amount : BigInt }
 let drift = sql {
   from d in Drift
@@ -210,6 +234,7 @@ let run () =
   let kept =
     (one (open_account, { owner = bob; balance = BigDecimal.from_integer 1n }, { id = 0n })).id
   Platform.stdout_line (show (Database.execute (Sql.bind close { owner = UserId 404n })))
+  Platform.stdout_line (show (Database.query (Sql.bind having { role = Admin })))
   kept
 
 refused : BigInt ->{Database; EncodeError, DbError, DecodeError} String
@@ -229,6 +254,10 @@ let main () =
         provide layer {
           let kept = run ()
           Platform.stdout_line (refused kept)
+          let unknown =
+            try show (Database.query (Sql.bind roles {})) with
+            | DecodeError e -> "DecodeError " ++ e.column ++ ": " ++ e.message
+          Platform.stdout_line unknown
           show (Database.query (Sql.bind drift {}))
         }
       with

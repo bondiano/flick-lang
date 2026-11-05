@@ -10,4 +10,6 @@ create table accounts (
   constraint balance_not_negative check (balance >= 0)
 );
 create table drift (id bigint primary key, amount text not null);
+create table roles (id bigint primary key, role text not null);
+insert into roles values (1, 'admin'), (2, 'root');
 insert into drift values (1, 'twelve');

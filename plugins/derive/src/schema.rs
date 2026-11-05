@@ -57,6 +57,9 @@ pub struct Gen<'m> {
     selves: Vec<(String, String)>,
     /// The type's recursive group.
     group: Vec<String>,
+    /// `deriving Schema { wire = "tag" }`: an enum on the wire as a
+    /// variant type.
+    pub wire_tag: bool,
 }
 
 impl<'m> Gen<'m> {
@@ -68,6 +71,7 @@ impl<'m> Gen<'m> {
                 .collect(),
             selves: Vec::new(),
             group: module.group(&me.name, "Schema"),
+            wire_tag: false,
         }
     }
 
@@ -278,6 +282,26 @@ impl<'m> Gen<'m> {
         let me = local.name.clone();
         let fail = |why: &str| -> Fail { (me.clone(), why.to_owned()) };
         match &local.form {
+            Form::Adt {
+                cases,
+                abi: Abi::Literal { int },
+                ..
+            } => {
+                let base = name(b, if *int { "Schema.int" } else { "Schema.string" });
+                if !self.wire_tag {
+                    return Ok(call(b, "Schema.enum", vec![base]));
+                }
+                let pairs: Vec<NodeId> = (cases.iter())
+                    .map(|(con, _)| {
+                        let wire = con.rsplit('.').next().unwrap_or(con);
+                        let wire = b.expr(Expr::Text(wire.to_owned()));
+                        let c = name(b, con);
+                        b.expr(Expr::Tuple(vec![wire, c]))
+                    })
+                    .collect();
+                let pairs = b.expr(Expr::Items(pairs));
+                Ok(call(b, "Schema.unsafe_enum_tags", vec![base, pairs]))
+            }
             Form::Adt {
                 abi: Abi::Untagged, ..
             } => Err(fail(

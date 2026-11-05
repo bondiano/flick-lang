@@ -202,6 +202,16 @@ fn scalar(module: &Module, ty: &Ty) -> bool {
             form: Form::Abstract,
             ..
         }) => true,
+        // an enum's segment is its literal, whose text its schema reads
+        Some(Local {
+            form:
+                Form::Adt {
+                    abi: Abi::Literal { .. },
+                    literals,
+                    ..
+                },
+            ..
+        }) => (literals.iter()).all(|l| !l.is_empty() && !l.contains(['/', '?', '#'])),
         Some(_) => false,
         // shortcut: a type of another module counts as a scalar, its schema checking the text; read its form from its interface once a derive gets one
         None => !["Unit", "Never", "Unknown", "BigInt"].contains(&short),

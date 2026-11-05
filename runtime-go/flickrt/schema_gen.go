@@ -47,6 +47,9 @@ func drawSchema(fb *Fiber, r rng, s *Schema, depth int) Value {
 		}
 		needsGenerator("the check of " + inner.name)
 	case kindCustom:
+		if e, ok := s.jsonOf().(*enumCodec); ok {
+			return drawEnum(r, e, depth)
+		}
 		// shortcut: a codec's decoded side says it needs a generator, as Effect's declarations do, though JS generates the decoded side of some codecs (strings); walk the codec's type when a program draws from one
 		if s.needs == "" {
 			needsGenerator("a declared type")

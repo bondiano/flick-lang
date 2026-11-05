@@ -15,9 +15,9 @@ pub mod server_fn;
 mod ty;
 mod url;
 
-use flick_plugin::{Arena, Builder, DeriveTarget, Diagnostic};
+use flick_plugin::{Arena, Block, Builder, DeriveTarget, Diagnostic};
 
-use module::Module;
+use module::{Abi, Form, Module};
 use schema::{Fail, Gen};
 
 /// The classes these derives make: the full names `derive` is called with.
@@ -29,10 +29,11 @@ pub const CLASSES: [&str; 4] = [
 ];
 
 /// The code `class` derives for `target`, a type of the module whose types
-/// are `module`.
+/// are `module`, with the arguments of the `deriving`.
 pub fn derive(
     target: &DeriveTarget,
     class: &str,
+    args: Option<&Block>,
     module: &[DeriveTarget],
 ) -> Result<Arena, Vec<Diagnostic>> {
     let whole = target.decl.whole();
@@ -48,9 +49,13 @@ pub fn derive(
     let module = Module::new(module);
     let local = module::read(target).map_err(|why| refuse("D001", (target.name.clone(), why)))?;
     let made = match class {
-        "Prelude.Schema" => Gen::new(&module, &local)
-            .declarations(&mut b, &local)
-            .map_err(|f| refuse("D001", f))?,
+        "Prelude.Schema" => {
+            let mut schemas = Gen::new(&module, &local);
+            schemas.wire_tag = wire_tag(args, &local.form).map_err(|why| {
+                vec![Diagnostic::error(why, args.map_or(whole, Block::whole)).with_code("D001")]
+            })?;
+            (schemas.declarations(&mut b, &local)).map_err(|f| refuse("D001", f))?
+        }
         "Prelude.Url" => {
             url::declarations(&mut b, &module, &local).map_err(|f| refuse("D009", f))?
         }
@@ -63,4 +68,31 @@ pub fn derive(
         }
     };
     Ok(b.finish(made))
+}
+
+/// Whether `deriving Schema { wire = "tag" }` puts an enum on the wire as a
+/// variant type, `{"_tag": "Get"}`, rather than as its literals.
+fn wire_tag(args: Option<&Block>, form: &Form) -> Result<bool, String> {
+    let Some(args) = args else {
+        return Ok(false);
+    };
+    let words: Vec<&str> = (args.tokens.iter())
+        .map(|t| args.text_of(t.span))
+        .filter(|w| !matches!(*w, "{" | "}"))
+        .collect();
+    let enumeration = matches!(
+        form,
+        Form::Adt {
+            abi: Abi::Literal { .. },
+            ..
+        }
+    );
+    match words[..] {
+        [] => Ok(false),
+        ["wire", "=", "\"tag\""] if enumeration => Ok(true),
+        ["wire", "=", "\"tag\""] => {
+            Err("`wire` is an argument of an enum's `deriving Schema`".into())
+        }
+        _ => Err("`deriving Schema` takes one argument, an enum's `{ wire = \"tag\" }`".into()),
+    }
 }
