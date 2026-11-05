@@ -98,8 +98,10 @@ pub fn equal(a: &Term, b: &Term) -> Option<bool> {
             x == y || (x.is_nan() && y.is_nan())
         }
         (Term::Lit(x), Term::Lit(y)) => x == y,
+        // the dictionaries a value of a GADT holds are not compared
         (Term::Apply(Head::Con(c), xs), Term::Apply(Head::Con(d), ys)) => {
-            c == d && all_equal(xs, ys)?
+            let held = c.dicts.min(xs.len()).min(ys.len());
+            c == d && all_equal(&xs[held..], &ys[held..])?
         }
         (Term::Tuple(xs), Term::Tuple(ys)) | (Term::List(xs), Term::List(ys)) => {
             xs.len() == ys.len() && all_equal(xs, ys)?

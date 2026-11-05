@@ -102,6 +102,7 @@ fn con(name: &str, ty: &str, arity: usize) -> Rc<Con> {
         ty: Path::new(T, ty),
         name: name.into(),
         arity,
+        dicts: 0,
     })
 }
 

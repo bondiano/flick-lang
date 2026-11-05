@@ -33,7 +33,7 @@ impl Checker<'_> {
     fn solution(&self, v: &Var) -> Option<&Solved> {
         match v {
             Var::Meta(m) => self.slots[*m as usize].solved.as_ref(),
-            Var::Named(_) => None,
+            Var::Named(n) => self.equalities.iter().rev().find(|(x, _)| x == n).map(|(_, s)| s),
         }
     }
 
@@ -241,7 +241,7 @@ impl Checker<'_> {
         }
     }
 
-    fn bind(&mut self, m: u32, solved: Solved, occurs: &Type) -> Check<()> {
+    pub(super) fn bind(&mut self, m: u32, solved: Solved, occurs: &Type) -> Check<()> {
         let mut ms = BTreeSet::new();
         self.metas(occurs, &mut ms);
         if ms.contains(&m) {
@@ -345,6 +345,14 @@ impl Checker<'_> {
                 .iter()
                 .zip(ys.iter())
                 .try_for_each(|(x, y)| self.unify(x, y)),
+            // an arm of a GADT match learns what a rigid variable is
+            (Type::Var(Var::Named(n)), t) | (t, Type::Var(Var::Named(n))) if self.refining => {
+                if self.mentions(&Var::Named(n.clone()), t) {
+                    return self.mismatch(&a, &b);
+                }
+                self.equalities.push((n.clone(), Solved::Type(t.clone())));
+                Ok(())
+            }
             (Type::Forall(s), Type::Forall(t)) if s.vars.len() == t.vars.len() => {
                 let names: Vec<Inst> = s
                     .vars

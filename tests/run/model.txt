@@ -15,6 +15,9 @@ codegen/services
 codegen/service_dictionary
 codegen/higher_rank
 codegen/functor
+codegen/gadt
+codegen/gadt_dicts
+codegen/gadt_derive
 codegen/generic
 codegen/defaults
 codegen/default_signatures

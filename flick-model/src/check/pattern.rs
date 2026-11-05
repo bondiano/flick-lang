@@ -3,12 +3,14 @@
 //! is left that a wildcard after `Π` would be the first to match.
 
 use std::collections::BTreeMap;
+use std::mem;
 use std::rc::Rc;
 use std::slice;
 
-use super::{Check, Checker, error};
+use super::generalize::Inst;
+use super::{Check, Checker, Solved, error};
 use crate::syntax::{Con, Lit, Name, Pat, Path};
-use crate::types::{Fields, Type, Var};
+use crate::types::{Fields, Kind, Scheme, Type, Var};
 
 /// A constructor of the values of a type, as `Exh` splits them.
 #[derive(Clone, Debug, PartialEq)]
@@ -166,15 +168,37 @@ impl Checker<'_> {
         }
     }
 
-    /// The types of the fields of `K` at `T ῡ`.
+    /// The types of the fields of `K` at `T ῡ`. A constructor of a GADT is
+    /// matched under the substitution θ its result and `T ῡ` unify by: the
+    /// rigid variables it fixes are equalities of the arm, and those it
+    /// leaves open, the types it hides, are rigid in it.
     fn con_fields(&mut self, c: &Con, t: &Type) -> Check<Vec<Type>> {
-        let mut ct = self.constructor(&c.ty.module, &c.name)?;
+        let Some(scheme) = self.decls.constructors.get(&Path::new(&c.ty.module, &c.name)).cloned()
+        else {
+            return error("Var", format!("no constructor `{}.{}`", c.ty.module, c.name));
+        };
+        let gadt = indexed(&scheme);
+        let (mut ct, insts) = self.instantiate_with(&scheme);
         let mut params = Vec::new();
         while let Type::Fun(p, _, r) = ct {
             params.push((*p).clone());
             ct = (*r).clone();
         }
-        self.unify(&self.resolve(&ct), &self.resolve(t))?;
+        let refining = mem::replace(&mut self.refining, gadt);
+        let unified = self.unify(&self.resolve(&ct), &self.resolve(t));
+        self.refining = refining;
+        unified?;
+        if gadt {
+            for (inst, (n, _)) in insts.iter().zip(&scheme.vars) {
+                if let Inst::Type(Type::Var(Var::Meta(m))) = inst
+                    && matches!(self.follow(&Type::Var(Var::Meta(*m))), Type::Var(Var::Meta(x)) if x == *m)
+                {
+                    self.rigid += 1;
+                    let hidden = Type::Var(Var::Named(format!("{n}'{}", self.rigid).as_str().into()));
+                    self.bind(*m, Solved::Type(hidden.clone()), &hidden)?;
+                }
+            }
+        }
         Ok(params)
     }
 
@@ -191,11 +215,25 @@ impl Checker<'_> {
         };
         let rows = expand(rows);
         let used = |c: &Ctor| rows.iter().any(|r| head_is(&r[0], c));
-        match self.signature(first)? {
+        // a constructor no value of `first` is built by needs no row
+        let signature = self.signature(first)?.map(|ctors| {
+            ctors
+                .into_iter()
+                .filter(|c| {
+                    let saved = self.clone();
+                    let builds = self.ctor_fields(c, first).is_ok();
+                    *self = saved;
+                    builds
+                })
+                .collect::<Vec<_>>()
+        });
+        match signature {
             // a constructor no row names is covered only by the rows with a
             // wildcard: the default matrix decides, as below
             Some(ctors) if ctors.iter().all(used) => {
                 for ctor in ctors {
+                    // what the constructor learns holds for its own rows only
+                    let saved = self.clone();
                     let fields = self.ctor_fields(&ctor, first)?;
                     let specialized: Vec<Vec<P>> = rows
                         .iter()
@@ -203,7 +241,9 @@ impl Checker<'_> {
                         .collect();
                     let mut tys = fields;
                     tys.extend(rest.iter().cloned());
-                    if self.missing(specialized, &tys)? {
+                    let missing = self.missing(specialized, &tys);
+                    *self = saved;
+                    if missing? {
                         return Ok(true);
                     }
                 }
@@ -241,6 +281,7 @@ impl Checker<'_> {
                             ty: p.clone(),
                             name: n.clone(),
                             arity: *arity,
+                            dicts: 0,
                         }))
                     })
                     .collect(),
@@ -259,6 +300,7 @@ impl Checker<'_> {
                         .get(e)
                         .and_then(|v| v.first())
                         .map_or(0, |v| v.1),
+                    dicts: 0,
                 }))]
             }
             _ => return Ok(None),
@@ -331,4 +373,31 @@ fn specialize(row: &[P], ctor: &Ctor, n: usize) -> Option<Vec<P>> {
     let mut out = head;
     out.extend(row[1..].iter().cloned());
     Some(out)
+}
+
+/// Whether a constructor of this scheme is one of a GADT: it builds other
+/// than `T ᾱ` over its first variables, or holds a dictionary.
+fn indexed(s: &Scheme) -> bool {
+    let mut t = &s.body;
+    while let Type::Fun(p, _, r) = t {
+        if matches!(**p, Type::Dict(..)) {
+            return true;
+        }
+        t = r;
+    }
+    if let Type::Captured(inner, _) | Type::Bounded(inner, _) = t {
+        t = inner;
+    }
+    let mut args = Vec::new();
+    while let Type::App(h, a) = t {
+        args.push(a);
+        t = h;
+    }
+    args.reverse();
+    let plain = args.len() <= s.vars.len()
+        && args
+            .iter()
+            .zip(&s.vars)
+            .all(|(a, (n, _))| matches!(&***a, Type::Var(Var::Named(x)) if x == n));
+    !plain || s.vars[args.len().min(s.vars.len())..].iter().any(|(_, k)| *k != Kind::Captures)
 }
