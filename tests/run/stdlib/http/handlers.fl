@@ -31,11 +31,10 @@ json_of : PureCodec Json a -> Codec none none Json a
 let json_of c = Codec.general (ignore_extra_fields c)
 
 query : Codec none none Json Query
-let query =
-  json_of (codec (schema Query) { id = field "id" String.json; q = field "q" String.json })
+let query = json_of (codec Query.schema { id = field "id" String.json; q = field "q" String.json })
 
 point : Codec none none Json Point
-let point = Codec.general (Codec.json (schema Point))
+let point = Codec.general (Codec.json Point.schema)
 
 hello : Http.Middleware.Handler none none
 let hello request = Http.ServerResponse.text ("hello " ++ Http.ServerRequest.url request) ok
@@ -98,25 +97,22 @@ let requests () =
   Platform.stdout_line
     ("schema_body_url_params: "
       ++ (show
-        (Http.ServerRequest.schema_body_url_params
-          (Codec.general (Codec.json (schema Note)))
-          form2)))
+        (Http.ServerRequest.schema_body_url_params (Codec.general (Codec.json Note.schema)) form2)))
   Platform.stdout_line
     ("schema_cookies: "
       ++ (show
         (Http.ServerRequest.schema_cookies
-          (json_of (codec (schema Theme) { theme = field "theme" String.json }))
+          (json_of (codec Theme.schema { theme = field "theme" String.json }))
           r)))
   Platform.stdout_line
     ("schema_headers: "
       ++ (show
         (Http.ServerRequest.schema_headers
-          (json_of (codec (schema Theme) { theme = field "content-type" String.json }))
+          (json_of (codec Theme.schema { theme = field "content-type" String.json }))
           r)))
   Platform.stdout_line
     ("schema_search_params: "
-      ++ (show
-        (Http.ServerRequest.schema_search_params (Codec.general (Codec.json (schema Qs))) r)))
+      ++ (show (Http.ServerRequest.schema_search_params (Codec.general (Codec.json Qs.schema)) r)))
   let small = Option.with_default ByteSize.zero (ByteSize.bytes 2)
   try
     Http.ServerRequest.with_max_body_size
@@ -148,18 +144,18 @@ let routes () =
   let item request =
     let by_path =
       Http.Router.schema_path_params
-        (json_of (codec (schema Theme) { theme = field "id" String.json }))
+        (json_of (codec Theme.schema { theme = field "id" String.json }))
     let both = Http.Router.schema_params query request
     let whole =
       Http.Router.schema_no_body
-        (json_of (codec (schema Theme) { theme = field "method" String.json }))
+        (json_of (codec Theme.schema { theme = field "method" String.json }))
         request
     Http.ServerResponse.text (show (by_path, both, whole)) ok
   posted : ServerRequest ->{RouteContext; SchemaError, HttpServerError} ServerResponse
   let posted request =
     let body =
       Http.Router.schema_json
-        (json_of (codec (schema Posted) { body = field "body" (Codec.json (schema Point)) }))
+        (json_of (codec Posted.schema { body = field "body" (Codec.json Point.schema) }))
         request
     Http.ServerResponse.text (show body) ok
   app : ServerRequest ->{; HttpServerError, SchemaError} ServerResponse

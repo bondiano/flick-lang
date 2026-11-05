@@ -36,7 +36,7 @@ import Shared.Types exposing (Box)
 get_box : HttpApi.Endpoint \"get_box\" (HttpApi.Request Unit Unit Unit Unit ->{r;} Box)
 let get_box =
   HttpApi.endpoint HttpApi.Get \"/box\" (Record.label : Record.Label \"get_box\")
-  |> HttpApi.with_success 200 (Codec.json (schema Box))
+  |> HttpApi.with_success 200 (Codec.json Box.schema)
 
 type alias Handlers r = { get_box : HttpApi.Request Unit Unit Unit Unit ->{r;} Box }
 

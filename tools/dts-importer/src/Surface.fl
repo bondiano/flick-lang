@@ -31,7 +31,7 @@ type alias Snapshot = {
 } deriving Schema
 
 snapshot_json : PureCodec Json Snapshot
-let snapshot_json = codec (schema Snapshot) {
+let snapshot_json = codec Snapshot.schema {
   package = field "package" String.json;
   version = field "version" String.json;
   entrypoints = field "entrypoints" (Codec.list String.json);
@@ -45,7 +45,7 @@ type alias Conditions = { types : Option String; default : Option String }
 conditions_json : PureCodec Json Conditions
 let conditions_json =
   ignore_extra_fields
-    (codec (schema Conditions) {
+    (codec Conditions.schema {
       types = optional_field "types" String.json;
       default = optional_field "default" String.json;
     })

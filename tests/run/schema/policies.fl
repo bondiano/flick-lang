@@ -15,7 +15,7 @@ type alias Row = {
 } deriving Schema
 
 row_json : Ref Float -> PureCodec Json Row
-let row_json calls = codec (schema Row) {
+let row_json calls = codec Row.schema {
   required = field "required" String.json;
   nullable = field "nullable" (option_as_null String.json);
   missing = optional_field "missing" String.json;

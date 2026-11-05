@@ -72,7 +72,7 @@ let sleeping =
       Sql.unsafe_text
         "select count(*)::int as n from pg_stat_activity where query = 'select pg_sleep(30)' and state = 'active'",
     ]
-    (Codec.json (schema Count))
+    (Codec.json Count.schema)
 
 put : BigInt -> BigInt ->{Database; EncodeError, DbError, DecodeError} Unit
 let put account amount =

@@ -22,14 +22,14 @@ type alias Expiry = { exp : Option Float }
 header_json : PureCodec Json Header
 let header_json =
   ignore_extra_fields
-    (codec (schema Header) {
+    (codec Header.schema {
       alg = field "alg" String.json;
     })
 
 expiry_json : PureCodec Json Expiry
 let expiry_json =
   ignore_extra_fields
-    (codec (schema Expiry) {
+    (codec Expiry.schema {
       exp = optional_field "exp" Float.json_finite;
     })
 

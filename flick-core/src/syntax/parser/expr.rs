@@ -226,8 +226,7 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::ScopeKw
         | K::ProvideKw
         | K::SqlKw
-        | K::UiKw
-        | K::SchemaKw => true,
+        | K::UiKw => true,
         K::LBrace => !p.no_brace,
         K::Dollar => p.sql_depth > 0,
         _ => false,
@@ -371,11 +370,6 @@ fn atom(p: &mut Parser) -> Option<Done> {
             p.braces(K::Block, sql_clause, at_sql_clause);
             p.sql_depth -= 1;
             K::SqlExpr
-        }
-        K::SchemaKw => {
-            p.bump();
-            con_path(p);
-            K::SchemaExpr
         }
         _ => {
             p.error_expected("an expression");

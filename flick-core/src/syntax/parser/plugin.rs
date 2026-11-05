@@ -1,6 +1,6 @@
 //! Blocks of plugins: `import Sql exposing (plugin sql)` makes `sql` start
 //! a block in the rest of the file. `sql p { … }`, `sql "x" (T) { … }` and
-//! `schema Shape` are expressions; at the start of a declaration,
+//! `server App.Api.place` are expressions; at the start of a declaration,
 //! `sql table Name "t" { … }` and `server fn ping x = …` are declarations.
 //! The arguments, the body and the rest of a declaration are kept as tokens
 //! for the plugin of `Sql`'s package to read. A head only the same

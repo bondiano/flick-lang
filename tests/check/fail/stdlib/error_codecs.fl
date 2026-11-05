@@ -19,7 +19,7 @@ let http () =
   let find =
     HttpApi.endpoint HttpApi.Get "/find" (Record.label : Record.Label "find")
       |> HttpApi.with_errors
-        (HttpApi.errors |> HttpApi.error_case 404 (Codec.json (schema NotFound)))
+        (HttpApi.errors |> HttpApi.error_case 404 (Codec.json NotFound.schema))
   let api =
     HttpApi.api "app"
       |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "app") |> HttpApi.add find)
@@ -32,7 +32,7 @@ rpc : Unit ->{; Rpc.ServeError} Unit
 let rpc () =
   let find =
     Rpc.make (Record.label : Record.Label "find")
-      |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
+      |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json NotFound.schema))
   scope s {
     let _server =
       Rpc.listen Rpc.defaults (Rpc.group |> Rpc.add find) { find = fun () -> ignore (lookup 1) }

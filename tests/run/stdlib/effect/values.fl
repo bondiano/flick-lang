@@ -47,7 +47,7 @@ let miss r =
   | Err (SchemaError issues) -> String.join ", " (List.map (fun i -> i.message) issues)
 
 json : Shape -> Result SchemaError Json
-let json s = Codec.encode_result (Codec.json (schema Shape)) s
+let json s = Codec.encode_result (Codec.json Shape.schema) s
 
 describe : JsonPatch.Operation -> String
 let describe op =

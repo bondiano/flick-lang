@@ -6,7 +6,7 @@ type alias Point = { x : Float; y : Float }
   deriving Schema
 
 point : Codec none none Json Point
-let point = Codec.general (Codec.json (schema Point))
+let point = Codec.general (Codec.json Point.schema)
 
 text : Codec none none Json String
 let text = Codec.general String.json

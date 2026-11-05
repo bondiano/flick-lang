@@ -354,7 +354,6 @@ impl Checker<'_> {
             K::FunExpr => K::FunKw,
             K::UiExpr => K::UiKw,
             K::SqlExpr => K::SqlKw,
-            K::SchemaExpr => K::SchemaKw,
             _ => return,
         };
         if let Some(kw) = node.child_tokens().find(|t| t.kind == head) {

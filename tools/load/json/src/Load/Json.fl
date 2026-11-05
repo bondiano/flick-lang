@@ -20,7 +20,7 @@ type alias Item = {
 } deriving Schema
 
 item : Codec none none Json Item
-let item = Codec.general (Codec.json (schema Item))
+let item = Codec.general (Codec.json Item.schema)
 
 stored : String
 let stored =

@@ -10,7 +10,7 @@ cfd4deeeb00ff9b0  01-direct-calls:8  load_name : UserId ->{Users, Log; NotFound}
 589f6dc98bbfef4f  03-types-and-classes:42  class Functor (f : Type -> Type) =
 351c17a8bae37ce1  03-types-and-classes:63  class Show a =
 0132888d2341123b  03-types-and-classes:125  apply_twice :
-74a14e74a12990e3  03-types-and-classes:133  decode_pair :
+2dff8ba5626f88c1  03-types-and-classes:145  decode_pair :
 9bdd6c03c6da66f8  03-types-and-classes:159  name :
 59ea26d822a0c2ae  03-types-and-classes:213  class Convert input output =
 ecba8ed13060594d  03-types-and-classes:238  class Collection c a | c -> a =
@@ -49,6 +49,6 @@ ff39f2dd8833d1d9  08-type-programming-and-edsl:32  type alias BalanceRow = {
 0d6f75c0a06b0061  08-type-programming-and-edsl:76  type alias SaveButtonProps c = {
 2c80c55aef7a08d4  08-type-programming-and-edsl:104  component counter (start : Float) =
 65d70b27c2164cf0  08-type-programming-and-edsl:139  import Cli exposing (plugin cli)
-668add0bc080fbe5  07-schema:69  refined type Email = String where Checks.email
-79692889cfb7adad  07-schema:112  type alias Preferences = {
-d58e74639bc698be  07-schema:159  type Tree a =
+f8f9582514af7ef5  07-schema:69  refined type Email = String where Checks.email
+0027637b2b681c4e  07-schema:112  type alias Preferences = {
+16ddba9438dc4858  07-schema:159  type Tree a =

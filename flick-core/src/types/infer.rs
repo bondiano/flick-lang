@@ -279,7 +279,6 @@ impl Checker<'_> {
             K::DoExpr => self.do_expr(node, None),
             K::ScopeExpr => self.scope_expr(node, None),
             K::ProvideExpr => self.provide(node, None),
-            K::SchemaExpr => self.schema_expr(node),
             K::UiExpr => {
                 self.ui += 1;
                 let ty = node

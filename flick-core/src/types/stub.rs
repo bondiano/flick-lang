@@ -24,6 +24,22 @@ impl Checker<'_> {
         }) else {
             return;
         };
+        // `schema T`, as a type's witness was written before `T.schema`
+        if let (Some(ty), "schema") = (args.first().filter(|a| self.is_type_path(a)), name.as_str())
+        {
+            let (start, end) = (span.start, self.span(ty).end);
+            let replacement = format!("{}.schema", self.text_of(ty));
+            let d = &mut self.diagnostics[since + i];
+            d.fixes.push(Fix {
+                safe: true,
+                message: format!("write `{replacement}`"),
+                edits: vec![Edit {
+                    span: Span::new(self.file, start, end),
+                    replacement,
+                }],
+            });
+            return;
+        }
         let mut params: Vec<String> = Vec::new();
         for (n, arg) in args.iter().enumerate() {
             let named = (arg.kind == K::NameExpr)
@@ -65,6 +81,18 @@ impl Checker<'_> {
     }
 }
 
+impl Checker<'_> {
+    /// Whether `node` names a type, maybe qualified: `Profile`, `App.Profile`.
+    fn is_type_path(&self, node: &Node) -> bool {
+        let text = self.text_of(node);
+        node.kind == K::NameExpr
+            && text
+                .rsplit('.')
+                .next()
+                .is_some_and(|last| last.starts_with(|c: char| c.is_ascii_uppercase()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::source::SourceMap;
@@ -98,6 +126,15 @@ mod tests {
             out.ends_with("let f n = describe n \"x\"\n\ndescribe : Float -> String -> _\nlet describe n arg2 = todo\n"),
             "{out}"
         );
+    }
+
+    #[test]
+    fn schema_of_a_type_is_its_witness_now() {
+        let out = fixed(
+            "type alias Point = { x : Float }\n  deriving Schema\n\np : Schema Point\nlet p = schema Point",
+            "FLICK-T001",
+        );
+        assert!(out.ends_with("let p = Point.schema\n"), "{out}");
     }
 
     #[test]

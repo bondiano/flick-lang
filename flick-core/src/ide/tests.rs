@@ -73,7 +73,7 @@ let run user =
   List.length [total]
 
 shapes : PureCodec Json Shape
-let shapes = Codec.json (schema Shape)
+let shapes = Codec.json Shape.schema
 
 describe : Show a => a -> Option String
 let describe x = Some (show x)
@@ -314,7 +314,7 @@ fn definition_crosses_modules_and_reaches_builtins_and_instances() {
     );
     assert_eq!(go("App.Main", "Circle 2", 0).1, "Circle");
     // a companion leads to the declaration that derives it
-    assert_eq!(go("App.Main", "Shape)", 0).1, "Shape");
+    assert_eq!(go("App.Main", "Shape.schema", 0).1, "Shape");
     assert_eq!(go("App.Main", "User ->", 0).1, "User");
     assert_eq!(go("App.Main", "total]", 0).1, "total");
     assert_eq!(go("App.Main", "put (", 0).1, "put");
@@ -565,7 +565,7 @@ fn hover_on_a_derived_class_shows_the_instance_it_makes() {
         "{tagged}"
     );
     let schema = hover("Schema\n");
-    assert!(schema.contains("schema Shape"), "{schema}");
+    assert!(schema.contains("Shape.schema"), "{schema}");
     let at = f.at("App.Domain", "Show, Schema", 0);
     let (_, range) = ide.symbol_at(domain, at + 1).expect("Show");
     assert_eq!(range, (at, at + 4));

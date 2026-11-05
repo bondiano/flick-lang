@@ -40,13 +40,13 @@ people : Sql.Query Pg Count
 let people =
   Sql.unsafe_query
     [Sql.unsafe_text "select count(*)::int as n from people"]
-    (Codec.json (schema Count))
+    (Codec.json Count.schema)
 
 halves : Sql.Query Pg Count
 let halves =
   Sql.unsafe_query
     [Sql.unsafe_text "select count(*)::int as n from pg_tables where tablename = 'half'"]
-    (Codec.json (schema Count))
+    (Codec.json Count.schema)
 
 count : Sql.Query Pg Count ->{Database; EncodeError, DbError, DecodeError} Int
 let count query =

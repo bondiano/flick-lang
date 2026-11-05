@@ -38,18 +38,19 @@ validate : Codec.StandardSchema Json Tree -> Unknown ->{} String
 foreign async validate from "./inputs.mjs" "validate"
 
 profile_json : PureCodec Json Profile
-let profile_json = codec (schema Profile) {
+let profile_json = codec Profile.schema {
   email = field "email" Email.json;
   secret = field "secret" (Redacted.json_reveal String.json);
-  session = field "session" (Codec.json (schema Session));
+  session = field "session" (Codec.json Session.schema);
 }
 
 scoped_session : PureCodec Json Profile
-let scoped_session = codec (schema Profile) {
+let scoped_session = codec Profile.schema {
   email = field "email" Email.json;
   secret = field "secret" Redacted.json_masked;
-  session =
-    field "session" (Codec.json (Schema.opaque "Session" "scoped resource has no wire codec"));
+  session = field
+    "session"
+    (Codec.json (Schema.opaque "Session" "scoped resource has no wire codec"));
 }
 
 outcome : Result SchemaError a -> String
@@ -66,7 +67,7 @@ let exported result =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let trees = Codec.json (schema Tree)
+  let trees = Codec.json Tree.schema
   Platform.stdout_line (outcome (Codec.decode_result trees (cyclic ())))
   Platform.stdout_line (outcome (Codec.decode_result trees (shared ())))
   Platform.stdout_line (outcome (Codec.decode_result Float.json_finite (not_a_number ())))
@@ -79,7 +80,7 @@ let main () =
     | Ok e -> e
     | Err _ -> App.fail "not an email"
   let profile = { email = email; secret = secret; session = session }
-  Platform.stdout_line (outcome (Codec.encode_result (Codec.json (schema Profile)) profile))
+  Platform.stdout_line (outcome (Codec.encode_result (Codec.json Profile.schema) profile))
   Platform.stdout_line (outcome (Codec.encode_result profile_json profile))
   Platform.stdout_line (outcome (Codec.encode_result scoped_session profile))
   Platform.stdout_line (exported (Codec.json_schema "Profile" scoped_session))

@@ -14,7 +14,7 @@ type error Teapot = Teapot
   deriving Schema
 
 instance Problem Gone =
-  let problem = { status = 410; body = Codec.json (schema Gone) }
+  let problem = { status = 410; body = Codec.json Gone.schema }
 
 type alias Params = {
   item : Get "/items/:id/:rev" { path : Item } Item {Gone};

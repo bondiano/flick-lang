@@ -20,10 +20,10 @@ type alias Item = { id : String }
   deriving Schema
 
 upload_json : PureCodec Json Upload
-let upload_json = Codec.json (schema Upload)
+let upload_json = Codec.json Upload.schema
 
 item_json : PureCodec Json Item
-let item_json = Codec.json (schema Item)
+let item_json = Codec.json Item.schema
 
 upload : HttpApi.Endpoint "upload" (HttpApi.Request Item Unit Unit Upload ->{r;} Unit)
 let upload =

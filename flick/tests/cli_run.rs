@@ -456,7 +456,7 @@ fn the_spec_examples_and_the_ci_set_pass() {
         Some(0)
     );
     let app = root.join("my-app");
-    let domain = "module App.Domain exposing (User, user_json, api)\n\ntype alias User = { name : String; age : Float }\n  deriving Schema\n\nuser_json : PureCodec Json User\nlet user_json = Codec.json (schema User)\n\nme : HttpApi.Endpoint \"me\" (HttpApi.Request Unit Unit Unit Unit ->{r;} User)\nlet me =\n  HttpApi.endpoint HttpApi.Get \"/me\" (Record.label : Record.Label \"me\")\n  |> HttpApi.with_success 200 user_json\n\napi : HttpApi.Api r { users : { me : HttpApi.Request Unit Unit Unit Unit ->{r;} User } }\nlet api =\n  HttpApi.api \"Users\"\n  |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label \"users\") |> HttpApi.add me)\n";
+    let domain = "module App.Domain exposing (User, user_json, api)\n\ntype alias User = { name : String; age : Float }\n  deriving Schema\n\nuser_json : PureCodec Json User\nlet user_json = Codec.json User.schema\n\nme : HttpApi.Endpoint \"me\" (HttpApi.Request Unit Unit Unit Unit ->{r;} User)\nlet me =\n  HttpApi.endpoint HttpApi.Get \"/me\" (Record.label : Record.Label \"me\")\n  |> HttpApi.with_success 200 user_json\n\napi : HttpApi.Api r { users : { me : HttpApi.Request Unit Unit Unit Unit ->{r;} User } }\nlet api =\n  HttpApi.api \"Users\"\n  |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label \"users\") |> HttpApi.add me)\n";
     fs::write(app.join("src/App/Domain.fl"), domain).expect("write");
     let sessions: [&[&str]; 12] = [
         &["check"],

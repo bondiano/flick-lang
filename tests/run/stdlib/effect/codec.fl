@@ -132,7 +132,7 @@ let main () =
         )
       | Err _ -> "not JSON"
     )
-  let tagged_json = Codec.json (schema Tagged)
+  let tagged_json = Codec.json Tagged.schema
   line
     "to_schema"
     (round "{\"label\": \"a\", \"size\": 1}" (Codec.json (Codec.to_schema tagged_json)))

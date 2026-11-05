@@ -147,24 +147,12 @@ impl Lower<'_> {
                 ExprKind::Scope { owner, outer, body }
             }
             K::ProvideExpr => ExprKind::Provide(self.boxed(children[0]), self.boxed(children[1])),
-            K::SchemaExpr => self.schema(node),
             _ => {
                 self.unsupported(node);
                 ExprKind::Lit(Lit::Unit)
             }
         };
         Expr::new(kind, span)
-    }
-
-    /// `schema T` names the witness.
-    fn schema(&self, node: &Node) -> ExprKind {
-        match self.typing.names.get(&node.range()) {
-            Some(Ref::Value { module, name }) => ExprKind::Global {
-                module: module.clone(),
-                name: name.clone(),
-            },
-            _ => ExprKind::Lit(Lit::Unit),
-        }
     }
 
     /// A field; a polymorphic one with constraints takes their dictionaries.

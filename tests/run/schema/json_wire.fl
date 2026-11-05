@@ -46,13 +46,13 @@ let main () =
     shapes = [Circle 1, Rect 2 3.5, Dot];
     outcome = Ok 7;
   }
-  say (encoded (schema Bag) bag)
-  say (encoded (schema Bag) { bag with outcome = Err "bad" })
-  say (encoded (schema Point) { x = 1; y = -2; label = None })
+  say (encoded Bag.schema bag)
+  say (encoded Bag.schema { bag with outcome = Err "bad" })
+  say (encoded Point.schema { x = 1; y = -2; label = None })
   say (encoded Schema.number (0 / 0))
   say (encoded Schema.number 1e21)
   say (encoded (Schema.list Schema.string) ["a\nb", "\u{7}", "é"])
-  let points = schema Point
+  let points = Point.schema
   for text <- [
     "{\"x\": 1, \"y\": 2, \"label\": \"here\"}",
     "{\"x\": 1, \"y\": 2, \"label\": null}",
@@ -66,7 +66,7 @@ let main () =
     "{\"x\": 1, \"y\": 2, \"label\": 3}",
   ] do
     say (decoded points text)
-  let shapes = schema Shape
+  let shapes = Shape.schema
   for text <- [
     "{\"_tag\": \"Rect\", \"_0\": 1, \"_1\": 2}",
     "{\"_tag\": \"Dot\"}",
@@ -77,7 +77,7 @@ let main () =
     "{\"_tag\": \"Circle\", \"_0\": true}",
   ] do
     say (decoded shapes text)
-  let bags = schema Bag
+  let bags = Bag.schema
   for text <- [
     "{\"count\": \"-42\", \"done\": false, \"nothing\": null, \"pair\": [\"a\", 1], \"shapes\": [], \"outcome\": {\"err\": \"e\"}}",
     "{\"count\": 42, \"done\": false, \"nothing\": null, \"pair\": [\"a\", 1], \"shapes\": [], \"outcome\": {\"ok\": 1}}",

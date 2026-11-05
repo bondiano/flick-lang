@@ -60,12 +60,12 @@ let main () =
   let openapi = JsonSchema.to_openapi_3_1 multi
   line "to_openapi_3_1" (openapi.dialect ++ " " ++ Json.stringify (NonEmpty.head openapi.schemas))
   let text =
-    match Codec.json_schema "Item" (Codec.json (schema Item)) with
+    match Codec.json_schema "Item" (Codec.json Item.schema) with
     | Ok text -> text
     | Err _ -> App.fail "no JSON Schema"
   let exported = JsonSchema.from_draft_2020_12 (json text)
   line "exported to draft-07" (document (JsonSchema.to_draft_07 exported))
-  let differ : Differ.Differ Item Json = Differ.json_patch (Codec.json (schema Item))
+  let differ : Differ.Differ Item Json = Differ.json_patch (Codec.json Item.schema)
   let old = { name = "a"; tags = ["x"] }
   let new = { name = "b"; tags = ["x", "y"] }
   let patch = Differ.diff old new differ

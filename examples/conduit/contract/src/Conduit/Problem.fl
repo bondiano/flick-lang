@@ -39,7 +39,7 @@ let problem subject message = [(subject, [message])]
 
 /// The codec of the body of every error.
 body : PureCodec Json Body
-let body = codec (schema Body) {
+let body = codec Body.schema {
   errors = field "errors" (Codec.entries (Codec.list String.json));
 }
 
@@ -47,7 +47,7 @@ let body = codec (schema Body) {
 unauthorized : PureCodec Json Unauthorized
 let unauthorized =
   Codec.transform_as
-    (schema Unauthorized)
+    Unauthorized.schema
     (fun b -> Unauthorized b.errors)
     (fun (Unauthorized p) -> { errors = p })
     body
@@ -56,7 +56,7 @@ let unauthorized =
 forbidden : PureCodec Json Forbidden
 let forbidden =
   Codec.transform_as
-    (schema Forbidden)
+    Forbidden.schema
     (fun b -> Forbidden b.errors)
     (fun (Forbidden p) -> { errors = p })
     body
@@ -65,7 +65,7 @@ let forbidden =
 not_found : PureCodec Json NotFound
 let not_found =
   Codec.transform_as
-    (schema NotFound)
+    NotFound.schema
     (fun b -> NotFound b.errors)
     (fun (NotFound p) -> { errors = p })
     body
@@ -74,7 +74,7 @@ let not_found =
 conflict : PureCodec Json Conflict
 let conflict =
   Codec.transform_as
-    (schema Conflict)
+    Conflict.schema
     (fun b -> Conflict b.errors)
     (fun (Conflict p) -> { errors = p })
     body
@@ -83,7 +83,7 @@ let conflict =
 unprocessable : PureCodec Json Unprocessable
 let unprocessable =
   Codec.transform_as
-    (schema Unprocessable)
+    Unprocessable.schema
     (fun b -> Unprocessable b.errors)
     (fun (Unprocessable p) -> { errors = p })
     body

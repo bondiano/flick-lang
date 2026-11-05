@@ -27,7 +27,7 @@ let items round =
 /// The length of the written JSON and the records read back.
 round_trip : Int -> (Int, Int)
 let round_trip round =
-  let wire = Codec.json (Schema.list (schema Item))
+  let wire = Codec.json (Schema.list Item.schema)
   match Codec.encode_result wire (items round) with
   | Err _ -> (0, 0)
   | Ok json ->

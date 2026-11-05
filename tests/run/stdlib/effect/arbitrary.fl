@@ -173,7 +173,7 @@ let report result =
 /// Reports of falsified checks, their values as Effect's Formatter writes them.
 reports : Unit ->{} Unit
 let reports () =
-  report (Arbitrary.check checking (fun p -> p.x < 5) (Arbitrary.from_schema (schema Point)))
+  report (Arbitrary.check checking (fun p -> p.x < 5) (Arbitrary.from_schema Point.schema))
   report
     (Arbitrary.check
       checking
@@ -182,7 +182,7 @@ let reports () =
         | Dot -> true
         | Circle r -> r < 3
       )
-      (Arbitrary.from_schema (schema Shape)))
+      (Arbitrary.from_schema Shape.schema))
   report
     (Arbitrary.check
       checking

@@ -29,21 +29,21 @@ text_raw : String ->{} String
 foreign async text_raw from "./raw.mjs" "text"
 
 user_path : PureCodec Json UserPath
-let user_path = Codec.json (schema UserPath)
+let user_path = Codec.json UserPath.schema
 
 get_user :
   HttpApi.Endpoint "get_user" (HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User)
 let get_user =
   HttpApi.endpoint HttpApi.Get "/users/:id" (Record.label : Record.Label "get_user")
   |> HttpApi.with_path user_path
-  |> HttpApi.with_success 200 (Codec.json (schema User))
-  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json (schema NotFound)))
+  |> HttpApi.with_success 200 (Codec.json User.schema)
+  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json NotFound.schema))
 
 create_user : HttpApi.Endpoint "create_user" (HttpApi.Request Unit Unit Unit NewUser ->{r;} User)
 let create_user =
   HttpApi.endpoint HttpApi.Post "/users" (Record.label : Record.Label "create_user")
-  |> HttpApi.with_payload (Codec.json (schema NewUser))
-  |> HttpApi.with_success 201 (Codec.json (schema User))
+  |> HttpApi.with_payload (Codec.json NewUser.schema)
+  |> HttpApi.with_success 201 (Codec.json User.schema)
   |> HttpApi.describe "Adds a user"
 
 type alias Handlers r = {
@@ -84,7 +84,7 @@ let token = HttpApi.bearer "token"
 me : HttpApi.Endpoint "me" (HttpApi.Request Unit Unit Auth Unit ->{r; HttpApi.HttpError} String)
 let me =
   HttpApi.endpoint HttpApi.Get "/me" (Record.label : Record.Label "me")
-  |> HttpApi.with_headers (Codec.json (schema Auth))
+  |> HttpApi.with_headers (Codec.json Auth.schema)
   |> HttpApi.with_success 200 (Codec.json Schema.string)
   |> HttpApi.with_security token
   |> HttpApi.with_security
@@ -108,7 +108,7 @@ let echo_text =
 login : HttpApi.Endpoint "login" (HttpApi.Request Unit Unit Unit NewUser ->{r;} String)
 let login =
   HttpApi.endpoint HttpApi.Post "/login" (Record.label : Record.Label "login")
-  |> HttpApi.with_form_payload (Codec.json (schema NewUser))
+  |> HttpApi.with_form_payload (Codec.json NewUser.schema)
   |> HttpApi.with_text_success 200
 
 health : HttpApi.Endpoint "health" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
@@ -121,7 +121,7 @@ type alias Upload = { name : String; data : Unknown }
 upload : HttpApi.Endpoint "upload" (HttpApi.Request Unit Unit Unit Upload ->{r;} Unit)
 let upload =
   HttpApi.endpoint HttpApi.Post "/files" (Record.label : Record.Label "upload")
-  |> HttpApi.with_payload (Codec.json (schema Upload))
+  |> HttpApi.with_payload (Codec.json Upload.schema)
 
 files : HttpApi.Api r { files : { upload : HttpApi.Request Unit Unit Unit Upload ->{r;} Unit } }
 let files =

@@ -31,13 +31,12 @@ fn conduit_endpoint_names_go_to_their_definitions() {
     }
     let qualified = (
         "/// The articles, the feed",
-        "probe : Schema Conduit.Model.UserBody\nlet probe = schema Conduit.Model.UserBody\n\n/// The articles, the feed",
+        "probe : Schema Conduit.Model.UserBody\nlet probe = Conduit.Model.UserBody.schema\n\n/// The articles, the feed",
     );
     let schema: &[(&str, usize, &str)] = &[
-        ("schema Conduit", 0, "type alias UserBody"),
-        ("schema Conduit", 7, "module Conduit.Model"),
-        ("Model.UserBody\n\n", 0, "module Conduit.Model"),
-        ("Model.UserBody\n\n", 6, "type alias UserBody"),
+        ("Conduit.Model.UserBody.schema", 8, "module Conduit.Model"),
+        ("Model.UserBody.schema\n\n", 6, "type alias UserBody"),
+        ("Model.UserBody.schema\n\n", 14, "type alias UserBody"),
     ];
     failed.extend(definitions_in("qualified_schema", Some(qualified), schema));
     assert!(failed.is_empty(), "{failed:#?}");

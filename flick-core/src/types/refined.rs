@@ -1,8 +1,7 @@
-//! `schema T`, the witness of `T`. A refined type's `parse` of a constant
-//! is checked when the program compiles, if the compiler knows the check.
+//! A refined type's `parse` of a constant, checked when the program
+//! compiles if the compiler knows the check.
 
 use super::Checker;
-use super::ty::Type;
 use super::typing::Ref;
 use crate::consteval::{self, Const};
 use crate::diagnostics::codes;
@@ -12,40 +11,6 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
 impl Checker<'_> {
-    /// `schema T`: the witness `T` derives.
-    pub fn schema_expr(&mut self, node: &Node) -> Type {
-        let span = self.span(node);
-        let parts: Vec<String> = node
-            .child_tokens()
-            .filter(|t| t.kind == K::Con)
-            .map(|t| t.text(self.text).to_owned())
-            .collect();
-        let Some((name, qualifier)) = parts.split_last() else {
-            return Type::Error;
-        };
-        let Some((module, _)) = self.find_type(node, &qualifier.join("."), name) else {
-            return Type::Error;
-        };
-        let entity = super::witness_entity(&module, name);
-        let Some(scheme) = self.env.value(&entity).cloned() else {
-            self.error(
-                codes::D001,
-                span,
-                format!("`{name}` derives no Schema: add `deriving Schema` to its declaration"),
-            );
-            return Type::Error;
-        };
-        let ty = self.instantiate(&scheme, span);
-        self.record_name(
-            span,
-            Ref::Value {
-                module,
-                name: entity.name,
-            },
-        );
-        ty
-    }
-
     /// `T.parse c` of a constant `c`: the check of `T`, applied when the
     /// program compiles if the compiler knows it.
     pub fn refined_constant(&mut self, head: &Node, arg: &Node) {

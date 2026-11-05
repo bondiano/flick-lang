@@ -144,36 +144,36 @@ let same what derived written =
 main : Unit ->{; AppError} Unit
 let main () =
   let p = { x = 3; label = Some "a" }
-  Platform.stdout_line (same "point" (json (schema Point) p) (json point p))
+  Platform.stdout_line (same "point" (json Point.schema p) (json point p))
   Platform.stdout_line
-    (same "point schema" (exported "Point" (schema Point)) (exported "Point" point))
+    (same "point schema" (exported "Point" Point.schema) (exported "Point" point))
   Platform.stdout_line
-    (same "point bad" (decoded (schema Point) "{\"x\": 1.5}") (decoded point "{\"x\": 1.5}"))
+    (same "point bad" (decoded Point.schema "{\"x\": 1.5}") (decoded point "{\"x\": 1.5}"))
   let r = Rect 1 2
-  Platform.stdout_line (same "shape" (json (schema Shape) r) (json shape r))
+  Platform.stdout_line (same "shape" (json Shape.schema r) (json shape r))
   Platform.stdout_line
-    (same "shape schema" (exported "Shape" (schema Shape)) (exported "Shape" shape))
+    (same "shape schema" (exported "Shape" Shape.schema) (exported "Shape" shape))
   Platform.stdout_line
     (same
       "shape bad"
-      (decoded (schema Shape) "{\"_tag\": \"Square\"}")
+      (decoded Shape.schema "{\"_tag\": \"Square\"}")
       (decoded shape "{\"_tag\": \"Square\"}"))
   let e = Neg (Block (Statements [Num 1, Neg (Num 2)]))
-  Platform.stdout_line (same "expr" (json (schema Expr) e) (json expr e))
-  Platform.stdout_line (same "expr schema" (exported "Expr" (schema Expr)) (exported "Expr" expr))
+  Platform.stdout_line (same "expr" (json Expr.schema e) (json expr e))
+  Platform.stdout_line (same "expr schema" (exported "Expr" Expr.schema) (exported "Expr" expr))
   let t = Branch [Leaf 1, Branch [Leaf 2]]
   Platform.stdout_line
-    (same "tree" (json (schema Tree Schema.number) t) (json (tree Schema.number) t))
+    (same "tree" (json (Tree.schema Schema.number) t) (json (tree Schema.number) t))
   Platform.stdout_line
     (same
       "tree schema"
-      (exported "Tree" (schema Tree Schema.number))
+      (exported "Tree" (Tree.schema Schema.number))
       (exported "Tree" (tree Schema.number)))
-  Platform.stdout_line (same "port" (decoded (schema Port) "8080") (decoded port "8080"))
-  Platform.stdout_line (same "port bad" (decoded (schema Port) "70000") (decoded port "70000"))
-  Platform.stdout_line (same "port schema" (exported "Port" (schema Port)) (exported "Port" port))
+  Platform.stdout_line (same "port" (decoded Port.schema "8080") (decoded port "8080"))
+  Platform.stdout_line (same "port bad" (decoded Port.schema "70000") (decoded port "70000"))
+  Platform.stdout_line (same "port schema" (exported "Port" Port.schema) (exported "Port" port))
   Platform.stdout_line
-    (same "user id" (json (schema UserId) (UserId "u1")) (json user_id (UserId "u1")))
+    (same "user id" (json UserId.schema (UserId "u1")) (json user_id (UserId "u1")))
   let search = Search { q = "atoms"; page = Some 2 }
   Platform.stdout_line (same "url" (Route.print Page.url search) (Route.print page_url search))
   Platform.stdout_line (same "url home" (Route.print Page.url Home) (Route.print page_url Home))

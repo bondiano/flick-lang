@@ -52,12 +52,12 @@ let token = HttpApi.api_key "Token" { key = "authorization"; location = HttpApi.
 
 /// A request without the header is anonymous.
 credentials : PureCodec Json Credentials
-let credentials = codec (schema Credentials) {
+let credentials = codec Credentials.schema {
   authorization = optional_field "authorization" String.json;
 }
 
 refusals : HttpApi.ErrorCases {Unauthorized}
-let refusals = HttpApi.errors |> HttpApi.error_case 401 (Codec.json (schema Unauthorized))
+let refusals = HttpApi.errors |> HttpApi.error_case 401 (Codec.json Unauthorized.schema)
 
 me : HttpApi.Endpoint "me" (Request ->{Session; Unauthorized} String)
 let me =

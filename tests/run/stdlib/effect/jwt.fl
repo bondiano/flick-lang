@@ -19,15 +19,15 @@ line : String -> String -> Unit ->{} Unit
 let line label value () = Platform.stdout_line (label ++ ": " ++ value)
 
 claims_json : PureCodec Json Claims
-let claims_json = Codec.json (schema Claims)
+let claims_json = Codec.json Claims.schema
 
 session_json : PureCodec Json Session
-let session_json = Codec.json (schema Session)
+let session_json = Codec.json Session.schema
 
 issuer_json : PureCodec Json Issuer
 let issuer_json =
   ignore_extra_fields
-    (codec (schema Issuer) {
+    (codec Issuer.schema {
       iss = field "iss" String.json;
     })
 

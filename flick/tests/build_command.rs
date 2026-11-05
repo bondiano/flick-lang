@@ -333,7 +333,7 @@ type alias Point = { x : Float; y : Float }
   deriving Schema
 
 point_json : PureCodec Json Point
-let point_json = Codec.json (schema Point)
+let point_json = Codec.json Point.schema
 
 main : Unit ->{; AppError} Unit
 let main () =

@@ -17,7 +17,7 @@ import Stream.Core exposing (Stream)
 type Rpc (l : Symbol) f
 
 /// The typed errors `e` of a procedure, each with its JSON codec:
-/// `errors |> error_case (Codec.json (schema NotFound))`.
+/// `errors |> error_case (Codec.json NotFound.schema)`.
 type ErrorCases (e : ErrorRow)
 
 /// A group whose handlers form the record `hs`; `r` is what the handlers
