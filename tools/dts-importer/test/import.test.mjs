@@ -29,7 +29,7 @@ test("import mode prints the shapes of date-fns", () => {
   const out = read("date-fns");
   assert.equal(
     createHash("sha256").update(out).digest("hex"),
-    "99b55b69e38b631486e7d55d2a9e62af496c4e55b12007395a7a73d1fa92782e",
+    "3624ea93dee4ebe914232b5fdb94ab3169cf212829289c548c2b62108172fde4",
   );
 });
 
@@ -103,4 +103,30 @@ test("import mode names the object types whose one name stands for two declarati
   assert.deepEqual(surface.ambiguous, ["Options"]);
   // where each is declared tells them apart but never reaches the shapes
   assert.doesNotMatch(JSON.stringify(surface.exports), /"site"/);
+});
+
+/** The surface of a package `enum-lib` whose declarations are `dts`. */
+const declared = (t, dts) => {
+  const projectRoot = mkdtempSync(path.join(tmpdir(), "flick-import-enum-"));
+  t.after(() => rmSync(projectRoot, { recursive: true, force: true }));
+  const pkg = path.join(projectRoot, "node_modules/enum-lib");
+  mkdirSync(pkg, { recursive: true });
+  writeFileSync(path.join(projectRoot, "package.json"), '{"type":"module"}\n');
+  writeFileSync(path.join(pkg, "package.json"), '{"name": "enum-lib", "version": "1.0.0", "types": "./index.d.ts"}\n');
+  writeFileSync(path.join(pkg, "index.d.ts"), dts);
+  return JSON.parse(read("enum-lib", projectRoot));
+};
+
+test("import mode names a union by its alias, which the fingerprint leaves out", (t) => {
+  const named = declared(t, 'export type Method = "GET" | "POST";\nexport declare function send(method: Method): void;\n');
+  const inline = declared(t, 'export declare function send(method: "GET" | "POST"): void;\n');
+  const param = (surface) => surface.exports[0].signatures[0].params[0].type;
+  const types = [
+    { k: "literal", text: '"GET"' },
+    { k: "literal", text: '"POST"' },
+  ];
+  assert.deepEqual(param(named), { k: "union", types, alias: "Method" });
+  assert.deepEqual(param(inline), { k: "union", types });
+  // naming the union changes no binding a review vouches for
+  assert.equal(named.exports[0].fingerprint, inline.exports[0].fingerprint);
 });

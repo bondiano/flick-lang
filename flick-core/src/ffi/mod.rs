@@ -7,8 +7,11 @@
 
 pub mod check;
 mod convert;
+mod enums;
 pub mod import;
 
+#[cfg(test)]
+mod enum_tests;
 #[cfg(test)]
 mod tests;
 
@@ -112,8 +115,11 @@ pub enum Shape {
         name: String,
         bound: Option<String>,
     },
+    /// `alias` names the `type` alias that declares it.
     Union {
         types: Vec<Shape>,
+        #[serde(default)]
+        alias: Option<String>,
     },
     Tuple {
         elements: Vec<Shape>,
@@ -161,7 +167,7 @@ impl Shape {
                 text.clone()
             }
             Shape::Param { name, .. } | Shape::Handle { name } => name.clone(),
-            Shape::Union { types } => join(types, " | "),
+            Shape::Union { types, .. } => join(types, " | "),
             Shape::Tuple { elements } => format!("[{}]", join(elements, ", ")),
             Shape::Array { element } => format!("{}[]", element.text()),
             Shape::Promise { ty } => format!("Promise<{}>", ty.text()),
@@ -188,6 +194,10 @@ pub struct Policy {
     pub strict: bool,
     #[serde(default)]
     pub exports: BTreeMap<String, ExportPolicy>,
+    /// The constructor names of an enum, by its literals:
+    /// `[enums.Method] "GET" = "Get"`.
+    #[serde(default)]
+    pub enums: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
@@ -227,6 +237,13 @@ impl Policy {
                         allowed.join(" or ")
                     ));
                 }
+            }
+        }
+        for (name, constructors) in &policy.enums {
+            if let Some(c) = constructors.values().find(|c| !convert::is_type_name(c)) {
+                return Err(format!(
+                    "`{c}` of `[enums.{name}]` is no constructor name: it starts with a capital letter"
+                ));
             }
         }
         Ok(policy)
