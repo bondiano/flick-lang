@@ -46,10 +46,12 @@ as SQL with `'quotes'` and `-- comments`, is a raw or multi-line string
 argument, `head migration 1 "init" r#"…"#`, which `flick_plugin::string_value`
 gives the value of.
 
-The compiler comes with the plugin of `std`, whose head is `cli` (see
-[command-line applications](../cli-dsl/)). `cli "x" { … }`, with its body, is
-a block even in a file that does not import it, so the compiler can say which
-import it needs: `FLICK-P037`, whose fix `flick check --fix` applies.
+The compiler comes with the plugin of `std`, whose heads are `cli` (see
+[command-line applications](../cli-dsl/)) and `server` (see
+[server functions](../server-fn/)). `cli "x" { … }`, with its body, and
+`server fn f x = …` or `server f` are blocks even in a file that does not
+import them, so the compiler can say which import they need: `FLICK-P037`,
+whose fix `flick check --fix` applies.
 
 The plugin is the one of the package the imported module belongs to; a
 module of the project or a built-in one has none. The code a plugin gives
@@ -108,7 +110,12 @@ length without one); and the tokens of the arguments, the body and the rest,
 it, the holes, is parsed by the compiler: `parse-expr(start, end)`,
 `parse-type`, `parse-pat` and `parse-decl` give the longest expression, type
 or pattern from `start` on, or the declaration there, with the layout of
-where it stands in the file.
+where it stands in the file; `parse-body` gives a body as after the `=` of a
+`let`, the lines of a block when it starts a line of its own. A block also
+shows `module`, the module it is in, and for a declaration right below a
+signature, `signature`: its text and tokens, spans counting from its start.
+Code with a type of the signature, `signed(span)`, takes it from the module;
+without one, the signature stays where it is, above what the code declares.
 
 The code of a block that is an expression is an expression; that of a
 declaration is declarations, which take the block's place among the module's
@@ -127,15 +134,16 @@ and with the span of the block it stands for:
 | Kind | Nodes |
 | - | - |
 | expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole |
-| type | name, application, record, function, type-level text (`"name"`), `_`, hole |
-| pattern | variable, wildcard, constructor, record, hole |
+| type | name, application, record, function, tuple, type-level text (`"name"`), `_`, `forall`, row, hole, a type of the signature |
+| pattern | variable, wildcard, constructor, record, tuple, hole |
 | declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, `instance` with members, a group of several, documentation of one, hole |
 
 The compiler checks the arena before it uses it: names must lex as names,
 numbers be finite, holes lie in the body and not overlap, an expression or a
 pattern be used once (a type may stand in several places, as in a signature
-and an annotation), and its size and depth are bounded. The arena version is the version of the interface,
-`0.8.0`. A component built for another version does not load: the import
+and an annotation), and its size and depth are bounded. A function in a
+plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,
+`0.9.0`. A component built for another version does not load: the import
 that exposes its heads is `FLICK-P035`, naming the version it was built for
 and the one the compiler speaks, until it is rebuilt.
 

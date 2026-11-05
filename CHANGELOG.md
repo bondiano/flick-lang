@@ -63,6 +63,20 @@ break programs.
   `Problem` instance, and a path whose `:name` parameters are not the fields
   of its `path` part, are `FLICK-C001`. A group's check gets the request's
   headers alone.
+- **Breaking:** `server fn` and `server name` are the plugin `server` of
+  `std`: a file that has them imports `Server exposing (plugin server)`,
+  which `flick check --fix` adds (`FLICK-P037`). The plugin writes
+  `name$impl`, `name$procedure`, the call `name` and `name$server` with
+  `Server.Derive`; the shape of a `server fn` is `std/E010`, a payload, a
+  success or an error without a Schema witness `FLICK-D001` (a type alias
+  of a record derives `Schema` for it), and `server name` of a value that
+  is no `server fn` stays `FLICK-E010`. `FLICK-E012` and the `server-stdlib`
+  feature are gone: every build has the plugin.
+- **Plugins, interface `0.9.0`:** a declaration block sees the signature
+  right above it, and code with a type of it, `signed(span)`, takes it from
+  the module; a block knows its `module`; `parse-body` parses a body as
+  after a `let`'s `=`; tuple types and patterns; and a function in a
+  plugin's code needs no signature.
 - **Plugins, interface `0.8.0`:** a row of types, `{NotFound, Conflict}`, in
   a plugin's types, and a type may stand in several places of its code.
 - **Plugins, interface `0.7.0`:** `let rec` and `forall` types in a plugin's

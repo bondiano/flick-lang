@@ -35,7 +35,7 @@ This specification is the normative description of the Flick language as impleme
 - **SQL:** a typed PostgreSQL eDSL whose queries are pure values ([SQL](../reference/sql/)).
 - **UI:** `ui { ... }` on React, state in `effect/reactivity` atoms, actions with an explicit event policy, server rendering with a registry per request; no JSX and no React hooks ([user interfaces](../reference/ui/)).
 - **Components:** `component name (props : P) = body`, whose setup runs once per instance and whose last expression renders ([components](../reference/ui/#components)).
-- **Server functions:** `server fn` declares a function that runs on the server and that a client calls by name, with the endpoint and codecs generated from one declaration ([server functions](../reference/server-fn/)).
+- **Server functions:** `server fn`, a block of std's plugin `server`, declares a function that runs on the server and that a client calls by name, with the endpoint and codecs generated from one declaration ([server functions](../reference/server-fn/)).
 - **RPC and HTTP APIs:** `Rpc` and `HttpApi` describe a contract once as values that client and server share; a missing or extra handler is a type error ([RPC](../reference/rpc/), [HTTP APIs](../reference/http-api/)).
 - **Routes and forms:** `deriving Url` makes a page's URL a typed value, `deriving Form` a record a text form ([routes](../reference/route/), [forms](../reference/form/)).
 - **Observability:** traces, logs and metrics through ordinary runtime functions, exported by OTLP, DevTools or Prometheus ([observability](../reference/observability/)).

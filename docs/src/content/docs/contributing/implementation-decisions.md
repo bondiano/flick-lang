@@ -23,7 +23,7 @@ diagnostics; TypeScript never decides a Flick type.
 | Parser | `flick-core/src/syntax` | the layout-aware parser builds a lossless CST and its AST; `fmt` formats the CST |
 | Resolver | `flick-core/src/resolve` | modules, imports, exports and names; unused-code warnings |
 | Checker | `flick-core/src/types` | kinds; bidirectional types with higher rank; record and effect rows; services and layers; classes, instances and `deriving`; regions and captures; the `sql` and `ui` blocks |
-| Typed IR | `flick-core/src/ir` | the checked module with application stages, dictionaries, lifts and source ranges made explicit; `ir/lower` elaborates `do`, comprehensions, `sql` and `server fn` |
+| Typed IR | `flick-core/src/ir` | the checked module with application stages, dictionaries, lifts and source ranges made explicit; `ir/lower` elaborates `do`, comprehensions and `sql` |
 | Constant evaluation | `flick-core/src/consteval` | expressions of literals folded with JS semantics bit for bit |
 | Optimizer | `flick-core/src/opt` | release passes over the typed IR (specialization, inlining, fusion, scalar replacement, folding) that keep every observable contract of the debug lowering; both backends run them (see [Release profile](../../reference/codegen/#release-profile)) |
 | JS backend | `flick-core/src/codegen/js`, `runtime/` | ESM with source maps: pure code is plain JS, a runtime stage an `Effect.gen` over `@flick-lang/runtime` |
