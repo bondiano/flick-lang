@@ -3,7 +3,7 @@ export const sidebar = [
   {
     label: "Learn",
     translations: { ru: "Изучение Flick" },
-    items: [{ slug: "start/why" }, { slug: "learn" }, { slug: "start/getting-started" }, { slug: "learn/syntax" }, { slug: "learn/flick-and-effect" }],
+    items: [{ slug: "start/why" }, { slug: "learn" }, { slug: "start/getting-started" }, { slug: "learn/syntax" }, { slug: "learn/flick-and-effect" }, { slug: "start/upgrading" }],
   },
   {
     label: "Guides",
