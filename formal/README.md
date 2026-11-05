@@ -36,7 +36,8 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
-- **T6, the elaboration** (`Formal/Elab/`): `T6a` (`Elab/T6a.lean`), an elaborated term is
+- **T6, the elaboration** (`Formal/Elab/`), with runtime stages `R r e` whose rows take
+  variables: `T6a` (`Elab/T6a.lean`), an elaborated term is
   typed in the target, with `T6a_default_instance` (`Elab/Defaults.lean`) for what an instance
   takes from a default, its default signature's dictionaries derived under its context, and `T6b` (`Elab/Coherence.lean`), two elaborations that differ only
   in the derivations of their dictionaries give the same result. Both are stated for an
@@ -461,7 +462,7 @@ and `Target`. See [The core as the target](#the-core-as-the-target).
 | §3.2 `for`, §3.3 `?`, §3.4 blocks | `Clause`, `Sugar.gen`, `Sugar.loop`, `GenOk`, `LoopOk`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`, `T6a_sugar` (`Elab/Sugar.lean`, `Elab/Comprehension.lean`) |
 | Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`); the schemes of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List` generated from the checker, those the model cannot write listed as skipped with a reason (`Elab/PreludeSchemes.lean`, [Prelude scheme generator with skip list](../docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names)) |
 | "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim`, then `T6b_target` (`Elab/Run.lean`) |
-| §0.1 `⟦·⟧` into the core with regions: types, stages, schemes | `Names`, `trT`, `trTT`, `trD`, `trS`, `trStage`, `trT_subst`, `trT_reach` (`Elab/CoreTy.lean`) |
+| §0.1 `⟦·⟧` into the core with regions: types, stages with rows, schemes | `Names`, `trT`, `trTT`, `trD`, `trS`, `trStage`, `trT_arr`, `Stage.qual`, `trT_subst`, `trStage_subst`, `trT_reach` (`Elab/CoreTy.lean`) |
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
 | §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
 | T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
@@ -524,11 +525,13 @@ Simplifications:
 9. The sugar (§3) desugars into `Exp`; `Sugar` names the Prelude methods (`flat_map`,
    `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
    hypotheses on the program. The schemes of the Prelude names are generated from the
-   checker (`PreludeSchemes.lean`); `pair`, `unc n` and `each_P` have no Prelude name and are
-   written in `Sugar.lean`. `from_result` is a family `from_result_n` over closed rows of
-   errors, one error type `con n` each (`frSch`, equal to the generated scheme at `e := con n`
-   by `frSch_gen`): the source stage `R` carries no rows, and `e?` takes the member of the row
-   of `e`'s type (`tryResult_elab`). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
+   checker (`PreludeSchemes.lean`), with the rows of their arrows: `->{r; e}` is the stage
+   `R r e` and its row variables are binders of the scheme (`traverse`, `Seq.each_effect`); a
+   row with a named element or a union is skipped (`timeout`). `pair`, `unc n` and `each_P` have no Prelude name and are
+   written in `Sugar.lean`. `from_result` is a family `from_result_n` over error types, one
+   `con n` each, at the stage `R⟨∅; con n⟩` (`frSch`, equal to the generated scheme at `e := con n`
+   by `frSch_gen`): its `raise` adds the atom `e` to the row, which the row variable `⟦e⟧`
+   does not give, and `e?` takes the member at `e`'s error type (`tryResult_elab`, at that stage). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
    hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
    qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and
    data without storage drops it. That argument is invariant, so a qualifier the caller
@@ -542,13 +545,19 @@ Simplifications:
    `p₁ <- e₁ and … and pₙ <- eₙ` form a left-nested tuple built by `map2 pair`, and
    `λ(p₁, …, pₙ). e` is `unc n (λp₁ … pₙ. e)` with a constant `unc n` per arity; the checker
    uses flat tuples with the same curried patterns. The clauses of `for … yield` run at `P`
-   (Sync calls are not modelled) and the loop of `for … do` at its stage, with one constant
-   `Seq.each_φ` per stage ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
+   (Sync calls are not modelled) and the loop of `for … do` at its stage, with the constant
+   `Seq.each_P` at `P` and the one `Seq.each_effect : ∀c d a r e. …` at every `R r e`, used at
+   the rows of the loop ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
-10. The core instance. `⟦R⟧ = rt ∅ ε` with `ε` every name (`allNames`): the stage `R`
-    of the source has no row of errors, so a runtime body may raise any error type that reaches
-    nothing. `Bool` is `base bool`, `Int` (`con 4`) is `base int`, other
+10. The core instance. `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ε)` with `ε` every name (`allNames`): a row
+    of the source is a type, a row variable `var n` or `cnil`, and `⟦r⟧` is what `⟦r⟧` stands
+    for as a row (`Ty.asRow`), the row variable `n`; every error name stays in the row, so a
+    runtime body may raise any error type that reaches nothing. The source compares stages
+    by equality and its `⌈·⌉` counts the variables of the rows of an arrow, so the qualifier
+    of a translated `R r e` arrow counts them too (`Stage.qual`); a `P` arrow translates as
+    before (`trT_arr`). A substitution acts on the rows of a stage, and `T6a_close` closes the
+    stage with the types (`φθ`). `Bool` is `base bool`, `Int` (`con 4`) is `base int`, other
     constructors are ADTs named by `Names.con`. `Real` is a hypothesis on the core's signature, not on the
     bodies of the globals (`RootTy`, part of the run). A class has a record type for each number of
     parameters (`Names.cls C n`), because the law `slot` holds for any constraint `q`;
@@ -574,7 +583,7 @@ Simplifications:
     `to_list` and `iter` are fixpoints over it, and the laziness of the checker's `Seq` is not
     modelled (T6 needs only the types of [Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes), and the witness has no infinite or effectful
     sequence). `Rec` has one field, so the `&&` of the structural `eq` over its fields is one
-    comparison by the slot dictionary `D_{Eq Int}`. `from_result_n` is a member at one closed
+    comparison by the slot dictionary `D_{Eq Int}`. `from_result_n` is a member at one
     error type (simplification 9). `eq` on `Int` is the constant `intEq`, and `unc n` is
     built by a Lean function of `n` and typed by induction. A match has one arm per
     constructor and no `_` (`exh_ctors`, `Exh.lean`), also in the lazy `Monad Eff`.
@@ -585,11 +594,12 @@ Simplifications:
 #### Captures in `Elab` and `Target`
 
 - **Types** (`Elab/Syntax.lean`). `Ty` has `arr (φ : Stage) (a b q : Ty)`, `cnil` and
-  `cun (q q' : Ty)` ([source arrow is a separate type form](../docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor)). The qualifier `q` is a capture row written
+  `cun (q q' : Ty)` ([source arrow is a separate type form](../docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor)); `Stage` is `P` or `R r e` with the rows
+  written as types, mutual with `Ty` (`Ty.ind` is its induction). The qualifier `q` is a capture row written
   as a type: a variable, `cnil`, or a union. Substitution is structural, so `DecidableEq`,
   `Ty.agree_of_eq` and K1 work without semantic sets. `Ty.reach` is the occurrence of a
   variable: `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈app⌉ = ⌈cun⌉ = ∪` and
-  `⌈arr φ a b q⌉ = ⌈a⌉ ∪ ⌈b⌉ ∪ ⌈q⌉`. Capture variables are ordinary variables, so
+  `⌈arr φ a b q⌉ = ⌈a⌉ ∪ ⌈b⌉ ∪ ⌈q⌉` with the variables of the rows of `φ`. Capture and row variables are ordinary variables, so
   (Var), (Method) and (Const) instantiate them through `ts` with no new rule. Schemes
   have no `Outlives` facts: `⟦·⟧` drops `Fiber.Outlives` (§2.1).
 - **Schemes.** `Scheme` has `q : Ty`, the qualifier of its dictionary arrows
@@ -674,8 +684,9 @@ are schemes, and fields need not be values.
 for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
 
 - **Types** (`CoreTy.lean`). `var ↦ tvar`, `app ↦ tapp`, `Bool ↦ base bool`,
-  other constructors `↦ adt (N.con c)`, `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉`,
-  `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R⟧ = rt ∅ allNames` (simplification 10).
+  other constructors `↦ adt (N.con c)`, `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉` (at `R r e` with
+  the variables of the rows), `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ allNames)`
+  (simplification 10).
   `trT_subst`/`trTT_subst`/`trS_subst` and `trT_reach` are the two commutations. The
   names of the core are a parameter `Names`, not a fixed encoding.
   `D_{C τ̄} ↦ dict (N.cls C |τ̄|) ⟦τ̄⟧`: the class name carries the number of parameters,

@@ -57,7 +57,7 @@ structure Real : Prop where
 /-- `Γ, ⟦Δ⟧ ⊢⁺ e : t ! φ` in the core. -/
 def Has (Γ : List TSch) (Δ : List Cn) (e : Tm) (t : TTy) (φ : Stage) : Prop :=
   ∀ Ψ Θ Γc γ δ, Corr N Γc Γ Δ γ δ →
-    ∃ e', Tr N γ δ e e' ∧ Typ S Ψ Θ Γc e' (.ex (trTT N t) (trStage φ))
+    ∃ e', Tr N γ δ e e' ∧ Typ S Ψ Θ Γc e' (.ex (trTT N t) (trStage N φ))
 
 variable {P S N}
 
@@ -72,7 +72,7 @@ theorem trTT_inst_tr (t : TTy) (ts : List Ty) :
     (trTT N t).substT (instT (ts.map (trT N))) = trTT N (t.subst (inst ts)) := by
   rw [trTT_subst]; exact Flick.Ty.substT_congr fun a => (trσ_inst N ts a).symm
 
-theorem trStage_le {ψ φ : Stage} (h : ψ = .P ∨ ψ = φ) : (trStage ψ).le (trStage φ) := by
+theorem trStage_le {ψ φ : Stage} (h : ψ = .P ∨ ψ = φ) : (trStage N ψ).le (trStage N φ) := by
   rcases h with rfl | rfl
   · trivial
   · cases ψ
@@ -95,6 +95,7 @@ theorem has_app {Γ Δ f x a b q ψ φ} (hf : Has S N Γ Δ f (.mono (.arr ψ a 
   intro Ψ Θ Γc γ δ hc
   obtain ⟨f', hf', tf⟩ := hf Ψ Θ Γc γ δ hc
   obtain ⟨x', hx', tx⟩ := hx Ψ Θ Γc γ δ hc
+  simp only [trTT, trT_arr] at tf
   exact ⟨_, .app hf' hx', .app tf tx (trStage_le hψ) .refl⟩
 
 theorem has_dapp {Γ Δ f x a t q φ} (hf : Has S N Γ Δ f (.arr .P a t q) φ) (hx : Has S N Γ Δ x a φ) :
@@ -122,7 +123,7 @@ theorem has_ite {Γ Δ c a b t φ} (hc : Has S N Γ Δ c (.mono boolTy) φ) (ha 
   obtain ⟨c', hc', tc⟩ := hc Ψ Θ Γc γ δ hC
   obtain ⟨a', ha', ta⟩ := ha Ψ Θ Γc γ δ hC
   obtain ⟨b', hb', tb⟩ := hb Ψ Θ Γc γ δ hC
-  have tc' : Typ S Ψ Θ Γc c' (.ex (.base (Lit.bool true).base) (trStage φ)) := by
+  have tc' : Typ S Ψ Θ Γc c' (.ex (.base (Lit.bool true).base) (trStage N φ)) := by
     have := trT_bool N; simp only [trTT] at tc; rwa [this] at tc
   exact ⟨_, .ite hc' ha' hb', .match_ tc' (.acons .lit ta (.acons .wild tb .anil))
     (.inl fun _ _ => ⟨.wild, by simp [Flick.Tm.unguarded], rfl⟩)⟩
@@ -150,13 +151,15 @@ theorem has_lam {Γ Δ b a t q φ ψ} (hb : Has S N (⟨0, .mono a⟩ :: Γ) Δ 
     Has S N Γ Δ (.lam b) (.mono (.arr φ a t q)) ψ := by
   intro Ψ Θ Γc γ δ hc
   obtain ⟨b', hb', tb⟩ := hb Ψ Θ _ _ _ (hc.cons N ⟨0, .mono a⟩)
+  simp only [trTT, trT_arr]
   refine ⟨_, .lam hb', .lam tb (hb'.noIns N) ?_ .refl⟩
   rintro x (⟨i, s, hi, hs, hr⟩ | ⟨⟨p, hp, -⟩ | ⟨l, u, hl, -⟩⟩)
   · obtain ⟨n, rfl, hn⟩ := corr_held N hc ((Tr.lam hb').free N hi) hs hr
-    rcases hh n hn with h | h | h
+    rcases hh n hn with h | h | h | h
     · exact .inl (trT_reach_v N h)
     · exact .inr (.inl (trT_reach_v N h))
-    · exact .inr (.inr (trT_reach_v N h))
+    · exact .inr (.inr ((Stage.qual_reach _ _ _).2 (.inl (trT_reach_v N h))))
+    · exact .inr (.inr ((Stage.qual_reach _ _ _).2 (.inr ⟨n, rfl, h⟩)))
   · exact absurd hp ((Tr.lam hb').has N _)
   · exact absurd hl ((Tr.lam hb').has N _)
 
@@ -167,7 +170,7 @@ theorem has_let {Γ Δ e b k t u φ₁ φ}
   intro Ψ Θ Γc γ δ hc
   obtain ⟨b', hb', tb⟩ := hb Ψ Θ _ _ _ (hc.cons N ⟨k, t⟩)
   have gen : φ₁ = .P → ∃ e', Tr N γ δ (.let_ e b) e' ∧
-      Typ S Ψ Θ Γc e' (.ex (trTT N u) (trStage φ)) := fun h => by
+      Typ S Ψ Θ Γc e' (.ex (trTT N u) (trStage N φ)) := fun h => by
     subst h
     obtain ⟨e', he', te⟩ :=
       he (Ψ.map (Flick.Ty.up k)) (Facts.union (Θ.substT (shiftV k)) Facts.none) _ _ _ (hc.up N k)

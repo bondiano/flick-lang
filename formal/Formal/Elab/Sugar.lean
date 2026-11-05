@@ -64,22 +64,27 @@ def uncSch (tup n : Nat) : Scheme :=
   ⟨n + 2, [], arrP (curry (.var (n + 1)) (vars n) (.var n))
     (.arr .P (nest tup (.var 0) (vars n).tail) (.var n) (.var (n + 1))), .cnil⟩
 
-/-- `each_φ : ∀c d a. (a →φ^c Unit) →P (Seq d a →φ^c Unit)`, the loop of `for … do` at the
-stage `φ` (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`). `each_P` has no Prelude name; `each_R` is `Seq.each_effect` (`eachSch_R`). -/
-def eachSch (unit seq : Nat) (φ : Stage) : Scheme :=
-  ⟨3, [], arrP (.arr φ (.var 2) (.con unit) (.var 0))
-    (.arr φ (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil⟩
+/-- `each_φ`, the loop of `for … do` at the stage `φ` (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`):
+`each_P : ∀c d a. (a →P^c Unit) →P (Seq d a →P^c Unit)`, which has no Prelude name, and for every
+`R r e` the one `each_R : ∀c d a r e. (a →R⟨r;e⟩^c Unit) →P (Seq d a →R⟨r;e⟩^c Unit)`, which is
+`Seq.each_effect` (`eachSch_R`) and is used at the rows of the loop. -/
+def eachSch (unit seq : Nat) : Stage → Scheme
+  | .P => ⟨3, [], arrP (.arr .P (.var 2) (.con unit) (.var 0))
+      (.arr .P (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil⟩
+  | .R _ _ => ⟨5, [], arrP (.arr (.R (.var 3) (.var 4)) (.var 2) (.con unit) (.var 0))
+      (.arr (.R (.var 3) (.var 4)) (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil⟩
 
-theorem eachSch_R (unit seq : Nat) :
-    eachSch unit seq .R = PreludeSchemes.Seq.each_effect unit seq := rfl
+theorem eachSch_R (unit seq : Nat) (r e : Ty) :
+    eachSch unit seq (.R r e) = PreludeSchemes.Seq.each_effect unit seq := rfl
 
-/-- `from_result_n : ∀a. Result (Errors (con n)) a →R a`, `from_result` at the closed row of
-errors `con n`. The core has no row variables, and its `raise` adds what the error reaches to
-the row, so the checker's `∀e a` becomes a family over closed rows, as `each_φ` is over stages
-(`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). `frSch_gen`: a member is the generated scheme at `e := con n`. -/
+/-- `from_result_n : ∀a. Result (Errors (con n)) a →R⟨∅; con n⟩ a`, `from_result` at the error
+type `con n`. Its `raise` adds what the error reaches to the row; for a variable `e` that is the
+atom `e`, which `⟦e⟧` as a row variable does not give, so the checker's `∀e a` becomes a family
+over error types, as `each_φ` is over stages (`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
+`frSch_gen`: a member is the generated scheme at `e := con n`. -/
 def frSch (result errors n : Nat) : Scheme :=
-  ⟨1, [], .arr .R (.app (.app (.con result) (.app (.con errors) (.con n))) (.var 0)) (.var 0) .cnil,
-    .cnil⟩
+  ⟨1, [], .arr (.R .cnil (.con n)) (.app (.app (.con result) (.app (.con errors) (.con n))) (.var 0))
+    (.var 0) .cnil, .cnil⟩
 
 theorem frSch_gen (result errors n : Nat) :
     frSch result errors n = ⟨1, [], (PreludeSchemes.from_result result errors).ty.subst

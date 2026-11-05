@@ -86,8 +86,8 @@ def fold_map (foldable monoid : Nat) : Scheme :=
 
 /-- `Prelude.traverse : forall f c a b r e. Traversable f => (a ->{r; e} b)^c -> (f a ->{r; e} f b)^c` -/
 def traverse (traversable : Nat) : Scheme :=
-  ⟨6, [⟨traversable, [.var 0]⟩],
-    .arr .P (.arr .R (.var 2) (.var 3) (.var 1)) (.arr .R (.app (.app (.var 0) (.var 4)) (.var 2)) (.app (.app (.var 0) (.var 5)) (.var 3)) (.var 1)) .cnil, .cnil⟩
+  ⟨8, [⟨traversable, [.var 0]⟩],
+    .arr .P (.arr (.R (.var 4) (.var 5)) (.var 2) (.var 3) (.var 1)) (.arr (.R (.var 4) (.var 5)) (.app (.app (.var 0) (.var 6)) (.var 2)) (.app (.app (.var 0) (.var 7)) (.var 3)) (.var 1)) .cnil, .cnil⟩
 
 /-- `Prelude.pure : forall f c a. Applicative f => a^c -> (f a)^c` -/
 def pure (applicative : Nat) : Scheme :=
@@ -152,37 +152,32 @@ def identity : Scheme :=
 /-- `Prelude.from_result : forall e a. Result (Errors e) a ->{none; e} a` -/
 def from_result (result errors : Nat) : Scheme :=
   ⟨2, [],
-    .arr .R (.app (.app (.con result) (.app (.con errors) (.var 0))) (.var 1)) (.var 1) .cnil, .cnil⟩
+    .arr (.R .cnil (.var 0)) (.app (.app (.con result) (.app (.con errors) (.var 0))) (.var 1)) (.var 1) .cnil, .cnil⟩
 
 /-- `Prelude.parallel : forall c r e a b. (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c` -/
 def parallel (eff tup : Nat) : Scheme :=
-  ⟨4, [],
-    .arr .P (.app (.app (.con eff) (.var 0)) (.var 1)) (.arr .R (.app (.app (.con eff) (.var 3)) (.var 2)) (.app (.app (.con tup) (.var 1)) (.var 2)) (.cun (.cun (.var 0) (.var 1)) (.cun (.var 3) (.var 2)))) .cnil, .cnil⟩
+  ⟨6, [],
+    .arr .P (.app (.app (.con eff) (.var 0)) (.var 3)) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con eff) (.var 5)) (.var 4)) (.app (.app (.con tup) (.var 3)) (.var 4)) (.cun (.cun (.var 0) (.var 3)) (.cun (.var 5) (.var 4)))) .cnil, .cnil⟩
 
 /-- `Prelude.parallel_all : forall c r e a. Int -> List (Eff r e a)^c ->{r; e} List a` -/
 def parallel_all (int list eff : Nat) : Scheme :=
-  ⟨2, [],
-    .arr .P (.con int) (.arr .R (.app (.con list) (.app (.app (.con eff) (.var 0)) (.var 1))) (.app (.con list) (.var 1)) .cnil) .cnil, .cnil⟩
+  ⟨4, [],
+    .arr .P (.con int) (.arr (.R (.var 1) (.var 2)) (.app (.con list) (.app (.app (.con eff) (.var 0)) (.var 3))) (.app (.con list) (.var 3)) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.race_success : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c` -/
 def race_success (eff : Nat) : Scheme :=
-  ⟨3, [],
-    .arr .P (.app (.app (.con eff) (.var 0)) (.var 1)) (.arr .R (.app (.app (.con eff) (.var 2)) (.var 1)) (.var 1) (.cun (.cun (.var 0) (.var 1)) (.cun (.var 2) (.var 1)))) .cnil, .cnil⟩
+  ⟨5, [],
+    .arr .P (.app (.app (.con eff) (.var 0)) (.var 3)) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con eff) (.var 4)) (.var 3)) (.var 3) (.cun (.cun (.var 0) (.var 3)) (.cun (.var 4) (.var 3)))) .cnil, .cnil⟩
 
 /-- `Prelude.race_first : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c` -/
 def race_first (eff : Nat) : Scheme :=
-  ⟨3, [],
-    .arr .P (.app (.app (.con eff) (.var 0)) (.var 1)) (.arr .R (.app (.app (.con eff) (.var 2)) (.var 1)) (.var 1) (.cun (.cun (.var 0) (.var 1)) (.cun (.var 2) (.var 1)))) .cnil, .cnil⟩
-
-/-- `Prelude.timeout : forall c r e a. Float -> (Eff r e a)^c ->{r; TimeoutError | e} a` -/
-def timeout (float eff : Nat) : Scheme :=
-  ⟨2, [],
-    .arr .P (.con float) (.arr .R (.app (.app (.con eff) (.var 0)) (.var 1)) (.var 1) .cnil) .cnil, .cnil⟩
+  ⟨5, [],
+    .arr .P (.app (.app (.con eff) (.var 0)) (.var 3)) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con eff) (.var 4)) (.var 3)) (.var 3) (.cun (.cun (.var 0) (.var 3)) (.cun (.var 4) (.var 3)))) .cnil, .cnil⟩
 
 /-- `Prelude.timeout_option : forall c r e a. Float -> (Eff r e a)^c ->{r; e} Option a` -/
 def timeout_option (float eff option : Nat) : Scheme :=
-  ⟨2, [],
-    .arr .P (.con float) (.arr .R (.app (.app (.con eff) (.var 0)) (.var 1)) (.app (.con option) (.var 1)) .cnil) .cnil, .cnil⟩
+  ⟨4, [],
+    .arr .P (.con float) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con eff) (.var 0)) (.var 3)) (.app (.con option) (.var 3)) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.bind : forall c d m a b. Monad m => (m a)^c -> ((a -> (m b)^d)^d -> (m b)^(c + d))^c` -/
 def bind (monad : Nat) : Scheme :=
@@ -361,13 +356,13 @@ def Seq.first (seq option : Nat) : Scheme :=
 
 /-- `Seq.each_effect : forall c d a r e. (a ->{r; e} Unit)^c -> ((Seq a)^d ->{r; e} Unit)^c` -/
 def Seq.each_effect (unit seq : Nat) : Scheme :=
-  ⟨3, [],
-    .arr .P (.arr .R (.var 2) (.con unit) (.var 0)) (.arr .R (.app (.app (.con seq) (.var 1)) (.var 2)) (.con unit) (.var 0)) .cnil, .cnil⟩
+  ⟨5, [],
+    .arr .P (.arr (.R (.var 3) (.var 4)) (.var 2) (.con unit) (.var 0)) (.arr (.R (.var 3) (.var 4)) (.app (.app (.con seq) (.var 1)) (.var 2)) (.con unit) (.var 0)) .cnil, .cnil⟩
 
 /-- `Seq.fold_effect : forall c d a b r e. (b -> (a ->{r; e} b)^{b | c})^c -> (b -> ((Seq a)^d ->{r; e} b)^c)^c` -/
 def Seq.fold_effect (seq : Nat) : Scheme :=
-  ⟨5, [],
-    .arr .P (.arr .P (.var 3) (.arr .R (.var 2) (.var 3) (.var 4)) (.var 0)) (.arr .P (.var 3) (.arr .R (.app (.app (.con seq) (.var 1)) (.var 2)) (.var 3) (.cun (.var 0) (.var 4))) (.cun (.var 0) (.var 4))) .cnil, .cnil⟩
+  ⟨7, [],
+    .arr .P (.arr .P (.var 3) (.arr (.R (.var 4) (.var 5)) (.var 2) (.var 3) (.var 6)) (.var 0)) (.arr .P (.var 3) (.arr (.R (.var 4) (.var 5)) (.app (.app (.con seq) (.var 1)) (.var 2)) (.var 3) (.cun (.var 0) (.var 6))) (.cun (.var 0) (.var 6))) .cnil, .cnil⟩
 
 /-- `Seq.empty : forall a. Seq a` -/
 def Seq.empty (seq : Nat) : Scheme :=
@@ -666,8 +661,8 @@ def List.map (list : Nat) : Scheme :=
 
 /-- `List.map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c` -/
 def List.map_effect (list : Nat) : Scheme :=
-  ⟨3, [],
-    .arr .P (.arr .R (.var 1) (.var 2) (.var 0)) (.arr .R (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.var 0)) .cnil, .cnil⟩
+  ⟨5, [],
+    .arr .P (.arr (.R (.var 3) (.var 4)) (.var 1) (.var 2) (.var 0)) (.arr (.R (.var 3) (.var 4)) (.app (.con list) (.var 1)) (.app (.con list) (.var 2)) (.var 0)) .cnil, .cnil⟩
 
 /-- `List.map_indexed : forall c a b. (Int -> (a -> b)^c)^c -> (List a -> List b)^c` -/
 def List.map_indexed (int list : Nat) : Scheme :=
@@ -676,8 +671,8 @@ def List.map_indexed (int list : Nat) : Scheme :=
 
 /-- `List.each_effect : forall c a r e. (a ->{r; e} Unit)^c -> (List a ->{r; e} Unit)^c` -/
 def List.each_effect (unit list : Nat) : Scheme :=
-  ⟨2, [],
-    .arr .P (.arr .R (.var 1) (.con unit) (.var 0)) (.arr .R (.app (.con list) (.var 1)) (.con unit) (.var 0)) .cnil, .cnil⟩
+  ⟨4, [],
+    .arr .P (.arr (.R (.var 2) (.var 3)) (.var 1) (.con unit) (.var 0)) (.arr (.R (.var 2) (.var 3)) (.app (.con list) (.var 1)) (.con unit) (.var 0)) .cnil, .cnil⟩
 
 /-- `List.fold_left : forall c a b. (b -> (a -> b)^{b | c})^c -> (b -> (List a -> b)^c)^c` -/
 def List.fold_left (list : Nat) : Scheme :=
@@ -691,8 +686,8 @@ def List.fold_right (list : Nat) : Scheme :=
 
 /-- `List.fold_effect : forall c a b r e. (b -> (a ->{r; e} b)^{b | c})^c -> (b -> (List a ->{r; e} b)^c)^c` -/
 def List.fold_effect (list : Nat) : Scheme :=
-  ⟨4, [],
-    .arr .P (.arr .P (.var 2) (.arr .R (.var 1) (.var 2) (.var 3)) (.var 0)) (.arr .P (.var 2) (.arr .R (.app (.con list) (.var 1)) (.var 2) (.cun (.var 0) (.var 3))) (.cun (.var 0) (.var 3))) .cnil, .cnil⟩
+  ⟨6, [],
+    .arr .P (.arr .P (.var 2) (.arr (.R (.var 3) (.var 4)) (.var 1) (.var 2) (.var 5)) (.var 0)) (.arr .P (.var 2) (.arr (.R (.var 3) (.var 4)) (.app (.con list) (.var 1)) (.var 2) (.cun (.var 0) (.var 5))) (.cun (.var 0) (.var 5))) .cnil, .cnil⟩
 
 /-- `List.filter : forall c a. (a -> Bool)^c -> (List a -> List a)^c` -/
 def List.filter (bool list : Nat) : Scheme :=
@@ -1188,12 +1183,14 @@ end Flick.Elab.PreludeSchemes
 
 /-! ## Skipped
 
-`row`: a row of services or errors outside an arrow and `Eff`; `rank`: `∀` of a
+`row`: a row of services or errors outside an arrow and `Eff`, or a row of an arrow
+with a named element or a union; `rank`: `∀` of a
 parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`); `region`: a region parameter.
 -/
 
 -- skip Prelude.parallel_results (row): forall c r e a. List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)
 -- skip Prelude.parallel_exits (row): forall c r e a. List (Eff r e a)^c ->{r; none} List (Exit e a)
+-- skip Prelude.timeout (row): forall c r e a. Float -> (Eff r e a)^c ->{r; TimeoutError | e} a
 -- skip Prelude.field (row): forall a. String -> PureCodec Json a -> FieldCodec none a
 -- skip Prelude.optional_field (row): forall a. String -> PureCodec Json a -> FieldCodec none (Option a)
 -- skip Prelude.field_effect (row): forall rd a. String -> Codec rd none Json a -> FieldCodec rd a

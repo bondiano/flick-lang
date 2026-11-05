@@ -108,7 +108,7 @@ theorem ty_lt {t : Ty} {k : Nat} (h : ∀ n, t.Occurs n → n < k) : ∀ n, t.Oc
 theorem methSch_lt {m C s} (h : methSch m = some (C, s)) : ∀ n, s.ty.Occurs n → n < s.k := by
   unfold methSch at h
   split at h <;> cases h <;> intro n hn <;>
-    simp [Ty.Occurs, bindTy, map2Ty, appQ, arrP, boolTy] at hn ⊢ <;> omega
+    simp [Ty.Occurs, Stage.Occurs, bindTy, map2Ty, appQ, arrP, boolTy] at hn ⊢ <;> omega
 
 theorem dict_closed : ∀ c k fs, some (c / 8, dfields (c % 8) (c / 8)) = some (k, fs) →
     ∀ l s, (l, s) ∈ fs → s.Closed (s.k + k) := by
@@ -147,13 +147,14 @@ theorem curry_occ {q r : Ty} {m : Nat} : ∀ {as : List Ty}, (curry q as r).Occu
     q.Occurs m ∨ (∃ a ∈ as, a.Occurs m) ∨ r.Occurs m
   | [], h => .inr (.inr h)
   | a :: as, h => by
-    rcases h with h | h | h
+    rcases h with h | h | h | h
     · exact .inr (.inl ⟨a, by simp, h⟩)
     · rcases curry_occ h with h | ⟨b, hb, h⟩ | h
       · exact .inl h
       · exact .inr (.inl ⟨b, by simp [hb], h⟩)
       · exact .inr (.inr h)
     · exact .inl h
+    · cases h
 
 theorem nest_occ {tup m : Nat} (as : List Ty) : ∀ {t : Ty}, (nest tup t as).Occurs m →
     t.Occurs m ∨ ∃ a ∈ as, a.Occurs m := by
@@ -171,7 +172,7 @@ theorem nest_occ {tup m : Nat} (as : List Ty) : ∀ {t : Ty}, (nest tup t as).Oc
 theorem uncSch_lt (n : Nat) : ∀ m, (uncSch 10 n).ty.Occurs m → m < (uncSch 10 n).k := by
   intro m h
   simp only [uncSch, arrP] at h ⊢
-  rcases h with h | (h | h | h) | h
+  rcases h with h | (h | h | h | h) | h | h
   · rcases curry_occ h with h | ⟨a, ha, h⟩ | h
     · simp [Ty.Occurs] at h; omega
     · have := vars_occ ha h; omega
@@ -182,6 +183,8 @@ theorem uncSch_lt (n : Nat) : ∀ m, (uncSch 10 n).ty.Occurs m → m < (uncSch 1
   · simp [Ty.Occurs] at h; omega
   · simp [Ty.Occurs] at h; omega
   · cases h
+  · cases h
+  · cases h
 
 theorem constSch_ok {c s} (h : constSch c = some s) : s.ctx = [] ∧ ∀ n, s.ty.Occurs n → n < s.k := by
   unfold constSch at h
@@ -191,14 +194,14 @@ theorem constSch_ok {c s} (h : constSch c = some s) : s.ctx = [] ∧ ∀ n, s.ty
     · split at h
       · cases h; exact ⟨rfl, uncSch_lt _⟩
       · cases h
-    · cases h; exact ⟨rfl, fun n hn => by simp [frSch, Ty.Occurs] at hn ⊢; omega⟩
+    · cases h; exact ⟨rfl, fun n hn => by simp [frSch, Ty.Occurs, Stage.Occurs] at hn ⊢; omega⟩
   all_goals
     first
     | (cases h; done)
     | (cases h
        refine ⟨rfl, ?_⟩
        intro n hn
-       simp [Ty.Occurs, bindTy, appQ, arrP, optTy] at hn ⊢
+       simp [Ty.Occurs, Stage.Occurs, bindTy, appQ, arrP, optTy] at hn ⊢
        try omega)
 
 theorem glob_closed : ∀ g s, globF g = some s → s.Closed s.k := by
@@ -224,7 +227,7 @@ theorem glob_closed : ∀ g s, globF g = some s → s.Closed s.k := by
         intro σ σ' _
         refine ⟨?_, by simp⟩
         simp [strctTy, dicts, trTT, trD, trT, tyInt, tyRec, cEq, Flick.Ty.substT, Flick.Ty.spine,
-          Flick.Ty.reach]
+          Flick.Ty.reach, Flick.Stage.substT]
       · cases h
 
 def Sg : Sig where

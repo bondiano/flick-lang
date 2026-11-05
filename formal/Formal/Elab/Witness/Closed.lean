@@ -1,4 +1,5 @@
 import Formal.Elab.CoreLaws
+import Formal.Elab.Basic
 
 /-!
 # Witness: closed types and the instance of a method field
@@ -12,19 +13,9 @@ type instantiated at `U`.
 
 namespace Flick.Elab
 
-theorem Ty.subst_congr {σ σ' : Nat → Ty} : ∀ {t : Ty}, (∀ n, t.Occurs n → σ n = σ' n) →
-    t.subst σ = t.subst σ'
-  | .var n, h => h n rfl
-  | .con _, _ | .cnil, _ => rfl
-  | .app t u, h => by
-    simp only [Ty.subst]; rw [Ty.subst_congr fun n hn => h n (.inl hn),
-      Ty.subst_congr fun n hn => h n (.inr hn)]
-  | .cun t u, h => by
-    simp only [Ty.subst]; rw [Ty.subst_congr fun n hn => h n (.inl hn),
-      Ty.subst_congr fun n hn => h n (.inr hn)]
-  | .arr φ a b q, h => by
-    simp only [Ty.subst]; rw [Ty.subst_congr fun n hn => h n (.inl hn),
-      Ty.subst_congr fun n hn => h n (.inr (.inl hn)), Ty.subst_congr fun n hn => h n (.inr (.inr hn))]
+theorem Ty.subst_congr {σ σ' : Nat → Ty} {t : Ty} (h : ∀ n, t.Occurs n → σ n = σ' n) :
+    t.subst σ = t.subst σ' :=
+  Ty.subst_agree h
 
 theorem TTy.closed_of {k : Nat} {t : Ty} (h : ∀ n, t.Occurs n → n < k) : (TTy.mono t).Closed k :=
   fun _ _ hσ => by simp only [TTy.subst]; rw [Ty.subst_congr fun n hn => hσ n (h n hn)]
@@ -37,11 +28,57 @@ theorem caps_congr {C : Caps} {σ σ' : Atom → Flick.Ty} (h : ∀ b, C b → �
   · rintro ⟨b, hb, h'⟩; exact ⟨b, hb, h b hb ▸ h'⟩
   · rintro ⟨b, hb, h'⟩; exact ⟨b, hb, (h b hb).symm ▸ h'⟩
 
+/-- A substitution acts on a row only through the atoms its elements name. -/
+theorem Row.substT_congr {r : Row} {σ σ' : Atom → Flick.Ty}
+    (h : ∀ b, (r (.atm b) ∨ r (.rv b) ∨ ∃ N, r (.ob N b) ∨ r (.need N b)) → σ b = σ' b) :
+    r.substT σ = r.substT σ' := by
+  funext x; apply propext
+  cases x with
+  | nm N =>
+    simp only [Row.substT]
+    constructor
+    · exact fun h' => h'.imp id fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inr (.inl hb)) ▸ h''⟩
+    · exact fun h' => h'.imp id fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inr (.inl hb))).symm ▸ h''⟩
+  | atm a =>
+    simp only [Row.substT]
+    constructor
+    · exact fun h' => h'.imp (fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inl hb) ▸ h''⟩)
+        fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inr (.inl hb)) ▸ h''⟩
+    · exact fun h' => h'.imp (fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inl hb)).symm ▸ h''⟩)
+        fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inr (.inl hb))).symm ▸ h''⟩
+  | ob N a =>
+    simp only [Row.substT]
+    constructor
+    · exact fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inr (.inr ⟨N, .inl hb⟩)) ▸ h''⟩
+    · exact fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inr (.inr ⟨N, .inl hb⟩))).symm ▸ h''⟩
+  | need N a =>
+    simp only [Row.substT]
+    constructor
+    · exact fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inr (.inr ⟨N, .inr hb⟩)) ▸ h''⟩
+    · exact fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inr (.inr ⟨N, .inr hb⟩))).symm ▸ h''⟩
+  | rv a =>
+    simp only [Row.substT]
+    constructor
+    · exact fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inr (.inl hb)) ▸ h''⟩
+    · exact fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inr (.inl hb))).symm ▸ h''⟩
+
+/-- What a translated row names is among the variables of the source row. -/
+theorem asRow_trT_atoms {t : Ty} {b : Atom}
+    (h : (trT N t).asRow (.atm b) ∨ (trT N t).asRow (.rv b) ∨
+      ∃ M, (trT N t).asRow (.ob M b) ∨ (trT N t).asRow (.need M b)) :
+    ∃ n, b = .v n ∧ t.Occurs n := by
+  refine (trT_reach N t b).1 ((Flick.Ty.reach_asRow _ _).2 ?_)
+  rcases h with h | h | ⟨M, h | h⟩
+  · exact .inl h
+  · exact .inr h
+  · exact (Flick.Ty.asRow_ob _ _ _ h).elim
+  · exact (Flick.Ty.asRow_need _ _ _ h).elim
+
 theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
     (h : ∀ n, t.Occurs n → σ (.v n) = σ' (.v n)) : (trT N t).substT σ = (trT N t).substT σ' := by
   have hc : ∀ b, (trT N t).reach b → σ b = σ' b := by
     intro b hb; obtain ⟨n, rfl, hn⟩ := (trT_reach N t b).1 hb; exact h n hn
-  induction t with
+  induction t using Ty.ind with
   | var n => exact h n rfl
   | con c => unfold trT; split <;> (try split) <;> rfl
   | cnil => simp [trT, Flick.Ty.substT]
@@ -50,10 +87,23 @@ theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
     rw [iht (fun n hn => h n (.inl hn)) (fun b hb => hc b (.inl hb)),
       ihu (fun n hn => h n (.inr hn)) (fun b hb => hc b (.inr hb))]
   | cun q q' _ _ => exact congrArg Flick.Ty.caps (caps_congr hc)
-  | arr φ a b q iha ihb _ =>
-    simp only [trT, Flick.Ty.substT, trStage_substT]
+  | arr φ a b q iha ihb _ _ =>
+    have hst : (trStage N φ).substT σ = (trStage N φ).substT σ' := by
+      cases φ with
+      | P => rfl
+      | R r e =>
+        have stage : ∀ x, (∃ n, x = .v n ∧ (Stage.R r e).Occurs n) → σ x = σ' x := fun x hx =>
+          hc x (by rw [trT_arr]; exact .inr (.inr (.inr hx)))
+        simp only [trStage, Flick.Stage.substT]
+        rw [Row.substT_congr fun x hx => stage x (let ⟨n, e, h⟩ := asRow_trT_atoms N hx; ⟨n, e, .inl h⟩),
+          Row.substT_congr (r := Row.union _ allNames) fun x hx => stage x ?_]
+        simp only [Row.union, allNames, or_false] at hx
+        obtain ⟨n, e, h⟩ := asRow_trT_atoms N hx
+        exact ⟨n, e, .inr h⟩
+    rw [trT_arr] at hc ⊢
+    simp only [Flick.Ty.substT]
     rw [iha (fun n hn => h n (.inl hn)) (fun x hx => hc x (.inl hx)),
-      ihb (fun n hn => h n (.inr (.inl hn))) (fun x hx => hc x (.inr (.inl hx))),
+      ihb (fun n hn => h n (.inr (.inl hn))) (fun x hx => hc x (.inr (.inl hx))), hst,
       caps_congr fun x hx => hc x (.inr (.inr hx))]
 
 /-- A translated type whose variables lie below `k` is closed at `k`. -/

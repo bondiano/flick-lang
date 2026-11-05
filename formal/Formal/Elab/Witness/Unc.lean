@@ -111,7 +111,7 @@ theorem typ_uncB : ∀ m (As : List Flick.Ty), As.length = m → ∀ {A₀ R : F
 
 theorem trT_curry (q : Ty) (as : List Ty) (r : Ty) :
     trT N (curry q as r) = curryC (trT N q).reach (as.map (trT N)) (trT N r) := by
-  induction as <;> simp_all [curry, curryC, trT, trStage]
+  induction as <;> simp_all [curry, curryC, trT]
 
 theorem trT_nest (t : Ty) (as : List Ty) :
     trT N (nest 10 t as) = nestC (trT N t) (as.map (trT N)) := by
@@ -123,7 +123,7 @@ theorem trT_nest (t : Ty) (as : List Ty) :
 theorem typ_unc_tr (m : Nat) {φ} : Typ Sg Ψ Θ [] (uncB m) (.ex (trT N (uncSch 10 (m + 1)).ty) φ) := by
   have hv : vars (m + 1) = .var 0 :: (List.range m).map fun i => .var (i + 1) := by
     simp [vars, List.range_succ_eq_map]
-  simp only [uncSch, arrP, trT, trStage, trT_curry, trT_nest, hv, List.map_cons, List.tail_cons]
+  simp only [uncSch, arrP, trT, trT_curry, trT_nest, hv, List.map_cons, List.tail_cons]
   exact typ_uncB m _ (by simp)
 
 /-- `from_result_n r = match r with Ok x → x | Err e → raise e`. -/
@@ -135,8 +135,9 @@ theorem hall_res : ∀ K k ts, Sg.ctor K = some (k, ts, "Result") →
   intro K k ts h; simp only [Sg] at h; unfold ctorF at h
   split at h <;> simp at h <;> (obtain ⟨rfl, rfl⟩ := h; simp)
 
-theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {φ} (hE : ∀ x, ¬ E.reach x) :
-    Typ Sg Ψ Θ [] frBody (.ex (.arrow (tc "Result" [tc "Errors" [E], A]) (trStage .R) A C0) φ) :=
+theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {n φ} (hE : ∀ x, ¬ E.reach x) :
+    Typ Sg Ψ Θ [] frBody (.ex (.arrow (tc "Result" [tc "Errors" [E], A]) (trStage N (.R .cnil (.con n))) A
+      C0) φ) :=
   .lam (.match_ (typ_var_mono rfl)
       (.acons (.adt (.app (.head (K := "Ok") (ts := [.tvar 1]) (us := [tc "Errors" [E], A]) rfl rfl)
           .var) (tcon_hd _ _))
@@ -144,9 +145,10 @@ theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {φ} (hE : ∀ x, ¬ E.reach x) 
         (.acons (.adt (.app (.head (K := "Err") (ts := [.tvar 0]) (us := [tc "Errors" [E], A]) rfl rfl)
           .var) (tcon_hd _ _))
           (.raiseAdt (typ_var_mono rfl) (tcon_hd _ _) (by
-            refine ⟨fun _ h => h, fun x hx => ?_⟩
+            refine ⟨fun _ h => h.elim, fun x hx => ?_⟩
             cases x with
             | atm a =>
+              exfalso
               simp [Row.err, Row.union, Row.single, Row.ofCaps, Flick.Ty.substT, instT] at hx
               rcases hx with h | h
               · exact h
