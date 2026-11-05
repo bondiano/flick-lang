@@ -25,7 +25,8 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 
 ## What is proved
 
-- **The core** (`Formal/`, the top-level modules): type soundness `T1` (Progress and
+- **The core** (`Formal/`, the top-level modules), with rows of services and errors that
+  take variables, generalized and instantiated as variables of the other kinds: type soundness `T1` (Progress and
   Preservation over every reachable configuration), `T2a` (a pure computation makes only
   pure steps) and `T2b` (a runtime computation asks only the services and raises only the
   errors of its row), `lemma_3_1` and `T3` (generalization and the store typing), `T4` (T4.1, T4.2: live work reaches only live
@@ -73,10 +74,11 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | Document | Lean |
 | - | - |
 | `core.md` §1.2 types, stages, rows; `σ` | `Ty`, `Stage`, `Row`, `Scheme` (`Syntax.lean`) |
+| row variables, the row an instance stands for | `Elem.rv`, `Ty.row`, `Ty.asRow`, `Row.Named` (`Syntax.lean`); `Ty.asRow_substT`, `Ty.reach_asRow` (`TyOps.lean`) |
 | `regions.md` §1.2 atoms, capture sets, `τ^C`, `H ϱ`, `Owner ϱ`, `Scope ϱ` | `Atom`, `Caps`, `Elem`; `Ty.arrow`/`Ty.eff` with `C`, `Ty.caps`, `Ty.rg`, `Ty.hnd`, `Ty.owner`; `Row.scope` (`Syntax.lean`) |
 | `regions.md` §2.1 `⌈τ⌉`; its commutation with substitution | `Ty.reach`; `Ty.reach_substT`, `Scheme.reach_substT` (`TyOps.lean`, `Reach.lean`) |
 | `regions.md` §2.4 `Θ ⊢ Outlives C ϱ` | `Facts`, `Outl` (`Syntax.lean`); dropping facts that follow: `Typ.cut` (`Cut.lean`) |
-| type substitution, `Gen` and instantiation | `Ty.substT`, `Ty.up`, `liftT`, `instT` (`TyOps.lean`) |
+| type substitution, `Gen` and instantiation | `Ty.substT`, `Ty.up`, `liftT`, `instT` (`TyOps.lean`); `Scheme.substT`, `Scheme.inst` (`SchemeOps.lean`) |
 | `core.md` §1.3 terms, patterns; §3.1 run-time forms; `regions.md` §1.3, §3.1 | `Tm`, `Pat` (`Syntax.lean`) |
 | what a term holds: free variables, run-time regions, locations (the premise of (Lam)/(Task)) | `Tm.Free`, `Tm.Has`, `held` (`Reach.lean`) |
 | §1.3, §3.1 values | `Value`, `IsEnv` (`Typing.lean`) |
@@ -117,7 +119,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | T1 | `T1` (`Soundness.lean`) |
 | T2(a), T2(b) | `T2a`, `T2b`, `T2b_await` (`Effects.lean`) |
 | lemma 3.1, T3 | `lemma_3_1`, `T3` (`Generalization.lean`) |
-| a polymorphic use; a scope that acquires and uses, as checks | `Examples.lean` |
+| a polymorphic use; a use of a row-polymorphic function at a row of services; a scope that acquires and uses, as checks | `Examples.lean` |
 
 ## Representation
 
@@ -138,9 +140,18 @@ variable or a run-time region, and a capture set is a set of atoms (`Atom → Pr
 atom `a` with `⌈σ a⌉`; then `⌈τ[σ]⌉ = ⌈τ⌉[σ]` holds by definition of the substitution on
 sets (`Ty.reach_substT`). A capture row variable instantiated by `caps C` is the set `C`,
 a region variable instantiated by `rg π` is `{π}`, a type variable instantiated by `υ` is
-`⌈υ⌉`: one substitution serves all kinds. A row is a set of elements, a name or an atom:
-in a row of services the atom `ϱ` is `Scope ϱ`, in a row of errors the atoms bound what
-the errors reach (`⌈Errors ε⌉`), so rows are substituted too.
+`⌈υ⌉`: one substitution serves all kinds. A row is a set of elements, a name, an atom or
+a row variable `rv a`: in a row of services the atom `ϱ` is `Scope ϱ`, in a row of errors
+the atoms bound what the errors reach (`⌈Errors ε⌉`), so rows are substituted too. A row
+variable instantiated by `row r` is the names, atoms and variables of `r` (`Ty.asRow`;
+obligations and uses do not come in through a variable), one instantiated by a type
+variable is that variable, by any other type the atoms the type reaches. Then the row a
+type stands for commutes with substitution (`Ty.asRow_substT`), and `⌈τ⌉` is what `τ`
+stands for as atoms and variables (`Ty.reach_asRow`), which keeps `⌈τ[σ]⌉ = ⌈τ⌉[σ]` and
+the composition of substitutions with kinds unchecked. A substitution of a term with
+run-time forms brings no names into rows (`NoNames`, part of `Fits`): the renaming
+`kill`, shifts and the region of a new scope are such, and only source code is
+instantiated by rows of names.
 
 Types have no binders; a scheme `⟨k, Θ, τ⟩` binds the indices `0 … k-1` of `τ` and of its
 facts `Θ`. Terms carry no types (Curry style), so a type substitution changes the judgment
@@ -163,8 +174,8 @@ Lists inside terms and types are spines, so `Tm` and `Ty` are plain inductive ty
 - match and `try` arms are `acons p b rest`, `aguard p g b rest`, ending in `anil`, with
   their own judgment forms `J.alts` and `J.halts` in the same inductive `Typ`.
 
-Rows are closed sets, `Elem → Prop`; equality of rows is extensional, which is
-`≡` of §1.2. Every rule types its premises at the stage of its conclusion, and the
+Rows are sets, `Elem → Prop`, with variables among their elements; equality of rows is
+extensional, which is `≡` of §1.2. Every rule types its premises at the stage of its conclusion, and the
 subsumption `≤` is folded into the rules whose result may be an arrow or an `Eff`; (Sub)
 is then admissible (`Typ.sub`). With (Sub) this is equivalent to the `⊔` form of §2.3,
 and inversion stays a plain `cases`. (≤-Cap) is a premise of `Le.arrow` and `Le.eff`:
@@ -183,9 +194,14 @@ finalizers, both computations. A configuration is a main thread with `Λ` and `�
 
 Each item narrows `core.md` or `regions.md` unless it says otherwise.
 
-1. **Rows are closed**, so row variables are neither generalized nor instantiated:
-   constants are typed at any rows (`CArg`), but schemes do not abstract over them.
-   Polymorphism is over variables of the other kinds. Nominal types have parameters
+1. **Row variables are variables of the scheme.** A scheme abstracts a row variable as
+   any other variable, and (Var) instantiates it by a row (`Ty.row`); constants are typed
+   at any rows (`CArg`). Kinds are not checked. A row variable stands for names, atoms and
+   variables, never for obligations or uses; the rows that must be named are those of the
+   outputs of `Layer.merge`, the services of `provide` and the work of `Fiber.spawn` and
+   `Scope.add_finalizer` (`Row.Named`, items 8 and 21). `⌈Errors ε⌉` counts the row
+   variables of `ε` (`regions.md` §2.1 excludes them): an instance shows what its errors
+   reach, and `⌈·⌉` must commute with it. Nominal types have parameters
    (`Sig.ctor` gives their number); their fields mention only the parameters
    (`Sig.ctor_closed`, `Sig.ctor_reach`); services have no parameters (`Sig.impl_closed`).
    (Let-Sig) is (Let-Gen) or (Let-Mono) with the annotation erased: terms carry no types,
@@ -214,12 +230,15 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    §1.5 at the only place the core needs it. (Errors-Val) types values only, as in §3.6.
 7. **`try` arms** are `x`/`_` at `Errors ε_b` or a constructor pattern `E p̄` at an error
    type `E` without parameters. `H` is a judgment index: each arm without `when` may add
-   what it catches (`Catches`), names only. (Handle) uses the value form of the coverage
-   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the caught errors reach passes to the errors it lets through.
+   what it catches (`Catches`), names only: a row variable of `ε_b` passes to `ε'` even
+   under `x`/`_`. (Handle) uses the value form of the coverage
+   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the caught errors reach and their row variables pass to the errors it lets through.
 8. **Environments.** `Env ρ` means "binds exactly `ρ`", as (Env), (Bind) and (Join)
    give it: T4.3 needs that a `with` frame answers `S` exactly when its row has `S`. `with θ e` and `econs` require
    `θ` and the bound values to be values. The disjointness of `Layer.merge` is kept
-   (`Const.ok`) though soundness does not need it.
+   (`Const.ok`) though soundness does not need it. The services a `provide` gives and the
+   outputs `Layer.merge` joins are named, without row variables (`Row.Named`): a row
+   variable among the outputs (`core.md`, [`provide` and output row variables](../docs/formal/core.md#provide-discharges-only-the-listed-outputs-of-a-layer-not-a-row-variable)) is not modelled.
 9. **Allocation is deterministic:** `Ref.make v` takes `ℓ = μ.length`, `scope` takes
    `π = Λ.length`.
 10. **Programs** are closed terms typed in the empty store with no facts; modules
@@ -286,7 +305,9 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     that closes `π` says that nothing that can step reaches `π`.
 21. **Obligations of `provide` (regions.md §2.7) are row elements.** `Provided {S} ϱ` is
     an element `ob S ϱ` of a row of services; `Fiber.spawn` and `Scope.add_finalizer`
-    put one for each service of the work into the stage of the call (`Row.obs`). A
+    put one for each service of the work into the stage of the call (`Row.obs`); the
+    services of the work are named, so `Provided r ϱ` over a row variable `r` is not
+    modelled (`Const.ok`). A
     `provide` in a program binds no region variable: an obligation about a region
     created in its body is discharged at the end of that region (`Row.disch`, the second
     case of §2.7, `S` coming from outside it), and one that reaches a `provide` giving `S`
@@ -506,7 +527,7 @@ Simplifications:
    checker (`PreludeSchemes.lean`); `pair`, `unc n` and `each_P` have no Prelude name and are
    written in `Sugar.lean`. `from_result` is a family `from_result_n` over closed rows of
    errors, one error type `con n` each (`frSch`, equal to the generated scheme at `e := con n`
-   by `frSch_gen`): the core has no row variables, and `e?` takes the member of the row
+   by `frSch_gen`): the source stage `R` carries no rows, and `e?` takes the member of the row
    of `e`'s type (`tryResult_elab`). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
    hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
    qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and

@@ -24,19 +24,42 @@ def J.substT (σ : Atom → Ty) : J → J
 
 /-- A substitution that fits a term: it keeps the regions the term writes and the
 `provide` regions of its `with` frames, and if the term has a run-time form, it brings
-in no run-time region and sends each atom to an atom or to a type without one. -/
+in no run-time region, sends each atom to an atom or to a type without one and brings no
+name into a row. -/
 def Fits (σ : Atom → Ty) (e : Tm) : Prop :=
   (∀ p, (e.Has (.rgn p) ∨ e.Has (.prov p)) → σ (.r p) = .rg p) ∧
     (e.Has .ins → ∀ b p, (σ b).reach (.r p) → b = .r p) ∧
-    (e.Has .ins → ∀ b a, (σ b).reach a → σ b = a.ty)
+    (e.Has .ins → ∀ b a, (σ b).reach a → σ b = a.ty) ∧
+    (e.Has .ins → NoNames σ)
 
 theorem Fits.sub {σ : Atom → Ty} {e e' : Tm} (h : Fits σ e) (hs : ∀ s, e'.Has s → e.Has s) :
     Fits σ e' :=
-  ⟨fun p hp => h.1 p (hp.imp (hs _) (hs _)), fun hi => h.2.1 (hs _ hi), fun hi => h.2.2 (hs _ hi)⟩
+  ⟨fun p hp => h.1 p (hp.imp (hs _) (hs _)), fun hi => h.2.1 (hs _ hi), fun hi => h.2.2.1 (hs _ hi),
+    fun hi => h.2.2.2 (hs _ hi)⟩
 
 theorem Fits.noIns {σ : Atom → Ty} {e : Tm} (hn : e.NoIns) (hr : ∀ p, σ (.r p) = .rg p) :
     Fits σ e :=
-  ⟨fun p _ => hr p, fun hi => (hn hi).elim, fun hi => (hn hi).elim⟩
+  ⟨fun p _ => hr p, fun hi => (hn hi).elim, fun hi => (hn hi).elim, fun hi => (hn hi).elim⟩
+
+theorem ident_noNames : NoNames Ty.ident := by
+  intro b N h; cases b <;> simp [Ty.ident, Ty.asRow_tvar, Ty.asRow_rg] at h
+
+/-- Shifting brings no name into a row. -/
+theorem NoNames.up {σ : Atom → Ty} (h : NoNames σ) (k : Nat) : NoNames fun b => (σ b).up k := by
+  intro b N hb
+  simp only [Ty.up, Ty.asRow_substT, Row.substT] at hb
+  rcases hb with hb | ⟨c, _, hc⟩
+  · exact h b N hb
+  · cases c <;> simp [shiftV, Ty.asRow_tvar, Ty.asRow_rg] at hc
+
+theorem NoNames.lift {σ : Atom → Ty} (h : NoNames σ) (k : Nat) : NoNames (liftT k σ) := by
+  intro b N hb
+  cases b with
+  | v i =>
+    by_cases hik : i < k
+    · simp [liftT, hik, Ty.asRow_tvar] at hb
+    · simp only [liftT, hik, if_false] at hb; exact h.up k _ N hb
+  | r q => exact h.up k _ N hb
 
 theorem shift_lift (k : Nat) (σ : Atom → Ty) (a : Atom) :
     (shiftV k a).substT (liftT k σ) = (σ a).up k := by
@@ -50,7 +73,7 @@ theorem Atom.ty_up (a : Atom) (k : Nat) : a.ty.up k = (a.up k).ty := by
 
 theorem Fits.lift {σ : Atom → Ty} {e : Tm} (h : Fits σ e) (k : Nat) : Fits (liftT k σ) e := by
   refine ⟨fun p hp => by simp [liftT, h.1 p hp, Ty.up, Ty.substT, shiftV], fun hi b p hb => ?_,
-    fun hi b a hb => ?_⟩
+    fun hi b a hb => ?_, fun hi => (h.2.2.2 hi).lift k⟩
   · have key : ∀ t : Ty, (t.up k).reach (.r p) → t.reach (.r p) := by
       intro t ht
       obtain ⟨a, ha, he⟩ := (Ty.reach_up t k _).mp ht
@@ -66,7 +89,7 @@ theorem Fits.lift {σ : Atom → Ty} {e : Tm} (h : Fits σ e) (k : Nat) : Fits (
       intro b' hb' _
       rw [← hb'] at hb ⊢
       obtain ⟨a', ha', rfl⟩ := (Ty.reach_up _ k _).mp hb
-      rw [h.2.2 hi b' a' ha', Atom.ty_up]
+      rw [h.2.2.1 hi b' a' ha', Atom.ty_up]
     cases b with
     | v i =>
       by_cases hik : i < k
@@ -103,10 +126,6 @@ theorem Facts.up_comm (Θ : Facts) (k : Nat) (σ : Atom → Ty) :
 theorem Row.up_comm (r : Row) (k : Nat) (σ : Atom → Ty) :
     (r.substT (shiftV k)).substT (liftT k σ) = (r.substT σ).substT (shiftV k) := by
   rw [Row.substT_comp, Row.substT_comp]; congr 1; funext a; exact shift_lift k σ a
-
-theorem Row.ofCaps_substT (C : Caps) (σ : Atom → Ty) :
-    (Row.ofCaps C).substT σ = Row.ofCaps (C.substT σ) := by
-  funext x; cases x <;> first | rfl | simp [Row.substT, Row.ofCaps]
 
 theorem Row.err_substT (E : Name) (U : Ty) (σ : Atom → Ty) :
     (Row.err E U).substT σ = Row.err E (U.substT σ) := by
