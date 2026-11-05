@@ -1,5 +1,7 @@
 module App.Codecs exposing (..)
 
+import Codec exposing (plugin codec)
+
 type File (s : Region)
 
 type alias Profile = { email : String; nickname : Option String }
@@ -9,15 +11,15 @@ type alias Session = {
   name : String;
   handler : Float -> Float;
 } deriving Schema
-//~ std/D001 @11:12-11:18 `Session.handler`: a field of type `Float -> Float` has no Schema witness
+//~ std/D001 @13:12-13:18 `Session.handler`: a field of type `Float -> Float` has no Schema witness
 
 type alias Cell = { value : Ref Float }
   deriving Schema
-//~ std/D001 @15:12-15:18 `Cell.value`: a field of type `Ref Float` has no Schema witness
+//~ std/D001 @17:12-17:18 `Cell.value`: a field of type `Ref Float` has no Schema witness
 
 type Holder s = Holder (File s)
   deriving Schema
-//~ std/D001 @19:12-19:18 a scoped resource has no wire form
+//~ std/D001 @21:12-21:18 a scoped resource has no wire form
 
 type Plain = Plain Float
 
@@ -30,7 +32,7 @@ let missing =
   codec (schema Profile) {
     email = field "email" String.json;
   }
-//~ FLICK-D002 @30:3-32:4 the codec misses the field `nickname`
+//~ std/D002 @32:3-34:4 the codec misses the field `nickname`
 
 twice : PureCodec Json Profile
 let twice =
@@ -39,7 +41,7 @@ let twice =
     email = field "mail" String.json;
     nickname = optional_field "nickname" String.json;
   }
-//~ FLICK-D003 @39:5-39:37 `email` is given twice
+//~ std/D003 @41:5-41:37 `email` is given twice
 
 unknown : PureCodec Json Profile
 let unknown =
@@ -48,7 +50,7 @@ let unknown =
     nickname = optional_field "nickname" String.json;
     age = field "age" Float.json_finite;
   }
-//~ FLICK-D004 @49:5-49:40 the record has no field `age`
+//~ std/D004 @51:5-51:40 the record has no field `age`
 
 clash : PureCodec Json Profile
 let clash =
@@ -56,7 +58,25 @@ let clash =
     email = field "name" String.json;
     nickname = optional_field "name" String.json;
   }
-//~ FLICK-D005 @57:16-57:49 the wire name "name" is already a field's
+//~ std/D005 @59:16-59:49 the wire name "name" is already a field's
+
+type Shape = Dot | Line Float
+  deriving Schema
+
+shapes : PureCodec Json Shape
+let shapes =
+  codec (schema Shape) {
+    x = field "x" Float.json_finite;
+  }
+//~ std/D007 @68:9-68:23 a `codec` block describes a record, but this is a schema of `Shape`
+
+wrong : PureCodec Json Profile
+let wrong =
+  codec (schema Profile) {
+    email = field "email" Float.json_finite;
+    nickname = optional_field "nickname" String.json;
+  }
+//~ std/D012 @76:5-76:44 `email` is a `String`, but its codec decodes `Float`
 
 service Directory =
   lookup : Unit ->{; SchemaError} String
@@ -67,7 +87,7 @@ let effectful =
     email = field "email" String.json |> on_missing_effect (fun () -> Directory.lookup ());
     nickname = optional_field "nickname" String.json;
   }
-//~ FLICK-E002 @67:71-67:90 does not allow service `Directory`
+//~ FLICK-T003 @86:3-89:4 expected `PureCodec Json Profile`, found `Codec
 
 general : Codec {Directory} none Json Profile
 let general =

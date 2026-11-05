@@ -1,19 +1,15 @@
-//! `schema T` and `codec s { field = … }`. A `codec` block gives every field
-//! of the record `s` describes exactly once, each with a `FieldCodec`; it is
-//! a `PureCodec Json R` when no field needs services to decode, a
-//! `Codec rd none Json R` otherwise. A refined type's `parse` of a constant
+//! `schema T`, the witness of `T`. A refined type's `parse` of a constant
 //! is checked when the program compiles, if the compiler knows the check.
 
 use super::Checker;
-use super::ty::{Row, Type};
-use super::typing::{CodecBlock, Ref, range};
+use super::ty::Type;
+use super::typing::Ref;
 use crate::consteval::{self, Const};
 use crate::diagnostics::codes;
 use crate::source::SourceMap;
+use crate::syntax;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::{self, literal};
-use crate::types::lang::Lang;
 
 impl Checker<'_> {
     /// `schema T`: the witness `T` derives.
@@ -50,170 +46,6 @@ impl Checker<'_> {
         ty
     }
 
-    /// `codec s { field = … }`.
-    pub fn codec_expr(&mut self, node: &Node, expected: Option<&Type>) -> Type {
-        let span = self.span(node);
-        let Some(head) = node.nodes().next() else {
-            return Type::Error;
-        };
-        let decoded = self.fresh();
-        let schema = self.infer(head);
-        self.expect(
-            &schema,
-            &Type::app(Type::lang(Lang::Schema), decoded.clone()),
-            self.span(head),
-        );
-        let fields: Vec<(String, &Node, &Node)> = node
-            .nodes()
-            .filter(|n| n.kind == K::RecordExpr)
-            .flat_map(Node::nodes)
-            .filter(|n| n.kind == K::RecordField)
-            .filter_map(|f| {
-                let label = f.child_tokens().find(|t| t.kind == K::Ident)?;
-                let value = f.nodes().next()?;
-                Some((label.text(self.text).to_owned(), f, value))
-            })
-            .collect();
-        let record = match self.whnf(&self.zonk(&decoded)) {
-            Type::Record(row) if row.tail.is_none() => row,
-            Type::Error => return Type::Error,
-            other => {
-                let shown = self.show(&other);
-                self.error(
-                    codes::D007,
-                    self.span(head),
-                    format!(
-                        "a `codec` block describes a record, but this is a schema of `{shown}`"
-                    ),
-                );
-                return Type::Error;
-            }
-        };
-        let (rows, given) = self.codec_fields(
-            &fields,
-            &record,
-            #[cfg(feature = "ide")]
-            &decoded,
-        );
-        let missing: Vec<String> = record
-            .entries
-            .iter()
-            .filter(|(l, _)| !given.contains(l))
-            .map(|(l, _)| format!("`{l}`"))
-            .collect();
-        if !missing.is_empty() {
-            self.error(
-                codes::D002,
-                span,
-                format!("the codec misses the field {}", missing.join(", ")),
-            );
-        }
-        let name = match head.kind {
-            K::SchemaExpr => head
-                .child_tokens()
-                .filter(|t| t.kind == K::Con)
-                .last()
-                .map_or_else(String::new, |t| t.text(self.text).to_owned()),
-            _ => String::new(),
-        };
-        self.typing.codecs.insert(range(span), CodecBlock { name });
-        self.codec_type(&rows, &fields, decoded, expected)
-    }
-
-    /// Checks each field of a block against its label's type in `record`:
-    /// the decoding services of each, and the labels given.
-    fn codec_fields(
-        &mut self,
-        fields: &[(String, &Node, &Node)],
-        record: &Row,
-        #[cfg(feature = "ide")] decoded: &Type,
-    ) -> (Vec<Type>, Vec<String>) {
-        let mut rows = Vec::new();
-        let mut given: Vec<String> = Vec::new();
-        let mut wires: Vec<String> = Vec::new();
-        for (label, field, value) in fields {
-            #[cfg(feature = "ide")]
-            if let Some(token) = field.child_tokens().find(|t| t.kind == K::Ident) {
-                self.note_field(self.token_span(token), decoded);
-            }
-            let Some(ty) = record.get(label).cloned() else {
-                self.error(
-                    codes::D004,
-                    self.span(field),
-                    format!("the record has no field `{label}`"),
-                );
-                continue;
-            };
-            if given.contains(label) {
-                self.error(
-                    codes::D003,
-                    self.span(field),
-                    format!("`{label}` is given twice"),
-                );
-                continue;
-            }
-            given.push(label.clone());
-            let rd = self.fresh();
-            let codec = Type::apps(Type::lang(Lang::FieldCodec), [rd.clone(), ty]);
-            self.check(value, &codec);
-            rows.push(rd);
-            if let Some(wire) = wire_name(value, self.text) {
-                if wires.contains(&wire) {
-                    self.error(
-                        codes::D005,
-                        self.span(value),
-                        format!("the wire name \"{wire}\" is already a field's"),
-                    );
-                }
-                wires.push(wire);
-            }
-        }
-        (rows, given)
-    }
-
-    /// A `PureCodec` when no field needs services or one is expected, a
-    /// `Codec` of the fields' services otherwise.
-    fn codec_type(
-        &mut self,
-        rows: &[Type],
-        fields: &[(String, &Node, &Node)],
-        decoded: Type,
-        expected: Option<&Type>,
-    ) -> Type {
-        let pure_wanted = expected
-            .map(|e| self.whnf(e))
-            .is_some_and(|e| e.spine().0.is_lang(Lang::PureCodec));
-        let json = Type::lang(Lang::Json);
-        if pure_wanted || rows.iter().all(|r| self.empty_row(r)) {
-            for (r, (label, _, value)) in rows.iter().zip(fields) {
-                if self.unify(r, &Type::empty_row()).is_err() {
-                    let shown = self.show(r);
-                    self.error(
-                        codes::T003,
-                        self.span(value),
-                        format!("decoding `{label}` needs `{shown}`, so the codec is no `PureCodec`: use a `Codec`"),
-                    );
-                }
-            }
-            return Type::apps(Type::lang(Lang::PureCodec), [json, decoded]);
-        }
-        let services = rows
-            .iter()
-            .cloned()
-            .reduce(|a, b| Type::Union(Box::new(a), Box::new(b)))
-            .unwrap_or_else(Type::empty_row);
-        Type::apps(
-            Type::lang(Lang::Codec),
-            [services, Type::empty_row(), json, decoded],
-        )
-    }
-
-    /// Whether the row `r` is known to be empty.
-    fn empty_row(&self, r: &Type) -> bool {
-        let norm = self.store.normalize(r);
-        norm.entries.is_empty() && norm.tails.is_empty()
-    }
-
     /// `T.parse c` of a constant `c`: the check of `T`, applied when the
     /// program compiles if the compiler knows it.
     pub fn refined_constant(&mut self, head: &Node, arg: &Node) {
@@ -242,35 +74,6 @@ impl Checker<'_> {
                 ),
             );
         }
-    }
-}
-
-/// The wire name of a field: the string literal `field "x" …` starts with.
-fn wire_name(value: &Node, text: &str) -> Option<String> {
-    let mut found = None;
-    walk(value, &mut |n| {
-        if found.is_none() && n.kind == K::AppExpr {
-            let mut parts = n.nodes();
-            let head = parts.next()?;
-            let arg = parts.next()?;
-            let name = head.text(text);
-            if matches!(name.trim(), "field" | "optional_field" | "field_effect")
-                && arg.kind == K::Literal
-                && let Some(t) = arg.child_tokens().next()
-                && t.kind == K::String
-            {
-                found = Some(literal::string_value(t.text(text)));
-            }
-        }
-        Some(())
-    });
-    found
-}
-
-fn walk(node: &Node, f: &mut impl FnMut(&Node) -> Option<()>) {
-    let _ = f(node);
-    for child in node.nodes() {
-        walk(child, f);
     }
 }
 

@@ -227,7 +227,6 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::ProvideKw
         | K::SqlKw
         | K::UiKw
-        | K::CodecKw
         | K::SchemaKw => true,
         K::LBrace => !p.no_brace,
         K::Dollar => p.sql_depth > 0,
@@ -364,20 +363,6 @@ fn atom(p: &mut Parser) -> Option<Done> {
             });
             p.braces(K::Block, stmt, |_| false);
             K::ProvideExpr
-        }
-        K::CodecKw => {
-            p.bump();
-            head_without_braces(p, |p| {
-                postfix(p);
-            });
-            if p.at(K::LBrace) {
-                let r = p.start();
-                let kind = record(p);
-                p.complete(r, kind);
-            } else {
-                p.error_expected("`{` with the codec fields");
-            }
-            K::CodecExpr
         }
         K::SqlKw => {
             p.bump();

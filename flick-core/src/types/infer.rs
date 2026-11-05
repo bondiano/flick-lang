@@ -104,10 +104,6 @@ impl Checker<'_> {
             (K::ScopeExpr, _) => {
                 self.scope_expr(node, Some(expected));
             }
-            (K::CodecExpr, _) => {
-                let actual = self.codec_expr(node, Some(expected));
-                self.expect(&actual, expected, self.span(node));
-            }
             (K::SqlExpr, _) => {
                 self.sql_expr(node, Some(expected));
             }
@@ -284,7 +280,6 @@ impl Checker<'_> {
             K::ScopeExpr => self.scope_expr(node, None),
             K::ProvideExpr => self.provide(node, None),
             K::SchemaExpr => self.schema_expr(node),
-            K::CodecExpr => self.codec_expr(node, None),
             K::UiExpr => {
                 self.ui += 1;
                 let ty = node

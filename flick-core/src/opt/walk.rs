@@ -34,7 +34,6 @@ pub fn strict_uses(e: &Expr, name: &str) -> usize {
         | ExprKind::Provide(..)
         | ExprKind::Lift(..)
         | ExprKind::Abstract(..)
-        | ExprKind::CodecBlock(..)
         | ExprKind::Generate { strict: false, .. } => 0,
         // the body runs once per element, maybe never
         ExprKind::Each { source, .. } => strict_uses(source, name),

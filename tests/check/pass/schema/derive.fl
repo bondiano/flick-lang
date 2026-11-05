@@ -2,6 +2,8 @@
 // blocks with their policies.
 module App.Derive exposing (..)
 
+import Codec exposing (plugin codec)
+
 refined type Email = String where Checks.email
   deriving Eq, Hash, Schema
 

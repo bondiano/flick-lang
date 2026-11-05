@@ -147,7 +147,7 @@ impl Lower<'_> {
                 ExprKind::Scope { owner, outer, body }
             }
             K::ProvideExpr => ExprKind::Provide(self.boxed(children[0]), self.boxed(children[1])),
-            K::SchemaExpr | K::CodecExpr => self.schema_or_codec(node),
+            K::SchemaExpr => self.schema(node),
             _ => {
                 self.unsupported(node);
                 ExprKind::Lit(Lit::Unit)
@@ -156,35 +156,13 @@ impl Lower<'_> {
         Expr::new(kind, span)
     }
 
-    /// `schema T` names the witness; a `codec` block lists its fields.
-    fn schema_or_codec(&mut self, node: &Node) -> ExprKind {
-        match node.kind {
-            K::SchemaExpr => match self.typing.names.get(&node.range()) {
-                Some(Ref::Value { module, name }) => ExprKind::Global {
-                    module: module.clone(),
-                    name: name.clone(),
-                },
-                _ => ExprKind::Lit(Lit::Unit),
+    /// `schema T` names the witness.
+    fn schema(&self, node: &Node) -> ExprKind {
+        match self.typing.names.get(&node.range()) {
+            Some(Ref::Value { module, name }) => ExprKind::Global {
+                module: module.clone(),
+                name: name.clone(),
             },
-            K::CodecExpr => {
-                let name = self
-                    .typing
-                    .codecs
-                    .get(&node.range())
-                    .map(|c| c.name.clone())
-                    .unwrap_or_default();
-                let fields = node
-                    .nodes()
-                    .filter(|n| n.kind == K::RecordExpr)
-                    .flat_map(Node::nodes)
-                    .filter(|n| n.kind == K::RecordField)
-                    .filter_map(|f| {
-                        let label = self.token_text(f, K::Ident)?;
-                        Some((label, self.expr(f.nodes().next()?)))
-                    })
-                    .collect();
-                ExprKind::CodecBlock(name, fields)
-            }
             _ => ExprKind::Lit(Lit::Unit),
         }
     }

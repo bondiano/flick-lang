@@ -5,6 +5,7 @@ module Import exposing (run)
 import JsonText exposing (Value(..))
 import Shape
 import Ts
+import Codec exposing (plugin codec)
 
 type alias Request = { root : String; name : String }
   deriving Schema

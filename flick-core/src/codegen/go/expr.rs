@@ -192,7 +192,6 @@ impl<'a> Gen<'a> {
             }
             ExprKind::Within(owner, inner) => self.within(owner, inner),
             ExprKind::Provide(layer, body) => self.provide(layer, body),
-            ExprKind::CodecBlock(name, fields) => self.codec_block(name, fields),
         }
     }
 
@@ -252,15 +251,6 @@ impl<'a> Gen<'a> {
             Some(b) => call(a, "flickrt.Update", [b.doc, record]).into(),
             None => record.into(),
         }
-    }
-
-    /// The codec of a `codec` block: its labels and fields, in turn.
-    fn codec_block(&mut self, name: &str, fields: &[(String, Expr)]) -> Code<'a> {
-        let a = self.a;
-        let values: Vec<&Expr> = fields.iter().map(|(_, v)| v).collect();
-        let values = self.ordered(&values);
-        let entries = list(a, "[]flickrt.Value{", self.entries(fields, values), "}");
-        call(a, "flickrt.CodecBlock", [self.string(name), entries]).into()
     }
 
     /// Each label, then its value, as one item of a list.

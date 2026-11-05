@@ -3,6 +3,8 @@
 // decoding and encoding both ways, and the Standard Schema adapter.
 module App.Main exposing (main)
 
+import Codec exposing (plugin codec)
+
 type alias Profile = {
   name : String;
   nick : Option String;

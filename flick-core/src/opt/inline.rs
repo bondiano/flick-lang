@@ -113,7 +113,6 @@ fn inlinable(e: &Expr) -> bool {
             | ExprKind::Dicts(..)
             | ExprKind::Method { .. }
             | ExprKind::Lift(..)
-            | ExprKind::CodecBlock(..)
             | ExprKind::Operation { .. }
             | ExprKind::Unwrap(_)
             | ExprKind::App {

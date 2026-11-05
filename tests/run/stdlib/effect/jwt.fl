@@ -4,6 +4,8 @@
 // and a malformed token are refused.
 module App.Main exposing (main)
 
+import Codec exposing (plugin codec)
+
 type alias Claims = { sub : String; admin : Bool }
   deriving Schema
 

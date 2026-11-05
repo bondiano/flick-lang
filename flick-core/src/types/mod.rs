@@ -105,8 +105,8 @@ pub(crate) use sql::base_type;
 pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
-    CodecBlock, Constructor, Copies, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
-    SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing, default_method, passes_dictionary,
+    Constructor, Copies, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref, SqlColumn,
+    SqlForm, SqlPlan, SqlTable, SqlValue, Typing, default_method, passes_dictionary,
 };
 
 use convert::TyVar;

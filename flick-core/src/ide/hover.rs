@@ -199,7 +199,6 @@ impl Ide<'_> {
                 "Describes a user interface; building it runs no handler.",
             ),
             K::SqlKw => ("sql { … }", "A typed SQL query."),
-            K::CodecKw => ("codec … { … }", "A codec built field by field."),
             K::SchemaKw => ("schema …", "The `Schema` of a type that derives it."),
             K::AwaitKw => {
                 let ran = match ty.spine() {

@@ -1,5 +1,4 @@
-//! Refined types and `codec` blocks: runtime calls that build the inert
-//! schema and codec trees.
+//! Refined types: the runtime calls that build their checks.
 
 use super::{Gen, names};
 use crate::ir::Expr;
@@ -20,22 +19,5 @@ impl Gen<'_> {
         let identity = format!("{} $x", self.arrow("$x"));
         stmts.push(self.export(&companion_name(name, "value"), &identity));
         stmts.join("\n")
-    }
-
-    /// A `codec` block: its fields, evaluated in order.
-    pub(super) fn codec_block(&mut self, name: &str, fields: &[(String, Expr)]) -> String {
-        let values: Vec<&Expr> = fields.iter().map(|(_, v)| v).collect();
-        let values = self.ordered(&values);
-        let entries: Vec<String> = fields
-            .iter()
-            .zip(values)
-            .map(|((l, _), v)| format!("[{}, {v}]", names::string(l)))
-            .collect();
-        format!(
-            "{}({}, [{}])",
-            self.rt("codecBlock"),
-            names::string(name),
-            entries.join(", ")
-        )
     }
 }

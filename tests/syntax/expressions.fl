@@ -1,5 +1,7 @@
 module App.Expressions exposing (numbers, classify)
 
+import Codec exposing (plugin codec)
+
 numbers : List Float
 let numbers = [0, 42, 1_000_000, 1.5, 1e-3, 2E+10, 0x1F, 0o17, 0b1010, -7]
 

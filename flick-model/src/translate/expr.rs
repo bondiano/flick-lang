@@ -135,7 +135,6 @@ impl Tr {
             // owner a `Within` names (`regions.md` §1.4, G6); a program that
             // acquires into an outer region from a nested one is rejected
             ExprKind::Within(_, inner) => self.expr(inner),
-            ExprKind::CodecBlock(..) => stuck("a `codec` block"),
         }
     }
 

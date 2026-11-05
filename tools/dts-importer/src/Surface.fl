@@ -6,6 +6,7 @@ module Surface exposing (Snapshot, wrapped, snapshot, render, snapshot_json)
 
 import JsonText exposing (quote)
 import Ts
+import Codec exposing (plugin codec)
 
 /// The entrypoints whose modules the standard library wraps export by export.
 wrapped : List String

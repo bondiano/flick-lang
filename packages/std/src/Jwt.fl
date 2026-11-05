@@ -3,6 +3,8 @@
 /// `iat` are whole seconds since the epoch, read from the `Clock`.
 module Jwt exposing (Problem(..), JwtError(..), sign, verify, now, expires_in)
 
+import Codec exposing (plugin codec)
+
 /// Why a token was refused.
 type Problem = Malformed | BadSignature | Expired
   deriving Eq, Show

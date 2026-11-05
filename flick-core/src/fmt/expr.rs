@@ -59,13 +59,7 @@ fn hugs(n: &Node) -> bool {
     match n.kind {
         K::ParenExpr => n.nodes().next().is_some_and(|c| c.kind == K::FunExpr),
         K::ListExpr | K::RecordExpr | K::RecordUpdate | K::TupleExpr => n.nodes().next().is_some(),
-        K::TaskExpr
-        | K::UiExpr
-        | K::ScopeExpr
-        | K::ProvideExpr
-        | K::DoExpr
-        | K::SqlExpr
-        | K::CodecExpr => true,
+        K::TaskExpr | K::UiExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr | K::SqlExpr => true,
         K::PluginExpr => n.has_token(K::LBrace),
         _ => false,
     }

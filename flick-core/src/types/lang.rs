@@ -74,7 +74,6 @@ lang_items! {
     Exit = "exit",
     Failure = "failure",
     Json = "json",
-    FieldCodec = "field_codec",
     SchemaError = "schema_error",
     AppError = "app_error",
     // constructors

@@ -8,6 +8,7 @@
 module App.Main exposing (main)
 
 import HttpApi.Derive exposing (..)
+import Codec exposing (plugin codec)
 
 type error Unauthorized = Unauthorized String
   deriving Schema
