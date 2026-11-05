@@ -1,0 +1,8 @@
+{
+  "check.corpus": { "budget": null, "tolerance": 0.25 },
+  "lsp.hover.p95": { "budget": null, "tolerance": 0.5 },
+  "lsp.hover_after_edit.p95": { "budget": null, "tolerance": 0.5 },
+  "load.json.go.rps": { "budget": null, "tolerance": 0.25 },
+  "load.json.go.binary": { "budget": null, "tolerance": 0.05 },
+  "load.ssr.rps": { "budget": null, "tolerance": 0.25 }
+}

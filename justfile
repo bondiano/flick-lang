@@ -102,6 +102,12 @@ lsp-bench file="examples/mtl/src/Mtl/StateT.fl" +positions="22:5":
     cargo build --release -p flick
     node tools/lsp-bench/index.mjs target/release/flick {{file}} {{positions}}
 
+# The performance baseline: corpus check time, hover latency, load-server throughput and Go binary size,
+# written to target/perf.json and held to tools/perf/budgets.json
+perf:
+    cargo build --release -p flick
+    node tools/perf/index.mjs target/release/flick
+
 # Hold the language server to a long open/edit/close session and print its resident memory (Linux)
 lsp-soak file="examples/mtl/src/Mtl/StateT.fl" cycles="400":
     cargo build --release -p flick
