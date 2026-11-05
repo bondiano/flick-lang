@@ -2,6 +2,7 @@ mod aliases;
 mod cli;
 mod completion;
 mod features;
+mod ffi;
 mod foreign;
 mod quick_fix;
 mod sql_table;

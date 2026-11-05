@@ -26,6 +26,8 @@ use super::{
     protocol,
 };
 
+#[path = "ffi.rs"]
+mod ffi;
 #[path = "foreign.rs"]
 mod foreign;
 
@@ -156,7 +158,8 @@ impl Server {
     }
 
     /// Quick fixes, the edits of the fixes of the diagnostics in the range,
-    /// then the rewrites the range offers.
+    /// then the rewrites the range offers, then the regeneration of an
+    /// imported module.
     fn code_actions(&mut self, params: &Value) -> Reply {
         let (path, text) = self.document(params)?;
         let start = protocol::offset(&text, &params["range"]["start"]);
@@ -190,6 +193,7 @@ impl Server {
                 "edit": { "changes": changes(&snapshot.sources, &action.edits) },
             }));
         }
+        actions.extend(ffi::regenerate(&path, &text, params));
         Ok(Value::Array(actions))
     }
 
