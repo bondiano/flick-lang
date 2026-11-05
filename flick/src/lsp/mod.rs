@@ -22,6 +22,7 @@ use std::time::Instant;
 
 use flick_core::diagnostics::Diagnostic;
 use flick_core::plugin::Expander;
+use flick_core::plugin::reach::Outside;
 use flick_core::project::config::Emit;
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, ModuleCache};
 use flick_core::source::{FileId, SourceMap};
@@ -90,6 +91,11 @@ impl Host for Overlay<'_> {
 
     fn save(&self, key: &[u8], value: &[u8]) {
         plugins::save(key, value);
+    }
+
+    /// The editor reaches no network: an answer comes from a snapshot.
+    fn outside(&self) -> Option<Arc<dyn Outside>> {
+        Some(plugins::outside(true))
     }
 }
 

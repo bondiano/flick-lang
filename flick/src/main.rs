@@ -1,3 +1,4 @@
+use std::env;
 use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
@@ -45,11 +46,11 @@ fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
 }
 
 /// The pnpm command of a dependency command.
-fn dependency_command(cmd: Commands) -> pnpm::Command {
+fn dependency_command(cmd: Commands, offline: bool) -> pnpm::Command {
     match cmd {
         Commands::Install(o) => pnpm::Command::Install {
             locked: o.locked,
-            offline: o.offline,
+            offline,
         },
         Commands::Add(o) => pnpm::Command::Add {
             packages: o.packages,
@@ -71,6 +72,7 @@ fn dependency_command(cmd: Commands) -> pnpm::Command {
 
 fn main() -> ExitCode {
     let args = CommandArguments::parse();
+    plugins::set_offline(args.global.offline || env::var_os("CI").is_some());
     // what installs or edits the dependencies, or checks no module, needs no `std`
     let needs_std = !matches!(
         args.cmd,
@@ -201,7 +203,7 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         | Commands::Remove(_)
         | Commands::Update(_)
         | Commands::Deps(_) => report(
-            commands::deps(&dependency_command(args.cmd), global),
+            commands::deps(&dependency_command(args.cmd, global.offline), global),
             global,
         ),
         Commands::Pack(o) => report(commands::pack(&o, global), global),

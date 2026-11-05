@@ -120,6 +120,7 @@ pub struct FfiCheckArguments {
 }
 
 #[derive(Args, Clone)]
+#[allow(clippy::struct_excessive_bools, reason = "one per command-line flag")]
 pub struct GlobalArguments {
     /// Format of diagnostics on stderr.
     #[arg(long, global = true, value_enum, default_value_t = DiagnosticsFormat::Human)]
@@ -165,6 +166,12 @@ pub struct GlobalArguments {
     /// Treat warnings as errors.
     #[arg(long, global = true)]
     pub warnings_as_errors: bool,
+
+    /// Reach no network: plugins answer from the project's snapshots, and
+    /// `install` installs only from the local store. `CI` set means this
+    /// for plugins too.
+    #[arg(long, global = true)]
+    pub offline: bool,
 }
 
 #[derive(Args)]

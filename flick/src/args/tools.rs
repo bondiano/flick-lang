@@ -76,10 +76,6 @@ pub struct InstallArguments {
     /// `package.json`, is an error.
     #[arg(long)]
     pub locked: bool,
-
-    /// Install only from the local store.
-    #[arg(long)]
-    pub offline: bool,
 }
 
 #[derive(Args)]

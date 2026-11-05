@@ -4,6 +4,7 @@
 //! plugin answers, which the tests count.
 
 mod cache;
+mod outside;
 #[cfg(feature = "wasm-plugins")]
 mod wasm;
 
@@ -20,6 +21,7 @@ use flick_plugin::{
 };
 
 pub use cache::{cached, save};
+pub use outside::{outside, set_offline};
 
 /// The plugin of the dependency `package`, from the component it names.
 pub fn plugin(package: &str, component: Option<&Path>) -> Result<Arc<dyn Expander>, String> {
