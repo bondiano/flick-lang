@@ -551,7 +551,7 @@ marker, ordinary client-only mounting is unchanged.
 
 `Atom.serializable wire state` marks a state whose value a server can hand
 to the client, coded by the JSON codec `wire`. Its key is the name of the
-top-level binding it defines, `Module.name`, which the compiler supplies; an
+top-level binding it defines, `Module.name`, its `CallSite.definition`; an
 atom of `Atom.serializable_family` has the key `Module.name/key`. Anywhere
 else, such as inside a function, applied without its state, or twice in one
 binding, one key could name many atoms, and `FLICK-U003` refuses it. A
