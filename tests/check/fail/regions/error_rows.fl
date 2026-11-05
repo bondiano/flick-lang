@@ -36,6 +36,23 @@ let leak path = scope {
   hide file
 }
 
+// a local without a signature: the row of what it closes over is not known
+// when its qualifier is inferred, and counts once it is
+leak_local : forall s. File s ->{} { run : Unit -> Unit }
+let leak_local file =
+  let k = { keep = fun y -> fun () -> ignore (Exit.fail y) }
+  try from_result (Err (Wrapped file)) with
+  | err -> { run = k.keep err }
+
+// a local generalized over the row its stage holds
+leak_generic : forall s. File s ->{} { run : Unit -> Unit }
+let leak_generic file =
+  let k = { keep = keep }
+  try from_result (Err (Wrapped file)) with
+  | err -> { run = k.keep err }
+
 //~ FLICK-G001 @18:28-18:46 this function uses `x`, which holds `e`, but the expected type `Unit -> Unit` holds no captures
 //~ FLICK-G001 @22:27-22:45 this function uses `x`, which holds `e`
 //~ FLICK-G001 @36:3-36:12 this value holds region `s`
+//~ FLICK-G001 @45:20-45:30 this value holds `s`, but the expected type `Unit -> Unit` holds no captures
+//~ FLICK-G001 @52:20-52:30 this value holds `s`, but the expected type `Unit -> Unit` holds no captures
