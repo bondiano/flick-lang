@@ -93,7 +93,7 @@ bundle-size:
     node tools/bundle-size/index.mjs "$(cargo build -p flick --profile e2e --message-format=json-render-diagnostics | jq -r 'select(.executable != null) | .executable')"
 
 # Count the tokens of the Conduit example's source against the RealWorld Go backend and React client:
-# o200k_base, and Claude's tokenizer when ANTHROPIC_API_KEY is set
+# o200k_base, and Claude's tokenizer when ANTHROPIC_API_KEY or OPENROUTER_API_KEY is set
 tokens:
     node tools/tokens/index.mjs
 
