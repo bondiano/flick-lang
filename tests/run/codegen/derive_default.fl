@@ -35,9 +35,7 @@ instance Default String =
 type Point = Point Float Float
   deriving Default, Show
 
-type Shape
-  = Rect Point Point
-  | Circle Float
+type Shape = Rect Point Point | Circle Float
   deriving Default, Show
 
 type Named = Named { width : Float; label : String }

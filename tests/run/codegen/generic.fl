@@ -5,10 +5,7 @@ module App.Main exposing (main)
 
 import Generic exposing (Generic(..), Sum(..), Con(..), Field(..))
 
-type Shape
-  = Circle Float
-  | Rect Float Float
-  | Dot
+type Shape = Circle Float | Rect Float Float | Dot
   deriving Generic, Show, Eq
 
 type Named = Named { width : Float; label : String }
@@ -43,7 +40,8 @@ let count x = gcount (to_rep x)
 main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line (show (List.map count [Circle 1, Rect 2 3, Dot]))
-  Platform.stdout_line (show (List.map (fun s -> (from_rep (to_rep s) : Shape) == s) [Circle 1, Rect 2 3, Dot]))
+  Platform.stdout_line
+    (show (List.map (fun s -> (from_rep (to_rep s) : Shape) == s) [Circle 1, Rect 2 3, Dot]))
   Platform.stdout_line (show (from_rep (to_rep (Named { width = 2; label = "w" })) : Named))
   Platform.stdout_line (show (count (Named { width = 2; label = "w" })))
   let Con (Field label, (Field width, ())) = to_rep (Named { width = 2; label = "w" })
