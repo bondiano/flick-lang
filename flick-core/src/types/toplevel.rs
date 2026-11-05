@@ -42,6 +42,20 @@ struct Item<'a> {
 }
 
 impl TopLevel<'_> {
+    /// The name of the top-level definition whose declaration holds `offset`.
+    pub fn definition_at(&self, offset: u32) -> Option<&str> {
+        let holds = |i: &&Item| {
+            let (start, end) = i.decl.range();
+            start <= offset && offset < end
+        };
+        self.items
+            .iter()
+            .find(holds)?
+            .names
+            .first()
+            .map(String::as_str)
+    }
+
     /// Whether the module declares the value `name` at its top level.
     pub fn declares(&self, name: &str) -> bool {
         self.by_name.contains_key(name)

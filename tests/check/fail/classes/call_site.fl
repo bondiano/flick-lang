@@ -1,0 +1,12 @@
+// `CallSite` is the checker's to give: a program declares no instance.
+module App.Sites exposing (..)
+
+import CallSite exposing (CallSite)
+
+instance CallSite =
+  place : String
+  let place = "nowhere"
+  definition : String
+  let definition = "nothing"
+
+//~ FLICK-C012 @6:1-10:29 `CallSite` is the compiler's: each use gets the place of its caller's, or its own, and a program declares no instance

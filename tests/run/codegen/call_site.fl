@@ -1,0 +1,32 @@
+// `CallSite`: a value constrained by it reads the place of its use. A
+// function with the constraint in its signature passes its caller's on;
+// a use outside one gets its own place.
+module App.Main exposing (main)
+
+import CallSite exposing (CallSite)
+
+/// Where this is used.
+here : CallSite => String
+let here = CallSite.place ++ " in " ++ CallSite.definition
+
+/// The place of the caller of `traced`, not of `traced` itself.
+traced : CallSite => String -> String
+let traced label = label ++ " at " ++ here
+
+/// A use in a definition without the constraint: its own place.
+fixed : String
+let fixed = here
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say here
+  say here
+  say (traced "first")
+  say (traced "second")
+  say fixed
+  local : Unit -> String
+  let local () = here
+  say (local ())

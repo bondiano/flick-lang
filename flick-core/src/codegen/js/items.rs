@@ -386,7 +386,7 @@ fn dict_uses(d: &Dict, module: &str, out: &mut BTreeSet<String>) {
                 dict_uses(f, module, out);
             }
         }
-        Dict::Given(_) | Dict::Primitive { .. } | Dict::Error => {}
+        Dict::Given(_) | Dict::Primitive { .. } | Dict::Site { .. } | Dict::Error => {}
     }
 }
 

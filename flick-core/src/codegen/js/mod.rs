@@ -496,6 +496,11 @@ impl Gen<'_> {
                 let labels: Vec<String> = labels.iter().map(|l| names::string(l)).collect();
                 format!("[{}]", labels.join(", "))
             }
+            Dict::Site { place, definition } => format!(
+                "{{ place: {}, definition: {} }}",
+                names::string(place),
+                names::string(definition)
+            ),
             Dict::Error => "undefined".to_owned(),
         }
     }

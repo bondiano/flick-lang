@@ -43,6 +43,7 @@ pub(super) const CORE: &[(&str, &str)] = &[
     ("Seq", builtin_source!("core", "Seq.fl")),
     ("Monoids", builtin_source!("core", "Monoids.fl")),
     ("Validation", builtin_source!("core", "Validation.fl")),
+    ("CallSite", builtin_source!("core", "CallSite.fl")),
     ("Flick.Debug", builtin_source!("core", "Flick/Debug.fl")),
 ];
 
