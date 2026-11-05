@@ -139,11 +139,13 @@ impl Checker<'_> {
                 }
             },
             // `Errors {E ῡ} ≡ E ῡ` (`core.md` §1.5) reaches what its errors
-            // do; a variable of the row is no capture (`docs/formal/regions.md#errors-reaches-its-payloads`)
+            // do, and a variable of the row what the errors it stands for do
+            // (`docs/formal/regions.md#errors-reaches-its-payloads`)
             Type::Errors(r) => {
                 for args in r.elems.values() {
                     args.iter().for_each(|a| go(a, out));
                 }
+                out.atoms.extend(r.vars.iter().cloned());
             }
             // a row is no capture; `Layer`, implementations, tags and
             // dictionaries hold nothing (§2.1)

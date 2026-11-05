@@ -1,0 +1,29 @@
+// An error holds what its errors hold, and an error-row variable what the
+// errors it stands for hold: a curried stage keeps it as it keeps a type
+// variable, and elsewhere a capture row names it.
+module App.ErrorRows exposing (..)
+
+type File (s : Region)
+
+type error Wrapped a = Wrapped a
+
+// read as `Errors e -> (Unit -> Unit)^{e}`
+keep : forall e. Errors e -> (Unit -> Unit)
+let keep x = fun () -> ignore x
+
+keep_field : forall c e. (Errors e)^c -> { run : (Unit -> Unit)^c }
+let keep_field x = { run = fun () -> ignore x }
+
+// the closure `keep` returns holds `s`, which the stage shows
+hide : forall s. File s ->{} (Unit -> Unit)
+let hide file =
+  try from_result (Err (Wrapped file)) with
+  | err -> keep err
+
+hide_shown : forall s. File s ->{} (Unit -> Unit)^{s}
+let hide_shown file = hide file
+
+hide_field : forall s. File s ->{} { run : (Unit -> Unit)^{s} }
+let hide_field file =
+  try from_result (Err (Wrapped file)) with
+  | err -> keep_field err

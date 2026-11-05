@@ -151,11 +151,10 @@ pub struct Hold {
 
 /// The types whose values hold nothing of their arguments: a witness
 /// describes values of its type, holding none of them.
-const HOLD_NOTHING: [Lang; 7] = [
+const HOLD_NOTHING: [Lang; 6] = [
     Lang::Layer,
     Lang::ServiceTag,
     Lang::ServiceImpl,
-    Lang::Errors,
     Lang::Schema,
     Lang::Url,
     Lang::Form,
@@ -235,20 +234,19 @@ impl Checker<'_> {
                         }
                         _ => None,
                     };
-                    // an error cannot carry a region, so its row holds none; a
-                    // service row is needed again wherever the value runs; a
-                    // symbol is text
-                    if matches!(
-                        param,
-                        Some(Kind::ErrorRow | Kind::ServiceRow | Kind::Symbol)
-                    ) {
-                        continue;
-                    }
-                    match self.store.resolve(arg) {
-                        row @ (Type::Row(_) | Type::Union(..)) => {
-                            self.capture_row_filtered(&row, out, bounded);
-                        }
-                        _ => self.collect_bounded_captures(arg, out, bounded),
+                    // a service row is needed again wherever the value runs; a
+                    // symbol is text; the error row of an `Eff` is that of its
+                    // stage, as a function's is
+                    match param {
+                        Some(Kind::ServiceRow | Kind::Symbol) => {}
+                        Some(Kind::ErrorRow) if head.is_lang(Lang::Eff) => {}
+                        Some(Kind::ErrorRow) => self.error_row_captures(arg, out, bounded),
+                        _ => match self.store.resolve(arg) {
+                            row @ (Type::Row(_) | Type::Union(..)) => {
+                                self.capture_row_filtered(&row, out, bounded);
+                            }
+                            _ => self.collect_bounded_captures(arg, out, bounded),
+                        },
                     }
                 }
             }
@@ -324,6 +322,26 @@ impl Checker<'_> {
         }
     }
 
+    /// What an error row reaches: what its errors reach and its row
+    /// variables, which stand for errors that may reach anything. A row not
+    /// inferred yet adds nothing until it is: a capture row must not take it
+    /// as a tail.
+    // shortcut: a row left unknown and generalized into a variable is not
+    // counted; count it if a local without a signature closes over one
+    fn error_row_captures(&self, row: &Type, out: &mut Norm, bounded: bool) {
+        let norm = self.store.normalize(row);
+        for (_, error) in &norm.entries {
+            self.collect_bounded_captures(error, out, bounded);
+        }
+        for tail in norm.tails {
+            match tail {
+                Type::Var(_) | Type::Skolem(_) if !bounded => push_atom(out, &tail),
+                Type::Error if !out.tails.contains(&tail) => out.tails.push(tail),
+                _ => {}
+            }
+        }
+    }
+
     /// A curried stage retains earlier parameters. Include projections of
     /// generic value captures as well as regions, so partial application
     /// has the same whole-value bound as an explicitly written closure.
@@ -373,7 +391,7 @@ impl Checker<'_> {
                 captures.entries.retain(|(_, atom)| {
                     matches!(
                         self.atom_kind(atom, kinds),
-                        None | Some(Kind::Type | Kind::Region | Kind::CaptureRow)
+                        None | Some(Kind::Type | Kind::Region | Kind::CaptureRow | Kind::ErrorRow)
                     )
                 });
                 let held = Type::Union(Box::new(held.clone()), Box::new(captures.into_type()));
