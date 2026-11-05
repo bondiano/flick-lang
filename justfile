@@ -92,10 +92,21 @@ language seed="42":
 bundle-size:
     node tools/bundle-size/index.mjs "$(cargo build -p flick --profile e2e --message-format=json-render-diagnostics | jq -r 'select(.executable != null) | .executable')"
 
+# Count the tokens of the Conduit example's source against the RealWorld Go backend and React client:
+# o200k_base, and Claude's tokenizer when ANTHROPIC_API_KEY is set
+tokens:
+    node tools/tokens/index.mjs
+
 # Time the language server on a file: opens, hovers and a hover after an edit
 lsp-bench file="examples/mtl/src/Mtl/StateT.fl" +positions="22:5":
     cargo build --release -p flick
     node tools/lsp-bench/index.mjs target/release/flick {{file}} {{positions}}
+
+# The performance baseline: corpus check time, hover latency, load-server throughput and Go binary size,
+# written to target/perf.json and held to tools/perf/budgets.json
+perf:
+    cargo build --release -p flick
+    node tools/perf/index.mjs target/release/flick
 
 # Hold the language server to a long open/edit/close session and print its resident memory (Linux)
 lsp-soak file="examples/mtl/src/Mtl/StateT.fl" cycles="400":
