@@ -80,6 +80,17 @@ break programs.
   field whose codec decodes another type than the record's is `std/D012`.
   A block is a `Codec` of services when a field calls `field_effect` or
   `on_missing_effect`. `schema` and `codec` are no keywords.
+- **Classes:** a default signature: the class body repeats a method's
+  signature with constraints only its default needs
+  (`describe : Show a => a -> String`), and each instance that takes the
+  default satisfies them. `deriving Generic` (module `Generic`) gives a
+  type its representation, `Sum`s of `Con`s of `Field`s in pairs, with
+  `to_rep` and `from_rep`; and `deriving C` of a class of one parameter
+  with a default for each method takes the defaults, so a class written
+  once over `Generic`, as `Default`, derives for every type. In release
+  the optimizer makes such an instance the one written by hand: a default
+  taken becomes the instance's own method, a method of a known instance
+  its code, and a `match` of a known constructor its arm.
 - **Plugins, interface `0.12.0`:** a plugin reaches files, variables of the
   environment and hosts over HTTP that the project grants in
   `[plugins.<package>]` (`fs-read`, `net`, `env`), through
