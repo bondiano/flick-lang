@@ -62,6 +62,17 @@ theorem Row.substT_congr {r : Row} {σ σ' : Atom → Flick.Ty}
     · exact fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inr (.inl hb)) ▸ h''⟩
     · exact fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inr (.inl hb))).symm ▸ h''⟩
 
+theorem Row.substE_congr {r : Row} {σ σ' : Atom → Flick.Ty}
+    (h : ∀ b, (r (.atm b) ∨ r (.rv b) ∨ ∃ N, r (.ob N b) ∨ r (.need N b)) → σ b = σ' b) :
+    r.substE σ = r.substE σ' := by
+  funext x
+  cases x with
+  | atm a =>
+    apply propext
+    exact ⟨fun ⟨b, hb, h'⟩ => ⟨b, hb, h b (.inl hb) ▸ h'⟩,
+      fun ⟨b, hb, h'⟩ => ⟨b, hb, (h b (.inl hb)).symm ▸ h'⟩⟩
+  | _ => simp only [Row.substE]; rw [Row.substT_congr h]
+
 /-- What a translated row names is among the variables of the source row. -/
 theorem asRow_trT_atoms {t : Ty} {b : Atom}
     (h : (trT N t).asRow (.atm b) ∨ (trT N t).asRow (.rv b) ∨
@@ -96,9 +107,9 @@ theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
           hc x (by rw [trT_arr]; exact .inr (.inr (.inr hx)))
         simp only [trStage, Flick.Stage.substT]
         rw [Row.substT_congr fun x hx => stage x (let ⟨n, e, h⟩ := asRow_trT_atoms N hx; ⟨n, e, .inl h⟩),
-          Row.substT_congr (r := Row.union _ allNames) fun x hx => stage x ?_]
-        simp only [Row.union, allNames, or_false] at hx
-        obtain ⟨n, e, h⟩ := asRow_trT_atoms N hx
+          Row.substE_congr (r := Row.union _ allNames) fun x hx => stage x ?_]
+        simp only [Row.union, Row.noAtoms, allNames, or_false, false_or] at hx
+        obtain ⟨n, e, h⟩ := asRow_trT_atoms N (.inr hx)
         exact ⟨n, e, .inr h⟩
     rw [trT_arr] at hc ⊢
     simp only [Flick.Ty.substT]

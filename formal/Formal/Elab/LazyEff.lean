@@ -45,7 +45,7 @@ def effMap2 (mk : Name) : Flick.Tm :=
 
 theorem effField_inst (q b : Flick.Ty) :
     effField.substT (instT [q, b]) = .eff Row.none Row.none b q.reach := by
-  simp only [effField, Flick.Ty.substT, Row.none_substT]
+  simp only [effField, Flick.Ty.substT, Row.none_substT, Row.none_substE]
   congr 1
   funext a; apply propext
   simp [Caps.substT, instT]

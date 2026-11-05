@@ -80,19 +80,19 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | raiseAdt _ hU hφ ih =>
     intro σ hσ
     refine .raiseAdt (ih σ hσ) (Ty.hd_substT σ hU) ?_
-    simpa [Stage.substT, Row.err_substT] using Stage.le_substT σ hφ
+    simpa [Stage.substT, Row.err_substE] using Stage.le_substT σ hφ
   | errVal hv _ hU hE ih =>
     intro σ hσ
     refine .errVal hv (ih σ hσ) (Ty.hd_substT σ hU) ?_
-    rw [← Row.err_substT]; exact hE.substT σ
+    rw [← Row.err_substE]; exact hE.substE σ
   | tryR _ _ hφ hs ih₁ ih₂ =>
     intro σ hσ
     exact .tryR (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
-      (Stage.le_substT σ hφ) (by simpa using hs.substT σ)
+      (Stage.le_substT σ hφ) (by simpa using hs.substE σ)
   | tryP _ _ ih₁ ih₂ =>
     intro σ hσ
     have := ih₂ σ (hσ.sub fun _ h => .inr h)
-    simp only [Flick.J.substT, Row.none_substT] at this
+    simp only [Flick.J.substT, Row.none_substE] at this
     exact .tryP (ih₁ σ (hσ.sub fun _ h => .inl h)) this
   | handle hv _ _ hc ha hφ ih₁ ih₂ =>
     intro σ hσ
@@ -103,7 +103,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | hnil hH =>
     intro σ _
     obtain rfl : _ = Row.none := funext fun n => propext ⟨fun h => hH n h, False.elim⟩
-    rw [Flick.J.substT, Row.none_substT]; exact .hnil fun _ h => h
+    rw [Flick.J.substT, Row.none_substE]; exact .hnil fun _ h => h
   | hcons hp _ _ hH ih₁ ih₂ =>
     intro σ hσ
     have := ih₁ σ (hσ.sub fun _ h => .inl h); rw [ctx_substT] at this
@@ -112,7 +112,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro σ hσ
     have g := ih₁ σ (hσ.sub fun _ h => .inl h); rw [ctx_substT] at g
     have b := ih₂ σ (hσ.sub fun _ h => .inr (.inl h)); rw [ctx_substT] at b
-    exact .hguard (hp.substT σ) g b (ih₃ σ (hσ.sub fun _ h => .inr (.inr h))) (hH.substT σ)
+    exact .hguard (hp.substT σ) g b (ih₃ σ (hσ.sub fun _ h => .inr (.inr h))) (hH.substE σ)
   | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ =>
     intro σ hσ
     exact .provideL (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
@@ -175,7 +175,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       have hd := Row.disch_substT (a := .v 0) (a' := .v 0) (r := r.substT (shiftV 1))
         (σ := liftT 1 σ) (fun x hx => by simpa [liftT, Ty.reach] using hx)
       rw [Row.up_comm] at hd
-      simp only [Stage.substT, Row.union_substT, Row.scope_substT, Row.up_comm] at this
+      simp only [Stage.substT, Row.union_substT, Row.scope_substT, Row.up_comm, Row.upE_comm] at this
       refine Stage.le_rt_sub (r := Row.union (Row.scope (.tvar 0)) (Row.union
         ((r.substT σ).substT (shiftV 1)) ((Row.disch (.v 0) (r.substT (shiftV 1))).substT (liftT 1 σ))))
         (by simpa [Ty.substT, liftT] using this) ?_

@@ -75,9 +75,7 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
     · rintro ⟨b, hb | hb, h⟩
       · exact .inl ⟨b, hb, h⟩
       · exact .inr ⟨b, hb, h⟩
-  | errors e =>
-    simp only [Ty.substT, Ty.reach, Row.substT]
-    grind [Ty.reach_asRow]
+  | errors e => simp [Ty.substT, Ty.reach, Row.substE]
   | hnd s ih | owner s ih => simp only [Ty.substT, Ty.reach, ih]
   | base | adt | rnil | layer | env | dict => simp [Ty.substT, Ty.reach, Caps.none]
 
@@ -139,9 +137,39 @@ theorem Row.substT_comp (r : Row) (σ σ' : Atom → Ty) :
     simp only [Row.substT, Ty.reach_substT, Ty.asRow_substT]
     grind
 
+/-- Away from atoms, a row of errors is substituted as any row. -/
+theorem Row.substE_of_ne {σ : Atom → Ty} {e : Row} {x : Elem} (hx : ∀ a, x ≠ .atm a) :
+    e.substE σ x = e.substT σ x := by
+  cases x with
+  | atm a => exact absurd rfl (hx a)
+  | _ => rfl
+
+/-- Away from atoms, a substitution reads a row only away from atoms. -/
+theorem Row.substT_nonatm {r r' : Row} (h : ∀ x, (∀ a, x ≠ .atm a) → (r x ↔ r' x)) (σ : Atom → Ty)
+    {x : Elem} (hx : ∀ a, x ≠ .atm a) : r.substT σ x ↔ r'.substT σ x := by
+  cases x with
+  | atm a => exact absurd rfl (hx a)
+  | nm N => simp only [Row.substT, h (.nm N) (by simp), fun b => h (.rv b) (by simp)]
+  | ob N a => simp only [Row.substT, fun b => h (.ob N b) (by simp)]
+  | need N a => simp only [Row.substT, fun b => h (.need N b) (by simp)]
+  | rv a => simp only [Row.substT, fun b => h (.rv b) (by simp)]
+
+theorem Row.substE_comp (r : Row) (σ σ' : Atom → Ty) :
+    (r.substE σ).substE σ' = r.substE fun a => (σ a).substT σ' := by
+  funext x; apply propext
+  cases x with
+  | atm a =>
+    simp only [Row.substE, Ty.reach_substT]
+    constructor
+    · rintro ⟨b, ⟨c, hc, hb⟩, h⟩; exact ⟨c, hc, b, hb, h⟩
+    · rintro ⟨c, hc, b, hb, h⟩; exact ⟨b, ⟨c, hc, hb⟩, h⟩
+  | _ =>
+    rw [Row.substE_of_ne (by simp), Row.substE_of_ne (by simp), ← Row.substT_comp]
+    exact Row.substT_nonatm (fun y hy => by rw [Row.substE_of_ne hy]) σ' (by simp)
+
 theorem Stage.substT_comp (φ : Stage) (σ σ' : Atom → Ty) :
     (φ.substT σ).substT σ' = φ.substT fun a => (σ a).substT σ' := by
-  cases φ <;> simp [Stage.substT, Row.substT_comp]
+  cases φ <;> simp [Stage.substT, Row.substT_comp, Row.substE_comp]
 
 theorem Caps.substT_ident (C : Caps) : C.substT Ty.ident = C := by
   funext a; apply propext; simp [Caps.substT]
@@ -152,17 +180,24 @@ theorem Ty.asRow_ident (b : Atom) : (Ty.ident b).asRow = fun x => x = .rv b := b
 theorem Row.substT_ident (r : Row) : r.substT Ty.ident = r := by
   funext x; apply propext; cases x <;> simp [Row.substT, Ty.asRow_ident]
 
+theorem Row.substE_ident (r : Row) : r.substE Ty.ident = r := by
+  funext x; apply propext
+  cases x with
+  | atm a => simp [Row.substE]
+  | _ => rw [Row.substE_of_ne (by simp), Row.substT_ident]
+
 theorem Stage.substT_ident (φ : Stage) : φ.substT Ty.ident = φ := by
-  cases φ <;> simp [Stage.substT, Row.substT_ident]
+  cases φ <;> simp [Stage.substT, Row.substT_ident, Row.substE_ident]
 
 theorem Ty.substT_comp (t : Ty) (σ σ' : Atom → Ty) :
     (t.substT σ).substT σ' = t.substT fun a => (σ a).substT σ' := by
   induction t <;>
-    simp_all [Ty.substT, Caps.substT_comp, Row.substT_comp, Stage.substT_comp]
+    simp_all [Ty.substT, Caps.substT_comp, Row.substT_comp, Row.substE_comp, Stage.substT_comp]
 
 theorem Ty.substT_ident (t : Ty) : t.substT Ty.ident = t := by
   induction t <;>
-    simp_all [Ty.substT, Ty.ident, Caps.substT_ident, Row.substT_ident, Stage.substT_ident]
+    simp_all [Ty.substT, Ty.ident, Caps.substT_ident, Row.substT_ident, Row.substE_ident,
+      Stage.substT_ident]
 
 theorem Ty.substT_congr {t : Ty} {σ σ' : Atom → Ty} (h : ∀ a, σ a = σ' a) :
     t.substT σ = t.substT σ' := by
@@ -181,10 +216,17 @@ theorem Row.Sub.substT {r r' : Row} (σ : Atom → Ty) (h : Row.Sub r r') :
     simp only [Row.substT] at hx ⊢
     grind [Row.Sub]
 
+theorem Row.Sub.substE {r r' : Row} (σ : Atom → Ty) (h : Row.Sub r r') :
+    Row.Sub (r.substE σ) (r'.substE σ) := by
+  intro x hx
+  cases x with
+  | atm a => obtain ⟨b, hb, h'⟩ := hx; exact ⟨b, h _ hb, h'⟩
+  | _ => rw [Row.substE_of_ne (by simp)] at hx ⊢; exact h.substT σ _ hx
+
 theorem Stage.le_substT {φ φ' : Stage} (σ : Atom → Ty) (h : φ.le φ') :
     (φ.substT σ).le (φ'.substT σ) := by
   cases φ <;> cases φ' <;> simp_all [Stage.le, Stage.substT]
-  exact ⟨h.1.substT σ, h.2.substT σ⟩
+  exact ⟨h.1.substT σ, h.2.substE σ⟩
 
 @[simp] theorem Row.none_substT (σ : Atom → Ty) : Row.none.substT σ = Row.none := by
   funext x; cases x <;> simp [Row.substT, Row.none]
@@ -197,6 +239,51 @@ theorem Stage.le_substT {φ φ' : Stage} (σ : Atom → Ty) (h : φ.le φ') :
     (Row.union r r').substT σ = Row.union (r.substT σ) (r'.substT σ) := by
   funext x; apply propext
   cases x <;> simp only [Row.substT, Row.union] <;> grind
+
+@[simp] theorem Row.none_substE (σ : Atom → Ty) : Row.none.substE σ = Row.none := by
+  funext x; cases x <;> simp [Row.substE, Row.substT, Row.none]
+
+@[simp] theorem Row.single_substE (σ : Atom → Ty) (N : Name) :
+    (Row.single N).substE σ = Row.single N := by
+  funext x; cases x <;> simp [Row.substE, Row.substT, Row.single]
+
+@[simp] theorem Row.union_substE (σ : Atom → Ty) (r r' : Row) :
+    (Row.union r r').substE σ = Row.union (r.substE σ) (r'.substE σ) := by
+  funext x; apply propext
+  cases x <;> simp only [Row.substE, Row.substT, Row.union] <;> grind
+
+/-- **An error carries no regions.** When the instance of each variable of a row of errors
+reaches nothing, as the errors of the checker do ((Err-Decl), (Err-Raise)), the substitution
+of the row of errors drops nothing: it is the substitution of a row. -/
+theorem Row.substE_of_free {σ : Atom → Ty} {e : Row}
+    (h : ∀ b, e (.rv b) → ∀ a, ¬ (σ b).asRow (.atm a)) : e.substE σ = e.substT σ := by
+  funext x; apply propext
+  cases x with
+  | atm a =>
+    simp only [Row.substE, Row.substT]
+    exact ⟨.inl, fun h' => h'.elim id fun ⟨b, hb, hb'⟩ => (h b hb a hb').elim⟩
+  | _ => rw [Row.substE_of_ne (by simp)]
+
+/-- A substitution whose instances of row variables have no atoms substitutes a row of
+errors as any row: a renaming, for one. -/
+theorem Row.substE_eq {σ : Atom → Ty} (h : ∀ b a, ¬ (σ b).asRow (.atm a)) (e : Row) :
+    e.substE σ = e.substT σ :=
+  Row.substE_of_free fun b _ => h b
+
+/-- A row without its atoms: what may stand in a row of errors through a variable. -/
+def Row.noAtoms (r : Row) : Row
+  | .atm _ => False
+  | x => r x
+
+/-- A row of errors that brings in no atoms is substituted as the row it comes from. -/
+theorem Row.noAtoms_substE (r : Row) (σ : Atom → Ty) :
+    r.noAtoms.substE σ = (r.substT σ).noAtoms := by
+  funext x; apply propext
+  cases x with
+  | atm a => simp [Row.substE, Row.noAtoms]
+  | _ =>
+    rw [Row.substE_of_ne (by simp)]
+    exact Row.substT_nonatm (fun y hy => by cases y <;> simp_all [Row.noAtoms]) σ (by simp)
 
 @[simp] theorem Row.scope_substT (σ : Atom → Ty) (s : Ty) :
     (Row.scope s).substT σ = Row.scope (s.substT σ) := by
@@ -333,8 +420,8 @@ theorem Sig.ctorTy_substT (S : Sig) {K k ts T} (σ : Atom → Ty) (us : List Ty)
   simp only [Sig.ctorTy, Ty.arrows_substT, Ty.tcon_substT, S.fields_inst_substT σ us hk h]
 
 def CArg.substT (σ : Atom → Ty) (ι : CArg) : CArg :=
-  ⟨ι.t.substT σ, ι.s.substT σ, ι.C.substT σ, ι.r.substT σ, ι.e.substT σ, ι.o.substT σ,
-    ι.r'.substT σ, ι.e'.substT σ, ι.o'.substT σ⟩
+  ⟨ι.t.substT σ, ι.s.substT σ, ι.C.substT σ, ι.r.substT σ, ι.e.substE σ, ι.o.substT σ,
+    ι.r'.substT σ, ι.e'.substE σ, ι.o'.substT σ⟩
 
 theorem Ty.reach_caps (s : Ty) (σ : Atom → Ty) : s.reach.substT σ = (s.substT σ).reach := by
   funext a; apply propext; simp [Caps.substT, Ty.reach_substT]

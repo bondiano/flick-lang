@@ -32,6 +32,13 @@ theorem Row.up_inst (r : Row) (x : Ty) : (r.substT (shiftV 1)).substT (instT [x]
   | v i => simp [shiftV, Ty.substT, instT, Ty.ident]
   | r p => simp [shiftV, Ty.substT, instT, Ty.ident]
 
+theorem Row.up_instE (r : Row) (x : Ty) : (r.substT (shiftV 1)).substE (instT [x]) = r := by
+  rw [← Row.substE_eq (shiftV_noAtm 1), Row.substE_comp]; conv => rhs; rw [← r.substE_ident]
+  congr 1; funext a
+  cases a with
+  | v i => simp [shiftV, Ty.substT, instT, Ty.ident]
+  | r p => simp [shiftV, Ty.substT, instT, Ty.ident]
+
 @[simp] theorem Ty.up_inst1 (t x : Ty) : (t.up 1).substT (instT [x]) = t :=
   Ty.up_substT t 1 [x] rfl
 
@@ -51,7 +58,7 @@ theorem Caps.kill_fixed {C : Caps} {n : Nat} (h : ∀ q, C (.r q) → q < n) : C
 theorem Ty.kill_fresh (t : Ty) (n : Nat) : ¬ (t.substT (kill n)).reach (.r n) :=
   fun h => Nat.lt_irrefl n (Ty.reach_kill h)
 
-theorem Row.kill_fresh (ε : Row) (n : Nat) : ¬ (Ty.errors (ε.substT (kill n))).reach (.r n) :=
+theorem Row.kill_fresh (ε : Row) (n : Nat) : ¬ (Ty.errors (ε.substE (kill n))).reach (.r n) :=
   Ty.kill_fresh (.errors ε) n
 
 theorem instT_rg_noNames (n : Nat) : NoNames (instT [.rg n]) := by
@@ -91,7 +98,7 @@ theorem scope_body {Ψ : List Ty} {Θ : Facts} {e : Tm} {t₀ : Ty} {φ' : Stage
     ∃ F' φ₁, (∀ C s, F' C s → s = .rg n ∧ ∀ q, C (.r q) → q < n) ∧
       Typ S Ψ (Facts.union Θ F') [] (e.subst (inst [.own n])) (.ex (t₀.substT (kill n)) φ₁) ∧
       φ₁.le (.rt (Row.union (Row.scope (.rg n))
-        (Row.union (r.substT (kill n)) (Row.disch (.r n) (r.substT (kill n))))) (ε.substT (kill n))) := by
+        (Row.union (r.substT (kill n)) (Row.disch (.r n) (r.substT (kill n))))) (ε.substE (kill n))) := by
   have hΨ' : Ψ.map (Ty.substT (kill n)) = Ψ := by
     conv => rhs; rw [← List.map_id Ψ]
     exact List.map_congr_left fun u hu => hΨ u hu
@@ -135,7 +142,7 @@ theorem scope_body {Ψ : List Ty} {Θ : Facts} {e : Tm} {t₀ : Ty} {φ' : Stage
     have d₂ := Row.disch_substT_eq (a := .v 0) (a' := .r n)
       (r := (r.substT (kill n)).substT (shiftV 1)) (σ := instT [.rg n]) (fun x => by simp [instT])
       (instT_rg_noNames n)
-    simpa [Stage.substT, Row.union_substT, Row.scope_substT, Row.up_comm, d₁, d₂, Row.up_inst,
-      Ty.substT, instT, liftT] using this
+    simpa [Stage.substT, Row.union_substT, Row.scope_substT, Row.up_comm, Row.upE_comm, d₁, d₂,
+      Row.up_inst, Row.up_instE, Ty.substT, instT, liftT] using this
 
 end Flick

@@ -204,7 +204,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
         (by simpa [Stage.substT] using Stage.le_substT σ hφ), look fun _ => rfl⟩
     | raiseAdt h₁ hU hφ =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .raiseAdt h'
-        (Ty.hd_substT σ hU) (by simpa [Stage.substT, Row.err_substT] using Stage.le_substT σ hφ),
+        (Ty.hd_substT σ hU) (by simpa [Stage.substT, Row.err_substE] using Stage.le_substT σ hφ),
         look fun _ => rfl⟩
     | errVal hv => exact (nv hv).elim
   case bind =>
@@ -245,12 +245,12 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
       refine .mk0 ⟨_, _, h₁, ⟨fun n hn => .inl (hr' n hn), fun h => (h trivial).elim,
         fun hp => (by cases hp), fun h => (h trivial).elim⟩,
         fun σ hσ X _ h' => .tryR h' (h₂.sx (hσ.sub fun _ h => .inr h) X) (Stage.le_substT σ hφ)
-          (by simpa using hs.substT σ), look fun _ => rfl⟩
+          (by simpa using hs.substE σ), look fun _ => rfl⟩
     | tryP h₁ h₂ =>
       refine .mk0 ⟨_, _, h₁, ⟨fun _ h => h.elim, fun h => (h trivial).elim, fun _ => rfl,
         fun h => (h trivial).elim⟩, fun σ hσ X _ h' => .tryP h' (by
           have := h₂.sx (hσ.sub fun _ h => .inr h) X
-          simp only [Flick.J.substT, Row.none_substT] at this; exact this), look fun _ => rfl⟩
+          simp only [Flick.J.substT, Row.none_substE] at this; exact this), look fun _ => rfl⟩
     | errVal hv => exact (nv hv).elim
   case with_ q θ =>
     cases h with

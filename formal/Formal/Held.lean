@@ -233,7 +233,7 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | errVal hv' _ hU hE ih =>
     intro _ _ _ hJ; cases hJ
     obtain ⟨h₁, _, hc, hm⟩ := ih hv' rfl
-    have key : Caps.Sub (held _ _ _) (Ty.errors _).reach := fun a ha => .inl (hE _ (.inr (h₁ a ha)))
+    have key : Caps.Sub (held _ _ _) (Ty.errors _).reach := fun a ha => hE _ (.inr (h₁ a ha))
     refine ⟨key, fun _ _ => ⟨trivial, key⟩, fun c hc' => ?_, fun c e₀ he h₁ h₂ =>
       ⟨(hm c e₀ he h₁ h₂).1, fun _ _ _ _ h => by cases h⟩⟩
     obtain ⟨ι, hι⟩ := hc c hc'

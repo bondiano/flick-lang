@@ -9,7 +9,8 @@ The types of `Elab` in the core of `Formal/` with regions and dictionary records
 `var ↦ tvar`, `app ↦ tapp`, `con c ↦ adt`, `Bool ↦ base bool`, `Int ↦ base int`,
 `arr φ a b q ↦ ⟦a⟧ →⟦φ⟧^(⌈⟦q⟧⌉ ∪ vars φ) ⟦b⟧`,
 `cnil ↦ caps ∅`, `cun ↦ caps (∪)`, `D_{C τ̄} ↦ dict (cls C |τ̄|) τ̄`. A stage `R r e` is
-`rt ⟦r⟧ (⟦e⟧ ∪ ε)`, a row `⟦r⟧` what the type `⟦r⟧` stands for as a row (`Ty.asRow`: a variable is
+`rt ⟦r⟧ (⟦e⟧ ∪ ε)`, a row `⟦r⟧` what the type `⟦r⟧` stands for as a row (`Ty.asRow`, without its
+atoms for a row of errors, `Row.noAtoms`: an error carries no regions; a variable is
 a row variable), `ε` every name (`allNames`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). The qualifier of a translated
 arrow also counts the variables of its rows, as `⌈·⌉` of the source does.
 The translation commutes with substitution (`trT_subst`, `trTT_subst`, `trS_subst`) and with
@@ -51,6 +52,9 @@ def allNames : Row
 @[simp] theorem allNames_substT (σ : Atom → Flick.Ty) : allNames.substT σ = allNames := by
   funext x; cases x <;> simp [Row.substT, allNames]
 
+@[simp] theorem allNames_substE (σ : Atom → Flick.Ty) : allNames.substE σ = allNames := by
+  funext x; cases x <;> simp [Row.substE, Row.substT, allNames]
+
 /-- The variables of the rows of a stage, as atoms. -/
 def Stage.atoms (φ : Stage) : Caps := fun a => ∃ n, a = .v n ∧ φ.Occurs n
 
@@ -66,15 +70,15 @@ def trT : Ty → Flick.Ty
   | .con c => if c = 2 then .base .bool else if c = 4 then .base .int else .adt (N.con c)
   | .app t u => .tapp (trT t) (trT u)
   | .arr .P a b q => .arrow (trT a) .pure (trT b) (trT q).reach
-  | .arr (.R r e) a b q => .arrow (trT a) (.rt (trT r).asRow (Row.union (trT e).asRow allNames))
+  | .arr (.R r e) a b q => .arrow (trT a) (.rt (trT r).asRow (Row.union (trT e).asRow.noAtoms allNames))
       (trT b) fun x => (trT q).reach x ∨ (Stage.R r e).atoms x
   | .cnil => .caps Caps.none
   | .cun q q' => .caps fun a => (trT q).reach a ∨ (trT q').reach a
 
-/-- `⟦P⟧ = pure`, `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ allNames)`. -/
+/-- `⟦P⟧ = pure`, `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ allNames)`, `⟦e⟧` without atoms. -/
 def trStage : Stage → Flick.Stage
   | .P => .pure
-  | .R r e => .rt (trT N r).asRow (Row.union (trT N e).asRow allNames)
+  | .R r e => .rt (trT N r).asRow (Row.union (trT N e).asRow.noAtoms allNames)
 
 theorem trT_arr (φ : Stage) (a b q : Ty) :
     trT N (.arr φ a b q) = .arrow (trT N a) (trStage N φ) (trT N b) (φ.qual (trT N q).reach) := by
@@ -225,7 +229,7 @@ theorem trT_subst (t : Ty) (σ : Nat → Ty) : trT N (t.subst σ) = (trT N t).su
       cases φ with
       | P => rfl
       | R r e =>
-        simp [Stage.subst, trStage, Flick.Stage.substT, ihφ.1, ihφ.2, Ty.asRow_substT]
+        simp [Stage.subst, trStage, Flick.Stage.substT, ihφ.1, ihφ.2, Ty.asRow_substT, Row.noAtoms_substE]
     have hq : (φ.subst σ).qual (trT N (q.subst σ)).reach =
         Caps.substT (trσ N σ) (φ.qual (trT N q).reach) := by
       rw [ihq, ← Ty.reach_caps]
@@ -243,7 +247,8 @@ theorem trStage_subst (φ : Stage) (σ : Nat → Ty) :
     trStage N (φ.subst σ) = (trStage N φ).substT (trσ N σ) := by
   cases φ with
   | P => rfl
-  | R r e => simp [Stage.subst, trStage, Flick.Stage.substT, trT_subst, Ty.asRow_substT]
+  | R r e =>
+    simp [Stage.subst, trStage, Flick.Stage.substT, trT_subst, Ty.asRow_substT, Row.noAtoms_substE]
 
 theorem trD_subst (q : Cn) (σ : Nat → Ty) : trD N (q.subst σ) = (trD N q).substT (trσ N σ) := by
   simp only [trD, Cn.subst, Flick.Ty.substT, Flick.Ty.spine_substT, List.map_map, List.length_map]

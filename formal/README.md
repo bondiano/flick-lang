@@ -76,6 +76,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | - | - |
 | `core.md` §1.2 types, stages, rows; `σ` | `Ty`, `Stage`, `Row`, `Scheme` (`Syntax.lean`) |
 | row variables, the row an instance stands for | `Elem.rv`, `Ty.row`, `Ty.asRow`, `Row.Named` (`Syntax.lean`); `Ty.asRow_substT`, `Ty.reach_asRow` (`TyOps.lean`) |
+| an error carries no regions: the substitution of a row of errors | `Row.substE` (`Syntax.lean`); `Row.substE_comp`, `Row.substE_of_free` (`TyOps.lean`) |
 | `regions.md` §1.2 atoms, capture sets, `τ^C`, `H ϱ`, `Owner ϱ`, `Scope ϱ` | `Atom`, `Caps`, `Elem`; `Ty.arrow`/`Ty.eff` with `C`, `Ty.caps`, `Ty.rg`, `Ty.hnd`, `Ty.owner`; `Row.scope` (`Syntax.lean`) |
 | `regions.md` §2.1 `⌈τ⌉`; its commutation with substitution | `Ty.reach`; `Ty.reach_substT`, `Scheme.reach_substT` (`TyOps.lean`, `Reach.lean`) |
 | `regions.md` §2.4 `Θ ⊢ Outlives C ϱ` | `Facts`, `Outl` (`Syntax.lean`); dropping facts that follow: `Typ.cut` (`Cut.lean`) |
@@ -149,7 +150,10 @@ obligations and uses do not come in through a variable), one instantiated by a t
 variable is that variable, by any other type the atoms the type reaches. Then the row a
 type stands for commutes with substitution (`Ty.asRow_substT`), and `⌈τ⌉` is what `τ`
 stands for as atoms and variables (`Ty.reach_asRow`), which keeps `⌈τ[σ]⌉ = ⌈τ⌉[σ]` and
-the composition of substitutions with kinds unchecked. A substitution of a term with
+the composition of substitutions with kinds unchecked. A row of errors is substituted by
+`Row.substE`: its row variables bring in the names and variables of their instances and no
+atoms, since an error carries no regions (assumption 1); so `⌈Errors ε⌉` is the atoms of `ε`
+without its row variables and still commutes with substitution. A substitution of a term with
 run-time forms brings no names into rows (`NoNames`, part of `Fits`): the renaming
 `kill`, shifts and the region of a new scope are such, and only source code is
 instantiated by rows of names.
@@ -200,9 +204,21 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    at any rows (`CArg`). Kinds are not checked. A row variable stands for names, atoms and
    variables, never for obligations or uses; the rows that must be named are those of the
    outputs of `Layer.merge`, the services of `provide` and the work of `Fiber.spawn` and
-   `Scope.add_finalizer` (`Row.Named`, items 8 and 21). `⌈Errors ε⌉` counts the row
-   variables of `ε` (`regions.md` §2.1 excludes them): an instance shows what its errors
-   reach, and `⌈·⌉` must commute with it. Nominal types have parameters
+   `Scope.add_finalizer` (`Row.Named`, items 8 and 21). **An error carries no regions**:
+   what instantiates an error-row variable reaches nothing. This is what the checker relies
+   on where `⌈·⌉` skips arguments of kind `ErrorRow` ("an error cannot carry a region, so its
+   row holds none", `flick-core/src/types/regions/mod.rs`), and what it enforces by (Err-Decl)
+   (`services.rs` `check_error_payload`, `live_part`: no parameter of kind `Region` or `CRow`
+   and no live value in a payload) and (Err-Raise) (`effects.rs` `perform`,
+   `regions/solve.rs` `check_raised`), both `FLICK-E005` (`regions.md` §2.5). In the model
+   the substitution of a row of errors keeps of an instance of its variables the names and
+   variables and drops the atoms (`Row.substE`), and drops nothing when the instance reaches
+   nothing (`Row.substE_of_free`); so `⌈Errors ε⌉` leaves out the row variables of `ε`, as
+   `regions.md` §2.1 does, and `⌈τ[σ]⌉ = ⌈τ⌉[σ]` holds. An argument whose errors reach
+   something does not fit the instance, so in effect an error-row variable is instantiated
+   only by errors that reach nothing. Atoms include type variables, so this is stricter than
+   the checker for a generic error at a type argument that reaches something (`Wrapped a`,
+   or `Wrapped (File s)` with `s` of a signature, which §2.5 lets through). Nominal types have parameters
    (`Sig.ctor` gives their number); their fields mention only the parameters
    (`Sig.ctor_closed`, `Sig.ctor_reach`); services have no parameters (`Sig.impl_closed`).
    (Let-Sig) is (Let-Gen) or (Let-Mono) with the annotation erased: terms carry no types,
@@ -233,7 +249,7 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    type `E` without parameters. `H` is a judgment index: each arm without `when` may add
    what it catches (`Catches`), names only: a row variable of `ε_b` passes to `ε'` even
    under `x`/`_`. (Handle) uses the value form of the coverage
-   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the caught errors reach and their row variables pass to the errors it lets through.
+   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the caught errors reach and the row variables of their row pass to the errors it lets through.
 8. **Environments.** `Env ρ` means "binds exactly `ρ`", as (Env), (Bind) and (Join)
    give it: T4.3 needs that a `with` frame answers `S` exactly when its row has `S`. `with θ e` and `econs` require
    `θ` and the bound values to be values. The disjointness of `Layer.merge` is kept
@@ -552,7 +568,8 @@ Simplifications:
    form before it is not.
 10. The core instance. `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ε)` with `ε` every name (`allNames`): a row
     of the source is a type, a row variable `var n` or `cnil`, and `⟦r⟧` is what `⟦r⟧` stands
-    for as a row (`Ty.asRow`), the row variable `n`; every error name stays in the row, so a
+    for as a row (`Ty.asRow`), the row variable `n`, a row of errors without atoms
+    (`Row.noAtoms`: an error carries no regions); every error name stays in the row, so a
     runtime body may raise any error type that reaches nothing. The source compares stages
     by equality and its `⌈·⌉` counts the variables of the rows of an arrow, so the qualifier
     of a translated `R r e` arrow counts them too (`Stage.qual`); a `P` arrow translates as
