@@ -126,6 +126,7 @@ importers.
 | record, tuple, list, constructor | what its parts hold |
 | type variable `a^c` | the whole value holds at most `c`, without erasing concrete regions or stored qualifiers |
 | type variable `a` without a qualifier | what the substituted type holds; curried stages retain its capture projection |
+| `Errors e`, `Exit e a`, `Failure e` | what the errors of `e` hold; an error-row variable `e` is held as a type variable is: curried stages retain it, and `(Errors e)^c` bounds it elsewhere |
 | `Eff r e a`, a function | hidden captures from its qualifier, and what its result type (and a function's parameter type) shows: a dropped result does not take a capture with it |
 
 A function that takes a callback declares the callback's captures and keeps
