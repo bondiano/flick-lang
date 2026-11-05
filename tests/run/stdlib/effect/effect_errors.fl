@@ -5,8 +5,9 @@ module App.Main exposing (main)
 type error Boom = Boom Float
   deriving Show
 
-ms5 : Duration.Duration
-let ms5 = Result.with_default Duration.zero (Duration.millis 5)
+/// Long enough that the other side of a race has won, on a slow scheduler too.
+ms100 : Duration.Duration
+let ms100 = Result.with_default Duration.zero (Duration.millis 100)
 
 boom : Eff none {Boom} String
 let boom = task { from_result (Err (Boom 1)) }
@@ -149,7 +150,7 @@ let interruption () =
     Effect.uninterruptible
       (task {
         let _ = Deferred.succeed () entered
-        Effect.sleep ms5
+        Effect.sleep ms100
         Ref.update steps (fun xs -> xs ++ ["uninterruptible done"])
       })
     Some "after"
