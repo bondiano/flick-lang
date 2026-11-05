@@ -16,12 +16,15 @@ let nap millis =
   | Ok d -> Effect.sleep d
   | Err _ -> ()
 
-/// Fails right after its mask ends, by when the fiber was asked to stop.
-late : Unit ->{; A} Float
-let late () =
+/// Tells `entered` it is masked, then fails right after its mask ends, by
+/// when the fiber was asked to stop.
+late : Deferred.Deferred none Unit ->{; A} Float
+let late entered =
   Effect.uninterruptible
     (task {
-      nap 40
+      let _ = Deferred.succeed () entered
+      // a masked fiber cannot see the request come in: only time keeps the mask on until it does
+      nap 250
       from_result (Err (A 1))
     })
 
@@ -35,12 +38,13 @@ let view f =
   let label r = if Cause.is_fail_reason r then "F" else if Cause.is_die_reason r then "D" else "I"
   List.map label (Cause.reasons f)
 
-/// Runs `body` in a child that is interrupted while `late` is masked.
-probe : String -> Eff none none Unit ->{} Unit
+/// Runs `body` in a child that is interrupted once `late` tells it is masked.
+probe : String -> (Deferred.Deferred none Unit -> Eff none none Unit) ->{} Unit
 let probe name body =
+  let entered : Deferred.Deferred none Unit = Deferred.make ()
   let exits = scope owner {
-    let fiber = Fiber.spawn owner quiet body
-    nap 10
+    let fiber = Fiber.spawn owner quiet (body entered)
+    Deferred.await_ entered
     Fiber.interrupt fiber
     Fiber.await_all [fiber]
   }
@@ -54,56 +58,46 @@ let probe name body =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  probe
-    "exit"
-    (task {
-      let ex = Effect.exit (task { late () })
-      say ("exit ran: " ++ show (Option.is_some (Exit.failure ex)))
-    })
-  probe
-    "match_cause"
-    (task {
-      let s = Effect.match_cause (fun _ -> "failed") (fun _ -> "ok") (task { late () })
-      say ("match_cause ran: " ++ s)
-    })
+  probe "exit" (fun entered -> task {
+    let ex = Effect.exit (task { late entered })
+    say ("exit ran: " ++ show (Option.is_some (Exit.failure ex)))
+  })
+  probe "match_cause" (fun entered -> task {
+    let s = Effect.match_cause (fun _ -> "failed") (fun _ -> "ok") (task { late entered })
+    say ("match_cause ran: " ++ s)
+  })
   let attempts = Ref.make 0
-  probe
-    "retry"
-    (task {
-      try
-        let v =
-          Effect.retry
-            (Schedule.recurs 2)
-            (task {
-              Ref.set attempts (Ref.get attempts + 1)
-              late ()
-            })
-        say ("retry gave " ++ show v)
-      with
-      | A _ -> say "retry handler ran"
-    })
+  probe "retry" (fun entered -> task {
+    try
+      let v =
+        Effect.retry
+          (Schedule.recurs 2)
+          (task {
+            Ref.set attempts (Ref.get attempts + 1)
+            late entered
+          })
+      say ("retry gave " ++ show v)
+    with
+    | A _ -> say "retry handler ran"
+  })
   say ("retry attempts: " ++ show (Ref.get attempts))
-  probe
-    "race"
-    (task {
-      try
-        let v =
-          race_first
-            (task { late () })
-            (task {
-              nap 1000
-              2
-            })
-        say ("race gave " ++ show v)
-      with
-      | A _ -> say "race handler ran"
-    })
-  probe
-    "stream"
-    (task {
-      let xs =
-        Stream.from_effect (task { late () })
-        |> Stream.catch_cause (fun _ -> Stream.make [0])
-        |> Stream.run_collect
-      say ("stream gave " ++ show xs)
-    })
+  probe "race" (fun entered -> task {
+    try
+      let v =
+        race_first
+          (task { late entered })
+          (task {
+            nap 1000
+            2
+          })
+      say ("race gave " ++ show v)
+    with
+    | A _ -> say "race handler ran"
+  })
+  probe "stream" (fun entered -> task {
+    let xs =
+      Stream.from_effect (task { late entered })
+      |> Stream.catch_cause (fun _ -> Stream.make [0])
+      |> Stream.run_collect
+    say ("stream gave " ++ show xs)
+  })
