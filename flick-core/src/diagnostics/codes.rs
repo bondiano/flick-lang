@@ -345,6 +345,8 @@ codes! {
     P035 = Project 35, "plugin cannot be loaded";
     P036 = Project 36, "plugin gave no code for a block";
     P037 = Project 37, "plugin block without its import";
+    P038 = Project 38, "plugin reaches what the project does not grant";
+    P039 = Project 39, "plugin's answer is in no snapshot of an offline run";
 }
 
 #[cfg(test)]

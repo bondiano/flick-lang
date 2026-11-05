@@ -11,6 +11,7 @@ use super::super::{Loaded, Loader, Root};
 use super::{Found, Plugins, Results, failure, refusal};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::derive::{Derived, Named, builtin_derived, derived_classes, named, target};
+use crate::plugin::reach::Reach;
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::{BlockSource, token_kind};
 use crate::plugin::{Expander, Failure, first_party};
@@ -312,7 +313,17 @@ impl Call<'_, '_> {
         diagnostics: &mut Vec<Diagnostic>,
     ) -> (Found, Option<Rendered>) {
         let package = found.package.clone();
-        let state = match results.collect(job.plugin, &[]) {
+        let m = &self.loader.modules[self.module];
+        let gate = self.loader.gate(&package, &m.root);
+        let mut collecting = BlockSource::default();
+        collecting.reach = Reach::new(gate.clone());
+        found.source.reach = Reach::new(gate);
+        let collected = results.collect(job.plugin, &[], &mut collecting);
+        // what the host refused, whatever the plugin made of it
+        for (code, message) in collecting.reach.problems {
+            diagnostics.push(Diagnostic::error(code, message, found.whole));
+        }
+        let state = match collected {
             Ok(state) => state,
             Err(why) => {
                 diagnostics.push(failure(&found, &package, &format!("failed: {why}")));
@@ -328,7 +339,9 @@ impl Call<'_, '_> {
             &state,
             &mut found.source,
         );
-        let m = &self.loader.modules[self.module];
+        for (code, message) in found.source.reach.problems.drain(..) {
+            diagnostics.push(Diagnostic::error(code, message, found.whole));
+        }
         let rendered = match made {
             Ok(arena) => {
                 let len = found.source.end() - found.source.start();

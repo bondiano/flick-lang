@@ -109,7 +109,11 @@ fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
     let mut out = vec![
         ("flick.toml", config),
         ("package.json", format!("{package:#}\n")),
-        (".gitignore", "node_modules/\ndist/\n.flick/\n".to_owned()),
+        // snapshots of what plugins fetched are part of the project
+        (
+            ".gitignore",
+            "node_modules/\ndist/\n.flick/*\n!.flick/plugin-snapshots/\n".to_owned(),
+        ),
     ];
     if template == Template::Plugin {
         out[2].1.push_str("plugin/target/\n");

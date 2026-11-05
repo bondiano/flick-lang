@@ -19,6 +19,7 @@ use super::unimported::unimported;
 use super::{Loaded, Loader, Root};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::expansion::{Expanded, Expansion};
+use crate::plugin::reach::{Gate, Reach};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
 use crate::plugin::{EditorBlock, Expander, Failure, blocks_under, first_party, placed};
@@ -266,8 +267,18 @@ impl Loader<'_> {
             };
             members.sort_by_key(|(name, j)| (name.clone(), found[*j].node.range()));
             let members: Vec<usize> = members.into_iter().map(|(_, j)| j).collect();
+            let gate = members
+                .first()
+                .and_then(|&j| self.gate(&package, &self.modules[found[j].module].root));
             let blocks: Vec<Block> = members.iter().map(|&j| found[j].source.block()).collect();
-            let state = match results.collect(plugin.as_ref(), &blocks) {
+            let mut collecting = BlockSource::default();
+            collecting.reach = Reach::new(gate.clone());
+            let collected = results.collect(plugin.as_ref(), &blocks, &mut collecting);
+            let first = &found[members[0]];
+            for (code, message) in collecting.reach.problems {
+                diagnostics.push(Diagnostic::error(code, message, first.whole));
+            }
+            let state = match collected {
                 Ok(state) => state,
                 Err(why) => {
                     for &j in &members {
@@ -282,7 +293,13 @@ impl Loader<'_> {
             }
             for (&j, block) in members.iter().zip(&blocks) {
                 let f = &mut found[j];
-                match results.expand(plugin.as_ref(), block, &state, &mut f.source) {
+                f.source.reach = Reach::new(gate.clone());
+                let expanded = results.expand(plugin.as_ref(), block, &state, &mut f.source);
+                // what the host refused, whatever the plugin made of it
+                for (code, message) in f.source.reach.problems.drain(..) {
+                    diagnostics.push(Diagnostic::error(code, message, f.whole));
+                }
+                match expanded {
                     Ok(arena) => {
                         let len = u32::try_from(block.text.len()).expect("source fits in u32");
                         let aliases = self.modules[f.module].syntax.aliases();
@@ -315,6 +332,24 @@ impl Loader<'_> {
             }
         }
         rendered
+    }
+}
+
+impl Loader<'_> {
+    /// What the plugin of `package` may reach for the blocks of modules of
+    /// `root`, as the project grants it: only the project's own modules
+    /// reach anything, and only with a host that reaches outside.
+    fn gate(&self, package: &str, root: &Root) -> Option<Arc<Gate>> {
+        if matches!(root, Root::Package(_)) {
+            return None;
+        }
+        let project = self.project?;
+        Some(Arc::new(Gate {
+            package: package.to_owned(),
+            root: project.root.clone(),
+            grants: (project.config.plugins.get(package).cloned()).unwrap_or_default(),
+            outside: self.host.outside()?,
+        }))
     }
 }
 

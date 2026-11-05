@@ -8,6 +8,7 @@ use std::{env, fs, io};
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::plugin::Expander;
+use flick_core::plugin::reach::Outside;
 use flick_core::project::Host;
 use flick_core::source::{FileId, SourceMap};
 
@@ -48,6 +49,10 @@ impl Host for FsHost {
 
     fn save(&self, key: &[u8], value: &[u8]) {
         plugins::save(key, value);
+    }
+
+    fn outside(&self) -> Option<Arc<dyn Outside>> {
+        Some(plugins::outside(false))
     }
 }
 

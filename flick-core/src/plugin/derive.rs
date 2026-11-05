@@ -321,7 +321,7 @@ fn std_blocks(
         return;
     }
     let read: Vec<Block> = found.iter().map(|(_, s)| s.block()).collect();
-    let state = match plugin.collect(&read) {
+    let state = match plugin.collect(&read, &mut BlockSource::default()) {
         Ok(state) => state,
         Err(why) => {
             let (start, end) = found[0].0.range();

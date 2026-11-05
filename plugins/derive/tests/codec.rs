@@ -8,7 +8,7 @@ use flick_plugin_derive::codec;
 struct Codecs;
 
 impl Plugin for Codecs {
-    fn collect(&self, _: &[Block]) -> Vec<u8> {
+    fn collect(&self, _: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
         Vec::new()
     }
 

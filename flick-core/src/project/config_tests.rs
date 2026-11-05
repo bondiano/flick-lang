@@ -300,6 +300,10 @@ fn rejects_invalid_workspaces_and_scripts() {
             codes::P005,
         ),
         (
+            "schema-version = 1\n[workspace]\nmembers = []\n[plugins.sql]\nenv = [\"A\"]\n",
+            codes::P005,
+        ),
+        (
             "schema-version = 1\n[project]\nkind = \"lib\"\n[dependencies]\nx = { version = \"1\" }\n",
             codes::P005,
         ),
@@ -322,5 +326,39 @@ fn a_package_names_its_plugin_inside_itself() {
     for outside in ["../pairs.wasm", "/tmp/pairs.wasm", "a/../../b.wasm"] {
         let refused = package(outside).expect_err(outside);
         assert_eq!(refused.code, codes::P032, "{outside}");
+    }
+}
+
+#[test]
+fn a_project_grants_a_plugin_files_hosts_and_variables() {
+    let with = |grants: &str| {
+        parse_text(&format!(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[plugins.sql]\n{grants}\n"
+        ))
+    };
+    let config = with(
+        "fs-read = [\"schema/\", \"db/extra.sql\"]\nnet = [\"db.example.com\", \"localhost:8080\"]\nenv = [\"SQL_TOKEN\"]",
+    )
+    .expect("valid");
+    let sql = &config.plugins["sql"];
+    assert_eq!(sql.fs_read, ["schema/", "db/extra.sql"]);
+    assert_eq!(sql.net, ["db.example.com", "localhost:8080"]);
+    assert_eq!(sql.env, ["SQL_TOKEN"]);
+    assert!(with("").expect("valid").plugins["sql"] == Grants::default());
+    for wrong in [
+        "fs-read = [\"../secrets\"]",
+        "fs-read = [\"/etc/passwd\"]",
+        "net = [\"https://db.example.com\"]",
+        "net = [\"Db.example.com\"]",
+        "net = [\"localhost:http\"]",
+        "net = [\".\"]",
+        "net = [\"-\"]",
+        "net = [\"a..b\"]",
+        "net = [\"db-.example.com\"]",
+        "env = [\"A-B\"]",
+        "exec = [\"sh\"]",
+    ] {
+        let refused = with(wrong).expect_err(wrong);
+        assert_eq!(refused.code, codes::P005, "{wrong}: {}", refused.message);
     }
 }

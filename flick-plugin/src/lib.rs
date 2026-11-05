@@ -16,6 +16,7 @@ mod cursor;
 #[cfg(feature = "guest")]
 pub mod guest;
 mod literal;
+mod reach;
 mod splice;
 mod wit;
 
@@ -25,13 +26,14 @@ pub use builder::Builder;
 pub use cursor::Cursor;
 pub use flick_plugin_macros::flick;
 pub use literal::string_value;
+pub use reach::{ReachError, Request, Response};
 #[doc(hidden)]
 pub use splice::__private;
 pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.11.0";
+pub const VERSION: &str = "0.12.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -417,12 +419,38 @@ pub trait Compiler {
     fn parse_body(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic> {
         self.parse_expr(start, end)
     }
+    /// The file at `path` from the project's root, as `[plugins.<package>]`
+    /// grants it with `fs-read`.
+    fn read_file(&mut self, path: &str) -> Result<Vec<u8>, ReachError> {
+        Err(ReachError::Denied(format!(
+            "no project grants reading `{path}`"
+        )))
+    }
+    /// The variable `name` of the environment, as `env` grants it.
+    fn env(&mut self, name: &str) -> Result<Option<String>, ReachError> {
+        Err(ReachError::Denied(format!(
+            "no project grants reading `{name}`"
+        )))
+    }
+    /// The answer of a host `net` grants, from the project's snapshots
+    /// when the run is offline.
+    fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {
+        Err(ReachError::Denied(format!(
+            "no project grants fetching `{}`",
+            request.url
+        )))
+    }
 }
 
 /// A plugin: what it learns from all its blocks of a group, and the code
-/// each block stands for. Both are pure, so the compiler caches them.
+/// each block stands for. Both depend only on the blocks and on what the
+/// project grants them to read, so the compiler caches each result while
+/// what its call read stays the same.
 pub trait Plugin {
-    fn collect(&self, blocks: &[Block]) -> Vec<u8>;
+    /// What the plugin learns from `blocks`, the state each expansion
+    /// gets; `compiler` reaches what the project grants, but parses no
+    /// hole.
+    fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8>;
     /// The code `block` stands for given what `collect` learned, or why
     /// there is none; no diagnostic means the compiler already reported why.
     fn expand(

@@ -5,8 +5,10 @@ title: "Command line"
 `flick` is one binary over the compiler core. Every command takes the
 global options `--project <path>`, `--package <name>` (`-p`, a member of the
 [workspace](../project/#workspaces)), `--diagnostics human|json`,
-`--warnings-as-errors`, `--color auto|always|never`, `--quiet` (alias `--silent`)/`--verbose`
-and `--help`; `flick help <command>` prints a command's help and
+`--warnings-as-errors`, `--color auto|always|never`, `--quiet` (alias `--silent`)/`--verbose`,
+`--offline` (no network: [plugins](../plugins/#reaching-outside) answer
+from the project's snapshots, which `CI` set means too, and `install`
+installs from the store) and `--help`; `flick help <command>` prints a command's help and
 `flick --version` the compiler's version (`flick doctor` shows the rest).
 
 ## Commands
@@ -23,7 +25,7 @@ and `--help`; `flick help <command>` prints a command's help and
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile] [--emit js\|go]` | runs the tests of the test root, on Node or as a Go executable |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | writes the canonical layout ([formatting](../grammar/#formatting)); without paths the source and test roots |
 | `clean [--cache]` | removes the build artifacts; `--cache` also the build cache |
-| `install [--locked] [--offline]` | installs with pnpm (`--frozen-lockfile`, `--offline`); at a workspace root, each member's |
+| `install [--locked]` | installs with pnpm (`--frozen-lockfile`, and `--offline` with the global `--offline`); at a workspace root, each member's |
 | `add <pkg>… [--dev]`, `remove <pkg>…`, `update [pkg]…` | changes dependencies with pnpm |
 | `deps [--why <pkg>]` | the installed graph, and the Flick modules of each direct dependency |
 | `pack --out-dir <dir>` | a release build and its npm tarball; refuses `todo` and `echo` (`FLICK-P024`), and warns when the public API breaks importers since the latest tag |

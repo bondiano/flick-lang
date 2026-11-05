@@ -40,8 +40,8 @@ fn cli(block: &Block) -> bool {
 }
 
 impl Plugin for Std {
-    fn collect(&self, blocks: &[Block]) -> Vec<u8> {
-        Cli.collect(blocks)
+    fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8> {
+        Cli.collect(blocks, compiler)
     }
 
     fn expand(

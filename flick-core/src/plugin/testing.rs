@@ -111,7 +111,7 @@ pub fn expand(plugin: &impl Plugin, source: &str) -> Vec<Result<String, Vec<Stri
         .map(|s| s.in_module(module, &parse.tree))
         .collect();
     let blocks: Vec<Block> = sources.iter().map(BlockSource::block).collect();
-    let state = plugin.collect(&blocks);
+    let state = plugin.collect(&blocks, &mut BlockSource::default());
     (sources.iter_mut().zip(&blocks))
         .map(|(source, block)| {
             let expanded = plugin.expand(block, &state, source);

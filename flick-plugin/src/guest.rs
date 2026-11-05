@@ -3,7 +3,7 @@
 //! [`Plugin`] value through the world of `wit/plugin.wit`, and the compiler's
 //! calls come back to it as a [`Compiler`].
 
-use crate::{Compiler, Diagnostic, Hole, Plugin};
+use crate::{Compiler, Diagnostic, Hole, Plugin, ReachError, Request, Response};
 
 #[allow(
     clippy::same_length_and_capacity,
@@ -22,6 +22,7 @@ pub mod bindings {
 }
 
 crate::wit_conversions!(bindings::flick::plugin::types);
+crate::reach_conversions!(bindings::flick::plugin::types);
 
 use bindings::flick::plugin::{compiler, types};
 
@@ -58,12 +59,26 @@ impl Compiler for Imports {
             .map(convert::from_hole)
             .map_err(convert::from_diagnostic)
     }
+
+    fn read_file(&mut self, path: &str) -> Result<Vec<u8>, ReachError> {
+        compiler::read_file(path).map_err(reach_convert::from_error)
+    }
+
+    fn env(&mut self, name: &str) -> Result<Option<String>, ReachError> {
+        compiler::env(name).map_err(reach_convert::from_error)
+    }
+
+    fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {
+        compiler::fetch(&reach_convert::to_request(request))
+            .map(reach_convert::from_response)
+            .map_err(reach_convert::from_error)
+    }
 }
 
 #[doc(hidden)]
 pub fn collect(plugin: &impl Plugin, blocks: Vec<types::Block>) -> Vec<u8> {
     let blocks: Vec<_> = blocks.into_iter().map(convert::from_block).collect();
-    plugin.collect(&blocks)
+    plugin.collect(&blocks, &mut Imports)
 }
 
 #[doc(hidden)]

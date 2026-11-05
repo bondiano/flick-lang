@@ -7,9 +7,11 @@
 use std::sync::Arc;
 
 use flick_plugin::{
-    Block, Compiler, Hole, HoleKind, Place, Signature, Span, Token as PluginToken, TokenKind,
+    Block, Compiler, Hole, HoleKind, Place, ReachError, Request, Response, Signature, Span,
+    Token as PluginToken, TokenKind,
 };
 
+use super::reach::Reach;
 use crate::diagnostics::Diagnostic;
 use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
@@ -79,6 +81,8 @@ pub struct BlockSource {
     foreign: bool,
     /// What parsing the holes the plugin asked for reported.
     pub diagnostics: Vec<Diagnostic>,
+    /// What the plugin reached outside the block, as the project grants it.
+    pub reach: Reach,
 }
 
 impl BlockSource {
@@ -136,6 +140,7 @@ impl BlockSource {
             place,
             tokens,
             diagnostics: Vec::new(),
+            reach: Reach::default(),
         })
     }
 
@@ -164,6 +169,7 @@ impl BlockSource {
             place: Place::Declaration,
             tokens: if holes { node.tokens() } else { Vec::new() },
             diagnostics: Vec::new(),
+            reach: Reach::default(),
             heads,
             foreign: !holes,
             text,
@@ -437,6 +443,18 @@ impl Compiler for BlockSource {
 
     fn parse_body(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
         self.parse_as(HoleKind::Expr, true, start, end)
+    }
+
+    fn read_file(&mut self, path: &str) -> Result<Vec<u8>, ReachError> {
+        self.reach.read_file(path)
+    }
+
+    fn env(&mut self, name: &str) -> Result<Option<String>, ReachError> {
+        self.reach.env(name)
+    }
+
+    fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {
+        self.reach.fetch(request)
     }
 }
 

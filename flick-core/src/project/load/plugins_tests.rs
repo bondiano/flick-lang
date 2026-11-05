@@ -13,10 +13,12 @@ mod derive;
 mod forms;
 mod names;
 mod nested;
+mod reach;
 
 use super::{check, compile};
 use crate::diagnostics::{Diagnostic, Severity};
 use crate::ir;
+use crate::plugin::reach::Outside;
 use crate::plugin::source::BlockSource;
 use crate::plugin::{Expander, Failure, Native};
 use crate::project::config::{Build, Config, Dependency, Kind, Source};
@@ -36,9 +38,9 @@ impl Expander for Counting {
         self.inner.id()
     }
 
-    fn collect(&self, blocks: &[Block]) -> Result<Vec<u8>, String> {
+    fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String> {
         self.collects.fetch_add(1, Ordering::Relaxed);
-        self.inner.collect(blocks)
+        self.inner.collect(blocks, source)
     }
 
     fn expand(
@@ -79,6 +81,7 @@ struct Memory {
     plugin: Arc<Counting>,
     /// What plugins gave, when this host keeps it.
     store: Option<RefCell<HashMap<Vec<u8>, Vec<u8>>>>,
+    outside: Option<Arc<dyn Outside>>,
 }
 
 impl Memory {
@@ -124,6 +127,10 @@ impl Host for Memory {
             store.borrow_mut().insert(key.to_vec(), value.to_vec());
         }
     }
+
+    fn outside(&self) -> Option<Arc<dyn Outside>> {
+        self.outside.clone()
+    }
 }
 
 const HEAD: &str =
@@ -155,6 +162,7 @@ fn library(sources: &mut SourceMap) -> Project {
             allow: Vec::new(),
             no_let_assert: false,
             thresholds: Thresholds::default(),
+            plugins: BTreeMap::new(),
         },
     }
 }
@@ -168,6 +176,7 @@ fn host(main: &str) -> Memory {
             expands: AtomicUsize::new(0),
         }),
         store: Some(RefCell::default()),
+        outside: None,
     };
     host.write("/p/src/App/Main.fl", main);
     host.write("/pairs/flick.toml", LIBRARY);

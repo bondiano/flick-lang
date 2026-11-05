@@ -5,8 +5,10 @@ title: "Командная строка"
 `flick` — исполняемый файл с командами компилятора. Все команды принимают
 глобальные параметры `--project <path>`, `--package <name>` (`-p`, участник
 [workspace](../project/#workspace)), `--diagnostics human|json`,
-`--warnings-as-errors`, `--color auto|always|never`, `--quiet` (псевдоним `--silent`)/`--verbose`
-и `--help`. Команда `flick help <command>` выводит справку по выбранной команде,
+`--warnings-as-errors`, `--color auto|always|never`, `--quiet` (псевдоним `--silent`)/`--verbose`,
+`--offline` (без сети: [плагины](../plugins/#доступ-вовне) отвечают из
+снимков проекта, то же значит заданная `CI`, а `install` ставит из
+хранилища) и `--help`. Команда `flick help <command>` выводит справку по выбранной команде,
 а `flick --version` — версию компилятора. Остальные сведения показывает `flick doctor`.
 
 ## Команды
@@ -23,7 +25,7 @@ title: "Командная строка"
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile] [--emit js\|go]` | запускает тесты из корневого каталога тестов на Node или исполняемым файлом Go |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | записывает каноническую раскладку кода ([форматирование](../grammar/#форматирование)); если пути не указаны, обрабатывает корневые каталоги исходников и тестов |
 | `clean [--cache]` | удаляет артефакты сборки; с `--cache` — также кеш сборки |
-| `install [--locked] [--offline]` | устанавливает зависимости с помощью pnpm (`--frozen-lockfile`, `--offline`); в корне workspace — каждого участника |
+| `install [--locked]` | устанавливает зависимости с помощью pnpm (`--frozen-lockfile`, а с глобальным `--offline` — `--offline`); в корне workspace — каждого участника |
 | `add <pkg>… [--dev]`, `remove <pkg>…`, `update [pkg]…` | изменяет зависимости с помощью pnpm |
 | `deps [--why <pkg>]` | показывает установленный граф зависимостей и модули Flick каждой прямой зависимости |
 | `pack --out-dir <dir>` | собирает проект в профиле release и создаёт tar-архив npm-пакета; отказывает при `todo` и `echo` (`FLICK-P024`) и предупреждает, если публичный API ломает импортёров со времени последнего тега |

@@ -10,6 +10,7 @@ use std::process::Command;
 use std::{env, fs, io};
 
 use flick_core::build::Artifact;
+use flick_core::plugin::reach::{SNAPSHOTS, hash};
 use flick_core::project::cache::{self, Key, Manifest};
 use flick_core::project::{self, Project, config};
 use flick_core::source::SourceMap;
@@ -55,6 +56,11 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
     for package in ["@flick-lang/runtime", "effect"] {
         let version = toolchain::resolved(&project.root, package).unwrap_or_default();
         key.add(format!("version {package}"), version);
+    }
+    // a variable a plugin may read, by its SHA-256: the key's hash is weak
+    for name in project.config.plugins.values().flat_map(|g| &g.env) {
+        let value = env::var(name).unwrap_or_default();
+        key.add(format!("env {name}"), hash([value.as_bytes()]));
     }
     for path in input_files(project, &selected) {
         key.add(
@@ -118,6 +124,16 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
     );
     files.extend(dependency_files(&project.root));
     library_files(&project.root, &project.config.dependencies, &mut files);
+    // what plugins read: the files the project grants them, and snapshots
+    files_under(&project.root.join(SNAPSHOTS), &mut files);
+    let granted = project.config.plugins.values().flat_map(|g| &g.fs_read);
+    for path in granted.map(|p| project.root.join(p)) {
+        if path.is_dir() {
+            files_under(&path, &mut files);
+        } else {
+            files.push(path);
+        }
+    }
     for path in &mut files {
         *path = project::normalize(path);
     }

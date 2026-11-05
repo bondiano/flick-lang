@@ -7,10 +7,12 @@
 //! stands for `(1.0 : String)`, an error in generated code; `coded { X001 }`
 //! refuses with the code its body names. `spin {}` never
 //! ends and `hog {}` takes all memory: the limits of a plugin's calls.
-//! `deriving Pairs.Arbitrary` is in `derive`.
+//! `deriving Pairs.Arbitrary` is in `derive`, and the heads that reach
+//! outside their blocks are in `reach`.
 
 mod derive;
 mod forms;
+mod reach;
 
 use std::hint::black_box;
 
@@ -25,12 +27,11 @@ pub struct Pairs;
 flick_plugin::export!(Pairs);
 
 impl Plugin for Pairs {
-    fn collect(&self, blocks: &[Block]) -> Vec<u8> {
+    /// The number of `pairs` blocks, then what `reach` reads.
+    fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8> {
         let pairs = blocks.iter().filter(|b| b.head == "pairs").count();
-        u32::try_from(pairs)
-            .unwrap_or(u32::MAX)
-            .to_le_bytes()
-            .to_vec()
+        let count = u32::try_from(pairs).unwrap_or(u32::MAX).to_le_bytes();
+        [count.as_slice(), &reach::collect(blocks, compiler)].concat()
     }
 
     fn expand(
@@ -40,6 +41,9 @@ impl Plugin for Pairs {
         compiler: &mut dyn Compiler,
     ) -> Result<Arena, Vec<Diagnostic>> {
         if let Some(made) = forms::expand(block, compiler) {
+            return made;
+        }
+        if let Some(made) = reach::expand(block, state, compiler) {
             return made;
         }
         let whole = block.whole();
@@ -92,7 +96,9 @@ impl Plugin for Pairs {
             };
             fields.push((c.text(name).to_owned(), node));
         }
-        let count = state.try_into().map_or(0, u32::from_le_bytes);
+        let count = (state.get(..4))
+            .and_then(|s| s.try_into().ok())
+            .map_or(0, u32::from_le_bytes);
         let record = flick!(b @ whole, { #(..fields); blocks = #(f64::from(count)) });
         Ok(b.finish(record))
     }

@@ -2,6 +2,8 @@
 //! `[sql]`, `[lint]`, `[dependencies]`, `[workspace]` and `[scripts]`. Unknown keys are errors so
 //! that a typo never silently means a default.
 
+use std::collections::BTreeMap;
+
 use crate::codegen::Labels;
 use crate::diagnostics::Code;
 use crate::source::Span;
@@ -108,6 +110,20 @@ pub struct Package {
     pub span: Span,
 }
 
+/// What `[plugins.<package>]` lets the plugin of a package reach while it
+/// expands the project's blocks; nothing without it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Grants {
+    /// Paths from the project's root: a file, or a directory and what it
+    /// holds.
+    pub fs_read: Vec<String>,
+    /// Hosts it fetches from over HTTP: `db.example.com` at any port, or
+    /// `localhost:8080` at that one.
+    pub net: Vec<String>,
+    /// Variables of the environment it reads.
+    pub env: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     pub kind: Kind,
@@ -130,6 +146,8 @@ pub struct Config {
     /// `[lint] max-function-lines`, `max-nesting`, `max-complexity`,
     /// `max-params`.
     pub thresholds: Thresholds,
+    /// `[plugins.<package>]`: what the plugin of each package may reach.
+    pub plugins: BTreeMap<String, Grants>,
 }
 
 /// An entry point of an app: its name and the module whose `main` it runs.

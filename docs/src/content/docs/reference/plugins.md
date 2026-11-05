@@ -144,7 +144,7 @@ numbers be finite, holes lie in the body and not overlap, an expression or a
 pattern be used once (a type may stand in several places, as in a signature
 and an annotation), and its size and depth are bounded. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,
-`0.11.0`. A component built for another version does not load: the import
+`0.12.0`. A component built for another version does not load: the import
 that exposes its heads is `FLICK-P035`, naming the version it was built for
 and the one the compiler speaks, until it is rebuilt.
 
@@ -213,7 +213,7 @@ pub struct Tagged;
 flick_plugin::export!(Tagged);
 
 impl Plugin for Tagged {
-    fn collect(&self, _: &[Block]) -> Vec<u8> {
+    fn collect(&self, _: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
         Vec::new()
     }
 
@@ -288,6 +288,43 @@ of the files given, stands for, the user's code in place. Built with
 `crate-type = ["cdylib"]`, the `guest` feature of `flick-plugin` and
 `--target wasm32-wasip2`, as the script does, the crate is a component.
 
+## Reaching outside
+
+A plugin reaches nothing but its blocks unless the project that uses it
+grants more in its `flick.toml`; the package of the plugin declares nothing:
+
+```toml
+[plugins.sql]
+fs-read = ["schema/", "db/extra.sql"]   # from the project's root: a directory and what it holds, or a file
+net = ["db.example.com", "localhost:8080"]  # a host at any port, or at that one
+env = ["SQL_TOKEN"]
+```
+
+`collect`, `expand` and `derive` ask through the compiler:
+`compiler.read_file("schema/users.sql")`, `compiler.env("SQL_TOKEN")` and
+`compiler.fetch(&Request { method, url, headers, body })`, which give the
+bytes, the value (`None` when it is unset) and the `Response { status, body }`.
+What the project does not grant is `ReachError::Denied`, and
+`FLICK-P038` on the block, naming the line to add, whatever the plugin makes
+of the error; a path with `..` or a root is never granted, nor is a URL
+other than `http` or `https`, one with `user@`, or one whose host is in
+brackets. A database is reached the same way, over HTTP or through a schema
+the project commits; the compiler has no drivers. Blocks of a library's
+modules reach nothing, and neither do `complete`, `hover`, `highlight` and
+`format`.
+
+An answer over HTTP is kept as a snapshot, the JSON file
+`.flick/plugin-snapshots/<package>/<hash>.json` in the project, which is
+committed: the hash is over the method, the URL and the body. Headers are
+not part of it, so a token goes in a header, never in the URL; a changed
+header changes no snapshot. A run asks
+the network only for a request no snapshot answers, follows no redirect,
+waits at most 30 seconds and takes at most 16 MiB; an answer with a status
+of 500 or more is not kept. With `--offline`, or `CI` set, and in the
+editor, a request no snapshot answers is `ReachError::Offline` and
+`FLICK-P039`. Deleting a snapshot fetches the answer again. Files and
+variables are read as they are on each run.
+
 ## Limits and caches
 
 Each call runs in a fresh instance with a budget of fuel and 64 MiB of
@@ -301,7 +338,10 @@ package and the hash of its component), the block's text and where its
 body starts, and the state collected. A second build calls no plugin; a
 changed block costs one `collect` and one `expand`; a new block changes
 what `collect` learns, and every block of its group is expanded again.
-`FLICK_PLUGIN_TRACE=<file>` appends a line for each call a plugin answers.
+A kept result also records the hash of each file, variable and snapshot its
+call reached, and holds only while each is the same; the build cache counts
+them too. `FLICK_PLUGIN_TRACE=<file>` appends a line for each call a plugin
+answers.
 
 ## Diagnostics
 
@@ -314,6 +354,8 @@ what `collect` learns, and every block of its group is expanded again.
 | an error in the user's code inside a block | the usual one, at that code |
 | an error in the code a plugin gave | the usual one, on the code it stands for, with a note naming the plugin |
 | what a plugin's `check` finds | `<package>/X001` at the span it names; `FLICK-P036` when `check` fails |
+| a plugin reaches a file, a variable or a host the project does not grant | `FLICK-P038` on the block |
+| an offline run has no snapshot of the answer a plugin asks for | `FLICK-P039` on the block |
 
 A span of the whole text of a block is the whole block, its head with it.
 A plugin's code is capital letters and three digits; the compiler puts the
@@ -324,7 +366,7 @@ dropped.
 
 ## Not yet
 
-Permissions and warnings of plugins come later. A
+Warnings of plugins come later. A
 built-in module the file hides by an alias, as `import Other as List`, is
 hidden from generated code too. `collect` sees the modules the run loads, so `flick check one.fl` gives it
 fewer blocks than a whole build. A package whose modules have plugin blocks

@@ -39,6 +39,7 @@ mod tests;
 #[cfg(feature = "native-project")]
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::plugin::Expander;
+use crate::plugin::reach::Outside;
 use crate::source::FileId;
 #[cfg(feature = "native-project")]
 use crate::source::SourceMap;
@@ -66,6 +67,11 @@ pub trait Host {
     /// Keeps what a plugin gave for the call `key` for later runs.
     fn save(&self, key: &[u8], value: &[u8]) {
         let _ = (key, value);
+    }
+    /// The world outside the compiler a plugin reaches as a project grants
+    /// it; none reaches nothing.
+    fn outside(&self) -> Option<Arc<dyn Outside>> {
+        None
     }
 }
 

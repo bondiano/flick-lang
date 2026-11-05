@@ -76,8 +76,13 @@ mod without {
 #[cfg(feature = "wasm-plugins")]
 mod wasm {
     use std::fs;
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
     use std::path::{Path, PathBuf};
     use std::process::{Command, Output};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::thread;
 
     use super::common::project;
     use super::{APP, LIB, MAIN, PAIRS};
@@ -116,6 +121,7 @@ mod wasm {
             .env("XDG_CACHE_HOME", root.join("cache"))
             .env("FLICK_PLUGIN_TRACE", root.join("trace"))
             .env("NO_COLOR", "1")
+            .env_remove("CI")
             .output()
             .expect("flick runs")
     }
@@ -250,5 +256,132 @@ mod wasm {
             stderr.contains("FLICK-P035") && stderr.contains("cannot read"),
             "{stderr}"
         );
+    }
+
+    /// A project whose `note` is the block `value`, granted `grants`.
+    fn reaching(name: &str, value: &str, grants: &str) -> PathBuf {
+        let head = value.split(' ').next().unwrap_or_default();
+        let main = format!(
+            "module App.Main exposing (main, note)\n\nimport Pairs exposing (plugin {head})\n\nnote : String\nlet note = {value}\n\nmain : Unit ->{{; AppError}} Unit\nlet main () = ()\n"
+        );
+        let root = app(name, &main);
+        let manifest = format!("{APP}\n[plugins.pairs]\n{grants}\n");
+        fs::write(root.join("app/flick.toml"), manifest).expect("write");
+        root
+    }
+
+    #[test]
+    fn a_plugin_reaches_only_what_the_project_grants() {
+        let root = reaching("plugins-denied", "read_file \"notes.txt\" {}", "");
+        fs::write(root.join("app/notes.txt"), "hello").expect("write");
+        let checked = flick(&root, &["check"]);
+        let stderr = String::from_utf8_lossy(&checked.stderr);
+        assert!(!checked.status.success(), "{stderr}");
+        assert!(stderr.contains("FLICK-P038"), "{stderr}");
+        assert!(
+            stderr.contains("add `fs-read = [\"notes.txt\"]` to `[plugins.pairs]`"),
+            "{stderr}"
+        );
+        let manifest = fs::read_to_string(root.join("app/flick.toml")).expect("read");
+        let granted = manifest.replace(
+            "[plugins.pairs]\n",
+            "[plugins.pairs]\nfs-read = [\"notes.txt\"]\n",
+        );
+        fs::write(root.join("app/flick.toml"), granted).expect("write");
+        let expanded = flick(&root, &["expand"]);
+        assert!(expanded.status.success(), "{expanded:?}");
+        assert!(
+            String::from_utf8_lossy(&expanded.stdout).contains("\"hello\""),
+            "{expanded:?}"
+        );
+        let built = |root: &Path| {
+            let out = flick(root, &["build", "--out-dir", "out"]);
+            assert!(out.status.success(), "{out:?}");
+            fs::read_to_string(root.join("app/out/App/Main.js")).expect("built")
+        };
+        assert!(built(&root).contains("\"hello\""));
+        // a changed file expands the block again, and builds anew
+        fs::write(root.join("app/notes.txt"), "again").expect("write");
+        let expanded = flick(&root, &["expand"]);
+        assert!(
+            String::from_utf8_lossy(&expanded.stdout).contains("\"again\""),
+            "{expanded:?}"
+        );
+        assert!(built(&root).contains("\"again\""));
+    }
+
+    /// A server at a port of 127.0.0.1 that answers each request with
+    /// `body`, its URL, and the number of requests for that URL: a probe of
+    /// the new port, as WSL makes, asks for another.
+    fn serve(body: &'static str) -> (String, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("a port");
+        let port = listener.local_addr().expect("bound").port();
+        let asked = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&asked);
+        thread::spawn(move || {
+            for mut stream in listener.incoming().map_while(Result::ok) {
+                let mut reader = BufReader::new(stream.try_clone().expect("stream"));
+                let mut line = String::new();
+                let _ = reader.read_line(&mut line);
+                if line.contains(" /tables ") {
+                    counted.fetch_add(1, Ordering::Relaxed);
+                }
+                while reader.read_line(&mut line).is_ok_and(|n| n > 2) {}
+                let answer = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = stream.write_all(answer.as_bytes());
+            }
+        });
+        (format!("http://127.0.0.1:{port}/tables"), asked)
+    }
+
+    #[test]
+    fn an_answer_is_kept_as_a_snapshot_an_offline_run_replays() {
+        let (url, asked) = serve("users");
+        let root = reaching(
+            "plugins-snapshots",
+            &format!("fetch_text \"{url}\" {{}}"),
+            "net = [\"127.0.0.1\"]",
+        );
+        let expanded = flick(&root, &["expand"]);
+        assert!(
+            String::from_utf8_lossy(&expanded.stdout).contains("\"200 users\""),
+            "{expanded:?}"
+        );
+        let snapshots = root.join("app/.flick/plugin-snapshots/pairs");
+        let kept: Vec<_> = fs::read_dir(&snapshots).expect("snapshots").collect();
+        assert_eq!(kept.len(), 1);
+        // without the cache, offline: the snapshot answers
+        fs::remove_dir_all(root.join("cache")).expect("drop the cache");
+        let offline = flick(&root, &["--offline", "expand"]);
+        assert!(
+            String::from_utf8_lossy(&offline.stdout).contains("\"200 users\""),
+            "{offline:?}"
+        );
+        assert_eq!(asked.load(Ordering::Relaxed), 1);
+        fs::remove_dir_all(&snapshots).expect("drop the snapshots");
+        // `--offline`, or `CI` set, reaches no network
+        let ci = |args: &[&str]| {
+            Command::new(env!("CARGO_BIN_EXE_flick"))
+                .args(args)
+                .current_dir(root.join("app"))
+                .env("XDG_CACHE_HOME", root.join("cache"))
+                .env("NO_COLOR", "1")
+                .env("CI", "true")
+                .output()
+                .expect("flick runs")
+        };
+        for (args, checked) in [
+            (
+                &["--offline", "check"][..],
+                flick(&root, &["--offline", "check"]),
+            ),
+            (&["check"], ci(&["check"])),
+        ] {
+            let stderr = String::from_utf8_lossy(&checked.stderr);
+            assert!(stderr.contains("FLICK-P039"), "{args:?}: {stderr}");
+        }
     }
 }
