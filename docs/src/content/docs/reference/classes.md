@@ -235,7 +235,8 @@ class can be written once for every type over it. The instance is
 | `type Named = Named { width : Float; label : String }` | `Con "Named" (Field "label" String, (Field "width" Float, Unit))` |
 
 Each constructor is a `Con` of its name holding its fields in pairs ended by
-`Unit`, numbered or, for one record field, labelled in sorted order; several
+`Unit`: numbered `_0`, `_1`, … or, when its one field is a record, labelled
+with the record's labels in sorted order, as `Named` shows; several
 are nested `Sum`s (`Inl`, `Inr`) in declaration order. `Con` and `Field` are
 unboxed: the representation costs one `Sum` per constructor but the last
 and a pair per field. A type without constructors has none (`FLICK-C013`).
