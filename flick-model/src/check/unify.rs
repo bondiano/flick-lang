@@ -71,6 +71,7 @@ impl Checker<'_> {
         for a in &c.atoms {
             match self.solution(a) {
                 Some(Solved::Type(t)) => out = out.union(&self.reach(t)),
+                Some(Solved::Row(r)) => out = out.union(&self.reach(&Type::Errors(r.clone()))),
                 _ => {
                     out.atoms.insert(a.clone());
                 }

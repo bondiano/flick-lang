@@ -6,7 +6,7 @@ use std::rc::Rc;
 use super::{Checker, TypeError};
 use crate::decls::Decls;
 use crate::syntax::{Arm, Con, Const, Lit, Pat, Path, Prim, Term};
-use crate::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 fn ty(name: &str) -> Type {
     Type::con("Prelude", name)
@@ -337,6 +337,47 @@ fn task_holds_a_type_variable() {
         check(&lam, &poly(Type::fun(a(), Stage::Pure, eff(ty("Unit"))))),
         "Task",
     );
+}
+
+/// `∀e. Errors e → (Unit → Unit)^{e}`: a qualifier takes what the row
+/// given for `e` reaches (`regions.md` §2.1), the rigid `e` of the
+/// signature, `{A}`, which reaches nothing, and the variable `f`, which a
+/// bare field does not allow.
+#[test]
+fn an_error_row_variable_is_substituted_in_a_qualifier() {
+    let unit_to_unit = Type::fun(ty("Unit"), Stage::Pure, ty("Unit"));
+    let errors = |v: &str| Type::Errors(Row::var(Var::Named(v.into())));
+    let keep = Scheme {
+        vars: vec![("e".into(), Kind::Errors)],
+        body: Type::fun(
+            errors("e"),
+            Stage::Pure,
+            Type::Captured(
+                Rc::new(unit_to_unit.clone()),
+                Caps::atom(Var::Named("e".into())),
+            ),
+        ),
+        outlives: Vec::new(),
+    };
+    let body = Term::lam("x", Term::lam("_", let_("_", var("x"), Term::unit())));
+    assert!(check(&body, &keep).is_ok());
+    let run = record(&[("run", Term::app(var("keep"), var("y")))]);
+    let use_ = Term::lam("y", let_sig("keep", keep, body, run));
+    let field = |param: Type| {
+        let fields = Fields {
+            fields: [("run".into(), unit_to_unit.clone())].into(),
+            tail: None,
+        };
+        Type::fun(param, Stage::Pure, Type::Record(fields))
+    };
+    let errors_a = field(Type::Errors(Row::one(Path::new(T, "A"))));
+    assert!(check(&use_, &mono(errors_a)).is_ok());
+    let errors_f = Scheme {
+        vars: vec![("f".into(), Kind::Errors)],
+        body: field(errors("f")),
+        outlives: Vec::new(),
+    };
+    rejected_by(check(&use_, &errors_f), "≤-Cap");
 }
 
 /// (Task): the body's errors are within the `Eff`'s.
