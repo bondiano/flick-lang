@@ -10,11 +10,13 @@
 //! - `capture { e }`: `(fun x -> { held = e; own = x; shown = show
 //!   Pairs.version }) "shadow"`, whose `x`, `show` and `Pairs` are not the
 //!   user's;
-//! - `companion Box { e }`: `let Box.label = e`, a companion of `Box`.
+//! - `companion Box { e }`: `let Box.label = e`, a companion of `Box`;
+//! - `signed name { e }` below `name : T`: `name : T`, `let name = e`, and
+//!   `let name_module = "App.Main"`, the module the block is in.
 
 use flick_plugin::{
-    Arena, Block, Builder, Case, Compiler, Decl, Diagnostic, Expr, Name, Place, TokenKind, flick,
-    string_value,
+    Arena, Block, Builder, Case, Compiler, Decl, Diagnostic, Expr, Name, Place, Span, TokenKind,
+    Ty, flick, string_value,
 };
 
 /// The code of `block` when its head is one of these; `None` otherwise.
@@ -25,7 +27,7 @@ pub fn expand(
     let expression = matches!(block.head.as_str(), "named" | "text_of" | "capture");
     let declaration = matches!(
         block.head.as_str(),
-        "define" | "table" | "traced" | "variants" | "shows" | "companion"
+        "define" | "table" | "traced" | "variants" | "shows" | "companion" | "signed"
     );
     if !expression && !declaration {
         return None;
@@ -51,6 +53,7 @@ pub fn expand(
         "companion" => companion(block, compiler, &mut b),
         "table" => table(block, compiler, &mut b),
         "traced" => traced(block, compiler, &mut b),
+        "signed" => signed(block, compiler, &mut b),
         "variants" => variants(block, &mut b),
         _ => Ok(shows(block, &mut b)),
     };
@@ -92,6 +95,36 @@ fn define(
         .ok_or_else(|| vec![Diagnostic::error("expected a name", block.whole())])?;
     let value = block.body().expr(compiler).map_err(|d| vec![d])?;
     Ok(flick!(b, let #(block.text_of(name.span)) = #value))
+}
+
+/// `name : T` from the signature above, `let name = e`, and
+/// `let name_module = "…"`.
+fn signed(
+    block: &Block,
+    compiler: &mut dyn Compiler,
+    b: &mut Builder,
+) -> Result<u32, Vec<Diagnostic>> {
+    let name = (block.cursor().ident())
+        .map(|t| block.text_of(t.span).to_owned())
+        .ok_or_else(|| vec![Diagnostic::error("expected a name", block.whole())])?;
+    if block.signature.is_none() {
+        let message = format!("`{name}` needs a signature right above it");
+        return Err(vec![Diagnostic::error(message, block.whole())]);
+    }
+    let value = block.body().expr(compiler).map_err(|d| vec![d])?;
+    // the type, after `name :`
+    let signature = block.signature.as_ref().expect("checked above");
+    let start = signature.tokens.get(2).map_or(0, |t| t.span.start);
+    let end = u32::try_from(signature.text.len()).unwrap_or(u32::MAX);
+    let ty = b.ty(Ty::Signed(Span { start, end }));
+    let signature = b.decl(Decl::Signature {
+        name: name.clone(),
+        ty,
+    });
+    let made = flick!(b, let #(name.clone()) = #value);
+    let module = b.expr(Expr::Text(block.module.clone()));
+    let module = flick!(b, let #(format!("{name}_module")) = #module);
+    Ok(b.group(vec![signature, made, module]))
 }
 
 /// The user's declaration, and `let f_name = "f"`.

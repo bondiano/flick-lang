@@ -19,7 +19,7 @@ use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
 
 use super::render::Rendered;
-use super::source::BlockSource;
+use super::source::{BlockSource, in_signature};
 use super::splice::{splice, splice_decls};
 use super::testing::shown;
 
@@ -61,6 +61,8 @@ struct Block {
     frame: (u32, u32),
     place: Place,
     holes: Vec<(u32, Hole)>,
+    /// The signature above it, as written.
+    signature: String,
 }
 
 /// A block and the code its plugin gave, as Flick text with the user's code
@@ -85,7 +87,7 @@ impl Expansion {
                 Shown {
                     range: b.range,
                     plugin: b.plugin.clone(),
-                    code: shown(&rendered, frame, b.place),
+                    code: shown(&rendered, frame, &b.signature, b.place),
                 }
             })
             .collect()
@@ -133,13 +135,18 @@ impl Expansion {
                         };
                         ((at + s, at + e), origin)
                     }));
+                    // the signature is a node of the module's own tree
                     holes.extend(
-                        block
-                            .rendered
-                            .holes
-                            .iter()
+                        (block.rendered.holes.iter())
+                            .filter(|(_, hole)| in_signature(*hole).is_none())
                             .filter_map(|&(_, hole)| Some((range, block.source.hole_tree(hole)?))),
                     );
+                    // code with its type takes the signature above the block
+                    let taken =
+                        (block.rendered.holes.iter()).any(|(_, h)| in_signature(*h).is_some());
+                    if let Some(signature) = block.source.signature().filter(|_| taken) {
+                        spliced.push((signature, Vec::new(), false));
+                    }
                     let end = u32::try_from(out.len()).expect("source fits in u32");
                     done.push(Block {
                         range: block.whole,
@@ -148,6 +155,7 @@ impl Expansion {
                         frame: (block.source.start(), block.source.end()),
                         place: block.source.place(),
                         holes: block.rendered.holes.clone(),
+                        signature: block.source.signature_text().unwrap_or("").to_owned(),
                     });
                     spliced.push((range, nodes, block.keep));
                 }
@@ -337,7 +345,12 @@ fn replace_blocks(node: &mut Node, spliced: &mut Spliced) {
         };
         if matches!(
             n.kind,
-            K::PluginExpr | K::PluginDecl | K::TypeDecl | K::ErrorDecl | K::DerivingDecl
+            K::PluginExpr
+                | K::PluginDecl
+                | K::TypeDecl
+                | K::ErrorDecl
+                | K::DerivingDecl
+                | K::Signature
         ) {
             let range = n.range();
             let (mut code, mut found, mut keep) = (Vec::new(), false, false);

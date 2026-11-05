@@ -117,6 +117,15 @@ impl<'b> Cursor<'b> {
         Ok(hole.span)
     }
 
+    /// The user's body from the next token on, past it: an expression, or
+    /// on a line of its own the lines of a block at its column, as after
+    /// the `=` of a `let`.
+    pub fn block(&mut self, compiler: &mut dyn Compiler) -> Result<Span, Diagnostic> {
+        let hole = compiler.parse_body(self.start(), self.block.whole().end)?;
+        self.skip_to(hole.span.end);
+        Ok(hole.span)
+    }
+
     /// The user's type from the next token on, the longest one, past it.
     pub fn ty(&mut self, compiler: &mut dyn Compiler) -> Result<Span, Diagnostic> {
         let hole = compiler.parse_type(self.start(), self.block.whole().end)?;
@@ -190,6 +199,8 @@ mod tests {
             body: at("{") + 1,
             place: Place::Expression,
             docs: String::new(),
+            signature: None,
+            module: "App".into(),
             tokens: vec![
                 token(TokenKind::String, 0, 3),
                 token(TokenKind::Ident, flag, flag + 4),

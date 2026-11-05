@@ -5,7 +5,7 @@
 
 use super::build::build;
 use super::types::type_;
-use super::{Ctx, Done, Parser, decl, expr, pattern};
+use super::{Ctx, Done, K, Parser, decl, expr, pattern};
 use crate::diagnostics::Diagnostic;
 use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
@@ -32,6 +32,28 @@ pub fn parse_expr_at<'t>(
     heads: Heads<'t>,
 ) -> Option<Fragment> {
     fragment(text, file, tokens, heads, expr::expr)
+}
+
+/// [`parse_expr_at`] for a body, as after the `=` of a `let`: one that
+/// starts a line is the lines of a block at its column.
+pub fn parse_body_at<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, body)
+}
+
+fn body(p: &mut Parser) -> Option<Done> {
+    if !p.raw().line_start {
+        return expr::expr(p);
+    }
+    let m = p.start();
+    p.push(Ctx::Aligned { col: p.col() });
+    p.items(expr::stmt, false, |_| false);
+    p.pop();
+    Some(p.complete(m, K::Block))
 }
 
 /// [`parse_expr_at`] for a type.

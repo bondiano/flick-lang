@@ -68,6 +68,7 @@ impl Loader<'_> {
             let imported = m.syntax.heads();
             let new = |node: &Node| {
                 BlockSource::new(Arc::clone(&shared), m.file, node, Arc::clone(&imported))
+                    .map(|s| s.in_module(&m.name, &m.parse.tree))
             };
             let mut sink = Sink {
                 plugins: &plugins,

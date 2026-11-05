@@ -327,6 +327,8 @@ impl Checker<'_> {
         let runtime = mem::replace(&mut self.runtime, saved);
         self.store.level -= 1;
         let is_fun = matches!(self.whnf(&ty), Type::Fun { .. });
+        // a plugin's code needs no signature: no one reads it
+        let signed = header || self.span(decl).start >= self.generated;
         if let (true, Some(written), true) = (is_fun, parts.header, parts.params.is_empty()) {
             let written = self.text_of(written);
             self.error(
@@ -336,7 +338,7 @@ impl Checker<'_> {
                     "write the type of function `{name}` as a signature above the `let`: `{name} : {written}`"
                 ),
             );
-        } else if (function || is_fun) && !header {
+        } else if (function || is_fun) && !signed {
             // the suggestion shows the rows the body needs, not their unknowns;
             // only this binding's own: an enclosing row still gathers its calls
             self.close_rows_above(Some(self.store.level));

@@ -16,7 +16,7 @@ use crate::project::load::analyze;
 use crate::project::load::{FormatPlugins, check, compile};
 use crate::source::{FileId, SourceMap};
 
-const IMPORT: &str = "module App.Main exposing (..)\n\nimport Pairs exposing (plugin named, plugin text_of, plugin define, plugin table, plugin traced, plugin variants, plugin shows)\n\n";
+const IMPORT: &str = "module App.Main exposing (..)\n\nimport Pairs exposing (plugin named, plugin text_of, plugin define, plugin table, plugin traced, plugin variants, plugin shows, plugin signed)\n\n";
 
 const FORMS: &str = "shape : String
 let shape = named Shape
@@ -41,8 +41,12 @@ type Box = Box
 
 shows Box
 
+/// Three.
+whole : Float
+signed whole { 1.0 + 2.0 }
+
 checks : List String
-let checks = [shape, path, ddl, show answer, point.label, double_name, show Red, show Box]
+let checks = [shape, path, ddl, show answer, point.label, double_name, show Red, show Box, show whole, whole_module]
 
 four : Float
 let four = double 2.0
@@ -83,6 +87,7 @@ fn every_form_of_a_block_expands_and_its_declarations_are_the_modules() {
         "\"App.Api.place\"",
         "create table t (name text default 'a') -- why",
         "double_name",
+        "\"App.Main\"",
     ] {
         assert!(printed.contains(needle), "{needle} in {printed}");
     }
@@ -132,6 +137,19 @@ fn errors_land_on_the_users_code_of_a_declaration_or_on_the_block() {
         found.iter().any(|f| f.contains("expected the type's name")),
         "{found:?}"
     );
+    // code that takes the signature above the block: its mistakes on it
+    let found = report("bad : Strin\nsigned bad { 1.0 }\n");
+    assert!(found.iter().any(|f| f.contains("`Strin`")), "{found:?}");
+    // code that does not: the signature stays and types what it declares
+    let found = report("kept : String\ndefine kept { 1.0 }\n");
+    assert!(found.iter().any(|f| f.contains("`1.0`")), "{found:?}");
+    let found = report("signed lone { 1.0 }\n");
+    assert!(
+        found
+            .iter()
+            .any(|f| f.contains("needs a signature right above it")),
+        "{found:?}"
+    );
     // a head where it does not stand: what the plugin says
     let found = report("x : String\nlet x = define y { 1.0 }\n");
     assert!(
@@ -173,7 +191,7 @@ fn editors_see_the_users_code_inside_a_declaration() {
 #[test]
 fn the_code_of_a_declaration_shows_as_declarations() {
     let source = format!(
-        "{IMPORT}table Point {{ x : Float = 1.0 }}\n\ntraced let double x =\n  x * 2.0\n\nshows Box\n"
+        "{IMPORT}table Point {{ x : Float = 1.0 }}\n\ntraced let double x =\n  x * 2.0\n\nshows Box\n\nwhole : Float\nsigned whole {{ 1.0 }}\n"
     );
     let shown: Vec<String> = (expand(&Pairs, &source).into_iter())
         .map(|found| found.unwrap_or_else(|e| panic!("{e:?}")))
@@ -184,6 +202,7 @@ fn the_code_of_a_declaration_shows_as_declarations() {
             "type alias Point = { x : Float }\nlet point : Point = { x = 1.0 }",
             "let double x = x * 2.0\nlet double_name = \"double\"",
             "instance (Show Box) =\n  let show _ = \"Box\"",
+            "whole : Float\nlet whole = 1.0\nlet whole_module = \"App.Main\"",
         ]
     );
 }
@@ -201,7 +220,7 @@ fn the_formatter_finds_the_plugins_of_the_projects_packages() {
     assert_eq!(
         heads,
         [
-            "define", "named", "shows", "table", "text_of", "traced", "variants"
+            "define", "named", "shows", "signed", "table", "text_of", "traced", "variants"
         ]
     );
     // without the project, a package's plugin is unknown

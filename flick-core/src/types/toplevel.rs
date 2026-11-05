@@ -153,7 +153,9 @@ impl<'a> Checker<'a> {
                 }
                 K::Signature => {
                     let next = decls.get(i + 1).filter(|d| self.pairs(decl, d));
-                    if next.is_none() {
+                    // a block below that gave no code is reported already
+                    let block = decls.get(i + 1).is_some_and(|d| d.kind == K::PluginDecl);
+                    if next.is_none() && !block {
                         self.orphan_signature(decl, decls);
                     }
                 }

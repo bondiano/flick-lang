@@ -74,6 +74,8 @@ impl Results<'_> {
             block.head.as_bytes(),
             block.text.as_bytes(),
             block.docs.as_bytes(),
+            block.module.as_bytes(),
+            (block.signature.as_ref()).map_or(&[][..], |s| s.text.as_bytes()),
             &[u8::from(block.place == Place::Declaration)],
             &column,
             &indent,

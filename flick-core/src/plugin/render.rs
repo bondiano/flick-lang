@@ -10,6 +10,7 @@ use flick_plugin::{Arena, Expr, Field, Hole, HoleKind, Kind, NodeId, Pat, Place,
 
 pub use decl::DECL_PLACEHOLDER;
 
+use super::source::{in_signature, signed};
 use crate::source::FileId;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::lexer::{lex, lex_generated};
@@ -56,7 +57,11 @@ pub fn render(
         Place::Declaration => Role::Decl,
     };
     out.node(arena.root, role, 0)?;
-    let mut holes: Vec<Hole> = out.holes.iter().map(|(_, h)| *h).collect();
+    // the signature above the block is no part of its body
+    let mut holes: Vec<Hole> = (out.holes.iter())
+        .map(|(_, h)| *h)
+        .filter(|h| in_signature(*h).is_none())
+        .collect();
     holes.sort_by_key(|h| (h.span.start, h.span.end));
     // a type may stand in several places, as in a signature and an annotation
     holes.dedup_by(|b, a| a == b && a.kind == HoleKind::Ty);
@@ -148,12 +153,12 @@ impl Printer<'_> {
                 self.push(").");
                 self.name(label, Names::Label)?;
             }
-            Expr::Items(items) => self.sequence("[", items, "]", d)?,
+            Expr::Items(items) => self.sequence("[", items, "]", Role::Expr, d)?,
             Expr::Tuple(items) => {
                 if items.len() < 2 {
                     return Err("a tuple of fewer than two items".into());
                 }
-                self.sequence("(", items, ")", d)?;
+                self.sequence("(", items, ")", Role::Expr, d)?;
             }
             Expr::Annot { expr, ty } => {
                 self.push("(");
@@ -186,6 +191,18 @@ impl Printer<'_> {
             Ty::Text(text) => self.string(text),
             Ty::Wildcard => self.push("_"),
             Ty::Hole(span) => self.hole(HoleKind::Ty, *span, "Hole")?,
+            Ty::Signed(span) => {
+                if span.start >= span.end {
+                    return Err("an empty hole".into());
+                }
+                self.placeholder(signed(*span), "Hole");
+            }
+            Ty::Tuple(items) => {
+                if items.len() < 2 {
+                    return Err("a tuple of fewer than two items".into());
+                }
+                self.sequence("(", items, ")", Role::Ty, d)?;
+            }
             Ty::Forall { vars, body } => {
                 if vars.is_empty() {
                     return Err("a `forall` of no variables".into());
@@ -232,6 +249,12 @@ impl Printer<'_> {
             }
             Pat::Record(fields) => self.record(fields, " = ", Role::Pat, d)?,
             Pat::Hole(span) => self.hole(HoleKind::Pat, *span, "hole")?,
+            Pat::Tuple(items) => {
+                if items.len() < 2 {
+                    return Err("a tuple of fewer than two items".into());
+                }
+                self.sequence("(", items, ")", Role::Pat, d)?;
+            }
         }
         Ok(())
     }
@@ -273,6 +296,7 @@ impl Printer<'_> {
         open: &str,
         items: &[NodeId],
         close: &str,
+        role: Role,
         d: u32,
     ) -> Result<(), String> {
         self.push(open);
@@ -280,7 +304,7 @@ impl Printer<'_> {
             if i > 0 {
                 self.push(", ");
             }
-            self.node(item, Role::Expr, d)?;
+            self.node(item, role, d)?;
         }
         self.push(close);
         Ok(())
@@ -293,12 +317,16 @@ impl Printer<'_> {
         if span.start == span.end {
             return Err("an empty hole".into());
         }
+        self.placeholder(Hole { kind, span }, placeholder);
+        Ok(())
+    }
+
+    fn placeholder(&mut self, hole: Hole, placeholder: &str) {
         self.push("(");
         let at = self.offset();
-        self.holes.push((at, Hole { kind, span }));
+        self.holes.push((at, hole));
         self.push(placeholder);
         self.push(")");
-        Ok(())
     }
 
     fn within(&self, span: Span, what: &str) -> Result<(), String> {

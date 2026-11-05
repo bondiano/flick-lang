@@ -378,6 +378,8 @@ fn arguments(node: &Node, text: &str, class: &str) -> Block {
         place: Place::Expression,
         tokens,
         docs: String::new(),
+        signature: None,
+        module: String::new(),
     }
 }
 
