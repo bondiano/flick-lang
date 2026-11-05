@@ -153,6 +153,22 @@ mod wasm {
     }
 
     #[test]
+    fn a_wasm_plugin_checks_its_code_with_the_types_found() {
+        let main = "module App.Main exposing (main, x)\n\nimport Pairs exposing (plugin typed)\n\nx : Float\nlet x = typed { 1.0 + 2.0 }\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
+        let root = app("plugins-check", main);
+        let checked = flick(&root, &["check"]);
+        let stderr = String::from_utf8_lossy(&checked.stderr);
+        assert!(!checked.status.success(), "{stderr}");
+        assert!(stderr.contains("pairs/X002"), "{stderr}");
+        assert!(stderr.contains("`_` is `Float`"), "{stderr}");
+        assert!(
+            trace(&root).iter().any(|l| l == "check pairs typed"),
+            "{:?}",
+            trace(&root)
+        );
+    }
+
+    #[test]
     fn a_plugin_runs_within_its_fuel_and_memory() {
         let main = "module App.Main exposing (main, a, b)\n\nimport Pairs exposing (plugin spin, plugin hog)\n\nlet a = spin {}\nlet b = hog {}\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
         let root = app("plugins-limits", main);

@@ -15,7 +15,7 @@ mod forms;
 use std::hint::black_box;
 
 use flick_plugin::{
-    Arena, Block, Builder, Compiler, DeriveTarget, Diagnostic, NodeId, Plugin, Span, Token,
+    Arena, Block, Builder, Compiler, DeriveTarget, Diagnostic, Fact, NodeId, Plugin, Span, Token,
     TokenKind, flick,
 };
 
@@ -95,6 +95,18 @@ impl Plugin for Pairs {
         let count = state.try_into().map_or(0, u32::from_le_bytes);
         let record = flick!(b @ whole, { #(..fields); blocks = #(f64::from(count)) });
         Ok(b.finish(record))
+    }
+
+    /// What `typed { e }` checks: the type of its `_`, as `X002`.
+    fn check(&self, block: &Block, _: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
+        if block.head != "typed" {
+            return Vec::new();
+        }
+        (facts.iter())
+            .map(|f| {
+                Diagnostic::error(format!("`_` is `{}`", f.ty.shown), f.span).with_code("X002")
+            })
+            .collect()
     }
 
     fn derive(

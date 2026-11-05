@@ -12,7 +12,8 @@
 //!   user's;
 //! - `companion Box { e }`: `let Box.label = e`, a companion of `Box`;
 //! - `signed name { e }` below `name : T`: `name : T`, `let name = e`, and
-//!   `let name_module = "App.Main"`, the module the block is in.
+//!   `let name_module = "App.Main"`, the module the block is in;
+//! - `typed { e }`: `(e : _)`, the `_` at `e`, whose type `check` reports.
 
 use flick_plugin::{
     Arena, Block, Builder, Case, Compiler, Decl, Diagnostic, Expr, Name, Place, Span, TokenKind,
@@ -24,7 +25,10 @@ pub fn expand(
     block: &Block,
     compiler: &mut dyn Compiler,
 ) -> Option<Result<Arena, Vec<Diagnostic>>> {
-    let expression = matches!(block.head.as_str(), "named" | "text_of" | "capture");
+    let expression = matches!(
+        block.head.as_str(),
+        "named" | "text_of" | "capture" | "typed"
+    );
     let declaration = matches!(
         block.head.as_str(),
         "define" | "table" | "traced" | "variants" | "shows" | "companion" | "signed"
@@ -49,6 +53,7 @@ pub fn expand(
             Ok(b.expr(Expr::Text(string_value(raw.unwrap_or("")))))
         }
         "capture" => capture(block, compiler, &mut b),
+        "typed" => typed(block, compiler, &mut b),
         "define" => define(block, compiler, &mut b),
         "companion" => companion(block, compiler, &mut b),
         "table" => table(block, compiler, &mut b),
@@ -206,4 +211,16 @@ fn table(
     lower[..1].make_ascii_lowercase();
     let value = flick!(b @ at, let #(lower) : #(Name(&name)) = { #(..values) });
     Ok(b.group(vec![alias, value]))
+}
+
+/// `(e : _)`, the `_` at `e`.
+fn typed(
+    block: &Block,
+    compiler: &mut dyn Compiler,
+    b: &mut Builder,
+) -> Result<u32, Vec<Diagnostic>> {
+    let e = block.body().expr(compiler).map_err(|d| vec![d])?;
+    let wildcard = b.at(e).ty(Ty::Wildcard);
+    let expr = b.at(block.whole()).expr(Expr::Hole(e));
+    Ok(b.expr(Expr::Annot { expr, ty: wildcard }))
 }

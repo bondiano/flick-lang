@@ -270,8 +270,12 @@ impl Checking<'_> {
         // not read those variables with their own unification store.
         let broken = !loaded.parse.diagnostics.is_empty();
         let mut untyped = interface.clone();
-        let (checked, typing) =
+        let (mut checked, typing) =
             types::check_typed(&module, lookup, types::builtins(), options, &mut interface);
+        // what the plugins find from the types of their code stops lowering too
+        if let Some(expansion) = &loaded.expansion {
+            checked.extend(expansion.check_blocks(&loaded.editing, &typing.wildcards));
+        }
         let checked = types::beside_syntax_errors(tree, checked);
         let clean =
             !broken && resolved_cleanly && !checked.iter().any(|d| d.severity == Severity::Error);

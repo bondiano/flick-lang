@@ -4,6 +4,8 @@
 //! user's code inside blocks parsed in place, and the way back from a place
 //! in generated code to the place in the module it stands for.
 
+mod check;
+
 use std::collections::HashSet;
 use std::iter::Peekable;
 use std::mem;
