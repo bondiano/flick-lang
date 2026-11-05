@@ -12,6 +12,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::types::Checker;
 use crate::types::env::{Form, Instance};
+use crate::types::gadt::scheme::is_indexed;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Binder, Type};
 use crate::types::typing::{Constructor, GenericInfo};
@@ -38,6 +39,20 @@ impl<'n> Checker<'_> {
                 return None;
             }
         };
+        // a sum of products has no constructor that refines its type
+        let indexed = names.iter().find(|c| {
+            let entity = self.env.entity(Namespace::Constructor, c);
+            self.env
+                .value(&entity)
+                .is_some_and(|s| is_indexed(s, &module, name))
+        });
+        if let Some(c) = indexed {
+            let message = format!(
+                "`Generic` represents a type as a sum of products, and the constructor `{c}` of `{name}` is a constructor of a GADT"
+            );
+            self.error(codes::C013, span, message);
+            return None;
+        }
         let sum = self.lang_constructors(Lang::GenericSum);
         let [inl, inr] = &sum[..] else {
             return None;

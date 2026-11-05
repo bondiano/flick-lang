@@ -1,0 +1,3 @@
+TInt TStr
+If (BoolLit true) (IntLit 1) (Lit 2)
+true false

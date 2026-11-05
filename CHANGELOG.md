@@ -19,6 +19,12 @@ break programs.
   value is built and are assumptions in a `match` arm on it. JS keeps them
   as `$0` … beside the fields, Go after the fields; `==` leaves them out.
   The interface format is version 6 (`dicts` of a constructor).
+- **Deriving a GADT:** `Eq`, `Ord`, `Hash` and `Show` cover a constructor
+  that hides no type and holds no dictionary, each field at the type the
+  constructor builds; otherwise `FLICK-C013`, as for `Generic`. The std
+  derives of `Schema`, `Url`, `Form` and `HttpApi` refuse a GADT with their
+  codes. The plugin interface is `0.14.0`: `case-target.refined` and
+  `case-target.constrained`.
 - **Enums:** `untagged type Method = Get = "GET" | Post = "POST"` is an
   enum: each value is its literal at run time, all strings or all `Int`s.
   `match` and `==` compare the value, derived `Ord` follows the order of

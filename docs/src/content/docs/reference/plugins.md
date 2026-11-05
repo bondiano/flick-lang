@@ -144,7 +144,7 @@ numbers be finite, holes lie in the body and not overlap, an expression or a
 pattern be used once (a type may stand in several places, as in a signature
 and an annotation), and its size and depth are bounded. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,
-`0.13.0`. A component built for another version does not load: the import
+`0.14.0`. A component built for another version does not load: the import
 that exposes its heads is `FLICK-P035`, naming the version it was built for
 and the one the compiler speaks, until it is rebuilt.
 
@@ -184,8 +184,9 @@ A type that names such a class in `deriving`, maybe with arguments
 
 - `target` is the type's declaration, a block, and what it declares at spans
   of it: its name, parameters, constructors with the types of their fields
-  and, of an enum, their literals, the type an alias stands for and the
-  base of a refined type;
+  and, of an enum, their literals, whether a constructor of a GADT names
+  the type it builds (`refined`) or holds dictionaries (`constrained`), the
+  type an alias stands for and the base of a refined type;
 - `class` is the class's full name, `Pairs.Arbitrary`;
 - `args` the `{ … }` after the class;
 - `module` every type the module declares.

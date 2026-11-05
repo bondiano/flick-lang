@@ -304,6 +304,13 @@ Where a type lacks what a default needs, as a `GDefault` of one of its
 fields, the clause is `FLICK-C013`, as is a class with a method without a
 default or with more than one parameter.
 
+
+A constructor of a GADT that hides no type and holds no dictionary is
+derived like any other, with each field at the type the constructor builds:
+`IntLit Int : Expr Int` shows its `Int` with `Show Int`. One that hides the
+type of a field or holds a dictionary has no derived instance (`FLICK-C013`),
+nor does a GADT have `Generic`; `Schema`, `Url` and `Form` refuse one with
+their own codes.
 ## Dictionaries
 
 Each solved constraint records its dictionary at the place that required it:

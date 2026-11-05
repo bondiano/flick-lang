@@ -87,7 +87,7 @@ impl Checker<'_> {
 }
 
 /// `t` with the rigid variables an arm learned the types of replaced.
-fn replace_skolems(t: &Type, equals: &[(u32, Type)]) -> Type {
+pub(super) fn replace_skolems(t: &Type, equals: &[(u32, Type)]) -> Type {
     if equals.is_empty() {
         return t.clone();
     }
