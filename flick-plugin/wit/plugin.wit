@@ -1,4 +1,4 @@
-package flick:plugin@0.11.0;
+package flick:plugin@0.12.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -168,6 +168,15 @@ interface types {
   /// a layout that starts in the body, and `}` after it.
   variant piece { text(string), line, indent, dedent, hole(hole) }
 
+  /// Why a plugin does not reach what it asks for: the project grants it
+  /// no such thing, the answer is in no snapshot of an offline run, or
+  /// reaching it failed.
+  variant reach-error { denied(string), offline(string), failed(string) }
+
+  /// A request over HTTP, and its answer.
+  record request { method: string, url: string, headers: list<tuple<string, string>>, body: list<u8> }
+  record response { status: u16, body: list<u8> }
+
   /// A constructor of a derive's target and the types of its fields.
   record case-target { name: string, fields: list<span> }
 
@@ -188,7 +197,7 @@ interface types {
 
 /// What the compiler offers a plugin while it expands a block.
 interface compiler {
-  use types.{hole, diagnostic};
+  use types.{hole, diagnostic, reach-error, request, response};
 
   /// The longest expression of the body from `start` on, before `end`.
   parse-expr: func(start: u32, end: u32) -> result<hole, diagnostic>;
@@ -202,6 +211,14 @@ interface compiler {
   /// of a `let`: an expression, or on a line of its own the lines of a
   /// block at its column; its hole is an expression's.
   parse-body: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// The file at `path` from the project's root, as `[plugins.<package>]`
+  /// grants it with `fs-read`.
+  read-file: func(path: string) -> result<list<u8>, reach-error>;
+  /// The variable `name` of the environment, as `env` grants it.
+  env: func(name: string) -> result<option<string>, reach-error>;
+  /// The answer of a host `net` grants, from the project's snapshots when
+  /// the run is offline.
+  fetch: func(request: request) -> result<response, reach-error>;
 }
 
 world plugin {

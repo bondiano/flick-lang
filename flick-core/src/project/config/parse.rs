@@ -6,7 +6,7 @@ use std::{mem, ops};
 use serde::Deserialize;
 use toml::{Spanned, de};
 
-use super::deps::{RawDependency, RawPackage, dependencies, package};
+use super::deps::{RawDependency, RawGrants, RawPackage, dependencies, grants, package};
 use super::{Build, Config, Entry, Kind, MAIN_ENTRY, Manifest, Script};
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::source::{FileId, Span};
@@ -31,6 +31,7 @@ struct Raw {
     lint: Option<Spanned<RawLint>>,
     dependencies: Option<Spanned<BTreeMap<String, Spanned<RawDependency>>>>,
     package: Option<Spanned<RawPackage>>,
+    plugins: Option<Spanned<BTreeMap<String, Spanned<RawGrants>>>>,
     workspace: Option<RawWorkspace>,
     #[serde(default)]
     scripts: BTreeMap<String, Spanned<RawScript>>,
@@ -156,6 +157,7 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
             ("lint", raw.lint.map(|l| l.span())),
             ("dependencies", raw.dependencies.map(|d| d.span())),
             ("package", raw.package.map(|p| p.span())),
+            ("plugins", raw.plugins.map(|p| p.span())),
         ];
         if let Some((table, at)) = settings.into_iter().find_map(|(t, at)| Some((t, at?))) {
             return Err(Diagnostic::error(
@@ -282,6 +284,10 @@ fn config(
         }
         None => None,
     };
+    let plugins = grants(
+        raw.plugins.map(Spanned::into_inner).unwrap_or_default(),
+        span,
+    )?;
     Ok(Config {
         kind: project.kind,
         source_dir: project.source_dir,
@@ -294,6 +300,7 @@ fn config(
         allow,
         no_let_assert: lint.no_let_assert,
         thresholds,
+        plugins,
     })
 }
 

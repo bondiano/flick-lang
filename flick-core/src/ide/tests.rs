@@ -164,6 +164,7 @@ pub(super) fn fixture_of(files: &[(&str, &str)]) -> Fixture {
             allow: Vec::new(),
             no_let_assert: false,
             thresholds: Thresholds::default(),
+            plugins: BTreeMap::new(),
         },
     };
     let last = files.last().expect("a file").0;

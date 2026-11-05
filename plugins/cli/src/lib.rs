@@ -20,7 +20,7 @@ use flick_plugin::{
 pub struct Cli;
 
 impl Plugin for Cli {
-    fn collect(&self, _: &[Block]) -> Vec<u8> {
+    fn collect(&self, _: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
         Vec::new()
     }
 

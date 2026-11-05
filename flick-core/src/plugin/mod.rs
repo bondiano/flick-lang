@@ -6,6 +6,7 @@
 pub mod derive;
 pub mod expansion;
 pub mod first_party;
+pub mod reach;
 pub mod render;
 pub mod source;
 pub mod splice;
@@ -28,8 +29,9 @@ use crate::syntax::kind::SyntaxKind as K;
 pub trait Expander: Send + Sync {
     /// What tells this plugin and its version apart, for caches.
     fn id(&self) -> &str;
-    /// What the plugin learns from all its blocks of a group.
-    fn collect(&self, blocks: &[Block]) -> Result<Vec<u8>, String>;
+    /// What the plugin learns from all its blocks of a group; `source`
+    /// reaches what the project grants.
+    fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String>;
     /// The code `block` stands for; `source` parses the holes it asks for.
     fn expand(
         &self,
@@ -154,8 +156,8 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         &self.id
     }
 
-    fn collect(&self, blocks: &[Block]) -> Result<Vec<u8>, String> {
-        Ok(self.plugin.collect(blocks))
+    fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String> {
+        Ok(self.plugin.collect(blocks, source))
     }
 
     fn expand(

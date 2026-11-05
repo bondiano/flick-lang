@@ -72,9 +72,9 @@ impl Expander for Traced {
         self.inner.id()
     }
 
-    fn collect(&self, blocks: &[Block]) -> Result<Vec<u8>, String> {
+    fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String> {
         self.trace(&format!("collect {}", self.inner.id()));
-        self.inner.collect(blocks)
+        self.inner.collect(blocks, source)
     }
 
     fn expand(

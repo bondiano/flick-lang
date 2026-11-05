@@ -69,6 +69,7 @@ fn library(sources: &mut SourceMap) -> Project {
             allow: Vec::new(),
             no_let_assert: false,
             thresholds: Thresholds::default(),
+            plugins: BTreeMap::new(),
         },
     }
 }

@@ -26,6 +26,7 @@ wasmtime::component::bindgen!({
 });
 
 flick_plugin::wit_conversions!(flick::plugin::types);
+flick_plugin::reach_conversions!(flick::plugin::types);
 
 /// What one call may compute and the memory it may take.
 const FUEL: u64 = 1_000_000_000;
@@ -137,6 +138,23 @@ impl flick::plugin::compiler::Host for State {
             .map(convert::to_hole)
             .map_err(convert::to_diagnostic)
     }
+
+    fn read_file(&mut self, path: String) -> Result<Vec<u8>, flick::plugin::types::ReachError> {
+        (self.source.read_file(&path)).map_err(reach_convert::to_error)
+    }
+
+    fn env(&mut self, name: String) -> Result<Option<String>, flick::plugin::types::ReachError> {
+        (self.source.env(&name)).map_err(reach_convert::to_error)
+    }
+
+    fn fetch(
+        &mut self,
+        request: flick::plugin::types::Request,
+    ) -> Result<flick::plugin::types::Response, flick::plugin::types::ReachError> {
+        (self.source.fetch(&reach_convert::from_request(request)))
+            .map(reach_convert::to_response)
+            .map_err(reach_convert::to_error)
+    }
 }
 
 fn engine() -> Result<&'static Engine, String> {
@@ -227,11 +245,16 @@ impl Expander for Wasm {
         &self.id
     }
 
-    fn collect(&self, blocks: &[flick_plugin::Block]) -> Result<Vec<u8>, String> {
+    fn collect(
+        &self,
+        blocks: &[flick_plugin::Block],
+        source: &mut BlockSource,
+    ) -> Result<Vec<u8>, String> {
         let blocks: Vec<_> = blocks.iter().map(convert::to_block).collect();
-        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+        let (result, back) = self.run(mem::take(source), |plugin, store| {
             plugin.call_collect(store, &blocks)
         });
+        *source = back;
         result
     }
 

@@ -99,7 +99,7 @@ fn layout(plugin: &dyn Expander, mut source: BlockSource, node: &Node) -> Option
         return None;
     }
     let block = source.block();
-    let state = plugin.collect(slice::from_ref(&block)).ok()?;
+    let state = (plugin.collect(slice::from_ref(&block), &mut BlockSource::default())).ok()?;
     let pieces = plugin.format(&block, &state, &mut source)?;
     let holes = (pieces.iter())
         .filter_map(|p| match p {

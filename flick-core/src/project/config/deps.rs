@@ -1,14 +1,14 @@
-//! `[dependencies]` and `[package]` of `flick.toml`.
+//! `[dependencies]`, `[package]` and `[plugins]` of `flick.toml`.
 
 use std::collections::BTreeMap;
 use std::ops;
-use std::path::{Component, Path};
 
 use serde::Deserialize;
 use toml::Spanned;
 
-use super::{Dependency, Package, Source};
+use super::{Dependency, Grants, Package, Source};
 use crate::diagnostics::{Diagnostic, codes};
+use crate::plugin::reach::inside;
 use crate::source::Span;
 
 /// A dependency as written: the keys of one of its sources.
@@ -109,9 +109,7 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
     }
     // a fetched library names a file of its own, not one beside it
     if let Some(plugin) = &plugin
-        && !Path::new(plugin)
-            .components()
-            .all(|c| matches!(c, Component::Normal(_)))
+        && !inside(plugin)
     {
         return Err(error(format!(
             "`plugin = \"{plugin}\"` must be a path inside the package, without `..`"
@@ -124,6 +122,63 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
         plugin,
         span: at,
     })
+}
+
+/// What a project grants the plugin of a package, as written.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub(super) struct RawGrants {
+    #[serde(default)]
+    fs_read: Vec<String>,
+    #[serde(default)]
+    net: Vec<String>,
+    #[serde(default)]
+    env: Vec<String>,
+}
+
+/// The grants of `[plugins]`, by package, each entry checked.
+pub(super) fn grants(
+    raw: BTreeMap<String, Spanned<RawGrants>>,
+    span: &dyn Fn(ops::Range<usize>) -> Span,
+) -> Result<BTreeMap<String, Grants>, Diagnostic> {
+    let name = |n: &str| {
+        !n.is_empty()
+            && (n.bytes())
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"-.".contains(&b))
+    };
+    let host = |h: &str| match h.split_once(':') {
+        Some((n, port)) => name(n) && port.parse::<u16>().is_ok(),
+        None => name(h),
+    };
+    let variable = |v: &str| {
+        v.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+            && v.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    };
+    raw.into_iter()
+        .map(|(package, value)| {
+            let at = span(value.span());
+            let RawGrants { fs_read, net, env } = value.into_inner();
+            let wrong = |what: String| {
+                Diagnostic::error(codes::P005, format!("`[plugins.{package}]`: {what}"), at)
+            };
+            if let Some(p) = fs_read.iter().find(|p| !inside(p)) {
+                return Err(wrong(format!(
+                    "`fs-read` names `{p}`, which is no path inside the project"
+                )));
+            }
+            if let Some(h) = net.iter().find(|h| !host(h)) {
+                return Err(wrong(format!(
+                    "`net` names `{h}`, which is no host, as `db.example.com` or `localhost:8080`"
+                )));
+            }
+            if let Some(v) = env.iter().find(|v| !variable(v)) {
+                return Err(wrong(format!(
+                    "`env` names `{v}`, which is no name of a variable"
+                )));
+            }
+            Ok((package, Grants { fs_read, net, env }))
+        })
+        .collect()
 }
 
 #[cfg(test)]

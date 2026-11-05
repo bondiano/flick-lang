@@ -5,9 +5,20 @@ use std::collections::HashMap;
 
 use flick_plugin::{Arena, Block, DeriveTarget, Place, VERSION};
 
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+
+use crate::plugin::reach::Used;
 use crate::plugin::source::BlockSource;
 use crate::plugin::{Expander, Failure};
 use crate::project::Host;
+
+/// What a call gave, and what its plugin reached outside to give it.
+#[derive(Serialize, Deserialize)]
+struct Kept<T> {
+    used: Vec<Used>,
+    value: T,
+}
 
 /// What plugins gave for the calls of a run: those the last run kept in
 /// memory first, then those the host saved, and the ones this run made.
@@ -32,11 +43,43 @@ impl Results<'_> {
         self.kept.insert(key, value);
     }
 
+    /// What `make` gives, or what the call `key` gave earlier while each
+    /// answer its plugin reached is still the same. A call that reported
+    /// anything is not kept: a kept one would not report it again.
+    fn reached<T: Serialize + DeserializeOwned, E>(
+        &mut self,
+        key: Vec<u8>,
+        source: &mut BlockSource,
+        make: impl FnOnce(&mut BlockSource) -> Result<T, E>,
+    ) -> Result<T, E> {
+        // a value that does not read as one is not one
+        let kept = self
+            .get(&key)
+            .and_then(|v| serde_json::from_slice::<Kept<T>>(&v).ok());
+        if let Some(kept) = kept.filter(|k| source.reach.still(&k.used)) {
+            source.reach.used = kept.used;
+            return Ok(kept.value);
+        }
+        let value = make(source)?;
+        let kept = Kept {
+            used: source.reach.used.clone(),
+            value,
+        };
+        if source.diagnostics.is_empty()
+            && source.reach.problems.is_empty()
+            && let Ok(bytes) = serde_json::to_vec(&kept)
+        {
+            self.put(key, bytes);
+        }
+        Ok(kept.value)
+    }
+
     /// What `plugin` collects from `blocks`, their heads and texts in order.
     pub(super) fn collect(
         &mut self,
         plugin: &dyn Expander,
         blocks: &[Block],
+        source: &mut BlockSource,
     ) -> Result<Vec<u8>, String> {
         let shown = blocks
             .iter()
@@ -47,17 +90,11 @@ impl Results<'_> {
             plugin.id().as_bytes(),
         ];
         let key = key(id.into_iter().chain(shown));
-        if let Some(state) = self.get(&key) {
-            return Ok(state);
-        }
-        let state = plugin.collect(blocks)?;
-        self.put(key, state.clone());
-        Ok(state)
+        self.reached(key, source, |source| plugin.collect(blocks, source))
     }
 
     /// The code `plugin` gives for `block`, keyed by the block's text, where
-    /// its holes stand and the state collected. An expansion whose holes did
-    /// not all parse is not kept: a cached one would not report them.
+    /// its holes stand and the state collected.
     pub(super) fn expand(
         &mut self,
         plugin: &dyn Expander,
@@ -81,17 +118,7 @@ impl Results<'_> {
             &indent,
             state,
         ]);
-        // a value that does not read as an arena is not one: made again
-        if let Some(arena) = self.get(&key).and_then(|v| serde_json::from_slice(&v).ok()) {
-            return Ok(arena);
-        }
-        let arena = plugin.expand(block, state, source)?;
-        if source.diagnostics.is_empty()
-            && let Ok(value) = serde_json::to_vec(&arena)
-        {
-            self.put(key, value);
-        }
-        Ok(arena)
+        self.reached(key, source, |source| plugin.expand(block, state, source))
     }
 }
 
@@ -118,16 +145,9 @@ impl Results<'_> {
             &summary,
             state,
         ]);
-        if let Some(arena) = self.get(&key).and_then(|v| serde_json::from_slice(&v).ok()) {
-            return Ok(arena);
-        }
-        let arena = plugin.derive(target, class, args, module, state, source)?;
-        if source.diagnostics.is_empty()
-            && let Ok(value) = serde_json::to_vec(&arena)
-        {
-            self.put(key, value);
-        }
-        Ok(arena)
+        self.reached(key, source, |source| {
+            plugin.derive(target, class, args, module, state, source)
+        })
     }
 }
 
