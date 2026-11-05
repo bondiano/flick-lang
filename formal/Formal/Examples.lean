@@ -8,6 +8,7 @@ import Formal.Generalization
 type is `Unit`, and `Scope s` leaves the row of the scope.
 `let app = λf. f () in app (λ_. let _ = ask_S () in ())` generalizes `app` over the row of
 services of its argument and uses it at `{S}`.
+`λf. try f () with _ → ()` removes the row variable of the errors of `f`.
 -/
 
 namespace Flick
@@ -81,6 +82,27 @@ example (S : Sig) :
       · simp [Tm.Free] at hi
       · simp [Tm.Has] at hp
       · simp [Tm.Has] at hl
+
+/-- `Unit →R⟨∅;ε⟩ Unit`. -/
+def raiseThunkTy (ε : Row) : Ty := .arrow (.base .unit) (.rt Row.none ε) (.base .unit) Caps.none
+
+/-- `λf. try f () with _ → ()`: the arm `_` removes the row variable `ρ` of the errors of `f`,
+so the function raises nothing. -/
+example (S : Sig) :
+    Typ S [] Facts.none []
+      (.lam (.try_ (.app (.var 0) (.lit .unit)) (.acons .wild (.lit .unit) .anil)))
+      (.ex (.arrow (raiseThunkTy rowVar) (.rt Row.none Row.none) (.base .unit) Caps.none) .pure) := by
+  refine .lam (.tryR (r := Row.none) (ε₀ := rowVar) (H := rowVar) (ε' := Row.none) ?_ ?_
+    (Stage.le_refl _) fun n hn => .inl hn) (fun h => by simp [Tm.Has] at h) ?_ .refl
+  · refine .app (.var (T := raiseThunkTy rowVar) (ts := []) rfl rfl (fun _ _ h => h.elim) ?_) .lit
+      (Stage.le_refl _) .refl
+    rw [Scheme.inst_mono]; exact .refl
+  · refine .hcons .wild .lit (.hnil (H := Row.none) fun _ h => h) fun n hn => ?_
+    subst hn; exact .inl ⟨rfl, rfl⟩
+  · rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
+    · simp [Tm.Free] at hi
+    · simp [Tm.Has] at hp
+    · simp [Tm.Has] at hl
 
 /-- The scheme `∀a. a →P a` of the field `id`. -/
 def idField : Scheme := ⟨1, Facts.none, .arrow (.tvar 0) .pure (.tvar 0) Caps.none⟩

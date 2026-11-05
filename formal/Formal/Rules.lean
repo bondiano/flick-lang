@@ -117,7 +117,8 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | tryP : Typ Ψ Θ Γ e (.ex t .pure) → Typ Ψ Θ Γ A (.halts Row.none H t φ) →
       Typ Ψ Θ Γ (.try_ e A) (.ex t φ)
   | handle : Value v → Typ Ψ Θ Γ v (.ex (.errors ε₀) .pure) → Typ Ψ Θ Γ A (.halts ε₀ H t φ) →
-      HCov S v H ε' → (∀ x, ε₀ x → (∃ N, x = .nm N) ∨ ε' x) → (Stage.rt Row.none ε').le φ →
+      HCov S v H ε' → (∀ x, ε₀ x → (∃ N, x = .nm N) ∨ Row.union H ε' x) →
+      (Stage.rt Row.none ε').le φ →
       Typ Ψ Θ Γ (.handle v A) (.ex t φ)
   | hnil : (∀ n, ¬ H n) → Typ Ψ Θ Γ .anil (.halts ε₀ H t φ)
   | hcons : HPat S ε₀ p θ Δ → Typ Ψ Θ (Δ.map .mono ++ Γ) b (.ex t φ) →

@@ -123,18 +123,18 @@ theorem Catches.substT {ε₀ : Row} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom
       · exact .inl (.inr ⟨rfl, h'⟩)
       · exact .inr (.inl h')
     · rcases h _ hb with h | h
-      · exact h.elim
+      · obtain ⟨rfl, hc⟩ := h; exact .inl (.inl ⟨rfl, .inr ⟨b, hc, h'⟩⟩)
       · exact .inr (.inr ⟨b, h, h'⟩)
   | atm a =>
     rcases hn with ⟨b, hb, h'⟩ | ⟨b, hb, h'⟩ <;> rcases h _ hb with h | h
-    · exact h.elim
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inl ⟨b, hc, h'⟩⟩
     · exact .inr (.inl ⟨b, h, h'⟩)
-    · exact h.elim
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inr ⟨b, hc, h'⟩⟩
     · exact .inr (.inr ⟨b, h, h'⟩)
   | ob _ a | need _ a | rv a =>
     obtain ⟨b, hb, h'⟩ := hn
     rcases h _ hb with h | h
-    · exact h.elim
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨b, hc, h'⟩⟩
     · exact .inr ⟨b, h, h'⟩
 
 end Flick

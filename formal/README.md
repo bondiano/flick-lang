@@ -120,7 +120,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | T1 | `T1` (`Soundness.lean`) |
 | T2(a), T2(b) | `T2a`, `T2b`, `T2b_await` (`Effects.lean`) |
 | lemma 3.1, T3 | `lemma_3_1`, `T3` (`Generalization.lean`) |
-| a polymorphic use; a use of a row-polymorphic function at a row of services; a scope that acquires and uses, as checks | `Examples.lean` |
+| a polymorphic use; a use of a row-polymorphic function at a row of services; a `_` arm that removes a row variable of errors; a scope that acquires and uses, as checks | `Examples.lean` |
 
 ## Representation
 
@@ -234,9 +234,12 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    §1.5 at the only place the core needs it. (Errors-Val) types values only, as in §3.6.
 7. **`try` arms** are `x`/`_` at `Errors ε_b` or a constructor pattern `E p̄` at an error
    type `E` without parameters. `H` is a judgment index: each arm without `when` may add
-   what it catches (`Catches`), names only: a row variable of `ε_b` passes to `ε'` even
-   under `x`/`_`. (Handle) uses the value form of the coverage
-   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the caught errors reach and their row variables pass to the errors it lets through.
+   what it catches (`Catches`): an `x`/`_` arm all of `ε_b`, its row variables and atoms
+   too, a constructor arm the name of its error type. (Handle) uses the value form of the coverage
+   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the raised row has besides names is removed by its
+   remaining arms or passes to the errors it lets through (`H ∪ ε'`): the arm that removed a row
+   variable is an `x`/`_` arm, which matches every value, so no later arm and no re-raise needs
+   it.
 8. **Environments.** `Env ρ` means "binds exactly `ρ`", as (Env), (Bind) and (Join)
    give it: T4.3 needs that a `with` frame answers `S` exactly when its row has `S`. `with θ e` and `econs` require
    `θ` and the bound values to be values. The disjointness of `Layer.merge` is kept
