@@ -2,8 +2,9 @@
 // Go server and the browser client, against the RealWorld reference of the
 // same app, a Go (gin) backend and a React/Redux client, each pinned to a
 // commit. Prints the tokens of each part with o200k_base, and with Claude's
-// tokenizer through the token counting endpoint when ANTHROPIC_API_KEY is
-// set. The reference sources are downloaded once into
+// tokenizer through Anthropic's token counting endpoint when
+// ANTHROPIC_API_KEY is set, or else through OpenRouter when
+// OPENROUTER_API_KEY is set. The reference sources are downloaded once into
 // node_modules/.cache/flick-tokens and only read.
 //
 //   node tools/tokens/index.mjs
@@ -48,6 +49,7 @@ const EXCLUDE = [
 const GENERATED = /^\/\/ Code generated .* DO NOT EDIT\.$/m;
 
 const CLAUDE_MODEL = "claude-opus-5-5";
+const OPENROUTER_MODEL = "anthropic/claude-opus-5.5";
 
 /** The sources of `repo` at `sha`, downloaded and extracted once. */
 const download = async ({ repo, sha }) => {
@@ -76,8 +78,8 @@ const files = (dir, include) =>
     .map((file) => ({ file, text: readFileSync(path.join(dir, file), "utf8") }))
     .filter(({ text }) => !GENERATED.test(text));
 
-/** Claude's count of `text` as one user message. */
-const claude = async (text) => {
+/** Claude's count of `text` as one user message, free. */
+const anthropic = async (text) => {
   const response = await fetch("https://api.anthropic.com/v1/messages/count_tokens", {
     method: "POST",
     headers: {
@@ -89,6 +91,18 @@ const claude = async (text) => {
   });
   if (!response.ok) throw new Error(`count_tokens: HTTP ${response.status} ${await response.text()}`);
   return (await response.json()).input_tokens;
+};
+
+/** The same count as the prompt of a one-token completion, which OpenRouter
+ * reports in the model's own tokenizer; the prompt is billed. */
+const openRouter = async (text) => {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "content-type": "application/json" },
+    body: JSON.stringify({ model: OPENROUTER_MODEL, max_tokens: 1, messages: [{ role: "user", content: text }] }),
+  });
+  if (!response.ok) throw new Error(`OpenRouter: HTTP ${response.status} ${await response.text()}`);
+  return (await response.json()).usage.prompt_tokens;
 };
 
 const table = (title, counts) => {
@@ -127,14 +141,19 @@ const main = async () => {
 
   table("o200k_base (gpt-tokenizer)", by((p) => countTokens(p.text)));
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.log(`\n${CLAUDE_MODEL}: skipped, ANTHROPIC_API_KEY is not set`);
+  const counter = process.env.ANTHROPIC_API_KEY
+    ? { count: anthropic, via: "count_tokens" }
+    : process.env.OPENROUTER_API_KEY
+      ? { count: openRouter, via: `OpenRouter ${OPENROUTER_MODEL}` }
+      : null;
+  if (!counter) {
+    console.log(`\n${CLAUDE_MODEL}: skipped, neither ANTHROPIC_API_KEY nor OPENROUTER_API_KEY is set`);
     return;
   }
   // a message of one character counts as one token plus the message's own overhead
-  const overhead = (await claude("x")) - 1;
-  for (const p of parts) p.claude = (await claude(p.text)) - overhead;
-  table(`${CLAUDE_MODEL} (count_tokens, less ${overhead} tokens of message overhead)`, by((p) => p.claude));
+  const overhead = (await counter.count("x")) - 1;
+  for (const p of parts) p.claude = (await counter.count(p.text)) - overhead;
+  table(`${CLAUDE_MODEL} (${counter.via}, less ${overhead} tokens of message overhead)`, by((p) => p.claude));
 };
 
 await main();
