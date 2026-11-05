@@ -29,12 +29,15 @@ fn lays_out_variants_and_deriving() {
 /// The constructors of a GADT take a line each, however short.
 #[test]
 fn lays_out_a_gadt_one_constructor_per_line() {
-    let src = "type Expr a = IntLit Int : Expr Int | Apply (Expr (b -> a)) (Expr b)  :  Expr a | Lit a\n";
+    let src = "type Expr a = IntLit Int : Expr Int | Apply (Expr (b -> a)) (Expr b)  :  Expr a | Lit a\ntype S = Show b=>S b:S | ( Eq a,Show a ) => P a : S\n";
     insta::assert_snapshot!(fmt(src), @r#"
     type Expr a =
       | IntLit Int : Expr Int
       | Apply (Expr (b -> a)) (Expr b) : Expr a
       | Lit a
+    type S =
+      | Show b => S b : S
+      | (Eq a, Show a) => P a : S
     "#);
 }
 

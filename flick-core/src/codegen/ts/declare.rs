@@ -187,6 +187,7 @@ impl Projection<'_> {
                 name: c.entity.name.clone(),
                 arity: fields.len(),
                 rep: Rep::Tagged,
+                dicts: 0,
             };
             let tag = names::string(&names::tag(
                 &constructor,

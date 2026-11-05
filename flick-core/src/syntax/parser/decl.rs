@@ -318,13 +318,29 @@ fn variants(p: &mut Parser, refinable: bool) {
     }
 }
 
-/// `Con field…`, `Con = literal`, or `Con field… : T index…`, a constructor
-/// of a `type` that builds a refined instance of it; a field is an atomic
-/// type, so `Some (List a)` needs the parentheses.
+/// `Con field…`, `Con = literal`, or `[C =>] Con field… : T index…`, a
+/// constructor of a `type` that builds a refined instance of it and may
+/// hold dictionaries; a field is an atomic type, so `Some (List a)` needs the
+/// parentheses.
 fn variant(p: &mut Parser, refinable: bool) {
     let m = p.start();
     if p.at(K::At) {
         attribute(p);
+    }
+    // `Show b => Showable b : Showable`, `(Eq a, Show a) => …`
+    if p.at(K::LParen) || variant_context_ahead(p) {
+        if !refinable {
+            let at = p.raw();
+            p.error_at(
+                codes::S015,
+                p.span(at.start, at.end),
+                "only a constructor of a `type` holds dictionaries".into(),
+            );
+        }
+        let c = p.start();
+        types::union(p);
+        p.expect(K::FatArrow);
+        p.complete(c, K::Context);
     }
     if p.expect(K::Con) {
         if p.at_word("of") {
@@ -511,6 +527,21 @@ fn service_decl(p: &mut Parser) {
         }
     }
     p.complete(m, K::ServiceDecl);
+}
+
+/// Whether `=>` comes before the end of the constructor it would belong to.
+fn variant_context_ahead(p: &Parser) -> bool {
+    for i in p.pos..p.toks.len() {
+        if p.sep_at(i).is_some() {
+            break;
+        }
+        match p.toks[i].kind {
+            K::FatArrow => return true,
+            K::Eq | K::Pipe | K::Colon | K::DerivingKw => break,
+            _ => {}
+        }
+    }
+    false
 }
 
 /// Whether `=>` comes before the `=` of a class or instance head.

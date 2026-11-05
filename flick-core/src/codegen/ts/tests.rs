@@ -67,6 +67,23 @@ fn exports_have_typescript_types_without_any() {
     assert!(typed.iter().all(|l| !l.contains("any")), "{out}");
 }
 
+/// A case per constructor, over the type's parameters; a hidden type is
+/// `unknown`, and a held dictionary is no field.
+#[test]
+fn a_gadt_is_a_union_of_its_cases_without_dictionaries() {
+    let out = project(
+        "module App.Shapes exposing (..)\n\
+         type Expr a =\n  | IntLit Int : Expr Int\n  | If (Expr Bool) (Expr a) (Expr a) : Expr a\n  | Apply (Expr (b -> a)) (Expr b) : Expr a\n  | Lit a\n\
+         type Ty a =\n  | TInt : Ty Int\n  | TStr : Ty String\n\
+         type Showable =\n  | Show b => Showable b : Showable\n",
+    );
+    insta::assert_snapshot!(out, @r#"
+    export type Expr<A> = { readonly _tag: "IntLit#662280bfd5ca"; readonly _0: number } | { readonly _tag: "If#7415f24a3923"; readonly _0: Expr<boolean>; readonly _1: Expr<A>; readonly _2: Expr<A> } | { readonly _tag: "Apply#cfce91e23371"; readonly _0: Expr<(arg: unknown) => A>; readonly _1: Expr<unknown> } | { readonly _tag: "Lit#90f2c71f30bd"; readonly _0: A };
+    export type Ty<T0> = { readonly _tag: "TInt#7ba8d1aef192" } | { readonly _tag: "TStr#9bbfbdae731e" };
+    export type Showable = { readonly _tag: "Showable#a990c444ac9c"; readonly _0: unknown };
+    "#);
+}
+
 #[test]
 fn unit_never_and_empty_rows_have_distinct_typescript_types() {
     let out = project(

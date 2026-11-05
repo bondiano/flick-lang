@@ -14,6 +14,11 @@ break programs.
   out, and hover shows `Int (= a)` there. The core module `TypeEq` has
   `Refl : TypeEq a a` and `TypeEq.cast`. New codes: `FLICK-S015`,
   `FLICK-T056`, `FLICK-T057`, `FLICK-T058`.
+- **Dictionaries in values:** a constructor of a GADT may hold class
+  dictionaries, `| Show b => Showable b : Showable`: they are solved where a
+  value is built and are assumptions in a `match` arm on it. JS keeps them
+  as `$0` … beside the fields, Go after the fields; `==` leaves them out.
+  The interface format is version 6 (`dicts` of a constructor).
 - **Enums:** `untagged type Method = Get = "GET" | Post = "POST"` is an
   enum: each value is its literal at run time, all strings or all `Int`s.
   `match` and `==` compare the value, derived `Ord` follows the order of

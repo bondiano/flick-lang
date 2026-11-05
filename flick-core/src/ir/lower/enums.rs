@@ -118,6 +118,7 @@ fn native(lang: Lang, ty: Lang) -> Constructor {
         name: item.name.clone(),
         arity: 1,
         rep: Rep::Tagged,
+        dicts: 0,
     }
 }
 
@@ -130,5 +131,6 @@ fn schema_error() -> Constructor {
         name: item.name.clone(),
         arity: 1,
         rep: Rep::Tagged,
+        dicts: 0,
     }
 }

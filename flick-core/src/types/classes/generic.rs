@@ -135,6 +135,7 @@ impl<'n> Checker<'_> {
             module,
             ty: name.to_owned(),
             name: c,
+            dicts: 0,
         };
         (rep, (constructor, labels))
     }
@@ -160,6 +161,7 @@ impl<'n> Checker<'_> {
                     arity: self.entity_fields(&entity).len(),
                     rep: self.env.constructor_rep(module, ty, &name),
                     name,
+                    dicts: 0,
                 }
             })
             .collect()

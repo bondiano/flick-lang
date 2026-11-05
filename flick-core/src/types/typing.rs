@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use super::Checker;
 use super::classes::Dict;
+use super::gadt::branch::as_field_given;
 use super::env::{Abi, Rep};
 #[cfg(feature = "ide")]
 use super::sql::dialect::Dialect;
@@ -189,6 +190,15 @@ pub struct Constructor {
     pub arity: usize,
     /// How its values are represented in JS.
     pub rep: Rep,
+    /// The dictionaries its values hold after the fields: one per class
+    /// constraint of a constructor of a GADT.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub dicts: usize,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero(n: &usize) -> bool {
+    *n == 0
 }
 
 /// What `===` compares for an `==` (see [`Typing::identity_eq`]).
@@ -332,7 +342,10 @@ pub fn default_method(class: &str, method: &str) -> String {
 /// GADT branch assumes, pass no dictionary.
 pub fn passes_dictionary(constraint: &Type) -> bool {
     let class = |item| super::classes::args_of(constraint, item).is_some();
-    !class(Lang::Outlives) && !class(Lang::Provided) && !class(Lang::TypeEq)
+    !class(Lang::Outlives)
+        && !class(Lang::Provided)
+        && !class(Lang::TypeEq)
+        && as_field_given(constraint).is_none()
 }
 
 impl Checker<'_> {

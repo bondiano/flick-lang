@@ -298,6 +298,7 @@ impl Checker<'_> {
                 Body::Variants(vec![Variant {
                     name: p.name.clone(),
                     payload,
+                    constraints: Vec::new(),
                     indexed: None,
                 }])
             }

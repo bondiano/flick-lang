@@ -310,3 +310,28 @@ Each solved constraint records its dictionary at the place that required it:
 an instance applied to the dictionaries of its context, an assumption, a
 superclass of another dictionary, a structural instance by field, or a
 primitive. Code generation passes them as arguments.
+
+### Dictionaries in values
+
+A constructor of a GADT may hold dictionaries: the constraints before it,
+`C =>`, are solved where a value is built (`FLICK-C001` there), and the value
+keeps their dictionaries after its fields. An arm of a `match` on the
+constructor has them as assumptions, for the types the constructor hides
+too:
+
+```flick
+type Showable =
+  | Show b => Showable b : Showable
+
+describe : Showable -> String
+let describe s =
+  match s with
+  | Showable x -> show x
+
+shown : List String
+let shown = List.map describe [Showable 1, Showable "two", Showable [3.5]]
+```
+
+Only an arm of a `match` takes them out (`FLICK-T058` for the pattern of a
+`let` or a parameter). `==` compares the fields of such values, not their
+dictionaries; in a `.d.ts` file a held dictionary is no field.

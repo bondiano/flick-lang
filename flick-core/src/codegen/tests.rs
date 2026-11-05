@@ -111,6 +111,7 @@ fn constructor_ids_name_package_module_and_type() {
         name: "Some".to_owned(),
         arity: 1,
         rep: Rep::Tagged,
+        dicts: 0,
     };
     let tag = super::tag(&c("App.Users"), Some("@acme/users"));
     assert!(

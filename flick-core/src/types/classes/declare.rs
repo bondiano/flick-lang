@@ -527,6 +527,7 @@ impl Checker<'_> {
                     arity: self.constructor_fields(&c).len(),
                     rep: self.env.constructor_rep(module, name, &c),
                     name: c,
+                    dicts: 0,
                 })
                 .collect(),
         )

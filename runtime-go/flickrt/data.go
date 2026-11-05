@@ -60,7 +60,11 @@ func Equals(a, b Value) bool {
 		// Effect's Chunk is `Equal`: the same elements, by `Equal.equals`
 		y, ok := b.(*Chunk)
 		return ok && Equals(x.items, y.items)
-	case Fn, Poly, *Dict:
+	case *Dict:
+		// a dictionary a value of a GADT holds: the fields beside it decide
+		_, ok := b.(*Dict)
+		return ok
+	case Fn, Poly:
 		// functions compare by identity on the JS target; Go cannot compare them
 		return false
 	default:

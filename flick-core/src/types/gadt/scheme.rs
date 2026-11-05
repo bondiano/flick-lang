@@ -19,6 +19,8 @@ use crate::types::ty::{Binder, Norm, Type};
 pub struct Variant {
     pub name: String,
     pub payload: Vec<Type>,
+    /// The class constraints whose dictionaries its values hold.
+    pub constraints: Vec<Type>,
     pub indexed: Option<Indexed>,
 }
 
@@ -60,6 +62,30 @@ pub fn is_indexed(scheme: &Type, module: &str, name: &str) -> bool {
     !(plain && vars[args.len()..].iter().all(is_hidden_captures) && constraints.is_empty())
 }
 
+/// How many dictionaries the values of a constructor with this scheme hold.
+pub fn dicts(scheme: &Type) -> usize {
+    match scheme {
+        Type::Forall { constraints, .. } => constraints.len(),
+        _ => 0,
+    }
+}
+
+/// How many constraints `C => K …` writes: the dictionaries a value holds.
+pub fn written_dicts(variant: &Node) -> usize {
+    fn count(n: &Node) -> usize {
+        match n.kind {
+            K::TupleType => n.nodes().filter(|c| is_type(c.kind)).count(),
+            K::ParenType => n.nodes().next().map_or(0, count),
+            _ => 1,
+        }
+    }
+    variant
+        .nodes()
+        .filter(|n| n.kind == K::Context)
+        .flat_map(|c| c.nodes().next().map(count))
+        .sum()
+}
+
 /// What a constructor of type `body`, without its `forall`, builds: the
 /// result of its fields without the hidden capture row.
 pub fn built(body: &Type) -> &Type {
@@ -70,6 +96,25 @@ pub fn built(body: &Type) -> &Type {
     match result {
         Type::Captured { ty, .. } => ty,
         t => t,
+    }
+}
+
+/// `scheme` with the class constraints of its constructor.
+fn constrained(scheme: Type, constraints: Vec<Type>) -> Type {
+    if constraints.is_empty() {
+        return scheme;
+    }
+    match scheme {
+        Type::Forall { vars, body, .. } => Type::Forall {
+            vars,
+            constraints,
+            body,
+        },
+        body => Type::Forall {
+            vars: Vec::new(),
+            constraints,
+            body: Box::new(body),
+        },
     }
 }
 
@@ -102,14 +147,17 @@ impl Checker<'_> {
     pub(in crate::types) fn variant(&mut self, variant: &Node) -> Option<Variant> {
         let name = self.con_token(variant)?;
         let Some(result) = variant.nodes().find(|n| n.kind == K::VariantResult) else {
+            let constraints = self.held_constraints(variant, Free::Reject);
             let payload = self.payload(variant);
             return Some(Variant {
                 name,
                 payload,
+                constraints,
                 indexed: None,
             });
         };
         let outer = mem::take(&mut self.tyvars);
+        let constraints = self.held_constraints(variant, Free::Quantify);
         let payload = self.fields(variant, Free::Quantify);
         let ty = match result.nodes().find(|n| is_type(n.kind)) {
             Some(node) => self.ty(node, &Kind::Type, Free::Quantify),
@@ -125,12 +173,24 @@ impl Checker<'_> {
         Some(Variant {
             name,
             payload,
+            constraints,
             indexed: Some(Indexed {
                 result: ty,
                 locals,
                 span: self.span(result),
             }),
         })
+    }
+
+    /// The constraints of `C => K …`, whose dictionaries a value holds.
+    fn held_constraints(&mut self, variant: &Node, free: Free) -> Vec<Type> {
+        let mut out = Vec::new();
+        for context in variant.nodes().filter(|n| n.kind == K::Context) {
+            for c in context.nodes() {
+                out.extend(self.constraints(c, free));
+            }
+        }
+        out
     }
 
     pub(in crate::types) fn payload(&mut self, variant: &Node) -> Vec<Type> {
@@ -183,6 +243,7 @@ impl Checker<'_> {
             } else {
                 quantify(params, self.held_scheme(params, variant.payload, own.clone()))
             };
+            let scheme = constrained(scheme, variant.constraints);
             let entity = self.env.entity(Namespace::Constructor, &variant.name);
             let scheme = self.default_kinds(&scheme);
             self.env.set_value(entity.clone(), scheme);

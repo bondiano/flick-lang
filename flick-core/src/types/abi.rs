@@ -28,6 +28,18 @@ impl Checker<'_> {
             return;
         };
         let span = self.span(decl);
+        let gadt = decl.nodes().filter(|n| n.kind == K::Variant).any(|v| {
+            v.nodes()
+                .any(|n| matches!(n.kind, K::VariantResult | K::Context))
+        });
+        if gadt {
+            self.error(
+                codes::T056,
+                span,
+                format!("`{word} type` names the JS form of its values, which a constructor of a GADT does not have: `{name}`"),
+            );
+            return;
+        }
         let module = self.env.module.clone();
         let Some(Form::Adt { constructors, .. }) =
             self.env.type_def(&module, name).map(|d| &d.form)

@@ -10,6 +10,7 @@ use super::matching::{Match, Subst, match_type};
 use super::{Dict, RECORD_CLASSES, has_metas, split, super_slot, vars, which};
 use crate::numeric::{Num, default_num};
 use crate::types::Checker;
+use crate::types::gadt::branch::as_field_given;
 use crate::types::env::Instance;
 use crate::types::generalize::replace_metas;
 use crate::types::ty::Type;
@@ -175,6 +176,11 @@ impl Checker<'_> {
         let mut out = Vec::new();
         let mut path = Vec::new();
         for g in givens.iter().rev() {
+            if let Some((local, c)) = as_field_given(g) {
+                let c = self.canon(c);
+                visit(self, c, Dict::Field(local.to_owned()), &mut path, &mut out);
+                continue;
+            }
             let g = self.canon(g);
             let shown = self.show(&g);
             visit(self, g, Dict::Given(shown), &mut path, &mut out);

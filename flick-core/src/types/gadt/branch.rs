@@ -141,7 +141,19 @@ impl Checker<'_> {
         let locals: Vec<Binder> = vars.iter().filter(|v| !is_hidden_captures(v)).cloned().collect();
         let names: Vec<String> = locals.iter().map(|v| v.name.clone()).collect();
         let refined = self.refine(&names, built(body), scrutinee);
-        let mut subst = self.learn(refined, &locals, node);
+        let constraints = match scheme {
+            Type::Forall { constraints, .. } => &constraints[..],
+            _ => &[],
+        };
+        let (mut subst, learned) = self.learn(refined, &locals, !constraints.is_empty(), node);
+        if learned {
+            // the dictionaries the value holds, as the pattern binds them
+            let start = node.range().0;
+            for (i, c) in constraints.iter().enumerate() {
+                let given = field_given(&dict_local(start, i), c.substitute(&subst));
+                self.classes.givens.push(given);
+            }
+        }
         if let Some(hidden) = vars.iter().find(|v| is_hidden_captures(v)) {
             // what the value holds, as the arm knows its type
             let captures = self.fresh();
@@ -153,10 +165,17 @@ impl Checker<'_> {
     }
 
     /// The types of a constructor's variables in the arm, after recording
-    /// what it learns; errors when it learns nothing it may.
-    fn learn(&mut self, refined: Refined, locals: &[Binder], node: &Node) -> Vec<(String, Type)> {
+    /// what it learns, and whether it learned it; errors when it learns
+    /// nothing it may. A constructor that `holds` dictionaries refines too.
+    fn learn(
+        &mut self,
+        refined: Refined,
+        locals: &[Binder],
+        holds: bool,
+        node: &Node,
+    ) -> (Vec<(String, Type)>, bool) {
         let span = self.span(node);
-        let errors = || locals.iter().map(|v| (v.name.clone(), Type::Error)).collect();
+        let errors = || (locals.iter().map(|v| (v.name.clone(), Type::Error)).collect(), false);
         let (bound, equals) = match refined {
             Refined::Unifier { bound, equals } => (bound, equals),
             Refined::Impossible => {
@@ -188,7 +207,7 @@ impl Checker<'_> {
             .iter()
             .filter(|v| !bound.iter().any(|(b, _)| *b == v.name))
             .collect();
-        if (!hidden.is_empty() || !equals.is_empty()) && !self.gadt.refining {
+        if (!hidden.is_empty() || !equals.is_empty() || holds) && !self.gadt.refining {
             self.error(
                 codes::T058,
                 span,
@@ -229,8 +248,38 @@ impl Checker<'_> {
                 level,
             });
         }
-        subst
+        (subst, true)
     }
+}
+
+/// The module of the marker of a given held by a matched value.
+const HELD: &str = "$held";
+
+/// The given `constraint` whose dictionary the local `local` holds, bound by
+/// the pattern of a constructor whose values hold dictionaries.
+pub fn field_given(local: &str, constraint: Type) -> Type {
+    let marker = Type::Con {
+        module: HELD.to_owned(),
+        name: "Field".to_owned(),
+    };
+    Type::apps(marker, [Type::Symbol(local.to_owned()), constraint])
+}
+
+/// The local and constraint of a given made by [`field_given`].
+pub fn as_field_given(g: &Type) -> Option<(&str, &Type)> {
+    match g.spine() {
+        (Type::Con { module, .. }, args) if module == HELD => match args[..] {
+            [Type::Symbol(local), c] => Some((local, c)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// The local the pattern at `start` binds the `i`-th dictionary of its
+/// constructor to.
+pub fn dict_local(start: u32, i: usize) -> String {
+    format!("$dict{start}_{i}")
 }
 
 /// The equalities among `givens`; none outside a GADT branch.

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use crate::ir::{BinOp, Expr, ExprKind, Pat, Stage, Stmt};
 use crate::numeric::{Arith, Num};
-use crate::types::Constructor;
+use crate::types::{Constructor, Dict};
 
 /// How often `e` reads the local `name`.
 pub fn uses(e: &Expr, name: &str) -> usize {
@@ -229,6 +229,13 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
     };
     match &mut e.kind {
         ExprKind::Local(n) | ExprKind::Within(n, _) => new(n),
+        // a dictionary a matched value holds is a local of the pattern too
+        ExprKind::Dicts(_, dicts) => {
+            for d in dicts {
+                rename_dict(d, names);
+            }
+        }
+        ExprKind::Method { dict, .. } => rename_dict(dict, names),
         ExprKind::Lambda { params, .. } => {
             for p in params {
                 apply_pat(&mut p.pat, names);
@@ -257,6 +264,23 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
         _ => {}
     }
     e.each_child_mut(&mut |c| apply(c, names));
+}
+
+fn rename_dict(d: &mut Dict, names: &HashMap<String, String>) {
+    match d {
+        Dict::Field(local) => {
+            if let Some(to) = names.get(local.as_str()) {
+                local.clone_from(to);
+            }
+        }
+        Dict::Instance { args: dicts, .. } | Dict::Structural { fields: dicts, .. } => {
+            for d in dicts {
+                rename_dict(d, names);
+            }
+        }
+        Dict::Super { dict, .. } => rename_dict(dict, names),
+        Dict::Given(_) | Dict::Primitive { .. } | Dict::Error => {}
+    }
 }
 
 fn apply_pat(p: &mut Pat, names: &HashMap<String, String>) {

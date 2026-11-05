@@ -130,7 +130,10 @@ impl Gen<'_> {
             Some(names::Native::Err) => ("Failure".into(), vec!["failure".into()]),
             None => {
                 let package = (self.options.package)(&c.module);
-                let fields = (0..arity).map(|i| format!("_{i}")).collect();
+                // the fields, then the dictionaries a value of a GADT holds
+                let fields = (0..arity)
+                    .map(|i| if i < c.arity { format!("_{i}") } else { format!("${}", i - c.arity) })
+                    .collect();
                 (names::tag(c, package.as_deref()), fields)
             }
         }

@@ -8,7 +8,7 @@ use crate::numeric::Num;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
-use crate::types::Ref;
+use crate::types::{Ref, dict_local};
 
 impl Lower<'_> {
     pub(super) fn pattern(&mut self, node: &Node) -> Pat {
@@ -81,7 +81,11 @@ impl Lower<'_> {
                     panic!("the checker resolved the constructor pattern");
                 };
                 let c = c.clone();
-                Pat::Con(c, children.iter().map(|p| self.pattern(p)).collect())
+                let mut args: Vec<Pat> = children.iter().map(|p| self.pattern(p)).collect();
+                // the dictionaries the value holds, after its fields
+                let start = node.range().0;
+                args.extend((0..c.dicts).map(|i| Pat::Bind(dict_local(start, i))));
+                Pat::Con(c, args)
             }
             _ => Pat::Wild,
         }

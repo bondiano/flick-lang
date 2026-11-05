@@ -83,6 +83,7 @@ pub fn dict(d: &Dict) -> String {
             format!("<{name}>({})", args.join(", "))
         }
         Dict::Given(g) => format!("?{g}"),
+        Dict::Field(local) => format!("@{local}"),
         Dict::Super { dict: d, class } => format!("{}.{class}", dict(d)),
         Dict::Structural { class, fields } => {
             let fields: Vec<String> = fields.iter().map(dict).collect();

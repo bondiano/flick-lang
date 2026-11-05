@@ -1,0 +1,27 @@
+// Constructors that hold dictionaries: `Showable` keeps the `Show` of the
+// value it hides, and a branch uses it; `==` compares the fields, not the
+// dictionaries.
+module App.Main exposing (main)
+
+type Showable =
+  | Show b => Showable b : Showable
+
+type Pair a =
+  | (Eq b, Show b) => Pair a b b : Pair a
+
+describe : Showable -> String
+let describe s =
+  match s with
+  | Showable x -> show x
+
+twins : forall a. Show a => Pair a -> String
+let twins p =
+  match p with
+  | Pair a x y -> show a ++ (if x == y then " twins " else " pair ") ++ show x
+
+main : Unit ->{} Unit
+let main () =
+  let items = [Showable 1, Showable "two", Showable [3.5], Showable (Some true)]
+  Platform.stdout_line (String.join ", " (List.map describe items))
+  Platform.stdout_line (twins (Pair "a" 1 1) ++ "; " ++ twins (Pair 2 "x" "y"))
+  Platform.stdout_line (show (Showable 1 == Showable 1) ++ " " ++ show (Showable 1 == Showable 2))

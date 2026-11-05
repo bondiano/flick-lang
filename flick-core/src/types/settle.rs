@@ -8,6 +8,8 @@ use std::mem;
 use super::classes::{NUMERIC_CLASSES, split, which};
 use super::env::{Abi, Form};
 use super::ty::Type;
+use super::gadt::branch::as_field_given;
+use super::gadt::scheme::dicts;
 use super::typing::Identity;
 use super::{Checker, Domain, NumLiteral, Operator};
 use crate::diagnostics::codes;
@@ -239,6 +241,7 @@ impl Checker<'_> {
 /// Whether `givens` hold a numeric class of `ty`.
 fn numeric_given(givens: &[Type], ty: &Type) -> bool {
     givens.iter().any(|g| {
+        let g = as_field_given(g).map_or(g, |(_, c)| c);
         split(g).is_some_and(|((module, name), args)| {
             which(&NUMERIC_CLASSES, module, name).is_some() && args.first() == Some(&ty)
         })
@@ -287,7 +290,7 @@ impl Checker<'_> {
             };
             self.env
                 .value(&entity)
-                .is_some_and(|s| !matches!(strip(s), Type::Fun { .. }))
+                .is_some_and(|s| !matches!(strip(s), Type::Fun { .. }) && dicts(s) == 0)
         };
         (abi.is_tagged() && constructors.iter().all(nullary)).then_some(Identity::Tag)
     }

@@ -167,6 +167,17 @@ fn a_gadt_constructor_names_what_it_builds() {
         errors("type error E = E Int : E\nkind K = A : K\nuntagged type M = G = \"g\" : M\n"),
         ["FLICK-S015 :", "FLICK-S015 :", "FLICK-S015 :"]
     );
+    assert_eq!(
+        sexp("type S = Show b => S b : S | (Eq a, Show a) => P a : S"),
+        "(TypeDecl type S = (Variant (Context (AppType (NameType Show) (NameType b)) =>) S \
+         (NameType b) (VariantResult : (NameType S))) | (Variant (Context (TupleType ( \
+         (AppType (NameType Eq) (NameType a)) , (AppType (NameType Show) (NameType a)) )) =>) \
+         P (NameType a) (VariantResult : (NameType S))))"
+    );
+    assert_eq!(
+        errors("type error E = (Show a) => E a\n"),
+        ["FLICK-S015 ("]
+    );
 }
 
 #[test]

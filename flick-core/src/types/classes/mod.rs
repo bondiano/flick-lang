@@ -70,6 +70,9 @@ pub enum Dict {
     },
     /// A constraint of the enclosing signature or instance.
     Given(String),
+    /// A dictionary a matched value holds, bound to this local by the
+    /// pattern of its constructor.
+    Field(String),
     /// The superclass `class` of another dictionary.
     Super { dict: Box<Dict>, class: String },
     /// The compiler-owned instance of a record or tuple, by field.
@@ -88,7 +91,7 @@ impl Dict {
     /// Whether it is built from an assumption, so holds only where that is.
     fn assumes(&self) -> bool {
         match self {
-            Self::Given(_) => true,
+            Self::Given(_) | Self::Field(_) => true,
             Self::Super { dict, .. } => dict.assumes(),
             Self::Instance { args: dicts, .. } | Self::Structural { fields: dicts, .. } => {
                 dicts.iter().any(Self::assumes)

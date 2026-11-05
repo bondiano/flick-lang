@@ -4,6 +4,7 @@
 use std::{iter, mem};
 
 use super::ty::{Row, Type};
+use super::gadt::scheme::dicts;
 use super::{Checker, Local};
 use crate::diagnostics::codes;
 use crate::diagnostics::suggest::closest;
@@ -379,6 +380,7 @@ impl Checker<'_> {
                 name: name.to_owned(),
                 arity: params.len(),
                 rep,
+                dicts: dicts(&scheme),
             };
             self.record_name(
                 self.span(node),
