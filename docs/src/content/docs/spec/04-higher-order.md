@@ -1,6 +1,6 @@
 ---
 title: "Higher-order functions and collection traversal"
-source_hash: 005865772d77c367
+source_hash: b9e42dd5d6c66ba8
 ---
 
 ## Pure and effectful traversal
@@ -52,7 +52,7 @@ Keeping the two families apart gives every callback one calling convention: a pu
 
 ## `do`, `for` and comprehensions
 
-```flick
+```flick keep
 pair_optional : Option a -> Option b -> Option (a, b)
 let pair_optional left right =
   match left with

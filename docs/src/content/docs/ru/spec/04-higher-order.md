@@ -51,7 +51,7 @@ List.map_effect :
 
 ## `do`, `for` и списковые выражения
 
-```flick
+```flick keep
 pair_optional : Option a -> Option b -> Option (a, b)
 let pair_optional left right =
   match left with

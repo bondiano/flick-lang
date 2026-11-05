@@ -22,6 +22,12 @@ lint:
 fmt:
     cargo fmt --all
 
+# Rewrite the ```flick blocks of the site's pages with the safe fixes of
+# `flick check --fix`, as a syntax change rewrites the `.fl` files with it
+docs-fix:
+    cargo build -p flick
+    find docs/src/content/docs \( -name '*.md' -o -name '*.mdx' \) -print0 | xargs -0 target/debug/flick check --fix
+
 # Run the test suites; the reference model has its own recipe, `model`
 test: unit feature-test
 

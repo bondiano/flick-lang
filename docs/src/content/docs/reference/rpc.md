@@ -209,7 +209,7 @@ let serve_both options handlers =
     let app =
       Http.Router.router Http.Router.config
         [
-          Http.Router.route (Some Http.Method.POST) "/rpc" (fun request -> rpc request),
+          Http.Router.route (Some Http.Method.POST) "/rpc" rpc,
           Http.Router.route (Some Http.Method.GET) "/hello/:name" hello,
         ]
     let server = Http.Server.serve options app

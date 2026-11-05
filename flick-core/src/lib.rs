@@ -15,6 +15,7 @@ pub mod fmt;
 pub mod ide;
 pub mod iface;
 pub mod ir;
+pub mod markdown;
 pub mod numeric;
 pub mod opt;
 pub mod plugin;
