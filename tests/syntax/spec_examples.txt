@@ -1,54 +1,54 @@
 # Fingerprints of the ```flick blocks of the Russian spec (docs/src/content/docs/ru/spec),
 # checked by flick-core/tests/corpus.rs.
 # A new or edited example fails the test until its parse is reviewed and its line added.
-cfd4deeeb00ff9b0  01-direct-calls:8  load_name : UserId ->{Users, Log; NotFound} String
-0e0762aff3749216  01-direct-calls:65  greet : String -> String -> String
-60c4be457650bda6  01-direct-calls:87  doubled : Unit ->{Atom.Read;} Float
-6c70dbf125707c4a  02-computations:17  load_user : UserId ->{Users; NotFound} User
-1f4fb3d7472f358e  02-computations:37  load_twice :
-5490665b39c55003  02-computations:78  load_name_pair : UserId -> UserId ->{Users; NotFound} (String, String)
+438ba443bbdcdff5  01-direct-calls:8  type UserId = UserId String
+c792a8b0fdbb4111  01-direct-calls:57  type UserId = UserId String
+0e0762aff3749216  01-direct-calls:88  greet : String -> String -> String
+8373e69a41ab4ed2  01-direct-calls:106  count : Atom.Writable Float
+c07f96b57a1a65fd  02-computations:17  type UserId = UserId String
+950aba5088199a59  02-computations:47  type UserId = UserId String
+0da8e6bb19c9ac86  02-computations:94  type UserId = UserId String
 589f6dc98bbfef4f  03-types-and-classes:42  class Functor (f : Type -> Type) =
-351c17a8bae37ce1  03-types-and-classes:63  class Show a =
-0132888d2341123b  03-types-and-classes:125  apply_twice :
-2dff8ba5626f88c1  03-types-and-classes:145  decode_pair :
-9bdd6c03c6da66f8  03-types-and-classes:159  name :
-59ea26d822a0c2ae  03-types-and-classes:213  class Convert input output =
-ecba8ed13060594d  03-types-and-classes:238  class Collection c a | c -> a =
-c18064c876fe3adf  03-types-and-classes:248  empty_users : UserSet
-9a9c17dd476c81cb  03-types-and-classes:324  unboxed type LocalExternalId =
-1336bb8a8a86841e  03-types-and-classes:345  invalid : Unit ->{} String
-8e5624e4a3c33f25  03-types-and-classes:366  make_empty : forall a. Unit ->{} Ref (Option a)
-ac73e7b4530d3617  03-types-and-classes:385  make_identity : Unit -> (a -> a)
-ce831b060f823d82  03-types-and-classes:399  fresh_cell : forall a. Eff none none (Ref (Option a))
-659dd5e1c7324273  03-types-and-classes:414  capture_cell : Ref (Option a) -> Eff none none (Ref (Option a))
-5e483a0a0ce484e8  04-higher-order:8  normalize_names : List String -> List String
-7644f905482ebdd8  04-higher-order:47  pair_optional : Option a -> Option b -> Option (a, b)
-3cbab87c79864e89  04-higher-order:60  pair_optional : Option a -> Option b -> Option (a, b)
-90c190d26dc0c631  05-errors-and-concurrency:12  type error NotFound = NotFound UserId
-c165c9574a810f65  05-errors-and-concurrency:29  type error RetryExhausted e = RetryExhausted e Float
-68432730286d9e2d  05-errors-and-concurrency:151  type error NotFound = NotFound UserId
-3731ef4320e94d37  05-errors-and-concurrency:231  read_config :
-49320955ffe530fe  05-errors-and-concurrency:265  deferred_read :
-e8bd3190545a729d  05-errors-and-concurrency:345  load_pair : UserId -> UserId ->{Users; NotFound} (User, User)
-1d4de52c15fcfbac  06-typescript-and-ffi:38  with_default : a -> Option a -> a
-cfd4deeeb00ff9b0  06-typescript-and-ffi:105  load_name : UserId ->{Users, Log; NotFound} String
-eafd6510c5484060  06-typescript-and-ffi:195  lookup : String ->{; JsError} Option String
-f0e9d4dc677fa1bf  06-typescript-and-ffi:239  hypot : Float -> Float -> Float
-969c35e8a198d3e4  06-typescript-and-ffi:547  unboxed type UserId = UserId String
-4fe0a456611fab95  07-schema:278  increment : Ref Float ->{} Float
-db39cdea80dbbc7c  07-schema:293  class Eq a => Hash a =
-0154bafc40249792  01-direct-calls:47  render : Show a => a -> String
-e1a65497b7577f4f  05-errors-and-concurrency:55  service Time =
-0e7f90ed0700e45f  05-errors-and-concurrency:81  application : UserId ->{Config, Log; NotFound, ConnectError} String
-a2291a048bb87a34  05-errors-and-concurrency:236  bad_deferred :
-768901f185de5828  05-errors-and-concurrency:266  bad_callback :
+351c17a8bae37ce1  03-types-and-classes:67  class Show a =
+0132888d2341123b  03-types-and-classes:131  apply_twice :
+79fff19c5abba49b  03-types-and-classes:145  type alias User = { name : String }
+9bdd6c03c6da66f8  03-types-and-classes:170  name :
+ed8ee388120ed3f8  03-types-and-classes:200  type ConversionError = ConversionError String
+ecba8ed13060594d  03-types-and-classes:211  class Collection c a | c -> a =
+1323aba26c1c0886  03-types-and-classes:221  class Collection c a | c -> a =
+a1b4b4d4111482b2  03-types-and-classes:256  import Sdk exposing (ExternalId)
+1336bb8a8a86841e  03-types-and-classes:277  invalid : Unit ->{} String
+8e5624e4a3c33f25  03-types-and-classes:291  make_empty : forall a. Unit ->{} Ref (Option a)
+ac73e7b4530d3617  03-types-and-classes:310  make_identity : Unit -> (a -> a)
+ce831b060f823d82  03-types-and-classes:322  fresh_cell : forall a. Eff none none (Ref (Option a))
+659dd5e1c7324273  03-types-and-classes:337  capture_cell : Ref (Option a) -> Eff none none (Ref (Option a))
+30bac568f94c41bf  04-higher-order:8  type UserId = UserId String
+7644f905482ebdd8  04-higher-order:55  pair_optional : Option a -> Option b -> Option (a, b)
+3cbab87c79864e89  04-higher-order:68  pair_optional : Option a -> Option b -> Option (a, b)
+7de9a4451432fdcb  05-errors-and-concurrency:12  type UserId = UserId String
+f8146bfdcfa3bb21  05-errors-and-concurrency:34  type error RetryExhausted e = RetryExhausted e Float
+e1a65497b7577f4f  05-errors-and-concurrency:63  service Time =
+e4c3a6f35bbce321  05-errors-and-concurrency:89  type UserId = UserId String
+17b6a846ff453f2c  05-errors-and-concurrency:174  type UserId = UserId String
+394876620d153a1c  05-errors-and-concurrency:243  import File exposing (File, Path, FileSystem, OpenError, ReadError)
+1c7460ca6702f465  05-errors-and-concurrency:267  import File exposing (File, Path, FileSystem, OpenError, ReadError)
+37cf42397db6f9c3  05-errors-and-concurrency:283  import File exposing (File, Path, FileSystem, OpenError, ReadError)
+d7add3cdb4017b53  05-errors-and-concurrency:301  import File exposing (File, Path, FileSystem, OpenError, ReadError)
+26c0a10afc3c3254  05-errors-and-concurrency:369  type UserId = UserId String
 04a35e4e95605dd5  06-typescript-and-ffi:10  identity : a -> a
-045fa2f488f81489  06-typescript-and-ffi:65  type Shape = Circle Point Float | Rect Float Float | Empty
-321da342acc527b3  06-typescript-and-ffi:276  type Emitter
-ff39f2dd8833d1d9  08-type-programming-and-edsl:32  type alias BalanceRow = {
-0d6f75c0a06b0061  08-type-programming-and-edsl:76  type alias SaveButtonProps c = {
-2c80c55aef7a08d4  08-type-programming-and-edsl:104  component counter (start : Float) =
-65d70b27c2164cf0  08-type-programming-and-edsl:139  import Cli exposing (plugin cli)
-f8f9582514af7ef5  07-schema:69  refined type Email = String where Checks.email
+1d4de52c15fcfbac  06-typescript-and-ffi:35  with_default : a -> Option a -> a
+01433f1e5e58aa84  06-typescript-and-ffi:65  type alias Point = { x : Float; y : Float }
+438ba443bbdcdff5  06-typescript-and-ffi:100  type UserId = UserId String
+ca743a3f39318615  06-typescript-and-ffi:172  import JsError exposing (JsError)
+5a97ae56ec583a7d  06-typescript-and-ffi:204  import File exposing (Path)
+969c35e8a198d3e4  06-typescript-and-ffi:273  unboxed type UserId = UserId String
+321da342acc527b3  06-typescript-and-ffi:295  type Emitter
+ecfe40849e18cf97  07-schema:69  refined type Email = String where Checks.email
 0027637b2b681c4e  07-schema:112  type alias Preferences = {
 16ddba9438dc4858  07-schema:159  type Tree a =
+4fe0a456611fab95  07-schema:265  increment : Ref Float ->{} Float
+db39cdea80dbbc7c  07-schema:280  class Eq a => Hash a =
+a5777c0c2d1c778a  08-type-programming-and-edsl:32  import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+0d6f75c0a06b0061  08-type-programming-and-edsl:92  type alias SaveButtonProps c = {
+2c80c55aef7a08d4  08-type-programming-and-edsl:120  component counter (start : Float) =
+f58178983e732561  08-type-programming-and-edsl:155  import Cli exposing (plugin cli)

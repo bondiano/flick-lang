@@ -13,6 +13,8 @@ title: "Регионы и захваты"
 ## Области и владельцы
 
 ```flick
+# import File exposing (Path, FileSystem, OpenError, ReadError)
+#
 read_config : Path ->{FileSystem; OpenError, ReadError} String
 let read_config path =
   scope {
@@ -31,6 +33,8 @@ let read_config path =
 на вызывающий код: для этого требование указывается в сигнатуре:
 
 ```flick
+# import File exposing (File, Path, FileSystem, OpenError)
+#
 open_two : forall s. Path ->{FileSystem, Scope s; OpenError} (File s, File s)
 let open_two path =
   (File.open_scoped path, File.open_scoped path)
@@ -49,6 +53,8 @@ let open_two path =
 во время выполнения вызова.
 
 ```flick
+# import File exposing (File, Path, FileSystem, OpenError)
+#
 keep : forall s. Path ->{FileSystem, Scope s; OpenError} File s
 let keep path =
   acquire : Unit ->{FileSystem, Scope s; OpenError} File s
@@ -89,7 +95,9 @@ let keep path =
 Это различие сохраняется в [схеме 2 `.iface`](../iface/#типы-и-кинды).
 
 ```flick
-read_later : forall s. File s -> (Eff none {ReadError} String)^{s}
+# import File exposing (File, FileSystem, ReadError)
+#
+read_later : forall s. File s -> (Eff {FileSystem} {ReadError} String)^{s}
 let read_later file =
   task { File.read_all file }
 ```
@@ -133,6 +141,7 @@ let read_later file =
 ```flick
 map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
 foreign sync map_effect from "./list.js" "mapEffect"
+  retention call
 ```
 
 Колбэки Prelude `map`, `map2` и `flat_map` квантифицируют границу захватов
@@ -173,10 +182,14 @@ foreign sync map_effect from "./list.js" "mapEffect"
 ни один `use`.
 
 ```flick
+# import ScopedRef exposing (ScopedRef)
+#
 use : forall c s r e a b. ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; e} b
+# let use = ScopedRef.use
 
 from_acquire :
   forall c s r e a. (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
+# let from_acquire = ScopedRef.from_acquire
 ```
 
 Значение удерживает регион аренды `t`, поэтому функция не может ни вернуть
@@ -195,6 +208,7 @@ spawn :
   Fiber.Owner s ->
   (Failure e ->{Scope s | r; none} Unit)^c ->
   (Eff {Scope s | r} e a)^c ->{r; none} Fiber.Fiber e a
+# let spawn owner supervisor child = Fiber.spawn owner supervisor child
 ```
 
 `Fiber.spawn owner supervisor task` регистрирует `task` у `owner`;

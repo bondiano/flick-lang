@@ -10,6 +10,7 @@ title: "Формы"
 
 ```flick
 module App.Signup exposing (..)
+# import App.Api
 
 refined type Name = String where Checks.non_empty
   deriving Eq, Show, Schema

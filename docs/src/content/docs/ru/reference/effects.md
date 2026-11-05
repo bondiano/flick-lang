@@ -18,6 +18,9 @@ title: "Эффекты, ошибки и сервисы"
 вызовы из тела учитываются в последней стрелке сигнатуры.
 
 ```flick
+# service Log =
+#   info : String ->{} Unit
+#
 greet : String -> String ->{Log; none} String
 let greet prefix name =
   Log.info name
@@ -50,6 +53,14 @@ let hello =
 `FLICK-E002`; сообщение перечисляет все лишние сервисы и ошибки:
 
 ```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+#
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
   let user = Users.get id
@@ -71,6 +82,11 @@ let both left right =
 по вызовам в теле переданной функции:
 
 ```flick
+# service Log =
+#   info : String ->{} Unit
+# each : (a ->{r; e} Unit) -> List a ->{r; e} Unit
+# let each f xs = List.each_effect f xs
+#
 log_all : List Float ->{Log; none} Unit
 let log_all numbers =
   each (fun n -> Log.info "number") numbers
@@ -113,9 +129,14 @@ let log_all numbers =
 и `Eff none none a` остаются без изменений.
 
 ```flick
+# service Log =
+#   info : String ->{} Unit
+#
 fail : String ->{; AppError} a
+# let fail message = App.fail message
 
 log_line : String ->{Log;} Unit
+# let log_line line = Log.info line
 ```
 
 Пустые строки не делают вызов чистым. `a ->{} b` остаётся эффектной
@@ -199,6 +220,15 @@ SendFailed a` возвращает значение, которое не уда�
 Требования обработчиков добавляются к требованиям всего выражения:
 
 ```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# type error DbUnavailable = DbUnavailable
+# find_user : UserId ->{Users; NotFound, DbUnavailable} User
+# let find_user id = Users.get id
+#
 find_optional : UserId ->{Users; DbUnavailable} Option User
 let find_optional id =
   try
@@ -215,6 +245,9 @@ let find_optional id =
 `Result String a` не подходит: вместо строки нужна объявленная ошибка:
 
 ```flick
+# type alias User = { name : String }
+# type error NotFound = NotFound String
+#
 checked : Result NotFound User ->{; NotFound} User
 let checked result =
   from_result result
@@ -235,6 +268,9 @@ let checked result =
 используется как значение:
 
 ```flick
+# js_now : Unit ->{} Float
+# let js_now () = 0.0
+#
 service Clock =
   now : Unit ->{} Float
 
@@ -266,6 +302,21 @@ let clock_layer =
 Строка ошибок блока объединяет ошибки слоя и тела.
 
 ```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# service Config =
+#   url : Unit ->{} String
+# type error ConnectError = ConnectError
+# users_live : Layer {Config} {ConnectError} {Users}
+# let users_live = Layer.effect Users (task { from_result (Err ConnectError) })
+# load_name : UserId ->{Users, Log; NotFound} String
+# let load_name id = (Users.get id).name
+#
 application : UserId ->{Config, Log; NotFound, ConnectError} String
 let application id =
   provide users_live {
@@ -290,7 +341,14 @@ let application id =
 `provide` вокруг области владельца или от вызывающего функции, в теле
 которой открыта эта область. Иначе — `FLICK-G003`:
 
-```flick
+```flick fail
+# service Greeter =
+#   greet : String ->{} String
+# report : Failure e ->{} Unit
+# let report _ = ()
+# greeter : Layer none none {Greeter}
+# let greeter = Layer.succeed Greeter { greet = fun name -> name }
+#
 leaked : Unit ->{} Unit
 let leaked () = scope outer {
   provide greeter {
@@ -306,6 +364,11 @@ let leaked () = scope outer {
 проверяет:
 
 ```flick
+# service Greeter =
+#   greet : String ->{} String
+# report : Failure e ->{} Unit
+# let report _ = ()
+#
 start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
 ```

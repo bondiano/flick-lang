@@ -72,7 +72,7 @@ refined type Email = String where Checks.email
 type alias Profile = {
   email : Email;
   nickname : Option String;
-} deriving Eq, Hash, Schema
+} deriving Schema
 
 profile_schema : Schema Profile
 let profile_schema =

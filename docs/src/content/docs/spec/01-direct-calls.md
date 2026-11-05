@@ -5,6 +5,16 @@ title: "Direct effectful calls"
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# normalize_name : String -> String
+# let normalize_name name = String.trim name
+#
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
   let user = Users.get id
@@ -40,6 +50,15 @@ Function blocks and `match` are delimited by indentation. `in` is not needed; th
 Every named function has a full signature directly above its definition. The rule is the same for public, internal and local functions, instance methods and functions obtained by partial application. The `let` header keeps the argument names; a second style with parameter and result types in the header is not used.
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# type alias UserView = { id : UserId; title : String }
+#
 render : Show a => a -> String
 let render value =
   show value
@@ -80,6 +99,9 @@ A pure body or callback is allowed in an expected runtime position through a che
 A runtime arrow whose services are a closed row of synchronous services, today `Atom.Read` alone, and whose errors are empty is a *Sync* stage: `Atom a ->{Atom.Read;} a`, the render of `Ui.view`, the computation of `Atom.derived`. Its body compiles to a plain JS function without `Effect.gen`; its calls of other Sync functions and of the operations of `Atom.Read` are plain calls, which read the services of the context the runtime set around the call (the reader of a render or a derived atom). The stage is decided where the arrow is written, so a row variable solved to `Atom.Read` later, as in `forall r. (a ->{r} b) -> …`, keeps the runtime stage its function was compiled with. A foreign function returns an Effect, so its arrows are never Sync.
 
 ```flick
+# count : Atom.Writable Float
+# let count = Atom.make 0
+#
 doubled : Unit ->{Atom.Read;} Float
 let doubled () = Atom.value count * 2
 

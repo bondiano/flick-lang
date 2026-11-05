@@ -125,6 +125,13 @@ See [Regions and captures](../../reference/regions/).
 To use the layers, follow [App.Plan](https://github.com/bondiano/flick-lang/blob/main/examples/mtl/src/App/Plan.fl):
 
 ```flick
+# import Mtl.Identity exposing (Identity)
+# import Mtl.MaybeT exposing (MaybeT)
+# import Mtl.StateT exposing (StateT)
+# import Mtl.ReaderT exposing (ReaderT)
+# type alias Config = { budget : Float; overhead : Float }
+# type alias PlanState = { remaining : Float; completed : List String }
+#
 type alias Planner a = MaybeT (StateT PlanState (ReaderT Config Identity)) a
 ```
 

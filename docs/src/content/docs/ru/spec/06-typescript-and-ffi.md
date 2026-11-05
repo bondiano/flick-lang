@@ -62,6 +62,8 @@ export const with_default = (fallback) => (value) => {
 Правая часть `type` всегда перечисляет варианты; ведущий `|` необязателен. Например, `type Wrapper = Wrap Float` — ADT с одним конструктором. Прозрачный псевдоним типа, в том числе типа записи, объявляется через `type alias`: `type alias UserId = Float`. `opaque type alias` скрывает представление за пределами модуля, а `opaque type` с вариантами скрывает конструкторы. `alias` — ключевое слово только сразу после `type`.
 
 ```flick
+# type alias Point = { x : Float; y : Float }
+#
 type Shape = Circle Point Float | Rect Float Float | Empty
 
 area : Shape -> Float
@@ -95,6 +97,16 @@ let is_round shape =
 ## Эффектная функция
 
 ```flick
+# type UserId = UserId String
+# type alias User = { id : UserId; name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# normalize_name : String -> String
+# let normalize_name name = String.trim name
+#
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
   let user = Users.get id
@@ -157,6 +169,8 @@ export declare function lookup(
 С политикой `undefined = "none"` и `catch = "JsError"` средство импорта создаёт:
 
 ```flick
+# import JsError exposing (JsError)
+#
 lookup : String ->{; JsError} Option String
 foreign async lookup from "package" "lookup"
   arity 1
@@ -187,6 +201,11 @@ export declare function nextId(): number;
 Режимы: `pure`, `sync`, `async`, `effect` и `blocked` (см. [FFI](#ffi)). Полная сигнатура Flick ставится над объявлением. Метаданные привязки задают `arity`, `this`, `catch`, преобразование допускающих null значений, удержание и отмену.
 
 ```flick
+# import File exposing (Path)
+# import JsError as FsError exposing (JsError)
+# type alias FsError = JsError
+# import App.Http exposing (Http, HttpError, UserId, User)
+#
 hypot : Float -> Float -> Float
 foreign pure hypot from global "Math.hypot"
   arity 2

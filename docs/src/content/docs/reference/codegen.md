@@ -97,6 +97,16 @@ stage is plain JS. A runtime stage returns an `Effect.gen` whose runtime
 calls are `yield*`; pure calls in it stay plain calls:
 
 ```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# normalize_name : String -> String
+# let normalize_name name = String.trim name
+#
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
   let user = Users.get id

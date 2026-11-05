@@ -136,6 +136,11 @@ let render_twice render =
 A runtime callback can be polymorphic too:
 
 ```flick
+# type alias User = { name : String }
+#   deriving Schema
+# type alias Settings = { theme : String }
+#   deriving Schema
+#
 decode_pair :
   (forall a. Schema a -> Unknown ->{r; SchemaError} a) ->
   Unknown -> Unknown ->{r; SchemaError} (User, Settings)
@@ -180,6 +185,8 @@ A record is a plain JS object with exactly its fields (on the Go target, a `*fli
 A class may have several parameters of any kind and superclasses. `Show a` selects an implementation for one type; `Functor f` has a single parameter of kind `Type -> Type`. A relation between independent types needs several parameters:
 
 ```flick
+# type ConversionError = ConversionError String
+#
 class Convert input output =
   convert : input -> Result ConversionError output
 ```
@@ -199,6 +206,15 @@ The qualifier on insert keeps the value a in the partially applied function; the
 The dependency `c -> a` reads: “a concrete collection type determines the unique element type”. For example, the heads `Collection UserSet User` and `Collection NameSet String` are possible.
 
 ```flick
+# class Collection c a | c -> a =
+#   empty : c
+#   insert : forall captures. a^captures -> (c -> c)^captures
+# type alias User = { name : String }
+# type UserSet = UserSet (List User)
+# instance Collection UserSet User =
+#   let empty = UserSet []
+#   let insert user set = set
+#
 empty_users : UserSet
 let empty_users =
   empty
@@ -221,6 +237,8 @@ Instance heads, after expanding aliases, must not unify (`FLICK-C003`); their co
 Let `Hash` be defined by the standard library and `ExternalId` by an SDK. An adapter package that owns neither the class nor the original type cannot declare `Hash ExternalId`: orphans are forbidden.
 
 ```flick
+# import Sdk exposing (ExternalId)
+#
 unboxed type LocalExternalId =
   | LocalExternalId ExternalId
 ```
@@ -237,7 +255,7 @@ The set of instances a module sees is determined by its dependency graph, not by
 
 Generalization means that the type of a binding can be instantiated anew at each use. For `identity : forall a. a -> a`, two calls can independently choose `Float` and `String`. A single mutable cell must keep one content type. An explicit `forall` signature cannot make unsafe sharing of state acceptable.
 
-```flick
+```flick fail
 invalid : Unit ->{} String
 let invalid () =
   let cell = Ref.make None

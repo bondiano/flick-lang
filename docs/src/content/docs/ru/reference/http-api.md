@@ -93,6 +93,10 @@ E.schema` для своего тела. Это нужно ошибкам с об
 создании группы.
 
 ```flick
+# type error Unauthorized = Unauthorized { errors : { token : List String } }
+#   deriving Schema
+# import App.Auth exposing (credentials, token)
+#
 service Session =
   user : Unit ->{} Option String
 
@@ -127,6 +131,22 @@ let me =
 
 ```flick
 import HttpApi.Derive exposing (..)
+# type alias Credentials = { authorization : Option String }
+#   deriving Schema
+# type alias Name = { name : String }
+#   deriving Schema
+# type alias Profile = { name : String; bio : String }
+#   deriving Schema
+# type alias Note = { body : String }
+#   deriving Schema
+# type error Unauthorized = Unauthorized
+#   deriving Schema
+# instance Problem Unauthorized =
+#   let problem = { status = 401; body = Codec.json Unauthorized.schema }
+# type error NotFound = NotFound
+#   deriving Schema
+# instance Problem NotFound =
+#   let problem = { status = 404; body = Codec.json NotFound.schema }
 
 type alias Users = {
   me : Authed (Get "/me" { headers : Credentials } String {Unauthorized});
@@ -161,10 +181,30 @@ type alias Users = {
 и падает с ошибками, которые объявляет каждый такой эндпоинт.
 
 ```flick
+# import HttpApi.Derive exposing (..)
+# import App.Auth exposing (token, check, maybe)
+# service Session =
+#   user : Unit ->{} String
+# type alias Credentials = { authorization : Option String }
+#   deriving Schema
+# type error Unauthorized = Unauthorized
+#   deriving Schema
+# instance Problem Unauthorized =
+#   let problem = { status = 401; body = Codec.json Unauthorized.schema }
+# type alias Users = {
+#   me : Authed (Get "/me" { headers : Credentials } String {Unauthorized});
+# } deriving HttpApi
+# type alias Public = {
+#   ping : Get "/ping" {} String {};
+# } deriving HttpApi
+#
+# let example = task {
 let api =
   HttpApi.api "Notes"
   |> HttpApi.add_group (Users.api token Session check maybe)
   |> HttpApi.add_group Public.api
+# ()
+# }
 ```
 
 `HttpApi.Mount.under "/api" api` помещает каждый эндпоинт под префикс — так
@@ -180,7 +220,12 @@ let api =
 ## Обслуживание запросов
 
 ```flick
+# import App.Users exposing (api, options, find_user)
+#
+# let example = task {
 let server = HttpApi.listen options api { users = { get_user = find_user } }
+# ()
+# }
 ```
 
 `listen` требует `Scope s` и обслуживает запросы до закрытия этой области.
@@ -210,12 +255,18 @@ let server = HttpApi.listen options api { users = { get_user = find_user } }
 для dev-сервера на другом origin.
 
 ```flick
+# import App.Notes exposing (api, handlers, options)
+#
+# let example = task {
 let files = Http.StaticServer.route { Http.StaticServer.static_options "dist" with spa = true } ""
+# app : Http.Middleware.Handler none {Http.ServerError.HttpServerError}
 let app =
   Http.Middleware.cors
     { Http.Middleware.cors_options with allowedOrigins = ["http://localhost:5173"] }
     (Http.Router.router Http.Router.config [HttpApi.route "/api/*" api handlers, files])
 let server = Http.Server.serve options app
+# ()
+# }
 ```
 
 ## Клиенты и документы

@@ -27,6 +27,22 @@ Constraint solving has a budget per checked definition: `solver-steps` (100 000)
 `sql table Name "table" { … }` declares the row type `Name` and its table; the compiler never connects to a database. `sql [p] { … }` is a pure, checked `Sql.Template Pg params row`. The name after `sql` binds the parameters, whose types follow from where they are used; `$name` captures a value of the program as a placeholder.
 
 ```flick
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+# import Database exposing (Database)
+# import BigDecimal exposing (BigDecimal)
+# type UserId = UserId BigInt
+# user_id : PureCodec BigInt UserId
+# let user_id = Sql.codec (fun n -> Ok (UserId n)) (fun (UserId n) -> n)
+# sql table Users "users" {
+#   id : bigint primary key generated always as UserId via user_id
+#   name : text not null as String
+# }
+# sql table Accounts "accounts" {
+#   id : bigint primary key generated always as BigInt
+#   user_id : bigint not null as UserId via user_id
+#   balance : numeric not null as BigDecimal
+# }
+#
 type alias BalanceRow = {
   name : String;
   balance : Option BigDecimal;
@@ -138,7 +154,7 @@ let greet = cli "greet" {
   /// Print in capitals
   flag loud : Bool
   /// How many times
-  flag times "n" : Float = 1
+  flag times "n" : Int = 1
   /// Who to greet
   arg name : String
   handle fun { loud; times; name } ->

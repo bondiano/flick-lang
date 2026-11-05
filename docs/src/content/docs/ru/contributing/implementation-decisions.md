@@ -110,6 +110,13 @@ ExceptT — обычными конструкторами, образцами и
 сохраняет прежний стек:
 
 ```flick
+# import Mtl.Identity exposing (Identity)
+# import Mtl.MaybeT exposing (MaybeT)
+# import Mtl.StateT exposing (StateT)
+# import Mtl.ReaderT exposing (ReaderT)
+# type alias Config = { budget : Float; overhead : Float }
+# type alias PlanState = { remaining : Float; completed : List String }
+#
 type alias Planner a = MaybeT (StateT PlanState (ReaderT Config Identity)) a
 ```
 

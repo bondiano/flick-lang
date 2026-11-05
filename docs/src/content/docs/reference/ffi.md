@@ -7,6 +7,10 @@ signature is the contract; the mode says how the call runs, and metadata
 lines below the declaration adapt the call.
 
 ```flick
+# import File exposing (Path)
+# import JsError as FsError
+# type alias FsError = JsError.JsError
+#
 hypot : Float -> Float -> Float
 foreign pure hypot from global "Math.hypot"
   arity 2
@@ -187,6 +191,8 @@ For `export declare function lookup(id: string): Promise<string | undefined>`
 this policy gives:
 
 ```flick
+# import JsError exposing (JsError)
+#
 lookup : String ->{; JsError} Option String
 foreign async lookup from "lookup-lib" "lookup"
   arity 1
@@ -213,6 +219,8 @@ a module of your own, usually `<dir>/<Pkg>.fl` re-exporting the rest, with
 generated module shows above the export:
 
 ```flick
+# import JsError exposing (JsError)
+#
 lookup : String ->{; JsError} Option String
 foreign async lookup from "lookup-lib" "lookup"
   arity 1

@@ -102,6 +102,8 @@ ID запроса), иначе число рядов будет расти вм�
 чтобы отправить ещё и счётчик, нужен `Otlp.layer` или слой метрик.
 
 ```flick
+# import App.Telemetry exposing (span_options, checkouts)
+#
 observe_checkout : Unit ->{} Unit
 let observe_checkout () =
   provide (Otlp.traces { url = "http://localhost:4318/v1/traces"; service_name = "shop" }) {
@@ -129,6 +131,8 @@ protobuf вместо `Otlp.json`; этот сериализатор попад�
 через `Otlp.layer` и аудит через `Otlp.tracer` в локальный коллектор.
 
 ```flick
+# import App.Telemetry exposing (span_options)
+#
 audit : Unit ->{} Unit
 let audit () =
   scope {

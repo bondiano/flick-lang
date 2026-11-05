@@ -9,6 +9,7 @@ URL страницы — значение типа, который вы пише
 
 ```flick
 module App.Pages exposing (..)
+# import App.Api
 
 type error NotFound = NotFound
   deriving Schema
@@ -105,6 +106,8 @@ URL нового значения добавляется в историю, а �
 который её гидрирует, совпадают:
 
 ```flick
+# import App.Pages
+#
 page_html : String ->{} List String
 let page_html url =
   provide Atom.layer {

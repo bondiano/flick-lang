@@ -9,6 +9,7 @@ the requested URL and in the browser after each navigation.
 
 ```flick
 module App.Pages exposing (..)
+# import App.Api
 
 type error NotFound = NotFound
   deriving Schema
@@ -104,6 +105,8 @@ request's registry with `Atom.serving` before it renders, so the markup and
 the root that hydrates it agree:
 
 ```flick
+# import App.Pages
+#
 page_html : String ->{} List String
 let page_html url =
   provide Atom.layer {

@@ -10,6 +10,9 @@ module App.Users exposing (User, load_user)
 
 import App.Domain exposing (User, UserId)
 import Effect.Log as Log
+#
+# load_user : User -> User
+# let load_user user = user
 ```
 
 ## Module names and files
@@ -84,6 +87,9 @@ make it a test module.
 module App.Users exposing (User, load_user)
 
 import App.Domain exposing (User)
+#
+# load_user : User -> User
+# let load_user user = user
 ```
 
 ## Top-level definitions

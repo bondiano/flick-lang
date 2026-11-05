@@ -87,6 +87,15 @@ The Astro/Starlight site in `docs/` serves English at `/` and Russian at
 in `docs/src/content/docs/`, with matching Russian paths under `ru/`.
 Keep translated code examples identical and preserve reference URLs.
 
+Every ```` ```flick ```` block of those pages must check on its own
+(`cargo test -p flick-core --test corpus docs_examples_check`; imports are
+taken on trust, not loaded). Declare the names a fragment uses on hidden
+lines: a line that is `#` alone or starts with `# ` is compiled without that
+prefix and left off the page, as rustdoc does. `flick ignore` only parses a
+block, for syntax that does not compile yet; `flick fail` must report an
+error, for an example of one. Give both locales the same hidden lines and
+markers.
+
 The main entry points are Learn, Guides, API and Ecosystem. `/play/` runs a
 single Flick module in an isolated browser worker; `/transpile/` shows its
 real debug or release JavaScript without executing it. Both use the

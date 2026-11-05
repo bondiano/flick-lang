@@ -12,6 +12,7 @@ title: "Серверные функции"
 module App.Shop exposing (Order, OutOfStock, place)
 
 import Server exposing (plugin server)
+# import App.Db
 
 type alias Order = { item : String; count : Float }
   deriving Schema
@@ -31,7 +32,11 @@ server fn place order =
 `String -> Float ->{Server.Server;} String` принимает два параметра. Вызывающий код видит другой тип:
 
 ```flick
+# type alias Order = { item : String; count : Float }
+# type error OutOfStock = OutOfStock String
+#
 place : Order ->{; Rpc.ClientError, OutOfStock} String
+# let place order = order.item
 ```
 
 Вызову не нужны сервисы, поэтому клиентский вход может до него дойти
@@ -61,6 +66,12 @@ place : Order ->{; Rpc.ClientError, OutOfStock} String
 доходит до `Server` и отклоняется.
 
 ```flick
+# import Http.ServerRequest exposing (ServerRequest)
+# import Http.ServerResponse exposing (ServerResponse)
+# import Server exposing (plugin server)
+# import App.Db
+# import App.Shop
+#
 serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db;} (ServerRequest ->{} ServerResponse)^{s}
 let serve () = Server.handler [server App.Shop.place]
 ```
@@ -68,6 +79,10 @@ let serve () = Server.handler [server App.Shop.place]
 Подключите обработчик к `Http.Router` как POST на `Server.path`:
 
 ```flick
+# import Http.ServerRequest exposing (ServerRequest)
+# import Http.ServerResponse exposing (ServerResponse)
+#
+# route : (ServerRequest ->{} ServerResponse) -> Http.Router.Route none none
 let route functions =
   Http.Router.route (Some Http.Method.POST) Server.path (fun request -> functions request)
 ```
@@ -99,6 +114,10 @@ let route functions =
 над функцией без `Server.Unauthorized` в ошибках — это `FLICK-E011`.
 
 ```flick
+# import Http.ServerRequest exposing (ServerRequest)
+# import Http.ServerResponse exposing (ServerResponse)
+# import Server exposing (plugin server)
+#
 service Session =
   user : Unit ->{} String
 
@@ -111,8 +130,17 @@ let check headers =
   | Some cookie -> { user = fun () -> cookie }
   | None -> from_result (Err Server.Unauthorized)
 
+# open_door : Unit ->{Server.Server;} String
+# server fn open_door () = "open"
+#
+# let example = task {
+#   scope s {
+# functions : (ServerRequest ->{} ServerResponse)^{s}
 let functions =
   Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
+# ()
+#   }
+# }
 ```
 
 Вызывающий обрабатывает `Server.Unauthorized` как любую объявленную

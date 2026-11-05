@@ -157,7 +157,7 @@ hash body` создаёт свидетельство с новой иденти�
 с помощью `HashSet.rehash witness set`.
 
 ```flick
-case_blind : Float
+case_blind : Int
 let case_blind =
   EqHash.with
     (fun a b -> String.to_lower a == String.to_lower b)
@@ -232,6 +232,12 @@ let tests =
 `HttpApi.Inject.call` (см. [HttpApi](../http-api/#клиенты-и-документы)):
 
 ```flick
+# import Conduit.Api as Api
+# import Conduit.Server.App as Server
+# import Conduit.Server.Postgres as Postgres
+# import Conduit.Server.ApiTest exposing (send, at, ada)
+#
+# let example = task {
 let services = Layer.merge Postgres.layer (Layer.merge (Server.keys "test") Crypto.system)
 
 tests : List Test.Test
@@ -243,6 +249,8 @@ let tests = [
     }),
   ],
 ]
+# ()
+# }
 ```
 
 Так `examples/conduit/server/test` проверяет API RealWorld; его PostgreSQL

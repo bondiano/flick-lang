@@ -9,6 +9,10 @@ title: "Внешние функции"
 описывают передачу аргументов и обработку результата.
 
 ```flick
+# import File exposing (Path)
+# import JsError as FsError
+# type alias FsError = JsError.JsError
+#
 hypot : Float -> Float -> Float
 foreign pure hypot from global "Math.hypot"
   arity 2
@@ -202,6 +206,8 @@ cancel = "signal"          # an async call gets an AbortSignal
 эта политика создаёт привязку:
 
 ```flick
+# import JsError exposing (JsError)
+#
 lookup : String ->{; JsError} Option String
 foreign async lookup from "lookup-lib" "lookup"
   arity 1
@@ -229,6 +235,8 @@ foreign async lookup from "lookup-lib" "lookup"
 Нужная строка приведена над экспортом в сгенерированном модуле:
 
 ```flick
+# import JsError exposing (JsError)
+#
 lookup : String ->{; JsError} Option String
 foreign async lookup from "lookup-lib" "lookup"
   arity 1

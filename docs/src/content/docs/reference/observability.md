@@ -102,6 +102,8 @@ This function uses the span options and counter above. It exports the span;
 exporting the counter as well requires `Otlp.layer` or a metrics layer.
 
 ```flick
+# import App.Telemetry exposing (span_options, checkouts)
+#
 observe_checkout : Unit ->{} Unit
 let observe_checkout () =
   provide (Otlp.traces { url = "http://localhost:4318/v1/traces"; service_name = "shop" }) {
@@ -129,6 +131,8 @@ checkout with `Otlp.layer` and an audit with `Otlp.tracer` to a local
 collector.
 
 ```flick
+# import App.Telemetry exposing (span_options)
+#
 audit : Unit ->{} Unit
 let audit () =
   scope {

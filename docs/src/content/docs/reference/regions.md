@@ -10,6 +10,8 @@ scope is open.
 ## Scopes and owners
 
 ```flick
+# import File exposing (Path, FileSystem, OpenError, ReadError)
+#
 read_config : Path ->{FileSystem; OpenError, ReadError} String
 let read_config path =
   scope {
@@ -27,6 +29,8 @@ otherwise acquires into the innermost `scope`. A function may pass the
 requirement on to its caller's scope by naming it in its signature:
 
 ```flick
+# import File exposing (File, Path, FileSystem, OpenError)
+#
 open_two : forall s. Path ->{FileSystem, Scope s; OpenError} (File s, File s)
 let open_two path =
   (File.open_scoped path, File.open_scoped path)
@@ -44,6 +48,8 @@ region is never looked up by whatever scope happens to be innermost when
 the call runs.
 
 ```flick
+# import File exposing (File, Path, FileSystem, OpenError)
+#
 keep : forall s. Path ->{FileSystem, Scope s; OpenError} File s
 let keep path =
   acquire : Unit ->{FileSystem, Scope s; OpenError} File s
@@ -83,7 +89,9 @@ cannot widen that inner bound to admit shorter-lived replacements.
 The distinction survives [`.iface` schema 2](../iface/#types-and-kinds).
 
 ```flick
-read_later : forall s. File s -> (Eff none {ReadError} String)^{s}
+# import File exposing (File, FileSystem, ReadError)
+#
+read_later : forall s. File s -> (Eff {FileSystem} {ReadError} String)^{s}
 let read_later file =
   task { File.read_all file }
 ```
@@ -126,6 +134,7 @@ them in what it returns, as `map_effect` does:
 ```flick
 map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
 foreign sync map_effect from "./list.js" "mapEffect"
+  retention call
 ```
 
 Prelude's `map`, `map2` and `flat_map` callbacks quantify an input capture
@@ -166,10 +175,14 @@ callback with it, and the previous resource is released once no `use`
 holds it.
 
 ```flick
+# import ScopedRef exposing (ScopedRef)
+#
 use : forall c s r e a b. ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; e} b
+# let use = ScopedRef.use
 
 from_acquire :
   forall c s r e a. (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
+# let from_acquire = ScopedRef.from_acquire
 ```
 
 The value holds the lease's region `t`, so the callback can neither give it
@@ -189,6 +202,7 @@ spawn :
   Fiber.Owner s ->
   (Failure e ->{Scope s | r; none} Unit)^c ->
   (Eff {Scope s | r} e a)^c ->{r; none} Fiber.Fiber e a
+# let spawn owner supervisor child = Fiber.spawn owner supervisor child
 ```
 
 `Fiber.spawn owner supervisor task` registers `task` with `owner`; the

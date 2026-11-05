@@ -14,6 +14,9 @@ after the first argument. A function body runs at its last stage, so its
 calls count against the last arrow of its signature.
 
 ```flick
+# service Log =
+#   info : String ->{} Unit
+#
 greet : String -> String ->{Log; none} String
 let greet prefix name =
   Log.info name
@@ -43,6 +46,14 @@ services and errors than its signature allows, never more. What exceeds the
 bound is `FLICK-E002`, which lists every extra service and error:
 
 ```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+#
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
   let user = Users.get id
@@ -63,6 +74,11 @@ A callback takes the rows of the arrow it is checked against; when those are
 row variables of the called function, its calls decide them:
 
 ```flick
+# service Log =
+#   info : String ->{} Unit
+# each : (a ->{r; e} Unit) -> List a ->{r; e} Unit
+# let each f xs = List.each_effect f xs
+#
 log_all : List Float ->{Log; none} Unit
 let log_all numbers =
   each (fun n -> Log.info "number") numbers
@@ -100,9 +116,14 @@ empty as `->{}`. Elsewhere `none` stays, so `->{Log; none}` and
 `Eff none none a` are left as they are.
 
 ```flick
+# service Log =
+#   info : String ->{} Unit
+#
 fail : String ->{; AppError} a
+# let fail message = App.fail message
 
 log_line : String ->{Log;} Unit
+# let log_line line = Log.info line
 ```
 
 An empty row does not make a call pure. `a ->{} b` is still a runtime arrow:
@@ -181,6 +202,15 @@ is used as one error only when the body raises only that one. What the
 handlers need is added:
 
 ```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# type error DbUnavailable = DbUnavailable
+# find_user : UserId ->{Users; NotFound, DbUnavailable} User
+# let find_user id = Users.get id
+#
 find_optional : UserId ->{Users; DbUnavailable} Option User
 let find_optional id =
   try
@@ -197,6 +227,9 @@ An arm that matches something other than an error is `FLICK-E007`.
 `Result String a` is rejected until the string becomes a declared error:
 
 ```flick
+# type alias User = { name : String }
+# type error NotFound = NotFound String
+#
 checked : Result NotFound User ->{; NotFound} User
 let checked result =
   from_result result
@@ -215,6 +248,9 @@ service.
 makes a layer from it; the service is named as a value:
 
 ```flick
+# js_now : Unit ->{} Float
+# let js_now () = 0.0
+#
 service Clock =
   now : Unit ->{} Float
 
@@ -244,6 +280,21 @@ body runs: the body may need the services the layer builds, and the block
 needs the layer's inputs and errors besides the rest of what the body needs.
 
 ```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# service Config =
+#   url : Unit ->{} String
+# type error ConnectError = ConnectError
+# users_live : Layer {Config} {ConnectError} {Users}
+# let users_live = Layer.effect Users (task { from_result (Err ConnectError) })
+# load_name : UserId ->{Users, Log; NotFound} String
+# let load_name id = (Users.get id).name
+#
 application : UserId ->{Config, Log; NotFound, ConnectError} String
 let application id =
   provide users_live {
@@ -266,7 +317,14 @@ place that started it, so each of them must come from a provider that
 outlives that owner: a `provide` around the owner's `scope`, or the caller
 of a function whose body opens that `scope`. Otherwise it is `FLICK-G003`:
 
-```flick
+```flick fail
+# service Greeter =
+#   greet : String ->{} String
+# report : Failure e ->{} Unit
+# let report _ = ()
+# greeter : Layer none none {Greeter}
+# let greeter = Layer.succeed Greeter { greet = fun name -> name }
+#
 leaked : Unit ->{} Unit
 let leaked () = scope outer {
   provide greeter {
@@ -281,6 +339,11 @@ A function whose owner and services both come from its caller says that
 the services outlive the owner with `Fiber.Provided`; each call checks it:
 
 ```flick
+# service Greeter =
+#   greet : String ->{} String
+# report : Failure e ->{} Unit
+# let report _ = ()
+#
 start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
 ```

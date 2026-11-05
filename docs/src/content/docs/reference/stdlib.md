@@ -148,7 +148,7 @@ set's own witness, and `HashSet.union` of sets of two witnesses is a type
 error: `HashSet.rehash witness set` moves a set to another witness first.
 
 ```flick
-case_blind : Float
+case_blind : Int
 let case_blind =
   EqHash.with
     (fun a b -> String.to_lower a == String.to_lower b)
@@ -223,6 +223,12 @@ in a container, and sends requests to the server's own router with
 `HttpApi.Inject.call` (see [HttpApi](../http-api/#clients-and-documents)):
 
 ```flick
+# import Conduit.Api as Api
+# import Conduit.Server.App as Server
+# import Conduit.Server.Postgres as Postgres
+# import Conduit.Server.ApiTest exposing (send, at, ada)
+#
+# let example = task {
 let services = Layer.merge Postgres.layer (Layer.merge (Server.keys "test") Crypto.system)
 
 tests : List Test.Test
@@ -234,6 +240,8 @@ let tests = [
     }),
   ],
 ]
+# ()
+# }
 ```
 
 `examples/conduit/server/test` runs the RealWorld API this way, its

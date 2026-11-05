@@ -183,6 +183,9 @@ one. The task of a handler runs on an event, not while rendering, and may
 make what it needs.
 
 ```flick
+# items : Atom.Writable (List Float)
+# let items = Atom.make []
+#
 drafts : Atom.Family Float (Atom.Writable String)
 let drafts = Atom.family (fun _ -> Atom.make "")
 
@@ -338,6 +341,10 @@ given as its props: a short screen needs no `match` and no `Atom.ready`.
 Its failure view is still required; a task of `Async a none` never calls it.
 
 ```flick
+# type error Offline = Offline
+# fetch_name : Unit ->{; Offline} String
+# let fetch_name () = "Ada"
+#
 user : Atom.Atom (Atom.Async String {Offline})
 let user = Atom.task (task { fetch_name () })
 
@@ -363,6 +370,8 @@ the latest element of the stream `s` and starts it anew on such a
 mutation; it has no mutation of its own. Over a [server function](../server-fn/):
 
 ```flick
+# import Shop exposing (Order, OutOfStock)
+#
 orders : Atom.Atom (Atom.Async (List Order) {Rpc.ClientError})
 let orders = Atom.query ["orders"] (task { Shop.orders () })
 
@@ -394,6 +403,9 @@ earlier one runs. The tasks belong to the root, which interrupts and joins
 them when it unmounts.
 
 ```flick
+# count : Atom.Writable Float
+# let count = Atom.make 0
+#
 increment : Action.Action Ui.ClickSnapshot
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 ```
@@ -444,6 +456,7 @@ still interrupts and joins them.
 mount :
   forall c r.
   Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Atom.Registry, Atom.Write | r; none} Never
+# let mount = Ui.Dom.mount
 ```
 
 `Ui.Dom.mount container supervisor ui` renders `ui` once; the views in it
@@ -454,6 +467,12 @@ supervisor gets its defects, and the registry is the one the program
 provides:
 
 ```flick
+# count : Atom.Writable Float
+# let count = Atom.make 0
+# component counter_view () = ui { text (Atom.value count |> show) }
+# report : Failure none ->{} Unit
+# let report _ = ()
+#
 main : Unit ->{; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
@@ -492,6 +511,10 @@ is a service of the `provide`, nothing can render with it after the
 `provide` ends (`FLICK-E002`). Handlers do not run on the server.
 
 ```flick
+# count : Atom.Writable Float
+# let count = Atom.make 0
+# component counter_view () = ui { text (Atom.value count |> show) }
+#
 request : Float ->{} String
 let request n =
   provide Atom.layer {
@@ -553,6 +576,10 @@ since. Each root of a page reads only the script of its own container. An atom w
 encode is a defect naming its key, not a value silently left out.
 
 ```flick
+# count : Atom.Writable Float
+# let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
+# component counter_view () = ui { text (Atom.value count |> show) }
+#
 page : Float ->{} String
 let page n =
   provide Atom.layer {
@@ -605,6 +632,10 @@ the container hydrates the scripts that arrive after it mounted, as they
 arrive.
 
 ```flick
+# fetch_name : Unit ->{} String
+# let fetch_name () = "Ada"
+# let page = ui { text "…" }
+#
 user : Atom.Atom (Atom.Async String none)
 let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { fetch_name () }))
 
@@ -624,6 +655,8 @@ only React renders, is a defect. It comes from
 `react-dom/server`.
 
 ```flick
+# type alias Order = { customer : String }
+#
 receipt : Order -> String
 let receipt order =
   Ui.Server.to_html (ui { div { class_name = "mail" } [paragraph [text ("Thanks, " ++ order.customer)]] })

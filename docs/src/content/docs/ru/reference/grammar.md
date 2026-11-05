@@ -198,6 +198,17 @@ let examples =
 7. `else if` на одной строке продолжает цепочку, не открывая блок.
 
 ```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type alias UserView = { title : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# to_view : User -> UserView
+# let to_view user = { title = user.name }
+#
 load_view : UserId ->{Users, Log; NotFound} UserView
 let load_view id =
   let user = Users.get id
@@ -298,17 +309,22 @@ module App.Shapes exposing (Shape(..), area)
 
 import App.Geometry exposing (Point)
 import Effect.Log as Log
+# import File exposing (Path)
+# import JsError as FsError
 
 type Shape =
   | Circle Point Float
   | Rect { origin : Point; size : Point }
   | Empty
-  deriving Eq, Show
+  deriving Eq
+# type alias FsError = FsError.JsError
+# area : Shape -> Float
+# let area _ = 0.0
 
 opaque type alias UserId = String
 
 refined type Port = Float where fun n -> n > 0 && n < 65536
-  deriving Eq, Hash
+  deriving Eq, Ord
 
 kind Nullability = NonNull | Nullable
 
@@ -376,16 +392,32 @@ atom        = name | Con { "." Con } | "none" | "(" ")" | "(" type ")"
 - Кинды записываются по той же грамматике: `Type`, `Type -> Type`, `ServiceRow`.
 
 ```flick
+# type alias User = { name : String }
+#   deriving Schema
+# type alias Settings = { theme : String }
+#   deriving Schema
+# type error NotFound = NotFound
+# type error SaveError = SaveError
+# service Users =
+#   get : String ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# import App.Ui exposing (SaveProps)
+#
 decode_pair :
   (forall a. Schema a -> Unknown ->{r; SchemaError} a) ->
   Unknown -> Unknown ->{r; SchemaError} (User, Settings)
+# let decode_pair decode user settings = (decode User.schema user, decode Settings.schema settings)
 
 open_rows : a ->{Users, Log | r; NotFound | e} b
+# let open_rows _ = todo
 
 fields : forall fields. { name : String | fields } -> { name : String }
+# let fields record = { name = record.name }
 
 save_with :
   SaveProps c -> (Eff {Users} {SaveError} Unit)^c
+# let save_with _ = task { () }
 ```
 
 ## Выражения
@@ -476,7 +508,7 @@ clause      = ("from" | "join" | "left_join") name "in" expr
 Комментарий `///` непосредственно над предложением `flag`, `arg`
 или `subcommand` задаёт текст справки для него.
 
-```flick
+```flick ignore
 load_twice : UserId ->{Users; NotFound} (User, User)
 let load_twice id =
   let request = task { Users.get id }
@@ -547,6 +579,13 @@ list_item    = or_pattern | "..." (name | "_")
 после `->` он начинает следующую ветвь.
 
 ```flick
+# type alias Point = { x : Float; y : Float }
+# type Shape =
+#   | Circle Point Float
+#   | Rect Float Float
+#   | Labeled { name : String }
+#   | Empty
+#
 describe : Shape -> String
 let describe shape =
   match shape with

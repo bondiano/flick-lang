@@ -12,6 +12,7 @@ crosses the network, so the two sides cannot disagree.
 module App.Shop exposing (Order, OutOfStock, place)
 
 import Server exposing (plugin server)
+# import App.Db
 
 type alias Order = { item : String; count : Float }
   deriving Schema
@@ -31,7 +32,11 @@ parameters, the services it needs and its errors. Only the last arrow runs:
 `String -> Float ->{Server.Server;} String` takes two parameters. Callers see another type:
 
 ```flick
+# type alias Order = { item : String; count : Float }
+# type error OutOfStock = OutOfStock String
+#
 place : Order ->{; Rpc.ClientError, OutOfStock} String
+# let place order = order.item
 ```
 
 The call needs no service, so a client entry may reach it
@@ -60,6 +65,12 @@ them on one route; a client entry that names `server place` reaches
 `Server` and is refused.
 
 ```flick
+# import Http.ServerRequest exposing (ServerRequest)
+# import Http.ServerResponse exposing (ServerResponse)
+# import Server exposing (plugin server)
+# import App.Db
+# import App.Shop
+#
 serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db;} (ServerRequest ->{} ServerResponse)^{s}
 let serve () = Server.handler [server App.Shop.place]
 ```
@@ -67,6 +78,10 @@ let serve () = Server.handler [server App.Shop.place]
 Mount the handler on `Http.Router` as a POST of `Server.path`:
 
 ```flick
+# import Http.ServerRequest exposing (ServerRequest)
+# import Http.ServerResponse exposing (ServerResponse)
+#
+# route : (ServerRequest ->{} ServerResponse) -> Http.Router.Route none none
 let route functions =
   Http.Router.route (Some Http.Method.POST) Server.path (fun request -> functions request)
 ```
@@ -99,6 +114,10 @@ does not run. Serving a guarded function without `Server.authenticated`, or
 guarding one that does not list `Server.Unauthorized`, is `FLICK-E011`.
 
 ```flick
+# import Http.ServerRequest exposing (ServerRequest)
+# import Http.ServerResponse exposing (ServerResponse)
+# import Server exposing (plugin server)
+#
 service Session =
   user : Unit ->{} String
 
@@ -111,8 +130,17 @@ let check headers =
   | Some cookie -> { user = fun () -> cookie }
   | None -> from_result (Err Server.Unauthorized)
 
+# open_door : Unit ->{Server.Server;} String
+# server fn open_door () = "open"
+#
+# let example = task {
+#   scope s {
+# functions : (ServerRequest ->{} ServerResponse)^{s}
 let functions =
   Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
+# ()
+#   }
+# }
 ```
 
 The caller handles `Server.Unauthorized` as any declared error. Each call

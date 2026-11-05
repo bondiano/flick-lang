@@ -14,6 +14,10 @@ the tag of templates (`Sql.Template Pg p r`).
 ## Tables
 
 ```flick
+# type UserId = UserId BigInt
+# user_id : PureCodec BigInt UserId
+# let user_id = Sql.codec (fun n -> Ok (UserId n)) (fun (UserId n) -> n)
+#
 sql table Users "users" {
   id : bigint primary key generated always as UserId via user_id
   name : text not null as String
@@ -55,6 +59,23 @@ from the module's migrations (below).
 ## Queries
 
 ```flick
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+# import Database exposing (Database)
+# import BigDecimal exposing (BigDecimal)
+# type UserId = UserId BigInt
+# user_id : PureCodec BigInt UserId
+# let user_id = Sql.codec (fun n -> Ok (UserId n)) (fun (UserId n) -> n)
+# sql table Users "users" {
+#   id : bigint primary key generated always as UserId via user_id
+#   name : text not null as String
+# }
+# sql table Accounts "accounts" {
+#   id : bigint primary key generated always as BigInt
+#   user_id : bigint not null as UserId via user_id
+#   balance : numeric not null as BigDecimal
+# }
+# type alias BalanceRow = { name : String; balance : Option BigDecimal }
+#
 balances : Sql.Template Pg { user_id : UserId } BalanceRow
 let balances =
   sql params {
@@ -81,6 +102,23 @@ PostgreSQL cannot type `$1 IS NULL` alone. A capture is no parameter of the
 template, so a function builds the template from its arguments:
 
 ```flick
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+# import Database exposing (Database)
+# import BigDecimal exposing (BigDecimal)
+# type UserId = UserId BigInt
+# user_id : PureCodec BigInt UserId
+# let user_id = Sql.codec (fun n -> Ok (UserId n)) (fun (UserId n) -> n)
+# sql table Users "users" {
+#   id : bigint primary key generated always as UserId via user_id
+#   name : text not null as String
+# }
+# sql table Accounts "accounts" {
+#   id : bigint primary key generated always as BigInt
+#   user_id : bigint not null as UserId via user_id
+#   balance : numeric not null as BigDecimal
+# }
+# type alias BalanceRow = { name : String; balance : Option BigDecimal }
+#
 balances_of : UserId -> Sql.Template Pg {} BalanceRow
 let balances_of id =
   sql {
@@ -159,6 +197,11 @@ subquery or a union (`FLICK-Q002`).
 ## Running queries
 
 ```flick
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+# import Database exposing (Database)
+# import BigDecimal exposing (BigDecimal)
+# import App.Queries exposing (UserId, BalanceRow, balances)
+#
 load : UserId ->{Database; EncodeError, DbError, DecodeError} List BalanceRow
 let load id = Database.query (Sql.bind balances { user_id = id })
 ```
@@ -189,6 +232,11 @@ no network. Other programs carry no driver and build offline.
 ## Transactions
 
 ```flick
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+# import Database exposing (Database)
+# import BigDecimal exposing (BigDecimal)
+# import App.Queries exposing (withdraw, deposit)
+#
 transfer : BigInt -> BigInt -> BigDecimal ->{Database; EncodeError, DbError, DecodeError} Unit
 let transfer source target amount =
   Database.transaction (task {
@@ -239,7 +287,10 @@ sql migration 2 "species" {
   alter table pets add column species text not null default "cat";
 }
 
+# let example = task {
 let applied = Database.Migrate.run migrations
+# ()
+# }
 ```
 
 - The DDL is `create table`, `create index`, `alter table` (add, drop,
@@ -273,7 +324,10 @@ let steps = [
   { version = 2; name = "emails"; statements = ["alter table users add column email text"] },
 ]
 
+# let example = task {
 let applied = Database.Migrate.run steps
+# ()
+# }
 ```
 
 ## Cancellation and limits
@@ -301,6 +355,9 @@ table or a column: a `String` never does. Rows are objects of `int2`,
 else as text, decoded by `decoder`.
 
 ```flick
+# type alias Count = { n : Int }
+#   deriving Schema
+# count_rows : Sql.Identifier -> Sql.Query Sql.Pg Count
 let count_rows table =
   Sql.unsafe_query
     [Sql.unsafe_text "select count(*)::int as n from ", Sql.ident table]

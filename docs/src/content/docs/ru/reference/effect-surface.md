@@ -146,6 +146,8 @@ span'ы программы по WebSocket в Effect DevTools, которые с�
 становится `type error`.
 
 ```flick
+# import Schedule exposing (Schedule)
+#
 /// Recurs forever, each step the duration after the previous one ended.
 spaced : Duration.Duration -> Schedule none none i Float
 foreign pure spaced from "@flick-lang/runtime/effect/Schedule" "spaced"

@@ -20,7 +20,7 @@ let greet =
     /// Print in capitals
     flag loud : Bool
     /// How many times
-    flag times "n" : Float = 1
+    flag times "n" : Int = 1
     /// Who to greet
     arg name : String
     handle fun { loud; times; name } ->
@@ -126,6 +126,8 @@ also gives the text of `--version` (`Cli.run` uses `0.0.0`), and
 of help and version as well.
 
 ```flick
+# import App.Greet exposing (greet)
+#
 main : Unit ->{; AppError} Unit
 let main () =
   try Cli.run greet (Platform.args ()) with
