@@ -295,6 +295,9 @@ fn closing(tokens: &[Token], signature: &Signature, open: usize) -> usize {
 /// The witnesses of the payload, the success and the errors, as
 /// `Server.Derive.procedure` takes them.
 fn witnesses(b: &mut Builder, parts: &Parts, me: &str) -> Result<Vec<NodeId>, String> {
+    // shortcut: `expand` has no summary of the module, so a local alias
+    // without `deriving Schema` is `T.schema` the checker does not find;
+    // give `expand` the summary a derive gets when a program needs one.
     let module = Module { types: Vec::new() };
     let local = Local {
         name: String::new(),
