@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 1eb849726c3babe7
+source_hash: b89795438ca192c8
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`

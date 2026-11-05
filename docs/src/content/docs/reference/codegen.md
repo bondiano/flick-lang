@@ -104,7 +104,8 @@ untagged type Method = Get = "GET" | Post = "POST" | Delete = "DELETE"
 untagged type Priority = Low = 1 | High = 2
 
 literals : Enum.Enum t String => List t -> List String
-let literals values = List.map Enum.value values   -- literals Method.all is ["GET", "POST", "DELETE"]
+// `literals Method.all` is `["GET", "POST", "DELETE"]`
+let literals values = List.map Enum.value values
 ```
 
 `==` is canonical structural equality: SameValueZero on numbers, so

@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: 941bfb1920f687de
+source_hash: 7540c08f10416948
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -113,7 +113,8 @@ untagged type Method = Get = "GET" | Post = "POST" | Delete = "DELETE"
 untagged type Priority = Low = 1 | High = 2
 
 literals : Enum.Enum t String => List t -> List String
-let literals values = List.map Enum.value values   -- literals Method.all — ["GET", "POST", "DELETE"]
+// `literals Method.all` — `["GET", "POST", "DELETE"]`
+let literals values = List.map Enum.value values
 ```
 
 `==` — каноническое структурное равенство: SameValueZero для чисел, поэтому
