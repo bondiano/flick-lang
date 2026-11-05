@@ -1,0 +1,11 @@
+{
+  "name": "@flick-lang/tokens",
+  "version": "0.1.0",
+  "description": "Output tokens of a fullstack app: `just tokens` counts the Conduit example against the RealWorld Go backend and React client",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "gpt-tokenizer": "4.1.0"
+  }
+}

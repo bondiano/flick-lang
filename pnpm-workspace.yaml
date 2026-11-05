@@ -5,6 +5,7 @@ packages:
   - tools/astro-flick
   - tools/bundle-size
   - tools/load
+  - tools/tokens
   - docs
   - editors/vscode
   - examples/conduit/contract
