@@ -58,7 +58,7 @@ fn the_go_server_passes_the_realworld_api_suite() {
     let started = Instant::now();
     while TcpStream::connect(("127.0.0.1", port)).is_err() {
         assert!(
-            started.elapsed() < Duration::from_secs(60),
+            started.elapsed() < Duration::from_mins(1),
             "the server did not start"
         );
         thread::sleep(Duration::from_millis(100));

@@ -124,6 +124,8 @@ break programs.
 - **Builds:** the built-in modules are lowered in one pass (a small build
   takes about a quarter of the time); the checked modules of libraries are
   saved between runs.
+- **Builds:** WebAssembly plugins run on wasmtime 48, a long-term support
+  release; building the compiler takes Rust 1.95.
 
 ## 0.1.0 — 2026-11-03
 

@@ -6,7 +6,7 @@ members = ["flick-core", "flick", "flick-pretty", "flick-wasm", "flick-model", "
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/bondiano/flick-lang"
-rust-version = "1.94"
+rust-version = "1.95"
 publish = false
 
 [workspace.lints.rust]

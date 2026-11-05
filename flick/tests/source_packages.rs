@@ -151,7 +151,7 @@ fn a_go_server_and_a_js_client_share_a_source_package() {
             }
         }
     });
-    let port = rx.recv_timeout(Duration::from_secs(60)).expect("the port");
+    let port = rx.recv_timeout(Duration::from_mins(1)).expect("the port");
     let client = workspace("source_package_client", CLIENT, "js").join("app");
     let run = Command::new(env!("CARGO_BIN_EXE_flick"))
         .arg("run")

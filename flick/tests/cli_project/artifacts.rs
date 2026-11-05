@@ -185,7 +185,7 @@ fn build_watch_follows_changes_creation_and_deletion_with_a_future_file() {
         }
     }
     fn until(child: &mut process::Child, ready: impl Fn() -> bool) {
-        let deadline = Instant::now() + Duration::from_secs(60);
+        let deadline = Instant::now() + Duration::from_mins(1);
         while !ready() {
             assert!(
                 child.try_wait().expect("watch status").is_none(),

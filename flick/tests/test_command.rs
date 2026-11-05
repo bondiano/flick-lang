@@ -468,7 +468,7 @@ fn clock_tests_pass(name: &str, args: &[&str]) {
         assert_eq!(status(&json, name), ("passed", ""), "{json}");
     }
     // no real hour, nor a real wait at all
-    assert!(started.elapsed() < Duration::from_secs(60));
+    assert!(started.elapsed() < Duration::from_mins(1));
 }
 
 #[test]
