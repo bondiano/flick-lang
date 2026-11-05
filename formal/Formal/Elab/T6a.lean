@@ -17,7 +17,8 @@ theorem TTy.subst_dicts (σ : Nat → Ty) (q : Ty) (qs : List Cn) (t : TTy) :
     (dicts q qs t).subst σ = dicts (q.subst σ) (qs.map (·.subst σ)) (t.subst σ) := by
   induction qs with
   | nil => rfl
-  | cons q qs ih => simp only [dicts, List.foldr_cons, List.map_cons] at ih ⊢; simp [TTy.subst, ih]
+  | cons q qs ih =>
+    simp only [dicts, List.foldr_cons, List.map_cons] at ih ⊢; simp [TTy.subst, Stage.subst, ih]
 
 theorem Scheme.tr_subst (σ : Nat → Ty) (s : Scheme) : (s.subst σ).tr = s.tr.subst σ := by
   simp [Scheme.tr, Scheme.subst, TSch.subst, TTy.subst_dicts, TTy.subst]
@@ -28,12 +29,17 @@ theorem lift_up_zero (k : Nat) : lift k (up 0) = .var := by
   split <;> first | rfl | (congr 1; omega)
 
 theorem Ty.subst_id (t : Ty) : t.subst .var = t := by
-  induction t <;> simp_all [Ty.subst]
+  induction t using Ty.ind
+  case arr φ a b q iha ihb ihq ihφ => cases φ <;> simp_all [Ty.subst, Stage.subst, Stage.All]
+  all_goals simp_all [Ty.subst]
+
+theorem Stage.subst_id (φ : Stage) : φ.subst .var = φ := by
+  cases φ <;> simp [Stage.subst, Ty.subst_id]
 
 theorem TTy.subst_id (t : TTy) : t.subst .var = t := by
   induction t with
   | mono t => simp [TTy.subst, Ty.subst_id]
-  | arr φ a b q iha ihb => simp [TTy.subst, iha, ihb, Ty.subst_id]
+  | arr φ a b q iha ihb => simp [TTy.subst, iha, ihb, Ty.subst_id, Stage.subst_id]
   | dict q => simp [TTy.subst, Cn.subst, Ty.subst_id]
 
 theorem up_zero : up 0 = .var := by funext n; simp [up]
@@ -108,10 +114,11 @@ theorem TTy.reach_dicts {q : Ty} {qs : List Cn} {t : TTy} {n : Nat}
   induction qs with
   | nil => exact .inl h
   | cons c qs ih =>
-    rcases h with h | h | h
+    rcases h with h | h | h | h
     · cases h
     · exact (ih h).imp id fun h => ⟨List.cons_ne_nil _ _, h.2⟩
     · exact .inr ⟨List.cons_ne_nil _ _, h⟩
+    · cases h
 
 theorem Scheme.reach_of_tr {s : Scheme} {n : Nat} (h : s.tr.reach n) : s.reach n :=
   TTy.reach_dicts h

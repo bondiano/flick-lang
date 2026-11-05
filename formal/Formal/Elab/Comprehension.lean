@@ -84,23 +84,26 @@ theorem loop_elab {φ Γ Δ cs e} (h : LoopOk S φ Γ Δ cs e) :
   | @gen Γ Δ s cs e f d a dk s' hd hs _ ih =>
     obtain ⟨_, hk⟩ := ih
     obtain ⟨_, hi⟩ := elab_iter S hd hs
-    have hf := elab_const (Γ := Γ) (Δ := Δ) (φ := φ) (S.hEach φ) (ts := [ctxRow Γ, .cun d a, a]) rfl
-      (τ := arrP (.arr φ a (.con S.unit) (ctxRow Γ))
-        (.arr φ (appQ (.con S.seq) (.cun d a) a) (.con S.unit) (ctxRow Γ))) rfl
+    have hf : Elab P Γ Δ (.const (S.each φ)) (arrP (.arr φ a (.con S.unit) (ctxRow Γ))
+        (.arr φ (appQ (.con S.seq) (.cun d a) a) (.con S.unit) (ctxRow Γ))) φ (.const (S.each φ)) := by
+      cases φ with
+      | P => exact elab_const (S.hEach .P) (ts := [ctxRow Γ, .cun d a, a]) rfl rfl
+      | R r e => exact elab_const (S.hEach (.R r e)) (ts := [ctxRow Γ, .cun d a, a, r, e]) rfl rfl
     exact ⟨_, .app (.app hf (.lam hk (lam_cov (cov_ctxRow Γ))) (.inl rfl)) hi (.inr rfl)⟩
   | guard hc _ ih =>
     obtain ⟨_, hk⟩ := ih
     exact ⟨_, .ite hc hk (elab_const S.hUnitV (ts := []) rfl rfl)⟩
   | let_ hx _ ih => obtain ⟨_, hk⟩ := ih; exact ⟨_, .let_ hx hk⟩
 
-/-- **`e?` on a `Result` elaborates**, at a runtime stage, through the member of `from_result`
-at the row of errors of `e`. -/
+/-- **`e?` on a `Result` elaborates**, at the runtime stage `R⟨∅; con n⟩`, through the member
+of `from_result` at the error type `con n` of `e`. -/
 theorem tryResult_elab {Γ Δ e n a e'}
-    (he : Elab P Γ Δ e (.app (.app (.con S.result) (.app (.con S.errors) (.con n))) a) .R e') :
-    ∃ e'', Elab P Γ Δ (S.tryResult n e) a .R e'' :=
+    (he : Elab P Γ Δ e (.app (.app (.con S.result) (.app (.con S.errors) (.con n))) a)
+      (.R .cnil (.con n)) e') :
+    ∃ e'', Elab P Γ Δ (S.tryResult n e) a (.R .cnil (.con n)) e'' :=
   ⟨_, .app (elab_const (S.hFromResult n) (ts := [a]) rfl
-    (τ := .arr .R (.app (.app (.con S.result) (.app (.con S.errors) (.con n))) a) a .cnil) rfl) he
-    (.inr rfl)⟩
+    (τ := .arr (.R .cnil (.con n)) (.app (.app (.con S.result) (.app (.con S.errors) (.con n))) a) a
+      .cnil) rfl) he (.inr rfl)⟩
 
 /-- **`let y = e? in b` on an `Option` elaborates** when the rest returns an `Option`. -/
 theorem tryOption_elab {Γ Δ e b a r φ e' b'} (he : Elab P Γ Δ e (optTy a) φ e')

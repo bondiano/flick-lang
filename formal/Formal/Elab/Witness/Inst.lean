@@ -44,7 +44,7 @@ theorem dcons_m {s : Scheme} {c : Nat} {v r : Flick.Tm} {fs l}
 theorem typ_optBind_tr (c d a b e : Ty) {φ} :
     Typ Sg Ψ Θ [] optBind (.ex (trT N (bindTy (.con 6) c d a b e)) φ) := by
   simp only [bindTy, arrP, appQ, trT, if_neg (show (6 : Nat) ≠ 2 by decide),
-    if_neg (show (6 : Nat) ≠ 4 by decide), trStage]
+    if_neg (show (6 : Nat) ≠ 4 by decide)]
   refine typ_optBind ?_
   intro x h; rcases x with n | p <;>
     simp [optT, N, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind
@@ -52,7 +52,7 @@ theorem typ_optBind_tr (c d a b e : Ty) {φ} :
 theorem typ_optMap2_tr (c d a b x g d' : Ty) {φ} :
     Typ Sg Ψ Θ [] optMap2 (.ex (trT N (map2Ty (.con 6) c d a b x g d')) φ) := by
   simp only [map2Ty, arrP, appQ, trT, if_neg (show (6 : Nat) ≠ 2 by decide),
-    if_neg (show (6 : Nat) ≠ 4 by decide), trStage]
+    if_neg (show (6 : Nat) ≠ 4 by decide)]
   refine typ_optMap2 ?_ ?_ ?_ <;> intro y h <;> rcases y with n | p <;>
     simp [optT, N, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind
 

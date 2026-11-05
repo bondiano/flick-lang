@@ -56,7 +56,7 @@ theorem Shp.of_substT {σ : Atom → Ty} :
       rcases Ty.hd_of_substT σ hT with h | h
       · exact .adt hs hU h
       · exact .hidden h
-  | .tvar _, _, _ | .rg _, _, _ | .caps _, _, _ | .arrow .., _, _ | .ref _, _, _
+  | .tvar _, _, _ | .rg _, _, _ | .caps _, _, _ | .row _, _, _ | .arrow .., _, _ | .ref _, _, _
   | .eff .., _, _ | .layer .., _, _ | .errors _, _, _ | .env _, _, _ | .hnd _, _, _
   | .owner _, _, _ | .dict .., _, _ => .hidden (by simp [Ty.Opaque, Ty.hd])
 
@@ -87,17 +87,51 @@ theorem HPat.substT {ε₀ p θ Δ} (σ : Atom → Ty) (h : HPat S ε₀ p θ Δ
   | var => exact .var
   | ctor hp => exact .ctor (hp.substT σ)
 
+/-- A type that does not reach a region keeps not reaching it under a substitution that
+keeps the region and brings in no other. -/
+theorem Ty.no_rg_substT {t : Ty} {σ : Atom → Ty} {p : Nat}
+    (hav : ∀ b q, (σ b).reach (.r q) → b = .r q) (ht : ¬ t.reach (.r p)) :
+    ¬ (t.substT σ).reach (.r p) := fun h => by
+  obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ _).mp h
+  rw [hav b _ h'] at hb; exact ht hb
+
+/-- What a `handle` lets through: all but the names of the raised row. -/
+theorem Row.passes_substT {ε₀ ε' : Row} (σ : Atom → Ty) (h : ∀ x, ε₀ x → (∃ N, x = .nm N) ∨ ε' x) :
+    ∀ x, ε₀.substT σ x → (∃ N, x = .nm N) ∨ ε'.substT σ x := by
+  have key : ∀ {y}, ε₀ y → (∀ N, y ≠ .nm N) → ε' y := fun hy hn =>
+    (h _ hy).resolve_left fun ⟨N, h'⟩ => hn N h'
+  intro x hx
+  cases x with
+  | nm N => exact .inl ⟨N, rfl⟩
+  | atm a =>
+    refine .inr ?_
+    rcases hx with ⟨b, hb, h'⟩ | ⟨b, hb, h'⟩
+    · exact .inl ⟨b, key hb (by simp), h'⟩
+    · exact .inr ⟨b, key hb (by simp), h'⟩
+  | ob _ a | need _ a | rv a =>
+    obtain ⟨b, hb, h'⟩ := hx; exact .inr ⟨b, key hb (by simp), h'⟩
+
 theorem Catches.substT {ε₀ : Row} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom → Ty)
     (h : ∀ n, H n → Catches S ε₀ p θ n ∨ H' n) :
     ∀ n, H.substT σ n → Catches S (ε₀.substT σ) p (θ.substT σ) n ∨ H'.substT σ n := by
   intro n hn
   cases n with
   | nm N =>
-    rcases h _ hn with (⟨rfl, h'⟩ | ⟨rfl, h'⟩) | h'
-    · exact .inl (.inl ⟨rfl, h'⟩)
-    · exact .inl (.inr ⟨rfl, h'⟩)
-    · exact .inr h'
-  | atm a | ob _ a | need _ a =>
+    rcases hn with hn | ⟨b, hb, h'⟩
+    · rcases h _ hn with (⟨rfl, h'⟩ | ⟨rfl, h'⟩) | h'
+      · exact .inl (.inl ⟨rfl, .inl h'⟩)
+      · exact .inl (.inr ⟨rfl, h'⟩)
+      · exact .inr (.inl h')
+    · rcases h _ hb with h | h
+      · exact h.elim
+      · exact .inr (.inr ⟨b, h, h'⟩)
+  | atm a =>
+    rcases hn with ⟨b, hb, h'⟩ | ⟨b, hb, h'⟩ <;> rcases h _ hb with h | h
+    · exact h.elim
+    · exact .inr (.inl ⟨b, h, h'⟩)
+    · exact h.elim
+    · exact .inr (.inr ⟨b, h, h'⟩)
+  | ob _ a | need _ a | rv a =>
     obtain ⟨b, hb, h'⟩ := hn
     rcases h _ hb with h | h
     · exact h.elim

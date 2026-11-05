@@ -117,7 +117,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | tryP : Typ Ψ Θ Γ e (.ex t .pure) → Typ Ψ Θ Γ A (.halts Row.none H t φ) →
       Typ Ψ Θ Γ (.try_ e A) (.ex t φ)
   | handle : Value v → Typ Ψ Θ Γ v (.ex (.errors ε₀) .pure) → Typ Ψ Θ Γ A (.halts ε₀ H t φ) →
-      HCov S v H ε' → (∀ a, ε₀ (.atm a) → ε' (.atm a)) → (Stage.rt Row.none ε').le φ →
+      HCov S v H ε' → (∀ x, ε₀ x → (∃ N, x = .nm N) ∨ ε' x) → (Stage.rt Row.none ε').le φ →
       Typ Ψ Θ Γ (.handle v A) (.ex t φ)
   | hnil : (∀ n, ¬ H n) → Typ Ψ Θ Γ .anil (.halts ε₀ H t φ)
   | hcons : HPat S ε₀ p θ Δ → Typ Ψ Θ (Δ.map .mono ++ Γ) b (.ex t φ) →
@@ -127,10 +127,10 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ (Δ.map .mono ++ Γ) b (.ex t φ) → Typ Ψ Θ Γ r (.halts ε₀ H' t φ) → Row.Sub H H' →
       Typ Ψ Θ Γ (.aguard p g b r) (.halts ε₀ H t φ)
   | provideL : Typ Ψ Θ Γ l (.ex (.layer i ε₂ o) φ) → Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.union o r) ε) → (∀ N a, φ₀.svc (.ob N a) → ¬ o (.nm N)) →
+      φ₀.le (.rt (Row.union o r) ε) → (o.Named ∧ ∀ N a, φ₀.svc (.ob N a) → ¬ o (.nm N)) →
       (Stage.rt (Row.union i r) (Row.union ε₂ ε)).le φ → Typ Ψ Θ Γ (.provide l e) (.ex t φ)
   | provideE : Typ Ψ Θ Γ l (.ex (.env o) φ) → Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.union o r) ε) → (∀ N a, φ₀.svc (.ob N a) → ¬ o (.nm N)) →
+      φ₀.le (.rt (Row.union o r) ε) → (o.Named ∧ ∀ N a, φ₀.svc (.ob N a) → ¬ o (.nm N)) →
       (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.provide l e) (.ex t φ)
   | with_ : Value θ → Typ Ψ Θ Γ θ (.ex (.env ρ) .pure) → Typ Ψ Θ Γ e (.ex t φ₀) →
       φ₀.le (.rt (Row.withP Θ q ρ r) ε) → (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.with_ q θ e) (.ex t φ)
@@ -150,7 +150,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | inside : (∀ C s, F C s → s = .rg p ∧ ∀ q, C (.r q) → q < p) →
       Typ Ψ (Facts.union Θ F) Γ e (.ex t φ') →
       φ'.le (.rt (Row.union (Row.scope (.rg p)) (Row.union r (Row.union (Row.disch (.r p) r) (Row.needs (.r p))))) ε) →
-      ¬ t.reach (.r p) → ¬ ε (.atm (.r p)) → (Stage.rt r ε).le φ → Le t T →
+      ¬ t.reach (.r p) → ¬ (Ty.errors ε).reach (.r p) → (Stage.rt r ε).le φ → Le t T →
       Typ Ψ Θ Γ (.inside p e) (.ex T φ)
   | cap : Typ Ψ Θ Γ (.cap p) (.ex (.hnd (.rg p)) φ)
   | own : Typ Ψ Θ Γ (.own p) (.ex (.owner (.rg p)) φ)

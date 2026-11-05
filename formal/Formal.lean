@@ -1,5 +1,6 @@
 import Formal.Syntax
 import Formal.TyOps
+import Formal.SchemeOps
 import Formal.DictOps
 import Formal.Subst
 import Formal.Reach

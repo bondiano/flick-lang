@@ -25,7 +25,8 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 
 ## What is proved
 
-- **The core** (`Formal/`, the top-level modules): type soundness `T1` (Progress and
+- **The core** (`Formal/`, the top-level modules), with rows of services and errors that
+  take variables, generalized and instantiated as variables of the other kinds: type soundness `T1` (Progress and
   Preservation over every reachable configuration), `T2a` (a pure computation makes only
   pure steps) and `T2b` (a runtime computation asks only the services and raises only the
   errors of its row), `lemma_3_1` and `T3` (generalization and the store typing), `T4` (T4.1, T4.2: live work reaches only live
@@ -35,7 +36,8 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
-- **T6, the elaboration** (`Formal/Elab/`): `T6a` (`Elab/T6a.lean`), an elaborated term is
+- **T6, the elaboration** (`Formal/Elab/`), with runtime stages `R r e` whose rows take
+  variables: `T6a` (`Elab/T6a.lean`), an elaborated term is
   typed in the target, with `T6a_default_instance` (`Elab/Defaults.lean`) for what an instance
   takes from a default, its default signature's dictionaries derived under its context, and `T6b` (`Elab/Coherence.lean`), two elaborations that differ only
   in the derivations of their dictionaries give the same result. Both are stated for an
@@ -76,10 +78,11 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | Document | Lean |
 | - | - |
 | `core.md` §1.2 types, stages, rows; `σ` | `Ty`, `Stage`, `Row`, `Scheme` (`Syntax.lean`) |
+| row variables, the row an instance stands for | `Elem.rv`, `Ty.row`, `Ty.asRow`, `Row.Named` (`Syntax.lean`); `Ty.asRow_substT`, `Ty.reach_asRow` (`TyOps.lean`) |
 | `regions.md` §1.2 atoms, capture sets, `τ^C`, `H ϱ`, `Owner ϱ`, `Scope ϱ` | `Atom`, `Caps`, `Elem`; `Ty.arrow`/`Ty.eff` with `C`, `Ty.caps`, `Ty.rg`, `Ty.hnd`, `Ty.owner`; `Row.scope` (`Syntax.lean`) |
 | `regions.md` §2.1 `⌈τ⌉`; its commutation with substitution | `Ty.reach`; `Ty.reach_substT`, `Scheme.reach_substT` (`TyOps.lean`, `Reach.lean`) |
 | `regions.md` §2.4 `Θ ⊢ Outlives C ϱ` | `Facts`, `Outl` (`Syntax.lean`); dropping facts that follow: `Typ.cut` (`Cut.lean`) |
-| type substitution, `Gen` and instantiation | `Ty.substT`, `Ty.up`, `liftT`, `instT` (`TyOps.lean`) |
+| type substitution, `Gen` and instantiation | `Ty.substT`, `Ty.up`, `liftT`, `instT` (`TyOps.lean`); `Scheme.substT`, `Scheme.inst` (`SchemeOps.lean`) |
 | `core.md` §1.3 terms, patterns; §3.1 run-time forms; `regions.md` §1.3, §3.1 | `Tm`, `Pat` (`Syntax.lean`) |
 | what a term holds: free variables, run-time regions, locations (the premise of (Lam)/(Task)) | `Tm.Free`, `Tm.Has`, `held` (`Reach.lean`) |
 | §1.3, §3.1 values | `Value`, `IsEnv` (`Typing.lean`) |
@@ -120,7 +123,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | T1 | `T1` (`Soundness.lean`) |
 | T2(a), T2(b) | `T2a`, `T2b`, `T2b_await` (`Effects.lean`) |
 | lemma 3.1, T3 | `lemma_3_1`, `T3` (`Generalization.lean`) |
-| a polymorphic use; a scope that acquires and uses, as checks | `Examples.lean` |
+| a polymorphic use; a use of a row-polymorphic function at a row of services; a scope that acquires and uses, as checks | `Examples.lean` |
 
 ## Representation
 
@@ -141,9 +144,18 @@ variable or a run-time region, and a capture set is a set of atoms (`Atom → Pr
 atom `a` with `⌈σ a⌉`; then `⌈τ[σ]⌉ = ⌈τ⌉[σ]` holds by definition of the substitution on
 sets (`Ty.reach_substT`). A capture row variable instantiated by `caps C` is the set `C`,
 a region variable instantiated by `rg π` is `{π}`, a type variable instantiated by `υ` is
-`⌈υ⌉`: one substitution serves all kinds. A row is a set of elements, a name or an atom:
-in a row of services the atom `ϱ` is `Scope ϱ`, in a row of errors the atoms bound what
-the errors reach (`⌈Errors ε⌉`), so rows are substituted too.
+`⌈υ⌉`: one substitution serves all kinds. A row is a set of elements, a name, an atom or
+a row variable `rv a`: in a row of services the atom `ϱ` is `Scope ϱ`, in a row of errors
+the atoms bound what the errors reach (`⌈Errors ε⌉`), so rows are substituted too. A row
+variable instantiated by `row r` is the names, atoms and variables of `r` (`Ty.asRow`;
+obligations and uses do not come in through a variable), one instantiated by a type
+variable is that variable, by any other type the atoms the type reaches. Then the row a
+type stands for commutes with substitution (`Ty.asRow_substT`), and `⌈τ⌉` is what `τ`
+stands for as atoms and variables (`Ty.reach_asRow`), which keeps `⌈τ[σ]⌉ = ⌈τ⌉[σ]` and
+the composition of substitutions with kinds unchecked. A substitution of a term with
+run-time forms brings no names into rows (`NoNames`, part of `Fits`): the renaming
+`kill`, shifts and the region of a new scope are such, and only source code is
+instantiated by rows of names.
 
 Types have no binders; a scheme `⟨k, Θ, τ⟩` binds the indices `0 … k-1` of `τ` and of its
 facts `Θ`. Terms carry no types (Curry style), so a type substitution changes the judgment
@@ -166,8 +178,8 @@ Lists inside terms and types are spines, so `Tm` and `Ty` are plain inductive ty
 - match and `try` arms are `acons p b rest`, `aguard p g b rest`, ending in `anil`, with
   their own judgment forms `J.alts` and `J.halts` in the same inductive `Typ`.
 
-Rows are closed sets, `Elem → Prop`; equality of rows is extensional, which is
-`≡` of §1.2. Every rule types its premises at the stage of its conclusion, and the
+Rows are sets, `Elem → Prop`, with variables among their elements; equality of rows is
+extensional, which is `≡` of §1.2. Every rule types its premises at the stage of its conclusion, and the
 subsumption `≤` is folded into the rules whose result may be an arrow or an `Eff`; (Sub)
 is then admissible (`Typ.sub`). With (Sub) this is equivalent to the `⊔` form of §2.3,
 and inversion stays a plain `cases`. (≤-Cap) is a premise of `Le.arrow` and `Le.eff`:
@@ -186,9 +198,17 @@ finalizers, both computations. A configuration is a main thread with `Λ` and `�
 
 Each item narrows `core.md` or `regions.md` unless it says otherwise.
 
-1. **Rows are closed**, so row variables are neither generalized nor instantiated:
-   constants are typed at any rows (`CArg`), but schemes do not abstract over them.
-   Polymorphism is over variables of the other kinds. Nominal types have parameters
+1. **Row variables are variables of the scheme.** A scheme abstracts a row variable as
+   any other variable, and (Var) instantiates it by a row (`Ty.row`); constants are typed
+   at any rows (`CArg`). Kinds are not checked. A row variable stands for names, atoms and
+   variables, never for obligations or uses; the rows that must be named are those of the
+   outputs of `Layer.merge`, the services of `provide` and the work of `Fiber.spawn` and
+   `Scope.add_finalizer` (`Row.Named`, items 8 and 21). `⌈Errors ε⌉` counts the row
+   variables of `ε`, as `regions.md` §2.1 and the checker do (`regions/mod.rs`
+   `error_row_captures`): an instance shows what its errors reach, and `⌈·⌉` must commute
+   with it, so a closure over an error of an unknown row holds that row. What still keeps a
+   region out of an error is (Err-Decl) and (Err-Raise) of `regions.md` §2.5 (`FLICK-E005`),
+   of which the model needs only the second (item 18). Nominal types have parameters
    (`Sig.ctor` gives their number); their fields mention only the parameters
    (`Sig.ctor_closed`, `Sig.ctor_reach`); services have no parameters (`Sig.impl_closed`).
    (Let-Sig) is (Let-Gen) or (Let-Mono) with the annotation erased: terms carry no types,
@@ -217,12 +237,15 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    §1.5 at the only place the core needs it. (Errors-Val) types values only, as in §3.6.
 7. **`try` arms** are `x`/`_` at `Errors ε_b` or a constructor pattern `E p̄` at an error
    type `E` without parameters. `H` is a judgment index: each arm without `when` may add
-   what it catches (`Catches`), names only. (Handle) uses the value form of the coverage
-   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the caught errors reach passes to the errors it lets through.
+   what it catches (`Catches`), names only: a row variable of `ε_b` passes to `ε'` even
+   under `x`/`_`. (Handle) uses the value form of the coverage
+   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the caught errors reach and their row variables pass to the errors it lets through.
 8. **Environments.** `Env ρ` means "binds exactly `ρ`", as (Env), (Bind) and (Join)
    give it: T4.3 needs that a `with` frame answers `S` exactly when its row has `S`. `with θ e` and `econs` require
    `θ` and the bound values to be values. The disjointness of `Layer.merge` is kept
-   (`Const.ok`) though soundness does not need it.
+   (`Const.ok`) though soundness does not need it. The services a `provide` gives and the
+   outputs `Layer.merge` joins are named, without row variables (`Row.Named`): a row
+   variable among the outputs (`core.md`, [`provide` and output row variables](../docs/formal/core.md#provide-discharges-only-the-listed-outputs-of-a-layer-not-a-row-variable)) is not modelled.
 9. **Allocation is deterministic:** `Ref.make v` takes `ℓ = μ.length`, `scope` takes
    `π = Λ.length`.
 10. **Programs** are closed terms typed in the empty store with no facts; modules
@@ -289,7 +312,9 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     that closes `π` says that nothing that can step reaches `π`.
 21. **Obligations of `provide` (regions.md §2.7) are row elements.** `Provided {S} ϱ` is
     an element `ob S ϱ` of a row of services; `Fiber.spawn` and `Scope.add_finalizer`
-    put one for each service of the work into the stage of the call (`Row.obs`). A
+    put one for each service of the work into the stage of the call (`Row.obs`); the
+    services of the work are named, so `Provided r ϱ` over a row variable `r` is not
+    modelled (`Const.ok`). A
     `provide` in a program binds no region variable: an obligation about a region
     created in its body is discharged at the end of that region (`Row.disch`, the second
     case of §2.7, `S` coming from outside it), and one that reaches a `provide` giving `S`
@@ -443,7 +468,7 @@ and `Target`. See [The core as the target](#the-core-as-the-target).
 | §3.2 `for`, §3.3 `?`, §3.4 blocks | `Clause`, `Sugar.gen`, `Sugar.loop`, `GenOk`, `LoopOk`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`, `T6a_sugar` (`Elab/Sugar.lean`, `Elab/Comprehension.lean`) |
 | Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`); the schemes of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List` generated from the checker, those the model cannot write listed as skipped with a reason (`Elab/PreludeSchemes.lean`, [Prelude scheme generator with skip list](../docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names)) |
 | "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim`, then `T6b_target` (`Elab/Run.lean`) |
-| §0.1 `⟦·⟧` into the core with regions: types, stages, schemes | `Names`, `trT`, `trTT`, `trD`, `trS`, `trStage`, `trT_subst`, `trT_reach` (`Elab/CoreTy.lean`) |
+| §0.1 `⟦·⟧` into the core with regions: types, stages with rows, schemes | `Names`, `trT`, `trTT`, `trD`, `trS`, `trStage`, `trT_arr`, `Stage.qual`, `trT_subst`, `trStage_subst`, `trT_reach` (`Elab/CoreTy.lean`) |
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
 | §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
 | T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
@@ -506,11 +531,13 @@ Simplifications:
 9. The sugar (§3) desugars into `Exp`; `Sugar` names the Prelude methods (`flat_map`,
    `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
    hypotheses on the program. The schemes of the Prelude names are generated from the
-   checker (`PreludeSchemes.lean`); `pair`, `unc n` and `each_P` have no Prelude name and are
-   written in `Sugar.lean`. `from_result` is a family `from_result_n` over closed rows of
-   errors, one error type `con n` each (`frSch`, equal to the generated scheme at `e := con n`
-   by `frSch_gen`): the core has no row variables, and `e?` takes the member of the row
-   of `e`'s type (`tryResult_elab`). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
+   checker (`PreludeSchemes.lean`), with the rows of their arrows: `->{r; e}` is the stage
+   `R r e` and its row variables are binders of the scheme (`traverse`, `Seq.each_effect`); a
+   row with a named element or a union is skipped (`timeout`). `pair`, `unc n` and `each_P` have no Prelude name and are
+   written in `Sugar.lean`. `from_result` is a family `from_result_n` over error types, one
+   `con n` each, at the stage `R⟨∅; con n⟩` (`frSch`, equal to the generated scheme at `e := con n`
+   by `frSch_gen`): its `raise` adds the atom `e` to the row, which the row variable `⟦e⟧`
+   does not give, and `e?` takes the member at `e`'s error type (`tryResult_elab`, at that stage). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
    hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
    qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and
    data without storage drops it. That argument is invariant, so a qualifier the caller
@@ -524,13 +551,19 @@ Simplifications:
    `p₁ <- e₁ and … and pₙ <- eₙ` form a left-nested tuple built by `map2 pair`, and
    `λ(p₁, …, pₙ). e` is `unc n (λp₁ … pₙ. e)` with a constant `unc n` per arity; the checker
    uses flat tuples with the same curried patterns. The clauses of `for … yield` run at `P`
-   (Sync calls are not modelled) and the loop of `for … do` at its stage, with one constant
-   `Seq.each_φ` per stage ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
+   (Sync calls are not modelled) and the loop of `for … do` at its stage, with the constant
+   `Seq.each_P` at `P` and the one `Seq.each_effect : ∀c d a r e. …` at every `R r e`, used at
+   the rows of the loop ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
-10. The core instance. `⟦R⟧ = rt ∅ ε` with `ε` every name (`allNames`): the stage `R`
-    of the source has no row of errors, so a runtime body may raise any error type that reaches
-    nothing. `Bool` is `base bool`, `Int` (`con 4`) is `base int`, other
+10. The core instance. `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ε)` with `ε` every name (`allNames`): a row
+    of the source is a type, a row variable `var n` or `cnil`, and `⟦r⟧` is what `⟦r⟧` stands
+    for as a row (`Ty.asRow`), the row variable `n`; every error name stays in the row, so a
+    runtime body may raise any error type that reaches nothing. The source compares stages
+    by equality and its `⌈·⌉` counts the variables of the rows of an arrow, so the qualifier
+    of a translated `R r e` arrow counts them too (`Stage.qual`); a `P` arrow translates as
+    before (`trT_arr`). A substitution acts on the rows of a stage, and `T6a_close` closes the
+    stage with the types (`φθ`). `Bool` is `base bool`, `Int` (`con 4`) is `base int`, other
     constructors are ADTs named by `Names.con`. `Real` is a hypothesis on the core's signature, not on the
     bodies of the globals (`RootTy`, part of the run). A class has a record type for each number of
     parameters (`Names.cls C n`), because the law `slot` holds for any constraint `q`;
@@ -556,7 +589,7 @@ Simplifications:
     `to_list` and `iter` are fixpoints over it, and the laziness of the checker's `Seq` is not
     modelled (T6 needs only the types of [Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes), and the witness has no infinite or effectful
     sequence). `Rec` has one field, so the `&&` of the structural `eq` over its fields is one
-    comparison by the slot dictionary `D_{Eq Int}`. `from_result_n` is a member at one closed
+    comparison by the slot dictionary `D_{Eq Int}`. `from_result_n` is a member at one
     error type (simplification 9). `eq` on `Int` is the constant `intEq`, and `unc n` is
     built by a Lean function of `n` and typed by induction. A match has one arm per
     constructor and no `_` (`exh_ctors`, `Exh.lean`), also in the lazy `Monad Eff`.
@@ -567,11 +600,12 @@ Simplifications:
 #### Captures in `Elab` and `Target`
 
 - **Types** (`Elab/Syntax.lean`). `Ty` has `arr (φ : Stage) (a b q : Ty)`, `cnil` and
-  `cun (q q' : Ty)` ([source arrow is a separate type form](../docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor)). The qualifier `q` is a capture row written
+  `cun (q q' : Ty)` ([source arrow is a separate type form](../docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor)); `Stage` is `P` or `R r e` with the rows
+  written as types, mutual with `Ty` (`Ty.ind` is its induction). The qualifier `q` is a capture row written
   as a type: a variable, `cnil`, or a union. Substitution is structural, so `DecidableEq`,
   `Ty.agree_of_eq` and K1 work without semantic sets. `Ty.reach` is the occurrence of a
   variable: `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈app⌉ = ⌈cun⌉ = ∪` and
-  `⌈arr φ a b q⌉ = ⌈a⌉ ∪ ⌈b⌉ ∪ ⌈q⌉`. Capture variables are ordinary variables, so
+  `⌈arr φ a b q⌉ = ⌈a⌉ ∪ ⌈b⌉ ∪ ⌈q⌉` with the variables of the rows of `φ`. Capture and row variables are ordinary variables, so
   (Var), (Method) and (Const) instantiate them through `ts` with no new rule. Schemes
   have no `Outlives` facts: `⟦·⟧` drops `Fiber.Outlives` (§2.1).
 - **Schemes.** `Scheme` has `q : Ty`, the qualifier of its dictionary arrows
@@ -656,8 +690,9 @@ are schemes, and fields need not be values.
 for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
 
 - **Types** (`CoreTy.lean`). `var ↦ tvar`, `app ↦ tapp`, `Bool ↦ base bool`,
-  other constructors `↦ adt (N.con c)`, `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉`,
-  `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R⟧ = rt ∅ allNames` (simplification 10).
+  other constructors `↦ adt (N.con c)`, `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉` (at `R r e` with
+  the variables of the rows), `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ allNames)`
+  (simplification 10).
   `trT_subst`/`trTT_subst`/`trS_subst` and `trT_reach` are the two commutations. The
   names of the core are a parameter `Names`, not a fixed encoding.
   `D_{C τ̄} ↦ dict (N.cls C |τ̄|) ⟦τ̄⟧`: the class name carries the number of parameters,

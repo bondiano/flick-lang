@@ -30,22 +30,27 @@ services the atom `ϱ` is `Scope ϱ`; in a row of errors the atoms bound what th
 errors reach, `⌈Errors ε⌉` (regions.md §2.1). A row of services also carries the
 obligations `{Provided {S} ϱ}` not yet discharged (`ob S ϱ`, regions.md §2.7) and, at
 run time, the uses `need S π` of a service `S` that a `with` frame of the `provide`
-region `π` answers. -/
+region `π` answers. `rv a` is a row variable: a substitution replaces it with the row
+that `σ a` stands for (`Ty.asRow`). -/
 inductive Elem
   | nm (N : Name)
   | atm (a : Atom)
   | ob (N : Name) (a : Atom)
   | need (N : Name) (a : Atom)
+  | rv (a : Atom)
 
 instance : Coe Name Elem := ⟨Elem.nm⟩
 
-/-- A closed row of services or errors. Equality of rows is extensional, which is
-`≡` of core.md §1.2 for closed rows. -/
+/-- A row of services or errors, possibly with row variables. Equality of rows is
+extensional, which is `≡` of core.md §1.2. -/
 abbrev Row := Elem → Prop
 
 def Row.none : Row := fun _ => False
 def Row.single (S : Name) : Row := fun n => n = .nm S
 def Row.union (r r' : Row) : Row := fun n => r n ∨ r' n
+/-- A row without row variables. -/
+def Row.Named (r : Row) : Prop := ∀ a, ¬ r (.rv a)
+
 /-- `ρ ⊆ ρ'`. -/
 def Row.Sub (r r' : Row) : Prop := ∀ n, r n → r' n
 /-- The atoms of a set as row elements: `Scope ϱ` for a region `ϱ`. -/
@@ -96,13 +101,15 @@ A record type is a spine `rcons ℓ τ (… rnil)`; field order is fixed. A nomi
 type `T ā` is a spine `tapp (… (tapp (adt T) a₁) …) aₙ`. A region is `tvar n` or
 `rg π`; a capture row is `tvar n` or `caps C`. The hidden qualifier `C` of a
 function or a computation is part of `arrow` and `eff`; that of data with hidden
-storage is a parameter of kind `CRow` of its type. `hnd ϱ` is `H ϱ`. `dict c ā` is the
+storage is a parameter of kind `CRow` of its type. A row of services or errors is `tvar n`
+or `row r`. `hnd ϱ` is `H ϱ`. `dict c ā` is the
 dictionary record `D_C ā` of λFlick⁺ (elaboration.md §0.1), its arguments a spine
 `Ty.spine`; it reaches nothing. -/
 inductive Ty
   | tvar (n : Nat)
   | rg (p : Nat)
   | caps (C : Caps)
+  | row (r : Row)
   | base (b : Base)
   | arrow (a : Ty) (φ : Stage) (b : Ty) (C : Caps)
   | ref (t : Ty)
@@ -119,17 +126,19 @@ inductive Ty
   | dict (c : Nat) (args : Ty)
 
 /-- `⌈τ⌉` of regions.md §2.1: the atoms a value of type `τ` may reach. Rows of
-services are not in it; a row of errors contributes its atoms. -/
+services are not in it; a row of errors contributes its atoms and its variables, which
+bound what the errors of an unknown row reach. -/
 def Ty.reach : Ty → Caps
   | .tvar n => fun a => a = .v n
   | .rg p => fun a => a = .r p
   | .caps C => C
+  | .row r => fun a => r (.atm a) ∨ r (.rv a)
   | .arrow a _ b C => fun x => a.reach x ∨ b.reach x ∨ C x
   | .ref t => t.reach
   | .tapp f a => fun x => f.reach x ∨ a.reach x
   | .rcons _ t r => fun x => t.reach x ∨ r.reach x
   | .eff _ _ t C => fun x => t.reach x ∨ C x
-  | .errors e => fun x => e (.atm x)
+  | .errors e => fun x => e (.atm x) ∨ e (.rv x)
   | .hnd s => s.reach
   | .owner s => s.reach
   | _ => Caps.none
@@ -137,11 +146,28 @@ def Ty.reach : Ty → Caps
 /-- A set of atoms after a substitution: each atom becomes `⌈σ a⌉`. -/
 def Caps.substT (σ : Atom → Ty) (C : Caps) : Caps := fun a => ∃ b, C b ∧ (σ b).reach a
 
+/-- The names, atoms and variables of a row: obligations and uses never come in through
+a row variable. -/
+def Row.plain (r : Row) : Row
+  | .ob .. | .need .. => False
+  | x => r x
+
+/-- What a type stands for as the instance of a row variable: a variable is itself, a
+`row r` the plain part of `r`, any other type the atoms it reaches. -/
+def Ty.asRow : Ty → Row
+  | .tvar n => fun x => x = .rv (.v n)
+  | .rg p => fun x => x = .rv (.r p)
+  | .row r => r.plain
+  | t => Row.ofCaps t.reach
+
+/-- A row after a substitution: a name stays, an atom `a` (also of an obligation or a
+use) becomes the atoms of `⌈σ a⌉`, a row variable `a` the row `σ a` stands for. -/
 def Row.substT (σ : Atom → Ty) (r : Row) : Row
-  | .nm n => r (.nm n)
-  | .atm a => ∃ b, r (.atm b) ∧ (σ b).reach a
+  | .nm n => r (.nm n) ∨ ∃ b, r (.rv b) ∧ (σ b).asRow (.nm n)
+  | .atm a => (∃ b, r (.atm b) ∧ (σ b).reach a) ∨ ∃ b, r (.rv b) ∧ (σ b).asRow (.atm a)
   | .ob n a => ∃ b, r (.ob n b) ∧ (σ b).reach a
   | .need n a => ∃ b, r (.need n b) ∧ (σ b).reach a
+  | .rv a => ∃ b, r (.rv b) ∧ (σ b).asRow (.rv a)
 
 def Stage.substT (σ : Atom → Ty) : Stage → Stage
   | .pure => .pure
@@ -152,6 +178,7 @@ def Ty.substT (σ : Atom → Ty) : Ty → Ty
   | .tvar n => σ (.v n)
   | .rg p => σ (.r p)
   | .caps C => .caps (C.substT σ)
+  | .row r => .row (r.substT σ)
   | .base b => .base b
   | .arrow a φ b C => .arrow (a.substT σ) (φ.substT σ) (b.substT σ) (C.substT σ)
   | .ref t => .ref (t.substT σ)
@@ -432,11 +459,13 @@ def Const.ty (S : Sig) : Const → CArg → Ty
 
 /-- Side conditions of a constant at an instance: `Layer.merge` has disjoint
 outputs; a finalizer and a child outlive their owner, with everything they hold
-(`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`). -/
+(`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`). The outputs of
+`Layer.merge` and the services of a finalizer or a child are named: an obligation is
+about a named service, and so is disjointness. -/
 def Const.ok (Θ : Facts) : Const → CArg → Prop
-  | .merge, ι => ∀ N, ¬ (ι.o (.nm N) ∧ ι.o' (.nm N))
-  | .addFin, ι => Outl Θ ι.C ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
-  | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
+  | .merge, ι => (∀ N, ¬ (ι.o (.nm N) ∧ ι.o' (.nm N))) ∧ ι.o.Named ∧ ι.o'.Named
+  | .addFin, ι => Outl Θ ι.C ι.s ∧ (∀ N a, ¬ ι.r (.need N a)) ∧ ι.r.Named
+  | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ (∀ N a, ¬ ι.r (.need N a)) ∧ ι.r.Named
   | _, _ => True
 
 end Flick

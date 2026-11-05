@@ -99,17 +99,21 @@ theorem ent_close {Γ : List TSch} {Δl Δ : List Cn} {θ : Nat → Ty} {ρ : Na
       Function.comp_def, Ty.subst_comp]
     exact .cons (dict_apps X (X.inst (σ := fun n => (σ n).subst θ) h₁) ih) .nil
 
+theorem Stage.subst_or {ψ φ : Stage} (θ : Nat → Ty) (h : ψ = .P ∨ ψ = φ) :
+    ψ.subst θ = .P ∨ ψ.subst θ = φ.subst θ :=
+  h.imp (fun h => by rw [h]; rfl) (congrArg _)
+
 /-- **T6(a) with the premises closed.** `Γ; Δl, Δ ⊢ e : τ ! φ ⇝ e'` and `Δ` closed by `θ`, `ρ`
-to ground constraints give `⟦Γθ⟧, ⟦Δl θ⟧ ⊢⁺ e'[ρ] : τθ ! φ` in any target. -/
+to ground constraints give `⟦Γθ⟧, ⟦Δl θ⟧ ⊢⁺ e'[ρ] : τθ ! φθ` in any target. -/
 theorem T6a_close (hP : P.ConstsClosed) {Γ D e τ φ e'} (h : Elab P Γ D e τ φ e') :
     ∀ {Δl Δ : List Cn} {θ : Nat → Ty} {ρ : Nat → Dict}, D = Δl ++ Δ → Closes P Δ θ ρ →
       (∀ (k : Nat) (Q : Cn), Δ[k]? = some Q → (Q.subst θ).Ground) →
       X.Has ((Γ.map (·.subst θ)).map Scheme.tr) (Δl.map (·.subst θ)) (e'.dsubst ρ Δl.length)
-        (.mono (τ.subst θ)) φ := by
+        (.mono (τ.subst θ)) (φ.subst θ) := by
   induction h with
   | @var Γ D x σ ts ds φ hx hk he =>
     intro Δl Δ θ ρ hD hρ _; subst hD
-    have hv := X.var (Γ := (Γ.map (·.subst θ)).map Scheme.tr) (Δ := Δl.map (·.subst θ)) (φ := φ)
+    have hv := X.var (Γ := (Γ.map (·.subst θ)).map Scheme.tr) (Δ := Δl.map (·.subst θ)) (φ := φ.subst θ)
       (s := (σ.subst θ).tr) (ts := ts.map (·.subst θ))
       (by rw [List.getElem?_map, List.getElem?_map, hx]; rfl) (by simpa [Scheme.subst] using hk)
     rw [show (σ.subst θ).tr.ty.subst (inst (ts.map (·.subst θ))) =
@@ -122,7 +126,7 @@ theorem T6a_close (hP : P.ConstsClosed) {Γ D e τ φ e'} (h : Elab P Γ D e τ 
   | @meth Γ D m C σ c₀ rest ts d₀ ds φ hm hc _ _ h₀ he =>
     intro Δl Δ θ ρ hD hρ _; subst hD
     rw [Tm.dsubst_dapps]
-    cases ent_close X (Γ := (Γ.map (·.subst θ)).map Scheme.tr) (φ := φ) hρ h₀ with
+    cases ent_close X (Γ := (Γ.map (·.subst θ)).map Scheme.tr) (φ := φ.subst θ) hρ h₀ with
     | cons r _ =>
       simp only [Cn.subst_comp] at r
       have hv := X.meth hm hc r
@@ -132,11 +136,12 @@ theorem T6a_close (hP : P.ConstsClosed) {Γ D e τ φ e'} (h : Elab P Γ D e τ 
   | @const Γ D c σ ts ds φ hc hk he =>
     intro Δl Δ θ ρ hD hρ _; subst hD
     have hv := X.const (Γ := (Γ.map (·.subst θ)).map Scheme.tr) (Δ := Δl.map (·.subst θ))
-      (φ := φ) (ts := ts.map (·.subst θ)) hc (by simpa using hk)
+      (φ := φ.subst θ) (ts := ts.map (·.subst θ)) hc (by simpa using hk)
     rw [const_inst hP hc hk θ] at hv
     rw [Tm.dsubst_dapps]
     exact tm_dapps X hv (ent_close X hρ he)
-  | app _ _ hψ ih₁ ih₂ => intro _ _ _ _ hD hρ hg; exact X.app (ih₁ hD hρ hg) (ih₂ hD hρ hg) hψ
+  | app _ _ hψ ih₁ ih₂ =>
+    intro _ _ θ _ hD hρ hg; exact X.app (ih₁ hD hρ hg) (ih₂ hD hρ hg) (Stage.subst_or θ hψ)
   | ite _ _ _ ihc iha ihb =>
     intro _ _ _ _ hD hρ hg; exact X.ite (ihc hD hρ hg) (iha hD hρ hg) (ihb hD hρ hg)
   | caseOpt _ _ _ ihe ihn ihs =>
@@ -175,7 +180,7 @@ theorem T6a_close (hP : P.ConstsClosed) {Γ D e τ φ e'} (h : Elab P Γ D e τ 
       (fun j Q hj => let ⟨Q₀, h₀, e⟩ := hΔ j Q hj; e ▸ hg j Q₀ h₀)
     rw [List.map_append] at h₁
     have hd := X.lamD (q := σ.q.subst (lift σ.k θ)) h₁
-      (fun h => hp (.inl fun e => h (by simp [e])))
+      (fun h => by rw [hp (.inl fun e => h (by simp [e]))]; rfl)
       fun hc n hn => by
         obtain ⟨m, hm, ho⟩ := heldS_subst (heldT_of (e := e)
           (fun _ hx => he.free (Tm.free_dsubst hx)) hn)
@@ -188,7 +193,11 @@ theorem T6a_close (hP : P.ConstsClosed) {Γ D e τ φ e'} (h : Elab P Γ D e τ 
         ((Γ.map (·.subst θ)).map Scheme.tr).map (·.subst (up σ.k)) := by
       simp [List.map_map, Function.comp_def, Scheme.up_lift, Scheme.tr_subst]
     rw [hΔl, hΓ, List.length_map, List.length_append, List.length_map] at hd
-    exact X.let_ hd (fun h => hp (.inr h)) hφ (ih₂ rfl hρ hg)
+    have hφ' : φ₁.subst (lift σ.k θ) = .P ∨ φ₁.subst (lift σ.k θ) = φ.subst θ := by
+      by_cases hk : σ.k = 0
+      · rw [hk, lift_zero]; exact Stage.subst_or θ hφ
+      · exact .inl (by rw [hp (.inr hk)]; rfl)
+    exact X.let_ hd (fun h => by rw [hp (.inr h)]; rfl) hφ' (ih₂ rfl hρ hg)
 
 /-- A dictionary whose premises lie below `L`. -/
 def Dict.Below (L : Nat) : Dict → Prop

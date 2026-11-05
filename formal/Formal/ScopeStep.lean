@@ -48,12 +48,17 @@ theorem Caps.kill_fixed {C : Caps} {n : Nat} (h : ∀ q, C (.r q) → q < n) : C
     | v i => rfl
     | r q => simp [kill, h q ha]
 
-theorem Row.kill_fresh (ε : Row) (n : Nat) : ¬ (ε.substT (kill n)) (.atm (.r n)) := by
-  rintro ⟨b, _, hb⟩
-  exact Nat.lt_irrefl n ((kill_reach hb).2 n rfl)
-
 theorem Ty.kill_fresh (t : Ty) (n : Nat) : ¬ (t.substT (kill n)).reach (.r n) :=
   fun h => Nat.lt_irrefl n (Ty.reach_kill h)
+
+theorem Row.kill_fresh (ε : Row) (n : Nat) : ¬ (Ty.errors (ε.substT (kill n))).reach (.r n) :=
+  Ty.kill_fresh (.errors ε) n
+
+theorem instT_rg_noNames (n : Nat) : NoNames (instT [.rg n]) := by
+  intro b N h
+  cases b with
+  | v i => cases i <;> simp [instT, Ty.asRow_rg, Ty.asRow_tvar] at h
+  | r p => simp [instT, Ty.asRow_rg] at h
 
 theorem Stage.YF_kill {φ φ' : Stage} {n : Nat} (h : φ.le φ') (hφ' : φ'.substT (kill n) = φ') :
     (φ.substT (kill n)).le φ' := by
@@ -126,9 +131,10 @@ theorem scope_body {Ψ : List Ty} {Θ : Facts} {e : Tm} {t₀ : Ty} {φ' : Stage
       subst hq'; exact hlt _ rfl
   · have := Stage.le_substT (instT [.rg n]) (Stage.le_substT (liftT 1 (kill n)) hφ')
     have d₁ := Row.disch_substT_eq (a := .v 0) (a' := .v 0) (r := r.substT (shiftV 1))
-      (σ := liftT 1 (kill n)) (fun x => by simp [liftT])
+      (σ := liftT 1 (kill n)) (fun x => by simp [liftT]) ((kill_noNames n).lift 1)
     have d₂ := Row.disch_substT_eq (a := .v 0) (a' := .r n)
       (r := (r.substT (kill n)).substT (shiftV 1)) (σ := instT [.rg n]) (fun x => by simp [instT])
+      (instT_rg_noNames n)
     simpa [Stage.substT, Row.union_substT, Row.scope_substT, Row.up_comm, d₁, d₂, Row.up_inst,
       Ty.substT, instT, liftT] using this
 

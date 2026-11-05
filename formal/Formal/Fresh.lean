@@ -45,9 +45,27 @@ theorem kill_atom (n : Nat) (b a : Atom) (h : (kill n b).reach a) : kill n b = a
     · simp [kill, hq, Atom.ty]
     · simp [kill, hq, Ty.reach, Caps.none] at h
 
+theorem kill_noNames (n : Nat) : NoNames (kill n) := by
+  intro b N hb
+  cases b with
+  | v i => simp [kill, Ty.asRow_tvar] at hb
+  | r q =>
+    simp only [kill] at hb
+    split at hb <;> simp [Ty.asRow, Row.ofCaps] at hb
+
+/-- `kill n` sends a row variable to itself or to nothing. -/
+theorem kill_asRow {n : Nat} {b : Atom} {x : Elem} (h : (kill n b).asRow x) : x = .rv b := by
+  cases b with
+  | v i => simpa [kill, Ty.asRow_tvar] using h
+  | r q =>
+    simp only [kill] at h
+    split at h
+    · simpa [Ty.asRow_rg] using h
+    · cases x <;> simp [Ty.asRow, Row.ofCaps, Ty.reach, Caps.none] at h
+
 theorem Fits.kill {n : Nat} {e : Tm} (h : e.Below n) : Fits (kill n) e :=
   ⟨fun p hp => by simp [Flick.kill, h p hp], fun _ b _ hb => (kill_reach hb).1.symm,
-    fun _ b a hb => kill_atom n b a hb⟩
+    fun _ b a hb => kill_atom n b a hb, fun _ => kill_noNames n⟩
 
 theorem Ty.reach_kill {n : Nat} {t : Ty} {p : Nat} (h : (t.substT (kill n)).reach (.r p)) : p < n := by
   obtain ⟨b, _, hb⟩ := (Ty.reach_substT _ _ _).mp h

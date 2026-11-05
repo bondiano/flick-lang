@@ -17,17 +17,19 @@ theorem err_type {Ψ Θ v ε} (hv : Value v) (h : Typ S Ψ Θ [] v (.ex (.errors
   exact ⟨U, hε, hU, ht, hsub⟩
 
 /-- The arms of `try` remove names of errors, not what they reach. -/
-theorem Typ.halts_no_atm {Ψ Θ Γ A J} (h : Typ S Ψ Θ Γ A J) :
-    ∀ {ε₀ H t φ}, J = .halts ε₀ H t φ → ∀ a, ¬ H (.atm a) := by
+theorem Typ.halts_nm {Ψ Θ Γ A J} (h : Typ S Ψ Θ Γ A J) :
+    ∀ {ε₀ H t φ}, J = .halts ε₀ H t φ → ∀ x, H x → ∃ N, x = .nm N := by
   induction h with
-  | hnil hH => intro _ _ _ _ hJ; cases hJ; exact fun a => hH _
+  | hnil hH => intro _ _ _ _ hJ; cases hJ; exact fun x hx => (hH x hx).elim
   | hcons _ _ _ hH _ ih₂ =>
     intro _ _ _ _ hJ; cases hJ
-    intro a ha
-    rcases hH _ ha with h | h
-    · exact h.elim
-    · exact ih₂ rfl a h
-  | hguard _ _ _ _ hH _ _ ih₃ => intro _ _ _ _ hJ; cases hJ; exact fun a ha => ih₃ rfl a (hH _ ha)
+    intro x hx
+    rcases hH _ hx with h | h
+    · cases x with
+      | nm N => exact ⟨N, rfl⟩
+      | _ => exact h.elim
+    · exact ih₂ rfl x h
+  | hguard _ _ _ _ hH _ _ ih₃ => intro _ _ _ _ hJ; cases hJ; exact fun x hx => ih₃ rfl x (hH _ hx)
   | _ => intro _ _ _ _ hJ; cases hJ
 
 /-- After a failed `try` arm, the remaining arms still remove or let through the
@@ -194,21 +196,17 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
           · exact (h h').elim
           · exact .inl h'
         | ob N a =>
-          refine ⟨fun h => (h₀ N a hx h).elim, fun _ => ?_⟩
+          refine ⟨fun h => (h₀.2 N a hx h).elim, fun _ => ?_⟩
           rcases hx' with h' | h'
           · obtain ⟨_, h''⟩ := nm _ h'; cases h''
           · exact .inl h'
-        | atm a =>
+        | atm a | need _ a | rv a =>
           rcases hx' with h' | h'
           · obtain ⟨_, h''⟩ := nm _ h'; cases h''
           · exact .inl h'
-        | need N a =>
-          rcases hx' with h' | h'
-          · obtain ⟨_, h''⟩ := nm _ h'; cases h''
-          · exact .inl h'
-      have hε : ¬ ε (.atm (.r Λ.length)) := fun h => by
+      have hε : ¬ (Ty.errors ε).reach (.r Λ.length) := fun h => by
         obtain ⟨_, _, rfl, _, he'⟩ := Stage.rt_le hφr
-        have h' := he' _ h
+        have h' := h.imp (he' _) (he' _)
         simp only [Stage.substT, Stage.rt.injEq] at hφ
         rw [← hφ.2] at h'
         exact Row.kill_fresh _ _ h'
@@ -224,11 +222,9 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
       obtain ⟨K, k, ts, T, U, hK, hS, hT, hU, ht, hsub⟩ := canonical_errors hv hv'
       obtain ⟨_, _, rfl, _, hε'⟩ := Stage.rt_le hφ
       refine same (.handle hv (.errVal hv ht hU (hsub.trans hε.2)) hA
-        (fun K' k' ts' T' hK' hS' => ?_) (fun a ha => ?_) ⟨fun _ h => h.elim, hε'⟩)
+        (fun K' k' ts' T' hK' hS' => ?_) (fun x hx => ?_) ⟨fun _ h => h.elim, hε'⟩)
       · rw [hK] at hK'; cases hK'; rw [hS] at hS'; cases hS'; exact hs _ (hε.2 _ hT)
-      · rcases hs _ ha with h | h
-        · exact (hA.halts_no_atm rfl a h).elim
-        · exact h
+      · exact (hs _ hx).imp (hA.halts_nm rfl x) id
     | tryP hb =>
       obtain ⟨_, _, hε⟩ := raise_inv hv hb; exact hε.elim
     | errVal hv'' => exact (nv hv'').elim
@@ -272,7 +268,7 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
           rcases hx with rfl | hx
           · exact h
           · cases x with
-            | atm a => exact ha _ (hsub _ (.inr hx))
+            | atm a => exact ((ha _ (hsub _ (.inr hx))).resolve_left fun ⟨_, h⟩ => by cases h)
             | _ => exact hx.elim
     | errVal hv'' => exact (nv hv'').elim
   | scope =>

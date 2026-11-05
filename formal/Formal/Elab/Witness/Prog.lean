@@ -64,8 +64,8 @@ def constSch : Nat → Option Scheme
   | 5 => some ⟨2, [], arrP (appQ (.con 9) (.var 0) (.var 1)) (.app (.con 8) (.var 1)), .cnil⟩
   | 6 => some ⟨3, [], arrP (.arr .P (.var 2) (.con 1) (.var 0))
       (.arr .P (appQ (.con 9) (.var 1) (.var 2)) (.con 1) (.var 0)), .cnil⟩
-  | 7 => some ⟨3, [], arrP (.arr .R (.var 2) (.con 1) (.var 0))
-      (.arr .R (appQ (.con 9) (.var 1) (.var 2)) (.con 1) (.var 0)), .cnil⟩
+  | 7 => some ⟨5, [], arrP (.arr (.R (.var 3) (.var 4)) (.var 2) (.con 1) (.var 0))
+      (.arr (.R (.var 3) (.var 4)) (appQ (.con 9) (.var 1) (.var 2)) (.con 1) (.var 0)), .cnil⟩
   | 8 => some ⟨0, [], .con 1, .cnil⟩
   | 9 => none
   | n + 10 => if n % 2 = 0 then (if 0 < n / 2 then some (uncSch 10 (n / 2)) else none)
@@ -122,7 +122,7 @@ def S : Sugar P where
   singleton := 3
   empty := 4
   toList := 5
-  each φ := match φ with | .P => 6 | .R => 7
+  each φ := match φ with | .P => 6 | .R _ _ => 7
   unitV := 8
   fromResult n := 2 * n + 11
   hFlatMap := rfl

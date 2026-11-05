@@ -277,8 +277,12 @@ impl Checker<'_> {
                 ).with_fix(|| (if reader {
                     "build a list with `[for …]`, or iterate the sequence in the function that builds it".to_owned()
                 } else if !self.is_region(atom, &[]) {
+                    let what = match self.atom_kind(atom, &[]) {
+                        Some(Kind::ErrorRow) => "the error row",
+                        _ => "the type variable",
+                    };
                     format!(
-                        "a qualifier names regions, not the type variable `{}`: build the value without what holds it, such as with `match` instead of a callback that uses it",
+                        "a qualifier names regions, not {what} `{}`: build the value without what holds it, such as with `match` instead of a callback that uses it",
                         self.show(atom)
                     )
                 } else {

@@ -40,6 +40,14 @@ break programs.
   severity, replace `LogLevel.all` … `LogLevel.none_`; `LogLevel.all` lists
   them, `LogLevel.value` is Effect's name (was `name`), `get_ordinal` is
   gone (use `compare`), and `show` gives the constructor, `Off` for `None`.
+- **Breaking:** a value of `Errors e`, `Exit e a` or `Failure e` holds what
+  the errors of `e` hold, and an error-row variable is held as a type
+  variable is, so a closure over a caught error can no longer hide a region
+  of its payload. A curried stage keeps the variable
+  (`Errors e -> (Unit -> Unit)` reads as holding `e`); in a field or another
+  bare position the closure is `FLICK-G001` until a capture row names it,
+  `(Errors e)^c -> { run : (Unit -> Unit)^c }`. `flick check --fix` does
+  not rewrite it.
 - **Enums across the FFI:** the TypeScript facade of an enum is the union
   of its literals, `"GET" | "POST"`, and of an opaque one `string` or
   `number` branded with its qualified name. `flick ffi import` makes an

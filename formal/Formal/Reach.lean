@@ -1,5 +1,5 @@
 import Formal.Subst
-import Formal.TyOps
+import Formal.SchemeOps
 
 /-!
 # What a term holds (regions.md §2.1, §2.3, §5.2)

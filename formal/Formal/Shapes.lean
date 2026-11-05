@@ -22,7 +22,7 @@ def Ty.kind : Ty → Nat
   | .env _ => 8
   | .hnd _ => 10
   | .owner _ => 11
-  | .rg _ | .caps _ => 12
+  | .rg _ | .caps _ | .row _ => 12
   | .dict .. => 13
 
 theorem Le.kind {a b : Ty} (h : Le a b) : a.kind = b.kind := by

@@ -6,7 +6,7 @@
 //! 1. `(T ā)^q` is `T q ā` (`appQ`) for a type with hidden storage and for
 //!    a variable over containers; data without storage and a type variable
 //!    drop `q`; `(A → B)^q` is `.arr φ A B q`, without `q` `.cnil`; an arrow
-//!    with rows is at the stage `R`.
+//!    with rows `{r; e}` is at the stage `R r e`, a row a variable or `.cnil`.
 //! 2. `∀v. a^v → …` of a parameter is instantiated `v := a`.
 //! 3. A qualifier in a negative position is a variable: a single variable
 //!    of the checker stays itself at its first such position, the rest are
@@ -42,7 +42,8 @@ const KEYWORDS: [&str; 4] = ["show", "from", "at", "fun"];
 /// Why an export has no `def`.
 #[derive(Debug)]
 enum Skip {
-    /// a row of services or errors outside an arrow and `Eff`
+    /// a row of services or errors outside an arrow and `Eff`, or a row of
+    /// an arrow with a named element or a union
     Row,
     /// `∀` of a parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`)
     Rank,
@@ -103,8 +104,17 @@ fn lean(t: &Ty, vars: &[String], out: &mut String) {
             out.push(' ');
             arg(b, out);
         }
-        Ty::Arr(r, a, b, q) => {
-            out.push_str(if *r { ".arr .R " } else { ".arr .P " });
+        Ty::Arr(rows, a, b, q) => {
+            match rows {
+                Some((r, e)) => {
+                    out.push_str(".arr (.R ");
+                    arg(r, out);
+                    out.push(' ');
+                    arg(e, out);
+                    out.push_str(") ");
+                }
+                None => out.push_str(".arr .P "),
+            }
             for (i, t) in [a, b, q].into_iter().enumerate() {
                 if i > 0 {
                     out.push(' ');
@@ -275,7 +285,8 @@ pub fn prelude_schemes() -> String {
     if !skipped.is_empty() {
         out.push_str(
             "\n/-! ## Skipped\n\n\
-             `row`: a row of services or errors outside an arrow and `Eff`; `rank`: `∀` of a\n\
+             `row`: a row of services or errors outside an arrow and `Eff`, or a row of an arrow\n\
+             with a named element or a union; `rank`: `∀` of a\n\
              parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`); `region`: a region parameter.\n\
              -/\n\n",
         );

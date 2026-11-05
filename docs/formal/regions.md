@@ -124,21 +124,22 @@ Sources:
 ⌈α⌉            = {α}
 ⌈B⌉            = ∅                     B is Int, Float, BigInt, String, Bool, Unit, Never
 ⌈H ϱ̄ τ̄⌉        = ϱ̄ ∪ ⋃ ⌈τᵢ⌉
-⌈T ā⌉          = ⋃ ⌈aᵢ⌉ over arguments of kinds Type, Region, CRow    arguments of kinds SRow and ERow are excluded
+⌈T ā⌉          = ⋃ ⌈aᵢ⌉ over arguments of kinds Type, Region, CRow, ERow    arguments of kind SRow are excluded
 ⌈Owner ϱ⌉      = {ϱ}
 ⌈Ref τ⌉        = ⌈τ⌉
 ⌈{ℓᵢ : τᵢ | ρ}⌉ = ⋃ ⌈τᵢ⌉
 ⌈τ₁ →φ τ₂⌉     = ⌈τ₁⌉ ∪ ⌈τ₂⌉
 ⌈Eff r e τ⌉    = ⌈τ⌉
 ⌈Layer ri e ro⌉ = ⌈S.Impl⌉ = ∅
-⌈Errors ρ⌉     = ⋃ ⌈ῡ⌉ over elements E ῡ ∈ ρ               the row variable is excluded (see below)
+⌈Errors ρ⌉     = ⌈ρ⌉
+⌈ρ⌉            = ⋃ ⌈ῡ⌉ over elements E ῡ ∈ ρ, and the row variables of ρ     ρ of kind ERow
 
 hidden qualifier:        ⌈τ^C⌉ = ⌈τ⌉ ∪ C
 value bound:             ⌈τ^C⌉ = C ∪ (regions of τ)       τ is not a type variable
 bound on a variable:     ⌈α^{≤C}⌉ = {α^{≤C}}
 ```
 
-`⌈Errors ρ⌉` is the union over the elements because `Errors {E ῡ} ≡ E ῡ` ([`Errors` reaches its payloads](#errors-reaches-its-payloads)).
+`⌈Errors ρ⌉` is the union over the elements because `Errors {E ῡ} ≡ E ῡ` ([`Errors` reaches its payloads](#errors-reaches-its-payloads)). A row variable `e` of kind ERow is an atom, as a type variable is: an instance `e := {Wrapped (File s)}` reaches `s`, so without it `⌈τ[e := ρ]⌉ = ⌈τ⌉[e := ⌈ρ⌉]` fails and a closure over a value of `Errors e` would claim to hold nothing ([an error-row variable reaches what its errors reach](#an-error-row-variable-reaches-what-its-errors-reach)). The error row of `Eff r e τ` and of an arrow is a row of its stage and is not in ⌈·⌉.
 
 **Bounded atom**: `α` together with the fact "`α` is no wider than `C`" ([bounded variable atoms](#a-bounded-variable-reaches-what-the-variable-reaches)). A bound on a variable appears only together with the premise (Inst) `⌈υ⌉ ⊆ C` for the value `υ` substituted for `α`: the premise is checked by whoever instantiates the scheme, or becomes an obligation if `C` grows. Hence `α^{≤C}` reaches the same as `α`: under substitution both give `⌈υ⌉`. How such an atom compares:
 
@@ -152,11 +153,11 @@ Why the result is included: the result can be discarded (`ignore (await t)`), an
 
 Why the parameter is included: a closure whose parameter type shows `s` may omit `s` from its qualifier. Narrowing the parameter by subtyping (§2.2) then compares ⌈·⌉ of the whole value, not just the qualifier.
 
-**Substitution.** `⌈τ[α := υ]⌉ = ⌈τ⌉[α := ⌈υ⌉]` and `⌈τ[c := C]⌉ = ⌈τ⌉[c := C]`. For a value bound, substitution is allowed only if its condition holds (§2.3, (Inst)).
+**Substitution.** `⌈τ[α := υ]⌉ = ⌈τ⌉[α := ⌈υ⌉]`, `⌈τ[e := ρ]⌉ = ⌈τ⌉[e := ⌈ρ⌉]` and `⌈τ[c := C]⌉ = ⌈τ⌉[c := C]`. For a value bound, substitution is allowed only if its condition holds (§2.3, (Inst)).
 
 Checker:
 
-- `regions/mod.rs` `captures_of`, `collect_bounded_captures` compute ⌈·⌉: `Layer`, `ServiceTag`, `ServiceImpl`, `Errors` are opaque, and arguments of kinds `ServiceRow` and `ErrorRow` are excluded ([the reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result), [service row variables](#service-row-variables-are-not-captures)); a qualifier on a value that can hold nothing (a scalar, data without hidden storage and without captures in its type) adds nothing (`regions/data.rs` `holds_nothing`, [value bounds in unknown positions](#a-value-bound-survives-an-unknown-type-position));
+- `regions/mod.rs` `captures_of`, `collect_bounded_captures` compute ⌈·⌉: `Layer`, `ServiceTag`, `ServiceImpl` are opaque, arguments of kind `ServiceRow` are excluded, and an argument of kind `ErrorRow` other than the row of an `Eff` reaches what its errors reach and its row variables (`error_row_captures`) ([the reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result), [service row variables](#service-row-variables-are-not-captures)); a curried stage retains the error-row variables of earlier parameters as it retains their type variables (`stages`); a qualifier on a value that can hold nothing (a scalar, data without hidden storage and without captures in its type) adds nothing (`regions/data.rs` `holds_nothing`, [value bounds in unknown positions](#a-value-bound-survives-an-unknown-type-position));
 - `regions/mod.rs` `shown_by` is what a type shows openly: exactly ⌈·⌉;
 - `regions/compare.rs` `expanded` replaces the atom of a variable already solved to a type by ⌈that type⌉.
 
@@ -295,14 +296,14 @@ a step with effect R⟨r; ε⟩ under scope s:   s ∉ ⌈E ῡ⌉ for each E �
 
 The second rule applies even when a `try` inside the same `scope` catches the error (spec/05 "Expected errors"). The model would only need the check on errors that leave the `scope`; the spec chooses the simpler and stricter rule, and the model adopts it.
 
-`Exit e a` stores the success value: `⌈Exit e a⌉ = ⌈a⌉`. `Failure e` and `RawCause` are opaque and reach no regions: error payloads are checked (Err-Decl), and foreign JS values are sealed (G4).
+`Exit e a` stores the success value or a failure: `⌈Exit e a⌉ = ⌈e⌉ ∪ ⌈a⌉`, and `⌈Failure e⌉ = ⌈e⌉`. `RawCause` is opaque and reaches no regions: foreign JS values are sealed (G4).
 
 Checker:
 
 - (Err-Decl): `services.rs` `check_error_payload`, `live_part` (`FLICK-E005`);
 - (Err-Raise): `effects.rs` `perform` puts the error row of each call into `regions.raised`, and `regions/solve.rs` `check_raised` looks for the region of the `scope` in it (`FLICK-E005`).
 
-A signature region in the error row is not checked: `∀s. File s →R⟨none; {Wrapped (File s)}⟩ Unit` is accepted. Each call site inside a `scope` substitutes the region of that `scope` and is checked (`FLICK-E005` at the call), so at the level of a program this is equivalent to (Err-Raise).
+A signature region in the error row is not checked: `∀s. File s →R⟨none; {Wrapped (File s)}⟩ Unit` is accepted. Each call site inside a `scope` substitutes the region of that `scope` and is checked (`FLICK-E005` at the call), so at the level of a program this is equivalent to (Err-Raise). A value that keeps such an error shows `s` (§2.1): a closure over it is `(Unit → Unit)^{s}`, and leaving a `scope` with it is `FLICK-G001`/`FLICK-G002` by its type.
 
 ### 2.6 Qualifier inference and generalization
 
@@ -790,6 +791,24 @@ Divergence: `⌈Errors ρ⌉ = ∅` contradicted `Errors {E} ≡ E`.
 
 - Symptom: `raise : ∀e a. Errors e →R⟨none; e⟩ a`, and the argument `Leaked h` with `h : Handle s` is compared with `Errors {Leaked (Handle s)}` by (≤-Cap). With `⌈Errors ρ⌉ = ∅` this is `{s} ⊆ ∅`, and the program is rejected by this premise rather than by (Err-Raise), even outside a `scope`. Likewise `∀s. File s →R⟨none; {Wrapped (File s)}⟩ Unit`, which §2.5 accepts, would be rejected.
 - Imprecise document. Resolution, document: `⌈Errors ρ⌉` is the union of ⌈·⌉ of the arguments of the elements of `ρ` (§2.1), like `E ῡ`, with which `Errors {E ῡ}` coincides. The error row is checked only by (Err-Raise). The model computes exactly this; the checker rejects an error leaving a `scope` with `FLICK-E005`, as the model does.
+
+### An error-row variable reaches what its errors reach
+
+Divergence: ⌈·⌉ left out the row variables of an error row, and the checker every argument of kind `ErrorRow` and `Errors` itself.
+
+```flick
+keep : forall e. Errors e -> (Unit -> Unit)
+let keep x = fun () -> ignore x
+
+hide : forall s. File s ->{} (Unit -> Unit)
+let hide file =
+  try from_result (Err (Wrapped file)) with
+  | err -> keep err
+```
+
+- Symptom: both were accepted with types that hold nothing, although the closure `keep` returns holds `x`, and `keep err` holds `s` through `Wrapped (File s)`. `⌈τ[e := ρ]⌉ = ⌈τ⌉[e := ⌈ρ⌉]` failed for `e := {Wrapped (File s)}`, and only the check at a call of `hide` inside a `scope` (`FLICK-G001` "this value holds region `s`") kept the closure in.
+- Cause: `regions/mod.rs` `collect_bounded_captures` skipped arguments of kind `ErrorRow` and treated `Errors` as opaque ("an error cannot carry a region"); (Err-Decl) and (Err-Raise) keep the region of a `scope` out of a raised error, not a signature region or a variable out of a kept one.
+- Imprecise document and checker incompleteness. Resolution, document, checker, model and Lean: an error row reaches what its errors reach and its row variables (§2.1), except the row of an `Eff`, which belongs to its stage; a curried stage retains them as it retains type variables, so `keep` reads as `Errors e -> (Unit -> Unit)^{e}`; a field or another bare position names them through a capture row, `(Errors e)^c -> { run : (Unit -> Unit)^c }`. Lean: `Ty.reach` of `Ty.errors` (`formal/Formal/Syntax.lean`). Fixtures: `tests/check/pass/regions/error_rows.fl`, `tests/check/fail/regions/error_rows.fl`.
 
 ### The field premise of Con ignores the field qualifier
 
