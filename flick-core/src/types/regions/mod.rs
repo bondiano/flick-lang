@@ -196,6 +196,10 @@ impl Checker<'_> {
                 self.collect_bounded_captures(ty, out, true);
             }
             // a capture row not inferred yet is a tail: it may still be empty
+            #[allow(
+                clippy::collapsible_match,
+                reason = "a known tail must not fall to an atom"
+            )]
             Type::Meta(m) if self.store.is_capture_row(*m) => {
                 if !out.tails.contains(&t) {
                     out.tails.push(t.clone());
@@ -203,10 +207,10 @@ impl Checker<'_> {
             }
             // an integer literal's type is a number, which captures nothing
             Type::Meta(m) if self.store.is_numeric(*m) => {}
-            Type::Var(_) | Type::Skolem(_) | Type::Meta(_) => {
-                if !bounded || matches!(self.atom_kind(&t, &[]), Some(Kind::Region)) {
-                    push_atom(out, &t);
-                }
+            Type::Var(_) | Type::Skolem(_) | Type::Meta(_)
+                if !bounded || matches!(self.atom_kind(&t, &[]), Some(Kind::Region)) =>
+            {
+                push_atom(out, &t);
             }
             Type::App { .. } => {
                 let (head, args) = t.spine();

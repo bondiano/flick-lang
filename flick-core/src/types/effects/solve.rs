@@ -37,8 +37,8 @@ impl Checker<'_> {
     /// Grows unknown declared rows until nothing changes.
     pub fn grow(&mut self) {
         loop {
-            let rows =
-                (0..self.subrows.len()).fold(false, |changed, i| self.grow_one(i) || changed);
+            // `|`, not `||`: every row grows in each round
+            let rows = (0..self.subrows.len()).fold(false, |changed, i| changed | self.grow_one(i));
             if !(self.grow_holds() || rows) {
                 break;
             }

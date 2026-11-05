@@ -106,13 +106,13 @@ fn exit_codes_follow_the_outcome_and_signals() {
             .expect("the executable runs");
         let rx = lines(&mut child);
         if let Some(s) = signal_name {
-            let started = rx.recv_timeout(Duration::from_secs(60));
+            let started = rx.recv_timeout(Duration::from_mins(1));
             assert_eq!(started.as_deref(), Ok("started"), "{name}");
             #[cfg(unix)]
             signal(&child, s);
             #[cfg(not(unix))]
             let _ = s;
-            let cleanup = rx.recv_timeout(Duration::from_secs(60));
+            let cleanup = rx.recv_timeout(Duration::from_mins(1));
             assert_eq!(
                 cleanup.as_deref(),
                 Ok("cleanup"),

@@ -50,7 +50,7 @@ pub fn start() -> (Container, String) {
         .is_ok_and(|s| !s.success())
     {
         assert!(
-            started.elapsed() < Duration::from_secs(60),
+            started.elapsed() < Duration::from_mins(1),
             "postgres did not start"
         );
         thread::sleep(Duration::from_millis(300));

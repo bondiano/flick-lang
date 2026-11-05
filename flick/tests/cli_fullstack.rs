@@ -51,7 +51,7 @@ fn call(port: u16, tag: &str, payload: &str, cookie: &str) -> String {
 
 fn wait_for(rx: &mpsc::Receiver<String>, prefix: &str) {
     loop {
-        match rx.recv_timeout(Duration::from_secs(60)) {
+        match rx.recv_timeout(Duration::from_mins(1)) {
             Ok(line) if line.starts_with(prefix) => return,
             Ok(_) => {}
             Err(mpsc::RecvTimeoutError::Timeout | mpsc::RecvTimeoutError::Disconnected) => {

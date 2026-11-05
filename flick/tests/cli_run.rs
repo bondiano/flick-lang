@@ -75,7 +75,7 @@ fn lines(child: &mut Child) -> mpsc::Receiver<String> {
 }
 
 fn expect_line(rx: &mpsc::Receiver<String>, wanted: &str) {
-    let deadline = Instant::now() + Duration::from_secs(60);
+    let deadline = Instant::now() + Duration::from_mins(1);
     loop {
         let left = deadline.saturating_duration_since(Instant::now());
         match rx.recv_timeout(left) {
@@ -345,7 +345,7 @@ fn dev_starts_the_next_version_after_foreign_work_settles() {
     fs::write(dir.join("src/App/Main.fl"), waiting("v2", false)).expect("write");
     let mut seen = Vec::new();
     while seen.last().is_none_or(|l| l != "started v2") {
-        let line = rx.recv_timeout(Duration::from_secs(60)).expect("a line");
+        let line = rx.recv_timeout(Duration::from_mins(1)).expect("a line");
         seen.push(line);
     }
     signal(&dev, "TERM");
