@@ -232,7 +232,7 @@ The model requires `δ̄` to be fresh. For strings this means that the givens in
 instance Q̄ ⇒ C τ̄ = let m₁ = e₁ … let mₙ = eₙ,      β̄ = ftv(τ̄)
 Γ, β̄; δ̄ : Q̄ ⊢ eⱼ : ⟦…⟧ ⇝ eⱼ'        against method_type: the scheme of mⱼ with ᾱ := τ̄, without C τ̄
 δ̄ : Q̄ ⊩ Sᵢ ῡᵢ[ᾱ := τ̄] ⇝ sᵢ            for each superclass
-δ̄ : Q̄ ⊩ Q̄ₖ[ᾱ := τ̄, γ̄ₖ := σₖ] ⇝ d̄ₖ     for each default taken, Q̄ₖ the constraints of its default signature
+δ̄ : Q̄ ⊩ Q̄ₖ[ᾱ := τ̄, γ̄ₖ := σ̄ₖ] ⇝ d̄ₖ    for each default taken and some σ̄ₖ, Q̄ₖ the constraints of its default signature
 ────────────────────────────────────────────────────────────────── (Instance)
 I = λδ̄. { $slotᵢ = sᵢ, mⱼ = eⱼ', mₖ = default_C_mₖ (I δ̄) d̄ₖ … }   : ∀β̄. D_{Q̄} →P D_{C τ̄}
 ```
