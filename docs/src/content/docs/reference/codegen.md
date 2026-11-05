@@ -299,6 +299,13 @@ constructor, and the dictionary of each instance without a context. An export
 whose type has no TypeScript form is `FLICK-F004`; the declarations never
 contain `any`.
 
+In `.d.ts`, the `///` comment of an exported type, constructor or value is its
+JSDoc, its Markdown as written, also for a library taken from the package
+cache. A `type alias` of a record is an `export interface`, which TypeScript
+names on hover; unlike an object type it has no implicit index signature, so
+it is not assignable to `Record<string, unknown>`. Other aliases stay
+`export type`.
+
 `--promise-facade` (or `promise-facade = true`) writes `A/B.promise.js` and
 its `.d.ts` for each exported runtime function that needs no service and
 whose earlier stages only make closures: `f(a, b, options?)` runs `f a b`

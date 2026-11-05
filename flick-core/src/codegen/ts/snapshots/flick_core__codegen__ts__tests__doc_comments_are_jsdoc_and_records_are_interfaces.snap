@@ -1,0 +1,25 @@
+---
+source: flick-core/src/codegen/ts/tests.rs
+expression: dts
+---
+import type { Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema, Stream as $Stream, Context as $Context } from "@flick-lang/runtime";
+
+/** A shape. */
+export type Shape = { readonly _tag: "Circle#7c57f5571734"; readonly _0: number } | { readonly _tag: "Rect#98a20d8a91fb"; readonly _0: number; readonly _1: number };
+/**
+ * A point on the plane.
+ *
+ * `x` grows to the right; a *\/ stays inside.
+ */
+export interface Point { readonly x: number; readonly y: number }
+export interface Box<A> { readonly label: string; readonly value: A }
+export type Size = number;
+export type Pair = readonly [number, number];
+export type Measure = (arg: Shape) => number;
+/** An opaque token. */
+export interface Token { readonly "~flick/brand": "@acme/shapes/App.Shapes.Token" }
+/** A circle by its radius. */
+export declare const Circle: (arg: number) => Shape;
+export declare const Rect: (arg: number) => (arg: number) => Shape;
+/** The area of a shape. */
+export declare const area: (arg: Shape) => number;

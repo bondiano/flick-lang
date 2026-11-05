@@ -29,7 +29,8 @@ pub fn declaration_file(
         };
         match projection.value(scheme) {
             Ok(ty) => values.push(format!(
-                "export declare const {}: {ty};",
+                "{}export declare const {}: {ty};",
+                jsdoc(interface, &entity.name),
                 names::ident(&entity.name)
             )),
             Err(reason) => refused.push((entity.name.clone(), reason)),
@@ -102,6 +103,25 @@ pub fn declaration_file(
     }
     out.push_str(&barrel);
     (out, refused)
+}
+
+/// The `///` comment of `name` as a `/** … */` above its declaration, with `*/`
+/// escaped and its Markdown as written; empty without a comment.
+pub fn jsdoc(interface: &Interface, name: &str) -> String {
+    let Some(doc) = interface.docs.get(name) else {
+        return String::new();
+    };
+    let doc = doc.replace("*/", "*\\/");
+    if !doc.contains('\n') {
+        return format!("/** {doc} */\n");
+    }
+    let mut out = "/**\n".to_owned();
+    for line in doc.lines() {
+        out.push_str(if line.is_empty() { " *" } else { " * " });
+        out.push_str(line);
+        out.push('\n');
+    }
+    out + " */\n"
 }
 
 /// One function of the Promise façade: the export, how many arguments it

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{EnumLit, Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 4;
+pub const IFACE_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -105,6 +105,10 @@ pub struct Interface {
     pub exports: Vec<Export>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden: Vec<Hidden>,
+    /// The `///` comment of each export the module declares, by name, so
+    /// declarations made from the interface alone (`.d.ts`) carry it too.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub docs: BTreeMap<String, String>,
     /// The instances of the module and of every module it depends on: an
     /// importer sees them all, whatever it imports by name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -215,8 +219,9 @@ pub struct Summary {
 pub fn fingerprint(interface: &Interface) -> String {
     let mut bare = interface.clone();
     bare.dependencies.clear();
-    // where declarations are written changes nothing for importers
+    // where declarations are written, and their comments, change nothing for importers
     bare.source = None;
+    bare.docs.clear();
     for export in &mut bare.exports {
         export.at = None;
     }
@@ -355,6 +360,7 @@ mod tests {
              refined type Port = Float where fun n -> n > 0\n\
              type alias Box (f : Type -> Type) a = { value : f a; size : Size }\n\
              wrap : f a -> Box f a\nlet wrap value = { value = value; size = 1 }\n\
+             /// A thunk of `h`.\n\
              later : forall s. Handle s -> (Unit -> Handle s)^{s}\nlet later h = fun () -> h\n\
              type Handle (s : Region)\n",
         );

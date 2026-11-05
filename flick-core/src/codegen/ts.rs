@@ -479,6 +479,6 @@ mod declare;
 mod dts;
 pub mod stages;
 
-pub use dts::{Facade, declaration_file, facade_files};
+pub use dts::{Facade, declaration_file, facade_files, jsdoc};
 #[cfg(test)]
 mod tests;

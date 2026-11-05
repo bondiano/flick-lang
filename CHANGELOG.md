@@ -35,6 +35,12 @@ break programs.
   enum of a `type` alias of string or integer literals, constructors named
   in PascalCase or by `[enums.<Type>]` of `policy.toml`; the fingerprint of
   an export leaves the alias out, so reviewed bindings stay current.
+- **TypeScript declarations:** in `.d.ts` the `///` comment of an exported
+  type, constructor or value is its JSDoc, also for a library taken from
+  the package cache: the interface carries the docs, and its format is
+  version 5. A `type alias` of a record is an `export interface`, which
+  TypeScript names on hover; it is no longer assignable to
+  `Record<string, unknown>`.
 - **Plugins:** `import Sql exposing (plugin sql)` makes `sql { … }` a block
   the plugin of `Sql`'s package expands: the user's code inside keeps its
   place for errors and editors, the plugin's code is checked in place of

@@ -492,6 +492,39 @@ fn the_projection_maps_names_exactly_and_comes_from_the_analysis() {
 }
 
 #[test]
+fn a_documented_declaration_keeps_its_exact_mappings() {
+    let f = fixture_of(&[(
+        "src/App/Docs.fl",
+        "module App.Docs exposing (User, greet)\n\n/// A user.\ntype alias User = { name : String }\n\n\
+         /// Greets.\ngreet : User -> String\nlet greet user = user.name\n",
+    )]);
+    let ide = f.ide();
+    let module = f.analysis.module("App.Docs").expect("module");
+    let text = &f.sources.get(module.file).text;
+    let lookup = |m: &str| ide.interface(m);
+    let projected = projection::project(module, text, "", &lookup, &|_| None, &|m| {
+        projection::relative(&module.name, m)
+    });
+    let ts = &projected.text;
+    assert!(
+        ts.contains("/** A user. */\nexport interface User {"),
+        "{ts}"
+    );
+    assert!(
+        ts.contains("/** Greets. */\nexport declare const greet:"),
+        "{ts}"
+    );
+    let exact: Vec<&projection::Mapping> = projected.mappings.iter().filter(|m| m.exact).collect();
+    assert_eq!(exact.len(), 2, "{:?}", projected.mappings);
+    for m in exact {
+        assert_eq!(
+            &ts[m.ts[0] as usize..m.ts[1] as usize],
+            &text[m.fl[0] as usize..m.fl[1] as usize]
+        );
+    }
+}
+
+#[test]
 fn captures_in_sql_are_names_of_the_program() {
     let f = fixture();
     let ide = f.ide();

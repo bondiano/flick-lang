@@ -47,8 +47,9 @@ struct Key {
     /// The effective configuration, including programmatically supplied values.
     config: Option<Config>,
     lower: bool,
-    /// Each import's interface, without where its names are declared, which
-    /// checking does not read, and whether it is a module of the project.
+    /// Each import's interface, without where its names are declared and
+    /// their docs, which checking does not read, and whether it is a module
+    /// of the project.
     imports: Vec<(Option<Interface>, bool)>,
 }
 
@@ -181,6 +182,7 @@ impl Checking<'_> {
                         for export in &mut interface.exports {
                             export.at = None;
                         }
+                        interface.docs.clear();
                         interface
                     });
                     (interface, self.by_name.contains_key(&i.module))
