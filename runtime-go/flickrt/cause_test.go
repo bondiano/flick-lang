@@ -226,11 +226,12 @@ func TestElectDefects(t *testing.T) {
 		owned(fb, func(fb *Fiber, _ *Owner) Value { AddFinalizer(fb, dies); return Fail("boom") })
 	}))
 	check("ensuring", failure(func() { EffectEnsuring(fb, dies, fails) }))
-	failed := make(chan struct{})
+	// the failure waits for the other branch to start: one interrupted before it starts never dies
+	started, failed := make(chan struct{}), make(chan struct{})
 	check("forEachConcurrent", failure(func() {
 		ParallelPair(fb,
-			Eff(func(*Fiber) Value { close(failed); return Fail("boom") }),
-			Eff(func(*Fiber) Value { <-failed; panic(Defect{"late"}) }))
+			Eff(func(*Fiber) Value { <-started; close(failed); return Fail("boom") }),
+			Eff(func(*Fiber) Value { close(started); <-failed; panic(Defect{"late"}) }))
 	}))
 	check("race", failure(func() { RaceSuccess(fb, fails, dies) }))
 	check("raceAll", failure(func() { RaceAll(fb, []Value{fails, dies}) }))
