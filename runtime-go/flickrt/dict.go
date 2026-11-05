@@ -57,13 +57,15 @@ func Super(fb *Fiber, d Value, class string) Value { return d.(*Dict).get(fb, "$
 
 // Constructor describes a constructor of a derived type: its tag, name and
 // arity, and whether a value is its one field: always when unboxed, and
-// when of its JS class `Class` (an `untagged` type).
+// when of its JS class `Class` (an `untagged` type). A constructor of an
+// enum is its `Literal`, and has no fields.
 type Constructor struct {
 	Tag     string
 	Name    string
 	Arity   int
 	Unboxed bool
 	Class   string
+	Literal Value
 }
 
 // IsClass is whether a value is of the JS class, as `typeof` tells the
@@ -98,6 +100,12 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 	variant := func(v Value) (int, int) {
 		offset := 0
 		for i, c := range constructors {
+			if c.Literal != nil {
+				if Same(v, c.Literal) {
+					return i, offset
+				}
+				continue
+			}
 			if c.Unboxed || c.Class != "" && IsClass(v, c.Class) || c.Class == "" && v.(*Data).Tag == c.Tag {
 				return i, offset
 			}
@@ -106,6 +114,9 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 		panic(Defect{"value of no constructor of its type"})
 	}
 	args := func(i int, v Value) []Value {
+		if constructors[i].Literal != nil {
+			return nil
+		}
 		if constructors[i].Unboxed || constructors[i].Class != "" {
 			return []Value{v}
 		}

@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: 941bfb1920f687de
+source_hash: 7540c08f10416948
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -57,6 +57,7 @@ source_hash: 941bfb1920f687de
 | значение алгебраического типа данных | `{ _tag, _0, _1, … }`, поля расположены в порядке объявления |
 | `unboxed type T = C f` | само поле |
 | `untagged type T = A f \| B g …` | поле соответствующего конструктора; конструкторы различаются по типу поля в JS |
+| `untagged type T = A = "a" \| B = "b"` | литерал конструктора, строка или число |
 | `type error E = E …` | та же структура: ошибки — значения их единственного конструктора |
 | `Option`, `Result` | собственные типы Effect `Option` (`Some`/`None`, `value`) и `Result` (`Success`/`Failure`, `success`/`failure`) |
 | `Ref` | ячейка среды выполнения, равная только самой себе |
@@ -92,6 +93,29 @@ untagged type Key = ByNumber Float | ByName String | ByPath (List String)
 
 `opaque unboxed type Token = Token String` скрывает конструктор от импортирующих
 модулей, как и `opaque type`, и сохраняет саму строку во время выполнения.
+
+Перечисление — `untagged type`, конструкторы которого — литералы: каждое
+значение во время выполнения и есть его литерал. Литералы — все строки или
+все `Int`, попарно различные (`FLICK-T020`; `Int` вне диапазона —
+`FLICK-T003`). У конструктора нет полей, у типа — параметров, а запись
+`Get "GET"` без `=` получает подсказку. `match` сравнивает значение, как и
+`==`; выведенный `Ord` идёт в порядке объявления, `Show` даёт имя
+конструктора. Компилятор даёт каждому перечислению экземпляр
+`Enum.Enum t b`, программа своих не объявляет (`FLICK-C012`), а его методы —
+компаньоны `T.value`, `T.parse` (`Err` для неизвестного литерала; от
+константы проверяется при компиляции, `FLICK-D006`) и `T.all` в порядке
+объявления. `opaque untagged type` скрывает конструкторы, но не компаньоны.
+
+```flick
+untagged type Method = Get = "GET" | Post = "POST" | Delete = "DELETE"
+  deriving Eq, Ord, Show
+
+untagged type Priority = Low = 1 | High = 2
+
+literals : Enum.Enum t String => List t -> List String
+// `literals Method.all` — `["GET", "POST", "DELETE"]`
+let literals values = List.map Enum.value values
+```
 
 `==` — каноническое структурное равенство: SameValueZero для чисел, поэтому
 `NaN == NaN` и `0 == -0`; `Float.strict_equal` — это `===`, а

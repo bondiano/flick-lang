@@ -8,6 +8,7 @@ mod atoms;
 mod comprehension;
 mod debug;
 mod do_notation;
+mod enums;
 mod expr;
 mod generic;
 mod lambda;
@@ -32,7 +33,7 @@ use crate::syntax::ddl;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::{
-    Constructor, Range, Rep, Typing, class_defaults, default_method, is_type, let_parts,
+    Abi, Constructor, Range, Rep, Typing, class_defaults, default_method, is_type, let_parts,
 };
 
 /// Lowers `module`, which checked without errors, with what its check recorded.
@@ -62,10 +63,11 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
     }
     for info in &typing.instances {
         let span = Span::new(module.file, info.span.0, info.span.1);
-        let methods = match (&info.derived, &info.generic) {
-            (Some(_), _) => Vec::new(),
-            (None, Some(generic)) => generic::methods(generic, span),
-            (None, None) => module
+        let methods = match (&info.derived, &info.generic, &info.enumerates) {
+            (Some(_), _, _) => Vec::new(),
+            (None, Some(generic), _) => generic::methods(generic, span),
+            (None, None, Some(ty)) => enums::methods(&info.module, ty, span),
+            (None, None, None) => module
                 .tree
                 .nodes()
                 .find(|n| n.kind == K::InstanceDecl && n.range() == info.span)
@@ -270,6 +272,7 @@ impl Lower<'_> {
             });
         }
         let abi = self.typing.abis.get(&ty).cloned().unwrap_or_default();
+        let mut constructors = Vec::new();
         for (i, variant) in decl.nodes().filter(|n| n.kind == K::Variant).enumerate() {
             let Some(name) = self.token_text(variant, K::Con) else {
                 continue;
@@ -281,10 +284,14 @@ impl Lower<'_> {
                 arity: variant.nodes().filter(|n| is_type(n.kind)).count(),
                 rep: abi.rep(i),
             };
+            constructors.push(constructor.clone());
             items.push(Item {
                 kind: ItemKind::Constructor(constructor),
                 span: self.span(variant),
             });
+        }
+        if matches!(abi, Abi::Literal(_)) {
+            items.extend(enums::companions(&ty, &constructors, span));
         }
         // `type error E` without fields still has its constructor
         if decl.kind == K::ErrorDecl && !decl.nodes().any(|n| n.kind == K::Variant) {

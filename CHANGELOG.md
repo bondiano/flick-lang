@@ -6,6 +6,13 @@ break programs.
 
 ## Unreleased
 
+- **Enums:** `untagged type Method = Get = "GET" | Post = "POST"` is an
+  enum: each value is its literal at run time, all strings or all `Int`s.
+  `match` and `==` compare the value, derived `Ord` follows the order of
+  declaration, and the compiler gives each enum its instance of the new
+  core class `Enum.Enum t b`, whose methods are the companions `T.value`,
+  `T.parse` (checked at compile time for a constant, `FLICK-D006`) and
+  `T.all`. The interface format is version 4.
 - **Plugins:** `import Sql exposing (plugin sql)` makes `sql { … }` a block
   the plugin of `Sql`'s package expands: the user's code inside keeps its
   place for errors and editors, the plugin's code is checked in place of

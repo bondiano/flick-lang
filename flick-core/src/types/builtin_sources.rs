@@ -23,6 +23,7 @@ pub(super) const CORE: &[(&str, &str)] = &[
     ("Prelude", builtin_source!("core", "Prelude.fl")),
     ("Instances", builtin_source!("core", "Instances.fl")),
     ("Record", builtin_source!("core", "Record.fl")),
+    ("Enum", builtin_source!("core", "Enum.fl")),
     ("Ref", builtin_source!("core", "Ref.fl")),
     ("String", builtin_source!("core", "String.fl")),
     ("Float", builtin_source!("core", "Float.fl")),

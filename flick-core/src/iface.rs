@@ -8,10 +8,10 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Instance, Type, TypeDef};
+use crate::types::{EnumLit, Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 3;
+pub const IFACE_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -178,6 +178,9 @@ pub struct ConstructorAbi {
     pub tag: Option<String>,
     /// Fields `_0` … `_{arity - 1}`.
     pub arity: usize,
+    /// The literal its value is, for a constructor of an enum.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub literal: Option<EnumLit>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

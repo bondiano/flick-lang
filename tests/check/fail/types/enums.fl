@@ -1,0 +1,50 @@
+// Enums: each constructor of an `untagged type` is a literal, all strings or
+// all `Int`s, distinct, without fields or type parameters; the compiler
+// gives the instance of `Enum`, and `T.parse` of a constant is checked.
+module App.Enums exposing (..)
+
+import Enum exposing (Enum)
+
+type Plain = X = "x" | Y = "y"
+
+untagged type Missing = P = "p" | Q
+
+untagged type Fields = R String = "r" | S = "s"
+
+untagged type Twice = U = "u" | V = "u"
+
+untagged type Mixed = W = "w" | Z = 1
+
+untagged type Param a = M = "m" | N = "n"
+
+untagged type Big = Huge = 3000000000 | Small = 0
+
+untagged type Half = Part = 1.5 | Whole = 1
+
+untagged type Unwritten = Get "GET" | Post = "POST"
+
+type error Failed = Failed = "failed"
+
+untagged type Method = Fetch = "GET" | Send = "POST"
+
+instance Enum Method String =
+  let value _ = ""
+  let parse _ = Err (SchemaError [])
+  let all = []
+
+typo : Result SchemaError Method
+let typo = Method.parse "GTE"
+
+
+//~ FLICK-T020 @8:18-8:21 a literal is the value of a constructor of an enum: write `untagged type Plain`
+//~ FLICK-T020 @10:35-10:36 `Q` has no literal: each constructor of an enum is one, as `Q = "…"`
+//~ FLICK-T020 @12:24-12:38 `R` of an enum has no fields: its value is its literal
+//~ FLICK-T020 @14:37-14:40 `U` and `V` are the same literal: an enum's literals differ
+//~ FLICK-T020 @16:37-16:38 `W` is a string and `Z` an `Int`: an enum's literals are all strings or all `Int`s
+//~ FLICK-T020 @18:1-18:42 an enum has no type parameters: the constructors of `Param` hold nothing to use them
+//~ FLICK-T003 @20:28-20:38 `3000000000` does not fit in `Int`, from -2147483648 to 2147483647
+//~ FLICK-T020 @22:29-22:32 `1.5` is no `Int`: an enum's literal is a string or an `Int`
+//~ FLICK-T020 @24:31-24:36 a constructor's literal comes after `=`: write `Get = "GET"` in an `untagged type`
+//~ FLICK-T020 @26:30-26:38 only the constructors of an enum, an `untagged type`, are literals
+//~ FLICK-C012 @30:1-33:15 `Enum` is the compiler's: each enum, an `untagged type` of literals, has its instance, and a program declares none
+//~ FLICK-D006 @36:25-36:30 this constant is no literal of `Method`, so `Method.parse` of it always fails

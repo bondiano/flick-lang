@@ -149,6 +149,9 @@ impl Gen<'_> {
             let native = self.constructor(c);
             return self.export(&name, &native);
         }
+        if let Rep::Literal(literal) = &c.rep {
+            return self.export(&name, &names::enum_literal(literal));
+        }
         if c.rep != Rep::Tagged {
             // `unboxed` and `untagged`: a value is its one field
             return self.export(&name, &format!("{} _0", self.arrow("_0")));
@@ -241,10 +244,11 @@ impl Gen<'_> {
                 .iter()
                 .map(|c| {
                     let tag = self.tag_of(c);
-                    let rep = match c.rep {
+                    let rep = match &c.rep {
                         Rep::Tagged => String::new(),
                         Rep::Unboxed => ", \"unboxed\"".to_owned(),
                         Rep::Typeof(class) => format!(", {}", names::string(class.name())),
+                        Rep::Literal(l) => format!(", \"literal\", {}", names::enum_literal(l)),
                     };
                     format!(
                         "[{}, {}, {}{rep}]",

@@ -212,10 +212,17 @@ export const structural = (name: string, dicts: ReadonlyArray<FieldDict>): Dict 
 
 /**
  * A constructor of a derived type: its qualified id, its name and arity.
- * `rep`, when present: `"unboxed"`, the value is the one field; or the JS
- * type that tells an `untagged` constructor's field apart.
+ * `rep`, when present: `"unboxed"`, the value is the one field; the JS type
+ * that tells an `untagged` constructor's field apart; or `"literal"`, the
+ * value is the enum's `literal` and has no fields.
  */
-type ConstructorInfo = readonly [tag: string, name: string, arity: number, rep?: string];
+type ConstructorInfo = readonly [
+  tag: string,
+  name: string,
+  arity: number,
+  rep?: string,
+  literal?: string | number,
+];
 
 const field = (value: Data, k: number): unknown => value[`_${k}`];
 
@@ -230,11 +237,13 @@ const isData = (value: unknown): value is Data => typeof value === "object" && v
 const isOf = (c: ConstructorInfo, value: unknown): boolean => {
   const rep = c[3];
   if (rep === undefined) return isData(value) && value._tag === c[0];
+  if (rep === "literal") return value === c[4];
   return rep === "unboxed" || rep === jsClass(value);
 };
 
 /** The fields of `value`, a value of constructor `c`. */
 const partsOf = (c: ConstructorInfo, value: unknown): Array<unknown> => {
+  if (c[3] === "literal") return [];
   if (c[3] !== undefined) return [value];
   return isData(value) ? argsOf(value, c[2]) : [];
 };

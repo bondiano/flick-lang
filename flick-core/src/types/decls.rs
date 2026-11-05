@@ -331,11 +331,13 @@ impl Checker<'_> {
     }
 
     fn payload(&mut self, variant: &Node) -> Vec<Type> {
-        variant
-            .nodes()
-            .filter(|n| is_type(n.kind))
-            .map(|t| self.ty(t, &Kind::Type, Free::Reject))
-            .collect()
+        let mut out = Vec::new();
+        for field in variant.nodes().filter(|n| is_type(n.kind)) {
+            if !self.literal_field(variant, field) {
+                out.push(self.ty(field, &Kind::Type, Free::Reject));
+            }
+        }
+        out
     }
 
     /// Fixes the kinds and stores what the declaration defines.

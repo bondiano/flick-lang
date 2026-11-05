@@ -1,0 +1,9 @@
+["delete", "get", "post"]
+[Get, Post, Delete]
+([false, true], LT, GT)
+[LT, GT, EQ]
+(true, false)
+("DELETE", -1)
+(Ok Post, Ok High)
+true
+([Get, Post, Delete], ["GET", "POST", "DELETE"])

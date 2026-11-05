@@ -48,6 +48,10 @@ fn data(module: &Module, package: Option<&str>) -> Vec<Data> {
             id: qualified_id(c, package),
             tag: (c.rep == Rep::Tagged).then(|| tag(c, package)),
             arity: c.arity,
+            literal: match &c.rep {
+                Rep::Literal(l) => Some(l.clone()),
+                _ => None,
+            },
         };
         match out.iter_mut().find(|d| d.ty == c.ty) {
             Some(d) => d.constructors.push(constructor),

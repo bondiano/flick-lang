@@ -1,11 +1,12 @@
 //! The companions of a refined type, `T$parse` and `T$value`, which its
-//! check makes; the witnesses `T$schema` of `deriving Schema` are the code
+//! check makes, and of an enum, `T$value`, `T$parse` and `T$all`; the witnesses `T$schema` of `deriving Schema` are the code
 //! std's plugin gives. Companions are values of the type's module, named as
 //! `T.parse`.
 
 use std::ptr;
 
 use super::Checker;
+use super::env::{Abi, EnumLit};
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
 
@@ -53,6 +54,26 @@ impl Checker<'_> {
                     &binders,
                     Type::pure_fun(this.clone(), base.clone()),
                 );
+            }
+            // an enum's are the methods of its instance of `Enum`
+            if let Some(Abi::Literal(literals)) = self.typing.abis.get(&name).cloned() {
+                let base = match literals.first() {
+                    Some(EnumLit::Int(_)) => Type::lang(Lang::Int),
+                    _ => Type::lang(Lang::String),
+                };
+                let result = Type::apps(
+                    Type::lang(Lang::Result),
+                    [Type::lang(Lang::SchemaError), this.clone()],
+                );
+                let all = Type::app(Type::lang(Lang::List), this.clone());
+                self.companion(
+                    &name,
+                    "value",
+                    &binders,
+                    Type::pure_fun(this.clone(), base.clone()),
+                );
+                self.companion(&name, "parse", &binders, Type::pure_fun(base, result));
+                self.companion(&name, "all", &binders, all);
             }
         }
     }

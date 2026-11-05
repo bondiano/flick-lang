@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 1eb849726c3babe7
+source_hash: b89795438ca192c8
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -268,7 +268,8 @@ type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | "refined" "type" Con { param } "=" type "where" expr [deriving]
             | ["opaque"] ("unboxed" | "untagged") "type" Con { param } "=" variants [deriving]
 variants    = ["|"] variant { "|" variant }
-variant     = Con { capture }                   // fields are atomic types
+variant     = Con { capture } ["=" literal]     // fields are atomic types; a literal only in an enum
+literal     = string | ["-"] number
 param       = name | "(" name ":" kind ")"
 deriving    = "deriving" Con { "," Con }
 kind_decl   = "kind" Con "=" ["|"] Con { "|" Con }

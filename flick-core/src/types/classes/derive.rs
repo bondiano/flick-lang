@@ -110,6 +110,7 @@ impl<'n> Checker<'_> {
                     // a class of defaults takes them, as an instance without methods
                     fields: structural.then(|| fields.clone()),
                     generic: None,
+                    enumerates: None,
                 });
             }
         }

@@ -7,6 +7,7 @@
 mod coherence;
 mod declare;
 mod derive;
+mod enum_instance;
 mod generic;
 mod matching;
 mod prims;

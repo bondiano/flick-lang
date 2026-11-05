@@ -156,7 +156,7 @@ impl Checker<'_> {
             });
         }
         for ty in types {
-            for member in ["schema", "parse", "value", "json", "table", "url"] {
+            for member in ["schema", "parse", "value", "all", "json", "table", "url"] {
                 let entity = self
                     .env
                     .entity(Namespace::Value, &super::companion_name(&ty, member));

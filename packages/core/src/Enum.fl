@@ -1,0 +1,15 @@
+/// Enums: an `untagged type` whose constructors are literals,
+/// `untagged type Method = Get = "GET" | Post = "POST"`. The compiler gives
+/// each enum its instance; its companions `Method.value`, `Method.parse` and
+/// `Method.all` are the methods at that type.
+module Enum exposing (Enum(..))
+
+@lang enum
+/// `t` is an enum whose values are the literals of type `b`.
+class Enum t b | t -> b =
+  /// The literal of a value.
+  value : t -> b
+  /// The value of a literal, or why it is none of them.
+  parse : b -> Result SchemaError t
+  /// Every value, in the order of declaration.
+  all : List t

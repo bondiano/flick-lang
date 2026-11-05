@@ -3,6 +3,7 @@
 # and compares what it prints with the `.stdout` the JS and Go builds print.
 # Every case here is in portable.txt too.
 bootstrap/hello
+codegen/enums
 codegen/eval_order
 codegen/stage_order
 codegen/lift

@@ -4,7 +4,7 @@
 
 use flick_pretty::{Document, Documentable, docvec};
 
-use super::expr::literal;
+use super::expr::{enum_literal, literal};
 use super::layout::{block, call, conjunction, inline, statement};
 use super::{Gen, names};
 use crate::ir::{Arm, Expr, Lit, Pat};
@@ -52,9 +52,16 @@ impl<'a> Gen<'a> {
                 }
             }
             Pat::Con(c, args) if c.rep != Rep::Tagged => {
-                if let Rep::Typeof(class) = c.rep {
-                    let class = self.string(class.name());
-                    t.conds.push(call(a, "flickrt.IsClass", [subject, class]));
+                match &c.rep {
+                    Rep::Typeof(class) => {
+                        let class = self.string(class.name());
+                        t.conds.push(call(a, "flickrt.IsClass", [subject, class]));
+                    }
+                    Rep::Literal(l) => {
+                        let lit = a.text(a.alloc_str(&enum_literal(l)));
+                        t.conds.push(call(a, "flickrt.Same", [subject, lit]));
+                    }
+                    Rep::Tagged | Rep::Unboxed => {}
                 }
                 for arg in args {
                     self.test(arg, subject, t);

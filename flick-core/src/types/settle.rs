@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::mem;
 
 use super::classes::{NUMERIC_CLASSES, split, which};
-use super::env::{Form, TypeDef};
+use super::env::{Abi, Form, TypeDef};
 use super::ty::Type;
 use super::typing::Identity;
 use super::{Checker, Domain, NumLiteral};
@@ -266,6 +266,10 @@ impl Checker<'_> {
         else {
             return None;
         };
+        // an enum's values are its literals
+        if matches!(abi, Abi::Literal(_)) {
+            return Some(Identity::Value);
+        }
         let nullary = |c: &String| {
             let entity = Entity {
                 module: module.clone(),

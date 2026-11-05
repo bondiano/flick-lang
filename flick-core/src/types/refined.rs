@@ -2,6 +2,7 @@
 //! compiles if the compiler knows the check.
 
 use super::Checker;
+use super::env::{Abi, EnumLit, Form};
 use super::typing::Ref;
 use crate::consteval::{self, Const};
 use crate::diagnostics::codes;
@@ -21,12 +22,34 @@ impl Checker<'_> {
         let Some(ty) = name.strip_suffix("$parse") else {
             return;
         };
-        if module != self.env.module {
-            return;
-        }
         let Some(constant) = consteval::eval(arg, self.text) else {
             return;
         };
+        // an enum's literals travel in its interface: of any module
+        if let Some(Form::Adt {
+            abi: Abi::Literal(literals),
+            ..
+        }) = self.env.type_def(&module, ty).map(|d| &d.form)
+        {
+            let known = match &constant {
+                Const::String(s) => literals.contains(&EnumLit::String(s.clone())),
+                Const::Number(n) => literals
+                    .iter()
+                    // exactly the integer, as the bits compare it
+                    .any(|l| matches!(l, EnumLit::Int(i) if f64::from(*i).to_bits() == n.to_bits())),
+                _ => return,
+            };
+            if !known {
+                let message = format!(
+                    "this constant is no literal of `{ty}`, so `{ty}.parse` of it always fails"
+                );
+                self.error(codes::D006, self.span(arg), message);
+            }
+            return;
+        }
+        if module != self.env.module {
+            return;
+        }
         let Some(predicate) = self.predicates.get(ty).copied() else {
             return;
         };

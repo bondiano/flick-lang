@@ -410,6 +410,8 @@ fn entity(module: &str, namespace: Namespace, name: &str) -> Symbol {
 #[cfg(test)]
 mod companion_tests;
 #[cfg(test)]
+mod enum_hover_tests;
+#[cfg(test)]
 mod hints_tests;
 #[cfg(test)]
 mod hover_tests;

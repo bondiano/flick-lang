@@ -89,6 +89,18 @@ pub enum Abi {
     /// `untagged type`: the one field of each constructor, told apart by
     /// its JS type, given per constructor.
     Untagged(Vec<JsClass>),
+    /// `untagged type T = A = "a" | B = "b"`: each constructor is its
+    /// literal, given per constructor.
+    Literal(Vec<EnumLit>),
+}
+
+/// The literal a constructor of an enum is: all of a type's are strings, or
+/// all are integers.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EnumLit {
+    Int(i32),
+    String(String),
 }
 
 impl Abi {
@@ -102,6 +114,9 @@ impl Abi {
             Abi::Tagged => Rep::Tagged,
             Abi::Unboxed => Rep::Unboxed,
             Abi::Untagged(classes) => classes.get(i).map_or(Rep::Tagged, |c| Rep::Typeof(*c)),
+            Abi::Literal(literals) => literals
+                .get(i)
+                .map_or(Rep::Tagged, |l| Rep::Literal(l.clone())),
         }
     }
 }
@@ -132,12 +147,14 @@ impl JsClass {
 }
 
 /// How the values of one constructor are represented.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Rep {
     #[default]
     Tagged,
     Unboxed,
     Typeof(JsClass),
+    /// The constructor is its literal: a string or an integer.
+    Literal(EnumLit),
 }
 
 /// `a b -> c` of a class: the parameters at `from` determine those at `to`,

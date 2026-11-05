@@ -1,0 +1,30 @@
+// Enums: an `untagged type` of literals, matched like an ADT; its
+// companions are the methods of its instance of `Enum`, and an opaque one
+// keeps its constructors to its module.
+module App.Enums exposing (Method(..), Level, label, rank, literals)
+
+import Enum exposing (Enum)
+
+untagged type Method = Get = "GET" | Post = "POST"
+  deriving Eq, Ord, Show, Hash
+
+opaque untagged type Level = Quiet = 0 | Loud = 1
+  deriving Eq
+
+label : Method -> String
+let label method =
+  match method with
+  | Get -> "read"
+  | Post -> "write"
+
+rank : Level -> Int
+let rank level = Level.value level
+
+literals : Enum t String => List t -> List String
+let literals values = List.map Enum.value values
+
+known : Result SchemaError Method
+let known = Method.parse "GET"
+
+every : List Method
+let every = Method.all

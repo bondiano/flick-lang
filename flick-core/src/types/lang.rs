@@ -151,6 +151,8 @@ lang_items! {
     FloatInfinity = "float_infinity",
     FloatNan = "float_nan",
     LayerMerge = "layer_merge",
+    // the class the compiler gives every enum an instance of
+    Enum = "enum",
     // the class `deriving Generic` gives an instance of, and its representation
     Generic = "generic",
     GenericSum = "generic_sum",
