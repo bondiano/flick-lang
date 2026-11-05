@@ -2,12 +2,12 @@
 // each emitted `flick-main.js`, or `flick-<entry>.js` of a project's
 // client entry, for the browser with rolldown (minified, React
 // in production mode), prints raw/min/gzip sizes and fails when a gzip size
-// exceeds its budget, a bundle keeps a module none of them uses, or a
-// release bundle is larger than the debug one. It also prints what labelling
-// atoms costs: release with `labels = "all"`, the default, against
-// `"components"`. Host
-// foreign modules (`.ts`/`.mjs` beside the source) are not Flick output and
-// stay external.
+// exceeds its budget in programs.mjs, a bundle keeps a module none of them
+// uses, or a release bundle is larger than the debug one; a size more than
+// 10% under its budget prints a note that the budget can be lowered. It
+// also prints what labelling atoms costs: release with `labels = "all"`,
+// the default, against `"components"`. Host foreign modules (`.ts`/`.mjs`
+// beside the source) are not Flick output and stay external.
 import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import path from "node:path";
@@ -16,56 +16,12 @@ import { gzipSync } from "node:zlib";
 
 import { rolldown } from "rolldown";
 
+import { PROGRAMS } from "./programs.mjs";
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 /** Modules a tracked program does not use, unless it lists its own: a bundle that keeps one is an error. */
 const UNUSED = ["effect/dist/Graph.js", "effect/dist/Stream.js"];
-
-/** Programs and their gzip budgets in KB. */
-export const PROGRAMS = [
-  { name: "pure", source: "tools/bundle-size/pure.fl", budget: 13 },
-  // the same program with `effect = "none"`, a project of its own: no Effect at all
-  { name: "none", source: "tools/bundle-size/none", budget: 2, effectFree: true },
-  // UI programs render views on atoms: at most 81 KB and 18 KB for effect/reactivity,
-  // and 5 KB for the spans of actions and the debug log of writes;
-  // the registry keeps `Stream`, which `effect/reactivity` imports for stream atoms,
-  // and since Effect 4.1 `Schema` (13 KB), whose `isSchemaError` hydration calls
-  { name: "counter", source: "tests/run/ui/counter.fl", budget: 118, unused: ["effect/dist/Graph.js"] },
-  { name: "playground", source: "docs/src/playground/Playground.fl", budget: 126, unused: ["effect/dist/Graph.js"] },
-  { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 117, unused: ["effect/dist/Graph.js"] },
-  // a browser client of a procedure keeps no Node server
-  {
-    name: "rpc",
-    source: "tools/bundle-size/rpc.fl",
-    budget: 56,
-    unused: ["effect/dist/Graph.js", "platform-node/dist/NodeHttpServer.js", "platform-node-shared/dist/NodeSocketServer.js"],
-  },
-  // a template renders without `react-dom/server` (R6); its view is still a React component,
-  // its atoms the registry's, with `Schema` since Effect 4.1
-  {
-    name: "email",
-    source: "tests/run/ui/email.fl",
-    budget: 48,
-    unused: ["effect/dist/Graph.js", "react-dom/cjs/react-dom-server.browser.production.js", "react-dom/cjs/react-dom-server-legacy.browser.production.js"],
-  },
-  // the client entry of a project with a server entry keeps no server module, and of a
-  // server function only its call: not its body, what the body uses or the Node server
-  {
-    name: "fullstack",
-    source: "tools/bundle-size/fullstack",
-    entry: "web",
-    // the call of a server function is an RPC client over fetch, as the `rpc` program's
-    budget: 56,
-    unused: [
-      "effect/dist/Graph.js",
-      "App/Db.js",
-      "App/Api.js",
-      "effect/server/FunctionsNode.js",
-      "rpc/server.js",
-      "platform-node/dist/NodeHttpServer.js",
-    ],
-  },
-];
 
 const host = (id) => id.startsWith("node:") || id === "jsdom" || (/^\.\.?\//.test(id) && /\.(m?ts|mjs)$/.test(id));
 
@@ -205,6 +161,10 @@ const main = async () => {
       ? [`${r.name} is built without effects, but its bundle keeps Effect`]
       : []),
   ]);
+  // the budgets carry a KB or so of slack; 10% hides real growth
+  for (const r of rows.filter((r) => r.gzip < r.budget * 1024 * 0.9)) {
+    console.log(`\nnote: ${r.name} is ${kb(r.gzip)} KB gzip, more than 10% under its budget of ${r.budget} KB: the budget can be lowered`);
+  }
   for (const e of errors) console.error(`error: ${e}`);
   if (errors.length > 0) process.exitCode = 1;
 };

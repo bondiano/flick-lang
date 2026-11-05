@@ -11,6 +11,7 @@ use std::{env, fs, panic};
 
 use flick_core::diagnostics::Severity;
 use flick_core::fmt;
+use flick_core::markdown::{Mode, blocks};
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
 
@@ -18,61 +19,6 @@ const SPEC: &str = "docs/src/content/docs/ru/spec";
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
-}
-
-/// What a block's info string asks of the checker: ```` ```flick ```` must
-/// check without errors, ```` ```flick ignore ```` is only parsed, and
-/// ```` ```flick fail ```` must report at least one error.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Mode {
-    Check,
-    Ignore,
-    Fail,
-}
-
-/// The mode of a block whose info string is ```` ```flick ```` and `words`.
-fn mode(words: &str) -> Mode {
-    words
-        .split_whitespace()
-        .fold(Mode::Check, |mode, word| match word {
-            "ignore" => Mode::Ignore,
-            "fail" => Mode::Fail,
-            _ => mode,
-        })
-}
-
-/// A block line as it is compiled: a hidden line, `#` alone or starting with
-/// `# `, loses that prefix.
-fn compiled(line: &str) -> &str {
-    // shortcut: a raw string line starting with `# ` would be hidden too; no example has one, mark such a block `ignore`
-    if line == "#" {
-        ""
-    } else {
-        line.strip_prefix("# ").unwrap_or(line)
-    }
-}
-
-/// `(first line number, compiled text, mode)` of each ```` ```flick ````
-/// block; hidden lines stay in place, so line numbers match the markdown.
-fn flick_blocks(markdown: &str) -> Vec<(usize, String, Mode)> {
-    let mut blocks = Vec::new();
-    let mut current: Option<(usize, String, Mode)> = None;
-    for (index, line) in markdown.lines().enumerate() {
-        match &mut current {
-            None => {
-                let info = line.trim_start().strip_prefix("```flick");
-                if let Some(words) = info.filter(|w| w.is_empty() || w.starts_with(' ')) {
-                    current = Some((index + 2, String::new(), mode(words)));
-                }
-            }
-            Some(_) if line.trim_start() == "```" => blocks.extend(current.take()),
-            Some((_, text, _)) => {
-                text.push_str(compiled(line));
-                text.push('\n');
-            }
-        }
-    }
-    blocks
 }
 
 /// FNV-1a, enough to notice a changed or new example.
@@ -113,9 +59,9 @@ fn spec_blocks() -> Vec<(String, String)> {
                 .expect("file name")
                 .to_string_lossy()
                 .into_owned();
-            flick_blocks(&markdown)
+            blocks(&markdown)
                 .into_iter()
-                .map(move |(line, text, _)| (format!("{chapter}:{line}"), text))
+                .map(move |b| (format!("{chapter}:{}", b.line), b.text))
         })
         .collect()
 }
@@ -235,8 +181,8 @@ fn corpus() -> Vec<(String, String)> {
     md_files(&root().join("docs"), &mut docs);
     for path in docs {
         let markdown = fs::read_to_string(&path).expect("readable markdown");
-        for (line, text, _) in flick_blocks(&markdown) {
-            entries.push((format!("{}:{line}", path.display()), text));
+        for block in blocks(&markdown) {
+            entries.push((format!("{}:{}", path.display(), block.line), block.text));
         }
     }
     entries
@@ -249,8 +195,9 @@ fn docs_examples_parse() {
     let mut errors = Vec::new();
     for path in docs {
         let markdown = fs::read_to_string(&path).expect("readable markdown");
-        for (line, text, _) in flick_blocks(&markdown) {
-            errors.extend(parse_errors(&format!("{}:{line}", path.display()), &text));
+        for block in blocks(&markdown) {
+            let name = format!("{}:{}", path.display(), block.line);
+            errors.extend(parse_errors(&name, &block.text));
         }
     }
     assert!(
@@ -276,13 +223,14 @@ fn docs_examples_check() {
             .unwrap_or(&path)
             .display()
             .to_string();
-        for (line, text, mode) in flick_blocks(&markdown) {
+        for block in blocks(&markdown) {
+            let (line, mode) = (block.line, block.mode);
             if mode == Mode::Ignore {
                 continue;
             }
             checked += 1;
             let mut sources = SourceMap::default();
-            let file = sources.add(format!("{page}:{line}"), text.as_str());
+            let file = sources.add(format!("{page}:{line}"), block.text);
             let errors: Vec<_> = flick_core::check(&sources, file)
                 .into_iter()
                 .filter(|d| d.severity == Severity::Error)
@@ -292,7 +240,7 @@ fn docs_examples_check() {
                     "{page}:{line}: a `fail` block checks without errors"
                 ));
             }
-            if mode == Mode::Check {
+            if matches!(mode, Mode::Check | Mode::Keep) {
                 failures.extend(errors.iter().map(|d| {
                     let at = d
                         .span

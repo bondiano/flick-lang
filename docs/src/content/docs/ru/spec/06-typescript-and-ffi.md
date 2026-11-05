@@ -31,7 +31,7 @@ export const hello = /*#__PURE__*/ greet("Hello");
 
 ## ADT и сопоставление с образцом
 
-```flick
+```flick keep
 with_default : a -> Option a -> a
 let with_default fallback value =
   match value with

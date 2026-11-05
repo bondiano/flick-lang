@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: e57bfa94d43055ac
+source_hash: 66d656f376fafc55
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -30,7 +30,7 @@ A pure function is an ordinary JS function. Each arrow of a curried function is 
 
 ## ADTs and pattern matching
 
-```flick
+```flick keep
 with_default : a -> Option a -> a
 let with_default fallback value =
   match value with

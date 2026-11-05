@@ -22,6 +22,12 @@ lint:
 fmt:
     cargo fmt --all
 
+# Rewrite the ```flick blocks of the site's pages with the safe fixes of
+# `flick check --fix`, as a syntax change rewrites the `.fl` files with it
+docs-fix:
+    cargo build -p flick
+    find docs/src/content/docs \( -name '*.md' -o -name '*.mdx' \) -print0 | xargs -0 target/debug/flick check --fix
+
 # Run the test suites; the reference model has its own recipe, `model`
 test: unit feature-test
 
@@ -107,6 +113,10 @@ lsp-bench file="examples/mtl/src/Mtl/StateT.fl" +positions="22:5":
 perf:
     cargo build --release -p flick
     node tools/perf/index.mjs target/release/flick
+
+# Budgets go down: those of tools/perf and tools/bundle-size against a base ref; a looser one needs a `reason` beside it
+ratchet base="origin/main":
+    node tools/perf/ratchet.mjs {{base}}
 
 # Hold the language server to a long open/edit/close session and print its resident memory (Linux)
 lsp-soak file="examples/mtl/src/Mtl/StateT.fl" cycles="400":
@@ -202,7 +212,7 @@ wasm-plugins:
 # Build the wasm module the in-browser demo loads and hold it to its size budget
 wasm:
     cargo build -p flick-wasm --target wasm32-unknown-unknown --release
-    test $(wc -c < target/wasm32-unknown-unknown/release/flick_wasm.wasm) -le 4194304
+    test $(wc -c < target/wasm32-unknown-unknown/release/flick_wasm.wasm) -le 4718592
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm

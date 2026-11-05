@@ -26,6 +26,7 @@ just test
 just check  # lint + test
 just e2e    # runtime tests + compiled programs on Node
 just bundle-size  # browser bundles against their gzip budgets
+just ratchet  # budgets only go down against origin/main; a looser one needs a `reason`
 ```
 
 ## Crates
@@ -94,7 +95,11 @@ lines: a line that is `#` alone or starts with `# ` is compiled without that
 prefix and left off the page, as rustdoc does. `flick ignore` only parses a
 block, for syntax that does not compile yet; `flick fail` must report an
 error, for an example of one. Give both locales the same hidden lines and
-markers.
+markers. `flick check --fix <page>.md` writes the safe fixes into the default
+blocks of a page, keeping hidden lines hidden, and `just docs-fix` into those
+of every page, as a syntax change rewrites the corpus. `flick keep` checks a
+block like a default one but leaves it as written, for an example that
+shows on purpose the long form a lint would shorten.
 
 English is the original of each page, except under `spec/`, where the
 Russian text is. A translation records in its frontmatter `source_hash`, the

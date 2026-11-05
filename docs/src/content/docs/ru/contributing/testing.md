@@ -1,6 +1,6 @@
 ---
 title: "Тестирование"
-source_hash: bfed11ca607cc8c2
+source_hash: c28b3b87047978d7
 ---
 
 Установите проверку зависимостей, используемую локально и в CI:
@@ -15,7 +15,7 @@ cargo install cargo-machete --version 0.9.2 --locked
 | `just check` | `just lint`, `cargo test --workspace` |
 | `just e2e` | `pnpm install --frozen-lockfile`, тесты среды выполнения, `tests/run/**` на Node, `flick test` на примерах проектов, `just language` |
 | `just language` | языковые тесты `tests/language` на Node и исполняемым файлом Go: оба запуска должны пройти с одинаковым отчётом |
-| `just bundle-size` | release-сборки `tools/bundle-size/pure.fl`, `tests/run/ui/counter.fl`, `tests/run/ui/atoms.fl` и плейграунда, собранные для браузера через rolldown; падает, если размер в gzip превышает бюджет из `tools/bundle-size/index.mjs` |
+| `just bundle-size` | release-сборки `tools/bundle-size/pure.fl`, `tests/run/ui/counter.fl`, `tests/run/ui/atoms.fl` и плейграунда, собранные для браузера через rolldown; падает, если размер в gzip превышает бюджет из `tools/bundle-size/programs.mjs` |
 
 Тесты сравнивают результаты с эталонными снимками через [`insta`](https://insta.rs).
 Просмотреть изменения можно командой `cargo insta review`, а принять их —

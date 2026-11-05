@@ -3,7 +3,9 @@
 // tools/load at concurrency 16 and the size of the Go one. Writes
 // target/perf.json and a table (also to $GITHUB_STEP_SUMMARY) and fails
 // when a metric is past its budget in budgets.json; a budget of null is
-// only reported.
+// only reported. A metric that beats its budget by a factor of more than
+// 1 + 2 × tolerance prints a note that the budget can be tightened;
+// loosening one takes a `reason` beside it (ratchet.mjs).
 //
 //   node tools/perf/index.mjs <flick binary>
 import { execFileSync, spawn, spawnSync } from "node:child_process";
@@ -15,7 +17,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 /** Each metric, its unit and which way is better. */
-const METRICS = {
+export const METRICS = {
   "check.corpus": { unit: "ms", better: "lower" },
   "lsp.hover.p95": { unit: "ms", better: "lower" },
   "lsp.hover_after_edit.p95": { unit: "ms", better: "lower" },
@@ -37,6 +39,14 @@ export const failure = (metric, value, { budget, tolerance }) => {
   const limit = better === "lower" ? budget * (1 + tolerance) : budget * (1 - tolerance);
   const past = better === "lower" ? value > limit : value < limit;
   return past ? `${metric} is ${value} ${unit}, past its budget of ${budget} ${unit} with a tolerance of ${tolerance * 100}%` : null;
+};
+
+/** A note that a measurement beats its budget by a factor of more than `1 + 2 * tolerance`, or null. */
+export const slack = (metric, value, { budget, tolerance }) => {
+  if (budget === null) return null;
+  const { unit, better } = METRICS[metric];
+  const far = better === "lower" ? value * (1 + 2 * tolerance) < budget : value > budget * (1 + 2 * tolerance);
+  return far ? `${metric} is ${value} ${unit}, well within its budget of ${budget} ${unit}: it can be ${better === "lower" ? "lowered" : "raised"}` : null;
 };
 
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
@@ -152,6 +162,7 @@ const main = async () => {
   writeFileSync(path.join(root, "target/perf.json"), `${JSON.stringify(rows, null, 2)}\n`);
 
   const errors = [];
+  const notes = [];
   const table = ["| metric | value | unit | budget |", "|---|---:|---|---:|"];
   for (const { metric, value, unit } of rows) {
     const budget = budgets[metric];
@@ -161,10 +172,13 @@ const main = async () => {
     }
     const failed = failure(metric, value, budget);
     if (failed) errors.push(failed);
+    const note = slack(metric, value, budget);
+    if (note) notes.push(note);
     table.push(`| ${metric} | ${value} | ${unit} | ${budget.budget ?? "—"}${failed ? " (failed)" : ""} |`);
   }
   console.log(`\n${table.join("\n")}`);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Performance\n\n${table.join("\n")}\n`);
+  for (const n of notes) console.log(`note: ${n}`);
   for (const e of errors) console.error(`error: ${e}`);
   if (errors.length > 0) process.exitCode = 1;
 };

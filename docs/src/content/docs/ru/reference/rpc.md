@@ -1,6 +1,6 @@
 ---
 title: "Типизированные RPC"
-source_hash: 258f7bb549302298
+source_hash: 60fe7b342338a1f5
 ---
 
 Опишите процедуру один раз и используйте это описание по обе стороны
@@ -214,7 +214,7 @@ let serve_both options handlers =
     let app =
       Http.Router.router Http.Router.config
         [
-          Http.Router.route (Some Http.Method.POST) "/rpc" (fun request -> rpc request),
+          Http.Router.route (Some Http.Method.POST) "/rpc" rpc,
           Http.Router.route (Some Http.Method.GET) "/hello/:name" hello,
         ]
     let server = Http.Server.serve options app

@@ -16,6 +16,14 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
+      # a pull request loosens no budget without a reason (`just ratchet`)
+      - if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          git fetch --depth=1 origin "$BASE"
+          node --test tools/perf/ratchet.test.mjs
+          node tools/perf/ratchet.mjs FETCH_HEAD
       # installs the toolchain, components and targets from rust-toolchain.toml
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2

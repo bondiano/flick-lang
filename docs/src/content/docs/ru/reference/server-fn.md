@@ -1,6 +1,6 @@
 ---
 title: "Серверные функции"
-source_hash: f34b3bd72c915642
+source_hash: 9043754a2155d926
 ---
 
 `server fn` — функция, которая выполняется на сервере и которую любой код,
@@ -85,7 +85,7 @@ let serve () = Server.handler [server App.Shop.place]
 #
 # route : (ServerRequest ->{} ServerResponse) -> Http.Router.Route none none
 let route functions =
-  Http.Router.route (Some Http.Method.POST) Server.path (fun request -> functions request)
+  Http.Router.route (Some Http.Method.POST) Server.path functions
 ```
 
 ## Что идёт по сети
