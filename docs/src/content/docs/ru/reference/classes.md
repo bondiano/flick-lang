@@ -1,6 +1,6 @@
 ---
 title: "Классы и экземпляры классов"
-source_hash: 39ee7b97597bf0cd
+source_hash: d038b56da9b24202
 ---
 
 После вывода типов компилятор разрешает ограничения классов: для каждого
@@ -228,6 +228,28 @@ instance Hash LocalExternalId =
 tag : Record.Lacks "tag" { id : Float | r } => { id : Float | r } -> { id : Float; tag : String | r }
 let tag value = Record.extend (Record.label : Record.Label "tag") "t" value
 ```
+
+## Место вызова
+
+Класс ядра `CallSite` из модуля `CallSite` — место использования:
+`CallSite.place` — это `Module:line`, а `CallSite.definition` — `Module.name`
+объемлющего определения верхнего уровня или `Module` вне его. Его даёт
+чекер, а не экземпляр: функция с `CallSite =>` в сигнатуре передаёт дальше
+место своего вызывающего, а любое другое использование получает своё.
+`Atom.set` называет место записи в отладочном логе, serializable-атом берёт
+ключ из определения, а `todo`, `echo` и `let assert` так называют своё
+место.
+
+```flick
+# import CallSite exposing (CallSite)
+#
+/// Место того, кто вызвал `traced`.
+traced : CallSite => String -> String
+let traced label = label ++ " at " ++ CallSite.place
+```
+
+Программа не объявляет его экземпляров (`FLICK-C012`). В контексте
+экземпляра и в сигнатуре метода по умолчанию он бывает только given.
 
 ## Автоматический вывод экземпляров классов
 

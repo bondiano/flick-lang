@@ -206,6 +206,28 @@ tag : Record.Lacks "tag" { id : Float | r } => { id : Float | r } -> { id : Floa
 let tag value = Record.extend (Record.label : Record.Label "tag") "t" value
 ```
 
+## Call sites
+
+The core class `CallSite` of the module `CallSite` is the place of a use:
+`CallSite.place` is `Module:line` and `CallSite.definition` the
+`Module.name` of the top-level definition around it, or `Module`. The
+checker gives it, never an instance: a function with `CallSite =>` in its
+signature passes on its caller's, and any other use gets its own place.
+`Atom.set` names the place of the write in a debug log, a serializable
+atom takes its key from the definition, and `todo`, `echo` and `let
+assert` name their place this way.
+
+```flick
+# import CallSite exposing (CallSite)
+#
+/// The place of the caller of `traced`.
+traced : CallSite => String -> String
+let traced label = label ++ " at " ++ CallSite.place
+```
+
+A program declares no instance of it (`FLICK-C012`). In the context of an
+instance or the signature of a default method, it is only a given.
+
 ## Deriving
 
 ```flick

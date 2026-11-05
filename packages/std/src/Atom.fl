@@ -8,6 +8,7 @@
 module Atom exposing (.., Registry)
 
 import Reactivity.Atom exposing (Registry)
+import CallSite exposing (CallSite)
 
 @lang atom
 /// A value to read.
@@ -61,17 +62,16 @@ foreign pure fresh from "@flick-lang/runtime" "atomLocal"
 @maker
 /// The state `atom`, coded by `wire` so a server can hand its value to
 /// the client. Its key is the name of the top-level binding it defines,
-/// `Module.name`, which the compiler gives; anywhere else it is an error.
-serializable : PureCodec Json a -> Writable a -> Writable a
-let serializable wire atom = Reactivity.Atom.serializable "Atom.serializable" wire atom
+/// `Module.name`; anywhere else it is an error.
+serializable : CallSite => PureCodec Json a -> Writable a -> Writable a
+let serializable wire atom = Reactivity.Atom.serializable CallSite.definition wire atom
 
 @lang serializable_family
 @maker
 /// One serializable state per key, made by `f` the first time: the key of
 /// each is `Module.name/key`.
-serializable_family : PureCodec Json a -> (String -> Writable a) -> String -> Writable a
-let serializable_family wire f =
-  Reactivity.Atom.serializable_family "Atom.serializable_family" wire f
+serializable_family : CallSite => PureCodec Json a -> (String -> Writable a) -> String -> Writable a
+let serializable_family wire f = Reactivity.Atom.serializable_family CallSite.definition wire f
 
 @lang atom_browser
 /// A state the browser holds, such as the URL. A server has no browser, so
@@ -144,29 +144,18 @@ value : forall d a. (Writable a)^d ->{Read;} a
 let value atom = Read.get (readonly atom)
 
 /// Replaces the value of `atom`; whoever read it renders or computes again.
-set : forall d a. (Writable a)^d -> a ->{Write;} Unit
-let set atom new_value = Write.set "" atom new_value
+/// A debug log of the write names the place of the call.
+set : forall d a. CallSite => (Writable a)^d -> a ->{Write;} Unit
+let set atom new_value = Write.set CallSite.place atom new_value
 
 /// Replaces the value of `atom` by `f` of it.
-update : forall d a. (Writable a)^d -> (a -> a) ->{Write;} Unit
-let update atom f = Write.update "" atom f
+update : forall d a. CallSite => (Writable a)^d -> (a -> a) ->{Write;} Unit
+let update atom f = Write.update CallSite.place atom f
 
 /// Replaces the value of `atom` by the second part of `f` of it and gives
 /// the first.
-modify : forall d a b. (Writable a)^d -> (a -> (b, a)) ->{Write;} b
-let modify atom f = Write.modify "" atom f
-
-/// `set` at `place`: the compiler calls it for `set` with its place.
-set_at : forall d a. String -> (Writable a)^d -> a ->{Write;} Unit
-let set_at place atom new_value = Write.set place atom new_value
-
-/// `update` at `place`.
-update_at : forall d a. String -> (Writable a)^d -> (a -> a) ->{Write;} Unit
-let update_at place atom f = Write.update place atom f
-
-/// `modify` at `place`.
-modify_at : forall d a b. String -> (Writable a)^d -> (a -> (b, a)) ->{Write;} b
-let modify_at place atom f = Write.modify place atom f
+modify : forall d a b. CallSite => (Writable a)^d -> (a -> (b, a)) ->{Write;} b
+let modify atom f = Write.modify CallSite.place atom f
 
 /// The value of the state `atom` now, in a task: a task reads without
 /// depending on what it read.
@@ -236,10 +225,10 @@ let ready atom =
 /// hand it to the client: the client starts from it instead of running
 /// the task again. One still loading or failed is not handed over. Its key
 /// is the name of the top-level binding it defines, as for `serializable`.
-serializable_task : PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
-let serializable_task wire atom = serializable_task_at "Atom.serializable_task" wire atom
+serializable_task : CallSite => PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
+let serializable_task wire atom = serializable_task_at CallSite.definition wire atom
 
-/// `serializable_task` under the key the compiler gives.
+/// `serializable_task` under the key `key`.
 serializable_task_at : String -> PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
 foreign pure serializable_task_at from "@flick-lang/runtime" "atomSerializableTask"
 
@@ -251,11 +240,12 @@ foreign pure serializable_task_at from "@flick-lang/runtime" "atomSerializableTa
 /// handed over, so no stack or secret leaves the server; the client runs
 /// the task again.
 serializable_result :
+  CallSite =>
   PureCodec Json a -> PureCodec Json x -> Atom (Async a {x | none}) -> Atom (Async a {x | none})
 let serializable_result wire error_wire atom =
-  serializable_result_at "Atom.serializable_result" wire error_wire atom
+  serializable_result_at CallSite.definition wire error_wire atom
 
-/// `serializable_result` under the key the compiler gives.
+/// `serializable_result` under the key `key`.
 serializable_result_at :
   String ->
   PureCodec Json a ->

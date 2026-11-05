@@ -42,7 +42,12 @@ impl Checker<'_> {
                 let c = self.canon(&w.constraint);
                 progress |= c != w.constraint;
                 w.constraint = c;
-                match self.entail(&w.constraint, &givens, &mut Vec::new()) {
+                let site = self.call_site(&w.constraint, &givens, w.span);
+                let outcome = site.map_or_else(
+                    || self.entail(&w.constraint, &givens, &mut Vec::new()),
+                    Outcome::Solved,
+                );
+                match outcome {
                     Outcome::Solved(dict) => {
                         progress = true;
                         self.record_dict(w.span, w.order, dict.clone());

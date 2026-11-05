@@ -1,13 +1,15 @@
-//! `todo`, `echo` and `let assert`: calls of `Flick.Debug` told where they are.
+//! `todo`, `echo` and `let assert`: calls of `Flick.Debug`, whose
+//! `CallSite` the checker gave at the keyword.
 
 use super::Lower;
+use super::expr::with_dicts;
 use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stage};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::lang::Lang;
-use crate::types::let_parts;
+use crate::types::{Range, let_parts};
 
 impl Lower<'_> {
     /// `todo ["message"]` fails with its place and message.
@@ -20,14 +22,16 @@ impl Lower<'_> {
                 || "`todo` reached".to_owned(),
                 |t| literal::string_value(t.text(self.text)),
             );
-        let message = format!("{}: {message}", self.location(node));
-        debug_call(Lang::TodoAt, string(message, span), span)
+        let todo = self.debug(Lang::TodoAt, node.range(), span);
+        apply(todo, string(message, span), span)
     }
 
     /// `echo e`, or a bare `echo` as a function.
     pub(super) fn echo(&mut self, node: &Node, operand: Option<&Node>) -> Expr {
         let span = self.span(node);
-        let echo = debug_call(Lang::EchoAt, string(self.location(node), span), span);
+        let keyword = node.child_tokens().find(|t| t.kind == K::EchoKw);
+        let keyword = keyword.map_or(node.range(), |t| (t.start, t.end));
+        let echo = self.debug(Lang::EchoAt, keyword, span);
         match operand {
             Some(operand) => apply(echo, self.expr(operand), span),
             None => echo,
@@ -54,10 +58,15 @@ impl Lower<'_> {
                 || "`let assert` did not match".to_owned(),
                 |t| literal::string_value(t.text(self.text)),
             );
-        let message = format!("{}: {message}", self.location(decl));
+        let keyword = decl.child_tokens().find(|t| t.kind == K::AssertKw);
+        let keyword = keyword.map_or(decl.range(), |t| (t.start, t.end));
         let missed = self.hidden("value");
         let fail = apply(
-            debug_call(Lang::AssertAt, string(message, span), span),
+            apply(
+                self.debug(Lang::AssertAt, keyword, span),
+                string(message, span),
+                span,
+            ),
             Expr::new(ExprKind::Local(missed.clone()), span),
             span,
         );
@@ -76,11 +85,11 @@ impl Lower<'_> {
         Expr::new(ExprKind::Match(Box::new(value), arms), span)
     }
 
-    /// `Module:line` of a node.
-    pub(super) fn location(&self, node: &Node) -> String {
-        let start = node.range().0 as usize;
-        let line = self.text[..start].matches('\n').count() + 1;
-        format!("{}:{line}", self.module)
+    /// The function of `Flick.Debug` the lang item `function` names, given
+    /// the `CallSite` the checker found at `keyword`.
+    fn debug(&self, function: Lang, keyword: Range, span: Span) -> Expr {
+        let dicts = self.typing.dicts.get(&keyword).cloned().unwrap_or_default();
+        with_dicts(Expr::new(ExprKind::lang(function), span), dicts)
     }
 }
 
@@ -98,9 +107,4 @@ fn apply(func: Expr, arg: Expr, span: Span) -> Expr {
         },
         span,
     )
-}
-
-fn debug_call(function: Lang, arg: Expr, span: Span) -> Expr {
-    let func = Expr::new(ExprKind::lang(function), span);
-    apply(func, arg, span)
 }

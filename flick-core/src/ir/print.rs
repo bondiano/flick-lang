@@ -89,6 +89,7 @@ pub fn dict(d: &Dict) -> String {
             format!("{class}{{{}}}", fields.join(", "))
         }
         Dict::Primitive { constraint, .. } => format!("#{constraint}"),
+        Dict::Site { place, .. } => format!("#CallSite {place}"),
         Dict::Error => "error".to_owned(),
     }
 }

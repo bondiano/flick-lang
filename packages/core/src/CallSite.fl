@@ -1,0 +1,12 @@
+/// Where a use is: a value constrained by `CallSite` reads the place of the
+/// code that uses it. The checker gives the constraint: the caller's own
+/// `CallSite` passes on, else the place of this use. A program declares no
+/// instance of it.
+module CallSite exposing (CallSite(..))
+
+@lang call_site
+class CallSite =
+  /// `Module:line` of the use.
+  place : String
+  /// `Module.name` of the top-level definition around the use, else `Module`.
+  definition : String

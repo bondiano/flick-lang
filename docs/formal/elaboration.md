@@ -14,7 +14,8 @@ Elaborated here:
 - `do` with `<-`, `and`, an `if` guard and `let`;
 - `for … yield`, `[for …]`, `for … do`;
 - postfix `?`;
-- direct calls.
+- direct calls;
+- `CallSite`, the place of a use, which the checker gives.
 
 | Not covered | Where | How the model accounts for it |
 | - | - | - |
@@ -113,9 +114,9 @@ d ::= δ | d.$slot | I d̄ | struct_C^τ d̄ | prim_Q ℓ̄
 
 - `I` is an instance dictionary (a top-level value of the instance's module, a function of the context dictionaries);
 - `struct_C^τ` is the dictionary of a record or tuple `τ` built by the compiler (`$rt.structural`). The runtime erases the type and takes the labels from the value; the term needs it for elaboration into the typed core ([dictionary terms carry their type](#the-structural-dictionary-term-carries-its-type));
-- `prim_Q ℓ̄` is a row primitive with labels.
+- `prim_Q ℓ̄` is a row primitive with labels, or `CallSite ℓ` at the place `ℓ` of a use, rule (Site) below.
 
-These are exactly the cases of `Dict` (`classes/mod.rs`): `Given`, `Super`, `Instance`, `Structural`, `Primitive`. `Dict::Error` stands in for a constraint that has already been reported and does not occur in the elaboration of an accepted program.
+These are exactly the cases of `Dict` (`classes/mod.rs`): `Given`, `Super`, `Instance`, `Structural`, `Primitive`, and `Site`, the `prim_{CallSite ℓ} ℓ̄` of (Site). `Dict::Error` stands in for a constraint that has already been reported and does not occur in the elaboration of an accepted program.
 
 Elaboration `⟦Γ⟧`: `x : σ` becomes `x : ⟦σ⟧`, and every given `δ : Q` becomes a variable `δ : D_Q`.
 
@@ -159,6 +160,16 @@ Checker:
 - (Struct): `structural_instance`;
 - (Inst): `by_instance`, the first head for which `head_match` (`matching.rs` `match_type`) returns `Yes`. Matching binds only the instance's variables. On `Unknown` (only metavariables are in the way) the constraint is deferred. Then `by_context` solves the context;
 - 𝓘 is the set of instances the module sees: the built-in ones, those of every module it depends on, and its own (`env.rs` `instances`).
+
+`CallSite` reads as `CallSite ς`, with an unwritten variable ς for the place. A given of the caller fixes ς, by (Given); without one the checker defaults ς to the literal ℓ of the use, as it defaults a numeric literal, and solves `CallSite ℓ` by (Prim):
+
+```text
+no δ : CallSite ς ∈ Δ*    ℓ = (Module:line of the use, Module.name of its definition)
+───────────────────────────────────────────────────────────────────── (Site)
+Δ ⊩ CallSite ℓ ⇝ prim_{CallSite ℓ} ℓ̄
+```
+
+Checker: `classes/call_site.rs` `call_site`, from `solve_classes` before `entail`. Each use has its own ℓ, so the solution never enters the cache; inside the context of an instance or a default signature there is no use, and `CallSite` is only a given there (`FLICK-C001` otherwise).
 
 Functional dependencies refine types, not dictionaries:
 
@@ -344,7 +355,7 @@ A program is the entry module and every module it depends on. 𝓘ₚ is the set
 | K3 | **Covered FDs.** The variables of the determined positions lie in the least fixed point reached from the determining positions of the head by the dependencies of the context and its superclasses | `declare.rs` `admit`, `coverage_rules`; `FLICK-C005` |
 | K4 | **No orphans.** An instance is declared by the package of the class or the package of the nominal constructor of the head's first parameter | `declare.rs` `ownership`; `FLICK-C006` |
 | K5 | **Termination.** The context's variables occur in the head; every context constraint is structurally smaller than the head and repeats no variable more often. Superclasses are acyclic. Exhausting the budget is a failure | `declare.rs` `terminates`, `declare_classes`; `FLICK-C007`, `FLICK-C008`, `FLICK-C009` |
-| K6 | **Closed classes.** Instances of the row primitives, `Numeric`, `Iterable` and the structural `Eq`/`Ord`/`Hash`/`Show` of records belong to the compiler | `declare.rs` `admit`; `FLICK-C012` ([closed `Iterable`](#for-did-not-call-iter-while-iterable-was-open)) |
+| K6 | **Closed classes.** Instances of the row primitives, `CallSite`, `Numeric`, `Iterable` and the structural `Eq`/`Ord`/`Hash`/`Show` of records belong to the compiler | `declare.rs` `admit`, `call_site.rs` `written_call_site`; `FLICK-C012` ([closed `Iterable`](#for-did-not-call-iter-while-iterable-was-open)) |
 | K7 | **Instance slots.** The slot `$slotᵢ` of an instance `I` holds the dictionary entailed for `Sᵢ ῡᵢ[ᾱ := τ̄]` from the context of `I` | `check_instances`; slots are distinct ([slots by position](#superclass-slots-named-by-the-bare-class-name)) |
 | K8 | **Names.** Givens in scope print differently ([given names](#givens-looked-up-by-string-confused-same-named-variables)); the instances of a module are named differently ([instance names](#instance-names-were-heads-without-modules)) | `unify.rs` `unshadowed`, `declare.rs` `instance_head` |
 
@@ -399,6 +410,8 @@ The sugar of §3 in Lean (`Sugar.lean`, `SugarBase.lean`, `DoNotation.lean`, `Co
 `Sim` is derived from the target's steps (`Run.lean`): `Target` has a step relation and a relation `Rel` on states that relates terms differing by `≈` in dictionary positions (`TmEqv`) and is a result-preserving weak simulation (`load_rel`, `step_rel`, `final_rel`). Only typed dictionaries are evaluated, so `load_rel` requires both terms to be closed and typed at one type, and `Sim` and `T6b` speak only of fillings `Exprs.Ok`: for the target, that is the typing of the filled skeleton. From this follow `Target.sim`, by induction on the run, and T6(b) without the hypothesis `Sim`, `T6b_target`, with the typing of both fillings as premises. The result is the set of observations of terminated runs; divergence is not compared. The fields of `Rel` are proved for the core by `runTarget` (`T6b_core`).
 
 The instance of `Target` on the Lean core with regions (`CoreTy.lean`, `CoreTr.lean`, `CoreLaws.lean`, `CoreDict.lean`, `CoreT6a.lean`). The type translation `⟦·⟧` is `trT`, `trTT`, `trS`; it commutes with substitution (`trT_subst`) and with `⌈·⌉` (`trT_reach`). The elaborated term in the core is `Tr`; the global of a structural or primitive dictionary is chosen by the type held in the term ([type-indexed families](#structural-and-primitive-dictionaries-are-families-indexed-by-type), [typed dictionary terms](#the-structural-dictionary-term-carries-its-type)), and the correspondence of contexts is `Corr`. `Has` is the core typing `Typ` of the elaboration in any corresponding context. The hypothesis `Real` is the program's declarations in the core signature: the dictionary records with slots and methods, the schemes of instance globals, of constants of Γ₀, of structural and primitive dictionaries, and the constructor `Some`. Every law of `Target` is one core rule (`has_var` … `has_prim`), and `typingTarget` collects them. T6(a) for the core is `T6a_core`, for a closed program `T6a_closed`, for the sugar `T6a_do_core` and `T6a_sugar_core`. Running dictionaries in the core: the hypothesis `RealRun` gives the bodies of dictionary globals; a closed derivation evaluates by pure steps (`ent_eval`), and `≈` preserves the values of a dictionary (`eqv_sem`, given [closed slot arguments](#slot-rules-of-equivalence-take-closed-derivations)). The target with the core's run (`CoreRel.lean` … `CoreRun.lean`) is `runTarget`: a state is a configuration, a step is `CStep`, the result is a literal of the main thread. `Rel` is the congruence `Cg` on terms generated by the base pairs `DP`: on the left a closed dictionary computation, typed in the core at stage `P` and not yet a value; on the right a closed term with the same values; on the store, children and finalizers it is pointwise (`CfgR`). A step inside a base pair is pure (`dp_calm`); otherwise the other side takes the same step (`thread_sim`, `cstep_sim`); `≈`-dictionaries give base pairs (`eqv_dsim`, `dsim_cg`; see [open dictionaries](#equivalence-relates-open-dictionaries) and [dictionaries typed in the empty context](#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)). T6(b) for the core without the hypothesis `Sim` is `T6b_core`.
+
+Call sites (`CallSite.lean`): (Site) is (Prim) at a literal place, so `Ent`, `Eqv`, `Coherent` and T6 are unchanged. A place that is still the variable ς is no primitive (`prims = none`), and `site_given` derives `CallSite ς` only from a given: (Prim) is excluded by `none`, (Struct) by `primStruct`, (Inst) by `k6prim`. `site_caller` closes a function under its given `CallSite ς` at its caller's place (`closed_rep`, `closed_unique`): what it passes on is `≈` the caller's dictionary.
 
 What T6 gives the optimizations:
 

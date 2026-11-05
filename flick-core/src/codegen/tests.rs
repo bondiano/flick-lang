@@ -41,6 +41,8 @@ fn top_level_atoms_views_and_actions_are_labelled_by_their_names() {
             labels != Labels::None || !release,
             "{code}"
         );
+        // a write's `CallSite` names its definition as data, not as a label
+        let code = code.replace("definition: \"App.Counter.reset\"", "");
         ["count", "reset", "counter", "start"]
             .into_iter()
             // a long call breaks after `$rt.label(`
@@ -298,6 +300,7 @@ fn an_atom_write_names_its_place() {
          reset : Action.Action Ui.ClickSnapshot\n\
          let reset = Action.exhaust (fun _ -> task {\n  Atom.set count 0\n  Atom.update count (fun n -> n + 1)\n})\n";
     let code = compile(text);
-    assert!(code.contains("set_at(\"App.Counter:6\")"), "{code}");
-    assert!(code.contains("update_at(\"App.Counter:7\")"), "{code}");
+    // each write's `CallSite` is the record of its own place
+    assert!(code.contains("place: \"App.Counter:6\""), "{code}");
+    assert!(code.contains("place: \"App.Counter:7\""), "{code}");
 }

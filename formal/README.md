@@ -44,6 +44,9 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   abstract target and instantiated on the core with regions and dictionary records as
   `T6a_core` (`Elab/CoreT6a.lean`) and `T6b_core` (`Elab/CoreRun.lean`), the latter with the
   run of the core itself.
+- **Call sites** (`Formal/Elab/CallSite.lean`): `site_given`, a `CallSite` at a place that is
+  no literal comes only from a given, and `site_caller`, a function under that given passes on
+  its caller's place; (Site) is (Prim) at a literal place, so T6 covers it unchanged.
 - **The hypotheses of T6 are satisfiable** (`Formal/Elab/Witness/`): one concrete program
   meets all of them, and `witness_T6a`, `witness_T6b` (`Witness/Main.lean`),
   `witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` (`Witness/T6b.lean`)
