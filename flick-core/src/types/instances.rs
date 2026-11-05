@@ -162,7 +162,7 @@ impl Checker<'_> {
                 continue;
             };
             let methods = self.class_info(&module, &class).map(|i| i.methods);
-            for (name, member) in super::decls::class_defaults(decl, self.text) {
+            for (name, member) in super::class_members::class_defaults(decl, self.text) {
                 if !methods.as_ref().is_some_and(|m| m.contains(&name)) {
                     self.error(
                         codes::C011,

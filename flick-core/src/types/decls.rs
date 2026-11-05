@@ -4,11 +4,11 @@
 //! and class methods.
 
 use super::Checker;
+use super::class_members::method_names;
 use super::convert::{Free, TyVar, is_type};
 use super::env::{Abi, Form, Fundep, Operation, TypeDef};
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
-use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::resolve;
 use crate::syntax::cst::Node;
@@ -329,85 +329,12 @@ impl Checker<'_> {
         }
     }
 
-    /// `a b -> c` by parameter positions; `None` after a diagnostic.
-    fn fundep(&mut self, node: &Node, params: &[Binder]) -> Option<Fundep> {
-        let mut sides = [Vec::new(), Vec::new()];
-        let mut side = 0;
-        for t in node.child_tokens() {
-            match t.kind {
-                K::Arrow => side = 1,
-                K::Ident => {
-                    let name = t.text(self.text);
-                    let Some(i) = params.iter().position(|p| p.name == name) else {
-                        self.error(
-                            codes::T001,
-                            self.token_span(t),
-                            format!("`{name}` is not a parameter of the class"),
-                        );
-                        return None;
-                    };
-                    sides[side].push(i);
-                }
-                _ => {}
-            }
-        }
-        let [from, to] = sides;
-        Some(Fundep { from, to })
-    }
-
     fn payload(&mut self, variant: &Node) -> Vec<Type> {
         variant
             .nodes()
             .filter(|n| is_type(n.kind))
             .map(|t| self.ty(t, &Kind::Type, Free::Reject))
             .collect()
-    }
-
-    /// Operations of a service or methods of a class, by name.
-    fn members(&mut self, decl: &Node, constraints: &[Type]) -> Vec<(String, Type)> {
-        let members = decl
-            .nodes()
-            .filter(|n| n.kind == K::Members)
-            .flat_map(Node::nodes);
-        let mut out = Vec::new();
-        for member in members.filter(|m| m.kind == K::Signature) {
-            let (Some(name), Some(ty)) = (
-                member.child_tokens().find(|t| t.kind == K::Ident),
-                member.nodes().find(|n| is_type(n.kind)),
-            ) else {
-                continue;
-            };
-            let (scheme, _) = self.signature(ty);
-            if decl.kind == K::ServiceDecl && !super::services::has_runtime_arrow(&scheme) {
-                let name = name.text(self.text);
-                self.error(
-                    codes::E006,
-                    self.span(member),
-                    format!(
-                        "service operation `{name}` must be a runtime function: running it looks the service up, so at least one arrow is `->{{…}}`"
-                    ),
-                );
-            }
-            let scheme = match scheme {
-                Type::Forall {
-                    vars,
-                    constraints: own,
-                    body,
-                } => Type::Forall {
-                    vars,
-                    constraints: constraints.iter().cloned().chain(own).collect(),
-                    body,
-                },
-                body if constraints.is_empty() => body,
-                body => Type::Forall {
-                    vars: Vec::new(),
-                    constraints: constraints.to_vec(),
-                    body: Box::new(body),
-                },
-            };
-            out.push((name.text(self.text).to_owned(), scheme));
-        }
-        out
     }
 
     /// Fixes the kinds and stores what the declaration defines.
@@ -586,37 +513,4 @@ enum Body {
     Members(Vec<(String, Type)>),
     /// Superclasses, functional dependencies and methods.
     Class(Vec<Type>, Vec<Fundep>, Vec<(String, Type)>),
-}
-
-impl Checker<'_> {
-    /// The methods of a class are values whose parent is the class.
-    fn declare_methods(&mut self, class: &str, members: Vec<(String, Type)>) {
-        for (name, ty) in members {
-            let scheme = self.default_kinds(&ty);
-            let entity = self.env.entity(Namespace::Value, &name);
-            self.env.set_value(entity.clone(), scheme);
-            self.env.set_parent(entity, class);
-            self.env.declare(Namespace::Value, &name);
-        }
-    }
-}
-
-/// The methods of a class, and those with a default in its body.
-fn method_names(decl: &Node, text: &str, members: &[(String, Type)]) -> (Vec<String>, Vec<String>) {
-    let methods: Vec<String> = members.iter().map(|(name, _)| name.clone()).collect();
-    let defaults = class_defaults(decl, text)
-        .into_iter()
-        .filter_map(|(name, _)| methods.contains(&name).then_some(name))
-        .collect();
-    (methods, defaults)
-}
-
-/// The `let` definitions in the body of class `decl`, by name.
-pub fn class_defaults<'n>(decl: &'n Node, text: &str) -> Vec<(String, &'n Node)> {
-    decl.nodes()
-        .filter(|n| n.kind == K::Members)
-        .flat_map(Node::nodes)
-        .filter(|n| n.kind == K::LetDecl)
-        .filter_map(|n| Some((super::let_parts(n, text).name?, n)))
-        .collect()
 }
