@@ -411,8 +411,6 @@ structure Sig where
   res : Name → List Ty
   res_closed : ∀ K k ts T σ, ctor K = some (k, ts, T) →
     (∀ i, i < k → σ (.v i) = .tvar i) → (res K).map (Ty.substT σ) = res K
-  /-- Every constructor builds `T α₀ … αₖ₋₁` (until the rules of GADTs). -/
-  res_plain : ∀ K k ts T, ctor K = some (k, ts, T) → res K = idTs k
   impl_closed : ∀ N σ, (impl N).substT σ = impl N
   dict : Nat → Option (Nat × List (Label × Scheme))
   glob : Nat → Option Scheme

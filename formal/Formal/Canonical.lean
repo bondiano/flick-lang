@@ -33,6 +33,10 @@ theorem Sig.ctorTy_pureSpine (ts : List Ty) (T : Name) (us : List Ty) :
     (Sig.ctorTy ts T us).PureSpine :=
   Ty.arrows_pureSpine _ _ (Ty.tcon_pureSpine T us)
 
+theorem Sig.ctorTyR_pureSpine (ts : List Ty) (T : Name) (rs us : List Ty) :
+    (Sig.ctorTyR ts T rs us).PureSpine :=
+  Ty.arrows_pureSpine _ _ (Ty.tcon_pureSpine T _)
+
 theorem Const.ty_first {c : Const} {ι : CArg} (h : c.arity = 2 ∨ c.layer) :
     ∃ x y, c.ty S ι = .arrow x .pure y Caps.none := by
   cases c <;> simp [Const.arity, Const.layer] at h <;> exact ⟨_, _, rfl⟩
@@ -70,10 +74,9 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ _ hJ; cases hJ
     exact ⟨_, hT, .const hc .refl, by simp [Tm.head], fun _ h => by cases h; exact ⟨_, rfl⟩,
       by simp⟩
-  | ctor hK hk hT =>
+  | ctor hK hk hH hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, hT, .ctor hK hk .refl,
-      fun _ _ => by rw [S.ctorTyR_plain hK hk]; exact Sig.ctorTy_pureSpine _ _ _, by simp, by simp⟩
+    exact ⟨_, hT, .ctor hK hk hH .refl, fun _ _ => Sig.ctorTyR_pureSpine _ _ _ _, by simp, by simp⟩
   | rnil => intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .rnil, by simp [Tm.head], by simp, by simp⟩
   | enil hρ =>
     intro _ _ _ hJ; cases hJ

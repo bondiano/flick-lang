@@ -328,9 +328,9 @@ theorem idTs_inst {k : Nat} {us : List Ty} (hk : us.length = k) :
   simp [idTs, Ty.substT, instT, h₂]
 
 /-- An ordinary constructor's type: it builds `T us`. -/
-theorem Sig.ctorTyR_plain (S : Sig) {K k ts T} (hK : S.ctor K = some (k, ts, T)) {us : List Ty}
-    (hk : us.length = k) : Sig.ctorTyR ts T (S.res K) us = Sig.ctorTy ts T us := by
-  simp only [Sig.ctorTyR, Sig.ctorTy, S.res_plain K k ts T hK, idTs_inst hk]
+theorem Sig.ctorTyR_plain {ts : List Ty} {T : Name} {k : Nat} {rs us : List Ty}
+    (hres : rs = idTs k) (hk : us.length = k) : Sig.ctorTyR ts T rs us = Sig.ctorTy ts T us := by
+  simp only [Sig.ctorTyR, Sig.ctorTy, hres, idTs_inst hk]
 
 theorem Sig.fields_inst_substT (S : Sig) {K k ts T} (σ : Atom → Ty) (us : List Ty)
     (hk : us.length = k) (h : S.ctor K = some (k, ts, T)) :
@@ -350,6 +350,26 @@ theorem Sig.ctorTy_substT (S : Sig) {K k ts T} (σ : Atom → Ty) (us : List Ty)
     (hk : us.length = k) (h : S.ctor K = some (k, ts, T)) :
     (Sig.ctorTy ts T us).substT σ = Sig.ctorTy ts T (us.map (Ty.substT σ)) := by
   simp only [Sig.ctorTy, Ty.arrows_substT, Ty.tcon_substT, S.fields_inst_substT σ us hk h]
+
+theorem Sig.res_inst_substT (S : Sig) {K k ts T} (σ : Atom → Ty) (us : List Ty)
+    (hk : us.length = k) (h : S.ctor K = some (k, ts, T)) :
+    ((S.res K).map (Ty.substT (instT us))).map (Ty.substT σ) =
+      (S.res K).map (Ty.substT (instT (us.map (Ty.substT σ)))) := by
+  have hc := S.res_closed K k ts T (liftT k σ) h (fun i hi => by simp [liftT, hi])
+  conv => rhs; rw [← hc]
+  simp only [List.map_map]
+  apply List.map_congr_left
+  intro t _
+  simp only [Function.comp]
+  have := Ty.inst_substT t σ us
+  rw [hk] at this
+  rw [this]
+
+theorem Sig.ctorTyR_substT (S : Sig) {K k ts T} (σ : Atom → Ty) (us : List Ty)
+    (hk : us.length = k) (h : S.ctor K = some (k, ts, T)) :
+    (Sig.ctorTyR ts T (S.res K) us).substT σ = Sig.ctorTyR ts T (S.res K) (us.map (Ty.substT σ)) := by
+  simp only [Sig.ctorTyR, Ty.arrows_substT, Ty.tcon_substT, S.fields_inst_substT σ us hk h,
+    S.res_inst_substT σ us hk h]
 
 def CArg.substT (σ : Atom → Ty) (ι : CArg) : CArg :=
   ⟨ι.t.substT σ, ι.s.substT σ, ι.C.substT σ, ι.r.substT σ, ι.e.substT σ, ι.o.substT σ,

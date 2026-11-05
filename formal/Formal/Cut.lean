@@ -93,7 +93,7 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | lit => intro _ _; exact .lit
   | loc hl => intro _ _; exact .loc hl
   | const hc hT => intro _ hΘ; exact .const (Const.ok_mono hc hΘ) hT
-  | ctor hK hk hT => intro _ _; exact .ctor hK hk hT
+  | ctor hK hk hH hT => intro _ _; exact .ctor hK hk hH hT
   | rnil => intro _ _; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ => intro _ hΘ; exact .rcons hR hl (ih₁ hΘ) (ih₂ hΘ)
   | proj _ hf hT ih => intro _ hΘ; exact .proj (ih hΘ) hf hT

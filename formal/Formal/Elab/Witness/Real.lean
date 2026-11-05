@@ -54,5 +54,6 @@ theorem real : Real P Sg N where
     exact ⟨0, rfl, fun _ _ _ => rfl⟩
   prim h := by cases h
   some := rfl
+  some_res := rfl
 
 end Flick.Elab.Witness

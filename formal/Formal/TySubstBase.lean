@@ -159,14 +159,25 @@ theorem Typ.var_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} 
     (by simp [Scheme.substT, hts]) (hH.substT σ hts) ?_
   rw [Scheme.inst_substT _ _ _ hts]; exact hT.substT σ
 
+/-- What the fields of a constructor hold stays within its value under a substitution. -/
+theorem Sig.holds_substT (S : Sig) {K k ts T} (hK : S.ctor K = some (k, ts, T)) {us : List Ty}
+    (hk : us.length = k) (hH : Sig.Holds ts T (S.res K) us) (σ : Atom → Ty) :
+    Sig.Holds ts T (S.res K) (us.map (Ty.substT σ)) := by
+  have hfs := S.fields_inst_substT σ us hk hK
+  rw [List.map_map, List.map_inj_left] at hfs
+  intro f hf a ha
+  rw [← hfs f hf] at ha
+  rw [← S.res_inst_substT σ us hk hK, ← Ty.tcon_substT, Ty.reach_substT]
+  obtain ⟨b, hb, hσ⟩ := (Ty.reach_substT _ _ _).mp ha
+  exact ⟨b, hH f hf b hb, hσ⟩
+
 theorem Typ.ctor_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name} {k : Nat}
     {ts us : List Ty} {T₀ : Name} {T : Ty} {φ : Stage} (hK : S.ctor K = some (k, ts, T₀))
-    (hk : us.length = k) (hT : Le (Sig.ctorTyR ts T₀ (S.res K) us) T) (σ : Atom → Ty) :
+    (hk : us.length = k) (hH : Sig.Holds ts T₀ (S.res K) us)
+    (hT : Le (Sig.ctorTyR ts T₀ (S.res K) us) T) (σ : Atom → Ty) :
     Typ S Ψ Θ Γ (.ctor K) (.ex (T.substT σ) φ) := by
-  refine .ctor (us := us.map (Ty.substT σ)) hK (by simpa using hk) ?_
-  rw [S.ctorTyR_plain hK hk] at hT
-  rw [S.ctorTyR_plain hK (by simpa using hk)]
-  have := hT.substT σ; rwa [S.ctorTy_substT σ _ hk hK] at this
+  refine .ctor (us := us.map (Ty.substT σ)) hK (by simpa using hk) (S.holds_substT hK hk hH σ) ?_
+  have := hT.substT σ; rwa [S.ctorTyR_substT σ _ hk hK] at this
 
 theorem Typ.letGen_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {e b : Tm} {a t : Ty}
     {φ : Stage} {k : Nat} {Φ : Facts}

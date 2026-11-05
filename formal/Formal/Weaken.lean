@@ -98,7 +98,7 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | fix hf hn hc hT ih => exact .fix (ih X) hn (Caps.Sub.trans (held_weaken X hf.locs) hc) hT
   | lit => exact .lit
   | const hc hT => exact .const hc hT
-  | ctor hK hk hT => exact .ctor hK hk hT
+  | ctor hK hk hH hT => exact .ctor hK hk hH hT
   | rnil => exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ => exact .rcons hR hl (ih₁ X) (ih₂ X)
   | proj _ hf hT ih => exact .proj (ih X) hf hT
@@ -202,7 +202,7 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | lit => intro _ _ _; exact .lit
   | loc hl => intro _ _ _; exact .loc hl
   | const hc hT => intro _ _ _; exact .const hc hT
-  | ctor hK hk hT => intro _ _ _; exact .ctor hK hk hT
+  | ctor hK hk hH hT => intro _ _ _; exact .ctor hK hk hH hT
   | rnil => intro _ _ _; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ => intro _ _ hξ; exact .rcons hR hl (ih₁ hξ) (ih₂ hξ)
   | proj _ hf hT ih => intro _ _ hξ; exact .proj (ih hξ) hf hT

@@ -70,10 +70,8 @@ theorem PatTy.substT {fl p t Δ} (σ : Atom → Ty) (h : PatTy S fl p t Δ) :
   | wild => exact .wild
   | var => exact .var
   | lit => exact .lit
-  | @head K k T ts us hK hk =>
-    have hk' : (us.map (Ty.substT σ)).length = k := by simpa using hk
-    rw [S.ctorTyR_plain hK hk, S.ctorTy_substT σ _ hk hK, ← S.ctorTyR_plain hK hk']
-    exact .head hK hk'
+  | head hK hj hk =>
+    rw [S.ctorTyR_substT σ _ hk hK]; exact .head hK hj (by simpa using hk)
   | app _ _ ih₁ ih₂ =>
     rw [List.map_append]
     exact .app (by simpa [Ty.substT, Stage.substT] using ih₁) ih₂

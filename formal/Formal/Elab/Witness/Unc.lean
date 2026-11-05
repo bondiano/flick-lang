@@ -95,7 +95,7 @@ theorem typ_uncB : ∀ m (As : List Flick.Ty), As.length = m → ∀ {A₀ R : F
     simp only [List.cons_append] at hc
     rw [hc, nestC_snoc]
     refine typ_lam (typ_lam (.match_ (typ_var_mono rfl)
-      (.acons (.adt (.app (.app (.head (K := "Tup") (ts := [.tvar 0, .tvar 1]) (us := [nestC A₀ As', A]) rfl rfl) .var) .var) (tcon_hd _ _))
+      (.acons (.adt (.app (.app (.head (K := "Tup") (ts := [.tvar 0, .tvar 1]) (us := [nestC A₀ As', A]) rfl Sig.inj_plain rfl) .var) .var) (tcon_hd _ _))
         (.app (ψ := .pure) (.app (ψ := .pure) (.app (ψ := .pure)
           (Typ.anyCtx (typ_uncB m As' hl' (R := .arrow A .pure R C) (C := C) (C0 := Caps.none)))
           (typ_var_mono rfl) trivial .refl) (typ_var_mono rfl) trivial .refl)
@@ -141,10 +141,10 @@ theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {e : Ty} {φ}
     Typ Sg Ψ Θ [] frBody (.ex (.arrow (tc "Result" [tc "Errors" [E], A]) (trStage N (.R .cnil e)) A
       C0) φ) :=
   .lam (.match_ (typ_var_mono rfl)
-      (.acons (.adt (.app (.head (K := "Ok") (ts := [.tvar 1]) (us := [tc "Errors" [E], A]) rfl rfl)
+      (.acons (.adt (.app (.head (K := "Ok") (ts := [.tvar 1]) (us := [tc "Errors" [E], A]) rfl Sig.inj_plain rfl)
           .var) (tcon_hd _ _))
         (typ_var_mono rfl)
-        (.acons (.adt (.app (.head (K := "Err") (ts := [.tvar 0]) (us := [tc "Errors" [E], A]) rfl rfl)
+        (.acons (.adt (.app (.head (K := "Err") (ts := [.tvar 0]) (us := [tc "Errors" [E], A]) rfl Sig.inj_plain rfl)
           .var) (tcon_hd _ _))
           (.raiseAdt (typ_var_mono rfl) (tcon_hd _ _) (by
             refine ⟨fun _ h => h.elim, fun x hx => ?_⟩

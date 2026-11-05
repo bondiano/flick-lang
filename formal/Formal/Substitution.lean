@@ -244,7 +244,7 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | lit => intro _ _ _; exact .lit
   | loc hl => intro _ _ _; exact .loc hl
   | const hc hT => intro _ _ _; exact .const hc hT
-  | ctor hK hk hT => intro _ _ _; exact .ctor hK hk hT
+  | ctor hK hk hH hT => intro _ _ _; exact .ctor hK hk hH hT
   | rnil => intro _ _ _; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ => intro _ _ hσ; exact .rcons hR hl (ih₁ hσ) (ih₂ hσ)
   | proj _ hf hT ih => intro _ _ hσ; exact .proj (ih hσ) hf hT

@@ -97,9 +97,9 @@ theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v
       have := Const.resKind_cases ‹Const›; omega
     | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
   rcases hs K hK with ⟨U, us, hU, hs'⟩ | ⟨_, E, U, he, hE, hUE, hs', hty, hsub⟩
-  · obtain ⟨_, k, _, T₀, ts', _, _, rfl⟩ := hs'.false_arrows
+  · obtain ⟨K', k, _, T₀, ts', _, _, rfl⟩ := hs'.false_arrows
     simp only [Ty.arrows_substT, Ty.tcon_substT] at hU
-    have h₁ := Ty.arrows_kind (ts'.map (Ty.substT (instT us))) T₀ ((idTs k).map (Ty.substT (instT us)))
+    have h₁ := Ty.arrows_kind (ts'.map (Ty.substT (instT us))) T₀ ((S.res K').map (Ty.substT (instT us)))
     rw [hU.kind] at h₁; simp [Ty.kind] at h₁
   · cases he
     cases hs' with

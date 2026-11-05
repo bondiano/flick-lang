@@ -54,6 +54,10 @@ theorem Ty.arrows_kind (ts : List Ty) (T : Name) (us : List Ty) :
 theorem Ty.kind_of_hd {U : Ty} {E : Name} (h : U.hd = .adt E) : U.kind = 3 := by
   cases U <;> simp [Ty.hd, Ty.kind] at h ⊢
 
+theorem Shp.ctor_instR {ts : List Ty} {T₀ : Name} {rs us : List Ty} :
+    (Ty.arrows ts (.tcon T₀ rs)).substT (instT us) = Sig.ctorTyR ts T₀ rs us := by
+  simp only [Ty.arrows_substT, Ty.tcon_substT, Sig.ctorTyR]
+
 theorem Shp.ctor_inst {k ts T₀} {us : List Ty} (hk : us.length = k) :
     (Ty.arrows ts (.tcon T₀ (idTs k))).substT (instT us) = Sig.ctorTy ts T₀ us := by
   have : (idTs k).map (Ty.substT (instT us)) = us := by
@@ -142,10 +146,10 @@ theorem Shp.le {a b : Ty} {e : Tm} (h : Le a b) (hs : Shp S true a e) : Shp S tr
 
 theorem Shp.false_arrows {U e} (h : Shp S false U e) :
     ∃ K k ts T ts', e.head = .ctor K ∧ S.ctor K = some (k, ts, T) ∧
-      U = .arrows ts' (.tcon T (idTs k)) := by
+      U = .arrows ts' (.tcon T (S.res K)) := by
   generalize hf : false = fl at h
   induction h with
-  | head hK => exact ⟨_, _, _, _, _, rfl, hK, by rw [S.res_plain _ _ _ _ hK]⟩
+  | head hK => exact ⟨_, _, _, _, _, rfl, hK, rfl⟩
   | app _ _ ih _ =>
     obtain ⟨K, k, ts, T, ts', hh, hK, hU⟩ := ih hf
     cases ts' with
@@ -194,13 +198,11 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     intro hv _ _ hJ; cases hJ
     cases hv with
     | rcons hv₁ hv₂ => exact ⟨.rcons (ih₁ hv₁ rfl).1 (ih₂ hv₂ rfl).1, by simp [Tm.head]⟩
-  | ctor hK hk hT =>
+  | ctor hK hk _ hT =>
     intro _ _ _ hJ; cases hJ
-    rw [S.ctorTyR_plain hK hk] at hT
     have hh := Shp.head (S := S) hK
-    rw [S.res_plain _ _ _ _ hK] at hh
-    exact ⟨hh.full_of (by rw [Shp.ctor_inst hk]; exact hT),
-      fun _ _ => .inl ⟨_, _, by rw [Shp.ctor_inst hk]; exact hT, hh⟩⟩
+    exact ⟨hh.full_of (by rw [Shp.ctor_instR]; exact hT),
+      fun _ _ => .inl ⟨_, _, by rw [Shp.ctor_instR]; exact hT, hh⟩⟩
   | errVal hv' h' hU hE ih =>
     intro _ _ _ hJ; cases hJ
     refine ⟨.hidden (by simp [Ty.Opaque, Ty.hd]),

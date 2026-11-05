@@ -29,27 +29,26 @@ theorem tcon_hd (T : Name) (us : List Flick.Ty) : (tc T us).hd = .adt T := foldl
 
 theorem typ_con0 {K T us φ} (hK : ctorF K = some (us.length, [], T)) :
     Typ Sg Ψ Θ Γ (.ctor K) (.ex (tc T us) φ) :=
-  .ctor hK rfl (by rw [Sg.ctorTyR_plain hK rfl]; exact .refl)
+  Typ.ctor_plain (S := Sg) hK (sg_plain hK) rfl .refl
 
 theorem typ_con1 {K f T us e φ} (hK : ctorF K = some (us.length, [f], T))
     (he : Typ Sg Ψ Θ Γ e (.ex (f.substT (instT us)) φ)) :
     Typ Sg Ψ Θ Γ (.app (.ctor K) e) (.ex (tc T us) φ) :=
-  .app (ψ := .pure) (.ctor hK rfl (by rw [Sg.ctorTyR_plain hK rfl]; exact .refl)) he trivial .refl
+  .app (ψ := .pure) (Typ.ctor_plain (S := Sg) hK (sg_plain hK) rfl .refl) he trivial .refl
 
 theorem typ_con2 {K f g T us e e' φ} (hK : ctorF K = some (us.length, [f, g], T))
     (he : Typ Sg Ψ Θ Γ e (.ex (f.substT (instT us)) φ))
     (he' : Typ Sg Ψ Θ Γ e' (.ex (g.substT (instT us)) φ)) :
     Typ Sg Ψ Θ Γ (.app (.app (.ctor K) e) e') (.ex (tc T us) φ) :=
   .app (ψ := .pure)
-    (.app (ψ := .pure) (.ctor hK rfl (by rw [Sg.ctorTyR_plain hK rfl]; exact .refl)) he trivial .refl)
+    (.app (ψ := .pure) (Typ.ctor_plain (S := Sg) hK (sg_plain hK) rfl .refl) he trivial .refl)
     he' trivial .refl
 
 theorem typ_un1 {K f T us e b n t φ} (hK : ctorF K = some (us.length, [f], T))
     (he : Typ Sg Ψ Θ Γ e (.ex (tc T us) φ))
     (hb : Typ Sg Ψ Θ (.mono (f.substT (instT us)) :: Γ) b (.ex t φ))
     (hn : Typ Sg Ψ Θ Γ n (.ex t φ)) : Typ Sg Ψ Θ Γ (un1 K e b n) (.ex t φ) := by
-  have hh := PatTy.head (S := Sg) hK (us := us) rfl
-  rw [Sg.ctorTyR_plain hK rfl] at hh
+  have hh := PatTy.head_plain (S := Sg) hK (sg_plain hK) (us := us) rfl
   exact .match_ he (.acons (.adt (.app hh .var) (tcon_hd T us)) hb
     (.acons .wild hn .anil)) (.inl fun _ _ => ⟨.wild, by simp [Flick.Tm.unguarded], rfl⟩)
 

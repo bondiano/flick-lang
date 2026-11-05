@@ -256,11 +256,16 @@ def Sg : Sig where
   ctor_reach := ctorF_reach
   res := resF
   res_closed := resF_closed
-  res_plain K k ts T h := by simp [resF, h]
   impl_closed _ _ := rfl
   dict c := some (c / 8, dfields (c % 8) (c / 8))
   glob := globF
   dict_closed := dict_closed
   glob_closed := glob_closed
+
+/-- Every constructor of the witness is an ordinary one. -/
+theorem sg_plain {K k ts T} (h : Sg.ctor K = some (k, ts, T)) : Sg.res K = idTs k := by
+  change ctorF K = _ at h
+  change resF K = _
+  simp [resF, h]
 
 end Flick.Elab.Witness

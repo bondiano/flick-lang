@@ -58,7 +58,7 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | const _ hT =>
     intro _ _ _ hJ; cases hJ
     simp only [VKind, Tm.head, Tm.args, Const.kindAt]; rw [← hT.kind, Const.ty_kind]
-  | ctor _ _ hT =>
+  | ctor _ _ _ hT =>
     intro _ _ _ hJ; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind]; unfold Sig.ctorTyR
     rcases Ty.arrows_kind _ _ _ with h | h <;> rw [h] <;> simp
@@ -78,9 +78,9 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     cases hv with
     | ctorApp _ hK _ =>
       rcases hs.2 _ hK with ⟨U, us, hU, hs'⟩ | ⟨_, _, _, h', -⟩
-      · obtain ⟨_, _, _, T₀, ts', _, _, rfl⟩ := hs'.false_arrows
+      · obtain ⟨K', _, _, T₀, ts', _, _, rfl⟩ := hs'.false_arrows
         have := Ty.arrows_kind (ts'.map (Ty.substT (instT us))) T₀
-          ((idTs ‹Nat›).map (Ty.substT (instT us)))
+          ((S.res K').map (Ty.substT (instT us)))
         simp only [Ty.arrows_substT, Ty.tcon_substT] at hU
         simp only [VKind, Tm.head, hK]; rw [← hU.kind]; omega
       · rw [h']; simp [VKind, Tm.head, hK, Ty.kind]
