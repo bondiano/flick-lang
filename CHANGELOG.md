@@ -13,6 +13,22 @@ break programs.
   core class `Enum.Enum t b`, whose methods are the companions `T.value`,
   `T.parse` (checked at compile time for a constant, `FLICK-D006`) and
   `T.all`. The interface format is version 4.
+- **Enums in std:** `deriving Schema` of an enum writes its literals on the
+  wire, `{ "enum": [...] }` in JSON Schema, or `{ "_tag": "Get" }` with
+  `deriving Schema { wire = "tag" }`; `Schema.enum base` is the combinator.
+  A URL segment of an enum is its literal, `deriving Cli.Value` chooses by
+  literal, and a `sql table` column of an enum needs no `via`: it is read
+  through `T.parse`, so a value the enum does not know is a `DecodeError`.
+  The module `Open` keeps literals an enum does not know: `Open t b` is
+  `Known t | Unknown b`, with `Open.parse`, `Open.value` and `Open.schema`.
+  The plugin interface is `0.13.0`: `case-target.literal` and
+  `fact-type.literal-of`; a component built for `0.12.0` is `FLICK-P035`.
+  `fmt` keeps the arguments of a derive as written.
+- **Breaking:** `LogLevel` is an enum: `LogLevel.All`, `Trace`, `Debug`,
+  `Info`, `Warn`, `Error`, `Fatal` and `Off` (`"None"`), ordered by
+  severity, replace `LogLevel.all` … `LogLevel.none_`; `LogLevel.all` lists
+  them, `LogLevel.value` is Effect's name (was `name`), `get_ordinal` is
+  gone (use `compare`), and `show` gives the constructor, `Off` for `None`.
 - **Enums across the FFI:** the TypeScript facade of an enum is the union
   of its literals, `"GET" | "POST"`, and of an opaque one `string` or
   `number` branded with its qualified name. `flick ffi import` makes an

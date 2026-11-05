@@ -24,6 +24,8 @@ schemaLazyOf SchemaLazyOf
 schemaRecursive SchemaRecursive
 schemaUnboxed SchemaUnboxed
 schemaRefinedOf SchemaRefinedOf
+schemaLiterals SchemaLiterals
+schemaEnumTags SchemaEnumTags
 routePath RoutePath
 routeSegment RouteSegment
 routeWordsOf RouteWordsOf

@@ -42,6 +42,7 @@ shows:
 | `type Tree a = …` | `Schema a -> Schema (Tree a)` |
 | `type alias PairOf f = { count : f Float }` | `(forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)` |
 | a phantom parameter, which the representation does not use | a witness all the same |
+| an enum, `untagged type Method = Get = "GET" \| …` | `Schema Method`, on the wire its literals |
 
 ```flick
 # type Tree a = Leaf | Node (Tree a) a (Tree a)
@@ -62,6 +63,23 @@ resource or a runtime description (`Eff`, `Layer`, a codec) has no witness:
 `std/D001` names the path of the field, as `Session.handler`. `T.schema` of
 a type that does not derive `Schema` is `FLICK-D001`.
 
+An enum's wire form is its literal, `"GET"`, which JSON Schema lists as
+`{ "enum": ["GET", …] }`; `deriving Schema { wire = "tag" }` keeps the form
+of a variant type, `{ "_tag": "Get" }`. A literal the enum does not know
+fails to decode. `Open t b` of the module `Open` keeps it instead:
+`Open.parse` gives `Known` a value of the enum or `Unknown` the literal,
+`Open.value` the literal of either, and `Open.schema Schema.string` decodes
+any literal.
+
+```flick
+# import Open exposing (Open)
+# untagged type Method = Get = "GET" | Post = "POST"
+#   deriving Show, Schema
+#
+methods : Schema (Open Method String)
+let methods = Open.schema Schema.string
+```
+
 The combinators the derive writes are values of `Schema` a program may use:
 
 | Combinator | Witness |
@@ -73,6 +91,7 @@ The combinators the derive writes are values of `Schema` a program may use:
 | `Schema.lazy "T" (fun _ -> s)` | a reference named `T` in JSON Schema, made on first use |
 | `Schema.recursive "T" (fun self -> s)` | a recursive type, `self` the reference to it |
 | `Schema.unsafe_unboxed s`, `Schema.unsafe_refined "T" known s T.parse` | an `unboxed type`, a refined one |
+| `Schema.enum Schema.string`, `Schema.unsafe_enum_tags Schema.string [("Get", Get), …]` | an enum, on the wire its literals or `{ "_tag" }` |
 
 Nothing checks that an `unsafe_` combinator's parts are those of its type:
 the derive writes them under the witness's signature.

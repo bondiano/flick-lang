@@ -3,6 +3,8 @@
 /// combinators build them by hand.
 module Schema exposing (..)
 
+import Enum
+
 /// Numbers, `NaN` and the infinities included.
 number : Schema Float
 foreign pure number from "@flick-lang/runtime" "schemaNumber"
@@ -145,6 +147,22 @@ foreign pure recursive from "@flick-lang/runtime" "schemaRecursive"
 /// unchecked as `unsafe_record` is.
 unsafe_unboxed : Schema b -> Schema a
 foreign pure unsafe_unboxed from "@flick-lang/runtime" "schemaUnboxed"
+
+/// The schema of an enum, whose values are its literals of `base`: on the
+/// wire the literals too, which JSON Schema lists as `enum`.
+enum : Enum.Enum t b => Schema b -> Schema t
+let enum base = unsafe_literals base Enum.value Enum.all
+
+/// The schema of `values`, each its literal of `base` at run time, as
+/// `value` gives it; unchecked as `unsafe_record` is.
+unsafe_literals : Schema b -> (a -> b) -> List a -> Schema a
+foreign pure unsafe_literals from "@flick-lang/runtime" "schemaLiterals"
+
+/// The schema of an enum on the wire as a variant type, `{"_tag": "Get"}`:
+/// each constructor's name with its value, a literal of `base`. Unchecked
+/// as `unsafe_record` is.
+unsafe_enum_tags : Schema b -> List (String, a) -> Schema a
+foreign pure unsafe_enum_tags from "@flick-lang/runtime" "schemaEnumTags"
 
 /// The schema of the refined type `name` over `base`, which `parse` checks;
 /// `known` names a check exporters know, `"email"`. Unchecked as

@@ -1,11 +1,15 @@
 // `deriving Cli.Value`, which the plugin of std derives: a choice among
-// constructors without fields by their names in kebab case, and a refined
-// type, whose base is parsed and whose predicate is checked.
+// constructors without fields by their names in kebab case, or an enum's
+// by its literals, and a refined type, whose base is parsed and whose
+// predicate is checked.
 module App.Main exposing (main)
 
 import Cli exposing (plugin cli)
 
 type Color = Red | GreenLight
+  deriving Cli.Value, Show
+
+untagged type Format = Json = "json" | PlainText = "text"
   deriving Cli.Value, Show
 
 refined type Port = Float where fun n -> n > 0 && n < 65536
@@ -28,6 +32,8 @@ main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line (shown (Cli.parse "green-light" : Result String Color))
   Platform.stdout_line (shown (Cli.parse "blue" : Result String Color))
+  Platform.stdout_line (shown (Cli.parse "text" : Result String Format))
+  Platform.stdout_line (shown (Cli.parse "plain-text" : Result String Format))
   Platform.stdout_line (port (Cli.parse "8080" : Result String Port))
   Platform.stdout_line (port (Cli.parse "70000" : Result String Port))
   Platform.stdout_line (port (Cli.parse "eighty" : Result String Port))

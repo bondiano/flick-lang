@@ -1,6 +1,6 @@
 ---
 title: "Схемы и кодеки"
-source_hash: d0d615be24713e6f
+source_hash: 4d0f4b7c74868087
 ---
 
 Схема описывает структуру значений типа и доступна во время выполнения.
@@ -48,6 +48,7 @@ refined type Email = String where Checks.email
 | `type Tree a = …` | `Schema a -> Schema (Tree a)` |
 | `type alias PairOf f = { count : f Float }` | `(forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)` |
 | фантомный параметр, который не используется в представлении типа | схема параметра всё равно нужна |
+| перечисление, `untagged type Method = Get = "GET" \| …` | `Schema Method`, на проводе — его литералы |
 
 ```flick
 # type Tree a = Leaf | Node (Tree a) a (Tree a)
@@ -71,6 +72,23 @@ let tree_schema item_schema =
 указывает путь к полю, например `Session.handler`. Выражение `T.schema`
 для типа без `deriving Schema` приводит к `FLICK-D001`.
 
+Внешняя форма перечисления — его литерал, `"GET"`; JSON Schema перечисляет
+их как `{ "enum": ["GET", …] }`. `deriving Schema { wire = "tag" }`
+сохраняет форму вариантного типа, `{ "_tag": "Get" }`. Литерал, которого
+перечисление не знает, не декодируется. `Open t b` из модуля `Open` его
+сохраняет: `Open.parse` даёт `Known` со значением перечисления или
+`Unknown` с литералом, `Open.value` — литерал любого из них, а
+`Open.schema Schema.string` декодирует любой литерал.
+
+```flick
+# import Open exposing (Open)
+# untagged type Method = Get = "GET" | Post = "POST"
+#   deriving Show, Schema
+#
+methods : Schema (Open Method String)
+let methods = Open.schema Schema.string
+```
+
 Комбинаторы, которыми пишет вывод, — значения `Schema`, ими может
 пользоваться и программа:
 
@@ -83,6 +101,7 @@ let tree_schema item_schema =
 | `Schema.lazy "T" (fun _ -> s)` | ссылка с именем `T` в JSON Schema, создаётся при первом использовании |
 | `Schema.recursive "T" (fun self -> s)` | рекурсивный тип, `self` — ссылка на него |
 | `Schema.unsafe_unboxed s`, `Schema.unsafe_refined "T" known s T.parse` | `unboxed type` и уточнённый тип |
+| `Schema.enum Schema.string`, `Schema.unsafe_enum_tags Schema.string [("Get", Get), …]` | перечисление, на проводе — литералы или `{ "_tag" }` |
 
 Что части `unsafe_`-комбинатора — части его типа, никто не проверяет: вывод
 пишет их под сигнатурой схемы.

@@ -4,7 +4,9 @@
 use flick_plugin::{Fact, FactField, FactType, Span};
 
 use super::Checker;
+use super::env::{Abi, EnumLit, Form};
 use super::ty::Type;
+use crate::types::lang::Lang;
 
 impl Checker<'_> {
     /// The fact of a `_` of generated code the checker found `t` for; the
@@ -35,7 +37,28 @@ impl Checker<'_> {
         FactType {
             shown: self.show(t),
             exact: (!unknown).then(|| self.show_qualified(&expanded)),
+            literal_of: self.literal_of(&expanded),
         }
+    }
+
+    /// The exact base type of `t` when it is an enum, opaque or not.
+    fn literal_of(&self, t: &Type) -> Option<String> {
+        let Type::Con { module, name } = t else {
+            return None;
+        };
+        let first = match &self.env.type_def(module, name)?.form {
+            Form::Adt {
+                abi: Abi::Literal(literals),
+                ..
+            }
+            | Form::Nominal { literals } => literals.first()?,
+            _ => return None,
+        };
+        let base = match first {
+            EnumLit::Int(_) => Lang::Int,
+            EnumLit::String(_) => Lang::String,
+        };
+        Some(self.show_qualified(&Type::lang(base)))
     }
 
     /// `t` with every alias in it expanded.

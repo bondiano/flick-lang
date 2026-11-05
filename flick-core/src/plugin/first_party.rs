@@ -112,7 +112,7 @@ impl Plugin for Std {
         compiler: &mut dyn Compiler,
     ) -> Result<Arena, Vec<Diagnostic>> {
         if flick_plugin_derive::CLASSES.contains(&class) {
-            return flick_plugin_derive::derive(target, class, module);
+            return flick_plugin_derive::derive(target, class, args, module);
         }
         Cli.derive(target, class, args, module, state, compiler)
     }

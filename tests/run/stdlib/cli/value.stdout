@@ -1,5 +1,7 @@
 ok GreenLight
 error expected one of red, green-light, got blue
+ok PlainText
+error expected one of json, text, got plain-text
 ok 8080
 error not a valid Port: 70000
 error not a number: eighty

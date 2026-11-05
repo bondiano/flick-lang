@@ -1,0 +1,23 @@
+// An enum column needs no `via`: its values are the literals of the
+// column's SQL type, read through the enum's `parse`.
+
+module App.Enums exposing (..)
+
+import Sql exposing (Pg)
+
+untagged type Role = Admin = "admin" | Guest = "guest"
+
+opaque untagged type Code = Ok200 = 200 | Missing = 404
+
+sql table Requests "requests" {
+  id : bigint primary key as BigInt
+  role : text not null as Role
+  code : integer as Code
+}
+
+by_role : Sql.Template Pg { role : Role } { id : BigInt; code : Option Code }
+let by_role = sql p {
+  from r in Requests
+  where r.role == p.role
+  select { id = r.id; code = r.code }
+}

@@ -1,4 +1,4 @@
-package flick:plugin@0.12.0;
+package flick:plugin@0.13.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -150,7 +150,8 @@ interface types {
 
   /// A type the checker found, as it shows it and qualified with aliases
   /// expanded; `exact` is none for one with errors or still unknown parts.
-  record fact-type { shown: string, exact: option<string> }
+  /// `literal-of` is the exact base type of an enum, `String` or `Int`.
+  record fact-type { shown: string, exact: option<string>, literal-of: option<string> }
   record fact-field { label: string, ty: fact-type }
   /// The type of a `_` of a block's code, at the span its code gave it, and
   /// its fields when it is a closed record.
@@ -177,8 +178,9 @@ interface types {
   record request { method: string, url: string, headers: list<tuple<string, string>>, body: list<u8> }
   record response { status: u16, body: list<u8> }
 
-  /// A constructor of a derive's target and the types of its fields.
-  record case-target { name: string, fields: list<span> }
+  /// A constructor of a derive's target, the types of its fields and the
+  /// literal of an enum's constructor.
+  record case-target { name: string, fields: list<span>, literal: option<span> }
 
   /// A type a class's derive makes an instance for: its declaration as a
   /// block, and what it declares at spans of that block; its name and

@@ -93,7 +93,7 @@ let catching () =
     ("match_cause_effect_eager: " ++ show (List.map_effect effectful_eager [broken, fine]))
   Platform.stdout_line ("or_die: " ++ ended (task { Effect.or_die boom }))
   Effect.ignore_ None boom
-  Effect.ignore_ (Some LogLevel.debug) boom
+  Effect.ignore_ (Some LogLevel.Debug) boom
   Effect.ignore_cause None broken
   Platform.stdout_line ("ignore: " ++ "done")
   Platform.stdout_line

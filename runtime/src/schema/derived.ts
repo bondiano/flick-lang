@@ -2,7 +2,15 @@
 // variant type is given as a value, whose tag the runtime reads.
 import { Option, Result } from "effect";
 
-import { type AnySchema, schemaAdt, schemaLazy, schemaRecord, schemaRefined, schemaTuple } from "./schemas.ts";
+import {
+  type AnySchema,
+  schemaAdt,
+  schemaEnum,
+  schemaLazy,
+  schemaRecord,
+  schemaRefined,
+  schemaTuple,
+} from "./schemas.ts";
 
 /** The tag of a constructor given as a value: a nullary one is its value, another a function of its fields. */
 export const tagOf = (constructor: unknown): string => {
@@ -59,6 +67,20 @@ export const schemaRecursive = (name: string, of: (self: AnySchema) => AnySchema
 
 /** `Schema.unsafe_unboxed field`: the values are the field's. */
 export const schemaUnboxed = (field: AnySchema): AnySchema => field;
+
+/** `Schema.unsafe_literals base value values`: an enum's values are its literals, on the wire too. */
+export const schemaLiterals = (
+  _base: AnySchema,
+  _value: unknown,
+  values: ReadonlyArray<string | number>,
+): AnySchema => schemaEnum(values, null);
+
+/** `Schema.unsafe_enum_tags base pairs`: an enum on the wire as a variant type, each constructor's name with its value. */
+export const schemaEnumTags = (_base: AnySchema, pairs: ReadonlyArray<readonly [string, string | number]>): AnySchema =>
+  schemaEnum(
+    pairs.map(([, l]) => l),
+    pairs.map(([tag]) => tag),
+  );
 
 /** `Schema.unsafe_refined name known base parse`. */
 export const schemaRefinedOf = (

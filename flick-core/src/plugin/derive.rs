@@ -112,6 +112,7 @@ pub fn target(
             Some(CaseTarget {
                 name: named(con),
                 fields,
+                literal: v.nodes().find(|n| n.kind == K::LitPat).map(span),
             })
         })
         .collect();

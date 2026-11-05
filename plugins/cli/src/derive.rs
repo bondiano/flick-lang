@@ -1,9 +1,9 @@
 //! `deriving Cli.Value`: for a choice among constructors without fields,
 //! `Cli.choice` over their names in kebab case, `GreenLight` as
-//! `green-light`; for a refined type, `Cli.refined` over its base and its
-//! `parse`, which checks its predicate.
+//! `green-light`, or over an enum's literals; for a refined type,
+//! `Cli.refined` over its base and its `parse`, which checks its predicate.
 
-use flick_plugin::{Arena, Builder, DeriveTarget, Diagnostic, Name, Ty, flick};
+use flick_plugin::{Arena, Builder, DeriveTarget, Diagnostic, Name, Ty, flick, literal_text};
 
 /// The code of a type that derives nothing of `Cli.Value`.
 pub const NOT_DERIVABLE: &str = "L010";
@@ -35,7 +35,11 @@ pub fn derive(target: &DeriveTarget, class: &str) -> Result<Arena, Vec<Diagnosti
         let choices: Vec<_> = (target.cases.iter())
             .map(|c| {
                 let name = c.name.rsplit('.').next().unwrap_or(&c.name);
-                flick!(b, (#(kebab(name)), #(Name(&c.name))))
+                let word = match c.literal {
+                    Some(span) => literal_text(target.decl.text_of(span)),
+                    None => kebab(name),
+                };
+                flick!(b, (#word, #(Name(&c.name))))
             })
             .collect();
         flick!(b, Cli.choice [#(..choices)] text)

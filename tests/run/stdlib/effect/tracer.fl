@@ -96,20 +96,20 @@ let main () =
   Platform.stdout_line ("with_tracer " ++ traced)
   let filtered =
     Tracer.with_minimum_trace_level
-      LogLevel.warn
+      LogLevel.Warn
       (task {
         Tracer.with_span
           "debug span"
-          { options with level = Some LogLevel.debug }
+          { options with level = Some LogLevel.Debug }
           (task { names () })
       })
   Platform.stdout_line ("with_minimum_trace_level " ++ filtered)
   let leveled =
     Tracer.with_minimum_trace_level
-      LogLevel.warn
+      LogLevel.Warn
       (task {
         Tracer.with_trace_level
-          LogLevel.error
+          LogLevel.Error
           (task { Tracer.with_span "error span" options (task { names () }) })
       })
   Platform.stdout_line ("with_trace_level " ++ leveled)

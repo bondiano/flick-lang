@@ -1,0 +1,19 @@
+// An enum column holds the literals of its SQL type: a `text` column holds
+// strings, an `integer` one numbers.
+
+module App.Enums exposing (..)
+
+import Sql exposing (Pg)
+
+untagged type Role = Admin = "admin" | Guest = "guest"
+
+untagged type Code = Ok200 = 200 | Missing = 404
+
+sql table Requests "requests" {
+  id : bigint primary key as BigInt
+  role : integer not null as Role
+  code : text as Code
+}
+
+//~ FLICK-Q011 @14:30-14:34 a `number` column holds `Int`, not `Role`: give a codec with `via`
+//~ FLICK-Q011 @15:18-15:22 a `text` column holds `String`, not `Code`: give a codec with `via`

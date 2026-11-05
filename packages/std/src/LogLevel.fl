@@ -1,53 +1,32 @@
-/// Effect's `LogLevel`: the levels of log messages, from `all` to `none_`,
-/// ordered by severity (`Ord`), as Effect's own names (`"Info"`, …).
+/// Effect's `LogLevel`: the levels of log messages, an enum of Effect's
+/// own names (`"Info"`, …) ordered by severity.
 module LogLevel exposing (..)
 
-/// One of `all`, `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `none_`.
-opaque unboxed type LogLevel = LogLevel String
+import Enum
 
-/// A level a message is logged at: neither `all` nor `none_`.
+/// Effect's levels, declared from least to most severe, so `Ord` is
+/// severity; each is Effect's own name of it, `Off` is `"None"`.
+untagged type LogLevel =
+  | All = "All"
+  | Trace = "Trace"
+  | Debug = "Debug"
+  | Info = "Info"
+  | Warn = "Warn"
+  | Error = "Error"
+  | Fatal = "Fatal"
+  | Off = "None"
+  deriving Eq, Ord, Hash, Show
+
+/// A level a message is logged at: neither `All` nor `Off`.
 type alias Severity = LogLevel
 
-all : LogLevel
-let all = LogLevel "All"
+/// Every level, from least to most severe.
+all : List LogLevel
+let all = Enum.all
 
-fatal : LogLevel
-let fatal = LogLevel "Fatal"
-
-error : LogLevel
-let error = LogLevel "Error"
-
-warn : LogLevel
-let warn = LogLevel "Warn"
-
-info : LogLevel
-let info = LogLevel "Info"
-
-debug : LogLevel
-let debug = LogLevel "Debug"
-
-trace : LogLevel
-let trace = LogLevel "Trace"
-
-/// Logs nothing: `none` is a keyword.
-none_ : LogLevel
-let none_ = LogLevel "None"
-
-/// Effect's name of the level, as `"Info"`.
-name : LogLevel -> String
-let name level =
-  match level with
-  | LogLevel n -> n
-
-/// Every level, from `all` to `none_`.
-values : List LogLevel
-foreign pure values from "@flick-lang/runtime/effect/LogLevel" "values"
-  reviewed "effect@4.1.2 sha256:dd1f953033fab26f"
-
-/// The rank of the level: higher is more severe.
-get_ordinal : LogLevel -> Float
-foreign pure get_ordinal from "@flick-lang/runtime/effect/LogLevel" "getOrdinal"
-  reviewed "effect@4.1.2 sha256:280a33d80234f9a5"
+/// Effect's name of the level, `"None"` for `Off`.
+value : LogLevel -> String
+let value level = Enum.value level
 
 /// `level |> is_greater_than that`: `level` is more severe than `that`.
 is_greater_than : LogLevel -> LogLevel -> Bool
@@ -78,16 +57,3 @@ foreign pure is_less_than_or_equal_to from "@flick-lang/runtime/effect/LogLevel"
 is_enabled : LogLevel ->{} Bool
 foreign effect is_enabled from "@flick-lang/runtime/effect/LogLevel" "isEnabled"
   reviewed "effect@4.1.2 sha256:c68766ed87e3755d"
-
-instance Eq LogLevel =
-  eq : LogLevel -> LogLevel -> Bool
-  let eq x y = name x == name y
-
-/// By severity, as Effect's `LogLevel.Order`.
-instance Ord LogLevel =
-  compare : LogLevel -> LogLevel -> Ordering
-  let compare x y = compare (get_ordinal x) (get_ordinal y)
-
-instance Show LogLevel =
-  show : LogLevel -> String
-  let show level = name level

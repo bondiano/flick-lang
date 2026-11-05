@@ -48,16 +48,16 @@ let logs () =
           Effect.log_info "info"
           Effect.log_debug "debug is below the minimum level"
           Effect.log_trace "trace is below the minimum level"
-          Effect.log_with_level LogLevel.warn "with level"
+          Effect.log_with_level LogLevel.Warn "with level"
           References.with_minimum_log_level
-            LogLevel.trace
+            LogLevel.Trace
             (task { Effect.log_debug "debug at trace" })
           References.with_current_log_level
-            LogLevel.error
+            LogLevel.Error
             (task {
               Effect.log "at the current level"
               Platform.stdout_line
-                ("current_log_level: " ++ LogLevel.name (References.current_log_level ()))
+                ("current_log_level: " ++ LogLevel.value (References.current_log_level ()))
             })
           Effect.annotate_logs
             "user"
