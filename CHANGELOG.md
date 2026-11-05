@@ -40,6 +40,11 @@ break programs.
   bare position the closure is `FLICK-G001` until a capture row names it,
   `(Errors e)^c -> { run : (Unit -> Unit)^c }`. `flick check --fix` does
   not rewrite it.
+- **Fix:** a closure over an error value whose row is known only later, in
+  a local without a signature or as the result of a generic
+  `keep : forall e. Errors e -> (Unit -> Unit)`, holds what that row holds
+  too: one that hid a region of the error's payload in a bare field passed,
+  and is `FLICK-G001` now.
 - **Enums across the FFI:** the TypeScript facade of an enum is the union
   of its literals, `"GET" | "POST"`, and of an opaque one `string` or
   `number` branded with its qualified name. `flick ffi import` makes an
