@@ -428,7 +428,7 @@ fn without_effects_nothing_runs_at_runtime() {
     }
 }
 
-#[cfg(all(feature = "native-project", feature = "server-stdlib"))]
+#[cfg(feature = "native-project")]
 #[test]
 fn a_runner_gives_the_type_of_main() {
     let check = |runner: &str, main: &str| {
@@ -474,7 +474,7 @@ fn a_runner_gives_the_type_of_main() {
     }
 }
 
-#[cfg(all(feature = "native-project", feature = "server-stdlib"))]
+#[cfg(feature = "native-project")]
 #[test]
 fn main_may_need_the_services_its_runner_provides() {
     let check = |main: &str| {

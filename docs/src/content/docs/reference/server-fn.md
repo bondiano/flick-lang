@@ -3,12 +3,15 @@ title: "Server functions"
 ---
 
 A `server fn` is a function that runs on the server and that any code,
-the browser included, calls by its name. The compiler makes the endpoint,
-the client call and the codecs of what crosses the network from one
-declaration, so the two sides cannot disagree.
+the browser included, calls by its name. It is a block of the plugin
+`server` of `std`, which a file imports from `Server`; from one declaration
+the plugin writes the endpoint, the client call and the codecs of what
+crosses the network, so the two sides cannot disagree.
 
 ```flick
 module App.Shop exposing (Order, OutOfStock, place)
+
+import Server exposing (plugin server)
 
 type alias Order = { item : String; count : Float }
   deriving Schema
@@ -73,8 +76,9 @@ let route functions =
 The payload (the parameter, or a tuple of several), the success and each
 error travel as JSON, so each has a
 Schema witness: a record or tuple of witnessed types, `List`, `Option`, a
-type that derives `Schema`. The compiler checks this where the function is
-declared (`FLICK-E010`), together with the rest of the shape: pure arrows
+type that derives `Schema` (a type alias too). A type without one is
+`FLICK-D001` at the function; the plugin checks the rest of the shape where
+the function is declared (`std/E010`): pure arrows
 before the last one, each parameter named, no type variables, the errors
 listed.
 

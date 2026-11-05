@@ -96,6 +96,14 @@ impl Checker<'_> {
                 .and_then(|i| i.find(namespace, name))
                 .map(|e| e.entity.clone());
             if entity.is_none() && interface.is_some() && !self.env.is_import(qualifier) {
+                // `Order.schema`: a companion of a type named as a module
+                if let Some(ty) = self.companion_of(qualifier, name, span) {
+                    return ty;
+                }
+                if let Some(value) = name.strip_suffix("$server") {
+                    self.not_a_server_fn(&format!("{qualifier}.{value}"), span);
+                    return Type::Error;
+                }
                 self.error_guess(
                     codes::T001,
                     span,
@@ -183,6 +191,17 @@ impl Checker<'_> {
                     );
                     Type::Error
                 }
+            }
+            // the witness a plugin's code names for a type without one
+            Some(_) if name == "schema" => {
+                self.error(
+                    codes::D001,
+                    span,
+                    format!(
+                        "`{qualifier}` derives no Schema: add `deriving Schema` to its declaration"
+                    ),
+                );
+                Type::Error
             }
             Some(_) => {
                 self.error(

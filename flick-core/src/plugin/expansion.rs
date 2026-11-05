@@ -19,7 +19,7 @@ use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
 
 use super::render::Rendered;
-use super::source::BlockSource;
+use super::source::{BlockSource, in_signature};
 use super::splice::{splice, splice_decls};
 use super::testing::shown;
 
@@ -61,6 +61,8 @@ struct Block {
     frame: (u32, u32),
     place: Place,
     holes: Vec<(u32, Hole)>,
+    /// The signature above it, as written.
+    signature: String,
 }
 
 /// A block and the code its plugin gave, as Flick text with the user's code
@@ -85,7 +87,7 @@ impl Expansion {
                 Shown {
                     range: b.range,
                     plugin: b.plugin.clone(),
-                    code: shown(&rendered, frame, b.place),
+                    code: shown(&rendered, frame, &b.signature, b.place),
                 }
             })
             .collect()
@@ -133,13 +135,18 @@ impl Expansion {
                         };
                         ((at + s, at + e), origin)
                     }));
+                    // the signature is a node of the module's own tree
                     holes.extend(
-                        block
-                            .rendered
-                            .holes
-                            .iter()
+                        (block.rendered.holes.iter())
+                            .filter(|(_, hole)| in_signature(*hole).is_none())
                             .filter_map(|&(_, hole)| Some((range, block.source.hole_tree(hole)?))),
                     );
+                    // code with its type takes the signature above the block
+                    let taken =
+                        (block.rendered.holes.iter()).any(|(_, h)| in_signature(*h).is_some());
+                    if let Some(signature) = block.source.signature().filter(|_| taken) {
+                        spliced.push((signature, Vec::new(), false));
+                    }
                     let end = u32::try_from(out.len()).expect("source fits in u32");
                     done.push(Block {
                         range: block.whole,
@@ -148,6 +155,7 @@ impl Expansion {
                         frame: (block.source.start(), block.source.end()),
                         place: block.source.place(),
                         holes: block.rendered.holes.clone(),
+                        signature: block.source.signature_text().unwrap_or("").to_owned(),
                     });
                     spliced.push((range, nodes, block.keep));
                 }
@@ -203,21 +211,20 @@ impl Expansion {
     }
 
     /// Each companion `Owner.member` the code of a block declares whose
-    /// owner is no type of the module.
+    /// owner is no type of the module, nor a value: `f$server` of a
+    /// `server fn` is one.
     fn stray_companions(&self) -> Vec<Diagnostic> {
         let declared = resolve::declarations(&self.tree, &self.text, self.file);
-        let is_type = |name: &str| {
-            (declared.iter()).any(|d| d.namespace == Namespace::Type && d.name == name)
-        };
+        let owned = |name: &str| (declared.iter()).any(|d| d.name == name && !d.signature);
         (declared.iter())
             .filter(|d| d.namespace == Namespace::Value && !d.signature)
             .filter_map(|d| Some((d, d.name.split_once('$')?)))
-            .filter(|(_, (owner, _))| !is_type(owner))
+            .filter(|(_, (owner, _))| !owned(owner))
             .filter_map(|(d, (owner, member))| {
                 let block = (self.blocks.iter())
                     .find(|b| b.code.0 <= d.span.start && d.span.start < b.code.1)?;
                 let message = format!(
-                    "plugin `{}` declares `{owner}.{member}`, but `{owner}` is no type of this module",
+                    "plugin `{}` declares `{owner}.{member}`, but `{owner}` is no type or value of this module",
                     block.plugin
                 );
                 let (start, end) = block.range;
@@ -337,7 +344,12 @@ fn replace_blocks(node: &mut Node, spliced: &mut Spliced) {
         };
         if matches!(
             n.kind,
-            K::PluginExpr | K::PluginDecl | K::TypeDecl | K::ErrorDecl | K::DerivingDecl
+            K::PluginExpr
+                | K::PluginDecl
+                | K::TypeDecl
+                | K::ErrorDecl
+                | K::DerivingDecl
+                | K::Signature
         ) {
             let range = n.range();
             let (mut code, mut found, mut keep) = (Vec::new(), false, false);

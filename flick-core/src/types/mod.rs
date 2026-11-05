@@ -57,7 +57,6 @@ mod route_template;
 mod rows;
 mod schemas;
 mod server;
-pub mod server_fn;
 mod services;
 mod settle;
 mod sql;
@@ -106,8 +105,7 @@ pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
     CodecBlock, Constructor, Copies, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
-    SchemaItem, SchemaPlan, ServerFn, SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing,
-    default_method, passes_dictionary,
+    SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing, default_method, passes_dictionary,
 };
 
 use convert::TyVar;

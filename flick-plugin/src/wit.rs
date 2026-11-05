@@ -31,18 +31,27 @@ macro_rules! wit_conversions {
                         $crate::Place::Declaration => w::Place::Declaration,
                     },
                     docs: b.docs.clone(),
-                    tokens: b.tokens.iter().map(|t| w::Token {
-                        kind: match t.kind {
-                            $crate::TokenKind::Ident => w::TokenKind::Ident,
-                            $crate::TokenKind::Con => w::TokenKind::Con,
-                            $crate::TokenKind::Number => w::TokenKind::Number,
-                            $crate::TokenKind::String => w::TokenKind::String,
-                            $crate::TokenKind::Keyword => w::TokenKind::Keyword,
-                            $crate::TokenKind::Punct => w::TokenKind::Punct,
-                        },
-                        span: to_span(t.span),
-                    }).collect(),
+                    tokens: to_tokens(&b.tokens),
+                    signature: b.signature.as_ref().map(|s| w::SignatureAbove {
+                        text: s.text.clone(),
+                        tokens: to_tokens(&s.tokens),
+                    }),
+                    module: b.module.clone(),
                 }
+            }
+
+            fn to_tokens(tokens: &[$crate::Token]) -> Vec<w::Token> {
+                tokens.iter().map(|t| w::Token {
+                    kind: match t.kind {
+                        $crate::TokenKind::Ident => w::TokenKind::Ident,
+                        $crate::TokenKind::Con => w::TokenKind::Con,
+                        $crate::TokenKind::Number => w::TokenKind::Number,
+                        $crate::TokenKind::String => w::TokenKind::String,
+                        $crate::TokenKind::Keyword => w::TokenKind::Keyword,
+                        $crate::TokenKind::Punct => w::TokenKind::Punct,
+                    },
+                    span: to_span(t.span),
+                }).collect()
             }
 
             pub fn from_block(b: w::Block) -> $crate::Block {
@@ -55,18 +64,27 @@ macro_rules! wit_conversions {
                         w::Place::Declaration => $crate::Place::Declaration,
                     },
                     docs: b.docs,
-                    tokens: b.tokens.into_iter().map(|t| $crate::Token {
-                        kind: match t.kind {
-                            w::TokenKind::Ident => $crate::TokenKind::Ident,
-                            w::TokenKind::Con => $crate::TokenKind::Con,
-                            w::TokenKind::Number => $crate::TokenKind::Number,
-                            w::TokenKind::String => $crate::TokenKind::String,
-                            w::TokenKind::Keyword => $crate::TokenKind::Keyword,
-                            w::TokenKind::Punct => $crate::TokenKind::Punct,
-                        },
-                        span: from_span(t.span),
-                    }).collect(),
+                    tokens: from_tokens(b.tokens),
+                    signature: b.signature.map(|s| $crate::Signature {
+                        text: s.text,
+                        tokens: from_tokens(s.tokens),
+                    }),
+                    module: b.module,
                 }
+            }
+
+            fn from_tokens(tokens: Vec<w::Token>) -> Vec<$crate::Token> {
+                tokens.into_iter().map(|t| $crate::Token {
+                    kind: match t.kind {
+                        w::TokenKind::Ident => $crate::TokenKind::Ident,
+                        w::TokenKind::Con => $crate::TokenKind::Con,
+                        w::TokenKind::Number => $crate::TokenKind::Number,
+                        w::TokenKind::String => $crate::TokenKind::String,
+                        w::TokenKind::Keyword => $crate::TokenKind::Keyword,
+                        w::TokenKind::Punct => $crate::TokenKind::Punct,
+                    },
+                    span: from_span(t.span),
+                }).collect()
             }
 
             pub fn to_hole(h: $crate::Hole) -> w::Hole {
@@ -235,6 +253,8 @@ macro_rules! wit_conversions {
                             $crate::Ty::Record(f) => w::Ty::Record(to_fields(f)),
                             $crate::Ty::Forall { vars, body } => w::Ty::Forall(w::ForallTy { vars, body }),
                             $crate::Ty::Row(entries) => w::Ty::Row(entries),
+                            $crate::Ty::Signed(s) => w::Ty::Signed(to_span(s)),
+                            $crate::Ty::Tuple(items) => w::Ty::Tuple(items),
                             $crate::Ty::Function { input, output } => {
                                 w::Ty::Function(w::Arrow { input, output })
                             }
@@ -247,6 +267,7 @@ macro_rules! wit_conversions {
                             $crate::Pat::Wildcard => w::Pat::Wildcard,
                             $crate::Pat::Con { name, arguments } => w::Pat::Con(w::ConPat { name, arguments }),
                             $crate::Pat::Record(f) => w::Pat::Record(to_fields(f)),
+                            $crate::Pat::Tuple(items) => w::Pat::Tuple(items),
                             $crate::Pat::Hole(s) => w::Pat::Hole(to_span(s)),
                         }),
                         $crate::Kind::Decl(d) => w::Kind::Decl(match d {
@@ -305,6 +326,8 @@ macro_rules! wit_conversions {
                             w::Ty::Function(a) => $crate::Ty::Function { input: a.input, output: a.output },
                             w::Ty::Forall(f) => $crate::Ty::Forall { vars: f.vars, body: f.body },
                             w::Ty::Row(entries) => $crate::Ty::Row(entries),
+                            w::Ty::Signed(s) => $crate::Ty::Signed(from_span(s)),
+                            w::Ty::Tuple(items) => $crate::Ty::Tuple(items),
                             w::Ty::Text(s) => $crate::Ty::Text(s),
                             w::Ty::Wildcard => $crate::Ty::Wildcard,
                             w::Ty::Hole(s) => $crate::Ty::Hole(from_span(s)),
@@ -314,6 +337,7 @@ macro_rules! wit_conversions {
                             w::Pat::Wildcard => $crate::Pat::Wildcard,
                             w::Pat::Con(c) => $crate::Pat::Con { name: c.name, arguments: c.arguments },
                             w::Pat::Record(f) => $crate::Pat::Record(from_fields(f)),
+                            w::Pat::Tuple(items) => $crate::Pat::Tuple(items),
                             w::Pat::Hole(s) => $crate::Pat::Hole(from_span(s)),
                         }),
                         w::Kind::Decl(d) => $crate::Kind::Decl(match d {

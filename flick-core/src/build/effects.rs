@@ -65,10 +65,6 @@ pub fn check(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
             item.span,
             format!("the refined type `{name}` parses with Schema"),
         )),
-        ItemKind::Schema(schema) => Some((
-            item.span,
-            format!("the schema of `{}` needs Effect", schema.ty),
-        )),
         _ => None,
     });
     if let Some((span, what)) = needed {

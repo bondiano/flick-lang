@@ -38,7 +38,6 @@ pub fn print(module: &Module) -> String {
             }
             ItemKind::Service { name, key } => format!("service {name} = {key}"),
             ItemKind::Refined { name, check } => format!("refined {name} = {}", expr(check)),
-            ItemKind::Schema(item) => format!("schema {} = {:?}", item.ty, item.plan),
             ItemKind::Instance { info, methods } => {
                 let mut s = format!("instance {}{}", info.name, given(&info.context));
                 for (class, d) in &info.supers {

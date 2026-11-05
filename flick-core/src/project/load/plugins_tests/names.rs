@@ -103,7 +103,7 @@ fn a_companion_of_no_type_of_the_module_is_an_error_on_its_block() {
     assert!(
         shown.iter().any(
             |s| s.starts_with("FLICK-P036 `companion Nope { \"boxed\" }`")
-                && s.contains("`Nope` is no type of this module")
+                && s.contains("`Nope` is no type or value of this module")
         ),
         "{shown:#?}"
     );

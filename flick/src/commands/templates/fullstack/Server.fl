@@ -6,6 +6,7 @@ import App.Api exposing (Session)
 import App.Store
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
+import Server exposing (plugin server)
 
 /// The session of a `session=<name>` cookie; without one, a guarded call is
 /// turned away. Replace it with your own sign-in.

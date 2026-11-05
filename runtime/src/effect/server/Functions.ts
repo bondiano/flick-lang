@@ -1,4 +1,4 @@
-// The calls of `server fn`: the compiler makes a procedure of each from its
+// The calls of `server fn`: std's plugin makes a procedure of each from its
 // name and the witnesses of what it sends; a caller sends it over HTTP and
 // `Server.handler` serves it with its implementation; while a handler is
 // mounted in this process, a call made here (rendering a page on the
@@ -30,7 +30,7 @@ export interface ServerFunction {
   readonly run: Handler;
 }
 
-/** `Server.procedure name payload success errors`. */
+/** `Server.Derive.procedure name payload success errors`. */
 export const serverProcedure = (
   name: string,
   payload: AnySchema,
@@ -41,6 +41,13 @@ export const serverProcedure = (
     errors.map(schemaJsonCodec),
     rpcWithSuccess(schemaJsonCodec(success), rpcWithPayload(schemaJsonCodec(payload), rpcMake(name))),
   );
+
+/** `Server.Derive.no_errors`. */
+export const serverNoErrors: ReadonlyArray<AnySchema> = Object.freeze([]);
+
+/** `Server.Derive.error witness errors`. */
+export const serverError = (witness: AnySchema, errors: ReadonlyArray<AnySchema>): ReadonlyArray<AnySchema> =>
+  Object.freeze([witness, ...errors]);
 
 /** Where the calls go: the page's origin in a browser, `FLICK_SERVER_URL` elsewhere. */
 const base = (): string | undefined => {
@@ -63,7 +70,7 @@ export const registerLocal = (name: string, call: Local): (() => void) => {
   };
 };
 
-/** `Server.call procedure payload`. */
+/** `Server.Derive.call procedure payload`. */
 export const serverCall = (procedure: Procedure, payload: unknown): Effect.Effect<unknown, unknown, unknown> =>
   Effect.suspend(() => {
     const here = local.get(procedure.name);
@@ -84,6 +91,6 @@ export const serverAuthenticated = (
     serverFunction(rpcWithAuth(tag, (call) => check(Reflect.get(Object(call), "headers")), f.procedure), f.run),
   );
 
-/** `Server.function procedure run`. */
+/** `Server.Derive.function procedure run` and `guarded`. */
 export const serverFunction = (procedure: Procedure, run: Handler): ServerFunction =>
   Object.freeze({ procedure, run });

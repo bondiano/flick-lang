@@ -42,13 +42,6 @@ fn top_decl(p: &mut Parser) {
         K::SqlKw if p.nth(1) == K::Ident => sql_table(p),
         // `component name`: the word is a name everywhere else
         K::Ident if p.at_word("component") && p.nth(1) == K::Ident => component_decl(p),
-        // `server fn name`: a `let` whose callers reach it over the network
-        K::Ident if p.at_word("server") && p.nth(1) == K::Ident && word_at(p, 1, "fn") => {
-            let m = p.start();
-            p.bump_as(K::ServerKw);
-            p.bump_as(K::FnKw);
-            let_rest(p, m, false);
-        }
         K::Ident if super::plugin::at_declaration(p) => super::plugin::declaration(p),
         _ => member(p),
     }
@@ -202,7 +195,7 @@ pub(super) fn let_decl(p: &mut Parser) {
 }
 
 /// Whether the token `n` ahead is the identifier `word`.
-fn word_at(p: &Parser, n: usize, word: &str) -> bool {
+pub(super) fn word_at(p: &Parser, n: usize, word: &str) -> bool {
     let t = p.toks[(p.pos + n).min(p.toks.len() - 1)];
     &p.text[t.start as usize..t.end as usize] == word
 }

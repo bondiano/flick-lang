@@ -241,7 +241,7 @@ codes! {
     E007 = Effects 7, "handler pattern is not an error";
     E008 = Effects 8, "effect in a project built without effects";
     E009 = Effects 9, "client entry reaches `Server`";
-    E010 = Effects 10, "`server fn` that cannot cross the network";
+    E010 = Effects 10, "`server name` of a value that is no `server fn`";
     E011 = Effects 11, "guarded `server fn` served the wrong way";
     E012 = Effects 12, "server function needs server stdlib";
     C001 = Classes 1, "no instance for a constraint";

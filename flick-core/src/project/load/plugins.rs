@@ -22,7 +22,6 @@ use crate::plugin::expansion::{Expanded, Expansion};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
 use crate::plugin::{EditorBlock, Expander, Failure, blocks_under, first_party};
-use crate::resolve::Import;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -68,6 +67,7 @@ impl Loader<'_> {
             let imported = m.syntax.heads();
             let new = |node: &Node| {
                 BlockSource::new(Arc::clone(&shared), m.file, node, Arc::clone(&imported))
+                    .map(|s| s.in_module(&m.name, &m.parse.tree))
             };
             let mut sink = Sink {
                 plugins: &plugins,
@@ -285,7 +285,7 @@ impl Loader<'_> {
                 match results.expand(plugin.as_ref(), block, &state, &mut f.source) {
                     Ok(arena) => {
                         let len = u32::try_from(block.text.len()).expect("source fits in u32");
-                        let aliases = aliases(&self.modules[f.module].syntax.imports);
+                        let aliases = self.modules[f.module].syntax.aliases();
                         match render(&arena, len, block.place, &aliases) {
                             Ok(code) => rendered[j] = Some(code),
                             Err(why) => diagnostics.push(failure(
@@ -429,16 +429,4 @@ impl Loader<'_> {
             None
         }
     }
-}
-
-/// The modules `imports` name only by an alias, each with it.
-fn aliases(imports: &[Import]) -> Vec<(String, String)> {
-    (imports.iter())
-        .filter(|i| {
-            !imports
-                .iter()
-                .any(|j| j.module == i.module && j.alias.is_none())
-        })
-        .filter_map(|i| Some((i.module.clone(), i.alias.clone()?)))
-        .collect()
 }

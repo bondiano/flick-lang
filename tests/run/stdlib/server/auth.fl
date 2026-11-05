@@ -6,6 +6,7 @@ module App.Main exposing (main)
 
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
+import Server exposing (plugin server)
 
 ran : Unit ->{} Unit
 foreign sync ran from "./auth.mjs" "ran"

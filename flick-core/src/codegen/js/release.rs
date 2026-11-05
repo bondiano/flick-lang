@@ -80,7 +80,7 @@ fn item_bodies<'a>(item: &'a Item, f: &mut dyn FnMut(&'a Expr)) {
         ItemKind::Refined { check, .. } => f(check),
         ItemKind::Instance { methods, .. } => methods.iter().for_each(|(_, m)| f(m)),
         ItemKind::Foreign(foreign) => foreign.catch.iter().for_each(&mut *f),
-        ItemKind::Constructor(_) | ItemKind::Service { .. } | ItemKind::Schema(_) => {}
+        ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }
 }
 

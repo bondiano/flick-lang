@@ -15,7 +15,6 @@ mod numeric;
 mod pattern;
 mod question;
 mod ranges;
-mod server_fn;
 mod sql;
 mod wire;
 
@@ -31,7 +30,6 @@ use crate::syntax::cst::Node;
 use crate::syntax::ddl;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
-use crate::types::server_fn::is_server_fn;
 use crate::types::{
     Constructor, Range, Rep, Typing, class_defaults, default_method, is_type, let_parts,
 };
@@ -181,9 +179,6 @@ impl Lower<'_> {
     fn item(&mut self, decl: &Node, items: &mut Vec<Item>) {
         let span = self.span(decl);
         match decl.kind {
-            K::LetDecl if is_server_fn(decl) => {
-                self.server_fn(decl, span, items);
-            }
             K::LetDecl => {
                 self.fresh_definition();
                 let parts = let_parts(decl, self.text);
@@ -253,8 +248,8 @@ impl Lower<'_> {
         }
     }
 
-    /// The constructors of a type or error, its refinement check and its
-    /// schema witness.
+    /// The constructors of a type or error and its refinement check; its
+    /// witness `T$schema` is the code std's plugin derives.
     fn type_items(&mut self, decl: &Node, span: Span, items: &mut Vec<Item>) {
         let Some(ty) = self.token_text(decl, K::Con) else {
             return;
@@ -269,12 +264,6 @@ impl Lower<'_> {
                     name: ty.clone(),
                     check,
                 },
-                span,
-            });
-        }
-        if let Some(schema) = self.typing.schemas.iter().find(|s| s.decl == decl.range()) {
-            items.push(Item {
-                kind: ItemKind::Schema(schema.clone()),
                 span,
             });
         }

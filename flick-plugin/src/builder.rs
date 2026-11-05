@@ -113,7 +113,10 @@ impl Kind {
                 Expr::Annot { expr, ty } => vec![*expr, *ty],
             },
             Kind::Ty(ty) => match ty {
-                Ty::Name(_) | Ty::Text(_) | Ty::Wildcard | Ty::Hole(_) => Vec::new(),
+                Ty::Name(_) | Ty::Text(_) | Ty::Wildcard | Ty::Hole(_) | Ty::Signed(_) => {
+                    Vec::new()
+                }
+                Ty::Tuple(items) => items.clone(),
                 Ty::Apply {
                     function,
                     arguments,
@@ -130,6 +133,7 @@ impl Kind {
                 Pat::Var(_) | Pat::Wildcard | Pat::Hole(_) => Vec::new(),
                 Pat::Con { arguments, .. } => arguments.clone(),
                 Pat::Record(entries) => fields(entries),
+                Pat::Tuple(items) => items.clone(),
             },
             Kind::Decl(decl) => match decl {
                 Decl::Let {

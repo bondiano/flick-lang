@@ -220,11 +220,11 @@ impl Checker<'_> {
         let (Some(actual), Some(expected)) = (server(actual), server(expected)) else {
             return false;
         };
-        // `server name` names the server fn; another expression does not
+        // `server name`, as `name$server`, names the server fn; another
+        // expression does not
         let text = &self.text[span.start as usize..span.end as usize];
-        let name = text
-            .strip_prefix("server")
-            .map(str::trim)
+        let name = (text.trim_matches(|c| c == '(' || c == ')'))
+            .strip_suffix("$server")
             .filter(|n| !n.contains(char::is_whitespace));
         let named = name.map_or_else(
             || "this server fn".to_owned(),
@@ -268,8 +268,22 @@ impl Checker<'_> {
 
     /// The edit that adds `Server.Unauthorized` to the errors of the last
     /// arrow of the signature of this module's `name`.
+    /// `server value`, whose implementation `value$server` no `server fn`
+    /// declares.
+    pub(super) fn not_a_server_fn(&mut self, value: &str, span: Span) {
+        self.error(
+            codes::E010,
+            span,
+            format!(
+                "`{value}` is not a server fn: only `server fn` has an implementation to serve"
+            ),
+        );
+    }
+
     fn unauthorized_edit(&self, name: &str) -> Option<Edit> {
-        let sig = self.signature_span(name)?;
+        // the signature of a server fn types its implementation
+        let sig = (self.signature_type_span(&format!("{name}$impl")))
+            .or_else(|| self.signature_span(name))?;
         let text = &self.text[sig.start as usize..sig.end as usize];
         let open = text.rfind("->{")?;
         let close = open + text[open..].find('}')?;

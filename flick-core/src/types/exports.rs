@@ -11,7 +11,6 @@ impl Checker<'_> {
         // built-in instances are known to every module without an interface
         interface.instances = self.env.own_instances().cloned().collect();
         self.export_companions(interface);
-        self.export_server_fns(interface);
         let exported: Vec<&str> = interface
             .exports
             .iter()
@@ -119,50 +118,28 @@ impl Checker<'_> {
         }
     }
 
-    /// The implementation `f$server` of each exported server function.
-    fn export_server_fns(&self, interface: &mut Interface) {
-        let values: Vec<String> = interface
-            .exports
-            .iter()
-            .filter(|e| {
-                e.entity.namespace == Namespace::Value && e.entity.module == self.env.module
-            })
-            .map(|e| e.entity.name.clone())
-            .collect();
-        for value in values {
-            let name = super::companion_name(&value, super::server_fn::IMPLEMENTATION);
-            let entity = self.env.entity(Namespace::Value, &name);
-            if self.env.value(&entity).is_some() {
-                interface.exports.push(Export {
-                    entity,
-                    decl: Decl::Let,
-                    parent: None,
-                    scheme: None,
-                    definition: None,
-                    blocked: None,
-                    at: None,
-                });
-            }
-        }
-    }
-
     /// The companions of each exported type of this module, `T$schema`,
     /// `T$parse`, `T$value`, `T$json`, `T$table`, `T$url`, and those a plugin
-    /// declares, as values beside it.
+    /// declares beside an exported type or value, as `f$server` of a
+    /// `server fn`.
     fn export_companions(&self, interface: &mut Interface) {
-        let types: Vec<String> = interface
-            .exports
-            .iter()
-            .filter(|e| e.entity.namespace == Namespace::Type && e.entity.module == self.env.module)
-            .map(|e| e.entity.name.clone())
-            .collect();
+        let own = |namespace: Namespace| -> Vec<String> {
+            (interface.exports.iter())
+                .filter(|e| e.entity.namespace == namespace && e.entity.module == self.env.module)
+                .map(|e| e.entity.name.clone())
+                .collect()
+        };
+        let types = own(Namespace::Type);
+        let values = own(Namespace::Value);
         // only generated code declares a top-level `T$member`
         let mut declared: Vec<&Entity> = (self.env.own_values())
             .map(|(e, _)| e)
             .filter(|e| {
                 e.namespace == Namespace::Value
                     && self.top.declares(&e.name)
-                    && (e.name.split_once('$')).is_some_and(|(ty, _)| types.iter().any(|t| t == ty))
+                    && (e.name.split_once('$')).is_some_and(|(owner, _)| {
+                        types.contains(&owner.to_owned()) || values.contains(&owner.to_owned())
+                    })
                     && !interface.exports.iter().any(|x| x.entity == **e)
             })
             .collect();

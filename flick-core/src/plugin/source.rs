@@ -6,13 +6,48 @@
 
 use std::sync::Arc;
 
-use flick_plugin::{Block, Compiler, Hole, HoleKind, Place, Span, Token as PluginToken, TokenKind};
+use flick_plugin::{
+    Block, Compiler, Hole, HoleKind, Place, Signature, Span, Token as PluginToken, TokenKind,
+};
 
 use crate::diagnostics::Diagnostic;
 use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::{Fragment, parse_decl_at, parse_expr_at, parse_pat_at, parse_type_at};
+use crate::syntax::{
+    Fragment, parse_body_at, parse_decl_at, parse_expr_at, parse_pat_at, parse_type_at,
+};
+
+/// Where the spans of a hole in the signature above a block start: past
+/// any of its own text.
+const SIGNED: u32 = 1 << 31;
+
+/// The hole of the user's type at `span` of the signature above a block.
+pub(crate) fn signed(span: Span) -> Hole {
+    Hole {
+        kind: HoleKind::Ty,
+        span: Span {
+            start: span.start.saturating_add(SIGNED),
+            end: span.end.saturating_add(SIGNED),
+        },
+    }
+}
+
+/// Where in the signature above its block `hole` is, if it is there.
+pub(crate) fn in_signature(hole: Hole) -> Option<Span> {
+    (hole.span.start >= SIGNED).then(|| Span {
+        start: hole.span.start - SIGNED,
+        end: hole.span.end - SIGNED,
+    })
+}
+
+/// The signature right above a declaration block, at its place in the
+/// module text.
+#[derive(Clone)]
+struct Above {
+    whole: (u32, u32),
+    tokens: Vec<Token>,
+}
 
 /// A plugin block of a module and what its plugin asked of it.
 #[derive(Default)]
@@ -20,6 +55,8 @@ pub struct BlockSource {
     text: Arc<str>,
     file: FileId,
     head: String,
+    /// Where the head starts in the module text.
+    head_at: u32,
     /// Where the frame starts (at the first argument, or at the body) and
     /// where the body ends, in the module text.
     start: u32,
@@ -31,8 +68,10 @@ pub struct BlockSource {
     /// The tokens of the arguments and the body, trivia included and `{`
     /// left out, at their places in the text.
     tokens: Vec<Token>,
-    /// The `///` lines right above a declaration.
+    /// The `///` lines right above a declaration, or above its signature.
     docs: String,
+    signature: Option<Above>,
+    module: Arc<str>,
     /// The heads the module imports, which start blocks in the holes.
     heads: Arc<[String]>,
     /// A declaration of another module, read by a derive: no span of it is
@@ -82,9 +121,12 @@ impl BlockSource {
         };
         Some(BlockSource {
             docs,
+            signature: None,
+            module: Arc::from(""),
             heads,
             foreign: false,
             head: head.text(&text).to_owned(),
+            head_at: head.start,
             text,
             file,
             start,
@@ -110,7 +152,10 @@ impl BlockSource {
         let (start, end) = node.range();
         BlockSource {
             docs: docs_above(&text, start),
+            signature: None,
+            module: Arc::from(""),
             head: String::new(),
+            head_at: start,
             file,
             start,
             end,
@@ -132,12 +177,60 @@ impl BlockSource {
 
     /// The block `node` inside the user's code of this one.
     pub fn nested(&self, node: &Node) -> Option<Self> {
-        Self::new(
+        let mut nested = Self::new(
             Arc::clone(&self.text),
             self.file,
             node,
             Arc::clone(&self.heads),
-        )
+        )?;
+        nested.module = Arc::clone(&self.module);
+        Some(nested)
+    }
+
+    /// The block in the module `module` whose tree is `tree`, with the
+    /// signature right above it when it is a declaration of the module.
+    #[must_use]
+    pub fn in_module(mut self, module: &str, tree: &Node) -> Self {
+        self.module = Arc::from(module);
+        if self.place != Place::Declaration {
+            return self;
+        }
+        let mut before: Option<&Node> = None;
+        for n in tree.nodes() {
+            let (start, end) = n.range();
+            if start <= self.start && self.start < end {
+                break;
+            }
+            before = Some(n);
+        }
+        let Some(sig) = before.filter(|n| n.kind == K::Signature) else {
+            return self;
+        };
+        // nothing but blank lines and comments between it and the block
+        let gap = &self.text[sig.range().1 as usize..self.head_at as usize];
+        if !gap
+            .lines()
+            .all(|l| l.trim().is_empty() || l.trim_start().starts_with("//"))
+        {
+            return self;
+        }
+        self.docs = docs_above(&self.text, sig.range().0);
+        self.signature = Some(Above {
+            whole: sig.range(),
+            tokens: sig.tokens(),
+        });
+        self
+    }
+
+    /// The range of the signature above the block in the module text.
+    pub fn signature(&self) -> Option<(u32, u32)> {
+        self.signature.as_ref().map(|s| s.whole)
+    }
+
+    /// The signature above the block, as written.
+    pub fn signature_text(&self) -> Option<&str> {
+        let (start, end) = self.signature.as_ref()?.whole;
+        self.text.get(start as usize..end as usize)
     }
 
     /// Where the block stands.
@@ -205,17 +298,55 @@ impl BlockSource {
             place: self.place,
             tokens,
             docs: self.docs.clone(),
+            signature: self.signature.as_ref().map(|s| {
+                let (start, end) = s.whole;
+                Signature {
+                    text: self.text[start as usize..end as usize].to_owned(),
+                    tokens: (s.tokens.iter())
+                        .filter(|t| !t.kind.is_trivia())
+                        .map(|t| PluginToken {
+                            kind: token_kind(t.kind),
+                            span: Span {
+                                start: t.start - start,
+                                end: t.end - start,
+                            },
+                        })
+                        .collect(),
+                }
+            }),
+            module: self.module.to_string(),
         }
     }
 
     /// The user's code at `hole`, parsed again where it stands; `None` when
     /// it does not parse into exactly that span.
     pub fn hole_tree(&self, hole: Hole) -> Option<Node> {
-        let fragment = self.fragment(hole.kind, hole.span.start, hole.span.end)?;
-        (fragment.diagnostics.is_empty()
-            && fragment.tree.range().0 == self.start + hole.span.start
-            && fragment.end == self.start + hole.span.end)
-            .then_some(fragment.tree)
+        if let Some(span) = in_signature(hole) {
+            let above = self.signature.as_ref()?;
+            let (start, end) = (above.whole.0 + span.start, above.whole.0 + span.end);
+            if start >= end || end > above.whole.1 {
+                return None;
+            }
+            let tokens: Vec<Token> = (above.tokens.iter())
+                .filter(|t| start <= t.start && t.end <= end)
+                .copied()
+                .collect();
+            let heads: Vec<&str> = self.heads.iter().map(String::as_str).collect();
+            let fragment = parse_type_at(&self.text, self.file, &tokens, &heads)?;
+            return (fragment.diagnostics.is_empty()
+                && fragment.tree.range().0 == start
+                && fragment.end == end)
+                .then_some(fragment.tree);
+        }
+        // an expression's hole may be a body, the lines of a block
+        let exact = |body: bool| {
+            let fragment = self.fragment(hole.kind, body, hole.span.start, hole.span.end)?;
+            (fragment.diagnostics.is_empty()
+                && fragment.tree.range().0 == self.start + hole.span.start
+                && fragment.end == self.start + hole.span.end)
+                .then_some(fragment.tree)
+        };
+        exact(false).or_else(|| (hole.kind == HoleKind::Expr).then(|| exact(true)).flatten())
     }
 
     /// The longest expression or type of the body from `start` on, before
@@ -227,6 +358,17 @@ impl BlockSource {
         start: u32,
         end: u32,
     ) -> Result<Hole, flick_plugin::Diagnostic> {
+        self.parse_as(kind, false, start, end)
+    }
+
+    /// [`BlockSource::parse`], an expression parsed as a body when `body`.
+    fn parse_as(
+        &mut self,
+        kind: HoleKind,
+        body: bool,
+        start: u32,
+        end: u32,
+    ) -> Result<Hole, flick_plugin::Diagnostic> {
         let refuse = |message: &str| flick_plugin::Diagnostic::error(message, Span { start, end });
         let what = match kind {
             HoleKind::Expr => "an expression",
@@ -234,7 +376,7 @@ impl BlockSource {
             HoleKind::Pat => "a pattern",
             HoleKind::Decl => "a declaration",
         };
-        let Some(fragment) = self.fragment(kind, start, end) else {
+        let Some(fragment) = self.fragment(kind, body, start, end) else {
             return Err(refuse(&format!("expected {what} here")));
         };
         if let Some(first) = fragment.diagnostics.first() {
@@ -249,7 +391,7 @@ impl BlockSource {
         })
     }
 
-    fn fragment(&self, kind: HoleKind, start: u32, end: u32) -> Option<Fragment> {
+    fn fragment(&self, kind: HoleKind, body: bool, start: u32, end: u32) -> Option<Fragment> {
         if start > end || end > self.end - self.start {
             return None;
         }
@@ -259,6 +401,7 @@ impl BlockSource {
         let tokens = self.tokens.get(first..last)?;
         let heads: Vec<&str> = self.heads.iter().map(String::as_str).collect();
         let parse = match kind {
+            HoleKind::Expr if body => parse_body_at,
             HoleKind::Expr => parse_expr_at,
             HoleKind::Ty => parse_type_at,
             HoleKind::Pat => parse_pat_at,
@@ -290,6 +433,10 @@ impl Compiler for BlockSource {
 
     fn parse_decl(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
         self.parse(HoleKind::Decl, start, end)
+    }
+
+    fn parse_body(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
+        self.parse_as(HoleKind::Expr, true, start, end)
     }
 }
 

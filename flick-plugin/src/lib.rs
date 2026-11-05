@@ -31,7 +31,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.8.0";
+pub const VERSION: &str = "0.9.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -87,6 +87,19 @@ pub struct Block {
     /// The `///` lines right above a declaration's head, each without `///`
     /// and one space, joined by `\n`; empty for an expression.
     pub docs: String,
+    /// The signature right above a declaration, if there is one.
+    pub signature: Option<Signature>,
+    /// The module the block is in, as `App.Shop`.
+    pub module: String,
+}
+
+/// The signature `name : type` right above a declaration block, its spans
+/// counting from its own start. Code that has a type of it, [`Ty::Signed`],
+/// takes it from the module; without that it stays where it is.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Signature {
+    pub text: String,
+    pub tokens: Vec<Token>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -168,6 +181,10 @@ pub enum Ty {
     },
     /// A row of types, as the errors `{NotFound, Conflict}`; `{}` without.
     Row(Vec<NodeId>),
+    /// The user's type at this span of the block's signature.
+    Signed(Span),
+    /// `(A, B)`.
+    Tuple(Vec<NodeId>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -181,6 +198,8 @@ pub enum Pat {
     Record(Vec<Field>),
     /// The user's pattern at this span of the block.
     Hole(Span),
+    /// `(a, b)`.
+    Tuple(Vec<NodeId>),
 }
 
 /// A constructor of a type and the types of its fields.
@@ -368,6 +387,12 @@ pub trait Compiler {
     fn parse_pat(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic>;
     /// The declaration of the block from `start` on, before `end`.
     fn parse_decl(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic>;
+    /// The body of the block from `start` on, before `end`, as after the
+    /// `=` of a `let`: an expression, or on a line of its own the lines of
+    /// a block at its column; its hole is an expression's.
+    fn parse_body(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic> {
+        self.parse_expr(start, end)
+    }
 }
 
 /// A plugin: what it learns from all its blocks of a group, and the code

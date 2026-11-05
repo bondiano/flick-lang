@@ -7,21 +7,23 @@ use flick_plugin::{Block, HoleKind, Place, Plugin};
 
 use super::blocks_under;
 use super::render::{DECL_PLACEHOLDER, Rendered, render};
-use super::source::BlockSource;
+use super::source::{BlockSource, in_signature};
 use crate::source::FileId;
 use crate::syntax;
 use crate::{fmt, resolve};
 
 /// The code `rendered` is, the user's code in place of each hole (spans of
-/// `frame`, the text of its block), laid out by the formatter where it can:
-/// an expression, or declarations by `place`.
-pub fn shown(rendered: &Rendered, frame: &str, place: Place) -> String {
+/// `frame`, the text of its block, or of `signature`, the signature above
+/// it), laid out by the formatter where it can: an expression, or
+/// declarations by `place`.
+pub fn shown(rendered: &Rendered, frame: &str, signature: &str, place: Place) -> String {
     let mut code = String::new();
     let mut at = 0;
     for &(offset, hole) in &rendered.holes {
         let offset = offset as usize;
-        let user = frame
-            .get(hole.span.start as usize..hole.span.end as usize)
+        let (text, span) = in_signature(hole).map_or((frame, hole.span), |s| (signature, s));
+        let user = text
+            .get(span.start as usize..span.end as usize)
             .unwrap_or("");
         // a declaration's placeholder is a line of its own
         if hole.kind == HoleKind::Decl {
@@ -100,10 +102,13 @@ pub fn expand(plugin: &impl Plugin, source: &str) -> Vec<Result<String, Vec<Stri
     let mut nodes = Vec::new();
     blocks_under(&parse.tree, &mut nodes);
     let text: Arc<str> = Arc::from(source);
-    let heads = resolve::module_syntax(&parse.tree, source, file).heads();
+    let syntax = resolve::module_syntax(&parse.tree, source, file);
+    let heads = syntax.heads();
+    let module = syntax.header.as_ref().map_or("Main", |h| h.name.as_str());
     let mut sources: Vec<BlockSource> = (nodes.into_iter())
         .filter_map(|n| BlockSource::new(Arc::clone(&text), file, n, Arc::clone(&heads)))
         .filter(BlockSource::closed)
+        .map(|s| s.in_module(module, &parse.tree))
         .collect();
     let blocks: Vec<Block> = sources.iter().map(BlockSource::block).collect();
     let state = plugin.collect(&blocks);
@@ -119,7 +124,8 @@ pub fn expand(plugin: &impl Plugin, source: &str) -> Vec<Result<String, Vec<Stri
             match expanded {
                 Ok(arena) => match render(&arena, block.whole().end, block.place, &[]) {
                     Ok(rendered) if errors.is_empty() => {
-                        return Ok(shown(&rendered, &block.text, block.place));
+                        let signature = source.signature_text().unwrap_or("");
+                        return Ok(shown(&rendered, &block.text, signature, block.place));
                     }
                     Ok(_) => {}
                     Err(why) => errors.push(format!("gave code that is not valid: {why}")),

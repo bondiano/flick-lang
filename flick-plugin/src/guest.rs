@@ -52,6 +52,12 @@ impl Compiler for Imports {
             .map(convert::from_hole)
             .map_err(convert::from_diagnostic)
     }
+
+    fn parse_body(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic> {
+        compiler::parse_body(start, end)
+            .map(convert::from_hole)
+            .map_err(convert::from_diagnostic)
+    }
 }
 
 #[doc(hidden)]

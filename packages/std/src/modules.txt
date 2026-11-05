@@ -225,6 +225,7 @@ HttpApi.Inject
 # Effect: RPC (unstable in Effect 4.1.2)
 Rpc
 Server
+Server.Derive
 # after `Server`: a secret is read only on a server
 Config
 # end of Effect: RPC

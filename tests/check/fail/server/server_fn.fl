@@ -2,6 +2,8 @@
 // each part of it has a Schema witness.
 module App.ServerFn exposing (..)
 
+import Server exposing (plugin server)
+
 type alias Order = { item : String }
   deriving Schema
 
@@ -31,11 +33,10 @@ let local order = order.item
 
 served : List (Server.Function {Server.Server})
 let served = [server local]
-//~ FLICK-T004 @12:1-12:25 function `unsigned` needs a signature right above its `let`
-//~ FLICK-T013 @12:1-12:25 the type of `unsigned` is not fully known (`_ -> _`) and can
-//~ FLICK-E010 @15:1-15:21 server fn `pick`
-//~ FLICK-E010 @18:1-18:64 server fn `keep` sends its payload as JSON, but a field of t
-//~ FLICK-E010 @21:1-21:34 server fn `find` sends its error `Missing` as JSON, but a fi
-//~ FLICK-E010 @24:1-24:29 server fn `early`: only the last arrow of a server fn runs
-//~ FLICK-E010 @27:1-27:67 server fn `sealed` sends its payload as JSON, but a field
-//~ FLICK-E010 @33:15-33:27 `local` is not a server fn
+//~ std/E010 @14:1-14:25 server fn `unsigned` needs a signature right above it: what the server runs
+//~ std/E010 @17:1-17:21 server fn `pick`: a server fn is not generic: its types cross the network
+//~ FLICK-D001 @20:1-20:64 `Secret` derives no Schema: add `deriving Schema` to its declaration
+//~ FLICK-D001 @23:1-23:34 `Missing` derives no Schema: add `deriving Schema` to its declaration
+//~ std/E010 @26:1-26:29 server fn `early`: only the last arrow of a server fn runs: `A -> B ->{r; e} S`
+//~ FLICK-D001 @29:1-29:67 `Secret` derives no Schema: add `deriving Schema` to its declaration
+//~ FLICK-E010 @35:15-35:27 `local` is not a server fn: only `server fn` has an implementation to serve

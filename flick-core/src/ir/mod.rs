@@ -24,7 +24,7 @@ use crate::numeric::{Arith, Num};
 use crate::source::Span;
 pub use crate::types::Stage;
 use crate::types::lang::{self, Lang};
-use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, SchemaItem, Type};
+use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, Type};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Module {
@@ -71,9 +71,6 @@ pub enum ItemKind {
     Service { name: String, key: String },
     /// A refined type `name`: its check `T$check`, and `T$parse`, `T$value`.
     Refined { name: String, check: Expr },
-    /// The witness `T$schema` of a type deriving `Schema`, a function of
-    /// `witnesses` witnesses; a refined type also gets `T$json`.
-    Schema(SchemaItem),
     /// An instance with its methods; with a context, a function of the
     /// context's dictionaries.
     Instance {
@@ -361,10 +358,7 @@ impl Module {
                         body.each_span_mut(f);
                     }
                 }
-                ItemKind::Foreign(_)
-                | ItemKind::Constructor(_)
-                | ItemKind::Service { .. }
-                | ItemKind::Schema(_) => {}
+                ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
             }
         }
     }

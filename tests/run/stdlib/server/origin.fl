@@ -5,6 +5,7 @@ module App.Main exposing (main)
 
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
+import Server exposing (plugin server)
 
 hello : HttpApi.Endpoint "hello" (HttpApi.Request Unit Unit Unit Unit ->{r;} String)
 let hello =

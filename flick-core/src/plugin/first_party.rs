@@ -7,6 +7,7 @@ use flick_plugin::{
     Arena, Block, Compiler, Completion, DeriveTarget, Diagnostic, Highlight, Hover, Piece, Plugin,
 };
 use flick_plugin_cli::Cli;
+use flick_plugin_derive::server_fn;
 
 use super::{Expander, Native};
 
@@ -14,7 +15,11 @@ use super::{Expander, Native};
 /// exposes each. One is a block even where no import exposes it, so the
 /// compiler can say which import it needs: `cli "x" { … }` stays the block
 /// it was before `Cli` gave it.
-pub const HEADS: [(&str, &str); 1] = [("cli", "Cli")];
+pub const HEADS: [(&str, &str); 2] = [("cli", "Cli"), ("server", "Server")];
+
+/// The heads whose blocks need no body even where no import exposes them,
+/// as the compiler read them before: `server fn f x = …` and `server f`.
+pub const BARE: [&str; 1] = ["server"];
 
 /// The plugin linked into the compiler for `package`.
 pub fn plugin(package: &str) -> Option<Arc<dyn Expander>> {
@@ -24,9 +29,14 @@ pub fn plugin(package: &str) -> Option<Arc<dyn Expander>> {
     }
 }
 
-/// The plugin of std: `cli` blocks and `deriving Cli.Value`, and the
-/// derives of the witnesses of the Prelude.
+/// The plugin of std: `cli` blocks and `deriving Cli.Value`, `server fn`,
+/// and the derives of the witnesses of the Prelude.
 struct Std;
+
+/// Whether `block` is a `cli` block, the others being `server`'s.
+fn cli(block: &Block) -> bool {
+    block.head != "server"
+}
 
 impl Plugin for Std {
     fn collect(&self, blocks: &[Block]) -> Vec<u8> {
@@ -39,19 +49,33 @@ impl Plugin for Std {
         state: &[u8],
         compiler: &mut dyn Compiler,
     ) -> Result<Arena, Vec<Diagnostic>> {
-        Cli.expand(block, state, compiler)
+        if cli(block) {
+            Cli.expand(block, state, compiler)
+        } else {
+            server_fn::expand(block, compiler)
+        }
     }
 
     fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
-        Cli.complete(block, state, offset)
+        if cli(block) {
+            Cli.complete(block, state, offset)
+        } else {
+            Vec::new()
+        }
     }
 
     fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
-        Cli.hover(block, state, offset)
+        cli(block)
+            .then(|| Cli.hover(block, state, offset))
+            .flatten()
     }
 
     fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
-        Cli.highlight(block, state)
+        if cli(block) {
+            Cli.highlight(block, state)
+        } else {
+            Vec::new()
+        }
     }
 
     fn format(
@@ -60,7 +84,9 @@ impl Plugin for Std {
         state: &[u8],
         compiler: &mut dyn Compiler,
     ) -> Option<Vec<Piece>> {
-        Cli.format(block, state, compiler)
+        cli(block)
+            .then(|| Cli.format(block, state, compiler))
+            .flatten()
     }
 
     fn derive(

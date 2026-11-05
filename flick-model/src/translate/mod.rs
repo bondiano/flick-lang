@@ -108,10 +108,7 @@ impl Tr {
                 let value = self.instance(info, methods);
                 program.globals.insert(path, value);
             }
-            ItemKind::Constructor(_)
-            | ItemKind::Service { .. }
-            | ItemKind::Refined { .. }
-            | ItemKind::Schema(_) => {}
+            ItemKind::Constructor(_) | ItemKind::Service { .. } | ItemKind::Refined { .. } => {}
         }
     }
 

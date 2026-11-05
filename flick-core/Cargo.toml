@@ -21,7 +21,6 @@ default = [
     "native-project",
     "terminal-diagnostics",
     "builtin-docs",
-    "server-stdlib",
 ]
 ide = ["typescript", "diagnostic-fixes"]
 build-artifacts = []
@@ -31,7 +30,6 @@ diagnostic-fixes = []
 native-project = ["dep:toml", "dep:semver"]
 terminal-diagnostics = ["dep:annotate-snippets"]
 builtin-docs = []
-server-stdlib = []
 # std in the binary, for a host with no packages: the playground
 embedded-std = []
 
