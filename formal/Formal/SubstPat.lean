@@ -30,6 +30,15 @@ theorem Ty.Opaque.of_substT {t : Ty} (σ : Atom → Ty) (h : (t.substT σ).Opaqu
   | base | adt | rnil | rcons => simp [Ty.Opaque, Ty.hd, Ty.substT] at h
   | _ => simp [Ty.Opaque, Ty.hd]
 
+/-- A constructor that can build an instance can build the type. -/
+theorem Sig.Builds.of_substT {K t} {σ : Atom → Ty} (h : S.Builds K (t.substT σ)) :
+    S.Builds K t := by
+  intro k ts T us hK ht hl
+  obtain ⟨ρ, hρ⟩ := h k ts T (us.map (Ty.substT σ)) hK (by rw [ht, Ty.tcon_substT]) (by simpa using hl)
+  refine ⟨fun a => (liftT k σ a).substT ρ, ?_⟩
+  rw [← Ty.substT_comp, ← Ty.substT_comp, Ty.up_comm, ← hρ, Ty.tcon_substT T (liftT k σ),
+    S.res_closed K k ts T _ hK fun i hi => by simp [liftT, hi]]
+
 theorem Shp.of_substT {σ : Atom → Ty} :
     ∀ {t : Ty} {v : Tm}, Shp S true (t.substT σ) v → Shp S true t v
   | .base _, _, h | .adt _, _, h | .rnil, _, h => h
@@ -42,9 +51,9 @@ theorem Shp.of_substT {σ : Atom → Ty} :
   | .tapp f a, _, h => by
     cases h with
     | hidden ho => exact .hidden (Ty.Opaque.of_substT σ ho)
-    | adt hs hU hT =>
+    | adt hs hU hT hB =>
       rcases Ty.hd_of_substT σ hT with h | h
-      · exact .adt hs hU h
+      · exact .adt hs hU h fun K hh => (hB K hh).of_substT
       · exact .hidden h
   | .tvar _, _, _ | .rg _, _, _ | .caps _, _, _ | .row _, _, _ | .arrow .., _, _ | .ref _, _, _
   | .eff .., _, _ | .layer .., _, _ | .errors _, _, _ | .env _, _, _ | .hnd _, _, _

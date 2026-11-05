@@ -179,6 +179,13 @@ theorem PatTy.head_plain {K k ts T us} (hK : S.ctor K = some (k, ts, T)) (hres :
   have h := PatTy.head (S := S) hK (by rw [hres]; exact Sig.inj_plain) hk
   rwa [Sig.ctorTyR_plain hres hk] at h
 
+/-- `K` can build a value of `t = T us`: what it builds unifies with `t` under some
+instance of its variables and of the ones around, regions included. Exhaustiveness
+needs no arm on a constructor that cannot. -/
+def Sig.Builds (S : Sig) (K : Name) (t : Ty) : Prop :=
+  ∀ k ts T us, S.ctor K = some (k, ts, T) → t = Ty.tcon T us → us.length = (S.res K).length →
+    ∃ ρ : Atom → Ty, (Ty.tcon T (S.res K)).substT ρ = (t.up k).substT ρ
+
 /-- Shapes of closed values of a type, as far as patterns see them. The fields of
 a constructor have the types of its declaration: a field of a parameter type is
 opaque. -/
@@ -190,7 +197,8 @@ inductive Shp : Bool → Ty → Tm → Prop
   | head {ts : List Ty} : S.ctor K = some (k, ts, T) →
       Shp false (.arrows ts (.tcon T (S.res K))) (.ctor K)
   | app : Shp false (.arrow a .pure t Caps.none) f → Shp true a e → Shp false t (.app f e)
-  | adt : Shp false U v → U.hd = .adt T → T'.hd = .adt T → Shp true T' v
+  | adt : Shp false U v → U.hd = .adt T → T'.hd = .adt T → (∀ K, v.head = .ctor K → S.Builds K T') →
+      Shp true T' v
 
 /-- `Exh(τ, Π)` of core.md §2.4. -/
 def Exh (t : Ty) (ps : List Pat) : Prop :=

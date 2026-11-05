@@ -16,6 +16,7 @@ import Formal.Held
 import Formal.SubstPat
 import Formal.TySubstBase
 import Formal.TySubst
+import Formal.ArefMgu
 import Formal.RowSubst
 import Formal.SubOk
 import Formal.SubstArm
