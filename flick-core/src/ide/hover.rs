@@ -199,8 +199,6 @@ impl Ide<'_> {
                 "Describes a user interface; building it runs no handler.",
             ),
             K::SqlKw => ("sql { … }", "A typed SQL query."),
-            K::CodecKw => ("codec … { … }", "A codec built field by field."),
-            K::SchemaKw => ("schema …", "The `Schema` of a type that derives it."),
             K::AwaitKw => {
                 let ran = match ty.spine() {
                     (h, args) if h.is_lang(Lang::Eff) && args.len() == 3 => show_type(args[2]),
@@ -275,8 +273,8 @@ impl Ide<'_> {
             }
             "Schema" => {
                 return Some((
-                    format!("schema {name}"),
-                    "Defines the witness `schema T`, the description of the type that \
+                    format!("{name}.schema"),
+                    "Defines the witness `T.schema`, the description of the type that \
                      codecs such as `Codec.json` are built from."
                         .to_owned(),
                 ));

@@ -1,5 +1,5 @@
 /// Schemas: runtime witnesses of the values of a type. `deriving Schema`
-/// writes them from a declaration and `schema T` names them; these
+/// writes them from a declaration and `T.schema` names them; these
 /// combinators build them by hand.
 module Schema exposing (..)
 

@@ -511,9 +511,9 @@ let drawn name witness = Test.property name (Schema.arbitrary witness) (fun v ->
 tests : List Test.Test
 let tests =
   [
-    drawn "items" (schema Item),
-    drawn "trees" (schema Tree),
-    drawn "generated" (Schema.with_generator (Gen.one_of digits) (schema Digit)),
+    drawn "items" Item.schema,
+    drawn "trees" Tree.schema,
+    drawn "generated" (Schema.with_generator (Gen.one_of digits) Digit.schema),
     drawn "secrets" (Schema.redacted Schema.string),
     Test.property "durations" (Schema.arbitrary Schema.duration) (fun _ -> Test.is_true "drawn" true),
   ]

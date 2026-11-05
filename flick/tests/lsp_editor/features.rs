@@ -189,7 +189,7 @@ profile : Atom.Atom (Atom.Async String {NotFound})
 let profile =
   Atom.serializable_result
     (Codec.json Schema.string)
-    (Codec.json (schema NotFound))
+    (Codec.json NotFound.schema)
     (Atom.loader page (fun p -> task {
       match p with
       | Home -> \"home\"

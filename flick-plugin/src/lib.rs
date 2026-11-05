@@ -31,7 +31,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.10.0";
+pub const VERSION: &str = "0.11.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -436,9 +436,10 @@ pub trait Plugin {
         let _ = (block, state, offset);
         Vec::new()
     }
-    /// What an editor shows at `offset` of `block`.
-    fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
-        let _ = (block, state, offset);
+    /// What an editor shows at `offset` of `block`; `facts` are the types
+    /// of the `_` of its code, as `check` gets them, once it checked.
+    fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
+        let _ = (block, state, offset, facts);
         None
     }
     /// How an editor colors the words of `block` that are the plugin's.

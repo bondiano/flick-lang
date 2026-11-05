@@ -219,8 +219,6 @@ pub enum ExprKind {
     Provide(Box<Expr>, Box<Expr>),
     /// A pure function value used where a runtime one is expected.
     Lift(Box<Expr>, Lift),
-    /// A `codec` block: the name it decodes, and each label with its field.
-    CodecBlock(String, Vec<(String, Expr)>),
 }
 
 /// How many arguments `S.op` of `stages` takes before it looks its service
@@ -317,7 +315,7 @@ impl Expr {
                     f(item);
                 }
             }
-            ExprKind::Record(fields) | ExprKind::CodecBlock(_, fields) => {
+            ExprKind::Record(fields) => {
                 for (_, v) in fields {
                     f(v);
                 }
@@ -439,7 +437,7 @@ impl Expr {
                     f(item);
                 }
             }
-            ExprKind::Record(fields) | ExprKind::CodecBlock(_, fields) => {
+            ExprKind::Record(fields) => {
                 for (_, v) in fields {
                     f(v);
                 }

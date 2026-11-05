@@ -35,7 +35,7 @@ arguments, words, names, numbers, strings, paths such as `App.Api.place` and
 | Form | Where | Example |
 | - | - | - |
 | `head args { body }` | an expression | `pairs "a" (1.0 + 2.0) { x = 1.0 }`, `sql p { … }` |
-| `head args` | an expression | `schema Shape`, `server App.Api.place` |
+| `head args` | an expression | `named Shape`, `server App.Api.place` |
 | `head args { body }` | the start of a declaration | `sql table Users "users" { … }` |
 | `head args rest` | the start of a declaration | `server fn ping (n : Int) = n + 1` |
 
@@ -47,8 +47,9 @@ argument, `head migration 1 "init" r#"…"#`, which `flick_plugin::string_value`
 gives the value of.
 
 The compiler comes with the plugin of `std`, whose heads are `cli` (see
-[command-line applications](../cli-dsl/)) and `server` (see
-[server functions](../server-fn/)). `cli "x" { … }`, with its body, and
+[command-line applications](../cli-dsl/)), `server` (see
+[server functions](../server-fn/)) and `codec` (see
+[the codec DSL](../schema/#the-codec-dsl)). `cli "x" { … }`, with its body, and
 `server fn f x = …` or `server f` are blocks even in a file that does not
 import them, so the compiler can say which import they need: `FLICK-P037`,
 whose fix `flick check --fix` applies.
@@ -143,7 +144,7 @@ numbers be finite, holes lie in the body and not overlap, an expression or a
 pattern be used once (a type may stand in several places, as in a signature
 and an annotation), and its size and depth are bounded. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,
-`0.10.0`. A component built for another version does not load: the import
+`0.11.0`. A component built for another version does not load: the import
 that exposes its heads is `FLICK-P035`, naming the version it was built for
 and the one the compiler speaks, until it is rebuilt.
 
@@ -156,7 +157,8 @@ the checker infers, is a fact with the span the plugin gave it, and `check`
 gets them, the type as written (`shown`), qualified with aliases expanded
 (`exact`, none while it has errors or unknowns) and, for a closed record,
 its fields. `check` only adds errors; a block whose code has no `_` is not
-asked.
+asked. An editor's `hover` gets the same facts, so a plugin can show the type
+of what its block names, as `codec` shows a field's over its label.
 
 ```rust
 fn check(&self, block: &Block, _: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {

@@ -433,10 +433,6 @@
     "named": false
   },
   {
-    "type": "codec",
-    "named": false
-  },
-  {
     "type": "constructor",
     "named": true
   },
@@ -568,10 +564,6 @@
   },
   {
     "type": "refined",
-    "named": false
-  },
-  {
-    "type": "schema",
     "named": false
   },
   {

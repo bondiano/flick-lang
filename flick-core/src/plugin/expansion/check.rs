@@ -25,27 +25,7 @@ impl Expansion {
                 continue;
             };
             let (start, end) = block.frame;
-            let facts: Vec<Fact> = (wildcards.iter())
-                .filter(|((s, e), _)| block.code.0 <= *s && *e <= block.code.1)
-                .map(|&((s, e), ref fact)| {
-                    let at = self.place(Span::new(self.file, s, e));
-                    let span = if (at.start, at.end) == block.range {
-                        BlockSpan {
-                            start: 0,
-                            end: end - start,
-                        }
-                    } else {
-                        BlockSpan {
-                            start: at.start.saturating_sub(start),
-                            end: at.end.saturating_sub(start),
-                        }
-                    };
-                    Fact {
-                        span,
-                        ..fact.clone()
-                    }
-                })
-                .collect();
+            let facts = self.facts(start, wildcards);
             if facts.is_empty() {
                 continue;
             }
@@ -67,5 +47,36 @@ impl Expansion {
             }
         }
         out
+    }
+
+    /// The facts of the block whose frame starts at `start`: each `_` of its
+    /// code in `wildcards`, at the span of the block its code gave it, the
+    /// whole block when that is the whole frame.
+    pub fn facts(&self, start: u32, wildcards: &[(Range, Fact)]) -> Vec<Fact> {
+        let Some(block) = self.blocks.iter().find(|b| b.frame.0 == start) else {
+            return Vec::new();
+        };
+        let end = block.frame.1;
+        (wildcards.iter())
+            .filter(|((s, e), _)| block.code.0 <= *s && *e <= block.code.1)
+            .map(|&((s, e), ref fact)| {
+                let at = self.place(Span::new(self.file, s, e));
+                let span = if (at.start, at.end) == block.range {
+                    BlockSpan {
+                        start: 0,
+                        end: end - start,
+                    }
+                } else {
+                    BlockSpan {
+                        start: at.start.saturating_sub(start),
+                        end: at.end.saturating_sub(start),
+                    }
+                };
+                Fact {
+                    span,
+                    ..fact.clone()
+                }
+            })
+            .collect()
     }
 }

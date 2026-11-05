@@ -22,9 +22,9 @@ type error NotFound = NotFound { id : String }
 get_user : HttpApi.Endpoint "get_user" (HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User)
 let get_user =
   HttpApi.endpoint HttpApi.Get "/users/:id" (Record.label : Record.Label "get_user")
-    |> HttpApi.with_path (Codec.json (schema UserPath))
-    |> HttpApi.with_success 200 (Codec.json (schema User))
-    |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json (schema NotFound)))
+    |> HttpApi.with_path (Codec.json UserPath.schema)
+    |> HttpApi.with_success 200 (Codec.json User.schema)
+    |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json NotFound.schema))
 
 api : HttpApi.Api r { users : { get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User } }
 let api =
@@ -70,8 +70,8 @@ let api =
 
 Если вариантов несколько, сервер отвечает на ошибку первым вариантом, кодек
 которого её принимает, поэтому каждый кодек должен знать свои ошибки:
-производный `Codec.json (schema E)` знает, как и `Codec.transform_as
-(schema E)` для своего тела. Это нужно ошибкам с общим телом, как у RealWorld
+производный `Codec.json E.schema` знает, как и `Codec.transform_as
+E.schema` для своего тела. Это нужно ошибкам с общим телом, как у RealWorld
 `{"errors": {…}}`. Кодек простого `Codec.transform` принимает любое значение,
 и эндпоинт с таким вариантом среди других отклоняется при создании: его
 ошибки нельзя различить.
@@ -111,7 +111,7 @@ let me =
   HttpApi.endpoint HttpApi.Get "/me" (Record.label : Record.Label "me")
   |> HttpApi.with_headers credentials
   |> HttpApi.with_success 200 (Codec.json Schema.string)
-  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 401 (Codec.json (schema Unauthorized)))
+  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 401 (Codec.json Unauthorized.schema))
   |> HttpApi.with_auth token Session check
 ```
 

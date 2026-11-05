@@ -1,5 +1,7 @@
 module App.Expressions exposing (numbers, classify)
 
+import Codec exposing (plugin codec)
+
 numbers : List Float
 let numbers = [0, 42, 1_000_000, 1.5, 1e-3, 2E+10, 0x1F, 0o17, 0b1010, -7]
 
@@ -106,15 +108,14 @@ let view props = ui {
 }
 
 json : PureCodec Json Profile
-let json = codec (schema Profile) {
+let json = codec Profile.schema {
   email = field "email" Email.json;
-  nickname =
-    optional_field "nickname" String.json
+  nickname = optional_field "nickname" String.json
     |> on_missing (fun () -> None);
 }
 
 tree : Schema a -> Schema (Tree a)
-let tree item = schema Tree item
+let tree item = Tree.schema item
 
 callback : Ref Float ->{} Float
 let callback counter =

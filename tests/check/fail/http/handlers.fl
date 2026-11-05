@@ -7,7 +7,7 @@ type alias User = { id : String }
 get_user : HttpApi.Endpoint "get_user" (HttpApi.Request Unit Unit Unit Unit ->{r;} User)
 let get_user =
   HttpApi.endpoint HttpApi.Get "/user" (Record.label : Record.Label "get_user")
-    |> HttpApi.with_success 200 (Codec.json (schema User))
+    |> HttpApi.with_success 200 (Codec.json User.schema)
 
 ping : HttpApi.Endpoint "ping" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
 let ping = HttpApi.endpoint HttpApi.Get "/ping" (Record.label : Record.Label "ping")

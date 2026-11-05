@@ -50,7 +50,6 @@ impl Checker<'_> {
                 | K::TryExpr
                 | K::ProvideExpr
                 | K::ScopeExpr
-                | K::CodecExpr
                 | K::SqlExpr
                 | K::TupleExpr
                 | K::ListExpr

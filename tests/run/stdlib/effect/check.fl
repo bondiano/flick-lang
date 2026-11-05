@@ -162,7 +162,7 @@ let main () =
       ++ dec "[1, 2]" (Check.apply Check.unique ints)
       ++ " | "
       ++ dec "[1, 1]" (Check.apply Check.unique ints))
-  let pairs = Codec.json (schema Pair)
+  let pairs = Codec.json Pair.schema
   let keyed = Check.apply Check.unique_keys (Codec.list pairs)
   Platform.stdout_line
     ("unique_keys: "

@@ -2,6 +2,8 @@
 // blocks with their policies.
 module App.Derive exposing (..)
 
+import Codec exposing (plugin codec)
+
 refined type Email = String where Checks.email
   deriving Eq, Hash, Schema
 
@@ -11,7 +13,7 @@ type alias Profile = {
 } deriving Schema
 
 profile_schema : Schema Profile
-let profile_schema = schema Profile
+let profile_schema = Profile.schema
 
 profile_json : PureCodec Json Profile
 let profile_json = codec profile_schema {
@@ -28,10 +30,9 @@ type alias Preferences = {
 } deriving Schema
 
 preferences_json : PureCodec Json Preferences
-let preferences_json = codec (schema Preferences) {
+let preferences_json = codec Preferences.schema {
   nickname = optional_field "nickname" String.json;
-  quota =
-    field "quota" Float.json_finite
+  quota = field "quota" Float.json_finite
     |> on_missing (fun () -> 0);
 }
 
@@ -39,7 +40,7 @@ type Tree a = Leaf a | Branch (List (Tree a))
   deriving Schema
 
 tree_schema : Schema a -> Schema (Tree a)
-let tree_schema item_schema = schema Tree item_schema
+let tree_schema item_schema = Tree.schema item_schema
 
 type alias PairOf f = {
   count : f Float;
@@ -47,19 +48,19 @@ type alias PairOf f = {
 } deriving Schema
 
 pair_of_schema : (forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)
-let pair_of_schema make_schema = schema PairOf make_schema
+let pair_of_schema make_schema = PairOf.schema make_schema
 
 type Phantom a = Phantom Float
   deriving Schema
 
 phantom : Schema (Phantom String)
-let phantom = schema Phantom Schema.string
+let phantom = Phantom.schema Schema.string
 
 type error NotFound = NotFound String
   deriving Schema
 
 not_found : Schema NotFound
-let not_found = schema NotFound
+let not_found = NotFound.schema
 
 checked : Result SchemaError Email
 let checked = Email.parse "ada@example.com"

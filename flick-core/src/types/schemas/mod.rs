@@ -9,7 +9,7 @@ use super::Checker;
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
 
-use crate::iface::{Entity, Namespace};
+use crate::iface::Namespace;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
@@ -99,13 +99,4 @@ impl Checker<'_> {
 /// The name of a companion value of type `ty`: `Email$parse`.
 pub fn companion_name(ty: &str, member: &str) -> String {
     format!("{ty}${member}")
-}
-
-/// The witness of `schema T`, in `T`'s module.
-pub fn witness_entity(module: &str, ty: &str) -> Entity {
-    Entity {
-        module: module.to_owned(),
-        namespace: Namespace::Value,
-        name: companion_name(ty, "schema"),
-    }
 }

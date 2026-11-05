@@ -12,7 +12,7 @@ type error NotFound = NotFound String
   deriving Schema
 
 instance Problem NotFound =
-  let problem = { status = 404; body = Codec.json (schema NotFound) }
+  let problem = { status = 404; body = Codec.json NotFound.schema }
 
 type alias Name = { name : String }
   deriving Schema

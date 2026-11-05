@@ -95,8 +95,6 @@ title: Ключевые слова
 
 | Ключевое слово | Назначение | Пример |
 | - | - | - |
-| `schema` | Возвращает `Schema` типа, для которого она создана через `deriving`: `schema T` | `Codec.json (schema Shape)` |
-| `codec` | Создаёт кодек с описанием отдельных полей | `codec Codec.json { name = … }` |
 | `sql` | Создаёт типизированный SQL-запрос; сочетание `sql table` объявляет таблицу | `sql { from u in Users select u }` |
 | `ui` | Создаёт представление интерфейса | `ui { … }` |
 
@@ -117,7 +115,7 @@ title: Ключевые слова
 | `provide`, `try` | Результат блока и сервисы или ошибки, которые он устраняет |
 | `match`, `if` | `match … with : String` — результат выбранной ветки |
 | `fun` | `fun … -> … : Float -> Float` — тип функции |
-| `sql`, `codec`, `ui`, `schema` | Значение, создаваемое блоком, например `sql { … } : Template Pg {} { label : String }` |
+| `sql`, `ui` | Значение, создаваемое блоком, например `sql { … } : Template Pg {} { label : String }` |
 | `await` | `await … : Float` — результат и запускаемое вычисление `Eff` |
 | `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit` — тип отбрасываемого значения и предупреждение, если это `Eff`, который не будет выполнен |
 

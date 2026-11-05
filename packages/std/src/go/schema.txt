@@ -13,6 +13,9 @@ routePrint RoutePrint
 routeParse *RouteParse
 schemaField SchemaField
 schemaRecordOf SchemaRecordOf
+codecFieldsEmpty CodecFieldsEmpty
+codecField CodecField
+codecRecord CodecRecord
 schemaItem SchemaItem
 schemaTupleOf SchemaTupleOf
 schemaCase SchemaCase

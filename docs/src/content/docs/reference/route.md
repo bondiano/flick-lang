@@ -26,7 +26,7 @@ profile : Atom.Atom (Atom.Async String {NotFound})
 let profile =
   Atom.serializable_result
     (Codec.json Schema.string)
-    (Codec.json (schema NotFound))
+    (Codec.json NotFound.schema)
     (Atom.loader page (fun p -> task {
       match p with
       | User id -> App.Api.user_name id
@@ -77,7 +77,7 @@ UTF-8. `Route.parse Page.url text` gives `Some value`, or `None` when no
 constructor matches or a field fails its type, refined checks included. It
 ignores the origin and the fragment. Printing and parsing round-trip for
 every value whose text is well-formed Unicode: `tests/run/schema/route.fl`
-checks it with `Arbitrary.check` over `schema Page`.
+checks it with `Arbitrary.check` over `Page.schema`.
 
 ## Routes as the paths of an API
 

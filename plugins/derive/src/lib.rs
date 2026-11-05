@@ -5,6 +5,7 @@
 //! and `T$api` with those of `HttpApi`. What they cannot derive is
 //! `std/D001`, `std/D009`, `std/D010` or `std/D011`.
 
+pub mod codec;
 mod endpoint;
 mod form;
 mod http_api;

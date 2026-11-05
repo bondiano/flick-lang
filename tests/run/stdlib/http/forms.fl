@@ -2,6 +2,8 @@
 // parser's helpers, and trace context headers to and from spans.
 module App.Main exposing (main)
 
+import Codec exposing (plugin codec)
+
 type alias Note = { title : String; tag : List String }
   deriving Schema
 
@@ -12,7 +14,7 @@ json_of : PureCodec Json a -> Codec none none Json a
 let json_of c = Codec.general (ignore_extra_fields c)
 
 point : Codec none none Json Point
-let point = Codec.general (Codec.json (schema Point))
+let point = Codec.general (Codec.json Point.schema)
 
 forms : Unit ->{; Http.Multipart.MultipartError, SchemaError} Unit
 let forms () =
@@ -27,7 +29,7 @@ let forms () =
     let note : Note =
       Http.Multipart.schema_persisted
         (json_of
-          (codec (schema Note) {
+          (codec Note.schema {
             title = field "title" String.json;
             tag = field "tag" (Codec.list String.json);
           }))

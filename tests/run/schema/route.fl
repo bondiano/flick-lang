@@ -75,7 +75,7 @@ let main () =
       Arbitrary.check
         checking
         (fun p -> Route.parse Page.url (Route.print Page.url p) == Some p)
-        (Arbitrary.filter encodable (Arbitrary.from_schema (schema Page)))
+        (Arbitrary.filter encodable (Arbitrary.from_schema Page.schema))
     Platform.stdout_line
       ("round trip: " ++ Option.with_default "passed" (Arbitrary.format_check_failure round_trip))
     let sites = [
@@ -101,7 +101,7 @@ let main () =
       Arbitrary.check
         checking
         (fun s -> Route.parse Site.url (Route.print Site.url s) == Some s)
-        (Arbitrary.filter site_encodable (Arbitrary.from_schema (schema Site)))
+        (Arbitrary.filter site_encodable (Arbitrary.from_schema Site.schema))
     Platform.stdout_line
       ("site round trip: "
         ++ Option.with_default "passed" (Arbitrary.format_check_failure site_round_trip))

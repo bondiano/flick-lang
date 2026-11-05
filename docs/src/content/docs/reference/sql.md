@@ -304,7 +304,7 @@ else as text, decoded by `decoder`.
 let count_rows table =
   Sql.unsafe_query
     [Sql.unsafe_text "select count(*)::int as n from ", Sql.ident table]
-    (Codec.json (schema Count))
+    (Codec.json Count.schema)
 ```
 
 Not supported: correlated and `LATERAL` subqueries, recursive

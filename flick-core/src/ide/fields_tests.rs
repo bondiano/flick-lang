@@ -124,8 +124,10 @@ fn a_field_of_a_signature_shows_its_comment() {
 }
 
 #[test]
-fn a_codec_label_shows_its_decoded_field_type() {
+fn a_codec_label_shows_its_field_type() {
     let source = "module App.Main exposing (..)
+
+import Codec exposing (plugin codec)
 
 refined type Email = String where Checks.email
   deriving Schema
@@ -135,11 +137,8 @@ type alias Profile = {
   nickname : Option String;
 } deriving Schema
 
-profile_schema : Schema Profile
-let profile_schema = schema Profile
-
 profile_json : PureCodec Json Profile
-let profile_json = codec profile_schema {
+let profile_json = codec Profile.schema {
   email = field \"email_address\" Email.json;
   nickname = field \"nickname\" (option_as_null String.json);
 }
@@ -154,7 +153,7 @@ let profile_json = codec profile_schema {
             let (shown, range) = ide.hover(file, offset).expect("codec field hover");
             assert_eq!(
                 shown,
-                format!("```flick\n{label} : {ty}\n```\n\nfield of `Profile` from `App.Main`")
+                format!("```flick\n{label} : {ty}\n```\n\nfield of `Profile`")
             );
             assert_eq!(range, (start, end));
         }

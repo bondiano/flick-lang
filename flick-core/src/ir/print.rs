@@ -209,14 +209,6 @@ pub fn expr(e: &Expr) -> String {
             expr(body)
         ),
         ExprKind::Within(owner, e) => format!("(within {owner} {})", expr(e)),
-        ExprKind::CodecBlock(name, fields) => format!(
-            "(codec {name} {})",
-            fields
-                .iter()
-                .map(|(l, v)| format!("{l}={}", expr(v)))
-                .collect::<Vec<_>>()
-                .join(" ")
-        ),
         ExprKind::Provide(l, e) => format!("(provide {} {})", expr(l), expr(e)),
         ExprKind::Lift(e, l) => format!("(lift{} {})", lift(l), expr(e)),
     }

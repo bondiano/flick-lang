@@ -1,4 +1,4 @@
-package flick:plugin@0.10.0;
+package flick:plugin@0.11.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -214,8 +214,9 @@ world plugin {
   export expand: func(block: block, state: list<u8>) -> result<arena, list<diagnostic>>;
   /// What an editor may insert at `offset` of the block.
   export complete: func(block: block, state: list<u8>, offset: u32) -> list<completion>;
-  /// What an editor shows at `offset` of the block.
-  export hover: func(block: block, state: list<u8>, offset: u32) -> option<hover>;
+  /// What an editor shows at `offset` of the block; `facts` are the types
+  /// of the `_` of its code, as `check` gets them, once it checked.
+  export hover: func(block: block, state: list<u8>, offset: u32, facts: list<fact>) -> option<hover>;
   /// How an editor colors the words of the block that are the plugin's.
   export highlight: func(block: block, state: list<u8>) -> list<highlight>;
   /// The layout of the block, the compiler parsing its holes; none keeps it

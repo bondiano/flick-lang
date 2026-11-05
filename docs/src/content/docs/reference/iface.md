@@ -79,7 +79,7 @@ re-exported from `App.Domain`).
 An exported type also exports its companion values as `value` entities named
 `T$member`, which no source name can spell (`T$table` of a `sql table`): `T$schema` of a type deriving
 `Schema`, `T$parse` and `T$value` of a refined type, and `T$json` of a
-refined type with a schema. `schema T` and `T.parse` name them. An export
+refined type with a schema. `T.schema` and `T.parse` name them. An export
 of a declaration of the module has `at`, the UTF-8 byte range of its name in
 `source`. A class's
 `definition` lists in `defaults` the methods with a default definition.

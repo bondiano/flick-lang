@@ -32,8 +32,8 @@ get_user : Rpc.Rpc "get_user" (Float ->{r; NotFound} User)
 let get_user =
   Rpc.make (Record.label : Record.Label "get_user")
     |> Rpc.with_payload (Codec.json Schema.number)
-    |> Rpc.with_success (Codec.json (schema User))
-    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
+    |> Rpc.with_success (Codec.json User.schema)
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json NotFound.schema))
 
 count_to : Rpc.Rpc "count_to" (Float ->{r;} Stream none none Float)
 let count_to =
@@ -269,7 +269,7 @@ me : Rpc.Rpc "me" (Unit ->{Session; Unauthorized} String)
 let me =
   Rpc.make (Record.label : Record.Label "me")
     |> Rpc.with_success (Codec.json Schema.string)
-    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema Unauthorized)))
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json Unauthorized.schema))
     |> Rpc.with_auth Session check
 
 group : Rpc.Group none { me : Unit ->{Session; Unauthorized} String }

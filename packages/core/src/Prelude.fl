@@ -199,7 +199,6 @@ type alias SchemaIssue = { message : String; path : String }
 /// Decoding or encoding failed; the issues name the paths, never the value.
 type error SchemaError = SchemaError (List SchemaIssue)
 
-@lang field_codec
 /// One field of a `codec` block: its wire name, its codec and its policy for
 /// a missing key; decoding it may need the services `rd`.
 type FieldCodec (rd : ServiceRow) a

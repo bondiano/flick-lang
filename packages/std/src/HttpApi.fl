@@ -21,7 +21,7 @@ type alias Request p q h b = { path : p; query : q; headers : h; payload : b }
 type Endpoint (l : Symbol) f
 
 /// The typed errors `e` of an endpoint, each with its status and its JSON
-/// codec: `errors |> error_case 404 (Codec.json (schema NotFound))`.
+/// codec: `errors |> error_case 404 (Codec.json NotFound.schema)`.
 type ErrorCases (e : ErrorRow)
 
 /// An error that carries its own status: sent as `{ message }` with it.
@@ -198,7 +198,7 @@ foreign pure with_errors from "@flick-lang/runtime/effect/http-api/HttpApi" "htt
 
 /// The cases and `HttpError`s of this status, for the document and the client.
 http_error : forall e. Int -> ErrorCases e -> ErrorCases {HttpError | e}
-let http_error status cases = error_case status (Codec.json (schema HttpError)) cases
+let http_error status cases = error_case status (Codec.json HttpError.schema) cases
 
 /// A bearer token in `Authorization`, under the scheme name `name`.
 bearer : String -> Security

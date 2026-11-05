@@ -43,9 +43,10 @@ pub trait Expander: Send + Sync {
         let _ = (block, state, offset);
         Vec::new()
     }
-    /// What an editor shows at `offset` of `block`.
-    fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
-        let _ = (block, state, offset);
+    /// What an editor shows at `offset` of `block`, given `facts`, the
+    /// types of the `_` of its code.
+    fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
+        let _ = (block, state, offset, facts);
         None
     }
     /// How an editor colors the words of `block` that are the plugin's.
@@ -172,8 +173,8 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         self.plugin.complete(block, state, offset)
     }
 
-    fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
-        self.plugin.hover(block, state, offset)
+    fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
+        self.plugin.hover(block, state, offset, facts)
     }
 
     fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {

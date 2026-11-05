@@ -97,8 +97,6 @@ pub struct Typing {
     pub wildcards: Vec<(Range, flick_plugin::Fact)>,
     /// The uses of `wire_codec` an annotation has not given a codec yet.
     pub(super) pending_wire: Vec<(Range, Span)>,
-    /// `codec` blocks: the fields' labels in the order written.
-    pub codecs: HashMap<Range, CodecBlock>,
     #[cfg(feature = "ide")]
     /// The type of each name in an expression or constructor pattern and
     /// of each variable a pattern binds, for editors; at a keyword that opens
@@ -239,13 +237,6 @@ impl Copies {
     }
 }
 
-/// A `codec` block: the name of what it decodes, for issue paths, and its
-/// fields as written.
-#[derive(Debug, Clone, Default)]
-pub struct CodecBlock {
-    pub name: String,
-}
-
 /// How the JS result of a foreign call becomes a Flick value.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct ResultAdapter {
@@ -363,8 +354,6 @@ impl Checker<'_> {
             K::FunExpr => K::FunKw,
             K::UiExpr => K::UiKw,
             K::SqlExpr => K::SqlKw,
-            K::CodecExpr => K::CodecKw,
-            K::SchemaExpr => K::SchemaKw,
             _ => return,
         };
         if let Some(kw) = node.child_tokens().find(|t| t.kind == head) {

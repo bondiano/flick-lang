@@ -19,7 +19,6 @@ mod builtin_sources;
 mod builtins;
 mod calls;
 mod classes;
-mod codecs;
 mod component;
 mod comprehension;
 mod convert;
@@ -52,6 +51,7 @@ mod ranges;
 mod records;
 mod recursion;
 mod redundant;
+mod refined;
 mod regions;
 mod report;
 mod route_template;
@@ -99,14 +99,14 @@ pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use question::Question;
 pub use ranges::range_list;
-pub use schemas::{companion_name, witness_entity};
+pub use schemas::companion_name;
 #[cfg(feature = "ide")]
 pub(crate) use sql::base_type;
 pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
-    CodecBlock, Constructor, Copies, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
-    SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing, default_method, passes_dictionary,
+    Constructor, Copies, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref, SqlColumn,
+    SqlForm, SqlPlan, SqlTable, SqlValue, Typing, default_method, passes_dictionary,
 };
 
 use convert::TyVar;

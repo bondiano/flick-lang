@@ -17,10 +17,10 @@ type Statements = Statements (List Expr)
   deriving Schema
 
 tree_schema : Schema a -> Schema (Tree a)
-let tree_schema item_schema = schema Tree item_schema
+let tree_schema item_schema = Tree.schema item_schema
 
 pair_of_schema : (forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)
-let pair_of_schema make_schema = schema PairOf make_schema
+let pair_of_schema make_schema = PairOf.schema make_schema
 
 round_trip : Schema a -> a -> String
 let round_trip s value =
@@ -48,7 +48,7 @@ let main () =
   Platform.stdout_line (round_trip numbers (Branch [Leaf 1, Branch [Leaf 2, Leaf 3]]))
   let optional = pair_of_schema Schema.option
   Platform.stdout_line (round_trip optional { count = Some 2; label = None })
-  Platform.stdout_line (round_trip (schema Expr) (Neg (Block (Statements [Num 1, Neg (Num 2)]))))
+  Platform.stdout_line (round_trip Expr.schema (Neg (Block (Statements [Num 1, Neg (Num 2)]))))
   Platform.stdout_line
     (decode "{\"_tag\": \"Branch\", \"_0\": [{\"_tag\": \"Leaf\", \"_0\": \"x\"}]}" numbers)
   Platform.stdout_line (decode "{\"_tag\": \"Twig\"}" numbers)

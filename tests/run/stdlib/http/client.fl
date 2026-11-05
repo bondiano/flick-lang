@@ -6,6 +6,7 @@ module App.Main exposing (main)
 import Http.ClientError exposing (HttpClientError)
 import Http.ClientRequest exposing (ClientRequest)
 import Http.ClientResponse exposing (ClientResponse)
+import Codec exposing (plugin codec)
 
 type alias Item = { label : String; size : Float }
   deriving Schema
@@ -17,7 +18,7 @@ ok : Http.ServerResponse.Options
 let ok = Http.ServerResponse.defaults
 
 item_json : PureCodec Json Item
-let item_json = Codec.json (schema Item)
+let item_json = Codec.json Item.schema
 
 item : Codec none none Json Item
 let item = Codec.general item_json
@@ -227,14 +228,13 @@ let responses () =
   forms ()
   let headers_codec =
     Codec.general
-      (ignore_extra_fields
-        (codec (schema Typed) { contentType = field "content-type" String.json }))
+      (ignore_extra_fields (codec Typed.schema { contentType = field "content-type" String.json }))
   Platform.stdout_line
     ("schema_headers: " ++ (show (Http.ClientResponse.schema_headers headers_codec it)))
   let whole =
     Codec.general
       (ignore_extra_fields
-        (codec (schema Whole) {
+        (codec Whole.schema {
           status = field "status" Float.json;
           body = field "body" item_json;
         }))
@@ -243,11 +243,11 @@ let responses () =
       ++ (show
         (Http.ClientResponse.schema_no_body
           (Codec.general
-            (ignore_extra_fields (codec (schema Status) { status = field "status" Float.json })))
+            (ignore_extra_fields (codec Status.schema { status = field "status" Float.json })))
           it)))
   let it2 = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/item")
   Platform.stdout_line ("schema_json: " ++ (show (Http.ClientResponse.schema_json whole it2)))
-  let pairs = Codec.general (Codec.json (schema Pairs))
+  let pairs = Codec.general (Codec.json Pairs.schema)
   let form2 = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/form")
   Platform.stdout_line
     ("schema_body_url_params: " ++ (show (Http.ClientResponse.schema_body_url_params pairs form2)))

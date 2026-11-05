@@ -77,6 +77,22 @@ func CodecBlock(name string, entries []Value) Value {
 	return b
 }
 
+// CodecFieldsEmpty is `Codec.Derive.fields`: no field of a block.
+var CodecFieldsEmpty Value = []Value{}
+
+// CodecField is `Codec.Derive.field label spec rest`: the fields `rest`,
+// then this one, labels and fields in turn as CodecBlock takes them.
+func CodecField(label, spec, rest Value) Value {
+	fields := rest.([]Value)
+	return append(append(make([]Value, 0, len(fields)+2), fields...), label, spec)
+}
+
+// CodecRecord is `Codec.Derive.record name schema fields`: the codec of a
+// `codec` block.
+func CodecRecord(name, _, fields Value) Value {
+	return CodecBlock(name.(string), fields.([]Value))
+}
+
 // CodecIgnoreExtra is the block dropping the keys it does not name; any
 // other codec as it is.
 func CodecIgnoreExtra(c Value) Value {

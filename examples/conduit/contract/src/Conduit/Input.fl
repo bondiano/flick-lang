@@ -6,6 +6,7 @@
 module Conduit.Input exposing (..)
 
 import Conduit.Route exposing (CommentId, Slug, Username)
+import Codec exposing (plugin codec)
 
 /// The fields of a sign-up.
 type alias NewUser = { username : Option String; email : Option String; password : Option String }
@@ -103,7 +104,7 @@ let texts = Codec.list String.json
 
 /// Decodes a sign-up, every field optional.
 new_user : PureCodec Json NewUser
-let new_user = codec (schema NewUser) {
+let new_user = codec NewUser.schema {
   username = optional_field "username" String.json;
   email = optional_field "email" String.json;
   password = optional_field "password" String.json;
@@ -111,14 +112,14 @@ let new_user = codec (schema NewUser) {
 
 /// Decodes a sign-in, every field optional.
 login : PureCodec Json Login
-let login = codec (schema Login) {
+let login = codec Login.schema {
   email = optional_field "email" String.json;
   password = optional_field "password" String.json;
 }
 
 /// Decodes an update: a missing field keeps its value, `null` clears it.
 update_user : PureCodec Json UpdateUser
-let update_user = codec (schema UpdateUser) {
+let update_user = codec UpdateUser.schema {
   email = optional_field "email" (option_as_null String.json);
   username = optional_field "username" (option_as_null String.json);
   password = optional_field "password" (option_as_null String.json);
@@ -128,7 +129,7 @@ let update_user = codec (schema UpdateUser) {
 
 /// Decodes a new article, every field optional.
 new_article : PureCodec Json NewArticle
-let new_article = codec (schema NewArticle) {
+let new_article = codec NewArticle.schema {
   title = optional_field "title" String.json;
   description = optional_field "description" String.json;
   body = optional_field "body" String.json;
@@ -137,7 +138,7 @@ let new_article = codec (schema NewArticle) {
 
 /// Decodes a change of an article: a missing field keeps its value.
 update_article : PureCodec Json UpdateArticle
-let update_article = codec (schema UpdateArticle) {
+let update_article = codec UpdateArticle.schema {
   title = optional_field "title" String.json;
   description = optional_field "description" String.json;
   body = optional_field "body" String.json;
@@ -146,49 +147,49 @@ let update_article = codec (schema UpdateArticle) {
 
 /// Decodes a new comment.
 new_comment : PureCodec Json NewComment
-let new_comment = codec (schema NewComment) {
+let new_comment = codec NewComment.schema {
   body = optional_field "body" String.json;
 }
 
 /// The codec of `NewUserBody`, which `deriving HttpApi` finds by its name.
 new_user_body : PureCodec Json NewUserBody
-let new_user_body = codec (schema NewUserBody) {
+let new_user_body = codec NewUserBody.schema {
   user = field "user" new_user;
 }
 
 /// The codec of `LoginBody`.
 login_body : PureCodec Json LoginBody
-let login_body = codec (schema LoginBody) {
+let login_body = codec LoginBody.schema {
   user = field "user" login;
 }
 
 /// The codec of `UpdateUserBody`.
 update_user_body : PureCodec Json UpdateUserBody
-let update_user_body = codec (schema UpdateUserBody) {
+let update_user_body = codec UpdateUserBody.schema {
   user = field "user" update_user;
 }
 
 /// The codec of `NewArticleBody`.
 new_article_body : PureCodec Json NewArticleBody
-let new_article_body = codec (schema NewArticleBody) {
+let new_article_body = codec NewArticleBody.schema {
   article = field "article" new_article;
 }
 
 /// The codec of `UpdateArticleBody`.
 update_article_body : PureCodec Json UpdateArticleBody
-let update_article_body = codec (schema UpdateArticleBody) {
+let update_article_body = codec UpdateArticleBody.schema {
   article = field "article" update_article;
 }
 
 /// The codec of `NewCommentBody`.
 new_comment_body : PureCodec Json NewCommentBody
-let new_comment_body = codec (schema NewCommentBody) {
+let new_comment_body = codec NewCommentBody.schema {
   comment = field "comment" new_comment;
 }
 
 /// The query of the list, its numbers as text in the URL.
 list_query : PureCodec Json ListQuery
-let list_query = codec (schema ListQuery) {
+let list_query = codec ListQuery.schema {
   tag = optional_field "tag" String.json;
   author = optional_field "author" String.json;
   favorited = optional_field "favorited" String.json;
@@ -198,32 +199,32 @@ let list_query = codec (schema ListQuery) {
 
 /// The query of the feed.
 page : PureCodec Json Page
-let page = codec (schema Page) {
+let page = codec Page.schema {
   limit = optional_field "limit" Codec.number_from_string;
   offset = optional_field "offset" Codec.number_from_string;
 }
 
 /// The `Authorization` header, absent for a visitor.
 credentials : PureCodec Json Credentials
-let credentials = codec (schema Credentials) {
+let credentials = codec Credentials.schema {
   authorization = optional_field "authorization" String.json;
 }
 
 /// The `:username` of a path.
 profile_path : PureCodec Json ProfilePath
-let profile_path = codec (schema ProfilePath) {
+let profile_path = codec ProfilePath.schema {
   username = field "username" Username.json;
 }
 
 /// The `:slug` of a path.
 article_path : PureCodec Json ArticlePath
-let article_path = codec (schema ArticlePath) {
+let article_path = codec ArticlePath.schema {
   slug = field "slug" Slug.json;
 }
 
 /// The `:slug` and `:comment_id` of a path.
 comment_path : PureCodec Json CommentPath
-let comment_path = codec (schema CommentPath) {
+let comment_path = codec CommentPath.schema {
   slug = field "slug" Slug.json;
   comment_id = field "comment_id" CommentId.json;
 }

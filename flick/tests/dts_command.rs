@@ -39,7 +39,7 @@ origin : Point
 let origin = { x = 0; y = 0 }
 
 point_json : PureCodec Json Point
-let point_json = Codec.json (schema Point)
+let point_json = Codec.json Point.schema
 
 identity_of : a -> a
 let identity_of x = x

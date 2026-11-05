@@ -26,7 +26,7 @@ let bytes =
 form : HttpApi.Endpoint "form" (HttpApi.Request Unit Unit Unit Note ->{r;} String)
 let form =
   HttpApi.endpoint HttpApi.Post "/form" (Record.label : Record.Label "form")
-  |> HttpApi.with_multipart_payload (Codec.json (schema Note))
+  |> HttpApi.with_multipart_payload (Codec.json Note.schema)
   |> HttpApi.with_text_success 200
 
 parts : HttpApi.Endpoint "parts" (HttpApi.Request Unit Unit Unit Parts ->{r; MultipartError} String)
@@ -44,7 +44,7 @@ let chunks =
 ticks : HttpApi.Endpoint "ticks" (HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none Tick)
 let ticks =
   HttpApi.endpoint HttpApi.Get "/ticks" (Record.label : Record.Label "ticks")
-  |> HttpApi.with_sse_success 200 (Codec.json (schema Tick))
+  |> HttpApi.with_sse_success 200 (Codec.json Tick.schema)
 
 events :
   HttpApi.Endpoint
@@ -64,7 +64,7 @@ login :
 let login =
   HttpApi.endpoint HttpApi.Post "/login" (Record.label : Record.Label "login")
   |> HttpApi.with_text_success 200
-  |> HttpApi.with_success_headers (Codec.json (schema Count))
+  |> HttpApi.with_success_headers (Codec.json Count.schema)
   |> HttpApi.security_set_cookie session
 
 type alias Handlers r = {

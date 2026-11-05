@@ -26,7 +26,7 @@ me : Rpc.Rpc "me" (Unit ->{Session; Unauthorized} String)
 let me =
   Rpc.make (Record.label : Record.Label "me")
   |> Rpc.with_success (Codec.json Schema.string)
-  |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema Unauthorized)))
+  |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json Unauthorized.schema))
   |> Rpc.with_auth Session check
 
 type alias Handlers = { me : Unit ->{Session; Unauthorized} String }

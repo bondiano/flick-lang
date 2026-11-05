@@ -292,14 +292,6 @@
         },
         {
           "type": "STRING",
-          "value": "schema"
-        },
-        {
-          "type": "STRING",
-          "value": "codec"
-        },
-        {
-          "type": "STRING",
           "value": "sql"
         },
         {

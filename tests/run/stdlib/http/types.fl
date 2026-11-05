@@ -5,6 +5,7 @@ module App.Main exposing (main)
 import Http.Etag exposing (Generator)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
+import Codec exposing (plugin codec)
 
 type alias Note = { title : String; tag : List String }
   deriving Schema
@@ -145,13 +146,13 @@ note : Codec none none Json Note
 let note =
   Codec.general
     (ignore_extra_fields
-      (codec (schema Note) {
+      (codec Note.schema {
         title = field "title" String.json;
         tag = field "tag" (Codec.list String.json);
       }))
 
 point : Codec none none Json Point
-let point = Codec.general (Codec.json (schema Point))
+let point = Codec.general (Codec.json Point.schema)
 
 forms : Unit ->{; Http.Multipart.MultipartError, SchemaError, Http.ServerError.HttpServerError} Unit
 let forms () =
@@ -198,7 +199,7 @@ let main () =
   Http.Headers.with_redacted_names ["x-token"] (task { line "with_redacted_names" "ran" })
   line "show" (show headers)
   let params = Http.UrlParams.make [("token", "t"), ("a", "1")]
-  let a_codec = ignore_extra_fields (codec (schema Theme) { theme = field "a" String.json })
+  let a_codec = ignore_extra_fields (codec Theme.schema { theme = field "a" String.json })
   line
     "params"
     (show (Http.UrlParams.equivalent params params)

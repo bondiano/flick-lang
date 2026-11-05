@@ -19,7 +19,7 @@ say : String ->{} Unit
 let say line = Platform.stdout_line line
 
 item : Codec none none Json Item
-let item = Codec.general (Codec.json (schema Item))
+let item = Codec.general (Codec.json Item.schema)
 
 ok : Http.ServerResponse.Options
 let ok = Http.ServerResponse.defaults

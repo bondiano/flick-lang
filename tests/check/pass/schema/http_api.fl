@@ -15,7 +15,7 @@ type error Gone = Gone
   deriving Schema
 
 instance Problem Gone =
-  let problem = { status = 410; body = Codec.json (schema Gone) }
+  let problem = { status = 410; body = Codec.json Gone.schema }
 
 type alias Profiles = {
   profile : Get "/profiles/:name" { path : Name } (Created Name) {Gone};

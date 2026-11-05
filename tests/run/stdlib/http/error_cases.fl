@@ -4,6 +4,8 @@
 // as the error it was.
 module App.Main exposing (main)
 
+import Codec exposing (plugin codec)
+
 type alias Problems = List (String, List String)
 
 type error Conflict = Conflict Problems
@@ -16,14 +18,14 @@ type alias Body = { errors : Problems }
   deriving Schema
 
 body : PureCodec Json Body
-let body = codec (schema Body) {
+let body = codec Body.schema {
   errors = field "errors" (Codec.entries (Codec.list String.json));
 }
 
 conflict : PureCodec Json Conflict
 let conflict =
   Codec.transform_as
-    (schema Conflict)
+    Conflict.schema
     (fun b -> Conflict b.errors)
     (fun (Conflict p) -> { errors = p })
     body
@@ -31,7 +33,7 @@ let conflict =
 unprocessable : PureCodec Json Unprocessable
 let unprocessable =
   Codec.transform_as
-    (schema Unprocessable)
+    Unprocessable.schema
     (fun b -> Unprocessable b.errors)
     (fun (Unprocessable p) -> { errors = p })
     body
@@ -45,7 +47,7 @@ register :
     (HttpApi.Request Unit Unit Unit Name ->{r; Conflict, Unprocessable} String)
 let register =
   HttpApi.endpoint HttpApi.Post "/users" (Record.label : Record.Label "register")
-  |> HttpApi.with_payload (Codec.json (schema Name))
+  |> HttpApi.with_payload (Codec.json Name.schema)
   |> HttpApi.with_success 201 (Codec.json Schema.string)
   |> HttpApi.with_errors
     (HttpApi.errors |> HttpApi.error_case 409 conflict |> HttpApi.error_case 422 unprocessable)

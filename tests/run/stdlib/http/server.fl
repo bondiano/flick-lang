@@ -26,7 +26,7 @@ ok : Http.ServerResponse.Options
 let ok = Http.ServerResponse.defaults
 
 item : Codec none none Json Item
-let item = Codec.general (Codec.json (schema Item))
+let item = Codec.general (Codec.json Item.schema)
 
 /// A log on stdout, to show what reaches it.
 stdout_log : Layer none none {Log}

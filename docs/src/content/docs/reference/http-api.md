@@ -21,9 +21,9 @@ type error NotFound = NotFound { id : String }
 get_user : HttpApi.Endpoint "get_user" (HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User)
 let get_user =
   HttpApi.endpoint HttpApi.Get "/users/:id" (Record.label : Record.Label "get_user")
-    |> HttpApi.with_path (Codec.json (schema UserPath))
-    |> HttpApi.with_success 200 (Codec.json (schema User))
-    |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json (schema NotFound)))
+    |> HttpApi.with_path (Codec.json UserPath.schema)
+    |> HttpApi.with_success 200 (Codec.json User.schema)
+    |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json NotFound.schema))
 
 api : HttpApi.Api r { users : { get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User } }
 let api =
@@ -64,7 +64,7 @@ with the stream's `MultipartError`, sent with the status it names.
 
 Of several cases, the server answers an error with the first case whose
 codec has it, so each codec must know its errors: a derived `Codec.json
-(schema E)` does, and so does `Codec.transform_as (schema E)` for a body of
+E.schema` does, and so does `Codec.transform_as E.schema` for a body of
 your own. Errors that share a body, as RealWorld's `{"errors": {…}}`, need
 it. A codec of a plain `Codec.transform` takes any value, and an endpoint with
 such a case among others is refused when it is made, as its errors cannot
@@ -104,7 +104,7 @@ let me =
   HttpApi.endpoint HttpApi.Get "/me" (Record.label : Record.Label "me")
   |> HttpApi.with_headers credentials
   |> HttpApi.with_success 200 (Codec.json Schema.string)
-  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 401 (Codec.json (schema Unauthorized)))
+  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 401 (Codec.json Unauthorized.schema))
   |> HttpApi.with_auth token Session check
 ```
 

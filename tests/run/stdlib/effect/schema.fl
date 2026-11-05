@@ -3,6 +3,8 @@
 // decoding and encoding both ways, and the Standard Schema adapter.
 module App.Main exposing (main)
 
+import Codec exposing (plugin codec)
+
 type alias Profile = {
   name : String;
   nick : Option String;
@@ -42,7 +44,7 @@ default_level : Unit ->{; SchemaError} Float
 let default_level () = 3
 
 profile_json : Codec none none Json Profile
-let profile_json = codec (schema Profile) {
+let profile_json = codec Profile.schema {
   name = field "name" String.json;
   nick = field "nick" (option_as_null String.json);
   age = field "age" (option_as_nullish Float.json_finite);
@@ -63,7 +65,7 @@ let main () =
   Platform.stdout_line
     ("result: " ++ dec "{\"err\": \"no\"}" (Codec.json (Schema.result Schema.string Schema.number)))
   Platform.stdout_line
-    ("shape: " ++ dec "{\"_tag\": \"Square\", \"_0\": 2}" (Codec.json (schema Shape)))
+    ("shape: " ++ dec "{\"_tag\": \"Square\", \"_0\": 2}" (Codec.json Shape.schema))
   let never = Codec.json Schema.never
   Platform.stdout_line
     ("never: "
@@ -200,7 +202,7 @@ let main () =
     | SchemaError found -> issues (SchemaError found)
   Platform.stdout_line ("missing name: " ++ missing)
   let schema_text =
-    match Codec.json_schema "Shape" (Codec.json (schema Shape)) with
+    match Codec.json_schema "Shape" (Codec.json Shape.schema) with
     | Ok text -> String.length text > 0
     | Err _ -> false
   Platform.stdout_line ("json_schema: " ++ show schema_text)

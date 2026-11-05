@@ -8,6 +8,7 @@
 module App.Main exposing (main)
 
 import HttpApi.Derive exposing (..)
+import Codec exposing (plugin codec)
 
 type error Unauthorized = Unauthorized String
   deriving Schema
@@ -16,10 +17,10 @@ type error NotFound = NotFound String
   deriving Schema
 
 instance Problem Unauthorized =
-  let problem = { status = 401; body = Codec.json (schema Unauthorized) }
+  let problem = { status = 401; body = Codec.json Unauthorized.schema }
 
 instance Problem NotFound =
-  let problem = { status = 404; body = Codec.json (schema NotFound) }
+  let problem = { status = 404; body = Codec.json NotFound.schema }
 
 /// Who calls, if anyone.
 service Session =
@@ -30,7 +31,7 @@ type alias Credentials = { authorization : Option String }
 
 /// A request without the header is anonymous.
 credentials : PureCodec Json Credentials
-let credentials = codec (schema Credentials) {
+let credentials = codec Credentials.schema {
   authorization = optional_field "authorization" String.json;
 }
 

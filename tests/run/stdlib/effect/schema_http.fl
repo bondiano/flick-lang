@@ -45,7 +45,7 @@ let main () =
       ++ round Http.Url.href "\"https://example.com/a?b=1\"" Http.Codecs.url
       ++ " | "
       ++ round Http.Url.href "\"nope\"" Http.Codecs.url)
-  let query = Codec.string_tree (schema Query)
+  let query = Codec.string_tree Query.schema
   Platform.stdout_line ("string_tree: " ++ round show "{\"name\":\"Ann\",\"age\":\"30\"}" query)
   Platform.stdout_line
     ("from_url_params: "
@@ -60,7 +60,7 @@ let main () =
         (Http.Codecs.json_url_params_field "q" (Codec.list Float.json_finite))
       ++ " | "
       ++ round show "[]" (Http.Codecs.json_url_params_field "q" (Codec.list Float.json_finite)))
-  let tree = Codec.string_tree (schema Tree)
+  let tree = Codec.string_tree Tree.schema
   Platform.stdout_line
     ("from_url_search_params: "
       ++ round show "\"user[name]=Di&tags[]=x&tags[]=y\"" (Http.Codecs.from_url_search_params tree))

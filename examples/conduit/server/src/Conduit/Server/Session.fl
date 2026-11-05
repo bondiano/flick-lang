@@ -36,7 +36,7 @@ type alias Claims = { sub : String; exp : Float }
 
 /// The codec of the claims.
 claims : PureCodec Json Claims
-let claims = Codec.json (schema Claims)
+let claims = Codec.json Claims.schema
 
 /// How long a token holds: 30 days.
 lifetime : Float

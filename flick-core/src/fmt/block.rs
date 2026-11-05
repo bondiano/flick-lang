@@ -32,7 +32,6 @@ pub(super) fn hugs(n: &Node) -> bool {
             | K::ProvideExpr
             | K::DoExpr
             | K::SqlExpr
-            | K::CodecExpr
             | K::FunExpr
     ) || matches!(n.kind, K::ForExpr | K::PluginExpr) && n.has_token(K::LBrace)
 }
@@ -281,22 +280,6 @@ impl<'a> Printer<'a> {
         }
         let inner = a.concat(inner).nest(a, INDENT);
         docvec![a, lbrace, after, inner, a.line(), close].force_break(a)
-    }
-
-    /// `codec head { fields }`.
-    pub fn codec(&mut self, n: &'a Node) -> Doc<'a> {
-        let a = self.a;
-        let Some(at) = node_position(n, K::RecordExpr) else {
-            return self.generic(n);
-        };
-        let head = self
-            .elements(n, &n.children[..at])
-            .next_break_fits(a, NextBreakFitsMode::Disabled);
-        let Element::Node(record) = &n.children[at] else {
-            unreachable!("a node position")
-        };
-        let record = self.record(record, &[]);
-        docvec![a, head, " ", record]
     }
 
     /// `on` after a `join` stays on its line when it fits.

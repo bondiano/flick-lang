@@ -90,8 +90,6 @@ as record labels: `{ echo = … }`.
 
 | Keyword | Meaning | Example |
 | - | - | - |
-| `schema` | the `Schema` of a type that derives it; `schema T` | `Codec.json (schema Shape)` |
-| `codec` | a codec built field by field | `codec Codec.json { name = … }` |
 | `sql` | a typed SQL query, or `sql table` for a table | `sql { from u in Users select u }` |
 | `ui` | a UI block | `ui { … }` |
 
@@ -112,7 +110,7 @@ with what the keyword does:
 | `provide`, `try` | the value of the block, with the services or errors it removes |
 | `match`, `if` | `match … with : String`: the value of the arm or branch taken |
 | `fun` | `fun … -> … : Float -> Float`: the function |
-| `sql`, `codec`, `ui`, `schema` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
+| `sql`, `ui` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
 | `await` | `await … : Float`: the result, with the `Eff` it runs |
 | `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit`: the type of what is discarded, with a warning when it is an `Eff` that is not run |
 

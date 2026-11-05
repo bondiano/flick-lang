@@ -37,7 +37,7 @@ latest : Sql.Query Pg Applied
 let latest =
   Sql.unsafe_query
     [Sql.unsafe_text "select coalesce(max(version), 0)::int as version from flick_migrations"]
-    (Codec.json (schema Applied))
+    (Codec.json Applied.schema)
 
 record : Migration -> Sql.Query Pg Unknown
 let record step =

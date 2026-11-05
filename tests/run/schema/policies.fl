@@ -3,6 +3,8 @@
 // tagged `Option`, a default for a missing key and extra keys.
 module App.Main exposing (main)
 
+import Codec exposing (plugin codec)
+
 type alias Row = {
   required : String;
   nullable : Option String;
@@ -13,7 +15,7 @@ type alias Row = {
 } deriving Schema
 
 row_json : Ref Float -> PureCodec Json Row
-let row_json calls = codec (schema Row) {
+let row_json calls = codec Row.schema {
   required = field "required" String.json;
   nullable = field "nullable" (option_as_null String.json);
   missing = optional_field "missing" String.json;

@@ -5,6 +5,7 @@ module Import exposing (run)
 import JsonText exposing (Value(..))
 import Shape
 import Ts
+import Codec exposing (plugin codec)
 
 type alias Request = { root : String; name : String }
   deriving Schema
@@ -12,7 +13,7 @@ type alias Request = { root : String; name : String }
 request_json : PureCodec Json Request
 let request_json =
   ignore_extra_fields
-    (codec (schema Request) {
+    (codec Request.schema {
       root = field "root" String.json;
       name = field "package" String.json;
     })
