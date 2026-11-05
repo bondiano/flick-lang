@@ -2,6 +2,7 @@
 # before it, and the core modules before all of them.
 
 Platform
+Generic
 App
 Layer
 Fiber

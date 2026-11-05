@@ -280,11 +280,19 @@ impl<'a> Gen<'a> {
             };
             self.emit(call(a, "d.Set", [self.string(name), v]));
         }
+        self.defaults(info);
+    }
+
+    /// The methods `info` takes from its class's defaults, each a lazy entry
+    /// of the dictionary `d`.
+    fn defaults(&mut self, info: &InstanceInfo) {
+        let a = self.a;
         let (module, class) = &info.class;
-        for (name, own) in &info.defaults {
+        for (name, own, extra) in &info.defaults {
             let default = default_method(class, name);
             self.reads(module);
             let mut dicts = vec![self.code("d")];
+            dicts.extend(extra.iter().map(|d| self.dict(d)));
             let value = if *own == 0 {
                 self.global_value(module, &default, dicts)
             } else {

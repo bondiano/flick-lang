@@ -7,6 +7,7 @@
 mod coherence;
 mod declare;
 mod derive;
+mod generic;
 mod matching;
 mod prims;
 mod report;
@@ -130,6 +131,8 @@ pub struct ClassInfo {
     pub fundeps: Vec<Fundep>,
     pub methods: Vec<String>,
     pub defaults: Vec<String>,
+    /// The schemes of the defaults with a signature of their own.
+    pub default_sigs: Vec<(String, Type)>,
 }
 
 /// The field of a dictionary holding the superclass at `index` of `supers`:
@@ -198,6 +201,7 @@ impl Checker<'_> {
                 fundeps,
                 methods,
                 defaults,
+                default_sigs,
                 ..
             } => Some(ClassInfo {
                 params: params.clone(),
@@ -205,6 +209,7 @@ impl Checker<'_> {
                 fundeps: fundeps.clone(),
                 methods: methods.clone(),
                 defaults: defaults.clone(),
+                default_sigs: default_sigs.clone(),
             }),
             _ => None,
         }

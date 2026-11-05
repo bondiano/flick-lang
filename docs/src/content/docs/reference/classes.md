@@ -67,6 +67,26 @@ instance Pretty Float =
   let pretty n = show n
 ```
 
+A default may need more than the class: the class body then repeats the
+method's signature with those constraints before it, a default signature,
+and the default is checked against it. An instance that takes the default
+must satisfy them, for its types (`FLICK-C001` on the instance names the one
+it lacks); one that defines the method needs none of them. The default
+signature has the method's type exactly and constrains only the class's
+parameters and variables of its own, as `rep` in
+`(Generic a rep, GDefault rep) => a`: the method itself may have no
+constraints of its own, and a method has at most one (`FLICK-C010`). A
+default signature without its `let` is `FLICK-C011`.
+
+```flick
+class Describe a =
+  describe : a -> String
+  describe : Show a => a -> String
+  let describe x = "<" ++ show x ++ ">"
+
+instance Describe Float   // takes the default: `Show Float` holds
+```
+
 Instances are canonical. The checker rejects an instance when:
 
 | Rule | Code |
@@ -204,6 +224,56 @@ type Point = Point Float Float
 
 deriving instance Arbitrary (Shapes.Shape)
 ```
+
+`deriving Generic` (module `Generic`) gives a type its representation, so a
+class can be written once for every type over it. The instance is
+`Generic T rep`, with `to_rep : T -> rep` and `from_rep : rep -> T`:
+
+| `T` | `rep` |
+| - | - |
+| `type Shape = Circle Float \| Dot` | `Sum (Con "Circle" (Field "_0" Float, Unit)) (Con "Dot" Unit)` |
+| `type Named = Named { width : Float; label : String }` | `Con "Named" (Field "label" String, (Field "width" Float, Unit))` |
+
+Each constructor is a `Con` of its name holding its fields in pairs ended by
+`Unit`: numbered `_0`, `_1`, … or, when its one field is a record, labelled
+with the record's labels in sorted order, as `Named` shows; several
+are nested `Sum`s (`Inl`, `Inr`) in declaration order. `Con` and `Field` are
+unboxed: the representation costs one `Sum` per constructor but the last
+and a pair per field. A type without constructors has none (`FLICK-C013`).
+
+```flick
+class GCount rep =
+  gcount : rep -> Int
+
+instance GCount Unit =
+  let gcount _ = 0
+
+instance GCount rest => GCount (Field l a, rest) =
+  let gcount (_, rest) = 1 + gcount rest
+
+count : (Generic a rep, GCount rep) => a -> Int
+let count x = gcount (to_rep x)
+```
+
+A class of one parameter with a default for each method is derived too: the
+instance takes every default, requiring the class of each type parameter of
+kind `Type`. A default signature that needs `Generic` gives the type its
+`Generic` instance as well, so a class written once over the representation
+derives for every type:
+
+```flick
+class Default a =
+  default : a
+  default : (Generic a rep, GDefault rep) => a
+  let default = from_rep gdefault
+
+type Pair a = Pair a a
+  deriving Default    // instance Default a => Default (Pair a)
+```
+
+Where a type lacks what a default needs, as a `GDefault` of one of its
+fields, the clause is `FLICK-C013`, as is a class with a method without a
+default or with more than one parameter.
 
 ## Dictionaries
 

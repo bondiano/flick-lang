@@ -145,8 +145,15 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
                 .nodes()
                 .filter(|n| n.kind == K::Members)
                 .flat_map(Node::nodes);
+            let mut declared = Vec::new();
             for sig in methods.filter(|n| decl.kind == K::ClassDecl && n.kind == K::Signature) {
                 let method = sig.child_tokens().find(|t| t.kind == K::Ident);
+                // a repeated signature is the method's default signature
+                let method = method.filter(|t| {
+                    let new = !declared.contains(&t.text(text));
+                    declared.push(t.text(text));
+                    new
+                });
                 defs.extend(method.map(|t| def(Namespace::Value, t, Some(parent), Decl::Method)));
             }
         }

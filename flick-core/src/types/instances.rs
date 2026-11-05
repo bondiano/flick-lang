@@ -6,7 +6,8 @@
 
 use super::Checker;
 use super::bindings::let_parts;
-use super::classes::{Wanted, split};
+use super::class_members::default_signature;
+use super::classes::{ClassInfo, Dict, Outcome, Wanted, split};
 use super::convert::{TyVar, is_type};
 use super::env::Instance;
 use super::passes_dictionary;
@@ -19,13 +20,14 @@ use crate::syntax::kind::SyntaxKind as K;
 
 impl Checker<'_> {
     /// Checks the methods of `instance`; the methods it takes from the
-    /// class's defaults, with how many dictionaries of their own each takes.
+    /// class's defaults, with how many dictionaries of their own each takes
+    /// and those its default signature needs.
     #[allow(clippy::too_many_lines)]
     pub(super) fn instance_methods(
         &mut self,
         decl: &Node,
         instance: &Instance,
-    ) -> Vec<(String, usize)> {
+    ) -> Vec<(String, usize, Vec<Dict>)> {
         let Some(((cm, cn), args)) = split(&instance.head) else {
             return Vec::new();
         };
@@ -113,17 +115,30 @@ impl Checker<'_> {
             .filter(|m| !defined.contains(m) && !info.defaults.contains(m))
             .map(|m| format!("`{m}`"))
             .collect();
-        let defaulted = info
-            .defaults
-            .iter()
+        // a type that derives the class takes every default: at its `deriving`
+        let written = decl.kind == K::InstanceDecl;
+        let head = (decl.nodes())
+            .find(|n| {
+                if written {
+                    is_type(n.kind)
+                } else {
+                    n.kind == K::DerivingClause
+                }
+            })
+            .map_or_else(|| self.span(decl), |h| self.span(h));
+        let defaulted: Vec<String> = (info.defaults.iter())
             .filter(|m| !defined.contains(m))
-            .map(|m| (m.clone(), self.own_dictionaries(&cm, m)))
+            .cloned()
+            .collect();
+        let defaulted = defaulted
+            .into_iter()
+            .map(|m| {
+                let own = self.own_dictionaries(&cm, &m);
+                let extra = self.default_dictionaries(instance, &info, &m, (head, written));
+                (m, own, extra)
+            })
             .collect();
         if !missing.is_empty() {
-            let head = decl
-                .nodes()
-                .find(|n| is_type(n.kind))
-                .map_or_else(|| self.span(decl), |h| self.span(h));
             self.error(
                 codes::C011,
                 head,
@@ -134,6 +149,64 @@ impl Checker<'_> {
         self.classes.givens.truncate(assumed);
         self.tyvars.truncate(mark);
         defaulted
+    }
+
+    /// The dictionaries the default signature of `method` needs beyond the
+    /// class's, for `instance`: its constraints with the instance's types for
+    /// the class's parameters, solved under the instance's context; none
+    /// without a default signature. `written` tells an `instance` from a
+    /// `deriving` at `at`.
+    pub(super) fn default_dictionaries(
+        &mut self,
+        instance: &Instance,
+        info: &ClassInfo,
+        method: &str,
+        (at, written): (Span, bool),
+    ) -> Vec<Dict> {
+        let Some((
+            _,
+            Type::Forall {
+                vars, constraints, ..
+            },
+        )) = info.default_sigs.iter().find(|(m, _)| m == method)
+        else {
+            return Vec::new();
+        };
+        let Some((_, args)) = split(&instance.head) else {
+            return Vec::new();
+        };
+        let mut subst: Vec<(String, Type)> = info
+            .params
+            .iter()
+            .cloned()
+            .zip(args.into_iter().cloned())
+            .collect();
+        for v in vars.iter().skip(info.params.len()) {
+            let fresh = self.fresh();
+            subst.push((v.name.clone(), fresh));
+        }
+        let mut dicts = Vec::new();
+        for c in constraints.iter().skip(1).filter(|c| passes_dictionary(c)) {
+            let wanted = c.substitute(&subst);
+            if let Outcome::Solved(dict) = self.entails(&wanted, &instance.context) {
+                dicts.push(dict);
+                continue;
+            }
+            let shown = self.show(&self.canon(&wanted));
+            let name = &instance.name;
+            if written {
+                let message = format!(
+                    "`{name}` takes `{method}` from its class's default, which needs `{shown}`"
+                );
+                self.error(codes::C001, at, message);
+            } else {
+                let message =
+                    format!("cannot derive `{name}`: the default of `{method}` needs `{shown}`");
+                self.error(codes::C013, at, message);
+            }
+            dicts.push(Dict::Error);
+        }
+        dicts
     }
 
     /// How many dictionaries a class method takes besides its class's.
@@ -154,15 +227,30 @@ impl Checker<'_> {
     }
 
     /// The default definitions in the bodies of the module's classes: each is
-    /// checked against its method's signature, the class constraint given.
+    /// checked against its method's signature, or its default signature, the
+    /// class constraint given.
     pub(super) fn class_defaults(&mut self, decls: &[&Node]) {
         let module = self.env.module.clone();
         for decl in decls.iter().filter(|d| d.kind == K::ClassDecl) {
             let Some(class) = self.con_token(decl) else {
                 continue;
             };
-            let methods = self.class_info(&module, &class).map(|i| i.methods);
-            for (name, member) in super::decls::class_defaults(decl, self.text) {
+            let info = self.class_info(&module, &class);
+            let methods = info.as_ref().map(|i| i.methods.clone());
+            let signed = info.map(|i| i.default_sigs).unwrap_or_default();
+            let defaults = super::class_members::class_defaults(decl, self.text);
+            for (name, _) in signed
+                .iter()
+                .filter(|(m, _)| defaults.iter().all(|(d, _)| d != m))
+            {
+                let at = default_signature(decl, self.text, name);
+                self.error(
+                    codes::C011,
+                    at.map_or_else(|| self.span(decl), |s| self.span(s)),
+                    format!("`{name}` has a default signature but no default: define `let {name} = …` in the class"),
+                );
+            }
+            for (name, member) in defaults {
                 if !methods.as_ref().is_some_and(|m| m.contains(&name)) {
                     self.error(
                         codes::C011,
@@ -176,7 +264,11 @@ impl Checker<'_> {
                     namespace: Namespace::Value,
                     name: name.clone(),
                 };
-                let Some(scheme) = self.env.value(&entity).cloned() else {
+                let own = signed
+                    .iter()
+                    .find(|(m, _)| *m == name)
+                    .map(|(_, t)| t.clone());
+                let Some(scheme) = own.or_else(|| self.env.value(&entity).cloned()) else {
                     continue;
                 };
                 let parts = let_parts(member, self.text);

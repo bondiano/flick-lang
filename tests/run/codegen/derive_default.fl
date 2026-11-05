@@ -1,0 +1,52 @@
+// `deriving` a class whose every method has a default: `Default`, written
+// once over the representation `Generic` gives, for an ADT, a record
+// payload, a sum and a type with a parameter, whose context it requires.
+module App.Main exposing (main)
+
+import Generic exposing (Generic(..), Sum(..), Con(..), Field(..))
+
+/// A value of each type: the first constructor, each field its default.
+class Default a =
+  default : a
+  default : (Generic a rep, GDefault rep) => a
+  let default = from_rep gdefault
+
+class GDefault rep =
+  gdefault : rep
+
+instance GDefault Unit =
+  let gdefault = ()
+
+instance (Default a, GDefault rest) => GDefault (Field l a, rest) =
+  let gdefault = (Field default, gdefault)
+
+instance GDefault fields => GDefault (Con n fields) =
+  let gdefault = Con gdefault
+
+instance GDefault a => GDefault (Sum a b) =
+  let gdefault = Inl gdefault
+
+instance Default Float =
+  let default = 0
+
+instance Default String =
+  let default = "-"
+
+type Point = Point Float Float
+  deriving Default, Show
+
+type Shape = Rect Point Point | Circle Float
+  deriving Default, Show
+
+type Named = Named { width : Float; label : String }
+  deriving Default, Show
+
+type Pair a = Pair a a
+  deriving Default, Show
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (default : Point))
+  Platform.stdout_line (show (default : Shape))
+  Platform.stdout_line (show (default : Named))
+  Platform.stdout_line (show (default : Pair String))

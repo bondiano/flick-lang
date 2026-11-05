@@ -23,3 +23,13 @@ test("an unused `deriving Show, Eq` adds no bytes to the bundle", async () => {
   }
   assert.equal(sizes[1], sizes[0]);
 });
+
+test("`deriving Default` through `Generic` is as small as the instance written by hand", async () => {
+  const sizes = [];
+  for (const name of ["hand", "derived"]) {
+    const out = path.join(repo, "target/tmp/bundle-size/generic-default", name);
+    build(flick, `tools/bundle-size/test/generic-default/${name}.fl`, out, "release");
+    sizes.push((await measure(path.join(out, "flick-main.js"))).min);
+  }
+  assert.equal(sizes[1], sizes[0]);
+});

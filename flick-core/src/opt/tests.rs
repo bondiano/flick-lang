@@ -12,7 +12,7 @@ fn builtin_generic(module: &str, name: &str) -> Option<(Vec<String>, Expr)> {
 }
 
 /// The JS of a self-contained module in the release profile.
-fn release(text: &str) -> String {
+pub(super) fn release(text: &str) -> String {
     release_with(text, &|_, _| None)
 }
 

@@ -7,7 +7,7 @@ use std::ptr;
 
 use super::declare::Declared;
 use super::solve::Outcome;
-use super::{Dict, STRUCTURAL, has_metas, which};
+use super::{Dict, STRUCTURAL, has_metas, split, which};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::iface::{Entity, Namespace};
 use crate::syntax::cst::Node;
@@ -60,7 +60,18 @@ impl<'n> Checker<'_> {
             })
             .collect();
         let mut out = Vec::new();
+        // the instance `Generic` of the type, once: named, or for a default
+        let mut generic = (classes.iter()).any(|(m, c)| lang::is(Lang::Generic, m, c));
         for (class_module, class) in classes {
+            if lang::is(Lang::Generic, &class_module, &class) {
+                out.extend(self.generic_instance(decl, &name, &params, span));
+                continue;
+            }
+            let structural = which(&STRUCTURAL, &class_module, &class).is_some();
+            if !structural && !generic && self.defaults_need_generic(&class_module, &class) {
+                generic = true;
+                out.extend(self.generic_instance(decl, &name, &params, span));
+            }
             if which(&[Lang::Hash, Lang::Ord], &class_module, &class).is_some() && !has_eq {
                 self.error(
                     codes::C013,
@@ -96,11 +107,23 @@ impl<'n> Checker<'_> {
                     decl,
                     span,
                     instance,
-                    fields: Some(fields.clone()),
+                    // a class of defaults takes them, as an instance without methods
+                    fields: structural.then(|| fields.clone()),
+                    generic: None,
                 });
             }
         }
         out
+    }
+
+    /// Whether a default signature of the class needs `Generic`.
+    fn defaults_need_generic(&self, module: &str, class: &str) -> bool {
+        let generic = |c: &Type| split(c).is_some_and(|((m, n), _)| lang::is(Lang::Generic, m, n));
+        self.class_info(module, class).is_some_and(|info| {
+            (info.default_sigs.iter()).any(|(_, t)| {
+                matches!(t, Type::Forall { constraints, .. } if constraints.iter().any(generic))
+            })
+        })
     }
 
     /// The types of the fields of a declaration, which derived instances
@@ -180,14 +203,17 @@ impl<'n> Checker<'_> {
                 // witnesses, not classes: see `types::schemas`
                 Some((module, _))
                     if which(&[Lang::Schema, Lang::Url, Lang::Form], &module, last).is_some() => {}
+                Some((module, _)) if lang::is(Lang::Generic, &module, last) => {
+                    out.push((module, (*last).to_owned()));
+                }
+                Some((module, def)) if of_defaults(&def.form) => {
+                    out.push((module, (*last).to_owned()));
+                }
                 None => {}
-                Some(_) => self.error(
-                    codes::C013,
-                    self.span(clause),
-                    format!(
-                        "the class `{last}` has no derive: deriving covers `Eq`, `Ord`, `Hash`, `Show` and the classes marked `@derive`"
-                    ),
-                ),
+                Some((_, def)) => {
+                    let message = underivable(last, &def.form);
+                    self.error(codes::C013, self.span(clause), message);
+                }
             }
         }
         out
@@ -247,4 +273,30 @@ impl<'n> Checker<'_> {
         }
         dicts
     }
+}
+
+/// Whether a class is derived by its defaults: of one parameter, with a
+/// default for each method.
+fn of_defaults(form: &Form) -> bool {
+    matches!(form, Form::Class { params, methods, defaults, derive: false, .. }
+        if params.len() == 1 && methods.iter().all(|m| defaults.contains(m)))
+}
+
+/// Why `deriving` gives no instance of the class `name`.
+fn underivable(name: &str, form: &Form) -> String {
+    let why = match form {
+        Form::Class { params, .. } if params.len() != 1 => {
+            "it has more than one parameter, and a derived class has one".to_owned()
+        }
+        Form::Class {
+            methods, defaults, ..
+        } => {
+            let abstract_ = methods.iter().find(|m| !defaults.contains(m));
+            format!("`{}` has no default", abstract_.map_or("", String::as_str))
+        }
+        _ => "it is no class".to_owned(),
+    };
+    format!(
+        "the class `{name}` has no derive: {why}; deriving covers `Eq`, `Ord`, `Hash`, `Show`, `Generic`, the classes marked `@derive` and those of one parameter with a default for each method"
+    )
 }

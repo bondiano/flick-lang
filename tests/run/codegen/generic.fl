@@ -1,0 +1,49 @@
+// `deriving Generic`: a type's value as a sum of products and back, and a
+// class written once over the representation, `GCount`, the fields of a
+// value.
+module App.Main exposing (main)
+
+import Generic exposing (Generic(..), Sum(..), Con(..), Field(..))
+
+type Shape = Circle Float | Rect Float Float | Dot
+  deriving Generic, Show, Eq
+
+type Named = Named { width : Float; label : String }
+  deriving Generic, Show
+
+type error Missing = Missing String
+  deriving Generic, Show
+
+/// How many fields a representation holds.
+class GCount rep =
+  gcount : rep -> Int
+
+instance GCount Unit =
+  let gcount _ = 0
+
+instance GCount rest => GCount (Field l a, rest) =
+  let gcount (_, rest) = 1 + gcount rest
+
+instance GCount fields => GCount (Con n fields) =
+  let gcount (Con fields) = gcount fields
+
+instance (GCount a, GCount b) => GCount (Sum a b) =
+  let gcount s =
+    match s with
+    | Inl a -> gcount a
+    | Inr b -> gcount b
+
+/// The fields of any value whose type derives `Generic`.
+count : (Generic a rep, GCount rep) => a -> Int
+let count x = gcount (to_rep x)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (List.map count [Circle 1, Rect 2 3, Dot]))
+  Platform.stdout_line
+    (show (List.map (fun s -> (from_rep (to_rep s) : Shape) == s) [Circle 1, Rect 2 3, Dot]))
+  Platform.stdout_line (show (from_rep (to_rep (Named { width = 2; label = "w" })) : Named))
+  Platform.stdout_line (show (count (Named { width = 2; label = "w" })))
+  let Con (Field label, (Field width, ())) = to_rep (Named { width = 2; label = "w" })
+  Platform.stdout_line (label ++ " " ++ show width)
+  Platform.stdout_line (show (from_rep (to_rep (Missing "key")) : Missing))

@@ -1,0 +1,6 @@
+[1, 2, 0]
+[true, true, true]
+Named { label = "w", width = 2 }
+2
+w 2
+Missing "key"

@@ -77,6 +77,10 @@ impl Walker<'_> {
             }
             K::NameExpr | K::ConPat => self.reference(node, Namespace::Constructor),
             K::NameType => self.reference(node, Namespace::Type),
+            K::DerivingClause => {
+                self.deriving(node);
+                return;
+            }
             K::LetDecl => {
                 // a top-level or member `let`: its names are not locals
                 self.let_decl(node);
@@ -248,6 +252,29 @@ impl Walker<'_> {
 
     /// `name`, `Con`, `M.name`, `M.N.Con`; a lowercase type name is a type
     /// variable and refers to nothing.
+    /// The classes a `deriving` clause names, each a path between commas.
+    fn deriving(&mut self, clause: &Node) {
+        let tokens: Vec<_> = (clause.child_tokens())
+            .filter(|t| matches!(t.kind, K::Con | K::Comma))
+            .collect();
+        for path in tokens.split(|t| t.kind == K::Comma) {
+            let (Some(first), Some(last)) = (path.first(), path.last()) else {
+                continue;
+            };
+            let parts: Vec<&str> = path.iter().map(|t| t.text(self.text)).collect();
+            let Some((&name, qualifier)) = parts.split_last() else {
+                continue;
+            };
+            self.out.push(Reference {
+                namespace: Namespace::Type,
+                qualifier: (!qualifier.is_empty()).then(|| qualifier.join(".")),
+                name: name.to_owned(),
+                span: Span::new(self.file, first.start, last.end),
+                top: self.top,
+            });
+        }
+    }
+
     fn reference(&mut self, node: &Node, con_namespace: Namespace) {
         let tokens: Vec<_> = node
             .child_tokens()

@@ -8,7 +8,7 @@ References are as in `core.md`. Checker paths are relative to `flick-core/src/ty
 
 Elaborated here:
 
-- classes with one or several parameters, superclasses, functional dependencies, default methods;
+- classes with one or several parameters, superclasses, functional dependencies, default methods and their default signatures;
 - instances with a context, and `deriving`;
 - constraints in signatures, in annotations and in higher-rank parameters;
 - `do` with `<-`, `and`, an `if` guard and `let`;
@@ -232,8 +232,9 @@ The model requires `δ̄` to be fresh. For strings this means that the givens in
 instance Q̄ ⇒ C τ̄ = let m₁ = e₁ … let mₙ = eₙ,      β̄ = ftv(τ̄)
 Γ, β̄; δ̄ : Q̄ ⊢ eⱼ : ⟦…⟧ ⇝ eⱼ'        against method_type: the scheme of mⱼ with ᾱ := τ̄, without C τ̄
 δ̄ : Q̄ ⊩ Sᵢ ῡᵢ[ᾱ := τ̄] ⇝ sᵢ            for each superclass
+δ̄ : Q̄ ⊩ Q̄ₖ[ᾱ := τ̄, γ̄ₖ := σ̄ₖ] ⇝ d̄ₖ    for each default taken and some σ̄ₖ, Q̄ₖ the constraints of its default signature
 ────────────────────────────────────────────────────────────────── (Instance)
-I = λδ̄. { $slotᵢ = sᵢ, mⱼ = eⱼ', mₖ = default_C_mₖ (I δ̄) … }   : ∀β̄. D_{Q̄} →P D_{C τ̄}
+I = λδ̄. { $slotᵢ = sᵢ, mⱼ = eⱼ', mₖ = default_C_mₖ (I δ̄) d̄ₖ … }   : ∀β̄. D_{Q̄} →P D_{C τ̄}
 ```
 
 Checker:
@@ -244,9 +245,11 @@ Checker:
 
 Defaults:
 
-- `class_defaults` checks the body of a default as a function with the given `C ᾱ`;
-- in the IR it is the value `$default_C_m` (`typing.rs` `default_method`, `ir/lower/mod.rs`), whose first parameter is the class dictionary;
-- an instance that does not define the method refers to it lazily (`get m(){ return $default_C_m(this, …) }`).
+- `class_defaults` checks the body of a default as a function with the given `C ᾱ`, and with those of its default signature when the class body repeats the method's signature with constraints `Q̄ₖ` before it: `default_C_m : ∀ᾱ β̄ γ̄. (C ᾱ, Q̄ₖ) ⇒ τ`, where the method is `∀ᾱ β̄. C ᾱ ⇒ τ` (`class_members.rs`; `Q̄ₖ` mentions no variable of `β̄`, and a method with constraints of its own has no default signature, `FLICK-C010`);
+- in the IR it is the value `$default_C_m` (`typing.rs` `default_method`, `ir/lower/mod.rs`), whose first parameter is the class dictionary and the next ones those of `Q̄ₖ`;
+- an instance that does not define the method derives `d̄ₖ` under its context (`instances.rs` `default_dictionaries`, `FLICK-C001` on the instance when one does not hold) and refers to the default lazily (`get m(){ return $default_C_m(this, d̄ₖ, …) }`).
+
+`formal/Formal/Elab/Defaults.lean` proves the field typed: `this_ent` derives `I δ̄` from the context, and `T6a_default_instance` gives `default_C_m (I δ̄) d̄ₖ` the method's type at the instance. Since `d̄ₖ` are derivations like any other, T6(b) covers them as it is.
 
 A `deriving` instance is the same (Instance), with methods the runtime builds from the field dictionaries (`InstanceInfo.derived`).
 

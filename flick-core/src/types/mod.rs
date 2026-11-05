@@ -18,6 +18,7 @@ mod bindings;
 mod builtin_sources;
 mod builtins;
 mod calls;
+mod class_members;
 mod classes;
 mod component;
 mod comprehension;
@@ -83,13 +84,13 @@ pub use builtins::{
     StdPackage, builtin_sources, builtins, check_each, has_std, install_builtins, is_std_module,
     set_std, std_go_bindings,
 };
+pub use class_members::class_defaults;
 pub use classes::{Dict, STRUCTURAL, which};
 #[cfg(feature = "ide")]
 pub(crate) use classes::{Match, match_type};
 pub use component::{instance_key as component_instance, parts as component_parts};
 pub use comprehension::{comprehension, for_parts};
 pub use convert::is_type;
-pub use decls::class_defaults;
 pub use display::show_type;
 pub use do_notation::{bind_key, guard_key};
 pub use effects::NO_EFFECTS;
@@ -105,8 +106,8 @@ pub(crate) use sql::base_type;
 pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
-    Constructor, Copies, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref, SqlColumn,
-    SqlForm, SqlPlan, SqlTable, SqlValue, Typing, default_method, passes_dictionary,
+    Constructor, Copies, ForeignInfo, GenericInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
+    SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing, default_method, passes_dictionary,
 };
 
 use convert::TyVar;

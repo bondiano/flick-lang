@@ -92,8 +92,14 @@ impl Decls {
                             params,
                             supers,
                             methods,
+                            default_sigs,
                             ..
                         } => {
+                            for (m, t) in default_sigs {
+                                let default =
+                                    Path::new(&path.module, &default_method(&path.name, m));
+                                self.values.insert(default, scheme(t));
+                            }
                             let class = Class {
                                 params: params.iter().map(|p| Name::from(p.as_str())).collect(),
                                 supers: supers.iter().map(constraint).collect(),
@@ -121,13 +127,14 @@ impl Decls {
     }
 
     /// The arities of the constructors, and the scheme of each method's
-    /// default, which is the method's own; once every module is added.
+    /// default without a signature of its own, which is the method's; once
+    /// every module is added.
     pub fn finish(&mut self) {
         for (c, class) in &self.classes {
             for m in &class.methods {
                 if let Some(s) = self.values.get(&Path::new(&c.module, m)).cloned() {
                     let default = Path::new(&c.module, &default_method(&c.name, m));
-                    self.values.insert(default, s);
+                    self.values.entry(default).or_insert(s);
                 }
             }
         }

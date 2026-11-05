@@ -305,7 +305,7 @@ Here repeated runs return the one captured cell. The type `a` is tied to the arg
 
 ## Deriving and class laws
 
-`deriving Eq, Ord, Hash, Show` creates class instances (`Hash` and `Ord` only together with `Eq`); `deriving Schema` creates a runtime witness of the data. Deriving Schema covers records, ADTs, tuples, generics, recursive types and refinements; it does not declare a type class of the same name. The contract is in [Schema and standard data types](../07-schema/).
+`deriving Eq, Ord, Hash, Show` creates class instances (`Hash` and `Ord` only together with `Eq`); `deriving Generic` gives a type its representation as a sum of products, and `deriving C` of a class of one parameter with a default for each method an instance that takes them, so a class written once over `Generic` derives for every type; `deriving Schema` creates a runtime witness of the data. Deriving Schema covers records, ADTs, tuples, generics, recursive types and refinements; it does not declare a type class of the same name. The contract is in [Schema and standard data types](../07-schema/).
 
 Checking an instance confirms its type but does not prove the class laws. Derived `Eq`, `Ord` and `Hash` use the same fields. User-written implementations require separate law checks; serialization and storage format are specified by an explicit codec, not by a single global instance.
 

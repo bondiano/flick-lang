@@ -36,7 +36,8 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
 - **T6, the elaboration** (`Formal/Elab/`): `T6a` (`Elab/T6a.lean`), an elaborated term is
-  typed in the target, and `T6b` (`Elab/Coherence.lean`), two elaborations that differ only
+  typed in the target, with `T6a_default_instance` (`Elab/Defaults.lean`) for what an instance
+  takes from a default, its default signature's dictionaries derived under its context, and `T6b` (`Elab/Coherence.lean`), two elaborations that differ only
   in the derivations of their dictionaries give the same result. Both are stated for an
   abstract target and instantiated on the core with regions and dictionary records as
   `T6a_core` (`Elab/CoreT6a.lean`) and `T6b_core` (`Elab/CoreRun.lean`), the latter with the

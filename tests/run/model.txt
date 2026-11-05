@@ -14,7 +14,9 @@ codegen/services
 codegen/service_dictionary
 codegen/higher_rank
 codegen/functor
+codegen/generic
 codegen/defaults
+codegen/default_signatures
 codegen/exports
 codegen/numbers
 codegen/do_notation

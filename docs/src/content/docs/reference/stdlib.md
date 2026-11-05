@@ -37,6 +37,7 @@ and `Monad`.
 | `Seq` | lazy sequences that start over on each iteration: infinite `from`, `iterate`, `repeat`, `cycle`, `unfold`; `range`, `map`, `filter`, `flat_map`, `take`, `take_while`, `drop`, `zip`, `enumerate`, `scan`, `chunks`, `windows`, `find`, `first`, `to_list`, `fold`, `each_effect`; a `Monad` for `do`; `Stream.from_seq` streams one |
 | `Option`, `Result` | `map`, `bind`, `with_default` and conversions |
 | `Monoids` | `Sum` and `Product` of numbers, `First` and `Last` of an `Option`, `Min` and `Max` by `Ord`: `fold_map Sum xs` says how numbers combine |
+| `Generic` | `Generic a rep` with `to_rep` and `from_rep`, which `deriving Generic` gives a type, and its representation `Sum`, `Con`, `Field` (see [Deriving](../classes/#deriving)) |
 | `Validation` | `Validation e a`, a `Result` whose `map2` combines the errors of both with their `Semigroup`: an `and` group of `do` reports every error; `valid`, `invalid`, `from_result`, `to_result` |
 | `Form` | forms of a record type that derives `Form`: `draft`, `input`, `validate`, `report` (see [Forms](../form/)) |
 | `Route` | URLs of a type that derives `Url`: `print` and `parse`; `Atom.route` holds the current page (see [Routes](../route/)) |

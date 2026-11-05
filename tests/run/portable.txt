@@ -12,6 +12,8 @@ codegen/classes
 codegen/closures
 codegen/deep_recursion
 codegen/defaults
+codegen/derive_default
+codegen/default_signatures
 codegen/defect
 codegen/do_notation
 codegen/errors
@@ -19,6 +21,7 @@ codegen/eval_order
 codegen/exports
 codegen/for_comprehension
 codegen/functor
+codegen/generic
 codegen/given_shadow
 codegen/fusion
 codegen/higher_rank

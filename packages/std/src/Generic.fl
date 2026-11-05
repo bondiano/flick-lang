@@ -1,0 +1,29 @@
+/// The representation of a type as a sum of products: `deriving Generic`
+/// gives `T` the instance `Generic T rep`, and a class whose default needs
+/// `Generic a rep` is written once over `rep` for every type.
+///
+/// Each constructor is a `Con` named after it holding its fields in pairs,
+/// `(Field "_0" a, (Field "_1" b, Unit))`, ended by `Unit`; the fields of a
+/// constructor whose one field is a record are its labels, sorted. Several
+/// constructors are nested `Sum`s, `Sum (Con "A" …) (Sum (Con "B" …) …)`, in
+/// the order of their declaration. `Con` and `Field` are their contents at
+/// run time.
+module Generic exposing (Generic(..), Sum(..), Con(..), Field(..))
+
+@lang generic
+/// `to_rep` and `from_rep` convert between a type and its representation.
+class Generic a rep | a -> rep =
+  to_rep : a -> rep
+  from_rep : rep -> a
+
+@lang generic_sum
+/// One of two constructors: the first, or one of the rest.
+type Sum a b = Inl a | Inr b
+
+@lang generic_con
+/// A constructor, by its name, and its fields.
+unboxed type Con (name : Symbol) fields = Con fields
+
+@lang generic_field
+/// A field, by its label, and its value.
+unboxed type Field (label : Symbol) a = Field a

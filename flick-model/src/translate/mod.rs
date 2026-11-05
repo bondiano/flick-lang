@@ -133,10 +133,11 @@ impl Tr {
             fields.push((format!("${class}").into(), dict(d)));
         }
         let (class_module, class) = &info.class;
-        for (method, own) in &info.defaults {
+        for (method, own, extra) in &info.defaults {
             let default = Term::Global(Path::new(class_module, &default_method(class, method)));
-            let call = Term::app(default, this.clone());
-            // shortcut: a default without dictionaries of its own is taken to be a function; eta-expanded so the dictionary is not built while it is built
+            // after the class's dictionary, those its default signature needs
+            let call = Term::apps(Term::app(default, this.clone()), extra.iter().map(dict));
+            // shortcut: a default without dictionaries of its own is taken to be a function, a value default too; eta-expanded so the dictionary is not built while it is built
             let field = if *own == 0 {
                 let x = self.fresh("x");
                 Term::lam(&x, Term::app(call, Term::Var(x.clone())))

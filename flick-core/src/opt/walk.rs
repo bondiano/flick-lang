@@ -4,8 +4,9 @@
 
 use std::collections::HashMap;
 
-use crate::ir::{BinOp, Expr, ExprKind, Pat, Stmt};
+use crate::ir::{BinOp, Expr, ExprKind, Pat, Stage, Stmt};
 use crate::numeric::{Arith, Num};
+use crate::types::Constructor;
 
 /// How often `e` reads the local `name`.
 pub fn uses(e: &Expr, name: &str) -> usize {
@@ -133,8 +134,32 @@ pub fn droppable(e: &Expr) -> bool {
         ExprKind::Record(fields) => fields.iter().all(|(_, v)| droppable(v)),
         ExprKind::Field(inner, _) | ExprKind::Not(inner) | ExprKind::Neg(_, inner) => droppable(inner),
         ExprKind::Binary(op, l, r) => total(*op) && droppable(l) && droppable(r),
+        // a constructor applied builds a value, and throws nothing
+        ExprKind::App { .. } => applied(e).is_some_and(|(_, args)| args.into_iter().all(droppable)),
         _ => false,
     }
+}
+
+/// `C a b` as the constructor and its arguments, in order: pure stages
+/// applied left to right.
+pub fn applied(e: &Expr) -> Option<(&Constructor, Vec<&Expr>)> {
+    let mut args = Vec::new();
+    let mut head = e;
+    while let ExprKind::App {
+        func,
+        arg,
+        stage: Stage::Pure,
+        arg_first: false,
+    } = &head.kind
+    {
+        args.push(&**arg);
+        head = func;
+    }
+    let ExprKind::Con(c) = &head.kind else {
+        return None;
+    };
+    args.reverse();
+    Some((c, args))
 }
 
 /// Whether an operator never throws, whatever its well-typed operands: a

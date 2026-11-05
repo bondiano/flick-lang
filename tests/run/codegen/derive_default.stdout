@@ -1,0 +1,4 @@
+Point 0 0
+Rect (Point 0 0) (Point 0 0)
+Named { label = "-", width = 0 }
+Pair "-" "-"
