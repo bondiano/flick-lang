@@ -38,6 +38,8 @@ change needs.
 | [Libraries are compiled from sources](#libraries-are-compiled-from-sources) | no | `FLICK-R003` |
 | [Instances belong to one package](#instances-belong-to-one-package) | no | `FLICK-C006` |
 | [Plugins reach only what is granted](#plugins-reach-only-what-is-granted) | no | `FLICK-P038`, `FLICK-P039` |
+| [`LogLevel` is an enum](#loglevel-is-an-enum) | no | `FLICK-T001` |
+| [Plugins speak interface 0.13](#plugins-speak-interface-013) | no | `FLICK-P035` |
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
@@ -246,6 +248,31 @@ snapshot answers is `FLICK-P039`. The plugin of `std` reaches nothing
 outside, so a project that uses only `std` grants nothing. See
 [Reaching outside](../../reference/plugins/#reaching-outside).
 
+## `LogLevel` is an enum
+
+Enums are new in 0.2: `untagged type Method = Get = "GET" | Post = "POST"`
+is a type whose values are their literals (see
+[Code generation](../../reference/codegen/)). `LogLevel` is one, its
+constructors declared from least to most severe:
+
+| 0.1.0 | 0.2 |
+| - | - |
+| `LogLevel.all`, `trace`, `debug`, `info`, `warn`, `error`, `fatal` | `LogLevel.All`, `Trace`, `Debug`, `Info`, `Warn`, `Error`, `Fatal` |
+| `LogLevel.none_` | `LogLevel.Off`, whose literal is Effect's `"None"` |
+| `LogLevel.values` | `LogLevel.all`, in order of severity |
+| `LogLevel.name level` | `LogLevel.value level` |
+| `LogLevel.get_ordinal a < LogLevel.get_ordinal b` | `compare a b`, the derived `Ord` |
+
+`show` of a level gives its constructor, `Off` where 0.1.0 printed `None`.
+Each old name is `FLICK-T001`; replace it by hand.
+
+## Plugins speak interface 0.13
+
+A derive of an enum gets the literals of its constructors, and a plugin's
+`check` the base type of an enum: the interface of plugins is `0.13.0`. A
+component built for `0.12.0` no longer loads, `FLICK-P035` names both
+versions; rebuild it against the new `flick-plugin`.
+
 ## Rust 1.95 builds the compiler
 
 A checkout of `main` builds with Rust 1.95 (0.1.0 took 1.94); its
@@ -257,7 +284,6 @@ Cargo feature is gone: every build has the plugin of `std`.
 These changes are planned and not done yet; each gets a section here when it
 lands:
 
-- enums whose values have a literal representation;
 - `CallSite` in place of the `_at` variants of functions, such as
   `Atom.set_at`;
 - `sql` blocks as a plugin of `std`, as `cli` and `codec` are now;
