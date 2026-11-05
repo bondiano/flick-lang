@@ -73,10 +73,12 @@ impl Plugin for Std {
         }
     }
 
-    fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
-        cli(block)
-            .then(|| Cli.hover(block, state, offset))
-            .flatten()
+    fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
+        match block.head.as_str() {
+            "codec" => codec::hover(block, offset, facts),
+            "server" => None,
+            _ => Cli.hover(block, state, offset, facts),
+        }
     }
 
     fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {

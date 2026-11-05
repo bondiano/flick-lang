@@ -42,7 +42,12 @@ impl Ide<'_> {
     /// What the plugin of the block at `offset` shows there, and its range.
     pub(super) fn plugin_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
         let b = self.editor_block(file, offset)?;
-        let hover = b.plugin.hover(&b.block, &b.state, offset - b.start)?;
+        let m = self.module(file)?;
+        let facts =
+            (m.expansion.as_ref()).map_or_else(Vec::new, |e| e.facts(b.start, &m.typing.wildcards));
+        let hover = b
+            .plugin
+            .hover(&b.block, &b.state, offset - b.start, &facts)?;
         let len = u32::try_from(b.block.text.len()).ok()?;
         // a plugin's span outside its block is none
         (hover.span.start <= hover.span.end && hover.span.end <= len).then(|| {

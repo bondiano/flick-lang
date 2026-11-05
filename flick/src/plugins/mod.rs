@@ -91,8 +91,8 @@ impl Expander for Traced {
         self.inner.complete(block, state, offset)
     }
 
-    fn hover(&self, block: &Block, state: &[u8], offset: u32) -> Option<Hover> {
-        self.inner.hover(block, state, offset)
+    fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
+        self.inner.hover(block, state, offset, facts)
     }
 
     fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {

@@ -13,7 +13,8 @@ mod read;
 mod shape;
 
 use flick_plugin::{
-    Arena, Block, Compiler, Completion, DeriveTarget, Diagnostic, Highlight, Hover, Piece, Plugin,
+    Arena, Block, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
+    Plugin,
 };
 
 pub struct Cli;
@@ -42,7 +43,7 @@ impl Plugin for Cli {
         editor::complete(block, offset)
     }
 
-    fn hover(&self, block: &Block, _: &[u8], offset: u32) -> Option<Hover> {
+    fn hover(&self, block: &Block, _: &[u8], offset: u32, _: &[Fact]) -> Option<Hover> {
         editor::hover(block, offset)
     }
 

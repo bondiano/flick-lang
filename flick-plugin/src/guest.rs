@@ -98,8 +98,10 @@ pub fn hover(
     block: types::Block,
     state: &[u8],
     offset: u32,
+    facts: Vec<types::Fact>,
 ) -> Option<types::Hover> {
-    (plugin.hover(&convert::from_block(block), state, offset)).map(convert::to_hover)
+    let facts: Vec<_> = facts.into_iter().map(convert::from_fact).collect();
+    (plugin.hover(&convert::from_block(block), state, offset, &facts)).map(convert::to_hover)
 }
 
 #[doc(hidden)]
@@ -190,8 +192,9 @@ macro_rules! export {
                 block: $crate::guest::bindings::flick::plugin::types::Block,
                 state: ::std::vec::Vec<u8>,
                 offset: u32,
+                facts: ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Fact>,
             ) -> ::std::option::Option<$crate::guest::bindings::flick::plugin::types::Hover> {
-                $crate::guest::hover(&$plugin, block, &state, offset)
+                $crate::guest::hover(&$plugin, block, &state, offset, facts)
             }
 
             fn highlight(

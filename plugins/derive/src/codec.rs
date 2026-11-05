@@ -5,8 +5,8 @@
 //! `_` of that code ask the checker, and `check` reads.
 
 use flick_plugin::{
-    Arena, Block, Builder, Compiler, Diagnostic, Expr, Fact, Hole, HoleKind, NodeId, Piece, Span,
-    Token, TokenKind, Ty as Type, string_value,
+    Arena, Block, Builder, Compiler, Diagnostic, Expr, Fact, Hole, HoleKind, Hover, NodeId, Piece,
+    Span, Token, TokenKind, Ty as Type, string_value,
 };
 
 use crate::schema::{call, name};
@@ -150,6 +150,30 @@ pub fn check(block: &Block, facts: &[Fact]) -> Vec<Diagnostic> {
     out
 }
 
+/// Over a field's label: the type of the record's field, from the facts of
+/// the block's code, as a field of a record shows.
+pub fn hover(block: &Block, offset: u32, facts: &[Fact]) -> Option<Hover> {
+    let schema = schema_span(block)?;
+    let fields = facts.iter().find(|f| f.span == schema)?.fields.as_ref()?;
+    let label = (block.tokens.iter())
+        .find(|t| t.kind == TokenKind::Ident && t.span.start <= offset && offset <= t.span.end)?;
+    // a label is what a field's `_` stands at
+    facts.iter().find(|f| f.span.start == label.span.start)?;
+    let name = block.text_of(label.span);
+    let field = fields.iter().find(|f| f.label == name)?;
+    let owner = type_name(block);
+    let of = if owner.is_empty() {
+        String::new()
+    } else {
+        format!("\n\nfield of `{owner}`")
+    };
+    let markdown = format!("```flick\n{name} : {}\n```{of}", field.ty.shown);
+    Some(Hover {
+        markdown,
+        span: label.span,
+    })
+}
+
 /// The layout of the block: the schema and `{`, then a field a line, one
 /// level in, each `label = codec;`; a block written on one line stays on
 /// one, `{ a = c; b = d }`. None when it does not read.
@@ -195,7 +219,8 @@ fn schema_span(block: &Block) -> Option<Span> {
 }
 
 /// The name of the type whose schema the block names, `Profile` of
-/// `Profile.schema` or `schema Profile`, for what its codec reports.
+/// `Profile.schema` (or `schema Profile`, as it was written), for what its
+/// codec reports.
 fn type_name(block: &Block) -> String {
     let words: Vec<(&str, TokenKind)> = (block.arguments().iter())
         .map(|t| (block.text_of(t.span), t.kind))

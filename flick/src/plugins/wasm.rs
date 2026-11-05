@@ -276,10 +276,12 @@ impl Expander for Wasm {
         block: &flick_plugin::Block,
         state: &[u8],
         offset: u32,
+        facts: &[flick_plugin::Fact],
     ) -> Option<flick_plugin::Hover> {
         let block = convert::to_block(block);
+        let facts: Vec<_> = facts.iter().map(convert::to_fact).collect();
         let (result, _) = self.run(BlockSource::default(), |plugin, store| {
-            plugin.call_hover(store, &block, state, offset)
+            plugin.call_hover(store, &block, state, offset, &facts)
         });
         result.ok().flatten().map(convert::from_hover)
     }
