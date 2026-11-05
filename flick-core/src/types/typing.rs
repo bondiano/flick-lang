@@ -291,6 +291,22 @@ pub struct InstanceInfo {
     /// of their own each takes, and the dictionaries its default signature
     /// needs, which it takes after the class's.
     pub defaults: Vec<(String, usize, Vec<Dict>)>,
+    /// For `deriving Generic`: what its methods convert, which lowering
+    /// writes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generic: Option<GenericInfo>,
+}
+
+/// The constructors of a type that derives `Generic`, each with the labels
+/// of its one record field when it has one, and the constructors of the
+/// representation: `Inl` and `Inr` of `Sum`, `Con` and `Field`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenericInfo {
+    pub cases: Vec<(Constructor, Option<Vec<String>>)>,
+    pub inl: Constructor,
+    pub inr: Constructor,
+    pub con: Constructor,
+    pub field: Constructor,
 }
 
 /// The top-level value a class's default definition of `method` compiles

@@ -225,6 +225,35 @@ type Point = Point Float Float
 deriving instance Arbitrary (Shapes.Shape)
 ```
 
+`deriving Generic` (module `Generic`) gives a type its representation, so a
+class can be written once for every type over it. The instance is
+`Generic T rep`, with `to_rep : T -> rep` and `from_rep : rep -> T`:
+
+| `T` | `rep` |
+| - | - |
+| `type Shape = Circle Float \| Dot` | `Sum (Con "Circle" (Field "_0" Float, Unit)) (Con "Dot" Unit)` |
+| `type Named = Named { width : Float; label : String }` | `Con "Named" (Field "label" String, (Field "width" Float, Unit))` |
+
+Each constructor is a `Con` of its name holding its fields in pairs ended by
+`Unit`, numbered or, for one record field, labelled in sorted order; several
+are nested `Sum`s (`Inl`, `Inr`) in declaration order. `Con` and `Field` are
+unboxed: the representation costs one `Sum` per constructor but the last
+and a pair per field. A type without constructors has none (`FLICK-C013`).
+
+```flick
+class GCount rep =
+  gcount : rep -> Int
+
+instance GCount Unit =
+  let gcount _ = 0
+
+instance GCount rest => GCount (Field l a, rest) =
+  let gcount (_, rest) = 1 + gcount rest
+
+count : (Generic a rep, GCount rep) => a -> Int
+let count x = gcount (to_rep x)
+```
+
 ## Dictionaries
 
 Each solved constraint records its dictionary at the place that required it:

@@ -18,7 +18,7 @@ use crate::types::env::Instance;
 use crate::types::kinds::Kind;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Binder, Type};
-use crate::types::typing::range;
+use crate::types::typing::{GenericInfo, range};
 use crate::types::{Checker, Constructor, Form, InstanceInfo, env, passes_dictionary};
 
 /// An instance this module declares, written or derived.
@@ -28,6 +28,8 @@ pub struct Declared<'n> {
     pub instance: Instance,
     /// For a derived instance, the field types its class must cover.
     pub fields: Option<Vec<Type>>,
+    /// For `deriving Generic`, what its methods convert.
+    pub generic: Option<GenericInfo>,
 }
 
 impl<'n> Checker<'_> {
@@ -100,6 +102,7 @@ impl<'n> Checker<'_> {
                                 span,
                                 instance,
                                 fields: None,
+                                generic: None,
                             });
                         }
                     }
@@ -437,6 +440,8 @@ impl<'n> Checker<'_> {
             }
             let (derived, defaults) = if let Some(fields) = &d.fields {
                 (Some(self.derived_fields(d, fields)), Vec::new())
+            } else if d.generic.is_some() {
+                (None, Vec::new())
             } else {
                 (None, self.instance_methods(d.decl, &d.instance))
             };
@@ -490,6 +495,7 @@ impl Checker<'_> {
             supers,
             derived,
             defaults,
+            generic: d.generic.clone(),
         };
         self.typing.instances.push(info);
     }

@@ -9,6 +9,7 @@ mod comprehension;
 mod debug;
 mod do_notation;
 mod expr;
+mod generic;
 mod lambda;
 mod literals;
 mod numeric;
@@ -60,16 +61,17 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         items.push(lower.migrations(&migrations, span));
     }
     for info in &typing.instances {
-        let methods = match &info.derived {
-            Some(_) => Vec::new(),
-            None => module
+        let span = Span::new(module.file, info.span.0, info.span.1);
+        let methods = match (&info.derived, &info.generic) {
+            (Some(_), _) => Vec::new(),
+            (None, Some(generic)) => generic::methods(generic, span),
+            (None, None) => module
                 .tree
                 .nodes()
                 .find(|n| n.kind == K::InstanceDecl && n.range() == info.span)
                 .map(|decl| lower.methods(decl))
                 .unwrap_or_default(),
         };
-        let span = Span::new(module.file, info.span.0, info.span.1);
         items.push(Item {
             kind: ItemKind::Instance {
                 info: Box::new(info.clone()),

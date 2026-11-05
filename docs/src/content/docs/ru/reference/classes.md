@@ -247,6 +247,36 @@ type Point = Point Float Float
 deriving instance Arbitrary (Shapes.Shape)
 ```
 
+`deriving Generic` (модуль `Generic`) даёт типу его представление, и класс
+можно написать один раз для всех типов через него. Экземпляр —
+`Generic T rep` с `to_rep : T -> rep` и `from_rep : rep -> T`:
+
+| `T` | `rep` |
+| - | - |
+| `type Shape = Circle Float \| Dot` | `Sum (Con "Circle" (Field "_0" Float, Unit)) (Con "Dot" Unit)` |
+| `type Named = Named { width : Float; label : String }` | `Con "Named" (Field "label" String, (Field "width" Float, Unit))` |
+
+Каждый конструктор — `Con` с его именем, внутри поля парами с `Unit` в
+конце: пронумерованные или, если поле одно и это запись, подписанные её
+метками по порядку. Несколько конструкторов — вложенные `Sum` (`Inl`,
+`Inr`) в порядке объявления. `Con` и `Field` — unboxed: представление
+стоит одного `Sum` на каждый конструктор, кроме последнего, и пары на поле.
+У типа без конструкторов представления нет (`FLICK-C013`).
+
+```flick
+class GCount rep =
+  gcount : rep -> Int
+
+instance GCount Unit =
+  let gcount _ = 0
+
+instance GCount rest => GCount (Field l a, rest) =
+  let gcount (_, rest) = 1 + gcount rest
+
+count : (Generic a rep, GCount rep) => a -> Int
+let count x = gcount (to_rep x)
+```
+
 ## Словари
 
 Для каждого разрешённого ограничения компилятор сохраняет словарь в том

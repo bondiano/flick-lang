@@ -151,6 +151,11 @@ lang_items! {
     FloatInfinity = "float_infinity",
     FloatNan = "float_nan",
     LayerMerge = "layer_merge",
+    // the class `deriving Generic` gives an instance of, and its representation
+    Generic = "generic",
+    GenericSum = "generic_sum",
+    GenericCon = "generic_con",
+    GenericField = "generic_field",
     TodoAt = "todo_at",
     EchoAt = "echo_at",
     AssertAt = "assert_at",

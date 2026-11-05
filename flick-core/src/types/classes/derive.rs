@@ -61,6 +61,10 @@ impl<'n> Checker<'_> {
             .collect();
         let mut out = Vec::new();
         for (class_module, class) in classes {
+            if lang::is(Lang::Generic, &class_module, &class) {
+                out.extend(self.generic_instance(decl, &name, &params, span));
+                continue;
+            }
             if which(&[Lang::Hash, Lang::Ord], &class_module, &class).is_some() && !has_eq {
                 self.error(
                     codes::C013,
@@ -97,6 +101,7 @@ impl<'n> Checker<'_> {
                     span,
                     instance,
                     fields: Some(fields.clone()),
+                    generic: None,
                 });
             }
         }
@@ -180,12 +185,15 @@ impl<'n> Checker<'_> {
                 // witnesses, not classes: see `types::schemas`
                 Some((module, _))
                     if which(&[Lang::Schema, Lang::Url, Lang::Form], &module, last).is_some() => {}
+                Some((module, _)) if lang::is(Lang::Generic, &module, last) => {
+                    out.push((module, (*last).to_owned()));
+                }
                 None => {}
                 Some(_) => self.error(
                     codes::C013,
                     self.span(clause),
                     format!(
-                        "the class `{last}` has no derive: deriving covers `Eq`, `Ord`, `Hash`, `Show` and the classes marked `@derive`"
+                        "the class `{last}` has no derive: deriving covers `Eq`, `Ord`, `Hash`, `Show`, `Generic` and the classes marked `@derive`"
                     ),
                 ),
             }

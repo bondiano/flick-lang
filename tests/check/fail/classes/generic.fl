@@ -1,0 +1,15 @@
+// `deriving Generic` represents a type by its constructors: an abstract
+// type has none, and a transparent alias has a form of its own.
+module App.Generic exposing (..)
+
+import Generic exposing (Generic)
+
+type Handle
+  deriving Generic
+
+type alias Pair = { left : Float; right : Float }
+  deriving Generic
+
+
+//~ FLICK-C013 @8:3-8:19 `Handle` has no definition to derive instances from
+//~ FLICK-C013 @11:3-11:19 `Pair` is a transparent alias: its form already has the structural instances, so there is nothing to derive

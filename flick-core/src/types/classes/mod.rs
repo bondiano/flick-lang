@@ -7,6 +7,7 @@
 mod coherence;
 mod declare;
 mod derive;
+mod generic;
 mod matching;
 mod prims;
 mod report;
