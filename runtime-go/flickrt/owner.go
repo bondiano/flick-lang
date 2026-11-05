@@ -219,12 +219,16 @@ func (o *Owner) closeFinalizers(fb *Fiber, exit *Cause) (cause *Cause) {
 	for c := range o.children {
 		children = append(children, c)
 	}
-	o.mu.Unlock()
+	// traced under the lock a child ends under, so a child that ends meanwhile
+	// is either not taken or ends after its interrupt
 	o.tracePhase("C2")
-	for _, c := range children {
-		if tracing && o.trace != 0 {
+	if tracing && o.trace != 0 {
+		for _, c := range children {
 			traceEvent("interrupt", "o", o.trace, "f", traceChild(c))
 		}
+	}
+	o.mu.Unlock()
+	for _, c := range children {
 		c.state.interrupt(fb.state.id)
 	}
 	suspended(fb.state)
