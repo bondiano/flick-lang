@@ -89,8 +89,9 @@ if (Number(repeat) > 0) {
   }
   for (const [label, ms] of Object.entries(samples)) {
     ms.sort((a, b) => a - b);
-    const at = (q) => ms[Math.min(ms.length - 1, Math.floor(q * ms.length))].toFixed(1);
-    console.log(`${`${label}, ${ms.length} samples`.padEnd(32)} p50 ${at(0.5).padStart(6)} ms  p95 ${at(0.95).padStart(6)} ms`);
+    // nearest rank: the smallest sample with at least `percent` of them at or below it
+    const at = (percent) => ms[Math.ceil((percent * ms.length) / 100) - 1].toFixed(1);
+    console.log(`${`${label}, ${ms.length} samples`.padEnd(32)} p50 ${at(50).padStart(6)} ms  p95 ${at(95).padStart(6)} ms`);
   }
 }
 server.kill();
