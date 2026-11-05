@@ -36,7 +36,7 @@ def Frame.dom (F : Frame) : Row
   | .nm N => (F.lookup N).isSome
   | .atm a => ∃ p, F = .inside p ∧ a = .r p
   | .ob N a => (F.lookup N).isSome ∨ ∃ p, F = .inside p ∧ a = .r p
-  | .need _ a => ∃ p, F = .inside p ∧ a = .r p
+  | .need _ a | .obv _ a => ∃ p, F = .inside p ∧ a = .r p
   | .rv _ => False
 
 /-- Services the frames of `E` provide. -/

@@ -95,6 +95,9 @@ theorem Ty.asRow_row (r : Row) : (Ty.row r).asRow = r.plain := rfl
 @[simp] theorem Ty.asRow_need (t : Ty) (N : Name) (a : Atom) : ¬ t.asRow (.need N a) := by
   cases t <;> simp [Ty.asRow, Row.plain, Row.ofCaps]
 
+@[simp] theorem Ty.asRow_obv (t : Ty) (v a : Atom) : ¬ t.asRow (.obv v a) := by
+  cases t <;> simp [Ty.asRow, Row.plain, Row.ofCaps]
+
 /-- What a type stands for in a row commutes with substitution. -/
 theorem Ty.asRow_substT (σ : Atom → Ty) (t : Ty) : (t.substT σ).asRow = t.asRow.substT σ := by
   have hc : ∀ t' : Ty, t'.asRow = Row.ofCaps t'.reach → (t'.substT σ).asRow = Row.ofCaps (t'.substT σ).reach →
@@ -130,7 +133,7 @@ theorem Row.substT_comp (r : Row) (σ σ' : Atom → Ty) :
     (r.substT σ).substT σ' = r.substT fun a => (σ a).substT σ' := by
   funext x; apply propext
   cases x with
-  | ob _ a | need _ a =>
+  | need _ a =>
     simp only [Row.substT, Ty.reach_substT]
     constructor
     · rintro ⟨b, ⟨c, hc, hb⟩, h⟩; exact ⟨c, hc, b, hb, h⟩
@@ -176,8 +179,8 @@ theorem Row.Sub.substT {r r' : Row} (σ : Atom → Ty) (h : Row.Sub r r') :
     Row.Sub (r.substT σ) (r'.substT σ) := by
   intro x hx
   cases x with
-  | ob _ a | need _ a => obtain ⟨b, hb, h'⟩ := hx; exact ⟨b, h _ hb, h'⟩
-  | nm | atm | rv =>
+  | need _ a => obtain ⟨b, hb, h'⟩ := hx; exact ⟨b, h _ hb, h'⟩
+  | nm | atm | rv | ob | obv =>
     simp only [Row.substT] at hx ⊢
     grind [Row.Sub]
 
@@ -347,23 +350,20 @@ theorem Row.Named.substT_nm {r : Row} (h : r.Named) (σ : Atom → Ty) (N : Name
 theorem Row.Named.substT {r : Row} (h : r.Named) (σ : Atom → Ty) : (r.substT σ).Named := by
   rintro a ⟨b, hb, _⟩; exact h b hb
 
-theorem Row.obs_substT (σ : Atom → Ty) {r : Row} (s : Ty) (hr : r.Named) :
+theorem Row.obs_substT (σ : Atom → Ty) (r : Row) (s : Ty) :
     (r.obs s).substT σ = (r.substT σ).obs (s.substT σ) := by
   funext x; apply propext
   cases x with
-  | ob n a =>
-    have := hr.substT_nm σ n; simp only [Row.substT] at this
-    simp only [Row.substT, Row.obs, Ty.reach_substT, this]
-    constructor
-    · rintro ⟨b, ⟨h₁, h₂⟩, h₃⟩; exact ⟨h₁, b, h₂, h₃⟩
-    · rintro ⟨h₁, b, h₂, h₃⟩; exact ⟨b, ⟨h₁, h₂⟩, h₃⟩
+  | ob | obv =>
+    simp only [Row.substT, Row.obs, Ty.reach_substT]
+    grind
   | _ => simp [Row.substT, Row.obs]
 
 theorem Const.ty_substT (S : Sig) {Θ : Facts} (c : Const) (ι : CArg) (σ : Atom → Ty)
     (hc : c.ok Θ ι) : (c.ty S ι).substT σ = c.ty S (ι.substT σ) := by
   cases c
   case addFin | spawn =>
-    simp [Const.ty, Ty.substT, Stage.substT, CArg.substT, Ty.reach_caps, Row.obs_substT σ _ hc.2.2]
+    simp [Const.ty, Ty.substT, Stage.substT, CArg.substT, Ty.reach_caps, Row.obs_substT σ]
   all_goals simp [Const.ty, Ty.substT, Stage.substT, S.impl_closed, CArg.substT]
 
 end Flick

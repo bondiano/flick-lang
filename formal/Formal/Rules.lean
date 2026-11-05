@@ -37,10 +37,19 @@ def Row.withP (Θ : Facts) (q : Nat) (ρ r : Row) : Row
   | .ob N a => (ρ (.nm N) → Outl Θ (· = .r q) a.ty) ∧ (¬ ρ (.nm N) → r (.ob N a))
   | x => r x
 
+/-- No obligation of the stage `φ₀` of a `provide` body is about a service its outputs
+`o` may give (regions.md §2.7, first case, rejected): a named obligation needs `o` without
+row variables and without its service, one over a row variable needs `o` without services. -/
+def Stage.ObOut (φ₀ : Stage) (o : Row) : Prop :=
+  (∀ N a, φ₀.svc (.ob N a) → o.Named ∧ ¬ o (.nm N)) ∧
+  ∀ v a, φ₀.svc (.obv v a) → o.Named ∧ ∀ N, ¬ o (.nm N)
+
 /-- The obligations `Provided {N} a` that the end of the region `a` discharges: `N` comes
-from outside the region, whose provider outlives it (regions.md §2.7, second case). -/
+from outside the region, whose provider outlives it (regions.md §2.7, second case); and so
+does `Provided v a` for a row variable `v` of the row outside. -/
 def Row.disch (a : Atom) (r : Row) : Row
   | .ob N b => b = a ∧ r (.nm N)
+  | .obv v b => b = a ∧ r (.rv v)
   | _ => False
 
 /-- The uses of the services of the `provide` region `a`. -/
@@ -117,7 +126,8 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | tryP : Typ Ψ Θ Γ e (.ex t .pure) → Typ Ψ Θ Γ A (.halts Row.none H t φ) →
       Typ Ψ Θ Γ (.try_ e A) (.ex t φ)
   | handle : Value v → Typ Ψ Θ Γ v (.ex (.errors ε₀) .pure) → Typ Ψ Θ Γ A (.halts ε₀ H t φ) →
-      HCov S v H ε' → (∀ x, ε₀ x → (∃ N, x = .nm N) ∨ ε' x) → (Stage.rt Row.none ε').le φ →
+      HCov S v H ε' → (∀ x, ε₀ x → (∃ N, x = .nm N) ∨ Row.union H ε' x) →
+      (Stage.rt Row.none ε').le φ →
       Typ Ψ Θ Γ (.handle v A) (.ex t φ)
   | hnil : (∀ n, ¬ H n) → Typ Ψ Θ Γ .anil (.halts ε₀ H t φ)
   | hcons : HPat S ε₀ p θ Δ → Typ Ψ Θ (Δ.map .mono ++ Γ) b (.ex t φ) →
@@ -127,10 +137,10 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ (Δ.map .mono ++ Γ) b (.ex t φ) → Typ Ψ Θ Γ r (.halts ε₀ H' t φ) → Row.Sub H H' →
       Typ Ψ Θ Γ (.aguard p g b r) (.halts ε₀ H t φ)
   | provideL : Typ Ψ Θ Γ l (.ex (.layer i ε₂ o) φ) → Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.union o r) ε) → (o.Named ∧ ∀ N a, φ₀.svc (.ob N a) → ¬ o (.nm N)) →
+      φ₀.le (.rt (Row.union o r) ε) → φ₀.ObOut o →
       (Stage.rt (Row.union i r) (Row.union ε₂ ε)).le φ → Typ Ψ Θ Γ (.provide l e) (.ex t φ)
   | provideE : Typ Ψ Θ Γ l (.ex (.env o) φ) → Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.union o r) ε) → (o.Named ∧ ∀ N a, φ₀.svc (.ob N a) → ¬ o (.nm N)) →
+      φ₀.le (.rt (Row.union o r) ε) → φ₀.ObOut o →
       (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.provide l e) (.ex t φ)
   | with_ : Value θ → Typ Ψ Θ Γ θ (.ex (.env ρ) .pure) → Typ Ψ Θ Γ e (.ex t φ₀) →
       φ₀.le (.rt (Row.withP Θ q ρ r) ε) → (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.with_ q θ e) (.ex t φ)

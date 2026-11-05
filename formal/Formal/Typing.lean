@@ -127,10 +127,12 @@ inductive HPat (εb : Row) : Pat → Ty → List Ty → Prop
   | var : HPat εb .var (.errors εb) [.errors εb]
   | ctor : PatTy S false p (.adt T) Δ → HPat εb p (.adt T) Δ
 
-/-- The errors an arm without `when` removes: the set `H` of (Try). -/
+/-- The errors an arm without `when` removes: the set `H` of (Try). An `x` or `_` arm
+removes all of `ε_b`, its row variables and atoms too; a constructor arm the name of its
+error type. -/
 def Catches (εb : Row) (p : Pat) (θ : Ty) : Elem → Prop
   | .nm n => (θ = .errors εb ∧ εb n) ∨ (θ = .adt n ∧ Exh S (.adt n) [p])
-  | _ => False
+  | x => θ = .errors εb ∧ εb x
 
 /-- The error type of the raised value `v` is removed by the arms or let
 through: the value form of `ε_b ⊆ H + ε'`. -/

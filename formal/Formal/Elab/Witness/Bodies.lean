@@ -6,7 +6,7 @@ import Formal.Elab.Witness.Real
 Each body is typed by the rules of the core at the translation of its scheme in `Sugar`, in
 the empty context. `OptQ` is eager: `flat_map k x` matches `x` and copies the result of `k`
 into the row of the result, as the `CRow` argument is invariant. The lists `Seq` and `ListQ`
-are in `Seq.lean`, `unc n`, `from_result_n` and `eq` in `Unc.lean`.
+are in `Seq.lean`, `unc n`, `from_result` and `eq` in `Unc.lean`.
 -/
 
 namespace Flick.Elab.Witness

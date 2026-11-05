@@ -22,8 +22,7 @@ arguments it holds reach (`elaboration.md`, Prelude schemes).
 The schemes of the Prelude names are generated from the checker (`PreludeSchemes`, `just
 formal-schemes`). `bindTy`, `map2Ty` and `eachSch` are their forms the proofs use; the witness
 holds them to the generated ones by `rfl` (`Witness/Prog.lean`, `eachSch_R`). `pair`, `unc n`
-and `each_P` have no Prelude name and stay written here (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`, README simplification 9);
-`from_result` is a family over closed rows of errors (`frSch`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
+and `each_P` have no Prelude name and stay written here (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`, README simplification 9).
 -/
 
 namespace Flick.Elab
@@ -77,19 +76,6 @@ def eachSch (unit seq : Nat) : Stage → Scheme
 theorem eachSch_R (unit seq : Nat) (r e : Ty) :
     eachSch unit seq (.R r e) = PreludeSchemes.Seq.each_effect unit seq := rfl
 
-/-- `from_result_n : ∀a. Result (Errors (con n)) a →R⟨∅; con n⟩ a`, `from_result` at the error
-type `con n`. Its `raise` adds what the error reaches to the row; for a variable `e` that is the
-atom `e`, which `⟦e⟧` as a row variable does not give, so the checker's `∀e a` becomes a family
-over error types, as `each_φ` is over stages (`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
-`frSch_gen`: a member is the generated scheme at `e := con n`. -/
-def frSch (result errors n : Nat) : Scheme :=
-  ⟨1, [], .arr (.R .cnil (.con n)) (.app (.app (.con result) (.app (.con errors) (.con n))) (.var 0))
-    (.var 0) .cnil, .cnil⟩
-
-theorem frSch_gen (result errors n : Nat) :
-    frSch result errors n = ⟨1, [], (PreludeSchemes.from_result result errors).ty.subst
-      (fun i => if i = 0 then .con n else .var (i - 1)), .cnil⟩ := rfl
-
 /-- The Prelude classes and methods, the constants of Γ₀ and the types the sugar uses. -/
 structure Sugar (P : Prog) where
   tup : Nat
@@ -116,7 +102,7 @@ structure Sugar (P : Prog) where
   toList : Nat
   each : Stage → Nat
   unitV : Nat
-  fromResult : Nat → Nat
+  fromResult : Nat
   /-- `flat_map : ∀m c d a b e. Monad m ⇒ bindTy m c d a b e` (`Prelude.fl`:
   `∀c d a b. (∀v. a^v → (m b)^(c + v))^c → ((m a)^d → (m b)^(c + d))^c`) -/
   hFlatMap : P.methods flatMap = some (monad, PreludeSchemes.flat_map monad)
@@ -148,9 +134,8 @@ structure Sugar (P : Prog) where
   /-- `each_φ` (`eachSch`) -/
   hEach : ∀ φ, P.consts (each φ) = some (eachSch unit seq φ)
   hUnitV : P.consts unitV = some ⟨0, [], .con unit, .cnil⟩
-  /-- `from_result_n : ∀a. Result (Errors (con n)) a →R a` (`core.md` §1.4), the generated
-  scheme at a closed row (`frSch_gen`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`) -/
-  hFromResult : ∀ n, P.consts (fromResult n) = some (frSch result errors n)
+  /-- `from_result : ∀e a. Result (Errors e) a →R⟨∅; e⟩ a` (`core.md` §1.4) -/
+  hFromResult : P.consts fromResult = some (PreludeSchemes.from_result result errors)
 
 variable {P : Prog} (S : Sugar P)
 
@@ -222,8 +207,8 @@ def Sugar.loop (φ : Stage) : List Clause → Exp → Exp
 /-- `[for c̄ yield e]` -/
 def Sugar.forList (cs : List Clause) (e : Exp) : Exp := .app (.const S.toList) (S.gen cs e)
 
-/-- `e?` on a `Result` with the row of errors `con n`, at a runtime stage. -/
-def Sugar.tryResult (n : Nat) (e : Exp) : Exp := .app (.const (S.fromResult n)) e
+/-- `e?` on a `Result`, at a runtime stage. -/
+def Sugar.tryResult (e : Exp) : Exp := .app (.const S.fromResult) e
 
 /-- `let y = e? in b` on an `Option`: `match e with None → None | Some y → b`. -/
 def Sugar.tryOption (e b : Exp) : Exp := .caseOpt e (.const S.noneC) b

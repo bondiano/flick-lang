@@ -54,7 +54,7 @@ def methSch : Nat → Option (Nat × Scheme)
   | _ => none
 
 /-- The constants of Γ₀: `pair`, `None`, `Seq.flat_map`, `singleton`, `empty`, `to_list`,
-`each_P`, `each_R`, `()`, then `unc n` at `2n + 10` and `from_result_n` at `2n + 11`. -/
+`each_P`, `each_R`, `()`, then `unc n` at `2n + 10` and `from_result` at `11`. -/
 def constSch : Nat → Option Scheme
   | 0 => some ⟨2, [], arrP (.var 0) (arrP (.var 1) (.app (.app (.con 10) (.var 0)) (.var 1))), .cnil⟩
   | 1 => some ⟨1, [], optTy (.var 0), .cnil⟩
@@ -69,7 +69,7 @@ def constSch : Nat → Option Scheme
   | 8 => some ⟨0, [], .con 1, .cnil⟩
   | 9 => none
   | n + 10 => if n % 2 = 0 then (if 0 < n / 2 then some (uncSch 10 (n / 2)) else none)
-      else some (frSch 11 12 (n / 2))
+      else if n = 1 then some (PreludeSchemes.from_result 11 12) else none
 
 /-- The instances `I0 … I6`. -/
 def insts : Nat → Option Inst
@@ -124,7 +124,7 @@ def S : Sugar P where
   toList := 5
   each φ := match φ with | .P => 6 | .R _ _ => 7
   unitV := 8
-  fromResult n := 2 * n + 11
+  fromResult := 11
   hFlatMap := rfl
   hMap2 := rfl
   hPure := rfl
@@ -139,8 +139,7 @@ def S : Sugar P where
   hToList := rfl
   hEach φ := by cases φ <;> rfl
   hUnitV := rfl
-  hFromResult n := by
-    show constSch (2 * n + 1 + 10) = _; simp only [constSch]; rw [if_neg (by omega)]; congr 3; omega
+  hFromResult := rfl
 
 /-- The size of a type; a constructor counts by its number, so `Int < Rec`. -/
 def tsize : Ty → Nat
@@ -149,7 +148,8 @@ def tsize : Ty → Nat
   | .app t u => tsize t + tsize u + 1
   | .arr _ a b q => tsize a + tsize b + tsize q + 1
   | .cnil => 1
-  | .cun q q' => tsize q + tsize q' + 1
+  | .cun q q' | .run q q' => tsize q + tsize q' + 1
+  | .rnm _ t => tsize t + 1
 
 /-- The order of K5: `Monad` and `Alternative` above `Applicative`, then the size. -/
 def measure (q : Cn) : Nat :=

@@ -98,18 +98,11 @@ theorem Ty.no_rg_substT {t : Ty} {σ : Atom → Ty} {p : Nat}
 /-- What a `handle` lets through: all but the names of the raised row. -/
 theorem Row.passes_substT {ε₀ ε' : Row} (σ : Atom → Ty) (h : ∀ x, ε₀ x → (∃ N, x = .nm N) ∨ ε' x) :
     ∀ x, ε₀.substT σ x → (∃ N, x = .nm N) ∨ ε'.substT σ x := by
-  have key : ∀ {y}, ε₀ y → (∀ N, y ≠ .nm N) → ε' y := fun hy hn =>
-    (h _ hy).resolve_left fun ⟨N, h'⟩ => hn N h'
+  have hn : Row.substT σ (fun x => ∃ N, x = .nm N) = fun x => ∃ N, x = .nm N := by
+    funext x; apply propext; cases x <;> simp [Row.substT]
   intro x hx
-  cases x with
-  | nm N => exact .inl ⟨N, rfl⟩
-  | atm a =>
-    refine .inr ?_
-    rcases hx with ⟨b, hb, h'⟩ | ⟨b, hb, h'⟩
-    · exact .inl ⟨b, key hb (by simp), h'⟩
-    · exact .inr ⟨b, key hb (by simp), h'⟩
-  | ob _ a | need _ a | rv a =>
-    obtain ⟨b, hb, h'⟩ := hx; exact .inr ⟨b, key hb (by simp), h'⟩
+  have := Row.Sub.substT σ (r' := Row.union (fun x => ∃ N, x = .nm N) ε') h x hx
+  rwa [Row.union_substT, hn] at this
 
 theorem Catches.substT {ε₀ : Row} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom → Ty)
     (h : ∀ n, H n → Catches S ε₀ p θ n ∨ H' n) :
@@ -123,18 +116,29 @@ theorem Catches.substT {ε₀ : Row} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom
       · exact .inl (.inr ⟨rfl, h'⟩)
       · exact .inr (.inl h')
     · rcases h _ hb with h | h
-      · exact h.elim
+      · obtain ⟨rfl, hc⟩ := h; exact .inl (.inl ⟨rfl, .inr ⟨b, hc, h'⟩⟩)
       · exact .inr (.inr ⟨b, h, h'⟩)
   | atm a =>
     rcases hn with ⟨b, hb, h'⟩ | ⟨b, hb, h'⟩ <;> rcases h _ hb with h | h
-    · exact h.elim
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inl ⟨b, hc, h'⟩⟩
     · exact .inr (.inl ⟨b, h, h'⟩)
-    · exact h.elim
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inr ⟨b, hc, h'⟩⟩
     · exact .inr (.inr ⟨b, h, h'⟩)
-  | ob _ a | need _ a | rv a =>
+  | ob N a =>
+    rcases hn with ⟨b, hb, h'⟩ | ⟨v, b, hb, hv, h'⟩ <;> rcases h _ hb with h | h
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inl ⟨b, hc, h'⟩⟩
+    · exact .inr (.inl ⟨b, h, h'⟩)
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inr ⟨v, b, hc, hv, h'⟩⟩
+    · exact .inr (.inr ⟨v, b, h, hv, h'⟩)
+  | obv w a =>
+    obtain ⟨v, b, hb, hv, h'⟩ := hn
+    rcases h _ hb with h | h
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨v, b, hc, hv, h'⟩⟩
+    · exact .inr ⟨v, b, h, hv, h'⟩
+  | need _ a | rv a =>
     obtain ⟨b, hb, h'⟩ := hn
     rcases h _ hb with h | h
-    · exact h.elim
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨b, hc, h'⟩⟩
     · exact .inr ⟨b, h, h'⟩
 
 end Flick

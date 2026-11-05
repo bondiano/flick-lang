@@ -79,10 +79,11 @@ theorem Ty.occurs_of_subst {σ : Nat → Ty} {n : Nat} {t : Ty} (h : (t.subst σ
   induction t using Ty.ind with
   | var m => exact ⟨m, rfl, h⟩
   | con | cnil => cases h
-  | app _ _ ih₁ ih₂ | cun _ _ ih₁ ih₂ =>
+  | app _ _ ih₁ ih₂ | cun _ _ ih₁ ih₂ | run _ _ ih₁ ih₂ =>
     rcases h with h | h
     · obtain ⟨m, hm, h⟩ := ih₁ h; exact ⟨m, .inl hm, h⟩
     · obtain ⟨m, hm, h⟩ := ih₂ h; exact ⟨m, .inr hm, h⟩
+  | rnm _ _ ih => exact ih h
   | arr φ _ _ _ ih₁ ih₂ ih₃ ihφ =>
     rcases h with h | h | h | h
     · obtain ⟨m, hm, h⟩ := ih₁ h; exact ⟨m, .inl hm, h⟩

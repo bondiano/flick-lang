@@ -107,7 +107,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | L6 | `lemma_6` (`Lemma4.lean`); the invariant of a configuration: `CfgTy` (`Soundness.lean`) |
 | §3.4 `⊢ Λ`: where a region may be written, the ancestors of a region | `Tm.Within`, `LocOk`, `Nest` (`Within.lean`, `Nest.lean`); kept by every step: `Nest.step`, `Nest.cstep` (`NestMain.lean`, `Regions.lean`) |
 | L5 | `Nest.nested` (`NestClose.lean`); in every reached configuration: `reach_nest`, `Nest.live` (`Regions.lean`) |
-| §2.7 obligations `{Provided {S} ϱ}`, uses of a service of a `provide` | `Elem.ob`, `Elem.need`; `Row.obs` in `Const.ty` of `spawn`/`addFin` (`Syntax.lean`); `Row.withP`, `Row.disch`, `Row.needs` in `Typ.with_`, `Typ.scope`, `Typ.inside`, `Typ.provideL`/`provideE` (`Rules.lean`) |
+| §2.7 obligations `{Provided {S} ϱ}` and `{Provided r ϱ}` over a row variable, uses of a service of a `provide` | `Elem.ob`, `Elem.obv`, `Elem.need`; `Row.obs` in `Const.ty` of `spawn`/`addFin` (`Syntax.lean`); `Row.withP`, `Row.disch`, `Row.needs`, `Stage.ObOut` in `Typ.with_`, `Typ.scope`, `Typ.inside`, `Typ.provideL`/`provideE` (`Rules.lean`) |
 | the region of `provide`; a service of an ended `provide` | `RHead.provideEnv`, `Tm.with_ q θ e`, the premise `Live Λ q` of `Step.askWith` (`Semantics.lean`); `DeadAsk` (`StepFrame.lean`) |
 | runtime.md §3.5: a child and a finalizer keep the `with` frames | `withs`, `Step.spawn`, `Step.addFin` (`Semantics.lean`); their typing `withs_typing`, `fin_await` (`KidTy.lean`) |
 | an `inside` form is younger than the `with` frames around it | `Tm.Asc`, `CfgAsc`, `Step.asc` (`Asc.lean`, `AscStep.lean`) |
@@ -120,7 +120,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | T1 | `T1` (`Soundness.lean`) |
 | T2(a), T2(b) | `T2a`, `T2b`, `T2b_await` (`Effects.lean`) |
 | lemma 3.1, T3 | `lemma_3_1`, `T3` (`Generalization.lean`) |
-| a polymorphic use; a use of a row-polymorphic function at a row of services; a scope that acquires and uses, as checks | `Examples.lean` |
+| a polymorphic use; a use of a row-polymorphic function at a row of services; a `_` arm that removes a row variable of errors; a `provide` of a layer whose outputs are a row variable; a scope that acquires and uses, as checks | `Examples.lean` |
 
 ## Representation
 
@@ -198,9 +198,9 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 1. **Row variables are variables of the scheme.** A scheme abstracts a row variable as
    any other variable, and (Var) instantiates it by a row (`Ty.row`); constants are typed
    at any rows (`CArg`). Kinds are not checked. A row variable stands for names, atoms and
-   variables, never for obligations or uses; the rows that must be named are those of the
-   outputs of `Layer.merge`, the services of `provide` and the work of `Fiber.spawn` and
-   `Scope.add_finalizer` (`Row.Named`, items 8 and 21). `⌈Errors ε⌉` counts the row
+   variables, never for obligations or uses; the rows that must be named are the outputs of
+   `Layer.merge`, and those of `provide` when its body has obligations (`Row.Named`, items 8
+   and 21). `⌈Errors ε⌉` counts the row
    variables of `ε`, as `regions.md` §2.1 and the checker do (`regions/mod.rs`
    `error_row_captures`): an instance shows what its errors reach, and `⌈·⌉` must commute
    with it, so a closure over an error of an unknown row holds that row. What still keeps a
@@ -234,15 +234,20 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    §1.5 at the only place the core needs it. (Errors-Val) types values only, as in §3.6.
 7. **`try` arms** are `x`/`_` at `Errors ε_b` or a constructor pattern `E p̄` at an error
    type `E` without parameters. `H` is a judgment index: each arm without `when` may add
-   what it catches (`Catches`), names only: a row variable of `ε_b` passes to `ε'` even
-   under `x`/`_`. (Handle) uses the value form of the coverage
-   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the caught errors reach and their row variables pass to the errors it lets through.
+   what it catches (`Catches`): an `x`/`_` arm all of `ε_b`, its row variables and atoms
+   too, a constructor arm the name of its error type. (Handle) uses the value form of the coverage
+   premise ([Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch)); what the raised row has besides names is removed by its
+   remaining arms or passes to the errors it lets through (`H ∪ ε'`): the arm that removed a row
+   variable is an `x`/`_` arm, which matches every value, so no later arm and no re-raise needs
+   it.
 8. **Environments.** `Env ρ` means "binds exactly `ρ`", as (Env), (Bind) and (Join)
    give it: T4.3 needs that a `with` frame answers `S` exactly when its row has `S`. `with θ e` and `econs` require
    `θ` and the bound values to be values. The disjointness of `Layer.merge` is kept
-   (`Const.ok`) though soundness does not need it. The services a `provide` gives and the
-   outputs `Layer.merge` joins are named, without row variables (`Row.Named`): a row
-   variable among the outputs (`core.md`, [`provide` and output row variables](../docs/formal/core.md#provide-discharges-only-the-listed-outputs-of-a-layer-not-a-row-variable)) is not modelled.
+   (`Const.ok`) though soundness does not need it. The outputs `Layer.merge` joins are
+   named, without row variables (`Row.Named`): the checker compares the names it sees, and
+   instantiating a row variable may make them overlap, so the condition is not kept by a
+   substitution. The services a `provide` gives may be a row variable, which its body may
+   require (`core.md`, [`provide` and output row variables](../docs/formal/core.md#provide-discharges-only-the-listed-outputs-of-a-layer-not-a-row-variable); `with_layer` in `Examples.lean`).
 9. **Allocation is deterministic:** `Ref.make v` takes `ℓ = μ.length`, `scope` takes
    `π = Λ.length`.
 10. **Programs** are closed terms typed in the empty store with no facts; modules
@@ -308,14 +313,17 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     reached configuration (live work reaches only live regions), which after a step
     that closes `π` says that nothing that can step reaches `π`.
 21. **Obligations of `provide` (regions.md §2.7) are row elements.** `Provided {S} ϱ` is
-    an element `ob S ϱ` of a row of services; `Fiber.spawn` and `Scope.add_finalizer`
-    put one for each service of the work into the stage of the call (`Row.obs`); the
-    services of the work are named, so `Provided r ϱ` over a row variable `r` is not
-    modelled (`Const.ok`). A
+    an element `ob S ϱ` of a row of services, and `Provided r ϱ` over a row variable `r`
+    an element `obv r ϱ`, which a substitution turns into the obligations of what `r` stands
+    for; `Fiber.spawn` and `Scope.add_finalizer` put one for each service and each row
+    variable of the work into the stage of the call (`Row.obs`). A
     `provide` in a program binds no region variable: an obligation about a region
     created in its body is discharged at the end of that region (`Row.disch`, the second
-    case of §2.7, `S` coming from outside it), and one that reaches a `provide` giving `S`
-    is rejected, which is the first case. An obligation not discharged stays in the row
+    case of §2.7, `S` or `r` coming from outside it), and one that reaches a `provide`
+    giving `S` is rejected, which is the first case. Which services an instance of a row
+    variable gives is unknown there, so `provide` asks more (`Stage.ObOut`): an obligation
+    `ob S ϱ` passes only outputs without row variables, and `obv r ϱ` only outputs that give
+    no service. An obligation not discharged stays in the row
     of the stage and of the arrows that carry it, which is the deferred element and the
     given `Provided` of a signature. At run time a `with` frame carries the region of its
     `provide`, records the uses `need S q` of its services and discharges an obligation
@@ -463,7 +471,7 @@ and `Target`. See [The core as the target](#the-core-as-the-target).
 | `Δ ⊩ Q ⇝ d ⇒ ⟦Δ⟧ ⊢⁺ d : D_Q`; T6(a) | `ent_typed`, `T6a` (`Elab/T6a.lean`) |
 | §3.1 `do` | `Stmt`, `Sugar.desugarDo`, `DoOk`, `do_elab`, `T6a_do` (`Elab/Sugar.lean`, `Elab/DoNotation.lean`) |
 | §3.2 `for`, §3.3 `?`, §3.4 blocks | `Clause`, `Sugar.gen`, `Sugar.loop`, `GenOk`, `LoopOk`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`, `T6a_sugar` (`Elab/Sugar.lean`, `Elab/Comprehension.lean`) |
-| Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`); the schemes of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List` generated from the checker, those the model cannot write listed as skipped with a reason (`Elab/PreludeSchemes.lean`, [Prelude scheme generator with skip list](../docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names)) |
+| Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`); the schemes of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List` generated from the checker, those the model cannot write listed as skipped with a reason, none today (`Elab/PreludeSchemes.lean`, [Prelude scheme generator with skip list](../docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names)) |
 | "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim`, then `T6b_target` (`Elab/Run.lean`) |
 | §0.1 `⟦·⟧` into the core with regions: types, stages with rows, schemes | `Names`, `trT`, `trTT`, `trD`, `trS`, `trStage`, `trT_arr`, `Stage.qual`, `trT_subst`, `trStage_subst`, `trT_reach` (`Elab/CoreTy.lean`) |
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
@@ -529,12 +537,15 @@ Simplifications:
    `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
    hypotheses on the program. The schemes of the Prelude names are generated from the
    checker (`PreludeSchemes.lean`), with the rows of their arrows: `->{r; e}` is the stage
-   `R r e` and its row variables are binders of the scheme (`traverse`, `Seq.each_effect`); a
-   row with a named element or a union is skipped (`timeout`). `pair`, `unc n` and `each_P` have no Prelude name and are
-   written in `Sugar.lean`. `from_result` is a family `from_result_n` over error types, one
-   `con n` each, at the stage `R⟨∅; con n⟩` (`frSch`, equal to the generated scheme at `e := con n`
-   by `frSch_gen`): its `raise` adds the atom `e` to the row, which the row variable `⟦e⟧`
-   does not give, and `e?` takes the member at `e`'s error type (`tryResult_elab`, at that stage). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
+   `R r e` and its row variables are binders of the scheme (`traverse`, `Seq.each_effect`). A
+   row is a type: a variable, `cnil`, the row `{t}` of one service or error type `t` with
+   constructor `c` (`rnm c t`) or a union `ρ₁ + ρ₂` (`run`), so `timeout` is at
+   `R r ({TimeoutError} + e)`; a row may be the argument of a type (`FieldCodec (rd + r) a`,
+   `Exit e a`), which the model writes as data. `pair`, `unc n` and `each_P` have no Prelude name and are
+   written in `Sugar.lean`. `from_result : ∀e a. Result (Errors e) a →R⟨∅; e⟩ a` is the
+   generated scheme, and `e?` takes it at the row of errors of `e` (`tryResult_elab`, at the
+   stage `R⟨∅; ε⟩`): its `raise` of `Errors e` adds the atom `e` to the row, which the stage
+   gives (simplification 10). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
    hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
    qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and
    data without storage drops it. That argument is invariant, so a qualifier the caller
@@ -553,10 +564,14 @@ Simplifications:
    the rows of the loop ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
-10. The core instance. `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ε)` with `ε` every name (`allNames`): a row
-    of the source is a type, a row variable `var n` or `cnil`, and `⟦r⟧` is what `⟦r⟧` stands
-    for as a row (`Ty.asRow`), the row variable `n`; every error name stays in the row, so a
-    runtime body may raise any error type that reaches nothing. The source compares stages
+10. The core instance. `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ⌈⟦e⟧⌉ ∪ ε)` with `ε` every name (`allNames`): a row
+    of the source is a type, and `⟦r⟧` is what `⟦r⟧` stands for as a row (`Ty.asRow`): a row
+    variable `var n` is the row variable `n`, `cnil` the empty row, `rnm c t` the name `N.con c`
+    with the atoms of `⌈⟦t⟧⌉` (`Row.err`, what an error of `t` reaches), `run r r'` the union of
+    what `⟦r⟧` and `⟦r'⟧` stand for. The atoms `⌈⟦e⟧⌉` bound what the errors of `e` reach
+    (`errRow`): a raised `Errors e`, data of the nominal type `Errors`, reaches the variable
+    `e`. Every error name stays in the row, so a runtime body may raise any error type that
+    reaches only what `e` reaches. The source compares stages
     by equality and its `⌈·⌉` counts the variables of the rows of an arrow, so the qualifier
     of a translated `R r e` arrow counts them too (`Stage.qual`); a `P` arrow translates as
     before (`trT_arr`). A substitution acts on the rows of a stage, and `T6a_close` closes the
@@ -581,13 +596,12 @@ Simplifications:
     the lazy `Monad Eff` ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)), an eager `Option` monad `OptQ q a` and `Iterable` of
     `ListQ q a` (data without storage gets a phantom `CRow` parameter as an instance of a class
     over containers). Every global has a body typed by the rules of the core, none is `todo`;
-    the bodies are honest but narrower than the checker's in three places. `Seq q a` is an
+    the bodies are honest but narrower than the checker's in two places. `Seq q a` is an
     eager list `SNil | SCons a (Seq q a)` with a phantom `q`: `Seq.flat_map`, `each_φ`,
     `to_list` and `iter` are fixpoints over it, and the laziness of the checker's `Seq` is not
     modelled (T6 needs only the types of [Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes), and the witness has no infinite or effectful
     sequence). `Rec` has one field, so the `&&` of the structural `eq` over its fields is one
-    comparison by the slot dictionary `D_{Eq Int}`. `from_result_n` is a member at one
-    error type (simplification 9). `eq` on `Int` is the constant `intEq`, and `unc n` is
+    comparison by the slot dictionary `D_{Eq Int}`. `eq` on `Int` is the constant `intEq`, and `unc n` is
     built by a Lean function of `n` and typed by induction. A match has one arm per
     constructor and no `_` (`exh_ctors`, `Exh.lean`), also in the lazy `Monad Eff`.
 
@@ -598,10 +612,11 @@ Simplifications:
 
 - **Types** (`Elab/Syntax.lean`). `Ty` has `arr (φ : Stage) (a b q : Ty)`, `cnil` and
   `cun (q q' : Ty)` ([source arrow is a separate type form](../docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor)); `Stage` is `P` or `R r e` with the rows
-  written as types, mutual with `Ty` (`Ty.ind` is its induction). The qualifier `q` is a capture row written
+  written as types, mutual with `Ty` (`Ty.ind` is its induction): a row of services or errors
+  is a variable, `cnil`, a named element `rnm c t` or a union `run r r'`, compared by equality. The qualifier `q` is a capture row written
   as a type: a variable, `cnil`, or a union. Substitution is structural, so `DecidableEq`,
   `Ty.agree_of_eq` and K1 work without semantic sets. `Ty.reach` is the occurrence of a
-  variable: `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈app⌉ = ⌈cun⌉ = ∪` and
+  variable: `⌈var n⌉ = {n}`, `⌈con⌉ = ⌈cnil⌉ = ∅`, `⌈rnm c t⌉ = ⌈t⌉`, `⌈app⌉ = ⌈cun⌉ = ⌈run⌉ = ∪` and
   `⌈arr φ a b q⌉ = ⌈a⌉ ∪ ⌈b⌉ ∪ ⌈q⌉` with the variables of the rows of `φ`. Capture and row variables are ordinary variables, so
   (Var), (Method) and (Const) instantiate them through `ts` with no new rule. Schemes
   have no `Outlives` facts: `⟦·⟧` drops `Fiber.Outlives` (§2.1).
@@ -688,8 +703,9 @@ for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
 
 - **Types** (`CoreTy.lean`). `var ↦ tvar`, `app ↦ tapp`, `Bool ↦ base bool`,
   other constructors `↦ adt (N.con c)`, `arr φ a b q ↦ arrow ⟦a⟧ ⟦φ⟧ ⟦b⟧ ⌈⟦q⟧⌉` (at `R r e` with
-  the variables of the rows), `cnil ↦ caps ∅`, `cun ↦ caps (∪)`; `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ allNames)`
-  (simplification 10).
+  the variables of the rows), `cnil ↦ caps ∅`, `cun ↦ caps (∪)`,
+  `rnm c t ↦ row ({N.con c} ∪ ⌈⟦t⟧⌉)`, `run r r' ↦ row (⟦r⟧ ∪ ⟦r'⟧)` with each side as a row
+  (`Ty.asRow`); `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ⌈⟦e⟧⌉ ∪ allNames)` (simplification 10).
   `trT_subst`/`trTT_subst`/`trS_subst` and `trT_reach` are the two commutations. The
   names of the core are a parameter `Names`, not a fixed encoding.
   `D_{C τ̄} ↦ dict (N.cls C |τ̄|) ⟦τ̄⟧`: the class name carries the number of parameters,

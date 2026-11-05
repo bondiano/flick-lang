@@ -99,7 +99,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     refine .handle hv (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
       ?_ ?_ (by simpa [Stage.substT] using Stage.le_substT σ hφ)
     · exact fun K k ts T h₁ h₂ => (hc K k ts T h₁ h₂).imp .inl .inl
-    · exact Row.passes_substT σ ha
+    · simpa using Row.passes_substT σ ha
   | hnil hH =>
     intro σ _
     obtain rfl : _ = Row.none := funext fun n => propext ⟨fun h => hH n h, False.elim⟩
@@ -116,12 +116,12 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ =>
     intro σ hσ
     exact .provideL (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
-      (by simpa [Stage.substT] using Stage.le_substT σ h₁) ⟨h₀.1.substT σ, ob_free_substT h₀.1 h₀.2⟩
+      (by simpa [Stage.substT] using Stage.le_substT σ h₁) (h₀.substT σ)
       (by simpa [Stage.substT] using Stage.le_substT σ h₂)
   | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ =>
     intro σ hσ
     exact .provideE (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
-      (by simpa [Stage.substT] using Stage.le_substT σ h₁) ⟨h₀.1.substT σ, ob_free_substT h₀.1 h₀.2⟩
+      (by simpa [Stage.substT] using Stage.le_substT σ h₁) (h₀.substT σ)
       (by simpa [Stage.substT] using Stage.le_substT σ h₂)
   | with_ hv _ _ h₁ h₂ ih₁ ih₂ =>
     intro σ hσ

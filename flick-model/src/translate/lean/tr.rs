@@ -22,6 +22,10 @@ pub(super) enum Ty {
     Arr(Option<(Box<Ty>, Box<Ty>)>, Box<Ty>, Box<Ty>, Box<Ty>),
     Nil,
     Un(Box<Ty>, Box<Ty>),
+    /// `.rnm c t`: the row of one service or error type `t` named `c`
+    Nm(String, Box<Ty>),
+    /// `.run r r'`: a union of rows
+    RUn(Box<Ty>, Box<Ty>),
     /// a positive qualifier, its variables of the checker, before rule 4
     Pos(Vec<String>),
 }
@@ -42,9 +46,6 @@ fn app(head: Ty, args: impl IntoIterator<Item = Ty>) -> Ty {
 pub(super) struct Tr {
     /// the variables over containers: of kind `Type → Type`
     pub containers: BTreeSet<String>,
-    /// the variables of rows of services or errors, which only the rows of
-    /// an arrow and `Eff` may name
-    pub rows: BTreeSet<String>,
     /// `v := a` of rule 2
     inst: BTreeMap<String, String>,
     /// variables that stayed themselves at a negative position
@@ -79,7 +80,6 @@ impl Tr {
 
     pub fn ty(&mut self, t: &fc::Type, neg: bool) -> Result<Ty, Skip> {
         Ok(match t {
-            fc::Type::Var(a) if self.rows.contains(a) => return Err(Skip::Row),
             fc::Type::Var(a) => Ty::Var(a.clone()),
             fc::Type::Con { name, .. } => self.con(name.to_lowercase()),
             fc::Type::App { .. } => self.data(t, None, neg)?,
@@ -112,7 +112,7 @@ impl Tr {
                     .collect::<Result<Vec<_>, _>>()?;
                 app(h, fields)
             }
-            fc::Type::Row(_) | fc::Type::Union(..) => return Err(Skip::Row),
+            fc::Type::Row(_) | fc::Type::Union(..) => self.row(t)?,
             fc::Type::Captured { ty, captures, .. } | fc::Type::Bounded { ty, captures } => {
                 let inner = self.open(ty)?;
                 match inner {
@@ -164,7 +164,12 @@ impl Tr {
         neg: bool,
     ) -> Result<Ty, Skip> {
         let rows = effects
-            .map(|e| Ok((Box::new(row(&e.services)?), Box::new(row(&e.errors)?))))
+            .map(|e| {
+                Ok((
+                    Box::new(self.row(&e.services)?),
+                    Box::new(self.row(&e.errors)?),
+                ))
+            })
             .transpose()?;
         let start = self.fresh.len();
         let a = self.ty(param, !neg)?;
@@ -262,21 +267,40 @@ impl Tr {
             Ty::App(a, b) => Ty::App(go(a), go(b)),
             Ty::Arr(rows, a, b, q) => Ty::Arr(rows, go(a), go(b), go(q)),
             Ty::Un(a, b) => Ty::Un(go(a), go(b)),
+            Ty::Nm(c, t) => Ty::Nm(c, go(t)),
+            Ty::RUn(a, b) => Ty::RUn(go(a), go(b)),
             leaf => leaf,
         }
     }
 }
 
-/// A row of an arrow: a variable or the empty row; a named element or a
-/// union is not modelled.
-fn row(t: &fc::Type) -> Result<Ty, Skip> {
-    match t {
-        fc::Type::Var(v) => Ok(Ty::Var(v.clone())),
-        fc::Type::Row(fc::Row { entries, tail }) if entries.is_empty() => match tail {
-            Some(t) => row(t),
-            None => Ok(Ty::Nil),
-        },
-        _ => Err(Skip::Row),
+impl Tr {
+    /// A row of services or errors: a variable, `.cnil`, `{S₁, …, Sₙ | r}`
+    /// as the union of its elements and its tail, `ρ₁ + ρ₂`.
+    fn row(&mut self, t: &fc::Type) -> Result<Ty, Skip> {
+        Ok(match t {
+            fc::Type::Var(v) => Ty::Var(v.clone()),
+            fc::Type::Union(a, b) => Ty::RUn(Box::new(self.row(a)?), Box::new(self.row(b)?)),
+            fc::Type::Row(fc::Row { entries, tail }) => {
+                let mut parts = Vec::new();
+                for (_, element) in entries {
+                    let fc::Type::Con { name, .. } = element.spine().0 else {
+                        return Err(Skip::Other(format!("a row element {}", show_type(element))));
+                    };
+                    let c = name.to_lowercase();
+                    let t = self.ty(element, false)?;
+                    parts.push(Ty::Nm(c, Box::new(t)));
+                }
+                if let Some(tail) = tail {
+                    parts.push(self.row(tail)?);
+                }
+                parts
+                    .into_iter()
+                    .reduce(|a, b| Ty::RUn(Box::new(a), Box::new(b)))
+                    .unwrap_or(Ty::Nil)
+            }
+            other => return Err(Skip::Other(format!("no row {}", show_type(other)))),
+        })
     }
 }
 
@@ -296,7 +320,8 @@ fn bound(t: &fc::Type, v: &str) -> Option<String> {
 pub(super) fn occurs(t: &Ty, v: &str) -> bool {
     match t {
         Ty::Var(w) => w == v,
-        Ty::App(a, b) | Ty::Un(a, b) => occurs(a, v) || occurs(b, v),
+        Ty::App(a, b) | Ty::Un(a, b) | Ty::RUn(a, b) => occurs(a, v) || occurs(b, v),
+        Ty::Nm(_, t) => occurs(t, v),
         Ty::Arr(rows, a, b, q) => {
             occurs(a, v)
                 || occurs(b, v)

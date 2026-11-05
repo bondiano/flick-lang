@@ -95,15 +95,14 @@ theorem loop_elab {φ Γ Δ cs e} (h : LoopOk S φ Γ Δ cs e) :
     exact ⟨_, .ite hc hk (elab_const S.hUnitV (ts := []) rfl rfl)⟩
   | let_ hx _ ih => obtain ⟨_, hk⟩ := ih; exact ⟨_, .let_ hx hk⟩
 
-/-- **`e?` on a `Result` elaborates**, at the runtime stage `R⟨∅; con n⟩`, through the member
-of `from_result` at the error type `con n` of `e`. -/
-theorem tryResult_elab {Γ Δ e n a e'}
-    (he : Elab P Γ Δ e (.app (.app (.con S.result) (.app (.con S.errors) (.con n))) a)
-      (.R .cnil (.con n)) e') :
-    ∃ e'', Elab P Γ Δ (S.tryResult n e) a (.R .cnil (.con n)) e'' :=
-  ⟨_, .app (elab_const (S.hFromResult n) (ts := [a]) rfl
-    (τ := .arr (.R .cnil (.con n)) (.app (.app (.con S.result) (.app (.con S.errors) (.con n))) a) a
-      .cnil) rfl) he (.inr rfl)⟩
+/-- **`e?` on a `Result` elaborates**, at the runtime stage `R⟨∅; ε⟩` of its row of errors
+`ε`, through `from_result` at `ε`. -/
+theorem tryResult_elab {Γ Δ e ε a e'}
+    (he : Elab P Γ Δ e (.app (.app (.con S.result) (.app (.con S.errors) ε)) a) (.R .cnil ε) e') :
+    ∃ e'', Elab P Γ Δ (S.tryResult e) a (.R .cnil ε) e'' :=
+  ⟨_, .app (elab_const S.hFromResult (ts := [ε, a]) rfl
+    (τ := .arr (.R .cnil ε) (.app (.app (.con S.result) (.app (.con S.errors) ε)) a) a .cnil) rfl)
+    he (.inr rfl)⟩
 
 /-- **`let y = e? in b` on an `Option` elaborates** when the rest returns an `Option`. -/
 theorem tryOption_elab {Γ Δ e b a r φ e' b'} (he : Elab P Γ Δ e (optTy a) φ e')
