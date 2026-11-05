@@ -5,6 +5,7 @@ module App.Api exposing (main)
 import App.Db
 import App.Remote
 import App.Shared
+import Server exposing (plugin server)
 
 main : Unit ->{; AppError} Unit
 let main () = provide Server.node {
