@@ -25,33 +25,42 @@ let report f =
 
 late_acquire : Unit ->{} Unit
 let late_acquire () = scope s {
+  let started : Deferred.Deferred none Unit = Deferred.make ()
   let _child =
     Fiber.spawn
       s
       report
       (task {
-        Effect.uninterruptible
+        // interrupted as its owner closes: the finalizer, masked, acquires while it closes
+        Effect.ensuring
           (task {
-            nap 60
             let _r = open_res "late"
             say "child uses late"
             nap 20
             say "child done with late"
           })
+          (task {
+            let _ = Deferred.succeed () started
+            Effect.never ()
+          })
       })
-  nap 10
+  Deferred.await_ started
   say "body done"
 }
 
 supervisor_owner : Unit ->{} Unit
 let supervisor_owner () = scope outer {
+  // the supervisor and the inner body take turns through this, not through a timer
+  let ran : Deferred.Deferred none Unit = Deferred.make ()
   sup : forall e. Failure e ->{Scope outer;} Unit
   let sup _ =
     let _r = open_res "sup"
     say "supervisor ran"
+    let _ = Deferred.succeed () ran
+    ()
   scope inner {
     let _child = Fiber.spawn outer sup (task { todo })
-    nap 40
+    Deferred.await_ ran
     say "inner done"
   }
   say "outer body done"
@@ -87,6 +96,7 @@ let group_close () = scope s {
 unmask : Unit ->{} Unit
 let unmask () =
   scope s {
+    let masked : Deferred.Deferred none Unit = Deferred.make ()
     let f =
       Fiber.spawn
         s
@@ -94,12 +104,14 @@ let unmask () =
         (task {
           Effect.uninterruptible
             (task {
-              nap 40
+              let _ = Deferred.succeed () masked
+              // a masked fiber cannot see the request come in: only time keeps the mask on until it does
+              nap 250
               say "block done"
             })
           say "after block"
         })
-    nap 10
+    Deferred.await_ masked
     Fiber.interrupt f
   }
   // after the scope: its close waits for the supervisor, which runs beside the interrupting fiber

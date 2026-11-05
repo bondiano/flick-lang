@@ -114,6 +114,10 @@ perf:
     cargo build --release -p flick
     node tools/perf/index.mjs target/release/flick
 
+# Budgets go down: those of tools/perf and tools/bundle-size against a base ref; a looser one needs a `reason` beside it
+ratchet base="origin/main":
+    node tools/perf/ratchet.mjs {{base}}
+
 # Hold the language server to a long open/edit/close session and print its resident memory (Linux)
 lsp-soak file="examples/mtl/src/Mtl/StateT.fl" cycles="400":
     cargo build --release -p flick

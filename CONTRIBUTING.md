@@ -26,6 +26,7 @@ just test
 just check  # lint + test
 just e2e    # runtime tests + compiled programs on Node
 just bundle-size  # browser bundles against their gzip budgets
+just ratchet  # budgets only go down against origin/main; a looser one needs a `reason`
 ```
 
 ## Crates
