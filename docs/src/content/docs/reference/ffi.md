@@ -197,6 +197,14 @@ foreign async lookup from "lookup-lib" "lookup"
 `JsError.from_js` keeps what a thrown value says — `name: message` of an
 `Error` — never the value.
 
+In an editor, the code action "Regenerate from `<pkg>@<version>`" on the
+header line `// flick ffi import <pkg> [--select a,b]` replaces the file
+with what `flick ffi import` writes now, with the `policy.toml` beside it;
+the module is named after the file. A file of the header line alone is a
+stub: the action writes the whole module into it. The declarations are
+read by the same helper; when it cannot run, the action is shown disabled,
+with the reason.
+
 ### Reviewed bindings and `ffi check`
 
 The import writes only `Generated.fl`. A binding you check by hand goes in

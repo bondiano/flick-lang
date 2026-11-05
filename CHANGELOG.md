@@ -126,6 +126,10 @@ break programs.
   saved between runs.
 - **Builds:** WebAssembly plugins run on wasmtime 48, a long-term support
   release; building the compiler takes Rust 1.95.
+- **Editors:** on the header line of a module `flick ffi import` wrote,
+  the code action "Regenerate from `<pkg>@<version>`" replaces the file with
+  what the import writes now; a file of the header alone is filled in. When
+  the `.d.ts` reader cannot run, the action is disabled with the reason.
 
 ## 0.1.0 — 2026-11-03
 

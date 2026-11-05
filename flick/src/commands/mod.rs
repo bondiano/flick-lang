@@ -5,7 +5,7 @@ mod deps;
 mod dev;
 mod diff;
 mod expand;
-mod ffi;
+pub(crate) mod ffi;
 mod fmt;
 pub(crate) mod inputs;
 mod inspect;

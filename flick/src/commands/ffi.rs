@@ -40,7 +40,7 @@ fn context(
 }
 
 /// Runs the helper: `FLICK_DTS_IMPORTER`, or the one installed in the project.
-fn read_surface(root: &Path, package: &str) -> Result<Surface, Diagnostic> {
+pub(crate) fn read_surface(root: &Path, package: &str) -> Result<Surface, Diagnostic> {
     let helper = env::var_os("FLICK_DTS_IMPORTER").map_or_else(
         || root.join("node_modules/@flick-lang/dts-importer/index.mjs"),
         PathBuf::from,
@@ -78,7 +78,7 @@ fn read_surface(root: &Path, package: &str) -> Result<Surface, Diagnostic> {
     Surface::parse(&String::from_utf8_lossy(&output.stdout)).map_err(error)
 }
 
-fn read_policy(dir: &Path) -> Result<Policy, Diagnostic> {
+pub(crate) fn read_policy(dir: &Path) -> Result<Policy, Diagnostic> {
     let path = dir.join(POLICY);
     match fs::read_to_string(&path) {
         Ok(text) => Policy::parse(&text).map_err(|e| error(format!("`{}`: {e}", path.display()))),
@@ -104,7 +104,7 @@ fn unknown_policies(policy: &Policy, surface: &Surface, dir: &Path) -> Vec<Diagn
 
 /// The module of `dir`'s files: `src/Ffi` of a project with source root
 /// `src` → `Ffi`; empty outside the source root.
-fn module_prefix(project: Option<&Project>, dir: &Path) -> Result<String, Diagnostic> {
+pub(crate) fn module_prefix(project: Option<&Project>, dir: &Path) -> Result<String, Diagnostic> {
     let Some(relative) = project.and_then(|p| dir.strip_prefix(p.source_root()).ok()) else {
         return Ok(String::new());
     };
