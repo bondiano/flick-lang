@@ -31,6 +31,7 @@ mod effects;
 mod env;
 mod exhaust;
 mod exports;
+mod facts;
 mod ffi;
 mod generalize;
 mod handlers;

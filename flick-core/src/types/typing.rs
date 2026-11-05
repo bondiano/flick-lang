@@ -93,6 +93,8 @@ pub struct Typing {
     pub instances: Vec<InstanceInfo>,
     /// The codec each use of `HttpApi.Derive.wire_codec` stands for.
     pub wire_codecs: HashMap<Range, super::wire::WireCodec>,
+    /// The type of each `_` of generated code, for its plugin's `check`.
+    pub wildcards: Vec<(Range, flick_plugin::Fact)>,
     /// The uses of `wire_codec` an annotation has not given a codec yet.
     pub(super) pending_wire: Vec<(Range, Span)>,
     /// `codec` blocks: the fields' labels in the order written.
