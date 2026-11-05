@@ -248,8 +248,8 @@ impl Lower<'_> {
         }
     }
 
-    /// The constructors of a type or error, its refinement check and its
-    /// schema witness.
+    /// The constructors of a type or error and its refinement check; its
+    /// witness `T$schema` is the code std's plugin derives.
     fn type_items(&mut self, decl: &Node, span: Span, items: &mut Vec<Item>) {
         let Some(ty) = self.token_text(decl, K::Con) else {
             return;

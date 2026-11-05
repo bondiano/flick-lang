@@ -254,7 +254,7 @@ pub fn builtin_expansion(
                 continue;
             };
             let len = source.end() - source.start();
-            match render(&arena, len, Place::Declaration, &[]) {
+            match render(&arena, len, Place::Declaration, &syntax.aliases()) {
                 Ok(rendered) => blocks.push(Expanded {
                     node: decl.clone(),
                     rendered,
@@ -272,7 +272,7 @@ pub fn builtin_expansion(
         file,
         tree,
         module,
-        &heads,
+        syntax,
         &mut blocks,
         &mut diagnostics,
     );
@@ -292,13 +292,14 @@ fn std_blocks(
     file: FileId,
     tree: &Node,
     module: &str,
-    heads: &Arc<[String]>,
+    syntax: &ModuleSyntax,
     blocks: &mut Vec<Expanded>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let Some(plugin) = first_party::plugin("std") else {
         return;
     };
+    let (heads, aliases) = (&syntax.heads(), syntax.aliases());
     let mut nodes = Vec::new();
     blocks_under(tree, &mut nodes);
     let own = |n: &&Node| {
@@ -340,7 +341,7 @@ fn std_blocks(
         let Some(arena) = made_or(made, "std", &source, whole, diagnostics) else {
             continue;
         };
-        match render(&arena, block.whole().end, source.place(), &[]) {
+        match render(&arena, block.whole().end, source.place(), &aliases) {
             Ok(rendered) => blocks.push(Expanded {
                 node,
                 rendered,

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use flick_plugin::{Block, DeriveTarget, Place};
 
 use super::super::{Loaded, Loader, Root};
-use super::{Found, Plugins, Results, aliases, failure, refusal};
+use super::{Found, Plugins, Results, failure, refusal};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::derive::{Derived, Named, builtin_derived, derived_classes, named, target};
 use crate::plugin::render::{Rendered, render};
@@ -332,7 +332,7 @@ impl Call<'_, '_> {
         let rendered = match made {
             Ok(arena) => {
                 let len = found.source.end() - found.source.start();
-                match render(&arena, len, Place::Declaration, &aliases(&m.syntax.imports)) {
+                match render(&arena, len, Place::Declaration, &m.syntax.aliases()) {
                     Ok(code) => Some(code),
                     Err(why) => {
                         let what = format!("gave code that is not valid: {why}");

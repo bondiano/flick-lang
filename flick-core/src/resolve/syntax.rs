@@ -40,6 +40,16 @@ impl ModuleSyntax {
             .flat_map(|i| i.plugins.iter().map(|p| p.name.clone()))
             .collect()
     }
+
+    /// The modules its imports name only by an alias, each with it: where
+    /// generated code, which names a module by its path, says the alias.
+    pub fn aliases(&self) -> Vec<(String, String)> {
+        let imports = &self.imports;
+        (imports.iter())
+            .filter(|i| !(imports.iter()).any(|j| j.module == i.module && j.alias.is_none()))
+            .filter_map(|i| Some((i.module.clone(), i.alias.clone()?)))
+            .collect()
+    }
 }
 
 impl Import {
