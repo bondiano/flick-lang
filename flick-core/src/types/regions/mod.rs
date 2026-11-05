@@ -301,8 +301,14 @@ impl Checker<'_> {
         for (label, t) in &norm.entries {
             if label.starts_with('^') {
                 match self.store.resolve(t) {
+                    // an error-row variable or unknown, held as an atom, may
+                    // have become a row of errors
                     row @ (Type::Row(_) | Type::Union(..)) => {
-                        self.capture_row_filtered(&row, out, bounded);
+                        if has_error(&self.store.normalize(&row)) {
+                            self.error_row_captures(&row, out, bounded);
+                        } else {
+                            self.capture_row_filtered(&row, out, bounded);
+                        }
                     }
                     other => self.collect_bounded_captures(&other, out, bounded),
                 }
@@ -324,10 +330,10 @@ impl Checker<'_> {
 
     /// What an error row reaches: what its errors reach and its row
     /// variables, which stand for errors that may reach anything. A row not
-    /// inferred yet adds nothing until it is: a capture row must not take it
-    /// as a tail.
-    // shortcut: a row left unknown and generalized into a variable is not
-    // counted; count it if a local without a signature closes over one
+    /// inferred yet is an atom, as a type not inferred yet is, so a qualifier
+    /// closed before it is known still holds what it becomes, a row or the
+    /// variable it is generalized into; it is no tail, which a capture row
+    /// would grow.
     fn error_row_captures(&self, row: &Type, out: &mut Norm, bounded: bool) {
         let norm = self.store.normalize(row);
         for (_, error) in &norm.entries {
@@ -335,7 +341,7 @@ impl Checker<'_> {
         }
         for tail in norm.tails {
             match tail {
-                Type::Var(_) | Type::Skolem(_) if !bounded => push_atom(out, &tail),
+                Type::Var(_) | Type::Skolem(_) | Type::Meta(_) if !bounded => push_atom(out, &tail),
                 Type::Error if !out.tails.contains(&tail) => out.tails.push(tail),
                 _ => {}
             }
@@ -713,6 +719,15 @@ fn qualify(t: Type, held: Type) -> Type {
 /// says what escapes.
 fn capture_mismatch(mismatch: &Mismatch) -> bool {
     matches!(mismatch, Mismatch::Label { label, .. } if label.starts_with('^'))
+}
+
+/// Whether a row has an error in it: a capture row labels each of its
+/// entries `^…`.
+// shortcut: a row of errors with no error yet, only variables, reads as a
+// capture row, whose unknown tail may grow; tell them apart by kind if one
+// such row is held while it is inferred
+fn has_error(row: &Norm) -> bool {
+    row.entries.iter().any(|(label, _)| !label.starts_with('^'))
 }
 
 fn push_atom(out: &mut Norm, t: &Type) {
