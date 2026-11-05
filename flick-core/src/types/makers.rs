@@ -1,9 +1,10 @@
-//! What makes an atom, an action or a view: the makers of the library, and
-//! every function that calls one outside the task of a handler, in this
-//! module or in one it imports, whose interface lists them. A render must
-//! call none (`FLICK-U006`).
+//! What makes an atom, an action or a view: the makers of the library, the
+//! values its modules mark `@maker`, and every function that calls one
+//! outside the task of a handler, in this module or in one it imports,
+//! whose interface lists them. A render must call none (`FLICK-U006`).
 
 use std::collections::HashMap;
+use std::mem;
 
 use super::ty::Type;
 use super::typing::Ref;
@@ -13,35 +14,14 @@ use crate::iface::Namespace;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
-/// The makers of the library, by module and names.
-const MAKERS: [(&str, &[&str]); 4] = [
-    (
-        "Atom",
-        &[
-            "make",
-            "derived",
-            "task",
-            "serializable",
-            "serializable_family",
-            "serializable_task",
-            "serializable_result",
-            "route",
-            "loader",
-            "on_server",
-            "client_only",
-            "search_param",
-            "family",
-        ],
-    ),
-    ("Action", &["exhaust", "latest", "queue", "concurrent"]),
-    ("Ui", &["view", "suspended", "named"]),
-    ("Form", &["draft"]),
-];
-
 impl Checker<'_> {
     /// The top-level functions of this module that make an atom, an action
     /// or a view, each with the maker of the library it ends at.
     pub fn makers(&mut self, decls: &[&Node]) {
+        for name in marked(decls, self.text) {
+            let maker = format!("{}.{name}", self.env.module);
+            self.typing.makers.insert(name, maker);
+        }
         let mut functions: Vec<(String, &Node)> = Vec::new();
         for decl in members(decls).filter(|d| d.kind == K::LetDecl) {
             let parts = let_parts(decl, self.text);
@@ -90,12 +70,6 @@ impl Checker<'_> {
 
     /// The maker of the library that the value `module.name` is or calls.
     fn maker(&self, module: &str, name: &str) -> Option<String> {
-        if MAKERS
-            .iter()
-            .any(|(m, names)| *m == module && names.contains(&name))
-        {
-            return Some(format!("{module}.{name}"));
-        }
         if module == self.env.module {
             return self.typing.makers.get(name).cloned();
         }
@@ -167,4 +141,23 @@ fn needs_setup(ty: &Type) -> bool {
         }
     });
     found
+}
+
+/// The values `decls` mark `@maker`: the makers of the library.
+fn marked(decls: &[&Node], text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut pending = false;
+    for decl in decls {
+        if decl.kind == K::Attribute {
+            let mut words = (decl.child_tokens()).filter(|t| t.kind == K::Ident);
+            pending |= words.next().is_some_and(|w| w.text(text) == "maker");
+            continue;
+        }
+        if mem::take(&mut pending)
+            && let Some(name) = decl.child_tokens().find(|t| t.kind == K::Ident)
+        {
+            out.push(name.text(text).to_owned());
+        }
+    }
+    out
 }

@@ -55,17 +55,20 @@ impl Validator<'_> {
         }
     }
 
-    /// `@lang item`, with an item the compiler knows, or `@derive` before a
-    /// class, maybe naming the package whose plugin derives it.
+    /// `@lang item`, with an item the compiler knows, `@derive` before a
+    /// class, maybe naming the package whose plugin derives it, or `@maker`
+    /// before a value that makes an atom, an action or a view.
     fn attribute(&mut self, node: &Node) {
         let words: Vec<Token> = idents(node).collect();
         let message = match &words[..] {
             [name] | [name, _] if name.text(self.src) == "derive" => return,
+            [name] if name.text(self.src) == "maker" => return,
+            [name, ..] if name.text(self.src) == "maker" => "`@maker` takes no argument".to_owned(),
             [name, ..] if name.text(self.src) == "derive" => {
                 "`@derive` names at most the package of its plugin: `@derive std`".to_owned()
             }
             [name, ..] if name.text(self.src) != "lang" => format!(
-                "unknown attribute `@{}`: the attributes are `@lang` and `@derive`",
+                "unknown attribute `@{}`: the attributes are `@lang`, `@derive` and `@maker`",
                 name.text(self.src)
             ),
             [_, item] if Lang::from_name(item.text(self.src)).is_some() => return,

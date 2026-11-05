@@ -6,6 +6,7 @@
 use super::Site;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
+use crate::types::lang::{self, Lang};
 use crate::types::ty::{Norm, Row, Type};
 use crate::types::{Checker, regions};
 
@@ -308,7 +309,7 @@ impl Checker<'_> {
         let writes = e
             .services
             .iter()
-            .any(|s| matches!(s.rsplit('.').next(), Some("Write" | "Registry")));
+            .any(|s| [Lang::AtomWrite, Lang::AtomRegistry].into_iter().any(|l| lang::label(l) == Some(s.as_str())));
         let setup = e.services.iter().any(|s| s.contains("Setup"));
         let document = e.services.iter().any(|s| s.contains("Document"));
         let fixes = [

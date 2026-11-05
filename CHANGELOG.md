@@ -13,6 +13,9 @@ break programs.
   core class `Enum.Enum t b`, whose methods are the companions `T.value`,
   `T.parse` (checked at compile time for a constant, `FLICK-D006`) and
   `T.all`. The interface format is version 4.
+- **Internal:** the makers of atoms, actions and views are marked `@maker`
+  in `std`, and the types, services and policies the `ui` checks name are
+  lang items, so the compiler spells no module of `std` for them.
 - **Enums in std:** `deriving Schema` of an enum writes its literals on the
   wire, `{ "enum": [...] }` in JSON Schema, or `{ "_tag": "Get" }` with
   `deriving Schema { wire = "tag" }`; `Schema.enum base` is the combinator.

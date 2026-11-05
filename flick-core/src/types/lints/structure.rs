@@ -9,7 +9,7 @@ use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::lang::Lang;
+use crate::types::lang::{self, Lang};
 
 /// The expressions each of which nests what is inside it one level deeper.
 const NESTS: [K; 7] = [
@@ -144,7 +144,8 @@ impl Checker<'_> {
             if let Some(effects) = effects
                 && let Type::Row(row) = &effects.services
             {
-                reads |= row.entries.iter().any(|(l, _)| l == "Atom.Read");
+                reads |= (row.entries.iter())
+                    .any(|(l, _)| Some(l.as_str()) == lang::label(Lang::AtomRead));
             }
             ty = *result;
         }

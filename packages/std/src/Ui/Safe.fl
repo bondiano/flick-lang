@@ -1,0 +1,17 @@
+/// What a page may carry as it is: URLs of a safe scheme and HTML the
+/// program vouches for. `Ui` exports them all.
+module Ui.Safe exposing (..)
+
+/// A URL with a safe scheme (`http`, `https`, `mailto`) or relative.
+type SafeUrl
+
+/// HTML trusted to be safe; nothing checks it.
+type SanitizedHtml
+
+/// The URL if its scheme is safe.
+safe_url : String -> Option SafeUrl
+foreign pure safe_url from "@flick-lang/runtime/ui/react" "uiSafeUrl"
+
+/// HTML the program vouches for: it is inserted as it is.
+trusted_html : String -> SanitizedHtml
+foreign pure trusted_html from "@flick-lang/runtime/ui/react" "uiTrustedHtml"

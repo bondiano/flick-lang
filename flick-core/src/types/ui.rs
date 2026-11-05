@@ -12,7 +12,7 @@ use crate::ir::Label;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::lang::Lang;
+use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
     /// A foreign component takes props only inside `ui`, through `Ui.component`.
@@ -23,7 +23,7 @@ impl Checker<'_> {
                 &target,
                 Type::App { head, .. }
                     if matches!(head.as_ref(), Type::Con { module, name }
-                        if module == "Ui" && name == "Component")
+                        if lang::is(Lang::UiComponent, module, name))
             )
         {
             self.expect(ty, &target, span);
@@ -45,12 +45,20 @@ impl Checker<'_> {
         let Some(Ref::Value { module, name }) = self.typing.names.get(&head.range()) else {
             return;
         };
-        if !matches!(module.as_str(), "Ui.Event" | "Action")
-            || !matches!(name.as_str(), "queue" | "concurrent")
-        {
+        let limited = [
+            Lang::EventQueue,
+            Lang::ActionQueue,
+            Lang::EventConcurrent,
+            Lang::ActionConcurrent,
+        ];
+        let Some(policy) = limited.into_iter().find(|l| lang::is(*l, module, name)) else {
             return;
-        }
-        let what = if name == "queue" { "capacity" } else { "limit" };
+        };
+        let what = if matches!(policy, Lang::EventQueue | Lang::ActionQueue) {
+            "capacity"
+        } else {
+            "limit"
+        };
         if let Some(Const::Number(n)) = consteval::eval(arg, self.text)
             && !(n >= 1.0 && n.fract() == 0.0 && n.is_finite())
         {
@@ -68,7 +76,7 @@ impl Checker<'_> {
     pub fn ui_render_handlers(&mut self, head: &Node, render: &Node) {
         let is_view = matches!(
             self.typing.names.get(&head.range()),
-            Some(Ref::Value { module, name }) if module == "Ui" && name == "view"
+            Some(Ref::Value { module, name }) if lang::is(Lang::View, module, name)
         );
         if !is_view {
             return;
@@ -148,15 +156,14 @@ impl Checker<'_> {
             let label = match self.bare(&ty).spine().0 {
                 // a family is not an atom: its atoms are made later, by key
                 Type::Con { module, name }
-                    if name != "Family" && ATOMS.contains(&(module.as_str(), name.as_str())) =>
+                    if !lang::is(Lang::AtomFamily, module, name) && is_atom(module, name) =>
                 {
                     Label::Atom
                 }
                 Type::Con { module, name }
-                    if matches!(
-                        (module.as_str(), name.as_str()),
-                        ("Ui", "View" | "Handler") | ("Action", "Action")
-                    ) =>
+                    if [Lang::UiView, Lang::UiHandler, Lang::Action]
+                        .into_iter()
+                        .any(|l| lang::is(l, module, name)) =>
                 {
                     Label::Component
                 }
@@ -172,7 +179,7 @@ impl Checker<'_> {
         let mut held = Vec::new();
         self.zonk(ty).visit(&mut |t| {
             if let (Type::Con { module, name }, args) = t.spine()
-                && ATOMS.contains(&(module.as_str(), name.as_str()))
+                && is_atom(module, name)
             {
                 held.extend(args.into_iter().cloned());
             }
@@ -197,8 +204,7 @@ impl Checker<'_> {
         let quantified = |t: &Type| t.contains(&mut |v| matches!(v, Type::Var(_)));
         let polymorphic = ty.contains(&mut |t| match t.spine() {
             (Type::Con { module, name }, args) => {
-                ATOMS.contains(&(module.as_str(), name.as_str()))
-                    && args.into_iter().any(quantified)
+                is_atom(module, name) && args.into_iter().any(quantified)
             }
             _ => false,
         });
@@ -234,7 +240,7 @@ impl Checker<'_> {
                 .entries
                 .iter()
                 .map(|(l, _)| l.as_str())
-                .eq(["Atom.Read"])
+                .eq(lang::label(Lang::AtomRead))
     }
 
     /// Whether `ty` is the setup of a component: a function whose services
@@ -364,14 +370,35 @@ fn funs<'n>(
     }
 }
 
-/// The types of atoms, by module and name; a signature keeps the aliases.
-const ATOMS: [(&str, &str); 6] = [
-    ("Reactivity.Atom", "Atom"),
-    ("Reactivity.Atom", "Writable"),
-    ("Atom", "Atom"),
-    ("Atom", "Writable"),
-    ("Atom", "Browser"),
-    ("Atom", "Family"),
+/// The types of atoms; a signature keeps the aliases.
+const ATOMS: [Lang; 6] = [
+    Lang::ReactivityAtom,
+    Lang::ReactivityWritable,
+    Lang::Atom,
+    Lang::AtomWritable,
+    Lang::AtomBrowser,
+    Lang::AtomFamily,
+];
+
+/// Whether `module.name` is a type of atoms.
+fn is_atom(module: &str, name: &str) -> bool {
+    ATOMS.into_iter().any(|l| lang::is(l, module, name))
+}
+
+/// The makers of serializable atoms, whose key U003 checks.
+const SERIALIZABLE: [Lang; 4] = [
+    Lang::Serializable,
+    Lang::SerializableFamily,
+    Lang::SerializableTask,
+    Lang::SerializableResult,
+];
+
+/// The event policies of `Ui.Event`, which make an action.
+const EVENTS: [Lang; 4] = [
+    Lang::EventExhaust,
+    Lang::EventLatest,
+    Lang::EventQueue,
+    Lang::EventConcurrent,
 ];
 
 /// The declarations, those of each `rec` group one by one.
@@ -388,7 +415,9 @@ pub(super) fn members<'n>(decls: &[&'n Node]) -> impl Iterator<Item = &'n Node> 
 
 /// The arguments of a serializable maker: its codecs and its state.
 fn key_arity(name: &str) -> usize {
-    if name == "serializable_result" { 3 } else { 2 }
+    let result = lang::module_of(Lang::SerializableResult).is_some()
+        && name == lang::item(Lang::SerializableResult).name;
+    if result { 3 } else { 2 }
 }
 
 /// The serializable atoms under a declaration: where each is named, and
@@ -420,14 +449,7 @@ impl Keyed {
             _ => {}
         }
         if let Some(Ref::Value { module, name }) = names.get(&node.range())
-            && module == "Atom"
-            && matches!(
-                name.as_str(),
-                "serializable"
-                    | "serializable_family"
-                    | "serializable_task"
-                    | "serializable_result"
-            )
+            && SERIALIZABLE.into_iter().any(|l| lang::is(l, module, name))
             && self.found.last().is_none_or(|(r, ..)| *r != node.range())
         {
             self.found.push((node.range(), name.clone(), in_function));
@@ -450,11 +472,7 @@ fn handlers_of_lambdas(node: &Node, names: &HashMap<Range, Ref>, out: &mut Vec<(
             .first()
             .and_then(|head| match names.get(&head.range()) {
                 Some(Ref::Value { module, name })
-                    if module == "Ui.Event"
-                        && matches!(
-                            name.as_str(),
-                            "exhaust" | "latest" | "queue" | "concurrent"
-                        ) =>
+                    if EVENTS.into_iter().any(|l| lang::is(l, module, name)) =>
                 {
                     Some(format!("{module}.{name}"))
                 }

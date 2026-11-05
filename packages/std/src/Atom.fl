@@ -9,9 +9,11 @@ module Atom exposing (.., Registry)
 
 import Reactivity.Atom exposing (Registry)
 
+@lang atom
 /// A value to read.
 type alias Atom a = Reactivity.Atom.Atom a
 
+@lang atom_writable
 /// A state: a value to read and write.
 type alias Writable a = Reactivity.Atom.Writable a
 
@@ -20,6 +22,7 @@ type alias Writable a = Reactivity.Atom.Writable a
 service Read =
   get : forall a d. (Atom a)^d ->{} a
 
+@lang atom_write
 /// Writing atoms: the task of an action, or a request on a server, writes
 /// states through it; a render, whose only service is `Read`, cannot. A
 /// write names its place in the source, `Module:line`, which a debug log
@@ -36,6 +39,7 @@ service Write =
 layer : Layer none none {Registry, Write}
 foreign pure layer from "@flick-lang/runtime/effect/reactivity/Atom" "atomLayer"
 
+@maker
 /// A state holding `value`, whatever its type. A registry keeps its value
 /// while it lives, read or not, so a write before the first read stays.
 make : a -> Writable a
@@ -53,36 +57,44 @@ fresh : a -> Writable a
 foreign pure fresh from "@flick-lang/runtime" "atomLocal"
   arity 1
 
+@lang serializable
+@maker
 /// The state `atom`, coded by `wire` so a server can hand its value to
 /// the client. Its key is the name of the top-level binding it defines,
 /// `Module.name`, which the compiler gives; anywhere else it is an error.
 serializable : PureCodec Json a -> Writable a -> Writable a
 let serializable wire atom = Reactivity.Atom.serializable "Atom.serializable" wire atom
 
+@lang serializable_family
+@maker
 /// One serializable state per key, made by `f` the first time: the key of
 /// each is `Module.name/key`.
 serializable_family : PureCodec Json a -> (String -> Writable a) -> String -> Writable a
 let serializable_family wire f =
   Reactivity.Atom.serializable_family "Atom.serializable_family" wire f
 
+@lang atom_browser
 /// A state the browser holds, such as the URL. A server has no browser, so
 /// a view reads one only through `on_server` or `client_only`, which say
 /// what the server renders; a root that hydrates server markup renders
 /// that too, then the browser's value.
 type Browser a
 
+@maker
 /// The browser state `atom`, read as `value` on a server and while a root
 /// hydrates.
 on_server : a -> Browser a -> Writable a
 foreign pure on_server from "@flick-lang/runtime" "atomOnServer"
   arity 2
 
+@maker
 /// The value of the browser state `atom`: `None` on a server and while a
 /// root hydrates, `Some` after.
 client_only : Browser a -> Atom (Option a)
 foreign pure client_only from "@flick-lang/runtime" "atomClientOnly"
   arity 1
 
+@maker
 /// The search parameter `name` of the page's URL, `""` when it has none;
 /// a write updates the URL.
 search_param : String -> Browser String
@@ -96,6 +108,7 @@ stored : String -> Browser (Option String)
 foreign pure stored from "@flick-lang/runtime" "atomStored"
   arity 1
 
+@maker
 /// The page as a value of a type that derives `Url`: the browser's URL
 /// parsed by `url`, `fallback` when no route matches. A write navigates:
 /// it pushes the value's URL to the history, and the back button gives
@@ -110,6 +123,7 @@ foreign pure route from "@flick-lang/runtime" "atomRoute"
 serving : String ->{Write;} Unit
 foreign effect serving from "@flick-lang/runtime" "atomServing"
 
+@maker
 /// An atom computed by `compute` from the atoms it reads, again when one
 /// of them changes.
 derived : (Unit ->{Read;} a) -> Atom a
@@ -166,6 +180,7 @@ let refresh atom = Write.refresh atom
 /// The result of a task an atom runs: still loading, loaded, or failed.
 type Async a (e : ErrorRow) = Loading | Loaded a | Failed (Failure e)
 
+@maker
 /// An atom of the result of `task`, run by the registry that first reads
 /// it and run anew by `Atom.refresh`. A view reads it like any
 /// atom and matches its three cases.
@@ -178,6 +193,7 @@ query : List String -> Eff none e a -> Atom (Async a e)
 foreign pure query from "@flick-lang/runtime" "atomQuery"
   arity 2
 
+@maker
 /// The task atom of `load` of the route's value, run anew when the route
 /// changes: a page's data. Made serializable, the result a server loaded
 /// for the requested URL is where the client starts.
@@ -214,6 +230,8 @@ let ready atom =
   | Failed failure -> Failure.rethrow failure
   | Loading -> pending ()
 
+@lang serializable_task
+@maker
 /// The task atom `atom`, whose loaded value `wire` codes so a server can
 /// hand it to the client: the client starts from it instead of running
 /// the task again. One still loading or failed is not handed over. Its key
@@ -225,6 +243,8 @@ let serializable_task wire atom = serializable_task_at "Atom.serializable_task" 
 serializable_task_at : String -> PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
 foreign pure serializable_task_at from "@flick-lang/runtime" "atomSerializableTask"
 
+@lang serializable_result
+@maker
 /// `serializable_task` whose failure of one typed error, coded by
 /// `error_wire`, is handed over too: the client shows the server's
 /// `NotFound` instead of asking again. A defect or an interruption is never
@@ -244,6 +264,7 @@ serializable_result_at :
   Atom (Async a {x | none})
 foreign pure serializable_result_at from "@flick-lang/runtime" "atomSerializableResult"
 
+@lang atom_family
 /// Atoms by key: `at family key` makes the atom of `key` the first time
 /// and gives the same one for every equal key after, so a view takes the
 /// atoms of its items from a family, not from `make` while it renders. Keys
@@ -252,6 +273,7 @@ foreign pure serializable_result_at from "@flick-lang/runtime" "atomSerializable
 /// `forget` lets it go.
 type Family k a
 
+@maker
 /// The family of the atoms `f` makes.
 family : Hash k => (k -> a) -> Family k a
 foreign pure family from "@flick-lang/runtime" "atomFamily"

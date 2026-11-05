@@ -15,16 +15,16 @@ use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::lang::Lang;
+use crate::types::lang::{self, Lang};
 
 /// The services of a stage that reads atoms.
 fn reader() -> Type {
-    let read = Type::Con {
-        module: "Atom".to_owned(),
-        name: "Read".to_owned(),
+    // none without the modules of atoms
+    let Some(label) = lang::label(Lang::AtomRead) else {
+        return Type::empty_row();
     };
     Type::Row(Row {
-        entries: vec![("Atom.Read".to_owned(), read)],
+        entries: vec![(label.to_owned(), Type::lang(Lang::AtomRead))],
         tail: None,
     })
 }

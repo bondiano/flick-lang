@@ -5,9 +5,11 @@
 /// same atom read through two registries has two values.
 module Reactivity.Atom exposing (..)
 
+@lang reactivity_atom
 /// A value a registry computes and keeps.
 type Atom a
 
+@lang reactivity_writable
 /// An atom that also takes writes: a state.
 type Writable a
 
@@ -87,6 +89,7 @@ idle_ttl : Duration.Duration -> Atom a -> Atom a
 foreign pure idle_ttl from "@flick-lang/runtime/effect/reactivity/Atom" "flickIdleTtl"
   reviewed "effect@4.1.2 sha256:ff359ba0593bfaa2"
 
+@lang atom_registry
 /// The values of atoms, held by Effect's `AtomRegistry`.
 service Registry =
   get : forall a. Atom a ->{} a

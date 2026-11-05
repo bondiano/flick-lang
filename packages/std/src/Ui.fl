@@ -4,8 +4,11 @@
 /// the policy of its handler (`Action`, `Ui.Event`). Inside `ui { … }` the
 /// names of this module need no `Ui.`, and a `Component p` takes its props
 /// directly: `badge props` means `Ui.component badge props`.
-module Ui exposing (..)
+module Ui exposing (.., SafeUrl, SanitizedHtml, safe_url, trusted_html)
 
+import Ui.Safe exposing (SafeUrl, SanitizedHtml, safe_url, trusted_html)
+
+@lang ui_handler
 /// What handles DOM events with snapshot `s`: a task per event under a
 /// concurrency policy. Only `Ui.Event.exhaust`, `latest`, `queue` and
 /// `concurrent` and their `Action` forms make one, so no handler is
@@ -27,16 +30,11 @@ type alias InputSnapshot = {
 /// A tab of `tabs`: a label and its content.
 type Tab
 
-/// A URL with a safe scheme (`http`, `https`, `mailto`) or relative.
-type SafeUrl
-
-/// HTML trusted to be safe; nothing checks it.
-type SanitizedHtml
-
 /// A React renderer factory bound with `foreign pure`: `mount_with` calls it
 /// for `render(node)` and `unmount()`; importing it mounts nothing.
 type Renderer
 
+@lang ui_component
 /// A React component of foreign code taking props `p`, bound with
 /// `foreign pure`: Flick renders it and never calls it.
 type Component p
@@ -254,14 +252,6 @@ foreign pure tabs from "@flick-lang/runtime/ui/react" "uiTabs"
 component : forall p. Component p -> p -> Ui
 foreign pure component from "@flick-lang/runtime/ui/react" "uiComponent"
 
-/// The URL if its scheme is safe.
-safe_url : String -> Option SafeUrl
-foreign pure safe_url from "@flick-lang/runtime/ui/react" "uiSafeUrl"
-
-/// HTML the program vouches for: it is inserted as it is.
-trusted_html : String -> SanitizedHtml
-foreign pure trusted_html from "@flick-lang/runtime/ui/react" "uiTrustedHtml"
-
 /// `Ui.Dom.mount` with a renderer factory, called when this call starts,
 /// instead of a DOM container. The elements here are still DOM ones.
 mount_with :
@@ -273,10 +263,13 @@ mount_with :
 foreign effect mount_with from "@flick-lang/runtime/ui/react" "uiMountWith"
   retention call
 
+@lang ui_view
 /// A component that reads atoms while it renders: React renders it again
 /// when one of them changes, or when its props do.
 type View p
 
+@lang view
+@maker
 /// The component of `render`.
 view : forall c p. (p ->{Atom.Read;} Ui^c)^c -> (View p)^c
 foreign pure view from "@flick-lang/runtime/ui/react" "uiView"
@@ -402,6 +395,7 @@ watch :
   (Unit ->{Atom.Read;} a)^c -> (a -> (Eff {Atom.Write, Document} none Unit)^c)^c ->{Setup s;} Unit
 let watch read run = Setup.start (watched read run)
 
+@maker
 /// The component named `name` in React's developer tools.
 named : forall c p. String -> (View p)^c -> (View p)^c
 foreign pure named from "@flick-lang/runtime/ui/react" "uiNamed"
@@ -523,6 +517,7 @@ heading_at : forall c. Level -> List (Ui^c) -> Ui^c
 foreign pure heading_at from "@flick-lang/runtime/ui/react" "uiHeadingAt"
   retention call
 
+@maker
 /// A view whose render may read tasks with `Atom.ready`: while one loads
 /// it shows `fallback`, and when one failed it shows `failed` of the
 /// failure, so each error of `x` has a place to go.
