@@ -107,7 +107,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | L6 | `lemma_6` (`Lemma4.lean`); the invariant of a configuration: `CfgTy` (`Soundness.lean`) |
 | §3.4 `⊢ Λ`: where a region may be written, the ancestors of a region | `Tm.Within`, `LocOk`, `Nest` (`Within.lean`, `Nest.lean`); kept by every step: `Nest.step`, `Nest.cstep` (`NestMain.lean`, `Regions.lean`) |
 | L5 | `Nest.nested` (`NestClose.lean`); in every reached configuration: `reach_nest`, `Nest.live` (`Regions.lean`) |
-| §2.7 obligations `{Provided {S} ϱ}`, uses of a service of a `provide` | `Elem.ob`, `Elem.need`; `Row.obs` in `Const.ty` of `spawn`/`addFin` (`Syntax.lean`); `Row.withP`, `Row.disch`, `Row.needs` in `Typ.with_`, `Typ.scope`, `Typ.inside`, `Typ.provideL`/`provideE` (`Rules.lean`) |
+| §2.7 obligations `{Provided {S} ϱ}` and `{Provided r ϱ}` over a row variable, uses of a service of a `provide` | `Elem.ob`, `Elem.obv`, `Elem.need`; `Row.obs` in `Const.ty` of `spawn`/`addFin` (`Syntax.lean`); `Row.withP`, `Row.disch`, `Row.needs`, `Stage.ObOut` in `Typ.with_`, `Typ.scope`, `Typ.inside`, `Typ.provideL`/`provideE` (`Rules.lean`) |
 | the region of `provide`; a service of an ended `provide` | `RHead.provideEnv`, `Tm.with_ q θ e`, the premise `Live Λ q` of `Step.askWith` (`Semantics.lean`); `DeadAsk` (`StepFrame.lean`) |
 | runtime.md §3.5: a child and a finalizer keep the `with` frames | `withs`, `Step.spawn`, `Step.addFin` (`Semantics.lean`); their typing `withs_typing`, `fin_await` (`KidTy.lean`) |
 | an `inside` form is younger than the `with` frames around it | `Tm.Asc`, `CfgAsc`, `Step.asc` (`Asc.lean`, `AscStep.lean`) |
@@ -120,7 +120,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | T1 | `T1` (`Soundness.lean`) |
 | T2(a), T2(b) | `T2a`, `T2b`, `T2b_await` (`Effects.lean`) |
 | lemma 3.1, T3 | `lemma_3_1`, `T3` (`Generalization.lean`) |
-| a polymorphic use; a use of a row-polymorphic function at a row of services; a `_` arm that removes a row variable of errors; a scope that acquires and uses, as checks | `Examples.lean` |
+| a polymorphic use; a use of a row-polymorphic function at a row of services; a `_` arm that removes a row variable of errors; a `provide` of a layer whose outputs are a row variable; a scope that acquires and uses, as checks | `Examples.lean` |
 
 ## Representation
 
@@ -198,9 +198,9 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 1. **Row variables are variables of the scheme.** A scheme abstracts a row variable as
    any other variable, and (Var) instantiates it by a row (`Ty.row`); constants are typed
    at any rows (`CArg`). Kinds are not checked. A row variable stands for names, atoms and
-   variables, never for obligations or uses; the rows that must be named are those of the
-   outputs of `Layer.merge`, the services of `provide` and the work of `Fiber.spawn` and
-   `Scope.add_finalizer` (`Row.Named`, items 8 and 21). `⌈Errors ε⌉` counts the row
+   variables, never for obligations or uses; the rows that must be named are the outputs of
+   `Layer.merge`, and those of `provide` when its body has obligations (`Row.Named`, items 8
+   and 21). `⌈Errors ε⌉` counts the row
    variables of `ε`, as `regions.md` §2.1 and the checker do (`regions/mod.rs`
    `error_row_captures`): an instance shows what its errors reach, and `⌈·⌉` must commute
    with it, so a closure over an error of an unknown row holds that row. What still keeps a
@@ -243,9 +243,11 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 8. **Environments.** `Env ρ` means "binds exactly `ρ`", as (Env), (Bind) and (Join)
    give it: T4.3 needs that a `with` frame answers `S` exactly when its row has `S`. `with θ e` and `econs` require
    `θ` and the bound values to be values. The disjointness of `Layer.merge` is kept
-   (`Const.ok`) though soundness does not need it. The services a `provide` gives and the
-   outputs `Layer.merge` joins are named, without row variables (`Row.Named`): a row
-   variable among the outputs (`core.md`, [`provide` and output row variables](../docs/formal/core.md#provide-discharges-only-the-listed-outputs-of-a-layer-not-a-row-variable)) is not modelled.
+   (`Const.ok`) though soundness does not need it. The outputs `Layer.merge` joins are
+   named, without row variables (`Row.Named`): the checker compares the names it sees, and
+   instantiating a row variable may make them overlap, so the condition is not kept by a
+   substitution. The services a `provide` gives may be a row variable, which its body may
+   require (`core.md`, [`provide` and output row variables](../docs/formal/core.md#provide-discharges-only-the-listed-outputs-of-a-layer-not-a-row-variable); `with_layer` in `Examples.lean`).
 9. **Allocation is deterministic:** `Ref.make v` takes `ℓ = μ.length`, `scope` takes
    `π = Λ.length`.
 10. **Programs** are closed terms typed in the empty store with no facts; modules
@@ -311,14 +313,17 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     reached configuration (live work reaches only live regions), which after a step
     that closes `π` says that nothing that can step reaches `π`.
 21. **Obligations of `provide` (regions.md §2.7) are row elements.** `Provided {S} ϱ` is
-    an element `ob S ϱ` of a row of services; `Fiber.spawn` and `Scope.add_finalizer`
-    put one for each service of the work into the stage of the call (`Row.obs`); the
-    services of the work are named, so `Provided r ϱ` over a row variable `r` is not
-    modelled (`Const.ok`). A
+    an element `ob S ϱ` of a row of services, and `Provided r ϱ` over a row variable `r`
+    an element `obv r ϱ`, which a substitution turns into the obligations of what `r` stands
+    for; `Fiber.spawn` and `Scope.add_finalizer` put one for each service and each row
+    variable of the work into the stage of the call (`Row.obs`). A
     `provide` in a program binds no region variable: an obligation about a region
     created in its body is discharged at the end of that region (`Row.disch`, the second
-    case of §2.7, `S` coming from outside it), and one that reaches a `provide` giving `S`
-    is rejected, which is the first case. An obligation not discharged stays in the row
+    case of §2.7, `S` or `r` coming from outside it), and one that reaches a `provide`
+    giving `S` is rejected, which is the first case. Which services an instance of a row
+    variable gives is unknown there, so `provide` asks more (`Stage.ObOut`): an obligation
+    `ob S ϱ` passes only outputs without row variables, and `obv r ϱ` only outputs that give
+    no service. An obligation not discharged stays in the row
     of the stage and of the arrows that carry it, which is the deferred element and the
     given `Provided` of a signature. At run time a `with` frame carries the region of its
     `provide`, records the uses `need S q` of its services and discharges an obligation

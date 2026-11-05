@@ -116,12 +116,12 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ =>
     intro σ hσ
     exact .provideL (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
-      (by simpa [Stage.substT] using Stage.le_substT σ h₁) ⟨h₀.1.substT σ, ob_free_substT h₀.1 h₀.2⟩
+      (by simpa [Stage.substT] using Stage.le_substT σ h₁) (h₀.substT σ)
       (by simpa [Stage.substT] using Stage.le_substT σ h₂)
   | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ =>
     intro σ hσ
     exact .provideE (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
-      (by simpa [Stage.substT] using Stage.le_substT σ h₁) ⟨h₀.1.substT σ, ob_free_substT h₀.1 h₀.2⟩
+      (by simpa [Stage.substT] using Stage.le_substT σ h₁) (h₀.substT σ)
       (by simpa [Stage.substT] using Stage.le_substT σ h₂)
   | with_ hv _ _ h₁ h₂ ih₁ ih₂ =>
     intro σ hσ

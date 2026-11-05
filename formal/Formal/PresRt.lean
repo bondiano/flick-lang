@@ -180,11 +180,11 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
           · exact (h h').elim
           · exact .inl h'
         | ob N a =>
-          refine ⟨fun h => (h₀.2 N a hx h).elim, fun _ => ?_⟩
+          refine ⟨fun h => ((h₀.1 N a hx).2 h).elim, fun _ => ?_⟩
           rcases hx' with h' | h'
           · obtain ⟨_, h''⟩ := nm _ h'; cases h''
           · exact .inl h'
-        | atm a | need _ a | rv a =>
+        | atm a | need _ a | rv a | obv _ a =>
           rcases hx' with h' | h'
           · obtain ⟨_, h''⟩ := nm _ h'; cases h''
           · exact .inl h'
