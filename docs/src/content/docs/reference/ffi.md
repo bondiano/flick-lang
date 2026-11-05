@@ -161,17 +161,27 @@ error too. Nothing is inferred that a declaration cannot show: a call is
 | `...xs: T[]` | `List T` with `variadic` |
 | unconstrained `<T>` | `forall t.`, if `T` appears in a parameter |
 | a class instance, `Date`, a named object type | an opaque `type` of the generated module |
+| `type Method = "GET" \| "POST"` | an enum `untagged type Method` of the generated module |
 | a callback `(a: A) => B` | a pure `(A -> B)`; needs `retention` |
 | `Promise<T>` result | `foreign async`; needs `catch` |
 | `T \| undefined` or `T \| null` result | `Option T` with `nullable`; needs `undefined = "none"` |
 | overloads with different numbers of parameters | one binding each, `name_<n>` |
 
-Unions, literal types, intersections, bounded or result-only type
+Other unions, literal types, intersections, bounded or result-only type
 parameters, `this` parameters, `null` arguments, object arguments of
 unnamed shape, functions returned, the class itself (`typeof C`) and a type
 name the package declares twice (two `Options` in different files) are
 unsupported, each with its reason.
 A trailing optional parameter of such a type is left out, with a note.
+
+A `type` alias whose members are all string literals, or all integers,
+becomes an enum: `untagged type Method = Get = "GET" | Post = "POST"`, whose
+values JS sees as the literals themselves. A string literal's constructor
+is its words in PascalCase (`"content-type"` → `ContentType`); a literal
+without such a name, every integer, and two literals or two enums that
+would share a constructor need names in the policy. A union of literals
+without an alias, or one that mixes strings, numbers or booleans, is
+unsupported. Naming a union in the `.d.ts` leaves the fingerprint as it is.
 
 Policies sit in `<dir>/<Pkg>/policy.toml`, which the import reads and never
 writes:
@@ -185,6 +195,10 @@ catch = "JsError"          # a throw or rejection becomes JsError
 cancel = "signal"          # an async call gets an AbortSignal
 # mode = "pure"            # trust the call to be pure
 # retention = "call"       # or "owner": how long JS keeps a callback
+
+[enums.Status]             # constructor names of an enum, by literal
+200 = "Ok"
+404 = "Missing"
 ```
 
 For `export declare function lookup(id: string): Promise<string | undefined>`

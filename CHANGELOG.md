@@ -13,6 +13,12 @@ break programs.
   core class `Enum.Enum t b`, whose methods are the companions `T.value`,
   `T.parse` (checked at compile time for a constant, `FLICK-D006`) and
   `T.all`. The interface format is version 4.
+- **Enums across the FFI:** the TypeScript facade of an enum is the union
+  of its literals, `"GET" | "POST"`, and of an opaque one `string` or
+  `number` branded with its qualified name. `flick ffi import` makes an
+  enum of a `type` alias of string or integer literals, constructors named
+  in PascalCase or by `[enums.<Type>]` of `policy.toml`; the fingerprint of
+  an export leaves the alias out, so reviewed bindings stay current.
 - **Plugins:** `import Sql exposing (plugin sql)` makes `sql { … }` a block
   the plugin of `Sql`'s package expands: the user's code inside keeps its
   place for errors and editors, the plugin's code is checked in place of
