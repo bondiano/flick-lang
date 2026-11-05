@@ -94,7 +94,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | loc : Ψ[l]? = some t → Typ Ψ Θ Γ (.loc l) (.ex (.ref t) φ)
   | const : c.ok Θ ι → Le (c.ty S ι) T → Typ Ψ Θ Γ (.const c) (.ex T φ)
   | ctor {ts us : List Ty} : S.ctor K = some (k, ts, T₀) → us.length = k →
-      Le (Sig.ctorTy ts T₀ us) T → Typ Ψ Θ Γ (.ctor K) (.ex T φ)
+      Le (Sig.ctorTyR ts T₀ (S.res K) us) T → Typ Ψ Θ Γ (.ctor K) (.ex T φ)
   | rnil : Typ Ψ Θ Γ .rnil (.ex .rnil φ)
   | rcons : R.IsRec → l ∉ R.labels → Typ Ψ Θ Γ e (.ex t φ) → Typ Ψ Θ Γ r (.ex R φ) →
       Typ Ψ Θ Γ (.rcons l e r) (.ex (.rcons l t R) φ)
@@ -202,5 +202,10 @@ structure RootTy (root : Roots) : Prop where
   glob : ∀ g v, root.glob g = some v → (∀ x, ¬ v.Has x) ∧
     ∃ s, S.glob g = some s ∧ Typ S [] s.cs [] v (.ex s.t .pure)
   globs : ∀ g s, S.glob g = some s → (root.glob g).isSome
+
+/-- An ordinary constructor at `T us`. -/
+theorem Typ.ctor_plain {Ψ Θ Γ K k ts T₀ us T φ} (hK : S.ctor K = some (k, ts, T₀))
+    (hk : us.length = k) (hT : Le (Sig.ctorTy ts T₀ us) T) : Typ S Ψ Θ Γ (.ctor K) (.ex T φ) :=
+  .ctor hK hk (by rw [S.ctorTyR_plain hK hk]; exact hT)
 
 end Flick

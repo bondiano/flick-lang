@@ -24,7 +24,8 @@ theorem Shp.spine {fl : Bool} {v : Tm} {U : Ty} (h : Shp S fl U v) : fl = false 
     ∃ K k ts T rest, S.ctor K = some (k, ts, T) ∧ v.head = .ctor K ∧
       U = Ty.arrows rest (.tcon T (idTs k)) ∧ v.args + rest.length = ts.length := by
   induction h with
-  | head hK => intro _; exact ⟨_, _, _, _, _, hK, rfl, rfl, by simp [Tm.args]⟩
+  | head hK =>
+    intro _; exact ⟨_, _, _, _, _, hK, rfl, by rw [S.res_plain _ _ _ _ hK], by simp [Tm.args]⟩
   | app _ _ ihf _ =>
     intro _
     obtain ⟨K, k, ts, T, rest, hK, hh, hU, hn⟩ := ihf rfl

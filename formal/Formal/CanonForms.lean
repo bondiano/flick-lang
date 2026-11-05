@@ -60,7 +60,7 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     simp only [VKind, Tm.head, Tm.args, Const.kindAt]; rw [← hT.kind, Const.ty_kind]
   | ctor _ _ hT =>
     intro _ _ _ hJ; cases hJ
-    simp only [VKind, Tm.head]; rw [← hT.kind]; unfold Sig.ctorTy
+    simp only [VKind, Tm.head]; rw [← hT.kind]; unfold Sig.ctorTyR
     rcases Ty.arrows_kind _ _ _ with h | h <;> rw [h] <;> simp
   | errVal hv' _ hU _ ih =>
     intro _ _ _ hJ; cases hJ

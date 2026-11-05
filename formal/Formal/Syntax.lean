@@ -390,6 +390,9 @@ def Scheme.Closed (n : Nat) (s : Scheme) : Prop :=
   ∀ σ σ' : Atom → Ty, (∀ i, i < n → σ (.v i) = σ' (.v i)) →
     s.t.substT σ = s.t.substT σ' ∧ s.cs.substT σ = s.cs.substT σ'
 
+/-- `α₀ … αₖ₋₁`. -/
+def idTs (k : Nat) : List Ty := (List.range k).map Ty.tvar
+
 /-- Declared ADTs and services. A constructor has the number of parameters of its
 type, its argument types over them and its type name; its fields mention nothing
 but the parameters (`ctor_closed`, `ctor_reach`). The record type `S.Impl` of a
@@ -403,6 +406,13 @@ structure Sig where
     (∀ i, i < k → σ (.v i) = .tvar i) → ts.map (Ty.substT σ) = ts
   ctor_reach : ∀ K k ts T, ctor K = some (k, ts, T) →
     ∀ t ∈ ts, ∀ a, t.reach a → ∃ i, i < k ∧ a = .v i
+  /-- The arguments of the type a constructor builds, over its `k` variables:
+  `α₀ … αₖ₋₁` of an ordinary constructor, any types of one of a GADT. -/
+  res : Name → List Ty
+  res_closed : ∀ K k ts T σ, ctor K = some (k, ts, T) →
+    (∀ i, i < k → σ (.v i) = .tvar i) → (res K).map (Ty.substT σ) = res K
+  /-- Every constructor builds `T α₀ … αₖ₋₁` (until the rules of GADTs). -/
+  res_plain : ∀ K k ts T, ctor K = some (k, ts, T) → res K = idTs k
   impl_closed : ∀ N σ, (impl N).substT σ = impl N
   dict : Nat → Option (Nat × List (Label × Scheme))
   glob : Nat → Option Scheme

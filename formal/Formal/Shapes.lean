@@ -145,7 +145,7 @@ theorem Shp.false_arrows {U e} (h : Shp S false U e) :
       U = .arrows ts' (.tcon T (idTs k)) := by
   generalize hf : false = fl at h
   induction h with
-  | head hK => exact ⟨_, _, _, _, _, rfl, hK, rfl⟩
+  | head hK => exact ⟨_, _, _, _, _, rfl, hK, by rw [S.res_plain _ _ _ _ hK]⟩
   | app _ _ ih _ =>
     obtain ⟨K, k, ts, T, ts', hh, hK, hU⟩ := ih hf
     cases ts' with
@@ -196,8 +196,11 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     | rcons hv₁ hv₂ => exact ⟨.rcons (ih₁ hv₁ rfl).1 (ih₂ hv₂ rfl).1, by simp [Tm.head]⟩
   | ctor hK hk hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨(Shp.head hK).full_of (by rw [Shp.ctor_inst hk]; exact hT),
-      fun _ _ => .inl ⟨_, _, by rw [Shp.ctor_inst hk]; exact hT, .head hK⟩⟩
+    rw [S.ctorTyR_plain hK hk] at hT
+    have hh := Shp.head (S := S) hK
+    rw [S.res_plain _ _ _ _ hK] at hh
+    exact ⟨hh.full_of (by rw [Shp.ctor_inst hk]; exact hT),
+      fun _ _ => .inl ⟨_, _, by rw [Shp.ctor_inst hk]; exact hT, hh⟩⟩
   | errVal hv' h' hU hE ih =>
     intro _ _ _ hJ; cases hJ
     refine ⟨.hidden (by simp [Ty.Opaque, Ty.hd]),

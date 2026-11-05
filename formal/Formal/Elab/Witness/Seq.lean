@@ -34,8 +34,10 @@ theorem typ_list2 {K₁ K₀ T f e c n D A t φ}
     (hc : Typ Sg Ψ Θ (.mono A :: .mono (f.substT (instT [D, A])) :: Γ) c (.ex t φ))
     (hn : Typ Sg Ψ Θ Γ n (.ex t φ)) :
     Typ Sg Ψ Θ Γ (.match_ e (.acons (pvars K₁ 2) c (.acons (pvars K₀ 0) n .anil))) (.ex t φ) :=
-  .match_ he (.acons (.adt (.app (.app (.head (us := [D, A]) h₁ rfl) .var) .var) (tcon_hd T _)) hc
-    (.acons (.adt (.head (us := [D, A]) h₀ rfl) (tcon_hd T _)) hn .anil)) (.inl (exh_ctors hall _))
+  .match_ he (.acons (.adt (.app (.app (PatTy.head_plain Sg (us := [D, A]) h₁ rfl) .var) .var)
+      (tcon_hd T _)) hc
+    (.acons (.adt (PatTy.head_plain Sg (us := [D, A]) h₀ rfl) (tcon_hd T _)) hn .anil))
+    (.inl (exh_ctors hall _))
 
 theorem hall_seq : ∀ K k ts, Sg.ctor K = some (k, ts, "Seq") →
     pvars K ts.length ∈ [pvars "SCons" 2, pvars "SNil" 0] := by

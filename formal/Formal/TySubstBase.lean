@@ -161,9 +161,11 @@ theorem Typ.var_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} 
 
 theorem Typ.ctor_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name} {k : Nat}
     {ts us : List Ty} {T₀ : Name} {T : Ty} {φ : Stage} (hK : S.ctor K = some (k, ts, T₀))
-    (hk : us.length = k) (hT : Le (Sig.ctorTy ts T₀ us) T) (σ : Atom → Ty) :
+    (hk : us.length = k) (hT : Le (Sig.ctorTyR ts T₀ (S.res K) us) T) (σ : Atom → Ty) :
     Typ S Ψ Θ Γ (.ctor K) (.ex (T.substT σ) φ) := by
   refine .ctor (us := us.map (Ty.substT σ)) hK (by simpa using hk) ?_
+  rw [S.ctorTyR_plain hK hk] at hT
+  rw [S.ctorTyR_plain hK (by simpa using hk)]
   have := hT.substT σ; rwa [S.ctorTy_substT σ _ hk hK] at this
 
 theorem Typ.letGen_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {e b : Tm} {a t : Ty}

@@ -72,7 +72,8 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       by simp⟩
   | ctor hK hk hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, hT, .ctor hK hk .refl, fun _ _ => Sig.ctorTy_pureSpine _ _ _, by simp, by simp⟩
+    exact ⟨_, hT, .ctor hK hk .refl,
+      fun _ _ => by rw [S.ctorTyR_plain hK hk]; exact Sig.ctorTy_pureSpine _ _ _, by simp, by simp⟩
   | rnil => intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .rnil, by simp [Tm.head], by simp, by simp⟩
   | enil hρ =>
     intro _ _ _ hJ; cases hJ

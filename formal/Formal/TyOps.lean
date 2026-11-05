@@ -316,6 +316,22 @@ theorem Ty.field_substT {R : Ty} {l t} (σ : Atom → Ty) (h : R.field l = some 
 def Sig.ctorTy (ts : List Ty) (T : Name) (us : List Ty) : Ty :=
   Ty.arrows (ts.map (Ty.substT (instT us))) (Ty.tcon T us)
 
+/-- The type of a constructor that builds `T rs`, at the instance `us` of its
+variables. -/
+def Sig.ctorTyR (ts : List Ty) (T : Name) (rs us : List Ty) : Ty :=
+  Ty.arrows (ts.map (Ty.substT (instT us))) (Ty.tcon T (rs.map (Ty.substT (instT us))))
+
+theorem idTs_inst {k : Nat} {us : List Ty} (hk : us.length = k) :
+    (idTs k).map (Ty.substT (instT us)) = us := by
+  apply List.ext_getElem (by simp [idTs, hk])
+  intro i h₁ h₂
+  simp [idTs, Ty.substT, instT, h₂]
+
+/-- An ordinary constructor's type: it builds `T us`. -/
+theorem Sig.ctorTyR_plain (S : Sig) {K k ts T} (hK : S.ctor K = some (k, ts, T)) {us : List Ty}
+    (hk : us.length = k) : Sig.ctorTyR ts T (S.res K) us = Sig.ctorTy ts T us := by
+  simp only [Sig.ctorTyR, Sig.ctorTy, S.res_plain K k ts T hK, idTs_inst hk]
+
 theorem Sig.fields_inst_substT (S : Sig) {K k ts T} (σ : Atom → Ty) (us : List Ty)
     (hk : us.length = k) (h : S.ctor K = some (k, ts, T)) :
     (ts.map (Ty.substT (instT us))).map (Ty.substT σ) =

@@ -202,6 +202,7 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       fun _ h => by cases h; exact ⟨_, hT⟩, by simp⟩
   | ctor hK hk hT =>
     intro _ _ _ hJ; cases hJ
+    rw [S.ctorTyR_plain hK hk] at hT
     obtain ⟨hs, _⟩ := S.ctorTy_shows hK hk
     exact ⟨(held_none (by simp [Tm.Free]) (by simp [Tm.Has])).of_none _,
       fun _ _ => ⟨hT.shows hs, (held_none (by simp [Tm.Free]) (by simp [Tm.Has])).of_none _⟩,

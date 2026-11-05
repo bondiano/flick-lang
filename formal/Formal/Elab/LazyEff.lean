@@ -85,14 +85,15 @@ theorem typ_mkEff {Ψ Θ Γ e q b ψ φ} (he : Typ S Ψ Θ Γ e (.ex b ψ))
     (hψ : ψ.le (.rt Row.none Row.none)) (hn : ∀ s, ¬ e.Has s)
     (hh : ∀ s ∈ Γ, ∀ a, Flick.Scheme.reach s a → b.reach a ∨ q.reach a) :
     Typ S Ψ Θ Γ (mkEff mk e) (.ex (effT E q b) φ) :=
-  .app (ψ := .pure) (.ctor hmk (us := [q, b]) rfl (by rw [ctorTy_eff]; exact .refl))
+  .app (ψ := .pure) (.ctor hmk (us := [q, b]) rfl
+    (by rw [S.ctorTyR_plain hmk rfl, ctorTy_eff]; exact .refl))
     (.task he hψ (hn .ins) (held_sub (by simpa [Flick.Tm.Has] using hn) hh) .refl) trivial .refl
 
 theorem typ_unEff {Ψ Θ Γ e b q a t φ} (he : Typ S Ψ Θ Γ e (.ex (effT E q a) φ))
     (hb : Typ S Ψ Θ (.mono (.eff Row.none Row.none a q.reach) :: Γ) b (.ex t φ)) :
     Typ S Ψ Θ Γ (unEff mk e b) (.ex t φ) := by
   have hh := PatTy.head (S := S) hmk (us := [q, a]) rfl
-  rw [ctorTy_eff] at hh
+  rw [S.ctorTyR_plain hmk rfl, ctorTy_eff] at hh
   exact .match_ he (.acons (.adt (.app hh .var) rfl) hb .anil) (.inl (exh_one hmk hone [q, a]))
 
 omit hone in

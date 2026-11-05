@@ -137,6 +137,7 @@ theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     intro _ _ _ _ _ _ _ hK' hS hJ _
     cases hJ; simp only [Tm.head] at hK'; cases hK'
     rw [hK] at hS; cases hS
+    rw [S.ctorTyR_plain hK hk] at hT
     exact ⟨_, hk, hT.res_tcon (S.ctorTy_shows hK hk).2⟩
   | app hf _ _ hT ih₁ _ =>
     intro hv _ _ _ _ _ _ hK hS hJ hk
@@ -158,7 +159,8 @@ theorem PatTy.spine {fl p t Δ} (hp : PatTy S fl p t Δ) (hf : fl = false) :
       ∀ v δ, matchP p v = some δ → v.head = .ctor K := by
   induction hp with
   | head hK hk =>
-    refine ⟨_, _, _, _, _, hK, hk, (S.ctorTy_shows hK hk).2, fun v δ hm => ?_⟩
+    refine ⟨_, _, _, _, _, hK, hk, by rw [S.ctorTyR_plain hK hk]; exact (S.ctorTy_shows hK hk).2,
+      fun v δ hm => ?_⟩
     cases v <;> simp [matchP] at hm; simp [Tm.head, hm.1]
   | app _ _ ih _ =>
     obtain ⟨K, k, ts, T, us, hK, hk, hr, hm⟩ := ih rfl
@@ -196,6 +198,8 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
     cases hv with
     | ctor hK' hk'' hT =>
       rw [hK] at hK'; cases hK'
+      rw [S.ctorTyR_plain hK hk''] at hT
+      rw [S.ctorTyR_plain hK hk] at hres ⊢
       have hr := (S.ctorTy_shows hK hk).2
       have := hT.res_tcon (S.ctorTy_shows hK hk'').2
       rw [hres, hr] at this

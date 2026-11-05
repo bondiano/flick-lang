@@ -78,9 +78,6 @@ def Ty.Opaque (t : Ty) : Prop :=
   | .base _ | .adt _ | .rnil | .rcons .. => False
   | _ => True
 
-/-- `α₀ … αₖ₋₁`. -/
-def idTs (k : Nat) : List Ty := (List.range k).map Ty.tvar
-
 variable (S : Sig)
 
 /-- `⊢ p : τ ⇒ Δ` of core.md §2.4; the flag is `false` for an unsaturated
@@ -90,7 +87,7 @@ inductive PatTy : Bool → Pat → Ty → List Ty → Prop
   | var : PatTy true .var t [t]
   | lit : PatTy true (.lit l) (.base l.base) []
   | head {ts us : List Ty} : S.ctor K = some (k, ts, T) → us.length = k →
-      PatTy false (.ctor K) (Sig.ctorTy ts T us) []
+      PatTy false (.ctor K) (Sig.ctorTyR ts T (S.res K) us) []
   | app : PatTy false p (.arrow a .pure t Caps.none) Δ₁ → PatTy true q a Δ₂ →
       PatTy false (.app p q) t (Δ₁ ++ Δ₂)
   | adt : PatTy false p U Δ → U.hd = .adt T → PatTy true p U Δ
@@ -98,6 +95,12 @@ inductive PatTy : Bool → Pat → Ty → List Ty → Prop
   | rfield : R.field l = some t → PatTy true p t Δ₁ → PatTy true r R Δ₂ →
       PatTy true (.rfield l p r) R (Δ₁ ++ Δ₂)
   | or : PatTy true p t Δ → PatTy true q t Δ → PatTy true (.or p q) t Δ
+
+/-- The head of an ordinary constructor's pattern, at `T us`. -/
+theorem PatTy.head_plain {K k ts T us} (hK : S.ctor K = some (k, ts, T)) (hk : us.length = k) :
+    PatTy S false (.ctor K) (Sig.ctorTy ts T us) [] := by
+  have h := PatTy.head (S := S) hK hk
+  rwa [S.ctorTyR_plain hK hk] at h
 
 /-- Shapes of closed values of a type, as far as patterns see them. The fields of
 a constructor have the types of its declaration: a field of a parameter type is
@@ -108,7 +111,7 @@ inductive Shp : Bool → Ty → Tm → Prop
   | rnil : Shp true .rnil .rnil
   | rcons : Shp true t e → Shp true R r → Shp true (.rcons l t R) (.rcons l e r)
   | head {ts : List Ty} : S.ctor K = some (k, ts, T) →
-      Shp false (.arrows ts (.tcon T (idTs k))) (.ctor K)
+      Shp false (.arrows ts (.tcon T (S.res K))) (.ctor K)
   | app : Shp false (.arrow a .pure t Caps.none) f → Shp true a e → Shp false t (.app f e)
   | adt : Shp false U v → U.hd = .adt T → T'.hd = .adt T → Shp true T' v
 

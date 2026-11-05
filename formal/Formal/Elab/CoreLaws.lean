@@ -137,6 +137,7 @@ theorem has_caseOpt (hR : Real P S N) {Γ Δ e n s a t φ} (he : Has S N Γ Δ e
   obtain ⟨s', hs', ts⟩ := hs Ψ Θ _ _ _ (hc.cons N ⟨0, .mono a⟩)
   have pat : PatTy S true (.app (.ctor N.some) .var) (trT N (optTy a)) [trT N a] := by
     have hh := PatTy.head (S := S) hR.some (us := [trT N a]) rfl
+    rw [S.ctorTyR_plain hR.some rfl] at hh
     have e : Sig.ctorTy [.tvar 0] (N.con 3) [trT N a] =
         .arrow (trT N a) .pure (.tapp (.adt (N.con 3)) (trT N a)) Caps.none := by
       simp [Sig.ctorTy, Flick.Ty.arrows, Flick.Ty.tcon, Flick.Ty.substT, instT]
