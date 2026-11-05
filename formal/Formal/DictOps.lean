@@ -1,4 +1,4 @@
-import Formal.TyOps
+import Formal.SchemeOps
 
 /-!
 # Dictionary records and globals of λFlick⁺: substitution

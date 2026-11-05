@@ -40,6 +40,7 @@ change needs.
 | [Plugins reach only what is granted](#plugins-reach-only-what-is-granted) | no | `FLICK-P038`, `FLICK-P039` |
 | [`LogLevel` is an enum](#loglevel-is-an-enum) | no | `FLICK-T001` |
 | [Plugins speak interface 0.13](#plugins-speak-interface-013) | no | `FLICK-P035` |
+| [A closure over an error value says so](#a-closure-over-an-error-value-says-so) | no | `FLICK-G001` |
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
@@ -272,6 +273,36 @@ A derive of an enum gets the literals of its constructors, and a plugin's
 `check` the base type of an enum: the interface of plugins is `0.13.0`. A
 component built for `0.12.0` no longer loads, `FLICK-P035` names both
 versions; rebuild it against the new `flick-plugin`.
+
+## A closure over an error value says so
+
+A value of `Errors e`, `Exit e a` or `Failure e` holds what the errors of
+`e` hold, and an error-row variable `e` is held as a type variable is. In
+0.1.0 such a value held nothing, so a closure over a caught error could
+hide a region its payload has. A curried stage keeps the variable, so
+`keep : forall e. Errors e -> (Unit -> Unit)` still checks and reads as
+holding `e`. A bare type that is no stage, such as a field, now rejects the
+closure:
+
+```flick fail
+keep_field : forall e. Errors e -> { run : Unit -> Unit }
+let keep_field x = { run = fun () -> ignore x }
+```
+
+```text
+error[FLICK-G001]: this function uses `x`, which holds `e`, but the expected type `Unit -> Unit` holds no captures
+```
+
+Name what it holds with a capture row, as for a type variable (see
+[Captures](../../reference/regions/#captures)):
+
+```flick
+keep_field : forall c e. (Errors e)^c -> { run : (Unit -> Unit)^c }
+let keep_field x = { run = fun () -> ignore x }
+```
+
+`flick check --fix` does not rewrite it: the capture row goes into the
+`forall`, the parameter and the field at once.
 
 ## Rust 1.95 builds the compiler
 

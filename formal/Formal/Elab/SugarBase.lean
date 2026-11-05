@@ -25,11 +25,15 @@ def ctxRow (Γ : List Scheme) : Ty := Γ.foldr (fun s q => .cun s.row q) .cnil
 
 theorem Ty.occurs_subst {σ : Nat → Ty} {m n : Nat} {t : Ty} (ht : t.Occurs m)
     (hs : (σ m).Occurs n) : (t.subst σ).Occurs n := by
-  induction t with
+  induction t using Ty.ind with
   | var => cases ht; exact hs
   | con | cnil => cases ht
   | app _ _ ih₁ ih₂ | cun _ _ ih₁ ih₂ => exact ht.imp ih₁ ih₂
-  | arr _ _ _ _ ih₁ ih₂ ih₃ => exact ht.imp ih₁ (Or.imp ih₂ ih₃)
+  | arr φ _ _ _ ih₁ ih₂ ih₃ ihφ =>
+    refine ht.imp ih₁ (Or.imp ih₂ (Or.imp ih₃ fun h => ?_))
+    cases φ with
+    | P => exact h.elim
+    | R r e => exact h.imp ihφ.1 ihφ.2
 
 theorem cov_ctxRow (Γ : List Scheme) : Cov Γ (ctxRow Γ) := by
   induction Γ with
@@ -48,7 +52,7 @@ theorem cov_ctxRow (Γ : List Scheme) : Cov Γ (ctxRow Γ) := by
 theorem lam_cov {Γ : List Scheme} {q : Ty} (h : Cov Γ q) {φ a t} {b : Exp} :
     ∀ n, heldS Γ (.lam b) n → (Ty.arr φ a t q).reach n := by
   rintro n ⟨x, s, -, hs, hr⟩
-  exact .inr (.inr (h s (List.mem_of_getElem? hs) n hr))
+  exact .inr (.inr (.inl (h s (List.mem_of_getElem? hs) n hr)))
 
 variable {P : Prog} (S : Sugar P)
 
@@ -65,7 +69,8 @@ theorem Ty.subst_curry (σ : Nat → Ty) (q : Ty) (as : List Ty) (r : Ty) :
     (curry q as r).subst σ = curry (q.subst σ) (as.map (·.subst σ)) (r.subst σ) := by
   induction as with
   | nil => rfl
-  | cons a as ih => simp only [curry, List.foldr_cons, List.map_cons] at ih ⊢; simp [Ty.subst, ih]
+  | cons a as ih =>
+    simp only [curry, List.foldr_cons, List.map_cons] at ih ⊢; simp [Ty.subst, Stage.subst, ih]
 
 theorem Ty.subst_nest (σ : Nat → Ty) (tup : Nat) (t : Ty) (as : List Ty) :
     (nest tup t as).subst σ = nest tup (t.subst σ) (as.map (·.subst σ)) := by
@@ -91,7 +96,7 @@ theorem elab_unc {Γ Δ φ} (a : Ty) (as : List Ty) (r q : Ty) :
   have h0 : inst ((a :: as) ++ [r, q]) 0 = a := by simp [inst]
   have hn : inst ((a :: as) ++ [r, q]) (as.length + 1) = r := by simp [inst]
   have hq : inst ((a :: as) ++ [r, q]) (as.length + 1 + 1) = q := by simp [inst]
-  simp only [Ty.subst, Ty.subst_curry, Ty.subst_nest, List.map_tail, hv, h0, hn, hq,
+  simp only [Ty.subst, Stage.subst, Ty.subst_curry, Ty.subst_nest, List.map_tail, hv, h0, hn, hq,
     List.tail_cons]
 
 /-- `λp₁ … pₙ. b`, each arrow with a qualifier `q` that covers the innermost context. -/

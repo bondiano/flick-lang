@@ -42,7 +42,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | lit => intro _ _; exact .lit
   | loc hl => intro σ _; exact .loc (by simp [hl])
   | const hc hT =>
-    intro σ _; exact .const (Const.ok_substT σ hc) (by have := hT.substT σ; rwa [Const.ty_substT] at this)
+    intro σ _; exact .const (Const.ok_substT σ hc) (by have := hT.substT σ; rwa [Const.ty_substT _ _ _ _ hc] at this)
   | ctor hK hk hT => intro σ _; exact Typ.ctor_substT hK hk hT σ
   | rnil => intro _ _; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ =>
@@ -98,14 +98,12 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro σ hσ
     refine .handle hv (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
       ?_ ?_ (by simpa [Stage.substT] using Stage.le_substT σ hφ)
-    · exact hc
-    · rintro a ⟨b, hb, h'⟩; exact ⟨b, ha b hb, h'⟩
+    · exact fun K k ts T h₁ h₂ => (hc K k ts T h₁ h₂).imp .inl .inl
+    · exact Row.passes_substT σ ha
   | hnil hH =>
     intro σ _
-    refine .hnil fun n hn => ?_
-    cases n with
-    | nm N => exact hH _ hn
-    | atm a | ob _ a | need _ a => obtain ⟨b, hb, _⟩ := hn; exact hH _ hb
+    obtain rfl : _ = Row.none := funext fun n => propext ⟨fun h => hH n h, False.elim⟩
+    rw [Flick.J.substT, Row.none_substT]; exact .hnil fun _ h => h
   | hcons hp _ _ hH ih₁ ih₂ =>
     intro σ hσ
     have := ih₁ σ (hσ.sub fun _ h => .inl h); rw [ctx_substT] at this
@@ -118,67 +116,43 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ =>
     intro σ hσ
     exact .provideL (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
-      (by simpa [Stage.substT] using Stage.le_substT σ h₁) (ob_free_substT h₀)
+      (by simpa [Stage.substT] using Stage.le_substT σ h₁) ⟨h₀.1.substT σ, ob_free_substT h₀.1 h₀.2⟩
       (by simpa [Stage.substT] using Stage.le_substT σ h₂)
   | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ =>
     intro σ hσ
     exact .provideE (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
-      (by simpa [Stage.substT] using Stage.le_substT σ h₁) (ob_free_substT h₀)
+      (by simpa [Stage.substT] using Stage.le_substT σ h₁) ⟨h₀.1.substT σ, ob_free_substT h₀.1 h₀.2⟩
       (by simpa [Stage.substT] using Stage.le_substT σ h₂)
   | with_ hv _ _ h₁ h₂ ih₁ ih₂ =>
     intro σ hσ
     have hq := hσ.1 _ (.inr (.inr (.inl rfl)))
-    have hat := hσ.2.2 (.inl rfl)
+    have hat := hσ.2.2.1 (.inl rfl)
     exact .with_ hv (ih₁ σ (hσ.sub fun _ h => .inr (.inr (.inl h))))
       (ih₂ σ (hσ.sub fun _ h => .inr (.inr (.inr h))))
-      (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ h₁) (Row.withP_substT hq hat))
+      (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ h₁)
+        (Row.withP_substT hq hat (hσ.2.2.2 (.inl rfl))))
       (by simpa [Stage.substT] using Stage.le_substT σ h₂)
   | enil hρ =>
     intro σ _
-    refine .enil fun n hn => ?_
-    cases n with
-    | nm N => exact hρ _ hn
-    | atm a | ob _ a | need _ a => obtain ⟨b, hb, _⟩ := hn; exact hρ _ hb
+    obtain rfl : _ = Row.none := funext fun n => propext ⟨fun h => hρ n h, False.elim⟩
+    simp only [Flick.J.substT, Ty.substT, Row.none_substT]; exact .enil fun _ h => h
   | econs hv hθ _ _ hρ ih₁ ih₂ =>
     intro σ hσ
     have := ih₁ σ (hσ.sub fun _ h => .inl h); simp only [Flick.J.substT, S.impl_closed] at this
-    refine .econs hv hθ this (ih₂ σ (hσ.sub fun _ h => .inr h)) fun n => ?_
-    cases n with
-    | nm N' => exact hρ _
-    | atm a | ob _ a | need _ a =>
-      constructor
-      · rintro ⟨b, hb, h'⟩
-        rcases (hρ _).mp hb with h | h
-        · cases h
-        · exact .inr ⟨b, h, h'⟩
-      · rintro (h | ⟨b, hb, h'⟩)
-        · cases h
-        · exact ⟨b, (hρ _).mpr (.inr hb), h'⟩
+    obtain rfl : _ = Row.union (Row.single _) _ := funext fun n => propext (hρ n)
+    simp only [Flick.J.substT, Ty.substT, Row.union_substT, Row.single_substT] at ih₂ ⊢
+    exact .econs hv hθ this (ih₂ σ (hσ.sub fun _ h => .inr h)) fun _ => Iff.rfl
   | bind _ hρ ih =>
     intro σ hσ
     have := ih σ hσ; simp only [Flick.J.substT, S.impl_closed] at this
-    refine .bind this fun n => ?_
-    cases n with
-    | nm N' => exact hρ _
-    | atm a | ob _ a | need _ a =>
-      constructor
-      · rintro ⟨b, hb, _⟩; cases (hρ _).mp hb
-      · intro h; cases h
+    obtain rfl : _ = Row.single _ := funext fun n => propext (hρ n)
+    simp only [Flick.J.substT, Ty.substT, Row.single_substT]
+    exact .bind this fun _ => Iff.rfl
   | join _ _ hρ ih₁ ih₂ =>
     intro σ hσ
-    refine .join (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
-      fun n => ?_
-    cases n with
-    | nm N' => exact hρ _
-    | atm a | ob _ a | need _ a =>
-      constructor
-      · rintro ⟨b, hb, h'⟩
-        rcases (hρ _).mp hb with h | h
-        · exact .inl ⟨b, h, h'⟩
-        · exact .inr ⟨b, h, h'⟩
-      · rintro (⟨b, hb, h'⟩ | ⟨b, hb, h'⟩)
-        · exact ⟨b, (hρ _).mpr (.inl hb), h'⟩
-        · exact ⟨b, (hρ _).mpr (.inr hb), h'⟩
+    obtain rfl : _ = Row.union _ _ := funext fun n => propext (hρ n)
+    simp only [Flick.J.substT, Ty.substT, Row.union_substT] at ih₁ ih₂ ⊢
+    exact .join (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h)) fun _ => Iff.rfl
   | @scope F _ _ r ε _ _ _ _ _ _ hn hF _ hφ' hφ hT ih =>
     intro σ hσ
     have h₁ := ih (liftT 1 σ) (hσ.lift 1)
@@ -215,8 +189,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     have hav := hσ.2.1 (.inr (.inl rfl))
     have h₁ := ih σ (hσ.sub fun _ h => .inr (.inr (.inr h)))
     rw [Facts.union_substT] at h₁
-    refine .inside ?_ h₁ ?_ (fun h => ht ?_) (fun ⟨b, hb, h'⟩ => hε (by rwa [hav b _ h'] at hb))
-      (Stage.le_substT σ hφ) (hT.substT σ)
+    refine .inside ?_ h₁ ?_ (fun h => ht ?_) ?_ (Stage.le_substT σ hφ) (hT.substT σ)
     · rintro C s ⟨C₀, s₀, h₀, rfl, rfl⟩
       obtain ⟨rfl, hC⟩ := hF C₀ s₀ h₀
       exact ⟨by simp [Ty.substT, hp], fun q ⟨b, hb, h'⟩ => by rw [hav b q h'] at hb; exact hC q hb⟩
@@ -230,6 +203,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       · exact .inr (.inr (.inr (Row.needs_substT (fun y hy => by rw [hp] at hy; exact hy) x hx)))
     · obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ _).mp h
       rwa [hav b _ h'] at hb
+    · exact Ty.no_rg_substT (t := .errors _) hav hε
   | cap =>
     intro σ hσ
     have hp := hσ.1 _ (.inl rfl)

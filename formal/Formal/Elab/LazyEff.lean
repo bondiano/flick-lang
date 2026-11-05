@@ -174,19 +174,19 @@ omit hone in
 /-- **`pure` of `Monad Eff`** is typed at its scheme in `Sugar`. -/
 theorem typ_effPure_tr (c a : Ty) {Ψ Θ φ} :
     Typ S Ψ Θ [] (effPure mk) (.ex (trT N (arrP a (appQ (.con eC) c a))) φ) := by
-  simp only [trT, if_neg h2, if_neg h4, hE, trStage]; exact typ_effPure hmk
+  simp only [trT, if_neg h2, if_neg h4, hE]; exact typ_effPure hmk
 
 /-- **`flat_map` of `Monad Eff`** is typed at its scheme in `Sugar` (`bindTy`). -/
 theorem typ_effBind_tr (c d a b e : Ty) {Ψ Θ φ} :
     Typ S Ψ Θ [] (effBind mk) (.ex (trT N (bindTy (.con eC) c d a b e)) φ) := by
-  simp only [bindTy, arrP, appQ, trT, if_neg h2, if_neg h4, hE, trStage]
+  simp only [bindTy, arrP, appQ, trT, if_neg h2, if_neg h4, hE]
   refine typ_effBind hmk hone ?_ ?_ ?_ <;> intro x h <;> rcases x with n | p <;>
     simp [effT, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind
 
 /-- **`map2` of `Monad Eff`** is typed at its scheme in `Sugar` (`map2Ty`). -/
 theorem typ_effMap2_tr (c d a b x g d' : Ty) {Ψ Θ φ} :
     Typ S Ψ Θ [] (effMap2 mk) (.ex (trT N (map2Ty (.con eC) c d a b x g d')) φ) := by
-  simp only [map2Ty, arrP, appQ, trT, if_neg h2, if_neg h4, hE, trStage]
+  simp only [map2Ty, arrP, appQ, trT, if_neg h2, if_neg h4, hE]
   refine typ_effMap2 hmk hone ?_ ?_ ?_ ?_ ?_ ?_ <;> intro y h <;> rcases y with n | p <;>
     simp [effT, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind
 

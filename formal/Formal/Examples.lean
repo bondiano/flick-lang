@@ -6,6 +6,8 @@ import Formal.Generalization
 `let id = λx. x in let _ = id 1 in id True` uses `id` at `Int` and at `Bool`.
 `scope s { op (open s) }` acquires a capability of its region and uses it: its
 type is `Unit`, and `Scope s` leaves the row of the scope.
+`let app = λf. f () in app (λ_. let _ = ask_S () in ())` generalizes `app` over the row of
+services of its argument and uses it at `{S}`.
 -/
 
 namespace Flick
@@ -39,6 +41,46 @@ example (S : Sig) :
         (.var (ts := []) rfl rfl (fun _ _ h => h.elim) .refl) (Stage.le_refl _) .refl
     · exact ⟨fun _ h => h.elim, fun _ h => h⟩
   · exact ⟨fun x h => .inl h, fun _ h => h.elim⟩
+
+/-- The row variable `ρ`, the variable `0` of a scheme. -/
+def rowVar : Row := fun x => x = .rv (.v 0)
+
+/-- `Unit →R⟨ρ;∅⟩ Unit`. -/
+def thunkTy (r : Row) : Ty := .arrow (.base .unit) (.rt r Row.none) (.base .unit) Caps.none
+
+theorem rowVar_inst (r : Row) : rowVar.substT (instT [.row r]) = r.plain := by
+  funext x; apply propext
+  cases x <;> simp [rowVar, Row.substT, instT, Ty.asRow_row, Row.plain]
+
+/-- `app : ∀ρ. (Unit →R⟨ρ;∅⟩ Unit) →R⟨ρ;∅⟩ Unit`, used at `ρ := {S}`. -/
+example (S : Sig) :
+    Typ S [] Facts.none [] (.let_ (.lam (.app (.var 0) (.lit .unit)))
+      (.app (.var 0) (.lam (.let_ (.app (.const (.ask "S")) (.lit .unit)) (.lit .unit)))))
+      (.ex (.base .unit) (.rt (Row.single "S") Row.none)) := by
+  have hS : (Row.single "S").plain = Row.single "S" := by
+    funext x; cases x <;> simp [Row.plain, Row.single]
+  refine .letGen (k := 1) (Φ := Facts.none)
+    (a := .arrow (thunkTy rowVar) (.rt rowVar Row.none) (.base .unit) Caps.none) ?_ ?_
+  · refine .lam (.app (C := Caps.none) (.var (T := thunkTy rowVar) (ts := []) rfl rfl
+      (fun _ _ h => h.elim) ?_) .lit (Stage.le_refl _) .refl) (fun h => by simp [Tm.Has] at h) ?_ .refl
+    · rw [Scheme.inst_mono]; exact .refl
+    · rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
+      · simp [Tm.Free] at hi
+      · simp [Tm.Has] at hp
+      · simp [Tm.Has] at hl
+  · refine .app (ψ := .rt (Row.single "S") Row.none) (a := thunkTy (Row.single "S")) (C := Caps.none)
+      (.var (T := .arrow (thunkTy (Row.single "S")) (.rt (Row.single "S") Row.none) (.base .unit) Caps.none)
+        (ts := [.row (Row.single "S")]) rfl rfl (fun _ _ h => h.elim) ?_) ?_ (Stage.le_refl _) .refl
+    · simp only [Scheme.inst, Ty.substT, thunkTy, Stage.substT, rowVar_inst, hS, Row.none_substT,
+        Caps.none_substT]
+      exact .refl
+    · refine .lam (ψ := .rt (Row.single "S") Row.none) (.let_ (a := S.impl "S")
+        (.app (.const (c := .ask "S") (ι := default) trivial .refl) .lit (Stage.le_refl _) .refl) .lit)
+        (fun h => by simp [Tm.Has] at h) ?_ .refl
+      rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
+      · simp [Tm.Free] at hi
+      · simp [Tm.Has] at hp
+      · simp [Tm.Has] at hl
 
 /-- The scheme `∀a. a →P a` of the field `id`. -/
 def idField : Scheme := ⟨1, Facts.none, .arrow (.tvar 0) .pure (.tvar 0) Caps.none⟩

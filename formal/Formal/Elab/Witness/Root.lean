@@ -42,7 +42,7 @@ variable {Ψ : List Flick.Ty} {Θ : Facts}
 theorem typ_seqFlatMap_tr (c d a b e : Ty) {φ} :
     Typ Sg Ψ Θ [] seqFlatMap (.ex (trT N (bindTy (.con 9) c d a b e)) φ) := by
   simp only [bindTy, arrP, appQ, trT, if_neg (show (9 : Nat) ≠ 2 by decide),
-    if_neg (show (9 : Nat) ≠ 4 by decide), trStage]
+    if_neg (show (9 : Nat) ≠ 4 by decide)]
   refine typ_seqFlatMap ?_
   intro x h; rcases x with n | p <;>
     simp [seqT, N, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind

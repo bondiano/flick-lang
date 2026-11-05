@@ -108,6 +108,7 @@ theorem withs_typing {x r : Tm} {o : Nat}
           | .ob N a => ¬ ρ (.nm N) ∧ R' (.ob N a)
           | .need N c => R' (.need N c) ∨ (c = .r q ∧ ρ (.nm N) ∧ R' (.nm N))
           | .atm a => R' (.atm a)
+          | .rv a => R' (.rv a)
         refine ⟨t', R'', ε', .with_ hθv (hθ.cut hΘ) hw (Stage.le_of_svc (Stage.le_refl _) fun y hy => ?_)
           (Stage.le_refl _), fun N a hy => ?_, fun N hy => ?_, fun N c hy => ?_⟩
         · cases y with
@@ -118,7 +119,7 @@ theorem withs_typing {x r : Tm} {o : Nat}
             · exact hΘ _ _ ((Stage.le_svc hrow _ h').1 h)
             · exact Outl.age_lt (hA.with_inside hp)
           | need N c => exact .inl hy
-          | atm a => exact hy
+          | atm a | rv a => exact hy
         · obtain ⟨hN, hy⟩ := hy
           rcases h1 N a hy with h' | ⟨p, rfl, hp⟩
           · exact .inl (up _ ((Stage.le_svc hrow _ h').2 hN))
@@ -216,7 +217,7 @@ theorem fin_await {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ : Sta
           have up := fun y h => Stage.le_svc (Stage.le_trans lφ hψ) y h
           refine ⟨_, _, _, .await ((hw.valueAny hv _).cut hΘ) (Stage.le_refl _) .refl,
             fun N a ha => .inl (up _ (.inr (.inl (hr' _ ha)))), fun N ha => ⟨up _ (.inr (.inl (hr' _ ha))),
-              .inl (up _ (.inr (.inr ⟨hr' _ ha, by rw [hs]; rfl⟩)))⟩, fun N c ha => (hok.2 N c (hr' _ ha)).elim⟩
+              .inl (up _ (.inr (.inr ⟨hr' _ ha, by rw [hs]; rfl⟩)))⟩, fun N c ha => (hok.2.1 N c (hr' _ ha)).elim⟩
         · obtain ⟨_, _, _, _, h, la₀, _, lt, -⟩ := hT'.arrow_left
           cases h; cases la₀
           obtain ⟨q, hq, hs⟩ := canonical_owner .own ho
@@ -237,7 +238,7 @@ theorem fin_await {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ : Sta
             · exact ⟨up _ (.inl h'), .inl (up _ (.inr ⟨h', by rw [hs]; rfl⟩))⟩
           · rcases inr _ ha with ⟨_, h'⟩ | h'
             · cases h'
-            · exact (hok.2 N c h').elim
+            · exact (hok.2.1 N c h').elim
   | errVal hv' => exact (fin_not_value hc hv').elim
 
 end Flick

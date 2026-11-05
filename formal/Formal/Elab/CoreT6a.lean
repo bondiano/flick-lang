@@ -51,12 +51,12 @@ theorem Corr.nil (γ δ : Nat → Nat) : Corr N [] [] [] γ δ := ⟨fun _ => rf
 every core context that corresponds to `⟦Γ⟧` and `⟦Δ⟧`. -/
 theorem T6a_core (hR : Real P Sg N) {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') {Ψ Θ Γc γ δ}
     (hc : Corr N Γc (Γ.map Scheme.tr) Δ γ δ) :
-    ∃ e'', Tr N γ δ e' e'' ∧ Typ Sg Ψ Θ Γc e'' (.ex (trT N τ) (trStage φ)) :=
+    ∃ e'', Tr N γ δ e' e'' ∧ Typ Sg Ψ Θ Γc e'' (.ex (trT N τ) (trStage N φ)) :=
   T6a (typingTarget hR) h Ψ Θ Γc γ δ hc
 
 /-- A closed program: its elaboration is a closed core term of the translated type. -/
 theorem T6a_closed (hR : Real P Sg N) {e τ φ e'} (h : Elab P [] [] e τ φ e') (Ψ : List Flick.Ty)
-    (Θ : Facts) : ∃ e'', Tr N id id e' e'' ∧ Typ Sg Ψ Θ [] e'' (.ex (trT N τ) (trStage φ)) :=
+    (Θ : Facts) : ∃ e'', Tr N id id e' e'' ∧ Typ Sg Ψ Θ [] e'' (.ex (trT N τ) (trStage N φ)) :=
   T6a_core hR h (Corr.nil id id)
 
 /-- **T6(a) for `do`** in the core. -/

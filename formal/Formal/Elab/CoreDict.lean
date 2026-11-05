@@ -116,7 +116,7 @@ theorem has_meth (hR : Real P S N) {Γ Δ e m C s c₀ rest θ φ} (hm : P.metho
   obtain ⟨fs, hd⟩ := hR.dict C p
   have hlen : ((vars p).map (·.subst θ)).length = p := by simp [vars]
   have te' : Typ S Ψ Θ Γc e'
-      (.ex (.dict (N.cls C p) (Flick.Ty.spine (((vars p).map (·.subst θ)).map (trT N)))) (trStage φ)) := by
+      (.ex (.dict (N.cls C p) (Flick.Ty.spine (((vars p).map (·.subst θ)).map (trT N)))) (trStage N φ)) := by
     have := te; simp only [trTT, trD, Cn.subst, hlen] at this; exact this
   refine ⟨_, .meth he', .dproj te' hd (by simp [vars]) (hfs fs hd)
     (ts := (List.range (s.k - p)).map fun j => trT N (θ (j + p))) (by simp) holds_none ?_⟩

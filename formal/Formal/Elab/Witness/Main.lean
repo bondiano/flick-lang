@@ -19,7 +19,7 @@ open Flick.Elab
 /-- **T6(a) on the witness.** -/
 theorem witness_T6a {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') {Ψ Θ Γc γ δ}
     (hc : Corr N Γc (Γ.map Scheme.tr) Δ γ δ) :
-    ∃ e'', Tr N γ δ e' e'' ∧ Typ Sg Ψ Θ Γc e'' (.ex (trT N τ) (trStage φ)) :=
+    ∃ e'', Tr N γ δ e' e'' ∧ Typ Sg Ψ Θ Γc e'' (.ex (trT N τ) (trStage N φ)) :=
   T6a_core real h hc
 
 /-- **T6(a) for `do` on the witness.** -/

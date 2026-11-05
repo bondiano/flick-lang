@@ -27,13 +27,13 @@ inductive TTy where
 
 def TTy.subst (σ : Nat → Ty) : TTy → TTy
   | .mono t => .mono (t.subst σ)
-  | .arr φ a b q => .arr φ (a.subst σ) (b.subst σ) (q.subst σ)
+  | .arr φ a b q => .arr (φ.subst σ) (a.subst σ) (b.subst σ) (q.subst σ)
   | .dict q => .dict (q.subst σ)
 
-/-- `⌈t⌉`, with `⌈D_Q⌉ = ∅`. -/
+/-- `⌈t⌉`, with `⌈D_Q⌉ = ∅`; an arrow counts the variables of the rows of its stage. -/
 def TTy.reach : TTy → Nat → Prop
   | .mono t, n => t.reach n
-  | .arr _ a b q, n => a.reach n ∨ b.reach n ∨ q.reach n
+  | .arr φ a b q, n => a.reach n ∨ b.reach n ∨ q.reach n ∨ φ.Occurs n
   | .dict _, _ => False
 
 /-- `D_{Q₁} →P^q … →P^q D_{Qₗ} →P^q t`. -/

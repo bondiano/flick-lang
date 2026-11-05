@@ -71,8 +71,21 @@ theorem step_root {root Ψ Θ Λ μ e t r ε N o} (h : Typ S Ψ Θ [] e (.ex t (
 theorem Row.kill_sub (ε : Row) (n : Nat) : Row.Sub (ε.substT (kill n)) ε := by
   intro x hx
   cases x with
-  | nm => exact hx
-  | atm a | ob _ a | need _ a => obtain ⟨b, hb, h⟩ := hx; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
+  | nm => rcases hx with hx | ⟨b, _, hb⟩
+          · exact hx
+          · cases kill_asRow hb
+  | atm a =>
+    rcases hx with ⟨b, hb, h⟩ | ⟨b, _, hb⟩
+    · obtain ⟨rfl, _⟩ := kill_reach h; exact hb
+    · cases kill_asRow hb
+  | ob _ a | need _ a => obtain ⟨b, hb, h⟩ := hx; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
+  | rv a => obtain ⟨b, hb, h⟩ := hx; cases kill_asRow h; exact hb
+
+theorem Steps.mono {root : Roots} {Q Q' : Lbl → Prop} {Λ μ e Λ' μ' e'}
+    (h : Steps root Q Λ μ e Λ' μ' e') (hQ : ∀ l, Q l → Q' l) : Steps root Q' Λ μ e Λ' μ' e' := by
+  induction h with
+  | refl => exact .refl
+  | step h₁ hl _ ih => exact .step h₁ (hQ _ hl) ih
 
 /-- **T2(b), rows.** From `·;Ψ ⊢ e : τ ! R⟨r; ε⟩`, every `ask_S` that reaches `Σ₀`
 has `S ∈ r`, and a computation that ends in `raise v` has `v : Errors ε`. -/
@@ -91,7 +104,8 @@ theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : S
       rcases List.mem_append.mp hu with hu | hu
       · exact (hΨ u hu).mono hl
       · exact (hX u hu).mono hl) (by simpa only [Stage.substT] using h')
-    refine ⟨.step h₁ (fun N hl => by subst hl; exact step_root h h₁) hs', fun v he hv => ?_⟩
+    refine ⟨.step h₁ (fun N hl => by subst hl; exact step_root h h₁)
+      (hs'.mono fun _ hq N hl => Row.kill_sub _ _ _ (hq N hl)), fun v he hv => ?_⟩
     obtain ⟨Ψ', hv'⟩ := hr v he hv
     obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hsub⟩ := canonical_errors hv hv'
     exact ⟨Ψ', .errVal hv ht hU (hsub.trans (Row.kill_sub _ _))⟩

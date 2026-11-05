@@ -18,8 +18,8 @@ pub(super) enum Ty {
     Var(String),
     Con(String),
     App(Box<Ty>, Box<Ty>),
-    /// `.arr φ a b q`, `R` when `true`
-    Arr(bool, Box<Ty>, Box<Ty>, Box<Ty>),
+    /// `.arr φ a b q`: `P` without rows, `R r e` with them
+    Arr(Option<(Box<Ty>, Box<Ty>)>, Box<Ty>, Box<Ty>, Box<Ty>),
     Nil,
     Un(Box<Ty>, Box<Ty>),
     /// a positive qualifier, its variables of the checker, before rule 4
@@ -42,8 +42,8 @@ fn app(head: Ty, args: impl IntoIterator<Item = Ty>) -> Ty {
 pub(super) struct Tr {
     /// the variables over containers: of kind `Type → Type`
     pub containers: BTreeSet<String>,
-    /// the variables of rows of services or errors, which only an arrow
-    /// and `Eff` may name
+    /// the variables of rows of services or errors, which only the rows of
+    /// an arrow and `Eff` may name
     pub rows: BTreeSet<String>,
     /// `v := a` of rule 2
     inst: BTreeMap<String, String>,
@@ -87,7 +87,7 @@ impl Tr {
                 param,
                 effects,
                 result,
-            } => self.arrow(param, effects.is_some(), result, None, neg)?,
+            } => self.arrow(param, effects.as_deref(), result, None, neg)?,
             // `(a, b, c)` is `tup (tup a b) c`, as `nest` of `Sugar`
             fc::Type::Tuple(ts) if ts.len() > 1 => {
                 let tup = self.con("tup".into());
@@ -120,7 +120,7 @@ impl Tr {
                         param,
                         effects,
                         result,
-                    } => self.arrow(param, effects.is_some(), result, Some(captures), neg)?,
+                    } => self.arrow(param, effects.as_deref(), result, Some(captures), neg)?,
                     fc::Type::App { .. } => self.data(inner, Some(captures), neg)?,
                     // a type variable: its bound is not modelled; other data
                     // has no storage
@@ -158,11 +158,14 @@ impl Tr {
     fn arrow(
         &mut self,
         param: &fc::Type,
-        runtime: bool,
+        effects: Option<&fc::Effects>,
         result: &fc::Type,
         q: Option<&fc::Type>,
         neg: bool,
     ) -> Result<Ty, Skip> {
+        let rows = effects
+            .map(|e| Ok((Box::new(row(&e.services)?), Box::new(row(&e.errors)?))))
+            .transpose()?;
         let start = self.fresh.len();
         let a = self.ty(param, !neg)?;
         let b = self.ty(result, neg)?;
@@ -170,7 +173,7 @@ impl Tr {
             Some(q) => self.qual(q, neg, Site::Fun(start))?,
             None => Ty::Nil,
         };
-        Ok(Ty::Arr(runtime, Box::new(a), Box::new(b), Box::new(q)))
+        Ok(Ty::Arr(rows, Box::new(a), Box::new(b), Box::new(q)))
     }
 
     /// `T ā` with the qualifier `q` of its value.
@@ -257,10 +260,23 @@ impl Tr {
                 })
                 .collect()),
             Ty::App(a, b) => Ty::App(go(a), go(b)),
-            Ty::Arr(r, a, b, q) => Ty::Arr(r, go(a), go(b), go(q)),
+            Ty::Arr(rows, a, b, q) => Ty::Arr(rows, go(a), go(b), go(q)),
             Ty::Un(a, b) => Ty::Un(go(a), go(b)),
             leaf => leaf,
         }
+    }
+}
+
+/// A row of an arrow: a variable or the empty row; a named element or a
+/// union is not modelled.
+fn row(t: &fc::Type) -> Result<Ty, Skip> {
+    match t {
+        fc::Type::Var(v) => Ok(Ty::Var(v.clone())),
+        fc::Type::Row(fc::Row { entries, tail }) if entries.is_empty() => match tail {
+            Some(t) => row(t),
+            None => Ok(Ty::Nil),
+        },
+        _ => Err(Skip::Row),
     }
 }
 
@@ -281,7 +297,14 @@ pub(super) fn occurs(t: &Ty, v: &str) -> bool {
     match t {
         Ty::Var(w) => w == v,
         Ty::App(a, b) | Ty::Un(a, b) => occurs(a, v) || occurs(b, v),
-        Ty::Arr(_, a, b, q) => occurs(a, v) || occurs(b, v) || occurs(q, v),
+        Ty::Arr(rows, a, b, q) => {
+            occurs(a, v)
+                || occurs(b, v)
+                || occurs(q, v)
+                || rows
+                    .as_ref()
+                    .is_some_and(|(r, e)| occurs(r, v) || occurs(e, v))
+        }
         _ => false,
     }
 }

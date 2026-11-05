@@ -21,10 +21,11 @@ theorem curry_lt {q r : Ty} {as : List Ty} {k : Nat} (hq : ∀ n, q.Occurs n →
   | nil => exact hr
   | cons a as ih =>
     intro n hn
-    rcases hn with hn | hn | hn
+    rcases hn with hn | hn | hn | hn
     · exact ha a (.head _) n hn
     · exact ih (fun b hb => ha b (.tail _ hb)) n hn
     · exact hq n hn
+    · cases hn
 
 theorem nest_lt {tup k : Nat} : ∀ {t : Ty} {as : List Ty}, (∀ n, t.Occurs n → n < k) →
     (∀ a ∈ as, ∀ n, a.Occurs n → n < k) → ∀ n, (nest tup t as).Occurs n → n < k
@@ -50,13 +51,13 @@ theorem constSch_lt {c : Nat} {s : Scheme} (h : constSch c = some s) :
   any_goals
     cases h
     exact ⟨rfl, fun n hn => by
-      simp [Ty.Occurs, bindTy, appQ, arrP, optTy] at hn ⊢ <;> omega⟩
+      simp [Ty.Occurs, Stage.Occurs, bindTy, appQ, arrP, optTy] at hn ⊢ <;> omega⟩
   · cases h
   · split at h
     · split at h
       · cases h
         refine ⟨rfl, fun n hn => ?_⟩
-        rcases hn with hn | hn | hn
+        rcases hn with hn | hn | hn | hn
         · exact curry_lt (fun m hm => by simp [Ty.Occurs] at hm ⊢; omega)
             (fun m hm => by simp [Ty.Occurs] at hm ⊢; omega)
             (fun a ha m hm => Nat.lt_succ_of_lt (Nat.lt_succ_of_lt (vars_lt a ha m hm))) n hn
@@ -65,11 +66,12 @@ theorem constSch_lt {c : Nat} {s : Scheme} (h : constSch c = some s) :
               (fun a ha m hm => Nat.lt_succ_of_lt (Nat.lt_succ_of_lt
                 (vars_lt a (List.mem_of_mem_tail ha) m hm))) n hn
           · simp [Ty.Occurs, uncSch] at hn ⊢; omega
-          · simp [Ty.Occurs, uncSch] at hn ⊢; omega
+          · simp [Ty.Occurs, Stage.Occurs, uncSch] at hn ⊢; omega
+        · cases hn
         · cases hn
       · cases h
     · cases h
-      exact ⟨rfl, fun n hn => by simp [frSch, Ty.Occurs] at hn ⊢; omega⟩
+      exact ⟨rfl, fun n hn => by simp [frSch, Ty.Occurs, Stage.Occurs] at hn ⊢; omega⟩
 
 /-- **The constants of the witness have closed schemes.** -/
 theorem consts_closed : P.ConstsClosed := by
