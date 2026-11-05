@@ -152,6 +152,12 @@ fn collect_reaches_what_the_project_grants_once_for_the_group() {
     let (ir, found) = built(&host, reads(&["stated.txt"]));
     assert!(found.is_empty(), "{found:?}");
     assert!(ir.contains("\"from collect\""), "{ir}");
+    assert_eq!(host.calls(), (1, 1));
+    // a changed file: collect again, and the state it gives expands again
+    world.write("/p/stated.txt", "changed");
+    let (ir, _) = built(&host, reads(&["stated.txt"]));
+    assert!(ir.contains("\"changed\""), "{ir}");
+    assert_eq!(host.calls(), (2, 2));
     let (_, found) = built(&reaching("stated {}", &world), Grants::default());
     assert!(
         found

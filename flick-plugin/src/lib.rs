@@ -443,7 +443,9 @@ pub trait Compiler {
 }
 
 /// A plugin: what it learns from all its blocks of a group, and the code
-/// each block stands for. Both are pure, so the compiler caches them.
+/// each block stands for. Both depend only on the blocks and on what the
+/// project grants them to read, so the compiler caches each result while
+/// what its call read stays the same.
 pub trait Plugin {
     /// What the plugin learns from `blocks`, the state each expansion
     /// gets; `compiler` reaches what the project grants, but parses no
