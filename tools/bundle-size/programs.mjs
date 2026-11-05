@@ -1,0 +1,48 @@
+// The programs `just bundle-size` tracks, apart from the tool so that
+// tools/perf/ratchet.mjs reads the budgets of a base ref without rolldown.
+
+/** Programs and their gzip budgets in KB; raising a budget takes a `reason` beside it. */
+export const PROGRAMS = [
+  { name: "pure", source: "tools/bundle-size/pure.fl", budget: 13 },
+  // the same program with `effect = "none"`, a project of its own: no Effect at all
+  { name: "none", source: "tools/bundle-size/none", budget: 2, effectFree: true },
+  // UI programs render views on atoms: at most 81 KB and 18 KB for effect/reactivity,
+  // and 5 KB for the spans of actions and the debug log of writes;
+  // the registry keeps `Stream`, which `effect/reactivity` imports for stream atoms,
+  // and since Effect 4.1 `Schema` (13 KB), whose `isSchemaError` hydration calls
+  { name: "counter", source: "tests/run/ui/counter.fl", budget: 118, unused: ["effect/dist/Graph.js"] },
+  { name: "playground", source: "docs/src/playground/Playground.fl", budget: 126, unused: ["effect/dist/Graph.js"] },
+  { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 117, unused: ["effect/dist/Graph.js"] },
+  // a browser client of a procedure keeps no Node server
+  {
+    name: "rpc",
+    source: "tools/bundle-size/rpc.fl",
+    budget: 56,
+    unused: ["effect/dist/Graph.js", "platform-node/dist/NodeHttpServer.js", "platform-node-shared/dist/NodeSocketServer.js"],
+  },
+  // a template renders without `react-dom/server`; its view is still a React component,
+  // its atoms the registry's, with `Schema` since Effect 4.1
+  {
+    name: "email",
+    source: "tests/run/ui/email.fl",
+    budget: 48,
+    unused: ["effect/dist/Graph.js", "react-dom/cjs/react-dom-server.browser.production.js", "react-dom/cjs/react-dom-server-legacy.browser.production.js"],
+  },
+  // the client entry of a project with a server entry keeps no server module, and of a
+  // server function only its call: not its body, what the body uses or the Node server
+  {
+    name: "fullstack",
+    source: "tools/bundle-size/fullstack",
+    entry: "web",
+    // the call of a server function is an RPC client over fetch, as the `rpc` program's
+    budget: 56,
+    unused: [
+      "effect/dist/Graph.js",
+      "App/Db.js",
+      "App/Api.js",
+      "effect/server/FunctionsNode.js",
+      "rpc/server.js",
+      "platform-node/dist/NodeHttpServer.js",
+    ],
+  },
+];
