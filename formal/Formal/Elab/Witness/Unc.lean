@@ -3,12 +3,13 @@ import Formal.Weaken
 import Formal.Closed
 
 /-!
-# Witness: `unc n`, `from_result_n` and the structural `eq`
+# Witness: `unc n`, `from_result` and the structural `eq`
 
 `unc n` is built by a Lean function of `n` (`uncB`): `unc 1 f t = f t`, and
 `unc (n+1) f t = match t with (t', x) → unc n f t' x`, `unc n` taken at the result
-`aₙ₊₁ →^c r`. Its typing is an induction on `n` (`typ_uncB`). `from_result_n` matches
-`Ok x → x | Err e → raise e`; the error type reaches nothing, so `⟦R⟧` lets it raise (`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
+`aₙ₊₁ →^c r`. Its typing is an induction on `n` (`typ_uncB`). `from_result` matches
+`Ok x → x | Err e → raise e`; `⟦R⟧` lets it raise `Errors e`: its name is in `allNames`, and what
+it reaches, the atom `e`, in `errRow` (`docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`).
 The structural `eq` of `Rec = MkRec Int` compares the one field by the `eq` of the slot
 dictionary `D_{Eq Int}` (`docs/formal/elaboration.md#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries`), so its `&&` over the fields is that one comparison.
 -/
@@ -126,7 +127,7 @@ theorem typ_unc_tr (m : Nat) {φ} : Typ Sg Ψ Θ [] (uncB m) (.ex (trT N (uncSch
   simp only [uncSch, arrP, trT, trT_curry, trT_nest, hv, List.map_cons, List.tail_cons]
   exact typ_uncB m _ (by simp)
 
-/-- `from_result_n r = match r with Ok x → x | Err e → raise e`. -/
+/-- `from_result r = match r with Ok x → x | Err e → raise e`. -/
 def frBody : Flick.Tm := .lam (.match_ (.var 0)
   (.acons (pvars "Ok" 1) (.var 0) (.acons (pvars "Err" 1) (.raise (.var 0)) .anil)))
 
@@ -135,8 +136,9 @@ theorem hall_res : ∀ K k ts, Sg.ctor K = some (k, ts, "Result") →
   intro K k ts h; simp only [Sg] at h; unfold ctorF at h
   split at h <;> simp at h <;> (obtain ⟨rfl, rfl⟩ := h; simp)
 
-theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {n φ} (hE : ∀ x, ¬ E.reach x) :
-    Typ Sg Ψ Θ [] frBody (.ex (.arrow (tc "Result" [tc "Errors" [E], A]) (trStage N (.R .cnil (.con n))) A
+theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {e : Ty} {φ}
+    (hE : ∀ x, E.reach x → errRow (trT N e) (.atm x)) :
+    Typ Sg Ψ Θ [] frBody (.ex (.arrow (tc "Result" [tc "Errors" [E], A]) (trStage N (.R .cnil e)) A
       C0) φ) :=
   .lam (.match_ (typ_var_mono rfl)
       (.acons (.adt (.app (.head (K := "Ok") (ts := [.tvar 1]) (us := [tc "Errors" [E], A]) rfl rfl)
@@ -148,11 +150,10 @@ theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {n φ} (hE : ∀ x, ¬ E.reach x
             refine ⟨fun _ h => h.elim, fun x hx => ?_⟩
             cases x with
             | atm a =>
-              exfalso
               simp [Row.err, Row.union, Row.single, Row.ofCaps, Flick.Ty.substT, instT] at hx
               rcases hx with h | h
-              · exact h
-              · exact hE _ h
+              · exact h.elim
+              · exact .inl (hE _ h)
             | _ => simp [Row.err, Row.union, Row.single, Row.ofCaps, allNames] at hx ⊢)) .anil))
       (.inl (exh_ctors hall_res _)))
     (fun h => by simp [Flick.Tm.Has] at h)

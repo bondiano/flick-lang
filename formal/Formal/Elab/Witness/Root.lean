@@ -6,7 +6,7 @@ import Formal.Elab.CoreDictSem
 
 `root` has a body for every global of `Sg`: the instances (`instBody`), the constants and
 the structural `Eq` of `Rec`, each typed by the rules of the core at its scheme. No body is
-`todo`: the lists of `Seq.lean`, `unc n`, `from_result_n` and the structural `eq` of `Unc.lean`,
+`todo`: the lists of `Seq.lean`, `unc n`, `from_result` and the structural `eq` of `Unc.lean`,
 and `eq` on `Int`, the constant `intEq` (`Inst.lean`).
 -/
 
@@ -25,7 +25,7 @@ def constBody : Nat → Option Flick.Tm
   | 8 => some (.ctor "MkUnit")
   | 9 => none
   | n + 10 => if n % 2 = 0 then (if 0 < n / 2 then some (uncB (n / 2 - 1)) else none)
-      else some frBody
+      else if n = 1 then some frBody else none
 
 def strctBody : Flick.Tm := .lam (.drec (N.cls 0 1) (.rcons "eq" eqRec .rnil))
 
@@ -66,10 +66,12 @@ theorem const_typ {c s b} (hc : constSch c = some s) (hb : constBody c = some b)
         exact ⟨uncB_has m, typ_unc_tr m⟩
       · cases hc
     · rename_i h2
-      cases hc
-      simp only [constBody, if_neg h2, Option.some.injEq] at hb; subst hb
-      exact ⟨frBody_has, typ_frBody fun x h => by
-        obtain ⟨_, -, h⟩ := (trT_reach N _ x).1 h; exact h⟩
+      split at hc
+      · rename_i h1
+        cases hc
+        simp only [constBody, if_neg h2, if_pos h1, Option.some.injEq] at hb; subst hb
+        exact ⟨frBody_has, typ_frBody fun _ h => .inr h⟩
+      · cases hc
   all_goals cases hc <;> simp only [constBody, Option.some.injEq] at hb <;> subst hb
   · exact ⟨fun _ h => by simp [pairB, Flick.Tm.Has] at h,
       typ_pairB fun x h => .inr (.inl (.inl (.inr h)))⟩
@@ -133,7 +135,9 @@ theorem constBody_some {c b} (h : constBody c = some b) : ∃ s, constSch c = so
   · split at h
     · exact ⟨uncSch 10 (n / 2), by simp [constSch, *]⟩
     · cases h
-  · exact ⟨frSch 11 12 (n / 2), by simp [constSch, *]⟩
+  · split at h
+    · exact ⟨PreludeSchemes.from_result 11 12, by simp [constSch, *]⟩
+    · cases h
 
 theorem constSch_body {c s} (h : constSch c = some s) : ∃ b, constBody c = some b := by
   unfold constSch at h; split at h <;> (try cases h) <;> (try exact ⟨_, rfl⟩)
@@ -141,7 +145,9 @@ theorem constSch_body {c s} (h : constSch c = some s) : ∃ b, constBody c = som
   · split at h
     · exact ⟨uncB (n / 2 - 1), by simp [constBody, *]⟩
     · cases h
-  · exact ⟨frBody, by simp [constBody, *]⟩
+  · split at h
+    · exact ⟨frBody, by simp [constBody, *]⟩
+    · cases h
 
 theorem rootTy : RootTy Sg root where
   svc _ _ h := by cases h

@@ -203,7 +203,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
         by_cases hN : ρ (.nm N)
         · exact .inl (.inl (dom N hN))
         · exact .inr (hr' _ (h.2 hN))
-      | atm a | need _ a | rv a => exact .inr (hr' _ h)
+      | atm a | need _ a | rv a | obv _ a => exact .inr (hr' _ h)
   | bind _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
@@ -234,6 +234,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
         · exact .inr (hr' n h)
         · cases n with
           | ob N a => exact .inl (.inr ⟨_, rfl, h.1⟩)
+          | obv v a => exact .inl ⟨_, rfl, h.1⟩
           | _ => exact h.elim
         · cases n with
           | need N a => exact .inl ⟨_, rfl, h⟩

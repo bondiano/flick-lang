@@ -27,3 +27,22 @@ hide_field : forall s. File s ->{} { run : (Unit -> Unit)^{s} }
 let hide_field file =
   try from_result (Err (Wrapped file)) with
   | err -> keep_field err
+
+// a local without a signature over a row not known yet, and one generalized
+// over it: what the row becomes is held
+show_local : forall s. File s ->{} { run : (Unit -> Unit)^{s} }
+let show_local file =
+  let k = { keep = fun y -> fun () -> ignore (Exit.fail y) }
+  try from_result (Err (Wrapped file)) with
+  | err -> { run = k.keep err }
+
+show_generic : forall s. File s ->{} { run : (Unit -> Unit)^{s}; other : Unit -> Unit }
+let show_generic file =
+  let k = { keep = keep }
+  let run =
+    try from_result (Err (Wrapped file)) with
+    | err -> { run = k.keep err }
+  let other =
+    try from_result (Err (Wrapped 1)) with
+    | err -> { run = k.keep err }
+  { run = run.run; other = other.run }

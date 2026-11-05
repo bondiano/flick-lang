@@ -230,12 +230,12 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
     | provideL h₁ h₂ hb h₀ hφ =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _),
         fun σ hσ X _ h' => .provideL h' (h₂.sx (hσ.sub fun _ h => .inr h) X)
-          (by simpa [Stage.substT] using Stage.le_substT σ hb) ⟨h₀.1.substT σ, ob_free_substT h₀.1 h₀.2⟩
+          (by simpa [Stage.substT] using Stage.le_substT σ hb) (h₀.substT σ)
           (by simpa [Stage.substT] using Stage.le_substT σ hφ), look fun _ => rfl⟩
     | provideE h₁ h₂ hb h₀ hφ =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _),
         fun σ hσ X _ h' => .provideE h' (h₂.sx (hσ.sub fun _ h => .inr h) X)
-          (by simpa [Stage.substT] using Stage.le_substT σ hb) ⟨h₀.1.substT σ, ob_free_substT h₀.1 h₀.2⟩
+          (by simpa [Stage.substT] using Stage.le_substT σ hb) (h₀.substT σ)
           (by simpa [Stage.substT] using Stage.le_substT σ hφ), look fun _ => rfl⟩
     | errVal hv => exact (nv hv).elim
   case try_ =>
@@ -275,7 +275,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
           by_cases hN : ρ (.nm N)
           · exact .inr (.inl (by simpa [Option.isSome_iff_ne_none] using dom N hN))
           · exact .inl (hr' _ (h.2 hN))
-        | atm a | need _ a | rv a => exact .inl (hr' _ h)
+        | atm a | need _ a | rv a | obv _ a => exact .inl (hr' _ h)
       · exact (Stage.le_err hb).trans he'
       · intro N q' v hv
         simp only [Frame.lookup, Option.map_eq_some_iff] at hv
@@ -298,6 +298,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
         · exact .inl (hr' n h)
         · cases n with
           | ob N a => exact .inr (.inr ⟨p, rfl, h.1⟩)
+          | obv v a => exact .inr ⟨p, rfl, h.1⟩
           | _ => exact h.elim
         · cases n with
           | need N a => exact .inr ⟨p, rfl, h⟩

@@ -78,8 +78,14 @@ theorem Row.kill_sub (ε : Row) (n : Nat) : Row.Sub (ε.substT (kill n)) ε := b
     rcases hx with ⟨b, hb, h⟩ | ⟨b, _, hb⟩
     · obtain ⟨rfl, _⟩ := kill_reach h; exact hb
     · cases kill_asRow hb
-  | ob _ a | need _ a => obtain ⟨b, hb, h⟩ := hx; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
+  | ob _ a =>
+    rcases hx with ⟨b, hb, h⟩ | ⟨_, _, _, hv, _⟩
+    · obtain ⟨rfl, _⟩ := kill_reach h; exact hb
+    · cases kill_asRow hv
+  | need _ a => obtain ⟨b, hb, h⟩ := hx; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
   | rv a => obtain ⟨b, hb, h⟩ := hx; cases kill_asRow h; exact hb
+  | obv w a =>
+    obtain ⟨v, b, hb, hv, h⟩ := hx; cases kill_asRow hv; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
 
 theorem Steps.mono {root : Roots} {Q Q' : Lbl → Prop} {Λ μ e Λ' μ' e'}
     (h : Steps root Q Λ μ e Λ' μ' e') (hQ : ∀ l, Q l → Q' l) : Steps root Q' Λ μ e Λ' μ' e' := by

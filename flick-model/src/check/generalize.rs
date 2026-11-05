@@ -132,8 +132,8 @@ fn names(vars: &[(Name, Kind)], insts: &[Inst]) -> HashMap<Name, Inst> {
         .collect()
 }
 
-/// `C[ᾱ := τ̄, c̄ := C̄]`: an atom or tail that becomes a type is what that
-/// type names.
+/// `C[ᾱ := τ̄, c̄ := C̄, ē := ρ̄]`: an atom or tail that becomes a type or
+/// a row of errors is what that type or row names.
 pub(super) fn substitute_caps(c: &Caps, map: &HashMap<Name, Inst>) -> Caps {
     let mut out = Caps::default();
     let all = c.atoms.iter().map(|v| (v, true));
@@ -145,6 +145,7 @@ pub(super) fn substitute_caps(c: &Caps, map: &HashMap<Name, Inst>) -> Caps {
         match inst {
             Some(Inst::Caps(more)) => out = out.union(more),
             Some(Inst::Type(t)) => free_atoms(t, &mut out),
+            Some(Inst::Row(r)) => row_atoms(r, &mut out),
             _ if atom => {
                 out.atoms.insert(v.clone());
             }
@@ -174,8 +175,17 @@ fn free_atoms(t: &Type, out: &mut Caps) {
         }
         Type::Tuple(ts) => ts.iter().for_each(|t| free_atoms(t, out)),
         Type::Record(f) => f.fields.values().for_each(|t| free_atoms(t, out)),
+        Type::Errors(r) => row_atoms(r, out),
         _ => {}
     }
+}
+
+/// `⌈Errors ρ⌉`: what the errors of `ρ` name and its variables.
+fn row_atoms(r: &Row, out: &mut Caps) {
+    for args in r.elems.values() {
+        args.iter().for_each(|t| free_atoms(t, out));
+    }
+    out.atoms.extend(r.vars.iter().cloned());
 }
 
 /// `τ[ᾱ := τ̄]`.
