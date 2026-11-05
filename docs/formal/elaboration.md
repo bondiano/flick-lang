@@ -621,7 +621,7 @@ The remaining entries were found by the Lean mechanization (`formal/Formal/Elab/
 
 - Divergence: §3.2 defined `L` only in words, "the same with `Unit` instead of a sequence". It did not say which constant traverses the sequence and at which stage the body runs. Without that, T6(a) for `for … do` cannot be stated.
 - Cause: the IR lowers the loop into an `Each` node without `Generate` (`ir/lower/comprehension.rs`), and `L` had no core form.
-- Resolution (prose): the rules `L_φ` of §3.2 with the Γ₀ constant `Seq.each_φ : ∀a. (a →φ Unit) →P Seq a →φ Unit`. The body and the clauses run at the loop's stage: the checker checks them at the current stage (`for_loop`). The core has no stage variables, so there are two constants, one per stage. Lean: `Sugar.loop`, `Sugar.each`, `loop_elab`.
+- Resolution (prose): the rules `L_φ` of §3.2 with the Γ₀ constant `Seq.each_φ : ∀a. (a →φ Unit) →P Seq a →φ Unit`. The body and the clauses run at the loop's stage: the checker checks them at the current stage (`for_loop`). There are two constants: `Seq.each_P` at `P`, which has no Prelude name, and one `Seq.each_effect : ∀c d a r e. (a →R⟨r; e⟩^c Unit) →P (Seq d a →R⟨r; e⟩^c Unit)` at every `R r e`, its rows binders of the scheme, used at the rows of the loop. Lean: `Sugar.loop`, `Sugar.each`, `eachSch`, `eachSch_R`, `loop_elab`.
 
 ### T6(a) without captures does not carry over to the core with regions
 
