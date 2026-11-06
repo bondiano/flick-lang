@@ -5,6 +5,7 @@
 mod data;
 mod dict;
 mod expr;
+mod float;
 mod foreign;
 mod handler;
 mod instance;
