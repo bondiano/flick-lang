@@ -363,12 +363,17 @@ impl Printer<'_> {
         Ok(())
     }
 
-    /// A finite number; a negative one as `(-n)`.
+    /// A finite number; a negative one as `(-n)`. An integral one up to
+    /// 2^53 is an integer literal, of any numeric type its use asks for.
     fn number(&mut self, n: f64) -> Result<(), String> {
         if !n.is_finite() {
             return Err(format!("{n} is no number of Flick"));
         }
-        let digits = format!("{:?}", n.abs());
+        let digits = if n.fract() == 0.0 && n.abs() <= 9_007_199_254_740_992.0 {
+            format!("{:.0}", n.abs())
+        } else {
+            format!("{:?}", n.abs())
+        };
         let (tokens, errors) = lex(&digits, FileId::default());
         if !errors.is_empty() || tokens.len() != 1 || tokens[0].kind != K::Number {
             return Err(format!("{n} is no number of Flick"));

@@ -46,8 +46,13 @@ fn cli(block: &Block) -> bool {
 }
 
 impl Plugin for Std {
+    // the state is the tables' and migrations' of `sql`: the others keep none
     fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8> {
-        Cli.collect(blocks, compiler)
+        let sql: Vec<Block> = (blocks.iter())
+            .filter(|b| b.head == "sql")
+            .cloned()
+            .collect();
+        Sql.collect(&sql, compiler)
     }
 
     fn expand(

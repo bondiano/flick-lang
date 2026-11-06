@@ -149,7 +149,6 @@ pub enum SyntaxKind {
     /// `@name argument…` before a declaration or a constructor.
     Attribute,
     KindDecl,
-    SqlMigrationDecl,
     ErrorDecl,
     ServiceDecl,
     ClassDecl,

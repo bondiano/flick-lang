@@ -44,6 +44,13 @@ break programs.
   `std/Q010` and `std/Q011` (`FLICK-Q011` is retired), and an enum column
   still needs no `via`. The plugin interface gains `literal-of`, which tells
   a plugin while it expands whether a type the block names is an enum.
+- **Breaking:** `sql migration` is a block of the same plugin, with the same
+  import; its rules are `std/Q010` and `std/Q013` (`FLICK-Q013` is
+  retired). The first migration of a module declares `migrations`, each one
+  the tables it creates that the last one leaves.
+- **Plugins:** a declaration block may stand for no declarations, an empty
+  group, as a migration that only alters a table; a whole number in a
+  plugin's code is an integer literal, of any numeric type its use asks for.
 - **CallSite:** the new core class `CallSite` is the place of a use,
   `CallSite.place` (`Module:line`) and `CallSite.definition`, which the
   checker gives: a function with `CallSite =>` passes on its caller's, any

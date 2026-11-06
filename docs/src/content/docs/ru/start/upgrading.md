@@ -1,7 +1,7 @@
 ---
 title: Переход на 0.2
 description: Что изменилось после Flick 0.1.0 и как обновить проект.
-source_hash: d77bbc44765e494d
+source_hash: cdeb5c9c85c0f01c
 ---
 
 Flick 0.2 разрабатывается в `main` и ещё не выпущен. До 1.0 минорный релиз
@@ -102,7 +102,8 @@ let profile_schema = Profile.schema
 
 ## Блокам плагинов нужен импорт
 
-Блоки `cli`, `codec`, `server fn` и `sql table` теперь плагины `std`.
+Блоки `cli`, `codec`, `server fn`, `sql table` и `sql migration` теперь
+плагины `std`.
 Файл, в котором есть такой блок, импортирует его голову:
 
 | Блок | Импорт |
@@ -110,7 +111,7 @@ let profile_schema = Profile.schema
 | `cli "name" { … }` | `import Cli exposing (plugin cli)` |
 | `codec s { … }` | `import Codec exposing (plugin codec)` |
 | `server fn f x = …`, `server f` | `import Server exposing (plugin server)` |
-| `sql table Name "table" { … }` | `import Sql exposing (plugin sql)` |
+| `sql table Name "table" { … }`, `sql migration 1 "name" { … }` | `import Sql exposing (plugin sql)` |
 
 В 0.1 блоку `codec` импорт был не нужен:
 
@@ -164,6 +165,7 @@ let profile_json =
 | `FLICK-E010` | `std/E010` | форма `server fn`; `server name` для значения, которое не `server fn`, остаётся `FLICK-E010` |
 | `FLICK-Q001`, `FLICK-Q010` в `sql table` | `std/Q001`, `std/Q010` | столбец указан дважды, тип SQL или атрибут, которого нет в диалекте |
 | `FLICK-Q011` | `std/Q011` | столбец другого типа, чем у его типа SQL, без `via` |
+| `FLICK-Q010`, `FLICK-Q013` в `sql migration` | `std/Q010`, `std/Q013` | инструкция вне DDL миграций или такая, что не применяется к схеме перед ней |
 | `FLICK-E012`, `FLICK-L008` | — | больше не используются: плагин `std` есть в каждой сборке |
 
 `flick explain std/D001` объясняет новый код, а `flick explain FLICK-L001`

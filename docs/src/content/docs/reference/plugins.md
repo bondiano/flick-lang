@@ -141,12 +141,14 @@ and with the span of the block it stands for:
 | expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole |
 | type | name, application, record, function, tuple, type-level text (`"name"`), `_`, `forall`, row, hole, a type of the signature |
 | pattern | variable, wildcard, constructor, record, tuple, hole |
-| declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, `instance` with members, a group of several, documentation of one, hole |
+| declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, `instance` with members, a group of several or none, documentation of one, hole |
 
 The compiler checks the arena before it uses it: names must lex as names,
 numbers be finite, holes lie in the body and not overlap, an expression or a
 pattern be used once (a type may stand in several places, as in a signature
-and an annotation), and its size and depth are bounded. A function in a
+and an annotation), and its size and depth are bounded. A whole number is
+an integer literal, of any numeric type its use asks for; a declaration
+block whose group is empty declares nothing. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,
 `0.1.0`. Until Flick 0.2 the interface changes without a new version: build
 a component with the `flick-plugin` of the compiler it runs in. A component

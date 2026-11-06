@@ -1,104 +1,13 @@
-//! The tables of `sql migration`s and `sql { … }` blocks: plain data for
-//! the runtime, `Sql.make_table` and `Sql.make_template` applied to records
-//! of the names, kinds and codecs the checker settled.
+//! `sql { … }` blocks: plain data for the runtime, `Sql.make_template`
+//! applied to records of the names, kinds and codecs the checker settled.
 
 use super::Lower;
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Stage};
+use crate::ir::{Expr, ExprKind, Lit, Stage};
 use crate::source::Span;
 use crate::syntax::cst::Node;
-use crate::syntax::ddl;
-use crate::types::{SqlForm, SqlTable, SqlValue, companion_name};
+use crate::types::{SqlForm, SqlValue};
 
 impl Lower<'_> {
-    /// The `Name$table` of each table a `sql migration` creates.
-    pub(super) fn sql_migration(&mut self, decl: &Node, span: Span, items: &mut Vec<Item>) {
-        let (start, end) = decl.range();
-        for table in &self.typing.sql_tables {
-            if start <= table.decl.0 && table.decl.1 <= end {
-                self.table_item(table, None, span, items);
-            }
-        }
-    }
-
-    /// `migrations`: every `sql migration` of the module, its statements as
-    /// written, for `Database.Migrate.run`.
-    pub(super) fn migrations(&mut self, migrations: &[ddl::Migration], span: Span) -> Item {
-        let steps = migrations
-            .iter()
-            .map(|m| {
-                let statements = m
-                    .statements
-                    .iter()
-                    .map(|s| string(&s.sql(), span))
-                    .collect();
-                let version = i32::try_from(m.version.unwrap_or_default()).unwrap_or(i32::MAX);
-                record(
-                    vec![
-                        ("version", lit(Lit::Int(version), span)),
-                        ("name", string(&m.name, span)),
-                        ("statements", Expr::new(ExprKind::List(statements), span)),
-                    ],
-                    span,
-                )
-            })
-            .collect();
-        self.fresh_definition();
-        Item {
-            kind: ItemKind::Value {
-                name: "migrations".to_owned(),
-                dicts: Vec::new(),
-                body: Expr::new(ExprKind::List(steps), span),
-            },
-            span,
-        }
-    }
-
-    /// `Name$table`: the table's SQL name and its columns, a column's
-    /// `via` codec read in `decl`.
-    fn table_item(
-        &mut self,
-        table: &SqlTable,
-        decl: Option<&Node>,
-        span: Span,
-        items: &mut Vec<Item>,
-    ) {
-        self.fresh_definition();
-        let columns = table
-            .columns
-            .iter()
-            .map(|c| {
-                let codec = match c.via.zip(decl).and_then(|(r, d)| find(d, r)) {
-                    Some(node) => self.expr(node),
-                    None => lit(Lit::Unit, span),
-                };
-                record(
-                    vec![
-                        ("name", string(&c.name, span)),
-                        ("kind", string(&c.kind, span)),
-                        ("nullable", lit(Lit::Bool(c.nullable), span)),
-                        ("codec", codec),
-                    ],
-                    span,
-                )
-            })
-            .collect();
-        let body = record(
-            vec![
-                ("name", string(&table.table, span)),
-                ("columns", Expr::new(ExprKind::List(columns), span)),
-            ],
-            span,
-        );
-        items.push(Item {
-            kind: ItemKind::Value {
-                name: companion_name(&table.name, "table"),
-                dicts: Vec::new(),
-                body: call("make_table", body, span),
-            },
-            span,
-        });
-    }
-
     /// A checked query: its text, tables, parameters and result columns.
     pub(super) fn sql_block(&mut self, node: &Node) -> Expr {
         let span = self.span(node);
