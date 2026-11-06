@@ -26,7 +26,9 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 ## What is proved
 
 - **The core** (`Formal/`, the top-level modules), with rows of services and errors that
-  take variables, generalized and instantiated as variables of the other kinds: type soundness `T1` (Progress and
+  take variables, generalized and instantiated as variables of the other kinds, and arms on
+  the constructors of a GADT typed under every unifier of what the constructor builds with
+  the matched type: type soundness `T1` (Progress and
   Preservation over every reachable configuration), `T2a` (a pure computation makes only
   pure steps) and `T2b` (a runtime computation asks only the services and raises only the
   errors of its row), `lemma_3_1` and `T3` (generalization and the store typing), `T4` (T4.1, T4.2: live work reaches only live
@@ -37,7 +39,8 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
 - **T6, the elaboration** (`Formal/Elab/`), with runtime stages `R r e` whose rows take
-  variables: `T6a` (`Elab/T6a.lean`), an elaborated term is
+  variables, and constructors whose values carry the dictionaries of their constraints, with
+  arms on them refined by the most general unifier: `T6a` (`Elab/T6a.lean`), an elaborated term is
   typed in the target, with `T6a_default_instance` (`Elab/Defaults.lean`) for what an instance
   takes from a default, its default signature's dictionaries derived under its context, and `T6b` (`Elab/Coherence.lean`), two elaborations that differ only
   in the derivations of their dictionaries give the same result. Both are stated for an
@@ -90,6 +93,8 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | `core.md` §2.3, §3.6 rules; `regions.md` §2.3–§2.5, §3.4 | `Typ` (`Rules.lean`) |
 | (Sub) | admissible: `Typ.sub` (`SubAdm.lean`) |
 | §2.4 patterns, `Exh`; (Match-Val), [Match-Val: a value needs only its own coverage](../docs/formal/core.md#the-residual-match-after-a-false-guard-fails-exh) | `PatTy`, `Shp`, `Exh`, `Covers` (`Typing.lean`) |
+| §2.4 constructors of a GADT: the arguments of the type they build, the hidden row of captures, (Branch-GADT) under every unifier ([not the most general one](../docs/formal/core.md#the-most-general-unifier-is-not-kept-by-substitution), [the free names of a dead branch](../docs/formal/core.md#a-dead-branch-keeps-no-typing-of-its-body)); `Exh` without the constructors that build no value | `Sig.res`, `Sig.ctorTyR` (`Syntax.lean`, `TyOps.lean`); `Sig.Holds`, `Sig.Inj`, `PatsTy`, `Sig.Builds` (`Typing.lean`); `Typ.aref` (`Rules.lean`); `Typ.aref_substT` (`TySubstBase.lean`), `Typ.aref_subst` (`SubstArm.lean`), `aref_match` (`SpineMatch.lean`) |
+| the checker's arm under the most general unifier, and a dropped dead arm | `Mgu`, `Typ.aref_mgu`, `Typ.aref_dead` (`ArefMgu.lean`) |
 | (Try), (Handle) | `HPat`, `Catches`, `HCov`; `tryR`, `tryP`, `handle` |
 | §3.6 `⊢ μ : Ψ`; §2.6 `Σ₀` | `StoreTy`, `RootTy` (`Rules.lean`) |
 | `core.md` §3.2 contexts, `lookup(E, S)`; the frame `inside π E` | `Frame`, `plug`, `lookupE` (`Semantics.lean`) |
@@ -337,6 +342,14 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     of `ϱ`, which the obligation `Provided {S} ϱ` of its registration gives
     (`withs_typing`). The row of the work `spawn` and `addFin` take has no uses (`Const.ok`):
     uses come only from `with` frames, so the derivations `regions.md` gives have none there.
+22. **Two kinds of dead constructor.** (Branch-GADT) is dead when no unifier of what the
+    constructor builds with the matched type keeps the regions the body writes, so that a
+    dead branch stays dead under the substitutions of the regions around it (`kill`, scopes),
+    which may move the regions it does not write; its body keeps only its free variables and
+    locations within the context. `Exh` leaves out a constructor when no instance at all
+    unifies, regions included (`Sig.Builds`): such a constructor builds no value of the type.
+    The second notion is weaker on purpose; the two agree in the checker, which refines no
+    region (`Unsupported(Region)`).
 
 ## Findings
 
@@ -354,6 +367,11 @@ that states the rule.
 - [Spawn bounds everything the task holds](../docs/formal/regions.md#spawn-bounds-everything-the-task-holds): (Spawn) bounded only the hidden qualifier `C` of the child; the child
   also holds what its result shows. The premise is `Outlives (C ∪ ⌈a⌉) ϱ` (`Const.ok`);
   the checker checks it (`regions.md` §6).
+- [the most general unifier is not kept by substitution](../docs/formal/core.md#the-most-general-unifier-is-not-kept-by-substitution): an arm of a GADT typed only under the most general unifier
+  cannot be typed again after a type substitution, as rows and captures are sets in the core;
+  the rule takes every unifier, and the checker's form is derived (`Typ.aref`, `Typ.aref_mgu`).
+- [a dead branch keeps no typing of its body](../docs/formal/core.md#a-dead-branch-keeps-no-typing-of-its-body): a typing of a dead arm under some instance does not survive
+  type substitution; the rule takes the free variables and locations of the body instead.
 - [Lam and Task count runtime forms](../docs/formal/regions.md#lam-and-task-count-runtime-forms): the premise of (Lam)/(Task) must count the run-time regions and cell
   types written in the body, or L4 fails for `λx. (λy. ()) (cap π n)` (`held`,
   `regions.md` §6).
@@ -474,12 +492,15 @@ and `Target`. See [The core as the target](#the-core-as-the-target).
 | §3.1 `do` | `Stmt`, `Sugar.desugarDo`, `DoOk`, `do_elab`, `T6a_do` (`Elab/Sugar.lean`, `Elab/DoNotation.lean`) |
 | §3.2 `for`, §3.3 `?`, §3.4 blocks | `Clause`, `Sugar.gen`, `Sugar.loop`, `GenOk`, `LoopOk`, `forSeq_elab`, `forList_elab`, `loop_elab`, `tryResult_elab`, `tryOption_elab`, `seqUnit_elab`, `T6a_sugar` (`Elab/Sugar.lean`, `Elab/Comprehension.lean`) |
 | Prelude methods and constants of Γ₀ the sugar uses | `Sugar` (`Elab/Sugar.lean`); the schemes of the exports of `Prelude`, `Seq`, `Option`, `Result` and `List` generated from the checker, those the model cannot write listed as skipped with a reason, none today (`Elab/PreludeSchemes.lean`, [Prelude scheme generator with skip list](../docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names)) |
-| "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim`, then `T6b_target` (`Elab/Run.lean`) |
+| "≈ gives the same result" | the hypothesis `Sim` (`Elab/Hyp.lean`); from the steps of a target `Target.sim` (`Elab/Run.lean`), then `T6b_target` (`Elab/Close.lean`) |
+| §2.4 (Con-Dict), (Case-Dict): constructors with dictionaries, arms that bind them as givens, refined by the most general unifier or dropped | `Ctor`, `Prog.ctors`, `Ty.tcon` (`Elab/Syntax.lean`); `Eqs`, `Unify`, `Clash` (`Elab/Unify.lean`); `Exp.con`, `Exp.caseK`, `Tm.caseK`, `armS`, `armΔ`, `Elab.con`, `Elab.caseK`, `Elab.caseKDead` (`Elab/Source.lean`); the laws `con`, `caseK`, `caseKDead`, `armT` (`Elab/Target.lean`); `Elab.dbelow` (`Elab/T6a.lean`) |
+| the refinement in the core: a derivation is the most general unifier there too, `Clash` leaves none | `CUnif`, `Unify.sound`, `Unify.most`, `Unify.unifies`, `Clash.none` (`Elab/CoreUnify.lean`) |
+| constructors and arms in the core: the dictionaries first, then the fields; an arm closed by `θ`, `ρ` ([typed before the closing](../docs/formal/elaboration.md#closing-the-premises-of-a-refined-arm-needs-its-typing-before-the-closing)) | `Real.ctor`, `Real.ctor_holds`, `Real.con_inj` (`Elab/CoreLaws.lean`); `aγ`, `aδ`, `Tr.con`, `Tr.caseK` (`Elab/CoreTr.lean`); `has_con`, `cunif_of`, `has_caseKDead` (`Elab/CoreArm.lean`); `Tr.dsubst` (`Elab/CoreDSubst.lean`); `canonC`, `ent_core`, `closed_dict` (`Elab/CoreCase.lean`); `armτ`, `has_caseK` (`Elab/CoreCaseK.lean`) |
 | §0.1 `⟦·⟧` into the core with regions: types, stages with rows, schemes | `Names`, `trT`, `trTT`, `trD`, `trS`, `trStage`, `trT_arr`, `Stage.qual`, `trT_subst`, `trStage_subst`, `trT_reach` (`Elab/CoreTy.lean`) |
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
 | §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
 | T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
-| an elaboration with its premises closed by `θ`, `ρ` ([dictionaries typed closed in the run target](../docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)) | `T6a_close`, `ent_close`, `Tm.dsubst`, `Tm.Skel`, `fill_dsubst` (`Elab/Close.lean`); `lift_inst`, `up_lift`, `heldS_subst`, `Cn.Ground`, `Prog.ConstsClosed` (`Elab/CloseTy.lean`) |
+| an elaboration with its premises closed by `θ`, `ρ` ([dictionaries typed closed in the run target](../docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)) | `T6a_close`, `ent_close`, `closed_typed`, `Tm.Skel`, `fill_dsubst` (`Elab/Close.lean`); `Tm.dsubst`, `Tm.DB`, `Tm.dsubst_congr` (`Elab/Source.lean`); `lift_inst`, `up_lift`, `heldS_subst`, `Prog.ConstsClosed`, `Prog.CtorsClosed` (`Elab/CloseTy.lean`); `Cn.Ground` (`Elab/Syntax.lean`) |
 | the hypotheses of T6 hold together: a witness program | `P`, `S`, `N`, `Sg`, `root`, `coherent`, `real`, `rootTy`, `realRun`, `witness_T6a`, `witness_T6a_do`, `witness_T6b`, `witness_T6b_example`, `witness_T6b_closed`, `witness_T6b_open` (`Elab/Witness/`, `T6b.lean`), `consts_closed` (`Consts.lean`); the bodies `seqFlatMap`, `seqEach`, `seqToList`, `iterL` (`Seq.lean`), `uncB`, `frBody`, `eqRec` (`Unc.lean`); arms for every constructor are exhaustive, `exh_ctors` (`Elab/Exh.lean`) |
 | the lazy `Monad Eff` in the core ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)), `Eff q b` with the field `eff ∅ ∅ b {q}` | `effT`, `effField`, `effPure`, `effMap2`, `effBind`, `typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr` (`Elab/LazyEff.lean`) |
 | the run of dictionaries in the core: closed derivations evaluate, `≈` keeps values | `RealRun`, `ent_eval`, `eqv_sem` (`Elab/CoreDictSem.lean`); `Eval`, `SemEq` (`Elab/CoreEval.lean`); `PStep`, `decomp_eq` (`Decomp.lean`) |
@@ -529,12 +550,13 @@ Simplifications:
    filled term (divergence is not compared). `Sim` follows by induction on the run from
    three fields, which the core instance proves with its relation `Rel`
    ([below](#the-run-rel-and-sim)):
-   `load_rel` (closed terms typed at one type that differ by `≈` in dictionary positions,
-   `TmEqv`, load to related states), `step_rel` (a step of one side is matched by zero or more steps of the other:
+   `load_rel` (two closed fillings of a skeleton typed at one type, by `≈` dictionaries typed
+   in the holes, load to related states), `step_rel` (a step of one side is matched by zero or more steps of the other:
    evaluating `(I d̄).$slotᵢ` and `sᵢ[δ̄ := d̄]` takes different numbers of steps) and
    `final_rel` (a result of one side is reached by the other). Only typed dictionaries
    evaluate, so `Sim` and `T6b` speak of fillings with `Exprs.Ok`, for a target the typing
-   of the filled skeleton, and `T6b_target` takes it for both fillings.
+   of the filled skeleton and of the dictionaries in its holes; `T6b_target` takes the first
+   for both fillings and derives the second from the closed derivations (`closed_typed`).
 9. The sugar (§3) desugars into `Exp`; `Sugar` names the Prelude methods (`flat_map`,
    `map2`, `pure`, `nothing`, `iter`) and the constants of Γ₀ with their schemes, as
    hypotheses on the program. The schemes of the Prelude names are generated from the
@@ -643,10 +665,11 @@ Simplifications:
   - The `lamD` law has the premise `qs ≠ [] → heldT Γ e ⊆ ⌈t⌉ ∪ ⌈q⌉`.
   - `meth`, `const`, `inst`, `strct` and `prim` use `q = cnil`.
   - The `Rel` fields take typing premises, because the run of the core relates closed typed
-    terms. `load_rel` takes `Has [] [] e t φ` and `Has [] [] e' t φ`. `Exprs` has `Ok`, and
-    `Sim` and `T6b` speak only of fillings with `Ok`. A skeleton of `Target.exprs` is
-    `Tm × TTy × Stage`, `Ok` is the typing of the filled skeleton, and `T6b_target`
-    takes it for both fillings. `step_rel` and `final_rel` take none: `Rel` carries them.
+    terms. `load_rel` takes the typings of two fillings of a skeleton and of the dictionaries
+    in its holes. `Exprs` has `Ok`, and `Sim` and `T6b` speak only of fillings with `Ok`. A
+    skeleton of `Target.exprs` is `Tm × TTy × Stage`, `Ok` is the typing of the filled
+    skeleton and of the dictionaries in its holes, and `T6b_target` gives it for both
+    fillings. `step_rel` and `final_rel` take none: `Rel` carries them.
 
 #### Dictionary records in the core
 
@@ -823,11 +846,13 @@ for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
     premises (`SlotsBelow`); the bodies of the instances are closed, so `RootTy` and
     `RealRun` give it (`slots_below`, [equivalence as closure of closed pairs](../docs/formal/elaboration.md#equivalence-relates-open-dictionaries)). A closed pair of typed
     dictionaries is a base pair `DP`: `eqv_sem` gives `SemEq`, and `DTyp` the core's typing
-    at the pure stage (`DTy.core`). `trE` is the function `Tr` is (`Tr.eq`);
-    `load e = ⟨[], [], trE id id e⟩`.
+    at the pure stage (`DTy.core`). Two fillings of one skeleton differ only in the holes, so
+    the rest of the two terms is related by `Cg.refl` and needs no typing (`fill_cg`); a closed
+    dead arm may hold dictionaries without one ([the dictionaries of a closed dead arm](../docs/formal/elaboration.md#the-dictionaries-of-a-closed-dead-arm-need-not-be-typed)). `trE` is the
+    function `Tr` is (`Tr.eq`); `load e = ⟨[], [], trE id id e⟩`.
   - The typing of the core of the whole term does not show its dictionaries in the empty
     context, so `runTarget` types terms with `RHas`, the core's `Has` together with `DTyp`
-    of every dictionary of the term; the laws of `Target` give both
+    of a dictionary term; the laws of `Target` give both
     ([dictionaries typed closed in the run target](../docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)). Closing the premises of an elaboration gives `RHas` of the
     closed filling (`T6a_close`).
   - `runTarget hR hRun hroot : Target P` with `Real`, `RealRun` and `RootTy`; `T6b_core` is
