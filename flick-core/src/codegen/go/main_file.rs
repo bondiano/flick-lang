@@ -99,6 +99,6 @@ fn reaches(
 ) -> bool {
     reached.iter().any(|&(m, i)| {
         matches!(&modules[m].items[i].kind, ItemKind::Foreign(f)
-            if f.module.as_deref() == Some(module) && exports.contains(&f.export.as_str()))
+            if f.binding.from.as_deref() == Some(module) && exports.contains(&f.binding.name.as_str()))
     })
 }

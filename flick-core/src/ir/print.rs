@@ -26,8 +26,8 @@ pub fn print(module: &Module) -> String {
                 format!(
                     "foreign {mode} {} = {}:{} arity {} dicts {} stages {}",
                     f.name,
-                    f.module.as_deref().unwrap_or("global"),
-                    f.export,
+                    f.binding.from.as_deref().unwrap_or("global"),
+                    f.binding.name,
                     f.arity,
                     f.dicts,
                     stages(&f.stages)

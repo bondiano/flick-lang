@@ -71,7 +71,7 @@ pub(super) fn lookup(
 /// returns a function of the rest, as Effect's data-last functions do.
 pub(super) fn parameters(f: &Foreign) -> usize {
     if f.arity == 0 {
-        f.info.stages_taken()
+        f.taken()
     } else {
         f.stages.len().max(f.arity)
     }
@@ -82,18 +82,24 @@ impl<'a> Gen<'a> {
     /// Go form, which is reported.
     pub(super) fn foreign(&mut self, f: &Foreign, span: Span) -> Option<Document<'a>> {
         let a = self.a;
-        let Some(target) = lookup(self.module, &f.name, f.module.as_deref(), &f.export) else {
-            if let Some(spec) = f.module.as_deref().filter(|m| is_relative(m)) {
+        let Some(target) = lookup(
+            self.module,
+            &f.name,
+            f.binding.from.as_deref(),
+            &f.binding.name,
+        ) else {
+            if let Some(spec) = f.binding.from.as_deref().filter(|m| is_relative(m)) {
                 return self.local(f, spec, span);
             }
             let from = f
-                .module
+                .binding
+                .from
                 .as_deref()
                 .map_or_else(|| "global".to_owned(), |m| format!("from `{m}`"));
             self.errors.push((
                 format!(
                     "`{}.{}` (foreign `{}` {from}) is not available on the go target",
-                    self.module, f.name, f.export
+                    self.module, f.name, f.binding.name
                 ),
                 Some(span),
             ));
@@ -163,16 +169,16 @@ impl<'a> Gen<'a> {
                     "`{}.{}` (foreign `{}` from `{spec}`) needs `{}` beside `{spec}` on the go target",
                     self.module,
                     f.name,
-                    f.export,
+                    f.binding.name,
                     sibling(spec)
                 ),
                 Some(span),
             ));
             return None;
         };
-        let info = &f.info;
+        let info = &f.adapter;
         if f.catch.is_some()
-            || info.this
+            || info.receiver
             || info.variadic
             || !info.optional.is_empty()
             || info.callbacks.iter().any(Option::is_some)
@@ -195,7 +201,7 @@ impl<'a> Gen<'a> {
                 "var ",
                 var,
                 " flickrt.Value = ",
-                f.export.clone()
+                f.binding.name.clone()
             ]);
         }
         let heads: Vec<String> = (0..f.dicts)
@@ -208,7 +214,7 @@ impl<'a> Gen<'a> {
             ForeignMode::Async => "ctx",
         };
         args.insert(0, first.to_owned());
-        let export = a.alloc_str(&f.export);
+        let export = a.alloc_str(&f.binding.name);
         let mut go = call(a, export, args.into_iter().map(|arg| arg.to_doc(a)));
         if f.mode == ForeignMode::Async {
             let head = "func(ctx flickrt.Context) flickrt.Value";

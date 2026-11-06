@@ -5,33 +5,35 @@
 use std::collections::HashMap;
 
 use super::{Gen, names};
+use crate::ir::Copies;
 use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
-use crate::types::Copies;
 
 /// What crosses `f` as a copy: an import outside the runtime may change
 /// Flick data in place (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`).
 fn copies(f: &Foreign) -> Option<&Copies> {
     let trusted = f
-        .module
+        .binding
+        .from
         .as_deref()
         .is_some_and(|m| m.starts_with("@flick-lang/runtime"));
-    (!trusted && f.info.copies.any()).then_some(&f.info.copies)
+    (!trusted && f.adapter.copies.any()).then_some(&f.adapter.copies)
 }
 
 impl Gen<'_> {
     pub(super) fn foreign(&mut self, f: &Foreign) -> String {
         let alias = format!("$f_{}", f.name);
-        let target = match &f.module {
+        let target = match &f.binding.from {
             Some(module) => {
                 let spec = (self.options.foreign)(self.module, module);
-                self.foreign.push((spec, f.export.clone(), alias.clone()));
+                self.foreign
+                    .push((spec, f.binding.name.clone(), alias.clone()));
                 alias
             }
-            None => format!("globalThis.{}", f.export),
+            None => format!("globalThis.{}", f.binding.name),
         };
-        let info = &f.info;
+        let info = &f.adapter;
         let dicts: Vec<String> = (0..f.dicts).map(|i| format!("$d{i}")).collect();
-        let params: Vec<String> = (0..info.stages_taken()).map(|i| format!("$a{i}")).collect();
+        let params: Vec<String> = (0..f.taken()).map(|i| format!("$a{i}")).collect();
         let runtime = params
             .len()
             .checked_sub(1)
@@ -125,14 +127,14 @@ impl Gen<'_> {
         dicts: &[String],
         params: &[String],
     ) -> String {
-        let info = &f.info;
+        let info = &f.adapter;
         let copies = copies(f);
         let mut args: Vec<String> = dicts.to_vec();
         for (i, param) in params.iter().take(f.arity).enumerate() {
             let copy = copies.is_some_and(|c| c.args.get(i) == Some(&true));
             let callback = copies.and_then(|c| c.callbacks.get(i).cloned().flatten());
             let arg = match info.callbacks.get(i).copied().flatten() {
-                _ if info.this && i == 0 => self.copied(copy, param.clone()),
+                _ if info.receiver && i == 0 => self.copied(copy, param.clone()),
                 Some(n) => self.callback(param, n, callback.as_ref()),
                 None if info.optional.contains(&i) => {
                     let arg = format!("{}({param})", self.rt("optionalArg"));
@@ -148,7 +150,7 @@ impl Gen<'_> {
         if info.cancel {
             args.push("$signal".to_owned());
         }
-        if info.this && !args.is_empty() {
+        if info.receiver && !args.is_empty() {
             let receiver = args.remove(dicts.len());
             let rest: Vec<String> = [receiver].into_iter().chain(args).collect();
             format!("{target}.call({})", rest.join(", "))
@@ -190,16 +192,16 @@ impl Gen<'_> {
 /// Whether the JS function itself can stand for `f` in release: a pure
 /// import called with its arguments as they are and returning its result.
 pub(super) fn plain(f: &Foreign) -> bool {
-    let info = &f.info;
+    let info = &f.adapter;
     f.mode == ForeignMode::Pure
-        && f.module.is_some()
+        && f.binding.from.is_some()
         && f.dicts == 0
         && f.catch.is_none()
         && !f.stages.is_empty()
         && f.stages.iter().all(|&runtime| !runtime)
         && f.arity == f.stages.len()
-        && info.stages_taken() == f.arity
-        && !(info.this || info.cancel || info.variadic)
+        && f.taken() == f.arity
+        && !(info.receiver || info.cancel || info.variadic)
         && info.optional.is_empty()
         && info.callbacks.iter().all(|c| matches!(c, None | Some(1)))
         && !(info.result.nullable || info.result.unit)

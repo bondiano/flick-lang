@@ -23,7 +23,9 @@ use std::collections::{HashMap, HashSet};
 use std::iter;
 use std::sync::Arc;
 
-use super::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind, Lit, Module, Param, Stage};
+use super::{
+    Binding, Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind, Lit, Module, Param, Stage,
+};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::{FileId, Span};
@@ -418,12 +420,14 @@ impl Lower<'_> {
         Some(Foreign {
             name,
             mode,
-            module,
-            export,
+            binding: Binding {
+                from: module,
+                name: export,
+            },
             stages: info.stages.clone(),
             dicts: info.dicts,
             arity: info.js_arity(),
-            info,
+            adapter: info.adapter,
             catch,
         })
     }

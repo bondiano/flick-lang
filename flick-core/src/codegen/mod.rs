@@ -65,7 +65,8 @@ pub enum Labels {
     /// Atoms, views and actions.
     #[default]
     All,
-    /// Views and actions; an atom's label costs a stack trace when it is made.
+    /// Those of kind `component`, views and actions; an atom's label
+    /// costs a stack trace when it is made.
     Components,
     None,
 }

@@ -105,8 +105,8 @@ pub use schemas::companion_name;
 pub use services::{OpClass, Operation};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
-    Constructor, Copies, ForeignInfo, GenericInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
-    Typing, default_method, passes_dictionary,
+    Constructor, ForeignInfo, GenericInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref, Typing,
+    default_method, passes_dictionary,
 };
 
 use convert::TyVar;

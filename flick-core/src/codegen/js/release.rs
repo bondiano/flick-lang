@@ -22,7 +22,7 @@ pub fn exported_worker(item: &Item) -> Option<(&str, usize)> {
             ),
             _ => return None,
         },
-        ItemKind::Foreign(f) if f.dicts == 0 && f.info.stages_taken() == f.stages.len() => (
+        ItemKind::Foreign(f) if f.dicts == 0 && f.taken() == f.stages.len() => (
             &f.name,
             f.stages.len(),
             f.stages.iter().rev().skip(1).all(|&r| !r),

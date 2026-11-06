@@ -57,7 +57,8 @@ pub fn check(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
     let needed = module.items.iter().find_map(|item| match &item.kind {
         // shortcut: checks the module, not the export; one `core` lacks fails when the program loads
         ItemKind::Foreign(f) => f
-            .module
+            .binding
+            .from
             .as_deref()
             .filter(|spec| specifier(spec).is_none())
             .map(|spec| (item.span, format!("`{spec}` runs on Effect"))),

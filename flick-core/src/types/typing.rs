@@ -16,7 +16,7 @@ use super::gadt::branch::as_field_given;
 use super::services::OpClass;
 use super::ty::{Stage, Type};
 use crate::iface::Interface;
-use crate::ir::Label;
+use crate::ir::{Adapter, Label};
 use crate::numeric::Num;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -213,53 +213,9 @@ pub struct ForeignInfo {
     pub dicts: usize,
     /// `arity n`, when written.
     pub arity: Option<usize>,
-    pub this: bool,
     /// The `catch` mapping expression.
     pub catch: Option<Range>,
-    pub cancel: bool,
-    pub optional: Vec<usize>,
-    pub variadic: bool,
-    pub result: ResultAdapter,
-    /// For each JS argument: the number of arguments of the JS function a
-    /// callback is adapted to.
-    pub callbacks: Vec<Option<usize>>,
-    pub copies: Copies,
-}
-
-/// Where a foreign call may pass Flick data, which an import outside the
-/// runtime gets as a copy: JS may change an array or object in place
-/// (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Copies {
-    /// For each JS argument.
-    pub args: Vec<bool>,
-    /// The result; of a `Promise` or an `Effect`, its value.
-    pub result: bool,
-    /// For each JS argument that is a callback: each argument JS gives it,
-    /// and the result it gives JS.
-    pub callbacks: Vec<Option<(Vec<bool>, bool)>>,
-}
-
-impl Copies {
-    /// Whether any value is copied.
-    pub fn any(&self) -> bool {
-        self.result
-            || self.args.contains(&true)
-            || self
-                .callbacks
-                .iter()
-                .flatten()
-                .any(|(args, result)| *result || args.contains(&true))
-    }
-}
-
-/// How the JS result of a foreign call becomes a Flick value.
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-pub struct ResultAdapter {
-    /// `nullable`: `null` and `undefined` are `None`.
-    pub nullable: bool,
-    /// The result is `Unit`: whatever JS returns becomes `()`.
-    pub unit: bool,
+    pub adapter: Adapter,
 }
 
 /// The scopes around a call, as their regions and `scope` expressions,

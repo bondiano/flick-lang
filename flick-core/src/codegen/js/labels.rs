@@ -4,20 +4,19 @@
 
 use super::{Gen, names};
 use crate::codegen::Labels;
-use crate::ir::Label;
 #[cfg(feature = "source-maps")]
 use crate::source::Span;
 
 impl Gen<'_> {
     /// `value`, the top-level value `name`, with its label if it gets one.
     pub(super) fn labelled(&mut self, name: &str, value: String) -> String {
-        let Some(&label) = self.labels.get(name) else {
+        let Some(label) = self.labels.get(name) else {
             return value;
         };
         let kept = match self.options.labels {
             _ if !self.options.release => true,
             Labels::All => true,
-            Labels::Components => label == Label::Component,
+            Labels::Components => label.kind == "component",
             Labels::None => false,
         };
         if !kept {

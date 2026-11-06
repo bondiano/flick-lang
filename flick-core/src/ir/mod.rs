@@ -8,10 +8,12 @@
 //! Built from the syntax tree and the checker's [`Typing`](crate::types::Typing)
 //! by [`lower`]; printed for tests by [`print`].
 
+mod foreign;
 mod handler;
 mod lower;
 mod print;
 
+pub use foreign::{Adapter, Binding, Copies, Foreign, ForeignMode, ResultAdapter};
 pub use lower::lower;
 pub use print::print;
 
@@ -25,7 +27,7 @@ use crate::numeric::{Arith, Num};
 use crate::source::Span;
 pub use crate::types::Stage;
 use crate::types::lang::{self, Lang};
-use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, Type};
+use crate::types::{Constructor, Dict, InstanceInfo, Lift, Type};
 pub use handler::{Handled, Handler, OpArm};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,12 +42,12 @@ pub struct Module {
     pub declarations: Arc<Interface>,
 }
 
-/// What a labelled top-level value is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Label {
-    Atom,
-    /// A view or an action, labelled in release too by default.
-    Component,
+/// The label of a top-level value, `Module.name`, which debugging tools
+/// show: of a kind its checker names, which the backend and `[build]
+/// labels` read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Label {
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,7 +67,7 @@ pub enum ItemKind {
     },
     /// `let (a, b) = …`.
     Destructure { pattern: Pat, body: Expr },
-    /// A binding to a JS function; only the JS backend emits it.
+    /// A function of the host, called by its convention.
     Foreign(Foreign),
     /// A constructor of a type or error declared here.
     Constructor(Constructor),
@@ -79,39 +81,6 @@ pub enum ItemKind {
         info: Box<InstanceInfo>,
         methods: Vec<(String, Expr)>,
     },
-}
-
-/// A `foreign` declaration: a JS calling convention, not a portable one.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Foreign {
-    pub name: String,
-    pub mode: ForeignMode,
-    /// `None` for `global`.
-    pub module: Option<String>,
-    /// The export, or the global path `Date.now`.
-    pub export: String,
-    /// Each arrow of the signature: whether it is runtime.
-    pub stages: Vec<bool>,
-    /// Dictionaries the JS function takes before its arguments.
-    pub dicts: usize,
-    /// `arity n`, else the stages up to the first runtime one.
-    pub arity: usize,
-    /// The rest of its calling convention.
-    pub info: ForeignInfo,
-    /// The `catch` mapping, a function of the thrown value.
-    pub catch: Option<Expr>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ForeignMode {
-    /// A plain JS function.
-    Pure,
-    /// Synchronous JS run by the runtime; a throw is a defect.
-    Sync,
-    /// Returns a `Promise`; a rejection is a defect.
-    Async,
-    /// Returns an `Effect`.
-    Effect,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
