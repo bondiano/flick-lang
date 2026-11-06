@@ -21,35 +21,6 @@ namespace Flick.Elab
 variable {P : Prog}
 
 /-- The premises from `L` on, closed by `ρ`; those below `L` are bound inside the term. -/
-def dsub (L : Nat) (ρ : Nat → Dict) : Nat → Dict := fun k => if k < L then .var k else ρ (k - L)
-
-/-- `e[ρ]` for the premises from `L` on. -/
-def Tm.dsubst (ρ : Nat → Dict) : Nat → Tm → Tm
-  | _, .var x => .var x
-  | _, .hole i => .hole i
-  | L, .dict d => .dict (d.subst (dsub L ρ))
-  | L, .meth e m => .meth (e.dsubst ρ L) m
-  | _, .const c => .const c
-  | L, .app f a => .app (f.dsubst ρ L) (a.dsubst ρ L)
-  | L, .lam b => .lam (b.dsubst ρ L)
-  | L, .let_ e b => .let_ (e.dsubst ρ L) (b.dsubst ρ L)
-  | L, .lamD l b => .lamD l (b.dsubst ρ (l + L))
-  | L, .ite c a b => .ite (c.dsubst ρ L) (a.dsubst ρ L) (b.dsubst ρ L)
-  | L, .caseOpt e n s => .caseOpt (e.dsubst ρ L) (n.dsubst ρ L) (s.dsubst ρ L)
-
-theorem Tm.dsubst_dapps (ρ : Nat → Dict) (L : Nat) (f : Tm) (ds : List Dict) :
-    (f.dapps ds).dsubst ρ L = (f.dsubst ρ L).dapps (ds.map (·.subst (dsub L ρ))) := by
-  induction ds generalizing f with
-  | nil => rfl
-  | cons d ds ih => exact ih (.app f (.dict d))
-
-theorem Tm.free_dsubst {ρ : Nat → Dict} {e : Tm} {L x : Nat} (h : (e.dsubst ρ L).Free x) :
-    e.Free x := by
-  induction e generalizing L x with
-  | var | hole | dict | const => exact h
-  | meth _ _ ih | lam _ ih | lamD _ _ ih => exact ih h
-  | app _ _ ih₁ ih₂ | let_ _ _ ih₁ ih₂ => exact h.imp ih₁ ih₂
-  | ite _ _ _ ih₁ ih₂ ih₃ | caseOpt _ _ _ ih₁ ih₂ ih₃ => exact h.imp ih₁ (Or.imp ih₂ ih₃)
 
 theorem Ent.weaken_nil {Δ qs : List Cn} {ds : List Dict} (h : Ent P [] qs ds) : Ent P Δ qs ds := by
   induction h with
@@ -105,7 +76,8 @@ theorem Stage.subst_or {ψ φ : Stage} (θ : Nat → Ty) (h : ψ = .P ∨ ψ = �
 
 /-- **T6(a) with the premises closed.** `Γ; Δl, Δ ⊢ e : τ ! φ ⇝ e'` and `Δ` closed by `θ`, `ρ`
 to ground constraints give `⟦Γθ⟧, ⟦Δl θ⟧ ⊢⁺ e'[ρ] : τθ ! φθ` in any target. -/
-theorem T6a_close (hP : P.ConstsClosed) {Γ D e τ φ e'} (h : Elab P Γ D e τ φ e') :
+theorem T6a_close (hP : P.ConstsClosed) (hC : P.CtorsClosed) {Γ D e τ φ e'}
+    (h : Elab P Γ D e τ φ e') :
     ∀ {Δl Δ : List Cn} {θ : Nat → Ty} {ρ : Nat → Dict}, D = Δl ++ Δ → Closes P Δ θ ρ →
       (∀ (k : Nat) (Q : Cn), Δ[k]? = some Q → (Q.subst θ).Ground) →
       X.Has ((Γ.map (·.subst θ)).map Scheme.tr) (Δl.map (·.subst θ)) (e'.dsubst ρ Δl.length)
@@ -140,6 +112,41 @@ theorem T6a_close (hP : P.ConstsClosed) {Γ D e τ φ e'} (h : Elab P Γ D e τ 
     rw [const_inst hP hc hk θ] at hv
     rw [Tm.dsubst_dapps]
     exact tm_dapps X hv (ent_close X hρ he)
+  | @con Γ D K c ts ds φ hK hk he =>
+    intro Δl Δ θ ρ hD hρ _; subst hD
+    have hv := X.con (Γ := (Γ.map (·.subst θ)).map Scheme.tr) (Δ := Δl.map (·.subst θ))
+      (φ := φ.subst θ) (ts := ts.map (·.subst θ)) hK (by simpa using hk)
+    rw [ctor_inst hC hK hk θ] at hv
+    rw [Tm.dsubst_dapps]
+    exact tm_dapps X hv (ent_close X hρ he)
+  | @caseK Γ D e K n b r T us t φ c θa e' b' r' _ hK hT hlen hn hU hb _ ihe _ ihr =>
+    intro Δl Δ θ ρ hD hρ hg; subst hD
+    have hΓ : (Γ.map (·.subst θ)).map Scheme.tr = (Γ.map Scheme.tr).map (·.subst θ) := by
+      simp [Scheme.tr_subst]
+    have hb' := T6a X hb
+    rw [armS_tr] at hb'
+    -- the dictionaries of premises that `Δ` does not have are never read: close them anyway
+    let ρ' : Nat → Dict := fun k => if k < Δ.length then ρ k else .inst 0
+    have hρ' : Closes P Δ θ ρ' := fun k Q hk => by
+      simp only [ρ', if_pos (List.getElem?_eq_some_iff.mp hk).1]; exact hρ k Q hk
+    have hcl : ∀ k, (ρ' k).Below 0 := fun k => by
+      simp only [ρ']
+      split
+      · rename_i hk
+        obtain ⟨Q, hQ⟩ : ∃ Q, Δ[k]? = some Q := ⟨_, List.getElem?_eq_getElem hk⟩
+        simpa using Ent.dbelow (hρ k Q hQ) _ (.head _)
+      · trivial
+    have h := X.caseK (Γ := Γ.map Scheme.tr) (Δl := Δl) (Δ := Δ) (σ := θ) (ρ := ρ')
+      (by rw [← hΓ]; exact ihe rfl hρ hg) hK hT hlen hn hU hb' hρ' hg hcl
+      (by rw [← hΓ]; exact ihr rfl hρ hg)
+    have e₁ : b'.dsubst ρ (c.ctx.length + Δl.length) = b'.dsubst ρ' (c.ctx.length + Δl.length) :=
+      Tm.dsubst_congr (M := Δ.length) (fun k hk => by simp [ρ', hk])
+        (by have := hb.dbelow; simpa [armΔ, Nat.add_assoc] using this)
+    rw [← hΓ, ← e₁] at h
+    exact h
+  | caseKDead _ hK hT hlen _ hC' _ ihe ihr =>
+    intro _ _ θ _ hD hρ hg
+    exact X.caseKDead (σ := θ) (ihe hD hρ hg) hK hT hlen hC' (ihr hD hρ hg)
   | app _ _ hψ ih₁ ih₂ =>
     intro _ _ θ _ hD hρ hg; exact X.app (ih₁ hD hρ hg) (ih₂ hD hρ hg) (Stage.subst_or θ hψ)
   | ite _ _ _ ihc iha ihb =>
@@ -199,20 +206,6 @@ theorem T6a_close (hP : P.ConstsClosed) {Γ D e τ φ e'} (h : Elab P Γ D e τ 
       · exact .inl (by rw [hp (.inr hk)]; rfl)
     exact X.let_ hd (fun h => by rw [hp (.inr h)]; rfl) hφ' (ih₂ rfl hρ hg)
 
-/-- A dictionary whose premises lie below `L`. -/
-def Dict.Below (L : Nat) : Dict → Prop
-  | .var k => k < L
-  | .slot d _ => d.Below L
-  | .ap d e => d.Below L ∧ e.Below L
-  | _ => True
-
-theorem Dict.subst_below {L : Nat} {ρ : Nat → Dict} : ∀ {d : Dict}, d.Below L →
-    d.subst (dsub L ρ) = d
-  | .var k, h => by simp [Dict.subst, dsub, show k < L from h]
-  | .slot d i, h => by simp [Dict.subst, Dict.subst_below (d := d) h]
-  | .ap d e, h => by simp [Dict.subst, Dict.subst_below h.1, Dict.subst_below h.2]
-  | .inst _, _ | .strct _ _, _ | .prim _ _, _ => rfl
-
 /-- A skeleton of `n` holes, all outside the abstractions over dictionaries; its own
 dictionaries name only the premises bound inside it (`L` of them around). -/
 def Tm.Skel (n : Nat) : Nat → Tm → Prop
@@ -225,7 +218,8 @@ def Tm.Skel (n : Nat) : Nat → Tm → Prop
   | L, .lamD l b => b.Skel n (l + L)
   | L, .ite c a b => c.Skel n L ∧ a.Skel n L ∧ b.Skel n L
   | L, .caseOpt e m s => e.Skel n L ∧ m.Skel n L ∧ s.Skel n L
-  | _, .var _ | _, .const _ => True
+  | L, .caseK e _ _ m b r => e.Skel n L ∧ b.Skel n (m + L) ∧ r.Skel n L
+  | _, .var _ | _, .const _ | _, .con _ => True
 
 /-- **Closing a filling is filling with the closed dictionaries.** -/
 theorem fill_dsubst {ds : List Dict} {ρ : Nat → Dict} : ∀ {s : Tm} {L : Nat},
@@ -235,7 +229,7 @@ theorem fill_dsubst {ds : List Dict} {ρ : Nat → Dict} : ∀ {s : Tm} {L : Nat
     have : dsub 0 ρ = ρ := by funext k; simp [dsub]
     simp [Tm.fill, Tm.dsubst, this, args, hi]
   | .dict d, _, h => by simp [Tm.fill, Tm.dsubst, Dict.subst_below h]
-  | .var _, _, _ | .const _, _, _ => rfl
+  | .var _, _, _ | .const _, _, _ | .con _, _, _ => rfl
   | .meth e _, _, h => by simp [Tm.fill, Tm.dsubst, fill_dsubst (s := e) h]
   | .lam b, _, h => by simp [Tm.fill, Tm.dsubst, fill_dsubst (s := b) h]
   | .lamD _ b, _, h => by simp [Tm.fill, Tm.dsubst, fill_dsubst (s := b) h]
@@ -245,5 +239,35 @@ theorem fill_dsubst {ds : List Dict} {ρ : Nat → Dict} : ∀ {s : Tm} {L : Nat
     simp [Tm.fill, Tm.dsubst, fill_dsubst h.1, fill_dsubst h.2.1, fill_dsubst h.2.2]
   | .caseOpt e m s, _, h => by
     simp [Tm.fill, Tm.dsubst, fill_dsubst h.1, fill_dsubst h.2.1, fill_dsubst h.2.2]
+  | .caseK e _ _ _ b r, _, h => by
+    simp [Tm.fill, Tm.dsubst, fill_dsubst h.1, fill_dsubst h.2.1, fill_dsubst h.2.2]
+
+theorem dsub_zero (ρ : Nat → Dict) : dsub 0 ρ = ρ := by funext k; simp [dsub]
+
+theorem All2.at {α β : Type} {R : α → β → Prop} : ∀ {l : List α} {l' : List β}, All2 R l l' →
+    ∀ (i : Nat) (a : α), l[i]? = some a → ∃ b, l'[i]? = some b ∧ R a b
+  | _, _, .nil, _, _, h => by cases h
+  | _, _, .cons r _, 0, _, h => by cases h; exact ⟨_, rfl, r⟩
+  | _, _, .cons _ t, i + 1, a, h => All2.at t i a h
+
+/-- The closed dictionaries of a derivation are typed in the empty context. -/
+theorem closed_typed {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat → Dict} (hρ : Closes P Δ θ ρ)
+    {qs : List Cn} {ds : List Dict} (h : Ent P Δ qs ds) :
+    ∀ (i : Nat) (d : Dict), (ds.map (·.subst ρ))[i]? = some d → ∃ q, X.Has [] [] (.dict d) (.dict q) .P := by
+  have := ent_close X (Γ := []) (Δl := []) (φ := .P) hρ h
+  simp only [List.length_nil, dsub_zero, List.map_nil] at this
+  intro i d hd
+  obtain ⟨q, -, hq⟩ := this.at i d hd
+  exact ⟨q, hq⟩
+
+/-- **T6(b)** for the skeletons of a target: the hypothesis `Sim` is `Target.sim`. -/
+theorem T6b_target {lt : Cn → Cn → Prop} (h : Coherent P lt) (s : Tm) {t : TTy} {φ : Stage}
+    {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat → Dict} (hρ : Closes P Δ θ ρ) {qs : List Cn}
+    {ds₁ ds₂ : List Dict} (h₁ : Ent P Δ qs ds₁) (h₂ : Ent P Δ qs ds₂)
+    (o₁ : X.Has [] [] (s.fill (ds₁.map (·.subst ρ))) t φ)
+    (o₂ : X.Has [] [] (s.fill (ds₂.map (·.subst ρ))) t φ) :
+    All2 (Eqv P) (ds₁.map (·.subst ρ)) (ds₂.map (·.subst ρ)) ∧
+      X.exprs.run (s, t, φ) (ds₁.map (·.subst ρ)) = X.exprs.run (s, t, φ) (ds₂.map (·.subst ρ)) :=
+  T6b h (X.sim) (s, t, φ) hρ h₁ h₂ ⟨o₁, closed_typed X hρ h₁⟩ ⟨o₂, closed_typed X hρ h₂⟩
 
 end Flick.Elab

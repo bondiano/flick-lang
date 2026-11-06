@@ -42,6 +42,13 @@ inductive TrD (δ : Nat → Nat) : Dict → Flick.Tm → Prop
   | prim {p q} : TrD δ (.prim p q) (.glob (N.prim p q))
   | ap {d d' e e'} : TrD δ d d' → TrD δ e e' → TrD δ (.ap d e) (.app d' e')
 
+/-- The variables of an arm on a constructor with `m` dictionaries and `n` fields: the pattern
+binds the dictionaries, then the fields. -/
+def aγ (m n : Nat) (γ : Nat → Nat) (x : Nat) : Nat := if x < n then m + x else γ (x - n) + (m + n)
+
+/-- The premises of such an arm: its dictionaries, then those around. -/
+def aδ (m n : Nat) (δ : Nat → Nat) (k : Nat) : Nat := if k < m then k else δ (k - m) + (m + n)
+
 /-- The elaborated term `e` is the core term `e'`. -/
 inductive Tr : (Nat → Nat) → (Nat → Nat) → Tm → Flick.Tm → Prop
   | var {γ δ x} : Tr γ δ (.var x) (.var (γ x))
@@ -59,6 +66,45 @@ inductive Tr : (Nat → Nat) → (Nat → Nat) → Tm → Flick.Tm → Prop
       Tr (ext γ) (fun k => δ k + 1) s s' →
       Tr γ δ (.caseOpt e n s)
         (.match_ e' (.acons (.app (.ctor N.some) .var) s' (.acons .wild n' .anil)))
+  | con {γ δ K} : Tr γ δ (.con K) (.ctor (N.ctor K))
+  | caseK {γ δ e e' K n m b b' r r'} : Tr γ δ e e' → Tr (aγ m n γ) (aδ m n δ) b b' → Tr γ δ r r' →
+      Tr γ δ (.caseK e K n m b r)
+        (.match_ e' (.acons (Pat.spine (N.ctor K) (List.replicate (m + n) .var)) b'
+          (.acons .wild r' .anil)))
+
+/-- The translation of a dictionary. -/
+def trDt (δ : Nat → Nat) : Dict → Flick.Tm
+  | .var k => .var (δ k)
+  | .slot d i => .proj (trDt δ d) (N.slot i)
+  | .inst I => .glob (N.inst I)
+  | .strct C τ => .glob (N.strct C τ)
+  | .prim p q => .glob (N.prim p q)
+  | .ap d e => .app (trDt δ d) (trDt δ e)
+
+variable {N}
+
+theorem TrD.eq {δ : Nat → Nat} {d : Dict} {d' : Flick.Tm} (h : TrD N δ d d') : d' = trDt N δ d := by
+  induction h <;> simp_all [trDt]
+
+theorem TrD.total (δ : Nat → Nat) : ∀ d, TrD N δ d (trDt N δ d)
+  | .var _ => .var
+  | .slot d _ => .slot (TrD.total δ d)
+  | .inst _ => .inst
+  | .strct _ _ => .strct
+  | .prim _ _ => .prim
+  | .ap d e => .ap (TrD.total δ d) (TrD.total δ e)
+
+/-- Substitution in a translated dictionary. -/
+theorem trDt_subst {δ δ' : Nat → Nat} {σ : Nat → Flick.Tm} {ρ : Nat → Dict}
+    (h : ∀ k, σ (δ k) = trDt N δ' (ρ k)) (s : Dict) :
+    (trDt N δ s).subst σ = trDt N δ' (s.subst ρ) := by
+  induction s with
+  | var k => exact h k
+  | slot d i ih => simp only [trDt, Flick.Tm.subst, Dict.subst, ih]
+  | ap d e ihd ihe => simp only [trDt, Flick.Tm.subst, Dict.subst, ihd, ihe]
+  | _ => rfl
+
+variable (N)
 
 theorem lamsC_free {n : Nat} {b : Flick.Tm} {i : Nat} : (lamsC n b).Free i ↔ b.Free (i + n) := by
   induction n generalizing i with
@@ -83,6 +129,14 @@ theorem TrD.free {δ d d'} (h : TrD N δ d d') {i : Nat} (hi : d'.Free i) : ∃ 
   | strct => cases hi
   | prim => cases hi
   | ap _ _ ih₁ ih₂ => exact hi.elim ih₁ ih₂
+
+theorem spine_vars_binds (K : Name) (j : Nat) : (Pat.spine K (List.replicate j .var)).binds = j := by
+  have key : ∀ (j : Nat) (p : Pat), ((List.replicate j Pat.var).foldl .app p).binds = p.binds + j := by
+    intro j
+    induction j with
+    | zero => intro p; rfl
+    | succ j ih => intro p; rw [List.replicate_succ, List.foldl_cons, ih]; simp only [Pat.binds]; omega
+  simpa [Pat.spine, Pat.binds] using key j (.ctor K)
 
 /-- A translation has no run-time sites. -/
 theorem Tr.has {γ δ e e'} (h : Tr N γ δ e e') (s : Site) : ¬ e'.Has s := by
@@ -142,6 +196,21 @@ theorem Tr.free {γ δ e e'} (h : Tr N γ δ e e') {i : Nat} (hi : e'.Free i) :
         | succ x => exact .inl ⟨x, .inr (.inr hx), by simp [ext] at he; exact he⟩
       · exact .inr ⟨k, by simp only at he; omega⟩
     · exact (ihn hi).imp (fun ⟨x, hx, he⟩ => ⟨x, .inr (.inl hx), he⟩) id
+  | con => cases hi
+  | @caseK γ δ e e' K n m b b' r r' _ _ _ ihe ihb ihr =>
+    simp only [Flick.Tm.Free, spine_vars_binds, Pat.binds, Nat.add_zero, or_false] at hi
+    rcases hi with hi | hi | hi
+    · exact (ihe hi).imp (fun ⟨x, hx, he⟩ => ⟨x, .inl hx, he⟩) id
+    · rcases ihb hi with ⟨x, hx, he⟩ | ⟨k, he⟩
+      · unfold aγ at he
+        split at he
+        · omega
+        · exact .inl ⟨x - n, .inr (.inl (by rwa [Nat.sub_add_cancel (by omega)])), by omega⟩
+      · unfold aδ at he
+        split at he
+        · omega
+        · exact .inr ⟨k - m, by omega⟩
+    · exact (ihr hi).imp (fun ⟨x, hx, he⟩ => ⟨x, .inr (.inr hx), he⟩) id
 
 /-- The context of the core gives `⟦Γ[x]⟧` at `γ x` and `D_{Δ[k]}` at `δ k`. -/
 structure Corr (Γc : List Flick.Scheme) (Γ : List TSch) (Δ : List Cn) (γ δ : Nat → Nat) : Prop where

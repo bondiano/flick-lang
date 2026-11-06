@@ -1,6 +1,7 @@
 import Formal.Decomp
 import Formal.SubstComp
 import Formal.Elab.CoreT6a
+import Formal.Elab.CoreDSubst
 
 /-!
 # λFlick⁺ as a `Target`: evaluation by pure steps
@@ -115,27 +116,6 @@ theorem All2.length {α β : Type} {R : α → β → Prop} {l : List α} {l' : 
   | nil => rfl
   | cons _ _ ih => simp [ih]
 
-theorem liftS_succ (m : Nat) (σ : Nat → Flick.Tm) (i : Nat) :
-    liftS m (liftS 1 σ) i = liftS (m + 1) σ i := by
-  simp only [liftS]
-  by_cases h : i < m
-  · rw [if_pos h, if_pos (show i < m + 1 by omega)]
-  · rw [if_neg h]
-    by_cases h' : i < m + 1
-    · rw [if_pos h', if_pos (by omega : i - m < 1)]; simp only [Flick.Tm.rename]; congr 1; omega
-    · rw [if_neg h', if_neg (by omega : ¬ i - m < 1), Flick.Tm.rename_rename,
-        show i - m - 1 = i - (m + 1) by omega]
-      congr 1; funext j; simp only [Function.comp]; omega
-
-theorem lamsC_subst (m : Nat) (b : Flick.Tm) (σ : Nat → Flick.Tm) :
-    (lamsC m b).subst σ = lamsC m (b.subst (liftS m σ)) := by
-  induction m generalizing σ with
-  | zero =>
-    simp only [lamsC]; congr 1; funext i; simp only [liftS, Nat.not_lt_zero, if_false, Nat.sub_zero]
-    exact ((σ i).rename_fix _ fun _ _ => rfl).symm
-  | succ m ih =>
-    simp only [lamsC, Flick.Tm.subst]
-    rw [ih, show liftS m (liftS 1 σ) = liftS (m + 1) σ from funext (liftS_succ m σ)]
 
 theorem inst_snoc (ws : List Flick.Tm) (v : Flick.Tm) (i : Nat) :
     (liftS ws.length (Flick.inst [v]) i).subst (Flick.inst ws) = Flick.inst (ws ++ [v]) i := by

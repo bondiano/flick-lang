@@ -91,6 +91,7 @@ import Formal.Decomp
 import Formal.Closed
 import Formal.SubstComp
 import Formal.Elab.Syntax
+import Formal.Elab.Unify
 import Formal.Elab.PreludeSchemes
 import Formal.Elab.Hyp
 import Formal.Elab.Basic
@@ -108,6 +109,11 @@ import Formal.Elab.Comprehension
 import Formal.Elab.CoreTy
 import Formal.Elab.CoreTr
 import Formal.Elab.CoreLaws
+import Formal.Elab.CoreUnify
+import Formal.Elab.CoreDSubst
+import Formal.Elab.CoreArm
+import Formal.Elab.CoreCase
+import Formal.Elab.CoreCaseK
 import Formal.Elab.CoreDict
 import Formal.Elab.CoreT6a
 import Formal.Elab.CoreEval

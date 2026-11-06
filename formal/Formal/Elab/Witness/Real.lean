@@ -55,5 +55,8 @@ theorem real : Real P Sg N where
   prim h := by cases h
   some := rfl
   some_res := rfl
+  ctor h := by cases h
+  ctor_holds h := by cases h
+  con_inj h := by cases h
 
 end Flick.Elab.Witness

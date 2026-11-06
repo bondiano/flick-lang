@@ -35,6 +35,7 @@ def N : Names where
   strct _ _ := 2
   prim _ _ := 3
   some := "Some"
+  ctor _ := "Ctor"
 
 def listT (t : Flick.Ty) : Flick.Ty := .tapp (.adt "List") t
 
