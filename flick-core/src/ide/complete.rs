@@ -233,8 +233,6 @@ impl Ide<'_> {
     }
 }
 
-/// The values, constructors and types an interface exports, without the
-/// companions of types.
 /// The exports of `interface` that `import` exposes unqualified.
 pub(super) fn exposed<'i>(
     import: &Node,
@@ -262,6 +260,8 @@ pub(super) fn exposed<'i>(
         })
 }
 
+/// The values, constructors and types an interface exports, without the
+/// companions of types.
 pub(super) fn exports(interface: &Interface) -> Vec<Completion> {
     interface
         .exports
