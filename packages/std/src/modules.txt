@@ -37,6 +37,7 @@ Open
 Codec.Derive
 Json
 Sql
+Sql.Derive
 Database
 Database.Migrate
 Test

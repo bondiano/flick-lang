@@ -9,6 +9,7 @@ use flick_plugin::{
 };
 use flick_plugin_cli::Cli;
 use flick_plugin_derive::{codec, server_fn};
+use flick_plugin_sql::Sql;
 
 use super::{Expander, Native};
 
@@ -16,7 +17,12 @@ use super::{Expander, Native};
 /// exposes each. One is a block even where no import exposes it, so the
 /// compiler can say which import it needs: `cli "x" { … }` stays the block
 /// it was before `Cli` gave it.
-pub const HEADS: [(&str, &str); 3] = [("cli", "Cli"), ("server", "Server"), ("codec", "Codec")];
+pub const HEADS: [(&str, &str); 4] = [
+    ("cli", "Cli"),
+    ("server", "Server"),
+    ("codec", "Codec"),
+    ("sql", "Sql"),
+];
 
 /// The heads whose blocks need no body even where no import exposes them,
 /// as the compiler read them before: `server fn f x = …` and `server f`.
@@ -31,12 +37,12 @@ pub fn plugin(package: &str) -> Option<Arc<dyn Expander>> {
 }
 
 /// The plugin of std: `cli` blocks and `deriving Cli.Value`, `server fn`,
-/// and the derives of the witnesses of the Prelude.
+/// `codec`, `sql table`, and the derives of the witnesses of the Prelude.
 struct Std;
 
 /// Whether `block` is a `cli` block, the others being `server`'s.
 fn cli(block: &Block) -> bool {
-    !matches!(block.head.as_str(), "server" | "codec")
+    !matches!(block.head.as_str(), "server" | "codec" | "sql")
 }
 
 impl Plugin for Std {
@@ -53,29 +59,31 @@ impl Plugin for Std {
         match block.head.as_str() {
             "server" => server_fn::expand(block, compiler),
             "codec" => codec::expand(block, compiler),
+            "sql" => Sql.expand(block, state, compiler),
             _ => Cli.expand(block, state, compiler),
         }
     }
 
     fn check(&self, block: &Block, _: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
-        if block.head == "codec" {
-            codec::check(block, facts)
-        } else {
-            Vec::new()
+        match block.head.as_str() {
+            "codec" => codec::check(block, facts),
+            "sql" => Sql.check(block, &[], facts),
+            _ => Vec::new(),
         }
     }
 
     fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
-        if cli(block) {
-            Cli.complete(block, state, offset)
-        } else {
-            Vec::new()
+        match block.head.as_str() {
+            "sql" => Sql.complete(block, state, offset),
+            _ if cli(block) => Cli.complete(block, state, offset),
+            _ => Vec::new(),
         }
     }
 
     fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
         match block.head.as_str() {
             "codec" => codec::hover(block, offset, facts),
+            "sql" => Sql.hover(block, state, offset, facts),
             "server" => None,
             _ => Cli.hover(block, state, offset, facts),
         }
@@ -97,6 +105,7 @@ impl Plugin for Std {
     ) -> Option<Vec<Piece>> {
         match block.head.as_str() {
             "codec" => codec::format(block, compiler),
+            "sql" => Sql.format(block, state, compiler),
             "server" => None,
             _ => Cli.format(block, state, compiler),
         }

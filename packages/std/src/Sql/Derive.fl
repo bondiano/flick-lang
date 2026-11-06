@@ -1,0 +1,28 @@
+/// What the plugin of std writes for a `sql table` block: each column as the
+/// runtime reads it, whatever its codec, and the witness that its type is
+/// the one of its SQL type.
+module Sql.Derive exposing (..)
+
+/// A column as the runtime reads it: its name, its SQL kind, whether it may
+/// be `NULL` and the codec of its values, of any types.
+type Column
+
+/// `a` and `b` are one type.
+type Same a b = Same
+
+/// The witness of `Same a a`.
+same : Same a a
+let same = Same
+
+/// The column `name` of the SQL kind `sql_kind`, its values coded by `codec`.
+via : String -> String -> Bool -> PureCodec b t -> Column
+let via name sql_kind nullable codec = column name sql_kind nullable codec
+
+/// The column `name` of the SQL kind `sql_kind`, holding its values as they
+/// are: `same` says the column's type is that of the SQL type.
+plain : String -> String -> Bool -> Same t t -> Column
+let plain name sql_kind nullable _ = column name sql_kind nullable ()
+
+column : String -> String -> Bool -> a -> Column
+foreign pure column from "@flick-lang/runtime/sql" "sqlColumn"
+  arity 4

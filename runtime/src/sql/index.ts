@@ -63,6 +63,10 @@ export const sqlTable = (table: { name: string; columns: ReadonlyArray<Column> }
 
 export const sqlTemplate = (template: Template): Template => frozen(template);
 
+/** `Sql.Derive.column name kind nullable codec`: a column as a table holds it. */
+export const sqlColumn = (name: string, kind: string, nullable: boolean, codec: unknown): unknown =>
+  frozen({ name, kind, nullable, codec });
+
 /** `Sql.codec decode encode`: over the value of the column's SQL type. */
 export const sqlCodec = (
   decode: (value: unknown) => Result.Result<unknown, SchemaError>,
