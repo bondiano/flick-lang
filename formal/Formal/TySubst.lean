@@ -42,7 +42,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | lit => intro _ _; exact .lit
   | loc hl => intro σ _; exact .loc (by simp [hl])
   | const hc hT =>
-    intro σ _; exact .const (Const.ok_substT σ hc) (by have := hT.substT σ; rwa [Const.ty_substT _ _ _ _ hc] at this)
+    intro σ _; exact .const (Const.ok_substT σ hc) (by have := hT.substT σ; rwa [Const.ty_substT] at this)
   | ctor hK hk hT => intro σ _; exact Typ.ctor_substT hK hk hT σ
   | rnil => intro _ _; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ =>
