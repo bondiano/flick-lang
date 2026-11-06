@@ -1,6 +1,7 @@
 //! Postfix `?` as the checker read it (`types::question`).
 
 use super::Lower;
+use crate::ir::ExprLang;
 use crate::ir::{Expr, ExprKind, Stage};
 use crate::syntax::cst::Node;
 use crate::types::Question;

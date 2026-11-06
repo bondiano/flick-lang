@@ -2,6 +2,7 @@
 //! for it: the value named after the type, or `Codec.json` of its schema.
 
 use super::Lower;
+use crate::ir::ExprLang;
 use crate::ir::{Expr, ExprKind, Stage};
 use crate::source::Span;
 use crate::types::lang::Lang;

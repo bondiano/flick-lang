@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::Expr;
+use crate::Expr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Foreign {

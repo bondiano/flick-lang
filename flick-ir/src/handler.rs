@@ -4,8 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{Arm, Expr};
-use crate::types::OpClass;
+use crate::{Arm, Expr, OpClass};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Handler {
