@@ -337,9 +337,20 @@ fn std_blocks(
         }
     };
     // what the plugin publishes of the module's own names, as the loader
-    // gives every block of a group
-    let published: BTreeMap<String, Vec<u8>> = (plugin.publish(&state).unwrap_or_default())
-        .into_iter()
+    // gives every block of a group; one that fails to publish expands none
+    let published = match plugin.publish(&state) {
+        Ok(published) => published,
+        Err(why) => {
+            let (start, end) = found[0].0.range();
+            diagnostics.push(Diagnostic::error(
+                codes::P036,
+                why,
+                Span::new(file, start, end),
+            ));
+            return;
+        }
+    };
+    let published: BTreeMap<String, Vec<u8>> = (published.into_iter())
         .filter(|p| p.module == module)
         .map(|p| (p.name, p.data))
         .collect();

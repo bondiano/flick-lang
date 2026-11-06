@@ -1,6 +1,6 @@
 ---
 title: "Запросы SQL"
-source_hash: 92a4accbc70dede3
+source_hash: 76dd5f549397c7ea
 ---
 
 Flick проверяет запросы к PostgreSQL по объявлениям таблиц в исходном коде.
@@ -189,7 +189,8 @@ let balances_of id =
 | `is_not_distinct_from a b` | равенство, безопасное при `NULL` |
 | `coalesce a b` | первое значение, отличное от `NULL` |
 | `count e`, `count_all` | `COUNT(e)`, `COUNT(*)`: `BigInt`, никогда не `NULL` |
-| `sum e`, `avg e`, `min e`, `max e` | `NULL` при отсутствии строк: `Option`; `sum` и `avg` берут столбец числового типа SQL (иначе `std/Q010`) или значение типа класса `Sql.Numeric` (иначе `FLICK-C001`) |
+| `sum e`, `avg e` | `NULL` при отсутствии строк: `Option`; берут столбец числового типа SQL (иначе `std/Q010`) или значение типа класса `Sql.Numeric` (иначе `FLICK-C001`) |
+| `min e`, `max e` | наименьшее и наибольшее значение любого типа, `NULL` при отсутствии строк: `Option` от него |
 | `exists (sql { … })`, `is_in e (sql { … })` | некоррелированные подзапросы |
 
 `==` следует правилам SQL: результат равен `NULL`, если хотя бы одна сторона

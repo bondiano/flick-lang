@@ -173,7 +173,8 @@ has it: `std/Q003` otherwise), parameters, captures, literals, `== != < <= > >=`
 | `is_not_distinct_from a b` | null-safe equality |
 | `coalesce a b` | the first that is not `NULL` |
 | `count e`, `count_all` | `COUNT(e)`, `COUNT(*)`: a `BigInt`, never `NULL` |
-| `sum e`, `avg e`, `min e`, `max e` | `NULL` over no rows: an `Option`; `sum` and `avg` take a column of a numeric SQL type (`std/Q010` otherwise) or a value of a type of the class `Sql.Numeric` (`FLICK-C001` otherwise) |
+| `sum e`, `avg e` | `NULL` over no rows: an `Option`; they take a column of a numeric SQL type (`std/Q010` otherwise) or a value of a type of the class `Sql.Numeric` (`FLICK-C001` otherwise) |
+| `min e`, `max e` | the least and the greatest value of any type, `NULL` over no rows: an `Option` of it |
 | `exists (sql { … })`, `is_in e (sql { … })` | uncorrelated subqueries |
 
 `==` is SQL's comparison: it is `NULL` when either side is, and `where` keeps
