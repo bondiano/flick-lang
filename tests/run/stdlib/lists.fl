@@ -4,7 +4,7 @@
 module App.Main exposing (main)
 
 sleep : Float ->{Async;} Unit
-foreign async sleep from "../runtime/timers.mjs" "sleep"
+foreign sleep from "../runtime/timers.mjs" "sleep"
 
 logged : Ref (List Float) -> Float ->{} Float
 let logged log n =

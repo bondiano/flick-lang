@@ -4,19 +4,19 @@
 module App.Main exposing (main)
 
 setup : Unit ->{} Unit
-foreign sync setup from "./dom.mjs" "setup"
+foreign setup from "./dom.mjs" "setup"
   arity 0
 
 click : String ->{} Unit
-foreign sync click from "./dom.mjs" "click"
+foreign click from "./dom.mjs" "click"
   arity 1
 
 settle : Unit ->{Async;} Unit
-foreign async settle from "./dom.mjs" "settle"
+foreign settle from "./dom.mjs" "settle"
   arity 0
 
 text : Unit ->{} String
-foreign sync text from "./dom.mjs" "text"
+foreign text from "./dom.mjs" "text"
   arity 0
 
 count : Atom.Writable Float

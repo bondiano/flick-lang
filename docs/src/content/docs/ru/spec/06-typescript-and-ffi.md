@@ -136,13 +136,13 @@ TypeScript не поддерживает запись `F<A>` для произв
 
 ## FFI
 
-Объявление `foreign` привязывает JS-значение к полной сигнатуре Flick, записанной над ним. Режим определяет, как выполняется вызов:
+Объявление `foreign` привязывает JS-значение к полной сигнатуре Flick, записанной над ним. Режим, а без слова режима — сигнатура, определяет, как выполняется вызов:
 
 | Режим | Контракт |
 | - | - |
 | `foreign pure` | Прямой вызов JS, которому доверяют чистоту, в том числе при загрузке модуля |
-| `foreign sync` | Откладывается до выполнения эффектной стадии; исключение — дефект, если `catch` его не преобразует |
-| `foreign async` | Promise создаётся при выполнении вызова, а не при построении `task`; ближайший владелец ждёт его завершения даже после прерывания |
+| `foreign`, строка без `Async` | Откладывается до выполнения эффектной стадии; исключение — дефект, если `catch` его не преобразует |
+| `foreign`, строка с `Async` | Promise, который создаётся при выполнении вызова, а не при построении `task`; ближайший владелец ждёт его завершения даже после прерывания |
 | `foreign effect` | JS-фабрика вызывается при выполнении (`Effect.suspend`), а её `Effect` выполняется в текущем файбере |
 | `foreign blocked name "причина"` | Привязки нет: использование `name` — ошибка компиляции (`FLICK-F005`); остальные экспорты модуля доступны |
 
@@ -172,7 +172,7 @@ export declare function lookup(
 # import JsError exposing (JsError)
 #
 lookup : String ->{Async; JsError} Option String
-foreign async lookup from "package" "lookup"
+foreign lookup from "package" "lookup"
   arity 1
   catch JsError.from_js
   nullable
@@ -211,11 +211,11 @@ foreign pure hypot from global "Math.hypot"
   arity 2
 
 now_millis : Unit ->{} Float
-foreign sync now_millis from global "Date.now"
+foreign now_millis from global "Date.now"
   arity 0
 
 read_text : Path ->{Async; FsError} String
-foreign async read_text from "./fs.js" "readText"
+foreign read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js
   cancel signal
@@ -297,11 +297,11 @@ untagged type Key = ByNumber Float | ByName String | ByPath (List String)
 type Emitter
 
 on : forall s. Emitter -> Events.Listener s Float ->{} Unit
-foreign sync on from "./bindings.mjs" "on"
+foreign on from "./bindings.mjs" "on"
   retention owner
 
 off : forall s. Emitter -> Events.Listener s Float ->{} Unit
-foreign sync off from "./bindings.mjs" "off"
+foreign off from "./bindings.mjs" "off"
   retention call
 
 report : Failure none ->{} Unit

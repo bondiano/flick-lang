@@ -40,5 +40,5 @@ foreign effect when_open from "@flick-lang/runtime/effect/Latch" "whenOpen"
 
 /// Whether the latch is open now.
 is_open : Latch ->{} Bool
-foreign sync is_open from "@flick-lang/runtime/effect/Latch" "isOpen"
+foreign is_open from "@flick-lang/runtime/effect/Latch" "isOpen"
   reviewed "effect@4.1.2 sha256:b6a31a0d043ec7a0"

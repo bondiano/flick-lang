@@ -54,7 +54,7 @@ type alias Theme = {
 
 /// Effect's theme, with colors when the output supports them.
 default_theme : Unit ->{} Theme
-foreign sync default_theme from "@flick-lang/runtime/cli" "promptDefaultTheme"
+foreign default_theme from "@flick-lang/runtime/cli" "promptDefaultTheme"
   arity 0
   reviewed "effect@4.1.2 sha256:47c0b93e9a1682bd"
 

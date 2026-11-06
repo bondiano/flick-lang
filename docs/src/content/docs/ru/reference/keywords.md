@@ -1,6 +1,6 @@
 ---
 title: Ключевые слова
-source_hash: 03b99191ec290a03
+source_hash: 5809f3243f2051cc
 ---
 
 Здесь перечислены зарезервированные слова Flick: что они обозначают
@@ -38,7 +38,7 @@ source_hash: 03b99191ec290a03
 | `class` | Объявляет класс типов | `class Named a = name : a -> String` |
 | `instance` | Определяет реализацию класса для типа | `instance Named User = let name u = u.name` |
 | `deriving` | Поручает компилятору создать экземпляры классов | `deriving Eq, Show, Schema` |
-| `foreign` | Связывает значение JavaScript с сигнатурой Flick | `foreign async read_text from "./fs.js" "readText"` |
+| `foreign` | Связывает значение JavaScript с сигнатурой Flick | `foreign read_text from "./fs.js" "readText"` |
 | `from` | Указывает источник для `foreign` или таблицу в `sql { … }` | `from user in Users` |
 | `forall` | Явно вводит универсально квантифицированные переменные типов | `keep : forall s. Path ->{Scope s} File s` |
 

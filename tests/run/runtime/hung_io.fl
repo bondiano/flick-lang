@@ -4,7 +4,7 @@
 module App.Main exposing (main)
 
 hang : Unit ->{Async;} Unit
-foreign async hang from "./timers.mjs" "hang"
+foreign hang from "./timers.mjs" "hang"
   cancel signal
 
 say : String ->{} Unit

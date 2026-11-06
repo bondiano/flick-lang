@@ -6,19 +6,19 @@ module App.Main exposing (main)
 import Cli exposing (plugin cli)
 
 start : Unit ->{Async;} Float
-foreign async start from "../observability/receiver.mjs" "start"
+foreign start from "../observability/receiver.mjs" "start"
   arity 0
 
 received : Unit ->{} String
-foreign sync received from "../observability/receiver.mjs" "received"
+foreign received from "../observability/receiver.mjs" "received"
   arity 0
 
 stop : Unit ->{Async;} Unit
-foreign async stop from "../observability/receiver.mjs" "stop"
+foreign stop from "../observability/receiver.mjs" "stop"
   arity 0
 
 set_env : String -> String ->{} Unit
-foreign sync set_env from "./env.mjs" "set"
+foreign set_env from "./env.mjs" "set"
   arity 2
 
 /// A logger writing the level and the message, without the time.

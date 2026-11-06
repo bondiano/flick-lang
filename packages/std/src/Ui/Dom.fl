@@ -7,7 +7,7 @@ type Container
 
 /// The element with this id in the document.
 container : String ->{} Option Container
-foreign sync container from "@flick-lang/runtime/ui" "uiContainer"
+foreign container from "@flick-lang/runtime/ui" "uiContainer"
   arity 1
   nullable
 

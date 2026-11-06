@@ -210,10 +210,11 @@ struct Binding {
 
 impl Binding {
     fn text(&self, name: &str, package: &str, export: &str, provenance: &str) -> String {
+        // a call of the host has no mode word: its signature tells, a promise by `Async`
+        let mode = if self.mode == "pure" { "pure " } else { "" };
         let mut out = format!(
-            "/// {provenance}\n{name} : {}\nforeign {} {name} from {} {}\n",
+            "/// {provenance}\n{name} : {}\nforeign {mode}{name} from {} {}\n",
             self.signature,
-            self.mode,
             quote(package),
             quote(export)
         );

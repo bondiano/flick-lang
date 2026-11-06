@@ -17,7 +17,7 @@ use super::gadt::branch::as_field_given;
 use super::services::OpClass;
 use super::ty::{Stage, Type};
 use crate::iface::Interface;
-use crate::ir::{Adapter, Label};
+use crate::ir::{Adapter, ForeignMode, Label};
 use crate::numeric::Num;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -198,6 +198,8 @@ pub struct ForeignInfo {
     /// The `catch` mapping expression.
     pub catch: Option<Range>,
     pub adapter: Adapter,
+    /// How the host is called: the mode as written, else as the signature tells.
+    pub mode: ForeignMode,
 }
 
 /// The scopes around a call, as their regions and `scope` expressions,

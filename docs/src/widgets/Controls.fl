@@ -5,15 +5,15 @@ import Elements exposing (attributes)
 type alias Model = { ru : Bool; dark : Bool }
 
 preferences : Unit ->{} Model
-foreign sync preferences from "./browser.ts" "preferences"
+foreign preferences from "./browser.ts" "preferences"
   arity 0
 
 set_dark : Bool ->{} Unit
-foreign sync set_dark from "./browser.ts" "setDark"
+foreign set_dark from "./browser.ts" "setDark"
   arity 1
 
 open_search : Unit ->{} Unit
-foreign sync open_search from "./browser.ts" "openSearch"
+foreign open_search from "./browser.ts" "openSearch"
   arity 0
 
 view : Atom.Writable Model -> Model -> Ui

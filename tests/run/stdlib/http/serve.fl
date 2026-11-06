@@ -13,7 +13,7 @@ type alias Item = { label : String; size : Float }
 type error Boom = Boom
 
 call : String -> String -> String ->{Async;} String
-foreign async call from "./wire.mjs" "call"
+foreign call from "./wire.mjs" "call"
 
 say : String ->{} Unit
 let say line = Platform.stdout_line line

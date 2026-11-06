@@ -3,10 +3,10 @@
 module App.Main exposing (main)
 
 start : String ->{} JsValue
-foreign sync start from "./raw.mjs" "start"
+foreign start from "./raw.mjs" "start"
 
 wait : JsValue ->{Async;} String
-foreign async wait from "./raw.mjs" "wait"
+foreign wait from "./raw.mjs" "wait"
 
 ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)

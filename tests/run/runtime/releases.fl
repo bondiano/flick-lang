@@ -8,7 +8,7 @@ open_raw : String ->{} String
 foreign effect open_raw from "./resources.mjs" "open"
 
 sleep : Float ->{Async;} Unit
-foreign async sleep from "./timers.mjs" "sleep"
+foreign sleep from "./timers.mjs" "sleep"
 
 type error Oops = Oops String
 

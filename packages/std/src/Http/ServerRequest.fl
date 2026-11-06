@@ -37,7 +37,7 @@ foreign pure remote_address from "@flick-lang/runtime/effect/http/HttpServerRequ
 
 /// The cookies of the `Cookie` header.
 cookies : ServerRequest ->{} List (String, Redacted String)
-foreign sync cookies from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickCookies"
+foreign cookies from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickCookies"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The parameters of the URL's query.

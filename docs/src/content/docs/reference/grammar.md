@@ -43,7 +43,7 @@ ui in when for yield do
 Contextual words are ordinary names everywhere except in one position:
 
 - `unboxed` and `untagged` right before `type` (see `codegen.md`);
-- foreign modes `pure`, `sync`, `async`, `effect`, `blocked` and the source
+- foreign modes `pure`, `effect`, `blocked` and the source
   `global`;
 - foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
   `retention`, `optional`, `variadic`, `reviewed` (unknown metadata is
@@ -260,9 +260,9 @@ class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] [
 fundep      = { name } "->" { name }
 instance    = "instance" [context "=>"] type ["=" members]
 members     = block of: signature | let | type_decl
-foreign     = "foreign" mode name "from" ("global" String | String String) [metadata]
+foreign     = "foreign" [mode] name "from" ("global" String | String String) [metadata]
             | "foreign" "blocked" name String
-mode        = "pure" | "sync" | "async" | "effect"
+mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
 ```
 
@@ -324,7 +324,7 @@ instance Show Shape =
     | _ -> "other"
 
 read_text : Path ->{Async; FsError} String
-foreign async read_text from "./fs.js" "readText"
+foreign read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js
   cancel signal

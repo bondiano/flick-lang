@@ -35,7 +35,7 @@ foreign pure not_a_number from "./inputs.mjs" "notANumber"
   arity 0
 
 validate : Codec.StandardSchema Json Tree -> Unknown ->{Async;} String
-foreign async validate from "./inputs.mjs" "validate"
+foreign validate from "./inputs.mjs" "validate"
 
 profile_json : PureCodec Json Profile
 let profile_json = codec Profile.schema {

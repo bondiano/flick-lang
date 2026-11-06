@@ -1,7 +1,7 @@
 ---
 title: Зачем Flick
 description: Для чего нужен Flick, кому он подходит и кому пока не подходит.
-source_hash: 9772582df053e5da
+source_hash: 8b39f251b75650b8
 ---
 
 Flick — функциональный язык для приложений, которые работают в браузере,
@@ -130,7 +130,7 @@ Flick не нужна собственная копия каждой библи�
 # import JsError exposing (JsError)
 #
 lookup : String ->{Async; JsError} Option String
-foreign async lookup from "lookup-lib" "lookup"
+foreign lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js
   nullable

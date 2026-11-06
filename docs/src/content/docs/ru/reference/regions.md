@@ -1,6 +1,6 @@
 ---
 title: "Регионы и захваты"
-source_hash: 5e37f1019258fec8
+source_hash: eac763910f4dda93
 ---
 
 `scope` освобождает полученные ресурсы, когда его тело завершается.
@@ -142,7 +142,7 @@ let read_later file =
 
 ```flick
 map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
-foreign sync map_effect from "./list.js" "mapEffect"
+foreign map_effect from "./list.js" "mapEffect"
   retention call
 ```
 

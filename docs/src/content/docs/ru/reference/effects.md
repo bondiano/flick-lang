@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: f78ba41194a080e9
+source_hash: 82a91655744f74ee
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -385,7 +385,7 @@ let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child"
 
 ```flick
 wait : Float ->{Async;} Unit
-foreign async wait from "./timers.mjs" "wait"
+foreign wait from "./timers.mjs" "wait"
 
 twice : Unit ->{Async;} Unit
 let twice () =
@@ -393,9 +393,10 @@ let twice () =
   wait 2
 ```
 
-`foreign async` возвращает Promise, поэтому его строке нужен `Async`
-(`FLICK-F001`). `foreign effect` таков, как записан: без `Async` он
-выполняется сразу, а его приостановка — дефект. Вызов, который может
+`foreign`, в строке которого есть `Async`, — вызов, результат JS которого —
+промис; без него — вызов, который возвращается сразу. `foreign effect`
+таков, как записан: без `Async` он выполняется сразу, а его приостановка —
+дефект. Вызов, который может
 приостановиться, в строке без `Async` — `FLICK-E002`; его исправление
 добавляет `Async` там, где строка записана: в сигнатуре, в `Eff` или в
 строке, переданной типу, как `Handlers none`.

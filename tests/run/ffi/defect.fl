@@ -5,7 +5,7 @@ module App.Main exposing (main)
 type error FsError = FsError String
 
 fail_sync : String ->{} Unit
-foreign sync fail_sync from "./bindings.mjs" "fail"
+foreign fail_sync from "./bindings.mjs" "fail"
 
 main : Unit ->{; AppError} Unit
 let main () =

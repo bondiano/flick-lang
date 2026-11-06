@@ -359,7 +359,7 @@ of `spawn` and `parallel`; `provide Async` is `FLICK-E016`.
 
 ```flick
 wait : Float ->{Async;} Unit
-foreign async wait from "./timers.mjs" "wait"
+foreign wait from "./timers.mjs" "wait"
 
 twice : Unit ->{Async;} Unit
 let twice () =
@@ -367,9 +367,9 @@ let twice () =
   wait 2
 ```
 
-A `foreign async` gives a Promise, so its row needs `Async` (`FLICK-F001`).
-A `foreign effect` is as written: without `Async` it runs at once, and a
-suspension is a defect. A call that may suspend in a row without `Async`
+A `foreign` whose row has `Async` is a call whose JS result is a promise;
+without it, a call that returns at once. A `foreign effect` is as written:
+without `Async` it runs at once, and a suspension is a defect. A call that may suspend in a row without `Async`
 is `FLICK-E002`, whose fix adds `Async` where the row is written: the
 signature, an `Eff`, or the row given to a type such as `Handlers none`.
 

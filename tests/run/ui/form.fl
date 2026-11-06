@@ -11,35 +11,35 @@ type alias Signup = { name : Name; age : Float; nick : Option String }
   deriving Schema, Form
 
 setup : Unit ->{} Unit
-foreign sync setup from "./form.mjs" "setup"
+foreign setup from "./form.mjs" "setup"
   arity 0
 
 type_into : String -> String ->{} Unit
-foreign sync type_into from "./form.mjs" "type"
+foreign type_into from "./form.mjs" "type"
   arity 2
 
 click : String ->{} Unit
-foreign sync click from "./form.mjs" "click"
+foreign click from "./form.mjs" "click"
   arity 1
 
 describe : String ->{} String
-foreign sync describe from "./form.mjs" "describe"
+foreign describe from "./form.mjs" "describe"
   arity 1
 
 focused : Unit ->{} String
-foreign sync focused from "./form.mjs" "focused"
+foreign focused from "./form.mjs" "focused"
   arity 0
 
 log : String ->{} Unit
-foreign sync log from "./form.mjs" "log"
+foreign log from "./form.mjs" "log"
   arity 1
 
 taken : String ->{Async;} Bool
-foreign async taken from "./form.mjs" "taken"
+foreign taken from "./form.mjs" "taken"
   arity 1
 
 settle : Unit ->{Async;} Unit
-foreign async settle from "./form.mjs" "settle"
+foreign settle from "./form.mjs" "settle"
   arity 0
 
 signup : Form.Draft Signup

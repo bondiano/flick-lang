@@ -11,33 +11,33 @@ type error Refused = Refused String
 type alias User = { id : Float; name : String }
 
 setup : Unit ->{} Unit
-foreign sync setup from "./dom.mjs" "setup"
+foreign setup from "./dom.mjs" "setup"
   arity 0
 
 choose : String ->{} Unit
-foreign sync choose from "./dom.mjs" "choose"
+foreign choose from "./dom.mjs" "choose"
   arity 1
 
 settle : Unit ->{Async;} Unit
-foreign async settle from "./dom.mjs" "settle"
+foreign settle from "./dom.mjs" "settle"
   arity 0
 
 text : Unit ->{} String
-foreign sync text from "./dom.mjs" "text"
+foreign text from "./dom.mjs" "text"
   arity 0
 
 markup : Unit ->{} String
-foreign sync markup from "./dom.mjs" "markup"
+foreign markup from "./dom.mjs" "markup"
   arity 0
 
 open_raw : String ->{} String
 foreign effect open_raw from "../runtime/resources.mjs" "open"
 
 write_on_release : String ->{Async;} Unit
-foreign async write_on_release from "./dom.mjs" "writeOnRelease"
+foreign write_on_release from "./dom.mjs" "writeOnRelease"
 
 release : Unit ->{} Unit
-foreign sync release from "./dom.mjs" "release"
+foreign release from "./dom.mjs" "release"
   arity 0
 
 // Generic over the item: the items, key, render_item and on_change of the

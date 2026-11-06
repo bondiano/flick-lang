@@ -197,8 +197,11 @@ fn fix_only_applies_the_fixes_of_the_codes_given() {
         "`nap` still lacks `Async`: {out:?}"
     );
     let fixed = fs::read_to_string(dir.join("src/App/Waits.fl")).expect("source");
+    // the word of before goes, and the promise's row says `Async`
     let row = "sleep : Float ->{Async;} Unit";
-    assert_eq!(fixed, text.replace("sleep : Float ->{} Unit", row));
+    let fixed_text = (text.replace("sleep : Float ->{} Unit", row))
+        .replace("foreign async sleep", "foreign sleep");
+    assert_eq!(fixed, fixed_text);
 
     // the fix of every code reaches the caller, one pass after the other
     let out = common::flick_in(&dir, &["check", "--fix"]);

@@ -23,7 +23,7 @@ type alias PackageId = { name : String; version : String; subModuleName : String
 
 /// The declarations `import "pkg"` finds from the file `from`.
 resolve : String -> String ->{} Option Resolution
-foreign sync resolve from "./ts.mjs" "resolve"
+foreign resolve from "./ts.mjs" "resolve"
   arity 2
   nullable
 
@@ -36,7 +36,7 @@ foreign pure resolved_package from "./ts.mjs" "resolvedPackage"
 
 /// The program of one root file, with NodeNext resolution.
 program : String ->{} Program
-foreign sync program from "./ts.mjs" "program"
+foreign program from "./ts.mjs" "program"
 
 checker : Program -> Checker
 foreign pure checker from "./ts.mjs" "checker"
@@ -188,5 +188,5 @@ foreign pure sha256 from "./ts.mjs" "sha256"
 
 /// Runs the command with the arguments; its stdout is discarded.
 exec : String -> List String ->{} Unit
-foreign sync exec from "./ts.mjs" "exec"
+foreign exec from "./ts.mjs" "exec"
   arity 2

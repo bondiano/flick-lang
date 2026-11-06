@@ -21,7 +21,7 @@ foreign effect with_console from "@flick-lang/runtime/effect/Console" "flickWith
 
 /// A console of Node.js that writes everything to stderr.
 to_stderr : Unit ->{} Console
-foreign sync to_stderr from "@flick-lang/runtime/effect/Console" "flickToStderr"
+foreign to_stderr from "@flick-lang/runtime/effect/Console" "flickToStderr"
   arity 0
 
 /// Writes the message to stdout.

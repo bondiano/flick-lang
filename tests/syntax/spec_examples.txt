@@ -40,10 +40,10 @@ d7add3cdb4017b53  05-errors-and-concurrency:301  import File exposing (File, Pat
 1d4de52c15fcfbac  06-typescript-and-ffi:35  with_default : a -> Option a -> a
 01433f1e5e58aa84  06-typescript-and-ffi:65  type alias Point = { x : Float; y : Float }
 438ba443bbdcdff5  06-typescript-and-ffi:100  type UserId = UserId String
-fc9aaa4f3d0ae64f  06-typescript-and-ffi:172  import JsError exposing (JsError)
-6c45c79d7dec55f9  06-typescript-and-ffi:204  import File exposing (Path)
+fc0a2efdd9333217  06-typescript-and-ffi:172  import JsError exposing (JsError)
+d80e7a9e80161f46  06-typescript-and-ffi:204  import File exposing (Path)
 969c35e8a198d3e4  06-typescript-and-ffi:273  unboxed type UserId = UserId String
-321da342acc527b3  06-typescript-and-ffi:295  type Emitter
+04aa5db360eea5c1  06-typescript-and-ffi:297  type Emitter
 ecfe40849e18cf97  07-schema:69  refined type Email = String where Checks.email
 0027637b2b681c4e  07-schema:112  type alias Preferences = {
 16ddba9438dc4858  07-schema:159  type Tree a =

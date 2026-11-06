@@ -7,7 +7,7 @@ use super::import::HEADER;
 use super::{ExportShape, Shape, Surface};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
-use crate::syntax::cst::Node;
+use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal::string_value;
 use crate::syntax::parse;
@@ -55,12 +55,7 @@ pub fn reviewed(text: &str, file: FileId) -> Vec<Reviewed> {
 }
 
 fn binding(decl: &Node, text: &str, file: FileId) -> Option<Reviewed> {
-    let name = decl
-        .child_tokens()
-        .filter(|t| t.kind == K::Ident)
-        .nth(1)?
-        .text(text)
-        .to_owned();
+    let name = foreign_words(decl).1?.text(text).to_owned();
     let source = decl.nodes().find(|n| n.kind == K::ForeignSource)?;
     let strings: Vec<String> = source
         .child_tokens()

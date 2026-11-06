@@ -6,7 +6,7 @@ service Log =
   now : Unit ->{} Float
 
 js_now : Unit ->{} Float
-foreign sync js_now from global "Date.now"
+foreign js_now from global "Date.now"
   arity 0
 
 impl : Log.Impl

@@ -19,7 +19,7 @@ service FileSystem =
 
 with_first :
   forall s. File s -> (Unit ->{FileSystem; ReadError} String)^{s} ->{FileSystem; ReadError} String
-foreign sync with_first from "./files.js" "withFirst"
+foreign with_first from "./files.js" "withFirst"
   retention call
 
 narrow : forall s t. File s -> File t ->{FileSystem; ReadError} String

@@ -306,7 +306,10 @@ impl SyntaxKind {
 
 /// The words after `foreign` that say how a binding runs: keywords there
 /// only, names everywhere else.
-pub const FOREIGN_MODES: [&str; 5] = ["pure", "sync", "async", "effect", "blocked"];
+/// The words a `foreign` may name its mode with; without one the signature
+/// tells: a call of the host, awaited when its row has `Async`. `sync` and
+/// `async` are the words of before, which a fix removes.
+pub const FOREIGN_MODES: [&str; 5] = ["pure", "effect", "blocked", "sync", "async"];
 
 pub fn keyword(text: &str) -> Option<SyntaxKind> {
     use SyntaxKind as K;

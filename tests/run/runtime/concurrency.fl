@@ -3,7 +3,7 @@
 module App.Main exposing (main)
 
 sleep : Float ->{Async;} Unit
-foreign async sleep from "./timers.mjs" "sleep"
+foreign sleep from "./timers.mjs" "sleep"
 
 type error Oops = Oops String
 

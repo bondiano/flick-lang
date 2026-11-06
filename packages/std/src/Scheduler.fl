@@ -9,7 +9,7 @@ type Scheduler
 /// A fresh scheduler of Effect's default kind: microtasks, then
 /// `setImmediate`, yielding by priority.
 make_mixed : Unit ->{} Scheduler
-foreign sync make_mixed from "@flick-lang/runtime/effect/Scheduler" "flickMakeMixed"
+foreign make_mixed from "@flick-lang/runtime/effect/Scheduler" "flickMakeMixed"
   arity 0
   reviewed "effect@4.1.2 sha256:599cb79ccc778b11"
 

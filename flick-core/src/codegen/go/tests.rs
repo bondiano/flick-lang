@@ -128,7 +128,7 @@ fn a_program_s_go_mod_requires_the_modules_of_its_packages() {
 fn what_the_target_cannot_run_yet_is_reported() {
     let errors = compile(
         "module App exposing (main)\n\
-         now : Unit ->{} Float\nforeign sync now from global \"Date.now\"\n\
+         now : Unit ->{} Float\nforeign now from global \"Date.now\"\n\
          main : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (now ()))\n",
     );
     assert_eq!(
@@ -143,7 +143,7 @@ fn what_the_target_cannot_run_yet_is_reported() {
 fn unreachable_foreigns_do_not_reject_a_supported_entry() {
     let errors = compile(
         "module App exposing (main)\n\
-         now : Unit ->{} Float\nforeign sync now from global \"Date.now\"\n\
+         now : Unit ->{} Float\nforeign now from global \"Date.now\"\n\
          main : Unit ->{} Unit\nlet main () = Platform.stdout_line \"hi\"\n",
     );
     assert_eq!(errors, []);
@@ -153,7 +153,7 @@ fn unreachable_foreigns_do_not_reject_a_supported_entry() {
 fn a_missing_local_go_foreign_reports_a_target_diagnostic() {
     let errors = compile(
         "module App exposing (main)\n\
-         wait : Float ->{Async;} Unit\nforeign async wait from \"./gone.mjs\" \"wait\"\n\
+         wait : Float ->{Async;} Unit\nforeign wait from \"./gone.mjs\" \"wait\"\n\
          main : Unit ->{Async;} Unit\nlet main () = wait 1\n",
     );
     assert_eq!(

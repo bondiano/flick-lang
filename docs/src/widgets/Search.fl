@@ -7,11 +7,11 @@ type alias Hit = { title : String; excerpt : String; url : String }
 type alias Model = { ru : Bool; query : String; hits : List Hit; problem : String }
 
 is_russian : Unit ->{} Bool
-foreign sync is_russian from "./browser.ts" "isRussian"
+foreign is_russian from "./browser.ts" "isRussian"
   arity 0
 
 search : String ->{Async; JsError} List Hit
-foreign async search from "./browser.ts" "search"
+foreign search from "./browser.ts" "search"
   arity 1
   catch JsError.from_js
 
@@ -20,7 +20,7 @@ foreign pure locale_prefix from "./browser.ts" "localePrefix"
   arity 1
 
 close_search : Unit ->{} Unit
-foreign sync close_search from "./browser.ts" "closeSearch"
+foreign close_search from "./browser.ts" "closeSearch"
   arity 0
 
 find : Atom.Writable Model -> String ->{Async, Atom.Write;} Unit

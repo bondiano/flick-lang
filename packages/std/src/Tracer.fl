@@ -115,12 +115,12 @@ foreign pure links from "@flick-lang/runtime/effect/Tracer" "flickLinks"
 
 /// Whether the span still runs; it changes when it ends.
 status : Span ->{} SpanStatus
-foreign sync status from "@flick-lang/runtime/effect/Tracer" "flickStatus"
+foreign status from "@flick-lang/runtime/effect/Tracer" "flickStatus"
   reviewed "effect@4.1.2 sha256:99ae427def19dcb4"
 
 /// The attributes of the span so far, as text.
 attributes : Span ->{} List (String, String)
-foreign sync attributes from "@flick-lang/runtime/effect/Tracer" "flickAttributes"
+foreign attributes from "@flick-lang/runtime/effect/Tracer" "flickAttributes"
   reviewed "effect@4.1.2 sha256:516a3c9b0ebd1a4d"
 
 /// Effect's tracer, which keeps spans in memory only.

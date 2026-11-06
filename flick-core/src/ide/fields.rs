@@ -7,7 +7,7 @@ use super::{Ide, Location, tree};
 use crate::doc;
 use crate::iface::Namespace;
 use crate::source::FileId;
-use crate::syntax::cst::Node;
+use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, Ref, Type, show_type};
 
@@ -268,7 +268,8 @@ fn written(module: &str, path: &[&Node], field: &Node, text: &str) -> Declared {
         .map_or_else(|| field.range(), |t| (t.start, t.end));
     let owner = path.iter().rev().find_map(|n| match n.kind {
         K::Variant | K::TypeDecl => tree::name_of(n, K::Con, text),
-        K::Signature | K::ForeignDecl => tree::name_of(n, K::Ident, text),
+        K::Signature => tree::name_of(n, K::Ident, text),
+        K::ForeignDecl => foreign_words(n).1.map(|t| t.text(text)),
         _ => None,
     });
     Declared {

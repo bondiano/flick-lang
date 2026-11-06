@@ -12,24 +12,24 @@ import JsError exposing (JsError)
 
 /// lookup-lib@1.0.0 sha256:aa
 lookup : String ->{Async; JsError} Option String
-foreign async lookup from "lookup-lib" "lookup"
+foreign lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js
   nullable
 
 /// lookup-lib@1.0.0 sha256:bb
 next_id : Unit ->{} Float
-foreign sync next_id from "lookup-lib" "nextId"
+foreign next_id from "lookup-lib" "nextId"
   arity 0
 
 /// lookup-lib@1.0.0 sha256:cc
 parse_1 : String ->{} Float
-foreign sync parse_1 from "lookup-lib" "parse"
+foreign parse_1 from "lookup-lib" "parse"
   arity 1
 
 /// lookup-lib@1.0.0 sha256:cc
 parse_2 : String -> Float ->{} Float
-foreign sync parse_2 from "lookup-lib" "parse"
+foreign parse_2 from "lookup-lib" "parse"
   arity 2
 
 /// lookup-lib@1.0.0 sha256:dd
@@ -37,12 +37,12 @@ foreign blocked to_date "unsupported: parameter `value`: the union `string | num
 
 /// lookup-lib@1.0.0 sha256:ee
 describe : JsValue ->{} String
-foreign sync describe from "lookup-lib" "describe"
+foreign describe from "lookup-lib" "describe"
   arity 1
 
 /// lookup-lib@1.0.0 sha256:ff
 each : forall t. List t -> (t -> Unit) ->{} Unit
-foreign sync each from "lookup-lib" "each"
+foreign each from "lookup-lib" "each"
   arity 2
   retention call
 
@@ -51,7 +51,7 @@ foreign blocked make "unsupported: type parameter `T` appears in no parameter, s
 
 /// lookup-lib@1.0.0 sha256:hh
 join : String -> List String ->{} String
-foreign sync join from "lookup-lib" "join"
+foreign join from "lookup-lib" "join"
   arity 2
   variadic
 

@@ -31,7 +31,7 @@ forever : Unit ->{{}} Unit
 foreign effect forever from \"./forever.mjs\" \"forever\"
 
 crash : String ->{{}} Unit
-foreign sync crash from global \"JSON.parse\"
+foreign crash from global \"JSON.parse\"
 
 main : Unit ->{{; AppError}} Unit
 let main () =
@@ -310,8 +310,8 @@ const LINGER: &str = "export const linger = (signal) =>
 
 const LINGERING: &str = "module App.Main exposing (main)
 
-linger : Unit ->{} Unit
-foreign async linger from \"./linger.mjs\" \"linger\"
+linger : Unit ->{Async;} Unit
+foreign linger from \"./linger.mjs\" \"linger\"
   arity 0
   cancel signal
 

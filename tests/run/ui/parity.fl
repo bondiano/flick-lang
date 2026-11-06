@@ -4,19 +4,19 @@
 module App.Main exposing (main)
 
 serve_at : String -> String -> String ->{} Unit
-foreign sync serve_at from "./dom.mjs" "serveAt"
+foreign serve_at from "./dom.mjs" "serveAt"
   arity 3
 
 complaints : Unit ->{} String
-foreign sync complaints from "./dom.mjs" "complaints"
+foreign complaints from "./dom.mjs" "complaints"
   arity 0
 
 settle : Unit ->{Async;} Unit
-foreign async settle from "./dom.mjs" "settle"
+foreign settle from "./dom.mjs" "settle"
   arity 0
 
 markup : Unit ->{} String
-foreign sync markup from "./dom.mjs" "markup"
+foreign markup from "./dom.mjs" "markup"
   arity 0
 
 query : Atom.Writable String

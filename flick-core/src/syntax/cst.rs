@@ -98,3 +98,16 @@ impl Node {
         out
     }
 }
+
+/// The words of `foreign [mode] name …`: its mode, when written, and its
+/// name. Without a mode the signature tells how the host is called.
+pub fn foreign_words(decl: &Node) -> (Option<Token>, Option<Token>) {
+    let idents: Vec<Token> = (decl.child_tokens())
+        .filter(|t| t.kind == SyntaxKind::Ident)
+        .collect();
+    match idents[..] {
+        [mode, name, ..] => (Some(mode), Some(name)),
+        [name] => (None, Some(name)),
+        [] => (None, None),
+    }
+}

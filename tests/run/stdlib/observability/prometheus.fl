@@ -3,7 +3,7 @@
 module App.Main exposing (main)
 
 scrape : String ->{Async;} String
-foreign async scrape from "./scrape.mjs" "scrape"
+foreign scrape from "./scrape.mjs" "scrape"
   arity 1
 
 checkouts : Metric.Counter

@@ -7,23 +7,23 @@ module App.Main exposing (main)
 import Stream.Core exposing (Stream)
 
 mark : String ->{} Unit
-foreign sync mark from "./marks.mjs" "mark"
+foreign mark from "./marks.mjs" "mark"
   arity 1
 
 marked : Unit ->{} String
-foreign sync marked from "./marks.mjs" "marked"
+foreign marked from "./marks.mjs" "marked"
   arity 0
 
 sleep : Float ->{Async;} Unit
-foreign async sleep from "./marks.mjs" "sleep"
+foreign sleep from "./marks.mjs" "sleep"
   arity 1
 
 start : String ->{} Unit
-foreign sync start from "./marks.mjs" "start"
+foreign start from "./marks.mjs" "start"
   arity 1
 
 started : String ->{Async;} Unit
-foreign async started from "./marks.mjs" "started"
+foreign started from "./marks.mjs" "started"
   arity 1
 
 type error NotFound = NotFound { id : Float }

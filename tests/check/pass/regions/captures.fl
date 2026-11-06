@@ -8,7 +8,7 @@ type Handle (s : Region)
 type error ReadError = ReadError String
 
 read_all : forall s. Handle s ->{; ReadError} String
-foreign sync read_all from "./files.js" "readAll"
+foreign read_all from "./files.js" "readAll"
   retention call
 
 class Functor (f : Type -> Type) =
@@ -22,7 +22,7 @@ instance Functor Option =
     | Some x -> Some (f x)
 
 map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
-foreign sync map_effect from "./list.js" "mapEffect"
+foreign map_effect from "./list.js" "mapEffect"
   retention call
 
 read_later : forall s. Handle s -> (Unit ->{; ReadError} String)^{s}

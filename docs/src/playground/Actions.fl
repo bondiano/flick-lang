@@ -27,28 +27,28 @@ import State exposing (
 )
 
 load_highlighting : Unit ->{Async; JsError} Unit
-foreign async load_highlighting from "./highlight.ts" "loadHighlighting"
+foreign load_highlighting from "./highlight.ts" "loadHighlighting"
   arity 0
   catch JsError.from_js
 
 highlight : String -> String ->{; JsError} List SyntaxToken
-foreign sync highlight from "./highlight.ts" "highlight"
+foreign highlight from "./highlight.ts" "highlight"
   arity 2
   catch JsError.from_js
 
 load : Unit ->{Async; JsError} String
-foreign async load from "./compiler.ts" "load"
+foreign load from "./compiler.ts" "load"
   arity 0
   catch JsError.from_js
 
 compile : String ->{Async; JsError} Compiled
-foreign async compile from "./compiler.ts" "compile"
+foreign compile from "./compiler.ts" "compile"
   arity 1
   catch JsError.from_js
   cancel signal
 
 run_build : String -> String ->{Async; JsError} Execution
-foreign async run_build from "./compiler.ts" "run"
+foreign run_build from "./compiler.ts" "run"
   arity 2
   catch JsError.from_js
   cancel signal

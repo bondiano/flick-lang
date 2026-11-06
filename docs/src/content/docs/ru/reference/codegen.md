@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: 324b147c12aa5abc
+source_hash: 3a959f60e2e4be6c
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -276,7 +276,7 @@ rec {
 а `effect` — возврат `Effect`. В режиме `async` самый внутренний владелец
 ждёт завершения промиса даже после прерывания (см. [среду выполнения](../runtime/)).
 Относительный путь модуля разрешается относительно исходного файла.
-Режим `global` указывает глобальное значение, как в `foreign sync now from global "Date.now"`.
+Режим `global` указывает глобальное значение, как в `foreign now from global "Date.now"`.
 
 ## Карты исходного кода
 

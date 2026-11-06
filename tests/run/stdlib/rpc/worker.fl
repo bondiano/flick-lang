@@ -6,7 +6,7 @@ module App.Main exposing (main)
 import Stream.Core exposing (Stream)
 
 script : Unit ->{} String
-foreign sync script from "./worker.mjs" "script"
+foreign script from "./worker.mjs" "script"
   arity 0
 
 type error NotFound = NotFound { id : Float }

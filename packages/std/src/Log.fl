@@ -17,7 +17,7 @@ debug : String ->{Log;} Unit
 let debug message = Log.write "debug" message
 
 write_console : String -> String ->{} Unit
-foreign sync write_console from "@flick-lang/runtime" "logConsole"
+foreign write_console from "@flick-lang/runtime" "logConsole"
 
 /// Info and debug to stdout, warnings and errors to stderr, with the level.
 console : Layer none none {Log}

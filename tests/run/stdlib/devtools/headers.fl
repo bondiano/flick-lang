@@ -2,15 +2,15 @@
 module App.Main exposing (main)
 
 start : Unit ->{Async;} Float
-foreign async start from "./handshake.mjs" "start"
+foreign start from "./handshake.mjs" "start"
   arity 0
 
 token : Unit ->{Async;} String
-foreign async token from "./handshake.mjs" "token"
+foreign token from "./handshake.mjs" "token"
   arity 0
 
 stop : Unit ->{Async;} Unit
-foreign async stop from "./handshake.mjs" "stop"
+foreign stop from "./handshake.mjs" "stop"
   arity 0
 
 options : Tracer.SpanOptions

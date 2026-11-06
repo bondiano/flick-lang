@@ -74,7 +74,7 @@ fn drops_empty_arrow_rows() {
 /// Members, foreign metadata and `rec` groups go one per line.
 #[test]
 fn puts_members_and_metadata_on_their_own_lines() {
-    let src = "module App.Shapes exposing (Shape(..), area, Nullability, aaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbbb, cccccccccccc)\nimport App.Domain exposing (User, Role(..))\ninstance Show a => Show (List a) = show : List a -> String\nclass Show a =\n  show : a -> String\n\n  debug : a -> String\nread_text : Path ->{; FsError} String\nforeign async read_text from \"./fs.js\" \"readText\"\n    arity 1\n    catch FsError.from_js\nrec {\n  is_even : Float -> Bool\n  let is_even n = if n == 0 then true else is_odd (n - 1)\n}\nsql table Users \"users\" {\n  id : bigint primary key generated always as UserId via user_id_codec\n}\n";
+    let src = "module App.Shapes exposing (Shape(..), area, Nullability, aaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbbb, cccccccccccc)\nimport App.Domain exposing (User, Role(..))\ninstance Show a => Show (List a) = show : List a -> String\nclass Show a =\n  show : a -> String\n\n  debug : a -> String\nread_text : Path ->{Async; FsError} String\nforeign read_text from \"./fs.js\" \"readText\"\n    arity 1\n    catch FsError.from_js\nrec {\n  is_even : Float -> Bool\n  let is_even n = if n == 0 then true else is_odd (n - 1)\n}\nsql table Users \"users\" {\n  id : bigint primary key generated always as UserId via user_id_codec\n}\n";
     insta::assert_snapshot!(fmt(src), @r#"
     module App.Shapes exposing (
       Shape(..),
@@ -91,8 +91,8 @@ fn puts_members_and_metadata_on_their_own_lines() {
       show : a -> String
 
       debug : a -> String
-    read_text : Path ->{; FsError} String
-    foreign async read_text from "./fs.js" "readText"
+    read_text : Path ->{Async; FsError} String
+    foreign read_text from "./fs.js" "readText"
       arity 1
       catch FsError.from_js
     rec {

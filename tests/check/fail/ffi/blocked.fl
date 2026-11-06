@@ -1,7 +1,7 @@
 module App.Blocked exposing (..)
 
 next_id : Unit ->{} Float
-foreign sync next_id from "lib" "nextId"
+foreign next_id from "lib" "nextId"
   arity 0
   reviewed "lib@1.0.0 sha256:00"
 

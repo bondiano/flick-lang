@@ -4,27 +4,27 @@
 module App.Main exposing (main)
 
 serve : String -> String ->{} Unit
-foreign sync serve from "./dom.mjs" "serve"
+foreign serve from "./dom.mjs" "serve"
   arity 2
 
 complaints : Unit ->{} String
-foreign sync complaints from "./dom.mjs" "complaints"
+foreign complaints from "./dom.mjs" "complaints"
   arity 0
 
 state_left : Unit ->{} Bool
-foreign sync state_left from "./dom.mjs" "stateLeft"
+foreign state_left from "./dom.mjs" "stateLeft"
   arity 0
 
 click : String ->{} Unit
-foreign sync click from "./dom.mjs" "click"
+foreign click from "./dom.mjs" "click"
   arity 1
 
 settle : Unit ->{Async;} Unit
-foreign async settle from "./dom.mjs" "settle"
+foreign settle from "./dom.mjs" "settle"
   arity 0
 
 text : Unit ->{} String
-foreign sync text from "./dom.mjs" "text"
+foreign text from "./dom.mjs" "text"
   arity 0
 
 count : Atom.Writable Float

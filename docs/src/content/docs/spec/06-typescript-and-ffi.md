@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: 527774b241843ebd
+source_hash: 5ae12791d6f2b9ee
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -133,13 +133,13 @@ The notation `F<A>` for an arbitrary type parameter `F` is not a TypeScript feat
 
 ## FFI
 
-A `foreign` declaration binds a JS value to a full Flick signature written above it. The mode says how the call runs:
+A `foreign` declaration binds a JS value to a full Flick signature written above it. The mode, or without a mode word the signature, says how the call runs:
 
 | Mode | Contract |
 | - | - |
 | `foreign pure` | A direct JS call, trusted to be pure, also at module load |
-| `foreign sync` | Deferred until the runtime stage runs; a throw is a defect unless `catch` maps it |
-| `foreign async` | The Promise is created when the call runs, not when a `task` is built; the innermost owner waits for it to settle, even after an interruption |
+| `foreign`, a row without `Async` | Deferred until the runtime stage runs; a throw is a defect unless `catch` maps it |
+| `foreign`, a row with `Async` | A Promise, created when the call runs, not when a `task` is built; the innermost owner waits for it to settle, even after an interruption |
 | `foreign effect` | The JS factory is called when the call runs (`Effect.suspend`), and its `Effect` runs in the current fiber |
 | `foreign blocked name "reason"` | No binding: using `name` is a compile error (`FLICK-F005`); the other exports of the module stay usable |
 
@@ -169,7 +169,7 @@ With the policy `undefined = "none"` and `catch = "JsError"`, the importer produ
 # import JsError exposing (JsError)
 #
 lookup : String ->{Async; JsError} Option String
-foreign async lookup from "package" "lookup"
+foreign lookup from "package" "lookup"
   arity 1
   catch JsError.from_js
   nullable
@@ -206,11 +206,11 @@ foreign pure hypot from global "Math.hypot"
   arity 2
 
 now_millis : Unit ->{} Float
-foreign sync now_millis from global "Date.now"
+foreign now_millis from global "Date.now"
   arity 0
 
 read_text : Path ->{Async; FsError} String
-foreign async read_text from "./fs.js" "readText"
+foreign read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js
   cancel signal
@@ -290,11 +290,11 @@ Only an argument of the binding is adapted: a function inside a record, a list o
 type Emitter
 
 on : forall s. Emitter -> Events.Listener s Float ->{} Unit
-foreign sync on from "./bindings.mjs" "on"
+foreign on from "./bindings.mjs" "on"
   retention owner
 
 off : forall s. Emitter -> Events.Listener s Float ->{} Unit
-foreign sync off from "./bindings.mjs" "off"
+foreign off from "./bindings.mjs" "off"
   retention call
 
 report : Failure none ->{} Unit

@@ -613,12 +613,12 @@ const FOREIGN_META: [&str; 9] = [
 fn foreign_decl(p: &mut Parser) {
     let m = p.start();
     p.bump();
-    let mode = p.at(K::Ident).then(|| p.text_of(p.raw()));
-    if !mode.is_some_and(|w| FOREIGN_MODES.contains(&w)) {
-        p.error_expected("a foreign mode: `pure`, `sync`, `async`, `effect` or `blocked`");
+    // `foreign name from …` has no mode: two words before `from` do
+    let mode = (p.at(K::Ident) && p.nth(1) == K::Ident).then(|| p.text_of(p.raw()));
+    if mode.is_some_and(|w| !FOREIGN_MODES.contains(&w)) {
+        p.error_expected("a foreign mode: `pure`, `effect` or `blocked`, or none");
     }
-    // an unknown mode word still takes the mode position
-    if p.at(K::Ident) && p.nth(1) == K::Ident {
+    if mode.is_some() {
         p.bump();
     }
     p.expect(K::Ident);

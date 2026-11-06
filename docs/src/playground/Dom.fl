@@ -3,13 +3,13 @@ module Dom exposing (configuration, source_value, notify)
 import State exposing (Configuration)
 
 configuration : Unit ->{} Configuration
-foreign sync configuration from "./dom.ts" "configuration"
+foreign configuration from "./dom.ts" "configuration"
   arity 0
 
 source_value : Unit ->{} String
-foreign sync source_value from "./dom.ts" "sourceValue"
+foreign source_value from "./dom.ts" "sourceValue"
   arity 0
 
 notify : String ->{} Unit
-foreign sync notify from "./dom.ts" "notify"
+foreign notify from "./dom.ts" "notify"
   arity 1

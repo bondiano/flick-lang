@@ -13,7 +13,7 @@ use super::ty::Type;
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::source::Span;
-use crate::syntax::cst::Node;
+use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
 
@@ -149,9 +149,8 @@ impl<'a> Checker<'a> {
                         .map(|j| decls[j])
                         .filter(|s| s.kind == K::Signature && self.pairs(s, decl))
                         .or_else(|| self.misplaced(decls, decl));
-                    let blocked = decl
-                        .child_tokens()
-                        .find(|t| t.kind == K::Ident)
+                    let blocked = foreign_words(decl)
+                        .0
                         .is_some_and(|t| t.text(self.text) == "blocked");
                     if sig.is_none() && !blocked {
                         let name = foreign_name(decl, self.text).unwrap_or_default();
@@ -459,8 +458,5 @@ impl<'a> Checker<'a> {
 }
 
 fn foreign_name<'t>(decl: &Node, text: &'t str) -> Option<&'t str> {
-    decl.child_tokens()
-        .filter(|t| t.kind == K::Ident)
-        .nth(1)
-        .map(|t| t.text(text))
+    foreign_words(decl).1.map(|t| t.text(text))
 }

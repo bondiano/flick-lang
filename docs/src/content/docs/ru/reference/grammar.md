@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 2f609a4a8c5485d2
+source_hash: d51820e5837c1216
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -47,7 +47,7 @@ ui in when for yield do
 Контекстные слова считаются обычными именами, кроме следующих позиций:
 
 - `unboxed` и `untagged` непосредственно перед `type` (см. `codegen.md`);
-- режимы внешних функций `pure`, `sync`, `async`, `effect`, `blocked` и источник
+- режимы внешних функций `pure`, `effect`, `blocked` и источник
   `global`;
 - метаданные внешних функций `arity`, `this`, `catch`, `cancel`, `nullable`,
   `retention`, `optional`, `variadic`, `reviewed` (неизвестные метаданные —
@@ -280,9 +280,9 @@ class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] [
 fundep      = { name } "->" { name }
 instance    = "instance" [context "=>"] type ["=" members]
 members     = block of: signature | let | type_decl
-foreign     = "foreign" mode name "from" ("global" String | String String) [metadata]
+foreign     = "foreign" [mode] name "from" ("global" String | String String) [metadata]
             | "foreign" "blocked" name String
-mode        = "pure" | "sync" | "async" | "effect"
+mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
 ```
 
@@ -347,7 +347,7 @@ instance Show Shape =
     | _ -> "other"
 
 read_text : Path ->{Async; FsError} String
-foreign async read_text from "./fs.js" "readText"
+foreign read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js
   cancel signal

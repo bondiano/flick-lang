@@ -86,7 +86,7 @@ foreign pure from_env_record from "@flick-lang/runtime/effect/ConfigProvider" "f
 
 /// The environment variables of the process.
 from_env : Options ->{} ConfigProvider
-foreign sync from_env from "@flick-lang/runtime/effect/ConfigProvider" "fromEnv"
+foreign from_env from "@flick-lang/runtime/effect/ConfigProvider" "fromEnv"
   reviewed "effect@4.1.2 sha256:069a8cae256d0b24"
 
 /// Values from the text of a `.env` file.

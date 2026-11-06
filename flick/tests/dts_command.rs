@@ -56,7 +56,7 @@ broken : Float ->{} Float
 let broken n = n + crash ()
 
 crash : Unit ->{} Float
-foreign sync crash from "./crash.mjs" "crash"
+foreign crash from "./crash.mjs" "crash"
   arity 0
 
 later : Float -> Eff none none Float
@@ -70,12 +70,12 @@ let waiting n =
   }
 
 pause : Float ->{} Float
-foreign async pause from "./crash.mjs" "pause"
+foreign pause from "./crash.mjs" "pause"
   arity 1
   cancel signal
 
 cleanup : Unit ->{} Unit
-foreign async cleanup from "./crash.mjs" "cleanup"
+foreign cleanup from "./crash.mjs" "cleanup"
   arity 0
 
 maybe : List Float -> Option Float

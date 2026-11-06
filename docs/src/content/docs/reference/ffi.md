@@ -3,8 +3,9 @@ title: "Foreign functions"
 ---
 
 A `foreign` declaration binds a JS function to a Flick signature (see [TypeScript generation and the FFI boundary](../../spec/06-typescript-and-ffi/)). The
-signature is the contract; the mode says how the call runs, and metadata
-lines below the declaration adapt the call.
+signature is the contract: without a mode word it tells how the call runs,
+`pure` and `effect` say it, and metadata lines below the declaration adapt
+the call.
 
 ```flick
 # import File exposing (Path)
@@ -16,11 +17,11 @@ foreign pure hypot from global "Math.hypot"
   arity 2
 
 now_millis : Unit ->{} Float
-foreign sync now_millis from global "Date.now"
+foreign now_millis from global "Date.now"
   arity 0
 
 read_text : Path ->{Async; FsError} String
-foreign async read_text from "./fs.js" "readText"
+foreign read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js
   cancel signal
@@ -31,9 +32,12 @@ foreign async read_text from "./fs.js" "readText"
 | Mode | The call |
 | - | - |
 | `pure` | a direct JS call: trusted to be pure, also at module load |
-| `sync` | runs when the runtime stage runs; a throw is a defect |
-| `async` | the promise is created when the call runs, not when a `task` is built; a rejection is a defect, and the innermost owner waits for the promise to settle even after an interruption |
+| none, a row without `Async` | runs when the runtime stage runs; a throw is a defect |
+| none, a row with `Async` | the JS result is a promise, created when the call runs, not when a `task` is built; a rejection is a defect, and the innermost owner waits for the promise to settle even after an interruption |
 | `effect` | the JS factory is called when the call runs (`Effect.suspend`), and its `Effect` runs in the current fiber |
+
+`foreign sync` and `foreign async` are the words of before: `FLICK-F001`,
+whose fix removes the word and gives a promise's row its `Async`.
 
 ## Metadata
 
@@ -42,7 +46,7 @@ foreign async read_text from "./fs.js" "readText"
 | `arity n` | `n` positional JS arguments, adapting `n` stages; `arity 0` takes the `()` of a first `Unit` parameter and calls JS without arguments, after evaluating that argument |
 | `this` | the first argument is the receiver: `target.call(a0, a1, …)` |
 | `catch f` | a throw or rejection becomes the typed error `f value`, with `f : JsValue -> E` and `E` in the error row; `E` may hold no capability of a scope (`FLICK-F003`) |
-| `cancel signal` | `foreign async` only: an `AbortSignal` is passed last and aborted on interruption; the owner still waits for the promise |
+| `cancel signal` | a promise only, a row with `Async`: an `AbortSignal` is passed last and aborted on interruption; the owner still waits for the promise |
 | `nullable` | the result is `Option a`: `null` and `undefined` are `None` |
 | `optional i` | argument `i` (from 0) is `Option a`: `None` is passed as `undefined` |
 | `variadic` | the last argument is a `List a` spread into the call |
@@ -163,7 +167,7 @@ error too. Nothing is inferred that a declaration cannot show: a call is
 | a class instance, `Date`, a named object type | an opaque `type` of the generated module |
 | `type Method = "GET" \| "POST"` | an enum `untagged type Method` of the generated module |
 | a callback `(a: A) => B` | a pure `(A -> B)`; needs `retention` |
-| `Promise<T>` result | `foreign async`; needs `catch` |
+| `Promise<T>` result | a row with `Async`; needs `catch` |
 | `T \| undefined` or `T \| null` result | `Option T` with `nullable`; needs `undefined = "none"` |
 | overloads with different numbers of parameters | one binding each, `name_<n>` |
 
@@ -208,7 +212,7 @@ this policy gives:
 # import JsError exposing (JsError)
 #
 lookup : String ->{Async; JsError} Option String
-foreign async lookup from "lookup-lib" "lookup"
+foreign lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js
   nullable
@@ -236,7 +240,7 @@ generated module shows above the export:
 # import JsError exposing (JsError)
 #
 lookup : String ->{Async; JsError} Option String
-foreign async lookup from "lookup-lib" "lookup"
+foreign lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js
   nullable

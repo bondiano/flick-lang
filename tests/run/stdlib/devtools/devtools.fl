@@ -3,15 +3,15 @@
 module App.Main exposing (main)
 
 start : Unit ->{Async;} Float
-foreign async start from "./server.mjs" "start"
+foreign start from "./server.mjs" "start"
   arity 0
 
 got : String ->{Async;} Bool
-foreign async got from "./server.mjs" "got"
+foreign got from "./server.mjs" "got"
   arity 1
 
 stop : Unit ->{Async;} Unit
-foreign async stop from "./server.mjs" "stop"
+foreign stop from "./server.mjs" "stop"
   arity 0
 
 options : Tracer.SpanOptions

@@ -218,7 +218,7 @@ impl Lexer<'_> {
         }
         matches!(
             before[..],
-            [.., "foreign", "pure" | "sync" | "async" | "effect"]
+            [.., "foreign"] | [.., "foreign", "pure" | "sync" | "async" | "effect"]
         ) || (matches!(before[..], ["let"] | ["let", "rec"]) && !matches!(word, "rec" | "assert"))
     }
 

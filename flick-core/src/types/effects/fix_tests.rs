@@ -1,5 +1,7 @@
 //! The fix of an E002 adds what a written row lacks right after its `{`.
 
+use std::cmp::Reverse;
+
 use crate::diagnostics::codes;
 use crate::source::SourceMap;
 
@@ -105,4 +107,35 @@ fn a_type_that_lacks_only_async_gets_it_where_it_is_written() {
                    let job () = Job\n\
                    let f = job ()";
     assert_eq!(fixed("f : Job none", program), "f : Job {Async}");
+}
+
+#[test]
+fn the_words_of_before_go_and_a_promise_says_async() {
+    let text = "module Probe exposing (..)\n\
+                wait : Unit ->{} Unit\n\
+                foreign async wait from \"./wait.mjs\" \"wait\"\n\
+                tick : Unit ->{} Unit\n\
+                foreign sync tick from \"./tick.mjs\" \"tick\"\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.to_owned());
+    let diagnostics = crate::check(&sources, file);
+    let mut edits: Vec<_> = (diagnostics.iter())
+        .filter(|d| d.code == codes::F001)
+        .flat_map(|d| &d.fixes)
+        .filter(|f| f.safe)
+        .flat_map(|f| &f.edits)
+        .collect();
+    edits.sort_by_key(|e| Reverse(e.span.start));
+    let mut out = text.to_owned();
+    for e in edits {
+        out.replace_range(e.span.range(), &e.replacement);
+    }
+    assert_eq!(
+        out,
+        "module Probe exposing (..)\n\
+         wait : Unit ->{Async;} Unit\n\
+         foreign wait from \"./wait.mjs\" \"wait\"\n\
+         tick : Unit ->{} Unit\n\
+         foreign tick from \"./tick.mjs\" \"tick\"\n"
+    );
 }

@@ -466,7 +466,7 @@ fn check_and_build_run_no_code_of_the_program() {
         "import {{ writeFileSync }} from \"node:fs\";\nwriteFileSync({:?}, \"loaded\");\nexport const now = () => 1;\n",
         witness.display().to_string()
     );
-    let main = "module App.Main exposing (main)\n\nnow : Unit ->{} Float\nforeign sync now from \"./effect.mjs\" \"now\"\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show (now ()))\n";
+    let main = "module App.Main exposing (main)\n\nnow : Unit ->{} Float\nforeign now from \"./effect.mjs\" \"now\"\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show (now ()))\n";
     let dir = project(
         "cli_effects",
         &[

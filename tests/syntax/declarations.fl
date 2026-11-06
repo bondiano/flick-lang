@@ -76,17 +76,17 @@ foreign pure hypot from global "Math.hypot"
   arity 2
 
 now : Unit ->{} Float
-foreign sync now from global "Date.now"
+foreign now from global "Date.now"
   arity 0
 
 read_text : Path ->{; FsError} String
-foreign async read_text from "./fs.js" "readText"
+foreign read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js
   cancel signal
 
 push : Array a -> a ->{} Unit
-foreign sync push from "./array.js" "push"
+foreign push from "./array.js" "push"
   this
   arity 1
   nullable result

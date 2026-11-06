@@ -259,7 +259,7 @@ runtime one (or `arity n`), dictionaries first. `pure` is a direct call,
 innermost owner waits for it to settle even after an interruption (see
 [runtime.md](../runtime/)) — and `effect` returns an `Effect`. A relative module is
 resolved against the source file. `global` names a global, as in
-`foreign sync now from global "Date.now"`.
+`foreign now from global "Date.now"`.
 
 ## Source maps
 

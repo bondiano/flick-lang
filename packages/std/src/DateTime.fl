@@ -169,7 +169,7 @@ let zone_make_named_effect id = from_result (zone_make_named id)
 
 /// The zone of the machine the program runs on.
 zone_make_local : Unit ->{} TimeZone
-foreign sync zone_make_local from "@flick-lang/runtime/effect/DateTime" "zoneMakeLocal"
+foreign zone_make_local from "@flick-lang/runtime/effect/DateTime" "zoneMakeLocal"
   arity 0
   reviewed "effect@4.1.2 sha256:63133ecf5695a43a"
 

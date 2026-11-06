@@ -35,7 +35,7 @@ See [modules.md](../modules/).
 | `class` | declares a type class | `class Named a = name : a -> String` |
 | `instance` | implements a class for a type | `instance Named User = let name u = u.name` |
 | `deriving` | asks the compiler for instances | `deriving Eq, Show, Schema` |
-| `foreign` | binds a JavaScript value with a Flick signature | `foreign async read_text from "./fs.js" "readText"` |
+| `foreign` | binds a JavaScript value with a Flick signature | `foreign read_text from "./fs.js" "readText"` |
 | `from` | the source of a `foreign`; a table in `sql { … }` | `from user in Users` |
 | `forall` | quantifies type variables explicitly | `keep : forall s. Path ->{Scope s} File s` |
 

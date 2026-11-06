@@ -872,7 +872,7 @@ mod tests {
              instance Describe Shape =\n  let describe s = \"shape\"\n\
              area : Shape -> Float\nlet area s =\n  match s with\n  | Circle r -> r * r\n  | Rect w h -> w * h\n\
              scale : Float -> Shape -> Shape\nlet scale k s = Circle k\n\
-             now : Unit ->{} Float\nforeign sync now from global \"Date.now\"\n",
+             now : Unit ->{} Float\nforeign now from global \"Date.now\"\n",
         )
         .expect("checks");
         let dependency = Interface {

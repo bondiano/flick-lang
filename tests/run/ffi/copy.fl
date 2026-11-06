@@ -9,18 +9,18 @@ sort_in_place : List Float -> List Float
 foreign pure sort_in_place from "./bindings.mjs" "sortInPlace"
 
 kept : Unit ->{} List Float
-foreign sync kept from "./bindings.mjs" "kept"
+foreign kept from "./bindings.mjs" "kept"
   arity 0
 
 spoil : Unit ->{} Unit
-foreign sync spoil from "./bindings.mjs" "spoil"
+foreign spoil from "./bindings.mjs" "spoil"
   arity 0
 
 rename : User ->{} Unit
-foreign sync rename from "./bindings.mjs" "rename"
+foreign rename from "./bindings.mjs" "rename"
 
 push_into : (Unit -> List Float) ->{} Float
-foreign sync push_into from "./bindings.mjs" "pushInto"
+foreign push_into from "./bindings.mjs" "pushInto"
 
 say : String ->{} Unit
 let say line = Platform.stdout_line line

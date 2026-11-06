@@ -158,12 +158,12 @@ foreign pure filter_interruptors from "@flick-lang/runtime/effect/Cause" "flickF
 
 /// A readable report of every reason, with stack traces.
 pretty : Failure e ->{} String
-foreign sync pretty from "@flick-lang/runtime/effect/Cause" "flickPretty"
+foreign pretty from "@flick-lang/runtime/effect/Cause" "flickPretty"
   reviewed "effect@4.1.2 sha256:8c70887b615de4e8"
 
 /// `name: message` of each reason as an error.
 pretty_errors : Failure e ->{} List String
-foreign sync pretty_errors from "@flick-lang/runtime/effect/Cause" "flickPrettyErrors"
+foreign pretty_errors from "@flick-lang/runtime/effect/Cause" "flickPrettyErrors"
   reviewed "effect@4.1.2 sha256:96cf0a2f7bb52a61"
 
 /// The stack frame annotated on the failure, if any.
@@ -195,7 +195,7 @@ foreign pure frame_name from "@flick-lang/runtime/effect/Cause" "flickFrameName"
 
 /// The JS stack of the frame, if it was captured.
 frame_stack : StackFrame ->{} Option String
-foreign sync frame_stack from "@flick-lang/runtime/effect/Cause" "flickFrameStack"
+foreign frame_stack from "@flick-lang/runtime/effect/Cause" "flickFrameStack"
 
 /// The frame around this one.
 frame_parent : StackFrame -> Option StackFrame

@@ -9,23 +9,23 @@ import Http.ServerResponse exposing (ServerResponse)
 import Server exposing (plugin server)
 
 start : Unit ->{Async;} Float
-foreign async start from "./traces.mjs" "start"
+foreign start from "./traces.mjs" "start"
   arity 0
 
 stop : Unit ->{Async;} Unit
-foreign async stop from "./traces.mjs" "stop"
+foreign stop from "./traces.mjs" "stop"
   arity 0
 
 shares : String -> String ->{} Bool
-foreign sync shares from "./traces.mjs" "shares"
+foreign shares from "./traces.mjs" "shares"
   arity 2
 
 names : Unit ->{} String
-foreign sync names from "./traces.mjs" "names"
+foreign names from "./traces.mjs" "names"
   arity 0
 
 set_env : String -> String ->{} Unit
-foreign sync set_env from "../cli/env.mjs" "set"
+foreign set_env from "../cli/env.mjs" "set"
   arity 2
 
 options : Tracer.SpanOptions

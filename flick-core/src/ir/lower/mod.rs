@@ -24,13 +24,12 @@ use std::iter;
 use std::sync::Arc;
 
 use super::{
-    Binding, Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind, Lit, Module, Param, Stage,
-    TypeName,
+    Binding, Expr, ExprKind, Foreign, Item, ItemKind, Lit, Module, Param, Stage, TypeName,
 };
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::{FileId, Span};
-use crate::syntax::cst::Node;
+use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::{
@@ -390,18 +389,7 @@ impl Lower<'_> {
     }
 
     fn foreign(&mut self, decl: &Node) -> Option<Foreign> {
-        let idents: Vec<String> = decl
-            .child_tokens()
-            .filter(|t| t.kind == K::Ident)
-            .map(|t| t.text(self.text).to_owned())
-            .collect();
-        let mode = match idents.first()?.as_str() {
-            "pure" => ForeignMode::Pure,
-            "sync" => ForeignMode::Sync,
-            "async" => ForeignMode::Async,
-            _ => ForeignMode::Effect,
-        };
-        let name = idents.get(1)?.clone();
+        let name = foreign_words(decl).1?.text(self.text).to_owned();
         let source = decl.nodes().find(|n| n.kind == K::ForeignSource)?;
         let strings: Vec<String> = source
             .child_tokens()
@@ -430,7 +418,7 @@ impl Lower<'_> {
         });
         Some(Foreign {
             name,
-            mode,
+            mode: info.mode,
             binding: Binding {
                 from: module,
                 name: export,

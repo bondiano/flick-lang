@@ -11,39 +11,39 @@ type Page = Home | User Float
   deriving Eq, Show, Schema, Url
 
 name : Float ->{Async;} String
-foreign async name from "./route.mjs" "name"
+foreign name from "./route.mjs" "name"
   arity 1
 
 loads : Unit ->{} Float
-foreign sync loads from "./route.mjs" "loads"
+foreign loads from "./route.mjs" "loads"
   arity 0
 
 open : String -> String ->{Async;} Unit
-foreign async open from "./route.mjs" "open"
+foreign open from "./route.mjs" "open"
   arity 2
 
 back : Unit ->{Async;} Unit
-foreign async back from "./route.mjs" "back"
+foreign back from "./route.mjs" "back"
   arity 0
 
 path : Unit ->{} String
-foreign sync path from "./route.mjs" "path"
+foreign path from "./route.mjs" "path"
   arity 0
 
 settle : Unit ->{Async;} Unit
-foreign async settle from "./route.mjs" "settle"
+foreign settle from "./route.mjs" "settle"
   arity 0
 
 text : Unit ->{} String
-foreign sync text from "./route.mjs" "text"
+foreign text from "./route.mjs" "text"
   arity 0
 
 complaints : Unit ->{} String
-foreign sync complaints from "./route.mjs" "complaints"
+foreign complaints from "./route.mjs" "complaints"
   arity 0
 
 close : Unit ->{} Unit
-foreign sync close from "./route.mjs" "close"
+foreign close from "./route.mjs" "close"
   arity 0
 
 page : Atom.Writable Page

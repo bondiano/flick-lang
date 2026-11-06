@@ -69,7 +69,7 @@ let handle request =
   | name -> "welcome " ++ name
 
 post_raw : String -> String ->{Async;} String
-foreign async post_raw from "./raw.mjs" "post"
+foreign post_raw from "./raw.mjs" "post"
 
 /// The outcome of registering `name`.
 ask : String -> String ->{Async;} String

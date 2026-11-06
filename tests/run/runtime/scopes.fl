@@ -7,7 +7,7 @@ open_raw : String ->{} String
 foreign effect open_raw from "./resources.mjs" "open"
 
 slow_write : String -> Float ->{Async;} Unit
-foreign async slow_write from "./resources.mjs" "slowWrite"
+foreign slow_write from "./resources.mjs" "slowWrite"
 
 type error Oops = Oops String
 

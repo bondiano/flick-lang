@@ -117,7 +117,7 @@
           }
         },
         {
-          "match": "(?<![.\\w])(foreign)\\s+(pure|sync|async|effect|blocked)\\s+([a-z_][A-Za-z0-9_]*)",
+          "match": "(?<![.\\w])(foreign)\\s+(?:(pure|effect|blocked|sync|async)\\s+)?([a-z_][A-Za-z0-9_]*)(?=\\s+(?:from\\b|\"))",
           "captures": {
             "1": { "name": "keyword.other.flick" },
             "2": { "name": "keyword.other.flick" },

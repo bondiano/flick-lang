@@ -11,35 +11,35 @@ type Page = Home | Profile String (Option Tab)
   deriving Eq, Show, Schema, Url
 
 open : String ->{} Unit
-foreign sync open from "./navigate.mjs" "open"
+foreign open from "./navigate.mjs" "open"
   arity 1
 
 click : String -> Bool ->{} String
-foreign sync click from "./navigate.mjs" "click"
+foreign click from "./navigate.mjs" "click"
   arity 2
 
 submit : String ->{} String
-foreign sync submit from "./navigate.mjs" "submit"
+foreign submit from "./navigate.mjs" "submit"
   arity 1
 
 path : Unit ->{} String
-foreign sync path from "./navigate.mjs" "path"
+foreign path from "./navigate.mjs" "path"
   arity 0
 
 href : String ->{} String
-foreign sync href from "./navigate.mjs" "href"
+foreign href from "./navigate.mjs" "href"
   arity 1
 
 settle : Unit ->{Async;} Unit
-foreign async settle from "./navigate.mjs" "settle"
+foreign settle from "./navigate.mjs" "settle"
   arity 0
 
 text : Unit ->{} String
-foreign sync text from "./navigate.mjs" "text"
+foreign text from "./navigate.mjs" "text"
   arity 0
 
 close : Unit ->{} Unit
-foreign sync close from "./navigate.mjs" "close"
+foreign close from "./navigate.mjs" "close"
   arity 0
 
 page : Atom.Writable Page

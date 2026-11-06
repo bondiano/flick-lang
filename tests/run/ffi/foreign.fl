@@ -25,29 +25,29 @@ counted : Float ->{} Float
 foreign effect counted from "./bindings.mjs" "counted"
 
 later : Float ->{Async;} Float
-foreign async later from "./bindings.mjs" "later"
+foreign later from "./bindings.mjs" "later"
 
 fail_sync : String ->{; FsError} Unit
-foreign sync fail_sync from "./bindings.mjs" "fail"
+foreign fail_sync from "./bindings.mjs" "fail"
   catch from_js
 
 fail_async : String ->{Async; FsError} Unit
-foreign async fail_async from "./bindings.mjs" "reject"
+foreign fail_async from "./bindings.mjs" "reject"
   catch from_js
 
 log : String ->{} Unit
-foreign sync log from "./bindings.mjs" "log"
+foreign log from "./bindings.mjs" "log"
 
 hypot : Float -> Float -> Float
 foreign pure hypot from global "Math.hypot"
   arity 2
 
 now_millis : Unit ->{} Float
-foreign sync now_millis from global "Date.now"
+foreign now_millis from global "Date.now"
   arity 0
 
 read_text : Path ->{Async; FsError} String
-foreign async read_text from "./bindings.mjs" "readText"
+foreign read_text from "./bindings.mjs" "readText"
   arity 1
   catch from_js
   cancel signal
@@ -96,7 +96,7 @@ twice : (Float ->{} Float) ->{} Float
 foreign effect twice from "./bindings.mjs" "twice"
 
 await_both : Js.PromiseCallback Float Float ->{Async;} Float
-foreign async await_both from "./bindings.mjs" "awaitBoth"
+foreign await_both from "./bindings.mjs" "awaitBoth"
 
 sync_outcome : Unit ->{} String
 let sync_outcome () =

@@ -3,7 +3,7 @@
 module App.Main exposing (main)
 
 sleep : Float ->{Async;} Unit
-foreign async sleep from "../runtime/timers.mjs" "sleep"
+foreign sleep from "../runtime/timers.mjs" "sleep"
 
 report : List (String, Float) ->{} Unit
 let report scores = for {

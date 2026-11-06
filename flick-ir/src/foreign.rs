@@ -46,9 +46,10 @@ pub struct Binding {
     pub name: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ForeignMode {
     /// A function of its arguments alone.
+    #[default]
     Pure,
     /// Runs at once, in the runtime; a failure is a defect.
     Sync,

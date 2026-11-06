@@ -6,35 +6,35 @@
 module App.Main exposing (main)
 
 later : Unit ->{Async;} String
-foreign async later from "./stream.mjs" "later"
+foreign later from "./stream.mjs" "later"
   arity 0
 
 task_runs : Unit ->{} Float
-foreign sync task_runs from "./stream.mjs" "taskRuns"
+foreign task_runs from "./stream.mjs" "taskRuns"
   arity 0
 
 stream_shell : String ->{Async;} Unit
-foreign async stream_shell from "./stream.mjs" "streamShell"
+foreign stream_shell from "./stream.mjs" "streamShell"
   arity 1
 
 stream_rest : Unit ->{Async;} Unit
-foreign async stream_rest from "./stream.mjs" "streamRest"
+foreign stream_rest from "./stream.mjs" "streamRest"
   arity 0
 
 settle : Unit ->{Async;} Unit
-foreign async settle from "./stream.mjs" "settle"
+foreign settle from "./stream.mjs" "settle"
   arity 0
 
 text : Unit ->{} String
-foreign sync text from "./stream.mjs" "text"
+foreign text from "./stream.mjs" "text"
   arity 0
 
 complaints : Unit ->{} String
-foreign sync complaints from "./stream.mjs" "complaints"
+foreign complaints from "./stream.mjs" "complaints"
   arity 0
 
 close : Unit ->{} Unit
-foreign sync close from "./stream.mjs" "close"
+foreign close from "./stream.mjs" "close"
   arity 0
 
 count : Atom.Writable Float

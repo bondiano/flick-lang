@@ -1,6 +1,6 @@
 ---
 title: "Внешние функции"
-source_hash: 9b85bfa41987819c
+source_hash: 4d48362e00834c31
 ---
 
 Объявление `foreign` связывает функцию JS с сигнатурой Flick
@@ -19,11 +19,11 @@ foreign pure hypot from global "Math.hypot"
   arity 2
 
 now_millis : Unit ->{} Float
-foreign sync now_millis from global "Date.now"
+foreign now_millis from global "Date.now"
   arity 0
 
 read_text : Path ->{Async; FsError} String
-foreign async read_text from "./fs.js" "readText"
+foreign read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js
   cancel signal
@@ -34,9 +34,12 @@ foreign async read_text from "./fs.js" "readText"
 | Режим | Вызов |
 | - | - |
 | `pure` | прямой вызов JS; чистота принимается на доверии, вызов возможен в том числе при загрузке модуля |
-| `sync` | JS вызывается на эффектной стадии функции; исключение считается дефектом |
-| `async` | промис создаётся при выполнении вызова, а не при построении `task`; отклонение промиса считается дефектом; ближайший владелец ждёт завершения промиса даже после прерывания |
+| нет, строка без `Async` | JS вызывается на эффектной стадии функции; исключение считается дефектом |
+| нет, строка с `Async` | результат JS — промис, который создаётся при выполнении вызова, а не при построении `task`; отклонение промиса считается дефектом; ближайший владелец ждёт завершения промиса даже после прерывания |
 | `effect` | фабрика JS вызывается при выполнении вызова (`Effect.suspend`), а возвращённый ею `Effect` выполняется в текущем файбере |
+
+`foreign sync` и `foreign async` — прежние слова: `FLICK-F001`, исправление
+убирает слово и даёт строке промиса её `Async`.
 
 ## Метаданные
 
@@ -45,7 +48,7 @@ foreign async read_text from "./fs.js" "readText"
 | `arity n` | адаптирует `n` стадий функции Flick к `n` позиционным аргументам JS; при `arity 0` первый аргумент `()` типа `Unit` вычисляется, но JS вызывается без аргументов |
 | `this` | первый аргумент становится получателем вызова: `target.call(a0, a1, …)` |
 | `catch f` | превращает исключение или отклонение промиса в типизированную ошибку `f value`, где `f : JsValue -> E`, а `E` входит в строку ошибок; `E` не может содержать значения, привязанные к области владения (`FLICK-F003`) |
-| `cancel signal` | только для `foreign async`: последним аргументом передаётся `AbortSignal`, который отменяется при прерывании; владелец по-прежнему ждёт завершения промиса |
+| `cancel signal` | только для промиса, строки с `Async`: последним аргументом передаётся `AbortSignal`, который отменяется при прерывании; владелец по-прежнему ждёт завершения промиса |
 | `nullable` | результат имеет тип `Option a`: `null` и `undefined` превращаются в `None` |
 | `optional i` | аргумент `i` (нумерация с 0) имеет тип `Option a`: `None` передаётся как `undefined` |
 | `variadic` | последний аргумент типа `List a` разворачивается в аргументы вызова |
@@ -178,7 +181,7 @@ Node.js `@flick-lang/dts-importer` или скрипт из `FLICK_DTS_IMPORTER`
 | экземпляр класса, `Date`, именованный объектный тип | непрозрачный `type` сгенерированного модуля |
 | `type Method = "GET" \| "POST"` | перечисление `untagged type Method` сгенерированного модуля |
 | функция обратного вызова `(a: A) => B` | чистая `(A -> B)`; требуется `retention` |
-| результат `Promise<T>` | `foreign async`; требуется `catch` |
+| результат `Promise<T>` | строка с `Async`; требуется `catch` |
 | результат `T \| undefined` или `T \| null` | `Option T` с `nullable`; требуется `undefined = "none"` |
 | перегрузки с разным количеством параметров | по одной привязке для каждой, `name_<n>` |
 
@@ -225,7 +228,7 @@ cancel = "signal"          # an async call gets an AbortSignal
 # import JsError exposing (JsError)
 #
 lookup : String ->{Async; JsError} Option String
-foreign async lookup from "lookup-lib" "lookup"
+foreign lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js
   nullable
@@ -254,7 +257,7 @@ foreign async lookup from "lookup-lib" "lookup"
 # import JsError exposing (JsError)
 #
 lookup : String ->{Async; JsError} Option String
-foreign async lookup from "lookup-lib" "lookup"
+foreign lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js
   nullable

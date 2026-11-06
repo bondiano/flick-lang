@@ -5,11 +5,11 @@ module App.Live exposing (users_live, log_live)
 import App.Users exposing (UserId, NotFound(..), Users, Log)
 
 find_name : UserId ->{Async;} Option String
-foreign async find_name from "./directory.mjs" "findName"
+foreign find_name from "./directory.mjs" "findName"
   nullable
 
 console_log : String ->{} Unit
-foreign sync console_log from global "console.log"
+foreign console_log from global "console.log"
 
 users_live : Layer none none {Users}
 let users_live =

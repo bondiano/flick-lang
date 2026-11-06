@@ -103,7 +103,7 @@ let raised path =
   }
 
 map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
-foreign sync map_effect from "./list.js" "mapEffect"
+foreign map_effect from "./list.js" "mapEffect"
   retention call
 
 partial : Path ->{FileSystem; OpenError} Unit

@@ -15,10 +15,10 @@ eff_units : Eff Unit Unit a -> a
 foreign pure eff_units from "./k.js" "effUnits"
 
 swapped : Unit ->{NotFound; Users} Unit
-foreign sync swapped from "./k.js" "swapped"
+foreign swapped from "./k.js" "swapped"
 
 not_error : Unit ->{; String} Unit
-foreign sync not_error from "./k.js" "notError"
+foreign not_error from "./k.js" "notError"
 
 mixed : (a ->{c; none} b)^c -> Unit
 foreign pure mixed from "./k.js" "mixed"

@@ -4,11 +4,11 @@ module App.Main exposing (main)
 
 /// An async iterable and a readable stream of the values.
 readable : List JsValue ->{} JsValue
-foreign sync readable from "./streams.mjs" "readable"
+foreign readable from "./streams.mjs" "readable"
 
 /// An event target that dispatches `abort` after the milliseconds.
 aborting : Float ->{} JsValue
-foreign sync aborting from global "AbortSignal.timeout"
+foreign aborting from global "AbortSignal.timeout"
 
 js_number : Float -> JsValue
 foreign pure js_number from global "Number"

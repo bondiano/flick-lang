@@ -114,7 +114,7 @@ fn reviewed(provenance: &str, catch: bool) -> String {
         "module Ffi.LookupLib exposing (lookup)\n\n\
          import JsError exposing (JsError)\n\n\
          lookup : String ->{{; JsError}} Option String\n\
-         foreign async lookup from \"lookup-lib\" \"lookup\"\n  arity 1\n{}  nullable\n  reviewed \"{provenance}\"\n",
+         foreign lookup from \"lookup-lib\" \"lookup\"\n  arity 1\n{}  nullable\n  reviewed \"{provenance}\"\n",
         if catch {
             "  catch JsError.from_js\n"
         } else {
@@ -281,7 +281,7 @@ fn identity_binding(
     let reviewed = format!(
         "module Ffi.Reviewed exposing (answer)\n\n\
          answer : Unit ->{{}} Float\n\
-         foreign sync answer from \"{module_specifier}\" \"answer\"\n  arity 0\n  reviewed \"{wrong}\"\n"
+         foreign answer from \"{module_specifier}\" \"answer\"\n  arity 0\n  reviewed \"{wrong}\"\n"
     );
     let reviewed_path = dir.join("src/Ffi/Reviewed.fl");
     fs::write(&reviewed_path, &reviewed).expect("reviewed");

@@ -13,7 +13,7 @@ to_other : JsValue -> Other
 let to_other value = Other "failed"
 
 now : Float ->{} Float
-foreign sync now from global "Date.now"
+foreign now from global "Date.now"
   arity 0
 //~ FLICK-F001 @16:1-17:10 `arity 0` drops the first argument, which must be `()`
 
@@ -23,14 +23,14 @@ foreign pure parse from global "Number.parseFloat"
 //^^^^^^^^^^^^^ FLICK-F001 a `foreign pure` call cannot throw
 
 read : String ->{Async; FsError} String
-foreign async read from "./fs.js" "read"
+foreign read from "./fs.js" "read"
   catch to_other
 //      ^^^^^^^^ FLICK-F003 `catch` makes `Other`
 
 tick : String ->{} Unit
-foreign sync tick from "./tick.js" "tick"
+foreign tick from "./tick.js" "tick"
   cancel signal
-//^^^^^^^^^^^^^ FLICK-F001 `cancel signal` is for `foreign async`
+//^^^^^^^^^^^^^ FLICK-F001 `cancel signal` is for a call whose row has `Async`
 
 first : List String -> String
 foreign pure first from "./first.js" "first"
@@ -39,23 +39,23 @@ foreign pure first from "./first.js" "first"
 
 /// A callback that may hold a scope, kept for who knows how long.
 every : forall c. Float -> (Unit ->{} Unit)^c ->{} Unit
-foreign sync every from global "setInterval"
-//~ FLICK-F002 @42:1-42:45 may hold the capabilities of a scope
+foreign every from global "setInterval"
+//~ FLICK-F002 @42:1-42:40 may hold the capabilities of a scope
 
 keep : forall s. File s ->{} Unit
-foreign sync keep from "./keep.js" "keep"
-//~ FLICK-F002 @46:1-46:42 `File s` may hold the capabilities of a scope
+foreign keep from "./keep.js" "keep"
+//~ FLICK-F002 @46:1-46:37 `File s` may hold the capabilities of a scope
 
 /// A bare callback parameter takes no closure over a scoped value.
 later : (Unit ->{} String) ->{} Unit
-foreign sync later from "./later.js" "later"
+foreign later from "./later.js" "later"
 
 open_file : forall s. String ->{Scope s;} File s
 foreign effect open_file from "./files.js" "open"
   retention call
 
 read_file : forall s. File s ->{} String
-foreign sync read_file from "./files.js" "read"
+foreign read_file from "./files.js" "read"
   retention call
 
 leak : Unit ->{} Unit

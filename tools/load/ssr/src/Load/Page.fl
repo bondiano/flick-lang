@@ -6,7 +6,7 @@ module Load.Page exposing (request, rows, suspended)
 
 /// Counts on the client how often the item's task ran: a hydrated page runs it 0 times.
 mark : Unit ->{} Unit
-foreign sync mark from "./marks.mjs" "mark"
+foreign mark from "./marks.mjs" "mark"
   arity 0
 
 /// The id of the page's request.

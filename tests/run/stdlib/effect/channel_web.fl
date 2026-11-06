@@ -5,29 +5,29 @@ module App.Main exposing (main)
 type error Boom = Boom String
 
 readable : List String ->{} Channel.ReadableStream String
-foreign sync readable from "./channel_js.mjs" "readable"
+foreign readable from "./channel_js.mjs" "readable"
 
 async_iterable : List Float -> String ->{} Channel.AsyncIterable Float String
-foreign sync async_iterable from "./channel_js.mjs" "asyncIterable"
+foreign async_iterable from "./channel_js.mjs" "asyncIterable"
 
 upper : Unit ->{} Channel.TransformStream String String
-foreign sync upper from "./channel_js.mjs" "upper"
+foreign upper from "./channel_js.mjs" "upper"
   arity 0
 
 writable : Unit ->{} Channel.WritableStream String
-foreign sync writable from "./channel_js.mjs" "writable"
+foreign writable from "./channel_js.mjs" "writable"
   arity 0
 
 written : Unit ->{} List String
-foreign sync written from "./channel_js.mjs" "writtenSoFar"
+foreign written from "./channel_js.mjs" "writtenSoFar"
   arity 0
 
 writable_numbers : Unit ->{} Channel.WritableStream Float
-foreign sync writable_numbers from "./channel_js.mjs" "writable"
+foreign writable_numbers from "./channel_js.mjs" "writable"
   arity 0
 
 written_numbers : Unit ->{} List Float
-foreign sync written_numbers from "./channel_js.mjs" "writtenSoFar"
+foreign written_numbers from "./channel_js.mjs" "writtenSoFar"
   arity 0
 
 boom : JsValue -> Boom

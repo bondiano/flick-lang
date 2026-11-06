@@ -220,12 +220,16 @@ In `std` the functions that wait have it: `Effect.sleep`, `Fiber.join`,
 tasks of actions, events, atoms and tests take it, `Test.suite` takes a
 layer that may need it, and the `main` of a runner may have it.
 
+A `foreign` takes no `sync` or `async` word any more: without a mode word
+its signature tells, and a row with `Async` is a promise.
+
 ```sh
 flick check --fix --only E002,F001,T003
 ```
 
-adds `Async` to every `foreign async`, then to the rows that call what
-waits, pass after pass up to `main`, and to the types written with such a
+removes those words and gives the row of each `foreign async` its `Async`,
+then adds `Async` to the rows that call what waits, pass after pass up to
+`main`, and to the types written with such a
 row, as `Cli.Command {Async, File.FileSystem} {AppError}`. It changes
 nothing else. One case needs a hand: a function given rows of both kinds in
 a position no subtyping reaches, as `Channel.Channel none …` given a channel

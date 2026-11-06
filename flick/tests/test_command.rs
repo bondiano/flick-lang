@@ -19,7 +19,7 @@ const SUITE: &str = r#"module Test.Sample exposing (tests)
 type error Boom = Boom String
 
 crash : String ->{} Unit
-foreign sync crash from global "JSON.parse"
+foreign crash from global "JSON.parse"
 
 note : String ->{} Unit
 let note text = Platform.stderr_line text
@@ -278,7 +278,7 @@ fn test_preparation_reports_phases_without_changing_json() {
 const SLOW: &str = r#"module Test.Slow exposing (tests)
 
 sleep : Float ->{} Unit
-foreign async sleep from "./sleep.mjs" "sleep"
+foreign sleep from "./sleep.mjs" "sleep"
 
 tests : List Test.Test
 let tests =

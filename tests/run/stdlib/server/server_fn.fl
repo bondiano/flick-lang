@@ -9,7 +9,7 @@ import Http.ServerResponse exposing (ServerResponse)
 import Server exposing (plugin server)
 
 set_env : String -> String ->{} Unit
-foreign sync set_env from "../cli/env.mjs" "set"
+foreign set_env from "../cli/env.mjs" "set"
   arity 2
 
 type alias Order = { item : String; count : Float }

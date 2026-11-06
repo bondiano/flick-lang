@@ -28,7 +28,7 @@ read : Result Invalid Int ->{Atom.Read;} Int
 let read result = result?
 //~ FLICK-E002 @28:19-28:26 the signature of `read` does not allow error `Invalid`
 
-/// A Promise suspends: the row of its arrow says so.
+/// The mode words of before: the signature tells, `Async` for a promise.
 fetch : String ->{} String
 foreign async fetch from "./fetch.mjs" "fetch"
-//~ FLICK-F001 @33:1-33:47 a `foreign async` gives a Promise, which suspends
+//~ FLICK-F001 @33:1-33:47 `foreign async` is now `foreign`

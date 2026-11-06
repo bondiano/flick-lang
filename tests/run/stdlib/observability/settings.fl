@@ -4,19 +4,19 @@
 module App.Main exposing (main)
 
 start : Unit ->{Async;} Float
-foreign async start from "./receiver.mjs" "start"
+foreign start from "./receiver.mjs" "start"
   arity 0
 
 received : Unit ->{} String
-foreign sync received from "./receiver.mjs" "received"
+foreign received from "./receiver.mjs" "received"
   arity 0
 
 meta : Unit ->{} String
-foreign sync meta from "./receiver.mjs" "meta"
+foreign meta from "./receiver.mjs" "meta"
   arity 0
 
 stop : Unit ->{Async;} Unit
-foreign async stop from "./receiver.mjs" "stop"
+foreign stop from "./receiver.mjs" "stop"
   arity 0
 
 span : List (String, String) -> Tracer.SpanOptions

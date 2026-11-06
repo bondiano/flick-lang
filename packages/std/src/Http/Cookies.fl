@@ -126,7 +126,7 @@ foreign pure get from "@flick-lang/runtime/effect/http/Cookies" "get"
 
 /// The value of the cookie of the name.
 get_value : String -> Cookies ->{} Option (Redacted String)
-foreign sync get_value from "@flick-lang/runtime/effect/http/Cookies" "flickGetValue"
+foreign get_value from "@flick-lang/runtime/effect/http/Cookies" "flickGetValue"
   arity 2
   reviewed "effect@4.1.2 sha256:fa506a7939671456"
 
@@ -163,7 +163,7 @@ foreign pure to_cookie_header from "@flick-lang/runtime/effect/http/Cookies" "to
 
 /// Each cookie's name and value.
 to_record : Cookies ->{} List (String, Redacted String)
-foreign sync to_record from "@flick-lang/runtime/effect/http/Cookies" "flickToRecord"
+foreign to_record from "@flick-lang/runtime/effect/http/Cookies" "flickToRecord"
   reviewed "effect@4.1.2 sha256:6d115ad56694d8bc"
 
 /// The `Set-Cookie` header values of the cookies.
@@ -174,7 +174,7 @@ foreign pure to_set_cookie_headers from "@flick-lang/runtime/effect/http/Cookies
 
 /// The names and values of a `Cookie` header.
 parse_header : String ->{} List (String, Redacted String)
-foreign sync parse_header from "@flick-lang/runtime/effect/http/Cookies" "flickParseHeader"
+foreign parse_header from "@flick-lang/runtime/effect/http/Cookies" "flickParseHeader"
   reviewed "effect@4.1.2 sha256:8580f6aa239d05af"
 
 /// The cookie's name.
@@ -184,7 +184,7 @@ foreign pure name from "@flick-lang/runtime/effect/http/Cookies" "flickName"
 
 /// The cookie's value.
 value : Cookie ->{} Redacted String
-foreign sync value from "@flick-lang/runtime/effect/http/Cookies" "flickValue"
+foreign value from "@flick-lang/runtime/effect/http/Cookies" "flickValue"
   reviewed "effect@4.1.2 sha256:0f91a2590a4c6757"
 
 show_cookie : Cookie -> String

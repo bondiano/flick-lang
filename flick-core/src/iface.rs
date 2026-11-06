@@ -362,7 +362,7 @@ mod tests {
              class Eq a => Collection c a | c -> a =\n  empty : c\n\
              instance Show Shape =\n  show : Shape -> String\n  let show s = \"shape\"\n\
              area : Shape -> Float\nlet area s = 0\n\
-             now : Unit ->{} Float\nforeign sync now from global \"Date.now\"\n\
+             now : Unit ->{} Float\nforeign now from global \"Date.now\"\n\
              type Pair\n\
              service Clock =\n  tick : Unit ->{} Float\n\
              type error NotFound = NotFound String\n\

@@ -157,7 +157,7 @@ double : Float -> Float
 foreign pure double from \"./double.js\" \"double\"
 
 now : Unit -> Float
-foreign sync now from global \"Date.now\"
+foreign now from global \"Date.now\"
 ";
     let f = fixture_of(&[("src/App/Main.fl", text)]);
     let tokens = f.ide().semantic_tokens(f.file("App.Main"));
@@ -169,7 +169,7 @@ foreign sync now from global \"Date.now\"
             .map(|t| TOKEN_TYPES[t.2 as usize])
     };
     assert_eq!(kind_at("pure"), Some("keyword"));
-    assert_eq!(kind_at("sync"), Some("keyword"));
+    assert_eq!(kind_at("now from"), Some("function"));
     assert_eq!(kind_at("global"), Some("keyword"));
     assert_eq!(kind_at("double from"), Some("function"));
 }

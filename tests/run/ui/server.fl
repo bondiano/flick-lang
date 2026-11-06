@@ -3,7 +3,7 @@
 module App.Main exposing (main)
 
 settle : Unit ->{Async;} Unit
-foreign async settle from "./dom.mjs" "settle"
+foreign settle from "./dom.mjs" "settle"
   arity 0
 
 count : Atom.Writable Float

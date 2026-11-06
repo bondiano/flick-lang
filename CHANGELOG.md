@@ -8,10 +8,13 @@ break programs.
 
 - **Effects:** what may suspend says so with the built-in effect `Async`,
   which the scheduler handles at the root; a row without it runs at once.
-  `foreign async` needs it (`FLICK-F001`), and in `std` the functions that
-  wait have it: `Effect.sleep`, `Fiber.join`, queues, `Database`,
+  In `std` the functions that wait have it: `Effect.sleep`, `Fiber.join`, queues, `Database`,
   `FileSystem`, `Http.Client`, the servers. `main`, the tasks of actions,
   events, atoms and tests may have it.
+- **FFI:** a `foreign` names its mode only for `pure` and `effect`; without
+  a word its signature tells, a call of the host, a promise when its row
+  has `Async`. `foreign sync` and `foreign async` are `FLICK-F001`, whose
+  fix removes the word and gives a promise's row its `Async`.
 - **Types:** a layer that needs less fits where one that needs more is
   expected, as an `Eff` does.
 - **Fixes:** `FLICK-E002` adds what a row lacks where it is written: the

@@ -9,11 +9,11 @@ import Http.ServerResponse exposing (ServerResponse)
 import Server exposing (plugin server)
 
 ran : Unit ->{} Unit
-foreign sync ran from "./auth.mjs" "ran"
+foreign ran from "./auth.mjs" "ran"
   arity 0
 
 runs : Unit ->{} Float
-foreign sync runs from "./auth.mjs" "runs_"
+foreign runs from "./auth.mjs" "runs_"
   arity 0
 
 /// Who calls.

@@ -98,7 +98,7 @@ let handlers = {
 }
 
 get_raw : String ->{Async;} String
-foreign async get_raw from "./raw.mjs" "get"
+foreign get_raw from "./raw.mjs" "get"
 
 /// A request of `endpoint` with `authorization`.
 ask :

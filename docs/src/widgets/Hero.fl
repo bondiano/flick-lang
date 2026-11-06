@@ -22,22 +22,22 @@ type alias Execution = {
 }
 
 is_russian : Unit ->{} Bool
-foreign sync is_russian from "./browser.ts" "isRussian"
+foreign is_russian from "./browser.ts" "isRussian"
   arity 0
 
 execute : String ->{Async; JsError} Execution
-foreign async execute from "./hero-browser.ts" "runDemo"
+foreign execute from "./hero-browser.ts" "runDemo"
   arity 1
   cancel signal
   catch JsError.from_js
 
 copy_text : String ->{Async; JsError} Unit
-foreign async copy_text from "./browser.ts" "copyText"
+foreign copy_text from "./browser.ts" "copyText"
   arity 1
   catch JsError.from_js
 
 notify : String ->{} Unit
-foreign sync notify from "../playground/dom.ts" "notify"
+foreign notify from "../playground/dom.ts" "notify"
   arity 1
 
 source : String

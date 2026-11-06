@@ -6,7 +6,7 @@ use std::collections::{HashMap, VecDeque};
 use super::{Decl, Namespace};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
-use crate::syntax::cst::{Node, Token};
+use crate::syntax::cst::{Node, Token, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal::string_value;
 
@@ -135,9 +135,9 @@ fn foreign(
     text: &str,
     def: impl Fn(Namespace, Token, Option<&str>, Decl) -> Def,
 ) -> Option<Def> {
-    let mut words = decl.child_tokens().filter(|t| t.kind == K::Ident);
-    let blocked = words.next().is_some_and(|m| m.text(text) == "blocked");
-    let def = def(Namespace::Value, words.next()?, None, Decl::Foreign);
+    let (mode, name) = foreign_words(decl);
+    let blocked = mode.is_some_and(|m| m.text(text) == "blocked");
+    let def = def(Namespace::Value, name?, None, Decl::Foreign);
     if !blocked {
         return Some(def);
     }

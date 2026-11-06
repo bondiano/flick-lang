@@ -22,7 +22,7 @@ use super::kinds::Kind;
 use super::ty::{Stage, Type};
 use super::typing::{ForeignInfo, range};
 use crate::diagnostics::codes;
-use crate::ir::Copies;
+use crate::ir::{Copies, ForeignMode};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -41,11 +41,6 @@ impl Checker<'_> {
     /// Checks the metadata of the foreign declaration `decl` of type
     /// `scheme` and records its calling convention.
     pub fn foreign_info(&mut self, decl: &Node, scheme: &Type) {
-        let mode = decl
-            .child_tokens()
-            .find(|t| t.kind == K::Ident)
-            .map(|t| t.text(self.text).to_owned())
-            .unwrap_or_default();
         let (binders, constraints, body) = match scheme {
             Type::Forall {
                 vars,
@@ -62,9 +57,7 @@ impl Checker<'_> {
                 "a foreign function returns an Effect, so its arrows cannot be Sync (`->{Atom.Read;}`): define the Sync function in Flick around a foreign",
             );
         }
-        if mode == "async" {
-            self.async_needs_async(decl, &body);
-        }
+        let mode = self.foreign_mode(decl, &body);
         let stages: Vec<bool> = stages.iter().map(|&s| s != Stage::Pure).collect();
         let dicts = match scheme {
             Type::Forall { constraints, .. } => constraints
@@ -78,7 +71,8 @@ impl Checker<'_> {
             dicts,
             ..ForeignInfo::default()
         };
-        let retention = self.read_meta(decl, &mode, &body, &mut info);
+        info.mode = mode;
+        let retention = self.read_meta(decl, mode, &body, &mut info);
         let arity = info.js_arity();
         let span = self.span(decl);
         self.check_meta(&info, &params, &body, span);
@@ -123,7 +117,7 @@ impl Checker<'_> {
     fn read_meta(
         &mut self,
         decl: &Node,
-        mode: &str,
+        mode: ForeignMode,
         body: &Type,
         info: &mut ForeignInfo,
     ) -> Option<Retention> {
@@ -161,8 +155,8 @@ impl Checker<'_> {
                     None => self.bad_meta(item, "`optional` takes the position of an `Option` argument, from 0"),
                 },
                 "cancel" => match word(0).as_deref() {
-                    Some("signal") if mode == "async" => info.adapter.cancel = true,
-                    Some("signal") => self.bad_meta(item, "`cancel signal` is for `foreign async`: only a promise can be aborted"),
+                    Some("signal") if mode == ForeignMode::Async => info.adapter.cancel = true,
+                    Some("signal") => self.bad_meta(item, "`cancel signal` is for a call whose row has `Async`: only a promise can be aborted"),
                     _ => self.bad_meta(item, "write `cancel signal`"),
                 },
                 "retention" => match word(0).as_deref() {
@@ -171,7 +165,7 @@ impl Checker<'_> {
                     _ => self.bad_meta(item, "write `retention call` or `retention owner`"),
                 },
                 "catch" => match args.first() {
-                    Some(mapping) if mode != "pure" => {
+                    Some(mapping) if mode != ForeignMode::Pure => {
                         self.catch_mapping(mapping, body);
                         info.catch = Some(mapping.range());
                     }

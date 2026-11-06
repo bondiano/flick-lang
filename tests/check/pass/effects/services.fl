@@ -28,7 +28,7 @@ users_live : Layer {Config} {ConnectError} {Users}
 foreign pure users_live from "./users.js" "usersLive"
 
 js_now : Unit ->{} Float
-foreign sync js_now from "./clock.js" "now"
+foreign js_now from "./clock.js" "now"
 
 clock_impl : Ticker.Impl
 let clock_impl = { now = js_now }

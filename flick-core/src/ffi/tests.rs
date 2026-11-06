@@ -153,20 +153,20 @@ const REVIEWED: &str = r#"module Ffi.LookupLib exposing (lookup)
 
 import JsError exposing (JsError)
 
-lookup : String ->{; JsError} Option String
-foreign async lookup from "lookup-lib" "lookup"
+lookup : String ->{Async; JsError} Option String
+foreign lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js
   reviewed "lookup-lib@0.9.0 sha256:aa"
 
 each : List Float -> (Float -> Unit) ->{} Unit
-foreign sync each from "lookup-lib" "each"
+foreign each from "lookup-lib" "each"
   arity 2
   retention call
   reviewed "lookup-lib@1.0.0 sha256:old"
 
 gone : Unit ->{} Unit
-foreign sync gone from "lookup-lib" "gone"
+foreign gone from "lookup-lib" "gone"
   arity 0
   reviewed "lookup-lib@1.0.0 sha256:zz"
 "#;
