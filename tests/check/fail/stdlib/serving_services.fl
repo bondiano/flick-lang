@@ -11,7 +11,7 @@ let ping = HttpApi.endpoint HttpApi.Get "/ping" (Record.label : Record.Label "pi
 total : Rpc.Rpc "total" (Unit ->{r;} Unit)
 let total = Rpc.make (Record.label : Record.Label "total")
 
-http : Unit ->{; HttpApi.ServeError} Unit
+http : Unit ->{Async; HttpApi.ServeError} Unit
 let http () =
   let options : HttpApi.ServeOptions =
     { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
@@ -24,7 +24,7 @@ let http () =
     ()
   }
 
-rpc : Unit ->{; Rpc.ServeError} Unit
+rpc : Unit ->{Async; Rpc.ServeError} Unit
 let rpc () =
   scope s {
     let _server =

@@ -1,6 +1,6 @@
 ---
 title: "Регионы и захваты"
-source_hash: d332743db2f9e5b7
+source_hash: 5e37f1019258fec8
 ---
 
 `scope` освобождает полученные ресурсы, когда его тело завершается.
@@ -16,7 +16,7 @@ source_hash: d332743db2f9e5b7
 ```flick
 # import File exposing (Path, FileSystem, OpenError, ReadError)
 #
-read_config : Path ->{FileSystem; OpenError, ReadError} String
+read_config : Path ->{Async, FileSystem; OpenError, ReadError} String
 let read_config path =
   scope {
     let file = File.open_scoped path
@@ -36,7 +36,7 @@ let read_config path =
 ```flick
 # import File exposing (File, Path, FileSystem, OpenError)
 #
-open_two : forall s. Path ->{FileSystem, Scope s; OpenError} (File s, File s)
+open_two : forall s. Path ->{Async, FileSystem, Scope s; OpenError} (File s, File s)
 let open_two path =
   (File.open_scoped path, File.open_scoped path)
 ```
@@ -56,9 +56,9 @@ let open_two path =
 ```flick
 # import File exposing (File, Path, FileSystem, OpenError)
 #
-keep : forall s. Path ->{FileSystem, Scope s; OpenError} File s
+keep : forall s. Path ->{Async, FileSystem, Scope s; OpenError} File s
 let keep path =
-  acquire : Unit ->{FileSystem, Scope s; OpenError} File s
+  acquire : Unit ->{Async, FileSystem, Scope s; OpenError} File s
   let acquire () = File.open_scoped path
   scope {
     let local = File.open_scoped path
@@ -98,7 +98,7 @@ let keep path =
 ```flick
 # import File exposing (File, FileSystem, ReadError)
 #
-read_later : forall s. File s -> (Eff {FileSystem} {ReadError} String)^{s}
+read_later : forall s. File s -> (Eff {Async, FileSystem} {ReadError} String)^{s}
 let read_later file =
   task { File.read_all file }
 ```

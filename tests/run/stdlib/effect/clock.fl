@@ -9,7 +9,7 @@ let later clock millis nanos mono =
     && Clock.nanos_of clock >= nanos
     && Clock.monotonic_nanos_of clock >= mono
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let millis = Clock.current_time_millis ()
   let nanos = Clock.current_time_nanos ()

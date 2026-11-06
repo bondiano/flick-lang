@@ -23,7 +23,7 @@ The source of an expected error is `raise`; the source of a defect is `todo`.
 | Regions, captures `T^c`, `scope`, `NoCapture` | `regions.md` | Core types are checker types with the `Captured`/`Bounded` qualifiers erased. `close_over`, `value_bound` and `hold` take no part in the rules |
 | Classes, dictionaries, `do`, `for`, `?` | `elaboration.md` | The core receives a program with dictionaries already inserted; schemes carry no constraints |
 | Fibers, `parallel`, `race`, `spawn`, Cause, interruption, layer memoization | `runtime.md` (λRT) | The core has one thread of execution; the "interrupted" outcome appears only in λRT |
-| The Sync stage `->{Atom.Read;}` | — | For typing this is the runtime arrow `R⟨{Atom.Read}; none⟩`. Sync is a way of compiling such an arrow, not a separate kind of stage |
+| The Sync stage | — | For typing this is the runtime arrow `R⟨ρ; ε⟩` with `ρ` a closed row of effects of `tail` and `abort` operations. Sync is a way of compiling such an arrow, not a separate kind of stage; what may suspend has the effect `Async` in `ρ` |
 | Nested `∀` in a parameter (higher rank) | later | The core is predicative and rank 1. The generalization rule applies there too: checking against `∀` is done by a single branch of `check_value` (see [an annotation with `forall`](#an-annotation-with-forall-bypasses-let-sig)) |
 | `foreign` | hypothesis G1 (§4) | Bindings enter Γ₀ with their declared types |
 
@@ -715,7 +715,7 @@ Hypotheses:
 
   What else at the TypeScript boundary rests on this hypothesis is listed in `ts-holes.md` §3.
 - **G2 (code generation).** The generated JS and Go implement the steps of §3, and the `Lift` node in them is the identity of the model. This is checked by differential tests, not by proof.
-- **G3 (runner).** `Σ₀` covers `r₀`.
+- **G3 (runner).** `Σ₀` covers `r₀`; `Async ∈ dom Σ₀`, which the scheduler handles.
 
 Lemmas:
 

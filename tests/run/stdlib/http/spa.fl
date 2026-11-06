@@ -24,14 +24,14 @@ origin : String
 let origin = "http://localhost:5173"
 
 /// The status and body of a GET of `url`.
-fetch : String ->{Http.Client.HttpClient; Http.ClientError.HttpClientError} String
+fetch : String ->{Async, Http.Client.HttpClient; Http.ClientError.HttpClientError} String
 let fetch url =
   let response = Http.Client.get url
   show (Http.ClientResponse.status response) ++ " " ++ Http.ClientResponse.text response
 
 /// The status and body of a page a browser asks for: a path of no file
 /// answers with the index only for a request that accepts HTML.
-page : String ->{Http.Client.HttpClient; Http.ClientError.HttpClientError} String
+page : String ->{Async, Http.Client.HttpClient; Http.ClientError.HttpClientError} String
 let page url =
   let response =
     Http.Client.execute (Http.ClientRequest.accept "text/html" (Http.ClientRequest.get url))
@@ -39,7 +39,7 @@ let page url =
 
 /// The CORS header of a request from the dev server's origin.
 allowed :
-  Http.ClientRequest.ClientRequest ->{Http.Client.HttpClient; Http.ClientError.HttpClientError}
+  Http.ClientRequest.ClientRequest ->{Async, Http.Client.HttpClient; Http.ClientError.HttpClientError}
   String
 let allowed request =
   let response = Http.Client.execute (Http.ClientRequest.set_header "origin" origin request)
@@ -49,7 +49,7 @@ let allowed request =
       "-"
       (Http.Headers.get "access-control-allow-origin" (Http.ClientResponse.headers response))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide (Layer.merge
   Http.FetchClient.layer
   (Layer.merge Http.Server.layer_services FileSystem.node)) {
@@ -57,7 +57,7 @@ let main () = provide (Layer.merge
     scope {
       let dir =
         FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-spa" }
-      write : String -> String ->{FileSystem.FileSystem; PlatformError.PlatformError} Unit
+      write : String -> String ->{Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
       let write = FileSystem.write_file_string { flag = None; mode = None }
       write (dir ++ "/index.html") "<div id=\"app\"></div>"
       write (dir ++ "/app.js") "run()"

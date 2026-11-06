@@ -29,7 +29,7 @@ let refs () = scope {
   )
 }
 
-resources : Unit ->{} String
+resources : Unit ->{Async;} String
 let resources () = scope s {
   let res : Resource.Resource s none Raw = Resource.manual (task { conn "a" })
   Resource.refresh res
@@ -59,5 +59,5 @@ let direct () = scope {
 listen_on :
   forall c s r hs.
   (Fiber.Outlives c s, Fiber.Provided r s) =>
-  Rpc.ServeOptions -> Rpc.Group r hs -> hs^c ->{Scope s | r; Rpc.ServeError} Rpc.Server s
+  Rpc.ServeOptions -> Rpc.Group r hs -> hs^c ->{Async, Scope s | r; Rpc.ServeError} Rpc.Server s
 let listen_on options group handlers = Rpc.listen options group handlers

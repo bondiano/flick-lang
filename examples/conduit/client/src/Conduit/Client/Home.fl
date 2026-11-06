@@ -23,7 +23,7 @@ type Feed = Feed (Option String) Listing Int
 listing_of :
   Option String ->
   Option String ->
-  Option Float ->{; HttpApi.ClientError, Unauthorized}
+  Option Float ->{Async; HttpApi.ClientError, Unauthorized}
   ArticlesBody
 let listing_of jwt tag offset =
   let query = { tag = tag; author = None; favorited = None; limit = Some 10; offset = offset }
@@ -32,7 +32,7 @@ let listing_of jwt tag offset =
     Api.Articles.endpoints.list_articles
 
 /// The articles of a feed.
-load : Feed -> Eff none {HttpApi.ClientError, Unauthorized} ArticlesBody
+load : Feed -> Eff {Async} {HttpApi.ClientError, Unauthorized} ArticlesBody
 let load feed = task {
   match feed with
   | Feed jwt listing number ->

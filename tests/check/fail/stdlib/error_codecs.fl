@@ -12,7 +12,7 @@ type error Conflict = Conflict { id : Float }
 lookup : Float ->{; NotFound, Conflict} Float
 let lookup id = if id < 0 then from_result (Err (Conflict { id = id })) else id
 
-http : Unit ->{; HttpApi.ServeError} Unit
+http : Unit ->{Async; HttpApi.ServeError} Unit
 let http () =
   let options : HttpApi.ServeOptions =
     { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
@@ -28,7 +28,7 @@ let http () =
     ()
   }
 
-rpc : Unit ->{; Rpc.ServeError} Unit
+rpc : Unit ->{Async; Rpc.ServeError} Unit
 let rpc () =
   let find =
     Rpc.make (Record.label : Record.Label "find")
@@ -40,7 +40,7 @@ let rpc () =
   }
 
 // no case at all: the handler may fail with nothing
-bare : Unit ->{; Rpc.ServeError} Unit
+bare : Unit ->{Async; Rpc.ServeError} Unit
 let bare () =
   let find = Rpc.make (Record.label : Record.Label "find")
   scope s {

@@ -138,18 +138,18 @@ let total f = sql {
 }
 
 /// A page of the articles the filter keeps, newest first, and their number.
-page : Option BigInt -> Filter -> { limit : Int; offset : Int } ->{Database;} (List Row, Int)
+page : Option BigInt -> Filter -> { limit : Int; offset : Int } ->{Async, Database;} (List Row, Int)
 let page reader f at =
   let found = Db.rows (rows reader f at.limit at.offset)
   let n = Option.map (fun row -> row.n) (Db.first (total f)) |> Option.with_default 0n
   (found, Int.truncate (BigInt.to_number n))
 
 /// The article of `slug`, as `reader` sees it.
-find : Option BigInt -> String ->{Database;} Option Row
+find : Option BigInt -> String ->{Async, Database;} Option Row
 let find reader slug = Db.first (rows reader { everything with slug = Some slug } 1 0)
 
 /// The tags of an article, in the order its author gave them.
-tags_of : BigInt ->{Database;} List String
+tags_of : BigInt ->{Async, Database;} List String
 let tags_of id =
   List.map
     (fun row -> row.name)
@@ -163,7 +163,7 @@ let tags_of id =
       }))
 
 /// The tags in use, the most used first.
-all_tags : Unit ->{Database;} List String
+all_tags : Unit ->{Async, Database;} List String
 let all_tags () =
   List.map
     (fun row -> row.name)
@@ -177,7 +177,7 @@ let all_tags () =
       }))
 
 /// The id of the tag `name`, made if there is none.
-tag_id : String ->{Database;} BigInt
+tag_id : String ->{Async, Database;} BigInt
 let tag_id name =
   let existing =
     Db.first
@@ -197,7 +197,7 @@ let tag_id name =
       })
 
 /// Replaces the tags of the article, in their order.
-set_tags : BigInt -> List String ->{Database;} Unit
+set_tags : BigInt -> List String ->{Async, Database;} Unit
 let set_tags article names =
   Db.run
     (sql {
@@ -216,7 +216,7 @@ let set_tags article names =
     (List.map_indexed (fun i name -> (i, name)) names)
 
 /// Stores a new article: its id.
-insert : BigInt -> String -> Fields -> String ->{Database;} BigInt
+insert : BigInt -> String -> Fields -> String ->{Async, Database;} BigInt
 let insert author slug fields now =
   Db.insert_id
     (sql {
@@ -234,7 +234,7 @@ let insert author slug fields now =
     })
 
 /// Stores the new fields of an article and when they changed.
-save : BigInt -> Fields -> String ->{Database;} Unit
+save : BigInt -> Fields -> String ->{Async, Database;} Unit
 let save id fields now =
   Db.run
     (sql {
@@ -249,7 +249,7 @@ let save id fields now =
     })
 
 /// Deletes an article, its tags, favorites and comments.
-delete : BigInt ->{Database;} Unit
+delete : BigInt ->{Async, Database;} Unit
 let delete id =
   Db.run
     (sql {
@@ -258,7 +258,7 @@ let delete id =
     })
 
 /// The user favors the article; twice is once.
-favorite : BigInt -> BigInt ->{Database;} Unit
+favorite : BigInt -> BigInt ->{Async, Database;} Unit
 let favorite user article =
   Db.run_once
     (sql {
@@ -267,7 +267,7 @@ let favorite user article =
     })
 
 /// The user takes their favorite back.
-unfavorite : BigInt -> BigInt ->{Database;} Unit
+unfavorite : BigInt -> BigInt ->{Async, Database;} Unit
 let unfavorite user article =
   Db.run
     (sql {

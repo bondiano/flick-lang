@@ -104,7 +104,7 @@ foreign async get_raw from "./raw.mjs" "get"
 ask :
   String ->
   Option String ->
-  HttpApi.Endpoint l (Request ->{Session; Unauthorized} String) ->{}
+  HttpApi.Endpoint l (Request ->{Session; Unauthorized} String) ->{Async;}
   String
 let ask base authorization endpoint =
   let request = { path = (); query = (); headers = { authorization = authorization }; payload = () }

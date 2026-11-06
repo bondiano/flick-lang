@@ -17,7 +17,7 @@ type error QuitError
 service Terminal =
   columns : Unit ->{} Int
   rows : Unit ->{} Int
-  read_line : Unit ->{; QuitError} String
+  read_line : Unit ->{Async; QuitError} String
   display : String ->{; PlatformError.PlatformError} Unit
 
 /// The width of the terminal in characters; 0 when stdout is not one.
@@ -29,7 +29,7 @@ rows : Unit ->{Terminal;} Int
 let rows () = Terminal.rows ()
 
 /// The next line of input.
-read_line : Unit ->{Terminal; QuitError} String
+read_line : Unit ->{Async, Terminal; QuitError} String
 let read_line () = Terminal.read_line ()
 
 /// Writes the text to the terminal as it is.

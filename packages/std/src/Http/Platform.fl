@@ -27,13 +27,13 @@ let file_options = {
 /// The operations of Effect's `HttpPlatform`.
 service HttpPlatform =
   file_response :
-    FileOptions -> String ->{; PlatformError.PlatformError} Http.ServerResponse.ServerResponse
+    FileOptions -> String ->{Async; PlatformError.PlatformError} Http.ServerResponse.ServerResponse
 
 /// A response of the file at the path, its content type from its extension
 /// and an `ETag` of its size and modification time.
 file :
   FileOptions ->
-  String ->{HttpPlatform; PlatformError.PlatformError}
+  String ->{Async, HttpPlatform; PlatformError.PlatformError}
   Http.ServerResponse.ServerResponse
 let file options path = HttpPlatform.file_response options path
 

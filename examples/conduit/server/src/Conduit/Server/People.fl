@@ -14,7 +14,7 @@ type alias Account = Users
 type alias NewAccount = { username : String; email : String; password_hash : String }
 
 /// The user of an id.
-by_id : BigInt ->{Database;} Option Account
+by_id : BigInt ->{Async, Database;} Option Account
 let by_id id =
   Db.first
     (sql {
@@ -24,7 +24,7 @@ let by_id id =
     })
 
 /// The user of an email.
-by_email : String ->{Database;} Option Account
+by_email : String ->{Async, Database;} Option Account
 let by_email email =
   Db.first
     (sql {
@@ -34,7 +34,7 @@ let by_email email =
     })
 
 /// The user of a name.
-by_username : String ->{Database;} Option Account
+by_username : String ->{Async, Database;} Option Account
 let by_username username =
   Db.first
     (sql {
@@ -52,7 +52,7 @@ let other except found =
 
 /// The fields among `username` and `email` another user than `except`
 /// already has.
-taken : Option BigInt -> Option String -> Option String ->{Database;} List String
+taken : Option BigInt -> Option String -> Option String ->{Async, Database;} List String
 let taken except username email =
   let name =
     match username with
@@ -66,7 +66,7 @@ let taken except username email =
     ++ (if other except address then ["email"] else [])
 
 /// Stores a new user: their id.
-insert : NewAccount ->{Database;} BigInt
+insert : NewAccount ->{Async, Database;} BigInt
 let insert account =
   Db.insert_id
     (sql {
@@ -80,7 +80,7 @@ let insert account =
     })
 
 /// Stores every field of `account`.
-save : Account ->{Database;} Unit
+save : Account ->{Async, Database;} Unit
 let save account =
   Db.run
     (sql {
@@ -96,7 +96,7 @@ let save account =
     })
 
 /// Whether `reader`, if anyone, follows `author`.
-follows : Option BigInt -> BigInt ->{Database;} Bool
+follows : Option BigInt -> BigInt ->{Async, Database;} Bool
 let follows reader author =
   let found =
     Db.first
@@ -108,7 +108,7 @@ let follows reader author =
   Option.map (fun row -> row.n > 0n) found |> Option.with_default false
 
 /// The reader follows the author; twice is once.
-follow : BigInt -> BigInt ->{Database;} Unit
+follow : BigInt -> BigInt ->{Async, Database;} Unit
 let follow reader author =
   Db.run_once
     (sql {
@@ -117,7 +117,7 @@ let follow reader author =
     })
 
 /// The reader stops following the author.
-unfollow : BigInt -> BigInt ->{Database;} Unit
+unfollow : BigInt -> BigInt ->{Async, Database;} Unit
 let unfollow reader author =
   Db.run
     (sql {

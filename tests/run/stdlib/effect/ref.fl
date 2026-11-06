@@ -22,7 +22,7 @@ let cells () =
   let g = Ref.update_some_and_get cell (less 2)
   [show (a, b, c, d), e, show (f, Ref.get cell, g)]
 
-synchronized : Unit ->{; Refused} List String
+synchronized : Unit ->{Async; Refused} List String
 let synchronized () =
   let ref = SynchronizedRef.make 1
   let a = SynchronizedRef.get_and_set 2 ref
@@ -52,7 +52,7 @@ let synchronized () =
     | Refused n -> "refused at " ++ show n
   // updates that sleep run one after another: neither loses the other's
   let slow = SynchronizedRef.make []
-  add : Float -> Eff none none Unit
+  add : Float -> Eff {Async} none Unit
   let add x = task {
     SynchronizedRef.update_effect
       (fun xs ->
@@ -70,7 +70,7 @@ let synchronized () =
     "serialized: " ++ show (List.length (SynchronizedRef.get slow)),
   ]
 
-subscription : Unit ->{} List String
+subscription : Unit ->{Async;} List String
 let subscription () =
   let ref = SubscriptionRef.make "a"
   let a = SubscriptionRef.get_and_set "b" ref
@@ -94,7 +94,7 @@ let subscription () =
   let n = SubscriptionRef.update_some_and_get_effect (fun _ -> None) ref
   [show (a, b, c, d, e), show (f, g, h, i, j), show (k, l, m, n), SubscriptionRef.get ref]
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   List.each_effect Platform.stdout_line (cells ())
   let lines =

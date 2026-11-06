@@ -4,7 +4,7 @@
 module Runner.Browser exposing (Main, run)
 
 /// What `main` of an entry is.
-type alias Main = Unit ->{; AppError} Unit
+type alias Main = Unit ->{Async; AppError} Unit
 
 /// Starts `main`; the runner of the entry exports what it returns.
 run : Main -> Unknown

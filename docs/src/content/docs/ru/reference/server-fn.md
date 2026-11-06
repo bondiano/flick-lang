@@ -1,6 +1,6 @@
 ---
 title: "Серверные функции"
-source_hash: 9043754a2155d926
+source_hash: bdd42d3a26791693
 ---
 
 `server fn` — функция, которая выполняется на сервере и которую любой код,
@@ -73,7 +73,7 @@ place : Order ->{; Rpc.ClientError, OutOfStock} String
 # import App.Db
 # import App.Shop
 #
-serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db;} (ServerRequest ->{} ServerResponse)^{s}
+serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db;} (ServerRequest ->{Async;} ServerResponse)^{s}
 let serve () = Server.handler [server App.Shop.place]
 ```
 
@@ -136,7 +136,7 @@ let check headers =
 #
 # let example = task {
 #   scope s {
-# functions : (ServerRequest ->{} ServerResponse)^{s}
+# functions : (ServerRequest ->{Async;} ServerResponse)^{s}
 let functions =
   Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
 # ()

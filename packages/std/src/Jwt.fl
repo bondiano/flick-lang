@@ -37,11 +37,12 @@ let expiry_json =
 signed_header : String
 let signed_header = Bytes.to_base64url (Bytes.from_string "{\"alg\":\"HS256\",\"typ\":\"JWT\"}")
 
-signature : List Int -> String ->{Crypto.Crypto; Crypto.CryptoError} List Int
+signature : List Int -> String ->{Async, Crypto.Crypto; Crypto.CryptoError} List Int
 let signature secret input = Crypto.hmac Crypto.Sha256 secret (Bytes.from_string input)
 
 /// The token of the claims, signed with the secret.
-sign : PureCodec Json c -> List Int -> c ->{Crypto.Crypto; Crypto.CryptoError, SchemaError} String
+sign :
+  PureCodec Json c -> List Int -> c ->{Async, Crypto.Crypto; Crypto.CryptoError, SchemaError} String
 let sign wire secret claims =
   let payload =
     Bytes.to_base64url
@@ -62,7 +63,8 @@ let refuse problem = from_result (Err (JwtError problem))
 /// The claims of a token signed with the secret: its header names `HS256`,
 /// its signature matches (compared in constant time), and its `exp`, when it
 /// has one, is still ahead of the clock.
-verify : PureCodec Json c -> List Int -> String ->{Crypto.Crypto; Crypto.CryptoError, JwtError} c
+verify :
+  PureCodec Json c -> List Int -> String ->{Async, Crypto.Crypto; Crypto.CryptoError, JwtError} c
 let verify wire secret token =
   match String.split "." token with
   | [header, payload, signed] ->

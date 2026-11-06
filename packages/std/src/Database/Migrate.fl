@@ -59,7 +59,7 @@ let rec out_of_order steps =
     if second.version <= first.version then Some second else out_of_order ([second] ++ rest)
   | _ -> None
 
-apply : Migration ->{Database; EncodeError, DbError} Int
+apply : Migration ->{Async, Database; EncodeError, DbError} Int
 let apply step =
   List.each_effect (fun text -> ignore (Database.execute (statement text))) step.statements
   ignore (Database.execute (record step))
@@ -67,7 +67,7 @@ let apply step =
 
 /// Applies the steps above the latest version the database records, in
 /// order, and gives their versions: none when the schema is current.
-run : List Migration ->{Database; MigrationError, EncodeError, DbError, DecodeError} List Int
+run : List Migration ->{Async, Database; MigrationError, EncodeError, DbError, DecodeError} List Int
 let run steps =
   match out_of_order steps with
   | Some step ->

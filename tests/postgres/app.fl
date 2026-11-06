@@ -71,13 +71,14 @@ let balances_of = sql params {
 }
 
 /// Binding is pure; `Database.query` encodes, runs and decodes.
-load_balances : UserId ->{Database; EncodeError, DbError, DecodeError} List BalanceRow
+load_balances : UserId ->{Async, Database; EncodeError, DbError, DecodeError} List BalanceRow
 let load_balances user_id =
   let query = Sql.bind balances_of { user_id = user_id }
   Database.query query
 
 /// The same call kept for later as an `Eff` value.
-deferred_balances : UserId -> Eff {Database} {EncodeError, DbError, DecodeError} (List BalanceRow)
+deferred_balances :
+  UserId -> Eff {Async, Database} {EncodeError, DbError, DecodeError} (List BalanceRow)
 let deferred_balances user_id = task { load_balances user_id }
 
 totals : Sql.Template Pg {} { name : String; accounts : BigInt; total : Option BigDecimal }
@@ -197,14 +198,15 @@ let drift = sql {
 }
 
 /// The one row a query returns, or `fallback`.
-one : forall p r. (Sql.Template Pg p r, p, r) ->{Database; EncodeError, DbError, DecodeError} r
+one :
+  forall p r. (Sql.Template Pg p r, p, r) ->{Async, Database; EncodeError, DbError, DecodeError} r
 let one (template, params, fallback) =
   match Database.query (Sql.bind template params) with
   | [row] -> row
   | _ -> fallback
 
 /// Runs the queries; returns an account that stays open.
-run : Unit ->{Database; EncodeError, DbError, DecodeError} BigInt
+run : Unit ->{Async, Database; EncodeError, DbError, DecodeError} BigInt
 let run () =
   let ada =
     (one (add_user, { name = "Ada"; email = Some "ada@example.org" }, { id = UserId 0n })).id
@@ -237,13 +239,13 @@ let run () =
   Platform.stdout_line (show (Database.query (Sql.bind having { role = Admin })))
   kept
 
-refused : BigInt ->{Database; EncodeError, DbError, DecodeError} String
+refused : BigInt ->{Async, Database; EncodeError, DbError, DecodeError} String
 let refused account =
   let negative = BigDecimal.from_integer (-100n)
   try show (Database.query (Sql.bind deposit { account = account; amount = negative })) with
   | DbError e -> "DbError " ++ e.code ++ " " ++ show e.constraint
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   match Platform.env "DATABASE_URL" with
   | None -> App.fail "DATABASE_URL is not set"

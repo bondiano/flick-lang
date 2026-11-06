@@ -25,13 +25,13 @@ is_russian : Unit ->{} Bool
 foreign sync is_russian from "./browser.ts" "isRussian"
   arity 0
 
-execute : String ->{; JsError} Execution
+execute : String ->{Async; JsError} Execution
 foreign async execute from "./hero-browser.ts" "runDemo"
   arity 1
   cancel signal
   catch JsError.from_js
 
-copy_text : String ->{; JsError} Unit
+copy_text : String ->{Async; JsError} Unit
 foreign async copy_text from "./browser.ts" "copyText"
   arity 1
   catch JsError.from_js
@@ -89,7 +89,7 @@ let snippet effect = ui {
     )
 }
 
-run_example : Atom.Writable Model ->{Atom.Write;} Unit
+run_example : Atom.Writable Model ->{Async, Atom.Write;} Unit
 let run_example model =
   let m = Atom.current model
   Atom.set model { m with running = true; failed = false; output = "" }

@@ -18,7 +18,7 @@ let counts lock = (
 permits : TxSemaphore.TxSemaphore ->{} Int
 let permits sem = Tx.atomically (task { TxSemaphore.available sem })
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let lock = TxReentrantLock.make ()
   let reads =

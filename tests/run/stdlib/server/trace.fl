@@ -52,7 +52,7 @@ priced : Atom.Atom (Atom.Async Float {Rpc.ClientError})
 let priced = Atom.task (task { price "jam" })
 
 /// The page: the stock of tea, asked of the server function, and the price.
-page : ServerRequest ->{Server.Server;} ServerResponse
+page : ServerRequest ->{Async, Server.Server;} ServerResponse
 let page _ =
   let count =
     try stock "tea" with
@@ -78,10 +78,10 @@ let main () =
     provide layers {
       try
         scope s {
-          functions : (ServerRequest ->{} ServerResponse)^{s}
+          functions : (ServerRequest ->{Async;} ServerResponse)^{s}
           let functions = Server.handler [server stock, server price]
           app :
-            (ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
+            (ServerRequest ->{Async, Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
           let app =
             Http.Router.router Http.Router.config [
               Http.Router.route (Some Http.Method.POST) Server.path (fun request ->

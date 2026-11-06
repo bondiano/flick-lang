@@ -9,7 +9,7 @@ type error Oops = Oops String
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -30,14 +30,14 @@ let failing_scope () = scope {
   from_result (Err (Oops "body failed"))
 }
 
-slow_scope : Unit ->{} String
+slow_scope : Unit ->{Async;} String
 let slow_scope () = scope {
   let _ = acquire "on timeout"
   nap 1000
   "never"
 }
 
-waiting : Eff none {Oops} Float
+waiting : Eff {Async} {Oops} Float
 let waiting = task {
   scope {
     let _ = acquire "in parallel"
@@ -46,13 +46,13 @@ let waiting = task {
   }
 }
 
-failing_soon : Eff none {Oops} Float
+failing_soon : Eff {Async} {Oops} Float
 let failing_soon = task {
   nap 5
   from_result (Err (Oops "sibling failed"))
 }
 
-race_sibling : Unit ->{} String
+race_sibling : Unit ->{Async;} String
 let race_sibling () =
   try
     let _ = parallel waiting failing_soon
@@ -60,7 +60,7 @@ let race_sibling () =
   with
   | Oops text -> text
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let caught =
     try failing_scope () with

@@ -35,7 +35,7 @@ let why_of e =
 note : Ref (List String) -> String ->{} Unit
 let note log line = Ref.set log (Ref.get log ++ [line])
 
-slow : Unit ->{} Float
+slow : Unit ->{Async;} Float
 let slow () =
   Effect.sleep (ms 5)
   0
@@ -134,7 +134,7 @@ let failures () =
   let paced = Channel.schedule (Schedule.map (fun _ -> ()) (Schedule.recurs 1)) nums
   say ("schedule: " ++ show (Channel.run_collect paced))
 
-merging : Unit ->{; Boom} Unit
+merging : Unit ->{Async; Boom} Unit
 let merging () =
   let both = Channel.halt_both
   say
@@ -251,7 +251,7 @@ let running () =
   }
   say ("run_into_pubsub, run_into_pubsub_array: " ++ show (replayed, ended))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     failures ()

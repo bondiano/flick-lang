@@ -31,7 +31,7 @@ text_lines :
   List String
 let text_lines bytes = Stream.run_collect (Stream.split_lines (Stream.decode_text bytes))
 
-run : Bool -> String ->{FileSystem.FileSystem; PlatformError.PlatformError} Unit
+run : Bool -> String ->{Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
 let run windows dir =
   line "lines" (show (ChildProcess.lines (shell windows "echo one&& echo two")))
   line "exit_code" (show (ChildProcess.exit_code (shell windows "exit 3")))
@@ -86,7 +86,7 @@ let run windows dir =
     | e -> reason e
   line "missing" missing
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let windows = Platform.env "OS" == Some "Windows_NT"
   let outcome =

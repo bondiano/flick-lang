@@ -11,18 +11,18 @@ foreign effect make from "@flick-lang/runtime/effect/SubscriptionRef" "make"
   reviewed "effect@4.1.2 sha256:f3f6e5a550530038"
 
 /// The current value.
-get : SubscriptionRef a ->{} a
+get : SubscriptionRef a ->{Async;} a
 foreign effect get from "@flick-lang/runtime/effect/SubscriptionRef" "get"
   reviewed "effect@4.1.2 sha256:53991aa417733785"
 
 /// Sets the value, giving the previous one.
-get_and_set : a -> SubscriptionRef a ->{} a
+get_and_set : a -> SubscriptionRef a ->{Async;} a
 foreign effect get_and_set from "@flick-lang/runtime/effect/SubscriptionRef" "getAndSet"
   arity 1
   reviewed "effect@4.1.2 sha256:42ce243743e1369c"
 
 /// Applies `f`, giving the previous value.
-get_and_update : forall c a. (a -> a)^c -> (SubscriptionRef a ->{} a)^c
+get_and_update : forall c a. (a -> a)^c -> (SubscriptionRef a ->{Async;} a)^c
 foreign effect get_and_update from "@flick-lang/runtime/effect/SubscriptionRef" "getAndUpdate"
   arity 1
   retention call
@@ -37,7 +37,7 @@ foreign effect get_and_update_effect from "@flick-lang/runtime/effect/Subscripti
   reviewed "effect@4.1.2 sha256:bb18e47f40a343d7"
 
 /// Applies `f` where it gives `Some`, giving the previous value.
-get_and_update_some : forall c a. (a -> Option a)^c -> (SubscriptionRef a ->{} a)^c
+get_and_update_some : forall c a. (a -> Option a)^c -> (SubscriptionRef a ->{Async;} a)^c
 foreign effect get_and_update_some from "@flick-lang/runtime/effect/SubscriptionRef" "getAndUpdateSome"
   arity 1
   retention call
@@ -52,7 +52,7 @@ foreign effect get_and_update_some_effect from "@flick-lang/runtime/effect/Subsc
   reviewed "effect@4.1.2 sha256:96778e681a82e6f9"
 
 /// `f` gives the result and the new value, in one step.
-modify : forall c a b. (a -> (b, a))^c -> (SubscriptionRef a ->{} b)^c
+modify : forall c a b. (a -> (b, a))^c -> (SubscriptionRef a ->{Async;} b)^c
 foreign effect modify from "@flick-lang/runtime/effect/SubscriptionRef" "modify"
   arity 1
   retention call
@@ -67,7 +67,7 @@ foreign effect modify_effect from "@flick-lang/runtime/effect/SubscriptionRef" "
   reviewed "effect@4.1.2 sha256:fb7b51e93e085576"
 
 /// `modify` where `f` may keep the value with `None`.
-modify_some : forall c a b. (a -> (b, Option a))^c -> (SubscriptionRef a ->{} b)^c
+modify_some : forall c a b. (a -> (b, Option a))^c -> (SubscriptionRef a ->{Async;} b)^c
 foreign effect modify_some from "@flick-lang/runtime/effect/SubscriptionRef" "modifySome"
   arity 1
   retention call
@@ -82,19 +82,19 @@ foreign effect modify_some_effect from "@flick-lang/runtime/effect/SubscriptionR
   reviewed "effect@4.1.2 sha256:583d92929d65447e"
 
 /// Sets the value.
-set : a -> SubscriptionRef a ->{} Unit
+set : a -> SubscriptionRef a ->{Async;} Unit
 foreign effect set from "@flick-lang/runtime/effect/SubscriptionRef" "set"
   arity 1
   reviewed "effect@4.1.2 sha256:2ae907aeaf0b15e4"
 
 /// Sets the value, giving it.
-set_and_get : a -> SubscriptionRef a ->{} a
+set_and_get : a -> SubscriptionRef a ->{Async;} a
 foreign effect set_and_get from "@flick-lang/runtime/effect/SubscriptionRef" "setAndGet"
   arity 1
   reviewed "effect@4.1.2 sha256:af164bd8a0226bc7"
 
 /// Applies `f` to the value.
-update : forall c a. (a -> a)^c -> (SubscriptionRef a ->{} Unit)^c
+update : forall c a. (a -> a)^c -> (SubscriptionRef a ->{Async;} Unit)^c
 foreign effect update from "@flick-lang/runtime/effect/SubscriptionRef" "update"
   arity 1
   retention call
@@ -108,7 +108,7 @@ foreign effect update_effect from "@flick-lang/runtime/effect/SubscriptionRef" "
   reviewed "effect@4.1.2 sha256:e729be2b3b147b76"
 
 /// Applies `f`, giving the new value.
-update_and_get : forall c a. (a -> a)^c -> (SubscriptionRef a ->{} a)^c
+update_and_get : forall c a. (a -> a)^c -> (SubscriptionRef a ->{Async;} a)^c
 foreign effect update_and_get from "@flick-lang/runtime/effect/SubscriptionRef" "updateAndGet"
   arity 1
   retention call
@@ -122,7 +122,7 @@ foreign effect update_and_get_effect from "@flick-lang/runtime/effect/Subscripti
   reviewed "effect@4.1.2 sha256:a5eb25db8deb5859"
 
 /// Applies `f` where it gives `Some`.
-update_some : forall c a. (a -> Option a)^c -> (SubscriptionRef a ->{} Unit)^c
+update_some : forall c a. (a -> Option a)^c -> (SubscriptionRef a ->{Async;} Unit)^c
 foreign effect update_some from "@flick-lang/runtime/effect/SubscriptionRef" "updateSome"
   arity 1
   retention call

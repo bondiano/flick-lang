@@ -139,7 +139,7 @@ let is_entrypoint (key, t) =
 
 /// The snapshot of the Effect installed at `dir`.
 snapshot :
-  String ->{FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError} Snapshot
+  String ->{Async, FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError} Snapshot
 let snapshot dir =
   let file = Path.join [dir, "package.json"]
   let fields =

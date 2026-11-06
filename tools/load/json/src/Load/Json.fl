@@ -36,7 +36,7 @@ let get_item _ =
   let made = { base with id = id; label = "item " ++ id; price = base.price * 2 }
   Http.ServerResponse.schema_json item made Http.ServerResponse.defaults
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let port = Option.with_default 3000 (Option.bind String.to_number (Platform.env "PORT"))
   provide Http.Server.layer_services {

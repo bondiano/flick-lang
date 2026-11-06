@@ -35,7 +35,7 @@ foreign pure procedure from "@flick-lang/runtime/effect/server/Functions" "serve
 
 /// A call of the procedure: to `FLICK_SERVER_URL` on Node, to the page's
 /// origin in a browser, at `Server.path`.
-call : forall p e s. Procedure p e s -> p ->{; Rpc.ClientError | e} s
+call : forall p e s. Procedure p e s -> p ->{Async; Rpc.ClientError | e} s
 foreign effect call from "@flick-lang/runtime/effect/server/Functions" "serverCall"
   arity 2
 

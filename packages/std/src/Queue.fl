@@ -39,13 +39,13 @@ foreign effect unbounded from "@flick-lang/runtime/effect/Queue" "unbounded"
 
 /// Adds `message`, waiting for room in a full `Suspend` queue; whether it
 /// was added.
-offer : a -> Queue e a ->{} Bool
+offer : a -> Queue e a ->{Async;} Bool
 foreign effect offer from "@flick-lang/runtime/effect/Queue" "offer"
   arity 1
   reviewed "effect@4.1.2 sha256:c5bcbfeef634138f"
 
 /// Adds the messages in order; the ones that were not added.
-offer_all : List a -> Queue e a ->{} List a
+offer_all : List a -> Queue e a ->{Async;} List a
 foreign effect offer_all from "@flick-lang/runtime/effect/Queue" "offerAll"
   arity 1
   reviewed "effect@4.1.2 sha256:ae494cd6cde81db7"
@@ -99,20 +99,20 @@ foreign effect collect from "@flick-lang/runtime/effect/Queue" "collect"
 
 /// Takes `n` messages, waiting for them, or what is left of an ended
 /// queue; `None` once it is empty.
-take_n : Int -> Queue e a ->{; e} Option (List a)
+take_n : Int -> Queue e a ->{Async; e} Option (List a)
 foreign effect take_n from "@flick-lang/runtime/effect/Queue" "flickTakeN"
   arity 1
   reviewed "effect@4.1.2 sha256:9738231cc25a25cf"
 
 /// Takes at least `min` and at most `max` messages, as `take_n` does.
-take_between : Int -> Int -> Queue e a ->{; e} Option (List a)
+take_between : Int -> Int -> Queue e a ->{Async; e} Option (List a)
 foreign effect take_between from "@flick-lang/runtime/effect/Queue" "flickTakeBetween"
   arity 2
   reviewed "effect@4.1.2 sha256:171bd6b4aaaa6bb8"
 
 /// Takes the next message, waiting for one; `None` once the queue has
 /// ended.
-take : Queue e a ->{; e} Option a
+take : Queue e a ->{Async; e} Option a
 foreign effect take from "@flick-lang/runtime/effect/Queue" "flickTake"
   reviewed "effect@4.1.2 sha256:67034406d934669f"
 

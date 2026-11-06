@@ -348,6 +348,31 @@ start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
 ```
 
+## What may suspend: `Async`
+
+A function that waits for time, input or output or another fiber says so
+with the effect `Async` in its row: `Effect.sleep : Duration ->{Async;} Unit`,
+`Database.query`, `Http.Client.get`, `Fiber.join`, `Queue.take`. A row
+without it runs at once. `Async` has no operations: the scheduler of the
+runtime handles it at the root, so `main` may have it, and so may the tasks
+of `spawn` and `parallel`; `provide Async` is `FLICK-E016`.
+
+```flick
+wait : Float ->{Async;} Unit
+foreign async wait from "./timers.mjs" "wait"
+
+twice : Unit ->{Async;} Unit
+let twice () =
+  wait 1
+  wait 2
+```
+
+A `foreign async` gives a Promise, so its row needs `Async` (`FLICK-F001`).
+A `foreign effect` is as written: without `Async` it runs at once, and a
+suspension is a defect. A call that may suspend in a row without `Async`
+is `FLICK-E002`, whose fix adds `Async` where the row is written: the
+signature, an `Eff`, or the row given to a type such as `Handlers none`.
+
 ## Effects and handlers
 
 `effect E params =` declares an effect: its operations are called as those

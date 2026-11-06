@@ -30,7 +30,7 @@ let streamed_ui n view =
   }
   Stream.provide_ Reactivity.Atom.layer (Stream.unwrap made)
 
-render : ServerRequest ->{RouteContext;} ServerResponse
+render : ServerRequest ->{Async, RouteContext;} ServerResponse
 let render _ =
   let n = id ()
   Http.ServerResponse.html
@@ -74,10 +74,12 @@ let html _ =
       }))
 
 client :
-  String -> ServerRequest ->{Http.Platform.HttpPlatform; PlatformError.PlatformError} ServerResponse
+  String ->
+  ServerRequest ->{Async, Http.Platform.HttpPlatform; PlatformError.PlatformError}
+  ServerResponse
 let client path _ = Http.Platform.file Http.Platform.file_options path
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let port = Option.with_default 3000 (Option.bind String.to_number (Platform.env "PORT"))
   let bundle = Option.with_default "dist/client.js" (Platform.env "CLIENT_JS")
@@ -85,7 +87,7 @@ let main () =
     try
       scope s {
         app :
-          ServerRequest ->{Http.Platform.HttpPlatform; Http.ServerError.HttpServerError, PlatformError.PlatformError}
+          ServerRequest ->{Async, Http.Platform.HttpPlatform; Http.ServerError.HttpServerError, PlatformError.PlatformError}
           ServerResponse
         let app =
           Http.Router.router Http.Router.config [

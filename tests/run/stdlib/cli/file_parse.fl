@@ -23,7 +23,7 @@ let attempt_in dir args =
   | Cli.CliError message ->
     Platform.stdout_line ("CliError: " ++ String.replace_all dir "$TMP" message)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let files = [
     (

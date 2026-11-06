@@ -24,7 +24,7 @@ let settings () = {
 
 /// Migrates the database, then serves until the process is stopped.
 serve :
-  Settings ->{Database, Keys, Crypto.Crypto, Http.Platform.HttpPlatform, FileSystem.FileSystem; PlatformError.PlatformError, Http.ServerError.ServeError}
+  Settings ->{Async, Database, Keys, Crypto.Crypto, Http.Platform.HttpPlatform, FileSystem.FileSystem; PlatformError.PlatformError, Http.ServerError.ServeError}
   Unit
 let serve config =
   // without its schema the server cannot answer anything
@@ -46,7 +46,7 @@ let serve config =
   }
 
 /// Serves Conduit; a wrong setting stops it with what is wrong.
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let config =
     try settings () with

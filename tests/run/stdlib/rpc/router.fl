@@ -34,7 +34,7 @@ let hello _ =
   let name = Option.with_default "nobody" (Http.Router.param "name")
   Http.ServerResponse.text ("hello " ++ name) Http.ServerResponse.defaults
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let handlers : Handlers none = {
     double = fun n -> n * 2;
@@ -43,9 +43,9 @@ let main () =
   provide (Layer.merge Http.FetchClient.layer Http.Server.layer_services) {
     try
       scope s {
-        rpc : (ServerRequest ->{} ServerResponse)^{s}
+        rpc : (ServerRequest ->{Async;} ServerResponse)^{s}
         let rpc = Rpc.handler Rpc.ndjson numbers handlers
-        app : (ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        app : (ServerRequest ->{Async; Http.ServerError.HttpServerError} ServerResponse)^{s}
         let app =
           Http.Router.router Http.Router.config [
             Http.Router.route (Some Http.Method.POST) "/rpc" (fun request -> rpc request),

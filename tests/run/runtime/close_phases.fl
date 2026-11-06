@@ -13,7 +13,7 @@ foreign effect open_res from "./resources.mjs" "open"
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -23,7 +23,7 @@ report : forall e. Failure e ->{} Unit
 let report f =
   say ("supervised " ++ show (Cause.has_fails f, Cause.has_dies f, Cause.has_interrupts f))
 
-late_acquire : Unit ->{} Unit
+late_acquire : Unit ->{Async;} Unit
 let late_acquire () = scope s {
   let started : Deferred.Deferred none Unit = Deferred.make ()
   let _child =
@@ -48,7 +48,7 @@ let late_acquire () = scope s {
   say "body done"
 }
 
-supervisor_owner : Unit ->{} Unit
+supervisor_owner : Unit ->{Async;} Unit
 let supervisor_owner () = scope outer {
   // the supervisor and the inner body take turns through this, not through a timer
   let ran : Deferred.Deferred none Unit = Deferred.make ()
@@ -66,7 +66,7 @@ let supervisor_owner () = scope outer {
   say "outer body done"
 }
 
-group_close : Unit ->{} Unit
+group_close : Unit ->{Async;} Unit
 let group_close () = scope s {
   let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
   // the child and the body take turns through these, not through timers
@@ -93,7 +93,7 @@ let group_close () = scope s {
   ()
 }
 
-unmask : Unit ->{} Unit
+unmask : Unit ->{Async;} Unit
 let unmask () =
   scope s {
     let masked : Deferred.Deferred none Unit = Deferred.make ()
@@ -117,7 +117,7 @@ let unmask () =
   // after the scope: its close waits for the supervisor, which runs beside the interrupting fiber
   say "interrupted"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   late_acquire ()
   say "--"

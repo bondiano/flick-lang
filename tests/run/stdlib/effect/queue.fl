@@ -13,7 +13,7 @@ let ms n = Result.with_default Duration.zero (Duration.millis n)
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-queues : Unit ->{; Broken} Unit
+queues : Unit ->{Async; Broken} Unit
 let queues () =
   let q : Queue.Queue {Broken} Float = Queue.bounded 4
   let offered = Queue.offer 1 q
@@ -113,7 +113,7 @@ let queues () =
     | Broken why -> "fail_cause: " ++ why
   say cause
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try queues () with
   | Broken why -> say ("unexpected " ++ why)

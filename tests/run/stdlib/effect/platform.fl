@@ -54,7 +54,7 @@ let quit_on_q input =
   let key : Terminal.Key = input.key
   key.name == "q" || key.ctrl
 
-terminal : Unit ->{Terminal.Terminal; PlatformError.PlatformError} Unit
+terminal : Unit ->{Async, Terminal.Terminal; PlatformError.PlatformError} Unit
 let terminal () =
   Platform.stdout_line ("size " ++ show (Terminal.columns (), Terminal.rows ()))
   Terminal.display "displayed\n"
@@ -72,7 +72,7 @@ let stdio () =
   Stdio.write_stdout "written to stdout\n"
   Stdio.write_stderr "written to stderr\n"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let outcome =
     try

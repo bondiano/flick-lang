@@ -30,7 +30,7 @@ let terminal keys =
   }
 
 /// The answer to `first_note` when the keys are `keys`.
-answer : List Terminal.UserInput ->{; Terminal.QuitError} String
+answer : List Terminal.UserInput ->{Async; Terminal.QuitError} String
 let answer keys =
   let script = Ref.make keys
   provide (terminal script) { Cli.Prompt.run first_note }

@@ -51,22 +51,22 @@ foreign pure search_params_from_url from "@flick-lang/runtime/effect/http/HttpSe
   reviewed "effect@4.1.2 sha256:79bf66712c3fcb76"
 
 /// The body as text.
-text : ServerRequest ->{; HttpServerError} String
+text : ServerRequest ->{Async; HttpServerError} String
 foreign effect text from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickText"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The body as JSON.
-json : ServerRequest ->{; HttpServerError} Json
+json : ServerRequest ->{Async; HttpServerError} Json
 foreign effect json from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickJson"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The body as URL parameters (`application/x-www-form-urlencoded`).
-url_params_body : ServerRequest ->{; HttpServerError} Http.UrlParams.UrlParams
+url_params_body : ServerRequest ->{Async; HttpServerError} Http.UrlParams.UrlParams
 foreign effect url_params_body from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickUrlParamsBody"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The bytes of the body.
-bytes : ServerRequest ->{; HttpServerError} List Int
+bytes : ServerRequest ->{Async; HttpServerError} List Int
 foreign effect bytes from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickBytes"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 

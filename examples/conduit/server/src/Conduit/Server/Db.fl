@@ -11,19 +11,19 @@ unique_violation : String
 let unique_violation = "23505"
 
 /// The rows of a query.
-rows : Sql.Template Pg {} a ->{Database;} List a
+rows : Sql.Template Pg {} a ->{Async, Database;} List a
 let rows query = Effect.or_die (task { Database.query (Sql.bind query {}) })
 
 /// The first row, if any.
-first : Sql.Template Pg {} a ->{Database;} Option a
+first : Sql.Template Pg {} a ->{Async, Database;} Option a
 let first query = List.head (rows query)
 
 /// Runs a statement.
-run : Sql.Template Pg {} a ->{Database;} Unit
+run : Sql.Template Pg {} a ->{Async, Database;} Unit
 let run query = Effect.or_die (task { ignore (Database.execute (Sql.bind query {})) })
 
 /// `run` of an insert that may find its row already there: then nothing.
-run_once : Sql.Template Pg {} a ->{Database;} Unit
+run_once : Sql.Template Pg {} a ->{Async, Database;} Unit
 let run_once query =
   Effect.or_die
     (task {
@@ -32,7 +32,7 @@ let run_once query =
     })
 
 /// The id an insert returns.
-insert_id : Sql.Template Pg {} { id : BigInt } ->{Database;} BigInt
+insert_id : Sql.Template Pg {} { id : BigInt } ->{Async, Database;} BigInt
 let insert_id query =
   match first query with
   | Some row -> row.id

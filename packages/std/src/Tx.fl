@@ -32,7 +32,7 @@ foreign effect atomically from "@flick-lang/runtime/effect/Effect" "tx"
 
 /// Abandons this attempt and runs the transaction again once a value it
 /// read changes.
-retry : Unit ->{Transaction;} a
+retry : Unit ->{Async, Transaction;} a
 foreign effect retry from "@flick-lang/runtime/effect/Tx" "flickRetry"
   arity 0
   reviewed "effect@4.1.2 sha256:24b8d20da1fdf180"

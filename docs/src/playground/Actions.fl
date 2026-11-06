@@ -26,7 +26,7 @@ import State exposing (
   profile_name,
 )
 
-load_highlighting : Unit ->{; JsError} Unit
+load_highlighting : Unit ->{Async; JsError} Unit
 foreign async load_highlighting from "./highlight.ts" "loadHighlighting"
   arity 0
   catch JsError.from_js
@@ -36,18 +36,18 @@ foreign sync highlight from "./highlight.ts" "highlight"
   arity 2
   catch JsError.from_js
 
-load : Unit ->{; JsError} String
+load : Unit ->{Async; JsError} String
 foreign async load from "./compiler.ts" "load"
   arity 0
   catch JsError.from_js
 
-compile : String ->{; JsError} Compiled
+compile : String ->{Async; JsError} Compiled
 foreign async compile from "./compiler.ts" "compile"
   arity 1
   catch JsError.from_js
   cancel signal
 
-run_build : String -> String ->{; JsError} Execution
+run_build : String -> String ->{Async; JsError} Execution
 foreign async run_build from "./compiler.ts" "run"
   arity 2
   catch JsError.from_js
@@ -105,7 +105,7 @@ let adopt_source model =
       update model (fun m -> { m with source = source })
       paint_source model
 
-prepare_highlighting : Atom.Writable Model ->{Atom.Write;} Unit
+prepare_highlighting : Atom.Writable Model ->{Async, Atom.Write;} Unit
 let prepare_highlighting model =
   let result =
     try Ok (load_highlighting ()) with
@@ -118,7 +118,7 @@ let prepare_highlighting model =
     paint_source model
     paint_generated model
 
-refresh : Atom.Writable Model ->{Atom.Write;} Unit
+refresh : Atom.Writable Model ->{Async, Atom.Write;} Unit
 let refresh model =
   let m = Atom.current model
   if m.version == "" then
@@ -153,7 +153,7 @@ let refresh model =
         )
         paint_generated model
 
-load_compiler : Atom.Writable Model ->{Atom.Write;} Unit
+load_compiler : Atom.Writable Model ->{Async, Atom.Write;} Unit
 let load_compiler model =
   update model (fun m -> {
     m with
@@ -190,7 +190,7 @@ let choose model example =
   edit model example.source
 
 // `latest` on the same button aborts and joins the worker before this Stop action.
-run_program : Atom.Writable Model ->{Atom.Write;} Unit
+run_program : Atom.Writable Model ->{Async, Atom.Write;} Unit
 let run_program model =
   let m = Atom.current model
   if m.running then

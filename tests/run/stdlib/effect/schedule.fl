@@ -52,7 +52,7 @@ let delays schedule =
   let _ = Effect.repeat (Schedule.up_to { duration = None; times = Some 3 } traced) (task { 0 })
   Ref.get seen
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   Platform.stdout_line ("recurs 2: " ++ show (count (Schedule.recurs 2)))
   Platform.stdout_line ("once: " ++ show (count (Schedule.map (fun _ -> 0) Schedule.once)))

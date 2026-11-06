@@ -25,7 +25,7 @@ let acquire name =
     })
     (fun n -> say ("release " ++ n))
 
-caches : Unit ->{; Missing} Unit
+caches : Unit ->{Async; Missing} Unit
 let caches () =
   let lookups = Ref.make 0
   lookup : Key ->{; Missing} Float
@@ -76,7 +76,7 @@ let caches () =
   let second = Cache.get 2 short
   say ("make_with: " ++ show (first, second, Cache.size short, Cache.keys short))
 
-scoped : Unit ->{; Missing} Unit
+scoped : Unit ->{Async; Missing} Unit
 let scoped () =
   scope s {
     let cache : ScopedCache.ScopedCache s String none String =
@@ -122,7 +122,7 @@ let scoped () =
   }
   say "scoped ref closed"
 
-counted : Unit ->{; RcMap.ExceededCapacity} Unit
+counted : Unit ->{Async; RcMap.ExceededCapacity} Unit
 let counted () =
   scope s {
     let shared : RcRef.RcRef s none String =
@@ -163,7 +163,7 @@ let counted () =
   }
   say ("rc map: " ++ full)
 
-pools : Unit ->{} Unit
+pools : Unit ->{Async;} Unit
 let pools () =
   let made = Ref.make 0
   let item = task {
@@ -207,7 +207,7 @@ let pools () =
     say ("usage pool: " ++ Pool.use (fun i -> i) usage)
   }
 
-resources : Unit ->{; Missing} Unit
+resources : Unit ->{Async; Missing} Unit
 let resources () =
   let version = Ref.make 0
   scope s {
@@ -232,7 +232,7 @@ let resources () =
     say (failed ++ ", still " ++ Resource.use res (fun v -> v))
   }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     caches ()

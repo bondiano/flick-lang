@@ -262,7 +262,7 @@ Failure.rethrow :
 # import File exposing (File, Path, FileSystem, OpenError, ReadError)
 #
 read_config :
-  Path ->{FileSystem; OpenError, ReadError} String
+  Path ->{Async, FileSystem; OpenError, ReadError} String
 let read_config path =
   scope {
     let file = File.open_scoped path
@@ -302,7 +302,7 @@ let bad_deferred path =
 # import File exposing (File, Path, FileSystem, OpenError, ReadError)
 #
 deferred_read :
-  Path -> Eff {FileSystem} {OpenError, ReadError} String
+  Path -> Eff {Async, FileSystem} {OpenError, ReadError} String
 let deferred_read path =
   task {
     scope {

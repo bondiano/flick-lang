@@ -62,7 +62,7 @@ let run_without_write root = Ui.Dom.mount root supervisor (refusing 0)
 //                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-E002 does not allow service `Write`
 
 // hold the button inside the scope, or open the file inside the task
-escaping : File.Path ->{File.FileSystem; File.OpenError} Ui
+escaping : File.Path ->{Async, File.FileSystem; File.OpenError} Ui
 let escaping path =
   scope {
     let file = File.open_scoped path
@@ -83,7 +83,7 @@ let escaping path =
   }
 
 // bound to a local first, it still cannot leave
-escaping_bound : File.Path ->{File.FileSystem; File.OpenError} Ui
+escaping_bound : File.Path ->{Async, File.FileSystem; File.OpenError} Ui
 let escaping_bound path =
   scope {
     let file = File.open_scoped path

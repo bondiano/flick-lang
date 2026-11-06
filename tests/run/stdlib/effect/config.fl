@@ -64,7 +64,7 @@ let own =
     | _ -> None
   )
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   Platform.stdout_line (read server (fun s -> s.host ++ ":" ++ show s.port))
   Platform.stdout_line (read (Config.boolean "DEBUG") show)

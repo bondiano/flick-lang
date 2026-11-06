@@ -36,22 +36,22 @@ foreign pure request from "@flick-lang/runtime/effect/http/HttpClientResponse" "
   reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The body as text.
-text : ClientResponse ->{; HttpClientError} String
+text : ClientResponse ->{Async; HttpClientError} String
 foreign effect text from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickText"
   reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The body as JSON.
-json : ClientResponse ->{; HttpClientError} Json
+json : ClientResponse ->{Async; HttpClientError} Json
 foreign effect json from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickJson"
   reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The body as URL parameters (`application/x-www-form-urlencoded`).
-url_params_body : ClientResponse ->{; HttpClientError} Http.UrlParams.UrlParams
+url_params_body : ClientResponse ->{Async; HttpClientError} Http.UrlParams.UrlParams
 foreign effect url_params_body from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickUrlParamsBody"
   reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The bytes of the body.
-bytes : ClientResponse ->{; HttpClientError} List Int
+bytes : ClientResponse ->{Async; HttpClientError} List Int
 foreign effect bytes from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickBytes"
   reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
@@ -61,7 +61,7 @@ foreign pure stream from "@flick-lang/runtime/effect/http/HttpClientResponse" "f
   reviewed "effect@4.1.2 sha256:d1e975aadadf634b"
 
 /// The text fields of a `multipart/form-data` body.
-form_data : ClientResponse ->{; HttpClientError} List (String, String)
+form_data : ClientResponse ->{Async; HttpClientError} List (String, String)
 foreign effect form_data from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickFormData"
   reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 

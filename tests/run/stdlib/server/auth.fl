@@ -40,7 +40,7 @@ let check headers =
   | _ -> from_result (Err Server.Unauthorized)
 
 /// A page that greets who asks.
-page : ServerRequest ->{Server.Server;} ServerResponse
+page : ServerRequest ->{Async, Server.Server;} ServerResponse
 let page _ =
   let greeting =
     try "hello " ++ whoami () with
@@ -49,7 +49,7 @@ let page _ =
   Http.ServerResponse.text greeting Http.ServerResponse.defaults
 
 /// A call of `whoami` over HTTP with `cookie`, as a browser makes it.
-posted : String -> String ->{Http.Client.HttpClient; Http.ClientError.HttpClientError} String
+posted : String -> String ->{Async, Http.Client.HttpClient; Http.ClientError.HttpClientError} String
 let posted base cookie =
   let call =
     "{\"_tag\":\"Request\",\"id\":\"1\",\"tag\":\"App.Main.whoami\",\"payload\":null,\"headers\":[]}\n"
@@ -64,22 +64,24 @@ let posted base cookie =
   Http.ClientResponse.text (Http.Client.execute request)
 
 /// The page as a browser with `cookie` gets it.
-visited : String -> String ->{Http.Client.HttpClient; Http.ClientError.HttpClientError} String
+visited :
+  String -> String ->{Async, Http.Client.HttpClient; Http.ClientError.HttpClientError} String
 let visited base cookie =
   Http.ClientResponse.text
     (Http.Client.execute
       (Http.ClientRequest.set_header "cookie" cookie (Http.ClientRequest.get (base ++ "/page"))))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide (Layer.merge
   Server.node
   (Layer.merge Http.FetchClient.layer Http.Server.layer_services)) {
   try
     scope s {
-      functions : (ServerRequest ->{} ServerResponse)^{s}
+      functions : (ServerRequest ->{Async;} ServerResponse)^{s}
       let functions =
         Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
-      app : (ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
+      app :
+        (ServerRequest ->{Async, Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
       let app =
         Http.Router.router Http.Router.config [
           Http.Router.route (Some Http.Method.POST) Server.path (fun request -> functions request),

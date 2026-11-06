@@ -48,14 +48,14 @@ let halves =
     [Sql.unsafe_text "select count(*)::int as n from pg_tables where tablename = 'half'"]
     (Codec.json Count.schema)
 
-count : Sql.Query Pg Count ->{Database; EncodeError, DbError, DecodeError} Int
+count : Sql.Query Pg Count ->{Async, Database; EncodeError, DbError, DecodeError} Int
 let count query =
   match Database.query query with
   | [row] -> row.n
   | _ -> -1
 
 /// What a run of `steps` applied, or why it was refused.
-migrate : String -> List Migration ->{Database; EncodeError, DecodeError} Unit
+migrate : String -> List Migration ->{Async, Database; EncodeError, DecodeError} Unit
 let migrate label steps =
   let outcome =
     try "applied " ++ show (Database.Migrate.run steps) with
@@ -63,7 +63,7 @@ let migrate label steps =
     | DbError e -> "failed " ++ e.code
   Platform.stdout_line (label ++ ": " ++ outcome)
 
-run : Unit ->{Database; MigrationError, EncodeError, DbError, DecodeError} Unit
+run : Unit ->{Async, Database; MigrationError, EncodeError, DbError, DecodeError} Unit
 let run () =
   migrate "first" [users, seed]
   migrate "again" [users, seed]
@@ -80,7 +80,7 @@ let run () =
   migrate "out of order" [seed, users]
   migrate "behind the database" [users]
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let url = Option.with_default "" (Platform.env "DATABASE_URL")
   provide (Database.pg (Database.config url)) {

@@ -33,16 +33,16 @@ let unique taken =
     from_result (Err (Conflict (List.map (fun field -> (field, ["has already been taken"])) taken)))
 
 /// The stored form of a password, PBKDF2 with a salt of its own.
-hash : String ->{Crypto.Crypto;} String
+hash : String ->{Async, Crypto.Crypto;} String
 let hash password = Effect.or_die (task { Crypto.hash_password password })
 
 /// The answer for a user who just signed in or up.
-signed : Account ->{Keys, Crypto.Crypto;} UserBody
+signed : Account ->{Async, Keys, Crypto.Crypto;} UserBody
 let signed account = { user = Present.user account (Auth.issue account) }
 
 /// Signs a user up: 422 for a field missing or malformed, 409 for a name or email taken.
 register :
-  Request Unit Unit NewUserBody ->{Database, Keys, Crypto.Crypto | r; Conflict, Unprocessable}
+  Request Unit Unit NewUserBody ->{Async, Database, Keys, Crypto.Crypto | r; Conflict, Unprocessable}
   UserBody
 let register request =
   let given = valid (Validate.registration request.payload.user)
@@ -59,7 +59,7 @@ let register request =
 
 /// Signs a user in: 401 for an unknown email or a wrong password.
 login :
-  Request Unit Unit LoginBody ->{Database, Keys, Crypto.Crypto | r; Unauthorized, Unprocessable}
+  Request Unit Unit LoginBody ->{Async, Database, Keys, Crypto.Crypto | r; Unauthorized, Unprocessable}
   UserBody
 let login request =
   let given = valid (Validate.credentials request.payload.user)
@@ -79,7 +79,7 @@ let current_user _ =
   { user = Present.user me.account me.token }
 
 /// The account with the change applied; a new password is hashed.
-changed : Account -> Validate.Change ->{Crypto.Crypto;} Account
+changed : Account -> Validate.Change ->{Async, Crypto.Crypto;} Account
 let changed account change = {
   id = account.id;
   username = Option.with_default account.username change.username;
@@ -94,7 +94,7 @@ let changed account change = {
 
 /// Changes the signed-in user: a name or email another has is 409.
 update_user :
-  Request Unit Unit UpdateUserBody ->{Session, Database, Crypto.Crypto | r; Unauthorized, Conflict, Unprocessable}
+  Request Unit Unit UpdateUserBody ->{Async, Session, Database, Crypto.Crypto | r; Unauthorized, Conflict, Unprocessable}
   UserBody
 let update_user request =
   let me = Auth.signed_in ()
@@ -105,7 +105,7 @@ let update_user request =
   { user = Present.user account me.token }
 
 /// The user of the path, or 404.
-named : String ->{Database; NotFound} Account
+named : String ->{Async, Database; NotFound} Account
 let named username =
   match People.by_username username with
   | Some account -> account
@@ -113,13 +113,14 @@ let named username =
 
 /// The profile of `:username`, and whether the reader follows them.
 get_profile :
-  Request ProfilePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ProfileBody
+  Request ProfilePath Unit Unit ->{Async, Session, Database | r; Unauthorized, NotFound} ProfileBody
 let get_profile request =
   let account = named (Username.value request.path.username)
   { profile = Present.profile account (People.follows (Auth.reader ()) account.id) }
 
 /// The reader follows `:username`; following twice changes nothing.
-follow : Request ProfilePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ProfileBody
+follow :
+  Request ProfilePath Unit Unit ->{Async, Session, Database | r; Unauthorized, NotFound} ProfileBody
 let follow request =
   let account = named (Username.value request.path.username)
   People.follow (Auth.signed_in ()).account.id account.id
@@ -127,7 +128,7 @@ let follow request =
 
 /// The reader stops following `:username`.
 unfollow :
-  Request ProfilePath Unit Unit ->{Session, Database | r; Unauthorized, NotFound} ProfileBody
+  Request ProfilePath Unit Unit ->{Async, Session, Database | r; Unauthorized, NotFound} ProfileBody
 let unfollow request =
   let account = named (Username.value request.path.username)
   People.unfollow (Auth.signed_in ()).account.id account.id

@@ -23,7 +23,7 @@ kind_of : FileSystem.Info -> FileSystem.FileType
 let kind_of info = info.type_
 
 /// The open file's bytes from the start, as text.
-contents : FileSystem.File s ->{; PlatformError.PlatformError} String
+contents : FileSystem.File s ->{Async; PlatformError.PlatformError} String
 let contents file =
   let start = FileSystem.Start
   let _ = FileSystem.seek 0n start file
@@ -31,7 +31,7 @@ let contents file =
   | Some bytes -> show bytes
   | None -> "end of file"
 
-work : String ->{FileSystem.FileSystem; PlatformError.PlatformError} Unit
+work : String ->{Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
 let work dir =
   let a = dir ++ "/a.txt"
   FileSystem.write_file_string plain a "hello"
@@ -113,7 +113,7 @@ let work dir =
     | e -> reason e
   line "exclusive" exclusive
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let outcome =
     try

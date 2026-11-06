@@ -10,7 +10,7 @@ is_russian : Unit ->{} Bool
 foreign sync is_russian from "./browser.ts" "isRussian"
   arity 0
 
-search : String ->{; JsError} List Hit
+search : String ->{Async; JsError} List Hit
 foreign async search from "./browser.ts" "search"
   arity 1
   catch JsError.from_js
@@ -23,7 +23,7 @@ close_search : Unit ->{} Unit
 foreign sync close_search from "./browser.ts" "closeSearch"
   arity 0
 
-find : Atom.Writable Model -> String ->{Atom.Write;} Unit
+find : Atom.Writable Model -> String ->{Async, Atom.Write;} Unit
 let find model query =
   let m = Atom.current model
   if String.trim query == "" then

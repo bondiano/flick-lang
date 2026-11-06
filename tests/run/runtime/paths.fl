@@ -11,13 +11,13 @@ temp : Unit ->{} String
 let temp () =
   Option.with_default (Option.with_default "/tmp" (Platform.env "TMPDIR")) (Platform.env "TEMP")
 
-read : String ->{File.FileSystem;} String
+read : String ->{Async, File.FileSystem;} String
 let read path =
   try File.read_text path with
   | File.ReadError message -> message
   | File.OpenError message -> message
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide File.node {
   let path = temp () ++ "/flick-paths.txt"
   try File.write_text path "written and read back" with

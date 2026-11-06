@@ -6,7 +6,7 @@ module App.Main exposing (main)
 drain : TxPubSub.Subscription s Float ->{Tx.Transaction;} List Float
 let drain sub = NonEmpty.to_list (TxPubSub.take_all sub)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let hub : TxPubSub.TxPubSub Float = TxPubSub.unbounded ()
   Platform.stdout_line ("no subscriber: " ++ show (Tx.atomically (task { TxPubSub.publish 0 hub })))

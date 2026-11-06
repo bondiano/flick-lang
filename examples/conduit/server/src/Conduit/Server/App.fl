@@ -15,7 +15,7 @@ type alias Handler =
   ServerRequest ->{Database, Keys, Crypto.Crypto; Http.ServerError.HttpServerError} ServerResponse
 
 /// The router of the API and, given a directory, of the client's files.
-router : Option String ->{Database, Keys, Crypto.Crypto; PlatformError.PlatformError} Handler
+router : Option String ->{Async, Database, Keys, Crypto.Crypto; PlatformError.PlatformError} Handler
 let router files =
   let api = HttpApi.route "/api/*" Routes.api Routes.handlers
   let client =

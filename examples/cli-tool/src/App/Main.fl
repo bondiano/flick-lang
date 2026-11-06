@@ -12,17 +12,17 @@ let notes_file () =
   | Config.ConfigError message -> App.fail message
 
 /// The notes of the file; none when it does not exist yet.
-load : String ->{File.FileSystem;} List String
+load : String ->{Async, File.FileSystem;} List String
 let load path =
   try Notes.parse (File.read_text path) with
   | File.ReadError _ -> []
 
-save : String -> List String ->{File.FileSystem; AppError} Unit
+save : String -> List String ->{Async, File.FileSystem; AppError} Unit
 let save path notes =
   try File.write_text path (Notes.render notes) with
   | File.WriteError message -> App.fail message
 
-add_command : Cli.Command {File.FileSystem} {AppError}
+add_command : Cli.Command {Async, File.FileSystem} {AppError}
 let add_command = cli "add" {
   description "Add a note"
   /// The words of the note
@@ -32,13 +32,13 @@ let add_command = cli "add" {
     save path (Notes.add (String.join " " (NonEmpty.to_list words)) (load path))
 }
 
-list_command : Cli.Command {File.FileSystem} {AppError}
+list_command : Cli.Command {Async, File.FileSystem} {AppError}
 let list_command = cli "list" {
   description "List the notes, numbered"
   handle fun _ -> for line <- Notes.listing (load (notes_file ())) do Platform.stdout_line line
 }
 
-done_command : Cli.Command {File.FileSystem} {AppError}
+done_command : Cli.Command {Async, File.FileSystem} {AppError}
 let done_command = cli "done" {
   description "Remove the note with this number"
   /// The number `list` shows
@@ -60,7 +60,7 @@ let first_note =
       Some (fun text -> if String.trim text == "" then Err "a note needs words" else Ok text);
   }
 
-init_command : Cli.Command {File.FileSystem} {AppError}
+init_command : Cli.Command {Async, File.FileSystem} {AppError}
 let init_command = cli "init" {
   description "Start a notes file, asking for its first note"
   handle fun _ ->
@@ -70,7 +70,7 @@ let init_command = cli "init" {
     save (notes_file ()) [note]
 }
 
-command : Cli.Command {File.FileSystem} {AppError}
+command : Cli.Command {Async, File.FileSystem} {AppError}
 let command = cli "notes" {
   description "Keep notes in a file, NOTES_FILE or notes.txt"
   subcommand init_command
@@ -79,7 +79,7 @@ let command = cli "notes" {
   subcommand done_command
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide File.node {
   try Cli.run_version "0.1.0" command (Platform.args ()) with
   | Cli.CliError message -> App.fail message

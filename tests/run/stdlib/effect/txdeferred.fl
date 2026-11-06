@@ -15,7 +15,7 @@ let describe outcome =
   | Some (Ok n) -> "ok " ++ show n
   | Some (Err (Late n)) -> "late " ++ show n
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let d : TxDeferred.TxDeferred Float {Late} = TxDeferred.make ()
   Platform.stdout_line ("before: " ++ describe (Tx.atomically (task { TxDeferred.poll d })))

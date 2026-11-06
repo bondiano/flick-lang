@@ -36,6 +36,7 @@ change needs.
 | [Diagnostic codes under `std/`](#diagnostic-codes-under-std) | no | new codes |
 | [`deriving HttpApi` is stricter](#deriving-httpapi-is-stricter) | no | `std/D011`, `FLICK-C001` |
 | [SQL queries are stricter](#sql-queries-are-stricter) | no | `std/Q010`, `FLICK-T003` |
+| [What may suspend says `Async`](#what-may-suspend-says-async) | yes: `--only E002,F001,T003` | `FLICK-E002`, `FLICK-F001`, `FLICK-T003` |
 | [Libraries are compiled from sources](#libraries-are-compiled-from-sources) | no | `FLICK-R003` |
 | [Instances belong to one package](#instances-belong-to-one-package) | no | `FLICK-C006` |
 | [Plugins reach only what is granted](#plugins-reach-only-what-is-granted) | no | `FLICK-P038`, `FLICK-P039` |
@@ -209,7 +210,27 @@ The plugin of `std` writes the same SQL text, with three differences:
 
 These need a manual change.
 
-## Libraries are compiled from sources
+## What may suspend says `Async`
+
+A function that waits for time, input or output or another fiber has the
+effect `Async` in its row ([Effects](../../reference/effects/#what-may-suspend-async)).
+In `std` the functions that wait have it: `Effect.sleep`, `Fiber.join`,
+`Queue.take`, the operations of `Database`, `FileSystem` and `Terminal`,
+`Http.Client`, the servers and clients of `Http`, `Rpc` and `HttpApi`. The
+tasks of actions, events, atoms and tests take it, `Test.suite` takes a
+layer that may need it, and the `main` of a runner may have it.
+
+```sh
+flick check --fix --only E002,F001,T003
+```
+
+adds `Async` to every `foreign async`, then to the rows that call what
+waits, pass after pass up to `main`, and to the types written with such a
+row, as `Cli.Command {Async, File.FileSystem} {AppError}`. It changes
+nothing else. One case needs a hand: a function given rows of both kinds in
+a position no subtyping reaches, as `Channel.Channel none …` given a channel
+of a queue, takes a row variable instead: `Channel.Channel r e … ->{r; e} …`.
+
 
 In 0.1.0 an npm package gave its Flick modules as compiled interfaces:
 

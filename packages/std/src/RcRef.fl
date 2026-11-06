@@ -25,7 +25,7 @@ foreign effect get from "@flick-lang/runtime/effect/RcRef" "get"
 
 /// Releases the resource once its holders are done; the next `get`
 /// acquires it again.
-invalidate : forall s e a. RcRef s e a ->{} Unit
+invalidate : forall s e a. RcRef s e a ->{Async;} Unit
 foreign effect invalidate from "@flick-lang/runtime/effect/RcRef" "invalidate"
   retention call
   reviewed "effect@4.1.2 sha256:1c1dccd0aab9e2c0"

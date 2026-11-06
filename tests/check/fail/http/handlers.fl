@@ -12,7 +12,7 @@ let get_user =
 ping : HttpApi.Endpoint "ping" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
 let ping = HttpApi.endpoint HttpApi.Get "/ping" (Record.label : Record.Label "ping")
 
-serve : Unit ->{; HttpApi.ServeError} Unit
+serve : Unit ->{Async; HttpApi.ServeError} Unit
 let serve () =
   let users =
     HttpApi.group (Record.label : Record.Label "users") |> HttpApi.add get_user |> HttpApi.add ping

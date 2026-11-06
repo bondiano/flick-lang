@@ -28,7 +28,7 @@ let at jwt path payload = { path = path; query = (); headers = credentials jwt; 
 call :
   forall l p q h b r e s.
   HttpApi.Request p q h b ->
-  HttpApi.Endpoint l (HttpApi.Request p q h b ->{r; e} s) ->{; HttpApi.ClientError | e}
+  HttpApi.Endpoint l (HttpApi.Request p q h b ->{r; e} s) ->{Async; HttpApi.ClientError | e}
   s
 let call request endpoint = HttpApi.call "/api" endpoint request
 

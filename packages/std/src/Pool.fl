@@ -59,7 +59,7 @@ foreign effect use from "@flick-lang/runtime/effect/Pool" "use"
 
 /// Releases `item`, the very value `get` gave, once its tasks are done;
 /// the pool acquires another when it needs one.
-invalidate : forall s e a. a -> Pool s e a ->{} Unit
+invalidate : forall s e a. a -> Pool s e a ->{Async;} Unit
 foreign effect invalidate from "@flick-lang/runtime/effect/Pool" "invalidate"
   arity 1
   retention call

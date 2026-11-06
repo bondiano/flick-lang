@@ -153,7 +153,7 @@ let requests () =
   Platform.stdout_line
     ("texts: " ++ (show (List.map (fun x -> Http.Body.to_text (Http.ClientRequest.body x)) bodies)))
 
-bodies : Unit ->{; Http.Body.HttpBodyError, SchemaError} Unit
+bodies : Unit ->{Async; Http.Body.HttpBodyError, SchemaError} Unit
 let bodies () =
   let wire = Codec.encode item { label = "cup"; size = 1 }
   let j = Http.ClientRequest.body_json wire Http.ClientRequest.empty
@@ -191,7 +191,7 @@ let bodies () =
 
 /// The text fields of a multipart body, of a URL-encoded one, and the
 /// failure of a body of neither.
-forms : Unit ->{; HttpClientError} Unit
+forms : Unit ->{Async; HttpClientError} Unit
 let forms () =
   let multipart = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/multipart")
   Platform.stdout_line ("form_data: " ++ show (Http.ClientResponse.form_data multipart))
@@ -205,7 +205,7 @@ let forms () =
         | e -> describe e
       ))
 
-responses : Unit ->{; HttpClientError, SchemaError} Unit
+responses : Unit ->{Async; HttpClientError, SchemaError} Unit
 let responses () =
   let echoed = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/echo")
   Platform.stdout_line
@@ -267,14 +267,14 @@ let responses () =
     Platform.stdout_line
       ("filter_status_ok: " ++ (describe e ++ " " ++ show (Http.ClientError.status e)))
 
-body_of : (Http.Client.Client r e, String) ->{r; HttpClientError | e} String
+body_of : (Http.Client.Client r e, String) ->{Async | r; HttpClientError | e} String
 let body_of (client, url) =
   Http.ClientResponse.text (Http.Client.execute_with client (Http.ClientRequest.get url))
 
 refuse : ClientResponse -> Errors {Refused}
 let refuse response = Refused (Http.ClientResponse.status response)
 
-combinators : Unit ->{; HttpClientError, Refused} Unit
+combinators : Unit ->{Async; HttpClientError, Refused} Unit
 let combinators () =
   let tagged = fake |> Http.Client.map_request (Http.ClientRequest.set_header "x-tag" "1")
   Platform.stdout_line ("map_request: " ++ (body_of (tagged, "http://fake/a")))
@@ -417,7 +417,7 @@ type alias Whole = { status : Float; body : Item }
 type alias Pairs = { a : List String }
   deriving Schema
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   requests ()
   try

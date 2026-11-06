@@ -74,19 +74,19 @@ let sleeping =
     ]
     (Codec.json Count.schema)
 
-put : BigInt -> BigInt ->{Database; EncodeError, DbError, DecodeError} Unit
+put : BigInt -> BigInt ->{Async, Database; EncodeError, DbError, DecodeError} Unit
 let put account amount =
   ignore (Database.query
     (Sql.bind deposit { account = account; amount = BigDecimal.from_integer amount }))
 
-balance : BigInt ->{Database; EncodeError, DbError, DecodeError} String
+balance : BigInt ->{Async, Database; EncodeError, DbError, DecodeError} String
 let balance account =
   match Database.query (Sql.bind balance_of { account = account }) with
   | [row] -> show row.balance
   | _ -> "missing"
 
 /// An account of a new user, holding 10.
-account : String ->{Database; EncodeError, DbError, DecodeError} BigInt
+account : String ->{Async, Database; EncodeError, DbError, DecodeError} BigInt
 let account name =
   match Database.query (Sql.bind add_user { name = name }) with
   | [user] ->
@@ -98,7 +98,7 @@ let account name =
     | _ -> 0n
   | _ -> 0n
 
-run : Unit ->{Database; EncodeError, DbError, DecodeError} Unit
+run : Unit ->{Async, Database; EncodeError, DbError, DecodeError} Unit
 let run () =
   // the second write breaks the check: the first goes too
   let a = account "atomic"
@@ -158,7 +158,7 @@ let run () =
   Platform.stdout_line ("balance " ++ balance c)
 
 /// Twenty sleepers interrupted on a pool of two: none keeps a backend.
-cancelled : Unit ->{Database; EncodeError, DbError, DecodeError} Unit
+cancelled : Unit ->{Async, Database; EncodeError, DbError, DecodeError} Unit
 let cancelled () =
   let stopped =
     parallel_all
@@ -171,7 +171,7 @@ let cancelled () =
   | [count] -> Platform.stdout_line ("still sleeping: " ++ show count.n)
   | _ -> Platform.stdout_line "no count"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   match Platform.env "DATABASE_URL" with
   | None -> App.fail "DATABASE_URL is not set"

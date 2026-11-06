@@ -5,7 +5,7 @@ module App.Web exposing (main)
 import App.Remote
 import App.Shared
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try Console.log (App.Shared.greeting (App.Remote.lookup "1")) with
   | Rpc.ClientError message -> App.fail message

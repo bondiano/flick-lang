@@ -33,7 +33,7 @@ type DigestAlgorithm = Sha1 | Sha256 | Sha384 | Sha512
 /// Cryptographically strong randomness and digests.
 service Crypto =
   random_bytes : Int ->{; CryptoError} List Int
-  digest : DigestAlgorithm -> List Int ->{; CryptoError} List Int
+  digest : DigestAlgorithm -> List Int ->{Async; CryptoError} List Int
   random : Unit ->{} Float
   random_boolean : Unit ->{} Bool
   random_int : Unit ->{} Int
@@ -49,11 +49,11 @@ random_bytes : Int ->{Crypto; CryptoError} List Int
 let random_bytes size = Crypto.random_bytes size
 
 /// The digest of the bytes by the algorithm.
-digest : DigestAlgorithm -> List Int ->{Crypto; CryptoError} List Int
+digest : DigestAlgorithm -> List Int ->{Async, Crypto; CryptoError} List Int
 let digest algorithm data = Crypto.digest algorithm data
 
 /// The HMAC of the message under the key (RFC 2104), over `digest`.
-hmac : DigestAlgorithm -> List Int -> List Int ->{Crypto; CryptoError} List Int
+hmac : DigestAlgorithm -> List Int -> List Int ->{Async, Crypto; CryptoError} List Int
 let hmac algorithm key message =
   let block =
     match algorithm with
@@ -68,13 +68,13 @@ let hmac algorithm key message =
 /// PBKDF2 (RFC 8018) with HMAC over the digest: `length` bytes derived from
 /// the salt and the password in `iterations` rounds. Both counts must be
 /// positive.
-pbkdf2 : DigestAlgorithm -> Int -> Int -> List Int -> List Int ->{; CryptoError} List Int
+pbkdf2 : DigestAlgorithm -> Int -> Int -> List Int -> List Int ->{Async; CryptoError} List Int
 foreign effect pbkdf2 from "@flick-lang/runtime/effect/Crypto" "flickPbkdf2"
 
 /// A hash of the password to store: PBKDF2-HMAC-SHA256 with 600000 rounds
 /// and a random 16-byte salt, written
 /// `$pbkdf2-sha256$i=600000$<salt>$<hash>` in URL-safe base64.
-hash_password : String ->{Crypto; CryptoError} String
+hash_password : String ->{Async, Crypto; CryptoError} String
 let hash_password password =
   let salt = Crypto.random_bytes 16
   let hash = pbkdf2 Sha256 600000 32 salt (Bytes.from_string password)
@@ -89,7 +89,7 @@ let hash_password password =
 /// Whether the password is the one `hash_password` hashed into `stored`, in
 /// its rounds, compared in constant time. A stored text of another form is a
 /// `CryptoError`.
-verify_password : String -> String ->{; CryptoError} Bool
+verify_password : String -> String ->{Async; CryptoError} Bool
 let verify_password password stored =
   let parts = String.split "$" stored
   let rounds = Option.with_default "" (List.get 2 parts)
@@ -155,7 +155,7 @@ let random_ulid () = Crypto.random_ulid ()
 system_random_bytes : Int ->{; CryptoError} List Int
 foreign effect system_random_bytes from "@flick-lang/runtime/effect/Crypto" "flickRandomBytes"
 
-system_digest : DigestAlgorithm -> List Int ->{; CryptoError} List Int
+system_digest : DigestAlgorithm -> List Int ->{Async; CryptoError} List Int
 foreign effect system_digest from "@flick-lang/runtime/effect/Crypto" "flickDigest"
 
 system_random : Unit ->{} Float

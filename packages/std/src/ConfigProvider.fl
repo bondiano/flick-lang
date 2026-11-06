@@ -101,7 +101,7 @@ from_dot_env :
     path : Option String;
     expandVariables : Bool;
     preserveEmptyStrings : Bool;
-  } ->{FileSystem.FileSystem; PlatformError.PlatformError}
+  } ->{Async, FileSystem.FileSystem; PlatformError.PlatformError}
   ConfigProvider
 let from_dot_env options =
   let text = FileSystem.read_file_string (Option.with_default ".env" options.path)
@@ -115,7 +115,7 @@ let from_dot_env options =
 /// Values from a directory tree, by default `/`: a file is a value, its
 /// trimmed text; a directory is a record of its entries.
 from_dir :
-  { rootPath : Option String; preserveEmptyStrings : Bool } ->{FileSystem.FileSystem;}
+  { rootPath : Option String; preserveEmptyStrings : Bool } ->{Async, FileSystem.FileSystem;}
   ConfigProvider
 foreign effect from_dir from "@flick-lang/runtime/effect/ConfigProvider" "flickFromDir"
   reviewed "effect@4.1.2 sha256:2df6220667d4e4fc"

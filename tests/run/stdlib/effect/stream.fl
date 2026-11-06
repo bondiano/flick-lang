@@ -30,7 +30,7 @@ let record seen n =
   Ref.set seen (Ref.get seen ++ [n])
   n < 5
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   line ("make", (Stream.run_collect (Stream.make [1, 2, 3])))
   line ("from_list", (Stream.run_collect (Stream.from_list [4, 5])))

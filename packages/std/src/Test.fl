@@ -62,12 +62,12 @@ clock_test : forall e. String -> (forall s. Eff {Async, Scope s, VirtualTime} e 
 foreign pure clock_test from "@flick-lang/runtime" "testClock"
 
 /// Moves the clock forward by `duration`, running what was waiting for it.
-adjust : Duration.Duration ->{VirtualTime;} Unit
+adjust : Duration.Duration ->{Async, VirtualTime;} Unit
 foreign effect adjust from "@flick-lang/runtime" "testAdjust"
 
 /// Sets the clock to `millis` since the epoch, running what was waiting
 /// until then.
-set_time : Float ->{VirtualTime;} Unit
+set_time : Float ->{Async, VirtualTime;} Unit
 foreign effect set_time from "@flick-lang/runtime" "testSetTime"
 
 /// Checks `check` on 100 values of `gen`, from the run's seed.
@@ -84,9 +84,9 @@ type Spec (o : ServiceRow)
 /// Tests that share what `layer` makes: it is built once, before the first
 /// of them that runs, and released after the last, the `beforeAll` and
 /// `afterAll` of the suite. A failed build fails each of its tests.
-suite : forall e o. String -> Layer none e o -> List (Spec o) -> Test
+suite : forall e o. String -> Layer {Async} e o -> List (Spec o) -> Test
 foreign pure suite from "@flick-lang/runtime" "testSuite"
 
 /// An effectful test of a suite: `effect_test` with the suite's services.
-it : forall o e. String -> (forall s. Eff {Scope s | o} e Unit) -> Spec o
+it : forall o e. String -> (forall s. Eff {Async, Scope s | o} e Unit) -> Spec o
 foreign pure it from "@flick-lang/runtime" "testEffect"

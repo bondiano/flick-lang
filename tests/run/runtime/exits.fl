@@ -8,7 +8,7 @@ type error Boom = Boom Float
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -23,7 +23,7 @@ let ended exit = Exit.match_ (fun v -> "value " ++ show v) (fun f -> "failed " +
 quiet : forall e. Failure e ->{} Unit
 let quiet _ = ()
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let exits = parallel_exits [task { 1 }, task { from_result (Err (Boom 2)) }]
   say (show (List.map ended exits))

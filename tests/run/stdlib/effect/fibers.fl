@@ -29,14 +29,14 @@ let ms20 = Result.with_default Duration.zero (Duration.millis 20)
 ms50 : Duration.Duration
 let ms50 = Result.with_default Duration.zero (Duration.millis 50)
 
-after : Duration.Duration -> String -> Eff none {Boom} String
+after : Duration.Duration -> String -> Eff {Async} {Boom} String
 let after d value = task {
   Effect.sleep d
   value
 }
 
 /// How joining ends.
-joined_by : forall c. (Eff none {Boom} Unit)^c ->{} String
+joined_by : forall c. (Eff {Async} {Boom} Unit)^c ->{Async;} String
 let joined_by t =
   try
     await t
@@ -44,7 +44,7 @@ let joined_by t =
   with
   | Boom n -> "Boom " ++ show n
 
-fibers : Unit ->{} Unit
+fibers : Unit ->{Async;} Unit
 let fibers () = scope s {
   let a : Fiber.Fiber {Boom} String = Fiber.spawn s quiet (after ms1 "a")
   let b = Fiber.spawn s quiet (task { from_result (Err (Boom 2)) })
@@ -69,7 +69,7 @@ let fibers () = scope s {
   Platform.stdout_line ("interrupt_all: " ++ show (List.map ended (Fiber.await_all [f, g, h])))
 }
 
-sets : Unit ->{} Unit
+sets : Unit ->{Async;} Unit
 let sets () =
   let run_options = { propagateInterruption = false; startImmediately = false }
   let joined = scope s {
@@ -134,7 +134,7 @@ let sets () =
     Platform.stdout_line ("handle join: " ++ failed)
   }
 
-races : Unit ->{; Boom} Unit
+races : Unit ->{Async; Boom} Unit
 let races () =
   Platform.stdout_line
     ("race_all: " ++ show (Effect.race_all [after ms1000 "slow", after ms1 "fast"]))
@@ -208,7 +208,7 @@ let plans () =
   Platform.stdout_line ("with_execution_plan: " ++ greeted)
   Platform.stdout_line ("events: " ++ show (Ref.get events))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   fibers ()
   sets ()

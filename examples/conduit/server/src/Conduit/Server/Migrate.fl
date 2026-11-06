@@ -9,7 +9,7 @@ url : Unit ->{; Config.ConfigError} String
 let url () = Config.get (Config.string "DATABASE_URL")
 
 /// Applies the migrations the database lacks and says which.
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let database =
     try url () with

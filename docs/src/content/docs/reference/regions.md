@@ -12,7 +12,7 @@ scope is open.
 ```flick
 # import File exposing (Path, FileSystem, OpenError, ReadError)
 #
-read_config : Path ->{FileSystem; OpenError, ReadError} String
+read_config : Path ->{Async, FileSystem; OpenError, ReadError} String
 let read_config path =
   scope {
     let file = File.open_scoped path
@@ -31,7 +31,7 @@ requirement on to its caller's scope by naming it in its signature:
 ```flick
 # import File exposing (File, Path, FileSystem, OpenError)
 #
-open_two : forall s. Path ->{FileSystem, Scope s; OpenError} (File s, File s)
+open_two : forall s. Path ->{Async, FileSystem, Scope s; OpenError} (File s, File s)
 let open_two path =
   (File.open_scoped path, File.open_scoped path)
 ```
@@ -50,9 +50,9 @@ the call runs.
 ```flick
 # import File exposing (File, Path, FileSystem, OpenError)
 #
-keep : forall s. Path ->{FileSystem, Scope s; OpenError} File s
+keep : forall s. Path ->{Async, FileSystem, Scope s; OpenError} File s
 let keep path =
-  acquire : Unit ->{FileSystem, Scope s; OpenError} File s
+  acquire : Unit ->{Async, FileSystem, Scope s; OpenError} File s
   let acquire () = File.open_scoped path
   scope {
     let local = File.open_scoped path
@@ -91,7 +91,7 @@ The distinction survives [`.iface` schema 2](../iface/#types-and-kinds).
 ```flick
 # import File exposing (File, FileSystem, ReadError)
 #
-read_later : forall s. File s -> (Eff {FileSystem} {ReadError} String)^{s}
+read_later : forall s. File s -> (Eff {Async, FileSystem} {ReadError} String)^{s}
 let read_later file =
   task { File.read_all file }
 ```

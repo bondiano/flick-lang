@@ -14,7 +14,7 @@ foreign effect make from "@flick-lang/runtime/effect/TxDeferred" "make"
 
 /// Its value, or its error as a typed failure; retries the transaction
 /// while it is not completed (`await` is a keyword).
-await_ : TxDeferred a e ->{Tx.Transaction; e} a
+await_ : TxDeferred a e ->{Async, Tx.Transaction; e} a
 foreign effect await_ from "@flick-lang/runtime/effect/TxDeferred" "await"
   reviewed "effect@4.1.2 sha256:f0edc72d9760c34b"
 

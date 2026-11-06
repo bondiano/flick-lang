@@ -514,7 +514,7 @@ instance MonadState m s => MonadState (Wrap m) s =
 
 import App.Box exposing (Box)
 
-save : String ->{File.FileSystem; e} Unit
+save : String ->{Async, File.FileSystem; e} Unit
 let save path =
   try File.write_text path \"x\" with
   | File.WriteError _ -> ()

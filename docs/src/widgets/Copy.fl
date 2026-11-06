@@ -6,7 +6,7 @@ import JsError exposing (JsError(..))
 type alias Input = { id : String; source : String; ru : Bool }
 type alias Model = { copied : Bool; problem : String }
 
-copy_text : String ->{; JsError} Unit
+copy_text : String ->{Async; JsError} Unit
 foreign async copy_text from "./browser.ts" "copyText"
   arity 1
   catch JsError.from_js

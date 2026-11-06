@@ -48,7 +48,7 @@ let pets = sql {
   order_by pet.name
 }
 
-run : Unit ->{Database; MigrationError, EncodeError, DbError, DecodeError} Unit
+run : Unit ->{Async, Database; MigrationError, EncodeError, DbError, DecodeError} Unit
 let run () =
   Platform.stdout_line ("applied " ++ show (Database.Migrate.run migrations))
   Platform.stdout_line ("again " ++ show (Database.Migrate.run migrations))
@@ -60,7 +60,7 @@ let run () =
       Platform.stdout_line (row.owner ++ " " ++ row.pet ++ " " ++ row.species)
   | _ -> Platform.stdout_line "no person"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let url = Option.with_default "" (Platform.env "DATABASE_URL")
   provide (Database.pg (Database.config url)) {

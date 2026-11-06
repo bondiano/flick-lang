@@ -27,7 +27,7 @@ server fn twice word = word ++ word
 page : ServerRequest ->{Server.Server;} ServerResponse
 let page _ = Http.ServerResponse.text "page" Http.ServerResponse.defaults
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let layers =
     Layer.merge
@@ -36,9 +36,10 @@ let main () =
   provide layers {
     try
       scope s {
-        functions : (ServerRequest ->{} ServerResponse)^{s}
+        functions : (ServerRequest ->{Async;} ServerResponse)^{s}
         let functions = Server.handler [server twice]
-        app : (ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        app :
+          (ServerRequest ->{Async, Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
         let app =
           Http.Router.router Http.Router.config [
             Http.Router.route (Some Http.Method.POST) Server.path (fun request ->

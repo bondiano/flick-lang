@@ -10,7 +10,7 @@ let initial_view config =
   let initial = initial_model config
   view (Atom.make initial) initial
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let initial = initial_model (configuration ())
   match Ui.Dom.container "flick-playground" with

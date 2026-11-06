@@ -212,7 +212,7 @@ subquery or a union (`std/Q002`).
 # import BigDecimal exposing (BigDecimal)
 # import App.Queries exposing (UserId, BalanceRow, balances)
 #
-load : UserId ->{Database; EncodeError, DbError, DecodeError} List BalanceRow
+load : UserId ->{Async, Database; EncodeError, DbError, DecodeError} List BalanceRow
 let load id = Database.query (Sql.bind balances { user_id = id })
 ```
 
@@ -247,7 +247,7 @@ no network. Other programs carry no driver and build offline.
 # import BigDecimal exposing (BigDecimal)
 # import App.Queries exposing (withdraw, deposit)
 #
-transfer : BigInt -> BigInt -> BigDecimal ->{Database; EncodeError, DbError, DecodeError} Unit
+transfer : BigInt -> BigInt -> BigDecimal ->{Async, Database; EncodeError, DbError, DecodeError} Unit
 let transfer source target amount =
   Database.transaction (task {
     ignore (Database.query (Sql.bind withdraw { account = source; amount = amount }))

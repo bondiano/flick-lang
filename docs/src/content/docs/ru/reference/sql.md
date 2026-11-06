@@ -1,6 +1,6 @@
 ---
 title: "Запросы SQL"
-source_hash: 76dd5f549397c7ea
+source_hash: 5a797e9006c37393
 ---
 
 Flick проверяет запросы к PostgreSQL по объявлениям таблиц в исходном коде.
@@ -237,7 +237,7 @@ let balances_of id =
 # import BigDecimal exposing (BigDecimal)
 # import App.Queries exposing (UserId, BalanceRow, balances)
 #
-load : UserId ->{Database; EncodeError, DbError, DecodeError} List BalanceRow
+load : UserId ->{Async, Database; EncodeError, DbError, DecodeError} List BalanceRow
 let load id = Database.query (Sql.bind balances { user_id = id })
 ```
 
@@ -275,7 +275,7 @@ v5.7.6, его скачивает первый `go build` в кэш модуле
 # import BigDecimal exposing (BigDecimal)
 # import App.Queries exposing (withdraw, deposit)
 #
-transfer : BigInt -> BigInt -> BigDecimal ->{Database; EncodeError, DbError, DecodeError} Unit
+transfer : BigInt -> BigInt -> BigDecimal ->{Async, Database; EncodeError, DbError, DecodeError} Unit
 let transfer source target amount =
   Database.transaction (task {
     ignore (Database.query (Sql.bind withdraw { account = source; amount = amount }))

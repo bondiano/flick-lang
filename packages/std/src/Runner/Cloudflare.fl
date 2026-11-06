@@ -20,7 +20,7 @@ type Context
 type alias Fetch = { request : ServerRequest; context : Context }
 
 /// What `main` of an entry is: the response to a request.
-type alias Main = Fetch ->{Env; AppError} ServerResponse
+type alias Main = Fetch ->{Async, Env; AppError} ServerResponse
 
 /// The Worker's handler of `main`.
 run : Main -> Unknown

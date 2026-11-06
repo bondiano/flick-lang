@@ -31,10 +31,10 @@ e1a65497b7577f4f  05-errors-and-concurrency:63  service Time =
 e4c3a6f35bbce321  05-errors-and-concurrency:89  type UserId = UserId String
 8649bca288383d5a  05-errors-and-concurrency:122  effect Emit a =
 17b6a846ff453f2c  05-errors-and-concurrency:174  type UserId = UserId String
-394876620d153a1c  05-errors-and-concurrency:243  import File exposing (File, Path, FileSystem, OpenError, ReadError)
+77ec8ad94fac68d4  05-errors-and-concurrency:262  import File exposing (File, Path, FileSystem, OpenError, ReadError)
 1c7460ca6702f465  05-errors-and-concurrency:267  import File exposing (File, Path, FileSystem, OpenError, ReadError)
-37cf42397db6f9c3  05-errors-and-concurrency:283  import File exposing (File, Path, FileSystem, OpenError, ReadError)
 d7add3cdb4017b53  05-errors-and-concurrency:301  import File exposing (File, Path, FileSystem, OpenError, ReadError)
+165a9ba77c667563  05-errors-and-concurrency:302  import File exposing (File, Path, FileSystem, OpenError, ReadError)
 26c0a10afc3c3254  05-errors-and-concurrency:369  type UserId = UserId String
 04a35e4e95605dd5  06-typescript-and-ffi:10  identity : a -> a
 1d4de52c15fcfbac  06-typescript-and-ffi:35  with_default : a -> Option a -> a
@@ -49,7 +49,7 @@ ecfe40849e18cf97  07-schema:69  refined type Email = String where Checks.email
 16ddba9438dc4858  07-schema:159  type Tree a =
 4fe0a456611fab95  07-schema:265  increment : Ref Float ->{} Float
 db39cdea80dbbc7c  07-schema:280  class Eq a => Hash a =
-8fa84d56ae5e9721  08-type-programming-and-edsl:32  import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+a7de73212b9fb42f  08-type-programming-and-edsl:33  import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
 0d6f75c0a06b0061  08-type-programming-and-edsl:92  type alias SaveButtonProps c = {
 2c80c55aef7a08d4  08-type-programming-and-edsl:120  component counter (start : Float) =
 f58178983e732561  08-type-programming-and-edsl:155  import Cli exposing (plugin cli)

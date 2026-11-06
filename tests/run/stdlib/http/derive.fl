@@ -88,21 +88,21 @@ let asking authorization = {
 answer :
   String ->
   Option String ->
-  HttpApi.Endpoint l (HttpApi.Request Unit Unit Credentials Unit ->{r; Unauthorized} String) ->{}
+  HttpApi.Endpoint l (HttpApi.Request Unit Unit Credentials Unit ->{r; Unauthorized} String) ->{Async;}
   String
 let answer base authorization endpoint =
   try HttpApi.call base endpoint (asking authorization) with
   | Unauthorized why -> "401 " ++ why
   | HttpApi.ClientError e -> "client error " ++ e.message
 
-profile : String -> String ->{} String
+profile : String -> String ->{Async;} String
 let profile base name =
   let request = { path = { name = name }; query = (); headers = (); payload = () }
   try (HttpApi.call base Public.endpoints.profile request).name with
   | NotFound who -> "404 " ++ who
   | HttpApi.ClientError e -> "client error " ++ e.message
 
-post : String ->{} String
+post : String ->{Async;} String
 let post base =
   let note = {
     path = ();
@@ -114,7 +114,7 @@ let post base =
   | Unauthorized why -> "401 " ++ why
   | HttpApi.ClientError e -> "client error " ++ e.message
 
-forget : String ->{} String
+forget : String ->{Async;} String
 let forget base =
   try
     HttpApi.call base Public.endpoints.forget { path = (); query = (); headers = (); payload = () }
@@ -122,7 +122,7 @@ let forget base =
   with
   | HttpApi.ClientError e -> "client error " ++ e.message
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let options : HttpApi.ServeOptions = {
     host = "127.0.0.1";

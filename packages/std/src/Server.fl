@@ -54,6 +54,7 @@ let path = "/_flick/fn"
 /// The calls of `functions`, each a POST of its name and payload as
 /// NDJSON, for a route at `path`. It holds region `s`: when the scope
 /// owning it closes, the calls it serves finish and run their finalizers.
-handler : forall s r. List (Function r) ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s}
+handler :
+  forall s r. List (Function r) ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s}
 foreign effect handler from "@flick-lang/runtime/effect/server/FunctionsNode" "serverHandler"
   retention owner

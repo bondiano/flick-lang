@@ -43,6 +43,6 @@ foreign effect use from "@flick-lang/runtime/effect/Resource" "flickUse"
 
 /// Acquires the value again; the previous one is released once no `use`
 /// holds it. If the acquisition fails, the previous value stays.
-refresh : forall s e a. Resource s e a ->{; e} Unit
+refresh : forall s e a. Resource s e a ->{Async; e} Unit
 foreign effect refresh from "@flick-lang/runtime/effect/Resource" "flickRefresh"
   retention call

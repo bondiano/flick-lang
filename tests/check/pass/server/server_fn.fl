@@ -23,14 +23,14 @@ server fn stock () = ["tea", "cake"]
 restock : String -> Int ->{Server.Server;} Int
 server fn restock item count = count + String.length item
 
-refill : String -> Int ->{; Rpc.ClientError} Int
+refill : String -> Int ->{Async; Rpc.ClientError} Int
 let refill = restock
 
-call : Order ->{; Rpc.ClientError, OutOfStock} String
+call : Order ->{Async; Rpc.ClientError, OutOfStock} String
 let call = place
 
 listing : Atom.Atom (Atom.Async (List String) {Rpc.ClientError})
 let listing = Atom.task (task { stock () })
 
-serve : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{} ServerResponse)^{s}
+serve : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{Async;} ServerResponse)^{s}
 let serve () = Server.handler [server place, server stock, server restock]

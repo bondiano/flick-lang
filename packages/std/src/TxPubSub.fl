@@ -64,13 +64,13 @@ foreign effect is_shutdown from "@flick-lang/runtime/effect/TxPubSub" "isShutdow
 
 /// Hands the element to every subscriber; false when it was dropped or
 /// the hub is shut down.
-publish : a -> TxPubSub a ->{Tx.Transaction;} Bool
+publish : a -> TxPubSub a ->{Async, Tx.Transaction;} Bool
 foreign effect publish from "@flick-lang/runtime/effect/TxPubSub" "publish"
   arity 1
   reviewed "effect@4.1.2 sha256:63779402c69879d4"
 
 /// Publishes the elements in order; false when one was dropped.
-publish_all : List a -> TxPubSub a ->{Tx.Transaction;} Bool
+publish_all : List a -> TxPubSub a ->{Async, Tx.Transaction;} Bool
 foreign effect publish_all from "@flick-lang/runtime/effect/TxPubSub" "publishAll"
   arity 1
   reviewed "effect@4.1.2 sha256:0f2fc6b1f4a733b6"
@@ -87,7 +87,7 @@ foreign effect shutdown from "@flick-lang/runtime/effect/TxPubSub" "shutdown"
   reviewed "effect@4.1.2 sha256:e8534b436917ff59"
 
 /// Retries the transaction until the hub is shut down.
-await_shutdown : TxPubSub a ->{Tx.Transaction;} Unit
+await_shutdown : TxPubSub a ->{Async, Tx.Transaction;} Unit
 foreign effect await_shutdown from "@flick-lang/runtime/effect/TxPubSub" "awaitShutdown"
   reviewed "effect@4.1.2 sha256:2e6d0d63d84a3814"
 

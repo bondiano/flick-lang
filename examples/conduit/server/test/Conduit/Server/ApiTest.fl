@@ -23,7 +23,7 @@ import Conduit.Server.Session exposing (Keys)
 
 /// What the server runs with: the database of the suite, a key and the
 /// system's cryptography.
-services : Layer none none {Database, Keys, Crypto.Crypto}
+services : Layer {Async} none {Database, Keys, Crypto.Crypto}
 let services =
   Layer.merge Postgres.layer (Layer.merge (Server.keys "conduit-test-key") Crypto.system)
 
@@ -31,7 +31,7 @@ let services =
 send :
   forall l p q h b r e s.
   HttpApi.Request p q h b ->
-  HttpApi.Endpoint l (HttpApi.Request p q h b ->{r; e} s) ->{Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError | e}
+  HttpApi.Endpoint l (HttpApi.Request p q h b ->{r; e} s) ->{Async, Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError | e}
   s
 let send request endpoint = HttpApi.Inject.call (Server.router None) "/api" endpoint request
 
@@ -49,7 +49,7 @@ let at user path payload = { path = path; query = (); headers = as_user user; pa
 
 /// Signs `name` up, its password `<name>-password`.
 sign_up :
-  String ->{Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError, Conflict, Unprocessable}
+  String ->{Async, Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError, Conflict, Unprocessable}
   User
 let sign_up name =
   let user = {
@@ -82,7 +82,7 @@ let draft title tags = {
 publish :
   User ->
   String ->
-  List String ->{Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError, Unauthorized, Unprocessable}
+  List String ->{Async, Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError, Unauthorized, Unprocessable}
   Article
 let publish author title tags =
   (send (at (Some author) () (draft title tags)) Api.Articles.endpoints.create_article).article

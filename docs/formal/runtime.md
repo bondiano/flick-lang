@@ -547,7 +547,7 @@ foreign effect open_res from "./resources.mjs" "open"
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -719,7 +719,7 @@ let main () =
 ### Go: leaving a mask does not deliver a pending interruption
 
 ```flick
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   scope s {
     let f = Fiber.spawn s report (task {

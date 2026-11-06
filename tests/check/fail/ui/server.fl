@@ -8,11 +8,11 @@ let count = Atom.make 0
 page : Ui
 let page = Ui.render (Ui.view (fun () -> Ui.text (show (Atom.value count)))) ()
 
-outside : Unit ->{} String
+outside : Unit ->{Async;} String
 let outside () = Ui.Server.render page
 //               ^^^^^^^^^^^^^^^^^^^^^ FLICK-E002 does not allow service `Registry`
 
-after : Unit ->{} String
+after : Unit ->{Async;} String
 let after () =
   provide Atom.layer { Atom.set count 1 }
   Ui.Server.render page

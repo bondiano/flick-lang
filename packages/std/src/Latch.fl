@@ -22,7 +22,7 @@ foreign effect release from "@flick-lang/runtime/effect/Latch" "release"
   reviewed "effect@4.1.2 sha256:31dc1ac73ff6aea2"
 
 /// Waits until the latch opens or releases its waiters.
-await_ : Latch ->{} Unit
+await_ : Latch ->{Async;} Unit
 foreign effect await_ from "@flick-lang/runtime/effect/Latch" "await"
   reviewed "effect@4.1.2 sha256:208393efc057b171"
 

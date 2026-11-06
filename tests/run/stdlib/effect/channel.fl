@@ -7,16 +7,16 @@ type error Boom = Boom String
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-lists : Channel.Channel none e i (NonEmpty.NonEmpty a) d none Unit ->{; e} List (List a)
+lists : Channel.Channel r e i (NonEmpty.NonEmpty a) d none Unit ->{r; e} List (List a)
 let lists channel = Channel.run_collect (Channel.map NonEmpty.to_list channel)
 
 /// Offers the numbers to the queue and ends it.
-feed : List Float -> Queue.Queue e Float ->{} Bool
+feed : List Float -> Queue.Queue e Float ->{Async;} Bool
 let feed numbers queue =
   let _ = Queue.offer_all numbers queue
   Queue.end queue
 
-values : Unit ->{; Boom} Unit
+values : Unit ->{Async; Boom} Unit
 let values () =
   say ("from_list: " ++ show (Channel.run_collect (Channel.from_list [1, 2, 3])))
   say ("from_list_chunked: " ++ show (lists (Channel.from_list_chunked 2 [1, 2, 3, 4, 5])))
@@ -57,7 +57,7 @@ let values () =
   say ("identity: " ++ show (Channel.run_collect echoed))
   say ("from_schedule: " ++ show (Channel.run_collect (Channel.from_schedule (Schedule.recurs 2))))
 
-queues : Unit ->{; Boom} Unit
+queues : Unit ->{Async; Boom} Unit
 let queues () =
   let q : Queue.Queue {Boom} Float = Queue.unbounded ()
   let _ = feed [1, 2, 3] q
@@ -111,7 +111,7 @@ let resources () =
       )
   say ("acquire_use_release: " ++ show (Channel.run_collect used) ++ " " ++ show (Ref.get log))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     values ()

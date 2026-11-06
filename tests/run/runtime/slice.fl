@@ -34,7 +34,7 @@ let scaled k = fun s ->
 count_down : Int -> Int -> Int
 let rec count_down acc n = if n == 0 then acc else count_down (acc + 1) (n - 1)
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -42,7 +42,7 @@ let nap millis =
 
 /// A parallel group whose failing branch stops the slow one, which ends
 /// before the failure reaches the caller.
-fail_fast : Ref (List String) ->{} String
+fail_fast : Ref (List String) ->{Async;} String
 let fail_fast stopped =
   let slow = task {
     Effect.ensuring
@@ -62,7 +62,7 @@ let fail_fast stopped =
   with
   | Stop text -> text
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let shapes = List.map (scaled 2) [Circle 1, Rect 2 3]
   say (show shapes ++ " " ++ show (total shapes) ++ " " ++ show (shapes == [Circle 2, Rect 4 6]))

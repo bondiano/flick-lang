@@ -170,14 +170,14 @@ Cases:
 
 ```flick
 // a. spawn, then only wait: 1 MiB nobody reads
-waits : Unit ->{; PlatformError.PlatformError} Int
+waits : Unit ->{Async; PlatformError.PlatformError} Int
 let waits () = scope {
   let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
   ChildProcess.wait p // JS: never returns; Go: 0
 }
 
 // b. exit_code of a command with much output: the same
-chatty : Unit ->{; PlatformError.PlatformError} Int
+chatty : Unit ->{Async; PlatformError.PlatformError} Int
 let chatty () =
   ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
 

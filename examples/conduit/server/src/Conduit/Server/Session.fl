@@ -43,7 +43,7 @@ lifetime : Float
 let lifetime = 30 * 24 * 60 * 60
 
 /// A new token of the account.
-issue : Account ->{Keys, Crypto.Crypto;} String
+issue : Account ->{Async, Keys, Crypto.Crypto;} String
 let issue account =
   Effect.or_die
     (task {
@@ -66,7 +66,7 @@ let token_of header =
     None
 
 /// The id a valid token signs, if it is one.
-signed_id : String ->{Keys, Crypto.Crypto;} Option BigInt
+signed_id : String ->{Async, Keys, Crypto.Crypto;} Option BigInt
 let signed_id token =
   Effect.or_die
     (task {
@@ -75,7 +75,7 @@ let signed_id token =
     })
 
 /// The user a header names, or 401.
-known : String ->{Database, Keys, Crypto.Crypto; Unauthorized} Signed
+known : String ->{Async, Database, Keys, Crypto.Crypto; Unauthorized} Signed
 let known header =
   let token = Option.with_default "" (token_of header)
   let account =
@@ -92,7 +92,8 @@ let session signed = { current = fun () -> signed }
 
 /// The session of a request that must name a user.
 check :
-  HttpApi.Request p q Credentials b ->{Database, Keys, Crypto.Crypto; Unauthorized} Session.Impl
+  HttpApi.Request p q Credentials b ->{Async, Database, Keys, Crypto.Crypto; Unauthorized}
+  Session.Impl
 let check request =
   match request.headers.authorization with
   | Some header -> session (Some (known header))
@@ -100,7 +101,8 @@ let check request =
 
 /// The session of a request that may name a user.
 maybe :
-  HttpApi.Request p q Credentials b ->{Database, Keys, Crypto.Crypto; Unauthorized} Session.Impl
+  HttpApi.Request p q Credentials b ->{Async, Database, Keys, Crypto.Crypto; Unauthorized}
+  Session.Impl
 let maybe request =
   match request.headers.authorization with
   | Some header -> session (Some (known header))

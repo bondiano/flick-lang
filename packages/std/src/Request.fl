@@ -27,7 +27,7 @@ foreign pure request from "@flick-lang/runtime/effect/Request" "flickRequest"
 
 /// Runs `request` through `resolver`: the requests run at the same time
 /// (`parallel_all`, fibers) are batched into one call of the resolver.
-run : RequestResolver p e a -> Request p e a ->{; e} a
+run : RequestResolver p e a -> Request p e a ->{Async; e} a
 foreign effect run from "@flick-lang/runtime/effect/Request" "flickRun"
   arity 1
   reviewed "effect@4.1.2 sha256:c9fdf75926dde85d"

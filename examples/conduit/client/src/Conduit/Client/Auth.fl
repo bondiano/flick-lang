@@ -53,7 +53,8 @@ let keep user =
 
 /// The problems of a failed sign-in or sign-up.
 failed :
-  (Unit ->{; HttpApi.ClientError, Conflict, Unauthorized, Unprocessable} User) ->{Atom.Write;} Unit
+  (Unit ->{Async; HttpApi.ClientError, Conflict, Unauthorized, Unprocessable} User) ->{Async, Atom.Write;}
+  Unit
 let failed send =
   let outcome =
     try Ok (send ()) with

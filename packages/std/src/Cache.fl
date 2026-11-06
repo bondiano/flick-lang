@@ -25,20 +25,20 @@ foreign effect make_with from "@flick-lang/runtime/effect/Cache" "flickMakeWith"
 
 /// The value of `key`, looking it up once if it is missing or expired;
 /// a failed lookup is cached too.
-get : k -> Cache k e a ->{; e} a
+get : k -> Cache k e a ->{Async; e} a
 foreign effect get from "@flick-lang/runtime/effect/Cache" "get"
   arity 1
   reviewed "effect@4.1.2 sha256:2786a8584b9b86b4"
 
 /// The value of `key` if it is cached, waiting for a lookup under way,
 /// without a new one; fails as the cached lookup did.
-get_option : k -> Cache k e a ->{; e} Option a
+get_option : k -> Cache k e a ->{Async; e} Option a
 foreign effect get_option from "@flick-lang/runtime/effect/Cache" "getOption"
   arity 1
   reviewed "effect@4.1.2 sha256:2b29cfe7af2a10a1"
 
 /// The value of `key` if a lookup of it has succeeded and not expired.
-get_success : k -> Cache k e a ->{} Option a
+get_success : k -> Cache k e a ->{Async;} Option a
 foreign effect get_success from "@flick-lang/runtime/effect/Cache" "getSuccess"
   arity 1
   reviewed "effect@4.1.2 sha256:a5888e0ccc2004b3"
@@ -69,7 +69,7 @@ foreign effect invalidate_when from "@flick-lang/runtime/effect/Cache" "invalida
   reviewed "effect@4.1.2 sha256:49c0b90f54bf0654"
 
 /// Looks `key` up again, cached or not, starting its time to live anew.
-refresh : k -> Cache k e a ->{; e} a
+refresh : k -> Cache k e a ->{Async; e} a
 foreign effect refresh from "@flick-lang/runtime/effect/Cache" "refresh"
   arity 1
   reviewed "effect@4.1.2 sha256:71aa32951a25a4f1"

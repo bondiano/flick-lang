@@ -20,7 +20,7 @@ let page =
     ui { text "read" }
   )
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide Atom.layer {
   Platform.stdout_line (Ui.Server.render (Ui.render page ()))
   let n = await (Atom.current job)

@@ -93,7 +93,7 @@ foreign effect invalidate_when from "@flick-lang/runtime/effect/ScopedCache" "fl
 
 /// Looks `key` up again, cached or not, starting its time to live anew; the
 /// previous value is released once no `use` holds it.
-refresh : forall s k e a. k -> ScopedCache s k e a ->{; e} Unit
+refresh : forall s k e a. k -> ScopedCache s k e a ->{Async; e} Unit
 foreign effect refresh from "@flick-lang/runtime/effect/ScopedCache" "flickRefresh"
   arity 1
   retention call

@@ -240,7 +240,7 @@ foreign pure set_body from "@flick-lang/runtime/effect/http/HttpClientRequest" "
 
 /// Compresses the body with the algorithm if it has at least `minSize`
 /// bytes (by default any), setting `Content-Encoding`.
-compress_body : CompressionAlgorithm -> Option Float -> ClientRequest ->{} ClientRequest
+compress_body : CompressionAlgorithm -> Option Float -> ClientRequest ->{Async;} ClientRequest
 foreign effect compress_body from "@flick-lang/runtime/effect/http/HttpClientRequest" "flickCompressBody"
   arity 3
   reviewed "effect@4.1.2 sha256:51099300fc21d90a"
@@ -299,7 +299,7 @@ foreign pure body_stream from "@flick-lang/runtime/effect/http/HttpClientRequest
 body_file :
   Http.Body.FileOptions ->
   String ->
-  ClientRequest ->{FileSystem.FileSystem; PlatformError.PlatformError}
+  ClientRequest ->{Async, FileSystem.FileSystem; PlatformError.PlatformError}
   ClientRequest
 let body_file options path request = set_body (Http.Body.file options path) request
 

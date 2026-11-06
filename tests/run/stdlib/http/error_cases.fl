@@ -72,7 +72,7 @@ post_raw : String -> String ->{Async;} String
 foreign async post_raw from "./raw.mjs" "post"
 
 /// The outcome of registering `name`.
-ask : String -> String ->{} String
+ask : String -> String ->{Async;} String
 let ask base name =
   let request = { path = (); query = (); headers = (); payload = { name = name } }
   try HttpApi.call base register request with

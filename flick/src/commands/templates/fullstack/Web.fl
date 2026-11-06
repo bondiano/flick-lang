@@ -14,7 +14,7 @@ type alias NewTodo = { title : Title }
 todos : Atom.Atom (Atom.Async (List Todo) {Rpc.ClientError})
 let todos = Atom.query ["todos"] (task { App.Api.list () })
 
-add : String ->{Atom.Write; Server.Unauthorized, Rpc.ClientError} Todo
+add : String ->{Async, Atom.Write; Server.Unauthorized, Rpc.ClientError} Todo
 let add title = Atom.mutation ["todos"] App.Api.add title
 
 new_todo : Form.Draft NewTodo

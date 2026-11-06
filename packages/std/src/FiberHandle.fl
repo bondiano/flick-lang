@@ -36,7 +36,7 @@ foreign effect run from "@flick-lang/runtime/effect/FiberHandle" "flickRun"
   reviewed "effect@4.1.2 sha256:aca7b90ef702a788"
 
 /// Keeps a child spawned elsewhere as the one of the handle.
-set : SetOptions -> Fiber.Fiber e a -> FiberHandle s e a ->{} Unit
+set : SetOptions -> Fiber.Fiber e a -> FiberHandle s e a ->{Async;} Unit
 foreign effect set from "@flick-lang/runtime/effect/FiberHandle" "flickSet"
   arity 1
   retention call
@@ -49,19 +49,19 @@ foreign effect get from "@flick-lang/runtime/effect/FiberHandle" "flickGet"
   reviewed "effect@4.1.2 sha256:a7a0c777d9a6de40"
 
 /// Interrupts the child and empties the handle.
-clear : FiberHandle s e a ->{} Unit
+clear : FiberHandle s e a ->{Async;} Unit
 foreign effect clear from "@flick-lang/runtime/effect/FiberHandle" "clear"
   retention call
   reviewed "effect@4.1.2 sha256:7fe537025eeec2f4"
 
 /// Waits until the scope closes or the child fails, and fails as it did.
-join : FiberHandle s e a ->{; e} Unit
+join : FiberHandle s e a ->{Async; e} Unit
 foreign effect join from "@flick-lang/runtime/effect/FiberHandle" "join"
   retention call
   reviewed "effect@4.1.2 sha256:caaa432c5d4304c0"
 
 /// Waits until no child is running.
-await_empty : FiberHandle s e a ->{} Unit
+await_empty : FiberHandle s e a ->{Async;} Unit
 foreign effect await_empty from "@flick-lang/runtime/effect/FiberHandle" "awaitEmpty"
   retention call
   reviewed "effect@4.1.2 sha256:7328e8a70fedd0b0"

@@ -2,12 +2,12 @@
 // `File.WriteError`: a handler matches them by constructor.
 module App.Main exposing (main)
 
-read : String ->{File.FileSystem;} String
+read : String ->{Async, File.FileSystem;} String
 let read path =
   try File.read_text path with
   | File.ReadError _ -> "read: no file"
 
-write : String ->{File.FileSystem;} String
+write : String ->{Async, File.FileSystem;} String
 let write path =
   try
     File.write_text path "x"
@@ -15,7 +15,7 @@ let write path =
   with
   | File.WriteError _ -> "write: no directory"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide File.node {
   Platform.stdout_line (read "/nonexistent/flick/file.txt")
   Platform.stdout_line (write "/nonexistent/flick/file.txt")

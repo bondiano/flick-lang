@@ -37,7 +37,7 @@ let server_url reason =
   | Http.ServerError.RouteNotFound details -> details.url
   | _ -> "unexpected server error"
 
-errors : Unit ->{} Unit
+errors : Unit ->{Async;} Unit
 let errors () =
   let raw = "http://example.com/?private_key=secret&sig=signed"
   let expected = "http://example.com/?private_key=REDACTED&sig=signed"
@@ -116,7 +116,7 @@ let errors () =
   check "route error outside scope" (Option.map server_url missing == Some expected_path)
   check "request untouched" (Http.ClientRequest.url request == raw)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let raw = "https://user:password@example.com/?private_key=secret&other_key=visible&sig=signed"
   let defaults =

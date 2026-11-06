@@ -38,13 +38,13 @@ handlers : Handlers
 let handlers = { me = fun () -> Session.user () }
 
 /// A call of `me` as `token`.
-as_user : String -> String ->{} String
+as_user : String -> String ->{Async;} String
 let as_user url token =
   try Rpc.with_headers [("authorization", token)] (task { Rpc.call url me () }) with
   | Unauthorized -> "refused"
   | Rpc.ClientError message -> "client: " ++ message
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     scope s {

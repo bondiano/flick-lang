@@ -35,7 +35,7 @@ foreign pure get from "@flick-lang/runtime/effect/LayerMap" "flickGet"
   retention owner
 
 /// Drops the services of `key`: the next use builds them anew.
-invalidate : k -> LayerMap s k e ro ->{} Unit
+invalidate : k -> LayerMap s k e ro ->{Async;} Unit
 foreign effect invalidate from "@flick-lang/runtime/effect/LayerMap" "flickInvalidate"
   arity 1
   retention call

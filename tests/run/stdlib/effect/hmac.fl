@@ -11,7 +11,7 @@ let digit n = String.slice n (n + 1) "0123456789abcdef"
 hex : List Int -> String
 let hex bytes = String.join "" (List.map (fun b -> digit (b / 16) ++ digit (b % 16)) bytes)
 
-checks : Unit ->{Crypto.Crypto; Crypto.CryptoError} Unit
+checks : Unit ->{Async, Crypto.Crypto; Crypto.CryptoError} Unit
 let checks () =
   let key = List.repeat 20 11
   let data = Bytes.from_string "Hi There"
@@ -25,7 +25,7 @@ let checks () =
   let fox = Bytes.from_string "The quick brown fox jumps over the lazy dog"
   line "hmac-sha1" (hex (Crypto.hmac Crypto.Sha1 (Bytes.from_string "key") fox)) ()
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   line "utf8" (show (Bytes.from_string "é")) ()
   line "decode" (show (Bytes.to_string [195, 169])) ()

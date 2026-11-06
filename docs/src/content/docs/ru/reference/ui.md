@@ -1,6 +1,6 @@
 ---
 title: "Пользовательские интерфейсы"
-source_hash: f31f85261f0ed741
+source_hash: 55d62d243055c0c1
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
@@ -549,7 +549,7 @@ let main () =
 # let count = Atom.make 0
 # component counter_view () = ui { text (Atom.value count |> show) }
 #
-request : Float ->{} String
+request : Float ->{Async;} String
 let request n =
   provide Atom.layer {
     Atom.set count n
@@ -616,7 +616,7 @@ let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.m
 # let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 # component counter_view () = ui { text (Atom.value count |> show) }
 #
-page : Float ->{} String
+page : Float ->{Async;} String
 let page n =
   provide Atom.layer {
     Atom.set count n

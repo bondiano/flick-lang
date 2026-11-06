@@ -11,13 +11,13 @@ type error B = B String
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
   | Err _ -> ()
 
-late_a : Float -> Float ->{; A} Float
+late_a : Float -> Float ->{Async; A} Float
 let late_a n millis =
   Effect.uninterruptible
     (task {
@@ -25,7 +25,7 @@ let late_a n millis =
       from_result (Err (A n))
     })
 
-late_b : String -> Float ->{; B} Float
+late_b : String -> Float ->{Async; B} Float
 let late_b s millis =
   Effect.uninterruptible
     (task {
@@ -35,7 +35,7 @@ let late_b s millis =
 
 /// Fails with `A n` as its mask ends, telling `entered` once masked: the
 /// sibling that waits for it fails first and stops it while masked.
-stopped_a : Float -> Deferred.Deferred none Unit ->{; A} Float
+stopped_a : Float -> Deferred.Deferred none Unit ->{Async; A} Float
 let stopped_a n entered =
   Effect.uninterruptible
     (task {
@@ -47,7 +47,7 @@ let stopped_a n entered =
 
 /// `parallel` of a branch failing with `A first` that stops, once masked,
 /// a branch failing with `A second`.
-both : Float -> Float ->{; A} (Float, Float)
+both : Float -> Float ->{Async; A} (Float, Float)
 let both first second =
   let entered : Deferred.Deferred none Unit = Deferred.make ()
   parallel
@@ -63,7 +63,7 @@ let count ex =
   | Some f -> show (List.length (Cause.reasons f))
   | None -> "ok"
 
-handled : Unit ->{; B} (Float, Float)
+handled : Unit ->{Async; B} (Float, Float)
 let handled () =
   let entered : Deferred.Deferred none Unit = Deferred.make ()
   try
@@ -87,7 +87,7 @@ let name o =
   | Some (B s) -> "B " ++ s
   | None -> "none"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let same : Failure {A} = Cause.combine (Cause.fail (A 1)) (Cause.fail (A 1))
   let other : Failure {A} = Cause.combine (Cause.fail (A 2)) (Cause.fail (A 1))

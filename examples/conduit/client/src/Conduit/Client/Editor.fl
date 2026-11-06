@@ -52,7 +52,7 @@ let fill article =
   Atom.set tag ""
 
 /// The article at `slug`, to edit.
-load : Option String -> String ->{Atom.Write;} Unit
+load : Option String -> String ->{Async, Atom.Write;} Unit
 let load jwt slug =
   match Paths.Slug.parse slug with
   | Ok path ->
@@ -95,7 +95,7 @@ let written () = {
 
 /// Sends the article: a new one, or a change of the one at `slug`.
 send :
-  Option String ->{Atom.Write; Unprocessable, Unauthorized, Forbidden, NotFound, HttpApi.ClientError}
+  Option String ->{Async, Atom.Write; Unprocessable, Unauthorized, Forbidden, NotFound, HttpApi.ClientError}
   Article
 let send slug =
   let jwt = Atom.current Session.token
@@ -123,7 +123,7 @@ let send slug =
     (Session.call (Session.at jwt () draft) Api.Articles.endpoints.create_article).article
 
 /// The article written, shown once saved; else the problems the server named.
-publish : Option String ->{Atom.Write;} Unit
+publish : Option String ->{Async, Atom.Write;} Unit
 let publish slug =
   let outcome : Result Problems Article =
     try Ok (send slug) with

@@ -9,7 +9,7 @@ type error Closed = Closed String
 ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-fill : List Float -> TxQueue.TxQueue Float {Closed} ->{Tx.Transaction;} List Float
+fill : List Float -> TxQueue.TxQueue Float {Closed} ->{Async, Tx.Transaction;} List Float
 let fill xs q = TxQueue.offer_all xs q
 
 /// A failure of `Closed`, as a child's exit gives it.
@@ -19,7 +19,7 @@ let closed_failure why =
   | [exit] -> Exit.failure exit
   | _ -> None
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let q = TxQueue.bounded 3
   let rejected = Tx.atomically (task { (fill [1, 2, 3] q, fill [1, 2, 3] (TxQueue.dropping 2)) })

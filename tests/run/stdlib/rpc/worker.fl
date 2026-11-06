@@ -39,10 +39,10 @@ let handlers = {
   count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
 }
 
-serve : Unit ->{} Unit
+serve : Unit ->{Async;} Unit
 let serve () = Rpc.serve_node_worker group handlers
 
-call : Unit ->{; AppError} Unit
+call : Unit ->{Async; AppError} Unit
 let call () =
   try
     scope s {
@@ -60,7 +60,7 @@ let call () =
   | Rpc.ClientError message -> Platform.stdout_line ("client: " ++ message)
   | NotFound e -> Platform.stdout_line ("not found " ++ show e.id)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   match Platform.args () with
   | ["worker"] -> serve ()

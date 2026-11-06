@@ -47,7 +47,7 @@ foreign effect keys from "@flick-lang/runtime/effect/RcMap" "flickKeys"
   reviewed "effect@4.1.2 sha256:415be2871c1c1181"
 
 /// Releases the resource of `key` once its holders are done.
-invalidate : forall s k e a. k -> RcMap s k e a ->{} Unit
+invalidate : forall s k e a. k -> RcMap s k e a ->{Async;} Unit
 foreign effect invalidate from "@flick-lang/runtime/effect/RcMap" "invalidate"
   arity 1
   retention call

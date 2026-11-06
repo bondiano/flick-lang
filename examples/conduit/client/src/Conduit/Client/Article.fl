@@ -69,7 +69,7 @@ let comments =
 /// Follows the author, or stops; a visitor signs up first.
 toggle_follow :
   Bool ->
-  HttpApi.Request ProfilePath Unit Credentials Unit ->{; HttpApi.ClientError, Unauthorized, NotFound}
+  HttpApi.Request ProfilePath Unit Credentials Unit ->{Async; HttpApi.ClientError, Unauthorized, NotFound}
   ProfileBody
 let toggle_follow following request =
   if following then

@@ -16,7 +16,7 @@ let acquire name =
     })
     (fun n -> say ("release " ++ n))
 
-main : Unit ->{} Unit
+main : Unit ->{Async;} Unit
 let main () =
   scope s {
     let ref = ScopedRef.from_acquire (task { acquire "ref 1" })

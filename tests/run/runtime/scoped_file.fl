@@ -8,7 +8,7 @@ type error Oops = Oops String
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -25,7 +25,7 @@ let path () =
 reading :
   forall e.
   String ->
-  (String ->{File.FileSystem; e} String) ->{File.FileSystem; e + {File.OpenError, File.ReadError}}
+  (String ->{Async, File.FileSystem; e} String) ->{Async, File.FileSystem; e + {File.OpenError, File.ReadError}}
   String
 let reading label finish = scope {
   let file = File.open_scoped (path ())
@@ -34,7 +34,7 @@ let reading label finish = scope {
   finish text
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide File.node {
   let outcome =
     try

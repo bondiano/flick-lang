@@ -62,7 +62,7 @@ let balances = sql params {
   }
 }
 
-load_balances : UserId ->{Database; EncodeError, DbError, DecodeError} List BalanceRow
+load_balances : UserId ->{Async, Database; EncodeError, DbError, DecodeError} List BalanceRow
 let load_balances user_id =
   let query = Sql.bind balances { user_id = user_id }
   Database.query query

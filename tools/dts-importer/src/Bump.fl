@@ -112,7 +112,8 @@ let report old next capabilities =
   String.join "\n" lines ++ "\n"
 
 /// Downloads `effect@version` and unpacks it into a fresh directory.
-download : String ->{FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError} String
+download :
+  String ->{Async, FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError} String
 let download version =
   let dir = FileSystem.make_temp_directory { directory = None; prefix = Some "effect-bump-" }
   Ts.exec "npm" ["pack", "effect@" ++ version, "--pack-destination", dir]
@@ -131,7 +132,7 @@ let plain = { flag = None; mode = None }
 run :
   String ->
   Option String ->
-  String ->{FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
+  String ->{Async, FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
   Unit
 let run version package_dir root =
   let dir =

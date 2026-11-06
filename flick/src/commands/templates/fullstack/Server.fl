@@ -22,18 +22,19 @@ let check headers =
       from_result (Err Server.Unauthorized)
   | None -> from_result (Err Server.Unauthorized)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let port = Option.with_default 3000 (Option.bind String.to_number (Platform.env "PORT"))
   let store = Layer.succeed App.Store.Store (App.Store.memory ())
   provide (Layer.merge Server.node (Layer.merge store Http.Server.layer_services)) {
     try
       scope s {
-        functions : (ServerRequest ->{} ServerResponse)^{s}
+        functions : (ServerRequest ->{Async;} ServerResponse)^{s}
         let functions =
           Server.handler
             (Server.authenticated Session check [server App.Api.add] ++ [server App.Api.list])
-        app : (ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        app :
+          (ServerRequest ->{Async, Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
         let app =
           Http.Router.router Http.Router.config [
             Http.Router.route (Some Http.Method.POST) Server.path functions,

@@ -5,7 +5,7 @@ module App.Main exposing (main)
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-hubs : Unit ->{} Unit
+hubs : Unit ->{Async;} Unit
 let hubs () =
   let hub : PubSub.PubSub String = PubSub.bounded { capacity = 4; replay = None }
   let got = scope s {
@@ -47,5 +47,5 @@ let hubs () =
   PubSub.await_shutdown closing
   say ("shutdown: " ++ show (before, PubSub.is_shutdown closing))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = hubs ()

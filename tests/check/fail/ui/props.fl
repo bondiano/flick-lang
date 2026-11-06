@@ -37,7 +37,7 @@ no_policy : Ui
 let no_policy = Ui.button { disabled = false; on_click = fun _ -> task { Atom.set saved "x" } } []
 //                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `Handler
 
-held : forall c. File.Path ->{File.FileSystem; File.OpenError}
+held : forall c. File.Path ->{Async, File.FileSystem; File.OpenError}
   Ui^c
 let held path =
   scope {

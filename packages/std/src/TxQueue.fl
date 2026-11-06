@@ -34,20 +34,20 @@ foreign effect sliding from "@flick-lang/runtime/effect/TxQueue" "sliding"
 
 /// Adds the element, waiting while a bounded queue is full; false when
 /// a dropping queue dropped it or the queue is closed.
-offer : a -> TxQueue a e ->{Tx.Transaction;} Bool
+offer : a -> TxQueue a e ->{Async, Tx.Transaction;} Bool
 foreign effect offer from "@flick-lang/runtime/effect/TxQueue" "offer"
   arity 1
   reviewed "effect@4.1.2 sha256:b9d8655fe9948f8b"
 
 /// Adds the elements, waiting while a bounded queue is full; the ones a
 /// dropping or closed queue did not take.
-offer_all : List a -> TxQueue a e ->{Tx.Transaction;} List a
+offer_all : List a -> TxQueue a e ->{Async, Tx.Transaction;} List a
 foreign effect offer_all from "@flick-lang/runtime/effect/TxQueue" "offerAll"
   arity 1
   reviewed "effect@4.1.2 sha256:cb34470fdfaf6365"
 
 /// Removes the oldest element, waiting for one.
-take : TxQueue a e ->{Tx.Transaction; e} a
+take : TxQueue a e ->{Async, Tx.Transaction; e} a
 foreign effect take from "@flick-lang/runtime/effect/TxQueue" "take"
   reviewed "effect@4.1.2 sha256:98a03d7d64e0d279"
 
@@ -62,13 +62,13 @@ foreign effect take_all from "@flick-lang/runtime/effect/TxQueue" "takeAll"
   reviewed "effect@4.1.2 sha256:4308b512040656d0"
 
 /// Removes `n` elements, waiting for them.
-take_n : Int -> TxQueue a e ->{Tx.Transaction; e} List a
+take_n : Int -> TxQueue a e ->{Async, Tx.Transaction; e} List a
 foreign effect take_n from "@flick-lang/runtime/effect/TxQueue" "takeN"
   arity 1
   reviewed "effect@4.1.2 sha256:d3ca973702ca1dfd"
 
 /// Removes at least `min` and at most `max` elements, waiting for `min`.
-take_between : Int -> Int -> TxQueue a e ->{Tx.Transaction; e} List a
+take_between : Int -> Int -> TxQueue a e ->{Async, Tx.Transaction; e} List a
 foreign effect take_between from "@flick-lang/runtime/effect/TxQueue" "takeBetween"
   arity 2
   reviewed "effect@4.1.2 sha256:d937babda2d00f7d"

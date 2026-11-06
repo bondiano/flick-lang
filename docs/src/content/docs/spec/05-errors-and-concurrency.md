@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: ccb9f7021b54371b
+source_hash: 97958ce73e27d245
 ---
 
 ## Expected errors
@@ -257,7 +257,7 @@ One Layer identity is reused within one graph build, and a `provide` nested in t
 # import File exposing (File, Path, FileSystem, OpenError, ReadError)
 #
 read_config :
-  Path ->{FileSystem; OpenError, ReadError} String
+  Path ->{Async, FileSystem; OpenError, ReadError} String
 let read_config path =
   scope {
     let file = File.open_scoped path
@@ -295,7 +295,7 @@ The correct fix is to move the acquisition inside the deferred execution:
 # import File exposing (File, Path, FileSystem, OpenError, ReadError)
 #
 deferred_read :
-  Path -> Eff {FileSystem} {OpenError, ReadError} String
+  Path -> Eff {Async, FileSystem} {OpenError, ReadError} String
 let deferred_read path =
   task {
     scope {

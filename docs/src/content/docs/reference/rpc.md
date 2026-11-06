@@ -58,7 +58,7 @@ let handlers =
     count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
   }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     scope s {
@@ -195,7 +195,7 @@ routes and the router over it: one of them returned out of that scope is
 # hello : ServerRequest ->{RouteContext;} ServerResponse
 # let hello _ = Http.ServerResponse.text "hello" Http.ServerResponse.defaults
 #
-serve_both : Http.Server.ServeOptions -> Handlers none ->{
+serve_both : Http.Server.ServeOptions -> Handlers none ->{Async, 
   Http.Platform.HttpPlatform,
   Http.Etag.Generator;
   Http.ServerError.ServeError
@@ -203,9 +203,9 @@ serve_both : Http.Server.ServeOptions -> Handlers none ->{
   Unit
 let serve_both options handlers =
   scope s {
-    rpc : (ServerRequest ->{} ServerResponse)^{s}
+    rpc : (ServerRequest ->{Async;} ServerResponse)^{s}
     let rpc = Rpc.handler Rpc.ndjson users handlers
-#     app : (ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse)^{s}
+#     app : (ServerRequest ->{Async; Http.ServerError.HttpServerError} ServerResponse)^{s}
     let app =
       Http.Router.router Http.Router.config
         [

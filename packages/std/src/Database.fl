@@ -5,14 +5,15 @@ module Database exposing (..)
 
 service Database =
   run_query :
-    forall a. Sql.Query Sql.Pg a ->{; Sql.EncodeError, Sql.DbError, Sql.DecodeError} List a
-  run_execute : forall a. Sql.Query Sql.Pg a ->{; Sql.EncodeError, Sql.DbError} Int
+    forall a. Sql.Query Sql.Pg a ->{Async; Sql.EncodeError, Sql.DbError, Sql.DecodeError} List a
+  run_execute : forall a. Sql.Query Sql.Pg a ->{Async; Sql.EncodeError, Sql.DbError} Int
 
 query :
-  forall a. Sql.Query Sql.Pg a ->{Database; Sql.EncodeError, Sql.DbError, Sql.DecodeError} List a
+  forall a.
+  Sql.Query Sql.Pg a ->{Async, Database; Sql.EncodeError, Sql.DbError, Sql.DecodeError} List a
 let query q = Database.run_query q
 
-execute : forall a. Sql.Query Sql.Pg a ->{Database; Sql.EncodeError, Sql.DbError} Int
+execute : forall a. Sql.Query Sql.Pg a ->{Async, Database; Sql.EncodeError, Sql.DbError} Int
 let execute q = Database.run_execute q
 
 /// `body` as one transaction on one connection: committed when it

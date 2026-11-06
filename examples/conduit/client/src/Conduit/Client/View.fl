@@ -148,7 +148,7 @@ let meta author created more = ui {
 /// Takes the favorite back when `favorited`, else favors the article.
 toggle :
   Bool ->
-  HttpApi.Request ArticlePath Unit Credentials Unit ->{; HttpApi.ClientError, Unauthorized, NotFound}
+  HttpApi.Request ArticlePath Unit Credentials Unit ->{Async; HttpApi.ClientError, Unauthorized, NotFound}
   ArticleBody
 let toggle favorited request =
   if favorited then

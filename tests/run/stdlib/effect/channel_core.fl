@@ -22,7 +22,7 @@ broken : Channel.Channel none {Boom} i Float Unit ie id
 let broken = nums |> Channel.concat_with (fun _ -> Channel.fail (Boom "late"))
 
 /// Ends with "late" after an hour.
-slow : Channel.Channel none none i Float String ie id
+slow : Channel.Channel {Async} none i Float String ie id
 let slow =
   Channel.unwrap
     (task {
@@ -132,7 +132,7 @@ let failures () =
     )
   say ("on_exit failure: " ++ outcome failed ++ " " ++ show (Ref.get log))
 
-merges : Unit ->{; Boom} Unit
+merges : Unit ->{Async; Boom} Unit
 let merges () =
   let nested = Channel.from_list [Channel.from_list [1], Channel.from_list [2, 3]]
   let one = { concurrency = Some 1; bufferSize = None; switch = false }
@@ -173,7 +173,7 @@ let runs () =
   say ("run_drain: " ++ show (Channel.run_drain nums))
   say ("run_collect failure: " ++ outcome broken)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     sources ()

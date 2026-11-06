@@ -36,7 +36,7 @@ foreign effect run from "@flick-lang/runtime/effect/FiberMap" "flickRun"
   reviewed "effect@4.1.2 sha256:19752d4c68444c31"
 
 /// Keeps a child spawned elsewhere as the one of `key`.
-set : SetOptions -> k -> Fiber.Fiber e a -> FiberMap s k e a ->{} Unit
+set : SetOptions -> k -> Fiber.Fiber e a -> FiberMap s k e a ->{Async;} Unit
 foreign effect set from "@flick-lang/runtime/effect/FiberMap" "flickSet"
   arity 1
   retention call
@@ -57,14 +57,14 @@ foreign effect has from "@flick-lang/runtime/effect/FiberMap" "has"
   reviewed "effect@4.1.2 sha256:f1062c1c871ae65f"
 
 /// Interrupts the child of `key` and removes it.
-remove : k -> FiberMap s k e a ->{} Unit
+remove : k -> FiberMap s k e a ->{Async;} Unit
 foreign effect remove from "@flick-lang/runtime/effect/FiberMap" "remove"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:1f708524facb6472"
 
 /// Interrupts every child and empties the map.
-clear : FiberMap s k e a ->{} Unit
+clear : FiberMap s k e a ->{Async;} Unit
 foreign effect clear from "@flick-lang/runtime/effect/FiberMap" "clear"
   retention call
   reviewed "effect@4.1.2 sha256:8f198f7500242507"
@@ -76,13 +76,13 @@ foreign effect size from "@flick-lang/runtime/effect/FiberMap" "size"
   reviewed "effect@4.1.2 sha256:42ae4b52db567a98"
 
 /// Waits until the scope closes or a child fails, and fails as it did.
-join : FiberMap s k e a ->{; e} Unit
+join : FiberMap s k e a ->{Async; e} Unit
 foreign effect join from "@flick-lang/runtime/effect/FiberMap" "join"
   retention call
   reviewed "effect@4.1.2 sha256:e53d549b25e4c0fd"
 
 /// Waits until no child is running, or fails as the first failed one did.
-await_empty : FiberMap s k e a ->{; e} Unit
+await_empty : FiberMap s k e a ->{Async; e} Unit
 foreign effect await_empty from "@flick-lang/runtime/effect/FiberMap" "awaitEmpty"
   retention call
   reviewed "effect@4.1.2 sha256:1b6002d5015f7c15"

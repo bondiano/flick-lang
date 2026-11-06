@@ -26,7 +26,7 @@ let nums = Stream.map Int.to_float (Stream.range 1 3)
 tens : Stream.Stream none none Float
 let tens = Stream.make [10, 20, 30]
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   line ("concat", (Stream.run_collect (nums |> Stream.concat tens)))
   line ("prepend", (Stream.run_collect (Stream.prepend [0] nums)))

@@ -80,7 +80,7 @@ let serving () = scope s {
 
 /// A scope failing after it starts a server; the server's URL.
 fails_serving :
-  Ref String ->{Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError, Boom}
+  Ref String ->{Async, Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError, Boom}
   Unit
 let fails_serving url = scope s {
   Ref.set url (base (Http.Server.serve options (app ())))
@@ -88,7 +88,8 @@ let fails_serving url = scope s {
 }
 
 failing :
-  Unit ->{Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError} String
+  Unit ->{Async, Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError}
+  String
 let failing () =
   let url = Ref.make ""
   try fails_serving url with
@@ -96,7 +97,8 @@ let failing () =
   Ref.get url
 
 interrupted :
-  Unit ->{Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError} String
+  Unit ->{Async, Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError}
+  String
 let interrupted () =
   let url = Ref.make ""
   let _ =

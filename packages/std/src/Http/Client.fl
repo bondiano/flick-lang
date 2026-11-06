@@ -27,45 +27,45 @@ current : Unit ->{HttpClient;} Client none {HttpClientError}
 let current () = HttpClient.client ()
 
 /// Sends the request with the client.
-execute_with : Client r e -> ClientRequest ->{r; e} ClientResponse
+execute_with : Client r e -> ClientRequest ->{Async | r; e} ClientResponse
 foreign effect execute_with from "@flick-lang/runtime/effect/http/HttpClient" "flickExecute"
   arity 2
   reviewed "effect@4.1.2 sha256:0239bbc65598209d"
 
 /// Sends the request with the service's client.
-execute : ClientRequest ->{HttpClient; HttpClientError} ClientResponse
+execute : ClientRequest ->{Async, HttpClient; HttpClientError} ClientResponse
 let execute request = execute_with (current ()) request
 
 /// Sends a `GET` of the URL.
-get : String ->{HttpClient; HttpClientError} ClientResponse
+get : String ->{Async, HttpClient; HttpClientError} ClientResponse
 let get url = execute (Http.ClientRequest.get url)
 
 /// Sends a `QUERY` of the URL.
-query : String ->{HttpClient; HttpClientError} ClientResponse
+query : String ->{Async, HttpClient; HttpClientError} ClientResponse
 let query url = execute (Http.ClientRequest.query url)
 
 /// Sends a `HEAD` of the URL.
-head : String ->{HttpClient; HttpClientError} ClientResponse
+head : String ->{Async, HttpClient; HttpClientError} ClientResponse
 let head url = execute (Http.ClientRequest.head url)
 
 /// Sends a `POST` to the URL, without a body.
-post : String ->{HttpClient; HttpClientError} ClientResponse
+post : String ->{Async, HttpClient; HttpClientError} ClientResponse
 let post url = execute (Http.ClientRequest.post url)
 
 /// Sends a `PATCH` of the URL, without a body.
-patch : String ->{HttpClient; HttpClientError} ClientResponse
+patch : String ->{Async, HttpClient; HttpClientError} ClientResponse
 let patch url = execute (Http.ClientRequest.patch url)
 
 /// Sends a `PUT` to the URL, without a body.
-put : String ->{HttpClient; HttpClientError} ClientResponse
+put : String ->{Async, HttpClient; HttpClientError} ClientResponse
 let put url = execute (Http.ClientRequest.put url)
 
 /// Sends a `DELETE` of the URL.
-del : String ->{HttpClient; HttpClientError} ClientResponse
+del : String ->{Async, HttpClient; HttpClientError} ClientResponse
 let del url = execute (Http.ClientRequest.delete url)
 
 /// Sends an `OPTIONS` of the URL.
-options : String ->{HttpClient; HttpClientError} ClientResponse
+options : String ->{Async, HttpClient; HttpClientError} ClientResponse
 let options url = execute (Http.ClientRequest.options url)
 
 /// A client of a function from the request and its URL to the response:

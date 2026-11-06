@@ -19,7 +19,7 @@ let logged loggers body = provide (Layer.merge loggers Logger.effect_log) { body
 contains : String -> String -> Bool
 let contains part whole = String.contains part whole
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   logged (Logger.layer replace [Logger.with_console_log simple]) (fun () ->
     Log.info "hello"

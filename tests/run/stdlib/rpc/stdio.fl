@@ -39,10 +39,10 @@ let handlers = {
   count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
 }
 
-serve : Unit ->{} Unit
+serve : Unit ->{Async;} Unit
 let serve () = provide Stdio.node { Rpc.serve_stdio Rpc.ndjson group handlers }
 
-call : Unit ->{; AppError} Unit
+call : Unit ->{Async; AppError} Unit
 let call () =
   let result =
     try
@@ -73,7 +73,7 @@ let call () =
   Platform.stdout_line "still running"
   result
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   match Platform.args () with
   | ["server"] -> serve ()

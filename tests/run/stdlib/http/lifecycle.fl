@@ -20,7 +20,7 @@ let api =
   |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "work") |> HttpApi.add slow)
 
 /// The slow handler; `started` tells the client side it is running.
-handle : Deferred.Deferred {} Unit -> HttpApi.Request Unit Unit Unit Unit ->{} Unit
+handle : Deferred.Deferred {} Unit -> HttpApi.Request Unit Unit Unit Unit ->{Async;} Unit
 let handle started _ = scope {
   Resource.acquire_release
     (task {

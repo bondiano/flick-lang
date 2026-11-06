@@ -17,35 +17,35 @@ type error WriteError = WriteError String
   deriving Eq, Show
 
 service FileSystem =
-  open : forall s. Path ->{Scope s; OpenError} File s
-  read_handle : forall s. File s ->{; ReadError} String
-  read_file : Path ->{; ReadError} String
-  write_file : Path -> String ->{; WriteError} Unit
+  open : forall s. Path ->{Async, Scope s; OpenError} File s
+  read_handle : forall s. File s ->{Async; ReadError} String
+  read_file : Path ->{Async; ReadError} String
+  write_file : Path -> String ->{Async; WriteError} Unit
 
-open_scoped : forall s. Path ->{FileSystem, Scope s; OpenError} File s
+open_scoped : forall s. Path ->{Async, FileSystem, Scope s; OpenError} File s
 let open_scoped path = FileSystem.open path
 
-read_all : forall s. File s ->{FileSystem; ReadError} String
+read_all : forall s. File s ->{Async, FileSystem; ReadError} String
 let read_all file = FileSystem.read_handle file
 
-read_text : Path ->{FileSystem; ReadError} String
+read_text : Path ->{Async, FileSystem; ReadError} String
 let read_text path = FileSystem.read_file path
 
-write_text : Path -> String ->{FileSystem; WriteError} Unit
+write_text : Path -> String ->{Async, FileSystem; WriteError} Unit
 let write_text path text = FileSystem.write_file path text
 
 node_open : forall s. Path ->{Scope s; OpenError} File s
 foreign effect node_open from "@flick-lang/runtime" "fileOpen"
   retention call
 
-node_read_handle : forall s. File s ->{; ReadError} String
+node_read_handle : forall s. File s ->{Async; ReadError} String
 foreign effect node_read_handle from "@flick-lang/runtime" "fileReadHandle"
   retention call
 
-node_read_file : Path ->{; ReadError} String
+node_read_file : Path ->{Async; ReadError} String
 foreign effect node_read_file from "@flick-lang/runtime" "fileRead"
 
-node_write_file : Path -> String ->{; WriteError} Unit
+node_write_file : Path -> String ->{Async; WriteError} Unit
 foreign effect node_write_file from "@flick-lang/runtime" "fileWrite"
 
 /// The file system of Node.js.

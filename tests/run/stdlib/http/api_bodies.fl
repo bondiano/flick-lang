@@ -138,7 +138,7 @@ let handlers = {
 empty : HttpApi.Request Unit Unit Unit Unit
 let empty = { path = (); query = (); headers = (); payload = () }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let document = Result.with_default "" (HttpApi.openapi api)
   Platform.stdout_line

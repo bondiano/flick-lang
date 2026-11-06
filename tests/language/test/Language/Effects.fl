@@ -17,7 +17,7 @@ type alias Log = Ref (List String)
 note : Log -> String ->{} Unit
 let note log text = Ref.set log (Ref.get log ++ [text])
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d

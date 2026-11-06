@@ -6,13 +6,13 @@ import Http.ServerResponse exposing (ServerResponse)
 
 // A route over the handler of `Rpc.handler` holds the region of its scope,
 // so it cannot outlive it.
-escaped : Rpc.Group none {} ->{} Route none none
+escaped : Rpc.Group none {} ->{} Route {Async} none
 let escaped group =
   scope s {
-    rpc : (ServerRequest ->{} ServerResponse)^{s}
+    rpc : (ServerRequest ->{Async;} ServerResponse)^{s}
     let rpc = Rpc.handler Rpc.ndjson group {}
     Http.Router.route (Some Http.Method.POST) "/rpc" (fun request -> rpc request)
   }
 
-//~ FLICK-G001 @14:5-14:82 this value holds region `s`, but the expected type `Route none none` holds no captures
+//~ FLICK-G001 @14:5-14:82 this value holds region `s`, but the expected type `Route {Async} none` holds no captures
 //~ FLICK-T052 @14:54-14:82 a `fun` that only passes `request` on: `rpc` is the same function

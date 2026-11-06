@@ -9,13 +9,13 @@ type error Oops = Oops String
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
   | Err _ -> ()
 
-after : Float -> String -> Eff none none String
+after : Float -> String -> Eff {Async} none String
 let after millis text = task {
   nap millis
   text
@@ -26,7 +26,7 @@ let failing text = task { from_result (Err (Oops text)) }
 
 /// A task that waits long, saying when it is interrupted; it tells
 /// `started` once that saying is in place.
-patient : String -> Deferred.Deferred none Unit -> Eff none none Float
+patient : String -> Deferred.Deferred none Unit -> Eff {Async} none Float
 let patient name started = task {
   Effect.ensuring
     (task { say (name ++ " ended") })
@@ -47,7 +47,7 @@ quiet : forall e. Failure e ->{} Unit
 let quiet _ = ()
 
 /// The sibling of a failing branch ends before the failure is caught.
-fail_fast : Unit ->{} String
+fail_fast : Unit ->{Async;} String
 let fail_fast () =
   let started : Deferred.Deferred none Unit = Deferred.make ()
   try
@@ -62,7 +62,7 @@ let fail_fast () =
   with
   | Oops text -> text
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let (a, b) = parallel (after 30 "slow") (after 1 "fast")
   say (a ++ " " ++ b)

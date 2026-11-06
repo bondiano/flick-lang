@@ -77,7 +77,7 @@ foreign pure pid from "@flick-lang/runtime/effect/ChildProcess" "flickPid"
 
 /// Waits for the process to end: its exit code. A process a signal ended
 /// fails.
-wait : forall s. Process s ->{; PlatformError.PlatformError} Int
+wait : forall s. Process s ->{Async; PlatformError.PlatformError} Int
 foreign effect wait from "@flick-lang/runtime/effect/ChildProcess" "flickWait"
   retention call
   reviewed "effect@4.1.2 sha256:6da3b9d4e047c7e2"
@@ -90,13 +90,13 @@ foreign effect is_running from "@flick-lang/runtime/effect/ChildProcess" "flickI
 
 /// Stops the process with `SIGTERM`, waits for it to end and gives the rest
 /// of its process group a second more.
-kill : forall s. Process s ->{; PlatformError.PlatformError} Unit
+kill : forall s. Process s ->{Async; PlatformError.PlatformError} Unit
 foreign effect kill from "@flick-lang/runtime/effect/ChildProcess" "flickKill"
   retention call
   reviewed "effect@4.1.2 sha256:2687b5e42628f930"
 
 /// Stops the process with the signal, then `SIGKILL` after `force_after`.
-kill_with : forall s. KillOptions -> Process s ->{; PlatformError.PlatformError} Unit
+kill_with : forall s. KillOptions -> Process s ->{Async; PlatformError.PlatformError} Unit
 foreign effect kill_with from "@flick-lang/runtime/effect/ChildProcess" "flickKillWith"
   arity 2
   retention call
@@ -116,16 +116,16 @@ foreign pure stderr from "@flick-lang/runtime/effect/ChildProcess" "flickStderr"
   reviewed "effect@4.1.2 sha256:3fe00f74628a0caf"
 
 /// What the command writes to stdout, as text; it runs to its end.
-string : Command ->{; PlatformError.PlatformError} String
+string : Command ->{Async; PlatformError.PlatformError} String
 foreign effect string from "@flick-lang/runtime/effect/ChildProcess" "flickString"
   reviewed "effect@4.1.2 sha256:40dccc7fabdf7b49"
 
 /// The lines the command writes to stdout.
-lines : Command ->{; PlatformError.PlatformError} List String
+lines : Command ->{Async; PlatformError.PlatformError} List String
 foreign effect lines from "@flick-lang/runtime/effect/ChildProcess" "flickLines"
   reviewed "effect@4.1.2 sha256:40dccc7fabdf7b49"
 
 /// Runs the command to its end: its exit code.
-exit_code : Command ->{; PlatformError.PlatformError} Int
+exit_code : Command ->{Async; PlatformError.PlatformError} Int
 foreign effect exit_code from "@flick-lang/runtime/effect/ChildProcess" "flickExitCode"
   reviewed "effect@4.1.2 sha256:40dccc7fabdf7b49"

@@ -14,7 +14,7 @@ let import_command = cli "import" {
 }
 
 surface_command :
-  Cli.Command {FileSystem.FileSystem, Path.Path} {AppError, PlatformError.PlatformError}
+  Cli.Command {Async, FileSystem.FileSystem, Path.Path} {AppError, PlatformError.PlatformError}
 let surface_command = cli "surface" {
   description "Prints the snapshot of an installed Effect's surface, as stdlib/Effect/snapshot.json holds it"
   /// The directory of the effect package
@@ -23,7 +23,7 @@ let surface_command = cli "surface" {
 }
 
 bump_command :
-  Cli.Command {FileSystem.FileSystem, Path.Path} {AppError, PlatformError.PlatformError}
+  Cli.Command {Async, FileSystem.FileSystem, Path.Path} {AppError, PlatformError.PlatformError}
 let bump_command = cli "bump" {
   description "Moves the repository to another Effect release: snapshot, report, pins"
   /// The unpacked effect package, instead of downloading it with npm
@@ -37,7 +37,7 @@ let bump_command = cli "bump" {
 
 tool :
   Cli.Command
-    {FileSystem.FileSystem, Path.Path, Stdio.Stdio}
+    {Async, FileSystem.FileSystem, Path.Path, Stdio.Stdio}
     {AppError, PlatformError.PlatformError}
 let tool = cli "dts-importer" {
   description "Reads TypeScript declarations for Flick"
@@ -48,15 +48,15 @@ let tool = cli "dts-importer" {
 
 /// Runs the task with the Node.js services, a platform error failing the app.
 with_node :
-  (Unit ->{FileSystem.FileSystem, Path.Path, Stdio.Stdio; AppError, PlatformError.PlatformError}
+  (Unit ->{Async, FileSystem.FileSystem, Path.Path, Stdio.Stdio; AppError, PlatformError.PlatformError}
     Unit) ->
-  Unit ->{; AppError}
+  Unit ->{Async; AppError}
   Unit
 let with_node act () =
   try provide FileSystem.node { provide Path.layer { provide Stdio.node { act () } } } with
   | PlatformError.PlatformError reason -> App.fail (show reason)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   with_node
     (fun () ->
@@ -66,5 +66,5 @@ let main () =
     ()
 
 /// The import mode alone, as `flick ffi import` runs it: no arguments.
-import_main : Unit ->{; AppError} Unit
+import_main : Unit ->{Async; AppError} Unit
 let import_main () = with_node (fun () -> Import.run ()) ()

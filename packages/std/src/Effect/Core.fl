@@ -13,7 +13,7 @@ foreign pure void from "@flick-lang/runtime/effect/Effect" "void"
   reviewed "effect@4.1.2 sha256:f4001e59cfd15a7d"
 
 /// Suspends the fiber for the duration.
-sleep : Duration.Duration ->{} Unit
+sleep : Duration.Duration ->{Async;} Unit
 foreign effect sleep from "@flick-lang/runtime/effect/Effect" "sleep"
   reviewed "effect@4.1.2 sha256:2900e4923ff8d2f8"
 
@@ -92,20 +92,20 @@ foreign effect fail_cause_sync from "@flick-lang/runtime/effect/Effect" "flickFa
   reviewed "effect@4.1.2 sha256:aab9e6230fa8e4ed"
 
 /// Never ends; only an interruption stops it.
-never : Unit ->{} a
+never : Unit ->{Async;} a
 foreign effect never from "@flick-lang/runtime/effect/Effect" "flickNever"
   arity 0
   reviewed "effect@4.1.2 sha256:8db8203fce2282c5"
 
 /// Lets the other fibers run before this one goes on.
-yield_now : Unit ->{} Unit
+yield_now : Unit ->{Async;} Unit
 foreign effect yield_now from "@flick-lang/runtime/effect/Effect" "flickYieldNow"
   arity 0
   reviewed "effect@4.1.2 sha256:c167d26106a1fa95"
 
 /// `yield_now` with the priority of the scheduler's task, a Float as the
 /// scheduler takes it.
-yield_now_with : Float ->{} Unit
+yield_now_with : Float ->{Async;} Unit
 foreign effect yield_now_with from "@flick-lang/runtime/effect/Effect" "yieldNowWith"
   reviewed "effect@4.1.2 sha256:7e82b2a2a9eb9a63"
 

@@ -25,7 +25,7 @@ let step token =
     typed token
 
 /// The next key of the script; with none left it waits a moment and quits.
-next_key : Ref (List Terminal.UserInput) ->{; Terminal.QuitError} Terminal.UserInput
+next_key : Ref (List Terminal.UserInput) ->{Async; Terminal.QuitError} Terminal.UserInput
 let next_key keys =
   let pending = Ref.get keys
   match List.head pending with
@@ -166,7 +166,7 @@ let event_step input _ =
 on_event : Cli.Prompt.Handlers Float String (Cli.Prompt.ProcessInput String)
 let on_event = { render = fun _ _ -> "waiting"; process = event_step; clear = fun _ _ -> "" }
 
-questions : Unit ->{Cli.Prompt.Tty; Terminal.QuitError} Unit
+questions : Unit ->{Async, Cli.Prompt.Tty; Terminal.QuitError} Unit
 let questions () =
   let name = Cli.Prompt.run (Cli.Prompt.text question)
   Platform.stdout_line ("text " ++ name)
@@ -226,7 +226,7 @@ let questions () =
   Platform.stdout_line ("map/flat_map " ++ chained)
   Platform.stdout_line ("custom " ++ show (Cli.Prompt.run (Cli.Prompt.custom 0 counter)))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   // `<name>` is the key of that name, other text is typed
   let script =

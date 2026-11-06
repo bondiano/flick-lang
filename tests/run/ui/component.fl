@@ -29,7 +29,7 @@ component mounted () =
   let _started = Ui.on_mount (task { Platform.stdout_line "mounted on a server" })
   ui { text "rendered" }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   Platform.stdout_line
     (Ui.Server.to_html (Ui.render card { name = "Ada"; tags = ["math", "engines"] }))

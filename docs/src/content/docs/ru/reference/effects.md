@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: 7e02fa81f4a0fc4e
+source_hash: f78ba41194a080e9
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -373,6 +373,32 @@ let leaked () = scope outer {
 start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
 ```
+
+## Что может приостановиться: `Async`
+
+Функция, которая ждёт времени, ввода-вывода или другого fiber, говорит об
+этом эффектом `Async` в своей строке: `Effect.sleep : Duration ->{Async;} Unit`,
+`Database.query`, `Http.Client.get`, `Fiber.join`, `Queue.take`. Строка без
+него выполняется сразу. У `Async` нет операций: его на корне обрабатывает
+планировщик среды выполнения, поэтому он может быть у `main` и у задач
+`spawn` и `parallel`; `provide Async` — `FLICK-E016`.
+
+```flick
+wait : Float ->{Async;} Unit
+foreign async wait from "./timers.mjs" "wait"
+
+twice : Unit ->{Async;} Unit
+let twice () =
+  wait 1
+  wait 2
+```
+
+`foreign async` возвращает Promise, поэтому его строке нужен `Async`
+(`FLICK-F001`). `foreign effect` таков, как записан: без `Async` он
+выполняется сразу, а его приостановка — дефект. Вызов, который может
+приостановиться, в строке без `Async` — `FLICK-E002`; его исправление
+добавляет `Async` там, где строка записана: в сигнатуре, в `Eff` или в
+строке, переданной типу, как `Handlers none`.
 
 ## Эффекты и handlers
 

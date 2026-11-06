@@ -102,12 +102,12 @@ let file_options = { offset = None; bytesToRead = None; chunkSize = None; conten
 file_from_info :
   FileOptions ->
   String ->
-  FileSystem.Info ->{FileSystem.FileSystem; PlatformError.PlatformError}
+  FileSystem.Info ->{Async, FileSystem.FileSystem; PlatformError.PlatformError}
   Body
 foreign effect file_from_info from "@flick-lang/runtime/effect/http/HttpBody" "flickFileFromInfo"
   arity 3
   reviewed "effect@4.1.2 sha256:9488e0fdf507824a"
 
 /// The file at the path, as `file_from_info` of its `stat`.
-file : FileOptions -> String ->{FileSystem.FileSystem; PlatformError.PlatformError} Body
+file : FileOptions -> String ->{Async, FileSystem.FileSystem; PlatformError.PlatformError} Body
 let file options path = file_from_info options path (FileSystem.stat path)

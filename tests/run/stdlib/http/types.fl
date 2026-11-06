@@ -175,7 +175,7 @@ let forms () =
       (show (Http.Multipart.schema_body_form_json point "meta" (multipart ())))
   }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   line "etags" (show etags)
   line "literal" (show (literal, Http.Status.from_literal literal))

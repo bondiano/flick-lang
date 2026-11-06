@@ -19,10 +19,10 @@ server fn leaky () = Session.user ()
 check : Http.Headers.Headers ->{; Server.Unauthorized} Session.Impl
 let check _ = from_result (Err Server.Unauthorized)
 
-unguarded : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{} ServerResponse)^{s}
+unguarded : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{Async;} ServerResponse)^{s}
 let unguarded () = Server.handler [server whoami]
 
-unlisted : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{} ServerResponse)^{s}
+unlisted : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{Async;} ServerResponse)^{s}
 let unlisted () = Server.handler (Server.authenticated Session check [server leaky])
 //~ FLICK-E011 @23:36-23:49 server fn `whoami` lists `Server.Unauthorized`, so only `Server.authenticated` serves it
 //~ FLICK-E011 @26:71-26:83 server fn `leaky` does not list `Server.Unauthorized`, so `Server.authenticated` cannot guard it

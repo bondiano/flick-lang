@@ -207,7 +207,7 @@ let custom = {
   formatVersion = fun name version -> name ++ "@" ++ version;
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   attempt deploy [
     "-e",

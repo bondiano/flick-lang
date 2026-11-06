@@ -71,7 +71,7 @@ them on one route; a client entry that names `server place` reaches
 # import App.Db
 # import App.Shop
 #
-serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db;} (ServerRequest ->{} ServerResponse)^{s}
+serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db;} (ServerRequest ->{Async;} ServerResponse)^{s}
 let serve () = Server.handler [server App.Shop.place]
 ```
 
@@ -135,7 +135,7 @@ let check headers =
 #
 # let example = task {
 #   scope s {
-# functions : (ServerRequest ->{} ServerResponse)^{s}
+# functions : (ServerRequest ->{Async;} ServerResponse)^{s}
 let functions =
   Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
 # ()

@@ -141,7 +141,7 @@ let finalizers () =
   }
   Platform.stdout_line ("finalizers: " ++ show (Ref.get seen))
 
-interruption : Unit ->{} Unit
+interruption : Unit ->{Async;} Unit
 let interruption () =
   Platform.stdout_line ("interrupt: " ++ ended (task { Effect.interrupt () }))
   let steps = Ref.make []
@@ -178,7 +178,7 @@ let interruption () =
       (task { Effect.uninterruptible (task { Effect.interruptible (task { Effect.never () }) }) })
   Platform.stdout_line ("interruptible: " ++ show freed)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   catching ()
   finalizers ()

@@ -9,7 +9,7 @@ type Prompt a
 /// The terminal prompts draw on and read key presses from; `node` is the
 /// terminal of the process, and a fake one is a `Layer.succeed Tty` record.
 service Tty =
-  read_key : Unit ->{; Terminal.QuitError} Terminal.UserInput
+  read_key : Unit ->{Async; Terminal.QuitError} Terminal.UserInput
   display : String ->{} Unit
   columns : Unit ->{} Int
   rows : Unit ->{} Int
@@ -21,13 +21,13 @@ foreign pure node_of from "@flick-lang/runtime/cli" "promptNode"
 node : Layer none none {Tty}
 let node = node_of Tty
 
-run_of : ServiceTag {Tty} -> Prompt a ->{Tty; Terminal.QuitError} a
+run_of : ServiceTag {Tty} -> Prompt a ->{Async, Tty; Terminal.QuitError} a
 foreign effect run_of from "@flick-lang/runtime/cli" "promptRun"
   arity 2
   reviewed "effect@4.1.2 sha256:18008f9b6d24eb7b"
 
 /// Asks the questions on `Tty`; `QuitError` when its input ends or the user quits.
-run : Prompt a ->{Tty; Terminal.QuitError} a
+run : Prompt a ->{Async, Tty; Terminal.QuitError} a
 let run prompt = run_of Tty prompt
 
 /// The symbols and colors the prompts draw with.
@@ -58,13 +58,13 @@ foreign sync default_theme from "@flick-lang/runtime/cli" "promptDefaultTheme"
   arity 0
   reviewed "effect@4.1.2 sha256:47c0b93e9a1682bd"
 
-run_themed_of : ServiceTag {Tty} -> Theme -> Prompt a ->{Tty; Terminal.QuitError} a
+run_themed_of : ServiceTag {Tty} -> Theme -> Prompt a ->{Async, Tty; Terminal.QuitError} a
 foreign effect run_themed_of from "@flick-lang/runtime/cli" "promptRunThemed"
   arity 3
   reviewed "effect@4.1.2 sha256:f397581b74a20b3b"
 
 /// `run`, drawing with `theme`.
-run_themed : Theme -> Prompt a ->{Tty; Terminal.QuitError} a
+run_themed : Theme -> Prompt a ->{Async, Tty; Terminal.QuitError} a
 let run_themed theme prompt = run_themed_of Tty theme prompt
 
 /// A text question; `validate` refuses a value with the message shown.

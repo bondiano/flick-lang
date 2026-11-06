@@ -46,7 +46,7 @@ let status_and response names =
     ++ show
       (List.map (fun n -> (n, Http.Headers.get n (Http.ServerResponse.headers response))) names)
 
-requests : Unit ->{; HttpServerError, SchemaError} Unit
+requests : Unit ->{Async; HttpServerError, SchemaError} Unit
 let requests () =
   let client =
     Http.ClientRequest.post "http://example.com/items/7?q=x&q=y"
@@ -426,7 +426,7 @@ let middlewares () =
       ("logger: " ++ (status_and (logged (Http.ServerRequest.from_client_request r)) []))
   }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     requests ()

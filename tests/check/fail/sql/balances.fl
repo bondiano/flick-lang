@@ -48,6 +48,6 @@ let listed ids = sql { from u in Users; where $ids == $ids; select { name = u.na
 //                                            ^^^^ FLICK-C001 no instance for `Param (List UserId) _`
 //                                                    ^^^^ FLICK-C001 no instance for `Param (List UserId) _`
 
-unbound : Unit ->{Database; EncodeError, DbError, DecodeError} List { name : String }
+unbound : Unit ->{Async, Database; EncodeError, DbError, DecodeError} List { name : String }
 let unbound () = Database.query (sql { from u in Users; select { name = u.name } })
 //                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `Query Pg _`, found `Template Pg {} { name : String }`

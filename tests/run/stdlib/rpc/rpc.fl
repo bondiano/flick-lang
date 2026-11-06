@@ -33,7 +33,7 @@ type alias Handlers r = {
 users : Rpc.Group r (Handlers r)
 let users = Rpc.group |> Rpc.add get_user |> Rpc.add count_to
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let handlers : Handlers none = {
     get_user = fun id ->

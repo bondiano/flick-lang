@@ -10,7 +10,7 @@ type error A = A Float
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -18,7 +18,7 @@ let nap millis =
 
 /// Tells `entered` it is masked, then fails right after its mask ends, by
 /// when the fiber was asked to stop.
-late : Deferred.Deferred none Unit ->{; A} Float
+late : Deferred.Deferred none Unit ->{Async; A} Float
 let late entered =
   Effect.uninterruptible
     (task {
@@ -39,7 +39,7 @@ let view f =
   List.map label (Cause.reasons f)
 
 /// Runs `body` in a child that is interrupted once `late` tells it is masked.
-probe : String -> (Deferred.Deferred none Unit -> Eff none none Unit) ->{} Unit
+probe : String -> (Deferred.Deferred none Unit -> Eff {Async} none Unit) ->{Async;} Unit
 let probe name body =
   let entered : Deferred.Deferred none Unit = Deferred.make ()
   let exits = scope owner {
@@ -56,7 +56,7 @@ let probe name body =
     )
     exits
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   probe "exit" (fun entered -> task {
     let ex = Effect.exit (task { late entered })

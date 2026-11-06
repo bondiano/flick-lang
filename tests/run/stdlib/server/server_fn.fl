@@ -31,22 +31,22 @@ label : String -> Float ->{Server.Server;} String
 server fn label item count = item ++ " x" ++ show count
 
 /// What the client sees of a call.
-shown : Order ->{} String
+shown : Order ->{Async;} String
 let shown order =
   try place order with
   | OutOfStock item -> "out of stock: " ++ item
   | Rpc.ClientError _ -> "no server"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   set_env "FLICK_SERVER_URL" "http://127.0.0.1:1"
   Platform.stdout_line (shown { item = "tea"; count = 1 })
   provide (Layer.merge Server.node (Layer.merge Http.FetchClient.layer Http.Server.layer_services)) {
     try
       scope s {
-        functions : (ServerRequest ->{} ServerResponse)^{s}
+        functions : (ServerRequest ->{Async;} ServerResponse)^{s}
         let functions = Server.handler [server place, server label]
-        app : (ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        app : (ServerRequest ->{Async; Http.ServerError.HttpServerError} ServerResponse)^{s}
         let app =
           Http.Router.router Http.Router.config [
             Http.Router.route (Some Http.Method.POST) Server.path (fun request ->

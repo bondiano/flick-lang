@@ -35,7 +35,7 @@ let handlers = {
   count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let options = { serialization = Rpc.json; transport = Rpc.websocket }
   let result =

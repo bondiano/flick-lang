@@ -45,7 +45,7 @@ let fail_with entry exit =
   | Some failure -> Request.fail_cause failure entry
   | None -> ()
 
-run_all : RequestResolver Query {NotFound} String -> List Float ->{} String
+run_all : RequestResolver Query {NotFound} String -> List Float ->{Async;} String
 let run_all resolver ids =
   let results = parallel_results (List.map (fun id -> task { Request.run resolver (ask id) }) ids)
   show (List.map describe results)
@@ -116,10 +116,10 @@ let traced =
     List.each_effect answer (NonEmpty.to_list entries)
   )
 
-twice : (c ->{; e} String) -> c ->{; e} String
+twice : (c ->{Async; e} String) -> c ->{Async; e} String
 let twice get cache = get cache ++ " " ++ get cache
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   Platform.stdout_line ("payload " ++ show (Request.payload (ask 1)))
   Platform.stdout_line ("make " ++ run_all batched [1, 2, 3, 12])

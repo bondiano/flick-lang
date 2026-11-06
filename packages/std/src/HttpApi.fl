@@ -322,7 +322,7 @@ foreign pure add_group from "@flick-lang/runtime/effect/http-api/HttpApi" "httpA
 listen :
   forall c s r gs.
   (Fiber.Outlives c s, Fiber.Provided r s) =>
-  ServeOptions -> Api r gs -> (gs^c ->{Scope s | r; ServeError} Server s)^c
+  ServeOptions -> Api r gs -> (gs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiListen"
   arity 3
   retention owner
@@ -349,7 +349,7 @@ foreign pure port from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiPor
 /// the success, a declared error as the typed failure, or `ClientError`.
 call :
   forall l p q h b r e s.
-  String -> Endpoint l (Request p q h b ->{r; e} s) -> Request p q h b ->{; ClientError | e} s
+  String -> Endpoint l (Request p q h b ->{r; e} s) -> Request p q h b ->{Async; ClientError | e} s
 foreign effect call from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiCall"
   arity 3
   reviewed "effect@4.1.2 sha256:054a5eea6e02f31e"

@@ -218,7 +218,7 @@ foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
 listen :
   forall c s r hs.
   (Fiber.Outlives c s, Fiber.Provided r s) =>
-  ServeOptions -> Group r hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+  ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
   arity 3
   retention owner
@@ -229,7 +229,7 @@ foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
 listen_websocket :
   forall c s r hs.
   (Fiber.Outlives c s, Fiber.Provided r s) =>
-  ServeOptions -> Group r hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+  ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenWebsocket"
   arity 3
   retention owner
@@ -242,7 +242,7 @@ foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "r
 listen_tcp :
   forall c s r hs.
   (Fiber.Outlives c s, Fiber.Provided r s) =>
-  ServeOptions -> Group r hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+  ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen_tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenTcp"
   arity 3
   retention owner
@@ -262,7 +262,9 @@ foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
 handler :
   forall c s r hs.
   (Fiber.Outlives c s, Fiber.Provided r s) =>
-  Serialization -> Group r hs -> (hs^c ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s})^c
+  Serialization ->
+  Group r hs ->
+  (hs^c ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s})^c
 foreign effect handler from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandler"
   arity 3
   retention owner
@@ -273,7 +275,9 @@ foreign effect handler from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandler
 handler_websocket :
   forall c s r hs.
   (Fiber.Outlives c s, Fiber.Provided r s) =>
-  Serialization -> Group r hs -> (hs^c ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s})^c
+  Serialization ->
+  Group r hs ->
+  (hs^c ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s})^c
 foreign effect handler_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandlerWebsocket"
   arity 3
   retention owner
@@ -283,13 +287,13 @@ foreign effect handler_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "
 /// `ws://…` over `websocket`) as `options` says: the success, a declared
 /// error as the typed failure, or `ClientError`.
 call_with :
-  forall l p r e s. CallOptions -> String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
+  forall l p r e s. CallOptions -> String -> Rpc l (p ->{r; e} s) -> p ->{Async; ClientError | e} s
 foreign effect call_with from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCall"
   arity 4
   reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
 /// `call_with call_defaults`.
-call : forall l p r e s. String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
+call : forall l p r e s. String -> Rpc l (p ->{r; e} s) -> p ->{Async; ClientError | e} s
 foreign effect call from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallNdjson"
   arity 3
   reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
@@ -323,13 +327,13 @@ type Client (s : Region)
 /// Connects to the server at `url` as `options` says, as `call_with` would
 /// for one call: a WebSocket stays open, and HTTP keeps its connections
 /// alive.
-connect : forall s. CallOptions -> String ->{Scope s; ClientError} Client s
+connect : forall s. CallOptions -> String ->{Async, Scope s; ClientError} Client s
 foreign effect connect from "@flick-lang/runtime/effect/rpc/Rpc" "rpcConnect"
   arity 2
   reviewed "effect@4.1.2 sha256:c3de3399064bf5e6"
 
 /// Calls the procedure over the connection.
-call_on : forall s l p r e x. Client s -> Rpc l (p ->{r; e} x) -> p ->{; ClientError | e} x
+call_on : forall s l p r e x. Client s -> Rpc l (p ->{r; e} x) -> p ->{Async; ClientError | e} x
 foreign effect call_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallOn"
   arity 3
   retention call
@@ -347,7 +351,8 @@ foreign pure call_stream_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallSt
 /// Answers the calls of the messages on stdin on stdout until stdin ends:
 /// a program another starts with `spawn`, as editors start language
 /// servers. Nothing else may write to stdout meanwhile. Node only.
-serve_stdio : forall c r hs. Serialization -> Group r hs -> (hs^c ->{Stdio.Stdio | r; none} Unit)^c
+serve_stdio :
+  forall c r hs. Serialization -> Group r hs -> (hs^c ->{Async, Stdio.Stdio | r; none} Unit)^c
 foreign effect serve_stdio from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcServeStdio"
   arity 3
   retention call
@@ -364,7 +369,7 @@ foreign effect spawn from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcSpawn"
 /// Answers the calls of the page that started this Web Worker until it
 /// closes the worker: the program of the module `worker` starts. Messages
 /// travel by structured clone, so it takes no serialization.
-serve_worker : forall c r hs. Group r hs -> (hs^c ->{r; none} Unit)^c
+serve_worker : forall c r hs. Group r hs -> (hs^c ->{Async | r; none} Unit)^c
 foreign effect serve_worker from "@flick-lang/runtime/effect/rpc/Rpc" "rpcServeWorker"
   arity 2
   retention call
@@ -379,7 +384,7 @@ foreign effect worker from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWorker"
 
 /// Answers the calls of the thread that started this worker thread until it
 /// closes it, as `serve_worker` in a browser. Node only.
-serve_node_worker : forall c r hs. Group r hs -> (hs^c ->{r; none} Unit)^c
+serve_node_worker : forall c r hs. Group r hs -> (hs^c ->{Async | r; none} Unit)^c
 foreign effect serve_node_worker from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcServeNodeWorker"
   arity 2
   retention call

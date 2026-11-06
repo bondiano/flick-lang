@@ -29,7 +29,7 @@ let suspended =
     ui { text (show (Seq.fold (fun a b -> a + b) 0 doubled)) }
   )
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide Atom.layer {
   Platform.stdout_line (Ui.Server.render (Ui.render page ()))
   Atom.set second 5

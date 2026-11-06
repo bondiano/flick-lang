@@ -22,12 +22,12 @@ foreign effect capacity from "@flick-lang/runtime/effect/TxSemaphore" "capacity"
   reviewed "effect@4.1.2 sha256:3b6a87231e7852b2"
 
 /// Takes a permit, waiting for one.
-acquire : TxSemaphore ->{Tx.Transaction;} Unit
+acquire : TxSemaphore ->{Async, Tx.Transaction;} Unit
 foreign effect acquire from "@flick-lang/runtime/effect/TxSemaphore" "acquire"
   reviewed "effect@4.1.2 sha256:2e202954494190c8"
 
 /// Takes `n` permits, waiting for them.
-acquire_n : Int -> TxSemaphore ->{Tx.Transaction;} Unit
+acquire_n : Int -> TxSemaphore ->{Async, Tx.Transaction;} Unit
 foreign effect acquire_n from "@flick-lang/runtime/effect/TxSemaphore" "acquireN"
   arity 1
   reviewed "effect@4.1.2 sha256:a268ae4fe41af93f"

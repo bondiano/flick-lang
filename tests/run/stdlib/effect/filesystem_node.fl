@@ -7,7 +7,7 @@ let line label text = Platform.stdout_line (label ++ ": " ++ text)
 plain : FileSystem.WriteOptions
 let plain = { flag = None; mode = None }
 
-work : String ->{FileSystem.FileSystem; PlatformError.PlatformError} Unit
+work : String ->{Async, FileSystem.FileSystem; PlatformError.PlatformError} Unit
 let work dir =
   let a = dir ++ "/a.txt"
   let b = dir ++ "/b.txt"
@@ -67,7 +67,7 @@ let work dir =
   await later
   line "indirect" "true"
 
-main : Unit ->{} Unit
+main : Unit ->{Async;} Unit
 let main () =
   try
     provide FileSystem.node {

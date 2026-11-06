@@ -13,7 +13,7 @@ foreign effect make from "@flick-lang/runtime/effect/Deferred" "make"
   reviewed "effect@4.1.2 sha256:1521a0846a3d9965"
 
 /// Waits until the deferred is completed, then succeeds or fails as it did.
-await_ : Deferred e a ->{; e} a
+await_ : Deferred e a ->{Async; e} a
 foreign effect await_ from "@flick-lang/runtime/effect/Deferred" "await"
   reviewed "effect@4.1.2 sha256:72074c23e1633d27"
 

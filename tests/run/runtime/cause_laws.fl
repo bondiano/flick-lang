@@ -163,7 +163,7 @@ let three p =
     )
     (Arbitrary.zip3 atoms atoms atoms)
 
-nap : Float ->{} Unit
+nap : Float ->{Async;} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -171,7 +171,7 @@ let nap millis =
 
 /// Tells `entered` it is masked, then fails after the mask ends, by when
 /// the fiber was asked to stop.
-late : Deferred.Deferred none Unit ->{; A} String
+late : Deferred.Deferred none Unit ->{Async; A} String
 let late entered =
   Effect.uninterruptible
     (task {
@@ -181,7 +181,7 @@ let late entered =
       from_result (Err (A 1))
     })
 
-guarded : Deferred.Deferred none Unit ->{} String
+guarded : Deferred.Deferred none Unit ->{Async;} String
 let guarded entered =
   try late entered with
   | A _ ->
@@ -192,7 +192,7 @@ quiet : forall e. Failure e ->{} Unit
 let quiet _ = ()
 
 /// The handler is skipped: the fiber ends with its interruption alone.
-skipped : Unit ->{} Unit
+skipped : Unit ->{Async;} Unit
 let skipped () =
   let entered : Deferred.Deferred none Unit = Deferred.make ()
   let exits = scope owner {
@@ -209,7 +209,7 @@ let skipped () =
     )
     exits
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   law "⧺ keeps every reason" (one (fun xs -> view (free xs) == expected false xs))
   law "⊕ is nub of ⧺" (one (fun xs -> view (nf xs) == expected false (List.dedupe xs)))

@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 5d25913b88ed2f91
+source_hash: ccca3e82ccc8e721
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -180,14 +180,14 @@ let case_blind =
 
 ```flick
 // a. spawn и только wait: 1 МиБ, который никто не читает
-waits : Unit ->{; PlatformError.PlatformError} Int
+waits : Unit ->{Async; PlatformError.PlatformError} Int
 let waits () = scope {
   let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
   ChildProcess.wait p // JS: не возвращается; Go: 0
 }
 
 // b. exit_code команды с большим выводом: так же
-chatty : Unit ->{; PlatformError.PlatformError} Int
+chatty : Unit ->{Async; PlatformError.PlatformError} Int
 let chatty () =
   ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
 

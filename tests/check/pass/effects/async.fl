@@ -23,3 +23,9 @@ checked : Result Invalid Int ->{Log; Invalid} Int
 let checked result =
   Log.line "checked"
   result?
+
+/// A layer that needs nothing fits where one may suspend while it builds.
+built : Layer {Async} none {Log} -> Int
+let built _ = 1
+
+let quiet = built (Layer.succeed Log { line = fun _ -> () })

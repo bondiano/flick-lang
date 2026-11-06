@@ -21,7 +21,7 @@ let within low high n = n >= low && n <= high
 within_int : Int -> Int -> Int -> Bool
 let within_int low high n = n >= low && n <= high
 
-checks : Unit ->{Crypto.Crypto; Crypto.CryptoError} Unit
+checks : Unit ->{Async, Crypto.Crypto; Crypto.CryptoError} Unit
 let checks () =
   let bytes = Crypto.random_bytes 16
   line
@@ -77,7 +77,7 @@ let checks () =
   with
   | Crypto.CryptoError _ -> line "negative size" "refused" ()
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try provide Crypto.system { checks () } with
   | Crypto.CryptoError message -> line "error" message ()

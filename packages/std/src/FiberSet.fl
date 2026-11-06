@@ -36,7 +36,7 @@ foreign effect add from "@flick-lang/runtime/effect/FiberSet" "flickAdd"
   reviewed "effect@4.1.2 sha256:598395337876f1d4"
 
 /// Interrupts every child and empties the set.
-clear : FiberSet s e a ->{} Unit
+clear : FiberSet s e a ->{Async;} Unit
 foreign effect clear from "@flick-lang/runtime/effect/FiberSet" "clear"
   retention call
   reviewed "effect@4.1.2 sha256:84d569b250f4f0fa"
@@ -48,13 +48,13 @@ foreign effect size from "@flick-lang/runtime/effect/FiberSet" "size"
   reviewed "effect@4.1.2 sha256:39bcfa8eedf749bc"
 
 /// Waits until the scope closes or a child fails, and fails as it did.
-join : FiberSet s e a ->{; e} Unit
+join : FiberSet s e a ->{Async; e} Unit
 foreign effect join from "@flick-lang/runtime/effect/FiberSet" "join"
   retention call
   reviewed "effect@4.1.2 sha256:2b481a2440fa00ef"
 
 /// Waits until no child is running.
-await_empty : FiberSet s e a ->{} Unit
+await_empty : FiberSet s e a ->{Async;} Unit
 foreign effect await_empty from "@flick-lang/runtime/effect/FiberSet" "awaitEmpty"
   retention call
   reviewed "effect@4.1.2 sha256:82b27c89ddbba48c"

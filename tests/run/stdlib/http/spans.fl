@@ -32,7 +32,7 @@ let get url =
   |> Http.ClientRequest.set_header "x-request-id" "r2"
   |> Http.ClientRequest.set_header "authorization" "Bearer t"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let seen = Ref.make None
   let request =

@@ -103,7 +103,7 @@ let forwarded request =
 broken : ServerRequest ->{; Boom} ServerResponse
 let broken _ = from_result (Err Boom)
 
-parse : ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse
+parse : ServerRequest ->{Async; Http.ServerError.HttpServerError} ServerResponse
 let parse request =
   let _ = Http.ServerRequest.json request
   Http.ServerResponse.text "parsed" ok
@@ -123,7 +123,7 @@ let upload_one request =
 
 /// Holds the request until the scope of the server closes; its finalizer
 /// runs before the server is closed.
-slow : Deferred.Deferred none Unit -> ServerRequest ->{} ServerResponse
+slow : Deferred.Deferred none Unit -> ServerRequest ->{Async;} ServerResponse
 let slow started _ = scope {
   Resource.acquire_release (task { line "slow" "acquired" }) (fun _ -> line "slow" "finalizer")
   let _ = Deferred.succeed () started
@@ -132,7 +132,9 @@ let slow started _ = scope {
 }
 
 file :
-  String -> ServerRequest ->{Http.Platform.HttpPlatform; PlatformError.PlatformError} ServerResponse
+  String ->
+  ServerRequest ->{Async, Http.Platform.HttpPlatform; PlatformError.PlatformError}
+  ServerResponse
 let file path _ = Http.Platform.file Http.Platform.file_options path
 
 describe : HttpClientError -> String
@@ -141,14 +143,14 @@ let describe failure =
   | Http.ClientError.HttpClientError (Http.ClientError.TransportError _) -> "transport error"
   | Http.ClientError.HttpClientError reason -> show reason
 
-status_of : String ->{Http.Client.HttpClient; HttpClientError} String
+status_of : String ->{Async, Http.Client.HttpClient; HttpClientError} String
 let status_of url =
   let response = Http.Client.get url
   show (Http.ClientResponse.status response) ++ " " ++ Http.ClientResponse.text response
 
 exercise :
   String ->
-  String ->{Http.Client.HttpClient; HttpClientError, SchemaError, Http.Body.HttpBodyError}
+  String ->{Async, Http.Client.HttpClient; HttpClientError, SchemaError, Http.Body.HttpBodyError}
   Unit
 let exercise base dir =
   line "hello" (status_of (base ++ "/hello/ann"))
@@ -192,7 +194,7 @@ let exercise base dir =
   line
     "with_limits"
     (show (Http.ClientResponse.status refused) ++ " " ++ Http.ClientResponse.text refused)
-  via : String ->{Http.Client.HttpClient; HttpClientError} String
+  via : String ->{Async, Http.Client.HttpClient; HttpClientError} String
   let via path =
     Http.ClientResponse.text
       (Http.Client.execute
@@ -211,7 +213,7 @@ let exercise base dir =
       ++ show (Http.Headers.has "etag" (Http.ClientResponse.headers sent)))
 
 serve_all :
-  String ->{Log, Http.Client.HttpClient, Http.Platform.HttpPlatform; HttpClientError, SchemaError, Http.Body.HttpBodyError, Http.ServerError.ServeError, PlatformError.PlatformError}
+  String ->{Async, Log, Http.Client.HttpClient, Http.Platform.HttpPlatform; HttpClientError, SchemaError, Http.Body.HttpBodyError, Http.ServerError.ServeError, PlatformError.PlatformError}
   Unit
 let serve_all dir =
   let started : Deferred.Deferred none Unit = Deferred.make ()
@@ -219,7 +221,7 @@ let serve_all dir =
     let (base, pending) = scope {
       let static_route = Http.StaticServer.route (Http.StaticServer.static_options dir) "/static"
       app :
-        ServerRequest ->{Log, Http.Platform.HttpPlatform; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError, Http.Cookies.CookiesError, Boom, Http.Multipart.MultipartError, PlatformError.PlatformError}
+        ServerRequest ->{Async, Log, Http.Platform.HttpPlatform; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError, Http.Cookies.CookiesError, Boom, Http.Multipart.MultipartError, PlatformError.PlatformError}
         ServerResponse
       let app =
         Http.Router.router Http.Router.config [
@@ -275,7 +277,7 @@ let serve_all dir =
     | e -> line "after close" (describe e)
   }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide (Layer.merge
   (Layer.merge Http.FetchClient.layer stdout_log)
   (Layer.merge Http.Server.layer_services FileSystem.node)) {

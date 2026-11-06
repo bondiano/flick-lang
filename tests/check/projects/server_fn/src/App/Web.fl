@@ -4,7 +4,7 @@ module App.Web exposing (main)
 
 import App.Api
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     let _ = App.Api.place { item = "tea" }
