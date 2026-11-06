@@ -24,5 +24,8 @@ func processKill(cmd *exec.Cmd, _ string) error {
 	return nil
 }
 
+// processGroupAlive: on Windows only the leader is waited for.
+func processGroupAlive(*exec.Cmd) bool { return false }
+
 // processSignal: a Windows process ends with an exit code only.
 func processSignal(*os.ProcessState) (string, bool) { return "", false }
