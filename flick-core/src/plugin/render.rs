@@ -62,6 +62,9 @@ pub fn render(
         .map(|(_, h)| *h)
         .filter(|h| in_signature(*h).is_none())
         .collect();
+    if place == Place::Expression && out.holes.iter().any(|(_, h)| in_signature(*h).is_some()) {
+        return Err("an expression takes no type of the signature above its `let`".into());
+    }
     holes.sort_by_key(|h| (h.span.start, h.span.end));
     // a type may stand in several places, as in a signature and an annotation
     holes.dedup_by(|b, a| a == b && a.kind == HoleKind::Ty);
@@ -168,6 +171,19 @@ impl Printer<'_> {
                 self.push(")");
             }
             Expr::Hole(span) => self.hole(HoleKind::Expr, *span, "hole")?,
+            Expr::Concat(items) => {
+                if items.len() < 2 {
+                    return Err("a concatenation of fewer than two items".into());
+                }
+                self.push("(");
+                for (i, &item) in items.iter().enumerate() {
+                    if i > 0 {
+                        self.push(" ++ ");
+                    }
+                    self.node(item, Role::Expr, d)?;
+                }
+                self.push(")");
+            }
         }
         Ok(())
     }

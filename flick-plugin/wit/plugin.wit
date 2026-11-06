@@ -68,6 +68,8 @@ interface types {
     %tuple(list<node-id>),
     annot(annot),
     hole(span),
+    /// `(a ++ b ++ …)`: texts or lists joined, at least two.
+    concat(list<node-id>),
   }
 
   variant ty {
@@ -174,6 +176,9 @@ interface types {
   /// reaching it failed.
   variant reach-error { denied(string), offline(string), failed(string) }
 
+  /// What a plugin tells its blocks of other groups and modules about a
+  /// name of the module `module`.
+  record published { module: string, name: string, data: list<u8> }
   /// A request over HTTP, and its answer.
   record request { method: string, url: string, headers: list<tuple<string, string>>, body: list<u8> }
   record response { status: u16, body: list<u8> }
@@ -233,14 +238,21 @@ interface compiler {
   /// module writes it, `Role` or `Roles.Role`; none for a type that is no
   /// enum, or one the module does not see.
   literal-of: func(name: string) -> option<string>;
+  /// What this plugin published of `name` as the block's module writes it,
+  /// `Users` or `Schema.Users`: its own module's, or one it imports, from
+  /// any group; none for a name it does not see or no publication.
+  published: func(name: string) -> option<list<u8>>;
 }
 
 world plugin {
   import compiler;
-  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact};
+  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact, published};
 
   /// What the plugin learns from all its blocks of a group, before any expands.
   export collect: func(blocks: list<block>) -> list<u8>;
+  /// What the blocks of other groups and modules may ask of the state of a
+  /// group, before any block expands.
+  export publish: func(state: list<u8>) -> list<published>;
   /// The code a block stands for, given what `collect` learned.
   export expand: func(block: block, state: list<u8>) -> result<arena, list<diagnostic>>;
   /// What an editor may insert at `offset` of the block.

@@ -6,13 +6,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use flick_plugin::{Arena, Block, DeriveTarget, Diagnostic as PluginDiagnostic, Fact};
+use flick_plugin::{Arena, Block, DeriveTarget, Diagnostic as PluginDiagnostic, Fact, Published};
 use flick_test_pairs::Pairs;
 
 mod derive;
 mod forms;
 mod names;
 mod nested;
+mod published;
 mod reach;
 
 use super::{check, compile};
@@ -41,6 +42,10 @@ impl Expander for Counting {
     fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String> {
         self.collects.fetch_add(1, Ordering::Relaxed);
         self.inner.collect(blocks, source)
+    }
+
+    fn publish(&self, state: &[u8]) -> Result<Vec<Published>, String> {
+        self.inner.publish(state)
     }
 
     fn expand(

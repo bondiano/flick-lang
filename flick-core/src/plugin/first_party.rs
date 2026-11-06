@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use flick_plugin::{
     Arena, Block, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
-    Plugin,
+    Plugin, Published,
 };
 use flick_plugin_cli::Cli;
 use flick_plugin_derive::{codec, server_fn};
@@ -53,6 +53,10 @@ impl Plugin for Std {
             .cloned()
             .collect();
         Sql.collect(&sql, compiler)
+    }
+
+    fn publish(&self, state: &[u8]) -> Vec<Published> {
+        Sql.publish(state)
     }
 
     fn expand(

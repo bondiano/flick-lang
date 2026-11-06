@@ -55,6 +55,13 @@ break programs.
 - **Plugins:** a declaration block may stand for no declarations, an empty
   group, as a migration that only alters a table; a whole number in a
   plugin's code is an integer literal, of any numeric type its use asks for.
+- **Plugins:** `publish(state)` tells the blocks of other modules and
+  groups about names, and `published(name)` gives a block what its plugin
+  published of a name its module sees: the tests see what the sources
+  published, and a kept expansion holds only while the answer is the same,
+  as with `literal-of`, which is now kept too. An expression that is the
+  whole body of a `let` sees its signature, and code may join texts or lists
+  with `concat`, `(a ++ b)`.
 - **CallSite:** the new core class `CallSite` is the place of a use,
   `CallSite.place` (`Module:line`) and `CallSite.definition`, which the
   checker gives: a function with `CallSite =>` passes on its caller's, any

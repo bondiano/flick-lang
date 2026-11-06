@@ -72,6 +72,10 @@ impl Compiler for Imports {
         compiler::literal_of(name)
     }
 
+    fn published(&mut self, name: &str) -> Option<Vec<u8>> {
+        compiler::published(name)
+    }
+
     fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {
         compiler::fetch(&reach_convert::to_request(request))
             .map(reach_convert::from_response)
@@ -83,6 +87,17 @@ impl Compiler for Imports {
 pub fn collect(plugin: &impl Plugin, blocks: Vec<types::Block>) -> Vec<u8> {
     let blocks: Vec<_> = blocks.into_iter().map(convert::from_block).collect();
     plugin.collect(&blocks, &mut Imports)
+}
+
+#[doc(hidden)]
+pub fn publish(plugin: &impl Plugin, state: &[u8]) -> Vec<types::Published> {
+    (plugin.publish(state).into_iter())
+        .map(|p| types::Published {
+            module: p.module,
+            name: p.name,
+            data: p.data,
+        })
+        .collect()
 }
 
 #[doc(hidden)]
@@ -187,6 +202,12 @@ macro_rules! export {
                 blocks: ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Block>,
             ) -> ::std::vec::Vec<u8> {
                 $crate::guest::collect(&$plugin, blocks)
+            }
+
+            fn publish(
+                state: ::std::vec::Vec<u8>,
+            ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Published> {
+                $crate::guest::publish(&$plugin, &state)
             }
 
             fn expand(

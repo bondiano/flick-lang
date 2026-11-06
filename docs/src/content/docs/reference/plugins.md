@@ -75,11 +75,15 @@ needs is imported by the user. Its names are its own:
 A plugin is a WebAssembly component of the world `flick:plugin` in
 [`flick-plugin/wit/plugin.wit`](https://github.com/bondiano/flick-lang/blob/main/flick-plugin/wit/plugin.wit),
 or a Rust value of the `Plugin` trait of the `flick-plugin` crate linked
-into the compiler. It has two calls, both pure:
+into the compiler. It has three calls, all pure:
 
 - `collect(blocks)` learns from all its blocks of a group (the project's
   sources, its tests, or a package), in the order of their modules' names
   and places, and gives a state of bytes;
+- `publish(state)` gives what the blocks of other modules and groups may
+  ask of a group's state: names of modules, each with bytes, as a table's
+  columns. Every group publishes before any block expands, so a module of
+  the tests sees what the sources published;
 - `expand(block, state)` gives the code of one block, or what it finds
   wrong at spans of the block.
 
@@ -117,10 +121,15 @@ shows `module`, the module it is in, and for a declaration right below a
 signature, `signature`: its text and tokens, spans counting from its start.
 Code with a type of the signature, `signed(span)`, takes it from the module;
 without one, the signature stays where it is, above what the code declares.
+An expression that is the whole body of a `let` of the module sees the
+signature of that `let` too, but its code takes no type of it.
 `literal-of(name)` says whether the type `name`, as the module writes it
 (`Role`, `Roles.Role`), is an enum the module declares or imports, and gives
 its base type, `String` or `Int`: the types are not checked yet, so a
-plugin asks before it writes code for one.
+plugin asks before it writes code for one. `published(name)` gives what the
+same plugin published of `name` as the module writes it (`Users`,
+`Schema.Users`): a name of the module itself or of one it imports. A kept
+expansion that asked holds only while the answer stays the same.
 
 The code of a block that is an expression is an expression; that of a
 declaration is declarations, which take the block's place among the module's
@@ -138,7 +147,7 @@ and with the span of the block it stands for:
 
 | Kind | Nodes |
 | - | - |
-| expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole |
+| expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole, concatenation (`a ++ b`) |
 | type | name, application, record, function, tuple, type-level text (`"name"`), `_`, `forall`, row, hole, a type of the signature |
 | pattern | variable, wildcard, constructor, record, tuple, hole |
 | declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, `instance` with members, a group of several or none, documentation of one, hole |

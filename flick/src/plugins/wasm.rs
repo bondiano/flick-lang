@@ -151,6 +151,10 @@ impl flick::plugin::compiler::Host for State {
         self.source.literal_of(&name)
     }
 
+    fn published(&mut self, name: String) -> Option<Vec<u8>> {
+        self.source.published(&name)
+    }
+
     fn fetch(
         &mut self,
         request: flick::plugin::types::Request,
@@ -260,6 +264,19 @@ impl Expander for Wasm {
         });
         *source = back;
         result
+    }
+
+    fn publish(&self, state: &[u8]) -> Result<Vec<flick_plugin::Published>, String> {
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_publish(store, state)
+        });
+        Ok((result?.into_iter())
+            .map(|p| flick_plugin::Published {
+                module: p.module,
+                name: p.name,
+                data: p.data,
+            })
+            .collect())
     }
 
     fn expand(

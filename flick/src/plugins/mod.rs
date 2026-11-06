@@ -17,7 +17,7 @@ use std::sync::Arc;
 use flick_core::plugin::source::BlockSource;
 use flick_core::plugin::{Expander, Failure};
 use flick_plugin::{
-    Arena, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
+    Arena, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece, Published,
 };
 
 pub use cache::{cached, save};
@@ -77,6 +77,11 @@ impl Expander for Traced {
     fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String> {
         self.trace(&format!("collect {}", self.inner.id()));
         self.inner.collect(blocks, source)
+    }
+
+    fn publish(&self, state: &[u8]) -> Result<Vec<Published>, String> {
+        self.trace(&format!("publish {}", self.inner.id()));
+        self.inner.publish(state)
     }
 
     fn expand(
