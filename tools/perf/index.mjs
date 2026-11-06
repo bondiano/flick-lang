@@ -130,8 +130,8 @@ const throughput = async (command, { port, path: route, expect, env = {} }) => {
 
 const main = async () => {
   const flick = path.resolve(process.argv[2] ?? "target/release/flick");
-  const build = (dir, ...args) =>
-    execFileSync(flick, ["build", ...args, "--quiet", "--color", "never"], { cwd: path.join(root, dir), stdio: "inherit" });
+  const build = (dir, args, env = process.env) =>
+    execFileSync(flick, ["build", ...args, "--quiet", "--color", "never"], { cwd: path.join(root, dir), stdio: "inherit", env });
   const values = {};
 
   values["check.corpus"] = Math.round(checkCorpus(flick));
@@ -141,12 +141,20 @@ const main = async () => {
   values["lsp.hover.p95"] = hover;
   values["lsp.hover_after_edit.p95"] = afterEdit;
 
-  build("tools/load/json", "--emit", "go", "--out-dir", "dist/go");
+  // the binary's budget is that of the Go in runtime-go/go.mod, which CI sets up: a newer
+  // Go builds a bigger one, so a local run builds with that version, which Go fetches once
+  const version = /^go (\S+)$/m.exec(readFileSync(path.join(root, "runtime-go/go.mod"), "utf8"))[1];
+  const goroot = execFileSync("go", ["env", "GOROOT"], {
+    env: { ...process.env, GOTOOLCHAIN: `go${version}` },
+    encoding: "utf8",
+  }).trim();
+  const withGo = { ...process.env, PATH: `${path.join(goroot, "bin")}${path.delimiter}${process.env.PATH}` };
+  build("tools/load/json", ["--emit", "go", "--out-dir", "dist/go"], withGo);
   const go = "tools/load/json/dist/go/flick-server";
   values["load.json.go.binary"] = statSync(path.join(root, go)).size;
   values["load.json.go.rps"] = await throughput([go], { port: 3930, path: "/item/{id}", expect: '"item {id}"' });
 
-  build("tools/load/ssr");
+  build("tools/load/ssr", []);
   execFileSync("node", ["tools/load/bundle.mjs", "tools/load/ssr/dist/flick-client.js", "tools/load/ssr/dist/client.js"], {
     cwd: root,
     stdio: "inherit",
