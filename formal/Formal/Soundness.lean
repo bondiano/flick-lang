@@ -239,7 +239,7 @@ with a store typing that extends the first one. The type and the stage of the
 program name no run-time region. -/
 theorem cstep_typed {root Ψ c c' t φ l} (hroot : RootTy S root) (ht : t.YF 0)
     (hφ : φ.substT (kill 0) = φ) (hc : CfgTy S Ψ c t φ) (hs : CStep root l c c') :
-    ∃ X, CfgTy S (Ψ ++ X) c' t φ := by
+    ∃ X, CfgTy S (Ψ ++ X) c' t φ ∧ ∀ u ∈ X, u.YF c.rgs.length := by
   obtain ⟨hμ, h, hΛ, hb, hΨ, ha, hcs, hcc, hcg⟩ := hc
   cases hs with
   | main hs =>
@@ -248,8 +248,8 @@ theorem cstep_typed {root Ψ c c' t φ l} (hroot : RootTy S root) (ht : t.YF 0)
     obtain ⟨ha', hka⟩ := hs.asc hroot ha hb.main
     obtain ⟨hs', cell', -, hcc'⟩ := hs.caught hroot hcg ha hb
     rw [ht.mono (Nat.zero_le _), Stage.YF_mono hφ (Nat.zero_le _)] at h'
-    refine ⟨X, hμ', h', (step_rgs hΛ h hb.main hΨ ha.main hs).weaken X, hb', fun u hu => ?_, hka _ ha',
-      hs', cell', hcc'⟩
+    refine ⟨X, ⟨hμ', h', (step_rgs hΛ h hb.main hΨ ha.main hs).weaken X, hb', fun u hu => ?_, hka _ ha',
+      hs', cell', hcc'⟩, hX⟩
     rcases List.mem_append.mp hu with hu | hu
     · exact (hΨ u hu).mono hl
     · exact (hX u hu).mono hl
@@ -263,9 +263,9 @@ theorem cstep_typed {root Ψ c c' t φ l} (hroot : RootTy S root) (ht : t.YF 0)
     obtain ⟨ha', hka⟩ := hs.asc hroot ⟨hkA, ha.rgs, ha.mem⟩ hkb
     obtain ⟨hs', cell', hg', hkc⟩ := hs.caught hroot
       ⟨hcg.rgs _ _ hg _ (List.mem_append_left _ hkm), hcg.rgs⟩ ⟨hkA, ha.rgs, ha.mem⟩ ⟨hkb, hb.mem, hb.rgs⟩
-    refine ⟨X, hμ', h.weakenStore X, ((step_rgs hΛ hk hkb hΨ hkA hs).weaken X).setKid ⟨_, _, hk'⟩,
+    refine ⟨X, ⟨hμ', h.weakenStore X, ((step_rgs hΛ hk hkb hΨ hkA hs).weaken X).setKid ⟨_, _, hk'⟩,
       CfgBelow.kid ⟨hb.main.mono hl, hb'.mem, hb'.rgs⟩ hb'.main, fun u hu => ?_,
-      (hka _ ha.main).setKid ha', hs', cell', hkc.setKid hkc.main (hcg.main.ghostB hb.main hg')⟩
+      (hka _ ha.main).setKid ha', hs', cell', hkc.setKid hkc.main (hcg.main.ghostB hb.main hg')⟩, hX⟩
     rw [setKid_length]
     rcases List.mem_append.mp hu with hu | hu
     · exact (hΨ u hu).mono hl
@@ -278,7 +278,7 @@ theorem steps_typed {root c c'} (hroot : RootTy S root) (hs : CSteps root c c') 
   | refl => intro Ψ _ _ _ _ h; exact ⟨[], by simpa using h⟩
   | step h₁ _ ih =>
     intro _ _ _ ht hφ h
-    obtain ⟨X₁, h'⟩ := cstep_typed hroot ht hφ h h₁
+    obtain ⟨X₁, h', -⟩ := cstep_typed hroot ht hφ h h₁
     obtain ⟨X₂, h''⟩ := ih ht hφ h'
     exact ⟨X₁ ++ X₂, by simpa using h''⟩
 

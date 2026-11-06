@@ -87,12 +87,12 @@ theorem frame_young {e : Tm} {A : Nat → Prop} {p x : Nat} (hle : ∀ q x, anc 
 an arm opened at the place of `p`. -/
 theorem old_move {Θ : Facts} {p : Nat} {w : Tm} {T : Ty} {φ : Stage} {A : Nat → Prop} {A' : List Frame}
     (hle : ∀ q x, anc q x → x ≤ q) (hp : A p) (ha : (plug A' (.hole p)).Within Ψ B anc A)
-    (hw : Value w) (ht : Typ S Ψ Θ [] w (.ex T φ)) (hT : T.YF p) (hW : w.Within Ψ B anc A) :
-    w.Within Ψ B anc (holeE A A') :=
+    (hw : Value w) (ht : Typ S Ψ Θ [] w (.ex T φ)) (hT : ∀ x, T.reach (.r x) → x < p)
+    (hW : w.Within Ψ B anc A) : w.Within Ψ B anc (holeE A A') :=
   hW.moveT hw ht fun x hx => ⟨fun h => holeE_iff.mpr (.inl h), fun h => by
     rcases holeE_iff.mp h with h | h
     · exact h
-    · exact absurd (hT.reach hx) (Nat.not_lt_of_le (Nat.le_of_lt
+    · exact absurd (hT x hx) (Nat.not_lt_of_le (Nat.le_of_lt
         (frame_young hle ha hp (plug_frame h))))⟩
 
 theorem Nest.hdoneVal {c : Cfg} {home i E p v} (hn : Nest Ψ c anc B home)

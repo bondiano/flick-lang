@@ -70,12 +70,6 @@ theorem T2a {root Ψ Λ μ e t Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreT
       · exact hX u hu) (by simpa [Stage.substT] using h')
     exact ⟨.step h₁ hl hs', rfl, rfl, hr⟩
 
-/-- `ask_S` names no effect. -/
-theorem ask_ok {Ψ Θ N w J} (h : Typ S Ψ Θ [] (.app (.const (.ask N)) w) J) : ∀ o, S.op N o = none := by
-  cases h with
-  | app hf _ _ _ => cases hf with | const hok _ => exact hok
-  | errVal hv => exact (ask_not_value hv).elim
-
 /-- A frame of a typed context that handles `N` makes `N` an effect. -/
 theorem installs_in_op {Ψ Θ E x t φ N} {F : Frame} (hE : OkE E) (hx : ¬ Value x)
     (h : Typ S Ψ Θ [] (plug E x) (.ex t φ)) (hF : F ∈ E) (hi : F.installs N) :

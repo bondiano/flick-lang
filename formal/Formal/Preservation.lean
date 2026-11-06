@@ -31,6 +31,12 @@ theorem ask_inv {Ψ Θ N w t φ} (h : Typ S Ψ Θ [] (.app (.const (.ask N)) w) 
       exact ⟨Stage.le_svc (Stage.le_trans lψ hψ) _ rfl, lt.trans hT⟩
   | errVal hv => exact (ask_not_value hv).elim
 
+/-- `ask_S` names no effect. -/
+theorem ask_ok {Ψ Θ N w J} (h : Typ S Ψ Θ [] (.app (.const (.ask N)) w) J) : ∀ o, S.op N o = none := by
+  cases h with
+  | app hf _ _ _ => cases hf with | const hok _ => exact hok
+  | errVal hv => exact (ask_not_value hv).elim
+
 theorem raise_not_pure {Ψ Θ e t} (h : Typ S Ψ Θ [] (.raise e) (.ex t .pure)) : False := by
   obtain ⟨_, hε⟩ := raise_stage h; exact hε
 

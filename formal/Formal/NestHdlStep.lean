@@ -32,6 +32,14 @@ theorem unw_inward {q ℓ : Nat} {b : Tm} {A₀ : Nat → Prop} {A : List Frame}
     (h : (Tm.unw q ℓ b).Within Ψ B anc A₀) : (Tm.unw q ℓ b).Within Ψ B anc (holeE A₀ A) :=
   ⟨holeE_iff.mpr (.inl h.1), h.2.1, h.2.2.1, fun x hx => holeE_iff.mpr (.inl (h.2.2.2 x hx))⟩
 
+theorem unw_noFrame {p ℓ : Nat} {a : Tm} {A : Nat → Prop} (h : (Tm.unw p ℓ a).Within Ψ B anc A) :
+    ∀ q, ¬ (Tm.unw p ℓ a).Has (.frame q) := fun q hq => by
+  simp only [Tm.Has] at hq
+  rcases hq with hq | hq | hq
+  · cases hq
+  · cases hq
+  · exact h.2.2.1 q hq
+
 theorem Cfg.at_mem {c : Cfg} {μ' : List Tm} (i : Option (Nat × Nat)) :
     (⟨c.rgs, μ', c.main⟩ : Cfg).at i = c.at i := by
   rcases i with _ | ⟨r, j⟩ <;> rfl

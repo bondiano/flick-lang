@@ -68,6 +68,7 @@ import Formal.NestHdl
 import Formal.NestHdlPure
 import Formal.NestHdlRt
 import Formal.NestHdlStep
+import Formal.NestHdlTyp
 import Formal.NestMain
 import Formal.Regions
 import Formal.NeedOut

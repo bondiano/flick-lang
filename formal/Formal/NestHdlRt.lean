@@ -22,7 +22,8 @@ theorem HCell.res {p ℓ : Nat} {a : Ty} {r ε : Row} {t : Ty} {C : Caps} (h : H
 
 theorem Nest.hresVal {c : Cfg} {home i E p ℓ w} {A : List Frame} {Θ : Facts} {T : Ty} {φ : Stage}
     (hn : Nest Ψ c anc B home) (hi : c.at i = some (plug E (.hres p ℓ (plug A (.hole p)) w)))
-    (hE : OkE E) (hA : OkE A) (hw : Value w) (ht : Typ S Ψ Θ [] w (.ex T φ)) (hT : T.YF p) :
+    (hE : OkE E) (hA : OkE A) (hw : Value w) (ht : Typ S Ψ Θ [] w (.ex T φ))
+    (hT : ∀ x, T.reach (.r x) → x < p) :
     Nest Ψ ((⟨c.rgs, c.mem, c.main⟩ : Cfg).put i (plug E (.hdone p (plug A w)))) anc B home :=
   hn.redex' hi hE (fun h => by cases h) (fun hW q => by
       have h₄ := (hw.noIns hW.2.2.1).frame q

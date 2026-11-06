@@ -33,7 +33,8 @@ theorem env_dom {Ψ Θ Γ N} {θ : Tm} (hθ : IsEnv θ) :
           · exact h
 
 theorem need_out {N : Name} {r : Tm}
-    (hask : ∀ {Ψ' Θ' t' φ'}, Typ S Ψ' Θ' [] r (.ex t' φ') → φ'.svc (.nm N)) (hv : ¬ Value r) :
+    (hask : ∀ {Ψ' Θ' t' φ'}, Typ S Ψ' Θ' [] r (.ex t' φ') → φ'.svc (.nm N)) (hv : ¬ Value r)
+    (hsvc : ∀ o, S.op N o = none) :
     ∀ (E : List Frame) {Ψ : List Ty} {Θ : Facts} {t : Ty} {φ : Stage}, OkE E →
       Typ S Ψ Θ [] (plug E r) (.ex t φ) →
       (∀ q v, lookupE E N = some (q, v) → φ.svc (.need N (.r q)) ∨ .inside q ∈ E) ∧
@@ -107,16 +108,23 @@ theorem need_out {N : Name} {r : Tm}
       | errVal hv' => exact (not_value_plug hnv _ hv').elim
     | _ =>
       obtain ⟨k, Θ', t₁, φ₁, h₁, rel, hk, -, -⟩ := frame_typing hnv _ hG h
-      have up : ∀ y, φ₁.svc y → φ.svc y := fun y h' =>
-        (rel.svc _ h').resolve_right fun h₂ => by cases y <;> simp [Frame.dom, Frame.lookup] at h₂
+      have up : ∀ y, (∀ M, y = .nm M → M = N) → φ₁.svc y → φ.svc y := fun y hy h' =>
+        (rel.svc _ h').resolve_right fun h₂ => by
+          cases y with
+          | nm M =>
+            rcases h₂ with h₂ | h₂
+            · simp [Frame.lookup] at h₂
+            · obtain ⟨o, _, _, _, hop⟩ := installs_op h h₂
+              rw [hy M rfl, hsvc o] at hop; cases hop
+          | _ => simp [Frame.dom, Frame.lookup] at h₂
       obtain ⟨h1, h2⟩ := ih hE₀ h₁
       rw [look]
       cases hl : lookupE E₀ N with
       | some w =>
         refine ⟨fun q v hqv => ?_, fun h => by simp at h⟩
         simp only [Option.some.injEq] at hqv; subst hqv
-        exact (h1 _ _ hl).imp (up _) mem
+        exact (h1 _ _ hl).imp (up _ fun _ h => by cases h) mem
       | none =>
-        exact ⟨fun q v hqv => by simp [Frame.lookup] at hqv, fun _ => up _ (h2 hl)⟩
+        exact ⟨fun q v hqv => by simp [Frame.lookup] at hqv, fun _ => up _ (fun _ h => by cases h; rfl) (h2 hl)⟩
 
 end Flick
