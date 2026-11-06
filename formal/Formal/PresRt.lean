@@ -307,12 +307,15 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
     | inside hF hbody hφ' _ _ hφ hT =>
       have hcut := inside_entails (hbl _ (.inl (.inl rfl))) hF hc.inΘ
       have hbody := hbody.cut hcut
-      rcases hw with hw | ⟨v, hv, rfl⟩
+      rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨_, rfl⟩
       · exact same ((hbody.valueAny hw _).sub ⟨hT, Stage.le_refl _⟩)
       · obtain ⟨ε, hv', hε⟩ := raise_inv hv hbody
         obtain ⟨_, _, rfl, _, he⟩ := Stage.rt_le hφ
         exact same (.raise (hv'.valueAny hv _) ⟨fun _ h => h.elim,
           fun n hn => he n ((Stage.le_err (Stage.le_trans hε hφ')) n hn)⟩)
+      · cases hbody with | errVal hv => cases hv
     | errVal hv'' => exact (nv hv'').elim
+  | hctlRaise _ | hctlUnw | hresRaise _ | hresUnw | habCatch | hdl =>
+    cases h with | errVal hv'' => exact (nv hv'').elim
 
 end Flick

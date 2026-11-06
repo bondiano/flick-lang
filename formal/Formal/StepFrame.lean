@@ -44,6 +44,10 @@ theorem Step.ofR {root Λ μ e Λ' μ' e'} (h : RHead Λ μ e Λ' μ' e') :
     Step root .rt Λ μ e (.cfg Λ' μ' e') :=
   Step.rt (E := []) OkE.nil h
 
+theorem Step.snoc {root l Λ μ E x o} {F : Frame} (h : Step root l Λ μ (plug (E ++ [F]) x) o) :
+    Step root l Λ μ (F.plug (plug E x)) o := by
+  rwa [plug_append] at h
+
 theorem DeadAsk.frame {Λ e} (h : DeadAsk Λ e) {F : Frame} (hF : F.ok) : DeadAsk Λ (F.plug e) := by
   obtain ⟨E, N, q, v, hE, rfl, hl, hq⟩ := h
   exact ⟨E ++ [F], N, q, v, hE.append hF, by rw [plug_append]; rfl, by rw [lookupE_append, hl], hq⟩
@@ -74,9 +78,22 @@ theorem Step.frame {root l Λ μ e o} (h : Step root l Λ μ e o) {F : Frame} (h
       have := Step.askRoot (root := root) (Λ := Λ) (μ := μ) (hE.append hF)
         (by rw [lookupE_append, hl]; exact hF') hr
       rw [plug_append, plug_append] at this; exact .inl ⟨_, _, this⟩
-  | raise hE hG hnt hni hv =>
-    have := Step.raise (root := root) (Λ := Λ) (μ := μ) (hE.append hF) hG hnt hni hv
+  | raise hE hG hnt hni hnc hv =>
+    have := Step.raise (root := root) (Λ := Λ) (μ := μ) (hE.append hF) hG hnt hni hnc hv
     rw [plug_append, plug_append] at this; exact .inl ⟨_, _, this⟩
+  | unw hE hG hni hnc hnh =>
+    have := Step.unw (root := root) (Λ := Λ) (μ := μ) (hE.append hF) hG hni hnc hnh
+    rw [plug_append, plug_append] at this; exact .inl ⟨_, _, this⟩
+  | performAbort hE hEi hh ha hv =>
+    exact .inl ⟨_, _, Step.snoc (Step.performAbort (hE.append hF) hEi hh ha hv)⟩
+  | performTail hE hEi hh ha hv =>
+    exact .inl ⟨_, _, Step.snoc (Step.performTail (hE.append hF) hEi hh ha hv)⟩
+  | performCtl hE hEi hh ha hv =>
+    exact .inl ⟨_, _, Step.snoc (Step.performCtl (hE.append hF) hEi hh ha hv)⟩
+  | resume hE hA hu =>
+    exact .inl ⟨_, _, Step.snoc (Step.resume (hE.append hF) hA hu)⟩
+  | resumeTwice hE hA hu =>
+    exact .inl ⟨_, _, Step.snoc (Step.resumeTwice (hE.append hF) hA hu)⟩
   | todo hE =>
     have := Step.todo (root := root) (Λ := Λ) (μ := μ) (hE.append hF)
     rw [plug_append] at this; exact .inl ⟨_, _, this⟩
@@ -119,7 +136,11 @@ theorem NV.frame {root Λ μ e D D'} (h : NV root Λ μ e D) {F : Frame} (hF : F
     (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hD : ∀ n, D n → F.dom n ∨ D' n) :
     NV root Λ μ (F.plug e) D' := by
   rcases h with ⟨v, hv, rfl⟩ | ⟨_, _, hs⟩ | hs | hb
-  · exact .inr (.inl ⟨_, _, Step.raise (E := []) OkE.nil hF hnt hni hv⟩)
+  · by_cases hc : F.isCtl
+    · cases F <;> simp only [Frame.isCtl] at hc
+      · exact .inr (.inl ⟨_, _, Step.ofR (.hctlRaise hv)⟩)
+      · exact .inr (.inl ⟨_, _, Step.ofR (.hresRaise hv)⟩)
+    · exact .inr (.inl ⟨_, _, Step.raise (E := []) OkE.nil hF hnt hni hc hv⟩)
   · rcases hs.frame hF with h | h
     · exact .inr (.inl h)
     · exact .inr (.inr (.inr (.inr h)))

@@ -67,11 +67,17 @@ def Tm.Has : Tm → Site → Prop
   | .unw p, s => s = .ins ∨ s = .rgn p
   -- a value, as `cap p`: closures and data may hold `resume`
   | .kont p, s => s = .rgn p
-  -- only inside `hctl` and `hres`, which hold the region
-  | .hole, _ => False
+  -- a run-time form: only where a body or an arm a handler parks evaluates
+  | .hole p, s => s = .ins ∨ s = .rgn p
 
 /-- No `inside` form: values and unevaluated code. -/
 def Tm.NoIns (e : Tm) : Prop := ¬ e.Has .ins
+
+/-- Filling a hole changes nothing without run-time forms. -/
+theorem Tm.fill_noIns {v : Tm} : ∀ {e : Tm}, e.NoIns → e.fill v = e := by
+  intro e
+  induction e <;> intro hn <;> simp only [Tm.NoIns, Tm.Has, not_or] at hn <;>
+    simp_all [Tm.fill, Tm.NoIns]
 
 /-- `i` occurs free in `e`. -/
 def Tm.Free : Tm → Nat → Prop

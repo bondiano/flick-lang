@@ -79,6 +79,7 @@ theorem rgs_preservation {Ψ Θ Λ μ r t φ Λ' μ' r'} (hΛ : RgsTy S Ψ Λ)
   cases hh with
   | scope => exact hΛ.append
   | provideEnv => exact hΛ.append
+  | hdl => exact hΛ.append
   | open_ hg =>
     refine hΛ.set hg (fun k hk => .inl hk) fun f hf => ?_
     rcases List.mem_append.mp hf with hf | hf
@@ -301,7 +302,7 @@ theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
     rcases progress (Λ := c.rgs) (root := root) hroot hk' hμ.1 rfl rfl with
       hv | ⟨v, hv, he⟩ | hstep | ha | hb
     · exact .inl (.inl hv)
-    · exact .inl (.inr ⟨v, hv, he⟩)
+    · exact .inl (.inr (.inl ⟨v, hv, he⟩))
     · exact .inr (.inl hstep)
     · exact .inr (.inr (.inl ⟨_, ha⟩))
     · exact .inr (.inr (.inr hb))

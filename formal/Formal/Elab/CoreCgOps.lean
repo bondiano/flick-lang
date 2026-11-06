@@ -163,15 +163,19 @@ theorem Cg.build (hB : BNoVal B) {v : Flick.Tm} (hv : Value v) :
     cases h <;> first | exact (hB _ _ ‹_› (by constructor <;> assumption)).elim |
       simp [Flick.Tm.build, ORel]
 
-/-- The left side of a base pair is never `raise`. -/
-def BNoRaise (B : Flick.Tm → Flick.Tm → Prop) : Prop := ∀ a b, B (.raise a) b → False
+/-- The left side of a base pair is never `raise`, nor unwinding to a handler. -/
+def BNoRaise (B : Flick.Tm → Flick.Tm → Prop) : Prop :=
+  (∀ a b, B (.raise a) b → False) ∧ ∀ p b, B (.unw p) b → False
 
 theorem Cg.final (hB : BNoVal B) (hR : BNoRaise B) {w w₂ : Flick.Tm} (h : Cg B false w w₂)
     (hw : Final w) : Final w₂ := by
-  rcases hw with hw | ⟨v, hv, rfl⟩
+  rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨p, rfl⟩
   · exact .inl (h.value hB hw).1
   · cases h with
-    | raise h => exact .inr ⟨_, (h.value hB hv).1, rfl⟩
-    | base h => exact (hR _ _ h).elim
+    | raise h => exact .inr (.inl ⟨_, (h.value hB hv).1, rfl⟩)
+    | base h => exact (hR.1 _ _ h).elim
+  · cases h with
+    | unw => exact .inr (.inr ⟨_, rfl⟩)
+    | base h => exact (hR.2 _ _ h).elim
 
 end Flick.Elab

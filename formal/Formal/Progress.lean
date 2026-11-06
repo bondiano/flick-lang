@@ -74,7 +74,7 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
   · cases hf with
     | const _ hT' =>
       cases c with
-      | perform E o => simp_all [Const.ok]
+      | perform E o _ => simp_all [Const.ok]
       | refMake => exact step (Step.ofR (.refMake hve))
       | refGet =>
         obtain ⟨_, _, _, _, h, la, _, _, -⟩ := hT'.arrow_left

@@ -79,7 +79,7 @@ inductive Cg (B : Flick.Tm → Flick.Tm → Prop) : Bool → Flick.Tm → Flick.
   | hab {x p a a' e e'} : Cg B false a a' → Cg B false e e' → Cg B x (.hab p a e) (.hab p a' e')
   | unw {x p} : Cg B x (.unw p) (.unw p)
   | kont {x p} : Cg B x (.kont p) (.kont p)
-  | hole {x} : Cg B x .hole .hole
+  | hole {x p} : Cg B x (.hole p) (.hole p)
   | base {a b} : B a b → Cg B false a b
 
 variable {B : Flick.Tm → Flick.Tm → Prop}

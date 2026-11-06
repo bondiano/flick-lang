@@ -32,6 +32,13 @@ inductive FrR (B : Flick.Tm → Flick.Tm → Prop) : Frame → Frame → Prop
   | with_ {q θ θ'} : Cg B false θ θ' → FrR B (.with_ q θ) (.with_ q θ')
   | raise : FrR B .raise .raise
   | inside {p} : FrR B (.inside p) (.inside p)
+  | hwith {p E al al' r r'} : Cg B false al al' → Cg B false r r' →
+      FrR B (.hwith p E al r) (.hwith p E al' r')
+  | hctlA {p tl E al al' r r' k k'} : Cg B false al al' → Cg B false r r' → Cg B false k k' →
+      FrR B (.hctlA p tl E al r k) (.hctlA p tl E al' r' k')
+  | hresB {p a a'} : Cg B false a a' → FrR B (.hresB p a) (.hresB p a')
+  | hdone {p} : FrR B (.hdone p) (.hdone p)
+  | hab {p a a'} : Cg B false a a' → FrR B (.hab p a) (.hab p a')
 
 variable {B : Flick.Tm → Flick.Tm → Prop}
 

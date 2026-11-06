@@ -33,24 +33,34 @@ theorem Cfg.at_append {Λ : List Rgn} {μ : List Tm} {m : Tm} (i : Option (Nat �
       · rintro ⟨g, hg, -⟩; cases hg
 
 theorem Frame.Within.withAnc {anc' : Nat → Nat → Prop} {F : Frame} {A : Nat → Prop}
-    (h : F.Within Ψ B anc A) (ha : ∀ q, F = .inside q → anc' q = anc q) : F.Within Ψ B anc' A := by
+    (h : F.Within Ψ B anc A) (ha : ∀ q, (F.plug (.var 0)).Has (.frame q) → anc' q = anc q) :
+    F.Within Ψ B anc' A := by
   have m : ∀ {x : Tm} {A'}, x.NoIns → x.Within Ψ B anc A' → x.Within Ψ B anc' A' :=
     fun hn hx => hx.mono (fun _ _ h => h) fun q hq => (hn.frame q hq).elim
+  have m' : ∀ {x : Tm} {A'}, x.Within Ψ B anc A' →
+      (∀ q, x.Has (.frame q) → (F.plug (.var 0)).Has (.frame q)) → x.Within Ψ B anc' A' :=
+    fun hx hs => hx.mono (fun _ _ h => h) fun q hq => ha q (hs q hq)
   cases F <;> simp only [Frame.Within] at h ⊢ <;>
     first
     | exact ⟨m h.2 h.1, h.2⟩
     | exact ⟨m (h.2.noIns h.1) h.1, h.2⟩
     | exact ⟨h.1, m h.1 h.2⟩
     | trivial
-    | exact ⟨h.1, (ha _ rfl).trans h.2⟩
+    | exact h
+    | exact ⟨h.1, (ha _ (by simp [Frame.plug, Tm.Has])).trans h.2⟩
+    | exact ⟨h.1, m h.2.2.2.1 h.2.1, m h.2.2.2.2 h.2.2.1, h.2.2.2⟩
+    | exact ⟨h.1, m h.2.2.2.2.1 h.2.1, m h.2.2.2.2.2 h.2.2.1,
+        m' h.2.2.2.1 (fun q hq => by simp [Frame.plug, Tm.Has, hq]), h.2.2.2.2⟩
+    | exact ⟨h.1, m' h.2 (fun q hq => by simp [Frame.plug, Tm.Has, hq])⟩
+    | exact ⟨h.1, h.2.1.mono (fun _ _ h => h) (fun q hq => (h.2.2 q hq).elim), h.2.2⟩
 
 theorem WithinE.withAnc {anc' : Nat → Nat → Prop} {A : Nat → Prop} :
-    ∀ {E : List Frame}, WithinE Ψ B anc A E → (∀ q, .inside q ∈ E → anc' q = anc q) →
+    ∀ {E : List Frame}, WithinE Ψ B anc A E → (∀ q, (plug E (.var 0)).Has (.frame q) → anc' q = anc q) →
       WithinE Ψ B anc' A E
   | [], _, _ => trivial
-  | F :: _, ⟨hE, hF⟩, ha =>
-    ⟨WithinE.withAnc hE fun q hq => ha q (List.mem_cons_of_mem _ hq),
-      hF.withAnc fun q hq => ha q (by rw [hq]; exact List.mem_cons_self)⟩
+  | F :: E, ⟨hE, hF⟩, ha =>
+    ⟨WithinE.withAnc hE fun q hq => ha q (plug_of_hole (E := E) (r := F.plug (.var 0)) hq),
+      hF.withAnc fun q hq => ha q (plug_has E hq)⟩
 
 /-- The regions of the hole of a thread are live. -/
 theorem Nest.hole_live {c : Cfg} {home i E r} (hn : Nest Ψ c anc B home) (hi : c.at i = some (plug E r))
@@ -86,8 +96,17 @@ theorem Nest.fresh {c : Cfg} {home i E r b} (hn : Nest Ψ c anc B home)
   have hbW' : b.Within Ψ B anc' (fun x => H x ∨ x = p) :=
     hbW.mono (fun _ _ h => h) fun q hq => (hb q hq).elim
   have hrW : (Tm.inside p b).Within Ψ B anc' H := ⟨hpH, ancp, hbW'⟩
-  have hframes : ∀ q, .inside q ∈ E → Live c.rgs q := fun q hq => ((hn.thread i _ hi).2 q (plug_frame hq)).2
-  have hWE' : WithinE Ψ B anc' A₀ E := hWE.withAnc fun q hq => ancq q (livep q (hframes q hq))
+  have hthr : ∀ q, (plug E r).Has (.frame q) → Live c.rgs q := fun q hq => ((hn.thread i _ hi).2 q hq).2
+  have hw' : (plug E r).Within Ψ B anc' A₀ := hw.mono (fun _ _ h => h) fun q hq => ancq q (livep q (hthr q hq))
+  have hd : ∀ x, (Tm.inside p b).Has (.frame x) → r.Has (.frame x) ∨ ¬ (plug E r).Has (.frame x) := by
+    intro x hx
+    refine .inr fun h => livep x (hthr x h) ?_
+    simp only [Tm.Has] at hx
+    rcases hx with hx | hx | hx | hx
+    · cases hx
+    · cases hx
+    · cases hx; rfl
+    · exact (hb x hx).elim
   have base' : ∀ i' e', c.at i' = some e' → baseOf anc' i' = baseOf anc i' := by
     rintro (_ | ⟨r, j⟩) e' h'
     · rfl
@@ -117,9 +136,9 @@ theorem Nest.fresh {c : Cfg} {home i E r b} (hn : Nest Ψ c anc B home)
     · rintro (⟨g, hg, hl⟩ | rfl)
       · exact ⟨g, List.getElem?_append_left (getElem?_lt hg) ▸ hg, hl⟩
       · exact ⟨Rgn.new, by simp [p], rfl⟩
-  have frE : ∀ q, (plug E (.inside p b)).Has (.frame q) → .inside q ∈ E ∨ q = p := by
+  have frE : ∀ q, (plug E (.inside p b)).Has (.frame q) → (plug E (.var 0)).Has (.frame q) ∨ q = p := by
     intro q hq
-    rcases hWE'.frames hq with h | h
+    rcases plug_has_inv (r := .var 0) E hq with h | h
     · exact .inl h
     · rcases h with h | h | h | h
       · cases h
@@ -159,9 +178,9 @@ theorem Nest.fresh {c : Cfg} {home i E r b} (hn : Nest Ψ c anc B home)
     split at he'
     · subst i'; cases he'
       rw [base' i _ hi]
-      refine ⟨hWE'.fill hrW, fun q hq => ?_⟩
+      refine ⟨hw'.replug hv hE hrW hd, fun q hq => ?_⟩
       rcases frE q hq with hq | rfl
-      · have := (hn.thread i _ hi).2 q (plug_frame hq)
+      · have := (hn.thread i _ hi).2 q (plug_of_hole hq)
         exact ⟨(homeq q (livep q this.2)).trans this.1, (hlive q).mpr (.inl this.2)⟩
       · exact ⟨if_pos rfl, (hlive _).mpr (.inr rfl)⟩
     · obtain ⟨h₁, h₂⟩ := hn.thread i' e' he'
@@ -175,8 +194,8 @@ theorem Nest.fresh {c : Cfg} {home i E r b} (hn : Nest Ψ c anc B home)
       split
       · next h => rw [h, hi] at he'; cases he'
                   refine ⟨_, rfl, ?_⟩
-                  rcases hWE.frames hq' with h' | h'
-                  · exact plug_frame h'
+                  rcases plug_has_inv (r := .var 0) E hq' with h' | h'
+                  · exact plug_of_hole h'
                   · exact (hr.frame q h').elim
       · exact ⟨e', he', hq'⟩
     · exact ⟨plug E (.inside p b), by rw [show home' p = i from if_pos rfl, hat, if_pos rfl],

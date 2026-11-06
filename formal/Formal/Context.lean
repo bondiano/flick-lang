@@ -117,6 +117,8 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
   have nv := not_value_plug hr F
   have look : (∀ N, F.lookup N = none) → FLook S Ψ Θ F := FLook.none
   cases F <;> simp only [Frame.plug] at h nv
+  -- the forms of a running handler have no typing rule yet
+  case hwith | hctlA | hresB | hdone | hab => cases h; exact (nv ‹_›).elim
   case appL =>
     cases h with
     | app h₁ h₂ hψ hT =>

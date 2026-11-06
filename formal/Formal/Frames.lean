@@ -19,6 +19,12 @@ theorem OkE.append {E : List Frame} {F : Frame} (hE : OkE E) (hF : F.ok) : OkE (
 
 theorem OkE.nil : OkE [] := by simp [OkE]
 
+theorem OkE.cons' {E : List Frame} {F : Frame} (hE : OkE E) (hF : F.ok) : OkE (F :: E) :=
+  fun G hG => (List.mem_cons.mp hG).elim (fun h => h ▸ hF) (hE G)
+
+theorem OkE.append' {E E' : List Frame} (h : OkE E) (h' : OkE E') : OkE (E ++ E') :=
+  fun G hG => (List.mem_append.mp hG).elim (h G) (h' G)
+
 theorem OkE.cons {E : List Frame} {F : Frame} (h : OkE (F :: E)) : F.ok ∧ OkE E :=
   ⟨h F (by simp), fun G hG => h G (by simp [hG])⟩
 
@@ -99,5 +105,16 @@ theorem ask_not_value {N w} : ¬ Value (.app (.const (.ask N)) w) := by
 
 theorem raise_not_value {v} : ¬ Value (.raise v) := by
   intro hv; cases hv
+
+theorem perform_not_value {E o c w} : ¬ Value (.app (.const (.perform E o c)) w) := by
+  intro hv
+  cases hv with
+  | ctorApp _ hf _ => simp [Tm.head] at hf
+  | constApp hc _ => simp [Const.arity, Const.layer] at hc
+
+theorem kont_not_value {p w} : ¬ Value (.app (.kont p) w) := by
+  intro hv
+  cases hv with
+  | ctorApp _ hf _ => simp [Tm.head] at hf
 
 end Flick

@@ -59,7 +59,7 @@ def Tm.Asc : Tm → Nat → Prop
   | .hab p a e, n => a.Asc n ∧ e.Asc (max n (p + 1))
   | .unw _, _ => True
   | .kont _, _ => True
-  | .hole, _ => True
+  | .hole _, _ => True
 
 theorem Tm.Asc.of_noIns : ∀ {e : Tm} {n : Nat}, e.NoIns → e.Asc n := by
   intro e
@@ -80,9 +80,17 @@ theorem Value.ascNoIns {e : Tm} {n : Nat} (hv : Value e) (h : e.Asc n) : e.NoIns
   | drec => exact h
   | _ => intro h'; cases h'
 
+/-- A hole stands where the term evaluates, so what fills it is there. -/
+theorem Tm.Asc.fill {v : Tm} (hv : ∀ m, v.Asc m) : ∀ {k : Tm} {m : Nat}, k.Asc m → (k.fill v).Asc m := by
+  have fv : ∀ {x : Tm} {m}, Value x → x.Asc m → x.fill v = x := fun hx h => Tm.fill_noIns (hx.ascNoIns h)
+  intro k
+  induction k <;> intro m h <;> simp only [Tm.fill, Tm.Asc] at h ⊢ <;>
+    grind [Tm.fill_noIns]
+
 /-- The bound under a frame. -/
 def Frame.ascB (n : Nat) : Frame → Nat
   | .with_ q _ => max n (q + 1)
+  | .hwith p .. | .hctlA p .. | .hresB p _ | .hdone p | .hab p _ => max n (p + 1)
   | _ => n
 
 def Frame.Asc (n : Nat) : Frame → Prop
@@ -91,6 +99,10 @@ def Frame.Asc (n : Nat) : Frame → Prop
   | .appR v | .rconsR _ v | .updR v _ | .joinR v => v.Asc n ∧ Value v
   | .with_ _ θ => θ.NoIns
   | .inside p => n ≤ p
+  | .hwith _ _ al r => al.NoIns ∧ r.NoIns
+  | .hctlA p _ _ al r k => al.NoIns ∧ r.NoIns ∧ k.Asc (max n (p + 1))
+  | .hresB p a => a.Asc (max n (p + 1))
+  | .hab _ a => a.Asc n
   | _ => True
 
 theorem Frame.Asc.plug {F : Frame} {n : Nat} {r : Tm} (hF : F.Asc n) (hr : r.Asc (F.ascB n)) :
@@ -102,6 +114,8 @@ theorem Frame.Asc.plug {F : Frame} {n : Nat} {r : Tm} (hF : F.Asc n) (hr : r.Asc
     | exact ⟨hr, hF⟩
     | exact ⟨hF, hr⟩
     | exact hr
+    | exact ⟨hF.1, hF.2, hr⟩
+    | exact ⟨hF.1, hF.2.1, hr, hF.2.2⟩
 
 theorem Frame.asc_of_plug {F : Frame} {n : Nat} {r : Tm} (hok : F.ok) (hv : ¬ Value r)
     (h : (F.plug r).Asc n) : F.Asc n ∧ r.Asc (F.ascB n) := by
@@ -129,15 +143,22 @@ theorem asc_of_plug {n : Nat} {r : Tm} (hv : ¬ Value r) :
     obtain ⟨h₃, h₄⟩ := Frame.asc_of_plug hF hv h₂
     exact ⟨⟨h₁, h₃⟩, h₄⟩
 
+/-- The region a frame raises the bound to after: a `provide`'s or a handler's. -/
+def Frame.bump : Frame → Option Nat
+  | .with_ q _ => some q
+  | .hwith p .. | .hctlA p .. | .hresB p _ | .hdone p | .hab p _ => some p
+  | _ => none
+
 theorem ascBE_le {n m : Nat} {E : List Frame} (hn : n ≤ m)
-    (hq : ∀ q θ, .with_ q θ ∈ E → q < m) : ascBE n E ≤ m := by
+    (hq : ∀ F ∈ E, ∀ q, F.bump = some q → q < m) : ascBE n E ≤ m := by
   induction E with
   | nil => exact hn
   | cons F E ih =>
-    have := ih fun q θ h => hq q θ (List.mem_cons_of_mem _ h)
+    have := ih fun G h q hG => hq G (List.mem_cons_of_mem _ h) q hG
     cases F <;> simp only [ascBE, Frame.ascB] <;> try exact this
-    have := hq _ _ List.mem_cons_self
-    omega
+    all_goals
+      have := hq _ List.mem_cons_self _ rfl
+      omega
 
 /-- An `inside` form under a `with` frame of `q` names a region younger than `q`. -/
 theorem AscE.with_inside {n q p : Nat} {θ : Tm} :

@@ -1,4 +1,4 @@
-import Formal.Preservation
+import Formal.StepSites
 
 /-!
 # Steps keep the terms below the number of regions
@@ -7,88 +7,6 @@ import Formal.Preservation
 namespace Flick
 
 variable {S : Sig}
-
-theorem subst_inst_has {e : Tm} {δ : List Tm} {s : Site} (h : (e.subst (inst δ)).Has s) :
-    e.Has s ∨ ∃ w ∈ δ, w.Has s := by
-  rcases Tm.has_subst e _ _ h with h | ⟨i, _, h⟩
-  · exact .inl h
-  · unfold inst at h
-    split at h
-    · exact .inr ⟨_, List.getElem_mem _, h⟩
-    · simp [Tm.Has] at h
-
-theorem field_has {v x : Tm} {l} {s : Site} (h : v.field l = some x) (hx : x.Has s) : v.Has s :=
-  matchP_below.field_has h hx
-
-theorem setField_has {v w v' : Tm} {l} {s : Site} (h : v.setField l w = some v') (hs : v'.Has s) :
-    v.Has s ∨ w.Has s := by
-  induction v generalizing v' with
-  | rcons l' e r _ ih =>
-    simp only [Tm.setField] at h
-    split at h
-    · cases h; rcases hs with hs | hs
-      · exact .inr hs
-      · exact .inl (.inr hs)
-    · obtain ⟨r', hr', rfl⟩ := Option.map_eq_some_iff.mp h
-      rcases hs with hs | hs
-      · exact .inl (.inl hs)
-      · exact (ih hr' hs).imp .inr id
-  | _ => simp [Tm.setField] at h
-
-theorem envAppend_has {θ₁ θ₂ : Tm} {s : Site} (h : (θ₁.envAppend θ₂).Has s) : θ₁.Has s ∨ θ₂.Has s := by
-  induction θ₁ with
-  | econs N v θ _ ih =>
-    rcases h with h | h
-    · exact .inl (.inl h)
-    · exact (ih h).imp .inr id
-  | _ => exact .inr h
-
-theorem matchP_has {s : Site} : ∀ (p : Pat) {v : Tm} {δ : List Tm}, matchP p v = some δ →
-    ∀ w ∈ δ, w.Has s → v.Has s
-  | .wild, _, _, h => by simp [matchP] at h; subst h; simp
-  | .var, _, _, h => by simp [matchP] at h; subst h; simp
-  | .lit _, v, _, h => by cases v <;> simp [matchP] at h; obtain ⟨_, rfl⟩ := h; simp
-  | .ctor _, v, _, h => by cases v <;> simp [matchP] at h; obtain ⟨_, rfl⟩ := h; simp
-  | .app p q, v, _, h => by
-    cases v with
-    | app f e =>
-      obtain ⟨δ₁, δ₂, h1, h2, rfl⟩ := matchP_app.mp h
-      intro w hw hs
-      rcases List.mem_append.mp hw with hw | hw
-      · exact .inl (matchP_has p h1 w hw hs)
-      · exact .inr (matchP_has q h2 w hw hs)
-    | _ => simp [matchP] at h
-  | .rany, v, _, h => by cases v <;> simp [matchP] at h <;> subst h <;> simp
-  | .rfield l p r, v, _, h => by
-    obtain ⟨x, δ₁, δ₂, hx, h1, h2, rfl⟩ := matchP_rfield.mp h
-    intro w hw hs
-    rcases List.mem_append.mp hw with hw | hw
-    · exact field_has hx (matchP_has p h1 w hw hs)
-    · exact matchP_has r h2 w hw hs
-  | .or p q, v, _, h => by
-    rcases matchP_or.mp h with h | ⟨_, h⟩
-    · exact matchP_has p h
-    · exact matchP_has q h
-
-theorem build_has {s : Site} (v : Tm) : ∀ {b : Tm}, v.build = some b → b.Has s → v.Has s := by
-  intro b h hb
-  rw [Tm.build.eq_def] at h
-  split at h
-  · cases h; rcases hb with hb | hb
-    · exact .inr hb
-    · simp [Tm.Has] at hb
-  · cases h; exact .inr hb
-  · rename_i v₁ v₂
-    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff, Option.pure_def, Option.some.injEq] at h
-    obtain ⟨b₁, h₁, b₂, h₂, rfl⟩ := h
-    rcases hb with hb | hb
-    · exact .inl (.inr (build_has v₁ h₁ hb))
-    · exact .inr (build_has v₂ h₂ hb)
-  · cases h
-
-theorem subst_match_has {p : Pat} {v x : Tm} {δ : List Tm} {s : Site} (hm : matchP p v = some δ)
-    (h : (x.subst (inst δ)).Has s) : x.Has s ∨ v.Has s :=
-  (subst_inst_has h).imp_right fun ⟨w, hw, h⟩ => matchP_has _ hm w hw h
 
 theorem PHead.has {e e' : Tm} (h : PHead e e') {s : Site} (hs : e'.Has s) : e.Has s := by
   cases h with
@@ -128,6 +46,8 @@ theorem PHead.has {e e' : Tm} (h : PHead e e') {s : Site} (hs : e'.Has s) : e.Ha
       · exact .inl h
     · simp at h; grind
   | guardNo => rcases hs with h | h; exact .inl h; exact .inr (.inr (.inr h))
+  | hwithVal _ | hctlTail _ | hctlDisc _ | hresVal _ | hdoneVal _ =>
+    simp only [Tm.Has] at hs ⊢; grind [→ Tm.has_fill, Tm.Has]
   | tryVal => exact .inl hs
   | withVal => exact .inr (.inr (.inr hs))
   | bind => rcases hs with h | h; exact h; cases h
@@ -217,6 +137,13 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
         · exact Nat.lt_succ_of_lt (h.main p (.inr (.inl hp)))
         · exact Nat.lt_succ_of_lt (h.main p (.inr (.inr hp)))
   | tryRaise => exact same (sub fun _ h => h.elim .inl (.inr ·))
+  | hctlRaise _ | hctlUnw | hresRaise _ | hresUnw | habCatch =>
+    exact same (sub fun _ hs => by simp only [Tm.Has] at hs ⊢; grind [→ Tm.has_fill, Tm.Has])
+  | hdl =>
+    refine ⟨h.append _ fun p hp => ?_, by simp⟩
+    have hm := h.main p
+    simp only [Tm.Has] at hp hm
+    grind
   | handleYes _ hm =>
     exact same (sub fun _ h => (subst_match_has hm h).elim (fun h => .inr (.inl h)) .inl)
   | handleNo => exact same (sub fun _ h => h.elim .inl (.inr ∘ .inr))
@@ -327,6 +254,69 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
   | raise hE =>
     exact ⟨⟨plug_below h.main (h.main.sub fun _ hp => plug_has _ (Frame.plug_has _ hp)), h.mem, h.rgs⟩,
       Nat.le_refl _⟩
+  | unw hE =>
+    exact ⟨⟨plug_below h.main (h.main.sub fun _ hp => plug_has _ (Frame.plug_has _ hp)), h.mem, h.rgs⟩,
+      Nat.le_refl _⟩
+  | @performAbort E o b v Λ μ p r Ei Ef al _ _ _ ha =>
+    refine ⟨⟨plug_below h.main (h.main.sub fun s hs => plug_has _ ?_), h.mem, h.rgs⟩, Nat.le_refl _⟩
+    obtain ⟨h₁, h₂, -, -, h₅, h₆⟩ := perform_has (c := .abort) (r := r) (x := .unw p) (δ := [v]) (s := s) ha
+      (fun w hw hh => by simp at hw; rw [hw] at hh; exact .inr hh) (fun h => by simpa [Tm.Has] using h)
+    simp only [Tm.Has] at hs
+    rcases hs with h | h | h | h
+    · exact h₁ h
+    · exact h₂ h
+    · exact h₅ h
+    · exact h₆ h
+  | @performTail E o b v Λ μ p r Ei Ef al _ _ _ ha =>
+    refine ⟨⟨plug_below h.main (h.main.sub fun s hs => plug_has _ ?_), h.mem, h.rgs⟩, Nat.le_refl _⟩
+    obtain ⟨h₁, h₂, h₃, h₄, h₅, h₆⟩ :=
+      perform_has (p := p) (c := .tail) (r := r) (Ei := Ei) (x := .hole p) (δ := [v]) (s := s) ha
+      (fun w hw hh => by simp at hw; rw [hw] at hh; exact .inr hh) (fun h => by simpa [Tm.Has] using h)
+    simp only [Tm.Has] at hs
+    rcases hs with h | h | h | h | h | h
+    · exact h₁ h
+    · exact h₂ h
+    · exact h₃ h
+    · exact h₄ h
+    · exact h₅ h
+    · exact h₆ h
+  | @performCtl E o b v Λ μ p r Ei Ef al _ _ _ ha =>
+    refine ⟨⟨plug_below h.main (h.main.sub fun s hs => plug_has _ ?_), h.mem, h.rgs⟩, Nat.le_refl _⟩
+    obtain ⟨h₁, h₂, h₃, h₄, h₅, h₆⟩ :=
+      perform_has (p := p) (c := .control) (r := r) (Ei := Ei) (x := .hole p) (δ := [v, .kont p]) (s := s) ha
+      (fun w hw hh => by
+        simp at hw
+        rcases hw with hw | hw <;> rw [hw] at hh
+        · exact .inr hh
+        · exact .inl (by simpa [Tm.Has] using hh))
+      (fun h => by simpa [Tm.Has] using h)
+    simp only [Tm.Has] at hs
+    rcases hs with h | h | h | h | h | h
+    · exact h₁ h
+    · exact h₂ h
+    · exact h₃ h
+    · exact h₄ h
+    · exact h₅ h
+    · exact h₆ h
+  | @resume E A u Λ μ p r k Ef al _ _ _ =>
+    refine ⟨⟨plug_below h.main (h.main.sub fun s hs => plug_has _ ?_), h.mem, h.rgs⟩, Nat.le_refl _⟩
+    simp only [Tm.Has] at hs ⊢
+    rcases hs with h | h | h | h | h | h | h | h
+    · exact .inl h
+    · exact .inr (.inl h)
+    · rcases plug_has_inv (r := .app (.kont p) u) A h with h | h
+      · exact .inr (.inr (.inr (.inr (.inl h))))
+      · simp only [Tm.Has] at h
+        rcases h with h | h
+        · exact .inl h
+        · exact .inr (.inl h)
+    · exact .inl h
+    · exact .inr (.inl h)
+    · exact .inr (.inr (.inl h))
+    · exact .inr (.inr (.inr (.inl h)))
+    · rcases Tm.has_fill h with h | h
+      · exact .inr (.inr (.inr (.inr (.inr h))))
+      · exact .inr (.inr (.inr (.inr (.inl (plug_has A (by simp [Tm.Has, h]))))))
   | addFin hE hg _ _ =>
     obtain ⟨hk, hf⟩ := h.rgs _ _ hg
     refine ⟨h.set hg hk (fun f hf' => ?_) (plug_below h.main (Tm.Below.empty fun p => by simp [Tm.Has])),

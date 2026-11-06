@@ -24,8 +24,8 @@ def Rgn.new : Rgn := ⟨true, [], []⟩
 /-- A live region. -/
 def Live (Λ : List Rgn) (p : Nat) : Prop := ∃ g, Λ[p]? = some g ∧ g.live = true
 
-/-- A finished computation: a value or `raise v`. -/
-def Final (e : Tm) : Prop := Value e ∨ ∃ v, Value v ∧ e = .raise v
+/-- A finished computation: a value, `raise v`, or unwinding to a handler. -/
+def Final (e : Tm) : Prop := Value e ∨ (∃ v, Value v ∧ e = .raise v) ∨ ∃ p, e = .unw p
 
 /-- One-frame evaluation contexts `F` of core.md §3.2. -/
 inductive Frame
@@ -47,6 +47,11 @@ inductive Frame
   | with_ (q : Nat) (θ : Tm)
   | raise
   | inside (p : Nat)
+  | hwith (p : Nat) (E : Name) (al r : Tm)
+  | hctlA (p : Nat) (tl : Bool) (E : Name) (al r k : Tm)
+  | hresB (p : Nat) (a : Tm)
+  | hdone (p : Nat)
+  | hab (p : Nat) (a : Tm)
 
 def Frame.plug : Frame → Tm → Tm
   | .appL a, e => .app e a
@@ -67,6 +72,11 @@ def Frame.plug : Frame → Tm → Tm
   | .with_ q θ, e => .with_ q θ e
   | .raise, e => .raise e
   | .inside p, e => .inside p e
+  | .hwith p E al r, e => .hwith p E al r e
+  | .hctlA p tl E al r k, e => .hctl p tl E al r e k
+  | .hresB p a, e => .hres p a e
+  | .hdone p, e => .hdone p e
+  | .hab p a, e => .hab p a e
 
 /-- Left-to-right order: a frame to the right of a value needs the value. -/
 def Frame.ok : Frame → Prop
@@ -81,6 +91,22 @@ def Frame.isTry : Frame → Prop
 def Frame.isInside : Frame → Prop
   | .inside _ => True
   | _ => False
+
+/-- The arm of a handler and its resumed body: `raise` and `unw` leave them by steps
+of their own, which let the waiting part go. -/
+def Frame.isCtl : Frame → Prop
+  | .hctlA .. | .hresB .. => True
+  | _ => False
+
+/-- The handler `p` an abort unwinds to. -/
+def Frame.isHab (p : Nat) : Frame → Prop
+  | .hab q _ => q = p
+  | _ => False
+
+/-- The handler of `E` with an arm for `o` that a frame installs, with its region. -/
+def Frame.handles (E o : Name) : Frame → Option Nat
+  | .hwith p E' al _ => if E' = E ∧ (al.armOf o).isSome then some p else none
+  | _ => none
 
 /-- The service a `with` frame provides, with the region of its `provide`. -/
 def Frame.lookup : Frame → Name → Option (Nat × Tm)
@@ -131,6 +157,16 @@ inductive PHead : Tm → Tm → Prop
   | bind : Value v → PHead (.bind S v) (.econs S v .enil)
   | join : IsEnv θ₁ → IsEnv θ₂ → PHead (.join θ₁ θ₂) (θ₁.envAppend θ₂)
   | intEq : PHead (.app (.app (.const .intEq) (.lit (.int a))) (.lit (.int b))) (.lit (.bool (a == b)))
+  -- the value of the body of a handler goes to its `return` function
+  | hwithVal {al : Tm} : Value v → PHead (.hwith p E al r v) (.app r v)
+  -- the value of a `tail` arm resumes the body under the handler
+  | hctlTail {al : Tm} : Value w → PHead (.hctl p true E al r w k) (.hwith p E al r (k.fill w))
+  -- a `control` arm that ends without resuming lets the body go: it unwinds to the
+  -- handler, closing its regions, and the arm's value is the handler's
+  | hctlDisc {al : Tm} : Value w → PHead (.hctl p false E al r w k) (.hab p w (k.fill (.unw p)))
+  -- the value of a resumed body is what `resume` gives the arm
+  | hresVal : Value w → PHead (.hres p a w) (.hdone p (a.fill w))
+  | hdoneVal : Value v → PHead (.hdone p v) v
 
 /-- `Λ[π] := g`. -/
 def setRgn (Λ : List Rgn) (p : Nat) (g : Rgn) : List Rgn := Λ.set p g
@@ -174,6 +210,18 @@ inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm �
       RHead Λ μ (.inside p w) (setRgn Λ p ⟨g.live, g.kids ++ [f], fs⟩) μ (.inside p w)
   | close : Λ[p]? = some g → g.live = true → Final w → (∀ k ∈ g.kids, Final k) → g.fins = [] →
       RHead Λ μ (.inside p w) (setRgn Λ p ⟨false, g.kids, []⟩) μ w
+  -- an arm that raises or unwinds lets the body go, and goes on raising or
+  -- unwinding from the handler; a resumed body that does gives it to the arm
+  | hctlRaise {al : Tm} {tl : Bool} : Value w →
+      RHead Λ μ (.hctl p tl E al r (.raise w) k) Λ μ (.hab p (.raise w) (k.fill (.unw p)))
+  | hctlUnw {al : Tm} {tl : Bool} :
+      RHead Λ μ (.hctl p tl E al r (.unw q) k) Λ μ (.hab p (.unw q) (k.fill (.unw p)))
+  | hresRaise : Value w → RHead Λ μ (.hres p a (.raise w)) Λ μ (.hdone p (a.fill (.raise w)))
+  | hresUnw : RHead Λ μ (.hres p a (.unw q)) Λ μ (.hdone p (a.fill (.unw q)))
+  -- the body has unwound to its handler: the arm runs there
+  | habCatch : RHead Λ μ (.hab p a (.unw p)) Λ μ a
+  -- a handler is the region `|Λ|` around its body, which `resume` holds
+  | hdl {al : Tm} : RHead Λ μ (.hdl E al r e) (Λ ++ [Rgn.new]) μ (.inside Λ.length (.hwith Λ.length E al r e))
 
 /-- Outcome of a step: a configuration or a defect. -/
 inductive Out
@@ -204,8 +252,32 @@ inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → 
   | askRoot : OkE E → lookupE E S = none → root.svc S = some v →
       Step root (.root S) Λ μ (plug E (.app (.const (.ask S)) (.lit .unit)))
         (.cfg Λ μ (plug E v))
-  | raise {F : Frame} : OkE E → F.ok → ¬ F.isTry → ¬ F.isInside → Value v →
+  | raise {F : Frame} : OkE E → F.ok → ¬ F.isTry → ¬ F.isInside → ¬ F.isCtl → Value v →
       Step root .rt Λ μ (plug E (F.plug (.raise v))) (.cfg Λ μ (plug E (.raise v)))
+  -- unwinding to the handler `p` passes `try`, as no error does
+  | unw {F : Frame} : OkE E → F.ok → ¬ F.isInside → ¬ F.isCtl → ¬ F.isHab p →
+      Step root .rt Λ μ (plug E (F.plug (.unw p))) (.cfg Λ μ (plug E (.unw p)))
+  -- an operation runs the arm of the nearest handler with one for it: `abort` after
+  -- the body unwinds to the handler, `tail` and `control` while the body waits there
+  | performAbort {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
+      Value v →
+      Step root .rt Λ μ (plug E (.hwith p Ef al r (plug Ei (.app (.const (.perform Ef o .abort)) v))))
+        (.cfg Λ μ (plug E (.hab p (b.subst (inst [v])) (plug Ei (.unw p)))))
+  | performTail {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
+      Value v →
+      Step root .rt Λ μ (plug E (.hwith p Ef al r (plug Ei (.app (.const (.perform Ef o .tail)) v))))
+        (.cfg Λ μ (plug E (.hctl p true Ef al r (b.subst (inst [v])) (plug Ei (.hole p)))))
+  | performCtl {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
+      Value v →
+      Step root .rt Λ μ (plug E (.hwith p Ef al r (plug Ei (.app (.const (.perform Ef o .control)) v))))
+        (.cfg Λ μ (plug E (.hctl p false Ef al r (b.subst (inst [v, .kont p])) (plug Ei (.hole p)))))
+  -- `resume` runs the body under the handler, the arm waiting for how it ends
+  | resume {Ef : Name} {al : Tm} : OkE E → OkE A → Value u →
+      Step root .rt Λ μ (plug E (.hctl p false Ef al r (plug A (.app (.kont p) u)) k))
+        (.cfg Λ μ (plug E (.hres p (plug A (.hole p)) (.hwith p Ef al r (k.fill u)))))
+  -- the body resumes once
+  | resumeTwice : OkE E → OkE A → Value u →
+      Step root .rt Λ μ (plug E (.hdone p (plug A (.app (.kont p) u)))) .die
   | todo : OkE E → Step root .pure Λ μ (plug E .todo) .die
   | glob : OkE E → root.glob g = some v → Step root .pure Λ μ (plug E (.glob g)) (.cfg Λ μ (plug E v))
 

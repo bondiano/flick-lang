@@ -245,6 +245,15 @@ outlive it. Facts are not chained: a scope gives one fact for everything outside
 def Outl (Θ : Facts) (C : Caps) (s : Ty) : Prop :=
   ∀ k, C k → s.reach k ∨ ∃ C', Θ C' s ∧ C' k
 
+/-- How a handler's arm for an operation returns (`docs/formal/core.md`): `tail` gives
+the operation its value, `abort` the handler its value without coming back, and
+`control` the handler its value with the rest of the body as `resume`. -/
+inductive OpClass
+  | tail
+  | abort
+  | control
+  deriving DecidableEq, Repr
+
 /-- Constants of Γ₀ (core.md §1.5, regions.md §1.5). The typing rule instantiates
 their types (`CArg`); `open_` acquires a capability `H ϱ`, `op` uses one; `intEq`
 compares two `Int`s. -/
@@ -261,7 +270,7 @@ inductive Const
   | addFin
   | spawn
   | intEq
-  | perform (E o : Name)
+  | perform (E o : Name) (c : OpClass)
 
 def Const.arity : Const → Nat
   | .refSet | .merge | .addFin | .spawn | .intEq => 2
@@ -294,15 +303,6 @@ def Pat.binds : Pat → Nat
   | .or p _ => p.binds
   | _ => 0
 
-/-- How a handler's arm for an operation returns (`docs/formal/core.md`): `tail` gives
-the operation its value, `abort` the handler its value without coming back, and
-`control` the handler its value with the rest of the body as `resume`. -/
-inductive OpClass
-  | tail
-  | abort
-  | control
-  deriving DecidableEq, Repr
-
 /-- Terms of core.md §1.3 and regions.md §1.3, and the run-time forms of
 core.md §3.1 and regions.md §3.1. Binders: `lam b`, `let_ e b` and
 `scope e` bind one variable (`scope` binds the owner); `letrec f b` and `fix f`
@@ -317,8 +317,8 @@ Handlers of effects: `hdl E al r e` handles the effect `E` in `e` with the arms 
 an `acons` spine whose patterns are `Pat.spine o [.var]` (`[.var, .var]` for a
 `control` operation, with `resume`), and gives the body's value to `r`. At run time a
 handler is the region `p`: `hwith p …` around the body, `hctl p tl … a k` while the
-arm `a` runs and the body `k` waits with a `hole` (`tl`: a `tail` arm, whose value
-resumes it), `hres p a b` while the resumed body `b` runs and the arm `a` waits,
+arm `a` runs and the body `k` waits with `hole p` where it performed (`tl`: a `tail`
+arm, whose value resumes it), `hres p a b` while the resumed body `b` runs and the arm `a` waits,
 `hdone p a` once the arm resumed it, `hab p a e` while `e` unwinds by `unw p` to `p`
 and `a` runs there; `kont p` is `resume`. -/
 inductive Tm
@@ -366,7 +366,7 @@ inductive Tm
   | hab (p : Nat) (a e : Tm)
   | unw (p : Nat)
   | kont (p : Nat)
-  | hole
+  | hole (p : Nat)
 
 def Tm.head : Tm → Tm
   | .app f _ => f.head
@@ -506,7 +506,7 @@ def Const.ty (S : Sig) : Const → CArg → Ty
     .arrow (.owner ι.s) .pure (.arrow (.eff (Row.union (Row.scope ι.s) ι.r) ι.e ι.t ι.C)
       (.rt (Row.union ι.r (Row.obs ι.r ι.s)) Row.none) (.base .unit) ι.s.reach) Caps.none
   | .intEq, _ => .arrow (.base .int) .pure (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none
-  | .perform E o, ι => match S.op E o with
+  | .perform E o _, ι => match S.op E o with
     | some (.abort, a, _) => .arrow a (.rt (Row.single E) Row.none) ι.t Caps.none
     | some (_, a, b) => .arrow a (.rt (Row.single E) Row.none) b Caps.none
     | none => .arrow (.base .unit) (.rt (Row.single E) Row.none) (.base .unit) Caps.none
@@ -521,7 +521,7 @@ def Const.ok (Θ : Facts) : Const → CArg → Prop
   | .addFin, ι => Outl Θ ι.C ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
   | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
   -- an operation has a rule of its own, which needs it declared
-  | .perform _ _, _ => False
+  | .perform _ _ _, _ => False
   | _, _ => True
 
 end Flick

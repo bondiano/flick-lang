@@ -75,6 +75,8 @@ theorem RHead.not_pure {Ψ Θ Λ μ r t Λ' μ' r'} (h : Typ S Ψ Θ [] r (.ex t
   have nv := hh.not_value
   cases hh with
   | refMake => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
+  | hctlRaise _ | hctlUnw | hresRaise _ | hresUnw | habCatch | hdl =>
+    cases h with | errVal hv => exact nv hv
   | refGet => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | open_ => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | op => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
@@ -249,7 +251,24 @@ theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
     obtain ⟨_, _, _, _, hr, _, _, back⟩ := ctx_typing _ hE (fun h => by cases h) h
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
       simpa using glob_preservation hroot (hole_kill hr hbl hΨ) hg), by simp⟩
-  | raise hE hF hnt hni hv =>
+  | unw hE hF _ _ _ =>
+    have nv : ∀ q, ¬ Value (.unw q) := fun _ h => by cases h
+    obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE (not_value_plug (nv _) _) h
+    obtain ⟨_, _, _, _, hr', -⟩ := frame_typing (nv _) _ hF hr
+    cases hr' with | errVal hv => cases hv
+  | performAbort hE _ _ _ _ =>
+    obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE (fun h => by cases h) h
+    cases hr with | errVal hv => cases hv
+  | performTail hE _ _ _ _ =>
+    obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE (fun h => by cases h) h
+    cases hr with | errVal hv => cases hv
+  | performCtl hE _ _ _ _ =>
+    obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE (fun h => by cases h) h
+    cases hr with | errVal hv => cases hv
+  | resume hE _ _ =>
+    obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE (fun h => by cases h) h
+    cases hr with | errVal hv => cases hv
+  | raise hE hF hnt hni _ hv =>
     obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ :=
       ctx_typing _ hE (not_value_plug raise_not_value _) h
     obtain ⟨rfl, -, -⟩ := hK.resolve_left fun hp => by

@@ -38,7 +38,7 @@ theorem Nest.nested {c : Cfg} {home i E π w g} (hn : Nest Ψ c anc B home)
     ∀ q, Live c.rgs q → anc q π → q = π := by
   have hW := (hn.thread i _ hi).1
   obtain ⟨hWE, hπH, -, hwW⟩ := within_of_plug inside_not_value hE hW
-  have hwn : w.NoIns := Final.noIns hw hwW
+  have hwn := Final.noFrame hw hwW
   have homeπ : home π = i := ((hn.thread i _ hi).2 π (plug_has E (by simp [Tm.Has]))).1
   intro q
   induction q using Nat.strongRecOn with
@@ -58,20 +58,22 @@ theorem Nest.nested {c : Cfg} {home i E π w g} (hn : Nest Ψ c anc B home)
       · subst hrπ
         obtain ⟨g', hg', -, hk'⟩ := Cfg.at_some.mp he_q
         rw [hg] at hg'; cases hg'
-        exact (Final.noIns (hk _ (List.mem_of_getElem? hk')) hWq).frame q hfq
+        exact Final.noFrame (hk _ (List.mem_of_getElem? hk')) hWq q hfq
       · have hrq : anc q r := hsub r (hn.self r)
         have hrne : r ≠ q := fun h => hnotA (h ▸ hn.self r)
         exact hrπ (ih r (Nat.lt_of_le_of_ne (hn.le q r hrq) hrne) hr hA)
   · have h₁ := ((hn.thread _ _ he_q).2 π hfπ).1
     rw [homeπ] at h₁
     rw [← h₁, hi] at he_q; cases he_q
-    rcases hWE.frames hfq with h | h
-    · exact hπH ((hWE.frameAnc h).2.2.2 π hqπ)
+    rcases plug_has_inv (r := .var 0) E hfq with h | h
+    · rcases (hWE.frameAnc h).2.2.2 π hqπ with h | h
+      · exact hπH h
+      · exact within_disj inside_not_value hE hW (by simp [Tm.Has]) h
     · rcases h with h | h | h | h
       · cases h
       · cases h
       · cases h; exact hne rfl
-      · exact hwn.frame q h
+      · exact hwn q h
 
 /-- Closing `π`: its body leaves the region with what its type shows. -/
 theorem Nest.close {c : Cfg} {home i E π w g} (hn : Nest Ψ c anc B home)
@@ -83,7 +85,7 @@ theorem Nest.close {c : Cfg} {home i E π w g} (hn : Nest Ψ c anc B home)
   have hW := (hn.thread i _ hi).1
   obtain ⟨hWE, hπH, -, hwW⟩ := within_of_plug inside_not_value hE hW
   have hw' := hmove hwW hπH
-  have hwn : w.NoIns := Final.noIns hw hw'
+  have hwn := Final.noFrame hw hw'
   have homeπ : home π = i := ((hn.thread i _ hi).2 π (plug_has E (by simp [Tm.Has]))).1
   have nested := hn.nested hi hE hw hg hk
   have hiπ : ∀ j, i ≠ some (π, j) := by
@@ -112,15 +114,15 @@ theorem Nest.close {c : Cfg} {home i E π w g} (hn : Nest Ψ c anc B home)
       refine ⟨g'', ?_, h₂⟩
       show (setRgn c.rgs π _)[q]? = some g''
       rw [setRgn, List.getElem?_set_ne (Ne.symm hq)]; exact h₁
-  have frE : ∀ q, (plug E (.inside π w)).Has (.frame q) → q ≠ π → .inside q ∈ E := by
+  have frE : ∀ q, (plug E (.inside π w)).Has (.frame q) → q ≠ π → (plug E (.var 0)).Has (.frame q) := by
     intro q hq hne
-    rcases hWE.frames hq with h | h
+    rcases plug_has_inv (r := .var 0) E hq with h | h
     · exact h
     · rcases h with h | h | h | h
       · cases h
       · cases h
       · cases h; exact (hne rfl).elim
-      · exact (hwn.frame q h).elim
+      · exact (hwn q h).elim
   refine ⟨hn.self, hn.le, fun q hq => hn.chain q ((hlive q).mp hq).1, fun q x hq hx => ?_,
     fun i' e' he' => ?_, fun q hq => ?_, fun r g'' hr hgl f hf => ?_, fun l v hv => ?_⟩
   · obtain ⟨hq, hqπ⟩ := (hlive q).mp hq
@@ -128,10 +130,10 @@ theorem Nest.close {c : Cfg} {home i E π w g} (hn : Nest Ψ c anc B home)
   · rw [hat] at he'
     split at he'
     · subst i'; cases he'
-      refine ⟨hWE.fill hw', fun q hq => ?_⟩
-      have hq' := (hWE.frames_iff hwn.frame).mp hq
-      have hqπ : q ≠ π := fun h => hπH (holeE_iff.mpr (.inr (h ▸ hq')))
-      obtain ⟨h₁, h₂⟩ := (hn.thread i _ hi).2 q (plug_frame hq')
+      refine ⟨hW.replug inside_not_value hE hw' (fun x hx => (hwn x hx).elim), fun q hq => ?_⟩
+      have hq' := (plug_frames_iff hwn).mp hq
+      have hqπ : q ≠ π := fun h => within_disj inside_not_value hE hW (x := π) (by simp [Tm.Has]) (h ▸ hq')
+      obtain ⟨h₁, h₂⟩ := (hn.thread i _ hi).2 q (plug_of_hole hq')
       exact ⟨h₁, (hlive q).mpr ⟨h₂, hqπ⟩⟩
     · split at he'
       · cases he'
@@ -145,7 +147,7 @@ theorem Nest.close {c : Cfg} {home i E π w g} (hn : Nest Ψ c anc B home)
     rw [hat]
     split
     · next h => rw [h, hi] at he_q; cases he_q
-                exact ⟨_, rfl, plug_frame (frE q hfq hqπ)⟩
+                exact ⟨_, rfl, plug_of_hole (frE q hfq hqπ)⟩
     · split
       · next h =>
         obtain ⟨j, hj⟩ := h
@@ -153,7 +155,7 @@ theorem Nest.close {c : Cfg} {home i E π w g} (hn : Nest Ψ c anc B home)
         obtain ⟨g', hg', -, hk'⟩ := Cfg.at_some.mp he_q
         rw [hg] at hg'; cases hg'
         have hWq := (hn.thread _ _ he_q).1
-        exact ((Final.noIns (hk _ (List.mem_of_getElem? hk')) hWq).frame q hfq).elim
+        exact (Final.noFrame (hk _ (List.mem_of_getElem? hk')) hWq q hfq).elim
       · exact ⟨e_q, he_q, hfq⟩
   · obtain ⟨g₀, h₀, h₁, h₂⟩ := Cfg.put_get hr
     rcases get h₀ with ⟨rfl, rfl⟩ | ⟨_, h₀⟩

@@ -41,6 +41,7 @@ import Formal.ScopeStep
 import Formal.PresRt
 import Formal.Below
 import Formal.Preservation
+import Formal.StepSites
 import Formal.BelowStep
 import Formal.Asc
 import Formal.KidTy
@@ -122,6 +123,7 @@ import Formal.Elab.CoreDictSem
 import Formal.Elab.CoreCg
 import Formal.Elab.CoreCgOps
 import Formal.Elab.CoreCgFrames
+import Formal.Elab.CoreCgHdl
 import Formal.Elab.CoreRel
 import Formal.Elab.CoreHead
 import Formal.Elab.CoreStep

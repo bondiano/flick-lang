@@ -76,12 +76,13 @@ theorem close_move {Θ : Facts} {p : Nat} {w : Tm} {T : Ty} {φ : Stage} {A : Na
   | inside _ hb hφ' ht hε _ _ =>
     have iff : ∀ x, x ≠ p → ((A x ∨ x = p) ↔ A x) := fun x hx =>
       ⟨fun h => h.resolve_right hx, .inl⟩
-    rcases hw with hv | ⟨v, hv, rfl⟩
+    rcases hw with hv | ⟨v, hv, rfl⟩ | ⟨q, rfl⟩
     · exact hW.moveT hv hb fun x hx => iff x fun h => ht (h ▸ hx)
     · have hv' := raise_errors hv hb
       have : v.Within Ψ B anc A := Tm.Within.moveT hv hv' hW fun x hx => iff x fun h => hε (by
         subst h; exact hx.imp (Stage.le_err hφ' _) (Stage.le_err hφ' _))
       exact this
+    · cases hb with | errVal hv => cases hv
   | errVal hv => exact absurd hv inside_not_value
 
 theorem envLookup_value {θ v : Tm} {N : Name} (hθ : Value θ) (h : θ.envLookup N = some v) : Value v := by

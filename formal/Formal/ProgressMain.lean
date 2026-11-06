@@ -223,7 +223,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
     obtain ⟨_, _, rfl, hr', _⟩ := Stage.rt_le hφ
     rcases ih hμ hΓ rfl with hv | ⟨v, hv, rfl⟩ | ⟨_, _, hs⟩ | hs | hb
     · exact inside_final (.inl hv)
-    · exact inside_final (.inr ⟨v, hv, rfl⟩)
+    · exact inside_final (.inr (.inl ⟨v, hv, rfl⟩))
     · rcases hs.frame (F := .inside _) trivial with ⟨_, _, hs'⟩ | hd
       · exact step hs'
       · exact .inr (.inr (.inr (.inr (.inr hd))))

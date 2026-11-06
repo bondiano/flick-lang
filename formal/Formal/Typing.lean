@@ -29,6 +29,7 @@ inductive Value : Tm → Prop
   | cap : Value (.cap p)
   | own : Value (.own p)
   | drec : Value (.drec c r)
+  | kont : Value (.kont p)
 
 /-- Environment values `env θ` of core.md §3.1. -/
 inductive IsEnv : Tm → Prop

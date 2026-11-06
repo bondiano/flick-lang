@@ -42,8 +42,9 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
         · cases h
         · exact hrW.1.frame q' h
         · exact hvn.frame q' h
-    · exact keep (hn.sub hi hE hh.not_value
-        (hh.noIns hrW fun q θ v h => hw ⟨q, θ, v, h⟩) fun _ h => hh.has h)
+    · obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE hh.not_value he
+      exact keep (hn.sub hi hE hh.not_value
+        (hh.noIns hrW hr fun q θ v h => hw ⟨q, θ, v, h⟩) fun _ h => hh.has h)
   | askWith hE hl _ =>
     rw [nil rfl, List.append_nil]
     obtain ⟨K, Θ', t₁, φ₁, hr, _, hK, -⟩ := ctx_typing _ hE ask_not_value he
@@ -73,13 +74,13 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     exact keep (hn.redex hi hE (fun h => by cases h) (fun q h => by simp [Tm.Has] at h)
       (nf (hno _)) (fun _ _ h => h) (fun _ _ => Tm.Within.of_has (hno _)
         (fun p hp => (hno _ hp).elim) fun l hl => (hno _ hl).elim) hn.cells)
-  | raise hE hF hnt hni hv =>
+  | raise hE hF hnt hni hnc hv =>
     rw [nil rfl, List.append_nil]
     have hrW := (within_of_plug (not_value_plug raise_not_value _) hE hW).2
     obtain ⟨hFW, hrv⟩ := Frame.within_of_plug hF raise_not_value hrW
     rw [Frame.hole_eq hni] at hrv
     exact keep (hn.redex hi hE (not_value_plug raise_not_value _)
-      (hFW.noFrame_plug hni (nf (hv.noIns hrv))) (nf (hv.noIns hrv)) (fun _ _ h => h)
+      (hFW.noFrame_plug hni hnc (nf (hv.noIns hrv))) (nf (hv.noIns hrv)) (fun _ _ h => h)
       (fun _ _ => hrv) hn.cells)
   | @addFin E _ p₀ _ t₀ _ hE hg hl hv =>
     rw [nil rfl, List.append_nil]
@@ -264,5 +265,16 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
       rw [nil rfl, List.append_nil]
       obtain ⟨Θ', t', φ', hr, -⟩ := hole_rt (RHead.close (μ := μ) hg hl hw hk hfs) hE he
       exact keep (hn.close hi hE hw hg hk fun hw' hπ => close_move hr hw hw' hπ)
+    | hctlRaise _ | hctlUnw | hresRaise _ | hresUnw | habCatch | hdl =>
+      obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE hnv he
+      cases hr with | errVal hv => exact (hnv hv).elim
+  | unw hE hF _ _ _ =>
+    have nv : ∀ q, ¬ Value (.unw q) := fun _ h => by cases h
+    obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE (not_value_plug (nv _) _) he
+    obtain ⟨_, _, _, _, hr', -⟩ := frame_typing (nv _) _ hF hr
+    cases hr' with | errVal hv => cases hv
+  | performAbort hE _ _ _ _ | performTail hE _ _ _ _ | performCtl hE _ _ _ _ | resume hE _ _ =>
+    obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE (fun h => by cases h) he
+    cases hr with | errVal hv => cases hv
 
 end Flick

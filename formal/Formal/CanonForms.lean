@@ -23,7 +23,7 @@ def VKind (e : Tm) (k : Nat) : Prop :=
   match e.head with
   | .ctor _ => k = 1 ∨ k = 3 ∨ k = 7
   | .const c => k = c.kindAt e.args
-  | .lam _ | .fix _ => k = 1
+  | .lam _ | .fix _ | .kont _ => k = 1
   | .lit _ => k = 0
   | .loc _ => k = 2
   | .rnil | .rcons .. => k = 4
@@ -109,6 +109,7 @@ theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
   | constApp hc hw =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
     exact .inr (.inr (.inr (.inr ⟨_, _, rfl, Const.arity_of_resKind hk.symm hc, hw⟩)))
+  | kont => cases h
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 /-- L1 for references. -/
@@ -121,6 +122,7 @@ theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
   | constApp =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
     have := Const.resKind_cases ‹Const›; omega
+  | kont => cases h
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 /-- L1 for computations. -/
@@ -139,6 +141,7 @@ theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
   | constApp =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
     have := Const.resKind_cases ‹Const›; omega
+  | kont => cases h
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 theorem canonical_unit {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.base .unit) φ)) :
@@ -171,6 +174,7 @@ theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (
   | constApp =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
     have := Const.resKind_cases ‹Const›; omega
+  | kont => cases h
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 /-- L1 for capabilities. -/
@@ -183,6 +187,7 @@ theorem canonical_hnd {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
   | constApp =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
     have := Const.resKind_cases ‹Const›; omega
+  | kont => cases h
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 /-- L1 for records: field lookup and update succeed. -/

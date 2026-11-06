@@ -63,14 +63,16 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .glob _, _ => True
   | .hdl _ al r e, A => al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns ∧ e.NoIns
   | .hwith p _ al r e, A => A p ∧ al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns
+  -- the arm and the body it parked are at the same place, and share no region
   | .hctl p _ _ al r a k, A =>
-    A p ∧ al.Within A ∧ r.Within A ∧ a.Within A ∧ k.Within A ∧ al.NoIns ∧ r.NoIns
-  | .hres p a b, A => A p ∧ a.Within A ∧ b.Within A
+    A p ∧ al.Within A ∧ r.Within A ∧ a.Within A ∧ k.Within A ∧ al.NoIns ∧ r.NoIns ∧
+      ∀ x, a.Has (.frame x) → ¬ k.Has (.frame x)
+  | .hres p a b, A => A p ∧ a.Within A ∧ b.Within A ∧ ∀ x, b.Has (.frame x) → ¬ a.Has (.frame x)
   | .hdone p a, A => A p ∧ a.Within A
-  | .hab p a e, A => A p ∧ a.Within A ∧ e.Within A
+  | .hab p a e, A => A p ∧ a.Within A ∧ e.Within A ∧ ∀ x, ¬ a.Has (.frame x)
   | .unw p, A => A p
   | .kont p, A => A p
-  | .hole, _ => True
+  | .hole p, A => A p
 
 /-- The frames of a context at a place with the regions `A`: what the frame
 holds besides the hole is there, and does not evaluate before the hole. -/
@@ -93,6 +95,13 @@ def Frame.Within (A : Nat → Prop) : Frame → Prop
   | .with_ _ θ => θ.NoIns ∧ θ.Within Ψ B anc (fun _ => False)
   | .raise => True
   | .inside p => ¬ A p ∧ anc p = fun x => A x ∨ x = p
+  | .hwith p _ al r => A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns
+  -- the body a handler parked while its arm runs is at the same place
+  | .hctlA p _ _ al r k =>
+    A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ k.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns
+  | .hresB p a => A p ∧ a.Within Ψ B anc A
+  | .hdone p => A p
+  | .hab p a => A p ∧ a.Within Ψ B anc A ∧ ∀ x, ¬ a.Has (.frame x)
 
 /-- The regions of the hole of a frame. -/
 def Frame.hole (A : Nat → Prop) : Frame → Nat → Prop
@@ -189,17 +198,13 @@ theorem Tm.Within.mono {Ψ' : List Ty} {B' anc' : Nat → Nat → Prop}
   induction e <;> intro A h ha <;> simp only [Tm.Within, Tm.Has] at h ha ⊢ <;> grind
 
 theorem Frame.Within.plug {F : Frame} {A : Nat → Prop} {r : Tm} (hF : F.Within Ψ B anc A)
-    (hr : r.Within Ψ B anc (F.hole A)) : (F.plug r).Within Ψ B anc A := by
-  cases F <;> simp only [Frame.Within, Frame.hole, Frame.plug, Tm.Within] at hF hr ⊢ <;> grind
+    (hr : r.Within Ψ B anc (F.hole A)) (hd : ∀ x, r.Has (.frame x) → ¬ (F.plug (.var 0)).Has (.frame x)) :
+    (F.plug r).Within Ψ B anc A := by
+  cases F <;> simp only [Frame.Within, Frame.hole, Frame.plug, Tm.Within, Tm.Has] at hF hr hd ⊢ <;> grind
 
 theorem Frame.within_of_plug {F : Frame} {A : Nat → Prop} {r : Tm} (hF : F.ok) (hv : ¬ Value r)
     (h : (F.plug r).Within Ψ B anc A) : F.Within Ψ B anc A ∧ r.Within Ψ B anc (F.hole A) := by
   cases F <;> simp only [Frame.Within, Frame.hole, Frame.plug, Frame.ok, Tm.Within] at hF h ⊢ <;> grind
-
-theorem WithinE.fill {A : Nat → Prop} {r : Tm} :
-    ∀ {E : List Frame}, WithinE Ψ B anc A E → r.Within Ψ B anc (holeE A E) → (plug E r).Within Ψ B anc A
-  | [], _, hr => hr
-  | F :: _, ⟨hE, hF⟩, hr => WithinE.fill (r := F.plug r) hE (hF.plug hr)
 
 theorem within_of_plug {A : Nat → Prop} {r : Tm} (hv : ¬ Value r) :
     ∀ {E : List Frame}, OkE E → (plug E r).Within Ψ B anc A →
@@ -211,55 +216,130 @@ theorem within_of_plug {A : Nat → Prop} {r : Tm} (hv : ¬ Value r) :
     obtain ⟨h₃, h₄⟩ := Frame.within_of_plug hF hv h₂
     exact ⟨⟨h₁, h₃⟩, h₄⟩
 
+/-- A region of a term in a frame is no region of the rest of the frame: an `inside`
+form is not inside itself, and a handler's arm and the body it parks share none. -/
+theorem Frame.disj {F : Frame} {A : Nat → Prop} {r : Tm} (hF : F.ok) (hv : ¬ Value r)
+    (h : (F.plug r).Within Ψ B anc A) {x : Nat} (hx : r.Has (.frame x)) :
+    ¬ (F.plug (.var 0)).Has (.frame x) := by
+  have hFW := (Frame.within_of_plug hF hv h).1
+  intro h'
+  cases F with
+  | inside p =>
+    simp only [Frame.plug, Tm.Has, Tm.Within] at h h'
+    rcases h' with h' | h' | h' | h'
+    · cases h'
+    · cases h'
+    · cases h'; exact (h.2.2.frame hx).1 (.inr rfl)
+    · exact h'
+  | _ =>
+    simp only [Frame.plug, Tm.Has, Tm.Within, Frame.Within] at h h' hFW <;>
+      first
+      | grind [Tm.has_frame_ins]
+      | (rcases h' with h' | h'
+         · exact absurd (Tm.has_frame_ins h') (hFW.2.noIns hFW.1)
+         · exact h'.elim)
+      | grind [Tm.has_frame_ins, Tm.NoIns]
+
+theorem plug_mono {s : Site} {x y : Tm} (hxy : ∀ s, x.Has s → y.Has s) :
+    ∀ {E : List Frame}, (plug E x).Has s → (plug E y).Has s
+  | [], h => hxy s h
+  | F :: E, h => plug_mono (E := E) (x := F.plug x) (y := F.plug y)
+      (fun s h => by cases F <;> simp only [Frame.plug, Tm.Has] at h ⊢ <;> grind) h
+
+/-- What a context writes around its hole it writes around any term. -/
+theorem plug_of_hole {s : Site} {r : Tm} {E : List Frame} (h : (plug E (.var 0)).Has s) : (plug E r).Has s :=
+  plug_mono (fun _ h => by simp [Tm.Has] at h) h
+
+/-- A region of a term in a context is no region of the rest of the context. -/
+theorem within_disj {A : Nat → Prop} {r : Tm} (hv : ¬ Value r) :
+    ∀ {E : List Frame}, OkE E → (plug E r).Within Ψ B anc A → ∀ {x}, r.Has (.frame x) →
+      ¬ (plug E (.var 0)).Has (.frame x)
+  | [], _, _, _, _, h => h
+  | F :: E, hE, h, x, hx, h' => by
+    obtain ⟨hF, hE'⟩ := hE.cons
+    have hW := (within_of_plug (r := F.plug r) (not_value_plug hv F) hE' h).2
+    rcases plug_has_inv (r := .var 0) E h' with h' | h'
+    · exact within_disj (not_value_plug hv F) hE' h (F.plug_has hx) h'
+    · exact Frame.disj hF hv hW hx h'
+
+/-- A term in a context replaced by one at the place of its hole whose regions are
+the old term's or new. -/
+theorem Tm.Within.replug {A : Nat → Prop} {r₀ r : Tm} (hv : ¬ Value r₀) :
+    ∀ {E : List Frame}, OkE E → (plug E r₀).Within Ψ B anc A → r.Within Ψ B anc (holeE A E) →
+      (∀ x, r.Has (.frame x) → r₀.Has (.frame x) ∨ ¬ (plug E r₀).Has (.frame x)) →
+      (plug E r).Within Ψ B anc A
+  | [], _, _, hr, _ => hr
+  | F :: E, hE, h, hr, hd => by
+    obtain ⟨hF, hE'⟩ := hE.cons
+    obtain ⟨-, hW⟩ := within_of_plug (r := F.plug r₀) (not_value_plug hv F) hE' h
+    have hFW := (Frame.within_of_plug hF hv hW).1
+    refine Tm.Within.replug (E := E) (r₀ := F.plug r₀) (not_value_plug hv F) hE' h
+      (hFW.plug hr fun x hx h' => ?_) fun x hx => ?_
+    · rcases hd x hx with hx | hx
+      · exact Frame.disj hF hv hW hx h'
+      · exact hx (plug_has E (F.has_of_hole h'))
+    · rcases F.plug_has_inv (r := .var 0) hx with hx | hx
+      · exact .inl (F.has_of_hole hx)
+      · exact (hd x hx).imp_left F.plug_has
+
 theorem holeE_iff {A : Nat → Prop} {x : Nat} : ∀ {E : List Frame}, holeE A E x ↔ A x ∨ .inside x ∈ E
   | [] => by simp [holeE]
   | F :: E => by
     have := holeE_iff (A := A) (x := x) (E := E)
     cases F <;> simp [holeE, Frame.hole, this] <;> grind
 
-/-- The `inside` forms of a term in a context are those of the context and of the term. -/
-theorem WithinE.frames {A : Nat → Prop} {r : Tm} {q : Nat} :
-    ∀ {E : List Frame}, WithinE Ψ B anc A E → (plug E r).Has (.frame q) → .inside q ∈ E ∨ r.Has (.frame q)
-  | [], _, h => .inr h
-  | F :: E, ⟨hE, hF⟩, h => by
-    rcases WithinE.frames (r := F.plug r) hE h with h | h
-    · exact .inl (List.mem_cons_of_mem _ h)
-    · cases F <;> simp only [Frame.plug, Tm.Has, Frame.Within] at h hF <;>
-        first
-        | (rcases h with h | h
-           · exact absurd (Tm.has_frame_ins h) (by first | exact hF.2 | exact (hF.2.noIns hF.1))
-           · exact .inr h)
-        | (rcases h with h | h
-           · exact .inr h
-           · exact absurd (Tm.has_frame_ins h) (by first | exact hF.2 | exact (hF.2.noIns hF.1)))
-        | exact .inr h
-        | (rcases h with h | h | h | h
-           · cases h
-           · cases h
-           · cases h; exact .inl (by simp)
-           · exact .inr h)
-        | (rcases h with h | h | h | h
-           · cases h
-           · cases h
-           · exact absurd (Tm.has_frame_ins h) hF.1
-           · exact .inr h)
-
-/-- The `inside` form of `q` in a context: `q` is new there and its ancestors are
-regions of the hole. -/
+/-- An `inside` form of `q` in a context: `q` is new at its place, and its ancestors
+are regions of the hole or of the context: a body or an arm a handler parks holds
+its own `inside` forms. -/
 theorem WithinE.frameAnc {A : Nat → Prop} {q : Nat} :
-    ∀ {E : List Frame}, WithinE Ψ B anc A E → .inside q ∈ E →
-      ¬ A q ∧ anc q q ∧ (∀ x, A x → anc q x) ∧ ∀ x, anc q x → holeE A E x
-  | [], _, h => by simp at h
+    ∀ {E : List Frame}, WithinE Ψ B anc A E → (plug E (.var 0)).Has (.frame q) →
+      ¬ A q ∧ anc q q ∧ (∀ x, A x → anc q x) ∧
+        ∀ x, anc q x → holeE A E x ∨ (plug E (.var 0)).Has (.frame x)
+  | [], _, h => by simp [plug, Tm.Has] at h
   | F :: E, ⟨hE, hF⟩, h => by
     have up : ∀ x, holeE A E x → holeE A (F :: E) x := fun x hx => by
       cases F <;> simp [holeE, Frame.hole, hx]
-    rcases List.mem_cons.mp h with rfl | h
-    · simp only [Frame.Within] at hF
-      refine ⟨fun h' => hF.1 (holeE_iff.mpr (.inl h')), by rw [hF.2]; simp, fun x hx => ?_, ?_⟩
-      · rw [hF.2]; exact .inl (holeE_iff.mpr (.inl hx))
-      · intro x hx; rw [hF.2] at hx; simp [holeE, Frame.hole, hx]
+    have upA : ∀ x, A x → holeE A E x := fun x hx => holeE_iff.mpr (.inl hx)
+    -- the `inside` forms of a part of `F` that is at the place of its hole
+    have part : ∀ {t : Tm}, t.Within Ψ B anc (holeE A E) → t.Has (.frame q) →
+        (∀ x, t.Has (.frame x) → (F.plug (.var 0)).Has (.frame x)) →
+        ¬ A q ∧ anc q q ∧ (∀ x, A x → anc q x) ∧
+          ∀ x, anc q x → holeE A (F :: E) x ∨ (plug (F :: E) (.var 0)).Has (.frame x) := by
+      intro t ht hq hs
+      obtain ⟨h₁, h₂, h₃, h₄⟩ := ht.frame hq
+      refine ⟨fun h' => h₁ (upA _ h'), h₂, fun x hx => h₃ x (upA x hx), fun x hx => ?_⟩
+      exact (h₄ x hx).imp (up x) fun h => plug_has E (hs x h)
+    rcases plug_has_inv (r := .var 0) E h with h | h
     · obtain ⟨h₁, h₂, h₃, h₄⟩ := WithinE.frameAnc hE h
-      exact ⟨h₁, h₂, h₃, fun x hx => up x (h₄ x hx)⟩
+      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp (up x) (plug_of_hole (r := F.plug (.var 0)))⟩
+    cases F with
+    | inside p =>
+      simp only [Frame.plug, Tm.Has, Frame.Within] at h hF
+      rcases h with h | h | h | h
+      · cases h
+      · cases h
+      · cases h
+        refine ⟨fun h' => hF.1 (upA _ h'), by rw [hF.2]; simp, fun x hx => ?_, ?_⟩
+        · rw [hF.2]; exact .inl (upA x hx)
+        · intro x hx; rw [hF.2] at hx; exact .inl (by simp [holeE, Frame.hole, hx])
+      · simp at h
+    | hctlA p tl E' al r k =>
+      simp only [Frame.Within] at hF
+      refine part hF.2.2.2.1 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]
+      simp only [Frame.plug, Tm.Has] at h
+      grind [Tm.has_frame_ins, Tm.NoIns]
+    | hresB p a =>
+      simp only [Frame.Within] at hF
+      refine part hF.2 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]
+      simp only [Frame.plug, Tm.Has] at h
+      grind
+    | _ =>
+      simp only [Frame.plug, Tm.Has, Frame.Within] at h hF <;>
+        first
+        | grind [Tm.has_frame_ins, Tm.NoIns]
+        | (rcases h with h | h
+           · exact absurd (Tm.has_frame_ins h) (hF.2.noIns hF.1)
+           · exact h.elim)
 
 /-- Regions whose ancestors are the regions before them. -/
 def Chain (anc : Nat → Nat → Prop) (A : Nat → Prop) : Prop :=

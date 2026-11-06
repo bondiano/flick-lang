@@ -31,6 +31,14 @@ theorem step_pure {root Ψ Θ Λ μ e t l Λ' μ' e'} (h : Typ S Ψ Θ [] e (.ex
     obtain ⟨_, _, _, _, hr', rel', _⟩ := frame_typing raise_not_value _ hF hr
     obtain rfl := rel'.pure rfl
     exact (raise_not_pure hr').elim
+  | unw hE hF _ _ _ =>
+    have nv : ∀ q, ¬ Value (.unw q) := fun _ h => by cases h
+    obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE (not_value_plug (nv _) _) h
+    obtain ⟨_, _, _, _, hr', -⟩ := frame_typing (nv _) _ hF hr
+    cases hr' with | errVal hv => cases hv
+  | performAbort hE _ _ _ _ | performTail hE _ _ _ _ | performCtl hE _ _ _ _ | resume hE _ _ =>
+    obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE (fun h => by cases h) h
+    cases hr with | errVal hv => cases hv
   | addFin hE =>
     obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (fin_not_value (.inl rfl)) h
     obtain rfl := rel.pure rfl

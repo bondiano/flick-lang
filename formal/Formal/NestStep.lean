@@ -8,12 +8,15 @@ namespace Flick
 
 variable {S : Sig} {Ψ : List Ty} {B anc : Nat → Nat → Prop}
 
-theorem PHead.noIns {r r' : Tm} {A : Nat → Prop} (hh : PHead r r') (h : r.Within Ψ B anc A)
-    (hw : ∀ q θ v, r ≠ .with_ q θ v) : r.NoIns := by
+/-- A typed pure redex holds no run-time form, but for the value of a `with`. -/
+theorem PHead.noIns {r r' : Tm} {A : Nat → Prop} {Ψ' Θ J} (hh : PHead r r') (h : r.Within Ψ B anc A)
+    (ht : Typ S Ψ' Θ [] r J) (hw : ∀ q θ v, r ≠ .with_ q θ v) : r.NoIns := by
   have vn : ∀ {x : Tm} {A}, Value x → x.Within Ψ B anc A → ¬ x.Has .ins := fun hv hx => hv.noIns hx
+  have nv := hh.not_value
   cases hh <;> simp only [Tm.Within] at h <;> simp only [Tm.NoIns, Tm.Has, not_or] <;>
     first
     | exact (hw _ _ _ rfl).elim
+    | (cases ht with | errVal hv => exact (nv hv).elim)
     | exact ⟨h.1.2, vn ‹_› h.2.1⟩
     | exact ⟨vn ‹_› h.1, h.2.2⟩
     | exact ⟨h.2.2.1, h.2.2.2⟩
@@ -25,13 +28,16 @@ theorem PHead.noIns {r r' : Tm} {A : Nat → Prop} (hh : PHead r r') (h : r.With
     | simp
 
 theorem Frame.Within.noFrame_plug {F : Frame} {A : Nat → Prop} {x : Tm} (hF : F.Within Ψ B anc A)
-    (hni : ¬ F.isInside) (hx : ∀ q, ¬ x.Has (.frame q)) : ∀ q, ¬ (F.plug x).Has (.frame q) := by
+    (hni : ¬ F.isInside) (hnc : ¬ F.isCtl) (hx : ∀ q, ¬ x.Has (.frame q)) :
+    ∀ q, ¬ (F.plug x).Has (.frame q) := by
   have vn : ∀ {y : Tm} {A}, Value y → y.Within Ψ B anc A → ¬ y.Has .ins := fun hv hy => hv.noIns hy
   intro q h
-  cases F <;> simp only [Frame.Within, Frame.isInside] at hF hni <;>
+  cases F <;> simp only [Frame.Within, Frame.isInside, Frame.isCtl] at hF hni hnc <;>
     simp only [Frame.plug, Tm.Has] at h <;>
     first
     | exact hni trivial
+    | exact hnc trivial
+    | grind [Tm.has_frame_ins, Tm.NoIns]
     | exact hx q h
     | (rcases h with h | h
        · exact hx q h

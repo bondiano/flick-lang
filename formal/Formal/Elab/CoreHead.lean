@@ -13,15 +13,8 @@ The other side needs no step before it: the values at the redex are related to v
 namespace Flick.Elab
 
 /-- Lists of alternatives. -/
-def IsAlts : Flick.Tm → Prop
-  | .anil | .acons .. | .aguard .. => True
-  | _ => False
-
-/-- The left side of a base pair is never a list of alternatives. -/
-def BNoAlts (B : Flick.Tm → Flick.Tm → Prop) : Prop := ∀ a b, B a b → ¬ IsAlts a
-
 theorem DP.noAlts {S : Sig} {root : Roots} : BNoAlts (DP S root) := by
-  rintro a b ⟨hv, -, -, Θ, t, ht⟩ ha
+  rintro a b ⟨hv, -, -, -, Θ, t, ht⟩ ha
   cases a <;> simp [IsAlts] at ha <;> cases ht <;> exact hv ‹_›
 
 variable {B : Flick.Tm → Flick.Tm → Prop}
@@ -67,7 +60,7 @@ theorem matchP_sub {p : Pat} {v v₂ : Flick.Tm} (h : Cg B true v v₂) {δ : Li
   · exact r
 
 /-- **A pure head step of related terms.** -/
-theorem phead_sim (hC : BClosed B) (hV : BNoVal B) (hA : BNoAlts B) {r r' r₂ : Flick.Tm}
+theorem phead_sim (hC : BClosed B) (hV : BNoVal B) (hA : BNoAlts B) (hP : BPlain B) {r r' r₂ : Flick.Tm}
     (hh : PHead r r') (h : Cg B false r r₂) : B r r₂ ∨ ∃ r₂', PHead r₂ r₂' ∧ Cg B false r' r₂' := by
   have nb : ∀ {a b : Flick.Tm}, B a b → Value a → False := fun hb hv => hV _ _ hb hv
   cases hh with
@@ -163,6 +156,28 @@ theorem phead_sim (hC : BClosed B) (hV : BNoVal B) (hA : BNoAlts B) {r r' r₂ :
     cases h with
     | base hb => exact .inl hb
     | with_ _ h₂ => exact .inr ⟨_, .withVal (Cg.value hV hv h₂).1, h₂⟩
+  | hwithVal hv =>
+    cases h with
+    | base hb => exact .inl hb
+    | hwith _ h₂ h₃ => exact .inr ⟨_, .hwithVal (Cg.value hV hv h₃).1, .app h₂ h₃⟩
+  | hctlTail hv =>
+    cases h with
+    | base hb => exact .inl hb
+    | hctl h₁ h₂ h₃ h₄ =>
+      exact .inr ⟨_, .hctlTail (Cg.value hV hv h₃).1, .hwith h₁ h₂ (Cg.fill hP (Cg.value hV hv h₃).2.2 h₄)⟩
+  | hctlDisc hv =>
+    cases h with
+    | base hb => exact .inl hb
+    | hctl _ _ h₃ h₄ =>
+      exact .inr ⟨_, .hctlDisc (Cg.value hV hv h₃).1, .hab h₃ (Cg.fill hP (fun _ => .unw) h₄)⟩
+  | hresVal hv =>
+    cases h with
+    | base hb => exact .inl hb
+    | hres h₁ h₂ => exact .inr ⟨_, .hresVal (Cg.value hV hv h₂).1, .hdone (Cg.fill hP (Cg.value hV hv h₂).2.2 h₁)⟩
+  | hdoneVal hv =>
+    cases h with
+    | base hb => exact .inl hb
+    | hdone h₁ => exact .inr ⟨_, .hdoneVal (Cg.value hV hv h₁).1, h₁⟩
   | bind hv =>
     cases h with
     | base hb => exact .inl hb
@@ -201,7 +216,7 @@ theorem live_rel {Λ Λ₂ : List Rgn} (h : All2 (RgR B) Λ Λ₂) {p : Nat} {g 
   exact ⟨g₂, hg₂, r.1 ▸ hl, r⟩
 
 /-- **A runtime head step of related terms.** -/
-theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClosed B)
+theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClosed B) (hP : BPlain B)
     {Λ Λ' Λ₂ : List Rgn} {μ μ' μ₂ : List Flick.Tm} {r r' r₂ : Flick.Tm}
     (hh : RHead Λ μ r Λ' μ' r') (h : Cg B false r r₂) (hs : StR B Λ Λ₂ μ μ₂) :
     B r r₂ ∨ ∃ Λ₂' μ₂' r₂', RHead Λ₂ μ₂ r₂ Λ₂' μ₂' r₂' ∧ Cg B false r' r₂' ∧ StR B Λ' Λ₂' μ' μ₂' := by
@@ -264,13 +279,59 @@ theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClos
     | provide h₁ h₂ =>
       refine .inr ⟨_, _, _, .provideEnv (h₁.isEnv hV hθ), ?_, hΛ.app (.cons RgR.new .nil), hμ⟩
       rw [hΛ.length]; exact .inside (.with_ h₁ h₂)
+  | hctlRaise hv =>
+    cases h with
+    | base hb => exact .inl hb
+    | hctl h₁ h₂ h₃ h₄ =>
+      cases h₃ with
+      | raise h' =>
+        exact .inr ⟨_, _, _, .hctlRaise (Cg.value hV hv h').1, .hab (.raise h') (Cg.fill hP (fun _ => .unw) h₄),
+          hΛ, hμ⟩
+      | base hb => exact (hR.1 _ _ hb).elim
+  | hctlUnw =>
+    cases h with
+    | base hb => exact .inl hb
+    | hctl h₁ h₂ h₃ h₄ =>
+      cases h₃ with
+      | unw => exact .inr ⟨_, _, _, .hctlUnw, .hab .unw (Cg.fill hP (fun _ => .unw) h₄), hΛ, hμ⟩
+      | base hb => exact (hR.2 _ _ hb).elim
+  | hresRaise hv =>
+    cases h with
+    | base hb => exact .inl hb
+    | hres h₁ h₂ =>
+      cases h₂ with
+      | raise h' =>
+        exact .inr ⟨_, _, _, .hresRaise (Cg.value hV hv h').1, .hdone (Cg.fill hP (fun _ => .raise h') h₁),
+          hΛ, hμ⟩
+      | base hb => exact (hR.1 _ _ hb).elim
+  | hresUnw =>
+    cases h with
+    | base hb => exact .inl hb
+    | hres h₁ h₂ =>
+      cases h₂ with
+      | unw => exact .inr ⟨_, _, _, .hresUnw, .hdone (Cg.fill hP (fun _ => .unw) h₁), hΛ, hμ⟩
+      | base hb => exact (hR.2 _ _ hb).elim
+  | habCatch =>
+    cases h with
+    | base hb => exact .inl hb
+    | hab h₁ h₂ =>
+      cases h₂ with
+      | unw => exact .inr ⟨_, _, _, .habCatch, h₁, hΛ, hμ⟩
+      | base hb => exact (hR.2 _ _ hb).elim
+  | hdl =>
+    cases h with
+    | base hb => exact .inl hb
+    | hdl h₁ h₂ h₃ =>
+      refine .inr ⟨_, _, _, .hdl, ?_, hΛ.app (.cons RgR.new .nil), hμ⟩
+      rw [hΛ.length]
+      exact .inside (.hwith h₁ h₂ h₃)
   | tryRaise hv =>
     cases h with
     | base hb => exact .inl hb
     | try_ h₁ h₂ =>
       cases h₁ with
       | raise h' => exact .inr ⟨_, _, _, .tryRaise (Cg.value hV hv h').1, .handle h' h₂, hΛ, hμ⟩
-      | base hb => exact (hR _ _ hb).elim
+      | base hb => exact (hR.1 _ _ hb).elim
   | handleYes hv hm =>
     cases h with
     | base hb => exact .inl hb

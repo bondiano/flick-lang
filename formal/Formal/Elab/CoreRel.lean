@@ -1,6 +1,7 @@
 import Formal.Preservation
+import Formal.BelowStep
 import Formal.Elab.CoreEval
-import Formal.Elab.CoreCgFrames
+import Formal.Elab.CoreCgHdl
 
 /-!
 # λFlick⁺ as a `Target`: the relation `Rel` of the run
@@ -39,16 +40,20 @@ termination_by sizeOf x
 /-- **The base pairs**: a closed computation typed at the pure stage that is not yet a value,
 and a closed term with the same values. -/
 def DP (S : Sig) (root : Roots) (a b : Flick.Tm) : Prop :=
-  ¬ Value a ∧ b.Closed ∧ SemEq root a b ∧ ∃ Θ t, Typ S [] Θ [] a (.ex t .pure)
+  ¬ Value a ∧ b.Closed ∧ (a.NoIns ∧ b.NoIns ∧ ¬ IsAlts b) ∧ SemEq root a b ∧
+    ∃ Θ t, Typ S [] Θ [] a (.ex t .pure)
 
 theorem DP.closed : BClosed (DP S root) := by
-  rintro a b ⟨-, hb, -, Θ, t, ht⟩
+  rintro a b ⟨-, hb, -, -, Θ, t, ht⟩
   exact ⟨fun i hi => by have := ht.frees i hi; simp at this, hb⟩
 
 theorem DP.noVal : BNoVal (DP S root) := fun _ _ h => h.1
 
-theorem DP.noRaise : BNoRaise (DP S root) := by
-  rintro a b ⟨-, -, -, Θ, t, ht⟩; exact raise_not_pure ht
+theorem DP.plain : BPlain (DP S root) := fun _ _ h => h.2.2.1
+
+theorem DP.noRaise : BNoRaise (DP S root) :=
+  ⟨by rintro a b ⟨-, -, -, -, Θ, t, ht⟩; exact raise_not_pure ht,
+    by rintro p b ⟨-, -, -, -, Θ, t, ht⟩; cases ht with | errVal hv => cases hv⟩
 
 theorem ask_redex {N : Name} : Redex (.app (.const (.ask N)) (.lit .unit)) := by
   refine ⟨ask_not_value, fun F a _ ha => ?_⟩
@@ -68,18 +73,43 @@ theorem raise_redex {v : Flick.Tm} (hv : Value v) : Redex (.raise v) := by
   cases F <;> simp [Frame.plug] at ha
   exact ha ▸ hv
 
-/-- A runtime head step is at a redex, or at `raise v` under a `try` or an `inside` frame. -/
+theorem unw_redex (p : Nat) : Redex (.unw p) :=
+  ⟨fun h => (by cases h), fun F a _ ha => (by cases F <;> simp [Frame.plug] at ha)⟩
+
+theorem perform_redex {E o : Name} {c : OpClass} {v : Flick.Tm} (hv : Value v) :
+    Redex (.app (.const (.perform E o c)) v) := by
+  refine ⟨perform_not_value, fun F a _ ha => ?_⟩
+  cases F <;> simp [Frame.plug] at ha
+  · exact ha.1 ▸ .const
+  · exact ha.2 ▸ hv
+
+theorem kont_redex {p : Nat} {u : Flick.Tm} (hu : Value u) : Redex (.app (.kont p) u) := by
+  refine ⟨kont_not_value, fun F a _ ha => ?_⟩
+  cases F <;> simp [Frame.plug] at ha
+  · exact ha.1 ▸ .kont
+  · exact ha.2 ▸ hu
+
+/-- A runtime head step is at a redex, or at `raise v` or unwinding under a `try` or an
+`inside` frame. -/
 theorem _root_.Flick.RHead.redex' {Λ Λ' : List Rgn} {μ μ' : List Flick.Tm} {e e' : Flick.Tm}
-    (h : RHead Λ μ e Λ' μ' e') : Redex e ∨ ∃ (F : Frame) (v : Flick.Tm), F.ok ∧ Value v ∧ e = F.plug (.raise v) := by
+    (h : RHead Λ μ e Λ' μ' e') : Redex e ∨
+      (∃ (F : Frame) (v : Flick.Tm), F.ok ∧ Value v ∧ e = F.plug (.raise v)) ∨
+      ∃ (F : Frame) (q : Nat), F.ok ∧ e = F.plug (.unw q) := by
   have nv := h.not_value
   cases h with
-  | tryRaise hv => exact .inr ⟨.try_ _, _, trivial, hv, rfl⟩
+  | tryRaise hv => exact .inr (.inl ⟨.try_ _, _, trivial, hv, rfl⟩)
+  | hctlRaise hv => exact .inr (.inl ⟨.hctlA _ _ _ _ _ _, _, trivial, hv, rfl⟩)
+  | hresRaise hv => exact .inr (.inl ⟨.hresB _ _, _, trivial, hv, rfl⟩)
+  | hctlUnw => exact .inr (.inr ⟨.hctlA _ _ _ _ _ _, _, trivial, rfl⟩)
+  | hresUnw => exact .inr (.inr ⟨.hresB _ _, _, trivial, rfl⟩)
+  | habCatch => exact .inr (.inr ⟨.hab _ _, _, trivial, rfl⟩)
   | finRun _ _ hw _ _ | close _ _ hw _ _ =>
-    rcases hw with hw | ⟨v, hv, rfl⟩
+    rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨q, rfl⟩
     · left; refine ⟨nv, fun F a _ ha => ?_⟩
       cases F <;> simp [Frame.plug] at ha
       exact ha.2 ▸ hw
-    · exact .inr ⟨.inside _, _, trivial, hv, rfl⟩
+    · exact .inr (.inl ⟨.inside _, _, trivial, hv, rfl⟩)
+    · exact .inr (.inr ⟨.inside _, _, trivial, rfl⟩)
   | _ =>
     left; refine ⟨nv, fun F a hF ha => ?_⟩
     cases F <;> simp [Frame.plug] at ha <;>
@@ -124,12 +154,15 @@ theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
     obtain ⟨rfl, rfl, -⟩ := typ hE' (glob_redex _) hq.symm
     exact ⟨rfl, rfl, _, .glob hE₀ hg, plug_append _ _ _⟩
   | rt hE' hh =>
-    rcases hh.redex' with hr | ⟨F, v, hF, hv, rfl⟩
+    rcases hh.redex' with hr | ⟨F, v, hF, hv, rfl⟩ | ⟨F, q, hF, rfl⟩
     · obtain ⟨-, -, Θ', t', h⟩ := typ hE' hr hq.symm
       exact (hh.not_pure h).elim
     · obtain ⟨-, -, Θ', t', h⟩ := typ (E := F :: _) (fun G hG => (List.mem_cons.mp hG).elim
         (fun h => h ▸ hF) (hE' G)) (raise_redex hv) hq.symm
       exact (raise_not_pure h).elim
+    · obtain ⟨-, -, Θ', t', h⟩ := typ (E := F :: _) (fun G hG => (List.mem_cons.mp hG).elim
+        (fun h => h ▸ hF) (hE' G)) (unw_redex q) hq.symm
+      cases h with | errVal hv => cases hv
   | askWith hE' =>
     obtain ⟨-, -, Θ', t', h⟩ := typ hE' ask_redex hq.symm
     exact (ask_inv h).1.elim
@@ -142,10 +175,57 @@ theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
   | spawn hE' _ _ hv =>
     obtain ⟨-, -, Θ', t', h⟩ := typ hE' (fin_redex (.inr rfl) hv) hq.symm
     exact (fin_not_pure h (.inr rfl)).elim
-  | raise hE' hF _ _ hv =>
+  | raise hE' hF _ _ _ hv =>
     obtain ⟨-, -, Θ', t', h⟩ := typ (E := _ :: _) (fun G hG => (List.mem_cons.mp hG).elim
       (fun h => h ▸ hF) (hE' G)) (raise_redex hv) hq.symm
     exact (raise_not_pure h).elim
+  | unw hE' hF =>
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := _ :: _) (fun G hG => (List.mem_cons.mp hG).elim
+      (fun h => h ▸ hF) (hE' G)) (unw_redex _) hq.symm
+    cases h with | errVal hv => cases hv
+  | @performAbort E o b v _ _ p r Ei Ef al hE' hEi _ _ hv =>
+    have hq' : Flick.plug (Ei ++ .hwith p Ef al r :: E) (.app (.const (.perform Ef o .abort)) v) =
+        Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hwith p Ef al r :: E) (hEi.append' (hE'.cons' trivial))
+      (perform_redex hv) hq'
+    cases h with
+    | app hf => cases hf with | const hc => exact hc.elim
+    | errVal hv => exact (perform_not_value hv).elim
+  | @performTail E o b v _ _ p r Ei Ef al hE' hEi _ _ hv =>
+    have hq' : Flick.plug (Ei ++ .hwith p Ef al r :: E) (.app (.const (.perform Ef o .tail)) v) =
+        Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hwith p Ef al r :: E) (hEi.append' (hE'.cons' trivial))
+      (perform_redex hv) hq'
+    cases h with
+    | app hf => cases hf with | const hc => exact hc.elim
+    | errVal hv => exact (perform_not_value hv).elim
+  | @performCtl E o b v _ _ p r Ei Ef al hE' hEi _ _ hv =>
+    have hq' : Flick.plug (Ei ++ .hwith p Ef al r :: E) (.app (.const (.perform Ef o .control)) v) =
+        Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hwith p Ef al r :: E) (hEi.append' (hE'.cons' trivial))
+      (perform_redex hv) hq'
+    cases h with
+    | app hf => cases hf with | const hc => exact hc.elim
+    | errVal hv => exact (perform_not_value hv).elim
+  | @resume E A u _ _ p r k Ef al hE' hA hu =>
+    have hq' : Flick.plug (A ++ .hctlA p false Ef al r k :: E) (.app (.kont p) u) =
+        Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := A ++ .hctlA p false Ef al r k :: E)
+      (hA.append' (hE'.cons' trivial)) (kont_redex hu) hq'
+    cases h with
+    | app hf => cases hf
+    | errVal hv => exact (kont_not_value hv).elim
+
+/-- A pure step makes no run-time form. -/
+theorem _root_.Flick.PStep.noIns {x x₁ : Flick.Tm} (hs : PStep root x x₁) (hroot : RootTy S root) (hn : x.NoIns) :
+    x₁.NoIns := by
+  obtain ⟨E, e, e', -, -, rfl, rfl, hh⟩ := hs.inv
+  intro h
+  rcases plug_has_inv (r := e) E h with h | h
+  · exact hn h
+  · rcases hh with hh | ⟨g, rfl, hg⟩
+    · exact hn (plug_has E (hh.has h))
+    · exact (hroot.glob _ _ hg).1 _ h
 
 /-- A pure step keeps the typing at the pure stage. -/
 theorem pstep_typed (hroot : RootTy S root) {Θ : Facts} {t : Flick.Ty} {x x₁ : Flick.Tm}
@@ -164,9 +244,10 @@ theorem pstep_typed (hroot : RootTy S root) {Θ : Facts} {t : Flick.Ty} {x x₁ 
 a value that the right side reaches. -/
 theorem DP.step (hroot : RootTy S root) {x x₂ x₁ : Flick.Tm} (h : DP S root x x₂)
     (hs : PStep root x x₁) : (¬ Value x₁ → DP S root x₁ x₂) ∧ (Value x₁ → Eval root x₂ x₁) := by
-  obtain ⟨-, hc, hse, Θ, t, ht⟩ := h
+  obtain ⟨-, hc, ⟨hn, hp⟩, hse, Θ, t, ht⟩ := h
   have hse₁ : SemEq root x₁ x₂ := fun v => (Eval.of_step hs).symm.trans (hse v)
-  refine ⟨fun hv => ⟨hv, hc, hse₁, Θ, t, pstep_typed hroot ht hs⟩, fun hv => ?_⟩
+  refine ⟨fun hv => ⟨hv, hc, ⟨hs.noIns hroot hn, hp⟩, hse₁, Θ, t, pstep_typed hroot ht hs⟩,
+    fun hv => ?_⟩
   exact (hse₁ x₁).1 (.value hv)
 
 /-- Two regions with one `live` flag and related children and finalizers. -/

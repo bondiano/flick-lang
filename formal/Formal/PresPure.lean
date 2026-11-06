@@ -141,5 +141,7 @@ theorem pure_preservation {Ψ Θ e t φ e'} (h : Typ S Ψ Θ [] e (.ex t φ)) (h
           obtain ⟨_, _, _, _, h, _, _, lt', -⟩ := (lt.trans hT').arrow_left
           cases h; cases lt'; cases hT; exact .lit
     | errVal hv'' => exact (nv hv'').elim
+  | hwithVal _ | hctlTail _ | hctlDisc _ | hresVal _ | hdoneVal _ =>
+    cases h with | errVal hv'' => exact (nv hv'').elim
 
 end Flick
