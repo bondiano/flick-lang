@@ -308,12 +308,12 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
     exact .inr (hn.frame (F := .hctlA _ _ _ _ _ _ _ _) trivial (nt id) (ni id) (fun n h => .inr (hr n h))
       ⟨_, hE, hk⟩)
-  | hres _ hA ha _ _ hφ _ ih _ =>
+  | hres _ _ hA ha _ _ hφ _ ih _ =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hresVal hA ha hv))
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
-    exact .inr (hn.frame (F := .hresB _ _) trivial (nt id) (ni id) (fun n h => .inr (hr n h)) ⟨_, hA, ha⟩)
+    exact .inr (hn.frame (F := .hresB _ _ _) trivial (nt id) (ni id) (fun n h => .inr (hr n h)) ⟨_, hA, ha⟩)
   | hdone _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn

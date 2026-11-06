@@ -25,7 +25,7 @@ def Tm.Caught : Tm → (Nat → Prop) → Prop
   | .scope b, H | .drec _ b, H | .hdone _ b, H => b.Caught H
   | .app a b, H | .let_ a b, H | .letrec a b, H | .rcons _ a b, H | .update a _ b, H
   | .match_ a b, H | .acons _ a b, H | .try_ a b, H | .handle a b, H | .provide a b, H
-  | .with_ _ a b, H | .econs _ a b, H | .join a b, H | .hres _ a b, H => a.Caught H ∧ b.Caught H
+  | .with_ _ a b, H | .econs _ a b, H | .join a b, H | .hres _ _ a b, H => a.Caught H ∧ b.Caught H
   | .aguard _ g b r, H => g.Caught H ∧ b.Caught H ∧ r.Caught H
   | .hdl _ al r e, H => al.Caught H ∧ r.Caught H ∧ e.Caught H
   | .inside p e, H => ¬ H p ∧ e.Caught H
@@ -37,7 +37,7 @@ def Tm.Caught : Tm → (Nat → Prop) → Prop
 
 def Frame.Caught (H : Nat → Prop) : Frame → Prop
   | .appL a | .appR a | .let_ a | .match_ a | .rconsL _ a | .rconsR _ a | .updL _ a | .updR a _
-  | .try_ a | .provide a | .joinL a | .joinR a | .with_ _ a | .hresB _ a => a.Caught hs cell H
+  | .try_ a | .provide a | .joinL a | .joinR a | .with_ _ a | .hresB _ _ a => a.Caught hs cell H
   | .proj _ | .await | .bind _ | .raise | .hdone _ => True
   | .inside p => ¬ H p
   | .hwith p ℓ _ al r => hs p = H ∧ cell p = ℓ ∧ al.Caught hs cell H ∧ r.Caught hs cell H

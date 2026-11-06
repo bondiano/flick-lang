@@ -41,7 +41,7 @@ theorem Tm.rename_rename :
     intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂, ih₃]
   | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂, ih₃, ih₄]
-  | hres _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ _ ih₁ ih₂ =>
     intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂]
   | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
     intro ξ ζ; simp only [Tm.rename]; rw [ih₁]
@@ -80,7 +80,7 @@ theorem Tm.subst_rename :
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂, ih₃]
   | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂, ih₃, ih₄]
-  | hres _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ _ ih₁ ih₂ =>
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂]
   | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁]
@@ -120,7 +120,7 @@ theorem Tm.rename_subst :
     intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁, ih₂, ih₃]
   | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁, ih₂, ih₃, ih₄]
-  | hres _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ _ ih₁ ih₂ =>
     intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁, ih₂]
   | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
     intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁]
@@ -158,7 +158,7 @@ theorem Tm.subst_subst :
     intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂, ih₃]
   | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂, ih₃, ih₄]
-  | hres _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ _ ih₁ ih₂ =>
     intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂]
   | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
     intro σ τ; simp only [Tm.subst]; rw [ih₁]

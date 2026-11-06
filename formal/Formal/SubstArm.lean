@@ -82,7 +82,7 @@ theorem Tm.has_subst_free :
     have := ih₁ σ s i; have := ih₂ σ s i; have := ih₃ σ s i; have := ih₄ σ s i
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
     grind
-  | hres _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ _ ih₁ ih₂ =>
     intro σ s i h hs
     have := ih₁ σ s i; have := ih₂ σ s i
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
@@ -136,7 +136,7 @@ theorem Tm.subst_congr : ∀ (e : Tm) {σ σ' : Nat → Tm}, (∀ i, e.Free i �
   | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ σ' h; simp only [Tm.subst]
     rw [ih₁ fun i hi => h i (.inl hi), ih₂ fun i hi => h i (.inr (.inl hi)), ih₃ fun i hi => h i (.inr (.inr (.inl hi))), ih₄ fun i hi => h i (.inr (.inr (.inr hi)))]
-  | hres _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ _ ih₁ ih₂ =>
     intro σ σ' h; simp only [Tm.subst]
     rw [ih₁ fun i hi => h i (.inl hi), ih₂ fun i hi => h i (.inr hi)]
   | hdone _ _ ih₁ | unw _ _ _ ih₁ =>

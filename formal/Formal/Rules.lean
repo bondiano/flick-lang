@@ -247,10 +247,11 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ (.hctl p ℓ κ tl E al rf a k) (.ex T φ)
   /-- While the resumed body runs, the arm is parked where it called `resume`, the
   argument left out. -/
-  | hres {A : List Frame} : Typ Ψ Θ Γ b (.ex t' (.rt r ε)) →
-      OkE A → a = plug A (.hole p) → Typ Ψ Θ [] (plug A (.app (.kont p ℓ) .todo)) (.ex t' (.rt r ε)) →
-      Ψ[ℓ]? = some (.arrow b₀ (.rt r ε) t' C') → (Stage.rt r ε).le φ → Le t' T →
-      Typ Ψ Θ Γ (.hres p a b) (.ex T φ)
+  | hres {A : List Frame} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Typ Ψ Θ Γ b (.ex t' (.rt r ε)) →
+      OkE A → a = plug A (.hole p) → Typ Ψ Θ [] (plug A (.app (.kont p κ) .todo)) (.ex t' (.rt r ε)) →
+      Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') → (Stage.rt r ε).le φ → Le t' T →
+      Typ Ψ Θ Γ (.hres p ℓ a b) (.ex T φ)
   | hdone : Typ Ψ Θ Γ a (.ex t φ) → Typ Ψ Θ Γ (.hdone p a) (.ex t φ)
   /-- Unwinding to the handler of the cell `ℓ`, which then runs `a` with the type of its
   value; unwinding itself has any type. -/

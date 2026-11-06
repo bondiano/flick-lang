@@ -55,7 +55,7 @@ theorem PHead.has {e e' : Tm} (h : PHead e e') {s : Site} (hs : e'.Has s) : e.Ha
     subst hk
     have := plug_has_inv (r := .hole p) (r' := .unw p ℓ w) (s := s) Ei
     simp only [Tm.Has] at hs this ⊢; grind
-  | @hresVal a p w A _ ha _ =>
+  | @hresVal a p w ℓ A _ ha _ =>
     subst ha
     have := plug_has_inv (r := .hole p) (r' := w) (s := s) A
     simp only [Tm.Has] at hs ⊢; grind
@@ -169,12 +169,12 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
     refine same (sub fun s hs => ?_)
     have := plug_has_inv (r := .hole p) (r' := .unw p ℓ (.unw q ℓ' a)) (s := s) Ei
     simp only [Tm.Has] at hs this ⊢; grind
-  | @hresRaise a p w _ _ A _ ha _ =>
+  | @hresRaise a p w _ _ ℓ A _ ha _ =>
     subst ha
     refine same (sub fun s hs => ?_)
     have := plug_has_inv (r := .hole p) (r' := .raise w) (s := s) A
     simp only [Tm.Has] at hs this ⊢; grind
-  | @hresUnw a p _ _ q ℓ' b A _ ha =>
+  | @hresUnw a p _ _ ℓ q ℓ' b A _ ha =>
     subst ha
     refine same (sub fun s hs => ?_)
     have := plug_has_inv (r := .hole p) (r' := .unw q ℓ' b) (s := s) A

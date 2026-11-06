@@ -284,7 +284,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     · split at h₄ <;> simp_all
     · obtain ⟨C', hl₁, hl₂⟩ := hl h
       exact ⟨C'.substT σ, by simp [hl₁, Ty.substT, Stage.substT, hb], ⟨_, hl₂, by simp [hp]⟩⟩
-  | hres _ hA ha _ hl hφ hT ih₁ ih₂ =>
+  | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ =>
     intro σ hσ
     subst ha
     have hp : σ (.r _) = .rg _ := hσ.1 _ (.inl (.inr (.inl rfl)))
@@ -296,7 +296,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         · subst h; exact .inr (.inl rfl)
         · exact h.elim)
     simp only [Flick.J.substT, Stage.substT] at h₁ h₂
-    exact .hres h₁ hA rfl h₂ (by rw [List.getElem?_map, hl]; rfl) (Stage.le_substT σ hφ) (hT.substT σ)
+    exact .hres (by simp [hℓ, Ty.substT, Stage.substT]) h₁ hA rfl h₂ (by rw [List.getElem?_map, hl]; rfl) (Stage.le_substT σ hφ) (hT.substT σ)
   | hdone _ ih => intro σ hσ; exact .hdone (ih σ (hσ.sub fun _ h => .inr (.inr h)))
   | unw hℓ _ hφ ih =>
     intro σ hσ

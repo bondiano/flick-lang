@@ -37,7 +37,7 @@ theorem Typ.armOf_subst {σ : Nat → Tm} {o : Name} :
   | .cap _, _, _, _, _, _, _, _, h | .own _, _, _, _, _, _, _, _, h | .drec _ _, _, _, _, _, _, _, _, h
   | .glob _, _, _, _, _, _, _, _, h | .hdl _ _ _ _, _, _, _, _, _, _, _, h
   | .hwith _ _ _ _ _ _, _, _, _, _, _, _, _, h | .hctl _ _ _ _ _ _ _ _ _, _, _, _, _, _, _, _, h
-  | .hres _ _ _, _, _, _, _, _, _, _, h | .hdone _ _, _, _, _, _, _, _, _, h
+  | .hres _ _ _ _, _, _, _, _, _, _, _, h | .hdone _ _, _, _, _, _, _, _, _, h
   | .unw _ _ _, _, _, _, _, _, _, _, h | .kont _ _, _, _, _, _, _, _, _, h | .hole _, _, _, _, _, _, _, _, h => by
     cases h
 
@@ -155,11 +155,11 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     rw [Tm.subst, (plug_hole_closed hp).subst]
     exact .hctl hℓ (ih₁ hσ) (ih₂ hσ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hσ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
-  | hres _ hA ha hp hl hφ hT ih₁ _ =>
+  | hres hℓ _ hA ha hp hl hφ hT ih₁ _ =>
     intro _ σ hσ
     subst ha
     rw [Tm.subst, (plug_hole_closed hp).subst]
-    exact .hres (ih₁ hσ) hA rfl hp hl hφ hT
+    exact .hres hℓ (ih₁ hσ) hA rfl hp hl hφ hT
   | hdone _ ih => intro _ _ hσ; exact .hdone (ih hσ)
   | unw hℓ _ hφ ih => intro _ _ hσ; exact .unw hℓ (ih hσ) hφ
   | kont hl hC hT => intro _ _ _; exact .kont hl hC hT

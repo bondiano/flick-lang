@@ -85,7 +85,7 @@ theorem RHead.not_pure {Ψ Θ Λ μ r t Λ' μ' r'} (h : Typ S Ψ Θ [] r (.ex t
     | hctl _ _ _ _ _ _ _ _ _ _ _ _ _ _ hφ _ => exact hφ
     | errVal hv => exact nv hv
   | hresRaise _ _ _ | hresUnw _ _ => cases h with
-    | hres _ _ _ _ _ hφ _ => exact hφ
+    | hres _ _ _ _ _ _ hφ _ => exact hφ
     | errVal hv => exact nv hv
   | hwithCatch => cases h with
     | hwith _ _ _ _ _ _ _ hφ _ => exact hφ

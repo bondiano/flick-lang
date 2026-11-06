@@ -30,7 +30,7 @@ theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l)
     · rcases plug_has_iff.mp h with h | h
       · exact ih₃ l (plug_has_iff.mpr (.inl h))
       · simp [Tm.Has] at h
-  | hres _ _ ha _ _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
     intro l h; subst ha
     simp only [Tm.Has] at h
     rcases h with h | h | h | h
@@ -106,7 +106,7 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
     · exact ih₂ i h
     · exact ih₄ i h
     · exact absurd (ih₃ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
-  | hres _ _ ha _ _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
     intro i h; subst ha
     rcases h with h | h
     · exact absurd (ih₂ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
@@ -198,8 +198,8 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
     exact .hctl (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ hop hc htl hE hk (ih₃ X) hφ₀ (ih₄ X)
       (fun h => let ⟨C', h₁, h₂⟩ := hl h
         ⟨C', by rw [List.getElem?_append_left (getElem?_lt h₁)]; exact h₁, h₂⟩) hcm hφ hT
-  | hres _ hA ha _ hl hφ hT ih₁ ih₂ =>
-    exact .hres (ih₁ X) hA ha (ih₂ X) (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hφ hT
+  | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ =>
+    exact .hres (getElem?_ext hℓ) (ih₁ X) hA ha (ih₂ X) (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hφ hT
   | hdone _ ih => exact .hdone (ih X)
   | unw hℓ _ hφ ih => exact .unw (getElem?_ext hℓ) (ih X) hφ
   | kont hl hC hT => exact .kont (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hC hT
@@ -384,11 +384,11 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     rw [Tm.rename, (plug_hole_closed hp).rename]
     exact .hctl hℓ (ih₁ hξ) (ih₂ hξ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hξ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
       rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT
-  | hres _ hA ha hp hl hφ hT ih₁ _ =>
+  | hres hℓ _ hA ha hp hl hφ hT ih₁ _ =>
     intro _ ξ hξ
     subst ha
     rw [Tm.rename, (plug_hole_closed hp).rename]
-    exact .hres (ih₁ hξ) hA rfl hp hl hφ hT
+    exact .hres hℓ (ih₁ hξ) hA rfl hp hl hφ hT
   | hdone _ ih => intro _ _ hξ; exact .hdone (ih hξ)
   | unw hℓ _ hφ ih => intro _ _ hξ; exact .unw hℓ (ih hξ) hφ
   | kont hl hC hT => intro _ _ _; exact .kont hl hC hT

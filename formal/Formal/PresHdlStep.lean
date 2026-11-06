@@ -167,7 +167,7 @@ theorem ctl_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : RtC
 theorem resume_pres {Ψ Θ n p ℓh ℓ Ef al rf u k t φ} {A Ei : List Frame} (hc : RtCtx Ψ Θ n)
     (hbu : u.Below n) (hA : OkE A) (hEi : OkE Ei) (hk : k = plug Ei (.hole p)) (hu : Value u)
     (h : Typ S Ψ Θ [] (.hctl p ℓh ℓ false Ef al rf (plug A (.app (.kont p ℓ) u)) k) (.ex t φ)) :
-    Typ S Ψ Θ [] (.hres p (plug A (.hole p)) (.hwith p ℓh Ef al rf (plug Ei u))) (.ex t φ) := by
+    Typ S Ψ Θ [] (.hres p ℓh (plug A (.hole p)) (.hwith p ℓh Ef al rf (plug Ei u))) (.ex t φ) := by
   cases h with
   | hctl hℓh hal hrf hψ hop hc' _ hE hk' hp hφ₀ ha hl hcm hφ hT =>
     obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
@@ -177,7 +177,7 @@ theorem resume_pres {Ψ Θ n p ℓh ℓ Ef al rf u k t φ} {A Ei : List Frame} (
     have hw := Typ.hwith hℓh hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
         fun T φ' hΘ _ hB _ => ((hx.valueAny hu φ').sub (J' := .ex T φ') ⟨hB hc', Stage.le_refl _⟩).cut
           hΘ.entails) hφ₀ hcm (Stage.le_refl _) .refl
-    exact .hres hw hA rfl (refill_todo hA kont_not_value ha) hl₁ hφ hT
+    exact .hres hℓh hw hA rfl (refill_todo hA kont_not_value ha) hl₁ hφ hT
   | errVal hv => cases hv
 
 end Flick

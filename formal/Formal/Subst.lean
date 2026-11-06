@@ -51,7 +51,7 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .hdl E al r e => .hdl E (al.rename ξ) (r.rename ξ) (e.rename ξ)
   | .hwith p ℓ E al r e => .hwith p ℓ E (al.rename ξ) (r.rename ξ) (e.rename ξ)
   | .hctl p ℓ κ tl E al r a k => .hctl p ℓ κ tl E (al.rename ξ) (r.rename ξ) (a.rename ξ) (k.rename ξ)
-  | .hres p a b => .hres p (a.rename ξ) (b.rename ξ)
+  | .hres p ℓ a b => .hres p ℓ (a.rename ξ) (b.rename ξ)
   | .hdone p a => .hdone p (a.rename ξ)
   | .unw p ℓ a => .unw p ℓ (a.rename ξ)
   | .kont p ℓ => .kont p ℓ
@@ -102,7 +102,7 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .hdl E al r e => .hdl E (al.subst σ) (r.subst σ) (e.subst σ)
   | .hwith p ℓ E al r e => .hwith p ℓ E (al.subst σ) (r.subst σ) (e.subst σ)
   | .hctl p ℓ κ tl E al r a k => .hctl p ℓ κ tl E (al.subst σ) (r.subst σ) (a.subst σ) (k.subst σ)
-  | .hres p a b => .hres p (a.subst σ) (b.subst σ)
+  | .hres p ℓ a b => .hres p ℓ (a.subst σ) (b.subst σ)
   | .hdone p a => .hdone p (a.subst σ)
   | .unw p ℓ a => .unw p ℓ (a.subst σ)
   | .kont p ℓ => .kont p ℓ

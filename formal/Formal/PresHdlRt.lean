@@ -53,11 +53,11 @@ theorem hctl_signal {Ψ Θ p ℓ κ tl E al r x k t φ} {Ei : List Frame} (hEi :
   | errVal hv => cases hv
 
 /-- A signal of a resumed body lets the parked arm go. -/
-theorem hres_signal {Ψ Θ p a x t φ} {A : List Frame} (hA : OkE A) (ha : a = plug A (.hole p))
-    (hx : ∀ {Θ'}, AnyTy S Ψ Θ' x) (h : Typ S Ψ Θ [] (.hres p a x) (.ex t φ)) :
+theorem hres_signal {Ψ Θ p ℓ a x t φ} {A : List Frame} (hA : OkE A) (ha : a = plug A (.hole p))
+    (hx : ∀ {Θ'}, AnyTy S Ψ Θ' x) (h : Typ S Ψ Θ [] (.hres p ℓ a x) (.ex t φ)) :
     Typ S Ψ Θ [] (.hdone p (plug A x)) (.ex t φ) := by
   cases h with
-  | hres hb hA' ha' hp hl hφ hT =>
+  | hres _ hb hA' ha' hp hl hφ hT =>
     obtain ⟨rfl, -⟩ := plug_hole_inj hA hA' (ha.symm.trans ha')
     have h₁ := refill_app hA' kont_not_value hp (kont_fn hl) (fun _ _ h l => h.trans l)
       fun T φ' hΘ hψ₀ _ _ => hx ((hb.cut hΘ.entails).sub (J' := .ex _ φ') ⟨.refl, hψ₀⟩)

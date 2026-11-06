@@ -118,7 +118,7 @@ theorem Typ.arm_inv {Ψ Θ E t φ s o c a₀ b₀} (hop : S.op E o = some (c, a�
   | .with_ _ _ _, _, _, h, _ | .enil, _, _, h, _ | .econs _ _ _, _, _, h, _ | .bind _ _, _, _, h, _
   | .join _ _, _, _, h, _ | .scope _, _, _, h, _ | .inside _ _, _, _, h, _ | .cap _, _, _, h, _
   | .own _, _, _, h, _ | .drec _ _, _, _, h, _ | .glob _, _, _, h, _ | .hdl _ _ _ _, _, _, h, _
-  | .hwith _ _ _ _ _ _, _, _, h, _ | .hctl _ _ _ _ _ _ _ _ _, _, _, h, _ | .hres _ _ _, _, _, h, _
+  | .hwith _ _ _ _ _ _, _, _, h, _ | .hctl _ _ _ _ _ _ _ _ _, _, _, h, _ | .hres _ _ _ _, _, _, h, _
   | .hdone _ _, _, _, h, _ | .unw _ _ _, _, _, h, _ | .kont _ _, _, _, h, _ | .hole _, _, _, h, _ => by
     cases h
 

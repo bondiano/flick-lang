@@ -34,7 +34,7 @@ inductive Frame
   | inside (p : Nat)
   | hwith (p ℓ : Nat) (E : Name) (al r : Tm)
   | hctlA (p ℓ κ : Nat) (tl : Bool) (E : Name) (al r k : Tm)
-  | hresB (p : Nat) (a : Tm)
+  | hresB (p ℓ : Nat) (a : Tm)
   | hdone (p : Nat)
 
 def Frame.plug : Frame → Tm → Tm
@@ -58,7 +58,7 @@ def Frame.plug : Frame → Tm → Tm
   | .inside p, e => .inside p e
   | .hwith p ℓ E al r, e => .hwith p ℓ E al r e
   | .hctlA p ℓ κ tl E al r k, e => .hctl p ℓ κ tl E al r e k
-  | .hresB p a, e => .hres p a e
+  | .hresB p ℓ a, e => .hres p ℓ a e
   | .hdone p, e => .hdone p e
 
 /-- Left-to-right order: a frame to the right of a value needs the value. -/
@@ -126,7 +126,7 @@ def OkE (E : List Frame) : Prop := ∀ F ∈ E, Frame.ok F
 /-- What a handler parks is a body or an arm at its hole. -/
 def Frame.Parks : Frame → Prop
   | .hctlA p _ _ _ _ _ _ k => ∃ Ei, OkE Ei ∧ k = Flick.plug Ei (.hole p)
-  | .hresB p a => ∃ A, OkE A ∧ a = Flick.plug A (.hole p)
+  | .hresB p _ a => ∃ A, OkE A ∧ a = Flick.plug A (.hole p)
   | _ => True
 
 /-- `lookup(E, S)` of core.md §3.2 without the fallback to `Σ₀`. -/

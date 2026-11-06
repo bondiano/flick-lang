@@ -167,7 +167,7 @@ theorem pure_preservation {Ψ Θ e t φ e'} (h : Typ S Ψ Θ [] e (.ex t φ)) (h
     | errVal hv'' => exact (nv hv'').elim
   | hresVal hA' ha' hv =>
     cases h with
-    | hres hb hA ha hp hl hφ hT =>
+    | hres _ hb hA ha hp hl hφ hT =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hA' hA (ha'.symm.trans ha)
       have h₁ := refill_app hA kont_not_value hp (kont_fn hl) (fun _ _ h l => h.trans l)
         fun T φ' hΘ _ hb' _ => ((hb.valueAny hv φ').sub (J' := .ex T φ') ⟨hb', Stage.le_refl _⟩).cut hΘ.entails

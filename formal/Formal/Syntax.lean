@@ -359,7 +359,7 @@ inductive Tm
   | hdl (E : Name) (al r e : Tm)
   | hwith (p ℓ : Nat) (E : Name) (al r e : Tm)
   | hctl (p ℓ κ : Nat) (tl : Bool) (E : Name) (al r a k : Tm)
-  | hres (p : Nat) (a b : Tm)
+  | hres (p ℓ : Nat) (a b : Tm)
   | hdone (p : Nat) (a : Tm)
   | unw (p ℓ : Nat) (a : Tm)
   | kont (p ℓ : Nat)

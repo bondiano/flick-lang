@@ -61,7 +61,7 @@ def Tm.Has : Tm → Site → Prop
   | .hdl _ al r e, s => al.Has s ∨ r.Has s ∨ e.Has s
   | .hwith p _ _ al r e, s => s = .ins ∨ s = .rgn p ∨ al.Has s ∨ r.Has s ∨ e.Has s
   | .hctl p _ _ _ _ al r a k, s => s = .ins ∨ s = .rgn p ∨ al.Has s ∨ r.Has s ∨ a.Has s ∨ k.Has s
-  | .hres p a b, s => s = .ins ∨ s = .rgn p ∨ a.Has s ∨ b.Has s
+  | .hres p _ a b, s => s = .ins ∨ s = .rgn p ∨ a.Has s ∨ b.Has s
   | .hdone p a, s => s = .ins ∨ s = .rgn p ∨ a.Has s
   | .unw p _ a, s => s = .ins ∨ s = .rgn p ∨ a.Has s
   -- a value, as `cap p`: closures and data may hold `resume`
@@ -102,7 +102,7 @@ def Tm.Free : Tm → Nat → Prop
   | .hdl _ al r e, j => al.Free j ∨ r.Free j ∨ e.Free j
   | .hwith _ _ _ al r e, j => al.Free j ∨ r.Free j ∨ e.Free j
   | .hctl _ _ _ _ _ al r a k, j => al.Free j ∨ r.Free j ∨ a.Free j ∨ k.Free j
-  | .hres _ a b, j => a.Free j ∨ b.Free j
+  | .hres _ _ a b, j => a.Free j ∨ b.Free j
   | .hdone _ a, j => a.Free j
   | .unw _ _ a, j => a.Free j
   | _, _ => False
@@ -160,7 +160,7 @@ theorem Tm.free_rename (ξ : Nat → Nat) :
     · obtain ⟨i, hi, he⟩ := ih₂ ξ j h; exact ⟨i, .inr hi, he⟩
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih | drec _ _ ih =>
     intro j h; exact ih ξ j h
-  | hres _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ _ ih₁ ih₂ =>
     intro j h
     rcases h with h | h
     · obtain ⟨i, hi, he⟩ := ih₁ ξ j h; exact ⟨i, .inl hi, he⟩
@@ -243,7 +243,7 @@ theorem Tm.free_subst :
     · obtain ⟨i, hi, he⟩ := ih₂ σ j h; exact ⟨i, .inr hi, he⟩
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih | drec _ _ ih =>
     intro σ j h; exact ih σ j h
-  | hres _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ _ ih₁ ih₂ =>
     intro σ j h
     rcases h with h | h
     · obtain ⟨i, hi, he⟩ := ih₁ σ j h; exact ⟨i, .inl hi, he⟩
@@ -333,7 +333,7 @@ theorem Tm.has_subst :
     have := ih₁ σ s; have := ih₂ σ s; have := ih₃ σ s; have := ih₄ σ s
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
     grind
-  | hres _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ _ ih₁ ih₂ =>
     intro σ s h
     have := ih₁ σ s; have := ih₂ σ s
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢

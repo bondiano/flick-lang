@@ -54,7 +54,7 @@ def Tm.Asc : Tm → Nat → Prop
   | .hwith p _ _ al r e, n => al.NoIns ∧ r.NoIns ∧ e.Asc (max n (p + 1))
   | .hctl p _ _ _ _ al r a k, n =>
     al.NoIns ∧ r.NoIns ∧ a.Asc (max n (p + 1)) ∧ k.Asc (max n (p + 1))
-  | .hres p a b, n => a.Asc (max n (p + 1)) ∧ b.Asc (max n (p + 1))
+  | .hres p _ a b, n => a.Asc (max n (p + 1)) ∧ b.Asc (max n (p + 1))
   | .hdone p a, n => a.Asc (max n (p + 1))
   | .unw _ _ a, _ => ∀ m, a.Asc m
   | .kont _ _, _ => True
@@ -82,7 +82,7 @@ theorem Value.ascNoIns {e : Tm} {n : Nat} (hv : Value e) (h : e.Asc n) : e.NoIns
 /-- The bound under a frame. -/
 def Frame.ascB (n : Nat) : Frame → Nat
   | .with_ q _ => max n (q + 1)
-  | .hwith p .. | .hctlA p .. | .hresB p _ | .hdone p => max n (p + 1)
+  | .hwith p .. | .hctlA p .. | .hresB p .. | .hdone p => max n (p + 1)
   | _ => n
 
 def Frame.Asc (n : Nat) : Frame → Prop
@@ -93,7 +93,7 @@ def Frame.Asc (n : Nat) : Frame → Prop
   | .inside p => n ≤ p
   | .hwith _ _ _ al r => al.NoIns ∧ r.NoIns
   | .hctlA p _ _ _ _ al r k => al.NoIns ∧ r.NoIns ∧ k.Asc (max n (p + 1))
-  | .hresB p a => a.Asc (max n (p + 1))
+  | .hresB p _ a => a.Asc (max n (p + 1))
   | _ => True
 
 theorem Frame.Asc.plug {F : Frame} {n : Nat} {r : Tm} (hF : F.Asc n) (hr : r.Asc (F.ascB n)) :
@@ -137,7 +137,7 @@ theorem asc_of_plug {n : Nat} {r : Tm} (hv : ¬ Value r) :
 /-- The region a frame raises the bound to after: a `provide`'s or a handler's. -/
 def Frame.bump : Frame → Option Nat
   | .with_ q _ => some q
-  | .hwith p .. | .hctlA p .. | .hresB p _ | .hdone p => some p
+  | .hwith p .. | .hctlA p .. | .hresB p .. | .hdone p => some p
   | _ => none
 
 theorem ascBE_le {n m : Nat} {E : List Frame} (hn : n ≤ m)

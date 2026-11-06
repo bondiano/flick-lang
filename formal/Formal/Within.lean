@@ -67,7 +67,7 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .hctl p _ _ _ _ al r a k, A =>
     A p ∧ al.Within A ∧ r.Within A ∧ a.Within A ∧ k.Within A ∧ al.NoIns ∧ r.NoIns ∧
       ∀ x, a.Has (.frame x) → ¬ k.Has (.frame x)
-  | .hres p a b, A => A p ∧ a.Within A ∧ b.Within A ∧ ∀ x, b.Has (.frame x) → ¬ a.Has (.frame x)
+  | .hres p _ a b, A => A p ∧ a.Within A ∧ b.Within A ∧ ∀ x, b.Has (.frame x) → ¬ a.Has (.frame x)
   | .hdone p a, A => A p ∧ a.Within A
   -- what runs once the body unwound runs at the handler's place, and holds no region
   | .unw p _ a, A => A p ∧ a.Within A ∧ ∀ x, ¬ a.Has (.frame x)
@@ -99,7 +99,7 @@ def Frame.Within (A : Nat → Prop) : Frame → Prop
   -- the body a handler parked while its arm runs is at the same place
   | .hctlA p _ _ _ _ al r k =>
     A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ k.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns
-  | .hresB p a => A p ∧ a.Within Ψ B anc A
+  | .hresB p _ a => A p ∧ a.Within Ψ B anc A
   | .hdone p => A p
 
 /-- The regions of the hole of a frame. -/
@@ -327,7 +327,7 @@ theorem WithinE.frameAnc {A : Nat → Prop} {q : Nat} :
       refine part hF.2.2.2.1 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]
       simp only [Frame.plug, Tm.Has] at h
       grind [Tm.has_frame_ins, Tm.NoIns]
-    | hresB p a =>
+    | hresB p ℓ a =>
       simp only [Frame.Within] at hF
       refine part hF.2 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]
       simp only [Frame.plug, Tm.Has] at h

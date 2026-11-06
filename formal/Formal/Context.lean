@@ -147,9 +147,9 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
         rw [List.getElem?_append_left (by simpa using getElem?_lt hl₁), List.getElem?_map, hl₁]
         simp [Ty.substT, Stage.substT, hb]
     | errVal hv => exact (nv hv).elim
-  case hresB p a =>
+  case hresB p ℓ a =>
     cases h with
-    | hres hb hA ha hp' hl hφ hT =>
+    | hres hℓ hb hA ha hp' hl hφ hT =>
       refine .mk0 ⟨_, _, hb, .of_le hφ, fun σ hσ X _ h' => ?_, look fun _ => rfl⟩
       subst ha
       have h₂ := hp'.sx (hσ.sub fun s h => by
@@ -159,7 +159,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
           · subst h; exact .inr (.inl rfl)
           · exact h.elim) X
       simp only [Flick.J.substT, Stage.substT] at h₂
-      exact .hres h' hA rfl h₂
+      exact .hres (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h' hA rfl h₂
         (by rw [List.getElem?_append_left (by simpa using getElem?_lt hl), List.getElem?_map, hl]; rfl)
         (Stage.le_substT σ hφ) (hT.substT σ)
     | errVal hv => exact (nv hv).elim

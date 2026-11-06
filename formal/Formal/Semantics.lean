@@ -57,7 +57,7 @@ inductive PHead : Tm → Tm → Prop
       PHead (.hctl p ℓ κ false E al r w k) (.hwith p ℓ E al r (plug Ei (.unw p ℓ w)))
   -- the value of a resumed body is what `resume` gives the arm
   | hresVal {A : List Frame} : OkE A → a = plug A (.hole p) → Value w →
-      PHead (.hres p a w) (.hdone p (plug A w))
+      PHead (.hres p ℓ a w) (.hdone p (plug A w))
   | hdoneVal : Value v → PHead (.hdone p v) v
 
 /-- `Λ[π] := g`. -/
@@ -110,9 +110,9 @@ inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm �
       RHead Λ μ (.hctl p ℓ κ tl E al r (.unw q ℓ' a) k) Λ μ
         (.hwith p ℓ E al r (plug Ei (.unw p ℓ (.unw q ℓ' a))))
   | hresRaise {A : List Frame} : OkE A → a = plug A (.hole p) → Value w →
-      RHead Λ μ (.hres p a (.raise w)) Λ μ (.hdone p (plug A (.raise w)))
+      RHead Λ μ (.hres p ℓ a (.raise w)) Λ μ (.hdone p (plug A (.raise w)))
   | hresUnw {A : List Frame} : OkE A → a = plug A (.hole p) →
-      RHead Λ μ (.hres p a (.unw q ℓ' b)) Λ μ (.hdone p (plug A (.unw q ℓ' b)))
+      RHead Λ μ (.hres p ℓ a (.unw q ℓ' b)) Λ μ (.hdone p (plug A (.unw q ℓ' b)))
   -- the body has unwound to its handler, which runs what the signal holds
   | hwithCatch {al : Tm} : RHead Λ μ (.hwith p ℓ E al r (.unw p ℓ a)) Λ μ a
   -- a handler is the region `|Λ|` around its body, which `resume` holds, and the cell
@@ -173,7 +173,7 @@ inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → 
   | resume {Ef : Name} {al : Tm} {Ei : List Frame} {ℓh : Nat} : OkE E → OkE A → OkE Ei → k = plug Ei (.hole p) →
       (∀ G ∈ A, ¬ G.resumes p) → Value u →
       Step root .rt Λ μ (plug E (.hctl p ℓh ℓ false Ef al r (plug A (.app (.kont p ℓ) u)) k))
-        (.cfg Λ μ (plug E (.hres p (plug A (.hole p)) (.hwith p ℓh Ef al r (plug Ei u)))))
+        (.cfg Λ μ (plug E (.hres p ℓh (plug A (.hole p)) (.hwith p ℓh Ef al r (plug Ei u)))))
   -- the body resumes once, in the thread of its handler, while its arm runs
   | resumeDie : OkE E → Value u → ¬ Resumable E p ℓ →
       Step root .rt Λ μ (plug E (.app (.kont p ℓ) u)) .die

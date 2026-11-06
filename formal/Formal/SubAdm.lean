@@ -201,9 +201,9 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | hres hb hA ha hp hl hφ hT =>
+  | hres hℓ hb hA ha hp hl hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .hres hb hA ha hp hl (Stage.le_trans hφ h₂) (hT.trans h₁)
+    exact .hres hℓ hb hA ha hp hl (Stage.le_trans hφ h₂) (hT.trans h₁)
   | hdone _ ih => intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; exact .hdone (ih ⟨h₁, h₂⟩)
   | unw hℓ ha hφ => intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex; exact .unw hℓ ha (Stage.le_trans hφ h₂)
   | kont hl hC hT => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .kont hl hC (hT.trans h₁)
