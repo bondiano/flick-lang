@@ -215,7 +215,6 @@ impl Lower<'_> {
                 }
             }
             K::TypeDecl | K::ErrorDecl => self.type_items(decl, span, items),
-            K::SqlTableDecl => self.sql_table(decl, span, items),
             K::SqlMigrationDecl => self.sql_migration(decl, span, items),
             K::ClassDecl => {
                 let Some(class) = self.token_text(decl, K::Con) else {

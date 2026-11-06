@@ -2,7 +2,7 @@
 // program prints their SQL. Values only ever become placeholders.
 module App.Main exposing (main)
 
-import Sql exposing (Pg)
+import Sql exposing (Pg, plugin sql)
 
 type UserId = UserId BigInt
 

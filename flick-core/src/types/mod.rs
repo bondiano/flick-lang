@@ -87,8 +87,6 @@ pub use builtins::{
 };
 pub use class_members::class_defaults;
 pub use classes::{Dict, STRUCTURAL, which};
-#[cfg(feature = "ide")]
-pub(crate) use classes::{Match, match_type};
 pub use component::{instance_key as component_instance, parts as component_parts};
 pub use comprehension::{comprehension, for_parts};
 pub use convert::is_type;
@@ -102,8 +100,6 @@ pub use patterns::is_pattern;
 pub use question::Question;
 pub use ranges::range_list;
 pub use schemas::companion_name;
-#[cfg(feature = "ide")]
-pub(crate) use sql::base_type;
 pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{

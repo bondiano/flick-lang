@@ -380,14 +380,6 @@ fn completion_recovery(text: &str, offset: usize, cursor: usize) -> Option<&'sta
         .rev()
         .find(|t| !t.kind.is_trivia() && t.end as usize <= offset)?;
     let at = u32::try_from(offset).ok()?;
-    // a column of a `sql table` that ends in `as` or `via`: a type or a codec
-    if in_sql(&tree, K::SqlTableDecl, previous.start) {
-        return match (previous.kind, previous.text(text)) {
-            (K::AsKw, _) => Some("FlickCompletion"),
-            (K::Ident, "via") => Some("__flick_completion"),
-            _ => None,
-        };
-    }
     if !in_sql(&tree, K::SqlExpr, at) {
         return None;
     }

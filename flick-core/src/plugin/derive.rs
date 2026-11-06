@@ -304,7 +304,7 @@ fn std_blocks(
     let mut nodes = Vec::new();
     blocks_under(tree, &mut nodes);
     let own = |n: &&Node| {
-        let head = n.child_tokens().find(|t| t.kind == K::Ident);
+        let head = super::head_token(n);
         head.is_some_and(|h| {
             let head = h.text(shared);
             heads.iter().any(|i| i == head) && first_party::HEADS.iter().any(|(h, _)| *h == head)

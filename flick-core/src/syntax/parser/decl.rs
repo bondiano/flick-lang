@@ -39,7 +39,8 @@ fn top_decl(p: &mut Parser) {
         K::DerivingKw if p.nth(1) == K::InstanceKw => deriving_decl(p),
         K::ForeignKw => foreign_decl(p),
         K::SqlKw if p.nth(1) == K::Ident && word_at(p, 1, "migration") => sql_migration(p),
-        K::SqlKw if p.nth(1) == K::Ident => sql_table(p),
+        // `sql table`: a block of the plugin of std, its head a keyword still
+        K::SqlKw if p.nth(1) == K::Ident => super::plugin::declaration(p),
         // `component name`: the word is a name everywhere else
         K::Ident if p.at_word("component") && p.nth(1) == K::Ident => component_decl(p),
         K::Ident if super::plugin::at_declaration(p) => super::plugin::declaration(p),
@@ -402,20 +403,6 @@ fn deriving_decl(p: &mut Parser) {
     p.complete(m, K::DerivingDecl);
 }
 
-/// `sql table Name "table" { column : sql type words as T [via codec] }`.
-fn sql_table(p: &mut Parser) {
-    let m = p.start();
-    p.bump();
-    if !p.at_word("table") {
-        p.error_expected("`table`");
-    }
-    p.bump();
-    if p.expect(K::Con) && p.expect(K::String) {
-        p.braces(K::Block, sql_column, |_| false);
-    }
-    p.complete(m, K::SqlTableDecl);
-}
-
 /// `sql migration 1 "name" { create table …; … }`: the statements are SQL,
 /// kept as tokens for `syntax::ddl` to read, layout and all words free.
 fn sql_migration(p: &mut Parser) {
@@ -426,25 +413,6 @@ fn sql_migration(p: &mut Parser) {
         super::plugin::raw_braces(p);
     }
     p.complete(m, K::SqlMigrationDecl);
-}
-
-fn sql_column(p: &mut Parser) {
-    let m = p.start();
-    if p.expect(K::Ident) && p.expect(K::Colon) {
-        while p.at(K::Ident) || p.at(K::NotKw) {
-            p.bump();
-        }
-        if p.expect(K::AsKw) {
-            p.sql_table = true;
-            types::type_(p);
-            p.sql_table = false;
-            if p.at_word("via") {
-                p.bump();
-                expr::expr(p);
-            }
-        }
-    }
-    p.complete(m, K::SqlColumn);
 }
 
 fn kind_decl(p: &mut Parser) {

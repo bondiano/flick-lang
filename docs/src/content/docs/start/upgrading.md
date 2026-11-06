@@ -101,14 +101,15 @@ let profile_schema = Profile.schema
 
 ## Plugin blocks need their import
 
-`cli`, `codec` and `server fn` blocks are plugins of `std` now. A file that
-writes one imports its head:
+`cli`, `codec`, `server fn` and `sql table` blocks are plugins of `std`
+now. A file that writes one imports its head:
 
 | Block | Import |
 | - | - |
 | `cli "name" { … }` | `import Cli exposing (plugin cli)` |
 | `codec s { … }` | `import Codec exposing (plugin codec)` |
 | `server fn f x = …`, `server f` | `import Server exposing (plugin server)` |
+| `sql table Name "table" { … }` | `import Sql exposing (plugin sql)` |
 
 In 0.1 a `codec` block needed no import:
 
@@ -160,6 +161,8 @@ of the blocks and derives that moved keep their meaning under new codes:
 | a type mismatch in a `codec` block | `std/D012` | a field whose codec decodes another type than the record's |
 | `FLICK-D011` | `std/D011` | a record that `deriving HttpApi` cannot read as endpoints |
 | `FLICK-E010` | `std/E010` | the shape of a `server fn`; `server name` of a value that is no `server fn` stays `FLICK-E010` |
+| `FLICK-Q001`, `FLICK-Q010` in a `sql table` | `std/Q001`, `std/Q010` | a column given twice, a SQL type or attribute the dialect does not know |
+| `FLICK-Q011` | `std/Q011` | a column of another type than its SQL type's, without `via` |
 | `FLICK-E012`, `FLICK-L008` | — | retired: every build has the plugin of `std` |
 
 `flick explain std/D001` explains a new code, and `flick explain FLICK-L001`

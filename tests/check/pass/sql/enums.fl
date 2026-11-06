@@ -3,7 +3,7 @@
 
 module App.Enums exposing (..)
 
-import Sql exposing (Pg)
+import Sql exposing (Pg, plugin sql)
 
 untagged type Role = Admin = "admin" | Guest = "guest"
 

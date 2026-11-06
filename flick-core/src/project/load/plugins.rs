@@ -23,7 +23,9 @@ use crate::plugin::expansion::{Expanded, Expansion};
 use crate::plugin::reach::{Gate, Reach};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
-use crate::plugin::{EditorBlock, Expander, Failure, blocks_under, first_party, placed};
+use crate::plugin::{
+    EditorBlock, Expander, Failure, blocks_under, first_party, head_token, placed,
+};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -387,7 +389,7 @@ impl Sink<'_> {
     ) {
         let m = &loader.modules[i];
         let text = &loader.sources.get(m.file).text;
-        let Some(token) = node.child_tokens().find(|t| t.kind == K::Ident) else {
+        let Some(token) = head_token(node) else {
             return;
         };
         let head = token.text(text);

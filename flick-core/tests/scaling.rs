@@ -86,7 +86,8 @@ fn function_of_2000_lines_checks_in_linear_time() {
 /// `tables` tables of 50 columns joined in one query that selects a column
 /// of each.
 fn wide_join(tables: usize) -> String {
-    let mut out = String::from("module App.Wide exposing (wide)\n\nimport Sql exposing (Pg)\n\n");
+    let mut out =
+        String::from("module App.Wide exposing (wide)\n\nimport Sql exposing (Pg, plugin sql)\n\n");
     for t in 0..tables {
         let _ = writeln!(out, "sql table T{t} \"t{t}\" {{");
         let _ = writeln!(out, "  id : bigint primary key as BigInt");

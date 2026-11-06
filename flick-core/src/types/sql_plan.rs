@@ -25,9 +25,6 @@ pub struct SqlColumn {
     /// The `via` codec.
     pub via: Option<Range>,
     pub ty: Type,
-    /// The enum the column holds without a `via`, its module and name: its
-    /// values are read through its `parse`.
-    pub enumerates: Option<(String, String)>,
 }
 
 /// A checked query: its SQL text with `$n` placeholders, the expressions

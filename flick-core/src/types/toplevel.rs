@@ -111,7 +111,6 @@ impl<'a> Checker<'a> {
             }
             self.settle_operators();
         }
-        self.check_tables(&decls);
         self.atom_keys(&decls);
         self.class_defaults(&decls);
         self.solve_classes(true);

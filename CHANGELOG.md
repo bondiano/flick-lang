@@ -13,6 +13,12 @@ break programs.
   core class `Enum.Enum t b`, whose methods are the companions `T.value`,
   `T.parse` (checked at compile time for a constant, `FLICK-D006`) and
   `T.all`. The interface format is version 4.
+- **Breaking:** `sql table` is a block of the plugin of std, which the file
+  imports: `import Sql exposing (Pg, plugin sql)` (`FLICK-P037`, whose fix
+  adds it). Its companion is `Name.table`, its rules are `std/Q001`,
+  `std/Q010` and `std/Q011` (`FLICK-Q011` is retired), and an enum column
+  still needs no `via`. The plugin interface is `0.14.0`: `literal-of` tells
+  a plugin while it expands whether a type the block names is an enum.
 - **CallSite:** the new core class `CallSite` is the place of a use,
   `CallSite.place` (`Module:line`) and `CallSite.definition`, which the
   checker gives: a function with `CallSite =>` passes on its caller's, any

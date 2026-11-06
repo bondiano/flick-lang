@@ -1,7 +1,7 @@
 // What the SQL elaboration refuses, each with its span inside `sql { }`.
 module App.Queries exposing (..)
 
-import Sql exposing (Pg)
+import Sql exposing (Pg, plugin sql)
 
 type UserId = UserId BigInt
 
@@ -86,7 +86,7 @@ sql table Bad "bad" {
   id : bigint primary key as UserId via date
 //                                      ^^^^ FLICK-T003
   amount : numeric not null as Float
-//                             ^^^^^ FLICK-Q011 a `numeric` column holds `BigDecimal`, not `Float`
+//                             ^^^^^ std/Q011 a `numeric` column holds `BigDecimal`, not `Float`
 }
 
 raw : Sql.Raw

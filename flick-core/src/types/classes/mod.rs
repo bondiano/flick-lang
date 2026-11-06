@@ -24,8 +24,6 @@ use super::ty::Type;
 use crate::source::Span;
 use crate::types::lang::{self, Lang};
 use crate::types::regions;
-#[cfg(feature = "ide")]
-pub(crate) use matching::{Match, match_type};
 pub use solve::Outcome;
 
 /// The row primitives: the compiler solves them from the fields of known

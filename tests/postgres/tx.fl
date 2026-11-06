@@ -4,7 +4,7 @@
 // statement timeout ends a slow query. Run by `flick/tests/sql_postgres.rs`.
 module App.Tx exposing (main)
 
-import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
 import Database exposing (Database)
 import BigDecimal exposing (BigDecimal)
 

@@ -2,7 +2,7 @@
 // optional, an INNER JOIN keeps it plain, and two LEFT JOINs give one `Option`.
 module App.Balances exposing (..)
 
-import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
 import Database exposing (Database)
 import BigDecimal exposing (BigDecimal)
 

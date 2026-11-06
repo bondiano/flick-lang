@@ -94,10 +94,7 @@ impl BlockSource {
     /// body without arguments, and ends at `}`, or at the end of the node for
     /// a block without a body or not closed.
     pub fn new(text: Arc<str>, file: FileId, node: &Node, heads: Arc<[String]>) -> Option<Self> {
-        let head = node.child_tokens().find(|t| !t.kind.is_trivia())?;
-        if head.kind != K::Ident {
-            return None;
-        }
+        let head = super::head_token(node)?;
         let all = node.tokens();
         let first = (all.iter()).find(|t| !t.kind.is_trivia() && t.start > head.start)?;
         // the braces of the body, not of an argument or of the rest

@@ -252,7 +252,7 @@ impl<'a> Printer<'a> {
         let close = self.tok(rbrace);
         let suffix = self.suffix(suffix);
         let close = docvec![a, close, suffix];
-        let always = matches!(n.kind, K::RecGroup | K::SqlTableDecl);
+        let always = n.kind == K::RecGroup;
         let plain = after.is_none()
             && dangling.is_empty()
             && items

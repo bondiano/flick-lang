@@ -141,6 +141,7 @@ fn shared_browser_and_sql_programs_compile_without_server_modules() {
         let fetch url = Http.Client.get url\n\
         main : Unit ->{} Unit\nlet main () = Platform.stdout_line \"ok\"\n";
     let sql = "module Main exposing (query)\n\
+        import Sql exposing (plugin sql)\n\
         sql table Users \"users\" { id : bigint primary key as BigInt }\n\
         query : Sql.Template Sql.Pg {} { id : BigInt }\n\
         let query = sql {\n  from user in Users\n  select { id = user.id }\n}\n";

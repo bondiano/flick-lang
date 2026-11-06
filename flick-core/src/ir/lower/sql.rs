@@ -1,6 +1,6 @@
-//! `sql table` declarations and `sql { … }` blocks: plain data for the
-//! runtime, `Sql.make_table` and `Sql.make_template` applied to records of
-//! the names, kinds and codecs the checker settled.
+//! The tables of `sql migration`s and `sql { … }` blocks: plain data for
+//! the runtime, `Sql.make_table` and `Sql.make_template` applied to records
+//! of the names, kinds and codecs the checker settled.
 
 use super::Lower;
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Stage};
@@ -10,19 +10,6 @@ use crate::syntax::ddl;
 use crate::types::{SqlForm, SqlTable, SqlValue, companion_name};
 
 impl Lower<'_> {
-    /// `Name$table`: the table's SQL name and its columns.
-    pub(super) fn sql_table(&mut self, decl: &Node, span: Span, items: &mut Vec<Item>) {
-        let Some(table) = self
-            .typing
-            .sql_tables
-            .iter()
-            .find(|t| t.decl == decl.range())
-        else {
-            return;
-        };
-        self.table_item(table, Some(decl), span, items);
-    }
-
     /// The `Name$table` of each table a `sql migration` creates.
     pub(super) fn sql_migration(&mut self, decl: &Node, span: Span, items: &mut Vec<Item>) {
         let (start, end) = decl.range();
@@ -80,10 +67,9 @@ impl Lower<'_> {
             .columns
             .iter()
             .map(|c| {
-                let codec = match (c.via.zip(decl).and_then(|(r, d)| find(d, r)), &c.enumerates) {
-                    (Some(node), _) => self.expr(node),
-                    (None, Some((module, ty))) => enum_codec(module, ty, span),
-                    (None, None) => lit(Lit::Unit, span),
+                let codec = match c.via.zip(decl).and_then(|(r, d)| find(d, r)) {
+                    Some(node) => self.expr(node),
+                    None => lit(Lit::Unit, span),
                 };
                 record(
                     vec![
@@ -195,25 +181,6 @@ fn string(s: &str, span: Span) -> Expr {
 fn record(fields: Vec<(&str, Expr)>, span: Span) -> Expr {
     let fields = fields.into_iter().map(|(l, e)| (l.to_owned(), e)).collect();
     Expr::new(ExprKind::Record(fields), span)
-}
-
-/// `Sql.codec T.parse T.value` of the enum `ty` of `module`: a value read
-/// from the database is one of its literals, or an error.
-fn enum_codec(module: &str, ty: &str, span: Span) -> Expr {
-    let companion = |member: &str| {
-        let global = ExprKind::Global {
-            module: module.to_owned(),
-            name: companion_name(ty, member),
-        };
-        Expr::new(global, span)
-    };
-    let app = ExprKind::App {
-        func: Box::new(call("codec", companion("parse"), span)),
-        arg: Box::new(companion("value")),
-        stage: Stage::Pure,
-        arg_first: false,
-    };
-    Expr::new(app, span)
 }
 
 fn call(name: &str, arg: Expr, span: Span) -> Expr {

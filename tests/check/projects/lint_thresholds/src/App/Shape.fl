@@ -1,26 +1,28 @@
 // Lowered `[lint]` thresholds, and a function that reads atoms to build a `Ui`.
 module App.Shape exposing (..)
 
+import Sql exposing (plugin sql)
+
 long : Float -> Float
 let long n =
   let a = n + 1
   let b = a + 1
   let c = b + 1
   c
-//~ FLICK-T036 @5:5-5:9 `long` is 4 lines long, more than 3
+//~ FLICK-T036 @7:5-7:9 `long` is 4 lines long, more than 3
 
 pair : Float -> Float -> Float
 let pair a b = if a > b then (if a > 0 then a else b) else b
-//~ FLICK-T038 @13:5-13:9 `pair` has a complexity of 3, more than 2
-//~ FLICK-T039 @13:5-13:9 `pair` takes 2 parameters, more than 1
-//~ FLICK-T037 @13:31-13:33 nested 2 levels deep, more than 1
+//~ FLICK-T038 @15:5-15:9 `pair` has a complexity of 3, more than 2
+//~ FLICK-T039 @15:5-15:9 `pair` takes 2 parameters, more than 1
+//~ FLICK-T037 @15:31-15:33 nested 2 levels deep, more than 1
 
 count : Atom.Writable Float
 let count = Atom.make 0
 
 label : Unit ->{Atom.Read;} Ui
 let label () = Ui.text (show (Atom.value count))
-//~ FLICK-U007 @22:5-22:10 `label` reads atoms to build a `Ui`
+//~ FLICK-U007 @24:5-24:10 `label` reads atoms to build a `Ui`
 
 sql table Rooms "rooms" {
   width : integer not null as Int

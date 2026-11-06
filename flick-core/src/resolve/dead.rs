@@ -36,6 +36,10 @@ pub(super) fn dead_values(
         .iter()
         .map(|decl| {
             let (start, end) = decl.range();
+            // what a plugin declares stands for the user's block, which is live
+            if start >= module.generated {
+                return None;
+            }
             let mut values = defs.iter().filter(|d| {
                 d.namespace == Namespace::Value && start <= d.span.start && d.span.end <= end
             });

@@ -239,7 +239,8 @@ fn lone(sources: &mut SourceMap, path: &Path, file: FileId) -> Vec<Diagnostic> {
 
 #[cfg(feature = "native-project")]
 fn has_blocks(node: &Node) -> bool {
-    node.kind == SyntaxKind::PluginExpr || node.nodes().any(has_blocks)
+    matches!(node.kind, SyntaxKind::PluginExpr | SyntaxKind::PluginDecl)
+        || node.nodes().any(has_blocks)
 }
 
 #[cfg(not(feature = "native-project"))]

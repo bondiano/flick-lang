@@ -99,10 +99,6 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
                 }
             }
         }
-        // the type of a row; its table is the companion value `Name$table`
-        K::SqlTableDecl => {
-            defs.extend(first(K::Con).map(|t| def(Namespace::Type, t, None, Decl::Alias)));
-        }
         K::TypeDecl | K::KindDecl | K::ErrorDecl | K::ServiceDecl | K::ClassDecl => {
             let Some(name) = first(K::Con) else { return };
             let parent = name.text(text);
