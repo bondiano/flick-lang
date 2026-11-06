@@ -1,4 +1,4 @@
-import Formal.Within
+import Formal.WithinChain
 
 /-!
 # `⊢ Λ`: what live work names (regions.md §3.4, §5)
@@ -116,7 +116,7 @@ theorem Final.noFrame {Ψ B anc A} {w : Tm} (hw : Final w) (h : w.Within Ψ B an
   rcases hw with hv | ⟨v, hv, rfl⟩ | ⟨p, ℓ, a, rfl⟩
   · exact (hv.noIns h).frame q
   · exact (hv.noIns (A := A) h).frame q
-  · simpa [Tm.Has] using h.2.2 q
+  · simpa [Tm.Has] using h.2.2.1 q
 
 /-- The program at the start. -/
 theorem Nest.init {Ψ e₀ t φ} (h : Typ S [] Facts.none [] e₀ (.ex t φ)) (hb : e₀.Below 0) :

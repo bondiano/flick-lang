@@ -23,6 +23,10 @@ variable (Ψ : List Ty) (B : Nat → Nat → Prop) (anc : Nat → Nat → Prop)
 def LocOk (A : Nat → Prop) (l : Nat) : Prop :=
   ∃ t, Ψ[l]? = some t ∧ B l = fun x => A x ∧ t.reach (.r x)
 
+/-- The cell `ℓ` of the handler `p` names no region created after `p`: what the
+handler gives back and raises is older than whatever its arm opens. -/
+def HCell (p ℓ : Nat) : Prop := ∃ t, Ψ[ℓ]? = some t ∧ t.YF p
+
 /-- `e` at a place with the regions `A`. -/
 def Tm.Within : Tm → (Nat → Prop) → Prop
   | .var _, _ => True
@@ -62,15 +66,18 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .drec _ r, A => r.Within A ∧ r.NoIns
   | .glob _, _ => True
   | .hdl _ al r e, A => al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns ∧ e.NoIns
-  | .hwith p _ _ al r e, A => A p ∧ al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns
+  -- a handler is at the place of its `inside` form
+  | .hwith p ℓ _ al r e, A => A p ∧ al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns ∧
+    (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ
   -- the arm and the body it parked are at the same place, and share no region
-  | .hctl p _ _ _ _ al r a k, A =>
+  | .hctl p ℓ _ _ _ al r a k, A =>
     A p ∧ al.Within A ∧ r.Within A ∧ a.Within A ∧ k.Within A ∧ al.NoIns ∧ r.NoIns ∧
-      ∀ x, a.Has (.frame x) → ¬ k.Has (.frame x)
-  | .hres p _ a b, A => A p ∧ a.Within A ∧ b.Within A ∧ ∀ x, b.Has (.frame x) → ¬ a.Has (.frame x)
+      (∀ x, a.Has (.frame x) → ¬ k.Has (.frame x)) ∧ (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ
+  | .hres p ℓ a b, A => A p ∧ a.Within A ∧ b.Within A ∧ (∀ x, b.Has (.frame x) → ¬ a.Has (.frame x)) ∧
+    HCell Ψ p ℓ
   | .hdone p a, A => A p ∧ a.Within A
   -- what runs once the body unwound runs at the handler's place, and holds no region
-  | .unw p _ a, A => A p ∧ a.Within A ∧ ∀ x, ¬ a.Has (.frame x)
+  | .unw p _ a, A => A p ∧ a.Within (anc p) ∧ (∀ x, ¬ a.Has (.frame x)) ∧ ∀ x, anc p x → A x
   | .kont p _, A => A p
   | .hole p, A => A p
 
@@ -95,11 +102,13 @@ def Frame.Within (A : Nat → Prop) : Frame → Prop
   | .with_ _ θ => θ.NoIns ∧ θ.Within Ψ B anc (fun _ => False)
   | .raise => True
   | .inside p => ¬ A p ∧ anc p = fun x => A x ∨ x = p
-  | .hwith p _ _ al r => A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns
+  | .hwith p ℓ _ al r => A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns ∧
+    (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ
   -- the body a handler parked while its arm runs is at the same place
-  | .hctlA p _ _ _ _ al r k =>
-    A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ k.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns
-  | .hresB p _ a => A p ∧ a.Within Ψ B anc A
+  | .hctlA p ℓ _ _ _ al r k =>
+    A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ k.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns ∧
+      (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ
+  | .hresB p ℓ a => A p ∧ a.Within Ψ B anc A ∧ HCell Ψ p ℓ
   | .hdone p => A p
 
 /-- The regions of the hole of a frame. -/
@@ -189,12 +198,22 @@ theorem Tm.Within.frame {q : Nat} : ∀ {e : Tm} {A : Nat → Prop}, e.Within Ψ
 
 /-- A term stays at its place when the ancestors of its `inside` forms and its
 locations do. -/
+theorem HCell.ext {X : List Ty} {p ℓ : Nat} : HCell Ψ p ℓ → HCell (Ψ ++ X) p ℓ :=
+  fun ⟨t, ht, hy⟩ => ⟨t, by rw [List.getElem?_append_left (List.getElem?_eq_some_iff.mp ht).1]; exact ht, hy⟩
+
 theorem Tm.Within.mono {Ψ' : List Ty} {B' anc' : Nat → Nat → Prop}
-    (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l) :
-    ∀ {e : Tm} {A : Nat → Prop}, e.Within Ψ B anc A → (∀ q, e.Has (.frame q) → anc' q = anc q) →
-      e.Within Ψ' B' anc' A := by
+    (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l) (hΨ : ∀ p ℓ, HCell Ψ p ℓ → HCell Ψ' p ℓ) :
+    ∀ {e : Tm} {A : Nat → Prop}, e.Within Ψ B anc A →
+      (∀ q, (e.Has (.frame q) ∨ e.Has .ins ∧ e.Has (.rgn q)) → anc' q = anc q) →
+        e.Within Ψ' B' anc' A := by
   intro e
   induction e <;> intro A h ha <;> simp only [Tm.Within, Tm.Has] at h ha ⊢ <;> grind
+
+/-- Without `inside` forms and handlers, a term is at its place for any ancestors. -/
+theorem Tm.Within.anyAnc {anc' : Nat → Nat → Prop} {e : Tm} {A : Nat → Prop} (hn : e.NoIns)
+    (h : e.Within Ψ B anc A) : e.Within Ψ B anc' A :=
+  h.mono (fun _ _ h => h) (fun _ _ h => h) fun q hq => hq.elim (fun h => (hn.frame q h).elim)
+    fun h => (hn h.1).elim
 
 theorem Frame.Within.plug {F : Frame} {A : Nat → Prop} {r : Tm} (hF : F.Within Ψ B anc A)
     (hr : r.Within Ψ B anc (F.hole A)) (hd : ∀ x, r.Has (.frame x) → ¬ (F.plug (.var 0)).Has (.frame x)) :
@@ -329,7 +348,7 @@ theorem WithinE.frameAnc {A : Nat → Prop} {q : Nat} :
       grind [Tm.has_frame_ins, Tm.NoIns]
     | hresB p ℓ a =>
       simp only [Frame.Within] at hF
-      refine part hF.2 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]
+      refine part hF.2.1 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]
       simp only [Frame.plug, Tm.Has] at h
       grind
     | _ =>
@@ -339,48 +358,5 @@ theorem WithinE.frameAnc {A : Nat → Prop} {q : Nat} :
         | (rcases h with h | h
            · exact absurd (Tm.has_frame_ins h) (hF.2.noIns hF.1)
            · exact h.elim)
-
-/-- Regions whose ancestors are the regions before them. -/
-def Chain (anc : Nat → Nat → Prop) (A : Nat → Prop) : Prop :=
-  ∀ x, A x → anc x = fun y => A y ∧ y ≤ x
-
-theorem Chain.inside {A : Nat → Prop} {p : Nat} (h : Chain anc A) (hp : ¬ A p)
-    (ha : anc p = fun x => A x ∨ x = p) (hle : ∀ x, anc p x → x ≤ p) :
-    Chain anc (fun x => A x ∨ x = p) := by
-  have lt : ∀ x, A x → x < p := fun x hx =>
-    Nat.lt_of_le_of_ne (hle x (by rw [ha]; exact .inl hx)) fun h' => hp (h' ▸ hx)
-  rintro x (hx | rfl)
-  · rw [h x hx]; funext y
-    have := lt x hx
-    apply propext; constructor
-    · rintro ⟨h₁, h₂⟩; exact ⟨.inl h₁, h₂⟩
-    · rintro ⟨h₁ | rfl, h₂⟩; exact ⟨h₁, h₂⟩; omega
-  · rw [ha]; funext y
-    apply propext; constructor
-    · rintro (h₁ | rfl); exact ⟨.inl h₁, Nat.le_of_lt (lt y h₁)⟩; exact ⟨.inr rfl, Nat.le_refl _⟩
-    · exact fun h => h.1
-
-theorem WithinE.chain {A : Nat → Prop} (hle : ∀ q x, anc q x → x ≤ q) :
-    ∀ {E : List Frame}, WithinE Ψ B anc A E → Chain anc A → Chain anc (holeE A E)
-  | [], _, h => h
-  | F :: E, ⟨hE, hF⟩, h => by
-    have h' := WithinE.chain hle hE h
-    cases F <;> simp only [holeE, Frame.hole] <;> try exact h'
-    exact h'.inside hF.1 hF.2 (hle _)
-
-/-- What a term reaches through the store is a region of its place or of an
-`inside` form in it, when every cell holds only what its locations see. -/
-theorem Tm.Within.reaches {μ : List Tm}
-    (hμ : ∀ (l : Nat) (v : Tm), μ[l]? = some v → v.Within Ψ B anc (B l) ∧ v.NoIns) {e : Tm} {p : Nat}
-    (hr : Reaches μ e p) : ∀ {A : Nat → Prop}, e.Within Ψ B anc A → A p ∨ e.Has (.frame p) := by
-  induction hr with
-  | here hp => exact fun h => h.rgn hp
-  | cell hl hv _ ih =>
-    intro A h
-    obtain ⟨hw, hn⟩ := hμ _ _ hv
-    obtain ⟨A', h₂, t, _, hB⟩ := h.loc hl
-    rcases ih hw with h' | h'
-    · rw [hB] at h'; exact h₂ _ h'.1
-    · exact absurd h' (hn.frame _)
 
 end Flick

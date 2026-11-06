@@ -56,6 +56,7 @@ import Formal.CaughtStep
 import Formal.Soundness
 import Formal.Lemma4
 import Formal.Within
+import Formal.WithinChain
 import Formal.Nest
 import Formal.NestPut
 import Formal.NestRedex

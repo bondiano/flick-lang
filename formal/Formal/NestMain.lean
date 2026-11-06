@@ -207,8 +207,8 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
           · cases h
           · exact hθn.frame q h
           · exact hrW.2.2.frame q h)
-        ⟨hθn, hθ0, hrW.2.1.extend hrW.2.2 fun l t ht h =>
-          Nat.lt_irrefl _ ((hΨ t (List.mem_of_getElem? ht)).reach h)⟩
+        fun _ _ _ => ⟨hθn, hθ0.anyAnc hθn, (hrW.2.1.extend hrW.2.2 fun l t ht h =>
+          Nat.lt_irrefl _ ((hΨ t (List.mem_of_getElem? ht)).reach h)).anyAnc hrW.2.2⟩
       exact ⟨anc', B, home', h', hag⟩
     | tryRaise hv =>
       rw [nil rfl, List.append_nil]
