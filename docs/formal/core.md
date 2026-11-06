@@ -677,6 +677,34 @@ The remainder of a `match` after a false guard may not cover the type of the scr
 
 The flick-core checker never sees runtime forms. The reference checker types them in `flick-model/src/check/runtime.rs` (`check_config`), and (Match-Val) in `handlers.rs` `match_`, only when checking a configuration.
 
+### 3.7 Handlers of effects
+
+An effect `E` declares operations `o : a → b` of a class `c`: `tail` (the arm's value is the operation's), `abort` (the arm's value is the handler's, the body does not come back) or `control` (the arm's value is the handler's, with the rest of the body as `resume`, at most once). Effects take no parameters, as services. `perform_{E.o}` is a constant; `hdl E al r e` handles `E` in `e`, `al` the arms, `r` the function of the body's value. A handler's arms for errors are a `try` around it: errors pass `hdl`.
+
+```text
+S.op E o = (c, a, b)
+────────────────────────────────────────────────────── (Perform)
+Γ ⊢ perform_{E.o} : a →R⟨{E};∅⟩ (c = abort ? τ : b) ! φ
+
+Γ↑, ϱ ⊢ al : arms E (τ' at R⟨r;ε⟩, resume over ϱ)    Γ ⊢ r : τ →ψ τ' ! R⟨r;ε⟩    ψ ⊑ R⟨r;ε⟩
+Γ ⊢ e : τ ! φ₀    φ₀ ⊑ R⟨{E} ∪ r; ε⟩    E ∈ r unless every operation of E has an arm without a guard
+──────────────────────────────────────────────────────────────────────────────────────────── (Handle-E)
+Γ ⊢ hdl E al r e : τ' ! R⟨r;ε⟩
+```
+
+The arm of a `tail` operation has `x : a` and the type `b`; of `abort`, `x : a` and `τ'`; of `control`, `x : a`, `resume : b →R⟨r;ε⟩ τ'` holding `ϱ`, and `τ'`. `ϱ` is a region variable of the handler, as the region of a `scope`: `resume` stays in the arms.
+
+Run-time forms. Installing a handler opens the region `p = |Λ|` and allocates the cell `ℓ = |μ|`, whose type `Unit →R⟨r;ε⟩ τ'` holds the stage and the type of the handler's value:
+
+- `hwith p ℓ E al r e`, inside `inside p`: the handler running its body;
+- `hctl p ℓ κ tl E al r a k`: the arm `a` runs while the body waits, parked at `hole p` in `k`; for `control`, `resume` is `kont p κ` with a new cell `κ` of its type;
+- `hres p ℓ a b`: the resumed body `b` runs under its handler while the arm waits, parked in `a`; `hdone p a`: the arm after its `resume` finished;
+- `unw p ℓ a`: unwinding to the handler `p`, which then runs `a`; it has any type, `a` the type of the handler's value.
+
+Steps. An operation runs the arm of the innermost handler with one for it, the frames between not handling it: `abort` puts `unw p ℓ arm[v]` at the operation; `tail` and `control` park the body and run the arm at the handler. The value of a `tail` arm goes back into the body; a `control` arm that ends without resuming, or an arm that raises or unwinds, unwinds the parked body to the handler. `resume u` puts `u` into the body under its handler, once; a second `resume` dies. A signal passes every frame but `inside`, which closes first, and the frames of an arm, which let their parked part go; the handler with the cell of the signal catches it. A handler whose body has a value applies `r` to it.
+
+Statements (Lean): Progress and Preservation cover every step above; T2b holds with the row `{E}` of an operation removed by its handler; no thread is ever a signal at its top (`Caught`); the regions of a handler nest as those of a scope, and what a resumed body gives back names no region younger than its handler (see [what a resumed body gives back enters the scopes of the arm](#what-a-resumed-body-gives-back-enters-the-scopes-of-the-arm)). A spawned task does not reach the handlers around the place that spawned it: an operation only they handle is stuck in the task, as an `ask_S` that nothing answers.
+
 ## 4. Theorems
 
 Hypotheses:
@@ -1003,6 +1031,16 @@ let v1 g x = (g x)
 - Divergence: the step of §3.3 gives `(λg. λx. g x) (try … with _ → as4)` with `as4 : Unit →R⟨none;none⟩ (Unit, Int)`. In the program the `try` was checked against `a →R⟨r;e⟩ b` from `σ`, but in the state `λg` has no signature. The reference checker infers the argument without an expected type: `λx2` takes `P` (see [a callee of unknown type](#a-callee-of-unknown-type-is-a-pure-arrow)), and the branch with `as4` fails `(⊑)` at step 32 of `progress_and_preservation_hold`.
 - This is incompleteness of the reference checker, not of the document: under the rules of §2, `λg` is typed with a runtime-arrow parameter, and Preservation holds. The reference checker infers, and `λg. λx. g x` has no principal type.
 - Resolution (model): in the reference checker the step `let x : σ = λy. e₁ in e₂` gives `e₂[x := fix x. λy. e₁]`: `x ∉ fv(λy. e₁)`, the value is the same, and (Fix) of §3.6 checks it against `σ`, like the source program (`flick-model/src/eval/mod.rs`). Test: `a_function_keeps_its_signature` (`flick-model/tests/props.rs`).
+
+### A handler that waited for its body to unwind was typable and stuck
+
+- Divergence: a first design kept the value of an `abort` arm, or of a `control` arm that let the body go, at the handler, while the body unwound with a bare signal `unw p`. A signal of the handler `p` typed anywhere, as it has any type, could pass the frame that waited for it inside another handler of the same effect, and a state typed by the rules did not step.
+- Resolution (model): the signal holds what the handler runs, `unw p ℓ a`, and the handler `hwith p ℓ` with the cell `ℓ` catches it, as the signal of the Go runtime holds the arm. The cell types `a` at the type of the handler's value, and `Caught` shows that a signal passes no frame of its own handler. Lean: `RHead.hwithCatch`, `Step.unw` (`Semantics.lean`); `Caught.lean`, `CaughtStep.lean`.
+
+### What a resumed body gives back enters the scopes of the arm
+
+- Divergence: `resume u` inside a `scope` the arm opened gives that scope the value of the resumed body, and its error when it raises. Values move into a deeper place, which `⊢ Λ` allows only for what names no region of the deeper places.
+- Resolution (model): the type and the errors of a handler's value are fixed when the handler is installed, and name only regions older than the handler; the scopes of an arm are younger. `⊢ Λ` records it of the cell of the handler (`HCell`), and the step moves the value by its type. Lean: `HCell`, `Tm.Within` (`Within.lean`); `old_move`, `Nest.hresVal` (`NestHdlPure.lean`, `NestHdlRt.lean`).
 
 ### Outside the core
 

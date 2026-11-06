@@ -28,7 +28,8 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 - **The core** (`Formal/`, the top-level modules), with rows of services and errors that
   take variables, generalized and instantiated as variables of the other kinds, and arms on
   the constructors of a GADT typed under every unifier of what the constructor builds with
-  the matched type: type soundness `T1` (Progress and
+  the matched type, and handlers of declared effects whose operations are `tail`, `abort` or
+  `control`, with `resume` at most once: type soundness `T1` (Progress and
   Preservation over every reachable configuration), `T2a` (a pure computation makes only
   pure steps) and `T2b` (a runtime computation asks only the services and raises only the
   errors of its row), `lemma_3_1` and `T3` (generalization and the store typing), `T4` (T4.1, T4.2: live work reaches only live
@@ -77,6 +78,33 @@ theorem T4_3 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Fact
 
 Here `lookupE E N` is the region and the value of the innermost `with` frame of `E` that
 provides `N`, and `c.at i` ranges over the main thread and the children of live regions.
+
+## Handlers of effects
+
+- **Syntax** (`Syntax.lean`, `EvalCtx.lean`). `Const.perform E o c`, `Tm.hdl E al r e`; at run
+  time `hwith p ℓ`, `hctl p ℓ κ tl`, `hres p ℓ`, `hdone p`, `unw p ℓ a`, `kont p κ`, `hole p`.
+  `p` is the region of the handler's `inside` form, `ℓ` its cell, `κ` the cell of `resume`.
+  The frames `hwith`, `hctlA` (the arm) and `hresB` (the resumed body) evaluate inside them.
+- **Typing** (`Rules.lean`). `perform`, `hdl`, the arms (`J.harms`: `hatail`, `haabort`,
+  `hactl`), `hwith`, `hctl`, `hres`, `hdone`, `unw`, `kont`. A parked body is typed with the
+  operation at its hole and the argument left out; the cells give the types of a signal and of
+  `resume`.
+- **Steps** (`Semantics.lean`). `RHead.hdl` (region and cell), `Step.performAbort`,
+  `performTail`, `performCtl` (cell of `resume`), `resume`, `resumeDie`, `Step.unw`,
+  `RHead.hwithCatch`, and the pure steps of values (`PHead.hwithVal`, `hctlTail`, `hctlDisc`,
+  `hresVal`, `hdoneVal`).
+- **Progress and Preservation** (`ProgressMain.lean`, `PresHdl.lean`, `PresHdlRt.lean`,
+  `PresHdlStep.lean`). An operation nothing handles is an outcome, `PerformStuck`, with its
+  effect in the services of the stage; at the top of the main thread it does not happen, as
+  `Σ₀` has no value of an effect.
+- **Signals** (`Caught.lean`, `CaughtStep.lean`). `Tm.Caught hs cell e H`: every `unw p ℓ` of
+  `e` is under the frame of its handler, `H` the handlers around; `hs p` and `cell p` are
+  what the handler `p` was installed with. It is part of a typed configuration (`CfgTy`).
+- **Regions** (`Within.lean`, `NestHdl*.lean`). A handler is at the place of its region,
+  `anc p`; what a signal holds is at that place; the cell of a handler names no region younger
+  than it (`HCell`). Every step of a handler keeps `⊢ Λ` (`Nest.step`).
+- **Elaboration.** λFlick⁺ has no handlers; the simulation of T6 relates the steps of handlers
+  in the core (`Elab/CoreHead.lean`, `Elab/CoreStep.lean`).
 
 ## Map to `core.md` and `regions.md`
 
@@ -355,6 +383,14 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     The second notion is weaker on purpose; the two agree in the checker, which refines no
     region (`Unsupported(Region)`).
 
+- **Effects take no parameters**, as services, and share their names: an effect's `impl` is
+  `Errors ∅`, which has no value, so neither `Σ₀` nor a `with` frame gives an effect
+  (`env_no_op`), and `ask_S` names no effect (`Const.ok`).
+- **A task does not reach the handlers of the place that spawned it.** An operation only
+  they handle is stuck in the task (`PerformStuck` among the outcomes of a child in `T1`), as
+  an `ask_S` nothing answers; `KidRow` lets the row of the child hold such an effect.
+- **The arms for errors of a handler** are a `try` around it: errors pass `hdl`.
+
 ## Findings
 
 Mechanizing the core found these errors in the calculus; each is fixed in the document
@@ -376,6 +412,12 @@ that states the rule.
   the rule takes every unifier, and the checker's form is derived (`Typ.aref`, `Typ.aref_mgu`).
 - [a dead branch keeps no typing of its body](../docs/formal/core.md#a-dead-branch-keeps-no-typing-of-its-body): a typing of a dead arm under some instance does not survive
   type substitution; the rule takes the free variables and locations of the body instead.
+- [a handler that waited for its body to unwind was typable and stuck](../docs/formal/core.md#a-handler-that-waited-for-its-body-to-unwind-was-typable-and-stuck):
+  a bare signal could pass the frame that waited for it; the signal holds what the handler
+  runs and the handler's cell types it (`unw p ℓ a`, `RHead.hwithCatch`, `Caught`).
+- [what a resumed body gives back enters the scopes of the arm](../docs/formal/core.md#what-a-resumed-body-gives-back-enters-the-scopes-of-the-arm):
+  a value moves into a deeper place; the handler's types name only regions older than it
+  (`HCell`, `old_move`).
 - [Lam and Task count runtime forms](../docs/formal/regions.md#lam-and-task-count-runtime-forms): the premise of (Lam)/(Task) must count the run-time regions and cell
   types written in the body, or L4 fails for `λx. (λy. ()) (cap π n)` (`held`,
   `regions.md` §6).
