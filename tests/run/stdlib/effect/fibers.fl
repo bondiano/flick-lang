@@ -137,9 +137,9 @@ let sets () =
 races : Unit ->{; Boom} Unit
 let races () =
   Platform.stdout_line
-    ("race_all: " ++ show (Effect.race_all [after ms20 "slow", after ms1 "fast"]))
+    ("race_all: " ++ show (Effect.race_all [after ms1000 "slow", after ms1 "fast"]))
   let first =
-    try Effect.race_all_first [after ms20 "slow", task { from_result (Err (Boom 6)) }] with
+    try Effect.race_all_first [after ms1000 "slow", task { from_result (Err (Boom 6)) }] with
     | Boom n -> "Boom " ++ show n
   Platform.stdout_line ("race_all_first: " ++ first)
   Platform.stdout_line ("fiber_id: " ++ show (Effect.fiber_id () >= 0))
