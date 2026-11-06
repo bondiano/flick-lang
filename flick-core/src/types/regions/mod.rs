@@ -304,7 +304,7 @@ impl Checker<'_> {
                     // an error-row variable or unknown, held as an atom, may
                     // have become a row of errors
                     row @ (Type::Row(_) | Type::Union(..)) => {
-                        if has_error(&self.store.normalize(&row)) {
+                        if self.of_errors(&self.store.normalize(&row)) {
                             self.error_row_captures(&row, out, bounded);
                         } else {
                             self.capture_row_filtered(&row, out, bounded);
@@ -435,6 +435,17 @@ impl Checker<'_> {
         )
     }
 
+    /// Whether a row is one of errors, not of captures: an entry of it is an
+    /// error, as a capture row labels each of its entries `^…`, or a row
+    /// variable of it stands for errors, as in a row with no error yet.
+    fn of_errors(&self, row: &Norm) -> bool {
+        row.entries.iter().any(|(label, _)| !label.starts_with('^'))
+            || row
+                .tails
+                .iter()
+                .any(|t| self.atom_kind(t, &[]) == Some(Kind::ErrorRow))
+    }
+
     fn atom_kind(&self, atom: &Type, kinds: &[(String, Kind)]) -> Option<Kind> {
         let kind = match atom {
             Type::Var(name) => kinds
@@ -454,6 +465,7 @@ impl Checker<'_> {
                 .find(|(id, _)| id == s)
                 .map(|(_, kind)| kind.clone())
                 .or_else(|| self.scope_of(*s).map(|_| Kind::Region)),
+            Type::Meta(m) if self.store.is_error_row(*m) => Some(Kind::ErrorRow),
             _ => None,
         };
         kind.map(|k| self.kinds.resolve(&k))
@@ -719,15 +731,6 @@ fn qualify(t: Type, held: Type) -> Type {
 /// says what escapes.
 fn capture_mismatch(mismatch: &Mismatch) -> bool {
     matches!(mismatch, Mismatch::Label { label, .. } if label.starts_with('^'))
-}
-
-/// Whether a row has an error in it: a capture row labels each of its
-/// entries `^…`.
-// shortcut: a row of errors with no error yet, only variables, reads as a
-// capture row, whose unknown tail may grow; tell them apart by kind if one
-// such row is held while it is inferred
-fn has_error(row: &Norm) -> bool {
-    row.entries.iter().any(|(label, _)| !label.starts_with('^'))
 }
 
 fn push_atom(out: &mut Norm, t: &Type) {

@@ -359,8 +359,8 @@ theorem Row.obs_substT (σ : Atom → Ty) (r : Row) (s : Ty) :
     grind
   | _ => simp [Row.substT, Row.obs]
 
-theorem Const.ty_substT (S : Sig) {Θ : Facts} (c : Const) (ι : CArg) (σ : Atom → Ty)
-    (hc : c.ok Θ ι) : (c.ty S ι).substT σ = c.ty S (ι.substT σ) := by
+theorem Const.ty_substT (S : Sig) (c : Const) (ι : CArg) (σ : Atom → Ty) :
+    (c.ty S ι).substT σ = c.ty S (ι.substT σ) := by
   cases c
   case addFin | spawn =>
     simp [Const.ty, Ty.substT, Stage.substT, CArg.substT, Ty.reach_caps, Row.obs_substT σ]

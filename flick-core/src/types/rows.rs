@@ -90,6 +90,11 @@ impl Checker<'_> {
             }
             ([Type::Meta(a)], [Type::Meta(b)]) => {
                 let rest = self.fresh();
+                // the shared rest is a row of the kind of the rows it ends
+                if let Type::Meta(r) = rest {
+                    self.store.mark_like(r, *a);
+                    self.store.mark_like(r, *b);
+                }
                 self.bind(*a, &extended(only_right, vec![rest.clone()]))?;
                 self.bind(*b, &extended(only_left, vec![rest]))
             }
