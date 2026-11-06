@@ -137,7 +137,7 @@ fn unavailable_typed_outputs_report_errors_instead_of_returning_javascript() {
 fn shared_browser_and_sql_programs_compile_without_server_modules() {
     let browser = "module Main exposing (view, fetch, main)\n\
         view : Ui\nlet view = Ui.text \"browser\"\n\
-        fetch : String ->{Http.Client.HttpClient; Http.ClientError.HttpClientError} Http.ClientResponse.ClientResponse\n\
+        fetch : String ->{Async, Http.Client.HttpClient; Http.ClientError.HttpClientError} Http.ClientResponse.ClientResponse\n\
         let fetch url = Http.Client.get url\n\
         main : Unit ->{} Unit\nlet main () = Platform.stdout_line \"ok\"\n";
     let sql = "module Main exposing (query)\n\
