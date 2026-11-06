@@ -5,6 +5,8 @@
 //! Operations are not class methods: no instance is looked up for them.
 //! Services and errors are identified by module and name.
 
+use serde::{Deserialize, Serialize};
+
 use super::Checker;
 use super::env::{Form, TypeDef};
 use super::kinds::Kind;
@@ -15,9 +17,40 @@ use crate::source::Span;
 use crate::types::lang::Lang;
 use crate::{diagnostics, source};
 
+/// An operation of a service or an effect.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Operation {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub ty: Type,
+    #[serde(default, skip_serializing_if = "OpClass::is_tail")]
+    pub class: OpClass,
+}
+
+/// What a handler's branch for an operation is: `tail` gives the operation
+/// its value, `abort` the handler its value without coming back, and
+/// `control` the handler its value with the rest of the body as `resume`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OpClass {
+    #[default]
+    Tail,
+    Abort,
+    Control,
+}
+
+impl OpClass {
+    pub fn is_tail(&self) -> bool {
+        *self == OpClass::Tail
+    }
+}
+
 /// The definition of `S.Impl` for the service definition `def`.
 pub fn impl_def(def: &TypeDef) -> Option<TypeDef> {
-    let Form::Service { params, operations } = &def.form else {
+    let Form::Service {
+        params, operations, ..
+    } = &def.form
+    else {
         return None;
     };
     let fields = operations
@@ -74,6 +107,36 @@ pub fn has_runtime_arrow(ty: &Type) -> bool {
         } => effects.is_some() || has_runtime_arrow(result),
         _ => false,
     }
+}
+
+/// Whether the result of the scheme `ty`, after all its arrows, is a
+/// variable it quantifies that no parameter and no constraint names: the
+/// type of an operation that never returns.
+pub fn returns_any(ty: &Type) -> bool {
+    let Type::Forall {
+        vars,
+        constraints,
+        body,
+    } = ty
+    else {
+        return false;
+    };
+    let mut params = Vec::new();
+    let mut result: &Type = body;
+    while let Type::Fun {
+        param, result: r, ..
+    } = result
+    {
+        params.push(&**param);
+        result = r;
+    }
+    let Type::Var(b) = result else {
+        return false;
+    };
+    let names = |t: &Type| t.contains(&mut |t| matches!(t, Type::Var(v) if v == b));
+    vars.iter().any(|v| v.name == *b)
+        && !params.into_iter().any(names)
+        && !constraints.iter().any(names)
 }
 
 /// `ty` with the service `label` needed at every runtime arrow of its stages.

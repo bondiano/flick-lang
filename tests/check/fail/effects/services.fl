@@ -50,7 +50,7 @@ let run_early id = with_users users_layer (prepare id)
 
 type error Late = Late String (Ref Float)
 
-//~ FLICK-E006 @10:3-10:16 service operation `value` must be a runtime function: running it looks the servi
+//~ FLICK-E006 @10:3-10:16 service operation `value` must be a runtime function: running it looks its handl
 //~ FLICK-E005 @12:21-12:39 the payload of error `Broken` holds `Ref Float`, a live value; an error carries
 //~ FLICK-E005 @14:21-14:47 the payload of error `Hidden` holds `Unknown`, a live value; an error carries da
 //~ FLICK-E005 @16:20-16:43 the payload of error `Thunk` holds `Unit ->{} Float`, a live value; an error ca

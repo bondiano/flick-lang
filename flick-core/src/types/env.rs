@@ -8,6 +8,7 @@ use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
 
 use super::kinds::Kind;
+use super::services::Operation;
 use super::ty::{Binder, Type};
 use crate::iface::{Entity, Export, Interface, Namespace};
 use crate::resolve::{ItemKind, ModuleSyntax};
@@ -55,6 +56,8 @@ pub enum Form {
     Service {
         params: Vec<String>,
         operations: Vec<Operation>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        effect: bool,
     },
     Class {
         params: Vec<String>,
@@ -183,13 +186,6 @@ pub struct Instance {
     pub context: Vec<Type>,
     /// The class applied to the instance's types.
     pub head: Type,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Operation {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub ty: Type,
 }
 
 /// A name found in scope.

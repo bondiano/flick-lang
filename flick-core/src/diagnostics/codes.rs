@@ -248,6 +248,8 @@ codes! {
     E010 = Effects 10, "`server name` of a value that is no `server fn`";
     E011 = Effects 11, "guarded `server fn` served the wrong way";
     E012 = Effects 12, "server function needs server stdlib";
+    E013 = Effects 13, "service operation that is not `tail`";
+    E014 = Effects 14, "`abort` operation that may return";
     C001 = Classes 1, "no instance for a constraint";
     C002 = Classes 2, "ambiguous class constraint";
     C003 = Classes 3, "overlapping instances";

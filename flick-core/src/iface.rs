@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{EnumLit, Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 6;
+pub const IFACE_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -413,11 +413,11 @@ mod tests {
                 .contains("describes `A`")
         );
         let current = format!("\"iface-version\": {IFACE_VERSION}");
-        let future = json.replace(&current, "\"iface-version\": 7");
+        let future = json.replace(&current, "\"iface-version\": 99");
         assert!(
             read(future.as_bytes(), "A")
                 .expect_err("rejected")
-                .contains("`iface-version` 7")
+                .contains("`iface-version` 99")
         );
         let other = json.replace(
             &format!("\"compiler\": \"{}\"", crate::VERSION),

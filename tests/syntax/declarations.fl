@@ -115,3 +115,8 @@ component badge (props : { label : String }) = ui { text props.label }
 component counter (props : { start : Float }) =
   let count = Atom.local props.start
   ui { text (show (Atom.get count)) }
+
+effect Emit a =
+  control emit : a ->{} Unit
+  abort stop : forall b. Unit ->{} b
+  tail : Unit ->{} a

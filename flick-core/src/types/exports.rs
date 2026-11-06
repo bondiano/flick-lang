@@ -1,7 +1,8 @@
 //! The types and kinds of a module's exports, as `.iface` stores them.
 
 use super::Checker;
-use super::env::{Abi, Form, Operation, TypeDef};
+use super::env::{Abi, Form, TypeDef};
+use super::services::Operation;
 use super::ty::Type;
 use crate::iface::{Decl, Entity, Export, Interface, Namespace};
 
@@ -61,15 +62,21 @@ impl Checker<'_> {
                 body: self.exported(&body),
                 opaque: false,
             },
-            Form::Service { params, operations } => Form::Service {
+            Form::Service {
+                params,
+                operations,
+                effect,
+            } => Form::Service {
                 params,
                 operations: operations
                     .into_iter()
                     .map(|o| Operation {
                         ty: self.exported(&o.ty),
                         name: o.name,
+                        class: o.class,
                     })
                     .collect(),
+                effect,
             },
             form => form,
         };

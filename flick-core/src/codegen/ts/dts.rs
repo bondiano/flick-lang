@@ -41,8 +41,12 @@ pub fn declaration_file(
         if export.entity.namespace != Namespace::Type || export.entity.module != projection.module {
             continue;
         }
-        let Some(Form::Service { params, operations }) =
-            export.definition.as_ref().map(|d| &d.form)
+        // an effect has no Effect.ts service: only a service bridges
+        let Some(Form::Service {
+            params,
+            operations,
+            effect: false,
+        }) = export.definition.as_ref().map(|d| &d.form)
         else {
             continue;
         };

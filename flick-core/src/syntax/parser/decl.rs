@@ -43,6 +43,8 @@ fn top_decl(p: &mut Parser) {
         K::SqlKw if p.nth(1) == K::Ident => super::plugin::declaration(p),
         // `component name`: the word is a name everywhere else
         K::Ident if p.at_word("component") && p.nth(1) == K::Ident => component_decl(p),
+        // `effect Name`: the word is a name everywhere else
+        K::Ident if p.at_word("effect") && p.nth(1) == K::Con => service_decl(p),
         K::Ident if super::plugin::at_declaration(p) => super::plugin::declaration(p),
         _ => member(p),
     }
@@ -485,16 +487,45 @@ fn error_decl(p: &mut Parser) {
     p.complete(m, K::ErrorDecl);
 }
 
+/// `service S params = …` or `effect E params = …`, one node: a service is
+/// an effect whose operations are all `tail`.
 fn service_decl(p: &mut Parser) {
     let m = p.start();
-    p.bump();
+    if p.at(K::ServiceKw) {
+        p.bump();
+    } else {
+        p.bump_as(K::EffectKw);
+    }
     if p.expect(K::Con) {
         type_params(p);
         if p.eat(K::Eq) {
-            p.body(K::Members, member);
+            p.body(K::Members, operation);
         }
     }
     p.complete(m, K::ServiceDecl);
+}
+
+/// A member of a service or an effect: a signature may start with the class
+/// of its operation.
+fn operation(p: &mut Parser) {
+    let class = [
+        ("tail", K::TailKw),
+        ("abort", K::AbortKw),
+        ("control", K::ControlKw),
+    ]
+    .into_iter()
+    .find(|(word, _)| p.at_word(word));
+    match class {
+        Some((_, kind)) if p.nth(1) == K::Ident && p.nth(2) == K::Colon => {
+            let m = p.start();
+            p.bump_as(kind);
+            p.bump();
+            p.bump();
+            types::type_(p);
+            p.complete(m, K::Signature);
+        }
+        _ => member(p),
+    }
 }
 
 /// Whether `=>` comes before the end of the constructor it would belong to.

@@ -435,3 +435,18 @@ fn attributes_stand_before_declarations_and_constructors() {
          (Variant (Attribute @ lang some) Some (NameType a)))"
     );
 }
+
+#[test]
+fn an_effect_names_the_class_of_each_operation() {
+    assert_eq!(
+        sexp("effect E =\n  abort stop : Int ->{} Int\n  tail : Unit ->{} Int"),
+        "(ServiceDecl effect E = (Members (Signature abort stop : (ArrowType (NameType Int) \
+         -> (EffectAnnot { }) (NameType Int))) (Signature tail : (ArrowType (NameType Unit) \
+         -> (EffectAnnot { }) (NameType Int)))))"
+    );
+    // the words are names elsewhere
+    assert_eq!(
+        errors("let effect = 1\nlet tail = 2\nlet control = 3\n"),
+        Vec::<String>::new()
+    );
+}
