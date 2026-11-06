@@ -321,6 +321,7 @@ impl Store {
         Row {
             entries,
             tail: tail.map(Box::new),
+            written: row.written,
         }
     }
 

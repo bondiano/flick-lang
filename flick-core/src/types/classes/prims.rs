@@ -85,6 +85,7 @@ impl Checker<'_> {
                 let removed = Type::Record(Row {
                     entries,
                     tail: row.tail.clone(),
+                    ..Row::default()
                 });
                 self.result(c, out, &removed)
             }
@@ -219,6 +220,7 @@ impl Checker<'_> {
         let union = Type::Record(Row {
             entries,
             tail: open.tail.clone(),
+            ..Row::default()
         });
         self.result(c, out, &union)
     }

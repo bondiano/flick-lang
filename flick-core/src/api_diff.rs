@@ -282,6 +282,7 @@ fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
             Type::Row(Row {
                 entries,
                 tail: row.tail.as_ref().map(|t| Box::new(rename(t, names, next))),
+                ..Row::default()
             })
         }
         _ => ty.map_children(&mut |t| rename(t, names, next)),

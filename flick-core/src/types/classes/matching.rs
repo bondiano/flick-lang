@@ -106,6 +106,7 @@ fn match_row(pattern: &Row, target: &Row, subst: &mut Subst) -> Match {
                 &Type::Row(Row {
                     entries: rest,
                     tail: target.tail.clone(),
+                    ..Row::default()
                 }),
                 subst,
             ),

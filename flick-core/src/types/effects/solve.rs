@@ -103,6 +103,7 @@ impl Checker<'_> {
                         let row = Type::Row(Row {
                             entries: vec![(label.clone(), ty.clone())],
                             tail: Some(Box::new(rest)),
+                            ..Row::default()
                         });
                         return self.bind(m, &row).is_ok();
                     }
@@ -250,7 +251,11 @@ impl Checker<'_> {
                     list.push(name);
                 }
             }
-            excess[i].labels.extend(labels);
+            for label in labels {
+                if !excess[i].labels.contains(&label) {
+                    excess[i].labels.push(label);
+                }
+            }
         }
         self.subrows.clear();
         for e in excess {

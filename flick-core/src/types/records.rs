@@ -75,6 +75,7 @@ impl Checker<'_> {
         let shape = Type::Record(Row {
             entries: vec![(label.clone(), field.clone())],
             tail: Some(Box::new(rest)),
+            ..Row::default()
         });
         if self.unify(&self.whnf(&record), &shape).is_err() {
             let shown = self.show(&record);
@@ -162,6 +163,7 @@ impl Checker<'_> {
             let shape = Type::Record(Row {
                 entries: vec![(name.clone(), ty.clone())],
                 tail: Some(Box::new(rest)),
+                ..Row::default()
             });
             if self.unify(&self.whnf(&record), &shape).is_err() {
                 let shown = self.show(&record);

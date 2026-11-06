@@ -103,6 +103,7 @@ impl Tr {
             fc::Type::Record(fc::Row {
                 entries,
                 tail: None,
+                ..
             }) => {
                 let labels: Vec<&str> = entries.iter().map(|(l, _)| l.as_str()).collect();
                 let h = self.con(format!("rec_{}", labels.join("_")));
@@ -281,7 +282,7 @@ impl Tr {
         Ok(match t {
             fc::Type::Var(v) => Ty::Var(v.clone()),
             fc::Type::Union(a, b) => Ty::RUn(Box::new(self.row(a)?), Box::new(self.row(b)?)),
-            fc::Type::Row(fc::Row { entries, tail }) => {
+            fc::Type::Row(fc::Row { entries, tail, .. }) => {
                 let mut parts = Vec::new();
                 for (_, element) in entries {
                     let fc::Type::Con { name, .. } = element.spine().0 else {

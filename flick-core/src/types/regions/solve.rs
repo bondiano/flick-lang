@@ -104,6 +104,7 @@ impl Checker<'_> {
                     let row = Type::Row(Row {
                         entries: vec![(label.clone(), atom.clone())],
                         tail: Some(Box::new(rest)),
+                        ..Row::default()
                     });
                     if self.bind(m, &row).is_ok() {
                         changed = true;

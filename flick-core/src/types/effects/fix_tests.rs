@@ -66,7 +66,7 @@ fn adding_async_alone_is_safe() {
                 wait : Unit ->{Async;} Unit\n\
                 foreign effect wait from \"./wait.mjs\" \"wait\"\n\
                 f : Unit ->{} Unit\n\
-                let f () = wait ()\n";
+                let f () =\n  wait ()\n  wait ()\n";
     let mut sources = SourceMap::default();
     let file = sources.add("Probe.fl", text.to_owned());
     let diagnostics = crate::check(&sources, file);
@@ -75,4 +75,25 @@ fn adding_async_alone_is_safe() {
         .flat_map(|d| &d.fixes)
         .collect();
     assert!(matches!(fixes[..], [fix] if fix.safe), "{diagnostics:?}");
+}
+
+#[test]
+fn the_services_of_a_written_eff_get_it_too() {
+    let program = "let f () = task { Log.line \"x\" }";
+    assert_eq!(
+        fixed("f : Unit -> Eff none none Unit", program),
+        "f : Unit -> Eff {Log} none Unit"
+    );
+    let program = "let f () = task {\n  let _ = Users.get 1.0\n  Log.line \"x\"\n}";
+    assert_eq!(
+        fixed("f : Unit -> Eff {Users} {NotFound} Unit", program),
+        "f : Unit -> Eff {Log, Users} {NotFound} Unit"
+    );
+}
+
+#[test]
+fn a_row_given_to_an_alias_gets_it_where_it_is_given() {
+    let program = "type alias Handlers r = { run : Unit ->{r;} Unit }\n\
+                   let f = { run = fun () -> Log.line \"x\" }";
+    assert_eq!(fixed("f : Handlers none", program), "f : Handlers {Log}");
 }

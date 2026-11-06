@@ -131,8 +131,10 @@ impl Checker<'_> {
             }),
             Some(effects) => {
                 let site = match (name, expected) {
-                    (Some(name), _) => Site::Signature(name, effects.written),
-                    (None, Some(expected)) => Site::Expected(expected.clone(), effects.written),
+                    (Some(name), _) => Site::Signature(name, self.row_place(effects)),
+                    (None, Some(expected)) => {
+                        Site::Expected(expected.clone(), self.row_place(effects))
+                    }
                     (None, None) => Site::Inferred,
                 };
                 self.bounded_stage(effects.services.clone(), effects.errors.clone(), site)
@@ -297,7 +299,7 @@ impl Checker<'_> {
                         return Err(super::unify::Mismatch::Types(a.clone(), e.clone()));
                     }
                     (Some(x), Some(y)) => {
-                        let site = self.expected_site(&e, y.written);
+                        let site = self.expected_site(&e, self.row_place(y));
                         self.sub_row(&x.services, &y.services, site, span, false);
                         self.sub_row(&x.errors, &y.errors, site, span, true);
                     }
@@ -309,13 +311,26 @@ impl Checker<'_> {
             }
             _ => match (self.eff_parts(&a), self.eff_parts(&e)) {
                 (Some((s1, e1, r1)), Some((s2, e2, r2))) => {
-                    let site = self.expected_site(&e, Written::default());
+                    let written = self.store.resolve(&s2).written();
+                    let site = self.expected_site(&e, written);
                     self.sub_row(&s1, &s2, site, span, false);
                     self.sub_row(&e1, &e2, site, span, true);
                     self.subsume(&r1, &r2, span)
                 }
                 _ => self.unify(&a, &e),
             },
+        }
+    }
+
+    /// Where a fix adds to the services of `effects`: where the row they
+    /// stand for is written, as `Handlers none` writes the `r` of
+    /// `->{r;}`, else where the arrow's row is.
+    fn row_place(&self, effects: &Effects) -> Written {
+        let own = self.store.resolve(&effects.services).written();
+        if own.0.is_some() {
+            own
+        } else {
+            effects.written
         }
     }
 

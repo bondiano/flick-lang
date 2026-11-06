@@ -269,6 +269,7 @@ impl Checker<'_> {
         let row = Type::Row(Row {
             entries,
             tail: None,
+            ..Row::default()
         });
         self.sub_row(&row, &at.services, at.site, span, false);
     }
@@ -338,6 +339,7 @@ fn obligation(label: &str, service: Type, owner: &Type) -> (String, Type) {
     let row = Type::Row(Row {
         entries: vec![(label.to_owned(), service)],
         tail: None,
+        ..Row::default()
     });
     let ty = Type::apps(Type::lang(Lang::Provided), [row, owner.clone()]);
     (format!("{PROVIDED}{label}"), ty)

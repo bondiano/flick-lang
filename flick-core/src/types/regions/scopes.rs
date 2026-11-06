@@ -194,6 +194,7 @@ impl Checker<'_> {
                         Type::app(Type::lang(Lang::Scope), need.region.clone()),
                     )],
                     tail: None,
+                    ..Row::default()
                 });
                 let outer = self.regions.scopes[first].outer.clone();
                 self.sub_row(&row, &outer, need.site, need.span, false);

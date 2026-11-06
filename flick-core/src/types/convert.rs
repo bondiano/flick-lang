@@ -20,6 +20,7 @@ mod kinds;
 mod rows;
 
 use kinds::with_article;
+use rows::{place_braces, written_none};
 
 /// What a type variable that is not in scope means.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -152,7 +153,7 @@ impl Checker<'_> {
                     );
                     return Type::Error;
                 }
-                return Type::empty_row();
+                return written_none(span);
             }
             K::NameType | K::AppType => {
                 let (ty, kind) = self.applied(node, &children, free);
@@ -179,7 +180,8 @@ impl Checker<'_> {
                 if expected == Kind::Type && children.is_empty() {
                     (Type::Record(Row::default()), Kind::Type)
                 } else {
-                    let ty = self.row(node, &expected, free);
+                    let mut ty = self.row(node, &expected, free);
+                    place_braces(&mut ty, node, span.file);
                     (ty, expected)
                 }
             }

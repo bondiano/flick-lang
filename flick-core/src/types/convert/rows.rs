@@ -4,7 +4,7 @@
 use super::{Free, is_type, with_article};
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
-use crate::source::Span;
+use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::env::{Form, Found};
@@ -138,7 +138,11 @@ impl Checker<'_> {
             .and_then(|t| self.row_tail(t))
             .map(|t| Box::new(self.ty(t, &kind, free)));
         entries.sort_by(|a, b| a.0.cmp(&b.0));
-        Type::Row(Row { entries, tail })
+        Type::Row(Row {
+            entries,
+            tail,
+            ..Row::default()
+        })
     }
 
     /// The kind of a row: the expected one, or what its elements tell.
@@ -244,7 +248,11 @@ impl Checker<'_> {
             }
         }
         entries.sort_by(|a, b| a.0.cmp(&b.0));
-        Row { entries, tail }
+        Row {
+            entries,
+            tail,
+            ..Row::default()
+        }
     }
 
     /// The tail after `|`, which names a row: an applied type there is
@@ -259,5 +267,28 @@ impl Checker<'_> {
             return None;
         }
         Some(tail)
+    }
+}
+
+/// The empty row `none`, written at `span`: a fix that adds to it replaces it.
+pub(super) fn written_none(span: Span) -> Type {
+    Type::Row(Row {
+        written: Written(Some((span, Shape::None))),
+        ..Row::default()
+    })
+}
+
+/// `ty`, a row written in the braces of `node`, with where it is written.
+pub(super) fn place_braces(ty: &mut Type, node: &Node, file: FileId) {
+    if let Type::Row(row) = ty
+        && let Some(brace) = node.child_tokens().find(|t| t.kind == K::LBrace)
+    {
+        let at = Span::new(file, brace.end, brace.end);
+        let shape = if node.nodes().next().is_none() {
+            Shape::EmptyRow
+        } else {
+            Shape::Items
+        };
+        row.written = Written(Some((at, shape)));
     }
 }

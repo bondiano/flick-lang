@@ -278,6 +278,7 @@ impl Checker<'_> {
                         .into_iter()
                         .collect(),
                     tail: None,
+                    ..Row::default()
                 })),
                 value: false,
             },

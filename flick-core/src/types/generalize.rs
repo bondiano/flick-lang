@@ -251,6 +251,7 @@ fn without_value_row(row: &Type, types: &[&str]) -> Type {
                 .cloned()
                 .collect(),
             tail: r.tail.clone(),
+            ..super::ty::Row::default()
         }),
         Type::Union(a, b) => Type::Union(
             Box::new(without_value_row(a, types)),

@@ -173,6 +173,7 @@ impl Checker<'_> {
                             .map(|(n, t)| (n, self.data_field(&t, &captures)))
                             .collect(),
                         tail: row.tail,
+                        ..super::ty::Row::default()
                     }
                 } else {
                     row

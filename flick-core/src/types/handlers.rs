@@ -37,14 +37,12 @@ impl Checker<'_> {
         let (uses, locals) = (self.uses_mark(), self.locals.len());
         let parts = expected.and_then(|t| Some((t.clone(), self.eff_parts(t)?)));
         let (stage, result) = match parts {
-            Some((expected, (services, errors, result))) => (
-                self.bounded_stage(
-                    services,
-                    errors,
-                    Site::Expected(expected, Written::default()),
-                ),
-                Some(result),
-            ),
+            Some((expected, (services, errors, result))) => {
+                // the services of an `Eff` written as a type: a fix adds to them there
+                let written = self.store.resolve(&services).written();
+                let site = Site::Expected(expected, written);
+                (self.bounded_stage(services, errors, site), Some(result))
+            }
             None => (self.open_stage(), None),
         };
         let outer = mem::replace(&mut self.stage, stage);
@@ -155,6 +153,7 @@ impl Checker<'_> {
             let rest = Type::Row(Row {
                 entries: handled,
                 tail: Some(Box::new(self.stage.errors.clone())),
+                ..Row::default()
             });
             let site = self.stage.site;
             self.sub_row(&raised, &rest, site, span, true);
@@ -188,6 +187,7 @@ impl Checker<'_> {
         let rest = Type::Row(Row {
             entries,
             tail: Some(Box::new(self.stage.services.clone())),
+            ..Row::default()
         });
         let site = self.stage.site;
         self.sub_row(needed, &rest, site, span, false);
@@ -303,6 +303,7 @@ impl Checker<'_> {
             let rest = Type::Row(Row {
                 entries: provided,
                 tail: Some(Box::new(tail)),
+                ..Row::default()
             });
             let site = self.stage.site;
             self.sub_row(&needed, &rest, site, span, false);
@@ -389,6 +390,7 @@ impl Checker<'_> {
             let rest = Type::Row(Row {
                 entries: vec![(label, entry)],
                 tail: Some(Box::new(self.stage.services.clone())),
+                ..Row::default()
             });
             let site = self.stage.site;
             self.sub_row(&needed, &rest, site, span, false);

@@ -114,14 +114,18 @@ impl Hash for Written {
 /// What the services of a written effect row are.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
-    /// `{}`.
+    /// `->{}`.
     Empty,
-    /// `{; E}`.
+    /// `->{; E}`.
     NoServices,
-    /// `{A | r; e}`.
+    /// `->{A | r; e}`, or a row `{A | r}`.
     Items,
-    /// `{r; e}`.
+    /// `->{r; e}`.
     TailOnly,
+    /// The row `{}`.
+    EmptyRow,
+    /// The row `none`, which the services replace.
+    None,
 }
 
 impl Written {
@@ -130,9 +134,10 @@ impl Written {
         let (at, shape) = self.0?;
         let text = match shape {
             Shape::Empty => format!("{services};"),
-            Shape::NoServices => services.to_owned(),
+            Shape::NoServices | Shape::EmptyRow => services.to_owned(),
             Shape::Items => format!("{services}, "),
             Shape::TailOnly => format!("{services} | "),
+            Shape::None => format!("{{{services}}}"),
         };
         Some((at, text))
     }
@@ -199,6 +204,10 @@ pub struct Row {
     pub entries: Vec<(String, Type)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tail: Option<Box<Type>>,
+    /// Where the row is written as a type, `none` or `{…}`, for a fix that
+    /// adds to it.
+    #[serde(skip)]
+    pub written: Written,
 }
 
 impl Row {
@@ -207,6 +216,7 @@ impl Row {
         Row {
             entries,
             tail: None,
+            ..Row::default()
         }
     }
 
@@ -246,6 +256,7 @@ impl Norm {
             tail => Type::Row(Row {
                 entries: self.entries,
                 tail: tail.map(Box::new),
+                ..Row::default()
             }),
         }
     }
@@ -318,6 +329,14 @@ impl Type {
         Type::Row(Row::default())
     }
 
+    /// Where this row is written, when it is a row written as a type.
+    pub fn written(&self) -> Written {
+        match self {
+            Type::Row(r) => r.written,
+            _ => Written::default(),
+        }
+    }
+
     /// The head constructor and arguments of an application.
     pub fn spine(&self) -> (&Type, Vec<&Type>) {
         let mut args = Vec::new();
@@ -336,6 +355,7 @@ impl Type {
         let row = |row: &Row, f: &mut dyn FnMut(&Type) -> Type| Row {
             entries: row.entries.iter().map(|(l, t)| (l.clone(), f(t))).collect(),
             tail: row.tail.as_ref().map(|t| Box::new(f(t))),
+            written: row.written,
         };
         match self {
             Type::App { head, arg } => Type::app(f(head), f(arg)),

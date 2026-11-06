@@ -26,6 +26,7 @@ fn reader() -> Type {
     Type::Row(Row {
         entries: vec![(label.to_owned(), Type::lang(Lang::AtomRead))],
         tail: None,
+        ..Row::default()
     })
 }
 

@@ -265,6 +265,7 @@ impl Checker<'_> {
                 entries
             },
             tail: Some(Box::new(rest)),
+            ..Row::default()
         });
         let (bare, captures) = self.whnf_captured(ty);
         self.pattern_type(&shape, &bare, node);
