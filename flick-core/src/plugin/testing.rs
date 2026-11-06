@@ -1,6 +1,7 @@
 //! What a plugin makes of blocks, as Flick text with the user's code in
 //! place: for the tests of plugins, and for `flick expand`.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use flick_plugin::{Block, HoleKind, Place, Plugin};
@@ -112,8 +113,15 @@ pub fn expand(plugin: &impl Plugin, source: &str) -> Vec<Result<String, Vec<Stri
         .collect();
     let blocks: Vec<Block> = sources.iter().map(BlockSource::block).collect();
     let state = plugin.collect(&blocks, &mut BlockSource::default());
+    // what the plugin publishes of the module's own names
+    let published: BTreeMap<String, Vec<u8>> = (plugin.publish(&state).into_iter())
+        .filter(|p| p.module == module)
+        .map(|p| (p.name, p.data))
+        .collect();
+    let published = Arc::new(published);
     (sources.iter_mut().zip(&blocks))
         .map(|(source, block)| {
+            source.see_published(Arc::clone(&published));
             let expanded = plugin.expand(block, &state, source);
             let mut errors: Vec<String> = (source.diagnostics.iter())
                 .map(|d| {

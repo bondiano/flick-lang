@@ -281,7 +281,6 @@ fn hover_on_a_keyword_shows_the_type_of_its_whole_block() {
         ("fun x", "fun … -> … : Float -> Float"),
         ("if m", "if … then … else … : Float"),
         ("match n", "match … with : String"),
-        ("sql {", "sql { … } : Template Pg {} { label : String }"),
     ] {
         let text = hover(needle, 0);
         assert!(text.contains(shown), "{needle}: {text}");

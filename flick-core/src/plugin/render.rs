@@ -291,6 +291,11 @@ impl Printer<'_> {
     }
 
     fn record(&mut self, fields: &[Field], sep: &str, role: Role, d: u32) -> Result<(), String> {
+        // `{}` is the type of no fields; as a value it is no record
+        if fields.is_empty() && role == Role::Ty {
+            self.push("{}");
+            return Ok(());
+        }
         if fields.is_empty() {
             return Err("an empty record".into());
         }

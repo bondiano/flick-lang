@@ -52,6 +52,26 @@ break programs.
   import; its rules are `std/Q010` and `std/Q013` (`FLICK-Q013` is
   retired). The first migration of a module declares `migrations`, each one
   the tables it creates that the last one leaves.
+- **Breaking:** `sql { … }` and `sql p { … }` queries are blocks of the
+  plugin `sql` of std, with the import `import Sql exposing (plugin sql)`,
+  and `sql` is no keyword. Their rules are `std/Q001` … `std/Q010`, with the
+  same texts and spans; `FLICK-Q001` … `FLICK-Q010` and `FLICK-Q012` are
+  retired. Narrower than before: `from x in T` reads a `sql table` or a
+  table of migrations by its name; beside a column with a codec a capture has
+  the column's own type, not an `Option` of it; an `Option` of a capture
+  reaches the row only when it is selected itself. A value of a type with no
+  SQL form, a capture of another type beside a base column and `sum` or
+  `avg` of a column with a codec are `FLICK-C001`, of the new classes
+  `Sql.Param` and `Sql.Numeric`. A release build folds the text of a query
+  into one literal. Hover and completion in a query are the plugin's; the
+  `sql` head no longer shows the type of its block, which the `let` does.
+- **Runtime:** a value of a template that no column decides gives its kind
+  as `sql_kind`, as `kind` is a word of Flick.
+- **Plugins:** `complete(block, state, offset, member)` says the user typed
+  `name.` there and has the compiler's `published`, and `published-names()`
+  lists every name it answers; `{}` is the type of no fields in a plugin's
+  code.
+- **Editors:** `sql` is no keyword of the TextMate and tree-sitter grammars.
 - **Plugins:** a declaration block may stand for no declarations, an empty
   group, as a migration that only alters a table; a whole number in a
   plugin's code is an integer literal, of any numeric type its use asks for.

@@ -39,7 +39,14 @@ impl Plugin for Cli {
         }
     }
 
-    fn complete(&self, block: &Block, _: &[u8], offset: u32) -> Vec<Completion> {
+    fn complete(
+        &self,
+        block: &Block,
+        _: &[u8],
+        offset: u32,
+        _: bool,
+        _: &mut dyn Compiler,
+    ) -> Vec<Completion> {
         editor::complete(block, offset)
     }
 

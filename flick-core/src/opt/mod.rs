@@ -31,6 +31,8 @@ mod walk;
 #[cfg(test)]
 mod gadt_tests;
 #[cfg(test)]
+mod inline_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::BTreeSet;

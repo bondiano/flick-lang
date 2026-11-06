@@ -242,6 +242,9 @@ interface compiler {
   /// `Users` or `Schema.Users`: its own module's, or one it imports, from
   /// any group; none for a name it does not see or no publication.
   published: func(name: string) -> option<list<u8>>;
+  /// Every name `published` answers for the block's module, as it writes
+  /// them.
+  published-names: func() -> list<string>;
 }
 
 world plugin {
@@ -255,8 +258,10 @@ world plugin {
   export publish: func(state: list<u8>) -> list<published>;
   /// The code a block stands for, given what `collect` learned.
   export expand: func(block: block, state: list<u8>) -> result<arena, list<diagnostic>>;
-  /// What an editor may insert at `offset` of the block.
-  export complete: func(block: block, state: list<u8>, offset: u32) -> list<completion>;
+  /// What an editor may insert at `offset` of the block; `member` says the
+  /// user typed `name.` before `offset`, the `.` not in the block. The
+  /// compiler answers `published` and `literal-of` as while it expands.
+  export complete: func(block: block, state: list<u8>, offset: u32, member: bool) -> list<completion>;
   /// What an editor shows at `offset` of the block; `facts` are the types
   /// of the `_` of its code, as `check` gets them, once it checked.
   export hover: func(block: block, state: list<u8>, offset: u32, facts: list<fact>) -> option<hover>;

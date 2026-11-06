@@ -38,8 +38,6 @@ fn top_decl(p: &mut Parser) {
         K::InstanceKw => instance_decl(p),
         K::DerivingKw if p.nth(1) == K::InstanceKw => deriving_decl(p),
         K::ForeignKw => foreign_decl(p),
-        // `sql table`: a block of the plugin of std, its head a keyword still
-        K::SqlKw if p.nth(1) == K::Ident => super::plugin::declaration(p),
         // `component name`: the word is a name everywhere else
         K::Ident if p.at_word("component") && p.nth(1) == K::Ident => component_decl(p),
         K::Ident if super::plugin::at_declaration(p) => super::plugin::declaration(p),

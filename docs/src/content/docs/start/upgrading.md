@@ -101,15 +101,16 @@ let profile_schema = Profile.schema
 
 ## Plugin blocks need their import
 
-`cli`, `codec`, `server fn`, `sql table` and `sql migration` blocks are
-plugins of `std` now. A file that writes one imports its head:
+`cli`, `codec`, `server fn` and `sql` blocks (queries, `sql table` and
+`sql migration`) are plugins of `std` now. A file that writes one imports
+its head:
 
 | Block | Import |
 | - | - |
 | `cli "name" { … }` | `import Cli exposing (plugin cli)` |
 | `codec s { … }` | `import Codec exposing (plugin codec)` |
 | `server fn f x = …`, `server f` | `import Server exposing (plugin server)` |
-| `sql table Name "table" { … }`, `sql migration 1 "name" { … }` | `import Sql exposing (plugin sql)` |
+| `sql { … }`, `sql p { … }`, `sql table Name "table" { … }`, `sql migration 1 "name" { … }` | `import Sql exposing (plugin sql)` |
 
 In 0.1 a `codec` block needed no import:
 
@@ -164,6 +165,9 @@ of the blocks and derives that moved keep their meaning under new codes:
 | `FLICK-Q001`, `FLICK-Q010` in a `sql table` | `std/Q001`, `std/Q010` | a column given twice, a SQL type or attribute the dialect does not know |
 | `FLICK-Q011` | `std/Q011` | a column of another type than its SQL type's, without `via` |
 | `FLICK-Q010`, `FLICK-Q013` in a `sql migration` | `std/Q010`, `std/Q013` | a statement outside the DDL the migrations hold, one that does not apply to the schema before it |
+| `FLICK-Q001` … `FLICK-Q010` in a query | `std/Q001` … `std/Q010` | the rules of `sql { … }`, with the same texts |
+| `FLICK-Q012` | `FLICK-C001` | a value whose type has no SQL form: no instance of `Sql.Param` for it |
+| a mismatched capture beside a base column, `sum` or `avg` of a column with a codec | `FLICK-C001` | no instance of `Sql.Param` or `Sql.Numeric` for the type |
 | `FLICK-E012`, `FLICK-L008` | — | retired: every build has the plugin of `std` |
 
 `flick explain std/D001` explains a new code, and `flick explain FLICK-L001`
@@ -331,5 +335,4 @@ Cargo feature is gone: every build has the plugin of `std`.
 These changes are planned and not done yet; each gets a section here when it
 lands:
 
-- `sql` blocks as a plugin of `std`, as `cli` and `codec` are now;
 - later, changes to the core of effects.

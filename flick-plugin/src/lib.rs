@@ -477,6 +477,11 @@ pub trait Compiler {
         let _ = name;
         None
     }
+    /// Every name `published` answers for the block's module, as it writes
+    /// them.
+    fn published_names(&mut self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// A plugin: what it learns from all its blocks of a group, and the code
@@ -502,9 +507,19 @@ pub trait Plugin {
         state: &[u8],
         compiler: &mut dyn Compiler,
     ) -> Result<Arena, Vec<Diagnostic>>;
-    /// What an editor may insert at `offset` of `block`.
-    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
-        let _ = (block, state, offset);
+    /// What an editor may insert at `offset` of `block`; `member` says the
+    /// user typed `name.` right before `offset`, the `.` not in the block.
+    /// `compiler` answers `published` and `literal_of` as while it expands,
+    /// and parses no hole.
+    fn complete(
+        &self,
+        block: &Block,
+        state: &[u8],
+        offset: u32,
+        member: bool,
+        compiler: &mut dyn Compiler,
+    ) -> Vec<Completion> {
+        let _ = (block, state, offset, member, compiler);
         Vec::new()
     }
     /// What an editor shows at `offset` of `block`; `facts` are the types

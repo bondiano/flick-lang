@@ -70,11 +70,6 @@ impl Walker<'_> {
         let mark = self.locals.len();
         match node.kind {
             K::ModuleHeader | K::ImportDecl => return,
-            // names inside `sql { }` are SQL-scoped: only captures and tables refer to the program
-            K::SqlExpr => {
-                self.sql_names(node);
-                return;
-            }
             K::NameExpr | K::ConPat => self.reference(node, Namespace::Constructor),
             K::NameType => self.reference(node, Namespace::Type),
             K::DerivingClause => {
@@ -191,28 +186,6 @@ impl Walker<'_> {
             binder: Some((t, puns.contains(&t.start))),
             used: false,
         }));
-    }
-
-    /// The names of a `sql { … }` block that are names of the program: its
-    /// `$name` captures, and its tables, `T` or `M.T` (columns and aliases are
-    /// SQL's).
-    fn sql_names(&mut self, node: &Node) {
-        for child in node.nodes() {
-            if child.kind == K::SqlCapture {
-                self.walk(child);
-            } else if child.kind == K::NameExpr && Self::is_table(child) {
-                self.reference(child, Namespace::Type);
-            } else {
-                self.sql_names(child);
-            }
-        }
-    }
-
-    /// A capitalized name, maybe qualified: what a table is in SQL.
-    fn is_table(node: &Node) -> bool {
-        let tokens: Vec<_> = node.child_tokens().collect();
-        tokens.last().is_some_and(|t| t.kind == K::Con)
-            && tokens.iter().all(|t| matches!(t.kind, K::Con | K::Dot))
     }
 
     /// Walks a `let`, then leaves the names it binds in scope.

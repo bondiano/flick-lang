@@ -63,8 +63,6 @@ mod schemas;
 mod server;
 mod services;
 mod settle;
-mod sql;
-mod sql_plan;
 #[cfg(feature = "diagnostic-fixes")]
 mod stub;
 mod sugar_lints;
@@ -103,11 +101,10 @@ pub use patterns::is_pattern;
 pub use question::Question;
 pub use ranges::range_list;
 pub use schemas::companion_name;
-pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
     Constructor, Copies, ForeignInfo, GenericInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
-    SqlForm, SqlPlan, SqlValue, Typing, default_method, passes_dictionary,
+    Typing, default_method, passes_dictionary,
 };
 
 use convert::TyVar;
@@ -171,8 +168,6 @@ pub struct Options<'a> {
     /// package of a class or of the type an instance is for may declare it.
     pub local: &'a dyn Fn(&str) -> bool,
     pub limits: Limits,
-    /// The SQL dialect of `sql table` and `sql { … }`.
-    pub sql: &'static Dialect,
     /// `[lint] no-let-assert`: every `let assert` is an error.
     pub no_let_assert: bool,
     pub thresholds: Thresholds,
@@ -309,10 +304,6 @@ fn run_in(
         sugar: Vec::new(),
         gadt: gadt::branch::State::default(),
     };
-    #[cfg(feature = "ide")]
-    {
-        checker.typing.sql_dialect = options.sql;
-    }
     checker.module(module.tree);
     checker.report_holes();
     checker.unannotated_codecs();

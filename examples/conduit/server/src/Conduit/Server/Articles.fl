@@ -4,7 +4,7 @@
 /// and follows its author. A filter left `None` keeps every article.
 module Conduit.Server.Articles exposing (..)
 
-import Sql exposing (Pg)
+import Sql exposing (Pg, plugin sql)
 import Database exposing (Database)
 import Conduit.Server.Db as Db
 import Conduit.Server.Schema exposing (Articles, ArticleTags, Favorites, Follows, Tags, Users)

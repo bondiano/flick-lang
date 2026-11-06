@@ -2,7 +2,7 @@
 // query names is still an unused import.
 module App.Store exposing (names, count_people)
 
-import Sql exposing (Pg)
+import Sql exposing (Pg, plugin sql)
 import App.Schema exposing (People, Pets)
 //                                  ^^^^ FLICK-R012 `Pets` is imported but never used
 import App.Schema as Schema

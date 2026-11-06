@@ -4,7 +4,7 @@
 
 use flick_plugin::{Block, CaseTarget, DeriveTarget, Span as BlockSpan};
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, OnceLock};
 
 use flick_plugin::Place;
@@ -336,9 +336,18 @@ fn std_blocks(
             return;
         }
     };
+    // what the plugin publishes of the module's own names, as the loader
+    // gives every block of a group
+    let published: BTreeMap<String, Vec<u8>> = (plugin.publish(&state).unwrap_or_default())
+        .into_iter()
+        .filter(|p| p.module == module)
+        .map(|p| (p.name, p.data))
+        .collect();
+    let published = Arc::new(published);
     for ((node, mut source), block) in found.drain(..).zip(&read) {
         let (start, end) = node.range();
         let whole = Span::new(file, start, end);
+        source.see_published(Arc::clone(&published));
         let made = plugin.expand(block, &state, &mut source);
         diagnostics.append(&mut source.diagnostics);
         let Some(arena) = made_or(made, "std", &source, whole, diagnostics) else {

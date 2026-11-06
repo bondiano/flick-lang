@@ -286,10 +286,6 @@ impl Loader<'_> {
             let theirs = publications.get(&package);
             let mut seen = HashMap::new();
             for &j in &members {
-                let editor = EditorBlock::new(&found[j].source, &state, plugin);
-                editing.push((found[j].module, editor));
-            }
-            for (&j, block) in members.iter().zip(&blocks) {
                 let f = &mut found[j];
                 if let Some(theirs) = theirs {
                     let module = &self.modules[f.module];
@@ -298,6 +294,11 @@ impl Loader<'_> {
                         .or_insert_with(|| Arc::new(published::seen(module, theirs)));
                     f.source.see_published(Arc::clone(view));
                 }
+                let editor = EditorBlock::new(&f.source, &state, plugin);
+                editing.push((f.module, editor));
+            }
+            for (&j, block) in members.iter().zip(&blocks) {
+                let f = &mut found[j];
                 f.source.reach = Reach::new(gate.clone());
                 let expanded = results.expand(plugin.as_ref(), block, &state, &mut f.source);
                 // what the host refused, whatever the plugin made of it

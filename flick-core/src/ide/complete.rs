@@ -71,10 +71,7 @@ impl Ide<'_> {
     /// Completions at `offset` of `file`. With `dotted`, `offset` is the end
     /// of what comes before a `.`.
     pub fn complete(&self, file: FileId, offset: u32, dotted: bool) -> Vec<Completion> {
-        if let Some(items) = self
-            .plugin_complete(file, offset, dotted)
-            .or_else(|| self.sql_complete(file, offset, dotted))
-        {
+        if let Some(items) = self.plugin_complete(file, offset, dotted) {
             return items;
         }
         let mut items = if dotted {

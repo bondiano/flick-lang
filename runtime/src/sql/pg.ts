@@ -94,7 +94,7 @@ type Failure = EncodeError | DbError | DecodeError;
 
 const columnOf = (template: Template, v: Value): Column =>
   v.table === undefined
-    ? { name: v.name, kind: v.kind ?? "text", nullable: v.nullable, codec: undefined }
+    ? { name: v.name, kind: v.sql_kind ?? "text", nullable: v.nullable, codec: undefined }
     : (template.tables[v.table]?.columns.find((c) => c.name === v.column) ?? {
         name: v.name,
         kind: "text",

@@ -1,7 +1,7 @@
 use super::*;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::SourceMap;
-use crate::types::{Thresholds, dialect};
+use crate::types::Thresholds;
 
 fn parse_text(text: &str) -> Result<Config, Diagnostic> {
     let mut sources = SourceMap::default();
@@ -30,7 +30,7 @@ fn spec_example_parses_with_defaults() {
         (lib.source_dir.as_str(), lib.test_dir.as_str()),
         ("src", "test")
     );
-    assert_eq!(lib.sql_dialect.name, "postgresql");
+    assert_eq!(lib.sql_dialect, "postgresql");
     assert!(!lib.no_let_assert);
     let strict =
         parse_text("schema-version = 1\n[project]\nkind = \"lib\"\n[lint]\nno-let-assert = true\n");
@@ -120,7 +120,7 @@ fn sql_dialect() {
         "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"postgresql\"\n",
     )
     .expect("valid");
-    assert_eq!(pg.sql_dialect, &dialect::POSTGRESQL);
+    assert_eq!(pg.sql_dialect, "postgresql");
     let err =
         parse_text("schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"oracle\"\n")
             .expect_err("unsupported");

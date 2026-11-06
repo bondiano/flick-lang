@@ -36,7 +36,6 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
         let options = Options {
             local: &local,
             limits: Limits::default(),
-            sql: Default::default(),
             no_let_assert: false,
             thresholds: Thresholds::default(),
             effects: true,

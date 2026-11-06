@@ -91,10 +91,11 @@ let balances =
   }
 ```
 
-`sql [p] { … }` is a `Sql.Template Pg params row`. The name after `sql`
+`sql [p] { … }` is a `Sql.Template Pg params row`, a block of the plugin
+`sql` of std as `sql table` is; `flick expand` shows its code. The name after `sql`
 binds the parameters: `p.x` is the parameter `x`, whose type follows from
 where it is used. With a signature, a parameter the signature does not
-declare is `FLICK-Q009`. A query without a name has no parameters.
+declare is `std/Q009`. A query without a name has no parameters.
 
 `$name` captures a value of the program, a local or a top-level one, as a
 placeholder; `$name.field` captures a field of it and `$(e)` the value of any
@@ -103,7 +104,10 @@ and it passes through the codec of the column it is compared with or
 written to. A capture of an `Option t` is a `t` that may be `NULL`: `None`
 is `NULL`, so `where is_null $tag || t.name == $tag` is a filter that may be
 absent. Of a base type it is cast to its SQL type (`CAST($1 AS text)`), as
-PostgreSQL cannot type `$1 IS NULL` alone. A capture is no parameter of the
+PostgreSQL cannot type `$1 IS NULL` alone. Beside a column with a codec a
+capture has the column's own type, never an `Option` of it (`FLICK-T003`),
+and a value whose type has no SQL form is `FLICK-C001`: the class
+`Sql.Param` has no instance for it. A capture is no parameter of the
 template, so a function builds the template from its arguments:
 
 ```flick
@@ -142,7 +146,7 @@ order whatever order they are written in:
 
 | Clause | Meaning |
 | - | - |
-| `from x in T` | the first table; `T` is a `sql table` or any `Sql.Table` value |
+| `from x in T` | the first table; `T` is a `sql table` or a table of migrations, by its name (`std/Q010` otherwise) |
 | `join x in T` / `left_join x in T`, then `on e` | inner and left joins |
 | `where e` | a `Bool` condition without aggregates |
 | `group_by e, …` | grouping keys |
@@ -159,7 +163,7 @@ order whatever order they are written in:
 In an insert, update or delete the table's name is its alias: `Users.id`.
 
 Expressions are columns (`alias.column`, or `column` when exactly one table
-has it: `FLICK-Q003` otherwise), parameters, captures, literals, `== != < <= > >=`,
+has it: `std/Q003` otherwise), parameters, captures, literals, `== != < <= > >=`,
 `&&`, `||`, `not`, `+ - * / %` on `Float`, `BigInt` and `BigDecimal`, `++` on
 `String`, and the functions:
 
@@ -169,7 +173,7 @@ has it: `FLICK-Q003` otherwise), parameters, captures, literals, `== != < <= > >
 | `is_not_distinct_from a b` | null-safe equality |
 | `coalesce a b` | the first that is not `NULL` |
 | `count e`, `count_all` | `COUNT(e)`, `COUNT(*)`: a `BigInt`, never `NULL` |
-| `sum e`, `avg e`, `min e`, `max e` | `NULL` over no rows: an `Option` |
+| `sum e`, `avg e`, `min e`, `max e` | `NULL` over no rows: an `Option`; `sum` and `avg` take a column of a numeric SQL type (`std/Q010` otherwise) or a value of a type of the class `Sql.Numeric` (`FLICK-C001` otherwise) |
 | `exists (sql { … })`, `is_in e (sql { … })` | uncorrelated subqueries |
 
 `==` is SQL's comparison: it is `NULL` when either side is, and `where` keeps
@@ -189,15 +193,15 @@ column stays plain.
 
 `group_by`, `having` or an aggregate in `select` make the query grouped:
 then every column a result, `having` or `order_by` uses outside an aggregate
-must be a grouping key (`FLICK-Q005`). Aggregates belong to `select`,
+must be a grouping key (`std/Q005`). Aggregates belong to `select`,
 `having` and `order_by`; in `where`, `on`, `group_by` or inside another
-aggregate they are `FLICK-Q006`.
+aggregate they are `std/Q006`.
 
 ## Scopes
 
 Each `sql { … }` has its own aliases. A subquery sees the parameters of the
 query around it, never its aliases, and a query never sees the aliases of a
-subquery or a union (`FLICK-Q002`).
+subquery or a union (`std/Q002`).
 
 ## Running queries
 
