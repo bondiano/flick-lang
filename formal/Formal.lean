@@ -51,6 +51,8 @@ import Formal.BelowStep
 import Formal.Asc
 import Formal.KidTy
 import Formal.AscStep
+import Formal.Caught
+import Formal.CaughtStep
 import Formal.Soundness
 import Formal.Lemma4
 import Formal.Within
