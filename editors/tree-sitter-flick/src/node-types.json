@@ -575,10 +575,6 @@
     "named": false
   },
   {
-    "type": "sql",
-    "named": false
-  },
-  {
     "type": "string",
     "named": true
   },
