@@ -4,6 +4,7 @@
 use super::Lower;
 use crate::ir::{Expr, ExprKind, Stage};
 use crate::source::Span;
+use crate::types::lang::Lang;
 use crate::types::wire::WireCodec;
 use crate::types::{Range, companion_name};
 
@@ -16,7 +17,7 @@ impl Lower<'_> {
         match self.typing.wire_codecs.get(&key) {
             Some(WireCodec::Value { module, name }) => global(module, name.clone()),
             Some(WireCodec::Schema { module, ty }) => ExprKind::App {
-                func: Box::new(Expr::new(global("Codec", "json".to_owned()), span)),
+                func: Box::new(Expr::new(ExprKind::lang(Lang::CodecJson), span)),
                 arg: Box::new(Expr::new(
                     global(module, companion_name(ty, "schema")),
                     span,
@@ -25,7 +26,7 @@ impl Lower<'_> {
                 arg_first: false,
             },
             // the checker reported the use
-            None => global("HttpApi.Derive", "wire_codec".to_owned()),
+            None => ExprKind::lang(Lang::WireCodec),
         }
     }
 }

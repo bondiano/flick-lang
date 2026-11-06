@@ -11,9 +11,7 @@ use super::{Checker, let_parts};
 use crate::iface::{Entity, Namespace};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-
-/// The label of the service in a row.
-const SERVER: &str = "Server.Server";
+use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
     /// The top-level values of this module that reach `Server`, each with
@@ -99,9 +97,12 @@ pub fn exported_servers(
 /// Whether `ty` mentions `Server` in a row: a function or an effect that
 /// needs it, or a layer that provides it.
 fn needs_server(ty: &Type) -> bool {
+    let Some(server) = lang::label(Lang::Server) else {
+        return false;
+    };
     let mut found = false;
     ty.visit(&mut |t| {
-        found |= matches!(t, Type::Row(row) if row.entries.iter().any(|(l, _)| l == SERVER));
+        found |= matches!(t, Type::Row(row) if row.entries.iter().any(|(l, _)| l == server));
     });
     found
 }

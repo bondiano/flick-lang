@@ -226,8 +226,10 @@ impl Checker<'_> {
     /// E011: a `Server.Guarded` where a `Server.Function` goes, or the other
     /// way round; `false` when the mismatch is something else.
     fn served_wrong(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {
+        // whether it is the guarded kind
         let server = |t: &Type| match t.spine().0 {
-            Type::Con { module, name } if module == "Server" => Some(name.clone()),
+            t if t.is_lang(Lang::ServerGuarded) => Some(true),
+            t if t.is_lang(Lang::ServerFunction) => Some(false),
             _ => None,
         };
         let (Some(actual), Some(expected)) = (server(actual), server(expected)) else {
@@ -243,8 +245,8 @@ impl Checker<'_> {
             || "this server fn".to_owned(),
             |n| format!("server fn `{n}`"),
         );
-        let d = match (actual.as_str(), expected.as_str()) {
-            ("Guarded", "Function") => Diagnostic::error(
+        let d = match (actual, expected) {
+            (true, false) => Diagnostic::error(
                 codes::E011,
                 format!(
                     "{named} lists `Server.Unauthorized`, so only `Server.authenticated` serves it"
@@ -257,7 +259,7 @@ impl Checker<'_> {
                     Vec::new(),
                 )
             }),
-            ("Function", "Guarded") => {
+            (false, true) => {
                 let d = Diagnostic::error(
                     codes::E011,
                     format!(

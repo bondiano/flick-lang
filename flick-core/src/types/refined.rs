@@ -2,10 +2,12 @@
 //! compiles if the compiler knows the check.
 
 use super::Checker;
-use super::env::{Abi, EnumLit, Form};
+use super::env::{Abi, EnumLit, Form, Found};
+use super::lang::{self, Lang};
 use super::typing::Ref;
 use crate::consteval::{self, Const};
 use crate::diagnostics::codes;
+use crate::iface::Namespace;
 use crate::source::SourceMap;
 use crate::syntax;
 use crate::syntax::cst::Node;
@@ -57,7 +59,11 @@ impl Checker<'_> {
         let Some(predicate) = self.predicates.get(ty).copied() else {
             return;
         };
-        if holds(predicate, self.text, &constant) == Some(false) {
+        let check = (predicate.nodes().next()).and_then(|body| {
+            let written: String = body.text(self.text).split_whitespace().collect();
+            self.known_check(&written)
+        });
+        if holds(predicate, self.text, &constant, check) == Some(false) {
             self.error(
                 codes::D006,
                 self.span(arg),
@@ -69,15 +75,33 @@ impl Checker<'_> {
     }
 }
 
+impl Checker<'_> {
+    /// The check of the compiler's that `written` names, qualified or not,
+    /// as the module sees it.
+    fn known_check(&self, written: &str) -> Option<Lang> {
+        let known = |module: &str, name: &str| {
+            [Lang::CheckEmail, Lang::CheckNonEmpty, Lang::CheckPositive]
+                .into_iter()
+                .find(|l| lang::is(*l, module, name))
+        };
+        match written.rsplit_once('.') {
+            Some((qualifier, name)) => known(self.env.qualified_module(qualifier)?.0, name),
+            None => match self.env.find(Namespace::Value, written) {
+                Found::Entity(e) => known(&e.module, &e.name),
+                Found::Unknown | Found::Missing => None,
+            },
+        }
+    }
+}
+
 /// Whether `constant` passes the predicate of a refined type, when the
 /// compiler can tell: a known check, or a `fun` of literals.
-fn holds(predicate: &Node, text: &str, constant: &Const) -> Option<bool> {
+fn holds(predicate: &Node, text: &str, constant: &Const, check: Option<Lang>) -> Option<bool> {
     let body = predicate.nodes().next()?;
-    let written: String = body.text(text).split_whitespace().collect();
-    match (written.as_str(), constant) {
-        ("Checks.email", Const::String(s)) => return Some(email(s)),
-        ("Checks.non_empty", Const::String(s)) => return Some(!s.is_empty()),
-        ("Checks.positive", Const::Number(n)) => return Some(*n > 0.0),
+    match (check, constant) {
+        (Some(Lang::CheckEmail), Const::String(s)) => return Some(email(s)),
+        (Some(Lang::CheckNonEmpty), Const::String(s)) => return Some(!s.is_empty()),
+        (Some(Lang::CheckPositive), Const::Number(n)) => return Some(*n > 0.0),
         _ => {}
     }
     if body.kind != K::FunExpr {
