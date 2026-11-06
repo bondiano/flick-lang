@@ -10,6 +10,7 @@
 #[doc(hidden)]
 macro_rules! wit_arena_conversions {
     () => {
+        #[allow(clippy::too_many_lines)]
         pub fn to_arena(a: $crate::Arena) -> w::Arena {
             let nodes = a
                 .nodes
@@ -136,6 +137,7 @@ macro_rules! wit_arena_conversions {
             }
         }
 
+        #[allow(clippy::too_many_lines)]
         pub fn from_arena(a: w::Arena) -> $crate::Arena {
             let nodes = a
                 .nodes
