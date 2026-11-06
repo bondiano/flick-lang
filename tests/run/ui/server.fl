@@ -2,7 +2,7 @@
 // each with its own value of the same atom, and a field shows its state.
 module App.Main exposing (main)
 
-settle : Unit ->{} Unit
+settle : Unit ->{Async;} Unit
 foreign async settle from "./dom.mjs" "settle"
   arity 0
 
@@ -21,7 +21,7 @@ let page =
     ]
   })
 
-request : Float ->{} String
+request : Float ->{Async;} String
 let request n = provide Atom.layer {
   Atom.set count n
   Atom.set name ("user " ++ show n)
@@ -30,7 +30,7 @@ let request n = provide Atom.layer {
   Ui.Server.render (Ui.render page ())
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let (first, second) = parallel (task { request 1 }) (task { request 2 })
   Platform.stdout_line first

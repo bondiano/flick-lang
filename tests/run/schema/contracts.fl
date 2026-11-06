@@ -34,7 +34,7 @@ not_a_number : Unit -> Unknown
 foreign pure not_a_number from "./inputs.mjs" "notANumber"
   arity 0
 
-validate : Codec.StandardSchema Json Tree -> Unknown ->{} String
+validate : Codec.StandardSchema Json Tree -> Unknown ->{Async;} String
 foreign async validate from "./inputs.mjs" "validate"
 
 profile_json : PureCodec Json Profile
@@ -65,7 +65,7 @@ let exported result =
   | Ok text -> text
   | Err (Codec.ExportError reason) -> "ExportError: " ++ reason
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let trees = Codec.json Tree.schema
   Platform.stdout_line (outcome (Codec.decode_result trees (cyclic ())))

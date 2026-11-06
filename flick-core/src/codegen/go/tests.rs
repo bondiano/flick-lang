@@ -153,8 +153,8 @@ fn unreachable_foreigns_do_not_reject_a_supported_entry() {
 fn a_missing_local_go_foreign_reports_a_target_diagnostic() {
     let errors = compile(
         "module App exposing (main)\n\
-         wait : Float ->{} Unit\nforeign async wait from \"./gone.mjs\" \"wait\"\n\
-         main : Unit ->{} Unit\nlet main () = wait 1\n",
+         wait : Float ->{Async;} Unit\nforeign async wait from \"./gone.mjs\" \"wait\"\n\
+         main : Unit ->{Async;} Unit\nlet main () = wait 1\n",
     );
     assert_eq!(
         errors.iter().map(|error| error.code).collect::<Vec<_>>(),

@@ -1,15 +1,15 @@
 // `DevTools.layer_with` sends its headers with the WebSocket's handshake.
 module App.Main exposing (main)
 
-start : Unit ->{} Float
+start : Unit ->{Async;} Float
 foreign async start from "./handshake.mjs" "start"
   arity 0
 
-token : Unit ->{} String
+token : Unit ->{Async;} String
 foreign async token from "./handshake.mjs" "token"
   arity 0
 
-stop : Unit ->{} Unit
+stop : Unit ->{Async;} Unit
 foreign async stop from "./handshake.mjs" "stop"
   arity 0
 
@@ -26,7 +26,7 @@ let options = {
   disablePropagation = false;
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let port = start ()
   let devtools = { url = "ws://127.0.0.1:" ++ show port; headers = [("x-token", "secret")] }

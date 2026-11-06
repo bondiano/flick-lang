@@ -5,12 +5,12 @@ module App.Main exposing (main)
 import App.Live exposing (users_live, log_live)
 import App.Users exposing (Users, Log, NotFound(..), user_id, load_view, load_two)
 
-describe : String ->{Users, Log;} String
+describe : String ->{Async, Users, Log;} String
 let describe raw =
   try (load_view (user_id raw)).title with
   | NotFound id -> "not found: " ++ show id
 
-program : Unit ->{Users, Log;} Unit
+program : Unit ->{Async, Users, Log;} Unit
 let program () =
   let both =
     try
@@ -21,5 +21,5 @@ let program () =
   Platform.stdout_line both
   Platform.stdout_line (describe "u3")
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide Layer.merge users_live log_live { program () }

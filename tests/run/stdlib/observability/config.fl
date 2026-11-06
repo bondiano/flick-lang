@@ -4,7 +4,7 @@
 // is sent.
 module App.Main exposing (main)
 
-start : Unit ->{} Float
+start : Unit ->{Async;} Float
 foreign async start from "./receiver.mjs" "start"
   arity 0
 
@@ -12,7 +12,7 @@ received : Unit ->{} String
 foreign sync received from "./receiver.mjs" "received"
   arity 0
 
-stop : Unit ->{} Unit
+stop : Unit ->{Async;} Unit
 foreign async stop from "./receiver.mjs" "stop"
   arity 0
 
@@ -32,7 +32,7 @@ let span = {
 has : String -> String -> String
 let has text needle = needle ++ ": " ++ show (String.contains needle text)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let base = "http://127.0.0.1:" ++ show (start ())
   let quiet =

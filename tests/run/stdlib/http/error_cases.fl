@@ -68,7 +68,7 @@ let handle request =
   | "ada" -> from_result (Err (Conflict [("username", ["has already been taken"])]))
   | name -> "welcome " ++ name
 
-post_raw : String -> String ->{} String
+post_raw : String -> String ->{Async;} String
 foreign async post_raw from "./raw.mjs" "post"
 
 /// The outcome of registering `name`.
@@ -80,7 +80,7 @@ let ask base name =
   | Unprocessable p -> "unprocessable " ++ show p
   | HttpApi.ClientError e -> "client error " ++ e.message
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let options : HttpApi.ServeOptions = {
     host = "127.0.0.1";

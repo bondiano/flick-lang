@@ -97,7 +97,7 @@ let handlers = {
   };
 }
 
-get_raw : String ->{} String
+get_raw : String ->{Async;} String
 foreign async get_raw from "./raw.mjs" "get"
 
 /// A request of `endpoint` with `authorization`.
@@ -112,7 +112,7 @@ let ask base authorization endpoint =
   | Unauthorized e -> "401 " ++ String.join ", " e.errors.token
   | HttpApi.ClientError e -> "client error " ++ e.message
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let options : HttpApi.ServeOptions = {
     host = "127.0.0.1";

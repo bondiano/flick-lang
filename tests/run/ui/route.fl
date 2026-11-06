@@ -10,7 +10,7 @@ type error NotFound = NotFound
 type Page = Home | User Float
   deriving Eq, Show, Schema, Url
 
-name : Float ->{} String
+name : Float ->{Async;} String
 foreign async name from "./route.mjs" "name"
   arity 1
 
@@ -18,11 +18,11 @@ loads : Unit ->{} Float
 foreign sync loads from "./route.mjs" "loads"
   arity 0
 
-open : String -> String ->{} Unit
+open : String -> String ->{Async;} Unit
 foreign async open from "./route.mjs" "open"
   arity 2
 
-back : Unit ->{} Unit
+back : Unit ->{Async;} Unit
 foreign async back from "./route.mjs" "back"
   arity 0
 
@@ -30,7 +30,7 @@ path : Unit ->{} String
 foreign sync path from "./route.mjs" "path"
   arity 0
 
-settle : Unit ->{} Unit
+settle : Unit ->{Async;} Unit
 foreign async settle from "./route.mjs" "settle"
   arity 0
 
@@ -83,7 +83,7 @@ let served url =
   String.join "" chunks
 
 /// Opens the server's page for `url` and mounts the client on it.
-visit : String -> (Unit ->{Atom.Write;} Unit) ->{} Unit
+visit : String -> (Unit ->{Async, Atom.Write;} Unit) ->{Async;} Unit
 let visit url after =
   open url (served url)
   Platform.stdout_line (url ++ " served, loads " ++ show (loads ()))
@@ -98,7 +98,7 @@ let visit url after =
     }
   }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   visit "http://localhost/user/42" (fun () ->
     Atom.set page (User 7)

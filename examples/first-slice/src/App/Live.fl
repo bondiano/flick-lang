@@ -4,7 +4,7 @@ module App.Live exposing (users_live, log_live)
 
 import App.Users exposing (UserId, NotFound(..), Users, Log)
 
-find_name : UserId ->{} Option String
+find_name : UserId ->{Async;} Option String
 foreign async find_name from "./directory.mjs" "findName"
   nullable
 

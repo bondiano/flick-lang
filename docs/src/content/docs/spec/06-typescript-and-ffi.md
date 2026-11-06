@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: 66d656f376fafc55
+source_hash: 527774b241843ebd
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -168,7 +168,7 @@ With the policy `undefined = "none"` and `catch = "JsError"`, the importer produ
 ```flick
 # import JsError exposing (JsError)
 #
-lookup : String ->{; JsError} Option String
+lookup : String ->{Async; JsError} Option String
 foreign async lookup from "package" "lookup"
   arity 1
   catch JsError.from_js
@@ -209,7 +209,7 @@ now_millis : Unit ->{} Float
 foreign sync now_millis from global "Date.now"
   arity 0
 
-read_text : Path ->{; FsError} String
+read_text : Path ->{Async; FsError} String
 foreign async read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js

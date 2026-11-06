@@ -171,7 +171,7 @@ export declare function lookup(
 ```flick
 # import JsError exposing (JsError)
 #
-lookup : String ->{; JsError} Option String
+lookup : String ->{Async; JsError} Option String
 foreign async lookup from "package" "lookup"
   arity 1
   catch JsError.from_js
@@ -214,7 +214,7 @@ now_millis : Unit ->{} Float
 foreign sync now_millis from global "Date.now"
   arity 0
 
-read_text : Path ->{; FsError} String
+read_text : Path ->{Async; FsError} String
 foreign async read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js

@@ -2,12 +2,12 @@
 // Flick declares them over the runtime.
 module App.Main exposing (main)
 
-sleep : Float ->{} Unit
+sleep : Float ->{Async;} Unit
 foreign async sleep from "./timers.mjs" "sleep"
 
 type error Oops = Oops String
 
-after : Float -> String -> Eff none none String
+after : Float -> String -> Eff {Async} none String
 let after millis text = task {
   sleep millis
   text
@@ -32,7 +32,7 @@ let outcome exit =
     | None -> "no typed error"
   | _ -> "?"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let (a, b) = parallel (after 20 "slow") (after 1 "fast")
   Platform.stdout_line (a ++ " " ++ b)

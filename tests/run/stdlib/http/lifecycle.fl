@@ -5,7 +5,7 @@ module App.Main exposing (main)
 start : String ->{} JsValue
 foreign sync start from "./raw.mjs" "start"
 
-wait : JsValue ->{} String
+wait : JsValue ->{Async;} String
 foreign async wait from "./raw.mjs" "wait"
 
 ms : Float -> Duration.Duration
@@ -32,7 +32,7 @@ let handle started _ = scope {
   Platform.stdout_line "handler finished"
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let options = { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
   let started : Deferred.Deferred {} Unit = Deferred.make ()

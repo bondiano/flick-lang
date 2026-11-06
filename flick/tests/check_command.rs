@@ -174,3 +174,35 @@ let wrong : Int = "no"
     );
     assert_eq!(String::from_utf8(again.stderr).expect("utf-8"), stderr);
 }
+
+#[test]
+fn fix_only_applies_the_fixes_of_the_codes_given() {
+    let text = "module App.Waits exposing (..)\n\n\
+                sleep : Float ->{} Unit\n\
+                foreign async sleep from \"./timers.mjs\" \"sleep\"\n\n\
+                nap : Unit ->{} Unit\n\
+                let nap () = sleep 1\n";
+    let files = [
+        (
+            "flick.toml",
+            "schema-version = 1\n[project]\nkind = \"lib\"\n",
+        ),
+        ("src/App/Waits.fl", text),
+    ];
+    let dir = common::project("check_fix_only", &files);
+    let out = common::flick_in(&dir, &["check", "--fix", "--only", "F001"]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "`nap` still lacks `Async`: {out:?}"
+    );
+    let fixed = fs::read_to_string(dir.join("src/App/Waits.fl")).expect("source");
+    let row = "sleep : Float ->{Async;} Unit";
+    assert_eq!(fixed, text.replace("sleep : Float ->{} Unit", row));
+
+    // the fix of every code reaches the caller, one pass after the other
+    let out = common::flick_in(&dir, &["check", "--fix"]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    let fixed = fs::read_to_string(dir.join("src/App/Waits.fl")).expect("source");
+    assert!(fixed.contains("nap : Unit ->{Async;} Unit"), "{fixed}");
+}

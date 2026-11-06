@@ -3,21 +3,21 @@
 // has ended.
 module App.Main exposing (main)
 
-hang : Unit ->{} Unit
+hang : Unit ->{Async;} Unit
 foreign async hang from "./timers.mjs" "hang"
   cancel signal
 
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-waiting : Unit ->{} String
+waiting : Unit ->{Async;} String
 let waiting () = scope {
   Resource.acquire_release (task { say "open" }) (fun _ -> say "close")
   hang ()
   "never"
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let outcome =
     try timeout 20 (task { waiting () }) with

@@ -22,7 +22,7 @@ foreign pure parse from global "Number.parseFloat"
   catch from_js
 //^^^^^^^^^^^^^ FLICK-F001 a `foreign pure` call cannot throw
 
-read : String ->{; FsError} String
+read : String ->{Async; FsError} String
 foreign async read from "./fs.js" "read"
   catch to_other
 //      ^^^^^^^^ FLICK-F003 `catch` makes `Other`

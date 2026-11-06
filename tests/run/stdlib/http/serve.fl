@@ -12,7 +12,7 @@ type alias Item = { label : String; size : Float }
 
 type error Boom = Boom
 
-call : String -> String -> String ->{} String
+call : String -> String -> String ->{Async;} String
 foreign async call from "./wire.mjs" "call"
 
 say : String ->{} Unit
@@ -65,7 +65,8 @@ let base server =
   | Http.Server.UnixAddress path -> path
 
 serving :
-  Unit ->{Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError} String
+  Unit ->{Async, Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError}
+  String
 let serving () = scope s {
   let url = base (Http.Server.serve options (app ()))
   say (call "GET" (url ++ "/item/7") "")
@@ -109,7 +110,7 @@ let interrupted () =
       })
   Ref.get url
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let outcome = provide Http.Server.layer_services {
     try

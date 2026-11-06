@@ -24,14 +24,14 @@ let from_js value = FsError "the file system failed"
 counted : Float ->{} Float
 foreign effect counted from "./bindings.mjs" "counted"
 
-later : Float ->{} Float
+later : Float ->{Async;} Float
 foreign async later from "./bindings.mjs" "later"
 
 fail_sync : String ->{; FsError} Unit
 foreign sync fail_sync from "./bindings.mjs" "fail"
   catch from_js
 
-fail_async : String ->{; FsError} Unit
+fail_async : String ->{Async; FsError} Unit
 foreign async fail_async from "./bindings.mjs" "reject"
   catch from_js
 
@@ -46,7 +46,7 @@ now_millis : Unit ->{} Float
 foreign sync now_millis from global "Date.now"
   arity 0
 
-read_text : Path ->{; FsError} String
+read_text : Path ->{Async; FsError} String
 foreign async read_text from "./bindings.mjs" "readText"
   arity 1
   catch from_js
@@ -95,7 +95,7 @@ foreign pure same_callback from "./bindings.mjs" "sameCallback"
 twice : (Float ->{} Float) ->{} Float
 foreign effect twice from "./bindings.mjs" "twice"
 
-await_both : Js.PromiseCallback Float Float ->{} Float
+await_both : Js.PromiseCallback Float Float ->{Async;} Float
 foreign async await_both from "./bindings.mjs" "awaitBoth"
 
 sync_outcome : Unit ->{} String
@@ -106,7 +106,7 @@ let sync_outcome () =
   with
   | FsError reason -> "sync: " ++ reason
 
-async_outcome : Unit ->{} String
+async_outcome : Unit ->{Async;} String
 let async_outcome () =
   try
     fail_async "boom"
@@ -121,7 +121,7 @@ let user_name http =
     | HttpError reason -> { id = 0; name = reason }
   user.name
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let request = task { counted 21 }
   let same = identity request

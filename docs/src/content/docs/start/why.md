@@ -124,7 +124,7 @@ binding:
 ```flick
 # import JsError exposing (JsError)
 #
-lookup : String ->{; JsError} Option String
+lookup : String ->{Async; JsError} Option String
 foreign async lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js

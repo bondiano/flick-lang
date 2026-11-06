@@ -3,7 +3,7 @@
 // and `parallel_all` keeps at most its limit of branches running.
 module App.Main exposing (main)
 
-sleep : Float ->{} Unit
+sleep : Float ->{Async;} Unit
 foreign async sleep from "../runtime/timers.mjs" "sleep"
 
 logged : Ref (List Float) -> Float ->{} Float
@@ -12,7 +12,7 @@ let logged log n =
   n * 10
 
 /// Tracks how many tasks run at once, and the most at any time.
-track : Ref Float -> Ref Float -> Float -> Eff none none Float
+track : Ref Float -> Ref Float -> Float -> Eff {Async} none Float
 let track active peak n = task {
   let now = Ref.modify active (fun a -> (a + 1, a + 1))
   Ref.modify peak (fun p -> ((), if now > p then now else p))
@@ -21,7 +21,7 @@ let track active peak n = task {
   n
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   Platform.stdout_line (show (List.map (fun x -> x + 1) [1, 2, 3]))
   let log = Ref.make []

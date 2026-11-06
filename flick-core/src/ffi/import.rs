@@ -364,8 +364,11 @@ fn signature(
     for t in &types {
         let _ = write!(out, "{} -> ", arrow_operand(t));
     }
+    // a Promise suspends
     let arrow = match (mode, errors) {
         ("pure", _) => " -> ".to_owned(),
+        ("async", "") => " ->{Async;} ".to_owned(),
+        ("async", e) => format!(" ->{{Async; {e}}} "),
         (_, "") => " ->{} ".to_owned(),
         (_, e) => format!(" ->{{; {e}}} "),
     };

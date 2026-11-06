@@ -21,7 +21,7 @@ foreign sync off from "./bindings.mjs" "off"
 emit : Emitter -> Float ->{} Unit
 foreign sync emit from "./bindings.mjs" "emit"
 
-sleep : Float ->{} Unit
+sleep : Float ->{Async;} Unit
 foreign async sleep from "../runtime/timers.mjs" "sleep"
 
 report : Failure none ->{} Unit
@@ -31,7 +31,7 @@ let report failure =
 handle : Float -> Eff none none Unit
 let handle n = task { Platform.stdout_line ("handled " ++ show n) }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let source = emitter ()
   scope s {

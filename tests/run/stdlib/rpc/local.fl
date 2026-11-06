@@ -14,7 +14,7 @@ marked : Unit ->{} String
 foreign sync marked from "./marks.mjs" "marked"
   arity 0
 
-sleep : Float ->{} Unit
+sleep : Float ->{Async;} Unit
 foreign async sleep from "./marks.mjs" "sleep"
   arity 1
 
@@ -22,7 +22,7 @@ start : String ->{} Unit
 foreign sync start from "./marks.mjs" "start"
   arity 1
 
-started : String ->{} Unit
+started : String ->{Async;} Unit
 foreign async started from "./marks.mjs" "started"
   arity 1
 
@@ -58,7 +58,7 @@ type alias Handlers r = {
 group : Rpc.Group r (Handlers r)
 let group = Rpc.group |> Rpc.add double |> Rpc.add count_to |> Rpc.add slow |> Rpc.add steady
 
-handlers : Handlers none
+handlers : Handlers {Async}
 let handlers = {
   double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
   count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
@@ -72,7 +72,7 @@ let handlers = {
     mark "steady";
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let local =
     try show (Rpc.call_local group handlers double 21) with

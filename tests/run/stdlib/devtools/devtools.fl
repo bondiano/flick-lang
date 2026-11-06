@@ -2,15 +2,15 @@
 // DevTools server listening on a local port.
 module App.Main exposing (main)
 
-start : Unit ->{} Float
+start : Unit ->{Async;} Float
 foreign async start from "./server.mjs" "start"
   arity 0
 
-got : String ->{} Bool
+got : String ->{Async;} Bool
 foreign async got from "./server.mjs" "got"
   arity 1
 
-stop : Unit ->{} Unit
+stop : Unit ->{Async;} Unit
 foreign async stop from "./server.mjs" "stop"
   arity 0
 
@@ -27,7 +27,7 @@ let options = {
   disablePropagation = false;
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let port = start ()
   provide (DevTools.layer ("ws://127.0.0.1:" ++ show port)) {

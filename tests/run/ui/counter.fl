@@ -12,7 +12,7 @@ click : String ->{} Unit
 foreign sync click from "./dom.mjs" "click"
   arity 1
 
-settle : Unit ->{} Unit
+settle : Unit ->{Async;} Unit
 foreign async settle from "./dom.mjs" "settle"
   arity 0
 
@@ -63,7 +63,7 @@ report : Failure e ->{} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   setup ()
   match Ui.Dom.container "app" with

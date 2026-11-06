@@ -323,7 +323,7 @@ instance Show Shape =
     | Circle _ _ -> "circle"
     | _ -> "other"
 
-read_text : Path ->{; FsError} String
+read_text : Path ->{Async; FsError} String
 foreign async read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js

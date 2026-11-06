@@ -12,6 +12,8 @@
 //! | `variadic` | the last argument is a `List a` spread into the call |
 //! | `retention call` / `retention owner` | what a parameter that may hold a scope's capabilities is kept for |
 
+mod suspends;
+
 use std::slice;
 
 use super::Checker;
@@ -59,6 +61,9 @@ impl Checker<'_> {
                 decl,
                 "a foreign function returns an Effect, so its arrows cannot be Sync (`->{Atom.Read;}`): define the Sync function in Flick around a foreign",
             );
+        }
+        if mode == "async" {
+            self.async_needs_async(decl, &body);
         }
         let stages: Vec<bool> = stages.iter().map(|&s| s != Stage::Pure).collect();
         let dicts = match scheme {

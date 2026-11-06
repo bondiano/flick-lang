@@ -6,11 +6,11 @@ module App.Main exposing (main)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 
-later : Unit ->{} String
+later : Unit ->{Async;} String
 foreign async later from "./streamed.mjs" "later"
   arity 0
 
-visit : String ->{} String
+visit : String ->{Async;} String
 foreign async visit from "./streamed.mjs" "visit"
   arity 1
 
@@ -29,7 +29,7 @@ let page _ =
     (Stream.provide_ Reactivity.Atom.layer (Ui.Server.stream "app" (Ui.render greeting ())))
     { Http.ServerResponse.defaults with contentType = Some "text/html" }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () = provide Http.Server.layer_services {
   try
     scope s {

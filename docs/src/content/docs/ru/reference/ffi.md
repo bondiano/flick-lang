@@ -1,6 +1,6 @@
 ---
 title: "Внешние функции"
-source_hash: f2a5d431c6c71f23
+source_hash: 9b85bfa41987819c
 ---
 
 Объявление `foreign` связывает функцию JS с сигнатурой Flick
@@ -22,7 +22,7 @@ now_millis : Unit ->{} Float
 foreign sync now_millis from global "Date.now"
   arity 0
 
-read_text : Path ->{; FsError} String
+read_text : Path ->{Async; FsError} String
 foreign async read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js
@@ -224,7 +224,7 @@ cancel = "signal"          # an async call gets an AbortSignal
 ```flick
 # import JsError exposing (JsError)
 #
-lookup : String ->{; JsError} Option String
+lookup : String ->{Async; JsError} Option String
 foreign async lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js
@@ -253,7 +253,7 @@ foreign async lookup from "lookup-lib" "lookup"
 ```flick
 # import JsError exposing (JsError)
 #
-lookup : String ->{; JsError} Option String
+lookup : String ->{Async; JsError} Option String
 foreign async lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js

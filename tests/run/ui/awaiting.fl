@@ -9,7 +9,7 @@ setup : Unit ->{} Unit
 foreign sync setup from "./dom.mjs" "setup"
   arity 0
 
-settle : Unit ->{} Unit
+settle : Unit ->{Async;} Unit
 foreign async settle from "./dom.mjs" "settle"
   arity 0
 
@@ -21,7 +21,7 @@ report : Failure e ->{} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   setup ()
   let name_gate : Deferred.Deferred none String = Deferred.make ()

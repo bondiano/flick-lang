@@ -16,16 +16,16 @@ type alias UserPath = { id : String }
 type error NotFound = NotFound { id : String }
   deriving Schema
 
-post_raw : String -> String ->{} String
+post_raw : String -> String ->{Async;} String
 foreign async post_raw from "./raw.mjs" "post"
 
-get_raw : String ->{} String
+get_raw : String ->{Async;} String
 foreign async get_raw from "./raw.mjs" "get"
 
-head_raw : String ->{} String
+head_raw : String ->{Async;} String
 foreign async head_raw from "./raw.mjs" "head"
 
-text_raw : String ->{} String
+text_raw : String ->{Async;} String
 foreign async text_raw from "./raw.mjs" "text"
 
 user_path : PureCodec Json UserPath
@@ -131,7 +131,7 @@ let files =
 find : List User -> String -> Option User
 let find all id = List.find (fun u -> u.id == id) all
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let store = Ref.make [{ id = "1"; name = "Ada" }]
   let handlers : { users : Handlers none } = {

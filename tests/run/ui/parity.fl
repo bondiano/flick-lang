@@ -11,7 +11,7 @@ complaints : Unit ->{} String
 foreign sync complaints from "./dom.mjs" "complaints"
   arity 0
 
-settle : Unit ->{} Unit
+settle : Unit ->{Async;} Unit
 foreign async settle from "./dom.mjs" "settle"
   arity 0
 
@@ -45,7 +45,7 @@ report : Failure e ->{} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let server = provide Atom.layer { Ui.Server.render (Ui.render page ()) }
   Platform.stdout_line server

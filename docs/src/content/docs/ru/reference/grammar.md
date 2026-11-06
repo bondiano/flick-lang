@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 45768138ef4de2ad
+source_hash: 2f609a4a8c5485d2
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -346,7 +346,7 @@ instance Show Shape =
     | Circle _ _ -> "circle"
     | _ -> "other"
 
-read_text : Path ->{; FsError} String
+read_text : Path ->{Async; FsError} String
 foreign async read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js

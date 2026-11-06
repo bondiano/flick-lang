@@ -6,7 +6,7 @@ module App.Main exposing (main)
 open_raw : String ->{} String
 foreign effect open_raw from "./resources.mjs" "open"
 
-slow_write : String -> Float ->{} Unit
+slow_write : String -> Float ->{Async;} Unit
 foreign async slow_write from "./resources.mjs" "slowWrite"
 
 type error Oops = Oops String
@@ -17,12 +17,12 @@ let report failure = Platform.stdout_line "supervisor saw a failure"
 unexpected : Failure none ->{} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
-worker : Unit ->{; Oops} Unit
+worker : Unit ->{Async; Oops} Unit
 let worker () =
   slow_write "log" 80
   from_result (Err (Oops "late"))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   scope owner {
     let first = open_raw "first"

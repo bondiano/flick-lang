@@ -5,7 +5,7 @@
 // way, and a mutation of its key runs it anew on the client.
 module App.Main exposing (main)
 
-later : Unit ->{} String
+later : Unit ->{Async;} String
 foreign async later from "./stream.mjs" "later"
   arity 0
 
@@ -13,15 +13,15 @@ task_runs : Unit ->{} Float
 foreign sync task_runs from "./stream.mjs" "taskRuns"
   arity 0
 
-stream_shell : String ->{} Unit
+stream_shell : String ->{Async;} Unit
 foreign async stream_shell from "./stream.mjs" "streamShell"
   arity 1
 
-stream_rest : Unit ->{} Unit
+stream_rest : Unit ->{Async;} Unit
 foreign async stream_rest from "./stream.mjs" "streamRest"
   arity 0
 
-settle : Unit ->{} Unit
+settle : Unit ->{Async;} Unit
 foreign async settle from "./stream.mjs" "settle"
   arity 0
 
@@ -66,7 +66,7 @@ report : Failure e ->{} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let chunks = provide Atom.layer {
     Atom.set count 5

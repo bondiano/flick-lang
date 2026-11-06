@@ -40,8 +40,8 @@ d7add3cdb4017b53  05-errors-and-concurrency:301  import File exposing (File, Pat
 1d4de52c15fcfbac  06-typescript-and-ffi:35  with_default : a -> Option a -> a
 01433f1e5e58aa84  06-typescript-and-ffi:65  type alias Point = { x : Float; y : Float }
 438ba443bbdcdff5  06-typescript-and-ffi:100  type UserId = UserId String
-ca743a3f39318615  06-typescript-and-ffi:172  import JsError exposing (JsError)
-5a97ae56ec583a7d  06-typescript-and-ffi:204  import File exposing (Path)
+fc9aaa4f3d0ae64f  06-typescript-and-ffi:172  import JsError exposing (JsError)
+6c45c79d7dec55f9  06-typescript-and-ffi:204  import File exposing (Path)
 969c35e8a198d3e4  06-typescript-and-ffi:273  unboxed type UserId = UserId String
 321da342acc527b3  06-typescript-and-ffi:295  type Emitter
 ecfe40849e18cf97  07-schema:69  refined type Email = String where Checks.email

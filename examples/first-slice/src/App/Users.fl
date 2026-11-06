@@ -30,7 +30,7 @@ type error NotFound = NotFound UserId
   deriving Show
 
 service Users =
-  get : UserId ->{; NotFound} User
+  get : UserId ->{Async; NotFound} User
 
 service Log =
   info : String ->{} Unit
@@ -45,7 +45,7 @@ let to_view user = {
   title = String.trim user.name;
 }
 
-load_view : UserId ->{Users, Log; NotFound} UserView
+load_view : UserId ->{Async, Users, Log; NotFound} UserView
 let load_view id =
   let user = Users.get id
   let view = to_view user
@@ -54,7 +54,7 @@ let load_view id =
 
   view
 
-load_two : UserId -> UserId ->{Users, Log; NotFound} (UserView, UserView)
+load_two : UserId -> UserId ->{Async, Users, Log; NotFound} (UserView, UserView)
 let load_two first_id second_id =
   let first = task { load_view first_id }
   let second = task { load_view second_id }

@@ -3,7 +3,7 @@ source: flick-core/src/ffi/tests.rs
 expression: generated.report(&lookup_surface())
 ---
 lookup-lib@1.0.0 (lookup-lib/index.d.ts)
-  supported    lookup — String ->{; JsError} Option String
+  supported    lookup — String ->{Async; JsError} Option String
   supported    next_id — Unit ->{} Float
   supported    parse_1 — String ->{} Float
   supported    parse_2 — String -> Float ->{} Float

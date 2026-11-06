@@ -18,7 +18,7 @@ choose : String ->{} Unit
 foreign sync choose from "./dom.mjs" "choose"
   arity 1
 
-settle : Unit ->{} Unit
+settle : Unit ->{Async;} Unit
 foreign async settle from "./dom.mjs" "settle"
   arity 0
 
@@ -33,7 +33,7 @@ foreign sync markup from "./dom.mjs" "markup"
 open_raw : String ->{} String
 foreign effect open_raw from "../runtime/resources.mjs" "open"
 
-write_on_release : String ->{} Unit
+write_on_release : String ->{Async;} Unit
 foreign async write_on_release from "./dom.mjs" "writeOnRelease"
 
 release : Unit ->{} Unit
@@ -58,7 +58,7 @@ people : List User
 let people = [{ id = 1; name = "Ada" }, { id = 2; name = "Mallory" }, { id = 3; name = "Carol" }]
 
 // The handler task: nothing of it runs while rendering.
-save : Atom.Writable (Option User) -> String -> User ->{Atom.Write; Refused} Unit
+save : Atom.Writable (Option User) -> String -> User ->{Async, Atom.Write; Refused} Unit
 let save model log user =
   if user.name == "Mallory" then
     from_result (Err (Refused user.name))
@@ -102,7 +102,7 @@ let closed failure =
     ("root closed: " ++ RawCause.describe (Failure.inspect failure) ++ ", page [" ++ text () ++ "]")
   release ()
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   setup ()
   let model = Atom.make None

@@ -8,11 +8,11 @@ import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 import Server exposing (plugin server)
 
-start : Unit ->{} Float
+start : Unit ->{Async;} Float
 foreign async start from "./traces.mjs" "start"
   arity 0
 
-stop : Unit ->{} Unit
+stop : Unit ->{Async;} Unit
 foreign async stop from "./traces.mjs" "stop"
   arity 0
 
@@ -69,7 +69,7 @@ let page _ =
 same : String -> String ->{} String
 let same a b = a ++ " and " ++ b ++ " in one trace: " ++ show (shares a b)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let collector = "http://127.0.0.1:" ++ show (start ())
   let layers =

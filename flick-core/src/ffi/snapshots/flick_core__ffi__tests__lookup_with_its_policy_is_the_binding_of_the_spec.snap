@@ -11,7 +11,7 @@ module Ffi.LookupLib.Generated exposing (..)
 import JsError exposing (JsError)
 
 /// lookup-lib@1.0.0 sha256:aa
-lookup : String ->{; JsError} Option String
+lookup : String ->{Async; JsError} Option String
 foreign async lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js
