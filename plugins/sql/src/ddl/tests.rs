@@ -1,7 +1,8 @@
 use flick_core::plugin::testing::blocks;
+use flick_plugin::Span;
 
 use super::schema::{Problem, Table, Write};
-use super::{Migration, migration, schema, type_name};
+use super::{Migration, located, migration, place, schema, type_name};
 
 fn migrations(text: &str) -> Vec<Migration> {
     let blocks = blocks(text);
@@ -117,4 +118,16 @@ sql migration 1 "b" {
         "migration 1 comes after 2: versions increase in the order written"
     );
     assert_eq!(problems.len(), 5);
+}
+
+#[test]
+fn a_place_keeps_its_block_and_offset_past_256_blocks_and_16_mib() {
+    for (index, start, end) in [
+        (256, 3, 9),
+        (1, 1 << 24, (1 << 24) + 5),
+        (70_000, 0, u32::MAX),
+    ] {
+        let (back, span) = located((place(index, start), place(index, end)));
+        assert_eq!((back, span), (index, Span { start, end }));
+    }
 }

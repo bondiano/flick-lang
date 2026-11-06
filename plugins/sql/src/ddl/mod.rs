@@ -1,7 +1,7 @@
 //! The statements of `sql migration N "name" { … }`: SQL DDL read from the
 //! tokens of the block. The schema of a module is built from all its
 //! migrations at once, so a word's place names its block too: the block's
-//! index in the high bits, the offset in the block in the low ones.
+//! index in the high 32 bits, the offset in the block in the low ones.
 
 mod alter;
 mod schema;
@@ -12,23 +12,27 @@ pub use schema::schema;
 
 use flick_plugin::{Block, Span, TokenKind, string_value};
 
-/// How many bits of a place are the offset in its block.
-const OFFSET_BITS: u32 = 24;
+/// A range in one of a module's migrations, its start and end each a
+/// [`place`].
+pub type Range = (u64, u64);
 
-/// The place of `offset` in the block `index`.
-pub fn place(index: usize, offset: u32) -> u32 {
-    (u32::try_from(index).unwrap_or(u32::MAX) << OFFSET_BITS) | offset
+/// The place of `offset` in the block `index`, every offset of a block
+/// being a `u32`.
+pub fn place(index: usize, offset: u32) -> u64 {
+    let index = u64::from(u32::try_from(index).expect("a module has fewer than 2^32 migrations"));
+    (index << 32) | u64::from(offset)
 }
 
 /// The block and the span in it of the range `range`.
-pub fn located(range: (u32, u32)) -> (usize, Span) {
-    let mask = (1 << OFFSET_BITS) - 1;
-    let index = (range.0 >> OFFSET_BITS) as usize;
+pub fn located(range: Range) -> (usize, Span) {
+    let index = usize::try_from(range.0 >> 32).expect("a migration's index fits in usize");
+    // the low 32 bits are the offset in the block
+    let offset = |at: u64| u32::try_from(at & u64::from(u32::MAX)).unwrap_or(u32::MAX);
     (
         index,
         Span {
-            start: range.0 & mask,
-            end: range.1 & mask,
+            start: offset(range.0),
+            end: offset(range.1),
         },
     )
 }
@@ -37,7 +41,7 @@ pub fn located(range: (u32, u32)) -> (usize, Span) {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Word {
     pub text: String,
-    pub range: (u32, u32),
+    pub range: Range,
 }
 
 impl Word {
@@ -81,7 +85,7 @@ impl Statement {
 /// A migration of the module: its version, name and statements.
 #[derive(Debug, Clone)]
 pub struct Migration {
-    pub range: (u32, u32),
+    pub range: Range,
     /// `None` for a version that is no whole number.
     pub version: Option<i64>,
     pub name: String,
