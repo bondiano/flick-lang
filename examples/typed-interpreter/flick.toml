@@ -1,0 +1,11 @@
+schema-version = 1
+
+[project]
+kind = "app"
+entry = "App.Main"
+source-dir = "src"
+test-dir = "test"
+
+[build]
+out-dir = "dist"
+emit = "js"

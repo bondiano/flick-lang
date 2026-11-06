@@ -14,6 +14,7 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
 use crate::types::env::{Form, Instance};
+use crate::types::gadt::scheme::is_indexed;
 use crate::types::kinds::Kind;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Binder, Type};
@@ -39,9 +40,6 @@ impl<'n> Checker<'_> {
         if classes.is_empty() {
             return Vec::new();
         }
-        let Some(fields) = self.fields_of(decl, &name, &def.form, refined) else {
-            return Vec::new();
-        };
         let has_eq = classes.iter().any(|(m, c)| lang::is(Lang::Eq, m, c));
         let mut kinds = Vec::new();
         let mut kind = def.kind.clone();
@@ -59,6 +57,9 @@ impl<'n> Checker<'_> {
                 kind,
             })
             .collect();
+        let Some(fields) = self.fields_of(decl, &name, &def.form, refined, &params) else {
+            return Vec::new();
+        };
         let mut out = Vec::new();
         // the instance `Generic` of the type, once: named, or for a default
         let mut generic = (classes.iter()).any(|(m, c)| lang::is(Lang::Generic, m, c));
@@ -135,6 +136,7 @@ impl<'n> Checker<'_> {
         name: &str,
         form: &Form,
         refined: &[(&Node, Type)],
+        params: &[Binder],
     ) -> Option<Vec<Type>> {
         let span = decl
             .nodes()
@@ -142,12 +144,27 @@ impl<'n> Checker<'_> {
             .map_or_else(|| self.span(decl), |c| self.span(c));
         let message = match form {
             Form::Adt { constructors, .. } => {
-                return Some(
-                    constructors
-                        .iter()
-                        .flat_map(|c| self.constructor_fields(c))
-                        .collect(),
-                );
+                let mut fields = Vec::new();
+                for c in constructors {
+                    let entity = self.env.entity(Namespace::Constructor, c);
+                    let scheme = self.env.value(&entity).cloned().unwrap_or(Type::Error);
+                    if !is_indexed(&scheme, &self.env.module, name) {
+                        fields.extend(self.constructor_fields(c));
+                        continue;
+                    }
+                    // a constructor of a GADT, over the type's parameters
+                    match self.indexed_fields(&scheme, name, params) {
+                        Ok(more) => fields.extend(more),
+                        Err(why) => {
+                            let message = format!(
+                                "cannot derive instances of `{name}`: its constructor `{c}` {why}; write the instances by hand"
+                            );
+                            self.error(codes::C013, span, message);
+                            return None;
+                        }
+                    }
+                }
+                return Some(fields);
             }
             Form::Error => return Some(self.constructor_fields(name)),
             Form::Alias {

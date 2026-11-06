@@ -1,4 +1,5 @@
 import Formal.Elab.CoreDict
+import Formal.Elab.CoreCaseK
 import Formal.Elab.Run
 import Formal.Elab.DoNotation
 import Formal.Elab.Comprehension
@@ -24,6 +25,9 @@ def typingTarget (hR : Real P Sg N) : Target P where
   app := has_app
   ite := has_ite
   caseOpt := has_caseOpt hR
+  con := has_con hR
+  caseK he hK hT hlen hn hU hb hρ _ hcl hr := has_caseK hR he hK hT hlen hn hU hb hρ hcl hr
+  caseKDead := has_caseKDead hR
   lam := has_lam
   let_ := has_let
   lamD := has_lamD
@@ -41,7 +45,7 @@ def typingTarget (hR : Real P Sg N) : Target P where
   Obs := Empty
   obs _ := none
   Rel _ _ := True
-  load_rel _ _ _ := trivial
+  load_rel _ _ _ _ := trivial
   step_rel _ h := h.elim
   final_rel _ h := nomatch h
 

@@ -159,13 +159,24 @@ impl Gen<'_> {
         let package = (self.options.package)(&c.module);
         let tag = names::string(&names::tag(c, package.as_deref()));
         let fields: Vec<String> = (0..c.arity).map(|i| format!("_{i}")).collect();
-        let mut value = if fields.is_empty() {
+        // the dictionaries a value of a GADT holds, under keys `==` skips
+        let dicts: Vec<String> = (0..c.dicts).map(|i| format!("$d{i}")).collect();
+        let held = fields
+            .iter()
+            .cloned()
+            .chain(dicts.iter().enumerate().map(|(i, d)| format!("${i}: {d}")))
+            .collect::<Vec<_>>();
+        let mut value = if held.is_empty() {
             format!("{{ _tag: {tag} }}")
         } else {
-            format!("({{ _tag: {tag}, {} }})", fields.join(", "))
+            format!("({{ _tag: {tag}, {} }})", held.join(", "))
         };
         for field in fields.iter().rev() {
             value = format!("{} {value}", self.arrow(field));
+        }
+        // dictionaries come first, as a use passes them
+        if !dicts.is_empty() {
+            value = format!("{} {value}", self.arrow(&dicts.join(", ")));
         }
         self.export(&name, &value)
     }
@@ -386,7 +397,11 @@ fn dict_uses(d: &Dict, module: &str, out: &mut BTreeSet<String>) {
                 dict_uses(f, module, out);
             }
         }
-        Dict::Given(_) | Dict::Primitive { .. } | Dict::Site { .. } | Dict::Error => {}
+        Dict::Given(_)
+        | Dict::Field(_)
+        | Dict::Primitive { .. }
+        | Dict::Site { .. }
+        | Dict::Error => {}
     }
 }
 

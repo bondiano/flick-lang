@@ -11,6 +11,7 @@ use super::{Dict, RECORD_CLASSES, has_metas, split, super_slot, vars, which};
 use crate::numeric::{Num, default_num};
 use crate::types::Checker;
 use crate::types::env::Instance;
+use crate::types::gadt::branch::as_field_given;
 use crate::types::generalize::replace_metas;
 use crate::types::ty::Type;
 
@@ -38,15 +39,18 @@ impl Checker<'_> {
             let mut left = Vec::new();
             let mut progress = false;
             for mut w in pending {
-                let givens = self.closure(&w.givens);
-                let c = self.canon(&w.constraint);
-                progress |= c != w.constraint;
-                w.constraint = c;
-                let site = self.call_site(&w.constraint, &givens, w.span);
-                let outcome = site.map_or_else(
-                    || self.entail(&w.constraint, &givens, &mut Vec::new()),
-                    Outcome::Solved,
-                );
+                // under the equalities of the GADT branches it is from
+                let outcome = self.under(&w.givens, |this| {
+                    let givens = this.closure(&w.givens);
+                    let c = this.canon(&w.constraint);
+                    progress |= c != w.constraint;
+                    w.constraint = c;
+                    let site = this.call_site(&w.constraint, &givens, w.span);
+                    site.map_or_else(
+                        || this.entail(&w.constraint, &givens, &mut Vec::new()),
+                        Outcome::Solved,
+                    )
+                });
                 match outcome {
                     Outcome::Solved(dict) => {
                         progress = true;
@@ -176,6 +180,11 @@ impl Checker<'_> {
         let mut out = Vec::new();
         let mut path = Vec::new();
         for g in givens.iter().rev() {
+            if let Some((local, c)) = as_field_given(g) {
+                let c = self.canon(c);
+                visit(self, c, Dict::Field(local.to_owned()), &mut path, &mut out);
+                continue;
+            }
             let g = self.canon(g);
             let shown = self.show(&g);
             visit(self, g, Dict::Given(shown), &mut path, &mut out);

@@ -30,6 +30,8 @@ theorem mfield_t (s : Scheme) (c : Nat) :
 
 theorem hmk : Sg.ctor "MkEff" = some (2, [effField], "Eff") := rfl
 
+theorem hmkr : Sg.res "MkEff" = idTs 2 := rfl
+
 theorem hone_eff : ∀ K k ts, Sg.ctor K = some (k, ts, "Eff") → K = "MkEff" := by
   intro K k ts h; simp only [Sg] at h; unfold ctorF at h; split at h <;> simp_all
 
@@ -71,11 +73,11 @@ theorem inst_typ {I ins b} (hI : insts I = some ins) (hb : instBody I = some b) 
         simp [eqInt, effPure, effMap2, effBind, mkEff, unEff, optPure, optMap2, optBind, un1, someQ,
           noneQ, iterL, caseLQ, scons, snil, pvars, Flick.Tm.Has] at h) (by simp))
   · exact dcons_m (s := ((methSch 0).get rfl).2) (fun _ _ => .const (ι := default) trivial .refl) .dnil
-  · exact dcons_m (s := ((methSch 1).get rfl).2) (fun _ _ => typ_effPure_tr hmk N rfl (by decide) (by decide) _ _)
+  · exact dcons_m (s := ((methSch 1).get rfl).2) (fun _ _ => typ_effPure_tr hmk hmkr N rfl (by decide) (by decide) _ _)
       (dcons_m (s := ((methSch 2).get rfl).2)
-        (fun _ _ => typ_effMap2_tr hmk hone_eff N rfl (by decide) (by decide) _ _ _ _ _ _ _) .dnil)
+        (fun _ _ => typ_effMap2_tr hmk hmkr hone_eff N rfl (by decide) (by decide) _ _ _ _ _ _ _) .dnil)
   · exact .dcons (.glob (ts := []) rfl rfl (fun _ _ h => h.elim) .refl) (dcons_m (s := ((methSch 3).get rfl).2)
-      (fun _ _ => typ_effBind_tr hmk hone_eff N rfl (by decide) (by decide) _ _ _ _ _) .dnil)
+      (fun _ _ => typ_effBind_tr hmk hmkr hone_eff N rfl (by decide) (by decide) _ _ _ _ _) .dnil)
   · exact dcons_m (s := ((methSch 1).get rfl).2)
       (fun _ _ => typ_optPure)
       (dcons_m (s := ((methSch 2).get rfl).2) (fun _ _ => typ_optMap2_tr _ _ _ _ _ _ _) .dnil)

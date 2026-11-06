@@ -326,9 +326,41 @@ Where a type lacks what a default needs, as a `GDefault` of one of its
 fields, the clause is `FLICK-C013`, as is a class with a method without a
 default or with more than one parameter.
 
+
+A constructor of a GADT that hides no type and holds no dictionary is
+derived like any other, with each field at the type the constructor builds:
+`IntLit Int : Expr Int` shows its `Int` with `Show Int`. One that hides the
+type of a field or holds a dictionary has no derived instance (`FLICK-C013`),
+nor does a GADT have `Generic`; `Schema`, `Url` and `Form` refuse one with
+their own codes.
 ## Dictionaries
 
 Each solved constraint records its dictionary at the place that required it:
 an instance applied to the dictionaries of its context, an assumption, a
 superclass of another dictionary, a structural instance by field, or a
 primitive. Code generation passes them as arguments.
+
+### Dictionaries in values
+
+A constructor of a GADT may hold dictionaries: the constraints before it,
+`C =>`, are solved where a value is built (`FLICK-C001` there), and the value
+keeps their dictionaries after its fields. An arm of a `match` on the
+constructor has them as assumptions, for the types the constructor hides
+too:
+
+```flick
+type Showable =
+  | Show b => Showable b : Showable
+
+describe : Showable -> String
+let describe s =
+  match s with
+  | Showable x -> show x
+
+shown : List String
+let shown = List.map describe [Showable 1, Showable "two", Showable [3.5]]
+```
+
+Only an arm of a `match` takes them out (`FLICK-T058` for the pattern of a
+`let` or a parameter). `==` compares the fields of such values, not their
+dictionaries; in a `.d.ts` file a held dictionary is no field.

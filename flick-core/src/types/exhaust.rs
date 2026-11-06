@@ -3,6 +3,8 @@
 //! some rows when a value matches it but none of the rows. A `match` must
 //! leave no value unmatched (the diagnostic shows one); an arm that is not
 //! useful can never run. Guarded arms cover nothing, since the guard may fail.
+//! Each column has the type of its values, when known: a constructor of a
+//! GADT that builds no value of that type is not among its constructors.
 
 use std::fmt::Write;
 use std::{iter, slice};
@@ -22,21 +24,23 @@ use crate::syntax::kind::SyntaxKind as K;
 const MISSING_SHOWN: usize = 8;
 
 impl Checker<'_> {
-    pub fn exhaustive(&mut self, node: &Node, arms: &[(Pat, bool, Span)]) {
+    pub fn exhaustive(&mut self, node: &Node, arms: &[(Pat, bool, Span)], ty: &Type) {
         let mut rows: Vec<Vec<Pat>> = Vec::new();
+        let tys = slice::from_ref(ty);
         for (pat, guarded, span) in arms {
-            if self.useful(&rows, slice::from_ref(pat)).is_none() {
-                self.warning(
-                    codes::T010,
-                    *span,
-                    "this arm is never reached: the arms above match every value it matches",
-                );
+            if self.useful_at(&rows, slice::from_ref(pat), tys).is_none() {
+                let message = if self.useful_at(&[], slice::from_ref(pat), tys).is_none() {
+                    "this arm is never reached: no value of the matched type is built so"
+                } else {
+                    "this arm is never reached: the arms above match every value it matches"
+                };
+                self.warning(codes::T010, *span, message);
             }
             if !guarded {
                 rows.push(vec![pat.clone()]);
             }
         }
-        let (missing, _) = self.missing_patterns(rows);
+        let (missing, _) = self.missing_at(rows, tys);
         let Some(first) = missing.first() else {
             return;
         };
@@ -60,9 +64,13 @@ impl Checker<'_> {
 
     /// A handful of patterns `rows` miss, each the first one the rows before
     /// miss, and whether they are all of them.
-    pub(super) fn missing_patterns(&self, mut rows: Vec<Vec<Pat>>) -> (Vec<String>, bool) {
+    pub(super) fn missing_patterns(&self, rows: Vec<Vec<Pat>>) -> (Vec<String>, bool) {
+        self.missing_at(rows, &[])
+    }
+
+    fn missing_at(&self, mut rows: Vec<Vec<Pat>>, tys: &[Type]) -> (Vec<String>, bool) {
         let mut missing = Vec::new();
-        while let Some(witness) = self.useful(&rows, &[Pat::Wild]) {
+        while let Some(witness) = self.useful_at(&rows, &[Pat::Wild], tys) {
             if missing.len() == MISSING_SHOWN {
                 return (missing, false);
             }
@@ -107,16 +115,26 @@ impl Checker<'_> {
 
     /// A value vector that matches `v` but no row; `None` if there is none.
     pub(super) fn useful(&self, rows: &[Vec<Pat>], v: &[Pat]) -> Option<Vec<Pat>> {
+        self.useful_at(rows, v, &[])
+    }
+
+    /// [`Self::useful`] where the columns have the types `tys`, as far as
+    /// they are known.
+    fn useful_at(&self, rows: &[Vec<Pat>], v: &[Pat], tys: &[Type]) -> Option<Vec<Pat>> {
         let Some((first, rest)) = v.split_first() else {
             return rows.is_empty().then(Vec::new);
         };
+        let (ty, tys) = tys
+            .split_first()
+            .map_or((&Type::Error, &[][..]), |(t, r)| (t, r));
         let rows: Vec<Vec<Pat>> = rows.iter().flat_map(|r| expand(r)).collect();
         match first {
             Pat::Or(alternatives) => alternatives.iter().find_map(|alt| {
                 let v: Vec<Pat> = iter::once(alt.clone())
                     .chain(rest.iter().cloned())
                     .collect();
-                self.useful(&rows, &v)
+                let tys: Vec<Type> = iter::once(ty.clone()).chain(tys.iter().cloned()).collect();
+                self.useful_at(&rows, &v, &tys)
             }),
             Pat::Ctor(Ctor::ListRest(m), args) => {
                 let heads = rows.iter().filter_map(|r| match &r[0] {
@@ -134,14 +152,16 @@ impl Checker<'_> {
                             .chain(iter::repeat_n(Pat::Wild, arity - m))
                             .chain(rest.iter().cloned())
                             .collect();
-                        let witness = self.useful(&specialized, &v)?;
+                        let tys = self.column_types(ctor, ty, *arity, tys)?;
+                        let witness = self.useful_at(&specialized, &v, &tys)?;
                         Some(rebuild(ctor, witness, *arity))
                     })
             }
             Pat::Ctor(ctor, args) => {
                 let specialized = specialize(&rows, ctor, args.len());
                 let v: Vec<Pat> = args.iter().chain(rest).cloned().collect();
-                let witness = self.useful(&specialized, &v)?;
+                let tys = self.column_types(ctor, ty, args.len(), tys)?;
+                let witness = self.useful_at(&specialized, &v, &tys)?;
                 Some(rebuild(ctor, witness, args.len()))
             }
             Pat::Record(fields) => {
@@ -151,14 +171,39 @@ impl Checker<'_> {
                     .into_iter()
                     .chain(rest.iter().cloned())
                     .collect();
-                let witness = self.useful(&specialized, &v)?;
+                let tys: Vec<Type> = labels
+                    .iter()
+                    .map(|_| Type::Error)
+                    .chain(tys.iter().cloned())
+                    .collect();
+                let witness = self.useful_at(&specialized, &v, &tys)?;
                 Some(rebuild_record(&labels, witness))
             }
-            Pat::Wild => self.useful_wild(&rows, rest),
+            Pat::Wild => self.useful_wild(&rows, rest, ty, tys),
         }
     }
 
-    fn useful_wild(&self, rows: &[Vec<Pat>], rest: &[Pat]) -> Option<Vec<Pat>> {
+    /// The types of the columns once the first one is specialized to
+    /// `ctor`; `None` when no value of its type `ty` is built by `ctor`.
+    fn column_types(
+        &self,
+        ctor: &Ctor,
+        ty: &Type,
+        arity: usize,
+        rest: &[Type],
+    ) -> Option<Vec<Type>> {
+        let mut tys = self.ctor_fields_at(ctor, ty, arity)?;
+        tys.extend(rest.iter().cloned());
+        Some(tys)
+    }
+
+    fn useful_wild(
+        &self,
+        rows: &[Vec<Pat>],
+        rest: &[Pat],
+        ty: &Type,
+        tys: &[Type],
+    ) -> Option<Vec<Pat>> {
         let heads: Vec<&Pat> = rows.iter().map(|r| &r[0]).collect();
         if heads.iter().any(|h| matches!(h, Pat::Record(_))) {
             let labels = labels(rows, None);
@@ -168,7 +213,12 @@ impl Checker<'_> {
                 .map(|_| Pat::Wild)
                 .chain(rest.iter().cloned())
                 .collect();
-            let witness = self.useful(&specialized, &v)?;
+            let tys: Vec<Type> = labels
+                .iter()
+                .map(|_| Type::Error)
+                .chain(tys.iter().cloned())
+                .collect();
+            let witness = self.useful_at(&specialized, &v, &tys)?;
             return Some(rebuild_record(&labels, witness));
         }
         let mut seen: Vec<&Ctor> = Vec::new();
@@ -179,9 +229,15 @@ impl Checker<'_> {
                 seen.push(c);
             }
         }
-        let all = seen
-            .first()
-            .and_then(|c| list_ctors(seen.iter().copied()).or_else(|| self.constructors(c)));
+        let all = seen.first().and_then(|c| {
+            let all = list_ctors(seen.iter().copied()).or_else(|| self.constructors(c))?;
+            // the constructors that build values of the column's type
+            Some(
+                all.into_iter()
+                    .filter(|(c, arity)| self.ctor_fields_at(c, ty, *arity).is_some())
+                    .collect::<Vec<_>>(),
+            )
+        });
         let covered = |c: &Ctor| seen.iter().any(|s| covers(s, c));
         if let Some(all) = &all
             && all.iter().all(|(c, _)| covered(c))
@@ -191,7 +247,8 @@ impl Checker<'_> {
                 let v: Vec<Pat> = iter::repeat_n(Pat::Wild, *arity)
                     .chain(rest.iter().cloned())
                     .collect();
-                let witness = self.useful(&specialized, &v)?;
+                let tys = self.column_types(ctor, ty, *arity, tys)?;
+                let witness = self.useful_at(&specialized, &v, &tys)?;
                 Some(rebuild(ctor, witness, *arity))
             });
         }
@@ -200,7 +257,7 @@ impl Checker<'_> {
             .filter(|r| r[0] == Pat::Wild)
             .map(|r| r[1..].to_vec())
             .collect();
-        let witness = self.useful(&defaults, rest)?;
+        let witness = self.useful_at(&defaults, rest, tys)?;
         let missing = match (&all, seen.first()) {
             (Some(all), _) => all
                 .iter()

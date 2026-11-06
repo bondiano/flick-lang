@@ -48,6 +48,7 @@ fn data(module: &Module, package: Option<&str>) -> Vec<Data> {
             id: qualified_id(c, package),
             tag: (c.rep == Rep::Tagged).then(|| tag(c, package)),
             arity: c.arity,
+            dicts: c.dicts,
             literal: match &c.rep {
                 Rep::Literal(l) => Some(l.clone()),
                 _ => None,

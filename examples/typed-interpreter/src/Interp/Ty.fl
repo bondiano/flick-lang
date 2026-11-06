@@ -1,0 +1,29 @@
+/// The types of the language, as values: a `Ty a` describes `a`, so a
+/// branch on it learns what `a` is.
+module Interp.Ty exposing (Ty(..), equal, describe)
+
+import TypeEq exposing (TypeEq(..))
+
+type Ty a =
+  | TInt : Ty Int
+  | TBool : Ty Bool
+  | TFun (Ty a) (Ty b) : Ty (a -> b)
+
+/// Evidence that two described types are one, when they are.
+equal : forall a b. Ty a -> Ty b -> Option (TypeEq a b)
+let rec equal a b =
+  match (a, b) with
+  | (TInt, TInt) -> Some Refl
+  | (TBool, TBool) -> Some Refl
+  | (TFun pa ra, TFun pb rb) ->
+    match (equal pa pb, equal ra rb) with
+    | (Some Refl, Some Refl) -> Some Refl
+    | _ -> None
+  | _ -> None
+
+describe : forall a. Ty a -> String
+let rec describe t =
+  match t with
+  | TInt -> "Int"
+  | TBool -> "Bool"
+  | TFun p r -> "(" ++ describe p ++ " -> " ++ describe r ++ ")"

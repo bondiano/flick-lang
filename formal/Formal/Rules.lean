@@ -94,7 +94,8 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | loc : Ψ[l]? = some t → Typ Ψ Θ Γ (.loc l) (.ex (.ref t) φ)
   | const : c.ok Θ ι → Le (c.ty S ι) T → Typ Ψ Θ Γ (.const c) (.ex T φ)
   | ctor {ts us : List Ty} : S.ctor K = some (k, ts, T₀) → us.length = k →
-      Le (Sig.ctorTy ts T₀ us) T → Typ Ψ Θ Γ (.ctor K) (.ex T φ)
+      Sig.Holds ts T₀ (S.res K) us → Le (Sig.ctorTyR ts T₀ (S.res K) us) T →
+      Typ Ψ Θ Γ (.ctor K) (.ex T φ)
   | rnil : Typ Ψ Θ Γ .rnil (.ex .rnil φ)
   | rcons : R.IsRec → l ∉ R.labels → Typ Ψ Θ Γ e (.ex t φ) → Typ Ψ Θ Γ r (.ex R φ) →
       Typ Ψ Θ Γ (.rcons l e r) (.ex (.rcons l t R) φ)
@@ -109,6 +110,24 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | aguard : PatTy S true p t Δ → Typ Ψ Θ (Δ.map .mono ++ Γ) g (.ex (.base .bool) φ) →
       Typ Ψ Θ (Δ.map .mono ++ Γ) b (.ex t' φ) → Typ Ψ Θ Γ r (.alts t t' φ) →
       Typ Ψ Θ Γ (.aguard p g b r) (.alts t t' φ)
+  /-- An arm on a constructor `K` of a GADT, which builds `T rs` over its `k`
+  variables, with the patterns `qs` of its fields: under each instance `θ` of those
+  variables and of the ones around that makes `T rs` the matched type and fits the
+  arm, the fields' patterns bind `Δ θ` and the arm has the result's type. No such
+  `θ`: no value of the matched type is built by `K`, and the arm is dead. A dead arm
+  still names only the variables and cells around it. The matched type is a type
+  `T …`, as for the patterns of ordinary constructors. -/
+  | aref {qs : List Pat} {ts : List Ty} {Δ : (Atom → Ty) → List Ty} :
+      S.ctor K = some (k, ts, T₀) → t.hd = .adt T₀ → b.NoIns →
+      (∀ i, b.Free i → i < (Pat.spine K qs).binds + Γ.length) →
+      (∀ l, b.Has (.loc l) → l < Ψ.length) →
+      (∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+        PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ)) →
+      (∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+        Typ ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
+          ((Δ θ).map .mono ++ (Γ.map (Scheme.up k)).map (Scheme.substT θ)) b
+          (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ))) →
+      Typ Ψ Θ Γ r (.alts t t' φ) → Typ Ψ Θ Γ (.acons (Pat.spine K qs) b r) (.alts t t' φ)
   | todo : Typ Ψ Θ Γ .todo (.ex t φ)
   | task : Typ Ψ Θ Γ e (.ex t ψ) → ψ.le (.rt r ε) → e.NoIns →
       Caps.Sub (held Ψ Γ (.task e)) (Ty.eff r ε t C).reach → Le (.eff r ε t C) T →
@@ -202,5 +221,11 @@ structure RootTy (root : Roots) : Prop where
   glob : ∀ g v, root.glob g = some v → (∀ x, ¬ v.Has x) ∧
     ∃ s, S.glob g = some s ∧ Typ S [] s.cs [] v (.ex s.t .pure)
   globs : ∀ g s, S.glob g = some s → (root.glob g).isSome
+
+/-- An ordinary constructor at `T us`. -/
+theorem Typ.ctor_plain {Ψ Θ Γ K k ts T₀ us T φ} (hK : S.ctor K = some (k, ts, T₀))
+    (hres : S.res K = idTs k) (hk : us.length = k) (hT : Le (Sig.ctorTy ts T₀ us) T) :
+    Typ S Ψ Θ Γ (.ctor K) (.ex T φ) :=
+  .ctor hK hk (S.holds_plain hK hres hk) (by rw [Sig.ctorTyR_plain hres hk]; exact hT)
 
 end Flick

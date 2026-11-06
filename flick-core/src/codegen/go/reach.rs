@@ -77,7 +77,11 @@ pub fn dict_uses(d: &Dict, out: &mut Vec<Key>) {
                 dict_uses(f, out);
             }
         }
-        Dict::Given(_) | Dict::Primitive { .. } | Dict::Site { .. } | Dict::Error => {}
+        Dict::Given(_)
+        | Dict::Field(_)
+        | Dict::Primitive { .. }
+        | Dict::Site { .. }
+        | Dict::Error => {}
     }
 }
 

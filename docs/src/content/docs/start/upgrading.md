@@ -39,7 +39,7 @@ change needs.
 | [Instances belong to one package](#instances-belong-to-one-package) | no | `FLICK-C006` |
 | [Plugins reach only what is granted](#plugins-reach-only-what-is-granted) | no | `FLICK-P038`, `FLICK-P039` |
 | [`LogLevel` is an enum](#loglevel-is-an-enum) | no | `FLICK-T001` |
-| [Plugins speak interface 0.13](#plugins-speak-interface-013) | no | `FLICK-P035` |
+| [Plugins follow the compiler's interface](#plugins-follow-the-compilers-interface) | no | — |
 | [`CallSite` replaces the `_at` writes](#callsite-replaces-the-_at-writes) | no | `FLICK-T001` |
 | [A closure over an error value says so](#a-closure-over-an-error-value-says-so) | no | `FLICK-G001` |
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
@@ -271,12 +271,14 @@ constructors declared from least to most severe:
 `show` of a level gives its constructor, `Off` where 0.1.0 printed `None`.
 Each old name is `FLICK-T001`; replace it by hand.
 
-## Plugins speak interface 0.13
+## Plugins follow the compiler's interface
 
 A derive of an enum gets the literals of its constructors, and a plugin's
-`check` the base type of an enum: the interface of plugins is `0.13.0`. A
-component built for `0.12.0` no longer loads, `FLICK-P035` names both
-versions; rebuild it against the new `flick-plugin`.
+`check` the base type of an enum; a derive knows which constructors are of
+a GADT (`refined`, `constrained` of a case), and a plugin asks while it
+expands whether a type is an enum (`literal-of`). The interface stays
+`0.1.0` until Flick 0.2 and changes without a new version: rebuild a
+component with the `flick-plugin` of the compiler it runs in.
 
 ## `CallSite` replaces the `_at` writes
 

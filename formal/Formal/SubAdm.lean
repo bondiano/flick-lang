@@ -47,6 +47,16 @@ theorem Ty.field_rcons {R : Ty} {l t} (h : R.field l = some t) :
   cases R <;> simp [Ty.field] at h
   exact ⟨_, _, _, rfl⟩
 
+theorem Le.substT {a b : Ty} (σ : Atom → Ty) (h : Le a b) : Le (a.substT σ) (b.substT σ) := by
+  have sub : ∀ {x y : Ty}, Caps.Sub x.reach y.reach →
+      Caps.Sub (x.substT σ).reach (y.substT σ).reach := fun hc a ha => by
+    obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ a).mp ha
+    exact (Ty.reach_substT σ _ a).mpr ⟨b, hc b hb, h'⟩
+  induction h with
+  | refl => exact .refl
+  | arrow _ hφ _ hc ih₁ ih₂ => exact .arrow ih₁ (Stage.le_substT σ hφ) ih₂ (sub hc)
+  | eff hr he _ hc ih => exact .eff (hr.substT σ) (he.substT σ) ih (sub hc)
+
 theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' → Typ S Ψ Θ Γ e J' := by
   induction h with
   | var hi hts hH hT =>
@@ -71,8 +81,8 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | loc hl => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .loc hl
   | const hc hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .const hc (hT.trans h₁)
-  | ctor hK hk hT =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .ctor hK hk (hT.trans h₁)
+  | ctor hK hk hH hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .ctor hK hk hH (hT.trans h₁)
   | rnil => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases h₁
@@ -95,6 +105,11 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | aguard hp _ _ _ ih₁ ih₂ ih₃ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.alts
     exact .aguard hp (ih₁ (.st h₂)) (ih₂ ⟨h₁, h₂⟩) (ih₃ ⟨rfl, h₁, h₂⟩)
+  | aref hK hU hn hfr hlc hpA _ _ ihA ihr =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.alts
+    exact .aref hK hU hn hfr hlc hpA
+      (fun θ hθ hu => ihA θ hθ hu ⟨(h₁.substT _).substT θ, Stage.le_substT θ (Stage.le_substT _ h₂)⟩)
+      (ihr ⟨rfl, h₁, h₂⟩)
   | todo => intro _ hJ; obtain ⟨_, _, rfl, _, _⟩ := hJ.ex; exact .todo
   | task he hψ hn hc hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .task he hψ hn hc (hT.trans h₁)

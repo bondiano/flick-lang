@@ -16,6 +16,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::types::Checker;
 use crate::types::classes::args_of;
+use crate::types::gadt::branch::type_eqs;
 use crate::types::lang::Lang;
 use crate::types::ty::{Norm, Row, Type};
 
@@ -115,7 +116,8 @@ impl Checker<'_> {
     pub fn settle_provided(&mut self, mark: usize) {
         let wanted: Vec<Want> = self.regions.provided.drain(mark..).collect();
         for mut want in wanted {
-            if self.settle_want(&mut want, false) {
+            let equalities = type_eqs(&want.at.givens);
+            if self.under(&equalities, |this| this.settle_want(&mut want, false)) {
                 self.regions.provided_late.push(want);
             }
         }
@@ -127,7 +129,8 @@ impl Checker<'_> {
         let mut wanted = mem::take(&mut self.regions.provided);
         wanted.append(&mut self.regions.provided_late);
         for mut want in wanted {
-            self.settle_want(&mut want, true);
+            let equalities = type_eqs(&want.at.givens);
+            self.under(&equalities, |this| this.settle_want(&mut want, true));
         }
         for (provide, owner, service, span) in mem::take(&mut self.regions.late_owners) {
             let owner = self.store.resolve(&owner);

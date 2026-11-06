@@ -16,7 +16,10 @@ import Formal.Held
 import Formal.SubstPat
 import Formal.TySubstBase
 import Formal.TySubst
+import Formal.ArefMgu
 import Formal.RowSubst
+import Formal.SubOk
+import Formal.SubstArm
 import Formal.Substitution
 import Formal.Canonical
 import Formal.Shapes
@@ -32,6 +35,7 @@ import Formal.Fresh
 import Formal.StepFrame
 import Formal.Progress
 import Formal.ProgressMain
+import Formal.SpineMatch
 import Formal.PresPure
 import Formal.ScopeStep
 import Formal.PresRt
@@ -87,6 +91,7 @@ import Formal.Decomp
 import Formal.Closed
 import Formal.SubstComp
 import Formal.Elab.Syntax
+import Formal.Elab.Unify
 import Formal.Elab.PreludeSchemes
 import Formal.Elab.Hyp
 import Formal.Elab.Basic
@@ -104,6 +109,11 @@ import Formal.Elab.Comprehension
 import Formal.Elab.CoreTy
 import Formal.Elab.CoreTr
 import Formal.Elab.CoreLaws
+import Formal.Elab.CoreUnify
+import Formal.Elab.CoreDSubst
+import Formal.Elab.CoreArm
+import Formal.Elab.CoreCase
+import Formal.Elab.CoreCaseK
 import Formal.Elab.CoreDict
 import Formal.Elab.CoreT6a
 import Formal.Elab.CoreEval
@@ -125,3 +135,4 @@ import Formal.Elab.Close
 import Formal.Elab.CallSite
 import Formal.Elab.Witness.Main
 import Formal.Elab.Witness.T6b
+import Formal.Axioms

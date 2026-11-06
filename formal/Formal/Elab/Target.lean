@@ -13,8 +13,9 @@ projecting a method instantiates the field's `∀`, projecting a slot gives the 
 `⌈D_Q⌉ = ∅`: a dictionary holds nothing (§0.1), so the arrows of methods, instances and
 `struct_C` have the qualifier `cnil`; so do those of the constants of Γ₀, top-level values.
 
-The run is about closed typed terms: `load_rel` takes the typings of both terms, and
-`Target.sim` and `T6b_target` the typing of each filled skeleton.
+The run is about closed typed terms: `load_rel` takes the typings of two fillings of a
+skeleton and of the dictionaries in its holes, and `Target.sim` and `T6b_target` the typing of
+each filled skeleton.
 -/
 
 namespace Flick.Elab
@@ -62,21 +63,26 @@ inductive Star {α : Type} (R : α → α → Prop) : α → α → Prop
   | refl {a} : Star R a a
   | step {a b c} : R a b → Star R b c → Star R a c
 
-/-- Two terms that differ only by `≈` in dictionary positions. -/
-inductive TmEqv (P : Prog) : Tm → Tm → Prop
-  | var {x} : TmEqv P (.var x) (.var x)
-  | hole {i} : TmEqv P (.hole i) (.hole i)
-  | dict {d d'} : Eqv P d d' → TmEqv P (.dict d) (.dict d')
-  | meth {e e' m} : TmEqv P e e' → TmEqv P (.meth e m) (.meth e' m)
-  | app {f f' a a'} : TmEqv P f f' → TmEqv P a a' → TmEqv P (.app f a) (.app f' a')
-  | lam {b b'} : TmEqv P b b' → TmEqv P (.lam b) (.lam b')
-  | let_ {e e' b b'} : TmEqv P e e' → TmEqv P b b' → TmEqv P (.let_ e b) (.let_ e' b')
-  | lamD {l b b'} : TmEqv P b b' → TmEqv P (.lamD l b) (.lamD l b')
-  | const {c} : TmEqv P (.const c) (.const c)
-  | ite {c c' a a' b b'} : TmEqv P c c' → TmEqv P a a' → TmEqv P b b' →
-      TmEqv P (.ite c a b) (.ite c' a' b')
-  | caseOpt {e e' n n' s s'} : TmEqv P e e' → TmEqv P n n' → TmEqv P s s' →
-      TmEqv P (.caseOpt e n s) (.caseOpt e' n' s')
+/-- Fill the holes of a skeleton with `ds`. -/
+def Tm.fill (ds : List Dict) : Tm → Tm
+  | .var x => .var x
+  | .hole i => .dict (args ds i)
+  | .dict d => .dict d
+  | .meth e m => .meth (e.fill ds) m
+  | .app f a => .app (f.fill ds) (a.fill ds)
+  | .lam b => .lam (b.fill ds)
+  | .let_ e b => .let_ (e.fill ds) (b.fill ds)
+  | .lamD l b => .lamD l (b.fill ds)
+  | .const c => .const c
+  | .ite c a b => .ite (c.fill ds) (a.fill ds) (b.fill ds)
+  | .caseOpt e n s => .caseOpt (e.fill ds) (n.fill ds) (s.fill ds)
+  | .con K => .con K
+  | .caseK e K n m b r => .caseK (e.fill ds) K n m (b.fill ds) (r.fill ds)
+
+/-- The context of an arm on `c` under `θ` in the target: its fields, then `Γ` past the
+variables of `c`. -/
+def armT (c : Ctor) (θ : Nat → Ty) (Γ : List TSch) : List TSch :=
+  c.fields.map (fun t => (⟨0, .mono (t.subst θ)⟩ : TSch)) ++ (Γ.map (·.subst (up c.k))).map (·.subst θ)
 
 /-- The target. `Has Γ Δ e t φ` is `Γ, ⟦Δ⟧ ⊢⁺ e : t ! φ`, where a premise `δ : Q` of `Δ` is
 the variable `δ : D_Q`. -/
@@ -95,6 +101,31 @@ structure Target (P : Prog) where
     Has Γ Δ b (.mono t) φ → Has Γ Δ (.ite c a b) (.mono t) φ
   caseOpt : ∀ {Γ Δ e n s a t φ}, Has Γ Δ e (.mono (optTy a)) φ → Has Γ Δ n (.mono t) φ →
     Has (⟨0, .mono a⟩ :: Γ) Δ s (.mono t) φ → Has Γ Δ (.caseOpt e n s) (.mono t) φ
+  /-- (Con) with the instantiation of `∀`: a pure function of its dictionaries and fields -/
+  con : ∀ {Γ Δ K c ts φ}, P.ctors K = some c → ts.length = c.k →
+    Has Γ Δ (.con K) ((dicts .cnil c.ctx (.mono c.ty)).subst (inst ts)) φ
+  /-- (Case) closed by the types `σ` and the dictionaries `ρ` of the premises `Δ`, ground
+  under `σ`: the arm is typed under the most general unifier `θ` of the open problem, before
+  the closing. The closing may leave a problem whose unifiers have no most general one, as
+  rows and captures are sets in the core. -/
+  caseK : ∀ {Γ : List TSch} {Δl Δ : List Cn} {e b r : Tm} {K n T : Nat} {us : List Ty} {t : Ty}
+      {φ : Stage} {c : Ctor} {θ σ : Nat → Ty} {ρ : Nat → Dict},
+    Has (Γ.map (·.subst σ)) (Δl.map (·.subst σ)) e (.mono ((Ty.tcon T us).subst σ)) (φ.subst σ) →
+    P.ctors K = some c → c.T = T → us.length = c.res.length → n = c.fields.length →
+    Unify (c.eqs us) θ →
+    Has (armT c θ Γ) (armΔ c θ (Δl ++ Δ)) b (.mono ((t.subst (up c.k)).subst θ))
+      ((φ.subst (up c.k)).subst θ) →
+    Closes P Δ σ ρ → (∀ (k : Nat) (Q : Cn), Δ[k]? = some Q → (Q.subst σ).Ground) →
+    (∀ k, (ρ k).Below 0) →
+    Has (Γ.map (·.subst σ)) (Δl.map (·.subst σ)) r (.mono (t.subst σ)) (φ.subst σ) →
+    Has (Γ.map (·.subst σ)) (Δl.map (·.subst σ))
+      (.caseK e K n c.ctx.length (b.dsubst ρ (c.ctx.length + Δl.length)) r) (.mono (t.subst σ))
+      (φ.subst σ)
+  /-- (Case-Dead), at any instance `σ` of the matched type -/
+  caseKDead : ∀ {Γ : List TSch} {Δ : List Cn} {e r : Tm} {K n m T : Nat} {us : List Ty}
+      {σ : Nat → Ty} {t : Ty} {φ : Stage} {c : Ctor}, Has Γ Δ e (.mono ((Ty.tcon T us).subst σ)) φ →
+    P.ctors K = some c → c.T = T → us.length = c.res.length → Clash (c.eqs us) →
+    Has Γ Δ r (.mono t) φ → Has Γ Δ (.caseK e K n m .dead r) (.mono t) φ
   /-- (Lam) of `regions.md`: the arrow shows what the closure holds -/
   lam : ∀ {Γ Δ b a t q φ ψ}, Has (⟨0, .mono a⟩ :: Γ) Δ b (.mono t) φ →
     (∀ n, heldT Γ (.lam b) n → (Ty.arr φ a t q).reach n) →
@@ -141,11 +172,13 @@ structure Target (P : Prog) where
   Obs : Type
   obs : St → Option Obs
   /-- `≈`-related dictionaries stay related under steps: `Rel` relates the states of closed
-  typed terms that differ by `≈` in dictionary positions, and is a weak simulation that keeps
-  results. The typings are there because only typed dictionaries evaluate (`CoreDictRun.lean`). -/
+  typed fillings of a skeleton by `≈` dictionaries, and is a weak simulation that keeps results.
+  The dictionaries of the holes are typed, because only typed dictionaries evaluate
+  (`CoreDictRun.lean`); the rest of the two terms is the same. -/
   Rel : St → St → Prop
-  load_rel : ∀ {e e' t φ}, TmEqv P e e' → Has [] [] e t φ → Has [] [] e' t φ →
-    Rel (load e) (load e')
+  load_rel : ∀ {s : Tm} {ds ds' : List Dict} {t : TTy} {φ : Stage}, All2 (Eqv P) ds ds' →
+    (∀ (i : Nat) (d : Dict), ds[i]? = some d → ∃ q, Has [] [] (.dict d) (.dict q) .P) →
+    Has [] [] (s.fill ds) t φ → Has [] [] (s.fill ds') t φ → Rel (load (s.fill ds)) (load (s.fill ds'))
   step_rel : ∀ {a a' b}, Rel a b → Step a a' → ∃ b', Star Step b b' ∧ Rel a' b'
   final_rel : ∀ {a b o}, Rel a b → obs a = some o → ∃ b', Star Step b b' ∧ obs b' = some o
 

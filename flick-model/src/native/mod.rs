@@ -125,6 +125,7 @@ pub fn prelude(ty: &str, name: &str, arity: usize) -> Rc<Con> {
         ty: Path::new("Prelude", ty),
         name: name.into(),
         arity,
+        dicts: 0,
     })
 }
 

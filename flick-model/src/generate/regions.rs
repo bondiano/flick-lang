@@ -18,6 +18,7 @@ pub(super) fn con(name: &str, arity: usize) -> Rc<Con> {
         ty: Path::new(MODULE, name),
         name: name.into(),
         arity,
+        dicts: 0,
     })
 }
 

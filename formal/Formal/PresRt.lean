@@ -30,7 +30,11 @@ theorem HCov.tail {Ψ Θ ε₀ p θ Δ v H H' ε'} (hp : HPat S ε₀ p θ Δ) (
         have hs := (ht.shape hv rfl).1
         cases hs with
         | hidden ho => simp [Ty.Opaque, hU] at ho
-        | adt hs hU₁ hU₂ => rw [hU] at hU₂; cases hU₂; exact .adt hs hU₁ rfl
+        | adt hs hU₁ hU₂ =>
+          rw [hU] at hU₂; cases hU₂
+          refine .adt hs hU₁ rfl fun _ _ _ _ _ _ _ h hl => ⟨Ty.ident, ?_⟩
+          obtain ⟨rfl, rfl⟩ := Ty.tcon_eq_adt h.symm
+          rw [List.length_eq_zero_iff.mp hl.symm]; rfl
         | _ => simp [Ty.hd] at hU
       obtain ⟨q, hq, hqm⟩ := hx v hs'
       simp at hq; subst hq; simp [hm] at hqm

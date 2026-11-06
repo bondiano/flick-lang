@@ -10,12 +10,14 @@ use flick_core::types::Constructor;
 use super::{Tr, dict, given, lams};
 use crate::syntax::{Arm, Con, Const, Lit, Name, Pat, Path, Prim, Term};
 
-/// The model's constructor of an IR one.
+/// The model's constructor of an IR one. A constructor of a GADT takes
+/// the dictionaries it holds first, as its scheme's arrows do.
 pub fn con(c: &Constructor) -> Rc<Con> {
     Rc::new(Con {
         ty: Path::new(&c.module, &c.ty),
         name: c.name.as_str().into(),
-        arity: c.arity,
+        arity: c.arity + c.dicts,
+        dicts: c.dicts,
     })
 }
 
@@ -239,7 +241,12 @@ pub fn pat(p: &ir::Pat) -> Pat {
                 .map(|(l, p)| (Name::from(l.as_str()), pat(p)))
                 .collect(),
         ),
-        ir::Pat::Con(c, ps) => Pat::Con(con(c), ps.iter().map(pat).collect()),
+        // the IR binds a value's dictionaries after its fields; the model
+        // holds them first
+        ir::Pat::Con(c, ps) => {
+            let (fields, dicts) = ps.split_at(ps.len() - c.dicts.min(ps.len()));
+            Pat::Con(con(c), dicts.iter().chain(fields).map(pat).collect())
+        }
         ir::Pat::Or(ps) => Pat::Or(ps.iter().map(pat).collect()),
     }
 }

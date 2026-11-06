@@ -53,6 +53,14 @@ impl Checker<'_> {
         substitute(&s.body, &map)
     }
 
+    /// [`Self::instantiate`], and what each variable became.
+    pub(super) fn instantiate_with(&mut self, s: &Scheme) -> (Type, Vec<Inst>) {
+        let insts: Vec<Inst> = s.vars.iter().map(|(_, k)| self.fresh_inst(k)).collect();
+        let map = names(&s.vars, &insts);
+        self.instance_premises(s, &map);
+        (substitute(&s.body, &map), insts)
+    }
+
     /// The body of `s` with its variables rigid and the stages of its
     /// signature holding their parameters: what (Let-Sig) checks. Its
     /// facts `Θ` are given from here on.
@@ -103,21 +111,23 @@ impl Checker<'_> {
 
     /// Whether meta `m` stands for a type in `t`, not for a row.
     fn is_type_meta(&self, m: u32, t: &Type) -> bool {
-        fn occurs(c: &Checker, m: u32, t: &Type) -> bool {
-            match c.zonk(t) {
-                Type::Var(Var::Meta(n)) => n == m,
-                Type::App(h, a) => occurs(c, m, &h) || occurs(c, m, &a),
-                Type::Fun(p, _, r) => occurs(c, m, &p) || occurs(c, m, &r),
-                Type::Eff(_, _, t) | Type::Ref(t) | Type::Captured(t, _) | Type::Bounded(t, _) => {
-                    occurs(c, m, &t)
-                }
-                Type::Record(f) => f.fields.values().any(|t| occurs(c, m, t)),
-                Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().any(|t| occurs(c, m, t)),
-                Type::Forall(s) => occurs(c, m, &s.body),
-                _ => false,
+        self.mentions(&Var::Meta(m), t)
+    }
+
+    /// Whether the variable `v` stands for a type in `t`, not for a row.
+    pub(super) fn mentions(&self, v: &Var, t: &Type) -> bool {
+        match self.zonk(t) {
+            Type::Var(x) => x == *v,
+            Type::App(h, a) => self.mentions(v, &h) || self.mentions(v, &a),
+            Type::Fun(p, _, r) => self.mentions(v, &p) || self.mentions(v, &r),
+            Type::Eff(_, _, t) | Type::Ref(t) | Type::Captured(t, _) | Type::Bounded(t, _) => {
+                self.mentions(v, &t)
             }
+            Type::Record(f) => f.fields.values().any(|t| self.mentions(v, t)),
+            Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().any(|t| self.mentions(v, t)),
+            Type::Forall(s) => self.mentions(v, &s.body),
+            _ => false,
         }
-        occurs(self, m, t)
     }
 }
 

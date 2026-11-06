@@ -482,6 +482,8 @@ impl Gen<'_> {
                     || panic!("dictionary `{shown}` is in scope"),
                     |(_, p)| p.clone(),
                 ),
+            // bound by the pattern of the constructor whose value holds it
+            Dict::Field(local) => names::ident(local),
             Dict::Super { dict, class } => format!("{}.${class}", self.dict(dict)),
             Dict::Structural { class, fields } => {
                 let fields: Vec<String> = fields.iter().map(|f| self.dict(f)).collect();

@@ -1,0 +1,60 @@
+/// Untyped terms, as a parser would build them, and the check that turns
+/// one into a typed expression or says why it has no type.
+module Interp.Check exposing (Term(..), Typed(..), check, expect)
+
+import TypeEq exposing (TypeEq(..))
+import Interp.Ty as Ty exposing (Ty(..))
+import Interp.Expr exposing (Expr(..))
+
+type Term =
+  | TmInt Int
+  | TmBool Bool
+  | TmPlus Term Term
+  | TmLess Term Term
+  | TmNot Term
+  | TmIf Term Term Term
+
+/// A typed expression whose type only its description tells.
+type Typed =
+  | Typed (Ty a) (Expr a) : Typed
+
+rec {
+  check : Term -> Result String Typed
+  let check t =
+    match t with
+    | TmInt n -> Ok (Typed TInt (IntLit n))
+    | TmBool b -> Ok (Typed TBool (BoolLit b))
+    | TmPlus x y -> ints Plus TInt x y
+    | TmLess x y -> ints Less TBool x y
+    | TmNot x ->
+      match expect TBool x with
+      | Ok b -> Ok (Typed TBool (Apply Not b))
+      | Err why -> Err why
+    | TmIf c t f ->
+      match (expect TBool c, check t) with
+      | (Ok cond, Ok (Typed ty yes)) ->
+        match expect ty f with
+        | Ok no -> Ok (Typed ty (If cond yes no))
+        | Err why -> Err why
+      | (Err why, _) -> Err why
+      | (_, Err why) -> Err why
+
+  /// The expression of `t` at the type `want` describes: `TypeEq` turns
+  /// the type the check found into it.
+  expect : forall a. Ty a -> Term -> Result String (Expr a)
+  let expect want t =
+    match check t with
+    | Ok (Typed got e) ->
+      match Ty.equal got want with
+      | Some Refl -> Ok e
+      | None -> Err ("expected " ++ Ty.describe want ++ ", found " ++ Ty.describe got)
+    | Err why -> Err why
+
+  /// The operator `op` applied to two `Int` operands.
+  ints : forall r. Expr (Int -> Int -> r) -> Ty r -> Term -> Term -> Result String Typed
+  let ints op result x y =
+    match (expect TInt x, expect TInt y) with
+    | (Ok a, Ok b) -> Ok (Typed result (Apply (Apply op a) b))
+    | (Err why, _) -> Err why
+    | (_, Err why) -> Err why
+}

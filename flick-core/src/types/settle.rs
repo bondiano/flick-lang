@@ -7,9 +7,11 @@ use std::mem;
 
 use super::classes::{NUMERIC_CLASSES, split, which};
 use super::env::{Abi, Form};
+use super::gadt::branch::as_field_given;
+use super::gadt::scheme::dicts;
 use super::ty::Type;
 use super::typing::Identity;
-use super::{Checker, Domain, NumLiteral};
+use super::{Checker, Domain, NumLiteral, Operator};
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::numeric::{Num, default_num};
@@ -43,8 +45,8 @@ impl Checker<'_> {
     /// determined becomes the first allowed type (`Int`, or `String` for
     /// `++`), a literal's becomes `Int`.
     pub fn settle_operators(&mut self) {
-        for (ty, span) in mem::take(&mut self.equalities) {
-            if let Some(identity) = self.identity(&ty) {
+        for (ty, span, givens) in mem::take(&mut self.equalities) {
+            if let Some(identity) = self.under(&givens, |this| this.identity(&ty)) {
                 let key = super::typing::range(span);
                 self.typing.identity_eq.insert(key, identity);
             }
@@ -56,7 +58,7 @@ impl Checker<'_> {
             if waits(self, &literal.ty) {
                 self.literals.push(literal);
             } else {
-                self.settle_literal(&literal);
+                self.under(&literal.givens, |this| this.settle_literal(&literal));
             }
         }
         self.settle_signatures();
@@ -65,6 +67,12 @@ impl Checker<'_> {
                 self.operators.push(op);
                 continue;
             }
+            self.under(&op.givens, |this| this.settle_operator(&op));
+        }
+    }
+
+    fn settle_operator(&mut self, op: &Operator) {
+        {
             let ty = self.whnf(&op.ty);
             let (head, _) = ty.spine();
             // on a type variable, the methods of its `Numeric` constraint; a
@@ -80,7 +88,7 @@ impl Checker<'_> {
                     self.want_under(class, op.span, op.givens.clone());
                     self.typing.generic_ordered.insert(key);
                 }
-                continue;
+                return;
             }
             let allowed = op.domain.names();
             let fits = match head {
@@ -233,6 +241,7 @@ impl Checker<'_> {
 /// Whether `givens` hold a numeric class of `ty`.
 fn numeric_given(givens: &[Type], ty: &Type) -> bool {
     givens.iter().any(|g| {
+        let g = as_field_given(g).map_or(g, |(_, c)| c);
         split(g).is_some_and(|((module, name), args)| {
             which(&NUMERIC_CLASSES, module, name).is_some() && args.first() == Some(&ty)
         })
@@ -281,7 +290,7 @@ impl Checker<'_> {
             };
             self.env
                 .value(&entity)
-                .is_some_and(|s| !matches!(strip(s), Type::Fun { .. }))
+                .is_some_and(|s| !matches!(strip(s), Type::Fun { .. }) && dicts(s) == 0)
         };
         (abi.is_tagged() && constructors.iter().all(nullary)).then_some(Identity::Tag)
     }

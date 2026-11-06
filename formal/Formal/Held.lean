@@ -22,31 +22,6 @@ theorem Sig.impl_reach (S : Sig) (N : Name) (a : Atom) : ¬ (S.impl N).reach a :
   obtain ⟨_, _, h⟩ := h
   exact h
 
-theorem Ty.reach_tcon_arg {T : Name} {us : List Ty} {u : Ty} (hu : u ∈ us) :
-    Caps.Sub u.reach (Ty.tcon T us).reach := by
-  have key : ∀ (us : List Ty) (f : Ty), Caps.Sub f.reach (us.foldl .tapp f).reach ∧
-      ∀ u ∈ us, Caps.Sub u.reach (us.foldl .tapp f).reach := by
-    intro us
-    induction us with
-    | nil => intro f; exact ⟨Caps.Sub.refl _, by simp⟩
-    | cons x xs ih =>
-      intro f
-      obtain ⟨h₁, h₂⟩ := ih (.tapp f x)
-      refine ⟨fun a h => h₁ a (.inl h), fun u hu => ?_⟩
-      rcases List.mem_cons.mp hu with rfl | hu
-      · exact fun a h => h₁ a (.inr h)
-      · exact h₂ u hu
-  exact (key us _).2 u hu
-
-/-- A field of a constructor at an instance reaches no more than the instance. -/
-theorem Sig.field_reach (S : Sig) {K k ts T} (hK : S.ctor K = some (k, ts, T)) {us : List Ty}
-    (hk : us.length = k) : ∀ f ∈ ts, Caps.Sub (f.substT (instT us)).reach (Ty.tcon T us).reach := by
-  intro f hf a ha
-  obtain ⟨b, hb, h⟩ := (Ty.reach_substT _ _ _).mp ha
-  obtain ⟨i, hi, rfl⟩ := S.ctor_reach K k ts T hK f hf b hb
-  have hi' : i < us.length := by omega
-  simp only [instT, hi', dif_pos] at h
-  exact Ty.reach_tcon_arg (List.getElem_mem hi') a h
 
 /-- The result after all stages of an arrow. -/
 def Ty.res : Ty → Ty
@@ -97,6 +72,25 @@ theorem Ty.shows_of {t : Ty} (h : ∀ a φ b C, t ≠ .arrow a φ b C) : t.Shows
   cases t with
   | arrow => exact absurd rfl (h _ _ _ _)
   | _ => trivial
+
+theorem Sig.ctorTyR_res (ts : List Ty) (T : Name) (rs us : List Ty) :
+    (Sig.ctorTyR ts T rs us).res = Ty.tcon T (rs.map (Ty.substT (instT us))) :=
+  Ty.arrows_res _ _ (Ty.tcon_not_arrow T _)
+
+/-- A constructor's type shows its fields when they hold no more than its value. -/
+theorem Sig.ctorTyR_shows {ts : List Ty} {T : Name} {rs us : List Ty}
+    (hH : Sig.Holds ts T rs us) : (Sig.ctorTyR ts T rs us).Shows := by
+  have key : ∀ fs : List Ty, fs ⊆ ts →
+      (Ty.arrows (fs.map (Ty.substT (instT us))) (Ty.tcon T (rs.map (Ty.substT (instT us))))).Shows := by
+    intro fs
+    induction fs with
+    | nil => intro _; exact Ty.shows_of (Ty.tcon_not_arrow T _)
+    | cons f fs ih =>
+      intro hfs
+      refine ⟨?_, ih fun x hx => hfs (List.mem_cons_of_mem _ hx)⟩
+      rw [Ty.arrows_res _ _ (Ty.tcon_not_arrow T _)]
+      exact hH f (hfs (List.mem_cons_self ..))
+  exact key ts (List.Subset.refl _)
 
 theorem Sig.ctorTy_shows (S : Sig) {K k ts T} (hK : S.ctor K = some (k, ts, T)) {us : List Ty}
     (hk : us.length = k) : (Sig.ctorTy ts T us).Shows ∧
@@ -200,9 +194,9 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ _ hJ; cases hJ
     exact ⟨(held_none (by simp [Tm.Free]) (by simp [Tm.Has])).of_none _, by simp [Tm.head],
       fun _ h => by cases h; exact ⟨_, hT⟩, by simp⟩
-  | ctor hK hk hT =>
+  | ctor hK hk hH hT =>
     intro _ _ _ hJ; cases hJ
-    obtain ⟨hs, _⟩ := S.ctorTy_shows hK hk
+    have hs := Sig.ctorTyR_shows hH
     exact ⟨(held_none (by simp [Tm.Free]) (by simp [Tm.Has])).of_none _,
       fun _ _ => ⟨hT.shows hs, (held_none (by simp [Tm.Free]) (by simp [Tm.Has])).of_none _⟩,
       by simp, by simp⟩

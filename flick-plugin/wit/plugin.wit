@@ -1,4 +1,4 @@
-package flick:plugin@0.14.0;
+package flick:plugin@0.1.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -179,8 +179,16 @@ interface types {
   record response { status: u16, body: list<u8> }
 
   /// A constructor of a derive's target, the types of its fields and the
-  /// literal of an enum's constructor.
-  record case-target { name: string, fields: list<span>, literal: option<span> }
+  /// literal of an enum's constructor; whether, as a constructor of a GADT,
+  /// it names the type it builds (`refined`) or holds dictionaries
+  /// (`constrained`).
+  record case-target {
+    name: string,
+    fields: list<span>,
+    literal: option<span>,
+    refined: bool,
+    constrained: bool,
+  }
 
   /// A type a class's derive makes an instance for: its declaration as a
   /// block, and what it declares at spans of that block; its name and

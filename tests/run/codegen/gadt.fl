@@ -1,0 +1,73 @@
+// GADTs: constructors that build an instance of their type of their own,
+// an `eval` whose branches learn the type of the result, an existential
+// variable, a `match` that needs no arm for a constructor its type rules
+// out, and `TypeEq`.
+module App.Main exposing (main)
+
+import TypeEq exposing (TypeEq(..))
+
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+  | Add (Expr Int) (Expr Int) : Expr Int
+  | Less (Expr Int) (Expr Int) : Expr Bool
+  | If (Expr Bool) (Expr a) (Expr a) : Expr a
+  | Pair (Expr a) (Expr b) : Expr (a, b)
+  | First (Expr (a, b)) : Expr a
+  | Lit a
+
+eval : forall a. Expr a -> a
+let rec eval e =
+  match e with
+  | IntLit n -> n
+  | BoolLit b -> b
+  | Add x y -> eval x + eval y
+  | Less x y -> eval x < eval y
+  | If c t f -> if eval c then eval t else eval f
+  | Pair x y -> (eval x, eval y)
+  | First p ->
+    let (x, _) = eval p
+    x
+  | Lit x -> x
+
+/// No arm for `BoolLit`, `Less` or `Pair`: they build no `Expr Int`.
+size : Expr Int -> Int
+let rec size e =
+  match e with
+  | IntLit _ -> 1
+  | Add x y -> size x + size y
+  | If _ t f -> 1 + size t + size f
+  | First _ -> 1
+  | Lit _ -> 1
+
+as_int : forall a. TypeEq a Int -> a -> Int
+let as_int eq x = TypeEq.cast eq x
+
+/// A value whose type a tag tells: in each branch `a` is that type, so
+/// `+`, `show` and `==` are those of `Int` or `String`.
+type Ty a =
+  | TInt : Ty Int
+  | TStr : Ty String
+
+describe : forall a. Ty a -> a -> String
+let describe t x =
+  match t with
+  | TInt -> show (x + x)
+  | TStr -> x ++ "!"
+
+same : forall a. Ty a -> a -> a -> Bool
+let same t x y =
+  match t with
+  | TInt -> x == y
+  | TStr -> x == y
+
+main : Unit ->{} Unit
+let main () =
+  let sum = Add (IntLit 1) (If (Less (IntLit 1) (IntLit 2)) (IntLit 2) (Lit 3))
+  Platform.stdout_line (show (eval sum))
+  Platform.stdout_line (show (eval (Less sum (IntLit 3))))
+  Platform.stdout_line (show (eval (First (Pair (IntLit 7) (BoolLit false)))))
+  Platform.stdout_line (show (size sum))
+  Platform.stdout_line (show (as_int Refl 5))
+  Platform.stdout_line (describe TInt 21 ++ " " ++ describe TStr "hi")
+  Platform.stdout_line (show (same TInt 1 1) ++ " " ++ show (same TStr "a" "b"))

@@ -131,13 +131,14 @@ theorem Ty.tcon_eq_adt {T T' : Name} {us : List Ty} (h : Ty.tcon T us = .adt T')
 /-- The final type of a typed constructor spine is its type at an instance. -/
 theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X φ}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
-      J = .ex X φ → X.kind ≠ 7 → ∃ us, us.length = k ∧ X.res = Ty.tcon T us := by
+      J = .ex X φ → X.kind ≠ 7 →
+        ∃ us, us.length = k ∧ X.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) := by
   induction h with
-  | ctor hK hk hT =>
+  | ctor hK hk _ hT =>
     intro _ _ _ _ _ _ _ hK' hS hJ _
     cases hJ; simp only [Tm.head] at hK'; cases hK'
     rw [hK] at hS; cases hS
-    exact ⟨_, hk, hT.res_tcon (S.ctorTy_shows hK hk).2⟩
+    exact ⟨_, hk, hT.res_tcon (Sig.ctorTyR_res _ _ _ _)⟩
   | app hf _ _ hT ih₁ _ =>
     intro hv _ _ _ _ _ _ hK hS hJ hk
     cases hJ
@@ -154,11 +155,12 @@ theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
 
 /-- The head of a constructor pattern, and the final type of its spine. -/
 theorem PatTy.spine {fl p t Δ} (hp : PatTy S fl p t Δ) (hf : fl = false) :
-    ∃ K k ts T us, S.ctor K = some (k, ts, T) ∧ us.length = k ∧ t.res = Ty.tcon T us ∧
+    ∃ K k ts T us, S.ctor K = some (k, ts, T) ∧ us.length = k ∧
+      t.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) ∧
       ∀ v δ, matchP p v = some δ → v.head = .ctor K := by
   induction hp with
-  | head hK hk =>
-    refine ⟨_, _, _, _, _, hK, hk, (S.ctorTy_shows hK hk).2, fun v δ hm => ?_⟩
+  | head hK _ hk =>
+    refine ⟨_, _, _, _, _, hK, hk, Sig.ctorTyR_res _ _ _ _, fun v δ hm => ?_⟩
     cases v <;> simp [matchP] at hm; simp [Tm.head, hm.1]
   | app _ _ ih _ =>
     obtain ⟨K, k, ts, T, us, hK, hk, hr, hm⟩ := ih rfl
@@ -188,18 +190,18 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
     obtain rfl := ht rfl
     cases v <;> simp [matchP] at hm
     exact ⟨.refl, hm.2 ▸ .nil⟩
-  | head hK hk =>
+  | head hK hj hk =>
     intro v _ _ _ hv hm _ hk'
     cases v <;> simp [matchP] at hm
     obtain ⟨rfl, rfl⟩ := hm
     obtain ⟨hk7, hres⟩ := hk' rfl
     cases hv with
-    | ctor hK' hk'' hT =>
+    | ctor hK' hk'' _ hT =>
       rw [hK] at hK'; cases hK'
-      have hr := (S.ctorTy_shows hK hk).2
-      have := hT.res_tcon (S.ctorTy_shows hK hk'').2
-      rw [hres, hr] at this
-      cases Ty.tcon_inj (by rw [hk, hk'']) this
+      have := hT.res_tcon (Sig.ctorTyR_res _ _ _ _)
+      rw [hres, Sig.ctorTyR_res] at this
+      -- the instance of what it builds is the instance of the constructor
+      cases Sig.inst_inj hj hk'' hk (Ty.tcon_inj (by simp) this.symm)
       exact ⟨hT, .nil⟩
     | errVal => exact absurd rfl hk7
   | app _ _ ih₁ ih₂ =>
@@ -268,12 +270,12 @@ theorem HPat.inst {Ψ Θ Γ ε₀ p θ Δ v δ} (hp : HPat S ε₀ p θ Δ) (hvv
     rw [hm' v δ hm] at hK; cases hK
     rw [hS] at hS'; cases hS'
     have hU7 : U.kind ≠ 7 := by rw [Ty.kind_of_hd hU]; decide
-    obtain ⟨us', hl', hr'⟩ := hv'.spine_res hvv (hm' v δ hm) hS rfl hU7
-    obtain ⟨rfl, rfl⟩ := Ty.tcon_eq_adt hr.symm
-    have : us' = [] := List.eq_nil_of_length_eq_zero (by simp at hk'; omega)
-    subst this
+    obtain ⟨_, _, hr'⟩ := hv'.spine_res hvv (hm' v δ hm) hS rfl hU7
+    -- an error's constructor builds the error type itself
+    obtain ⟨hnil, rfl⟩ := Ty.tcon_eq_adt hr.symm
+    have hrs : S.res K = [] := List.map_eq_nil_iff.mp hnil
     obtain ⟨hl, i⟩ := hp.typ_match hvv hv' hm (fun h => by cases h)
-      (fun _ => ⟨hU7, by rw [hr']; rfl⟩)
+      (fun _ => ⟨hU7, by rw [hr', hrs]; rfl⟩)
     cases hl; exact ⟨i, hv'⟩
 
 end Flick

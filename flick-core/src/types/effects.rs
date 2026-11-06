@@ -243,6 +243,7 @@ impl Checker<'_> {
             span,
             errors,
             provides: None,
+            givens: self.equalities_in_scope(),
         });
     }
 
@@ -257,6 +258,7 @@ impl Checker<'_> {
             span,
             errors: false,
             provides: Some(region.clone()),
+            givens: self.equalities_in_scope(),
         });
     }
 

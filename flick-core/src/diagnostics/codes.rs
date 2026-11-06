@@ -161,6 +161,7 @@ codes! {
     S012 = Syntax 12, "inconsistent pattern bindings";
     S013 = Syntax 13, "`<-` outside a `do` block";
     S014 = Syntax 14, "unknown attribute";
+    S015 = Syntax 15, "a constructor result where none can be written";
     R001 = Resolve 1, "module name does not match the file path";
     R002 = Resolve 2, "two files declare the same module";
     R003 = Resolve 3, "unknown module";
@@ -232,6 +233,9 @@ codes! {
     T053 = Types 53, "two string literals joined with `++`";
     T054 = Types 54, "a local function that uses no local around it";
     T055 = Types 55, "an `_` arm that hides constructors of a type of this module";
+    T056 = Types 56, "a constructor builds a type it cannot";
+    T057 = Types 57, "a refining match needs known types";
+    T058 = Types 58, "a refinement Flick does not make";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

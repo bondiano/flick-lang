@@ -7,6 +7,7 @@ use super::Checker;
 use super::class_members::method_names;
 use super::convert::{Free, TyVar, is_type};
 use super::env::{Abi, Form, Fundep, Operation, TypeDef};
+use super::gadt::scheme::{Variant, quantify};
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
 use crate::iface::Namespace;
@@ -256,10 +257,7 @@ impl Checker<'_> {
                 let variants: Vec<&Node> = decl.nodes().filter(|n| n.kind == K::Variant).collect();
                 if !variants.is_empty() {
                     return Body::Variants(
-                        variants
-                            .iter()
-                            .filter_map(|v| Some((self.con_token(v)?, self.payload(v))))
-                            .collect(),
+                        variants.iter().filter_map(|v| self.variant(v)).collect(),
                     );
                 }
                 let Some(body) = decl.nodes().find(|n| is_type(n.kind)) else {
@@ -291,7 +289,12 @@ impl Checker<'_> {
                     .find(|n| n.kind == K::Variant)
                     .map(|v| self.payload(v))
                     .unwrap_or_default();
-                Body::Variants(vec![(p.name.clone(), payload)])
+                Body::Variants(vec![Variant {
+                    name: p.name.clone(),
+                    payload,
+                    constraints: Vec::new(),
+                    indexed: None,
+                }])
             }
             K::ServiceDecl => Body::Members(self.members(decl, &[])),
             K::SqlMigrationDecl => match &p.table {
@@ -321,16 +324,6 @@ impl Checker<'_> {
         }
     }
 
-    fn payload(&mut self, variant: &Node) -> Vec<Type> {
-        let mut out = Vec::new();
-        for field in variant.nodes().filter(|n| is_type(n.kind)) {
-            if !self.literal_field(variant, field) {
-                out.push(self.ty(field, &Kind::Type, Free::Reject));
-            }
-        }
-        out
-    }
-
     /// Fixes the kinds and stores what the declaration defines.
     #[allow(clippy::too_many_lines)]
     fn finish(&mut self, p: &Pending, body: Body) {
@@ -347,27 +340,7 @@ impl Checker<'_> {
             return;
         };
         def.kind = self.kinds.zonk(&def.kind, true);
-        let quantify = |body: Type| {
-            if params.is_empty() {
-                return body;
-            }
-            match body {
-                Type::Forall {
-                    vars,
-                    constraints,
-                    body,
-                } => Type::Forall {
-                    vars: params.iter().cloned().chain(vars).collect(),
-                    constraints,
-                    body,
-                },
-                body => Type::Forall {
-                    vars: params.clone(),
-                    constraints: Vec::new(),
-                    body: Box::new(body),
-                },
-            }
-        };
+        let quantify = |body: Type| quantify(&params, body);
         match body {
             Body::None => {}
             Body::Alias(ty) => {
@@ -376,78 +349,8 @@ impl Checker<'_> {
                 }
             }
             Body::Variants(variants) => {
-                let result = Type::apps(
-                    Type::con(&module, &p.name),
-                    params.iter().map(|b| Type::Var(b.name.clone())),
-                );
-                for (name, payload) in variants {
-                    if p.node.kind == K::ErrorDecl {
-                        let ty = payload
-                            .into_iter()
-                            .rev()
-                            .fold(result.clone(), |acc, t| Type::pure_fun(t, acc));
-                        let entity = self.env.entity(Namespace::Constructor, &name);
-                        let scheme = self.default_kinds(&quantify(ty));
-                        self.env.set_value(entity.clone(), scheme);
-                        self.env.set_parent(entity, &p.name);
-                        self.env.declare(Namespace::Constructor, &name);
-                        continue;
-                    }
-                    let mut capture_name = "captures".to_owned();
-                    while params.iter().any(|p| p.name == capture_name)
-                        || payload.iter().any(|t| {
-                            t.contains(&mut |t| match t {
-                                Type::Var(name) => *name == capture_name,
-                                Type::Forall { vars, .. } => {
-                                    vars.iter().any(|v| v.name == capture_name)
-                                }
-                                _ => false,
-                            })
-                        })
-                    {
-                        capture_name.push('_');
-                    }
-                    let capture = Binder {
-                        name: capture_name,
-                        kind: Kind::CaptureRow,
-                    };
-                    let row = Type::Var(capture.name.clone());
-                    let payload: Vec<Type> = payload
-                        .iter()
-                        .map(|t| self.constructor_field(t, &row))
-                        .collect();
-                    let mut held = super::ty::Norm::default();
-                    for field in &payload {
-                        let captures = self.captures_of(field);
-                        held.entries.extend(captures.entries);
-                        held.tails.extend(captures.tails);
-                    }
-                    let captured = Type::Captured {
-                        ty: Box::new(result.clone()),
-                        captures: Box::new(held.into_type()),
-                        value: false,
-                    };
-                    let ty = payload
-                        .into_iter()
-                        .rev()
-                        .fold(captured, |acc, t| Type::pure_fun(t, acc));
-                    let ty = if ty
-                        .contains(&mut |t| matches!(t, Type::Var(name) if *name == capture.name))
-                    {
-                        Type::Forall {
-                            vars: vec![capture],
-                            constraints: Vec::new(),
-                            body: Box::new(ty),
-                        }
-                    } else {
-                        ty
-                    };
-                    let entity = self.env.entity(Namespace::Constructor, &name);
-                    let scheme = self.default_kinds(&quantify(ty));
-                    self.env.set_value(entity.clone(), scheme);
-                    self.env.set_parent(entity, &p.name);
-                    self.env.declare(Namespace::Constructor, &name);
-                }
+                let error = p.node.kind == K::ErrorDecl;
+                self.constructor_schemes(&p.name, error, &params, variants);
             }
             Body::Class(supers, fundeps, members, signed) => {
                 let (methods, defaults) = method_names(p.node, self.text, &members);
@@ -502,8 +405,7 @@ impl Checker<'_> {
 enum Body {
     None,
     Alias(Type),
-    /// Constructors with their payload types.
-    Variants(Vec<(String, Vec<Type>)>),
+    Variants(Vec<Variant>),
     Members(Vec<(String, Type)>),
     /// Superclasses, functional dependencies, methods and default
     /// signatures.

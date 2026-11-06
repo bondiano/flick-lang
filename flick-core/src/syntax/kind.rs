@@ -135,6 +135,9 @@ pub enum SyntaxKind {
     TypeDecl,
     TypeParam,
     Variant,
+    /// `: T index…` after the fields of a constructor of a GADT: the type
+    /// it builds.
+    VariantResult,
     Refinement,
     DerivingClause,
     /// `{ … }` after a class in `deriving`: the arguments of its derive,

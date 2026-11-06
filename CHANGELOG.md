@@ -6,6 +6,31 @@ break programs.
 
 ## Unreleased
 
+- **GADTs:** a constructor names the type it builds after `:`,
+  `| IntLit Int : Expr Int`; variables of its fields that the result does
+  not mention are existential. A `match` arm learns the type of the matched
+  value under a complete signature (`eval : forall a. Expr a -> a` returns
+  `n` in the `IntLit` arm), needs no arm for a constructor its type rules
+  out, and hover shows `Int (= a)` there. The core module `TypeEq` has
+  `Refl : TypeEq a a` and `TypeEq.cast`. New codes: `FLICK-S015`,
+  `FLICK-T056`, `FLICK-T057`, `FLICK-T058`.
+- **Dictionaries in values:** a constructor of a GADT may hold class
+  dictionaries, `| Show b => Showable b : Showable`: they are solved where a
+  value is built and are assumptions in a `match` arm on it. JS keeps them
+  as `$0` … beside the fields, Go after the fields; `==` leaves them out.
+  The interface format is version 6 (`dicts` of a constructor).
+- **Deriving a GADT:** `Eq`, `Ord`, `Hash` and `Show` cover a constructor
+  that hides no type and holds no dictionary, each field at the type the
+  constructor builds; otherwise `FLICK-C013`, as for `Generic`. The std
+  derives of `Schema`, `Url`, `Form` and `HttpApi` refuse a GADT with their
+  codes. The plugin interface gains `case-target.refined` and
+  `case-target.constrained`.
+- **GADTs in the formal semantics:** the Lean proofs in
+  [`formal/`](./formal/README.md) cover them. Type soundness types an arm on
+  a constructor of a GADT under every unifier of what it builds with the
+  matched type, and the checker's arm under the most general one is a
+  derived rule. T6 covers constructors that carry dictionaries and arms
+  refined by the most general unifier, also with their premises closed.
 - **Enums:** `untagged type Method = Get = "GET" | Post = "POST"` is an
   enum: each value is its literal at run time, all strings or all `Int`s.
   `match` and `==` compare the value, derived `Ord` follows the order of
@@ -17,7 +42,7 @@ break programs.
   imports: `import Sql exposing (Pg, plugin sql)` (`FLICK-P037`, whose fix
   adds it). Its companion is `Name.table`, its rules are `std/Q001`,
   `std/Q010` and `std/Q011` (`FLICK-Q011` is retired), and an enum column
-  still needs no `via`. The plugin interface is `0.14.0`: `literal-of` tells
+  still needs no `via`. The plugin interface gains `literal-of`, which tells
   a plugin while it expands whether a type the block names is an enum.
 - **CallSite:** the new core class `CallSite` is the place of a use,
   `CallSite.place` (`Module:line`) and `CallSite.definition`, which the
@@ -38,8 +63,8 @@ break programs.
   through `T.parse`, so a value the enum does not know is a `DecodeError`.
   The module `Open` keeps literals an enum does not know: `Open t b` is
   `Known t | Unknown b`, with `Open.parse`, `Open.value` and `Open.schema`.
-  The plugin interface is `0.13.0`: `case-target.literal` and
-  `fact-type.literal-of`; a component built for `0.12.0` is `FLICK-P035`.
+  The plugin interface gains `case-target.literal` and
+  `fact-type.literal-of`.
   `fmt` keeps the arguments of a derive as written.
 - **Breaking:** `LogLevel` is an enum: `LogLevel.All`, `Trace`, `Debug`,
   `Info`, `Warn`, `Error`, `Fatal` and `Off` (`"None"`), ordered by
@@ -82,13 +107,15 @@ break programs.
   (`h "x" (e) { … }`); a plugin reports under codes of its own, shown under
   its package (`std/L001`, explained by `flick explain std/L001`), and
   answers editors' completions, hovers and highlights in its blocks. The
-  interface is `flick:plugin@0.2.0`. Writing one: `flick!` builds a
+  interface is `flick:plugin@0.1.0` until Flick 0.2 and changes without new
+  versions: rebuild a component with the `flick-plugin` of the compiler it
+  runs in. Writing one: `flick!` builds a
   plugin's code written in Flick (`flick!(b, Cli.default (#d : #ty))`), a
   `Cursor` reads a block, `flick_core::plugin::testing::expand` shows what a
   plugin makes of blocks for its tests, `flick expand` prints the code of a
   program's blocks, and `flick new --template plugin` makes a library with a
   plugin.
-- **Plugins, interface `0.3.0`:** a block without a body (`Shape.schema`,
+- **Plugins:** a block without a body (`Shape.schema`,
   raw text as `head r#"…"#`), heads with names and numbers among their
   arguments (`sql p { … }`), and blocks that are declarations: `head table
   Name "t" { … }`, or a head before the rest of a declaration (`server fn
@@ -97,7 +124,7 @@ break programs.
   the others; the user's patterns and declarations are holes too.
   `flick!` builds declarations, and a type is `flick!(b, type T)`, told from
   `type N = …` by its `=`.
-- **Plugins, interface `0.4.0`:** the names of a plugin's code are its own:
+- **Plugins:** the names of a plugin's code are its own:
   its locals and the user's do not capture each other, and `Pairs.make`
   names the module `Pairs` whatever the file calls it. A plugin declares
   companions such as `Users.table`, exported with their type, and documents
@@ -105,7 +132,7 @@ break programs.
   `b.doc`), which hovers, completions and `flick doc` show. Editors go to a
   generated name at the span its plugin gave it, outline it, and refuse to
   rename it outside its block.
-- **Plugins, interface `0.5.0`:** a plugin lays out its blocks for the
+- **Plugins:** a plugin lays out its blocks for the
   formatter (`format`, pieces of its words, lines, levels and the user's code
   in holes), and `cli` does again, a clause a line; a block without a layout
   moves with its head. A block inside the user's code of another expands in
@@ -156,7 +183,7 @@ break programs.
   the optimizer makes such an instance the one written by hand: a default
   taken becomes the instance's own method, a method of a known instance
   its code, and a `match` of a known constructor its arm.
-- **Plugins, interface `0.12.0`:** a plugin reaches files, variables of the
+- **Plugins:** a plugin reaches files, variables of the
   environment and hosts over HTTP that the project grants in
   `[plugins.<package>]` (`fs-read`, `net`, `env`), through
   `compiler.read_file`, `env` and `fetch`; anything else is `FLICK-P038`,
@@ -165,21 +192,21 @@ break programs.
   global option, and `CI` read only those, and a missing one is
   `FLICK-P039`. A kept result holds while what its call read is the same.
   `Plugin::collect` takes the compiler.
-- **Plugins, interface `0.11.0`:** `hover` gets the facts of the block's
+- **Plugins:** `hover` gets the facts of the block's
   code, as `check` does, once it checked.
-- **Plugins, interface `0.10.0`:** `check` after checking: a plugin gets the
+- **Plugins:** `check` after checking: a plugin gets the
   type the checker found for each `_` of its code, at the span it gave it,
   with the fields of a closed record, and may add errors under its codes.
-- **Plugins, interface `0.9.0`:** a declaration block sees the signature
+- **Plugins:** a declaration block sees the signature
   right above it, and code with a type of it, `signed(span)`, takes it from
   the module; a block knows its `module`; `parse-body` parses a body as
   after a `let`'s `=`; tuple types and patterns; and a function in a
   plugin's code needs no signature.
-- **Plugins, interface `0.8.0`:** a row of types, `{NotFound, Conflict}`, in
+- **Plugins:** a row of types, `{NotFound, Conflict}`, in
   a plugin's types, and a type may stand in several places of its code.
-- **Plugins, interface `0.7.0`:** `let rec` and `forall` types in a plugin's
+- **Plugins:** `let rec` and `forall` types in a plugin's
   declarations.
-- **Plugins, interface `0.6.0`:** a class marked `@derive` (or `@derive
+- **Plugins:** a class marked `@derive` (or `@derive
   std`) is derived by a plugin: `deriving C { args }` and `deriving instance
   C (M.T a)` call its `derive`, whose declarations follow the type. A class
   without a derive is `FLICK-C013`, "has no derive".

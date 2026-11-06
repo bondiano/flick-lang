@@ -148,6 +148,93 @@ xs as "no items"`. It belongs in a block, not at the top level of a module
 `FLICK-T025`. `[lint] no-let-assert` in `flick.toml` makes every `let assert`
 an error (`FLICK-T027`).
 
+## GADTs
+
+A constructor may name the type it builds after `:`. Its type variables are
+its own, and those of its fields that the result does not mention are
+existential: a value hides their types. A constructor without `: R` builds
+`T a…` as usual, and both kinds mix in one type.
+
+```flick
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+  | Add (Expr Int) (Expr Int) : Expr Int
+  | If (Expr Bool) (Expr a) (Expr a) : Expr a
+  | Apply (Expr (b -> a)) (Expr b) : Expr a
+  | Lit a
+
+eval : forall a. Expr a -> a
+let rec eval e =
+  match e with
+  | IntLit n -> n
+  | BoolLit b -> b
+  | Add x y -> eval x + eval y
+  | If c t f -> if eval c then eval t else eval f
+  | Apply f x -> (eval f) (eval x)
+  | Lit x -> x
+```
+
+A branch learns what the type of the matched value is: in the `IntLit` branch
+`a` is `Int`, so `n` is a result of type `a`, and an editor shows a value of
+type `a` there as `Int (= a)`. The result of a constructor is its own type
+applied to all of the type's parameters (`FLICK-T056`); an argument is a type,
+a member of a `kind` or a `Symbol`, and a region, row or capture parameter is
+passed on as a variable.
+
+A `match` needs no arm for a constructor that builds no value of the matched
+type, and an arm for one is the warning `FLICK-T010`:
+
+```flick
+# type Expr a =
+#   | IntLit Int : Expr Int
+#   | BoolLit Bool : Expr Bool
+#   | Add (Expr Int) (Expr Int) : Expr Int
+size : Expr Int -> Int
+let rec size e =
+  match e with
+  | IntLit _ -> 1
+  | Add x y -> size x + size y
+```
+
+The checker learns from a branch only where the types are known
+(`FLICK-T057`): the function has a complete signature, the type of the matched
+value is known where it is matched, and nothing from outside the branch gets
+its type from what the branch learned; such a type needs an annotation. A
+`let` in the branch is not generalized. An existential type cannot leave its
+branch (`FLICK-T007`). What a field holds, the value holds, so a scoped
+resource hidden in a value cannot leave its scope either. Only an arm of a
+`match` refines or hides types: the pattern of a `let`, of a parameter or an
+alternative of an or-pattern does not, and no branch learns that two regions
+or two rows are one (`FLICK-T058`).
+
+`TypeEq a b` of the core module `TypeEq` is evidence that two types are one:
+`Refl : TypeEq a a`, and `TypeEq.cast : TypeEq a b -> a -> b`.
+
+```flick
+import TypeEq exposing (TypeEq(..))
+
+type Ty a =
+  | TInt : Ty Int
+  | TStr : Ty String
+
+equal_types : forall a b. Ty a -> Ty b -> Option (TypeEq a b)
+let equal_types a b =
+  match (a, b) with
+  | (TInt, TInt) -> Some Refl
+  | (TStr, TStr) -> Some Refl
+  | _ -> None
+
+coerce : forall a b. Ty a -> Ty b -> a -> Option b
+let coerce a b x =
+  match equal_types a b with
+  | Some eq -> Some (TypeEq.cast eq x)
+  | None -> None
+```
+
+TypeScript has no refinement: in a `.d.ts` file each constructor of a GADT is
+a case of every instance of its type, and a type it hides is `unknown`.
+
 ## Numbers and operators
 
 There are three numeric types, and no implicit conversions between them (see

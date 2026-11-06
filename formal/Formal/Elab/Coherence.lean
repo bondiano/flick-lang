@@ -19,10 +19,6 @@ def SlotOK (P : Prog) (Q : Cn) : Prop :=
   ∀ d₀ i S, Ent P [] [Q] [d₀] → P.super Q i = some S →
     ∃ d, Eqv P (.slot d₀ i) d ∧ Ent P [] [S] [d]
 
-/-- `ρ` of Lemma 6.1: types `θ` and closed dictionaries `ρ(δ)` with `· ⊩ Q'θ ⇝ ρ(δ)`. -/
-def Closes (P : Prog) (Δ : List Cn) (θ : Nat → Ty) (ρ : Nat → Dict) : Prop :=
-  ∀ k Q, Δ[k]? = some Q → Ent P [] [Q.subst θ] [ρ k]
-
 theorem All2.single {R : Dict → Dict → Prop} {a : Dict} {l : List Dict} (h : All2 R [a] l) :
     ∃ b, l = [b] ∧ R a b := by
   cases h with

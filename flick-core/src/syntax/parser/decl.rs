@@ -302,7 +302,7 @@ fn type_decl(p: &mut Parser) {
                     }
                     p.complete(r, K::Refinement);
                 } else {
-                    variants(p);
+                    variants(p, true);
                 }
             }
             deriving(p);
@@ -311,20 +311,37 @@ fn type_decl(p: &mut Parser) {
     p.complete(m, K::TypeDecl);
 }
 
-fn variants(p: &mut Parser) {
+fn variants(p: &mut Parser, refinable: bool) {
     p.eat(K::Pipe);
-    variant(p);
+    variant(p, refinable);
     while p.eat(K::Pipe) {
-        variant(p);
+        variant(p, refinable);
     }
 }
 
-/// `Con field…`, or `Con = literal`; a field is an atomic type, so
-/// `Some (List a)` needs the parentheses.
-fn variant(p: &mut Parser) {
+/// `Con field…`, `Con = literal`, or `[C =>] Con field… : T index…`, a
+/// constructor of a `type` that builds a refined instance of it and may
+/// hold dictionaries; a field is an atomic type, so `Some (List a)` needs the
+/// parentheses.
+fn variant(p: &mut Parser, refinable: bool) {
     let m = p.start();
     if p.at(K::At) {
         attribute(p);
+    }
+    // `Show b => Showable b : Showable`, `(Eq a, Show a) => …`
+    if p.at(K::LParen) || variant_context_ahead(p) {
+        if !refinable {
+            let at = p.raw();
+            p.error_at(
+                codes::S015,
+                p.span(at.start, at.end),
+                "only a constructor of a `type` holds dictionaries".into(),
+            );
+        }
+        let c = p.start();
+        types::union(p);
+        p.expect(K::FatArrow);
+        p.complete(c, K::Context);
     }
     if p.expect(K::Con) {
         if p.at_word("of") {
@@ -340,8 +357,9 @@ fn variant(p: &mut Parser) {
             types::capture(p);
         }
         // `Get = "GET"`: the literal that is the value of an `untagged type`
-        if p.eat(K::Eq) {
-            let literal = p.start();
+        let literal = p.eat(K::Eq);
+        if literal {
+            let lit = p.start();
             if p.at(K::Minus) && p.nth(1) == K::Number {
                 p.bump();
             }
@@ -350,7 +368,23 @@ fn variant(p: &mut Parser) {
             } else {
                 p.error_expected("the literal of the constructor, a string or a number");
             }
-            p.complete(literal, K::LitPat);
+            p.complete(lit, K::LitPat);
+        }
+        // `IntLit Int : Expr Int`: the type a constructor of a GADT builds
+        if p.at(K::Colon) {
+            let colon = p.raw();
+            if !refinable || literal {
+                let why = if literal {
+                    "a constructor with a literal value builds its own type: drop the `:` result"
+                } else {
+                    "only a constructor of a `type` names the type it builds after `:`"
+                };
+                p.error_at(codes::S015, p.span(colon.start, colon.end), why.into());
+            }
+            let result = p.start();
+            p.bump();
+            types::type_(p);
+            p.complete(result, K::VariantResult);
         }
     }
     p.complete(m, K::Variant);
@@ -419,7 +453,7 @@ fn kind_decl(p: &mut Parser) {
     let m = p.start();
     p.bump();
     if p.expect(K::Con) && p.expect(K::Eq) {
-        variants(p);
+        variants(p, false);
     }
     p.complete(m, K::KindDecl);
 }
@@ -444,7 +478,7 @@ fn error_decl(p: &mut Parser) {
                     ),
                 );
             }
-            variant(p);
+            variant(p, false);
         }
         deriving(p);
     }
@@ -461,6 +495,21 @@ fn service_decl(p: &mut Parser) {
         }
     }
     p.complete(m, K::ServiceDecl);
+}
+
+/// Whether `=>` comes before the end of the constructor it would belong to.
+fn variant_context_ahead(p: &Parser) -> bool {
+    for i in p.pos..p.toks.len() {
+        if p.sep_at(i).is_some() {
+            break;
+        }
+        match p.toks[i].kind {
+            K::FatArrow => return true,
+            K::Eq | K::Pipe | K::Colon | K::DerivingKw => break,
+            _ => {}
+        }
+    }
+    false
 }
 
 /// Whether `=>` comes before the `=` of a class or instance head.

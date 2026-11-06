@@ -34,6 +34,7 @@ mod exhaust;
 mod exports;
 mod facts;
 mod ffi;
+mod gadt;
 mod generalize;
 mod handlers;
 mod infer;
@@ -94,6 +95,8 @@ pub use display::show_type;
 pub use do_notation::{bind_key, guard_key};
 pub use effects::NO_EFFECTS;
 pub use env::{Abi, EnumLit, Form, Fundep, Instance, JsClass, Operation, Rep, TypeDef};
+pub use gadt::branch::dict_local;
+pub use gadt::scheme::{built, is_indexed, written_dicts};
 pub use generalize::without_value_captures;
 pub use kinds::Kind;
 pub use patterns::is_pattern;
@@ -304,6 +307,7 @@ fn run_in(
             .iter()
             .any(|(name, _)| *name == module.name),
         sugar: Vec::new(),
+        gadt: gadt::branch::State::default(),
     };
     #[cfg(feature = "ide")]
     {
@@ -456,8 +460,10 @@ struct Checker<'a> {
     operators: Vec<Operator>,
     literals: Vec<NumLiteral>,
     signatures: Vec<bindings::PendingSignature>,
-    /// `==` and `!=` with the type of their operands.
-    equalities: Vec<(Type, Span)>,
+    /// `==` and `!=` with the type of their operands and the equalities of
+    /// the GADT branches they are in.
+    equalities: Vec<(Type, Span, Vec<Type>)>,
+    gadt: gadt::branch::State,
     /// The types of `do` blocks and of their expression statements, by
     /// range, for the lints of `sugar_lints`.
     sugar: Vec<(typing::Range, Type)>,

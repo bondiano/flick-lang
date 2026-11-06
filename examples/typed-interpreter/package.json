@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "@flick-lang/runtime": "0.1.0",
+    "effect": "4.1.2"
+  },
+  "flick": {
+    "compiler": "0.1.0"
+  },
+  "name": "typed-interpreter",
+  "packageManager": "pnpm@12.16.1",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0"
+}

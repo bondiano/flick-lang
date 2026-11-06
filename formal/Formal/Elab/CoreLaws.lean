@@ -53,6 +53,20 @@ structure Real : Prop where
   prim : ∀ {q p}, P.primC q.cls = true → P.prims q = some p → ∃ k,
     S.glob (N.prim p q) = some ⟨k, Facts.none, trD N q⟩ ∧ (TTy.dict q).Closed k
   some : S.ctor N.some = some (1, [.tvar 0], N.con 3)
+  /-- `Some` builds `Option a`: it is an ordinary constructor. -/
+  some_res : S.res N.some = idTs 1
+  /-- A constructor of the program is one of the core: its dictionaries first, then its
+  fields, building `T ρ̄` of its source type. -/
+  ctor : ∀ {K c}, P.ctors K = Option.some c →
+    S.ctor (N.ctor K) = Option.some (c.k, c.ctx.map (trD N) ++ c.fields.map (trT N), N.con c.T) ∧
+      S.res (N.ctor K) = c.res.map (trT N) ∧ c.T ≠ 2 ∧ c.T ≠ 4
+  /-- What a value of a constructor holds its type shows, through the hidden row of
+  captures of the checker. -/
+  ctor_holds : ∀ {K c}, P.ctors K = Option.some c → ∀ us : List Flick.Ty, us.length = c.k →
+    Sig.Holds (c.ctx.map (trD N) ++ c.fields.map (trT N)) (N.con c.T) (c.res.map (trT N)) us
+  /-- In a program with data types, type constructors have names apart. -/
+  con_inj : ∀ {K c}, P.ctors K = Option.some c → ∀ {c₁ c₂ : Nat}, c₁ ≠ c₂ →
+    trT N (.con c₁) ≠ trT N (.con c₂)
 
 /-- `Γ, ⟦Δ⟧ ⊢⁺ e : t ! φ` in the core. -/
 def Has (Γ : List TSch) (Δ : List Cn) (e : Tm) (t : TTy) (φ : Stage) : Prop :=
@@ -136,7 +150,7 @@ theorem has_caseOpt (hR : Real P S N) {Γ Δ e n s a t φ} (he : Has S N Γ Δ e
   obtain ⟨n', hn', tn⟩ := hn Ψ Θ Γc γ δ hc
   obtain ⟨s', hs', ts⟩ := hs Ψ Θ _ _ _ (hc.cons N ⟨0, .mono a⟩)
   have pat : PatTy S true (.app (.ctor N.some) .var) (trT N (optTy a)) [trT N a] := by
-    have hh := PatTy.head (S := S) hR.some (us := [trT N a]) rfl
+    have hh := PatTy.head_plain (S := S) hR.some hR.some_res (us := [trT N a]) rfl
     have e : Sig.ctorTy [.tvar 0] (N.con 3) [trT N a] =
         .arrow (trT N a) .pure (.tapp (.adt (N.con 3)) (trT N a)) Caps.none := by
       simp [Sig.ctorTy, Flick.Ty.arrows, Flick.Ty.tcon, Flick.Ty.substT, instT]

@@ -54,6 +54,10 @@ theorem Ty.arrows_kind (ts : List Ty) (T : Name) (us : List Ty) :
 theorem Ty.kind_of_hd {U : Ty} {E : Name} (h : U.hd = .adt E) : U.kind = 3 := by
   cases U <;> simp [Ty.hd, Ty.kind] at h ⊢
 
+theorem Shp.ctor_instR {ts : List Ty} {T₀ : Name} {rs us : List Ty} :
+    (Ty.arrows ts (.tcon T₀ rs)).substT (instT us) = Sig.ctorTyR ts T₀ rs us := by
+  simp only [Ty.arrows_substT, Ty.tcon_substT, Sig.ctorTyR]
+
 theorem Shp.ctor_inst {k ts T₀} {us : List Ty} (hk : us.length = k) :
     (Ty.arrows ts (.tcon T₀ (idTs k))).substT (instT us) = Sig.ctorTy ts T₀ us := by
   have : (idTs k).map (Ty.substT (instT us)) = us := by
@@ -142,7 +146,7 @@ theorem Shp.le {a b : Ty} {e : Tm} (h : Le a b) (hs : Shp S true a e) : Shp S tr
 
 theorem Shp.false_arrows {U e} (h : Shp S false U e) :
     ∃ K k ts T ts', e.head = .ctor K ∧ S.ctor K = some (k, ts, T) ∧
-      U = .arrows ts' (.tcon T (idTs k)) := by
+      U = .arrows ts' (.tcon T (S.res K)) := by
   generalize hf : false = fl at h
   induction h with
   | head hK => exact ⟨_, _, _, _, _, rfl, hK, rfl⟩
@@ -153,19 +157,47 @@ theorem Shp.false_arrows {U e} (h : Shp S false U e) :
     | cons a ts' => cases hU; exact ⟨K, k, ts, T, ts', hh, hK, rfl⟩
   | _ => cases hf
 
+theorem Sig.res_congr {K k ts T} (hK : S.ctor K = some (k, ts, T)) {ρ ρ' : Atom → Ty}
+    (h : ∀ i, i < k → ρ (.v i) = ρ' (.v i)) :
+    (S.res K).map (Ty.substT ρ) = (S.res K).map (Ty.substT ρ') := by
+  let σ : Atom → Ty := fun a => match a with
+    | .v i => if i < k then .tvar i else .rnil
+    | .r _ => .rnil
+  have hσ := S.res_closed K k ts T σ hK fun i hi => by simp [σ, hi]
+  rw [← hσ]; simp only [List.map_map, Function.comp_def, Ty.substT_comp]
+  congr 1; funext x; apply Ty.substT_congr; intro a
+  cases a with
+  | v i => by_cases hi : i < k <;> simp [σ, hi, Ty.substT, h i]
+  | r p => simp [σ, Ty.substT]
+
+/-- A constructor builds each of its instances. -/
+theorem Sig.builds_inst {K k ts T} (hK : S.ctor K = some (k, ts, T)) (us : List Ty) :
+    S.Builds K (Ty.tcon T ((S.res K).map (Ty.substT (instT us)))) := by
+  intro k' ts' T' _ hK' _ _
+  rw [hK] at hK'; cases hK'
+  have hl : ((List.range k).map fun i => instT us (.v i)).length = k := by simp
+  have hres : (S.res K).map (Ty.substT (instT ((List.range k).map fun i => instT us (.v i)))) =
+      (S.res K).map (Ty.substT (instT us)) :=
+    Sig.res_congr hK fun i hi => by simp [instT, hi]
+  refine ⟨instT ((List.range k).map fun i => instT us (.v i)), ?_⟩
+  rw [Ty.up_substT _ k _ hl, Ty.tcon_substT, hres]
+
 theorem Shp.full_of {U T e} {us : List Ty} (h : Shp S false U e) (hl : Le (U.substT (instT us)) T) :
     Shp S true T e := by
-  obtain ⟨_, _, _, T₀, ts', _, _, rfl⟩ := h.false_arrows
+  obtain ⟨K, _, _, T₀, ts', hh, hK, rfl⟩ := h.false_arrows
   cases ts' with
   | nil =>
     simp only [Ty.arrows, Ty.tcon_substT] at hl
-    have hT : ∀ X, Le X T → X.hd = .adt T₀ → T.hd = .adt T₀ := by
+    have hT : ∀ X, Le X T → X.hd = .adt T₀ → T = X := by
       intro X hl hX
       cases hl with
-      | refl => exact hX
+      | refl => rfl
       | arrow => simp [Ty.hd] at hX
       | eff => simp [Ty.hd] at hX
-    exact .adt h (Ty.tcon_hd _ _) (hT _ hl (Ty.tcon_hd _ _))
+    obtain rfl := hT _ hl (Ty.tcon_hd _ _)
+    refine .adt h (Ty.tcon_hd _ _) (Ty.tcon_hd _ _) fun K' hh' => ?_
+    rw [hh] at hh'; cases hh'
+    exact Sig.builds_inst hK us
   | cons _ _ => exact .hidden (hl.opaque (by simp [Ty.arrows, Ty.substT, Ty.Opaque, Ty.hd]))
 
 /-- The spine clause of `Typ.shape`: a constructor spine has the shape of its
@@ -194,10 +226,11 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     intro hv _ _ hJ; cases hJ
     cases hv with
     | rcons hv₁ hv₂ => exact ⟨.rcons (ih₁ hv₁ rfl).1 (ih₂ hv₂ rfl).1, by simp [Tm.head]⟩
-  | ctor hK hk hT =>
+  | ctor hK hk _ hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨(Shp.head hK).full_of (by rw [Shp.ctor_inst hk]; exact hT),
-      fun _ _ => .inl ⟨_, _, by rw [Shp.ctor_inst hk]; exact hT, .head hK⟩⟩
+    have hh := Shp.head (S := S) hK
+    exact ⟨hh.full_of (by rw [Shp.ctor_instR]; exact hT),
+      fun _ _ => .inl ⟨_, _, by rw [Shp.ctor_instR]; exact hT, hh⟩⟩
   | errVal hv' h' hU hE ih =>
     intro _ _ _ hJ; cases hJ
     refine ⟨.hidden (by simp [Ty.Opaque, Ty.hd]),

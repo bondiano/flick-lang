@@ -108,6 +108,61 @@ theorem Elab.free {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') {x : Nat} (hx
   | letSig _ _ _ _ _ ih₁ ih₂ => exact hx.imp ih₁ ih₂
   | ite _ _ _ ihc iha ihb => exact hx.imp ihc (Or.imp iha ihb)
   | caseOpt _ _ _ ihe ihn ihs => exact hx.imp ihe (Or.imp ihn ihs)
+  | con => exact False.elim (Tm.free_dapps hx)
+  | caseK _ _ _ _ _ _ _ _ ihe ihb ihr => exact hx.imp ihe (Or.imp ihb ihr)
+  | caseKDead _ _ _ _ _ _ _ ihe ihr =>
+    exact hx.imp ihe (Or.imp (fun h => Nat.noConfusion h) ihr)
+
+theorem apps_below {L : Nat} : ∀ {f : Dict} {ds : List Dict}, f.Below L → (∀ d ∈ ds, d.Below L) →
+    (apps f ds).Below L
+  | _, [], hf, _ => hf
+  | _, d :: _, hf, h => apps_below (f := .ap _ d) ⟨hf, h d (.head _)⟩ fun d' hd => h d' (.tail _ hd)
+
+theorem Clo.dbelow {Δ d Q} (h : Clo P Δ d Q) : d.Below Δ.length := by
+  induction h with
+  | given hk => exact (List.getElem?_eq_some_iff.mp hk).1
+  | super _ _ ih => exact ih
+
+/-- A derived dictionary names only premises of `Δ`. -/
+theorem Ent.dbelow {Δ qs ds} (h : Ent P Δ qs ds) : ∀ d ∈ ds, d.Below Δ.length := by
+  induction h with
+  | nil => intro d hd; cases hd
+  | cons _ _ ih₁ ih₂ =>
+    intro d hd
+    rcases List.mem_cons.mp hd with rfl | hd
+    · exact ih₁ _ (.head _)
+    · exact ih₂ _ hd
+  | given hc => intro d hd; simp only [List.mem_singleton] at hd; subst hd; exact hc.dbelow
+  | prim => intro d hd; simp only [List.mem_singleton] at hd; subst hd; trivial
+  | strct _ _ _ ih => intro d hd; simp only [List.mem_singleton] at hd; subst hd; exact apps_below trivial ih
+  | inst _ _ _ _ ih => intro d hd; simp only [List.mem_singleton] at hd; subst hd; exact apps_below trivial ih
+
+theorem Tm.dapps_DB {L : Nat} : ∀ {f : Tm} {ds : List Dict}, f.DB L → (∀ d ∈ ds, d.Below L) →
+    (f.dapps ds).DB L
+  | _, [], hf, _ => hf
+  | _, d :: _, hf, h =>
+    Tm.dapps_DB (f := .app _ (.dict d)) ⟨hf, h d (.head _)⟩ fun d' hd => h d' (.tail _ hd)
+
+/-- **An elaboration names only premises of `Δ`.** -/
+theorem Elab.dbelow {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') : e'.DB Δ.length := by
+  induction h with
+  | var _ _ he => exact Tm.dapps_DB trivial he.dbelow
+  | meth _ _ _ _ h₀ he => exact Tm.dapps_DB (h₀.dbelow _ (.head _)) he.dbelow
+  | const _ _ he => exact Tm.dapps_DB trivial he.dbelow
+  | con _ _ he => exact Tm.dapps_DB trivial he.dbelow
+  | app _ _ _ ih₁ ih₂ => exact ⟨ih₁, ih₂⟩
+  | lam _ _ ih => exact ih
+  | let_ _ _ ih₁ ih₂ => exact ⟨ih₁, ih₂⟩
+  | letSig _ _ _ _ _ ih₁ ih₂ => exact ⟨by simpa using ih₁, ih₂⟩
+  | ite _ _ _ ih₁ ih₂ ih₃ => exact ⟨ih₁, ih₂, ih₃⟩
+  | caseOpt _ _ _ ih₁ ih₂ ih₃ => exact ⟨ih₁, ih₂, ih₃⟩
+  | caseK _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ => exact ⟨ih₁, by simpa [armΔ] using ih₂, ih₃⟩
+  | caseKDead _ _ _ _ _ _ _ ih₁ ih₂ => exact ⟨ih₁, trivial, ih₂⟩
+
+theorem armS_tr (c : Ctor) (θ : Nat → Ty) (Γ : List Scheme) :
+    (armS c θ Γ).map Scheme.tr = armT c θ (Γ.map Scheme.tr) := by
+  simp only [armS, armT, List.map_append, List.map_map, Function.comp_def, Scheme.tr_subst]
+  rfl
 
 theorem TTy.reach_dicts {q : Ty} {qs : List Cn} {t : TTy} {n : Nat}
     (h : (dicts q qs t).reach n) : t.reach n ∨ (qs ≠ [] ∧ q.reach n) := by
@@ -154,6 +209,25 @@ theorem T6a {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') :
   | app _ _ hψ ih₁ ih₂ => exact X.app ih₁ ih₂ hψ
   | ite _ _ _ ihc iha ihb => exact X.ite ihc iha ihb
   | caseOpt _ _ _ ihe ihn ihs => exact X.caseOpt ihe ihn ihs
+  | @con Γ Δ K c ts ds φ hK hk he =>
+    have hv := X.con (Γ := Γ.map Scheme.tr) (Δ := Δ) (φ := φ) hK hk
+    simp only [TTy.subst_dicts, TTy.subst] at hv
+    exact tm_dapps X hv (ent_typed X he)
+  | @caseK Γ Δ e K n b r T us t φ c θ e' b' r' _ hK hT hlen hn hU hb _ ihe ihb ihr =>
+    have hΓ : (Γ.map Scheme.tr).map (·.subst (up 0)) = Γ.map Scheme.tr := by
+      simp [TSch.subst_up_zero]
+    have hΔ : Δ.map (·.subst (up 0)) = Δ := by simp [Cn.subst_up_zero]
+    have hτ : ∀ τ : Ty, τ.subst (up 0) = τ := fun τ => by rw [up_zero, Ty.subst_id]
+    have hφ : φ.subst (up 0) = φ := by rw [up_zero, Stage.subst_id]
+    have h := X.caseK (Γ := Γ.map Scheme.tr) (Δl := Δ) (Δ := []) (σ := up 0)
+      (ρ := fun _ => .inst 0) (e := e') (b := b') (r := r') (t := t) (φ := φ) (c := c) (θ := θ)
+      (T := T) (us := us) (K := K) (n := n) (by rw [hΓ, hΔ, hτ, hφ]; exact ihe) hK hT hlen hn hU
+      (by rw [List.append_nil, ← armS_tr]; exact ihb) (fun _ _ h => by simp at h)
+      (fun _ _ h => by simp at h) (fun _ => trivial) (by rw [hΓ, hΔ, hτ, hφ]; exact ihr)
+    rw [hΓ, hΔ, hτ, hφ, Tm.dsubst_of_DB (by simpa [armΔ] using hb.dbelow)] at h
+    exact h
+  | caseKDead _ hK hT hlen _ hC _ ihe ihr =>
+    exact X.caseKDead (σ := .var) (by rw [Ty.subst_id]; exact ihe) hK hT hlen hC ihr
   | @lam Γ Δ b a t q φ ψ b' hb hh ih =>
     exact X.lam ih fun n hn => hh n (heldT_of (e := .lam b) (e' := .lam b') (fun _ hx => hb.free hx) hn)
   | let_ _ _ ih₁ ih₂ =>

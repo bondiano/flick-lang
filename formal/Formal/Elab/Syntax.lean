@@ -110,6 +110,9 @@ structure Cn where
 
 def Cn.subst (σ : Nat → Ty) (q : Cn) : Cn := ⟨q.cls, q.args.map (·.subst σ)⟩
 
+/-- A ground constraint. -/
+def Cn.Ground (q : Cn) : Prop := ∀ t ∈ q.args, t.Ground
+
 /-- The substitution of a class's parameters `ᾱ := τ̄` (parameters are `var 0 … var (k-1)`). -/
 def params (ts : List Ty) : Nat → Ty := fun n => ts.getD n (.con 0)
 
@@ -156,11 +159,26 @@ structure Inst where
   ctx : List Cn
   slots : List Dict
 
+/-- `T τ̄`: a type constructor applied to its arguments. -/
+def Ty.tcon (T : Nat) (us : List Ty) : Ty := us.foldl .app (.con T)
+
+/-- A constructor `K : ∀ᾱ. Q̄ ⇒ τ̄ → T ρ̄` of a data type, `ᾱ` its `k` variables
+`var 0 … var (k-1)`: the constraints whose dictionaries a value of `K` carries, the types of its
+fields, its type constructor and the arguments `ρ̄` of the type it builds. An ordinary
+constructor builds `T ᾱ`, one of a GADT any instance of `T`; a variable of `ᾱ` that is not in
+`ρ̄` is existential. -/
+structure Ctor where
+  k : Nat
+  ctx : List Cn
+  fields : List Ty
+  T : Nat
+  res : List Ty
+
 /-- A program: its classes (superclasses over the class parameters), its instances `𝓘ₚ`, and
 the compiler's classes: structural (`Eq`, `Ord`, `Hash`, `Show` of records) and primitives of
 `Record` rows, whose rules (Struct) and (Prim) are black boxes. `methods m` is the class of the
 method `m` and its scheme `∀ᾱ β̄. (C ᾱ, Q̄) ⇒ τ` of §1.1: the class constraint comes first.
-`consts c` is the scheme of a constant of Γ₀. -/
+`consts c` is the scheme of a constant of Γ₀, `ctors K` a constructor of a data type. -/
 structure Prog where
   supers : Nat → List Cn
   insts : Nat → Option Inst
@@ -170,6 +188,7 @@ structure Prog where
   prims : Cn → Option Nat
   methods : Nat → Option (Nat × Scheme)
   consts : Nat → Option Scheme
+  ctors : Nat → Option Ctor
 
 variable (P : Prog)
 
@@ -194,6 +213,10 @@ inductive Ent (Δ : List Cn) : List Cn → List Dict → Prop
   | inst {Q I ins σ ds} : P.insts I = some ins → ins.cls = Q.cls →
       Q.args = ins.head.map (·.subst σ) → Ent Δ (ins.ctx.map (·.subst σ)) ds →
       Ent Δ [Q] [apps (.inst I) ds]
+
+/-- `ρ` of Lemma 6.1: types `θ` and closed dictionaries `ρ(δ)` with `· ⊩ Q'θ ⇝ ρ(δ)`. -/
+def Closes (P : Prog) (Δ : List Cn) (θ : Nat → Ty) (ρ : Nat → Dict) : Prop :=
+  ∀ k Q, Δ[k]? = some Q → Ent P [] [Q.subst θ] [ρ k]
 
 /-- `≈` of §4.2: the least congruence with the slot rule of an instance, and of a structural
 dictionary (`docs/formal/elaboration.md#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries`), both for closed derivations of the arguments (`docs/formal/elaboration.md#slot-rules-of-equivalence-take-closed-derivations`); a structural or primitive dictionary of a type is `≈` the one of its

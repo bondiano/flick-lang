@@ -170,7 +170,7 @@ impl Checker<'_> {
         // after the holds: what a qualifier holds too much is theirs to name
         self.compare_deferred();
         for o in mem::take(&mut self.regions.outlives) {
-            self.check_outlives(&o);
+            self.under(&o.givens, |this| this.check_outlives(&o));
         }
         self.settle_late_provided();
         for (errors, span) in mem::take(&mut self.regions.raised) {

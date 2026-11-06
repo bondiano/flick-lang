@@ -5,7 +5,7 @@
 use std::mem;
 
 use super::ty::Type;
-use super::typing::Ref;
+use super::typing::{Ref, range};
 use super::{Checker, Domain, Local, Operator};
 use crate::diagnostics::suggest::closest;
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
@@ -29,6 +29,7 @@ impl Checker<'_> {
     /// The type of a value or constructor reference, instantiated.
     pub fn name(&mut self, node: &Node) -> Type {
         let ty = self.name_type(node);
+        let declared = self.gadt.declared.take();
         let ty = self.value_bound(ty);
         let ty = if matches!(self.typing.names.get(&node.range()), Some(Ref::Local)) {
             ty
@@ -38,7 +39,10 @@ impl Checker<'_> {
                 captures: Box::new(Type::empty_row()),
             }
         };
-        self.note_type(self.span(node), &ty);
+        match declared {
+            Some(declared) => self.note_refined(range(self.span(node)), &ty, &declared),
+            None => self.note_type(self.span(node), &ty),
+        }
         ty
     }
 
@@ -63,6 +67,7 @@ impl Checker<'_> {
                 .rposition(|l| l.name == name && l.generated == (span.start >= self.generated))
         {
             self.record_name(span, Ref::Local);
+            self.gadt.declared = self.declared_local(i);
             return self.use_local(i, span);
         }
         if self.ui > 0
@@ -314,7 +319,8 @@ impl Checker<'_> {
             K::EqEq | K::NotEq => {
                 let ty = self.infer(lhs);
                 self.check(rhs, &ty);
-                self.equalities.push((ty, span));
+                let givens = self.equalities_in_scope();
+                self.equalities.push((ty, span, givens));
                 bool_
             }
             kind => {

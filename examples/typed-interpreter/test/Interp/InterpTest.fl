@@ -1,0 +1,62 @@
+module Interp.InterpTest exposing (tests)
+
+import Interp.Check exposing (Term(..), Typed(..), check)
+import Interp.Expr exposing (Expr(..), eval, pretty)
+import Interp.Ty as Ty exposing (Ty(..))
+import Interp.Value exposing (Showable(..), results)
+
+/// The type `check` gives a term, described, or why it has none.
+typed : Term -> String
+let typed term =
+  match check term with
+  | Ok (Typed t _) -> Ty.describe t
+  | Err why -> why
+
+/// A showable value shown: only a `match` arm takes its `Show` out.
+shown : Showable -> String
+let shown s =
+  match s with
+  | Showable x -> show x
+
+tests : List Test.Test
+let tests = [
+  Test.test "eval returns the type the expression has" (fun () ->
+    Test.all [
+      Test.equal 3 (eval (Apply (Apply Plus (IntLit 1)) (IntLit 2))),
+      Test.equal true (eval (Apply (Apply Less (IntLit 1)) (IntLit 2))),
+      Test.equal 7 (eval (Named "seven" (If (BoolLit false) (IntLit 0) (IntLit 7)))),
+    ]
+  ),
+  Test.test "pretty prints an application and a name" (fun () ->
+    Test.equal
+      "if (not true) then 1 else x"
+      (pretty (If (Apply Not (BoolLit true)) (IntLit 1) (Named "x" (IntLit 2))))
+  ),
+  Test.test "check types a term or says why it has no type" (fun () ->
+    Test.all [
+      Test.equal "Int" (typed (TmPlus (TmInt 1) (TmInt 2))),
+      Test.equal "Bool" (typed (TmNot (TmBool false))),
+      Test.equal "expected Int, found Bool" (typed (TmPlus (TmInt 1) (TmBool true))),
+      Test.equal "expected Bool, found Int" (typed (TmIf (TmInt 0) (TmInt 1) (TmInt 2))),
+      Test.equal "expected Int, found Bool" (typed (TmIf (TmBool true) (TmInt 1) (TmBool false))),
+    ]
+  ),
+  Test.test "equal compares function types part by part" (fun () ->
+    Test.all [
+      Test.equal true (Option.is_some (Ty.equal (TFun TInt TBool) (TFun TInt TBool))),
+      Test.equal false (Option.is_some (Ty.equal (TFun TInt TBool) (TFun TBool TBool))),
+    ]
+  ),
+  Test.test "a list of showables shows each value with its own Show" (fun () ->
+    Test.equal ["1", "true", "[2, 3]"] (List.map shown [Showable 1, Showable true, Showable [2, 3]])
+  ),
+  Test.test "results run the well-typed terms" (fun () ->
+    Test.equal
+      ["3", "false", "type error: expected Int, found Bool"]
+      (results [
+        TmPlus (TmInt 1) (TmInt 2),
+        TmLess (TmInt 2) (TmInt 1),
+        TmPlus (TmBool true) (TmInt 1),
+      ])
+  ),
+]

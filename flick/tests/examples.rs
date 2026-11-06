@@ -302,3 +302,47 @@ fn bash_completes_add(script: &[u8]) {
     assert!(completion.status.success(), "{completion:?}");
     assert_eq!(String::from_utf8_lossy(&completion.stdout), "add\n");
 }
+
+#[test]
+fn the_typed_interpreter_checks_and_is_formatted() {
+    let dir = common::example("typed-interpreter", "examples/typed-interpreter-check");
+    success(&dir, &["check", "--warnings-as-errors"]);
+    success(&dir, &["fmt", "--check"]);
+}
+
+#[test]
+#[ignore = "needs Node and the installed runtime"]
+fn the_typed_interpreter_evaluates_well_typed_terms() {
+    typed_interpreter_runs("js");
+}
+
+#[test]
+#[ignore = "needs Go"]
+fn the_typed_interpreter_evaluates_well_typed_terms_on_go() {
+    typed_interpreter_runs("go");
+}
+
+fn typed_interpreter_runs(emit: &str) {
+    let dir = common::example(
+        "typed-interpreter",
+        &format!("examples/typed-interpreter-{emit}"),
+    );
+    success(&dir, &["test", "--emit", emit, "--seed", "7"]);
+    success(&dir, &["build", "--emit", emit]);
+    let mut command = if emit == "go" {
+        Command::new(dir.join("dist").join(executable("main")))
+    } else {
+        let mut node = Command::new("node");
+        node.arg(dir.join("dist").join(runner_path(false)));
+        node
+    };
+    let out = command
+        .current_dir(&dir)
+        .output()
+        .expect("the interpreter runs");
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "3\n10\ntrue\ntype error: expected Int, found Bool\ntype error: expected Bool, found Int\n"
+    );
+}
