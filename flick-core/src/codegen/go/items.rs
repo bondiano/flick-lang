@@ -390,6 +390,12 @@ impl<'a> Gen<'a> {
                 let labels = labels.iter().map(|l| self.string(l));
                 list(a, "[]flickrt.Value{", labels, "}").into()
             }
+            Dict::Site { place, definition } => call(
+                a,
+                "flickrt.Site",
+                [self.string(place), self.string(definition)],
+            )
+            .into(),
             Dict::Error => self.unit(),
         }
     }

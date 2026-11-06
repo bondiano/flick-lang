@@ -13,6 +13,8 @@ use crate::diagnostics::{Severity, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
+use crate::types::ty::Type;
 
 impl Checker<'_> {
     /// A pattern of `let` or of a parameter must match every value. A local
@@ -88,6 +90,8 @@ impl Checker<'_> {
             );
             return;
         };
+        // its failure names the place of the `assert`
+        self.want(Type::lang(Lang::CallSite), span);
         if self.options.no_let_assert {
             let message = "`let assert` is not allowed in this project (`[lint] no-let-assert`); \
                            use `match` to handle every case";

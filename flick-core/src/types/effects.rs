@@ -149,7 +149,7 @@ impl Checker<'_> {
 
     /// A stage whose rows are inferred: they grow with its calls.
     pub fn open_stage(&mut self) -> Stage {
-        let (services, errors) = (self.fresh(), self.fresh());
+        let (services, errors) = (self.fresh(), self.store.fresh_error_row());
         self.bounded_stage(services, errors, Site::Inferred)
     }
 

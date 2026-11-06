@@ -98,7 +98,9 @@ impl<'n> Checker<'_> {
                 K::InstanceDecl => {
                     if let Some(instance) = self.instance_head(decl) {
                         let span = self.span(decl);
-                        if !self.written_enum(&instance, span) && self.admit(&instance, span) {
+                        let written = self.written_enum(&instance, span)
+                            || self.written_call_site(&instance, span);
+                        if !written && self.admit(&instance, span) {
                             out.push(Declared {
                                 decl,
                                 span,

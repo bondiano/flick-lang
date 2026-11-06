@@ -51,8 +51,19 @@ let leak_generic file =
   try from_result (Err (Wrapped file)) with
   | err -> { run = k.keep err }
 
+// the errors `err` stands for are `e` and a row not known yet, with no error
+// in it: still a row of errors, not a capture row whose unknown tail would
+// take the region of what the cell is set to
+leak_cell : forall s e. File s -> (Unit ->{; e} Unit) ->{} Unit
+let leak_cell file act =
+  try act () with
+  | err ->
+    let cell = Ref.make (keep err)
+    Ref.set cell (fun () -> ignore file)
+
 //~ FLICK-G001 @18:28-18:46 this function uses `x`, which holds `e`, but the expected type `Unit -> Unit` holds no captures
 //~ FLICK-G001 @22:27-22:45 this function uses `x`, which holds `e`
 //~ FLICK-G001 @36:3-36:12 this value holds region `s`
 //~ FLICK-G001 @45:20-45:30 this value holds `s`, but the expected type `Unit -> Unit` holds no captures
 //~ FLICK-G001 @52:20-52:30 this value holds `s`, but the expected type `Unit -> Unit` holds no captures
+//~ FLICK-G001 @62:19-62:40 this function uses `file`, which holds `s`, but the expected type `(Unit -> Unit)^{e}` allows only `e`

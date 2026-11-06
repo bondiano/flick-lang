@@ -24,12 +24,14 @@ let after millis text = task {
 failing : String -> Eff none {Oops} Float
 let failing text = task { from_result (Err (Oops text)) }
 
-/// A task that waits long, saying when it is interrupted.
-patient : String -> Eff none none Float
-let patient name = task {
+/// A task that waits long, saying when it is interrupted; it tells
+/// `started` once that saying is in place.
+patient : String -> Deferred.Deferred none Unit -> Eff none none Float
+let patient name started = task {
   Effect.ensuring
     (task { say (name ++ " ended") })
     (task {
+      let _ = Deferred.succeed () started
       nap 2000
       0
     })
@@ -47,12 +49,13 @@ let quiet _ = ()
 /// The sibling of a failing branch ends before the failure is caught.
 fail_fast : Unit ->{} String
 let fail_fast () =
+  let started : Deferred.Deferred none Unit = Deferred.make ()
   try
     let _ =
       parallel
-        (patient "sibling")
+        (patient "sibling" started)
         (task {
-          nap 5
+          Deferred.await_ started
           from_result (Err (Oops "fail fast"))
         })
     "both ended"
@@ -86,23 +89,27 @@ let main () =
   }
   say (show joined)
   scope owner {
-    let child = Fiber.spawn owner quiet (patient "child")
-    nap 5
+    let started : Deferred.Deferred none Unit = Deferred.make ()
+    let child = Fiber.spawn owner quiet (patient "child" started)
+    Deferred.await_ started
     Fiber.interrupt child
     say "interrupted the child"
   }
   scope owner {
-    let _left = Fiber.spawn owner quiet (patient "left running")
-    nap 5
+    let started : Deferred.Deferred none Unit = Deferred.make ()
+    let _left = Fiber.spawn owner quiet (patient "left running" started)
+    Deferred.await_ started
     say "scope body done"
   }
+  // a timeout arms its timer as it forks the task, and a fiber stopped before it
+  // starts never runs: only time gets the task masked before the deadline
   let kept =
     timeout_option
-      5
+      100
       (task {
         Effect.uninterruptible
           (task {
-            nap 30
+            nap 350
             say "uninterruptible part done"
           })
         nap 2000

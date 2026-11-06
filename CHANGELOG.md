@@ -32,6 +32,14 @@ break programs.
   core class `Enum.Enum t b`, whose methods are the companions `T.value`,
   `T.parse` (checked at compile time for a constant, `FLICK-D006`) and
   `T.all`. The interface format is version 4.
+- **CallSite:** the new core class `CallSite` is the place of a use,
+  `CallSite.place` (`Module:line`) and `CallSite.definition`, which the
+  checker gives: a function with `CallSite =>` passes on its caller's, any
+  other use gets its own; a program declares no instance (`FLICK-C012`).
+  `Atom.set`, `update`, `modify`, the serializable atoms, `todo`, `echo`
+  and `let assert` take it instead of the lowering's rewriting.
+- **Breaking:** `Atom.set_at`, `update_at` and `modify_at` are gone: `Atom.set`
+  names its place itself.
 - **Internal:** the makers of atoms, actions and views are marked `@maker`
   in `std`, and the types, services and policies the `ui` checks name are
   lang items, so the compiler spells no module of `std` for them.

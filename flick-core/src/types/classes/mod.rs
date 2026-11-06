@@ -4,6 +4,7 @@
 //! the row primitives and structural instances of records, and `deriving`.
 //! Rules: `docs/src/content/docs/reference/classes.md`.
 
+mod call_site;
 mod coherence;
 mod declare;
 mod derive;
@@ -83,6 +84,8 @@ pub enum Dict {
         constraint: String,
         labels: Vec<String>,
     },
+    /// `CallSite` of a use the checker made: its place and definition.
+    Site { place: String, definition: String },
     /// A constraint on a type that already produced a diagnostic.
     Error,
 }
@@ -96,7 +99,7 @@ impl Dict {
             Self::Instance { args: dicts, .. } | Self::Structural { fields: dicts, .. } => {
                 dicts.iter().any(Self::assumes)
             }
-            Self::Primitive { .. } | Self::Error => false,
+            Self::Primitive { .. } | Self::Site { .. } | Self::Error => false,
         }
     }
 }

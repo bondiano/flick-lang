@@ -60,7 +60,7 @@ impl Checker<'_> {
                     );
                     return value;
                 }
-                let errors = self.fresh();
+                let errors = self.store.fresh_error_row();
                 let result = Type::apps(
                     Type::lang(Lang::Result),
                     [

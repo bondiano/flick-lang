@@ -25,6 +25,11 @@ func NewDict() *Dict {
 	return &Dict{entries: map[string]Value{}, lazy: map[string]*lazyEntry{}}
 }
 
+// Site is the dictionary of `CallSite` the compiler made for a use.
+func Site(place, definition string) Value {
+	return NewDict().Set("place", place).Set("definition", definition)
+}
+
 // Set binds a method.
 func (d *Dict) Set(name string, v Value) *Dict {
 	d.entries[name] = v

@@ -4,7 +4,6 @@
 //! shadowing in the generated code.
 
 mod applicative_do;
-mod atoms;
 mod comprehension;
 mod debug;
 mod do_notation;
@@ -45,7 +44,6 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         file: module.file,
         generated: module.generated,
         typing,
-        definition: String::new(),
         scope: Vec::new(),
         used: HashMap::new(),
         consumed: HashSet::new(),
@@ -106,8 +104,6 @@ struct Lower<'a> {
     /// Where generated code starts in `text`.
     generated: u32,
     typing: &'a Typing,
-    /// The top-level value being lowered, which names its serializable atom.
-    definition: String,
     /// Locals in scope.
     scope: Vec<Bound>,
     /// How often each source name was bound in the current definition.
@@ -187,7 +183,6 @@ impl Lower<'_> {
             K::LetDecl => {
                 self.fresh_definition();
                 let parts = let_parts(decl, self.text);
-                self.definition = parts.name.clone().unwrap_or_default();
                 let kind = match (&parts.name, parts.pattern) {
                     (Some(name), _) => ItemKind::Value {
                         name: name.clone(),

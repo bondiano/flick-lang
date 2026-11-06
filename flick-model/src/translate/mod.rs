@@ -20,7 +20,7 @@ use self::expr::pat;
 use crate::eval::Program;
 use crate::native;
 use crate::subst::binders;
-use crate::syntax::{Arm, Const, Name, Path, RegionOp, Term};
+use crate::syntax::{Arm, Const, Lit, Name, Path, RegionOp, Term};
 
 /// The program of `modules`: those of a build and the built-in ones.
 pub fn program<'a>(modules: impl IntoIterator<Item = &'a ir::Module>) -> Program {
@@ -174,6 +174,13 @@ fn dict(d: &Dict) -> Term {
         Dict::Primitive { constraint, .. } => {
             Term::Stuck(format!("the row primitive `{constraint}`").into())
         }
+        // the record of `CallSite`'s two values, in label order
+        Dict::Site { place, definition } => Term::Record(
+            [("definition", definition), ("place", place)]
+                .into_iter()
+                .map(|(l, v)| (Name::from(l), Term::Lit(Lit::String(v.as_str().into()))))
+                .collect(),
+        ),
         Dict::Error => Term::Stuck("a dictionary of a type with an error".into()),
     }
 }

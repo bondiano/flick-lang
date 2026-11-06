@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use super::Lower;
-use super::atoms::completed;
 use super::numeric::{apply, arith_of};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::numeric::Arith;
@@ -194,9 +193,6 @@ impl Lower<'_> {
             }
             Ref::Value { module, name } if lang::is(Lang::WireCodec, module, name) => {
                 self.wire_codec(key, span)
-            }
-            Ref::Value { module, name } if module == "Atom" && completed(name) => {
-                self.atom_call(name, node, span)
             }
             Ref::Value { module, name } => ExprKind::Global {
                 module: module.clone(),

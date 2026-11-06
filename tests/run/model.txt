@@ -4,6 +4,7 @@
 # Every case here is in portable.txt too.
 bootstrap/hello
 codegen/enums
+codegen/call_site
 codegen/eval_order
 codegen/stage_order
 codegen/lift

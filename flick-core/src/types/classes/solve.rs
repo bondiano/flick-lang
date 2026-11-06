@@ -45,7 +45,11 @@ impl Checker<'_> {
                     let c = this.canon(&w.constraint);
                     progress |= c != w.constraint;
                     w.constraint = c;
-                    this.entail(&w.constraint, &givens, &mut Vec::new())
+                    let site = this.call_site(&w.constraint, &givens, w.span);
+                    site.map_or_else(
+                        || this.entail(&w.constraint, &givens, &mut Vec::new()),
+                        Outcome::Solved,
+                    )
                 });
                 match outcome {
                     Outcome::Solved(dict) => {

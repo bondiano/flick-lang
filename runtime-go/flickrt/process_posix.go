@@ -34,6 +34,13 @@ func processKill(cmd *exec.Cmd, signal string) error {
 	return nil
 }
 
+// processGroupAlive is whether the command's process group still has a
+// member, one only zombies hold included (EPERM on macOS).
+func processGroupAlive(cmd *exec.Cmd) bool {
+	err := syscall.Kill(-cmd.Process.Pid, 0)
+	return err == nil || err == syscall.EPERM
+}
+
 // processSignal is the name of the signal that ended the process, if one did.
 func processSignal(state *os.ProcessState) (string, bool) {
 	if state == nil {

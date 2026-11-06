@@ -279,7 +279,7 @@ fn rename_dict(d: &mut Dict, names: &HashMap<String, String>) {
             }
         }
         Dict::Super { dict, .. } => rename_dict(dict, names),
-        Dict::Given(_) | Dict::Primitive { .. } | Dict::Error => {}
+        Dict::Given(_) | Dict::Primitive { .. } | Dict::Site { .. } | Dict::Error => {}
     }
 }
 

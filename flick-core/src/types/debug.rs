@@ -9,6 +9,7 @@ use super::typing::range;
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::source::Span;
 use crate::syntax::cst::{Node, Token};
+use crate::types::lang::Lang;
 
 impl Checker<'_> {
     /// `todo`: any type its place needs.
@@ -18,6 +19,8 @@ impl Checker<'_> {
             self.span(node),
             "`todo` is left in the code: running it fails",
         );
+        // the message names the place of the `todo`
+        self.want(Type::lang(Lang::CallSite), self.span(node));
         self.fresh()
     }
 
@@ -25,6 +28,7 @@ impl Checker<'_> {
     pub(super) fn echo(&mut self, node: &Node, op: Token, operand: Option<&Node>) -> Type {
         let warning = Diagnostic::new(codes::T023, Severity::Warning, "`echo` is left in the code")
             .with_span(self.token_span(op));
+        self.want(Type::lang(Lang::CallSite), self.token_span(op));
         let Some(operand) = operand else {
             self.diagnostics.push(warning);
             let a = self.fresh();

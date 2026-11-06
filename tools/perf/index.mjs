@@ -52,19 +52,21 @@ export const slack = (metric, value, { budget, tolerance }) => {
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 
 /**
- * Checking the corpus: `flick check tests/check/pass`, then each project of
- * tests/check/projects, whose expected diagnostics are part of it.
+ * Checking the corpus: `flick check` of each area of tests/check/pass, then each
+ * project of tests/check/projects, whose expected diagnostics are part of it.
  */
 const checkCorpus = (flick) => {
-  const projects = readdirSync(path.join(root, "tests/check/projects"), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
+  const dirs = (dir) =>
+    readdirSync(path.join(root, dir), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
   const runs = [
-    { args: ["check", "tests/check/pass"], ok: [0] },
+    // area by area: fixtures of different areas may declare the same module
+    ...dirs("tests/check/pass").map((d) => ({ args: ["check", `tests/check/pass/${d}`], ok: [0] })),
     // 1 and 2, errors and a usage error such as a bad flick.toml, are what a project may expect;
     // 3, an internal error, or a panic is not
-    ...projects.map((p) => ({ args: ["--project", `tests/check/projects/${p}`, "check"], ok: [0, 1, 2] })),
+    ...dirs("tests/check/projects").map((p) => ({ args: ["--project", `tests/check/projects/${p}`, "check"], ok: [0, 1, 2] })),
   ];
   const once = () => {
     const started = performance.now();

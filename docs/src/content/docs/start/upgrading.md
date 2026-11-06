@@ -40,6 +40,7 @@ change needs.
 | [Plugins reach only what is granted](#plugins-reach-only-what-is-granted) | no | `FLICK-P038`, `FLICK-P039` |
 | [`LogLevel` is an enum](#loglevel-is-an-enum) | no | `FLICK-T001` |
 | [Plugins speak interface 0.14](#plugins-speak-interface-014) | no | `FLICK-P035` |
+| [`CallSite` replaces the `_at` writes](#callsite-replaces-the-_at-writes) | no | `FLICK-T001` |
 | [A closure over an error value says so](#a-closure-over-an-error-value-says-so) | no | `FLICK-G001` |
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
 
@@ -276,6 +277,15 @@ a GADT (`refined`, `constrained` of a case): the interface of plugins is
 `FLICK-P035` names both versions; rebuild it against the new
 `flick-plugin`.
 
+## `CallSite` replaces the `_at` writes
+
+The core class `CallSite` gives a function the place of its use (see
+[Call sites](../../reference/classes/#call-sites)). `Atom.set`, `update` and
+`modify` take it themselves, so `Atom.set_at`, `update_at` and `modify_at`
+are gone (`FLICK-T001`): call `Atom.set atom value`, or give your own
+function `CallSite =>` to report its caller's place. A serializable atom's
+key is still `Module.name`, now its `CallSite.definition`.
+
 ## A closure over an error value says so
 
 A value of `Errors e`, `Exit e a` or `Failure e` holds what the errors of
@@ -317,7 +327,5 @@ Cargo feature is gone: every build has the plugin of `std`.
 These changes are planned and not done yet; each gets a section here when it
 lands:
 
-- `CallSite` in place of the `_at` variants of functions, such as
-  `Atom.set_at`;
 - `sql` blocks as a plugin of `std`, as `cli` and `codec` are now;
 - later, changes to the core of effects.

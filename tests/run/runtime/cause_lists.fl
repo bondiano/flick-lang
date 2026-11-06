@@ -33,6 +33,30 @@ let late_b s millis =
       from_result (Err (B s))
     })
 
+/// Fails with `A n` as its mask ends, telling `entered` once masked: the
+/// sibling that waits for it fails first and stops it while masked.
+stopped_a : Float -> Deferred.Deferred none Unit ->{; A} Float
+let stopped_a n entered =
+  Effect.uninterruptible
+    (task {
+      let _ = Deferred.succeed () entered
+      // a masked fiber cannot see the request come in: only time keeps the mask on until it does
+      nap 250
+      from_result (Err (A n))
+    })
+
+/// `parallel` of a branch failing with `A first` that stops, once masked,
+/// a branch failing with `A second`.
+both : Float -> Float ->{; A} (Float, Float)
+let both first second =
+  let entered : Deferred.Deferred none Unit = Deferred.make ()
+  parallel
+    (task {
+      Deferred.await_ entered
+      late_a first 10
+    })
+    (task { stopped_a second entered })
+
 count : Exit e a -> String
 let count ex =
   match Exit.failure ex with
@@ -41,7 +65,15 @@ let count ex =
 
 handled : Unit ->{; B} (Float, Float)
 let handled () =
-  try parallel (task { late_b "b" 10 }) (task { late_a 1 40 }) with
+  let entered : Deferred.Deferred none Unit = Deferred.make ()
+  try
+    parallel
+      (task {
+        Deferred.await_ entered
+        late_b "b" 10
+      })
+      (task { stopped_a 1 entered })
+  with
   | A _ -> (0, 0)
 
 bang : Errors {B} -> Errors {B}
@@ -66,10 +98,8 @@ let main () =
       List.length (Cause.reasons other),
       List.length (Cause.reasons (Cause.combine empty same)),
     ))
-  let distinct : Exit {A} (Float, Float) =
-    Effect.exit (task { parallel (task { late_a 1 10 }) (task { late_a 2 40 }) })
-  let equal : Exit {A} (Float, Float) =
-    Effect.exit (task { parallel (task { late_a 1 10 }) (task { late_a 1 40 }) })
+  let distinct : Exit {A} (Float, Float) = Effect.exit (task { both 1 2 })
+  let equal : Exit {A} (Float, Float) = Effect.exit (task { both 1 1 })
   let raced : Exit {A} Float =
     Effect.exit (task { race_success (task { late_a 1 10 }) (task { late_a 1 40 }) })
   say ("parallel " ++ count distinct ++ " " ++ count equal ++ ", race " ++ count raced)

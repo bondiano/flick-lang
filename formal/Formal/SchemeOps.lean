@@ -52,8 +52,6 @@ theorem Outl.mono {Θ Θ' C s} (h : Outl Θ C s) (hΘ : ∀ C s, Θ C s → Θ' 
 theorem Const.ok_substT {Θ c ι} (σ : Atom → Ty) (h : Const.ok Θ c ι) :
     Const.ok (Θ.substT σ) c (ι.substT σ) := by
   cases c <;> simp only [Const.ok, CArg.substT] at h ⊢
-  · exact ⟨fun N ⟨h₁, h₂⟩ => h.1 N ⟨(h.2.1.substT_nm σ N).mp h₁, (h.2.2.substT_nm σ N).mp h₂⟩,
-      h.2.1.substT σ, h.2.2.substT σ⟩
   · exact ⟨h.1.substT σ, fun N a ⟨b, hb, _⟩ => h.2 N b hb⟩
   · have := h.1.substT σ
     refine ⟨fun k hk => this k ?_, fun N a ⟨b, hb, _⟩ => h.2 N b hb⟩

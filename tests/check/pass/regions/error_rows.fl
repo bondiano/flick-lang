@@ -46,3 +46,12 @@ let show_generic file =
     try from_result (Err (Wrapped 1)) with
     | err -> { run = k.keep err }
   { run = run.run; other = other.run }
+
+// the errors `err` stands for are `e` and a row not known yet: a cell of
+// what `keep err` holds takes it again
+keep_cell : forall e. (Unit ->{; e} Unit) ->{} Unit
+let keep_cell act =
+  try act () with
+  | err ->
+    let cell = Ref.make (keep err)
+    Ref.set cell (keep err)

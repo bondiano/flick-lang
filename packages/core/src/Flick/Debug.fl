@@ -1,21 +1,31 @@
 /// What `todo`, `echo` and a failing `let assert` compile to. Programs
 /// write the keywords, not these names; the warnings for `todo` and `echo`
-/// keep them out of packages.
+/// keep them out of packages. Each names the place of its keyword.
 module Flick.Debug exposing (todo_at, echo_at, assert_at)
 
+import CallSite exposing (CallSite)
+
 @lang todo_at
-/// Fails with `message`, which says where the `todo` is and what it stands
-/// for.
-todo_at : String -> a
-foreign pure todo_at from "@flick-lang/runtime" "flickTodo"
+/// Fails with `message`, after the place of the `todo`.
+todo_at : CallSite => String -> a
+let todo_at message = todo_failed (CallSite.place ++ ": " ++ message)
 
 @lang echo_at
-/// Writes `location` and `value` to stderr, and returns `value`.
-echo_at : String -> a -> a
-foreign pure echo_at from "@flick-lang/runtime" "flickEcho"
+/// Writes the place of the `echo` and `value` to stderr, and returns `value`.
+echo_at : CallSite => a -> a
+let echo_at value = echoed CallSite.place value
 
 @lang assert_at
-/// Fails with `message`, which says where the `let assert` is, and the
+/// Fails with `message`, after the place of the `let assert`, and the
 /// `value` its pattern did not match.
-assert_at : String -> a -> b
-foreign pure assert_at from "@flick-lang/runtime" "flickAssert"
+assert_at : CallSite => String -> a -> b
+let assert_at message value = assert_failed (CallSite.place ++ ": " ++ message) value
+
+todo_failed : String -> a
+foreign pure todo_failed from "@flick-lang/runtime" "flickTodo"
+
+echoed : String -> a -> a
+foreign pure echoed from "@flick-lang/runtime" "flickEcho"
+
+assert_failed : String -> a -> b
+foreign pure assert_failed from "@flick-lang/runtime" "flickAssert"

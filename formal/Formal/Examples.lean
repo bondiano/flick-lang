@@ -10,6 +10,7 @@ type is `Unit`, and `Scope s` leaves the row of the scope.
 services of its argument and uses it at `{S}`.
 `λf. try f () with _ → ()` removes the row variable of the errors of `f`.
 `λl. λt. provide l (await t)` provides a layer whose outputs are a row variable.
+`λl. λm. Layer.merge l m` merges a layer whose outputs are a row variable with one giving `S`.
 -/
 
 namespace Flick
@@ -124,6 +125,37 @@ example (S : Sig) :
   · rintro a (⟨i, s, hi, hs, ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
     · cases i with
       | zero => simp at hs; subst hs; simp [Ty.reach, Caps.none] at ha
+      | succ => simp at hs
+    · simp [Tm.Has] at hp
+    · simp [Tm.Has] at hl
+  · rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
+    · simp [Tm.Free] at hi
+    · simp [Tm.Has] at hp
+    · simp [Tm.Has] at hl
+
+/-- `Layer⟨∅;∅;o⟩`. -/
+def outLayer (o : Row) : Ty := .layer Row.none Row.none o
+
+/-- `λl. λm. Layer.merge l m`: the outputs of `l` are a row variable `ρ`, which an instance
+may make overlap the `S` of `m`. -/
+example (S : Sig) :
+    Typ S [] Facts.none [] (.lam (.lam (.app (.app (.const .merge) (.var 1)) (.var 0))))
+      (.ex (.arrow (outLayer rowVar) .pure (.arrow (outLayer (Row.single "S")) .pure
+        (outLayer (Row.union rowVar (Row.single "S"))) Caps.none) Caps.none) .pure) := by
+  have h0 : Row.union Row.none Row.none = Row.none := by funext x; simp [Row.union, Row.none]
+  have hv : ∀ {Γ : List Scheme} {i t}, Γ[i]? = some (.mono t) →
+      Typ S [] Facts.none Γ (.var i) (.ex t .pure) :=
+    fun h => .var (ts := []) h rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl)
+  refine .lam (.lam (.app (C := Caps.none) (.app (C := Caps.none)
+      (.const (c := .merge) (ι := ⟨.base .unit, .base .unit, Caps.none, Row.none, Row.none, rowVar,
+        Row.none, Row.none, Row.single "S"⟩) trivial ?_)
+      (hv rfl) (Stage.le_refl _) .refl) (hv rfl) (Stage.le_refl _) .refl)
+      (fun h => by simp [Tm.Has] at h) ?_ .refl)
+    (fun h => by simp [Tm.Has] at h) ?_ .refl
+  · simp only [Const.ty, outLayer, h0]; exact .refl
+  · rintro a (⟨i, s, hi, hs, ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
+    · cases i with
+      | zero => simp at hs; subst hs; simp [outLayer, Ty.reach, Caps.none] at ha
       | succ => simp at hs
     · simp [Tm.Has] at hp
     · simp [Tm.Has] at hl

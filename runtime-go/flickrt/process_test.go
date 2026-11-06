@@ -61,6 +61,37 @@ func TestChildProcessKillAndScope(t *testing.T) {
 	}
 }
 
+// Kill waits for the process, not for a member of its group that ignores
+// the signal and still holds its stdout: that one gets a second, as with
+// Effect's spawner.
+func TestChildProcessKillAwaitsTheLeaderNotItsPipes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no signals to ignore")
+	}
+	fb := rootFiber()
+	owned(fb, func(fb *Fiber, _ *Owner) Value {
+		p := ChildProcessSpawn(fb, procShell(`(trap "" TERM; echo ready; sleep 30) & sleep 30`)).(*process)
+		t.Cleanup(func() { processKill(p.cmds[0], "SIGKILL") })
+		if _, ok := p.out.next(fb); !ok {
+			t.Fatal("no ready line")
+		}
+		start := time.Now()
+		ChildProcessKill(fb, p)
+		if took := time.Since(start); took > 10*time.Second {
+			t.Fatalf("kill took %v", took)
+		}
+		if p.running() {
+			t.Fatal("still running after kill")
+		}
+		if !processGroupAlive(p.cmds[0]) {
+			t.Fatal("the member ignoring SIGTERM is gone: the case tests nothing")
+		}
+		processKill(p.cmds[0], "SIGKILL")
+		p.out.all(fb) // ends once the last holder of the pipe is gone
+		return Unit
+	})
+}
+
 func TestChildProcessMissingProgramIsNotFound(t *testing.T) {
 	_, cause := catch(func() Value {
 		return ChildProcessExitCode(rootFiber(), ChildProcessMake("flick-no-such-program", []Value{}))

@@ -331,7 +331,7 @@ impl Checker<'_> {
         {
             let subst: Vec<(String, Type)> = vars
                 .iter()
-                .map(|v| (v.name.clone(), self.fresh()))
+                .map(|v| (v.name.clone(), self.store.fresh_of(&v.kind)))
                 .collect();
             if vars.len() > arity
                 && let Some((_, capture)) = subst.last()

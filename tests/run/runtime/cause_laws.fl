@@ -169,18 +169,21 @@ let nap millis =
   | Ok d -> Effect.sleep d
   | Err _ -> ()
 
-/// Fails after the mask ends, by when the fiber was asked to stop.
-late : Unit ->{; A} String
-let late () =
+/// Tells `entered` it is masked, then fails after the mask ends, by when
+/// the fiber was asked to stop.
+late : Deferred.Deferred none Unit ->{; A} String
+let late entered =
   Effect.uninterruptible
     (task {
-      nap 40
+      let _ = Deferred.succeed () entered
+      // a masked fiber cannot see the request come in: only time keeps the mask on until it does
+      nap 250
       from_result (Err (A 1))
     })
 
-guarded : Unit ->{} String
-let guarded () =
-  try late () with
+guarded : Deferred.Deferred none Unit ->{} String
+let guarded entered =
+  try late entered with
   | A _ ->
     say "the handler ran"
     "handled"
@@ -191,9 +194,10 @@ let quiet _ = ()
 /// The handler is skipped: the fiber ends with its interruption alone.
 skipped : Unit ->{} Unit
 let skipped () =
+  let entered : Deferred.Deferred none Unit = Deferred.make ()
   let exits = scope owner {
-    let fiber = Fiber.spawn owner quiet (task { guarded () })
-    nap 10
+    let fiber = Fiber.spawn owner quiet (task { guarded entered })
+    Deferred.await_ entered
     Fiber.interrupt fiber
     Fiber.await_all [fiber]
   }

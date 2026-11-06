@@ -179,6 +179,7 @@ lang_items! {
     Enum = "enum",
     // the evidence of two types being one, which a GADT branch assumes
     TypeEq = "type_eq",
+    CallSite = "call_site",
     // the class `deriving Generic` gives an instance of, and its representation
     Generic = "generic",
     GenericSum = "generic_sum",
