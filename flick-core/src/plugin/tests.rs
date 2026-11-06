@@ -44,6 +44,12 @@ fn every_kind_of_node_renders_in_parentheses() {
     );
     assert_eq!(text(|b| b.expr(Expr::Boolean(true))), Ok("true".into()));
     assert_eq!(text(|b| b.expr(Expr::Unit)), Ok("()".into()));
+    let joined = text(|b| {
+        let a = b.expr(Expr::Text("a".into()));
+        let x = name(b, "x");
+        b.expr(Expr::Concat(vec![a, x]))
+    });
+    assert_eq!(joined, Ok("(\"a\" ++ x)".into()));
     let applied = text(|b| {
         let f = name(b, "f");
         let x = name(b, "x");
@@ -173,6 +179,7 @@ fn generated_code_is_checked_before_it_is_rendered() {
         (Expr::Number(f64::NAN), "no number"),
         (Expr::Record(Vec::new()), "empty record"),
         (Expr::Tuple(Vec::new()), "fewer than two"),
+        (Expr::Concat(Vec::new()), "fewer than two"),
     ] {
         let arena = Arena {
             nodes: vec![node(Kind::Expr(kind))],

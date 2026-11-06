@@ -19,7 +19,8 @@ pub fn collect(blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8> {
     (compiler.read_file(STATED)).unwrap_or_else(|e| format!("refused: {e}").into_bytes())
 }
 
-/// The code of `block` when its head is one of these; `None` otherwise.
+/// The code of `block` when its head is one of these, `state` being what
+/// `collect` read; `None` otherwise.
 pub fn expand(
     block: &Block,
     state: &[u8],
@@ -45,7 +46,7 @@ pub fn expand(
             (compiler.fetch(&request))
                 .map(|r| format!("{} {}", r.status, String::from_utf8_lossy(&r.body)))
         }
-        "stated" => Ok(String::from_utf8_lossy(state.get(4..).unwrap_or_default()).into_owned()),
+        "stated" => Ok(String::from_utf8_lossy(state).into_owned()),
         _ => return None,
     };
     let text = text.unwrap_or_else(|e| format!("refused: {e}"));

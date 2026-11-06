@@ -258,6 +258,21 @@ mod wasm {
         );
     }
 
+    #[test]
+    fn a_wasm_plugin_tells_another_module_what_it_published() {
+        let main = "module App.Main exposing (main, heard_it)\n\nimport Pairs exposing (plugin heard)\nimport App.Notes exposing (greeting)\n\nheard_it : String\nlet heard_it = heard greeting\n\necho : String\nlet echo = greeting\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
+        let root = app("plugins-published", main);
+        let notes = "module App.Notes exposing (..)\n\nimport Pairs exposing (plugin note)\n\nnote greeting \"hello\"\n";
+        fs::write(root.join("app/src/App/Notes.fl"), notes).expect("write");
+        let expanded = flick(&root, &["expand"]);
+        assert!(expanded.status.success(), "{expanded:?}");
+        let stdout = String::from_utf8_lossy(&expanded.stdout);
+        assert!(
+            stdout.contains("src/App/Main.fl:7:16: plugin `pairs`\n  \"hello\""),
+            "{stdout}"
+        );
+    }
+
     /// A project whose `note` is the block `value`, granted `grants`.
     fn reaching(name: &str, value: &str, grants: &str) -> PathBuf {
         let head = value.split(' ').next().unwrap_or_default();

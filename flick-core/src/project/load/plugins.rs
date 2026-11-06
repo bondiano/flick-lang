@@ -12,8 +12,10 @@ use flick_plugin::Block;
 
 mod derive;
 mod enums;
+mod published;
 mod results;
 
+use published::Publications;
 use results::Results;
 
 use super::unimported::unimported;
@@ -85,6 +87,7 @@ impl Loader<'_> {
             kept: HashMap::new(),
         };
         let mut expanded = Vec::new();
+        let mut publications = Publications::new();
         // the blocks of the modules, then those nested in 1 to ROUNDS blocks
         for _ in 0..=ROUNDS {
             if round.is_empty() {
@@ -93,6 +96,7 @@ impl Loader<'_> {
             let rendered = self.expand_found(
                 &plugins,
                 &mut results,
+                &mut publications,
                 &mut round,
                 &mut diagnostics,
                 &mut editing,
@@ -255,12 +259,15 @@ impl Loader<'_> {
 
     /// The code each block of `found` stands for, from its plugin: each
     /// plugin collects from its blocks of a group, in the order of their
-    /// modules' names and places, then expands each. A call whose result
-    /// this or an earlier run already has is not made again.
+    /// modules' names and places, and publishes what it learned; then it
+    /// expands each block. A call whose result this or an earlier run
+    /// already has is not made again.
+    #[allow(clippy::too_many_arguments)]
     fn expand_found(
         &self,
         plugins: &Plugins,
         results: &mut Results,
+        publications: &mut Publications,
         found: &mut [Found],
         diagnostics: &mut Vec<Diagnostic>,
         editing: &mut Vec<(usize, EditorBlock)>,
@@ -274,6 +281,7 @@ impl Loader<'_> {
             entry.push((m.name.clone(), j));
         }
         let mut rendered: Vec<Option<Rendered>> = found.iter().map(|_| None).collect();
+        let mut states = Vec::new();
         for ((_, package), mut members) in groups {
             let Some(Ok(plugin)) = plugins.get(&package) else {
                 continue;
@@ -300,12 +308,31 @@ impl Loader<'_> {
                     continue;
                 }
             };
+            match results.publish(plugin.as_ref(), &state) {
+                Ok(published) => published::add(publications, &package, published),
+                Err(why) => diagnostics.push(failure(first, &package, &format!("failed: {why}"))),
+            }
+            states.push((package, members, blocks, state, gate));
+        }
+        for (package, members, blocks, state, gate) in states {
+            let Some(Ok(plugin)) = plugins.get(&package) else {
+                continue;
+            };
+            let theirs = publications.get(&package);
+            let mut seen = HashMap::new();
             for &j in &members {
                 let editor = EditorBlock::new(&found[j].source, &state, plugin);
                 editing.push((found[j].module, editor));
             }
             for (&j, block) in members.iter().zip(&blocks) {
                 let f = &mut found[j];
+                if let Some(theirs) = theirs {
+                    let module = &self.modules[f.module];
+                    let view = seen
+                        .entry(f.module)
+                        .or_insert_with(|| Arc::new(published::seen(module, theirs)));
+                    f.source.see_published(Arc::clone(view));
+                }
                 f.source.reach = Reach::new(gate.clone());
                 let expanded = results.expand(plugin.as_ref(), block, &state, &mut f.source);
                 // what the host refused, whatever the plugin made of it

@@ -7,31 +7,58 @@
 //! stands for `(1.0 : String)`, an error in generated code; `coded { X001 }`
 //! refuses with the code its body names. `spin {}` never
 //! ends and `hog {}` takes all memory: the limits of a plugin's calls.
-//! `deriving Pairs.Arbitrary` is in `derive`, and the heads that reach
-//! outside their blocks are in `reach`.
+//! `deriving Pairs.Arbitrary` is in `derive`, the heads that reach
+//! outside their blocks are in `reach`, and those that tell other modules
+//! about a name in `published`.
 
 mod derive;
 mod forms;
+mod published;
 mod reach;
 
 use std::hint::black_box;
 
 use flick_plugin::{
-    Arena, Block, Builder, Compiler, DeriveTarget, Diagnostic, Fact, NodeId, Plugin, Span, Token,
-    TokenKind, flick,
+    Arena, Block, Builder, Compiler, DeriveTarget, Diagnostic, Fact, NodeId, Plugin, Published,
+    Span, Token, TokenKind, flick,
 };
 
 pub struct Pairs;
+
+/// What `reach` read and the notes of `published`, in a state.
+fn parts(state: &[u8]) -> (&[u8], &[u8]) {
+    let len = (state.get(4..8))
+        .and_then(|s| s.try_into().ok())
+        .map_or(0, u32::from_le_bytes);
+    let len = usize::try_from(len).unwrap_or(usize::MAX);
+    let rest = state.get(8..).unwrap_or_default();
+    rest.split_at(len.min(rest.len()))
+}
 
 #[cfg(feature = "guest")]
 flick_plugin::export!(Pairs);
 
 impl Plugin for Pairs {
-    /// The number of `pairs` blocks, then what `reach` reads.
+    /// The number of `pairs` blocks, the length of what `reach` reads and
+    /// it, then the notes of `published`.
     fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8> {
         let pairs = blocks.iter().filter(|b| b.head == "pairs").count();
         let count = u32::try_from(pairs).unwrap_or(u32::MAX).to_le_bytes();
-        [count.as_slice(), &reach::collect(blocks, compiler)].concat()
+        let reached = reach::collect(blocks, compiler);
+        let len = u32::try_from(reached.len())
+            .unwrap_or(u32::MAX)
+            .to_le_bytes();
+        [
+            count.as_slice(),
+            &len,
+            &reached,
+            &published::collect(blocks),
+        ]
+        .concat()
+    }
+
+    fn publish(&self, state: &[u8]) -> Vec<Published> {
+        published::publish(parts(state).1)
     }
 
     fn expand(
@@ -43,7 +70,10 @@ impl Plugin for Pairs {
         if let Some(made) = forms::expand(block, compiler) {
             return made;
         }
-        if let Some(made) = reach::expand(block, state, compiler) {
+        if let Some(made) = reach::expand(block, parts(state).0, compiler) {
+            return made;
+        }
+        if let Some(made) = published::expand(block, compiler) {
             return made;
         }
         let whole = block.whole();

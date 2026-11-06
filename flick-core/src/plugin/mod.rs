@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use flick_plugin::{
     Arena, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece, Plugin,
+    Published,
 };
 
 use source::BlockSource;
@@ -32,6 +33,8 @@ pub trait Expander: Send + Sync {
     /// What the plugin learns from all its blocks of a group; `source`
     /// reaches what the project grants.
     fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String>;
+    /// What the blocks of other groups and modules may ask of `state`.
+    fn publish(&self, state: &[u8]) -> Result<Vec<Published>, String>;
     /// The code `block` stands for; `source` parses the holes it asks for.
     fn expand(
         &self,
@@ -158,6 +161,10 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
 
     fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String> {
         Ok(self.plugin.collect(blocks, source))
+    }
+
+    fn publish(&self, state: &[u8]) -> Result<Vec<Published>, String> {
+        Ok(self.plugin.publish(state))
     }
 
     fn expand(

@@ -157,6 +157,8 @@ pub enum Expr {
     },
     /// The user's expression at this span of the body.
     Hole(Span),
+    /// `(a ++ b ++ …)`: texts or lists joined, at least two.
+    Concat(Vec<NodeId>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -415,6 +417,15 @@ pub struct Highlight {
     pub kind: HighlightKind,
 }
 
+/// What a plugin tells its blocks of other groups and modules about a name
+/// of the module `module`, as `Compiler::published` answers it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Published {
+    pub module: String,
+    pub name: String,
+    pub data: Vec<u8>,
+}
+
 /// What the compiler offers a plugin while it expands a block.
 pub trait Compiler {
     /// The longest expression of the body from `start` on, before `end`.
@@ -459,6 +470,13 @@ pub trait Compiler {
         let _ = name;
         None
     }
+    /// What this plugin published of `name` as the block's module writes
+    /// it, `Users` or `Schema.Users`: its own module's, or one it imports,
+    /// from any group; `None` for a name it does not see or no publication.
+    fn published(&mut self, name: &str) -> Option<Vec<u8>> {
+        let _ = name;
+        None
+    }
 }
 
 /// A plugin: what it learns from all its blocks of a group, and the code
@@ -470,6 +488,12 @@ pub trait Plugin {
     /// gets; `compiler` reaches what the project grants, but parses no
     /// hole.
     fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8>;
+    /// What the blocks of other groups and modules may ask of `state`, the
+    /// state of a group: each before any block expands.
+    fn publish(&self, state: &[u8]) -> Vec<Published> {
+        let _ = state;
+        Vec::new()
+    }
     /// The code `block` stands for given what `collect` learned, or why
     /// there is none; no diagnostic means the compiler already reported why.
     fn expand(
