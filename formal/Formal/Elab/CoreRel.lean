@@ -53,7 +53,7 @@ theorem DP.plain : BPlain (DP S root) := fun _ _ h => h.2.2.1
 
 theorem DP.noRaise : BNoRaise (DP S root) :=
   ⟨by rintro a b ⟨-, -, -, -, Θ, t, ht⟩; exact raise_not_pure ht,
-    by rintro p b ⟨-, -, -, -, Θ, t, ht⟩; cases ht with | errVal hv => cases hv⟩
+    by rintro p ℓ a b ⟨-, -, -, -, Θ, t, ht⟩; exact unw_not_pure ht⟩
 
 theorem ask_redex {N : Name} : Redex (.app (.const (.ask N)) (.lit .unit)) := by
   refine ⟨ask_not_value, fun F a _ ha => ?_⟩
@@ -73,7 +73,7 @@ theorem raise_redex {v : Flick.Tm} (hv : Value v) : Redex (.raise v) := by
   cases F <;> simp [Frame.plug] at ha
   exact ha ▸ hv
 
-theorem unw_redex (p : Nat) : Redex (.unw p) :=
+theorem unw_redex (p ℓ : Nat) (a : Flick.Tm) : Redex (.unw p ℓ a) :=
   ⟨fun h => (by cases h), fun F a _ ha => (by cases F <;> simp [Frame.plug] at ha)⟩
 
 theorem perform_redex {E o : Name} {c : OpClass} {v : Flick.Tm} (hv : Value v) :
@@ -82,6 +82,17 @@ theorem perform_redex {E o : Name} {c : OpClass} {v : Flick.Tm} (hv : Value v) :
   cases F <;> simp [Frame.plug] at ha
   · exact ha.1 ▸ .const
   · exact ha.2 ▸ hv
+
+theorem perform_app_not_pure {Ψ Θ E o c v t} (h : Typ S Ψ Θ [] (.app (.const (.perform E o c)) v) (.ex t .pure)) :
+    False := by
+  cases h with
+  | app hf _ hψ _ =>
+    cases hf with
+    | perform _ hT =>
+      obtain ⟨_, _, _, _, he, -, lψ, -, -⟩ := hT.arrow_left
+      cases he; exact Stage.le_trans lψ hψ
+    | const hc => exact hc.elim
+  | errVal hv => exact (perform_not_value hv).elim
 
 theorem kont_redex {p ℓ : Nat} {u : Flick.Tm} (hu : Value u) : Redex (.app (.kont p ℓ) u) := by
   refine ⟨kont_not_value, fun F a _ ha => ?_⟩
@@ -94,22 +105,22 @@ theorem kont_redex {p ℓ : Nat} {u : Flick.Tm} (hu : Value u) : Redex (.app (.k
 theorem _root_.Flick.RHead.redex' {Λ Λ' : List Rgn} {μ μ' : List Flick.Tm} {e e' : Flick.Tm}
     (h : RHead Λ μ e Λ' μ' e') : Redex e ∨
       (∃ (F : Frame) (v : Flick.Tm), F.ok ∧ Value v ∧ e = F.plug (.raise v)) ∨
-      ∃ (F : Frame) (q : Nat), F.ok ∧ e = F.plug (.unw q) := by
+      ∃ (F : Frame) (q ℓ : Nat) (a : Flick.Tm), F.ok ∧ e = F.plug (.unw q ℓ a) := by
   have nv := h.not_value
   cases h with
   | tryRaise hv => exact .inr (.inl ⟨.try_ _, _, trivial, hv, rfl⟩)
-  | hctlRaise _ _ hv => exact .inr (.inl ⟨.hctlA _ _ _ _ _ _ _, _, trivial, hv, rfl⟩)
+  | hctlRaise _ _ hv => exact .inr (.inl ⟨.hctlA _ _ _ _ _ _ _ _, _, trivial, hv, rfl⟩)
   | hresRaise _ _ hv => exact .inr (.inl ⟨.hresB _ _ _, _, trivial, hv, rfl⟩)
-  | hctlUnw _ _ => exact .inr (.inr ⟨.hctlA _ _ _ _ _ _ _, _, trivial, rfl⟩)
-  | hresUnw _ _ => exact .inr (.inr ⟨.hresB _ _ _, _, trivial, rfl⟩)
-  | habCatch => exact .inr (.inr ⟨.hab _ _ _, _, trivial, rfl⟩)
+  | hctlUnw _ _ => exact .inr (.inr ⟨.hctlA _ _ _ _ _ _ _ _, _, _, _, trivial, rfl⟩)
+  | hresUnw _ _ => exact .inr (.inr ⟨.hresB _ _ _, _, _, _, trivial, rfl⟩)
+  | hwithCatch => exact .inr (.inr ⟨.hwith _ _ _ _ _, _, _, _, trivial, rfl⟩)
   | finRun _ _ hw _ _ | close _ _ hw _ _ =>
-    rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨q, rfl⟩
+    rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨q, ℓ, a, rfl⟩
     · left; refine ⟨nv, fun F a _ ha => ?_⟩
       cases F <;> simp [Frame.plug] at ha
       exact ha.2 ▸ hw
     · exact .inr (.inl ⟨.inside _, _, trivial, hv, rfl⟩)
-    · exact .inr (.inr ⟨.inside _, _, trivial, rfl⟩)
+    · exact .inr (.inr ⟨.inside _, _, _, _, trivial, rfl⟩)
   | _ =>
     left; refine ⟨nv, fun F a hF ha => ?_⟩
     cases F <;> simp [Frame.plug] at ha <;>
@@ -154,15 +165,15 @@ theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
     obtain ⟨rfl, rfl, -⟩ := typ hE' (glob_redex _) hq.symm
     exact ⟨rfl, rfl, _, .glob hE₀ hg, plug_append _ _ _⟩
   | rt hE' hh =>
-    rcases hh.redex' with hr | ⟨F, v, hF, hv, rfl⟩ | ⟨F, q, hF, rfl⟩
+    rcases hh.redex' with hr | ⟨F, v, hF, hv, rfl⟩ | ⟨F, q, ℓ, a, hF, rfl⟩
     · obtain ⟨-, -, Θ', t', h⟩ := typ hE' hr hq.symm
       exact (hh.not_pure h).elim
     · obtain ⟨-, -, Θ', t', h⟩ := typ (E := F :: _) (fun G hG => (List.mem_cons.mp hG).elim
         (fun h => h ▸ hF) (hE' G)) (raise_redex hv) hq.symm
       exact (raise_not_pure h).elim
     · obtain ⟨-, -, Θ', t', h⟩ := typ (E := F :: _) (fun G hG => (List.mem_cons.mp hG).elim
-        (fun h => h ▸ hF) (hE' G)) (unw_redex q) hq.symm
-      cases h with | errVal hv => cases hv
+        (fun h => h ▸ hF) (hE' G)) (unw_redex q ℓ a) hq.symm
+      exact (unw_not_pure h).elim
   | askWith hE' =>
     obtain ⟨-, -, Θ', t', h⟩ := typ hE' ask_redex hq.symm
     exact (ask_inv h).1.elim
@@ -181,39 +192,33 @@ theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
     exact (raise_not_pure h).elim
   | unw hE' hF =>
     obtain ⟨-, -, Θ', t', h⟩ := typ (E := _ :: _) (fun G hG => (List.mem_cons.mp hG).elim
-      (fun h => h ▸ hF) (hE' G)) (unw_redex _) hq.symm
-    cases h with | errVal hv => cases hv
-  | @performAbort E o b v _ _ p r Ei Ef al hE' hEi _ _ hv =>
-    have hq' : Flick.plug (Ei ++ .hwith p Ef al r :: E) (.app (.const (.perform Ef o .abort)) v) =
+      (fun h => h ▸ hF) (hE' G)) (unw_redex _ _ _) hq.symm
+    exact (unw_not_pure h).elim
+  | @performAbort E o b v _ _ p ℓ r Ei Ef al hE' hEi _ _ hv =>
+    have hq' : Flick.plug (Ei ++ .hwith p ℓ Ef al r :: E) (.app (.const (.perform Ef o .abort)) v) =
         Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
-    obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hwith p Ef al r :: E) (hEi.append' (hE'.cons' trivial))
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hwith p ℓ Ef al r :: E) (hEi.append' (hE'.cons' trivial))
       (perform_redex hv) hq'
-    cases h with
-    | app hf => cases hf with | const hc => exact hc.elim
-    | errVal hv => exact (perform_not_value hv).elim
-  | @performTail E o b v _ _ p r Ei Ef al hE' hEi _ _ hv =>
-    have hq' : Flick.plug (Ei ++ .hwith p Ef al r :: E) (.app (.const (.perform Ef o .tail)) v) =
+    exact (perform_app_not_pure h).elim
+  | @performTail E o b v _ _ p ℓ r Ei Ef al hE' hEi _ _ hv =>
+    have hq' : Flick.plug (Ei ++ .hwith p ℓ Ef al r :: E) (.app (.const (.perform Ef o .tail)) v) =
         Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
-    obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hwith p Ef al r :: E) (hEi.append' (hE'.cons' trivial))
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hwith p ℓ Ef al r :: E) (hEi.append' (hE'.cons' trivial))
       (perform_redex hv) hq'
-    cases h with
-    | app hf => cases hf with | const hc => exact hc.elim
-    | errVal hv => exact (perform_not_value hv).elim
-  | @performCtl E o b v _ _ p r Ei Ef al hE' hEi _ _ hv =>
-    have hq' : Flick.plug (Ei ++ .hwith p Ef al r :: E) (.app (.const (.perform Ef o .control)) v) =
+    exact (perform_app_not_pure h).elim
+  | @performCtl E o b v _ _ p ℓ r Ei Ef al hE' hEi _ _ hv =>
+    have hq' : Flick.plug (Ei ++ .hwith p ℓ Ef al r :: E) (.app (.const (.perform Ef o .control)) v) =
         Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
-    obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hwith p Ef al r :: E) (hEi.append' (hE'.cons' trivial))
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hwith p ℓ Ef al r :: E) (hEi.append' (hE'.cons' trivial))
       (perform_redex hv) hq'
-    cases h with
-    | app hf => cases hf with | const hc => exact hc.elim
-    | errVal hv => exact (perform_not_value hv).elim
-  | @resume E A k p u _ _ ℓ r Ef al Ei hE' hA _ _ _ hu =>
-    have hq' : Flick.plug (A ++ .hctlA p ℓ false Ef al r k :: E) (.app (.kont p ℓ) u) =
+    exact (perform_app_not_pure h).elim
+  | @resume E A k p u _ _ ℓ r Ef al Ei ℓh hE' hA _ _ _ hu =>
+    have hq' : Flick.plug (A ++ .hctlA p ℓh ℓ false Ef al r k :: E) (.app (.kont p ℓ) u) =
         Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
-    obtain ⟨-, -, Θ', t', h⟩ := typ (E := A ++ .hctlA p ℓ false Ef al r k :: E)
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := A ++ .hctlA p ℓh ℓ false Ef al r k :: E)
       (hA.append' (hE'.cons' trivial)) (kont_redex hu) hq'
     cases h with
-    | app hf => cases hf
+    | app hf => cases hf with | kont hl => simp at hl
     | errVal hv => exact (kont_not_value hv).elim
 
 /-- A pure step makes no run-time form. -/

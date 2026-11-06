@@ -58,7 +58,7 @@ theorem lam_todo_sites : (Tm.lam .todo).NoIns ∧ (∀ p, ¬ (Tm.lam .todo).Has 
 theorem Tm.Within.moveC {Θ : Facts} {v : Tm} {T : Ty} {φ : Stage} {A₁ A₂ : Nat → Prop}
     (hv : Value v) (ht : Typ S Ψ Θ [] v (.ex T φ)) (h : v.Within Ψ B anc A₁) (hT : T.YF 0) :
     v.Within Ψ B anc A₂ :=
-  h.moveT hv ht fun x hx => absurd (hT.reach hx) (Nat.not_lt_zero _)
+  h.moveT hv ht fun _ hx => absurd (hT.reach hx) (Nat.not_lt_zero _)
 
 theorem Ty.closed_YF {T : Ty} (h : ∀ σ, T.substT σ = T) : T.YF 0 := h _
 

@@ -79,7 +79,7 @@ theorem Nest.performAbort {c : Cfg} {home i E p ℓ Ef al rf o b v} {Ei : List F
           · exact (hn₁.frame _ h).elim, fun h => by
           simp only [Tm.Has] at h
           rcases h with h | h
-          · simp [Tm.Has] at h
+          · simp at h
           · exact ((hv.noIns ((within_of_plug perform_not_value hEi hW.2.2.2.1).2.2.1)).frame _ h).elim⟩) q
       simp only [Tm.Has] at ⊢; grind)
     fun hW => by
@@ -101,7 +101,7 @@ theorem park_within {p ℓ κ : Nat} {tl : Bool} {Ef : Name} {al rf a v f : Tm} 
     (haW : a.Within Ψ B anc A) :
     (Tm.hctl p ℓ κ tl Ef al rf a (plug Ei (.hole p))).Within Ψ B anc A :=
   ⟨hW.1, hW.2.1, hW.2.2.1, haW, hW.2.2.2.1.replug hfv hEi (holeE_iff.mpr (.inl hW.1))
-    (fun x hx => (hole_frames hx).elim), hW.2.2.2.2.1, hW.2.2.2.2.2.1,
+    (fun _ hx => (hole_frames hx).elim), hW.2.2.2.2.1, hW.2.2.2.2.2.1,
     fun x hx => (han.frame x hx).elim, hW.2.2.2.2.2.2⟩
 
 theorem park_frames {p ℓ κ ℓ' : Nat} {tl : Bool} {Ef : Name} {al rf a v f : Tm} {Ei : List Frame}
@@ -117,7 +117,7 @@ theorem perform_frames {Ef o : Name} {c : OpClass} {v : Tm} {A : Nat → Prop} (
     (h : (Tm.app (.const (.perform Ef o c)) v).Within Ψ B anc A) (q : Nat) :
     ¬ (Tm.app (.const (.perform Ef o c)) v).Has (.frame q) := by
   simp only [Tm.Has, not_or]
-  exact ⟨by simp [Tm.Has], (hv.noIns h.2.1).frame q⟩
+  exact ⟨by simp, (hv.noIns h.2.1).frame q⟩
 
 theorem Nest.performTail {c : Cfg} {home i E p ℓ Ef al rf o b v} {Ei : List Frame} {Θ : Facts} {T : Ty}
     {φ : Stage} (hn : Nest Ψ c anc B home)
@@ -169,7 +169,7 @@ theorem Nest.resume {c : Cfg} {home i E p ℓh κ Ef al rf u} {A Ei : List Frame
       (plug E (.hres p ℓh (plug A (.hole p)) (.hwith p ℓh Ef al rf (plug Ei u))))) anc B home := by
   have kf : ∀ {A₀ : Nat → Prop}, (Tm.app (.kont p κ) u).Within Ψ B anc A₀ →
       ∀ q, ¬ (Tm.app (.kont p κ) u).Has (.frame q) := fun h q => by
-    simp only [Tm.Has, not_or]; exact ⟨by simp [Tm.Has], (hu.noIns h.2.1).frame q⟩
+    simp only [Tm.Has, not_or]; exact ⟨by simp, (hu.noIns h.2.1).frame q⟩
   refine hn.redex' hi hE (fun h => by cases h) (fun hW q => ?_) fun hW => ?_
   · have hk := (within_of_plug kont_not_value hA hW.2.2.2.1).2
     have h₁ := plug_frame_iff (E := A) (x := .hole p) (y := .app (.kont p κ) u)
