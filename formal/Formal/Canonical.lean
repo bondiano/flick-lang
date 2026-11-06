@@ -46,8 +46,8 @@ theorem Const.ty_merge {c : Const} {ι : CArg} (h₁ : c.arity = 2) (h₂ : c.la
   cases c <;> simp [Const.arity, Const.layer] at h₁ h₂
   exact ⟨_, _, _, rfl⟩
 
-theorem Const.ty_arrow (c : Const) (ι : CArg) : ∃ x φ y C, c.ty S ι = .arrow x φ y C := by
-  cases c <;> exact ⟨_, _, _, _, rfl⟩
+theorem Const.ty_arrow (c : Const) (ι : CArg) : ∃ x φ y C, c.ty S ι = .arrow x φ y C :=
+  Const.ty_isArrow c ι S
 
 /-- What `Value.pure` gives. -/
 def PureTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (T : Ty) : Prop :=

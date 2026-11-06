@@ -61,6 +61,16 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .own p, A => A p
   | .drec _ r, A => r.Within A ∧ r.NoIns
   | .glob _, _ => True
+  | .hdl _ al r e, A => al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns ∧ e.NoIns
+  | .hwith p _ al r e, A => A p ∧ al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns
+  | .hctl p _ _ al r a k, A =>
+    A p ∧ al.Within A ∧ r.Within A ∧ a.Within A ∧ k.Within A ∧ al.NoIns ∧ r.NoIns
+  | .hres p a b, A => A p ∧ a.Within A ∧ b.Within A
+  | .hdone p a, A => A p ∧ a.Within A
+  | .hab p a e, A => A p ∧ a.Within A ∧ e.Within A
+  | .unw p, A => A p
+  | .kont p, A => A p
+  | .hole, _ => True
 
 /-- The frames of a context at a place with the regions `A`: what the frame
 holds besides the hole is there, and does not evaluate before the hole. -/

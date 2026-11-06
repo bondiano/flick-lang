@@ -23,7 +23,7 @@ theorem builds_one {Ψ Θ Γ} (c : Const) {w} (hc : c.arity = 2 ∨ c.layer) (hw
     cases hf with
     | const _ hT' =>
       cases c with
-      | refMake | refGet | ask | open_ | op => simp [Const.arity, Const.layer] at hc
+      | refMake | refGet | ask | open_ | op | perform _ _ => simp [Const.arity, Const.layer] at hc
       | refSet | merge | addFin | spawn | intEq =>
         obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
         cases h; have := (lt.trans hT).kind; simp [Ty.kind] at this

@@ -117,7 +117,11 @@ theorem Const.shows_first (c : Const) (ι : CArg) (S : Sig) (hc : c.arity = 2 �
 
 theorem Const.ty_isArrow (c : Const) (ι : CArg) (S : Sig) :
     ∃ a φ t C, c.ty S ι = .arrow a φ t C := by
-  cases c <;> exact ⟨_, _, _, _, rfl⟩
+  cases c
+  case perform E o =>
+    simp only [Const.ty]
+    split <;> exact ⟨_, _, _, _, rfl⟩
+  all_goals exact ⟨_, _, _, _, rfl⟩
 
 theorem Le.layer_right {x : Ty} {i e o : Row} (h : Le x (.layer i e o)) : x = .layer i e o := by
   cases h; rfl

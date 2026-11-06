@@ -261,6 +261,7 @@ inductive Const
   | addFin
   | spawn
   | intEq
+  | perform (E o : Name)
 
 def Const.arity : Const → Nat
   | .refSet | .merge | .addFin | .spawn | .intEq => 2
@@ -293,6 +294,15 @@ def Pat.binds : Pat → Nat
   | .or p _ => p.binds
   | _ => 0
 
+/-- How a handler's arm for an operation returns (`docs/formal/core.md`): `tail` gives
+the operation its value, `abort` the handler its value without coming back, and
+`control` the handler its value with the rest of the body as `resume`. -/
+inductive OpClass
+  | tail
+  | abort
+  | control
+  deriving DecidableEq, Repr
+
 /-- Terms of core.md §1.3 and regions.md §1.3, and the run-time forms of
 core.md §3.1 and regions.md §3.1. Binders: `lam b`, `let_ e b` and
 `scope e` bind one variable (`scope` binds the owner); `letrec f b` and `fix f`
@@ -301,7 +311,16 @@ bind two in `f` (`0 = x`, `1 = f`) and `letrec` one in `b`; arms bind
 `econs S v (… enil)`; `raise` is a term former, not a constant. `drec c r` is a
 dictionary record of λFlick⁺ with the fields `r`, an `rcons` spine; it is a value and
 `proj` reads its fields. `glob g` is a global: an instance, a structural or primitive
-dictionary or a constant of Γ₀, which steps to its value in `Σ₀`. -/
+dictionary or a constant of Γ₀, which steps to its value in `Σ₀`.
+
+Handlers of effects: `hdl E al r e` handles the effect `E` in `e` with the arms `al`,
+an `acons` spine whose patterns are `Pat.spine o [.var]` (`[.var, .var]` for a
+`control` operation, with `resume`), and gives the body's value to `r`. At run time a
+handler is the region `p`: `hwith p …` around the body, `hctl p tl … a k` while the
+arm `a` runs and the body `k` waits with a `hole` (`tl`: a `tail` arm, whose value
+resumes it), `hres p a b` while the resumed body `b` runs and the arm `a` waits,
+`hdone p a` once the arm resumed it, `hab p a e` while `e` unwinds by `unw p` to `p`
+and `a` runs there; `kont p` is `resume`. -/
 inductive Tm
   | var (i : Nat)
   | lam (b : Tm)
@@ -339,6 +358,15 @@ inductive Tm
   | own (p : Nat)
   | drec (c : Nat) (r : Tm)
   | glob (g : Nat)
+  | hdl (E : Name) (al r e : Tm)
+  | hwith (p : Nat) (E : Name) (al r e : Tm)
+  | hctl (p : Nat) (tl : Bool) (E : Name) (al r a k : Tm)
+  | hres (p : Nat) (a b : Tm)
+  | hdone (p : Nat) (a : Tm)
+  | hab (p : Nat) (a e : Tm)
+  | unw (p : Nat)
+  | kont (p : Nat)
+  | hole
 
 def Tm.head : Tm → Tm
   | .app f _ => f.head
@@ -417,6 +445,10 @@ structure Sig where
   impl_closed : ∀ N σ, (impl N).substT σ = impl N
   dict : Nat → Option (Nat × List (Label × Scheme))
   glob : Nat → Option Scheme
+  /-- The operation `o` of the effect `E`: its class, its argument and its result,
+  closed; the result of an `abort` one is any type at a call. -/
+  op : Name → Name → Option (OpClass × Ty × Ty)
+  op_closed : ∀ E o c a b σ, op E o = some (c, a, b) → a.substT σ = a ∧ b.substT σ = b
   dict_closed : ∀ c k fs, dict c = some (k, fs) → ∀ l s, (l, s) ∈ fs → s.Closed (s.k + k)
   glob_closed : ∀ g s, glob g = some s → s.Closed s.k
 
@@ -474,6 +506,10 @@ def Const.ty (S : Sig) : Const → CArg → Ty
     .arrow (.owner ι.s) .pure (.arrow (.eff (Row.union (Row.scope ι.s) ι.r) ι.e ι.t ι.C)
       (.rt (Row.union ι.r (Row.obs ι.r ι.s)) Row.none) (.base .unit) ι.s.reach) Caps.none
   | .intEq, _ => .arrow (.base .int) .pure (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none
+  | .perform E o, ι => match S.op E o with
+    | some (.abort, a, _) => .arrow a (.rt (Row.single E) Row.none) ι.t Caps.none
+    | some (_, a, b) => .arrow a (.rt (Row.single E) Row.none) b Caps.none
+    | none => .arrow (.base .unit) (.rt (Row.single E) Row.none) (.base .unit) Caps.none
 
 /-- Side conditions of a constant at an instance: a finalizer and a child outlive their
 owner, with everything they hold
@@ -484,6 +520,8 @@ sees on names is not kept by instantiating a row variable. -/
 def Const.ok (Θ : Facts) : Const → CArg → Prop
   | .addFin, ι => Outl Θ ι.C ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
   | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
+  -- an operation has a rule of its own, which needs it declared
+  | .perform _ _, _ => False
   | _, _ => True
 
 end Flick

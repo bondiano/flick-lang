@@ -48,6 +48,15 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .own p => .own p
   | .drec c r => .drec c (r.rename ξ)
   | .glob g => .glob g
+  | .hdl E al r e => .hdl E (al.rename ξ) (r.rename ξ) (e.rename ξ)
+  | .hwith p E al r e => .hwith p E (al.rename ξ) (r.rename ξ) (e.rename ξ)
+  | .hctl p tl E al r a k => .hctl p tl E (al.rename ξ) (r.rename ξ) (a.rename ξ) (k.rename ξ)
+  | .hres p a b => .hres p (a.rename ξ) (b.rename ξ)
+  | .hdone p a => .hdone p (a.rename ξ)
+  | .hab p a e => .hab p (a.rename ξ) (e.rename ξ)
+  | .unw p => .unw p
+  | .kont p => .kont p
+  | .hole => .hole
 
 /-- Lift a substitution under `n` binders. -/
 def liftS (n : Nat) (σ : Nat → Tm) (i : Nat) : Tm :=
@@ -91,6 +100,15 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .own p => .own p
   | .drec c r => .drec c (r.subst σ)
   | .glob g => .glob g
+  | .hdl E al r e => .hdl E (al.subst σ) (r.subst σ) (e.subst σ)
+  | .hwith p E al r e => .hwith p E (al.subst σ) (r.subst σ) (e.subst σ)
+  | .hctl p tl E al r a k => .hctl p tl E (al.subst σ) (r.subst σ) (a.subst σ) (k.subst σ)
+  | .hres p a b => .hres p (a.subst σ) (b.subst σ)
+  | .hdone p a => .hdone p (a.subst σ)
+  | .hab p a e => .hab p (a.subst σ) (e.subst σ)
+  | .unw p => .unw p
+  | .kont p => .kont p
+  | .hole => .hole
 
 /-- Substitute `vs` for the innermost `vs.length` variables: `e[δ]`. -/
 def inst (vs : List Tm) (i : Nat) : Tm :=

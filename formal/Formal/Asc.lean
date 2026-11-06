@@ -50,6 +50,16 @@ def Tm.Asc : Tm → Nat → Prop
   | .own _, _ => True
   | .drec _ r, _ => r.NoIns
   | .glob _, _ => True
+  | .hdl _ al r e, _ => al.NoIns ∧ r.NoIns ∧ e.NoIns
+  | .hwith p _ al r e, n => al.NoIns ∧ r.NoIns ∧ e.Asc (max n (p + 1))
+  | .hctl p _ _ al r a k, n =>
+    al.NoIns ∧ r.NoIns ∧ a.Asc (max n (p + 1)) ∧ k.Asc (max n (p + 1))
+  | .hres p a b, n => a.Asc (max n (p + 1)) ∧ b.Asc (max n (p + 1))
+  | .hdone p a, n => a.Asc (max n (p + 1))
+  | .hab p a e, n => a.Asc n ∧ e.Asc (max n (p + 1))
+  | .unw _, _ => True
+  | .kont _, _ => True
+  | .hole, _ => True
 
 theorem Tm.Asc.of_noIns : ∀ {e : Tm} {n : Nat}, e.NoIns → e.Asc n := by
   intro e

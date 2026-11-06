@@ -400,6 +400,11 @@ theorem Const.ty_substT (S : Sig) (c : Const) (ι : CArg) (σ : Atom → Ty) :
   cases c
   case addFin | spawn =>
     simp [Const.ty, Ty.substT, Stage.substT, CArg.substT, Ty.reach_caps, Row.obs_substT σ]
+  case perform E o =>
+    rcases h : S.op E o with _ | ⟨c, a, b⟩
+    · simp [Const.ty, h, Ty.substT, Stage.substT]
+    · obtain ⟨ha, hb⟩ := S.op_closed E o c a b σ h
+      cases c <;> simp [Const.ty, h, Ty.substT, Stage.substT, CArg.substT, ha, hb]
   all_goals simp [Const.ty, Ty.substT, Stage.substT, S.impl_closed, CArg.substT]
 
 end Flick

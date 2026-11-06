@@ -37,6 +37,14 @@ theorem Tm.rename_rename :
   | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ => intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂]
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
   | drec _ _ ih => intro ξ ζ; simp only [Tm.rename]; rw [ih]
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
+    intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂, ih₃]
+  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+    intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂, ih₃, ih₄]
+  | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
+    intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂]
+  | hdone _ _ ih₁ =>
+    intro ξ ζ; simp only [Tm.rename]; rw [ih₁]
   | _ => intro ξ ζ; rfl
 
 theorem liftS_rename (n : Nat) (ξ : Nat → Nat) (σ : Nat → Tm) (i : Nat) :
@@ -68,6 +76,14 @@ theorem Tm.subst_rename :
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂]
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
   | drec _ _ ih => intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih]
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
+    intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂, ih₃]
+  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+    intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂, ih₃, ih₄]
+  | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
+    intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂]
+  | hdone _ _ ih₁ =>
+    intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁]
   | _ => intro ξ σ; rfl
 
 theorem liftS_rename' (n : Nat) (ξ : Nat → Nat) (σ : Nat → Tm) (i : Nat) :
@@ -100,6 +116,14 @@ theorem Tm.rename_subst :
     intro σ ξ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂]
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
   | drec _ _ ih => intro σ ξ; simp only [Tm.rename, Tm.subst]; rw [ih]
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
+    intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁, ih₂, ih₃]
+  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+    intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁, ih₂, ih₃, ih₄]
+  | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
+    intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁, ih₂]
+  | hdone _ _ ih₁ =>
+    intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁]
   | _ => intro σ ξ; rfl
 
 theorem liftS_comp (n : Nat) (σ τ : Nat → Tm) (i : Nat) :
@@ -130,6 +154,14 @@ theorem Tm.subst_subst :
   | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ => intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂]
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
   | drec _ _ ih => intro σ τ; simp only [Tm.subst]; rw [ih]
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
+    intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂, ih₃]
+  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+    intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂, ih₃, ih₄]
+  | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
+    intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂]
+  | hdone _ _ ih₁ =>
+    intro σ τ; simp only [Tm.subst]; rw [ih₁]
   | _ => intro σ τ; rfl
 
 end Flick

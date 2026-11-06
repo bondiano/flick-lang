@@ -75,7 +75,8 @@ theorem Const.resKind_cases (c : Const) : c.resKind = 1 ∨ c.resKind = 6 := by
   cases c <;> simp [Const.resKind]
 
 theorem Const.ty_kind (c : Const) (ι : CArg) : (c.ty S ι).kind = 1 := by
-  cases c <;> rfl
+  obtain ⟨_, _, _, _, h⟩ := Const.ty_isArrow c ι S
+  rw [h]; rfl
 
 /-- The result of a binary or layer constant after one argument. -/
 theorem Const.ty_res {c : Const} {ι : CArg} (h : c.arity = 2 ∨ c.layer) :
