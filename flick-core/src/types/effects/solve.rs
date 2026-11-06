@@ -9,7 +9,7 @@ use super::Site;
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::types::lang::{self, Lang};
-use crate::types::ty::{Norm, Row, Type};
+use crate::types::ty::{Norm, Row, Type, Written};
 use crate::types::{Checker, regions};
 
 /// The row `actual` of a call must be part of `declared`.
@@ -38,6 +38,9 @@ struct Excess {
     errors: Vec<String>,
     /// The row labels of what is lacking, for the fixes that name a service.
     labels: Vec<String>,
+    /// Where the bound's row is written, once rows are solved: a variable
+    /// may stand for a row written elsewhere.
+    bound: Written,
 }
 
 impl Checker<'_> {
@@ -235,6 +238,7 @@ impl Checker<'_> {
                     services: Vec::new(),
                     errors: Vec::new(),
                     labels: Vec::new(),
+                    bound: Written::default(),
                 });
             }
             let i = excess
@@ -255,6 +259,9 @@ impl Checker<'_> {
                 if !excess[i].labels.contains(&label) {
                     excess[i].labels.push(label);
                 }
+            }
+            if !c.errors && excess[i].bound.0.is_none() {
+                excess[i].bound = self.local_place(&c.declared);
             }
         }
         self.subrows.clear();
@@ -322,6 +329,11 @@ impl Checker<'_> {
             format!("{bound} does not allow {list}, which {needer} needs"),
             e.span,
         );
+        let written = if e.bound.0.is_some() {
+            Some(e.bound)
+        } else {
+            written
+        };
         if let Some(written) = written {
             // the services go after the `{`; the errors, after the `;`, are left to the user
             let edits: Vec<Edit> = (e.errors.is_empty())

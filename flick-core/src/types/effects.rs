@@ -317,7 +317,17 @@ impl Checker<'_> {
                     self.sub_row(&e1, &e2, site, span, true);
                     self.subsume(&r1, &r2, span)
                 }
-                _ => self.unify(&a, &e),
+                // a layer that needs less fits where more is allowed; it makes the same services
+                _ => match (self.layer_parts(&a), self.layer_parts(&e)) {
+                    (Some((n1, e1, o1)), Some((n2, e2, o2))) => {
+                        let written = self.store.resolve(&n2).written();
+                        let site = self.expected_site(&e, written);
+                        self.sub_row(&n1, &n2, site, span, false);
+                        self.sub_row(&e1, &e2, site, span, true);
+                        self.unify(&o1, &o2)
+                    }
+                    _ => self.unify(&a, &e),
+                },
             },
         }
     }
@@ -326,12 +336,37 @@ impl Checker<'_> {
     /// stand for is written, as `Handlers none` writes the `r` of
     /// `->{r;}`, else where the arrow's row is.
     fn row_place(&self, effects: &Effects) -> Written {
-        let own = self.store.resolve(&effects.services).written();
+        let own = self.local_place(&effects.services);
         if own.0.is_some() {
             own
         } else {
-            effects.written
+            self.local(effects.written)
         }
+    }
+
+    /// Where `row` is written in this module, its tail's place first: in
+    /// `{RouteContext | r}` with `r` given as `none` here, that `none`.
+    pub(super) fn local_place(&self, row: &Type) -> Written {
+        match self.store.resolve(row) {
+            Type::Row(r) => {
+                let tail = r
+                    .tail
+                    .as_ref()
+                    .map(|t| self.local_place(t))
+                    .unwrap_or_default();
+                if tail.0.is_some() {
+                    tail
+                } else {
+                    self.local(r.written)
+                }
+            }
+            _ => Written::default(),
+        }
+    }
+
+    /// `place` when it is in this module, which a fix may edit.
+    pub(super) fn local(&self, place: Written) -> Written {
+        Written(place.0.filter(|(span, _)| span.file == self.file))
     }
 
     fn expected_site(&mut self, expected: &Type, written: Written) -> usize {

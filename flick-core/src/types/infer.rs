@@ -303,6 +303,16 @@ impl Checker<'_> {
     }
 
     /// `(r, e, a)` of `Eff r e a`.
+    /// What a `Layer` needs, how it fails and what it makes.
+    pub fn layer_parts(&self, t: &Type) -> Option<(Type, Type, Type)> {
+        let t = self.whnf(t);
+        let (head, args) = t.spine();
+        match args[..] {
+            [n, e, o] if head.is_lang(Lang::Layer) => Some((n.clone(), e.clone(), o.clone())),
+            _ => None,
+        }
+    }
+
     pub fn eff_parts(&self, t: &Type) -> Option<(Type, Type, Type)> {
         let t = self.whnf(t);
         let (head, args) = t.spine();

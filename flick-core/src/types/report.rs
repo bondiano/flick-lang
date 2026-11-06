@@ -3,9 +3,11 @@
 use super::Checker;
 use super::ty::Type;
 use super::unify::Mismatch;
+mod async_place;
+
 use crate::diagnostics::{Code, Diagnostic, Edit, codes};
 use crate::source::Span;
-use crate::types::lang::Lang;
+use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
     /// An error whose `detail`, when there is one, is a help line under it.
@@ -123,6 +125,31 @@ impl Checker<'_> {
     }
 
     pub fn mismatch(&mut self, mismatch: &Mismatch, actual: &Type, expected: &Type, span: Span) {
+        let reported = self.diagnostics.len();
+        self.report_mismatch(mismatch, actual, expected, span);
+        // a type that lacks only `Async` says so where it is written
+        let about_async = match mismatch {
+            Mismatch::Label { label, .. } => lang::label(Lang::Async) == Some(label.as_str()),
+            Mismatch::Types(..) => true,
+            _ => false,
+        };
+        if about_async
+            && self.diagnostics.len() == reported + 1
+            && let Some((at, text)) = (self.async_place(actual, expected))
+                .or_else(|| self.async_place(expected, actual))
+                .and_then(|w| w.adding("Async"))
+            && let Some(d) = self.diagnostics.pop()
+        {
+            let edits = vec![Edit {
+                span: at,
+                replacement: text,
+            }];
+            self.diagnostics
+                .push(d.with_safe_fix(|| ("add `Async` to the type", edits)));
+        }
+    }
+
+    fn report_mismatch(&mut self, mismatch: &Mismatch, actual: &Type, expected: &Type, span: Span) {
         let (actual, expected) = self.mismatch_types(mismatch, actual, expected);
         let head = format!("expected `{expected}`, found `{actual}`");
         match mismatch {

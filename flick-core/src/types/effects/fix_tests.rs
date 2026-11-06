@@ -16,7 +16,7 @@ fn fixed(signature: &str, program: &str) -> String {
     let file = sources.add("Probe.fl", text.clone());
     let diagnostics = crate::check(&sources, file);
     let edits: Vec<_> = (diagnostics.iter())
-        .filter(|d| d.code == codes::E002)
+        .filter(|d| d.code == codes::E002 || d.code == codes::T003)
         .flat_map(|d| &d.fixes)
         .flat_map(|f| &f.edits)
         .collect();
@@ -96,4 +96,13 @@ fn a_row_given_to_an_alias_gets_it_where_it_is_given() {
     let program = "type alias Handlers r = { run : Unit ->{r;} Unit }\n\
                    let f = { run = fun () -> Log.line \"x\" }";
     assert_eq!(fixed("f : Handlers none", program), "f : Handlers {Log}");
+}
+
+#[test]
+fn a_type_that_lacks_only_async_gets_it_where_it_is_written() {
+    let program = "type Job (r : ServiceRow) = Job\n\
+                   job : Unit -> Job {Async}\n\
+                   let job () = Job\n\
+                   let f = job ()";
+    assert_eq!(fixed("f : Job none", program), "f : Job {Async}");
 }

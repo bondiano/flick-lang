@@ -7,7 +7,7 @@
 use std::cmp::Ordering;
 
 use super::Checker;
-use super::ty::{Norm, Row, Type};
+use super::ty::{Norm, Row, Type, Written};
 use super::unify::{Mismatch, Unified};
 
 impl Checker<'_> {
@@ -19,6 +19,11 @@ impl Checker<'_> {
     /// Unifies two types of a row kind: rows, unions and row variables.
     #[allow(clippy::too_many_lines)]
     pub fn unify_row_types(&mut self, left: &Type, right: &Type) -> Unified {
+        // what a variable is solved to keeps where the row it comes from is written
+        let (left_written, right_written) = (
+            self.store.resolve(left).written(),
+            self.store.resolve(right).written(),
+        );
         let mut left_norm = self.store.normalize(left);
         let mut right_norm = self.store.normalize(right);
         if left_norm
@@ -100,11 +105,14 @@ impl Checker<'_> {
             }
             ([Type::Meta(m)], _) => {
                 missing(&only_left, true)?;
-                self.bind(*m, &extended(only_right, tails_right))
+                self.bind(
+                    *m,
+                    &written(extended(only_right, tails_right), right_written),
+                )
             }
             (_, [Type::Meta(m)]) => {
                 missing(&only_right, false)?;
-                self.bind(*m, &extended(only_left, tails_left))
+                self.bind(*m, &written(extended(only_left, tails_left), left_written))
             }
             // `r1 + r2` against what is left empty: each variable is empty
             (metas, []) | ([], metas)
@@ -178,4 +186,14 @@ impl Checker<'_> {
 
 fn extended(entries: Vec<(String, Type)>, tails: Vec<Type>) -> Type {
     Norm { entries, tails }.into_type()
+}
+
+/// `row` with where it is written, when that is known.
+fn written(mut row: Type, place: Written) -> Type {
+    if let Type::Row(r) = &mut row
+        && place.0.is_some()
+    {
+        r.written = place;
+    }
+    row
 }
