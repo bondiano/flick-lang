@@ -11,8 +11,9 @@ use std::mem;
 
 use super::Generics;
 use super::specialize::instantiate;
-use super::walk::{applied, rename, size};
+use super::walk::{applied, rename, respan, size};
 use crate::ir::{Arm, Expr, ExprKind, ItemKind, Lit, Module, Pat, Stmt};
+use crate::source::Span;
 use crate::types::{Dict, default_method};
 
 /// The size budget of data copied where a method of a known instance is.
@@ -84,8 +85,9 @@ impl<'a> Lookup<'a> {
     }
 
     /// The code of `method` of the instance `dict`, its context given: its
-    /// own, or the default it takes.
-    fn method(&self, dict: &Dict, method: &str) -> Option<Expr> {
+    /// own, or the default it takes; that of another module at `at`, as its
+    /// spans are of its file.
+    fn method(&self, dict: &Dict, method: &str, at: Span) -> Option<Expr> {
         let Dict::Instance { module, name, args } = dict else {
             return None;
         };
@@ -104,6 +106,9 @@ impl<'a> Lookup<'a> {
         }
         let given: Vec<(&str, &Dict)> = context.iter().map(String::as_str).zip(args).collect();
         instantiate(&mut code, &given);
+        if *module != self.module {
+            respan(&mut code, at);
+        }
         Some(code)
     }
 
@@ -153,7 +158,9 @@ pub fn defaults(module: &mut Module, lookup: &Lookup, fresh: &mut usize) {
         };
         let mut kept = Vec::new();
         for (name, n, extra) in mem::take(&mut info.defaults) {
-            let made = (n == 0).then(|| lookup.method(&this, &name)).flatten();
+            let made = (n == 0)
+                .then(|| lookup.method(&this, &name, item.span))
+                .flatten();
             let made = made.and_then(|mut code| {
                 *fresh += 1;
                 rename(&mut code, &format!("$v{fresh}"));
@@ -197,7 +204,7 @@ pub fn methods(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -
         }
         ExprKind::App { func, arg, .. } => {
             if let ExprKind::Method { dict, name } = &func.kind
-                && let Some(mut code) = lookup.method(dict, name)
+                && let Some(mut code) = lookup.method(dict, name, func.span)
                 && takes_apart(&code)
             {
                 changed |= settle(arg, lookup, fresh, depth);
@@ -236,7 +243,7 @@ fn settle(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -> boo
     let ExprKind::Method { dict, name } = &e.kind else {
         return settle_parts(e, lookup, fresh, depth);
     };
-    let Some(mut code) = lookup.method(dict, name) else {
+    let Some(mut code) = lookup.method(dict, name, e.span) else {
         return false;
     };
     *fresh += 1;

@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **Release:** a small pure function of a built-in module, of core or std,
+  is inlined like one of the module when its body names only what its
+  module exports: `Int.min 3 5` is `3`. Those of the program's other
+  modules stay calls.
 - **GADTs:** a constructor names the type it builds after `:`,
   `| IntLit Int : Expr Int`; variables of its fields that the result does
   not mention are existential. A `match` arm learns the type of the matched
