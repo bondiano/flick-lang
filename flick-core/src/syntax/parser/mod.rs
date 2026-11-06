@@ -109,8 +109,6 @@ pub(crate) struct Parser<'t> {
     failed: bool,
     /// `provide e { … }` and `codec e { … }`: `{` ends the head expression.
     no_brace: bool,
-    /// Inside `sql { … }` clause words end an application.
-    sql_depth: u32,
     /// The heads of plugin blocks the imports so far exposed.
     plugin_heads: Vec<&'t str>,
     depth: u32,
@@ -179,7 +177,6 @@ impl<'t> Parser<'t> {
             last_error_at: None,
             failed: false,
             no_brace: false,
-            sql_depth: 0,
             plugin_heads: Vec::new(),
             depth: 0,
         }

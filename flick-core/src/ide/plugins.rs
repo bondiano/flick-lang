@@ -23,11 +23,11 @@ impl Ide<'_> {
         offset: u32,
         dotted: bool,
     ) -> Option<Vec<Completion>> {
-        if dotted {
-            return None;
-        }
         let b = self.editor_block(file, offset)?;
-        let offered = b.plugin.complete(&b.block, &b.state, offset - b.start);
+        let mut source = b.source();
+        source.see_scope(self.in_scope(self.module(file)?));
+        let offered =
+            (b.plugin).complete(&b.block, &b.state, offset - b.start, dotted, &mut source);
         (!offered.is_empty()).then(|| {
             (offered.into_iter())
                 .map(|c| Completion {

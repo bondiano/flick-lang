@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 8b524f7a102d4fc6
+source_hash: 45768138ef4de2ad
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -23,7 +23,6 @@ source_hash: 8b524f7a102d4fc6
 - `// …` — однострочный комментарий, `/// …` — комментарий документации
   для команды `flick doc`, `/* … */` — блочный комментарий.
   Блочные комментарии можно вкладывать друг в друга.
-  Все три вида комментариев допустимы и внутри `sql { … }`.
 
 ### Имена
 
@@ -42,7 +41,7 @@ source_hash: 8b524f7a102d4fc6
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false
-sql ui in when for yield do
+ui in when for yield do
 ```
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
@@ -53,13 +52,9 @@ sql ui in when for yield do
 - метаданные внешних функций `arity`, `this`, `catch`, `cancel`, `nullable`,
   `retention`, `optional`, `variadic`, `reviewed` (неизвестные метаданные —
   `FLICK-S011`);
-- слова предложений SQL внутри `sql { … }`: `join`, `left_join`, `on`, `group_by`,
-  `having`, `order_by`, `limit`, `offset`, `select`, `union`, `union_all`,
-  `insert_into`, `values`, `update`, `set`, `delete_from`, `returning`,
-  а также ключевые слова `from` и `where`. В блоке SQL такое слово завершает
-  применение функции, поэтому предложение можно продолжить на следующей строке;
-- `table` сразу после `sql` на верхнем уровне и `via` после типа столбца
-  `sql table` (см. [SQL](../sql/));
+- `sql` перед телом, именем и телом, `table` или `migration`: блок плагина
+  пакета `std`, который читает его предложения, столбцы и DDL (см.
+  [SQL](../sql/));
 - `cli` перед строкой и `{`: блок плагина пакета `std`, который читает его
   предложения (см. [приложения командной строки](../cli-dsl/));
 - `and` между связками группы `do`, `x <- a and y <- b`;
@@ -259,7 +254,7 @@ item        = name | Con | Con "(..)" | ".." | "plugin" name   // см. plugins.
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign | sql_table | component
+            | service | class | instance | foreign | component
             | head { head_arg } ("{" { token } "}" | { token })   // плагина, до следующего decl
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
@@ -288,8 +283,6 @@ members     = block of: signature | let | type_decl
 foreign     = "foreign" mode name "from" ("global" String | String String) [metadata]
             | "foreign" "blocked" name String
 mode        = "pure" | "sync" | "async" | "effect"
-sql_table   = "sql" "table" Con String "{" column { column } "}"
-column      = name ":" { name | "not" } "as" type ["via" expr]
 metadata    = indented lines: meta_name { atom }
 ```
 
@@ -452,7 +445,6 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "do" "{" do_stmt { ";" | line break … } "}"
             | "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
-            | "sql" [name] "{" clause { clause } "}"
             | head { head_arg } ["{" { token } "}"]
                                             // голова, которую импорт открывает как `plugin head`, с
                                             // аргументом или телом; `cli` с телом

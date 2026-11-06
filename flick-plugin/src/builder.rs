@@ -109,7 +109,7 @@ impl Kind {
                 Expr::Lambda { params, body } => params.iter().copied().chain([*body]).collect(),
                 Expr::Record(entries) => fields(entries),
                 Expr::Get { record, .. } => vec![*record],
-                Expr::Items(items) | Expr::Tuple(items) => items.clone(),
+                Expr::Items(items) | Expr::Tuple(items) | Expr::Concat(items) => items.clone(),
                 Expr::Annot { expr, ty } => vec![*expr, *ty],
             },
             Kind::Ty(ty) => match ty {

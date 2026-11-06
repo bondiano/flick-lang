@@ -71,10 +71,7 @@ impl Ide<'_> {
     /// Completions at `offset` of `file`. With `dotted`, `offset` is the end
     /// of what comes before a `.`.
     pub fn complete(&self, file: FileId, offset: u32, dotted: bool) -> Vec<Completion> {
-        if let Some(items) = self
-            .plugin_complete(file, offset, dotted)
-            .or_else(|| self.sql_complete(file, offset, dotted))
-        {
+        if let Some(items) = self.plugin_complete(file, offset, dotted) {
             return items;
         }
         let mut items = if dotted {
@@ -136,29 +133,8 @@ impl Ide<'_> {
             let Some(interface) = self.interface(&module) else {
                 continue;
             };
-            let exposing: Vec<String> = import
-                .nodes()
-                .filter(|n| n.kind == K::Exposing)
-                .flat_map(Node::nodes)
-                .map(|i| i.text(text).split_whitespace().collect())
-                .collect();
-            let all = exposing.iter().any(|e| e == "..");
-            for e in interface
-                .exports
-                .iter()
-                .filter(|e| !e.entity.name.contains('$'))
-            {
-                let label = &e.entity.name;
-                let named = exposing.iter().any(|x| {
-                    x == label
-                        || x.strip_suffix("(..)") == Some(label.as_str())
-                        || e.parent
-                            .as_ref()
-                            .is_some_and(|p| x.strip_suffix("(..)") == Some(p.as_str()))
-                });
-                if all || named {
-                    add(IMPORTED, completion(e));
-                }
+            for e in exposed(import, &interface, text) {
+                add(IMPORTED, completion(e));
             }
         }
         if let Some(prelude) = self.interface(lang::prelude()) {
@@ -255,6 +231,33 @@ impl Ide<'_> {
             _ => {}
         }
     }
+}
+
+/// The exports of `interface` that `import` exposes unqualified.
+pub(super) fn exposed<'i>(
+    import: &Node,
+    interface: &'i Interface,
+    text: &str,
+) -> impl Iterator<Item = &'i Export> {
+    let exposing: Vec<String> = import
+        .nodes()
+        .filter(|n| n.kind == K::Exposing)
+        .flat_map(Node::nodes)
+        .map(|i| i.text(text).split_whitespace().collect())
+        .collect();
+    let all = exposing.iter().any(|e| e == "..");
+    (interface.exports.iter())
+        .filter(|e| !e.entity.name.contains('$'))
+        .filter(move |e| {
+            let label = &e.entity.name;
+            all || exposing.iter().any(|x| {
+                x == label
+                    || x.strip_suffix("(..)") == Some(label.as_str())
+                    || e.parent
+                        .as_ref()
+                        .is_some_and(|p| x.strip_suffix("(..)") == Some(p.as_str()))
+            })
+        })
 }
 
 /// The values, constructors and types an interface exports, without the

@@ -151,6 +151,28 @@ impl flick::plugin::compiler::Host for State {
         self.source.literal_of(&name)
     }
 
+    fn published(&mut self, name: String) -> Option<Vec<u8>> {
+        self.source.published(&name)
+    }
+
+    fn published_names(&mut self) -> Vec<String> {
+        self.source.published_names()
+    }
+
+    fn in_scope(
+        &mut self,
+        ns: flick::plugin::types::Namespace,
+        fits: Option<String>,
+    ) -> Vec<flick::plugin::types::Completion> {
+        let namespace = match ns {
+            flick::plugin::types::Namespace::Value => flick_plugin::Namespace::Value,
+            flick::plugin::types::Namespace::Type => flick_plugin::Namespace::Type,
+        };
+        (self.source.in_scope(namespace, fits.as_deref()).into_iter())
+            .map(convert::to_completion)
+            .collect()
+    }
+
     fn fetch(
         &mut self,
         request: flick::plugin::types::Request,
@@ -262,6 +284,19 @@ impl Expander for Wasm {
         result
     }
 
+    fn publish(&self, state: &[u8]) -> Result<Vec<flick_plugin::Published>, String> {
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_publish(store, state)
+        });
+        Ok((result?.into_iter())
+            .map(|p| flick_plugin::Published {
+                module: p.module,
+                name: p.name,
+                data: p.data,
+            })
+            .collect())
+    }
+
     fn expand(
         &self,
         block: &flick_plugin::Block,
@@ -287,11 +322,14 @@ impl Expander for Wasm {
         block: &flick_plugin::Block,
         state: &[u8],
         offset: u32,
+        member: bool,
+        source: &mut BlockSource,
     ) -> Vec<flick_plugin::Completion> {
         let block = convert::to_block(block);
-        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
-            plugin.call_complete(store, &block, state, offset)
+        let (result, back) = self.run(mem::take(source), |plugin, store| {
+            plugin.call_complete(store, &block, state, offset, member)
         });
+        *source = back;
         result.map_or_else(
             |_| Vec::new(),
             |found| found.into_iter().map(convert::from_completion).collect(),

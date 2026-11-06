@@ -54,6 +54,20 @@ pub enum Asked {
     Fetch(String),
     /// The base type of an enum, as the block's module names it.
     LiteralOf(String),
+    /// What the plugin published of a name, as the block's module names it.
+    Published(String),
+    /// The names the plugin published that the block's module sees.
+    PublishedNames,
+}
+
+impl Asked {
+    /// Whether what the block's module sees answers it, not the gate.
+    pub fn by_module(&self) -> bool {
+        matches!(
+            self,
+            Asked::LiteralOf(_) | Asked::Published(_) | Asked::PublishedNames
+        )
+    }
 }
 
 /// What a call reached and the hash of its answer.
@@ -122,10 +136,43 @@ impl Reach {
     pub fn literal_of(&mut self, name: &str, answer: Option<String>) -> Option<String> {
         self.used.push(Used {
             asked: Asked::LiteralOf(name.to_owned()),
-            answer: format!("{answer:?}"),
+            answer: literal_answer(answer.as_deref()),
         });
         answer
     }
+
+    /// `names`, the answer to `published-names`, kept with what the block
+    /// asked.
+    pub fn published_names(&mut self, names: Vec<String>) -> Vec<String> {
+        self.used.push(Used {
+            asked: Asked::PublishedNames,
+            answer: names.join("\n"),
+        });
+        names
+    }
+
+    /// `answer` to `published` of `name`, kept with what the block asked.
+    pub fn published(&mut self, name: &str, answer: Option<Vec<u8>>) -> Option<Vec<u8>> {
+        self.used.push(Used {
+            asked: Asked::Published(name.to_owned()),
+            answer: published_answer(answer.as_deref()),
+        });
+        answer
+    }
+}
+
+/// How an answer to `literal-of` is kept.
+pub fn literal_answer(answer: Option<&str>) -> String {
+    format!("{answer:?}")
+}
+
+/// How an answer to `published` is kept: a hash of it, or itself in a
+/// build without hashes, which keeps results only in memory.
+pub fn published_answer(answer: Option<&[u8]>) -> String {
+    #[cfg(feature = "native-project")]
+    return answer.map_or_else(String::new, |data| hash([b"some".as_slice(), data]));
+    #[cfg(not(feature = "native-project"))]
+    format!("{answer:?}")
 }
 
 /// Whether `path` names something inside a directory: no `..`, no root.

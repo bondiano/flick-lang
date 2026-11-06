@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **Release:** a small pure function of a built-in module, of core or std,
+  is inlined like one of the module when its body names only what its
+  module exports: `Int.min 3 5` is `3`. Those of the program's other
+  modules stay calls.
 - **Effects and handlers:** `effect E params =` declares an effect whose
   operations are `tail` (the default), `abort` (never returns, `forall b. …
   -> b`) or `control`. `try … with` handles them: `| E.op p… -> …` for an
@@ -59,9 +63,40 @@ break programs.
   import; its rules are `std/Q010` and `std/Q013` (`FLICK-Q013` is
   retired). The first migration of a module declares `migrations`, each one
   the tables it creates that the last one leaves.
+- **Breaking:** `sql { … }` and `sql p { … }` queries are blocks of the
+  plugin `sql` of std, with the import `import Sql exposing (plugin sql)`,
+  and `sql` is no keyword. Their rules are `std/Q001` … `std/Q010`, with the
+  same texts and spans; `FLICK-Q001` … `FLICK-Q010` and `FLICK-Q012` are
+  retired. Narrower than before: `from x in T` reads a `sql table` or a
+  table of migrations by its name; beside a column with a codec a capture has
+  the column's own type, not an `Option` of it; an `Option` of a capture
+  reaches the row only when it is selected itself. A value of a type with no
+  SQL form, a capture of another type beside a base column and `sum` or
+  `avg` of a column with a codec are `FLICK-C001`, of the new classes
+  `Sql.Param` and `Sql.Numeric`. A release build folds the text of a query
+  into one literal. Hover and completion in a query are the plugin's; the
+  `sql` head no longer shows the type of its block, which the `let` does.
+- **Plugins:** in an editor, `in-scope(ns, fits)` gives a plugin the values
+  or types its block's module has in scope, only the values whose type
+  instantiates to `fits` when given. A `sql table` column again offers only
+  the codecs of its `PureCodec` after `via`, and only types after `as`.
+- **Runtime:** a value of a template that no column decides gives its kind
+  as `sql_kind`, as `kind` is a word of Flick.
+- **Plugins:** `complete(block, state, offset, member)` says the user typed
+  `name.` there and has the compiler's `published`, and `published-names()`
+  lists every name it answers; `{}` is the type of no fields in a plugin's
+  code.
+- **Editors:** `sql` is no keyword of the TextMate and tree-sitter grammars.
 - **Plugins:** a declaration block may stand for no declarations, an empty
   group, as a migration that only alters a table; a whole number in a
   plugin's code is an integer literal, of any numeric type its use asks for.
+- **Plugins:** `publish(state)` tells the blocks of other modules and
+  groups about names, and `published(name)` gives a block what its plugin
+  published of a name its module sees: the tests see what the sources
+  published, and a kept expansion holds only while the answer is the same,
+  as with `literal-of`, which is now kept too. An expression that is the
+  whole body of a `let` sees its signature, and code may join texts or lists
+  with `concat`, `(a ++ b)`.
 - **CallSite:** the new core class `CallSite` is the place of a use,
   `CallSite.place` (`Module:line`) and `CallSite.definition`, which the
   checker gives: a function with `CallSite =>` passes on its caller's, any
@@ -254,25 +289,4 @@ break programs.
 
 ## 0.1.0 — 2026-11-03
 
-The first public release.
-
-- **Language:** ML-family syntax with indentation-based bodies, ADTs and
-  pattern matching, higher-kinded types and type classes with deriving,
-  typed effect rows of services and errors, regions that keep scoped
-  resources from escaping, `do`/`for` sugar, `cli`, `sql`, `schema` and
-  `ui { … }` embedded languages, and `server fn` calls shared by a server and
-  a browser page.
-- **Targets:** ES modules over [Effect](https://effect.website/) 4.1.2 with
-  source maps, TypeScript declarations and Promise façades, and a
-  standalone Go executable (`emit = "go"`).
-- **Toolchain:** the `flick` CLI (`new`, `check`, `build`, `run`, `dev`,
-  `test`, `fmt`, `install`, `pack`, `diff`, `ffi`, `doc`, `doctor`, …),
-  workspaces with path dependencies and `[scripts]`, `.iface` interfaces
-  (`iface-version` 3) for packages, and a language server.
-- **Runtime:** `@flick-lang/runtime` on npm for the JavaScript target and
-  `@flick-lang/astro` for Astro and Vite.
-- **Editors:** VS Code and Zed extensions and a tree-sitter grammar in
-  [`editors/`](./editors/README.md).
-- **Documentation:** the guide, reference and specification at
-  [bondiano.github.io/flick-lang](https://bondiano.github.io/flick-lang/) with an in-browser playground,
-  and the formal semantics with Lean proofs in [`formal/`](./formal/README.md).
+The first public release: [CHANGELOG-0.1.md](CHANGELOG-0.1.md).

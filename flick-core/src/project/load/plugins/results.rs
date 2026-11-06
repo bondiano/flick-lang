@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use flick_plugin::{Arena, Block, DeriveTarget, Place, VERSION};
+use flick_plugin::{Arena, Block, DeriveTarget, Place, Published, VERSION};
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -56,7 +56,7 @@ impl Results<'_> {
         let kept = self
             .get(&key)
             .and_then(|v| serde_json::from_slice::<Kept<T>>(&v).ok());
-        if let Some(kept) = kept.filter(|k| source.reach.still(&k.used)) {
+        if let Some(kept) = kept.filter(|k| source.still(&k.used)) {
             source.reach.used = kept.used;
             return Ok(kept.value);
         }
@@ -91,6 +91,23 @@ impl Results<'_> {
         ];
         let key = key(id.into_iter().chain(shown));
         self.reached(key, source, |source| plugin.collect(blocks, source))
+    }
+
+    /// What `plugin` publishes of `state`, the state of a group.
+    pub(super) fn publish(
+        &mut self,
+        plugin: &dyn Expander,
+        state: &[u8],
+    ) -> Result<Vec<Published>, String> {
+        let id = [
+            b"publish".as_slice(),
+            VERSION.as_bytes(),
+            plugin.id().as_bytes(),
+            state,
+        ];
+        self.reached(key(id), &mut BlockSource::default(), |_| {
+            plugin.publish(state)
+        })
     }
 
     /// The code `plugin` gives for `block`, keyed by the block's text, where

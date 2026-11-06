@@ -31,6 +31,8 @@ mod walk;
 #[cfg(test)]
 mod gadt_tests;
 #[cfg(test)]
+mod inline_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::BTreeSet;
@@ -45,15 +47,17 @@ use walk::{droppable, strict_uses, substitute};
 /// Rounds of inlining: a body inlined in the first may inline again.
 const ROUNDS: usize = 2;
 
-/// The functions with dictionaries of the other modules of the build, by
-/// module and name: their dictionary parameters and body, when the body
-/// names only what its module exports.
+/// The values of the other modules of the build, by module and name: their
+/// dictionary parameters and body, when the body names only what its
+/// module exports.
 pub type Generics<'a> = &'a dyn Fn(&str, &str) -> Option<(Vec<String>, Expr)>;
 
 /// Optimizes `module` in place; `exported` tells the values importers see,
-/// `generics` what [`specialize`] may copy from other modules.
+/// `generics` what [`specialize`] may copy and [`inline`] may inline from
+/// other modules.
 pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool, generics: Generics) {
     let mut fresh = 0;
+    let foreign = inline::Foreign::new(generics);
     devirt::defaults(module, &devirt::Lookup::new(module, generics), &mut fresh);
     specialize::specialize(module, generics);
     for _ in 0..ROUNDS {
@@ -63,7 +67,7 @@ pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool, generics: 
         for item in &mut module.items {
             for body in bodies(item) {
                 devirt::methods(body, &lookup, &mut fresh, 0);
-                inline::inline(body, &module.name, &candidates, &mut fresh);
+                inline::inline(body, &module.name, &candidates, &foreign, &mut fresh);
                 fuse::fuse(body, &mut fresh);
                 simplify(body);
             }

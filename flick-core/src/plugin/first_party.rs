@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use flick_plugin::{
     Arena, Block, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
-    Plugin,
+    Plugin, Published,
 };
 use flick_plugin_cli::Cli;
 use flick_plugin_derive::{codec, server_fn};
@@ -27,6 +27,13 @@ pub const HEADS: [(&str, &str); 4] = [
 /// The heads whose blocks need no body even where no import exposes them,
 /// as the compiler read them before: `server fn f x = …` and `server f`.
 pub const BARE: [&str; 1] = ["server"];
+
+/// The declarations of the compiler's own plugins even where no import
+/// exposes their heads, by the head and the word after it: `server fn f x
+/// = …`, `sql table Users "users" { … }`, `sql migration 1 "m" { … }`, so
+/// that the compiler says which import they need.
+pub const DECLARATIONS: [(&str, &str); 3] =
+    [("server", "fn"), ("sql", "table"), ("sql", "migration")];
 
 /// The plugin linked into the compiler for `package`.
 pub fn plugin(package: &str) -> Option<Arc<dyn Expander>> {
@@ -55,6 +62,10 @@ impl Plugin for Std {
         Sql.collect(&sql, compiler)
     }
 
+    fn publish(&self, state: &[u8]) -> Vec<Published> {
+        Sql.publish(state)
+    }
+
     fn expand(
         &self,
         block: &Block,
@@ -77,10 +88,17 @@ impl Plugin for Std {
         }
     }
 
-    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
+    fn complete(
+        &self,
+        block: &Block,
+        state: &[u8],
+        offset: u32,
+        member: bool,
+        compiler: &mut dyn Compiler,
+    ) -> Vec<Completion> {
         match block.head.as_str() {
-            "sql" => Sql.complete(block, state, offset),
-            _ if cli(block) => Cli.complete(block, state, offset),
+            "sql" => Sql.complete(block, state, offset, member, compiler),
+            _ if cli(block) => Cli.complete(block, state, offset, member, compiler),
             _ => Vec::new(),
         }
     }

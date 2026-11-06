@@ -157,6 +157,8 @@ pub enum Expr {
     },
     /// The user's expression at this span of the body.
     Hole(Span),
+    /// `(a ++ b ++ …)`: texts or lists joined, at least two.
+    Concat(Vec<NodeId>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -415,6 +417,22 @@ pub struct Highlight {
     pub kind: HighlightKind,
 }
 
+/// The names of values or of types, as `Compiler::in_scope` asks for them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Namespace {
+    Value,
+    Type,
+}
+
+/// What a plugin tells its blocks of other groups and modules about a name
+/// of the module `module`, as `Compiler::published` answers it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Published {
+    pub module: String,
+    pub name: String,
+    pub data: Vec<u8>,
+}
+
 /// What the compiler offers a plugin while it expands a block.
 pub trait Compiler {
     /// The longest expression of the body from `start` on, before `end`.
@@ -459,6 +477,26 @@ pub trait Compiler {
         let _ = name;
         None
     }
+    /// What this plugin published of `name` as the block's module writes
+    /// it, `Users` or `Schema.Users`: its own module's, or one it imports,
+    /// from any group; `None` for a name it does not see or no publication.
+    fn published(&mut self, name: &str) -> Option<Vec<u8>> {
+        let _ = name;
+        None
+    }
+    /// Every name `published` answers for the block's module, as it writes
+    /// them.
+    fn published_names(&mut self) -> Vec<String> {
+        Vec::new()
+    }
+    /// The values or types in scope of the block's module, as it writes
+    /// them; with `fits`, the values whose type instantiates to that type,
+    /// written as the module writes it or with names qualified in full. An
+    /// editor answers it; while a block expands, nothing.
+    fn in_scope(&mut self, namespace: Namespace, fits: Option<&str>) -> Vec<Completion> {
+        let _ = (namespace, fits);
+        Vec::new()
+    }
 }
 
 /// A plugin: what it learns from all its blocks of a group, and the code
@@ -470,6 +508,12 @@ pub trait Plugin {
     /// gets; `compiler` reaches what the project grants, but parses no
     /// hole.
     fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8>;
+    /// What the blocks of other groups and modules may ask of `state`, the
+    /// state of a group: each before any block expands.
+    fn publish(&self, state: &[u8]) -> Vec<Published> {
+        let _ = state;
+        Vec::new()
+    }
     /// The code `block` stands for given what `collect` learned, or why
     /// there is none; no diagnostic means the compiler already reported why.
     fn expand(
@@ -478,9 +522,19 @@ pub trait Plugin {
         state: &[u8],
         compiler: &mut dyn Compiler,
     ) -> Result<Arena, Vec<Diagnostic>>;
-    /// What an editor may insert at `offset` of `block`.
-    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
-        let _ = (block, state, offset);
+    /// What an editor may insert at `offset` of `block`; `member` says the
+    /// user typed `name.` right before `offset`, the `.` not in the block.
+    /// `compiler` answers `published` and `literal_of` as while it expands,
+    /// and parses no hole.
+    fn complete(
+        &self,
+        block: &Block,
+        state: &[u8],
+        offset: u32,
+        member: bool,
+        compiler: &mut dyn Compiler,
+    ) -> Vec<Completion> {
+        let _ = (block, state, offset, member, compiler);
         Vec::new()
     }
     /// What an editor shows at `offset` of `block`; `facts` are the types

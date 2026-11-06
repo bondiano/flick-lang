@@ -8,12 +8,11 @@
 //! no import says so.
 
 use super::{K, Parser, SyntaxKind};
-use crate::plugin::first_party::{BARE, HEADS};
+use crate::plugin::first_party::{BARE, DECLARATIONS, HEADS};
 
 /// Whether an exposed item `plugin head` starts here.
 pub(super) fn at_head(p: &Parser) -> bool {
-    // `sql` is a keyword still, of the queries the compiler reads
-    p.at_word("plugin") && matches!(p.nth(1), K::Ident | K::SqlKw)
+    p.at_word("plugin") && p.nth(1) == K::Ident
 }
 
 /// `plugin head` in the exposed items of an import: `head` starts plugin
@@ -90,12 +89,13 @@ fn arguments(p: &mut Parser) {
 }
 
 /// Whether a declaration of a plugin starts here: a head an import exposed
-/// at the start of a declaration, not its signature; or one of [`BARE`]
-/// before `fn`.
+/// at the start of a declaration, not its signature; or one of
+/// [`DECLARATIONS`] before its word.
 pub(super) fn at_declaration(p: &Parser) -> bool {
     let head = p.text_of(p.raw());
-    let bare = BARE.contains(&head) && p.nth(1) == K::Ident && super::decl::word_at(p, 1, "fn");
-    (p.plugin_heads.contains(&head) || bare) && p.nth(1) != K::Colon
+    let own = (DECLARATIONS.iter())
+        .any(|(h, w)| *h == head && p.nth(1) == K::Ident && super::decl::word_at(p, 1, w));
+    (p.plugin_heads.contains(&head) || own) && p.nth(1) != K::Colon
 }
 
 /// `head args { … }`, or `head args` and the rest of the declaration up to

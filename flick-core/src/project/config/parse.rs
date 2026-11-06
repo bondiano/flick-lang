@@ -10,7 +10,7 @@ use super::deps::{RawDependency, RawGrants, RawPackage, dependencies, grants, pa
 use super::{Build, Config, Entry, Kind, MAIN_ENTRY, Manifest, Script};
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::source::{FileId, Span};
-use crate::types::{Dialect, Thresholds, dialect};
+use crate::types::Thresholds;
 
 pub const SCHEMA_VERSION: i64 = 1;
 
@@ -232,7 +232,7 @@ fn config(
     }
     let sql = raw.sql.map(Spanned::into_inner).unwrap_or_default();
     let sql_dialect = match sql.dialect {
-        None => Default::default(),
+        None => DIALECTS[0].0,
         Some(name) => sql_dialect(name.get_ref())
             .map_err(|(code, message)| Diagnostic::error(code, message, span(name.span())))?,
     };
@@ -423,11 +423,21 @@ fn is_entry_name(name: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
+/// The SQL dialects `[sql] dialect` may name, and whether each is
+/// supported yet.
+const DIALECTS: [(&str, bool); 5] = [
+    ("postgresql", true),
+    ("mysql", false),
+    ("sqlite", false),
+    ("clickhouse", false),
+    ("oracle", false),
+];
+
 /// The dialect `[sql] dialect` names, or why it cannot be used.
-fn sql_dialect(name: &str) -> Result<&'static Dialect, (Code, String)> {
-    match dialect::DIALECTS.iter().find(|(n, _)| *n == name) {
-        Some((_, Some(d))) => Ok(d),
-        Some((_, None)) => Err((
+fn sql_dialect(name: &str) -> Result<&'static str, (Code, String)> {
+    match DIALECTS.iter().find(|(n, _)| *n == name) {
+        Some((n, true)) => Ok(n),
+        Some((_, false)) => Err((
             codes::P022,
             format!(
                 "the SQL dialect `{name}` is not supported yet; supported: {}",
@@ -442,9 +452,9 @@ fn sql_dialect(name: &str) -> Result<&'static Dialect, (Code, String)> {
 }
 
 fn names(supported: bool) -> String {
-    dialect::DIALECTS
+    DIALECTS
         .iter()
-        .filter(|(_, d)| !supported || d.is_some())
+        .filter(|(_, d)| !supported || *d)
         .map(|(n, _)| format!("`{n}`"))
         .collect::<Vec<_>>()
         .join(", ")

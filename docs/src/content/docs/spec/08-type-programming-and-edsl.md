@@ -1,6 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
-source_hash: 94b69fe2d0402e94
+source_hash: 739003bb52925306
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
@@ -67,15 +67,15 @@ let load_balances user_id =
   Database.query query
 ```
 
-A block consists of clauses, one per line or separated by `;`; the continuation of a clause is indented deeper. `from x in T`, `join x in T` and `left_join x in T` introduce an alias; `on e` refines the preceding join. The other clauses are a word followed by comma-separated expressions: `where`, `group_by`, `having`, `order_by`, `limit`, `offset`, `select`, `union`, `union_all`, `insert_into`, `values`, `update`, `set`, `delete_from`, `returning`. Inside the block these words end a function application, so a clause can begin without a separator. The parser fixes only this form; the SQL elaboration of the checker checks the rest against the tables:
+A block consists of clauses, one per line or separated by `;`; the continuation of a clause is indented deeper. `from x in T`, `join x in T` and `left_join x in T` introduce an alias; `on e` refines the preceding join. The other clauses are a word followed by comma-separated expressions: `where`, `group_by`, `having`, `order_by`, `limit`, `offset`, `select`, `union`, `union_all`, `insert_into`, `values`, `update`, `set`, `delete_from`, `returning`. Inside the block these words end a function application, so a clause can begin without a separator. The block is the plugin `sql` of std: it reads the clauses from the tokens of the block and checks them against the tables its plugin published, and its code states the rules of types it leaves to the checker:
 
 | Check | Code |
 | - | - |
-| Unknown column, unknown or out-of-scope alias, ambiguous column | `FLICK-Q001`, `FLICK-Q002`, `FLICK-Q003` |
-| Two results with the same name | `FLICK-Q004` |
-| A column neither grouped nor aggregated; an aggregate where none is allowed | `FLICK-Q005`, `FLICK-Q006` |
-| An INSERT missing a required column; a write to a generated column | `FLICK-Q007`, `FLICK-Q008` |
-| An unknown parameter; a construct outside the supported subset | `FLICK-Q009`, `FLICK-Q010` |
+| Unknown column, unknown or out-of-scope alias, ambiguous column | `std/Q001`, `std/Q002`, `std/Q003` |
+| Two results with the same name | `std/Q004` |
+| A column neither grouped nor aggregated; an aggregate where none is allowed | `std/Q005`, `std/Q006` |
+| An INSERT missing a required column; a write to a generated column | `std/Q007`, `std/Q008` |
+| An unknown parameter; a construct outside the supported subset | `std/Q009`, `std/Q010` |
 | Comparing values of different Flick types | A type error, even when both are numbers in SQL |
 
 A result that may be `NULL` — a nullable column, a column of a `left_join`ed table, an aggregate other than `count` — has type `Option t`, once: two left joins do not make `Option (Option t)`. `==` is SQL's comparison, and `where` keeps only rows where the condition is true; `is_null`, `is_not_null` and `is_not_distinct_from` are separate functions.

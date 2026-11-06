@@ -17,7 +17,6 @@ mod numeric;
 mod pattern;
 mod question;
 mod ranges;
-mod sql;
 mod wire;
 
 use std::collections::{HashMap, HashSet};

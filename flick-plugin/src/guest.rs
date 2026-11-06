@@ -3,7 +3,9 @@
 //! [`Plugin`] value through the world of `wit/plugin.wit`, and the compiler's
 //! calls come back to it as a [`Compiler`].
 
-use crate::{Compiler, Diagnostic, Hole, Plugin, ReachError, Request, Response};
+use crate::{
+    Compiler, Completion, Diagnostic, Hole, Namespace, Plugin, ReachError, Request, Response,
+};
 
 #[allow(
     clippy::same_length_and_capacity,
@@ -72,6 +74,24 @@ impl Compiler for Imports {
         compiler::literal_of(name)
     }
 
+    fn published(&mut self, name: &str) -> Option<Vec<u8>> {
+        compiler::published(name)
+    }
+
+    fn published_names(&mut self) -> Vec<String> {
+        compiler::published_names()
+    }
+
+    fn in_scope(&mut self, namespace: Namespace, fits: Option<&str>) -> Vec<Completion> {
+        let namespace = match namespace {
+            Namespace::Value => types::Namespace::Value,
+            Namespace::Type => types::Namespace::Type,
+        };
+        (compiler::in_scope(namespace, fits).into_iter())
+            .map(convert::from_completion)
+            .collect()
+    }
+
     fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {
         compiler::fetch(&reach_convert::to_request(request))
             .map(reach_convert::from_response)
@@ -83,6 +103,17 @@ impl Compiler for Imports {
 pub fn collect(plugin: &impl Plugin, blocks: Vec<types::Block>) -> Vec<u8> {
     let blocks: Vec<_> = blocks.into_iter().map(convert::from_block).collect();
     plugin.collect(&blocks, &mut Imports)
+}
+
+#[doc(hidden)]
+pub fn publish(plugin: &impl Plugin, state: &[u8]) -> Vec<types::Published> {
+    (plugin.publish(state).into_iter())
+        .map(|p| types::Published {
+            module: p.module,
+            name: p.name,
+            data: p.data,
+        })
+        .collect()
 }
 
 #[doc(hidden)]
@@ -103,9 +134,16 @@ pub fn complete(
     block: types::Block,
     state: &[u8],
     offset: u32,
+    member: bool,
 ) -> Vec<types::Completion> {
     (plugin
-        .complete(&convert::from_block(block), state, offset)
+        .complete(
+            &convert::from_block(block),
+            state,
+            offset,
+            member,
+            &mut Imports,
+        )
         .into_iter())
     .map(convert::to_completion)
     .collect()
@@ -189,6 +227,12 @@ macro_rules! export {
                 $crate::guest::collect(&$plugin, blocks)
             }
 
+            fn publish(
+                state: ::std::vec::Vec<u8>,
+            ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Published> {
+                $crate::guest::publish(&$plugin, &state)
+            }
+
             fn expand(
                 block: $crate::guest::bindings::flick::plugin::types::Block,
                 state: ::std::vec::Vec<u8>,
@@ -203,8 +247,9 @@ macro_rules! export {
                 block: $crate::guest::bindings::flick::plugin::types::Block,
                 state: ::std::vec::Vec<u8>,
                 offset: u32,
+                member: bool,
             ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Completion> {
-                $crate::guest::complete(&$plugin, block, &state, offset)
+                $crate::guest::complete(&$plugin, block, &state, offset, member)
             }
 
             fn hover(

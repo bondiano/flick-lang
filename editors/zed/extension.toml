@@ -10,7 +10,7 @@ repository = "https://github.com/bondiano/flick-lang"
 # editors/tree-sitter-flick, or at `file:///…/flick-lang` while developing.
 [grammars.flick]
 repository = "https://github.com/bondiano/flick-lang"
-rev = "29c6592c6d2af17befb0ef5bd0011bb34fe979e7"
+rev = "c2b4ab6ba3baaa9a22ddcd6dbfac3e7eff945a84"
 path = "editors/tree-sitter-flick"
 
 [language_servers.flick]

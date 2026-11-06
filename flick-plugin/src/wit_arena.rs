@@ -39,6 +39,7 @@ macro_rules! wit_arena_conversions {
                             }
                             $crate::Expr::Items(i) => w::Expr::Items(i),
                             $crate::Expr::Tuple(i) => w::Expr::Tuple(i),
+                            $crate::Expr::Concat(i) => w::Expr::Concat(i),
                             $crate::Expr::Annot { expr, ty } => {
                                 w::Expr::Annot(w::Annot { expr, ty })
                             }
@@ -165,6 +166,7 @@ macro_rules! wit_arena_conversions {
                             },
                             w::Expr::Items(i) => $crate::Expr::Items(i),
                             w::Expr::Tuple(i) => $crate::Expr::Tuple(i),
+                            w::Expr::Concat(i) => $crate::Expr::Concat(i),
                             w::Expr::Annot(a) => $crate::Expr::Annot {
                                 expr: a.expr,
                                 ty: a.ty,

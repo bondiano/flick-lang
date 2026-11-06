@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use flick_plugin::{
-    Block, Compiler, Hole, HoleKind, Place, ReachError, Request, Response, Signature, Span,
-    Token as PluginToken, TokenKind,
+    Block, Compiler, Completion, Hole, HoleKind, Namespace, Place, ReachError, Request, Response,
+    Signature, Span, Token as PluginToken, TokenKind,
 };
 
 use super::reach::Reach;
@@ -20,6 +20,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::{
     Fragment, parse_body_at, parse_decl_at, parse_expr_at, parse_pat_at, parse_type_at,
 };
+use crate::types::{let_parts, signature_name};
 
 /// Where the spans of a hole in the signature above a block start: past
 /// any of its own text.
@@ -51,6 +52,12 @@ struct Above {
     whole: (u32, u32),
     tokens: Vec<Token>,
 }
+
+mod scope;
+mod seen;
+
+pub use scope::InScope;
+pub use seen::Seen;
 
 /// A plugin block of a module and what its plugin asked of it.
 #[derive(Default)]
@@ -86,6 +93,11 @@ pub struct BlockSource {
     pub reach: Reach,
     /// The enums the module sees, as it writes them, with their base types.
     enums: Arc<BTreeMap<String, String>>,
+    /// What the plugin published of the names the module sees, as it
+    /// writes them.
+    published: Arc<BTreeMap<String, Vec<u8>>>,
+    /// What the module has in scope, in an editor.
+    in_scope: Option<Arc<InScope>>,
 }
 
 impl BlockSource {
@@ -142,6 +154,8 @@ impl BlockSource {
             diagnostics: Vec::new(),
             reach: Reach::default(),
             enums: Arc::default(),
+            published: Arc::default(),
+            in_scope: None,
         })
     }
 
@@ -172,6 +186,8 @@ impl BlockSource {
             diagnostics: Vec::new(),
             reach: Reach::default(),
             enums: Arc::default(),
+            published: Arc::default(),
+            in_scope: None,
             heads,
             foreign: !holes,
             text,
@@ -193,6 +209,7 @@ impl BlockSource {
         )?;
         nested.module = Arc::clone(&self.module);
         nested.enums = Arc::clone(&self.enums);
+        nested.published = Arc::clone(&self.published);
         Some(nested)
     }
 
@@ -205,17 +222,17 @@ impl BlockSource {
     }
 
     /// The block in the module `module` whose tree is `tree`, with the
-    /// signature right above it when it is a declaration of the module.
+    /// signature right above it when it is a declaration of the module, or
+    /// above the `let` of the module whose whole body it is.
     #[must_use]
     pub fn in_module(mut self, module: &str, tree: &Node) -> Self {
         self.module = Arc::from(module);
-        if self.place != Place::Declaration {
-            return self;
-        }
         let mut before: Option<&Node> = None;
+        let mut within = None;
         for n in tree.nodes() {
             let (start, end) = n.range();
             if start <= self.start && self.start < end {
+                within = Some(n);
                 break;
             }
             before = Some(n);
@@ -223,20 +240,42 @@ impl BlockSource {
         let Some(sig) = before.filter(|n| n.kind == K::Signature) else {
             return self;
         };
+        let decl = match self.place {
+            Place::Declaration => self.head_at,
+            Place::Expression => match within.filter(|n| self.whole_body_of(n, sig)) {
+                Some(decl) => decl.range().0,
+                None => return self,
+            },
+        };
         // nothing but blank lines and comments between it and the block
-        let gap = &self.text[sig.range().1 as usize..self.head_at as usize];
+        let gap = &self.text[sig.range().1 as usize..decl as usize];
         if !gap
             .lines()
             .all(|l| l.trim().is_empty() || l.trim_start().starts_with("//"))
         {
             return self;
         }
-        self.docs = docs_above(&self.text, sig.range().0);
+        if self.place == Place::Declaration {
+            self.docs = docs_above(&self.text, sig.range().0);
+        }
         self.signature = Some(Above {
             whole: sig.range(),
             tokens: sig.tokens(),
         });
         self
+    }
+
+    /// Whether the block is the whole body of `decl`, a `let` that `sig`
+    /// declares.
+    fn whole_body_of(&self, decl: &Node, sig: &Node) -> bool {
+        if decl.kind != K::LetDecl {
+            return false;
+        }
+        let parts = let_parts(decl, &self.text);
+        let named =
+            parts.name.is_some() && parts.name.as_deref() == signature_name(sig, &self.text);
+        let items: Vec<&Node> = parts.body.iter().flat_map(|b| b.nodes()).collect();
+        named && matches!(items[..], [only] if only.range().0 == self.head_at)
     }
 
     /// The range of the signature above the block in the module text.
@@ -471,6 +510,20 @@ impl Compiler for BlockSource {
     fn literal_of(&mut self, name: &str) -> Option<String> {
         let answer = self.enums.get(name).cloned();
         self.reach.literal_of(name, answer)
+    }
+
+    fn published(&mut self, name: &str) -> Option<Vec<u8>> {
+        let answer = self.published.get(name).cloned();
+        self.reach.published(name, answer)
+    }
+
+    fn published_names(&mut self) -> Vec<String> {
+        let names: Vec<String> = self.published.keys().cloned().collect();
+        self.reach.published_names(names)
+    }
+
+    fn in_scope(&mut self, namespace: Namespace, fits: Option<&str>) -> Vec<Completion> {
+        (self.in_scope.as_ref()).map_or_else(Vec::new, |s| s.answer(namespace, fits))
     }
 }
 

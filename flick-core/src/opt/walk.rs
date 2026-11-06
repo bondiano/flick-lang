@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use crate::ir::{BinOp, Expr, ExprKind, Pat, Stage, Stmt};
 use crate::numeric::{Arith, Num};
+use crate::source::Span;
 use crate::types::{Constructor, Dict};
 
 /// How often `e` reads the local `name`.
@@ -68,6 +69,13 @@ pub fn substitute(e: &mut Expr, name: &str, value: &Expr) {
         return;
     }
     e.each_child_mut(&mut |c| substitute(c, name, value));
+}
+
+/// `e` at `span`, every part of it: code copied from another module, whose
+/// spans are of its file.
+pub fn respan(e: &mut Expr, span: Span) {
+    e.span = span;
+    e.each_child_mut(&mut |c| respan(c, span));
 }
 
 /// The number of nodes of `e`, patterns included: a `match` emits a test

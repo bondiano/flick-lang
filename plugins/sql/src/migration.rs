@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ddl::{self, located};
 use crate::dialect;
+use crate::shown::{Named, Shown, ShownColumn};
 use crate::table::MALFORMED;
 
 /// A statement that does not apply.
@@ -70,7 +71,7 @@ pub fn is_migration(block: &Block) -> bool {
 
 /// The schema each module's migrations build, from the migrations of
 /// `blocks` in order.
-pub fn collect(blocks: &[Block]) -> Vec<u8> {
+pub fn collect(blocks: &[Block]) -> State {
     let mut by_module: BTreeMap<&str, Vec<&Block>> = BTreeMap::new();
     for b in blocks.iter().filter(|b| is_migration(b)) {
         by_module.entry(&b.module).or_default().push(b);
@@ -139,7 +140,7 @@ pub fn collect(blocks: &[Block]) -> Vec<u8> {
         }
         state.modules.insert(module.to_owned(), steps);
     }
-    serde_json::to_vec(&state).unwrap_or_default()
+    state
 }
 
 /// The migrations of the module of `block`, and the index of `block` there.
@@ -149,10 +150,35 @@ fn steps<'s>(block: &Block, state: &'s State) -> Option<(&'s [Step], usize)> {
     Some((steps, i))
 }
 
+/// The tables the migrations of each module leave, as queries read them.
+pub fn shown(state: &State) -> Vec<Named> {
+    let mut out = Vec::new();
+    for (module, steps) in &state.modules {
+        for t in steps.iter().flat_map(|s| &s.tables) {
+            let columns = (t.columns.iter())
+                .map(|c| ShownColumn {
+                    name: c.name.clone(),
+                    kind: c.kind.clone(),
+                    base: c.flick.clone(),
+                    ty: c.flick.clone(),
+                    nullable: c.nullable,
+                    write: c.write.clone(),
+                    via: false,
+                })
+                .collect();
+            let shown = Shown {
+                sql: t.name.clone(),
+                columns,
+            };
+            out.push((module.clone(), ddl::type_name(&t.name), shown));
+        }
+    }
+    out
+}
+
 /// What does not apply in `block`.
-pub fn check(block: &Block, state: &[u8]) -> Vec<Diagnostic> {
-    let state: State = serde_json::from_slice(state).unwrap_or_default();
-    match steps(block, &state) {
+pub fn check(block: &Block, state: &State) -> Vec<Diagnostic> {
+    match steps(block, state) {
         Some((steps, i)) if !bare(steps, i) => problems(&steps[i]),
         _ => Vec::new(),
     }
@@ -177,9 +203,8 @@ fn problems(step: &Step) -> Vec<Diagnostic> {
 /// of the module, the list of them all. Each `_` of it makes `check` report
 /// what does not apply; a later migration that creates no table reports it
 /// here, as it declares nothing.
-pub fn arena(block: &Block, state: &[u8]) -> Result<Arena, Vec<Diagnostic>> {
-    let state: State = serde_json::from_slice(state).unwrap_or_default();
-    let Some((steps, i)) = steps(block, &state) else {
+pub fn arena(block: &Block, state: &State) -> Result<Arena, Vec<Diagnostic>> {
+    let Some((steps, i)) = steps(block, state) else {
         let message = "the migration is no step of its module's schema";
         return Err(vec![Diagnostic::error(message, block.whole())]);
     };

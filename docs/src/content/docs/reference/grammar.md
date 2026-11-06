@@ -18,8 +18,7 @@ UTF-8 byte ranges; layout columns count characters.
   comments (`FLICK-S009`), because layout depends on columns.
 - Line breaks are `\n` or `\r\n`.
 - `// …` is a line comment, `/// …` a doc comment (used by `flick doc`),
-  `/* … */` a block comment; block comments nest. The same comments work inside
-  `sql { … }`.
+  `/* … */` a block comment; block comments nest.
 
 ### Names
 
@@ -38,7 +37,7 @@ Qualified names are written without spaces around `.`: `Users.get`,
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false
-sql ui in when for yield do
+ui in when for yield do
 ```
 
 Contextual words are ordinary names everywhere except in one position:
@@ -49,13 +48,9 @@ Contextual words are ordinary names everywhere except in one position:
 - foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
   `retention`, `optional`, `variadic`, `reviewed` (unknown metadata is
   `FLICK-S011`);
-- SQL clause words inside `sql { … }`: `join`, `left_join`, `on`, `group_by`,
-  `having`, `order_by`, `limit`, `offset`, `select`, `union`, `union_all`,
-  `insert_into`, `values`, `update`, `set`, `delete_from`, `returning` (plus the
-  keywords `from` and `where`). Inside a SQL block such a word ends a function
-  application, so a clause may continue on the next line;
-- `table` right after `sql` at the top level, and `via` after the type of a
-  column of a `sql table` (see [sql.md](../sql/));
+- `sql` before a body, a name and a body, `table` or `migration`: a block of
+  the plugin of `std`, which reads its clauses, its columns and its DDL (see
+  [sql.md](../sql/));
 - `cli` before a string and `{`: a block of the plugin of `std`, which reads
   its clauses (see [command-line applications](../cli-dsl/));
 - `and` between the bindings of a `do` group, `x <- a and y <- b`;
@@ -239,7 +234,7 @@ item        = name | Con | Con "(..)" | ".." | "plugin" name   // see plugins.md
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign | sql_table | component
+            | service | class | instance | foreign | component
             | head { head_arg } ("{" { token } "}" | { token })   // a plugin's, to the next decl
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
@@ -268,8 +263,6 @@ members     = block of: signature | let | type_decl
 foreign     = "foreign" mode name "from" ("global" String | String String) [metadata]
             | "foreign" "blocked" name String
 mode        = "pure" | "sync" | "async" | "effect"
-sql_table   = "sql" "table" Con String "{" column { column } "}"
-column      = name ":" { name | "not" } "as" type ["via" expr]
 metadata    = indented lines: meta_name { atom }
 ```
 
@@ -427,7 +420,6 @@ atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "do" "{" do_stmt { ";" | line break … } "}"
             | "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
-            | "sql" [name] "{" clause { clause } "}"
             | head { head_arg } ["{" { token } "}"]
                                             // a head an import exposes as `plugin head`, with an
                                             // argument or a body; `cli` with its body

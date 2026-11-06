@@ -16,9 +16,10 @@ use std::sync::Arc;
 
 use flick_plugin::{
     Arena, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece, Plugin,
+    Published,
 };
 
-use source::BlockSource;
+use source::{BlockSource, Seen};
 
 use crate::diagnostics::{self, codes};
 use crate::source::Span;
@@ -32,6 +33,8 @@ pub trait Expander: Send + Sync {
     /// What the plugin learns from all its blocks of a group; `source`
     /// reaches what the project grants.
     fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String>;
+    /// What the blocks of other groups and modules may ask of `state`.
+    fn publish(&self, state: &[u8]) -> Result<Vec<Published>, String>;
     /// The code `block` stands for; `source` parses the holes it asks for.
     fn expand(
         &self,
@@ -39,10 +42,18 @@ pub trait Expander: Send + Sync {
         state: &[u8],
         source: &mut BlockSource,
     ) -> Result<Arena, Failure>;
-    /// What an editor may insert at `offset` of `block`; none when the
-    /// plugin fails.
-    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
-        let _ = (block, state, offset);
+    /// What an editor may insert at `offset` of `block`, whether the user
+    /// typed `name.` before `offset`; `source` answers what the block's
+    /// module sees. None when the plugin fails.
+    fn complete(
+        &self,
+        block: &Block,
+        state: &[u8],
+        offset: u32,
+        member: bool,
+        source: &mut BlockSource,
+    ) -> Vec<Completion> {
+        let _ = (block, state, offset, member, source);
         Vec::new()
     }
     /// What an editor shows at `offset` of `block`, given `facts`, the
@@ -104,6 +115,8 @@ pub struct EditorBlock {
     /// What its plugin collected from its group.
     pub state: Arc<[u8]>,
     pub plugin: Arc<dyn Expander>,
+    /// What the block's module sees, which answers its plugin's questions.
+    seen: Seen,
 }
 
 impl EditorBlock {
@@ -114,7 +127,14 @@ impl EditorBlock {
             block: source.block(),
             state: Arc::from(state),
             plugin: Arc::clone(plugin),
+            seen: source.seen(),
         }
+    }
+
+    /// What answers the plugin's questions in an editor: what the block's
+    /// module sees, no hole parsed.
+    pub fn source(&self) -> BlockSource {
+        self.seen.source()
     }
 
     /// Whether `offset` of the module text is in the block, its end included.
@@ -160,6 +180,10 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         Ok(self.plugin.collect(blocks, source))
     }
 
+    fn publish(&self, state: &[u8]) -> Result<Vec<Published>, String> {
+        Ok(self.plugin.publish(state))
+    }
+
     fn expand(
         &self,
         block: &Block,
@@ -171,8 +195,15 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
             .map_err(Failure::Refused)
     }
 
-    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
-        self.plugin.complete(block, state, offset)
+    fn complete(
+        &self,
+        block: &Block,
+        state: &[u8],
+        offset: u32,
+        member: bool,
+        source: &mut BlockSource,
+    ) -> Vec<Completion> {
+        self.plugin.complete(block, state, offset, member, source)
     }
 
     fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
@@ -242,11 +273,10 @@ pub(crate) fn placed(
     }
 }
 
-/// The head of the block `node`, its first token: a name, or `sql`, still
-/// a keyword of the queries the compiler reads.
+/// The head of the block `node`, its first token: a name.
 pub fn head_token(node: &Node) -> Option<Token> {
     let head = node.child_tokens().find(|t| !t.kind.is_trivia())?;
-    matches!(head.kind, K::Ident | K::SqlKw).then_some(head)
+    (head.kind == K::Ident).then_some(head)
 }
 
 /// The plugin blocks under `node`, expressions and declarations, not those

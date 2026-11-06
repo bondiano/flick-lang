@@ -90,12 +90,12 @@ as record labels: `{ echo = … }`.
 
 | Keyword | Meaning | Example |
 | - | - | - |
-| `sql` | a typed SQL query, or `sql table` for a table | `sql { from u in Users select u }` |
 | `ui` | a UI block | `ui { … }` |
 
-See [schema.md](../schema/), [sql.md](../sql/) and [ui.md](../ui/). A
-command-line interface, `cli "deploy" { … }`, is a block of the plugin of
-`std`, not a keyword: see [cli-dsl.md](../cli-dsl/).
+See [schema.md](../schema/) and [ui.md](../ui/). A command-line interface,
+`cli "deploy" { … }`, and a typed SQL query, `sql { from u in Users; select
+u }`, are blocks of the plugin of `std`, not keywords: see
+[cli-dsl.md](../cli-dsl/) and [sql.md](../sql/).
 
 ## In the editor
 

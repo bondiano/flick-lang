@@ -7,6 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use super::walk::respan;
 use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Lit, Module};
 use crate::numeric::{Arith, Num};
 use crate::source::Span;
@@ -49,11 +50,6 @@ struct Pending {
     at: Option<Span>,
 }
 
-fn respan(e: &mut Expr, span: Span) {
-    e.span = span;
-    e.each_child_mut(&mut |c| respan(c, span));
-}
-
 /// Copies the generic functions `module` calls with numeric instances, its
 /// own and those `generics` offers, until no call is left to copy for.
 pub fn specialize(module: &mut Module, generics: Generics) {
@@ -74,7 +70,7 @@ pub fn specialize(module: &mut Module, generics: Generics) {
         }
         found
             .entry((m.to_owned(), name.to_owned()))
-            .or_insert_with(|| generics(m, name))
+            .or_insert_with(|| generics(m, name).filter(|(dicts, _)| !dicts.is_empty()))
             .clone()
     };
     let mut made: HashSet<String> = HashSet::new();
@@ -112,11 +108,10 @@ pub fn specialize(module: &mut Module, generics: Generics) {
     }
 }
 
-/// The parameters and body of the function `name` of `module` when it
-/// takes dictionaries, or of the method `<instance>#<method>` and the
-/// dictionaries of its instance's context, when its body names only what
-/// `exported` allows of `module`, so a copy in another module can reach all
-/// it uses.
+/// The dictionary parameters and body of the value `name` of `module`, or
+/// of the method `<instance>#<method>` and the dictionaries of its
+/// instance's context, when its body names only what `exported` allows of
+/// `module`, so a copy in another module can reach all it uses.
 pub fn names_only(module: &Module, name: &str, exported: &dyn Fn(&str) -> bool) -> Option<Generic> {
     // `<instance>#<method>`: a method of an instance, over its context
     let method = name.split_once('#');
@@ -131,7 +126,7 @@ pub fn names_only(module: &Module, name: &str, exported: &dyn Fn(&str) -> bool) 
                     body,
                 },
                 None,
-            ) if n == name && !dicts.is_empty() => Some((dicts, body)),
+            ) if n == name => Some((dicts, body)),
             (ItemKind::Instance { info, methods }, Some((instance, method)))
                 if info.name == instance =>
             {

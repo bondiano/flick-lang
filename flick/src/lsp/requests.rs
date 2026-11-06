@@ -12,12 +12,11 @@ use std::process;
 use std::sync::Arc;
 
 use flick_core::diagnostics::Edit;
-use flick_core::diagnostics::codes::Area;
 use flick_core::fmt;
 use flick_core::ide::{CompletionKind, Ide, Location, TOKEN_TYPES, Target};
 use flick_core::plugin::Expander;
 use flick_core::source::{FileId, SourceMap};
-use flick_core::syntax::{self, cst::Node, kind::SyntaxKind as K, lexer};
+use flick_core::syntax::{kind::SyntaxKind as K, lexer};
 use flick_core::types::builtin_sources;
 use serde_json::{Value, json};
 
@@ -212,7 +211,7 @@ impl Server {
             .last()
             .map_or(cursor, |(i, _)| i);
         let dotted = text[..word].ends_with('.');
-        let (mut snapshot, offset) = if dotted {
+        let (snapshot, offset) = if dotted {
             let dot = word - 1;
             let mut docs = self.docs.clone();
             docs.insert(path.clone(), format!("{}{}", &text[..dot], &text[cursor..]));
@@ -222,24 +221,6 @@ impl Server {
             docs.insert(path.clone(), text.clone());
             (analyze(&docs, &path, &mut self.caches), word)
         };
-        // a file with syntax errors is analyzed, but completes better repaired
-        let broken = match snapshot.file(&path) {
-            None => true,
-            Some(file) => snapshot
-                .analysis
-                .diagnostics
-                .iter()
-                .any(|d| d.code.area == Area::Syntax && d.span.is_some_and(|s| s.file == file)),
-        };
-        if broken && let Some(replacement) = completion_recovery(&text, word, cursor) {
-            tracing::debug!(word, cursor, "repairing syntax for completion");
-            let mut docs = self.docs.clone();
-            docs.insert(
-                path.clone(),
-                format!("{}{replacement}{}", &text[..word], &text[cursor..]),
-            );
-            snapshot = analyze(&docs, &path, &mut self.caches);
-        }
         let Some(file) = snapshot.file(&path) else {
             return Ok(json!([]));
         };
@@ -362,45 +343,6 @@ fn in_comment_or_string(text: &str, cursor: usize) -> bool {
 /// Whether string literal text has its closing quote.
 fn closed(literal: &str) -> bool {
     literal.len() > 1 && literal.trim_end_matches('#').ends_with('"')
-}
-
-/// Like removing an unfinished `.member`, supply syntax for the expression
-/// or clause currently being typed; never change the open buffer.
-fn completion_recovery(text: &str, offset: usize, cursor: usize) -> Option<&'static str> {
-    fn in_sql(node: &Node, kind: K, offset: u32) -> bool {
-        let (start, end) = node.range();
-        start <= offset
-            && offset <= end
-            && (node.kind == kind || node.nodes().any(|n| in_sql(n, kind, offset)))
-    }
-    let tree = syntax::parse(text, FileId::default()).tree;
-    let tokens = tree.tokens();
-    let previous = tokens
-        .iter()
-        .rev()
-        .find(|t| !t.kind.is_trivia() && t.end as usize <= offset)?;
-    let at = u32::try_from(offset).ok()?;
-    if !in_sql(&tree, K::SqlExpr, at) {
-        return None;
-    }
-    let next = tokens
-        .iter()
-        .find(|t| !t.kind.is_trivia() && t.start as usize >= cursor);
-    let select = if next.is_some_and(|t| t.kind == K::LBrace) {
-        "select"
-    } else {
-        "select {}"
-    };
-    Some(match previous.kind {
-        K::FromKw => "__flick_completion in __flick_completion",
-        K::Ident if matches!(previous.text(text), "join" | "left_join") => {
-            "__flick_completion in __flick_completion"
-        }
-        K::InKw | K::Eq | K::Comma | K::Dot | K::LParen => "__flick_completion",
-        K::LBrace => select,
-        _ if text[..offset].rsplit('\n').next()?.trim().is_empty() => select,
-        _ => "__flick_completion",
-    })
 }
 
 fn capabilities() -> Value {

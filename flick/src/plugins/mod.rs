@@ -17,7 +17,7 @@ use std::sync::Arc;
 use flick_core::plugin::source::BlockSource;
 use flick_core::plugin::{Expander, Failure};
 use flick_plugin::{
-    Arena, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
+    Arena, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece, Published,
 };
 
 pub use cache::{cached, save};
@@ -79,6 +79,11 @@ impl Expander for Traced {
         self.inner.collect(blocks, source)
     }
 
+    fn publish(&self, state: &[u8]) -> Result<Vec<Published>, String> {
+        self.trace(&format!("publish {}", self.inner.id()));
+        self.inner.publish(state)
+    }
+
     fn expand(
         &self,
         block: &Block,
@@ -89,8 +94,15 @@ impl Expander for Traced {
         self.inner.expand(block, state, source)
     }
 
-    fn complete(&self, block: &Block, state: &[u8], offset: u32) -> Vec<Completion> {
-        self.inner.complete(block, state, offset)
+    fn complete(
+        &self,
+        block: &Block,
+        state: &[u8],
+        offset: u32,
+        member: bool,
+        source: &mut BlockSource,
+    ) -> Vec<Completion> {
+        self.inner.complete(block, state, offset, member, source)
     }
 
     fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
