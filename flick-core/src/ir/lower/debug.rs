@@ -3,6 +3,7 @@
 
 use super::Lower;
 use super::expr::with_dicts;
+use crate::ir::ExprLang;
 use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stage};
 use crate::source::Span;
 use crate::syntax::cst::Node;

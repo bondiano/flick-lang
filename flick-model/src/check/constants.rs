@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use flick_core::numeric::Num;
+use flick_core::numeric::{Num, NumLang};
 
 use super::expr::{list, mono, prelude, runtime, scheme, var};
 use super::{Check, Checker, error};

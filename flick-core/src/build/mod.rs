@@ -15,7 +15,7 @@ pub use abi::interface;
 use std::collections::BTreeMap;
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 #[cfg(feature = "source-maps")]
 use crate::codegen::sourcemap;
@@ -593,13 +593,7 @@ fn compiled_module(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Vec<String> {
     // the interface and its summaries come from the reference lowering
-    let optimized = ctx.settings.release.then(|| {
-        let mut ir = module.ir.clone();
-        let exported = |name: &str| module.interface.exports_value(name);
-        let generics = |m: &str, name: &str| generic_of(ctx.modules, m, name);
-        opt::optimize(&mut ir, &exported, &generics);
-        ir
-    });
+    let optimized = ctx.settings.release.then(|| optimized(ctx.modules, module));
     if ctx.settings.backend == Backend::None {
         effects::check(&module.ir, diagnostics);
     }
@@ -830,15 +824,36 @@ fn specifier(from: &Path, target: &Path) -> String {
     }
 }
 
+/// The IR of `module` of the build `modules` as a release build optimizes
+/// it, for every target alike.
+pub fn optimized(modules: &[Compiled], module: &Compiled) -> ir::Module {
+    let mut ir = module.ir.clone();
+    let exported = |name: &str| module.interface.exports_value(name);
+    let generics = |m: &str, name: &str| generic_of(modules, m, name);
+    opt::optimize(&mut ir, &exported, &generics);
+    ir
+}
+
 /// The built-in modules, lowered.
 pub fn builtin_modules() -> &'static [ir::Module] {
-    static MODULES: OnceLock<Vec<ir::Module>> = OnceLock::new();
-    MODULES.get_or_init(|| {
-        let mut lowered = Vec::new();
+    &lowered_builtins().0
+}
+
+/// What the reference model reads of each built-in module, in the order of
+/// [`builtin_modules`].
+pub fn builtin_declarations() -> &'static [Arc<Interface>] {
+    &lowered_builtins().1
+}
+
+fn lowered_builtins() -> &'static (Vec<ir::Module>, Vec<Arc<Interface>>) {
+    static BUILTINS: OnceLock<(Vec<ir::Module>, Vec<Arc<Interface>>)> = OnceLock::new();
+    BUILTINS.get_or_init(|| {
+        let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
         types::check_each(types::builtin_sources(), |module, typing| {
             lowered.push(ir::lower(module, typing).expect("built-in modules compile"));
+            declarations.push(typing.declarations.clone());
         });
-        lowered
+        (lowered, declarations)
     })
 }
 

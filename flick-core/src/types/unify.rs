@@ -6,6 +6,7 @@
 //! shallower level may not be bound to it: that would let the rigid type escape
 //! its scope.
 
+use crate::numeric::NumLang;
 use std::collections::HashSet;
 
 use super::Checker;

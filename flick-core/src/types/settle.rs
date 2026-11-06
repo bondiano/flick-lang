@@ -2,6 +2,7 @@
 //! an operand or literal type nothing determined gets its default, and on a
 //! type variable both go through the closed numeric classes.
 
+use crate::numeric::NumLang;
 use std::collections::HashSet;
 use std::mem;
 

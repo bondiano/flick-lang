@@ -3,6 +3,7 @@
 //! constant conditions chosen. A result that is not certain to match JS, or
 //! that JS would throw, stays a run-time computation.
 
+use crate::ir::ExprLang;
 use std::fmt::Write as _;
 
 use crate::consteval::{self, Const};

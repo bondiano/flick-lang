@@ -5,42 +5,22 @@
 use crate::syntax::literal;
 use crate::types::Type;
 use crate::types::lang::{self, Lang};
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Num {
-    Int,
-    Float,
-    BigInt,
-}
+pub use flick_ir::{Arith, Num, NumKind};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NumKind {
-    /// Two's complement of `bits` bits; arithmetic wraps around.
-    Integer { bits: u32, signed: bool },
-    /// IEEE 754 binary of `bits` bits.
-    Float { bits: u32 },
-    /// An integer of any size.
-    Arbitrary,
-}
-
-/// The arithmetic operators.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Arith {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Pow,
-}
-
-impl Num {
-    /// The type an operand nothing determines becomes comes first.
-    pub const ALL: [Num; 3] = [Num::Int, Num::Float, Num::BigInt];
-
+/// What the compiler knows of a numeric type through its lang item.
+pub trait NumLang: Sized {
     /// The lang item of its type.
-    pub fn lang(self) -> Lang {
+    fn lang(self) -> Lang;
+    /// The name of its type.
+    fn name(self) -> &'static str;
+    fn of(name: &str) -> Option<Self>;
+    /// The numeric type `ty` is, if it is one.
+    fn of_type(ty: &Type) -> Option<Self>;
+}
+
+impl NumLang for Num {
+    fn lang(self) -> Lang {
         match self {
             Num::Int => Lang::Int,
             Num::Float => Lang::Float,
@@ -48,50 +28,16 @@ impl Num {
         }
     }
 
-    /// The name of its type.
-    pub fn name(self) -> &'static str {
+    fn name(self) -> &'static str {
         &lang::item(self.lang()).name
     }
 
-    pub fn of(name: &str) -> Option<Num> {
+    fn of(name: &str) -> Option<Num> {
         Num::ALL.into_iter().find(|n| n.name() == name)
     }
 
-    /// The numeric type `ty` is, if it is one.
-    pub fn of_type(ty: &Type) -> Option<Num> {
+    fn of_type(ty: &Type) -> Option<Num> {
         Num::ALL.into_iter().find(|n| ty.is_lang(n.lang()))
-    }
-
-    pub fn kind(self) -> NumKind {
-        match self {
-            Num::Int => NumKind::Integer {
-                bits: 32,
-                signed: true,
-            },
-            Num::Float => NumKind::Float { bits: 64 },
-            Num::BigInt => NumKind::Arbitrary,
-        }
-    }
-
-    /// Whether the integer `value` is one of this type's values; a float
-    /// type holds every integer literal, rounded.
-    pub fn holds(self, value: i128) -> bool {
-        match self.kind() {
-            NumKind::Integer { bits, signed: true } => {
-                let max = (1_i128 << (bits - 1)) - 1;
-                (-max - 1..=max).contains(&value)
-            }
-            NumKind::Integer {
-                bits,
-                signed: false,
-            } => (0..1_i128 << bits).contains(&value),
-            NumKind::Float { .. } | NumKind::Arbitrary => true,
-        }
-    }
-
-    /// Whether a literal written with a fraction or an exponent may be one.
-    pub fn fractional(self) -> bool {
-        matches!(self.kind(), NumKind::Float { .. })
     }
 }
 
@@ -102,19 +48,6 @@ pub fn default_num(fractional: bool) -> Num {
         .into_iter()
         .find(|n| n.fractional() || !fractional)
         .unwrap_or(Num::Float)
-}
-
-impl Arith {
-    pub fn symbol(self) -> &'static str {
-        match self {
-            Arith::Add => "+",
-            Arith::Sub => "-",
-            Arith::Mul => "*",
-            Arith::Div => "/",
-            Arith::Rem => "%",
-            Arith::Pow => "**",
-        }
-    }
 }
 
 /// The shorter of the plain and the exponent spelling of a finite `x`,

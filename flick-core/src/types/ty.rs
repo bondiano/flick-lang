@@ -88,20 +88,10 @@ pub struct Effects {
     pub sync: bool,
 }
 
+pub use flick_ir::Stage;
+
 /// Services whose operations run at once, without the Effect runtime.
 pub const SYNC_SERVICES: [Lang; 2] = [Lang::AtomRead, Lang::Setup];
-
-/// How a stage of a function runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Stage {
-    /// `->`: at once, with nothing.
-    Pure,
-    /// `->{S;}` with only [`SYNC_SERVICES`] and no errors: at once, reading
-    /// the services of the context the runtime has set.
-    Sync,
-    /// Any other `->{r; e}`: an Effect.
-    Runtime,
-}
 
 impl Effects {
     /// The rows of an arrow as written: Sync when its services are a closed

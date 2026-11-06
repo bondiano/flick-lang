@@ -2,6 +2,7 @@
 //! kinds and definitions, the types of values and constructors, and which
 //! entity a plain or qualified name refers to in the current module.
 
+pub use flick_ir::{EnumLit, JsClass, Rep};
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
@@ -101,15 +102,6 @@ pub enum Abi {
     Literal(Vec<EnumLit>),
 }
 
-/// The literal a constructor of an enum is: all of a type's are strings, or
-/// all are integers.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum EnumLit {
-    Int(i32),
-    String(String),
-}
-
 impl Abi {
     pub fn is_tagged(&self) -> bool {
         *self == Abi::Tagged
@@ -126,42 +118,6 @@ impl Abi {
                 .map_or(Rep::Tagged, |l| Rep::Literal(l.clone())),
         }
     }
-}
-
-/// What JS can tell a value apart by, without a tag.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum JsClass {
-    Number,
-    String,
-    Boolean,
-    Bigint,
-    /// A list or a tuple.
-    Array,
-}
-
-impl JsClass {
-    /// The name the runtime and the generated tests use.
-    pub fn name(self) -> &'static str {
-        match self {
-            JsClass::Number => "number",
-            JsClass::String => "string",
-            JsClass::Boolean => "boolean",
-            JsClass::Bigint => "bigint",
-            JsClass::Array => "array",
-        }
-    }
-}
-
-/// How the values of one constructor are represented.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Rep {
-    #[default]
-    Tagged,
-    Unboxed,
-    Typeof(JsClass),
-    /// The constructor is its literal: a string or an integer.
-    Literal(EnumLit),
 }
 
 /// `a b -> c` of a class: the parameters at `from` determine those at `to`,

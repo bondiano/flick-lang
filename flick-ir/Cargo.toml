@@ -1,0 +1,23 @@
+[package]
+name = "flick-ir"
+description = "The typed IR of the Flick compiler: what a backend gets, and its JSON and CBOR forms"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+# the forms of a program, for tools; the browser build leaves them out
+[features]
+# exact for every float, which the whole build's serde_json then is
+json = ["dep:serde_json", "serde_json/float_roundtrip"]
+cbor = ["dep:ciborium"]
+
+[dependencies]
+ciborium = { version = "0.2.2", optional = true }
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+serde_json = { version = "1.0.154", optional = true }

@@ -6,6 +6,9 @@ break programs.
 
 ## Unreleased
 
+- **Build:** `flick build --emit-ir[=json|cbor]` writes the IR the backend
+  gets, in the crate `flick-ir`, with its version (`0.1.0`); a reader takes
+  only its own minor version before 1.0.
 - **Release:** a small pure function of a built-in module, of core or std,
   is inlined like one of the module when its body names only what its
   module exports: `Int.min 3 5` is `3`. Those of the program's other

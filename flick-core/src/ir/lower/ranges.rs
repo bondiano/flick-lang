@@ -1,6 +1,7 @@
 //! Ranges as the checker reads them (`types::ranges`): calls of `Seq`.
 
 use super::Lower;
+use crate::ir::ExprLang;
 use crate::ir::{Expr, ExprKind, Stage};
 use crate::source::Span;
 use crate::syntax::cst::Node;

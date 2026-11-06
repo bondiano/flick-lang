@@ -7,10 +7,9 @@ use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::Gen;
 use super::layout::{Code, block, call, statement};
-use crate::ir::{BinOp, Expr, ExprKind, Lit};
+use crate::ir::{BinOp, Expr, ExprKind, Lit, TypeName};
 use crate::numeric::{Arith, Num};
-use crate::types::Type;
-use crate::types::lang::Lang;
+use crate::types::lang::{self, Lang};
 
 /// A type whose values are Go's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,7 +53,7 @@ impl Native {
     }
 
     /// The type of values of type `ty`, when it is one of these.
-    pub(super) fn of(ty: Option<&Type>) -> Option<Native> {
+    pub(super) fn of(ty: Option<&TypeName>) -> Option<Native> {
         let ty = ty?;
         [
             (Lang::Int, Native::Int),
@@ -63,7 +62,7 @@ impl Native {
             (Lang::String, Native::String),
         ]
         .into_iter()
-        .find(|&(item, _)| ty.is_lang(item))
+        .find(|&(item, _)| lang::is(item, &ty.module, &ty.name))
         .map(|(_, native)| native)
     }
 }

@@ -4,9 +4,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::Expr;
+use crate::Expr;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Foreign {
     pub name: String,
     pub mode: ForeignMode,
@@ -60,7 +60,7 @@ pub enum ForeignMode {
 
 /// What a `foreign` declaration says about how values cross: the arguments
 /// as the function takes them, and its result as the program gets it.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Adapter {
     /// The first argument is the receiver of the call, `this`.
     pub receiver: bool,
@@ -81,7 +81,7 @@ pub struct Adapter {
 /// Where a call may pass Flick data, which a function outside the runtime
 /// gets as a copy, as the host may change a list or a record in place
 /// (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Copies {
     /// For each argument.
     pub args: Vec<bool>,
@@ -106,7 +106,7 @@ impl Copies {
 }
 
 /// How the result of a call becomes a Flick value.
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct ResultAdapter {
     /// `nullable`: the host's absent values are `None`.
     pub nullable: bool,

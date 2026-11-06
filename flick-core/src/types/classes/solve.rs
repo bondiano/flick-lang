@@ -4,6 +4,8 @@
 //! it; functional dependencies improve unknown types on the way. Every step
 //! counts against the budget of the definition being checked.
 
+use super::assumes;
+use crate::numeric::NumLang;
 use std::mem;
 
 use super::matching::{Match, Subst, match_type};
@@ -256,7 +258,7 @@ impl Checker<'_> {
             self.by_instance(c, (&module, &name), &args, givens, chain)
         };
         if let (Some(key), Outcome::Solved(dict)) = (key, &outcome)
-            && !dict.assumes()
+            && !assumes(dict)
         {
             self.classes.cache.insert(key, dict.clone());
         }

@@ -41,7 +41,7 @@ pub use release::{direct_methods, exported_worker};
 
 #[cfg(feature = "typescript")]
 use std::cell::RefCell;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::mem;
 
 use super::exports::reexports;
@@ -296,7 +296,7 @@ struct Gen<'a> {
     module: &'a str,
     options: &'a Options<'a>,
     /// The module's labelled top-level values (see [`Gen::labelled`]).
-    labels: &'a HashMap<String, Label>,
+    labels: &'a BTreeMap<String, Label>,
     #[cfg(feature = "source-maps")]
     /// The Flick name at a marker, by its index in `spans`.
     names: HashMap<usize, String>,

@@ -215,6 +215,11 @@ pub struct BuildArguments {
     #[arg(long)]
     pub promise_facade: bool,
 
+    /// Also write the IR the backend gets, `program.ir.json` or
+    /// `program.ir.cbor`; optimized in a release build.
+    #[arg(long, value_enum, value_name = "FORMAT", num_args = 0..=1, default_missing_value = "json")]
+    pub emit_ir: Option<IrFormat>,
+
     /// Compile pure codecs ahead of use in the app's runner.
     #[arg(long)]
     pub schema_aot: bool,
@@ -250,6 +255,12 @@ pub enum LabelsArgument {
     All,
     Components,
     None,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum IrFormat {
+    Json,
+    Cbor,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
