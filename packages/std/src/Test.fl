@@ -48,7 +48,7 @@ foreign pure test from "@flick-lang/runtime" "testPure"
 
 /// An effectful test: it passes when the task succeeds and its scope, which
 /// owns what the task acquires, closes cleanly.
-effect_test : forall e. String -> (forall s. Eff {Scope s} e Unit) -> Test
+effect_test : forall e. String -> (forall s. Eff {Async, Scope s} e Unit) -> Test
 foreign pure effect_test from "@flick-lang/runtime" "testEffect"
 
 /// Virtual time: the clock a `clock_test` runs on, which moves only when
@@ -58,7 +58,7 @@ service VirtualTime
 /// An effectful test on a clock of its own that starts at 0 and moves only
 /// by `adjust` and `set_time`: a sleep, a timeout or a retry schedule waits
 /// for virtual time, not real time. Each test has its own clock.
-clock_test : forall e. String -> (forall s. Eff {Scope s, VirtualTime} e Unit) -> Test
+clock_test : forall e. String -> (forall s. Eff {Async, Scope s, VirtualTime} e Unit) -> Test
 foreign pure clock_test from "@flick-lang/runtime" "testClock"
 
 /// Moves the clock forward by `duration`, running what was waiting for it.

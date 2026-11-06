@@ -188,6 +188,11 @@ pub struct CheckArguments {
     /// type annotation the value already has, then report what is left.
     #[arg(long, conflicts_with = "watch")]
     pub fix: bool,
+
+    /// With `--fix`, apply only the fixes of diagnostics with these codes,
+    /// such as `E002,F001`: a migration that changes nothing else.
+    #[arg(long, requires = "fix", value_delimiter = ',', value_name = "CODES")]
+    pub only: Vec<String>,
 }
 
 #[derive(Args)]

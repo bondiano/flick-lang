@@ -36,7 +36,8 @@ impl Command for CheckCommand {
             self.check_files(&paths)
         };
         for page in &pages {
-            let diagnostics = pages::check(&mut outcome.sources, page, self.options.fix);
+            let fix = self.options.fix.then_some(self.options.only.as_slice());
+            let diagnostics = pages::check(&mut outcome.sources, page, fix);
             outcome.diagnostics.extend(diagnostics);
         }
         outcome
@@ -57,7 +58,7 @@ impl CheckCommand {
         // a fix left out for an overlap, or one a fix uncovers, waits for the next pass
         let mut errors = Vec::new();
         for _ in 0..FIX_PASSES {
-            let (changed, failed) = apply_fixes(&outcome, &roots, &host.cwd);
+            let (changed, failed) = apply_fixes(&outcome, &roots, &host.cwd, &self.options.only);
             errors.extend(failed);
             if !changed {
                 break;
@@ -100,9 +101,16 @@ impl CheckCommand {
 /// Writes the safe fixes of `outcome` into those of its files that are
 /// `roots`, never into a dependency; whether a file changed, and the files
 /// that could not be written.
-fn apply_fixes(outcome: &Outcome, roots: &[PathBuf], cwd: &Path) -> (bool, Vec<Diagnostic>) {
+fn apply_fixes(
+    outcome: &Outcome,
+    roots: &[PathBuf],
+    cwd: &Path,
+    only: &[String],
+) -> (bool, Vec<Diagnostic>) {
     let mut by_file: BTreeMap<FileId, Vec<&[Edit]>> = BTreeMap::new();
-    let fixes = outcome.diagnostics.iter().flat_map(|d| &d.fixes);
+    let fixes = (outcome.diagnostics.iter())
+        .filter(|d| chosen(d, only))
+        .flat_map(|d| &d.fixes);
     for fix in fixes.filter(|f| f.safe) {
         if let Some(first) = fix.edits.first() {
             by_file.entry(first.span.file).or_default().push(&fix.edits);
@@ -126,6 +134,12 @@ fn apply_fixes(outcome: &Outcome, roots: &[PathBuf], cwd: &Path) -> (bool, Vec<D
         }
     }
     (changed, errors)
+}
+
+/// Whether `--only` lets the fixes of `d` through: `E002` or `FLICK-E002`.
+pub(super) fn chosen(d: &Diagnostic, only: &[String]) -> bool {
+    let code = d.code.to_string();
+    only.is_empty() || (only.iter()).any(|c| code == *c || code.strip_prefix("FLICK-") == Some(c))
 }
 
 /// `text` with `fixes`, each made whole or not at all.

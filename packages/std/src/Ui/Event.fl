@@ -5,21 +5,23 @@ module Ui.Event exposing (..)
 
 @lang event_exhaust
 /// Ignores events while the task of an earlier one runs.
-exhaust : forall c s. (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+exhaust :
+  forall c s. (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
 foreign pure exhaust from "@flick-lang/runtime/ui/react" "eventExhaust"
   retention call
 
 @lang event_latest
 /// Interrupts the running task, waits until it stopped, then runs the
 /// last event; one event waits at most.
-latest : forall c s. (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+latest : forall c s. (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
 foreign pure latest from "@flick-lang/runtime/ui/react" "eventLatest"
   retention call
 
 @lang event_queue
 /// Runs events one by one, `capacity` of them waiting at most; an event
 /// that finds the queue full is rejected and reported to the supervisor.
-queue : forall c s. Int -> (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+queue :
+  forall c s. Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
 foreign pure queue from "@flick-lang/runtime/ui/react" "eventQueue"
   retention call
 
@@ -27,7 +29,7 @@ foreign pure queue from "@flick-lang/runtime/ui/react" "eventQueue"
 /// Runs at most `limit` tasks at once; an event beyond that is rejected and
 /// reported to the supervisor.
 concurrent :
-  forall c s. Int -> (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+  forall c s. Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
 foreign pure concurrent from "@flick-lang/runtime/ui/react" "eventConcurrent"
   retention call
 

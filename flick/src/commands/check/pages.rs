@@ -9,7 +9,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::markdown::{self, Block, Mode};
 use flick_core::source::{FileId, SourceMap};
 
-use super::{FIX_PASSES, taken};
+use super::{FIX_PASSES, chosen, taken};
 
 /// Whether `path` names a Markdown page rather than Flick sources.
 pub fn is_page(path: &str) -> bool {
@@ -19,10 +19,10 @@ pub fn is_page(path: &str) -> bool {
 }
 
 /// The diagnostics of the blocks of the page at `path`, which is added to
-/// `sources`; with `fix`, the page is first rewritten with their safe fixes,
-/// except in `keep` blocks. An `ignore` block is not checked; a `fail` block
+/// `sources`; with `fix`, the page is first rewritten with their safe fixes
+/// of the codes `fix` lets through, except in `keep` blocks. An `ignore` block is not checked; a `fail` block
 /// is not either, as its errors are the example and a fix could remove them.
-pub fn check(sources: &mut SourceMap, path: &str, fix: bool) -> Vec<Diagnostic> {
+pub fn check(sources: &mut SourceMap, path: &str, fix: Option<&[String]>) -> Vec<Diagnostic> {
     let error = |code, message: String| vec![Diagnostic::new(code, Severity::Error, message)];
     let read = match fs::read_to_string(path) {
         Ok(text) => text,
@@ -30,9 +30,9 @@ pub fn check(sources: &mut SourceMap, path: &str, fix: bool) -> Vec<Diagnostic> 
     };
     let mut page = read.clone();
     let mut checked = check_blocks(&page);
-    let passes = if fix { FIX_PASSES } else { 0 };
+    let passes = if fix.is_some() { FIX_PASSES } else { 0 };
     for _ in 0..passes {
-        let fixed = fixed(&page, &checked);
+        let fixed = fixed(&page, &checked, fix.unwrap_or_default());
         if fixed == page {
             break;
         }
@@ -69,13 +69,14 @@ fn check_blocks(page: &str) -> Vec<(Block, Vec<Diagnostic>)> {
 }
 
 /// `page` with the safe fixes of the diagnostics of its `checked` blocks.
-fn fixed(page: &str, checked: &[(Block, Vec<Diagnostic>)]) -> String {
+fn fixed(page: &str, checked: &[(Block, Vec<Diagnostic>)], only: &[String]) -> String {
     let mut out = page.to_owned();
     // the last block first, so the ranges of those before it hold
     let fixable = checked.iter().filter(|(b, _)| b.mode == Mode::Check);
     for (block, diagnostics) in fixable.rev() {
         let fixes = diagnostics
             .iter()
+            .filter(|d| chosen(d, only))
             .flat_map(|d| &d.fixes)
             .filter(|f| f.safe)
             .map(|f| f.edits.as_slice());

@@ -173,12 +173,12 @@ type Async a (e : ErrorRow) = Loading | Loaded a | Failed (Failure e)
 /// An atom of the result of `task`, run by the registry that first reads
 /// it and run anew by `Atom.refresh`. A view reads it like any
 /// atom and matches its three cases.
-task : Eff none e a -> Atom (Async a e)
+task : Eff {Prelude.Async} e a -> Atom (Async a e)
 foreign pure task from "@flick-lang/runtime" "atomTask"
 
 /// A task atom that a `mutation` of one of `keys` runs anew, in the
 /// registry where it succeeds: the list of orders a placed order changes.
-query : List String -> Eff none e a -> Atom (Async a e)
+query : List String -> Eff {Prelude.Async} e a -> Atom (Async a e)
 foreign pure query from "@flick-lang/runtime" "atomQuery"
   arity 2
 
@@ -186,7 +186,7 @@ foreign pure query from "@flick-lang/runtime" "atomQuery"
 /// The task atom of `load` of the route's value, run anew when the route
 /// changes: a page's data. Made serializable, the result a server loaded
 /// for the requested URL is where the client starts.
-loader : forall d r e a. (Writable r)^d -> (r -> Eff none e a) -> (Atom (Async a e))^d
+loader : forall d r e a. (Writable r)^d -> (r -> Eff {Prelude.Async} e a) -> (Atom (Async a e))^d
 foreign pure loader from "@flick-lang/runtime" "atomLoader"
   arity 2
   retention call
