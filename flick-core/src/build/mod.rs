@@ -593,13 +593,7 @@ fn compiled_module(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Vec<String> {
     // the interface and its summaries come from the reference lowering
-    let optimized = ctx.settings.release.then(|| {
-        let mut ir = module.ir.clone();
-        let exported = |name: &str| module.interface.exports_value(name);
-        let generics = |m: &str, name: &str| generic_of(ctx.modules, m, name);
-        opt::optimize(&mut ir, &exported, &generics);
-        ir
-    });
+    let optimized = ctx.settings.release.then(|| optimized(ctx.modules, module));
     if ctx.settings.backend == Backend::None {
         effects::check(&module.ir, diagnostics);
     }
@@ -828,6 +822,16 @@ fn specifier(from: &Path, target: &Path) -> String {
     } else {
         format!("./{joined}")
     }
+}
+
+/// The IR of `module` of the build `modules` as a release build optimizes
+/// it, for every target alike.
+pub fn optimized(modules: &[Compiled], module: &Compiled) -> ir::Module {
+    let mut ir = module.ir.clone();
+    let exported = |name: &str| module.interface.exports_value(name);
+    let generics = |m: &str, name: &str| generic_of(modules, m, name);
+    opt::optimize(&mut ir, &exported, &generics);
+    ir
 }
 
 /// The built-in modules, lowered.

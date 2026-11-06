@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Constructor, Dict};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InstanceInfo {
     pub module: String,
     /// The head as written: what `Dict::Instance` names it by.
@@ -37,7 +37,7 @@ pub struct InstanceInfo {
 /// The constructors of a type that derives `Generic`, each with the labels
 /// of its one record field when it has one, and the constructors of the
 /// representation: `Inl` and `Inr` of `Sum`, `Con` and `Field`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GenericInfo {
     pub cases: Vec<(Constructor, Option<Vec<String>>)>,
     pub inl: Constructor,

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Arm, Expr, OpClass};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Handler {
     pub effects: Vec<Handled>,
     pub body: Expr,
@@ -18,7 +18,7 @@ pub struct Handler {
 }
 
 /// An effect a handler handles, with the function of each operation's arms.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Handled {
     /// `M.E`, the key of the effect.
     pub effect: String,
@@ -31,7 +31,7 @@ pub struct Handled {
 /// `control` it is pure up to a last runtime parameter, `resume`, and its
 /// result the handler's. `provide S impl` handles each operation by the
 /// field of `impl`, as a `tail` arm.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OpArm {
     pub name: String,
     pub class: OpClass,

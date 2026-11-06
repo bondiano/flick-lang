@@ -258,7 +258,7 @@ impl Checker<'_> {
             self.by_instance(c, (&module, &name), &args, givens, chain)
         };
         if let (Some(key), Outcome::Solved(dict)) = (key, &outcome)
-            && !assumes(&dict)
+            && !assumes(dict)
         {
             self.classes.cache.insert(key, dict.clone());
         }

@@ -6,7 +6,7 @@
 
 pub use flick_ir::{Constructor, GenericInfo, InstanceInfo, Lift};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::mem;
 use std::sync::Arc;
 
@@ -90,7 +90,7 @@ pub struct Typing {
     pub labels: HashMap<Range, String>,
     /// The top-level atoms, views and actions, which debugging tools know
     /// by `Module.name`.
-    pub labelled: HashMap<String, Label>,
+    pub labelled: BTreeMap<String, Label>,
     /// The top-level functions that make an atom, an action or a view, each
     /// with the maker of the library it ends at.
     pub makers: HashMap<String, String>,

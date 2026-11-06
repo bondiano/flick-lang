@@ -5,11 +5,10 @@
 use std::env;
 use std::path::Path;
 
-use super::{Artifact, Settings, builtin_modules, generic_of, specifier};
+use super::{Artifact, Settings, builtin_modules, optimized, specifier};
 use crate::codegen::go::{self, GO_MOD, GO_SUM, PACKAGES, Package, Program, RUNTIME};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir;
-use crate::opt;
 use crate::project::{Compilation, normalize};
 use crate::source::{SourceMap, Span};
 
@@ -59,13 +58,11 @@ pub fn emit(
     let optimized: Vec<ir::Module> = modules
         .iter()
         .map(|module| {
-            let mut ir = module.ir.clone();
             if settings.release {
-                let exported = |name: &str| module.interface.exports_value(name);
-                let generics = |m: &str, name: &str| generic_of(modules, m, name);
-                opt::optimize(&mut ir, &exported, &generics);
+                optimized(modules, module)
+            } else {
+                module.ir.clone()
             }
-            ir
         })
         .collect();
     let all: Vec<&ir::Module> = optimized.iter().chain(builtin_modules()).collect();

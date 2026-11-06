@@ -10,6 +10,7 @@ mod handler;
 mod instance;
 mod num;
 mod op;
+mod program;
 mod span;
 mod stage;
 
@@ -24,5 +25,6 @@ pub use handler::{Handled, Handler, OpArm};
 pub use instance::{GenericInfo, InstanceInfo};
 pub use num::{Arith, Num, NumKind};
 pub use op::OpClass;
+pub use program::{Error, Program, VERSION};
 pub use span::{FileId, Span};
 pub use stage::{Lift, Stage};

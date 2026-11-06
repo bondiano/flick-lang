@@ -39,6 +39,7 @@ flick-ir = { path = "../flick-ir" }
 serde = { version = "1.0.229", features = ["derive"] }
 
 [dev-dependencies]
+flick-ir = { path = "../flick-ir", features = ["json", "cbor"] }
 flick-test-pairs = { path = "../tests/plugins/pairs" }
 insta = "1.49.0"
 toml = "1.1.8"

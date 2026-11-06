@@ -1,7 +1,7 @@
 //! The IR itself: modules of items, expressions with every application
 //! stage, dictionary and lift explicit, patterns and literals.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -10,14 +10,14 @@ use crate::{
     Arith, Constructor, Dict, Foreign, Handler, InstanceInfo, Lift, Num, Span, Stage, TypeName,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Module {
     pub name: String,
     /// Top-level definitions in source order; code generation orders them
     /// by what each one uses.
     pub items: Vec<Item>,
     /// The top-level values debugging tools know by `Module.name`.
-    pub labels: HashMap<String, Label>,
+    pub labels: BTreeMap<String, Label>,
 }
 
 /// The label of a top-level value, `Module.name`, which debugging tools
@@ -28,13 +28,13 @@ pub struct Label {
     pub kind: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Item {
     pub kind: ItemKind,
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ItemKind {
     /// `let name … = …`; a definition with class constraints takes their
     /// dictionaries first.
@@ -61,7 +61,7 @@ pub enum ItemKind {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
@@ -70,7 +70,7 @@ pub struct Expr {
     pub ty: Option<Arc<TypeName>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ExprKind {
     Lit(Lit),
     /// A local by its unique name in the enclosing top-level definition.
@@ -292,7 +292,12 @@ impl Module {
                         body.each_span_mut(f);
                     }
                 }
-                ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
+                ItemKind::Foreign(foreign) => {
+                    if let Some(catch) = &mut foreign.catch {
+                        catch.each_span_mut(f);
+                    }
+                }
+                ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
             }
         }
     }
@@ -401,7 +406,7 @@ impl Expr {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Param {
     pub pat: Pat,
     /// The stage of the arrow of this parameter.
@@ -411,7 +416,7 @@ pub struct Param {
     pub ty: Option<Arc<TypeName>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Stmt {
     Let(Pat, Expr),
     /// A local function; `rec` when it may call itself.
@@ -424,17 +429,19 @@ pub enum Stmt {
     Expr(Expr),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Arm {
     pub pat: Pat,
     pub guard: Option<Expr>,
     pub body: Expr,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// A literal; a `Float` equals another with the same bits, and any NaN
+/// another NaN: `0.0` is not `-0.0`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Lit {
     Int(i32),
-    Float(f64),
+    Float(#[serde(with = "float")] f64),
     /// Decimal or `0x`/`0o`/`0b` digits with an optional `-`, without `_`
     /// or a suffix: its size is not bounded.
     BigInt(String),
@@ -550,6 +557,78 @@ impl Pat {
             Pat::Or(alternatives) => alternatives.iter().any(Pat::irrefutable),
             Pat::List(items, rest) => items.is_empty() && rest.is_some(),
             Pat::Lit(_) | Pat::Con(..) => false,
+        }
+    }
+}
+
+impl PartialEq for Lit {
+    fn eq(&self, other: &Lit) -> bool {
+        match (self, other) {
+            (Lit::Int(a), Lit::Int(b)) => a == b,
+            (Lit::Float(a), Lit::Float(b)) => {
+                a.to_bits() == b.to_bits() || a.is_nan() && b.is_nan()
+            }
+            (Lit::BigInt(a), Lit::BigInt(b)) | (Lit::String(a), Lit::String(b)) => a == b,
+            (Lit::Bool(a), Lit::Bool(b)) => a == b,
+            (Lit::Unit, Lit::Unit) => true,
+            _ => false,
+        }
+    }
+}
+
+/// A float in a text format: a number when it is finite, else `"NaN"`,
+/// `"inf"` or `"-inf"`, which JSON has no number for. A binary format
+/// keeps the float as it is.
+mod float {
+    use std::fmt;
+
+    use serde::de::{self, Visitor};
+    use serde::{Deserializer, Serializer};
+
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub fn serialize<S: Serializer>(x: &f64, s: S) -> Result<S::Ok, S::Error> {
+        match *x {
+            x if x.is_finite() || !s.is_human_readable() => s.serialize_f64(x),
+            x if x.is_nan() => s.serialize_str("NaN"),
+            x if x > 0.0 => s.serialize_str("inf"),
+            _ => s.serialize_str("-inf"),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+        d.deserialize_any(Float)
+    }
+
+    struct Float;
+
+    impl Visitor<'_> for Float {
+        type Value = f64;
+
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("a number, \"NaN\", \"inf\" or \"-inf\"")
+        }
+
+        fn visit_f64<E: de::Error>(self, x: f64) -> Result<f64, E> {
+            Ok(x)
+        }
+
+        #[allow(clippy::cast_precision_loss)]
+        fn visit_i64<E: de::Error>(self, x: i64) -> Result<f64, E> {
+            Ok(x as f64)
+        }
+
+        #[allow(clippy::cast_precision_loss)]
+        fn visit_u64<E: de::Error>(self, x: u64) -> Result<f64, E> {
+            Ok(x as f64)
+        }
+
+        fn visit_str<E: de::Error>(self, x: &str) -> Result<f64, E> {
+            match x {
+                "NaN" => Ok(f64::NAN),
+                "inf" => Ok(f64::INFINITY),
+                "-inf" => Ok(f64::NEG_INFINITY),
+                _ => Err(E::invalid_value(de::Unexpected::Str(x), &self)),
+            }
         }
     }
 }

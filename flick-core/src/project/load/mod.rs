@@ -105,8 +105,7 @@ struct Loader<'a> {
     from_packages: BTreeMap<String, Interface>,
     diagnostics: Vec<Diagnostic>,
     /// With `Some`, the IR of each module that checks without errors.
-    /// Each module's IR and what the reference model reads of it.
-    lowered: Option<Vec<Option<(ir::Module, Arc<Interface>)>>>,
+    lowered: Option<Vec<Option<Lowered>>>,
     /// Lowers only the modules of source packages, to save them.
     lower_packages_only: bool,
     /// Modules of source packages saved by earlier runs.
@@ -116,6 +115,28 @@ struct Loader<'a> {
     ide: Option<Vec<Analyzed>>,
     /// With `Some`, the outputs of earlier runs to reuse.
     cache: Option<&'a mut ModuleCache>,
+}
+
+/// A module's IR and what the reference model reads of it.
+type Lowered = (ir::Module, Arc<Interface>);
+
+/// The module `m` of the build, lowered.
+fn compiled(m: &Loaded, (ir, declarations): Lowered, interface: Interface) -> Compiled {
+    Compiled {
+        name: m.name.clone(),
+        path: m.path.clone(),
+        file: m.file,
+        test: m.root == Root::Test,
+        package: match &m.root {
+            Root::Package(name) => Some(name.clone()),
+            _ => None,
+        },
+        imports: m.syntax.imports.iter().map(|i| i.module.clone()).collect(),
+        ir,
+        declarations,
+        interface,
+        expansion: m.expansion.clone(),
+    }
 }
 
 /// The modules of a build: the project's and those of its libraries.
@@ -270,24 +291,7 @@ fn run(
             .into_iter()
             .zip(interfaces)
             .zip(&loader.modules)
-            .filter_map(|((lowered, interface), m)| {
-                let (ir, declarations) = lowered?;
-                Some(Compiled {
-                    name: m.name.clone(),
-                    path: m.path.clone(),
-                    file: m.file,
-                    test: m.root == Root::Test,
-                    package: match &m.root {
-                        Root::Package(name) => Some(name.clone()),
-                        _ => None,
-                    },
-                    imports: m.syntax.imports.iter().map(|i| i.module.clone()).collect(),
-                    ir,
-                    declarations,
-                    interface: interface?,
-                    expansion: m.expansion.clone(),
-                })
-            })
+            .filter_map(|((lowered, interface), m)| Some(compiled(m, lowered?, interface?)))
             .collect(),
         _ => Vec::new(),
     };

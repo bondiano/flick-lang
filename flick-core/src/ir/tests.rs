@@ -2,7 +2,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::{env, fs};
 
-use crate::build::builtin_modules;
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::Severity;
 use crate::diagnostics::codes;
@@ -205,23 +204,5 @@ fn ir_carries_the_checker_types() {
         "label app String",
     ] {
         assert!(seen.iter().any(|s| s == want), "no `{want}` in {seen:?}");
-    }
-}
-
-/// The IR of every built-in module survives JSON, spans included: what an
-/// on-disk cache of lowered modules relies on. JSON values compare without
-/// the order of hash maps.
-#[test]
-fn the_ir_round_trips_through_json() {
-    for module in builtin_modules() {
-        let json = serde_json::to_value(module).expect("serializes");
-        let back: super::Module = serde_json::from_value(json.clone()).expect("deserializes");
-        assert_eq!(
-            serde_json::to_value(&back).expect("serializes"),
-            json,
-            "{}",
-            module.name
-        );
-        assert_eq!(super::print(&back), super::print(module), "{}", module.name);
     }
 }
