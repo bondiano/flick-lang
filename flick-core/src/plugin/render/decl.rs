@@ -10,10 +10,8 @@ impl Printer<'_> {
     pub(super) fn decl(&mut self, decl: &Decl, depth: u32) -> Result<(), String> {
         let d = depth + 1;
         match decl {
+            // a group of none declares nothing, as a migration that only alters a table
             Decl::Group(decls) => {
-                if decls.is_empty() {
-                    return Err("a group of no declarations".into());
-                }
                 for (i, &id) in decls.iter().enumerate() {
                     if i > 0 {
                         self.push("\n");

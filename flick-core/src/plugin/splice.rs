@@ -64,7 +64,7 @@ pub fn splice(
 }
 
 /// The declarations that replace the block of `source`, a declaration of
-/// the module: [`splice`]'s, in order.
+/// the module: [`splice`]'s, in order, none for code of no declarations.
 pub fn splice_decls(
     text: &str,
     file: FileId,
@@ -72,6 +72,9 @@ pub fn splice_decls(
     rendered: &Rendered,
     source: &BlockSource,
 ) -> Result<Vec<Node>, String> {
+    if rendered.text.is_empty() {
+        return Ok(Vec::new());
+    }
     let tree = generated(text, file, at, rendered, source, parse_decls_at)?;
     let decls: Vec<Node> = (tree.children.into_iter())
         .filter_map(|c| match c {
