@@ -10,7 +10,7 @@ mod op;
 mod span;
 mod stage;
 
-pub use data::{Constructor, EnumLit, JsClass, Rep};
+pub use data::{Constructor, EnumLit, JsClass, Rep, TypeName};
 pub use dict::Dict;
 pub use instance::{GenericInfo, InstanceInfo};
 pub use num::{Arith, Num, NumKind};

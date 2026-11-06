@@ -4,7 +4,6 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
-#[cfg(feature = "ide")]
 use std::sync::Arc;
 
 use tracing::debug;
@@ -131,7 +130,7 @@ impl Loader<'_> {
         }
         self.diagnostics.extend(output.diagnostics);
         if let (Some(lowered), Some(ir)) = (&mut self.lowered, output.ir) {
-            lowered[i] = Some(ir);
+            lowered[i] = Some((ir, output.declarations));
         }
         #[cfg(feature = "ide")]
         if let Some(ide) = &mut self.ide {
@@ -283,6 +282,7 @@ impl Checking<'_> {
         let clean =
             !broken && resolved_cleanly && !checked.iter().any(|d| d.severity == Severity::Error);
         diagnostics.extend(checked);
+        let declarations = typing.declarations.clone();
         let mut ir = None;
         let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
         if clean && self.lower && lowers {
@@ -311,6 +311,7 @@ impl Checking<'_> {
             exported: if clean { interface.clone() } else { untyped },
             interface,
             ir,
+            declarations,
         }
     }
 }
@@ -326,6 +327,8 @@ struct Output {
     /// What importers see: without types when the module has errors.
     exported: Interface,
     ir: Option<ir::Module>,
+    /// Every top-level entity with its type, for the reference model.
+    declarations: Arc<Interface>,
 }
 
 /// Takes where `imported` declares the names `interface` re-exports.

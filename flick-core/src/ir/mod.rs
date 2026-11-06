@@ -22,12 +22,13 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::iface::Interface;
 use crate::numeric::{Arith, Num};
 use crate::source::Span;
 pub use crate::types::Stage;
 use crate::types::lang::{self, Lang};
-use crate::types::{Constructor, Dict, InstanceInfo, Lift, Type};
+pub use flick_ir::TypeName;
+
+use crate::types::{Constructor, Dict, InstanceInfo, Lift};
 pub use handler::{Handled, Handler, OpArm};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,8 +39,6 @@ pub struct Module {
     pub items: Vec<Item>,
     /// The top-level values debugging tools know by `Module.name`.
     pub labels: HashMap<String, Label>,
-    /// Every top-level entity with its type, for the reference model.
-    pub declarations: Arc<Interface>,
 }
 
 /// The label of a top-level value, `Module.name`, which debugging tools
@@ -89,7 +88,7 @@ pub struct Expr {
     pub span: Span,
     /// The checker's type of the expression when that is a type constructor
     /// on its own (`Float`, `String`); none otherwise.
-    pub ty: Option<Arc<Type>>,
+    pub ty: Option<Arc<TypeName>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -446,7 +445,7 @@ pub struct Param {
     pub stage: Stage,
     /// The parameter's type when it is a type constructor on its own, as
     /// [`Expr::ty`].
-    pub ty: Option<Arc<Type>>,
+    pub ty: Option<Arc<TypeName>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

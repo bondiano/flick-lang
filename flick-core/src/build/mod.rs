@@ -15,7 +15,7 @@ pub use abi::interface;
 use std::collections::BTreeMap;
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 #[cfg(feature = "source-maps")]
 use crate::codegen::sourcemap;
@@ -832,13 +832,24 @@ fn specifier(from: &Path, target: &Path) -> String {
 
 /// The built-in modules, lowered.
 pub fn builtin_modules() -> &'static [ir::Module] {
-    static MODULES: OnceLock<Vec<ir::Module>> = OnceLock::new();
-    MODULES.get_or_init(|| {
-        let mut lowered = Vec::new();
+    &lowered_builtins().0
+}
+
+/// What the reference model reads of each built-in module, in the order of
+/// [`builtin_modules`].
+pub fn builtin_declarations() -> &'static [Arc<Interface>] {
+    &lowered_builtins().1
+}
+
+fn lowered_builtins() -> &'static (Vec<ir::Module>, Vec<Arc<Interface>>) {
+    static BUILTINS: OnceLock<(Vec<ir::Module>, Vec<Arc<Interface>>)> = OnceLock::new();
+    BUILTINS.get_or_init(|| {
+        let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
         types::check_each(types::builtin_sources(), |module, typing| {
             lowered.push(ir::lower(module, typing).expect("built-in modules compile"));
+            declarations.push(typing.declarations.clone());
         });
-        lowered
+        (lowered, declarations)
     })
 }
 

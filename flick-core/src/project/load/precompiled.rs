@@ -11,6 +11,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 #[cfg(feature = "native-project")]
 use std::mem;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -39,6 +40,8 @@ pub struct CachedModule {
     pub path: PathBuf,
     pub imports: Vec<String>,
     pub interface: Interface,
+    /// Every top-level entity with its type, for the reference model.
+    declarations: Arc<Interface>,
     /// The IR with its spans in file 0; a run moves them to the module's file.
     ir: Value,
     /// A hash of the text it was checked from, which its spans point into.
@@ -210,6 +213,7 @@ fn cached(compiled: &Compiled, dir: &Path, text: &str) -> Option<CachedModule> {
         path: compiled.path.strip_prefix(dir).ok()?.to_path_buf(),
         imports: compiled.imports.clone(),
         interface: compiled.interface.clone(),
+        declarations: compiled.declarations.clone(),
         ir,
         source: hash(text),
     })
@@ -378,6 +382,7 @@ impl Loader<'_> {
                 package: Some(package.clone()),
                 imports: module.imports.clone(),
                 ir,
+                declarations: module.declarations.clone(),
                 interface: module.interface.clone(),
                 expansion: None,
             });

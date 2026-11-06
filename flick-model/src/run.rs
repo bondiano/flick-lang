@@ -56,9 +56,9 @@ pub fn program(modules: &[Compiled]) -> Program {
 /// What the checker knows of `modules` and the built-in modules.
 pub fn decls(modules: &[Compiled]) -> Decls {
     let mut decls = Decls::default();
-    let builtins: &[ir::Module] = build::builtin_modules();
-    for m in modules.iter().map(|m| &m.ir).chain(builtins) {
-        decls.add(&m.declarations);
+    let builtins = build::builtin_declarations();
+    for d in modules.iter().map(|m| &m.declarations).chain(builtins) {
+        decls.add(d);
     }
     decls.finish();
     decls

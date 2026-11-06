@@ -16,6 +16,7 @@ mod entry;
 mod format_plugins;
 #[cfg(feature = "ide")]
 mod ide;
+mod imports;
 mod plugins;
 // the plugin of a module is its package's, which needs packages
 #[cfg(all(test, feature = "native-project"))]
@@ -45,7 +46,6 @@ use crate::plugin::expansion::Expansion;
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
 use crate::syntax::{self, Parse};
-use crate::types;
 use precompiled::Precompiled;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -105,7 +105,8 @@ struct Loader<'a> {
     from_packages: BTreeMap<String, Interface>,
     diagnostics: Vec<Diagnostic>,
     /// With `Some`, the IR of each module that checks without errors.
-    lowered: Option<Vec<Option<ir::Module>>>,
+    /// Each module's IR and what the reference model reads of it.
+    lowered: Option<Vec<Option<(ir::Module, Arc<Interface>)>>>,
     /// Lowers only the modules of source packages, to save them.
     lower_packages_only: bool,
     /// Modules of source packages saved by earlier runs.
@@ -135,6 +136,8 @@ pub struct Compiled {
     /// The modules it imports.
     pub imports: Vec<String>,
     pub ir: ir::Module,
+    /// Every top-level entity with its type, for the reference model.
+    pub declarations: Arc<Interface>,
     pub interface: Interface,
     /// The module with its plugin blocks expanded, when it has any.
     pub expansion: Option<Arc<Expansion>>,
@@ -267,7 +270,8 @@ fn run(
             .into_iter()
             .zip(interfaces)
             .zip(&loader.modules)
-            .filter_map(|((ir, interface), m)| {
+            .filter_map(|((lowered, interface), m)| {
+                let (ir, declarations) = lowered?;
                 Some(Compiled {
                     name: m.name.clone(),
                     path: m.path.clone(),
@@ -278,7 +282,8 @@ fn run(
                         _ => None,
                     },
                     imports: m.syntax.imports.iter().map(|i| i.module.clone()).collect(),
-                    ir: ir?,
+                    ir,
+                    declarations,
                     interface: interface?,
                     expansion: m.expansion.clone(),
                 })
@@ -452,102 +457,5 @@ impl Loader<'_> {
             editing: Vec::new(),
         });
         Ok(Some(index))
-    }
-
-    /// Loads imported modules until the set is closed; returns the local
-    /// import edges of each module, sorted by module name.
-    fn load_imports(&mut self) -> Vec<Vec<usize>> {
-        let mut edges = Vec::new();
-        let mut i = 0;
-        while i < self.modules.len() {
-            let mut targets = Vec::new();
-            for import in self.modules[i].syntax.imports.clone() {
-                if let Some(target) = self.find_module(i, &import.module, import.span) {
-                    targets.push(target);
-                }
-            }
-            targets.sort_by(|a, b| self.modules[*a].name.cmp(&self.modules[*b].name));
-            targets.dedup();
-            edges.push(targets);
-            i += 1;
-        }
-        edges
-    }
-
-    fn find_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
-        let packages = self.package_sources().into_iter().map(|(_, dir)| dir);
-        // the project's own modules come before those of source packages
-        let dirs: Vec<PathBuf> = match (&self.modules[importer].root, self.project) {
-            (Root::Source, Some(p)) => [p.source_root()].into_iter().chain(packages).collect(),
-            (Root::Test, Some(p)) => [p.source_root(), p.test_root()]
-                .into_iter()
-                .chain(packages)
-                .collect(),
-            (Root::Package(_), _) => packages.collect(),
-            (Root::Other(dir), _) => dir.iter().cloned().collect(),
-            _ => Vec::new(),
-        };
-        if !self.by_name.contains_key(name) {
-            for dir in dirs {
-                if self.use_saved(&dir, name) {
-                    continue;
-                }
-                // absent files are simply not candidates
-                let _ = self.load(&dir.join(module_path(name)));
-            }
-        }
-        let local = self.by_name.get(name).copied();
-        if local.is_none() && !self.from_packages.contains_key(name) {
-            match types::builtins().iter().find(|i| i.module == name) {
-                Some(builtin) => {
-                    self.from_packages.insert(name.to_owned(), builtin.clone());
-                }
-                None => self.diagnostics.push(self.unknown_module(name, span)),
-            }
-        }
-        local
-    }
-
-    fn import_cycles(&mut self, edges: &[Vec<usize>]) {
-        let mut order: Vec<usize> = (0..self.modules.len()).collect();
-        order.sort_by(|a, b| self.modules[*a].name.cmp(&self.modules[*b].name));
-        let mut reported = vec![false; self.modules.len()];
-        for start in order {
-            if reported[start] {
-                continue;
-            }
-            let Some(cycle) = resolve::shortest_cycle(start, edges) else {
-                continue;
-            };
-            for &i in &cycle {
-                reported[i] = true;
-            }
-            let next = cycle.get(1).copied().unwrap_or(start);
-            let chain: Vec<&str> = cycle
-                .iter()
-                .chain([&start])
-                .map(|&i| self.modules[i].name.as_str())
-                .collect();
-            let module = &self.modules[start];
-            let span = module
-                .syntax
-                .imports
-                .iter()
-                .find(|i| i.module == self.modules[next].name)
-                .map(|i| i.span);
-            self.diagnostics.push(
-                Diagnostic::error(
-                    codes::R006,
-                    format!("import cycle: {}", chain.join(" -> ")),
-                    span.expect("edge has an import"),
-                )
-                .with_fix(|| {
-                    (
-                        "move what the modules share into a module that both import",
-                        Vec::new(),
-                    )
-                }),
-            );
-        }
     }
 }

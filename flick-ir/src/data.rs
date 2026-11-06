@@ -65,3 +65,11 @@ pub enum EnumLit {
     Int(i32),
     String(String),
 }
+
+/// A type constructor by its module and name: the type of an expression
+/// when that is a constructor on its own (`Float`, `String`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct TypeName {
+    pub module: String,
+    pub name: String,
+}

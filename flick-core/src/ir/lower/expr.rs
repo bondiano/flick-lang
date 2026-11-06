@@ -1,9 +1,7 @@
 //! Expressions, blocks and match arms.
 
-use std::sync::Arc;
-
-use super::Lower;
 use super::numeric::{apply, arith_of};
+use super::{Lower, type_name};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::numeric::Arith;
 use crate::source::Span;
@@ -30,7 +28,7 @@ impl Lower<'_> {
         let span = self.span(node);
         let mut expr = self.expr_kind(node);
         if let Some(ty) = self.typing.values.get(&key) {
-            expr.ty = Some(Arc::new(ty.clone()));
+            expr.ty = type_name(ty);
         }
         if let Some(lift) = lift {
             expr = Expr::new(ExprKind::Lift(Box::new(expr), lift), span);

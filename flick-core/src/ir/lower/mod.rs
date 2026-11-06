@@ -25,6 +25,7 @@ use std::sync::Arc;
 
 use super::{
     Binding, Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind, Lit, Module, Param, Stage,
+    TypeName,
 };
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
@@ -33,7 +34,7 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::{
-    Abi, Constructor, Range, Rep, Typing, class_defaults, default_method, is_type, let_parts,
+    Abi, Constructor, Range, Rep, Type, Typing, class_defaults, default_method, is_type, let_parts,
     written_dicts,
 };
 
@@ -82,10 +83,20 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
             name: module.name.to_owned(),
             items,
             labels: typing.labelled.clone(),
-            declarations: typing.declarations.clone(),
         })
     } else {
         Err(lower.diagnostics)
+    }
+}
+
+/// The name of `ty` when it is a type constructor on its own.
+pub(super) fn type_name(ty: &Type) -> Option<Arc<TypeName>> {
+    match ty {
+        Type::Con { module, name } => Some(Arc::new(TypeName {
+            module: module.clone(),
+            name: name.clone(),
+        })),
+        _ => None,
     }
 }
 
@@ -342,7 +353,7 @@ impl Lower<'_> {
             .map(|(p, stage)| Param {
                 pat: self.pattern(p),
                 stage,
-                ty: self.typing.values.get(&p.range()).cloned().map(Arc::new),
+                ty: self.typing.values.get(&p.range()).and_then(type_name),
             })
             .collect();
         let body = body(self);

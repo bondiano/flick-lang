@@ -169,7 +169,6 @@ fn ir_does_not_depend_on_a_backend() {
 #[test]
 fn ir_carries_the_checker_types() {
     use super::{ExprKind, ItemKind};
-    use crate::types::Type;
     let ir = lower_text(
         "App",
         "module App exposing (..)\n\
@@ -192,11 +191,7 @@ fn ir_carries_the_checker_types() {
                 ExprKind::App { .. } => "app",
                 _ => "",
             };
-            let ty = match e.ty.as_deref() {
-                Some(Type::Con { name, .. }) => name.clone(),
-                Some(_) => "general".to_owned(),
-                None => "none".to_owned(),
-            };
+            let ty = e.ty.as_ref().map_or("none".to_owned(), |t| t.name.clone());
             if !kind.is_empty() {
                 seen.push(format!("{name} {kind} {ty}"));
             }
