@@ -36,6 +36,8 @@ struct Excess {
     span: Span,
     services: Vec<String>,
     errors: Vec<String>,
+    /// The row labels of what is lacking, for the fixes that name a service.
+    labels: Vec<String>,
 }
 
 impl Checker<'_> {
@@ -195,6 +197,7 @@ impl Checker<'_> {
                 continue;
             }
             let mut lacking = Vec::new();
+            let mut labels = Vec::new();
             for (label, ty) in &actual.entries {
                 match declared.get(label) {
                     Some(bound) => {
@@ -210,7 +213,10 @@ impl Checker<'_> {
                             self.unprovided(service.trim_matches(['{', '}', ' ']), &owner, c.span);
                         }
                     }
-                    None => lacking.push(self.show(ty)),
+                    None => {
+                        lacking.push(self.show(ty));
+                        labels.push(label.clone());
+                    }
                 }
             }
             for tail in &actual.tails {
@@ -227,6 +233,7 @@ impl Checker<'_> {
                     span: c.span,
                     services: Vec::new(),
                     errors: Vec::new(),
+                    labels: Vec::new(),
                 });
             }
             let i = excess
@@ -243,6 +250,7 @@ impl Checker<'_> {
                     list.push(name);
                 }
             }
+            excess[i].labels.extend(labels);
         }
         self.subrows.clear();
         for e in excess {
@@ -317,12 +325,9 @@ impl Checker<'_> {
                 ),
                 e.span,
             ).with_fix(|| {
-        let writes = e
-            .services
-            .iter()
-            .any(|s| [Lang::AtomWrite, Lang::AtomRegistry].into_iter().any(|l| lang::label(l) == Some(s.as_str())));
-        let setup = e.services.iter().any(|s| s.contains("Setup"));
-        let document = e.services.iter().any(|s| s.contains("Document"));
+        let is = |l: Lang| e.labels.iter().any(|s| lang::label(l) == Some(s.as_str()));
+        let writes = is(Lang::AtomWrite) || is(Lang::AtomRegistry);
+        let (setup, document) = (is(Lang::Setup), is(Lang::UiDocument));
         let fixes = [
             setup.then_some("call it before a component's last expression, in its setup, which runs once per instance"),
             document.then_some("reach the DOM in a task: of an `Action`, `Ui.on_mount` or `Ui.watch`"),

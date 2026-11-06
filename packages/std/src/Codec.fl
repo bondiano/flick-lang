@@ -39,6 +39,7 @@ general : PureCodec i a -> Codec none none i a
 foreign pure general from "@flick-lang/runtime" "identity"
   reviewed "effect@4.1.2 sha256:395729b0180c3f87"
 
+@lang codec_json
 /// The canonical JSON form of a schema: records as objects, variants as
 /// `{"_tag": "Name", "_0": …}`, `Option` as the value or `null`. A
 /// `Redacted` value has none without an explicit policy.

@@ -7,6 +7,7 @@ module Server exposing (..)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 
+@lang server
 /// The server a program runs on; it has no operations of its own.
 service Server
 
@@ -14,11 +15,13 @@ service Server
 node : Layer none none {Server}
 let node = Layer.succeed Server {}
 
+@lang server_function
 /// The implementation of a `server fn` with its name and the codecs of
 /// what it sends: `server name` gives it, `handler` serves it. `r` is what
 /// it needs, `Server` among it.
 type Function (r : ServiceRow)
 
+@lang server_guarded
 /// The implementation of a `server fn` that lists `Unauthorized` among its
 /// errors: it runs for a caller `authenticated` lets in, so `handler`
 /// serves it only through that.

@@ -172,6 +172,17 @@ lang_items! {
     ListFilter = "list_filter",
     RecordLabel = "record_label",
     WireCodec = "wire_codec",
+    CodecJson = "codec_json",
+    // what a server fn needs and serves as, which E009 and E011 name
+    Server = "server",
+    ServerFunction = "server_function",
+    ServerGuarded = "server_guarded",
+    // the live page, which a view's render does not reach
+    UiDocument = "ui_document",
+    // the checks of refined types the compiler applies to a constant
+    CheckEmail = "check_email",
+    CheckNonEmpty = "check_non_empty",
+    CheckPositive = "check_positive",
     FloatInfinity = "float_infinity",
     FloatNan = "float_nan",
     LayerMerge = "layer_merge",

@@ -300,6 +300,7 @@ type error Detached = Detached
 /// Where a node is on the page, in CSS pixels.
 type alias Rect = { width : Float; height : Float; top : Float; left : Float }
 
+@lang ui_document
 /// The live document of a root: the nodes of elements. A root provides it
 /// to the tasks of its handlers and instances; a server renders without it.
 service Document =

@@ -1,0 +1,21 @@
+module App.Checked exposing (..)
+
+import Checks as C exposing (non_empty)
+
+refined type Email = String where C.email
+
+bad_email : Result SchemaError Email
+let bad_email = Email.parse "nobody"
+//                          ^^^^^^^^ FLICK-D006 fails the check of `Email`
+
+good_email : Result SchemaError Email
+let good_email = Email.parse "someone@example.com"
+
+refined type Name = String where non_empty
+
+bad_name : Result SchemaError Name
+let bad_name = Name.parse ""
+//                        ^^ FLICK-D006 fails the check of `Name`
+
+good_name : Result SchemaError Name
+let good_name = Name.parse "Ada"
