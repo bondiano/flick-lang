@@ -8,6 +8,7 @@
 //! Built from the syntax tree and the checker's [`Typing`](crate::types::Typing)
 //! by [`lower`]; printed for tests by [`print`].
 
+mod handler;
 mod lower;
 mod print;
 
@@ -25,6 +26,7 @@ use crate::source::Span;
 pub use crate::types::Stage;
 use crate::types::lang::{self, Lang};
 use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, Type};
+pub use handler::{Handled, Handler, OpArm};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Module {
@@ -217,6 +219,8 @@ pub enum ExprKind {
     /// into the innermost scope.
     Within(String, Box<Expr>),
     Provide(Box<Expr>, Box<Expr>),
+    /// The handler of effects of `try` arms for operations or `provide S impl`.
+    Handle(Box<Handler>),
     /// A pure function value used where a runtime one is expected.
     Lift(Box<Expr>, Lift),
 }
@@ -330,6 +334,7 @@ impl Expr {
                 f(l);
                 f(r);
             }
+            ExprKind::Handle(h) => h.each_child(f),
             ExprKind::Lit(_)
             | ExprKind::Local(_)
             | ExprKind::Global { .. }
@@ -452,6 +457,7 @@ impl Expr {
                 f(l);
                 f(r);
             }
+            ExprKind::Handle(h) => h.each_child_mut(f),
             ExprKind::Lit(_)
             | ExprKind::Local(_)
             | ExprKind::Global { .. }

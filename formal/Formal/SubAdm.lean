@@ -17,6 +17,7 @@ def JLe : J → J → Prop
   | .alts t r φ, .alts t' r' φ' => t = t' ∧ Le r r' ∧ φ.le φ'
   | .halts ε H r φ, .halts ε' H' r' φ' => ε = ε' ∧ H = H' ∧ Le r r' ∧ φ.le φ'
   | .dfs fs, .dfs fs' => fs = fs'
+  | .harms E t φ s, .harms E' t' φ' s' => E = E' ∧ t = t' ∧ φ = φ' ∧ s = s'
   | _, _ => False
 
 theorem JLe.ex {t φ J'} (h : JLe (.ex t φ) J') :
@@ -177,5 +178,34 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
     exact .dproj (ih (.st h₂)) hc hk hl hts hH (hT.trans h₁)
   | glob hg hts hH hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .glob hg hts hH (hT.trans h₁)
+  | perform hop hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .perform hop (hT.trans h₁)
+  | hanil =>
+    intro J' hJ; cases J' <;> simp only [JLe] at hJ
+    obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hanil
+  | hatail hop hb hr =>
+    intro J' hJ; cases J' <;> simp only [JLe] at hJ
+    obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hatail hop hb hr
+  | haabort hop hb hr =>
+    intro J' hJ; cases J' <;> simp only [JLe] at hJ
+    obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .haabort hop hb hr
+  | hactl hop hb hr =>
+    intro J' hJ; cases J' <;> simp only [JLe] at hJ
+    obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hactl hop hb hr
+  | hdl hal hn hrf hψ he hφ₀ hc hφ hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .hdl hal hn hrf hψ he hφ₀ hc (Stage.le_trans hφ h₂) (hT.trans h₁)
+  | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .hwith hℓ hal hrf hψ he hφ₀ hc (Stage.le_trans hφ h₂) (hT.trans h₁)
+  | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm hφ hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm (Stage.le_trans hφ h₂) (hT.trans h₁)
+  | hres hℓ hb hA ha hp hl hφ hT =>
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
+    exact .hres hℓ hb hA ha hp hl (Stage.le_trans hφ h₂) (hT.trans h₁)
+  | hdone _ ih => intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; exact .hdone (ih ⟨h₁, h₂⟩)
+  | unw hℓ ha hφ => intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex; exact .unw hℓ ha (Stage.le_trans hφ h₂)
+  | kont hl hC hT => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .kont hl hC (hT.trans h₁)
 
 end Flick

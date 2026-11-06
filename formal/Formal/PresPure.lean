@@ -1,5 +1,6 @@
 import Formal.ProgressMain
 import Formal.SpineMatch
+import Formal.PresHdl
 
 /-!
 # Preservation of pure steps
@@ -140,6 +141,41 @@ theorem pure_preservation {Ψ Θ e t φ e'} (h : Typ S Ψ Θ [] e (.ex t φ)) (h
           cases h
           obtain ⟨_, _, _, _, h, _, _, lt', -⟩ := (lt.trans hT').arrow_left
           cases h; cases lt'; cases hT; exact .lit
+    | errVal hv'' => exact (nv hv'').elim
+  | hwithVal hv =>
+    cases h with
+    | hwith _ _ hrf hψ he _ _ hφ hT =>
+      exact .app (hrf.sub ⟨.refl, hφ⟩) (he.valueAny hv _) (Stage.le_trans hψ hφ) hT
+    | errVal hv'' => exact (nv hv'').elim
+  | hctlTail hE' hk' hv =>
+    cases h with
+    | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT =>
+      obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
+      refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+        fun T φ' hΘ _ hb _ => ?_) hφ₀ hcm hφ hT
+      exact (((by simpa using ha : Typ S _ _ [] _ (.ex _ _)).valueAny hv φ').sub (J' := .ex T φ')
+        ⟨hb hc, Stage.le_refl _⟩).cut hΘ.entails
+    | errVal hv'' => exact (nv hv'').elim
+  | hctlDisc hE' hk' hv =>
+    cases h with
+    | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT =>
+      obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
+      refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+        fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT
+      exact .unw hℓ ((by simpa using ha : Typ S _ _ [] _ (.ex _ _)).cut hΘ.entails)
+          (Stage.none_le (Stage.rt_ne_pure hψ₀))
+    | errVal hv'' => exact (nv hv'').elim
+  | hresVal hA' ha' hv =>
+    cases h with
+    | hres _ hb hA ha hp hl hφ hT =>
+      obtain ⟨rfl, -⟩ := plug_hole_inj hA' hA (ha'.symm.trans ha)
+      have h₁ := refill_app hA kont_not_value hp (kont_fn hl) (fun _ _ h l => h.trans l)
+        fun T φ' hΘ _ hb' _ => ((hb.valueAny hv φ').sub (J' := .ex T φ') ⟨hb', Stage.le_refl _⟩).cut hΘ.entails
+      exact .hdone (h₁.sub ⟨hT, hφ⟩)
+    | errVal hv'' => exact (nv hv'').elim
+  | hdoneVal hv =>
+    cases h with
+    | hdone ha => exact ha
     | errVal hv'' => exact (nv hv'').elim
 
 end Flick

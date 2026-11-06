@@ -29,6 +29,7 @@ ce831b060f823d82  03-types-and-classes:322  fresh_cell : forall a. Eff none none
 f8146bfdcfa3bb21  05-errors-and-concurrency:34  type error RetryExhausted e = RetryExhausted e Float
 e1a65497b7577f4f  05-errors-and-concurrency:63  service Time =
 e4c3a6f35bbce321  05-errors-and-concurrency:89  type UserId = UserId String
+8649bca288383d5a  05-errors-and-concurrency:122  effect Emit a =
 17b6a846ff453f2c  05-errors-and-concurrency:174  type UserId = UserId String
 394876620d153a1c  05-errors-and-concurrency:243  import File exposing (File, Path, FileSystem, OpenError, ReadError)
 1c7460ca6702f465  05-errors-and-concurrency:267  import File exposing (File, Path, FileSystem, OpenError, ReadError)

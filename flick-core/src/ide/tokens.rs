@@ -196,7 +196,17 @@ fn foreign_modes(tree: &Node, text: &str, out: &mut Vec<(u32, u32, u32)>) {
 /// Contextual keywords.
 fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
     for t in node.child_tokens() {
-        if matches!(t.kind, K::AndKw | K::ComponentKw | K::PluginKw) {
+        if matches!(
+            t.kind,
+            K::AndKw
+                | K::ComponentKw
+                | K::PluginKw
+                | K::EffectKw
+                | K::TailKw
+                | K::AbortKw
+                | K::ControlKw
+                | K::ReturnKw
+        ) {
             out.push((t.start, t.end, KEYWORD));
         }
     }

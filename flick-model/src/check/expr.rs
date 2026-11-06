@@ -75,6 +75,7 @@ impl Checker<'_> {
             Term::Await(e) => self.await_(e),
             Term::Try(body, arms) => self.try_(body, arms, None),
             Term::Provide(l, body) => self.provide(l, body, None),
+            Term::Handler(h) => self.handler(h, None),
             Term::Apply(Head::Con(c), args) if args.len() == c.arity => self.construct(c, args),
             Term::Apply(head, args) => {
                 let t = match head {
@@ -135,6 +136,7 @@ impl Checker<'_> {
             (Term::Match(e, arms), _) => self.match_(e, arms, Some(&full)).map(drop),
             (Term::Try(body, arms), _) => self.try_(body, arms, Some(&full)).map(drop),
             (Term::Provide(l, body), _) => self.provide(l, body, Some(&full)).map(drop),
+            (Term::Handler(h), _) => self.handler(h, Some(&full)).map(drop),
             (Term::Task(body), Type::Eff(..)) => self.task(body, Some(&full)).map(drop),
             (Term::Record(fields), Type::Record(f)) if f.tail.is_none() => {
                 self.record_against(fields, f)

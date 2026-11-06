@@ -62,22 +62,33 @@ theorem Outl.age_le {q o : Nat} (h : Outl Facts.age (· = .r q) (Atom.r o).ty) :
 
 /-- What the frames of the place say of the work wrapped in them: its obligations are
 those of the place or of a region of the place that discharged them; its services
-reach the place with the obligation for the owner `o`; the uses of a service of a
+reach the place with the obligation for the owner `o`, or are effects of a handler of
+the place, which the child cannot reach; the uses of a service of a
 `provide` region `q` reach the place or the `inside` form of `q`, and `q` is not
 younger than `o`. -/
-def KidRow (o : Nat) (φ : Stage) (E : List Frame) (R : Row) : Prop :=
+def KidRow (S : Sig) (o : Nat) (φ : Stage) (E : List Frame) (R : Row) : Prop :=
   (∀ N a, R (.ob N a) → φ.svc (.ob N a) ∨ ∃ p, a = .r p ∧ .inside p ∈ E) ∧
-  (∀ N, R (.nm N) → φ.svc (.nm N) ∧ (φ.svc (.ob N (.r o)) ∨ .inside o ∈ E)) ∧
+  (∀ N, R (.nm N) → φ.svc (.nm N) ∧ (φ.svc (.ob N (.r o)) ∨ .inside o ∈ E) ∨
+    (∃ F ∈ E, F.installs N) ∧ ∃ o c a b, S.op N o = some (c, a, b)) ∧
   (∀ N c, R (.need N c) → ∃ q, c = .r q ∧ (φ.svc (.need N (.r q)) ∨ .inside q ∈ E) ∧ q ≤ o)
+
+/-- A handler handles an effect. -/
+theorem installs_op {Ψ' Θ x t φ} {F : Frame} {N : Name} (h : Typ S Ψ' Θ [] (F.plug x) (.ex t φ))
+    (hi : F.installs N) : ∃ o c a b, S.op N o = some (c, a, b) := by
+  cases F <;> simp only [Frame.installs] at hi
+  subst hi
+  cases h with
+  | hwith _ _ _ _ _ _ hc _ _ => exact hc.1
+  | errVal hv => cases hv
 
 /-- The work of a child in the `with` frames of its context. -/
 theorem withs_typing {x r : Tm} {o : Nat}
     (mk : ∀ {Θ' t' φ'}, Typ S Ψ Θ' [] r (.ex t' φ') → Entails Θ' Facts.age →
-      ∃ tx R εx, Typ S Ψ Facts.age [] x (.ex tx (.rt R εx)) ∧ KidRow o φ' [] R)
+      ∃ tx R εx, Typ S Ψ Facts.age [] x (.ex tx (.rt R εx)) ∧ KidRow S o φ' [] R)
     (hnp : ∀ {Ψ' Θ' t'}, ¬ Typ S Ψ' Θ' [] r (.ex t' .pure)) (hv : ¬ Value r) :
     ∀ (E : List Frame) {b : Nat} {Θ : Facts} {t : Ty} {φ : Stage}, OkE E →
       Typ S Ψ Θ [] (plug E r) (.ex t φ) → Entails Θ Facts.age → AscE b E →
-      ∃ t' R' ε', Typ S Ψ Facts.age [] (withs E x) (.ex t' (.rt R' ε')) ∧ KidRow o φ E R' := by
+      ∃ t' R' ε', Typ S Ψ Facts.age [] (withs E x) (.ex t' (.rt R' ε')) ∧ KidRow S o φ E R' := by
   refine list_rev_ind ?_ ?_
   · intro b Θ t φ _ h hΘ _
     exact mk h hΘ
@@ -89,6 +100,7 @@ theorem withs_typing {x r : Tm} {o : Nat}
     have hA₀ := hA.of_append
     rw [withs_append]
     have mem : ∀ {p}, .inside p ∈ E₀ → .inside p ∈ E₀ ++ [G] := fun h => List.mem_append_left _ h
+    have mem' : ∀ {F}, F ∈ E₀ → F ∈ E₀ ++ [G] := fun h => List.mem_append_left _ h
     have nopure : ∀ {k Θ' t'}, ¬ Typ S (Ψ.map (Ty.up k)) Θ' [] (plug E₀ r) (.ex t' .pure) := by
       intro k Θ' t' h'
       obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE₀ hv h'
@@ -97,10 +109,15 @@ theorem withs_typing {x r : Tm} {o : Nat}
     | with_ q θ =>
       cases h with
       | @with_ _ _ _ _ ρ _ _ φ₀ _ r_out ε _ hθv hθ hb hrow hφ =>
-        obtain ⟨t', R', ε', hw, h1, h2, h3⟩ := ih hE₀ hb hΘ hA₀
+        obtain ⟨t', R', ε', hw, h1, h2', h3⟩ := ih hE₀ hb hΘ hA₀
         have up : ∀ y, r_out y → φ.svc y := fun y h => Stage.le_svc hφ _ h
+        have h2 : ∀ N, ρ (.nm N) → R' (.nm N) →
+            φ₀.svc (.nm N) ∧ (φ₀.svc (.ob N (.r o)) ∨ .inside o ∈ E₀) :=
+          fun N hN hy => (h2' N hy).resolve_right fun ⟨_, o', c, a, b, hop⟩ => by
+            rw [env_no_op (canonical_env hθv hθ) hθ (Option.isSome_iff_exists.mpr (env_lookup_some (canonical_env hθv hθ) hθ hN)) o'] at hop
+            cases hop
         have qle : ∀ N, ρ (.nm N) → R' (.nm N) → q ≤ o := fun N hN hy => by
-          rcases (h2 N hy).2 with h' | h'
+          rcases (h2 N hN hy).2 with h' | h'
           · exact Outl.age_le (hΘ _ _ ((Stage.le_svc hrow _ h').1 hN))
           · exact Nat.le_of_lt (hA.with_inside h')
         let R'' : Row := fun y => match y with
@@ -126,18 +143,19 @@ theorem withs_typing {x r : Tm} {o : Nat}
           · exact .inl (up _ ((Stage.le_svc hrow _ h').2 hN))
           · exact .inr ⟨p, rfl, mem hp⟩
         · obtain ⟨hN, hy⟩ := hy
-          obtain ⟨h₁, h₂⟩ := h2 N hy
-          refine ⟨up _ ((Stage.le_svc hrow _ h₁).2 hN), ?_⟩
-          rcases h₂ with h₂ | h₂
-          · exact .inl (up _ ((Stage.le_svc hrow _ h₂).2 hN))
-          · exact .inr (mem h₂)
+          rcases h2' N hy with ⟨h₁, h₂⟩ | ⟨⟨F, hF, hi⟩, he⟩
+          · refine .inl ⟨up _ ((Stage.le_svc hrow _ h₁).2 hN), ?_⟩
+            rcases h₂ with h₂ | h₂
+            · exact .inl (up _ ((Stage.le_svc hrow _ h₂).2 hN))
+            · exact .inr (mem h₂)
+          · exact .inr ⟨⟨F, mem' hF, hi⟩, he⟩
         · rcases hy with hy | ⟨rfl, hN, hy⟩
           · obtain ⟨q', rfl, h₁, h₂⟩ := h3 N c hy
             refine ⟨q', rfl, ?_, h₂⟩
             rcases h₁ with h₁ | h₁
             · exact .inl (up _ (Stage.le_svc hrow _ h₁))
             · exact .inr (mem h₁)
-          · exact ⟨q, rfl, .inl (up _ ((Stage.le_svc hrow _ (h2 N hy).1).1 hN)), qle N hN hy⟩
+          · exact ⟨q, rfl, .inl (up _ ((Stage.le_svc hrow _ (h2 N hN hy).1).1 hN)), qle N hN hy⟩
       | errVal hv' => exact (not_value_plug hnv _ hv').elim
     | inside p =>
       cases h with
@@ -152,8 +170,8 @@ theorem withs_typing {x r : Tm} {o : Nat}
             · exact .inr ⟨p, h₁.1, by simp⟩
             · exact h₁.elim
           · exact .inr ⟨p', rfl, mem hp⟩
-        · obtain ⟨h₁, h₂⟩ := h2 N hy
-          refine ⟨?_, ?_⟩
+        · refine (h2 N hy).elim (fun ⟨h₁, h₂⟩ => .inl ⟨?_, ?_⟩)
+            fun ⟨⟨F, hF, hi⟩, he⟩ => .inr ⟨⟨F, mem' hF, hi⟩, he⟩
           · rcases Stage.le_svc hrow _ h₁ with h' | h' | h' | h'
             · exact h'.elim
             · exact up _ h'
@@ -183,29 +201,35 @@ theorem withs_typing {x r : Tm} {o : Nat}
       · rw [hΘ' (fun h => h.elim)] at h₁
         simp only [List.map_up_zero] at h₁
         obtain ⟨t', R', ε', hw, h1, h2, h3⟩ := ih hE₀ h₁ hΘ hA₀
-        have up : ∀ y, φ₁.svc y → φ.svc y := fun y h' =>
+        have up : ∀ y, (∀ N, y ≠ .nm N) → φ₁.svc y → φ.svc y := fun y hn h' =>
           (rel.svc _ h').resolve_right fun h₂ => by
-            cases y <;> simp [Frame.dom, Frame.lookup] at h₂
+            cases y <;> simp [Frame.dom, Frame.lookup] at h₂ hn
+        have nn : ∀ {N a}, ∀ M, Elem.ob N a ≠ .nm M := fun _ h => by cases h
         refine ⟨t', R', ε', hw, fun N a hy => ?_, fun N hy => ?_, fun N c hy => ?_⟩
         · rcases h1 N a hy with h' | ⟨p, rfl, hp⟩
-          · exact .inl (up _ h')
+          · exact .inl (up _ nn h')
           · exact .inr ⟨p, rfl, mem hp⟩
-        · obtain ⟨h₁', h₂⟩ := h2 N hy
-          exact ⟨up _ h₁', h₂.imp (up _) mem⟩
+        · rcases h2 N hy with ⟨h₁', h₂⟩ | ⟨⟨F, hF, hi⟩, he⟩
+          · rcases rel.svc _ h₁' with h₃ | h₃ | h₃
+            · exact .inl ⟨h₃, h₂.imp (up _ nn) mem⟩
+            · simp [Frame.lookup] at h₃
+            · exact .inr ⟨⟨_, List.mem_append_right _ (List.mem_singleton_self _), h₃⟩, installs_op h h₃⟩
+          · exact .inr ⟨⟨F, mem' hF, hi⟩, he⟩
         · obtain ⟨q, rfl, h₁', h₂⟩ := h3 N c hy
-          exact ⟨q, rfl, h₁'.imp (up _) mem, h₂⟩
+          exact ⟨q, rfl, h₁'.imp (up _ fun _ h => by cases h) mem, h₂⟩
 
 /-- The work a finalizer or a child is given, awaited: its obligations are in the
 stage of the registration (regions.md §2.7). -/
 theorem fin_await {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ : Stage}
     (h : Typ S Ψ Θ [] (.app (.app (.const c) (.own p)) w) (.ex T φ))
     (hc : c = .addFin ∨ c = .spawn) (hΘ : Entails Θ Facts.age) (hv : Value w) :
-    ∃ tx R εx, Typ S Ψ Facts.age [] (.await w) (.ex tx (.rt R εx)) ∧ KidRow p φ [] R := by
+    ∃ tx R εx, Typ S Ψ Facts.age [] (.await w) (.ex tx (.rt R εx)) ∧ KidRow S p φ [] R := by
   cases h with
   | app hf hw hψ _ =>
     cases hf with
     | app hc' ho _ hT₁ =>
       cases hc' with
+      | perform => rcases hc with h | h <;> cases h
       | const hok hT' =>
         rcases hc with rfl | rfl
         · obtain ⟨_, _, _, _, h, la₀, _, lt, -⟩ := hT'.arrow_left
@@ -217,7 +241,7 @@ theorem fin_await {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ : Sta
           obtain ⟨r', e', t', C', rfl, hr', -, -, -⟩ := la.eff_right
           have up := fun y h => Stage.le_svc (Stage.le_trans lφ hψ) y h
           refine ⟨_, _, _, .await ((hw.valueAny hv _).cut hΘ) (Stage.le_refl _) .refl,
-            fun N a ha => .inl (up _ (.inr (.inl (hr' _ ha)))), fun N ha => ⟨up _ (.inr (.inl (hr' _ ha))),
+            fun N a ha => .inl (up _ (.inr (.inl (hr' _ ha)))), fun N ha => .inl ⟨up _ (.inr (.inl (hr' _ ha))),
               .inl (up _ (.inr (.inr ⟨hr' _ ha, by rw [hs]; rfl⟩)))⟩, fun N c ha => (hok.2 N c (hr' _ ha)).elim⟩
         · obtain ⟨_, _, _, _, h, la₀, _, lt, -⟩ := hT'.arrow_left
           cases h; cases la₀
@@ -236,7 +260,7 @@ theorem fin_await {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ : Sta
             · exact .inl (up _ (.inl h'))
           · rcases inr _ ha with ⟨_, h'⟩ | h'
             · cases h'
-            · exact ⟨up _ (.inl h'), .inl (up _ (.inr ⟨h', by rw [hs]; rfl⟩))⟩
+            · exact .inl ⟨up _ (.inl h'), .inl (up _ (.inr ⟨h', by rw [hs]; rfl⟩))⟩
           · rcases inr _ ha with ⟨_, h'⟩ | h'
             · cases h'
             · exact (hok.2 N c h').elim

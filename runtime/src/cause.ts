@@ -22,11 +22,44 @@ const failsToDies = <E>(cause: Cause.Cause<E>): Cause.Cause<never> =>
   ));
 
 /**
+ * Where a handler of effects unwinds to (`handlers.ts`): the `abort` arm to
+ * run there, or the typed failure of a `tail` arm, which is the handler's,
+ * not its body's. No `try` and no `Exit` takes it for an error.
+ */
+export class HandlerSignal {
+  readonly token: object;
+  readonly arm: Effect.Effect<unknown, unknown, unknown> | undefined;
+  readonly error: unknown;
+  constructor(token: object, arm: Effect.Effect<unknown, unknown, unknown> | undefined, error?: unknown) {
+    this.token = token;
+    this.arm = arm;
+    this.error = error;
+    Object.freeze(this);
+  }
+}
+
+/** Whether a typed failure is a handler unwinding, not an error. */
+export const isHandlerSignal = (error: unknown): error is HandlerSignal => error instanceof HandlerSignal;
+
+/** Whether `cause` unwinds to a handler of effects. */
+export const unwinds = (cause: Cause.Cause<unknown>): boolean =>
+  cause.reasons.some((r) => Cause.isFailReason(r) && isHandlerSignal(r.error));
+
+/**
+ * `cause` again, unchanged, where only a handler of effects takes it: it
+ * is no error of the code it passes, so it has the type of none.
+ */
+export const passOn = (cause: Cause.Cause<unknown>): Effect.Effect<never> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- what it fails with is a handler's, of no error type of the code
+  Effect.failCause(cause as Cause.Cause<never>);
+
+/**
  * The typed error recovery may handle: the first failure of a cause without
- * defects. A defect blocks recovery; interruption alone has no error.
+ * defects. A defect blocks recovery, and so does unwinding to a handler;
+ * interruption alone has no error.
  */
 const recoverable = <E>(cause: Cause.Cause<E>): Cause.Fail<E> | undefined =>
-  Cause.hasDies(cause) ? undefined : cause.reasons.find(Cause.isFailReason);
+  Cause.hasDies(cause) || unwinds(cause) ? undefined : cause.reasons.find(Cause.isFailReason);
 
 type Selected<B> = { readonly die: Cause.Cause<never> } | { readonly handled: B };
 
@@ -96,9 +129,13 @@ export class FlickExit<A> {
   }
 }
 
-/** The exit of `effect`, which itself never fails. */
+/** The exit of `effect`, which itself never fails but where it unwinds to a handler. */
 export const exitOf = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<FlickExit<A>, never, R> =>
-  Effect.map(Effect.exit(effect), (exit) => new FlickExit(exit));
+  Effect.flatMap(Effect.exit(effect), (exit) =>
+    Exit.isFailure(exit) && unwinds(exit.cause)
+      ? passOn(exit.cause)
+      : Effect.succeed(new FlickExit(exit)),
+  );
 export const exitValue = <A>(exit: FlickExit<A>): Option.Option<A> => FlickExit.value(exit);
 export const exitFailure = <A>(exit: FlickExit<A>): Option.Option<Failure> => FlickExit.failure(exit);
 

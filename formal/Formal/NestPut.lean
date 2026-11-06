@@ -88,7 +88,7 @@ theorem Cfg.at_put_ne {c : Cfg} {i i' : Option (Nat × Nat)} {e₀ e : Tm} (h : 
 locations may change. -/
 theorem Nest.put_local {Ψ Ψ' : List Ty} {c : Cfg} {μ' : List Tm} {anc B B' home i e e'}
     (hn : Nest Ψ c anc B home) (hi : c.at i = some e) (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l)
-    (h' : e'.Within Ψ' B' anc (baseOf anc i)) (hf : ∀ q, e'.Has (.frame q) ↔ e.Has (.frame q))
+    (hh : ∀ p ℓ, HCell Ψ p ℓ → HCell Ψ' p ℓ) (h' : e'.Within Ψ' B' anc (baseOf anc i)) (hf : ∀ q, e'.Has (.frame q) ↔ e.Has (.frame q))
     (hc : ∀ (l : Nat) (v : Tm), μ'[l]? = some v → v.Within Ψ' B' anc (B' l) ∧ v.NoIns) :
     Nest Ψ' ((⟨c.rgs, μ', c.main⟩ : Cfg).put i e') anc B' home := by
   have hi₁ : (⟨c.rgs, μ', c.main⟩ : Cfg).at i = some e := by
@@ -114,7 +114,7 @@ theorem Nest.put_local {Ψ Ψ' : List Ty} {c : Cfg} {μ' : List Tm} {anc B B' ho
       obtain ⟨h₁, h₂⟩ := (hn.thread i e hi).2 q ((hf q).mp hq)
       exact ⟨h₁, (hlive q).mpr h₂⟩
     · obtain ⟨h₁, h₂⟩ := hn.thread i' k hk
-      exact ⟨h₁.mono hl fun _ _ => rfl, fun q hq => let ⟨a, b⟩ := h₂ q hq; ⟨a, (hlive q).mpr b⟩⟩
+      exact ⟨h₁.mono hl hh fun _ _ => rfl, fun q hq => let ⟨a, b⟩ := h₂ q hq; ⟨a, (hlive q).mpr b⟩⟩
   · obtain ⟨k, hk, hkq⟩ := hn.home q ((hlive q).mp hq)
     rw [hat]
     by_cases hh : home q = i
@@ -124,6 +124,6 @@ theorem Nest.put_local {Ψ Ψ' : List Ty} {c : Cfg} {μ' : List Tm} {anc B B' ho
   · obtain ⟨g₀, h₀, h₁, h₂⟩ := Cfg.put_get hg
     rw [h₂] at hf'
     obtain ⟨h₃, h₄⟩ := hn.fins r g₀ h₀ (h₁ ▸ hgl) f hf'
-    exact ⟨h₃.mono hl fun _ _ => rfl, h₄⟩
+    exact ⟨h₃.mono hl hh fun _ _ => rfl, h₄⟩
 
 end Flick

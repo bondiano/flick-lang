@@ -129,3 +129,27 @@ fn keeps_the_arguments_of_a_derive() {
       deriving Eq, Schema {wire = "tag"}
     "#);
 }
+
+/// An effect keeps the class of each operation before its name.
+#[test]
+fn keeps_the_classes_of_an_effects_operations() {
+    let src = "effect Emit a =\n  control   emit : a ->{} Unit\n  abort stop :   forall b. Unit ->{} b\n  tail : Unit ->{} a\n";
+    insta::assert_snapshot!(fmt(src), @r"
+    effect Emit a =
+      control emit : a ->{} Unit
+      abort stop : forall b. Unit ->{} b
+      tail : Unit ->{} a
+    ");
+}
+
+/// A handler keeps `return` before the pattern of its arm.
+#[test]
+fn keeps_the_return_arm_of_a_handler() {
+    let src = "let collect body =\n  try body () with\n  | Emit.emit x ->   [x] ++ resume ()\n  | return   () -> []\n";
+    insta::assert_snapshot!(fmt(src), @r"
+    let collect body =
+      try body () with
+      | Emit.emit x -> [x] ++ resume ()
+      | return () -> []
+    ");
+}

@@ -1,0 +1,31 @@
+module App.EffectDecls exposing (..)
+
+effect Ask a =
+  ask : Unit ->{} a
+
+effect Emit a =
+  control emit : a ->{} Unit
+
+effect Throw =
+  abort throw : forall b. String ->{} b
+
+// a class word is a name of an operation, and `effect` of a value
+effect Stack =
+  tail : Unit ->{} Int
+  tail push : Int ->{} Unit
+
+greet : String ->{Ask String; none} String
+let greet name = Ask.ask () ++ ", " ++ name
+
+emit_all : List Int ->{Emit Int; none} Unit
+let emit_all xs = List.each_effect Emit.emit xs
+
+checked : Int ->{Throw; none} Int
+let checked n = if n < 0 then Throw.throw "negative" else n
+
+top : Unit ->{Stack; none} Int
+let top () =
+  Stack.push 1
+  Stack.tail ()
+
+let effect = 1

@@ -6,6 +6,7 @@
 //! `regions.rs`.
 
 mod frames;
+mod handler;
 mod prim;
 pub mod regions;
 #[cfg(test)]
@@ -67,6 +68,8 @@ pub struct Machine<'p> {
     /// What `Platform.stdout_line` wrote.
     pub stdout: String,
     fuel: u64,
+    /// Handlers installed so far: the `id` of the next is one more.
+    handlers: usize,
 }
 
 fn stuck(what: impl Into<String>) -> Outcome {
@@ -83,6 +86,7 @@ impl<'p> Machine<'p> {
             roots: Env::new(),
             stdout: String::new(),
             fuel,
+            handlers: 0,
         }
     }
 
@@ -204,6 +208,7 @@ impl<'p> Machine<'p> {
             Term::Die(why) => return Err(Outcome::Die(why.to_string())),
             Term::Stuck(why) => return Err(stuck(why.to_string())),
             Term::Scope(s, body) => self.open_scope(s, &body),
+            Term::Handler(h) => self.install(&h),
             other => return Err(stuck(format!("no rule for {other:?}"))),
         })
     }
@@ -252,6 +257,7 @@ impl<'p> Machine<'p> {
                 self.push(Frame::AppR(v));
                 Control::Eval((*a).clone())
             }
+            Frame::AppR(Term::Cont(cont)) => return self.resume(&cont, v),
             Frame::AppR(func) => return Self::apply(func, v),
             // a λ keeps its signature as `fix x. λ`, `x` not free in it: a
             // state types it against σ, as the source did (`docs/formal/core.md#stepping-a-signed-let-loses-its-signature`)
@@ -338,6 +344,9 @@ impl<'p> Machine<'p> {
                 (a, b) => return Err(stuck(format!("join of {a:?} and {b:?}"))),
             },
             Frame::Inside(pi, s) => self.close(pi, s, Ok(v)),
+            f @ (Frame::Handler(..) | Frame::Resume(_) | Frame::Discontinue(..)) => {
+                self.ret_handler(f, v)
+            }
             // what a child or a finalizer gives is dropped
             Frame::Close(pi, s, ended) => self.close(pi, s, ended),
         })
@@ -407,7 +416,15 @@ impl<'p> Machine<'p> {
     fn unwind(&mut self, v: Term) -> Step {
         while let Some(f) = self.frames.pop() {
             match f {
-                Frame::Try(arms) => return self.handle(v, &arms, 0),
+                // a handler's signal is no error
+                Frame::Try(arms) if !matches!(v, Term::Signal(_)) => {
+                    return self.handle(v, &arms, 0);
+                }
+                f @ (Frame::Handler(..) | Frame::Resume(_) | Frame::Discontinue(..)) => {
+                    if let Some(step) = self.unwind_handler(f, &v) {
+                        return step;
+                    }
+                }
                 Frame::Inside(pi, s) => return Ok(self.close(pi, s, Err(v))),
                 // shortcut: a child or a finalizer that fails stops the machine, its supervisor and the order of failures are λRT's (`runtime.md`); run the supervisor once a generated child can fail
                 Frame::Close(pi, ..) => {
@@ -420,23 +437,6 @@ impl<'p> Machine<'p> {
             }
         }
         Err(Outcome::Raise(v))
-    }
-
-    /// `lookup(E, S)`: the innermost `with` that has `S`, else `Σ₀`. One
-    /// of a `provide` that ended is a use after its release: work a region
-    /// kept uses it (T4.3, `regions.md` §5.3).
-    fn lookup(&self, s: &Path) -> Result<Option<Term>, Outcome> {
-        let found = self.frames.iter().rev().find_map(|f| match f {
-            Frame::With(env) | Frame::Kept(env) => env.get(s).map(|v| (env, v)),
-            _ => None,
-        });
-        match found {
-            Some((env, _)) if self.lambda.ended.iter().any(|e| Rc::ptr_eq(e, env)) => {
-                Err(stuck(format!("use after release of service `{s}`")))
-            }
-            Some((_, v)) => Ok(Some(v.clone())),
-            None => Ok(self.roots.get(s).cloned()),
-        }
     }
 
     /// The steps of the constants (§3.4), and of the natives that stand
@@ -462,6 +462,16 @@ impl<'p> Machine<'p> {
                 Err(why) => return Err(stuck(why)),
             },
             (Const::Region(p, op), args) => return self.region_step(p, *op, args),
+            (
+                Const::Perform {
+                    id,
+                    effect,
+                    op,
+                    class,
+                    ..
+                },
+                args,
+            ) => return self.perform(*id, effect, op, *class, args),
             (Const::Native(n), args) => match (n.run)(args, &mut self.stdout) {
                 Ok(t) => Control::Eval(t),
                 Err(why) => return Err(stuck(format!("{}: {why}", n.export))),

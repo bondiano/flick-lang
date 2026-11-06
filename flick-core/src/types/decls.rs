@@ -6,9 +6,10 @@
 use super::Checker;
 use super::class_members::method_names;
 use super::convert::{Free, TyVar, is_type};
-use super::env::{Abi, Form, Fundep, Operation, TypeDef};
+use super::env::{Abi, Form, Fundep, TypeDef};
 use super::gadt::scheme::{Variant, quantify};
 use super::kinds::Kind;
+use super::services::{OpClass, Operation};
 use super::ty::{Binder, Type};
 use crate::iface::Namespace;
 use crate::resolve;
@@ -183,6 +184,7 @@ impl Checker<'_> {
                 Form::Service {
                     params: params.iter().map(|p| p.name.clone()).collect(),
                     operations: Vec::new(),
+                    effect: decl.has_token(K::EffectKw),
                 },
                 result,
             ),
@@ -268,7 +270,7 @@ impl Checker<'_> {
                     indexed: None,
                 }])
             }
-            K::ServiceDecl => Body::Members(self.members(decl, &[])),
+            K::ServiceDecl => Body::Members(self.operations(decl)),
             K::ClassDecl => {
                 let mut supers = Vec::new();
                 for context in decl.nodes().filter(|n| n.kind == K::Context) {
@@ -336,9 +338,10 @@ impl Checker<'_> {
             Body::Members(members) => {
                 let operations = members
                     .into_iter()
-                    .map(|(name, ty)| Operation {
+                    .map(|(name, ty, class)| Operation {
                         name,
                         ty: self.default_kinds(&quantify(ty)),
+                        class,
                     })
                     .collect();
                 if let Some(TypeDef {
@@ -374,7 +377,7 @@ enum Body {
     None,
     Alias(Type),
     Variants(Vec<Variant>),
-    Members(Vec<(String, Type)>),
+    Members(Vec<(String, Type, OpClass)>),
     /// Superclasses, functional dependencies, methods and default
     /// signatures.
     Class(

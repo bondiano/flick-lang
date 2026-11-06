@@ -34,6 +34,7 @@ pub fn strict_uses(e: &Expr, name: &str) -> usize {
         | ExprKind::Scope { .. }
         | ExprKind::Within(..)
         | ExprKind::Provide(..)
+        | ExprKind::Handle(_)
         | ExprKind::Lift(..)
         | ExprKind::Abstract(..)
         | ExprKind::Generate { strict: false, .. } => 0,
@@ -85,6 +86,7 @@ pub fn size(e: &Expr) -> usize {
         ExprKind::Match(_, arms) | ExprKind::Try(_, arms) => {
             n += arms.iter().map(|a| pat_size(&a.pat)).sum::<usize>();
         }
+        ExprKind::Handle(h) => n += h.errors.iter().map(|a| pat_size(&a.pat)).sum::<usize>(),
         ExprKind::Each { pat, .. } => n += pat_size(pat),
         ExprKind::Block(stmts, _) => {
             n += stmts
@@ -218,6 +220,11 @@ fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
                 pat_binders(&arm.pat, names, suffix);
             }
         }
+        ExprKind::Handle(h) => {
+            for arm in &h.errors {
+                pat_binders(&arm.pat, names, suffix);
+            }
+        }
         ExprKind::Each { pat, .. } => pat_binders(pat, names, suffix),
         ExprKind::Scope { owner, outer, .. } => {
             for name in owner.iter().chain(outer) {
@@ -260,6 +267,11 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
         }
         ExprKind::Match(_, arms) | ExprKind::Try(_, arms) => {
             for arm in arms {
+                apply_pat(&mut arm.pat, names);
+            }
+        }
+        ExprKind::Handle(h) => {
+            for arm in &mut h.errors {
                 apply_pat(&mut arm.pat, names);
             }
         }

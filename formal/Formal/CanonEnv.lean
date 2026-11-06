@@ -115,4 +115,43 @@ theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v
       | cons => simp [Ty.arrows, Ty.hd] at hU₁
     | lit | rnil | rcons => simp [Ty.hd] at hUE
 
+theorem IsEnv.lookup_value {θ : Tm} {N : Name} {v : Tm} (hθ : IsEnv θ) (hl : θ.envLookup N = some v) :
+    Value v := by
+  induction hθ with
+  | enil => simp [Tm.envLookup] at hl
+  | econs hv _ ih =>
+    simp only [Tm.envLookup] at hl
+    split at hl
+    · cases hl; exact hv
+    · exact ih hl
+
+/-- An environment provides no effect: its value would be of `Errors ∅`. -/
+theorem env_no_op {Ψ Θ Γ θ ρ φ N} (hθ : IsEnv θ) (h : Typ S Ψ Θ Γ θ (.ex (.env ρ) φ))
+    (hl : (θ.envLookup N).isSome) : ∀ o, S.op N o = none := by
+  intro o
+  cases hop : S.op N o with
+  | none => rfl
+  | some x =>
+    obtain ⟨c, a, b⟩ := x
+    obtain ⟨v, hv⟩ := Option.isSome_iff_exists.mp hl
+    have ht := env_lookup_typ h hv
+    rw [S.op_impl _ _ _ _ _ hop] at ht
+    obtain ⟨_, _, _, _, _, _, _, hN, _⟩ := canonical_errors (hθ.lookup_value hv) ht
+    exact hN.elim
+
+theorem env_nm {Ψ Θ Γ θ ρ φ} (hθ : IsEnv θ) (h : Typ S Ψ Θ Γ θ (.ex (.env ρ) φ)) {x : Elem} :
+    ρ x → ∃ N, x = .nm N := by
+  induction hθ generalizing ρ with
+  | enil => cases h with | enil hρ => exact fun h => (hρ _ h).elim
+  | econs _ _ ih =>
+    cases h with
+    | econs _ _ _ hθ' hρ =>
+      intro ha
+      rcases (hρ _).mp ha with h | h
+      · exact ⟨_, h⟩
+      · exact ih hθ' h
+
+theorem env_no_atm {Ψ Θ Γ θ ρ φ} (hθ : IsEnv θ) (h : Typ S Ψ Θ Γ θ (.ex (.env ρ) φ)) (a : Atom) :
+    ¬ ρ (.atm a) := fun ha => by obtain ⟨_, h'⟩ := env_nm hθ h ha; cases h'
+
 end Flick

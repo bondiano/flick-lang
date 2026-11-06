@@ -11,19 +11,27 @@ type Exit struct {
 	cause *Cause
 }
 
-// exitOf runs `task` to its exit, which itself never fails.
+// exitOf runs `task` to its exit, which itself never fails but where it
+// unwinds to a handler of effects.
 func exitOf(fb *Fiber, task Value) *Exit {
 	v, c := catch(func() Value { return Run(fb, task) })
+	if c != nil && unwinds(c) {
+		panic(&Failure{c})
+	}
 	return &Exit{v, c}
 }
 
 func ex(v Value) *Exit { return v.(*Exit) }
 
 // failureOf is the `Failure` of a cause; one without reasons is the empty
-// cause, which still fails, as Effect's `Cause.empty`.
+// cause, which still fails, as Effect's `Cause.empty`. A cause that unwinds
+// to a handler of effects is no failure the code sees: it goes on unwinding.
 func failureOf(c *Cause) Value {
 	if c == nil {
 		c = emptyCause
+	}
+	if unwinds(c) {
+		panic(&Failure{c})
 	}
 	return &Supervised{cause: c}
 }

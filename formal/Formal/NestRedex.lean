@@ -49,15 +49,16 @@ theorem Tm.Within.moveT {Θ : Facts} {v : Tm} {T : Ty} {φ : Stage} {A₁ A₂ :
   h.move (hv.noIns h) hr hl hA
 
 theorem Frame.Within.mono {Ψ' : List Ty} {B' : Nat → Nat → Prop} {F : Frame} {A : Nat → Prop}
-    (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l) (h : F.Within Ψ B anc A) : F.Within Ψ' B' anc A := by
-  have m : ∀ {x : Tm} {A}, x.Within Ψ B anc A → x.Within Ψ' B' anc A := fun hx => hx.mono hl fun _ _ => rfl
+    (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l) (hh : ∀ p ℓ, HCell Ψ p ℓ → HCell Ψ' p ℓ)
+    (h : F.Within Ψ B anc A) : F.Within Ψ' B' anc A := by
+  have m : ∀ {x : Tm} {A}, x.Within Ψ B anc A → x.Within Ψ' B' anc A := fun hx => hx.mono hl hh fun _ _ => rfl
   cases F <;> simp only [Frame.Within] at h ⊢ <;> grind
 
 theorem WithinE.mono {Ψ' : List Ty} {B' : Nat → Nat → Prop} {A : Nat → Prop}
-    (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l) :
+    (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l) (hh : ∀ p ℓ, HCell Ψ p ℓ → HCell Ψ' p ℓ) :
     ∀ {E : List Frame}, WithinE Ψ B anc A E → WithinE Ψ' B' anc A E
   | [], _ => trivial
-  | _ :: _, ⟨hE, hF⟩ => ⟨WithinE.mono hl hE, hF.mono hl⟩
+  | _ :: _, ⟨hE, hF⟩ => ⟨WithinE.mono hl hh hE, hF.mono hl hh⟩
 
 theorem plug_frame {q : Nat} {x : Tm} : ∀ {E : List Frame}, .inside q ∈ E → (plug E x).Has (.frame q)
   | F :: E, h => by
@@ -65,23 +66,24 @@ theorem plug_frame {q : Nat} {x : Tm} : ∀ {E : List Frame}, .inside q ∈ E �
     · exact plug_has E (by simp [Frame.plug, Tm.Has])
     · exact plug_frame (x := F.plug x) h
 
-theorem WithinE.frames_iff {A : Nat → Prop} {E : List Frame} {x : Tm} {q : Nat}
-    (h : WithinE Ψ B anc A E) (hx : ∀ q, ¬ x.Has (.frame q)) : (plug E x).Has (.frame q) ↔ .inside q ∈ E :=
-  ⟨fun h' => (h.frames h').resolve_right (hx q), plug_frame⟩
+theorem plug_frames_iff {E : List Frame} {x : Tm} {q : Nat} (hx : ∀ q, ¬ x.Has (.frame q)) :
+    (plug E x).Has (.frame q) ↔ (plug E (.var 0)).Has (.frame q) :=
+  ⟨fun h => (plug_has_inv E h).resolve_right (hx q), plug_of_hole⟩
 
 /-- The redex of a thread replaced by a term without `inside` forms at its place. -/
 theorem Nest.redex {Ψ' : List Ty} {c : Cfg} {μ' : List Tm} {B' home i E r r'}
     (hn : Nest Ψ c anc B home) (hi : c.at i = some (plug E r)) (hE : OkE E) (hv : ¬ Value r)
     (hr : ∀ q, ¬ r.Has (.frame q)) (hr' : ∀ q, ¬ r'.Has (.frame q))
-    (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l)
+    (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l) (hh : ∀ p ℓ, HCell Ψ p ℓ → HCell Ψ' p ℓ)
     (h' : (plug E r).Within Ψ B anc (baseOf anc i) → r.Within Ψ B anc (holeE (baseOf anc i) E) →
       r'.Within Ψ' B' anc (holeE (baseOf anc i) E))
     (hc : ∀ (l : Nat) (v : Tm), μ'[l]? = some v → v.Within Ψ' B' anc (B' l) ∧ v.NoIns) :
     Nest Ψ' ((⟨c.rgs, μ', c.main⟩ : Cfg).put i (plug E r')) anc B' home := by
   have hw := (hn.thread i _ hi).1
-  obtain ⟨hWE, hrW⟩ := within_of_plug hv hE hw
-  refine hn.put_local hi hl ((hWE.mono hl).fill (h' hw hrW)) (fun q => ?_) hc
-  rw [(hWE.mono hl).frames_iff hr', hWE.frames_iff hr]
+  obtain ⟨-, hrW⟩ := within_of_plug hv hE hw
+  refine hn.put_local hi hl hh ((hw.mono hl hh fun _ _ => rfl).replug hv hE (h' hw hrW)
+    fun x hx => (hr' x hx).elim) (fun q => ?_) hc
+  rw [plug_frames_iff hr', plug_frames_iff hr]
 
 /-- New children and finalizers of a live region, at its place. -/
 theorem Nest.regs {c : Cfg} {home p g g'} (hn : Nest Ψ c anc B home) (hg : c.rgs[p]? = some g)

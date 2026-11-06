@@ -3,7 +3,7 @@
 
 use std::fmt::Write;
 
-use super::{Arm, Expr, ExprKind, ForeignMode, ItemKind, Lit, Module, Pat, Stage, Stmt};
+use super::{Arm, Expr, ExprKind, ForeignMode, Handler, ItemKind, Lit, Module, Pat, Stage, Stmt};
 use crate::types::{Dict, Lift};
 
 pub fn print(module: &Module) -> String {
@@ -216,6 +216,7 @@ pub fn expr(e: &Expr) -> String {
         ),
         ExprKind::Within(owner, e) => format!("(within {owner} {})", expr(e)),
         ExprKind::Provide(l, e) => format!("(provide {} {})", expr(l), expr(e)),
+        ExprKind::Handle(h) => handler(h),
         ExprKind::Lift(e, l) => format!("(lift{} {})", lift(l), expr(e)),
     }
 }
@@ -286,4 +287,36 @@ pub fn pat(p: &Pat) -> String {
 
 fn pats(items: &[Pat], sep: &str) -> String {
     items.iter().map(pat).collect::<Vec<_>>().join(sep)
+}
+
+/// `(handle [E.op class f …] body [return f] arms)`.
+fn handler(h: &Handler) -> String {
+    let effects: Vec<String> = h
+        .effects
+        .iter()
+        .map(|e| {
+            let ops = e.operations.iter();
+            ops.map(|o| {
+                format!(
+                    "{}.{} {:?} {}",
+                    e.effect,
+                    o.name,
+                    o.class,
+                    expr(&o.function)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+        })
+        .collect();
+    let ret = h
+        .ret
+        .as_ref()
+        .map_or(String::new(), |r| format!(" return {}", expr(r)));
+    format!(
+        "(handle [{}] {}{ret} {})",
+        effects.join(" "),
+        expr(&h.body),
+        arms(&h.errors)
+    )
 }

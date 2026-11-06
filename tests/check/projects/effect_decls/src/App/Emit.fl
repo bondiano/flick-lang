@@ -1,0 +1,7 @@
+module App.Emit exposing (Emit, Throw)
+
+effect Emit a =
+  control emit : a ->{} Unit
+
+effect Throw =
+  abort throw : forall b. String ->{} b

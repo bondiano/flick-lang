@@ -603,6 +603,7 @@ fn compiled_module(
     if ctx.settings.backend == Backend::None {
         effects::check(&module.ir, diagnostics);
     }
+    effects::control_on_js(&module.ir, diagnostics);
     let output = codegen::js(optimized.as_ref().unwrap_or(&module.ir), ctx.options);
     let file = (ctx.path)(&module.name);
     #[cfg(feature = "source-maps")]

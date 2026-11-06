@@ -48,6 +48,14 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .own p => .own p
   | .drec c r => .drec c (r.rename ξ)
   | .glob g => .glob g
+  | .hdl E al r e => .hdl E (al.rename ξ) (r.rename ξ) (e.rename ξ)
+  | .hwith p ℓ E al r e => .hwith p ℓ E (al.rename ξ) (r.rename ξ) (e.rename ξ)
+  | .hctl p ℓ κ tl E al r a k => .hctl p ℓ κ tl E (al.rename ξ) (r.rename ξ) (a.rename ξ) (k.rename ξ)
+  | .hres p ℓ a b => .hres p ℓ (a.rename ξ) (b.rename ξ)
+  | .hdone p a => .hdone p (a.rename ξ)
+  | .unw p ℓ a => .unw p ℓ (a.rename ξ)
+  | .kont p ℓ => .kont p ℓ
+  | .hole p => .hole p
 
 /-- Lift a substitution under `n` binders. -/
 def liftS (n : Nat) (σ : Nat → Tm) (i : Nat) : Tm :=
@@ -91,6 +99,25 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .own p => .own p
   | .drec c r => .drec c (r.subst σ)
   | .glob g => .glob g
+  | .hdl E al r e => .hdl E (al.subst σ) (r.subst σ) (e.subst σ)
+  | .hwith p ℓ E al r e => .hwith p ℓ E (al.subst σ) (r.subst σ) (e.subst σ)
+  | .hctl p ℓ κ tl E al r a k => .hctl p ℓ κ tl E (al.subst σ) (r.subst σ) (a.subst σ) (k.subst σ)
+  | .hres p ℓ a b => .hres p ℓ (a.subst σ) (b.subst σ)
+  | .hdone p a => .hdone p (a.subst σ)
+  | .unw p ℓ a => .unw p ℓ (a.subst σ)
+  | .kont p ℓ => .kont p ℓ
+  | .hole p => .hole p
+
+/-- The constructor a pattern starts with: the operation of an arm of a handler. -/
+def Pat.headName : Pat → Option Name
+  | .ctor K => some K
+  | .app p _ => p.headName
+  | _ => none
+
+/-- The body of the arm for the operation `o` in a spine of arms. -/
+def Tm.armOf : Tm → Name → Option Tm
+  | .acons p b r, o => if p.headName = some o then some b else r.armOf o
+  | _, _ => none
 
 /-- Substitute `vs` for the innermost `vs.length` variables: `e[δ]`. -/
 def inst (vs : List Tm) (i : Nat) : Tm :=

@@ -71,6 +71,7 @@ impl Checker<'_> {
             node: node.range(),
             outer: self.stage.services.clone(),
             parent: self.regions.nest.last().copied(),
+            handler: false,
         });
         let scope = self.regions.scopes.len() - 1;
         self.regions.nest.push(scope);

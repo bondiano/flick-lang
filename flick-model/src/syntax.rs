@@ -8,6 +8,7 @@ use std::rc::Rc;
 
 use flick_core::numeric::{Arith, Num};
 
+use crate::handler::{Cont, Handler, OpClass, Signal};
 use crate::native::Native;
 use crate::types::Scheme;
 
@@ -109,6 +110,15 @@ pub enum Const {
     /// machine takes its step (§3.2), its type is the scheme of the global
     /// `Path` it stands for.
     Region(Path, RegionOp),
+    /// An operation of the effect `Path` the handler `id` handles, given
+    /// its dictionaries and arguments (only at run time).
+    Perform {
+        id: usize,
+        effect: Path,
+        op: Name,
+        class: OpClass,
+        arity: usize,
+    },
 }
 
 /// The steps of the foreign bindings of regions (`regions.md` §3.2), and
@@ -157,6 +167,7 @@ impl Const {
             },
             Const::Native(n) => n.arity,
             Const::Region(_, op) => op.arity(),
+            Const::Perform { arity, .. } => *arity,
         }
     }
 
@@ -248,6 +259,12 @@ pub enum Term {
     /// `inside π e`: the body of a `scope` run in region `π`; its types
     /// name the region `Name`, as the `scope` did.
     Inside(usize, Name, Rc<Term>),
+    /// `try … with` with arms for operations, or `provide S impl`.
+    Handler(Rc<Handler>),
+    /// `resume` of a `control` arm (only at run time).
+    Cont(Cont),
+    /// What unwinds a body to its handler (only at run time, raised).
+    Signal(Rc<Signal>),
 }
 
 /// `p → e` or `p when g → e`.
@@ -315,6 +332,7 @@ impl Term {
             | Term::Loc(_)
             | Term::Env(_)
             | Term::Own(_)
+            | Term::Cont(_)
             | Term::Cap(..) => true,
             Term::Apply(head, args) => {
                 args.len() < head.arity()

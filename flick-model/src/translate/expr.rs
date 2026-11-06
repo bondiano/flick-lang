@@ -8,6 +8,7 @@ use flick_core::ir::{self, BinOp, ExprKind, Stmt};
 use flick_core::types::Constructor;
 
 use super::{Tr, dict, given, lams};
+use crate::handler::{Handled, Handler, Op};
 use crate::syntax::{Arm, Con, Const, Lit, Name, Pat, Path, Prim, Term};
 
 /// The model's constructor of an IR one. A constructor of a GADT takes
@@ -122,6 +123,7 @@ impl Tr {
             ExprKind::Await(x) => Term::Await(rc(self.expr(x))),
             ExprKind::Task(x) => Term::Task(rc(self.expr(x))),
             ExprKind::Provide(l, x) => Term::Provide(rc(self.expr(l)), rc(self.expr(x))),
+            ExprKind::Handle(h) => Term::Handler(Rc::new(self.handler(h))),
             // a lift does nothing in the model (§3.4); its correctness is G2
             ExprKind::Lift(x, _) => self.expr(x),
             ExprKind::Label(_) => stuck("`Record.label`"),
@@ -221,6 +223,35 @@ impl Tr {
                 body: self.expr(&a.body),
             })
             .collect()
+    }
+
+    /// A handler of effects: the function of each operation as it is.
+    fn handler(&mut self, h: &ir::Handler) -> Handler {
+        let effects = h
+            .effects
+            .iter()
+            .map(|e| Handled {
+                effect: Path::parse(&e.effect),
+                ops: e
+                    .operations
+                    .iter()
+                    .map(|o| Op {
+                        name: o.name.as_str().into(),
+                        class: o.class,
+                        dicts: o.dicts,
+                        arity: o.arity,
+                        covers: o.covers,
+                        function: self.expr(&o.function),
+                    })
+                    .collect(),
+            })
+            .collect();
+        Handler {
+            effects,
+            body: self.expr(&h.body),
+            ret: h.ret.as_ref().map(|r| self.expr(r)),
+            errors: self.arms(&h.errors),
+        }
     }
 }
 

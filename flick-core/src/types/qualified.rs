@@ -166,7 +166,13 @@ impl Checker<'_> {
             super::env::Found::Missing => None,
         };
         match service.map(|(module, service, d)| (module, service, d.form)) {
-            Some((module, service, super::env::Form::Service { params, operations })) => {
+            Some((
+                module,
+                service,
+                super::env::Form::Service {
+                    params, operations, ..
+                },
+            )) => {
                 if let Some(op) = operations.iter().find(|o| o.name == name) {
                     let ty = self.operation_type(&module, &service, params.len(), &op.ty, span);
                     let stages = self.arrow_stages(&ty);

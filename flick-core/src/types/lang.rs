@@ -130,6 +130,7 @@ lang_items! {
     Owner = "owner",
     Outlives = "outlives",
     Provided = "provided",
+    Detached = "detached",
     // the module of the built-in instances
     Instances = "instances",
     // class methods that syntax stands for

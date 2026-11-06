@@ -221,5 +221,91 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | dcons _ _ ih₁ ih₂ => exact Typ.dcons_substT ih₁ ih₂
   | dproj _ hc hk hl hts hH hT ih => exact Typ.dproj_substT ih hc hk hl hts hH hT
   | glob hg hts hH hT => intro σ _; exact Typ.glob_substT hg hts hH hT σ
+  | @perform E o c a b t T _ _ _ _ hop hT =>
+    intro σ _
+    obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+    refine .perform (t := t.substT σ) hop ?_
+    have := hT.substT σ
+    split at this <;> split <;> simp_all [Ty.substT, Stage.substT]
+  | hanil => intro _ _; exact .hanil
+  | hatail hop _ _ ih₁ ih₂ =>
+    intro σ hσ
+    obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+    have h₁ := ih₁ σ (hσ.sub fun _ h => .inl h)
+    simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT, ha, hb] at h₁
+    exact .hatail hop h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
+  | haabort hop _ _ ih₁ ih₂ =>
+    intro σ hσ
+    obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+    have h₁ := ih₁ σ (hσ.sub fun _ h => .inl h)
+    simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT, ha] at h₁
+    exact .haabort hop h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
+  | hactl hop _ _ ih₁ ih₂ =>
+    intro σ hσ
+    obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+    have h₁ := ih₁ σ (hσ.sub fun _ h => .inl h)
+    simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT, Ty.substT, ha, hb] at h₁
+    rw [Caps.substT_reach] at h₁
+    exact .hactl hop h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
+  | hdl _ hn _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+    intro σ hσ
+    have h₁ := ih₁ (liftT 1 σ) ((hσ.sub fun _ h => .inl h).lift 1)
+    simp only [Flick.J.substT] at h₁
+    rw [shift_comm, shift_comm', Facts.up_comm, Ty.up_comm, Stage.up_comm] at h₁
+    simp only [Ty.substT, liftT, if_true, Nat.zero_lt_one] at h₁
+    have h₂ := ih₂ σ (hσ.sub fun _ h => .inr (.inl h))
+    have h₃ := ih₃ σ (hσ.sub fun _ h => .inr (.inr h))
+    simp only [Flick.J.substT, Ty.substT, Stage.substT] at h₂ h₃ h₁
+    refine .hdl h₁ hn h₂ (Stage.le_substT σ hψ) h₃ ?_ ⟨hc.1, fun h => .inl (hc.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
+    simpa [Stage.substT, Row.union_substT] using Stage.le_substT σ hφ₀
+  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+    intro σ hσ
+    have hp : σ (.r _) = .rg _ := hσ.1 _ (.inl (.inr (.inl rfl)))
+    have h₁ := ih₁ σ (hσ.sub fun _ h => .inr (.inr (.inl h)))
+    have h₂ := ih₂ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inl h))))
+    have h₃ := ih₃ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inr h))))
+    simp only [Flick.J.substT, Ty.substT, Stage.substT, hp] at h₁ h₂ h₃
+    refine .hwith (by simp [hℓ, Ty.substT, Stage.substT]) h₁ h₂ (Stage.le_substT σ hψ) h₃ ?_ ⟨hc.1, fun h => .inl (hc.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
+    simpa [Stage.substT, Row.union_substT] using Stage.le_substT σ hφ₀
+  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ih₁ ih₂ ih₃ ih₄ =>
+    intro σ hσ
+    subst hk
+    obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+    have hp : σ (.r _) = .rg _ := hσ.1 _ (.inl (.inr (.inl rfl)))
+    have h₁ := ih₁ σ (hσ.sub fun _ h => .inr (.inr (.inl h)))
+    have h₂ := ih₂ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inl h))))
+    have h₃ := ih₃ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inr (.inr
+      (plug_has_of_nosite (by simp [Tm.Has]) h))))))
+    have h₄ := ih₄ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inr (.inl h)))))
+    simp only [Flick.J.substT, Ty.substT, Stage.substT, hp] at h₁ h₂ h₃ h₄
+    refine .hctl (by simp [hℓ, Ty.substT, Stage.substT]) h₁ h₂ (Stage.le_substT σ hψ) hop hc htl hE rfl h₃ ?_ ?_ (fun h => ?_) ⟨hcm.1, fun h => .inl (hcm.2 h)⟩
+      (Stage.le_substT σ hφ) (hT.substT σ)
+    · simpa [Stage.substT, Row.union_substT] using Stage.le_substT σ hφ₀
+    · split at h₄ <;> simp_all
+    · obtain ⟨C', hl₁, hl₂⟩ := hl h
+      exact ⟨C'.substT σ, by simp [hl₁, Ty.substT, Stage.substT, hb], ⟨_, hl₂, by simp [hp]⟩⟩
+  | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ =>
+    intro σ hσ
+    subst ha
+    have hp : σ (.r _) = .rg _ := hσ.1 _ (.inl (.inr (.inl rfl)))
+    have h₁ := ih₁ σ (hσ.sub fun _ h => .inr (.inr (.inr h)))
+    have h₂ := ih₂ σ (hσ.sub fun s h => by
+      rcases plug_has_iff.mp h with h | h
+      · exact .inr (.inr (.inl (plug_has_iff.mpr (.inl h))))
+      · simp only [Tm.Has] at h; rcases h with h | h
+        · subst h; exact .inr (.inl rfl)
+        · exact h.elim)
+    simp only [Flick.J.substT, Stage.substT] at h₁ h₂
+    exact .hres (by simp [hℓ, Ty.substT, Stage.substT]) h₁ hA rfl h₂ (by rw [List.getElem?_map, hl]; rfl) (Stage.le_substT σ hφ) (hT.substT σ)
+  | hdone _ ih => intro σ hσ; exact .hdone (ih σ (hσ.sub fun _ h => .inr (.inr h)))
+  | unw hℓ _ hφ ih =>
+    intro σ hσ
+    have h₁ := ih σ (hσ.sub fun _ h => .inr (.inr h))
+    simp only [Flick.J.substT, Stage.substT] at h₁
+    exact .unw (by simp [hℓ, Ty.substT, Stage.substT]) h₁ (by simpa [Stage.substT] using Stage.le_substT σ hφ)
+  | kont hl hC hT =>
+    intro σ hσ
+    have hp : σ (.r _) = .rg _ := hσ.1 _ (.inl rfl)
+    exact .kont (by simp [hl, Ty.substT]) ⟨_, hC, by simp [hp]⟩ (hT.substT σ)
 
 end Flick

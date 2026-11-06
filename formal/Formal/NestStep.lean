@@ -8,12 +8,23 @@ namespace Flick
 
 variable {S : Sig} {Ψ : List Ty} {B anc : Nat → Nat → Prop}
 
-theorem PHead.noIns {r r' : Tm} {A : Nat → Prop} (hh : PHead r r') (h : r.Within Ψ B anc A)
-    (hw : ∀ q θ v, r ≠ .with_ q θ v) : r.NoIns := by
+/-- The run-time forms of a handler, whose pure steps leave the region of the handler. -/
+def Tm.IsHdl : Tm → Prop
+  | .hwith .. | .hctl .. | .hres .. | .hdone .. => True
+  | _ => False
+
+/-- A typed pure redex holds no run-time form, but for the value of a `with` and the
+forms of a handler. -/
+
+theorem PHead.noIns {r r' : Tm} {A : Nat → Prop} {Ψ' Θ J} (hh : PHead r r') (h : r.Within Ψ B anc A)
+    (ht : Typ S Ψ' Θ [] r J) (hw : ∀ q θ v, r ≠ .with_ q θ v) (hd : ¬ r.IsHdl) : r.NoIns := by
   have vn : ∀ {x : Tm} {A}, Value x → x.Within Ψ B anc A → ¬ x.Has .ins := fun hv hx => hv.noIns hx
+  have nv := hh.not_value
   cases hh <;> simp only [Tm.Within] at h <;> simp only [Tm.NoIns, Tm.Has, not_or] <;>
     first
     | exact (hw _ _ _ rfl).elim
+    | exact (hd trivial).elim
+    | (cases ht with | errVal hv => exact (nv hv).elim)
     | exact ⟨h.1.2, vn ‹_› h.2.1⟩
     | exact ⟨vn ‹_› h.1, h.2.2⟩
     | exact ⟨h.2.2.1, h.2.2.2⟩
@@ -25,13 +36,16 @@ theorem PHead.noIns {r r' : Tm} {A : Nat → Prop} (hh : PHead r r') (h : r.With
     | simp
 
 theorem Frame.Within.noFrame_plug {F : Frame} {A : Nat → Prop} {x : Tm} (hF : F.Within Ψ B anc A)
-    (hni : ¬ F.isInside) (hx : ∀ q, ¬ x.Has (.frame q)) : ∀ q, ¬ (F.plug x).Has (.frame q) := by
+    (hni : ¬ F.isInside) (hnc : ¬ F.isCtl) (hx : ∀ q, ¬ x.Has (.frame q)) :
+    ∀ q, ¬ (F.plug x).Has (.frame q) := by
   have vn : ∀ {y : Tm} {A}, Value y → y.Within Ψ B anc A → ¬ y.Has .ins := fun hv hy => hv.noIns hy
   intro q h
-  cases F <;> simp only [Frame.Within, Frame.isInside] at hF hni <;>
+  cases F <;> simp only [Frame.Within, Frame.isInside, Frame.isCtl] at hF hni hnc <;>
     simp only [Frame.plug, Tm.Has] at h <;>
     first
     | exact hni trivial
+    | exact hnc trivial
+    | grind [Tm.has_frame_ins, Tm.NoIns]
     | exact hx q h
     | (rcases h with h | h
        · exact hx q h
@@ -49,7 +63,7 @@ theorem Frame.Within.noFrame_plug {F : Frame} {A : Nat → Prop} {x : Tm} (hF : 
 theorem Nest.sub {c : Cfg} {home i E r r'} (hn : Nest Ψ c anc B home) (hi : c.at i = some (plug E r))
     (hE : OkE E) (hv : ¬ Value r) (hr : r.NoIns) (hs : ∀ s, r'.Has s → r.Has s) :
     Nest Ψ ((⟨c.rgs, c.mem, c.main⟩ : Cfg).put i (plug E r')) anc B home :=
-  hn.redex hi hE hv hr.frame (fun _ h => hr (Tm.has_frame_ins (hs _ h))) (fun _ _ h => h)
+  hn.redex hi hE hv hr.frame (fun _ h => hr (Tm.has_frame_ins (hs _ h))) (fun _ _ h => h) (fun _ _ h => h)
     (fun _ hrW => Tm.Within.of_has (fun h => hr (hs _ h)) (fun _ hp => hrW.rgn0 hr (hs _ hp))
       fun _ hl => hrW.loc0 hr (hs _ hl)) hn.cells
 
@@ -101,7 +115,7 @@ theorem Nest.grow0 {c : Cfg} {home i e p g g'} (hn : Nest Ψ c anc B home) (hi :
     Nest Ψ ((⟨setRgn c.rgs p g', c.mem, c.main⟩ : Cfg).put i e) anc B home :=
   have hn₁ := hn.regs hg hl (hl'.trans hl) hk hf
   have hi₁ := Cfg.at_grow hg hl' (let ⟨ks, h, _⟩ := hk; ⟨ks, h⟩) hi
-  hn₁.put_local hi₁ (fun _ _ h => h) (hn₁.thread i e hi₁).1 (fun _ => Iff.rfl) hn₁.cells
+  hn₁.put_local hi₁ (fun _ _ h => h) (fun _ _ h => h) (hn₁.thread i e hi₁).1 (fun _ => Iff.rfl) hn₁.cells
 
 theorem WithinE.with_frame {A : Nat → Prop} {q : Nat} {θ : Tm} :
     ∀ {E : List Frame}, WithinE Ψ B anc A E → .with_ q θ ∈ E → θ.NoIns ∧ θ.Within Ψ B anc (fun _ => False)

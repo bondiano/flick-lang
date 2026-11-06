@@ -245,6 +245,15 @@ outlive it. Facts are not chained: a scope gives one fact for everything outside
 def Outl (Θ : Facts) (C : Caps) (s : Ty) : Prop :=
   ∀ k, C k → s.reach k ∨ ∃ C', Θ C' s ∧ C' k
 
+/-- How a handler's arm for an operation returns: `tail` gives
+the operation its value, `abort` the handler its value without coming back, and
+`control` the handler its value with the rest of the body as `resume`. -/
+inductive OpClass
+  | tail
+  | abort
+  | control
+  deriving DecidableEq, Repr
+
 /-- Constants of Γ₀ (core.md §1.5, regions.md §1.5). The typing rule instantiates
 their types (`CArg`); `open_` acquires a capability `H ϱ`, `op` uses one; `intEq`
 compares two `Int`s. -/
@@ -261,6 +270,7 @@ inductive Const
   | addFin
   | spawn
   | intEq
+  | perform (E o : Name) (c : OpClass)
 
 def Const.arity : Const → Nat
   | .refSet | .merge | .addFin | .spawn | .intEq => 2
@@ -301,7 +311,14 @@ bind two in `f` (`0 = x`, `1 = f`) and `letrec` one in `b`; arms bind
 `econs S v (… enil)`; `raise` is a term former, not a constant. `drec c r` is a
 dictionary record of λFlick⁺ with the fields `r`, an `rcons` spine; it is a value and
 `proj` reads its fields. `glob g` is a global: an instance, a structural or primitive
-dictionary or a constant of Γ₀, which steps to its value in `Σ₀`. -/
+dictionary or a constant of Γ₀, which steps to its value in `Σ₀`.
+
+`hdl E al r e` handles the effect `E` in `e` with the arms `al`, an `acons` spine of
+patterns `Pat.spine o [.var]` (`[.var, .var]` for `control`, with `resume`); `r` takes
+the body's value. At run time a handler is the region `p` and the cell `ℓ`: `hwith p ℓ`
+around the body, `hctl p ℓ κ tl` while an arm runs and the body waits at `hole p`, `hres p
+a b` while the resumed body `b` runs and the arm `a` waits, `hdone p a` after; `unw p ℓ a`
+unwinds to the handler, which then runs `a`; `kont p κ` is `resume`. -/
 inductive Tm
   | var (i : Nat)
   | lam (b : Tm)
@@ -339,6 +356,14 @@ inductive Tm
   | own (p : Nat)
   | drec (c : Nat) (r : Tm)
   | glob (g : Nat)
+  | hdl (E : Name) (al r e : Tm)
+  | hwith (p ℓ : Nat) (E : Name) (al r e : Tm)
+  | hctl (p ℓ κ : Nat) (tl : Bool) (E : Name) (al r a k : Tm)
+  | hres (p ℓ : Nat) (a b : Tm)
+  | hdone (p : Nat) (a : Tm)
+  | unw (p ℓ : Nat) (a : Tm)
+  | kont (p ℓ : Nat)
+  | hole (p : Nat)
 
 def Tm.head : Tm → Tm
   | .app f _ => f.head
@@ -417,6 +442,12 @@ structure Sig where
   impl_closed : ∀ N σ, (impl N).substT σ = impl N
   dict : Nat → Option (Nat × List (Label × Scheme))
   glob : Nat → Option Scheme
+  /-- The operation `o` of the effect `E`: its class, argument and result, closed;
+  an `abort` one returns any type. -/
+  op : Name → Name → Option (OpClass × Ty × Ty)
+  op_closed : ∀ E o c a b σ, op E o = some (c, a, b) → a.substT σ = a ∧ b.substT σ = b
+  /-- An effect is no service: nothing implements it as one (E016). -/
+  op_impl : ∀ E o c a b, op E o = some (c, a, b) → impl E = .errors Row.none
   dict_closed : ∀ c k fs, dict c = some (k, fs) → ∀ l s, (l, s) ∈ fs → s.Closed (s.k + k)
   glob_closed : ∀ g s, glob g = some s → s.Closed s.k
 
@@ -474,6 +505,10 @@ def Const.ty (S : Sig) : Const → CArg → Ty
     .arrow (.owner ι.s) .pure (.arrow (.eff (Row.union (Row.scope ι.s) ι.r) ι.e ι.t ι.C)
       (.rt (Row.union ι.r (Row.obs ι.r ι.s)) Row.none) (.base .unit) ι.s.reach) Caps.none
   | .intEq, _ => .arrow (.base .int) .pure (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none
+  | .perform E o _, ι => match S.op E o with
+    | some (.abort, a, _) => .arrow a (.rt (Row.single E) Row.none) ι.t Caps.none
+    | some (_, a, b) => .arrow a (.rt (Row.single E) Row.none) b Caps.none
+    | none => .arrow (.base .unit) (.rt (Row.single E) Row.none) (.base .unit) Caps.none
 
 /-- Side conditions of a constant at an instance: a finalizer and a child outlive their
 owner, with everything they hold
@@ -481,9 +516,12 @@ owner, with everything they hold
 finalizer or a child has no uses: uses come only from `with` frames. `Layer.merge` has
 none: soundness does not need its outputs disjoint, and the disjointness the checker
 sees on names is not kept by instantiating a row variable. -/
-def Const.ok (Θ : Facts) : Const → CArg → Prop
+def Const.ok (S : Sig) (Θ : Facts) : Const → CArg → Prop
   | .addFin, ι => Outl Θ ι.C ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
   | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
+  -- of a service, not an effect
+  | .ask N, _ => ∀ o, S.op N o = none
+  | .perform _ _ _, _ => False
   | _, _ => True
 
 end Flick

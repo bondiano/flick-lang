@@ -1,4 +1,4 @@
-import Formal.Below
+import Formal.PresHdlStep
 
 /-!
 # Preservation (core.md §4)
@@ -31,6 +31,12 @@ theorem ask_inv {Ψ Θ N w t φ} (h : Typ S Ψ Θ [] (.app (.const (.ask N)) w) 
       exact ⟨Stage.le_svc (Stage.le_trans lψ hψ) _ rfl, lt.trans hT⟩
   | errVal hv => exact (ask_not_value hv).elim
 
+/-- `ask_S` names no effect. -/
+theorem ask_ok {Ψ Θ N w J} (h : Typ S Ψ Θ [] (.app (.const (.ask N)) w) J) : ∀ o, S.op N o = none := by
+  cases h with
+  | app hf _ _ _ => cases hf with | const hok _ => exact hok
+  | errVal hv => exact (ask_not_value hv).elim
+
 theorem raise_not_pure {Ψ Θ e t} (h : Typ S Ψ Θ [] (.raise e) (.ex t .pure)) : False := by
   obtain ⟨_, hε⟩ := raise_stage h; exact hε
 
@@ -45,6 +51,9 @@ theorem const_app_rt {Ψ Θ c w t} (h : Typ S Ψ Θ [] (.app (.const c) w) (.ex 
       rw [hx] at hT'
       obtain ⟨_, _, _, _, h, _, lψ, _, -⟩ := hT'.arrow_left
       cases h; exact Stage.le_trans lψ hψ
+    | perform _ hT' =>
+      obtain ⟨_, _, _, _, h, _, lψ, _, -⟩ := hT'.arrow_left
+      cases h; exact Stage.le_trans lψ hψ
   | errVal hv _ _ _ => cases hv with
     | constApp hc' _ =>
       cases ‹Const› <;> simp_all [Const.arity, Const.layer, Const.ty] <;> exact (hc default).elim
@@ -55,8 +64,11 @@ theorem const_app2_rt {Ψ Θ c w₁ w₂ t} (h : Typ S Ψ Θ [] (.app (.app (.co
   cases h with
   | app hf _ hψ _ =>
     cases hf with
-    | app hc' _ _ hT₁ =>
+    | app hc' _ hψ₁ hT₁ =>
       cases hc' with
+      | perform _ hT' =>
+        obtain ⟨_, _, _, _, h, _, lψ, _, -⟩ := hT'.arrow_left
+        cases h; exact Stage.le_trans lψ hψ₁
       | const _ hT' =>
         obtain ⟨_, _, _, _, _, _, _, hx⟩ := hc ‹_›
         rw [hx] at hT'
@@ -75,6 +87,18 @@ theorem RHead.not_pure {Ψ Θ Λ μ r t Λ' μ' r'} (h : Typ S Ψ Θ [] r (.ex t
   have nv := hh.not_value
   cases hh with
   | refMake => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
+  | hctlRaise _ _ _ | hctlUnw _ _ => cases h with
+    | hctl _ _ _ _ _ _ _ _ _ _ _ _ _ _ hφ _ => exact hφ
+    | errVal hv => exact nv hv
+  | hresRaise _ _ _ | hresUnw _ _ => cases h with
+    | hres _ _ _ _ _ _ hφ _ => exact hφ
+    | errVal hv => exact nv hv
+  | hwithCatch => cases h with
+    | hwith _ _ _ _ _ _ _ hφ _ => exact hφ
+    | errVal hv => exact nv hv
+  | hdl => cases h with
+    | hdl _ _ _ _ _ _ _ hφ _ => exact hφ
+    | errVal hv => exact nv hv
   | refGet => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | open_ => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | op => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
@@ -121,11 +145,6 @@ theorem raise_frame {Ψ Θ v t φ} {F : Frame} (hF : F.ok) (hnt : ¬ F.isTry) (h
     subst hφ
     exact .raise (hv'.valueAny hv _) ⟨fun _ h => h.elim, fun n h => rel.err hnt n (he n h)⟩
 
-theorem List.map_kill_YF {Ψ : List Ty} {n : Nat} (h : ∀ u ∈ Ψ, u.YF n) :
-    Ψ.map (Ty.substT (kill n)) = Ψ := by
-  conv => rhs; rw [← List.map_id Ψ]
-  exact List.map_congr_left fun u hu => h u hu
-
 theorem fin_not_value {c : Const} {w₁ w₂ : Tm} (hc : c = .addFin ∨ c = .spawn) :
     ¬ Value (.app (.app (.const c) w₁) w₂) := by
   intro hv
@@ -142,6 +161,7 @@ theorem fin_unit {Ψ Θ c p w T φ} (h : Typ S Ψ Θ [] (.app (.app (.const c) (
     cases hf with
     | app hc' _ _ hT₁ =>
       cases hc' with
+      | perform => rcases hc with h | h <;> cases h
       | const _ hT' =>
         rcases hc with rfl | rfl <;>
         · obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
@@ -249,7 +269,49 @@ theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
     obtain ⟨_, _, _, _, hr, _, _, back⟩ := ctx_typing _ hE (fun h => by cases h) h
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
       simpa using glob_preservation hroot (hole_kill hr hbl hΨ) hg), by simp⟩
-  | raise hE hF hnt hni hv =>
+  | unw hE hF hni _ _ =>
+    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (not_value_plug unw_not_value _) h
+    obtain ⟨rfl, -, -⟩ := hK.resolve_left fun hp => by
+      subst hp; exact unw_not_pure (unw_frame hF hni hr)
+    have hr' := hole_kill hr hbl hΨ
+    simp only [List.map_up_zero, liftT_zero] at hr'
+    exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by simpa using unw_frame hF hni hr'), by simp⟩
+  | performAbort hE hEi _ ha hv =>
+    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+    obtain ⟨rfl, -, -⟩ := hK.resolve_left fun hp => by subst hp; exact hwith_not_pure hr
+    have hr' := hole_kill hr hbl hΨ
+    simp only [List.map_up_zero, liftT_zero] at hr'
+    exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by simpa using abort_pres hEi ha hv hr'),
+      by simp⟩
+  | performTail hE hEi _ ha hv =>
+    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+    obtain ⟨rfl, hΘ, -⟩ := hK.resolve_left fun hp => by subst hp; exact hwith_not_pure hr
+    have hr' := hole_kill hr hbl hΨ
+    simp only [List.map_up_zero, liftT_zero] at hr'
+    exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
+      simpa using tail_pres (RtCtx.hole hΘ hΨ) (hbl.sub fun _ h => plug_has _ (by
+        simp only [Tm.Has]; exact .inr (.inr (.inr (.inr (plug_has _ (.inr h))))))) hEi ha hv hr'),
+      by simp⟩
+  | performCtl hE hEi _ ha hv =>
+    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+    obtain ⟨rfl, hΘ, -⟩ := hK.resolve_left fun hp => by subst hp; exact hwith_not_pure hr
+    have hr' := hole_kill hr hbl hΨ
+    simp only [List.map_up_zero, liftT_zero] at hr'
+    obtain ⟨c, hcy, hcl, ht'⟩ := ctl_pres (RtCtx.hole hΘ hΨ) (hbl.sub fun _ h => plug_has _ (by
+        simp only [Tm.Has]; exact .inr (.inr (.inr (.inr (plug_has _ (.inr h)))))))
+      (hbl _ (.inl (plug_has _ (by simp [Tm.Has])))) hEi ha hv hr'
+    exact ⟨[c], hμ.alloc .lam hcl, refill_kill back hbl hΨ (by rw [hμ.1]; simpa using ht'),
+      by simpa using hcy⟩
+  | resume hE hA hEi hk hn hu =>
+    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+    obtain ⟨rfl, hΘ, -⟩ := hK.resolve_left fun hp => by subst hp; exact hctl_not_pure hr
+    have hr' := hole_kill hr hbl hΨ
+    simp only [List.map_up_zero, liftT_zero] at hr'
+    exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
+      simpa using resume_pres (RtCtx.hole hΘ hΨ) (hbl.sub fun _ h => plug_has _ (by
+        simp only [Tm.Has]; exact .inr (.inr (.inr (.inr (.inl (plug_has _ (.inr h)))))))) hA hEi hk hu hr'),
+      by simp⟩
+  | raise hE hF hnt hni _ hv =>
     obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ :=
       ctx_typing _ hE (not_value_plug raise_not_value _) h
     obtain ⟨rfl, -, -⟩ := hK.resolve_left fun hp => by

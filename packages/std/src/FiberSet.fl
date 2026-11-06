@@ -20,7 +20,7 @@ foreign effect make from "@flick-lang/runtime/effect/FiberSet" "flickMake"
 /// set's region.
 run :
   forall s c r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   RunOptions -> (Eff {Scope s | r} e a)^c -> FiberSet s e a ->{r;} Fiber.Fiber e a
 foreign effect run from "@flick-lang/runtime/effect/FiberSet" "flickRun"
   arity 1

@@ -199,7 +199,7 @@ of a type that names its region, such as `File t`, cannot be kept in them.
 ```flick
 spawn :
   forall s c r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Fiber.Owner s ->
   (Failure e ->{Scope s | r; none} Unit)^c ->
   (Eff {Scope s | r} e a)^c ->{r; none} Fiber.Fiber e a

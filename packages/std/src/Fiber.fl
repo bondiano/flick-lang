@@ -39,7 +39,7 @@ class Provided (r : ServiceRow) (s : Region)
 /// Both may hold only what outlives the owner.
 spawn :
   forall s c r e a.
-  (Outlives c s, Provided r s) =>
+  (Outlives c s, Provided r s, Detached r) =>
   Owner s ->
   (Failure e ->{Scope s | r; none} Unit)^c ->
   (Eff {Scope s | r} e a)^c ->{r; none}

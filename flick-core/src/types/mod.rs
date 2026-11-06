@@ -36,6 +36,7 @@ mod facts;
 mod ffi;
 mod gadt;
 mod generalize;
+pub mod handle;
 mod handlers;
 mod infer;
 mod instances;
@@ -92,7 +93,7 @@ pub use convert::is_type;
 pub use display::show_type;
 pub use do_notation::{bind_key, guard_key};
 pub use effects::NO_EFFECTS;
-pub use env::{Abi, EnumLit, Form, Fundep, Instance, JsClass, Operation, Rep, TypeDef};
+pub use env::{Abi, EnumLit, Form, Fundep, Instance, JsClass, Rep, TypeDef};
 pub use gadt::branch::dict_local;
 pub use gadt::scheme::{built, is_indexed, written_dicts};
 pub use generalize::without_value_captures;
@@ -101,6 +102,7 @@ pub use patterns::is_pattern;
 pub use question::Question;
 pub use ranges::range_list;
 pub use schemas::companion_name;
+pub use services::{OpClass, Operation};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
     Constructor, Copies, ForeignInfo, GenericInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,

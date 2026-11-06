@@ -9,6 +9,7 @@ use crate::numeric::Arith;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::handle::{arm_pattern, operation_path};
 use crate::types::lang::{self, Lang};
 use crate::types::{Dict, Identity, Range, Ref, is_pattern, let_parts};
 
@@ -118,6 +119,7 @@ impl Lower<'_> {
                 let scrutinee = self.boxed(children[0]);
                 ExprKind::Match(scrutinee, self.arms(node))
             }
+            K::TryExpr | K::ProvideExpr if self.handles_effects(node) => self.handler(node),
             K::TryExpr => {
                 let body = self.boxed(children[0]);
                 ExprKind::Try(body, self.arms(node))
@@ -427,35 +429,60 @@ impl Lower<'_> {
         }
     }
 
+    /// Whether a `try` has arms for operations or for the value of its
+    /// body, or the operand of a `provide` is `S impl`, a service and the
+    /// record that handles it.
+    fn handles_effects(&self, node: &Node) -> bool {
+        let Some(first) = node.nodes().next() else {
+            return false;
+        };
+        match node.kind {
+            K::TryExpr => node.nodes().filter(|n| n.kind == K::MatchArm).any(|arm| {
+                arm.has_token(K::ReturnKw)
+                    || arm_pattern(arm).is_some_and(|p| operation_path(p, self.text).is_some())
+            }),
+            _ => {
+                first.kind == K::AppExpr
+                    && first.nodes().next().is_some_and(|head| {
+                        matches!(
+                            self.typing.names.get(&head.range()),
+                            Some(Ref::ServiceTag(_))
+                        )
+                    })
+            }
+        }
+    }
+
     fn arms(&mut self, node: &Node) -> Vec<Arm> {
         // an arm the type of the matched value rules out was not checked
         let live: Vec<&Node> = node
             .nodes()
             .filter(|n| n.kind == K::MatchArm && !self.typing.dead_arms.contains(&n.range()))
             .collect();
-        live.into_iter()
-            .map(|arm| {
-                let mark = self.scope.len();
-                let mut pat = Pat::Wild;
-                let mut guard = None;
-                let mut body = None;
-                for child in arm.nodes() {
-                    match child.kind {
-                        K::Guard => guard = child.nodes().next().map(|g| self.expr(g)),
-                        K::Block => body = Some(self.expr(child)),
-                        kind if is_pattern(kind) => pat = self.pattern(child),
-                        _ => {}
-                    }
-                }
-                self.scope.truncate(mark);
-                let span = self.span(arm);
-                Arm {
-                    pat,
-                    guard,
-                    body: body.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span)),
-                }
-            })
-            .collect()
+        live.into_iter().map(|arm| self.arm(arm)).collect()
+    }
+
+    /// `| pattern [when guard] -> body`.
+    pub(super) fn arm(&mut self, arm: &Node) -> Arm {
+        let mark = self.scope.len();
+        let mut pat = Pat::Wild;
+        let mut guard = None;
+        let mut body = None;
+        for child in arm.nodes() {
+            match child.kind {
+                K::Guard => guard = child.nodes().next().map(|g| self.expr(g)),
+                K::Block => body = Some(self.expr(child)),
+                kind if is_pattern(kind) => pat = self.pattern(child),
+                _ => {}
+            }
+        }
+        self.scope.truncate(mark);
+        let span = self.span(arm);
+        Arm {
+            pat,
+            guard,
+            body: body.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span)),
+        }
     }
 }
 

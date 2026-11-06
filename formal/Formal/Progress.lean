@@ -61,19 +61,25 @@ theorem live_or_dead (Λ : List Rgn) (p : Nat) :
 /-- Progress of an application of two values. -/
 theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.length) (hvf : Value f)
     (hve : Value e) (hf : Typ S Ψ Θ [] f (.ex (.arrow a ψ t C) φ)) (he : Typ S Ψ Θ [] e (.ex a φ))
-    (hψ : ψ.le φ) : Value (.app f e) ∨ NV root Λ μ (.app f e) φ.svc := by
-  have step : ∀ {l o}, Step root l Λ μ (.app f e) o → Value (.app f e) ∨ NV root Λ μ (.app f e) φ.svc :=
-    fun h => .inr (.inr (.inl ⟨_, _, h⟩))
-  have blocked : Blocks Λ (.app f e) → Value (.app f e) ∨ NV root Λ μ (.app f e) φ.svc :=
-    fun h => .inr (.inr (.inr (.inr (.inl ⟨[], _, OkE.nil, rfl, h⟩))))
+    (hψ : ψ.le φ) : Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc := by
+  have step : ∀ {l o}, Step root l Λ μ (.app f e) o → Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc :=
+    fun h => .inr (.step ⟨_, _, h⟩)
+  have blocked : Blocks Λ (.app f e) → Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc :=
+    fun h => .inr (.blocked (.inl ⟨[], _, OkE.nil, rfl, h⟩))
   rcases canonical_arrow hvf hf with ⟨b, rfl⟩ | ⟨g, rfl⟩ | ⟨K, hK⟩ | ⟨c, rfl⟩ |
-      ⟨c, w, rfl, hc, hw⟩
+      ⟨c, w, rfl, hc, hw⟩ | ⟨p, ℓ, rfl⟩
   · exact step (Step.ofP (.beta hve))
   · exact step (Step.ofP (.fix hve))
   · exact .inl (.ctorApp hvf hK hve)
   · cases hf with
-    | const _ hT' =>
+    | perform hop hT' =>
+      obtain ⟨_, _, _, _, h, _, hψ', _, -⟩ := hT'.arrow_left
+      cases h
+      exact .inr (.perform ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
+        Stage.le_svc (Stage.le_trans hψ' hψ) _ rfl⟩)
+    | const hok hT' =>
       cases c with
+      | perform E o _ => simp_all [Const.ok]
       | refMake => exact step (Step.ofR (.refMake hve))
       | refGet =>
         obtain ⟨_, _, _, _, h, la, _, _, -⟩ := hT'.arrow_left
@@ -88,8 +94,8 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
         cases hr : root.svc N with
         | some w => exact step (Step.askRoot (E := []) OkE.nil rfl hr)
         | none =>
-          exact .inr (.inr (.inr (.inl ⟨[], N, OkE.nil, rfl, rfl, hr,
-            Stage.le_svc (Stage.le_trans hψ' hψ) _ rfl⟩)))
+          exact .inr (.ask ⟨[], N, OkE.nil, rfl, rfl, hr, hok,
+            Stage.le_svc (Stage.le_trans hψ' hψ) _ rfl⟩)
       | succeed => exact .inl (.constApp (.inr trivial) hve)
       | effect => exact .inl (.constApp (.inr trivial) hve)
       | merge => exact .inl (.constApp (.inl rfl) hve)
@@ -156,5 +162,6 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
           obtain ⟨n, rfl⟩ := canonical_int hve he
           exact step (Step.ofP .intEq)
     | _ => simp [Const.arity] at hc
+  · exact step (Step.resumeDie (E := []) OkE.nil hve (by rintro ⟨A, E', _, _, _, _, _, h, _⟩; simp at h))
 
 end Flick

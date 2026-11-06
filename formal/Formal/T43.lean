@@ -118,7 +118,7 @@ theorem KidNeeds.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
   cases hs with
   | rt hE hh =>
     cases hh with
-    | scope | provideEnv =>
+    | scope | provideEnv | hdl =>
       refine hk.keep hag fun r g hg hl k hk' => ?_
       by_cases hr : r < Λ.length
       · rw [List.getElem?_append_left hr] at hg; exact .inl ⟨g, hg, hl, hk'⟩

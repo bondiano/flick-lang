@@ -420,6 +420,15 @@ fn expr_uses(e: &Expr, module: &str, out: &mut BTreeSet<String>) {
                 out.insert(names::service(name));
             }
         }
+        ExprKind::Handle(h) => {
+            for handled in &h.effects {
+                if let Some((m, name)) = handled.effect.rsplit_once('.')
+                    && m == module
+                {
+                    out.insert(names::service(name));
+                }
+            }
+        }
         ExprKind::Method { dict, .. } => dict_uses(dict, module, out),
         ExprKind::Dicts(_, dicts) => {
             for d in dicts {

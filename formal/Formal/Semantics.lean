@@ -1,4 +1,5 @@
 import Formal.Rules
+import Formal.EvalCtx
 
 /-!
 # Dynamics of λFlick (core.md §3, regions.md §3)
@@ -24,92 +25,6 @@ def Rgn.new : Rgn := ⟨true, [], []⟩
 /-- A live region. -/
 def Live (Λ : List Rgn) (p : Nat) : Prop := ∃ g, Λ[p]? = some g ∧ g.live = true
 
-/-- A finished computation: a value or `raise v`. -/
-def Final (e : Tm) : Prop := Value e ∨ ∃ v, Value v ∧ e = .raise v
-
-/-- One-frame evaluation contexts `F` of core.md §3.2. -/
-inductive Frame
-  | appL (e : Tm)
-  | appR (v : Tm)
-  | let_ (b : Tm)
-  | match_ (al : Tm)
-  | rconsL (l : Label) (r : Tm)
-  | rconsR (l : Label) (v : Tm)
-  | proj (l : Label)
-  | updL (l : Label) (e' : Tm)
-  | updR (v : Tm) (l : Label)
-  | await
-  | try_ (al : Tm)
-  | provide (e : Tm)
-  | bind (S : Name)
-  | joinL (e : Tm)
-  | joinR (v : Tm)
-  | with_ (q : Nat) (θ : Tm)
-  | raise
-  | inside (p : Nat)
-
-def Frame.plug : Frame → Tm → Tm
-  | .appL a, e => .app e a
-  | .appR v, e => .app v e
-  | .let_ b, e => .let_ e b
-  | .match_ al, e => .match_ e al
-  | .rconsL l r, e => .rcons l e r
-  | .rconsR l v, e => .rcons l v e
-  | .proj l, e => .proj e l
-  | .updL l e', e => .update e l e'
-  | .updR v l, e => .update v l e
-  | .await, e => .await e
-  | .try_ al, e => .try_ e al
-  | .provide b, e => .provide e b
-  | .bind S, e => .bind S e
-  | .joinL b, e => .join e b
-  | .joinR v, e => .join v e
-  | .with_ q θ, e => .with_ q θ e
-  | .raise, e => .raise e
-  | .inside p, e => .inside p e
-
-/-- Left-to-right order: a frame to the right of a value needs the value. -/
-def Frame.ok : Frame → Prop
-  | .appR v | .rconsR _ v | .updR v _ | .joinR v | .with_ _ v => Value v
-  | _ => True
-
-def Frame.isTry : Frame → Prop
-  | .try_ _ => True
-  | _ => False
-
-/-- `raise v` does not leave a region: the region closes first (regions.md §3.3). -/
-def Frame.isInside : Frame → Prop
-  | .inside _ => True
-  | _ => False
-
-/-- The service a `with` frame provides, with the region of its `provide`. -/
-def Frame.lookup : Frame → Name → Option (Nat × Tm)
-  | .with_ q θ, S => (θ.envLookup S).map (q, ·)
-  | _, _ => none
-
-/-- A `with` frame of a context kept around a child or a finalizer it registers. -/
-def Frame.wrap : Frame → Tm → Tm
-  | .with_ q θ, e => .with_ q θ e
-  | _, e => e
-
-/-- `E[e]`; the list starts at the innermost frame. -/
-def plug : List Frame → Tm → Tm
-  | [], e => e
-  | F :: E, e => plug E (F.plug e)
-
-/-- `lookup(E, S)` of core.md §3.2 without the fallback to `Σ₀`. -/
-def lookupE : List Frame → Name → Option (Nat × Tm)
-  | [], _ => none
-  | F :: E, S => match F.lookup S with
-    | some v => some v
-    | none => lookupE E S
-
-/-- The `with` frames of a context around a term: the environment a child or a
-finalizer inherits from where it is registered (runtime.md §3.5). -/
-def withs : List Frame → Tm → Tm
-  | [], e => e
-  | F :: E, e => withs E (F.wrap e)
-
 /-- Pure steps `→ₚ` of core.md §3.3, with `bind` and `join` (`docs/formal/core.md#bind_s-and-join-steps-are-pure`). -/
 inductive PHead : Tm → Tm → Prop
   | beta : Value v → PHead (.app (.lam b) v) (b.subst (inst [v]))
@@ -131,6 +46,19 @@ inductive PHead : Tm → Tm → Prop
   | bind : Value v → PHead (.bind S v) (.econs S v .enil)
   | join : IsEnv θ₁ → IsEnv θ₂ → PHead (.join θ₁ θ₂) (θ₁.envAppend θ₂)
   | intEq : PHead (.app (.app (.const .intEq) (.lit (.int a))) (.lit (.int b))) (.lit (.bool (a == b)))
+  -- the value of the body of a handler goes to its `return` function
+  | hwithVal {al : Tm} : Value v → PHead (.hwith p ℓ E al r v) (.app r v)
+  -- the value of a `tail` arm resumes the body under the handler
+  | hctlTail {al : Tm} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole p) → Value w →
+      PHead (.hctl p ℓ κ true E al r w k) (.hwith p ℓ E al r (plug Ei w))
+  -- a `control` arm that ends without resuming lets the body go: it unwinds to the
+  -- handler, closing its regions, and the arm's value is the handler's
+  | hctlDisc {al : Tm} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole p) → Value w →
+      PHead (.hctl p ℓ κ false E al r w k) (.hwith p ℓ E al r (plug Ei (.unw p ℓ w)))
+  -- the value of a resumed body is what `resume` gives the arm
+  | hresVal {A : List Frame} : OkE A → a = plug A (.hole p) → Value w →
+      PHead (.hres p ℓ a w) (.hdone p (plug A w))
+  | hdoneVal : Value v → PHead (.hdone p v) v
 
 /-- `Λ[π] := g`. -/
 def setRgn (Λ : List Rgn) (p : Nat) (g : Rgn) : List Rgn := Λ.set p g
@@ -174,6 +102,23 @@ inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm �
       RHead Λ μ (.inside p w) (setRgn Λ p ⟨g.live, g.kids ++ [f], fs⟩) μ (.inside p w)
   | close : Λ[p]? = some g → g.live = true → Final w → (∀ k ∈ g.kids, Final k) → g.fins = [] →
       RHead Λ μ (.inside p w) (setRgn Λ p ⟨false, g.kids, []⟩) μ w
+  -- an arm that raises or unwinds lets the body go, and goes on raising or
+  -- unwinding from the handler; a resumed body that does gives it to the arm
+  | hctlRaise {al : Tm} {tl : Bool} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole p) → Value w →
+      RHead Λ μ (.hctl p ℓ κ tl E al r (.raise w) k) Λ μ (.hwith p ℓ E al r (plug Ei (.unw p ℓ (.raise w))))
+  | hctlUnw {al : Tm} {tl : Bool} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole p) →
+      RHead Λ μ (.hctl p ℓ κ tl E al r (.unw q ℓ' a) k) Λ μ
+        (.hwith p ℓ E al r (plug Ei (.unw p ℓ (.unw q ℓ' a))))
+  | hresRaise {A : List Frame} : OkE A → a = plug A (.hole p) → Value w →
+      RHead Λ μ (.hres p ℓ a (.raise w)) Λ μ (.hdone p (plug A (.raise w)))
+  | hresUnw {A : List Frame} : OkE A → a = plug A (.hole p) →
+      RHead Λ μ (.hres p ℓ a (.unw q ℓ' b)) Λ μ (.hdone p (plug A (.unw q ℓ' b)))
+  -- the body has unwound to its handler, which runs what the signal holds
+  | hwithCatch {al : Tm} : RHead Λ μ (.hwith p ℓ E al r (.unw p ℓ a)) Λ μ a
+  -- a handler is the region `|Λ|` around its body, which `resume` holds, and the cell
+  -- `|μ|`, which holds the type of its value
+  | hdl {al : Tm} : RHead Λ μ (.hdl E al r e) (Λ ++ [Rgn.new]) (μ ++ [.lam .todo])
+      (.inside Λ.length (.hwith Λ.length μ.length E al r e))
 
 /-- Outcome of a step: a configuration or a defect. -/
 inductive Out
@@ -186,7 +131,6 @@ inductive Lbl
   | rt
   | root (S : Name)
 
-def OkE (E : List Frame) : Prop := ∀ F ∈ E, Frame.ok F
 
 /-- `⟨Λ, μ, e⟩ → ⟨Λ', μ', e'⟩` and `⟨Λ, μ, e⟩ → die` of one thread (core.md
 §3.3–3.5, regions.md §3.2–§3.3). A global steps to its body, a pure step. -/
@@ -204,8 +148,35 @@ inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → 
   | askRoot : OkE E → lookupE E S = none → root.svc S = some v →
       Step root (.root S) Λ μ (plug E (.app (.const (.ask S)) (.lit .unit)))
         (.cfg Λ μ (plug E v))
-  | raise {F : Frame} : OkE E → F.ok → ¬ F.isTry → ¬ F.isInside → Value v →
+  | raise {F : Frame} : OkE E → F.ok → ¬ F.isTry → ¬ F.isInside → ¬ F.isCtl → Value v →
       Step root .rt Λ μ (plug E (F.plug (.raise v))) (.cfg Λ μ (plug E (.raise v)))
+  -- unwinding to the handler `p` passes `try`, as no error does
+  | unw {F : Frame} : OkE E → F.ok → ¬ F.isInside → ¬ F.isCtl → ¬ F.catches p ℓ →
+      Step root .rt Λ μ (plug E (F.plug (.unw p ℓ a))) (.cfg Λ μ (plug E (.unw p ℓ a)))
+  -- an operation runs the arm of the nearest handler with one for it: `abort` after
+  -- the body unwinds to the handler, `tail` and `control` while the body waits there
+  | performAbort {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
+      Value v →
+      Step root .rt Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o .abort)) v))))
+        (.cfg Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.unw p ℓ (b.subst (inst [v])))))))
+  | performTail {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
+      Value v →
+      Step root .rt Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o .tail)) v))))
+        (.cfg Λ μ (plug E (.hctl p ℓ 0 true Ef al r (b.subst (inst [v])) (plug Ei (.hole p)))))
+  -- `resume` of a `control` arm is `kont p κ`: its type is that of the new cell `κ`
+  | performCtl {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
+      Value v →
+      Step root .rt Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o .control)) v))))
+        (.cfg Λ (μ ++ [.lam .todo]) (plug E (.hctl p ℓ μ.length false Ef al r
+          (b.subst (inst [v, .kont p μ.length])) (plug Ei (.hole p)))))
+  -- `resume` runs the body under the handler, the arm waiting for how it ends
+  | resume {Ef : Name} {al : Tm} {Ei : List Frame} {ℓh : Nat} : OkE E → OkE A → OkE Ei → k = plug Ei (.hole p) →
+      (∀ G ∈ A, ¬ G.resumes p) → Value u →
+      Step root .rt Λ μ (plug E (.hctl p ℓh ℓ false Ef al r (plug A (.app (.kont p ℓ) u)) k))
+        (.cfg Λ μ (plug E (.hres p ℓh (plug A (.hole p)) (.hwith p ℓh Ef al r (plug Ei u)))))
+  -- the body resumes once, in the thread of its handler, while its arm runs
+  | resumeDie : OkE E → Value u → ¬ Resumable E p ℓ →
+      Step root .rt Λ μ (plug E (.app (.kont p ℓ) u)) .die
   | todo : OkE E → Step root .pure Λ μ (plug E .todo) .die
   | glob : OkE E → root.glob g = some v → Step root .pure Λ μ (plug E (.glob g)) (.cfg Λ μ (plug E v))
 

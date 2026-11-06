@@ -55,7 +55,11 @@ Contextual words are ordinary names everywhere except in one position:
   its clauses (see [command-line applications](../cli-dsl/));
 - `and` between the bindings of a `do` group, `x <- a and y <- b`;
 - `component` before the name of a top-level declaration (see
-  [ui.md](../ui/#components)).
+  [ui.md](../ui/#components));
+- `effect` before the name of an effect declaration, `tail`, `abort` and
+  `control` before an operation of a service or an effect, and `return`
+  before the pattern of an arm of `try` (see
+  [effects.md](../effects/#effects-and-handlers)).
 
 ### Float literals
 
@@ -250,7 +254,8 @@ param       = name | "(" name ":" kind ")"
 deriving    = "deriving" Con { "," Con }
 kind_decl   = "kind" Con "=" ["|"] Con { "|" Con }
 error_decl  = "type" "error" Con { param } ["=" variant] [deriving]
-service     = "service" Con { param } [ "=" members ]
+service     = ("service" | "effect") Con { param } [ "=" operations ]
+operations  = block of: [ "tail" | "abort" | "control" ] signature | let | type_decl
 class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] ["=" members]
 fundep      = { name } "->" { name }
 instance    = "instance" [context "=>"] type ["=" members]
@@ -398,10 +403,12 @@ block       = statement { line break statement }
 statement   = "let" … | signature | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "match" expr "with" arm { arm }
-            | "try" block "with" arm { arm }
+            | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]
             | operator expression over application (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
+handler_arm = arm | "|" "return" or_pattern "->" block
+            // an operation's arm is `| E.op p… -> …`, a pattern whose path ends in a name
 application = postfix { postfix }
 postfix     = atom { "." name | "?" }           // no space before either
 atom        = name | Con { "." Con } ["." name] | Float | BigInt | String

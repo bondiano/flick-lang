@@ -29,19 +29,6 @@ theorem Tm.Below.noIns {e : Tm} (h : e.Below 0) : e.NoIns := fun hi =>
   let ⟨p, hp⟩ := Tm.has_ins_site hi
   Nat.not_lt_zero _ (h p hp)
 
-theorem Frame.plug_has_inv {r r' : Tm} {s : Site} (F : Frame) (h : (F.plug r').Has s) :
-    (F.plug r).Has s ∨ r'.Has s := by
-  cases F <;> simp only [Frame.plug, Tm.Has] at h ⊢ <;> grind
-
-theorem plug_has_inv {r r' : Tm} {s : Site} :
-    ∀ (E : List Frame), (plug E r').Has s → (plug E r).Has s ∨ r'.Has s
-  | [], h => .inr h
-  | F :: E, h => by
-    rcases plug_has_inv (r := F.plug r) E h with h | h
-    · exact .inl h
-    · rcases F.plug_has_inv (r := r) h with h | h
-      · exact .inl (plug_has E h)
-      · exact .inr h
 
 theorem envLookup_has {θ v : Tm} {N : Name} {s : Site} (h : θ.envLookup N = some v) (hv : v.Has s) :
     θ.Has s := by

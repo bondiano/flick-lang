@@ -1,9 +1,11 @@
-//! The members of classes and services: functional dependencies, the
-//! signatures of methods and operations, and the defaults in a class body.
+//! The members of classes, services and effects: functional dependencies,
+//! the signatures of methods and operations, and the defaults in a class
+//! body.
 
 use super::Checker;
 use super::convert::is_type;
 use super::env::{Form, Fundep, TypeDef};
+use super::services::{OpClass, has_runtime_arrow, returns_any};
 use super::ty::{Binder, Type};
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
@@ -41,10 +43,60 @@ impl Checker<'_> {
         Some(Fundep { from, to })
     }
 
-    /// Operations of a service or methods of a class, by name.
-    pub(super) fn members(&mut self, decl: &Node, constraints: &[Type]) -> Vec<(String, Type)> {
-        let signed = self.signatures(decl, constraints);
-        signed.into_iter().map(|(name, ty, _)| (name, ty)).collect()
+    /// The operations of a service or an effect, by name, with their
+    /// classes. Running one looks its handler up, so each is a runtime
+    /// function (E006); a service's are all `tail` (E013); an `abort` one
+    /// never returns, so its result is a variable of its own (E014).
+    pub(super) fn operations(&mut self, decl: &Node) -> Vec<(String, Type, OpClass)> {
+        let effect = decl.has_token(K::EffectKw);
+        let classes: Vec<OpClass> = decl
+            .nodes()
+            .filter(|n| n.kind == K::Members)
+            .flat_map(Node::nodes)
+            .filter(|m| m.kind == K::Signature)
+            .map(|m| {
+                if m.has_token(K::AbortKw) {
+                    OpClass::Abort
+                } else if m.has_token(K::ControlKw) {
+                    OpClass::Control
+                } else {
+                    OpClass::Tail
+                }
+            })
+            .collect();
+        let signed = self.signatures(decl, &[]);
+        let mut out = Vec::new();
+        for ((name, scheme, span), class) in signed.into_iter().zip(classes) {
+            let what = if effect { "effect" } else { "service" };
+            if !has_runtime_arrow(&scheme) {
+                self.error(
+                    codes::E006,
+                    span,
+                    format!(
+                        "{what} operation `{name}` must be a runtime function: running it looks its handler up, so at least one arrow is `->{{…}}`"
+                    ),
+                );
+            }
+            if !effect && !class.is_tail() {
+                self.error(
+                    codes::E013,
+                    span,
+                    format!(
+                        "service operation `{name}` must be `tail`: a service is an effect whose handlers give each operation its value; declare `effect` for an operation that does not return"
+                    ),
+                );
+            } else if class == OpClass::Abort && !returns_any(&scheme) {
+                self.error(
+                    codes::E014,
+                    span,
+                    format!(
+                        "`abort` operation `{name}` never returns, so its result is a type variable of its own, `forall b. … -> b`, that nothing else in its type names"
+                    ),
+                );
+            }
+            out.push((name, scheme, class));
+        }
+        out
     }
 
     /// The methods of a class, and the default signature of each method
@@ -168,16 +220,6 @@ impl Checker<'_> {
                 continue;
             };
             let (scheme, _) = self.signature(ty);
-            if decl.kind == K::ServiceDecl && !super::services::has_runtime_arrow(&scheme) {
-                let name = name.text(self.text);
-                self.error(
-                    codes::E006,
-                    self.span(member),
-                    format!(
-                        "service operation `{name}` must be a runtime function: running it looks the service up, so at least one arrow is `->{{…}}`"
-                    ),
-                );
-            }
             let scheme = match scheme {
                 Type::Forall {
                     vars,

@@ -36,14 +36,6 @@ theorem liftT_add (K k : Nat) (σ : Atom → Ty) : liftT k (liftT K σ) = liftT 
         congr 3; omega
   | r p => simp [liftT, Ty.up_up]
 
-theorem Frame.plug_has {e : Tm} {s : Site} (F : Frame) (h : e.Has s) : (F.plug e).Has s := by
-  cases F <;> simp only [Frame.plug, Tm.Has] <;> simp [h]
-
-/-- A term in a context has everything its context gives it. -/
-theorem plug_has {e : Tm} {s : Site} : ∀ (E : List Frame), e.Has s → (plug E e).Has s
-  | [], h => h
-  | F :: E, h => plug_has E (F.plug_has h)
-
 /-- **L3.** The hole of a well-typed context is well-typed, its stage is bounded
 as in `ERel`, and any term of its type can replace it. Under `K` frames of
 (Let-Gen) right-hand sides the hole is `K` variables deep, with the facts of

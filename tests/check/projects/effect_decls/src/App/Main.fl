@@ -1,0 +1,13 @@
+module App.Main exposing (both, checked)
+
+import App.Emit exposing (Emit, Throw)
+
+/// The operations of an imported effect keep their classes: `throw` fits
+/// any result.
+both : Int ->{Emit Int, Throw; none} Int
+let both n =
+  Emit.emit n
+  if n < 0 then Throw.throw "negative" else n
+
+checked : Int ->{Throw; none} String
+let checked n = if n < 0 then Throw.throw "negative" else "fine"

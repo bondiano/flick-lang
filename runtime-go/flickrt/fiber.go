@@ -43,6 +43,7 @@ type fiberState struct {
 	clock     *testClock             // the test clock that counts the fiber as running, if any
 	cohort    *cohort                // a forked fiber's until it first suspends (startup.go)
 	forks     atomic.Pointer[cohort] // the cohort its forks join until it suspends (startup.go)
+	coro      *coroutine             // the body of a `control` handler the fiber runs now, if any (handle.go)
 }
 
 var fibers atomic.Int64

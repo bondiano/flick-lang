@@ -45,16 +45,17 @@ structure Homo (m : Tm → Tm) : Prop where
   cap : ∀ p, m (.cap p) = .cap p
   own : ∀ p, m (.own p) = .own p
   drec : ∀ c r, m (.drec c r) = .drec c (m r)
+  kont : ∀ p ℓ, m (.kont p ℓ) = .kont p ℓ
 
 theorem Homo.rename (ξ : Nat → Nat) : Homo (Tm.rename ξ) :=
   ⟨fun _ _ _ => rfl, fun _ _ => rfl, fun _ => rfl, fun _ => rfl, rfl, fun _ => ⟨_, rfl⟩,
     fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩, rfl, fun _ _ _ => rfl,
-    fun _ => rfl, fun _ => rfl, fun _ _ => rfl⟩
+    fun _ => rfl, fun _ => rfl, fun _ _ => rfl, fun _ _ => rfl⟩
 
 theorem Homo.subst (σ : Nat → Tm) : Homo (Tm.subst σ) :=
   ⟨fun _ _ _ => rfl, fun _ _ => rfl, fun _ => rfl, fun _ => rfl, rfl, fun _ => ⟨_, rfl⟩,
     fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩, rfl, fun _ _ _ => rfl,
-    fun _ => rfl, fun _ => rfl, fun _ _ => rfl⟩
+    fun _ => rfl, fun _ => rfl, fun _ _ => rfl, fun _ _ => rfl⟩
 
 theorem Homo.head {m : Tm → Tm} (hm : Homo m) {K} :
     ∀ {f : Tm}, Value f → f.head = .ctor K → (m f).head = .ctor K := by
@@ -85,6 +86,7 @@ theorem Homo.head_rev {m : Tm → Tm} (hm : Homo m) {K} :
   | cap => rw [hm.cap] at h; simp [Tm.head] at h
   | own => rw [hm.own] at h; simp [Tm.head] at h
   | drec => rw [hm.drec] at h; simp [Tm.head] at h
+  | kont => rw [hm.kont] at h; simp [Tm.head] at h
 
 theorem Homo.value {m : Tm → Tm} (hm : Homo m) {e} (h : Value e) : Value (m e) := by
   induction h with
@@ -100,6 +102,7 @@ theorem Homo.value {m : Tm → Tm} (hm : Homo m) {e} (h : Value e) : Value (m e)
   | cap => rw [hm.cap]; exact .cap
   | own => rw [hm.own]; exact .own
   | drec => rw [hm.drec]; exact .drec
+  | kont => rw [hm.kont]; exact .kont
   | rcons _ _ ih₁ ih₂ => rw [hm.rcons]; exact .rcons ih₁ ih₂
   | econs _ _ ih₁ ih₂ => rw [hm.econs]; exact .econs ih₁ ih₂
   | ctorApp hf hK _ ih₁ ih₂ => rw [hm.app]; exact .ctorApp ih₁ (hm.head hf hK) ih₂

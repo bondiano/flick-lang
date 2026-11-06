@@ -16,14 +16,15 @@ variable {S : Sig}
 
 theorem Nest.cstep {root : Roots} {c c' : Cfg} {l Ψ X anc B home t φ}
     (hroot : RootTy S root) (hc : CfgTy S Ψ c t φ) (hc' : CfgTy S (Ψ ++ X) c' t φ)
-    (hn : Nest Ψ c anc B home) (hs : CStep root l c c') :
+    (hX : ∀ u ∈ X, u.YF c.rgs.length) (hn : Nest Ψ c anc B home) (hs : CStep root l c c') :
     ∃ anc' B' home', Nest (Ψ ++ X) c' anc' B' home' ∧ ∀ q, q ≠ c.rgs.length → anc' q = anc q := by
-  obtain ⟨hμ, h, hΛ, -, hΨ, -⟩ := hc
+  obtain ⟨hμ, h, hΛ, -, hΨ, -, _, _, hcg⟩ := hc
   cases hs with
-  | main hs => exact hn.step (i := none) hroot rfl h hμ hc'.1 hΨ hs
+  | main hs => exact hn.step (i := none) hroot rfl h hμ hc'.1 hΨ hX hcg.main hs
   | kid hg hl hj hs =>
     obtain ⟨t', φ', hk⟩ := (hΛ _ _ hg).1 _ (List.mem_of_getElem? hj)
-    exact hn.step hroot (Cfg.at_some.mpr ⟨_, hg, hl, hj⟩) hk hμ hc'.1 hΨ hs
+    exact hn.step hroot (Cfg.at_some.mpr ⟨_, hg, hl, hj⟩) hk hμ hc'.1 hΨ hX
+      (hcg.rgs _ _ hg _ (List.mem_append_left _ (List.mem_of_getElem? hj))) hs
 
 theorem steps_nest {root : Roots} {c c' : Cfg} (hroot : RootTy S root)
     (hs : CSteps root c c') :
@@ -33,8 +34,8 @@ theorem steps_nest {root : Roots} {c c' : Cfg} (hroot : RootTy S root)
   | refl => intro Ψ _ _ anc B home _ _ hc hn; exact ⟨[], anc, B, home, by simpa using hc, by simpa using hn⟩
   | step h₁ _ ih =>
     intro Ψ t φ anc B home ht hφ hc hn
-    obtain ⟨X₁, hc₁⟩ := cstep_typed hroot ht hφ hc h₁
-    obtain ⟨anc₁, B₁, home₁, hn₁, -⟩ := hn.cstep hroot hc hc₁ h₁
+    obtain ⟨X₁, hc₁, hX₁⟩ := cstep_typed hroot ht hφ hc h₁
+    obtain ⟨anc₁, B₁, home₁, hn₁, -⟩ := hn.cstep hroot hc hc₁ hX₁ h₁
     obtain ⟨X₂, anc₂, B₂, home₂, hc₂, hn₂⟩ := ih ht hφ hc₁ hn₁
     exact ⟨X₁ ++ X₂, anc₂, B₂, home₂, by simpa using hc₂, by simpa using hn₂⟩
 

@@ -200,6 +200,7 @@ impl<'a> Gen<'a> {
             }
             ExprKind::Within(owner, inner) => self.within(owner, inner),
             ExprKind::Provide(layer, body) => self.provide(layer, body),
+            ExprKind::Handle(h) => self.handle(h),
         }
     }
 

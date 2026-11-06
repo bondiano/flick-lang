@@ -1,0 +1,16 @@
+module App.EffectDecls exposing (..)
+
+service Exit =
+  abort exit : forall b. Int ->{} b
+//~ FLICK-E013 @4:3-4:36 service operation `exit` must be `tail`:
+  control pause : Unit ->{} Unit
+//~ FLICK-E013 @6:3-6:33 service operation `pause` must be `tail`:
+  tail stay : Unit ->{} Unit
+
+effect Throw =
+  abort throw : String ->{} Unit
+//~ FLICK-E014 @11:3-11:33 `abort` operation `throw` never returns, so
+  abort fail : forall b. b ->{} b
+//~ FLICK-E014 @13:3-13:34 `abort` operation `fail` never returns, so
+  value : Int
+//~ FLICK-E006 @15:3-15:14 effect operation `value` must be a

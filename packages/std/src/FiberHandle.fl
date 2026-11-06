@@ -28,7 +28,7 @@ foreign effect make from "@flick-lang/runtime/effect/FiberHandle" "flickMake"
 /// the handle's region.
 run :
   forall s c r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   RunOptions -> (Eff {Scope s | r} e a)^c -> FiberHandle s e a ->{r;} Fiber.Fiber e a
 foreign effect run from "@flick-lang/runtime/effect/FiberHandle" "flickRun"
   arity 1

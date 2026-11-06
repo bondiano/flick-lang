@@ -8,6 +8,7 @@ mod call_site;
 mod coherence;
 mod declare;
 mod derive;
+mod detached;
 mod enum_instance;
 mod generic;
 mod matching;

@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: c88affec2d31fae7
+source_hash: 45768138ef4de2ad
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -59,7 +59,10 @@ ui in when for yield do
   предложения (см. [приложения командной строки](../cli-dsl/));
 - `and` между связками группы `do`, `x <- a and y <- b`;
 - `component` перед именем объявления верхнего уровня (см.
-  [ui.md](../ui/#компоненты)).
+  [ui.md](../ui/#компоненты));
+- `effect` перед именем объявления эффекта, `tail`, `abort` и `control` перед
+  операцией сервиса или эффекта и `return` перед образцом ветки `try` (см.
+  [effects.md](../effects/#эффекты-и-handlers)).
 
 ### Числовые литералы
 
@@ -271,7 +274,8 @@ param       = name | "(" name ":" kind ")"
 deriving    = "deriving" Con { "," Con }
 kind_decl   = "kind" Con "=" ["|"] Con { "|" Con }
 error_decl  = "type" "error" Con { param } ["=" variant] [deriving]
-service     = "service" Con { param } [ "=" members ]
+service     = ("service" | "effect") Con { param } [ "=" operations ]
+operations  = block of: [ "tail" | "abort" | "control" ] signature | let | type_decl
 class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] ["=" members]
 fundep      = { name } "->" { name }
 instance    = "instance" [context "=>"] type ["=" members]
@@ -424,10 +428,12 @@ block       = statement { line break statement }
 statement   = "let" … | signature | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "match" expr "with" arm { arm }
-            | "try" block "with" arm { arm }
+            | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]
             | operator expression over application (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
+handler_arm = arm | "|" "return" or_pattern "->" block
+            // ветка операции — `| E.op p… -> …`, образец, чей путь кончается именем
 application = postfix { postfix }
 postfix     = atom { "." name | "?" }           // без пробела перед ними
 atom        = name | Con { "." Con } ["." name] | Float | BigInt | String

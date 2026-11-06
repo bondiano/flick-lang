@@ -31,6 +31,18 @@ theorem step_pure {root Ψ Θ Λ μ e t l Λ' μ' e'} (h : Typ S Ψ Θ [] e (.ex
     obtain ⟨_, _, _, _, hr', rel', _⟩ := frame_typing raise_not_value _ hF hr
     obtain rfl := rel'.pure rfl
     exact (raise_not_pure hr').elim
+  | unw hE hF hni _ _ =>
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (not_value_plug unw_not_value _) h
+    obtain rfl := rel.pure rfl
+    exact (unw_not_pure (unw_frame hF hni hr)).elim
+  | performAbort hE _ _ _ _ | performTail hE _ _ _ _ | performCtl hE _ _ _ _ =>
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (fun h => by cases h) h
+    obtain rfl := rel.pure rfl
+    exact (hwith_not_pure hr).elim
+  | resume hE _ _ =>
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (fun h => by cases h) h
+    obtain rfl := rel.pure rfl
+    exact (hctl_not_pure hr).elim
   | addFin hE =>
     obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (fin_not_value (.inl rfl)) h
     obtain rfl := rel.pure rfl
@@ -58,15 +70,30 @@ theorem T2a {root Ψ Λ μ e t Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreT
       · exact hX u hu) (by simpa [Stage.substT] using h')
     exact ⟨.step h₁ hl hs', rfl, rfl, hr⟩
 
+/-- A frame of a typed context that handles `N` makes `N` an effect. -/
+theorem installs_in_op {Ψ Θ E x t φ N} {F : Frame} (hE : OkE E) (hx : ¬ Value x)
+    (h : Typ S Ψ Θ [] (plug E x) (.ex t φ)) (hF : F ∈ E) (hi : F.installs N) :
+    ∃ o c a b, S.op N o = some (c, a, b) := by
+  obtain ⟨E₁, E₂, rfl⟩ := List.append_of_mem hF
+  rw [plug_append] at h
+  simp only [plug] at h
+  obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing E₂ (fun G hG => hE G (by simp [hG]))
+    (not_value_plug (not_value_plugs hx E₁) F) h
+  exact installs_op hr hi
+
 /-- An `ask_S` answered by `Σ₀` from a term with services `r` has `S ∈ r`. -/
 theorem step_root {root Ψ Θ Λ μ e t r ε N o} (h : Typ S Ψ Θ [] e (.ex t (.rt r ε)))
     (hs : Step root (.root N) Λ μ e o) : r (.nm N) := by
   cases hs with
   | askRoot hE hl =>
     obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE ask_not_value h
-    rcases rel.svc _ (ask_inv hr).1 with h | h
-    · exact h
-    · rw [domE_nm, hl] at h; cases h
+    rcases rel.svc _ (ask_inv hr).1 with h' | h'
+    · exact h'
+    · rw [domE_nm, hl] at h'
+      rcases h' with h' | ⟨F, hF, hi⟩
+      · cases h'
+      · obtain ⟨o, _, _, _, hop⟩ := installs_in_op hE ask_not_value h hF hi
+        rw [ask_ok hr o] at hop; cases hop
 
 theorem Row.kill_sub (ε : Row) (n : Nat) : Row.Sub (ε.substT (kill n)) ε := by
   intro x hx

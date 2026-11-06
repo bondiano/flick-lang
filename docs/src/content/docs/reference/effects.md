@@ -348,6 +348,128 @@ start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
 ```
 
+## Effects and handlers
+
+`effect E params =` declares an effect: its operations are called as those
+of a service, `E.op x`, and a call needs `E` in the row of its stage. Before
+its name an operation may say how a handler's arm for it returns:
+
+- `tail`, the default: the arm is the value of the operation;
+- `abort`: the operation never returns, so its result is a variable of its
+  own, `forall b. … -> b` (`FLICK-E014`), and the arm is the value of the
+  handler;
+- `control`: the arm is the value of the handler, and `resume` is the rest
+  of the body, which gives back the handler's value.
+
+A service is an effect whose operations are all `tail`: another class in a
+`service` is `FLICK-E013`. The words `effect`, `tail`, `abort` and `control`
+are keywords only there.
+
+`try … with` handles operations as it handles errors. An arm
+`| E.op p… -> h` takes the arguments of a call; `| return p -> h` takes the
+value of the body, and the handler's value is then `h`. A handler has one
+`return` arm, without a guard, matching every value (`FLICK-E015`); without
+it the body's value is the handler's. An effect leaves the row of the body
+when arms without a guard take every argument of each of its operations;
+other calls of it go on to the handler around. The arms run where the
+handler is: what they need is the enclosing stage's, and a failure of a
+`tail` arm is the handler's, which no `try` in the body sees.
+
+```flick
+effect Ask a =
+  ask : Unit ->{} a
+
+effect Emit a =
+  control emit : a ->{} Unit
+
+effect Throw =
+  abort throw : forall b. String ->{} b
+
+with_name : forall a r e. String -> (Unit ->{Ask String | r; e} a) ->{r; e} a
+let with_name name body =
+  try body () with
+  | Ask.ask () -> name
+
+collect : forall a r e. (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
+let collect body =
+  try body () with
+  | Emit.emit x -> [x] ++ resume ()
+  | return () -> []
+
+attempt : forall a r e. (Unit ->{Throw | r; e} a) ->{r; e} Result String a
+let attempt body =
+  try Ok (body ()) with
+  | Throw.throw message -> Err message
+```
+
+An `abort` closes the scopes it leaves before its arm runs. A `control`
+arm that ends without calling `resume` lets the rest of the body go, which
+closes its scopes too; calling `resume` a second time is a defect.
+`resume` holds the handler's region, so it stays in the arms: kept in a
+cell made outside, it is `FLICK-G002`:
+
+```flick fail
+# effect Emit a =
+#   control emit : a ->{} Unit
+# zero : Unit ->{} Int
+# let zero () = 0
+#
+escaped : (Unit ->{Emit Int; none} Int) ->{} Int
+let escaped body =
+  let cell = Ref.make zero
+  try body () with
+  | Emit.emit _ ->
+    // FLICK-G002: `resume` stays in the arms of its handler
+    Ref.set cell resume
+    0
+```
+
+`provide S impl { body }` handles the service `S` in its body with the
+record `impl : S.Impl`, each operation by its field, as `tail` arms do. The
+record is named, or written in parentheses: `provide S ({ op = … }) { … }`.
+An effect is handled by the arms of a `try` (`FLICK-E016`).
+
+```flick
+# service Greeter =
+#   greet : String ->{} String
+#
+greeter : Greeter.Impl
+let greeter = { greet = fun name -> "hello, " ++ name }
+
+greeted : Unit ->{} String
+let greeted () = provide Greeter greeter { Greeter.greet "ada" }
+```
+
+A task that `spawn`, `parallel`, the races, `timeout`, or the runs of
+`FiberSet`, `FiberMap` and `FiberHandle` start runs in a fiber of its own.
+The handler of an effect with a `control` operation is in the fiber that
+installed it, so such a task needs `Detached r`: no effect of its services
+has one. The compiler decides it from the row; a function that starts
+tasks with the services of a row variable names `Detached r` in its
+signature. A `control` effect there, or a row variable without it, is
+`FLICK-E017`:
+
+```flick
+# effect Emit a =
+#   control emit : a ->{} Unit
+# collect : forall a r e. (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
+# let collect body =
+#   try body () with
+#   | Emit.emit x -> [x] ++ resume ()
+#   | return () -> []
+#
+both_of : forall r e a. Detached r => Eff r e a -> Eff r e a ->{r; e} (a, a)
+let both_of first second = parallel first second
+
+children : Unit ->{} (List Int, List Int)
+let children () =
+  parallel (task { collect (fun () -> Emit.emit 1) }) (task { collect (fun () -> Emit.emit 2) })
+```
+
+Handlers run on both targets. A `control` arm needs the body to wait as a
+coroutine: the Go build runs it, the JavaScript build reports `FLICK-P012`
+until its runtime has such a body of its own.
+
 ## Not checked yet
 
 | Construct | Today |

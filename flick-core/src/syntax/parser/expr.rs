@@ -532,13 +532,18 @@ fn fun_expr(p: &mut Parser) -> Done {
     p.complete(m, K::FunExpr)
 }
 
-fn arms(p: &mut Parser) {
+/// The arms of a `match`, or of a `try` (`handler`): there `| return p ->`
+/// is the arm for the value of the body, and `return` alone a name.
+fn arms(p: &mut Parser, handler: bool) {
     if !p.at(K::Pipe) {
         p.error_expected("a match arm `| pattern -> …`");
     }
     while p.at(K::Pipe) {
         let m = p.start();
         p.bump();
+        if handler && p.at_word("return") && !matches!(p.nth(1), K::Arrow | K::WhenKw | K::Pipe) {
+            p.bump_as(K::ReturnKw);
+        }
         pattern::or_pattern(p);
         if p.at(K::WhenKw) {
             let guard = p.start();
@@ -558,7 +563,7 @@ fn match_expr(p: &mut Parser) -> Done {
     p.bump();
     expr(p);
     if p.expect(K::WithKw) {
-        arms(p);
+        arms(p, false);
     }
     p.complete(m, K::MatchExpr)
 }
@@ -568,7 +573,7 @@ fn try_expr(p: &mut Parser) -> Done {
     p.bump();
     p.body(K::Block, stmt);
     if p.expect(K::WithKw) {
-        arms(p);
+        arms(p, true);
     }
     p.complete(m, K::TryExpr)
 }

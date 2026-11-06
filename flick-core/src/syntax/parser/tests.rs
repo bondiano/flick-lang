@@ -418,3 +418,31 @@ fn attributes_stand_before_declarations_and_constructors() {
          (Variant (Attribute @ lang some) Some (NameType a)))"
     );
 }
+
+#[test]
+fn an_effect_names_the_class_of_each_operation() {
+    assert_eq!(
+        sexp("effect E =\n  abort stop : Int ->{} Int\n  tail : Unit ->{} Int"),
+        "(ServiceDecl effect E = (Members (Signature abort stop : (ArrowType (NameType Int) \
+         -> (EffectAnnot { }) (NameType Int))) (Signature tail : (ArrowType (NameType Unit) \
+         -> (EffectAnnot { }) (NameType Int)))))"
+    );
+    // the words are names elsewhere
+    assert_eq!(
+        errors("let effect = 1\nlet tail = 2\nlet control = 3\n"),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_handler_has_an_arm_for_the_value_of_its_body() {
+    let tree = sexp("let f () = try g () with\n  | E.op x -> x\n  | return v -> v");
+    assert!(tree.contains("(MatchArm | return (VarPat v) -> "), "{tree}");
+    // `return` alone is a name, and no keyword in `match`
+    let tree = sexp("let f () = try g () with\n  | return -> 0");
+    assert!(tree.contains("(MatchArm | (VarPat return) -> "), "{tree}");
+    assert_eq!(
+        errors("let f x = match x with\n  | return -> 0\n"),
+        Vec::<String>::new()
+    );
+}

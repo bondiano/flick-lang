@@ -31,6 +31,7 @@ theorem owner_arg {Θ : Facts} {c : Const} {p : Nat} {T : Ty} {φ : Stage} {w : 
     cases hf with
     | app hc' ho _ hT₁ =>
       cases hc' with
+      | perform => rcases hc with h | h <;> cases h
       | const hok hT' =>
         have out : ∀ (C : Caps) (s : Ty), Outl Θ C s → s = .rg p → ∀ x, C (.r x) → x ≤ p := by
           intro C s hO hs x hx
@@ -71,17 +72,25 @@ theorem owner_arg {Θ : Facts} {c : Const} {p : Nat} {T : Ty} {φ : Stage} {w : 
 /-- The body of a closing region leaves it for the place around it. -/
 theorem close_move {Θ : Facts} {p : Nat} {w : Tm} {T : Ty} {φ : Stage} {A : Nat → Prop}
     (h : Typ S Ψ Θ [] (.inside p w) (.ex T φ)) (hw : Final w)
-    (hW : w.Within Ψ B anc (fun x => A x ∨ x = p)) (hA : ¬ A p) : w.Within Ψ B anc A := by
+    (hW : w.Within Ψ B anc (fun x => A x ∨ x = p)) (hA : ¬ A p)
+    (hle : ∀ q x, anc q x → x ≤ q) (hp : anc p = fun x => A x ∨ x = p)
+    (hc : ∀ q ℓ a, w = .unw q ℓ a → q ≠ p) : w.Within Ψ B anc A := by
   cases h with
   | inside _ hb hφ' ht hε _ _ =>
     have iff : ∀ x, x ≠ p → ((A x ∨ x = p) ↔ A x) := fun x hx =>
       ⟨fun h => h.resolve_right hx, .inl⟩
-    rcases hw with hv | ⟨v, hv, rfl⟩
+    rcases hw with hv | ⟨v, hv, rfl⟩ | ⟨q, ℓ, a, rfl⟩
     · exact hW.moveT hv hb fun x hx => iff x fun h => ht (h ▸ hx)
     · have hv' := raise_errors hv hb
       have : v.Within Ψ B anc A := Tm.Within.moveT hv hv' hW fun x hx => iff x fun h => hε (by
         subst h; exact hx.imp (Stage.le_err hφ' _) (Stage.le_err hφ' _))
       exact this
+    · obtain ⟨hq, ha, hf, hanc⟩ := hW
+      have hqp := hc _ _ _ rfl
+      have hAq : A q := hq.resolve_right hqp
+      refine ⟨hAq, ha, hf, fun x hx => (hanc x hx).resolve_right fun hxp => ?_⟩
+      subst hxp
+      exact hqp (Nat.le_antisymm (hle x q (by rw [hp]; exact .inl hAq)) (hle q x hx))
   | errVal hv => exact absurd hv inside_not_value
 
 theorem envLookup_value {θ v : Tm} {N : Name} (hθ : Value θ) (h : θ.envLookup N = some v) : Value v := by

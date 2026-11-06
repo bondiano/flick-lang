@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: fa4e115f960ab79c
+source_hash: ccb9f7021b54371b
 ---
 
 ## Expected errors
@@ -111,6 +111,25 @@ If `load_name` requires `{Users, Log}` and allows `{NotFound}`, then after provi
 
 Providing a layer removes the services it supplies, but adds the dependencies and errors of its construction. For an ordinary function, the argument must be `task { ... }` instead of a special block, so that strict evaluation order does not start the body before the environment is established. [Effect Layers](https://effect.website/docs/v4/requirements-management/layers).
 
+## Effects of the program and handlers
+
+`effect E params =` declares an effect: its operations are called as those of a service, `E.op x`, and a call needs `E` in the row of its stage. The declaration gives each operation its class: `tail` (the default), whose handler's arm gives the operation its value; `abort`, which never returns, its arm giving the handler its value; and `control`, whose arm gives the handler its value and gets `resume`, the rest of the body. A service is an effect whose operations are all `tail`.
+
+`try … with` handles operations as it handles errors: an arm `| E.op p… -> …` takes the arguments of a call, `| return p -> …` the value of the body. The arms run where the handler is, and an effect leaves the row of the body when arms without a guard cover all its operations:
+
+```flick
+effect Emit a =
+  control emit : a ->{} Unit
+
+collect : forall a r e. (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
+let collect body =
+  try body () with
+  | Emit.emit x -> [x] ++ resume ()
+  | return () -> []
+```
+
+A handler is deep: `resume` goes on with the body under the same handler and gives back its value. `resume` runs at most once, a second call is a defect; an arm that does not call it lets the rest of the body go, and its scopes close. `resume` holds the handler's region, so it does not leave the arms. A task in a fiber of its own (`spawn`, `parallel`, the races) cannot carry an effect with a `control` operation: its handler stayed in the parent's fiber. `provide S impl { … }` handles a service with a record `S.Impl`. The details are in [Effects, errors and services](../../reference/effects/#effects-and-handlers).
+
 ## Resources
 
 `scope` combines runtime finalization with a static ban on unsafe escape. Acquisition registers a finalizer with the lexical owner. The safe scoped API has **no early close**; separate manual-handle bindings do not get this guarantee. A library owner that replaces or evicts its resources (`ScopedRef`, `Resource`, `ScopedCache`) hands its value out only under a lease, and releases a value once no lease holds it. With this restriction resources need neither linearity nor typestate for an open/closed handle.
@@ -133,7 +152,7 @@ Retry, schedules, streams, queues, cache, tracing and HTTP are a typed standard 
 
 `deriving Schema` and codecs for external formats are part of the language. Generics, recursion, refinements, field policies and effectful transformations are covered in [Schema and standard data types](../07-schema/).
 
-Services and `provide` are not universal algebraic handlers with capture and multi-shot resumption of a continuation: the language's operations rely on concrete Effect mechanisms, and on the Go target on the same mechanisms of `runtime-go/flickrt`.
+The handlers of a program's effects are one-shot: a continuation resumes at most once, never several times. Services and `provide layer` still rely on Effect's mechanisms, and on the Go target on the same mechanisms of `runtime-go/flickrt`; `control` arms compile for Go, and for JavaScript once it has a runtime of its own.
 
 ## Execution and static lifetime contracts
 

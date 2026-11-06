@@ -93,6 +93,15 @@ impl<'a> Gen<'a> {
     pub(super) fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> Code<'a> {
         let a = self.a;
         let body = self.task(body);
+        let handler = self.error_handler(arms);
+        let fb = self.fiber.expect("a `try` with arms runs in a fiber");
+        call(a, "flickrt.Try", [a.text(fb), body.doc, handler]).into()
+    }
+
+    /// The handler of the typed errors of `arms`: a Go function of the fiber
+    /// and the error that gives `flickrt.Unmatched` when no arm matches.
+    pub(super) fn error_handler(&mut self, arms: &[Arm]) -> Document<'a> {
+        let a = self.a;
         let saved = (
             self.tail.take(),
             mem::replace(&mut self.generator, false),
@@ -116,15 +125,13 @@ impl<'a> Gen<'a> {
         });
         (self.tail, self.generator, self.fiber, self.context) = saved;
         stmts.push(statement(a, "return flickrt.Unmatched"));
-        let fb = self.fiber.expect("a `try` with arms runs in a fiber");
-        let handler = docvec![
+        docvec![
             a,
             "func(fb *flickrt.Fiber, ",
             err,
             " flickrt.Value) flickrt.Value ",
             block(a, stmts)
-        ];
-        call(a, "flickrt.Try", [a.text(fb), body.doc, handler]).into()
+        ]
     }
 
     /// `o?`: the value of the `Some`, after returning a `None` at once.

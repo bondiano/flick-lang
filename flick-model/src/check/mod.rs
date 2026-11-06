@@ -18,6 +18,7 @@ mod constants;
 mod dicts;
 mod expr;
 mod generalize;
+mod handle;
 mod handlers;
 mod pattern;
 mod regions;

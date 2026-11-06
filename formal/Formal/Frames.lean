@@ -19,6 +19,12 @@ theorem OkE.append {E : List Frame} {F : Frame} (hE : OkE E) (hF : F.ok) : OkE (
 
 theorem OkE.nil : OkE [] := by simp [OkE]
 
+theorem OkE.cons' {E : List Frame} {F : Frame} (hE : OkE E) (hF : F.ok) : OkE (F :: E) :=
+  fun G hG => (List.mem_cons.mp hG).elim (fun h => h ▸ hF) (hE G)
+
+theorem OkE.append' {E E' : List Frame} (h : OkE E) (h' : OkE E') : OkE (E ++ E') :=
+  fun G hG => (List.mem_append.mp hG).elim (h G) (h' G)
+
 theorem OkE.cons {E : List Frame} {F : Frame} (h : OkE (F :: E)) : F.ok ∧ OkE E :=
   ⟨h F (by simp), fun G hG => h G (by simp [hG])⟩
 
@@ -30,10 +36,11 @@ theorem lookupE_append (E : List Frame) (F : Frame) (N : Name) :
   | nil => simp [lookupE]; cases F.lookup N <;> rfl
   | cons G E ih => simp only [List.cons_append, lookupE]; cases G.lookup N <;> simp [ih]
 
-/-- Services a frame provides: those of `with θ`, and `Scope π` of `inside π`; the
-obligations it may discharge and the uses of a `provide` region it ends. -/
+/-- Services a frame provides: those of `with θ`, the effect of a handler, and `Scope π`
+of `inside π`; the obligations it may discharge and the uses of a `provide` region it
+ends. -/
 def Frame.dom (F : Frame) : Row
-  | .nm N => (F.lookup N).isSome
+  | .nm N => (F.lookup N).isSome ∨ F.installs N
   | .atm a => ∃ p, F = .inside p ∧ a = .r p
   | .ob N a => (F.lookup N).isSome ∨ ∃ p, F = .inside p ∧ a = .r p
   | .need _ a | .obv _ a => ∃ p, F = .inside p ∧ a = .r p
@@ -47,12 +54,13 @@ def domE : List Frame → Row
 theorem domE_cons (F : Frame) (E : List Frame) (n : Elem) :
     domE (F :: E) n ↔ F.dom n ∨ domE E n := Iff.rfl
 
-theorem domE_nm (E : List Frame) (N : Name) : domE E (.nm N) ↔ (lookupE E N).isSome := by
+theorem domE_nm (E : List Frame) (N : Name) :
+    domE E (.nm N) ↔ (lookupE E N).isSome ∨ ∃ F ∈ E, F.installs N := by
   induction E with
   | nil => simp [domE, Row.none, lookupE]
   | cons F E ih =>
-    simp only [domE, Row.union, Frame.dom, lookupE, ih]
-    cases F.lookup N <;> simp
+    simp only [domE, Row.union, Frame.dom, lookupE, ih, List.mem_cons]
+    cases F.lookup N <;> simp <;> grind
 
 theorem not_value_plug {r : Tm} (hr : ¬ Value r) (F : Frame) : ¬ Value (F.plug r) := by
   intro hv
@@ -99,5 +107,19 @@ theorem ask_not_value {N w} : ¬ Value (.app (.const (.ask N)) w) := by
 
 theorem raise_not_value {v} : ¬ Value (.raise v) := by
   intro hv; cases hv
+
+theorem perform_not_value {E o c w} : ¬ Value (.app (.const (.perform E o c)) w) := by
+  intro hv
+  cases hv with
+  | ctorApp _ hf _ => simp [Tm.head] at hf
+  | constApp hc _ => simp [Const.arity, Const.layer] at hc
+
+theorem hole_not_value {p} : ¬ Value (.hole p) := by
+  intro hv; cases hv
+
+theorem kont_not_value {p ℓ w} : ¬ Value (.app (.kont p ℓ) w) := by
+  intro hv
+  cases hv with
+  | ctorApp _ hf _ => simp [Tm.head] at hf
 
 end Flick

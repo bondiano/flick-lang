@@ -41,6 +41,8 @@ pub fn subst(e: &Term, s: &Subst) -> Term {
         | Term::Env(_)
         | Term::Die(_)
         | Term::Own(_)
+        | Term::Cont(_)
+        | Term::Signal(_)
         | Term::Cap(..) => e.clone(),
         Term::Lam(x, b) => Term::Lam(x.clone(), Rc::new(subst(b, &without(s, x)))),
         Term::App(f, a) => Term::App(go(f), go(a)),
@@ -85,6 +87,7 @@ pub fn subst(e: &Term, s: &Subst) -> Term {
         Term::Raise(v) => Term::Raise(go(v)),
         // the region's name binds in types only
         Term::Inside(p, r, e) => Term::Inside(*p, r.clone(), go(e)),
+        Term::Handler(h) => Term::Handler(Rc::new(h.map(|t| subst(t, s), |a| arms_subst(a, s)))),
     }
 }
 
@@ -214,7 +217,10 @@ pub fn any(e: &Term, f: &dyn Fn(&Term) -> bool) -> bool {
             xs.iter().any(|x| any(x, f))
         }
         Term::Record(fs) => fs.iter().any(|(_, x)| any(x, f)),
+        Term::Handler(h) => h.terms().any(|x| any(x, f)) || arms(&Term::unit(), &h.errors),
         Term::Var(_)
+        | Term::Cont(_)
+        | Term::Signal(_)
         | Term::Global(_)
         | Term::Lit(_)
         | Term::Tag(_)
@@ -271,6 +277,18 @@ fn free(e: &Term, bound: &mut Vec<Name>, out: &mut BTreeSet<Name>) {
             xs.iter().for_each(|x| free(x, bound, out));
         }
         Term::Record(fs) => fs.iter().for_each(|(_, x)| free(x, bound, out)),
+        Term::Handler(h) => {
+            h.terms().for_each(|x| free(x, bound, out));
+            for arm in h.errors.iter() {
+                let mark = bound.len();
+                binders(&arm.pat, bound);
+                if let Some(g) = &arm.guard {
+                    free(g, bound, out);
+                }
+                free(&arm.body, bound, out);
+                bound.truncate(mark);
+            }
+        }
         Term::App(a, b) | Term::Update(a, _, b) | Term::Provide(a, b) | Term::Join(a, b) => {
             free(a, bound, out);
             free(b, bound, out);
@@ -290,6 +308,8 @@ fn free(e: &Term, bound: &mut Vec<Name>, out: &mut BTreeSet<Name>) {
         | Term::Env(_)
         | Term::Die(_)
         | Term::Own(_)
+        | Term::Cont(_)
+        | Term::Signal(_)
         | Term::Cap(..) => {}
     }
 }

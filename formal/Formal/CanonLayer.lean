@@ -23,7 +23,7 @@ theorem builds_one {Ψ Θ Γ} (c : Const) {w} (hc : c.arity = 2 ∨ c.layer) (hw
     cases hf with
     | const _ hT' =>
       cases c with
-      | refMake | refGet | ask | open_ | op => simp [Const.arity, Const.layer] at hc
+      | refMake | refGet | ask | open_ | op | perform _ _ _ => simp [Const.arity, Const.layer] at hc
       | refSet | merge | addFin | spawn | intEq =>
         obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
         cases h; have := (lt.trans hT).kind; simp [Ty.kind] at this
@@ -37,6 +37,7 @@ theorem builds_one {Ψ Θ Γ} (c : Const) {w} (hc : c.arity = 2 ∨ c.layer) (hw
         cases h; cases lt; cases hT
         exact ⟨_, rfl, .bind (.await ((hw'.valueAny hw _).sub ⟨la, Stage.le_refl _⟩)
           (Stage.le_refl _) .refl) fun _ => Iff.rfl⟩
+    | perform => simp [Const.arity, Const.layer] at hc
 
 theorem builds_two {Ψ Θ Γ} (c : Const) {w₁ w₂} (h₁ : c.arity = 2) (h₂ : c.layer)
     (ih₁ : Builds S Ψ Θ Γ w₁) (ih₂ : Builds S Ψ Θ Γ w₂) :

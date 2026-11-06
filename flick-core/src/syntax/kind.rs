@@ -69,6 +69,17 @@ pub enum SyntaxKind {
     /// `plugin` before a head in the exposed items of an import, a keyword
     /// only there.
     PluginKw,
+    /// `effect` before the name of an effect declaration, a keyword only
+    /// there.
+    EffectKw,
+    /// `tail`, `abort` and `control` before an operation of an effect, the
+    /// class of its handler's branch; keywords only there.
+    TailKw,
+    AbortKw,
+    ControlKw,
+    /// `return` before the pattern of a handler's branch for the value of
+    /// its body, a keyword only there.
+    ReturnKw,
 
     // punctuation and operators
     LParen,

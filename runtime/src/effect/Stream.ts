@@ -18,7 +18,7 @@ import {
   Stream,
 } from "effect";
 
-import { Failure } from "../cause.ts";
+import { Failure, passOn, unwinds } from "../cause.ts";
 import type { Data } from "../data.ts";
 import { service } from "../effects.ts";
 import { failureCause, flickExit } from "../stdlib/outcome.ts";
@@ -257,14 +257,14 @@ export const flickShare =
 export const flickCatchCause =
   <A2, E2, R2>(f: (failure: Failure) => Stream.Stream<A2, E2, R2>) =>
   <A, E, R>(self: Stream.Stream<A, E, R>): Stream.Stream<A | A2, E2, R | R2> =>
-    Stream.catchCause(self, (cause) => f(new Failure(cause)));
+    Stream.catchCause(self, (cause) => (unwinds(cause) ? Stream.fromEffect(passOn(cause)) : f(new Failure(cause))));
 
 export const flickCatchCauseIf =
   <A2, E2, R2>(p: (failure: Failure) => boolean, f: (failure: Failure) => Stream.Stream<A2, E2, R2>) =>
   <A, E, R>(self: Stream.Stream<A, E, R>): Stream.Stream<A | A2, E | E2, R | R2> =>
     Stream.catchCauseIf(
       self,
-      (cause) => p(new Failure(cause)),
+      (cause) => !unwinds(cause) && p(new Failure(cause)),
       (cause) => f(new Failure(cause)),
     );
 
@@ -276,7 +276,10 @@ export const flickCatchCauseFilter =
   <A, E, R>(self: Stream.Stream<A, E, R>): Stream.Stream<A | A2, unknown, R | R2> =>
     Stream.catchCauseFilter(
       self,
-      (cause: Cause.Cause<E>) => Result.mapError(filter(new Failure(cause)), (refused) => failureCause<unknown>(refused)),
+      (cause: Cause.Cause<E>) =>
+        unwinds(cause)
+          ? Result.fail(cause)
+          : Result.mapError(filter(new Failure(cause)), (refused) => failureCause<unknown>(refused)),
       (b, cause) => f(b, new Failure(cause)),
     );
 

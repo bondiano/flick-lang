@@ -1,4 +1,4 @@
-import Formal.Covers
+import Formal.WeakenBase
 
 /-!
 # Structural lemmas: store weakening and renaming
@@ -7,32 +7,6 @@ import Formal.Covers
 namespace Flick
 
 variable {S : Sig}
-
-theorem PatTy.binds {fl p t Δ} (h : PatTy S fl p t Δ) : Δ.length = p.binds := by
-  induction h <;> simp_all [Pat.binds]
-
-theorem Pat.spine_binds (K : Name) (qs : List Pat) :
-    (Pat.spine K qs).binds = (qs.map Pat.binds).sum := by
-  have key : ∀ (qs : List Pat) (p : Pat), (qs.foldl .app p).binds = p.binds + (qs.map Pat.binds).sum := by
-    intro qs
-    induction qs with
-    | nil => intro p; simp
-    | cons q qs ih => intro p; simp only [List.foldl, ih, Pat.binds, List.map_cons, List.sum_cons]; omega
-  simpa [Pat.spine, Pat.binds] using key qs (.ctor K)
-
-theorem PatsTy.binds {qs us Δ} (h : PatsTy S qs us Δ) : Δ.length = (qs.map Pat.binds).sum := by
-  induction h with
-  | nil => rfl
-  | cons hq _ ih => simp [hq.binds, ih]
-
-/-- The arm of a GADT binds what its patterns bind, under any instance. -/
-theorem PatsTy.spine_binds {K qs us Δ} (h : PatsTy S qs us Δ) :
-    (Δ.map Scheme.mono).length = (Pat.spine K qs).binds := by
-  simp [h.binds, Pat.spine_binds]
-
-theorem getElem?_lt {α} {l : List α} {i : Nat} {a : α} (h : l[i]? = some a) : i < l.length := by
-  obtain ⟨hi, _⟩ := List.getElem?_eq_some_iff.mp h
-  exact hi
 
 /-- A typed term names only cells of its store typing. -/
 theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l) → l < Ψ.length := by
@@ -44,6 +18,28 @@ theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l)
     · exact ih₂ l h
   | scope _ _ _ _ _ _ ih => intro l h; simpa using ih l h
   | aref _ _ _ _ hlc _ _ _ _ ih => intro l h; exact h.elim (hlc l) (ih l)
+  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+    intro l h; subst hk
+    simp only [Tm.Has] at h
+    rcases h with h | h | h | h | h | h
+    · cases h
+    · cases h
+    · exact ih₁ l h
+    · exact ih₂ l h
+    · exact ih₄ l h
+    · rcases plug_has_iff.mp h with h | h
+      · exact ih₃ l (plug_has_iff.mpr (.inl h))
+      · simp [Tm.Has] at h
+  | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
+    intro l h; subst ha
+    simp only [Tm.Has] at h
+    rcases h with h | h | h | h
+    · cases h
+    · cases h
+    · rcases plug_has_iff.mp h with h | h
+      · exact ih₂ l (plug_has_iff.mpr (.inl h))
+      · simp [Tm.Has] at h
+    · exact ih₁ l h
   | _ => intro l h; (try simp only [Tm.Has] at h) <;> grind
 
 theorem HPat.binds {ε₀ p θ Δ} (h : HPat S ε₀ p θ Δ) : Δ.length = p.binds := by
@@ -95,6 +91,26 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
     · have := ih₁ _ h; simp [hp.binds] at this; omega
     · have := ih₂ _ h; simp [hp.binds] at this; omega
     · exact ih₃ i h
+  | hatail _ _ _ ih₁ ih₂ | haabort _ _ _ ih₁ ih₂ =>
+    intro i h; rcases h with h | h
+    · have := ih₁ _ h; simp [Pat.spine_binds, Pat.binds] at this; omega
+    · exact ih₂ i h
+  | hactl _ _ _ ih₁ ih₂ =>
+    intro i h; rcases h with h | h
+    · have := ih₁ _ h; simp [Pat.spine_binds, Pat.binds] at this; omega
+    · exact ih₂ i h
+  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+    intro i h; subst hk
+    rcases h with h | h | h | h
+    · exact ih₁ i h
+    · exact ih₂ i h
+    · exact ih₄ i h
+    · exact absurd (ih₃ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
+  | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
+    intro i h; subst ha
+    rcases h with h | h
+    · exact absurd (ih₂ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
+    · exact ih₁ i h
   | _ => intro i h; (try simp only [Tm.Free] at h) <;> grind
 
 theorem held_weaken {Ψ Γ e} (X : List Ty) (hl : ∀ l, e.Has (.loc l) → l < Ψ.length) :
@@ -168,6 +184,25 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
     rw [List.map_append]; exact ih₁ _
   | dproj _ hc hk hl hts hH hT ih => exact .dproj (ih X) hc hk hl hts hH hT
   | glob hg hts hH hT => exact .glob hg hts hH hT
+  | perform hop hT => exact .perform hop hT
+  | hanil => exact .hanil
+  | hatail hop _ _ ih₁ ih₂ => exact .hatail hop (ih₁ X) (ih₂ X)
+  | haabort hop _ _ ih₁ ih₂ => exact .haabort hop (ih₁ X) (ih₂ X)
+  | hactl hop _ _ ih₁ ih₂ => exact .hactl hop (ih₁ X) (ih₂ X)
+  | hdl _ hn _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+    refine .hdl ?_ hn (ih₂ X) hψ (ih₃ X) hφ₀ hc hφ hT
+    rw [List.map_append]; exact ih₁ _
+  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+    exact .hwith (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ (ih₃ X) hφ₀ hc hφ hT
+  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ih₁ ih₂ ih₃ ih₄ =>
+    exact .hctl (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ hop hc htl hE hk (ih₃ X) hφ₀ (ih₄ X)
+      (fun h => let ⟨C', h₁, h₂⟩ := hl h
+        ⟨C', by rw [List.getElem?_append_left (getElem?_lt h₁)]; exact h₁, h₂⟩) hcm hφ hT
+  | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ =>
+    exact .hres (getElem?_ext hℓ) (ih₁ X) hA ha (ih₂ X) (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hφ hT
+  | hdone _ ih => exact .hdone (ih X)
+  | unw hℓ _ hφ ih => exact .unw (getElem?_ext hℓ) (ih X) hφ
+  | kont hl hC hT => exact .kont (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hC hT
 
 /-- A renaming `ξ : Γ → Γ'`. -/
 def RenOk (Γ Γ' : List Scheme) (ξ : Nat → Nat) : Prop :=
@@ -224,6 +259,20 @@ theorem RenOk.frees_lift {Γ Γ' ξ} (h : RenOk Γ Γ' ξ) {e : Tm} {n : Nat}
 
 theorem Tm.NoIns.rename {e : Tm} (ξ : Nat → Nat) (h : e.NoIns) : (e.rename ξ).NoIns :=
   fun h' => h ((Tm.has_rename _ _ _).mp h')
+
+/-- A body parked at a hole whose filling is closed and typed is closed. -/
+theorem plug_hole_closed {Ψ Θ Ei x J} {p : Nat} (h : Typ S Ψ Θ [] (plug Ei x) J) :
+    (plug Ei (.hole p)).Closed :=
+  fun i hi => absurd (h.frees i (plug_free_of_hole hi)) (Nat.not_lt_zero _)
+
+theorem Tm.armOf_rename {ξ : Nat → Nat} {o : Name} :
+    ∀ {al : Tm}, ((al.rename ξ).armOf o).isSome = (al.armOf o).isSome := by
+  intro al
+  induction al generalizing ξ with
+  | acons p b r _ ih =>
+    simp only [Tm.rename, Tm.armOf]
+    split <;> simp_all
+  | _ => simp [Tm.rename, Tm.armOf]
 
 theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ {Γ' ξ}, RenOk Γ Γ' ξ → Typ S Ψ Θ Γ' (e.rename ξ) J := by
@@ -316,6 +365,33 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | dnil => intro _ _ _; exact .dnil
   | dcons _ _ ih₁ ih₂ => intro _ _ hξ; exact .dcons (ih₁ (hξ.up _)) (ih₂ hξ)
   | dproj _ hc hk hl hts hH hT ih => intro _ _ hξ; exact .dproj (ih hξ) hc hk hl hts hH hT
+  | perform hop hT => intro _ _ _; exact .perform hop hT
+  | hanil => intro _ _ _; exact .hanil
+  | hatail hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hatail hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
+  | haabort hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .haabort hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
+  | hactl hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hactl hop (ih₁ (hξ.lift [_, _] rfl)) (ih₂ hξ)
+  | hdl _ hn _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+    intro _ ξ hξ
+    exact .hdl (ih₁ (hξ.up 1)) (hn.rename ξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT
+  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+    intro _ ξ hξ
+    exact .hwith hℓ (ih₁ hξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT
+  | hctl hℓ _ _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT ih₁ ih₂ _ ih₄ =>
+    intro _ ξ hξ
+    subst hk
+    rw [Tm.rename, (plug_hole_closed hp).rename]
+    exact .hctl hℓ (ih₁ hξ) (ih₂ hξ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hξ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
+      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT
+  | hres hℓ _ hA ha hp hl hφ hT ih₁ _ =>
+    intro _ ξ hξ
+    subst ha
+    rw [Tm.rename, (plug_hole_closed hp).rename]
+    exact .hres hℓ (ih₁ hξ) hA rfl hp hl hφ hT
+  | hdone _ ih => intro _ _ hξ; exact .hdone (ih hξ)
+  | unw hℓ _ hφ ih => intro _ _ hξ; exact .unw hℓ (ih hξ) hφ
+  | kont hl hC hT => intro _ _ _; exact .kont hl hC hT
   | glob hg hts hH hT => intro _ _ _; exact .glob hg hts hH hT
 
 end Flick

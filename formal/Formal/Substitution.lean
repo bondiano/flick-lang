@@ -11,6 +11,36 @@ namespace Flick
 
 variable {S : Sig}
 
+/-- The arms of a handler keep their operations under a substitution. -/
+theorem Typ.armOf_subst {σ : Nat → Tm} {o : Name} :
+    ∀ {al : Tm} {Ψ Θ Γ E t φ s}, Typ S Ψ Θ Γ al (.harms E t φ s) →
+      ((al.subst σ).armOf o).isSome = (al.armOf o).isSome
+  | .acons p b r, _, _, _, _, _, _, _, h => by
+    have hr : ∃ Ψ Θ Γ E t φ s, Typ S Ψ Θ Γ r (.harms E t φ s) := by
+      cases h <;> exact ⟨_, _, _, _, _, _, _, ‹_›⟩
+    obtain ⟨_, _, _, _, _, _, _, hr⟩ := hr
+    simp only [Tm.subst, Tm.armOf]
+    split <;> simp [Typ.armOf_subst hr]
+  | .anil, _, _, _, _, _, _, _, _ => rfl
+  | .var _, _, _, _, _, _, _, _, h | .lam _, _, _, _, _, _, _, _, h | .app _ _, _, _, _, _, _, _, _, h
+  | .let_ _ _, _, _, _, _, _, _, _, h | .letrec _ _, _, _, _, _, _, _, _, h
+  | .fix _, _, _, _, _, _, _, _, h | .lit _, _, _, _, _, _, _, _, h | .loc _, _, _, _, _, _, _, _, h
+  | .const _, _, _, _, _, _, _, _, h | .ctor _, _, _, _, _, _, _, _, h | .rnil, _, _, _, _, _, _, _, h
+  | .rcons _ _ _, _, _, _, _, _, _, _, h | .proj _ _, _, _, _, _, _, _, _, h
+  | .update _ _ _, _, _, _, _, _, _, _, h | .match_ _ _, _, _, _, _, _, _, _, h
+  | .aguard _ _ _ _, _, _, _, _, _, _, _, h | .todo, _, _, _, _, _, _, _, h
+  | .task _, _, _, _, _, _, _, _, h | .await _, _, _, _, _, _, _, _, h | .raise _, _, _, _, _, _, _, _, h
+  | .try_ _ _, _, _, _, _, _, _, _, h | .handle _ _, _, _, _, _, _, _, _, h
+  | .provide _ _, _, _, _, _, _, _, _, h | .with_ _ _ _, _, _, _, _, _, _, _, h
+  | .enil, _, _, _, _, _, _, _, h | .econs _ _ _, _, _, _, _, _, _, _, h | .bind _ _, _, _, _, _, _, _, _, h
+  | .join _ _, _, _, _, _, _, _, _, h | .scope _, _, _, _, _, _, _, _, h | .inside _ _, _, _, _, _, _, _, _, h
+  | .cap _, _, _, _, _, _, _, _, h | .own _, _, _, _, _, _, _, _, h | .drec _ _, _, _, _, _, _, _, _, h
+  | .glob _, _, _, _, _, _, _, _, h | .hdl _ _ _ _, _, _, _, _, _, _, _, h
+  | .hwith _ _ _ _ _ _, _, _, _, _, _, _, _, h | .hctl _ _ _ _ _ _ _ _ _, _, _, _, _, _, _, _, h
+  | .hres _ _ _ _, _, _, _, _, _, _, _, h | .hdone _ _, _, _, _, _, _, _, _, h
+  | .unw _ _ _, _, _, _, _, _, _, _, h | .kont _ _, _, _, _, _, _, _, _, h | .hole _, _, _, _, _, _, _, _, h => by
+    cases h
+
 theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ {Γ' σ}, SubOk S Ψ Θ Γ Γ' σ → Typ S Ψ Θ Γ' (e.subst σ) J := by
   induction h with
@@ -104,6 +134,35 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | dcons _ _ ih₁ ih₂ => intro _ _ hσ; exact .dcons (ih₁ (SubOk.up hσ _ _)) (ih₂ hσ)
   | dproj _ hc hk hl hts hH hT ih => intro _ _ hσ; exact .dproj (ih hσ) hc hk hl hts hH hT
   | glob hg hts hH hT => intro _ _ _; exact .glob hg hts hH hT
+  | perform hop hT => intro _ _ _; exact .perform hop hT
+  | hanil => intro _ _ _; exact .hanil
+  | hatail hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hatail hop (ih₁ (SubOk.lift hσ [_] rfl)) (ih₂ hσ)
+  | haabort hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .haabort hop (ih₁ (SubOk.lift hσ [_] rfl)) (ih₂ hσ)
+  | hactl hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hactl hop (ih₁ (SubOk.lift hσ [_, _] rfl)) (ih₂ hσ)
+  | hdl hal hn _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+    intro _ σ hσ
+    have h₁ := ih₁ ((SubOk.up hσ 1 Facts.none).mono fun C s h x hx =>
+      (h x hx).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', h₁.elim id False.elim, h₂⟩)
+    exact .hdl h₁ (SubOk.noIns hσ (by simpa using hal.frees) hn) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
+  | hwith hℓ hal _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+    intro _ σ hσ
+    exact .hwith hℓ (ih₁ hσ) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
+  | hctl hℓ hal _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT ih₁ ih₂ _ ih₄ =>
+    intro _ σ hσ
+    subst hk
+    rw [Tm.subst, (plug_hole_closed hp).subst]
+    exact .hctl hℓ (ih₁ hσ) (ih₂ hσ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hσ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
+      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
+  | hres hℓ _ hA ha hp hl hφ hT ih₁ _ =>
+    intro _ σ hσ
+    subst ha
+    rw [Tm.subst, (plug_hole_closed hp).subst]
+    exact .hres hℓ (ih₁ hσ) hA rfl hp hl hφ hT
+  | hdone _ ih => intro _ _ hσ; exact .hdone (ih hσ)
+  | unw hℓ _ hφ ih => intro _ _ hσ; exact .unw hℓ (ih hσ) hφ
+  | kont hl hC hT => intro _ _ _; exact .kont hl hC hT
 
 /-- `e[x := v]` for `x` with a scheme: `v` is a value typed with the scheme's
 variables fresh and its facts assumed. -/

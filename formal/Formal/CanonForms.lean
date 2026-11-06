@@ -23,7 +23,7 @@ def VKind (e : Tm) (k : Nat) : Prop :=
   match e.head with
   | .ctor _ => k = 1 ∨ k = 3 ∨ k = 7
   | .const c => k = c.kindAt e.args
-  | .lam _ | .fix _ => k = 1
+  | .lam _ | .fix _ | .kont _ _ => k = 1
   | .lit _ => k = 0
   | .loc _ => k = 2
   | .rnil | .rcons .. => k = 4
@@ -58,6 +58,10 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | const _ hT =>
     intro _ _ _ hJ; cases hJ
     simp only [VKind, Tm.head, Tm.args, Const.kindAt]; rw [← hT.kind, Const.ty_kind]
+  | perform _ hT =>
+    intro _ _ _ hJ; cases hJ
+    simp only [VKind, Tm.head, Tm.args, Const.kindAt]; rw [← hT.kind]; rfl
+  | kont _ _ hT => intro _ _ _ hJ; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
   | ctor _ _ _ hT =>
     intro _ _ _ hJ; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind]; unfold Sig.ctorTyR
@@ -98,7 +102,7 @@ theorem Const.arity_of_resKind {c : Const} (h₁ : c.resKind = 1) (h₂ : c.arit
 theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.arrow a ψ t C) φ)) :
     (∃ b, v = .lam b) ∨ (∃ f, v = .fix f) ∨ (∃ K, v.head = .ctor K) ∨ (∃ c, v = .const c) ∨
-      (∃ c w, v = .app (.const c) w ∧ c.arity = 2 ∧ Value w) := by
+      (∃ c w, v = .app (.const c) w ∧ c.arity = 2 ∧ Value w) ∨ ∃ p ℓ, v = .kont p ℓ := by
   have hk := h.vkind hv rfl
   cases hv with
   | lam => exact .inl ⟨_, rfl⟩
@@ -108,7 +112,8 @@ theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
   | const => exact .inr (.inr (.inr (.inl ⟨_, rfl⟩)))
   | constApp hc hw =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
-    exact .inr (.inr (.inr (.inr ⟨_, _, rfl, Const.arity_of_resKind hk.symm hc, hw⟩)))
+    exact .inr (.inr (.inr (.inr (.inl ⟨_, _, rfl, Const.arity_of_resKind hk.symm hc, hw⟩))))
+  | kont => exact .inr (.inr (.inr (.inr (.inr ⟨_, _, rfl⟩))))
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 /-- L1 for references. -/

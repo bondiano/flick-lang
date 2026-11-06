@@ -46,8 +46,8 @@ theorem Const.ty_merge {c : Const} {ι : CArg} (h₁ : c.arity = 2) (h₂ : c.la
   cases c <;> simp [Const.arity, Const.layer] at h₁ h₂
   exact ⟨_, _, _, rfl⟩
 
-theorem Const.ty_arrow (c : Const) (ι : CArg) : ∃ x φ y C, c.ty S ι = .arrow x φ y C := by
-  cases c <;> exact ⟨_, _, _, _, rfl⟩
+theorem Const.ty_arrow (c : Const) (ι : CArg) : ∃ x φ y C, c.ty S ι = .arrow x φ y C :=
+  Const.ty_isArrow c ι S
 
 /-- What `Value.pure` gives. -/
 def PureTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (T : Ty) : Prop :=
@@ -148,6 +148,14 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | drec hc hk hr hn hh =>
     intro _ _ _ hJ; cases hJ
     exact ⟨_, .refl, .drec hc hk hr hn hh, by simp [Tm.head], by simp, by simp⟩
+  | @perform E o c a b t T _ _ _ _ hop hT =>
+    intro _ _ _ hJ; cases hJ
+    refine ⟨_, hT, .perform hop .refl, by simp [Tm.head], fun _ h => ?_, by simp⟩
+    cases h
+    exact ⟨{ (default : CArg) with t := t }, by cases c <;> simp [Const.ty, hop]⟩
+  | kont hl hC hT =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨_, hT, .kont hl hC .refl, by simp [Tm.head], by simp, by simp⟩
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
 /-- L1, last clause: a value has its type with any stage. -/

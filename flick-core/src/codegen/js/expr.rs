@@ -168,6 +168,7 @@ impl Gen<'_> {
                 self.expr(call)
             }
             ExprKind::Provide(layer, body) => self.provide(layer, body),
+            ExprKind::Handle(h) => self.handle(h),
             ExprKind::Lift(inner, lift) => self.lifted(inner, lift),
         }
     }
@@ -321,7 +322,7 @@ impl Gen<'_> {
     /// `yield*` of the effect `js`, in `owner` when a `Within` gave one.
     /// Runs the effect `js`: in a generator with `yield*`, in a Sync stage
     /// at once with the services of the context.
-    fn run(&mut self, owner: Option<String>, js: &str) -> String {
+    pub(super) fn run(&mut self, owner: Option<String>, js: &str) -> String {
         let js = match owner {
             Some(owner) => format!("{}({owner}, {js})", self.rt("within")),
             None => js.to_owned(),

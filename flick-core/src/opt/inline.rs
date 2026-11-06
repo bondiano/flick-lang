@@ -157,6 +157,7 @@ fn inlinable(e: &Expr) -> bool {
             | ExprKind::Scope { .. }
             | ExprKind::Within(..)
             | ExprKind::Provide(..)
+            | ExprKind::Handle(_)
             | ExprKind::Try(..)
             | ExprKind::Task(_)
             | ExprKind::Await(_)

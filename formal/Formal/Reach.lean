@@ -58,6 +58,16 @@ def Tm.Has : Tm → Site → Prop
   | .own p, s => s = .rgn p
   | .drec _ r, s => r.Has s
   | .glob _, _ => False
+  | .hdl _ al r e, s => al.Has s ∨ r.Has s ∨ e.Has s
+  | .hwith p _ _ al r e, s => s = .ins ∨ s = .rgn p ∨ al.Has s ∨ r.Has s ∨ e.Has s
+  | .hctl p _ _ _ _ al r a k, s => s = .ins ∨ s = .rgn p ∨ al.Has s ∨ r.Has s ∨ a.Has s ∨ k.Has s
+  | .hres p _ a b, s => s = .ins ∨ s = .rgn p ∨ a.Has s ∨ b.Has s
+  | .hdone p a, s => s = .ins ∨ s = .rgn p ∨ a.Has s
+  | .unw p _ a, s => s = .ins ∨ s = .rgn p ∨ a.Has s
+  -- a value, as `cap p`: closures and data may hold `resume`
+  | .kont p _, s => s = .rgn p
+  -- a run-time form: only where a body or an arm a handler parks evaluates
+  | .hole p, s => s = .ins ∨ s = .rgn p
 
 /-- No `inside` form: values and unevaluated code. -/
 def Tm.NoIns (e : Tm) : Prop := ¬ e.Has .ins
@@ -89,6 +99,12 @@ def Tm.Free : Tm → Nat → Prop
   | .scope e, j => e.Free (j + 1)
   | .inside _ e, j => e.Free j
   | .drec _ r, j => r.Free j
+  | .hdl _ al r e, j => al.Free j ∨ r.Free j ∨ e.Free j
+  | .hwith _ _ _ al r e, j => al.Free j ∨ r.Free j ∨ e.Free j
+  | .hctl _ _ _ _ _ al r a k, j => al.Free j ∨ r.Free j ∨ a.Free j ∨ k.Free j
+  | .hres _ _ a b, j => a.Free j ∨ b.Free j
+  | .hdone _ a, j => a.Free j
+  | .unw _ _ a, j => a.Free j
   | _, _ => False
 
 theorem Tm.has_rename (ξ : Nat → Nat) (e : Tm) (s : Site) : (e.rename ξ).Has s ↔ e.Has s := by
@@ -144,6 +160,25 @@ theorem Tm.free_rename (ξ : Nat → Nat) :
     · obtain ⟨i, hi, he⟩ := ih₂ ξ j h; exact ⟨i, .inr hi, he⟩
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih | drec _ _ ih =>
     intro j h; exact ih ξ j h
+  | hres _ _ _ _ ih₁ ih₂ =>
+    intro j h
+    rcases h with h | h
+    · obtain ⟨i, hi, he⟩ := ih₁ ξ j h; exact ⟨i, .inl hi, he⟩
+    · obtain ⟨i, hi, he⟩ := ih₂ ξ j h; exact ⟨i, .inr hi, he⟩
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
+    intro j h
+    rcases h with h | h | h
+    · obtain ⟨i, hi, he⟩ := ih₁ ξ j h; exact ⟨i, .inl hi, he⟩
+    · obtain ⟨i, hi, he⟩ := ih₂ ξ j h; exact ⟨i, .inr (.inl hi), he⟩
+    · obtain ⟨i, hi, he⟩ := ih₃ ξ j h; exact ⟨i, .inr (.inr hi), he⟩
+  | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+    intro j h
+    rcases h with h | h | h | h
+    · obtain ⟨i, hi, he⟩ := ih₁ ξ j h; exact ⟨i, .inl hi, he⟩
+    · obtain ⟨i, hi, he⟩ := ih₂ ξ j h; exact ⟨i, .inr (.inl hi), he⟩
+    · obtain ⟨i, hi, he⟩ := ih₃ ξ j h; exact ⟨i, .inr (.inr (.inl hi)), he⟩
+    · obtain ⟨i, hi, he⟩ := ih₄ ξ j h; exact ⟨i, .inr (.inr (.inr hi)), he⟩
+  | hdone _ _ ih | unw _ _ _ ih => intro j h; exact ih ξ j h
   | _ => intro j h; exact h.elim
 
 theorem liftS_free {n : Nat} {σ : Nat → Tm} {i j : Nat} (h : (liftS n σ i).Free (j + n)) :
@@ -208,6 +243,25 @@ theorem Tm.free_subst :
     · obtain ⟨i, hi, he⟩ := ih₂ σ j h; exact ⟨i, .inr hi, he⟩
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih | drec _ _ ih =>
     intro σ j h; exact ih σ j h
+  | hres _ _ _ _ ih₁ ih₂ =>
+    intro σ j h
+    rcases h with h | h
+    · obtain ⟨i, hi, he⟩ := ih₁ σ j h; exact ⟨i, .inl hi, he⟩
+    · obtain ⟨i, hi, he⟩ := ih₂ σ j h; exact ⟨i, .inr hi, he⟩
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
+    intro σ j h
+    rcases h with h | h | h
+    · obtain ⟨i, hi, he⟩ := ih₁ σ j h; exact ⟨i, .inl hi, he⟩
+    · obtain ⟨i, hi, he⟩ := ih₂ σ j h; exact ⟨i, .inr (.inl hi), he⟩
+    · obtain ⟨i, hi, he⟩ := ih₃ σ j h; exact ⟨i, .inr (.inr hi), he⟩
+  | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+    intro σ j h
+    rcases h with h | h | h | h
+    · obtain ⟨i, hi, he⟩ := ih₁ σ j h; exact ⟨i, .inl hi, he⟩
+    · obtain ⟨i, hi, he⟩ := ih₂ σ j h; exact ⟨i, .inr (.inl hi), he⟩
+    · obtain ⟨i, hi, he⟩ := ih₃ σ j h; exact ⟨i, .inr (.inr (.inl hi)), he⟩
+    · obtain ⟨i, hi, he⟩ := ih₄ σ j h; exact ⟨i, .inr (.inr (.inr hi)), he⟩
+  | hdone _ _ ih | unw _ _ _ ih => intro σ j h; exact ih σ j h
   | _ => intro σ j h; exact h.elim
 
 theorem Tm.has_subst :
@@ -269,6 +323,26 @@ theorem Tm.has_subst :
     · exact .inl (.inr (.inl h))
     · exact .inl (.inr (.inr (.inl h)))
     · exact (ih σ s h).imp (.inr ∘ .inr ∘ .inr) id
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
+    intro σ s h
+    have := ih₁ σ s; have := ih₂ σ s; have := ih₃ σ s
+    simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
+    grind
+  | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+    intro σ s h
+    have := ih₁ σ s; have := ih₂ σ s; have := ih₃ σ s; have := ih₄ σ s
+    simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
+    grind
+  | hres _ _ _ _ ih₁ ih₂ =>
+    intro σ s h
+    have := ih₁ σ s; have := ih₂ σ s
+    simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
+    grind
+  | hdone _ _ ih | unw _ _ _ ih =>
+    intro σ s h
+    have := ih σ s
+    simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
+    grind
   | _ => intro σ s h; exact .inl h
 
 /-- An atom of a scheme's type, outside its own binders, in the context's terms. -/

@@ -4,7 +4,7 @@
 // `Exit` values.
 import { Channel, Effect, Option, Sink, type Stream } from "effect";
 
-import { Failure } from "../cause.ts";
+import { Failure, passOn, unwinds } from "../cause.ts";
 import { failureCause, flickExit } from "../stdlib/outcome.ts";
 
 export * from "effect/Sink";
@@ -62,7 +62,7 @@ export const flickMapEffectEnd =
 
 /** `Sink.catch_cause`: the handler gets a `Failure`. */
 export const flickCatchCause = (f: (failure: Failure) => Effect.Effect<unknown, unknown, unknown>) => (self: AnySink) =>
-  Sink.catchCause(self, (cause) => f(new Failure(cause)));
+  Sink.catchCause(self, (cause) => (unwinds(cause) ? passOn(cause) : f(new Failure(cause))));
 
 /** `Sink.on_exit`: `f` gets a Flick `Exit`. */
 export const flickOnExit =

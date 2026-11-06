@@ -20,8 +20,11 @@ impl Checker<'_> {
                 Outcome::Missing(part, reason) => {
                     self.missing(&constraint, &part, reason.as_deref(), w.span);
                 }
-                // a route that is no path has its error where it is written
-                Outcome::Stuck if args_of(&constraint, Lang::PathParams).is_some() => {}
+                // a route that is no path has its error where it is written;
+                // services still unknown at the end are none, so no `control` one
+                Outcome::Stuck
+                    if args_of(&constraint, Lang::PathParams).is_some()
+                        || args_of(&constraint, Lang::Detached).is_some() => {}
                 Outcome::Stuck => {
                     let shown = self.show(&constraint);
                     let candidates = self.candidates(&constraint);
@@ -66,6 +69,8 @@ impl Checker<'_> {
         let mut diagnostic = if reason.is_none() && !rigid {
             let candidates = self.candidates(part);
             Diagnostic::error(codes::C001, format!("{message}; {candidates}"), span)
+        } else if args_of(constraint, Lang::Detached).is_some() {
+            Diagnostic::error(codes::E017, message, span)
         } else {
             Diagnostic::error(codes::C001, message, span)
         };

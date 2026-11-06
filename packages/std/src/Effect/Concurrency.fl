@@ -38,14 +38,14 @@ foreign effect interruptible_mask from "@flick-lang/runtime/effect/Effect" "inte
 
 /// The result of the first task to succeed; the others are interrupted
 /// and awaited.
-race_all : forall c r e a. List ((Eff r e a)^c) ->{r; e} a
+race_all : forall c r e a. Detached r => List ((Eff r e a)^c) ->{r; e} a
 foreign effect race_all from "@flick-lang/runtime/effect/Effect" "raceAll"
   retention call
   reviewed "effect@4.1.2 sha256:a81830e3f46e7acb"
 
 /// The first task to end, however it ends; the others are interrupted and
 /// awaited.
-race_all_first : forall c r e a. List ((Eff r e a)^c) ->{r; e} a
+race_all_first : forall c r e a. Detached r => List ((Eff r e a)^c) ->{r; e} a
 foreign effect race_all_first from "@flick-lang/runtime/effect/Effect" "raceAllFirst"
   retention call
   reviewed "effect@4.1.2 sha256:b744957ac315cbf1"

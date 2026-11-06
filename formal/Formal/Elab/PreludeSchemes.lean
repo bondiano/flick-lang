@@ -154,44 +154,44 @@ def from_result (result errors : Nat) : Scheme :=
   ⟨2, [],
     .arr (.R .cnil (.var 0)) (.app (.app (.con result) (.app (.con errors) (.var 0))) (.var 1)) (.var 1) .cnil, .cnil⟩
 
-/-- `Prelude.parallel : forall c r e a b. (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c` -/
-def parallel (eff tup : Nat) : Scheme :=
-  ⟨6, [],
+/-- `Prelude.parallel : forall c r e a b. Detached r => (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c` -/
+def parallel (detached eff tup : Nat) : Scheme :=
+  ⟨6, [⟨detached, [.var 1]⟩],
     .arr .P (.app (.app (.con eff) (.var 0)) (.var 3)) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con eff) (.var 5)) (.var 4)) (.app (.app (.con tup) (.var 3)) (.var 4)) (.cun (.cun (.var 0) (.var 3)) (.cun (.var 5) (.var 4)))) .cnil, .cnil⟩
 
-/-- `Prelude.parallel_all : forall c r e a. Int -> List (Eff r e a)^c ->{r; e} List a` -/
-def parallel_all (int list eff : Nat) : Scheme :=
-  ⟨4, [],
+/-- `Prelude.parallel_all : forall c r e a. Detached r => Int -> List (Eff r e a)^c ->{r; e} List a` -/
+def parallel_all (detached int list eff : Nat) : Scheme :=
+  ⟨4, [⟨detached, [.var 1]⟩],
     .arr .P (.con int) (.arr (.R (.var 1) (.var 2)) (.app (.con list) (.app (.app (.con eff) (.var 0)) (.var 3))) (.app (.con list) (.var 3)) .cnil) .cnil, .cnil⟩
 
-/-- `Prelude.parallel_results : forall c r e a. List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)` -/
-def parallel_results (list eff result errors : Nat) : Scheme :=
-  ⟨4, [],
+/-- `Prelude.parallel_results : forall c r e a. Detached r => List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)` -/
+def parallel_results (detached list eff result errors : Nat) : Scheme :=
+  ⟨4, [⟨detached, [.var 1]⟩],
     .arr (.R (.var 1) .cnil) (.app (.con list) (.app (.app (.con eff) (.var 0)) (.var 3))) (.app (.con list) (.app (.app (.con result) (.app (.con errors) (.var 2))) (.var 3))) .cnil, .cnil⟩
 
-/-- `Prelude.parallel_exits : forall c r e a. List (Eff r e a)^c ->{r; none} List (Exit e a)` -/
-def parallel_exits (list eff exit : Nat) : Scheme :=
-  ⟨4, [],
+/-- `Prelude.parallel_exits : forall c r e a. Detached r => List (Eff r e a)^c ->{r; none} List (Exit e a)` -/
+def parallel_exits (detached list eff exit : Nat) : Scheme :=
+  ⟨4, [⟨detached, [.var 1]⟩],
     .arr (.R (.var 1) .cnil) (.app (.con list) (.app (.app (.con eff) (.var 0)) (.var 3))) (.app (.con list) (.app (.app (.con exit) (.var 2)) (.var 3))) .cnil, .cnil⟩
 
-/-- `Prelude.race_success : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c` -/
-def race_success (eff : Nat) : Scheme :=
-  ⟨5, [],
+/-- `Prelude.race_success : forall c r e a. Detached r => (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c` -/
+def race_success (detached eff : Nat) : Scheme :=
+  ⟨5, [⟨detached, [.var 1]⟩],
     .arr .P (.app (.app (.con eff) (.var 0)) (.var 3)) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con eff) (.var 4)) (.var 3)) (.var 3) (.cun (.cun (.var 0) (.var 3)) (.cun (.var 4) (.var 3)))) .cnil, .cnil⟩
 
-/-- `Prelude.race_first : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c` -/
-def race_first (eff : Nat) : Scheme :=
-  ⟨5, [],
+/-- `Prelude.race_first : forall c r e a. Detached r => (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c` -/
+def race_first (detached eff : Nat) : Scheme :=
+  ⟨5, [⟨detached, [.var 1]⟩],
     .arr .P (.app (.app (.con eff) (.var 0)) (.var 3)) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con eff) (.var 4)) (.var 3)) (.var 3) (.cun (.cun (.var 0) (.var 3)) (.cun (.var 4) (.var 3)))) .cnil, .cnil⟩
 
-/-- `Prelude.timeout : forall c r e a. Float -> (Eff r e a)^c ->{r; TimeoutError | e} a` -/
-def timeout (float timeouterror eff : Nat) : Scheme :=
-  ⟨4, [],
+/-- `Prelude.timeout : forall c r e a. Detached r => Float -> (Eff r e a)^c ->{r; TimeoutError | e} a` -/
+def timeout (detached float timeouterror eff : Nat) : Scheme :=
+  ⟨4, [⟨detached, [.var 1]⟩],
     .arr .P (.con float) (.arr (.R (.var 1) (.run (.rnm timeouterror (.con timeouterror)) (.var 2))) (.app (.app (.con eff) (.var 0)) (.var 3)) (.var 3) .cnil) .cnil, .cnil⟩
 
-/-- `Prelude.timeout_option : forall c r e a. Float -> (Eff r e a)^c ->{r; e} Option a` -/
-def timeout_option (float eff option : Nat) : Scheme :=
-  ⟨4, [],
+/-- `Prelude.timeout_option : forall c r e a. Detached r => Float -> (Eff r e a)^c ->{r; e} Option a` -/
+def timeout_option (detached float eff option : Nat) : Scheme :=
+  ⟨4, [⟨detached, [.var 1]⟩],
     .arr .P (.con float) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con eff) (.var 0)) (.var 3)) (.app (.con option) (.var 3)) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.bind : forall c d m a b. Monad m => (m a)^c -> ((a -> (m b)^d)^d -> (m b)^(c + d))^c` -/
