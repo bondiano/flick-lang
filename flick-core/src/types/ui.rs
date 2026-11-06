@@ -167,18 +167,19 @@ impl Checker<'_> {
                 Type::Con { module, name }
                     if !lang::is(Lang::AtomFamily, module, name) && is_atom(module, name) =>
                 {
-                    Label::Atom
+                    "atom"
                 }
                 Type::Con { module, name }
                     if [Lang::UiView, Lang::UiHandler, Lang::Action]
                         .into_iter()
                         .any(|l| lang::is(l, module, name)) =>
                 {
-                    Label::Component
+                    "component"
                 }
                 _ => continue,
             };
-            self.typing.labelled.insert(name, label);
+            let kind = label.to_owned();
+            self.typing.labelled.insert(name, Label { kind });
         }
     }
 

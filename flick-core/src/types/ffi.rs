@@ -18,8 +18,9 @@ use super::Checker;
 use super::env::Form;
 use super::kinds::Kind;
 use super::ty::{Stage, Type};
-use super::typing::{Copies, ForeignInfo, range};
+use super::typing::{ForeignInfo, range};
 use crate::diagnostics::codes;
+use crate::ir::Copies;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -76,10 +77,10 @@ impl Checker<'_> {
         let arity = info.js_arity();
         let span = self.span(decl);
         self.check_meta(&info, &params, &body, span);
-        info.result.unit = self
+        info.adapter.result.unit = self
             .call_result(&body, arity)
             .is_some_and(|r| r.is_lang(Lang::Unit));
-        info.callbacks = params
+        info.adapter.callbacks = params
             .iter()
             .take(arity)
             .map(|p| {
@@ -90,7 +91,7 @@ impl Checker<'_> {
                 (n > 0).then_some(n)
             })
             .collect();
-        info.copies = self.copies(&params, &body, arity, &info.callbacks);
+        info.adapter.copies = self.copies(&params, &body, arity, &info.adapter.callbacks);
         let scoped: Vec<String> = binders
             .iter()
             .filter(|b| matches!(b.kind, Kind::Region | Kind::CaptureRow))
@@ -143,19 +144,19 @@ impl Checker<'_> {
                         stages.len()
                     )),
                 },
-                "this" => info.this = true,
+                "this" => info.adapter.receiver = true,
                 "reviewed" if !word(0).is_some_and(|w| w.starts_with('"')) => self.bad_meta(
                     item,
                     "`reviewed` takes the package and fingerprint the binding was checked against, as a string",
                 ),
-                "nullable" => info.result.nullable = true,
-                "variadic" => info.variadic = true,
+                "nullable" => info.adapter.result.nullable = true,
+                "variadic" => info.adapter.variadic = true,
                 "optional" => match number(0) {
-                    Some(i) => info.optional.push(i),
+                    Some(i) => info.adapter.optional.push(i),
                     None => self.bad_meta(item, "`optional` takes the position of an `Option` argument, from 0"),
                 },
                 "cancel" => match word(0).as_deref() {
-                    Some("signal") if mode == "async" => info.cancel = true,
+                    Some("signal") if mode == "async" => info.adapter.cancel = true,
                     Some("signal") => self.bad_meta(item, "`cancel signal` is for `foreign async`: only a promise can be aborted"),
                     _ => self.bad_meta(item, "write `cancel signal`"),
                 },
@@ -192,14 +193,14 @@ impl Checker<'_> {
                 "`arity 0` drops the first argument, which must be `()`".to_owned(),
             );
         }
-        if info.this && arity == 0 {
+        if info.adapter.receiver && arity == 0 {
             self.error(
                 codes::F001,
                 span,
                 "`this` needs an argument to be the receiver".to_owned(),
             );
         }
-        for &i in &info.optional {
+        for &i in &info.adapter.optional {
             if !params
                 .get(i)
                 .is_some_and(|p| self.whnf(p).spine().0.is_lang(Lang::Option))
@@ -212,7 +213,7 @@ impl Checker<'_> {
                 );
             }
         }
-        if info.variadic
+        if info.adapter.variadic
             && (arity == 0 || !self.whnf(&params[arity - 1]).spine().0.is_lang(Lang::List))
         {
             self.error(
@@ -221,7 +222,7 @@ impl Checker<'_> {
                 "`variadic` spreads a last argument of type `List a`".to_owned(),
             );
         }
-        if info.result.nullable
+        if info.adapter.result.nullable
             && !self
                 .call_result(body, arity)
                 .is_some_and(|r| self.whnf(&r).spine().0.is_lang(Lang::Option))
@@ -484,15 +485,5 @@ impl ForeignInfo {
                 .position(|&runtime| runtime)
                 .map_or(self.stages.len(), |i| i + 1)
         })
-    }
-
-    /// The Flick parameters the JS call takes: `arity 0` still takes `()`.
-    pub fn stages_taken(&self) -> usize {
-        let arity = self.js_arity();
-        if arity == 0 {
-            self.stages.len().min(1)
-        } else {
-            arity
-        }
     }
 }

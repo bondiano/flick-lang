@@ -191,8 +191,8 @@ fn dict(d: &Dict) -> Term {
 /// `docs/formal/regions.md` (§6), are steps of the machine (§3.2).
 fn foreign(path: Path, f: &ir::Foreign) -> Term {
     let arity = f.dicts + f.stages.len();
-    let module = f.module.as_deref().unwrap_or("global");
-    let core = match (module, f.export.as_str()) {
+    let module = f.binding.from.as_deref().unwrap_or("global");
+    let core = match (module, f.binding.name.as_str()) {
         ("@flick-lang/runtime", "refMake") => Some(Const::RefMake),
         ("@flick-lang/runtime", "refGet") => Some(Const::RefGet),
         ("@flick-lang/runtime", "refSet") => Some(Const::RefSet),
@@ -203,7 +203,7 @@ fn foreign(path: Path, f: &ir::Foreign) -> Term {
             Term::Stuck(format!("{c:?} takes {} arguments, the binding {arity}", c.arity()).into())
         }
         Some(c) => Term::konst(c),
-        None => match native::find(module, &f.export) {
+        None => match native::find(module, &f.binding.name) {
             Some(n) if n.arity == arity => Term::konst(Const::Native(n)),
             Some(n) => Term::Stuck(
                 format!(
@@ -212,9 +212,9 @@ fn foreign(path: Path, f: &ir::Foreign) -> Term {
                 )
                 .into(),
             ),
-            None => {
-                Term::Stuck(format!("no native for `{}` ({module} {})", f.name, f.export).into())
-            }
+            None => Term::Stuck(
+                format!("no native for `{}` ({module} {})", f.name, f.binding.name).into(),
+            ),
         },
     }
 }

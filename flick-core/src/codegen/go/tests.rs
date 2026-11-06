@@ -192,16 +192,22 @@ fn go_bindings_cover_builtins() {
             let ItemKind::Foreign(f) = &item.kind else {
                 continue;
             };
-            let (from, key) = match &f.module {
-                Some(from) => (from.clone(), f.export.clone()),
+            let (from, key) = match &f.binding.from {
+                Some(from) => (from.clone(), f.binding.name.clone()),
                 None => (format!("global {}", module.name), f.name.clone()),
             };
-            if lookup(&module.name, &f.name, f.module.as_deref(), &f.export).is_some()
+            if lookup(
+                &module.name,
+                &f.name,
+                f.binding.from.as_deref(),
+                &f.binding.name,
+            )
+            .is_some()
                 || js_only_exports.contains(&(from.clone(), key))
             {
                 continue;
             }
-            let entry = format!("{}.{} ({})", module.name, f.name, f.export);
+            let entry = format!("{}.{} ({})", module.name, f.name, f.binding.name);
             missing.entry(from).or_default().push(entry);
         }
     }
