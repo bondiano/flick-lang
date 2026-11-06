@@ -143,19 +143,23 @@ mod wasm {
         let root = app("plugins-wasm", MAIN);
         let checked = flick(&root, &["check"]);
         assert!(checked.status.success(), "{checked:?}");
-        assert_eq!(trace(&root), ["collect pairs", "expand pairs pairs"]);
+        assert_eq!(
+            trace(&root),
+            ["collect pairs", "publish pairs", "expand pairs pairs"]
+        );
         // again: every result comes from the cache
         let built = flick(&root, &["build", "--out-dir", "out"]);
         assert!(built.status.success(), "{built:?}");
         let checked = flick(&root, &["check"]);
         assert!(checked.status.success(), "{checked:?}");
-        assert_eq!(trace(&root).len(), 2);
-        // a changed block: one collect and one expand
+        assert_eq!(trace(&root).len(), 3);
+        // a changed block: one collect and one expand; the state is the same,
+        // so what it publishes is kept
         let main = MAIN.replace("x = 1.0", "x = 2.0");
         fs::write(root.join("app/src/App/Main.fl"), main).expect("write");
         let checked = flick(&root, &["check"]);
         assert!(checked.status.success(), "{checked:?}");
-        assert_eq!(trace(&root)[2..], ["collect pairs", "expand pairs pairs"]);
+        assert_eq!(trace(&root)[3..], ["collect pairs", "expand pairs pairs"]);
     }
 
     #[test]

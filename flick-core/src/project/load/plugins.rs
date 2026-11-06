@@ -12,6 +12,7 @@ use flick_plugin::Block;
 
 mod derive;
 mod enums;
+mod groups;
 mod published;
 mod results;
 
@@ -38,6 +39,10 @@ const ROUNDS: usize = 8;
 
 /// The plugin of each package a module imports, or why it does not load.
 type Plugins = HashMap<String, Result<Arc<dyn Expander>, String>>;
+
+/// A group collected: its plugin's package, its members, their blocks,
+/// its state and its gate.
+type Collected = (String, Vec<usize>, Vec<Block>, Vec<u8>, Option<Arc<Gate>>);
 
 /// A block of a loaded module and the package of its plugin.
 struct Found {
@@ -272,48 +277,8 @@ impl Loader<'_> {
         diagnostics: &mut Vec<Diagnostic>,
         editing: &mut Vec<(usize, EditorBlock)>,
     ) -> Vec<Option<Rendered>> {
-        let mut groups: BTreeMap<(String, String), Vec<(String, usize)>> = BTreeMap::new();
-        for (j, f) in found.iter().enumerate() {
-            let m = &self.modules[f.module];
-            let entry = groups
-                .entry((group(&m.root), f.package.clone()))
-                .or_default();
-            entry.push((m.name.clone(), j));
-        }
         let mut rendered: Vec<Option<Rendered>> = found.iter().map(|_| None).collect();
-        let mut states = Vec::new();
-        for ((_, package), mut members) in groups {
-            let Some(Ok(plugin)) = plugins.get(&package) else {
-                continue;
-            };
-            members.sort_by_key(|(name, j)| (name.clone(), found[*j].node.range()));
-            let members: Vec<usize> = members.into_iter().map(|(_, j)| j).collect();
-            let gate = members
-                .first()
-                .and_then(|&j| self.gate(&package, &self.modules[found[j].module].root));
-            let blocks: Vec<Block> = members.iter().map(|&j| found[j].source.block()).collect();
-            let mut collecting = BlockSource::default();
-            collecting.reach = Reach::new(gate.clone());
-            let collected = results.collect(plugin.as_ref(), &blocks, &mut collecting);
-            let first = &found[members[0]];
-            for (code, message) in collecting.reach.problems {
-                diagnostics.push(Diagnostic::error(code, message, first.whole));
-            }
-            let state = match collected {
-                Ok(state) => state,
-                Err(why) => {
-                    for &j in &members {
-                        diagnostics.push(failure(&found[j], &package, &format!("failed: {why}")));
-                    }
-                    continue;
-                }
-            };
-            match results.publish(plugin.as_ref(), &state) {
-                Ok(published) => published::add(publications, &package, published),
-                Err(why) => diagnostics.push(failure(first, &package, &format!("failed: {why}"))),
-            }
-            states.push((package, members, blocks, state, gate));
-        }
+        let states = self.collect_groups(plugins, results, publications, found, diagnostics);
         for (package, members, blocks, state, gate) in states {
             let Some(Ok(plugin)) = plugins.get(&package) else {
                 continue;
@@ -372,24 +337,6 @@ impl Loader<'_> {
             }
         }
         rendered
-    }
-}
-
-impl Loader<'_> {
-    /// What the plugin of `package` may reach for the blocks of modules of
-    /// `root`, as the project grants it: only the project's own modules
-    /// reach anything, and only with a host that reaches outside.
-    fn gate(&self, package: &str, root: &Root) -> Option<Arc<Gate>> {
-        if matches!(root, Root::Package(_)) {
-            return None;
-        }
-        let project = self.project?;
-        Some(Arc::new(Gate {
-            package: package.to_owned(),
-            root: project.root.clone(),
-            grants: (project.config.plugins.get(package).cloned()).unwrap_or_default(),
-            outside: self.host.outside()?,
-        }))
     }
 }
 

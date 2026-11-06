@@ -80,6 +80,7 @@ impl Expander for Traced {
     }
 
     fn publish(&self, state: &[u8]) -> Result<Vec<Published>, String> {
+        self.trace(&format!("publish {}", self.inner.id()));
         self.inner.publish(state)
     }
 
