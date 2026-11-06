@@ -1,0 +1,19 @@
+// The words of a table's columns: a SQL type the dialect knows, then
+// attributes that do not contradict each other, each column once. A wrong
+// column is left out of the table, which is still declared.
+module App.Tables exposing (..)
+
+import Sql exposing (plugin sql)
+
+sql table Users "users" {
+  id : bigint primary key generated always as BigInt
+  name : text default generated always as String
+  email : text not null nope as String
+  id : bigint as BigInt
+  age : tinyint as Int
+}
+
+//~ std/Q010 @10:23-10:39 `generated always` contradicts `default` before it
+//~ std/Q010 @11:25-11:29 unknown column attribute `nope`
+//~ std/Q001 @12:3-12:24 the table has two columns `id`
+//~ std/Q010 @13:9-13:16 unknown SQL type `tinyint`; known: bigint, int8, bigserial, integer, int, int4, smallint, int2, serial, real, double precision, float8, numeric, decimal, text, varchar, character varying, uuid, boolean, bool, date, timestamp, timestamptz, jsonb, json

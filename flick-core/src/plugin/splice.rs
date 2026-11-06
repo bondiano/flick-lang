@@ -33,8 +33,7 @@ pub fn splice(
     block: &Node,
 ) -> Result<Node, String> {
     let tree = generated(text, file, at, rendered, source, parse_expr_at)?;
-    let head = block.child_tokens().find(|t| t.kind == K::Ident);
-    let Some(head) = head else {
+    let Some(head) = super::head_token(block) else {
         return Err("the block has no head".into());
     };
     // `}`, or nothing at the end of a block without a body

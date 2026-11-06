@@ -68,6 +68,10 @@ impl Compiler for Imports {
         compiler::env(name).map_err(reach_convert::from_error)
     }
 
+    fn literal_of(&mut self, name: &str) -> Option<String> {
+        compiler::literal_of(name)
+    }
+
     fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {
         compiler::fetch(&reach_convert::to_request(request))
             .map(reach_convert::from_response)

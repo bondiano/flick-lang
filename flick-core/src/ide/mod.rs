@@ -13,7 +13,6 @@ mod navigate;
 mod plugins;
 mod rename;
 mod sql;
-mod sql_table;
 mod symbols;
 mod tokens;
 mod tree;

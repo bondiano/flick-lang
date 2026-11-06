@@ -48,6 +48,12 @@ type rawPiece struct {
 func SqlTable(table Value) Value       { return table }
 func SqlTemplate(template Value) Value { return template }
 
+// SqlColumn is `Sql.Derive.column name kind nullable codec`: a column as a
+// table holds it.
+func SqlColumn(name, kind, nullable, codec Value) Value {
+	return Rec("codec", codec, "kind", kind, "name", name, "nullable", nullable)
+}
+
 // SqlCodec is `Sql.codec decode encode`, over the value of the column's
 // SQL type.
 func SqlCodec(decode, encode Value) Value {

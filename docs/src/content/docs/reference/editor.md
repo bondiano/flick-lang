@@ -63,8 +63,8 @@ Hover on `url` in `Page.url` shows `Page.url : Url Page` and explains the
 generated URL codec and its use with `Route.print` and `Route.parse`.
 Definition still leads to the declaration of `Page`.
 
-Hover on `sql table` shows the row type and the type of `Name$table` in
-column order; on the name, the row type and the SQL table; on the table
+Hover on `table` of `sql table` shows the row type and the type of
+`Name.table` in column order; on the name, the row type and the SQL table; on the table
 name string, the table it names; on a column's SQL type, the Flick type the
 dialect gives it; on a modifier, `as` and `via`, what they mean.
 

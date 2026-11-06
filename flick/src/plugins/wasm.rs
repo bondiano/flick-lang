@@ -147,6 +147,10 @@ impl flick::plugin::compiler::Host for State {
         (self.source.env(&name)).map_err(reach_convert::to_error)
     }
 
+    fn literal_of(&mut self, name: String) -> Option<String> {
+        self.source.literal_of(&name)
+    }
+
     fn fetch(
         &mut self,
         request: flick::plugin::types::Request,

@@ -117,6 +117,10 @@ shows `module`, the module it is in, and for a declaration right below a
 signature, `signature`: its text and tokens, spans counting from its start.
 Code with a type of the signature, `signed(span)`, takes it from the module;
 without one, the signature stays where it is, above what the code declares.
+`literal-of(name)` says whether the type `name`, as the module writes it
+(`Role`, `Roles.Role`), is an enum the module declares or imports, and gives
+its base type, `String` or `Int`: the types are not checked yet, so a
+plugin asks before it writes code for one.
 
 The code of a block that is an expression is an expression; that of a
 declaration is declarations, which take the block's place among the module's
@@ -144,9 +148,11 @@ numbers be finite, holes lie in the body and not overlap, an expression or a
 pattern be used once (a type may stand in several places, as in a signature
 and an annotation), and its size and depth are bounded. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,
-`0.14.0`. A component built for another version does not load: the import
-that exposes its heads is `FLICK-P035`, naming the version it was built for
-and the one the compiler speaks, until it is rebuilt.
+`0.1.0`. Until Flick 0.2 the interface changes without a new version: build
+a component with the `flick-plugin` of the compiler it runs in. A component
+built for another version does not load: the import that exposes its heads
+is `FLICK-P035`, naming the version it was built for and the one the
+compiler speaks, until it is rebuilt.
 
 ## Checks with types
 

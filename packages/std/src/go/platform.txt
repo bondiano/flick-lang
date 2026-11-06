@@ -133,6 +133,7 @@ sqlRawIdent SqlRawIdent
 sqlRawParam SqlRawParam
 sqlRawQuery SqlRawQuery
 sqlTable SqlTable
+sqlColumn SqlColumn
 sqlTemplate SqlTemplate
 pgTransaction *DatabaseTransaction
 pgLayer DatabasePgLayer

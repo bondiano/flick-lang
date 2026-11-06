@@ -160,7 +160,7 @@ impl Checker<'_> {
     /// Registers the name and kind of a declaration before any body is read.
     fn skeleton<'n>(&mut self, decl: &'n Node) -> Option<Pending<'n>> {
         let result = match decl.kind {
-            K::TypeDecl | K::ErrorDecl | K::SqlTableDecl => Kind::Type,
+            K::TypeDecl | K::ErrorDecl => Kind::Type,
             K::ServiceDecl => Kind::Service,
             K::ClassDecl => Kind::Constraint,
             _ => return None,
@@ -205,14 +205,6 @@ impl Checker<'_> {
                 self.kinds.fresh(),
             ),
             K::TypeDecl => (Form::NOMINAL, result),
-            K::SqlTableDecl => (
-                Form::Alias {
-                    params: Vec::new(),
-                    body: Type::Error,
-                    opaque: false,
-                },
-                result,
-            ),
             K::ErrorDecl => (Form::Error, result),
             K::ServiceDecl => (
                 Form::Service {
@@ -305,7 +297,6 @@ impl Checker<'_> {
                 }])
             }
             K::ServiceDecl => Body::Members(self.members(decl, &[])),
-            K::SqlTableDecl => Body::Alias(self.sql_row(decl, &p.name)),
             K::SqlMigrationDecl => match &p.table {
                 Some(table) => Body::Alias(self.migrated_row(table, &p.name)),
                 None => Body::None,

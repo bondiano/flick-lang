@@ -7,12 +7,10 @@ use std::mem;
 
 use super::Checker;
 use super::env::{Abi, EnumLit, Form};
-use super::ty::Type;
 use crate::diagnostics::codes;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal::{bigint_digits, bigint_digits_value, string_value};
-use crate::types::lang::Lang;
 
 impl Form {
     /// A nominal type of no literals.
@@ -34,27 +32,6 @@ pub(super) fn literal_as_field(field: &Node, text: &str) -> bool {
 }
 
 impl Checker<'_> {
-    /// The module and name of `ty` when it is an enum, opaque or not, of
-    /// the literals of `base`, `String` or `Int`.
-    pub(super) fn enum_over(&self, ty: &Type, base: &Type) -> Option<(String, String)> {
-        let Type::Con { module, name } = self.whnf(ty) else {
-            return None;
-        };
-        let first = match &self.env.type_def(&module, &name)?.form {
-            Form::Adt {
-                abi: Abi::Literal(literals),
-                ..
-            }
-            | Form::Nominal { literals } => literals.first()?,
-            _ => return None,
-        };
-        let lang = match first {
-            EnumLit::Int(_) => Lang::Int,
-            EnumLit::String(_) => Lang::String,
-        };
-        self.whnf(base).is_lang(lang).then_some((module, name))
-    }
-
     /// Records the representation of `decl`, of type `name`, when its
     /// constructors are literals, or reports why they cannot be; whether
     /// they are, or one is a literal written as a field, reported already.

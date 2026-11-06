@@ -10,7 +10,7 @@ use flick_plugin::Piece;
 
 use super::printer::{Doc, INDENT, Printer};
 use crate::plugin::source::BlockSource;
-use crate::plugin::{Expander, blocks_under, first_party};
+use crate::plugin::{Expander, blocks_under, first_party, head_token};
 use crate::resolve;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
@@ -67,7 +67,7 @@ pub(super) fn layouts(tree: &Node, text: &str, file: FileId, plugin_of: PluginOf
     blocks_under(tree, &mut blocks);
     let mut pending: Vec<Node> = blocks.into_iter().cloned().collect();
     while let Some(node) = pending.pop() {
-        let head = node.child_tokens().find(|t| t.kind == K::Ident);
+        let head = head_token(&node);
         let Some(plugin) = head.and_then(|h| plugin(h.text(text))) else {
             continue;
         };
@@ -131,10 +131,7 @@ impl<'a> Printer<'a> {
         // what comments the block has are the plugin's words or are dropped,
         // which the check of the declaration then refuses
         self.comments.skip(n.range().1);
-        let head = n
-            .child_tokens()
-            .find(|t| t.kind == K::Ident)
-            .map_or("", |t| t.text(self.text));
+        let head = head_token(n).map_or("", |t| t.text(self.text));
         let mut levels: Vec<Vec<Doc<'a>>> = vec![vec![self.str(head), a.text(" ")]];
         if layout.opens {
             levels[0].push(a.text("{"));

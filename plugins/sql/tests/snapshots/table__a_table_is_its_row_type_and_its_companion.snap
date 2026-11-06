@@ -1,0 +1,7 @@
+---
+source: plugins/sql/tests/table.rs
+expression: code
+---
+type alias Users = { id : UserId; name : String; email : (Option String) }
+Users$table : (Sql.Table "users" { id : (Sql.Column UserId Sql.NonNull Sql.Generated); name : (Sql.Column String Sql.NonNull Sql.Required); email : (Sql.Column String Sql.Nullable Sql.Defaulted) })
+let Users$table = (Sql.make_table ({ name = "users"; columns = [(Sql.Derive.via "id" "bigint" false (user_id : (PureCodec BigInt UserId))), (Sql.Derive.plain "name" "text" false (Sql.Derive.same : (Sql.Derive.Same String _))), (Sql.Derive.plain "email" "text" true (Sql.Derive.same : (Sql.Derive.Same String _)))] } : _))

@@ -52,6 +52,8 @@ pub enum Asked {
     Env(String),
     /// The snapshot of a request, by its key.
     Fetch(String),
+    /// The base type of an enum, as the block's module names it.
+    LiteralOf(String),
 }
 
 /// What a call reached and the hash of its answer.
@@ -112,6 +114,17 @@ impl Reach {
 
     pub fn still(&self, used: &[Used]) -> bool {
         used.is_empty()
+    }
+}
+
+impl Reach {
+    /// `answer` to `literal-of` of `name`, kept with what the block asked.
+    pub fn literal_of(&mut self, name: &str, answer: Option<String>) -> Option<String> {
+        self.used.push(Used {
+            asked: Asked::LiteralOf(name.to_owned()),
+            answer: format!("{answer:?}"),
+        });
+        answer
     }
 }
 

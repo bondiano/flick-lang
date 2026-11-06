@@ -1,0 +1,19 @@
+[package]
+name = "flick-plugin-sql"
+description = "The plugin of std for `sql table Name \"table\" { … }`: a table's row type and its columns as calls of `Sql`"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+flick-plugin = { path = "../../flick-plugin" }
+
+[dev-dependencies]
+flick-core = { path = "../../flick-core" }
+insta = "1.49.0"

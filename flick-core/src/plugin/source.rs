@@ -4,6 +4,7 @@
 //! body, without arguments), and the user's expressions, types, patterns
 //! and declarations parsed where they stand.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use flick_plugin::{
@@ -83,6 +84,8 @@ pub struct BlockSource {
     pub diagnostics: Vec<Diagnostic>,
     /// What the plugin reached outside the block, as the project grants it.
     pub reach: Reach,
+    /// The enums the module sees, as it writes them, with their base types.
+    enums: Arc<BTreeMap<String, String>>,
 }
 
 impl BlockSource {
@@ -91,10 +94,7 @@ impl BlockSource {
     /// body without arguments, and ends at `}`, or at the end of the node for
     /// a block without a body or not closed.
     pub fn new(text: Arc<str>, file: FileId, node: &Node, heads: Arc<[String]>) -> Option<Self> {
-        let head = node.child_tokens().find(|t| !t.kind.is_trivia())?;
-        if head.kind != K::Ident {
-            return None;
-        }
+        let head = super::head_token(node)?;
         let all = node.tokens();
         let first = (all.iter()).find(|t| !t.kind.is_trivia() && t.start > head.start)?;
         // the braces of the body, not of an argument or of the rest
@@ -141,6 +141,7 @@ impl BlockSource {
             tokens,
             diagnostics: Vec::new(),
             reach: Reach::default(),
+            enums: Arc::default(),
         })
     }
 
@@ -170,6 +171,7 @@ impl BlockSource {
             tokens: if holes { node.tokens() } else { Vec::new() },
             diagnostics: Vec::new(),
             reach: Reach::default(),
+            enums: Arc::default(),
             heads,
             foreign: !holes,
             text,
@@ -190,7 +192,16 @@ impl BlockSource {
             Arc::clone(&self.heads),
         )?;
         nested.module = Arc::clone(&self.module);
+        nested.enums = Arc::clone(&self.enums);
         Some(nested)
+    }
+
+    /// The block, whose module sees the enums `enums`, written as it writes
+    /// them, with their base types.
+    #[must_use]
+    pub fn with_enums(mut self, enums: Arc<BTreeMap<String, String>>) -> Self {
+        self.enums = enums;
+        self
     }
 
     /// The block in the module `module` whose tree is `tree`, with the
@@ -455,6 +466,11 @@ impl Compiler for BlockSource {
 
     fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {
         self.reach.fetch(request)
+    }
+
+    fn literal_of(&mut self, name: &str) -> Option<String> {
+        let answer = self.enums.get(name).cloned();
+        self.reach.literal_of(name, answer)
     }
 }
 

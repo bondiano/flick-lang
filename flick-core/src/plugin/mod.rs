@@ -22,7 +22,7 @@ use source::BlockSource;
 
 use crate::diagnostics::{self, codes};
 use crate::source::Span;
-use crate::syntax::cst::Node;
+use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
 /// A plugin as the compiler runs it: linked into the compiler, or loaded.
@@ -240,6 +240,13 @@ pub(crate) fn placed(
             span,
         ),
     }
+}
+
+/// The head of the block `node`, its first token: a name, or `sql`, still
+/// a keyword of the queries the compiler reads.
+pub fn head_token(node: &Node) -> Option<Token> {
+    let head = node.child_tokens().find(|t| !t.kind.is_trivia())?;
+    matches!(head.kind, K::Ident | K::SqlKw).then_some(head)
 }
 
 /// The plugin blocks under `node`, expressions and declarations, not those

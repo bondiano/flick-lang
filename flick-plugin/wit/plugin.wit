@@ -1,4 +1,4 @@
-package flick:plugin@0.14.0;
+package flick:plugin@0.1.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -229,6 +229,10 @@ interface compiler {
   /// The answer of a host `net` grants, from the project's snapshots when
   /// the run is offline.
   fetch: func(request: request) -> result<response, reach-error>;
+  /// The base type, `String` or `Int`, of the enum `name` as the block's
+  /// module writes it, `Role` or `Roles.Role`; none for a type that is no
+  /// enum, or one the module does not see.
+  literal-of: func(name: string) -> option<string>;
 }
 
 world plugin {

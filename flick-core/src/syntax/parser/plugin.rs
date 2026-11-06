@@ -12,7 +12,8 @@ use crate::plugin::first_party::{BARE, HEADS};
 
 /// Whether an exposed item `plugin head` starts here.
 pub(super) fn at_head(p: &Parser) -> bool {
-    p.at_word("plugin") && p.nth(1) == K::Ident
+    // `sql` is a keyword still, of the queries the compiler reads
+    p.at_word("plugin") && matches!(p.nth(1), K::Ident | K::SqlKw)
 }
 
 /// `plugin head` in the exposed items of an import: `head` starts plugin

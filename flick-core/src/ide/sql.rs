@@ -139,13 +139,6 @@ impl Ide<'_> {
         if captured(&path) {
             return None;
         }
-        if path.iter().any(|n| n.kind == K::SqlTableDecl) {
-            let column = path.iter().find(|n| n.kind == K::SqlColumn)?;
-            if dotted {
-                return None;
-            }
-            return Some(self.sql_table_complete(m, column, offset));
-        }
         if !path.iter().any(|n| n.kind == K::SqlExpr) {
             return None;
         }
@@ -245,6 +238,10 @@ impl Ide<'_> {
                 )
             })
             .collect();
+        // the module's own tables, which the plugin of std declares
+        for c in tables(&m.interface) {
+            out.entry(c.label.clone()).or_insert(c);
+        }
         for import in m.tree.nodes().filter(|n| n.kind == K::ImportDecl) {
             let module = import.nodes().find(|n| n.kind == K::ModulePath)?;
             let module: String = module.text(text).split_whitespace().collect();
@@ -271,11 +268,7 @@ impl Ide<'_> {
         let m = self.module(file)?;
         let text = self.text(file);
         let path = tree::path_to(&m.tree, offset);
-        if captured(&path)
-            || !path
-                .iter()
-                .any(|n| matches!(n.kind, K::SqlExpr | K::SqlTableDecl))
-        {
+        if captured(&path) || !path.iter().any(|n| n.kind == K::SqlExpr) {
             return None;
         }
         let scope = bindings(&path, &m.typing, text, offset);
@@ -316,11 +309,6 @@ impl Ide<'_> {
                     (token.start, token.end),
                 ));
             }
-        }
-        if path.iter().any(|n| n.kind == K::SqlTableDecl)
-            && let Some(hover) = self.sql_table_hover(m, &path, offset)
-        {
-            return Some(hover);
         }
         let (range, ty) = tree::innermost(
             m.typing.types.iter().filter(|(_, ty)| **ty != Type::Error),

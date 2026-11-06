@@ -30,7 +30,7 @@ DSL Flick для SQL, UI и командной строки — `sql params { �
 `sql table Name "table" { … }` объявляет тип строки `Name` и его таблицу; компилятор никогда не подключается к БД. `sql [p] { … }` — чистый проверенный `Sql.Template Pg params row`. Имя после `sql` связывает параметры, типы которых выводятся из мест использования; `$name` захватывает значение программы как место для подстановки.
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # type UserId = UserId BigInt

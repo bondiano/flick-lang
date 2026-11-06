@@ -39,7 +39,7 @@ change needs.
 | [Instances belong to one package](#instances-belong-to-one-package) | no | `FLICK-C006` |
 | [Plugins reach only what is granted](#plugins-reach-only-what-is-granted) | no | `FLICK-P038`, `FLICK-P039` |
 | [`LogLevel` is an enum](#loglevel-is-an-enum) | no | `FLICK-T001` |
-| [Plugins speak interface 0.14](#plugins-speak-interface-014) | no | `FLICK-P035` |
+| [Plugins follow the compiler's interface](#plugins-follow-the-compilers-interface) | no | — |
 | [`CallSite` replaces the `_at` writes](#callsite-replaces-the-_at-writes) | no | `FLICK-T001` |
 | [A closure over an error value says so](#a-closure-over-an-error-value-says-so) | no | `FLICK-G001` |
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
@@ -101,14 +101,15 @@ let profile_schema = Profile.schema
 
 ## Plugin blocks need their import
 
-`cli`, `codec` and `server fn` blocks are plugins of `std` now. A file that
-writes one imports its head:
+`cli`, `codec`, `server fn` and `sql table` blocks are plugins of `std`
+now. A file that writes one imports its head:
 
 | Block | Import |
 | - | - |
 | `cli "name" { … }` | `import Cli exposing (plugin cli)` |
 | `codec s { … }` | `import Codec exposing (plugin codec)` |
 | `server fn f x = …`, `server f` | `import Server exposing (plugin server)` |
+| `sql table Name "table" { … }` | `import Sql exposing (plugin sql)` |
 
 In 0.1 a `codec` block needed no import:
 
@@ -160,6 +161,8 @@ of the blocks and derives that moved keep their meaning under new codes:
 | a type mismatch in a `codec` block | `std/D012` | a field whose codec decodes another type than the record's |
 | `FLICK-D011` | `std/D011` | a record that `deriving HttpApi` cannot read as endpoints |
 | `FLICK-E010` | `std/E010` | the shape of a `server fn`; `server name` of a value that is no `server fn` stays `FLICK-E010` |
+| `FLICK-Q001`, `FLICK-Q010` in a `sql table` | `std/Q001`, `std/Q010` | a column given twice, a SQL type or attribute the dialect does not know |
+| `FLICK-Q011` | `std/Q011` | a column of another type than its SQL type's, without `via` |
 | `FLICK-E012`, `FLICK-L008` | — | retired: every build has the plugin of `std` |
 
 `flick explain std/D001` explains a new code, and `flick explain FLICK-L001`
@@ -268,14 +271,14 @@ constructors declared from least to most severe:
 `show` of a level gives its constructor, `Off` where 0.1.0 printed `None`.
 Each old name is `FLICK-T001`; replace it by hand.
 
-## Plugins speak interface 0.14
+## Plugins follow the compiler's interface
 
 A derive of an enum gets the literals of its constructors, and a plugin's
 `check` the base type of an enum; a derive knows which constructors are of
-a GADT (`refined`, `constrained` of a case): the interface of plugins is
-`0.14.0`. A component built for an earlier version no longer loads,
-`FLICK-P035` names both versions; rebuild it against the new
-`flick-plugin`.
+a GADT (`refined`, `constrained` of a case), and a plugin asks while it
+expands whether a type is an enum (`literal-of`). The interface stays
+`0.1.0` until Flick 0.2 and changes without a new version: rebuild a
+component with the `flick-plugin` of the compiler it runs in.
 
 ## `CallSite` replaces the `_at` writes
 

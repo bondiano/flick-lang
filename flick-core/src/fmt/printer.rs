@@ -128,8 +128,7 @@ impl<'a> Printer<'a> {
             | K::ProvideExpr
             | K::DoExpr
             | K::SqlExpr
-            | K::RecGroup
-            | K::SqlTableDecl => self.braced(n, &[]),
+            | K::RecGroup => self.braced(n, &[]),
             K::ForExpr => self.for_(n),
             K::ListExpr | K::TupleExpr | K::ListPat | K::TuplePat | K::TupleType | K::Exposing => {
                 self.bracket(n, &[])
