@@ -16,7 +16,7 @@ import Ffi.LookupLib exposing (lookup)
 import Ffi.LookupLib.Generated exposing (next_id, each)
 import JsError exposing (JsError(..))
 
-name_of : String ->{} String
+name_of : String ->{Async;} String
 let name_of id =
   try
     match lookup id with
@@ -25,7 +25,7 @@ let name_of id =
   with
   | JsError { message } -> message
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   Platform.stdout_line (name_of "1")
   Platform.stdout_line (name_of "2")
@@ -113,7 +113,7 @@ fn reviewed(provenance: &str, catch: bool) -> String {
     format!(
         "module Ffi.LookupLib exposing (lookup)\n\n\
          import JsError exposing (JsError)\n\n\
-         lookup : String ->{{; JsError}} Option String\n\
+         lookup : String ->{{Async; JsError}} Option String\n\
          foreign lookup from \"lookup-lib\" \"lookup\"\n  arity 1\n{}  nullable\n  reviewed \"{provenance}\"\n",
         if catch {
             "  catch JsError.from_js\n"

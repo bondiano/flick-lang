@@ -19,7 +19,7 @@ use flick_core::build::go::executable;
 /// when its scope closes.
 const WAITING: &str = "module App.Main exposing (main)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   scope {
     Resource.acquire_release (task { Platform.stdout_line \"started\" }) (fun _ -> Platform.stdout_line \"cleanup\")

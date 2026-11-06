@@ -69,12 +69,12 @@ let waiting n =
     pause n
   }
 
-pause : Float ->{} Float
+pause : Float ->{Async;} Float
 foreign pause from "./crash.mjs" "pause"
   arity 1
   cancel signal
 
-cleanup : Unit ->{} Unit
+cleanup : Unit ->{Async;} Unit
 foreign cleanup from "./crash.mjs" "cleanup"
   arity 0
 

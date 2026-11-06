@@ -12,20 +12,20 @@ import JsError exposing (JsError)
 
 /// lookup-lib@1.0.0 sha256:f0646211c5c47346e173692c28444bc515da1bc8f7508c9321db521f504836f1
 each : forall t. List t -> (t -> Unit) ->{} Unit
-foreign sync each from "lookup-lib" "each"
+foreign each from "lookup-lib" "each"
   arity 2
   retention call
 
 /// lookup-lib@1.0.0 sha256:6fa19f9012c9632a6e97d8e8485a3c7ee91ef53de65737b318e90a7ae9889c12
-lookup : String ->{; JsError} Option String
-foreign async lookup from "lookup-lib" "lookup"
+lookup : String ->{Async; JsError} Option String
+foreign lookup from "lookup-lib" "lookup"
   arity 1
   catch JsError.from_js
   nullable
 
 /// lookup-lib@1.0.0 sha256:db17cdc95b77b6ade2401f2dcfd47a44c2c190acab5c55821ac141d0e62ad094
 next_id : Unit ->{} Float
-foreign sync next_id from "lookup-lib" "nextId"
+foreign next_id from "lookup-lib" "nextId"
   arity 0
 
 /// lookup-lib@1.0.0 sha256:fba0145498ef4be5397feebf75d90ed0f41b0c89070a94b5269007211915db06

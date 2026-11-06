@@ -277,7 +277,7 @@ fn test_preparation_reports_phases_without_changing_json() {
 
 const SLOW: &str = r#"module Test.Slow exposing (tests)
 
-sleep : Float ->{} Unit
+sleep : Float ->{Async;} Unit
 foreign sleep from "./sleep.mjs" "sleep"
 
 tests : List Test.Test
