@@ -141,7 +141,7 @@ impl Checker<'_> {
         };
         let subst: Vec<(String, Type)> = vars
             .iter()
-            .map(|v: &Binder| (v.name.clone(), self.fresh()))
+            .map(|v: &Binder| (v.name.clone(), self.store.fresh_of(&v.kind)))
             .collect();
         // the implementation takes their dictionaries, as a constrained function does
         for c in constraints {
