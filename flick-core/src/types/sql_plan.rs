@@ -1,31 +1,6 @@
-//! What the checker records of `sql` tables and queries for the lowering.
+//! What the checker records of `sql` queries for the lowering.
 
-use super::ty::Type;
 use super::typing::Range;
-
-/// A `sql table` declaration.
-#[derive(Debug, Clone)]
-pub struct SqlTable {
-    pub decl: Range,
-    /// The row type; the table is the companion `Name$table`.
-    pub name: String,
-    /// The table's SQL name.
-    pub table: String,
-    pub columns: Vec<SqlColumn>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SqlColumn {
-    pub name: String,
-    /// How the runtime passes and reads values: `bigint`, `number`, `text`, ….
-    pub kind: String,
-    pub nullable: bool,
-    /// `Required`, `Defaulted` or `Generated`.
-    pub write: String,
-    /// The `via` codec.
-    pub via: Option<Range>,
-    pub ty: Type,
-}
 
 /// A checked query: its SQL text with `$n` placeholders, the expressions
 /// giving its tables, and how each parameter and result crosses the driver.

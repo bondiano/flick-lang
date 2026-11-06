@@ -141,7 +141,7 @@ impl<'a> Printer<'a> {
             K::ClassDecl | K::InstanceDecl | K::ServiceDecl => self.class(n),
             K::ForeignDecl => self.foreign(n),
             // the arguments of a derive are its plugin's words
-            K::SqlMigrationDecl | K::DerivingArgs => self.as_written(n),
+            K::DerivingArgs => self.as_written(n),
             K::PluginExpr | K::PluginDecl => self.plugin_block(n),
             _ => self.generic(n),
         }

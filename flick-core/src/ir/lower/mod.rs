@@ -28,7 +28,6 @@ use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
-use crate::syntax::ddl;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::{
@@ -54,11 +53,6 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
     let mut items = Vec::new();
     for decl in module.tree.nodes() {
         lower.item(decl, &mut items);
-    }
-    let migrations = ddl::migrations(module.tree, module.text);
-    if let Some(first) = migrations.first() {
-        let span = Span::new(module.file, first.range.0, first.range.1);
-        items.push(lower.migrations(&migrations, span));
     }
     for info in &typing.instances {
         let span = Span::new(module.file, info.span.0, info.span.1);
@@ -216,7 +210,6 @@ impl Lower<'_> {
                 }
             }
             K::TypeDecl | K::ErrorDecl => self.type_items(decl, span, items),
-            K::SqlMigrationDecl => self.sql_migration(decl, span, items),
             K::ClassDecl => {
                 let Some(class) = self.token_text(decl, K::Con) else {
                     return;

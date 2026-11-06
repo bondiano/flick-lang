@@ -223,21 +223,7 @@ impl Ide<'_> {
     fn sql_table_names(&self, m: &Analyzed, offset: u32) -> Option<Vec<Completion>> {
         let text = self.text(m.file);
         let names = self.complete_names(m.file, offset);
-        let mut out: BTreeMap<_, _> = m
-            .typing
-            .sql_tables
-            .iter()
-            .map(|t| {
-                (
-                    t.name.clone(),
-                    item(
-                        &t.name,
-                        CompletionKind::Type,
-                        Some(format!("sql table {}", t.name)),
-                    ),
-                )
-            })
-            .collect();
+        let mut out = BTreeMap::new();
         // the module's own tables, which the plugin of std declares
         for c in tables(&m.interface) {
             out.entry(c.label.clone()).or_insert(c);

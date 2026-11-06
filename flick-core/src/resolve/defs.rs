@@ -7,7 +7,6 @@ use super::{Decl, Namespace};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
-use crate::syntax::ddl;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal::string_value;
 
@@ -29,33 +28,6 @@ pub(super) fn collect(tree: &Node, text: &str, file: FileId) -> Vec<Def> {
     let mut defs = Vec::new();
     for decl in tree.nodes() {
         declaration(decl, text, file, &mut defs);
-    }
-    // the value `migrations`, and the type of each table they leave
-    if let Some(first) = tree.nodes().find(|n| n.kind == K::SqlMigrationDecl) {
-        let word = first
-            .child_tokens()
-            .nth(1)
-            .unwrap_or_else(|| first.child_tokens().next().expect("`sql`"));
-        defs.push(Def {
-            namespace: Namespace::Value,
-            name: "migrations".to_owned(),
-            span: Span::new(file, word.start, word.end),
-            parent: None,
-            decl: Decl::Let,
-            signature: false,
-            blocked: None,
-        });
-        for (name, (start, end)) in ddl::table_names(tree, text) {
-            defs.push(Def {
-                namespace: Namespace::Type,
-                name,
-                span: Span::new(file, start, end),
-                parent: None,
-                decl: Decl::Alias,
-                signature: false,
-                blocked: None,
-            });
-        }
     }
     defs
 }

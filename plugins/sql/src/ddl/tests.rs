@@ -1,20 +1,22 @@
-use super::{Write, migrations, schema, type_name};
-use crate::source::SourceMap;
-use crate::syntax::{Parse, parse};
+use flick_core::plugin::testing::blocks;
 
-fn parsed(text: &str) -> Parse {
-    let mut map = SourceMap::default();
-    let file = map.add("t.fl", text);
-    parse(text, file)
+use super::schema::{Problem, Table, Write};
+use super::{Migration, migration, schema, type_name};
+
+fn migrations(text: &str) -> Vec<Migration> {
+    let blocks = blocks(text);
+    (blocks.iter().enumerate())
+        .map(|(i, b)| migration(b, i))
+        .collect()
 }
 
-fn tables(text: &str) -> (Vec<super::Table>, Vec<super::Problem>) {
-    let parsed = parsed(text);
-    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
-    schema(&migrations(&parsed.tree, text))
+fn tables(text: &str) -> (Vec<Table>, Vec<Problem>) {
+    schema(&migrations(text))
 }
 
 const CONDUIT: &str = r#"module App.Schema exposing (..)
+
+import Sql exposing (plugin sql)
 
 sql migration 1 "first" {
   create table users (
@@ -68,8 +70,7 @@ fn migrations_build_the_tables_in_order() {
 
 #[test]
 fn a_statement_runs_as_written() {
-    let parsed = parsed(CONDUIT);
-    let m = migrations(&parsed.tree, CONDUIT);
+    let m = migrations(CONDUIT);
     assert_eq!((m[0].version, m[0].name.as_str()), (Some(1), "first"));
     assert_eq!(
         m[0].statements[2].sql(),
@@ -88,6 +89,8 @@ fn a_statement_runs_as_written() {
 #[test]
 fn what_does_not_apply_is_a_problem() {
     let text = r#"module App.Schema exposing (..)
+
+import Sql exposing (plugin sql)
 
 sql migration 2 "a" {
   create table posts (author bigint references people, title text);

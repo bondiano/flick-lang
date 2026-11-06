@@ -1,18 +1,37 @@
 //! The statements of `sql migration N "name" { … }`: SQL DDL read from the
-//! tokens of the block, for name resolution, the checker, which derives
-//! the module's tables from the schema the migrations build, and lowering,
-//! which runs the statements as written.
+//! tokens of the block. The schema of a module is built from all its
+//! migrations at once, so a word's place names its block too: the block's
+//! index in the high bits, the offset in the block in the low ones.
 
 mod alter;
 mod schema;
 
 use std::mem;
 
-pub use schema::{Column, Problem, Table, Write, schema};
+pub use schema::schema;
 
-use super::cst::{Node, Token};
-use super::kind::SyntaxKind as K;
-use super::literal::string_value;
+use flick_plugin::{Block, Span, TokenKind, string_value};
+
+/// How many bits of a place are the offset in its block.
+const OFFSET_BITS: u32 = 24;
+
+/// The place of `offset` in the block `index`.
+pub fn place(index: usize, offset: u32) -> u32 {
+    (u32::try_from(index).unwrap_or(u32::MAX) << OFFSET_BITS) | offset
+}
+
+/// The block and the span in it of the range `range`.
+pub fn located(range: (u32, u32)) -> (usize, Span) {
+    let mask = (1 << OFFSET_BITS) - 1;
+    let index = (range.0 >> OFFSET_BITS) as usize;
+    (
+        index,
+        Span {
+            start: range.0 & mask,
+            end: range.1 & mask,
+        },
+    )
+}
 
 /// A word of a statement: its text and where it is.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,11 +54,6 @@ pub struct Statement {
 }
 
 impl Statement {
-    pub fn range(&self) -> (u32, u32) {
-        let start = self.words.first().map_or(0, |w| w.range.0);
-        (start, self.words.last().map_or(start, |w| w.range.1))
-    }
-
     /// The statement as SQL: its words, spaced as a person writes them; a
     /// string, `"cat"`, is a text literal, `'cat'`, as in `sql { … }`.
     pub fn sql(&self) -> String {
@@ -74,34 +88,21 @@ pub struct Migration {
     pub statements: Vec<Statement>,
 }
 
-/// The migrations of a module, in the order written.
-pub fn migrations(tree: &Node, text: &str) -> Vec<Migration> {
-    tree.nodes()
-        .filter(|n| n.kind == K::SqlMigrationDecl)
-        .map(|n| migration(n, text))
-        .collect()
-}
-
-/// A `sql migration` declaration.
-pub fn migration(decl: &Node, text: &str) -> Migration {
-    let tokens: Vec<Token> = decl.child_tokens().collect();
-    let version = tokens
-        .iter()
-        .find(|t| t.kind == K::Number)
-        .and_then(|t| t.text(text).replace('_', "").parse().ok());
-    let name = tokens
-        .iter()
-        .find(|t| t.kind == K::String)
-        .map(|t| string_value(t.text(text)))
+/// The migration of `block`, the `index`th of its module.
+pub fn migration(block: &Block, index: usize) -> Migration {
+    let text = |span: Span| block.text_of(span);
+    let args = block.arguments();
+    let version = (args.iter())
+        .find(|t| t.kind == TokenKind::Number)
+        .and_then(|t| text(t.span).replace('_', "").parse().ok());
+    let name = (args.iter())
+        .find(|t| t.kind == TokenKind::String)
+        .map(|t| string_value(text(t.span)))
         .unwrap_or_default();
     let mut statements = Vec::new();
     let mut words = Vec::new();
-    for t in decl
-        .nodes()
-        .filter(|n| n.kind == K::Block)
-        .flat_map(Node::child_tokens)
-    {
-        if t.kind == K::Semi {
+    for t in block.body().rest() {
+        if text(t.span) == ";" {
             if !words.is_empty() {
                 statements.push(Statement {
                     words: mem::take(&mut words),
@@ -110,15 +111,16 @@ pub fn migration(decl: &Node, text: &str) -> Migration {
             continue;
         }
         words.push(Word {
-            text: t.text(text).to_owned(),
-            range: (t.start, t.end),
+            text: text(t.span).to_owned(),
+            range: (place(index, t.span.start), place(index, t.span.end)),
         });
     }
     if !words.is_empty() {
         statements.push(Statement { words });
     }
+    let whole = block.whole();
     Migration {
-        range: decl.range(),
+        range: (place(index, whole.start), place(index, whole.end)),
         version,
         name,
         statements,
@@ -136,16 +138,6 @@ pub fn type_name(table: &str) -> String {
                 c.to_ascii_uppercase().to_string() + chars.as_str()
             })
         })
-        .collect()
-}
-
-/// The type names of the tables a module's migrations leave, for name
-/// resolution: the problems are the checker's to report.
-pub fn table_names(tree: &Node, text: &str) -> Vec<(String, (u32, u32))> {
-    schema(&migrations(tree, text))
-        .0
-        .into_iter()
-        .map(|t| (type_name(&t.name), t.at))
         .collect()
 }
 

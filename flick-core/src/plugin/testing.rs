@@ -143,3 +143,36 @@ pub fn expand(plugin: &impl Plugin, source: &str) -> Vec<Result<String, Vec<Stri
         })
         .collect()
 }
+
+/// The closed blocks of `source`, a module whose imports expose the
+/// plugin's heads, as a plugin gets them.
+pub fn blocks(source: &str) -> Vec<Block> {
+    let file = FileId::default();
+    let parse = syntax::parse(source, file);
+    let mut nodes = Vec::new();
+    blocks_under(&parse.tree, &mut nodes);
+    let text: Arc<str> = Arc::from(source);
+    let syntax = resolve::module_syntax(&parse.tree, source, file);
+    let heads = syntax.heads();
+    let module = syntax.header.as_ref().map_or("Main", |h| h.name.as_str());
+    (nodes.into_iter())
+        .filter_map(|n| BlockSource::new(Arc::clone(&text), file, n, Arc::clone(&heads)))
+        .filter(BlockSource::closed)
+        .map(|s| s.in_module(module, &parse.tree).block())
+        .collect()
+}
+
+/// What `check` of `plugin` reports for each block of `source`, without
+/// facts, as ``code `text`: message``.
+pub fn check(plugin: &impl Plugin, source: &str) -> Vec<String> {
+    let blocks = blocks(source);
+    let state = plugin.collect(&blocks, &mut BlockSource::default());
+    (blocks.iter())
+        .flat_map(|block| {
+            (plugin.check(block, &state, &[]).into_iter()).map(move |d| {
+                let code = d.code.as_deref().unwrap_or("error");
+                format!("{code} `{}`: {}", block.text_of(d.span), d.message)
+            })
+        })
+        .collect()
+}

@@ -1,0 +1,12 @@
+---
+source: plugins/sql/tests/migration.rs
+expression: "code.join(\"\\n----\\n\")"
+---
+migrations : (List Database.Migrate.Migration)
+let migrations = ([{ version = 1; name = "people"; statements = ["create table people (id bigint primary key generated always as identity, name text not null)"] }, { version = 2; name = "pets"; statements = ["create table pets (owner bigint not null references people, name text)", "alter table people add column born date"] }, { version = 3; name = "late"; statements = ["drop table pets"] }] : _)
+type alias People = { id : BigInt; name : String; born : (Option String) }
+People$table : (Sql.Table "people" { id : (Sql.Column BigInt Sql.NonNull Sql.Generated); name : (Sql.Column String Sql.NonNull Sql.Required); born : (Sql.Column String Sql.Nullable Sql.Defaulted) })
+let People$table = (Sql.make_table ({ name = "people"; columns = [(Sql.Derive.plain "id" "bigint" false Sql.Derive.same), (Sql.Derive.plain "name" "text" false Sql.Derive.same), (Sql.Derive.plain "born" "date" true Sql.Derive.same)] } : _))
+----
+
+----

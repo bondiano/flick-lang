@@ -8,13 +8,19 @@ use super::super::Checker;
 use super::super::ty::{Row, Type};
 use super::super::typing::{SqlForm, SqlPlan, SqlValue, range};
 use super::expr::{Place, Val, inner, quote};
-use super::table::{SQL, index};
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
+
+const SQL: &str = "Sql";
+
+/// `Sql.Pg`, `Sql.Template`, ….
+fn index(name: &str) -> Type {
+    Type::con(SQL, name)
+}
 
 /// A table in the scope of a query.
 #[derive(Debug, Clone)]

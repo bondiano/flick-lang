@@ -2,25 +2,25 @@
 // the DDL stays in the subset; the tables it leaves are still declared.
 module App.Schema exposing (..)
 
-import Sql exposing (Pg)
+import Sql exposing (Pg, plugin sql)
 
 sql migration 1 "people" {
   create table people (id bigint primary key, name text not null, born date);
   create view grown as select 1;
-//~ FLICK-Q010 @9:3-9:32 `create view` is outside the DDL a migration may hold: `create table`, `create index`, `alter table`, `drop table`, `drop index`
+//~ std/Q010 @9:3-9:32 `create view` is outside the DDL a migration may hold: `create table`, `create index`, `alter table`, `drop table`, `drop index`
 }
 
 sql migration 3 "pets" {
   create table pets (owner bigint not null references owners, name text not null);
-//~ FLICK-Q013 @14:55-14:61 no table `owners` to refer to
+//~ std/Q013 @14:55-14:61 no table `owners` to refer to
   create index pets_by_kind on pets (kind);
-//~ FLICK-Q013 @16:38-16:42 no column `kind` in `pets`
+//~ std/Q013 @16:38-16:42 no column `kind` in `pets`
 }
 
 sql migration 2 "late" {
   drop table pets;
 }
-//~ FLICK-Q013 @20:1-22:2 migration 2 comes after 3: versions increase in the order written
+//~ std/Q013 @20:1-22:2 migration 2 comes after 3: versions increase in the order written
 
 names : Sql.Template Pg {} { name : String }
 let names = sql {
