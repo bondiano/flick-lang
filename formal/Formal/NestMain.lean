@@ -1,4 +1,4 @@
-import Formal.NestStep
+import Formal.NestHdlStep
 
 /-!
 # Every step of a thread keeps `⊢ Λ`

@@ -64,6 +64,10 @@ import Formal.NestScope
 import Formal.NestClose
 import Formal.NestTyping
 import Formal.NestStep
+import Formal.NestHdl
+import Formal.NestHdlPure
+import Formal.NestHdlRt
+import Formal.NestHdlStep
 import Formal.NestMain
 import Formal.Regions
 import Formal.NeedOut
