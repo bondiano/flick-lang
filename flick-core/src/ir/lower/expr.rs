@@ -9,6 +9,7 @@ use crate::numeric::Arith;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::handle::{arm_pattern, operation_path};
 use crate::types::lang::{self, Lang};
 use crate::types::{Dict, Identity, Range, Ref, is_pattern, let_parts};
 
@@ -118,6 +119,10 @@ impl Lower<'_> {
             K::MatchExpr => {
                 let scrutinee = self.boxed(children[0]);
                 ExprKind::Match(scrutinee, self.arms(node))
+            }
+            K::TryExpr if handles_effects(node, self.text) => {
+                self.unsupported(node);
+                ExprKind::Lit(Lit::Unit)
             }
             K::TryExpr => {
                 let body = self.boxed(children[0]);
@@ -466,4 +471,12 @@ pub(super) fn with_dicts(expr: Expr, dicts: Vec<Dict>) -> Expr {
     }
     let span = expr.span;
     Expr::new(ExprKind::Dicts(Box::new(expr), dicts), span)
+}
+
+/// Whether a `try` has arms for operations or for the value of its body.
+fn handles_effects(node: &Node, text: &str) -> bool {
+    node.nodes().filter(|n| n.kind == K::MatchArm).any(|arm| {
+        arm.has_token(K::ReturnKw)
+            || arm_pattern(arm).is_some_and(|p| operation_path(p, text).is_some())
+    })
 }

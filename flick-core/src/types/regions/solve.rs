@@ -253,6 +253,11 @@ impl Checker<'_> {
                     Vec::new(),
                 )
             }),
+            None if self.handler_region(atom) => Diagnostic::error(
+                codes::G002,
+                format!("{subject}: `resume` stays in the arms of its handler"),
+                hold.span,
+            ),
             None => Diagnostic::error(
                 codes::G002,
                 format!("{subject}, so it cannot leave the `scope` that owns the region"),
@@ -293,8 +298,13 @@ impl Checker<'_> {
                 }, Vec::new()))
             }
         };
+        let ends = if self.handler_region(atom) {
+            "the handler ends here"
+        } else {
+            "the region's scope ends here"
+        };
         let diagnostic = match scope {
-            Some(span) => diagnostic.with_related(span, "the region's scope ends here"),
+            Some(span) => diagnostic.with_related(span, ends),
             None => diagnostic,
         };
         self.diagnostics.push(diagnostic);

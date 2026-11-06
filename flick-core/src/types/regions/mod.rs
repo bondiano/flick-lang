@@ -116,6 +116,8 @@ pub struct Scope {
     /// The services of the stage around the scope.
     pub outer: Type,
     pub parent: Option<usize>,
+    /// The region of `resume` in the arms of a handler, not a `scope`'s.
+    pub handler: bool,
 }
 
 /// Values a closure holds, by name, with their types.
@@ -693,17 +695,31 @@ impl Checker<'_> {
             return false;
         };
         let name = self.store.skolem_name(skolem).to_owned();
-        self.diagnostics.push(
-            diagnostics::Diagnostic::error(
-                codes::G002,
+        let (message, related) = if scope.handler {
+            (
+                format!(
+                    "{head}: region `{name}` is that of `resume`, which stays in the arms of its handler"
+                ),
+                "the handler ends here",
+            )
+        } else {
+            (
                 format!(
                     "{head}: region `{name}` ends with its `scope`, so the value cannot leave it"
                 ),
-                span,
+                "the scope ends here",
             )
-            .with_related(scope.span, "the scope ends here"),
+        };
+        self.diagnostics.push(
+            diagnostics::Diagnostic::error(codes::G002, message, span)
+                .with_related(scope.span, related),
         );
         true
+    }
+
+    /// Whether `atom` is the region of `resume` in a handler's arms.
+    pub fn handler_region(&self, atom: &Type) -> bool {
+        matches!(atom, Type::Skolem(s) if self.scope_of(*s).is_some_and(|scope| scope.handler))
     }
 }
 

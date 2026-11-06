@@ -250,6 +250,7 @@ codes! {
     E012 = Effects 12, "server function needs server stdlib";
     E013 = Effects 13, "service operation that is not `tail`";
     E014 = Effects 14, "`abort` operation that may return";
+    E015 = Effects 15, "handler `return` arm that may not match";
     C001 = Classes 1, "no instance for a constraint";
     C002 = Classes 2, "ambiguous class constraint";
     C003 = Classes 3, "overlapping instances";

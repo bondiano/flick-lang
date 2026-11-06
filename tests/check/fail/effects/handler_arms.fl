@@ -1,0 +1,78 @@
+module App.HandlerArms exposing (..)
+
+effect Ask a =
+  ask : Unit ->{} a
+
+effect Emit a =
+  control emit : a ->{} Unit
+
+effect Throw =
+  abort throw : forall b. String ->{} b
+
+/// No handler: `Ask` is not allowed.
+unhandled : Unit ->{} Int
+let unhandled () = Ask.ask ()
+//~ FLICK-E002 @14:20-14:30 the signature of `unhandled` does not allow
+
+/// A guarded arm covers nothing: `Ask` stays.
+guarded : (Unit ->{Ask Int; none} Int) ->{} Int
+let guarded body =
+  try
+//~ FLICK-E002 @20:3-20:6 the signature of `guarded` does not allow
+    body ()
+  with
+  | Ask.ask () when true -> 0
+
+/// `resume` is of the handler's region: in a cell made outside the
+/// handler, it would outlive it.
+zero : Unit ->{} Int
+let zero () = 0
+
+escaped : (Unit ->{Emit Int; none} Int) ->{} Int
+let escaped body =
+  let cell = Ref.make zero
+  try
+    body ()
+  with
+  | Emit.emit _ ->
+    Ref.set cell resume
+//~ FLICK-G002 @38:18-38:24 this value holds region `resume`: `resume` stays
+    0
+
+/// One `return` arm, matching every value, without a guard.
+returns : (Unit ->{Emit Int; none} Int) ->{} Int
+let returns body =
+  try
+    body ()
+  with
+  | Emit.emit _ -> resume ()
+  | return 0 -> 0
+//~ FLICK-E015 @49:12-49:13 a handler has one `return` arm, without
+
+unknown : (Unit ->{Ask Int; none} Int) ->{} Int
+let unknown body =
+  try
+    body ()
+  with
+  | Ask.tell () -> 0
+//~ FLICK-T001 @57:5-57:13 effect `Ask` has no operation `tell`
+  | Ask.ask -> 1
+//~ FLICK-T018 @59:5-59:12 operation `ask` takes 1 argument(s) before it
+
+/// An `abort` arm is the value of the handler.
+aborted : (Unit ->{Throw; none} Int) ->{} Int
+let aborted body =
+  try
+    body ()
+  with
+  | Throw.throw message -> message
+//~ FLICK-T003 @68:28-68:35 expected `Int`, found `String`
+
+/// A `tail` arm is the value of the operation.
+told : (Unit ->{Ask Int; none} Int) ->{} Int
+let told body =
+  try
+//~ FLICK-T003 @74:3-74:6 expected `Ask String`, found `Ask Int`
+    body ()
+  with
+  | Ask.ask () -> "one"

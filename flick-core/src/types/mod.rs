@@ -36,6 +36,7 @@ mod facts;
 mod ffi;
 mod gadt;
 mod generalize;
+pub mod handle;
 mod handlers;
 mod infer;
 mod instances;
