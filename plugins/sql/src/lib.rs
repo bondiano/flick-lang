@@ -137,7 +137,7 @@ impl Plugin for Sql {
         if migration::is_migration(block) {
             return Vec::new();
         }
-        editor::complete(block, offset)
+        editor::complete(block, offset, compiler)
     }
 }
 

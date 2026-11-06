@@ -15,6 +15,7 @@ mod prims;
 mod report;
 mod solve;
 
+pub use matching::{Match, match_type};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

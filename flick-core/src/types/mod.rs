@@ -85,7 +85,7 @@ pub use builtins::{
     set_std, std_go_bindings,
 };
 pub use class_members::class_defaults;
-pub use classes::{Dict, STRUCTURAL, which};
+pub use classes::{Dict, Match, STRUCTURAL, match_type, which};
 pub use component::{instance_key as component_instance, parts as component_parts};
 pub use comprehension::{comprehension, for_parts};
 pub use convert::is_type;

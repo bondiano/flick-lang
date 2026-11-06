@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::BlockSource;
+use super::{BlockSource, InScope};
 use crate::plugin::reach::{Asked, Used, literal_answer, published_answer};
 
 impl BlockSource {
@@ -41,6 +41,12 @@ impl BlockSource {
             )),
             _ => None,
         }
+    }
+
+    /// What the module has in scope, for its plugin's completion in an
+    /// editor.
+    pub fn see_scope(&mut self, in_scope: Arc<InScope>) {
+        self.in_scope = Some(in_scope);
     }
 
     /// What this block's module sees, for its plugin's questions of later.

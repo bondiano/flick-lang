@@ -417,6 +417,13 @@ pub struct Highlight {
     pub kind: HighlightKind,
 }
 
+/// The names of values or of types, as `Compiler::in_scope` asks for them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Namespace {
+    Value,
+    Type,
+}
+
 /// What a plugin tells its blocks of other groups and modules about a name
 /// of the module `module`, as `Compiler::published` answers it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -480,6 +487,14 @@ pub trait Compiler {
     /// Every name `published` answers for the block's module, as it writes
     /// them.
     fn published_names(&mut self) -> Vec<String> {
+        Vec::new()
+    }
+    /// The values or types in scope of the block's module, as it writes
+    /// them; with `fits`, the values whose type instantiates to that type,
+    /// written as the module writes it or with names qualified in full. An
+    /// editor answers it; while a block expands, nothing.
+    fn in_scope(&mut self, namespace: Namespace, fits: Option<&str>) -> Vec<Completion> {
+        let _ = (namespace, fits);
         Vec::new()
     }
 }
