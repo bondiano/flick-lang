@@ -64,10 +64,10 @@ impl Plugin for Std {
         }
     }
 
-    fn check(&self, block: &Block, _: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
+    fn check(&self, block: &Block, state: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
         match block.head.as_str() {
             "codec" => codec::check(block, facts),
-            "sql" => Sql.check(block, &[], facts),
+            "sql" => Sql.check(block, state, facts),
             _ => Vec::new(),
         }
     }
