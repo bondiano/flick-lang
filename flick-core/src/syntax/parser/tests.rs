@@ -174,10 +174,7 @@ fn a_gadt_constructor_names_what_it_builds() {
          (AppType (NameType Eq) (NameType a)) , (AppType (NameType Show) (NameType a)) )) =>) \
          P (NameType a) (VariantResult : (NameType S))))"
     );
-    assert_eq!(
-        errors("type error E = (Show a) => E a\n"),
-        ["FLICK-S015 ("]
-    );
+    assert_eq!(errors("type error E = (Show a) => E a\n"), ["FLICK-S015 ("]);
 }
 
 #[test]

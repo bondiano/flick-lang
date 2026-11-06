@@ -173,9 +173,16 @@ impl Checker<'_> {
     /// rigid variables it fixes are equalities of the arm, and those it
     /// leaves open, the types it hides, are rigid in it.
     fn con_fields(&mut self, c: &Con, t: &Type) -> Check<Vec<Type>> {
-        let Some(scheme) = self.decls.constructors.get(&Path::new(&c.ty.module, &c.name)).cloned()
+        let Some(scheme) = self
+            .decls
+            .constructors
+            .get(&Path::new(&c.ty.module, &c.name))
+            .cloned()
         else {
-            return error("Var", format!("no constructor `{}.{}`", c.ty.module, c.name));
+            return error(
+                "Var",
+                format!("no constructor `{}.{}`", c.ty.module, c.name),
+            );
         };
         let gadt = indexed(&scheme);
         let (mut ct, insts) = self.instantiate_with(&scheme);
@@ -194,7 +201,8 @@ impl Checker<'_> {
                     && matches!(self.follow(&Type::Var(Var::Meta(*m))), Type::Var(Var::Meta(x)) if x == *m)
                 {
                     self.rigid += 1;
-                    let hidden = Type::Var(Var::Named(format!("{n}'{}", self.rigid).as_str().into()));
+                    let hidden =
+                        Type::Var(Var::Named(format!("{n}'{}", self.rigid).as_str().into()));
                     self.bind(*m, Solved::Type(hidden.clone()), &hidden)?;
                 }
             }
@@ -399,5 +407,8 @@ fn indexed(s: &Scheme) -> bool {
             .iter()
             .zip(&s.vars)
             .all(|(a, (n, _))| matches!(&***a, Type::Var(Var::Named(x)) if x == n));
-    !plain || s.vars[args.len().min(s.vars.len())..].iter().any(|(_, k)| *k != Kind::Captures)
+    !plain
+        || s.vars[args.len().min(s.vars.len())..]
+            .iter()
+            .any(|(_, k)| *k != Kind::Captures)
 }

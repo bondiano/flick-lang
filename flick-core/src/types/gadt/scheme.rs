@@ -241,7 +241,10 @@ impl Checker<'_> {
                 let result = self.indexed_result(name, params, &locals, &indexed);
                 quantify(&locals, self.held_scheme(&locals, variant.payload, result))
             } else {
-                quantify(params, self.held_scheme(params, variant.payload, own.clone()))
+                quantify(
+                    params,
+                    self.held_scheme(params, variant.payload, own.clone()),
+                )
             };
             let scheme = constrained(scheme, variant.constraints);
             let entity = self.env.entity(Namespace::Constructor, &variant.name);

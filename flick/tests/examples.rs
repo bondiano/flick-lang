@@ -336,7 +336,10 @@ fn typed_interpreter_runs(emit: &str) {
         node.arg(dir.join("dist").join(runner_path(false)));
         node
     };
-    let out = command.current_dir(&dir).output().expect("the interpreter runs");
+    let out = command
+        .current_dir(&dir)
+        .output()
+        .expect("the interpreter runs");
     assert!(out.status.success(), "{out:?}");
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),

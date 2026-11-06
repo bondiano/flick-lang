@@ -33,7 +33,12 @@ impl Checker<'_> {
     fn solution(&self, v: &Var) -> Option<&Solved> {
         match v {
             Var::Meta(m) => self.slots[*m as usize].solved.as_ref(),
-            Var::Named(n) => self.equalities.iter().rev().find(|(x, _)| x == n).map(|(_, s)| s),
+            Var::Named(n) => self
+                .equalities
+                .iter()
+                .rev()
+                .find(|(x, _)| x == n)
+                .map(|(_, s)| s),
         }
     }
 

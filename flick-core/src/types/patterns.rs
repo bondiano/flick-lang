@@ -3,8 +3,8 @@
 
 use std::{iter, mem};
 
-use super::ty::{Row, Type};
 use super::gadt::scheme::dicts;
+use super::ty::{Row, Type};
 use super::{Checker, Local};
 use crate::diagnostics::codes;
 use crate::diagnostics::suggest::closest;

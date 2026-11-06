@@ -13,7 +13,13 @@ use crate::types::ty::Type;
 impl Checker<'_> {
     /// Whether the constructor `name` of the type `module.ty_name` builds
     /// values of type `ty`.
-    pub(in crate::types) fn builds(&self, module: &str, ty_name: &str, name: &str, ty: &Type) -> bool {
+    pub(in crate::types) fn builds(
+        &self,
+        module: &str,
+        ty_name: &str,
+        name: &str,
+        ty: &Type,
+    ) -> bool {
         let ctor = Ctor::Variant {
             module: module.to_owned(),
             ty: ty_name.to_owned(),
@@ -25,7 +31,12 @@ impl Checker<'_> {
     /// The types of the `arity` fields of `ctor` in a value of type `ty`;
     /// `None` when no value of `ty` is built by it. A type that is not
     /// known makes its fields not known either (`Error`).
-    pub(in crate::types) fn ctor_fields_at(&self, ctor: &Ctor, ty: &Type, arity: usize) -> Option<Vec<Type>> {
+    pub(in crate::types) fn ctor_fields_at(
+        &self,
+        ctor: &Ctor,
+        ty: &Type,
+        arity: usize,
+    ) -> Option<Vec<Type>> {
         let unknown = || Some(vec![Type::Error; arity]);
         if *ty == Type::Error {
             return unknown();
@@ -69,7 +80,11 @@ impl Checker<'_> {
                     fields.push(replace_skolems(&param, &equals));
                     current = *result;
                 }
-                if fields.len() == arity { Some(fields) } else { unknown() }
+                if fields.len() == arity {
+                    Some(fields)
+                } else {
+                    unknown()
+                }
             }
             Ctor::Tuple(_) => match t {
                 Type::Tuple(items) if items.len() == arity => Some(items),

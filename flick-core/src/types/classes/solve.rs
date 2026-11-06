@@ -10,8 +10,8 @@ use super::matching::{Match, Subst, match_type};
 use super::{Dict, RECORD_CLASSES, has_metas, split, super_slot, vars, which};
 use crate::numeric::{Num, default_num};
 use crate::types::Checker;
-use crate::types::gadt::branch::as_field_given;
 use crate::types::env::Instance;
+use crate::types::gadt::branch::as_field_given;
 use crate::types::generalize::replace_metas;
 use crate::types::ty::Type;
 

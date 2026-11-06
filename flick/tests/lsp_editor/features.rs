@@ -75,7 +75,10 @@ let describe t x =
   | TInt -> show (x + 1)
   | TStr -> x ++ \"!\"
 ";
-    let dir = project("lsp_gadt_hover", &[("flick.toml", LIB), ("src/App/Main.fl", source)]);
+    let dir = project(
+        "lsp_gadt_hover",
+        &[("flick.toml", LIB), ("src/App/Main.fl", source)],
+    );
     let file = dir.join("src/App/Main.fl");
     let mut lsp = Lsp::start(&dir);
     lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": source } }));

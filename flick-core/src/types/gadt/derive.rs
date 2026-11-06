@@ -75,4 +75,3 @@ impl Checker<'_> {
         Ok(fields)
     }
 }
-

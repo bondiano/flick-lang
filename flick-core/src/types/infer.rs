@@ -618,7 +618,9 @@ impl Checker<'_> {
             }
         }
         if self.leave_arm(frame) {
-            self.typing.dead_arms.insert(super::typing::range(self.span(arm)));
+            self.typing
+                .dead_arms
+                .insert(super::typing::range(self.span(arm)));
         }
         self.locals.truncate(mark);
         (pat, guarded, span)

@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use super::Checker;
 use super::classes::Dict;
-use super::gadt::branch::as_field_given;
 use super::env::{Abi, Rep};
+use super::gadt::branch::as_field_given;
 #[cfg(feature = "ide")]
 use super::sql::dialect::Dialect;
 pub use super::sql_plan::{SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue};

@@ -162,7 +162,9 @@ impl Projection<'_> {
                     .collect::<Result<_, _>>()?
             }
             None => {
-                let arity = schemes.first().map_or(0, |s| built(&split(s).1).spine().1.len());
+                let arity = schemes
+                    .first()
+                    .map_or(0, |s| built(&split(s).1).spine().1.len());
                 (0..arity).map(|i| format!("T{i}")).collect()
             }
         };

@@ -124,7 +124,9 @@ impl Checker<'_> {
         let Some((first, rest)) = v.split_first() else {
             return rows.is_empty().then(Vec::new);
         };
-        let (ty, tys) = tys.split_first().map_or((&Type::Error, &[][..]), |(t, r)| (t, r));
+        let (ty, tys) = tys
+            .split_first()
+            .map_or((&Type::Error, &[][..]), |(t, r)| (t, r));
         let rows: Vec<Vec<Pat>> = rows.iter().flat_map(|r| expand(r)).collect();
         match first {
             Pat::Or(alternatives) => alternatives.iter().find_map(|alt| {
@@ -169,7 +171,11 @@ impl Checker<'_> {
                     .into_iter()
                     .chain(rest.iter().cloned())
                     .collect();
-                let tys: Vec<Type> = labels.iter().map(|_| Type::Error).chain(tys.iter().cloned()).collect();
+                let tys: Vec<Type> = labels
+                    .iter()
+                    .map(|_| Type::Error)
+                    .chain(tys.iter().cloned())
+                    .collect();
                 let witness = self.useful_at(&specialized, &v, &tys)?;
                 Some(rebuild_record(&labels, witness))
             }
@@ -179,13 +185,25 @@ impl Checker<'_> {
 
     /// The types of the columns once the first one is specialized to
     /// `ctor`; `None` when no value of its type `ty` is built by `ctor`.
-    fn column_types(&self, ctor: &Ctor, ty: &Type, arity: usize, rest: &[Type]) -> Option<Vec<Type>> {
+    fn column_types(
+        &self,
+        ctor: &Ctor,
+        ty: &Type,
+        arity: usize,
+        rest: &[Type],
+    ) -> Option<Vec<Type>> {
         let mut tys = self.ctor_fields_at(ctor, ty, arity)?;
         tys.extend(rest.iter().cloned());
         Some(tys)
     }
 
-    fn useful_wild(&self, rows: &[Vec<Pat>], rest: &[Pat], ty: &Type, tys: &[Type]) -> Option<Vec<Pat>> {
+    fn useful_wild(
+        &self,
+        rows: &[Vec<Pat>],
+        rest: &[Pat],
+        ty: &Type,
+        tys: &[Type],
+    ) -> Option<Vec<Pat>> {
         let heads: Vec<&Pat> = rows.iter().map(|r| &r[0]).collect();
         if heads.iter().any(|h| matches!(h, Pat::Record(_))) {
             let labels = labels(rows, None);
@@ -195,7 +213,11 @@ impl Checker<'_> {
                 .map(|_| Pat::Wild)
                 .chain(rest.iter().cloned())
                 .collect();
-            let tys: Vec<Type> = labels.iter().map(|_| Type::Error).chain(tys.iter().cloned()).collect();
+            let tys: Vec<Type> = labels
+                .iter()
+                .map(|_| Type::Error)
+                .chain(tys.iter().cloned())
+                .collect();
             let witness = self.useful_at(&specialized, &v, &tys)?;
             return Some(rebuild_record(&labels, witness));
         }
@@ -210,7 +232,11 @@ impl Checker<'_> {
         let all = seen.first().and_then(|c| {
             let all = list_ctors(seen.iter().copied()).or_else(|| self.constructors(c))?;
             // the constructors that build values of the column's type
-            Some(all.into_iter().filter(|(c, arity)| self.ctor_fields_at(c, ty, *arity).is_some()).collect::<Vec<_>>())
+            Some(
+                all.into_iter()
+                    .filter(|(c, arity)| self.ctor_fields_at(c, ty, *arity).is_some())
+                    .collect::<Vec<_>>(),
+            )
         });
         let covered = |c: &Ctor| seen.iter().any(|s| covers(s, c));
         if let Some(all) = &all

@@ -50,7 +50,12 @@ struct Refiner<'c, 'a> {
 impl Checker<'_> {
     /// Unifies `built`, the type a constructor builds over its variables
     /// `locals`, with `scrutinee`, the type of the matched value.
-    pub(in crate::types) fn refine(&self, locals: &[String], built: &Type, scrutinee: &Type) -> Refined {
+    pub(in crate::types) fn refine(
+        &self,
+        locals: &[String],
+        built: &Type,
+        scrutinee: &Type,
+    ) -> Refined {
         let mut r = Refiner {
             checker: self,
             locals,
@@ -154,7 +159,11 @@ impl Refiner<'_, '_> {
             }
             (Type::Skolem(s), t) | (t, Type::Skolem(s)) => self.equate(*s, t),
             (Type::Con { .. }, Type::Con { .. }) | (Type::Symbol(_), Type::Symbol(_)) => {
-                if a == b { Ok(()) } else { Err(Stop::Impossible) }
+                if a == b {
+                    Ok(())
+                } else {
+                    Err(Stop::Impossible)
+                }
             }
             (Type::App { head: h1, arg: a1 }, Type::App { head: h2, arg: a2 }) => {
                 self.unify(h1, h2)?;
@@ -182,7 +191,8 @@ impl Refiner<'_, '_> {
                 self.unify(r1, r2)?;
                 let store = &self.checker.store;
                 let zonked = |e: &Option<Box<crate::types::ty::Effects>>| {
-                    e.as_ref().map(|e| (store.zonk(&e.services), store.zonk(&e.errors), e.sync))
+                    e.as_ref()
+                        .map(|e| (store.zonk(&e.services), store.zonk(&e.errors), e.sync))
                 };
                 if zonked(e1) == zonked(e2) {
                     Ok(())
@@ -190,7 +200,8 @@ impl Refiner<'_, '_> {
                     Err(Stop::Unsupported(Unsupported::Row))
                 }
             }
-            (Type::Record(_) | Type::Row(_) | Type::Union(..), _) | (_, Type::Record(_) | Type::Row(_) | Type::Union(..)) => {
+            (Type::Record(_) | Type::Row(_) | Type::Union(..), _)
+            | (_, Type::Record(_) | Type::Row(_) | Type::Union(..)) => {
                 if self.full(&a) == self.full(&b) {
                     Ok(())
                 } else {

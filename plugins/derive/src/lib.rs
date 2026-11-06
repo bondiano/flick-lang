@@ -48,11 +48,18 @@ pub fn derive(
             "HttpApi.Derive.HttpApi" => "D011",
             _ => "D001",
         };
-        let why = if case.constrained { "holds dictionaries" } else { "names the type it builds" };
+        let why = if case.constrained {
+            "holds dictionaries"
+        } else {
+            "names the type it builds"
+        };
         let derive = class.rsplit('.').next().unwrap_or(class);
         let fail = (
             target.name.clone(),
-            format!("`deriving {derive}` describes ordinary constructors, and `{}` {why}, as a constructor of a GADT", case.name),
+            format!(
+                "`deriving {derive}` describes ordinary constructors, and `{}` {why}, as a constructor of a GADT",
+                case.name
+            ),
         );
         return Err(refuse(code, fail));
     }

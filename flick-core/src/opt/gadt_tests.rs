@@ -28,6 +28,12 @@ fn renaming_an_arm_renames_the_dictionaries_its_pattern_binds() {
     let after = format!("{body:?}");
     let binds = after.matches("Bind(\"$dict").count();
     let renamed_binds = after.matches("_0_copy\")").count();
-    assert!(binds > 0 && after.contains("Field(\"$dict") && renamed_binds >= 2, "{after}");
-    assert!(!after.contains("_0\")"), "a dictionary local kept its old name: {after}");
+    assert!(
+        binds > 0 && after.contains("Field(\"$dict") && renamed_binds >= 2,
+        "{after}"
+    );
+    assert!(
+        !after.contains("_0\")"),
+        "a dictionary local kept its old name: {after}"
+    );
 }

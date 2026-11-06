@@ -16,9 +16,9 @@ use crate::types::lang::Lang;
 use crate::types::patterns::Pat;
 use crate::types::ty::{Binder, Type};
 use crate::types::typing::Range;
+use crate::types::unify::Equality;
 #[cfg(feature = "ide")]
 use crate::types::{Typing, show_type};
-use crate::types::unify::Equality;
 
 /// What the checker knows about the code around the pattern being bound.
 #[derive(Debug, Default)]
@@ -73,7 +73,11 @@ impl Checker<'_> {
 
     /// Runs `f` under the equalities among `givens`, the assumptions a
     /// deferred constraint was made with.
-    pub(in crate::types) fn under<T>(&mut self, givens: &[Type], f: impl FnOnce(&mut Self) -> T) -> T {
+    pub(in crate::types) fn under<T>(
+        &mut self,
+        givens: &[Type],
+        f: impl FnOnce(&mut Self) -> T,
+    ) -> T {
         let mark = self.store.equalities.len();
         for g in givens {
             if let Some(args) = args_of(g, Lang::TypeEq)
@@ -138,7 +142,11 @@ impl Checker<'_> {
             Type::Forall { vars, body, .. } => (&vars[..], &**body),
             t => (&[][..], t),
         };
-        let locals: Vec<Binder> = vars.iter().filter(|v| !is_hidden_captures(v)).cloned().collect();
+        let locals: Vec<Binder> = vars
+            .iter()
+            .filter(|v| !is_hidden_captures(v))
+            .cloned()
+            .collect();
         let names: Vec<String> = locals.iter().map(|v| v.name.clone()).collect();
         let refined = self.refine(&names, built(body), scrutinee);
         let constraints = match scheme {
@@ -175,7 +183,15 @@ impl Checker<'_> {
         node: &Node,
     ) -> (Vec<(String, Type)>, bool) {
         let span = self.span(node);
-        let errors = || (locals.iter().map(|v| (v.name.clone(), Type::Error)).collect(), false);
+        let errors = || {
+            (
+                locals
+                    .iter()
+                    .map(|v| (v.name.clone(), Type::Error))
+                    .collect(),
+                false,
+            )
+        };
         let (bound, equals) = match refined {
             Refined::Unifier { bound, equals } => (bound, equals),
             Refined::Impossible => {

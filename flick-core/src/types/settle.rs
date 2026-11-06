@@ -7,9 +7,9 @@ use std::mem;
 
 use super::classes::{NUMERIC_CLASSES, split, which};
 use super::env::{Abi, Form};
-use super::ty::Type;
 use super::gadt::branch::as_field_given;
 use super::gadt::scheme::dicts;
+use super::ty::Type;
 use super::typing::Identity;
 use super::{Checker, Domain, NumLiteral, Operator};
 use crate::diagnostics::codes;

@@ -264,7 +264,9 @@ impl Checker<'_> {
             K::TypeDecl => {
                 let variants: Vec<&Node> = decl.nodes().filter(|n| n.kind == K::Variant).collect();
                 if !variants.is_empty() {
-                    return Body::Variants(variants.iter().filter_map(|v| self.variant(v)).collect());
+                    return Body::Variants(
+                        variants.iter().filter_map(|v| self.variant(v)).collect(),
+                    );
                 }
                 let Some(body) = decl.nodes().find(|n| is_type(n.kind)) else {
                     return Body::None;
