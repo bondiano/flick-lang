@@ -15,6 +15,8 @@ use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::types::lang::Lang;
+pub use flick_ir::OpClass;
+
 use crate::{diagnostics, source};
 
 /// An operation of a service or an effect.
@@ -25,24 +27,6 @@ pub struct Operation {
     pub ty: Type,
     #[serde(default, skip_serializing_if = "OpClass::is_tail")]
     pub class: OpClass,
-}
-
-/// What a handler's branch for an operation is: `tail` gives the operation
-/// its value, `abort` the handler its value without coming back, and
-/// `control` the handler its value with the rest of the body as `resume`.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum OpClass {
-    #[default]
-    Tail,
-    Abort,
-    Control,
-}
-
-impl OpClass {
-    pub fn is_tail(&self) -> bool {
-        *self == OpClass::Tail
-    }
 }
 
 /// The definition of `S.Impl` for the service definition `def`.

@@ -35,6 +35,7 @@ embedded-std = []
 
 # the build script compiles src/source.rs, whose spans the IR serializes
 [build-dependencies]
+flick-ir = { path = "../flick-ir" }
 serde = { version = "1.0.229", features = ["derive"] }
 
 [dev-dependencies]
@@ -44,6 +45,7 @@ toml = "1.1.8"
 
 [dependencies]
 annotate-snippets = { version = "0.12.17", optional = true }
+flick-ir = { path = "../flick-ir" }
 flick-plugin = { path = "../flick-plugin" }
 flick-plugin-cli = { path = "../plugins/cli" }
 flick-plugin-derive = { path = "../plugins/derive" }

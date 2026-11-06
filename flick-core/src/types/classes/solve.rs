@@ -4,6 +4,7 @@
 //! it; functional dependencies improve unknown types on the way. Every step
 //! counts against the budget of the definition being checked.
 
+use crate::numeric::NumLang;
 use std::mem;
 
 use super::matching::{Match, Subst, match_type};

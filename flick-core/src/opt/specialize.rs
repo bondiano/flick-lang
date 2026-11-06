@@ -5,6 +5,7 @@
 //! type: the copy is then as plain as code written for that type, and small
 //! enough to inline. The classes are closed, so the copies are finitely many.
 
+use crate::numeric::NumLang;
 use std::collections::{HashMap, HashSet};
 
 use super::walk::respan;

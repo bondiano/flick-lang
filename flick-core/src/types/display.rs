@@ -1,5 +1,6 @@
 //! Types as diagnostics show them, in source syntax.
 
+use crate::numeric::NumLang;
 use std::fmt::Write;
 
 use super::Checker;

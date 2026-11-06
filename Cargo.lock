@@ -579,6 +579,7 @@ name = "flick-core"
 version = "0.1.0"
 dependencies = [
  "annotate-snippets",
+ "flick-ir",
  "flick-plugin",
  "flick-plugin-cli",
  "flick-plugin-derive",
@@ -593,6 +594,13 @@ dependencies = [
  "strsim",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "flick-ir"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

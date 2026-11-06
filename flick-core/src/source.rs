@@ -1,34 +1,11 @@
 //! Source files, UTF-8 byte spans and line index: diagnostics carry UTF-8 byte
 //! ranges; editors convert them to their own position encoding.
 
-use serde::{Deserialize, Serialize};
-use std::{iter, ops};
+use std::iter;
+
+pub use flick_ir::{FileId, Span};
 
 use crate::diagnostics::{Diagnostic, codes};
-
-#[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
-)]
-pub struct FileId(u32);
-
-/// Half-open UTF-8 byte range `start..end` in one file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Span {
-    pub file: FileId,
-    pub start: u32,
-    pub end: u32,
-}
-
-impl Span {
-    pub fn new(file: FileId, start: u32, end: u32) -> Self {
-        debug_assert!(start <= end);
-        Span { file, start, end }
-    }
-
-    pub fn range(self) -> ops::Range<usize> {
-        self.start as usize..self.end as usize
-    }
-}
 
 #[derive(Debug)]
 pub struct SourceFile {
@@ -69,7 +46,7 @@ pub struct SourceMap {
 
 impl SourceMap {
     pub fn add(&mut self, path: impl Into<String>, text: impl Into<String>) -> FileId {
-        let id = FileId(offset(self.files.len()));
+        let id = FileId::new(offset(self.files.len()));
         self.files.push(SourceFile::new(path.into(), text.into()));
         id
     }
@@ -100,7 +77,7 @@ impl SourceMap {
     }
 
     pub fn get(&self, id: FileId) -> &SourceFile {
-        &self.files[id.0 as usize]
+        &self.files[id.index() as usize]
     }
 
     /// The files in the order they were added.
