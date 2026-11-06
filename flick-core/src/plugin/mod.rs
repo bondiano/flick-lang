@@ -242,8 +242,6 @@ pub(crate) fn placed(
     }
 }
 
-/// The plugin blocks under `node`, expressions and declarations, not those
-/// inside them.
 /// The head of the block `node`, its first token: a name, or `sql`, still
 /// a keyword of the queries the compiler reads.
 pub fn head_token(node: &Node) -> Option<Token> {
@@ -251,6 +249,8 @@ pub fn head_token(node: &Node) -> Option<Token> {
     matches!(head.kind, K::Ident | K::SqlKw).then_some(head)
 }
 
+/// The plugin blocks under `node`, expressions and declarations, not those
+/// inside them.
 pub fn blocks_under<'n>(node: &'n Node, out: &mut Vec<&'n Node>) {
     for child in node.nodes() {
         if matches!(child.kind, K::PluginExpr | K::PluginDecl) {
