@@ -160,20 +160,29 @@ theorem phead_sim (hC : BClosed B) (hV : BNoVal B) (hA : BNoAlts B) (hP : BPlain
     cases h with
     | base hb => exact .inl hb
     | hwith _ h₂ h₃ => exact .inr ⟨_, .hwithVal (Cg.value hV hv h₃).1, .app h₂ h₃⟩
-  | hctlTail hv =>
+  | hctlTail hE hk hv =>
+    subst hk
     cases h with
     | base hb => exact .inl hb
     | hctl h₁ h₂ h₃ h₄ =>
-      exact .inr ⟨_, .hctlTail (Cg.value hV hv h₃).1, .hwith h₁ h₂ (Cg.fill hP (Cg.value hV hv h₃).2.2 h₄)⟩
-  | hctlDisc hv =>
+      obtain ⟨Ei₂, rfl, hfr⟩ := Cg.plug_hole hP h₄
+      exact .inr ⟨_, .hctlTail (FrR.okE hV hfr hE) rfl (Cg.value hV hv h₃).1,
+        .hwith h₁ h₂ (FrR.plugs hfr ((Cg.value hV hv h₃).2.2 false))⟩
+  | hctlDisc hE hk hv =>
+    subst hk
     cases h with
     | base hb => exact .inl hb
     | hctl _ _ h₃ h₄ =>
-      exact .inr ⟨_, .hctlDisc (Cg.value hV hv h₃).1, .hab h₃ (Cg.fill hP (fun _ => .unw) h₄)⟩
-  | hresVal hv =>
+      obtain ⟨Ei₂, rfl, hfr⟩ := Cg.plug_hole hP h₄
+      exact .inr ⟨_, .hctlDisc (FrR.okE hV hfr hE) rfl (Cg.value hV hv h₃).1, .hab h₃ (FrR.plugs hfr .unw)⟩
+  | hresVal hA ha hv =>
+    subst ha
     cases h with
     | base hb => exact .inl hb
-    | hres h₁ h₂ => exact .inr ⟨_, .hresVal (Cg.value hV hv h₂).1, .hdone (Cg.fill hP (Cg.value hV hv h₂).2.2 h₁)⟩
+    | hres h₁ h₂ =>
+      obtain ⟨A₂, rfl, hfr⟩ := Cg.plug_hole hP h₁
+      exact .inr ⟨_, .hresVal (FrR.okE hV hfr hA) rfl (Cg.value hV hv h₂).1,
+        .hdone (FrR.plugs hfr ((Cg.value hV hv h₂).2.2 false))⟩
   | hdoneVal hv =>
     cases h with
     | base hb => exact .inl hb
@@ -279,37 +288,45 @@ theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClos
     | provide h₁ h₂ =>
       refine .inr ⟨_, _, _, .provideEnv (h₁.isEnv hV hθ), ?_, hΛ.app (.cons RgR.new .nil), hμ⟩
       rw [hΛ.length]; exact .inside (.with_ h₁ h₂)
-  | hctlRaise hv =>
+  | hctlRaise hE hk hv =>
+    subst hk
     cases h with
     | base hb => exact .inl hb
     | hctl h₁ h₂ h₃ h₄ =>
+      obtain ⟨Ei₂, rfl, hfr⟩ := Cg.plug_hole hP h₄
       cases h₃ with
       | raise h' =>
-        exact .inr ⟨_, _, _, .hctlRaise (Cg.value hV hv h').1, .hab (.raise h') (Cg.fill hP (fun _ => .unw) h₄),
-          hΛ, hμ⟩
+        exact .inr ⟨_, _, _, .hctlRaise (FrR.okE hV hfr hE) rfl (Cg.value hV hv h').1,
+          .hab (.raise h') (FrR.plugs hfr .unw), hΛ, hμ⟩
       | base hb => exact (hR.1 _ _ hb).elim
-  | hctlUnw =>
+  | hctlUnw hE hk =>
+    subst hk
     cases h with
     | base hb => exact .inl hb
     | hctl h₁ h₂ h₃ h₄ =>
+      obtain ⟨Ei₂, rfl, hfr⟩ := Cg.plug_hole hP h₄
       cases h₃ with
-      | unw => exact .inr ⟨_, _, _, .hctlUnw, .hab .unw (Cg.fill hP (fun _ => .unw) h₄), hΛ, hμ⟩
+      | unw => exact .inr ⟨_, _, _, .hctlUnw (FrR.okE hV hfr hE) rfl, .hab .unw (FrR.plugs hfr .unw), hΛ, hμ⟩
       | base hb => exact (hR.2 _ _ hb).elim
-  | hresRaise hv =>
+  | hresRaise hA ha hv =>
+    subst ha
     cases h with
     | base hb => exact .inl hb
     | hres h₁ h₂ =>
+      obtain ⟨A₂, rfl, hfr⟩ := Cg.plug_hole hP h₁
       cases h₂ with
       | raise h' =>
-        exact .inr ⟨_, _, _, .hresRaise (Cg.value hV hv h').1, .hdone (Cg.fill hP (fun _ => .raise h') h₁),
-          hΛ, hμ⟩
+        exact .inr ⟨_, _, _, .hresRaise (FrR.okE hV hfr hA) rfl (Cg.value hV hv h').1,
+          .hdone (FrR.plugs hfr (.raise h')), hΛ, hμ⟩
       | base hb => exact (hR.1 _ _ hb).elim
-  | hresUnw =>
+  | hresUnw hA ha =>
+    subst ha
     cases h with
     | base hb => exact .inl hb
     | hres h₁ h₂ =>
+      obtain ⟨A₂, rfl, hfr⟩ := Cg.plug_hole hP h₁
       cases h₂ with
-      | unw => exact .inr ⟨_, _, _, .hresUnw, .hdone (Cg.fill hP (fun _ => .unw) h₁), hΛ, hμ⟩
+      | unw => exact .inr ⟨_, _, _, .hresUnw (FrR.okE hV hfr hA) rfl, .hdone (FrR.plugs hfr .unw), hΛ, hμ⟩
       | base hb => exact (hR.2 _ _ hb).elim
   | habCatch =>
     cases h with

@@ -251,24 +251,30 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
           | const =>
             obtain ⟨b₂, hb₂, hbb⟩ := (Cg.armOf (o := o) hA DP.plain hal).some_left ha
             have hv' := Cg.value hV hv h₂
-            refine .inr ⟨.rt, _, _, _, ?_, FrR.plugs hfo' (.hctl hal hr (hbb.subst hC _ _ (SubR.inst (.cons hv'.2.2 (.cons (fun _ => .kont) .nil))))
-                (FrR.plugs hfi .hole)), hst⟩
+            have hl := hst.2.length
+            refine .inr ⟨.rt, _, _, _, ?_, FrR.plugs hfo' (by
+                rw [hl]
+                exact .hctl hal hr (hbb.subst hC _ _ (SubR.inst (.cons hv'.2.2 (.cons (fun _ => .kont) .nil))))
+                  (FrR.plugs hfi .hole)), hst.1, hst.2.app (.cons (.lam .todo) .nil)⟩
             rw [plug_append]
             exact .performCtl (fun G hG => hE₂ G (List.mem_append_right _ (List.mem_cons_of_mem _ hG)))
               (fun G hG => hE₂ G (List.mem_append_left _ hG)) (FrR.handlesE hA DP.plain hfi hh) hb₂ hv'.1
-  | @resume E A u _ _ p r k Ef al hE hA' hu =>
+  | @resume E A k p u _ _ ℓ r Ef al Ei hE hA' hEi hk hn hu =>
     have hs := Flick.Step.resume (root := root) (Λ := Λ) (μ := μ) (p := p) (r := r) (k := k) (Ef := Ef)
-      (al := al) hE hA' hu
-    rw [show Flick.plug E (.hctl p false Ef al r (Flick.plug A (.app (.kont p) u)) k) =
-      Flick.plug (A ++ .hctlA p false Ef al r k :: E) (.app (.kont p) u) by
+      (al := al) (ℓ := ℓ) hE hA' hEi hk hn hu
+    rw [show Flick.plug E (.hctl p ℓ false Ef al r (Flick.plug A (.app (.kont p ℓ) u)) k) =
+      Flick.plug (A ++ .hctlA p ℓ false Ef al r k :: E) (.app (.kont p ℓ) u) by
         rw [plug_append]; rfl] at ht hs
-    rcases around hroot (hA'.append' (hE.cons' (F := .hctlA p false Ef al r k) trivial)) ht hs with hw | ⟨E₂, e₂, rfl, hfr, hE₂, he, hw⟩
+    subst hk
+    rcases around hroot (hA'.append' (hE.cons' (F := .hctlA p ℓ false Ef al r _) trivial)) ht hs with
+      hw | ⟨E₂, e₂, rfl, hfr, hE₂, he, hw⟩
     · exact .inl hw
     obtain ⟨A₂, Eo₂, rfl, hfa, hfo⟩ := All2.split hfr
     cases hfo with
     | cons hF₂ hfo' =>
       cases hF₂ with
       | hctlA hal hr hk =>
+        obtain ⟨Ei₂, rfl, hfe⟩ := Cg.plug_hole DP.plain hk
         cases he with
         | base hb => exact .inl (hw hb)
         | app h₁ h₂ =>
@@ -277,9 +283,10 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
           | kont =>
             have hu' := Cg.value hV hu h₂
             refine .inr ⟨.rt, _, _, _, ?_, FrR.plugs hfo' (.hres (FrR.plugs hfa .hole)
-              (.hwith hal hr (Cg.fill DP.plain hu'.2.2 hk))), hst⟩
+              (.hwith hal hr (FrR.plugs hfe (hu'.2.2 false)))), hst⟩
             rw [plug_append]
             exact .resume (fun G hG => hE₂ G (List.mem_append_right _ (List.mem_cons_of_mem _ hG)))
-              (fun G hG => hE₂ G (List.mem_append_left _ hG)) hu'.1
+              (fun G hG => hE₂ G (List.mem_append_left _ hG)) (FrR.okE hV hfe hEi) rfl
+              (FrR.resumesE hfa hn) hu'.1
 
 end Flick.Elab

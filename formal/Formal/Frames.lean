@@ -112,7 +112,10 @@ theorem perform_not_value {E o c w} : ¬ Value (.app (.const (.perform E o c)) w
   | ctorApp _ hf _ => simp [Tm.head] at hf
   | constApp hc _ => simp [Const.arity, Const.layer] at hc
 
-theorem kont_not_value {p w} : ¬ Value (.app (.kont p) w) := by
+theorem hole_not_value {p} : ¬ Value (.hole p) := by
+  intro hv; cases hv
+
+theorem kont_not_value {p ℓ w} : ¬ Value (.app (.kont p ℓ) w) := by
   intro hv
   cases hv with
   | ctorApp _ hf _ => simp [Tm.head] at hf

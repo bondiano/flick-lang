@@ -94,8 +94,24 @@ theorem glob_redex (g : Nat) : Redex (.glob g) := by
   refine ⟨(fun h => nomatch h), fun F a _ h => ?_⟩
   cases F <;> simp [Frame.plug] at h
 
+theorem hole_redex (p : Nat) : Redex (.hole p) :=
+  ⟨fun h => (by cases h), fun F a _ ha => (by cases F <;> simp [Frame.plug] at ha)⟩
+
+/-- A handler parks one body: its hole has one context. -/
+theorem plug_hole_inj {E E' : List Frame} {p p' : Nat} (hE : OkE E) (hE' : OkE E')
+    (h : plug E (.hole p) = plug E' (.hole p')) : E = E' ∧ p = p' := by
+  have ⟨h₁, h₂⟩ := decomp_eq (hole_redex p) (hole_redex p') hE hE' h
+  exact ⟨h₁, by cases h₂; rfl⟩
+
 theorem PHead.det {e e₁ e₂ : Tm} (h₁ : PHead e e₁) (h₂ : PHead e e₂) : e₁ = e₂ := by
-  cases h₁ <;> cases h₂ <;> simp_all
+  cases h₁ with
+  | hctlTail hE hk _ => cases h₂ with
+    | hctlTail hE' hk' _ => obtain ⟨rfl, -⟩ := plug_hole_inj hE hE' (hk.symm.trans hk'); rfl
+  | hctlDisc hE hk _ => cases h₂ with
+    | hctlDisc hE' hk' _ => obtain ⟨rfl, -⟩ := plug_hole_inj hE hE' (hk.symm.trans hk'); rfl
+  | hresVal hE hk _ => cases h₂ with
+    | hresVal hE' hk' _ => obtain ⟨rfl, -⟩ := plug_hole_inj hE hE' (hk.symm.trans hk'); rfl
+  | _ => cases h₂ <;> simp_all
 
 /-- A pure step of one thread that does not read the store or the regions. -/
 inductive PStep (root : Roots) : Tm → Tm → Prop

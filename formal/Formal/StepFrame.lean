@@ -52,7 +52,19 @@ theorem DeadAsk.frame {Λ e} (h : DeadAsk Λ e) {F : Frame} (hF : F.ok) : DeadAs
   obtain ⟨E, N, q, v, hE, rfl, hl, hq⟩ := h
   exact ⟨E ++ [F], N, q, v, hE.append hF, by rw [plug_append]; rfl, by rw [lookupE_append, hl], hq⟩
 
-theorem Step.frame {root l Λ μ e o} (h : Step root l Λ μ e o) {F : Frame} (hF : F.ok) :
+/-- A context with one more frame around it: the frame at its end, or one of its frames. -/
+theorem snoc_eq_mid {E A E' : List Frame} {F X : Frame} (h : E ++ [F] = A ++ X :: E') :
+    (E' = [] ∧ E = A ∧ F = X) ∨ ∃ E'', E' = E'' ++ [F] ∧ E = A ++ X :: E'' := by
+  rcases List.eq_nil_or_concat E' with rfl | ⟨E'', G, rfl⟩
+  · obtain ⟨h₁, h₂⟩ := List.append_inj' h rfl
+    exact .inl ⟨rfl, h₁, by simpa using h₂⟩
+  · have h' : E ++ [F] = (A ++ X :: E'') ++ [G] := by simpa using h
+    obtain ⟨h₁, h₂⟩ := List.append_inj' h' rfl
+    simp only [List.cons.injEq, and_true] at h₂
+    exact .inr ⟨E'', by rw [h₂]; simp, h₁⟩
+
+theorem Step.frame {root l Λ μ e o} (h : Step root l Λ μ e o) {F : Frame} (hF : F.ok)
+    (hk : F.Parks := by trivial) :
     (∃ l' o', Step root l' Λ μ (F.plug e) o') ∨ DeadAsk Λ (F.plug e) := by
   cases h with
   | pure hE hh =>
@@ -90,10 +102,16 @@ theorem Step.frame {root l Λ μ e o} (h : Step root l Λ μ e o) {F : Frame} (h
     exact .inl ⟨_, _, Step.snoc (Step.performTail (hE.append hF) hEi hh ha hv)⟩
   | performCtl hE hEi hh ha hv =>
     exact .inl ⟨_, _, Step.snoc (Step.performCtl (hE.append hF) hEi hh ha hv)⟩
-  | resume hE hA hu =>
-    exact .inl ⟨_, _, Step.snoc (Step.resume (hE.append hF) hA hu)⟩
-  | resumeTwice hE hA hu =>
-    exact .inl ⟨_, _, Step.snoc (Step.resumeTwice (hE.append hF) hA hu)⟩
+  | resume hE hA hEi hk' hn hu =>
+    exact .inl ⟨_, _, Step.snoc (Step.resume (hE.append hF) hA hEi hk' hn hu)⟩
+  | @resumeDie E u p ℓ _ _ hE hu hn =>
+    by_cases hR : Resumable (E ++ [F]) p ℓ
+    · obtain ⟨A, E', Ef, al, r, k, hEq, hA⟩ := hR
+      rcases snoc_eq_mid hEq with ⟨rfl, rfl, rfl⟩ | ⟨E'', rfl, rfl⟩
+      · obtain ⟨Ei, hEi, rfl⟩ := hk
+        exact .inl ⟨_, _, Step.resume (E := []) OkE.nil hE hEi rfl hA hu⟩
+      · exact (hn ⟨A, E'', Ef, al, r, k, rfl, hA⟩).elim
+    · exact .inl ⟨_, _, Step.snoc (Step.resumeDie (hE.append hF) hu hR)⟩
   | todo hE =>
     have := Step.todo (root := root) (Λ := Λ) (μ := μ) (hE.append hF)
     rw [plug_append] at this; exact .inl ⟨_, _, this⟩
@@ -133,15 +151,18 @@ theorem Blocked.frame {Λ e} (h : Blocked Λ e) {F : Frame} (hF : F.ok) : Blocke
 
 /-- Lift the non-value outcomes over a frame that is neither `try` nor `inside`. -/
 theorem NV.frame {root Λ μ e D D'} (h : NV root Λ μ e D) {F : Frame} (hF : F.ok)
-    (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hD : ∀ n, D n → F.dom n ∨ D' n) :
+    (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hD : ∀ n, D n → F.dom n ∨ D' n)
+    (hk : F.Parks := by trivial) :
     NV root Λ μ (F.plug e) D' := by
   rcases h with ⟨v, hv, rfl⟩ | ⟨_, _, hs⟩ | hs | hb
   · by_cases hc : F.isCtl
     · cases F <;> simp only [Frame.isCtl] at hc
-      · exact .inr (.inl ⟨_, _, Step.ofR (.hctlRaise hv)⟩)
-      · exact .inr (.inl ⟨_, _, Step.ofR (.hresRaise hv)⟩)
+      · obtain ⟨Ei, hEi, hk⟩ := hk
+        exact .inr (.inl ⟨_, _, Step.ofR (.hctlRaise hEi hk hv)⟩)
+      · obtain ⟨A, hA, hk⟩ := hk
+        exact .inr (.inl ⟨_, _, Step.ofR (.hresRaise hA hk hv)⟩)
     · exact .inr (.inl ⟨_, _, Step.raise (E := []) OkE.nil hF hnt hni hc hv⟩)
-  · rcases hs.frame hF with h | h
+  · rcases hs.frame hF hk with h | h
     · exact .inr (.inl h)
     · exact .inr (.inr (.inr (.inr h)))
   · rcases hs.frame (Λ := Λ) (μ := μ) hF hD with h | h | h
@@ -152,7 +173,7 @@ theorem NV.frame {root Λ μ e D D'} (h : NV root Λ μ e D) {F : Frame} (hF : F
 
 /-- The common case: the frame keeps the stage. -/
 theorem NV.frame' {root Λ μ e D} (h : NV root Λ μ e D) {F : Frame} (hF : F.ok)
-    (hnt : ¬ F.isTry) (hni : ¬ F.isInside) : NV root Λ μ (F.plug e) D :=
-  h.frame hF hnt hni fun _ h => .inr h
+    (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hk : F.Parks := by trivial) : NV root Λ μ (F.plug e) D :=
+  h.frame hF hnt hni (fun _ h => .inr h) hk
 
 end Flick

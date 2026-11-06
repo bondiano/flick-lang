@@ -1,9 +1,10 @@
 import Formal.Elab.CoreCgFrames
+import Formal.Lemma3
 
 /-!
 # λFlick⁺ as a `Target`: related handlers
 
-Related terms run one handler: a related body filled at its hole stays related (`Cg.fill`),
+Related terms run one handler: a body related to a parked one has the same frames (`Cg.plug_hole`),
 an operation has related arms (`Cg.armOf`), and related frames handle the same operations,
 park the same parts and unwind to the same handler (`FrR.handles`, `FrR.isCtl`,
 `FrR.isHab`). For this a base pair holds no run-time form, so filling a hole leaves it, and
@@ -25,18 +26,15 @@ def BPlain (B : Flick.Tm → Flick.Tm → Prop) : Prop :=
 
 variable {B : Flick.Tm → Flick.Tm → Prop}
 
-/-- A related body with related terms at its hole. -/
-theorem Cg.fill (hP : BPlain B) {v v₂ : Flick.Tm} (hv : ∀ y, Cg B y v v₂) :
-    ∀ {x k k₂}, Cg B x k k₂ → Cg B x (k.fill v) (k₂.fill v₂) := by
-  intro x k k₂ h
-  induction h with
-  | base hb =>
-    rw [Flick.Tm.fill_noIns (hP _ _ hb).1, Flick.Tm.fill_noIns (hP _ _ hb).2.1]; exact .base hb
-  | hole => exact hv _
-  | hctl _ _ _ hk ih₁ ih₂ ih₃ _ => simp only [Flick.Tm.fill]; exact .hctl ih₁ ih₂ ih₃ hk
-  | hres ha _ _ ih => simp only [Flick.Tm.fill]; exact .hres ha ih
-  | hab ha _ _ ih => simp only [Flick.Tm.fill]; exact .hab ha ih
-  | _ => simp only [Flick.Tm.fill]; constructor <;> assumption
+/-- A body related to a body parked at its hole: the same frames around the hole. -/
+theorem Cg.plug_hole (hP : BPlain B) {Ei : List Frame} {p : Nat} {k₂ : Flick.Tm}
+    (h : Cg B false (Flick.plug Ei (.hole p)) k₂) :
+    ∃ Ei₂, k₂ = Flick.plug Ei₂ (.hole p) ∧ All2 (FrR B) Ei Ei₂ := by
+  rcases h.decomp with ⟨E₀, E₁, E₂, x₂, hE, hb, ht, hfr⟩ | ⟨Ei₂, r₂, rfl, hfr, hr⟩
+  · exact ((hP _ _ hb).1 (plug_has E₀ (by simp [Flick.Tm.Has]))).elim
+  · cases hr with
+    | hole => exact ⟨Ei₂, rfl, hfr⟩
+    | base hb => exact ((hP _ _ hb).1 (by simp [Flick.Tm.Has])).elim
 
 theorem armOf_none {a : Flick.Tm} (h : ¬ IsAlts a) (o : Name) : a.armOf o = none := by
   cases a <;> simp_all [IsAlts, Flick.Tm.armOf]
@@ -58,6 +56,19 @@ theorem FrR.isCtl {F F' : Frame} (h : FrR B F F') : F.isCtl ↔ F'.isCtl := by
 
 theorem FrR.isHab {F F' : Frame} (h : FrR B F F') (p : Nat) : F.isHab p ↔ F'.isHab p := by
   cases h <;> simp [Frame.isHab]
+
+theorem FrR.resumes {F F' : Frame} (h : FrR B F F') (p : Nat) : F.resumes p ↔ F'.resumes p := by
+  cases h <;> simp [Frame.resumes]
+
+theorem FrR.resumesE {E E₂ : List Frame} (h : All2 (FrR B) E E₂) {p : Nat}
+    (hn : ∀ G ∈ E, ¬ G.resumes p) : ∀ G ∈ E₂, ¬ G.resumes p := by
+  induction h with
+  | nil => intro G hG; cases hG
+  | cons hF _ ih =>
+    intro G hG
+    rcases List.mem_cons.mp hG with rfl | hG
+    · exact fun h => hn _ (List.mem_cons_self ..) ((hF.resumes p).2 h)
+    · exact ih (fun G' hG' => hn G' (List.mem_cons_of_mem _ hG')) G hG
 
 theorem FrR.handles (hA : BNoAlts B) (hP : BPlain B) {F F' : Frame} (h : FrR B F F') (E o : Name) :
     F.handles E o = F'.handles E o := by

@@ -61,7 +61,7 @@ theorem Tm.rename_fix :
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro ξ h; simp only [Tm.rename]
     rw [ih₁ ξ fun i hi => h i (.inl hi), ih₂ ξ fun i hi => h i (.inr (.inl hi)), ih₃ ξ fun i hi => h i (.inr (.inr hi))]
-  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro ξ h; simp only [Tm.rename]
     rw [ih₁ ξ fun i hi => h i (.inl hi), ih₂ ξ fun i hi => h i (.inr (.inl hi)), ih₃ ξ fun i hi => h i (.inr (.inr (.inl hi))), ih₄ ξ fun i hi => h i (.inr (.inr (.inr hi)))]
   | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
@@ -107,7 +107,7 @@ theorem Tm.subst_fix :
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ h; simp only [Tm.subst]
     rw [ih₁ σ fun i hi => h i (.inl hi), ih₂ σ fun i hi => h i (.inr (.inl hi)), ih₃ σ fun i hi => h i (.inr (.inr hi))]
-  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ h; simp only [Tm.subst]
     rw [ih₁ σ fun i hi => h i (.inl hi), ih₂ σ fun i hi => h i (.inr (.inl hi)), ih₃ σ fun i hi => h i (.inr (.inr (.inl hi))), ih₄ σ fun i hi => h i (.inr (.inr (.inr hi)))]
   | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>

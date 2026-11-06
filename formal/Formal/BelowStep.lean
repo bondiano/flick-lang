@@ -46,8 +46,19 @@ theorem PHead.has {e e' : Tm} (h : PHead e e') {s : Site} (hs : e'.Has s) : e.Ha
       · exact .inl h
     · simp at h; grind
   | guardNo => rcases hs with h | h; exact .inl h; exact .inr (.inr (.inr h))
-  | hwithVal _ | hctlTail _ | hctlDisc _ | hresVal _ | hdoneVal _ =>
-    simp only [Tm.Has] at hs ⊢; grind [→ Tm.has_fill, Tm.Has]
+  | hwithVal _ | hdoneVal _ => simp only [Tm.Has] at hs ⊢; grind
+  | @hctlTail k p w ℓ E r al Ei _ hk _ =>
+    subst hk
+    have := plug_has_inv (r := .hole p) (r' := w) (s := s) Ei
+    simp only [Tm.Has] at hs ⊢; grind
+  | @hctlDisc k p w ℓ E r al Ei _ hk _ =>
+    subst hk
+    have := plug_has_inv (r := .hole p) (r' := .unw p) (s := s) Ei
+    simp only [Tm.Has] at hs this ⊢; grind
+  | @hresVal a p w A _ ha _ =>
+    subst ha
+    have := plug_has_inv (r := .hole p) (r' := w) (s := s) A
+    simp only [Tm.Has] at hs ⊢; grind
   | tryVal => exact .inl hs
   | withVal => exact .inr (.inr (.inr hs))
   | bind => rcases hs with h | h; exact h; cases h
@@ -137,8 +148,27 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
         · exact Nat.lt_succ_of_lt (h.main p (.inr (.inl hp)))
         · exact Nat.lt_succ_of_lt (h.main p (.inr (.inr hp)))
   | tryRaise => exact same (sub fun _ h => h.elim .inl (.inr ·))
-  | hctlRaise _ | hctlUnw | hresRaise _ | hresUnw | habCatch =>
-    exact same (sub fun _ hs => by simp only [Tm.Has] at hs ⊢; grind [→ Tm.has_fill, Tm.Has])
+  | habCatch => exact same (sub fun _ hs => by simp only [Tm.Has] at hs ⊢; grind)
+  | @hctlRaise k p w _ _ ℓ E r al tl Ei _ hk _ =>
+    subst hk
+    refine same (sub fun s hs => ?_)
+    have := plug_has_inv (r := .hole p) (r' := .unw p) (s := s) Ei
+    simp only [Tm.Has] at hs this ⊢; grind
+  | @hctlUnw k p _ _ ℓ E r q al tl Ei _ hk =>
+    subst hk
+    refine same (sub fun s hs => ?_)
+    have := plug_has_inv (r := .hole p) (r' := .unw p) (s := s) Ei
+    simp only [Tm.Has] at hs this ⊢; grind
+  | @hresRaise a p w _ _ A _ ha _ =>
+    subst ha
+    refine same (sub fun s hs => ?_)
+    have := plug_has_inv (r := .hole p) (r' := .raise w) (s := s) A
+    simp only [Tm.Has] at hs this ⊢; grind
+  | @hresUnw a p _ _ q A _ ha =>
+    subst ha
+    refine same (sub fun s hs => ?_)
+    have := plug_has_inv (r := .hole p) (r' := .unw q) (s := s) A
+    simp only [Tm.Has] at hs this ⊢; grind
   | hdl =>
     refine ⟨h.append _ fun p hp => ?_, by simp⟩
     have hm := h.main p
@@ -281,9 +311,18 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     · exact h₅ h
     · exact h₆ h
   | @performCtl E o b v Λ μ p r Ei Ef al _ _ _ ha =>
-    refine ⟨⟨plug_below h.main (h.main.sub fun s hs => plug_has _ ?_), h.mem, h.rgs⟩, Nat.le_refl _⟩
+    have hm : ∀ (l : Nat) (v' : Tm), (μ ++ [.lam .todo])[l]? = some v' → v'.Below Λ.length := by
+      intro l v' hv'
+      by_cases hl : l < μ.length
+      · rw [List.getElem?_append_left hl] at hv'; exact h.mem l v' hv'
+      · rw [List.getElem?_append_right (by omega)] at hv'
+        cases hj : l - μ.length with
+        | zero => simp [hj] at hv'; subst hv'; exact Tm.Below.empty fun p => by simp [Tm.Has]
+        | succ => simp [hj] at hv'
+    refine ⟨⟨plug_below h.main (h.main.sub fun s hs => plug_has _ ?_), hm, h.rgs⟩, Nat.le_refl _⟩
     obtain ⟨h₁, h₂, h₃, h₄, h₅, h₆⟩ :=
-      perform_has (p := p) (c := .control) (r := r) (Ei := Ei) (x := .hole p) (δ := [v, .kont p]) (s := s) ha
+      perform_has (p := p) (c := .control) (r := r) (Ei := Ei) (x := .hole p) (δ := [v, .kont p μ.length])
+        (s := s) ha
       (fun w hw hh => by
         simp at hw
         rcases hw with hw | hw <;> rw [hw] at hh
@@ -298,13 +337,14 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     · exact h₄ h
     · exact h₅ h
     · exact h₆ h
-  | @resume E A u Λ μ p r k Ef al _ _ _ =>
+  | @resume E A k p u Λ μ ℓ r Ef al Ei _ _ _ hk _ _ =>
+    subst hk
     refine ⟨⟨plug_below h.main (h.main.sub fun s hs => plug_has _ ?_), h.mem, h.rgs⟩, Nat.le_refl _⟩
     simp only [Tm.Has] at hs ⊢
     rcases hs with h | h | h | h | h | h | h | h
     · exact .inl h
     · exact .inr (.inl h)
-    · rcases plug_has_inv (r := .app (.kont p) u) A h with h | h
+    · rcases plug_has_inv (r := .app (.kont p ℓ) u) A h with h | h
       · exact .inr (.inr (.inr (.inr (.inl h))))
       · simp only [Tm.Has] at h
         rcases h with h | h
@@ -314,7 +354,7 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     · exact .inr (.inl h)
     · exact .inr (.inr (.inl h))
     · exact .inr (.inr (.inr (.inl h)))
-    · rcases Tm.has_fill h with h | h
+    · rcases plug_has_inv (r := .hole p) Ei h with h | h
       · exact .inr (.inr (.inr (.inr (.inr h))))
       · exact .inr (.inr (.inr (.inr (.inl (plug_has A (by simp [Tm.Has, h]))))))
   | addFin hE hg _ _ =>

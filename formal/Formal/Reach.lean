@@ -60,24 +60,18 @@ def Tm.Has : Tm → Site → Prop
   | .glob _, _ => False
   | .hdl _ al r e, s => al.Has s ∨ r.Has s ∨ e.Has s
   | .hwith p _ al r e, s => s = .ins ∨ s = .rgn p ∨ al.Has s ∨ r.Has s ∨ e.Has s
-  | .hctl p _ _ al r a k, s => s = .ins ∨ s = .rgn p ∨ al.Has s ∨ r.Has s ∨ a.Has s ∨ k.Has s
+  | .hctl p _ _ _ al r a k, s => s = .ins ∨ s = .rgn p ∨ al.Has s ∨ r.Has s ∨ a.Has s ∨ k.Has s
   | .hres p a b, s => s = .ins ∨ s = .rgn p ∨ a.Has s ∨ b.Has s
   | .hdone p a, s => s = .ins ∨ s = .rgn p ∨ a.Has s
   | .hab p a e, s => s = .ins ∨ s = .rgn p ∨ a.Has s ∨ e.Has s
   | .unw p, s => s = .ins ∨ s = .rgn p
   -- a value, as `cap p`: closures and data may hold `resume`
-  | .kont p, s => s = .rgn p
+  | .kont p _, s => s = .rgn p
   -- a run-time form: only where a body or an arm a handler parks evaluates
   | .hole p, s => s = .ins ∨ s = .rgn p
 
 /-- No `inside` form: values and unevaluated code. -/
 def Tm.NoIns (e : Tm) : Prop := ¬ e.Has .ins
-
-/-- Filling a hole changes nothing without run-time forms. -/
-theorem Tm.fill_noIns {v : Tm} : ∀ {e : Tm}, e.NoIns → e.fill v = e := by
-  intro e
-  induction e <;> intro hn <;> simp only [Tm.NoIns, Tm.Has, not_or] at hn <;>
-    simp_all [Tm.fill, Tm.NoIns]
 
 /-- `i` occurs free in `e`. -/
 def Tm.Free : Tm → Nat → Prop
@@ -108,7 +102,7 @@ def Tm.Free : Tm → Nat → Prop
   | .drec _ r, j => r.Free j
   | .hdl _ al r e, j => al.Free j ∨ r.Free j ∨ e.Free j
   | .hwith _ _ al r e, j => al.Free j ∨ r.Free j ∨ e.Free j
-  | .hctl _ _ _ al r a k, j => al.Free j ∨ r.Free j ∨ a.Free j ∨ k.Free j
+  | .hctl _ _ _ _ al r a k, j => al.Free j ∨ r.Free j ∨ a.Free j ∨ k.Free j
   | .hres _ a b, j => a.Free j ∨ b.Free j
   | .hdone _ a, j => a.Free j
   | .hab _ a e, j => a.Free j ∨ e.Free j
@@ -178,7 +172,7 @@ theorem Tm.free_rename (ξ : Nat → Nat) :
     · obtain ⟨i, hi, he⟩ := ih₁ ξ j h; exact ⟨i, .inl hi, he⟩
     · obtain ⟨i, hi, he⟩ := ih₂ ξ j h; exact ⟨i, .inr (.inl hi), he⟩
     · obtain ⟨i, hi, he⟩ := ih₃ ξ j h; exact ⟨i, .inr (.inr hi), he⟩
-  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro j h
     rcases h with h | h | h | h
     · obtain ⟨i, hi, he⟩ := ih₁ ξ j h; exact ⟨i, .inl hi, he⟩
@@ -261,7 +255,7 @@ theorem Tm.free_subst :
     · obtain ⟨i, hi, he⟩ := ih₁ σ j h; exact ⟨i, .inl hi, he⟩
     · obtain ⟨i, hi, he⟩ := ih₂ σ j h; exact ⟨i, .inr (.inl hi), he⟩
     · obtain ⟨i, hi, he⟩ := ih₃ σ j h; exact ⟨i, .inr (.inr hi), he⟩
-  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ j h
     rcases h with h | h | h | h
     · obtain ⟨i, hi, he⟩ := ih₁ σ j h; exact ⟨i, .inl hi, he⟩
@@ -335,7 +329,7 @@ theorem Tm.has_subst :
     have := ih₁ σ s; have := ih₂ σ s; have := ih₃ σ s
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
     grind
-  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ s h
     have := ih₁ σ s; have := ih₂ σ s; have := ih₃ σ s; have := ih₄ σ s
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢

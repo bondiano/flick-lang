@@ -83,7 +83,7 @@ theorem perform_redex {E o : Name} {c : OpClass} {v : Flick.Tm} (hv : Value v) :
   · exact ha.1 ▸ .const
   · exact ha.2 ▸ hv
 
-theorem kont_redex {p : Nat} {u : Flick.Tm} (hu : Value u) : Redex (.app (.kont p) u) := by
+theorem kont_redex {p ℓ : Nat} {u : Flick.Tm} (hu : Value u) : Redex (.app (.kont p ℓ) u) := by
   refine ⟨kont_not_value, fun F a _ ha => ?_⟩
   cases F <;> simp [Frame.plug] at ha
   · exact ha.1 ▸ .kont
@@ -98,10 +98,10 @@ theorem _root_.Flick.RHead.redex' {Λ Λ' : List Rgn} {μ μ' : List Flick.Tm} {
   have nv := h.not_value
   cases h with
   | tryRaise hv => exact .inr (.inl ⟨.try_ _, _, trivial, hv, rfl⟩)
-  | hctlRaise hv => exact .inr (.inl ⟨.hctlA _ _ _ _ _ _, _, trivial, hv, rfl⟩)
-  | hresRaise hv => exact .inr (.inl ⟨.hresB _ _, _, trivial, hv, rfl⟩)
-  | hctlUnw => exact .inr (.inr ⟨.hctlA _ _ _ _ _ _, _, trivial, rfl⟩)
-  | hresUnw => exact .inr (.inr ⟨.hresB _ _, _, trivial, rfl⟩)
+  | hctlRaise _ _ hv => exact .inr (.inl ⟨.hctlA _ _ _ _ _ _ _, _, trivial, hv, rfl⟩)
+  | hresRaise _ _ hv => exact .inr (.inl ⟨.hresB _ _, _, trivial, hv, rfl⟩)
+  | hctlUnw _ _ => exact .inr (.inr ⟨.hctlA _ _ _ _ _ _ _, _, trivial, rfl⟩)
+  | hresUnw _ _ => exact .inr (.inr ⟨.hresB _ _, _, trivial, rfl⟩)
   | habCatch => exact .inr (.inr ⟨.hab _ _, _, trivial, rfl⟩)
   | finRun _ _ hw _ _ | close _ _ hw _ _ =>
     rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨q, rfl⟩
@@ -207,10 +207,10 @@ theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
     cases h with
     | app hf => cases hf with | const hc => exact hc.elim
     | errVal hv => exact (perform_not_value hv).elim
-  | @resume E A u _ _ p r k Ef al hE' hA hu =>
-    have hq' : Flick.plug (A ++ .hctlA p false Ef al r k :: E) (.app (.kont p) u) =
+  | @resume E A k p u _ _ ℓ r Ef al Ei hE' hA _ _ _ hu =>
+    have hq' : Flick.plug (A ++ .hctlA p ℓ false Ef al r k :: E) (.app (.kont p ℓ) u) =
         Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
-    obtain ⟨-, -, Θ', t', h⟩ := typ (E := A ++ .hctlA p false Ef al r k :: E)
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := A ++ .hctlA p ℓ false Ef al r k :: E)
       (hA.append' (hE'.cons' trivial)) (kont_redex hu) hq'
     cases h with
     | app hf => cases hf

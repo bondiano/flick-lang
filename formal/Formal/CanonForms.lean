@@ -23,7 +23,7 @@ def VKind (e : Tm) (k : Nat) : Prop :=
   match e.head with
   | .ctor _ => k = 1 ∨ k = 3 ∨ k = 7
   | .const c => k = c.kindAt e.args
-  | .lam _ | .fix _ | .kont _ => k = 1
+  | .lam _ | .fix _ | .kont _ _ => k = 1
   | .lit _ => k = 0
   | .loc _ => k = 2
   | .rnil | .rcons .. => k = 4

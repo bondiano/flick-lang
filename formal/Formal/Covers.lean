@@ -45,17 +45,17 @@ structure Homo (m : Tm → Tm) : Prop where
   cap : ∀ p, m (.cap p) = .cap p
   own : ∀ p, m (.own p) = .own p
   drec : ∀ c r, m (.drec c r) = .drec c (m r)
-  kont : ∀ p, m (.kont p) = .kont p
+  kont : ∀ p ℓ, m (.kont p ℓ) = .kont p ℓ
 
 theorem Homo.rename (ξ : Nat → Nat) : Homo (Tm.rename ξ) :=
   ⟨fun _ _ _ => rfl, fun _ _ => rfl, fun _ => rfl, fun _ => rfl, rfl, fun _ => ⟨_, rfl⟩,
     fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩, rfl, fun _ _ _ => rfl,
-    fun _ => rfl, fun _ => rfl, fun _ _ => rfl, fun _ => rfl⟩
+    fun _ => rfl, fun _ => rfl, fun _ _ => rfl, fun _ _ => rfl⟩
 
 theorem Homo.subst (σ : Nat → Tm) : Homo (Tm.subst σ) :=
   ⟨fun _ _ _ => rfl, fun _ _ => rfl, fun _ => rfl, fun _ => rfl, rfl, fun _ => ⟨_, rfl⟩,
     fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩, rfl, fun _ _ _ => rfl,
-    fun _ => rfl, fun _ => rfl, fun _ _ => rfl, fun _ => rfl⟩
+    fun _ => rfl, fun _ => rfl, fun _ _ => rfl, fun _ _ => rfl⟩
 
 theorem Homo.head {m : Tm → Tm} (hm : Homo m) {K} :
     ∀ {f : Tm}, Value f → f.head = .ctor K → (m f).head = .ctor K := by

@@ -39,7 +39,7 @@ theorem Tm.rename_rename :
   | drec _ _ ih => intro ξ ζ; simp only [Tm.rename]; rw [ih]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂, ih₃]
-  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂, ih₃, ih₄]
   | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
     intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂]
@@ -78,7 +78,7 @@ theorem Tm.subst_rename :
   | drec _ _ ih => intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂, ih₃]
-  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂, ih₃, ih₄]
   | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂]
@@ -118,7 +118,7 @@ theorem Tm.rename_subst :
   | drec _ _ ih => intro σ ξ; simp only [Tm.rename, Tm.subst]; rw [ih]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁, ih₂, ih₃]
-  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁, ih₂, ih₃, ih₄]
   | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
     intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁, ih₂]
@@ -156,7 +156,7 @@ theorem Tm.subst_subst :
   | drec _ _ ih => intro σ τ; simp only [Tm.subst]; rw [ih]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂, ih₃]
-  | hctl _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂, ih₃, ih₄]
   | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
     intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂]

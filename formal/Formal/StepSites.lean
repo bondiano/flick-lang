@@ -92,9 +92,6 @@ theorem subst_match_has {p : Pat} {v x : Tm} {δ : List Tm} {s : Site} (hm : mat
     (h : (x.subst (inst δ)).Has s) : x.Has s ∨ v.Has s :=
   (subst_inst_has h).imp_right fun ⟨w, hw, h⟩ => matchP_has _ hm w hw h
 
-theorem Tm.has_fill {k v : Tm} {s : Site} (h : (k.fill v).Has s) : k.Has s ∨ v.Has s := by
-  induction k <;> simp only [Tm.fill, Tm.Has] at h ⊢ <;> grind
-
 theorem Tm.armOf_has {o : Name} {s : Site} {b : Tm} : ∀ {al : Tm}, al.armOf o = some b → b.Has s → al.Has s := by
   intro al
   induction al with

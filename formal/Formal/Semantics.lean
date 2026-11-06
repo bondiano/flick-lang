@@ -48,7 +48,7 @@ inductive Frame
   | raise
   | inside (p : Nat)
   | hwith (p : Nat) (E : Name) (al r : Tm)
-  | hctlA (p : Nat) (tl : Bool) (E : Name) (al r k : Tm)
+  | hctlA (p ℓ : Nat) (tl : Bool) (E : Name) (al r k : Tm)
   | hresB (p : Nat) (a : Tm)
   | hdone (p : Nat)
   | hab (p : Nat) (a : Tm)
@@ -73,7 +73,7 @@ def Frame.plug : Frame → Tm → Tm
   | .raise, e => .raise e
   | .inside p, e => .inside p e
   | .hwith p E al r, e => .hwith p E al r e
-  | .hctlA p tl E al r k, e => .hctl p tl E al r e k
+  | .hctlA p ℓ tl E al r k, e => .hctl p ℓ tl E al r e k
   | .hresB p a, e => .hres p a e
   | .hdone p, e => .hdone p e
   | .hab p a, e => .hab p a e
@@ -103,6 +103,16 @@ def Frame.isHab (p : Nat) : Frame → Prop
   | .hab q _ => q = p
   | _ => False
 
+/-- A frame where `resume` of the handler `p` stops: its arm, or the arm it resumed. -/
+def Frame.resumes (p : Nat) : Frame → Prop
+  | .hctlA q .. | .hdone q => q = p
+  | _ => False
+
+/-- `resume` of the cell `ℓ` resumes the body at the arm of a `control` operation that
+holds it: the nearest frame where `resume` of `p` stops is that arm. -/
+def Resumable (E : List Frame) (p ℓ : Nat) : Prop :=
+  ∃ A E' Ef al r k, E = A ++ .hctlA p ℓ false Ef al r k :: E' ∧ ∀ G ∈ A, ¬ G.resumes p
+
 /-- The handler of `E` with an arm for `o` that a frame installs, with its region. -/
 def Frame.handles (E o : Name) : Frame → Option Nat
   | .hwith p E' al _ => if E' = E ∧ (al.armOf o).isSome then some p else none
@@ -122,6 +132,14 @@ def Frame.wrap : Frame → Tm → Tm
 def plug : List Frame → Tm → Tm
   | [], e => e
   | F :: E, e => plug E (F.plug e)
+
+def OkE (E : List Frame) : Prop := ∀ F ∈ E, Frame.ok F
+
+/-- What a handler parks is a body or an arm at its hole. -/
+def Frame.Parks : Frame → Prop
+  | .hctlA p _ _ _ _ _ k => ∃ Ei, OkE Ei ∧ k = Flick.plug Ei (.hole p)
+  | .hresB p a => ∃ A, OkE A ∧ a = Flick.plug A (.hole p)
+  | _ => True
 
 /-- `lookup(E, S)` of core.md §3.2 without the fallback to `Σ₀`. -/
 def lookupE : List Frame → Name → Option (Nat × Tm)
@@ -160,12 +178,15 @@ inductive PHead : Tm → Tm → Prop
   -- the value of the body of a handler goes to its `return` function
   | hwithVal {al : Tm} : Value v → PHead (.hwith p E al r v) (.app r v)
   -- the value of a `tail` arm resumes the body under the handler
-  | hctlTail {al : Tm} : Value w → PHead (.hctl p true E al r w k) (.hwith p E al r (k.fill w))
+  | hctlTail {al : Tm} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole p) → Value w →
+      PHead (.hctl p ℓ true E al r w k) (.hwith p E al r (plug Ei w))
   -- a `control` arm that ends without resuming lets the body go: it unwinds to the
   -- handler, closing its regions, and the arm's value is the handler's
-  | hctlDisc {al : Tm} : Value w → PHead (.hctl p false E al r w k) (.hab p w (k.fill (.unw p)))
+  | hctlDisc {al : Tm} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole p) → Value w →
+      PHead (.hctl p ℓ false E al r w k) (.hab p w (plug Ei (.unw p)))
   -- the value of a resumed body is what `resume` gives the arm
-  | hresVal : Value w → PHead (.hres p a w) (.hdone p (a.fill w))
+  | hresVal {A : List Frame} : OkE A → a = plug A (.hole p) → Value w →
+      PHead (.hres p a w) (.hdone p (plug A w))
   | hdoneVal : Value v → PHead (.hdone p v) v
 
 /-- `Λ[π] := g`. -/
@@ -212,12 +233,14 @@ inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm �
       RHead Λ μ (.inside p w) (setRgn Λ p ⟨false, g.kids, []⟩) μ w
   -- an arm that raises or unwinds lets the body go, and goes on raising or
   -- unwinding from the handler; a resumed body that does gives it to the arm
-  | hctlRaise {al : Tm} {tl : Bool} : Value w →
-      RHead Λ μ (.hctl p tl E al r (.raise w) k) Λ μ (.hab p (.raise w) (k.fill (.unw p)))
-  | hctlUnw {al : Tm} {tl : Bool} :
-      RHead Λ μ (.hctl p tl E al r (.unw q) k) Λ μ (.hab p (.unw q) (k.fill (.unw p)))
-  | hresRaise : Value w → RHead Λ μ (.hres p a (.raise w)) Λ μ (.hdone p (a.fill (.raise w)))
-  | hresUnw : RHead Λ μ (.hres p a (.unw q)) Λ μ (.hdone p (a.fill (.unw q)))
+  | hctlRaise {al : Tm} {tl : Bool} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole p) → Value w →
+      RHead Λ μ (.hctl p ℓ tl E al r (.raise w) k) Λ μ (.hab p (.raise w) (plug Ei (.unw p)))
+  | hctlUnw {al : Tm} {tl : Bool} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole p) →
+      RHead Λ μ (.hctl p ℓ tl E al r (.unw q) k) Λ μ (.hab p (.unw q) (plug Ei (.unw p)))
+  | hresRaise {A : List Frame} : OkE A → a = plug A (.hole p) → Value w →
+      RHead Λ μ (.hres p a (.raise w)) Λ μ (.hdone p (plug A (.raise w)))
+  | hresUnw {A : List Frame} : OkE A → a = plug A (.hole p) →
+      RHead Λ μ (.hres p a (.unw q)) Λ μ (.hdone p (plug A (.unw q)))
   -- the body has unwound to its handler: the arm runs there
   | habCatch : RHead Λ μ (.hab p a (.unw p)) Λ μ a
   -- a handler is the region `|Λ|` around its body, which `resume` holds
@@ -234,7 +257,6 @@ inductive Lbl
   | rt
   | root (S : Name)
 
-def OkE (E : List Frame) : Prop := ∀ F ∈ E, Frame.ok F
 
 /-- `⟨Λ, μ, e⟩ → ⟨Λ', μ', e'⟩` and `⟨Λ, μ, e⟩ → die` of one thread (core.md
 §3.3–3.5, regions.md §3.2–§3.3). A global steps to its body, a pure step. -/
@@ -266,18 +288,21 @@ inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → 
   | performTail {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
       Value v →
       Step root .rt Λ μ (plug E (.hwith p Ef al r (plug Ei (.app (.const (.perform Ef o .tail)) v))))
-        (.cfg Λ μ (plug E (.hctl p true Ef al r (b.subst (inst [v])) (plug Ei (.hole p)))))
+        (.cfg Λ μ (plug E (.hctl p 0 true Ef al r (b.subst (inst [v])) (plug Ei (.hole p)))))
+  -- `resume` of a `control` arm is `kont p ℓ`: its type is that of the new cell `ℓ`
   | performCtl {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
       Value v →
       Step root .rt Λ μ (plug E (.hwith p Ef al r (plug Ei (.app (.const (.perform Ef o .control)) v))))
-        (.cfg Λ μ (plug E (.hctl p false Ef al r (b.subst (inst [v, .kont p])) (plug Ei (.hole p)))))
+        (.cfg Λ (μ ++ [.lam .todo]) (plug E (.hctl p μ.length false Ef al r
+          (b.subst (inst [v, .kont p μ.length])) (plug Ei (.hole p)))))
   -- `resume` runs the body under the handler, the arm waiting for how it ends
-  | resume {Ef : Name} {al : Tm} : OkE E → OkE A → Value u →
-      Step root .rt Λ μ (plug E (.hctl p false Ef al r (plug A (.app (.kont p) u)) k))
-        (.cfg Λ μ (plug E (.hres p (plug A (.hole p)) (.hwith p Ef al r (k.fill u)))))
-  -- the body resumes once
-  | resumeTwice : OkE E → OkE A → Value u →
-      Step root .rt Λ μ (plug E (.hdone p (plug A (.app (.kont p) u)))) .die
+  | resume {Ef : Name} {al : Tm} {Ei : List Frame} : OkE E → OkE A → OkE Ei → k = plug Ei (.hole p) →
+      (∀ G ∈ A, ¬ G.resumes p) → Value u →
+      Step root .rt Λ μ (plug E (.hctl p ℓ false Ef al r (plug A (.app (.kont p ℓ) u)) k))
+        (.cfg Λ μ (plug E (.hres p (plug A (.hole p)) (.hwith p Ef al r (plug Ei u)))))
+  -- the body resumes once, in the thread of its handler, while its arm runs
+  | resumeDie : OkE E → Value u → ¬ Resumable E p ℓ →
+      Step root .rt Λ μ (plug E (.app (.kont p ℓ) u)) .die
   | todo : OkE E → Step root .pure Λ μ (plug E .todo) .die
   | glob : OkE E → root.glob g = some v → Step root .pure Λ μ (plug E (.glob g)) (.cfg Λ μ (plug E v))
 

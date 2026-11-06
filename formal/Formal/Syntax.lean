@@ -360,12 +360,12 @@ inductive Tm
   | glob (g : Nat)
   | hdl (E : Name) (al r e : Tm)
   | hwith (p : Nat) (E : Name) (al r e : Tm)
-  | hctl (p : Nat) (tl : Bool) (E : Name) (al r a k : Tm)
+  | hctl (p ℓ : Nat) (tl : Bool) (E : Name) (al r a k : Tm)
   | hres (p : Nat) (a b : Tm)
   | hdone (p : Nat) (a : Tm)
   | hab (p : Nat) (a e : Tm)
   | unw (p : Nat)
-  | kont (p : Nat)
+  | kont (p ℓ : Nat)
   | hole (p : Nat)
 
 def Tm.head : Tm → Tm

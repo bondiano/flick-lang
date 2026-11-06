@@ -23,9 +23,15 @@ theorem PHead.asc {r r' : Tm} {n : Nat} (hh : PHead r r') (h : r.Asc n) : r'.Asc
   cases hh with
   | withVal hv => exact Tm.Asc.of_noIns (hv.ascNoIns h.2)
   | hwithVal hv => exact ⟨Tm.Asc.of_noIns h.2.1, va hv h.2.2 n, .inl (vn hv h.2.2)⟩
-  | hctlTail hv => exact ⟨h.1, h.2.1, Tm.Asc.fill (va hv h.2.2.1) h.2.2.2⟩
-  | hctlDisc hv => exact ⟨va hv h.2.2.1 n, Tm.Asc.fill (v := .unw _) (fun _ => trivial) h.2.2.2⟩
-  | hresVal hv => exact Tm.Asc.fill (va hv h.2) h.1
+  | hctlTail hE hk hv =>
+    subst hk
+    exact ⟨h.1, h.2.1, (asc_of_plug hole_not_value hE h.2.2.2).1.fill (va hv h.2.2.1 _)⟩
+  | hctlDisc hE hk hv =>
+    subst hk
+    exact ⟨va hv h.2.2.1 n, (asc_of_plug hole_not_value hE h.2.2.2).1.fill trivial⟩
+  | hresVal hA ha hv =>
+    subst ha
+    exact (asc_of_plug hole_not_value hA h.1).1.fill (va hv h.2 _)
   | hdoneVal hv => exact va hv h n
   | _ =>
     apply plain
@@ -137,13 +143,20 @@ theorem RHead.asc {Λ μ r Λ' μ' r'} {n : Nat} {e : Tm} (hh : RHead Λ μ r Λ
       | zero => simp [hj] at hq; subst hq; simp [Rgn.new] at hk
       | succ => simp [hj] at hq
   | tryRaise hv => exact noins fun h => h.elim (vn hv hr.1) hr.2
-  | hctlRaise hv =>
-    exact same ⟨Tm.Asc.of_noIns (vn hv hr.2.2.1 : Tm.NoIns _), Tm.Asc.fill (v := .unw _) (fun _ => trivial) hr.2.2.2⟩
-  | hctlUnw => exact same ⟨trivial, Tm.Asc.fill (v := .unw _) (fun _ => trivial) hr.2.2.2⟩
-  | hresRaise hv =>
-    refine same (Tm.Asc.fill ?_ hr.1)
-    exact fun _ => Tm.Asc.of_noIns fun h' => vn hv hr.2 h'
-  | hresUnw => exact same (Tm.Asc.fill (v := .unw _) (fun _ => trivial) hr.1)
+  | hctlRaise hE hk hv =>
+    subst hk
+    exact same ⟨Tm.Asc.of_noIns (vn hv hr.2.2.1 : Tm.NoIns _),
+      (asc_of_plug hole_not_value hE hr.2.2.2).1.fill trivial⟩
+  | hctlUnw hE hk =>
+    subst hk
+    exact same ⟨trivial, (asc_of_plug hole_not_value hE hr.2.2.2).1.fill trivial⟩
+  | hresRaise hA ha hv =>
+    subst ha
+    exact same ((asc_of_plug hole_not_value hA hr.1).1.fill
+      (Tm.Asc.of_noIns fun h' => vn hv hr.2 h'))
+  | hresUnw hA ha =>
+    subst ha
+    exact same ((asc_of_plug hole_not_value hA hr.1).1.fill trivial)
   | habCatch => exact same hr.1
   | hdl =>
     refine ⟨⟨hn, hr.1, hr.2.1, Tm.Asc.of_noIns hr.2.2⟩, fun e' he => ⟨he, fun q g hq k hk => ?_, hc.mem⟩⟩
@@ -244,17 +257,27 @@ theorem Step.asc {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
   | performCtl hE hEi _ ha hv =>
     obtain ⟨hA, hr⟩ := asc_of_plug (fun h => by cases h) hE hc.main
     obtain ⟨hAi, hri⟩ := asc_of_plug perform_not_value hEi hr.2.2
-    refine ⟨hA.fill ⟨hr.1, hr.2.1, Tm.Asc.of_noIns fun h => ?_, hAi.fill trivial⟩, fun _ => keep⟩
+    have hm : ∀ (l : Nat) (v' : Tm), (μ ++ [.lam .todo])[l]? = some v' → v'.NoIns := by
+      intro l v' hv'
+      by_cases hl : l < μ.length
+      · rw [List.getElem?_append_left hl] at hv'; exact hc.mem l v' hv'
+      · rw [List.getElem?_append_right (by omega)] at hv'
+        cases hj : l - μ.length with
+        | zero => simp [hj] at hv'; subst hv'; simp [Tm.NoIns, Tm.Has]
+        | succ => simp [hj] at hv'
+    refine ⟨hA.fill ⟨hr.1, hr.2.1, Tm.Asc.of_noIns fun h => ?_, hAi.fill trivial⟩,
+      fun x hx => ⟨hx, hc.rgs, hm⟩⟩
     rcases subst_inst_has h with h | ⟨w, hw, h⟩
     · exact hr.1 (Tm.armOf_has ha h)
     · simp at hw
       rcases hw with hw | hw <;> rw [hw] at h
       · exact hv.ascNoIns hri.2.1 h
       · simp [Tm.Has] at h
-  | resume hE hA' hu =>
+  | resume hE hA' hEi hk' _ hu =>
+    subst hk'
     obtain ⟨hA, hr⟩ := asc_of_plug (fun h => by cases h) hE hc.main
     obtain ⟨hAi, hri⟩ := asc_of_plug kont_not_value hA' hr.2.2.1
-    have hk := Tm.Asc.fill (fun _ => Tm.Asc.of_noIns (hu.ascNoIns hri.2.1)) hr.2.2.2
+    have hk := (asc_of_plug hole_not_value hEi hr.2.2.2).1.fill (Tm.Asc.of_noIns (hu.ascNoIns hri.2.1))
     refine ⟨hA.fill ⟨hAi.fill trivial, hr.1, hr.2.1, ?_⟩, fun _ => keep⟩
     rwa [show ∀ a b : Nat, max (max a b) b = max a b from fun a b => by omega]
   | raise hE hF _ _ _ hv =>

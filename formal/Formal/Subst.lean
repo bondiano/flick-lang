@@ -50,12 +50,12 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .glob g => .glob g
   | .hdl E al r e => .hdl E (al.rename ξ) (r.rename ξ) (e.rename ξ)
   | .hwith p E al r e => .hwith p E (al.rename ξ) (r.rename ξ) (e.rename ξ)
-  | .hctl p tl E al r a k => .hctl p tl E (al.rename ξ) (r.rename ξ) (a.rename ξ) (k.rename ξ)
+  | .hctl p ℓ tl E al r a k => .hctl p ℓ tl E (al.rename ξ) (r.rename ξ) (a.rename ξ) (k.rename ξ)
   | .hres p a b => .hres p (a.rename ξ) (b.rename ξ)
   | .hdone p a => .hdone p (a.rename ξ)
   | .hab p a e => .hab p (a.rename ξ) (e.rename ξ)
   | .unw p => .unw p
-  | .kont p => .kont p
+  | .kont p ℓ => .kont p ℓ
   | .hole p => .hole p
 
 /-- Lift a substitution under `n` binders. -/
@@ -102,12 +102,12 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .glob g => .glob g
   | .hdl E al r e => .hdl E (al.subst σ) (r.subst σ) (e.subst σ)
   | .hwith p E al r e => .hwith p E (al.subst σ) (r.subst σ) (e.subst σ)
-  | .hctl p tl E al r a k => .hctl p tl E (al.subst σ) (r.subst σ) (a.subst σ) (k.subst σ)
+  | .hctl p ℓ tl E al r a k => .hctl p ℓ tl E (al.subst σ) (r.subst σ) (a.subst σ) (k.subst σ)
   | .hres p a b => .hres p (a.subst σ) (b.subst σ)
   | .hdone p a => .hdone p (a.subst σ)
   | .hab p a e => .hab p (a.subst σ) (e.subst σ)
   | .unw p => .unw p
-  | .kont p => .kont p
+  | .kont p ℓ => .kont p ℓ
   | .hole p => .hole p
 
 /-- The constructor a pattern starts with: the operation of an arm of a handler. -/
@@ -120,57 +120,6 @@ def Pat.headName : Pat → Option Name
 def Tm.armOf : Tm → Name → Option Tm
   | .acons p b r, o => if p.headName = some o then some b else r.armOf o
   | _, _ => none
-
-/-- `k` with `hole` replaced by `v`: the body of a handler that resumes, or unwinds.
-The hole of a body stands where it evaluates, never under a binder, so `v` is not
-shifted. -/
-def Tm.fill : Tm → Tm → Tm
-  | .var i, _ => .var i
-  | .lam b, v => .lam (b.fill v)
-  | .app f a, v => .app (f.fill v) (a.fill v)
-  | .let_ e b, v => .let_ (e.fill v) (b.fill v)
-  | .letrec f b, v => .letrec (f.fill v) (b.fill v)
-  | .fix f, v => .fix (f.fill v)
-  | .lit l, _ => .lit l
-  | .loc l, _ => .loc l
-  | .const c, _ => .const c
-  | .ctor K, _ => .ctor K
-  | .rnil, _ => .rnil
-  | .rcons l e r, v => .rcons l (e.fill v) (r.fill v)
-  | .proj e l, v => .proj (e.fill v) l
-  | .update e l e', v => .update (e.fill v) l (e'.fill v)
-  | .match_ e al, v => .match_ (e.fill v) (al.fill v)
-  | .anil, _ => .anil
-  | .acons p b r, v => .acons p (b.fill v) (r.fill v)
-  | .aguard p g b r, v => .aguard p (g.fill v) (b.fill v) (r.fill v)
-  | .todo, _ => .todo
-  | .task e, v => .task (e.fill v)
-  | .await e, v => .await (e.fill v)
-  | .raise e, v => .raise (e.fill v)
-  | .try_ e al, v => .try_ (e.fill v) (al.fill v)
-  | .handle w al, v => .handle (w.fill v) (al.fill v)
-  | .provide l e, v => .provide (l.fill v) (e.fill v)
-  | .with_ q θ e, v => .with_ q (θ.fill v) (e.fill v)
-  | .enil, _ => .enil
-  | .econs S w θ, v => .econs S (w.fill v) (θ.fill v)
-  | .bind S e, v => .bind S (e.fill v)
-  | .join e₁ e₂, v => .join (e₁.fill v) (e₂.fill v)
-  | .scope e, v => .scope (e.fill v)
-  | .inside p e, v => .inside p (e.fill v)
-  | .cap p, _ => .cap p
-  | .own p, _ => .own p
-  | .drec c r, v => .drec c (r.fill v)
-  | .glob g, _ => .glob g
-  | .hdl E al r e, v => .hdl E (al.fill v) (r.fill v) (e.fill v)
-  | .hwith p E al r e, v => .hwith p E (al.fill v) (r.fill v) (e.fill v)
-  -- not into what a handler parks or runs later: its own hole is there
-  | .hctl p tl E al r a k, v => .hctl p tl E (al.fill v) (r.fill v) (a.fill v) k
-  | .hres p a b, v => .hres p a (b.fill v)
-  | .hdone p a, v => .hdone p (a.fill v)
-  | .hab p a e, v => .hab p a (e.fill v)
-  | .unw p, _ => .unw p
-  | .kont p, _ => .kont p
-  | .hole _, v => v
 
 /-- Substitute `vs` for the innermost `vs.length` variables: `e[δ]`. -/
 def inst (vs : List Tm) (i : Nat) : Tm :=
