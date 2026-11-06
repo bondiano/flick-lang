@@ -370,6 +370,8 @@ impl<'a> Gen<'a> {
                     .map_or_else(|| panic!("dictionary `{shown}` is in scope"), |&(_, p)| p);
                 self.code(given)
             }
+            // bound by the pattern of the constructor whose value holds it
+            Dict::Field(local) => self.code(&names::local(local)),
             Dict::Super { dict, class } => {
                 let d = self.dict(dict);
                 call(

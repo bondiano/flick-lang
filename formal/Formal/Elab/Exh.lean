@@ -22,7 +22,7 @@ def pvars (K : Name) : Nat → Pat
 /-- An unsaturated shape is a constructor spine, still waiting for `rest`. -/
 theorem Shp.spine {fl : Bool} {v : Tm} {U : Ty} (h : Shp S fl U v) : fl = false →
     ∃ K k ts T rest, S.ctor K = some (k, ts, T) ∧ v.head = .ctor K ∧
-      U = Ty.arrows rest (.tcon T (idTs k)) ∧ v.args + rest.length = ts.length := by
+      U = Ty.arrows rest (.tcon T (S.res K)) ∧ v.args + rest.length = ts.length := by
   induction h with
   | head hK => intro _; exact ⟨_, _, _, _, _, hK, rfl, rfl, by simp [Tm.args]⟩
   | app _ _ ihf _ =>

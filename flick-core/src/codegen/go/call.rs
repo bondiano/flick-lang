@@ -11,7 +11,7 @@ use super::layout::{Code, block, call, closure, signature, single, statement};
 use super::{Gen, Shape, names};
 use crate::codegen::tail::Target;
 use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, operation_arity};
-use crate::types::{Dict, Rep};
+use crate::types::{Constructor, Dict, Rep};
 
 /// How to build a call from the fiber in scope and its Go arguments.
 type Call<'a> = Box<dyn Fn(&'static str, &[Code<'a>]) -> Code<'a> + 'a>;
@@ -105,6 +105,27 @@ pub(super) fn poly<'a>(
 }
 
 impl<'a> Gen<'a> {
+    /// Builds a value of the constructor `c` from its fields, holding the
+    /// dictionaries `held` after them.
+    fn construct(&mut self, c: &Constructor, held: Vec<Document<'a>>) -> Call<'a> {
+        let a = self.a;
+        let tag = a.alloc_str(&names::string(&self.tag(c)));
+        match &c.rep {
+            Rep::Literal(l) => {
+                let lit = a.alloc_str(&enum_literal(l));
+                Box::new(move |_, _: &[Code<'a>]| a.text(lit).into())
+            }
+            Rep::Tagged if c.arity == 0 && held.is_empty() => {
+                Box::new(move |_, _: &[Code<'a>]| call(a, "flickrt.Nullary", [a.text(tag)]).into())
+            }
+            Rep::Tagged => Box::new(move |_, args: &[Code<'a>]| {
+                let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
+                call(a, "flickrt.NewData", iter::once(a.text(tag)).chain(args)).into()
+            }),
+            Rep::Unboxed | Rep::Typeof(_) => Box::new(|_, args: &[Code<'a>]| args[0]),
+        }
+    }
+
     /// A constrained value given its dictionaries.
     pub(super) fn given(&mut self, inner: &Expr, dicts: &[Dict]) -> Code<'a> {
         let dicts: Vec<Code<'a>> = dicts
@@ -248,23 +269,14 @@ impl<'a> Gen<'a> {
         args.reverse();
         let (make, given, arity, effects): (Call<'a>, Vec<Code<'a>>, usize, u64) = match &head.kind
         {
-            ExprKind::Con(c) => {
-                let tag = a.alloc_str(&names::string(&self.tag(c)));
-                let make: Call<'a> = match &c.rep {
-                    Rep::Literal(l) => {
-                        let lit = a.alloc_str(&enum_literal(l));
-                        Box::new(move |_, _: &[Code<'a>]| a.text(lit).into())
-                    }
-                    Rep::Tagged if c.arity == 0 => Box::new(move |_, _: &[Code<'a>]| {
-                        call(a, "flickrt.Nullary", [a.text(tag)]).into()
-                    }),
-                    Rep::Tagged => Box::new(move |_, args: &[Code<'a>]| {
-                        let args = args.iter().map(|arg| arg.doc);
-                        call(a, "flickrt.NewData", iter::once(a.text(tag)).chain(args)).into()
-                    }),
-                    Rep::Unboxed | Rep::Typeof(_) => Box::new(|_, args: &[Code<'a>]| args[0]),
+            ExprKind::Con(c) => (self.construct(c, Vec::new()), Vec::new(), c.arity, 0),
+            // a constructor of a GADT with the dictionaries its value holds
+            ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Con(_)) => {
+                let ExprKind::Con(c) = &inner.kind else {
+                    unreachable!("a constructor, as the guard tested");
                 };
-                (make, Vec::new(), c.arity, 0)
+                let carried = dicts.iter().map(|d| self.dict(d).doc).collect();
+                (self.construct(c, carried), Vec::new(), c.arity, 0)
             }
             ExprKind::Global { module, name } => self.direct(module, name, Vec::new()),
             ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Global { .. }) => {

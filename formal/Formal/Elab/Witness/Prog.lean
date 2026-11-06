@@ -97,6 +97,7 @@ def P : Prog where
   prims _ := none
   methods := methSch
   consts := constSch
+  ctors _ := none
 
 /-- The names of `Sugar`. -/
 def S : Sugar P where

@@ -31,7 +31,8 @@ namespace Flick.Elab
 /-- The names of the core that realise a program: type constructors, dictionary classes
 (by class and number of parameters), the labels of methods and slots, the globals of
 instances, constants of Γ₀, structural dictionaries (by class and record type) and
-primitive ones (by primitive and constraint), and the constructor `Some`. -/
+primitive ones (by primitive and constraint), the constructor `Some` and the constructors of
+the program's data types. -/
 structure Names where
   con : Nat → Name
   cls : Nat → Nat → Nat
@@ -42,6 +43,7 @@ structure Names where
   strct : Nat → Ty → Nat
   prim : Nat → Cn → Nat
   some : Name
+  ctor : Nat → Name
 
 variable (N : Names)
 

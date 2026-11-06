@@ -298,7 +298,10 @@ impl Ide<'_> {
         let m = self.module(file)?;
         let (range, ty) = tree::innermost(m.typing.types.iter(), offset)?;
         let name = &self.text(file)[range.0 as usize..range.1 as usize];
-        Some((format!("```flick\n{name} : {}\n```", show_type(ty)), range))
+        Some((
+            format!("```flick\n{name} : {}\n```", m.typing.shown(range, ty)),
+            range,
+        ))
     }
 
     fn exposing_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
@@ -388,10 +391,9 @@ impl Ide<'_> {
             }
             Symbol::Local { name, binder, .. } => {
                 let m = self.module(file)?;
-                let ty = tree::innermost(m.typing.types.iter(), offset)
-                    .or_else(|| tree::innermost(m.typing.types.iter(), binder.0))?
-                    .1;
-                (format!("{name} : {}", show_type(ty)), None)
+                let (at, ty) = tree::innermost(m.typing.types.iter(), offset)
+                    .or_else(|| tree::innermost(m.typing.types.iter(), binder.0))?;
+                (format!("{name} : {}", m.typing.shown(at, ty)), None)
             }
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;

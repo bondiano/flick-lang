@@ -419,8 +419,24 @@ Rules:
 - In `match`, `Π` is the set of branch patterns without `when`; if they do not cover, `FLICK-T009`. An unreachable branch is the warning `FLICK-T010`, which does not affect typing.
 - Patterns of `let` and of λ parameters must be irrefutable: `Exh(τ, {p})`.
 
+A constructor of a GADT builds `T ρ̄`, with result arguments `ρ̄` over its own variables, instead of `T ᾱ`. A branch on it is typed under every instance `θ` of the constructor's variables and of the type variables around it that makes `T ρ̄` the matched type and keeps the regions the branch writes:
+
+```text
+K : ∀ᾱ. τ₁ →P … →P τₙ →P T ρ̄
+for every θ with (T ρ̄)θ = (T ῡ)θ that keeps the regions e writes:
+    ⊢ pᵢ : τᵢθ ⇒ Δᵢ(θ)      Γθ, Δ₁(θ), …, Δₙ(θ) ⊢ e : τ'θ ! φθ
+the free variables and locations of e are those of the branch
+──────────────────────────────────────────────────────────── (Branch-GADT)
+the branch K p₁ … pₙ → e of a match on a value of T ῡ
+```
+
+With no such `θ` the branch is dead: no value of `T ῡ` is built by `K`, and its body is not typed. The checker types the branch once, under the most general unifier, or drops it as `FLICK-T010` when there is none; both are instances of the rule. The rule over every unifier is the primary one, because the most general unifier is not kept by type substitution ([the most general unifier is not kept by substitution](#the-most-general-unifier-is-not-kept-by-substitution)).
+
+- `Exh(T ῡ, Π)` counts only the constructors that can build `T ῡ`, those whose `T ρ̄` unifies with `T ῡ` under some instance, regions included. This deadness differs on purpose from that of a branch, which keeps the regions the body writes. A constructor left out of `Exh` builds no value of the type at all. A dead branch has to stay dead under the substitutions of the regions around it (scopes, `kill`), which may move the regions it does not write.
+
 Checker:
 
+- `types/gadt/refine.rs` `refine` (the unifier, `Impossible`), `types/gadt/branch.rs` (the branch under the unifier, `FLICK-T010` for a dead one);
 - `patterns.rs` `bind_pattern`, `constructor_pattern` (`FLICK-T018`), `record_pattern`, `or_pattern`;
 - `exhaust.rs` `exhaustive`, `useful` (Maranget's usefulness algorithm), `covers_all`;
 - `irrefutable.rs`.
@@ -962,6 +978,16 @@ let program () =
 
 - Divergence: §3.6 required closed `Ψ(ℓ)`, and T3 required the same type `τ` for all reachable configurations. The closed term `Ref.make (λx. x)` has type `Ref (α → α)`: (Let-Gen) does not apply because of the runtime stage, and `α` is free. After the step, `Ψ(ℓ)` is either open or, after substituting a closed type, the type of the configuration is no longer `τ`. "Without loss of generality" relied on a type-substitution lemma that the document did not have.
 - Resolution (model): the `Ψ(ℓ)` are monotypes, possibly with free inference variables, and `Gen` with `Ψ` in the context does not generalize `ftv(Ψ)`. So the premise `ᾱ ∉ ftv(Ψ)` of L2 holds by construction. Lean: (Let-Gen) shifts `Γ` and `Ψ` past the generalized variables (`Typ.letGen`, `formal/Formal/Rules.lean`); the type-substitution lemma is `Typ.substT` (`formal/Formal/TySubst.lean`).
+
+### The most general unifier is not kept by substitution
+
+- Divergence: a rule that types a GADT branch only under the most general unifier of `T ρ̄` with the matched type is not closed under type substitution in the core, where rows and captures are sets. For `Refl : TypeEq a a` at `TypeEq (Int ->{c} Int) (Int -> Int)`, every unifier sends `c` to a type that reaches nothing (`Int`, `Unit`, `caps ∅`), and none of them is most general. A substitution of the variables around a branch can leave such a problem, and the branch cannot be typed again.
+- Resolution (model): (Branch-GADT) types the branch under every unifier that keeps the regions the branch writes. The checker's typing under the most general unifier and its dropped dead branch are derived rules. Lean: `Typ.aref` (`formal/Formal/Rules.lean`); `Typ.aref_substT` (`TySubstBase.lean`), `Typ.aref_subst` (`SubstArm.lean`), `aref_match` (`SpineMatch.lean`); `Mgu`, `Typ.aref_mgu`, `Typ.aref_dead` (`ArefMgu.lean`).
+
+### A dead branch keeps no typing of its body
+
+- Divergence: weakening and substitution need the free variables and locations of a branch within its context, also for a dead one. A typing of the body under some instance does not survive type substitution: `match (x : Expr a) | IntLit n → n` is typed under `a := Int`, and under `a := Bool` the branch is dead and `n : Int` has no typing at `Bool`.
+- Resolution (model): (Branch-GADT) asks for the free variables and locations of the body directly, beside the typings under the unifiers. Lean: the premises of `Typ.aref`.
 
 ### Stepping a signed let loses its signature
 

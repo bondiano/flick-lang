@@ -17,6 +17,7 @@ theorem Typ.unguarded_subst {Ψ Θ Γ A J} (h : Typ S Ψ Θ Γ A J) (σ : Nat �
   | anil => intros; rfl
   | acons _ _ _ _ ih => intro _ _ _ hJ; simp [Tm.subst, Tm.unguarded, ih hJ]
   | aguard _ _ _ _ _ _ ih => intro _ _ _ hJ; simp [Tm.subst, Tm.unguarded, ih hJ]
+  | aref _ _ _ _ _ _ _ _ _ ih => intro _ _ _ hJ; simp [Tm.subst, Tm.unguarded, ih hJ]
   | _ => intro _ _ _ hJ; cases hJ
 
 theorem Tm.head_rename {ξ : Nat → Nat} {K} {f : Tm} (h : f.head = .ctor K) :

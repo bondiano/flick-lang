@@ -227,6 +227,24 @@ IR:
 - a local signature: `Stmt::Fun { dicts }`;
 - a higher-rank argument: `ExprKind::Abstract(dicts, e)`.
 
+A constructor whose declaration has constraints carries their dictionaries, first, and a branch on it binds them as givens. The branch on a constructor of a GADT is elaborated under the most general unifier `θ` of what it builds with the matched type ([`core.md` (Branch-GADT)](core.md#24-patterns-and-exhaustiveness)):
+
+```text
+K : ∀ᾱ. Q₁ … Qₘ ⇒ τ₁ →P … →P τₙ →P T ρ̄      τ̄ monotypes      Δ ⊩ Qᵢ[ᾱ := τ̄] ⇝ dᵢ
+──────────────────────────────────────────────────────────────── (Con-Dict)
+Γ; Δ ⊢ K : (τ₁ →P … →P τₙ →P T ρ̄)[ᾱ := τ̄] ! P ⇝ K d₁ … dₘ
+
+Γ; Δ ⊢ e : T ῡ ! φ ⇝ e'      θ the most general unifier of T ρ̄ and T ῡ
+Γθ, y₁ : τ₁θ, …, yₙ : τₙθ; δ₁ : Q₁θ, …, δₘ : Qₘθ, Δθ ⊢ b : τθ ! φθ ⇝ b'
+Γ; Δ ⊢ r : τ ! φ ⇝ r'
+──────────────────────────────────────────────────────────────── (Case-Dict)
+Γ; Δ ⊢ match e with K y₁ … yₙ → b | _ → r : τ ! φ ⇝ match e' with K δ₁ … δₘ y₁ … yₙ → b' | _ → r'
+```
+
+A match with more branches nests (Case-Dict) on the same value. With no unifier the branch is dropped. Under an arrow the unifier compares the rows and the captures as they are, as the checker does.
+
+Checker: `types/gadt/refine.rs`, `types/gadt/branch.rs`; the dictionaries of the value are `Dict::Field`. IR: `ir/lower/pattern.rs` binds them after the fields. Lean: `Elab.con`, `Elab.caseK`, `Elab.caseKDead` (`formal/Formal/Elab/Source.lean`), `Unify`, `Clash` (`Elab/Unify.lean`).
+
 A binding without a signature gets no constraints: the variables of unsolved constraints stay monomorphic (`generalize.rs` `generalize`; [unsigned bindings get no class constraints](core.md#class-constraints-and-generalization)).
 
 **Names of givens.** In the implementation `δ` is the constraint as `show` prints it:
@@ -698,7 +716,7 @@ The remaining entries were found by the Lean mechanization (`formal/Formal/Elab/
 ### Typing the whole term does not type its dictionaries in the empty context
 
 - Divergence: `load_rel` gets `Has [] [] e t φ` for both terms, that is the core typing of the whole elaboration. A base pair of the run needs the typing of every closed dictionary in the empty context at stage `P`: only then is a step inside the dictionary pure. A dictionary may stand under a binder, and its typing cannot be obtained from the typing of the whole term without strengthening the context and changing the stage in the core.
-- Resolution (model): in the target with a run (`runTarget`), `Has` is the core `Has` together with the typing of the term's dictionaries by the laws of `Target` (`DTyp`, `RHas`). The laws give both. `T6b_core` takes `RHas` for both fillings; T6(a) for the core (`T6a_core`) is unchanged. The checker is not affected.
+- Resolution (model): in the target with a run (`runTarget`), `Has` is the core `Has` together with the typing of a dictionary by the laws of `Target` (`DTyp`, `RHas`); the laws give both. `load_rel` takes the typings of the dictionaries in the holes of a skeleton ([the dictionaries of a closed dead arm](#the-dictionaries-of-a-closed-dead-arm-need-not-be-typed)). `T6b_core` takes `RHas` for both fillings; T6(a) for the core (`T6a_core`) is unchanged. The checker is not affected.
 - `RHas` of closed fillings is derived rather than taken as a premise. `T6a_close` is T6(a) with closed givens: a derivation under `Δl, Δ`, where `Δ` is closed by the types `θ` and by closed dictionaries `ρ` down to constraints without variables, has type `τθ` under `Δl θ` in any target, with the givens `Δ` replaced by dictionaries. For a skeleton whose holes stand outside dictionary abstractions (`Tm.Skel`), closing a filling is the same as filling with closed dictionaries (`fill_dsubst`). From this follows `witness_T6b_open`: T6(b) on the witness under givens, without premises about typing. It relies on [structural dictionaries typed at any instance](#structural-dictionaries-were-typed-only-at-their-own-record-type). Lean: `Elab/Close.lean`, `Elab/CloseTy.lean`, `Witness/Consts.lean`.
 
 ### Record patterns read dictionary fields without evaluating them
@@ -708,9 +726,19 @@ The remaining entries were found by the Lean mechanization (`formal/Formal/Elab/
 
 ### Structural dictionaries were typed only at their own record type
 
-- Divergence: the laws `strct` and `prim` of `Target` and `DTyp` gave `struct_C^τ` a type only at `τ` itself, and `prim_q` only at `q`. Closing the givens ([typing dictionaries in the empty context](#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)) substitutes types `θ`, while a dictionary term stores its type ([typed dictionary terms](#the-structural-dictionary-term-carries-its-type)) and is unchanged by type substitution. Let `Δ = [Eq a]`, `d = struct_Eq^{x:a} δ₀`, `θ: a := Int`, `ρ₀ = I_EqInt`. Then `d[ρ] = struct_Eq^{x:a} I_EqInt`: the function expects `D_{Eq a}` but gets `D_{Eq Int}`. There is no `DTyp` for this term, `DOk` is false, and `RHas` of the closed filling does not hold: for a non-identity `θ` the claim about closed fillings was false in the model.
+- Divergence: the laws `strct` and `prim` of `Target` and `DTyp` gave `struct_C^τ` a type only at `τ` itself, and `prim_q` only at `q`. Closing the givens ([typing dictionaries in the empty context](#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)) substitutes types `θ`, while a dictionary term stores its type ([typed dictionary terms](#the-structural-dictionary-term-carries-its-type)) and is unchanged by type substitution. Let `Δ = [Eq a]`, `d = struct_Eq^{x:a} δ₀`, `θ: a := Int`, `ρ₀ = I_EqInt`. Then `d[ρ] = struct_Eq^{x:a} I_EqInt`: the function expects `D_{Eq a}` but gets `D_{Eq Int}`. There is no `DTyp` for this term, and the dictionaries of the closed filling had no typing: for a non-identity `θ` the claim about closed fillings was false in the model.
 - Cause: the law fixed the type. In the core the global `N.strct C τ` has a closed scheme `∀k` (`Real.strct`), and the run erases the type (`Eqv.strctSub`, `primSub`): the term is usable at any `τθ`.
 - Resolution (model): the laws `strct` and `prim` and `DTyp` take any instance `θ` of their type, `struct_C^τ : D_{C τ₁θ} →P … →P D_{C τθ}` and `prim_q : D_{qθ}`, as the law `inst` takes any `σ`. The core proves them through `has_glob` at `θ`. The run (`DSim`, `eqv_sem`, `DTyp.core`) does not depend on the type and does not change. The checker is not affected: `Dict::Structural` stores no type. Lean: `Target.strct`, `Target.prim`, `DTyp.strct`, `DTyp.prim`, `has_strct`, `has_prim`.
+
+### Closing the premises of a refined arm needs its typing before the closing
+
+- Divergence: T6(a) with closed premises closes the types by `θ` and the premises by closed dictionaries `ρ`. Under `θ` the problem of a GADT arm may have unifiers in the core and no derivation in the source, which compares rows and captures as written (`cun cnil cnil` against `cnil`). The closed dictionaries have the closed types, not those the arm was elaborated at.
+- Resolution (model): the law `caseK` of `Target` takes the arm typed under the most general unifier of the open problem, before the closing, and gives the closed arm. In the core each unifier of the closed problem, after `θ`, is one of the open problem, so `⟦θ_arm⟧` followed by it; the body typed under `⟦θ_arm⟧` is typed under it (T1), and then its closed premises are substituted (L2). Lean: `Target.caseK`; `has_caseK` (`Elab/CoreCaseK.lean`), `Tr.dsubst` (`Elab/CoreDSubst.lean`), `Unify.most` (`Elab/CoreUnify.lean`); `T6a_close` (`Elab/Close.lean`).
+
+### The dictionaries of a closed dead arm need not be typed
+
+- Divergence: `RHas` asked every dictionary of a term to be typed (`DOk`). After the closing a dead arm may hold a dictionary built for the types of the open problem from closed dictionaries of other types. With `C a ⇒` around and `a := List Int` in the arm, the arm builds `I δ` for an instance `I : C (List x) ⇒ D (List x)`; under `a := Bool` it holds `I I_{C Bool}`, which has no typing. The arm is never run.
+- Resolution (model): `load_rel` relates two fillings of one skeleton by `≈` dictionaries typed in the holes; the rest of the two terms is the same and needs no typing (`fill_cg`). `RHas` types a dictionary term only, and `Exprs.Ok` of a target carries the typings of the dictionaries in the holes, which `T6b_target` gets from the closed derivations (`closed_typed`). Lean: `Target.load_rel`, `Target.exprs` (`Elab/Run.lean`); `fill_cg`, `RHas` (`Elab/CoreRun.lean`); `T6b_target` (`Elab/Close.lean`).
 
 ### `from_result` could not raise in the core
 

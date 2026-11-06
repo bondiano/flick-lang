@@ -76,29 +76,29 @@ theorem noHas_mkEff {e : Flick.Tm} (h : ∀ s, ¬ e.Has s) : ∀ s, ¬ (mkEff mk
   · exact hs
   · exact h s hs
 
-variable (hmk : S.ctor mk = some (2, [effField], E))
+variable (hmk : S.ctor mk = some (2, [effField], E)) (hmkr : S.res mk = idTs 2)
   (hone : ∀ K k ts, S.ctor K = some (k, ts, E) → K = mk)
-include hmk hone
+include hmk hmkr hone
 
 omit hone in
 theorem typ_mkEff {Ψ Θ Γ e q b ψ φ} (he : Typ S Ψ Θ Γ e (.ex b ψ))
     (hψ : ψ.le (.rt Row.none Row.none)) (hn : ∀ s, ¬ e.Has s)
     (hh : ∀ s ∈ Γ, ∀ a, Flick.Scheme.reach s a → b.reach a ∨ q.reach a) :
     Typ S Ψ Θ Γ (mkEff mk e) (.ex (effT E q b) φ) :=
-  .app (ψ := .pure) (.ctor hmk (us := [q, b]) rfl (by rw [ctorTy_eff]; exact .refl))
+  .app (ψ := .pure) (Typ.ctor_plain (S := S) hmk hmkr (us := [q, b]) rfl (by rw [ctorTy_eff]; exact .refl))
     (.task he hψ (hn .ins) (held_sub (by simpa [Flick.Tm.Has] using hn) hh) .refl) trivial .refl
 
 theorem typ_unEff {Ψ Θ Γ e b q a t φ} (he : Typ S Ψ Θ Γ e (.ex (effT E q a) φ))
     (hb : Typ S Ψ Θ (.mono (.eff Row.none Row.none a q.reach) :: Γ) b (.ex t φ)) :
     Typ S Ψ Θ Γ (unEff mk e b) (.ex t φ) := by
-  have hh := PatTy.head (S := S) hmk (us := [q, a]) rfl
+  have hh := PatTy.head_plain (S := S) hmk hmkr (us := [q, a]) rfl
   rw [ctorTy_eff] at hh
   exact .match_ he (.acons (.adt (.app hh .var) rfl) hb .anil) (.inl (exh_one hmk hone [q, a]))
 
 omit hone in
 theorem typ_effPure {Ψ Θ A Q C0 φ} :
     Typ S Ψ Θ [] (effPure mk) (.ex (.arrow A .pure (effT E Q A) C0) φ) :=
-  .lam (typ_mkEff hmk (ψ := .pure) (typ_var_mono rfl) trivial (fun _ h => h)
+  .lam (typ_mkEff hmk hmkr (ψ := .pure) (typ_var_mono rfl) trivial (fun _ h => h)
       (by intro s hs a h; simp at hs; subst hs; exact .inl ((Flick.Scheme.reach_mono _ _).1 h)))
     (fun h => by simp [mkEff, Flick.Tm.Has] at h)
     (held_sub (fun _ h => by simp [mkEff, Flick.Tm.Has] at h) (by simp)) .refl
@@ -112,8 +112,8 @@ theorem typ_effBind {Ψ Θ A B C C0 C2 D Q1 Q3 φ}
       (.arrow (effT E D A) .pure (effT E Q3 B) C2) C0) φ) := by
   have hn : ∀ s, ¬ (unEff mk (.var 0) (unEff mk (.app (.var 2) (.await (.var 0)))
       (.await (.var 0)))).Has s := fun s h => by simp [unEff, Flick.Tm.Has] at h
-  refine .lam (.lam (typ_mkEff hmk (ψ := .rt Row.none Row.none)
-    (typ_unEff hmk hone (typ_var_mono rfl) (typ_unEff hmk hone
+  refine .lam (.lam (typ_mkEff hmk hmkr (ψ := .rt Row.none Row.none)
+    (typ_unEff hmk hmkr hone (typ_var_mono rfl) (typ_unEff hmk hmkr hone
       (.app (ψ := .pure) (typ_var_mono rfl) (typ_await_var rfl) trivial .refl) (typ_await_var rfl)))
     ⟨fun _ h => h, fun _ h => h⟩ hn ?_) (fun h => noHas_mkEff hn _ h)
     (held_sub (fun s h => noHas_mkEff hn s h) ?_) .refl)
@@ -144,8 +144,8 @@ theorem typ_effMap2 {Ψ Θ A Bt X Cg C C0 C1 C2 D D' R φ}
   have hm : ∀ s, ¬ (Flick.Tm.lam (mkEff mk (unEff mk (.var 1) (unEff mk (.var 1)
       (.app (.app (.var 4) (.await (.var 1))) (.await (.var 0))))))).Has s :=
     fun s h => noHas_mkEff hn s h
-  refine .lam (.lam (.lam (typ_mkEff hmk (ψ := .rt Row.none Row.none)
-    (typ_unEff hmk hone (typ_var_mono rfl) (typ_unEff hmk hone (typ_var_mono rfl)
+  refine .lam (.lam (.lam (typ_mkEff hmk hmkr (ψ := .rt Row.none Row.none)
+    (typ_unEff hmk hmkr hone (typ_var_mono rfl) (typ_unEff hmk hmkr hone (typ_var_mono rfl)
       (.app (ψ := .pure) (.app (ψ := .pure) (typ_var_mono rfl) (typ_await_var rfl) trivial .refl) (typ_await_var rfl)
         trivial .refl)))
     ⟨fun _ h => h, fun _ h => h⟩ hn ?_) (fun h => noHas_mkEff hn _ h)
@@ -174,20 +174,20 @@ omit hone in
 /-- **`pure` of `Monad Eff`** is typed at its scheme in `Sugar`. -/
 theorem typ_effPure_tr (c a : Ty) {Ψ Θ φ} :
     Typ S Ψ Θ [] (effPure mk) (.ex (trT N (arrP a (appQ (.con eC) c a))) φ) := by
-  simp only [trT, if_neg h2, if_neg h4, hE]; exact typ_effPure hmk
+  simp only [trT, if_neg h2, if_neg h4, hE]; exact typ_effPure hmk hmkr
 
 /-- **`flat_map` of `Monad Eff`** is typed at its scheme in `Sugar` (`bindTy`). -/
 theorem typ_effBind_tr (c d a b e : Ty) {Ψ Θ φ} :
     Typ S Ψ Θ [] (effBind mk) (.ex (trT N (bindTy (.con eC) c d a b e)) φ) := by
   simp only [bindTy, arrP, appQ, trT, if_neg h2, if_neg h4, hE]
-  refine typ_effBind hmk hone ?_ ?_ ?_ <;> intro x h <;> rcases x with n | p <;>
+  refine typ_effBind hmk hmkr hone ?_ ?_ ?_ <;> intro x h <;> rcases x with n | p <;>
     simp [effT, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind
 
 /-- **`map2` of `Monad Eff`** is typed at its scheme in `Sugar` (`map2Ty`). -/
 theorem typ_effMap2_tr (c d a b x g d' : Ty) {Ψ Θ φ} :
     Typ S Ψ Θ [] (effMap2 mk) (.ex (trT N (map2Ty (.con eC) c d a b x g d')) φ) := by
   simp only [map2Ty, arrP, appQ, trT, if_neg h2, if_neg h4, hE]
-  refine typ_effMap2 hmk hone ?_ ?_ ?_ ?_ ?_ ?_ <;> intro y h <;> rcases y with n | p <;>
+  refine typ_effMap2 hmk hmkr hone ?_ ?_ ?_ ?_ ?_ ?_ <;> intro y h <;> rcases y with n | p <;>
     simp [effT, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind
 
 end Flick.Elab

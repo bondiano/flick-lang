@@ -1,4 +1,5 @@
 import Formal.ProgressMain
+import Formal.SpineMatch
 
 /-!
 # Preservation of pure steps
@@ -90,12 +91,14 @@ theorem pure_preservation {Ψ Θ e t φ e'} (h : Typ S Ψ Θ [] e (.ex t φ)) (h
     | match_ h₁ hA _ =>
       cases hA with
       | acons hp hb _ => exact hb.inst (hp.inst hv (h₁.valueAny hv _) hm)
+      | aref hK hU hn _ _ hpA hbA _ => exact aref_match hv h₁ hK hU hn hpA hbA hm
     | errVal hv'' => exact (nv hv'').elim
   | matchNo hv hm =>
     cases h with
     | match_ h₁ hA hc =>
       cases hA with
       | acons _ _ hr => exact .match_ h₁ hr (hc.tail hv (h₁.shape hv rfl).1 hm)
+      | aref _ _ _ _ _ _ _ hr => exact .match_ h₁ hr (hc.tail hv (h₁.shape hv rfl).1 hm)
     | errVal hv'' => exact (nv hv'').elim
   | guardYes hv hm =>
     cases h with

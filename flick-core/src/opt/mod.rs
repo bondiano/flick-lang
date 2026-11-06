@@ -29,6 +29,8 @@ mod sroa;
 mod walk;
 
 #[cfg(test)]
+mod gadt_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::BTreeSet;

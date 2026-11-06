@@ -6,6 +6,31 @@ break programs.
 
 ## Unreleased
 
+- **GADTs:** a constructor names the type it builds after `:`,
+  `| IntLit Int : Expr Int`; variables of its fields that the result does
+  not mention are existential. A `match` arm learns the type of the matched
+  value under a complete signature (`eval : forall a. Expr a -> a` returns
+  `n` in the `IntLit` arm), needs no arm for a constructor its type rules
+  out, and hover shows `Int (= a)` there. The core module `TypeEq` has
+  `Refl : TypeEq a a` and `TypeEq.cast`. New codes: `FLICK-S015`,
+  `FLICK-T056`, `FLICK-T057`, `FLICK-T058`.
+- **Dictionaries in values:** a constructor of a GADT may hold class
+  dictionaries, `| Show b => Showable b : Showable`: they are solved where a
+  value is built and are assumptions in a `match` arm on it. JS keeps them
+  as `$0` … beside the fields, Go after the fields; `==` leaves them out.
+  The interface format is version 6 (`dicts` of a constructor).
+- **Deriving a GADT:** `Eq`, `Ord`, `Hash` and `Show` cover a constructor
+  that hides no type and holds no dictionary, each field at the type the
+  constructor builds; otherwise `FLICK-C013`, as for `Generic`. The std
+  derives of `Schema`, `Url`, `Form` and `HttpApi` refuse a GADT with their
+  codes. The plugin interface is `0.14.0`: `case-target.refined` and
+  `case-target.constrained`.
+- **GADTs in the formal semantics:** the Lean proofs in
+  [`formal/`](./formal/README.md) cover them. Type soundness types an arm on
+  a constructor of a GADT under every unifier of what it builds with the
+  matched type, and the checker's arm under the most general one is a
+  derived rule. T6 covers constructors that carry dictionaries and arms
+  refined by the most general unifier, also with their premises closed.
 - **Enums:** `untagged type Method = Get = "GET" | Post = "POST"` is an
   enum: each value is its literal at run time, all strings or all `Int`s.
   `match` and `==` compare the value, derived `Ord` follows the order of

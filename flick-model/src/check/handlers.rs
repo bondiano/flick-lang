@@ -69,6 +69,14 @@ impl Checker<'_> {
 
     /// `⊢ p : θ ⇒ Δ`, `Γ, Δ ⊢ g : Bool`, `Γ, Δ ⊢ e : τ'`.
     fn arm(&mut self, arm: &Arm, scrutinee: &Type, result: &Type) -> Check<()> {
+        // what the arm learns of the rigid variables holds in it only
+        let learned = self.equalities.len();
+        let checked = self.arm_under(arm, scrutinee, result);
+        self.equalities.truncate(learned);
+        checked
+    }
+
+    fn arm_under(&mut self, arm: &Arm, scrutinee: &Type, result: &Type) -> Check<()> {
         let bound = self.pattern(&arm.pat, scrutinee)?;
         let depth = self.locals.len();
         self.locals

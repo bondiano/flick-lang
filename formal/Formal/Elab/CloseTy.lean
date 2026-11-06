@@ -128,9 +128,6 @@ theorem heldS_subst {σ : Nat → Ty} {Γ : List Scheme} {e : Exp} {n : Nat}
     obtain ⟨m, hm, h⟩ := Scheme.reach_subst hr
     exact ⟨m, ⟨x, s₀, hx, hΓ, hm⟩, h⟩
 
-/-- A ground constraint. -/
-def Cn.Ground (q : Cn) : Prop := ∀ t ∈ q.args, t.Ground
-
 theorem Ty.subst_ground {t : Ty} (h : t.Ground) (σ : Nat → Ty) : t.subst σ = t := by
   rw [Ty.subst_agree (σ' := .var) fun n hn => (h n hn).elim, Ty.subst_id]
 
@@ -153,6 +150,23 @@ theorem const_inst {P : Prog} (hP : P.ConstsClosed) {c : Nat} {s : Scheme} (hc :
       dicts .cnil ((s.ctx.map (·.subst (inst ts))).map (·.subst θ))
         (.mono ((s.ty.subst (inst ts)).subst θ)) := by
   rw [hP c s hc _ (fun n => (inst ts n).subst θ) fun j hj => by
+    simp [inst, hk, hj]]
+  simp only [TTy.subst_dicts, TTy.subst, List.map_map, Function.comp_def, Cn.subst_comp,
+    Ty.subst_comp]
+  rfl
+
+/-- The constructors have closed types: they mention only their variables. -/
+def Prog.CtorsClosed (P : Prog) : Prop :=
+  ∀ K c, P.ctors K = some c → ∀ σ σ' : Nat → Ty, (∀ j, j < c.k → σ j = σ' j) →
+    (dicts .cnil c.ctx (.mono c.ty)).subst σ = (dicts .cnil c.ctx (.mono c.ty)).subst σ'
+
+/-- An instantiation of a constructor, substituted, is an instantiation. -/
+theorem ctor_inst {P : Prog} (hP : P.CtorsClosed) {K : Nat} {c : Ctor} (hK : P.ctors K = some c)
+    {ts : List Ty} (hk : ts.length = c.k) (θ : Nat → Ty) :
+    (dicts .cnil c.ctx (.mono c.ty)).subst (inst (ts.map (·.subst θ))) =
+      dicts .cnil ((c.ctx.map (·.subst (inst ts))).map (·.subst θ))
+        (.mono ((c.ty.subst (inst ts)).subst θ)) := by
+  rw [hP K c hK _ (fun n => (inst ts n).subst θ) fun j hj => by
     simp [inst, hk, hj]]
   simp only [TTy.subst_dicts, TTy.subst, List.map_map, Function.comp_def, Cn.subst_comp,
     Ty.subst_comp]

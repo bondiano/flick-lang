@@ -43,7 +43,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | loc hl => intro σ _; exact .loc (by simp [hl])
   | const hc hT =>
     intro σ _; exact .const (Const.ok_substT σ hc) (by have := hT.substT σ; rwa [Const.ty_substT] at this)
-  | ctor hK hk hT => intro σ _; exact Typ.ctor_substT hK hk hT σ
+  | ctor hK hk hH hT => intro σ _; exact Typ.ctor_substT hK hk hH hT σ
   | rnil => intro _ _; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ =>
     intro σ hσ
@@ -68,6 +68,10 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     have g := ih₁ σ (hσ.sub fun _ h => .inl h); rw [ctx_substT] at g
     have b := ih₂ σ (hσ.sub fun _ h => .inr (.inl h)); rw [ctx_substT] at b
     exact .aguard (hp.substT σ) g b (ih₃ σ (hσ.sub fun _ h => .inr (.inr h)))
+  | aref hK hU hn hfr hlc hpA hbA _ _ ihr =>
+    intro σ hσ
+    exact Typ.aref_substT hK hU hn hfr hlc hpA hbA σ (hσ.sub fun _ h => .inl h)
+      (ihr σ (hσ.sub fun _ h => .inr h))
   | todo => intro _ _; exact .todo
   | task _ hψ hn hc hT ih =>
     intro σ hσ

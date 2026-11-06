@@ -1,4 +1,4 @@
-import Formal.Elab.Syntax
+import Formal.Elab.Unify
 
 /-!
 # Elaboration: the source and `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (elaboration.md §2.2, §2.4)
@@ -50,6 +50,11 @@ inductive Exp where
   | ite (c a b : Exp)
   /-- `match e with None → n | Some y → s` -/
   | caseOpt (e n s : Exp)
+  /-- a constructor of a data type -/
+  | con (K : Nat)
+  /-- `match e with K y₁ … yₙ → b | _ → r`: an arm on the constructor `K`, binding its `n`
+  fields; a match with more arms nests them -/
+  | caseK (e : Exp) (K n : Nat) (b r : Exp)
 
 /-- Elaborated terms: a subset of λFlick⁺. `dict d` is a dictionary term, `meth e m` the
 projection of a method, `lamD l e` the abstraction `λδ₁ … δₗ. e` whose `i`-th argument is the
@@ -67,6 +72,9 @@ inductive Tm where
   | lamD (l : Nat) (b : Tm)
   | ite (c a b : Tm)
   | caseOpt (e n s : Tm)
+  | con (K : Nat)
+  /-- the arm binds the `n` fields of `K` as variables and its `m` dictionaries as premises -/
+  | caseK (e : Tm) (K n m : Nat) (b r : Tm)
 
 /-- `x` is free in `e`. -/
 def Exp.Free : Exp → Nat → Prop
@@ -79,6 +87,8 @@ def Exp.Free : Exp → Nat → Prop
   | .letSig _ e b, x => e.Free x ∨ b.Free (x + 1)
   | .ite c a b, x => c.Free x ∨ a.Free x ∨ b.Free x
   | .caseOpt e n s, x => e.Free x ∨ n.Free x ∨ s.Free (x + 1)
+  | .con _, _ => False
+  | .caseK e _ n b r, x => e.Free x ∨ b.Free (x + n) ∨ r.Free x
 
 /-- `x` is free in `e`; `lamD` binds premises, not term variables. -/
 def Tm.Free : Tm → Nat → Prop
@@ -93,6 +103,8 @@ def Tm.Free : Tm → Nat → Prop
   | .lamD _ b, x => b.Free x
   | .ite c a b, x => c.Free x ∨ a.Free x ∨ b.Free x
   | .caseOpt e n s, x => e.Free x ∨ n.Free x ∨ s.Free (x + 1)
+  | .con _, _ => False
+  | .caseK e _ n _ b r, x => e.Free x ∨ b.Free (x + n) ∨ r.Free x
 
 /-- What `e` holds in `Γ`: the reach of its free variables. `Δ` adds nothing: `⌈D_Q⌉ = ∅`. -/
 def heldS (Γ : List Scheme) (e : Exp) (n : Nat) : Prop :=
@@ -100,6 +112,143 @@ def heldS (Γ : List Scheme) (e : Exp) (n : Nat) : Prop :=
 
 /-- `e d₁ … dₗ`. -/
 def Tm.dapps (f : Tm) (ds : List Dict) : Tm := ds.foldl (fun f d => .app f (.dict d)) f
+
+/-- The premises from `L` on go to `ρ`; those below `L` are bound inside the term. -/
+def dsub (L : Nat) (ρ : Nat → Dict) : Nat → Dict := fun k => if k < L then .var k else ρ (k - L)
+
+/-- `e[ρ]` for the premises from `L` on. -/
+def Tm.dsubst (ρ : Nat → Dict) : Nat → Tm → Tm
+  | _, .var x => .var x
+  | _, .hole i => .hole i
+  | L, .dict d => .dict (d.subst (dsub L ρ))
+  | L, .meth e m => .meth (e.dsubst ρ L) m
+  | _, .const c => .const c
+  | L, .app f a => .app (f.dsubst ρ L) (a.dsubst ρ L)
+  | L, .lam b => .lam (b.dsubst ρ L)
+  | L, .let_ e b => .let_ (e.dsubst ρ L) (b.dsubst ρ L)
+  | L, .lamD l b => .lamD l (b.dsubst ρ (l + L))
+  | L, .ite c a b => .ite (c.dsubst ρ L) (a.dsubst ρ L) (b.dsubst ρ L)
+  | L, .caseOpt e n s => .caseOpt (e.dsubst ρ L) (n.dsubst ρ L) (s.dsubst ρ L)
+  | _, .con K => .con K
+  | L, .caseK e K n m b r => .caseK (e.dsubst ρ L) K n m (b.dsubst ρ (m + L)) (r.dsubst ρ L)
+
+theorem Tm.dsubst_dapps (ρ : Nat → Dict) (L : Nat) (f : Tm) (ds : List Dict) :
+    (f.dapps ds).dsubst ρ L = (f.dsubst ρ L).dapps (ds.map (·.subst (dsub L ρ))) := by
+  induction ds generalizing f with
+  | nil => rfl
+  | cons d ds ih => exact ih (.app f (.dict d))
+
+theorem Tm.free_dsubst {ρ : Nat → Dict} {e : Tm} {L x : Nat} (h : (e.dsubst ρ L).Free x) :
+    e.Free x := by
+  induction e generalizing L x with
+  | var | hole | dict | const | con => exact h
+  | meth _ _ ih | lam _ ih | lamD _ _ ih => exact ih h
+  | app _ _ ih₁ ih₂ | let_ _ _ ih₁ ih₂ => exact h.imp ih₁ ih₂
+  | ite _ _ _ ih₁ ih₂ ih₃ | caseOpt _ _ _ ih₁ ih₂ ih₃ | caseK _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
+    exact h.imp ih₁ (Or.imp ih₂ ih₃)
+
+/-- A dictionary whose premises lie below `L`. -/
+def Dict.Below (L : Nat) : Dict → Prop
+  | .var k => k < L
+  | .slot d _ => d.Below L
+  | .ap d e => d.Below L ∧ e.Below L
+  | _ => True
+
+theorem Dict.subst_below {L : Nat} {ρ : Nat → Dict} : ∀ {d : Dict}, d.Below L →
+    d.subst (dsub L ρ) = d
+  | .var k, h => by simp [Dict.subst, dsub, show k < L from h]
+  | .slot d i, h => by simp [Dict.subst, Dict.subst_below (d := d) h]
+  | .ap d e, h => by simp [Dict.subst, Dict.subst_below h.1, Dict.subst_below h.2]
+  | .inst _, _ | .strct _ _, _ | .prim _ _, _ => rfl
+
+/-- The premises `e` names lie below `L`, past the premises bound inside it. -/
+def Tm.DB : Nat → Tm → Prop
+  | L, .dict d => d.Below L
+  | L, .meth e _ => e.DB L
+  | L, .app f a => f.DB L ∧ a.DB L
+  | L, .lam b => b.DB L
+  | L, .let_ e b => e.DB L ∧ b.DB L
+  | L, .lamD l b => b.DB (l + L)
+  | L, .ite c a b => c.DB L ∧ a.DB L ∧ b.DB L
+  | L, .caseOpt e n s => e.DB L ∧ n.DB L ∧ s.DB L
+  | L, .caseK e _ _ m b r => e.DB L ∧ b.DB (m + L) ∧ r.DB L
+  | _, _ => True
+
+theorem Tm.dsubst_of_DB {ρ : Nat → Dict} : ∀ {e : Tm} {L : Nat}, e.DB L → e.dsubst ρ L = e
+  | .var _, _, _ | .hole _, _, _ | .const _, _, _ | .con _, _, _ => rfl
+  | .dict _, _, h => by simp [Tm.dsubst, Dict.subst_below h]
+  | .meth e _, _, h => by simp [Tm.dsubst, Tm.dsubst_of_DB (e := e) h]
+  | .app f a, _, h => by simp [Tm.dsubst, Tm.dsubst_of_DB (e := f) h.1, Tm.dsubst_of_DB (e := a) h.2]
+  | .lam b, _, h => by simp [Tm.dsubst, Tm.dsubst_of_DB (e := b) h]
+  | .let_ e b, _, h => by
+    simp [Tm.dsubst, Tm.dsubst_of_DB (e := e) h.1, Tm.dsubst_of_DB (e := b) h.2]
+  | .lamD _ b, _, h => by simp [Tm.dsubst, Tm.dsubst_of_DB (e := b) h]
+  | .ite c a b, _, h => by
+    simp [Tm.dsubst, Tm.dsubst_of_DB (e := c) h.1, Tm.dsubst_of_DB (e := a) h.2.1,
+      Tm.dsubst_of_DB (e := b) h.2.2]
+  | .caseOpt e n s, _, h => by
+    simp [Tm.dsubst, Tm.dsubst_of_DB (e := e) h.1, Tm.dsubst_of_DB (e := n) h.2.1,
+      Tm.dsubst_of_DB (e := s) h.2.2]
+  | .caseK e _ _ _ b r, _, h => by
+    simp [Tm.dsubst, Tm.dsubst_of_DB (e := e) h.1, Tm.dsubst_of_DB (e := b) h.2.1,
+      Tm.dsubst_of_DB (e := r) h.2.2]
+
+theorem Dict.subst_congr_below {ρ ρ' : Nat → Dict} {M : Nat} (h : ∀ k, k < M → ρ k = ρ' k) :
+    ∀ {d : Dict}, d.Below M → d.subst ρ = d.subst ρ'
+  | .var k, hd => h k hd
+  | .slot d _, hd => by simp [Dict.subst, Dict.subst_congr_below h (d := d) hd]
+  | .ap d e, hd => by
+    simp [Dict.subst, Dict.subst_congr_below h (d := d) hd.1, Dict.subst_congr_below h (d := e) hd.2]
+  | .inst _, _ | .strct _ _, _ | .prim _ _, _ => rfl
+
+/-- Closing the premises from `L` on reads only the dictionaries of the premises named. -/
+theorem Tm.dsubst_congr {ρ ρ' : Nat → Dict} {M : Nat} (h : ∀ k, k < M → ρ k = ρ' k) :
+    ∀ {e : Tm} {L : Nat}, e.DB (L + M) → e.dsubst ρ L = e.dsubst ρ' L
+  | .var _, _, _ | .hole _, _, _ | .const _, _, _ | .con _, _, _ => rfl
+  | .dict _, L, hd => by
+    simp only [Tm.dsubst]
+    rw [Dict.subst_congr_below (ρ := dsub L ρ) (ρ' := dsub L ρ') (M := L + M) (fun k hk => by
+      simp only [dsub]
+      by_cases hkL : k < L
+      · simp [hkL]
+      · simp only [hkL, if_false]; exact h _ (by omega)) hd]
+  | .meth e _, _, hd => by simp [Tm.dsubst, Tm.dsubst_congr h (e := e) hd]
+  | .app f a, _, hd => by
+    simp [Tm.dsubst, Tm.dsubst_congr h (e := f) hd.1, Tm.dsubst_congr h (e := a) hd.2]
+  | .lam b, _, hd => by simp [Tm.dsubst, Tm.dsubst_congr h (e := b) hd]
+  | .let_ e b, _, hd => by
+    simp [Tm.dsubst, Tm.dsubst_congr h (e := e) hd.1, Tm.dsubst_congr h (e := b) hd.2]
+  | .lamD l b, L, hd => by
+    simp only [Tm.dsubst]
+    rw [Tm.dsubst_congr h (e := b) (L := l + L) (by rwa [Nat.add_assoc])]
+  | .ite c a b, _, hd => by
+    simp [Tm.dsubst, Tm.dsubst_congr h (e := c) hd.1, Tm.dsubst_congr h (e := a) hd.2.1,
+      Tm.dsubst_congr h (e := b) hd.2.2]
+  | .caseOpt e n s, _, hd => by
+    simp [Tm.dsubst, Tm.dsubst_congr h (e := e) hd.1, Tm.dsubst_congr h (e := n) hd.2.1,
+      Tm.dsubst_congr h (e := s) hd.2.2]
+  | .caseK e _ _ m b r, L, hd => by
+    simp only [Tm.dsubst]
+    rw [Tm.dsubst_congr h (e := e) hd.1, Tm.dsubst_congr h (e := r) hd.2.2,
+      Tm.dsubst_congr h (e := b) (L := m + L) (by rw [Nat.add_assoc]; exact hd.2.1)]
+
+/-- `K : ∀ᾱ. Q̄ ⇒ τ̄ → T ρ̄` as a type: `τ₁ →P^∅ … →P^∅ T ρ̄`. -/
+def Ctor.ty (c : Ctor) : Ty := c.fields.foldr (fun a r => .arr .P a r .cnil) (Ty.tcon c.T c.res)
+
+/-- The equations of an arm on `c` at `T us`: what `c` builds against `us`, both past the
+variables of `c`. -/
+def Ctor.eqs (c : Ctor) (us : List Ty) : Eqs := c.res.zip (us.map (·.subst (up c.k)))
+
+/-- The context of an arm on `c` under `θ`: its fields, then `Γ` past the variables of `c`. -/
+def armS (c : Ctor) (θ : Nat → Ty) (Γ : List Scheme) : List Scheme :=
+  c.fields.map (fun t => (⟨0, [], t.subst θ, .cnil⟩ : Scheme)) ++ (Γ.map (·.subst (up c.k))).map (·.subst θ)
+
+/-- The premises of an arm on `c` under `θ`: the dictionaries of the value, then `Δ`. -/
+def armΔ (c : Ctor) (θ : Nat → Ty) (Δ : List Cn) : List Cn :=
+  c.ctx.map (·.subst θ) ++ (Δ.map (·.subst (up c.k))).map (·.subst θ)
+
+/-- The body of an arm that no value reaches. -/
+def Tm.dead : Tm := .lam (.var 0)
 
 variable (P : Prog)
 
@@ -139,5 +288,22 @@ inductive Elab : List Scheme → List Cn → Exp → Ty → Stage → Tm → Pro
       Elab Γ Δ b t φ b' → Elab Γ Δ (.ite c a b) t φ (.ite c' a' b')
   | caseOpt {Γ Δ e n s a t φ e' n' s'} : Elab Γ Δ e (optTy a) φ e' → Elab Γ Δ n t φ n' →
       Elab (⟨0, [], a, .cnil⟩ :: Γ) Δ s t φ s' → Elab Γ Δ (.caseOpt e n s) t φ (.caseOpt e' n' s')
+  /-- (Con): a constructor with the dictionaries of its constraints, as (Const) -/
+  | con {Γ Δ K c ts ds φ} : P.ctors K = some c → ts.length = c.k →
+      Ent P Δ (c.ctx.map (·.subst (inst ts))) ds →
+      Elab Γ Δ (.con K) (c.ty.subst (inst ts)) φ ((Tm.con K).dapps ds)
+  /-- (Case): the arm on `K` under the most general unifier `θ` of what `K` builds with the
+  matched type `T us`; the fields of the value are its variables, its dictionaries its
+  premises -/
+  | caseK {Γ Δ e K n b r T us t φ c θ e' b' r'} : Elab Γ Δ e (Ty.tcon T us) φ e' →
+      P.ctors K = some c → c.T = T → us.length = c.res.length → n = c.fields.length →
+      Unify (c.eqs us) θ →
+      Elab (armS c θ Γ) (armΔ c θ Δ) b ((t.subst (up c.k)).subst θ) ((φ.subst (up c.k)).subst θ) b' →
+      Elab Γ Δ r t φ r' → Elab Γ Δ (.caseK e K n b r) t φ (.caseK e' K n c.ctx.length b' r')
+  /-- (Case-Dead): `K` builds no value of the matched type; the arm is not elaborated -/
+  | caseKDead {Γ Δ e K n b r T us t φ c e' r'} : Elab Γ Δ e (Ty.tcon T us) φ e' →
+      P.ctors K = some c → c.T = T → us.length = c.res.length → n = c.fields.length →
+      Clash (c.eqs us) → Elab Γ Δ r t φ r' →
+      Elab Γ Δ (.caseK e K n b r) t φ (.caseK e' K n c.ctx.length .dead r')
 
 end Flick.Elab

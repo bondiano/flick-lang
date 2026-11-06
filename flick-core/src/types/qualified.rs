@@ -2,6 +2,7 @@
 //! operation of a service, a companion of a type.
 
 use super::Checker;
+use super::gadt::scheme::dicts;
 use super::ty::Type;
 use super::typing::{Constructor, Ref, range};
 use crate::diagnostics::codes;
@@ -18,12 +19,14 @@ impl Checker<'_> {
             (Namespace::Constructor, Some((module, ty_name))) => {
                 let arity = self.arrow_stages(ty).len();
                 let rep = self.env.constructor_rep(&module, &ty_name, &entity.name);
+                let dicts = self.env.value(entity).map_or(0, dicts);
                 Ref::Constructor(Constructor {
                     module,
                     ty: ty_name,
                     name: entity.name.clone(),
                     arity,
                     rep,
+                    dicts,
                 })
             }
             (Namespace::Value, Some(_)) => Ref::Method {

@@ -429,8 +429,12 @@ impl Lower<'_> {
     }
 
     fn arms(&mut self, node: &Node) -> Vec<Arm> {
-        node.nodes()
-            .filter(|n| n.kind == K::MatchArm)
+        // an arm the type of the matched value rules out was not checked
+        let live: Vec<&Node> = node
+            .nodes()
+            .filter(|n| n.kind == K::MatchArm && !self.typing.dead_arms.contains(&n.range()))
+            .collect();
+        live.into_iter()
             .map(|arm| {
                 let mark = self.scope.len();
                 let mut pat = Pat::Wild;

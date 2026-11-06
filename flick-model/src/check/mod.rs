@@ -106,6 +106,12 @@ pub struct Checker<'d> {
     config: bool,
     /// Obligations and `scope`s of `docs/formal/regions.md` §2.
     regions: regions::Regions,
+    /// What the rigid variables equal in the arms of GADT matches being
+    /// checked, innermost last: the substitution θ the arm is typed under.
+    equalities: Vec<(Name, Solved)>,
+    /// Whether `≡` may equate a rigid variable: the result of a constructor
+    /// of a GADT against the type of the matched value.
+    refining: bool,
 }
 
 impl<'d> Checker<'d> {
@@ -123,6 +129,8 @@ impl<'d> Checker<'d> {
             store: Vec::new(),
             config: false,
             regions: regions::Regions::default(),
+            equalities: Vec::new(),
+            refining: false,
         }
     }
 

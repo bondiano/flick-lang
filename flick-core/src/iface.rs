@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{EnumLit, Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 5;
+pub const IFACE_VERSION: u32 = 6;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -182,6 +182,10 @@ pub struct ConstructorAbi {
     pub tag: Option<String>,
     /// Fields `_0` … `_{arity - 1}`.
     pub arity: usize,
+    /// The dictionaries a value of a GADT holds after its fields: `$0` … in
+    /// JS, the fields after the others in Go.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub dicts: usize,
     /// The literal its value is, for a constructor of an enum.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub literal: Option<EnumLit>,
@@ -297,6 +301,12 @@ pub fn read(bytes: &[u8], module: &str) -> Result<Interface, String> {
         ));
     }
     Ok(file.interface)
+}
+
+/// Whether a count is left out of the interface file.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero(n: &usize) -> bool {
+    *n == 0
 }
 
 #[cfg(test)]

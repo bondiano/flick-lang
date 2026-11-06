@@ -59,7 +59,10 @@ pub struct Con {
     /// The type it builds.
     pub ty: Path,
     pub name: Name,
+    /// Its arguments: the dictionaries a value of a GADT holds, then its fields.
     pub arity: usize,
+    /// How many of the arguments are dictionaries, which `==` leaves out.
+    pub dicts: usize,
 }
 
 /// The operators the surface writes infix, and helpers the translation

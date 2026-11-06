@@ -125,7 +125,8 @@ theorem witness_T6b_open {e : Exp} {τ : Ty} {φ : Stage} (s : Tm) {Δ : List Cn
           (ds₂.map (·.subst ρ)) := by
   have o : ∀ {ds : List Dict}, Ent P Δ qs ds → Elab P [] Δ e τ φ (s.fill ds) →
       RHas P Sg N [] [] (s.fill (ds.map (·.subst ρ))) (.mono (τ.subst θ)) (φ.subst θ) := fun hE he => by
-    have := T6a_close (runTarget real realRun rootTy) consts_closed he (Δl := []) rfl hρ hg
+    have := T6a_close (runTarget real realRun rootTy) consts_closed (fun _ _ h => by cases h) he
+      (Δl := []) rfl hρ hg
     rwa [fill_dsubst (by rw [hE.get.1]; exact hs)] at this
   exact witness_T6b s hρ h₁ h₂ (o h₁ he₁) (o h₂ he₂)
 

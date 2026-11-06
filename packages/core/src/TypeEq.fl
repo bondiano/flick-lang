@@ -1,0 +1,15 @@
+/// Evidence that two types are one type. A function that finds out at run
+/// time that its `a` is a `b` returns `Some Refl`; a `match` on `Refl` then
+/// uses a value of `a` where a `b` is wanted.
+module TypeEq exposing (TypeEq(..), cast)
+
+@lang type_eq
+/// `a` and `b` are the same type.
+type TypeEq a b =
+  | Refl : TypeEq a a
+
+/// `x` at the type that its type equals.
+cast : forall a b. TypeEq a b -> a -> b
+let cast eq x =
+  match eq with
+  | Refl -> x

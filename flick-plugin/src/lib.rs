@@ -19,6 +19,7 @@ mod literal;
 mod reach;
 mod splice;
 mod wit;
+mod wit_arena;
 
 use serde::{Deserialize, Serialize};
 
@@ -33,7 +34,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.13.0";
+pub const VERSION: &str = "0.14.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -336,12 +337,19 @@ pub struct DeriveTarget {
 }
 
 /// A constructor of a derive's target, the types of its fields and the
-/// literal of an enum's constructor: `"GET"` of `Get = "GET"`.
+/// literal of an enum's constructor: `"GET"` of `Get = "GET"`. A
+/// constructor of a GADT names the type it builds (`refined`, as
+/// `| IntLit Int : Expr Int`) or holds dictionaries (`constrained`, as
+/// `| Show b => Showable b : Showable`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaseTarget {
     pub name: String,
     pub fields: Vec<Span>,
     pub literal: Option<Span>,
+    #[serde(default)]
+    pub refined: bool,
+    #[serde(default)]
+    pub constrained: bool,
 }
 
 /// A piece of the layout a plugin gives a block, from its first argument

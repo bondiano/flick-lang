@@ -146,6 +146,7 @@ fn a() -> Rc<Con> {
         ty: Path::new("T", "A"),
         name: "A".into(),
         arity: 1,
+        dicts: 0,
     })
 }
 

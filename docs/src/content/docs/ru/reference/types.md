@@ -1,6 +1,6 @@
 ---
 title: "Кинды и типы"
-source_hash: cf20552f9ebc16e9
+source_hash: 142bacbc9ba97a79
 ---
 
 После разрешения имён компилятор проверяет типы в каждом модуле без
@@ -168,6 +168,93 @@ let name value = value.name
 уровне модуля (`FLICK-T026`); с образцом, подходящим всем значениям, это
 предупреждение `FLICK-T025`. `[lint] no-let-assert` в `flick.toml` делает
 каждый `let assert` ошибкой (`FLICK-T027`).
+
+## GADT
+
+Конструктор может назвать после `:` тип, который он строит. Его переменные
+типов — собственные, а те переменные полей, которых нет в результате,
+экзистенциальные: значение скрывает их типы. Конструктор без `: R` строит
+`T a…`, как обычно, и в одном типе можно смешивать оба вида.
+
+```flick
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+  | Add (Expr Int) (Expr Int) : Expr Int
+  | If (Expr Bool) (Expr a) (Expr a) : Expr a
+  | Apply (Expr (b -> a)) (Expr b) : Expr a
+  | Lit a
+
+eval : forall a. Expr a -> a
+let rec eval e =
+  match e with
+  | IntLit n -> n
+  | BoolLit b -> b
+  | Add x y -> eval x + eval y
+  | If c t f -> if eval c then eval t else eval f
+  | Apply f x -> (eval f) (eval x)
+  | Lit x -> x
+```
+
+Ветвь узнаёт, какого типа сопоставляемое значение: в ветви `IntLit` `a` — это
+`Int`, поэтому `n` годится как результат типа `a`, а редактор показывает там
+значение типа `a` как `Int (= a)`. Результат конструктора — его собственный
+тип, применённый ко всем параметрам типа (`FLICK-T056`). Аргумент — тип, член
+`kind` или `Symbol`; параметр-регион, ряд или захваты передаётся дальше
+переменной.
+
+`match` не требует ветви для конструктора, который не строит значений
+сопоставляемого типа, а ветвь для него — предупреждение `FLICK-T010`:
+
+```flick
+# type Expr a =
+#   | IntLit Int : Expr Int
+#   | BoolLit Bool : Expr Bool
+#   | Add (Expr Int) (Expr Int) : Expr Int
+size : Expr Int -> Int
+let rec size e =
+  match e with
+  | IntLit _ -> 1
+  | Add x y -> size x + size y
+```
+
+Проверка учитывает то, что узнала ветвь, только там, где типы известны
+(`FLICK-T057`): у функции полная сигнатура, тип сопоставляемого значения
+известен в месте сопоставления, и ничто снаружи ветви не получает свой тип из
+того, что она узнала; такому типу нужна аннотация. `let` внутри ветви не
+обобщается. Экзистенциальный тип не может покинуть свою ветвь (`FLICK-T007`).
+То, что держит поле, держит и значение, поэтому ресурс области, спрятанный в
+значении, тоже не выйдет из неё. Уточняет и скрывает типы только ветвь
+`match`: образец `let`, параметра или альтернатива or-образца этого не
+делают, и ни одна ветвь не узнаёт, что два региона или два ряда совпадают
+(`FLICK-T058`).
+
+`TypeEq a b` из core-модуля `TypeEq` — свидетельство того, что два типа
+совпадают: `Refl : TypeEq a a` и `TypeEq.cast : TypeEq a b -> a -> b`.
+
+```flick
+import TypeEq exposing (TypeEq(..))
+
+type Ty a =
+  | TInt : Ty Int
+  | TStr : Ty String
+
+equal_types : forall a b. Ty a -> Ty b -> Option (TypeEq a b)
+let equal_types a b =
+  match (a, b) with
+  | (TInt, TInt) -> Some Refl
+  | (TStr, TStr) -> Some Refl
+  | _ -> None
+
+coerce : forall a b. Ty a -> Ty b -> a -> Option b
+let coerce a b x =
+  match equal_types a b with
+  | Some eq -> Some (TypeEq.cast eq x)
+  | None -> None
+```
+
+В TypeScript уточнения нет: в `.d.ts` каждый конструктор GADT — вариант любого
+экземпляра своего типа, а скрытый им тип — `unknown`.
 
 ## Числа и операторы
 

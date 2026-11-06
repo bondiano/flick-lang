@@ -113,6 +113,8 @@ pub fn target(
                 name: named(con),
                 fields,
                 literal: v.nodes().find(|n| n.kind == K::LitPat).map(span),
+                refined: v.nodes().any(|n| n.kind == K::VariantResult),
+                constrained: v.nodes().any(|n| n.kind == K::Context),
             })
         })
         .collect();

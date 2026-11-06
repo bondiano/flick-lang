@@ -1,0 +1,31 @@
+// A constructor that hides the type of its field still holds what the
+// field holds: a scoped file hidden in it cannot leave its scope.
+module App.GadtHidden exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type Hidden =
+  | Hide b : Hidden
+
+type error OpenError = OpenError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+
+hidden : Path ->{FileSystem; OpenError} Unit
+let hidden path =
+  let h =
+    scope {
+      Hide (FileSystem.open_scoped path)
+//~ FLICK-G002 @21:7-21:41 region `s` ends with its `scope`
+    }
+  ignore h
+
+inside : Path ->{FileSystem; OpenError} Unit
+let inside path =
+  scope {
+    let h = Hide (FileSystem.open_scoped path)
+    ignore h
+  }

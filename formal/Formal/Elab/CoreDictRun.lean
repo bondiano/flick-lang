@@ -20,19 +20,7 @@ namespace Flick.Elab
 
 variable (N : Names)
 
-/-- The translation of a dictionary. -/
-def trDt (δ : Nat → Nat) : Dict → Flick.Tm
-  | .var k => .var (δ k)
-  | .slot d i => .proj (trDt δ d) (N.slot i)
-  | .inst I => .glob (N.inst I)
-  | .strct C τ => .glob (N.strct C τ)
-  | .prim p q => .glob (N.prim p q)
-  | .ap d e => .app (trDt δ d) (trDt δ e)
-
 variable {N}
-
-theorem TrD.eq {δ : Nat → Nat} {d : Dict} {d' : Flick.Tm} (h : TrD N δ d d') : d' = trDt N δ d := by
-  induction h <;> simp_all [trDt]
 
 theorem trDt_apps (δ : Nat → Nat) (f : Dict) (ds : List Dict) :
     trDt N δ (apps f ds) = appsC (trDt N δ f) (ds.map (trDt N δ)) := by
@@ -40,15 +28,6 @@ theorem trDt_apps (δ : Nat → Nat) (f : Dict) (ds : List Dict) :
   | nil => rfl
   | cons d ds ih => exact ih (.ap f d)
 
-/-- Substitution in a translated dictionary. -/
-theorem trDt_subst {δ δ' : Nat → Nat} {σ : Nat → Flick.Tm} {ρ : Nat → Dict}
-    (h : ∀ k, σ (δ k) = trDt N δ' (ρ k)) (s : Dict) :
-    (trDt N δ s).subst σ = trDt N δ' (s.subst ρ) := by
-  induction s with
-  | var k => exact h k
-  | slot d i ih => simp only [trDt, Flick.Tm.subst, Dict.subst, ih]
-  | ap d e ihd ihe => simp only [trDt, Flick.Tm.subst, Dict.subst, ihd, ihe]
-  | _ => rfl
 
 variable {root : Roots}
 

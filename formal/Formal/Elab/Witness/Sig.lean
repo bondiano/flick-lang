@@ -35,6 +35,7 @@ def N : Names where
   strct _ _ := 2
   prim _ _ := 3
   some := "Some"
+  ctor _ := "Ctor"
 
 def listT (t : Flick.Ty) : Flick.Ty := .tapp (.adt "List") t
 
@@ -234,15 +235,38 @@ theorem glob_closed : ∀ g s, globF g = some s → s.Closed s.k := by
           Flick.Ty.reach, Flick.Stage.substT]
       · cases h
 
+/-- The witness's constructors are ordinary: each builds `T α₀ … αₖ₋₁`. -/
+def resF (K : Flick.Name) : List Flick.Ty :=
+  match ctorF K with
+  | some (k, _, _) => idTs k
+  | none => []
+
+theorem resF_closed : ∀ K k ts T σ, ctorF K = some (k, ts, T) →
+    (∀ i, i < k → σ (.v i) = .tvar i) → (resF K).map (Flick.Ty.substT σ) = resF K := by
+  intro K k ts T σ h hσ
+  simp only [resF, h, idTs, List.map_map]
+  apply List.map_congr_left
+  intro i hi
+  simp only [Function.comp, Flick.Ty.substT]
+  exact hσ i (List.mem_range.mp hi)
+
 def Sg : Sig where
   ctor := ctorF
   impl _ := .rnil
   ctor_closed := ctorF_closed
   ctor_reach := ctorF_reach
+  res := resF
+  res_closed := resF_closed
   impl_closed _ _ := rfl
   dict c := some (c / 8, dfields (c % 8) (c / 8))
   glob := globF
   dict_closed := dict_closed
   glob_closed := glob_closed
+
+/-- Every constructor of the witness is an ordinary one. -/
+theorem sg_plain {K k ts T} (h : Sg.ctor K = some (k, ts, T)) : Sg.res K = idTs k := by
+  change ctorF K = _ at h
+  change resF K = _
+  simp [resF, h]
 
 end Flick.Elab.Witness

@@ -213,6 +213,8 @@ fn docs_examples_parse() {
 fn docs_examples_check() {
     let mut pages = Vec::new();
     md_files(&root().join("docs/src/content/docs"), &mut pages);
+    // an example's README whose blocks stand on their own
+    pages.push(root().join("examples/typed-interpreter/README.md"));
     pages.sort();
     let mut failures = Vec::new();
     let mut checked = 0;

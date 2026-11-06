@@ -5,6 +5,8 @@ use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::types::Checker;
 use crate::types::env::Form;
+use crate::types::gadt::refine::Refined;
+use crate::types::gadt::scheme::{built, is_hidden_captures, is_indexed};
 use crate::types::kinds::Kind;
 use crate::types::lang::Lang;
 use crate::types::ty::{Norm, Type};
@@ -112,6 +114,7 @@ impl Checker<'_> {
                     return false;
                 }
                 seen.push((module.clone(), name.clone()));
+                let ty_name = name;
                 constructors.iter().any(|name| {
                     let entity = Entity {
                         module: module.clone(),
@@ -123,6 +126,22 @@ impl Checker<'_> {
                     };
                     let instantiated;
                     let mut current = match scheme {
+                        // a GADT constructor over its own variables, as `t` instantiates them
+                        Type::Forall { vars, body, .. } if is_indexed(scheme, module, ty_name) => {
+                            let locals: Vec<String> = vars
+                                .iter()
+                                .filter(|v| !is_hidden_captures(v))
+                                .map(|v| v.name.clone())
+                                .collect();
+                            match self.refine(&locals, built(body), &t) {
+                                Refined::Impossible => return false,
+                                Refined::Unifier { bound, .. } => {
+                                    instantiated = body.substitute(&bound);
+                                    &instantiated
+                                }
+                                _ => body,
+                            }
+                        }
                         Type::Forall { vars, body, .. } if !args.is_empty() => {
                             let subst: Vec<_> = vars
                                 .iter()

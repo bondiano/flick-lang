@@ -40,6 +40,29 @@ pub fn derive(
     let refuse = |code: &str, (path, why): Fail| {
         vec![Diagnostic::error(format!("`{path}`: {why}"), whole).with_code(code)]
     };
+    // what a value of a GADT is depends on its type, which no derive here reads
+    if let Some(case) = target.cases.iter().find(|c| c.refined || c.constrained) {
+        let code = match class {
+            "Prelude.Url" => "D009",
+            "Prelude.Form" => "D010",
+            "HttpApi.Derive.HttpApi" => "D011",
+            _ => "D001",
+        };
+        let why = if case.constrained {
+            "holds dictionaries"
+        } else {
+            "names the type it builds"
+        };
+        let derive = class.rsplit('.').next().unwrap_or(class);
+        let fail = (
+            target.name.clone(),
+            format!(
+                "`deriving {derive}` describes ordinary constructors, and `{}` {why}, as a constructor of a GADT",
+                case.name
+            ),
+        );
+        return Err(refuse(code, fail));
+    }
     let mut b = Builder::new(whole);
     if class == "HttpApi.Derive.HttpApi" {
         let made = http_api::declarations(&mut b, target)

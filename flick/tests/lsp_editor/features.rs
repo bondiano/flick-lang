@@ -61,6 +61,44 @@ let example = Block (Statements [Neg (Num 1)])
     lsp.close();
 }
 
+#[test]
+fn a_gadt_branch_hover_shows_the_refined_type() {
+    let source = "module App.Main exposing (Ty(..), describe)
+
+type Ty a =
+  | TInt : Ty Int
+  | TStr : Ty String
+
+describe : forall a. Ty a -> a -> String
+let describe t x =
+  match t with
+  | TInt -> show (x + 1)
+  | TStr -> x ++ \"!\"
+";
+    let dir = project(
+        "lsp_gadt_hover",
+        &[("flick.toml", LIB), ("src/App/Main.fl", source)],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": source } }));
+    assert!(lsp.diagnostics(&uri(&file)).is_empty());
+    for (needle, expected) in [("x + 1", "x : Int (= a)"), ("x ++", "x : String (= a)")] {
+        let start = source.find(needle).expect("hover target");
+        let hover = lsp.request(
+            "textDocument/hover",
+            &json!({ "textDocument": { "uri": uri(&file) }, "position": position(source, start) }),
+        );
+        assert!(
+            hover["result"]["contents"]["value"]
+                .as_str()
+                .is_some_and(|s| s.contains(expected)),
+            "{needle}: {hover}"
+        );
+    }
+    lsp.close();
+}
+
 const SOURCE: &str = "module App.Geo exposing (Shape(..), area, scaled)
 
 type Shape = Circle Float | Square Float

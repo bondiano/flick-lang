@@ -53,6 +53,9 @@ export const GT = /*#__PURE__*/ ordering("GT");
 
 const isObject = (a: unknown): a is Readonly<Record<string, unknown>> => typeof a === "object" && a !== null;
 
+/** A key `$0`, `$1` …: a dictionary a value of a GADT holds, which `==` and `hash` leave out. */
+const held = (k: string): boolean => k.charCodeAt(0) === 36;
+
 /** `==`: structural equality with SameValueZero on numbers. */
 export const equals = (a: unknown, b: unknown): boolean => {
   // oxlint-disable-next-line no-self-compare -- SameValueZero: NaN equals NaN
@@ -64,7 +67,9 @@ export const equals = (a: unknown, b: unknown): boolean => {
   // shortcut: plain objects and arrays only; a Map, Set or Date compares by identity until Flick has one without Effect
   if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false;
   const keys = Object.keys(a);
-  return keys.length === Object.keys(b).length && keys.every((k) => Object.hasOwn(b, k) && equals(a[k], b[k]));
+  return (
+    keys.length === Object.keys(b).length && keys.every((k) => held(k) || (Object.hasOwn(b, k) && equals(a[k], b[k])))
+  );
 };
 
 const rank = (n: number): number => (Number.isNaN(n) ? 1 : 0);
@@ -94,7 +99,7 @@ export const hash = (a: unknown): number => {
   if (Array.isArray(a)) return listHash(hash, a);
   return Object.keys(a)
     .toSorted()
-    .reduce((h, k) => combine(combine(h, hashString(k)), hash(a[k])), 13);
+    .reduce((h, k) => (held(k) ? h : combine(combine(h, hashString(k)), hash(a[k]))), 13);
 };
 
 const tagOf = (a: object): string | undefined => {

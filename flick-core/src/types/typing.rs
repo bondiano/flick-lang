@@ -12,6 +12,7 @@ use std::sync::Arc;
 use super::Checker;
 use super::classes::Dict;
 use super::env::{Abi, Rep};
+use super::gadt::branch::as_field_given;
 #[cfg(feature = "ide")]
 use super::sql::dialect::Dialect;
 pub use super::sql_plan::{SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue};
@@ -69,6 +70,9 @@ pub struct Typing {
     pub generic_ordered: HashSet<Range>,
     /// `++` on lists rather than strings.
     pub list_concat: HashSet<Range>,
+    /// `match` arms whose pattern matches no value of its type: a GADT
+    /// constructor the type of the matched value rules out.
+    pub dead_arms: HashSet<Range>,
     /// `==` and `!=` that JS `===` decides: on the values themselves, or on
     /// their tags when every constructor of the type has no fields.
     pub identity_eq: HashMap<Range, Identity>,
@@ -125,6 +129,12 @@ pub struct Typing {
     pub fields: HashMap<Range, Type>,
     #[cfg(feature = "ide")]
     pub(crate) pending_fields: Vec<(Range, Type)>,
+    #[cfg(feature = "ide")]
+    /// What the type at a range is without the equalities of the GADT
+    /// branch it is in, where they change it: hover shows `Int (= a)`.
+    pub refined: HashMap<Range, Type>,
+    #[cfg(feature = "ide")]
+    pub(crate) pending_refined: Vec<(Range, Type)>,
     /// `sql table` declarations.
     pub sql_tables: Vec<SqlTable>,
     #[cfg(feature = "ide")]
@@ -180,6 +190,15 @@ pub struct Constructor {
     pub arity: usize,
     /// How its values are represented in JS.
     pub rep: Rep,
+    /// The dictionaries its values hold after the fields: one per class
+    /// constraint of a constructor of a GADT.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub dicts: usize,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero(n: &usize) -> bool {
+    *n == 0
 }
 
 /// What `===` compares for an `==` (see [`Typing::identity_eq`]).
@@ -319,10 +338,14 @@ pub fn default_method(class: &str, method: &str) -> String {
     format!("$default_{class}_{method}")
 }
 
-/// Constraints that are solved by the region checker and pass no dictionary.
+/// Constraints that are solved by the region checker, and the equalities a
+/// GADT branch assumes, pass no dictionary.
 pub fn passes_dictionary(constraint: &Type) -> bool {
     let class = |item| super::classes::args_of(constraint, item).is_some();
-    !class(Lang::Outlives) && !class(Lang::Provided)
+    !class(Lang::Outlives)
+        && !class(Lang::Provided)
+        && !class(Lang::TypeEq)
+        && as_field_given(constraint).is_none()
 }
 
 impl Checker<'_> {
@@ -346,6 +369,9 @@ impl Checker<'_> {
     /// Records the type of a name or binder at `span`, settled once the
     /// module is solved.
     pub fn note_type(&mut self, span: Span, ty: &Type) {
+        if !self.store.equalities.is_empty() {
+            return self.note_refined(range(span), ty, ty);
+        }
         self.typing.pending_types.push((range(span), ty.clone()));
     }
 
@@ -422,6 +448,10 @@ impl Checker<'_> {
             for (at, ty) in mem::take(&mut typing.pending_fields) {
                 let ty = self.named_skolems(&self.zonk(&ty));
                 typing.fields.insert(at, ty);
+            }
+            for (at, ty) in mem::take(&mut typing.pending_refined) {
+                let ty = self.named_skolems(&self.zonk(&ty));
+                typing.refined.insert(at, ty);
             }
         }
         #[cfg(not(feature = "ide"))]

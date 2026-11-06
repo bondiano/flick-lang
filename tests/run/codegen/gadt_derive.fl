@@ -1,0 +1,23 @@
+// Derived `Eq` and `Show` of GADTs whose constructors hide no type: each
+// field at the type its constructor builds.
+module App.Main exposing (main)
+
+type Ty a =
+  | TInt : Ty Int
+  | TStr : Ty String
+  deriving Eq, Show
+
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+  | If (Expr Bool) (Expr a) (Expr a) : Expr a
+  | Lit a
+  deriving Eq, Show
+
+main : Unit ->{} Unit
+let main () =
+  let e = If (BoolLit true) (IntLit 1) (Lit 2)
+  Platform.stdout_line (show TInt ++ " " ++ show TStr)
+  Platform.stdout_line (show e)
+  Platform.stdout_line
+    (show (e == If (BoolLit true) (IntLit 1) (Lit 2)) ++ " " ++ show (e == IntLit 1))

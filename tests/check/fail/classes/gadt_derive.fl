@@ -1,0 +1,42 @@
+// What a derived instance of a GADT cannot cover: a constructor that hides
+// a type or holds a dictionary, a field the constructor's own variable
+// types, and every derive that describes ordinary constructors.
+module App.GadtDerive exposing (..)
+
+import Generic exposing (Generic)
+
+type Hidden =
+  | Hide b : Hidden
+  deriving Eq, Show
+//~ FLICK-C013 @10:3-10:20 cannot derive instances of `Hidden`: its constructor `Hide` hides
+
+type Held =
+  | Show b => Held b : Held
+  deriving Eq
+//~ FLICK-C013 @15:3-15:14 cannot derive instances of `Held`: its constructor `Held` holds
+
+type Pairs a =
+  | Pairs (Pairs b) (Pairs c) : Pairs (b, c)
+  | One Int : Pairs Int
+  deriving Show
+//~ FLICK-C013 @21:3-21:16 cannot derive `Show (Pairs a)`: a field of type
+
+type Tag a =
+  | TInt : Tag Int
+  deriving Generic
+//~ FLICK-C013 @26:3-26:19 `Generic` represents a type as a sum of products,
+
+type Wire a =
+  | WInt Int : Wire Int
+  deriving Schema
+//~ std/D001 @31:12-31:18 `Wire`: `deriving Schema` describes ordinary constructors, and `WInt` names
+
+type Route a =
+  | Home : Route Int
+  deriving Url
+//~ std/D009 @36:12-36:15 `Route`: `deriving Url` describes ordinary constructors, and `Home` names
+
+type Fields a =
+  | Field Int : Fields Int
+  deriving Form
+//~ std/D010 @41:12-41:16 `Fields`: `deriving Form` describes ordinary constructors, and `Field` names

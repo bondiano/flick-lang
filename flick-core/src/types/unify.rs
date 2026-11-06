@@ -44,6 +44,19 @@ pub struct Store {
     /// Those of literals with a fraction, which an integer type cannot bind.
     fractional: HashSet<u32>,
     pub level: u32,
+    /// What rigid variables equal in the branches of GADT matches being
+    /// checked, innermost last.
+    pub equalities: Vec<Equality>,
+}
+
+/// A rigid variable that a matched constructor made equal to `ty`.
+#[derive(Debug, Clone)]
+pub struct Equality {
+    pub skolem: u32,
+    pub ty: Type,
+    /// The level of the branch that learned it; `None` while a deferred
+    /// constraint is solved under the assumptions it was made with.
+    pub level: Option<u32>,
 }
 
 /// Why two types do not unify, about the innermost conflicting part.
@@ -63,6 +76,9 @@ pub enum Mismatch {
     Escape(u32),
     /// A type variable cannot stand for a polymorphic type (instantiation is predicative).
     Polymorphic(Type),
+    /// A variable from outside a branch that learned an equality would get
+    /// its type from that equality.
+    Untouchable(Type),
 }
 
 pub type Unified = Result<(), Mismatch>;
@@ -211,15 +227,39 @@ impl Store {
 
     /// [`Store::resolve`] without the copy.
     pub fn head<'a>(&'a self, mut t: &'a Type) -> &'a Type {
-        while let Type::Meta(m) = t {
-            // a variable this store never made (a stored type shown by
-            // `show_type` with an empty store) is open
-            match self.metas.get(*m as usize) {
-                Some(MetaState::Bound(next)) => t = next,
-                Some(MetaState::Open { .. }) | None => break,
+        loop {
+            match t {
+                // a variable this store never made (a stored type shown by
+                // `show_type` with an empty store) is open
+                Type::Meta(m) => match self.metas.get(*m as usize) {
+                    Some(MetaState::Bound(next)) => t = next,
+                    Some(MetaState::Open { .. }) | None => return t,
+                },
+                Type::Skolem(s) => match self.equal(*s) {
+                    Some(next) => t = next,
+                    None => return t,
+                },
+                _ => return t,
             }
         }
-        t
+    }
+
+    /// What the rigid variable `s` equals in the branch being checked.
+    pub fn equal(&self, s: u32) -> Option<&Type> {
+        self.equalities
+            .iter()
+            .rev()
+            .find(|e| e.skolem == s)
+            .map(|e| &e.ty)
+    }
+
+    /// Whether binding the variable `m` would take a branch's equality
+    /// outside it: `m` is older than a branch that learned one.
+    fn untouchable(&self, m: u32) -> bool {
+        let level = self.meta_level(m).unwrap_or(u32::MAX);
+        self.equalities
+            .iter()
+            .any(|e| e.level.is_some_and(|l| l > level))
     }
 
     /// `t` with every bound variable replaced by its solution.
@@ -229,9 +269,11 @@ impl Store {
                 MetaState::Bound(next) => self.zonk(next),
                 MetaState::Open { .. } => t.clone(),
             },
-            Type::Con { .. } | Type::Var(_) | Type::Symbol(_) | Type::Skolem(_) | Type::Error => {
-                t.clone()
-            }
+            Type::Skolem(s) => match self.equal(*s) {
+                Some(next) => self.zonk(next),
+                None => t.clone(),
+            },
+            Type::Con { .. } | Type::Var(_) | Type::Symbol(_) | Type::Error => t.clone(),
             Type::Union(a, b) => self
                 .normalize(&Type::Union(Box::new(self.zonk(a)), Box::new(self.zonk(b))))
                 .into_type(),
@@ -698,6 +740,9 @@ impl Checker<'_> {
         }
         if self.store.is_numeric(m) && !self.store.numeric_fits(m, &t) {
             return Err(Mismatch::Types(Type::Meta(m), t));
+        }
+        if self.store.untouchable(m) {
+            return Err(Mismatch::Untouchable(t));
         }
         let level = self.store.meta_level(m).expect("an open variable");
         self.store.adjust(&t, level).map_err(Mismatch::Escape)?;

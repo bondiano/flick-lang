@@ -1,4 +1,5 @@
 import Formal.Elab.CoreLoad
+import Formal.Elab.Close
 
 /-!
 # λFlick⁺ as a `Target` with the run of the core
@@ -6,10 +7,10 @@ import Formal.Elab.CoreLoad
 `runTarget` is the core with its run: states are configurations, `load e` puts the translation
 `trE` of `e` (the function `Tr` is) in the main thread, a step is a `CStep`, the result is the
 literal of the main thread, and `Rel = CfgR (DP Sg root)`. Its `Has` is the typing of the core,
-`Has`, with the typing `DTyp` of the dictionaries of the term by the laws (`RHas`): `load_rel`
-needs the closed dictionaries typed in the empty context, and the core's typing of the whole
-term does not show them. The slots of the instances name only their premises (`slots_below`):
-their bodies are closed (`RootTy`).
+`Has`, with the typing `DTyp` of a dictionary by the laws (`RHas`): `load_rel` needs the
+dictionaries in the holes of a skeleton typed in the empty context, and the core's typing of the
+whole term does not show them; the rest of two fillings is the same (`fill_cg`). The slots of
+the instances name only their premises (`slots_below`): their bodies are closed (`RootTy`).
 
 `T6b_core` is T6(b) for the core with its run, without the hypothesis `Sim`.
 -/
@@ -35,52 +36,51 @@ def trE : (Nat → Nat) → (Nat → Nat) → Tm → Flick.Tm
   | γ, δ, .caseOpt e n s =>
     .match_ (trE γ δ e) (.acons (.app (.ctor N.some) .var) (trE (ext γ) (fun k => δ k + 1) s)
       (.acons .wild (trE γ δ n) .anil))
+  | _, _, .con K => .ctor (N.ctor K)
+  | γ, δ, .caseK e K n m b r =>
+    .match_ (trE γ δ e) (.acons (Pat.spine (N.ctor K) (List.replicate (m + n) .var))
+      (trE (aγ m n γ) (aδ m n δ) b) (.acons .wild (trE γ δ r) .anil))
 
 theorem Tr.eq {γ δ : Nat → Nat} {e : Tm} {e' : Flick.Tm} (h : Tr N γ δ e e') : e' = trE N γ δ e := by
   induction h with
   | dict hd => exact hd.eq
   | _ => simp_all [trE]
 
-variable (P) in
-/-- Every dictionary of the term is typed in some context of premises. -/
-def DOk : Tm → Prop
-  | .dict d => ∃ Δ T, DTyp P Δ d T
-  | .meth e _ => DOk e
-  | .app f a => DOk f ∧ DOk a
-  | .lam b => DOk b
-  | .let_ e b => DOk e ∧ DOk b
-  | .lamD _ b => DOk b
-  | .ite c a b => DOk c ∧ DOk a ∧ DOk b
-  | .caseOpt e n s => DOk e ∧ DOk n ∧ DOk s
-  | _ => True
-
 theorem lamsC_cg {B : Flick.Tm → Flick.Tm → Prop} {b b' : Flick.Tm} (h : Cg B false b b') :
     ∀ l, Cg B false (lamsC l b) (lamsC l b')
   | 0 => h
   | l + 1 => .lam (lamsC_cg h l)
 
-/-- **`TmEqv` terms translate to related terms.** -/
-theorem tmEqv_cg (hR : Real P Sg N) (hRun : RealRun P N root) (hS : SlotsBelow P) {e e' : Tm}
-    (h : TmEqv P e e') (ho : DOk P e) :
-    ∀ γ δ, Cg (DP Sg root) false (trE N γ δ e) (trE N γ δ e') := by
-  induction h with
-  | var => intro γ δ; exact .var
-  | hole => intro γ δ; exact .todo
-  | const => intro γ δ; exact .glob
-  | dict hd =>
+/-- **Two fillings of a skeleton by `≈` typed dictionaries translate to related terms.** -/
+theorem fill_cg (hR : Real P Sg N) (hRun : RealRun P N root) (hS : SlotsBelow P) {ds ds' : List Dict}
+    (h : All2 (Eqv P) ds ds') (ht : ∀ (i : Nat) (d : Dict), ds[i]? = some d → ∃ Δ T, DTyp P Δ d T) :
+    ∀ (s : Tm) γ δ, Cg (DP Sg root) false (trE N γ δ (s.fill ds)) (trE N γ δ (s.fill ds')) := by
+  intro s
+  induction s with
+  | hole i =>
     intro γ δ
-    obtain ⟨Δ, T, ht⟩ := ho
-    exact dsim_cg hR hRun (eqv_dsim hS hd) ht δ
-  | meth _ ih => intro γ δ; exact .proj (ih ho γ δ)
-  | app _ _ ih₁ ih₂ => intro γ δ; exact .app (ih₁ ho.1 γ δ) (ih₂ ho.2 γ δ)
-  | lam _ ih => intro γ δ; exact .lam (ih ho _ _)
-  | let_ _ _ ih₁ ih₂ => intro γ δ; exact .let_ (ih₁ ho.1 γ δ) (ih₂ ho.2 _ _)
-  | lamD _ ih => intro γ δ; exact lamsC_cg (ih ho _ _) _
+    have hd : ∃ Δ T, DTyp P Δ (args ds i) T := by
+      cases hi : ds[i]? with
+      | none =>
+        simp only [args, List.getD_eq_getElem?_getD, hi, Option.getD_none]
+        exact ⟨[⟨0, []⟩], _, .var rfl⟩
+      | some d =>
+        simp only [args, List.getD_eq_getElem?_getD, hi, Option.getD_some]
+        exact ht i d hi
+    obtain ⟨Δ, T, hd⟩ := hd
+    exact dsim_cg hR hRun (eqv_dsim hS (args_eqv h i)) hd δ
+  | lamD _ _ ih => intro γ δ; exact lamsC_cg (ih _ _) _
   | ite _ _ _ ihc iha ihb =>
-    intro γ δ; exact .match_ (ihc ho.1 γ δ) (.acons (iha ho.2.1 γ δ) (.acons (ihb ho.2.2 γ δ) .anil))
+    intro γ δ; exact .match_ (ihc γ δ) (.acons (iha γ δ) (.acons (ihb γ δ) .anil))
   | caseOpt _ _ _ ihe ihn ihs =>
-    intro γ δ
-    exact .match_ (ihe ho.1 γ δ) (.acons (ihs ho.2.2 _ _) (.acons (ihn ho.2.1 γ δ) .anil))
+    intro γ δ; exact .match_ (ihe γ δ) (.acons (ihs _ _) (.acons (ihn γ δ) .anil))
+  | caseK _ _ _ _ _ _ ihe ihb ihr =>
+    intro γ δ; exact .match_ (ihe γ δ) (.acons (ihb _ _) (.acons (ihr γ δ) .anil))
+  | meth _ _ ih => intro γ δ; exact .proj (ih γ δ)
+  | app _ _ ih₁ ih₂ => intro γ δ; exact .app (ih₁ γ δ) (ih₂ γ δ)
+  | lam _ ih => intro γ δ; exact .lam (ih _ _)
+  | let_ _ _ ih₁ ih₂ => intro γ δ; exact .let_ (ih₁ γ δ) (ih₂ _ _)
+  | var | dict | const | con => intro γ δ; exact Cg.refl _ _
 
 theorem trDt_free {δ : Nat → Nat} {s : Dict} {k : Nat} (h : s.Occ k) : (trDt N δ s).Free (δ k) := by
   induction s with
@@ -118,43 +118,42 @@ theorem slots_below (hRun : RealRun P N root) (hroot : RootTy Sg root) : SlotsBe
 variable (P Sg N) in
 /-- The typing of the core with the typing of the dictionaries of the term. -/
 def RHas (Γ : List TSch) (Δ : List Cn) (e : Tm) (t : TTy) (φ : Stage) : Prop :=
-  Has Sg N Γ Δ e t φ ∧ (∀ d, e = .dict d → DTyp P Δ d t) ∧ DOk P e
+  Has Sg N Γ Δ e t φ ∧ ∀ d, e = .dict d → DTyp P Δ d t
 
 /-- **λFlick⁺ as a `Target` with the run of the core.** -/
 def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg root) : Target P where
   Has := RHas P Sg N
-  var hx hk := ⟨(typingTarget hR).var hx hk, (fun _ h => by cases h), trivial⟩
-  const hc hk := ⟨(typingTarget hR).const hc hk, (fun _ h => by cases h), trivial⟩
-  app h₁ h₂ hψ := ⟨(typingTarget hR).app h₁.1 h₂.1 hψ, (fun _ h => by cases h), h₁.2.2, h₂.2.2⟩
-  ite h₁ h₂ h₃ := ⟨(typingTarget hR).ite h₁.1 h₂.1 h₃.1, (fun _ h => by cases h),
-    h₁.2.2, h₂.2.2, h₃.2.2⟩
-  caseOpt h₁ h₂ h₃ := ⟨(typingTarget hR).caseOpt h₁.1 h₂.1 h₃.1, (fun _ h => by cases h),
-    h₁.2.2, h₂.2.2, h₃.2.2⟩
-  lam h hh := ⟨(typingTarget hR).lam h.1 hh, (fun _ h => by cases h), h.2.2⟩
-  let_ h₁ hk hφ h₂ := ⟨(typingTarget hR).let_ h₁.1 hk hφ h₂.1, (fun _ h => by cases h),
-    h₁.2.2, h₂.2.2⟩
-  lamD h hφ hh := ⟨(typingTarget hR).lamD h.1 hφ hh, (fun _ h => by cases h), h.2.2⟩
-  dapp h₁ h₂ := ⟨(typingTarget hR).dapp h₁.1 h₂.1, (fun _ h => by cases h), h₁.2.2, h₂.2.2⟩
-  meth hm hc h := ⟨(typingTarget hR).meth hm hc h.1, (fun _ h => by cases h), h.2.2⟩
-  dvar hk := ⟨(typingTarget hR).dvar hk, (fun _ h => by cases h; exact .var hk), _, _, .var hk⟩
-  slot h hs := ⟨(typingTarget hR).slot h.1 hs, (fun _ e => by cases e; exact .slot (h.2.1 _ rfl) hs),
-    _, _, .slot (h.2.1 _ rfl) hs⟩
+  var hx hk := ⟨(typingTarget hR).var hx hk, fun _ h => by cases h⟩
+  const hc hk := ⟨(typingTarget hR).const hc hk, fun _ h => by cases h⟩
+  app h₁ h₂ hψ := ⟨(typingTarget hR).app h₁.1 h₂.1 hψ, fun _ h => by cases h⟩
+  ite h₁ h₂ h₃ := ⟨(typingTarget hR).ite h₁.1 h₂.1 h₃.1, fun _ h => by cases h⟩
+  caseOpt h₁ h₂ h₃ := ⟨(typingTarget hR).caseOpt h₁.1 h₂.1 h₃.1, fun _ h => by cases h⟩
+  con hK hk := ⟨(typingTarget hR).con hK hk, fun _ h => by cases h⟩
+  caseK he hK hT hlen hn hU hb hρ hg hcl hr :=
+    ⟨(typingTarget hR).caseK he.1 hK hT hlen hn hU hb.1 hρ hg hcl hr.1, fun _ h => by cases h⟩
+  caseKDead he hK hT hlen hC hr :=
+    ⟨(typingTarget hR).caseKDead he.1 hK hT hlen hC hr.1, fun _ h => by cases h⟩
+  lam h hh := ⟨(typingTarget hR).lam h.1 hh, fun _ h => by cases h⟩
+  let_ h₁ hk hφ h₂ := ⟨(typingTarget hR).let_ h₁.1 hk hφ h₂.1, fun _ h => by cases h⟩
+  lamD h hφ hh := ⟨(typingTarget hR).lamD h.1 hφ hh, fun _ h => by cases h⟩
+  dapp h₁ h₂ := ⟨(typingTarget hR).dapp h₁.1 h₂.1, fun _ h => by cases h⟩
+  meth hm hc h := ⟨(typingTarget hR).meth hm hc h.1, fun _ h => by cases h⟩
+  dvar hk := ⟨(typingTarget hR).dvar hk, fun _ h => by cases h; exact .var hk⟩
+  slot h hs := ⟨(typingTarget hR).slot h.1 hs, fun _ e => by cases e; exact .slot (h.2 _ rfl) hs⟩
   dap h₁ h₂ := ⟨(typingTarget hR).dap h₁.1 h₂.1,
-    (fun _ e => by cases e; exact .ap (h₁.2.1 _ rfl) (h₂.2.1 _ rfl)),
-    _, _, .ap (h₁.2.1 _ rfl) (h₂.2.1 _ rfl)⟩
-  inst hI := ⟨(typingTarget hR).inst hI, (fun _ e => by cases e; exact .inst hI), [], _, .inst (σ := Ty.var) hI⟩
-  strct h₁ h₂ := ⟨(typingTarget hR).strct h₁ h₂, (fun _ e => by cases e; exact .strct h₁ h₂),
-    [], _, .strct (θ := .var) h₁ h₂⟩
-  prim h₁ h₂ := ⟨(typingTarget hR).prim h₁ h₂, (fun _ e => by cases e; exact .prim h₁ h₂),
-    [], _, .prim (θ := .var) h₁ h₂⟩
+    fun _ e => by cases e; exact .ap (h₁.2 _ rfl) (h₂.2 _ rfl)⟩
+  inst hI := ⟨(typingTarget hR).inst hI, fun _ e => by cases e; exact .inst hI⟩
+  strct h₁ h₂ := ⟨(typingTarget hR).strct h₁ h₂, fun _ e => by cases e; exact .strct h₁ h₂⟩
+  prim h₁ h₂ := ⟨(typingTarget hR).prim h₁ h₂, fun _ e => by cases e; exact .prim h₁ h₂⟩
   St := Cfg
   load e := ⟨[], [], trE N id id e⟩
   Step := CS root
   Obs := Lit
   obs := obsC
   Rel := CfgR (DP Sg root)
-  load_rel h o₁ _ :=
-    ⟨tmEqv_cg hR hRun (slots_below hRun hroot) h o₁.2.2 id id, .nil, .nil⟩
+  load_rel h ht _ _ :=
+    ⟨fill_cg hR hRun (slots_below hRun hroot) h
+      (fun i d hd => let ⟨q, hq⟩ := ht i d hd; ⟨[], _, hq.2 _ rfl⟩) _ id id, .nil, .nil⟩
   step_rel hr hs := let ⟨_, hs⟩ := hs; cstep_sim hroot hr hs
   final_rel hr ho := ⟨_, .refl, final_sim hr ho⟩
 

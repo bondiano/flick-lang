@@ -146,6 +146,7 @@ fn error_con(name: &str) -> Rc<Con> {
         ty: Path::new(MODULE, name),
         name: name.into(),
         arity: 1,
+        dicts: 0,
     })
 }
 

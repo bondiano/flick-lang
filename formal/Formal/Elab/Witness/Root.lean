@@ -91,7 +91,7 @@ theorem typ_eqRec {Ψ Θ} : Typ Sg Ψ Θ [.mono (trD N ⟨cEq, [tyInt]⟩)] eqRe
       Typ Sg Ψ Θ Γ' e (.ex (tc "Rec" []) .pure) →
       Typ Sg Ψ Θ (.mono (.base .int) :: Γ') b (.ex t .pure) →
       Typ Sg Ψ Θ Γ' (.match_ e (.acons (pvars "MkRec" 1) b .anil)) (.ex t .pure) := fun he hb =>
-    .match_ he (.acons (.adt (.app (.head (K := "MkRec") (ts := [.base .int]) (us := []) rfl rfl) .var)
+    .match_ he (.acons (.adt (.app (.head (K := "MkRec") (ts := [.base .int]) (us := []) rfl Sig.inj_plain rfl) .var)
       (tcon_hd _ _)) hb .anil) (.inl (exh_one (K := "MkRec") (ts := [.base .int]) rfl hone_rec []))
   refine typ_lam (typ_lam (hR (typ_var_mono rfl) (hR (typ_var_mono rfl)
       (.app (ψ := .pure) (.app (ψ := .pure)
