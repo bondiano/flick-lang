@@ -32,10 +32,41 @@ impl BlockSource {
             Asked::LiteralOf(name) => {
                 Some(literal_answer(self.enums.get(name).map(String::as_str)))
             }
+            Asked::PublishedNames => {
+                let names: Vec<&str> = self.published.keys().map(String::as_str).collect();
+                Some(names.join("\n"))
+            }
             Asked::Published(name) => Some(published_answer(
                 self.published.get(name).map(Vec::as_slice),
             )),
             _ => None,
+        }
+    }
+
+    /// What this block's module sees, for its plugin's questions of later.
+    pub fn seen(&self) -> Seen {
+        Seen {
+            enums: Arc::clone(&self.enums),
+            published: Arc::clone(&self.published),
+        }
+    }
+}
+
+/// What a module sees that answers its plugin's questions: the enums and
+/// what the plugin published, as it writes them.
+#[derive(Clone, Default)]
+pub struct Seen {
+    enums: Arc<BTreeMap<String, String>>,
+    published: Arc<BTreeMap<String, Vec<u8>>>,
+}
+
+impl Seen {
+    /// A source of no block that sees it.
+    pub fn source(&self) -> BlockSource {
+        BlockSource {
+            enums: Arc::clone(&self.enums),
+            published: Arc::clone(&self.published),
+            ..BlockSource::default()
         }
     }
 }

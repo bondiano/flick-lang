@@ -1,0 +1,60 @@
+---
+source: plugins/sql/tests/query.rs
+expression: code
+---
+Sql.Derive.with (Sql.Proxy ()) (fun px0 ->
+  (Sql.Derive.with (Sql.Proxy ()) (fun px1 ->
+    (Sql.Derive.with ("x") (fun c0 ->
+      (Sql.Derive.query
+        ((fun p ->
+          (Sql.Derive.with ((Sql.Derive.columns Users.table) : _) (fun a0 ->
+            (Sql.Derive.with ((Sql.Derive.columns Accounts.table) : _) (fun a1 ->
+              (Sql.Derive.checked
+                [
+                  (Sql.Derive.truth
+                    (Sql.Derive.equal
+                      (Sql.Derive.value (a1).user_id)
+                      (Sql.Derive.value (a0).id))),
+                  (Sql.Derive.equal (Sql.Derive.value (a0).id) ((p).user_id : _)),
+                  (Sql.Derive.equal (Sql.Derive.value (a0).name) (Sql.Derive.param px1 c0)),
+                  (Sql.Derive.truth true),
+                  (Sql.Derive.typed_by px1 c0),
+                ]
+                {
+                  name = (Sql.Derive.value (a0).name);
+                  balance = (Sql.Derive.maybe (Sql.Derive.value (a1).balance));
+                })
+            ))
+          ))
+        ) : ({ user_id : _ } -> _))
+        {
+          text =
+            ("SELECT \"user\".\"name\" AS \"name\", \"account\".\"balance\" AS \"balance\" FROM \"users\" AS \"user\" LEFT JOIN \"accounts\" AS \"account\" ON (\"account\".\"user_id\" = \"user\".\"id\") WHERE ((\"user\".\"id\" = $1) AND (\"user\".\"name\" <> "
+              ++ (Sql.cast_open (Sql.Derive.like px1))
+              ++ "$2"
+              ++ (Sql.cast_close (Sql.Derive.like px1))
+              ++ "))");
+          tables = [(Sql.Derive.erase Users.table), (Sql.Derive.erase Accounts.table)];
+          params = [
+            (Sql.Derive.erase { name = "user_id"; nullable = false; table = 0; column = "id" }),
+            (Sql.Derive.erase {
+              name = "$(\"x\")";
+              nullable = (Sql.nullable_of (Sql.Derive.like px1));
+              table = 0;
+              column = "name";
+              value = c0;
+            }),
+          ];
+          columns = [
+            (Sql.Derive.erase { name = "name"; nullable = false; table = 0; column = "name" }),
+            (Sql.Derive.erase {
+              name = "balance";
+              nullable = true;
+              table = 1;
+              column = "balance";
+            }),
+          ];
+        })
+    ))
+  ))
+)

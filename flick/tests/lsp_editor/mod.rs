@@ -151,7 +151,7 @@ fn sql_completion_and_hover() {
                 .expect("items")
                 .iter()
                 .any(|i| i["label"] == "load_balances"),
-            "SQL does not offer Flick functions"
+            "{replacement}: SQL does not offer Flick functions"
         );
     }
     lsp.close();

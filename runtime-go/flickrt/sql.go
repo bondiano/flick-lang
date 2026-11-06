@@ -277,8 +277,8 @@ func columnOf(template *Record, v *Record) sqlColumn {
 	name, nullable := v.Get("name").(string), v.Get("nullable").(bool)
 	own := sqlColumn{name: name, kind: "text", nullable: nullable}
 	if v.index("table") < 0 {
-		if v.index("kind") >= 0 {
-			own.kind = v.Get("kind").(string)
+		if v.index("sql_kind") >= 0 {
+			own.kind = v.Get("sql_kind").(string)
 		}
 		return own
 	}

@@ -146,10 +146,7 @@ fn plugins(exposing: &Node, text: &str, file: FileId) -> Vec<Item> {
         .filter_map(|item| {
             let mut tokens = item.child_tokens();
             tokens.next().filter(|t| t.kind == K::PluginKw)?;
-            // `sql` is a keyword still, of the queries the compiler reads
-            let head = tokens
-                .next()
-                .filter(|t| matches!(t.kind, K::Ident | K::SqlKw))?;
+            let head = tokens.next().filter(|t| t.kind == K::Ident)?;
             Some(Item {
                 kind: ItemKind::Value,
                 name: head.text(text).to_owned(),

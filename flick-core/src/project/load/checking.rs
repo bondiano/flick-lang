@@ -16,9 +16,13 @@ use super::{Loaded, Loader, Root};
 use crate::clock::timed;
 use crate::diagnostics::{Diagnostic, Severity};
 use crate::ir;
+#[cfg(feature = "ide")]
+use crate::plugin::expansion::Expansion;
 use crate::project::Project;
 use crate::project::config::{Backend, Config};
 use crate::resolve::{self, Interface};
+#[cfg(feature = "ide")]
+use crate::source::Span;
 use crate::source::{FileId, SourceMap};
 use crate::types;
 
@@ -255,9 +259,6 @@ impl Checking<'_> {
                 steps: b.solver_steps,
                 depth: b.solver_depth,
             }),
-            sql: self
-                .project
-                .map_or_else(Default::default, |p| p.config.sql_dialect),
             no_let_assert: self.project.is_some_and(|p| p.config.no_let_assert),
             thresholds: self
                 .project
@@ -295,16 +296,11 @@ impl Checking<'_> {
             expansion.place_interface(&mut interface);
             expansion.place_interface(&mut untyped);
         }
-        // editors find and rename names of the module's own text only
         #[cfg(feature = "ide")]
         let typing = match &loaded.expansion {
             Some(expansion) => {
-                let mut typing = typing;
-                typing.names.retain(|&(start, _), _| start < expansion.len);
-                typing
-                    .type_names
-                    .retain(|&(start, _), _| start < expansion.len);
-                typing
+                let own = &self.sources.get(loaded.file).text;
+                editor_names(typing, expansion, loaded.file, own)
             }
             None => typing,
         };
@@ -428,4 +424,37 @@ fn package_of(root: &Root) -> Option<&str> {
         Root::Package(name) => Some(name),
         _ => None,
     }
+}
+
+/// The names editors find and rename: those of the module's own text, and
+/// those a plugin's code writes where the user wrote them, as a table
+/// `Users` of a query that stands for `Users.table`.
+#[cfg(feature = "ide")]
+fn editor_names(
+    mut typing: types::Typing,
+    expansion: &Expansion,
+    file: FileId,
+    own: &str,
+) -> types::Typing {
+    let written: Vec<_> = (typing.names.iter())
+        .filter(|((start, _), _)| *start >= expansion.len)
+        .filter_map(|(&(start, end), r)| {
+            let at = expansion.place(Span::new(file, start, end));
+            let word = own.get(at.start as usize..at.end as usize)?;
+            let types::Ref::Value { name, .. } = r else {
+                return None;
+            };
+            let named = name
+                .split_once('$')
+                .map_or(name.as_str(), |(owner, _)| owner);
+            let last = word.rsplit('.').next().unwrap_or(word);
+            (at.end <= expansion.len && last == named).then(|| ((at.start, at.end), r.clone()))
+        })
+        .collect();
+    typing.names.retain(|&(start, _), _| start < expansion.len);
+    typing.names.extend(written);
+    typing
+        .type_names
+        .retain(|&(start, _), _| start < expansion.len);
+    typing
 }

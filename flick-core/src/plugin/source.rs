@@ -55,6 +55,8 @@ struct Above {
 
 mod seen;
 
+pub use seen::Seen;
+
 /// A plugin block of a module and what its plugin asked of it.
 #[derive(Default)]
 pub struct BlockSource {
@@ -507,6 +509,11 @@ impl Compiler for BlockSource {
     fn published(&mut self, name: &str) -> Option<Vec<u8>> {
         let answer = self.published.get(name).cloned();
         self.reach.published(name, answer)
+    }
+
+    fn published_names(&mut self) -> Vec<String> {
+        let names: Vec<String> = self.published.keys().cloned().collect();
+        self.reach.published_names(names)
     }
 }
 

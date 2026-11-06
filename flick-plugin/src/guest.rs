@@ -76,6 +76,10 @@ impl Compiler for Imports {
         compiler::published(name)
     }
 
+    fn published_names(&mut self) -> Vec<String> {
+        compiler::published_names()
+    }
+
     fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {
         compiler::fetch(&reach_convert::to_request(request))
             .map(reach_convert::from_response)
@@ -118,9 +122,16 @@ pub fn complete(
     block: types::Block,
     state: &[u8],
     offset: u32,
+    member: bool,
 ) -> Vec<types::Completion> {
     (plugin
-        .complete(&convert::from_block(block), state, offset)
+        .complete(
+            &convert::from_block(block),
+            state,
+            offset,
+            member,
+            &mut Imports,
+        )
         .into_iter())
     .map(convert::to_completion)
     .collect()
@@ -224,8 +235,9 @@ macro_rules! export {
                 block: $crate::guest::bindings::flick::plugin::types::Block,
                 state: ::std::vec::Vec<u8>,
                 offset: u32,
+                member: bool,
             ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Completion> {
-                $crate::guest::complete(&$plugin, block, &state, offset)
+                $crate::guest::complete(&$plugin, block, &state, offset, member)
             }
 
             fn hover(

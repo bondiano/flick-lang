@@ -206,23 +206,6 @@ fn deep_nesting_is_an_error_not_a_stack_overflow() {
 }
 
 #[test]
-fn sql_captures_take_a_name_a_field_path_or_parentheses() {
-    let tree = sexp("let q = sql { from u in T; where u.a == $x.y && u.b == $(f x); limit $M.n }");
-    assert_eq!(
-        tree,
-        "(LetDecl let (VarPat q) = (Block (SqlExpr sql { (Block (SqlClause from u in (NameExpr T)) ; \
-         (SqlClause where (BinExpr (BinExpr (FieldExpr (NameExpr u) . a) == (SqlCapture $ (FieldExpr (NameExpr x) . y))) && \
-         (BinExpr (FieldExpr (NameExpr u) . b) == (SqlCapture $ (ParenExpr ( (AppExpr (NameExpr f) (NameExpr x)) )))))) ; \
-         (SqlClause limit (SqlCapture $ (NameExpr M . n)))) })))"
-    );
-    assert_eq!(
-        errors("let q = sql { from u in T; where u.a == $ x }\nlet r = $x\n"),
-        // a space after `$`, and `$` outside `sql { … }`
-        ["FLICK-S007 x", "FLICK-S007 $"]
-    );
-}
-
-#[test]
 fn list_patterns_end_with_a_rest() {
     assert_eq!(
         sexp("let [x, ...rest] = xs"),

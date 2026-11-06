@@ -31,7 +31,6 @@ pub(super) fn hugs(n: &Node) -> bool {
             | K::ScopeExpr
             | K::ProvideExpr
             | K::DoExpr
-            | K::SqlExpr
             | K::FunExpr
     ) || matches!(n.kind, K::ForExpr | K::PluginExpr) && n.has_token(K::LBrace)
 }
@@ -241,13 +240,10 @@ impl<'a> Printer<'a> {
         let after = self.comments.trailing(first, None);
         let members = inner.is_some_and(|i| i.kind == K::Members);
         self.column += if members { INDENT } else { 0 };
-        let mut items = self.items(&statements, rbrace.start, Some(';'), &mut |p, s| {
+        let items = self.items(&statements, rbrace.start, Some(';'), &mut |p, s| {
             p.statement(s)
         });
         self.column -= if members { INDENT } else { 0 };
-        if n.kind == K::SqlExpr {
-            self.glue_on(&mut items);
-        }
         let dangling = self.comments.leading(rbrace.start);
         let close = self.tok(rbrace);
         let suffix = self.suffix(suffix);
@@ -280,34 +276,6 @@ impl<'a> Printer<'a> {
         }
         let inner = a.concat(inner).nest(a, INDENT);
         docvec![a, lbrace, after, inner, a.line(), close].force_break(a)
-    }
-
-    /// `on` after a `join` stays on its line when it fits.
-    fn glue_on(&mut self, items: &mut Vec<super::printer::Item<'a>>) {
-        let a = self.a;
-        let starts = |item: &super::printer::Item, words: &[&str]| {
-            item.node
-                .child_tokens()
-                .next()
-                .is_some_and(|t| words.contains(&t.text(self.text)))
-        };
-        let mut i = 1;
-        while i < items.len() {
-            let on = &items[i];
-            let glued = starts(on, &["on"])
-                && on.comments.is_empty()
-                && items[i - 1].trailing.is_none()
-                && starts(&items[i - 1], &["join", "left_join"]);
-            if glued {
-                let on = items.remove(i);
-                let join = &mut items[i - 1];
-                let step = docvec![a, a.break_("", " "), on.doc].nest(a, INDENT);
-                join.doc = docvec![a, join.doc, step].group(a);
-                join.trailing = on.trailing;
-            } else {
-                i += 1;
-            }
-        }
     }
 
     /// `for { … } yield e`, `for x <- xs yield e`, and `do` instead of `yield`.

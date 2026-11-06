@@ -186,7 +186,6 @@ pub fn check_each(
         let options = super::Options {
             local: &local,
             limits: super::Limits::default(),
-            sql: Default::default(),
             no_let_assert: false,
             thresholds: super::Thresholds::default(),
             effects: true,

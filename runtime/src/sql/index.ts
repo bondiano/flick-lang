@@ -22,7 +22,8 @@ export interface Table {
 export interface Value {
   readonly name: string;
   readonly nullable: boolean;
-  readonly kind?: string;
+  /** How the runtime passes a value no column decides: `kind` is a word of Flick. */
+  readonly sql_kind?: string;
   readonly table?: number;
   readonly column?: string;
   readonly value?: unknown;

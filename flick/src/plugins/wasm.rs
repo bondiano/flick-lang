@@ -155,6 +155,10 @@ impl flick::plugin::compiler::Host for State {
         self.source.published(&name)
     }
 
+    fn published_names(&mut self) -> Vec<String> {
+        self.source.published_names()
+    }
+
     fn fetch(
         &mut self,
         request: flick::plugin::types::Request,
@@ -304,11 +308,14 @@ impl Expander for Wasm {
         block: &flick_plugin::Block,
         state: &[u8],
         offset: u32,
+        member: bool,
+        source: &mut BlockSource,
     ) -> Vec<flick_plugin::Completion> {
         let block = convert::to_block(block);
-        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
-            plugin.call_complete(store, &block, state, offset)
+        let (result, back) = self.run(mem::take(source), |plugin, store| {
+            plugin.call_complete(store, &block, state, offset, member)
         });
+        *source = back;
         result.map_or_else(
             |_| Vec::new(),
             |found| found.into_iter().map(convert::from_completion).collect(),

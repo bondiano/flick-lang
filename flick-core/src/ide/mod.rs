@@ -12,7 +12,6 @@ mod locals;
 mod navigate;
 mod plugins;
 mod rename;
-mod sql;
 mod symbols;
 mod tokens;
 mod tree;
@@ -159,6 +158,9 @@ impl Ide<'_> {
             };
             return Some((symbol, at));
         }
+        if let Some(found) = Self::generated_name_at(m, offset) {
+            return Some(found);
+        }
         if let Some((range, (module, name))) = tree::innermost(m.typing.type_names.iter(), offset) {
             // a class of `deriving` is a bare token, without a node
             let at = tree::find(&m.tree, range)
@@ -167,6 +169,24 @@ impl Ide<'_> {
             return Some((entity(module, Namespace::Type, name), at));
         }
         self.declared_at(m, file, offset)
+    }
+
+    /// A name of a plugin's code at the user's word it stands for, as
+    /// `Users` of a query for `Users.table`, which no node of the module
+    /// holds: a companion is its type's.
+    fn generated_name_at(m: &Analyzed, offset: u32) -> Option<(Symbol, (u32, u32))> {
+        let (range, r) = tree::innermost(m.typing.names.iter(), offset)?;
+        if tree::find(&m.tree, range).is_some() {
+            return None;
+        }
+        let Ref::Value { module, name } = r else {
+            return None;
+        };
+        let symbol = match name.split_once('$') {
+            Some((ty, _)) => entity(module, Namespace::Type, ty),
+            None => entity(module, Namespace::Value, name),
+        };
+        Some((symbol, range))
     }
 
     /// `Public` in `Api.Public.api`: the type that owns a companion, named

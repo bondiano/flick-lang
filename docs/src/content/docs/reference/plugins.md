@@ -93,8 +93,10 @@ learns from the blocks of a round together, and a block nested in more than
 eight is `FLICK-P036`.
 
 Editors also ask a plugin about its blocks, even ones that do not expand:
-`complete(block, state, offset)` gives what to insert at an offset (an
-empty list leaves the user's code to the usual completion), `hover(block,
+`complete(block, state, offset, member)` gives what to insert at an offset
+(an empty list leaves the user's code to the usual completion; `member`
+says the user typed `name.` there, the `.` not in the block, and the
+compiler answers `published` as while the block expands), `hover(block,
 state, offset)` what a span means, and `highlight(block, state)` the spans
 of the plugin's own words, as keywords or parameters.
 
@@ -128,8 +130,9 @@ signature of that `let` too, but its code takes no type of it.
 its base type, `String` or `Int`: the types are not checked yet, so a
 plugin asks before it writes code for one. `published(name)` gives what the
 same plugin published of `name` as the module writes it (`Users`,
-`Schema.Users`): a name of the module itself or of one it imports. A kept
-expansion that asked holds only while the answer stays the same.
+`Schema.Users`): a name of the module itself or of one it imports, and
+`published-names()` every name it answers. A kept expansion that asked holds
+only while the answer stays the same.
 
 The code of a block that is an expression is an expression; that of a
 declaration is declarations, which take the block's place among the module's

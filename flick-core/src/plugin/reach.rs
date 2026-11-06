@@ -56,12 +56,17 @@ pub enum Asked {
     LiteralOf(String),
     /// What the plugin published of a name, as the block's module names it.
     Published(String),
+    /// The names the plugin published that the block's module sees.
+    PublishedNames,
 }
 
 impl Asked {
     /// Whether what the block's module sees answers it, not the gate.
     pub fn by_module(&self) -> bool {
-        matches!(self, Asked::LiteralOf(_) | Asked::Published(_))
+        matches!(
+            self,
+            Asked::LiteralOf(_) | Asked::Published(_) | Asked::PublishedNames
+        )
     }
 }
 
@@ -134,6 +139,16 @@ impl Reach {
             answer: literal_answer(answer.as_deref()),
         });
         answer
+    }
+
+    /// `names`, the answer to `published-names`, kept with what the block
+    /// asked.
+    pub fn published_names(&mut self, names: Vec<String>) -> Vec<String> {
+        self.used.push(Used {
+            asked: Asked::PublishedNames,
+            answer: names.join("\n"),
+        });
+        names
     }
 
     /// `answer` to `published` of `name`, kept with what the block asked.

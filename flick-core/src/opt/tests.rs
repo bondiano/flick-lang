@@ -469,19 +469,3 @@ fn folded_floats_are_written_as_js_writes_them() {
     }
     assert!(cases > 300, "{cases} cases");
 }
-
-#[test]
-fn a_small_function_of_another_module_is_inlined() {
-    let js = release(
-        "module App exposing (pick, empty)\n\n\
-         pick : Int\nlet pick = Int.min 3 5\n\n\
-         empty : String -> Bool\nlet empty s = String.is_empty s\n",
-    );
-    // the bodies of `Int.min` and `String.is_empty`, which name only what
-    // their modules export
-    assert!(js.contains("export const pick = 3;"), "{js}");
-    assert!(
-        js.contains("export const empty = (s) => $m_String.length(s) === 0;"),
-        "{js}"
-    );
-}

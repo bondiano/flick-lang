@@ -36,7 +36,7 @@ const KEYWORD: u32 = 7;
 const MACRO: u32 = 8;
 
 /// Nodes worth folding when they span several lines.
-const FOLDED: [K; 16] = [
+const FOLDED: [K; 15] = [
     K::LetDecl,
     K::TypeDecl,
     K::ServiceDecl,
@@ -48,7 +48,6 @@ const FOLDED: [K; 16] = [
     K::ListExpr,
     K::TaskExpr,
     K::DoExpr,
-    K::SqlExpr,
     K::UiExpr,
     K::PluginExpr,
     K::PluginDecl,

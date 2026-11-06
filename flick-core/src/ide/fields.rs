@@ -25,7 +25,6 @@ impl Ide<'_> {
     /// field labels.
     pub(super) fn embedded_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
         self.plugin_hover(file, offset)
-            .or_else(|| self.sql_hover(file, offset))
             .or_else(|| self.field_hover(file, offset))
     }
 

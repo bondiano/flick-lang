@@ -13,9 +13,6 @@ use super::Checker;
 use super::classes::Dict;
 use super::env::{Abi, Rep};
 use super::gadt::branch::as_field_given;
-#[cfg(feature = "ide")]
-use super::sql::dialect::Dialect;
-pub use super::sql_plan::{SqlForm, SqlPlan, SqlValue};
 use super::ty::{Stage, Type};
 use crate::iface::Interface;
 use crate::ir::Label;
@@ -136,14 +133,9 @@ pub struct Typing {
     #[cfg(feature = "ide")]
     pub(crate) pending_refined: Vec<(Range, Type)>,
     #[cfg(feature = "ide")]
-    /// The dialect the SQL of the module was checked against.
-    pub sql_dialect: &'static Dialect,
-    #[cfg(feature = "ide")]
     /// The transparent aliases the module declares, exported or not: their
     /// parameters and bodies.
     pub aliases: HashMap<String, (Vec<String>, Type)>,
-    /// `sql { … }` blocks: their SQL and how values cross the driver.
-    pub sql: HashMap<Range, SqlPlan>,
     /// Runtime calls inside a `scope` that acquire into the owner of another
     /// region than the innermost scope's.
     pub owners: HashMap<Range, Owner>,
@@ -398,7 +390,6 @@ impl Checker<'_> {
             K::IfExpr => K::IfKw,
             K::FunExpr => K::FunKw,
             K::UiExpr => K::UiKw,
-            K::SqlExpr => K::SqlKw,
             _ => return,
         };
         if let Some(kw) = node.child_tokens().find(|t| t.kind == head) {

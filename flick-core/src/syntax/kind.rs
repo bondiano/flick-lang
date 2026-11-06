@@ -55,7 +55,6 @@ pub enum SyntaxKind {
     NoneKw,
     TrueKw,
     FalseKw,
-    SqlKw,
     UiKw,
     InKw,
     WhenKw,
@@ -208,10 +207,6 @@ pub enum SyntaxKind {
     ComponentExpr,
     ScopeExpr,
     ProvideExpr,
-    SqlExpr,
-    SqlClause,
-    /// `$name` inside `sql { … }`: a value of the program as a placeholder.
-    SqlCapture,
     UiExpr,
     /// `head { … }` of a head an import exposes as `plugin head`: the body is
     /// kept as tokens, which the plugin reads.
@@ -343,7 +338,6 @@ pub fn keyword(text: &str) -> Option<SyntaxKind> {
         "none" => K::NoneKw,
         "true" => K::TrueKw,
         "false" => K::FalseKw,
-        "sql" => K::SqlKw,
         "ui" => K::UiKw,
         "in" => K::InKw,
         "when" => K::WhenKw,

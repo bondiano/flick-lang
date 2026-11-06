@@ -104,9 +104,6 @@ impl Checker<'_> {
             (K::ScopeExpr, _) => {
                 self.scope_expr(node, Some(expected));
             }
-            (K::SqlExpr, _) => {
-                self.sql_expr(node, Some(expected));
-            }
             (K::TupleExpr, Type::Tuple(items)) if items.len() == children.len() => {
                 let captures = self.whnf_captured(expected).1;
                 let mut held = Vec::new();
@@ -288,7 +285,6 @@ impl Checker<'_> {
                 self.ui -= 1;
                 ty
             }
-            K::SqlExpr => self.sql_expr(node, None),
             _ => Type::Error,
         }
     }

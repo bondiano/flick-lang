@@ -199,7 +199,6 @@ impl Ide<'_> {
                 "ui { … }",
                 "Describes a user interface; building it runs no handler.",
             ),
-            K::SqlKw => ("sql { … }", "A typed SQL query."),
             K::AwaitKw => {
                 let ran = match ty.spine() {
                     (h, args) if h.is_lang(Lang::Eff) && args.len() == 3 => show_type(args[2]),

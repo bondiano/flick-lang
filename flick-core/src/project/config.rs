@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use crate::codegen::Labels;
 use crate::diagnostics::Code;
 use crate::source::Span;
-use crate::types::{self, Dialect, Thresholds};
+use crate::types::{self, Thresholds};
 
 #[cfg(feature = "native-project")]
 mod deps;
@@ -137,8 +137,8 @@ pub struct Config {
     /// `[package]`, which a library others fetch has.
     pub package: Option<Package>,
     pub build: Build,
-    /// `[sql] dialect`: what `sql table` and `sql { … }` are checked against.
-    pub sql_dialect: &'static Dialect,
+    /// `[sql] dialect`: the dialect of the database `sql` blocks are for.
+    pub sql_dialect: &'static str,
     /// `[lint] allow`: warnings that are not reported.
     pub allow: Vec<Code>,
     /// `[lint] no-let-assert`: every `let assert` is an error.

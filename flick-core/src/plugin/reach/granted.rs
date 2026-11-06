@@ -132,7 +132,7 @@ impl Reach {
                 ),
                 Asked::Env(name) => answer(&gate.outside.env(name)),
                 // the block's source answers these: `BlockSource::still`
-                Asked::LiteralOf(_) | Asked::Published(_) => return false,
+                Asked::LiteralOf(_) | Asked::Published(_) | Asked::PublishedNames => return false,
                 Asked::Fetch(key) => {
                     let at = gate
                         .root

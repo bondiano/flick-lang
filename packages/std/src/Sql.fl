@@ -4,6 +4,8 @@
 /// only `Database.query` talks to the database.
 module Sql exposing (..)
 
+import BigDecimal exposing (BigDecimal)
+
 /// The PostgreSQL dialect.
 type Pg
 
@@ -102,3 +104,257 @@ foreign pure make_table from "@flick-lang/runtime/sql" "sqlTable"
 /// What a `sql { … }` block compiles to.
 make_template : forall a b. a -> b
 foreign pure make_template from "@flick-lang/runtime/sql" "sqlTemplate"
+
+/// A type named without a value: what the methods of `Param` and `Numeric`
+/// take, so the code of a query asks them of a type alone.
+type Proxy a = Proxy Unit
+
+/// A type a placeholder of a query carries: `a` as the program holds it,
+/// `t` as the query compares it. An `Option t` is a `t` that may be
+/// `NULL`, cast to its SQL type, as PostgreSQL cannot type `$1 IS NULL`
+/// alone. A type of a column with a codec has no instance: a capture of it
+/// stands beside its column.
+class Param a t | a -> t =
+  /// How the runtime passes a value: `number`, `bigint`, `text`, ….
+  kind_of : Proxy a -> String
+  /// Whether a value may be `NULL`.
+  nullable_of : Proxy a -> Bool
+  /// What comes before the placeholder: `CAST(` for a value that may be
+  /// `NULL`.
+  cast_open : Proxy a -> String
+  /// What comes after it: ` AS text)`.
+  cast_close : Proxy a -> String
+
+instance Param Int Int =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "number"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> false
+  let cast_open p =
+    match p with
+    | Proxy _ -> ""
+  let cast_close p =
+    match p with
+    | Proxy _ -> ""
+
+instance Param (Option Int) Int =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "number"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> true
+  let cast_open p =
+    match p with
+    | Proxy _ -> "CAST("
+  let cast_close p =
+    match p with
+    | Proxy _ -> " AS integer)"
+
+instance Param Float Float =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "number"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> false
+  let cast_open p =
+    match p with
+    | Proxy _ -> ""
+  let cast_close p =
+    match p with
+    | Proxy _ -> ""
+
+instance Param (Option Float) Float =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "number"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> true
+  let cast_open p =
+    match p with
+    | Proxy _ -> "CAST("
+  let cast_close p =
+    match p with
+    | Proxy _ -> " AS double precision)"
+
+instance Param BigInt BigInt =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "bigint"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> false
+  let cast_open p =
+    match p with
+    | Proxy _ -> ""
+  let cast_close p =
+    match p with
+    | Proxy _ -> ""
+
+instance Param (Option BigInt) BigInt =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "bigint"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> true
+  let cast_open p =
+    match p with
+    | Proxy _ -> "CAST("
+  let cast_close p =
+    match p with
+    | Proxy _ -> " AS bigint)"
+
+instance Param BigDecimal BigDecimal =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "numeric"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> false
+  let cast_open p =
+    match p with
+    | Proxy _ -> ""
+  let cast_close p =
+    match p with
+    | Proxy _ -> ""
+
+instance Param (Option BigDecimal) BigDecimal =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "numeric"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> true
+  let cast_open p =
+    match p with
+    | Proxy _ -> "CAST("
+  let cast_close p =
+    match p with
+    | Proxy _ -> " AS numeric)"
+
+instance Param String String =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "text"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> false
+  let cast_open p =
+    match p with
+    | Proxy _ -> ""
+  let cast_close p =
+    match p with
+    | Proxy _ -> ""
+
+instance Param (Option String) String =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "text"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> true
+  let cast_open p =
+    match p with
+    | Proxy _ -> "CAST("
+  let cast_close p =
+    match p with
+    | Proxy _ -> " AS text)"
+
+instance Param Bool Bool =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "bool"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> false
+  let cast_open p =
+    match p with
+    | Proxy _ -> ""
+  let cast_close p =
+    match p with
+    | Proxy _ -> ""
+
+instance Param (Option Bool) Bool =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "bool"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> true
+  let cast_open p =
+    match p with
+    | Proxy _ -> "CAST("
+  let cast_close p =
+    match p with
+    | Proxy _ -> " AS boolean)"
+
+instance Param Json Json =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "json"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> false
+  let cast_open p =
+    match p with
+    | Proxy _ -> ""
+  let cast_close p =
+    match p with
+    | Proxy _ -> ""
+
+instance Param (Option Json) Json =
+  let kind_of p =
+    match p with
+    | Proxy _ -> "json"
+  let nullable_of p =
+    match p with
+    | Proxy _ -> true
+  let cast_open p =
+    match p with
+    | Proxy _ -> "CAST("
+  let cast_close p =
+    match p with
+    | Proxy _ -> " AS json)"
+
+/// A type `sum` and `avg` of a query take, `s` and `v` the types of their
+/// results, each with the cast that gives it.
+class Numeric a s v | a -> s v =
+  sum_cast : Proxy a -> String
+  avg_cast : Proxy a -> String
+
+instance Numeric Int Int Int =
+  let sum_cast p =
+    match p with
+    | Proxy _ -> "::double precision"
+  let avg_cast p =
+    match p with
+    | Proxy _ -> "::double precision"
+
+instance Numeric Float Float Float =
+  let sum_cast p =
+    match p with
+    | Proxy _ -> "::double precision"
+  let avg_cast p =
+    match p with
+    | Proxy _ -> "::double precision"
+
+instance Numeric BigInt BigInt BigDecimal =
+  let sum_cast p =
+    match p with
+    | Proxy _ -> "::bigint"
+  let avg_cast p =
+    match p with
+    | Proxy _ -> "::numeric"
+
+instance Numeric BigDecimal BigDecimal BigDecimal =
+  let sum_cast p =
+    match p with
+    | Proxy _ -> "::numeric"
+  let avg_cast p =
+    match p with
+    | Proxy _ -> "::numeric"

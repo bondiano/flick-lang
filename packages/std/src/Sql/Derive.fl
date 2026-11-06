@@ -26,3 +26,102 @@ let plain name sql_kind nullable _ = column name sql_kind nullable ()
 column : String -> String -> Bool -> a -> Column
 foreign pure column from "@flick-lang/runtime/sql" "sqlColumn"
   arity 4
+
+/// A value of a template as the runtime reads it, a table or a placeholder
+/// or a result, whatever its fields.
+type Erased
+
+erase : a -> Erased
+foreign pure erase from "@flick-lang/runtime" "identity"
+
+/// The template of a `sql { … }` block: `data`, the text and the values as
+/// the runtime reads them. `typing` is the query's types as a function
+/// from its parameters to a row, which never runs: its type is the
+/// template's.
+query : (p -> r) -> d -> Sql.Template Sql.Pg p r
+let query _ data = Sql.make_template data
+
+/// A proxy of the type `proxy` names, written where a method takes it.
+like : Sql.Proxy a -> Sql.Proxy a
+let like _ = Sql.Proxy ()
+
+/// `x`, of the type `proxy` names.
+tie : Sql.Proxy a -> a -> a
+let tie _ x = x
+
+/// A value of any type, for the function of a query's types, which never
+/// runs.
+phantom : Unit -> a
+foreign pure phantom from "@flick-lang/runtime" "identity"
+
+/// The columns of a table.
+columns : Sql.Table n cols -> cols
+let columns _ = phantom ()
+
+/// The value of a column.
+value : Sql.Column t n w -> t
+let value _ = phantom ()
+
+/// The value of a parameter that may be `NULL`.
+inner : Option t -> t
+let inner _ = phantom ()
+
+/// A result that may be `NULL`.
+maybe : t -> Option t
+let maybe x = Some x
+
+/// A placeholder of `a`, compared as `t`.
+param : Sql.Param a t => Sql.Proxy a -> a -> t
+let param _ _ = phantom ()
+
+/// The sum of values of `a`.
+sum : Sql.Numeric a s v => Sql.Proxy a -> a -> s
+let sum _ _ = phantom ()
+
+/// The average of values of `a`.
+avg : Sql.Numeric a s v => Sql.Proxy a -> a -> v
+let avg _ _ = phantom ()
+
+/// `a` and `b` compared: values of one type.
+equal : a -> a -> Bool
+let equal _ _ = true
+
+/// `coalesce a b`: values of one type.
+either : a -> a -> a
+let either a _ = a
+
+/// A value that is tested, as `is_null` does, or counted.
+tested : a -> Bool
+let tested _ = true
+
+counted : a -> BigInt
+let counted _ = 0
+
+/// `limit` and `offset` take an `Int`.
+whole : Int -> Bool
+let whole _ = true
+
+/// `a || b` in SQL: texts joined.
+joined : String -> String -> String
+let joined a b = a ++ b
+
+/// A condition: a `Bool`.
+truth : Bool -> Bool
+let truth b = b
+
+/// That `x` has the type `proxy` names.
+typed_by : Sql.Proxy a -> a -> Bool
+let typed_by _ _ = true
+
+/// The row of a query, once each condition is a `Bool`.
+checked : List Bool -> r -> r
+let checked _ r = r
+
+/// The row of a statement that returns nothing.
+nothing : {}
+let nothing = phantom ()
+
+/// `f x`, `x` typed first: the code of a query binds what it reads so that
+/// a value of the wrong type is wrong where the query uses it.
+with : a -> (a -> b) -> b
+let with x f = f x

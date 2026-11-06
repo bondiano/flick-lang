@@ -1,7 +1,5 @@
 //! Expressions and block statements.
 
-use std::mem;
-
 use super::{Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
 
@@ -185,34 +183,9 @@ fn app(p: &mut Parser) -> Option<Done> {
     Some(p.complete(m, K::AppExpr))
 }
 
-const SQL_CLAUSES: [&str; 17] = [
-    "join",
-    "left_join",
-    "on",
-    "group_by",
-    "having",
-    "order_by",
-    "limit",
-    "offset",
-    "select",
-    "union",
-    "union_all",
-    "insert_into",
-    "values",
-    "update",
-    "set",
-    "delete_from",
-    "returning",
-];
-
-fn at_sql_clause(p: &Parser) -> bool {
-    matches!(p.current(), K::FromKw | K::WhereKw)
-        || (p.at(K::Ident) && SQL_CLAUSES.contains(&p.text_of(p.raw())))
-}
-
 pub(super) fn at_arg_start(p: &Parser) -> bool {
     match p.current() {
-        K::Ident => !(at_and(p) || p.sql_depth > 0 && at_sql_clause(p)),
+        K::Ident => !at_and(p),
         K::Con
         | K::Number
         | K::BigInt
@@ -225,10 +198,8 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::TodoKw
         | K::ScopeKw
         | K::ProvideKw
-        | K::SqlKw
         | K::UiKw => true,
         K::LBrace => !p.no_brace,
-        K::Dollar => p.sql_depth > 0,
         _ => false,
     }
 }
@@ -325,18 +296,6 @@ fn atom(p: &mut Parser) -> Option<Done> {
             K::ListExpr
         }
         K::LBrace if !p.no_brace => record(p),
-        K::Dollar if p.sql_depth > 0 => {
-            p.bump();
-            // `$name`, `$name.field` or `$(e)`: a Flick expression, not SQL
-            if matches!(p.current(), K::Ident | K::Con | K::LParen) && p.adjacent() {
-                let depth = mem::replace(&mut p.sql_depth, 0);
-                postfix(p);
-                p.sql_depth = depth;
-            } else {
-                p.error_expected("a name or `(` right after `$`");
-            }
-            K::SqlCapture
-        }
         K::DoKw => do_expr(p),
         K::ForKw => for_expr(p),
         K::TaskKw | K::UiKw => {
@@ -362,14 +321,6 @@ fn atom(p: &mut Parser) -> Option<Done> {
             });
             p.braces(K::Block, stmt, |_| false);
             K::ProvideExpr
-        }
-        K::SqlKw => {
-            p.bump();
-            p.eat(K::Ident);
-            p.sql_depth += 1;
-            p.braces(K::Block, sql_clause, at_sql_clause);
-            p.sql_depth -= 1;
-            K::SqlExpr
         }
         _ => {
             p.error_expected("an expression");
@@ -445,30 +396,6 @@ fn record_field(p: &mut Parser) {
         p.body(K::Block, stmt);
     }
     p.complete(m, K::RecordField);
-}
-
-/// `from x in E`, `join x in E`, `on E`, `select E`, `group_by a, b`, ….
-fn sql_clause(p: &mut Parser) {
-    let m = p.start();
-    if !at_sql_clause(p) {
-        p.error_expected("a SQL clause (`from`, `where`, `select`, …)");
-        p.recover();
-        p.complete(m, K::Error);
-        return;
-    }
-    let word = p.text_of(p.raw());
-    p.bump();
-    if matches!(word, "from" | "join" | "left_join") {
-        p.expect(K::Ident);
-        p.expect(K::InKw);
-        expr(p);
-    } else {
-        expr(p);
-        while p.eat(K::Comma) {
-            expr(p);
-        }
-    }
-    p.complete(m, K::SqlClause);
 }
 
 fn do_expr(p: &mut Parser) -> K {

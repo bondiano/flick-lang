@@ -37,7 +37,7 @@ let mistyped = sql p { insert_into Accounts; values { user_id = p.owner; balance
 
 dialect : Sql.Template Pg {} { name : String }
 let dialect = sql { from u in Users; select { name = ifnull u.name "nobody" } }
-//                                                   ^^^^^^ FLICK-Q010 `ifnull` is not a SQL function
+//                                                   ^^^^^^ std/Q010 `ifnull` is not a SQL function
 
 raw_id : Sql.Template Pg { user_id : BigInt } { name : String }
 let raw_id = sql p { from u in Users; where u.id == p.user_id; select { name = u.name } }
@@ -45,8 +45,8 @@ let raw_id = sql p { from u in Users; where u.id == p.user_id; select { name = u
 
 listed : List UserId -> Sql.Template Pg {} { name : String }
 let listed ids = sql { from u in Users; where $ids == $ids; select { name = u.name } }
-//                                            ^^^^ FLICK-Q012 `List UserId` has no SQL form
-//                                                    ^^^^ FLICK-Q012 `List UserId` has no SQL form
+//                                            ^^^^ FLICK-C001 no instance for `Param (List UserId) _`
+//                                                    ^^^^ FLICK-C001 no instance for `Param (List UserId) _`
 
 unbound : Unit ->{Database; EncodeError, DbError, DecodeError} List { name : String }
 let unbound () = Database.query (sql { from u in Users; select { name = u.name } })
