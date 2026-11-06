@@ -120,7 +120,7 @@ impl Lower<'_> {
                 let scrutinee = self.boxed(children[0]);
                 ExprKind::Match(scrutinee, self.arms(node))
             }
-            K::TryExpr if handles_effects(node, self.text) => {
+            K::TryExpr | K::ProvideExpr if self.handles_effects(node) => {
                 self.unsupported(node);
                 ExprKind::Lit(Lit::Unit)
             }
@@ -433,6 +433,30 @@ impl Lower<'_> {
         }
     }
 
+    /// Whether a `try` has arms for operations or for the value of its
+    /// body, or the operand of a `provide` is `S impl`, a service and the
+    /// record that handles it.
+    fn handles_effects(&self, node: &Node) -> bool {
+        let Some(first) = node.nodes().next() else {
+            return false;
+        };
+        match node.kind {
+            K::TryExpr => node.nodes().filter(|n| n.kind == K::MatchArm).any(|arm| {
+                arm.has_token(K::ReturnKw)
+                    || arm_pattern(arm).is_some_and(|p| operation_path(p, self.text).is_some())
+            }),
+            _ => {
+                first.kind == K::AppExpr
+                    && first.nodes().next().is_some_and(|head| {
+                        matches!(
+                            self.typing.names.get(&head.range()),
+                            Some(Ref::ServiceTag(_))
+                        )
+                    })
+            }
+        }
+    }
+
     fn arms(&mut self, node: &Node) -> Vec<Arm> {
         // an arm the type of the matched value rules out was not checked
         let live: Vec<&Node> = node
@@ -471,12 +495,4 @@ pub(super) fn with_dicts(expr: Expr, dicts: Vec<Dict>) -> Expr {
     }
     let span = expr.span;
     Expr::new(ExprKind::Dicts(Box::new(expr), dicts), span)
-}
-
-/// Whether a `try` has arms for operations or for the value of its body.
-fn handles_effects(node: &Node, text: &str) -> bool {
-    node.nodes().filter(|n| n.kind == K::MatchArm).any(|arm| {
-        arm.has_token(K::ReturnKw)
-            || arm_pattern(arm).is_some_and(|p| operation_path(p, text).is_some())
-    })
 }

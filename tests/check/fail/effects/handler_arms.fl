@@ -76,3 +76,16 @@ let told body =
     body ()
   with
   | Ask.ask () -> "one"
+
+/// Only a service is handled by a record.
+recorded : (Unit ->{Ask Int; none} Int) ->{} Int
+let recorded body = provide Ask ({ ask = fun () -> 1 }) { body () }
+//~ FLICK-E016 @82:21-82:28 `provide Ask impl` takes a service, and
+
+service Greeter =
+  greet : String ->{} String
+
+/// The record has the type of the service's operations.
+wrong_record : Unit ->{} String
+let wrong_record () = provide Greeter ({ greet = fun n -> n + 1 }) { Greeter.greet "x" }
+//~ FLICK-T003 @90:63-90:64 expected `String`, found `Int`

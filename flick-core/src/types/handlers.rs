@@ -7,13 +7,15 @@ use std::mem;
 
 use super::Checker;
 use super::effects::{NO_EFFECTS, Site};
-use super::env::Form;
+use super::env::{Form, Found};
 use super::handle::{Handled, arm_pattern, operation_path};
 use super::infer::eff;
 use super::patterns::is_pattern;
 use super::services::Operation;
 use super::ty::{Row, Type};
+use super::typing::Ref;
 use crate::diagnostics::codes;
+use crate::iface::Entity;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -238,6 +240,9 @@ impl Checker<'_> {
         let Some(&layer) = children.first() else {
             return Type::Error;
         };
+        if let Some(service) = self.record_handler(layer) {
+            return self.provide_impl(node, layer, service, children.get(1).copied(), expected);
+        }
         let actual = self.infer(layer);
         let (inputs, errors, outputs) = (self.fresh(), self.store.fresh_error_row(), self.fresh());
         let shape = Type::apps(
@@ -299,6 +304,98 @@ impl Checker<'_> {
             self.sub_row(&needed, &rest, site, span, false);
         }
         ty
+    }
+
+    /// `provide S impl { body }`: the record `impl : S.Impl` handles the
+    /// service in the body, each operation by its field, as `tail` arms do.
+    fn provide_impl(
+        &mut self,
+        node: &Node,
+        layer: &Node,
+        (entity, params, effect): (Entity, usize, bool),
+        body: Option<&Node>,
+        expected: Option<&Type>,
+    ) -> Type {
+        let span = self.keyword_span(node, K::ProvideKw);
+        let label = format!("{}.{}", entity.module, entity.name);
+        let mut parts = layer.nodes();
+        if let Some(head) = parts.next() {
+            self.record_name(self.span(head), Ref::ServiceTag(label.clone()));
+        }
+        if effect {
+            self.error(
+                codes::E016,
+                span,
+                format!(
+                    "`provide {0} impl` takes a service, and `{0}` is an effect: handle it with the arms of a `try`",
+                    entity.name
+                ),
+            );
+        }
+        if self.runtime_allowed(span) {
+            let empty = Type::empty_row();
+            self.perform(&empty, &empty, span);
+        }
+        let args: Vec<Type> = (0..params).map(|_| self.fresh()).collect();
+        let entry = Type::apps(Type::con(&entity.module, &entity.name), args.clone());
+        let implementation = Type::apps(
+            Type::con(&entity.module, &format!("{}.Impl", entity.name)),
+            args,
+        );
+        if let Some(record) = parts.next() {
+            self.check(record, &implementation);
+        }
+        let needed = self.fresh();
+        let mut stage = self.stage.clone();
+        stage.services = needed.clone();
+        stage.returns = None;
+        let outer = mem::replace(&mut self.stage, stage);
+        self.enter_provide(node, span, vec![label.clone()], false);
+        let ty = match (body, expected) {
+            (Some(body), Some(expected)) => {
+                self.check(body, expected);
+                expected.clone()
+            }
+            (Some(body), None) => self.infer(body),
+            (None, _) => Type::Error,
+        };
+        self.leave_provide();
+        let inner = mem::replace(&mut self.stage, outer);
+        self.stage.calls = inner.calls;
+        if self.stage.pure.is_none() {
+            let rest = Type::Row(Row {
+                entries: vec![(label, entry)],
+                tail: Some(Box::new(self.stage.services.clone())),
+            });
+            let site = self.stage.site;
+            self.sub_row(&needed, &rest, site, span, false);
+        }
+        ty
+    }
+
+    /// The service `S` of `provide S impl { … }`: the head of the
+    /// application names a service, its module and name, the number of its
+    /// parameters, and whether it is an effect.
+    fn record_handler(&self, layer: &Node) -> Option<(Entity, usize, bool)> {
+        let mut parts = layer.nodes();
+        let (head, _, None) = (parts.next()?, parts.next()?, parts.next()) else {
+            return None;
+        };
+        if layer.kind != K::AppExpr || head.kind != K::NameExpr {
+            return None;
+        }
+        let tokens: Vec<_> = head.child_tokens().filter(|t| t.kind != K::Dot).collect();
+        if tokens.last()?.kind != K::Con {
+            return None;
+        }
+        let path: Vec<&str> = tokens.iter().map(|t| t.text(self.text)).collect();
+        let Found::Entity(entity) = self.env.find_type(&path.join(".")) else {
+            return None;
+        };
+        match &self.env.type_def(&entity.module, &entity.name)?.form {
+            Form::Service { params, effect, .. } => Some((entity.clone(), params.len(), *effect)),
+            _ => None,
+        }
     }
 
     /// The row label of a type declared with `type error`.
