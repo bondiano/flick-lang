@@ -159,6 +159,20 @@ impl flick::plugin::compiler::Host for State {
         self.source.published_names()
     }
 
+    fn in_scope(
+        &mut self,
+        ns: flick::plugin::types::Namespace,
+        fits: Option<String>,
+    ) -> Vec<flick::plugin::types::Completion> {
+        let namespace = match ns {
+            flick::plugin::types::Namespace::Value => flick_plugin::Namespace::Value,
+            flick::plugin::types::Namespace::Type => flick_plugin::Namespace::Type,
+        };
+        (self.source.in_scope(namespace, fits.as_deref()).into_iter())
+            .map(convert::to_completion)
+            .collect()
+    }
+
     fn fetch(
         &mut self,
         request: flick::plugin::types::Request,

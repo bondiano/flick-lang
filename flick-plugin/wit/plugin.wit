@@ -176,6 +176,8 @@ interface types {
   /// reaching it failed.
   variant reach-error { denied(string), offline(string), failed(string) }
 
+  /// The names of values or of types.
+  enum namespace { value, %type }
   /// What a plugin tells its blocks of other groups and modules about a
   /// name of the module `module`.
   record published { module: string, name: string, data: list<u8> }
@@ -212,7 +214,7 @@ interface types {
 
 /// What the compiler offers a plugin while it expands a block.
 interface compiler {
-  use types.{hole, diagnostic, reach-error, request, response};
+  use types.{hole, diagnostic, reach-error, request, response, completion, namespace};
 
   /// The longest expression of the body from `start` on, before `end`.
   parse-expr: func(start: u32, end: u32) -> result<hole, diagnostic>;
@@ -245,6 +247,11 @@ interface compiler {
   /// Every name `published` answers for the block's module, as it writes
   /// them.
   published-names: func() -> list<string>;
+  /// The values or types in scope of the block's module, as it writes
+  /// them; with `fits`, the values whose type instantiates to that type,
+  /// written as the module writes it or with names qualified in full. An
+  /// editor answers it; while a block expands, none.
+  in-scope: func(ns: namespace, fits: option<string>) -> list<completion>;
 }
 
 world plugin {

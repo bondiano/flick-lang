@@ -12,6 +12,7 @@ mod locals;
 mod navigate;
 mod plugins;
 mod rename;
+mod scope;
 mod symbols;
 mod tokens;
 mod tree;

@@ -65,6 +65,10 @@ break programs.
   `Sql.Param` and `Sql.Numeric`. A release build folds the text of a query
   into one literal. Hover and completion in a query are the plugin's; the
   `sql` head no longer shows the type of its block, which the `let` does.
+- **Plugins:** in an editor, `in-scope(ns, fits)` gives a plugin the values
+  or types its block's module has in scope, only the values whose type
+  instantiates to `fits` when given. A `sql table` column again offers only
+  the codecs of its `PureCodec` after `via`, and only types after `as`.
 - **Runtime:** a value of a template that no column decides gives its kind
   as `sql_kind`, as `kind` is a word of Flick.
 - **Plugins:** `complete(block, state, offset, member)` says the user typed

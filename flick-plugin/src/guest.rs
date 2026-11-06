@@ -3,7 +3,9 @@
 //! [`Plugin`] value through the world of `wit/plugin.wit`, and the compiler's
 //! calls come back to it as a [`Compiler`].
 
-use crate::{Compiler, Diagnostic, Hole, Plugin, ReachError, Request, Response};
+use crate::{
+    Compiler, Completion, Diagnostic, Hole, Namespace, Plugin, ReachError, Request, Response,
+};
 
 #[allow(
     clippy::same_length_and_capacity,
@@ -78,6 +80,16 @@ impl Compiler for Imports {
 
     fn published_names(&mut self) -> Vec<String> {
         compiler::published_names()
+    }
+
+    fn in_scope(&mut self, namespace: Namespace, fits: Option<&str>) -> Vec<Completion> {
+        let namespace = match namespace {
+            Namespace::Value => types::Namespace::Value,
+            Namespace::Type => types::Namespace::Type,
+        };
+        (compiler::in_scope(namespace, fits).into_iter())
+            .map(convert::from_completion)
+            .collect()
     }
 
     fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {

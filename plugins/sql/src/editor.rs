@@ -1,9 +1,12 @@
 //! The editor in a table: its layout, a column a line; what the table, its
 //! names, SQL types and attributes mean; and what may come next in a
-//! column, a SQL type or an attribute. After `as` and `via` the names in
-//! scope are offered, as in the user's code.
+//! column, a SQL type or an attribute. After `as` the types in scope are
+//! offered, after `via` the codecs between the column's SQL value and its
+//! type.
 
-use flick_plugin::{Block, Compiler, Completion, Hole, HoleKind, Hover, Piece, Span, Token};
+use flick_plugin::{
+    Block, Compiler, Completion, Hole, HoleKind, Hover, Namespace, Piece, Span, Token,
+};
 
 use crate::dialect::{self, ATTRIBUTES, TITLE};
 use crate::table::{self, Column, Table};
@@ -140,7 +143,7 @@ pub fn hover(block: &Block, offset: u32) -> Option<Hover> {
     at(word.span, md(block.text_of(word.span), "flick", &doc))
 }
 
-pub fn complete(block: &Block, offset: u32) -> Vec<Completion> {
+pub fn complete(block: &Block, offset: u32, compiler: &mut dyn Compiler) -> Vec<Completion> {
     let line: Vec<Token> = (block.body().rest().iter())
         .copied()
         .filter(|t| t.span.end <= offset)
@@ -154,13 +157,24 @@ pub fn complete(block: &Block, offset: u32) -> Vec<Completion> {
         .rev()
         .collect();
     let words: Vec<&str> = line.iter().map(|t| block.text_of(t.span)).collect();
-    // after `as` and `via`, the names in scope
-    if words.iter().any(|w| *w == "as" || *w == "via") {
-        return Vec::new();
-    }
-    let Some(colon) = words.iter().position(|w| *w == ":") else {
+    let at = |word: &str| words.iter().position(|w| *w == word);
+    let Some(colon) = at(":") else {
         return Vec::new();
     };
+    if let Some(via) = at("via") {
+        let sql = dialect::column_type(&words[colon + 1..]);
+        let ty = at("as")
+            .and_then(|a| words.get(a + 1..via))
+            .filter(|t| !t.is_empty());
+        let (Some(sql), Some(ty)) = (sql, ty) else {
+            return Vec::new();
+        };
+        let codec = format!("Prelude.PureCodec {} ({})", sql.exact, ty.join(" "));
+        return compiler.in_scope(Namespace::Value, Some(&codec));
+    }
+    if at("as").is_some() {
+        return compiler.in_scope(Namespace::Type, None);
+    }
     let item = |label: &str, detail: &str| Completion {
         label: label.to_owned(),
         detail: Some(detail.to_owned()),

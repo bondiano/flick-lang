@@ -96,7 +96,12 @@ Editors also ask a plugin about its blocks, even ones that do not expand:
 `complete(block, state, offset, member)` gives what to insert at an offset
 (an empty list leaves the user's code to the usual completion; `member`
 says the user typed `name.` there, the `.` not in the block, and the
-compiler answers `published` as while the block expands), `hover(block,
+compiler answers `published` as while the block expands; there
+`in-scope(ns, fits)` gives the values or types in scope of the block's
+module, by the names it writes them with, and with `fits`, a type written as
+the module writes it or with names qualified in full (`Prelude.PureCodec
+Prelude.BigInt UserId`), only the values whose type instantiates to it;
+while a block expands it gives none), `hover(block,
 state, offset)` what a span means, and `highlight(block, state)` the spans
 of the plugin's own words, as keywords or parameters.
 

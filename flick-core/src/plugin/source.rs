@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use flick_plugin::{
-    Block, Compiler, Hole, HoleKind, Place, ReachError, Request, Response, Signature, Span,
-    Token as PluginToken, TokenKind,
+    Block, Compiler, Completion, Hole, HoleKind, Namespace, Place, ReachError, Request, Response,
+    Signature, Span, Token as PluginToken, TokenKind,
 };
 
 use super::reach::Reach;
@@ -53,8 +53,10 @@ struct Above {
     tokens: Vec<Token>,
 }
 
+mod scope;
 mod seen;
 
+pub use scope::InScope;
 pub use seen::Seen;
 
 /// A plugin block of a module and what its plugin asked of it.
@@ -94,6 +96,8 @@ pub struct BlockSource {
     /// What the plugin published of the names the module sees, as it
     /// writes them.
     published: Arc<BTreeMap<String, Vec<u8>>>,
+    /// What the module has in scope, in an editor.
+    in_scope: Option<Arc<InScope>>,
 }
 
 impl BlockSource {
@@ -151,6 +155,7 @@ impl BlockSource {
             reach: Reach::default(),
             enums: Arc::default(),
             published: Arc::default(),
+            in_scope: None,
         })
     }
 
@@ -182,6 +187,7 @@ impl BlockSource {
             reach: Reach::default(),
             enums: Arc::default(),
             published: Arc::default(),
+            in_scope: None,
             heads,
             foreign: !holes,
             text,
@@ -514,6 +520,10 @@ impl Compiler for BlockSource {
     fn published_names(&mut self) -> Vec<String> {
         let names: Vec<String> = self.published.keys().cloned().collect();
         self.reach.published_names(names)
+    }
+
+    fn in_scope(&mut self, namespace: Namespace, fits: Option<&str>) -> Vec<Completion> {
+        (self.in_scope.as_ref()).map_or_else(Vec::new, |s| s.answer(namespace, fits))
     }
 }
 
