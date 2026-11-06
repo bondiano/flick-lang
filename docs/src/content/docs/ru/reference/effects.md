@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: 997e21a649907783
+source_hash: 7e02fa81f4a0fc4e
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -373,6 +373,127 @@ let leaked () = scope outer {
 start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
 ```
+
+## Эффекты и handlers
+
+`effect E params =` объявляет эффект. Его операции вызываются так же, как
+операции сервиса, `E.op x`, и вызову нужен `E` в строке его стадии. Перед
+именем операции можно указать, как возвращается ветка handler для неё:
+
+- `tail`, по умолчанию: ветка — значение операции;
+- `abort`: операция не возвращается, поэтому её результат — своя
+  переменная, `forall b. … -> b` (`FLICK-E014`), а ветка — значение handler;
+- `control`: ветка — значение handler, а `resume` — остаток тела, который
+  возвращает значение handler.
+
+Сервис — эффект, у которого все операции `tail`: другой класс в `service` —
+это `FLICK-E013`. Слова `effect`, `tail`, `abort` и `control` — ключевые
+только там.
+
+`try … with` обрабатывает операции так же, как ошибки. Ветка
+`| E.op p… -> h` принимает аргументы вызова; `| return p -> h` принимает
+значение тела, и тогда значение handler — `h`. Ветка `return` у handler
+одна, без guard, и подходит под любое значение (`FLICK-E015`); без неё
+значение тела и есть значение handler. Эффект уходит из строки тела, когда
+ветки без guard принимают все аргументы каждой его операции; остальные его
+вызовы уходят к handler снаружи. Ветки выполняются там, где стоит handler:
+то, что им нужно, берётся из охватывающей стадии, а сбой ветки `tail`
+принадлежит handler, и `try` внутри тела его не видит.
+
+```flick
+effect Ask a =
+  ask : Unit ->{} a
+
+effect Emit a =
+  control emit : a ->{} Unit
+
+effect Throw =
+  abort throw : forall b. String ->{} b
+
+with_name : forall a r e. String -> (Unit ->{Ask String | r; e} a) ->{r; e} a
+let with_name name body =
+  try body () with
+  | Ask.ask () -> name
+
+collect : forall a r e. (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
+let collect body =
+  try body () with
+  | Emit.emit x -> [x] ++ resume ()
+  | return () -> []
+
+attempt : forall a r e. (Unit ->{Throw | r; e} a) ->{r; e} Result String a
+let attempt body =
+  try Ok (body ()) with
+  | Throw.throw message -> Err message
+```
+
+`abort` закрывает scope, из которых выходит, до запуска своей ветки. Ветка
+`control`, которая закончилась без вызова `resume`, отпускает остаток тела,
+и его scope тоже закрываются; второй вызов `resume` — дефект. `resume`
+держит регион handler и поэтому остаётся в ветках: сохранённый в ячейке,
+созданной снаружи, он даёт `FLICK-G002`:
+
+```flick fail
+# effect Emit a =
+#   control emit : a ->{} Unit
+# zero : Unit ->{} Int
+# let zero () = 0
+#
+escaped : (Unit ->{Emit Int; none} Int) ->{} Int
+let escaped body =
+  let cell = Ref.make zero
+  try body () with
+  | Emit.emit _ ->
+    // FLICK-G002: `resume` остаётся в ветках своего handler
+    Ref.set cell resume
+    0
+```
+
+`provide S impl { body }` обрабатывает в теле сервис `S` записью
+`impl : S.Impl`, каждую операцию её полем, как это делают ветки `tail`.
+Запись передаётся по имени или в скобках: `provide S ({ op = … }) { … }`.
+Эффект обрабатывают ветки `try` (`FLICK-E016`).
+
+```flick
+# service Greeter =
+#   greet : String ->{} String
+#
+greeter : Greeter.Impl
+let greeter = { greet = fun name -> "hello, " ++ name }
+
+greeted : Unit ->{} String
+let greeted () = provide Greeter greeter { Greeter.greet "ada" }
+```
+
+Задача, которую запускают `spawn`, `parallel`, гонки, `timeout` или `run`
+у `FiberSet`, `FiberMap` и `FiberHandle`, выполняется в собственном файбере.
+Handler эффекта с операцией `control` находится в файбере, который его
+установил, поэтому такой задаче нужен `Detached r`: ни у одного эффекта её
+сервисов такой операции нет. Компилятор выводит его из строки; функция,
+которая запускает задачи с сервисами переменной строки, называет
+`Detached r` в своей сигнатуре. Эффект `control` там или переменная строки
+без него — это `FLICK-E017`:
+
+```flick
+# effect Emit a =
+#   control emit : a ->{} Unit
+# collect : forall a r e. (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
+# let collect body =
+#   try body () with
+#   | Emit.emit x -> [x] ++ resume ()
+#   | return () -> []
+#
+both_of : forall r e a. Detached r => Eff r e a -> Eff r e a ->{r; e} (a, a)
+let both_of first second = parallel first second
+
+children : Unit ->{} (List Int, List Int)
+let children () =
+  parallel (task { collect (fun () -> Emit.emit 1) }) (task { collect (fun () -> Emit.emit 2) })
+```
+
+Handlers работают на обеих целях. Ветке `control` нужно, чтобы тело ждало
+как корутина: сборка Go это выполняет, а сборка JavaScript сообщает
+`FLICK-P012`, пока у её рантайма нет такого тела.
 
 ## Пока не проверяется
 

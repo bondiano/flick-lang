@@ -6,6 +6,17 @@ break programs.
 
 ## Unreleased
 
+- **Effects and handlers:** `effect E params =` declares an effect whose
+  operations are `tail` (the default), `abort` (never returns, `forall b. …
+  -> b`) or `control`. `try … with` handles them: `| E.op p… -> …` for an
+  operation, `| return p -> …` for the value of the body, `resume` in a
+  `control` arm, at most once. An effect leaves the row when arms without a
+  guard cover all its operations; the others go on to the handler around.
+  `provide S impl { … }` handles a service with a record. Handlers run on
+  JavaScript and Go; `control` arms run on Go, and on JavaScript report
+  `FLICK-P012` until its own runtime. A task in a fiber of its own needs
+  `Detached r`, no `control` effect in its services. New codes:
+  `FLICK-E013` … `FLICK-E017`. The interface format is version 7.
 - **GADTs:** a constructor names the type it builds after `:`,
   `| IntLit Int : Expr Int`; variables of its fields that the result does
   not mention are existential. A `match` arm learns the type of the matched
