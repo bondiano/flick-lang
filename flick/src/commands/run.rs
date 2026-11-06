@@ -220,6 +220,7 @@ pub fn build_into_generation(
             }),
             emit_dts: false,
             promise_facade: false,
+            emit_ir: None,
             schema_aot: false,
             profile: options.profile,
             labels: None,

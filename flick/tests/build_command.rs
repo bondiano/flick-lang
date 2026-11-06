@@ -1,6 +1,8 @@
 #[path = "build_command/cache.rs"]
 mod cache;
 mod common;
+#[path = "build_command/ir.rs"]
+mod ir;
 
 use std::fs;
 use std::path::Path;

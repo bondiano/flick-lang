@@ -11,6 +11,7 @@ use flick_core::project::{self, Compilation, Compiled, Project};
 use flick_core::source::{FileId, SourceMap};
 
 use super::check::select;
+use super::emit_ir;
 use super::out_dir::overlap;
 use super::summary::{self, Built};
 use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
@@ -126,9 +127,11 @@ impl Command for BuildCommand {
             let output = self.plan(&host, Some(p), self.entries(p));
             self.key(p, &roots, &output)
         });
+        // a cached build has no IR to write
         let cached = project
             .as_ref()
             .zip(initial_key.as_ref())
+            .filter(|_| self.options.emit_ir.is_none())
             .and_then(|(p, key)| self.cached(p, &host, &progress, key));
         if let Some(diagnostics) = cached {
             return Outcome {
@@ -173,6 +176,11 @@ impl Command for BuildCommand {
             (false, false) => "Emitting JavaScript",
         });
         let mut emitted = artifacts(&host, &sources, project.as_ref(), &compilation, &output);
+        if let Some(format) = self.options.emit_ir {
+            emitted
+                .diagnostics
+                .extend(emit_ir::write(&compilation, &sources, &output, format));
+        }
         self.publish(project.as_ref(), &output, &mut emitted, &progress);
         let clean = diagnostics.is_empty() && emitted.diagnostics.is_empty();
         diagnostics.extend(emitted.diagnostics);

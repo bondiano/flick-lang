@@ -4,6 +4,7 @@ mod clean;
 mod deps;
 mod dev;
 mod diff;
+mod emit_ir;
 mod expand;
 pub(crate) mod ffi;
 mod fmt;
