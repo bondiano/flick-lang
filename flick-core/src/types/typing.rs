@@ -4,6 +4,7 @@
 //! into a runtime position, and which dictionaries a use of a constrained
 //! value receives.
 
+pub use flick_ir::{Constructor, GenericInfo, InstanceInfo, Lift};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::mem;
@@ -11,7 +12,7 @@ use std::sync::Arc;
 
 use super::Checker;
 use super::classes::Dict;
-use super::env::{Abi, Rep};
+use super::env::Abi;
 use super::gadt::branch::as_field_given;
 use super::services::OpClass;
 use super::ty::{Stage, Type};
@@ -179,25 +180,6 @@ pub enum Ref {
     ServiceTag(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Constructor {
-    pub module: String,
-    pub ty: String,
-    pub name: String,
-    pub arity: usize,
-    /// How its values are represented in JS.
-    pub rep: Rep,
-    /// The dictionaries its values hold after the fields: one per class
-    /// constraint of a constructor of a GADT.
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub dicts: usize,
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_zero(n: &usize) -> bool {
-    *n == 0
-}
-
 /// What `===` compares for an `==` (see [`Typing::identity_eq`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Identity {
@@ -228,61 +210,6 @@ pub(super) type OpenScopes = Vec<(u32, Range)>;
 pub struct Owner {
     pub scope: Range,
     pub outside: bool,
-}
-
-/// How a function becomes the one of another stage its position expects.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Lift {
-    /// A function: the stage of this stage and the one expected, and how its
-    /// result lifts.
-    Stage {
-        from: Stage,
-        to: Stage,
-        result: Option<Box<Lift>>,
-    },
-    /// The result of an `Eff`.
-    Eff(Box<Lift>),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InstanceInfo {
-    pub module: String,
-    /// The head as written: what `Dict::Instance` names it by.
-    pub name: String,
-    pub class: (String, String),
-    /// The `instance` declaration, or the `deriving` clause.
-    pub span: Range,
-    /// The context, as its dictionaries are named.
-    pub context: Vec<String>,
-    pub supers: Vec<(String, Dict)>,
-    /// For a derived instance: the dictionary of each field, constructor by
-    /// constructor, and the constructors (`None` for a type without variants,
-    /// whose one field is its representation).
-    pub derived: Option<(Vec<Dict>, Option<Vec<Constructor>>)>,
-    /// Methods taken from the class's defaults, with how many dictionaries
-    /// of their own each takes, and the dictionaries its default signature
-    /// needs, which it takes after the class's.
-    pub defaults: Vec<(String, usize, Vec<Dict>)>,
-    /// For `deriving Generic`: what its methods convert, which lowering
-    /// writes.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub generic: Option<GenericInfo>,
-    /// For the instance of `Enum` of an enum, the enum: its methods are the
-    /// enum's companions.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enumerates: Option<String>,
-}
-
-/// The constructors of a type that derives `Generic`, each with the labels
-/// of its one record field when it has one, and the constructors of the
-/// representation: `Inl` and `Inr` of `Sum`, `Con` and `Field`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenericInfo {
-    pub cases: Vec<(Constructor, Option<Vec<String>>)>,
-    pub inl: Constructor,
-    pub inr: Constructor,
-    pub con: Constructor,
-    pub field: Constructor,
 }
 
 /// The top-level value a class's default definition of `method` compiles

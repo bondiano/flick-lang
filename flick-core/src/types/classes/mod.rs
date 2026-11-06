@@ -16,8 +16,8 @@ mod prims;
 mod report;
 mod solve;
 
+pub use flick_ir::Dict;
 pub use matching::{Match, match_type};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::Checker;
@@ -60,47 +60,15 @@ pub fn args_of(c: &Type, item: Lang) -> Option<Vec<&Type>> {
     lang::is(item, module, name).then_some(args)
 }
 
-/// The dictionary a class constraint resolved to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Dict {
-    /// An instance applied to the dictionaries of its context.
-    Instance {
-        module: String,
-        name: String,
-        args: Vec<Dict>,
-    },
-    /// A constraint of the enclosing signature or instance.
-    Given(String),
-    /// A dictionary a matched value holds, bound to this local by the
-    /// pattern of its constructor.
-    Field(String),
-    /// The superclass `class` of another dictionary.
-    Super { dict: Box<Dict>, class: String },
-    /// The compiler-owned instance of a record or tuple, by field.
-    Structural { class: String, fields: Vec<Dict> },
-    /// A row primitive, solved by the compiler: the constraint as shown, and
-    /// the labels its operation needs at run time (those `Project` keeps).
-    Primitive {
-        constraint: String,
-        labels: Vec<String>,
-    },
-    /// `CallSite` of a use the checker made: its place and definition.
-    Site { place: String, definition: String },
-    /// A constraint on a type that already produced a diagnostic.
-    Error,
-}
-
-impl Dict {
-    /// Whether it is built from an assumption, so holds only where that is.
-    fn assumes(&self) -> bool {
-        match self {
-            Self::Given(_) | Self::Field(_) => true,
-            Self::Super { dict, .. } => dict.assumes(),
-            Self::Instance { args: dicts, .. } | Self::Structural { fields: dicts, .. } => {
-                dicts.iter().any(Self::assumes)
-            }
-            Self::Primitive { .. } | Self::Site { .. } | Self::Error => false,
+/// Whether `d` is built from an assumption, so holds only where that is.
+fn assumes(d: &Dict) -> bool {
+    match d {
+        Dict::Given(_) | Dict::Field(_) => true,
+        Dict::Super { dict, .. } => assumes(dict),
+        Dict::Instance { args: dicts, .. } | Dict::Structural { fields: dicts, .. } => {
+            dicts.iter().any(assumes)
         }
+        Dict::Primitive { .. } | Dict::Site { .. } | Dict::Error => false,
     }
 }
 

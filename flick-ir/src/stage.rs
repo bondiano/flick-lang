@@ -12,3 +12,17 @@ pub enum Stage {
     /// Through the runtime, which may suspend it.
     Runtime,
 }
+
+/// How a function becomes the one of another stage its position expects.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Lift {
+    /// A function: the stage of this stage and the one expected, and how its
+    /// result lifts.
+    Stage {
+        from: Stage,
+        to: Stage,
+        result: Option<Box<Lift>>,
+    },
+    /// The result of an `Eff`.
+    Eff(Box<Lift>),
+}
