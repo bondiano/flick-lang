@@ -35,6 +35,7 @@ change needs.
 | [Plugin blocks need their import](#plugin-blocks-need-their-import) | yes | `FLICK-P037` |
 | [Diagnostic codes under `std/`](#diagnostic-codes-under-std) | no | new codes |
 | [`deriving HttpApi` is stricter](#deriving-httpapi-is-stricter) | no | `std/D011`, `FLICK-C001` |
+| [SQL queries are stricter](#sql-queries-are-stricter) | no | `std/Q010`, `FLICK-T003` |
 | [Libraries are compiled from sources](#libraries-are-compiled-from-sources) | no | `FLICK-R003` |
 | [Instances belong to one package](#instances-belong-to-one-package) | no | `FLICK-C006` |
 | [Plugins reach only what is granted](#plugins-reach-only-what-is-granted) | no | `FLICK-P038`, `FLICK-P039` |
@@ -188,6 +189,23 @@ three differences:
 - An error without a `Problem` instance, and a path whose `:name`
   parameters are not the fields of its `path` part, are `FLICK-C001`
   (they were `FLICK-D011`).
+
+These need a manual change.
+
+## SQL queries are stricter
+
+The plugin of `std` writes the same SQL text, with three differences:
+
+- `from x in T` reads a table by its name only: a `sql table` or a table of
+  migrations, qualified or not. Any other expression after `in` is
+  `std/Q010`; name the table itself.
+- Beside a column with a codec, a capture has the column's own type, never
+  an `Option` of it (`FLICK-T003`). Test for `None` in Flick and build the
+  query without the filter there.
+- An `Option` of a capture reaches the row only when the capture is
+  selected itself, as in `select { tag = $tag }`. Elsewhere it makes no
+  field of the row an `Option`, and code that matched on one is
+  `FLICK-T003`.
 
 These need a manual change.
 
