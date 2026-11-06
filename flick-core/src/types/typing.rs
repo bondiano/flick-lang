@@ -344,6 +344,7 @@ pub fn passes_dictionary(constraint: &Type) -> bool {
     let class = |item| super::classes::args_of(constraint, item).is_some();
     !class(Lang::Outlives)
         && !class(Lang::Provided)
+        && !class(Lang::Detached)
         && !class(Lang::TypeEq)
         && as_field_given(constraint).is_none()
 }

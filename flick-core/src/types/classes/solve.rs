@@ -13,6 +13,7 @@ use crate::types::Checker;
 use crate::types::env::Instance;
 use crate::types::gadt::branch::as_field_given;
 use crate::types::generalize::replace_metas;
+use crate::types::lang::{self, Lang};
 use crate::types::ty::Type;
 
 #[derive(Debug, Clone)]
@@ -241,6 +242,8 @@ impl Checker<'_> {
         }
         let outcome = if let Some(class) = which(&RECORD_CLASSES, &module, &name) {
             self.primitive(c, class, &args, givens, chain)
+        } else if lang::is(Lang::Detached, &module, &name) {
+            self.detached(c, &args, givens)
         } else if Self::structural(&module, &name)
             && matches!(args.first(), Some(Type::Record(_) | Type::Tuple(_)))
         {

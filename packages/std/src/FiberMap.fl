@@ -28,7 +28,7 @@ foreign effect make from "@flick-lang/runtime/effect/FiberMap" "flickMake"
 /// map's region.
 run :
   forall s c r k e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   RunOptions -> k -> (Eff {Scope s | r} e a)^c -> FiberMap s k e a ->{r;} Fiber.Fiber e a
 foreign effect run from "@flick-lang/runtime/effect/FiberMap" "flickRun"
   arity 1

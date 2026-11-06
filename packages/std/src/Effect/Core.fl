@@ -173,7 +173,7 @@ foreign pure replicate from "@flick-lang/runtime/effect/Effect" "replicate"
 
 /// Runs `task` `n` times, as many at once as `concurrency` lets; the
 /// results in order.
-replicate_effect : forall c r e a. Concurrency -> Int -> (Eff r e a)^c ->{r; e} List a
+replicate_effect : forall c r e a. Detached r => Concurrency -> Int -> (Eff r e a)^c ->{r; e} List a
 foreign effect replicate_effect from "@flick-lang/runtime/effect/Effect" "flickReplicateEffect"
   arity 2
   retention call

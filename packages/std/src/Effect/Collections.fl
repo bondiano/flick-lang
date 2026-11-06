@@ -17,7 +17,7 @@ foreign effect for_each from "@flick-lang/runtime/effect/Effect" "flickForEach"
 
 /// Runs every task, as many at once as `concurrency` lets; the results in
 /// order. The first typed failure stops the others.
-all : forall c r e a. Concurrency -> List ((Eff r e a)^c) ->{r; e} List a
+all : forall c r e a. Detached r => Concurrency -> List ((Eff r e a)^c) ->{r; e} List a
 foreign effect all from "@flick-lang/runtime/effect/Effect" "flickAll"
   arity 1
   retention call

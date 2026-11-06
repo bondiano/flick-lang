@@ -217,49 +217,58 @@ from_result : Result (Errors e) a ->{; e} a
 foreign effect from_result from "@flick-lang/runtime" "fromResult"
   reviewed "effect@4.1.2 sha256:5776a5b0ab051f96"
 
+@lang detached
+/// No effect of the services `r` has a `control` operation, so a task that
+/// needs them may run in a fiber of its own: the handler of such an effect,
+/// and the rest of the computation it resumes, are in the fiber that
+/// installed it. The compiler decides it from the effects of the row; a
+/// signature names it for a row variable.
+class Detached (r : ServiceRow)
+
 /// Runs both, as children: on a failure the other one is interrupted and
 /// awaited. The results keep the order of the arguments.
-parallel : forall c r e a b. (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c
+parallel : forall c r e a b. Detached r => (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c
 foreign effect parallel from "@flick-lang/runtime" "parallel"
   retention call
 
 /// Runs every task, at most `limit` at a time; `limit` must be a positive
 /// finite integer. The results keep the order of the input.
-parallel_all : forall c r e a. Int -> List ((Eff r e a)^c) ->{r; e} List a
+parallel_all : forall c r e a. Detached r => Int -> List ((Eff r e a)^c) ->{r; e} List a
 foreign effect parallel_all from "@flick-lang/runtime" "parallelAll"
   retention call
 
 /// Each task's typed failure as an `Err`; a defect or an interruption still
 /// stops the group.
-parallel_results : forall c r e a. List ((Eff r e a)^c) ->{r; none} List (Result (Errors e) a)
+parallel_results :
+  forall c r e a. Detached r => List ((Eff r e a)^c) ->{r; none} List (Result (Errors e) a)
 foreign effect parallel_results from "@flick-lang/runtime" "parallelResults"
   retention call
 
 /// The opaque exit of every task.
-parallel_exits : forall c r e a. List ((Eff r e a)^c) ->{r; none} List (Exit e a)
+parallel_exits : forall c r e a. Detached r => List ((Eff r e a)^c) ->{r; none} List (Exit e a)
 foreign effect parallel_exits from "@flick-lang/runtime" "parallelExits"
   retention call
 
 /// The first task to succeed; the loser is interrupted and awaited.
-race_success : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
+race_success : forall c r e a. Detached r => (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
 foreign effect race_success from "@flick-lang/runtime" "raceSuccess"
   retention call
   reviewed "effect@4.1.2 sha256:ac5b5886f22dc7c6"
 
 /// The first task to end, however it ends.
-race_first : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
+race_first : forall c r e a. Detached r => (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
 foreign effect race_first from "@flick-lang/runtime" "raceFirst"
   retention call
   reviewed "effect@4.1.2 sha256:5247faa250c6adc7"
 
 /// Fails with `TimeoutError` when `millis` pass before the task ends.
-timeout : forall c r e a. Float -> (Eff r e a)^c ->{r; TimeoutError | e} a
+timeout : forall c r e a. Detached r => Float -> (Eff r e a)^c ->{r; TimeoutError | e} a
 foreign effect timeout from "@flick-lang/runtime" "timeout"
   retention call
   reviewed "effect@4.1.2 sha256:297e05405fa2e747"
 
 /// `None` when `millis` pass before the task ends; other failures stay.
-timeout_option : forall c r e a. Float -> (Eff r e a)^c ->{r; e} Option a
+timeout_option : forall c r e a. Detached r => Float -> (Eff r e a)^c ->{r; e} Option a
 foreign effect timeout_option from "@flick-lang/runtime" "timeoutOption"
   retention call
   reviewed "effect@4.1.2 sha256:35e1a71b230ac8e2"

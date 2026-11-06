@@ -89,3 +89,20 @@ service Greeter =
 wrong_record : Unit ->{} String
 let wrong_record () = provide Greeter ({ greet = fun n -> n + 1 }) { Greeter.greet "x" }
 //~ FLICK-T003 @90:63-90:64 expected `String`, found `Int`
+
+/// The handler of `Emit` is in this fiber: a child cannot reach it.
+children : Unit ->{} List Int
+let children () =
+  collect (fun () -> parallel (task { Emit.emit 1 }) (task { Emit.emit 2 }))
+//~ FLICK-E017 @96:22-96:30 `Detached {Emit Int}` does not hold: effect
+
+collect : forall a b r e. (Unit ->{Emit a | r; e} b) ->{r; e} List a
+let collect body =
+  try body () with
+  | Emit.emit x -> [x] ++ resume ()
+  | return _ -> []
+
+/// A row variable may hold a `control` effect.
+both_of : forall r e a. Eff r e a -> Eff r e a ->{r; e} (a, a)
+let both_of first second = parallel first second
+//~ FLICK-E017 @107:28-107:36 cannot deduce `Detached r` from the constraints

@@ -18,50 +18,38 @@ type error Missing = Missing String
 /// `tail`: the arm is the value of the operation.
 with_name : forall a r e. String -> (Unit ->{Ask String | r; e} a) ->{r; e} a
 let with_name name body =
-  try
-    body ()
-  with
+  try body () with
   | Ask.ask () -> name
 
 /// `control`: `resume` is the rest of the body, under the same handler.
 collect : forall a r e. (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
 let collect body =
-  try
-    body ()
-  with
+  try body () with
   | Emit.emit x -> [x] ++ resume ()
   | return () -> []
 
 /// `abort`: the arm is the value of the handler.
 attempt : forall a r e. (Unit ->{Throw | r; e} a) ->{r; e} Result String a
 let attempt body =
-  try
-    Ok (body ())
-  with
+  try Ok (body ()) with
   | Throw.throw message -> Err message
 
 /// An arm for `bump` only: `read` goes on to the enclosing handler.
 doubled : (Unit ->{Counter; none} Int) ->{Counter; none} Int
 let doubled body =
-  try
-    body ()
-  with
+  try body () with
   | Counter.bump n -> Counter.bump (n * 2)
 
 /// A guarded arm covers nothing: `ask` may go on.
 fallback : (Unit ->{Ask Int; none} Int) ->{Ask Int; none} Int
 let fallback body =
-  try
-    body ()
-  with
+  try body () with
   | Ask.ask () when false -> 0
 
 /// Arms for operations and for errors in one handler.
 both : (Unit ->{Ask Int; Missing} Int) ->{} Int
 let both body =
-  try
-    body ()
-  with
+  try body () with
   | Ask.ask () -> 1
   | Missing _ -> 0
 
@@ -92,3 +80,16 @@ let greeted () = provide Greeter greeter { welcome () }
 
 stored : Unit ->{} Int
 let stored () = provide Store ({ load = fun () -> 42 }) { Store.load () + 1 }
+
+/// A task in a fiber of its own may need `tail` effects; a `control` one
+/// is handled inside it.
+children : Unit ->{} (List Int, List Int)
+let children () =
+  parallel (task { collect (fun () -> Emit.emit 1) }) (task { collect (fun () -> Emit.emit 2) })
+
+asked : Unit ->{Ask Int; none} (Int, Int)
+let asked () = parallel (task { Ask.ask () }) (task { Ask.ask () + 1 })
+
+/// A row variable of the signature is `Detached` by its constraint.
+both_of : forall r e a. Detached r => Eff r e a -> Eff r e a ->{r; e} (a, a)
+let both_of first second = parallel first second

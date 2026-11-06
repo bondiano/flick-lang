@@ -1,6 +1,6 @@
 ---
 title: "Регионы и захваты"
-source_hash: 6cce6002bc6728da
+source_hash: d332743db2f9e5b7
 ---
 
 `scope` освобождает полученные ресурсы, когда его тело завершается.
@@ -206,7 +206,7 @@ from_acquire :
 ```flick
 spawn :
   forall s c r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Fiber.Owner s ->
   (Failure e ->{Scope s | r; none} Unit)^c ->
   (Eff {Scope s | r} e a)^c ->{r; none} Fiber.Fiber e a
