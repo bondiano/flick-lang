@@ -16,6 +16,7 @@ mod effects;
 mod expr;
 mod foreign;
 mod generate;
+mod handle;
 mod items;
 mod layout;
 mod loops;

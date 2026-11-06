@@ -235,13 +235,17 @@ var Unmatched Value = &struct{ unmatched bool }{true}
 // Try is `try body with arms`: the first typed failure of a cause without
 // defects goes to `handle`, which gives Unmatched when no arm matches and
 // the cause goes on. A cause with a defect turns its failures into defects;
-// interruption alone has no typed error.
+// interruption alone has no typed error, and unwinding to a handler of
+// effects is none either.
 func Try(fb *Fiber, body Eff, handle func(*Fiber, Value) Value) Value {
 	out, caught := catch(func() Value { return body(fb) })
 	if caught == nil {
 		return out
 	}
 	skipHandler(fb, caught)
+	if unwinds(caught) {
+		panic(&Failure{caught})
+	}
 	if caught.has(causeDie) {
 		if caught.has(causeFail) {
 			caught = caught.failsToDies()

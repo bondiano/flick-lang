@@ -62,6 +62,7 @@ export const parallel = /*#__PURE__*/ needsEffect("parallel");
 export const parallelAll = /*#__PURE__*/ needsEffect("parallelAll");
 export const parallelExits = /*#__PURE__*/ needsEffect("parallelExits");
 export const parallelResults = /*#__PURE__*/ needsEffect("parallelResults");
+export const handle = /*#__PURE__*/ needsEffect("handle");
 export const provide = /*#__PURE__*/ needsEffect("provide");
 export const raceFirst = /*#__PURE__*/ needsEffect("raceFirst");
 export const raceSuccess = /*#__PURE__*/ needsEffect("raceSuccess");

@@ -122,12 +122,13 @@ impl Checker<'_> {
             );
             return None;
         };
+        let stages = self.arrow_stages(&op.ty);
         self.record_name(
             span,
             Ref::Operation {
                 service: label.clone(),
                 name: name.to_owned(),
-                stages: Vec::new(),
+                stages,
             },
         );
         let index = if let Some(i) = handled.iter().position(|h| h.label == label) {
@@ -183,6 +184,11 @@ impl Checker<'_> {
             .collect();
         let pattern = arm_pattern(arm);
         let start = pattern.map_or(arm.range().0, |p| p.range().0);
+        if let Some(pattern) = pattern {
+            self.typing
+                .handled
+                .insert(pattern.range(), (op.class, constraints.len()));
+        }
         for (i, c) in constraints.iter().enumerate() {
             let given = field_given(&dict_local(start, i), c.substitute(&subst));
             self.classes.givens.push(given);

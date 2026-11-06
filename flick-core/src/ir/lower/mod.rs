@@ -10,6 +10,7 @@ mod do_notation;
 mod enums;
 mod expr;
 mod generic;
+mod handle;
 mod lambda;
 mod literals;
 mod numeric;

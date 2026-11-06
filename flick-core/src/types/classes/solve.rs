@@ -14,6 +14,7 @@ use crate::types::env::Instance;
 use crate::types::gadt::branch::as_field_given;
 use crate::types::generalize::replace_metas;
 use crate::types::lang::{self, Lang};
+use crate::types::passes_dictionary;
 use crate::types::ty::Type;
 
 #[derive(Debug, Clone)]
@@ -55,7 +56,10 @@ impl Checker<'_> {
                 match outcome {
                     Outcome::Solved(dict) => {
                         progress = true;
-                        self.record_dict(w.span, w.order, dict.clone());
+                        // `Detached` is the compiler's to decide: no dictionary at run time
+                        if passes_dictionary(&w.constraint) {
+                            self.record_dict(w.span, w.order, dict.clone());
+                        }
                         self.classes.evidence.push((w.span, dict));
                     }
                     outcome => left.push((w, outcome)),

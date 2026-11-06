@@ -122,6 +122,7 @@ impl Tr {
             ExprKind::Await(x) => Term::Await(rc(self.expr(x))),
             ExprKind::Task(x) => Term::Task(rc(self.expr(x))),
             ExprKind::Provide(l, x) => Term::Provide(rc(self.expr(l)), rc(self.expr(x))),
+            ExprKind::Handle(_) => stuck("a handler of effects"),
             // a lift does nothing in the model (§3.4); its correctness is G2
             ExprKind::Lift(x, _) => self.expr(x),
             ExprKind::Label(_) => stuck("`Record.label`"),

@@ -1,0 +1,41 @@
+// Handlers of effects: a `tail` arm gives the operation its value, an
+// `abort` arm the handler its value; an inner handler hides an outer one.
+module App.Main exposing (main)
+
+effect Ask =
+  ask : Unit ->{} Int
+
+effect Throw =
+  abort throw : forall b. String ->{} b
+
+type error Oops = Oops String
+
+asked : Unit ->{Ask; none} Int
+let asked () = Ask.ask () + 1
+
+checked : Int ->{Throw; none} Int
+let checked n = if n < 0 then Throw.throw "negative" else n * 2
+
+attempt : (Unit ->{Throw; none} Int) ->{} String
+let attempt body =
+  try show (body ()) with
+  | Throw.throw message -> "thrown: " ++ message
+
+main : Unit ->{} Unit
+let main () =
+  let n =
+    try asked () with
+    | Ask.ask () -> 41
+  Platform.stdout_line (show n)
+  Platform.stdout_line (attempt (fun () -> checked 5))
+  Platform.stdout_line (attempt (fun () -> checked (0 - 5)))
+  let inner =
+    try
+      (
+        try Ask.ask () with
+        | Ask.ask () -> 1
+      )
+        + Ask.ask ()
+    with
+    | Ask.ask () -> 10
+  Platform.stdout_line (show inner)

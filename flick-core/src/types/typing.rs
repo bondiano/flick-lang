@@ -13,6 +13,7 @@ use super::Checker;
 use super::classes::Dict;
 use super::env::{Abi, Rep};
 use super::gadt::branch::as_field_given;
+use super::services::OpClass;
 #[cfg(feature = "ide")]
 use super::sql::dialect::Dialect;
 pub use super::sql_plan::{SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue};
@@ -73,6 +74,12 @@ pub struct Typing {
     /// `match` arms whose pattern matches no value of its type: a GADT
     /// constructor the type of the matched value rules out.
     pub dead_arms: HashSet<Range>,
+    /// The class and the number of dictionaries of the operation each arm
+    /// of a handler is for, by its pattern.
+    pub handled: HashMap<Range, (OpClass, usize)>,
+    /// The operations of the service of each `provide S impl`, by its node:
+    /// name, number of dictionaries and stages.
+    pub provided_ops: HashMap<Range, Vec<(String, usize, Vec<Stage>)>>,
     /// `==` and `!=` that JS `===` decides: on the values themselves, or on
     /// their tags when every constructor of the type has no fields.
     pub identity_eq: HashMap<Range, Identity>,

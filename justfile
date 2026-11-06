@@ -79,7 +79,7 @@ e2e-js: docs-wasm e2e-prepare
 
 # The e2e suites of the compiler but the cases of tests/run, under nextest
 e2e-tests: e2e-prepare
-    cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core --test e2e --test e2e_numbers --test go_main --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path --test source_packages --test workspace --test consteval_node -E 'not test(=run_cases)'
+    cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core --test e2e --test e2e_numbers --test go_main --test control_handlers --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path --test source_packages --test workspace --test consteval_node -E 'not test(=run_cases)'
 
 # The cases of tests/run: all of them, or the shard `k/n` of them
 e2e-cases shard="": e2e-prepare

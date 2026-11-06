@@ -1,0 +1,101 @@
+// The arms of a handler: errors beside operations, the value of the body,
+// a guard that lets a call go on to the handler around, a failure of a
+// `tail` arm that no `try` in between sees, an `abort` that closes the
+// scopes it leaves, a record that handles a service, and an operation with
+// a class constraint.
+module App.Main exposing (main)
+
+effect Ask =
+  ask : Int ->{} Int
+
+effect Throw =
+  abort throw : forall b. String ->{} b
+
+effect Log =
+  log : forall a. Show a => a ->{} Unit
+
+service Greeter =
+  greet : String ->{} String
+
+service Render =
+  render : Show a => a ->{} String
+  pair : (Show a, Show b) => a -> b ->{} String
+
+type error Oops = Oops String
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// An error arm and an operation arm in one handler; `return` doubles the
+/// body's value, not the error arm's.
+both : (Unit ->{Ask; Oops} Int) ->{} Int
+let both body =
+  try body () with
+  | Ask.ask n -> n + 1
+  | Oops _ -> 0
+  | return v -> v * 2
+
+/// A guarded arm lets the other calls go on to the handler around it.
+evens : Unit ->{Ask; none} Int
+let evens () =
+  try Ask.ask 2 + Ask.ask 3 with
+  | Ask.ask n when n % 2 == 0 -> n * 100
+
+/// The failure of a `tail` arm is the handler's: the `try` in the body
+/// does not catch it.
+strict : Unit ->{; Oops} Int
+let strict () =
+  try
+    try Ask.ask 1 with
+    | Oops _ -> 0
+  with
+  | Ask.ask _ -> from_result (Err (Oops "in the arm"))
+
+/// An `abort` leaves the scope, which closes first.
+leaving : Unit ->{} String
+let leaving () =
+  try
+    scope {
+      Scope.add_finalizer (task { say "scope closed" })
+      Throw.throw "out"
+    }
+  with
+  | Throw.throw m -> "aborted: " ++ m
+
+greeter : Greeter.Impl
+let greeter = { greet = fun name -> "hello, " ++ name }
+
+render_impl : Render.Impl
+let render_impl = {
+  render = fun x -> "<" ++ show x ++ ">";
+  pair = fun x y -> show x ++ "/" ++ show y;
+}
+
+logged : Unit ->{} Unit
+let logged () =
+  try
+    Log.log 1
+    Log.log "two"
+  with
+  | Log.log x -> say ("log " ++ show x)
+
+main : Unit ->{} Unit
+let main () =
+  say (show (both (fun () -> Ask.ask 4)))
+  say (show (both (fun () -> from_result (Err (Oops "x")))))
+  say
+    (show
+      (
+        try evens () with
+        | Ask.ask n -> n
+      ))
+  say
+    (show
+      (
+        try strict () with
+        | Oops m -> 0 - String.length m
+      ))
+  say (leaving ())
+  say (provide Greeter greeter { Greeter.greet "ada" })
+  say (provide Render render_impl { Render.render 42 ++ " " ++ Render.pair 1 true })
+  logged ()

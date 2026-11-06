@@ -120,10 +120,7 @@ impl Lower<'_> {
                 let scrutinee = self.boxed(children[0]);
                 ExprKind::Match(scrutinee, self.arms(node))
             }
-            K::TryExpr | K::ProvideExpr if self.handles_effects(node) => {
-                self.unsupported(node);
-                ExprKind::Lit(Lit::Unit)
-            }
+            K::TryExpr | K::ProvideExpr if self.handles_effects(node) => self.handler(node),
             K::TryExpr => {
                 let body = self.boxed(children[0]);
                 ExprKind::Try(body, self.arms(node))
@@ -463,29 +460,30 @@ impl Lower<'_> {
             .nodes()
             .filter(|n| n.kind == K::MatchArm && !self.typing.dead_arms.contains(&n.range()))
             .collect();
-        live.into_iter()
-            .map(|arm| {
-                let mark = self.scope.len();
-                let mut pat = Pat::Wild;
-                let mut guard = None;
-                let mut body = None;
-                for child in arm.nodes() {
-                    match child.kind {
-                        K::Guard => guard = child.nodes().next().map(|g| self.expr(g)),
-                        K::Block => body = Some(self.expr(child)),
-                        kind if is_pattern(kind) => pat = self.pattern(child),
-                        _ => {}
-                    }
-                }
-                self.scope.truncate(mark);
-                let span = self.span(arm);
-                Arm {
-                    pat,
-                    guard,
-                    body: body.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span)),
-                }
-            })
-            .collect()
+        live.into_iter().map(|arm| self.arm(arm)).collect()
+    }
+
+    /// `| pattern [when guard] -> body`.
+    pub(super) fn arm(&mut self, arm: &Node) -> Arm {
+        let mark = self.scope.len();
+        let mut pat = Pat::Wild;
+        let mut guard = None;
+        let mut body = None;
+        for child in arm.nodes() {
+            match child.kind {
+                K::Guard => guard = child.nodes().next().map(|g| self.expr(g)),
+                K::Block => body = Some(self.expr(child)),
+                kind if is_pattern(kind) => pat = self.pattern(child),
+                _ => {}
+            }
+        }
+        self.scope.truncate(mark);
+        let span = self.span(arm);
+        Arm {
+            pat,
+            guard,
+            body: body.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span)),
+        }
     }
 }
 

@@ -4,7 +4,7 @@
 // cause or exit, and bytes as lists of numbers.
 import { type Cause, Channel, Effect, type Exit, Option, type PubSub, type Queue } from "effect";
 
-import { Failure } from "../cause.ts";
+import { Failure, passOn, unwinds } from "../cause.ts";
 import type { Data } from "../data.ts";
 import { failureCause, flickExit } from "../stdlib/outcome.ts";
 import { tag } from "../tags.ts";
@@ -128,7 +128,7 @@ export const flickEncodeText = <Err, Done>() => Channel.map(Channel.encodeText<E
 
 /** `Channel.catch_cause`: the handler gets a `Failure`. */
 export const flickCatchCause = (f: (failure: Failure) => Any) => (self: Any) =>
-  Channel.catchCause(self, (cause) => f(failureOf(cause)));
+  Channel.catchCause(self, (cause) => (unwinds(cause) ? Channel.fromEffect(passOn(cause)) : f(failureOf(cause))));
 
 /** `Channel.tap_cause`: `f` gets a `Failure`. */
 export const flickTapCause = (f: (failure: Failure) => Effect.Effect<unknown, unknown, unknown>) => (self: Any) =>

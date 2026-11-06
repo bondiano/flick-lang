@@ -322,6 +322,25 @@ impl Checker<'_> {
         if let Some(head) = parts.next() {
             self.record_name(self.span(head), Ref::ServiceTag(label.clone()));
         }
+        let operations = match self
+            .env
+            .type_def(&entity.module, &entity.name)
+            .map(|d| &d.form)
+        {
+            Some(Form::Service { operations, .. }) => operations.clone(),
+            _ => Vec::new(),
+        };
+        let ops = operations
+            .iter()
+            .map(|o| {
+                let dicts = match &o.ty {
+                    Type::Forall { constraints, .. } => constraints.len(),
+                    _ => 0,
+                };
+                (o.name.clone(), dicts, self.arrow_stages(&o.ty))
+            })
+            .collect();
+        self.typing.provided_ops.insert(node.range(), ops);
         if effect {
             self.error(
                 codes::E016,

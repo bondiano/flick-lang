@@ -275,6 +275,7 @@ impl Totality<'_> {
             | ExprKind::Scope { .. }
             | ExprKind::Within(..)
             | ExprKind::Provide(..)
+            | ExprKind::Handle(_)
             | ExprKind::Generate { .. }
             | ExprKind::Unwrap(_)
             | ExprKind::Each { .. }

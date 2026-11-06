@@ -13,6 +13,7 @@ export * from "./data.ts";
 export * from "./atoms.ts";
 export * from "./storage.ts";
 export * from "./effects.ts";
+export * from "./handlers.ts";
 export * from "./entry.ts";
 export * from "./layer.ts";
 export * from "./owner.ts";

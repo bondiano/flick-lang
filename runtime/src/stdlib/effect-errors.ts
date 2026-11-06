@@ -3,7 +3,7 @@
 // and a defect only as inert text.
 import { type Cause, Effect, Exit, type LogLevel, Option, Result } from "effect";
 
-import { type Failure, type FlickExit, RawCause, describeDefect } from "../cause.ts";
+import { type Failure, type FlickExit, RawCause, describeDefect, passOn, unwinds } from "../cause.ts";
 import { none, some } from "../data.ts";
 import { causeOf, toFailure } from "../effect/Cause.ts";
 import { flickExit } from "./outcome.ts";
@@ -11,23 +11,23 @@ import { flickExit } from "./outcome.ts";
 type Run<A, E = unknown, R = unknown> = (value: A) => Effect.Effect<unknown, E, R>;
 type Filtered<B> = (failure: Failure) => Result.Result<B, Failure>;
 
-/** A Flick filter of failures as a filter of native causes. */
+/** A Flick filter of failures as a filter of native causes; one unwinding to a handler of effects is no failure of the code. */
 const causeFilter =
   <B>(filter: Filtered<B>) =>
-  (cause: Cause.Cause<unknown>) =>
-    Result.mapError(filter(toFailure(cause)), (failure) => causeOf(failure));
+  (cause: Cause.Cause<unknown>): Result.Result<B, Cause.Cause<unknown>> =>
+    unwinds(cause) ? Result.fail(cause) : Result.mapError(filter(toFailure(cause)), (failure) => causeOf(failure));
 
 export const flickCatchCause =
   <A2, E2, R2>(f: (failure: Failure) => Effect.Effect<A2, E2, R2>) =>
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
-    Effect.catchCause(self, (cause) => f(toFailure(cause)));
+    Effect.catchCause(self, (cause) => (unwinds(cause) ? passOn(cause) : f(toFailure(cause))));
 
 export const flickCatchCauseIf =
   <A2, E2, R2>(predicate: (failure: Failure) => boolean, f: (failure: Failure) => Effect.Effect<A2, E2, R2>) =>
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
     Effect.catchCauseIf(
       self,
-      (cause) => predicate(toFailure(cause)),
+      (cause) => !unwinds(cause) && predicate(toFailure(cause)),
       (cause) => f(toFailure(cause)),
     );
 
@@ -68,12 +68,18 @@ export const flickTapDefect =
 export const flickMatchCause =
   <A, B>(onFailure: (failure: Failure) => B, onSuccess: (value: A) => B) =>
   <E, R>(self: Effect.Effect<A, E, R>) =>
-    Effect.matchCause(self, { onFailure: (cause) => onFailure(toFailure(cause)), onSuccess });
+    Effect.matchCauseEffect(self, {
+      onFailure: (cause) => (unwinds(cause) ? passOn(cause) : Effect.succeed(onFailure(toFailure(cause)))),
+      onSuccess: (value) => Effect.succeed(onSuccess(value)),
+    });
 
 export const flickMatchCauseEager =
   <A, B>(onFailure: (failure: Failure) => B, onSuccess: (value: A) => B) =>
   <E, R>(self: Effect.Effect<A, E, R>) =>
-    Effect.matchCauseEager(self, { onFailure: (cause) => onFailure(toFailure(cause)), onSuccess });
+    Effect.matchCauseEffectEager(self, {
+      onFailure: (cause) => (unwinds(cause) ? passOn(cause) : Effect.succeed(onFailure(toFailure(cause)))),
+      onSuccess: (value) => Effect.succeed(onSuccess(value)),
+    });
 
 export const flickMatchCauseEffect =
   <A, B, E2, R2, E3, R3>(
@@ -81,7 +87,10 @@ export const flickMatchCauseEffect =
     onSuccess: (value: A) => Effect.Effect<B, E3, R3>,
   ) =>
   <E, R>(self: Effect.Effect<A, E, R>) =>
-    Effect.matchCauseEffect(self, { onFailure: (cause) => onFailure(toFailure(cause)), onSuccess });
+    Effect.matchCauseEffect(self, {
+      onFailure: (cause) => (unwinds(cause) ? passOn(cause) : onFailure(toFailure(cause))),
+      onSuccess,
+    });
 
 export const flickMatchCauseEffectEager =
   <A, B, E2, R2, E3, R3>(
@@ -89,7 +98,10 @@ export const flickMatchCauseEffectEager =
     onSuccess: (value: A) => Effect.Effect<B, E3, R3>,
   ) =>
   <E, R>(self: Effect.Effect<A, E, R>) =>
-    Effect.matchCauseEffectEager(self, { onFailure: (cause) => onFailure(toFailure(cause)), onSuccess });
+    Effect.matchCauseEffectEager(self, {
+      onFailure: (cause) => (unwinds(cause) ? passOn(cause) : onFailure(toFailure(cause))),
+      onSuccess,
+    });
 
 const logOption = (level: Option.Option<LogLevel.Severity>): { readonly log: boolean | LogLevel.Severity } => ({
   log: Option.getOrElse(level, (): boolean | LogLevel.Severity => false),

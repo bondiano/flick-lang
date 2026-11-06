@@ -2,7 +2,7 @@
 // adapters where a Flick value differs from what Effect takes.
 import { type Cause, Context, Effect, Exit, Layer, type LogLevel, Option, Scope, Tracer } from "effect";
 
-import { Failure, RawCause } from "../cause.ts";
+import { Failure, RawCause, passOn, unwinds } from "../cause.ts";
 
 export * from "effect/Layer";
 
@@ -22,7 +22,12 @@ export const flickTapCause =
 export const flickCatchCause =
   <E, A2, E2, R2>(f: (failure: Failure) => Layer.Layer<A2, E2, R2>) =>
   <A, R>(self: Layer.Layer<A, E, R>): Layer.Layer<A & A2, E2, R | R2> =>
-    Layer.catchCause(self, (cause: Cause.Cause<E>) => f(new Failure(cause)));
+    Layer.catchCause(self, (cause: Cause.Cause<E>) =>
+      unwinds(cause)
+        ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- it never builds: it unwinds to a handler of effects
+          (Layer.effectDiscard(passOn(cause)) as unknown as Layer.Layer<A2, E2, R2>)
+        : f(new Failure(cause)),
+    );
 
 /** `Layer.build_with_memo_map`: into the scope of the call. */
 export const flickBuildWithMemoMap =

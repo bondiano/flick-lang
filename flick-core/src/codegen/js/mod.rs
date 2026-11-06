@@ -24,6 +24,7 @@ mod foreign;
 mod function;
 mod generator;
 mod group;
+mod handle;
 mod imports;
 mod items;
 mod labels;
