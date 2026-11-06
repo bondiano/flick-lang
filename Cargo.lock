@@ -646,6 +646,8 @@ dependencies = [
  "flick-core",
  "flick-plugin",
  "insta",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

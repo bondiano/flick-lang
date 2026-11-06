@@ -38,7 +38,6 @@ fn top_decl(p: &mut Parser) {
         K::InstanceKw => instance_decl(p),
         K::DerivingKw if p.nth(1) == K::InstanceKw => deriving_decl(p),
         K::ForeignKw => foreign_decl(p),
-        K::SqlKw if p.nth(1) == K::Ident && word_at(p, 1, "migration") => sql_migration(p),
         // `sql table`: a block of the plugin of std, its head a keyword still
         K::SqlKw if p.nth(1) == K::Ident => super::plugin::declaration(p),
         // `component name`: the word is a name everywhere else
@@ -437,18 +436,6 @@ fn deriving_decl(p: &mut Parser) {
     derived(p);
     super::types::type_(p);
     p.complete(m, K::DerivingDecl);
-}
-
-/// `sql migration 1 "name" { create table …; … }`: the statements are SQL,
-/// kept as tokens for `syntax::ddl` to read, layout and all words free.
-fn sql_migration(p: &mut Parser) {
-    let m = p.start();
-    p.bump();
-    p.bump();
-    if p.expect(K::Number) && p.expect(K::String) {
-        super::plugin::raw_braces(p);
-    }
-    p.complete(m, K::SqlMigrationDecl);
 }
 
 fn kind_decl(p: &mut Parser) {

@@ -14,7 +14,6 @@ use super::ty::{Binder, Type};
 use crate::iface::Namespace;
 use crate::resolve;
 use crate::syntax::cst::Node;
-use crate::syntax::ddl::{self, Table};
 use crate::syntax::kind::SyntaxKind as K;
 
 /// A declaration whose body is converted after every name is known.
@@ -22,8 +21,6 @@ struct Pending<'n> {
     node: &'n Node,
     name: String,
     params: Vec<Binder>,
-    /// The table of a `sql migration`, whose row this is.
-    table: Option<Table>,
 }
 
 impl Checker<'_> {
@@ -35,30 +32,6 @@ impl Checker<'_> {
         for decl in decls {
             if let Some(p) = self.skeleton(decl) {
                 pending.push(p);
-            }
-        }
-        // the tables of the migrations, each a row type
-        if let Some(first) = decls.iter().find(|d| d.kind == K::SqlMigrationDecl) {
-            for table in self.migrated_tables(decls) {
-                let name = ddl::type_name(&table.name);
-                self.env.define_type(
-                    &name,
-                    TypeDef {
-                        kind: Kind::Type,
-                        form: Form::Alias {
-                            params: Vec::new(),
-                            body: Type::Error,
-                            opaque: false,
-                        },
-                    },
-                );
-                self.env.declare(Namespace::Type, &name);
-                pending.push(Pending {
-                    node: first,
-                    name,
-                    params: Vec::new(),
-                    table: Some(table),
-                });
             }
         }
         let mut refined = Vec::new();
@@ -235,7 +208,6 @@ impl Checker<'_> {
             node: decl,
             name,
             params,
-            table: None,
         })
     }
 
@@ -299,10 +271,6 @@ impl Checker<'_> {
                 }])
             }
             K::ServiceDecl => Body::Members(self.operations(decl)),
-            K::SqlMigrationDecl => match &p.table {
-                Some(table) => Body::Alias(self.migrated_row(table, &p.name)),
-                None => Body::None,
-            },
             K::ClassDecl => {
                 let mut supers = Vec::new();
                 for context in decl.nodes().filter(|n| n.kind == K::Context) {

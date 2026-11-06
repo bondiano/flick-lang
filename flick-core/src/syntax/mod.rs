@@ -3,7 +3,6 @@
 
 pub mod ast;
 pub mod cst;
-pub mod ddl;
 pub mod kind;
 pub mod lexer;
 pub mod literal;

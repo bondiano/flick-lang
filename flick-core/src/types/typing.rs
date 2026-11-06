@@ -16,7 +16,7 @@ use super::gadt::branch::as_field_given;
 use super::services::OpClass;
 #[cfg(feature = "ide")]
 use super::sql::dialect::Dialect;
-pub use super::sql_plan::{SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue};
+pub use super::sql_plan::{SqlForm, SqlPlan, SqlValue};
 use super::ty::{Stage, Type};
 use crate::iface::Interface;
 use crate::ir::Label;
@@ -142,8 +142,6 @@ pub struct Typing {
     pub refined: HashMap<Range, Type>,
     #[cfg(feature = "ide")]
     pub(crate) pending_refined: Vec<(Range, Type)>,
-    /// `sql table` declarations.
-    pub sql_tables: Vec<SqlTable>,
     #[cfg(feature = "ide")]
     /// The dialect the SQL of the module was checked against.
     pub sql_dialect: &'static Dialect,

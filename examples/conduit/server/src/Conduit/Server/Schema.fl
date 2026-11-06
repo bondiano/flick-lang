@@ -6,6 +6,8 @@
 /// from its clock, so they sort as they read and go out as they are stored.
 module Conduit.Server.Schema exposing (..)
 
+import Sql exposing (plugin sql)
+
 /// The first schema: people, what they write and how they follow and
 /// favor each other.
 sql migration 1 "conduit" {

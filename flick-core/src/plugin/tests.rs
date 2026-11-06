@@ -36,7 +36,8 @@ fn every_kind_of_node_renders_in_parentheses() {
     let name = |b: &mut Builder, n: &str| b.expr(Expr::Name(n.into()));
     assert_eq!(text(|b| name(b, "List.map")), Ok("List.map".into()));
     assert_eq!(text(|b| b.expr(Expr::Number(1.5))), Ok("1.5".into()));
-    assert_eq!(text(|b| b.expr(Expr::Number(-2.0))), Ok("(-2.0)".into()));
+    assert_eq!(text(|b| b.expr(Expr::Number(-2.0))), Ok("(-2)".into()));
+    assert_eq!(text(|b| b.expr(Expr::Number(1e300))), Ok("1e300".into()));
     assert_eq!(
         text(|b| b.expr(Expr::Text("a\"b\\c\n\u{1}".into()))),
         Ok(r#""a\"b\\c\n\u{1}""#.into())
@@ -52,7 +53,7 @@ fn every_kind_of_node_renders_in_parentheses() {
             arguments: vec![x, y],
         })
     });
-    assert_eq!(applied, Ok("(f x 1.0)".into()));
+    assert_eq!(applied, Ok("(f x 1)".into()));
     let lambda = text(|b| {
         let p = b.pat(Pat::Var("p".into()));
         let w = b.pat(Pat::Wildcard);
@@ -82,7 +83,7 @@ fn every_kind_of_node_renders_in_parentheses() {
         let two = b.expr(Expr::Number(2.0));
         b.expr(Expr::Tuple(vec![items, two]))
     });
-    assert_eq!(record, Ok("([({ a = x }).a, 1.0], 2.0)".into()));
+    assert_eq!(record, Ok("([({ a = x }).a, 1], 2)".into()));
     let annot = text(|b| {
         let e = name(b, "e");
         let list = b.ty(Ty::Name("List".into()));

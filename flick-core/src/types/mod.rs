@@ -109,7 +109,7 @@ pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
     Constructor, Copies, ForeignInfo, GenericInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
-    SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing, default_method, passes_dictionary,
+    SqlForm, SqlPlan, SqlValue, Typing, default_method, passes_dictionary,
 };
 
 use convert::TyVar;

@@ -5,7 +5,7 @@
 // `flick/tests/sql_postgres.rs` on a fresh database.
 module App.Migrated exposing (main)
 
-import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
 import Database exposing (Database)
 import Database.Migrate exposing (MigrationError(..))
 
