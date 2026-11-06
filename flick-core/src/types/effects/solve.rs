@@ -6,7 +6,7 @@
 use std::mem;
 
 use super::Site;
-use crate::diagnostics::{Diagnostic, codes};
+use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Norm, Row, Type};
@@ -283,12 +283,12 @@ impl Checker<'_> {
             .flatten()
             .collect::<Vec<_>>()
             .join(" and ");
-        if let Site::Expected(ty) = &self.sites[e.site]
+        if let Site::Expected(ty, _) = &self.sites[e.site]
             && self.reads_only(&ty.clone())
         {
             return self.render_excess(e, &list);
         }
-        if let Site::Expected(ty) = &self.sites[e.site]
+        if let Site::Expected(ty, _) = &self.sites[e.site]
             && self.setup_only(&ty.clone())
         {
             let diagnostic = Diagnostic::error(
@@ -299,18 +299,33 @@ impl Checker<'_> {
             self.diagnostics.push(diagnostic);
             return;
         }
-        let (bound, needer) = match &self.sites[e.site] {
-            Site::Signature(name) => (format!("the signature of `{name}`"), "its body"),
-            Site::Expected(ty) => (format!("the expected type `{}`", self.show(ty)), "this"),
-            Site::Inferred => ("the type of this function".to_owned(), "its body"),
+        let (bound, needer, written) = match &self.sites[e.site] {
+            Site::Signature(name, written) => (
+                format!("the signature of `{name}`"),
+                "its body",
+                Some(*written),
+            ),
+            Site::Expected(ty, written) => (
+                format!("the expected type `{}`", self.show(ty)),
+                "this",
+                written.0.is_some().then_some(*written),
+            ),
+            Site::Inferred => ("the type of this function".to_owned(), "its body", None),
         };
         let mut diagnostic = Diagnostic::error(
             codes::E002,
             format!("{bound} does not allow {list}, which {needer} needs"),
             e.span,
         );
-        if matches!(self.sites[e.site], Site::Signature(_)) {
-            diagnostic = diagnostic.with_fix(|| (format!("add {list} to {bound}"), Vec::new()));
+        if let Some(written) = written {
+            // the services go after the `{`; the errors, after the `;`, are left to the user
+            let edits: Vec<Edit> = (e.errors.is_empty())
+                .then(|| written.adding(&e.services.join(", ")))
+                .flatten()
+                .map(|(span, replacement)| Edit { span, replacement })
+                .into_iter()
+                .collect();
+            diagnostic = diagnostic.with_fix(|| (format!("add {list} to {bound}"), edits));
         }
         self.diagnostics.push(diagnostic);
     }

@@ -11,7 +11,7 @@
 mod solve;
 
 use super::Checker;
-use super::ty::{Effects, Type};
+use super::ty::{Effects, Type, Written};
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -54,10 +54,11 @@ pub struct Stage {
 /// Where the upper bound of a stage comes from, for diagnostics.
 #[derive(Debug, Clone)]
 pub enum Site {
-    /// The signature of the named function.
-    Signature(String),
-    /// The type a value or a `task` is checked against.
-    Expected(Type),
+    /// The signature of the named function, and where its row is written.
+    Signature(String, Written),
+    /// The type a value or a `task` is checked against, and where the row
+    /// of its arrow is written.
+    Expected(Type, Written),
     /// The rows inferred for a function without an expected type.
     Inferred,
 }
@@ -134,8 +135,8 @@ impl Checker<'_> {
             }),
             Some(effects) => {
                 let site = match (name, expected) {
-                    (Some(name), _) => Site::Signature(name),
-                    (None, Some(expected)) => Site::Expected(expected.clone()),
+                    (Some(name), _) => Site::Signature(name, effects.written),
+                    (None, Some(expected)) => Site::Expected(expected.clone(), effects.written),
                     (None, None) => Site::Inferred,
                 };
                 let sync = effects.sync;
@@ -157,9 +158,8 @@ impl Checker<'_> {
     pub fn stage_effects(stage: &Stage) -> Option<Box<Effects>> {
         stage.runtime.then(|| {
             Box::new(Effects {
-                services: stage.services.clone(),
-                errors: stage.errors.clone(),
                 sync: false,
+                ..Effects::new(stage.services.clone(), stage.errors.clone())
             })
         })
     }
@@ -305,7 +305,7 @@ impl Checker<'_> {
                         return Err(super::unify::Mismatch::Types(a.clone(), e.clone()));
                     }
                     (Some(x), Some(y)) => {
-                        let site = self.expected_site(&e);
+                        let site = self.expected_site(&e, y.written);
                         self.sub_row(&x.services, &y.services, site, span, false);
                         self.sub_row(&x.errors, &y.errors, site, span, true);
                     }
@@ -317,7 +317,7 @@ impl Checker<'_> {
             }
             _ => match (self.eff_parts(&a), self.eff_parts(&e)) {
                 (Some((s1, e1, r1)), Some((s2, e2, r2))) => {
-                    let site = self.expected_site(&e);
+                    let site = self.expected_site(&e, Written::default());
                     self.sub_row(&s1, &s2, site, span, false);
                     self.sub_row(&e1, &e2, site, span, true);
                     self.subsume(&r1, &r2, span)
@@ -327,12 +327,14 @@ impl Checker<'_> {
         }
     }
 
-    fn expected_site(&mut self, expected: &Type) -> usize {
-        self.sites.push(Site::Expected(expected.clone()));
+    fn expected_site(&mut self, expected: &Type, written: Written) -> usize {
+        self.sites.push(Site::Expected(expected.clone(), written));
         self.sites.len() - 1
     }
 }
 
+#[cfg(all(test, feature = "diagnostic-fixes"))]
+mod fix_tests;
 #[cfg(all(test, feature = "diagnostic-fixes"))]
 mod tests {
     use crate::source::SourceMap;

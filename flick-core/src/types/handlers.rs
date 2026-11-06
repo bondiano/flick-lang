@@ -12,7 +12,7 @@ use super::handle::{Handled, arm_pattern, operation_path};
 use super::infer::eff;
 use super::patterns::is_pattern;
 use super::services::Operation;
-use super::ty::{Row, Type};
+use super::ty::{Row, Type, Written};
 use super::typing::Ref;
 use crate::diagnostics::codes;
 use crate::iface::Entity;
@@ -38,7 +38,11 @@ impl Checker<'_> {
         let parts = expected.and_then(|t| Some((t.clone(), self.eff_parts(t)?)));
         let (stage, result) = match parts {
             Some((expected, (services, errors, result))) => (
-                self.bounded_stage(services, errors, Site::Expected(expected)),
+                self.bounded_stage(
+                    services,
+                    errors,
+                    Site::Expected(expected, Written::default()),
+                ),
                 Some(result),
             ),
             None => (self.open_stage(), None),
@@ -197,7 +201,7 @@ impl Checker<'_> {
             let errors = Type::app(Type::lang(Lang::Errors), every.clone());
             let (_, guarded, span) = self.arm(arm, &errors, ty);
             if self.stage.pure.is_none() {
-                self.sites.push(Site::Expected(errors));
+                self.sites.push(Site::Expected(errors, Written::default()));
                 self.sub_row(raised, &every, self.sites.len() - 1, span, true);
             }
             caught.all |= !guarded;

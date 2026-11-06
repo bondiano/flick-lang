@@ -4,11 +4,12 @@
 use super::{Free, is_type, with_article};
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
+use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::env::{Form, Found};
 use crate::types::kinds::Kind;
-use crate::types::ty::{Effects, Row, Type};
+use crate::types::ty::{Effects, Row, Shape, Type, Written};
 use crate::types::{Checker, ty};
 
 impl Checker<'_> {
@@ -21,7 +22,43 @@ impl Checker<'_> {
         };
         let services = side(self, Kind::ServiceRow);
         let errors = side(self, Kind::ErrorRow);
-        Effects::new(services, errors)
+        Effects {
+            written: self.row_written(node),
+            ..Effects::new(services, errors)
+        }
+    }
+
+    /// Where `node`, an effect annotation, is written, for a fix that adds
+    /// to its services; none for `none` and `r1 + r2`.
+    fn row_written(&self, node: &Node) -> Written {
+        let Some(brace) = node.child_tokens().find(|t| t.kind == K::LBrace) else {
+            return Written::default();
+        };
+        let shape = match node.nodes().find(|n| n.kind == K::Row) {
+            None => Shape::Empty,
+            Some(row) => {
+                let items: Vec<&Node> = row.nodes().filter(|n| is_type(n.kind)).collect();
+                let tail = row.nodes().any(|n| n.kind == K::RowTail);
+                let variable = |n: &Node| {
+                    n.kind == K::NameType
+                        && !n.has_token(K::NoneKw)
+                        && (n.text(self.text).trim()).starts_with(|c: char| c.is_ascii_lowercase())
+                };
+                match items[..] {
+                    [] => Shape::NoServices,
+                    [only] if !tail && variable(only) => Shape::TailOnly,
+                    _ if items
+                        .iter()
+                        .any(|n| n.kind == K::UnionType || n.has_token(K::NoneKw)) =>
+                    {
+                        return Written::default();
+                    }
+                    _ => Shape::Items,
+                }
+            }
+        };
+        let at = Span::new(self.span(node).file, brace.end, brace.end);
+        Written(Some((at, shape)))
     }
 
     /// A row: `none`, `r`, `r1 + r2`, `A, B`, `A, B | r`, in braces or not.

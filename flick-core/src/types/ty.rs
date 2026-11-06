@@ -1,10 +1,13 @@
 //! Types as the checker and `.iface` see them. A type in an interface is
 //! closed: it holds no unification variables, skolems or error markers.
 
+use std::hash::{Hash, Hasher};
+
 use serde::{Deserialize, Serialize};
 
 use super::kinds::Kind;
 use super::lang::{self, Lang};
+use crate::source::Span;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -86,6 +89,53 @@ pub struct Effects {
     /// `Atom.Read` keeps the runtime stage its function was compiled with.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub sync: bool,
+    /// Where the row is written, for a fix that adds to it.
+    #[serde(skip)]
+    pub written: Written,
+}
+
+/// Where an effect row is written: right after its `{`, and what is
+/// already there. No part of the type: every two are equal.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Written(pub Option<(Span, Shape)>);
+
+impl PartialEq for Written {
+    fn eq(&self, _: &Written) -> bool {
+        true
+    }
+}
+
+impl Eq for Written {}
+
+impl Hash for Written {
+    fn hash<H: Hasher>(&self, _: &mut H) {}
+}
+
+/// What the services of a written effect row are.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shape {
+    /// `{}`.
+    Empty,
+    /// `{; E}`.
+    NoServices,
+    /// `{A | r; e}`.
+    Items,
+    /// `{r; e}`.
+    TailOnly,
+}
+
+impl Written {
+    /// The text that adds `services` to the row, with where it goes.
+    pub fn adding(self, services: &str) -> Option<(Span, String)> {
+        let (at, shape) = self.0?;
+        let text = match shape {
+            Shape::Empty => format!("{services};"),
+            Shape::NoServices => services.to_owned(),
+            Shape::Items => format!("{services}, "),
+            Shape::TailOnly => format!("{services} | "),
+        };
+        Some((at, text))
+    }
 }
 
 pub use flick_ir::Stage;
@@ -102,6 +152,7 @@ impl Effects {
             services,
             errors,
             sync,
+            written: Written::default(),
         }
     }
 
@@ -299,6 +350,7 @@ impl Type {
                         services: f(&e.services),
                         errors: f(&e.errors),
                         sync: e.sync,
+                        written: e.written,
                     })
                 }),
                 result: Box::new(f(result)),
