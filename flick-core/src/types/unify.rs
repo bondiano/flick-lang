@@ -35,6 +35,9 @@ pub struct Store {
     skolems: Vec<Skolem>,
     /// The variables that stand for a capture row: an instantiated `^c`.
     capture_rows: HashSet<u32>,
+    /// Those that stand for a row of errors: an instantiated `e` of kind
+    /// `ErrorRow`, or the errors of a stage or a handler.
+    error_rows: HashSet<u32>,
     /// The variables of number literals, which only a numeric type or a
     /// rigid variable binds.
     numeric: HashSet<u32>,
@@ -81,6 +84,24 @@ impl Store {
             self.capture_rows.insert(m);
         }
         row
+    }
+
+    /// A variable for a row of errors.
+    pub fn fresh_error_row(&mut self) -> Type {
+        let row = self.fresh();
+        if let Type::Meta(m) = row {
+            self.error_rows.insert(m);
+        }
+        row
+    }
+
+    /// A variable for a quantified variable of `kind`.
+    pub fn fresh_of(&mut self, kind: &Kind) -> Type {
+        match kind {
+            Kind::CaptureRow => self.fresh_capture_row(),
+            Kind::ErrorRow => self.fresh_error_row(),
+            _ => self.fresh(),
+        }
     }
 
     /// A variable that only a numeric type binds, a `Float` one when
@@ -130,11 +151,29 @@ impl Store {
         self.capture_rows.contains(&m)
     }
 
-    /// A variable of the level of `m`, to extend what `m` stands for.
+    /// Whether `m` stands for a row of errors.
+    pub fn is_error_row(&self, m: u32) -> bool {
+        self.error_rows.contains(&m)
+    }
+
+    /// A variable of the level and the kind of `m`, to extend what `m`
+    /// stands for.
     pub fn fresh_beside(&mut self, m: u32) -> Type {
         let level = self.meta_level(m).unwrap_or(self.level);
         self.metas.push(MetaState::Open { level });
-        Type::Meta(id(self.metas.len() - 1))
+        let rest = id(self.metas.len() - 1);
+        self.mark_like(rest, m);
+        Type::Meta(rest)
+    }
+
+    /// Gives `to` the kind marks of `from`: a capture row or a row of errors.
+    pub fn mark_like(&mut self, to: u32, from: u32) {
+        if self.is_capture_row(from) {
+            self.capture_rows.insert(to);
+        }
+        if self.is_error_row(from) {
+            self.error_rows.insert(to);
+        }
     }
 
     pub fn skolem(&mut self, name: &str) -> Type {
@@ -706,14 +745,7 @@ impl Checker<'_> {
             } => {
                 let subst: Vec<(String, Type)> = vars
                     .iter()
-                    .map(|v| {
-                        let meta = if matches!(v.kind, Kind::CaptureRow) {
-                            self.store.fresh_capture_row()
-                        } else {
-                            self.fresh()
-                        };
-                        (v.name.clone(), meta)
-                    })
+                    .map(|v| (v.name.clone(), self.store.fresh_of(&v.kind)))
                     .collect();
                 for c in &constraints {
                     self.want(c.substitute(&subst), span);

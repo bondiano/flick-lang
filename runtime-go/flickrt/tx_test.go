@@ -64,15 +64,20 @@ func TestTxRetryWaitsForAWriteOfWhatItRead(t *testing.T) {
 	counter, unrelated := newTxRef(int32(0)), newTxRef(int32(0))
 	const target = 50
 	got := make(chan Value)
+	// the writes start once the transaction has read too little, so it has to retry
+	waiting := make(chan struct{})
+	var once sync.Once
 	go func() {
 		got <- TxAtomically(rootFiber(), txTask(func(fb *Fiber) Value {
 			n := TxRefGet(fb, counter).(int32)
 			if n < target {
+				once.Do(func() { close(waiting) })
 				return TxRetry(fb)
 			}
 			return TxCurrent(fb)
 		}))
 	}()
+	<-waiting
 	var wg sync.WaitGroup
 	for range 5 {
 		wg.Add(1)

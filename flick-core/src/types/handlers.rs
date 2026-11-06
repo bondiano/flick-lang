@@ -62,7 +62,7 @@ impl Checker<'_> {
     pub fn try_expr(&mut self, node: &Node, expected: Option<&Type>) -> Type {
         let ty = expected.cloned().unwrap_or_else(|| self.fresh());
         let mut nodes = node.nodes();
-        let raised = self.fresh();
+        let raised = self.store.fresh_error_row();
         let mut stage = self.stage.clone();
         stage.errors = raised.clone();
         stage.returns = None;
@@ -84,7 +84,7 @@ impl Checker<'_> {
                 .is_some_and(catch_all)
             {
                 // it receives every error the body raises, whatever its uses ask for
-                let caught = self.fresh();
+                let caught = self.store.fresh_error_row();
                 let errors = Type::app(Type::lang(Lang::Errors), caught.clone());
                 let (_, guarded, span) = self.arm(arm, &errors, &ty);
                 if self.stage.pure.is_none() {
@@ -145,7 +145,7 @@ impl Checker<'_> {
             return Type::Error;
         };
         let actual = self.infer(layer);
-        let (inputs, errors, outputs) = (self.fresh(), self.fresh(), self.fresh());
+        let (inputs, errors, outputs) = (self.fresh(), self.store.fresh_error_row(), self.fresh());
         let shape = Type::apps(
             Type::lang(Lang::Layer),
             [inputs.clone(), errors.clone(), outputs.clone()],

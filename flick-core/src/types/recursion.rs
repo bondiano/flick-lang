@@ -130,7 +130,7 @@ impl Checker<'_> {
             Type::Forall { vars, body, .. } => {
                 let subst: Vec<(String, Type)> = vars
                     .iter()
-                    .map(|v| (v.name.clone(), self.fresh()))
+                    .map(|v| (v.name.clone(), self.store.fresh_of(&v.kind)))
                     .collect();
                 let (body, mut more) = self.open(&body.substitute(&subst));
                 more.splice(0..0, subst);
