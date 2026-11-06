@@ -8,7 +8,7 @@
 use super::Checker;
 use super::env::{Form, Found};
 use super::gadt::branch::{dict_local, field_given};
-use super::patterns::is_pattern;
+use super::patterns::{Ctor, Pat, is_pattern};
 use super::regions::Scope;
 use super::services::{OpClass, Operation};
 use super::ty::{Effects, Row, Type, capture_label};
@@ -149,7 +149,7 @@ impl Checker<'_> {
 
     /// `| E.op p… [when g] -> h` of the handler whose value is `result`, with
     /// `resume` of the region `region` for a `control` arm; whether it
-    /// covers the operation: it has no guard.
+    /// covers the operation: it has no guard and matches every argument.
     pub fn operation_arm(
         &mut self,
         arm: &Node,
@@ -184,11 +184,6 @@ impl Checker<'_> {
             .collect();
         let pattern = arm_pattern(arm);
         let start = pattern.map_or(arm.range().0, |p| p.range().0);
-        if let Some(pattern) = pattern {
-            self.typing
-                .handled
-                .insert(pattern.range(), (op.class, constraints.len()));
-        }
         for (i, c) in constraints.iter().enumerate() {
             let given = field_given(&dict_local(start, i), c.substitute(&subst));
             self.classes.givens.push(given);
@@ -224,9 +219,11 @@ impl Checker<'_> {
                 ),
             );
         }
-        for (arg, ty) in args.iter().zip(&params) {
-            self.bind_pattern(arg, ty);
-        }
+        let pats: Vec<Pat> = args
+            .iter()
+            .zip(&params)
+            .map(|(arg, ty)| self.bind_pattern(arg, ty))
+            .collect();
         let mut guarded = false;
         for child in arm.nodes() {
             match child.kind {
@@ -250,7 +247,15 @@ impl Checker<'_> {
         }
         self.leave_arm(frame);
         self.locals.truncate(mark);
-        !guarded
+        // it covers the operation when it takes every value of its arguments
+        let covers = !guarded
+            && pats.len() == params.len()
+            && self.covers_all(&Pat::Ctor(Ctor::Tuple(pats.len()), pats));
+        if let Some(pattern) = pattern {
+            let entry = (op.class, constraints.len(), covers);
+            self.typing.handled.insert(pattern.range(), entry);
+        }
+        covers
     }
 
     /// The type of `resume` in a `control` arm: the rest of the body, under

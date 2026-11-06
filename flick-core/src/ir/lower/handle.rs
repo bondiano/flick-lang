@@ -19,6 +19,7 @@ struct Group<'n> {
     class: OpClass,
     stages: Vec<Stage>,
     dicts: usize,
+    covers: bool,
     arms: Vec<&'n Node>,
 }
 
@@ -53,18 +54,22 @@ impl Lower<'_> {
                 continue;
             }
             match self.operation_of(arm) {
-                Some((effect, name, stages, class, dicts)) => {
+                Some((effect, name, stages, class, dicts, covers)) => {
                     match groups
                         .iter_mut()
                         .find(|g| g.effect == effect && g.name == name)
                     {
-                        Some(group) => group.arms.push(arm),
+                        Some(group) => {
+                            group.covers |= covers;
+                            group.arms.push(arm);
+                        }
                         None => groups.push(Group {
                             effect,
                             name,
                             class,
                             stages,
                             dicts,
+                            covers,
                             arms: vec![arm],
                         }),
                     }
@@ -79,6 +84,7 @@ impl Lower<'_> {
                 class: group.class,
                 dicts: group.dicts,
                 arity: operation_arity(&group.stages),
+                covers: group.covers,
                 function: self.operation_function(group, self.span(node)),
             };
             match effects.iter_mut().find(|h| h.effect == group.effect) {
@@ -170,6 +176,7 @@ impl Lower<'_> {
                 class: OpClass::Tail,
                 dicts,
                 arity,
+                covers: true,
                 function,
             });
         }
@@ -186,8 +193,12 @@ impl Lower<'_> {
     }
 
     /// The effect, operation, stages, class and number of dictionaries of
-    /// an arm for an operation.
-    fn operation_of(&self, arm: &Node) -> Option<(String, String, Vec<Stage>, OpClass, usize)> {
+    /// an arm for an operation, and whether it covers the operation.
+    #[allow(clippy::type_complexity)]
+    fn operation_of(
+        &self,
+        arm: &Node,
+    ) -> Option<(String, String, Vec<Stage>, OpClass, usize, bool)> {
         let pattern = arm_pattern(arm)?;
         operation_path(pattern, self.text)?;
         let mut names = pattern
@@ -203,8 +214,8 @@ impl Lower<'_> {
         else {
             return None;
         };
-        let (class, dicts) = *self.typing.handled.get(&pattern.range())?;
-        Some((service, name, stages, class, dicts))
+        let (class, dicts, covers) = *self.typing.handled.get(&pattern.range())?;
+        Some((service, name, stages, class, dicts, covers))
     }
 
     /// `| return p -> body`: a function of the body's value.
@@ -267,12 +278,15 @@ impl Lower<'_> {
             }
             arms.push(lowered);
         }
-        let forwarded = forward(group, &dicts, &args, resume.as_deref(), span);
-        arms.push(Arm {
-            pat: Pat::Wild,
-            guard: None,
-            body: forwarded,
-        });
+        // arms that take every argument leave the operation nothing to go on with
+        if !group.covers {
+            let forwarded = forward(group, &dicts, &args, resume.as_deref(), span);
+            arms.push(Arm {
+                pat: Pat::Wild,
+                guard: None,
+                body: forwarded,
+            });
+        }
         self.scope.truncate(mark);
         let scrutinee = match &args[..] {
             [x] => at(ExprKind::Local(x.clone())),

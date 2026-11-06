@@ -82,3 +82,30 @@ fn model_prints_what_the_builds_print() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
+
+/// Handlers of `control` operations, which only the Go build runs yet:
+/// the model prints what it prints, and a second `resume` is a defect.
+#[test]
+#[ignore = "runs a program of tests/handlers; run `just model`"]
+fn control_handlers_print_what_go_prints() {
+    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/handlers/control.fl");
+    let modules = run::compile(&file).expect("control.fl compiles");
+    let program = run::program(&modules);
+    let errors = run::check(&modules, &program);
+    assert!(
+        errors.is_empty(),
+        "the model rejects it:\n{}",
+        errors.join("\n")
+    );
+    let main = run::main_of(&modules).expect("a main");
+    let ran = run::run_main(&program, &main, FUEL);
+    assert_eq!(
+        ran.stdout,
+        "[1, 2, 3]\n[3, 2, 1]\nscope closed\n7\n[1, 3]\n"
+    );
+    assert!(
+        matches!(&ran.outcome, Outcome::Die(why) if why.contains("`resume` ran twice")),
+        "{:?}",
+        ran.outcome
+    );
+}

@@ -151,6 +151,17 @@ impl Checker<'_> {
             Stage::Pure => (Row::none(), Row::none()),
             Stage::Runtime(r, e) => (r.clone(), e.clone()),
         };
+        let rest = self.error_arms(arms, &raised, &t)?;
+        if inner == Stage::Pure {
+            return Ok(t);
+        }
+        self.perform(&Stage::Runtime(services, rest))?;
+        Ok(t)
+    }
+
+    /// The arms of a `try`, or of a handler for its body's errors, at the
+    /// result `t`: what of `raised` no arm without `when` covers.
+    pub(super) fn error_arms(&mut self, arms: &[Arm], raised: &Row, t: &Type) -> Check<Row> {
         let mut handled = Row::none();
         let mut all = false;
         for arm in arms {
@@ -172,18 +183,13 @@ impl Checker<'_> {
                 }
                 _ => return error("Try", "a handler pattern is not an error (`FLICK-E007`)"),
             };
-            self.arm(arm, &theta, &t)?;
+            self.arm(arm, &theta, t)?;
         }
-        if inner == Stage::Pure {
-            return Ok(t);
-        }
-        let rest = if all {
-            Row::none()
+        if all {
+            Ok(Row::none())
         } else {
-            self.minus(&raised, &handled)?
-        };
-        self.perform(&Stage::Runtime(services, rest))?;
-        Ok(t)
+            self.minus(raised, &handled)
+        }
     }
 
     /// (Provide): the layer is built around the body, whose services it

@@ -5,6 +5,7 @@
 use std::rc::Rc;
 
 use super::regions::Ended;
+use crate::handler::{Cont, Handler};
 use crate::syntax::{Arm, Env, Lit, Name, Pat, Path, Term};
 use crate::types::Scheme;
 
@@ -63,6 +64,15 @@ pub enum Frame {
     /// `inside π □` while `π` closes (§3.3): `□` is a child or a
     /// finalizer, and the body ended with what it keeps.
     Close(usize, Name, Ended),
+    /// A handler of effects around its body, `id` while it runs
+    /// (`handler.rs`).
+    Handler(usize, Rc<Handler>),
+    /// The rest of a body under its handler, the handler's frame first,
+    /// for the value of a `tail` arm that runs below it.
+    Resume(Vec<Frame>),
+    /// The arm of a `control` operation of the handler `id`, and the rest
+    /// of the body it may resume.
+    Discontinue(usize, Cont),
 }
 
 impl Frame {
@@ -140,6 +150,13 @@ impl Frame {
                 let body = Term::Let("_".into(), None, e, Rc::new(w));
                 Term::Inside(*pi, s.clone(), Rc::new(body))
             }
+            Frame::Handler(_, h) => Term::Handler(Rc::new(Handler {
+                body: (*e).clone(),
+                ..(**h).clone()
+            })),
+            // K[e]: the arm's value goes into the rest of the body
+            Frame::Resume(k) => k.iter().rev().fold((*e).clone(), |e, f| f.plug(e)),
+            Frame::Discontinue(..) => (*e).clone(),
         }
     }
 }

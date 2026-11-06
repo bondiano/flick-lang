@@ -75,8 +75,8 @@ pub struct Typing {
     /// constructor the type of the matched value rules out.
     pub dead_arms: HashSet<Range>,
     /// The class and the number of dictionaries of the operation each arm
-    /// of a handler is for, by its pattern.
-    pub handled: HashMap<Range, (OpClass, usize)>,
+    /// of a handler is for, by its pattern, and whether the arm covers it.
+    pub handled: HashMap<Range, (OpClass, usize, bool)>,
     /// The operations of the service of each `provide S impl`, by its node:
     /// name, number of dictionaries and stages.
     pub provided_ops: HashMap<Range, Vec<(String, usize, Vec<Stage>)>>,

@@ -33,6 +33,9 @@ pub struct Decls {
     pub errors: HashSet<Path>,
     /// The operations of each service, with their schemes.
     pub services: HashMap<Path, Vec<(Name, Scheme)>>,
+    /// The number of parameters of each service and effect: the first
+    /// variables of the schemes of its operations.
+    pub service_params: HashMap<Path, usize>,
     pub classes: HashMap<Path, Class>,
     /// The dictionary of each instance: a function of its context's.
     pub instances: HashMap<Path, Scheme>,
@@ -81,11 +84,14 @@ impl Decls {
                                 .insert(path.clone(), vec![(path.name.clone(), 0)]);
                             self.errors.insert(path);
                         }
-                        Form::Service { operations, .. } => {
+                        Form::Service {
+                            operations, params, ..
+                        } => {
                             let ops = operations
                                 .iter()
                                 .map(|o| (Name::from(o.name.as_str()), scheme(&o.ty)))
                                 .collect();
+                            self.service_params.insert(path.clone(), params.len());
                             self.services.insert(path, ops);
                         }
                         Form::Class {

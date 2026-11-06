@@ -90,11 +90,10 @@ let main () =
         | Ask.ask n -> n
       ))
   say
-    (show
-      (
-        try strict () with
-        | Oops m -> 0 - String.length m
-      ))
+    (
+      try show (strict ()) with
+      | Oops m -> m
+    )
   say (leaving ())
   say (provide Greeter greeter { Greeter.greet "ada" })
   say (provide Render render_impl { Render.render 42 ++ " " ++ Render.pair 1 true })

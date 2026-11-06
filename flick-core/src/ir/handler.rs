@@ -40,6 +40,9 @@ pub struct OpArm {
     pub dicts: usize,
     /// The arguments it takes then, up to the operation's first runtime stage.
     pub arity: usize,
+    /// Whether an arm without a guard matches every argument: else a call
+    /// may go on to the handler around.
+    pub covers: bool,
     pub function: Expr,
 }
 
