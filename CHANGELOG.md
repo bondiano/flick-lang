@@ -25,6 +25,12 @@ break programs.
   derives of `Schema`, `Url`, `Form` and `HttpApi` refuse a GADT with their
   codes. The plugin interface is `0.14.0`: `case-target.refined` and
   `case-target.constrained`.
+- **GADTs in the formal semantics:** the Lean proofs in
+  [`formal/`](./formal/README.md) cover them. Type soundness types an arm on
+  a constructor of a GADT under every unifier of what it builds with the
+  matched type, and the checker's arm under the most general one is a
+  derived rule. T6 covers constructors that carry dictionaries and arms
+  refined by the most general unifier, also with their premises closed.
 - **Enums:** `untagged type Method = Get = "GET" | Post = "POST"` is an
   enum: each value is its literal at run time, all strings or all `Int`s.
   `match` and `==` compare the value, derived `Ord` follows the order of
