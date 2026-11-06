@@ -247,7 +247,10 @@ impl Projection<'_> {
     fn row_parts(&self, t: &Type, vars: &Vars, out: &mut Vec<String>) -> Result<(), String> {
         match t {
             Type::Row(row) => {
-                for (_, entry) in &row.entries {
+                // TypeScript has no `Async`: a function that may suspend is async anyway
+                let not_async =
+                    |(l, _): &&(String, Type)| lang::label(Lang::Async) != Some(l.as_str());
+                for (_, entry) in row.entries.iter().filter(not_async) {
                     out.push(self.ty(entry, vars)?);
                 }
                 if let Some(tail) = &row.tail {

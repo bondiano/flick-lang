@@ -10,7 +10,7 @@ use crate::project::config::{self, Backend, Emit, Kind};
 use crate::project::{Project, is_module_name, module_path};
 use crate::resolve::Interface;
 use crate::source::Span;
-use crate::types::lang::Lang;
+use crate::types::lang::{self, Lang};
 use crate::types::{self, Effects, NO_EFFECTS, Type, show_type};
 
 /// How the runner starts `main`.
@@ -54,7 +54,9 @@ pub fn main_kind(t: &Type) -> Result<MainKind, String> {
     } = effects.as_ref();
     match services {
         Type::Var(_) => {}
-        Type::Row(row) if row.entries.is_empty() => {}
+        // the scheduler of every runner handles `Async`
+        Type::Row(row)
+            if (row.entries.iter()).all(|(l, _)| lang::label(Lang::Async) == Some(l.as_str())) => {}
         _ => {
             return Err(format!(
                 "entry `main` needs `{}`, which no runner provides; provide it inside `main`",

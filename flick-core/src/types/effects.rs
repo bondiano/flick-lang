@@ -34,8 +34,6 @@ pub struct Stage {
     pub site: usize,
     /// A runtime call ran at this stage.
     pub runtime: bool,
-    /// The stage is Sync: its calls run at once (see [`super::ty::Stage`]).
-    pub sync: bool,
     /// Why runtime calls are not allowed in this Sync stage, if they are not.
     pub only_sync: Option<&'static str>,
     /// The result type of the function whose body this is, which `o?`
@@ -71,7 +69,6 @@ impl Stage {
             errors: Type::empty_row(),
             site: 0,
             runtime: false,
-            sync: false,
             only_sync: None,
             returns: None,
             calls: 0,
@@ -101,7 +98,6 @@ impl Checker<'_> {
             errors,
             site: self.sites.len() - 1,
             runtime: false,
-            sync: false,
             only_sync: None,
             returns: None,
             calls: 0,
@@ -139,11 +135,7 @@ impl Checker<'_> {
                     (None, Some(expected)) => Site::Expected(expected.clone(), effects.written),
                     (None, None) => Site::Inferred,
                 };
-                let sync = effects.sync;
-                let mut stage =
-                    self.bounded_stage(effects.services.clone(), effects.errors.clone(), site);
-                stage.sync = sync && stage.pure.is_none();
-                stage
+                self.bounded_stage(effects.services.clone(), effects.errors.clone(), site)
             }
         }
     }

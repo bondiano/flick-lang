@@ -52,7 +52,8 @@ impl Checker<'_> {
             }
             [_, value] if head.is_lang(Lang::Result) => {
                 let value = value.clone();
-                if self.stage.pure.is_some() || self.stage.sync {
+                // errors are `abort`: a stage that is no `for` clause takes them, through its row
+                if self.stage.pure.is_some() || self.stage.only_sync.is_some() {
                     self.error(
                         codes::E001,
                         span,

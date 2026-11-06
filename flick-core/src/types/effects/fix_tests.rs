@@ -59,3 +59,20 @@ fn a_row_of_a_variable_gets_the_service_before_it() {
         "f : forall r. String ->{Log | r} Unit"
     );
 }
+
+#[test]
+fn adding_async_alone_is_safe() {
+    let text = "module Probe exposing (..)\n\
+                wait : Unit ->{Async;} Unit\n\
+                foreign effect wait from \"./wait.mjs\" \"wait\"\n\
+                f : Unit ->{} Unit\n\
+                let f () = wait ()\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.to_owned());
+    let diagnostics = crate::check(&sources, file);
+    let fixes: Vec<_> = (diagnostics.iter())
+        .filter(|d| d.code == codes::E002)
+        .flat_map(|d| &d.fixes)
+        .collect();
+    assert!(matches!(fixes[..], [fix] if fix.safe), "{diagnostics:?}");
+}

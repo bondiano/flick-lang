@@ -1,0 +1,29 @@
+module App.Hurried exposing (..)
+
+type error Invalid = Invalid String
+
+wait : Unit ->{Async;} Unit
+foreign effect wait from "./wait.mjs" "wait"
+
+/// A function that does not say it may suspend cannot wait.
+hurried : Unit ->{} Unit
+let hurried () = wait ()
+//~ FLICK-E002 @10:18-10:25 the signature of `hurried` does not allow service `Async`
+
+each : (Unit ->{} Unit) -> Unit ->{} Unit
+let each f () = f ()
+
+/// A function that waits is no callback that runs at once.
+passed : Unit ->{} Unit
+let passed () = each wait ()
+//~ FLICK-E002 @18:22-18:26 the expected type `Unit ->{} Unit` does not allow service `Async`
+
+/// `Async` is the scheduler's, which no record replaces.
+replaced : (Unit ->{Async;} Unit) ->{} Unit
+let replaced body = provide Async ({}) { body () }
+//~ FLICK-E016 @23:21-23:28 `provide Async impl` takes a service, and `Async` is an effect
+
+/// A reader of atoms fails with nothing.
+read : Result Invalid Int ->{Atom.Read;} Int
+let read result = result?
+//~ FLICK-E002 @28:19-28:26 the signature of `read` does not allow error `Invalid`

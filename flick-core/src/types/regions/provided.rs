@@ -17,7 +17,7 @@ use crate::syntax::cst::Node;
 use crate::types::Checker;
 use crate::types::classes::args_of;
 use crate::types::gadt::branch::type_eqs;
-use crate::types::lang::Lang;
+use crate::types::lang::{self, Lang};
 use crate::types::ty::{Norm, Row, Type};
 
 /// Labels of the obligations in a services row: the prefix, then the
@@ -154,7 +154,13 @@ impl Checker<'_> {
         let norm = self.store.normalize(&want.row);
         let mut keep = Vec::new();
         for (label, ty) in norm.entries {
-            if label == scope() || label.starts_with(PROVIDED) || want.settled.contains(&label) {
+            // `Async` is the root's: no owner provides it
+            let root = lang::label(Lang::Async) == Some(label.as_str());
+            if root
+                || label == scope()
+                || label.starts_with(PROVIDED)
+                || want.settled.contains(&label)
+            {
                 continue;
             }
             want.settled.push(label.clone());

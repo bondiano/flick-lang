@@ -72,7 +72,6 @@ impl Checker<'_> {
         // a stage that may read atoms lends its reader to the clauses
         let stage = if self.stage.pure.is_none() {
             let mut stage = self.bounded_stage(reader(), Type::empty_row(), Site::Inferred);
-            stage.sync = stage.pure.is_none();
             stage.only_sync = Some(sync_reason);
             stage
         } else {
@@ -102,7 +101,7 @@ impl Checker<'_> {
         self.runtime = saved;
         let mut held = self.held_since(uses, mark);
         let mut region = None;
-        if inner.sync && inner.calls > 0 {
+        if inner.only_sync.is_some() && inner.calls > 0 {
             let span = self.span(node);
             self.perform(&reader(), &Type::empty_row(), span);
             if !strict {

@@ -325,7 +325,18 @@ impl Checker<'_> {
                 .map(|(span, replacement)| Edit { span, replacement })
                 .into_iter()
                 .collect();
-            diagnostic = diagnostic.with_fix(|| (format!("add {list} to {bound}"), edits));
+            // a function that suspends says so: adding `Async` alone changes nothing else
+            let only_async = e.errors.is_empty()
+                && !edits.is_empty()
+                // a row variable it lacks has no label
+                && e.labels.len() == e.services.len()
+                && (e.labels.iter()).all(|l| lang::label(Lang::Async) == Some(l.as_str()));
+            let fix = || (format!("add {list} to {bound}"), edits);
+            diagnostic = if only_async {
+                diagnostic.with_safe_fix(fix)
+            } else {
+                diagnostic.with_fix(fix)
+            };
         }
         self.diagnostics.push(diagnostic);
     }

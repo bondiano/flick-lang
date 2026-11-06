@@ -66,6 +66,8 @@ lang_items! {
     Ui = "ui",
     ServiceTag = "service_tag",
     Scope = "scope",
+    // what may suspend, which the runtime's scheduler handles at the root
+    Async = "async",
     Setup = "setup",
     AtomRead = "atom_read",
     // what `ui` and atoms are made of, which their checks name

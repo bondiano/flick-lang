@@ -64,6 +64,13 @@ type Ui
 /// A service named as a value, as in `Layer.succeed Clock clock_impl`.
 type ServiceTag (r : ServiceRow)
 
+@lang async
+/// Suspension: waiting for time, input or output, or another fiber. The
+/// runtime's scheduler handles it at the root. A function whose row has it
+/// may suspend; one whose closed row has only effects of `tail` and `abort`
+/// operations runs at once.
+effect Async
+
 @lang scope
 /// The owner of what a `scope` acquires: an operation that acquires a
 /// resource of region `s` needs `Scope s`, which the innermost `scope`

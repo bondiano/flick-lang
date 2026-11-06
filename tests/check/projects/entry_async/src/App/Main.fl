@@ -1,0 +1,8 @@
+module App.Main exposing (main)
+
+wait : Unit ->{Async;} Unit
+foreign effect wait from "./wait.mjs" "wait"
+
+/// The runner's scheduler handles `Async`: `main` may wait.
+main : Unit ->{Async; AppError} Unit
+let main () = wait ()
