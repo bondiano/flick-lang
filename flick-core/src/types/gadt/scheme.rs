@@ -82,7 +82,7 @@ pub fn written_dicts(variant: &Node) -> usize {
     variant
         .nodes()
         .filter(|n| n.kind == K::Context)
-        .flat_map(|c| c.nodes().next().map(count))
+        .filter_map(|c| c.nodes().next().map(count))
         .sum()
 }
 
@@ -239,11 +239,11 @@ impl Checker<'_> {
                     })
                     .collect();
                 let result = self.indexed_result(name, params, &locals, &indexed);
-                quantify(&locals, self.held_scheme(&locals, variant.payload, result))
+                quantify(&locals, self.held_scheme(&locals, &variant.payload, result))
             } else {
                 quantify(
                     params,
-                    self.held_scheme(params, variant.payload, own.clone()),
+                    self.held_scheme(params, &variant.payload, own.clone()),
                 )
             };
             let scheme = constrained(scheme, variant.constraints);
@@ -300,7 +300,7 @@ impl Checker<'_> {
 
     /// `fields -> result` whose fields and value share a hidden capture row,
     /// bound by its own `forall` when anything holds one.
-    fn held_scheme(&mut self, vars: &[Binder], payload: Vec<Type>, result: Type) -> Type {
+    fn held_scheme(&mut self, vars: &[Binder], payload: &[Type], result: Type) -> Type {
         let mut capture_name = "captures".to_owned();
         while vars.iter().any(|p| p.name == capture_name)
             || payload.iter().any(|t| {

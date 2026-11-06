@@ -150,23 +150,20 @@ impl Projection<'_> {
         };
         let indexed = |scheme: &Type| is_indexed(scheme, self.module, name);
         // the parameters as an ordinary constructor names them
-        let params: Vec<String> = match schemes.iter().find(|s| !indexed(s)) {
-            Some(scheme) => {
-                let (vars, body) = split(scheme);
-                let scope = scope_of(&vars, None);
-                built(&body)
-                    .spine()
-                    .1
-                    .iter()
-                    .map(|a| self.ty(a, &scope))
-                    .collect::<Result<_, _>>()?
-            }
-            None => {
-                let arity = schemes
-                    .first()
-                    .map_or(0, |s| built(&split(s).1).spine().1.len());
-                (0..arity).map(|i| format!("T{i}")).collect()
-            }
+        let params: Vec<String> = if let Some(scheme) = schemes.iter().find(|s| !indexed(s)) {
+            let (vars, body) = split(scheme);
+            let scope = scope_of(&vars, None);
+            built(&body)
+                .spine()
+                .1
+                .iter()
+                .map(|a| self.ty(a, &scope))
+                .collect::<Result<_, _>>()?
+        } else {
+            let arity = schemes
+                .first()
+                .map_or(0, |s| built(&split(s).1).spine().1.len());
+            (0..arity).map(|i| format!("T{i}")).collect()
         };
         let mut cases = Vec::new();
         for (c, scheme) in constructors.iter().zip(&schemes) {

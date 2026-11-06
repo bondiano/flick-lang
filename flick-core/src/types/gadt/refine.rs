@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use crate::types::Checker;
 use crate::types::kinds::Kind;
-use crate::types::ty::Type;
+use crate::types::ty::{Effects, Type};
 
 /// The outcome of matching a constructor against a value's type.
 #[derive(Debug, Clone, PartialEq)]
@@ -154,8 +154,8 @@ impl Refiner<'_, '_> {
             (Type::Skolem(x), Type::Skolem(y)) if x == y => Ok(()),
             (Type::Skolem(x), Type::Skolem(y)) => {
                 // the later variable is the one the branch learns about
-                let (s, t) = if x > y { (*x, &b) } else { (*y, &a) };
-                self.equate(s, t)
+                let (later, other) = if x > y { (*x, &b) } else { (*y, &a) };
+                self.equate(later, other)
             }
             (Type::Skolem(s), t) | (t, Type::Skolem(s)) => self.equate(*s, t),
             (Type::Con { .. }, Type::Con { .. }) | (Type::Symbol(_), Type::Symbol(_)) => {
@@ -190,7 +190,7 @@ impl Refiner<'_, '_> {
                 self.unify(p1, p2)?;
                 self.unify(r1, r2)?;
                 let store = &self.checker.store;
-                let zonked = |e: &Option<Box<crate::types::ty::Effects>>| {
+                let zonked = |e: &Option<Box<Effects>>| {
                     e.as_ref()
                         .map(|e| (store.zonk(&e.services), store.zonk(&e.errors), e.sync))
                 };

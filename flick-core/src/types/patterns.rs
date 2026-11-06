@@ -293,6 +293,21 @@ impl Checker<'_> {
         Pat::Record(pats)
     }
 
+    /// The number of parameters of the data type a constructor belongs to.
+    fn adt_arity(&self, entity: &iface::Entity) -> Option<usize> {
+        let (module, name) = self.env.parent(entity)?;
+        let def = self.env.type_def(&module, &name)?;
+        if !matches!(def.form, super::env::Form::Adt { .. }) {
+            return None;
+        }
+        let (mut arity, mut kind) = (0, &def.kind);
+        while let super::kinds::Kind::Arrow(_, result) = kind {
+            arity += 1;
+            kind = result;
+        }
+        Some(arity)
+    }
+
     fn constructor_pattern(&mut self, node: &Node, args: &[&Node], ty: &Type) -> Pat {
         let parts: Vec<&str> = node
             .child_tokens()
@@ -311,18 +326,7 @@ impl Checker<'_> {
         let scheme = self.env.value(&entity).cloned().unwrap_or(Type::Error);
         self.note_type(self.name_span(node), &scheme);
         let captures = self.captures_of(ty).into_type();
-        let adt_params = self.env.parent(&entity).and_then(|(module, name)| {
-            let def = self.env.type_def(&module, &name)?;
-            if !matches!(def.form, super::env::Form::Adt { .. }) {
-                return None;
-            }
-            let (mut arity, mut kind) = (0, &def.kind);
-            while let super::kinds::Kind::Arrow(_, result) = kind {
-                arity += 1;
-                kind = result;
-            }
-            Some(arity)
-        });
+        let adt_params = self.adt_arity(&entity);
         let indexed = self.indexed_pattern(&scheme, self.env.parent(&entity), ty, node);
         let mut current = if let Some(body) = &indexed {
             body.clone()

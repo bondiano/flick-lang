@@ -275,8 +275,8 @@ impl<'a> Gen<'a> {
                 let ExprKind::Con(c) = &inner.kind else {
                     unreachable!("a constructor, as the guard tested");
                 };
-                let held = dicts.iter().map(|d| self.dict(d).doc).collect();
-                (self.construct(c, held), Vec::new(), c.arity, 0)
+                let carried = dicts.iter().map(|d| self.dict(d).doc).collect();
+                (self.construct(c, carried), Vec::new(), c.arity, 0)
             }
             ExprKind::Global { module, name } => self.direct(module, name, Vec::new()),
             ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Global { .. }) => {

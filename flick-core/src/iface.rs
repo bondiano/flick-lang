@@ -303,6 +303,12 @@ pub fn read(bytes: &[u8], module: &str) -> Result<Interface, String> {
     Ok(file.interface)
 }
 
+/// Whether a count is left out of the interface file.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero(n: &usize) -> bool {
+    *n == 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -424,9 +430,4 @@ mod tests {
         );
         assert!(read(b"{", "A").is_err());
     }
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_zero(n: &usize) -> bool {
-    *n == 0
 }

@@ -298,6 +298,53 @@ impl Checker<'_> {
 
     /// A `let` without a signature: a value, whose type is inferred and
     /// generalized when it is built purely. A function here is an error.
+    /// `FLICK-T004` for a function without a signature, with the inferred one
+    /// as an edit when it is known.
+    fn missing_signature(&mut self, name: &str, ty: &Type, span: Span, errors: usize) {
+        let incomplete = self.zonk(ty).contains(&mut |t| matches!(t, Type::Error));
+        let diagnostic = Diagnostic::error(
+            codes::T004,
+            format!("function `{name}` needs a signature right above its `let`"),
+            span,
+        )
+        .with_incomplete(incomplete);
+        if cfg!(feature = "diagnostic-fixes") {
+            let suggestion = self.signature_of(ty);
+            let shown = self.show(&suggestion);
+            // the edit is offered only for a type inferred without errors
+            let line = self.text[..span.start as usize]
+                .rfind('\n')
+                .map_or(0, |i| i + 1);
+            let indent = &self.text[line..span.start as usize];
+            let inferred = errors == self.diagnostics.len()
+                && self.operators_fit()
+                && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
+            let at = (inferred && indent.chars().all(|c| c == ' ' || c == '\t')).then(|| {
+                (
+                    u32::try_from(line).expect("offsets fit in u32"),
+                    indent.to_owned(),
+                )
+            });
+            // a number literal's type is known once the declaration settles
+            if self.has_open_number(ty) {
+                self.signatures.push(PendingSignature {
+                    index: self.diagnostics.len(),
+                    name: name.to_owned(),
+                    ty: ty.clone(),
+                    span,
+                    at,
+                });
+                self.diagnostics
+                    .push(signature_diagnostic(diagnostic, name, &shown, span, None));
+            } else {
+                self.diagnostics
+                    .push(signature_diagnostic(diagnostic, name, &shown, span, at));
+            }
+        } else {
+            self.diagnostics.push(diagnostic);
+        }
+    }
+
     pub fn unsigned(&mut self, decl: &Node, parts: &LetParts, name: &str) -> Type {
         let function = parts.is_function();
         let header = self.header_types(decl, parts, false);
@@ -347,49 +394,7 @@ impl Checker<'_> {
             // the suggestion shows the rows the body needs, not their unknowns;
             // only this binding's own: an enclosing row still gathers its calls
             self.close_rows_above(Some(self.store.level));
-            let span = self.span(decl);
-            let incomplete = self.zonk(&ty).contains(&mut |t| matches!(t, Type::Error));
-            let diagnostic = Diagnostic::error(
-                codes::T004,
-                format!("function `{name}` needs a signature right above its `let`"),
-                span,
-            )
-            .with_incomplete(incomplete);
-            if cfg!(feature = "diagnostic-fixes") {
-                let suggestion = self.signature_of(&ty);
-                let shown = self.show(&suggestion);
-                // the edit is offered only for a type inferred without errors
-                let line = self.text[..span.start as usize]
-                    .rfind('\n')
-                    .map_or(0, |i| i + 1);
-                let indent = &self.text[line..span.start as usize];
-                let inferred = errors == self.diagnostics.len()
-                    && self.operators_fit()
-                    && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
-                let at = (inferred && indent.chars().all(|c| c == ' ' || c == '\t')).then(|| {
-                    (
-                        u32::try_from(line).expect("offsets fit in u32"),
-                        indent.to_owned(),
-                    )
-                });
-                // a number literal's type is known once the declaration settles
-                if self.has_open_number(&ty) {
-                    self.signatures.push(PendingSignature {
-                        index: self.diagnostics.len(),
-                        name: name.to_owned(),
-                        ty: ty.clone(),
-                        span,
-                        at,
-                    });
-                    self.diagnostics
-                        .push(signature_diagnostic(diagnostic, name, &shown, span, None));
-                } else {
-                    self.diagnostics
-                        .push(signature_diagnostic(diagnostic, name, &shown, span, at));
-                }
-            } else {
-                self.diagnostics.push(diagnostic);
-            }
+            self.missing_signature(name, &ty, self.span(decl), errors);
         } else if let Some(header) = redundant {
             self.redundant_annotation(decl, parts, header);
         }

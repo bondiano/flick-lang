@@ -37,6 +37,7 @@ pub struct State {
 }
 
 /// The state around an arm, restored when it is left.
+#[derive(Clone, Copy)]
 pub struct Arm {
     equalities: usize,
     givens: usize,
