@@ -11,6 +11,7 @@ use std::sync::Arc;
 use flick_plugin::Block;
 
 mod derive;
+mod enums;
 mod results;
 
 use results::Results;
@@ -64,12 +65,7 @@ impl Loader<'_> {
             if blocks.is_empty() {
                 continue;
             }
-            let shared: Arc<str> = Arc::from(self.sources.get(m.file).text.as_str());
-            let imported = m.syntax.heads();
-            let new = |node: &Node| {
-                BlockSource::new(Arc::clone(&shared), m.file, node, Arc::clone(&imported))
-                    .map(|s| s.in_module(&m.name, &m.parse.tree))
-            };
+            let new = self.block_sources(m);
             let mut sink = Sink {
                 plugins: &plugins,
                 heads: &heads[i],
@@ -151,6 +147,21 @@ impl Loader<'_> {
         }
         self.place_expanded(expanded, &mut diagnostics);
         self.diagnostics.extend(diagnostics);
+    }
+
+    /// The source of each block of `m`: its text, its module and what that
+    /// module imports and sees.
+    fn block_sources<'m>(&self, m: &'m Loaded) -> impl Fn(&Node) -> Option<BlockSource> + 'm {
+        let shared: Arc<str> = Arc::from(self.sources.get(m.file).text.as_str());
+        let imported = m.syntax.heads();
+        let enums = Arc::new(self.enums_seen(m));
+        move |node: &Node| {
+            let source = BlockSource::new(Arc::clone(&shared), m.file, node, Arc::clone(&imported));
+            source.map(|s| {
+                s.in_module(&m.name, &m.parse.tree)
+                    .with_enums(Arc::clone(&enums))
+            })
+        }
     }
 
     /// The expansion of each module with blocks `expanded` gave code for.

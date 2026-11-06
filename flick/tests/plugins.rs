@@ -196,7 +196,7 @@ mod wasm {
         let path = root.join("lib/pairs.wasm");
         let ours = format!("flick:plugin/compiler@{}", flick_plugin::VERSION);
         // the version before, of the same length, keeps the binary
-        let version = "0.12.0";
+        let version = "0.13.0";
         let old = format!("flick:plugin/compiler@{version}");
         assert_eq!(ours.len(), old.len());
         let mut bytes = fs::read(&path).expect("read the component");

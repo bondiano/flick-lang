@@ -131,6 +131,8 @@ impl Reach {
                         .map_err(|e| e.to_string()),
                 ),
                 Asked::Env(name) => answer(&gate.outside.env(name)),
+                // shortcut: the answer depends on other modules, so a block that asked is expanded again each run; keep the answer's hash with the modules' when expanding costs
+                Asked::LiteralOf(_) => return false,
                 Asked::Fetch(key) => {
                     let at = gate
                         .root

@@ -33,7 +33,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.13.0";
+pub const VERSION: &str = "0.14.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -443,6 +443,13 @@ pub trait Compiler {
             "no project grants fetching `{}`",
             request.url
         )))
+    }
+    /// The base type, `String` or `Int`, of the enum `name` as the block's
+    /// module writes it, `Role` or `Roles.Role`; `None` for a type that is
+    /// no enum, or one the module does not see.
+    fn literal_of(&mut self, name: &str) -> Option<String> {
+        let _ = name;
+        None
     }
 }
 

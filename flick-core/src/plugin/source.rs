@@ -4,6 +4,7 @@
 //! body, without arguments), and the user's expressions, types, patterns
 //! and declarations parsed where they stand.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use flick_plugin::{
@@ -83,6 +84,8 @@ pub struct BlockSource {
     pub diagnostics: Vec<Diagnostic>,
     /// What the plugin reached outside the block, as the project grants it.
     pub reach: Reach,
+    /// The enums the module sees, as it writes them, with their base types.
+    enums: Arc<BTreeMap<String, String>>,
 }
 
 impl BlockSource {
@@ -141,6 +144,7 @@ impl BlockSource {
             tokens,
             diagnostics: Vec::new(),
             reach: Reach::default(),
+            enums: Arc::default(),
         })
     }
 
@@ -170,6 +174,7 @@ impl BlockSource {
             tokens: if holes { node.tokens() } else { Vec::new() },
             diagnostics: Vec::new(),
             reach: Reach::default(),
+            enums: Arc::default(),
             heads,
             foreign: !holes,
             text,
@@ -190,7 +195,16 @@ impl BlockSource {
             Arc::clone(&self.heads),
         )?;
         nested.module = Arc::clone(&self.module);
+        nested.enums = Arc::clone(&self.enums);
         Some(nested)
+    }
+
+    /// The block, whose module sees the enums `enums`, written as it writes
+    /// them, with their base types.
+    #[must_use]
+    pub fn with_enums(mut self, enums: Arc<BTreeMap<String, String>>) -> Self {
+        self.enums = enums;
+        self
     }
 
     /// The block in the module `module` whose tree is `tree`, with the
@@ -455,6 +469,11 @@ impl Compiler for BlockSource {
 
     fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {
         self.reach.fetch(request)
+    }
+
+    fn literal_of(&mut self, name: &str) -> Option<String> {
+        let answer = self.enums.get(name).cloned();
+        self.reach.literal_of(name, answer)
     }
 }
 
