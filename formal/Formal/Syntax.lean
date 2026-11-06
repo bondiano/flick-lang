@@ -245,7 +245,7 @@ outlive it. Facts are not chained: a scope gives one fact for everything outside
 def Outl (Θ : Facts) (C : Caps) (s : Ty) : Prop :=
   ∀ k, C k → s.reach k ∨ ∃ C', Θ C' s ∧ C' k
 
-/-- How a handler's arm for an operation returns (`docs/formal/core.md`): `tail` gives
+/-- How a handler's arm for an operation returns: `tail` gives
 the operation its value, `abort` the handler its value without coming back, and
 `control` the handler its value with the rest of the body as `resume`. -/
 inductive OpClass
@@ -313,14 +313,12 @@ dictionary record of λFlick⁺ with the fields `r`, an `rcons` spine; it is a v
 `proj` reads its fields. `glob g` is a global: an instance, a structural or primitive
 dictionary or a constant of Γ₀, which steps to its value in `Σ₀`.
 
-Handlers of effects: `hdl E al r e` handles the effect `E` in `e` with the arms `al`,
-an `acons` spine whose patterns are `Pat.spine o [.var]` (`[.var, .var]` for a
-`control` operation, with `resume`), and gives the body's value to `r`. At run time a
-handler is the region `p`: `hwith p …` around the body, `hctl p tl … a k` while the
-arm `a` runs and the body `k` waits with `hole p` where it performed (`tl`: a `tail`
-arm, whose value resumes it), `hres p a b` while the resumed body `b` runs and the arm `a` waits,
-`hdone p a` once the arm resumed it, `hab p a e` while `e` unwinds by `unw p` to `p`
-and `a` runs there; `kont p` is `resume`. -/
+`hdl E al r e` handles the effect `E` in `e` with the arms `al`, an `acons` spine of
+patterns `Pat.spine o [.var]` (`[.var, .var]` for `control`, with `resume`); `r` takes
+the body's value. At run time a handler is the region `p` and the cell `ℓ`: `hwith p ℓ`
+around the body, `hctl p ℓ κ tl` while an arm runs and the body waits at `hole p`, `hres p
+a b` while the resumed body `b` runs and the arm `a` waits, `hdone p a` after; `unw p ℓ a`
+unwinds to the handler, which then runs `a`; `kont p κ` is `resume`. -/
 inductive Tm
   | var (i : Nat)
   | lam (b : Tm)
@@ -359,12 +357,11 @@ inductive Tm
   | drec (c : Nat) (r : Tm)
   | glob (g : Nat)
   | hdl (E : Name) (al r e : Tm)
-  | hwith (p : Nat) (E : Name) (al r e : Tm)
-  | hctl (p ℓ : Nat) (tl : Bool) (E : Name) (al r a k : Tm)
+  | hwith (p ℓ : Nat) (E : Name) (al r e : Tm)
+  | hctl (p ℓ κ : Nat) (tl : Bool) (E : Name) (al r a k : Tm)
   | hres (p : Nat) (a b : Tm)
   | hdone (p : Nat) (a : Tm)
-  | hab (p : Nat) (a e : Tm)
-  | unw (p : Nat)
+  | unw (p ℓ : Nat) (a : Tm)
   | kont (p ℓ : Nat)
   | hole (p : Nat)
 
@@ -445,10 +442,12 @@ structure Sig where
   impl_closed : ∀ N σ, (impl N).substT σ = impl N
   dict : Nat → Option (Nat × List (Label × Scheme))
   glob : Nat → Option Scheme
-  /-- The operation `o` of the effect `E`: its class, its argument and its result,
-  closed; the result of an `abort` one is any type at a call. -/
+  /-- The operation `o` of the effect `E`: its class, argument and result, closed;
+  an `abort` one returns any type. -/
   op : Name → Name → Option (OpClass × Ty × Ty)
   op_closed : ∀ E o c a b σ, op E o = some (c, a, b) → a.substT σ = a ∧ b.substT σ = b
+  /-- An effect is no service: nothing implements it as one (E016). -/
+  op_impl : ∀ E o c a b, op E o = some (c, a, b) → impl E = .errors Row.none
   dict_closed : ∀ c k fs, dict c = some (k, fs) → ∀ l s, (l, s) ∈ fs → s.Closed (s.k + k)
   glob_closed : ∀ g s, glob g = some s → s.Closed s.k
 
@@ -517,10 +516,11 @@ owner, with everything they hold
 finalizer or a child has no uses: uses come only from `with` frames. `Layer.merge` has
 none: soundness does not need its outputs disjoint, and the disjointness the checker
 sees on names is not kept by instantiating a row variable. -/
-def Const.ok (Θ : Facts) : Const → CArg → Prop
+def Const.ok (S : Sig) (Θ : Facts) : Const → CArg → Prop
   | .addFin, ι => Outl Θ ι.C ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
   | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
-  -- an operation has a rule of its own, which needs it declared
+  -- of a service, not an effect
+  | .ask N, _ => ∀ o, S.op N o = none
   | .perform _ _ _, _ => False
   | _, _ => True
 

@@ -113,10 +113,10 @@ theorem Nest.not_dead {Ψ c anc B home i E r} (hn : Nest Ψ c anc B home) (h : c
 /-- A finished computation at a place holds no `inside` form. -/
 theorem Final.noFrame {Ψ B anc A} {w : Tm} (hw : Final w) (h : w.Within Ψ B anc A) (q : Nat) :
     ¬ w.Has (.frame q) := by
-  rcases hw with hv | ⟨v, hv, rfl⟩ | ⟨p, rfl⟩
+  rcases hw with hv | ⟨v, hv, rfl⟩ | ⟨p, ℓ, a, rfl⟩
   · exact (hv.noIns h).frame q
   · exact (hv.noIns (A := A) h).frame q
-  · simp [Tm.Has]
+  · simpa [Tm.Has] using h.2.2 q
 
 /-- The program at the start. -/
 theorem Nest.init {Ψ e₀ t φ} (h : Typ S [] Facts.none [] e₀ (.ex t φ)) (hb : e₀.Below 0) :

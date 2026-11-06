@@ -165,17 +165,17 @@ theorem Cg.build (hB : BNoVal B) {v : Flick.Tm} (hv : Value v) :
 
 /-- The left side of a base pair is never `raise`, nor unwinding to a handler. -/
 def BNoRaise (B : Flick.Tm → Flick.Tm → Prop) : Prop :=
-  (∀ a b, B (.raise a) b → False) ∧ ∀ p b, B (.unw p) b → False
+  (∀ a b, B (.raise a) b → False) ∧ ∀ p ℓ a b, B (.unw p ℓ a) b → False
 
 theorem Cg.final (hB : BNoVal B) (hR : BNoRaise B) {w w₂ : Flick.Tm} (h : Cg B false w w₂)
     (hw : Final w) : Final w₂ := by
-  rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨p, rfl⟩
+  rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨p, ℓ, a, rfl⟩
   · exact .inl (h.value hB hw).1
   · cases h with
     | raise h => exact .inr (.inl ⟨_, (h.value hB hv).1, rfl⟩)
     | base h => exact (hR.1 _ _ h).elim
   · cases h with
-    | unw => exact .inr (.inr ⟨_, rfl⟩)
-    | base h => exact (hR.2 _ _ h).elim
+    | unw => exact .inr (.inr ⟨_, _, _, rfl⟩)
+    | base h => exact (hR.2 _ _ _ _ h).elim
 
 end Flick.Elab

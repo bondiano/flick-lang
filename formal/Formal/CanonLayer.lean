@@ -37,6 +37,7 @@ theorem builds_one {Ψ Θ Γ} (c : Const) {w} (hc : c.arity = 2 ∨ c.layer) (hw
         cases h; cases lt; cases hT
         exact ⟨_, rfl, .bind (.await ((hw'.valueAny hw _).sub ⟨la, Stage.le_refl _⟩)
           (Stage.le_refl _) .refl) fun _ => Iff.rfl⟩
+    | perform => simp [Const.arity, Const.layer] at hc
 
 theorem builds_two {Ψ Θ Γ} (c : Const) {w₁ w₂} (h₁ : c.arity = 2) (h₂ : c.layer)
     (ih₁ : Builds S Ψ Θ Γ w₁) (ih₂ : Builds S Ψ Θ Γ w₂) :

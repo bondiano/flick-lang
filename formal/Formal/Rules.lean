@@ -1,4 +1,4 @@
-import Formal.Typing
+import Formal.EvalCtx
 
 /-!
 # Typing rules of λFlick (core.md §2.3, §3.6; regions.md §2.3–§2.5, §3.4)
@@ -21,12 +21,14 @@ def Row.err (E : Name) (U : Ty) : Row := Row.union (Row.single E) (Row.ofCaps U.
 
 /-- Judgment forms: an expression, `match` arms, `try` arms. For `try` arms,
 `ε₀` is the error row of the body and `H` the errors the arms remove. The fields of a
-dictionary record have the schemes `fs`. -/
+dictionary record have the schemes `fs`. The arms of a handler of the effect `E` give
+the handler's type `t` at its stage `φ`; `resume` holds the region `s` of the handler. -/
 inductive J
   | ex (t : Ty) (φ : Stage)
   | alts (t t' : Ty) (φ : Stage)
   | halts (ε₀ H : Row) (t : Ty) (φ : Stage)
   | dfs (fs : List (Label × Scheme))
+  | harms (E : Name) (t : Ty) (φ : Stage) (s : Ty)
 
 /-- What a `with` frame of the `provide` region `q` with the services `ρ` gives its
 body (regions.md §2.7): the frame answers a service of `ρ`, and the row outside records
@@ -92,7 +94,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ (.fix f) (.ex T φ)
   | lit : Typ Ψ Θ Γ (.lit l) (.ex (.base l.base) φ)
   | loc : Ψ[l]? = some t → Typ Ψ Θ Γ (.loc l) (.ex (.ref t) φ)
-  | const : c.ok Θ ι → Le (c.ty S ι) T → Typ Ψ Θ Γ (.const c) (.ex T φ)
+  | const : c.ok S Θ ι → Le (c.ty S ι) T → Typ Ψ Θ Γ (.const c) (.ex T φ)
   | ctor {ts us : List Ty} : S.ctor K = some (k, ts, T₀) → us.length = k →
       Sig.Holds ts T₀ (S.res K) us → Le (Sig.ctorTyR ts T₀ (S.res K) us) T →
       Typ Ψ Θ Γ (.ctor K) (.ex T φ)
@@ -196,6 +198,67 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Le ((s.substT (instT us)).inst ts) T → Typ Ψ Θ Γ (.proj e l) (.ex T φ)
   | glob {ts : List Ty} : S.glob g = some σ → ts.length = σ.k → σ.Holds Θ ts → Le (σ.inst ts) T →
       Typ Ψ Θ Γ (.glob g) (.ex T φ)
+  /-- An operation of a declared effect: its value needs the effect; an `abort`
+  operation never returns, so its result has any type. -/
+  | perform : S.op E o = some (c, a, b) →
+      Le (.arrow a (.rt (Row.single E) Row.none) (if c = .abort then t else b) Caps.none) T →
+      Typ Ψ Θ Γ (.const (.perform E o c)) (.ex T φ)
+  /-- The arms of a handler, `x` the operation's argument and, for `control`, `k` its
+  `resume`, which runs the rest of the body under the handler and holds its region. -/
+  | hanil : Typ Ψ Θ Γ .anil (.harms E t φ s)
+  | hatail : S.op E o = some (.tail, a, b) → Typ Ψ Θ (.mono a :: Γ) e (.ex b φ) →
+      Typ Ψ Θ Γ r (.harms E t φ s) → Typ Ψ Θ Γ (.acons (Pat.spine o [.var]) e r) (.harms E t φ s)
+  | haabort : S.op E o = some (.abort, a, b) → Typ Ψ Θ (.mono a :: Γ) e (.ex t φ) →
+      Typ Ψ Θ Γ r (.harms E t φ s) → Typ Ψ Θ Γ (.acons (Pat.spine o [.var]) e r) (.harms E t φ s)
+  | hactl : S.op E o = some (.control, a, b) →
+      Typ Ψ Θ (.mono a :: .mono (.arrow b φ t s.reach) :: Γ) e (.ex t φ) →
+      Typ Ψ Θ Γ r (.harms E t φ s) → Typ Ψ Θ Γ (.acons (Pat.spine o [.var, .var]) e r) (.harms E t φ s)
+  /-- (Handle): the body may perform `E`; the arms run at the handler's stage, `resume`
+  over a region variable of the handler, as the region of a `scope`; `rf` makes the
+  handler's value of the body's. Without an arm for every operation, the body's other
+  operations of `E` go on to the handler around. -/
+  | hdl {al rf : Tm} : Typ (Ψ.map (Ty.up 1)) (Θ.substT (shiftV 1)) (Γ.map (Scheme.up 1)) al
+        (.harms E (t'.up 1) ((Stage.rt r ε).substT (shiftV 1)) (.tvar 0)) → al.NoIns →
+      Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → ψ.le (.rt r ε) →
+      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.union (Row.single E) r) ε) →
+      S.Handles E al r → (Stage.rt r ε).le φ → Le t' T →
+      Typ Ψ Θ Γ (.hdl E al rf e) (.ex T φ)
+  /-- The run-time forms of a handler, whose region is `p`; the cell `ℓ` holds the type and
+  the stage of its value. -/
+  | hwith {al rf : Tm} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg p)) →
+      Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → ψ.le (.rt r ε) →
+      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.union (Row.single E) r) ε) →
+      S.Handles E al r → (Stage.rt r ε).le φ → Le t' T →
+      Typ Ψ Θ Γ (.hwith p ℓ E al rf e) (.ex T φ)
+  /-- While an arm runs, the body is parked where it performed the operation `o`: it is
+  typed with the operation at the hole, the argument left out. A `tail` arm gives that
+  operation its value, a `control` arm the handler its value, with `resume` the cell `κ`. -/
+  | hctl {Ei : List Frame} {al rf : Tm} {tl : Bool} :
+      Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg p)) →
+      Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → ψ.le (.rt r ε) →
+      S.op E o = some (c, a₀, b₀) → c ≠ .abort → (tl = true ↔ c = .tail) →
+      OkE Ei → k = plug Ei (.hole p) → Typ Ψ Θ [] (plug Ei (.app (.const (.perform E o c)) .todo)) (.ex t φ₀) →
+      φ₀.le (.rt (Row.union (Row.single E) r) ε) →
+      Typ Ψ Θ Γ a (.ex (if tl then b₀ else t') (.rt r ε)) →
+      (tl = false → ∃ C', Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') ∧ C' (.r p)) →
+      S.Handles E al r → (Stage.rt r ε).le φ → Le t' T →
+      Typ Ψ Θ Γ (.hctl p ℓ κ tl E al rf a k) (.ex T φ)
+  /-- While the resumed body runs, the arm is parked where it called `resume`, the
+  argument left out. -/
+  | hres {A : List Frame} : Typ Ψ Θ Γ b (.ex t' (.rt r ε)) →
+      OkE A → a = plug A (.hole p) → Typ Ψ Θ [] (plug A (.app (.kont p ℓ) .todo)) (.ex t' (.rt r ε)) →
+      Ψ[ℓ]? = some (.arrow b₀ (.rt r ε) t' C') → (Stage.rt r ε).le φ → Le t' T →
+      Typ Ψ Θ Γ (.hres p a b) (.ex T φ)
+  | hdone : Typ Ψ Θ Γ a (.ex t φ) → Typ Ψ Θ Γ (.hdone p a) (.ex t φ)
+  /-- Unwinding to the handler of the cell `ℓ`, which then runs `a` with the type of its
+  value; unwinding itself has any type. -/
+  | unw : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) → Typ Ψ Θ Γ a (.ex t' (.rt r ε)) →
+      (Stage.rt Row.none Row.none).le φ → Typ Ψ Θ Γ (.unw p ℓ a) (.ex t φ)
+  /-- `resume`: the type of its cell, which holds the handler's region. -/
+  | kont : Ψ[ℓ]? = some (.arrow a ψ t C) → C (.r p) → Le (.arrow a ψ t C) T →
+      Typ Ψ Θ Γ (.kont p ℓ) (.ex T φ)
 
 /-- The facts of a running configuration: a region outlives every region created
 after it. A scope gives its region facts about everything outside it, which

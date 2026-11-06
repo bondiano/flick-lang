@@ -102,7 +102,7 @@ theorem _root_.Flick.RHead.redex' {Λ Λ' : List Rgn} {μ μ' : List Flick.Tm} {
   | hresRaise _ _ hv => exact .inr (.inl ⟨.hresB _ _, _, trivial, hv, rfl⟩)
   | hctlUnw _ _ => exact .inr (.inr ⟨.hctlA _ _ _ _ _ _ _, _, trivial, rfl⟩)
   | hresUnw _ _ => exact .inr (.inr ⟨.hresB _ _, _, trivial, rfl⟩)
-  | habCatch => exact .inr (.inr ⟨.hab _ _, _, trivial, rfl⟩)
+  | habCatch => exact .inr (.inr ⟨.hab _ _ _, _, trivial, rfl⟩)
   | finRun _ _ hw _ _ | close _ _ hw _ _ =>
     rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨q, rfl⟩
     · left; refine ⟨nv, fun F a _ ha => ?_⟩

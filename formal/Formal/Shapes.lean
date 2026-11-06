@@ -103,7 +103,9 @@ theorem Const.res2_kind {c : Const} {ι a ψ t C a₂ ψ₂ t₂ C₂ T'} (h₁ 
 theorem Typ.constApp_kind {Ψ Θ Γ c w T φ} (h : Typ S Ψ Θ Γ (.app (.const c) w) (.ex T φ))
     (hc : c.arity = 2 ∨ c.layer) : T.kind = c.resKind := by
   cases h with
-  | app hf _ _ hT => cases hf with | const _ hT' => exact Const.res_kind hc hT' hT
+  | app hf _ _ hT => cases hf with
+    | const _ hT' => exact Const.res_kind hc hT' hT
+    | perform => simp [Const.arity, Const.layer] at hc
   | errVal _ h' hU _ =>
     exfalso
     cases h' with
@@ -113,6 +115,7 @@ theorem Typ.constApp_kind {Ψ Θ Γ c w T φ} (h : Typ S Ψ Θ Γ (.app (.const 
         have := Const.res_kind hc hT' hT
         rw [Ty.kind_of_hd hU] at this
         cases c <;> simp [Const.resKind] at this
+      | perform => simp [Const.arity, Const.layer] at hc
     | errVal _ _ _ _ => simp [Ty.hd] at hU
 
 theorem Typ.constApp2_kind {Ψ Θ Γ c w₁ w₂ T φ}
@@ -122,7 +125,9 @@ theorem Typ.constApp2_kind {Ψ Θ Γ c w₁ w₂ T φ}
       T'.kind = 6 := by
     intro _ _ _ _ _ hf hT
     cases hf with
-    | app hc _ _ hT' => cases hc with | const _ hT'' => exact Const.res2_kind h₁ h₂ hT'' hT' hT
+    | app hc _ _ hT' => cases hc with
+      | const _ hT'' => exact Const.res2_kind h₁ h₂ hT'' hT' hT
+      | perform => simp [Const.arity] at h₁
   cases h with
   | app hf _ _ hT => exact key hf hT
   | errVal _ h' hU _ =>
@@ -212,7 +217,7 @@ def SpineShp (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (
 theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T φ}, J = .ex T φ →
     Shp S true T e ∧ (∀ K, e.head = .ctor K → SpineShp S Ψ Θ Γ e T φ) := by
   induction h with
-  | lam _ _ _ hT | fix _ _ _ hT | task _ _ _ _ hT =>
+  | lam _ _ _ hT | fix _ _ _ hT | task _ _ _ _ hT | perform _ hT | kont _ _ hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨.hidden (hT.opaque (by simp [Ty.Opaque, Ty.hd])), by simp [Tm.head]⟩
   | const _ hT =>

@@ -58,16 +58,16 @@ theorem Tm.rename_fix :
     rw [ih₁ ξ fun i hi => h i (.inl hi), ih₂ ξ fun i hi => h i (.inr hi)]
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
   | drec _ _ ih => intro ξ h; simp only [Tm.rename]; rw [ih ξ h]
-  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro ξ h; simp only [Tm.rename]
     rw [ih₁ ξ fun i hi => h i (.inl hi), ih₂ ξ fun i hi => h i (.inr (.inl hi)), ih₃ ξ fun i hi => h i (.inr (.inr hi))]
-  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro ξ h; simp only [Tm.rename]
     rw [ih₁ ξ fun i hi => h i (.inl hi), ih₂ ξ fun i hi => h i (.inr (.inl hi)), ih₃ ξ fun i hi => h i (.inr (.inr (.inl hi))), ih₄ ξ fun i hi => h i (.inr (.inr (.inr hi)))]
-  | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ ih₁ ih₂ =>
     intro ξ h; simp only [Tm.rename]
     rw [ih₁ ξ fun i hi => h i (.inl hi), ih₂ ξ fun i hi => h i (.inr hi)]
-  | hdone _ _ ih₁ =>
+  | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
     intro ξ h; simp only [Tm.rename]
     rw [ih₁ ξ fun i hi => h i hi]
   | _ => intro ξ _; rfl
@@ -104,16 +104,16 @@ theorem Tm.subst_fix :
     rw [ih₁ σ fun i hi => h i (.inl hi), ih₂ σ fun i hi => h i (.inr hi)]
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
   | drec _ _ ih => intro σ h; simp only [Tm.subst]; rw [ih σ h]
-  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ h; simp only [Tm.subst]
     rw [ih₁ σ fun i hi => h i (.inl hi), ih₂ σ fun i hi => h i (.inr (.inl hi)), ih₃ σ fun i hi => h i (.inr (.inr hi))]
-  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ h; simp only [Tm.subst]
     rw [ih₁ σ fun i hi => h i (.inl hi), ih₂ σ fun i hi => h i (.inr (.inl hi)), ih₃ σ fun i hi => h i (.inr (.inr (.inl hi))), ih₄ σ fun i hi => h i (.inr (.inr (.inr hi)))]
-  | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ ih₁ ih₂ =>
     intro σ h; simp only [Tm.subst]
     rw [ih₁ σ fun i hi => h i (.inl hi), ih₂ σ fun i hi => h i (.inr hi)]
-  | hdone _ _ ih₁ =>
+  | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
     intro σ h; simp only [Tm.subst]
     rw [ih₁ σ fun i hi => h i hi]
   | _ => intro σ _; rfl

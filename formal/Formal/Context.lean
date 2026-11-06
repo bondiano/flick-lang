@@ -61,6 +61,10 @@ theorem Typ.sx {Ψ Θ e J} (h : Typ S Ψ Θ [] e J) {σ : Atom → Ty} (hσ : Fi
     Typ S (Ψ.map (Ty.substT σ) ++ X) (Θ.substT σ) [] e (J.substT σ) := by
   simpa using (h.substT σ hσ).weakenStore X
 
+theorem cell_sx {Ψ : List Ty} {σ : Atom → Ty} {ℓ : Nat} {T : Ty} (h : Ψ[ℓ]? = some T) (X : List Ty) :
+    (Ψ.map (Ty.substT σ) ++ X)[ℓ]? = some (T.substT σ) := by
+  rw [List.getElem?_append_left (by simpa using getElem?_lt h), List.getElem?_map, h]; rfl
+
 theorem Typ.sx1 {Ψ Θ a e J} (h : Typ S Ψ Θ [.mono a] e J) {σ : Atom → Ty} (hσ : Fits σ e)
     (X : List Ty) :
     Typ S (Ψ.map (Ty.substT σ) ++ X) (Θ.substT σ) [.mono (a.substT σ)] e (J.substT σ) := by
@@ -97,28 +101,73 @@ theorem join_row_substT {ρ ρ₁ ρ₂ : Row} (σ : Atom → Ty) (hρ : ∀ n, 
   obtain rfl : ρ = Row.union ρ₁ ρ₂ := funext fun n => propext (hρ n)
   rw [Row.union_substT]; exact fun _ => Iff.rfl
 
-theorem env_nm {Ψ Θ Γ θ ρ φ} (hθ : IsEnv θ) (h : Typ S Ψ Θ Γ θ (.ex (.env ρ) φ)) {x : Elem} :
-    ρ x → ∃ N, x = .nm N := by
-  induction hθ generalizing ρ with
-  | enil => cases h with | enil hρ => exact fun h => (hρ _ h).elim
-  | econs _ _ ih =>
-    cases h with
-    | econs _ _ _ hθ' hρ =>
-      intro ha
-      rcases (hρ _).mp ha with h | h
-      · exact ⟨_, h⟩
-      · exact ih hθ' h
-
-theorem env_no_atm {Ψ Θ Γ θ ρ φ} (hθ : IsEnv θ) (h : Typ S Ψ Θ Γ θ (.ex (.env ρ) φ)) (a : Atom) :
-    ¬ ρ (.atm a) := fun ha => by obtain ⟨_, h'⟩ := env_nm hθ h ha; cases h'
+/-- A frame that handles `E` in its hole: the hole may also need `E`. -/
+theorem FRel.installs {F : Frame} {E : Name} {φ₀ φ : Stage} {r ε : Row} (hE : F.installs E)
+    (h₀ : φ₀.le (.rt (Row.union (Row.single E) r) ε)) (h : (Stage.rt r ε).le φ) : FRel F φ₀ φ := by
+  obtain ⟨_, _, rfl, hr, he⟩ := Stage.rt_le h
+  refine ⟨fun n hn => ?_, fun _ => (Stage.le_err h₀).trans he, fun hp => (by cases hp),
+    fun _ _ h => (by cases h)⟩
+  rcases Stage.le_svc h₀ n hn with h | h
+  · subst h; exact .inr (.inr hE)
+  · exact .inl (hr n h)
 
 theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
     (h : Typ S Ψ Θ [] (F.plug r) (.ex t φ)) : FrameTy S Ψ Θ F r t φ := by
   have nv := not_value_plug hr F
   have look : (∀ N, F.lookup N = none) → FLook S Ψ Θ F := FLook.none
   cases F <;> simp only [Frame.plug] at h nv
-  -- the forms of a running handler have no typing rule yet
-  case hwith | hctlA | hresB | hdone | hab => cases h; exact (nv ‹_›).elim
+  case hwith p ℓ E al rf =>
+    cases h with
+    | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT =>
+      refine .mk0 ⟨_, _, he, .installs rfl hφ₀ hφ, fun σ hσ X _ h' => ?_, look fun _ => rfl⟩
+      have hp : σ (.r p) = .rg p := hσ.1 _ (.inl (.inr (.inl rfl)))
+      have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
+      simp only [Flick.J.substT, Ty.substT, hp] at h₁
+      exact .hwith (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (Stage.le_substT σ hψ) h'
+        (by simpa [Stage.substT, Row.union_substT] using Stage.le_substT σ hφ₀)
+        ⟨hc.1, fun h => .inl (hc.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
+    | errVal hv => exact (nv hv).elim
+  case hctlA p ℓ κ tl E al rf k =>
+    cases h with
+    | hctl hℓ hal hrf hψ hop hc htl hE hk hp' hφ₀ ha hl hcm hφ hT =>
+      refine .mk0 ⟨_, _, ha, .of_le hφ, fun σ hσ X _ h' => ?_, look fun _ => rfl⟩
+      subst hk
+      obtain ⟨-, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+      have hp : σ (.r p) = .rg p := hσ.1 _ (.inl (.inr (.inl rfl)))
+      have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
+      simp only [Flick.J.substT, Ty.substT, hp] at h₁
+      have h₃ := hp'.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inr (.inr
+        (plug_has_of_nosite (by simp [Tm.Has]) h)))))) X
+      refine .hctl (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (Stage.le_substT σ hψ)
+        hop hc htl hE rfl h₃ (by simpa [Stage.substT, Row.union_substT] using Stage.le_substT σ hφ₀) ?_
+        (fun h => ?_) ⟨hcm.1, fun h => .inl (hcm.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
+      · cases tl <;> simpa [hb] using h'
+      · obtain ⟨C', hl₁, hl₂⟩ := hl h
+        refine ⟨C'.substT σ, ?_, ⟨_, hl₂, by simp [hp]⟩⟩
+        rw [List.getElem?_append_left (by simpa using getElem?_lt hl₁), List.getElem?_map, hl₁]
+        simp [Ty.substT, Stage.substT, hb]
+    | errVal hv => exact (nv hv).elim
+  case hresB p a =>
+    cases h with
+    | hres hb hA ha hp' hl hφ hT =>
+      refine .mk0 ⟨_, _, hb, .of_le hφ, fun σ hσ X _ h' => ?_, look fun _ => rfl⟩
+      subst ha
+      have h₂ := hp'.sx (hσ.sub fun s h => by
+        rcases plug_has_iff.mp h with h | h
+        · exact .inr (.inr (.inl (plug_has_iff.mpr (.inl h))))
+        · simp only [Tm.Has] at h; rcases h with h | h
+          · subst h; exact .inr (.inl rfl)
+          · exact h.elim) X
+      simp only [Flick.J.substT, Stage.substT] at h₂
+      exact .hres h' hA rfl h₂
+        (by rw [List.getElem?_append_left (by simpa using getElem?_lt hl), List.getElem?_map, hl]; rfl)
+        (Stage.le_substT σ hφ) (hT.substT σ)
+    | errVal hv => exact (nv hv).elim
+  case hdone p =>
+    cases h with
+    | hdone ha =>
+      exact .mk0 ⟨_, _, ha, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .hdone h', look fun _ => rfl⟩
+    | errVal hv => exact (nv hv).elim
   case appL =>
     cases h with
     | app h₁ h₂ hψ hT =>
@@ -271,7 +320,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
         cases n with
         | nm N =>
           by_cases hN : ρ (.nm N)
-          · exact .inr (by simpa [Frame.dom, Option.isSome_iff_ne_none] using dom N hN)
+          · exact .inr (.inl (by simpa [Option.isSome_iff_ne_none] using dom N hN))
           · exact .inl (hr' _ (h.2 hN))
         | ob N a =>
           by_cases hN : ρ (.nm N)

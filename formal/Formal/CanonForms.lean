@@ -58,6 +58,10 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | const _ hT =>
     intro _ _ _ hJ; cases hJ
     simp only [VKind, Tm.head, Tm.args, Const.kindAt]; rw [← hT.kind, Const.ty_kind]
+  | perform _ hT =>
+    intro _ _ _ hJ; cases hJ
+    simp only [VKind, Tm.head, Tm.args, Const.kindAt]; rw [← hT.kind]; rfl
+  | kont _ _ hT => intro _ _ _ hJ; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
   | ctor _ _ _ hT =>
     intro _ _ _ hJ; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind]; unfold Sig.ctorTyR
@@ -98,7 +102,7 @@ theorem Const.arity_of_resKind {c : Const} (h₁ : c.resKind = 1) (h₂ : c.arit
 theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.arrow a ψ t C) φ)) :
     (∃ b, v = .lam b) ∨ (∃ f, v = .fix f) ∨ (∃ K, v.head = .ctor K) ∨ (∃ c, v = .const c) ∨
-      (∃ c w, v = .app (.const c) w ∧ c.arity = 2 ∧ Value w) := by
+      (∃ c w, v = .app (.const c) w ∧ c.arity = 2 ∧ Value w) ∨ ∃ p ℓ, v = .kont p ℓ := by
   have hk := h.vkind hv rfl
   cases hv with
   | lam => exact .inl ⟨_, rfl⟩
@@ -108,8 +112,8 @@ theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
   | const => exact .inr (.inr (.inr (.inl ⟨_, rfl⟩)))
   | constApp hc hw =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
-    exact .inr (.inr (.inr (.inr ⟨_, _, rfl, Const.arity_of_resKind hk.symm hc, hw⟩)))
-  | kont => cases h
+    exact .inr (.inr (.inr (.inr (.inl ⟨_, _, rfl, Const.arity_of_resKind hk.symm hc, hw⟩))))
+  | kont => exact .inr (.inr (.inr (.inr (.inr ⟨_, _, rfl⟩))))
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 /-- L1 for references. -/
@@ -122,7 +126,6 @@ theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
   | constApp =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
     have := Const.resKind_cases ‹Const›; omega
-  | kont => cases h
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 /-- L1 for computations. -/
@@ -141,7 +144,6 @@ theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
   | constApp =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
     have := Const.resKind_cases ‹Const›; omega
-  | kont => cases h
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 theorem canonical_unit {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.base .unit) φ)) :
@@ -174,7 +176,6 @@ theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (
   | constApp =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
     have := Const.resKind_cases ‹Const›; omega
-  | kont => cases h
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 /-- L1 for capabilities. -/
@@ -187,7 +188,6 @@ theorem canonical_hnd {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
   | constApp =>
     simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
     have := Const.resKind_cases ‹Const›; omega
-  | kont => cases h
   | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
 
 /-- L1 for records: field lookup and update succeed. -/

@@ -70,14 +70,13 @@ inductive Cg (B : Flick.Tm → Flick.Tm → Prop) : Bool → Flick.Tm → Flick.
   | glob {x g} : Cg B x (.glob g) (.glob g)
   | hdl {x E al al' r r' e e'} : Cg B false al al' → Cg B false r r' → Cg B false e e' →
       Cg B x (.hdl E al r e) (.hdl E al' r' e')
-  | hwith {x p E al al' r r' e e'} : Cg B false al al' → Cg B false r r' → Cg B false e e' →
-      Cg B x (.hwith p E al r e) (.hwith p E al' r' e')
-  | hctl {x p ℓ tl E al al' r r' a a' k k'} : Cg B false al al' → Cg B false r r' →
-      Cg B false a a' → Cg B false k k' → Cg B x (.hctl p ℓ tl E al r a k) (.hctl p ℓ tl E al' r' a' k')
+  | hwith {x p ℓ E al al' r r' e e'} : Cg B false al al' → Cg B false r r' → Cg B false e e' →
+      Cg B x (.hwith p ℓ E al r e) (.hwith p ℓ E al' r' e')
+  | hctl {x p ℓ κ tl E al al' r r' a a' k k'} : Cg B false al al' → Cg B false r r' →
+      Cg B false a a' → Cg B false k k' → Cg B x (.hctl p ℓ κ tl E al r a k) (.hctl p ℓ κ tl E al' r' a' k')
   | hres {x p a a' b b'} : Cg B false a a' → Cg B false b b' → Cg B x (.hres p a b) (.hres p a' b')
   | hdone {x p a a'} : Cg B false a a' → Cg B x (.hdone p a) (.hdone p a')
-  | hab {x p a a' e e'} : Cg B false a a' → Cg B false e e' → Cg B x (.hab p a e) (.hab p a' e')
-  | unw {x p} : Cg B x (.unw p) (.unw p)
+  | unw {x p ℓ a a'} : Cg B false a a' → Cg B x (.unw p ℓ a) (.unw p ℓ a')
   | kont {x p ℓ} : Cg B x (.kont p ℓ) (.kont p ℓ)
   | hole {x p} : Cg B x (.hole p) (.hole p)
   | base {a b} : B a b → Cg B false a b

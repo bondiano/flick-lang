@@ -81,6 +81,9 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
   | hnd s ih | owner s ih => simp only [Ty.substT, Ty.reach, ih]
   | base | adt | rnil | layer | env | dict => simp [Ty.substT, Ty.reach, Caps.none]
 
+theorem Caps.substT_reach (σ : Atom → Ty) (t : Ty) : t.reach.substT σ = (t.substT σ).reach := by
+  funext a; exact propext (Ty.reach_substT σ t a).symm
+
 theorem Row.ofCaps_substT (C : Caps) (σ : Atom → Ty) :
     (Row.ofCaps C).substT σ = Row.ofCaps (C.substT σ) := by
   funext x; cases x <;> simp [Row.substT, Row.ofCaps, Caps.substT]

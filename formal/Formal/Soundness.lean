@@ -56,6 +56,9 @@ theorem await_arg {Ψ Θ c w t₀ T φ} (h : Typ S Ψ Θ [] (.app (.app (.const 
     cases hf with
     | app hc' _ _ hT₁ =>
       cases hc' with
+      | perform =>
+        obtain ⟨_, _, _, _, _, _, _, _, hx⟩ := hc default
+        simp only [Const.ty] at hx; split at hx <;> cases hx
       | const _ hT' =>
         obtain ⟨_, _, _, _, _, _, _, _, hx⟩ := hc ‹_›
         rw [hx] at hT'
@@ -275,36 +278,52 @@ theorem CfgTy.init {e₀ t φ₀} (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ�
 /-- **T1.** A program `· ⊢ e₀ : τ ! φ₀` (a term without run-time regions, at a type and
 a stage without them) whose services `Σ₀` provides (G3) reaches
 only configurations whose main thread is a value, `raise v` with `v : Errors ε₀`,
-makes a step, or is blocked (waits for a child of a region it closes, or uses a
-region that is not live); every child of a live region is finished, makes a step,
-asks for a service `Σ₀` lacks, or is blocked. -/
+makes a step, is blocked (waits for a child of a region it closes, or uses a
+region that is not live), or unwinds to a handler (which T4 rules out at the top,
+`T1_regions`); every child of a live region is finished, makes a step, asks for a
+service `Σ₀` lacks, performs an operation no handler of its own handles, or is
+blocked. An operation no handler handles is not an outcome of the main thread:
+`Σ₀` has no value of an effect. -/
 theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
     (hcov : ∀ N, φ₀.svc (.nm N) → (root.svc N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :
     ((Value c.main ∧ ∃ Ψ, StoreTy S Ψ c.mem ∧ Typ S Ψ Facts.age [] c.main (.ex t .pure)) ∨
       (∃ v, c.main = .raise v ∧ ∃ Ψ, Typ S Ψ Facts.age [] v (.ex (.errors φ₀.err) .pure)) ∨
-      (∃ l o, Step root l c.rgs c.mem c.main o) ∨ Blocked c.rgs c.main) ∧
+      (∃ l o, Step root l c.rgs c.mem c.main o) ∨ Blocked c.rgs c.main ∨
+      ∃ p ℓ a, c.main = .unw p ℓ a) ∧
     ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids,
-      Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, AskStuck root k D) ∨
-        Blocked c.rgs k := by
+      Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, AskStuck S root k D) ∨
+        (∃ D, PerformStuck S k D) ∨ Blocked c.rgs k := by
   obtain ⟨Ψ, hμ, h, hΛ, -⟩ := steps_typed hroot hs ht hφ (CfgTy.init h₀ hp)
   simp only [List.nil_append] at hμ h hΛ
   refine ⟨?_, fun p g hg _ k hk => ?_⟩
-  · rcases progress (Λ := c.rgs) (root := root) hroot h hμ.1 rfl rfl with
-      hv | ⟨v, hv, he⟩ | hstep | ⟨_, N, _, _, _, hN, hD⟩ | hb
+  · rcases progress (Λ := c.rgs) (root := root) hroot h hμ.1 rfl rfl with hv | hn
     · exact .inl ⟨hv, Ψ, hμ, h.valueAny hv _⟩
-    · exact .inr (.inl ⟨v, he, Ψ, raise_errors hv (he ▸ h)⟩)
-    · exact .inr (.inr (.inl hstep))
-    · have := hcov N hD; rw [hN] at this; cases this
-    · exact .inr (.inr (.inr hb))
+    cases hn with
+    | raise h' => obtain ⟨v, hv, he⟩ := h'; exact .inr (.inl ⟨v, he, Ψ, raise_errors hv (he ▸ h)⟩)
+    | step hstep => exact .inr (.inr (.inl hstep))
+    | ask h' =>
+      obtain ⟨_, N, _, _, _, hN, _, hD⟩ := h'
+      have := hcov N hD; rw [hN] at this; cases this
+    | perform h' =>
+      obtain ⟨_, Ef, o, _, _, _, _, _, _, _, hop, _, hD⟩ := h'
+      obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp (hcov Ef hD)
+      obtain ⟨hwv, hwt⟩ := hroot.svc _ _ hw
+      rw [S.op_impl _ _ _ _ _ hop] at hwt
+      obtain ⟨_, _, _, _, _, _, _, hN, _⟩ := canonical_errors hwv hwt
+      exact hN.elim
+    | blocked hb => exact .inr (.inr (.inr (.inl hb)))
+    | unw h' => exact .inr (.inr (.inr (.inr h')))
   · obtain ⟨t', φ', hk'⟩ := (hΛ p g hg).1 k hk
-    rcases progress (Λ := c.rgs) (root := root) hroot hk' hμ.1 rfl rfl with
-      hv | ⟨v, hv, he⟩ | hstep | ha | hb
+    rcases progress (Λ := c.rgs) (root := root) hroot hk' hμ.1 rfl rfl with hv | hn
     · exact .inl (.inl hv)
-    · exact .inl (.inr (.inl ⟨v, hv, he⟩))
-    · exact .inr (.inl hstep)
-    · exact .inr (.inr (.inl ⟨_, ha⟩))
-    · exact .inr (.inr (.inr hb))
+    cases hn with
+    | raise h' => exact .inl (.inr (.inl h'))
+    | step hstep => exact .inr (.inl hstep)
+    | ask ha => exact .inr (.inr (.inl ⟨_, ha⟩))
+    | perform hp => exact .inr (.inr (.inr (.inl ⟨_, hp⟩)))
+    | blocked hb => exact .inr (.inr (.inr (.inr hb)))
+    | unw h' => exact .inl (.inr (.inr h'))
 
 end Flick

@@ -62,15 +62,15 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .drec _ r, A => r.Within A ∧ r.NoIns
   | .glob _, _ => True
   | .hdl _ al r e, A => al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns ∧ e.NoIns
-  | .hwith p _ al r e, A => A p ∧ al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns
+  | .hwith p _ _ al r e, A => A p ∧ al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns
   -- the arm and the body it parked are at the same place, and share no region
-  | .hctl p _ _ _ al r a k, A =>
+  | .hctl p _ _ _ _ al r a k, A =>
     A p ∧ al.Within A ∧ r.Within A ∧ a.Within A ∧ k.Within A ∧ al.NoIns ∧ r.NoIns ∧
       ∀ x, a.Has (.frame x) → ¬ k.Has (.frame x)
   | .hres p a b, A => A p ∧ a.Within A ∧ b.Within A ∧ ∀ x, b.Has (.frame x) → ¬ a.Has (.frame x)
   | .hdone p a, A => A p ∧ a.Within A
-  | .hab p a e, A => A p ∧ a.Within A ∧ e.Within A ∧ ∀ x, ¬ a.Has (.frame x)
-  | .unw p, A => A p
+  -- what runs once the body unwound runs at the handler's place, and holds no region
+  | .unw p _ a, A => A p ∧ a.Within A ∧ ∀ x, ¬ a.Has (.frame x)
   | .kont p _, A => A p
   | .hole p, A => A p
 
@@ -95,13 +95,12 @@ def Frame.Within (A : Nat → Prop) : Frame → Prop
   | .with_ _ θ => θ.NoIns ∧ θ.Within Ψ B anc (fun _ => False)
   | .raise => True
   | .inside p => ¬ A p ∧ anc p = fun x => A x ∨ x = p
-  | .hwith p _ al r => A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns
+  | .hwith p _ _ al r => A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns
   -- the body a handler parked while its arm runs is at the same place
-  | .hctlA p _ _ _ al r k =>
+  | .hctlA p _ _ _ _ al r k =>
     A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ k.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns
   | .hresB p a => A p ∧ a.Within Ψ B anc A
   | .hdone p => A p
-  | .hab p a => A p ∧ a.Within Ψ B anc A ∧ ∀ x, ¬ a.Has (.frame x)
 
 /-- The regions of the hole of a frame. -/
 def Frame.hole (A : Nat → Prop) : Frame → Nat → Prop
@@ -323,7 +322,7 @@ theorem WithinE.frameAnc {A : Nat → Prop} {q : Nat} :
         · rw [hF.2]; exact .inl (upA x hx)
         · intro x hx; rw [hF.2] at hx; exact .inl (by simp [holeE, Frame.hole, hx])
       · simp at h
-    | hctlA p ℓ tl E' al r k =>
+    | hctlA p ℓ κ tl E' al r k =>
       simp only [Frame.Within] at hF
       refine part hF.2.2.2.1 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]
       simp only [Frame.plug, Tm.Has] at h

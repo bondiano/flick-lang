@@ -297,6 +297,20 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | drec _ _ _ _ hh =>
     intro _ _ _ hJ; cases hJ
     exact ⟨hh, by simp [Tm.head], by simp, by simp⟩
+  | @perform E o c a b t T _ _ _ _ hop hT =>
+    intro _ _ _ hJ; cases hJ
+    refine ⟨(held_none (by simp [Tm.Free]) (by simp [Tm.Has])).of_none _, by simp [Tm.head],
+      fun _ h => ?_, by simp⟩
+    cases h
+    refine ⟨{ (default : CArg) with t := t }, ?_⟩
+    cases c <;> simpa [Const.ty, hop] using hT
+  | kont _ hC hT =>
+    intro _ _ _ hJ; cases hJ
+    refine ⟨?_, by simp [Tm.head], by simp, by simp⟩
+    rintro x (⟨_, _, h, _⟩ | ⟨q, h, rfl⟩ | ⟨l, t, h, _⟩)
+    · exact h.elim
+    · cases h; exact hT.reach _ (.inr (.inr hC))
+    · cases h
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
 /-- A value has no `inside` form. -/
@@ -333,7 +347,8 @@ theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns 
       rintro (h | h)
       · exact ih₁ (.constApp (.inl ‹_›) hv₁) h
       · exact ih₂ hve h
-  | lit | loc | const | ctor | rnil | enil | cap | own | dnil => intro _ h; cases h
+  | lit | loc | const | ctor | rnil | enil | cap | own | dnil | perform => intro _ h; cases h
+  | kont => intro _ h; simp [Tm.Has] at h
   | drec _ _ _ hn => intro _; exact hn
   | dcons _ _ ih₁ ih₂ =>
     intro hv; cases hv with

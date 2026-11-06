@@ -72,22 +72,22 @@ theorem Tm.has_subst_free :
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | drec _ _ ih =>
     intro σ s i h hs; exact ih σ s i h hs
   | inside p e ih => intro σ s i h hs; exact .inr (.inr (.inr (ih σ s i h hs)))
-  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ s i h hs
     have := ih₁ σ s i; have := ih₂ σ s i; have := ih₃ σ s i
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
     grind
-  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ s i h hs
     have := ih₁ σ s i; have := ih₂ σ s i; have := ih₃ σ s i; have := ih₄ σ s i
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
     grind
-  | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ ih₁ ih₂ =>
     intro σ s i h hs
     have := ih₁ σ s i; have := ih₂ σ s i
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
     grind
-  | hdone _ _ ih₁ =>
+  | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
     intro σ s i h hs
     have := ih₁ σ s i
     simp only [Tm.subst, Tm.Has, Tm.Free] at h ⊢
@@ -130,16 +130,16 @@ theorem Tm.subst_congr : ∀ (e : Tm) {σ σ' : Nat → Tm}, (∀ i, e.Free i �
     rw [ih₁ fun i hi => h i (.inl hi), ih₂ fun i hi => h i (.inr hi)]
   | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih | drec _ _ ih =>
     intro σ σ' h; simp only [Tm.subst]; rw [ih h]
-  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ ih₁ ih₂ ih₃ =>
+  | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ σ' h; simp only [Tm.subst]
     rw [ih₁ fun i hi => h i (.inl hi), ih₂ fun i hi => h i (.inr (.inl hi)), ih₃ fun i hi => h i (.inr (.inr hi))]
-  | hctl _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro σ σ' h; simp only [Tm.subst]
     rw [ih₁ fun i hi => h i (.inl hi), ih₂ fun i hi => h i (.inr (.inl hi)), ih₃ fun i hi => h i (.inr (.inr (.inl hi))), ih₄ fun i hi => h i (.inr (.inr (.inr hi)))]
-  | hres _ _ _ ih₁ ih₂ | hab _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ ih₁ ih₂ =>
     intro σ σ' h; simp only [Tm.subst]
     rw [ih₁ fun i hi => h i (.inl hi), ih₂ fun i hi => h i (.inr hi)]
-  | hdone _ _ ih₁ =>
+  | hdone _ _ ih₁ | unw _ _ _ ih₁ =>
     intro σ σ' h; simp only [Tm.subst]
     rw [ih₁ fun i hi => h i hi]
   | _ => intro _ _ _; rfl

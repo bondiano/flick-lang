@@ -1,4 +1,4 @@
-import Formal.ScopeStep
+import Formal.PresHdlRt
 
 /-!
 # Preservation of runtime steps at the redex
@@ -307,15 +307,26 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
     | inside hF hbody hφ' _ _ hφ hT =>
       have hcut := inside_entails (hbl _ (.inl (.inl rfl))) hF hc.inΘ
       have hbody := hbody.cut hcut
-      rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨_, rfl⟩
+      rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨_, _, _, rfl⟩
       · exact same ((hbody.valueAny hw _).sub ⟨hT, Stage.le_refl _⟩)
       · obtain ⟨ε, hv', hε⟩ := raise_inv hv hbody
         obtain ⟨_, _, rfl, _, he⟩ := Stage.rt_le hφ
         exact same (.raise (hv'.valueAny hv _) ⟨fun _ h => h.elim,
           fun n hn => he n ((Stage.le_err (Stage.le_trans hε hφ')) n hn)⟩)
-      · cases hbody with | errVal hv => cases hv
+      · cases hbody with
+        | unw h₁ h₂ _ => exact same (.unw h₁ h₂ (Stage.none_le (Stage.rt_ne_pure hφ)))
+        | errVal hv => cases hv
     | errVal hv'' => exact (nv hv'').elim
-  | hctlRaise _ | hctlUnw | hresRaise _ | hresUnw | habCatch | hdl =>
-    cases h with | errVal hv'' => exact (nv hv'').elim
+  | hctlRaise hEi hk _ => exact same (hctl_signal hEi hk raise_any h)
+  | hctlUnw hEi hk => exact same (hctl_signal hEi hk unw_any h)
+  | hresRaise hA ha _ => exact same (hres_signal hA ha raise_any h)
+  | hresUnw hA ha => exact same (hres_signal hA ha unw_any h)
+  | hwithCatch => exact same (hwith_catch h)
+  | hdl =>
+    cases h with
+    | hdl hal hn hrf hψ he hφ₀ hc' hφ' hT =>
+      obtain ⟨c, hcy, hcl, hb⟩ := hdl_install hal hn hrf hψ he hφ₀ hc' hφ' hT hbl hc.yf hc.idem ht hφ
+      exact ⟨[c], hμ.alloc .lam hcl, by rw [hμ.1]; exact hb, by simpa using hcy⟩
+    | errVal hv'' => exact (nv hv'').elim
 
 end Flick

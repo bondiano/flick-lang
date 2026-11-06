@@ -7,7 +7,7 @@ import Formal.Lemma3
 Related terms run one handler: a body related to a parked one has the same frames (`Cg.plug_hole`),
 an operation has related arms (`Cg.armOf`), and related frames handle the same operations,
 park the same parts and unwind to the same handler (`FrR.handles`, `FrR.isCtl`,
-`FrR.isHab`). For this a base pair holds no run-time form, so filling a hole leaves it, and
+`FrR.catches`). For this a base pair holds no run-time form, so filling a hole leaves it, and
 neither side is a list of alternatives (`BNoAlts`, `BPlain`).
 -/
 
@@ -54,8 +54,8 @@ theorem Cg.armOf (hA : BNoAlts B) (hP : BPlain B) {o : Name} {x : Bool} {al al�
 theorem FrR.isCtl {F F' : Frame} (h : FrR B F F') : F.isCtl ↔ F'.isCtl := by
   cases h <;> simp [Frame.isCtl]
 
-theorem FrR.isHab {F F' : Frame} (h : FrR B F F') (p : Nat) : F.isHab p ↔ F'.isHab p := by
-  cases h <;> simp [Frame.isHab]
+theorem FrR.catches {F F' : Frame} (h : FrR B F F') (p ℓ : Nat) : F.catches p ℓ ↔ F'.catches p ℓ := by
+  cases h <;> simp [Frame.catches]
 
 theorem FrR.resumes {F F' : Frame} (h : FrR B F F') (p : Nat) : F.resumes p ↔ F'.resumes p := by
   cases h <;> simp [Frame.resumes]

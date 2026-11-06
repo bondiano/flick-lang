@@ -142,5 +142,20 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | dcons _ _ ih₁ ih₂ => intro _ hΘ; exact .dcons (ih₁ (hΘ.lift _ _)) (ih₂ hΘ)
   | dproj _ hc hk hl hts hH hT ih => intro _ hΘ; exact .dproj (ih hΘ) hc hk hl hts (hH.mono hΘ) hT
   | glob hg hts hH hT => intro _ hΘ; exact .glob hg hts (hH.mono hΘ) hT
+  | perform hop hT => intro _ _; exact .perform hop hT
+  | hanil => intro _ _; exact .hanil
+  | hatail hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hatail hop (ih₁ hΘ) (ih₂ hΘ)
+  | haabort hop _ _ ih₁ ih₂ => intro _ hΘ; exact .haabort hop (ih₁ hΘ) (ih₂ hΘ)
+  | hactl hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hactl hop (ih₁ hΘ) (ih₂ hΘ)
+  | hdl _ hn _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+    intro _ hΘ; exact .hdl (ih₁ (hΘ.substT _)) hn (ih₂ hΘ) hψ (ih₃ hΘ) hφ₀ hc hφ hT
+  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+    intro _ hΘ; exact .hwith hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) hφ₀ hc hφ hT
+  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ih₁ ih₂ ih₃ ih₄ =>
+    intro _ hΘ; exact .hctl hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) hφ₀ (ih₄ hΘ) hl hcm hφ hT
+  | hres _ hA ha _ hl hφ hT ih₁ ih₂ => intro _ hΘ; exact .hres (ih₁ hΘ) hA ha (ih₂ hΘ) hl hφ hT
+  | hdone _ ih => intro _ hΘ; exact .hdone (ih hΘ)
+  | unw hℓ _ hφ ih => intro _ hΘ; exact .unw hℓ (ih hΘ) hφ
+  | kont hl hC hT => intro _ _; exact .kont hl hC hT
 
 end Flick

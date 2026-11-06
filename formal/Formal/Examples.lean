@@ -55,8 +55,8 @@ theorem rowVar_inst (r : Row) : rowVar.substT (instT [.row r]) = r.plain := by
   funext x; apply propext
   cases x <;> simp [rowVar, Row.substT, instT, Ty.asRow_row, Row.plain]
 
-/-- `app : ∀ρ. (Unit →R⟨ρ;∅⟩ Unit) →R⟨ρ;∅⟩ Unit`, used at `ρ := {S}`. -/
-example (S : Sig) :
+/-- `app : ∀ρ. (Unit →R⟨ρ;∅⟩ Unit) →R⟨ρ;∅⟩ Unit`, used at `ρ := {S}`, a service. -/
+example (S : Sig) (hS₀ : ∀ o, S.op "S" o = none) :
     Typ S [] Facts.none [] (.let_ (.lam (.app (.var 0) (.lit .unit)))
       (.app (.var 0) (.lam (.let_ (.app (.const (.ask "S")) (.lit .unit)) (.lit .unit)))))
       (.ex (.base .unit) (.rt (Row.single "S") Row.none)) := by
@@ -78,7 +78,7 @@ example (S : Sig) :
         Caps.none_substT]
       exact .refl
     · refine .lam (ψ := .rt (Row.single "S") Row.none) (.let_ (a := S.impl "S")
-        (.app (.const (c := .ask "S") (ι := default) trivial .refl) .lit (Stage.le_refl _) .refl) .lit)
+        (.app (.const (c := .ask "S") (ι := default) hS₀ .refl) .lit (Stage.le_refl _) .refl) .lit)
         (fun h => by simp [Tm.Has] at h) ?_ .refl
       rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
       · simp [Tm.Free] at hi

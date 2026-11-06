@@ -21,6 +21,7 @@ def J.substT (σ : Atom → Ty) : J → J
   | .alts t t' φ => .alts (t.substT σ) (t'.substT σ) (φ.substT σ)
   | .halts ε H t φ => .halts (ε.substT σ) (H.substT σ) (t.substT σ) (φ.substT σ)
   | .dfs fs => .dfs (fs.map fun f => (f.1, f.2.substT σ))
+  | .harms E t φ s => .harms E (t.substT σ) (φ.substT σ) (s.substT σ)
 
 theorem Fits.sub {σ : Atom → Ty} {e e' : Tm} (h : Fits σ e) (hs : ∀ s, e'.Has s → e.Has s) :
     Fits σ e' :=
@@ -116,6 +117,10 @@ theorem Facts.up_comm (Θ : Facts) (k : Nat) (σ : Atom → Ty) :
 theorem Row.up_comm (r : Row) (k : Nat) (σ : Atom → Ty) :
     (r.substT (shiftV k)).substT (liftT k σ) = (r.substT σ).substT (shiftV k) := by
   rw [Row.substT_comp, Row.substT_comp]; congr 1; funext a; exact shift_lift k σ a
+
+theorem Stage.up_comm (φ : Stage) (k : Nat) (σ : Atom → Ty) :
+    (φ.substT (shiftV k)).substT (liftT k σ) = (φ.substT σ).substT (shiftV k) := by
+  cases φ <;> simp [Stage.substT, Row.up_comm]
 
 theorem Row.err_substT (E : Name) (U : Ty) (σ : Atom → Ty) :
     (Row.err E U).substT σ = Row.err E (U.substT σ) := by

@@ -148,6 +148,14 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | drec hc hk hr hn hh =>
     intro _ _ _ hJ; cases hJ
     exact ⟨_, .refl, .drec hc hk hr hn hh, by simp [Tm.head], by simp, by simp⟩
+  | @perform E o c a b t T _ _ _ _ hop hT =>
+    intro _ _ _ hJ; cases hJ
+    refine ⟨_, hT, .perform hop .refl, by simp [Tm.head], fun _ h => ?_, by simp⟩
+    cases h
+    exact ⟨{ (default : CArg) with t := t }, by cases c <;> simp [Const.ty, hop]⟩
+  | kont hl hC hT =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨_, hT, .kont hl hC .refl, by simp [Tm.head], by simp, by simp⟩
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
 /-- L1, last clause: a value has its type with any stage. -/

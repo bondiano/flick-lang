@@ -105,23 +105,26 @@ theorem Tm.armOf_has {o : Name} {s : Site} {b : Tm} : ∀ {al : Tm}, al.armOf o 
 
 /-- What the step of an operation writes, its handler and the operation wrote: the
 arm, the value, the context between them and the handler's region. -/
-theorem perform_has {p : Nat} {Ef o : Name} {c : OpClass} {al r b v x : Tm} {Ei : List Frame}
+theorem perform_has {p ℓ : Nat} {Ef o : Name} {c : OpClass} {al r b v x : Tm} {Ei : List Frame}
     {δ : List Tm} {s : Site} (ha : al.armOf o = some b) (hδ : ∀ w ∈ δ, w.Has s → s = .rgn p ∨ v.Has s)
-    (hx : x.Has s → s = .ins ∨ s = .rgn p) :
-    let e := Tm.hwith p Ef al r (plug Ei (.app (.const (.perform Ef o c)) v))
+    (hx : x.Has s → s = .ins ∨ s = .rgn p ∨ (b.subst (inst δ)).Has s) :
+    let e := Tm.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o c)) v))
     (s = .ins → e.Has s) ∧ (s = .rgn p → e.Has s) ∧ (al.Has s → e.Has s) ∧ (r.Has s → e.Has s) ∧
       ((b.subst (inst δ)).Has s → e.Has s) ∧ ((plug Ei x).Has s → e.Has s) := by
-  refine ⟨.inl, (.inr <| .inl ·), (.inr <| .inr <| .inl ·), (.inr <| .inr <| .inr <| .inl ·),
-    fun h => ?_, fun h => ?_⟩
-  · rcases subst_inst_has h with h | ⟨w, hw, h⟩
+  have h₅ : (b.subst (inst δ)).Has s →
+      (Tm.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o c)) v))).Has s := fun h => by
+    rcases subst_inst_has h with h | ⟨w, hw, h⟩
     · exact .inr (.inr (.inl (Tm.armOf_has ha h)))
     · rcases hδ w hw h with h | h
       · exact .inr (.inl h)
       · exact .inr (.inr (.inr (.inr (plug_has _ (by simp [Tm.Has, h])))))
-  · rcases plug_has_inv (r := .app (.const (.perform Ef o c)) v) Ei h with h | h
-    · exact .inr (.inr (.inr (.inr h)))
-    · rcases hx h with h | h
-      · exact .inl h
-      · exact .inr (.inl h)
+  refine ⟨.inl, (.inr <| .inl ·), (.inr <| .inr <| .inl ·), (.inr <| .inr <| .inr <| .inl ·), h₅,
+    fun h => ?_⟩
+  rcases plug_has_inv (r := .app (.const (.perform Ef o c)) v) Ei h with h | h
+  · exact .inr (.inr (.inr (.inr h)))
+  · rcases hx h with h | h | h
+    · exact .inl h
+    · exact .inr (.inl h)
+    · exact h₅ h
 
 end Flick

@@ -36,10 +36,11 @@ theorem lookupE_append (E : List Frame) (F : Frame) (N : Name) :
   | nil => simp [lookupE]; cases F.lookup N <;> rfl
   | cons G E ih => simp only [List.cons_append, lookupE]; cases G.lookup N <;> simp [ih]
 
-/-- Services a frame provides: those of `with θ`, and `Scope π` of `inside π`; the
-obligations it may discharge and the uses of a `provide` region it ends. -/
+/-- Services a frame provides: those of `with θ`, the effect of a handler, and `Scope π`
+of `inside π`; the obligations it may discharge and the uses of a `provide` region it
+ends. -/
 def Frame.dom (F : Frame) : Row
-  | .nm N => (F.lookup N).isSome
+  | .nm N => (F.lookup N).isSome ∨ F.installs N
   | .atm a => ∃ p, F = .inside p ∧ a = .r p
   | .ob N a => (F.lookup N).isSome ∨ ∃ p, F = .inside p ∧ a = .r p
   | .need _ a | .obv _ a => ∃ p, F = .inside p ∧ a = .r p
@@ -53,12 +54,13 @@ def domE : List Frame → Row
 theorem domE_cons (F : Frame) (E : List Frame) (n : Elem) :
     domE (F :: E) n ↔ F.dom n ∨ domE E n := Iff.rfl
 
-theorem domE_nm (E : List Frame) (N : Name) : domE E (.nm N) ↔ (lookupE E N).isSome := by
+theorem domE_nm (E : List Frame) (N : Name) :
+    domE E (.nm N) ↔ (lookupE E N).isSome ∨ ∃ F ∈ E, F.installs N := by
   induction E with
   | nil => simp [domE, Row.none, lookupE]
   | cons F E ih =>
-    simp only [domE, Row.union, Frame.dom, lookupE, ih]
-    cases F.lookup N <;> simp
+    simp only [domE, Row.union, Frame.dom, lookupE, ih, List.mem_cons]
+    cases F.lookup N <;> simp <;> grind
 
 theorem not_value_plug {r : Tm} (hr : ¬ Value r) (F : Frame) : ¬ Value (F.plug r) := by
   intro hv
