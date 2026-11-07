@@ -26,6 +26,45 @@ struct Group<'n> {
 }
 
 impl Lower<'_> {
+    /// `scope s { body }`: `Scope.run (fun s -> body)`, after the owner around
+    /// it when a call in `body` acquires into that one.
+    pub(super) fn scope_run(
+        owner: Option<String>,
+        outer: Option<String>,
+        body: Expr,
+        span: Span,
+    ) -> Expr {
+        let lang = |item| Box::new(Expr::new(ExprKind::lang(item), span));
+        let thunk = ExprKind::Lambda {
+            params: vec![Param {
+                pat: owner.map_or(Pat::Wild, Pat::Bind),
+                stage: Stage::Runtime,
+                ty: None,
+            }],
+            body: Box::new(body),
+        };
+        let run = Expr::new(
+            ExprKind::App {
+                func: lang(Lang::ScopeRun),
+                arg: Box::new(Expr::new(thunk, span)),
+                stage: Stage::Runtime,
+                arg_first: false,
+            },
+            span,
+        );
+        let Some(outer) = outer else {
+            return run;
+        };
+        let current = ExprKind::App {
+            func: lang(Lang::ScopeCurrent),
+            arg: Box::new(Expr::new(ExprKind::Tuple(Vec::new()), span)),
+            stage: Stage::Runtime,
+            arg_first: false,
+        };
+        let bind = Stmt::Let(Pat::Bind(outer), Expr::new(current, span));
+        Expr::new(ExprKind::Block(vec![bind], Box::new(run)), span)
+    }
+
     /// `provide layer { body }`: `Layer.run layer (fun () -> body)`.
     pub(super) fn layer_run(&mut self, layer: &Node, body: &Node, span: Span) -> ExprKind {
         let layer = self.expr(layer);

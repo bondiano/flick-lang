@@ -195,9 +195,6 @@ impl<'a> Gen<'a> {
                 self.run(t)
             }
             ExprKind::Task(body) => self.task(body),
-            ExprKind::Scope { owner, outer, body } => {
-                self.scope(owner.as_deref(), outer.as_deref(), body)
-            }
             ExprKind::Within(owner, inner) => self.within(owner, inner),
             ExprKind::Handle(h) => self.handle(h),
         }

@@ -63,6 +63,15 @@ let keep path =
 Here `local` is released when the inner `scope` ends, and the file `keep`
 returns when the caller's scope does.
 
+`scope s { body }` stands for `Scope.run (fun s -> body)`. `Scope.run` takes a
+function polymorphic in the region, so a function can receive the body as a
+value:
+
+```flick
+with_region : (forall s. Fiber.Owner s ->{Scope s; none} String) ->{} String
+let with_region body = Scope.run body
+```
+
 ## Captures
 
 A resource has its region in its type: `File s`, and also `List (File s)`

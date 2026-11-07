@@ -79,6 +79,8 @@ map2Eff Map2Eff
 bindEff BindEff
 listMapEffect *ListMapEffect
 layerRun *LayerRun
+scopeRun *ScopeRun
+scopeCurrent *ScopeCurrent
 fromResult FromResult
 appFail AppFail
 recordLabels RecordLabels

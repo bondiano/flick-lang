@@ -153,13 +153,6 @@ pub enum ExprKind {
     Ignore(Box<Expr>),
     Await(Box<Expr>),
     Task(Box<Expr>),
-    /// `scope [s] { … }`: binds its owner (the name of a named scope, or
-    /// one a `Within` needs) and the owner around it, when used.
-    Scope {
-        owner: Option<String>,
-        outer: Option<String>,
-        body: Box<Expr>,
-    },
     /// A runtime call that acquires into the owner bound to the local, not
     /// into the innermost scope.
     Within(String, Box<Expr>),
@@ -191,7 +184,6 @@ impl Expr {
             | ExprKind::Ignore(inner)
             | ExprKind::Await(inner)
             | ExprKind::Task(inner)
-            | ExprKind::Scope { body: inner, .. }
             | ExprKind::Within(_, inner)
             | ExprKind::Lift(inner, _)
             | ExprKind::Lambda { body: inner, .. }
@@ -319,7 +311,6 @@ impl Expr {
             | ExprKind::Ignore(inner)
             | ExprKind::Await(inner)
             | ExprKind::Task(inner)
-            | ExprKind::Scope { body: inner, .. }
             | ExprKind::Within(_, inner)
             | ExprKind::Lift(inner, _)
             | ExprKind::Lambda { body: inner, .. }

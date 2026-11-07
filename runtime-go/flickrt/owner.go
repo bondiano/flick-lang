@@ -300,6 +300,15 @@ func Scope(fb *Fiber, body func(fb *Fiber, owner, outer Value) Value) Value {
 	})
 }
 
+// ScopeRun is `Scope.run f`, which `scope s { body }` stands for.
+func ScopeRun(fb *Fiber, f Value) Value {
+	return Scope(fb, func(inner *Fiber, owner, _ Value) Value { return Run(inner, Apply(inner, f, owner)) })
+}
+
+// ScopeCurrent is `Scope.current ()`: the owner around, which a nested
+// `scope` may acquire into.
+func ScopeCurrent(fb *Fiber, _ Value) Value { return fb.owner }
+
 // Within is `fb` acquiring into `owner`, an outer region's, not the
 // innermost one's.
 func Within(fb *Fiber, owner Value) *Fiber {

@@ -70,6 +70,8 @@ impl Tr {
                 lams(names.iter().map(|n| given(n)), self.expr(body))
             }
             ExprKind::App { func, arg, .. } if layer_run(func).is_some() => self.provide(func, arg),
+            ExprKind::App { func, arg, .. } if is_global(func, "Scope", "run") => self.scope(arg),
+            ExprKind::App { func, .. } if is_global(func, "Scope", "current") => Term::unit(),
             ExprKind::App {
                 func,
                 arg,
@@ -133,10 +135,6 @@ impl Tr {
                 stuck("a `for` or a `Seq`")
             }
             ExprKind::Unwrap(_) => stuck("`?` on an `Option`, a return from the function,"),
-            ExprKind::Scope { owner, body, .. } => {
-                let s = owner.as_deref().map_or_else(|| self.fresh("s"), Name::from);
-                Term::Scope(s, rc(self.expr(body)))
-            }
             // shortcut: the model acquires into the innermost `scope`, not the
             // owner a `Within` names (`regions.md` §1.4, G6); a program that
             // acquires into an outer region from a nested one is rejected
@@ -316,6 +314,27 @@ fn binary(op: BinOp, a: Term, b: Term) -> Term {
 }
 
 impl Tr {
+    /// `Scope.run arg`, which is `scope s { body }`: the core's form of it.
+    fn scope(&mut self, arg: &ir::Expr) -> Term {
+        if let ExprKind::Lambda { params, body } = &arg.kind
+            && let [ir::Param { pat, .. }] = &params[..]
+        {
+            match pat {
+                ir::Pat::Bind(s) => {
+                    return Term::Scope(Name::from(s.as_str()), Rc::new(self.expr(body)));
+                }
+                ir::Pat::Wild => {
+                    let s = self.fresh("s");
+                    return Term::Scope(s, Rc::new(self.expr(body)));
+                }
+                _ => {}
+            }
+        }
+        let s = self.fresh("s");
+        let body = Term::app(self.expr(arg), Term::Var(s.clone()));
+        Term::Scope(s, Rc::new(body))
+    }
+
     /// `Layer.run layer arg`, which is `provide layer { body }`: the core's
     /// form of it.
     fn provide(&mut self, func: &ir::Expr, arg: &ir::Expr) -> Term {
@@ -337,6 +356,10 @@ impl Tr {
         };
         Term::Provide(Rc::new(layer), Rc::new(body))
     }
+}
+
+fn is_global(func: &ir::Expr, m: &str, n: &str) -> bool {
+    matches!(&func.kind, ExprKind::Global { module, name } if module == m && name == n)
 }
 
 /// The layer of `Layer.run layer`.

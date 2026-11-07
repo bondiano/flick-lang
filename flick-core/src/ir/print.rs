@@ -209,14 +209,6 @@ pub fn expr(e: &Expr) -> String {
             format!("(each {} <- {} {})", pat(p), expr(source), expr(body))
         }
         ExprKind::Yield(e) => format!("(yield {})", expr(e)),
-        ExprKind::Scope { owner, outer, body } => format!(
-            "(scope{}{} {})",
-            owner.as_ref().map_or(String::new(), |o| format!(" {o}")),
-            outer
-                .as_ref()
-                .map_or(String::new(), |o| format!(" outer {o}")),
-            expr(body)
-        ),
         ExprKind::Within(owner, e) => format!("(within {owner} {})", expr(e)),
         ExprKind::Handle(h) if h.is_try() => format!("(try {} {})", expr(&h.body), arms(&h.errors)),
         ExprKind::Handle(h) => handler(h),

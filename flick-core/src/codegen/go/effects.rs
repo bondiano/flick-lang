@@ -31,28 +31,6 @@ impl<'a> Gen<'a> {
         stmts
     }
 
-    /// `scope [owner] { body }`: the body runs as the owner of a fresh
-    /// region, given it and the owner around it.
-    pub(super) fn scope(
-        &mut self,
-        owner: Option<&str>,
-        outer: Option<&str>,
-        body: &Expr,
-    ) -> Code<'a> {
-        let a = self.a;
-        let fb = self
-            .fiber
-            .expect("a `scope` runs where a fiber is in scope");
-        let name = |n: Option<&str>| n.map_or_else(|| "_".to_owned(), names::local);
-        let head = format!(
-            "func(fb *flickrt.Fiber, {}, {} flickrt.Value) flickrt.Value ",
-            name(owner),
-            name(outer)
-        );
-        let body = block(a, self.effectful_body(body));
-        call(a, "flickrt.Scope", [a.text(fb), docvec![a, head, body]]).into()
-    }
-
     /// A call that acquires into the region of `owner`: run in a fiber
     /// whose owner it is.
     pub(super) fn within(&mut self, owner: &str, inner: &Expr) -> Code<'a> {

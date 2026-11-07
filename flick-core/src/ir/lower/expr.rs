@@ -145,9 +145,9 @@ impl Lower<'_> {
                 };
                 let outer = outside.then(|| self.hidden("$outer"));
                 self.owners.insert(key, (owner.clone(), outer.clone()));
-                let body = self.boxed(children[0]);
+                let body = self.expr(children[0]);
                 self.scope.truncate(mark);
-                ExprKind::Scope { owner, outer, body }
+                return Self::scope_run(owner, outer, body, span);
             }
             K::ProvideExpr => self.layer_run(children[0], children[1], span),
             _ => {

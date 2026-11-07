@@ -154,7 +154,6 @@ fn inlinable(e: &Expr) -> bool {
             | ExprKind::Generate { .. }
             | ExprKind::Each { .. }
             | ExprKind::Yield(_)
-            | ExprKind::Scope { .. }
             | ExprKind::Within(..)
             | ExprKind::Handle(_)
             | ExprKind::Task(_)
