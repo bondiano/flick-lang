@@ -33,9 +33,8 @@ theorem Tm.rename_rename :
   | acons _ _ _ ih₁ ih₂ => intro ξ ζ; simp only [Tm.rename]; rw [bind ih₁, ih₂]
   | aguard _ _ _ _ ih₁ ih₂ ih₃ => intro ξ ζ; simp only [Tm.rename]; rw [bind ih₁, bind ih₂, ih₃]
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂ | with_ _ _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ => intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂]
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ => intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂]
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih
   | drec _ _ ih => intro ξ ζ; simp only [Tm.rename]; rw [ih]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro ξ ζ; simp only [Tm.rename]; rw [ih₁, ih₂, ih₃]
@@ -71,10 +70,9 @@ theorem Tm.subst_rename :
   | aguard _ _ _ _ ih₁ ih₂ ih₃ =>
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [bind ih₁, bind ih₂, ih₃]
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂ | with_ _ _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ =>
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂]
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih
   | drec _ _ ih => intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro ξ σ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂, ih₃]
@@ -111,10 +109,9 @@ theorem Tm.rename_subst :
   | aguard _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ ξ; simp only [Tm.rename, Tm.subst]; rw [bind ih₁, bind ih₂, ih₃]
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂ | with_ _ _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ =>
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro σ ξ; simp only [Tm.rename, Tm.subst]; rw [ih₁, ih₂]
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih
   | drec _ _ ih => intro σ ξ; simp only [Tm.rename, Tm.subst]; rw [ih]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ ξ; simp only [Tm.subst, Tm.rename]; rw [ih₁, ih₂, ih₃]
@@ -150,9 +147,8 @@ theorem Tm.subst_subst :
   | acons _ _ _ ih₁ ih₂ => intro σ τ; simp only [Tm.subst]; rw [bind ih₁, ih₂]
   | aguard _ _ _ _ ih₁ ih₂ ih₃ => intro σ τ; simp only [Tm.subst]; rw [bind ih₁, bind ih₂, ih₃]
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂ | with_ _ _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ => intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂]
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ => intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂]
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih
   | drec _ _ ih => intro σ τ; simp only [Tm.subst]; rw [ih]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ τ; simp only [Tm.subst]; rw [ih₁, ih₂, ih₃]

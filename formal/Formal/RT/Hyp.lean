@@ -57,10 +57,10 @@ inductive Steps (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
 def Reach (K : Core T V) (L : Lib V) (e₀ : T) (C : Conf T V) : Prop :=
   Steps K L (init e₀ K.unit) C
 
-/-- **G11**, the liveness premise of `provide` (`runtime.md`): at an `ask_S`, the environment entry that answers it — the
-`provide` owner `πₚ` — is live (before its (C5)). Only the answering entry counts: a child
+/-- **G11**, the liveness premise of `provide` (`runtime.md`): at an operation answered by the
+owner `πₚ` of a handler in the environment, `πₚ` is live (before its (C5)). Only the answering entry counts: a child
 may carry an entry it never asks (`docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives`). It is the typing rule of `regions.md` §2.7, point 3
-of T4, proved as `T4_3`; `Live` of the region of the `with` frame `lookupE` finds. -/
+of T4, proved as `T4_3`; `Live` of the region `handlerOf` finds. -/
 def G11 (K : Core T V) (L : Lib V) (e₀ : T) : Prop :=
   ∀ C, Reach K L e₀ C → ∀ f φ e e' π, C.Φ f = some (.run φ) → φ.code = .tm e →
     K.step e (.use π) e' → π ∈ φ.env → ∃ o, C.Λ π = some o ∧ o.st.live = true

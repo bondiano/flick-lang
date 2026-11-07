@@ -20,12 +20,12 @@ variable (hs : Nat → Nat → Prop) (cell : Nat → Nat)
 
 def Tm.Caught : Tm → (Nat → Prop) → Prop
   | .var _, _ | .lit _, _ | .loc _, _ | .const _, _ | .ctor _, _ | .rnil, _ | .anil, _
-  | .todo, _ | .enil, _ | .cap _, _ | .own _, _ | .glob _, _ | .kont _ _, _ | .hole _, _ => True
-  | .lam b, H | .fix b, H | .proj b _, H | .task b, H | .await b, H | .raise b, H | .bind _ b, H
+  | .todo, _ | .cap _, _ | .own _, _ | .glob _, _ | .kont _ _, _ | .hole _, _ => True
+  | .lam b, H | .fix b, H | .proj b _, H | .task b, H | .await b, H | .raise b, H
   | .scope b, H | .drec _ b, H | .hdone _ b, H => b.Caught H
   | .app a b, H | .let_ a b, H | .letrec a b, H | .rcons _ a b, H | .update a _ b, H
-  | .match_ a b, H | .acons _ a b, H | .try_ a b, H | .handle a b, H | .provide a b, H
-  | .with_ _ a b, H | .econs _ a b, H | .join a b, H | .hres _ _ a b, H => a.Caught H ∧ b.Caught H
+  | .match_ a b, H | .acons _ a b, H | .try_ a b, H | .handle a b, H
+  | .hres _ _ a b, H => a.Caught H ∧ b.Caught H
   | .aguard _ g b r, H => g.Caught H ∧ b.Caught H ∧ r.Caught H
   | .hdl _ al r e, H => al.Caught H ∧ r.Caught H ∧ e.Caught H
   | .inside p e, H => ¬ H p ∧ e.Caught H
@@ -37,8 +37,8 @@ def Tm.Caught : Tm → (Nat → Prop) → Prop
 
 def Frame.Caught (H : Nat → Prop) : Frame → Prop
   | .appL a | .appR a | .let_ a | .match_ a | .rconsL _ a | .rconsR _ a | .updL _ a | .updR a _
-  | .try_ a | .provide a | .joinL a | .joinR a | .with_ _ a | .hresB _ _ a => a.Caught hs cell H
-  | .proj _ | .await | .bind _ | .raise | .hdone _ => True
+  | .try_ a | .hresB _ _ a => a.Caught hs cell H
+  | .proj _ | .await | .raise | .hdone _ => True
   | .inside p => ¬ H p
   | .hwith p ℓ _ al r => hs p = H ∧ cell p = ℓ ∧ al.Caught hs cell H ∧ r.Caught hs cell H
   | .hctlA p ℓ _ _ _ al r k => hs p = H ∧ cell p = ℓ ∧ al.Caught hs cell H ∧ r.Caught hs cell H ∧

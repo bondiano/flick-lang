@@ -40,8 +40,6 @@ structure Homo (m : Tm → Tm) : Prop where
   loc : ∀ l, m (.loc l) = .loc l
   const : ∀ c, m (.const c) = .const c
   task : ∀ e, ∃ e', m (.task e) = .task e'
-  enil : m .enil = .enil
-  econs : ∀ N v θ, m (.econs N v θ) = .econs N (m v) (m θ)
   cap : ∀ p, m (.cap p) = .cap p
   own : ∀ p, m (.own p) = .own p
   drec : ∀ c r, m (.drec c r) = .drec c (m r)
@@ -49,12 +47,12 @@ structure Homo (m : Tm → Tm) : Prop where
 
 theorem Homo.rename (ξ : Nat → Nat) : Homo (Tm.rename ξ) :=
   ⟨fun _ _ _ => rfl, fun _ _ => rfl, fun _ => rfl, fun _ => rfl, rfl, fun _ => ⟨_, rfl⟩,
-    fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩, rfl, fun _ _ _ => rfl,
+    fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩,
     fun _ => rfl, fun _ => rfl, fun _ _ => rfl, fun _ _ => rfl⟩
 
 theorem Homo.subst (σ : Nat → Tm) : Homo (Tm.subst σ) :=
   ⟨fun _ _ _ => rfl, fun _ _ => rfl, fun _ => rfl, fun _ => rfl, rfl, fun _ => ⟨_, rfl⟩,
-    fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩, rfl, fun _ _ _ => rfl,
+    fun _ => ⟨_, rfl⟩, fun _ => rfl, fun _ => rfl, fun _ => ⟨_, rfl⟩,
     fun _ => rfl, fun _ => rfl, fun _ _ => rfl, fun _ _ => rfl⟩
 
 theorem Homo.head {m : Tm → Tm} (hm : Homo m) {K} :
@@ -72,7 +70,6 @@ theorem Homo.head_rev {m : Tm → Tm} (hm : Homo m) {K} :
   | ctor => rw [hm.ctor] at h; exact h
   | ctorApp _ _ _ ih _ => rw [hm.app] at h; exact ih h
   | constApp => rw [hm.app, hm.const] at h; simp [Tm.head] at h
-  | constApp2 => rw [hm.app, hm.app, hm.const] at h; simp [Tm.head] at h
   | lam => obtain ⟨_, e⟩ := hm.lam _; rw [e] at h; simp [Tm.head] at h
   | fix => obtain ⟨_, e⟩ := hm.fix _; rw [e] at h; simp [Tm.head] at h
   | task => obtain ⟨_, e⟩ := hm.task _; rw [e] at h; simp [Tm.head] at h
@@ -80,9 +77,7 @@ theorem Homo.head_rev {m : Tm → Tm} (hm : Homo m) {K} :
   | loc => rw [hm.loc] at h; simp [Tm.head] at h
   | const => rw [hm.const] at h; simp [Tm.head] at h
   | rnil => rw [hm.rnil] at h; simp [Tm.head] at h
-  | enil => rw [hm.enil] at h; simp [Tm.head] at h
   | rcons => rw [hm.rcons] at h; simp [Tm.head] at h
-  | econs => rw [hm.econs] at h; simp [Tm.head] at h
   | cap => rw [hm.cap] at h; simp [Tm.head] at h
   | own => rw [hm.own] at h; simp [Tm.head] at h
   | drec => rw [hm.drec] at h; simp [Tm.head] at h
@@ -98,21 +93,13 @@ theorem Homo.value {m : Tm → Tm} (hm : Homo m) {e} (h : Value e) : Value (m e)
   | const => rw [hm.const]; exact .const
   | ctor => rw [hm.ctor]; exact .ctor
   | rnil => rw [hm.rnil]; exact .rnil
-  | enil => rw [hm.enil]; exact .enil
   | cap => rw [hm.cap]; exact .cap
   | own => rw [hm.own]; exact .own
   | drec => rw [hm.drec]; exact .drec
   | kont => rw [hm.kont]; exact .kont
   | rcons _ _ ih₁ ih₂ => rw [hm.rcons]; exact .rcons ih₁ ih₂
-  | econs _ _ ih₁ ih₂ => rw [hm.econs]; exact .econs ih₁ ih₂
   | ctorApp hf hK _ ih₁ ih₂ => rw [hm.app]; exact .ctorApp ih₁ (hm.head hf hK) ih₂
   | constApp hc _ ih => rw [hm.app, hm.const]; exact .constApp hc ih
-  | constApp2 h₁ h₂ _ _ ih₁ ih₂ => rw [hm.app, hm.app, hm.const]; exact .constApp2 h₁ h₂ ih₁ ih₂
-
-theorem Homo.isEnv {m : Tm → Tm} (hm : Homo m) {θ} (h : IsEnv θ) : IsEnv (m θ) := by
-  induction h with
-  | enil => rw [hm.enil]; exact .enil
-  | econs hv _ ih => rw [hm.econs]; exact .econs (hm.value hv) ih
 
 theorem Value.rename {ξ : Nat → Nat} {e} (h : Value e) : Value (e.rename ξ) :=
   (Homo.rename ξ).value h

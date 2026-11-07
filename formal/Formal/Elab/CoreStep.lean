@@ -89,8 +89,8 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
     cases he with
     | glob => exact .inr ⟨_, _, _, _, .glob hE₂ hg, FrR.plugs hfr (Cg.refl _ _), hst⟩
     | base hb => exact .inl (hw hb)
-  | askWith hE hl hq =>
-    rcases around hroot hE ht (.askWith hE hl hq) with hw | ⟨E₂, e₂, rfl, hfr, hE₂, he, hw⟩
+  | performRoot hE hh hr hf hv =>
+    rcases around hroot hE ht (.performRoot hE hh hr hf hv) with hw | ⟨E₂, e₂, rfl, hfr, hE₂, he, hw⟩
     · exact .inl hw
     cases he with
     | base hb => exact .inl (hw hb)
@@ -98,27 +98,9 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
       cases h₁ with
       | base hb => exact (nb hb .const).elim
       | const =>
-        cases h₂ with
-        | base hb => exact (nb hb .lit).elim
-        | lit =>
-          obtain ⟨⟨q₂, v₂⟩, hl₂, rfl, hv⟩ := (FrR.lookupE hV hfr hE _).some_left hl
-          obtain ⟨g, hg, hgl⟩ := hq
-          obtain ⟨g₂, hg₂, hl₂', -⟩ := live_rel hst.1 hg hgl
-          exact .inr ⟨_, _, _, _, .askWith hE₂ hl₂ ⟨g₂, hg₂, hl₂'⟩, FrR.plugs hfr hv, hst⟩
-  | askRoot hE hl hr =>
-    rcases around hroot hE ht (.askRoot hE hl hr) with hw | ⟨E₂, e₂, rfl, hfr, hE₂, he, hw⟩
-    · exact .inl hw
-    cases he with
-    | base hb => exact .inl (hw hb)
-    | app h₁ h₂ =>
-      cases h₁ with
-      | base hb => exact (nb hb .const).elim
-      | const =>
-        cases h₂ with
-        | base hb => exact (nb hb .lit).elim
-        | lit =>
-          exact .inr ⟨_, _, _, _, .askRoot hE₂ ((FrR.lookupE hV hfr hE _).none_left hl) hr,
-            FrR.plugs hfr (Cg.refl _ _), hst⟩
+        have hv' := Cg.value hV hv h₂
+        exact .inr ⟨_, _, _, _, .performRoot hE₂ (FrR.handlesE hA DP.plain hfr hh) hr hf hv'.1,
+          FrR.plugs hfr (.app (Cg.refl _ _) h₂), hst⟩
   | addFin hE hg hl hv =>
     rcases around hroot hE ht (.addFin hE hg hl hv) with hw | ⟨E₂, e₂, rfl, hfr, hE₂, he, hw⟩
     · exact .inl hw
@@ -126,7 +108,7 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
     | base hb => exact .inl (hw hb)
     | app h₁ h₂ =>
       cases h₁ with
-      | base hb => exact (nb hb (.constApp (.inl rfl) .own)).elim
+      | base hb => exact (nb hb (.constApp rfl .own)).elim
       | app h₃ h₄ =>
         cases h₃ with
         | base hb => exact (nb hb .const).elim
@@ -137,7 +119,7 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
             obtain ⟨g₂, hg₂, hl₂, r⟩ := live_rel hst.1 hg hl
             exact .inr ⟨_, _, _, _, .addFin hE₂ hg₂ hl₂ (Cg.value hV hv h₂).1,
               FrR.plugs hfr .lit, hst.1.set _ ⟨r.1, r.2.1,
-                r.2.2.app (.cons (FrR.withs hfr (.await h₂)) .nil)⟩, hst.2⟩
+                r.2.2.app (.cons (.await h₂) .nil)⟩, hst.2⟩
   | spawn hE hg hl hv =>
     rcases around hroot hE ht (.spawn hE hg hl hv) with hw | ⟨E₂, e₂, rfl, hfr, hE₂, he, hw⟩
     · exact .inl hw
@@ -145,7 +127,7 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
     | base hb => exact .inl (hw hb)
     | app h₁ h₂ =>
       cases h₁ with
-      | base hb => exact (nb hb (.constApp (.inl rfl) .own)).elim
+      | base hb => exact (nb hb (.constApp rfl .own)).elim
       | app h₃ h₄ =>
         cases h₃ with
         | base hb => exact (nb hb .const).elim
@@ -156,7 +138,7 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
             obtain ⟨g₂, hg₂, hl₂, r⟩ := live_rel hst.1 hg hl
             exact .inr ⟨_, _, _, _, .spawn hE₂ hg₂ hl₂ (Cg.value hV hv h₂).1,
               FrR.plugs hfr .lit, hst.1.set _ ⟨r.1,
-                r.2.1.app (.cons (FrR.withs hfr (.await h₂)) .nil), r.2.2⟩, hst.2⟩
+                r.2.1.app (.cons (.await h₂) .nil), r.2.2⟩, hst.2⟩
   | @raise E v _ _ F hE hF hnt hni hnc hv =>
     have hE' : OkE (F :: E) := fun G hG => (List.mem_cons.mp hG).elim (fun h => h ▸ hF) (hE G)
     rcases around (E := F :: E) (e := .raise v) hroot hE' ht (.raise hE hF hnt hni hnc hv) with

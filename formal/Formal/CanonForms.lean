@@ -12,33 +12,19 @@ def Tm.args : Tm → Nat
   | .app f _ => f.args + 1
   | _ => 0
 
-/-- The kind of a constant applied to `n` arguments. -/
-def Const.kindAt (c : Const) : Nat → Nat
-  | 0 => 1
-  | 1 => c.resKind
-  | _ => 6
-
 /-- The kinds a value's type can have, read from the value's head. -/
 def VKind (e : Tm) (k : Nat) : Prop :=
   match e.head with
   | .ctor _ => k = 1 ∨ k = 3 ∨ k = 7
-  | .const c => k = c.kindAt e.args
-  | .lam _ | .fix _ | .kont _ _ => k = 1
+  | .const _ | .lam _ | .fix _ | .kont _ _ => k = 1
   | .lit _ => k = 0
   | .loc _ => k = 2
   | .rnil | .rcons .. => k = 4
   | .task _ => k = 5
-  | .enil | .econs .. => k = 8
   | .cap _ => k = 10
   | .own _ => k = 11
   | .drec .. => k = 13
   | _ => True
-
-theorem Const.kindAt_ne3 (c : Const) (n : Nat) : c.kindAt n ≠ 3 := by
-  have := Const.resKind_cases c
-  cases n with
-  | zero => simp [Const.kindAt]
-  | succ n => cases n <;> simp [Const.kindAt] <;> omega
 
 theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T φ}, J = .ex T φ →
     VKind e T.kind := by
@@ -52,15 +38,13 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | loc => intro _ _ _ hJ; cases hJ; rfl
   | rnil => intro _ _ _ hJ; cases hJ; rfl
   | rcons => intro _ _ _ hJ; cases hJ; rfl
-  | enil => intro _ _ _ hJ; cases hJ; rfl
-  | econs => intro _ _ _ hJ; cases hJ; rfl
   | drec => intro _ _ _ hJ; cases hJ; rfl
   | const _ hT =>
     intro _ _ _ hJ; cases hJ
-    simp only [VKind, Tm.head, Tm.args, Const.kindAt]; rw [← hT.kind, Const.ty_kind]
+    simp only [VKind, Tm.head]; rw [← hT.kind, Const.ty_kind]
   | perform _ hT =>
     intro _ _ _ hJ; cases hJ
-    simp only [VKind, Tm.head, Tm.args, Const.kindAt]; rw [← hT.kind]; rfl
+    simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
   | kont _ _ hT => intro _ _ _ hJ; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
   | ctor _ _ _ hT =>
     intro _ _ _ hJ; cases hJ
@@ -74,7 +58,7 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     simp only [VKind, Ty.kind]
     split
     · intro; simp
-    · intro h; exact absurd h.symm (Const.kindAt_ne3 _ _)
+    · intro h; cases h
     all_goals simp
   | app hf ha hψ hT _ _ =>
     intro hv _ _ hJ; cases hJ
@@ -89,14 +73,8 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
         simp only [VKind, Tm.head, hK]; rw [← hU.kind]; omega
       · rw [h']; simp [VKind, Tm.head, hK, Ty.kind]
     | constApp hc _ =>
-      simp [VKind, Tm.head, Tm.args, Const.kindAt, (Typ.app hf ha hψ hT).constApp_kind hc]
-    | constApp2 h₁ h₂ _ _ =>
-      simp [VKind, Tm.head, Tm.args, Const.kindAt, (Typ.app hf ha hψ hT).constApp2_kind h₁ h₂]
+      simp [VKind, Tm.head, (Typ.app hf ha hψ hT).constApp_kind hc]
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
-
-theorem Const.arity_of_resKind {c : Const} (h₁ : c.resKind = 1) (h₂ : c.arity = 2 ∨ c.layer) :
-    c.arity = 2 := by
-  cases c <;> simp [Const.resKind, Const.arity, Const.layer] at h₁ h₂ ⊢
 
 /-- L1 for functions. -/
 theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
@@ -111,10 +89,10 @@ theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
   | ctorApp _ hf _ => exact .inr (.inr (.inl ⟨_, hf⟩))
   | const => exact .inr (.inr (.inr (.inl ⟨_, rfl⟩)))
   | constApp hc hw =>
-    simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
-    exact .inr (.inr (.inr (.inr (.inl ⟨_, _, rfl, Const.arity_of_resKind hk.symm hc, hw⟩))))
+    simp [VKind, Tm.head, Ty.kind] at hk
+    exact .inr (.inr (.inr (.inr (.inl ⟨_, _, rfl, hc, hw⟩))))
   | kont => exact .inr (.inr (.inr (.inr (.inr ⟨_, _, rfl⟩))))
-  | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
+  | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
 /-- L1 for references. -/
 theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.ref t) φ)) :
@@ -124,9 +102,8 @@ theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
   | loc => cases h with | loc hl => exact ⟨_, rfl, hl⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
-    simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
-    have := Const.resKind_cases ‹Const›; omega
-  | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
+    simp [VKind, Tm.head, Ty.kind] at hk
+  | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
 /-- L1 for computations. -/
 theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
@@ -142,9 +119,8 @@ theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
       exact ⟨_, _, _, rfl, he, Stage.le_trans hψ ⟨hr, he'⟩, ht⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
-    simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
-    have := Const.resKind_cases ‹Const›; omega
-  | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
+    simp [VKind, Tm.head, Ty.kind] at hk
+  | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
 theorem canonical_unit {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.base .unit) φ)) :
     v = .lit .unit := by
@@ -174,9 +150,8 @@ theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (
   | own => cases h with | own => exact ⟨_, rfl, rfl⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
-    simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
-    have := Const.resKind_cases ‹Const›; omega
-  | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
+    simp [VKind, Tm.head, Ty.kind] at hk
+  | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
 /-- L1 for capabilities. -/
 theorem canonical_hnd {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.hnd s) φ)) :
@@ -186,9 +161,8 @@ theorem canonical_hnd {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
   | cap => cases h with | cap => exact ⟨_, rfl, rfl⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
-    simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
-    have := Const.resKind_cases ‹Const›; omega
-  | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
+    simp [VKind, Tm.head, Ty.kind] at hk
+  | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
 /-- L1 for records: field lookup and update succeed. -/
 theorem Shp.field {fl R v l t} (h : Shp S fl R v) (hf : fl = true) (hR : R.field l = some t) :
@@ -210,5 +184,38 @@ theorem Shp.field {fl R v l t} (h : Shp S fl R v) (hf : fl = true) (hR : R.field
   | lit => simp [Ty.field] at hR
   | rnil => simp [Ty.field] at hR
   | adt _ _ h => cases ‹Ty› <;> first | (simp [Ty.hd] at h; done) | (simp [Ty.field] at hR; done)
+
+/-- L1 for errors: a value of `Errors ε` is a constructor of an error in `ε`, at a
+type whose `⌈·⌉` is within the atoms of `ε`. -/
+theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.errors ε) φ)) :
+    ∃ K k ts T U, v.head = .ctor K ∧ S.ctor K = some (k, ts, T) ∧ ε (.nm T) ∧ U.hd = .adt T ∧
+      Typ S Ψ Θ Γ v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := by
+  have hk := h.vkind hv rfl
+  have hs := (h.shape hv rfl).2
+  obtain ⟨K, hK⟩ : ∃ K, v.head = .ctor K := by
+    cases hv with
+    | ctor => exact ⟨_, rfl⟩
+    | ctorApp _ hf _ => exact ⟨_, hf⟩
+    | constApp =>
+      simp [VKind, Tm.head, Ty.kind] at hk
+    | _ => simp [VKind, Tm.head, Ty.kind] at hk
+  rcases hs K hK with ⟨U, us, hU, hs'⟩ | ⟨_, E, U, he, hE, hUE, hs', hty, hsub⟩
+  · obtain ⟨K', k, _, T₀, ts', _, _, rfl⟩ := hs'.false_arrows
+    simp only [Ty.arrows_substT, Ty.tcon_substT] at hU
+    have h₁ := Ty.arrows_kind (ts'.map (Ty.substT (instT us))) T₀ ((S.res K').map (Ty.substT (instT us)))
+    rw [hU.kind] at h₁; simp [Ty.kind] at h₁
+  · cases he
+    cases hs' with
+    | hidden ho => simp [Ty.Opaque, hUE] at ho
+    | adt hsp hU₁ hU₂ =>
+      rw [hUE] at hU₂; cases hU₂
+      obtain ⟨K', k, ts, T, ts', hK', hS, rfl⟩ := hsp.false_arrows
+      rw [hK] at hK'; cases hK'
+      cases ts' with
+      | nil =>
+        simp only [Ty.arrows, Ty.tcon_hd] at hU₁; cases hU₁
+        exact ⟨K, k, ts, _, U, hK, hS, hE, hUE, hty.valueAny hv _, hsub⟩
+      | cons => simp [Ty.arrows, Ty.hd] at hU₁
+    | lit | rnil | rcons => simp [Ty.hd] at hUE
 
 end Flick

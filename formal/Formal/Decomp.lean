@@ -31,7 +31,7 @@ theorem frame_inj {F G : Frame} {a b : Tm} (hF : F.ok) (hG : G.ok) (ha : ¬ Valu
     (hb : ¬ Value b) (h : F.plug a = G.plug b) : F = G ∧ a = b := by
   cases F <;> cases G <;> simp only [Frame.plug, Tm.app.injEq, Tm.let_.injEq, Tm.match_.injEq,
     Tm.rcons.injEq, Tm.proj.injEq, Tm.update.injEq, Tm.await.injEq, Tm.try_.injEq,
-    Tm.provide.injEq, Tm.bind.injEq, Tm.join.injEq, Tm.with_.injEq, Tm.raise.injEq,
+    Tm.raise.injEq,
     Tm.inside.injEq, reduceCtorEq] at h <;>
     simp only [Frame.ok] at hF hG <;> simp_all
 
@@ -78,15 +78,14 @@ theorem decomp_frame {r a : Tm} {E : List Frame} {F : Frame} (hr : Redex r) (hE 
 theorem PHead.redex {e e' : Tm} (h : PHead e e') : Redex e := by
   refine ⟨h.not_value, fun F a hF ha => ?_⟩
   cases h <;> cases F <;> simp only [Frame.plug, Frame.ok, reduceCtorEq, Tm.app.injEq,
-    Tm.let_.injEq, Tm.match_.injEq, Tm.proj.injEq, Tm.update.injEq, Tm.try_.injEq,
-    Tm.with_.injEq, Tm.bind.injEq, Tm.join.injEq] at ha hF <;>
+    Tm.let_.injEq, Tm.match_.injEq, Tm.proj.injEq, Tm.update.injEq, Tm.try_.injEq] at ha hF <;>
     first
-    | (obtain ⟨rfl, -⟩ := ha; first | assumption | exact .lam | exact .fix | exact IsEnv.value ‹_›)
-    | (obtain ⟨-, rfl⟩ := ha; first | assumption | exact IsEnv.value ‹_›)
+    | (obtain ⟨rfl, -⟩ := ha; first | assumption | exact .lam | exact .fix)
+    | (obtain ⟨-, rfl⟩ := ha; first | assumption)
     | (obtain ⟨-, -, rfl⟩ := ha; assumption)
     | (obtain ⟨-, rfl, -⟩ := ha; assumption)
     | (subst ha; assumption)
-    | (obtain ⟨rfl, -⟩ := ha; exact .constApp (.inl rfl) .lit)
+    | (obtain ⟨rfl, -⟩ := ha; exact .constApp rfl .lit)
     | (obtain ⟨-, rfl⟩ := ha; exact .lit)
 
 theorem glob_redex (g : Nat) : Redex (.glob g) := by

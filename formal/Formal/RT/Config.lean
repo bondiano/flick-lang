@@ -55,7 +55,7 @@ inductive Act (T V : Type) where
   /-- `provide L { b }`: the memoizable layers of `L` in build order, each an identity
   and its build code -/
   | provide (Ls : List (Nat × T)) (b : T)
-  /-- an `ask_S` answered by the `provide` owner `π` of the environment -/
+  /-- an operation answered by the `provide` owner `π` of the environment -/
   | use (π : Nat)
 
 /-- The core, a parameter of λRT. -/

@@ -25,7 +25,7 @@ def Rgn.new : Rgn := ⟨true, [], []⟩
 /-- A live region. -/
 def Live (Λ : List Rgn) (p : Nat) : Prop := ∃ g, Λ[p]? = some g ∧ g.live = true
 
-/-- Pure steps `→ₚ` of core.md §3.3, with `bind` and `join` (`docs/formal/core.md#bind_s-and-join-steps-are-pure`). -/
+/-- Pure steps `→ₚ` of core.md §3.3. -/
 inductive PHead : Tm → Tm → Prop
   | beta : Value v → PHead (.app (.lam b) v) (b.subst (inst [v]))
   | fix : Value v → PHead (.app (.fix f) v) (f.subst (inst [v, .fix f]))
@@ -42,9 +42,6 @@ inductive PHead : Tm → Tm → Prop
             (.acons (.lit (.bool false)) (.match_ v r) .anil)))
   | guardNo : Value v → matchP p v = none → PHead (.match_ v (.aguard p g b r)) (.match_ v r)
   | tryVal : Value v → PHead (.try_ v A) v
-  | withVal : Value v → PHead (.with_ q θ v) v
-  | bind : Value v → PHead (.bind S v) (.econs S v .enil)
-  | join : IsEnv θ₁ → IsEnv θ₂ → PHead (.join θ₁ θ₂) (θ₁.envAppend θ₂)
   | intEq : PHead (.app (.app (.const .intEq) (.lit (.int a))) (.lit (.int b))) (.lit (.bool (a == b)))
   -- the value of the body of a handler goes to its `return` function
   | hwithVal {al : Tm} : Value v → PHead (.hwith p ℓ E al r v) (.app r v)
@@ -64,7 +61,7 @@ inductive PHead : Tm → Tm → Prop
 def setRgn (Λ : List Rgn) (p : Nat) (g : Rgn) : List Rgn := Λ.set p g
 
 /-- Runtime steps of core.md §3.4–3.5 and regions.md §3.2–§3.3 at the redex,
-except `ask_S` and the propagation of `raise`, which need the context. An
+except operations and the propagation of `raise`, which need the context. An
 acquisition registers the use that releases it as a finalizer. A finalizer runs
 as a child once the body is finished and the earlier children are, the last one
 first; the region closes when none is left. -/
@@ -74,9 +71,6 @@ inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm �
   | refSet : Value v → l < μ.length →
       RHead Λ μ (.app (.app (.const .refSet) (.loc l)) v) Λ (μ.set l v) (.lit .unit)
   | await : RHead Λ μ (.await (.task e)) Λ μ e
-  | build : Value v → v.build = some b → RHead Λ μ (.provide v e) Λ μ (.provide b e)
-  | provideEnv : IsEnv θ → RHead Λ μ (.provide θ e) (Λ ++ [Rgn.new]) μ
-      (.inside Λ.length (.with_ Λ.length θ e))
   | tryRaise : Value v → RHead Λ μ (.try_ (.raise v) A) Λ μ (.handle v A)
   | handleYes : Value v → matchP p v = some δ →
       RHead Λ μ (.handle v (.acons p b r)) Λ μ (b.subst (inst δ))
@@ -125,7 +119,7 @@ inductive Out
   | cfg (Λ : List Rgn) (μ : List Tm) (e : Tm)
   | die
 
-/-- Step labels: pure, runtime, or an `ask_S` answered by `Σ₀` (T2(b)). -/
+/-- Step labels: pure, runtime, or an operation answered by `Σ₀` (T2(b)). -/
 inductive Lbl
   | pure
   | rt
@@ -137,17 +131,17 @@ inductive Lbl
 inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → Prop
   | pure : OkE E → PHead e e' → Step root .pure Λ μ (plug E e) (.cfg Λ μ (plug E e'))
   | rt : OkE E → RHead Λ μ e Λ' μ' e' → Step root .rt Λ μ (plug E e) (.cfg Λ' μ' (plug E e'))
-  | askWith : OkE E → lookupE E S = some (q, v) → Live Λ q →
-      Step root .rt Λ μ (plug E (.app (.const (.ask S)) (.lit .unit))) (.cfg Λ μ (plug E v))
   | addFin : OkE E → Λ[p]? = some g → g.live = true → Value t →
       Step root .rt Λ μ (plug E (.app (.app (.const .addFin) (.own p)) t))
-        (.cfg (setRgn Λ p ⟨g.live, g.kids, g.fins ++ [withs E (.await t)]⟩) μ (plug E (.lit .unit)))
+        (.cfg (setRgn Λ p ⟨g.live, g.kids, g.fins ++ [.await t]⟩) μ (plug E (.lit .unit)))
   | spawn : OkE E → Λ[p]? = some g → g.live = true → Value t →
       Step root .rt Λ μ (plug E (.app (.app (.const .spawn) (.own p)) t))
-        (.cfg (setRgn Λ p ⟨g.live, g.kids ++ [withs E (.await t)], g.fins⟩) μ (plug E (.lit .unit)))
-  | askRoot : OkE E → lookupE E S = none → root.svc S = some v →
-      Step root (.root S) Λ μ (plug E (.app (.const (.ask S)) (.lit .unit)))
-        (.cfg Λ μ (plug E v))
+        (.cfg (setRgn Λ p ⟨g.live, g.kids ++ [.await t], g.fins⟩) μ (plug E (.lit .unit)))
+  -- an operation no handler answers is `Σ₀`'s, if its record has a function for it
+  | performRoot {Ef : Name} {w f : Tm} : OkE E → (∀ G ∈ E, G.handles Ef o .tail = none) →
+      root.svc Ef = some w → w.field o = some f → Value v →
+      Step root (.root Ef) Λ μ (plug E (.app (.const (.perform Ef o .tail)) v))
+        (.cfg Λ μ (plug E (.app f v)))
   | raise {F : Frame} : OkE E → F.ok → ¬ F.isTry → ¬ F.isInside → ¬ F.isCtl → Value v →
       Step root .rt Λ μ (plug E (F.plug (.raise v))) (.cfg Λ μ (plug E (.raise v)))
   -- unwinding to the handler `p` passes `try`, as no error does
@@ -155,16 +149,16 @@ inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → 
       Step root .rt Λ μ (plug E (F.plug (.unw p ℓ a))) (.cfg Λ μ (plug E (.unw p ℓ a)))
   -- an operation runs the arm of the nearest handler with one for it: `abort` after
   -- the body unwinds to the handler, `tail` and `control` while the body waits there
-  | performAbort {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
+  | performAbort {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o .abort = none) → al.armOf o = some b →
       Value v →
       Step root .rt Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o .abort)) v))))
         (.cfg Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.unw p ℓ (b.subst (inst [v])))))))
-  | performTail {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
+  | performTail {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o .tail = none) → al.armOf o = some b →
       Value v →
       Step root .rt Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o .tail)) v))))
         (.cfg Λ μ (plug E (.hctl p ℓ 0 true Ef al r (b.subst (inst [v])) (plug Ei (.hole p)))))
   -- `resume` of a `control` arm is `kont p κ`: its type is that of the new cell `κ`
-  | performCtl {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o = none) → al.armOf o = some b →
+  | performCtl {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o .control = none) → al.armOf o = some b →
       Value v →
       Step root .rt Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o .control)) v))))
         (.cfg Λ (μ ++ [.lam .todo]) (plug E (.hctl p ℓ μ.length false Ef al r

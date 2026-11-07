@@ -17,7 +17,7 @@ theorem hole_typ0 {Θ E r t φ} (hE : OkE E) (hv : ¬ Value r) (h : Typ S Ψ Θ 
     (hnp : ∀ {K Θ' t'}, ¬ Typ S (Ψ.map (Ty.up K)) Θ' [] r (.ex t' .pure)) :
     ∃ Θ' t' φ', Typ S Ψ Θ' [] r (.ex t' φ') := by
   obtain ⟨K, Θ', t', φ', hr, -, hK, -⟩ := ctx_typing E hE hv h
-  rcases hK with hp | ⟨rfl, -, -⟩
+  rcases hK with hp | ⟨rfl, -⟩
   · subst hp; exact (hnp hr).elim
   · exact ⟨Θ', t', φ', by simpa using hr⟩
 
@@ -36,7 +36,7 @@ theorem perform_arg {Θ Ei Ef o c v t φ} (hEi : OkE Ei)
     | perform hop hT =>
       obtain ⟨_, _, _, _, he, la, lψ, _, -⟩ := hT.arrow_left
       cases he
-      rcases hK with hp | ⟨rfl, -, -⟩
+      rcases hK with hp | ⟨rfl, -⟩
       · exact absurd (Stage.le_trans lψ (hp ▸ hψ)) id
       · simp only [List.map_up_zero] at hx
         exact ⟨_, _, _, hx.sub ⟨la, Stage.le_refl _⟩, (op_YF hop).1⟩
@@ -78,7 +78,7 @@ theorem resume_arg {Θ p ℓ κ Ef al rf u k t φ} {A : List Frame} (hA : OkE A)
     cases hr with
     | app hf hx hψ _ =>
       obtain ⟨hψp, hb⟩ := kont_fn (S := S) hl₁ hf
-      rcases hK with hp | ⟨rfl, -, -⟩
+      rcases hK with hp | ⟨rfl, -⟩
       · exact (hψp (Stage.eq_pure (hp ▸ hψ))).elim
       · simp only [List.map_up_zero] at hx
         exact ⟨_, _, _, hx.sub ⟨(hb rfl).1, Stage.le_refl _⟩, (op_YF hop).2⟩

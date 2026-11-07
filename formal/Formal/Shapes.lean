@@ -17,9 +17,7 @@ def Ty.kind : Ty → Nat
   | .adt _ | .tapp .. => 3
   | .rnil | .rcons .. => 4
   | .eff .. => 5
-  | .layer .. => 6
   | .errors _ => 7
-  | .env _ => 8
   | .hnd _ => 10
   | .owner _ => 11
   | .rg _ | .caps _ | .row _ => 12
@@ -28,7 +26,7 @@ def Ty.kind : Ty → Nat
 theorem Le.kind {a b : Ty} (h : Le a b) : a.kind = b.kind := by
   cases h <;> rfl
 
-theorem Ty.opaque_of_kind {t : Ty} (h : t.kind = 1 ∨ t.kind = 6) : t.Opaque := by
+theorem Ty.opaque_of_kind {t : Ty} (h : t.kind = 1) : t.Opaque := by
   cases t <;> simp [Ty.kind] at h <;> simp [Ty.Opaque, Ty.hd]
 
 theorem Ty.tcon_kind (T : Name) (us : List Ty) : (Ty.tcon T us).kind = 3 := by
@@ -66,46 +64,28 @@ theorem Shp.ctor_inst {k ts T₀} {us : List Ty} (hk : us.length = k) :
     simp [idTs, Ty.substT, instT, h₂]
   simp only [Ty.arrows_substT, Ty.tcon_substT, Sig.ctorTy, this]
 
-/-- The kind of a constant's type after one argument. -/
-def Const.resKind : Const → Nat
-  | .succeed _ | .effect _ => 6
-  | _ => 1
-
-theorem Const.resKind_cases (c : Const) : c.resKind = 1 ∨ c.resKind = 6 := by
-  cases c <;> simp [Const.resKind]
-
 theorem Const.ty_kind (c : Const) (ι : CArg) : (c.ty S ι).kind = 1 := by
   obtain ⟨_, _, _, _, h⟩ := Const.ty_isArrow c ι S
   rw [h]; rfl
 
-/-- The result of a binary or layer constant after one argument. -/
-theorem Const.ty_res {c : Const} {ι : CArg} (h : c.arity = 2 ∨ c.layer) :
-    ∃ x y, c.ty S ι = .arrow x .pure y Caps.none ∧ y.kind = c.resKind := by
-  cases c <;> simp [Const.arity, Const.layer] at h <;> exact ⟨_, _, rfl, rfl⟩
+/-- The result of a binary constant after one argument. -/
+theorem Const.ty_res {c : Const} {ι : CArg} (h : c.arity = 2) :
+    ∃ x y, c.ty S ι = .arrow x .pure y Caps.none ∧ y.kind = 1 := by
+  cases c <;> simp [Const.arity] at h <;> exact ⟨_, _, rfl, rfl⟩
 
-theorem Const.res_kind {c : Const} {ι a ψ t C T'} (hc : c.arity = 2 ∨ c.layer)
-    (h : Le (c.ty S ι) (.arrow a ψ t C)) (hT : Le t T') : T'.kind = c.resKind := by
+theorem Const.res_kind {c : Const} {ι a ψ t C T'} (hc : c.arity = 2)
+    (h : Le (c.ty S ι) (.arrow a ψ t C)) (hT : Le t T') : T'.kind = 1 := by
   obtain ⟨x, y, hxy, hk⟩ := Const.ty_res (S := S) (ι := ι) hc
   rw [hxy] at h
   obtain ⟨_, _, _, _, h', _, _, lt, -⟩ := h.arrow_left
   cases h'; rw [← hT.kind, ← lt.kind, hk]
 
-theorem Const.res2_kind {c : Const} {ι a ψ t C a₂ ψ₂ t₂ C₂ T'} (h₁ : c.arity = 2) (h₂ : c.layer)
-    (h : Le (c.ty S ι) (.arrow a ψ t C)) (h' : Le t (.arrow a₂ ψ₂ t₂ C₂)) (hT : Le t₂ T') :
-    T'.kind = 6 := by
-  cases c <;> simp [Const.arity, Const.layer] at h₁ h₂
-  simp only [Const.ty] at h
-  obtain ⟨_, _, _, _, e, _, _, lt, -⟩ := h.arrow_left
-  cases e
-  obtain ⟨_, _, _, _, e, _, _, lt', -⟩ := (lt.trans h').arrow_left
-  cases e; rw [← hT.kind, ← lt'.kind]; rfl
-
 theorem Typ.constApp_kind {Ψ Θ Γ c w T φ} (h : Typ S Ψ Θ Γ (.app (.const c) w) (.ex T φ))
-    (hc : c.arity = 2 ∨ c.layer) : T.kind = c.resKind := by
+    (hc : c.arity = 2) : T.kind = 1 := by
   cases h with
   | app hf _ _ hT => cases hf with
     | const _ hT' => exact Const.res_kind hc hT' hT
-    | perform => simp [Const.arity, Const.layer] at hc
+    | perform => simp [Const.arity] at hc
   | errVal _ h' hU _ =>
     exfalso
     cases h' with
@@ -114,28 +94,8 @@ theorem Typ.constApp_kind {Ψ Θ Γ c w T φ} (h : Typ S Ψ Θ Γ (.app (.const 
       | const _ hT' =>
         have := Const.res_kind hc hT' hT
         rw [Ty.kind_of_hd hU] at this
-        cases c <;> simp [Const.resKind] at this
-      | perform => simp [Const.arity, Const.layer] at hc
-    | errVal _ _ _ _ => simp [Ty.hd] at hU
-
-theorem Typ.constApp2_kind {Ψ Θ Γ c w₁ w₂ T φ}
-    (h : Typ S Ψ Θ Γ (.app (.app (.const c) w₁) w₂) (.ex T φ))
-    (h₁ : c.arity = 2) (h₂ : c.layer) : T.kind = 6 := by
-  have key : ∀ {a ψ t C T'}, Typ S Ψ Θ Γ (.app (.const c) w₁) (.ex (.arrow a ψ t C) φ) → Le t T' →
-      T'.kind = 6 := by
-    intro _ _ _ _ _ hf hT
-    cases hf with
-    | app hc _ _ hT' => cases hc with
-      | const _ hT'' => exact Const.res2_kind h₁ h₂ hT'' hT' hT
-      | perform => simp [Const.arity] at h₁
-  cases h with
-  | app hf _ _ hT => exact key hf hT
-  | errVal _ h' hU _ =>
-    exfalso
-    cases h' with
-    | app hf _ _ hT =>
-      have := key hf hT
-      rw [Ty.kind_of_hd hU] at this; cases this
+        cases this
+      | perform => simp [Const.arity] at hc
     | errVal _ _ _ _ => simp [Ty.hd] at hU
 
 theorem Le.opaque {a b : Ty} (h : Le a b) (ha : a.Opaque) : b.Opaque := by
@@ -222,9 +182,9 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     exact ⟨.hidden (hT.opaque (by simp [Ty.Opaque, Ty.hd])), by simp [Tm.head]⟩
   | const _ hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨.hidden (Ty.opaque_of_kind (.inl (by rw [← hT.kind]; exact Const.ty_kind _ _))),
+    exact ⟨.hidden (Ty.opaque_of_kind (by rw [← hT.kind]; exact Const.ty_kind _ _)),
       by simp [Tm.head]⟩
-  | loc | cap | own | enil | econs | drec =>
+  | loc | cap | own | drec =>
     intro _ _ _ hJ; cases hJ; exact ⟨.hidden (by simp [Ty.Opaque, Ty.hd]), by simp [Tm.head]⟩
   | lit => intro _ _ _ hJ; cases hJ; exact ⟨.lit, by simp [Tm.head]⟩
   | rnil => intro _ _ _ hJ; cases hJ; exact ⟨.rnil, by simp [Tm.head]⟩
@@ -263,11 +223,7 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
       · cases h
     | constApp hc _ =>
       have hk := (Typ.app hf ‹_› ‹_› hT).constApp_kind hc
-      refine ⟨.hidden (Ty.opaque_of_kind ?_), by simp [Tm.head]⟩
-      rw [hk]; exact Const.resKind_cases _
-    | constApp2 h₁ h₂ _ _ =>
-      have hk := (Typ.app hf ‹_› ‹_› hT).constApp2_kind h₁ h₂
-      exact ⟨.hidden (Ty.opaque_of_kind (.inr hk)), by simp [Tm.head]⟩
+      exact ⟨.hidden (Ty.opaque_of_kind hk), by simp [Tm.head]⟩
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
 end Flick

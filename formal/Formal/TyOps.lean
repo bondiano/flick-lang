@@ -79,7 +79,7 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
     simp only [Ty.substT, Ty.reach, Row.substT]
     grind [Ty.reach_asRow]
   | hnd s ih | owner s ih => simp only [Ty.substT, Ty.reach, ih]
-  | base | adt | rnil | layer | env | dict => simp [Ty.substT, Ty.reach, Caps.none]
+  | base | adt | rnil | dict => simp [Ty.substT, Ty.reach, Caps.none]
 
 theorem Caps.substT_reach (σ : Atom → Ty) (t : Ty) : t.reach.substT σ = (t.substT σ).reach := by
   funext a; exact propext (Ty.reach_substT σ t a).symm
@@ -95,8 +95,6 @@ theorem Ty.asRow_row (r : Row) : (Ty.row r).asRow = r.plain := rfl
 @[simp] theorem Ty.asRow_ob (t : Ty) (N : Name) (a : Atom) : ¬ t.asRow (.ob N a) := by
   cases t <;> simp [Ty.asRow, Row.plain, Row.ofCaps]
 
-@[simp] theorem Ty.asRow_need (t : Ty) (N : Name) (a : Atom) : ¬ t.asRow (.need N a) := by
-  cases t <;> simp [Ty.asRow, Row.plain, Row.ofCaps]
 
 @[simp] theorem Ty.asRow_obv (t : Ty) (v a : Atom) : ¬ t.asRow (.obv v a) := by
   cases t <;> simp [Ty.asRow, Row.plain, Row.ofCaps]
@@ -136,11 +134,6 @@ theorem Row.substT_comp (r : Row) (σ σ' : Atom → Ty) :
     (r.substT σ).substT σ' = r.substT fun a => (σ a).substT σ' := by
   funext x; apply propext
   cases x with
-  | need _ a =>
-    simp only [Row.substT, Ty.reach_substT]
-    constructor
-    · rintro ⟨b, ⟨c, hc, hb⟩, h⟩; exact ⟨c, hc, b, hb, h⟩
-    · rintro ⟨c, hc, b, hb, h⟩; exact ⟨b, ⟨c, hc, hb⟩, h⟩
   | _ =>
     simp only [Row.substT, Ty.reach_substT, Ty.asRow_substT]
     grind
@@ -182,7 +175,6 @@ theorem Row.Sub.substT {r r' : Row} (σ : Atom → Ty) (h : Row.Sub r r') :
     Row.Sub (r.substT σ) (r'.substT σ) := by
   intro x hx
   cases x with
-  | need _ a => obtain ⟨b, hb, h'⟩ := hx; exact ⟨b, h _ hb, h'⟩
   | nm | atm | rv | ob | obv =>
     simp only [Row.substT] at hx ⊢
     grind [Row.Sub]
@@ -375,8 +367,7 @@ theorem Sig.ctorTyR_substT (S : Sig) {K k ts T} (σ : Atom → Ty) (us : List Ty
     S.res_inst_substT σ us hk h]
 
 def CArg.substT (σ : Atom → Ty) (ι : CArg) : CArg :=
-  ⟨ι.t.substT σ, ι.s.substT σ, ι.C.substT σ, ι.r.substT σ, ι.e.substT σ, ι.o.substT σ,
-    ι.r'.substT σ, ι.e'.substT σ, ι.o'.substT σ⟩
+  ⟨ι.t.substT σ, ι.s.substT σ, ι.C.substT σ, ι.r.substT σ, ι.e.substT σ⟩
 
 theorem Ty.reach_caps (s : Ty) (σ : Atom → Ty) : s.reach.substT σ = (s.substT σ).reach := by
   funext a; apply propext; simp [Caps.substT, Ty.reach_substT]
@@ -408,6 +399,6 @@ theorem Const.ty_substT (S : Sig) (c : Const) (ι : CArg) (σ : Atom → Ty) :
     · simp [Const.ty, h, Ty.substT, Stage.substT]
     · obtain ⟨ha, hb⟩ := S.op_closed E o c a b σ h
       cases c <;> simp [Const.ty, h, Ty.substT, Stage.substT, CArg.substT, ha, hb]
-  all_goals simp [Const.ty, Ty.substT, Stage.substT, S.impl_closed, CArg.substT]
+  all_goals simp [Const.ty, Ty.substT, Stage.substT, CArg.substT]
 
 end Flick

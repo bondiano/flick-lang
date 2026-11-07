@@ -31,11 +31,11 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   the matched type, and handlers of declared effects whose operations are `tail`, `abort` or
   `control`, with `resume` at most once: type soundness `T1` (Progress and
   Preservation over every reachable configuration), `T2a` (a pure computation makes only
-  pure steps) and `T2b` (a runtime computation asks only the services and raises only the
-  errors of its row), `lemma_3_1` and `T3` (generalization and the store typing), `T4` (T4.1, T4.2: live work reaches only live
-  regions), `T4_3` (no service of an ended `provide` is used) and `T1_regions` (`T1` with
-  `op_H`, without the blocked outcome of a step that needs a region that is not live or a
-  service of an ended `provide`, which `T4` and `T4_3` rule out).
+  pure steps) and `T2b` (a runtime computation reaches the root only for the effects and raises
+  only the errors of its row), `lemma_3_1` and `T3` (generalization and the store typing), `T4` (T4.1, T4.2: live work reaches only live
+  regions), `T4_3` (no handler of a region that ended is used) and `T1_regions` (`T1` with
+  `op_H`, without the blocked outcome of a step that needs a region that is not live, which
+  `T4` rules out).
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
@@ -64,20 +64,19 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 `Formal/Axioms.lean` pins what `#print axioms` prints for `T1`, `T6a`, `T6b`, `T6a_core`
 and `T6b_core` with `#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
 
-T4.3 is the premise G11 of T5 in the form [the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives) gives it: an `ask_S` answered by a `with`
-frame of the region `q` of a `provide`, inherited or not, happens only while `q` is live.
+T4.3 is the premise G11 of T5 in the form [the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives) gives it: an operation answered by a handler of the region `q` happens only while `q` is live.
 Its Lean statement (`T43Main.lean`), the counterpart of `G11` in `Formal/RT/Hyp.lean`:
 
 ```lean
 theorem T4_3 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :
-    ∀ i e E N q v, c.at i = some e → OkE E → e = plug E (.app (.const (.ask N)) (.lit .unit)) →
-      lookupE E N = some (q, v) → Live c.rgs q
+    ∀ i e E Ef o k v q, c.at i = some e → OkE E → e = plug E (.app (.const (.perform Ef o k)) v) →
+      handlerOf E Ef o k = some q → Live c.rgs q
 ```
 
-Here `lookupE E N` is the region and the value of the innermost `with` frame of `E` that
-provides `N`, and `c.at i` ranges over the main thread and the children of live regions.
+Here `handlerOf E Ef o k` is the region of the innermost handler of `E` with an arm for the
+operation, and `c.at i` ranges over the main thread and the children of live regions.
 
 ## Handlers of effects
 
@@ -94,9 +93,11 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
   `RHead.hwithCatch`, and the pure steps of values (`PHead.hwithVal`, `hctlTail`, `hctlDisc`,
   `hresVal`, `hdoneVal`).
 - **Progress and Preservation** (`ProgressMain.lean`, `PresHdl.lean`, `PresHdlRt.lean`,
-  `PresHdlStep.lean`). An operation nothing handles is an outcome, `PerformStuck`, with its
-  effect in the services of the stage; at the top of the main thread it does not happen, as
-  `Σ₀` has no value of an effect.
+  `PresHdlStep.lean`). An operation no handler answers goes to `Σ₀` (`Step.performRoot`, labelled
+  `root E`), whose record has a function for each operation of an effect of `tail` operations.
+  One `Σ₀` does not answer either is an outcome, `PerformStuck`, with its effect in the services
+  of the stage; at the top of the main thread it does not happen, as `T1` assumes `Σ₀` covers
+  the stage (`root_answers`).
 - **Signals** (`Caught.lean`, `CaughtStep.lean`). `Tm.Caught hs cell e H`: every `unw p ℓ` of
   `e` is under the frame of its handler, `H` the handlers around; `hs p` and `cell p` are
   what the handler `p` was installed with. It is part of a typed configuration (`CfgTy`).
@@ -118,7 +119,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | type substitution, `Gen` and instantiation | `Ty.substT`, `Ty.up`, `liftT`, `instT` (`TyOps.lean`); `Scheme.substT`, `Scheme.inst` (`SchemeOps.lean`) |
 | `core.md` §1.3 terms, patterns; §3.1 run-time forms; `regions.md` §1.3, §3.1 | `Tm`, `Pat` (`Syntax.lean`) |
 | what a term holds: free variables, run-time regions, locations (the premise of (Lam)/(Task)) | `Tm.Free`, `Tm.Has`, `held` (`Reach.lean`) |
-| §1.3, §3.1 values | `Value`, `IsEnv` (`Typing.lean`) |
+| §1.3, §3.1 values | `Value` (`Typing.lean`) |
 | `core.md` §1.5, `regions.md` §1.5 constants | `Const`, `Const.ty`, `Const.ok` (`Syntax.lean`) |
 | §2.1 `⊑`, §2.2 `≤`, (≤-Cap) | `Stage.le`, `Le` (`Syntax.lean`, `Typing.lean`, `Order.lean`); `Le.reach` |
 | `core.md` §2.3, §3.6 rules; `regions.md` §2.3–§2.5, §3.4 | `Typ` (`Rules.lean`) |
@@ -128,11 +129,10 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | the checker's arm under the most general unifier, and a dropped dead arm | `Mgu`, `Typ.aref_mgu`, `Typ.aref_dead` (`ArefMgu.lean`) |
 | (Try), (Handle) | `HPat`, `Catches`, `HCov`; `tryR`, `tryP`, `handle` |
 | §3.6 `⊢ μ : Ψ`; §2.6 `Σ₀` | `StoreTy`, `RootTy` (`Rules.lean`) |
-| `core.md` §3.2 contexts, `lookup(E, S)`; the frame `inside π E` | `Frame`, `plug`, `lookupE` (`Semantics.lean`) |
+| `core.md` §3.2 contexts; the handler of an operation; the frame `inside π E` | `Frame`, `plug`, `handlerOf` (`EvalCtx.lean`) |
 | `core.md` §3.3 `→ₚ`; §3.4–3.5 steps; `regions.md` §3.2–§3.3 | `PHead`, `RHead`, `Step`, `Steps` (`Semantics.lean`) |
 | `regions.md` §3.1 `Λ`, children step at any time | `Rgn`, `Cfg`, `CStep`, `CSteps` (`Semantics.lean`) |
-| lemma about `build` | `canonical_layer` (`CanonLayer.lean`) |
-| L1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_owner`, `canonical_hnd`, `canonical_env`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `CanonEnv.lean`, `Canonical.lean`) |
+| L1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_owner`, `canonical_hnd`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `Canonical.lean`) |
 | (Let-Gen), (Let-Mono) | `Typ.letGen`, `Typ.let_` (`Rules.lean`) |
 | type substitution lemma | `Typ.substT`, with `Fits` (`TySubst.lean`, `SubstPat.lean`) |
 | L2 | `Typ.subst`, `Typ.instantiate`, `SubOk.one` (`Substitution.lean`) |
@@ -145,12 +145,10 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | L6 | `lemma_6` (`Lemma4.lean`); the invariant of a configuration: `CfgTy` (`Soundness.lean`) |
 | §3.4 `⊢ Λ`: where a region may be written, the ancestors of a region | `Tm.Within`, `LocOk`, `Nest` (`Within.lean`, `Nest.lean`); kept by every step: `Nest.step`, `Nest.cstep` (`NestMain.lean`, `Regions.lean`) |
 | L5 | `Nest.nested` (`NestClose.lean`); in every reached configuration: `reach_nest`, `Nest.live` (`Regions.lean`) |
-| §2.7 obligations `{Provided {S} ϱ}` and `{Provided r ϱ}` over a row variable, uses of a service of a `provide` | `Elem.ob`, `Elem.obv`, `Elem.need`; `Row.obs` in `Const.ty` of `spawn`/`addFin` (`Syntax.lean`); `Row.withP`, `Row.disch`, `Row.needs`, `Stage.ObOut` in `Typ.with_`, `Typ.scope`, `Typ.inside`, `Typ.provideL`/`provideE` (`Rules.lean`) |
-| the region of `provide`; a service of an ended `provide` | `RHead.provideEnv`, `Tm.with_ q θ e`, the premise `Live Λ q` of `Step.askWith` (`Semantics.lean`); `DeadAsk` (`StepFrame.lean`) |
-| runtime.md §3.5: a child and a finalizer keep the `with` frames | `withs`, `Step.spawn`, `Step.addFin` (`Semantics.lean`); their typing `withs_typing`, `fin_await` (`KidTy.lean`) |
-| an `inside` form is younger than the `with` frames around it | `Tm.Asc`, `CfgAsc`, `Step.asc` (`Asc.lean`, `AscStep.lean`) |
+| §2.7 obligations `{Provided {S} ϱ}` and `{Provided r ϱ}` over a row variable | `Elem.ob`, `Elem.obv`; `Row.obs` in `Const.ty` of `spawn`/`addFin` (`Syntax.lean`); `Row.hP`, `Row.disch`, `Stage.ObOut` in `Typ.hdl`, `Typ.hwith`, `Typ.scope`, `Typ.inside` (`Rules.lean`) |
+| an `inside` form is younger than the handlers around it | `Tm.Asc`, `CfgAsc`, `Step.asc` (`Asc.lean`, `AscStep.lean`) |
 | T4.1, T4.2 | `T4` (`Regions.lean`) |
-| T4.3: a child and a finalizer of a live region `ϱ` use services only of `provide` regions that are ancestors of `ϱ`; an `ask_S` leaves its use at the top of the thread or at the `inside` form of the region of its frame | `KidRow`, `withs_typing` (`KidTy.lean`); `KidNeeds`, `KidNeeds.step` (`T43.lean`); `env_dom`, `need_out` (`NeedOut.lean`); `cstep_all`, `T4_3` (`T43Main.lean`) |
+| T4.3: the handler of an operation is live | `handlerOf_has`, `T4_3` (`T43Main.lean`) |
 | T1 with `op_H` | `T1_regions` (`T43Main.lean`) |
 | `elaboration.md` §0.1 λFlick⁺: `D_C ā`, dictionary records, projection with `∀`-instantiation, globals | `Ty.dict`, `Ty.spine`, `Sig.dict`, `Sig.glob` (`Syntax.lean`); `Tm.drec`, `Tm.glob`, `J.dfs`, `Typ.drec`, `Typ.dcons`, `Typ.dproj`, `Typ.glob`, `Roots`, `RootTy` (`Rules.lean`); `Step.glob` (`Semantics.lean`); `canonical_dict`, `dict_field` (`DictCanon.lean`); `glob_preservation` (`Preservation.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
@@ -158,7 +156,7 @@ provides `N`, and `c.at i` ranges over the main thread and the children of live 
 | T1 | `T1` (`Soundness.lean`) |
 | T2(a), T2(b) | `T2a`, `T2b`, `T2b_await` (`Effects.lean`) |
 | lemma 3.1, T3 | `lemma_3_1`, `T3` (`Generalization.lean`) |
-| a polymorphic use; a use of a row-polymorphic function at a row of services; a `_` arm that removes a row variable of errors; a `provide` of a layer whose outputs are a row variable; a `Layer.merge` of such a layer; a scope that acquires and uses, as checks | `Examples.lean` |
+| a polymorphic use; a use of a row-polymorphic function at a row of services; a `_` arm that removes a row variable of errors; a scope that acquires and uses, as checks | `Examples.lean` |
 
 ## Representation
 
@@ -209,7 +207,6 @@ Lists inside terms and types are spines, so `Tm` and `Ty` are plain inductive ty
   constructor patterns are spines too (`Pat.app`), and so is a nominal type `T ā`
   (`Ty.tapp`, `Ty.tcon`);
 - a record is `rcons ℓ₁ e₁ (… rnil)`, a record type `Ty.rcons ℓ₁ τ₁ (… Ty.rnil)`;
-- an environment `env θ` is `econs S₁ v₁ (… enil)`;
 - match and `try` arms are `acons p b rest`, `aguard p g b rest`, ending in `anil`, with
   their own judgment forms `J.alts` and `J.halts` in the same inductive `Typ`.
 
@@ -236,8 +233,8 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 1. **Row variables are variables of the scheme.** A scheme abstracts a row variable as
    any other variable, and (Var) instantiates it by a row (`Ty.row`); constants are typed
    at any rows (`CArg`). Kinds are not checked. A row variable stands for names, atoms and
-   variables, never for obligations or uses; the rows that must be named are the outputs of
-   `provide` when its body has obligations (`Row.Named`, item 21). `⌈Errors ε⌉` counts the row
+   variables, never for obligations; the rows that must be named are what a handler gives when
+   its body has obligations (`Row.Named`, item 21). `⌈Errors ε⌉` counts the row
    variables of `ε`, as `regions.md` §2.1 and the checker do (`regions/mod.rs`
    `error_row_captures`): an instance shows what its errors reach, and `⌈·⌉` must commute
    with it, so a closure over an error of an unknown row holds that row. What still keeps a
@@ -260,7 +257,7 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    record type (`Ty.IsRec`). Record patterns are always open (`{…, ..}`), as in `core.md`.
 5. **`Exh` over shapes.** `Exh(τ, Π)` quantifies over `Shp τ v`, the closed values of `τ`
    as far as patterns see them (variables, functions, references, computations,
-   layers, errors, environments, capabilities and owners are opaque), not over typed
+   errors, capabilities and owners are opaque), not over typed
    values: the typed version would put `Typ` in a negative position of its own
    definition. The fields of a constructor have the types of its declaration, so a field
    of a parameter type is opaque: exhaustiveness through type arguments is not modeled.
@@ -284,31 +281,23 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    remaining arms or passes to the errors it lets through (`H ∪ ε'`): the arm that removed a row
    variable is an `x`/`_` arm, which matches every value, so no later arm and no re-raise needs
    it.
-8. **Environments.** `Env ρ` means "binds exactly `ρ`", as (Env), (Bind) and (Join)
-   give it: T4.3 needs that a `with` frame answers `S` exactly when its row has `S`. `with θ e` and `econs` require
-   `θ` and the bound values to be values. `Layer.merge` has no side condition, which widens
-   `core.md` §1.5: the checker rejects outputs that share a name it sees (`services.rs`
-   `merge_conflicts`, `FLICK-E004`), the model does not, so the theorems cover a superset of
-   what the checker accepts there. Soundness does not need disjoint outputs (the first
-   binding of a name wins, `Tm.envAppend`), and disjointness of the names the checker sees is
-   not kept by instantiating a row variable, so the outputs `Layer.merge` joins may be row
-   variables (`Examples.lean`). The services a `provide` gives may be a row variable, which its body may
-   require (`core.md`, [`provide` and output row variables](../docs/formal/core.md#provide-discharges-only-the-listed-outputs-of-a-layer-not-a-row-variable); `with_layer` in `Examples.lean`).
+8. **Services are effects.** A service is an effect whose operations are all `tail`, and
+   `S.Impl` the record of functions its root gives. A handler for a record is `T6c_tail`.
 9. **Allocation is deterministic:** `Ref.make v` takes `ℓ = μ.length`, `scope` takes
    `π = Λ.length`.
 10. **Programs** are closed terms typed in the empty store with no facts; modules
     (`core.md` §2.6, path 4 of `regions.md` §4) are not modeled. `Σ₀` and the bodies of the
     globals of λFlick⁺ are a parameter `root : Roots` with `RootTy`; G3 is the hypothesis of `T1` that `Σ₀` covers the services of the program's
-    stage. Progress reports an `ask_S` that neither a `with` frame nor `Σ₀` answers
-    (`AskStuck`) instead of assuming G3.
-11. **L3** is stated as `ERel`: the hole's services are within those of the context, of
-    its `with` frames and the `Scope π` of its `inside` frames, its errors grow only under
+    stage. Progress reports an operation that neither a handler nor `Σ₀` answers
+    (`PerformStuck`) instead of assuming G3.
+11. **L3** is stated as `ERel`: the hole's services are within those of the context, the
+    effects of its handlers and the `Scope π` of its `inside` frames, its errors grow only under
     a `try` frame, and a pure context has a pure hole. Under `K` right-hand sides of
     (Let-Gen) the hole is typed `K` variables deep, with `Ψ` and `Θ` shifted and the facts
     of the schemes assumed, and is pure.
-12. **Steps carry labels** (`Lbl`): pure, runtime, or `root S` for an `ask_S` answered by
+12. **Steps carry labels** (`Lbl`): pure, runtime, or `root S` for an operation answered by
     `Σ₀`; T2(b) is about the `root` labels. `todo → die` is labelled pure, as T2(a) allows
-    `die`; `bind_S` and `join` steps are pure ([bind_S and join steps are pure](../docs/formal/core.md#bind_s-and-join-steps-are-pure)).
+    `die`.
 13. **Cell types may be open** ([store types are ungeneralized monotypes](../docs/formal/core.md#a-store-typing-of-closed-types-is-not-preserved)). `Ψ(ℓ)` is a monotype that may mention free type
     variables of the configuration's derivation; (Let-Gen) shifts `Ψ`, so it never
     generalizes them.
@@ -324,8 +313,7 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 16. **Capabilities and constants.** `H ϱ̄ τ̄` is one family `hnd ϱ` with one region;
     `open_H` takes the owner of its region and nothing else (G6: the region is explicit)
     and registers the use that releases it; `op_H` returns `()`; `cap π` has no index `n`.
-    `Fiber.spawn` has no supervisor and returns `()`: there is no `join`; a child does
-    not inherit the services of the context that spawns it (λRT's). A finalizer runs as a
+    `Fiber.spawn` has no supervisor and returns `()`: there is no `join`. A finalizer runs as a
     child once the body of its region is finished and the earlier children are, the last
     one first; the region closes when none is left. Closing waits for every child.
 17. **Facts are not chained.** `Θ ⊢ k ≥ ϱ` is reflexive or a fact; a scope gives one fact
@@ -347,8 +335,7 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     every program, which has no run-time forms; T2 assumes the same of its configuration
     (`hb`, `hΨ`). T1 is stated with two blocked outcomes: a finished region body
     waiting for a child (deadlock freedom is λRT's), and a step that needs a region
-    that is not live or a service of an ended `provide`; `T1_regions` drops the second
-    by T4 and T4.3.
+    that is not live; `T1_regions` drops the second by T4.
 20. **`⊢ Λ` is an invariant with ghost data.** `Nest` relates a configuration to the
     ancestors `anc π` of each region, the regions `B ℓ` each cell may hold and the
     thread `home π` of the `inside π` form; T4 needs no other change to the model.
@@ -358,29 +345,19 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     drops one, and only `scope` and closing change them. T4.2 is stated for every
     reached configuration (live work reaches only live regions), which after a step
     that closes `π` says that nothing that can step reaches `π`.
-21. **Obligations of `provide` (regions.md §2.7) are row elements.** `Provided {S} ϱ` is
+21. **Obligations of handlers (regions.md §2.7) are row elements.** `Provided {S} ϱ` is
     an element `ob S ϱ` of a row of services, and `Provided r ϱ` over a row variable `r`
     an element `obv r ϱ`, which a substitution turns into the obligations of what `r` stands
     for; `Fiber.spawn` and `Scope.add_finalizer` put one for each service and each row
     variable of the work into the stage of the call (`Row.obs`). A
-    `provide` in a program binds no region variable: an obligation about a region
+    handler in a program binds no region variable: an obligation about a region
     created in its body is discharged at the end of that region (`Row.disch`, the second
-    case of §2.7, `S` or `r` coming from outside it), and one that reaches a `provide`
-    giving `S` is rejected, which is the first case. Which services an instance of a row
-    variable gives is unknown there, so `provide` asks more (`Stage.ObOut`): an obligation
-    `ob S ϱ` passes only outputs without row variables, and `obv r ϱ` only outputs that give
-    no service. An obligation not discharged stays in the row
-    of the stage and of the arrows that carry it, which is the deferred element and the
-    given `Provided` of a signature. At run time a `with` frame carries the region of its
-    `provide`, records the uses `need S q` of its services and discharges an obligation
-    when its region is older (`Row.withP`). A child and a finalizer keep the `with` frames
-    of the place that registered them (`withs`); asking a service of an ended `provide`
-    is stuck (`DeadAsk`). Typing a new child needs `Tm.Asc`: a region is younger than the
-    `with` frames around its `inside` form. T4.3 adds the invariant `KidNeeds`: a child
-    or a finalizer of a live region `ϱ` has a typing whose uses `need S q` name ancestors
-    of `ϱ`, which the obligation `Provided {S} ϱ` of its registration gives
-    (`withs_typing`). The row of the work `spawn` and `addFin` take has no uses (`Const.ok`):
-    uses come only from `with` frames, so the derivations `regions.md` gives have none there.
+    case of §2.7, `S` or `r` coming from outside it), and one that reaches the handler of
+    `S` is rejected, which is the first case. Which effects an instance of a row
+    variable gives is unknown there, so a handler rejects `obv r ϱ` too (`Stage.ObOut`). An
+    obligation not discharged stays in the row of the stage and of the arrows that carry it,
+    which is the deferred element and the given `Provided` of a signature. At run time a
+    handler discharges an obligation about its effect when its region is older (`Row.hP`).
 22. **Two kinds of dead constructor.** (Branch-GADT) is dead when no unifier of what the
     constructor builds with the matched type keeps the regions the body writes, so that a
     dead branch stays dead under the substitutions of the regions around it (`kill`, scopes),
@@ -390,12 +367,10 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     The second notion is weaker on purpose; the two agree in the checker, which refines no
     region (`Unsupported(Region)`).
 
-- **Effects take no parameters**, as services, and share their names: an effect's `impl` is
-  `Errors ∅`, which has no value, so neither `Σ₀` nor a `with` frame gives an effect
-  (`env_no_op`), and `ask_S` names no effect (`Const.ok`).
+- **Effects take no parameters.** An effect with an operation that is not `tail` has `impl`
+  `Errors ∅`, which has no value, so `Σ₀` gives it nothing (`Sig.op_impl`, `root_answers`).
 - **A task does not reach the handlers of the place that spawned it.** An operation only
-  they handle is stuck in the task (`PerformStuck` among the outcomes of a child in `T1`), as
-  an `ask_S` nothing answers; `KidRow` lets the row of the child hold such an effect.
+  they handle is stuck in the task (`PerformStuck` among the outcomes of a child in `T1`).
 - **The arms for errors of a handler** are a `try` around it: errors pass `hdl`.
 
 ## Findings
@@ -405,8 +380,6 @@ that states the rule.
 
 - [a partial constructor application is a value](../docs/formal/core.md#a-partial-constructor-application-is-a-value): a partially applied constructor is a value, and L1 for an arrow type
   has to list it (`Value.ctorApp`, `canonical_arrow`).
-- [bind_S and join steps are pure](../docs/formal/core.md#bind_s-and-join-steps-are-pure): `bind_S` and `join` steps were runtime steps while their rules are
-  pure, so T2(a) failed for a bare `bind_S v`; they are pure steps.
 - [Handle covers only the raised error](../docs/formal/core.md#handle-required-the-whole-error-row-after-a-failed-branch): (Handle) asked for the whole row `ε_b ⊆ H + ε'`, which a failed arm
   breaks; it asks for the error of the value only, as `flick-model` does.
 - [store types are ungeneralized monotypes](../docs/formal/core.md#a-store-typing-of-closed-types-is-not-preserved): closed cell types and a fixed program type cannot both hold; cell types
@@ -510,10 +483,10 @@ Simplifications of λRT:
     outer `provide`, whose owner observes the build until its own (C5), that is "at most
     once". (b) A build is released only after every consumer's observer ran (`Good6` of
     `release`). (c) No service is used after its build is released (`GoodUse`), under G11.
-    `G11` is about the answering entry only: `Act.use π` names the `provide` owner whose
-    environment entry answers the `ask_S`, and at such a step `π` is live. A child may carry
+    `G11` is about the answering entry only: `Act.use π` names the owner whose handler answers
+    the operation, and at such a step `π` is live. A child may carry
     an entry of a closed `provide` that it never asks ([the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives)). The core development gives it as `T4_3`: the
-    region `q` of the `with` frame that `lookupE E N` finds for an `ask_N` is `Live`.
+    region `q` that `handlerOf E Ef o k` finds for an operation is `Live`.
     A layer's build code runs in the providing fiber with the area `σ` as current owner; a
     failed build closes `σ` and makes the `provide` fail.
 12. **R7** is `Hist GoodRef`: each `Ref.modify ℓ` read the value of the latest `make` or
@@ -872,8 +845,8 @@ for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
     evaluate a dictionary before the same rule applies. When the left side of a pair becomes
     a value, the right side reaches that value at once (`DP.step`), and the pair is gone.
   - The operations of the steps on related values (`CoreCgOps.lean`): `field`, `matchP`,
-    `envLookup`, `envAppend`, `IsEnv`, `build`, `Final`; related contexts
-    (`CoreCgFrames.lean`): `FrR`, plugging, order, `lookupE`, `withs`, and `Cg.decomp`, a
+    `Final`; related contexts
+    (`CoreCgFrames.lean`): `FrR`, plugging, order, and `Cg.decomp`, a
     related term around a hole is a base pair at some frame or the same frames around a
     related hole.
   - `DP S root a b` (`CoreRel.lean`), the base pairs: `a` is not a value and is typed in the

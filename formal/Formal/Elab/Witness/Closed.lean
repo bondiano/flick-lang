@@ -30,7 +30,7 @@ theorem caps_congr {C : Caps} {σ σ' : Atom → Flick.Ty} (h : ∀ b, C b → �
 
 /-- A substitution acts on a row only through the atoms its elements name. -/
 theorem Row.substT_congr {r : Row} {σ σ' : Atom → Flick.Ty}
-    (h : ∀ b, (r (.atm b) ∨ r (.rv b) ∨ (∃ N, r (.ob N b) ∨ r (.need N b)) ∨
+    (h : ∀ b, (r (.atm b) ∨ r (.rv b) ∨ (∃ N, r (.ob N b)) ∨
       ∃ c, r (.obv b c) ∨ r (.obv c b)) → σ b = σ' b) :
     r.substT σ = r.substT σ' := by
   funext x; apply propext
@@ -52,10 +52,10 @@ theorem Row.substT_congr {r : Row} {σ σ' : Atom → Flick.Ty}
     have hv : ∀ {v b}, r (.obv v b) → σ v = σ' v ∧ σ b = σ' b := fun hb =>
       ⟨h _ (.inr (.inr (.inr ⟨_, .inl hb⟩))), h _ (.inr (.inr (.inr ⟨_, .inr hb⟩)))⟩
     constructor
-    · exact fun h' => h'.imp (fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inr (.inr (.inl ⟨N, .inl hb⟩))) ▸ h''⟩)
+    · exact fun h' => h'.imp (fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inr (.inr (.inl ⟨N, hb⟩))) ▸ h''⟩)
         fun ⟨v, b, hb, h₁, h₂⟩ => ⟨v, b, hb, (hv hb).1 ▸ h₁, (hv hb).2 ▸ h₂⟩
     · exact fun h' => h'.imp
-        (fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inr (.inr (.inl ⟨N, .inl hb⟩)))).symm ▸ h''⟩)
+        (fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inr (.inr (.inl ⟨N, hb⟩)))).symm ▸ h''⟩)
         fun ⟨v, b, hb, h₁, h₂⟩ => ⟨v, b, hb, (hv hb).1.symm ▸ h₁, (hv hb).2.symm ▸ h₂⟩
   | obv w a =>
     simp only [Row.substT]
@@ -64,11 +64,6 @@ theorem Row.substT_congr {r : Row} {σ σ' : Atom → Flick.Ty}
     constructor
     · exact fun ⟨v, b, hb, h₁, h₂⟩ => ⟨v, b, hb, (hv hb).1 ▸ h₁, (hv hb).2 ▸ h₂⟩
     · exact fun ⟨v, b, hb, h₁, h₂⟩ => ⟨v, b, hb, (hv hb).1.symm ▸ h₁, (hv hb).2.symm ▸ h₂⟩
-  | need N a =>
-    simp only [Row.substT]
-    constructor
-    · exact fun ⟨b, hb, h''⟩ => ⟨b, hb, h b (.inr (.inr (.inl ⟨N, .inr hb⟩))) ▸ h''⟩
-    · exact fun ⟨b, hb, h''⟩ => ⟨b, hb, (h b (.inr (.inr (.inl ⟨N, .inr hb⟩)))).symm ▸ h''⟩
   | rv a =>
     simp only [Row.substT]
     constructor
@@ -78,11 +73,11 @@ theorem Row.substT_congr {r : Row} {σ σ' : Atom → Flick.Ty}
 /-- What a translated row names is among the variables of the source row. -/
 theorem asRow_trT_atoms {t : Ty} {b : Atom}
     (h : (trT N t).asRow (.atm b) ∨ (trT N t).asRow (.rv b) ∨
-      (∃ M, (trT N t).asRow (.ob M b) ∨ (trT N t).asRow (.need M b)) ∨
+      (∃ M, (trT N t).asRow (.ob M b)) ∨
       ∃ c, (trT N t).asRow (.obv b c) ∨ (trT N t).asRow (.obv c b)) :
     ∃ n, b = .v n ∧ t.Occurs n := by
   refine (trT_reach N t b).1 ((Flick.Ty.reach_asRow _ _).2 ?_)
-  rcases h with h | h | ⟨M, h | h⟩ | ⟨c, h | h⟩
+  rcases h with h | h | ⟨M, h⟩ | ⟨c, h | h⟩
   · exact .inl h
   · exact .inr h
   all_goals simp at h
@@ -90,11 +85,11 @@ theorem asRow_trT_atoms {t : Ty} {b : Atom}
 /-- What a translated row of errors names is among the variables of the source row. -/
 theorem errRow_trT_atoms {t : Ty} {b : Atom}
     (h : errRow (trT N t) (.atm b) ∨ errRow (trT N t) (.rv b) ∨
-      (∃ M, errRow (trT N t) (.ob M b) ∨ errRow (trT N t) (.need M b)) ∨
+      (∃ M, errRow (trT N t) (.ob M b)) ∨
       ∃ c, errRow (trT N t) (.obv b c) ∨ errRow (trT N t) (.obv c b)) :
     ∃ n, b = .v n ∧ t.Occurs n := by
   simp only [errRow, Row.union, Row.ofCaps, or_false] at h
-  rcases h with (h | h) | h | ⟨M, h | h⟩ | ⟨c, h | h⟩
+  rcases h with (h | h) | h | ⟨M, h⟩ | ⟨c, h | h⟩
   · exact asRow_trT_atoms N (.inl h)
   · exact (trT_reach N t b).1 h
   · exact asRow_trT_atoms N (.inr (.inl h))
@@ -117,7 +112,7 @@ theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
     simp only [trT, Flick.Ty.substT]
     congr 1
     refine Row.substT_congr fun b hb => ?_
-    rcases hb with hb | hb | ⟨M, hb | hb⟩ | ⟨c, hb | hb⟩
+    rcases hb with hb | hb | ⟨M, hb⟩ | ⟨c, hb | hb⟩
     · exact hc b (Or.inl hb)
     · exact hc b (Or.inr hb)
     all_goals simp [Row.err, Row.union, Row.single, Row.ofCaps] at hb

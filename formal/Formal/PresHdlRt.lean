@@ -88,7 +88,7 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
       (.harms E (t'.up 1) ((Stage.rt r ε).substT (shiftV 1)) (.tvar 0))) (hn : al.NoIns)
     (hrf : Typ S Ψ Θ [] rf (.ex (.arrow t ψ t' C) (.rt r ε))) (hψ : ψ.le (.rt r ε))
     (he : Typ S Ψ Θ [] e₀ (.ex t φ₀)) (hφ₀ : φ₀.le (.rt (Row.union (Row.single E) r) ε))
-    (hc : S.Handles E al r) (hφ' : (Stage.rt r ε).le φ) (hT : Le t' T)
+    (hOb : φ₀.ObOut (Row.single E)) (hc : S.Handles E al r) (hφ' : (Stage.rt r ε).le φ) (hT : Le t' T)
     (hbl : (Tm.hdl E al rf e₀).Below n) (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ)
     (ht : T.YF n) (hφ : φ.substT (kill n) = φ) :
     ∃ c, c.YF n ∧ Typ S Ψ Facts.age [] (.lam .todo) (.ex c .pure) ∧
@@ -97,7 +97,7 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
     conv => rhs; rw [← List.map_id Ψ]
     exact List.map_congr_left fun u hu => hΨ u hu
   have fk := Fits.kill hbl
-  have h₁ := arms_body hn (fun p hp => hbl p (hp.imp .inl .inl)) hΨ hidem hal
+  have h₁ := arms_body hn (fun p hp => hbl p (.inl hp)) hΨ hidem hal
   have h₂ := hrf.substT (kill n) (fk.sub fun _ h => .inr (.inl h))
   have h₃ := he.substT (kill n) (fk.sub fun _ h => .inr (.inr h))
   rw [hΨ', hidem] at h₂ h₃
@@ -111,7 +111,8 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
         (.ex (t'.substT (kill n)) (.rt (r.substT (kill n)) (ε.substT (kill n)))) :=
       .hwith (by simp [c]) (h₁.weakenStore _) (h₂.weakenStore _)
         (by simpa [Stage.substT] using Stage.le_substT (kill n) hψ) (h₃.weakenStore _)
-        (by simpa [Stage.substT, Row.union_substT] using Stage.le_substT (kill n) hφ₀)
+        (Stage.hP_of_out (by simpa [Stage.substT, Row.union_substT] using Stage.le_substT (kill n) hφ₀)
+          (by simpa [Row.single_substT] using hOb.substT (kill n)))
         ⟨hc.1, fun h => .inl (hc.2 h)⟩ (Stage.le_refl _) .refl
     refine .inside (F := Facts.none) (fun _ _ h => h.elim) (hw.cut (Entails.union_left _ _))
       ⟨fun _ h => .inr (.inl h), fun _ h => h⟩ (Ty.kill_fresh _ _) (Row.kill_fresh _ _)

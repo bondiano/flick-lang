@@ -265,6 +265,7 @@ def Sg : Sig where
   op _ _ := none
   op_closed _ _ _ _ _ _ h := by cases h
   op_impl _ _ _ _ _ h := by cases h
+  op_field _ _ _ _ h := by cases h
 
 /-- Every constructor of the witness is an ordinary one. -/
 theorem sg_plain {K k ts T} (h : Sg.ctor K = some (k, ts, T)) : Sg.res K = idTs k := by

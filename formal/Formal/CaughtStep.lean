@@ -40,7 +40,6 @@ theorem PHead.caught {r r' : Tm} {n : Nat} {H : Nat → Prop} (hh : PHead r r') 
     simp only [Tm.Caught] at h ⊢
     exact caught_plug.mpr ⟨(caught_plug.mp h.1).1, Tm.Caught.noIns (vn hv ha.2)⟩
   | hdoneVal hv => exact h
-  | withVal hv => exact Tm.Caught.noIns (vn hv ha.2)
   | _ =>
     apply plain
     simp only [Tm.Asc] at ha
@@ -51,7 +50,6 @@ theorem PHead.caught {r r' : Tm} {n : Nat} {H : Nat → Prop} (hh : PHead r r') 
     | exact ⟨ha.1, ha.2⟩
     | exact vn ‹_› ha
     | exact ⟨vn ‹_› ha.1, vn ‹_› ha.2.1⟩
-    | exact ⟨vn (IsEnv.value ‹_›) ha.1, vn (IsEnv.value ‹_›) ha.2.1⟩
     | (have h3 := ha.2; simp only [Tm.NoIns, Tm.Has, not_or] at h3; exact ⟨vn ‹_› ha.1, h3⟩)
     | simp
 
@@ -105,9 +103,6 @@ theorem RHead.caught {Λ : List Rgn} {μ : List Tm} {r Λ' μ' r'} {n : Nat} {H 
   | refGet hl => exact keep (Tm.Caught.noIns (hμ _ _ hl)) (.refl _)
   | refSet => exact keep (Tm.Caught.noIns (by simp [Tm.NoIns, Tm.Has])) (.refl _)
   | await => exact keep h (.refl _)
-  | build hv hb =>
-    exact keep ⟨Tm.Caught.noIns fun hi => vn hv ha.1 (build_has _ hb hi), h.2⟩ (.refl _)
-  | provideEnv => exact keep ⟨fresh, h⟩ (.new _)
   | tryRaise => exact keep h (.refl _)
   | handleYes _ hm =>
     exact keep (Tm.Caught.noIns fun hi => (subst_match_has hm hi).elim (fun h' => ha.2 (.inl h')) ha.1)
@@ -179,14 +174,14 @@ structure CfgCaught (hs : Nat → Nat → Prop) (cell : Nat → Nat) (Λ : List 
 theorem Tm.Caught.ghostB {hs' : Nat → Nat → Prop} {cell' : Nat → Nat} {e : Tm} {H : Nat → Prop} {n : Nat}
     (h : e.Caught hs cell H) (hb : e.Below n) (hg : ∀ p, p < n → hs' p = hs p ∧ cell' p = cell p) :
     e.Caught hs' cell' H :=
-  h.ghost fun p hp => hg p (hb p (.inl hp))
+  h.ghost fun p hp => hg p (hb p hp)
 
 theorem CaughtE.ghostB {hs' : Nat → Nat → Prop} {cell' : Nat → Nat} {E : List Frame} {x : Tm}
     {H : Nat → Prop} {n : Nat} (h : CaughtE hs cell H E) (hb : (plug E x).Below n)
     (hg : ∀ p, p < n → hs' p = hs p ∧ cell' p = cell p) : CaughtE hs' cell' H E := by
   have h₀ := (caught_plug (hs := hs) (cell := cell) (e := .var 0) (E := E) (H := H)).mpr ⟨h, trivial⟩
-  have h₁ := h₀.ghost (hs' := hs') (cell' := cell') fun p hp => hg p (hb p (.inl
-    ((plug_has_inv (r := x) E hp).resolve_right (by simp [Tm.Has]))))
+  have h₁ := h₀.ghost (hs' := hs') (cell' := cell') fun p hp => hg p (hb p
+    ((plug_has_inv (r := x) E hp).resolve_right (by simp [Tm.Has])))
   exact (caught_plug.mp h₁).1
 
 theorem CfgCaught.ghostB {hs' : Nat → Nat → Prop} {cell' : Nat → Nat} {Λ : List Rgn} {μ : List Tm} {e : Tm}
@@ -201,17 +196,6 @@ theorem CfgCaught.from {Λ Λ' : List Rgn} {e e' : Tm} (h : CfgCaught hs cell Λ
     (he : e'.Caught hs cell (fun _ => False)) : CfgCaught hs cell Λ' e' :=
   ⟨he, fun p g' hg k hk => (hr p g' hg k hk).elim (fun ⟨g, hg, hk⟩ => h.rgs p g hg k hk)
     fun hn => Tm.Caught.noIns hn⟩
-
-theorem Tm.Caught.of_withs {H : Nat → Prop} :
-    ∀ {E : List Frame} {x : Tm}, x.Caught hs cell H → (∀ q θ, .with_ q θ ∈ E → θ.NoIns) →
-      (Flick.withs E x).Caught hs cell H
-  | [], _, hx, _ => hx
-  | F :: E, x, hx, hE => by
-    simp only [Flick.withs]
-    refine Tm.Caught.of_withs (x := F.wrap x) ?_ fun q θ h => hE q θ (List.mem_cons_of_mem _ h)
-    cases F with
-    | with_ q θ => exact ⟨Tm.Caught.noIns (hE q θ (List.mem_cons_self ..)), hx⟩
-    | _ => exact hx
 
 /-- A signal passes a frame that is not its handler's. -/
 theorem unw_pass {F : Frame} {H : Nat → Prop} {p ℓ : Nat} {a : Tm} (hcF : F.Caught hs cell H)
@@ -239,7 +223,7 @@ theorem Step.caught {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
       x < Λ.length := fun {E r x} he h => by
     rcases CaughtE.holeC_has (r := _) h with h | h
     · exact h.elim
-    · exact hb.main x (.inl (he ▸ h))
+    · exact hb.main x ((he ▸ h))
   cases hst with
   | pure hE hh =>
     obtain ⟨hA, hr⟩ := asc_of_plug hh.not_value hE ha.main
@@ -251,12 +235,11 @@ theorem Step.caught {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     obtain ⟨hs', cell', hg, hr', hrg⟩ := hh.caught hcr hr ha.mem fun x h => hH rfl h
     exact ⟨hs', cell', hg, (CfgCaught.ghostB hc hb hg).from hrg
       (caught_plug.mpr ⟨hcE.ghostB hb.main hg, hr'⟩)⟩
-  | askWith hE hl _ =>
-    obtain ⟨hA, -⟩ := asc_of_plug ask_not_value hE ha.main
-    exact same rfl fun _ => Tm.Caught.noIns (lookupE_noIns hA hl)
-  | askRoot hE _ hr₀ =>
-    exact same rfl fun _ => Tm.Caught.noIns ((hroot.svc _ _ hr₀).2.noIns (hroot.svc _ _ hr₀).1)
   | glob hE hg => exact same rfl fun _ => Tm.Caught.noIns ((hroot.glob _ _ hg).1 _)
+  | performRoot hE _ hr₀ hf hv =>
+    obtain ⟨hA, hr⟩ := asc_of_plug perform_not_value hE ha.main
+    have hfn : Tm.NoIns _ := fun h => (hroot.svc _ _ hr₀).2.noIns (hroot.svc _ _ hr₀).1 (field_has hf h)
+    exact same rfl fun _ => Tm.Caught.noIns (fun h => h.elim hfn (hv.ascNoIns hr.2.1))
   | raise hE hF _ _ _ hv =>
     obtain ⟨hA, hr⟩ := asc_of_plug (not_value_plug raise_not_value _) hE ha.main
     obtain ⟨-, hr'⟩ := Frame.asc_of_plug hF raise_not_value hr
@@ -321,8 +304,7 @@ theorem Step.caught {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
       · exact hc.rgs _ _ hg k (List.mem_append_left _ hk)
       · exact hc.rgs _ _ hg k (List.mem_append_right _ hk)
       · simp at hk; subst hk
-        exact Tm.Caught.of_withs (Tm.Caught.noIns fun h => hv.ascNoIns hr.2.1 h)
-          fun q θ h => hA.with_noIns h
+        exact Tm.Caught.noIns fun h => hv.ascNoIns hr.2.1 h
     · exact hc.rgs _ _ hq k hk
   | spawn hE hg _ hv =>
     obtain ⟨hA, hr⟩ := asc_of_plug (fin_not_value (.inr rfl)) hE ha.main
@@ -333,8 +315,7 @@ theorem Step.caught {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
       rcases hk with (hk | hk) | hk
       · exact hc.rgs _ _ hg k (List.mem_append_left _ hk)
       · simp at hk; subst hk
-        exact Tm.Caught.of_withs (Tm.Caught.noIns fun h => hv.ascNoIns hr.2.1 h)
-          fun q θ h => hA.with_noIns h
+        exact Tm.Caught.noIns fun h => hv.ascNoIns hr.2.1 h
       · exact hc.rgs _ _ hg k (List.mem_append_right _ hk)
     · exact hc.rgs _ _ hq k hk
 

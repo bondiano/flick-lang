@@ -8,8 +8,7 @@ import Formal.DictOps
 namespace Flick
 
 /-- Values `v` of core.md §1.3 and §3.1. A partially applied constructor is a
-spine with a `ctor` head (`docs/formal/core.md#a-partial-constructor-application-is-a-value`). A constant of arity 2 applied once is a value,
-and so is a saturated `Layer.*` application. -/
+spine with a `ctor` head (`docs/formal/core.md#a-partial-constructor-application-is-a-value`). A constant of arity 2 applied once is a value. -/
 inductive Value : Tm → Prop
   | lam : Value (.lam b)
   | fix : Value (.fix f)
@@ -20,26 +19,12 @@ inductive Value : Tm → Prop
   | rnil : Value .rnil
   | rcons : Value e → Value r → Value (.rcons l e r)
   | ctorApp : Value f → f.head = .ctor K → Value e → Value (.app f e)
-  | constApp : (c.arity = 2 ∨ c.layer) → Value e → Value (.app (.const c) e)
-  | constApp2 : c.arity = 2 → c.layer → Value e₁ → Value e₂ →
-      Value (.app (.app (.const c) e₁) e₂)
+  | constApp : c.arity = 2 → Value e → Value (.app (.const c) e)
   | task : Value (.task e)
-  | enil : Value .enil
-  | econs : Value v → Value θ → Value (.econs S v θ)
   | cap : Value (.cap p)
   | own : Value (.own p)
   | drec : Value (.drec c r)
   | kont : Value (.kont p ℓ)
-
-/-- Environment values `env θ` of core.md §3.1. -/
-inductive IsEnv : Tm → Prop
-  | enil : IsEnv .enil
-  | econs : Value v → IsEnv θ → IsEnv (.econs S v θ)
-
-theorem IsEnv.value {θ : Tm} (h : IsEnv θ) : Value θ := by
-  induction h with
-  | enil => exact .enil
-  | econs hv _ ih => exact .econs hv ih
 
 /-- `match(p, v)` of core.md §3.3: the values bound by `p`, left to right. -/
 def matchP : Pat → Tm → Option (List Tm)
@@ -154,12 +139,11 @@ inductive PatTy : Bool → Pat → Ty → List Ty → Prop
       PatTy true (.rfield l p r) R (Δ₁ ++ Δ₂)
   | or : PatTy true p t Δ → PatTy true q t Δ → PatTy true (.or p q) t Δ
 
-/-- A substitution that fits a term: it keeps the regions the term writes and the
-`provide` regions of its `with` frames, and if the term has a run-time form, it brings
+/-- A substitution that fits a term: it keeps the regions the term writes, and if the term has a run-time form, it brings
 in no run-time region, sends each atom to an atom or to a type without one and brings no
 name into a row. -/
 def Fits (σ : Atom → Ty) (e : Tm) : Prop :=
-  (∀ p, (e.Has (.rgn p) ∨ e.Has (.prov p)) → σ (.r p) = .rg p) ∧
+  (∀ p, e.Has (.rgn p) → σ (.r p) = .rg p) ∧
     (e.Has .ins → ∀ b p, (σ b).reach (.r p) → b = .r p) ∧
     (e.Has .ins → ∀ b a, (σ b).reach a → σ b = a.ty) ∧
     (e.Has .ins → NoNames σ)

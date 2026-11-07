@@ -163,13 +163,6 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | hnil hH => exact .hnil hH
   | hcons hp _ _ hH ih₁ ih₂ => exact .hcons hp (ih₁ X) (ih₂ X) hH
   | hguard hp _ _ _ hH ih₁ ih₂ ih₃ => exact .hguard hp (ih₁ X) (ih₂ X) (ih₃ X) hH
-  | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ => exact .provideL (ih₁ X) (ih₂ X) h₁ h₀ h₂
-  | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ => exact .provideE (ih₁ X) (ih₂ X) h₁ h₀ h₂
-  | with_ hv _ _ h₁ h₂ ih₁ ih₂ => exact .with_ hv (ih₁ X) (ih₂ X) h₁ h₂
-  | enil hρ => exact .enil hρ
-  | econs hv hθ _ _ hρ ih₁ ih₂ => exact .econs hv hθ (ih₁ X) (ih₂ X) hρ
-  | bind _ hρ ih => exact .bind (ih X) hρ
-  | join _ _ hρ ih₁ ih₂ => exact .join (ih₁ X) (ih₂ X) hρ
   | scope hn hF _ hφ' hφ hT ih =>
     refine .scope hn hF ?_ hφ' hφ hT
     rw [List.map_append]; exact ih _
@@ -189,8 +182,8 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   | hatail hop _ _ ih₁ ih₂ => exact .hatail hop (ih₁ X) (ih₂ X)
   | haabort hop _ _ ih₁ ih₂ => exact .haabort hop (ih₁ X) (ih₂ X)
   | hactl hop _ _ ih₁ ih₂ => exact .hactl hop (ih₁ X) (ih₂ X)
-  | hdl _ hn _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
-    refine .hdl ?_ hn (ih₂ X) hψ (ih₃ X) hφ₀ hc hφ hT
+  | hdl _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
+    refine .hdl ?_ hn (ih₂ X) hψ (ih₃ X) hφ₀ hOb hc hφ hT
     rw [List.map_append]; exact ih₁ _
   | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
     exact .hwith (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ (ih₃ X) hφ₀ hc hφ hT
@@ -344,15 +337,6 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ hξ
     exact .hguard hp (ih₁ (hξ.lift _ (by simpa using hp.binds)))
       (ih₂ (hξ.lift _ (by simpa using hp.binds))) (ih₃ hξ) hH
-  | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ _ hξ; exact .provideL (ih₁ hξ) (ih₂ hξ) h₁ h₀ h₂
-  | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ _ hξ; exact .provideE (ih₁ hξ) (ih₂ hξ) h₁ h₀ h₂
-  | with_ hv _ _ h₁ h₂ ih₁ ih₂ =>
-    intro _ _ hξ; exact .with_ hv.rename (ih₁ hξ) (ih₂ hξ) h₁ h₂
-  | enil hρ => intro _ _ _; exact .enil hρ
-  | econs hv hθ _ _ hρ ih₁ ih₂ =>
-    intro _ ξ hξ; exact .econs hv.rename ((Homo.rename ξ).isEnv hθ) (ih₁ hξ) (ih₂ hξ) hρ
-  | bind _ hρ ih => intro _ _ hξ; exact .bind (ih hξ) hρ
-  | join _ _ hρ ih₁ ih₂ => intro _ _ hξ; exact .join (ih₁ hξ) (ih₂ hξ) hρ
   | scope hn hF _ hφ' hφ hT ih =>
     intro _ _ hξ; exact .scope (hn.rename _) hF (ih ((hξ.up 1).lift [_] rfl)) hφ' hφ hT
   | inside hF _ hφ' ht hε hφ hT ih => intro _ _ hξ; exact .inside hF (ih hξ) hφ' ht hε hφ hT
@@ -370,9 +354,9 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | hatail hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hatail hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
   | haabort hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .haabort hop (ih₁ (hξ.lift [_] rfl)) (ih₂ hξ)
   | hactl hop _ _ ih₁ ih₂ => intro _ _ hξ; exact .hactl hop (ih₁ (hξ.lift [_, _] rfl)) (ih₂ hξ)
-  | hdl _ hn _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+  | hdl _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ ξ hξ
-    exact .hdl (ih₁ (hξ.up 1)) (hn.rename ξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+    exact .hdl (ih₁ (hξ.up 1)) (hn.rename ξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT
   | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ ξ hξ

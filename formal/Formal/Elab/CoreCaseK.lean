@@ -208,7 +208,7 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
       rw [List.getElem?_append_right (by simp), List.getElem?_map, List.getElem?_map]
       simp [hu]
     have hF : Fits (fun a => (liftT c.k (trσ N σ) a).substT θ'') bu :=
-      ⟨fun p hp => (hp.elim (hbu.has N _) (hbu.has N _)).elim, fun hi => (hbu.has N _ hi).elim,
+      ⟨fun p hp => (hbu.has N _ hp).elim, fun hi => (hbu.has N _ hi).elim,
         fun hi => (hbu.has N _ hi).elim, fun hi => (hbu.has N _ hi).elim⟩
     have t₁ := tbu.substT _ hF
     simp only [List.map_nil, Facts.none_substT, Flick.J.substT] at t₁

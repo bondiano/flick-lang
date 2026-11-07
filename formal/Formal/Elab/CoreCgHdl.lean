@@ -70,8 +70,8 @@ theorem FrR.resumesE {E E₂ : List Frame} (h : All2 (FrR B) E E₂) {p : Nat}
     · exact fun h => hn _ (List.mem_cons_self ..) ((hF.resumes p).2 h)
     · exact ih (fun G' hG' => hn G' (List.mem_cons_of_mem _ hG')) G hG
 
-theorem FrR.handles (hA : BNoAlts B) (hP : BPlain B) {F F' : Frame} (h : FrR B F F') (E o : Name) :
-    F.handles E o = F'.handles E o := by
+theorem FrR.handles (hA : BNoAlts B) (hP : BPlain B) {F F' : Frame} (h : FrR B F F') (E o : Name)
+    (c : OpClass) : F.handles E o c = F'.handles E o c := by
   cases h with
   | hwith hal _ =>
     have := Cg.armOf (o := o) hA hP hal
@@ -81,7 +81,7 @@ theorem FrR.handles (hA : BNoAlts B) (hP : BPlain B) {F F' : Frame} (h : FrR B F
   | _ => simp [Frame.handles]
 
 theorem FrR.handlesE (hA : BNoAlts B) (hP : BPlain B) {E E₂ : List Frame} (h : All2 (FrR B) E E₂)
-    {Ef o : Name} (hh : ∀ G ∈ E, G.handles Ef o = none) : ∀ G ∈ E₂, G.handles Ef o = none := by
+    {Ef o : Name} {c : OpClass} (hh : ∀ G ∈ E, G.handles Ef o c = none) : ∀ G ∈ E₂, G.handles Ef o c = none := by
   induction h with
   | nil => intro G hG; cases hG
   | cons hF _ ih =>

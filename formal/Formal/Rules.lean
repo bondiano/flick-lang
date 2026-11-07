@@ -30,33 +30,27 @@ inductive J
   | dfs (fs : List (Label × Scheme))
   | harms (E : Name) (t : Ty) (φ : Stage) (s : Ty)
 
-/-- What a `with` frame of the `provide` region `q` with the services `ρ` gives its
-body (regions.md §2.7): the frame answers a service of `ρ`, and the row outside records
-the use `need N q`; it discharges an obligation `Provided {N} ϱ` for a service of `ρ`
-when `q` outlives `ϱ`; everything else comes from outside. -/
-def Row.withP (Θ : Facts) (q : Nat) (ρ r : Row) : Row
-  | .nm N => (ρ (.nm N) → r (.need N (.r q))) ∧ (¬ ρ (.nm N) → r (.nm N))
-  | .ob N a => (ρ (.nm N) → Outl Θ (· = .r q) a.ty) ∧ (¬ ρ (.nm N) → r (.ob N a))
+/-- What a handler of `E` of the region `q` gives its body (regions.md §2.7): the frame
+answers `E`, and it discharges an obligation `Provided {E} ϱ` when `q` outlives `ϱ`;
+everything else comes from outside. -/
+def Row.hP (Θ : Facts) (q : Nat) (E : Name) (r : Row) : Row
+  | .nm N => N = E ∨ r (.nm N)
+  | .ob N a => (N = E → Outl Θ (· = .r q) a.ty) ∧ (N ≠ E → r (.ob N a))
   | x => r x
 
-/-- No obligation of the stage `φ₀` of a `provide` body is about a service its outputs
-`o` may give (regions.md §2.7, first case, rejected): a named obligation needs `o` without
-row variables and without its service, one over a row variable needs `o` without services. -/
+/-- No obligation of the stage `φ₀` of the body of a handler is about an effect it may
+give (regions.md §2.7, first case, rejected): a named obligation needs `o` without row
+variables and without its effect, one over a row variable needs `o` without effects. -/
 def Stage.ObOut (φ₀ : Stage) (o : Row) : Prop :=
   (∀ N a, φ₀.svc (.ob N a) → o.Named ∧ ¬ o (.nm N)) ∧
   ∀ v a, φ₀.svc (.obv v a) → o.Named ∧ ∀ N, ¬ o (.nm N)
 
 /-- The obligations `Provided {N} a` that the end of the region `a` discharges: `N` comes
-from outside the region, whose provider outlives it (regions.md §2.7, second case); and so
+from outside the region, whose handler outlives it (regions.md §2.7, second case); and so
 does `Provided v a` for a row variable `v` of the row outside. -/
 def Row.disch (a : Atom) (r : Row) : Row
   | .ob N b => b = a ∧ r (.nm N)
   | .obv v b => b = a ∧ r (.rv v)
-  | _ => False
-
-/-- The uses of the services of the `provide` region `a`. -/
-def Row.needs (a : Atom) : Row
-  | .need _ b => b = a
   | _ => False
 
 theorem Stage.le_rt_sub {φ : Stage} {r r' ε : Row} (h : φ.le (.rt r ε)) (hr : Row.Sub r r') :
@@ -70,6 +64,30 @@ theorem Stage.le_of_svc {φ : Stage} {r r' ε : Row} (h : φ.le (.rt r ε)) (hr 
   cases φ with
   | pure => trivial
   | rt r₀ e₀ => exact ⟨hr, h.2⟩
+
+/-- A body with no obligation about the effect of its handler has what the handler gives. -/
+theorem Stage.hP_of_out {φ₀ : Stage} {E : Name} {r ε : Row} {Θ : Facts} {q : Nat}
+    (h : φ₀.le (.rt (Row.union (Row.single E) r) ε)) (hO : φ₀.ObOut (Row.single E)) :
+    φ₀.le (.rt (Row.hP Θ q E r) ε) := by
+  cases φ₀ with
+  | pure => trivial
+  | rt r₀ e₀ =>
+    refine ⟨fun x hx => ?_, h.2⟩
+    have h₁ := h.1 x hx
+    cases x with
+    | nm N =>
+      rcases h₁ with h₁ | h₁
+      · cases h₁; exact .inl rfl
+      · exact .inr h₁
+    | ob N a =>
+      refine ⟨fun hN => ((hO.1 N a hx).2 (by rw [hN]; rfl)).elim, fun _ => ?_⟩
+      rcases h₁ with h₁ | h₁
+      · cases h₁
+      · exact h₁
+    | atm a | rv a | obv v a =>
+      rcases h₁ with h₁ | h₁
+      · cases h₁
+      · exact h₁
 
 variable (S : Sig)
 
@@ -94,7 +112,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ (.fix f) (.ex T φ)
   | lit : Typ Ψ Θ Γ (.lit l) (.ex (.base l.base) φ)
   | loc : Ψ[l]? = some t → Typ Ψ Θ Γ (.loc l) (.ex (.ref t) φ)
-  | const : c.ok S Θ ι → Le (c.ty S ι) T → Typ Ψ Θ Γ (.const c) (.ex T φ)
+  | const : c.ok Θ ι → Le (c.ty S ι) T → Typ Ψ Θ Γ (.const c) (.ex T φ)
   | ctor {ts us : List Ty} : S.ctor K = some (k, ts, T₀) → us.length = k →
       Sig.Holds ts T₀ (S.res K) us → Le (Sig.ctorTyR ts T₀ (S.res K) us) T →
       Typ Ψ Θ Γ (.ctor K) (.ex T φ)
@@ -157,21 +175,6 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | hguard : HPat S ε₀ p θ Δ → Typ Ψ Θ (Δ.map .mono ++ Γ) g (.ex (.base .bool) φ) →
       Typ Ψ Θ (Δ.map .mono ++ Γ) b (.ex t φ) → Typ Ψ Θ Γ r (.halts ε₀ H' t φ) → Row.Sub H H' →
       Typ Ψ Θ Γ (.aguard p g b r) (.halts ε₀ H t φ)
-  | provideL : Typ Ψ Θ Γ l (.ex (.layer i ε₂ o) φ) → Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.union o r) ε) → φ₀.ObOut o →
-      (Stage.rt (Row.union i r) (Row.union ε₂ ε)).le φ → Typ Ψ Θ Γ (.provide l e) (.ex t φ)
-  | provideE : Typ Ψ Θ Γ l (.ex (.env o) φ) → Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.union o r) ε) → φ₀.ObOut o →
-      (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.provide l e) (.ex t φ)
-  | with_ : Value θ → Typ Ψ Θ Γ θ (.ex (.env ρ) .pure) → Typ Ψ Θ Γ e (.ex t φ₀) →
-      φ₀.le (.rt (Row.withP Θ q ρ r) ε) → (Stage.rt r ε).le φ → Typ Ψ Θ Γ (.with_ q θ e) (.ex t φ)
-  | enil : (∀ n, ¬ ρ n) → Typ Ψ Θ Γ .enil (.ex (.env ρ) φ)
-  | econs : Value v → IsEnv θ → Typ Ψ Θ Γ v (.ex (S.impl N) φ) → Typ Ψ Θ Γ θ (.ex (.env ρ) φ) →
-      (∀ n, ρ' n ↔ n = .nm N ∨ ρ n) → Typ Ψ Θ Γ (.econs N v θ) (.ex (.env ρ') φ)
-  | bind : Typ Ψ Θ Γ e (.ex (S.impl N) φ) → (∀ n, ρ n ↔ n = .nm N) →
-      Typ Ψ Θ Γ (.bind N e) (.ex (.env ρ) φ)
-  | join : Typ Ψ Θ Γ e₁ (.ex (.env ρ₁) φ) → Typ Ψ Θ Γ e₂ (.ex (.env ρ₂) φ) →
-      (∀ n, ρ n ↔ ρ₁ n ∨ ρ₂ n) → Typ Ψ Θ Γ (.join e₁ e₂) (.ex (.env ρ) φ)
   | scope : e.NoIns → (∀ C s, F C s → s = .tvar 0 ∧ ¬ C (.v 0)) →
       Typ (Ψ.map (Ty.up 1)) (Facts.union (Θ.substT (shiftV 1)) F)
         (.mono (.owner (.tvar 0)) :: Γ.map (Scheme.up 1)) e (.ex (t.up 1) φ') →
@@ -180,7 +183,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       (Stage.rt r ε).le φ → Le t T → Typ Ψ Θ Γ (.scope e) (.ex T φ)
   | inside : (∀ C s, F C s → s = .rg p ∧ ∀ q, C (.r q) → q < p) →
       Typ Ψ (Facts.union Θ F) Γ e (.ex t φ') →
-      φ'.le (.rt (Row.union (Row.scope (.rg p)) (Row.union r (Row.union (Row.disch (.r p) r) (Row.needs (.r p))))) ε) →
+      φ'.le (.rt (Row.union (Row.scope (.rg p)) (Row.union r (Row.disch (.r p) r))) ε) →
       ¬ t.reach (.r p) → ¬ (Ty.errors ε).reach (.r p) → (Stage.rt r ε).le φ → Le t T →
       Typ Ψ Θ Γ (.inside p e) (.ex T φ)
   | cap : Typ Ψ Θ Γ (.cap p) (.ex (.hnd (.rg p)) φ)
@@ -220,7 +223,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | hdl {al rf : Tm} : Typ (Ψ.map (Ty.up 1)) (Θ.substT (shiftV 1)) (Γ.map (Scheme.up 1)) al
         (.harms E (t'.up 1) ((Stage.rt r ε).substT (shiftV 1)) (.tvar 0)) → al.NoIns →
       Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → ψ.le (.rt r ε) →
-      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.union (Row.single E) r) ε) →
+      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.union (Row.single E) r) ε) → φ₀.ObOut (Row.single E) →
       S.Handles E al r → (Stage.rt r ε).le φ → Le t' T →
       Typ Ψ Θ Γ (.hdl E al rf e) (.ex T φ)
   /-- The run-time forms of a handler, whose region is `p`; the cell `ℓ` holds the type and
@@ -228,7 +231,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | hwith {al rf : Tm} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
       Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg p)) →
       Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → ψ.le (.rt r ε) →
-      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.union (Row.single E) r) ε) →
+      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ p E r) ε) →
       S.Handles E al r → (Stage.rt r ε).le φ → Le t' T →
       Typ Ψ Θ Γ (.hwith p ℓ E al rf e) (.ex T φ)
   /-- While an arm runs, the body is parked where it performed the operation `o`: it is
@@ -240,7 +243,7 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
       Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → ψ.le (.rt r ε) →
       S.op E o = some (c, a₀, b₀) → c ≠ .abort → (tl = true ↔ c = .tail) →
       OkE Ei → k = plug Ei (.hole p) → Typ Ψ Θ [] (plug Ei (.app (.const (.perform E o c)) .todo)) (.ex t φ₀) →
-      φ₀.le (.rt (Row.union (Row.single E) r) ε) →
+      φ₀.le (.rt (Row.hP Θ p E r) ε) →
       Typ Ψ Θ Γ a (.ex (if tl then b₀ else t') (.rt r ε)) →
       (tl = false → ∃ C', Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') ∧ C' (.r p)) →
       S.Handles E al r → (Stage.rt r ε).le φ → Le t' T →

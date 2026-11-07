@@ -1,4 +1,5 @@
-import Formal.CanonLayer
+import Formal.CanonForms
+import Formal.Semantics
 
 /-!
 # Records and pattern matching on well-typed values
@@ -149,7 +150,6 @@ theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
       simp only [Ty.res] at hr
       exact ⟨us, hl, hT.res_tcon hr⟩
     | constApp => simp [Tm.head] at hK
-    | constApp2 => simp [Tm.head] at hK
   | errVal => intro _ _ _ _ _ _ _ _ _ hJ hk; cases hJ; simp [Ty.kind] at hk
   | _ => intro hv _ _ _ _ _ _ hK; cases hv <;> simp [Tm.head] at hK
 
@@ -217,7 +217,6 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
           cases hvv with
           | ctorApp hf' _ he' => exact ⟨hf', he'⟩
           | constApp _ he' => exact ⟨.const, he'⟩
-          | constApp2 _ _ hf' he' => exact ⟨.constApp (.inl ‹_›) hf', he'⟩
         obtain ⟨_, _, _, _, _, _, _, hr, _⟩ := (‹PatTy S false _ _ _›).spine rfl
         simp only [Ty.res] at hr
         have hres' := hT.res_tcon' (by rw [hres]; exact hr)

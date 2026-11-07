@@ -74,8 +74,7 @@ theorem Tm.Within.armOf {o : Name} {b : Tm} {A : Nat → Prop} :
   | .letrec _ _, _, ha | .fix _, _, ha | .lit _, _, ha | .loc _, _, ha | .const _, _, ha
   | .ctor _, _, ha | .rnil, _, ha | .rcons _ _ _, _, ha | .proj _ _, _, ha | .update _ _ _, _, ha
   | .match_ _ _, _, ha | .aguard _ _ _ _, _, ha | .todo, _, ha | .task _, _, ha | .await _, _, ha
-  | .raise _, _, ha | .try_ _ _, _, ha | .handle _ _, _, ha | .provide _ _, _, ha
-  | .with_ _ _ _, _, ha | .enil, _, ha | .econs _ _ _, _, ha | .bind _ _, _, ha | .join _ _, _, ha
+  | .raise _, _, ha | .try_ _ _, _, ha | .handle _ _, _, ha
   | .scope _, _, ha | .inside _ _, _, ha | .cap _, _, ha | .own _, _, ha | .drec _ _, _, ha
   | .glob _, _, ha | .hdl _ _ _ _, _, ha | .hwith _ _ _ _ _ _, _, ha | .hctl _ _ _ _ _ _ _ _ _, _, ha
   | .hres _ _ _ _, _, ha | .hdone _ _, _, ha | .unw _ _ _, _, ha | .kont _ _, _, ha

@@ -6,11 +6,9 @@ import Formal.Generalization
 `let id = λx. x in let _ = id 1 in id True` uses `id` at `Int` and at `Bool`.
 `scope s { op (open s) }` acquires a capability of its region and uses it: its
 type is `Unit`, and `Scope s` leaves the row of the scope.
-`let app = λf. f () in app (λ_. let _ = ask_S () in ())` generalizes `app` over the row of
+`let app = λf. f () in app (λ_. let _ = S.op () in ())` generalizes `app` over the row of
 services of its argument and uses it at `{S}`.
 `λf. try f () with _ → ()` removes the row variable of the errors of `f`.
-`λl. λt. provide l (await t)` provides a layer whose outputs are a row variable.
-`λl. λm. Layer.merge l m` merges a layer whose outputs are a row variable with one giving `S`.
 -/
 
 namespace Flick
@@ -56,9 +54,9 @@ theorem rowVar_inst (r : Row) : rowVar.substT (instT [.row r]) = r.plain := by
   cases x <;> simp [rowVar, Row.substT, instT, Ty.asRow_row, Row.plain]
 
 /-- `app : ∀ρ. (Unit →R⟨ρ;∅⟩ Unit) →R⟨ρ;∅⟩ Unit`, used at `ρ := {S}`, a service. -/
-example (S : Sig) (hS₀ : ∀ o, S.op "S" o = none) :
+example (S : Sig) (hop : S.op "S" "op" = some (.tail, .base .unit, .base .unit)) :
     Typ S [] Facts.none [] (.let_ (.lam (.app (.var 0) (.lit .unit)))
-      (.app (.var 0) (.lam (.let_ (.app (.const (.ask "S")) (.lit .unit)) (.lit .unit)))))
+      (.app (.var 0) (.lam (.let_ (.app (.const (.perform "S" "op" .tail)) (.lit .unit)) (.lit .unit)))))
       (.ex (.base .unit) (.rt (Row.single "S") Row.none)) := by
   have hS : (Row.single "S").plain = Row.single "S" := by
     funext x; cases x <;> simp [Row.plain, Row.single]
@@ -77,8 +75,8 @@ example (S : Sig) (hS₀ : ∀ o, S.op "S" o = none) :
     · simp only [Scheme.inst, Ty.substT, thunkTy, Stage.substT, rowVar_inst, hS, Row.none_substT,
         Caps.none_substT]
       exact .refl
-    · refine .lam (ψ := .rt (Row.single "S") Row.none) (.let_ (a := S.impl "S")
-        (.app (.const (c := .ask "S") (ι := default) hS₀ .refl) .lit (Stage.le_refl _) .refl) .lit)
+    · refine .lam (ψ := .rt (Row.single "S") Row.none) (.let_ (a := .base .unit)
+        (.app (.perform (t := .base .unit) hop (by simpa using Le.refl)) .lit (Stage.le_refl _) .refl) .lit)
         (fun h => by simp [Tm.Has] at h) ?_ .refl
       rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
       · simp [Tm.Free] at hi
@@ -101,64 +99,6 @@ example (S : Sig) :
     rw [Scheme.inst_mono]; exact .refl
   · refine .hcons .wild .lit (.hnil (H := Row.none) fun _ h => h) fun n hn => ?_
     subst hn; exact .inl ⟨rfl, rfl⟩
-  · rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
-    · simp [Tm.Free] at hi
-    · simp [Tm.Has] at hp
-    · simp [Tm.Has] at hl
-
-/-- `λl. λt. provide l (await t)` (`with_layer` of core.md): the outputs of `l` are a row
-variable `ρ`, which the body requires. -/
-example (S : Sig) :
-    Typ S [] Facts.none [] (.lam (.lam (.provide (.var 1) (.await (.var 0)))))
-      (.ex (.arrow (.layer Row.none Row.none rowVar) .pure
-        (.arrow (.eff rowVar Row.none (.base .int) Caps.none) (.rt Row.none Row.none) (.base .int)
-          Caps.none) Caps.none) .pure) := by
-  refine .lam (.lam (.provideL (i := Row.none) (ε₂ := Row.none) (o := rowVar) (r := Row.none)
-      (ε := Row.none) (φ₀ := .rt rowVar Row.none) ?_ ?_ ?_ ?_ ?_) (fun h => by simp [Tm.Has] at h) ?_ .refl)
-    (fun h => by simp [Tm.Has] at h) ?_ .refl
-  · exact .var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl)
-  · exact .await (.var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl))
-      (Stage.le_refl _) .refl
-  · exact ⟨fun _ h => .inl h, fun _ h => h⟩
-  · exact ⟨fun _ _ h => (nomatch h), fun _ _ h => (nomatch h)⟩
-  · exact ⟨fun _ h => by simp [Row.union, Row.none] at h, fun _ h => by simp [Row.union, Row.none] at h⟩
-  · rintro a (⟨i, s, hi, hs, ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
-    · cases i with
-      | zero => simp at hs; subst hs; simp [Ty.reach, Caps.none] at ha
-      | succ => simp at hs
-    · simp [Tm.Has] at hp
-    · simp [Tm.Has] at hl
-  · rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
-    · simp [Tm.Free] at hi
-    · simp [Tm.Has] at hp
-    · simp [Tm.Has] at hl
-
-/-- `Layer⟨∅;∅;o⟩`. -/
-def outLayer (o : Row) : Ty := .layer Row.none Row.none o
-
-/-- `λl. λm. Layer.merge l m`: the outputs of `l` are a row variable `ρ`, which an instance
-may make overlap the `S` of `m`. -/
-example (S : Sig) :
-    Typ S [] Facts.none [] (.lam (.lam (.app (.app (.const .merge) (.var 1)) (.var 0))))
-      (.ex (.arrow (outLayer rowVar) .pure (.arrow (outLayer (Row.single "S")) .pure
-        (outLayer (Row.union rowVar (Row.single "S"))) Caps.none) Caps.none) .pure) := by
-  have h0 : Row.union Row.none Row.none = Row.none := by funext x; simp [Row.union, Row.none]
-  have hv : ∀ {Γ : List Scheme} {i t}, Γ[i]? = some (.mono t) →
-      Typ S [] Facts.none Γ (.var i) (.ex t .pure) :=
-    fun h => .var (ts := []) h rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl)
-  refine .lam (.lam (.app (C := Caps.none) (.app (C := Caps.none)
-      (.const (c := .merge) (ι := ⟨.base .unit, .base .unit, Caps.none, Row.none, Row.none, rowVar,
-        Row.none, Row.none, Row.single "S"⟩) trivial ?_)
-      (hv rfl) (Stage.le_refl _) .refl) (hv rfl) (Stage.le_refl _) .refl)
-      (fun h => by simp [Tm.Has] at h) ?_ .refl)
-    (fun h => by simp [Tm.Has] at h) ?_ .refl
-  · simp only [Const.ty, outLayer, h0]; exact .refl
-  · rintro a (⟨i, s, hi, hs, ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
-    · cases i with
-      | zero => simp at hs; subst hs; simp [outLayer, Ty.reach, Caps.none] at ha
-      | succ => simp at hs
-    · simp [Tm.Has] at hp
-    · simp [Tm.Has] at hl
   · rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
     · simp [Tm.Free] at hi
     · simp [Tm.Has] at hp

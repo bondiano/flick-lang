@@ -25,7 +25,7 @@ def J.substT (σ : Atom → Ty) : J → J
 
 theorem Fits.sub {σ : Atom → Ty} {e e' : Tm} (h : Fits σ e) (hs : ∀ s, e'.Has s → e.Has s) :
     Fits σ e' :=
-  ⟨fun p hp => h.1 p (hp.imp (hs _) (hs _)), fun hi => h.2.1 (hs _ hi), fun hi => h.2.2.1 (hs _ hi),
+  ⟨fun p hp => h.1 p (hs _ hp), fun hi => h.2.1 (hs _ hi), fun hi => h.2.2.1 (hs _ hi),
     fun hi => h.2.2.2 (hs _ hi)⟩
 
 theorem Fits.noIns {σ : Atom → Ty} {e : Tm} (hn : e.NoIns) (hr : ∀ p, σ (.r p) = .rg p) :
@@ -136,7 +136,7 @@ theorem held_substT {Ψ : List Ty} {Γ : List Scheme} {e : Tm} {T : Ty} {σ : At
     obtain ⟨b, hb, h'⟩ := (Scheme.reach_substT _ _ _).mp ha
     exact (Ty.reach_substT σ _ _).mpr ⟨b, h b (.inl ⟨i, s₀, hi, hs₀, hb⟩), h'⟩
   · refine (Ty.reach_substT σ _ _).mpr ⟨.r p, h _ (.inr (.inl ⟨p, hp, rfl⟩)), ?_⟩
-    rw [hσ.1 p (.inl hp)]; rfl
+    rw [hσ.1 p hp]; rfl
   · simp only [List.getElem?_map, Option.map_eq_some_iff] at ht
     obtain ⟨t₀, ht₀, rfl⟩ := ht
     obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ _).mp ha

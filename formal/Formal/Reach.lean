@@ -5,8 +5,8 @@ import Formal.SchemeOps
 # What a term holds (regions.md §2.1, §2.3, §5.2)
 
 `e.Has` is what a term writes down: a run-time region (in `cap π`, `own π`,
-`inside π e`), a location, a run-time form (`inside` or `with`), the `inside` form of a
-region, the `provide` region of a `with` frame. `e.Free i` is a free variable.
+`inside π e`), a location, a run-time form, the `inside` form of a region. `e.Free i` is a
+free variable.
 `held Ψ Γ e` is what the premises of (Lam) and (Task) bound: `⌈Γ(y)⌉` of each
 free `y`, the run-time regions written in `e` and `⌈Ψ(ℓ)⌉` of each location.
 -/
@@ -19,7 +19,6 @@ inductive Site
   | loc (l : Nat)
   | ins
   | frame (p : Nat)
-  | prov (p : Nat)
 
 def Tm.Has : Tm → Site → Prop
   | .var _, _ => False
@@ -46,12 +45,6 @@ def Tm.Has : Tm → Site → Prop
   | .raise e, s => e.Has s
   | .try_ e al, s => e.Has s ∨ al.Has s
   | .handle v al, s => v.Has s ∨ al.Has s
-  | .provide l e, s => l.Has s ∨ e.Has s
-  | .with_ q θ e, s => s = .ins ∨ s = .prov q ∨ θ.Has s ∨ e.Has s
-  | .enil, _ => False
-  | .econs _ v θ, s => v.Has s ∨ θ.Has s
-  | .bind _ e, s => e.Has s
-  | .join e₁ e₂, s => e₁.Has s ∨ e₂.Has s
   | .scope e, s => e.Has s
   | .inside p e, s => s = .rgn p ∨ s = .ins ∨ s = .frame p ∨ e.Has s
   | .cap p, s => s = .rgn p
@@ -91,11 +84,6 @@ def Tm.Free : Tm → Nat → Prop
   | .raise e, j => e.Free j
   | .try_ e al, j => e.Free j ∨ al.Free j
   | .handle v al, j => v.Free j ∨ al.Free j
-  | .provide l e, j => l.Free j ∨ e.Free j
-  | .with_ _ θ e, j => θ.Free j ∨ e.Free j
-  | .econs _ v θ, j => v.Free j ∨ θ.Free j
-  | .bind _ e, j => e.Free j
-  | .join e₁ e₂, j => e₁.Free j ∨ e₂.Free j
   | .scope e, j => e.Free (j + 1)
   | .inside _ e, j => e.Free j
   | .drec _ r, j => r.Free j
@@ -152,13 +140,12 @@ theorem Tm.free_rename (ξ : Nat → Nat) :
     · obtain ⟨i, hi, he⟩ := free_rename_bind (ih₂ _) h; exact ⟨i, .inr (.inl hi), he⟩
     · obtain ⟨i, hi, he⟩ := ih₃ ξ j h; exact ⟨i, .inr (.inr hi), he⟩
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂ | with_ _ _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ =>
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro j h
     rcases h with h | h
     · obtain ⟨i, hi, he⟩ := ih₁ ξ j h; exact ⟨i, .inl hi, he⟩
     · obtain ⟨i, hi, he⟩ := ih₂ ξ j h; exact ⟨i, .inr hi, he⟩
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih | drec _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih | drec _ _ ih =>
     intro j h; exact ih ξ j h
   | hres _ _ _ _ ih₁ ih₂ =>
     intro j h
@@ -235,13 +222,12 @@ theorem Tm.free_subst :
     · obtain ⟨i, hi, he⟩ := bind ih₂ h; exact ⟨i, .inr (.inl hi), he⟩
     · obtain ⟨i, hi, he⟩ := ih₃ σ j h; exact ⟨i, .inr (.inr hi), he⟩
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂ | with_ _ _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ =>
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro σ j h
     rcases h with h | h
     · obtain ⟨i, hi, he⟩ := ih₁ σ j h; exact ⟨i, .inl hi, he⟩
     · obtain ⟨i, hi, he⟩ := ih₂ σ j h; exact ⟨i, .inr hi, he⟩
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih | drec _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih | drec _ _ ih =>
     intro σ j h; exact ih σ j h
   | hres _ _ _ _ ih₁ ih₂ =>
     intro σ j h
@@ -301,20 +287,12 @@ theorem Tm.has_subst :
     · exact (bind (ih₂ · s) h).imp (.inr ∘ .inl) fun ⟨i, hi, he⟩ => ⟨i, .inr (.inl hi), he⟩
     · exact (ih₃ σ s h).imp (.inr ∘ .inr) fun ⟨i, hi, he⟩ => ⟨i, .inr (.inr hi), he⟩
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ =>
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro σ s h
     rcases h with h | h
     · exact (ih₁ σ s h).imp .inl fun ⟨i, hi, he⟩ => ⟨i, .inl hi, he⟩
     · exact (ih₂ σ s h).imp .inr fun ⟨i, hi, he⟩ => ⟨i, .inr hi, he⟩
-  | with_ _ _ _ ih₁ ih₂ =>
-    intro σ s h
-    rcases h with h | h | h | h
-    · exact .inl (.inl h)
-    · exact .inl (.inr (.inl h))
-    · exact (ih₁ σ s h).imp (.inr ∘ .inr ∘ .inl) fun ⟨i, hi, he⟩ => ⟨i, .inl hi, he⟩
-    · exact (ih₂ σ s h).imp (.inr ∘ .inr ∘ .inr) fun ⟨i, hi, he⟩ => ⟨i, .inr hi, he⟩
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | drec _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | drec _ _ ih =>
     intro σ s h; exact ih σ s h
   | inside p e ih =>
     intro σ s h

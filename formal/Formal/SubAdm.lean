@@ -142,25 +142,6 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | hguard hp _ _ _ hH ih₁ ih₂ ih₃ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.halts
     exact .hguard hp (ih₁ (.st h₂)) (ih₂ ⟨h₁, h₂⟩) (ih₃ ⟨rfl, rfl, h₁, h₂⟩) hH
-  | provideL _ _ hb h₀ hφ ih₁ ih₂ =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .provideL (ih₁ (.st h₂)) (ih₂ ⟨h₁, Stage.le_refl _⟩) hb h₀ (Stage.le_trans hφ h₂)
-  | provideE _ _ hb h₀ hφ ih₁ ih₂ =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .provideE (ih₁ (.st h₂)) (ih₂ ⟨h₁, Stage.le_refl _⟩) hb h₀ (Stage.le_trans hφ h₂)
-  | with_ hv hθ _ hb hφ _ ih₂ =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .with_ hv hθ (ih₂ ⟨h₁, Stage.le_refl _⟩) hb (Stage.le_trans hφ h₂)
-  | enil hρ => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .enil hρ
-  | econs hv hθ _ _ hρ ih₁ ih₂ =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases h₁
-    exact .econs hv hθ (ih₁ (.st h₂)) (ih₂ (.st h₂)) hρ
-  | bind _ hρ ih =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases h₁
-    exact .bind (ih (.st h₂)) hρ
-  | join _ _ hρ ih₁ ih₂ =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases h₁
-    exact .join (ih₁ (.st h₂)) (ih₂ (.st h₂)) hρ
   | scope hn hF hb hφ' hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .scope hn hF hb hφ' (Stage.le_trans hφ h₂) (hT.trans h₁)
@@ -192,9 +173,9 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | hactl hop hb hr =>
     intro J' hJ; cases J' <;> simp only [JLe] at hJ
     obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hactl hop hb hr
-  | hdl hal hn hrf hψ he hφ₀ hc hφ hT =>
+  | hdl hal hn hrf hψ he hφ₀ hOb hc hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .hdl hal hn hrf hψ he hφ₀ hc (Stage.le_trans hφ h₂) (hT.trans h₁)
+    exact .hdl hal hn hrf hψ he hφ₀ hOb hc (Stage.le_trans hφ h₂) (hT.trans h₁)
   | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hwith hℓ hal hrf hψ he hφ₀ hc (Stage.le_trans hφ h₂) (hT.trans h₁)

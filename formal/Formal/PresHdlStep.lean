@@ -39,7 +39,7 @@ theorem unw_not_pure {Ψ Θ p ℓ a t} (h : Typ S Ψ Θ [] (.unw p ℓ a) (.ex t
 /-- Removing a frame around unwinding keeps it typed. -/
 theorem unw_frame {Ψ Θ p ℓ a t φ} {F : Frame} (hF : F.ok) (hni : ¬ F.isInside)
     (h : Typ S Ψ Θ [] (F.plug (.unw p ℓ a)) (.ex t φ)) : Typ S Ψ Θ [] (.unw p ℓ a) (.ex t φ) := by
-  obtain ⟨k, Θ', _, φ', hr, rel, hk, _, _⟩ := frame_typing unw_not_value F hF h
+  obtain ⟨k, Θ', _, φ', hr, rel, hk, _⟩ := frame_typing unw_not_value F hF h
   cases hr with
   | unw hℓ ha hst =>
     have hne : φ' ≠ .pure := Stage.rt_ne_pure hst
@@ -69,7 +69,7 @@ theorem hole_arg {Ψ Θ E f x t₀ φ₀ a₀ ψ₀ B n} (hE : OkE E) (hn : ¬ V
   | app hf' hx' hψ _ =>
     obtain ⟨hψp, hb'⟩ := hf hf'
     have hφ : φ' ≠ .pure := fun h => hψp (Stage.eq_pure (h ▸ hψ))
-    rcases hp with hp | ⟨rfl, hΘ, -⟩
+    rcases hp with hp | ⟨rfl, hΘ⟩
     · exact (hφ hp).elim
     · simp only [List.map_up_zero] at hx'
       have h₁ := (hx'.sub (J' := .ex a₀ φ') ⟨(hb' rfl).1, Stage.le_refl _⟩).substT (kill n) (Fits.kill hb)
