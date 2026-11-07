@@ -208,6 +208,16 @@ impl<'a> Checker<'a> {
         })
     }
 
+    /// The signature of the top-level declaration around `span`.
+    pub(super) fn signature_around(&self, span: Span) -> Option<&'a Node> {
+        self.top.items.iter().find_map(|item| {
+            let (start, end) = item.decl.range();
+            (start <= span.start && span.end <= end)
+                .then_some(item.sig)
+                .flatten()
+        })
+    }
+
     pub(super) fn pairs(&self, sig: &Node, decl: &Node) -> bool {
         let name = signature_name(sig, self.text);
         name.is_some()
