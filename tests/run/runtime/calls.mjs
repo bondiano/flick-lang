@@ -15,12 +15,15 @@ const latch = (name) => {
 /** A promise that settles some time after its call is cancelled, and says so. */
 export const settleLater = (name, signal) =>
   new Promise((resolve) => {
-    signal.addEventListener("abort", () => {
+    const settle = () => {
       setTimeout(() => {
         process.stdout.write(`${name} settled\n`);
         resolve();
       }, 30);
-    });
+    };
+    // a call cancelled before it started hears no event
+    if (signal.aborted) settle();
+    else signal.addEventListener("abort", settle);
     latch(name).open();
   });
 

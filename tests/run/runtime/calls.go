@@ -9,15 +9,21 @@ import (
 
 var calls sync.Map
 
-// latch is the channel of the call named `name`, closed when it is under way.
-func latch(name flickrt.Value) chan struct{} {
-	opened, _ := calls.LoadOrStore(name, make(chan struct{}))
-	return opened.(chan struct{})
+// call is the latch of the call named `name`, opened when it is under way.
+type call struct {
+	once   sync.Once
+	opened chan struct{}
+}
+
+func latch(name flickrt.Value) *call {
+	c, _ := calls.LoadOrStore(name, &call{opened: make(chan struct{})})
+	return c.(*call)
 }
 
 // settleLater settles some time after its call is cancelled, and says so.
 func settleLater(ctx flickrt.Context, name flickrt.Value) flickrt.Value {
-	close(latch(name))
+	c := latch(name)
+	c.once.Do(func() { close(c.opened) })
 	<-ctx.Done()
 	time.Sleep(30 * time.Millisecond)
 	return flickrt.StdoutLine(name.(string) + " settled")
@@ -25,6 +31,6 @@ func settleLater(ctx flickrt.Context, name flickrt.Value) flickrt.Value {
 
 // underWay ends when the call named `name` is under way.
 func underWay(_ flickrt.Context, name flickrt.Value) flickrt.Value {
-	<-latch(name)
+	<-latch(name).opened
 	return flickrt.Unit
 }

@@ -554,7 +554,7 @@ Each law below names the cases that exercise it, under `tests/run/runtime/` unle
 | C5 | `scope_close`, `closing_causes`, `closed_owner`, `interrupt_in_finalizer` | both | trace, output |
 | C6 | `closing_causes`, `closing_child_fails`, `scope_close` | both | output: causes are not traced. `c_H` is not checked, as for C1 |
 
-The law (Unmask) of §3.2 has its own case, `interrupt_after_close`, a [known gap on Go](#go-leaving-a-close-does-not-deliver-a-pending-interruption).
+The law (Unmask) of §3.2 has its own case, `interrupt_after_close`.
 
 `tests/run/known_gaps.txt` lists the cases a target does not pass yet, each with its reason. Their `.stdout` is what the contract asks for; the harness runs them and fails on one that passes, so a case joins its target as soon as the target holds the law.
 
@@ -922,7 +922,7 @@ Found by the Lean development of the core (`formal/Formal/`).
 
 - Divergence: the fiber is asked to stop while a finalizer of its `scope` runs. On Node the statement after the scope does not run and the fiber ends interrupted. On Go the statement runs, and the fiber ends with success if no interruption point follows, so its supervisor is not called. If the finalizer died, Go's cause lacks the `Int` that Node's has.
 - Cause: closing runs at `mask (…)`, and (Unmask) delivers a pending request when the depth returns to zero. Go's internal masks leave the request until the next interruption point ([mask exit in Go](#go-leaving-a-mask-does-not-deliver-a-pending-interruption)), and a direct call is not one. Breaks (Unmask) and the parity of §2.5; R1–R4 hold.
-- Resolution: recorded. Case: `tests/run/runtime/interrupt_after_close.fl`, listed in `tests/run/known_gaps.txt` for Go. A fix is a check when `scope` and `provide` have left the close, at depth zero, not inside it.
+- Resolution — Go: `scope` and `provide` deliver the request when they have left the close, at depth zero, not inside it (`region` in `owner.go`). Internal masks still leave it until the next interruption point. Case: `tests/run/runtime/interrupt_after_close.fl`.
 
 ### JS: a group made while its owner closes runs nothing
 

@@ -271,7 +271,13 @@ func owned(fb *Fiber, body func(fb *Fiber, owner *Owner) Value) Value {
 // with `Cause.combine`, as owner.ts does, electing no defect.
 func region(fb *Fiber, body func(fb *Fiber, owner *Owner) Value) Value {
 	return ownedWith(fb, func(o *Owner, fb *Fiber, exit *Cause) *Cause {
-		return Sequential(exit, o.closeFinalizers(fb, exit))
+		cause := Sequential(exit, o.closeFinalizers(fb, exit))
+		// (Unmask): the close ran masked, and a request that came in during it
+		// is delivered on leaving it, at depth zero
+		if s := fb.state; s.requested.Load() && s.mask == 0 && !causeInterrupted(cause) {
+			cause = Sequential(cause, s.stopped().Cause)
+		}
+		return cause
 	}, body)
 }
 
