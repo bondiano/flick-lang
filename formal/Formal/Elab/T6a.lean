@@ -98,7 +98,8 @@ theorem Elab.free {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') {x : Nat} (hx
   | meth => have := Tm.free_dapps hx; simp [Tm.Free] at this
   | const => have := Tm.free_dapps hx; simp [Tm.Free] at this
   | app _ _ _ ih₁ ih₂ => exact hx.imp ih₁ ih₂
-  | lam _ _ ih => exact ih hx
+  | lam _ _ ih | allLam _ ih => exact ih hx
+  | allVar | varAll => simpa [Tm.Free, Exp.Free] using hx
   | let_ _ _ ih₁ ih₂ => exact hx.imp ih₁ ih₂
   | letSig _ _ _ _ _ ih₁ ih₂ => exact hx.imp ih₁ ih₂
   | ite _ _ _ ihc iha ihb => exact hx.imp ihc (Or.imp iha ihb)
@@ -147,6 +148,8 @@ theorem Elab.dbelow {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') : e'.DB Δ.
   | con _ _ he => exact Tm.dapps_DB trivial he.dbelow
   | app _ _ _ ih₁ ih₂ => exact ⟨ih₁, ih₂⟩
   | lam _ _ ih => exact ih
+  | allLam _ ih => simpa using ih
+  | allVar | varAll => trivial
   | let_ _ _ ih₁ ih₂ => exact ⟨ih₁, ih₂⟩
   | letSig _ _ _ _ _ ih₁ ih₂ => exact ⟨by simpa using ih₁, ih₂⟩
   | ite _ _ _ ih₁ ih₂ ih₃ => exact ⟨ih₁, ih₂, ih₃⟩
@@ -201,6 +204,15 @@ theorem T6a {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') :
     have hv := X.const (Γ := Γ.map Scheme.tr) (Δ := Δ) (φ := φ) hc hk
     simp only [TTy.subst_dicts, TTy.subst] at hv
     exact tm_dapps X hv (ent_typed X he)
+  | @allLam Γ Δ k b t ψ b' _ ih =>
+    refine X.allLam ?_
+    simpa only [List.map_map, Function.comp_def, Scheme.tr_subst] using ih
+  | allVar hx hc hk =>
+    refine X.allVar ?_ hk
+    rw [List.getElem?_map, hx]; simp [Scheme.tr, hc, dicts]
+  | varAll hx hc hts hA hus =>
+    refine X.varAll ?_ hts hA hus
+    rw [List.getElem?_map, hx]; simp [Scheme.tr, hc, dicts]
   | app _ _ hψ ih₁ ih₂ => exact X.app ih₁ ih₂ hψ
   | ite _ _ _ ihc iha ihb => exact X.ite ihc iha ihb
   | caseOpt _ _ _ ihe ihn ihs => exact X.caseOpt ihe ihn ihs

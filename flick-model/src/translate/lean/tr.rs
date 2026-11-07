@@ -26,6 +26,8 @@ pub(super) enum Ty {
     Nm(String, Box<Ty>),
     /// `.run r r'`: a union of rows
     RUn(Box<Ty>, Box<Ty>),
+    /// `.all k t`: the binder of a parameter, its variables by name
+    All(Vec<String>, Box<Ty>),
     /// a positive qualifier, its variables of the checker, before rule 4
     Pos(Vec<String>),
 }
@@ -35,6 +37,15 @@ fn cun(xs: Vec<Ty>) -> Ty {
     xs.into_iter()
         .reduce(|a, b| Ty::Un(Box::new(a), Box::new(b)))
         .unwrap_or(Ty::Nil)
+}
+
+/// `∀names. t`, or `t` without names.
+fn all(names: Vec<String>, t: Ty) -> Ty {
+    if names.is_empty() {
+        t
+    } else {
+        Ty::All(names, Box::new(t))
+    }
 }
 
 fn app(head: Ty, args: impl IntoIterator<Item = Ty>) -> Ty {
@@ -115,8 +126,8 @@ impl Tr {
             }
             fc::Type::Row(_) | fc::Type::Union(..) => self.row(t)?,
             fc::Type::Captured { ty, captures, .. } | fc::Type::Bounded { ty, captures } => {
-                let inner = self.open(ty)?;
-                match inner {
+                let (names, inner) = self.open(ty)?;
+                let t = match inner {
                     fc::Type::Fun {
                         param,
                         effects,
@@ -126,34 +137,41 @@ impl Tr {
                     // a type variable: its bound is not modelled; other data
                     // has no storage
                     _ => self.ty(inner, neg)?,
-                }
+                };
+                all(names, t)
             }
             fc::Type::Forall { .. } => {
-                let body = self.open(t)?;
-                self.ty(body, neg)?
+                let (names, body) = self.open(t)?;
+                all(names, self.ty(body, neg)?)
             }
             other => return Err(Skip::Other(format!("no type {}", show_type(other)))),
         })
     }
 
-    /// The body of `∀v. a^v → …`, with `v := a` (rule 2).
-    fn open<'t>(&mut self, t: &'t fc::Type) -> Result<&'t fc::Type, Skip> {
+    /// The variables of a `∀` that stay binders, and its body: `∀v. a^v → …`
+    /// has `v := a` (rule 2). A constraint would need a dictionary in the type.
+    fn open<'t>(&mut self, t: &'t fc::Type) -> Result<(Vec<String>, &'t fc::Type), Skip> {
         let fc::Type::Forall {
             vars,
             constraints,
             body,
         } = t
         else {
-            return Ok(t);
+            return Ok((Vec::new(), t));
         };
         if !constraints.is_empty() {
             return Err(Skip::Rank);
         }
+        let mut names = Vec::new();
         for v in vars {
-            let a = bound(body, &v.name).ok_or(Skip::Rank)?;
-            self.inst.insert(v.name.clone(), a);
+            match bound(body, &v.name) {
+                Some(a) => {
+                    self.inst.insert(v.name.clone(), a);
+                }
+                None => names.push(v.name.clone()),
+            }
         }
-        Ok(body)
+        Ok((names, body))
     }
 
     fn arrow(
@@ -256,13 +274,18 @@ impl Tr {
 
     /// Rule 4 on the positive qualifiers.
     pub fn resolve(&self, t: Ty) -> Ty {
-        let go = |t: Box<Ty>| Box::new(self.resolve(*t));
+        self.resolve_under(t, &[])
+    }
+
+    /// [`Tr::resolve`] under the binders of `bound`, whose variables stay.
+    fn resolve_under(&self, t: Ty, bound: &[String]) -> Ty {
+        let go = |t: Box<Ty>| Box::new(self.resolve_under(*t, bound));
         match t {
             Ty::Pos(atoms) => cun(atoms
                 .into_iter()
                 .map(|v| match self.reach.get(&v) {
-                    Some(sites) => cun(sites.clone()),
-                    None => Ty::Var(v),
+                    Some(sites) if !bound.contains(&v) => cun(sites.clone()),
+                    _ => Ty::Var(v),
                 })
                 .collect()),
             Ty::App(a, b) => Ty::App(go(a), go(b)),
@@ -270,6 +293,11 @@ impl Tr {
             Ty::Un(a, b) => Ty::Un(go(a), go(b)),
             Ty::Nm(c, t) => Ty::Nm(c, go(t)),
             Ty::RUn(a, b) => Ty::RUn(go(a), go(b)),
+            Ty::All(names, t) => {
+                let inner: Vec<String> = bound.iter().chain(&names).cloned().collect();
+                let t = Box::new(self.resolve_under(*t, &inner));
+                Ty::All(names, t)
+            }
             leaf => leaf,
         }
     }
@@ -323,6 +351,7 @@ pub(super) fn occurs(t: &Ty, v: &str) -> bool {
         Ty::Var(w) => w == v,
         Ty::App(a, b) | Ty::Un(a, b) | Ty::RUn(a, b) => occurs(a, v) || occurs(b, v),
         Ty::Nm(_, t) => occurs(t, v),
+        Ty::All(names, t) => !names.iter().any(|n| n == v) && occurs(t, v),
         Ty::Arr(rows, a, b, q) => {
             occurs(a, v)
                 || occurs(b, v)
@@ -332,5 +361,21 @@ pub(super) fn occurs(t: &Ty, v: &str) -> bool {
                     .is_some_and(|(r, e)| occurs(r, v) || occurs(e, v))
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod resolve_tests {
+    use super::{Tr, Ty};
+
+    #[test]
+    fn a_binder_keeps_its_own_variable_from_what_one_outside_reaches() {
+        let mut tr = Tr::default();
+        tr.reach.insert("s".into(), vec![Ty::Var("site".into())]);
+        let shadowed = Ty::All(vec!["s".into()], Box::new(Ty::Pos(vec!["s".into()])));
+        let Ty::All(_, inner) = tr.resolve(shadowed) else {
+            panic!("a binder stays a binder");
+        };
+        assert!(matches!(*inner, Ty::Var(v) if v == "s"));
     }
 }

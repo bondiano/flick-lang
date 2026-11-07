@@ -9,7 +9,8 @@
 //!    with rows `{r; e}` is at the stage `R r e`; a row is a variable,
 //!    `.cnil`, a named element `.rnm c t` or a union `.run`, also as an
 //!    argument of a type.
-//! 2. `∀v. a^v → …` of a parameter is instantiated `v := a`.
+//! 2. `∀v. a^v → …` of a parameter is instantiated `v := a`; any other
+//!    variable of a `∀` stays a binder, `.all k t`.
 //! 3. A qualifier in a negative position is a variable: a single variable
 //!    of the checker stays itself at its first such position, the rest are
 //!    new; a missing qualifier of a stored type is new.
@@ -40,7 +41,7 @@ const KEYWORDS: [&str; 4] = ["show", "from", "at", "fun"];
 /// Why an export has no `def`.
 #[derive(Debug)]
 enum Skip {
-    /// `∀` of a parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`)
+    /// `∀` of a parameter with a constraint (`docs/formal/elaboration.md#a-polymorphic-parameter-has-no-constraint-in-the-model`)
     Rank,
     /// a region parameter
     Region,
@@ -123,6 +124,12 @@ fn lean(t: &Ty, vars: &[String], out: &mut String) {
         Ty::Nm(c, a) => {
             let _ = write!(out, ".rnm {} ", ident(c));
             arg(a, out);
+        }
+        Ty::All(names, t) => {
+            let inner: Vec<String> = names.iter().chain(vars).cloned().collect();
+            let _ = write!(out, ".all {} (", names.len());
+            lean(t, &inner, out);
+            out.push(')');
         }
         Ty::Pos(_) => unreachable!("resolved"),
     }
@@ -274,7 +281,7 @@ pub fn prelude_schemes() -> String {
     if !skipped.is_empty() {
         out.push_str(
             "\n/-! ## Skipped\n\n\
-             `rank`: `∀` of a parameter other than `∀v. a^v → …` (`docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields`);\n\
+             `rank`: `∀` of a parameter with a constraint (`docs/formal/elaboration.md#a-polymorphic-parameter-has-no-constraint-in-the-model`).\n\
              `region`: a region parameter.\n\
              -/\n\n",
         );
@@ -286,6 +293,94 @@ pub fn prelude_schemes() -> String {
 #[cfg(test)]
 mod tests {
     use std::{env, fs};
+
+    use flick_core::types::{self as fc, Binder, Effects, Kind};
+
+    fn var(v: &str) -> fc::Type {
+        fc::Type::Var(v.into())
+    }
+
+    fn arrow(param: fc::Type, effects: Option<(fc::Type, fc::Type)>, result: fc::Type) -> fc::Type {
+        fc::Type::Fun {
+            param: Box::new(param),
+            effects: effects.map(|(s, e)| Box::new(Effects::new(s, e))),
+            result: Box::new(result),
+        }
+    }
+
+    fn forall(vars: &[(&str, Kind)], body: fc::Type) -> fc::Type {
+        fc::Type::Forall {
+            vars: vars
+                .iter()
+                .map(|(name, kind)| Binder {
+                    name: (*name).into(),
+                    kind: kind.clone(),
+                })
+                .collect(),
+            constraints: Vec::new(),
+            body: Box::new(body),
+        }
+    }
+
+    #[test]
+    fn a_parameter_of_rank_two_is_a_binder() {
+        let param = forall(&[("a", Kind::Type)], arrow(var("a"), None, var("a")));
+        let scheme = arrow(param, None, fc::Type::con("Prelude", "Int"));
+        let text = super::def("M", "apply_twice", &scheme, None).expect("translated");
+        assert!(
+            text.contains("⟨0, [],\n    .arr .P (.all 1 (.arr .P (.var 0) (.var 0) .cnil)) (.con int) .cnil, .cnil⟩"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn scope_run_takes_its_region_as_a_binder() {
+        let owner = fc::Type::app(fc::Type::con("Scope", "Owner"), var("s"));
+        let services = fc::Type::Row(fc::Row {
+            entries: vec![(
+                "Scope".into(),
+                fc::Type::app(fc::Type::con("Scope", "Scope"), var("s")),
+            )],
+            tail: Some(Box::new(var("r"))),
+            ..fc::Row::default()
+        });
+        let param = forall(
+            &[("s", Kind::Region)],
+            arrow(owner, Some((services, var("e"))), var("a")),
+        );
+        let scheme = forall(
+            &[
+                ("r", Kind::ServiceRow),
+                ("e", Kind::ErrorRow),
+                ("a", Kind::Type),
+            ],
+            arrow(param, Some((var("r"), var("e"))), var("a")),
+        );
+        let text = super::def("Scope", "run", &scheme, None).expect("translated");
+        assert!(
+            text.contains(".all 1 (.arr (.R (.run (.rnm scope"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn a_constraint_on_a_parameter_is_skipped() {
+        let fc::Type::Forall { vars, body, .. } =
+            forall(&[("a", Kind::Type)], arrow(var("a"), None, var("a")))
+        else {
+            unreachable!()
+        };
+        let param = fc::Type::Forall {
+            vars,
+            constraints: vec![fc::Type::app(fc::Type::con("Prelude", "Show"), var("a"))],
+            body,
+        };
+        let scheme = arrow(param, None, fc::Type::con("Prelude", "String"));
+        assert!(matches!(
+            super::def("M", "f", &scheme, None),
+            Err(super::Skip::Rank)
+        ));
+    }
 
     /// The committed file is what the checker's Prelude gives, and each
     /// export is in it, a `def` or a skipped line; with

@@ -594,7 +594,9 @@ Simplifications:
 6. The source of T6(a) has variables, methods, constants of Γ₀ (`Prog.consts`, with the
    dictionaries of their schemes, as (Var-Dict)), application, `λ` over a monotype, `let`
    without generalization, `let` with a signature, `if` and a `match` on `Option`; no
-   constructors, other `match` or higher-rank parameters. Its types are the first-order
+   constructors or other `match`. A parameter can have the type `∀ᾱ. τ` (`Ty.all`): a lambda or a
+   variable of a scheme with no dictionaries is its argument (`Elab.allLam`, `Elab.allVar`), and a
+   variable gives its instances (`Elab.varAll`). Its types are the first-order
    `Ty` with the arrow `a →φ^q b` (`Ty.arr`, [source arrow is a separate type form](../docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor)), whose qualifier is a capture row
    written as a type (a variable, `cnil`, `cun`); `Bool` and `Option` are reserved
    constructors (`boolTy`, `optTy`). (Lam) and (Let-Sig-Dict) show what a closure holds,
@@ -784,9 +786,9 @@ are schemes, and fields need not be values.
   is typed in the core iff its method scheme shows that: the core has (≤-Cap) on arrows and
   `Eff`, but no `τ^q` on other types. The `CRow` parameter of simplification 15 is how the
   schemes show it ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes); see the core instance below).
-- **Higher rank** ([no higher-rank parameters in the model](../docs/formal/elaboration.md#the-model-allows-polymorphic-types-only-in-dictionary-fields)). `elaboration.md` §0.1 also allows `∀` in an
-  arrow parameter; the model has `∀` in dictionary fields only, as the source of `Elab` has
-  no higher-rank parameters.
+- **Higher rank** ([a polymorphic parameter has no constraint in the model](../docs/formal/elaboration.md#a-polymorphic-parameter-has-no-constraint-in-the-model)). `elaboration.md` §0.1 also allows a
+  constraint on a `∀` in an arrow parameter; `Ty.all` holds no dictionary, so the model has `∀`
+  with constraints in dictionary fields only.
 
 #### The core instance of `Target`
 

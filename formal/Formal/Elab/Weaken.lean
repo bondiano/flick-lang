@@ -142,6 +142,10 @@ theorem Elab.rename {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') {Γ' : List
   | meth hm hc hC hk h₀ he => rw [Tm.rename_dapps]; exact .meth hm hc hC hk h₀ he
   | const hc hk he => rw [Tm.rename_dapps]; exact .const hc hk he
   | app _ _ hψ ih₁ ih₂ => exact .app (ih₁ hρ) (ih₂ hρ) hψ
+  | allVar hx hc hk => exact .allVar (by rw [hρ]; exact hx) hc hk
+  | varAll hx hc hts hA hus => exact .varAll (by rw [hρ]; exact hx) hc hts hA hus
+  | @allLam Γ Δ k b t ψ b' _ ih =>
+    exact .allLam (ih fun x => by simp only [List.getElem?_map, hρ])
   | @lam Γ Δ b a t q φ ψ b' _ hh ih =>
     exact .lam (ih (liftR_get hρ _)) fun n hn => hh n (heldS_rename (e := .lam b) hρ hn)
   | let_ _ _ ih₁ ih₂ => exact .let_ (ih₁ hρ) (ih₂ (liftR_get hρ _))
@@ -174,6 +178,9 @@ theorem Elab.anyStage {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') (hφ : φ
     subst hφ
     exact .app (ih₁ rfl ψ) (ih₂ rfl ψ) (.inl (by rcases hψ with h | h <;> exact h))
   | lam h hh _ => exact .lam h hh
+  | allLam h => exact .allLam h
+  | allVar hx hc hk => exact .allVar hx hc hk
+  | varAll hx hc hts hA hus => exact .varAll hx hc hts hA hus
   | let_ _ _ ih₁ ih₂ => exact .let_ (ih₁ hφ ψ) (ih₂ hφ ψ)
   | letSig h₁ hp hφ₁ hq _ _ ih₂ =>
     subst hφ
