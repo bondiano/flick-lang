@@ -7,6 +7,7 @@ import { defineConfig } from "astro/config";
 
 import { sidebar } from "./astro.sidebar.mjs";
 import { flickBlocks } from "./flick-blocks.mjs";
+import { flickDark, flickLight } from "./src/styles/code-themes.mjs";
 
 // the newest compiler of this checkout, unless FLICK_BIN names another
 const local = ["release", "debug"]
@@ -85,8 +86,18 @@ export default defineConfig({
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/bondiano/flick-lang" }],
       editLink: { baseUrl: "https://github.com/bondiano/flick-lang/edit/main/docs/" },
       expressiveCode: {
+        themes: [flickDark, flickLight],
+        useStarlightUiThemeColors: false,
         frames: { showCopyToClipboardButton: false },
         shiki: { langs: [{ ...grammar, name: "flick" }] },
+        styleOverrides: {
+          borderRadius: "0",
+          borderColor: "var(--sl-color-hairline)",
+          codeFontFamily: "var(--sl-font-mono)",
+          uiFontFamily: "var(--sl-font)",
+          codeLineHeight: "1.6",
+          frames: { frameBoxShadowCssValue: "none" },
+        },
       },
     }),
   ],
