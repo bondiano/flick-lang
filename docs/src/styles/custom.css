@@ -132,7 +132,7 @@ button { font: inherit; }
 .hero-copy { min-width: 0; }
 .runtime-link { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--sl-color-gray-3); text-decoration: none; font-size: 0.875rem; }
 .runtime-link:hover { color: var(--sl-color-accent-high); }
-.hero-copy h1 { color: var(--sl-color-white); font-size: clamp(3.25rem, 5.05vw, 4.8rem); font-weight: 720; line-height: 1.08; letter-spacing: -0.035em; margin: 3rem 0 1.8rem; text-wrap: balance; }
+.hero-copy h1 { color: var(--sl-color-white); font-size: clamp(2.9rem, 4.5vw, 4.4rem); font-weight: 720; line-height: 1.08; letter-spacing: -0.035em; margin: 3rem 0 1.8rem; text-wrap: balance; }
 .hero-copy h1 span { color: var(--sl-color-accent-high); }
 .hero-description { font-size: clamp(1.15rem, 1.5vw, 1.45rem); line-height: 1.52; max-width: 29rem; margin: 0; color: var(--sl-color-white); }
 .hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 1.2rem; margin-top: 2rem; }

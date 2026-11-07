@@ -87,13 +87,18 @@ and its type allows none.
 ```flick fail
 # import File exposing (Path, FileSystem, OpenError, ReadError)
 #
-read_later : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
+read_later : Path ->{Async, FileSystem; OpenError} (Unit ->{Async, FileSystem; ReadError} String)
 let read_later path =
   scope {
     let file = File.open_scoped path
     fun () -> File.read_all file
   }
 ```
+
+Host calls have an empty row today. `Console.log`, the clock and random
+numbers are `->{}` functions, so such a signature says only that the function
+runs in the runtime, not what it touches. Defects stay outside the signature
+too.
 
 [Effects, errors and services](../../reference/effects/) and
 [Regions and captures](../../reference/regions/) have the full rules.
