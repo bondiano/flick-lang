@@ -173,9 +173,11 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
     let dir = path
         .parent()
         .map_or_else(|| PathBuf::from("/"), Path::to_path_buf);
-    let found = project::discover(&host, &mut sources, &dir, None)
-        .ok()
-        .flatten();
+    // a manifest that does not read says why
+    let (found, unread) = match project::discover(&host, &mut sources, &dir, None) {
+        Ok(found) => (found, None),
+        Err(why) => (None, Some(why)),
+    };
     let context = Context::of(docs, path);
     let mut roots: Vec<PathBuf> = Vec::new();
     let directories = found.as_ref().map(|p| [p.source_root(), p.test_root()]);
@@ -214,7 +216,8 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
     let mut seen = HashSet::new();
     roots.retain(|root| seen.insert(canonical(root)));
     let cache = caches.entry(context.clone()).or_default();
-    let analysis = project::analyze_with(&host, &mut sources, found.as_ref(), &roots, cache);
+    let mut analysis = project::analyze_with(&host, &mut sources, found.as_ref(), &roots, cache);
+    analysis.diagnostics.extend(unread);
     let emit = found.as_ref().map_or(Emit::Js, |p| p.config.build.emit);
     let root = found.map_or(dir, |p| p.root);
     debug!(
