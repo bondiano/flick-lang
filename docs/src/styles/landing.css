@@ -85,7 +85,7 @@
 
 /* Desktop: everything takes its place on the one diagram. */
 @media (min-width: 75rem) {
-  .hero { container-type: inline-size; position: relative; display: block; max-width: 1760px; margin-inline: auto; aspect-ratio: 1440 / 772; padding: 0; overflow: clip; }
+  .hero { container-type: inline-size; position: relative; display: block; max-width: 1760px; margin-inline: auto; aspect-ratio: 1440 / 772; padding: 0; overflow-x: clip; }
   .hero-map { position: absolute; inset: 0 0 auto 0; max-width: none; }
   .map-wide { display: block !important; }
   .map-corridor { display: none !important; }

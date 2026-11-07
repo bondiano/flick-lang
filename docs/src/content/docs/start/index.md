@@ -16,5 +16,5 @@ have what you came for.
 4. **Learn the language.** [Learn Flick](../learn/) introduces the ideas in
    order, and [Syntax in five minutes](../learn/syntax/) is the quick version.
 
-Already on an earlier version? [Upgrading to 0.2](../handbook/upgrading/) lists
-what changed and how to update a project.
+Moving a project from 0.1 to `main`? [Upgrading to 0.2](../handbook/upgrading/)
+lists what changed and how to update it. 0.2 is not released yet.
