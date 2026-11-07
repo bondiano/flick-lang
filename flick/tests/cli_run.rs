@@ -315,7 +315,7 @@ foreign linger from \"./linger.mjs\" \"linger\"
   arity 0
   cancel signal
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   scope {
     Resource.acquire_release (task { Platform.stdout_line \"started v1\" }) (fun _ -> Platform.stdout_line \"cleanup v1\")
