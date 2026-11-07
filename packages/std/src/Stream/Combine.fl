@@ -414,7 +414,7 @@ type alias Split = {
 /// elements.
 broadcast :
   forall s c r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Split -> (Stream r e a)^c ->{Scope s | r;} (Stream none e a)^{s}
 foreign effect broadcast from "@flick-lang/runtime/effect/Stream" "flickBroadcast"
   arity 1
@@ -425,7 +425,7 @@ foreign effect broadcast from "@flick-lang/runtime/effect/Stream" "flickBroadcas
 /// as a child of the scope of region `s`.
 broadcast_n :
   forall s c r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Int -> Split -> (Stream r e a)^c ->{Scope s | r;} List ((Stream none e a)^{s})
 foreign effect broadcast_n from "@flick-lang/runtime/effect/Stream" "flickBroadcastN"
   arity 2
@@ -436,7 +436,7 @@ foreign effect broadcast_n from "@flick-lang/runtime/effect/Stream" "flickBroadc
 /// `idleTimeToLive` (`None`: at once) after its last one ends.
 share :
   forall s c r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Split -> Option Duration.Duration -> (Stream r e a)^c ->{Scope s | r;} (Stream none e a)^{s}
 foreign effect share from "@flick-lang/runtime/effect/Stream" "flickShare"
   arity 2
@@ -447,7 +447,7 @@ foreign effect share from "@flick-lang/runtime/effect/Stream" "flickShare"
 /// the scope of region `s`; the source runs once as a child of it.
 partition :
   forall s c r e a p f.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Filter.Filter a p f ->
   (Stream r e a)^c ->{Scope s | r;}
   ((Stream none e p)^{s}, (Stream none e f)^{s})
@@ -459,7 +459,7 @@ foreign effect partition from "@flick-lang/runtime/effect/Stream" "partition"
 /// `partition` with a task as the filter.
 partition_effect :
   forall s c r e a r2 e2 p f.
-  (Fiber.Outlives c s, Fiber.Provided r s, Fiber.Provided r2 s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Fiber.Provided r2 s, Detached r, Detached r2) =>
   Filter.FilterEffect r2 e2 a p f ->
   (Stream r e a)^c ->{Scope s | r + r2;}
   ((Stream none (e + e2) p)^{s}, (Stream none (e + e2) f)^{s})
@@ -473,7 +473,7 @@ foreign effect partition_effect from "@flick-lang/runtime/effect/Stream" "partit
 /// it closes.
 partition_queue :
   forall s c r e a p f.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Filter.Filter a p f -> (Stream r e a)^c ->{Scope s | r;} (Queue.Queue e p, Queue.Queue e f)
 foreign effect partition_queue from "@flick-lang/runtime/effect/Stream" "partitionQueue"
   arity 1

@@ -114,3 +114,7 @@ inside : (Unit ->{Store Int; none} Int) ->{} Int
 let inside body =
   try body () with
   | Store.load () -> List.length (collect (fun () -> Emit.emit 1))
+
+/// A row variable a finalizer takes is `Detached` by its constraint too.
+closing : Detached r => Eff r none Unit ->{r;} Unit
+let closing work = scope { Scope.add_finalizer work }

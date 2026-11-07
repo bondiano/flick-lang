@@ -486,10 +486,12 @@ A task that `spawn`, `parallel`, the races, `timeout`, or the runs of
 `FiberSet`, `FiberMap` and `FiberHandle` start runs in a fiber of its own.
 The handler of an effect with a `control` operation is in the fiber that
 installed it, so such a task needs `Detached r`: no effect of its services
-has one. The compiler decides it from the row; a function that starts
-tasks with the services of a row variable names `Detached r` in its
-signature. A `control` effect there, or a row variable without it, is
-`FLICK-E017`:
+has one. Work a region keeps needs it too: a finalizer, the release of a
+resource, a listener. It runs as its scope closes, when a handler may already
+have let the body go, and no one would answer the operation. The compiler
+decides `Detached r` from the row; a function that starts or keeps such work
+with the services of a row variable names it in its signature. A `control`
+effect there, or a row variable without it, is `FLICK-E017`:
 
 ```flick
 # effect Emit a =

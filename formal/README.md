@@ -397,7 +397,7 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
   while the child runs and whose arms it could not hold (`T4`). Nothing observes the difference
   in a typed program: the obligation of the work keeps such an effect out of its row
   (`kid_dropped`).
-- **A child runs only `tail` arms.** An `abort` or `control` operation in a child with no frame
+- **A child or a finalizer runs only `tail` arms.** An `abort` or `control` operation in one with no frame
   of its handler stays an outcome, `PerformStuck`, in `T1` and `T1_regions`: such an effect is
   named in the row of the work (`Sig.NonTail`), and no rule of this calculus rejects it; the
   checker rejects `control` there (`classes/detached.rs`). A

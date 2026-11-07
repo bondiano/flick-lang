@@ -27,6 +27,10 @@ break programs.
 - **`Scope.current`:** it is not exposed. Its region was any, so a child could
   stay under an owner longer than the region its type names and use a resource
   after its release. Take the owner from `scope s { … }`.
+- **`Detached`:** work a region keeps needs it, as a child does: a finalizer,
+  the release of a resource, a listener, the handlers of a server. A `control`
+  operation in a finalizer stopped it without an error once a handler let the
+  body go; now it is `FLICK-E017`.
 - **`Scope.run`:** `scope s { body }` stands for `Scope.run (fun s -> body)`, and
   `Scope.run` takes a function polymorphic in the region, also as a value. The
   IR has no `Scope` node; its version is 0.4.0.

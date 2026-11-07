@@ -38,7 +38,7 @@ type alias ServeOptions = {
 /// Serves the handler until the scope of region `s` closes.
 serve :
   forall s c r e.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   ServeOptions ->
   (ServerRequest ->{r; e} ServerResponse)^c ->{Async, Scope s | r; ServeError}
   Server s

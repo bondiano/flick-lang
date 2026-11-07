@@ -1,7 +1,9 @@
 //! `Detached r`: no effect of the services `r` has a `control` operation.
-//! A task in a fiber of its own, a child of `spawn` or `parallel`, needs
-//! it: the handler of a `control` effect, and the rest of the computation
-//! that `resume` holds, are in the fiber that installed the handler.
+//! Work that runs apart from the code that started it needs it: a child of
+//! `spawn` or `parallel`, or what a region keeps, as a finalizer. The handler
+//! of a `control` effect, and the rest of the computation that `resume` holds,
+//! are in the fiber that installed the handler, and a finalizer may run after
+//! that handler let its body go.
 
 use super::Dict;
 use super::args_of;
@@ -21,7 +23,7 @@ impl Checker<'_> {
         for (_, entry) in &norm.entries {
             if let Some((effect, op)) = self.control_operation(entry) {
                 let reason = format!(
-                    "effect `{effect}` has the `control` operation `{op}`, whose handler is in the fiber that starts the task: handle `{effect}` inside the task"
+                    "effect `{effect}` has the `control` operation `{op}`, and this task runs apart from its handler: handle `{effect}` inside the task"
                 );
                 return Outcome::Missing(c.clone(), Some(reason));
             }
