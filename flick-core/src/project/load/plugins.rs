@@ -250,11 +250,11 @@ impl Loader<'_> {
                         None => self.host.plugin(&package, self.component(&package)),
                     }
                 });
+            // its blocks still find it, to say they have no code
             if let Err(why) = plugin {
                 diagnostics.extend(refuse(format!(
                     "the plugin of package `{package}` cannot be loaded: {why}"
                 )));
-                continue;
             }
             for item in &import.plugins {
                 heads.insert(item.name.clone(), package.clone());
@@ -376,6 +376,22 @@ impl Sink<'_> {
             }
             return;
         };
+        if let Some(Err(_)) = self.plugins.get(package) {
+            let import = (m.syntax.imports.iter())
+                .flat_map(|i| &i.plugins)
+                .find(|item| item.name == head);
+            let (start, end) = node.range();
+            let mut d = Diagnostic::error(
+                codes::P036,
+                format!("plugin `{package}` is not loaded, so this block has no code"),
+                Span::new(m.file, start, end),
+            );
+            if let Some(item) = import {
+                d = d.with_related(item.span, "the import says why it does not load");
+            }
+            diagnostics.push(d);
+            return;
+        }
         let Some(source) = source else {
             return;
         };

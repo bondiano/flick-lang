@@ -277,12 +277,13 @@ fn errors_land_on_the_users_code_or_on_the_block() {
 }
 
 #[test]
-fn a_plugin_that_does_not_load_is_reported_once_on_its_import() {
+fn a_plugin_that_does_not_load_is_reported_on_its_import_and_each_block() {
     let main = "module App.Main exposing (x)\n\nimport Other exposing (plugin other)\n\nlet x = other { a = 1 }\n";
     assert_eq!(
         report(main),
         [
-            "FLICK-P035 `plugin other`: the plugin of package `other` cannot be loaded: no such plugin"
+            "FLICK-P035 `plugin other`: the plugin of package `other` cannot be loaded: no such plugin",
+            "FLICK-P036 `other { a = 1 }`: plugin `other` is not loaded, so this block has no code",
         ]
     );
     // a module of the project or a built-in one has no plugin
