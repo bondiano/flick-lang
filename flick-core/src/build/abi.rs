@@ -233,7 +233,7 @@ impl Totality<'_> {
             | ExprKind::Label(_)
             | ExprKind::ServiceTag(_)
             | ExprKind::Method { .. }
-            | ExprKind::Operation { .. }
+            | ExprKind::Perform { .. }
             | ExprKind::Lambda { .. }
             | ExprKind::Task(_)
             | ExprKind::Lift(..)
@@ -273,7 +273,6 @@ impl Totality<'_> {
             | ExprKind::Await(_)
             | ExprKind::Scope { .. }
             | ExprKind::Within(..)
-            | ExprKind::Provide(..)
             | ExprKind::Handle(_)
             | ExprKind::Generate { .. }
             | ExprKind::Unwrap(_)

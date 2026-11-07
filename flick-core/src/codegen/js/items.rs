@@ -413,7 +413,7 @@ fn expr_uses(e: &Expr, module: &str, out: &mut BTreeSet<String>) {
         ExprKind::Con(c) if c.module == module => {
             out.insert(names::ident(&c.name));
         }
-        ExprKind::Operation { service: key, .. } | ExprKind::ServiceTag(key) => {
+        ExprKind::Perform { effect: key, .. } | ExprKind::ServiceTag(key) => {
             if let Some((m, name)) = key.rsplit_once('.')
                 && m == module
             {

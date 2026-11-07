@@ -15,6 +15,7 @@ codegen/errors
 codegen/fail
 codegen/services
 codegen/service_dictionary
+codegen/service_place
 codegen/higher_rank
 codegen/functor
 codegen/gadt

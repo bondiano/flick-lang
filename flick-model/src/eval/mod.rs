@@ -314,7 +314,7 @@ impl<'p> Machine<'p> {
                 other => return Err(stuck(format!("`await` of {other:?}"))),
             },
             // try v with ā → v; a `provide` ends with its `with` (`regions.md` §2.7)
-            Frame::Try(_) | Frame::Kept(_) => Control::Ret(v),
+            Frame::Try(_) | Frame::Kept(_) | Frame::KeptHandler(..) => Control::Ret(v),
             Frame::With(env) => {
                 self.lambda.ended.push(env);
                 Control::Ret(v)

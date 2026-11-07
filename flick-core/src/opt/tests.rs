@@ -118,7 +118,7 @@ fn forbidden_transformations_stay_out() {
     // two layers stay two builds
     assert_eq!(js.matches("Layer.succeed").count(), 2, "{js}");
     // the lookup stays inside `provide`
-    let provide = js.find("provide(").expect("provide");
+    let provide = js.find("Layer.run(").expect("provide");
     assert!(js[provide..].contains("operation("), "{js}");
     // a schema check is a call, never dropped for an unused result
     assert!(js.contains("Codec.decode_result"), "{js}");

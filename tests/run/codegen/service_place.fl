@@ -1,0 +1,42 @@
+// Where the effects an operation needs resolve: under `provide S impl` at the
+// handler, as an arm of a handler; for a service of a layer where it is called.
+module App.Main exposing (main)
+
+service Prefix =
+  prefix : Unit ->{} String
+
+service Greeter =
+  greet : String ->{Prefix;} String
+
+outer : Prefix.Impl
+let outer = { prefix = fun () -> "outer" }
+
+inner : Prefix.Impl
+let inner = { prefix = fun () -> "inner" }
+
+impl : Greeter.Impl
+let impl = { greet = fun name -> Prefix.prefix () ++ " " ++ name }
+
+by_record : Unit ->{} String
+let by_record () = provide Prefix outer {
+  provide Greeter impl { provide Prefix inner { Greeter.greet "record" } }
+}
+
+by_layer : Unit ->{} String
+let by_layer () = provide Prefix outer {
+  provide (Layer.succeed Greeter impl) { provide Prefix inner { Greeter.greet "layer" } }
+}
+
+/// `Layer.run` called by name, whose function takes the unit.
+by_name : Unit ->{Prefix;} String
+let by_name () =
+  Layer.run (Layer.succeed Greeter impl) (fun unit ->
+    ignore unit
+    Greeter.greet "by name"
+  )
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (by_record ())
+  Platform.stdout_line (by_layer ())
+  Platform.stdout_line (provide Prefix inner { by_name () })

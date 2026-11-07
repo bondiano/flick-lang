@@ -6,6 +6,13 @@ break programs.
 
 ## Unreleased
 
+- **`Layer.run`:** `provide layer { body }` stands for `Layer.run layer (fun
+  () -> body)`; the type of `provide` is still the checker's. A child reaches
+  the handlers around where it started. The IR has no `Provide` node, and
+  `Operation` is `Perform`; its version is 0.3.0.
+- **`Fail`:** `Fail.fail` fails with an error; `Fail e` in the row of an arrow
+  is the error row `e`; `| Fail.fail p ->` in a `try` is `| p ->`. The IR has
+  no `Try` node: a `try` is a `Handle`, and the IR version is 0.2.0.
 - **Effects:** what may suspend says so with the built-in effect `Async`,
   which the scheduler handles at the root; a row without it runs at once.
   In `std` the functions that wait have it: `Effect.sleep`, `Fiber.join`, queues, `Database`,

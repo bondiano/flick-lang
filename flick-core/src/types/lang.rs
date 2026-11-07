@@ -157,6 +157,7 @@ lang_items! {
     // functions that syntax stands for or the optimizer knows
     FromResult = "from_result",
     Fail = "fail",
+    LayerRun = "layer_run",
     Pure = "pure",
     OptionBind = "option_bind",
     ResultBind = "result_bind",

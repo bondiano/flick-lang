@@ -180,9 +180,9 @@ impl<'a> Gen<'a> {
                 self.unsupported(e.span, "a lazy `for` that reads services")
             }
             ExprKind::Generate { body, .. } => self.strict(body),
-            ExprKind::Operation {
-                service,
-                name,
+            ExprKind::Perform {
+                effect: service,
+                op: name,
                 stages,
             } => self.operation(service, name, stages),
             ExprKind::ServiceTag(key) => self.code(&names::string(key)),
@@ -199,7 +199,6 @@ impl<'a> Gen<'a> {
                 self.scope(owner.as_deref(), outer.as_deref(), body)
             }
             ExprKind::Within(owner, inner) => self.within(owner, inner),
-            ExprKind::Provide(layer, body) => self.provide(layer, body),
             ExprKind::Handle(h) => self.handle(h),
         }
     }

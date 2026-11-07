@@ -78,6 +78,8 @@ stdlib/seq
 stdlib/seqs
 codegen/services
 codegen/service_dictionary
+codegen/service_place
+codegen/service_child
 runtime/scope_close
 codegen/release
 runtime/parallel

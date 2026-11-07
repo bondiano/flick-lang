@@ -28,7 +28,7 @@ impl Machine<'_> {
                     return Ok(Some(v.clone()));
                 }
                 // a handler gives its operations, which perform
-                Frame::Handler(id, h) => {
+                Frame::Handler(id, h) | Frame::KeptHandler(id, h) => {
                     if let Some(handled) = h.effects.iter().find(|e| e.effect == *s) {
                         return Ok(Some(operations(*id, handled)));
                     }
@@ -57,14 +57,16 @@ impl Machine<'_> {
         class: OpClass,
         args: &[Term],
     ) -> Step {
-        let at = self
-            .frames
-            .iter()
-            .rposition(|f| matches!(f, Frame::Handler(h, _) if *h == id));
+        let at = self.frames.iter().rposition(
+            |f| matches!(f, Frame::Handler(h, _) | Frame::KeptHandler(h, _) if *h == id),
+        );
         let Some(at) = at else {
             return Err(stuck(format!("`{effect}.{op}` of a handler that ended")));
         };
-        let Frame::Handler(_, h) = &self.frames[at] else {
+        if self.lambda.ended_handlers.contains(&id) {
+            return Err(stuck(format!("`{effect}.{op}` of a handler that ended")));
+        }
+        let (Frame::Handler(_, h) | Frame::KeptHandler(_, h)) = &self.frames[at] else {
             unreachable!("a handler's frame, found above")
         };
         let Some(function) = h.op(effect, op).map(|o| o.function.clone()) else {
@@ -118,10 +120,13 @@ impl Machine<'_> {
     /// `v` returns to a frame of a handler.
     pub(super) fn ret_handler(&mut self, f: Frame, v: Term) -> Control {
         match f {
-            Frame::Handler(_, h) => match &h.ret {
-                Some(ret) => Control::Eval(Term::app(ret.clone(), v)),
-                None => Control::Ret(v),
-            },
+            Frame::Handler(id, h) => {
+                self.lambda.ended_handlers.insert(id);
+                match &h.ret {
+                    Some(ret) => Control::Eval(Term::app(ret.clone(), v)),
+                    None => Control::Ret(v),
+                }
+            }
             Frame::Resume(k) => {
                 self.frames.extend(k);
                 Control::Ret(v)
@@ -136,16 +141,19 @@ impl Machine<'_> {
     /// of a body whose arm never ends is let go. `None`: it goes on.
     pub(super) fn unwind_handler(&mut self, f: Frame, v: &Term) -> Option<Step> {
         match f {
-            Frame::Handler(id, h) => match v {
-                Term::Signal(s) if s.id() == id => Some(Ok(match &**s {
-                    Signal::Abort { arm, .. } => Control::Eval(arm.clone()),
-                    Signal::Discontinue { then: Ok(v), .. } => Control::Ret(v.clone()),
-                    Signal::Discontinue { then: Err(v), .. } => Control::Raise(v.clone()),
-                })),
-                Term::Signal(_) => None,
-                _ if h.errors.is_empty() => None,
-                _ => Some(self.handle(v.clone(), &h.errors, 0)),
-            },
+            Frame::Handler(id, h) => {
+                self.lambda.ended_handlers.insert(id);
+                match v {
+                    Term::Signal(s) if s.id() == id => Some(Ok(match &**s {
+                        Signal::Abort { arm, .. } => Control::Eval(arm.clone()),
+                        Signal::Discontinue { then: Ok(v), .. } => Control::Ret(v.clone()),
+                        Signal::Discontinue { then: Err(v), .. } => Control::Raise(v.clone()),
+                    })),
+                    Term::Signal(_) => None,
+                    _ if h.errors.is_empty() => None,
+                    _ => Some(self.handle(v.clone(), &h.errors, 0)),
+                }
+            }
             // the arm's value never comes
             Frame::Resume(k) => {
                 let Some(Frame::Handler(id, _)) = k.first() else {

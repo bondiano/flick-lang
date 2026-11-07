@@ -109,3 +109,21 @@ fn control_handlers_print_what_go_prints() {
         ran.outcome
     );
 }
+
+/// A child reaches the handlers around where it started, as on both targets.
+#[test]
+#[ignore = "runs a program of tests/handlers; run `just model`"]
+fn a_child_reaches_the_handlers_around_it() {
+    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/handlers/children.fl");
+    let modules = run::compile(&file).expect("children.fl compiles");
+    let program = run::program(&modules);
+    let errors = run::check(&modules, &program);
+    assert!(
+        errors.is_empty(),
+        "the model rejects it:\n{}",
+        errors.join("\n")
+    );
+    let main = run::main_of(&modules).expect("a main");
+    let ran = run::run_main(&program, &main, FUEL);
+    assert_eq!(ran.stdout, "record\narm\n", "{:?}", ran.outcome);
+}

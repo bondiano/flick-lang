@@ -78,6 +78,7 @@ flatMapEff FlatMapEff
 map2Eff Map2Eff
 bindEff BindEff
 listMapEffect *ListMapEffect
+layerRun *LayerRun
 fromResult FromResult
 appFail AppFail
 recordLabels RecordLabels

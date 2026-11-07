@@ -263,6 +263,11 @@ func Provide(fb *Fiber, layer, body Value) Value {
 	})
 }
 
+// LayerRun is `Layer.run layer thunk`, which `provide layer { body }` stands for.
+func LayerRun(fb *Fiber, layer, thunk Value) Value {
+	return Provide(fb, layer, Apply(fb, thunk, Unit))
+}
+
 // constant is a layer of services built without effects.
 func constant(s Services) Value {
 	return &Layer{func(*Fiber, *MemoMap, *Owner) Services { return s }}

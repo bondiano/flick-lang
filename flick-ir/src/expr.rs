@@ -87,10 +87,10 @@ pub enum ExprKind {
     },
     /// A constructor as a function of its fields (a value without fields).
     Con(Constructor),
-    /// `S.op`, looked up at its first runtime stage.
-    Operation {
-        service: String,
-        name: String,
+    /// `E.op`, looked up at its first runtime stage.
+    Perform {
+        effect: String,
+        op: String,
         stages: Vec<Stage>,
     },
     /// A service named as a value.
@@ -163,7 +163,6 @@ pub enum ExprKind {
     /// A runtime call that acquires into the owner bound to the local, not
     /// into the innermost scope.
     Within(String, Box<Expr>),
-    Provide(Box<Expr>, Box<Expr>),
     /// The handler of effects of `try` arms for operations or `provide S impl`.
     Handle(Box<Handler>),
     /// A pure function value used where a runtime one is expected.
@@ -259,7 +258,7 @@ impl Expr {
                     f(v);
                 }
             }
-            ExprKind::Binary(_, l, r) | ExprKind::Provide(l, r) => {
+            ExprKind::Binary(_, l, r) => {
                 f(l);
                 f(r);
             }
@@ -269,7 +268,7 @@ impl Expr {
             | ExprKind::Global { .. }
             | ExprKind::Method { .. }
             | ExprKind::Con(_)
-            | ExprKind::Operation { .. }
+            | ExprKind::Perform { .. }
             | ExprKind::ServiceTag(_)
             | ExprKind::Label(_) => {}
         }
@@ -387,7 +386,7 @@ impl Expr {
                     f(v);
                 }
             }
-            ExprKind::Binary(_, l, r) | ExprKind::Provide(l, r) => {
+            ExprKind::Binary(_, l, r) => {
                 f(l);
                 f(r);
             }
@@ -397,7 +396,7 @@ impl Expr {
             | ExprKind::Global { .. }
             | ExprKind::Method { .. }
             | ExprKind::Con(_)
-            | ExprKind::Operation { .. }
+            | ExprKind::Perform { .. }
             | ExprKind::ServiceTag(_)
             | ExprKind::Label(_) => {}
         }
