@@ -282,12 +282,87 @@ let clock_layer =
 
 A `type alias` of a service or of an error stands for it in a row:
 `type alias Time = Clock` makes `->{Time;}` the same row as `->{Clock;}`.
-An alias of anything else in a row is an error (`FLICK-T002`). An alias
+An alias of a whole row is a [set](#sets-of-services-and-errors). An alias of
+anything else in a row is an error (`FLICK-T002`). An alias
 names a type, not a namespace: as an alias of a data type does not open its
 constructors, an alias of a service does not open its operations or
 `S.Impl`. A [re-export](../modules/) does: `Atom.Registry`, which `Atom`
 re-exports from `Reactivity.Atom`, is that service, so `Atom.Registry.get`,
 `Atom.Registry.Impl` and `Layer.succeed Atom.Registry impl` all work.
+
+## Sets of services and errors
+
+A `type alias` of a row names a set of services and errors. `...` merges a set
+into a row, a plain name adds one element, and `-` takes one out:
+
+```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error UserNotFound = UserNotFound
+# type error InvalidEmail = InvalidEmail
+# type error OrderNotFound = OrderNotFound
+# type error Boom = Boom
+# service Log =
+#   info : String ->{} Unit
+# service Users =
+#   get : UserId ->{; UserNotFound} User
+# service Billing =
+#   charge : Float ->{} Unit
+#
+type alias UserErrors = {UserNotFound, InvalidEmail}
+
+type alias Reads = {Log, Users; ...UserErrors}
+
+type alias Orders = {...Reads, Billing; OrderNotFound}
+
+type alias Quiet = {...Orders, -Log; -InvalidEmail}
+
+load : UserId ->{...Orders} User
+let load id = Users.get id
+
+wider : UserId ->{...Orders, Async | r; Boom} User
+let wider id = load id
+```
+
+A set expands where it is named: `->{...Reads}` is the same row as
+`->{Log, Users; UserNotFound, InvalidEmail}`. That gives composition without
+any rule of its own:
+
+- Sets may name each other in any order, and an element two sets hold counts
+  once. A set cannot hold itself (`FLICK-R007`).
+- What needs less fits where more is allowed, as for
+  [any row](#rows-a-body-needs): a function of `{...Reads}` passes where one of
+  `{...Orders}` is expected. Under another constructor rows stay equal, so
+  `List (Eff {...Reads} none Unit)` is not a
+  `List (Eff {...Orders} none Unit)` (`FLICK-T003`).
+- An arm of a `try` catches one error of a set, and the rest stay in the row.
+
+In braces a set takes `...` and one element does not, both `FLICK-T002` with a
+fix. Outside braces an alias is the whole row: `Layer none none Services`,
+`Eff Services Errs a`, `Services + r`. A row that merges or takes out a set may
+leave out its `;`, since a set can hold errors of its own.
+
+A set of errors alone stands on either side of `;`; a set with services only
+before it (`FLICK-T002`). An arrow and `Eff` take the errors of a set into their
+row of errors. Any other type with a row, such as `Layer {...Orders} none {Log}`,
+has no place for them (`FLICK-T002`): name the services in an alias of their own.
+
+`-` takes from everything the braces merge, wherever it stands, and services and
+errors each go on their own side of `;`. `-...Reads` takes a whole set. All of
+these are `FLICK-T002`, so a typo or a rename does not pass silently:
+
+- taking out what the row does not hold;
+- taking out of a row variable, as in `{-Log | r}`: only the names the row lists
+  can go, and `| r` is left as it is;
+- writing an element and taking it out in one row, as in `{Log, ...Reads, -Log}`;
+- `...r`, since a row variable goes after `|`; merging an alias with a tail, since
+  `| r` belongs where the set is used; `opaque type alias` of a row.
+
+A set may take parameters, as in `type alias Db s = {Scope s, Log}`.
+
+A set widens a signature: its callers must provide all of it, and tests must too.
+Use sets at the boundaries of modules, where many functions need the same things.
+Leave a small function its exact row, or let the row be inferred.
 
 ## Layers and `provide`
 
