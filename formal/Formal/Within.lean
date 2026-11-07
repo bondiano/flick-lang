@@ -27,6 +27,10 @@ def LocOk (A : Nat → Prop) (l : Nat) : Prop :=
 handler gives back and raises is older than whatever its arm opens. -/
 def HCell (p ℓ : Nat) : Prop := ∃ t, Ψ[ℓ]? = some t ∧ t.YF p
 
+/-- The locations of the arms of the handler `p` are as old as it: they name no region created
+after `p`, so the arms mean the same at a place deeper than the handler's. -/
+def HLocs (p : Nat) (al : Tm) : Prop := ∀ l, al.Has (.loc l) → HCell Ψ p l
+
 /-- `e` at a place with the regions `A`. -/
 def Tm.Within : Tm → (Nat → Prop) → Prop
   | .var _, _ => True
@@ -62,11 +66,11 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .hdl _ al r e, A => al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns ∧ e.NoIns
   -- a handler is at the place of its `inside` form
   | .hwith p ℓ _ al r e, A => A p ∧ al.Within A ∧ r.Within A ∧ e.Within A ∧ al.NoIns ∧ r.NoIns ∧
-    (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ
+    (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ ∧ HLocs Ψ p al
   -- the arm and the body it parked are at the same place, and share no region
   | .hctl p ℓ _ _ _ al r a k, A =>
     A p ∧ al.Within A ∧ r.Within A ∧ a.Within A ∧ k.Within A ∧ al.NoIns ∧ r.NoIns ∧
-      (∀ x, a.Has (.frame x) → ¬ k.Has (.frame x)) ∧ (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ
+      (∀ x, a.Has (.frame x) → ¬ k.Has (.frame x)) ∧ (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ ∧ HLocs Ψ p al
   | .hres p ℓ a b, A => A p ∧ a.Within A ∧ b.Within A ∧ (∀ x, b.Has (.frame x) → ¬ a.Has (.frame x)) ∧
     HCell Ψ p ℓ
   | .hdone p a, A => A p ∧ a.Within A
@@ -74,6 +78,11 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .unw p _ a, A => A p ∧ a.Within (anc p) ∧ (∀ x, ¬ a.Has (.frame x)) ∧ ∀ x, anc p x → A x
   | .kont p _, A => A p
   | .hole p, A => A p
+  -- a kept handler is at the place of the child, deeper than the handler's own
+  | .hkeep q ℓ _ al e, A => A q ∧ al.Within (anc q) ∧ e.Within A ∧ al.NoIns ∧
+    (∀ x, anc q x → A x) ∧ HCell Ψ q ℓ ∧ HLocs Ψ q al
+  | .hkarm q ℓ _ al a k, A => A q ∧ al.Within (anc q) ∧ a.Within A ∧ k.Within A ∧ al.NoIns ∧
+    (∀ x, a.Has (.frame x) → ¬ k.Has (.frame x)) ∧ (∀ x, anc q x → A x) ∧ HCell Ψ q ℓ ∧ HLocs Ψ q al
 
 /-- The frames of a context at a place with the regions `A`: what the frame
 holds besides the hole is there, and does not evaluate before the hole. -/
@@ -92,13 +101,17 @@ def Frame.Within (A : Nat → Prop) : Frame → Prop
   | .raise => True
   | .inside p => ¬ A p ∧ anc p = fun x => A x ∨ x = p
   | .hwith p ℓ _ al r => A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns ∧
-    (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ
+    (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ ∧ HLocs Ψ p al
   -- the body a handler parked while its arm runs is at the same place
   | .hctlA p ℓ _ _ _ al r k =>
     A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ k.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns ∧
-      (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ
+      (∀ x, A x ↔ anc p x) ∧ HCell Ψ p ℓ ∧ HLocs Ψ p al
   | .hresB p ℓ a => A p ∧ a.Within Ψ B anc A ∧ HCell Ψ p ℓ
   | .hdone p => A p
+  | .hkeep q ℓ _ al => A q ∧ al.Within Ψ B anc (anc q) ∧ al.NoIns ∧ (∀ x, anc q x → A x) ∧
+    HCell Ψ q ℓ ∧ HLocs Ψ q al
+  | .hkarmA q ℓ _ al k => A q ∧ al.Within Ψ B anc (anc q) ∧ k.Within Ψ B anc A ∧ al.NoIns ∧
+    (∀ x, anc q x → A x) ∧ HCell Ψ q ℓ ∧ HLocs Ψ q al
 
 /-- The regions of the hole of a frame. -/
 def Frame.hole (A : Nat → Prop) : Frame → Nat → Prop
@@ -172,6 +185,24 @@ theorem Tm.Within.frame {q : Nat} : ∀ {e : Tm} {A : Nat → Prop}, e.Within Ψ
     ¬ A q ∧ anc q q ∧ (∀ x, A x → anc q x) ∧ ∀ x, anc q x → A x ∨ e.Has (.frame x) := by
   intro e
   induction e with
+  | hkeep p ℓ E' al e _ ih =>
+    intro A h hs
+    rcases hs with hs | hs | hs | hs
+    · cases hs
+    · cases hs
+    · exact absurd (Tm.has_frame_ins hs) h.2.2.2.1
+    · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih h.2.2.1 hs
+      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr h))⟩
+  | hkarm p ℓ E' al a k _ ih₁ ih₂ =>
+    intro A h hs
+    rcases hs with hs | hs | hs | hs | hs
+    · cases hs
+    · cases hs
+    · exact absurd (Tm.has_frame_ins hs) h.2.2.2.2.1
+    · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih₁ h.2.2.1 hs
+      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr (.inl h)))⟩
+    · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih₂ h.2.2.2.1 hs
+      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr (.inr h)))⟩
   | _ => intro A h hs; simp only [Tm.Within, Tm.Has] at h hs ⊢ <;> grind
 
 /-- A term stays at its place when the ancestors of its `inside` forms and its
@@ -185,7 +216,7 @@ theorem Tm.Within.mono {Ψ' : List Ty} {B' anc' : Nat → Nat → Prop}
       (∀ q, (e.Has (.frame q) ∨ e.Has .ins ∧ e.Has (.rgn q)) → anc' q = anc q) →
         e.Within Ψ' B' anc' A := by
   intro e
-  induction e <;> intro A h ha <;> simp only [Tm.Within, Tm.Has] at h ha ⊢ <;> grind
+  induction e <;> intro A h ha <;> simp only [Tm.Within, Tm.Has, HLocs] at h ha ⊢ <;> grind
 
 /-- Without `inside` forms and handlers, a term is at its place for any ancestors. -/
 theorem Tm.Within.anyAnc {anc' : Nat → Nat → Prop} {e : Tm} {A : Nat → Prop} (hn : e.NoIns)
@@ -329,6 +360,18 @@ theorem WithinE.frameAnc {A : Nat → Prop} {q : Nat} :
       refine part hF.2.1 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]
       simp only [Frame.plug, Tm.Has] at h
       grind
+    | hkeep p ℓ E' al =>
+      simp only [Frame.plug, Tm.Has, Frame.Within] at h hF
+      rcases h with h | h | h | h
+      · cases h
+      · cases h
+      · exact absurd (Tm.has_frame_ins h) hF.2.2.1
+      · exact h.elim
+    | hkarmA p ℓ E' al k =>
+      simp only [Frame.Within] at hF
+      refine part hF.2.2.1 ?_ fun x hx => by simp [Frame.plug, Tm.Has, hx]
+      simp only [Frame.plug, Tm.Has] at h
+      grind [Tm.has_frame_ins, Tm.NoIns]
     | _ =>
       simp only [Frame.plug, Tm.Has, Frame.Within] at h hF <;>
         first

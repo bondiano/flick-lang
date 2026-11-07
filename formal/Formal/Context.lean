@@ -139,6 +139,36 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
         rw [List.getElem?_append_left (by simpa using getElem?_lt hl₁), List.getElem?_map, hl₁]
         simp [Ty.substT, Stage.substT, hb]
     | errVal hv => exact (nv hv).elim
+  case hkeep q ℓ E al =>
+    cases h with
+    | hkeep hℓ hal he hφ₀ hc hnt hle hφ hT =>
+      refine .mk0 ⟨_, _, he, .installs rfl hφ₀ hφ, fun σ hσ X _ h' => ?_⟩
+      have hp : σ (.r q) = .rg q := hσ.1 _ (.inr (.inl rfl))
+      have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
+      simp only [Flick.J.substT, Ty.substT, hp] at h₁
+      exact .hkeep (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ h'
+        (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
+          (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
+        ⟨hc.1, fun h => .inl (hc.2 h)⟩ (fun h => .inl (hnt h))
+        (by simpa [Stage.substT] using Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
+    | errVal hv => exact (nv hv).elim
+  case hkarmA q ℓ E al k =>
+    cases h with
+    | hkarm hℓ hal hop hE hk hp' hφ₀ hc hnt ha hle hφ hT =>
+      refine .mk0 ⟨_, _, ha, .of_le (Stage.le_trans hle hφ), fun σ hσ X _ h' => ?_⟩
+      subst hk
+      obtain ⟨-, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+      have hp : σ (.r q) = .rg q := hσ.1 _ (.inr (.inl rfl))
+      have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
+      simp only [Flick.J.substT, Ty.substT, hp] at h₁
+      have h₃ := hp'.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inr
+        (plug_has_of_nosite (by simp [Tm.Has]) h))))) X
+      exact .hkarm (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ hop hE rfl h₃
+        (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
+          (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
+        ⟨hc.1, fun h => .inl (hc.2 h)⟩ (fun h => .inl (hnt h)) (by simpa [hb] using h')
+        (by simpa [Stage.substT] using Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
+    | errVal hv => exact (nv hv).elim
   case hresB p ℓ a =>
     cases h with
     | hres hℓ hb hA ha hp' hl hφ hT =>

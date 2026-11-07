@@ -56,6 +56,11 @@ inductive PHead : Tm → Tm → Prop
   | hresVal {A : List Frame} : OkE A → a = plug A (.hole p) → Value w →
       PHead (.hres p ℓ a w) (.hdone p (plug A w))
   | hdoneVal : Value v → PHead (.hdone p v) v
+  -- a kept handler runs no `return`
+  | hkeepVal {al : Tm} : Value v → PHead (.hkeep q ℓ E al v) v
+  -- the value of a `tail` arm of a kept handler resumes the body under it
+  | hkarmVal {al : Tm} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole q) → Value w →
+      PHead (.hkarm q ℓ E al w k) (.hkeep q ℓ E al (plug Ei w))
 
 /-- `Λ[π] := g`. -/
 def setRgn (Λ : List Rgn) (p : Nat) (g : Rgn) : List Rgn := Λ.set p g
@@ -107,6 +112,11 @@ inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm �
       RHead Λ μ (.hres p ℓ a (.raise w)) Λ μ (.hdone p (plug A (.raise w)))
   | hresUnw {A : List Frame} : OkE A → a = plug A (.hole p) →
       RHead Λ μ (.hres p ℓ a (.unw q ℓ' b)) Λ μ (.hdone p (plug A (.unw q ℓ' b)))
+  -- an arm of a kept handler that raises lets the body go, closing its regions: the child ends
+  | hkarmRaise {al : Tm} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole q) → Value w →
+      RHead Λ μ (.hkarm q ℓ E al (.raise w) k) Λ μ (.hkeep q ℓ E al (plug Ei (.unw q ℓ (.raise w))))
+  | hkarmUnw {al : Tm} {Ei : List Frame} : OkE Ei → k = plug Ei (.hole q) →
+      RHead Λ μ (.hkarm q ℓ E al (.unw q' ℓ' a) k) Λ μ (.hkeep q ℓ E al (plug Ei (.unw q' ℓ' a)))
   -- the body has unwound to its handler, which runs what the signal holds
   | hwithCatch {al : Tm} : RHead Λ μ (.hwith p ℓ E al r (.unw p ℓ a)) Λ μ a
   -- a handler is the region `|Λ|` around its body, which `resume` holds, and the cell
@@ -133,10 +143,10 @@ inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → 
   | rt : OkE E → RHead Λ μ e Λ' μ' e' → Step root .rt Λ μ (plug E e) (.cfg Λ' μ' (plug E e'))
   | addFin : OkE E → Λ[p]? = some g → g.live = true → Value t →
       Step root .rt Λ μ (plug E (.app (.app (.const .addFin) (.own p)) t))
-        (.cfg (setRgn Λ p ⟨g.live, g.kids, g.fins ++ [.await t]⟩) μ (plug E (.lit .unit)))
+        (.cfg (setRgn Λ p ⟨g.live, g.kids, g.fins ++ [withs p E (.await t)]⟩) μ (plug E (.lit .unit)))
   | spawn : OkE E → Λ[p]? = some g → g.live = true → Value t →
       Step root .rt Λ μ (plug E (.app (.app (.const .spawn) (.own p)) t))
-        (.cfg (setRgn Λ p ⟨g.live, g.kids ++ [.await t], g.fins⟩) μ (plug E (.lit .unit)))
+        (.cfg (setRgn Λ p ⟨g.live, g.kids ++ [withs p E (.await t)], g.fins⟩) μ (plug E (.lit .unit)))
   -- an operation no handler answers is `Σ₀`'s, if its record has a function for it
   | performRoot {Ef : Name} {w f : Tm} : OkE E → (∀ G ∈ E, G.handles Ef o .tail = none) →
       root.svc Ef = some w → w.field o = some f → Value v →
@@ -157,6 +167,12 @@ inductive Step (root : Roots) : Lbl → List Rgn → List Tm → Tm → Out → 
       Value v →
       Step root .rt Λ μ (plug E (.hwith p ℓ Ef al r (plug Ei (.app (.const (.perform Ef o .tail)) v))))
         (.cfg Λ μ (plug E (.hctl p ℓ 0 true Ef al r (b.subst (inst [v])) (plug Ei (.hole p)))))
+  -- a `tail` operation of a child runs the arm of a handler kept from where it started, while
+  -- the region of that handler is live
+  | performKept {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o .tail = none) → al.armOf o = some b →
+      Value v → Live Λ q →
+      Step root .rt Λ μ (plug E (.hkeep q ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v))))
+        (.cfg Λ μ (plug E (.hkarm q ℓ Ef al (b.subst (inst [v])) (plug Ei (.hole q)))))
   -- `resume` of a `control` arm is `kont p κ`: its type is that of the new cell `κ`
   | performCtl {Ei : List Frame} {Ef : Name} {al : Tm} : OkE E → OkE Ei → (∀ G ∈ Ei, G.handles Ef o .control = none) → al.armOf o = some b →
       Value v →

@@ -63,6 +63,30 @@ theorem Row.disch_substT_eq {a a' : Atom} {r : Row} {σ : Atom → Ty} (h : ∀ 
     · rintro ⟨rfl, v, h₁, hv⟩; exact ⟨v, a, ⟨rfl, h₁⟩, hv, (h _).mpr rfl⟩
   | _ => simp [Row.substT, Row.disch]
 
+/-- A body with no obligation about the effect of its handler has what the handler gives. -/
+theorem Stage.hP_of_out {φ₀ : Stage} {E : Name} {r ε : Row} {Θ : Facts} {q : Nat}
+    (h : φ₀.le (.rt (Row.union (Row.single E) r) ε)) (hO : φ₀.ObOut (Row.single E)) :
+    φ₀.le (.rt (Row.hP Θ q E r) ε) := by
+  cases φ₀ with
+  | pure => trivial
+  | rt r₀ e₀ =>
+    refine ⟨fun x hx => ?_, h.2⟩
+    have h₁ := h.1 x hx
+    cases x with
+    | nm N =>
+      rcases h₁ with h₁ | h₁
+      · cases h₁; exact .inl rfl
+      · exact .inr h₁
+    | ob N a =>
+      refine ⟨fun hN => ((hO.1 N a hx).2 (by rw [hN]; rfl)).elim, fun _ => ?_⟩
+      rcases h₁ with h₁ | h₁
+      · cases h₁
+      · exact h₁
+    | atm a | rv a | obv v a =>
+      rcases h₁ with h₁ | h₁
+      · cases h₁
+      · exact h₁
+
 theorem Stage.ObOut.substT {φ₀ : Stage} {o : Row} (σ : Atom → Ty) (h : φ₀.ObOut o) :
     (φ₀.substT σ).ObOut (o.substT σ) := by
   have none : ∀ {o : Row}, o.Named → (∀ N, ¬ o (.nm N)) → ∀ N, ¬ (o.substT σ) (.nm N) :=

@@ -144,6 +144,18 @@ theorem pure_preservation {Ψ Θ e t φ e'} (h : Typ S Ψ Θ [] e (.ex t φ)) (h
       exact (((by simpa using ha : Typ S _ _ [] _ (.ex _ _)).valueAny hv φ').sub (J' := .ex T φ')
         ⟨hb hc, Stage.le_refl _⟩).cut hΘ.entails
     | errVal hv'' => exact (nv hv'').elim
+  | hkeepVal hv =>
+    cases h with
+    | hkeep _ _ he _ _ _ _ hφ hT => exact (he.valueAny hv _).sub ⟨hT, Stage.pure_le _⟩
+    | errVal hv'' => exact (nv hv'').elim
+  | hkarmVal hE' hk' hv =>
+    cases h with
+    | hkarm hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
+      obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
+      refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+        fun T φ' hΘ _ hb _ => ?_) hφ₀ hc hnt hle hφ hT
+      exact ((ha.valueAny hv φ').sub (J' := .ex T φ') ⟨hb (by decide), Stage.le_refl _⟩).cut hΘ.entails
+    | errVal hv'' => exact (nv hv'').elim
   | hctlDisc hE' hk' hv =>
     cases h with
     | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT =>

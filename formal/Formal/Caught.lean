@@ -9,8 +9,9 @@ its region `p`, and the region of a handler is not yet a handler around its `ins
 form. Two maps hold for the whole configuration what a handler was installed with:
 `hs p` the handlers around the handler `p`, where what its signal holds runs, and
 `cell p` its cell. So a signal passes no frame of its own handler without being
-caught, a closing region is never the handler of a signal in its body, and no thread
-is a signal at its top.
+caught, a closing region is never the handler of a signal in its body, and the main
+thread is never a signal at its top. A child starts with `H` the regions older than it:
+a kept handler catches no signal, and a child may end as one.
 -/
 
 namespace Flick
@@ -34,6 +35,8 @@ def Tm.Caught : Tm → (Nat → Prop) → Prop
   | .hctl p ℓ _ _ _ al r a k, H => hs p = H ∧ cell p = ℓ ∧ al.Caught H ∧ r.Caught H ∧
       a.Caught H ∧ k.Caught (fun x => H x ∨ x = p)
   | .unw p ℓ a, H => H p ∧ cell p = ℓ ∧ a.Caught (hs p)
+  | .hkeep q ℓ _ al e, H => H q ∧ cell q = ℓ ∧ al.Caught H ∧ e.Caught H
+  | .hkarm q ℓ _ al a k, H => H q ∧ cell q = ℓ ∧ al.Caught H ∧ a.Caught H ∧ k.Caught H
 
 def Frame.Caught (H : Nat → Prop) : Frame → Prop
   | .appL a | .appR a | .let_ a | .match_ a | .rconsL _ a | .rconsR _ a | .updL _ a | .updR a _
@@ -43,6 +46,8 @@ def Frame.Caught (H : Nat → Prop) : Frame → Prop
   | .hwith p ℓ _ al r => hs p = H ∧ cell p = ℓ ∧ al.Caught hs cell H ∧ r.Caught hs cell H
   | .hctlA p ℓ _ _ _ al r k => hs p = H ∧ cell p = ℓ ∧ al.Caught hs cell H ∧ r.Caught hs cell H ∧
       k.Caught hs cell (fun x => H x ∨ x = p)
+  | .hkeep q ℓ _ al => H q ∧ cell q = ℓ ∧ al.Caught hs cell H
+  | .hkarmA q ℓ _ al k => H q ∧ cell q = ℓ ∧ al.Caught hs cell H ∧ k.Caught hs cell H
 
 /-- The contexts of a context, from the outside in. -/
 def CaughtE (H : Nat → Prop) : List Frame → Prop

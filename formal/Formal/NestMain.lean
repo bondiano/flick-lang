@@ -14,7 +14,7 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     (hn : Nest Ψ ⟨Λ, μ, m⟩ anc B home) (hi : (⟨Λ, μ, m⟩ : Cfg).at i = some e)
     (he : Typ S Ψ Facts.age [] e (.ex t φ)) (hμ : StoreTy S Ψ μ) (hμ' : StoreTy S (Ψ ++ X) μ')
     (hΨ : ∀ u ∈ Ψ, u.YF Λ.length) (hX : ∀ u ∈ X, u.YF Λ.length) {hs₀ : Nat → Nat → Prop}
-    {cell : Nat → Nat} (hca : e.Caught hs₀ cell (fun _ => False)) (hs : Step root l Λ μ e (.cfg Λ' μ' e')) :
+    {cell : Nat → Nat} {H : Nat → Prop} (hca : e.Caught hs₀ cell H) (hs : Step root l Λ μ e (.cfg Λ' μ' e')) :
     ∃ anc' B' home', Nest (Ψ ++ X) ((⟨Λ', μ', m⟩ : Cfg).put i e') anc' B' home' ∧
       ∀ q, q ≠ Λ.length → anc' q = anc q := by
   have keep : ∀ {Ψ' c' B' home'}, Nest Ψ' c' anc B' home' →
@@ -39,6 +39,11 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
         obtain ⟨_, _, ht', hT⟩ := tail_val ht
         exact keep (hn.hctlTail hi hE hEi hv ht' hT)
       | hctlDisc hEi hk hv => subst hk; exact keep (hn.hctlDisc hi hE hEi hv)
+      | hkeepVal hv => exact keep (hn.hkeepVal hi hE hv)
+      | hkarmVal hEi hk hv =>
+        subst hk
+        obtain ⟨_, _, _, ht', hT⟩ := kept_val hE he
+        exact keep (hn.hkarmVal hi hE hEi hv ht' hT)
       | hresVal hA ha hv =>
         subst ha
         obtain ⟨_, _, _, ht⟩ := hole_typ0 hE (fun h => by cases h) he fun h => hres_not_pure h
@@ -89,7 +94,8 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     rcases List.mem_append.mp hf with hf | hf
     · exact hn.fins _ _ hg hl f hf
     · simp at hf; subst hf
-      exact ⟨hw, htn.frame⟩
+      have hc := hn.hole_chain hi hWE p₀ hrW.1.2.1
+      exact withs_within hn.le hWE (fun y hy hyp => by rw [hc]; exact ⟨hy, hyp⟩) hw htn.frame
   | @spawn E _ p₀ _ t₀ _ hE hg hl hv =>
     rw [nil rfl, List.append_nil]
     have hnv := fin_not_value (w₁ := .own p₀) (w₂ := t₀) (.inr rfl)
@@ -105,7 +111,8 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
       (fun h => h.elim) (fun h => by cases h)) id)) (fun _ h => by cases h) hg hl rfl
       ⟨[_], rfl, fun k hk => by
         simp at hk; subst hk
-        exact ⟨hw, htn.frame⟩⟩
+        have hc := hn.hole_chain hi hWE p₀ hrW.1.2.1
+        exact withs_within hn.le hWE (fun y hy hyp => by rw [hc]; exact ⟨hy, hyp⟩) hw htn.frame⟩
       fun f hf => hn.fins _ _ hg hl f hf)
   | @rt E _ _ _ _ _ _ hE hh =>
     have hnv := hh.not_value
@@ -253,6 +260,26 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
         · cases h
         · exact hrW.2.2.1.2.2.1 q h) hnv fun _ _ hx => unw_inward hx)
     | hwithCatch => rw [nil rfl, List.append_nil]; exact keep (hn.hwithCatch hi hE)
+    | hkarmRaise hEi hk hw =>
+      rw [nil rfl, List.append_nil]; subst hk
+      have hwn := hw.noIns hrW.2.2.1
+      obtain ⟨_, _, _, ε, _, _, hℓ, ht⟩ := kept_raise hE hw he
+      have hA := hn.hole_anc hi hWE hrW.1
+      obtain ⟨_, hYF⟩ := HCell.res hrW.2.2.2.2.2.2.2.1 hℓ
+      refine keep (hn.hkarmSig hi hE hEi hnv (fun q' h => ?_) hwn.frame fun hx hs hq => ?_)
+      · simp only [Tm.Has] at h
+        rcases h with h | h | h
+        · cases h
+        · cases h
+        · exact hwn.frame q' h
+      · have hmv : Tm.Within Ψ B anc _ _ := Tm.Within.moveT (A₂ := anc _) hw ht hx fun x hX =>
+          (hA x (Nat.le_of_lt (hYF.reach hX))).symm
+        exact ⟨holeE_iff.mpr (.inl hq), hmv, fun q' h => hwn.frame q' h,
+          fun x hx' => holeE_iff.mpr (.inl (hs x hx'))⟩
+    | hkarmUnw hEi hk =>
+      rw [nil rfl, List.append_nil]; subst hk
+      have hf := unw_noFrame hrW.2.2.1
+      exact keep (hn.hkarmSig hi hE hEi hnv hf hf fun hx _ _ => unw_inward hx)
     | hdl =>
       have hlen : X.length = 1 := by
         have h₁ := hμ.1; have h₂ := hμ'.1; simp only [List.length_append, List.length_singleton] at h₂; omega
@@ -277,6 +304,11 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     obtain ⟨_, _, _, hb⟩ := hwith_body hE he
     obtain ⟨_, _, _, ht, hT⟩ := perform_arg hEi hb
     exact keep (hn.performTail hi hE hEi ha hv ht hT)
+  | performKept hE hEi _ ha hv _ =>
+    rw [nil rfl, List.append_nil]
+    obtain ⟨_, _, _, hb⟩ := hkeep_body hE he
+    obtain ⟨_, _, _, ht, hT⟩ := perform_arg hEi hb
+    exact keep (hn.performKept hi hE hEi ha hv ht hT)
   | performCtl hE hEi _ ha hv =>
     have hlen : X.length = 1 := by
       have h₁ := hμ.1; have h₂ := hμ'.1; simp only [List.length_append, List.length_singleton] at h₂; omega

@@ -105,6 +105,8 @@ theorem _root_.Flick.RHead.redex' {Λ Λ' : List Rgn} {μ μ' : List Flick.Tm} {
   | tryRaise hv => exact .inr (.inl ⟨.try_ _, _, trivial, hv, rfl⟩)
   | hctlRaise _ _ hv => exact .inr (.inl ⟨.hctlA _ _ _ _ _ _ _ _, _, trivial, hv, rfl⟩)
   | hresRaise _ _ hv => exact .inr (.inl ⟨.hresB _ _ _, _, trivial, hv, rfl⟩)
+  | hkarmRaise _ _ hv => exact .inr (.inl ⟨.hkarmA _ _ _ _ _, _, trivial, hv, rfl⟩)
+  | hkarmUnw _ _ => exact .inr (.inr ⟨.hkarmA _ _ _ _ _, _, _, _, trivial, rfl⟩)
   | hctlUnw _ _ => exact .inr (.inr ⟨.hctlA _ _ _ _ _ _ _ _, _, _, _, trivial, rfl⟩)
   | hresUnw _ _ => exact .inr (.inr ⟨.hresB _ _ _, _, _, _, trivial, rfl⟩)
   | hwithCatch => exact .inr (.inr ⟨.hwith _ _ _ _ _, _, _, _, trivial, rfl⟩)
@@ -195,6 +197,12 @@ theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
     have hq' : Flick.plug (Ei ++ .hwith p ℓ Ef al r :: E) (.app (.const (.perform Ef o .tail)) v) =
         Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
     obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hwith p ℓ Ef al r :: E) (hEi.append' (hE'.cons' trivial))
+      (perform_redex hv) hq'
+    exact (perform_app_not_pure h).elim
+  | @performKept E o b v _ q _ ℓ Ei Ef al hE' hEi _ _ hv _ =>
+    have hq' : Flick.plug (Ei ++ .hkeep q ℓ Ef al :: E) (.app (.const (.perform Ef o .tail)) v) =
+        Flick.plug E₁ (Flick.plug E₀ r₀) := by rw [plug_append]; exact hq.symm
+    obtain ⟨-, -, Θ', t', h⟩ := typ (E := Ei ++ .hkeep q ℓ Ef al :: E) (hEi.append' (hE'.cons' trivial))
       (perform_redex hv) hq'
     exact (perform_app_not_pure h).elim
   | @performCtl E o b v _ _ p ℓ r Ei Ef al hE' hEi _ _ hv =>

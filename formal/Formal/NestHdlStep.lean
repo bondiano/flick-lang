@@ -199,7 +199,7 @@ theorem Nest.resume {c : Cfg} {home i E p ℓh κ Ef al rf u} {A Ei : List Frame
         hW.2.2.2.2.1.replug hole_not_value hEi huW fun x hx => ((hu.noIns hk.2.1).frame x hx).elim,
         hW.2.2.2.2.2.1, hW.2.2.2.2.2.2.1, hW.2.2.2.2.2.2.2.2⟩,
       fun x hx hx' => hW.2.2.2.2.2.2.2.1 x ((hfa x).mp hx') ((hfk x).mp (hb x hx)),
-      hW.2.2.2.2.2.2.2.2.2⟩
+      hW.2.2.2.2.2.2.2.2.2.1⟩
 
 /-- A new handler: a new region around its body, and a new cell that holds its type. -/
 theorem Nest.hdl {c : Cfg} {home i E Ef al rf e₀} {t₀ : Ty} (hn : Nest Ψ c anc B home)
@@ -214,15 +214,17 @@ theorem Nest.hdl {c : Cfg} {home i E Ef al rf e₀} {t₀ : Ty} (hn : Nest Ψ c 
   obtain ⟨-, hrW⟩ := within_of_plug (by intro h; cases h) hE (hn'.thread i _ hi').1
   have hnr : (Tm.hdl Ef al rf e₀).NoIns := by
     simp only [Tm.NoIns, Tm.Has, not_or]; exact ⟨hrW.2.2.2.1, hrW.2.2.2.2.1, hrW.2.2.2.2.2⟩
-  have hfr : ∀ (l : Nat) (t : Ty), (Ψ ++ [t₀])[l]? = some t → ¬ t.reach (.r c.rgs.length) := by
-    intro l t ht h
+  have hyf : ∀ (l : Nat) (t : Ty), (Ψ ++ [t₀])[l]? = some t → t.YF c.rgs.length := by
+    intro l t ht
     by_cases hl : l < Ψ.length
     · rw [List.getElem?_append_left hl] at ht
-      exact Nat.lt_irrefl _ ((hΨ t (List.mem_of_getElem? ht)).reach h)
+      exact hΨ t (List.mem_of_getElem? ht)
     · rw [List.getElem?_append_right (by omega)] at ht
       cases hj : l - Ψ.length with
-      | zero => simp [hj] at ht; subst ht; exact Nat.lt_irrefl _ (ht₀.reach h)
+      | zero => simp [hj] at ht; subst ht; exact ht₀
       | succ => simp [hj] at ht
+  have hfr : ∀ (l : Nat) (t : Ty), (Ψ ++ [t₀])[l]? = some t → ¬ t.reach (.r c.rgs.length) :=
+    fun l t ht h => Nat.lt_irrefl _ ((hyf l t ht).reach h)
   refine hn'.fresh hi' hE (by intro h; cases h) hnr (fun q h => ?_) fun anc' ha hq => ?_
   · simp only [Tm.Has] at h
     rcases h with h | h | h | h | h
@@ -234,6 +236,8 @@ theorem Nest.hdl {c : Cfg} {home i E Ef al rf e₀} {t₀ : Ty} (hn : Nest Ψ c 
   · refine ⟨.inr rfl, (hrW.1.extend hrW.2.2.2.1 hfr).anyAnc hrW.2.2.2.1,
       (hrW.2.1.extend hrW.2.2.2.2.1 hfr).anyAnc hrW.2.2.2.2.1,
       (hrW.2.2.1.extend hrW.2.2.2.2.2 hfr).anyAnc hrW.2.2.2.2.2, hrW.2.2.2.1, hrW.2.2.2.2.1,
-      fun x => by rw [ha], ⟨t₀, by simp, ht₀⟩⟩
+      fun x => by rw [ha], ⟨t₀, by simp, ht₀⟩, fun l hl => by
+        obtain ⟨t, ht, -⟩ := hrW.1.loc0 hrW.2.2.2.1 hl
+        exact ⟨t, ht, hyf l t ht⟩⟩
 
 end Flick

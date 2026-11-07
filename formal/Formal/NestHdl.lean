@@ -78,6 +78,7 @@ theorem Tm.Within.armOf {o : Name} {b : Tm} {A : Nat → Prop} :
   | .scope _, _, ha | .inside _ _, _, ha | .cap _, _, ha | .own _, _, ha | .drec _ _, _, ha
   | .glob _, _, ha | .hdl _ _ _ _, _, ha | .hwith _ _ _ _ _ _, _, ha | .hctl _ _ _ _ _ _ _ _ _, _, ha
   | .hres _ _ _ _, _, ha | .hdone _ _, _, ha | .unw _ _ _, _, ha | .kont _ _, _, ha
+  | .hkeep _ _ _ _ _, _, ha | .hkarm _ _ _ _ _ _, _, ha
   | .hole _, _, ha => by simp [Tm.armOf] at ha
 
 /-- An arm instantiated with values, at a place where both are. -/

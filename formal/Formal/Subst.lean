@@ -50,6 +50,8 @@ def Tm.rename (ξ : Nat → Nat) : Tm → Tm
   | .unw p ℓ a => .unw p ℓ (a.rename ξ)
   | .kont p ℓ => .kont p ℓ
   | .hole p => .hole p
+  | .hkeep q ℓ E al e => .hkeep q ℓ E (al.rename ξ) (e.rename ξ)
+  | .hkarm q ℓ E al a k => .hkarm q ℓ E (al.rename ξ) (a.rename ξ) (k.rename ξ)
 
 /-- Lift a substitution under `n` binders. -/
 def liftS (n : Nat) (σ : Nat → Tm) (i : Nat) : Tm :=
@@ -95,6 +97,8 @@ def Tm.subst (σ : Nat → Tm) : Tm → Tm
   | .unw p ℓ a => .unw p ℓ (a.subst σ)
   | .kont p ℓ => .kont p ℓ
   | .hole p => .hole p
+  | .hkeep q ℓ E al e => .hkeep q ℓ E (al.subst σ) (e.subst σ)
+  | .hkarm q ℓ E al a k => .hkarm q ℓ E (al.subst σ) (a.subst σ) (k.subst σ)
 
 /-- The constructor a pattern starts with: the operation of an arm of a handler. -/
 def Pat.headName : Pat → Option Name

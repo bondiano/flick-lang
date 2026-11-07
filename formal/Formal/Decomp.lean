@@ -110,6 +110,8 @@ theorem PHead.det {e e₁ e₂ : Tm} (h₁ : PHead e e₁) (h₂ : PHead e e₂)
     | hctlDisc hE' hk' _ => obtain ⟨rfl, -⟩ := plug_hole_inj hE hE' (hk.symm.trans hk'); rfl
   | hresVal hE hk _ => cases h₂ with
     | hresVal hE' hk' _ => obtain ⟨rfl, -⟩ := plug_hole_inj hE hE' (hk.symm.trans hk'); rfl
+  | hkarmVal hE hk _ => cases h₂ with
+    | hkarmVal hE' hk' _ => obtain ⟨rfl, -⟩ := plug_hole_inj hE hE' (hk.symm.trans hk'); rfl
   | _ => cases h₂ <;> simp_all
 
 /-- A pure step of one thread that does not read the store or the regions. -/

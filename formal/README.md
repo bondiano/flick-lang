@@ -84,6 +84,8 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
   time `hwith p ℓ`, `hctl p ℓ κ tl`, `hres p ℓ`, `hdone p`, `unw p ℓ a`, `kont p κ`, `hole p`.
   `p` is the region of the handler's `inside` form, `ℓ` its cell, `κ` the cell of `resume`.
   The frames `hwith`, `hctlA` (the arm) and `hresB` (the resumed body) evaluate inside them.
+  In a child or a finalizer, `hkeep q ℓ` is a handler kept from where it started and `hkarm q ℓ`
+  its arm running.
 - **Typing** (`Rules.lean`). `perform`, `hdl`, the arms (`J.harms`: `hatail`, `haabort`,
   `hactl`), `hwith`, `hctl`, `hres`, `hdone`, `unw`, `kont`. A parked body is typed with the
   operation at its hole and the argument left out; the cells give the types of a signal and of
@@ -91,16 +93,25 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 - **Steps** (`Semantics.lean`). `RHead.hdl` (region and cell), `Step.performAbort`,
   `performTail`, `performCtl` (cell of `resume`), `resume`, `resumeDie`, `Step.unw`,
   `RHead.hwithCatch`, and the pure steps of values (`PHead.hwithVal`, `hctlTail`, `hctlDisc`,
-  `hresVal`, `hdoneVal`).
+  `hresVal`, `hdoneVal`). For a kept handler `Step.performKept` (it needs its region live),
+  `PHead.hkeepVal` (no `return`), `hkarmVal`, `RHead.hkarmRaise`, `hkarmUnw`.
 - **Progress and Preservation** (`ProgressMain.lean`, `PresHdl.lean`, `PresHdlRt.lean`,
   `PresHdlStep.lean`). An operation no handler answers goes to `Σ₀` (`Step.performRoot`, labelled
   `root E`), whose record has a function for each operation of an effect of `tail` operations.
   One `Σ₀` does not answer either is an outcome, `PerformStuck`, with its effect in the services
   of the stage; at the top of the main thread it does not happen, as `T1` assumes `Σ₀` covers
   the stage (`root_answers`).
-- **Signals** (`Caught.lean`, `CaughtStep.lean`). `Tm.Caught hs cell e H`: every `unw p ℓ` of
-  `e` is under the frame of its handler, `H` the handlers around; `hs p` and `cell p` are
-  what the handler `p` was installed with. It is part of a typed configuration (`CfgTy`).
+- **Signals** (`Caught.lean`, `CaughtStep.lean`, `CaughtCfg.lean`). `Tm.Caught hs cell e H`: every
+  `unw p ℓ` of `e` is under the frame of its handler, `H` the handlers around; `hs p` and
+  `cell p` are what the handler `p` was installed with. It is part of a typed configuration
+  (`CfgTy`). The main thread starts with no handler in `H`, a child with the regions older than
+  it: a kept handler catches no signal, and a child may end as one.
+- **A child and a kept handler** (`KidRow.lean`, `KidTy.lean`, `NestKept.lean`, `T43.lean`).
+  `withs p E x` keeps the handlers of `E` older than the owner `p`. A handler at the place of
+  its child is deeper than its own place, and its arms move there because what they name is as
+  old as it (`HLocs`, `Tm.Within.moveArm`). The row of the work holds no effect of a handler
+  left out (`kid_dropped`); its row is what the place had or what a kept handler's arms need
+  (`KidRow`), so a child stays within what the root answers (`KidCov`).
 - **Regions** (`Within.lean`, `NestHdl*.lean`). A handler is at the place of its region,
   `anc p`; what a signal holds is at that place; the cell of a handler names no region younger
   than it (`HCell`). Every step of a handler keeps `⊢ Λ` (`Nest.step`).
@@ -369,8 +380,20 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 
 - **Effects take no parameters.** An effect with an operation that is not `tail` has `impl`
   `Errors ∅`, which has no value, so `Σ₀` gives it nothing (`Sig.op_impl`, `root_answers`).
-- **A task does not reach the handlers of the place that spawned it.** An operation only
-  they handle is stuck in the task (`PerformStuck` among the outcomes of a child in `T1`).
+- **A child keeps the handlers older than its owner.** `flick-model` keeps every handler around
+  the registration; here `withs` leaves out one younger than the owner, whose region may close
+  while the child runs and whose arms it could not hold (`T4`). Nothing observes the difference
+  in a typed program: the obligation of the work keeps such an effect out of its row
+  (`kid_dropped`).
+- **A child runs only `tail` arms.** An `abort` or `control` operation in a child with no frame
+  of its handler stays an outcome, `PerformStuck`, in `T1` and `T1_regions`: such an effect is
+  named in the row of the work (`Sig.NonTail`), and no rule of this calculus rejects it; the
+  checker rejects `control` there (`classes/detached.rs`). A
+  `tail` operation of an effect all of whose operations are `tail` is always answered
+  (`T1_regions`).
+- **A signal may end a child.** An arm of a kept handler that raises lets the rest of the child
+  go, closing its regions, and the child ends as a signal, not as `raise v`: the core drops
+  how a child ends either way.
 - **The arms for errors of a handler** are a `try` around it: errors pass `hdl`.
 
 ## Findings

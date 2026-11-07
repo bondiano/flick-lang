@@ -97,6 +97,9 @@ theorem RHead.not_pure {Ψ Θ Λ μ r t Λ' μ' r'} (h : Typ S Ψ Θ [] r (.ex t
   | hctlRaise _ _ _ | hctlUnw _ _ => cases h with
     | hctl _ _ _ _ _ _ _ _ _ _ _ _ _ _ hφ _ => exact hφ
     | errVal hv => exact nv hv
+  | hkarmRaise _ _ _ | hkarmUnw _ _ => cases h with
+    | hkarm _ _ _ _ _ _ _ _ _ _ hle hφ _ => exact Stage.le_trans hle hφ
+    | errVal hv => exact nv hv
   | hresRaise _ _ _ | hresUnw _ _ => cases h with
     | hres _ _ _ _ _ _ hφ _ => exact hφ
     | errVal hv => exact nv hv
@@ -312,6 +315,15 @@ theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
     exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
       simpa using tail_pres (RtCtx.hole hΘ hΨ) (hbl.sub fun _ h => plug_has _ (by
         simp only [Tm.Has]; exact .inr (.inr (.inr (.inr (plug_has _ (.inr h))))))) hEi ha hv hr'),
+      by simp⟩
+  | performKept hE hEi _ ha hv _ =>
+    obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
+    obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact hkeep_not_pure hr
+    have hr' := hole_kill hr hbl hΨ
+    simp only [List.map_up_zero, liftT_zero] at hr'
+    exact ⟨[], by simpa using hμ, refill_kill back hbl hΨ (by
+      simpa using kept_pres (RtCtx.hole hΘ hΨ) (hbl.sub fun _ h => plug_has _ (by
+        simp only [Tm.Has]; exact .inr (.inr (.inr (plug_has _ (.inr h)))))) hEi ha hv hr'),
       by simp⟩
   | performCtl hE hEi _ ha hv =>
     obtain ⟨K, Θ', _, _, hr, _, hK, back⟩ := ctx_typing _ hE (fun h => by cases h) h
