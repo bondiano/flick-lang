@@ -100,7 +100,9 @@ impl Ide<'_> {
         binders(&m.tree, &mut out);
         for b in &m.editing {
             let len = u32::try_from(b.block.text.len()).unwrap_or(u32::MAX);
-            for h in b.plugin.highlight(&b.block, &b.state) {
+            let found = (b.plugin.highlight(&b.block, &b.state))
+                .unwrap_or_else(|why| super::plugins::failed(b.plugin.id(), "highlight", &why));
+            for h in found {
                 // a plugin's span outside its block is none
                 if h.span.start <= h.span.end && h.span.end <= len {
                     let kind = match h.kind {

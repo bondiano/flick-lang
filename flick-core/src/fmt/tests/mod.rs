@@ -6,6 +6,7 @@ use crate::source::SourceMap;
 
 mod decl;
 mod layout;
+mod plugins;
 
 /// The formatted text, checked to be a fixed point of the formatter, to keep
 /// every declaration formatted and to end no line with whitespace.

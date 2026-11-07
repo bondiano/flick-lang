@@ -44,7 +44,7 @@ pub trait Expander: Send + Sync {
     ) -> Result<Arena, Failure>;
     /// What an editor may insert at `offset` of `block`, whether the user
     /// typed `name.` before `offset`; `source` answers what the block's
-    /// module sees. None when the plugin fails.
+    /// module sees. An error when the plugin fails.
     fn complete(
         &self,
         block: &Block,
@@ -52,26 +52,37 @@ pub trait Expander: Send + Sync {
         offset: u32,
         member: bool,
         source: &mut BlockSource,
-    ) -> Vec<Completion> {
+    ) -> Result<Vec<Completion>, String> {
         let _ = (block, state, offset, member, source);
-        Vec::new()
+        Ok(Vec::new())
     }
     /// What an editor shows at `offset` of `block`, given `facts`, the
     /// types of the `_` of its code.
-    fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
+    fn hover(
+        &self,
+        block: &Block,
+        state: &[u8],
+        offset: u32,
+        facts: &[Fact],
+    ) -> Result<Option<Hover>, String> {
         let _ = (block, state, offset, facts);
-        None
+        Ok(None)
     }
     /// How an editor colors the words of `block` that are the plugin's.
-    fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
+    fn highlight(&self, block: &Block, state: &[u8]) -> Result<Vec<Highlight>, String> {
         let _ = (block, state);
-        Vec::new()
+        Ok(Vec::new())
     }
     /// The layout of `block`, whose holes `source` parses; none keeps it as
-    /// written, as when the plugin fails.
-    fn format(&self, block: &Block, state: &[u8], source: &mut BlockSource) -> Option<Vec<Piece>> {
+    /// written, and an error says the plugin failed.
+    fn format(
+        &self,
+        block: &Block,
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Result<Option<Vec<Piece>>, String> {
         let _ = (block, state, source);
-        None
+        Ok(None)
     }
     /// The instance of `class` for `target` as declarations; `source`, the
     /// target's declaration, parses the holes the plugin asks for.
@@ -202,20 +213,31 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         offset: u32,
         member: bool,
         source: &mut BlockSource,
-    ) -> Vec<Completion> {
-        self.plugin.complete(block, state, offset, member, source)
+    ) -> Result<Vec<Completion>, String> {
+        Ok(self.plugin.complete(block, state, offset, member, source))
     }
 
-    fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
-        self.plugin.hover(block, state, offset, facts)
+    fn hover(
+        &self,
+        block: &Block,
+        state: &[u8],
+        offset: u32,
+        facts: &[Fact],
+    ) -> Result<Option<Hover>, String> {
+        Ok(self.plugin.hover(block, state, offset, facts))
     }
 
-    fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
-        self.plugin.highlight(block, state)
+    fn highlight(&self, block: &Block, state: &[u8]) -> Result<Vec<Highlight>, String> {
+        Ok(self.plugin.highlight(block, state))
     }
 
-    fn format(&self, block: &Block, state: &[u8], source: &mut BlockSource) -> Option<Vec<Piece>> {
-        self.plugin.format(block, state, source)
+    fn format(
+        &self,
+        block: &Block,
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Result<Option<Vec<Piece>>, String> {
+        Ok(self.plugin.format(block, state, source))
     }
 
     fn derive(

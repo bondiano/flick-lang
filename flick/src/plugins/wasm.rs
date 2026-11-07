@@ -324,16 +324,13 @@ impl Expander for Wasm {
         offset: u32,
         member: bool,
         source: &mut BlockSource,
-    ) -> Vec<flick_plugin::Completion> {
+    ) -> Result<Vec<flick_plugin::Completion>, String> {
         let block = convert::to_block(block);
         let (result, back) = self.run(mem::take(source), |plugin, store| {
             plugin.call_complete(store, &block, state, offset, member)
         });
         *source = back;
-        result.map_or_else(
-            |_| Vec::new(),
-            |found| found.into_iter().map(convert::from_completion).collect(),
-        )
+        Ok(result?.into_iter().map(convert::from_completion).collect())
     }
 
     fn hover(
@@ -342,24 +339,25 @@ impl Expander for Wasm {
         state: &[u8],
         offset: u32,
         facts: &[flick_plugin::Fact],
-    ) -> Option<flick_plugin::Hover> {
+    ) -> Result<Option<flick_plugin::Hover>, String> {
         let block = convert::to_block(block);
         let facts: Vec<_> = facts.iter().map(convert::to_fact).collect();
         let (result, _) = self.run(BlockSource::default(), |plugin, store| {
             plugin.call_hover(store, &block, state, offset, &facts)
         });
-        result.ok().flatten().map(convert::from_hover)
+        Ok(result?.map(convert::from_hover))
     }
 
-    fn highlight(&self, block: &flick_plugin::Block, state: &[u8]) -> Vec<flick_plugin::Highlight> {
+    fn highlight(
+        &self,
+        block: &flick_plugin::Block,
+        state: &[u8],
+    ) -> Result<Vec<flick_plugin::Highlight>, String> {
         let block = convert::to_block(block);
         let (result, _) = self.run(BlockSource::default(), |plugin, store| {
             plugin.call_highlight(store, &block, state)
         });
-        result.map_or_else(
-            |_| Vec::new(),
-            |found| found.into_iter().map(convert::from_highlight).collect(),
-        )
+        Ok(result?.into_iter().map(convert::from_highlight).collect())
     }
 
     fn derive(
@@ -392,13 +390,13 @@ impl Expander for Wasm {
         block: &flick_plugin::Block,
         state: &[u8],
         source: &mut BlockSource,
-    ) -> Option<Vec<flick_plugin::Piece>> {
+    ) -> Result<Option<Vec<flick_plugin::Piece>>, String> {
         let block = convert::to_block(block);
         let (result, back) = self.run(mem::take(source), |plugin, store| {
             plugin.call_format(store, &block, state)
         });
         *source = back;
-        Some(result.ok()??.into_iter().map(convert::from_piece).collect())
+        Ok(result?.map(|pieces| pieces.into_iter().map(convert::from_piece).collect()))
     }
 
     fn check(

@@ -101,15 +101,21 @@ impl Expander for Traced {
         offset: u32,
         member: bool,
         source: &mut BlockSource,
-    ) -> Vec<Completion> {
+    ) -> Result<Vec<Completion>, String> {
         self.inner.complete(block, state, offset, member, source)
     }
 
-    fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
+    fn hover(
+        &self,
+        block: &Block,
+        state: &[u8],
+        offset: u32,
+        facts: &[Fact],
+    ) -> Result<Option<Hover>, String> {
         self.inner.hover(block, state, offset, facts)
     }
 
-    fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
+    fn highlight(&self, block: &Block, state: &[u8]) -> Result<Vec<Highlight>, String> {
         self.inner.highlight(block, state)
     }
 
@@ -131,7 +137,12 @@ impl Expander for Traced {
             .derive(target, class, args, module, state, source)
     }
 
-    fn format(&self, block: &Block, state: &[u8], source: &mut BlockSource) -> Option<Vec<Piece>> {
+    fn format(
+        &self,
+        block: &Block,
+        state: &[u8],
+        source: &mut BlockSource,
+    ) -> Result<Option<Vec<Piece>>, String> {
         self.trace(&format!("format {} {}", self.inner.id(), block.head));
         self.inner.format(block, state, source)
     }
