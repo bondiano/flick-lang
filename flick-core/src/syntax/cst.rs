@@ -64,11 +64,22 @@ impl Node {
 
     /// Byte range of the non-trivia tokens; `0..0` for a node without any.
     pub fn range(&self) -> (u32, u32) {
-        let tokens = self.tokens();
-        let mut code = tokens.iter().filter(|t| !t.kind.is_trivia());
-        let first = code.next();
-        let last = code.next_back().or(first);
+        let first = self.code_token(false);
+        let last = self.code_token(true);
         (first.map_or(0, |t| t.start), last.map_or(0, |t| t.end))
+    }
+
+    /// The first or, from the end, the last token that is not trivia.
+    fn code_token(&self, from_end: bool) -> Option<Token> {
+        let code = |child: &Element| match child {
+            Element::Node(n) => n.code_token(from_end),
+            Element::Token(t) => (!t.kind.is_trivia()).then_some(*t),
+        };
+        if from_end {
+            self.children.iter().rev().find_map(code)
+        } else {
+            self.children.iter().find_map(code)
+        }
     }
 
     pub fn nodes(&self) -> impl Iterator<Item = &Node> {
@@ -109,5 +120,46 @@ pub fn foreign_words(decl: &Node) -> (Option<Token>, Option<Token>) {
         [mode, name, ..] => (Some(mode), Some(name)),
         [name] => (None, Some(name)),
         [] => (None, None),
+    }
+}
+
+#[cfg(test)]
+mod range_tests {
+    use super::{Element, Node, Token};
+    use crate::syntax::kind::SyntaxKind as K;
+
+    fn token(kind: K, start: u32, end: u32) -> Element {
+        Element::Token(Token { kind, start, end })
+    }
+
+    #[test]
+    fn range_spans_the_code_of_nested_nodes_without_trivia() {
+        let inner = |children| {
+            Element::Node(Node {
+                kind: K::Block,
+                children,
+            })
+        };
+        let nested = Node {
+            kind: K::Block,
+            children: vec![
+                token(K::Whitespace, 0, 1),
+                inner(vec![token(K::Whitespace, 1, 2), token(K::Ident, 2, 3)]),
+                inner(vec![]),
+                inner(vec![token(K::Ident, 4, 5), token(K::Whitespace, 5, 6)]),
+                token(K::Whitespace, 6, 7),
+            ],
+        };
+        assert_eq!(nested.range(), (2, 5));
+        let one = Node {
+            kind: K::Block,
+            children: vec![token(K::Ident, 3, 4)],
+        };
+        assert_eq!(one.range(), (3, 4));
+        let blank = Node {
+            kind: K::Block,
+            children: vec![token(K::Whitespace, 3, 4)],
+        };
+        assert_eq!(blank.range(), (0, 0));
     }
 }
