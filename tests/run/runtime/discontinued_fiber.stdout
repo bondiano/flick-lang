@@ -1,0 +1,14 @@
+child stops
+supervised, an interruption: true
+finalizer, after the child
+2
+--
+ensuring, when the body is let go
+5
+--
+the body held by the arm closes
+supervised, an interruption: true
+the fiber stopped
+--
+finalizer of what resumed
+a second resume is a defect: true

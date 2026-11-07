@@ -1,0 +1,11 @@
+inner
+outer, added last
+outer, added first
+arm runs
+left two scopes
+--
+inside, before the arm
+arm runs
+after the handler
+around, when its scope ends
+left one scope
