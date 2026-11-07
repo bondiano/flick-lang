@@ -129,7 +129,7 @@ theorem Nest.init {Ψ e₀ t φ} (h : Typ S [] Facts.none [] e₀ (.ex t φ)) (h
   cases i with
   | none =>
     cases hi
-    exact ⟨Tm.Within.of_has hn (fun p hp => absurd (hb p (.inl hp)) (Nat.not_lt_zero _))
+    exact ⟨Tm.Within.of_has hn (fun p hp => absurd (hb p hp) (Nat.not_lt_zero _))
       (fun l hl => absurd (h.locs l hl) (Nat.not_lt_zero _)), fun q hq => (hn.frame q hq).elim⟩
   | some rj => obtain ⟨g, hg, -⟩ := Cfg.at_some.mp hi; simp at hg
 

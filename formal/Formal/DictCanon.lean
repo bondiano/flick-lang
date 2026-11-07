@@ -28,9 +28,8 @@ theorem canonical_dict {Ψ Θ Γ v c U φ} (hv : Value v) (h : Typ S Ψ Θ Γ v 
   | drec => cases h with | drec hc hl hr hn _ => exact ⟨_, _, _, _, rfl, rfl, hc, hl, hr, hn⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
-    simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
-    have := Const.resKind_cases ‹Const›; omega
-  | _ => simp [VKind, Tm.head, Tm.args, Const.kindAt, Ty.kind] at hk
+    simp [VKind, Tm.head, Ty.kind] at hk
+  | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
 /-- A field a dictionary record declares is there, at its scheme. -/
 theorem Typ.dfs_field {Ψ Θ Γ l} : ∀ {r : Tm} {fs : List (Label × Scheme)} {s : Scheme},

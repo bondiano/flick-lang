@@ -152,10 +152,6 @@ theorem phead_sim (hC : BClosed B) (hV : BNoVal B) (hA : BNoAlts B) (hP : BPlain
     cases h with
     | base hb => exact .inl hb
     | try_ h₁ _ => exact .inr ⟨_, .tryVal (Cg.value hV hv h₁).1, h₁⟩
-  | withVal hv =>
-    cases h with
-    | base hb => exact .inl hb
-    | with_ _ h₂ => exact .inr ⟨_, .withVal (Cg.value hV hv h₂).1, h₂⟩
   | hwithVal hv =>
     cases h with
     | base hb => exact .inl hb
@@ -188,14 +184,6 @@ theorem phead_sim (hC : BClosed B) (hV : BNoVal B) (hA : BNoAlts B) (hP : BPlain
     cases h with
     | base hb => exact .inl hb
     | hdone h₁ => exact .inr ⟨_, .hdoneVal (Cg.value hV hv h₁).1, h₁⟩
-  | bind hv =>
-    cases h with
-    | base hb => exact .inl hb
-    | bind h₁ => exact .inr ⟨_, .bind (Cg.value hV hv h₁).1, .econs h₁ .enil⟩
-  | join h₁ h₂ =>
-    cases h with
-    | base hb => exact .inl hb
-    | join a b => exact .inr ⟨_, .join (a.isEnv hV h₁) (b.isEnv hV h₂), a.envAppend hV h₁ b⟩
   | intEq =>
     cases h with
     | base hb => exact .inl hb
@@ -204,7 +192,7 @@ theorem phead_sim (hC : BClosed B) (hV : BNoVal B) (hA : BNoAlts B) (hP : BPlain
       | base hb => exact (nb hb .lit).elim
       | lit =>
         cases h₁ with
-        | base hb => exact (nb hb (.constApp (.inl rfl) .lit)).elim
+        | base hb => exact (nb hb (.constApp rfl .lit)).elim
         | app h₃ h₄ =>
           cases h₃ with
           | base hb => exact (nb hb .const).elim
@@ -269,7 +257,7 @@ theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClos
             exact .inr ⟨_, _, _, .refSet (Cg.value hV hv h₂).1 (hμ.lt hl), .lit, hΛ, hμ.set _ h₂⟩
           | base hb => exact (nb hb .loc).elim
         | base hb => exact (nb hb .const).elim
-      | base hb => exact (nb hb (.constApp (.inl rfl) .loc)).elim
+      | base hb => exact (nb hb (.constApp rfl .loc)).elim
   | await =>
     cases h with
     | base hb => exact .inl hb
@@ -277,18 +265,6 @@ theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClos
       cases h₁ with
       | task he => exact .inr ⟨_, _, _, .await, he, hΛ, hμ⟩
       | base hb => exact (nb hb .task).elim
-  | build hv hb =>
-    cases h with
-    | base hb => exact .inl hb
-    | provide h₁ h₂ =>
-      obtain ⟨b₂, hb₂, r⟩ := (h₁.build hV hv).some_left hb
-      exact .inr ⟨_, _, _, .build (Cg.value hV hv h₁).1 hb₂, .provide r h₂, hΛ, hμ⟩
-  | provideEnv hθ =>
-    cases h with
-    | base hb => exact .inl hb
-    | provide h₁ h₂ =>
-      refine .inr ⟨_, _, _, .provideEnv (h₁.isEnv hV hθ), ?_, hΛ.app (.cons RgR.new .nil), hμ⟩
-      rw [hΛ.length]; exact .inside (.with_ h₁ h₂)
   | hctlRaise hE hk hv =>
     subst hk
     cases h with

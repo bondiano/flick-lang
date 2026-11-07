@@ -28,16 +28,13 @@ def Caps.none : Caps := fun _ => False
 /-- An element of a row: a named service or error type, or an atom. In a row of
 services the atom `ϱ` is `Scope ϱ`; in a row of errors the atoms bound what the
 errors reach, `⌈Errors ε⌉` (regions.md §2.1). A row of services also carries the
-obligations `{Provided {S} ϱ}` not yet discharged (`ob S ϱ`, regions.md §2.7), those
-`{Provided r ϱ}` over a row variable `r` (`obv r ϱ`) and, at
-run time, the uses `need S π` of a service `S` that a `with` frame of the `provide`
-region `π` answers. `rv a` is a row variable: a substitution replaces it with the row
-that `σ a` stands for (`Ty.asRow`). -/
+obligations `{Provided {S} ϱ}` not yet discharged (`ob S ϱ`, regions.md §2.7) and those
+`{Provided r ϱ}` over a row variable `r` (`obv r ϱ`). `rv a` is a row variable: a
+substitution replaces it with the row that `σ a` stands for (`Ty.asRow`). -/
 inductive Elem
   | nm (N : Name)
   | atm (a : Atom)
   | ob (N : Name) (a : Atom)
-  | need (N : Name) (a : Atom)
   | rv (a : Atom)
   | obv (v a : Atom)
 
@@ -98,7 +95,7 @@ def Lit.base : Lit → Base
   | .bool _ => .bool
   | .int _ => .int
 
-/-- Types `τ` of core.md §1.2 and regions.md §1.2, and the run-time `Env ρ`.
+/-- Types `τ` of core.md §1.2 and regions.md §1.2.
 A record type is a spine `rcons ℓ τ (… rnil)`; field order is fixed. A nominal
 type `T ā` is a spine `tapp (… (tapp (adt T) a₁) …) aₙ`. A region is `tvar n` or
 `rg π`; a capture row is `tvar n` or `caps C`. The hidden qualifier `C` of a
@@ -120,9 +117,7 @@ inductive Ty
   | rnil
   | rcons (l : Label) (t rest : Ty)
   | eff (r e : Row) (t : Ty) (C : Caps)
-  | layer (i e o : Row)
   | errors (e : Row)
-  | env (r : Row)
   | hnd (s : Ty)
   | owner (s : Ty)
   | dict (c : Nat) (args : Ty)
@@ -148,10 +143,10 @@ def Ty.reach : Ty → Caps
 /-- A set of atoms after a substitution: each atom becomes `⌈σ a⌉`. -/
 def Caps.substT (σ : Atom → Ty) (C : Caps) : Caps := fun a => ∃ b, C b ∧ (σ b).reach a
 
-/-- The names, atoms and variables of a row: obligations and uses never come in through
-a row variable. -/
+/-- The names, atoms and variables of a row: obligations never come in through a row
+variable. -/
 def Row.plain (r : Row) : Row
-  | .ob .. | .need .. | .obv .. => False
+  | .ob .. | .obv .. => False
   | x => r x
 
 /-- What a type stands for as the instance of a row variable: a variable is itself, a
@@ -162,8 +157,8 @@ def Ty.asRow : Ty → Row
   | .row r => r.plain
   | t => Row.ofCaps t.reach
 
-/-- A row after a substitution: a name stays, an atom `a` (also of an obligation or a
-use) becomes the atoms of `⌈σ a⌉`, a row variable `a` the row `σ a` stands for, and so does
+/-- A row after a substitution: a name stays, an atom `a` (also of an obligation)
+becomes the atoms of `⌈σ a⌉`, a row variable `a` the row `σ a` stands for, and so does
 the row variable of an obligation: `Provided v ϱ` becomes one for each name and variable
 of `σ v`. -/
 def Row.substT (σ : Atom → Ty) (r : Row) : Row
@@ -172,7 +167,6 @@ def Row.substT (σ : Atom → Ty) (r : Row) : Row
   | .ob n a => (∃ b, r (.ob n b) ∧ (σ b).reach a) ∨
       ∃ v b, r (.obv v b) ∧ (σ v).asRow (.nm n) ∧ (σ b).reach a
   | .obv w a => ∃ v b, r (.obv v b) ∧ (σ v).asRow (.rv w) ∧ (σ b).reach a
-  | .need n a => ∃ b, r (.need n b) ∧ (σ b).reach a
   | .rv a => ∃ b, r (.rv b) ∧ (σ b).asRow (.rv a)
 
 def Stage.substT (σ : Atom → Ty) : Stage → Stage
@@ -193,9 +187,7 @@ def Ty.substT (σ : Atom → Ty) : Ty → Ty
   | .rnil => .rnil
   | .rcons l t r => .rcons l (t.substT σ) (r.substT σ)
   | .eff r e t C => .eff (r.substT σ) (e.substT σ) (t.substT σ) (C.substT σ)
-  | .layer i e o => .layer (i.substT σ) (e.substT σ) (o.substT σ)
   | .errors e => .errors (e.substT σ)
-  | .env r => .env (r.substT σ)
   | .hnd s => .hnd (s.substT σ)
   | .owner s => .owner (s.substT σ)
   | .dict c a => .dict c (a.substT σ)
@@ -261,10 +253,6 @@ inductive Const
   | refMake
   | refGet
   | refSet
-  | ask (S : Name)
-  | succeed (S : Name)
-  | effect (S : Name)
-  | merge
   | open_
   | op
   | addFin
@@ -273,13 +261,8 @@ inductive Const
   | perform (E o : Name) (c : OpClass)
 
 def Const.arity : Const → Nat
-  | .refSet | .merge | .addFin | .spawn | .intEq => 2
+  | .refSet | .addFin | .spawn | .intEq => 2
   | _ => 1
-
-/-- `Layer.*`: a saturated application is a value, built by `provide`. -/
-def Const.layer : Const → Prop
-  | .succeed _ | .effect _ | .merge => True
-  | _ => False
 
 /-- Patterns of core.md §1.3: constructor patterns and record patterns are spines. -/
 inductive Pat
@@ -307,8 +290,7 @@ def Pat.binds : Pat → Nat
 core.md §3.1 and regions.md §3.1. Binders: `lam b`, `let_ e b` and
 `scope e` bind one variable (`scope` binds the owner); `letrec f b` and `fix f`
 bind two in `f` (`0 = x`, `1 = f`) and `letrec` one in `b`; arms bind
-`p.binds` in the guard and the body. An environment `θ` is a spine
-`econs S v (… enil)`; `raise` is a term former, not a constant. `drec c r` is a
+`p.binds` in the guard and the body. `raise` is a term former, not a constant. `drec c r` is a
 dictionary record of λFlick⁺ with the fields `r`, an `rcons` spine; it is a value and
 `proj` reads its fields. `glob g` is a global: an instance, a structural or primitive
 dictionary or a constant of Γ₀, which steps to its value in `Σ₀`.
@@ -344,12 +326,6 @@ inductive Tm
   | raise (e : Tm)
   | try_ (e alts : Tm)
   | handle (v alts : Tm)
-  | provide (l e : Tm)
-  | with_ (p : Nat) (θ e : Tm)
-  | enil
-  | econs (S : Name) (v θ : Tm)
-  | bind (S : Name) (e : Tm)
-  | join (e₁ e₂ : Tm)
   | scope (e : Tm)
   | inside (p : Nat) (e : Tm)
   | cap (p : Nat)
@@ -384,26 +360,6 @@ def Tm.unguarded : Tm → List Pat
   | .aguard _ _ _ r => r.unguarded
   | _ => []
 
-/-- `θ(S)`. -/
-def Tm.envLookup : Tm → Name → Option Tm
-  | .econs S' v θ, S => if S' = S then some v else θ.envLookup S
-  | _, _ => none
-
-/-- `θ₁ ∪ θ₂`: the first binding of a name wins. -/
-def Tm.envAppend : Tm → Tm → Tm
-  | .econs S v θ, θ₂ => .econs S v (θ.envAppend θ₂)
-  | _, θ₂ => θ₂
-
-/-- `build(v)` of core.md §3.4 on a layer value. -/
-def Tm.build : Tm → Option Tm
-  | .app (.const (.succeed S)) v => some (.econs S v .enil)
-  | .app (.const (.effect S)) v => some (.bind S (.await v))
-  | .app (.app (.const .merge) v₁) v₂ => do
-    let b₁ ← v₁.build
-    let b₂ ← v₂.build
-    pure (.join b₁ b₂)
-  | _ => none
-
 /-- A type scheme `∀ α₀ … αₖ₋₁. Θ ⇒ t` of a typing context; `k = 0` and no
 facts is a monotype. -/
 structure Scheme where
@@ -421,10 +377,10 @@ def Scheme.Closed (n : Nat) (s : Scheme) : Prop :=
 /-- `α₀ … αₖ₋₁`. -/
 def idTs (k : Nat) : List Ty := (List.range k).map Ty.tvar
 
-/-- Declared ADTs and services. A constructor has the number of parameters of its
+/-- Declared ADTs and effects. A constructor has the number of parameters of its
 type, its argument types over them and its type name; its fields mention nothing
-but the parameters (`ctor_closed`, `ctor_reach`). The record type `S.Impl` of a
-service is closed. A class `c` of λFlick⁺ has `k` parameters and fields with their
+but the parameters (`ctor_closed`, `ctor_reach`). The record type `S.Impl` of an
+effect, what `Σ₀` gives for it, is closed. A class `c` of λFlick⁺ has `k` parameters and fields with their
 schemes, which mention the parameters below their own binders (`dict_closed`); a global
 has a closed scheme. -/
 structure Sig where
@@ -446,8 +402,13 @@ structure Sig where
   an `abort` one returns any type. -/
   op : Name → Name → Option (OpClass × Ty × Ty)
   op_closed : ∀ E o c a b σ, op E o = some (c, a, b) → a.substT σ = a ∧ b.substT σ = b
-  /-- An effect is no service: nothing implements it as one (E016). -/
-  op_impl : ∀ E o c a b, op E o = some (c, a, b) → impl E = .errors Row.none
+  /-- An effect with an operation that is not `tail` has no root: its record has no
+  value (E016). -/
+  op_impl : ∀ E o c a b, op E o = some (c, a, b) → c ≠ .tail → impl E = .errors Row.none
+  /-- The record of any other effect has a function for each operation, of no row:
+  a root answers it without anything around. -/
+  op_field : ∀ E o a b, op E o = some (.tail, a, b) → impl E ≠ .errors Row.none →
+    (impl E).field o = some (.arrow a (.rt Row.none Row.none) b Caps.none)
   dict_closed : ∀ c k fs, dict c = some (k, fs) → ∀ l s, (l, s) ∈ fs → s.Closed (s.k + k)
   glob_closed : ∀ g s, glob g = some s → s.Closed s.k
 
@@ -458,13 +419,9 @@ structure CArg where
   C : Caps
   r : Row
   e : Row
-  o : Row
-  r' : Row
-  e' : Row
-  o' : Row
 
 instance : Inhabited CArg :=
-  ⟨⟨.base .unit, .base .unit, Caps.none, Row.none, Row.none, Row.none, Row.none, Row.none, Row.none⟩⟩
+  ⟨⟨.base .unit, .base .unit, Caps.none, Row.none, Row.none⟩⟩
 
 /-- `Scope ϱ` as a row. -/
 def Row.scope (s : Ty) : Row := Row.ofCaps s.reach
@@ -488,13 +445,6 @@ def Const.ty (S : Sig) : Const → CArg → Ty
   | .refGet, ι => .arrow (.ref ι.t) (.rt Row.none Row.none) ι.t Caps.none
   | .refSet, ι =>
     .arrow (.ref ι.t) .pure (.arrow ι.t (.rt Row.none Row.none) (.base .unit) Caps.none) Caps.none
-  | .ask Sv, _ => .arrow (.base .unit) (.rt (Row.single Sv) Row.none) (S.impl Sv) Caps.none
-  | .succeed Sv, _ => .arrow (S.impl Sv) .pure (.layer Row.none Row.none (Row.single Sv)) Caps.none
-  | .effect Sv, ι =>
-    .arrow (.eff ι.r ι.e (S.impl Sv) Caps.none) .pure (.layer ι.r ι.e (Row.single Sv)) Caps.none
-  | .merge, ι =>
-    .arrow (.layer ι.r ι.e ι.o) .pure (.arrow (.layer ι.r' ι.e' ι.o') .pure
-      (.layer (Row.union ι.r ι.r') (Row.union ι.e ι.e') (Row.union ι.o ι.o')) Caps.none) Caps.none
   | .open_, ι => .arrow (.owner ι.s) (.rt (Row.scope ι.s) Row.none) (.hnd ι.s) Caps.none
   | .op, ι => .arrow (.hnd ι.s) (.rt Row.none Row.none) (.base .unit) Caps.none
   | .addFin, ι =>
@@ -512,15 +462,10 @@ def Const.ty (S : Sig) : Const → CArg → Ty
 
 /-- Side conditions of a constant at an instance: a finalizer and a child outlive their
 owner, with everything they hold
-(`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`). The work of a
-finalizer or a child has no uses: uses come only from `with` frames. `Layer.merge` has
-none: soundness does not need its outputs disjoint, and the disjointness the checker
-sees on names is not kept by instantiating a row variable. -/
-def Const.ok (S : Sig) (Θ : Facts) : Const → CArg → Prop
-  | .addFin, ι => Outl Θ ι.C ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
-  | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ ∀ N a, ¬ ι.r (.need N a)
-  -- of a service, not an effect
-  | .ask N, _ => ∀ o, S.op N o = none
+(`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`). -/
+def Const.ok (Θ : Facts) : Const → CArg → Prop
+  | .addFin, ι => Outl Θ ι.C ι.s
+  | .spawn, ι => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s
   | .perform _ _ _, _ => False
   | _, _ => True
 

@@ -13,16 +13,13 @@ def Tm.IsHdl : Tm → Prop
   | .hwith .. | .hctl .. | .hres .. | .hdone .. => True
   | _ => False
 
-/-- A typed pure redex holds no run-time form, but for the value of a `with` and the
-forms of a handler. -/
-
+/-- A typed pure redex holds no run-time form, but for the forms of a handler. -/
 theorem PHead.noIns {r r' : Tm} {A : Nat → Prop} {Ψ' Θ J} (hh : PHead r r') (h : r.Within Ψ B anc A)
-    (ht : Typ S Ψ' Θ [] r J) (hw : ∀ q θ v, r ≠ .with_ q θ v) (hd : ¬ r.IsHdl) : r.NoIns := by
+    (ht : Typ S Ψ' Θ [] r J) (hd : ¬ r.IsHdl) : r.NoIns := by
   have vn : ∀ {x : Tm} {A}, Value x → x.Within Ψ B anc A → ¬ x.Has .ins := fun hv hx => hv.noIns hx
   have nv := hh.not_value
   cases hh <;> simp only [Tm.Within] at h <;> simp only [Tm.NoIns, Tm.Has, not_or] <;>
     first
-    | exact (hw _ _ _ rfl).elim
     | exact (hd trivial).elim
     | (cases ht with | errVal hv => exact (nv hv).elim)
     | exact ⟨h.1.2, vn ‹_› h.2.1⟩
@@ -31,7 +28,6 @@ theorem PHead.noIns {r r' : Tm} {A : Nat → Prop} {Ψ' Θ J} (hh : PHead r r') 
     | exact vn ‹_› h
     | exact ⟨vn ‹_› h.1, vn ‹_› h.2.1⟩
     | exact ⟨h.2.2, vn ‹_› h.2.1⟩
-    | exact ⟨vn (IsEnv.value ‹_›) h.1, vn (IsEnv.value ‹_›) h.2.1⟩
     | (have h3 := h.2.2; simp only [Tm.NoIns, Tm.Has, not_or] at h3; exact ⟨vn ‹_› h.1, h3⟩)
     | simp
 
@@ -116,34 +112,6 @@ theorem Nest.grow0 {c : Cfg} {home i e p g g'} (hn : Nest Ψ c anc B home) (hi :
   have hn₁ := hn.regs hg hl (hl'.trans hl) hk hf
   have hi₁ := Cfg.at_grow hg hl' (let ⟨ks, h, _⟩ := hk; ⟨ks, h⟩) hi
   hn₁.put_local hi₁ (fun _ _ h => h) (fun _ _ h => h) (hn₁.thread i e hi₁).1 (fun _ => Iff.rfl) hn₁.cells
-
-theorem WithinE.with_frame {A : Nat → Prop} {q : Nat} {θ : Tm} :
-    ∀ {E : List Frame}, WithinE Ψ B anc A E → .with_ q θ ∈ E → θ.NoIns ∧ θ.Within Ψ B anc (fun _ => False)
-  | F :: E, ⟨hE, hF⟩, h => by
-    rcases List.mem_cons.mp h with rfl | h
-    · exact hF
-    · exact WithinE.with_frame hE h
-
-/-- A child or a finalizer in the `with` frames of its context, at the place of its owner. -/
-theorem withs_within {A : Nat → Prop} {x : Tm} :
-    ∀ {E : List Frame}, (∀ q θ, .with_ q θ ∈ E → θ.NoIns ∧ θ.Within Ψ B anc (fun _ => False)) →
-      x.Within Ψ B anc A → (∀ q, ¬ x.Has (.frame q)) →
-      (withs E x).Within Ψ B anc A ∧ ∀ q, ¬ (withs E x).Has (.frame q)
-  | [], _, hx, hf => ⟨hx, hf⟩
-  | F :: E, hE, hx, hf => by
-    simp only [withs]
-    refine withs_within (fun q θ h => hE q θ (List.mem_cons_of_mem _ h)) ?_ ?_
-    · cases F with
-      | with_ q θ => exact ⟨(hE q θ List.mem_cons_self).1, (hE q θ List.mem_cons_self).2, hx⟩
-      | _ => exact hx
-    · cases F with
-      | with_ q θ =>
-        rintro q' (h | h | h | h)
-        · cases h
-        · cases h
-        · exact (hE q θ List.mem_cons_self).1.frame q' h
-        · exact hf q' h
-      | _ => exact hf
 
 theorem Frame.hole_eq {F : Frame} {A : Nat → Prop} (h : ¬ F.isInside) : F.hole A = A := by
   cases F <;> simp_all [Frame.hole, Frame.isInside]

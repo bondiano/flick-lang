@@ -1,14 +1,14 @@
 import Formal.KidTy
 
 /-!
-# Steps keep the `inside` forms younger than the `with` frames around them
+# Steps keep the `inside` forms younger than the handlers around them
 -/
 
 namespace Flick
 
 variable {S : Sig}
 
-/-- Every thread, child and finalizer has its `inside` forms after the `with` frames
+/-- Every thread, child and finalizer has its `inside` forms after the handlers
 around them; cells hold no run-time form. -/
 structure CfgAsc (Λ : List Rgn) (μ : List Tm) (e : Tm) : Prop where
   main : e.Asc 0
@@ -21,7 +21,6 @@ theorem PHead.asc {r r' : Tm} {n : Nat} (hh : PHead r r') (h : r.Asc n) : r'.Asc
     fun hv hx _ => Tm.Asc.of_noIns (vn hv hx)
   have plain : r.NoIns → r'.Asc n := fun hn => Tm.Asc.of_noIns fun hi => hn (hh.has hi)
   cases hh with
-  | withVal hv => exact Tm.Asc.of_noIns (hv.ascNoIns h.2)
   | hwithVal hv => exact ⟨Tm.Asc.of_noIns h.2.1, va hv h.2.2 n, .inl (vn hv h.2.2)⟩
   | hctlTail hE hk hv =>
     subst hk
@@ -43,42 +42,8 @@ theorem PHead.asc {r r' : Tm} {n : Nat} (hh : PHead r r') (h : r.Asc n) : r'.Asc
     | exact ⟨h.1, h.2⟩
     | exact vn ‹_› h
     | exact ⟨vn ‹_› h.1, vn ‹_› h.2.1⟩
-    | exact ⟨vn (IsEnv.value ‹_›) h.1, vn (IsEnv.value ‹_›) h.2.1⟩
     | (have h3 := h.2; simp only [Tm.NoIns, Tm.Has, not_or] at h3; exact ⟨vn ‹_› h.1, h3⟩)
     | simp
-
-theorem envLookup_noIns {θ v : Tm} {N : Name} (hθ : θ.NoIns) (h : θ.envLookup N = some v) : v.NoIns :=
-  fun hv => hθ (envLookup_has h hv)
-
-theorem lookupE_noIns {n : Nat} {N : Name} {q : Nat} {v : Tm} :
-    ∀ {E : List Frame}, AscE n E → lookupE E N = some (q, v) → v.NoIns
-  | [], _, h => by simp [lookupE] at h
-  | F :: E, ⟨hE, hF⟩, h => by
-    simp only [lookupE] at h
-    cases hl : F.lookup N with
-    | some w =>
-      rw [hl] at h; cases h
-      cases F with
-      | with_ q' θ =>
-        simp only [Frame.lookup, Option.map_eq_some_iff] at hl
-        obtain ⟨w, hw, hwq⟩ := hl
-        cases hwq
-        exact envLookup_noIns hF hw
-      | _ => simp [Frame.lookup] at hl
-    | none => rw [hl] at h; exact lookupE_noIns hE h
-
-theorem AscE.with_noIns {n q : Nat} {θ : Tm} : ∀ {E : List Frame}, AscE n E → .with_ q θ ∈ E → θ.NoIns
-  | F :: E, ⟨hE, hF⟩, h => by
-    rcases List.mem_cons.mp h with rfl | h
-    · exact hF
-    · exact AscE.with_noIns hE h
-
-theorem plug_frame_prov {q : Nat} {θ : Tm} :
-    ∀ {E : List Frame} {r : Tm}, .with_ q θ ∈ E → (plug E r).Has (.prov q)
-  | F :: E, r, h => by
-    rcases List.mem_cons.mp h with rfl | h
-    · exact plug_has E (.inr (.inl rfl))
-    · exact plug_frame_prov (E := E) (r := F.plug r) h
 
 theorem Frame.has_of_hole {s : Site} (F : Frame) {r : Tm} (h : (F.plug (.var 0)).Has s) :
     (F.plug r).Has s := by
@@ -96,8 +61,7 @@ theorem plug_frame_has {s : Site} :
 theorem ascBE_below {E : List Frame} {r : Tm} {n : Nat} (h : (plug E r).Below n) : ascBE 0 E ≤ n :=
   ascBE_le (Nat.zero_le _) fun F hF q hq => by
     cases F <;> simp only [Frame.bump, reduceCtorEq, Option.some.injEq] at hq
-    case with_ => subst hq; exact h _ (.inr (plug_frame_prov hF))
-    all_goals subst hq; exact h _ (.inl (plug_frame_has hF (by simp [Frame.plug, Tm.Has])))
+    all_goals subst hq; exact h _ (plug_frame_has hF (by simp [Frame.plug, Tm.Has]))
 
 theorem CfgAsc.set {Λ : List Rgn} {μ : List Tm} {e e' : Tm} {p : Nat} {g g' : Rgn} (h : CfgAsc Λ μ e)
     (hg : Λ[p]? = some g) (hk : ∀ k ∈ g'.kids ++ g'.fins, k ∈ g.kids ++ g.fins ∨ k.Asc 0)
@@ -107,7 +71,7 @@ theorem CfgAsc.set {Λ : List Rgn} {μ : List Tm} {e e' : Tm} {p : Nat} {g g' : 
   · exact (hk k hk').elim (h.rgs _ _ hg k) id
   · exact h.rgs q g'' hq k hk'
 
-/-- A step at the redex keeps the order of `inside` forms and `with` frames. -/
+/-- A step at the redex keeps the order of `inside` forms and handlers. -/
 theorem RHead.asc {Λ μ r Λ' μ' r'} {n : Nat} {e : Tm} (hh : RHead Λ μ r Λ' μ' r')
     (hc : CfgAsc Λ μ e) (hr : r.Asc n) (hn : n ≤ Λ.length) :
     r'.Asc n ∧ ∀ e', e'.Asc 0 → CfgAsc Λ' μ' e' := by
@@ -132,16 +96,6 @@ theorem RHead.asc {Λ μ r Λ' μ' r'} {n : Nat} {e : Tm} (hh : RHead Λ μ r Λ
     · subst hi; rw [List.getElem?_set_self hlt] at hv'; cases hv'; exact vn hv hr.2.1
     · rw [List.getElem?_set_ne hi] at hv'; exact hc.mem l v' hv'
   | await => exact noins hr
-  | build hv hb =>
-    refine same ⟨Tm.Asc.of_noIns fun h => vn hv hr.1 (build_has _ hb h), hr.2⟩
-  | provideEnv hθ =>
-    refine ⟨⟨hn, vn hθ.value hr.1, Tm.Asc.of_noIns hr.2⟩, fun e' he => ⟨he, fun q g hq k hk => ?_, hc.mem⟩⟩
-    by_cases hql : q < Λ.length
-    · rw [List.getElem?_append_left hql] at hq; exact hc.rgs q g hq k hk
-    · rw [List.getElem?_append_right (by omega)] at hq
-      cases hj : q - Λ.length with
-      | zero => simp [hj] at hq; subst hq; simp [Rgn.new] at hk
-      | succ => simp [hj] at hq
   | tryRaise hv => exact noins fun h => h.elim (vn hv hr.1) hr.2
   | hctlRaise hE hk hv =>
     subst hk
@@ -223,7 +177,7 @@ theorem RHead.asc {Λ μ r Λ' μ' r'} {n : Nat} {e : Tm} (hh : RHead Λ μ r Λ
   | close hg =>
     exact ⟨hr.2, fun e' he => hc.set hg (fun k hk => .inl (by simp at hk ⊢; exact .inl hk)) he⟩
 
-/-- A step of a thread keeps the order of `inside` forms and `with` frames. -/
+/-- A step of a thread keeps the order of `inside` forms and handlers. -/
 theorem Step.asc {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     (hs : Step root l Λ μ e (.cfg Λ' μ' e')) (hc : CfgAsc Λ μ e) (hb : e.Below Λ.length) :
     e'.Asc 0 ∧ ∀ x, x.Asc 0 → CfgAsc Λ' μ' x := by
@@ -236,12 +190,12 @@ theorem Step.asc {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     obtain ⟨hA, hr⟩ := asc_of_plug hh.not_value hE hc.main
     obtain ⟨hr', k⟩ := hh.asc hc hr (ascBE_below hb)
     exact ⟨hA.fill hr', k⟩
-  | askWith hE hl _ =>
-    obtain ⟨hA, -⟩ := asc_of_plug ask_not_value hE hc.main
-    exact ⟨hA.fill (Tm.Asc.of_noIns (lookupE_noIns hA hl)), fun _ => keep⟩
-  | askRoot hE _ hr₀ =>
-    obtain ⟨hA, -⟩ := asc_of_plug ask_not_value hE hc.main
-    exact ⟨hA.fill (Tm.Asc.of_noIns ((hroot.svc _ _ hr₀).2.noIns (hroot.svc _ _ hr₀).1)), fun _ => keep⟩
+  | performRoot hE _ hr₀ hf hv =>
+    obtain ⟨hA, hr⟩ := asc_of_plug perform_not_value hE hc.main
+    obtain ⟨hwv, hwt⟩ := hroot.svc _ _ hr₀
+    have hfn : Tm.NoIns _ := fun h => hwt.noIns hwv (field_has hf h)
+    exact ⟨hA.fill ⟨Tm.Asc.of_noIns hfn, Tm.Asc.of_noIns (hv.ascNoIns hr.2.1), .inl (hv.ascNoIns hr.2.1)⟩,
+      fun _ => keep⟩
   | glob hE hg =>
     obtain ⟨hA, -⟩ := asc_of_plug (fun h => by cases h) hE hc.main
     exact ⟨hA.fill (Tm.Asc.of_noIns ((hroot.glob _ _ hg).1 _)), fun _ => keep⟩
@@ -301,8 +255,7 @@ theorem Step.asc {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     · exact .inl (List.mem_append_left _ hk)
     · exact .inl (List.mem_append_right _ hk)
     · simp at hk; subst hk
-      exact .inr (withs_asc (x := .await _) (fun q θ h => hA.with_noIns h)
-        (fun m => Tm.Asc.of_noIns (hv.ascNoIns hr.2.1 : Tm.NoIns _)) 0)
+      exact .inr (Tm.Asc.of_noIns (hv.ascNoIns hr.2.1 : Tm.NoIns _))
   | spawn hE hg _ hv =>
     obtain ⟨hA, hr⟩ := asc_of_plug (fin_not_value (.inr rfl)) hE hc.main
     refine ⟨hA.fill (Tm.Asc.of_noIns (by simp [Tm.NoIns, Tm.Has])), fun x hx => hc.set hg (fun k hk => ?_) hx⟩
@@ -310,8 +263,7 @@ theorem Step.asc {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     rcases hk with (hk | hk) | hk
     · exact .inl (List.mem_append_left _ hk)
     · simp at hk; subst hk
-      exact .inr (withs_asc (x := .await _) (fun q θ h => hA.with_noIns h)
-        (fun m => Tm.Asc.of_noIns (hv.ascNoIns hr.2.1 : Tm.NoIns _)) 0)
+      exact .inr (Tm.Asc.of_noIns (hv.ascNoIns hr.2.1 : Tm.NoIns _))
     · exact .inl (List.mem_append_right _ hk)
 
 end Flick

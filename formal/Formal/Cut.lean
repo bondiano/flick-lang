@@ -81,8 +81,8 @@ theorem Scheme.Holds.mono {Θ₁ Θ₂ : Facts} {s : Scheme} {ts : List Ty} (h :
   fun C r hc => hΘ _ _ (h C r hc)
 
 /-- Facts that follow from the context may be dropped. -/
-theorem Row.withP_mono {Θ₁ Θ₂ : Facts} {q : Nat} {ρ r : Row} (hΘ : Entails Θ₁ Θ₂) :
-    Row.Sub (Row.withP Θ₁ q ρ r) (Row.withP Θ₂ q ρ r) := by
+theorem Row.hP_mono {Θ₁ Θ₂ : Facts} {q : Nat} {E : Name} {r : Row} (hΘ : Entails Θ₁ Θ₂) :
+    Row.Sub (Row.hP Θ₁ q E r) (Row.hP Θ₂ q E r) := by
   intro x hx
   cases x with
   | ob N a => exact ⟨fun h => hΘ _ _ (hx.1 h), hx.2⟩
@@ -124,14 +124,6 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | hnil hH => intro _ _; exact .hnil hH
   | hcons hp _ _ hH ih₁ ih₂ => intro _ hΘ; exact .hcons hp (ih₁ hΘ) (ih₂ hΘ) hH
   | hguard hp _ _ _ hH ih₁ ih₂ ih₃ => intro _ hΘ; exact .hguard hp (ih₁ hΘ) (ih₂ hΘ) (ih₃ hΘ) hH
-  | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ hΘ; exact .provideL (ih₁ hΘ) (ih₂ hΘ) h₁ h₀ h₂
-  | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ hΘ; exact .provideE (ih₁ hΘ) (ih₂ hΘ) h₁ h₀ h₂
-  | with_ hv _ _ h₁ h₂ ih₁ ih₂ =>
-    intro _ hΘ; exact .with_ hv (ih₁ hΘ) (ih₂ hΘ) (Stage.le_rt_sub h₁ (Row.withP_mono hΘ)) h₂
-  | enil hρ => intro _ _; exact .enil hρ
-  | econs hv hθ _ _ hρ ih₁ ih₂ => intro _ hΘ; exact .econs hv hθ (ih₁ hΘ) (ih₂ hΘ) hρ
-  | bind _ hρ ih => intro _ hΘ; exact .bind (ih hΘ) hρ
-  | join _ _ hρ ih₁ ih₂ => intro _ hΘ; exact .join (ih₁ hΘ) (ih₂ hΘ) hρ
   | scope hn hF _ hφ' hφ hT ih => intro _ hΘ; exact .scope hn hF (ih (hΘ.lift _ _)) hφ' hφ hT
   | inside hF _ hφ' ht hε hφ hT ih =>
     intro _ hΘ; exact .inside hF (ih (hΘ.union _)) hφ' ht hε hφ hT
@@ -147,12 +139,12 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | hatail hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hatail hop (ih₁ hΘ) (ih₂ hΘ)
   | haabort hop _ _ ih₁ ih₂ => intro _ hΘ; exact .haabort hop (ih₁ hΘ) (ih₂ hΘ)
   | hactl hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hactl hop (ih₁ hΘ) (ih₂ hΘ)
-  | hdl _ hn _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
-    intro _ hΘ; exact .hdl (ih₁ (hΘ.substT _)) hn (ih₂ hΘ) hψ (ih₃ hΘ) hφ₀ hc hφ hT
+  | hdl _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
+    intro _ hΘ; exact .hdl (ih₁ (hΘ.substT _)) hn (ih₂ hΘ) hψ (ih₃ hΘ) hφ₀ hOb hc hφ hT
   | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
-    intro _ hΘ; exact .hwith hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) hφ₀ hc hφ hT
+    intro _ hΘ; exact .hwith hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hφ hT
   | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ih₁ ih₂ ih₃ ih₄ =>
-    intro _ hΘ; exact .hctl hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) hφ₀ (ih₄ hΘ) hl hcm hφ hT
+    intro _ hΘ; exact .hctl hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) (ih₄ hΘ) hl hcm hφ hT
   | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ => intro _ hΘ; exact .hres hℓ (ih₁ hΘ) hA ha (ih₂ hΘ) hl hφ hT
   | hdone _ ih => intro _ hΘ; exact .hdone (ih hΘ)
   | unw hℓ _ hφ ih => intro _ hΘ; exact .unw hℓ (ih hΘ) hφ

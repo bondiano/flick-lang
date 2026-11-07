@@ -61,7 +61,7 @@ theorem Nest.hole_live {c : Cfg} {home i E r} (hn : Nest Ψ c anc B home) (hi : 
   · exact ((hn.thread i _ hi).2 x (plug_frame hx)).2
 
 /-- A redex creates the region `|Λ|`, a child of the regions of its place, whose
-`inside` form holds a body without `inside` forms (`scope`, `provide`). -/
+`inside` form holds a body without `inside` forms (`scope`, `hdl`). -/
 theorem Nest.fresh {c : Cfg} {home i E r b} (hn : Nest Ψ c anc B home)
     (hi : c.at i = some (plug E r)) (hE : OkE E) (hv : ¬ Value r) (hr : r.NoIns)
     (hb : ∀ q, ¬ b.Has (.frame q))

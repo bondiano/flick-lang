@@ -52,11 +52,10 @@ theorem Tm.rename_fix :
     rw [bind ih₁ fun i hi => h i (.inl hi), bind ih₂ fun i hi => h i (.inr (.inl hi)),
       ih₃ ξ fun i hi => h i (.inr (.inr hi))]
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂ | with_ _ _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ =>
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro ξ h; simp only [Tm.rename]
     rw [ih₁ ξ fun i hi => h i (.inl hi), ih₂ ξ fun i hi => h i (.inr hi)]
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih
   | drec _ _ ih => intro ξ h; simp only [Tm.rename]; rw [ih ξ h]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro ξ h; simp only [Tm.rename]
@@ -98,11 +97,10 @@ theorem Tm.subst_fix :
     rw [bind ih₁ fun i hi => h i (.inl hi), bind ih₂ fun i hi => h i (.inr (.inl hi)),
       ih₃ σ fun i hi => h i (.inr (.inr hi))]
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂ | with_ _ _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ =>
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro σ h; simp only [Tm.subst]
     rw [ih₁ σ fun i hi => h i (.inl hi), ih₂ σ fun i hi => h i (.inr hi)]
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih
   | drec _ _ ih => intro σ h; simp only [Tm.subst]; rw [ih σ h]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ h; simp only [Tm.subst]

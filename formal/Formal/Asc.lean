@@ -1,14 +1,11 @@
 import Formal.BelowStep
 
 /-!
-# A region is younger than the `with` frames around its `inside` form
+# A region is younger than the handlers around its `inside` form
 
-Run-time forms stand only where the term evaluates, and under a `with` frame of the
-`provide` region `q` a `scope` creates a region after `q`. A child keeps the `with`
-frames of the place that registered it, so an obligation `Provided {N} ϱ` that a
-region `ϱ` of that place discharged meets, in the child, frames older than `ϱ`
-(`KidTy.lean`). `e.Asc n`: the `inside` forms of `e` name regions `≥ n`, and those
-under a `with` frame of `q` regions `> q`.
+Run-time forms stand only where the term evaluates, and under a handler of the region `q`
+a `scope` creates a region after `q`. `e.Asc n`: the `inside` forms of `e` name regions
+`≥ n`, and those under a handler of `q` regions `> q`.
 -/
 
 namespace Flick
@@ -38,12 +35,6 @@ def Tm.Asc : Tm → Nat → Prop
   | .raise e, n => e.Asc n
   | .try_ e al, n => e.Asc n ∧ al.NoIns
   | .handle v al, _ => v.NoIns ∧ al.NoIns
-  | .provide l e, n => l.Asc n ∧ e.NoIns
-  | .with_ q θ e, n => θ.NoIns ∧ e.Asc (max n (q + 1))
-  | .enil, _ => True
-  | .econs _ v θ, _ => v.NoIns ∧ θ.NoIns
-  | .bind _ e, n => e.Asc n
-  | .join e₁ e₂, n => e₁.Asc n ∧ e₂.Asc n ∧ (e₂.NoIns ∨ Value e₁)
   | .scope e, _ => e.NoIns
   | .inside p e, n => n ≤ p ∧ e.Asc n
   | .cap _, _ => True
@@ -73,23 +64,18 @@ theorem Value.ascNoIns {e : Tm} {n : Nat} (hv : Value e) (h : e.Asc n) : e.NoIns
   | rcons _ _ ih₁ ih₂ => rintro (h' | h'); exact ih₁ h.1 h'; exact ih₂ h.2.1 h'
   | ctorApp _ _ _ ih₁ ih₂ => rintro (h' | h'); exact ih₁ h.1 h'; exact ih₂ h.2.1 h'
   | constApp _ _ ih => rintro (h' | h'); cases h'; exact ih h.2.1 h'
-  | constApp2 _ _ _ _ ih₁ ih₂ =>
-    rintro ((h' | h') | h'); cases h'; exact ih₁ h.1.2.1 h'; exact ih₂ h.2.1 h'
-  | econs => rintro (h' | h'); exact h.1 h'; exact h.2 h'
   | drec => exact h
   | _ => intro h'; cases h'
 
 /-- The bound under a frame. -/
 def Frame.ascB (n : Nat) : Frame → Nat
-  | .with_ q _ => max n (q + 1)
   | .hwith p .. | .hctlA p .. | .hresB p .. | .hdone p => max n (p + 1)
   | _ => n
 
 def Frame.Asc (n : Nat) : Frame → Prop
-  | .appL a | .let_ a | .match_ a | .rconsL _ a | .updL _ a | .try_ a | .provide a | .joinL a =>
+  | .appL a | .let_ a | .match_ a | .rconsL _ a | .updL _ a | .try_ a =>
     a.NoIns
-  | .appR v | .rconsR _ v | .updR v _ | .joinR v => v.Asc n ∧ Value v
-  | .with_ _ θ => θ.NoIns
+  | .appR v | .rconsR _ v | .updR v _ => v.Asc n ∧ Value v
   | .inside p => n ≤ p
   | .hwith _ _ _ al r => al.NoIns ∧ r.NoIns
   | .hctlA p _ _ _ _ al r k => al.NoIns ∧ r.NoIns ∧ k.Asc (max n (p + 1))
@@ -134,9 +120,8 @@ theorem asc_of_plug {n : Nat} {r : Tm} (hv : ¬ Value r) :
     obtain ⟨h₃, h₄⟩ := Frame.asc_of_plug hF hv h₂
     exact ⟨⟨h₁, h₃⟩, h₄⟩
 
-/-- The region a frame raises the bound to after: a `provide`'s or a handler's. -/
+/-- The region a frame raises the bound to after: a handler's. -/
 def Frame.bump : Frame → Option Nat
-  | .with_ q _ => some q
   | .hwith p .. | .hctlA p .. | .hresB p .. | .hdone p => some p
   | _ => none
 
@@ -150,33 +135,5 @@ theorem ascBE_le {n m : Nat} {E : List Frame} (hn : n ≤ m)
     all_goals
       have := hq _ List.mem_cons_self _ rfl
       omega
-
-/-- An `inside` form under a `with` frame of `q` names a region younger than `q`. -/
-theorem AscE.with_inside {n q p : Nat} {θ : Tm} :
-    ∀ {E₀ E₁ : List Frame}, AscE n (E₀ ++ .with_ q θ :: E₁) → .inside p ∈ E₀ → q < p
-  | F :: E₀, E₁, h, hp => by
-    simp only [List.cons_append, AscE] at h
-    rcases List.mem_cons.mp hp with rfl | hp
-    · have key : ∀ E : List Frame, q + 1 ≤ ascBE n (E ++ .with_ q θ :: E₁) := by
-        intro E
-        induction E with
-        | nil =>
-          simp only [List.nil_append, ascBE, Frame.ascB]
-          exact Nat.le_max_right _ _
-        | cons G E ih => cases G <;> simp only [List.cons_append, ascBE, Frame.ascB] at ih ⊢ <;> omega
-      have := key E₀
-      have := h.2; simp only [Frame.Asc] at this; omega
-    · exact AscE.with_inside h.1 hp
-
-/-- A child or a finalizer in the `with` frames of its context. -/
-theorem withs_asc {x : Tm} :
-    ∀ {E : List Frame}, (∀ q θ, .with_ q θ ∈ E → θ.NoIns) → (∀ m, x.Asc m) → ∀ m, (withs E x).Asc m
-  | [], _, hx => hx
-  | F :: E, hE, hx => by
-    simp only [withs]
-    refine withs_asc (fun q θ h => hE q θ (List.mem_cons_of_mem _ h)) ?_
-    cases F with
-    | with_ q θ => exact fun m => ⟨hE q θ List.mem_cons_self, hx _⟩
-    | _ => exact hx
 
 end Flick

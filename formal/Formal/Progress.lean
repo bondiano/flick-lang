@@ -65,18 +65,21 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
   have step : ∀ {l o}, Step root l Λ μ (.app f e) o → Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc :=
     fun h => .inr (.step ⟨_, _, h⟩)
   have blocked : Blocks Λ (.app f e) → Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc :=
-    fun h => .inr (.blocked (.inl ⟨[], _, OkE.nil, rfl, h⟩))
+    fun h => .inr (.blocked ⟨[], _, OkE.nil, rfl, h⟩)
   rcases canonical_arrow hvf hf with ⟨b, rfl⟩ | ⟨g, rfl⟩ | ⟨K, hK⟩ | ⟨c, rfl⟩ |
       ⟨c, w, rfl, hc, hw⟩ | ⟨p, ℓ, rfl⟩
   · exact step (Step.ofP (.beta hve))
   · exact step (Step.ofP (.fix hve))
   · exact .inl (.ctorApp hvf hK hve)
   · cases hf with
-    | perform hop hT' =>
+    | @perform Ef o c _ _ _ _ _ _ _ _ hop hT' =>
       obtain ⟨_, _, _, _, h, _, hψ', _, -⟩ := hT'.arrow_left
       cases h
-      exact .inr (.perform ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
-        Stage.le_svc (Stage.le_trans hψ' hψ) _ rfl⟩)
+      by_cases hra : RootAnswers root Ef o c
+      · obtain ⟨rfl, _, _, hr, hf⟩ := hra
+        exact step (Step.performRoot (E := []) OkE.nil (fun _ h => by cases h) hr hf hve)
+      · exact .inr (.perform ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
+          hra, Stage.le_svc (Stage.le_trans hψ' hψ) _ rfl⟩)
     | const hok hT' =>
       cases c with
       | perform E o _ => simp_all [Const.ok]
@@ -86,22 +89,10 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
         cases h; cases la
         obtain ⟨l, rfl, hl⟩ := canonical_ref hve he
         exact step (Step.ofR (.refGet (List.getElem?_eq_getElem (hμ ▸ getElem?_lt hl))))
-      | refSet => exact .inl (.constApp (.inl rfl) hve)
-      | ask N =>
-        obtain ⟨_, _, _, _, h, la, hψ', _, -⟩ := hT'.arrow_left
-        cases h; cases la
-        obtain rfl := canonical_unit hve he
-        cases hr : root.svc N with
-        | some w => exact step (Step.askRoot (E := []) OkE.nil rfl hr)
-        | none =>
-          exact .inr (.ask ⟨[], N, OkE.nil, rfl, rfl, hr, hok,
-            Stage.le_svc (Stage.le_trans hψ' hψ) _ rfl⟩)
-      | succeed => exact .inl (.constApp (.inr trivial) hve)
-      | effect => exact .inl (.constApp (.inr trivial) hve)
-      | merge => exact .inl (.constApp (.inl rfl) hve)
-      | addFin => exact .inl (.constApp (.inl rfl) hve)
-      | spawn => exact .inl (.constApp (.inl rfl) hve)
-      | intEq => exact .inl (.constApp (.inl rfl) hve)
+      | refSet => exact .inl (.constApp rfl hve)
+      | addFin => exact .inl (.constApp rfl hve)
+      | spawn => exact .inl (.constApp rfl hve)
+      | intEq => exact .inl (.constApp rfl hve)
       | open_ =>
         obtain ⟨_, _, _, _, h, la, _, _, -⟩ := hT'.arrow_left
         cases h; cases la
@@ -126,7 +117,6 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
           cases h; cases la
           obtain ⟨l, rfl, hl⟩ := canonical_ref hw hw'
           exact step (Step.ofR (.refSet hve (hμ ▸ getElem?_lt hl)))
-    | merge => exact .inl (.constApp2 rfl trivial hw hve)
     | addFin =>
       cases hf with
       | app hc' hw' _ _ =>

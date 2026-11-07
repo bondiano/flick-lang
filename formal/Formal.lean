@@ -27,8 +27,6 @@ import Formal.Canonical
 import Formal.Shapes
 import Formal.CanonForms
 import Formal.DictCanon
-import Formal.CanonEnv
-import Formal.CanonLayer
 import Formal.Patterns
 import Formal.Frames
 import Formal.Context
@@ -71,8 +69,6 @@ import Formal.NestHdlStep
 import Formal.NestHdlTyp
 import Formal.NestMain
 import Formal.Regions
-import Formal.NeedOut
-import Formal.T43
 import Formal.T43Main
 import Formal.Effects
 import Formal.Generalization

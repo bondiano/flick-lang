@@ -327,7 +327,7 @@ inductive Step (K : Core T V) (L : Lib V) : Conf T V → Conf T V → Prop
         Φ := setF C f { φ with code := .idle, stack := .closing σ :: s },
         Λ := upd C.Λ σ (some { oσ with st := .closing, x := .fail c, ph := .hooks false }),
         M := setEnt C.M m Ly (some ⟨.failed c, σ, []⟩), J := .close σ :: C.J }
-  /-- `ask_S` answered by `πₚ` of `θ` -/
+  /-- an operation answered by `πₚ` of `θ` -/
   | use {C f φ e e' π} : C.Φ f = some (.run φ) → φ.code = .tm e → K.step e (.use π) e' →
       π ∈ φ.env →
       Step K L C { C with

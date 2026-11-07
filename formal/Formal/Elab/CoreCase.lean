@@ -124,7 +124,7 @@ theorem closed_dict (hR : Real P S N) {Q : Cn} {d : Dict} (h : Ent P [] [Q] [d])
     | dict hd' =>
       rw [hd'.eq, trDt_below (δ' := fun _ => 0) hb] at td
       have hns : ∀ s, ¬ (trDt N (fun _ => 0) d).Has s := fun s => (TrD.total (N := N) _ d).has N s
-      have t₁ := td.substT μ ⟨fun p hp => (hp.elim (hns _) (hns _)).elim,
+      have t₁ := td.substT μ ⟨fun p hp => (hns _ hp).elim,
         fun hi => (hns _ hi).elim, fun hi => (hns _ hi).elim, fun hi => (hns _ hi).elim⟩
       simp only [List.map_nil, Facts.none_substT, Flick.J.substT, trTT, trStage_P] at t₁
       have t₂ := (t₁.weakenStore Ψ).cut (Θ₂ := Θ) (Entails.none Θ)

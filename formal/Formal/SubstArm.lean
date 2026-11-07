@@ -58,18 +58,12 @@ theorem Tm.has_subst_free :
     · exact .inr (.inl (bind ih₂ h hs))
     · exact .inr (.inr (ih₃ σ s i h hs))
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ =>
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro σ s i h hs
     rcases h with h | h
     · exact .inl (ih₁ σ s i h hs)
     · exact .inr (ih₂ σ s i h hs)
-  | with_ _ _ _ ih₁ ih₂ =>
-    intro σ s i h hs
-    rcases h with h | h
-    · exact .inr (.inr (.inl (ih₁ σ s i h hs)))
-    · exact .inr (.inr (.inr (ih₂ σ s i h hs)))
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | drec _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | drec _ _ ih =>
     intro σ s i h hs; exact ih σ s i h hs
   | inside p e ih => intro σ s i h hs; exact .inr (.inr (.inr (ih σ s i h hs)))
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
@@ -124,11 +118,10 @@ theorem Tm.subst_congr : ∀ (e : Tm) {σ σ' : Nat → Tm}, (∀ i, e.Free i �
     rw [ih₁ (liftS_congr fun i hi => h i (.inl hi)),
       ih₂ (liftS_congr fun i hi => h i (.inr (.inl hi))), ih₃ fun i hi => h i (.inr (.inr hi))]
   | app _ _ ih₁ ih₂ | rcons _ _ _ ih₁ ih₂ | update _ _ _ ih₁ ih₂ | match_ _ _ ih₁ ih₂
-  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ | provide _ _ ih₁ ih₂ | with_ _ _ _ ih₁ ih₂
-  | econs _ _ _ ih₁ ih₂ | join _ _ ih₁ ih₂ =>
+  | try_ _ _ ih₁ ih₂ | handle _ _ ih₁ ih₂ =>
     intro σ σ' h; simp only [Tm.subst]
     rw [ih₁ fun i hi => h i (.inl hi), ih₂ fun i hi => h i (.inr hi)]
-  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | bind _ _ ih | inside _ _ ih | drec _ _ ih =>
+  | proj _ _ ih | task _ ih | await _ ih | raise _ ih | inside _ _ ih | drec _ _ ih =>
     intro σ σ' h; simp only [Tm.subst]; rw [ih h]
   | hdl _ _ _ _ ih₁ ih₂ ih₃ | hwith _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
     intro σ σ' h; simp only [Tm.subst]
@@ -154,7 +147,7 @@ theorem held_substS {Ψ : List Ty} {Γ : List Scheme} {e : Tm} {s : Scheme} {σ 
     obtain ⟨b, hb, h'⟩ := (Scheme.reach_substT _ _ _).mp ha
     exact (Scheme.reach_substT _ _ _).mpr ⟨b, h b (.inl ⟨i, s₀, hi, hs₀, hb⟩), h'⟩
   · refine (Scheme.reach_substT _ _ _).mpr ⟨.r p, h _ (.inr (.inl ⟨p, hp, rfl⟩)), ?_⟩
-    rw [hσ.1 p (.inl hp)]; rfl
+    rw [hσ.1 p hp]; rfl
   · simp only [List.getElem?_map, Option.map_eq_some_iff] at ht
     obtain ⟨t₀, ht₀, rfl⟩ := ht
     obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ _).mp ha
@@ -240,7 +233,7 @@ theorem Typ.aref_subst {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {σ : 
     · rw [if_pos hP]
       exact hθ.sub fun s h => Tm.has_subst_free b _ s _ hP (liftS_has_of h)
     · rw [if_neg hP]
-      exact ⟨fun _ hp => hp.elim False.elim False.elim, fun h => False.elim h,
+      exact ⟨fun _ hp => False.elim hp, fun h => False.elim h,
         fun h => False.elim h, fun h => False.elim h⟩
   have h₁ := ((hσ.restrict fun i => b.Free (i + (Pat.spine K qs).binds)).up k Facts.none).mono
     (Θ' := Θ.substT (shiftV k)) fun C s h => h.mono fun _ _ h => h.elim id False.elim

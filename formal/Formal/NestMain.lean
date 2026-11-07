@@ -46,45 +46,18 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
         exact keep (hn.hresVal hi hE hA hv ht' hT)
       | hdoneVal hv => exact keep (hn.hdoneVal hi hE hv)
       | _ => simp [Tm.IsHdl] at hd
-    by_cases hw : ∃ q θ v, r₀ = .with_ q θ v
-    · obtain ⟨q, θ, v, rfl⟩ := hw
-      have hnv := hh.not_value
-      cases hh with
-      | withVal hv =>
-        have hvn := hv.noIns hrW.2.2
-        refine keep (hn.redex hi hE hnv (fun q' h => ?_) (nf hvn) (fun _ _ h => h) (fun _ _ h => h)
-          (fun _ h => h.2.2) hn.cells)
-        rcases h with h | h | h | h
-        · cases h
-        · cases h
-        · exact hrW.1.frame q' h
-        · exact hvn.frame q' h
-    · obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE hh.not_value he
-      exact keep (hn.sub hi hE hh.not_value
-        (hh.noIns hrW hr (fun q θ v h => hw ⟨q, θ, v, h⟩) hd) fun _ h => hh.has h)
-  | askWith hE hl _ =>
+    obtain ⟨_, _, _, _, hr, -⟩ := ctx_typing _ hE hh.not_value he
+    exact keep (hn.sub hi hE hh.not_value (hh.noIns hrW hr hd) fun _ h => hh.has h)
+  | performRoot hE _ hr₀ hf hv =>
     rw [nil rfl, List.append_nil]
-    obtain ⟨K, Θ', t₁, φ₁, hr, _, hK, -⟩ := ctx_typing _ hE ask_not_value he
-    obtain ⟨rfl, -, look⟩ := hK.resolve_left fun hp => by subst hp; exact (ask_inv hr).1
-    have hvT := look _ _ _ hl
-    have hvv := lookupE_value hE hl
-    obtain ⟨hvr, hvl⟩ := Typ.sites hvv hvT
-    refine keep (hn.redex hi hE ask_not_value (fun q h => by simp [Tm.Has] at h)
-      (nf (hvT.noIns hvv)) (fun _ _ h => h) (fun _ _ h => h) (fun hw _ => ?_) hn.cells)
-    refine Tm.Within.of_has (hvT.noIns hvv) (fun p hp => (S.impl_reach _ _ (hvr p hp)).elim)
-      fun l' hl' => ?_
-    obtain ⟨A', -, t', ht', hB⟩ := hw.loc (lookupE_has _ hl hl')
-    exact ⟨t', ht', hB.trans (funext fun x => propext
-      ⟨fun h => (S.impl_reach _ _ (hvl l' t' hl' ht' x h.2)).elim,
-        fun h => (S.impl_reach _ _ (hvl l' t' hl' ht' x h.2)).elim⟩)⟩
-  | askRoot hE _ hr₀ =>
-    rw [nil rfl, List.append_nil]
-    obtain ⟨hvv, hvT⟩ := hroot.svc _ _ hr₀
-    obtain ⟨hvr, -⟩ := Typ.sites hvv hvT
-    exact keep (hn.redex hi hE ask_not_value (fun q h => by simp [Tm.Has] at h)
-      (nf (hvT.noIns hvv)) (fun _ _ h => h) (fun _ _ h => h) (fun _ _ => Tm.Within.of_has (hvT.noIns hvv)
-        (fun p hp => (S.impl_reach _ _ (hvr p hp)).elim)
-        fun l hl => absurd (hvT.locs l hl) (Nat.not_lt_zero _)) hn.cells)
+    have hrW := (within_of_plug perform_not_value hE hW).2
+    obtain ⟨hwv, hwt⟩ := hroot.svc _ _ hr₀
+    have hfn : Tm.NoIns _ := fun h => hwt.noIns hwv (field_has hf h)
+    have hvn := hv.noIns hrW.2.1
+    exact keep (hn.redex hi hE perform_not_value (nf fun h => h.elim (fun h => h.elim) hvn) (nf fun h => h.elim hfn hvn) (fun _ _ h => h)
+      (fun _ _ h => h) (fun _ _ => ⟨Tm.Within.of_has hfn
+        (fun p hp => (root_no_rgn hroot hr₀ p (field_has hf hp)).elim)
+        (fun l hl => absurd (hwt.locs l (field_has hf hl)) (Nat.not_lt_zero _)), hrW.2.1, .inl hvn⟩) hn.cells)
   | glob hE hg =>
     rw [nil rfl, List.append_nil]
     have hno := (hroot.glob _ _ hg).1
@@ -104,7 +77,7 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     have hnv := fin_not_value (w₁ := .own p₀) (w₂ := t₀) (.inl rfl)
     obtain ⟨hWE, hrW⟩ := within_of_plug hnv hE hW
     obtain ⟨K, Θ', _, _, hr, _, hK, -⟩ := ctx_typing _ hE hnv he
-    obtain ⟨rfl, hΘ, -⟩ := hK.resolve_left fun hp => by subst hp; exact fin_not_pure hr (.inl rfl)
+    obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact fin_not_pure hr (.inl rfl)
     rw [List.map_up_zero] at hr
     obtain ⟨U, hU, hUp⟩ := owner_arg hr (.inl rfl) fun C s h => (hΘ.2 C s h).elim id id
     have htW := hrW.2.1
@@ -116,13 +89,13 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     rcases List.mem_append.mp hf with hf | hf
     · exact hn.fins _ _ hg hl f hf
     · simp at hf; subst hf
-      exact withs_within (fun q θ h => hWE.with_frame h) (x := .await _) hw (htn.frame)
+      exact ⟨hw, htn.frame⟩
   | @spawn E _ p₀ _ t₀ _ hE hg hl hv =>
     rw [nil rfl, List.append_nil]
     have hnv := fin_not_value (w₁ := .own p₀) (w₂ := t₀) (.inr rfl)
     obtain ⟨hWE, hrW⟩ := within_of_plug hnv hE hW
     obtain ⟨K, Θ', _, _, hr, _, hK, -⟩ := ctx_typing _ hE hnv he
-    obtain ⟨rfl, hΘ, -⟩ := hK.resolve_left fun hp => by subst hp; exact fin_not_pure hr (.inr rfl)
+    obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact fin_not_pure hr (.inr rfl)
     rw [List.map_up_zero] at hr
     obtain ⟨U, hU, hUp⟩ := owner_arg hr (.inr rfl) fun C s h => (hΘ.2 C s h).elim id id
     have htW := hrW.2.1
@@ -132,7 +105,7 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
       (fun h => h.elim) (fun h => by cases h)) id)) (fun _ h => by cases h) hg hl rfl
       ⟨[_], rfl, fun k hk => by
         simp at hk; subst hk
-        exact withs_within (fun q θ h => hWE.with_frame h) (x := .await _) hw (htn.frame)⟩
+        exact ⟨hw, htn.frame⟩⟩
       fun f hf => hn.fins _ _ hg hl f hf)
   | @rt E _ _ _ _ _ _ hE hh =>
     have hnv := hh.not_value
@@ -195,38 +168,6 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     | await =>
       rw [nil rfl, List.append_nil]
       exact keep (hn.sub hi hE hnv hrW.2 fun _ h => h)
-    | build hv hb =>
-      rw [nil rfl, List.append_nil]
-      exact keep (hn.sub hi hE hnv (fun h => h.elim (hv.noIns hrW.1) hrW.2.2)
-        fun _ h => h.elim (fun h => .inl (build_has _ hb h)) .inr)
-    | @provideEnv θ₀ _ _ e₀ hθ =>
-      rw [nil rfl, List.append_nil]
-      obtain ⟨Θ', t', φ', hr, -⟩ := hole_rt (RHead.provideEnv (Λ := Λ) (μ := μ) (e := e₀) hθ) hE he
-      obtain ⟨o, hθT⟩ : ∃ o, Typ S Ψ Θ' [] θ₀ (.ex (.env o) .pure) := by
-        cases hr with
-        | provideL hl =>
-          obtain ⟨_, hb, -⟩ := canonical_layer hθ.value hl
-          cases hθ <;> simp [Tm.build] at hb
-        | provideE hl => exact ⟨_, hl.valueAny hθ.value _⟩
-        | errVal hv => exact (hnv hv).elim
-      obtain ⟨hθr, hθl⟩ := Typ.sites hθ.value hθT
-      have hθn := hθ.value.noIns hrW.1
-      have hθ0 : θ₀.Within Ψ B anc (fun _ => False) :=
-        Tm.Within.of_has hθn (fun p hp => by simpa [Ty.reach, Caps.none] using hθr p hp) fun l hl => by
-          obtain ⟨t, ht, hB⟩ := hrW.1.loc0 hθn hl
-          refine ⟨t, ht, hB.trans (funext fun x => propext ⟨fun h => ?_, fun h => h.1.elim⟩)⟩
-          have := hθl l t hl ht x h.2
-          simp [Ty.reach, Caps.none] at this
-      obtain ⟨anc', home', h', hag⟩ := hn.fresh (b := .with_ Λ.length θ₀ e₀) hi hE hnv
-        (fun h => h.elim hθn hrW.2.2) (fun q h => by
-          rcases h with h | h | h | h
-          · cases h
-          · cases h
-          · exact hθn.frame q h
-          · exact hrW.2.2.frame q h)
-        fun _ _ _ => ⟨hθn, hθ0.anyAnc hθn, (hrW.2.1.extend hrW.2.2 fun l t ht h =>
-          Nat.lt_irrefl _ ((hΨ t (List.mem_of_getElem? ht)).reach h)).anyAnc hrW.2.2⟩
-      exact ⟨anc', B, home', h', hag⟩
     | tryRaise hv =>
       rw [nil rfl, List.append_nil]
       exact keep (hn.sub hi hE hnv (fun h => h.elim (hv.noIns hrW.1) hrW.2.2)

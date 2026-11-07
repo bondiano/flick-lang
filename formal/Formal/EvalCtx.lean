@@ -25,11 +25,6 @@ inductive Frame
   | updR (v : Tm) (l : Label)
   | await
   | try_ (al : Tm)
-  | provide (e : Tm)
-  | bind (S : Name)
-  | joinL (e : Tm)
-  | joinR (v : Tm)
-  | with_ (q : Nat) (θ : Tm)
   | raise
   | inside (p : Nat)
   | hwith (p ℓ : Nat) (E : Name) (al r : Tm)
@@ -49,11 +44,6 @@ def Frame.plug : Frame → Tm → Tm
   | .updR v l, e => .update v l e
   | .await, e => .await e
   | .try_ al, e => .try_ e al
-  | .provide b, e => .provide e b
-  | .bind S, e => .bind S e
-  | .joinL b, e => .join e b
-  | .joinR v, e => .join v e
-  | .with_ q θ, e => .with_ q θ e
   | .raise, e => .raise e
   | .inside p, e => .inside p e
   | .hwith p ℓ E al r, e => .hwith p ℓ E al r e
@@ -63,7 +53,7 @@ def Frame.plug : Frame → Tm → Tm
 
 /-- Left-to-right order: a frame to the right of a value needs the value. -/
 def Frame.ok : Frame → Prop
-  | .appR v | .rconsR _ v | .updR v _ | .joinR v | .with_ _ v => Value v
+  | .appR v | .rconsR _ v | .updR v _ => Value v
   | _ => True
 
 def Frame.isTry : Frame → Prop
@@ -96,8 +86,9 @@ holds it: the nearest frame where `resume` of `p` stops is that arm. -/
 def Resumable (E : List Frame) (p ℓ : Nat) : Prop :=
   ∃ A E' ℓh Ef al r k, E = A ++ .hctlA p ℓh ℓ false Ef al r k :: E' ∧ ∀ G ∈ A, ¬ G.resumes p
 
-/-- The handler of `E` with an arm for `o` that a frame installs, with its region. -/
-def Frame.handles (E o : Name) : Frame → Option Nat
+/-- The handler of `E` with an arm for `o` of the class `c` that a frame installs, with its
+region. -/
+def Frame.handles (E o : Name) (_ : OpClass) : Frame → Option Nat
   | .hwith p _ E' al _ => if E' = E ∧ (al.armOf o).isSome then some p else none
   | _ => none
 
@@ -106,15 +97,12 @@ def Frame.installs : Frame → Name → Prop
   | .hwith _ _ E _ _, N => E = N
   | _, _ => False
 
-/-- The service a `with` frame provides, with the region of its `provide`. -/
-def Frame.lookup : Frame → Name → Option (Nat × Tm)
-  | .with_ q θ, S => (θ.envLookup S).map (q, ·)
-  | _, _ => none
-
-/-- A `with` frame of a context kept around a child or a finalizer it registers. -/
-def Frame.wrap : Frame → Tm → Tm
-  | .with_ q θ, e => .with_ q θ e
-  | _, e => e
+/-- The handler of an operation in a context: its region, if a frame answers it. -/
+def handlerOf : List Frame → Name → Name → OpClass → Option Nat
+  | [], _, _, _ => none
+  | F :: E, Ef, o, c => match F.handles Ef o c with
+    | some q => some q
+    | none => handlerOf E Ef o c
 
 /-- `E[e]`; the list starts at the innermost frame. -/
 def plug : List Frame → Tm → Tm
@@ -128,19 +116,6 @@ def Frame.Parks : Frame → Prop
   | .hctlA p _ _ _ _ _ _ k => ∃ Ei, OkE Ei ∧ k = Flick.plug Ei (.hole p)
   | .hresB p _ a => ∃ A, OkE A ∧ a = Flick.plug A (.hole p)
   | _ => True
-
-/-- `lookup(E, S)` of core.md §3.2 without the fallback to `Σ₀`. -/
-def lookupE : List Frame → Name → Option (Nat × Tm)
-  | [], _ => none
-  | F :: E, S => match F.lookup S with
-    | some v => some v
-    | none => lookupE E S
-
-/-- The `with` frames of a context around a term: the environment a child or a
-finalizer inherits from where it is registered (runtime.md §3.5). -/
-def withs : List Frame → Tm → Tm
-  | [], e => e
-  | F :: E, e => withs E (F.wrap e)
 
 /-- What a term writes, a frame and a context around it write. -/
 theorem Frame.plug_has {e : Tm} {s : Site} (F : Frame) (h : e.Has s) : (F.plug e).Has s := by

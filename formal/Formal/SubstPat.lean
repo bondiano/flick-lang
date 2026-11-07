@@ -56,7 +56,7 @@ theorem Shp.of_substT {σ : Atom → Ty} :
       · exact .adt hs hU h fun K hh => (hB K hh).of_substT
       · exact .hidden h
   | .tvar _, _, _ | .rg _, _, _ | .caps _, _, _ | .row _, _, _ | .arrow .., _, _ | .ref _, _, _
-  | .eff .., _, _ | .layer .., _, _ | .errors _, _, _ | .env _, _, _ | .hnd _, _, _
+  | .eff .., _, _ | .errors _, _, _ | .hnd _, _, _
   | .owner _, _, _ | .dict .., _, _ => .hidden (by simp [Ty.Opaque, Ty.hd])
 
 theorem Covers.substT {t ps e} (σ : Atom → Ty) (h : Covers S t ps e) :
@@ -134,7 +134,7 @@ theorem Catches.substT {ε₀ : Row} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom
     rcases h _ hb with h | h
     · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨v, b, hc, hv, h'⟩⟩
     · exact .inr ⟨v, b, h, hv, h'⟩
-  | need _ a | rv a =>
+  | rv a =>
     obtain ⟨b, hb, h'⟩ := hn
     rcases h _ hb with h | h
     · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨b, hc, h'⟩⟩

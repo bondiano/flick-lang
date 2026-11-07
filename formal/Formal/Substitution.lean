@@ -31,9 +31,7 @@ theorem Typ.armOf_subst {σ : Nat → Tm} {o : Name} :
   | .aguard _ _ _ _, _, _, _, _, _, _, _, h | .todo, _, _, _, _, _, _, _, h
   | .task _, _, _, _, _, _, _, _, h | .await _, _, _, _, _, _, _, _, h | .raise _, _, _, _, _, _, _, _, h
   | .try_ _ _, _, _, _, _, _, _, _, h | .handle _ _, _, _, _, _, _, _, _, h
-  | .provide _ _, _, _, _, _, _, _, _, h | .with_ _ _ _, _, _, _, _, _, _, _, h
-  | .enil, _, _, _, _, _, _, _, h | .econs _ _ _, _, _, _, _, _, _, _, h | .bind _ _, _, _, _, _, _, _, _, h
-  | .join _ _, _, _, _, _, _, _, _, h | .scope _, _, _, _, _, _, _, _, h | .inside _ _, _, _, _, _, _, _, _, h
+  | .scope _, _, _, _, _, _, _, _, h | .inside _ _, _, _, _, _, _, _, _, h
   | .cap _, _, _, _, _, _, _, _, h | .own _, _, _, _, _, _, _, _, h | .drec _ _, _, _, _, _, _, _, _, h
   | .glob _, _, _, _, _, _, _, _, h | .hdl _ _ _ _, _, _, _, _, _, _, _, h
   | .hwith _ _ _ _ _ _, _, _, _, _, _, _, _, h | .hctl _ _ _ _ _ _ _ _ _, _, _, _, _, _, _, _, h
@@ -109,15 +107,6 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ hσ
     exact .hguard hp (ih₁ (SubOk.lift hσ _ (by simpa using hp.binds)))
       (ih₂ (SubOk.lift hσ _ (by simpa using hp.binds))) (ih₃ hσ) hH
-  | provideL _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ _ hσ; exact .provideL (ih₁ hσ) (ih₂ hσ) h₁ h₀ h₂
-  | provideE _ _ h₁ h₀ h₂ ih₁ ih₂ => intro _ _ hσ; exact .provideE (ih₁ hσ) (ih₂ hσ) h₁ h₀ h₂
-  | with_ hv _ _ h₁ h₂ ih₁ ih₂ =>
-    intro _ _ hσ; exact .with_ hv.subst (ih₁ hσ) (ih₂ hσ) h₁ h₂
-  | enil hρ => intro _ _ _; exact .enil hρ
-  | econs hv hθ _ _ hρ ih₁ ih₂ =>
-    intro _ σ hσ; exact .econs hv.subst ((Homo.subst σ).isEnv hθ) (ih₁ hσ) (ih₂ hσ) hρ
-  | bind _ hρ ih => intro _ _ hσ; exact .bind (ih hσ) hρ
-  | join _ _ hρ ih₁ ih₂ => intro _ _ hσ; exact .join (ih₁ hσ) (ih₂ hσ) hρ
   | scope hne hF he hφ' hφ hT ih =>
     intro _ _ hσ
     have hΓ : ∀ i, (Tm.scope _).Free i → i < _ := fun i h => by
@@ -139,11 +128,11 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | hatail hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hatail hop (ih₁ (SubOk.lift hσ [_] rfl)) (ih₂ hσ)
   | haabort hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .haabort hop (ih₁ (SubOk.lift hσ [_] rfl)) (ih₂ hσ)
   | hactl hop _ _ ih₁ ih₂ => intro _ _ hσ; exact .hactl hop (ih₁ (SubOk.lift hσ [_, _] rfl)) (ih₂ hσ)
-  | hdl hal hn _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+  | hdl hal hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ σ hσ
     have h₁ := ih₁ ((SubOk.up hσ 1 Facts.none).mono fun C s h x hx =>
       (h x hx).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', h₁.elim id False.elim, h₂⟩)
-    exact .hdl h₁ (SubOk.noIns hσ (by simpa using hal.frees) hn) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+    exact .hdl h₁ (SubOk.noIns hσ (by simpa using hal.frees) hn) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
   | hwith hℓ hal _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ σ hσ

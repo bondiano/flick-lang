@@ -207,7 +207,6 @@ theorem trDt_shape (δ : Nat → Nat) (d : Dict) : ¬ Value (trDt N δ d) ∧
     · cases hv with
       | ctorApp _ hK => exact ih₁.2.1 _ hK
       | constApp => exact ih₁.2.2.1 _ rfl
-      | constApp2 => exact ih₁.2.2.2 _ _ rfl
     · simp only [Flick.Tm.app.injEq] at h; exact ih₁.2.2.1 c h.1
   | _ =>
     refine ⟨fun hv => ?_, fun K => by simp [trDt, Flick.Tm.head], fun c => by simp [trDt],

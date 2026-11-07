@@ -60,9 +60,6 @@ theorem PHead.has {e e' : Tm} (h : PHead e e') {s : Site} (hs : e'.Has s) : e.Ha
     have := plug_has_inv (r := .hole p) (r' := w) (s := s) A
     simp only [Tm.Has] at hs ⊢; grind
   | tryVal => exact .inl hs
-  | withVal => exact .inr (.inr (.inr hs))
-  | bind => rcases hs with h | h; exact h; cases h
-  | join => exact envAppend_has hs
   | intEq => cases hs
 
 /-- The terms of a configuration write only regions that exist. -/
@@ -88,8 +85,8 @@ theorem CfgBelow.set {Λ μ e e' p g g'} (h : CfgBelow Λ μ e) (hg : Λ[p]? = s
   · exact ⟨hk, hf⟩
   · exact h.rgs q g'' hq
 
-theorem Tm.Below.empty {n : Nat} {x : Tm} (h : ∀ p, ¬ x.Has (.rgn p) ∧ ¬ x.Has (.prov p)) : x.Below n :=
-  fun p hp => (hp.elim (h p).1 (h p).2).elim
+theorem Tm.Below.empty {n : Nat} {x : Tm} (h : ∀ p, ¬ x.Has (.rgn p)) : x.Below n :=
+  fun p hp => (h p hp).elim
 
 theorem CfgBelow.alloc {Λ : List Rgn} {μ : List Tm} {e : Tm} (h : CfgBelow Λ μ e) {v : Tm}
     (hv : v.Below Λ.length) : CfgBelow Λ (μ ++ [v]) e := by
@@ -135,28 +132,6 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
     · subst hi; rw [List.getElem?_set_self hlt] at hv'; cases hv'; exact sub fun _ h => .inr h
     · rw [List.getElem?_set_ne hi] at hv'; exact h.mem l v hv'
   | await => exact same (sub fun _ h => h)
-  | build hv hb => exact same (sub fun _ h => h.elim (fun h => .inl (build_has _ hb h)) .inr)
-  | provideEnv =>
-    refine ⟨h.append _ fun p hp => ?_, by simp⟩
-    rcases hp with hp | hp
-    · rcases hp with hp | hp | hp | hp
-      · cases hp; omega
-      · cases hp
-      · cases hp
-      · rcases hp with hp | hp | hp | hp
-        · cases hp
-        · cases hp
-        · exact Nat.lt_succ_of_lt (h.main p (.inl (.inl hp)))
-        · exact Nat.lt_succ_of_lt (h.main p (.inl (.inr hp)))
-    · rcases hp with hp | hp | hp | hp
-      · cases hp
-      · cases hp
-      · cases hp
-      · rcases hp with hp | hp | hp | hp
-        · cases hp
-        · cases hp; omega
-        · exact Nat.lt_succ_of_lt (h.main p (.inr (.inl hp)))
-        · exact Nat.lt_succ_of_lt (h.main p (.inr (.inr hp)))
   | tryRaise => exact same (sub fun _ h => h.elim .inl (.inr ·))
   | hwithCatch => exact same (sub fun _ hs => by simp only [Tm.Has] at hs ⊢; grind)
   | @hctlRaise k p w _ _ ℓ κ E r al tl Ei _ hk _ =>
@@ -202,21 +177,13 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
   | handleNil => exact same (sub fun _ h => .inl h)
   | scope =>
     refine ⟨h.append _ fun p hp => ?_, by simp⟩
-    rcases hp with hp | hp
-    · rcases hp with hp | hp | hp | hp
-      · cases hp; omega
-      · cases hp
-      · cases hp
-      · rcases subst_inst_has hp with hp | ⟨w, hw, hp⟩
-        · exact Nat.lt_succ_of_lt (h.main _ (.inl hp))
-        · simp at hw; subst hw; cases hp; omega
-    · rcases hp with hp | hp | hp | hp
-      · cases hp
-      · cases hp
-      · cases hp
-      · rcases subst_inst_has hp with hp | ⟨w, hw, hp⟩
-        · exact Nat.lt_succ_of_lt (h.main _ (.inr hp))
-        · simp at hw; subst hw; cases hp
+    rcases hp with hp | hp | hp | hp
+    · cases hp; omega
+    · cases hp
+    · cases hp
+    · rcases subst_inst_has hp with hp | ⟨w, hw, hp⟩
+      · exact Nat.lt_succ_of_lt (h.main _ hp)
+      · simp at hw; subst hw; cases hp; omega
   | open_ hg =>
     obtain ⟨hk, hf⟩ := h.rgs _ _ hg
     refine ⟨h.set hg hk (fun f hf' => ?_) (sub fun _ h => by cases h; exact .inr rfl),
@@ -238,40 +205,11 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
       by simp [setRgn]⟩
 
 theorem root_below {root : Roots} (hroot : RootTy S root) {N v} (h : root.svc N = some v)
-    (n : Nat) : v.Below n := by
-  intro p hp
-  rcases hp with hp | hp
-  · have := ((hroot.svc N v h).2.holds (hroot.svc N v h).1 rfl).1 _ (.inr (.inl ⟨p, hp, rfl⟩))
-    exact (S.impl_reach N _ this).elim
-  · exact ((hroot.svc N v h).2.noIns (hroot.svc N v h).1 (Tm.has_prov_ins hp)).elim
+    (n : Nat) : v.Below n := fun p hp => (root_no_rgn hroot h p hp).elim
 
 theorem plug_below {E : List Frame} {r r' : Tm} {n : Nat} (h : (plug E r).Below n) (h' : r'.Below n) :
-    (plug E r').Below n := fun p hp => by
-  rcases hp with hp | hp
-  · exact (plug_has_inv E hp).elim (fun h₁ => h p (.inl h₁)) (fun h₁ => h' p (.inl h₁))
-  · exact (plug_has_inv E hp).elim (fun h₁ => h p (.inr h₁)) (fun h₁ => h' p (.inr h₁))
-
-/-- What the `with` frames of a context hold, the context holds. -/
-theorem withs_has {r x : Tm} {s : Site} :
-    ∀ (E : List Frame), (withs E x).Has s → (plug E r).Has s ∨ x.Has s
-  | [], h => .inr h
-  | F :: E, h => by
-    rcases withs_has (x := F.wrap x) (r := F.plug r) E h with h | h
-    · exact .inl h
-    · cases F with
-      | with_ q θ =>
-        rcases h with h | h | h | h
-        · exact .inl (plug_has E (.inl h))
-        · exact .inl (plug_has E (.inr (.inl h)))
-        · exact .inl (plug_has E (.inr (.inr (.inl h))))
-        · exact .inr h
-      | _ => exact .inr h
-
-theorem withs_below {E : List Frame} {r x : Tm} {n : Nat} (h : (plug E r).Below n) (hx : x.Below n) :
-    (withs E x).Below n := fun p hp => by
-  rcases hp with hp | hp
-  · exact (withs_has E hp).elim (fun h₁ => h p (.inl h₁)) (fun h₁ => hx p (.inl h₁))
-  · exact (withs_has E hp).elim (fun h₁ => h p (.inr h₁)) (fun h₁ => hx p (.inr h₁))
+    (plug E r').Below n := fun p hp =>
+  (plug_has_inv E hp).elim (fun h₁ => h p h₁) (fun h₁ => h' p h₁)
 
 /-- A step writes only regions that exist after it. -/
 theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
@@ -284,13 +222,13 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
   | rt hE hh =>
     obtain ⟨h', hl⟩ := hh.below ⟨h.main.sub fun _ hp => plug_has _ hp, h.mem, h.rgs⟩
     exact ⟨⟨plug_below (h.main.mono hl) h'.main, h'.mem, h'.rgs⟩, hl⟩
-  | askWith hE hv =>
-    exact ⟨⟨plug_below h.main (h.main.sub fun _ hp => lookupE_has _ hv hp), h.mem, h.rgs⟩,
-      Nat.le_refl _⟩
-  | askRoot hE _ hr => exact ⟨⟨plug_below h.main (root_below hroot hr _), h.mem, h.rgs⟩, Nat.le_refl _⟩
   | glob hE hg =>
-    exact ⟨⟨plug_below h.main fun _ hp => (hp.elim ((hroot.glob _ _ hg).1 _) ((hroot.glob _ _ hg).1 _)).elim,
-      h.mem, h.rgs⟩, Nat.le_refl _⟩
+    exact ⟨⟨plug_below h.main fun _ hp => ((hroot.glob _ _ hg).1 _ hp).elim, h.mem, h.rgs⟩, Nat.le_refl _⟩
+  | performRoot hE _ hr hf _ =>
+    refine ⟨⟨plug_below h.main fun p hp => ?_, h.mem, h.rgs⟩, Nat.le_refl _⟩
+    rcases hp with hp | hp
+    · exact root_below hroot hr _ p (field_has hf hp)
+    · exact h.main p (plug_has _ (.inr hp))
   | raise hE =>
     exact ⟨⟨plug_below h.main (h.main.sub fun _ hp => plug_has _ (Frame.plug_has _ hp)), h.mem, h.rgs⟩,
       Nat.le_refl _⟩
@@ -376,7 +314,7 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     rcases List.mem_append.mp hf' with hf' | hf'
     · exact hf f hf'
     · simp at hf'; subst hf'
-      exact withs_below h.main (h.main.sub fun _ hp => plug_has _ (.inr hp))
+      exact h.main.sub fun _ hp => plug_has _ (.inr hp)
   | spawn hE hg _ _ =>
     obtain ⟨hk, hf⟩ := h.rgs _ _ hg
     refine ⟨h.set hg (fun k hk' => ?_) hf (plug_below h.main (Tm.Below.empty fun p => by simp [Tm.Has])),
@@ -384,6 +322,6 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     rcases List.mem_append.mp hk' with hk' | hk'
     · exact hk k hk'
     · simp at hk'; subst hk'
-      exact withs_below h.main (h.main.sub fun _ hp => plug_has _ (.inr hp))
+      exact h.main.sub fun _ hp => plug_has _ (.inr hp)
 
 end Flick

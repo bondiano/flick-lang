@@ -13,7 +13,7 @@ threads, the store pointwise, and the regions pointwise with equal `live` flags 
 children and finalizers.
 
 A step whose redex lies inside the left side of a base pair is a pure step of that side
-(`dp_calm`): a term typed at the pure stage has no runtime redex, no `ask`, no registration and
+(`dp_calm`): a term typed at the pure stage has no runtime redex, no operation, no registration and
 no `raise`. The pair stays a base pair, and when its left side becomes a value the right side
 reaches the same value (`DP.step`).
 -/
@@ -55,17 +55,11 @@ theorem DP.noRaise : BNoRaise (DP S root) :=
   ⟨by rintro a b ⟨-, -, -, -, Θ, t, ht⟩; exact raise_not_pure ht,
     by rintro p ℓ a b ⟨-, -, -, -, Θ, t, ht⟩; exact unw_not_pure ht⟩
 
-theorem ask_redex {N : Name} : Redex (.app (.const (.ask N)) (.lit .unit)) := by
-  refine ⟨ask_not_value, fun F a _ ha => ?_⟩
-  cases F <;> simp [Frame.plug] at ha
-  · exact ha.1 ▸ .const
-  · exact ha.2 ▸ .lit
-
 theorem fin_redex {c : Const} {p : Nat} {t : Flick.Tm} (hc : c = .addFin ∨ c = .spawn)
     (ht : Value t) : Redex (.app (.app (.const c) (.own p)) t) := by
   refine ⟨fin_not_value hc, fun F a hF ha => ?_⟩
   cases F <;> simp [Frame.plug] at ha
-  · rw [ha.1]; exact .constApp (.inl (by rcases hc with rfl | rfl <;> rfl)) .own
+  · rw [ha.1]; exact .constApp (by rcases hc with rfl | rfl <;> rfl) .own
   · rw [ha.2]; exact ht
 
 theorem raise_redex {v : Flick.Tm} (hv : Value v) : Redex (.raise v) := by
@@ -127,8 +121,8 @@ theorem _root_.Flick.RHead.redex' {Λ Λ' : List Rgn} {μ μ' : List Flick.Tm} {
     first
     | (obtain ⟨rfl, -⟩ := ha
        first
-       | assumption | exact .const | exact .task | exact IsEnv.value ‹_›
-       | exact .constApp (.inl rfl) .loc)
+       | assumption | exact .const | exact .task
+       | exact .constApp rfl .loc)
     | (obtain ⟨-, rfl⟩ := ha
        first | assumption | exact .loc | exact .cap | exact .own)
     | (subst ha
@@ -174,12 +168,9 @@ theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
     · obtain ⟨-, -, Θ', t', h⟩ := typ (E := F :: _) (fun G hG => (List.mem_cons.mp hG).elim
         (fun h => h ▸ hF) (hE' G)) (unw_redex q ℓ a) hq.symm
       exact (unw_not_pure h).elim
-  | askWith hE' =>
-    obtain ⟨-, -, Θ', t', h⟩ := typ hE' ask_redex hq.symm
-    exact (ask_inv h).1.elim
-  | askRoot hE' =>
-    obtain ⟨-, -, Θ', t', h⟩ := typ hE' ask_redex hq.symm
-    exact (ask_inv h).1.elim
+  | performRoot hE' _ _ _ hv =>
+    obtain ⟨-, -, Θ', t', h⟩ := typ hE' (perform_redex hv) hq.symm
+    exact (perform_app_not_pure h).elim
   | addFin hE' _ _ hv =>
     obtain ⟨-, -, Θ', t', h⟩ := typ hE' (fin_redex (.inl rfl) hv) hq.symm
     exact (fin_not_pure h (.inl rfl)).elim

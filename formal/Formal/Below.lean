@@ -19,10 +19,7 @@ theorem Tm.has_frame_ins {e : Tm} {p : Nat} (h : e.Has (.frame p)) : e.Has .ins 
 theorem Tm.NoIns.frame {e : Tm} (h : e.NoIns) (p : Nat) : ¬ e.Has (.frame p) :=
   fun h' => h (Tm.has_frame_ins h')
 
-theorem Tm.has_prov_ins {e : Tm} {p : Nat} (h : e.Has (.prov p)) : e.Has .ins := by
-  induction e <;> simp_all [Tm.Has] <;> grind
-
-theorem Tm.has_ins_site {e : Tm} (h : e.Has .ins) : ∃ p, e.Has (.rgn p) ∨ e.Has (.prov p) := by
+theorem Tm.has_ins_site {e : Tm} (h : e.Has .ins) : ∃ p, e.Has (.rgn p) := by
   induction e <;> simp_all [Tm.Has] <;> grind
 
 theorem Tm.Below.noIns {e : Tm} (h : e.Below 0) : e.NoIns := fun hi =>
@@ -30,36 +27,8 @@ theorem Tm.Below.noIns {e : Tm} (h : e.Below 0) : e.NoIns := fun hi =>
   Nat.not_lt_zero _ (h p hp)
 
 
-theorem envLookup_has {θ v : Tm} {N : Name} {s : Site} (h : θ.envLookup N = some v) (hv : v.Has s) :
-    θ.Has s := by
-  induction θ with
-  | econs N' w θ' _ ih =>
-    simp only [Tm.envLookup] at h
-    split at h
-    · cases h; exact .inl hv
-    · exact .inr (ih h)
-  | _ => simp [Tm.envLookup] at h
-
-theorem lookupE_has {r v : Tm} {N : Name} {q : Nat} {s : Site} :
-    ∀ (E : List Frame), lookupE E N = some (q, v) → v.Has s → (plug E r).Has s
-  | [], h, _ => by simp [lookupE] at h
-  | F :: E, h, hv => by
-    simp only [lookupE] at h
-    cases hF : F.lookup N with
-    | some w =>
-      rw [hF] at h; cases h
-      cases F with
-      | with_ q' θ =>
-        simp only [Frame.lookup, Option.map_eq_some_iff] at hF
-        obtain ⟨w, hw, hwq⟩ := hF
-        cases hwq
-        exact plug_has E (show (Frame.plug (.with_ _ _) r).Has s from
-        Or.inr (Or.inr (Or.inl (envLookup_has hw hv))))
-      | _ => simp [Frame.lookup] at hF
-    | none => rw [hF] at h; exact lookupE_has (r := Frame.plug F r) E h hv
-
 theorem Tm.Below.sub {n : Nat} {e e' : Tm} (h : e.Below n) (hs : ∀ s, e'.Has s → e.Has s) :
-    e'.Below n := fun p hp => h p (hp.imp (hs _) (hs _))
+    e'.Below n := fun p hp => h p (hs _ hp)
 
 theorem Tm.Below.mono {n n' : Nat} {e : Tm} (h : e.Below n) (hn : n ≤ n') : e.Below n' :=
   fun p hp => Nat.lt_of_lt_of_le (h p hp) hn
@@ -74,13 +43,9 @@ theorem Tm.Below.subst {n : Nat} {e : Tm} {δ : List Tm} (h : e.Below n) (hδ : 
       · exact .inr ⟨_, List.getElem_mem _, h'⟩
       · simp [Tm.Has] at h'
   intro p hp
-  rcases hp with hp | hp
-  · rcases key _ hp with h' | ⟨w, hw, h'⟩
-    · exact h p (.inl h')
-    · exact hδ w hw p (.inl h')
-  · rcases key _ hp with h' | ⟨w, hw, h'⟩
-    · exact h p (.inr h')
-    · exact hδ w hw p (.inr h')
+  rcases key _ hp with h' | ⟨w, hw, h'⟩
+  · exact h p h'
+  · exact hδ w hw p h'
 
 theorem matchP_below {n : Nat} : ∀ (p : Pat) {v : Tm} {δ : List Tm}, v.Below n → matchP p v = some δ →
     ∀ w ∈ δ, w.Below n

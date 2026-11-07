@@ -4,7 +4,7 @@ import Formal.Preservation
 # What a redex writes
 
 The sites of a term built by a step are those of the terms it is built from: a
-substitution, a field, an update, a match, an environment, a layer, a hole filled,
+substitution, a field, an update, a match, a hole filled,
 the arm of an operation (`perform_has`).
 -/
 
@@ -37,14 +37,6 @@ theorem setField_has {v w v' : Tm} {l} {s : Site} (h : v.setField l w = some v')
       · exact (ih hr' hs).imp .inr id
   | _ => simp [Tm.setField] at h
 
-theorem envAppend_has {θ₁ θ₂ : Tm} {s : Site} (h : (θ₁.envAppend θ₂).Has s) : θ₁.Has s ∨ θ₂.Has s := by
-  induction θ₁ with
-  | econs N v θ _ ih =>
-    rcases h with h | h
-    · exact .inl (.inl h)
-    · exact (ih h).imp .inr id
-  | _ => exact .inr h
-
 theorem matchP_has {s : Site} : ∀ (p : Pat) {v : Tm} {δ : List Tm}, matchP p v = some δ →
     ∀ w ∈ δ, w.Has s → v.Has s
   | .wild, _, _, h => by simp [matchP] at h; subst h; simp
@@ -71,22 +63,6 @@ theorem matchP_has {s : Site} : ∀ (p : Pat) {v : Tm} {δ : List Tm}, matchP p 
     rcases matchP_or.mp h with h | ⟨_, h⟩
     · exact matchP_has p h
     · exact matchP_has q h
-
-theorem build_has {s : Site} (v : Tm) : ∀ {b : Tm}, v.build = some b → b.Has s → v.Has s := by
-  intro b h hb
-  rw [Tm.build.eq_def] at h
-  split at h
-  · cases h; rcases hb with hb | hb
-    · exact .inr hb
-    · simp [Tm.Has] at hb
-  · cases h; exact .inr hb
-  · rename_i v₁ v₂
-    simp only [Option.bind_eq_bind, Option.bind_eq_some_iff, Option.pure_def, Option.some.injEq] at h
-    obtain ⟨b₁, h₁, b₂, h₂, rfl⟩ := h
-    rcases hb with hb | hb
-    · exact .inl (.inr (build_has v₁ h₁ hb))
-    · exact .inr (build_has v₂ h₂ hb)
-  · cases h
 
 theorem subst_match_has {p : Pat} {v x : Tm} {δ : List Tm} {s : Site} (hm : matchP p v = some δ)
     (h : (x.subst (inst δ)).Has s) : x.Has s ∨ v.Has s :=

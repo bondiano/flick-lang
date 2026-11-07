@@ -25,7 +25,7 @@ def kill (n : Nat) : Atom → Ty
 def Ty.YF (n : Nat) (t : Ty) : Prop := t.substT (kill n) = t
 
 /-- A term writes only regions `< n`. -/
-def Tm.Below (n : Nat) (e : Tm) : Prop := ∀ p, (e.Has (.rgn p) ∨ e.Has (.prov p)) → p < n
+def Tm.Below (n : Nat) (e : Tm) : Prop := ∀ p, e.Has (.rgn p) → p < n
 
 theorem kill_reach {n : Nat} {b a : Atom} (h : (kill n b).reach a) : a = b ∧ ∀ p, a = .r p → p < n := by
   cases b with

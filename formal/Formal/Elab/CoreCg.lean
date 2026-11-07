@@ -53,15 +53,6 @@ inductive Cg (B : Flick.Tm → Flick.Tm → Prop) : Bool → Flick.Tm → Flick.
       Cg B x (.try_ e al) (.try_ e' al')
   | handle {x v v' al al'} : Cg B false v v' → Cg B false al al' →
       Cg B x (.handle v al) (.handle v' al')
-  | provide {x l l' e e'} : Cg B false l l' → Cg B false e e' →
-      Cg B x (.provide l e) (.provide l' e')
-  | with_ {x p θ θ' e e'} : Cg B false θ θ' → Cg B false e e' →
-      Cg B x (.with_ p θ e) (.with_ p θ' e')
-  | enil {x} : Cg B x .enil .enil
-  | econs {x S v v' θ θ'} : Cg B false v v' → Cg B false θ θ' →
-      Cg B x (.econs S v θ) (.econs S v' θ')
-  | bind {x S e e'} : Cg B false e e' → Cg B x (.bind S e) (.bind S e')
-  | join {x a a' b b'} : Cg B false a a' → Cg B false b b' → Cg B x (.join a b) (.join a' b')
   | scope {x e e'} : Cg B false e e' → Cg B x (.scope e) (.scope e')
   | inside {x p e e'} : Cg B false e e' → Cg B x (.inside p e) (.inside p e')
   | cap {x p} : Cg B x (.cap p) (.cap p)
@@ -146,11 +137,6 @@ theorem Cg.value (hB : BNoVal B) {a : Flick.Tm} (hv : Value a) :
       exact ⟨.rcons (ih₁ h₁).1 (ih₂ h₂).1, by simp [Flick.Tm.head],
         fun y => .rcons ((ih₁ h₁).2.2 y) ((ih₂ h₂).2.2 y)⟩
     | base h => exact (hB _ _ h (.rcons ‹_› ‹_›)).elim
-  | econs hv hθ ihv ihθ => intro x b h; cases h with
-    | econs h₁ h₂ =>
-      exact ⟨.econs (ihv h₁).1 (ihθ h₂).1, by simp [Flick.Tm.head],
-        fun _ => .econs h₁ h₂⟩
-    | base h => exact (hB _ _ h (.econs ‹_› ‹_›)).elim
   | ctorApp hf hK he ihf ihe => intro x b h; cases h with
     | app h₁ h₂ =>
       obtain ⟨vf, kf, yf⟩ := ihf h₁
@@ -165,17 +151,6 @@ theorem Cg.value (hB : BNoVal B) {a : Flick.Tm} (hv : Value a) :
           fun y => .app .const ((ihe h₂).2.2 y)⟩
       | base h => exact (hB _ _ h .const).elim
     | base h => exact (hB _ _ h (.constApp hc he)).elim
-  | constApp2 hc hl he₁ he₂ ih₁ ih₂ => intro x b h; cases h with
-    | app h₁ h₂ =>
-      cases h₁ with
-      | app h₃ h₄ =>
-        cases h₃ with
-        | const =>
-          exact ⟨.constApp2 hc hl (ih₁ h₄).1 (ih₂ h₂).1, by simp [Flick.Tm.head],
-            fun y => .app (.app .const ((ih₁ h₄).2.2 y)) ((ih₂ h₂).2.2 y)⟩
-        | base h => exact (hB _ _ h .const).elim
-      | base h => exact (hB _ _ h (.constApp (.inl hc) he₁)).elim
-    | base h => exact (hB _ _ h (.constApp2 hc hl he₁ he₂)).elim
   | _ => intro x b h; cases h with
     | base h => exact (hB _ _ h (by constructor)).elim
     | _ => exact ⟨by constructor, by simp [Flick.Tm.head], fun _ => by constructor⟩

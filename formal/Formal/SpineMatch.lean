@@ -78,7 +78,6 @@ theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
         cases h
         exact ⟨lt.trans hT, i₁.append (hq.inst hve (he.sub ⟨la, Stage.le_refl _⟩) h2)⟩
     | constApp => simp [Tm.head] at hK
-    | constApp2 => simp [Tm.head] at hK
   | errVal => intro _ _ _ _ _ _ _ _ hJ hk; cases hJ; simp [Ty.kind] at hk
   | _ => intro hv _ _ _ _ _ hK; cases hv <;> simp [Tm.head] at hK
 

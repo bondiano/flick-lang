@@ -53,12 +53,6 @@ def Tm.Within : Tm → (Nat → Prop) → Prop
   | .raise e, A => e.Within A
   | .try_ e al, A => e.Within A ∧ al.Within A ∧ al.NoIns
   | .handle v al, A => v.Within A ∧ al.Within A ∧ v.NoIns ∧ al.NoIns
-  | .provide l e, A => l.Within A ∧ e.Within A ∧ e.NoIns
-  | .with_ _ θ e, A => θ.NoIns ∧ θ.Within (fun _ => False) ∧ e.Within A
-  | .enil, _ => True
-  | .econs _ v θ, A => v.Within A ∧ θ.Within A
-  | .bind _ e, A => e.Within A
-  | .join e₁ e₂, A => e₁.Within A ∧ e₂.Within A ∧ (e₂.NoIns ∨ Value e₁)
   | .scope e, A => e.Within A ∧ e.NoIns
   | .inside p e, A => ¬ A p ∧ anc p = (fun x => A x ∨ x = p) ∧ e.Within (fun x => A x ∨ x = p)
   | .cap p, A => A p
@@ -95,11 +89,6 @@ def Frame.Within (A : Nat → Prop) : Frame → Prop
   | .updR v _ => v.Within Ψ B anc A ∧ Value v
   | .await => True
   | .try_ al => al.Within Ψ B anc A ∧ al.NoIns
-  | .provide e => e.Within Ψ B anc A ∧ e.NoIns
-  | .bind _ => True
-  | .joinL e => e.Within Ψ B anc A ∧ e.NoIns
-  | .joinR v => v.Within Ψ B anc A ∧ Value v
-  | .with_ _ θ => θ.NoIns ∧ θ.Within Ψ B anc (fun _ => False)
   | .raise => True
   | .inside p => ¬ A p ∧ anc p = fun x => A x ∨ x = p
   | .hwith p ℓ _ al r => A p ∧ al.Within Ψ B anc A ∧ r.Within Ψ B anc A ∧ al.NoIns ∧ r.NoIns ∧
@@ -138,9 +127,6 @@ theorem Value.noIns {e : Tm} {A : Nat → Prop} (hv : Value e) (h : e.Within Ψ 
   | rcons _ _ ih₁ ih₂ => rintro (h' | h'); exact ih₁ h.1 h'; exact ih₂ h.2.1 h'
   | ctorApp _ _ _ ih₁ ih₂ => rintro (h' | h'); exact ih₁ h.1 h'; exact ih₂ h.2.1 h'
   | constApp _ _ ih => rintro (h' | h'); cases h'; exact ih h.2.1 h'
-  | constApp2 _ _ _ _ ih₁ ih₂ =>
-    rintro ((h' | h') | h'); cases h'; exact ih₁ h.1.2.1 h'; exact ih₂ h.2.1 h'
-  | econs _ _ ih₁ ih₂ => rintro (h' | h'); exact ih₁ h.1 h'; exact ih₂ h.2 h'
   | drec => exact h.2
   | _ => intro h'; cases h'
 
@@ -186,14 +172,6 @@ theorem Tm.Within.frame {q : Nat} : ∀ {e : Tm} {A : Nat → Prop}, e.Within Ψ
     ¬ A q ∧ anc q q ∧ (∀ x, A x → anc q x) ∧ ∀ x, anc q x → A x ∨ e.Has (.frame x) := by
   intro e
   induction e with
-  | with_ p θ e _ ih =>
-    intro A h hs
-    rcases hs with hs | hs | hs | hs
-    · cases hs
-    · cases hs
-    · exact absurd (Tm.has_frame_ins hs) h.1
-    · obtain ⟨h₁, h₂, h₃, h₄⟩ := ih h.2.2 hs
-      exact ⟨h₁, h₂, h₃, fun x hx => (h₄ x hx).imp_right fun h => .inr (.inr (.inr h))⟩
   | _ => intro A h hs; simp only [Tm.Within, Tm.Has] at h hs ⊢ <;> grind
 
 /-- A term stays at its place when the ancestors of its `inside` forms and its

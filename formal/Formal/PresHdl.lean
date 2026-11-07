@@ -42,7 +42,7 @@ theorem refill_app {Ψ Θ E f x t₀ φ₀ a₀ w ψ₀ B} (hE : OkE E) (hn : ¬
   | app hf' hx hψ hT =>
     obtain ⟨hψp, hb⟩ := hf hf'
     have hφ : φ' ≠ .pure := fun h => hψp (Stage.eq_pure (h ▸ hψ))
-    rcases hp with hp | ⟨rfl, hΘ, -⟩
+    rcases hp with hp | ⟨rfl, hΘ⟩
     · exact (hφ hp).elim
     · obtain ⟨ha, hψ₀, hbt⟩ := hb rfl
       simp only [List.map_up_zero] at hx
@@ -114,9 +114,8 @@ theorem Typ.arm_inv {Ψ Θ E t φ s o c a₀ b₀} (hop : S.op E o = some (c, a�
   | .const _, _, _, h, _ | .ctor _, _, _, h, _ | .rnil, _, _, h, _ | .rcons _ _ _, _, _, h, _
   | .proj _ _, _, _, h, _ | .update _ _ _, _, _, h, _ | .match_ _ _, _, _, h, _
   | .aguard _ _ _ _, _, _, h, _ | .todo, _, _, h, _ | .task _, _, _, h, _ | .await _, _, _, h, _
-  | .raise _, _, _, h, _ | .try_ _ _, _, _, h, _ | .handle _ _, _, _, h, _ | .provide _ _, _, _, h, _
-  | .with_ _ _ _, _, _, h, _ | .enil, _, _, h, _ | .econs _ _ _, _, _, h, _ | .bind _ _, _, _, h, _
-  | .join _ _, _, _, h, _ | .scope _, _, _, h, _ | .inside _ _, _, _, h, _ | .cap _, _, _, h, _
+  | .raise _, _, _, h, _ | .try_ _ _, _, _, h, _ | .handle _ _, _, _, h, _
+  | .scope _, _, _, h, _ | .inside _ _, _, _, h, _ | .cap _, _, _, h, _
   | .own _, _, _, h, _ | .drec _ _, _, _, h, _ | .glob _, _, _, h, _ | .hdl _ _ _ _, _, _, h, _
   | .hwith _ _ _ _ _ _, _, _, h, _ | .hctl _ _ _ _ _ _ _ _ _, _, _, h, _ | .hres _ _ _ _, _, _, h, _
   | .hdone _ _, _, _, h, _ | .unw _ _ _, _, _, h, _ | .kont _ _, _, _, h, _ | .hole _, _, _, h, _ => by

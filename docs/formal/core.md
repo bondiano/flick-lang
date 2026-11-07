@@ -13,7 +13,7 @@ The core is what the surface language reduces to once classes, regions and captu
 - ADTs and `match`;
 - exact records with a row tail;
 - `Ref`;
-- `task`/`await`, `try … with`, `provide`;
+- `task`/`await`, `try … with`, handlers of effects (§3.7);
 - the pure and the effectful arrow, service rows `r` and error rows `e`.
 
 The source of an expected error is `raise`; the source of a defect is `todo`.
@@ -48,7 +48,6 @@ Checker: `kinds.rs`, `convert/kinds.rs`, `convert/rows.rs` `Checker::row`, `row_
     | τ →φ τ                      arrow of stage φ
     | Eff ρ ρ τ                   computation: services, errors, result
     | Ref τ
-    | Layer ρ ρ ρ                 inputs, errors, outputs
     | {ℓ₁ : τ₁, …, ℓₙ : τₙ | ρ}    exact record; closed without a tail
     | Errors ρ                    the errors of a row as a type
     | S.Impl                      implementation record of service S
@@ -71,7 +70,7 @@ How this is written in the language:
 - `a ->{r; e} b` is `a →R⟨r;e⟩ b`;
 - `->{}` is `→R⟨none;none⟩`.
 
-The kind of a row in `φ`, `Eff` and `Layer` is fixed by its position. `none` is the empty row of any kind.
+The kind of a row in `φ` and `Eff` is fixed by its position. `none` is the empty row of any kind.
 
 **Row equality ≡** (SRow, ERow):
 
@@ -103,7 +102,6 @@ e ::= x | c | K
     | {ℓ₁ = e₁, …, ℓₙ = eₙ} | e.ℓ | {e with ℓ = e}
     | task e | await e
     | try e with ā
-    | provide e e
     | todo
 
 ā ::= a | a ā
@@ -142,8 +140,9 @@ The reduction is specified normatively in `elaboration.md`. This table gives the
 | `if c then a else b` | `match c with True → a \| False → b` |
 | Annotation `let x : σ = e`, expression `(e : σ)` | `let x : σ = e in …`, `let x : σ = e in x` |
 | `from_result r` | `match r with Err v → raise v \| Ok v → v` |
-| Operation `S.op` with `op : τ₁ →R⟨r;ε⟩ τ₂` | `λx. (ask_S ()).op x : τ₁ →R⟨{S} + r; ε⟩ τ₂`; each runtime stage of the operation has its own `ask_S` |
-| `Layer.succeed S impl` | `Layer.succeed_S impl` |
+| Operation `S.op` of a service | `perform_{S.op}`; a service is an effect whose operations are all `tail` (§3.7) |
+| `provide S impl { e }` | a handler of `S` whose arm for each operation `o` is `x → impl.o x` (§3.7, `T6c_tail`) |
+| `provide layer { e }` | the library's `Layer.run layer (fun () -> e)`: a known layer of `succeed` and `merge` means a chain of such handlers (`Layer` in [`runtime.md`](runtime.md)) |
 | `x \|> f`, operators | `f x`, constants |
 
 ### 1.5 Constants Γ₀
@@ -153,27 +152,19 @@ Ref.make        : ∀α. α →R⟨none;none⟩ Ref α
 Ref.get         : ∀α. Ref α →R⟨none;none⟩ α
 Ref.set         : ∀α. Ref α →P α →R⟨none;none⟩ Unit
 raise           : ∀ε α. Errors ε →R⟨none;ε⟩ α
-ask_S           : Unit →R⟨{S};none⟩ S.Impl                    for every service S
-Layer.succeed_S : S.Impl →P Layer none none {S}
-Layer.effect_S  : ∀r ε. Eff r ε S.Impl →P Layer r ε {S}
-Layer.merge     : ∀i₁ e₁ o₁ i₂ e₂ o₂.
-                  Layer i₁ e₁ o₁ →P Layer i₂ e₂ o₂ →P Layer (i₁+i₂) (e₁+e₂) (o₁+o₂)
-                  if o₁ and o₂ share no name
 <, <=, >, >=    : ∀α. α →P α →P Bool                       α ∈ {Int, Float, BigInt, String}
 ```
 
 Where the constants come from:
 
-- `Ref.*`, `from_result`, `Layer.*`: the types from `builtins/Ref.fl`, `builtins/Prelude.fl` and `builtins/Layer.fl` with captures erased.
-- `ask_S`: the service lookup performed by a generated operation (`services.rs` `operation_type`, `require`). Every operation must have a runtime arrow (`has_runtime_arrow`, `FLICK-E006`).
-- The `merge` side condition is checked by `services.rs` `merge_conflicts` (`FLICK-E004`).
+- `Ref.*`, `from_result`: the types from `builtins/Ref.fl` and `builtins/Prelude.fl` with captures erased.
 - Order comparisons are checked by `settle.rs` `settle_operators` after inference: an unknown `α` becomes `Int`, a rigid one requires `Ord α`, anything else is `FLICK-T003` (see [order comparison on functions](#order-comparison-on-functions)).
 
 Constructors:
 
 - `K` from `type T ᾱ = … | K τ₁ … τₙ | …` has type `∀ᾱ. τ₁ →P … →P τₙ →P T ᾱ`.
 - `E` from `type error E ᾱ = E τ̄` has type `∀ᾱ. τ̄ →P E ᾱ`. Here `E ᾱ` is at once a type of kind `Type` and an `ERow` element named `E`.
-- Error fields may not hold `Ref`, `Eff`, `Layer`, runtime functions or `Unknown` (`services.rs` `check_error_payload`, `FLICK-E005`). The core does not need this restriction, regions do, but it always applies.
+- Error fields may not hold `Ref`, `Eff`, runtime functions or `Unknown` (`services.rs` `check_error_payload`, `FLICK-E005`). The core does not need this restriction, regions do, but it always applies.
 
 `Errors ρ` is the projection of a row to a type:
 
@@ -247,7 +238,7 @@ Checker:
  τ ≤ τ                 τ₁ →φ τ₂  ≤  τ₁' →φ' τ₂'                   Eff r e τ  ≤  Eff r' e' τ'
 ```
 
-There are no other rules. `Ref`, `List`, records, ADTs and `Layer` are invariant; inside them types are compared by `≡` (see [only arrows and `Eff` have subtyping](#only-arrows-and-eff-have-subtyping)).
+There are no other rules. `Ref`, `List`, records and ADTs are invariant; inside them types are compared by `≡` (see [only arrows and `Eff` have subtyping](#only-arrows-and-eff-have-subtyping)).
 
 `≤-Fun` with `φ = P` and `φ' = R⟨…⟩` is the lift of a pure function into a runtime position. There is no converse, because `R⟨…⟩ ⋢ P`. At run time (§3) the lift does nothing in the model. In the IR it is the `Lift` node, and its correctness is hypothesis G2.
 
@@ -376,15 +367,7 @@ Checker:
 - `handlers.rs` `try_expr`: the body is checked in a copy of the stage whose errors are `raised`. An `x`/`_` branch (function `catch_all`, also in parentheses and with an annotation) is checked against `Errors caught` with its own row `caught` and the constraint `raised ⊆ caught`: `caught` is the `ε_b` of the rule. An error branch covers its error when `!guarded && covers_all(pat)`. Then the constraint `raised ⊆ {handled | errors}` is added. A non-error pattern is `FLICK-E007`.
 - `exhaust.rs` `covers_all`.
 
-```text
-Γ ⊢ eₗ : Layer rᵢ εₗ ρₒ ! φₗ      Γ ⊢ e : τ ! φ_b      φ_b ⊑ R⟨ρₒ + r; ε⟩
-──────────────────────────────────────────────────────────────── (Provide)
-Γ ⊢ provide eₗ e : τ ! φₗ ⊔ R⟨rᵢ + r; εₗ + ε⟩
-```
-
-`R⟨rᵢ; εₗ⟩` is always part of the result: `provide` is a runtime step even with empty rows (spec/02). The body's errors pass outward unchanged.
-
-Checker: `handlers.rs` `provide`: first `perform(inputs, errors)`, then the constraint `needed ⊆ {provided | services}`. For row variables among the outputs see [`provide` and output row variables](#provide-discharges-only-the-listed-outputs-of-a-layer-not-a-row-variable).
+`provide` is no rule of the core: §1.4 lowers it to a handler, typed by (Handle-E) of §3.7. The checker keeps typing it (`handlers.rs` `provide`).
 
 ```text
 ──────────────────── (Todo)
@@ -519,9 +502,8 @@ The core has no interruption: there is one thread, and `task`/`await` run on the
 Forms absent from the source language:
 
 ```text
-v ::= … | ℓ | fix f. λx. e | env θ
-e ::= … | bind_S e | join e e | with θ e | handle v with ā
-θ ::= {S₁ ↦ v₁, …, Sₙ ↦ vₙ}
+v ::= … | ℓ | fix f. λx. e
+e ::= … | handle v with ā
 ```
 
 ### 3.2 Contexts
@@ -533,13 +515,12 @@ E ::= □ | E e | v E
     | let x = E in e | let x : σ = E in e
     | match E with ā
     | {ℓ₁ = v₁, …, ℓᵢ = E, ℓᵢ₊₁ = eᵢ₊₁, …} | E.ℓ | {E with ℓ = e} | {v with ℓ = E}
-    | await E | try E with ā | provide E e
-    | bind_S E | join E e | join v E | with θ E
+    | await E | try E with ā
 ```
 
-Contexts do not enter `λ`, `task`, branches or the body of `provide`. `F` is a single-frame context: one of the forms above with `□` in place of `E`.
+Contexts do not enter `λ`, `task` or branches. `F` is a single-frame context: one of the forms above with `□` in place of `E`.
 
-`lookup(E, S)` is `θ(S)` of the innermost frame `with θ` in `E` with `S ∈ dom θ`. If there is no such frame, it is `Σ₀(S)`.
+An operation is answered by the innermost handler in `E` with an arm for it (§3.7); if there is none, by `Σ₀`.
 
 ### 3.3 Pure steps
 
@@ -556,12 +537,7 @@ match v with p when g → e | ā   →ₚ  match g[δ] with True → e[δ] | Fal
                                                                    if match(p, v) = δ
                                 →ₚ  match v with ā                 otherwise
 try v with ā                    →ₚ  v
-with θ v                        →ₚ  v
-bind_S v                        →ₚ  env {S ↦ v}
-join (env θ₁) (env θ₂)          →ₚ  env (θ₁ ∪ θ₂)
 ```
-
-`bind_S` and `join` do not touch the store, services or errors, and (Bind) and (Join) do not require `R⟨…⟩`, so their steps are pure (see [`bind_S` and `join` steps are pure](#bind_s-and-join-steps-are-pure)).
 
 ```text
 match(_, v)                          = ∅
@@ -581,21 +557,13 @@ undefined in all other cases
 ⟨μ, E[Ref.get ℓ]⟩                 →  ⟨μ, E[μ(ℓ)]⟩
 ⟨μ, E[Ref.set ℓ v]⟩               →  ⟨μ[ℓ ↦ v], E[()]⟩
 ⟨μ, E[await (task e)]⟩            →  ⟨μ, E[e]⟩
-⟨μ, E[ask_S ()]⟩                  →  ⟨μ, E[lookup(E, S)]⟩
-⟨μ, E[provide v e]⟩               →  ⟨μ, E[provide build(v) e]⟩   v a value of type Layer
-⟨μ, E[provide (env θ) e]⟩         →  ⟨μ, E[with θ e]⟩
-
-build(Layer.succeed_S v) = env {S ↦ v}
-build(Layer.effect_S v)  = bind_S (await v)
-build(Layer.merge v₁ v₂) = join build(v₁) build(v₂)
+⟨μ, E[perform_{S.o} v]⟩           →  ⟨μ, E[f v]⟩                 no handler in E answers it, f = Σ₀(S).o
 ```
 
 What this shows:
 
 - `await` runs the body anew on every call. `task` is neither a cache nor a Promise (spec/02 "Re-running and the value of await").
-- Lexical values enter `task e` by substitution when it is built. Services are looked up at execution time, through `lookup(E, S)` in the current environment.
-- A layer is built in the environment around `provide`, before the body. If building fails, the body does not start (§3.5).
-- A layer is built once per execution of `provide`. Memoization across builds and release are described by λRT.
+- Lexical values enter `task e` by substitution when it is built. Operations are answered at execution time, by the handlers of the current context.
 - Lifting a pure function does nothing: `(λx. e) v` reduces the same way whatever the stage of the arrow.
 
 ### 3.5 Errors and defects
@@ -615,7 +583,7 @@ What this shows:
 
 How it works:
 
-- `raise v` propagates through frames up to the nearest `try`. A `with θ` frame is removed on the way, which restores the environment.
+- `raise v` propagates through frames up to the nearest `try`.
 - The branches of `handle` are evaluated already outside the `try`.
 - `handle v with ·` rethrows the error: this is the operational side of the remainder `ε'` in (Try).
 - `die` is not caught: an ordinary handler is not a universal catch (spec/05).
@@ -634,22 +602,6 @@ The rules of §2 are read with `Ψ` in the context. In addition:
 ───────────────────── (Loc)            ──────────────────────────────────────────────── (Fix)
 Γ;Ψ ⊢ ℓ : Ref τ ! P                     Γ ⊢ fix f. λx. e : σ
 
-Γ;Ψ ⊢ vᵢ : Sᵢ.Impl ! P
-─────────────────────────────────────────────────── (Env)
-Γ;Ψ ⊢ env {S₁ ↦ v₁, …, Sₙ ↦ vₙ} : Env {S₁, …, Sₙ} ! P
-
-Γ ⊢ e : S.Impl ! φ                     Γ ⊢ e₁ : Env ρ₁ ! φ₁    Γ ⊢ e₂ : Env ρ₂ ! φ₂
-───────────────────────── (Bind)       ──────────────────────────────────────────── (Join)
-Γ ⊢ bind_S e : Env {S} ! φ             Γ ⊢ join e₁ e₂ : Env (ρ₁ + ρ₂) ! φ₁ ⊔ φ₂
-
-Γ ⊢ eₗ : Env ρₒ ! φₗ    Γ ⊢ e : τ ! φ_b    φ_b ⊑ R⟨ρₒ + r; ε⟩
-───────────────────────────────────────────────────── (Provide-Env)
-Γ ⊢ provide eₗ e : τ ! φₗ ⊔ R⟨r; ε⟩
-
-Γ ⊢ env θ : Env ρ ! P    Γ ⊢ e : τ ! φ    φ ⊑ R⟨ρ + r; ε⟩
-───────────────────────────────────────────────── (With)
-Γ ⊢ with θ e : τ ! R⟨r; ε⟩
-
 E : ∀ᾱ. τ̄ →P E ᾱ    Γ ⊢ w̄ : τ̄[ᾱ := ῡ] ! P    E ῡ ∈ ε
 ──────────────────────────────────────────── (Errors-Val)
 Γ ⊢ E w̄ : Errors ε ! P
@@ -661,9 +613,7 @@ E : ∀ᾱ. τ̄ →P E ᾱ    Γ ⊢ w̄ : τ̄[ᾱ := ῡ] ! P    E ῡ ∈ ε
 
 (Handle) does not require the whole row `ε_b ⊆ H + ε'`, only the error of `v` itself: after a failed branch the remainder has a smaller `H` (see [(Handle) after a failed branch](#handle-required-the-whole-error-row-after-a-failed-branch)). Coming from `try (raise v)`, the premise follows from `ε_b ⊆ H + ε'` of (Try).
 
-`Env ρ` is a runtime-only type. (Errors-Val) types values only. In the source language, a value of `Errors ρ` with two or more elements is introduced only by an `x`/`_` branch (see [`Errors` of a row with two or more elements](#errors-of-a-row-with-two-or-more-elements)).
-
-Lemma on `build`: if `Γ ⊢ v : Layer rᵢ εₗ ρₒ ! P`, then `Γ ⊢ build(v) : Env ρₒ ! R⟨rᵢ; εₗ⟩`. Proof by induction on `v`.
+(Errors-Val) types values only. In the source language, a value of `Errors ρ` with two or more elements is introduced only by an `x`/`_` branch (see [`Errors` of a row with two or more elements](#errors-of-a-row-with-two-or-more-elements)).
 
 The remainder of a `match` after a false guard may not cover the type of the scrutinee. For `match Some 1 with | None → a | Some x when p → b | Some _ → c` the remainder `match Some 1 with | Some _ → c` fails `Exh(Option Int, …)`. For a value it is enough to cover the value itself (see [the residual match](#the-residual-match-after-a-false-guard-fails-exh)):
 
@@ -687,7 +637,8 @@ S.op E o = (c, a, b)
 Γ ⊢ perform_{E.o} : a →R⟨{E};∅⟩ (c = abort ? τ : b) ! φ
 
 Γ↑, ϱ ⊢ al : arms E (τ' at R⟨r;ε⟩, resume over ϱ)    Γ ⊢ r : τ →ψ τ' ! R⟨r;ε⟩    ψ ⊑ R⟨r;ε⟩
-Γ ⊢ e : τ ! φ₀    φ₀ ⊑ R⟨{E} ∪ r; ε⟩    E ∈ r unless every operation of E has an arm without a guard
+Γ ⊢ e : τ ! φ₀    φ₀ ⊑ R⟨{E} ∪ r; ε⟩    no {Provided {E} _} or {Provided v _} in φ₀
+E ∈ r unless every operation of E has an arm without a guard
 ──────────────────────────────────────────────────────────────────────────────────────────── (Handle-E)
 Γ ⊢ hdl E al r e : τ' ! R⟨r;ε⟩
 ```
@@ -723,7 +674,6 @@ Lemmas:
   - for `τ = τ₁ →φ' τ₂`, `v` is a λ, a `fix`, or a partial application of a constant or a constructor (see [partial constructor application](#a-partial-constructor-application-is-a-value));
   - for `Eff r ε τ'`, `task e`;
   - for `Ref τ'`, `ℓ` with `Ψ(ℓ) = τ'`;
-  - for `Layer …`, an application of `Layer.*`;
   - for `T ῡ`, `K v̄` with a constructor `K` of type `T`;
   - for a record, a record with the same labels;
   - for `Errors ε`, `E w̄` with `E ῡ ∈ ε`.
@@ -742,9 +692,9 @@ Lemmas:
 
 T1 follows from two statements:
 
-- **Progress.** Let `·;Ψ ⊢ e : τ ! φ` and `⊢ μ : Ψ`, and let the services of `φ` be in `Σ₀`, taking `with` frames into account. Then `e` is a value, or `e = raise v`, or the configuration takes a step (possibly to `die`). The main cases:
+- **Progress.** Let `·;Ψ ⊢ e : τ ! φ` and `⊢ μ : Ψ`, and let the effects of `φ` be in `Σ₀`, taking the handlers of `e` into account. Then `e` is a value, or `e = raise v`, or the configuration takes a step (possibly to `die`). The main cases:
   - `match`: by L1 and `Exh` a branch exists. A `False` guard passes the value to the next branch, and `Exh` over the branches without `when` guarantees that a matching one is found.
-  - `ask_S`: by L3, `S` is either in the nearest `with` frame or in `r₀ ⊆ dom Σ₀`.
+  - `perform_{E.o} v`: by L3, a handler of `E` answers it or `E ∈ r₀ ⊆ dom Σ₀`, whose record has a function for `o`.
   - `await v`: by L1, `v = task e`.
   - `Ref.get ℓ`: by L1 and `⊢ μ : Ψ`, the location `ℓ ∈ dom μ`.
 - **Preservation.** Let `·;Ψ ⊢ e : τ ! φ`, `⊢ μ : Ψ` and `⟨μ, e⟩ → ⟨μ', e'⟩`. Then there is `Ψ' ⊇ Ψ` with `⊢ μ' : Ψ'` and `·;Ψ' ⊢ e' : τ ! φ'`, where `φ' ⊑ φ`.
@@ -759,15 +709,15 @@ Progress and Preservation are checked on the reference checker by the property `
 
 - **(a) Purity.** If `·;Ψ ⊢ e : τ ! P`, then every evaluation `⟨μ, e⟩ →* ⟨μ', e'⟩` consists only of `→ₚ` steps:
   - `μ' = μ`;
-  - there is no `Ref.*`, `await`, `ask_S` or `provide` step;
+  - there is no `Ref.*`, `await` or operation step;
   - `e'` is not `raise v`.
 
-  `die` and divergence are possible. Justification: the steps of §3.4–3.5 happen on redexes that the rules type only with `R⟨…⟩`: constants with `→R`, (Await) and (Provide). By L3 the redex's effect would then be `⊑ P`, which is impossible, and Preservation keeps `P`.
+  `die` and divergence are possible. Justification: the steps of §3.4–3.5 happen on redexes that the rules type only with `R⟨…⟩`: constants with `→R`, operations, (Await) and (Handle-E). By L3 the redex's effect would then be `⊑ P`, which is impossible, and Preservation keeps `P`.
 - **(b) Rows.** Let `·;Ψ ⊢ e : τ ! R⟨r; ε⟩`. Then in every evaluation from `⟨μ, e⟩`:
-  - every `ask_S` step that finds `S` in `Σ₀`, rather than in a `with` frame of the evaluation itself, has `S ∈ r`;
+  - every operation of `S` answered by `Σ₀`, rather than by a handler of the evaluation itself, has `S ∈ r`;
   - if the evaluation ends in `raise v`, then `· ⊢ v : Errors ε`, that is, the constructor of `v` is an element of `ε`.
 
-  For `· ⊢ v : Eff r ε τ` the same holds for `await v`. Formally this is a statement about a semantics where an `ask_S` step is labelled `S` when the lookup reaches `Σ₀`.
+  For `· ⊢ v : Eff r ε τ` the same holds for `await v`. Formally this is a statement about a semantics where an operation of `S` answered by `Σ₀` is labelled `S`.
 
   Corollary: with `ε = none` the evaluation does not end in an expected error. A defect and divergence remain possible (spec/05 "Expected errors").
 
@@ -888,19 +838,6 @@ let poke () =
 - The model does not need the sum: in the source language values of `Errors ρ` come only from an `x`/`_` branch, and for the proof (Errors-Val) on runtime values suffices.
 - Resolution (spec, spec/03 "Notation and joining of rows"): "`Errors ρ` with two or more elements or with a variable is an opaque type. Its value comes from the `x`/`_` branch of a `try` and flows into `from_result`, `Failure.rethrow` and generic code. To take it apart by error, use a `try` with error branches over `from_result (Err e)`." A sum with patterns on elements is a possible extension: an introduction rule and a pattern on an element of a closed row.
 
-### `provide` discharges only the listed outputs of a layer, not a row variable
-
-```flick
-with_layer : Layer none none o -> Eff o none Float ->{} Float
-let with_layer layer t =
-  provide layer {
-    await t
-  }
-```
-
-- Divergence: `FLICK-E002`: "does not allow service `o`". By (Provide) the body may require the whole `ρₒ`. This was incompleteness, not a soundness hole.
-- Resolution (checker, `handlers.rs` `provide`, fixture `tests/check/pass/effects/provide_variable.fl`): in `provide` the remainder is built from the normal form of the outputs together with their variable tails. Only rigid and quantified variables are taken, not metas: a layer type that is not yet known must not grow because of what the body requires.
-
 ### A callee of unknown type is a pure arrow
 
 - Divergence: `(fun h -> h ()) f` with `f : Unit ->{Log;} Unit` is `FLICK-T003` "expected `Unit -> _`".
@@ -991,11 +928,6 @@ let program () =
 
 - Divergence: the value grammar of §1.3 gave `K v₁ … vₙ` without fixing `n`, and L1 for arrows listed only λ, `fix` and a partial application of a constant. But a `K` of arity above zero and `K v₁` are functions: `let f = Some in f 1` substitutes `Some` as a value. Without this, L1 for arrows is false, and Progress gets stuck on `let f = Some in …`.
 - Resolution (model): the grammar has `K v₁ … vₖ` with `k` at most the arity of `K`, and L1 for arrows includes a partial constructor application. Lean: `Value.ctorApp`, `canonical_arrow` (`formal/Formal/CanonForms.lean`).
-
-### `bind_S` and `join` steps are pure
-
-- Divergence: §3.4 listed `bind_S v` and `join (env θ₁) (env θ₂)` as runtime steps, while (Bind) and (Join) do not require `R⟨…⟩`. The term `bind_S v` is typed with `P`, and its evaluation takes a non-`→ₚ` step: T2(a) in the form "only `→ₚ` steps" is false for it. Source programs have no such terms; they appear from `build` under `provide`, where the stage is already a runtime stage.
-- Resolution (model): the `bind_S` and `join` steps are in §3.3. They do not change `μ`, do not look up services and do not raise errors, so T2(a) is not weakened. Lean: `PHead.bind`, `PHead.join` (`formal/Formal/Semantics.lean`), `T2a` (`formal/Formal/Effects.lean`).
 
 ### (Handle) required the whole error row after a failed branch
 

@@ -70,8 +70,7 @@ theorem await_arg {Ψ Θ c w t₀ T φ} (h : Typ S Ψ Θ [] (.app (.app (.const 
         exact ⟨_, _, .await (ht.valueAny hv _) (Stage.le_refl _) .refl⟩
   | errVal hv' => exact absurd hv' (by
       intro hv''; cases hv'' with
-      | ctorApp _ hK _ => simp [Tm.head] at hK
-      | constApp2 _ hl => cases c <;> simp_all [Const.layer, Const.ty] <;> exact (hc default).elim)
+      | ctorApp _ hK _ => simp [Tm.head] at hK)
 
 /-- What a step at the redex does to the regions is typed. -/
 theorem rgs_preservation {Ψ Θ Λ μ r t φ Λ' μ' r'} (hΛ : RgsTy S Ψ Λ)
@@ -81,7 +80,6 @@ theorem rgs_preservation {Ψ Θ Λ μ r t φ Λ' μ' r'} (hΛ : RgsTy S Ψ Λ)
     fun ⟨t, φ, h⟩ => ⟨t, φ, h.cut hout⟩
   cases hh with
   | scope => exact hΛ.append
-  | provideEnv => exact hΛ.append
   | hdl => exact hΛ.append
   | open_ hg =>
     refine hΛ.set hg (fun k hk => .inl hk) fun f hf => ?_
@@ -102,15 +100,18 @@ theorem rgs_preservation {Ψ Θ Λ μ r t φ Λ' μ' r'} (hΛ : RgsTy S Ψ Λ)
 /-- A step of one thread keeps the regions typed. -/
 theorem step_rgs {root Ψ Λ μ e t φ l Λ' μ' e'} (hΛ : RgsTy S Ψ Λ)
     (h : Typ S Ψ Facts.age [] e (.ex t φ)) (hbl : e.Below Λ.length) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
-    (ha : e.Asc 0) (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : RgsTy S Ψ Λ' := by
+    (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : RgsTy S Ψ Λ' := by
   have kid : ∀ {E c p w}, OkE E → e = plug E (.app (.app (.const c) (.own p)) w) →
-      (c = .addFin ∨ c = .spawn) → Value w → ∃ t φ, Typ S Ψ Facts.age [] (withs E (.await w)) (.ex t φ) := by
+      (c = .addFin ∨ c = .spawn) → Value w → ∃ t φ, Typ S Ψ Facts.age [] (.await w) (.ex t φ) := by
     intro E c p w hE he hc hv
     subst he
-    obtain ⟨hA, -⟩ := asc_of_plug (fin_not_value hc) hE ha
-    obtain ⟨t', R', ε', hk, -⟩ := withs_typing (fun h' hΘ => fin_await h' hc hΘ hv)
-      (fun h' => fin_not_pure h' hc) (fin_not_value hc) _ hE h (Entails.refl _) hA
-    exact ⟨_, _, hk⟩
+    obtain ⟨_, _, _, _, hr, _, hK, _⟩ := ctx_typing _ hE (fin_not_value hc) h
+    obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact fin_not_pure hr hc
+    have hr' := hole_kill hr hbl hΨ
+    simp only [List.map_up_zero, liftT_zero] at hr'
+    obtain ⟨t', φ', ha⟩ := await_arg hr' hv fun ι => by
+      rcases hc with rfl | rfl <;> exact ⟨_, _, _, _, _, _, _, _, rfl⟩
+    exact ⟨t', φ', ha.cut (RtCtx.hole hΘ hΨ).outΘ⟩
   cases hs with
   | addFin hE hg _ hv =>
     refine hΛ.set hg (fun k hk => .inl hk) fun f hf => ?_
@@ -124,7 +125,7 @@ theorem step_rgs {root Ψ Λ μ e t φ l Λ' μ' e'} (hΛ : RgsTy S Ψ Λ)
     · simp at hk; subst hk; exact .inr (kid hE rfl (.inr rfl) hv)
   | rt hE hh =>
     obtain ⟨K, Θ', _, _, hr, _, hK, _⟩ := ctx_typing _ hE hh.not_value h
-    obtain ⟨rfl, hΘ, -⟩ := hK.resolve_left fun hp => by subst hp; exact hh.not_pure hr
+    obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact hh.not_pure hr
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
     exact rgs_preservation hΛ hr' (RtCtx.hole hΘ hΨ).outΘ hh
@@ -248,7 +249,7 @@ theorem cstep_typed {root Ψ c c' t φ l} (hroot : RootTy S root) (ht : t.YF 0)
     obtain ⟨ha', hka⟩ := hs.asc hroot ha hb.main
     obtain ⟨hs', cell', -, hcc'⟩ := hs.caught hroot hcg ha hb
     rw [ht.mono (Nat.zero_le _), Stage.YF_mono hφ (Nat.zero_le _)] at h'
-    refine ⟨X, ⟨hμ', h', (step_rgs hΛ h hb.main hΨ ha.main hs).weaken X, hb', fun u hu => ?_, hka _ ha',
+    refine ⟨X, ⟨hμ', h', (step_rgs hΛ h hb.main hΨ hs).weaken X, hb', fun u hu => ?_, hka _ ha',
       hs', cell', hcc'⟩, hX⟩
     rcases List.mem_append.mp hu with hu | hu
     · exact (hΨ u hu).mono hl
@@ -263,7 +264,7 @@ theorem cstep_typed {root Ψ c c' t φ l} (hroot : RootTy S root) (ht : t.YF 0)
     obtain ⟨ha', hka⟩ := hs.asc hroot ⟨hkA, ha.rgs, ha.mem⟩ hkb
     obtain ⟨hs', cell', hg', hkc⟩ := hs.caught hroot
       ⟨hcg.rgs _ _ hg _ (List.mem_append_left _ hkm), hcg.rgs⟩ ⟨hkA, ha.rgs, ha.mem⟩ ⟨hkb, hb.mem, hb.rgs⟩
-    refine ⟨X, ⟨hμ', h.weakenStore X, ((step_rgs hΛ hk hkb hΨ hkA hs).weaken X).setKid ⟨_, _, hk'⟩,
+    refine ⟨X, ⟨hμ', h.weakenStore X, ((step_rgs hΛ hk hkb hΨ hs).weaken X).setKid ⟨_, _, hk'⟩,
       CfgBelow.kid ⟨hb.main.mono hl, hb'.mem, hb'.rgs⟩ hb'.main, fun u hu => ?_,
       (hka _ ha.main).setKid ha', hs', cell', hkc.setKid hkc.main (hcg.main.ghostB hb.main hg')⟩, hX⟩
     rw [setKid_length]
@@ -297,15 +298,29 @@ theorem CfgTy.init {e₀ t φ₀} (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ�
     ⟨Tm.Asc.of_noIns hb.noIns, fun _ _ h => by simp at h, fun _ _ h => by simp at h⟩,
     fun _ _ => False, fun _ => 0, ⟨Tm.Caught.noIns hb.noIns, fun _ _ h => by simp at h⟩⟩
 
+/-- A root of an effect answers each of its operations: an effect with one that is not `tail`
+has no root. -/
+theorem root_answers {root Ef o c a b w} (hroot : RootTy S root) (hw : root.svc Ef = some w)
+    (hop : S.op Ef o = some (c, a, b)) : RootAnswers root Ef o c := by
+  obtain ⟨hwv, hwt⟩ := hroot.svc _ _ hw
+  have hne : S.impl Ef ≠ .errors Row.none := fun he => by
+    rw [he] at hwt
+    obtain ⟨_, _, _, _, _, _, _, hN, _⟩ := canonical_errors hwv hwt
+    exact hN.elim
+  have hc : c = .tail := Classical.byContradiction fun hc => hne (S.op_impl _ _ _ _ _ hop hc)
+  subst hc
+  obtain ⟨⟨f, hf⟩, _⟩ := (hwt.shape hwv rfl).1.field rfl (S.op_field _ _ _ _ hop hne)
+  exact ⟨rfl, w, f, hw, hf⟩
+
 /-- **T1.** A program `· ⊢ e₀ : τ ! φ₀` (a term without run-time regions, at a type and
 a stage without them) whose services `Σ₀` provides (G3) reaches
 only configurations whose main thread is a value, `raise v` with `v : Errors ε₀`,
 makes a step, or is blocked (waits for a child of a region it closes, or uses a
 region that is not live); every child of a live region is finished, makes a step,
-asks for a service `Σ₀` lacks, performs an operation no handler of its own handles,
-or is blocked. An operation no handler handles is not an outcome of the main thread,
-for `Σ₀` has no value of an effect, and no thread unwinds past its top: every signal
-is under the frame of its handler (`CfgCaught`). -/
+performs an operation no handler of its own and no root answers, or is blocked. An
+operation nothing answers is not an outcome of the main thread, for `Σ₀` has a function
+for each operation of an effect of the stage, and no thread unwinds past its top: every
+signal is under the frame of its handler (`CfgCaught`). -/
 theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
     (hcov : ∀ N, φ₀.svc (.nm N) → (root.svc N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
@@ -314,8 +329,8 @@ theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
       (∃ v, c.main = .raise v ∧ ∃ Ψ, Typ S Ψ Facts.age [] v (.ex (.errors φ₀.err) .pure)) ∨
       (∃ l o, Step root l c.rgs c.mem c.main o) ∨ Blocked c.rgs c.main) ∧
     ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids,
-      Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, AskStuck S root k D) ∨
-        (∃ D, PerformStuck S k D) ∨ Blocked c.rgs k := by
+      Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, PerformStuck S root k D) ∨
+        Blocked c.rgs k := by
   obtain ⟨Ψ, hμ, h, hΛ, -, -, -, _, _, hcg⟩ := steps_typed hroot hs ht hφ (CfgTy.init h₀ hp)
   simp only [List.nil_append] at hμ h hΛ
   refine ⟨?_, fun p g hg _ k hk => ?_⟩
@@ -324,16 +339,10 @@ theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
     cases hn with
     | raise h' => obtain ⟨v, hv, he⟩ := h'; exact .inr (.inl ⟨v, he, Ψ, raise_errors hv (he ▸ h)⟩)
     | step hstep => exact .inr (.inr (.inl hstep))
-    | ask h' =>
-      obtain ⟨_, N, _, _, _, hN, _, hD⟩ := h'
-      have := hcov N hD; rw [hN] at this; cases this
     | perform h' =>
-      obtain ⟨_, Ef, o, _, _, _, _, _, _, _, hop, _, hD⟩ := h'
+      obtain ⟨_, Ef, o, c', _, a, b, _, _, _, hop, _, hna, hD⟩ := h'
       obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp (hcov Ef hD)
-      obtain ⟨hwv, hwt⟩ := hroot.svc _ _ hw
-      rw [S.op_impl _ _ _ _ _ hop] at hwt
-      obtain ⟨_, _, _, _, _, _, _, hN, _⟩ := canonical_errors hwv hwt
-      exact hN.elim
+      exact (hna (root_answers hroot hw hop)).elim
     | blocked hb => exact .inr (.inr (.inr hb))
     | unw h' =>
       obtain ⟨_, _, _, he⟩ := h'
@@ -344,9 +353,8 @@ theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
     cases hn with
     | raise h' => exact .inl (.inr (.inl h'))
     | step hstep => exact .inr (.inl hstep)
-    | ask ha => exact .inr (.inr (.inl ⟨_, ha⟩))
-    | perform hp => exact .inr (.inr (.inr (.inl ⟨_, hp⟩)))
-    | blocked hb => exact .inr (.inr (.inr (.inr hb)))
+    | perform hp => exact .inr (.inr (.inl ⟨_, hp⟩))
+    | blocked hb => exact .inr (.inr (.inr hb))
     | unw h' => exact .inl (.inr (.inr h'))
 
 end Flick
