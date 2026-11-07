@@ -107,7 +107,7 @@ impl Checker<'_> {
                 }
                 // shortcut: an open `out` keeps only its known fields at run time
                 let labels = out.entries.iter().map(|(l, _)| l.clone());
-                primitive(self.show(c), labels.collect())
+                primitive(self.show_exact(c), labels.collect())
             }
             (Lang::UnionDisjoint, [Type::Record(a), Type::Record(b), out]) => {
                 self.union_disjoint(c, (a, b), out, givens, chain)
@@ -156,7 +156,7 @@ impl Checker<'_> {
             _ => Vec::new(),
         };
         match path_params(path, fields) {
-            None => primitive(self.show(c), Vec::new()),
+            None => primitive(self.show_exact(c), Vec::new()),
             Some(why) => refuse(why),
         }
     }
@@ -228,7 +228,7 @@ impl Checker<'_> {
     /// The determined record of a primitive must be `computed`.
     fn result(&mut self, c: &Type, out: &Type, computed: &Type) -> Outcome {
         if self.unify(out, computed).is_ok() {
-            return primitive(self.show(c), Vec::new());
+            return primitive(self.show_exact(c), Vec::new());
         }
         let shown = self.show(computed);
         Outcome::Missing(c.clone(), Some(format!("the result is `{shown}`")))

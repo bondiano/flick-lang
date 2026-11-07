@@ -35,7 +35,7 @@ impl Checker<'_> {
         let expanded = self.unaliased(t);
         let unknown = expanded.contains(&mut |x| matches!(x, Type::Meta(_) | Type::Error));
         FactType {
-            shown: self.show(t),
+            shown: self.show_exact(t),
             exact: (!unknown).then(|| self.show_qualified(&expanded)),
             literal_of: self.literal_of(&expanded),
         }

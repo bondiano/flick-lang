@@ -32,7 +32,7 @@ on-disk version for dependent requests.
 | `textDocument/typeDefinition` | the declaration of the type of the expression under the cursor |
 | `textDocument/semanticTokens/full` | what each name is: module, type, constructor, function, variable, method or parameter |
 | `textDocument/foldingRange` | declarations, `match`, records, lists, embedded blocks and the run of imports |
-| `textDocument/inlayHint` | the type of each `let` without a signature, and of each stage of a pipeline written over several lines |
+| `textDocument/inlayHint` | the type of each `let` without a signature, a local function or an instance method among them, and of each stage of a pipeline written over several lines |
 
 Hover resolves source bindings, not just the public export list. Private
 helpers such as a view or an error reporter show their written signatures
@@ -42,6 +42,11 @@ discarding a result does not discard the expression's effects or errors.
 The [Gleam language server reference](https://gleam.run/documentation/language-server-reference/)
 is the behavior reference for symbol hover and navigation, not a claim of
 complete feature parity.
+
+Types are shown without an outer `forall` and the qualifier of a later stage when
+a signature written that way gets them back: `lift : Monad m => (m a)^c -> (MaybeT
+m a)^c`. A `forall` of rank 2 stays, and so does an outer one that a variable
+needs, as in `forall e. (forall a. a -> e) -> Int`.
 
 Hover on `..` in `MonadError(..)` or `ExceptT(..)` lists the methods or
 constructors made visible by that import or export. Each member has its full

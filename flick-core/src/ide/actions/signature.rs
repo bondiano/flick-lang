@@ -5,7 +5,7 @@ use super::{Action, edit, indent_at, line_start};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Kind, Type, show_type, without_value_captures};
+use crate::types::{Kind, Type, show_signature, without_value_captures};
 use crate::{diagnostics::Severity, resolve, syntax, types};
 
 impl Ide<'_> {
@@ -212,7 +212,7 @@ impl Ide<'_> {
                 .collect(),
             _ => Vec::new(),
         };
-        let shown = show_type(&without_value_captures(ty, &types));
+        let shown = show_signature(&without_value_captures(ty, &types));
         // a type the checker did not finish has holes; it is no signature
         if shown
             .split(|c: char| !c.is_alphanumeric() && c != '_')

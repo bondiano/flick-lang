@@ -81,7 +81,7 @@ impl<'n> Checker<'_> {
         let head = Type::apps(Type::con(&generic.module, &generic.name), [target, rep]);
         let instance = Instance {
             module,
-            name: self.show(&head),
+            name: self.show_exact(&head),
             vars: params.to_vec(),
             context: Vec::new(),
             head,

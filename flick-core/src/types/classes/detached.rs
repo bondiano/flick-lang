@@ -44,7 +44,7 @@ impl Checker<'_> {
             }
         }
         Outcome::Solved(Dict::Primitive {
-            constraint: self.show(c),
+            constraint: self.show_exact(c),
             labels: Vec::new(),
         })
     }

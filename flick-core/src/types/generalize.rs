@@ -226,17 +226,29 @@ pub fn without_value_captures(t: &Type, types: &[&str]) -> Type {
             ty,
             captures,
             value,
-        } => Type::Captured {
-            ty: Box::new(without_value_captures(ty, types)),
-            captures: Box::new(without_value_row(captures, types)),
-            value: *value,
-        },
+        } => {
+            let ty = without_value_captures(ty, types);
+            let row = without_value_row(captures, types);
+            // it restated only variables: `^{}` would say it holds nothing
+            if is_empty_row(&row) && !is_empty_row(captures) {
+                return ty;
+            }
+            Type::Captured {
+                ty: Box::new(ty),
+                captures: Box::new(row),
+                value: *value,
+            }
+        }
         Type::Bounded { ty, captures } => Type::Bounded {
             ty: Box::new(without_value_captures(ty, types)),
             captures: Box::new(without_value_row(captures, types)),
         },
         other => other.map_children(&mut |c| without_value_captures(c, types)),
     }
+}
+
+fn is_empty_row(row: &Type) -> bool {
+    matches!(row, Type::Row(r) if r.entries.is_empty() && r.tail.is_none())
 }
 
 fn without_value_row(row: &Type, types: &[&str]) -> Type {

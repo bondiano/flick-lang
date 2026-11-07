@@ -177,7 +177,7 @@ impl Checker<'_> {
                 Type::Var(_) | Type::Skolem(_)
                     if !self.discharge_tail(tail, &want.owner, &want.at) =>
                 {
-                    let (service, region) = (self.show(tail), self.show(&want.owner));
+                    let (service, region) = (self.show_exact(tail), self.show_exact(&want.owner));
                     self.unprovided(&service, &region, want.span);
                 }
                 _ => {}
@@ -285,7 +285,7 @@ impl Checker<'_> {
         for (label, ty) in entries {
             if row.get(&label).is_none() {
                 let (service, region) = match ty.spine().1[..] {
-                    [service, owner] => (self.show(service), self.show(owner)),
+                    [service, owner] => (self.show_exact(service), self.show_exact(owner)),
                     _ => continue,
                 };
                 self.unprovided(service.trim_matches(['{', '}', ' ']), &region, span);

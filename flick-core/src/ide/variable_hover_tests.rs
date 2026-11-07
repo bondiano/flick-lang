@@ -91,7 +91,7 @@ service Setup (s : Region) =
             (start, start + u32::try_from(name.len()).expect("small"))
         );
         assert!(
-            markdown.contains(&format!("Setup.{name} : forall")),
+            markdown.contains(&format!("Setup.{name} : ")) && !markdown.contains("forall"),
             "{markdown}"
         );
         assert!(markdown.contains(doc), "{markdown}");

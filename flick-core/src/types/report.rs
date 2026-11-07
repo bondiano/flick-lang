@@ -89,14 +89,28 @@ impl Checker<'_> {
         expected: &Type,
     ) -> (String, String) {
         let captures = matches!(mismatch, Mismatch::Label { label, .. } if label.starts_with('^'));
-        let shown = |t: &Type| {
-            if captures {
-                self.show(t)
-            } else {
-                self.show(&uncaptured(&self.zonk(t)))
-            }
-        };
-        (shown(actual), shown(expected))
+        let plain = |t: &Type| uncaptured(&self.zonk(t));
+        let polymorphic = |t: &Type| matches!(plain(t), Type::Forall { .. });
+        let short = |t: &Type| self.show(&plain(t));
+        // the difference may be what the short form leaves out
+        if captures || polymorphic(actual) || polymorphic(expected) {
+            let exact = |t: &Type| {
+                if captures {
+                    self.show_exact(t)
+                } else {
+                    self.show_exact(&plain(t))
+                }
+            };
+            return (exact(actual), exact(expected));
+        }
+        let (a, e) = (short(actual), short(expected));
+        if a == e {
+            return (
+                self.show_exact(&plain(actual)),
+                self.show_exact(&plain(expected)),
+            );
+        }
+        (a, e)
     }
 
     fn mismatch_hint(&self, a: &Type, b: &Type, actual: &str, expected: &str) -> String {
@@ -114,7 +128,12 @@ impl Checker<'_> {
                 )
             }
             _ => {
-                let (sa, sb) = (self.show(a), self.show(b));
+                // here the difference may be the `forall` itself
+                let show = |t: &Type| match t {
+                    Type::Forall { .. } => self.show_exact(t),
+                    _ => self.show(t),
+                };
+                let (sa, sb) = (show(a), show(b));
                 if sa == actual && sb == expected || sa == expected && sb == actual {
                     String::new()
                 } else {
@@ -236,7 +255,7 @@ impl Checker<'_> {
                 );
             }
             Mismatch::Polymorphic(t) => {
-                let t = self.show(t);
+                let t = self.show_exact(t);
                 self.error(
                     codes::T003,
                     span,

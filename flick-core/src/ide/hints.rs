@@ -6,7 +6,7 @@ use crate::iface::{Entity, Namespace};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Type, show_type};
+use crate::types::{Type, show_signature, show_type};
 
 /// The signature of the function a call at the cursor applies.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,7 +38,7 @@ impl Ide<'_> {
         if params.is_empty() {
             return None;
         }
-        let label = format!("{} : {}", head.text(text), show_type(ty));
+        let label = format!("{} : {}", head.text(text), show_signature(ty));
         let mut from = head.text(text).len() + 3;
         let mut ranges = Vec::new();
         for p in &params {
@@ -78,7 +78,7 @@ impl Ide<'_> {
         let text = self.text(file);
         let mut out = Vec::new();
         walk(&m.tree, &mut |node, parent| match node.kind {
-            K::LetDecl if !node.nodes().any(|n| n.kind == K::Params) => {
+            K::LetDecl => {
                 let Some(name) = node
                     .nodes()
                     .find(|n| n.kind == K::VarPat)
@@ -95,7 +95,7 @@ impl Ide<'_> {
                     })
                 });
                 if let (false, Some(ty)) = (signed, m.typing.types.get(&(name.start, name.end))) {
-                    out.push((name.end, format!(": {}", show_type(ty))));
+                    out.push((name.end, format!(": {}", show_signature(ty))));
                 }
             }
             K::BinExpr => {
@@ -110,7 +110,7 @@ impl Ide<'_> {
                     && at_line_end
                     && let Some(ty) = m.typing.types.get(&(pipe.start, pipe.end))
                 {
-                    out.push((end, format!(" : {}", show_type(ty))));
+                    out.push((end, format!(" : {}", show_signature(ty))));
                 }
             }
             _ => {}

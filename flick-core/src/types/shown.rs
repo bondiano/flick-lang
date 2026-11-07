@@ -129,10 +129,7 @@ fn stages(t: &Type, kinds: &mut Vec<(String, Kind)>, held: &Atoms) -> Type {
                     ty,
                     captures,
                     value: false,
-                } if matches!(**ty, Type::Fun { .. })
-                    && later.as_ref().is_some_and(|l| !l.is_empty())
-                    && row_atoms(captures) == later =>
-                {
+                } if matches!(**ty, Type::Fun { .. }) && row_atoms(captures) == later => {
                     stages(ty, kinds, &later)
                 }
                 other => stages(other, kinds, &later),

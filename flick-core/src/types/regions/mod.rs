@@ -673,7 +673,7 @@ impl Checker<'_> {
         if !found {
             return;
         }
-        let head = self.show(result);
+        let head = self.show_exact(result);
         self.diagnostics.push(
             diagnostics::Diagnostic::error(
                 codes::G002,

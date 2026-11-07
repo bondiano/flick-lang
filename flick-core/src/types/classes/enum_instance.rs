@@ -33,7 +33,7 @@ impl<'n> Checker<'_> {
         );
         let instance = Instance {
             module,
-            name: self.show(&head),
+            name: self.show_exact(&head),
             vars: Vec::new(),
             context: Vec::new(),
             head,

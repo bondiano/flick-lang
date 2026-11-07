@@ -10,7 +10,23 @@ use super::unify::Store;
 use crate::numeric::default_num;
 
 impl Checker<'_> {
+    /// `t` for a message: as a reader wants a declared or inferred type, without
+    /// what a signature gets back (`shown`).
     pub fn show(&self, t: &Type) -> String {
+        let mut out = String::new();
+        let printer = Printer {
+            store: &self.store,
+            qualified: false,
+            zero: true,
+        };
+        let held = self.held_now(&self.zonk(t));
+        printer.print(&short_form(&held, &self.store), Prec::Top, &mut out);
+        out
+    }
+
+    /// `t` with its `forall` and its qualifiers, for a message about them and
+    /// for text that is not a message: a dictionary's name, a plugin's fact.
+    pub fn show_exact(&self, t: &Type) -> String {
         let mut out = String::new();
         let printer = Printer {
             store: &self.store,
@@ -100,8 +116,8 @@ pub(super) fn show_type_qualified(t: &Type) -> String {
 struct Printer<'s> {
     store: &'s Store,
     qualified: bool,
-    /// Writes `^{}`. Without a word about it, the short form would say that a
-    /// later stage holds what its parameters hold.
+    /// Writes `^{}` on a later stage. The short form has only those that say
+    /// something: without it, the stage would hold what its parameters hold.
     zero: bool,
 }
 
@@ -161,7 +177,7 @@ impl Printer<'_> {
                         out.push_str("} ");
                     }
                 }
-                self.print(result, Prec::Top, out);
+                self.print_result(result, out);
             }),
             Type::Tuple(items) => {
                 out.push('(');
@@ -206,13 +222,24 @@ impl Printer<'_> {
         }
     }
 
+    /// What an arrow gives, which may be a later stage that holds nothing.
+    fn print_result(&self, result: &Type, out: &mut String) {
+        match result {
+            Type::Captured { ty, captures, .. }
+                if self.zero && is_empty(captures) && matches!(**ty, Type::Fun { .. }) =>
+            {
+                self.print(ty, Prec::Arg, out);
+                out.push_str("^{}");
+            }
+            _ => self.print(result, Prec::Top, out),
+        }
+    }
+
     /// `T^{s}`, `T^c`, `T^(c + d)`; a qualifier still being inferred tells
     /// nothing yet and is left out.
     fn print_captured(&self, ty: &Type, captures: &Type, prec: Prec, out: &mut String) {
         let norm = self.store.normalize(captures);
-        let unknown =
-            norm.entries.is_empty() && norm.tails.iter().all(|t| matches!(t, Type::Meta(_)));
-        if unknown && !(self.zero && norm.tails.is_empty()) {
+        if norm.entries.is_empty() && norm.tails.iter().all(|t| matches!(t, Type::Meta(_))) {
             self.print(ty, prec, out);
             return;
         }
@@ -222,7 +249,6 @@ impl Printer<'_> {
             Type::Row(row) if row.entries.is_empty() && row.tail.is_some() => {
                 self.print(captures, Prec::Arg, out);
             }
-            Type::Row(row) if row.entries.is_empty() => out.push_str("{}"),
             Type::Row(_) => {
                 out.push('{');
                 self.print_row_items(captures, out);

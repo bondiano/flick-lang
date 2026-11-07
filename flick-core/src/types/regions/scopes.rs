@@ -81,7 +81,7 @@ impl Checker<'_> {
         self.regions.nest.pop();
         self.store.level -= 1;
         if let Err(skolem) = self.store.leave(&ty) {
-            let shown = self.show(&ty);
+            let shown = self.show_exact(&ty);
             let span = body.map_or(span, |b| self.span(b));
             let head = format!("the value of this `scope` has type `{shown}`");
             self.region_escape(skolem, &head, span);

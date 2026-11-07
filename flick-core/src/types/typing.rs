@@ -242,7 +242,7 @@ impl Checker<'_> {
         let shown: Vec<String> = givens
             .iter()
             .filter(|g| passes_dictionary(g))
-            .map(|g| self.show(&self.canon(g)))
+            .map(|g| self.show_exact(&self.canon(g)))
             .collect();
         if !shown.is_empty() {
             self.typing.givens.insert(range(span), shown);

@@ -1,44 +1,27 @@
 //! Hover: the source type of what a position names, as Flick writes it,
 //! with its rows, captures and constraints, never a TypeScript helper.
 
+use std::collections::HashSet;
 use std::fmt::Write;
 use std::ptr;
 
 use super::{Ide, Symbol, navigate::Source, tree};
 use crate::doc;
 use crate::iface::{Decl, Namespace};
-use crate::project::Analyzed;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, Ref, TypeDef, component_instance, show_type};
+use crate::types::{Form, Ref, TypeDef, component_instance, show_signature, show_type};
 
 pub(super) mod companions;
 mod kinds;
 mod types;
+mod written;
 
 use crate::types::lang::Lang;
 use companions::enum_literal;
 use kinds::kind_description;
-
-/// `node` as its source lays it out, one written line per line, its
-/// continuation lines dedented by the indentation of its first line.
-fn as_written(node: &Node, text: &str) -> String {
-    let (start, end) = node.range();
-    let line_start = text[..start as usize].rfind('\n').map_or(0, |i| i + 1);
-    let indent = text[line_start..start as usize]
-        .chars()
-        .take_while(|c| c.is_whitespace())
-        .count();
-    let mut lines = text[start as usize..end as usize].lines();
-    let first = lines.next().unwrap_or_default().trim_end().to_owned();
-    lines.fold(first, |mut acc, line| {
-        let cut = line.len() - line.trim_start().len();
-        acc.push('\n');
-        acc.push_str(line[cut.min(indent)..].trim_end());
-        acc
-    })
-}
+use written::{as_written, signature_as_written};
 
 fn documentation(source: &Source, name: &str) -> Option<String> {
     source
@@ -65,30 +48,6 @@ fn member_documentation(decl: &Node, name: &str, text: &str) -> Option<String> {
 }
 
 impl Ide<'_> {
-    /// The signature of a top-level value as its source writes it.
-    fn signature(&self, module: &str, name: &str) -> Option<String> {
-        let source = self.source(module)?;
-        let sig = source.tree.nodes().find(|d| {
-            d.kind == K::Signature
-                && d.child_tokens()
-                    .next()
-                    .is_some_and(|t| t.text(&source.text) == name)
-        })?;
-        Some(as_written(sig.nodes().next()?, &source.text))
-    }
-
-    /// The signature of `method` as the instance `instance` of `m` writes it.
-    fn instance_signature(&self, m: &Analyzed, instance: &str, method: &str) -> Option<String> {
-        let info = m.typing.instances.iter().find(|i| i.name == instance)?;
-        let text = self.text(m.file);
-        let sig = tree::find(&m.tree, info.span)?
-            .nodes()
-            .filter(|n| n.kind == K::Members)
-            .flat_map(Node::nodes)
-            .find(|n| n.kind == K::Signature && tree::name_of(n, K::Ident, text) == Some(method))?;
-        Some(as_written(sig.nodes().next()?, text))
-    }
-
     fn instance_method_hover(
         &self,
         file: FileId,
@@ -111,7 +70,7 @@ impl Ide<'_> {
             }
         };
         let ty = match tree::innermost(m.typing.types.iter(), offset) {
-            Some((_, ty)) => show_type(ty),
+            Some((_, ty)) => show_signature(ty),
             None => self.instance_signature(m, instance, method)?,
         };
         let mut note = self
@@ -137,7 +96,7 @@ impl Ide<'_> {
             .filter(|n| n.kind == K::Members)
             .flat_map(Node::nodes)
             .find(|s| tree::name_of(s, K::Ident, &source.text) == Some(name))?;
-        let ty = as_written(sig.nodes().next()?, &source.text);
+        let ty = signature_as_written(sig.nodes().next()?, &source.text, &HashSet::new());
         let note = member_documentation(decl, name, &source.text)
             .map_or_else(String::new, |doc| format!("{doc}\n\n"));
         Some((
@@ -165,7 +124,7 @@ impl Ide<'_> {
             _ => (kw.start, kw.end),
         };
         let ty = m.typing.types.get(&at)?;
-        let shown = show_type(ty);
+        let shown = show_signature(ty);
         let (head, note) = match kw.kind {
             K::TaskKw => (
                 "task { … }",
@@ -341,7 +300,7 @@ impl Ide<'_> {
             any = true;
             let name = &member.entity.name;
             let code = match (&member.scheme, &member.definition) {
-                (Some(scheme), _) => format!("{name} : {}", show_type(scheme)),
+                (Some(scheme), _) => format!("{name} : {}", show_signature(scheme)),
                 (_, Some(definition)) => format!("{name} : {}", definition.kind),
                 _ => name.clone(),
             };
@@ -416,11 +375,11 @@ impl Ide<'_> {
                         export.and_then(|e| e.scheme.as_ref()),
                     ) {
                         (Some(written), _) => format!("{} : {written}", e.name),
-                        (None, Some(scheme)) => format!("{} : {}", e.name, show_type(scheme)),
+                        (None, Some(scheme)) => format!("{} : {}", e.name, show_signature(scheme)),
                         (None, None) => {
                             let m = self.module(file)?;
                             let (_, ty) = tree::innermost(m.typing.types.iter(), offset)?;
-                            format!("{} : {}", e.name, show_type(ty))
+                            format!("{} : {}", e.name, show_signature(ty))
                         }
                     },
                 };
