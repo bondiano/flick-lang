@@ -102,7 +102,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     progress.stage("Compiling Flick modules");
     let (diagnostics, compilation) = package_cache::with_saved(|saved| {
         let (diagnostics, compilation, fresh) =
-            project::compile_with(&host, &mut sources, Some(&project), &roots, saved);
+            project::compile_with(&host, &mut sources, Some(&project), &roots, saved, false);
         ((diagnostics, compilation), fresh)
     });
     let errors = diagnostics.iter().any(|d| d.severity == Severity::Error);

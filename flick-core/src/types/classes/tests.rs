@@ -39,6 +39,7 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
             no_let_assert: false,
             thresholds: Thresholds::default(),
             effects: true,
+            stages_by_class: false,
         };
         let (more, evidence) =
             check_with_evidence(&module, &imported, builtins(), options, &mut interface);

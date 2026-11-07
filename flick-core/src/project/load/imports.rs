@@ -7,7 +7,6 @@ use super::{Loader, Root, module_path};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::Span;
-use crate::types;
 
 impl Loader<'_> {
     /// Loads imported modules until the set is closed; returns the local
@@ -54,7 +53,7 @@ impl Loader<'_> {
         }
         let local = self.by_name.get(name).copied();
         if local.is_none() && !self.from_packages.contains_key(name) {
-            match types::builtins().iter().find(|i| i.module == name) {
+            match self.builtins().iter().find(|i| i.module == name) {
                 Some(builtin) => {
                     self.from_packages.insert(name.to_owned(), builtin.clone());
                 }

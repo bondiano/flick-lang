@@ -30,7 +30,6 @@ use crate::project::packages::{Library, Packages};
 use crate::resolve::Interface;
 #[cfg(feature = "native-project")]
 use crate::source::{FileId, SourceMap};
-use crate::types;
 
 /// A module of a source package as a run checked and lowered it.
 #[derive(Clone, Serialize, Deserialize)]
@@ -81,14 +80,20 @@ pub(super) struct Precompiled {
 impl Precompiled {
     /// The libraries of `packages` with their keys and saved modules. A
     /// library's key covers the compiler, the configuration of the project,
-    /// its sources and the keys of the libraries it depends on.
+    /// its sources and the keys of the libraries it depends on. A `--rt` build
+    /// keeps the configuration of the project, so the mode counts on its own.
     #[cfg(feature = "native-project")]
-    pub(super) fn new(packages: &Packages, project: &Project, cache: &PackageCache) -> Self {
+    pub(super) fn new(
+        packages: &Packages,
+        project: &Project,
+        cache: &PackageCache,
+        stages_by_class: bool,
+    ) -> Self {
         let libraries: HashMap<&str, _> = packages
             .libraries()
             .map(|(name, dir, library)| (name, (dir, library)))
             .collect();
-        let config = format!("{:?}", project.config);
+        let config = format!("{:?} {stages_by_class}", project.config);
         let mut keys: HashMap<String, Option<String>> = HashMap::new();
         let mut out = Precompiled::default();
         for &name in libraries.keys() {
@@ -289,7 +294,7 @@ impl Loader<'_> {
         }
         if !self.by_name.contains_key(name)
             && !self.from_packages.contains_key(name)
-            && let Some(builtin) = types::builtins().iter().find(|i| i.module == name)
+            && let Some(builtin) = self.builtins().iter().find(|i| i.module == name)
         {
             self.from_packages.insert(name.to_owned(), builtin.clone());
         }

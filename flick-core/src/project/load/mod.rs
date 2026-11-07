@@ -36,6 +36,7 @@ pub use precompiled::{CachedModule, Fresh, PackageCache};
 #[cfg(all(test, feature = "build-artifacts"))]
 pub(crate) use target::js_only;
 
+use super::config::Backend;
 #[cfg(feature = "native-project")]
 use super::packages::Packages;
 use super::{Host, Project, module_name, module_path, normalize};
@@ -46,6 +47,7 @@ use crate::plugin::expansion::Expansion;
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
 use crate::syntax::{self, Parse};
+use crate::types;
 use precompiled::Precompiled;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -97,6 +99,8 @@ struct Loader<'a> {
     host: &'a dyn Host,
     sources: &'a mut SourceMap,
     project: Option<&'a Project>,
+    /// The mode every module of the run and the built-in modules are checked in.
+    stages_by_class: bool,
     #[cfg(feature = "native-project")]
     packages: Packages,
     modules: Vec<Loaded>,
@@ -238,15 +242,18 @@ pub fn compile(
 }
 
 /// [`compile`], taking the modules of source packages `packages` saved and
-/// giving those to save.
+/// giving those to save; `rt` builds for Flick's own runtime whatever the
+/// project says.
 pub fn compile_with(
     host: &dyn Host,
     sources: &mut SourceMap,
     project: Option<&Project>,
     roots: &[PathBuf],
     packages: Option<&PackageCache>,
+    rt: bool,
 ) -> (Vec<Diagnostic>, Compilation, Vec<Fresh>) {
-    let output = run(host, sources, project, roots, Mode::Compile, None, packages);
+    let mode = Mode::Compile;
+    let output = run_in(host, sources, project, roots, mode, None, packages, rt);
     (output.diagnostics, output.compilation, output.fresh)
 }
 
@@ -259,6 +266,21 @@ fn run(
     cache: Option<&mut ModuleCache>,
     saved: Option<&PackageCache>,
 ) -> Output {
+    run_in(host, sources, project, roots, mode, cache, saved, false)
+}
+
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+fn run_in(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+    mode: Mode,
+    cache: Option<&mut ModuleCache>,
+    saved: Option<&PackageCache>,
+    rt: bool,
+) -> Output {
+    let stages_by_class = rt || project.is_some_and(|p| p.config.build.effect == Backend::Rt);
     #[cfg(feature = "native-project")]
     let mut diagnostics = Vec::new();
     #[cfg(feature = "native-project")]
@@ -277,7 +299,7 @@ fn run(
     #[cfg(feature = "native-project")]
     let precompiled = project
         .zip(saved)
-        .map(|(p, saved)| Precompiled::new(&packages, p, saved))
+        .map(|(p, saved)| Precompiled::new(&packages, p, saved, stages_by_class))
         .unwrap_or_default();
     #[cfg(not(feature = "native-project"))]
     let (diagnostics, precompiled) = (Vec::new(), Precompiled::default());
@@ -287,6 +309,7 @@ fn run(
         host,
         sources,
         project,
+        stages_by_class,
         #[cfg(feature = "native-project")]
         packages,
         modules: Vec::new(),
@@ -364,6 +387,11 @@ fn run(
 }
 
 impl Loader<'_> {
+    /// The interfaces of the built-in modules, in the mode of this run.
+    fn builtins(&self) -> &'static [Interface] {
+        types::builtins_of(self.stages_by_class)
+    }
+
     /// The diagnostics of the run without the warnings it does not report:
     /// those the project allows, and those of source packages, whose
     /// dependent does not answer for them.

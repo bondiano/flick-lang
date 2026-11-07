@@ -20,7 +20,13 @@ const PREFIX: &str = "builtins-";
 /// Installs the saved interfaces, or checks the built-in modules and saves
 /// them. Any failure only means they are checked again.
 pub fn prepare() {
-    let Some((dir, binary, name)) = location() else {
+    prepare_in(false);
+}
+
+/// [`prepare`], for checks with `stages_by_class` or without, each with a file
+/// of its own.
+pub fn prepare_in(stages_by_class: bool) {
+    let Some((dir, binary, name)) = location(stages_by_class) else {
         return;
     };
     let path = dir.join(&name);
@@ -28,10 +34,10 @@ pub fn prepare() {
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Vec<Interface>>(&bytes).ok())
     {
-        types::install_builtins(interfaces);
+        types::install_builtins(stages_by_class, interfaces);
         return;
     }
-    let Ok(json) = serde_json::to_vec(types::builtins()) else {
+    let Ok(json) = serde_json::to_vec(types::builtins_of(stages_by_class)) else {
         return;
     };
     if fs::create_dir_all(&dir).is_err() {
@@ -58,10 +64,11 @@ pub fn prepare() {
 /// name for its implicit packages: the interfaces depend on the checker as
 /// much as on the sources, so the name follows the executable, not only the
 /// version, and the hash of the sources of those packages, which a project picks.
-fn location() -> Option<(PathBuf, String, String)> {
+fn location(stages_by_class: bool) -> Option<(PathBuf, String, String)> {
     let dir = store::cache_dir()?;
     let binary = format!("{PREFIX}{}-", toolchain::fingerprint()?);
-    let name = format!("{binary}{}.json", &implicit_hash()[..16]);
+    let mode = if stages_by_class { "-by-class" } else { "" };
+    let name = format!("{binary}{}{mode}.json", &implicit_hash()[..16]);
     Some((dir, binary, name))
 }
 

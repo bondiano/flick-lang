@@ -37,6 +37,7 @@ fn probe(text: &str) -> Interface {
         no_let_assert: false,
         thresholds: types::Thresholds::default(),
         effects: true,
+        stages_by_class: false,
     };
     types::check(
         &module,

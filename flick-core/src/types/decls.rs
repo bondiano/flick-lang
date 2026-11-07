@@ -140,6 +140,13 @@ impl Checker<'_> {
             _ => return None,
         };
         let name = self.con_token(decl)?;
+        if decl.kind == K::ServiceDecl
+            && (decl.nodes().filter(|n| n.kind == K::Members))
+                .flat_map(Node::nodes)
+                .any(|m| m.kind == K::Signature && m.has_token(K::ControlKw))
+        {
+            self.control_effects.insert(name.clone());
+        }
         let params: Vec<Binder> = decl
             .nodes()
             .filter(|n| n.kind == K::TypeParam)
@@ -336,12 +343,6 @@ impl Checker<'_> {
                 self.class_schemes(&p.name, members, signed, &quantify);
             }
             Body::Members(members) => {
-                if members
-                    .iter()
-                    .any(|(_, _, class)| *class == OpClass::Control)
-                {
-                    super::ty::declare_control_effect(format!("{module}.{}", p.name));
-                }
                 let operations = members
                     .into_iter()
                     .map(|(name, ty, class)| Operation {

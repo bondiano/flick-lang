@@ -11,7 +11,7 @@ use crate::project::{Project, is_module_name, module_path};
 use crate::resolve::Interface;
 use crate::source::Span;
 use crate::types::lang::{self, Lang};
-use crate::types::{self, Effects, NO_EFFECTS, Type, show_type};
+use crate::types::{Effects, NO_EFFECTS, Type, show_type};
 
 /// How the runner starts `main`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -195,7 +195,7 @@ impl Loader<'_> {
         let interface_of = |m: &str| {
             let own = self.by_name.get(m).and_then(|&i| interfaces[i].as_ref());
             own.or_else(|| self.from_packages.get(m))
-                .or_else(|| types::builtins().iter().find(|i| i.module == m))
+                .or_else(|| self.builtins().iter().find(|i| i.module == m))
         };
         let (mut module, mut name) = (module.to_owned(), "main".to_owned());
         let mut path = vec![format!("{module}.{name}")];
