@@ -53,7 +53,7 @@ export default defineConfig({
     },
     starlight({
       title: "Flick",
-      description: "An ML language with higher-kinded types, typed effects and regions, on Effect",
+      description: "A language for whole apps, where every function does what it says",
       favicon: "/favicon.ico",
       head: [
         { tag: "link", attrs: { rel: "icon", type: "image/svg+xml", href: `${base}/favicon.svg` } },

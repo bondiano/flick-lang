@@ -1,7 +1,7 @@
 ---
 title: Зачем Flick
 description: Для чего нужен Flick, кому он подходит и кому пока не подходит.
-source_hash: 8b39f251b75650b8
+source_hash: 9e8127e5da294664
 ---
 
 Flick — функциональный язык для приложений, которые работают в браузере,
@@ -92,13 +92,18 @@ let load_two first_id second_id =
 ```flick fail
 # import File exposing (Path, FileSystem, OpenError, ReadError)
 #
-read_later : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
+read_later : Path ->{Async, FileSystem; OpenError} (Unit ->{Async, FileSystem; ReadError} String)
 let read_later path =
   scope {
     let file = File.open_scoped path
     fun () -> File.read_all file
   }
 ```
+
+Вызовы хоста сегодня идут с пустой строкой эффектов. `Console.log`, часы и
+случайные числа — функции `->{}`, поэтому такая сигнатура говорит только о том,
+что вызов эффектный, но не о том, что он трогает. Дефекты тоже остаются вне
+сигнатуры.
 
 Полные правила — в разделах [Эффекты, ошибки и сервисы](../../reference/effects/)
 и [Регионы и захваты](../../reference/regions/).

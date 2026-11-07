@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <strong>Functional programming. Explicit effects. JavaScript and Go.</strong>
+  <strong>Functions that do what they say.</strong>
 </p>
 
 <p align="center">
@@ -19,11 +19,13 @@
   <a href="./editors/README.md">Editor setup</a>
 </p>
 
-Flick is an ML-family language for the browser, the server and the command
-line. It compiles to JavaScript and TypeScript, where effects run on
-[Effect](https://effect.website/), and to Go for a standalone executable.
-Pattern matching, higher-kinded types and type classes meet typed effects,
-errors and services, with regions to keep scoped resources from escaping.
+Flick is a language for whole apps: the browser, the server and the command
+line. A function's signature says what it needs and how it can fail, the
+compiler holds the body to it, and the code still reads like plain code. It
+compiles to JavaScript and TypeScript, where effects run on
+[Effect](https://effect.website/) for now, and to Go for a standalone
+executable. It is alpha: host calls such as `Console.log`, the clock and
+randomness are not named in signatures yet.
 [Why Flick](./docs/src/content/docs/start/why.md) says what it is for, and
 who it is not for yet.
 
