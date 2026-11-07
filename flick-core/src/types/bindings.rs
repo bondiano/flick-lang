@@ -191,6 +191,7 @@ impl Checker<'_> {
                     generated: at >= self.generated,
                     ty: scheme.clone(),
                     rec,
+                    unsigned: false,
                 });
                 rec
             });
@@ -215,6 +216,9 @@ impl Checker<'_> {
                 self.locals.pop();
             }
             self.push_local(&name, at, ty);
+            if let Some(local) = self.locals.last_mut() {
+                local.unsigned = parts.is_function();
+            }
         }
         if let (Some(binder), Some(local)) = (binder, self.locals.last()) {
             let ty = local.ty.clone();
@@ -379,8 +383,10 @@ impl Checker<'_> {
         self.gadt.signed = signed;
         self.store.level -= 1;
         let is_fun = matches!(self.whnf(&ty), Type::Fun { .. });
-        // a plugin's code needs no signature: no one reads it
-        let signed = header || self.span(decl).start >= self.generated;
+        // a plugin's code needs no signature: no one reads it. Nor does a local
+        // function: nothing outside its body sees it, and it stays of one type
+        let local = self.store.level > 0 && !parts.rec;
+        let signed = header || local || self.span(decl).start >= self.generated;
         if let (true, Some(written), true) = (is_fun, parts.header, parts.params.is_empty()) {
             let written = self.text_of(written);
             self.error(

@@ -25,5 +25,20 @@ let hinted () =
 //~ FLICK-T005 @7:1-7:35 write the types of `header` in its signature above the
 //~ FLICK-T006 @9:1-9:30 signature `add` has no definition below it
 //~ FLICK-T004 @11:1-11:20 function `partial` needs a signature right above its `let`
-//~ FLICK-T004 @15:3-15:22 function `local` needs a signature right above its `let`
 //~ FLICK-T005 @20:3-20:38 write the type of function `f` as a signature above the
+
+// without a signature a local function has one type
+one_type : Unit ->{} Unit
+let one_type () =
+  let id x = x
+  let _ = id 1
+  let _ = id "a"
+  ()
+
+// and a recursive one needs a signature, as at the top level
+counted : Unit ->{} Int
+let counted () =
+  let rec count n = if n == 0 then 0 else count (n - 1)
+  count 3
+//~ FLICK-T003 @35:14-35:17 expected `Int`, found `String`
+//~ FLICK-T004 @41:3-41:56 function `count` needs a signature right above its `let`

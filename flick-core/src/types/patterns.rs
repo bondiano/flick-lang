@@ -67,6 +67,7 @@ impl Checker<'_> {
                         generated: name.start >= self.generated,
                         ty: ty.clone(),
                         rec: None,
+                        unsigned: false,
                     });
                 }
                 Pat::Wild
@@ -284,6 +285,7 @@ impl Checker<'_> {
                         generated: node.range().0 >= self.generated,
                         ty: field_ty,
                         rec: None,
+                        unsigned: false,
                     });
                     Pat::Wild
                 };

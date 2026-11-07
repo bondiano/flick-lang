@@ -39,6 +39,7 @@ codegen/ints
 codegen/let_assert
 codegen/lift
 codegen/literals
+codegen/local_functions
 codegen/numbers
 codegen/numeric_classes
 codegen/patterns
