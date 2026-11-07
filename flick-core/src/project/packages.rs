@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use super::config::{self, Dependency, Kind, Source};
+use super::config::{self, Dependency, JsDependency, Kind, Source};
 use super::lock::{LOCK_FILE, Lock};
 use super::store;
 use super::{Host, Project};
@@ -43,14 +43,16 @@ struct Package {
 pub struct Library {
     pub checksum: Option<String>,
     pub dependencies: Vec<String>,
+    /// The npm packages it needs on the js target.
+    pub js_dependencies: Vec<JsDependency>,
 }
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-struct Manifest {
+pub(super) struct Manifest {
     name: Option<String>,
     #[serde(default)]
-    dependencies: serde_json::Map<String, serde_json::Value>,
+    pub(super) dependencies: serde_json::Map<String, serde_json::Value>,
     #[serde(default)]
     dev_dependencies: serde_json::Map<String, serde_json::Value>,
     flick: Option<FlickField>,
@@ -331,6 +333,7 @@ impl Libraries<'_> {
             library: Some(Library {
                 checksum,
                 dependencies,
+                js_dependencies: library.js_dependencies,
             }),
             plugin: (library.package.as_ref())
                 .and_then(|p| p.plugin.as_ref())
@@ -352,7 +355,11 @@ fn compiles_with(requirement: &str, version: &str) -> bool {
 }
 
 /// `None` when the file is absent; an unreadable manifest is reported.
-fn manifest(host: &dyn Host, path: &Path, diagnostics: &mut Vec<Diagnostic>) -> Option<Manifest> {
+pub(super) fn manifest(
+    host: &dyn Host,
+    path: &Path,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<Manifest> {
     let bytes = host.read(path).ok()?;
     match serde_json::from_slice(&bytes) {
         Ok(manifest) => Some(manifest),

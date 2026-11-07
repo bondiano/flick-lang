@@ -185,8 +185,31 @@ A library is compiled like a [source package](#packages): for the target the
 project emits, without its warnings, after the project's own modules, as
 another package, so instances of its classes and types are its own. A change
 to a path library's sources or its `flick.toml`, or to `flick.lock`, rebuilds
-the project, and `--watch` follows them. npm dependencies stay in
-`package.json`.
+the project, and `--watch` follows them.
+
+### npm packages of a library
+
+A project's own npm dependencies stay in `package.json`. A library that needs
+npm packages at run time on the js target names them under
+`[js.dependencies]`, each a version or range of the registry, not a path, a
+URL or a `workspace:` protocol:
+
+```toml
+[js.dependencies]
+left-pad = "^1.3.0"
+```
+
+`flick install` and `flick update` gather these tables from the project's
+manifest and from each library it depends on, directly or through another,
+and add what `package.json` lacks to its `dependencies`, creating the file if
+the project has none; pnpm then installs and pins them as the project's own,
+and `flick pack` ships them in the manifest of an app. `--locked` fails rather
+than change `package.json`.
+
+A js build without them fails with `FLICK-P034`, which says to run
+`flick install`; a build for go needs none of them. Two packages must name one
+npm package with the same text, and `package.json` with it, or the build and
+`flick install` report `FLICK-P040`.
 
 ## Scripts
 

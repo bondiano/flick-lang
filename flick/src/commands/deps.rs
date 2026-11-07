@@ -10,6 +10,7 @@ use std::process::Command as Process;
 
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::project::pnpm::{self, Command};
+use flick_core::project::{self, js};
 use flick_core::source::SourceMap;
 
 use super::libraries;
@@ -18,6 +19,7 @@ use crate::args::GlobalArguments;
 use crate::child;
 use crate::command::Outcome;
 use crate::fetch;
+use crate::sources::FsHost;
 use crate::stdlib;
 use crate::toolchain;
 use flick_core::project::Project;
@@ -108,6 +110,44 @@ fn fetch(project: &Project, command: &Command) -> Option<Outcome> {
     }
 }
 
+/// For `install` and `update`, adds what the dependency closure wants of npm
+/// to `package.json`, which pnpm then installs; the failure.
+fn add_js_dependencies(command: &Command, global: &GlobalArguments) -> Option<Outcome> {
+    let locked = match command {
+        Command::Install { locked, .. } => *locked,
+        Command::Update { .. } => false,
+        _ => return None,
+    };
+    let host = FsHost::new();
+    let mut sources = SourceMap::default();
+    let explicit = global.project.as_deref().map(Path::new);
+    let project = project::discover(&host, &mut sources, &host.cwd, explicit)
+        .ok()
+        .flatten()?;
+    let mut diagnostics = Vec::new();
+    let wanted = js::wanted(&host, &mut sources, &project, &mut diagnostics);
+    diagnostics.extend(js::conflicts(&host, &project.root, &wanted));
+    if !diagnostics.is_empty() {
+        return Some(Outcome {
+            sources,
+            diagnostics,
+        });
+    }
+    let path = project.root.join("package.json");
+    let text = fs::read_to_string(&path).ok();
+    match js::merged_manifest(text.as_deref(), &wanted) {
+        Ok(None) => None,
+        Ok(Some(_)) if locked => Some(failure(
+            codes::P034,
+            "`package.json` lacks npm packages that `[js.dependencies]` name: run `flick install` without `--locked`".to_owned(),
+        )),
+        Ok(Some(merged)) => fs::write(&path, merged).err().map(|e| {
+            failure(codes::P013, format!("cannot write `{}`: {e}", path.display()))
+        }),
+        Err(message) => Some(failure(codes::P005, message)),
+    }
+}
+
 pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
     let project = match find_project(global) {
         Ok(p) => p,
@@ -119,7 +159,8 @@ pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
         }
     };
     let root = &project.root;
-    if let Some(failed) = fetch(&project, command) {
+    if let Some(failed) = fetch(&project, command).or_else(|| add_js_dependencies(command, global))
+    {
         return failed;
     }
     let npm_remove;

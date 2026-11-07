@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **`[js.dependencies]`:** a library of `[dependencies]` names the npm packages
+  it needs on the js target, and `flick install` adds those of the project's
+  whole dependency closure to its `package.json`. A js build without them is
+  `FLICK-P034`, and two packages that disagree on a version are `FLICK-P040`.
 - **`Scope.run`:** `scope s { body }` stands for `Scope.run (fun s -> body)`, and
   `Scope.run` takes a function polymorphic in the region, also as a value. The
   IR has no `Scope` node; its version is 0.4.0.

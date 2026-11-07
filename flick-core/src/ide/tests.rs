@@ -159,6 +159,7 @@ pub(super) fn fixture_of(files: &[(&str, &str)]) -> Fixture {
             test_dir: "test".into(),
             entries: Vec::new(),
             dependencies: Vec::new(),
+            js_dependencies: Vec::new(),
             package: None,
             build: Build::default(),
             sql_dialect: Default::default(),
