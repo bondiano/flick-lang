@@ -198,3 +198,39 @@ fn the_fix_of_g003_adds_the_constraint_to_the_context() {
         format!("f : Fiber.Provided r s => {row}")
     );
 }
+
+#[test]
+fn the_fix_of_g001_adds_the_region_to_a_written_qualifier() {
+    let text = |signature: &str| {
+        format!(
+            "module Probe exposing (..)\n\
+             type Handle (s : Region) = Handle\n\
+             {signature}\n\
+             let f h = fun () -> ignore h\n"
+        )
+    };
+    let fixed = |signature: &str| {
+        let text = text(signature);
+        let mut sources = SourceMap::default();
+        let file = sources.add("Probe.fl", text.clone());
+        let diagnostics = crate::check(&sources, file);
+        let edits: Vec<_> = (diagnostics.iter())
+            .filter(|d| d.code == codes::G001)
+            .flat_map(|d| &d.fixes)
+            .flat_map(|f| &f.edits)
+            .collect();
+        let [edit] = edits[..] else {
+            panic!("expected one edit, got {diagnostics:?}");
+        };
+        let mut out = text;
+        out.replace_range(edit.span.range(), &edit.replacement);
+        out.lines()
+            .find(|l| l.starts_with("f :"))
+            .expect("the signature")
+            .to_owned()
+    };
+    assert_eq!(
+        fixed("f : Handle s -> (Unit ->{} Unit)^{}"),
+        "f : Handle s -> (Unit ->{} Unit)^{s}"
+    );
+}

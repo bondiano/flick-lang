@@ -1,0 +1,15 @@
+// A later stage of a function holds what its earlier parameters hold, a qualifier
+// no one wrote. The message says so, since the signature does not show it.
+module App.StageQualifier exposing (..)
+
+type Handle (s : Region) = Handle
+
+use_it : Handle s ->{} Unit
+let use_it _ = ()
+
+local : Handle s ->{} Unit
+let local h =
+  wrap : forall a. a -> (Unit ->{} Unit)
+  let wrap _ = fun () -> use_it h
+  (wrap 1) ()
+//~ FLICK-G001 @13:16-13:34 this function uses `h`, which holds `s`, but the expected type `(Unit ->{} Unit)^{a}` allows only `a`; the signature does not write

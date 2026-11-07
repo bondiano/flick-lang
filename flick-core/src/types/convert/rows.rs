@@ -213,7 +213,11 @@ impl Checker<'_> {
     /// `^c`, `^{s, t}`, `^(c + d)`.
     pub(super) fn capture(&mut self, node: &Node, free: Free) -> Type {
         match node.kind {
-            K::RowType => self.row(node, &Kind::CaptureRow, free),
+            K::RowType => {
+                let mut row = self.row(node, &Kind::CaptureRow, free);
+                place_braces(&mut row, node, self.file);
+                row
+            }
             _ => self.ty(node, &Kind::CaptureRow, free),
         }
     }
