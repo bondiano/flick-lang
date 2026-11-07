@@ -6,6 +6,7 @@
 
 ../rt/control_handlers
 ../rt/deep_async
+../rt/wake_chain
 bootstrap/debug
 bootstrap/hello
 bootstrap/stderr
