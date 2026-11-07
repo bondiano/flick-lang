@@ -1,10 +1,2 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><title>Flick</title><g transform="translate(105.5 9) scale(.75)">
-    <path d="M272 132 350 154 236 182Z" fill="#df6aa6" />
-    <path d="M26 24 184 43C222 48 248 83 272 132L236 182C197 200 165 236 168 294L196 402C184 494 125 579 58 636 69 529 64 467 50 385 36 302 39 245 63 192 73 168 86 149 99 135L32 80 96 85Z" fill="#6b50dc" />
-    <path d="M26 24 184 43C222 48 248 83 272 132L174 110 96 85Z" fill="#9273f4" />
-    <path d="m26 24 43 7 26 24-32-2Zm6 56 35 2 18 23-25-4Z" fill="#df6aa6" />
-    <path d="m174 110 72 21-36 13C197 140 187 126 174 110Z" fill="#fffaff" />
-    <path d="m218 123 28 8-36 13Z" fill="#171424" />
-    <path d="M124 292C204 300 297 310 374 313 347 336 318 349 281 347L351 354C326 377 290 389 238 382L299 394C269 411 230 417 196 409 144 406 108 369 94 321 92 311 100 295 124 292Z" fill="#6c52df" />
-    </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" role="img" aria-label="Flick favicon"><title>Flick favicon</title><style>.base{fill:#0E1116}.accent{fill:#5B3FD6}@media (prefers-color-scheme:dark){.base{fill:#FFFFFF}.accent{fill:#B7A5FF}}</style>
+<path class="base" d="M26 8H38V92H26A18 18 0 0 1 8 74V26A18 18 0 0 1 26 8Z"/><path class="accent" d="M48 8H74A18 18 0 0 1 83.3251106527435 10.603821535391015L48 45.928932188134524Z"/><path class="base" d="M48 60.071067811865476L90.10675861985747 17.964309192008002A18 18 0 0 1 92 26V74A18 18 0 0 1 74 92H48Z"/></svg>
