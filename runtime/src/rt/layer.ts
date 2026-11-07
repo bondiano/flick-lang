@@ -5,7 +5,7 @@
 // memo map of the one around it; sibling ones build anew.
 import { type Cause, type Exit, raise } from "./cause.ts";
 import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, lookup, owned, raiseOf } from "./fiber.ts";
-import { Owner, addFinalizerExit, close, inside, withOwner } from "./owner.ts";
+import { Owner, addTo, close, withOwner } from "./owner.ts";
 import { traceEvent, traceLayer, tracing } from "./trace.ts";
 
 /** What a layer gives: implementations by tag, later ones replacing earlier ones. */
@@ -47,18 +47,17 @@ class MemoMap {
 
 const MEMO = /*#__PURE__*/ Object.freeze({ key: "effect/Layer/CurrentMemoMap" });
 
-/** `task` running with `scope` as its owner. */
-const inScope = (scope: Owner, task: () => unknown): Under => inside(scope, task);
-
 const held = (map: MemoMap, layer: Layer, entry: Entry, into: Owner): unknown => {
   entry.observers++;
-  return inScope(into, () =>
-    addFinalizerExit(function* (exit: Exit): Run {
+  return addTo(
+    into,
+    function* (exit: Exit): Run {
       entry.observers--;
       if (entry.observers > 0) return undefined;
       if (map.entries.get(layer) === entry) map.entries.delete(layer);
       return raiseOf(asExit(yield close(entry.scope, exit)));
-    }),
+    },
+    true,
   );
 };
 

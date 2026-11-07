@@ -238,10 +238,13 @@ export const scopeCurrent = (): Owner | undefined => currentCtx().owner;
 /** A call that acquires into the owner of a region the compiler chose: an outer `scope`'s. */
 export const within = (owner: Owner, call: () => unknown): Under => inside(owner, call);
 
-/** A finalizer on the stack of `owner`, or run at once when its finalizers have started. */
-const addTo = (owner: Owner | undefined, run: (exit: Exit) => unknown): unknown => {
+/**
+ * A finalizer on the stack of `owner`, or run at once when its finalizers have
+ * started. The trace has what Flick adds; `silent` is one of the runtime's own.
+ */
+export const addTo = (owner: Owner | undefined, run: (exit: Exit) => unknown, silent = false): unknown => {
   if (owner === undefined) return undefined;
-  const traced = tracing && owner.trace !== 0;
+  const traced = !silent && tracing && owner.trace !== 0;
   const place = traced ? ++owner.fins : 0;
   const finalizer: Finalizer = { ctx: currentCtx(), run, place };
   if (owner.finalizing) {

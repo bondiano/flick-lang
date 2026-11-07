@@ -31,5 +31,5 @@ export { parallel, parallelAll, parallelExits, parallelResults, raceFirst, raceS
 export { durationMillis, durationMinutes, durationSeconds } from "./duration.ts";
 export { layerMerge, layerOverride, layerRun, layerSucceed } from "./layer.ts";
 export { absent, flickAssert, flickEcho, flickTodo, refGet, refMake, refModify, refSame, refSet } from "./builtins.ts";
-export { exitFailure, exitValue, failurePrimary, failureRawCause } from "./outcome.ts";
+export { exitFailure, exitValue, failurePrimary, failureRawCause, failureRethrow } from "./outcome.ts";
 export { acquireRelease, bracket, reportedDefects } from "./owner.ts";

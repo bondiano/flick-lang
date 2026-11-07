@@ -25,6 +25,7 @@
 //! to what the JS debug run projects it to (`trace`).
 
 mod gaps;
+mod rt;
 mod times;
 mod trace;
 
@@ -83,6 +84,18 @@ impl Ran {
 
 /// Builds and runs one case, as JS, TypeScript or Go, in a profile.
 fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) -> Ran {
+    run_case_with(case, rel, out_dir, emit, profile, &[])
+}
+
+/// [`run_case`], with `flags` for the build.
+fn run_case_with(
+    case: &Path,
+    rel: &Path,
+    out_dir: &Path,
+    emit: &str,
+    profile: &str,
+    flags: &[&str],
+) -> Ran {
     let _ = fs::remove_dir_all(out_dir);
     let started = Instant::now();
     let build = Command::new(env!("CARGO_BIN_EXE_flick"))
@@ -94,6 +107,7 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
         .arg(emit)
         .arg("--profile")
         .arg(profile)
+        .args(flags)
         .output()
         .expect("flick runs");
     let build_time = started.elapsed();
@@ -170,8 +184,13 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
 
 /// The cases of `tests/run/portable.txt`, by path without `.fl`.
 fn portable(root: &Path) -> Vec<String> {
+    listed_cases(root, "portable.txt")
+}
+
+/// The cases a list under `root` names, by path without `.fl`.
+fn listed_cases(root: &Path, list: &str) -> Vec<String> {
     let text =
-        fs::read_to_string(root.join("portable.txt")).expect("readable tests/run/portable.txt");
+        fs::read_to_string(root.join(list)).unwrap_or_else(|_| panic!("readable tests/run/{list}"));
     let cases: Vec<String> = text
         .lines()
         .map(|l| l.split('#').next().unwrap_or("").trim())
@@ -181,7 +200,7 @@ fn portable(root: &Path) -> Vec<String> {
     for case in &cases {
         assert!(
             root.join(format!("{case}.fl")).exists(),
-            "tests/run/portable.txt lists `{case}`, which is no case"
+            "tests/run/{list} lists `{case}`, which is no case"
         );
     }
     cases

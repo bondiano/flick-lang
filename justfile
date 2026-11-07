@@ -178,6 +178,10 @@ conformance: e2e-prepare
     FLICK_E2E_ONLY=tests/run/runtime/,effect/shared_layer_merged cargo test --profile e2e -p flick --test e2e -- --ignored run_cases
     FLICK_MODEL_ONLY=runtime/ cargo test --profile e2e -p flick-model --test run -- --include-ignored model_prints
 
+# The cases of tests/run/rt.txt on Flick's own runtime, in both profiles
+conformance-rt: e2e-prepare
+    cargo test --profile e2e -p flick --test e2e -- --ignored rt_cases
+
 # Run SQL queries against PostgreSQL in Docker
 e2e-postgres: e2e-prepare
     cargo test --profile e2e -p flick --test sql_postgres -- --ignored
