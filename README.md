@@ -1,14 +1,10 @@
 <h1 align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/public/flick-wordmark-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/public/flick-wordmark.svg">
-    <img src="./docs/public/flick-wordmark.svg" width="592" height="200" alt="Flick">
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/public/flick-readme-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/public/flick-readme.svg">
+    <img src="./docs/public/flick-readme.svg" width="800" height="240" alt="Flick: functions that do what they say.">
   </picture>
 </h1>
-
-<p align="center">
-  <strong>Functions that do what they say.</strong>
-</p>
 
 <p align="center">
   <a href="https://bondiano.github.io/flick-lang/">Documentation</a> ·
