@@ -83,14 +83,14 @@ pub(super) fn inherited(project: &Project) -> Vec<String> {
     if project.workspace.is_none() {
         return Vec::new();
     }
-    let written = fs::read_to_string(project.root.join(project::CONFIG_FILE))
+    // a manifest that does not read tells nothing
+    let Some(written) = fs::read_to_string(project.root.join(project::CONFIG_FILE))
         .ok()
-        .and_then(|text| config::parse(&text, FileId::default()).ok());
-    let own = |name: &str| {
-        (written.iter())
-            .flat_map(|c| &c.dependencies)
-            .any(|d| d.name == name)
+        .and_then(|text| config::parse(&text, FileId::default()).ok())
+    else {
+        return Vec::new();
     };
+    let own = |name: &str| written.dependencies.iter().any(|d| d.name == name);
     (project.config.dependencies.iter())
         .filter(|d| !own(&d.name))
         .map(|d| d.name.clone())

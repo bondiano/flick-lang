@@ -8,6 +8,7 @@ pub use download::hex;
 
 use std::collections::BTreeSet;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use flick_core::project::config::{self, Dependency, Source};
@@ -51,11 +52,12 @@ pub fn install(
     let Install {
         mut lock, fetched, ..
     } = install;
-    lock.plugins = plugins(root, dependencies);
+    lock.plugins = plugins(root, dependencies)?;
     let empty = lock.packages.is_empty() && lock.plugins.is_empty();
     let changed = lock.render() != old.render() || !lock_path.exists() && !empty;
     if changed && options.locked {
-        let rebuilt = (lock.plugins.iter()).find(|p| !old.plugins.contains(p));
+        let rebuilt = (lock.plugins.iter())
+            .find(|p| !old.plugins.contains(p) && old.plugins.iter().any(|o| o.name == p.name));
         return Err(match rebuilt {
             Some(p) if lock.packages == old.packages => format!(
                 "the component of the plugin of `{}` is not the one `{LOCK_FILE}` was written with: \
@@ -75,22 +77,29 @@ pub fn install(
 }
 
 /// The components of the plugins of the path dependencies of the project at
-/// `root` that are built: a fetched one is pinned by the package's checksum.
-fn plugins(root: &Path, dependencies: &[Dependency]) -> Vec<LockedPlugin> {
-    (dependencies.iter())
-        .filter_map(|d| {
-            let library = project::normalize(&root.join(d.path()?));
-            let component = manifest(&library)?.package?.plugin?;
-            let path = project::normalize(&library.join(component));
-            let bytes = fs::read(&path).ok()?;
-            let relative = relative(root, &path);
-            Some(LockedPlugin {
-                name: d.name.clone(),
-                component: relative,
-                checksum: format!("sha256:{}", hex(&Sha256::digest(&bytes))),
-            })
-        })
-        .collect()
+/// `root` that are built: a fetched one is pinned by the package's checksum,
+/// and one not built yet has nothing to pin.
+fn plugins(root: &Path, dependencies: &[Dependency]) -> Result<Vec<LockedPlugin>, String> {
+    let mut out = Vec::new();
+    for d in dependencies {
+        let Some(dir) = d.path() else { continue };
+        let library = project::normalize(&root.join(dir));
+        let Some(component) = manifest(&library).and_then(|c| c.package?.plugin) else {
+            continue;
+        };
+        let path = project::normalize(&library.join(component));
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(format!("cannot read `{}`: {e}", path.display())),
+        };
+        out.push(LockedPlugin {
+            name: d.name.clone(),
+            component: relative(root, &path),
+            checksum: format!("sha256:{}", hex(&Sha256::digest(&bytes))),
+        });
+    }
+    Ok(out)
 }
 
 /// `path` from `root`, with `/` between its parts.
