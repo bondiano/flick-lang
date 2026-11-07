@@ -1,0 +1,12 @@
+// What a set of another module holds; `App.Main` does not import this module.
+module App.Errors exposing (Boom(..), Other(..), Suspends, wait)
+
+type error Boom = Boom
+
+type error Other = Other
+
+effect Suspends =
+  control pause : Unit ->{} Unit
+
+wait : Unit ->{Suspends;} Unit
+let wait () = Suspends.pause ()

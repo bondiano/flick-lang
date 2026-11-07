@@ -101,6 +101,112 @@ fn a_row_given_to_an_alias_gets_it_where_it_is_given() {
 }
 
 #[test]
+fn a_set_gets_what_it_lacks_beside_it() {
+    let program = "type alias Env = {Users; NotFound}\nlet f x = Log.line x";
+    assert_eq!(
+        fixed("f : String ->{...Env} Unit", program),
+        "f : String ->{Log, ...Env} Unit"
+    );
+}
+
+/// `signature` after the fix of its T002, in the text of `program`.
+fn fixed_t002(signature: &str, program: &str) -> String {
+    let mut text = format!(
+        "module Probe exposing (..)\n\
+         service Log =\n  line : String ->{{}} Unit\n\
+         type alias Env = {{Log}}\n\
+         {signature}\n{program}\n"
+    );
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.clone());
+    let diagnostics = crate::check(&sources, file);
+    let mut edits: Vec<_> = (diagnostics.iter())
+        .filter(|d| d.code == codes::T002)
+        .flat_map(|d| &d.fixes)
+        .flat_map(|f| &f.edits)
+        .collect();
+    assert!(!edits.is_empty(), "{diagnostics:?}");
+    edits.sort_by_key(|e| Reverse(e.span.range().start));
+    for edit in edits {
+        text.replace_range(edit.span.range(), &edit.replacement);
+    }
+    let line = text.lines().find(|l| l.starts_with("f :"));
+    line.expect("the signature").to_owned()
+}
+
+#[test]
+fn a_set_without_dots_gets_them_and_an_element_loses_them() {
+    let program = "let f x = Log.line x";
+    assert_eq!(
+        fixed_t002("f : String ->{Env;} Unit", program),
+        "f : String ->{...Env;} Unit"
+    );
+    assert_eq!(
+        fixed_t002("f : String ->{...Env, -Env} Unit", program),
+        "f : String ->{...Env, -...Env} Unit"
+    );
+}
+
+#[test]
+fn an_arrow_without_its_only_set_gets_its_semicolon() {
+    let program = "let f x = Log.line x";
+    assert_eq!(
+        fixed_t002("f : String ->{...Log} Unit", program),
+        "f : String ->{Log;} Unit"
+    );
+    assert_eq!(
+        fixed_t002(
+            "f : String ->{...Log; Boom} Unit",
+            "type error Boom = Boom\nlet f x = Log.line x"
+        ),
+        "f : String ->{Log; Boom} Unit"
+    );
+    // another set stays, so the row needs no `;`
+    assert_eq!(
+        fixed_t002("f : String ->{...Log, ...Env} Unit", program),
+        "f : String ->{Log, ...Env} Unit"
+    );
+}
+
+/// The edits of the E002 of `signature`, in the text of `program`.
+fn edits_of_e002(signature: &str, program: &str) -> usize {
+    let text = format!(
+        "module Probe exposing (..)\n\
+         service Users =\n  get : Float ->{{}} String\n\
+         service Log =\n  line : String ->{{}} Unit\n\
+         {signature}\n{program}\n"
+    );
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text);
+    let diagnostics = crate::check(&sources, file);
+    assert!(
+        diagnostics.iter().any(|d| d.code == codes::E002),
+        "{diagnostics:?}"
+    );
+    (diagnostics.iter())
+        .filter(|d| d.code == codes::E002)
+        .flat_map(|d| &d.fixes)
+        .map(|f| f.edits.len())
+        .sum()
+}
+
+#[test]
+fn a_row_named_by_its_alias_is_not_edited_through_it() {
+    let program = "type alias Env = {Users}\nlet f = task { Log.line \"x\" }";
+    assert_eq!(edits_of_e002("f : Eff Env none Unit", program), 0);
+}
+
+#[test]
+fn a_row_with_omit_gets_no_fix() {
+    // adding `Log` beside `-Log` would change nothing
+    let program = "type alias Env = {Users, Log}\nlet f x = Log.line x";
+    assert_eq!(
+        edits_of_e002("f : String ->{...Env, -Log} Unit", program),
+        0
+    );
+}
+
+#[test]
 fn a_type_that_lacks_only_async_gets_it_where_it_is_written() {
     let program = "type Job (r : ServiceRow) = Job\n\
                    job : Unit -> Job {Async}\n\

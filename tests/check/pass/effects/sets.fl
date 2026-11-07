@@ -1,0 +1,136 @@
+// A set of services and errors is an alias of a row: `...` merges a set into a
+// row, `-` takes out of it, and the row that results is a plain row.
+module App.Sets exposing (..)
+
+// the order of the declarations does not matter
+type alias Shop = {...Orders, ...Payments}
+
+type alias Orders = {...Reads, Billing; OrderNotFound}
+
+type alias Reads = {Log, Users; ...UserErrors}
+
+type alias Payments = {Log, Billing; CardDeclined}
+
+type alias UserErrors = {UserNotFound, InvalidEmail}
+
+type alias AllErrors = {...UserErrors, OrderNotFound}
+
+type alias OnlyErrors = {; Boom}
+
+type alias Quiet = {...Orders, -Log; -InvalidEmail}
+
+type alias NoReads = {...Orders, -...Reads}
+
+type alias Public = {...AllErrors, -InvalidEmail}
+
+type alias Db s = {Scope s, Log}
+
+type alias WithErrors e = {Log; e}
+
+type error UserNotFound = UserNotFound
+
+type error InvalidEmail = InvalidEmail
+
+type error OrderNotFound = OrderNotFound
+
+type error CardDeclined = CardDeclined
+
+type error Boom = Boom
+
+service Log =
+  info : String ->{} Unit
+
+service Users =
+  find : String ->{; UserNotFound} String
+
+service Billing =
+  charge : Int ->{} Unit
+
+// a set in an arrow holds as much as its row
+spelled : String ->{Log, Users, Billing; UserNotFound, InvalidEmail, OrderNotFound} String
+let spelled name =
+  Log.info name
+  Users.find name
+
+merged : String ->{...Orders} String
+let merged name = spelled name
+
+back : String ->{Log, Users, Billing; UserNotFound, InvalidEmail, OrderNotFound} String
+let back name = merged name
+
+// add a service, an error, a row variable
+wider : String ->{...Orders, Async | r; Boom} String
+let wider name = merged name
+
+// a set of errors stands in either slot
+errors_after : Int ->{; ...UserErrors, Boom} Int
+let errors_after n = if n > 0 then from_result (Err InvalidEmail) else from_result (Err Boom)
+
+errors_before : Int ->{...UserErrors; Boom} Int
+let errors_before n = errors_after n
+
+only_errors : Int ->{...OnlyErrors} Int
+let only_errors _ = from_result (Err Boom)
+
+// a set can be taken apart where it is used
+quiet : String ->{...Orders, -Log; -InvalidEmail, -OrderNotFound} String
+let quiet name = Users.find name
+
+named_set : String ->{...Quiet; -OrderNotFound} String
+let named_set name = quiet name
+
+no_reads : Int ->{...NoReads} Unit
+let no_reads _ = Billing.charge 0
+
+public : Int ->{; ...Public} Int
+let public _ = from_result (Err OrderNotFound)
+
+// the arguments of a set are its own
+in_scope : String ->{...Db s} Unit
+let in_scope line = Log.info line
+
+open_errors : String ->{...WithErrors {Boom}} Unit
+let open_errors line = Log.info line
+
+// a function that needs less fits where more is allowed
+each : (String ->{...Orders} String) -> String ->{...Orders} String
+let each f name = f name
+
+narrow : String ->{...Orders} String
+let narrow name = each (fun x -> Users.find x) name
+
+// catching one error leaves the rest of the set
+caught : String ->{Log, Users, Billing; InvalidEmail, OrderNotFound} String
+let caught name =
+  try merged name with
+  | UserNotFound -> name
+
+// outside the braces an alias is the whole row
+built : Eff {...Orders} none String
+let built = task { merged "a" }
+
+in_eff : Eff Payments none Unit
+let in_eff = task { Log.info "b" }
+
+as_union : Unit ->{Payments + r;} Unit
+let as_union () = Log.info "c"
+
+as_tail : Unit ->{Users | Payments;} Unit
+let as_tail () = Log.info "d"
+
+type alias Services = {Log, Users}
+
+taken : Layer none none Services -> Int
+let taken _ = 1
+
+// a set of what runs at once keeps the stage
+type alias Reading = {Atom.Read}
+
+count : Atom.Writable Float
+let count = Atom.make 0
+
+doubled : Unit ->{...Reading} Float
+let doubled () = Atom.value count * 2
+
+halves : Atom.Atom Float
+let halves = Atom.derived doubled

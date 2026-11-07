@@ -1,0 +1,21 @@
+// Naming a set of another module: its errors and services are checked here too.
+module App.Main exposing (holds, outside, narrow, errors_too, paused)
+
+import App.Sets as Sets
+
+holds : Unit ->{...Sets.Held} Int
+let holds () = Sets.boom ()
+
+outside : Unit ->{...Sets.Held} Int
+let outside () = Sets.other ()
+//~ FLICK-E002 @10:18-10:31 does not allow error `Other`
+
+narrow : Unit ->{...Sets.Held; -...Sets.OnlyErrors} Int
+let narrow () = Sets.boom ()
+//~ FLICK-E002 @14:17-14:29 does not allow error `Boom`
+
+errors_too : Unit ->{; ...Sets.OnlyErrors} Int
+let errors_too () = Sets.boom ()
+
+paused : Unit ->{...Sets.Paused} Unit
+let paused () = Sets.wait ()

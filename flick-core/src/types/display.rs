@@ -4,6 +4,7 @@ use crate::numeric::NumLang;
 use std::fmt::Write;
 
 use super::Checker;
+use super::lang::Lang;
 use super::shown::short_form;
 use super::ty::{Binder, Row, Type};
 use super::unify::Store;
@@ -296,15 +297,25 @@ impl Printer<'_> {
             out.push_str("none");
             return;
         }
-        for (i, (_, item)) in row.entries.iter().enumerate() {
+        // a set holds its errors in `Fail`; it reads as it is written, `{A; E}`
+        let is_fail = |item: &Type| item.spine().0.is_lang(Lang::Fail);
+        let items = row.entries.iter().map(|(_, item)| item);
+        for (i, item) in items.clone().filter(|item| !is_fail(item)).enumerate() {
             if i > 0 {
                 out.push_str(", ");
             }
             self.print(item, Prec::App, out);
         }
+        let services = items.clone().any(|item| !is_fail(item));
         if let Some(tail) = &row.tail {
-            out.push_str(if row.entries.is_empty() { "" } else { " | " });
+            out.push_str(if services { " | " } else { "" });
             self.print(tail, Prec::App, out);
+        }
+        for item in items.filter(|item| is_fail(item)) {
+            if let [errors] = item.spine().1[..] {
+                out.push_str("; ");
+                self.print_row_items(errors, out);
+            }
         }
     }
 

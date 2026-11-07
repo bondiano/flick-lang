@@ -265,7 +265,7 @@ fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
         (K::Arrow, K::LBrace) if b_parent == K::EffectAnnot => false,
         (K::LBrace, _) => !tight_braces(a_parent),
         (_, K::RBrace) => !tight_braces(b_parent),
-        (K::Minus, _) => !matches!(a_parent, K::PrefixExpr | K::LitPat),
+        (K::Minus, _) => !matches!(a_parent, K::PrefixExpr | K::LitPat | K::RowOmit),
         (K::Con, K::LParen) => b_parent != K::ExposeItem,
         _ => true,
     }

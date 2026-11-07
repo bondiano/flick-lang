@@ -254,6 +254,8 @@ pub enum SyntaxKind {
     EffectAnnot,
     Row,
     RowTail,
+    RowSpread,
+    RowOmit,
     ForallType,
     ConstrainedType,
     TupleType,

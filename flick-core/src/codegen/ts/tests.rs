@@ -239,3 +239,24 @@ fn doc_comments_are_jsdoc_and_records_are_interfaces() {
     assert!(refused.is_empty(), "{refused:?}");
     insta::assert_snapshot!(dts);
 }
+
+#[test]
+fn a_set_of_services_and_errors_has_no_declaration() {
+    let (interface, lookup) = checked(
+        "module App.Sets exposing (..)\n\
+         service Log =\n  line : String ->{} Unit\n\
+         type error Boom = Boom\n\
+         type alias Env = {Log; Boom}\n\
+         type alias Errs = {Boom}\n\
+         type alias Db s = {Scope s, Log}\n\
+         run : String ->{...Env} Unit\nlet run line = Log.line line\n",
+    );
+    let package = |_: &str| Some("@acme/sets".to_owned());
+    let projection = Projection::new("App.Sets", &lookup, &package);
+    let (dts, refused) = declaration_file(&projection, &interface, &|m: &str| m.to_owned());
+    assert!(refused.is_empty(), "{refused:?}");
+    for name in ["Env", "Errs", "Db"] {
+        assert!(!dts.contains(&format!("export type {name}")), "{dts}");
+        assert!(!dts.contains(&format!("export interface {name}")), "{dts}");
+    }
+}
