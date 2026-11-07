@@ -214,3 +214,5 @@ runtime/supervisor_defect
 runtime/settling_calls
 runtime/closing_causes
 runtime/group_in_closing
+runtime/interrupt_in_finalizer
+runtime/interrupt_after_close
