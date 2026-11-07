@@ -1,0 +1,16 @@
+finalizer starts
+finalizer ends
+added first, runs last
+supervised, a defect: false
+requested: closed
+finalizer starts
+owner body done
+finalizer ends
+added first, runs last
+supervised, a defect: false
+owner finalizer, after both
+closing: closed
+finalizer dies
+added first, still runs
+supervised, a defect: true
+dying: closed

@@ -1,0 +1,68 @@
+// Leaving the mask of a close delivers a request that came in during it, at
+// once (Unmask, docs/formal/runtime.md §3.2): the statement after the scope
+// does not run, and the fiber ends interrupted, also when a finalizer died.
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+report : Failure e ->{} Unit
+let report f =
+  say ("supervised " ++ show (Cause.has_fails f, Cause.has_dies f, Cause.has_interrupts f))
+
+ping : Deferred.Deferred none Unit ->{} Unit
+let ping d = ignore (Deferred.succeed () d)
+
+/// Waits to be stopped, and opens `stopped` when it is.
+signal_when_stopped :
+  Deferred.Deferred none Unit -> Deferred.Deferred none Unit -> Eff {Async} none Unit
+let signal_when_stopped started stopped = task {
+  Effect.ensuring
+    (task { ping stopped })
+    (task {
+      ping started
+      Effect.never ()
+    })
+}
+
+/// Runs `body` with a finalizer that holds until the fiber was asked to stop.
+closes_under_request :
+  (Deferred.Deferred none Unit -> Deferred.Deferred none Unit -> Eff {Async} none Unit) ->{Async;}
+  Unit
+let closes_under_request body = scope owner {
+  let in_finalizer : Deferred.Deferred none Unit = Deferred.make ()
+  let go : Deferred.Deferred none Unit = Deferred.make ()
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  let target = Fiber.spawn owner report (body in_finalizer go)
+  let stopper = Fiber.spawn owner quiet (signal_when_stopped started go)
+  Deferred.await_ started
+  Deferred.await_ in_finalizer
+  // a request reaches the target before the stopper, which then opens `go`
+  Fiber.interrupt_all [target, stopper]
+}
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  closes_under_request (fun in_finalizer go -> task {
+    scope {
+      Scope.add_finalizer
+        (task {
+          ping in_finalizer
+          Deferred.await_ go
+        })
+    }
+    say "not reached: the request came in"
+  })
+  closes_under_request (fun in_finalizer go -> task {
+    scope {
+      Scope.add_finalizer
+        (task {
+          ping in_finalizer
+          Deferred.await_ go
+          Effect.die "the finalizer dies"
+        })
+    }
+  })
