@@ -9,7 +9,9 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Build, Emit, Kind, MAIN_ENTRY, Profile};
 use flick_core::project::{self, Compilation, Compiled, Project, js};
 use flick_core::source::{FileId, SourceMap};
+use flick_core::types::set_stages_by_class;
 
+use self::js_artifacts::js_artifacts;
 use super::check::select;
 use super::emit_ir;
 use super::out_dir::overlap;
@@ -22,6 +24,7 @@ use crate::sources::FsHost;
 use crate::{cache, toolchain};
 
 mod cached;
+mod js_artifacts;
 mod progress;
 mod shipped;
 
@@ -107,7 +110,19 @@ impl Command for BuildCommand {
         if self.options.inputs {
             return super::inputs::describe(&host, sources, project.as_ref(), &roots);
         }
-        let go = self.plan(&host, project.as_ref(), Vec::new()).go;
+        let plan = self.plan(&host, project.as_ref(), Vec::new());
+        let go = plan.go;
+        if plan.extras.rt {
+            // the stages of the built-in modules too: nothing has checked one yet
+            set_stages_by_class();
+            if plan.typescript || go || plan.extras.dts || plan.extras.promise_facade {
+                let message = "Flick's own runtime has only JavaScript output yet";
+                return Outcome {
+                    sources,
+                    diagnostics: vec![Diagnostic::new(codes::F004, Severity::Error, message)],
+                };
+            }
+        }
         if let Some(problem) = project
             .as_ref()
             .filter(|_| !go)
@@ -273,6 +288,7 @@ impl BuildCommand {
                 dts: self.options.emit_dts || config.is_some_and(|b| b.emit_dts),
                 promise_facade: self.options.promise_facade
                     || config.is_some_and(|b| b.promise_facade),
+                rt: self.options.rt || config.is_some_and(|b| b.effect == Backend::Rt),
                 schema_aot: self.options.schema_aot || config.is_some_and(|b| b.schema_aot),
                 labels: match self.options.labels {
                     Some(LabelsArgument::All) => Labels::All,
@@ -475,7 +491,11 @@ pub fn artifacts(
         .flat_map(|p| &p.config.entries)
         .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
         .collect();
-    let backend = project.map_or(Backend::Effect, |p| p.config.build.effect);
+    let backend = if output.extras.rt {
+        Backend::Rt
+    } else {
+        project.map_or(Backend::Effect, |p| p.config.build.effect)
+    };
     let settings = Settings {
         source_dir: &source_dir,
         out_dir,
@@ -515,60 +535,4 @@ pub fn artifacts(
         needs.extend(js::unmet(host, &project.root, wanted));
     }
     emission
-}
-
-/// The output of a js build; a library on Effect is also built without it,
-/// for applications with `effect = "none"`.
-fn js_artifacts(
-    sources: &SourceMap,
-    library: bool,
-    compilation: &Compilation,
-    settings: &Settings,
-) -> Emission {
-    let (shipped, problems) = shipped::foreign_files(compilation, &|_| true);
-    if !library {
-        let (mut artifacts, mut diagnostics) = build::emit(compilation, sources, settings);
-        artifacts.extend(shipped);
-        diagnostics.extend(problems);
-        return Emission {
-            artifacts,
-            diagnostics,
-        };
-    }
-    let core_dir = settings.out_dir.join(build::effects::CORE_DIR);
-    let (core, _) = build::emit(
-        compilation,
-        sources,
-        &Settings {
-            out_dir: &core_dir,
-            backend: Backend::None,
-            extras: Extras {
-                labels: settings.extras.labels,
-                ..Extras::default()
-            },
-            core_only: true,
-            ..*settings
-        },
-    );
-    let core_modules = build::core_built(&core, compilation, settings.typescript);
-    let (mut artifacts, mut diagnostics) = build::emit(
-        compilation,
-        sources,
-        &Settings {
-            core_modules: &core_modules,
-            ..*settings
-        },
-    );
-    artifacts.extend(shipped);
-    diagnostics.extend(problems);
-    let (core_shipped, _) =
-        shipped::foreign_files(compilation, &|m| core_modules.iter().any(|c| c == m));
-    artifacts.extend(core.into_iter().chain(core_shipped).map(|a| Artifact {
-        path: format!("{}{}", build::effects::CORE_DIR, a.path),
-        contents: a.contents,
-    }));
-    Emission {
-        artifacts,
-        diagnostics,
-    }
 }

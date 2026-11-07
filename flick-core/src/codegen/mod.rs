@@ -49,6 +49,8 @@ pub struct Options<'a> {
     /// In release, which top-level values keep their label; debug labels
     /// every atom, view and action.
     pub labels: Labels,
+    /// Compile for Flick's own runtime instead of Effect (see `js::kernel`).
+    pub rt: bool,
 }
 
 impl Options<'_> {

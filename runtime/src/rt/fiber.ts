@@ -8,6 +8,7 @@
 // The driver checks for interruption before every step, so a step of the driver
 // is an interruption point; a plain function called between two is not.
 import { type Cause, Exit, Raise, causeOf, raise, concat, failed, fromReasons, interrupt, isFail, sameReason, succeeded } from "./cause.ts";
+import { env } from "./host.ts";
 import type { Owner } from "./owner.ts";
 
 /** The evidence: an immutable list of what is in effect, innermost first, with the owner there. */
@@ -84,6 +85,29 @@ export abstract class Instruction {
 
 const NEXT = 0;
 const THROW = 1;
+
+/** A generator of numbers in [0, 1) from a seed (mulberry32). */
+const seeded = (seed: number): (() => number) => {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
+  };
+};
+
+/**
+ * Stress (`just stress`): with FLICK_STRESS set to a seed, each round of tasks
+ * is shuffled and fibers give their turn at random, so that runs take
+ * interleavings a plain run never does. The same seed gives the same choices.
+ */
+const stressing = (): (() => number) | undefined => {
+  const seed = env("FLICK_STRESS");
+  return seed === undefined || seed === "" ? undefined : seeded(Number(seed) || 1);
+};
+const stress = /*#__PURE__*/ stressing();
 
 /** A frame: the generator, the evidence it runs with, the frame it returns to. */
 export class Frame {
@@ -175,11 +199,12 @@ export class Fiber {
       const frame = this.top;
       if (frame === base) return false;
       if (frame === null) throw new Error("a fiber ran past its base frame");
-      if (this.requested !== 0 && this.mask === 0 && this.mode === NEXT) {
+      if (this.requested !== 0 && this.mask === 0) {
+        // a failure leaving an interruptible fiber asked to stop carries the request
+        this.value = new Raise(this.mode === NEXT ? this.stopped() : withInterruption(causeOf(this.value), this.stopped()));
         this.mode = THROW;
-        this.value = new Raise(this.stopped());
       }
-      if (++this.ops >= BUDGET && this.nested === 0) {
+      if ((++this.ops >= BUDGET || (stress !== undefined && stress() < 0.05)) && this.nested === 0) {
         this.ops = 0;
         this.pause();
         return true;
@@ -251,6 +276,9 @@ export class Fiber {
   }
 }
 
+const withInterruption = (cause: Cause, stop: Cause): Cause =>
+  stop.reasons.every((r) => cause.reasons.some((k) => sameReason(k, r))) ? cause : concat(cause, stop);
+
 /** Runs `fiber` on this stack until it suspends or ends. */
 const evaluate = (fiber: Fiber): void => {
   const [fiberBefore, contextBefore] = [current, context];
@@ -270,7 +298,7 @@ let running = false;
 const TICKS_BEFORE_TIMER = 2048;
 
 const round = (depth: number): void => {
-  const batch = tasks;
+  const batch = stress === undefined ? tasks : tasks.map((task) => [stress(), task] as const).toSorted((x, y) => x[0] - y[0]).map(([, task]) => task);
   tasks = [];
   for (const task of batch) task();
   if (tasks.length === 0) running = false;
@@ -370,8 +398,12 @@ export const runIn = (run: unknown): unknown => {
     context = saved;
     if (outside) current = undefined;
   }
-  if (fiber.mode === THROW) throw fiber.value;
-  return fiber.value;
+  // the driver that called this may be in the middle of an instruction
+  const { mode, value } = fiber;
+  fiber.mode = NEXT;
+  fiber.value = undefined;
+  if (mode === THROW) throw value;
+  return value;
 };
 
 /** A wait: `start` gets the functions that end it, and may give what stops it. */
@@ -488,11 +520,7 @@ export function* exitOf(task: () => unknown): Run {
  */
 export const skipHandler = (fiber: Fiber, cause: Cause): void => {
   if (!fiber.interrupted()) return;
-  const kept = fromReasons(cause.reasons.filter((r) => !isFail(r)));
-  const stop = fiber.stopped();
-  const [reason] = stop.reasons;
-  const has = reason !== undefined && kept.reasons.some((r) => sameReason(r, reason));
-  return raise(has ? kept : concat(kept, stop));
+  return raise(withInterruption(fromReasons(cause.reasons.filter((r) => !isFail(r))), fiber.stopped()));
 };
 
 /** `task` under a recovery: how it ended, unless an interruption skips it. */

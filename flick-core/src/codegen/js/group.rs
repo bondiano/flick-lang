@@ -9,7 +9,7 @@ use std::mem;
 use super::function::{binds, offsets};
 use super::{Gen, Tail, indent, names, view};
 use crate::codegen::tail::{Callee, Calls, Target, cycles, function, target};
-use crate::ir::{Expr, Item, Lit, Param, Pat};
+use crate::ir::{Expr, Item, Lit, Param, Pat, Stage};
 
 /// Mutually tail-recursive functions of a module.
 pub(super) struct Group {
@@ -20,13 +20,20 @@ pub(super) struct Group {
 }
 
 /// The groups of `items`, each named after its first member.
-pub(super) fn groups(module: &str, items: &[Item]) -> Vec<Group> {
-    cycles(module, items, Calls::Pure)
+pub(super) fn groups(module: &str, items: &[Item], calls: Calls) -> Vec<Group> {
+    cycles(module, items, calls)
         .into_iter()
+        // one function runs them: of one stage, a generator or not
+        .filter(|items_of| {
+            let last = |&i: &usize| {
+                function(&items[i], calls).and_then(|(_, params, _)| params.last().map(|p| p.stage))
+            };
+            items_of.iter().all(|i| last(i) == last(&items_of[0]))
+        })
         .map(|items_of| Group {
             name: format!(
                 "{}$rec",
-                names::ident(function(&items[items_of[0]], Calls::Pure).map_or("", |(n, ..)| n))
+                names::ident(function(&items[items_of[0]], calls).map_or("", |(n, ..)| n))
             ),
             items: items_of,
         })
@@ -38,14 +45,14 @@ pub(super) fn grouped(
     module: &str,
     items: &[Item],
     groups: &[Group],
+    calls: Calls,
 ) -> HashMap<String, (usize, usize)> {
     groups
         .iter()
         .enumerate()
         .flat_map(|(g, group)| {
             group.items.iter().enumerate().filter_map(move |(k, &i)| {
-                function(&items[i], Calls::Pure)
-                    .map(|(name, ..)| (format!("{module}.{name}"), (g, k)))
+                function(&items[i], calls).map(|(name, ..)| (format!("{module}.{name}"), (g, k)))
             })
         })
         .collect()
@@ -67,10 +74,11 @@ impl Gen<'_> {
 
     /// The function running the group `g` of `items`.
     pub(super) fn group(&mut self, g: usize, items: &[Item]) -> String {
+        let calls = self.calls();
         let functions: Vec<(&str, &[Param], &Expr)> = self.groups[g]
             .items
             .iter()
-            .filter_map(|&i| function(&items[i], Calls::Pure))
+            .filter_map(|&i| function(&items[i], calls))
             .collect();
         let members: Vec<(Target, usize)> = functions
             .iter()
@@ -80,7 +88,16 @@ impl Gen<'_> {
         let vars: Vec<String> = (0..arity).map(|i| format!("$l{i}")).collect();
         let bodies: Vec<(&[Param], &Expr)> = functions.iter().map(|(_, p, b)| (*p, *b)).collect();
         let offsets = offsets(&view::positions(&bodies, &members));
-        let saved = (mem::replace(&mut self.generator, false), self.tail.take());
+        let last = functions
+            .first()
+            .and_then(|(_, params, _)| params.last())
+            .map_or(Stage::Pure, |p| p.stage);
+        let generator = self.kernel && last == Stage::Runtime;
+        let saved = (
+            mem::replace(&mut self.generator, generator),
+            mem::replace(&mut self.sync, self.kernel && last == Stage::Sync),
+            self.tail.take(),
+        );
         let mut cases = Vec::new();
         for (k, (_, params, body)) in functions.iter().enumerate() {
             let (stmts, ()) = self.block(|g| {
@@ -114,7 +131,7 @@ impl Gen<'_> {
             });
             cases.push(format!("case {k}: {{\n{}}}", indent(&stmts)));
         }
-        (self.generator, self.tail) = saved;
+        (self.generator, self.sync, self.tail) = saved;
         let switch = format!("switch ($f) {{\n{}}}", indent(&cases));
         let mut body = vec![format!("for (;;) {{\n{}}}", indent(&[switch]))];
         let init: Vec<String> = offsets
@@ -126,7 +143,11 @@ impl Gen<'_> {
             body.insert(0, format!("let {};", init.join(", ")));
         }
         let params = format!("$f, {}", vars.join(", "));
-        let value = format!("{} {{\n{}}}", self.arrow(&params), indent(&body));
+        let value = if generator {
+            format!("function* ({params}) {{\n{}}}", indent(&body))
+        } else {
+            format!("{} {{\n{}}}", self.arrow(&params), indent(&body))
+        };
         self.constant(&self.groups[g].name, &value)
     }
 }

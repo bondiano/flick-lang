@@ -1,7 +1,10 @@
 //! Types as the checker and `.iface` see them. A type in an interface is
 //! closed: it holds no unification variables, skolems or error markers.
 
+use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::{Deserialize, Serialize};
 
@@ -162,12 +165,53 @@ impl Effects {
     }
 
     pub fn stage(&self) -> Stage {
-        if self.sync {
+        if self.sync || (stages_by_class() && direct_row(&self.services)) {
             Stage::Sync
         } else {
             Stage::Runtime
         }
     }
+}
+
+/// Whether a stage comes from the classes of the operations of its row, as on
+/// Flick's own runtime, where no effect but `Async` and a `control` operation
+/// suspends. The types do not change: `sync` still says what unifies, and the
+/// runtime adapts a call of either stage to a function of the other.
+static CLASS_STAGES: AtomicBool = AtomicBool::new(false);
+
+/// The effects with a `control` operation declared so far, `Module.Name`.
+static CONTROL_EFFECTS: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+
+/// Decides stages by class, from now on in this process.
+pub fn set_stages_by_class() {
+    CLASS_STAGES.store(true, Ordering::Relaxed);
+}
+
+pub(super) fn stages_by_class() -> bool {
+    CLASS_STAGES.load(Ordering::Relaxed)
+}
+
+/// Records the effect `Module.Name` as having a `control` operation.
+// shortcut: only effects checked in this process count; one of a library read from its interface runs as Runtime only if a row variable or `Async` says so, until interfaces carry the class
+pub fn declare_control_effect(key: String) {
+    if let Ok(mut effects) = CONTROL_EFFECTS.lock() {
+        effects.insert(key);
+    }
+}
+
+/// Whether `row` is closed, without `Async` or an effect with a `control` operation.
+fn direct_row(row: &Type) -> bool {
+    let Type::Row(r) = row else { return false };
+    let direct = r.entries.iter().all(|(_, entry)| {
+        let Type::Con { module, name } = entry.spine().0 else {
+            return false;
+        };
+        !lang::is(Lang::Async, module, name)
+            && CONTROL_EFFECTS
+                .lock()
+                .is_ok_and(|effects| !effects.contains(&format!("{module}.{name}")))
+    });
+    direct && r.tail.as_deref().is_none_or(direct_row)
 }
 
 /// The stage of an arrow with `effects`.

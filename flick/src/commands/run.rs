@@ -224,6 +224,7 @@ pub fn build_into_generation(
             schema_aot: false,
             profile: options.profile,
             labels: None,
+            rt: false,
             watch: false,
             inputs: false,
         },

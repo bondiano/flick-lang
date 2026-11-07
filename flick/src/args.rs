@@ -242,6 +242,11 @@ pub struct BuildArguments {
     #[arg(long, value_enum)]
     pub labels: Option<LabelsArgument>,
 
+    /// Build for Flick's own runtime, as `build.effect = "rt"` does. Only
+    /// JavaScript output has it.
+    #[arg(long)]
+    pub rt: bool,
+
     /// Print the compiler's input inventory as JSON without building.
     #[arg(long, conflicts_with = "watch")]
     pub inputs: bool,

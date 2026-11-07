@@ -35,6 +35,7 @@ fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> St
         workers,
         direct: &|_, _, _| false,
         labels: Labels::default(),
+        rt: false,
     };
     js(&ir, &options).code
 }
@@ -249,6 +250,7 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
         workers: &workers,
         direct: &direct,
         labels: Labels::default(),
+        rt: false,
     };
     let js = js(&ir, &options).code;
     assert!(js.contains("$m_Instances.$i_Show_Float$show(n)"), "{js}");
