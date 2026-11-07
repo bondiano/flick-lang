@@ -23,14 +23,13 @@ to_result : Validation e a -> Result e a
 let to_result (Validation result) = result
 
 instance Functor (Validation e) =
-  map : forall c d a b. (forall v. a^v -> b)^c -> ((Validation e a)^d -> (Validation e b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> ((Validation e a)^d -> (Validation e b)^(c + d))^c
   let map f (Validation result) = Validation (Result.map f result)
 
 instance Semigroup e => Applicative (Validation e) =
-  pure : forall c a. a^c -> (Validation e a)^c
+  pure : a^c -> (Validation e a)^c
   let pure x = Validation (Ok x)
   map2 :
-    forall c d a b x.
     (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
     ((Validation e a)^d -> ((Validation e b)^d -> (Validation e x)^(c + d))^(c + d))^c
   let map2 f = map2_validation combine f
