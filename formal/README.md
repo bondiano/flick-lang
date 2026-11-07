@@ -48,6 +48,11 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   abstract target and instantiated on the core with regions and dictionary records as
   `T6a_core` (`Elab/CoreT6a.lean`) and `T6b_core` (`Elab/CoreRun.lean`), the latter with the
   run of the core itself.
+- **A handler of a record** (`Formal/RecordHandler.lean`): `T6c_tail`, a `tail` operation under
+  a handler of a record of functions runs the field of the record, and `T6c_tail_kept` under the
+  frame a child keeps. A known layer of `succeed` and `merge` is a chain of such handlers:
+  `chain_installs`, `layer_typ` (its outputs leave the row of the body) and `layer_answers` (an
+  operation runs the field of the first binding of its effect).
 - **Call sites** (`Formal/Elab/CallSite.lean`): `site_given`, a `CallSite` at a place that is
   no literal comes only from a given, and `site_caller`, a function under that given passes on
   its caller's place; (Site) is (Prim) at a literal place, so T6 covers it unchanged.
@@ -138,6 +143,7 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | §2.4 patterns, `Exh`; (Match-Val), [Match-Val: a value needs only its own coverage](../docs/formal/core.md#the-residual-match-after-a-false-guard-fails-exh) | `PatTy`, `Shp`, `Exh`, `Covers` (`Typing.lean`) |
 | §2.4 constructors of a GADT: the arguments of the type they build, the hidden row of captures, (Branch-GADT) under every unifier ([not the most general one](../docs/formal/core.md#the-most-general-unifier-is-not-kept-by-substitution), [the free names of a dead branch](../docs/formal/core.md#a-dead-branch-keeps-no-typing-of-its-body)); `Exh` without the constructors that build no value | `Sig.res`, `Sig.ctorTyR` (`Syntax.lean`, `TyOps.lean`); `Sig.Holds`, `Sig.Inj`, `PatsTy`, `Sig.Builds` (`Typing.lean`); `Typ.aref` (`Rules.lean`); `Typ.aref_substT` (`TySubstBase.lean`), `Typ.aref_subst` (`SubstArm.lean`), `aref_match` (`SpineMatch.lean`) |
 | the checker's arm under the most general unifier, and a dropped dead arm | `Mgu`, `Typ.aref_mgu`, `Typ.aref_dead` (`ArefMgu.lean`) |
+| §1.4 `provide S impl`, `provide layer` | `recArms`, `T6c_tail`; `KnownLayer`, `chain`, `layer_typ`, `layer_answers` (`RecordHandler.lean`) |
 | (Try), (Handle) | `HPat`, `Catches`, `HCov`; `tryR`, `tryP`, `handle` |
 | §3.6 `⊢ μ : Ψ`; §2.6 `Σ₀` | `StoreTy`, `RootTy` (`Rules.lean`) |
 | `core.md` §3.2 contexts; the handler of an operation; the frame `inside π E` | `Frame`, `plug`, `handlerOf` (`EvalCtx.lean`) |
@@ -394,6 +400,13 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
 - **A signal may end a child.** An arm of a kept handler that raises lets the rest of the child
   go, closing its regions, and the child ends as a signal, not as `raise v`: the core drops
   how a child ends either way.
+- **A root's function has no row.** `Sig.op_field` types the field of the record `Σ₀` gives for
+  an operation at `→R⟨∅;∅⟩`: an operation has the row of its effect only (`Const.ty`), and what an
+  arm needs is in the stage of its handler. A root that needs a service is a handler over it.
+- **A layer in the core is a known one.** `chain` expands `succeed` and `merge`. `Layer.effect`,
+  a build's scope and memoization are the library's, stated of λRT (`Formal/RT/`, R6).
+- **A handler's body has no obligation about its effect** (`Stage.ObOut`), nor over a row variable,
+  which an instance could make its effect: the first case of `regions.md` §2.7, as for `provide`.
 - **The arms for errors of a handler** are a `try` around it: errors pass `hdl`.
 
 ## Findings
@@ -452,7 +465,7 @@ is a parameter of it.
 | I5 | `Iε_comb`, `Iε_append`, `Iε_close`, `Iε_keep` (`RT/Recover.lean`) |
 | R1, R2, R3, R4 | `R1`–`R4`, `Inv.r1`–`Inv.r4`, `Inv.r4_closed`, `parResult_keeps` (`RT/Props.lean`) |
 | the sketch of R3: who waits for a running fiber | `Guard`, `Inv.noRun` (`RT/Inv.lean`, `RT/NoRun.lean`) |
-| §3.5 memo maps, `build`, observers | `Memo`, `Ent`, `lookup`, `Step.provide`, `.provHit`, `.provBuild`, `.buildOk`, `.buildFail`, `.finObs`, `.finObsLast` |
+| §3.5 memo maps, `build`, observers, of the library, as `Formal/RT/` is a model of its own | `Memo`, `Ent`, `lookup`, `Step.provide`, `.provHit`, `.provBuild`, `.buildOk`, `.buildFail`, `.finObs`, `.finObsLast` |
 | I6 | `Inv6.obsIn`, `Good6` of `release` (`RT/Layers.lean`) |
 | R6; its premise from [provide services must not outlive their layer](../docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer) | `R6`, `Good6`, `GoodUse` (`RT/Layers.lean`, `RT/T5.lean`); `G11` (`RT/Hyp.lean`) |
 | §3.7, R7 | `Step.modify`, `cell`, `R7` (`RT/RefLin.lean`) |
