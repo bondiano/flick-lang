@@ -3,6 +3,8 @@
 //! order), alias bodies, and the types of constructors, service operations
 //! and class methods.
 
+use std::collections::HashMap;
+
 use super::Checker;
 use super::class_members::method_names;
 use super::convert::{Free, TyVar, is_type};
@@ -35,11 +37,10 @@ impl Checker<'_> {
             }
         }
         let mut refined = Vec::new();
-        let mut bodies = Vec::new();
-        for p in &pending {
-            self.with_params(&p.params, |this| {
-                bodies.push(this.body(p, &mut refined));
-            });
+        let mut bodies: Vec<Body> = pending.iter().map(|_| Body::None).collect();
+        for i in self.conversion_order(&pending) {
+            let p = &pending[i];
+            bodies[i] = self.with_params(&p.params, |this| this.body(p, &mut refined));
         }
         for (p, body) in pending.iter().zip(bodies) {
             self.finish(p, body);
@@ -54,6 +55,58 @@ impl Checker<'_> {
             self.check_abi(p.node, &p.name);
         }
         refined
+    }
+
+    /// The order bodies are converted in: aliases first, each after the aliases
+    /// it names, so that every later declaration sees what an alias stands for.
+    /// `= {}` keeps its place: the uses before it decide whether it is a record.
+    fn conversion_order(&self, pending: &[Pending]) -> Vec<usize> {
+        let module = &self.env.module;
+        let converted_early = |p: &Pending| {
+            matches!(
+                self.env.type_def(module, &p.name).map(|d| &d.form),
+                Some(Form::Alias { .. })
+            ) && !p
+                .node
+                .nodes()
+                .any(|n| n.kind == K::RowType && n.nodes().next().is_none())
+        };
+        let aliases: HashMap<&str, usize> = pending
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| converted_early(p))
+            .map(|(i, p)| (p.name.as_str(), i))
+            .collect();
+        let mut order = Vec::with_capacity(pending.len());
+        let mut seen = vec![false; pending.len()];
+        for (i, p) in pending.iter().enumerate() {
+            if aliases.contains_key(p.name.as_str()) {
+                self.after_named(i, pending, &aliases, &mut seen, &mut order);
+            }
+        }
+        order.extend((0..pending.len()).filter(|&i| !seen[i]));
+        order
+    }
+
+    /// Adds alias `i` after the aliases it names; a cycle, which name resolution
+    /// reports, ends where it comes back.
+    fn after_named(
+        &self,
+        i: usize,
+        pending: &[Pending],
+        aliases: &HashMap<&str, usize>,
+        seen: &mut [bool],
+        order: &mut Vec<usize>,
+    ) {
+        if std::mem::replace(&mut seen[i], true) {
+            return;
+        }
+        for name in resolve::alias_names(pending[i].node, self.text) {
+            if let Some(&named) = aliases.get(name.as_str()) {
+                self.after_named(named, pending, aliases, seen, order);
+            }
+        }
+        order.push(i);
     }
 
     /// A cycle of transparent aliases is reported by name resolution; its
@@ -255,7 +308,15 @@ impl Checker<'_> {
                         other => other,
                     };
                 }
-                Body::Alias(self.ty(body, &result, Free::Reject))
+                let converted = self.ty(body, &result, Free::Reject);
+                if let Some(TypeDef {
+                    form: Form::Alias { body, .. },
+                    ..
+                }) = self.env.type_def_mut(&p.name)
+                {
+                    *body = converted;
+                }
+                Body::None
             }
             K::ErrorDecl => {
                 let payload = decl
@@ -313,11 +374,6 @@ impl Checker<'_> {
         let quantify = |body: Type| quantify(&params, body);
         match body {
             Body::None => {}
-            Body::Alias(ty) => {
-                if let Form::Alias { body, .. } = &mut def.form {
-                    *body = ty;
-                }
-            }
             Body::Variants(variants) => {
                 let error = p.node.kind == K::ErrorDecl;
                 self.constructor_schemes(&p.name, error, &params, variants);
@@ -375,7 +431,6 @@ impl Checker<'_> {
 
 enum Body {
     None,
-    Alias(Type),
     Variants(Vec<Variant>),
     Members(Vec<(String, Type, OpClass)>),
     /// Superclasses, functional dependencies, methods and default

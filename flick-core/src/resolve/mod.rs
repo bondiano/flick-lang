@@ -10,7 +10,7 @@ mod unexported;
 mod unused;
 mod uses;
 
-pub(crate) use defs::shortest_cycle;
+pub(crate) use defs::{alias_names, shortest_cycle};
 pub use syntax::{Header, Import, Item, ItemKind, ModuleSyntax, module_syntax};
 #[cfg(feature = "ide")]
 pub(crate) use unused::item_removal;

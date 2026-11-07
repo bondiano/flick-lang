@@ -1,0 +1,18 @@
+// A declaration may use an alias written below it: the alias stands for what
+// it names whatever the order of the two.
+module App.AliasOrder exposing (..)
+
+service Runner =
+  run : Unit ->{Time; Failure} Float
+
+type alias Time = Clock
+
+type alias Failure = Oops
+
+type error Oops = Oops
+
+service Clock =
+  now : Unit ->{} Float
+
+through_the_original : Unit ->{Runner, Clock; Oops} Float
+let through_the_original () = Runner.run ()
