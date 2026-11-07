@@ -133,15 +133,23 @@ function* awaiting(ef: EffectFiber, owner: Owner | undefined, scope: EScope.Clos
 
 const FAST = !process.env["FLICK_BRIDGE_NO_FAST"];
 
+/** spike: crossings by kind, written to stderr at exit when FLICK_BRIDGE_COUNT is set. */
+export const crossings = { fromEffect: 0, fromEffectFast: 0, fromEffectRun: 0, callEffect: 0, callSync: 0, hostOp: 0, adopt: 0 };
+if (process.env["FLICK_BRIDGE_COUNT"]) process.on("exit", () => process.stderr.write(`[bridge] ${JSON.stringify(crossings)}\n`));
+const COUNT = Boolean(process.env["FLICK_BRIDGE_COUNT"]);
+
 /** An Effect as a call of the kernel: runs at once, on this stack, as far as it goes. */
 export const fromEffect = (effect: unknown): unknown => {
   // spike: what is not an Effect is already a value or a kernel call
   if (!Effect.isEffect(effect)) return effect;
+  if (COUNT) crossings.fromEffect++;
   if (FAST) {
+    if (COUNT && ((effect as { readonly _tag?: string })._tag === "Success" || (effect as { readonly _tag?: string })._tag === "Failure")) crossings.fromEffectFast++;
     const tag = (effect as { readonly _tag?: string })._tag;
     if (tag === "Success") return (effect as unknown as { readonly value: unknown }).value;
     if (tag === "Failure") return raise(causeIn((effect as unknown as { readonly cause: ECause.Cause<unknown> }).cause));
   }
+  if (COUNT) crossings.fromEffectRun++;
   const ctx = currentCtx();
   const scope = EScope.makeUnsafe();
   const services = Context.add(Context.add(hostOf(ctx), KERNEL, ctx), EScope.Scope, scope);
@@ -170,6 +178,7 @@ const ROOT_CTX = /*#__PURE__*/ currentCtx();
 /** A kernel call as an Effect: a fiber of the kernel per run, with the evidence of the Effect fiber that runs it. */
 export const callEffect = (call: () => unknown): Effect.Effect<unknown, unknown> =>
   Effect.withFiber((ef) => {
+    if (COUNT) crossings.callEffect++;
     const context = ef.context as Context.Context<never>;
     const base = Context.getOrUndefined(context, KERNEL) ?? ROOT_CTX;
     const fiber: Fiber = forkNow(call, hosted(base, context), (ef as unknown as EffectFiber).interruptible ? 0 : 1);
@@ -186,6 +195,7 @@ export const callEffect = (call: () => unknown): Effect.Effect<unknown, unknown>
 
 /** A Sync stage of Flick that Effect's side calls and that gives its value: the evidence is the services the side set. */
 export const callSync = (call: () => unknown): unknown => {
+  if (COUNT) crossings.callSync++;
   const context = syncContext();
   const base = Context.getOrUndefined(context, KERNEL) ?? ROOT_CTX;
   return inCtx(hosted(base, context), () => runIn(call()));
@@ -237,6 +247,7 @@ const adopt = (layer: unknown): Layer => {
   const found = adopted.get(layer as object);
   if (found !== undefined) return found;
   const made = memoizable(function* (memo: MemoMap, into: Owner): Run {
+    if (COUNT) crossings.adopt++;
     const scope = EScope.makeUnsafe();
     yield addTo(
       into,
@@ -282,6 +293,7 @@ if (!process.env["FLICK_BRIDGE_PLAIN_DATA"]) {
 
 bridgeHooks.operation = (tag) => {
   const host = currentCtx().host as Context.Context<never> | undefined;
+  if (COUNT) crossings.hostOp++;
   return host === undefined ? undefined : host.mapUnsafe.get(String(Reflect.get(tag, "key")));
 };
 bridgeHooks.ran = fromEffect;
