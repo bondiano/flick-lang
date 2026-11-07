@@ -3,7 +3,7 @@
 //! [`ModuleCache`] kept of earlier runs.
 
 use std::collections::{BTreeMap, HashMap};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tracing::debug;
@@ -19,10 +19,11 @@ use crate::ir;
 use crate::plugin::expansion::Expansion;
 use crate::project::Project;
 use crate::project::config::{Backend, Config};
-use crate::resolve::{self, Interface};
+use crate::resolve::{self, Interface, ModuleSyntax};
 #[cfg(feature = "ide")]
 use crate::source::Span;
 use crate::source::{FileId, SourceMap};
+use crate::syntax::Parse;
 use crate::types;
 
 /// The output of checking each module in earlier runs, reused while the
@@ -33,13 +34,32 @@ pub struct ModuleCache {
     entries: HashMap<PathBuf, (Key, Output)>,
     /// What plugins gave in the last run, by the key of each call.
     pub(super) plugins: HashMap<Vec<u8>, Vec<u8>>,
+    /// The parse of each module, and the file and the text it is of.
+    parses: HashMap<PathBuf, (FileId, String, Parsed)>,
 }
+
+type Parsed = (Arc<Parse>, Arc<ModuleSyntax>);
 
 impl ModuleCache {
     /// Drops the modules a run no longer loaded.
     pub(super) fn retain_loaded(&mut self, modules: &[Loaded]) {
         self.entries
             .retain(|path, _| modules.iter().any(|m| m.path == *path));
+        self.parses
+            .retain(|path, _| modules.iter().any(|m| m.path == *path));
+    }
+
+    /// The parse kept of `path`, if it is of this file and this text.
+    pub(super) fn parsed(&self, path: &Path, file: FileId, text: &str) -> Option<Parsed> {
+        self.parses
+            .get(path)
+            .filter(|(kept, kept_text, _)| *kept == file && kept_text == text)
+            .map(|(_, _, parsed)| parsed.clone())
+    }
+
+    pub(super) fn keep_parsed(&mut self, path: &Path, file: FileId, text: &str, parsed: Parsed) {
+        let entry = (file, text.to_owned(), parsed);
+        self.parses.insert(path.to_path_buf(), entry);
     }
 }
 
@@ -53,7 +73,7 @@ struct Key {
     /// Each import's interface, without where its names are declared and
     /// their docs, which checking does not read, and whether it is a module
     /// of the project.
-    imports: Vec<(Option<Interface>, bool)>,
+    imports: Vec<(Option<Arc<Interface>>, bool)>,
 }
 
 impl Loader<'_> {
@@ -61,40 +81,47 @@ impl Loader<'_> {
     /// closes a cycle sees no interface. Without cycles, the modules of one
     /// level of the import graph are checked in parallel.
     pub(super) fn resolve_all(&mut self, edges: &[Vec<usize>]) -> Vec<Option<Interface>> {
-        let mut interfaces: Vec<Option<Interface>> = vec![None; self.modules.len()];
+        let mut known = Known {
+            interfaces: vec![None; self.modules.len()],
+            comparable: vec![None; self.modules.len()],
+        };
         let Some(levels) = levels(edges) else {
             let mut visiting = vec![false; self.modules.len()];
             for i in 0..self.modules.len() {
-                self.resolve_one(i, edges, &mut interfaces, &mut visiting);
+                self.resolve_one(i, edges, &mut known, &mut visiting);
             }
-            return interfaces;
+            return known.interfaces;
         };
         for level in levels {
             let checking = self.checking();
-            let outputs = parallel(&level, |i| checking.module(i, &interfaces));
+            let outputs = parallel(&level, |i| {
+                checking.module(i, &known.interfaces, &known.comparable)
+            });
             for (i, output) in level.into_iter().zip(outputs) {
-                self.apply(i, output, &mut interfaces);
+                self.apply(i, output, &mut known);
             }
         }
-        interfaces
+        known.interfaces
     }
 
     fn resolve_one(
         &mut self,
         i: usize,
         edges: &[Vec<usize>],
-        interfaces: &mut Vec<Option<Interface>>,
+        known: &mut Known,
         visiting: &mut Vec<bool>,
     ) {
-        if interfaces[i].is_some() || visiting[i] {
+        if known.interfaces[i].is_some() || visiting[i] {
             return;
         }
         visiting[i] = true;
         for &j in &edges[i] {
-            self.resolve_one(j, edges, interfaces, visiting);
+            self.resolve_one(j, edges, known, visiting);
         }
-        let output = self.checking().module(i, interfaces);
-        self.apply(i, output, interfaces);
+        let output = self
+            .checking()
+            .module(i, &known.interfaces, &known.comparable);
+        self.apply(i, output, known);
         visiting[i] = false;
     }
 
@@ -117,13 +144,9 @@ impl Loader<'_> {
         }
     }
 
-    fn apply(
-        &mut self,
-        i: usize,
-        (output, key): (Output, Option<Key>),
-        interfaces: &mut [Option<Interface>],
-    ) {
+    fn apply(&mut self, i: usize, (output, key): (Output, Option<Key>), known: &mut Known) {
         if let (Some(cache), Some(key)) = (&mut self.cache, key) {
+            known.comparable[i] = Some(comparable_copy(&output.exported));
             cache
                 .entries
                 .insert(self.modules[i].path.clone(), (key, output.clone()));
@@ -140,8 +163,16 @@ impl Loader<'_> {
                 output.interface,
             ));
         }
-        interfaces[i] = Some(output.exported);
+        known.interfaces[i] = Some(output.exported);
     }
+}
+
+/// What the modules checked so far show their importers.
+struct Known {
+    interfaces: Vec<Option<Interface>>,
+    /// Each one as a cache key compares it, one copy for all its importers;
+    /// only with a cache.
+    comparable: Vec<Option<Arc<Interface>>>,
 }
 
 /// What checking a module reads of the loader; shared by parallel checks.
@@ -161,12 +192,18 @@ impl Checking<'_> {
     /// Resolves, checks and, when asked and clean, lowers module `i` against
     /// the interfaces known so far, or reuses the cached output; with a
     /// cache, also the key to cache it by.
-    fn module(&self, i: usize, interfaces: &[Option<Interface>]) -> (Output, Option<Key>) {
+    fn module(
+        &self,
+        i: usize,
+        interfaces: &[Option<Interface>],
+        comparable: &[Option<Arc<Interface>>],
+    ) -> (Output, Option<Key>) {
         let loaded = &self.modules[i];
-        let lookup = |name: &str| match self.by_name.get(name) {
-            Some(&j) => interfaces[j].clone(),
-            None => self.from_packages.get(name).cloned(),
+        let known = |name: &str| match self.by_name.get(name) {
+            Some(&j) => interfaces[j].as_ref(),
+            None => self.from_packages.get(name),
         };
+        let lookup = |name: &str| known(name).cloned();
         let Some(cache) = self.cache else {
             return (self.timed(loaded, &lookup), None);
         };
@@ -181,13 +218,10 @@ impl Checking<'_> {
                 .imports
                 .iter()
                 .map(|i| {
-                    let interface = lookup(&i.module).map(|mut interface| {
-                        for export in &mut interface.exports {
-                            export.at = None;
-                        }
-                        interface.docs.clear();
-                        interface
-                    });
+                    let interface = match self.by_name.get(&i.module) {
+                        Some(&j) => comparable[j].clone(),
+                        None => self.from_packages.get(&i.module).map(comparable_copy),
+                    };
                     (interface, self.by_name.contains_key(&i.module))
                 })
                 .collect(),
@@ -197,9 +231,9 @@ impl Checking<'_> {
                 let mut output = output.clone();
                 // re-exported names are declared where their module now says
                 for import in &loaded.syntax.imports {
-                    if let Some(interface) = lookup(&import.module) {
-                        redeclare(&mut output.interface, &interface);
-                        redeclare(&mut output.exported, &interface);
+                    if let Some(interface) = known(&import.module) {
+                        redeclare(&mut output.interface, interface);
+                        redeclare(&mut output.exported, interface);
                     }
                 }
                 debug!(module = %loaded.name, "module reused");
@@ -310,7 +344,9 @@ impl Checking<'_> {
             typing: Arc::new(typing),
             exported: if clean { interface.clone() } else { untyped },
             interface,
-            ir,
+            // editors, the runs with a cache, read its diagnostics only, and
+            // keeping the IR would copy all of it on every keystroke
+            ir: ir.filter(|_| self.cache.is_none()),
             declarations,
         }
     }
@@ -329,6 +365,17 @@ struct Output {
     ir: Option<ir::Module>,
     /// Every top-level entity with its type, for the reference model.
     declarations: Arc<Interface>,
+}
+
+/// `interface` as a cache key compares it: without where its names are
+/// declared and their docs, which checking does not read.
+fn comparable_copy(interface: &Interface) -> Arc<Interface> {
+    let mut copy = interface.clone();
+    for export in &mut copy.exports {
+        export.at = None;
+    }
+    copy.docs.clear();
+    Arc::new(copy)
 }
 
 /// Takes where `imported` declares the names `interface` re-exports.
