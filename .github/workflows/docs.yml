@@ -3,6 +3,11 @@ name: Docs
 on:
   push:
     branches: [main]
+  pull_request:
+    paths:
+      - docs/**
+      - editors/vscode/syntaxes/**
+      - .github/workflows/docs.yml
   workflow_dispatch:
 
 permissions:
@@ -12,7 +17,7 @@ permissions:
 
 # one deployment at a time; a newer push supersedes a queued one
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -32,16 +37,17 @@ jobs:
           node-version: 24.18.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # nothing is published with a translation behind, a broken example or a dead link:
-      # the link validator runs as part of the site's build
+      # nothing is published with a translation behind, a broken example or a dead link
       - run: node docs/scripts/parity.mjs
       - run: cargo test -p flick-core --test corpus docs_examples_check
       - run: just docs
+      - run: node docs/scripts/links.mjs
       - uses: actions/upload-pages-artifact@v5
         with:
           path: docs/dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-26.04
     environment:

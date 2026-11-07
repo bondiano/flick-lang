@@ -22,6 +22,7 @@ const links = [
   { label: ru ? "Песочница" : "Playground", href: "/play/", current: playground },
 ];
 const install = ru ? "Установить" : "Install";
+const installHref = `${prefix}/start/getting-started/#${ru ? "установка" : "install"}`;
 const sidebar = route?.hasSidebar ? route.sidebar : undefined;
 const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(shell(ru))));
 ---
@@ -38,10 +39,10 @@ const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(shell
       {ru ? <span aria-current="true">RU</span> : <a href={russian} lang="ru" aria-label="Переключить на русский">RU</a>}
     </div>
     <a class="header-github" href="https://github.com/bondiano/flick-lang" aria-label="GitHub"><Icon name="github" /></a>
-    <a class="header-install" href={`${prefix}/start/getting-started/#install`}>{install}</a>
+    <a class="header-install" href={installHref}>{install}</a>
   </div>
   <nav id="flick-navigation" class="mobile-navigation" popover="auto" aria-label={ru ? "Навигация по сайту" : "Site navigation"}>
-    <div class="mobile-primary-links">{links.map(({ label, href }) => <a href={`${prefix}${href}`}>{label}</a>)}<a href={`${prefix}/start/getting-started/#install`}>{install}</a></div>
+    <div class="mobile-primary-links">{links.map(({ label, href }) => <a href={`${prefix}${href}`}>{label}</a>)}<a href={installHref}>{install}</a></div>
     <div class="mobile-languages" aria-label={ru ? "Язык документации" : "Documentation language"}>
       <a href={english} lang="en" aria-current={!ru ? "page" : undefined}>English</a>
       <a href={russian} lang="ru" aria-current={ru ? "page" : undefined}>Русский</a>

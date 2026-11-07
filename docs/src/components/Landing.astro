@@ -104,7 +104,7 @@ const status = [
             <a class="action action-primary" href={`${prefix}/start/getting-started/`}>{text("Get started", "Начать")} <Icon name="arrow" size={20} /></a>
             <a class="action" href={`${prefix}/play/`}>{text("Open playground", "Открыть песочницу")}</a>
           </div>
-          <p class="hero-limit"><a href={`${prefix}/start/why/#where-the-promise-stops`}>{text("Alpha: console, clock and randomness aren't in signatures yet", "Альфа: консоль, часы и случайные числа пока не видны в сигнатуре")} <Icon name="arrow" size={15} /></a></p>
+          <p class="hero-limit"><a href={`${prefix}/start/why/#${ru ? "где-обещание-заканчивается" : "where-the-promise-stops"}`}>{text("Alpha: console, clock and randomness aren't in signatures yet", "Альфа: консоль, часы и случайные числа пока не видны в сигнатуре")} <Icon name="arrow" size={15} /></a></p>
         </div>
         <div id="flick-hero" data-flick-ssr set:html={heroHtml}></div>
       </section>
