@@ -225,12 +225,8 @@ pub(super) fn alias_cycles(tree: &Node, text: &str, file: FileId) -> Vec<Diagnos
             continue;
         };
         if is_alias {
-            let mut refs = Vec::new();
-            for rhs in decl.nodes().filter(|n| n.kind != K::TypeParam) {
-                type_names(rhs, text, &mut refs);
-            }
             let span = Span::new(file, name.start, name.end);
-            aliases.push((name.text(text).to_owned(), span, refs));
+            aliases.push((name.text(text).to_owned(), span, alias_names(decl, text)));
         }
     }
     let index: HashMap<&str, usize> = aliases
@@ -283,6 +279,15 @@ pub(super) fn alias_cycles(tree: &Node, text: &str, file: FileId) -> Vec<Diagnos
         }));
     }
     out
+}
+
+/// Unqualified capitalized names the body of an alias declaration refers to.
+pub(crate) fn alias_names(decl: &Node, text: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for rhs in decl.nodes().filter(|n| n.kind != K::TypeParam) {
+        type_names(rhs, text, &mut names);
+    }
+    names
 }
 
 /// Unqualified capitalized names a type refers to.
