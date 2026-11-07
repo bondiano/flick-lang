@@ -23,8 +23,8 @@ theorem Nest.cstep {root : Roots} {c c' : Cfg} {l Ψ X anc B home t φ}
   | main hs => exact hn.step (i := none) hroot rfl h hμ hc'.1 hΨ hX hcg.main hs
   | kid hg hl hj hs =>
     obtain ⟨t', φ', hk⟩ := (hΛ _ _ hg).1 _ (List.mem_of_getElem? hj)
-    exact hn.step hroot (Cfg.at_some.mpr ⟨_, hg, hl, hj⟩) hk hμ hc'.1 hΨ hX
-      (hcg.rgs _ _ hg _ (List.mem_append_left _ (List.mem_of_getElem? hj))) hs
+    obtain ⟨_, _, hkc⟩ := hcg.rgs _ _ hg _ (List.mem_append_left _ (List.mem_of_getElem? hj))
+    exact hn.step hroot (Cfg.at_some.mpr ⟨_, hg, hl, hj⟩) hk hμ hc'.1 hΨ hX hkc hs
 
 theorem steps_nest {root : Roots} {c c' : Cfg} (hroot : RootTy S root)
     (hs : CSteps root c c') :
@@ -54,7 +54,9 @@ a finalizer or a child registered, or a region closed. -/
 def DeadUse (Λ : List Rgn) (r : Tm) : Prop :=
   ∃ p, Dead Λ p ∧ (r = .app (.const .open_) (.own p) ∨ r = .app (.const .op) (.cap p) ∨
     (∃ t, r = .app (.app (.const .addFin) (.own p)) t) ∨
-    (∃ t, r = .app (.app (.const .spawn) (.own p)) t) ∨ ∃ w, r = .inside p w ∧ Final w)
+    (∃ t, r = .app (.app (.const .spawn) (.own p)) t) ∨ (∃ w, r = .inside p w ∧ Final w) ∨
+    ∃ ℓ Ef al Ei o v, r = .hkeep p ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v)) ∧
+      OkE Ei ∧ ∀ G ∈ Ei, G.handles Ef o .tail = none)
 
 /-- A finished region body that waits for a child. -/
 def Waits (Λ : List Rgn) (e : Tm) : Prop :=

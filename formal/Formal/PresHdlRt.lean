@@ -52,6 +52,32 @@ theorem hctl_signal {Ψ Θ p ℓ κ tl E al r x k t φ} {Ei : List Frame} (hEi :
     exact .unw hℓ (hx (ha.cut hΘ.entails)) (Stage.none_le (Stage.rt_ne_pure hψ₀))
   | errVal hv => cases hv
 
+/-- An arm of a kept handler that raises lets the parked body go. -/
+theorem hkarm_raise {Ψ Θ q ℓ E al w k t φ} {Ei : List Frame} (hEi : OkE Ei) (hk : k = plug Ei (.hole q))
+    (h : Typ S Ψ Θ [] (.hkarm q ℓ E al (.raise w) k) (.ex t φ)) :
+    Typ S Ψ Θ [] (.hkeep q ℓ E al (plug Ei (.unw q ℓ (.raise w)))) (.ex t φ) := by
+  cases h with
+  | hkarm hℓ hal hop hE hk' hp hφ₀ hc hnt ha hle hφ hT =>
+    obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
+    refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+      fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
+    exact .unw hℓ (raise_any (ha.cut hΘ.entails)) (Stage.none_le (Stage.rt_ne_pure hψ₀))
+  | errVal hv => cases hv
+
+/-- A signal in an arm of a kept handler goes on through the parked body. -/
+theorem hkarm_unw {Ψ Θ q ℓ E al q' ℓ' a k t φ} {Ei : List Frame} (hEi : OkE Ei)
+    (hk : k = plug Ei (.hole q)) (h : Typ S Ψ Θ [] (.hkarm q ℓ E al (.unw q' ℓ' a) k) (.ex t φ)) :
+    Typ S Ψ Θ [] (.hkeep q ℓ E al (plug Ei (.unw q' ℓ' a))) (.ex t φ) := by
+  cases h with
+  | hkarm hℓ hal hop hE hk' hp hφ₀ hc hnt ha hle hφ hT =>
+    obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
+    refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
+      fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
+    cases ha with
+    | unw hℓ' ha' _ => exact .unw hℓ' (ha'.cut hΘ.entails) (Stage.none_le (Stage.rt_ne_pure hψ₀))
+    | errVal hv => cases hv
+  | errVal hv => cases hv
+
 /-- A signal of a resumed body lets the parked arm go. -/
 theorem hres_signal {Ψ Θ p ℓ a x t φ} {A : List Frame} (hA : OkE A) (ha : a = plug A (.hole p))
     (hx : ∀ {Θ'}, AnyTy S Ψ Θ' x) (h : Typ S Ψ Θ [] (.hres p ℓ a x) (.ex t φ)) :

@@ -78,6 +78,11 @@ theorem FrR.handles (hA : BNoAlts B) (hP : BPlain B) {F F' : Frame} (h : FrR B F
     simp only [Frame.handles]
     revert this
     cases (_ : Flick.Tm).armOf o <;> cases (_ : Flick.Tm).armOf o <;> simp [ORel]
+  | hkeep hal =>
+    have := Cg.armOf (o := o) hA hP hal
+    simp only [Frame.handles]
+    revert this
+    cases (_ : Flick.Tm).armOf o <;> cases (_ : Flick.Tm).armOf o <;> simp [ORel]
   | _ => simp [Frame.handles]
 
 theorem FrR.handlesE (hA : BNoAlts B) (hP : BPlain B) {E E₂ : List Frame} (h : All2 (FrR B) E E₂)

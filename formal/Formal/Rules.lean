@@ -65,30 +65,6 @@ theorem Stage.le_of_svc {φ : Stage} {r r' ε : Row} (h : φ.le (.rt r ε)) (hr 
   | pure => trivial
   | rt r₀ e₀ => exact ⟨hr, h.2⟩
 
-/-- A body with no obligation about the effect of its handler has what the handler gives. -/
-theorem Stage.hP_of_out {φ₀ : Stage} {E : Name} {r ε : Row} {Θ : Facts} {q : Nat}
-    (h : φ₀.le (.rt (Row.union (Row.single E) r) ε)) (hO : φ₀.ObOut (Row.single E)) :
-    φ₀.le (.rt (Row.hP Θ q E r) ε) := by
-  cases φ₀ with
-  | pure => trivial
-  | rt r₀ e₀ =>
-    refine ⟨fun x hx => ?_, h.2⟩
-    have h₁ := h.1 x hx
-    cases x with
-    | nm N =>
-      rcases h₁ with h₁ | h₁
-      · cases h₁; exact .inl rfl
-      · exact .inr h₁
-    | ob N a =>
-      refine ⟨fun hN => ((hO.1 N a hx).2 (by rw [hN]; rfl)).elim, fun _ => ?_⟩
-      rcases h₁ with h₁ | h₁
-      · cases h₁
-      · exact h₁
-    | atm a | rv a | obv v a =>
-      rcases h₁ with h₁ | h₁
-      · cases h₁
-      · exact h₁
-
 variable (S : Sig)
 
 inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
@@ -260,6 +236,23 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   value; unwinding itself has any type. -/
   | unw : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) → Typ Ψ Θ Γ a (.ex t' (.rt r ε)) →
       (Stage.rt Row.none Row.none).le φ → Typ Ψ Θ Γ (.unw p ℓ a) (.ex t φ)
+  /-- A handler kept around a child: `ℓ` and the arms are those of the handler it keeps. The
+  child runs the arms, so its stage holds theirs; an operation the kept handler does not answer
+  goes on to the handler around, or the root. -/
+  | hkeep {al : Tm} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg q)) →
+      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ q E r₁) ε₁) →
+      S.Handles E al r₁ → S.NonTail E r₁ → (Stage.rt r ε).le (.rt r₁ ε₁) →
+      (Stage.rt r₁ ε₁).le φ → Le t T → Typ Ψ Θ Γ (.hkeep q ℓ E al e) (.ex T φ)
+  /-- While an arm of a kept handler runs, the body is parked where it performed the operation
+  `o`, as for `hctl` of a `tail` operation. -/
+  | hkarm {Ei : List Frame} {al : Tm} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
+      Typ Ψ Θ Γ al (.harms E t' (.rt r ε) (.rg q)) →
+      S.op E o = some (.tail, a₀, b₀) → OkE Ei → k = plug Ei (.hole q) →
+      Typ Ψ Θ [] (plug Ei (.app (.const (.perform E o .tail)) .todo)) (.ex t φ₀) →
+      φ₀.le (.rt (Row.hP Θ q E r₁) ε₁) → S.Handles E al r₁ → S.NonTail E r₁ →
+      Typ Ψ Θ Γ a (.ex b₀ (.rt r ε)) → (Stage.rt r ε).le (.rt r₁ ε₁) →
+      (Stage.rt r₁ ε₁).le φ → Le t T → Typ Ψ Θ Γ (.hkarm q ℓ E al a k) (.ex T φ)
   /-- `resume`: the type of its cell, which holds the handler's region. -/
   | kont : Ψ[ℓ]? = some (.arrow a ψ t C) → C (.r p) → Le (.arrow a ψ t C) T →
       Typ Ψ Θ Γ (.kont p ℓ) (.ex T φ)

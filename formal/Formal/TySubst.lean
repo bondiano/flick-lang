@@ -246,6 +246,32 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     · split at h₄ <;> simp_all
     · obtain ⟨C', hl₁, hl₂⟩ := hl h
       exact ⟨C'.substT σ, by simp [hl₁, Ty.substT, Stage.substT, hb], ⟨_, hl₂, by simp [hp]⟩⟩
+  | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
+    intro σ hσ
+    have hp : σ (.r _) = .rg _ := hσ.1 _ (.inr (.inl rfl))
+    have h₁ := ih₁ σ (hσ.sub fun _ h => .inr (.inr (.inl h)))
+    have h₂ := ih₂ σ (hσ.sub fun _ h => .inr (.inr (.inr h)))
+    simp only [Flick.J.substT, Ty.substT, Stage.substT, hp] at h₁ h₂
+    exact .hkeep (by simp [hℓ, Ty.substT, Stage.substT]) h₁ h₂
+      (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
+        (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
+      ⟨hc.1, fun h => .inl (hc.2 h)⟩ (fun h => .inl (hnt h))
+      (by simpa [Stage.substT] using Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
+  | hkarm hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
+    intro σ hσ
+    subst hk
+    obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
+    have hp : σ (.r _) = .rg _ := hσ.1 _ (.inr (.inl rfl))
+    have h₁ := ih₁ σ (hσ.sub fun _ h => .inr (.inr (.inl h)))
+    have h₃ := ih₂ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inr
+      (plug_has_of_nosite (by simp [Tm.Has]) h)))))
+    have h₄ := ih₃ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inl h))))
+    simp only [Flick.J.substT, Ty.substT, Stage.substT, hp, hb] at h₁ h₃ h₄
+    exact .hkarm (by simp [hℓ, Ty.substT, Stage.substT]) h₁ hop hE rfl h₃
+      (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
+        (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
+      ⟨hc.1, fun h => .inl (hc.2 h)⟩ (fun h => .inl (hnt h)) h₄
+      (by simpa [Stage.substT] using Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
   | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ =>
     intro σ hσ
     subst ha

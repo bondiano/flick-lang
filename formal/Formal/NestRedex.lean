@@ -52,7 +52,7 @@ theorem Frame.Within.mono {Ψ' : List Ty} {B' : Nat → Nat → Prop} {F : Frame
     (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l) (hh : ∀ p ℓ, HCell Ψ p ℓ → HCell Ψ' p ℓ)
     (h : F.Within Ψ B anc A) : F.Within Ψ' B' anc A := by
   have m : ∀ {x : Tm} {A}, x.Within Ψ B anc A → x.Within Ψ' B' anc A := fun hx => hx.mono hl hh fun _ _ => rfl
-  cases F <;> simp only [Frame.Within] at h ⊢ <;> grind
+  cases F <;> simp only [Frame.Within, HLocs] at h ⊢ <;> grind
 
 theorem WithinE.mono {Ψ' : List Ty} {B' : Nat → Nat → Prop} {A : Nat → Prop}
     (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l) (hh : ∀ p ℓ, HCell Ψ p ℓ → HCell Ψ' p ℓ) :

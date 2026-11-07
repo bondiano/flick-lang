@@ -4,7 +4,8 @@ import Formal.Elab.CoreCgOps
 # λFlick⁺ as a `Target`: related evaluation contexts
 
 `FrR B F F'`: two frames of one kind with related parts. Related contexts plug related terms
-into related terms (`FrR.plugs`) and keep the order of evaluation (`FrR.okE`). A related term around a hole is a base pair at some frame, or the same frames around a
+into related terms (`FrR.plugs`), keep the order of evaluation (`FrR.okE`) and the handlers a
+child inherits (`FrR.withs`). A related term around a hole is a base pair at some frame, or the same frames around a
 related hole (`Cg.decomp`).
 -/
 
@@ -31,6 +32,9 @@ inductive FrR (B : Flick.Tm → Flick.Tm → Prop) : Frame → Frame → Prop
       FrR B (.hctlA p ℓ κ tl E al r k) (.hctlA p ℓ κ tl E al' r' k')
   | hresB {p ℓ a a'} : Cg B false a a' → FrR B (.hresB p ℓ a) (.hresB p ℓ a')
   | hdone {p} : FrR B (.hdone p) (.hdone p)
+  | hkeep {q ℓ E al al'} : Cg B false al al' → FrR B (.hkeep q ℓ E al) (.hkeep q ℓ E al')
+  | hkarmA {q ℓ E al al' k k'} : Cg B false al al' → Cg B false k k' →
+      FrR B (.hkarmA q ℓ E al k) (.hkarmA q ℓ E al' k')
 
 variable {B : Flick.Tm → Flick.Tm → Prop}
 
@@ -63,6 +67,18 @@ theorem FrR.okE (hB : BNoVal B) {E E' : List Frame} (h : All2 (FrR B) E E') (hE 
     rcases List.mem_cons.mp hG with rfl | hG
     · exact hF.ok hB h₁
     · exact ih h₂ G hG
+
+theorem FrR.wrap {F F' : Frame} (h : FrR B F F') (p : Nat) {a a' : Flick.Tm} (ha : Cg B false a a') :
+    Cg B false (F.wrap p a) (F'.wrap p a') := by
+  cases h <;> simp only [Frame.wrap] <;> first
+    | exact ha
+    | (split <;> first | exact .hkeep ‹_› ha | exact ha)
+
+theorem FrR.withs {E E' : List Frame} (h : All2 (FrR B) E E') (p : Nat) :
+    ∀ {a a' : Flick.Tm}, Cg B false a a' → Cg B false (Flick.withs p E a) (Flick.withs p E' a') := by
+  induction h with
+  | nil => exact id
+  | cons hF _ ih => exact fun ha => ih (hF.wrap p ha)
 
 /-- A related term in a frame is a base pair, or the same frame around a related hole. -/
 theorem Cg.frame {F : Frame} {a t : Flick.Tm} (h : Cg B false (F.plug a) t) :

@@ -300,7 +300,10 @@ patterns `Pat.spine o [.var]` (`[.var, .var]` for `control`, with `resume`); `r`
 the body's value. At run time a handler is the region `p` and the cell `ℓ`: `hwith p ℓ`
 around the body, `hctl p ℓ κ tl` while an arm runs and the body waits at `hole p`, `hres p
 a b` while the resumed body `b` runs and the arm `a` waits, `hdone p a` after; `unw p ℓ a`
-unwinds to the handler, which then runs `a`; `kont p κ` is `resume`. -/
+unwinds to the handler, which then runs `a`; `kont p κ` is `resume`. A child or a finalizer
+keeps the handlers around where it started: `hkeep q ℓ E al e` around its body answers the
+`tail` operations of `E`, `hkarm q ℓ E al a k` while an arm of it runs. They run no `return`,
+and pass signals. -/
 inductive Tm
   | var (i : Nat)
   | lam (b : Tm)
@@ -340,6 +343,8 @@ inductive Tm
   | unw (p ℓ : Nat) (a : Tm)
   | kont (p ℓ : Nat)
   | hole (p : Nat)
+  | hkeep (q ℓ : Nat) (E : Name) (al e : Tm)
+  | hkarm (q ℓ : Nat) (E : Name) (al a k : Tm)
 
 def Tm.head : Tm → Tm
   | .app f _ => f.head

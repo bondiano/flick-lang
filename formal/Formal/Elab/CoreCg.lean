@@ -63,6 +63,10 @@ inductive Cg (B : Flick.Tm → Flick.Tm → Prop) : Bool → Flick.Tm → Flick.
       Cg B x (.hdl E al r e) (.hdl E al' r' e')
   | hwith {x p ℓ E al al' r r' e e'} : Cg B false al al' → Cg B false r r' → Cg B false e e' →
       Cg B x (.hwith p ℓ E al r e) (.hwith p ℓ E al' r' e')
+  | hkeep {x q ℓ E al al' e e'} : Cg B false al al' → Cg B false e e' →
+      Cg B x (.hkeep q ℓ E al e) (.hkeep q ℓ E al' e')
+  | hkarm {x q ℓ E al al' a a' k k'} : Cg B false al al' → Cg B false a a' → Cg B false k k' →
+      Cg B x (.hkarm q ℓ E al a k) (.hkarm q ℓ E al' a' k')
   | hctl {x p ℓ κ tl E al al' r r' a a' k k'} : Cg B false al al' → Cg B false r r' →
       Cg B false a a' → Cg B false k k' → Cg B x (.hctl p ℓ κ tl E al r a k) (.hctl p ℓ κ tl E al' r' a' k')
   | hres {x p ℓ a a' b b'} : Cg B false a a' → Cg B false b b' → Cg B x (.hres p ℓ a b) (.hres p ℓ a' b')

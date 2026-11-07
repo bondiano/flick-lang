@@ -269,6 +269,8 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
     | errVal hv'' => exact (nv hv'').elim
   | hctlRaise hEi hk _ => exact same (hctl_signal hEi hk raise_any h)
   | hctlUnw hEi hk => exact same (hctl_signal hEi hk unw_any h)
+  | hkarmRaise hEi hk _ => exact same (hkarm_raise hEi hk h)
+  | hkarmUnw hEi hk => exact same (hkarm_unw hEi hk h)
   | hresRaise hA ha _ => exact same (hres_signal hA ha raise_any h)
   | hresUnw hA ha => exact same (hres_signal hA ha unw_any h)
   | hwithCatch => exact same (hwith_catch h)

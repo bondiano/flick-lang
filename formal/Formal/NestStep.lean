@@ -10,7 +10,7 @@ variable {S : Sig} {Ψ : List Ty} {B anc : Nat → Nat → Prop}
 
 /-- The run-time forms of a handler, whose pure steps leave the region of the handler. -/
 def Tm.IsHdl : Tm → Prop
-  | .hwith .. | .hctl .. | .hres .. | .hdone .. => True
+  | .hwith .. | .hctl .. | .hres .. | .hdone .. | .hkeep .. | .hkarm .. => True
   | _ => False
 
 /-- A typed pure redex holds no run-time form, but for the forms of a handler. -/

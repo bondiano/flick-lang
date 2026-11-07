@@ -35,6 +35,10 @@ theorem step_pure {root Ψ Θ Λ μ e t l Λ' μ' e'} (h : Typ S Ψ Θ [] e (.ex
     obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (fun h => by cases h) h
     obtain rfl := rel.pure rfl
     exact (hwith_not_pure hr).elim
+  | performKept hE _ _ _ _ _ =>
+    obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (fun h => by cases h) h
+    obtain rfl := rel.pure rfl
+    exact (hkeep_not_pure hr).elim
   | resume hE _ _ =>
     obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE (fun h => by cases h) h
     obtain rfl := rel.pure rfl

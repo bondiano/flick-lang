@@ -42,14 +42,16 @@ def Tm.Asc : Tm → Nat → Prop
   | .drec _ r, _ => r.NoIns
   | .glob _, _ => True
   | .hdl _ al r e, _ => al.NoIns ∧ r.NoIns ∧ e.NoIns
-  | .hwith p _ _ al r e, n => al.NoIns ∧ r.NoIns ∧ e.Asc (max n (p + 1))
+  | .hwith p _ _ al r e, n => al.NoIns ∧ r.NoIns ∧ e.Asc (max n (p + 1)) ∧ n ≤ p
   | .hctl p _ _ _ _ al r a k, n =>
-    al.NoIns ∧ r.NoIns ∧ a.Asc (max n (p + 1)) ∧ k.Asc (max n (p + 1))
-  | .hres p _ a b, n => a.Asc (max n (p + 1)) ∧ b.Asc (max n (p + 1))
+    al.NoIns ∧ r.NoIns ∧ a.Asc (max n (p + 1)) ∧ k.Asc (max n (p + 1)) ∧ n ≤ p
+  | .hres p _ a b, n => a.Asc (max n (p + 1)) ∧ b.Asc n
   | .hdone p a, n => a.Asc (max n (p + 1))
   | .unw _ _ a, _ => ∀ m, a.Asc m
   | .kont _ _, _ => True
   | .hole _, _ => True
+  | .hkeep q _ _ al e, n => al.NoIns ∧ e.Asc (max n (q + 1)) ∧ n ≤ q
+  | .hkarm q _ _ al a k, n => al.NoIns ∧ a.Asc (max n (q + 1)) ∧ k.Asc (max n (q + 1)) ∧ n ≤ q
 
 theorem Tm.Asc.of_noIns : ∀ {e : Tm} {n : Nat}, e.NoIns → e.Asc n := by
   intro e
@@ -69,7 +71,7 @@ theorem Value.ascNoIns {e : Tm} {n : Nat} (hv : Value e) (h : e.Asc n) : e.NoIns
 
 /-- The bound under a frame. -/
 def Frame.ascB (n : Nat) : Frame → Nat
-  | .hwith p .. | .hctlA p .. | .hresB p .. | .hdone p => max n (p + 1)
+  | .hwith p .. | .hctlA p .. | .hdone p | .hkeep p .. | .hkarmA p .. => max n (p + 1)
   | _ => n
 
 def Frame.Asc (n : Nat) : Frame → Prop
@@ -77,8 +79,10 @@ def Frame.Asc (n : Nat) : Frame → Prop
     a.NoIns
   | .appR v | .rconsR _ v | .updR v _ => v.Asc n ∧ Value v
   | .inside p => n ≤ p
-  | .hwith _ _ _ al r => al.NoIns ∧ r.NoIns
-  | .hctlA p _ _ _ _ al r k => al.NoIns ∧ r.NoIns ∧ k.Asc (max n (p + 1))
+  | .hwith p _ _ al r => al.NoIns ∧ r.NoIns ∧ n ≤ p
+  | .hctlA p _ _ _ _ al r k => al.NoIns ∧ r.NoIns ∧ k.Asc (max n (p + 1)) ∧ n ≤ p
+  | .hkeep q _ _ al => al.NoIns ∧ n ≤ q
+  | .hkarmA q _ _ al k => al.NoIns ∧ k.Asc (max n (q + 1)) ∧ n ≤ q
   | .hresB p _ a => a.Asc (max n (p + 1))
   | _ => True
 
@@ -86,6 +90,10 @@ theorem Frame.Asc.plug {F : Frame} {n : Nat} {r : Tm} (hF : F.Asc n) (hr : r.Asc
     (F.plug r).Asc n := by
   cases F <;> simp only [Frame.Asc, Frame.ascB, Frame.plug, Tm.Asc] at hF hr ⊢ <;>
     first
+    | exact ⟨hF.1, hF.2.1, hr, hF.2.2⟩
+    | exact ⟨hF.1, hr, hF.2⟩
+    | exact ⟨hF.1, hF.2.1, hr, hF.2.2.1, hF.2.2.2⟩
+    | exact ⟨hF.1, hr, hF.2.1, hF.2.2⟩
     | exact ⟨hr, Tm.Asc.of_noIns hF, .inl hF⟩
     | exact ⟨hF.1, hr, .inr hF.2⟩
     | exact ⟨hr, hF⟩
@@ -120,9 +128,14 @@ theorem asc_of_plug {n : Nat} {r : Tm} (hv : ¬ Value r) :
     obtain ⟨h₃, h₄⟩ := Frame.asc_of_plug hF hv h₂
     exact ⟨⟨h₁, h₃⟩, h₄⟩
 
+/-- A frame that answers operations. -/
+def Frame.isHandler : Frame → Prop
+  | .hwith .. | .hkeep .. => True
+  | _ => False
+
 /-- The region a frame raises the bound to after: a handler's. -/
 def Frame.bump : Frame → Option Nat
-  | .hwith p .. | .hctlA p .. | .hresB p .. | .hdone p => some p
+  | .hwith p .. | .hctlA p .. | .hdone p | .hkeep p .. | .hkarmA p .. => some p
   | _ => none
 
 theorem ascBE_le {n m : Nat} {E : List Frame} (hn : n ≤ m)
@@ -135,5 +148,63 @@ theorem ascBE_le {n m : Nat} {E : List Frame} (hn : n ≤ m)
     all_goals
       have := hq _ List.mem_cons_self _ rfl
       omega
+
+/-- A term under a smaller bound: the bound is a lower bound of the regions of its `inside`
+forms. -/
+theorem Tm.Asc.anti : ∀ {e : Tm} {n m : Nat}, e.Asc n → m ≤ n → e.Asc m := by
+  intro e
+  induction e <;> intro n m h hm <;> simp only [Tm.Asc] at h ⊢ <;>
+    have hx : ∀ x, max m x ≤ max n x := fun x => by omega
+  all_goals grind
+
+/-- What `withs` keeps stays in order, and a frame it leaves out only lowers the bound. -/
+theorem withs_asc {x : Tm} {n p : Nat} :
+    ∀ {E : List Frame}, AscE n E → x.Asc (ascBE n E) → (withs p E x).Asc n
+  | [], _, hx => hx
+  | F :: E, ⟨hE, hF⟩, hx => by
+    simp only [withs]
+    refine withs_asc hE ?_
+    have hb : ascBE n E ≤ F.ascB (ascBE n E) := by
+      cases F <;> simp only [Frame.ascB] <;> first | exact Nat.le_refl _ | exact Nat.le_max_left _ _
+    cases F with
+    | hwith q ℓ E' al rf =>
+      simp only [Frame.wrap]
+      split
+      · exact ⟨hF.1, hx, hF.2.2⟩
+      · exact hx.anti hb
+    | hkeep q ℓ E' al =>
+      simp only [Frame.wrap]
+      split
+      · exact ⟨hF.1, hx, hF.2⟩
+      · exact hx.anti hb
+    | _ => exact hx.anti hb
+
+/-- Under a handler of `q` everything with a bound names younger regions. -/
+theorem ascBE_above {n q : Nat} {G : Frame} (hG : G.bump = some q) :
+    ∀ (E₀ : List Frame) {E₁ : List Frame}, q + 1 ≤ ascBE n (E₀ ++ G :: E₁)
+  | [], E₁ => by
+    simp only [List.nil_append, ascBE]
+    cases G <;> simp only [Frame.bump, reduceCtorEq, Option.some.injEq] at hG
+    all_goals subst hG; simp only [Frame.ascB]; exact Nat.le_max_right _ _
+  | F :: E₀, E₁ => by
+    have := ascBE_above (n := n) hG E₀ (E₁ := E₁)
+    cases F <;> simp only [List.cons_append, ascBE, Frame.ascB] <;> omega
+
+/-- An `inside` form under a handler of `q` names a region younger than `q`, and so does a
+handler. -/
+theorem AscE.under {n q p : Nat} {G F : Frame} (hG : G.bump = some q) :
+    ∀ {E₀ E₁ : List Frame}, AscE n (E₀ ++ G :: E₁) → F ∈ E₀ →
+      F = .inside p ∨ F.bump = some p ∧ (F.isHandler) → q < p
+  | G' :: E₀, E₁, h, hF, hp => by
+    simp only [List.cons_append, AscE] at h
+    rcases List.mem_cons.mp hF with rfl | hF
+    · have key := ascBE_above (n := n) hG E₀ (E₁ := E₁)
+      have h₂ := h.2
+      rcases hp with rfl | ⟨hb, hi⟩
+      · simp only [Frame.Asc] at h₂; omega
+      · cases F <;> simp only [Frame.isHandler] at hi <;>
+          simp only [Frame.bump, Option.some.injEq] at hb <;> subst hb <;>
+          simp only [Frame.Asc] at h₂ <;> omega
+    · exact AscE.under hG h.1 hF hp
 
 end Flick

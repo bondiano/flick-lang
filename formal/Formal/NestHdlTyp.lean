@@ -1,4 +1,4 @@
-import Formal.NestHdlStep
+import Formal.NestKept
 
 /-!
 # What the types of a handler's redex give `⊢ Λ`
@@ -57,6 +57,40 @@ theorem hctl_typ {Θ E p ℓ κ tl Ef al rf a k t φ} (hE : OkE E)
     (h : Typ S Ψ Θ [] (plug E (.hctl p ℓ κ tl Ef al rf a k)) (.ex t φ)) :
     ∃ Θ' t' φ', Typ S Ψ Θ' [] (.hctl p ℓ κ tl Ef al rf a k) (.ex t' φ') :=
   hole_typ0 hE (fun h => by cases h) h fun h => hctl_not_pure h
+
+/-- The body of a kept handler in the store of its context. -/
+theorem hkeep_body {Θ E q ℓ Ef al e t φ} (hE : OkE E)
+    (h : Typ S Ψ Θ [] (plug E (.hkeep q ℓ Ef al e)) (.ex t φ)) :
+    ∃ Θ' t' φ', Typ S Ψ Θ' [] e (.ex t' φ') := by
+  obtain ⟨Θ', t', φ', hr⟩ := hole_typ0 hE (fun h => by cases h) h fun h => hkeep_not_pure h
+  cases hr with
+  | hkeep _ _ he _ _ _ _ _ _ => exact ⟨_, _, _, he⟩
+  | errVal hv => cases hv
+
+theorem hkarm_not_pure {Θ q ℓ E al a k t} (h : Typ S Ψ Θ [] (.hkarm q ℓ E al a k) (.ex t .pure)) :
+    False := by
+  cases h with
+  | hkarm _ _ _ _ _ _ _ _ _ _ hle hφ _ => exact Stage.le_trans hle hφ
+  | errVal hv => cases hv
+
+/-- The value of an arm of a kept handler has a type without regions. -/
+theorem kept_val {Θ E q ℓ Ef al w k t φ} (hE : OkE E)
+    (h : Typ S Ψ Θ [] (plug E (.hkarm q ℓ Ef al w k)) (.ex t φ)) :
+    ∃ Θ' T φ', Typ S Ψ Θ' [] w (.ex T φ') ∧ T.YF 0 := by
+  obtain ⟨Θ', t', φ', hr⟩ := hole_typ0 hE (fun h => by cases h) h fun h => hkarm_not_pure h
+  cases hr with
+  | hkarm _ _ hop _ _ _ _ _ _ ha _ _ _ => exact ⟨_, _, _, ha, (op_YF hop).2⟩
+  | errVal hv => cases hv
+
+/-- What an arm of a kept handler raises has a type of the errors of its cell. -/
+theorem kept_raise {Θ E q ℓ Ef al w k t φ} (hE : OkE E) (hw : Value w)
+    (h : Typ S Ψ Θ [] (plug E (.hkarm q ℓ Ef al (.raise w) k)) (.ex t φ)) :
+    ∃ Θ' a r ε t' C, Ψ[ℓ]? = some (.arrow a (.rt r ε) t' C) ∧
+      Typ S Ψ Θ' [] w (.ex (.errors ε) .pure) := by
+  obtain ⟨Θ', t', φ', hr⟩ := hole_typ0 hE (fun h => by cases h) h fun h => hkarm_not_pure h
+  cases hr with
+  | hkarm hℓ _ _ _ _ _ _ _ _ ha _ _ _ => exact ⟨_, _, _, _, _, _, hℓ, raise_errors hw ha⟩
+  | errVal hv => cases hv
 
 /-- The value of a `tail` arm has a type without regions. -/
 theorem tail_val {Θ p ℓ κ Ef al rf w k t φ} (h : Typ S Ψ Θ [] (.hctl p ℓ κ true Ef al rf w k) (.ex t φ)) :

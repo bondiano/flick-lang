@@ -31,6 +31,8 @@ inductive Frame
   | hctlA (p ℓ κ : Nat) (tl : Bool) (E : Name) (al r k : Tm)
   | hresB (p ℓ : Nat) (a : Tm)
   | hdone (p : Nat)
+  | hkeep (q ℓ : Nat) (E : Name) (al : Tm)
+  | hkarmA (q ℓ : Nat) (E : Name) (al k : Tm)
 
 def Frame.plug : Frame → Tm → Tm
   | .appL a, e => .app e a
@@ -50,6 +52,8 @@ def Frame.plug : Frame → Tm → Tm
   | .hctlA p ℓ κ tl E al r k, e => .hctl p ℓ κ tl E al r e k
   | .hresB p ℓ a, e => .hres p ℓ a e
   | .hdone p, e => .hdone p e
+  | .hkeep q ℓ E al, e => .hkeep q ℓ E al e
+  | .hkarmA q ℓ E al k, e => .hkarm q ℓ E al e k
 
 /-- Left-to-right order: a frame to the right of a value needs the value. -/
 def Frame.ok : Frame → Prop
@@ -68,7 +72,7 @@ def Frame.isInside : Frame → Prop
 /-- The arm of a handler and its resumed body: `raise` and `unw` leave them by steps
 of their own, which let the waiting part go. -/
 def Frame.isCtl : Frame → Prop
-  | .hctlA .. | .hresB .. => True
+  | .hctlA .. | .hresB .. | .hkarmA .. => True
   | _ => False
 
 /-- The handler that catches unwinding to `p` through its cell `ℓ`. -/
@@ -88,13 +92,15 @@ def Resumable (E : List Frame) (p ℓ : Nat) : Prop :=
 
 /-- The handler of `E` with an arm for `o` of the class `c` that a frame installs, with its
 region. -/
-def Frame.handles (E o : Name) (_ : OpClass) : Frame → Option Nat
+def Frame.handles (E o : Name) (c : OpClass) : Frame → Option Nat
   | .hwith p _ E' al _ => if E' = E ∧ (al.armOf o).isSome then some p else none
+  -- a child keeps a handler for its `tail` operations: the rest of a body is the parent's
+  | .hkeep q _ E' al => if c = .tail ∧ E' = E ∧ (al.armOf o).isSome then some q else none
   | _ => none
 
 /-- The effect a handler frame handles in its body. -/
 def Frame.installs : Frame → Name → Prop
-  | .hwith _ _ E _ _, N => E = N
+  | .hwith _ _ E _ _, N | .hkeep _ _ E _, N => E = N
   | _, _ => False
 
 /-- The handler of an operation in a context: its region, if a frame answers it. -/
@@ -111,11 +117,25 @@ def plug : List Frame → Tm → Tm
 
 def OkE (E : List Frame) : Prop := ∀ F ∈ E, Frame.ok F
 
+/-- A frame of a context kept around a child or a finalizer of the owner `p` it registers: a
+handler older than `p`. A younger one ends first, and an obligation of the work keeps it out
+of the row of the work. -/
+def Frame.wrap (p : Nat) : Frame → Tm → Tm
+  | .hwith q ℓ E al _, e | .hkeep q ℓ E al, e => if q ≤ p then .hkeep q ℓ E al e else e
+  | _, e => e
+
 /-- What a handler parks is a body or an arm at its hole. -/
 def Frame.Parks : Frame → Prop
   | .hctlA p _ _ _ _ _ _ k => ∃ Ei, OkE Ei ∧ k = Flick.plug Ei (.hole p)
   | .hresB p _ a => ∃ A, OkE A ∧ a = Flick.plug A (.hole p)
+  | .hkarmA q _ _ _ k => ∃ Ei, OkE Ei ∧ k = Flick.plug Ei (.hole q)
   | _ => True
+
+/-- The handlers of a context around a term: the evidence a child or a finalizer of the owner
+`p` inherits from where it is registered (runtime.md §3.5). -/
+def withs (p : Nat) : List Frame → Tm → Tm
+  | [], e => e
+  | F :: E, e => withs p E (F.wrap p e)
 
 /-- What a term writes, a frame and a context around it write. -/
 theorem Frame.plug_has {e : Tm} {s : Site} (F : Frame) (h : e.Has s) : (F.plug e).Has s := by
@@ -168,6 +188,11 @@ theorem plug_free_of_hole {x : Tm} {p : Nat} {E : List Frame} {i : Nat} (h : (pl
 row of its body. -/
 def Sig.Complete (S : Sig) (E : Name) (al : Tm) : Prop :=
   ∀ o c a b, S.op E o = some (c, a, b) → (al.armOf o).isSome
+
+/-- An effect with an operation that is not `tail` stays in the row `r` around a kept handler:
+a child does not run such an arm. -/
+def Sig.NonTail (S : Sig) (E : Name) (r : Row) : Prop :=
+  (∃ o c a b, S.op E o = some (c, a, b) ∧ c ≠ .tail) → r (.nm E)
 
 /-- A handler handles a declared effect, which leaves the row `r` outside unless the
 handler has an arm for every operation. -/

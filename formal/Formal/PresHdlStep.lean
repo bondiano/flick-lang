@@ -23,6 +23,12 @@ theorem hwith_not_pure {Ψ Θ p ℓ E al r e t} (h : Typ S Ψ Θ [] (.hwith p �
   | hwith _ _ _ _ _ _ _ hφ _ => exact hφ
   | errVal hv => cases hv
 
+theorem hkeep_not_pure {Ψ Θ q ℓ E al e t} (h : Typ S Ψ Θ [] (.hkeep q ℓ E al e) (.ex t .pure)) :
+    False := by
+  cases h with
+  | hkeep _ _ _ _ _ _ _ hφ _ => exact hφ
+  | errVal hv => cases hv
+
 theorem hctl_not_pure {Ψ Θ p ℓ κ tl E al r a k t}
     (h : Typ S Ψ Θ [] (.hctl p ℓ κ tl E al r a k) (.ex t .pure)) : False := by
   cases h with
@@ -137,6 +143,21 @@ theorem tail_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : Rt
       (refill_todo hEi perform_not_value he) hφ₀ ?_ (fun h => by cases h) hc' hφ hT
     rw [if_pos rfl]
     exact hb.inst (Δ := [_]) (.cons hv hx .nil)
+  | errVal hv => cases hv
+
+/-- `tail` under a kept handler: its arm runs there while the body waits for its value. -/
+theorem kept_pres {Ψ Θ n q ℓ Ef al o v b t φ} {Ei : List Frame} (hc : RtCtx Ψ Θ n)
+    (hbv : v.Below n) (hEi : OkE Ei) (ha : al.armOf o = some b) (hv : Value v)
+    (h : Typ S Ψ Θ [] (.hkeep q ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v))) (.ex t φ)) :
+    Typ S Ψ Θ [] (.hkarm q ℓ Ef al (b.subst (inst [v])) (plug Ei (.hole q))) (.ex t φ) := by
+  cases h with
+  | hkeep hℓ hal he hφ₀ hc' hnt hle hφ hT =>
+    obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
+    have hb := (hal.arm_inv hop ha).1 rfl
+    have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
+      (S.op_closed _ _ _ _ _ (kill n) hop).1
+    exact .hkarm hℓ hal hop hEi rfl (refill_todo hEi perform_not_value he) hφ₀ hc' hnt
+      (hb.inst (Δ := [_]) (.cons hv hx .nil)) hle hφ hT
   | errVal hv => cases hv
 
 /-- `control`: the arm runs at the handler with `resume`, a new cell of the type of the rest

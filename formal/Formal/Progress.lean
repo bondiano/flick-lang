@@ -49,15 +49,6 @@ theorem handle_progress {Ψ Θ Λ μ v A ε₀ H t φ} (hv : Value v)
 theorem nt {F : Frame} (h : F.isTry → False) : ¬ F.isTry := h
 theorem ni {F : Frame} (h : F.isInside → False) : ¬ F.isInside := h
 
-theorem live_or_dead (Λ : List Rgn) (p : Nat) :
-    (∃ g, Λ[p]? = some g ∧ g.live = true) ∨ Dead Λ p := by
-  cases hg : Λ[p]? with
-  | none => exact .inr fun g h => by rw [hg] at h; cases h
-  | some g =>
-    cases hl : g.live with
-    | true => exact .inl ⟨g, rfl, hl⟩
-    | false => exact .inr fun g' h => by rw [hg] at h; cases h; exact hl
-
 /-- Progress of an application of two values. -/
 theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.length) (hvf : Value f)
     (hve : Value e) (hf : Typ S Ψ Θ [] f (.ex (.arrow a ψ t C) φ)) (he : Typ S Ψ Θ [] e (.ex a φ))

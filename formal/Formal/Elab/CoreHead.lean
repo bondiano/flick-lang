@@ -156,6 +156,18 @@ theorem phead_sim (hC : BClosed B) (hV : BNoVal B) (hA : BNoAlts B) (hP : BPlain
     cases h with
     | base hb => exact .inl hb
     | hwith _ h₂ h₃ => exact .inr ⟨_, .hwithVal (Cg.value hV hv h₃).1, .app h₂ h₃⟩
+  | hkeepVal hv =>
+    cases h with
+    | base hb => exact .inl hb
+    | hkeep _ h₂ => exact .inr ⟨_, .hkeepVal (Cg.value hV hv h₂).1, h₂⟩
+  | hkarmVal hE hk hv =>
+    subst hk
+    cases h with
+    | base hb => exact .inl hb
+    | hkarm h₁ h₃ h₄ =>
+      obtain ⟨Ei₂, rfl, hfr⟩ := Cg.plug_hole hP h₄
+      exact .inr ⟨_, .hkarmVal (FrR.okE hV hfr hE) rfl (Cg.value hV hv h₃).1,
+        .hkeep h₁ (FrR.plugs hfr ((Cg.value hV hv h₃).2.2 false))⟩
   | hctlTail hE hk hv =>
     subst hk
     cases h with
@@ -265,6 +277,27 @@ theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClos
       cases h₁ with
       | task he => exact .inr ⟨_, _, _, .await, he, hΛ, hμ⟩
       | base hb => exact (nb hb .task).elim
+  | hkarmRaise hE hk hv =>
+    subst hk
+    cases h with
+    | base hb => exact .inl hb
+    | hkarm h₁ h₃ h₄ =>
+      obtain ⟨Ei₂, rfl, hfr⟩ := Cg.plug_hole hP h₄
+      cases h₃ with
+      | raise h' =>
+        exact .inr ⟨_, _, _, .hkarmRaise (FrR.okE hV hfr hE) rfl (Cg.value hV hv h').1,
+          .hkeep h₁ (FrR.plugs hfr (.unw (.raise h'))), hΛ, hμ⟩
+      | base hb => exact (hR.1 _ _ hb).elim
+  | hkarmUnw hE hk =>
+    subst hk
+    cases h with
+    | base hb => exact .inl hb
+    | hkarm h₁ h₃ h₄ =>
+      obtain ⟨Ei₂, rfl, hfr⟩ := Cg.plug_hole hP h₄
+      cases h₃ with
+      | unw h' => exact .inr ⟨_, _, _, .hkarmUnw (FrR.okE hV hfr hE) rfl,
+          .hkeep h₁ (FrR.plugs hfr (.unw h')), hΛ, hμ⟩
+      | base hb => exact (hR.2 _ _ _ _ hb).elim
   | hctlRaise hE hk hv =>
     subst hk
     cases h with

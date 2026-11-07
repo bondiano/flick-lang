@@ -119,7 +119,7 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
             obtain ⟨g₂, hg₂, hl₂, r⟩ := live_rel hst.1 hg hl
             exact .inr ⟨_, _, _, _, .addFin hE₂ hg₂ hl₂ (Cg.value hV hv h₂).1,
               FrR.plugs hfr .lit, hst.1.set _ ⟨r.1, r.2.1,
-                r.2.2.app (.cons (.await h₂) .nil)⟩, hst.2⟩
+                r.2.2.app (.cons (FrR.withs hfr _ (.await h₂)) .nil)⟩, hst.2⟩
   | spawn hE hg hl hv =>
     rcases around hroot hE ht (.spawn hE hg hl hv) with hw | ⟨E₂, e₂, rfl, hfr, hE₂, he, hw⟩
     · exact .inl hw
@@ -138,7 +138,7 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
             obtain ⟨g₂, hg₂, hl₂, r⟩ := live_rel hst.1 hg hl
             exact .inr ⟨_, _, _, _, .spawn hE₂ hg₂ hl₂ (Cg.value hV hv h₂).1,
               FrR.plugs hfr .lit, hst.1.set _ ⟨r.1,
-                r.2.1.app (.cons (.await h₂) .nil), r.2.2⟩, hst.2⟩
+                r.2.1.app (.cons (FrR.withs hfr _ (.await h₂)) .nil), r.2.2⟩, hst.2⟩
   | @raise E v _ _ F hE hF hnt hni hnc hv =>
     have hE' : OkE (F :: E) := fun G hG => (List.mem_cons.mp hG).elim (fun h => h ▸ hF) (hE G)
     rcases around (E := F :: E) (e := .raise v) hroot hE' ht (.raise hE hF hnt hni hnc hv) with
@@ -215,6 +215,33 @@ theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S
             rw [plug_append]
             exact .performTail (fun G hG => hE₂ G (List.mem_append_right _ (List.mem_cons_of_mem _ hG)))
               (fun G hG => hE₂ G (List.mem_append_left _ hG)) (FrR.handlesE hA DP.plain hfi hh) hb₂ hv'.1
+  | @performKept E o b v _ q _ ℓ Ei Ef al hE hEi hh ha hv hl =>
+    have hs := Flick.Step.performKept (root := root) (Λ := Λ) (μ := μ) (q := q) (ℓ := ℓ) hE hEi hh ha hv hl
+    rw [show Flick.plug E (.hkeep q ℓ Ef al (Flick.plug Ei (.app (.const (.perform Ef o .tail)) v))) =
+      Flick.plug (Ei ++ .hkeep q ℓ Ef al :: E) (.app (.const (.perform Ef o .tail)) v) by
+        rw [plug_append]; rfl] at ht hs
+    rcases around hroot (hEi.append' (hE.cons' (F := .hkeep q ℓ Ef al) trivial)) ht hs with hw | ⟨E₂, e₂, rfl, hfr, hE₂, he, hw⟩
+    · exact .inl hw
+    obtain ⟨Ei₂, Eo₂, rfl, hfi, hfo⟩ := All2.split hfr
+    cases hfo with
+    | cons hF₂ hfo' =>
+      cases hF₂ with
+      | hkeep hal =>
+        cases he with
+        | base hb => exact .inl (hw hb)
+        | app h₁ h₂ =>
+          cases h₁ with
+          | base hb => exact (nb hb .const).elim
+          | const =>
+            obtain ⟨b₂, hb₂, hbb⟩ := (Cg.armOf (o := o) hA DP.plain hal).some_left ha
+            have hv' := Cg.value hV hv h₂
+            obtain ⟨g, hg, hgl⟩ := hl
+            obtain ⟨g₂, hg₂, hl₂', -⟩ := live_rel hst.1 hg hgl
+            refine .inr ⟨.rt, _, _, _, ?_, FrR.plugs hfo' (.hkarm hal (hbb.subst hC _ _ (SubR.inst (.cons hv'.2.2 .nil))) (FrR.plugs hfi .hole)), hst⟩
+            rw [plug_append]
+            exact .performKept (fun G hG => hE₂ G (List.mem_append_right _ (List.mem_cons_of_mem _ hG)))
+              (fun G hG => hE₂ G (List.mem_append_left _ hG)) (FrR.handlesE hA DP.plain hfi hh) hb₂ hv'.1
+              ⟨g₂, hg₂, hl₂'⟩
   | @performCtl E o b v _ _ p ℓ r Ei Ef al hE hEi hh ha hv =>
     have hs := Flick.Step.performCtl (root := root) (Λ := Λ) (μ := μ) (p := p) (ℓ := ℓ) (r := r) hE hEi hh ha hv
     rw [show Flick.plug E (.hwith p ℓ Ef al r (Flick.plug Ei (.app (.const (.perform Ef o .control)) v))) =

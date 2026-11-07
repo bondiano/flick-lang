@@ -145,6 +145,10 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
     intro _ hΘ; exact .hwith hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hφ hT
   | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ih₁ ih₂ ih₃ ih₄ =>
     intro _ hΘ; exact .hctl hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) (ih₄ hΘ) hl hcm hφ hT
+  | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
+    intro _ hΘ; exact .hkeep hℓ (ih₁ hΘ) (ih₂ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hnt hle hφ hT
+  | hkarm hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
+    intro _ hΘ; exact .hkarm hℓ (ih₁ hΘ) hop hE hk (ih₂ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hnt (ih₃ hΘ) hle hφ hT
   | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ => intro _ hΘ; exact .hres hℓ (ih₁ hΘ) hA ha (ih₂ hΘ) hl hφ hT
   | hdone _ ih => intro _ hΘ; exact .hdone (ih hΘ)
   | unw hℓ _ hφ ih => intro _ hΘ; exact .unw hℓ (ih hΘ) hφ

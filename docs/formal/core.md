@@ -654,7 +654,19 @@ Run-time forms. Installing a handler opens the region `p = |Λ|` and allocates t
 
 Steps. An operation runs the arm of the innermost handler with one for it, the frames between not handling it: `abort` puts `unw p ℓ arm[v]` at the operation; `tail` and `control` park the body and run the arm at the handler. The value of a `tail` arm goes back into the body; a `control` arm that ends without resuming, or an arm that raises or unwinds, unwinds the parked body to the handler. `resume u` puts `u` into the body under its handler, once; a second `resume` dies. A signal passes every frame but `inside`, which closes first, and the frames of an arm, which let their parked part go; the handler with the cell of the signal catches it. A handler whose body has a value applies `r` to it.
 
-Statements (Lean): Progress and Preservation cover every step above; T2b holds with the row `{E}` of an operation removed by its handler; no thread is ever a signal at its top (`Caught`); the regions of a handler nest as those of a scope, and what a resumed body gives back names no region younger than its handler (see [what a resumed body gives back enters the scopes of the arm](#what-a-resumed-body-gives-back-enters-the-scopes-of-the-arm)). A spawned task does not reach the handlers around the place that spawned it: an operation only they handle is stuck in the task, as an `ask_S` that nothing answers.
+A child or a finalizer keeps the handlers of the place that registered it, those older than its owner: `hkeep q ℓ E al e` around its work.
+
+```text
+Ψ(ℓ) = Unit →R⟨r;ε⟩ τ'    Γ ⊢ al : arms E (τ' at R⟨r;ε⟩, resume over q)    Γ ⊢ e : τ ! φ₀
+φ₀ ⊑ R⟨E ∪ r₁; ε₁⟩, its {Provided {E} a} with q ≥ a    R⟨r;ε⟩ ⊑ R⟨r₁;ε₁⟩ ⊑ φ
+E ∈ r₁ if an operation of E has no arm without a guard, or is not tail
+──────────────────────────────────────────────────────────────────────── (Keep)
+Γ ⊢ hkeep q ℓ E al e : τ ! φ
+```
+
+It answers the `tail` operations of `E` with an arm while the region `q` is live: the arm runs at the frame, while the rest of the child waits, as `hkarm q ℓ E al a k`, and its value goes back to the operation. A kept handler runs no `return`: a value passes it. It catches no signal: an arm that raises lets the rest of the child go, closing its regions, and the child ends with the signal, as it would with the error. Other operations pass it. An `abort` or `control` operation of a child that reaches no frame of its handler is stuck; the checker rejects `control` there (`classes/detached.rs`), and these rules do not.
+
+Statements (Lean): Progress and Preservation cover every step above; T2b holds with the row `{E}` of an operation removed by its handler; the main thread is never a signal at its top (`Caught`); the regions of a handler nest as those of a scope, and what a resumed body gives back names no region younger than its handler (see [what a resumed body gives back enters the scopes of the arm](#what-a-resumed-body-gives-back-enters-the-scopes-of-the-arm)). A spawned task does not reach the handlers around the place that spawned it: an operation only they handle is stuck in the task, as an `ask_S` that nothing answers.
 
 ## 4. Theorems
 

@@ -51,6 +51,11 @@ theorem PHead.has {e e' : Tm} (h : PHead e e') {s : Site} (hs : e'.Has s) : e.Ha
     subst hk
     have := plug_has_inv (r := .hole p) (r' := w) (s := s) Ei
     simp only [Tm.Has] at hs ⊢; grind
+  | hkeepVal => exact .inr (.inr (.inr hs))
+  | @hkarmVal k q w ℓ E al Ei _ hk _ =>
+    subst hk
+    have := plug_has_inv (r := .hole q) (r' := w) (s := s) Ei
+    simp only [Tm.Has] at hs ⊢; grind
   | @hctlDisc k p w ℓ κ E r al Ei _ hk _ =>
     subst hk
     have := plug_has_inv (r := .hole p) (r' := .unw p ℓ w) (s := s) Ei
@@ -144,6 +149,16 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
     refine same (sub fun s hs => ?_)
     have := plug_has_inv (r := .hole p) (r' := .unw p ℓ (.unw q ℓ' a)) (s := s) Ei
     simp only [Tm.Has] at hs this ⊢; grind
+  | @hkarmRaise k q w _ _ ℓ E al Ei _ hk _ =>
+    subst hk
+    refine same (sub fun s hs => ?_)
+    have := plug_has_inv (r := .hole q) (r' := .unw q ℓ (.raise w)) (s := s) Ei
+    simp only [Tm.Has] at hs this ⊢; grind
+  | @hkarmUnw k q _ _ ℓ E q' ℓ' a al Ei _ hk =>
+    subst hk
+    refine same (sub fun s hs => ?_)
+    have := plug_has_inv (r := .hole q) (r' := .unw q' ℓ' a) (s := s) Ei
+    simp only [Tm.Has] at hs this ⊢; grind
   | @hresRaise a p w _ _ ℓ A _ ha _ =>
     subst ha
     refine same (sub fun s hs => ?_)
@@ -211,6 +226,40 @@ theorem plug_below {E : List Frame} {r r' : Tm} {n : Nat} (h : (plug E r).Below 
     (plug E r').Below n := fun p hp =>
   (plug_has_inv E hp).elim (fun h₁ => h p h₁) (fun h₁ => h' p h₁)
 
+/-- What the handlers of a context hold, the context holds. -/
+theorem withs_has {r x : Tm} {p : Nat} {s : Site} :
+    ∀ (E : List Frame), (withs p E x).Has s → (plug E r).Has s ∨ x.Has s
+  | [], h => .inr h
+  | F :: E, h => by
+    rcases withs_has (x := F.wrap p x) (r := F.plug r) E h with h | h
+    · exact .inl h
+    · cases F with
+      | hwith q ℓ E' al rf =>
+        simp only [Frame.wrap] at h
+        split at h
+        · simp only [Tm.Has] at h
+          rcases h with h | h | h | h
+          · exact .inl (plug_has E (.inl h))
+          · exact .inl (plug_has E (.inr (.inl h)))
+          · exact .inl (plug_has E (.inr (.inr (.inl h))))
+          · exact .inr h
+        · exact .inr h
+      | hkeep q ℓ E' al =>
+        simp only [Frame.wrap] at h
+        split at h
+        · simp only [Tm.Has] at h
+          rcases h with h | h | h | h
+          · exact .inl (plug_has E (.inl h))
+          · exact .inl (plug_has E (.inr (.inl h)))
+          · exact .inl (plug_has E (.inr (.inr (.inl h))))
+          · exact .inr h
+        · exact .inr h
+      | _ => exact .inr h
+
+theorem withs_below {E : List Frame} {r x : Tm} {p n : Nat} (h : (plug E r).Below n) (hx : x.Below n) :
+    (withs p E x).Below n := fun q hq =>
+  (withs_has E hq).elim (fun h₁ => h q h₁) (fun h₁ => hx q h₁)
+
 /-- A step writes only regions that exist after it. -/
 theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     (hs : Step root l Λ μ e (.cfg Λ' μ' e')) (h : CfgBelow Λ μ e) :
@@ -247,6 +296,8 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     · exact h₃ h
     · exact h₄ h
     · exact h₆ h
+  | performKept hE hEi _ ha _ _ =>
+    exact ⟨⟨plug_below h.main (h.main.sub fun s hs => plug_has _ (kept_has ha hs)), h.mem, h.rgs⟩, Nat.le_refl _⟩
   | @performTail E o b v Λ μ p ℓ r Ei Ef al _ _ _ ha =>
     refine ⟨⟨plug_below h.main (h.main.sub fun s hs => plug_has _ ?_), h.mem, h.rgs⟩, Nat.le_refl _⟩
     obtain ⟨h₁, h₂, h₃, h₄, h₅, h₆⟩ :=
@@ -314,7 +365,7 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     rcases List.mem_append.mp hf' with hf' | hf'
     · exact hf f hf'
     · simp at hf'; subst hf'
-      exact h.main.sub fun _ hp => plug_has _ (.inr hp)
+      exact withs_below h.main (h.main.sub fun _ hp => plug_has _ (.inr hp))
   | spawn hE hg _ _ =>
     obtain ⟨hk, hf⟩ := h.rgs _ _ hg
     refine ⟨h.set hg (fun k hk' => ?_) hf (plug_below h.main (Tm.Below.empty fun p => by simp [Tm.Has])),
@@ -322,6 +373,6 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     rcases List.mem_append.mp hk' with hk' | hk'
     · exact hk k hk'
     · simp at hk'; subst hk'
-      exact h.main.sub fun _ hp => plug_has _ (.inr hp)
+      exact withs_below h.main (h.main.sub fun _ hp => plug_has _ (.inr hp))
 
 end Flick

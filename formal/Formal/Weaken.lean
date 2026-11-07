@@ -30,6 +30,17 @@ theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l)
     · rcases plug_has_iff.mp h with h | h
       · exact ih₃ l (plug_has_iff.mpr (.inl h))
       · simp [Tm.Has] at h
+  | hkarm _ _ _ _ hk _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
+    intro l h; subst hk
+    simp only [Tm.Has] at h
+    rcases h with h | h | h | h | h
+    · cases h
+    · cases h
+    · exact ih₁ l h
+    · exact ih₃ l h
+    · rcases plug_has_iff.mp h with h | h
+      · exact ih₂ l (plug_has_iff.mpr (.inl h))
+      · simp [Tm.Has] at h
   | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
     intro l h; subst ha
     simp only [Tm.Has] at h
@@ -106,6 +117,12 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
     · exact ih₂ i h
     · exact ih₄ i h
     · exact absurd (ih₃ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
+  | hkarm _ _ _ _ hk _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
+    intro i h; subst hk
+    rcases h with h | h | h
+    · exact ih₁ i h
+    · exact ih₃ i h
+    · exact absurd (ih₂ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
   | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
     intro i h; subst ha
     rcases h with h | h
@@ -191,6 +208,10 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
     exact .hctl (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ hop hc htl hE hk (ih₃ X) hφ₀ (ih₄ X)
       (fun h => let ⟨C', h₁, h₂⟩ := hl h
         ⟨C', by rw [List.getElem?_append_left (getElem?_lt h₁)]; exact h₁, h₂⟩) hcm hφ hT
+  | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
+    exact .hkeep (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hφ₀ hc hnt hle hφ hT
+  | hkarm hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
+    exact .hkarm (getElem?_ext hℓ) (ih₁ X) hop hE hk (ih₂ X) hφ₀ hc hnt (ih₃ X) hle hφ hT
   | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ =>
     exact .hres (getElem?_ext hℓ) (ih₁ X) hA ha (ih₂ X) (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hφ hT
   | hdone _ ih => exact .hdone (ih X)
@@ -368,6 +389,16 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     rw [Tm.rename, (plug_hole_closed hp).rename]
     exact .hctl hℓ (ih₁ hξ) (ih₂ hξ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hξ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
       rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT
+  | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
+    intro _ ξ hξ
+    exact .hkeep hℓ (ih₁ hξ) (ih₂ hξ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hnt hle hφ hT
+  | hkarm hℓ _ hop hE hk hp hφ₀ hc hnt _ hle hφ hT ih₁ _ ih₃ =>
+    intro _ ξ hξ
+    subst hk
+    rw [Tm.rename, (plug_hole_closed hp).rename]
+    exact .hkarm hℓ (ih₁ hξ) hop hE rfl hp hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
+      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hnt (ih₃ hξ) hle hφ hT
   | hres hℓ _ hA ha hp hl hφ hT ih₁ _ =>
     intro _ ξ hξ
     subst ha

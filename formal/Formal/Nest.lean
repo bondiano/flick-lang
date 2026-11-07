@@ -103,10 +103,12 @@ theorem Nest.reach_fin {Ψ c anc B home} {r : Nat} {g : Rgn} {f : Tm} {p : Nat} 
 theorem Nest.not_dead {Ψ c anc B home i E r} (hn : Nest Ψ c anc B home) (h : c.at i = some (plug E r))
     (hb : ∃ p, Dead c.rgs p ∧ (r = .app (.const .open_) (.own p) ∨ r = .app (.const .op) (.cap p) ∨
       (∃ t, r = .app (.app (.const .addFin) (.own p)) t) ∨
-      (∃ t, r = .app (.app (.const .spawn) (.own p)) t) ∨ ∃ w, r = .inside p w ∧ Final w)) : False := by
+      (∃ t, r = .app (.app (.const .spawn) (.own p)) t) ∨ (∃ w, r = .inside p w ∧ Final w) ∨
+      ∃ ℓ Ef al Ei o v, r = .hkeep p ℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v)) ∧
+        OkE Ei ∧ ∀ G ∈ Ei, G.handles Ef o .tail = none)) : False := by
   obtain ⟨p, hd, hr⟩ := hb
   have hp : r.Has (.rgn p) := by
-    rcases hr with rfl | rfl | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl, _⟩ <;> simp [Tm.Has]
+    rcases hr with rfl | rfl | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl, _⟩ | ⟨_, _, _, _, _, _, rfl, _⟩ <;> simp [Tm.Has]
   obtain ⟨g, hg, hl⟩ := hn.reach h (.here (plug_has E hp))
   rw [hd g hg] at hl; cases hl
 
