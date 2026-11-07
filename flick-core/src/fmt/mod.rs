@@ -31,6 +31,8 @@
 //! - a function type breaks after each arrow, `->{r; e}` staying whole; an
 //!   empty service row is dropped: `->{none; E}` becomes `->{; E}` and
 //!   `->{none; none}` becomes `->{}`;
+//! - an outer `forall` of a nonrecursive `let` signature is dropped when its
+//!   variables stay implicitly quantified and no comment would be lost;
 //! - variants stay on one line when the declaration fits, else one per line
 //!   after `|`; `deriving` ends the line or takes its own; members of
 //!   classes, instances, services and `rec`, foreign metadata, columns of a
@@ -63,6 +65,7 @@ mod block;
 mod comments;
 mod decl;
 mod expr;
+mod foralls;
 mod plugins;
 mod printer;
 mod program;
@@ -70,6 +73,7 @@ mod record;
 mod types;
 
 use comments::Comments;
+use foralls::drop_redundant_foralls;
 pub use plugins::PluginOf;
 use printer::{Printer, nodes};
 use program::program;
@@ -106,6 +110,9 @@ fn format_reporting(
     if !parsed.diagnostics.is_empty() {
         return Err(parsed.diagnostics);
     }
+    // This syntax rewrite is narrower than AST normalization: explicit
+    // `forall` changes polymorphic recursion and may shadow an outer variable.
+    drop_redundant_foralls(&mut parsed.tree, text);
     let expected = program(&parsed.tree, text);
     drop_empty_rows(&mut parsed.tree);
     let (out, kept) = source_file(&parsed.tree, text, file, plugin_of);

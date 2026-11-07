@@ -97,8 +97,34 @@ pub(super) fn dead_values(
                     vec![removal(module, decl, signature)],
                 )
             })
+            .with_fix(|| {
+                (
+                    format!("expose `{}` from the module", def.name),
+                    expose_value(module, &def.name).into_iter().collect(),
+                )
+            })
         })
         .collect()
+}
+
+fn expose_value(module: &Module, name: &str) -> Option<Edit> {
+    let header = module.tree.nodes().find(|n| n.kind == K::ModuleHeader)?;
+    let exposing = header.nodes().find(|n| n.kind == K::Exposing)?;
+    let items: Vec<_> = exposing
+        .nodes()
+        .filter(|n| n.kind == K::ExposeItem)
+        .collect();
+    let (at, replacement) = match items.last() {
+        Some(last) => (last.range().1, format!(", {name}")),
+        None => {
+            let close = exposing.child_tokens().find(|t| t.kind == K::RParen)?;
+            (close.start, name.to_owned())
+        }
+    };
+    Some(Edit {
+        span: Span::new(module.file, at, at),
+        replacement,
+    })
 }
 
 /// The text of a declaration, its signature and the line breaks after it.

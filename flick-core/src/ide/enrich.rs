@@ -140,7 +140,7 @@ impl Ide<'_> {
 }
 
 /// `import module` after the last import, or after the module header.
-fn import_edit(root: &Node, file: FileId, module: &str) -> Edit {
+pub(super) fn import_edit(root: &Node, file: FileId, module: &str) -> Edit {
     let last = root
         .nodes()
         .filter(|n| n.kind == K::ImportDecl)

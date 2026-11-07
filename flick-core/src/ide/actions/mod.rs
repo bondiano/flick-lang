@@ -3,6 +3,7 @@
 //! extracting or inlining a variable.
 
 mod extract;
+mod import_class;
 mod match_on;
 mod qualify;
 mod signature;
@@ -24,6 +25,8 @@ impl Ide<'_> {
     pub fn actions(&self, file: FileId, start: u32, end: u32) -> Vec<Action> {
         let mut out: Vec<Action> = Vec::new();
         out.extend(self.add_signature(file, start));
+        out.extend(self.infer_todo_signature(file, start));
+        out.extend(self.import_class(file, start));
         out.extend(self.match_on(file, start));
         out.extend(self.qualify(file, start));
         out.extend(self.extract(file, start, end));

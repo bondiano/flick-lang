@@ -1,13 +1,21 @@
 //! Kinds as written in type parameters: `Type`, `Type -> Type`, `Row Type`,
 //! the built-in row kinds and the finite kinds of `kind` declarations.
 
-use super::is_type;
 use crate::diagnostics::codes;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
 use crate::types::env::Form;
 use crate::types::kinds::Kind;
+
+/// Whether a syntax node is a type rather than a row or annotation part.
+pub fn is_type(kind: K) -> bool {
+    (K::NameType..=K::CaptureType).contains(&kind)
+        && !matches!(
+            kind,
+            K::EffectAnnot | K::Row | K::RowTail | K::RecordTypeField
+        )
+}
 
 /// `a Type`, `an ErrorRow`.
 pub(super) fn with_article(kind: &Kind) -> String {

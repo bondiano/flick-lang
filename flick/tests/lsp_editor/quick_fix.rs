@@ -32,6 +32,58 @@ fn offset(text: &str, position: &Value) -> usize {
 }
 
 #[test]
+fn class_import_todo_signature_and_export_actions_work_together() {
+    let initial = "module App.Main exposing ()\n\ntype ExprT a =\n  | IntLitT Int : ExprT Int\n  | BoolLitT Bool : ExprT Bool\n  | Numeric a => Add a a : ExprT a\n  | Equals a (a -> b) : ExprT b\n\nevalT : todo\nlet evalT e =\n  match e with\n  | IntLitT n -> n\n  | BoolLitT b -> b\n  | Equals x f -> f x\n  | Add x y -> x + y\n";
+    let dir = project(
+        "lsp_gadt_actions",
+        &[("flick.toml", LIB), ("src/App/Main.fl", initial)],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let document = json!({ "uri": uri(&file) });
+    let mut lsp = Lsp::start(&dir);
+    let mut text = initial.to_owned();
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": text } }));
+    for (version, code, title) in [
+        (2, "FLICK-T001", "import `Numeric`"),
+        (3, "FLICK-T024", "replace `todo`"),
+        (4, "FLICK-R014", "expose `evalT`"),
+    ] {
+        let diagnostics = lsp.diagnostics(&uri(&file));
+        let diagnostic = diagnostics
+            .iter()
+            .find(|d| d["code"] == code)
+            .unwrap_or_else(|| panic!("missing {code}: {diagnostics:?}"));
+        let actions = lsp.request(
+            "textDocument/codeAction",
+            &json!({
+                "textDocument": document,
+                "range": diagnostic["range"],
+                "context": { "diagnostics": [diagnostic] },
+            }),
+        );
+        let action = actions["result"]
+            .as_array()
+            .expect("actions")
+            .iter()
+            .find(|a| a["title"].as_str().is_some_and(|t| t.starts_with(title)))
+            .unwrap_or_else(|| panic!("missing {title}: {actions:?}"));
+        let edit = &action["edit"]["changes"][uri(&file)][0];
+        let start = offset(&text, &edit["range"]["start"]);
+        let end = offset(&text, &edit["range"]["end"]);
+        text.replace_range(start..end, edit["newText"].as_str().expect("replacement"));
+        lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": version }, "contentChanges": [{ "text": text }] }));
+    }
+    assert!(text.contains("evalT : forall a. ExprT a -> a"), "{text}");
+    assert!(text.contains("module App.Main exposing (evalT)"), "{text}");
+    assert!(
+        lsp.diagnostics(&uri(&file)).is_empty(),
+        "{:?}",
+        lsp.diagnostics(&uri(&file))
+    );
+    lsp.close();
+}
+
+#[test]
 fn signature_quick_fix_makes_the_module_check() {
     let dir = project(
         "lsp_signature_fix",

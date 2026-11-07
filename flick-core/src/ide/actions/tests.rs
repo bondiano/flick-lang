@@ -43,6 +43,165 @@ fn add_signature_writes_the_inferred_type_of_a_value() {
 }
 
 #[test]
+fn unresolved_class_can_be_imported() {
+    let src =
+        "module App.Main exposing (Expr(..))\n\ntype Expr a =\n  | Numeric a => Add a a : Expr a\n";
+    let (f, text) = main(src);
+    let at = f.at("App.Main", "Numeric", 0);
+    let a = action(&f, at, at, "import `Numeric`").expect("class import");
+    assert!(applied(&text, &a).contains("import Numeric exposing (Numeric)"));
+
+    let existing = src.replace("\ntype Expr", "\nimport Numeric\n\ntype Expr");
+    let (f, text) = main(&existing);
+    let at = f.at("App.Main", "Numeric a", 0);
+    let a = action(&f, at, at, "import `Numeric`").expect("extend import");
+    assert!(applied(&text, &a).contains("import Numeric exposing (Numeric)"));
+
+    let classes = "module App.Classes exposing (Named)\n\nclass Named a =\n  name : a -> String\n";
+    let needs = "module App.Main exposing (Box(..))\n\nimport App.Classes\n\ntype Box a =\n  | Named a => Box a : Box a\n";
+    let f = fixture_of(&[("src/App/Classes.fl", classes), ("src/App/Main.fl", needs)]);
+    let at = f.at("App.Main", "Named a", 0);
+    let a = action(&f, at, at, "import `Named`").expect("project class import");
+    assert!(applied(needs, &a).contains("import App.Classes exposing (Named)"));
+}
+
+#[test]
+fn todo_signature_of_gadt_interpreter_is_checked_before_offering() {
+    let src = "module App.Main exposing (evalT)\n\nimport Numeric exposing (Numeric)\n\ntype ExprT a =\n  | IntLitT Int : ExprT Int\n  | BoolLitT Bool : ExprT Bool\n  | Numeric a => Add a a : ExprT a\n  | Equals a (a -> b) : ExprT b\n\nevalT : todo\nlet evalT e =\n  match e with\n  | IntLitT n -> n\n  | BoolLitT b -> b\n  | Equals x f -> f x\n  | Add x y -> x + y\n";
+    let (f, text) = main(src);
+    assert!(
+        f.ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .any(|d| d.code.to_string() == "FLICK-T024"
+                && d.severity == crate::diagnostics::Severity::Error)
+    );
+    assert!(
+        !f.ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .any(|d| d.code.to_string() == "FLICK-T004")
+    );
+    let at = f.at("App.Main", "todo", 0);
+    let a = action(&f, at, at, "replace `todo`").expect("GADT signature");
+    let fixed = applied(&text, &a);
+    assert!(fixed.contains("evalT : forall a. ExprT a -> a"), "{fixed}");
+    let checked = fixture_of(&[("src/App/Main.fl", &fixed)]);
+    assert!(
+        checked
+            .ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .all(crate::diagnostics::Diagnostic::unnecessary),
+        "{:?}",
+        checked.ide().analysis.diagnostics
+    );
+
+    let partial = src.replace("evalT : todo", "evalT : ExprT a -> todo");
+    let (f, text) = main(&partial);
+    let at = f.at("App.Main", "todo", 0);
+    let a = action(&f, at, at, "replace `todo`").expect("GADT result type");
+    let fixed = applied(&text, &a);
+    assert!(fixed.contains("evalT : ExprT a -> a"));
+    let checked = fixture_of(&[("src/App/Main.fl", &fixed)]);
+    assert!(
+        checked
+            .ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .all(crate::diagnostics::Diagnostic::unnecessary)
+    );
+}
+
+#[test]
+fn imported_gadt_signature_uses_exposed_type_name() {
+    let expr = "module App.Expr exposing (Expr(..))\n\ntype Expr a =\n  | IntLit Int : Expr Int\n  | BoolLit Bool : Expr Bool\n  | Wrap b (b -> a) : Expr a\n";
+    let main = "module App.Main exposing (eval)\n\nimport App.Expr exposing (Expr(..))\n\neval : todo\nlet eval e =\n  match e with\n  | IntLit n -> n\n  | BoolLit b -> b\n  | Wrap x f -> f x\n";
+    let f = fixture_of(&[("src/App/Expr.fl", expr), ("src/App/Main.fl", main)]);
+    let at = f.at("App.Main", "todo", 0);
+    let a = action(&f, at, at, "replace `todo`").expect("inferred signature");
+    let fixed = applied(main, &a);
+    assert!(fixed.contains("eval : forall a. Expr a -> a"), "{fixed}");
+    assert!(!fixed.contains("App.Expr.Expr"), "{fixed}");
+
+    let aliased = main
+        .replace(
+            "import App.Expr exposing (Expr(..))",
+            "import App.Expr as E",
+        )
+        .replace("| IntLit", "| E.IntLit")
+        .replace("| BoolLit", "| E.BoolLit")
+        .replace("| Wrap", "| E.Wrap");
+    let explicit = aliased.replace("eval : todo", "eval : forall a. E.Expr a -> a");
+    let checked = fixture_of(&[("src/App/Expr.fl", expr), ("src/App/Main.fl", &explicit)]);
+    assert!(
+        checked
+            .ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .all(crate::diagnostics::Diagnostic::unnecessary),
+        "{:?}",
+        checked.ide().analysis.diagnostics
+    );
+    let f = fixture_of(&[("src/App/Expr.fl", expr), ("src/App/Main.fl", &aliased)]);
+    let at = f.at("App.Main", "todo", 0);
+    let a = action(&f, at, at, "replace `todo`")
+        .unwrap_or_else(|| panic!("aliased signature: {:?}", f.ide().analysis.diagnostics));
+    assert!(applied(&aliased, &a).contains("eval : forall a. E.Expr a -> a"));
+}
+
+#[test]
+fn gadt_todo_signature_can_have_a_constant_result() {
+    let src = "module App.Main exposing (describe)\n\ntype Expr a =\n  | IntLit Int : Expr Int\n  | BoolLit Bool : Expr Bool\n\ndescribe : todo\nlet describe e =\n  match e with\n  | IntLit _ -> \"int\"\n  | BoolLit _ -> \"bool\"\n";
+    let (f, text) = main(src);
+    let at = f.at("App.Main", "todo", 0);
+    let a = action(&f, at, at, "replace `todo`").expect("constant result signature");
+    let fixed = applied(&text, &a);
+    assert!(
+        fixed.contains("describe : forall a. Expr a -> String"),
+        "{fixed}"
+    );
+
+    let invalid = src.replace("\"bool\"", "true");
+    let (f, _) = main(&invalid);
+    let at = f.at("App.Main", "todo", 0);
+    assert!(action(&f, at, at, "replace `todo`").is_none());
+}
+
+#[cfg(feature = "diagnostic-fixes")]
+#[test]
+fn nested_todo_type_is_an_error_with_a_replacement() {
+    let src = "module App.Main exposing (wrap)\n\nwrap : Int -> Option todo\nlet wrap x = Some x\n";
+    let (f, text) = main(src);
+    let diagnostic = f
+        .ide()
+        .analysis
+        .diagnostics
+        .iter()
+        .find(|d| d.code.to_string() == "FLICK-T024")
+        .expect("todo error");
+    assert_eq!(diagnostic.severity, crate::diagnostics::Severity::Error);
+    let fix = diagnostic
+        .fixes
+        .iter()
+        .find(|f| !f.edits.is_empty())
+        .expect("inferred replacement");
+    let mut changed = text;
+    for edit in fix.edits.iter().rev() {
+        changed.replace_range(
+            edit.span.start as usize..edit.span.end as usize,
+            &edit.replacement,
+        );
+    }
+    assert!(changed.contains("wrap : Int -> Option Int"), "{changed}");
+}
+
+#[test]
 fn pattern_match_on_a_variable_lists_its_constructors() {
     let src = "module App.Main exposing (area)\n\nimport App.Shapes exposing (..)\n\narea : Shape -> Float\nlet area shape =\n  shape\n";
     let (f, text) = main(src);

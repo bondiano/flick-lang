@@ -76,6 +76,37 @@ fn removing_an_unused_import_or_value_deletes_its_lines() {
 
 #[cfg(feature = "diagnostic-fixes")]
 #[test]
+fn unused_value_can_be_exposed_without_removing_it() {
+    for (head, want) in [
+        ("module Probe exposing (f)", "module Probe exposing (f, g)"),
+        ("module Probe exposing ()", "module Probe exposing (g)"),
+    ] {
+        let text = format!("{head}\nf : Int\nlet f = 1\ng : Int\nlet g = 2\n");
+        let mut sources = SourceMap::default();
+        let file = sources.add("Probe.fl", text.clone());
+        let diagnostics = crate::check(&sources, file);
+        let unused = diagnostics
+            .iter()
+            .find(|d| d.code.to_string() == "FLICK-R014" && d.message.contains("`g`"))
+            .expect("unused g");
+        let fix = unused
+            .fixes
+            .iter()
+            .find(|f| f.message.contains("expose `g`"))
+            .expect("expose action");
+        let mut changed = text.clone();
+        for edit in fix.edits.iter().rev() {
+            changed.replace_range(
+                edit.span.start as usize..edit.span.end as usize,
+                &edit.replacement,
+            );
+        }
+        assert!(changed.starts_with(want), "{changed}");
+    }
+}
+
+#[cfg(feature = "diagnostic-fixes")]
+#[test]
 fn an_unused_variable_is_renamed_with_an_underscore() {
     let text = format!("{HEAD}f : (Float, Float) -> Float\nlet f (x, y) = x\n");
     assert!(fixed(&text, "FLICK-R013").contains("let f (x, _y) = x"));

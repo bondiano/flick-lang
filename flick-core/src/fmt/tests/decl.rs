@@ -2,6 +2,58 @@
 
 use super::fmt;
 
+#[test]
+fn omits_redundant_outer_forall_on_nonrecursive_functions() {
+    let src = "module App.Main exposing (eval)\n\ntype Expr a = IntLit Int : Expr Int | BoolLit Bool : Expr Bool\n\neval : forall a. Expr a -> a\nlet eval e =\n  match e with\n  | IntLit n -> n\n  | BoolLit b -> b\n";
+    let out = fmt(src);
+    assert!(out.contains("eval : Expr a -> a\n"), "{out}");
+    for text in [src, out.as_str()] {
+        let mut sources = crate::source::SourceMap::default();
+        let file = sources.add("App/Main.fl", text);
+        let errors: Vec<_> = crate::check(&sources, file)
+            .into_iter()
+            .filter(|d| d.severity == crate::diagnostics::Severity::Error)
+            .collect();
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+}
+
+#[test]
+fn local_forall_respects_enclosing_type_variables() {
+    let safe = "outer : Float -> (Float, String)\nlet outer x =\n  inner : forall a. a -> a\n  let inner y = y\n  (inner x, inner \"ok\")\n";
+    let safe_out = fmt(safe);
+    assert!(safe_out.contains("inner : a -> a\n"));
+
+    let shadowed = "outer : forall a. a -> a\nlet outer x =\n  inner : forall a. a -> a\n  let inner y = y\n  inner x\n";
+    let out = fmt(shadowed);
+    assert!(out.contains("outer : a -> a\n"), "{out}");
+    assert!(out.contains("inner : forall a. a -> a\n"), "{out}");
+    for text in [safe, shadowed, safe_out.as_str(), out.as_str()] {
+        let mut sources = crate::source::SourceMap::default();
+        let file = sources.add("App/Main.fl", text);
+        let errors: Vec<_> = crate::check(&sources, file)
+            .into_iter()
+            .filter(|d| d.severity == crate::diagnostics::Severity::Error)
+            .collect();
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+}
+
+#[test]
+fn keeps_forall_when_its_binding_may_matter() {
+    let src = "depth : forall a. Nested a -> Float\nlet rec depth x = depth x\n\nrec {\n  mutual : forall a. a -> a\n  let mutual x = x\n}\n\napply : (forall a. a -> a) -> Float\nlet apply f = f 1\n\nunused : forall a. Int -> Int\nlet unused x = x\n\ncommented : forall a. /* keep */ a -> a\nlet commented x = x\n";
+    let out = fmt(src);
+    for snippet in [
+        "depth : forall a. Nested a -> Float",
+        "mutual : forall a. a -> a",
+        "apply : (forall a. a -> a) -> Float",
+        "unused : forall a. Int -> Int",
+        "commented : forall a. /* keep */ a -> a",
+    ] {
+        assert!(out.contains(snippet), "missing {snippet}: {out}");
+    }
+}
+
 /// Variants share a line when they fit; `deriving` takes its own unless a
 /// broken record ends before it.
 #[test]

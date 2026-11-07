@@ -112,7 +112,7 @@ pub(super) fn union(p: &mut Parser) -> Option<Done> {
 pub(super) fn at_atom_start(p: &Parser) -> bool {
     matches!(
         p.current(),
-        K::Ident | K::Con | K::NoneKw | K::String | K::LParen | K::LBrace
+        K::Ident | K::Con | K::NoneKw | K::String | K::LParen | K::LBrace | K::TodoKw
     )
 }
 
@@ -188,6 +188,10 @@ fn atom(p: &mut Parser) -> Option<Done> {
         K::Underscore => {
             p.bump();
             K::HoleType
+        }
+        K::TodoKw => {
+            p.bump();
+            K::TodoType
         }
         _ => {
             p.error_expected("a type");

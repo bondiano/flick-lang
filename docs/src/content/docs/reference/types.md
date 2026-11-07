@@ -65,6 +65,11 @@ as a suggestion; types written in the `let` header are `FLICK-T005`; a
 signature without the definition right below it is `FLICK-T006`. Values that
 are not functions need no signature, and a local `let x : T = …` is a hint.
 
+`todo` can stand for a whole signature or part of one while editing. It is an
+error until replaced, so checking and building cannot succeed with it. The
+editor offers the inferred replacement when it can verify a complete type;
+unlike `_`, a type-level `todo` is never a warning-only hole.
+
 New type variables of a signature are quantified over the whole signature
 and their kinds are inferred. Inside its body, a nested signature that uses
 the same name means the same type:
