@@ -215,45 +215,7 @@ impl Checker<'_> {
             {
                 push_atom(out, &t);
             }
-            Type::App { .. } => {
-                let (head, args) = t.spine();
-                // an `Eff` holds what its result holds, as a function does: a
-                // capture shown only in the result is lost when the result is dropped
-                if HOLD_NOTHING.into_iter().any(|n| head.is_lang(n)) {
-                    return;
-                }
-                let kinds = match head {
-                    Type::Con { module, name } => self
-                        .env
-                        .type_def(module, name)
-                        .map(|d| self.kinds.resolve(&d.kind)),
-                    _ => None,
-                };
-                let mut kind = kinds.as_ref();
-                for arg in args {
-                    let param = match kind {
-                        Some(Kind::Arrow(param, rest)) => {
-                            kind = Some(rest);
-                            Some(&**param)
-                        }
-                        _ => None,
-                    };
-                    // a service row is needed again wherever the value runs; a
-                    // symbol is text; the error row of an `Eff` is that of its
-                    // stage, as a function's is
-                    match param {
-                        Some(Kind::ServiceRow | Kind::Symbol) => {}
-                        Some(Kind::ErrorRow) if head.is_lang(Lang::Eff) => {}
-                        Some(Kind::ErrorRow) => self.error_row_captures(arg, out, bounded),
-                        _ => match self.store.resolve(arg) {
-                            row @ (Type::Row(_) | Type::Union(..)) => {
-                                self.capture_row_filtered(&row, out, bounded);
-                            }
-                            _ => self.collect_bounded_captures(arg, out, bounded),
-                        },
-                    }
-                }
-            }
+            Type::App { .. } => self.applied_captures(&t, out, bounded),
             Type::Tuple(items) => items
                 .iter()
                 .for_each(|i| self.collect_bounded_captures(i, out, bounded)),
@@ -289,6 +251,52 @@ impl Checker<'_> {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// What the application `t` holds, of a head and the arguments of a kind
+    /// that holds.
+    fn applied_captures(&self, t: &Type, out: &mut Norm, bounded: bool) {
+        let (head, args) = t.spine();
+        // an `Eff` holds what its result holds, as a function does: a
+        // capture shown only in the result is lost when the result is dropped
+        if HOLD_NOTHING.into_iter().any(|n| head.is_lang(n)) {
+            return;
+        }
+        // `f a` holds what `f` stands for, as `Holder h a` holds `h`
+        if !bounded {
+            self.collect_bounded_captures(head, out, false);
+        }
+        let kinds = match head {
+            Type::Con { module, name } => self
+                .env
+                .type_def(module, name)
+                .map(|d| self.kinds.resolve(&d.kind)),
+            _ => None,
+        };
+        let mut kind = kinds.as_ref();
+        for arg in args {
+            let param = match kind {
+                Some(Kind::Arrow(param, rest)) => {
+                    kind = Some(rest);
+                    Some(&**param)
+                }
+                _ => None,
+            };
+            // a service row is needed again wherever the value runs; a
+            // symbol is text; the error row of an `Eff` is that of its
+            // stage, as a function's is
+            match param {
+                Some(Kind::ServiceRow | Kind::Symbol) => {}
+                Some(Kind::ErrorRow) if head.is_lang(Lang::Eff) => {}
+                Some(Kind::ErrorRow) => self.error_row_captures(arg, out, bounded),
+                _ => match self.store.resolve(arg) {
+                    row @ (Type::Row(_) | Type::Union(..)) => {
+                        self.capture_row_filtered(&row, out, bounded);
+                    }
+                    _ => self.collect_bounded_captures(arg, out, bounded),
+                },
+            }
         }
     }
 
@@ -436,7 +444,9 @@ impl Checker<'_> {
         captures.entries.retain(|(_, atom)| {
             matches!(
                 self.atom_kind(atom, kinds),
-                None | Some(Kind::Type | Kind::Region | Kind::CaptureRow | Kind::ErrorRow)
+                None | Some(
+                    Kind::Type | Kind::Arrow(..) | Kind::Region | Kind::CaptureRow | Kind::ErrorRow
+                )
             )
         });
         Type::Union(Box::new(held.clone()), Box::new(captures.into_type()))

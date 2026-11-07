@@ -128,6 +128,7 @@ Sources:
 ⌈B⌉            = ∅                     B is Int, Float, BigInt, String, Bool, Unit, Never
 ⌈H ϱ̄ τ̄⌉        = ϱ̄ ∪ ⋃ ⌈τᵢ⌉
 ⌈T ā⌉          = ⋃ ⌈aᵢ⌉ over arguments of kinds Type, Region, CRow, ERow    arguments of kind SRow are excluded
+⌈f τ̄⌉          = {f} ∪ ⋃ ⌈τᵢ⌉          f is a variable of a higher kind
 ⌈Owner ϱ⌉      = {ϱ}
 ⌈Ref τ⌉        = ⌈τ⌉
 ⌈{ℓᵢ : τᵢ | ρ}⌉ = ⋃ ⌈τᵢ⌉

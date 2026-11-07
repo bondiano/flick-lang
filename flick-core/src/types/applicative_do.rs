@@ -95,7 +95,7 @@ impl Checker<'_> {
                 self.expect(value, &fb, at);
             }
             // checked like the others, once the second shows the container
-            if i == 0 && self.unify(&fa, &acc).is_err() {
+            if i == 0 {
                 let at = parts[0].1.map_or(span, |v| self.span(v));
                 self.expect(&acc, &fa, at);
             }
