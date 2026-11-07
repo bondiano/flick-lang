@@ -64,3 +64,30 @@ test("plugin heads in imports and server functions are scoped, `cli` elsewhere i
     highlighter.dispose();
   }
 });
+
+test("the two parts of an arrow's row have their own scopes, and names in them keep theirs", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [],
+    langs: [{ ...grammar, name: "flick" }],
+  });
+  try {
+    const language = highlighter.getLanguage("flick");
+    const line = "load : UserId ->{Users, Log {a}; NotFound} (Unit ->{; Other} View)";
+    const { tokens } = language.tokenizeLine(line, null);
+    const scopes = (word: string): readonly string[] => {
+      const start = line.indexOf(word);
+      return tokens.find((token) => token.startIndex <= start && start < token.endIndex)?.scopes ?? [];
+    };
+    assert.ok(scopes("Users").includes("meta.effect-row.needs.flick"));
+    assert.ok(scopes("Users").includes("entity.name.type.flick"));
+    assert.ok(scopes("Log").includes("meta.effect-row.needs.flick"));
+    assert.ok(scopes("NotFound").includes("meta.effect-row.fails.flick"));
+    assert.ok(!scopes("NotFound").includes("meta.effect-row.needs.flick") || scopes("NotFound").indexOf("meta.effect-row.fails.flick") > scopes("NotFound").indexOf("meta.effect-row.needs.flick"));
+    assert.ok(scopes("Other").includes("meta.effect-row.fails.flick"));
+    assert.ok(!scopes("UserId").some((scope) => scope.startsWith("meta.effect-row")));
+    assert.ok(!scopes("View").some((scope) => scope.startsWith("meta.effect-row")));
+  } finally {
+    highlighter.dispose();
+  }
+});
