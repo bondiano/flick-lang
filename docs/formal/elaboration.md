@@ -21,6 +21,7 @@ Elaborated here:
 | - | - | - |
 | Solving the `Record` row primitives (`HasField`, `Lacks`, `Remove`, `Project`, `UnionDisjoint`, `Map`, `Labels`) | `classes/prims.rs` | Rule (Prim) of §2.3 is a black box: it yields a `Dict::Primitive` with the labels the operation needs at run time |
 | Captures and regions in dictionaries | `regions.md` | A dictionary is built from top-level values and has no captures of its own (`regions.md` §0) |
+| Sets of services and errors: `...`, `-` and aliases of a row | `types/convert/sets.rs` | Expanded when a type is converted, before the stage described here: the model sees plain rows |
 | Record sugar, operators, `\|>`, `sql` and `ui` blocks | `core.md` §1.4 | Elaborated before the stage described here, or as constants of Γ₀ |
 | Optimizations: `opt/specialize.rs`, `opt/fold.rs`, `js/expr.rs` `direct_method`, `opt/fuse.rs` | hypothesis G2 of `core.md` | They rely on coherence (T6(b)): they replace a dictionary with a known instance or with a call of its method |
 | Checking order, messages, the solver budget as a number | — | The budget enters the model only as a failure: exhausting it is the error `FLICK-C009`, not a solution |

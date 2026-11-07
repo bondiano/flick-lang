@@ -6,6 +6,15 @@ break programs.
 
 ## Unreleased
 
+- **Sets of services and errors:** a `type alias` of a row names a set, as in
+  `type alias Orders = {...Reads, Billing; OrderNotFound}`. `...` merges a set
+  into a row, also in an arrow (`->{...Orders, Async | r; Boom}`), and `-` takes
+  an element or a set out (`{...Orders, -Log; -InvalidEmail}`). A set expands
+  where it is named, so it fits wherever its row does; `Eff {...Orders} none a`
+  takes the errors of a set into its row of errors.
+- **Aliases in declarations:** a declaration may use an alias written below it.
+  `run : Unit ->{Time; Failure} Float` above `type alias Failure = Oops` was
+  `FLICK-T002`.
 - **GADTs:** a `match` follows a type variable across the parts of the matched
   value. On `(x, y)` of type `(Tagged a, Tagged a)` it needs no arm for a pair of
   different constructors, and an arm for one is `FLICK-T010`.
