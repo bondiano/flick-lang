@@ -265,6 +265,8 @@ pub enum SyntaxKind {
     UnionType,
     /// `_`: a type left for the checker to infer.
     HoleType,
+    /// `todo`: a required type placeholder that keeps checking the draft.
+    TodoType,
     CaptureType,
 }
 

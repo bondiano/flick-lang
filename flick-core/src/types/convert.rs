@@ -19,6 +19,7 @@ use crate::types::lang::Lang;
 mod kinds;
 mod rows;
 
+pub use kinds::is_type;
 use kinds::with_article;
 use rows::{place_braces, written_none};
 
@@ -40,14 +41,6 @@ pub struct TyVar {
     pub name: String,
     pub ty: Type,
     pub kind: Kind,
-}
-
-pub fn is_type(kind: K) -> bool {
-    (K::NameType..=K::CaptureType).contains(&kind)
-        && !matches!(
-            kind,
-            K::EffectAnnot | K::Row | K::RowTail | K::RecordTypeField
-        )
 }
 
 impl Checker<'_> {
@@ -164,6 +157,7 @@ impl Checker<'_> {
             }
             K::UnitType => (Type::lang(Lang::Unit), Kind::Type),
             K::HoleType => self.hole(span, expected),
+            K::TodoType => self.todo_type(span, expected),
             K::TupleType => (
                 Type::Tuple(
                     children

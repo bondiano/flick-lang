@@ -60,23 +60,48 @@ impl Checker<'_> {
             return (Type::Error, expected.clone());
         }
         let hole = self.fresh();
-        self.holes.push((span, hole.clone()));
+        self.holes.push((span, hole.clone(), false));
+        (hole, expected.clone())
+    }
+
+    /// A type placeholder is inferred like `_`, but must be replaced before build.
+    pub(super) fn todo_type(&mut self, span: Span, expected: &Kind) -> (Type, Kind) {
+        let hole = self.fresh();
+        self.holes.push((span, hole.clone(), true));
         (hole, expected.clone())
     }
 
     /// A warning for each `_` in a type, with the type inferred for it; one
     /// of generated code is a fact for its plugin's `check` too.
     pub(super) fn report_holes(&mut self) {
-        for (span, hole) in mem::take(&mut self.holes) {
+        for (span, hole, required) in mem::take(&mut self.holes) {
             if span.start >= self.generated {
                 let fact = self.fact(&hole);
                 self.typing.wildcards.push((range(span), fact));
             }
             let shown = self.show(&hole);
+            let (severity, message) = if required {
+                (
+                    Severity::Error,
+                    format!("replace `todo` with its inferred type `{shown}`"),
+                )
+            } else {
+                (Severity::Warning, format!("`_` is `{shown}`"))
+            };
+            let complete = !shown
+                .split(|c: char| !c.is_alphanumeric() && c != '_')
+                .any(|w| w == "_");
+            let clean = !self
+                .diagnostics
+                .iter()
+                .any(|d| d.severity == Severity::Error);
             self.diagnostics.push(
-                Diagnostic::new(codes::T024, Severity::Warning, format!("`_` is `{shown}`"))
+                Diagnostic::new(codes::T024, severity, message)
                     .with_span(span)
                     .with_fix(|| {
+                        if required && (!complete || !clean) {
+                            return (format!("write `{shown}`"), Vec::new());
+                        }
                         let bare = !shown.contains(' ') || shown.starts_with(['(', '{', '[']);
                         let replacement = if bare {
                             shown.clone()
