@@ -6,18 +6,39 @@ use crate::types::lang::Lang;
 use crate::types::ty::{Stage, Type};
 use crate::types::typing::ForeignInfo;
 
+/// spike: the row of the first runtime arrow: `async`, `open` with a variable, `closed` without `Async`, or `pure`.
+fn row_class(mut ty: &Type) -> &'static str {
+    loop {
+        match ty {
+            Type::Fun { effects: Some(e), .. } => {
+                let label = crate::types::lang::label(Lang::Async);
+                let Type::Row(r) = &e.services else { return "open" };
+                if r.entries.iter().any(|(l, _)| Some(l.as_str()) == label) {
+                    return "async";
+                }
+                return if r.tail.is_some() { "open" } else { "closed" };
+            }
+            Type::Fun { result, .. } => ty = result,
+            Type::Captured { ty: inner, .. } | Type::Bounded { ty: inner, .. } => ty = inner,
+            Type::Forall { body, .. } => ty = body,
+            _ => return "pure",
+        }
+    }
+}
+
 impl Checker<'_> {
-    pub(super) fn bridge_dump(&self, decl: &Node, info: &ForeignInfo) {
+    pub(super) fn bridge_dump(&self, decl: &Node, info: &ForeignInfo, body: &Type) {
         if let Ok(path) = std::env::var("FLICK_BRIDGE_DUMP") {
             use std::io::Write;
             let binding = decl.text(self.text).lines().find(|l| l.trim_start().starts_with("foreign")).unwrap_or("").trim().to_owned();
             let line = format!(
-                "{}\t{}\t{:?}\t{:?}\t{:?}\n",
+                "{}\t{}\t{:?}\t{:?}\t{:?}\t{}\n",
                 self.env.module,
                 binding,
                 info.mode,
                 info.adapter.shapes,
                 info.adapter.result_shape,
+                row_class(body),
             );
             if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
                 let _ = f.write_all(line.as_bytes());

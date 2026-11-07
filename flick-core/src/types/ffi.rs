@@ -96,7 +96,7 @@ impl Checker<'_> {
         info.adapter.result_shape = self
             .call_result(&body, arity)
             .map_or(flick_ir::Shape::Data, |r| self.shape(&r, 0));
-        self.bridge_dump(decl, &info);
+        self.bridge_dump(decl, &info, &body);
         let scoped: Vec<String> = binders
             .iter()
             .filter(|b| matches!(b.kind, Kind::Region | Kind::CaptureRow))

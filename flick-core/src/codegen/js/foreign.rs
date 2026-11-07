@@ -23,7 +23,6 @@ impl Gen<'_> {
     pub(super) fn foreign(&mut self, f: &Foreign) -> String {
         let alias = format!("$f_{}", f.name);
         let mut bridged = false;
-        let mut host_effect = false;
         let target = match &f.binding.from {
             Some(module) => {
                 let mut spec = (self.options.foreign)(self.module, module);
@@ -32,8 +31,8 @@ impl Gen<'_> {
                     spec = module.clone();
                     bridged = true;
                 }
-                // spike: a foreign `effect` of the program's own may give an Effect
-                host_effect = self.kernel && !module.starts_with("@flick-lang/runtime");
+                // spike: a foreign `effect` of the program's own gives an Effect
+                bridged |= self.kernel && f.mode == ForeignMode::Effect && !module.starts_with("@flick-lang/runtime");
                 self.runtime |= self.kernel;
                 self.foreign
                     .push((spec, f.binding.name.clone(), alias.clone()));
@@ -73,7 +72,7 @@ impl Gen<'_> {
                 self.from_host(&info.result_shape, value)
             }
             (ForeignMode::Pure, _) | (_, false) => result(self, &call),
-            (ForeignMode::Effect, true) if bridged || host_effect => {
+            (ForeignMode::Effect, true) if bridged => {
                 let made = match catch {
                     Some(c) => format!("{}(() => {}({call}), {c})", self.rt("foreignEffect"), self.rt("fromEffect")),
                     None => format!("{}({call})", self.rt("fromEffect")),

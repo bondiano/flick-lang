@@ -1,0 +1,72 @@
+// The cost of one crossing, in the same loop on both modes.
+module App.Main exposing (main)
+
+now : Unit ->{Async;} Float
+foreign now from "./m.mjs" "now"
+
+e_succeed : Int ->{Async;} Int
+foreign effect e_succeed from "./m.mjs" "eSucceed"
+
+e_sync : Int ->{Async;} Int
+foreign effect e_sync from "./m.mjs" "eSync"
+
+e_two : Int ->{Async;} Int
+foreign effect e_two from "./m.mjs" "eTwoSteps"
+
+e_yield : Int ->{Async;} Int
+foreign effect e_yield from "./m.mjs" "eYield"
+
+drive : (Int ->{Async;} Int) -> Int ->{Async;} Int
+foreign effect drive from "./m.mjs" "drive"
+  arity 2
+
+drive_native : Int ->{Async;} Int
+foreign effect drive_native from "./m.mjs" "driveNative"
+
+own : Int ->{Async;} Int
+let own x = x
+
+suspends : Int ->{Async;} Int
+let suspends x =
+  let y = own x
+  Effect.yield_now ()
+  y + 1
+
+steps : Int ->{Async;} Int
+let steps x =
+  let y = own x
+  own y + 1
+
+/// `f` n times in a Flick loop.
+go : (Int ->{Async;} Int) -> Int -> Int ->{Async;} Int
+let rec go f i acc = if i == 0 then acc else go f (i - 1) (acc + f i)
+
+looped : (Int ->{Async;} Int) -> Int ->{Async;} Int
+let looped f n = go f n 0
+
+timed : String -> Int -> (Unit ->{Async;} Int) ->{Async;} Unit
+let timed label n run =
+  // warm up, then the median of five
+  let _ = run ()
+  let _ = run ()
+  let ts = List.map_effect (fun _ ->
+    let t0 = now ()
+    let _ = run ()
+    (now () - t0) * 1000000 / Int.to_float n
+  ) [1, 2, 3, 4, 5]
+  let sorted = List.sort ts
+  Platform.stdout_line (label ++ "\t" ++ show (Option.with_default 0 (List.get 2 sorted)))
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let big = 1000000
+  let small = 100000
+  timed "kernel_loop_baseline" big (fun () -> looped own big)
+  timed "from_effect_succeed" big (fun () -> looped e_succeed big)
+  timed "from_effect_sync" big (fun () -> looped e_sync big)
+  timed "from_effect_two_steps" big (fun () -> looped e_two big)
+  timed "from_effect_yield" small (fun () -> looped e_yield small)
+  timed "effect_loop_baseline" big (fun () -> drive_native big)
+  timed "callback_plain" big (fun () -> drive (fun x -> x + 1) big)
+  timed "callback_generator" big (fun () -> drive steps big)
+  timed "callback_suspends" small (fun () -> drive suspends small)
