@@ -9,6 +9,7 @@
     { "include": "#strings" },
     { "include": "#numbers" },
     { "include": "#attributes" },
+    { "include": "#effect-row" },
     { "include": "#definitions" },
     { "include": "#keywords" },
     { "include": "#names" },
@@ -98,6 +99,35 @@
       "comment": "`@lang int`: an attribute of the declaration that follows",
       "name": "entity.other.attribute-name.flick",
       "match": "@[a-z_][A-Za-z0-9_]*"
+    },
+    "effect-row": {
+      "begin": "(->)\\s*(\\{)",
+      "beginCaptures": {
+        "1": { "name": "keyword.operator.flick" },
+        "2": { "name": "punctuation.definition.effect-row.begin.flick" }
+      },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.definition.effect-row.end.flick" } },
+      "contentName": "meta.effect-row.needs.flick",
+      "patterns": [
+        {
+          "begin": ";",
+          "beginCaptures": { "0": { "name": "punctuation.separator.flick" } },
+          "end": "(?=\\})",
+          "contentName": "meta.effect-row.fails.flick",
+          "patterns": [{ "include": "#comments" }, { "include": "#row-item" }]
+        },
+        { "include": "#comments" },
+        { "include": "#row-item" }
+      ]
+    },
+    "row-item": {
+      "patterns": [
+        { "include": "#effect-row" },
+        { "begin": "\\{", "end": "\\}", "patterns": [{ "include": "#row-item" }] },
+        { "include": "#names" },
+        { "include": "#operators" }
+      ]
     },
     "definitions": {
       "patterns": [
