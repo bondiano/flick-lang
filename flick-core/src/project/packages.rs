@@ -16,6 +16,7 @@ use super::lock::{LOCK_FILE, Lock};
 use super::store;
 use super::{Host, Project};
 use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::implicit_packages::is_implicit_package;
 use crate::source::SourceMap;
 
 #[derive(Debug, Default)]
@@ -235,8 +236,11 @@ impl Libraries<'_> {
     /// theirs, each once.
     fn add(&mut self, dir: &Path, dependencies: &[Dependency]) {
         let mut found = Vec::new();
-        // `std` is built in: the host hands its modules to the checker
-        for dependency in dependencies.iter().filter(|d| d.name != "std") {
+        // an implicit package is built in: the host hands its modules to the checker
+        for dependency in dependencies
+            .iter()
+            .filter(|d| !is_implicit_package(&d.name))
+        {
             if let Some(library) = self.library(dir, dependency) {
                 found.push(library);
             }
@@ -323,7 +327,7 @@ impl Libraries<'_> {
                 .map(|locked| locked.checksum.clone()),
         };
         let dependencies = (library.dependencies.iter())
-            .filter(|d| d.name != "std")
+            .filter(|d| !is_implicit_package(&d.name))
             .map(|d| d.name.clone())
             .collect();
         out.push(Package {

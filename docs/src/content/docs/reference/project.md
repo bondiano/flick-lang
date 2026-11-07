@@ -149,6 +149,10 @@ std = { git = "https://github.com/bondiano/flick-lang", tag = "std-v0.1.0", subd
 text = { url = "https://example.com/text-1.0.0.tgz", sha256 = "<64 hexadecimal digits>" }
 ```
 
+A project sees the implicit packages, `std` today, without naming them:
+`flick install` fetches each of this compiler's release, and an entry of that
+name in `[dependencies]` picks another source for it, as the `std` above does.
+
 The library's directory holds a `flick.toml` of `kind = "lib"`; its
 `source-dir` is where the modules are, and its own dependencies come along.
 A library others fetch says what it is and which compilers build it, the

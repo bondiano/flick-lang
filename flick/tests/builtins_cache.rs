@@ -65,6 +65,26 @@ fn a_changed_std_is_checked_again() {
     fs::write(&markdown, text).expect("write");
     let after = check(&app, &std, &cache);
     assert!(after.status.success(), "{after:?}");
+    // the tables of Go bindings decide a build for go as the modules do
+    let keyed = key(&app, &std, &cache);
+    let table = std.join("src/go/globals.txt");
+    let text = fs::read_to_string(&table).expect("a table");
+    fs::write(&table, format!("{text}\n# a change\n")).expect("write");
+    assert_ne!(key(&app, &std, &cache), keyed);
+}
+
+/// The key of a build of the project in `dir`.
+fn key(dir: &Path, std: &Path, cache: &Path) -> String {
+    let out = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args(["build", "src/App/Main.fl", "--inputs"])
+        .current_dir(dir)
+        .env("FLICK_STD_PATH", std)
+        .env("XDG_CACHE_HOME", cache)
+        .output()
+        .expect("flick runs");
+    assert!(out.status.success(), "{out:?}");
+    let inputs: serde_json::Value = serde_json::from_slice(&out.stdout).expect("JSON");
+    inputs["key"].as_str().expect("a key").to_owned()
 }
 
 #[test]

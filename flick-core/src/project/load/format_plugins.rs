@@ -63,12 +63,12 @@ impl<'h> FormatPlugins<'h> {
         out
     }
 
-    /// The package `module` belongs to: `std` for its modules, else the
-    /// package whose source directory has its file.
+    /// The package `module` belongs to: an implicit one for its modules, else
+    /// the package whose source directory has its file.
     #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
     fn package_of(&self, module: &str) -> Option<String> {
-        if types::is_std_module(module) {
-            return Some("std".to_owned());
+        if let Some(package) = types::implicit_package_of(module) {
+            return Some(package.to_owned());
         }
         #[cfg(feature = "native-project")]
         {

@@ -42,7 +42,7 @@ impl Saved {
         Some(Saved {
             dir: store::cache_dir()?.join("packages"),
             binary: format!("{PREFIX}{fingerprint}-"),
-            salt: format!("{fingerprint} {}", builtins::std_hash()),
+            salt: format!("{fingerprint} {}", builtins::implicit_hash()),
         })
     }
 

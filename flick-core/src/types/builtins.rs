@@ -1,9 +1,9 @@
 //! Built-in modules, written in Flick and checked by this checker: `Prelude`
 //! (the built-in types every module sees) and small modules a program may
 //! qualify without an import (`Ref.make`, `String.trim`, `Layer.succeed`, …).
-//! The core modules are part of the compiler; the modules of `std` come from
-//! the `std` package the host hands over with [`set_std`] before any
-//! module is checked.
+//! The core modules are part of the compiler; the others come from the
+//! implicit packages the host hands over with [`set_implicit_packages`]
+//! before any module is checked.
 
 #[cfg(feature = "native-project")]
 use std::env;
@@ -21,24 +21,41 @@ use super::builtin_sources::CORE;
 use super::env::Builtins;
 use crate::clock::timed;
 use crate::iface::Interface;
+#[cfg(feature = "native-project")]
+use crate::implicit_packages::IMPLICIT_PACKAGES;
 use crate::plugin::derive::builtin_expansion;
+#[cfg(feature = "native-project")]
+use crate::project::{CONFIG_FILE, config};
 use crate::resolve::{self, Module};
+#[cfg(feature = "native-project")]
+use crate::source::FileId;
 use crate::source::SourceMap;
 use crate::syntax;
 
-/// The files of the `std` package, as `(name, text)`.
+/// The files of a package, as `(name, text)`.
 type Files = &'static [(&'static str, &'static str)];
 
-/// What the compiler reads of the `std` package: its modules, in the order of
-/// its `src/modules.txt`, and the tables of `src/go/` that bind its foreign
-/// declarations on the go target.
+/// What the compiler reads of an implicit package: its modules, in the order
+/// of its `src/modules.txt`, the tables of `src/go/` that bind its foreign
+/// declarations on the go target, and the `[js.dependencies]` of its manifest
+/// as `(name, version)`.
 #[derive(Debug, Default)]
-pub struct StdPackage {
+pub struct ImplicitPackage {
+    pub name: String,
     pub modules: Vec<(String, String)>,
     pub go_bindings: Vec<(String, String)>,
+    pub js_dependencies: Vec<(String, String)>,
 }
 
-static STD: OnceLock<(Files, Files)> = OnceLock::new();
+/// An implicit package this run uses.
+struct Implicit {
+    name: &'static str,
+    modules: Files,
+    go_bindings: Files,
+    js_dependencies: Files,
+}
+
+static IMPLICIT: OnceLock<Vec<Implicit>> = OnceLock::new();
 
 fn leak(files: Vec<(String, String)>) -> Files {
     let leaked: Vec<(&'static str, &'static str)> = files
@@ -48,51 +65,95 @@ fn leak(files: Vec<(String, String)>) -> Files {
     leaked.leak()
 }
 
-/// Uses `package` as `std`; false once it is set.
-pub fn set_std(package: StdPackage) -> bool {
-    STD.set((leak(package.modules), leak(package.go_bindings)))
-        .is_ok()
+fn leak_all(packages: Vec<ImplicitPackage>) -> Vec<Implicit> {
+    packages
+        .into_iter()
+        .map(|package| Implicit {
+            name: package.name.leak(),
+            modules: leak(package.modules),
+            go_bindings: leak(package.go_bindings),
+            js_dependencies: leak(package.js_dependencies),
+        })
+        .collect()
 }
 
-/// Whether the modules of `std` are known: set, built in or found at
-/// `FLICK_STD_PATH`.
-pub fn has_std() -> bool {
-    !std_files().0.is_empty()
+/// Uses `packages` as the implicit ones, in that order; false once they are
+/// set.
+pub fn set_implicit_packages(packages: Vec<ImplicitPackage>) -> bool {
+    IMPLICIT.set(leak_all(packages)).is_ok()
 }
 
-/// Whether `module` is a module of `std`.
-pub fn is_std_module(module: &str) -> bool {
-    std_files().0.iter().any(|(name, _)| *name == module)
+/// Whether the modules of the implicit packages are known: set, built in or
+/// found at `FLICK_STD_PATH`.
+pub fn has_implicit_packages() -> bool {
+    !implicit().is_empty()
 }
 
-/// The tables that bind the foreign declarations of `std` on the go target.
-pub fn std_go_bindings() -> Files {
-    std_files().1
+/// The implicit package `module` belongs to.
+pub fn implicit_package_of(module: &str) -> Option<&'static str> {
+    (implicit().iter())
+        .find(|package| package.modules.iter().any(|(name, _)| *name == module))
+        .map(|package| package.name)
 }
 
-/// The files of `std`: those set, else those of the package at
-/// `FLICK_STD_PATH`, else the ones built in, else none. The variable comes
-/// before what is built in: a workspace build unifies the playground's
-/// `embedded-std` into every binary.
-fn std_files() -> (Files, Files) {
-    *STD.get_or_init(|| {
-        #[cfg(feature = "native-project")]
-        if let Some(package) = env::var_os("FLICK_STD_PATH")
-            .filter(|dir| !dir.is_empty())
-            .and_then(|dir| read_std(Path::new(&dir)).ok())
-        {
-            return (leak(package.modules), leak(package.go_bindings));
-        }
-        #[cfg(feature = "embedded-std")]
-        return (super::builtin_sources::STD, super::builtin_sources::STD_GO);
-        #[allow(unreachable_code, reason = "a host without a project hands std over")]
-        (&[], &[])
+/// The tables that bind the foreign declarations of the implicit packages on
+/// the go target.
+pub fn implicit_go_bindings() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
+    implicit().iter().flat_map(|package| package.go_bindings)
+}
+
+/// The npm packages each implicit package names, with its name.
+pub fn implicit_js_dependencies() -> impl Iterator<Item = (&'static str, &'static str, &'static str)>
+{
+    implicit().iter().flat_map(|package| {
+        (package.js_dependencies.iter()).map(|(name, version)| (package.name, *name, *version))
     })
 }
 
-/// The `std` package in `dir`.
+/// The implicit packages: those set, else those at `FLICK_STD_PATH`, else the
+/// ones built in, else none. The variable comes before what is built in: a
+/// workspace build unifies the playground's `embedded-std` into every binary.
+fn implicit() -> &'static [Implicit] {
+    IMPLICIT.get_or_init(|| {
+        #[cfg(feature = "native-project")]
+        if let Some(packages) = env::var_os("FLICK_STD_PATH")
+            .filter(|dir| !dir.is_empty())
+            .and_then(|dir| read_implicit(Path::new(&dir)).ok())
+        {
+            return leak_all(packages);
+        }
+        #[cfg(feature = "embedded-std")]
+        return (super::builtin_sources::IMPLICIT.iter())
+            .map(|&(name, modules, go_bindings)| Implicit {
+                name,
+                modules,
+                go_bindings,
+                js_dependencies: &[],
+            })
+            .collect();
+        #[allow(unreachable_code, reason = "a host without a project hands them over")]
+        Vec::new()
+    })
+}
+
+/// Each implicit package, the first in the directory `first` and the others
+/// beside it.
 #[cfg(feature = "native-project")]
-pub fn read_std(dir: &Path) -> io::Result<StdPackage> {
+fn read_implicit(first: &Path) -> io::Result<Vec<ImplicitPackage>> {
+    (IMPLICIT_PACKAGES.iter().enumerate())
+        .map(|(i, name)| {
+            if i == 0 {
+                return read_package(name, first);
+            }
+            let parent = first.parent().unwrap_or(first);
+            read_package(name, &parent.join(name))
+        })
+        .collect()
+}
+
+/// The implicit package `name` in `dir`.
+#[cfg(feature = "native-project")]
+pub fn read_package(name: &str, dir: &Path) -> io::Result<ImplicitPackage> {
     let sources = dir.join("src");
     let order = fs::read_to_string(sources.join("modules.txt"))?;
     let modules = order
@@ -109,23 +170,43 @@ pub fn read_std(dir: &Path) -> io::Result<StdPackage> {
         for entry in entries {
             let path = entry?.path();
             if path.extension().is_some_and(|e| e == "txt") {
-                let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
-                go_bindings.push((name.unwrap_or_default(), fs::read_to_string(&path)?));
+                let file = path.file_name().map(|n| n.to_string_lossy().into_owned());
+                go_bindings.push((file.unwrap_or_default(), fs::read_to_string(&path)?));
             }
         }
     }
     go_bindings.sort();
-    Ok(StdPackage {
+    Ok(ImplicitPackage {
+        name: name.to_owned(),
         modules,
         go_bindings,
+        js_dependencies: manifest_js_dependencies(dir),
     })
 }
 
+/// The `[js.dependencies]` of the manifest in `dir`. A manifest that does not
+/// parse names none: its own build reports it.
+#[cfg(feature = "native-project")]
+fn manifest_js_dependencies(dir: &Path) -> Vec<(String, String)> {
+    let Ok(text) = fs::read_to_string(dir.join(CONFIG_FILE)) else {
+        return Vec::new();
+    };
+    let Ok(config) = config::parse(&text, FileId::default()) else {
+        return Vec::new();
+    };
+    (config.js_dependencies.into_iter())
+        .map(|d| (d.name, d.version))
+        .collect()
+}
+
 /// Names and sources of the built-in modules, in dependency order: the
-/// core modules, then those of `std`.
+/// core modules, then those of each implicit package.
 pub fn builtin_sources() -> &'static [(&'static str, &'static str)] {
     static ALL: OnceLock<Vec<(&str, &str)>> = OnceLock::new();
-    ALL.get_or_init(|| CORE.iter().chain(std_files().0).copied().collect())
+    ALL.get_or_init(|| {
+        let implicit = implicit().iter().flat_map(|package| package.modules);
+        CORE.iter().chain(implicit).copied().collect()
+    })
 }
 
 static BUILTINS: OnceLock<Vec<Interface>> = OnceLock::new();

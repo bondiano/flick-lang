@@ -35,12 +35,13 @@ pub const BARE: [&str; 1] = ["server"];
 pub const DECLARATIONS: [(&str, &str); 3] =
     [("server", "fn"), ("sql", "table"), ("sql", "migration")];
 
+/// The package whose plugin is linked into the compiler. An implicit package
+/// without a plugin of its own needs no entry here.
+pub const PACKAGE: &str = "std";
+
 /// The plugin linked into the compiler for `package`.
 pub fn plugin(package: &str) -> Option<Arc<dyn Expander>> {
-    match package {
-        "std" => Some(Arc::new(Native::new("std", Std))),
-        _ => None,
-    }
+    (package == PACKAGE).then(|| Arc::new(Native::new(PACKAGE, Std)) as Arc<dyn Expander>)
 }
 
 /// The plugin of std: `cli` blocks and `deriving Cli.Value`, `server fn`,

@@ -27,6 +27,10 @@ mod syntax {
 }
 #[path = "src/builtin_source.rs"]
 mod builtin_source;
+#[path = "src/implicit_packages.rs"]
+mod implicit_packages;
+
+use implicit_packages::IMPLICIT_PACKAGES;
 
 fn main() -> io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
@@ -35,26 +39,42 @@ fn main() -> io::Result<()> {
     go_packages(&output)?;
     let docs = cfg!(feature = "builtin-docs");
     if !docs {
-        for package in ["core", "std"] {
+        for package in ["core"].iter().chain(IMPLICIT_PACKAGES) {
             let sources = Path::new("../packages").join(package).join("src");
             strip_tree(&sources, &output.join(package))?;
         }
     }
-    std_sources(&output, docs)?;
-    std_go_bindings(&output)
+    implicit_sources(&output, docs)
 }
 
-/// `std_go.rs`: `STD_GO`, the tables of `packages/std/src/go`, by file name.
-fn std_go_bindings(output: &Path) -> io::Result<()> {
+/// `implicit_sources.rs`: `IMPLICIT`, each implicit package with its modules
+/// and the tables of its `src/go`.
+fn implicit_sources(output: &Path, docs: bool) -> io::Result<()> {
+    let mut out = String::from("pub(super) const IMPLICIT: &[Embedded] = &[\n");
+    for package in IMPLICIT_PACKAGES {
+        let modules = package_modules(package, output, docs)?;
+        let go = package_go_tables(package)?;
+        let _ = writeln!(out, "    ({package:?}, &[\n{modules}    ], &[\n{go}    ]),");
+    }
+    out.push_str("];\n");
+    fs::write(output.join("implicit_sources.rs"), out)
+}
+
+/// The tables of `packages/<package>/src/go`, by file name, as array items; a
+/// package without them has none.
+fn package_go_tables(package: &str) -> io::Result<String> {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("Cargo supplies it"));
-    let dir = manifest.join("../packages/std/src/go");
+    let dir = manifest.join("../packages").join(package).join("src/go");
     println!("cargo:rerun-if-changed={}", dir.display());
+    let mut out = String::new();
+    if !dir.is_dir() {
+        return Ok(out);
+    }
     let mut files: Vec<PathBuf> = fs::read_dir(&dir)?
         .map(|e| e.map(|e| e.path()))
         .collect::<io::Result<_>>()?;
     files.retain(|p| p.extension().is_some_and(|e| e == "txt"));
     files.sort();
-    let mut out = String::from("pub(super) const STD_GO: &[(&str, &str)] = &[\n");
     for path in files {
         println!("cargo:rerun-if-changed={}", path.display());
         let name = path
@@ -64,22 +84,21 @@ fn std_go_bindings(output: &Path) -> io::Result<()> {
             .into_owned();
         let _ = writeln!(
             out,
-            "    ({name:?}, include_str!({:?})),",
+            "        ({name:?}, include_str!({:?})),",
             path.display().to_string()
         );
     }
-    out.push_str("];\n");
-    fs::write(output.join("std_go.rs"), out)
+    Ok(out)
 }
 
-/// `std_sources.rs`: `STD`, the modules of `packages/std` in the order of its
-/// `modules.txt`, each its file as written, or without its docs.
-fn std_sources(output: &Path, docs: bool) -> io::Result<()> {
+/// The modules of `packages/<package>` in the order of its `modules.txt`, each
+/// its file as written, or without its docs, as array items.
+fn package_modules(package: &str, output: &Path, docs: bool) -> io::Result<String> {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("Cargo supplies it"));
-    let sources = manifest.join("../packages/std/src");
+    let sources = manifest.join("../packages").join(package).join("src");
     let order = sources.join("modules.txt");
     println!("cargo:rerun-if-changed={}", order.display());
-    let mut out = String::from("pub(super) const STD: &[(&str, &str)] = &[\n");
+    let mut out = String::new();
     for module in fs::read_to_string(&order)?
         .lines()
         .map(str::trim)
@@ -89,16 +108,15 @@ fn std_sources(output: &Path, docs: bool) -> io::Result<()> {
         let path = if docs {
             sources.join(&file)
         } else {
-            output.join("std").join(&file)
+            output.join(package).join(&file)
         };
         let _ = writeln!(
             out,
-            "    ({module:?}, include_str!({:?})),",
+            "        ({module:?}, include_str!({:?})),",
             path.display().to_string()
         );
     }
-    out.push_str("];\n");
-    fs::write(output.join("std_sources.rs"), out)
+    Ok(out)
 }
 
 /// `go_runtime.rs`: the files of the go target's runtime, the package

@@ -16,6 +16,11 @@ break programs.
   packages; the import in the module is `./x.mjs` instead of a path to the
   library's sources. On go, its `x.go` is named by the package instead of by its
   absolute path. A file that cannot ship is `FLICK-P041`.
+- **Implicit packages:** the packages every program sees without depending on
+  them are a list, of one member `std` for now: a second is an entry and a
+  directory `packages/<name>` beside it, with its own `modules.txt`, and
+  `FLICK_STD_PATH` finds it next to `std`. Their go binding tables are now part
+  of the build's key.
 - **`Scope.run`:** `scope s { body }` stands for `Scope.run (fun s -> body)`, and
   `Scope.run` takes a function polymorphic in the region, also as a value. The
   IR has no `Scope` node; its version is 0.4.0.

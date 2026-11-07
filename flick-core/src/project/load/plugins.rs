@@ -223,10 +223,11 @@ impl Loader<'_> {
             // a module of a package may come from the package cache
             let saved = self.precompiled.package_of(module);
             let root = self.by_name.get(module).map(|&j| &self.modules[j].root);
+            let implicit = types::implicit_package_of(module);
             let package = match (root, saved) {
                 (Some(Root::Package(name)), _) => name.clone(),
                 (None, Some(name)) => name.to_owned(),
-                (None, None) if types::is_std_module(module) => "std".to_owned(),
+                (None, None) if implicit.is_some() => implicit.unwrap_or_default().to_owned(),
                 (Some(_), _) => {
                     diagnostics.extend(refuse(format!(
                         "`{module}` is a module of this project: only a package provides a plugin"

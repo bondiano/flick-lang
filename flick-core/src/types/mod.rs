@@ -81,10 +81,11 @@ use builtins::builtin_env;
 #[cfg(test)]
 pub(crate) use builtins::check_sources;
 #[cfg(feature = "native-project")]
-pub use builtins::read_std;
+pub use builtins::read_package;
 pub use builtins::{
-    StdPackage, builtin_sources, builtins, check_each, has_std, install_builtins, is_std_module,
-    set_std, std_go_bindings,
+    ImplicitPackage, builtin_sources, builtins, check_each, has_implicit_packages,
+    implicit_go_bindings, implicit_js_dependencies, implicit_package_of, install_builtins,
+    set_implicit_packages,
 };
 pub use class_members::class_defaults;
 pub use classes::{Dict, Match, STRUCTURAL, match_type, which};

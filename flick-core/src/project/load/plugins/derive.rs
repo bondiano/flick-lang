@@ -134,8 +134,9 @@ impl Loader<'_> {
         match self.by_name.get(module).map(|&j| &self.modules[j].root) {
             Some(Root::Package(name)) => Some(name.clone()),
             Some(_) => None,
-            None if types::is_std_module(module) => Some("std".to_owned()),
-            None => self.precompiled.package_of(module).map(str::to_owned),
+            None => types::implicit_package_of(module)
+                .or_else(|| self.precompiled.package_of(module))
+                .map(str::to_owned),
         }
     }
 
