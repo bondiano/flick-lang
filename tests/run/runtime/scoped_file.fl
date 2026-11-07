@@ -23,7 +23,6 @@ let path () =
 
 /// Reads the file in a scope that says when it closes, then ends by `finish`.
 reading :
-  forall e.
   String ->
   (String ->{Async, File.FileSystem; e} String) ->{Async, File.FileSystem; e + {File.OpenError, File.ReadError}}
   String

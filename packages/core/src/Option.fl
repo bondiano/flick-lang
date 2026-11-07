@@ -36,7 +36,7 @@ module Option exposing (
 )
 
 /// `Some (f x)` for `Some x`.
-map : forall c d a b. (forall v. a^v -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c
+map : (forall v. a^v -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c
 let map f value =
   match value with
   | None -> None
@@ -44,7 +44,7 @@ let map f value =
 
 @lang option_bind
 /// `f x` for `Some x`.
-bind : forall c a b. (a -> Option b)^c -> (Option a -> Option b)^c
+bind : (a -> Option b)^c -> (Option a -> Option b)^c
 let bind f value =
   match value with
   | None -> None

@@ -2,7 +2,10 @@ module App.Sugar exposing (..)
 
 // A binding only returned is the bound computation.
 firsts : Option Float -> Option Float
-let firsts o = do { x <- o; pure x }
+let firsts o = do {
+  x <- o
+  pure x
+}
 
 // A whole infinite sequence never ends.
 all_naturals : List Int
@@ -18,20 +21,19 @@ let piped xs = xs |> List.filter (fun x -> x > 1) |> List.map (fun x -> x * 10)
 
 // `do` over `Eff` is a `task` with direct calls.
 both : Eff none none Float
-let both =
-  do {
-    x <- pure 40
-    y <- pure 2
-    pure (x + y)
-  }
+let both = do {
+  x <- pure 40
+  y <- pure 2
+  pure (x + y)
+}
 
 // Nested binds are one `do`.
 chained : Option Float -> Option Float -> Option Float
 let chained a b = Option.bind (fun x -> Option.bind (fun y -> Some (x + y)) b) a
 
-//~ FLICK-T030 @5:21-5:27 binding a value only to return it: the bound computation is the same
-//~ FLICK-T031 @9:20-9:73 this sequence never ends, so `Seq.to_list` never returns: take a part
-//~ FLICK-T032 @13:17-13:58 `Seq.to_list` of a `for`: `[for …]` builds the list without a generato
-//~ FLICK-T033 @17:16-17:80 `List.filter` then `List.map` walk the list twice: `[for …]` does both
-//~ FLICK-T029 @22:3-22:5 `do` over `Eff`: a `task` with direct calls builds the same computatio
-//~ FLICK-T035 @30:19-30:81 a chain of `flat_map`: `do` binds each value in turn
+//~ FLICK-T030 @6:3-6:9 binding a value only to return it: the bound computation is the same
+//~ FLICK-T031 @12:20-12:73 this sequence never ends, so `Seq.to_list` never returns: take a part
+//~ FLICK-T032 @16:17-16:58 `Seq.to_list` of a `for`: `[for …]` builds the list without a generato
+//~ FLICK-T033 @20:16-20:80 `List.filter` then `List.map` walk the list twice: `[for …]` does both
+//~ FLICK-T029 @24:12-24:14 `do` over `Eff`: a `task` with direct calls builds the same computatio
+//~ FLICK-T035 @32:19-32:81 a chain of `flat_map`: `do` binds each value in turn

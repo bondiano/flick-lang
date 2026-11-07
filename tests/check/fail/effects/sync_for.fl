@@ -8,7 +8,10 @@ service Log =
 
 // a runtime call may suspend, so it does not run at a step of a sequence
 logged : Unit ->{Atom.Read, Log;} Seq Float
-let logged () = for { n <- [1, 2]; if Log.keep n } yield n
+let logged () = for {
+  n <- [1, 2]
+  if Log.keep n
+} yield n
 
 // a pure function has no reader to lend
 pure_reads : Unit -> Seq Float
@@ -28,9 +31,9 @@ let scoped () = for n <- [1] yield scope { n }
 provided : Unit ->{Atom.Read;} Seq Float
 let provided () = for n <- [1] yield provide Layer.empty { n }
 
-//~ FLICK-E001 @11:39-11:49 only Sync calls
-//~ FLICK-E001 @15:51-15:67 outside this function
-//~ FLICK-E002 @19:18-19:60 does not allow service `Read`
-//~ FLICK-E001 @23:37-23:53 only Sync calls
-//~ FLICK-E001 @26:36-26:41 only Sync calls
-//~ FLICK-E001 @29:38-29:45 only Sync calls
+//~ FLICK-E001 @13:6-13:16 only Sync calls
+//~ FLICK-E001 @18:51-18:67 outside this function
+//~ FLICK-E002 @22:18-22:60 does not allow service `Read`
+//~ FLICK-E001 @26:37-26:53 only Sync calls
+//~ FLICK-E001 @29:36-29:41 only Sync calls
+//~ FLICK-E001 @32:38-32:45 only Sync calls

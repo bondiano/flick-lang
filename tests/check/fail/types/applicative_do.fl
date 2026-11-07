@@ -5,7 +5,10 @@ let lookup n = Some n
 
 // the bindings of a group run independently: `x` is not in scope beside it
 dependent : Option Float -> Option Float
-let dependent a = do { x <- a and y <- lookup x; pure (x + y) }
+let dependent a = do {
+  x <- a and y <- lookup x
+  pure (x + y)
+}
 
 // a group cannot end the block
 ending : Option Float -> Option Float
@@ -13,13 +16,19 @@ let ending a = do { x <- a and y <- a }
 
 // each operand is a container, the first as the others
 scalar : Option Float
-let scalar = do { x <- 1 and y <- Some 2; pure (x + y) }
+let scalar = do {
+  x <- 1 and y <- Some 2
+  pure (x + y)
+}
 
-//~ FLICK-T001 @8:47-8:48 `x` is bound by another binding of this `and` group
-//~ FLICK-T019 @12:21-12:38 must end with an expression
-//~ FLICK-T003 @16:24-16:25 expected `Option _`, found `Int`
+//~ FLICK-T001 @9:26-9:27 `x` is bound by another binding of this `and` group
+//~ FLICK-T019 @15:21-15:38 must end with an expression
+//~ FLICK-T003 @20:8-20:9 expected `Option _`, found `Int`
 
 // the monadic tail after an `and` group must still match the block's type
 wrong_tail : Option Float
-let wrong_tail = do { _ <- Some 1 and _ <- Some 2; Some "wrong" }
-//~ FLICK-T003 @24:52-24:64 expected `Option Float`, found `Option String`
+let wrong_tail = do {
+  _ <- Some 1 and _ <- Some 2
+  Some "wrong"
+}
+//~ FLICK-T003 @32:3-32:15 expected `Option Float`, found `Option String`

@@ -27,7 +27,7 @@ let use_logged_none () =
   let empty = logged_none ()
   (empty, empty)
 
-shared : forall a. Ref (Option a)
+shared : Ref (Option a)
 let shared = Ref.make None
 
 annotated : Unit ->{} Unit

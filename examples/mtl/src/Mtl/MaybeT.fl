@@ -19,11 +19,11 @@ import Mtl.Classes exposing (
 type MaybeT (m : Type -> Type) a = MaybeT (m (Option a))
 
 /// Remove this layer to expose the inner `m (Option a)` action.
-run : forall c m a. (MaybeT m a)^c -> (m (Option a))^c
+run : (MaybeT m a)^c -> (m (Option a))^c
 let run (MaybeT action) = action
 
 /// Embed an option: `None` stops the outer workflow, while `Some` continues it.
-from_option : forall c m a. Applicative m => (Option a)^c -> (MaybeT m a)^c
+from_option : Applicative m => (Option a)^c -> (MaybeT m a)^c
 let from_option value = MaybeT (pure value)
 
 instance Functor m => Functor (MaybeT m) =

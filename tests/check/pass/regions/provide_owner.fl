@@ -28,7 +28,7 @@ let from_caller () = scope s {
 }
 
 // the caller settles the obligation the signature names
-given : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
+given : Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
 let given owner = ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "child") }))
 
 uses_given : Unit ->{} Unit

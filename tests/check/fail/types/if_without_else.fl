@@ -1,10 +1,7 @@
 module App.IfWithoutElse exposing (..)
 
 say : Bool ->{a; b} Unit
-let say c =
-  if c then
-    Console.log "yes"
-  else ()
+let say c = if c then Console.log "yes" else ()
 
 chain : Bool ->{a; b} Unit
 let chain c = if c then Console.log "a" else if not c then Console.log "b" else ()
@@ -13,7 +10,8 @@ kept : Bool -> Unit
 let kept c =
   if c then
     () // the comment stays
-  else ()
+  else
+    ()
 
 quiet : Bool ->{a; b} Unit
 let quiet c = if c then Console.log "c"
@@ -24,7 +22,7 @@ let value c = if c then 1
 discarded : Bool -> Unit
 let discarded c = if c then 2
 
-//~ FLICK-T028 @7:3-7:10 `else ()` can be left out: an `if` without `else` is `Unit`
-//~ FLICK-T028 @10:76-10:83 `else ()` can be left out: an `if` without `else` is `Unit`
-//~ FLICK-T003 @22:15-22:26 expected `Float`, found `Unit`
-//~ FLICK-T003 @25:29-25:30 expected `Unit`, found `Int`
+//~ FLICK-T028 @7:76-7:83 `else ()` can be left out: an `if` without `else` is `Unit`
+//~ FLICK-T028 @4:41-4:48 `else ()` can be left out: an `if` without `else` is `Unit`
+//~ FLICK-T003 @20:15-20:26 expected `Float`, found `Unit`
+//~ FLICK-T003 @23:29-23:30 expected `Unit`, found `Int`

@@ -12,7 +12,6 @@ type alias Stack (m : Type -> Type) a =
   ExceptT String (WriterT (List String) (StateT Float (ReaderT Float m))) a
 
 workflow :
-  forall m.
   (MonadState m Float, MonadReader m Float, MonadWriter m (List String), MonadError m String) =>
   Float -> m Float
 let workflow input = do {
@@ -30,7 +29,7 @@ let workflow input = do {
     }
 }
 
-lift_base : forall c m a. Monad m => (m a)^c -> (Stack m a)^c
+lift_base : Monad m => (m a)^c -> (Stack m a)^c
 let lift_base action =
   reading : (ReaderT Float m a)^c
   let reading = lift action
@@ -40,7 +39,7 @@ let lift_base action =
   let writing = lift changing
   lift writing
 
-run : forall c m a. Float -> Float -> (Stack m a)^c -> (m ((Result String a, List String), Float))^c
+run : Float -> Float -> (Stack m a)^c -> (m ((Result String a, List String), Float))^c
 let run environment initial action =
   ReaderT.run (StateT.run (WriterT.run (ExceptT.run action)) initial) environment
 

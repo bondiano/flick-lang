@@ -15,7 +15,7 @@ let nap millis =
   | Ok d -> Effect.sleep d
   | Err _ -> ()
 
-acquire : forall s. String ->{Scope s;} String
+acquire : String ->{Scope s;} String
 let acquire name =
   Resource.acquire_release
     (task {

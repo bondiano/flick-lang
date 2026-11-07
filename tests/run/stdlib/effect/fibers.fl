@@ -36,7 +36,7 @@ let after d value = task {
 }
 
 /// How joining ends.
-joined_by : forall c. (Eff {Async} {Boom} Unit)^c ->{Async;} String
+joined_by : (Eff {Async} {Boom} Unit)^c ->{Async;} String
 let joined_by t =
   try
     await t

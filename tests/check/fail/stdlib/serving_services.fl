@@ -13,27 +13,29 @@ let total = Rpc.make (Record.label : Record.Label "total")
 
 http : Unit ->{Async; HttpApi.ServeError} Unit
 let http () =
-  let options : HttpApi.ServeOptions =
-    { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
+  let options : HttpApi.ServeOptions = {
+    host = "127.0.0.1";
+    port = 0;
+    openapi = None;
+    swagger = None;
+    scalar = None;
+  }
   let api =
     HttpApi.api "app"
-      |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "app") |> HttpApi.add ping)
+    |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "app") |> HttpApi.add ping)
   scope s {
-    let _server =
-      HttpApi.listen options api { app = { ping = fun _ -> ignore (Users.count ()) } }
+    let _server = HttpApi.listen options api { app = { ping = fun _ -> ignore (Users.count ()) } }
     ()
   }
 
 rpc : Unit ->{Async; Rpc.ServeError} Unit
-let rpc () =
-  scope s {
-    let _server =
-      Rpc.listen
-        Rpc.defaults
-        (Rpc.group |> Rpc.add total)
-        { total = fun () -> ignore (Users.count ()) }
-    ()
-  }
+let rpc () = scope s {
+  let _server =
+    Rpc.listen Rpc.defaults (Rpc.group |> Rpc.add total) {
+      total = fun () -> ignore (Users.count ());
+    }
+  ()
+}
 
-//~ FLICK-E002 @21:3-21:8 does not allow service `Users`
-//~ FLICK-C001 @33:23-33:30 does not hold
+//~ FLICK-E002 @26:3-26:8 does not allow service `Users`
+//~ FLICK-C001 @34:43-34:50 does not hold

@@ -2,7 +2,7 @@ module App.Main exposing (eval, as_int)
 
 import App.Expr exposing (Expr(..))
 
-eval : forall a. Expr a -> a
+eval : Expr a -> a
 let eval e =
   match e with
   | IntLit n -> n

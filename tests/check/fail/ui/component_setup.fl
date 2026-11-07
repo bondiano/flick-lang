@@ -10,11 +10,10 @@ let top = Atom.local 0
 helper : Float ->{} Atom.Writable Float
 let helper n = Atom.local n
 
-component plain (n : Float) =
-  ui {
-    let again = Atom.local n
-    text (show (Atom.value again))
-  }
+component plain (n : Float) = ui {
+  let again = Atom.local n
+  text (show (Atom.value again))
+}
 
 component counter (start : Float) =
   let count = Atom.local start
@@ -23,11 +22,10 @@ component counter (start : Float) =
     text (show (Atom.value count + Atom.value other))
   }
 
-component ticking (n : Float) =
-  ui {
-    let _started = Ui.on_mount (task { Platform.stdout_line "tick" })
-    text (show n)
-  }
+component ticking (n : Float) = ui {
+  let _started = Ui.on_mount (task { Platform.stdout_line "tick" })
+  text (show n)
+}
 
 component once (start : Float) =
   let count = Atom.local start
@@ -38,14 +36,16 @@ component once (start : Float) =
 component grabbing () =
   let field : (Ui.Element Ui.Input)^c = Ui.element ()
   ui {
-    let _focused = try Ui.focus field with | Ui.Detached -> ()
+    let _focused =
+      try Ui.focus field with
+      | Ui.Detached -> ()
     text "grab"
   }
 
 //~ FLICK-E001 @8:11-8:23 module initialization is pure
 //~ FLICK-E002 @11:16-11:28 does not allow service `Setup _`
-//~ FLICK-U004 @15:17-15:29 before a component's last expression
-//~ FLICK-U006 @22:17-22:26 while rendering makes another one
-//~ FLICK-U004 @28:20-28:70 service `Setup _` is not allowed here
-//~ FLICK-E002 @34:15-34:31 a component's setup runs once per instance
-//~ FLICK-U004 @41:24-41:38 reach the DOM in a task
+//~ FLICK-U004 @14:15-14:27 before a component's last expression
+//~ FLICK-U006 @21:17-21:26 while rendering makes another one
+//~ FLICK-U004 @26:18-26:68 service `Setup _` is not allowed here
+//~ FLICK-E002 @32:15-32:31 a component's setup runs once per instance
+//~ FLICK-U004 @40:11-40:25 reach the DOM in a task

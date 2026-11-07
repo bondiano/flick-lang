@@ -10,19 +10,19 @@ type ReaderT r (m : Type -> Type) a = ReaderT (r -> m a)
 
 type Callback = Callback (Unit -> Float)
 
-identity : forall c a. (Identity a)^c -> a^c
+identity : (Identity a)^c -> a^c
 let identity (Identity value) = value
 
-maybe : forall c m a. (MaybeT m a)^c -> (m (Option a))^c
+maybe : (MaybeT m a)^c -> (m (Option a))^c
 let maybe (MaybeT action) = action
 
-state : forall c d s m a. (StateT s m a)^c -> (s^d -> (m (a, s))^(c + d))^c
+state : (StateT s m a)^c -> (s^d -> (m (a, s))^(c + d))^c
 let state (StateT step) value = step value
 
-reader : forall c d r m a. (ReaderT r m a)^c -> (r^d -> (m a)^(c + d))^c
+reader : (ReaderT r m a)^c -> (r^d -> (m a)^(c + d))^c
 let reader (ReaderT read) environment = read environment
 
-zero : forall a. a^{} -> a^{}
+zero : a^{} -> a^{}
 let zero value = value
 
 instance Functor Identity =
@@ -134,7 +134,6 @@ instance Monad m => Monad (ReaderT r m) =
     })
 
 partial :
-  forall c d a b x.
   (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
   (Identity a)^d ->
   ((Identity b)^d -> (Identity x)^(c + d))^(c + d)
@@ -146,8 +145,8 @@ let stack = do {
   pure (value + 1)
 }
 
-capture_field : forall c. (Unit -> Float)^c -> Callback^c
+capture_field : (Unit -> Float)^c -> Callback^c
 let capture_field callback = Callback callback
 
-capture_reader : forall c. (Unit -> Float)^c -> (ReaderT Unit Identity Float)^c
+capture_reader : (Unit -> Float)^c -> (ReaderT Unit Identity Float)^c
 let capture_reader callback = ReaderT (fun () -> Identity (callback ()))

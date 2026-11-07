@@ -28,6 +28,6 @@ unrelated : Component Props -> Props -> Ui
 let unrelated badge props = ui { badge props }
 //~ FLICK-T003 @28:34-28:45 not a function
 
-captured : forall c. (Ui.Component Props)^c -> Props -> Ui
+captured : (Ui.Component Props)^c -> Props -> Ui
 let captured badge props = ui { badge props }
 //~ FLICK-G001 @32:33-32:38 holds `c`

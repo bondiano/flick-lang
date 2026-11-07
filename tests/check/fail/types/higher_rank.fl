@@ -1,19 +1,16 @@
 module App.HigherRank exposing (..)
 
 apply_twice : (forall a. a -> a) -> (Float, String)
-let apply_twice transform =
-  (transform 42, transform "hello")
+let apply_twice transform = (transform 42, transform "hello")
 
-wrong : forall a. a -> a
+wrong : a -> a
 let wrong x = x + 1
 
 use_mono : Unit -> (Float, String)
-let use_mono () =
-  apply_twice (fun x -> x + 1)
+let use_mono () = apply_twice (fun x -> x + 1)
 
 trim_only : Unit -> (Float, String)
-let trim_only () =
-  apply_twice String.trim
+let trim_only () = apply_twice String.trim
 
 each : (forall a. a ->{} Unit) ->{} Unit
 let each log =
@@ -29,7 +26,7 @@ let escape () =
 // are checked there; a nested `forall` without `Show` gives no dictionary.
 type error Stop = Stop String
 
-each_shown : forall r e. (forall a. Show a => a ->{r; e} Unit) ->{r; e} Unit
+each_shown : (forall a. Show a => a ->{r; e} Unit) ->{r; e} Unit
 let each_shown log =
   log 1
   log "two"
@@ -52,10 +49,10 @@ let no_dictionary render = render 1
 needs_show : Unit -> String
 let needs_show () = no_dictionary show
 
-//~ FLICK-C001 @8:19-8:20 cannot deduce `Numeric a` from the constraints in scope
-//~ FLICK-C001 @12:29-12:30 cannot deduce `Numeric a` from the constraints in scope
-//~ FLICK-T008 @16:15-16:26 expected `a -> a`, found `String -> String`: `a` stands for
-//~ FLICK-T007 @26:32-26:38 expected `Option _`, found `Option a`: the type variable
-//~ FLICK-E002 @41:21-41:39 does not allow error `Stop`
-//~ FLICK-E002 @47:32-47:39 the expected type `a ->{} Unit` does not allow error `Stop`
-//~ FLICK-C001 @53:35-53:39 cannot deduce `Show a`
+//~ FLICK-C001 @7:19-7:20 cannot deduce `Numeric a` from the constraints in scope
+//~ FLICK-C001 @10:45-10:46 cannot deduce `Numeric a` from the constraints in scope
+//~ FLICK-T008 @13:32-13:43 expected `a -> a`, found `String -> String`: `a` stands for
+//~ FLICK-T007 @23:32-23:38 expected `Option _`, found `Option a`: the type variable
+//~ FLICK-E002 @38:21-38:39 does not allow error `Stop`
+//~ FLICK-E002 @44:32-44:39 the expected type `a ->{} Unit` does not allow error `Stop`
+//~ FLICK-C001 @50:35-50:39 cannot deduce `Show a`

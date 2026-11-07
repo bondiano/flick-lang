@@ -22,7 +22,7 @@ instance Area Shape =
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-total : forall a. Area a => List a -> Float
+total : Area a => List a -> Float
 let total shapes = List.fold_left (fun sum s -> sum + area s) 0 shapes
 
 scaled : Float -> (Shape -> Shape)

@@ -302,8 +302,7 @@ foreign pure handle from "@flick-lang/runtime/cli" "specHandle"
 
 /// [`handle`] with the spec first, so the handler is checked against the
 /// options the spec makes: what the block `cli "name" { … }` stands for.
-handled :
-  forall c r e o r2 e2. (Spec r e o)^c -> ((o ->{r2; e2} Unit)^c -> (Command (r + r2) (e + e2))^c)^c
+handled : (Spec r e o)^c -> ((o ->{r2; e2} Unit)^c -> (Command (r + r2) (e + e2))^c)^c
 let handled spec handler = handle handler spec
 
 /// The command without a handler of its own: it needs subcommands, and run
@@ -384,7 +383,7 @@ foreign effect help_doc from "@flick-lang/runtime/cli" "cliHelpDoc"
   reviewed "effect@4.1.2 sha256:d67efcd7d4d83aff"
 
 /// The text of `help_doc`, without colors.
-help : forall c r e. List String -> (Command r e)^c ->{} String
+help : List String -> (Command r e)^c ->{} String
 let help path command = (default_formatter false).formatHelpDoc (help_doc path command)
 
 /// The shells `completions` writes scripts for.
@@ -437,5 +436,5 @@ foreign effect run_version from "@flick-lang/runtime/cli" "cliRunVersion"
   reviewed "effect@4.1.2 sha256:fe039b878ff7b17a"
 
 /// `run_version "0.0.0"`.
-run : forall c r e. (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
+run : (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
 let run command args = run_version "0.0.0" command args

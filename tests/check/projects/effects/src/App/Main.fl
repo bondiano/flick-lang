@@ -4,22 +4,15 @@ import App.Users exposing (User, UserId, Users, NotFound(..), users_layer)
 
 load : UserId ->{Users; none} Option User
 let load id =
-  try
-    Some (Users.get id)
-  with
+  try Some (Users.get id) with
   | NotFound _ -> None
 
 run : UserId ->{} Option User
-let run id =
-  provide users_layer {
-    load id
-  }
+let run id = provide users_layer { load id }
 
 implementation : Users.Impl
-let implementation =
-  { get = fun id -> { id = id; name = "Grace" } }
+let implementation = { get = fun id -> { id = id; name = "Grace" } }
 
 leaky : UserId ->{} User
-let leaky id =
-  Users.get id
-//^^^^^^^^^^^^ FLICK-E002 does not allow service `Users` and error `NotFound`
+let leaky id = Users.get id
+//~ FLICK-E002 @17:16-17:28 does not allow service `Users` and error `NotFound`

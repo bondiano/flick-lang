@@ -188,7 +188,7 @@ let guarded entered =
     say "the handler ran"
     "handled"
 
-quiet : forall e. Failure e ->{} Unit
+quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 /// The handler is skipped: the fiber ends with its interruption alone.

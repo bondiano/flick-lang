@@ -20,7 +20,8 @@ let gross price = Float.abs price
 //  ^^^^^ FLICK-R014 `gross` is never used
 
 area : Shape -> Float
-let area shape = match shape with
+let area shape =
+  match shape with
   | Circle _radius -> 3
   | Square s -> s * s
 
@@ -33,6 +34,6 @@ let first (a, b) { name } = map (fun x -> a) []
 sum_with : List Float -> List Float
 let sum_with xs =
   let unused = 1
-//    ^^^^^^ FLICK-R013 `unused` is never used
+  //~ FLICK-R013 @36:7-36:13 `unused` is never used
   List.map (fun x -> abs x) xs
-//~ FLICK-T052 @37:12-37:28 a `fun` that only passes `x` on: `abs` is the same function
+//~ FLICK-T052 @38:12-38:28 a `fun` that only passes `x` on: `abs` is the same function

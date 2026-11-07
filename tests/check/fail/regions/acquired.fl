@@ -11,24 +11,20 @@ close_conn : forall c. Raw^c ->{} Unit
 foreign effect close_conn from "./conn.js" "close"
   retention call
 
-pass : forall a. a -> a
+pass : a -> a
 let pass x = x
 
 direct : Unit ->{} Unit
 let direct () =
-  let leaked =
-    scope {
-      Resource.acquire_release (task { make_conn "db" }) close_conn
-    }
+  let leaked = scope { Resource.acquire_release (task { make_conn "db" }) close_conn }
   ()
 
 generic : Unit ->{} Unit
 let generic () =
-  let leaked =
-    scope {
-      let c = Resource.acquire_release (task { make_conn "db" }) close_conn
-      pass c
-    }
+  let leaked = scope {
+    let c = Resource.acquire_release (task { make_conn "db" }) close_conn
+    pass c
+  }
   ()
-//~ FLICK-G002 @21:7-21:68
-//~ FLICK-G002 @29:7-30:13
+//~ FLICK-G002 @19:24-19:85
+//~ FLICK-G002 @25:5-26:11

@@ -40,7 +40,7 @@ let rec size e =
   | First _ -> 1
   | Lit _ -> 1
 
-as_int : forall a. TypeEq a Int -> a -> Int
+as_int : TypeEq a Int -> a -> Int
 let as_int eq x = TypeEq.cast eq x
 
 /// A value whose type a tag tells: in each branch `a` is that type, so
@@ -49,13 +49,13 @@ type Ty a =
   | TInt : Ty Int
   | TStr : Ty String
 
-describe : forall a. Ty a -> a -> String
+describe : Ty a -> a -> String
 let describe t x =
   match t with
   | TInt -> show (x + x)
   | TStr -> x ++ "!"
 
-same : forall a. Ty a -> a -> a -> Bool
+same : Ty a -> a -> a -> Bool
 let same t x y =
   match t with
   | TInt -> x == y

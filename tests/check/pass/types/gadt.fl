@@ -38,20 +38,20 @@ type Ty a =
   | TInt : Ty Int
   | TStr : Ty String
 
-describe : forall a. Ty a -> a -> String
+describe : Ty a -> a -> String
 let describe t x =
   match t with
   | TInt -> show (x * 2)
   | TStr -> x ++ "!"
 
-equal_types : forall a b. Ty a -> Ty b -> Option (TypeEq a b)
+equal_types : Ty a -> Ty b -> Option (TypeEq a b)
 let equal_types a b =
   match (a, b) with
   | (TInt, TInt) -> Some Refl
   | (TStr, TStr) -> Some Refl
   | _ -> None
 
-coerce : forall a b. Ty a -> Ty b -> a -> Option b
+coerce : Ty a -> Ty b -> a -> Option b
 let coerce a b x =
   match equal_types a b with
   | Some eq -> Some (TypeEq.cast eq x)

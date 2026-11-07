@@ -10,5 +10,5 @@ foreign blocked lookup "needs policy: returns a Promise"
 use : Unit ->{} Float
 let use u =
   let found = lookup "a"
-//            ^^^^^^ FLICK-F005 `lookup` is blocked: needs policy: returns a Promise
+  //~ FLICK-F005 @12:15-12:21 `lookup` is blocked: needs policy: returns a Promise
   next_id ()

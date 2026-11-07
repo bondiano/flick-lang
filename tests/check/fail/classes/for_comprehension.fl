@@ -15,11 +15,10 @@ let size _file = 1
 // The clauses run when the sequence is iterated: a runtime call there is an
 // error with the way out.
 logged : List Float -> Seq Float
-let logged xs =
-  for {
-    x <- xs
-    let _ = Platform.stdout_line "no"
-  } yield x
+let logged xs = for {
+  x <- xs
+  let _ = Platform.stdout_line "no"
+} yield x
 
 // A source is `Iterable`; `Option` is not.
 from_option : Option Float -> List Float
@@ -28,25 +27,23 @@ let from_option o = [for x <- o yield x]
 // A lazy sequence holds what it uses: one over a scoped file cannot leave
 // the scope.
 escaped : Path ->{FileSystem; OpenError} Seq Float
-let escaped path =
-  scope {
-    let file = FileSystem.open_scoped path
-    for { n <- [1, 2] } yield n + size file
-  }
+let escaped path = scope {
+  let file = FileSystem.open_scoped path
+  for { n <- [1, 2] } yield n + size file
+}
 
 // The strict list is built inside the scope and holds only numbers.
 counted : Path ->{FileSystem; OpenError} List Float
-let counted path =
-  scope {
-    let file = FileSystem.open_scoped path
-    [for n <- [1, 2] yield n + size file]
-  }
+let counted path = scope {
+  let file = FileSystem.open_scoped path
+  [for n <- [1, 2] yield n + size file]
+}
 
 // The body of `for … do` is a statement, of type `Unit`.
 looped : List Float -> Unit
 let looped xs = for x <- xs do x + 1
 
-//~ FLICK-E001 @21:13-21:38 this is a runtime call, but the clauses of `for` run when the sequence
-//~ FLICK-C001 @26:28-26:30 no instance for `Iterable Option`; instances of `Iterable`: `Iterable
-//~ FLICK-G001 @34:5-34:44 this sequence uses `file`, which holds region `s`, but the expected ty
-//~ FLICK-T003 @47:32-47:37 expected `Unit`, found `Float`
+//~ FLICK-E001 @20:11-20:36 this is a runtime call, but the clauses of `for` run when the sequence
+//~ FLICK-C001 @25:28-25:30 no instance for `Iterable Option`; instances of `Iterable`: `Iterable
+//~ FLICK-G001 @32:3-32:42 this sequence uses `file`, which holds region `s`, but the expected ty
+//~ FLICK-T003 @44:32-44:37 expected `Unit`, found `Float`

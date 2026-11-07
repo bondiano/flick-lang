@@ -7,7 +7,9 @@ defer : forall c s r. (Eff r none Unit)^c ->{Scope s | r;} Unit
 foreign effect defer from "./scope.js" "defer"
   retention owner
 
-defer_checked : forall c s r. (Fiber.Outlives c s, Fiber.Provided r s) => (Eff r none Unit)^c ->{Scope s | r;} Unit
+defer_checked :
+  forall c s r.
+  (Fiber.Outlives c s, Fiber.Provided r s) => (Eff r none Unit)^c ->{Scope s | r;} Unit
 foreign effect defer_checked from "./scope.js" "defer"
   retention owner
 
@@ -19,4 +21,4 @@ defer_unprovided : forall c s r. Fiber.Outlives c s => (Eff r none Unit)^c ->{Sc
 foreign effect defer_unprovided from "./scope.js" "defer"
   retention owner
 //~ FLICK-F002 @7:1-8:18
-//~ FLICK-F002 @19:1-20:18
+//~ FLICK-F002 @21:1-22:18

@@ -58,7 +58,7 @@ let app () =
   ]
 
 /// The base URL of a server.
-base : forall s. Http.Server.Server s -> String
+base : Http.Server.Server s -> String
 let base server =
   match Http.Server.address server with
   | Http.Server.TcpAddress host port -> "http://" ++ host ++ ":" ++ show port

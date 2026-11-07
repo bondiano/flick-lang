@@ -16,20 +16,20 @@ effect Counter =
 type error Missing = Missing String
 
 /// `tail`: the arm is the value of the operation.
-with_name : forall a r e. String -> (Unit ->{Ask String | r; e} a) ->{r; e} a
+with_name : String -> (Unit ->{Ask String | r; e} a) ->{r; e} a
 let with_name name body =
   try body () with
   | Ask.ask () -> name
 
 /// `control`: `resume` is the rest of the body, under the same handler.
-collect : forall a r e. (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
+collect : (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
 let collect body =
   try body () with
   | Emit.emit x -> [x] ++ resume ()
   | return () -> []
 
 /// `abort`: the arm is the value of the handler.
-attempt : forall a r e. (Unit ->{Throw | r; e} a) ->{r; e} Result String a
+attempt : (Unit ->{Throw | r; e} a) ->{r; e} Result String a
 let attempt body =
   try Ok (body ()) with
   | Throw.throw message -> Err message
@@ -91,7 +91,7 @@ asked : Unit ->{Ask Int; none} (Int, Int)
 let asked () = parallel (task { Ask.ask () }) (task { Ask.ask () + 1 })
 
 /// A row variable of the signature is `Detached` by its constraint.
-both_of : forall r e a. Detached r => Eff r e a -> Eff r e a ->{r; e} (a, a)
+both_of : Detached r => Eff r e a -> Eff r e a ->{r; e} (a, a)
 let both_of first second = parallel first second
 
 /// A `tail` arm may suspend through what its operation declares, or what a

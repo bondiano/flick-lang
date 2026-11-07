@@ -4,7 +4,8 @@ module App.Scope exposing (..)
 type Shape = Circle Float | Square Float | Dot
 
 area : Shape -> Float
-let area shape = match shape with
+let area shape =
+  match shape with
   | Circle r -> r * r
   | _ -> 0
 
@@ -28,9 +29,10 @@ let outer n =
   add (double n)
 
 pick : Option Float -> Float
-let pick x = match x with
+let pick x =
+  match x with
   | Some x -> x + 1
   | None -> 0
-//~ FLICK-T055 @9:5-9:6 `_` stands for `Square`, `Dot` of `Shape`: a constructor added to it later lands here unchecked
-//~ FLICK-R015 @17:7-17:8 `m` shadows the local `m` bound above
-//~ FLICK-T054 @23:7-23:13 the local function `double` uses no local around it: it can be a top-level function
+//~ FLICK-T055 @10:5-10:6 `_` stands for `Square`, `Dot` of `Shape`: a constructor added to it later lands here unchecked
+//~ FLICK-R015 @18:7-18:8 `m` shadows the local `m` bound above
+//~ FLICK-T054 @24:7-24:13 the local function `double` uses no local around it: it can be a top-level function

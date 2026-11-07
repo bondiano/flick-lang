@@ -22,10 +22,10 @@ service FileSystem =
   read_file : Path ->{Async; ReadError} String
   write_file : Path -> String ->{Async; WriteError} Unit
 
-open_scoped : forall s. Path ->{Async, FileSystem, Scope s; OpenError} File s
+open_scoped : Path ->{Async, FileSystem, Scope s; OpenError} File s
 let open_scoped path = FileSystem.open path
 
-read_all : forall s. File s ->{Async, FileSystem; ReadError} String
+read_all : File s ->{Async, FileSystem; ReadError} String
 let read_all file = FileSystem.read_handle file
 
 read_text : Path ->{Async, FileSystem; ReadError} String

@@ -133,7 +133,6 @@ foreign pure text_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "ht
 
 /// The body as plain text.
 with_text_payload :
-  forall l p q h b r e s.
   Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h String ->{r; e} s)
 let with_text_payload endpoint = text_payload (Codec.json Schema.string) endpoint
 
@@ -160,7 +159,6 @@ foreign pure text_success from "@flick-lang/runtime/effect/http-api/HttpApi" "ht
 
 /// The success as plain text, with its status.
 with_text_success :
-  forall l p q h b r e s.
   Int -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} String)
 let with_text_success status endpoint = text_success status (Codec.json Schema.string) endpoint
 
@@ -197,7 +195,7 @@ foreign pure with_errors from "@flick-lang/runtime/effect/http-api/HttpApi" "htt
   reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// The cases and `HttpError`s of this status, for the document and the client.
-http_error : forall e. Int -> ErrorCases e -> ErrorCases {HttpError | e}
+http_error : Int -> ErrorCases e -> ErrorCases {HttpError | e}
 let http_error status cases = error_case status (Codec.json HttpError.schema) cases
 
 /// A bearer token in `Authorization`, under the scheme name `name`.

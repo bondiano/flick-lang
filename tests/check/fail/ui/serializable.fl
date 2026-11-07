@@ -20,7 +20,7 @@ inside : Atom.Writable Float
 let inside =
   mk : Float -> Atom.Writable Float
   let mk n = Atom.serializable numbers (Atom.make n)
-//           ^^^^^^^^^^^^^^^^^ FLICK-U003 `Atom.serializable` inside a function would give its key to every atom
+  //~ FLICK-U003 @22:14-22:31 `Atom.serializable` inside a function would give its key to every atom
   mk 1
 
 partial : Atom.Writable Float -> Atom.Writable Float

@@ -9,7 +9,6 @@ import Mtl.WriterT as WriterT exposing (WriterT)
 import Mtl.ExceptT as ExceptT exposing (ExceptT)
 
 reader_catch_probe :
-  forall m.
   (MonadReader m Float, MonadError m String) => m (Float, (String, Float), (String, Float), Float)
 let reader_catch_probe =
   failed : m (String, Float)

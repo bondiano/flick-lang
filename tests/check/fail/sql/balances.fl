@@ -23,13 +23,12 @@ sql table Accounts "accounts" {
 }
 
 plain : Sql.Template Pg {} { balance : BigDecimal }
-let plain =
-  sql {
-    from u in Users;
-    left_join a in Accounts on a.user_id == u.id;
-    select { balance = a.balance }
-  }
-//~ FLICK-T003 @27:3-31:4 `Option BigDecimal` is not `BigDecimal`
+let plain = sql {
+  from u in Users;
+  left_join a in Accounts on a.user_id == u.id;
+  select { balance = a.balance }
+}
+//~ FLICK-T003 @26:13-30:2 `Option BigDecimal` is not `BigDecimal`
 
 mistyped : Sql.Template Pg { owner : UserId } {}
 let mistyped = sql p { insert_into Accounts; values { user_id = p.owner; balance = "ten" } }

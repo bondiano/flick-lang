@@ -26,7 +26,6 @@ let at jwt path payload = { path = path; query = (); headers = credentials jwt; 
 
 /// Sends `request` to `endpoint` of the API on this page's origin.
 call :
-  forall l p q h b r e s.
   HttpApi.Request p q h b ->
   HttpApi.Endpoint l (HttpApi.Request p q h b ->{r; e} s) ->{Async; HttpApi.ClientError | e}
   s

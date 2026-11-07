@@ -147,7 +147,7 @@ let make_temp_directory options = FileSystem.make_temp_directory options
 /// `make_temp_directory`, removed with its contents when the scope of
 /// region `s` closes.
 make_temp_directory_scoped :
-  forall s. TempDirectoryOptions ->{Async, FileSystem, Scope s; PlatformError.PlatformError} String
+  TempDirectoryOptions ->{Async, FileSystem, Scope s; PlatformError.PlatformError} String
 let make_temp_directory_scoped options = FileSystem.make_temp_directory_scoped options
 
 /// Makes a new empty file under the system's temporary directory; its path.
@@ -156,12 +156,11 @@ let make_temp_file options = FileSystem.make_temp_file options
 
 /// `make_temp_file`, removed when the scope of region `s` closes.
 make_temp_file_scoped :
-  forall s. TempFileOptions ->{Async, FileSystem, Scope s; PlatformError.PlatformError} String
+  TempFileOptions ->{Async, FileSystem, Scope s; PlatformError.PlatformError} String
 let make_temp_file_scoped options = FileSystem.make_temp_file_scoped options
 
 /// Opens the file, which the scope of region `s` closes.
-open :
-  forall s. OpenOptions -> String ->{Async, FileSystem, Scope s; PlatformError.PlatformError} File s
+open : OpenOptions -> String ->{Async, FileSystem, Scope s; PlatformError.PlatformError} File s
 let open options path = FileSystem.open options path
 
 /// The entries of the directory, with those of its subdirectories when the

@@ -16,7 +16,7 @@ say : String ->{} Unit
 let say line = Platform.stdout_line line
 
 /// A resource named `name`, released with a log line by its scope.
-acquire : forall s. String ->{Scope s;} String
+acquire : String ->{Scope s;} String
 let acquire name =
   Resource.acquire_release
     (task {

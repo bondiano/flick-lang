@@ -14,7 +14,8 @@ pairs : List Float -> List Float
 let pairs xs = List.concat (List.map (fun x -> [x, x]) xs)
 
 count : Option Float -> Float
-let count o = match o with
+let count o =
+  match o with
   | Some n -> n
   | None -> 0
 
@@ -24,4 +25,4 @@ let kept xs = List.length xs == 2
 //~ FLICK-T048 @8:15-8:64 the length of a `List.filter` compared with zero: `List.any` stops at the first match
 //~ FLICK-T049 @11:15-11:34 a length compared with zero: `List.is_empty` says it
 //~ FLICK-T050 @14:16-14:59 `List.concat` of `List.map`: `List.flat_map` does both
-//~ FLICK-T051 @17:15-19:14 a `match` that unwraps an `Option` with a default: `Option.with_default` says it
+//~ FLICK-T051 @18:3-20:14 a `match` that unwraps an `Option` with a default: `Option.with_default` says it

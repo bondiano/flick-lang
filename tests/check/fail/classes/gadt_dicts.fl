@@ -5,20 +5,19 @@ module App.GadtDicts exposing (..)
 type Showable =
   | Show b => Showable b : Showable
 
-type Box =
-  | Box (Int -> Int)
+type Box = Box (Int -> Int)
 
 no_instance : Showable
 let no_instance = Showable (Box (fun x -> x))
-//~ FLICK-C001 @12:19-12:27 no instance for `Show Box`; instances of `Show`:
+//~ FLICK-C001 @11:19-11:27 no instance for `Show Box`; instances of `Show`:
 
 in_let : Showable -> String
 let in_let s =
   let Showable x = s
-//~ FLICK-T058 @17:7-17:17 this constructor hides or refines a type, which
+  //~ FLICK-T058 @16:7-16:17 this constructor hides or refines a type, which
   show x
-//~ FLICK-C002 @19:3-19:7 cannot choose an instance for `Show _`: a
+//~ FLICK-C002 @18:3-18:7 cannot choose an instance for `Show _`: a
 
 unboxed type One =
   | Show a => One a : One
-//~ FLICK-T056 @22:1-23:26 `unboxed type` names the JS form of its
+//~ FLICK-T056 @21:1-22:26 `unboxed type` names the JS form of its

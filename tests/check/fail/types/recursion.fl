@@ -25,10 +25,16 @@ let b = a + 1
 
 rec {
   wrap : List a -> Float
-  let wrap xs = match xs with | [] -> 0 | [x, ..._] -> unwrap [[x]]
+  let wrap xs =
+    match xs with
+    | [] -> 0
+    | [x, ..._] -> unwrap [[x]]
 
   unwrap : List b -> Float
-  let unwrap xs = match xs with | [] -> 0 | [_, ...rest] -> wrap rest
+  let unwrap xs =
+    match xs with
+    | [] -> 0
+    | [_, ...rest] -> wrap rest
 }
 
 rec {
@@ -44,5 +50,5 @@ rec {
 //~ FLICK-T017 @15:14-15:18 `ping`, `pong` use each other: define mutually recursive
 //~ FLICK-T012 @20:1-20:23 `xs` would be evaluated while it is being defined; only
 //~ FLICK-T012 @22:9-22:10 `a` and `b` would be evaluated while being defined; only
-//~ FLICK-T015 @28:56-28:62 `unwrap` is used at type `List (List a) -> Float` inside
-//~ FLICK-T015 @36:23-36:29 `swap_b` is used at type `(b, a) -> Float` inside
+//~ FLICK-T015 @31:20-31:26 `unwrap` is used at type `List (List a) -> Float` inside
+//~ FLICK-T015 @42:23-42:29 `swap_b` is used at type `(b, a) -> Float` inside

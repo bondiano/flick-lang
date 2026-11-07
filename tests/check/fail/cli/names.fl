@@ -4,30 +4,27 @@ module App.Names exposing (twice, reserved, positional)
 import Cli exposing (plugin cli)
 
 twice : Cli.Command none none
-let twice =
-  cli "twice" {
-    flag dry_run "d" : Bool
-    flag dry "d" : Bool
-//           ^^^ std/L001 the alias `-d` is already taken
-    flag dry_run : Bool
-//       ^^^^^^^ std/L001 the options already have a field `dry_run`
-    handle fun { dry_run; dry } -> ()
-  }
+let twice = cli "twice" {
+  flag dry_run "d" : Bool
+  flag dry "d" : Bool
+//~ std/L001 @9:12-9:15 the alias `-d` is already taken
+  flag dry_run : Bool
+//~ std/L001 @11:8-11:15 the options already have a field `dry_run`
+  handle fun { dry_run; dry } -> ()
+}
 
 reserved : Cli.Command none none
-let reserved =
-  cli "reserved" {
-    flag version : Bool
-//       ^^^^^^^ std/L001 `--version` is reserved by the CLI
-    flag quiet "h" : Bool
-//             ^^^ std/L001 `-h` is reserved by the CLI
-    handle fun { version; quiet } -> ()
-  }
+let reserved = cli "reserved" {
+  flag version : Bool
+//~ std/L001 @18:8-18:15 `--version` is reserved by the CLI
+  flag quiet "h" : Bool
+//~ std/L001 @20:14-20:17 `-h` is reserved by the CLI
+  handle fun { version; quiet } -> ()
+}
 
 positional : Cli.Command none none
-let positional =
-  cli "positional" {
-    arg name "n" : String
-//           ^^^ std/L007 a positional `arg` has no other names
-    handle fun { name } -> ()
-  }
+let positional = cli "positional" {
+  arg name "n" : String
+//~ std/L007 @27:12-27:15 a positional `arg` has no other names
+  handle fun { name } -> ()
+}

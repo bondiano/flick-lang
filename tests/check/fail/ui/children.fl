@@ -20,10 +20,10 @@ let tabs_of_nodes = Ui.tabs { selected = 0 } (NonEmpty.singleton (Ui.text "a"))
 // an input has no children argument
 input_children : Ui
 let input_children =
-  Ui.input
-    { value = ""; placeholder = ""; on_input = Ui.Event.latest (fun _ -> Effect.void) }
-    [Ui.text "x"]
-//~ FLICK-T003 @23:3-25:18 this is not a function: it has type `Ui`,
+  Ui.input { value = ""; placeholder = ""; on_input = Ui.Event.latest (fun _ -> Effect.void) } [
+    Ui.text "x",
+  ]
+//~ FLICK-T003 @23:3-25:4 this is not a function: it has type `Ui`,
 
 // named places are exact fields
 panel_no_header : Ui
@@ -45,16 +45,15 @@ supervisor : Failure none ->{} Unit
 let supervisor failure = ()
 
 refusing : Float -> Ui
-let refusing n =
-  ui {
-    button
-      {
-        disabled = false;
-        on_click = Ui.Event.exhaust (fun _ -> task { from_result (Err (Refused "no")) });
-//                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-E002 does not allow error `Refused`
-      }
-      []
-  }
+let refusing n = ui {
+  button
+    {
+      disabled = false;
+      on_click = Ui.Event.exhaust (fun _ -> task { from_result (Err (Refused "no")) });
+      //~ FLICK-E002 @52:52-52:84 does not allow error `Refused`
+    }
+    []
+}
 
 // handlers write atoms, so a root needs `Atom.Write`
 run_without_write : Ui.Dom.Container ->{Atom.Registry;} Never
@@ -63,42 +62,43 @@ let run_without_write root = Ui.Dom.mount root supervisor (refusing 0)
 
 // hold the button inside the scope, or open the file inside the task
 escaping : File.Path ->{Async, File.FileSystem; File.OpenError} Ui
-let escaping path =
-  scope {
-    let file = File.open_scoped path
-    ui {
-      button
-        {
-          disabled = false;
-          on_click =
-            Ui.Event.exhaust
-              (
-                fun _ ->
-                  task { provide File.node { try ignore (File.read_all file) with | _ -> () } }
-              );
-        }
-        []
-    }
-//~ FLICK-G001 @69:5-81:6 this value holds region `s`, but the expected
+let escaping path = scope {
+  let file = File.open_scoped path
+  ui {
+    button
+      {
+        disabled = false;
+        on_click =
+          Ui.Event.exhaust (fun _ -> task {
+            provide File.node {
+              try ignore (File.read_all file) with
+              | _ -> ()
+            }
+          });
+      }
+      []
   }
+  //~ FLICK-G001 @67:3-80:4 this value holds region `s`, but the expected
+}
 
 // bound to a local first, it still cannot leave
 escaping_bound : File.Path ->{Async, File.FileSystem; File.OpenError} Ui
-let escaping_bound path =
-  scope {
-    let file = File.open_scoped path
-    let view =
-      ui {
-        button
-          {
-            disabled = false;
-            on_click =
-              Ui.Event.exhaust
-                (fun _ ->
-                  task { provide File.node { try ignore (File.read_all file) with | _ -> () } });
-          }
-          []
+let escaping_bound path = scope {
+  let file = File.open_scoped path
+  let view = ui {
+    button
+      {
+        disabled = false;
+        on_click =
+          Ui.Event.exhaust (fun _ -> task {
+            provide File.node {
+              try ignore (File.read_all file) with
+              | _ -> ()
+            }
+          });
       }
-    view
-//  ^^^^ FLICK-G001 this value holds region `s`
+      []
   }
+  view
+  //~ FLICK-G001 @102:3-102:7 this value holds region `s`
+}

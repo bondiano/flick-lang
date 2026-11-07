@@ -33,23 +33,16 @@ let load_name id =
   user.name
 
 application : UserId ->{Log; NotFound} String
-let application id =
-  provide users_live {
-    load_name id
-  }
+let application id = provide users_live { load_name id }
 
 load_guarded : UserId ->{Users; none} Option User
 let load_guarded id =
-  try
-    Some (Users.get id)
-  with
+  try Some (Users.get id) with
   | NotFound missing when missing > 0 -> None
 
 load_partial : UserId ->{Users; none} Option User
 let load_partial id =
-  try
-    Some (Users.get id)
-  with
+  try Some (Users.get id) with
   | NotFound 0 -> None
 
 narrow_task : UserId -> Eff none none User
@@ -60,9 +53,7 @@ let lenient result = from_result result
 
 not_an_error : Unit ->{} Float
 let not_an_error () =
-  try
-    1
-  with
+  try 1 with
   | Some x -> x
 
 no_layer : Unit ->{} Float
@@ -83,12 +74,12 @@ both : Float ->{Jobs; Failed Float, Failed String} Float
 let both n = Jobs.count n
 
 //~ FLICK-E002 @22:14-22:26 the signature of `narrow` does not allow service `Log` and error `NotFound`, whi
-//~ FLICK-E002 @37:3-37:10 the signature of `application` does not allow service `Config` and error `Connec
-//~ FLICK-E002 @43:3-43:6 the signature of `load_guarded` does not allow error `NotFound`, which its body 
-//~ FLICK-E002 @50:3-50:6 the signature of `load_partial` does not allow error `NotFound`, which its body 
-//~ FLICK-E002 @56:29-56:41 the expected type `Eff none none User` does not allow service `Users` and error 
-//~ FLICK-T003 @59:34-59:40 expected `Result (Errors _) _`, found `Result String Float`: `String` is not an
-//~ FLICK-T003 @69:27-69:28 `provide` takes a `Layer`, but this has type `Int`
-//~ FLICK-E007 @66:5-66:11 a handler matches errors declared with `type error`, but this pattern has type `
-//~ FLICK-T003 @79:11-79:23 expected `Failed Float`, found `Failed String`: `String` is not `Float`
-//~ FLICK-T003 @82:37-82:50 the row already holds `Failed Float`, so it cannot hold `Failed String` too: a
+//~ FLICK-E002 @36:22-36:29 the signature of `application` does not allow service `Config` and error `Connec
+//~ FLICK-E002 @40:3-40:6 the signature of `load_guarded` does not allow error `NotFound`, which its body
+//~ FLICK-E002 @45:3-45:6 the signature of `load_partial` does not allow error `NotFound`, which its body
+//~ FLICK-E002 @49:29-49:41 the expected type `Eff none none User` does not allow service `Users` and error
+//~ FLICK-T003 @52:34-52:40 expected `Result (Errors _) _`, found `Result String Float`: `String` is not an
+//~ FLICK-T003 @60:27-60:28 `provide` takes a `Layer`, but this has type `Int`
+//~ FLICK-E007 @57:5-57:11 a handler matches errors declared with `type error`, but this pattern has type `
+//~ FLICK-T003 @70:11-70:23 expected `Failed Float`, found `Failed String`: `String` is not `Float`
+//~ FLICK-T003 @73:37-73:50 the row already holds `Failed Float`, so it cannot hold `Failed String` too: a

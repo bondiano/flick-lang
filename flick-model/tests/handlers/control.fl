@@ -10,13 +10,13 @@ effect Choose =
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-collect : forall r e. (Unit ->{Emit | r; e} Unit) ->{r; e} List Int
+collect : (Unit ->{Emit | r; e} Unit) ->{r; e} List Int
 let collect body =
   try body () with
   | Emit.emit x -> [x] ++ resume ()
   | return () -> []
 
-reversed : forall r e. (Unit ->{Emit | r; e} Unit) ->{r; e} List Int
+reversed : (Unit ->{Emit | r; e} Unit) ->{r; e} List Int
 let reversed body =
   try body () with
   | Emit.emit x ->
@@ -40,19 +40,23 @@ main : Unit ->{} Unit
 let main () =
   say (show (collect three))
   say (show (reversed three))
-  let x = first (fun () -> scope {
-    Scope.add_finalizer (task { say "scope closed" })
-    Emit.emit 7
-    say "not reached"
-  })
+  let x =
+    first (fun () -> scope {
+      Scope.add_finalizer (task { say "scope closed" })
+      Emit.emit 7
+      say "not reached"
+    })
   say (show x)
-  let chosen = collect (fun () ->
-    try
-      Emit.emit (if Choose.choose () then 1 else 2)
-      Emit.emit 3
-    with
-    | Choose.choose () -> resume true)
+  let chosen =
+    collect (fun () ->
+      try
+        Emit.emit (if Choose.choose () then 1 else 2)
+        Emit.emit 3
+      with
+      | Choose.choose () -> resume true
+    )
   say (show chosen)
-  let twice = try (if Choose.choose () then 1 else 2) with
+  let twice =
+    try (if Choose.choose () then 1 else 2) with
     | Choose.choose () -> resume true + resume false
   say (show twice)

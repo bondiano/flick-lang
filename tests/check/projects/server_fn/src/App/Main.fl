@@ -5,10 +5,9 @@ import App.Api
 import Server exposing (plugin server)
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide Server.node {
-    scope {
-      let _ = Server.handler [server App.Api.place]
-      ()
-    }
+let main () = provide Server.node {
+  scope {
+    let _ = Server.handler [server App.Api.place]
+    ()
   }
+}

@@ -51,8 +51,7 @@ let require_passed result =
           (Arbitrary.format_check_failure failed)))
 
 // Reset only between independent awaits, retaining each side's complete ordered trace.
-observe :
-  forall c. Ref (List String) -> (Eff none {Offline} Float)^c ->{} (Result Float Float, List String)
+observe : Ref (List String) -> (Eff none {Offline} Float)^c ->{} (Result Float Float, List String)
 let observe trace action =
   Ref.set trace []
   let result =
@@ -61,7 +60,6 @@ let observe trace action =
   (result, Ref.get trace)
 
 observe_maybe :
-  forall c.
   Ref (List String) ->
   (Eff none {Offline} (Option Float))^c ->{}
   (Result Float (Option Float), List String)
@@ -73,7 +71,6 @@ let observe_maybe trace action =
   (result, Ref.get trace)
 
 observe_state :
-  forall c.
   Ref (List String) ->
   (Eff none {Offline} (Float, Float))^c ->{}
   (Result Float (Float, Float), List String)
@@ -85,7 +82,6 @@ let observe_state trace action =
   (result, Ref.get trace)
 
 observe_writer :
-  forall c.
   Ref (List String) ->
   (Eff none {Offline} (Float, List String))^c ->{}
   (Result Float (Float, List String), List String)
@@ -97,7 +93,6 @@ let observe_writer trace action =
   (result, Ref.get trace)
 
 observe_except :
-  forall c.
   Ref (List String) ->
   (Eff none {Offline} (Result String Float))^c ->{}
   (Result Float (Result String Float), List String)

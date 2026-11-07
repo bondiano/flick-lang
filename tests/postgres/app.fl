@@ -198,8 +198,7 @@ let drift = sql {
 }
 
 /// The one row a query returns, or `fallback`.
-one :
-  forall p r. (Sql.Template Pg p r, p, r) ->{Async, Database; EncodeError, DbError, DecodeError} r
+one : (Sql.Template Pg p r, p, r) ->{Async, Database; EncodeError, DbError, DecodeError} r
 let one (template, params, fallback) =
   match Database.query (Sql.bind template params) with
   | [row] -> row

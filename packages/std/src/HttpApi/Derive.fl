@@ -64,7 +64,7 @@ class Problem e =
   problem : { status : Int; body : PureCodec Json e }
 
 /// The cases and the error `t`, as its `Problem` instance says.
-problem_case : forall t e. Problem t => ErrorCases e -> ErrorCases {t | e}
+problem_case : Problem t => ErrorCases e -> ErrorCases {t | e}
 let problem_case cases =
   let answer = problem
   error_case answer.status answer.body cases

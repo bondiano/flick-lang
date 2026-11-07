@@ -287,7 +287,7 @@ foreign effect timeout_option from "@flick-lang/runtime" "timeoutOption"
   reviewed "effect@4.1.2 sha256:35e1a71b230ac8e2"
 
 /// `ma` followed by `f` of its value, for any monad.
-bind : forall c d m a b. Monad m => (m a)^c -> ((a -> (m b)^d)^d -> (m b)^(c + d))^c
+bind : Monad m => (m a)^c -> ((a -> (m b)^d)^d -> (m b)^(c + d))^c
 let bind ma f = flat_map f ma
 
 /// A task followed by `f` of its value; the rows of both join.

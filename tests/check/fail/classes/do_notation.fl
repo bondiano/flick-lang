@@ -3,47 +3,40 @@ module App.DoErrors exposing (..)
 // The rest of a `do` block is a pure function: a runtime call there is an
 // error with the way out.
 logged : Float -> Option Float
-let logged n =
-  do {
-    x <- Some n
-    Platform.stdout_line "no"
-    pure x
-  }
+let logged n = do {
+  x <- Some n
+  Platform.stdout_line "no"
+  pure x
+}
 
 // A pattern after `<-` must match every value.
 values : List (Option Float) -> List Float
-let values xs =
-  do {
-    Some x <- xs
-    pure x
-  }
+let values xs = do {
+  Some x <- xs
+  pure x
+}
 
 // The block ends with an expression, not a binding or a `let`.
 dangling : Option Float -> Option Float
-let dangling o =
-  do {
-    _x <- o
-  }
+let dangling o = do { _x <- o }
 
 trailing_let : Option Float -> Option Float
-let trailing_let o =
-  do {
-    x <- o
-    let _y = x
-  }
+let trailing_let o = do {
+  x <- o
+  let _y = x
+}
 
 // A guard needs `Alternative`, and `Result e` has none: there is no error
 // to fail with.
 guarded : Float -> Result String Float
-let guarded n =
-  do {
-    if n > 0
-    Ok n
-  }
+let guarded n = do {
+  if n > 0
+  Ok n
+}
 
-//~ FLICK-E001 @9:5-9:30 this is a runtime call, but the rest of a `do` block is the pure funct
-//~ FLICK-T003 @9:5-9:30 expected `Option _`, found `Unit`
-//~ FLICK-T009 @17:5-17:11 this pattern does not match `None`; use `match` to handle every case
-//~ FLICK-T019 @25:5-25:12 a `do` block must end with an expression, not a binding: add `pure x`
-//~ FLICK-T019 @33:4-33:4 a `do` block must end with an expression: its value is the value of th
-//~ FLICK-C001 @40:5-40:7 no instance for `Alternative (Result String)`; instances of `Alternati
+//~ FLICK-E001 @8:3-8:28 this is a runtime call, but the rest of a `do` block is the pure funct
+//~ FLICK-T003 @8:3-8:28 expected `Option _`, found `Unit`
+//~ FLICK-T009 @15:3-15:9 this pattern does not match `None`; use `match` to handle every case
+//~ FLICK-T019 @21:23-21:30 a `do` block must end with an expression, not a binding: add `pure x`
+//~ FLICK-T019 @27:2-27:2 a `do` block must end with an expression: its value is the value of th
+//~ FLICK-C001 @33:3-33:5 no instance for `Alternative (Result String)`; instances of `Alternati

@@ -4,26 +4,23 @@ module App.Streams exposing (..)
 
 /// The stream of a subscription holds its region.
 escaped : PubSub.PubSub Float ->{} Stream.Stream none none Float
-let escaped hub =
-  scope {
-    let sub = PubSub.subscribe hub
-    Stream.from_subscription sub |> Stream.take 3
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-G001 holds region `s`
-  }
+let escaped hub = scope {
+  let sub = PubSub.subscribe hub
+  Stream.from_subscription sub |> Stream.take 3
+  //~ FLICK-G001 @9:3-9:48 holds region `s`
+}
 
 /// So does a stream that a scope broadcasts.
 broadcast : Stream.Stream none none Float ->{} Stream.Stream none none Float
-let broadcast source =
-  scope {
-    Stream.broadcast { capacity = None; strategy = None; replay = None } source
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-G001 holds region `s`
-  }
+let broadcast source = scope {
+  Stream.broadcast { capacity = None; strategy = None; replay = None } source
+  //~ FLICK-G001 @16:3-16:78 holds region `s`
+}
 
 /// A stream whose callback holds a scoped value holds its region too.
 leaked : PubSub.PubSub Int ->{} Stream.Stream none none Int
-let leaked hub =
-  scope {
-    let sub = PubSub.subscribe hub
-    Stream.map_effect (fun n -> PubSub.take sub + n) (Stream.range 1 2)
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-G001 holds region `s`
-  }
+let leaked hub = scope {
+  let sub = PubSub.subscribe hub
+  Stream.map_effect (fun n -> PubSub.take sub + n) (Stream.range 1 2)
+  //~ FLICK-G001 @24:3-24:70 holds region `s`
+}

@@ -5,7 +5,7 @@ module App.Main exposing (main)
 
 type error Stop = Stop String
 
-each_shown : forall r e. (forall a. Show a => a ->{r; e} Unit) ->{r; e} Unit
+each_shown : (forall a. Show a => a ->{r; e} Unit) ->{r; e} Unit
 let each_shown log =
   log 1
   log "two"

@@ -11,14 +11,12 @@ let loaded xs = List.map load xs
 /// Sets of two witnesses do not mix without `rehash`.
 mixed : HashSet.HashSet EqHash.Canonical String -> Int
 let mixed canonical =
-  EqHash.with
-    (fun a b -> a == b)
-    (fun s -> String.length s)
-    (fun witness -> HashSet.size (HashSet.union canonical (HashSet.with witness)))
-//                                                         ^^^^^^^^^^^^^^^^^^^^ FLICK-T003 found `HashSet w String`
+  EqHash.with (fun a b -> a == b) (fun s -> String.length s) (fun witness ->
+    HashSet.size (HashSet.union canonical (HashSet.with witness))
+  )
+//~ FLICK-T003 @15:44-15:64 found `HashSet w String`
 
 /// A witness cannot leave the function it is given to.
 escaped : Float
-let escaped =
-  EqHash.with (fun a b -> a == b) (fun n -> n) (fun witness -> HashSet.with witness)
-//                                                             ^^^^^^^^^^^^^^^^^^^^ FLICK-T007 `w` would escape
+let escaped = EqHash.with (fun a b -> a == b) (fun n -> n) (fun witness -> HashSet.with witness)
+//~ FLICK-T007 @21:76-21:96 `w` would escape

@@ -35,7 +35,6 @@ instance Enum Method String =
 typo : Result SchemaError Method
 let typo = Method.parse "GTE"
 
-
 //~ FLICK-T020 @8:18-8:21 a literal is the value of a constructor of an enum: write `untagged type Plain`
 //~ FLICK-T020 @10:35-10:36 `Q` has no literal: each constructor of an enum is one, as `Q = "…"`
 //~ FLICK-T020 @12:24-12:38 `R` of an enum has no fields: its value is its literal

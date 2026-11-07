@@ -141,5 +141,5 @@ foreign pure compact from "@flick-lang/runtime/effect/Trie" "compact"
   reviewed "effect@4.1.2 sha256:e9226ab10cebd82a"
 
 /// Runs `f value key` on each entry in key order.
-for_each : forall c v r e. (v -> String ->{r; e} Unit)^c -> (Trie v ->{r; e} Unit)^c
+for_each : (v -> String ->{r; e} Unit)^c -> (Trie v ->{r; e} Unit)^c
 let for_each f trie = List.each_effect (fun (key, value) -> f value key) (entries trie)

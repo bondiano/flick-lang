@@ -18,7 +18,7 @@ instance Show a => Container (Pair a) =
     match p with
     | Pair x y -> show x ++ " / " ++ show y
 
-twice : forall c. (forall a. Show a => a -> String)^c -> String
+twice : (forall a. Show a => a -> String)^c -> String
 let twice f = f 42
 
 inner : Show a => a -> String

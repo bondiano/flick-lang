@@ -21,10 +21,10 @@ let outer_finalizer () = scope {
   provide greeter { Scope.add_finalizer (task { ignore (Greeter.greet "finalizer") }) }
 }
 
-not_given : forall s. Fiber.Owner s ->{Greeter;} Unit
+not_given : Fiber.Owner s ->{Greeter;} Unit
 let not_given owner = ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "child") }))
 
-given : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
+given : Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
 let given owner = ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "child") }))
 
 given_inside : Unit ->{} Unit

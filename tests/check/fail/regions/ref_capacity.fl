@@ -3,7 +3,7 @@
 // allows no captures.
 module App.RefCapacity exposing (..)
 
-unsafe : forall a. a -> a^{} -> a ->{} (Eff none none Unit)^{}
+unsafe : a -> a^{} -> a ->{} (Eff none none Unit)^{}
 let unsafe exemplar empty full =
   ignore exemplar
   let ref = Ref.make empty

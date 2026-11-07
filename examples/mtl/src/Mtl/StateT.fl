@@ -19,7 +19,7 @@ import Mtl.Classes exposing (
 type StateT s (m : Type -> Type) a = StateT (s -> m (a, s))
 
 /// Supply the initial state and remove this layer, yielding `m (a, s)`.
-run : forall c d s m a. (StateT s m a)^c -> (s^d -> (m (a, s))^(c + d))^c
+run : (StateT s m a)^c -> (s^d -> (m (a, s))^(c + d))^c
 let run (StateT step) state = step state
 
 instance Functor m => Functor (StateT s m) =

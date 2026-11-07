@@ -26,14 +26,14 @@ module Result exposing (
 )
 
 /// `Ok (f x)` for `Ok x`.
-map : forall c d e a b. (forall v. a^v -> b)^c -> ((Result e a)^d -> (Result e b)^(c + d))^c
+map : (forall v. a^v -> b)^c -> ((Result e a)^d -> (Result e b)^(c + d))^c
 let map f result =
   match result with
   | Err e -> Err e
   | Ok x -> Ok (f x)
 
 /// `Err (f e)` for `Err e`.
-map_err : forall c e x a. (e -> x)^c -> (Result e a -> Result x a)^c
+map_err : (e -> x)^c -> (Result e a -> Result x a)^c
 let map_err f result =
   match result with
   | Err e -> Err (f e)
@@ -41,7 +41,7 @@ let map_err f result =
 
 @lang result_bind
 /// `f x` for `Ok x`.
-bind : forall c e a b. (a -> Result e b)^c -> (Result e a -> Result e b)^c
+bind : (a -> Result e b)^c -> (Result e a -> Result e b)^c
 let bind f result =
   match result with
   | Err e -> Err e

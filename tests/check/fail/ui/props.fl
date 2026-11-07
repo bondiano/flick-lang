@@ -37,35 +37,34 @@ no_policy : Ui
 let no_policy = Ui.button { disabled = false; on_click = fun _ -> task { Atom.set saved "x" } } []
 //                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `Handler
 
-held : forall c. File.Path ->{Async, File.FileSystem; File.OpenError}
-  Ui^c
-let held path =
-  scope {
-    let file = File.open_scoped path
-    Ui.button
-      {
-        disabled = false;
-        on_click =
-          Ui.Event.exhaust
-            (
-              fun _ -> task { provide File.node { try ignore (File.read_all file) with | _ -> () } }
-            );
-      }
-      []
-  }
-//~ FLICK-G001 @45:5-54:9 holds region `s`
+held : File.Path ->{Async, File.FileSystem; File.OpenError} Ui^c
+let held path = scope {
+  let file = File.open_scoped path
+  Ui.button
+    {
+      disabled = false;
+      on_click =
+        Ui.Event.exhaust (fun _ -> task {
+          provide File.node {
+            try ignore (File.read_all file) with
+            | _ -> ()
+          }
+        });
+    }
+    []
+}
+//~ FLICK-G001 @43:3-54:7 holds region `s`
 
 mixed : Ui.SelectProps User c -> Ui^c
 let mixed props =
-  Ui.select
-    {
-      items = props.items;
-      selected = props.selected;
-      key = props.key;
-      render_item = props.render_item;
-      on_change = Ui.Event.latest (fun (product : Product) -> task { Atom.set saved product.sku });
-    }
-//~ FLICK-T003 @66:19-66:99 expected `Handler { id : Float; name : String }
+  Ui.select {
+    items = props.items;
+    selected = props.selected;
+    key = props.key;
+    render_item = props.render_item;
+    on_change = Ui.Event.latest (fun (product : Product) -> task { Atom.set saved product.sku });
+  }
+//~ FLICK-T003 @65:17-65:97 expected `Handler { id : Float; name : String }
 
 link : Ui
 let link = Ui.link { href = "javascript:alert(1)" } [Ui.text "x"]

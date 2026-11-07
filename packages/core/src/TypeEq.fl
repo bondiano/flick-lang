@@ -9,7 +9,7 @@ type TypeEq a b =
   | Refl : TypeEq a a
 
 /// `x` at the type that its type equals.
-cast : forall a b. TypeEq a b -> a -> b
+cast : TypeEq a b -> a -> b
 let cast eq x =
   match eq with
   | Refl -> x

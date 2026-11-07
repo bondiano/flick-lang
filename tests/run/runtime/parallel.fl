@@ -43,7 +43,7 @@ let describe result =
   | Ok n -> show n
   | Err (Oops text) -> "oops " ++ text
 
-quiet : forall e. Failure e ->{} Unit
+quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 /// The sibling of a failing branch ends before the failure is caught.

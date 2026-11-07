@@ -28,73 +28,65 @@ let plain = Plain.schema
 //          ^^^^^^^^^^^^ FLICK-D001 `Plain` derives no Schema
 
 missing : PureCodec Json Profile
-let missing =
-  codec Profile.schema {
-    email = field "email" String.json;
-  }
-//~ std/D002 @32:3-34:4 the codec misses the field `nickname`
+let missing = codec Profile.schema {
+  email = field "email" String.json;
+}
+//~ std/D002 @31:15-33:2 the codec misses the field `nickname`
 
 twice : PureCodec Json Profile
-let twice =
-  codec Profile.schema {
-    email = field "email" String.json;
-    email = field "mail" String.json;
-    nickname = optional_field "nickname" String.json;
-  }
-//~ std/D003 @41:5-41:37 `email` is given twice
+let twice = codec Profile.schema {
+  email = field "email" String.json;
+  email = field "mail" String.json;
+  nickname = optional_field "nickname" String.json;
+}
+//~ std/D003 @39:3-39:35 `email` is given twice
 
 unknown : PureCodec Json Profile
-let unknown =
-  codec Profile.schema {
-    email = field "email" String.json;
-    nickname = optional_field "nickname" String.json;
-    age = field "age" Float.json_finite;
-  }
-//~ std/D004 @51:5-51:40 the record has no field `age`
+let unknown = codec Profile.schema {
+  email = field "email" String.json;
+  nickname = optional_field "nickname" String.json;
+  age = field "age" Float.json_finite;
+}
+//~ std/D004 @48:3-48:38 the record has no field `age`
 
 clash : PureCodec Json Profile
-let clash =
-  codec Profile.schema {
-    email = field "name" String.json;
-    nickname = optional_field "name" String.json;
-  }
-//~ std/D005 @59:16-59:49 the wire name "name" is already a field's
+let clash = codec Profile.schema {
+  email = field "name" String.json;
+  nickname = optional_field "name" String.json;
+}
+//~ std/D005 @55:14-55:47 the wire name "name" is already a field's
 
 type Shape = Dot | Line Float
   deriving Schema
 
 shapes : PureCodec Json Shape
-let shapes =
-  codec Shape.schema {
-    x = field "x" Float.json_finite;
-  }
-//~ std/D007 @68:9-68:21 a `codec` block describes a record, but this is a schema of `Shape`
+let shapes = codec Shape.schema {
+  x = field "x" Float.json_finite;
+}
+//~ std/D007 @63:20-63:32 a `codec` block describes a record, but this is a schema of `Shape`
 
 wrong : PureCodec Json Profile
-let wrong =
-  codec Profile.schema {
-    email = field "email" Float.json_finite;
-    nickname = optional_field "nickname" String.json;
-  }
-//~ std/D012 @76:5-76:44 `email` is a `String`, but its codec decodes `Float`
+let wrong = codec Profile.schema {
+  email = field "email" Float.json_finite;
+  nickname = optional_field "nickname" String.json;
+}
+//~ std/D012 @70:3-70:42 `email` is a `String`, but its codec decodes `Float`
 
 service Directory =
   lookup : Unit ->{; SchemaError} String
 
 effectful : PureCodec Json Profile
-let effectful =
-  codec Profile.schema {
-    email = field "email" String.json |> on_missing_effect (fun () -> Directory.lookup ());
-    nickname = optional_field "nickname" String.json;
-  }
-//~ FLICK-T003 @86:3-89:4 expected `PureCodec Json Profile`, found `Codec
+let effectful = codec Profile.schema {
+  email = field "email" String.json |> on_missing_effect (fun () -> Directory.lookup ());
+  nickname = optional_field "nickname" String.json;
+}
+//~ FLICK-T003 @79:17-82:2 expected `PureCodec Json Profile`, found `Codec
 
 general : Codec {Directory} none Json Profile
-let general =
-  codec Profile.schema {
-    email = field "email" String.json |> on_missing_effect (fun () -> Directory.lookup ());
-    nickname = optional_field "nickname" String.json;
-  }
+let general = codec Profile.schema {
+  email = field "email" String.json |> on_missing_effect (fun () -> Directory.lookup ());
+  nickname = optional_field "nickname" String.json;
+}
 
 as_pure : PureCodec Json Profile
 let as_pure = general

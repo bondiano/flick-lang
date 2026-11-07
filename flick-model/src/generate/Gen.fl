@@ -44,7 +44,7 @@ use_conn : forall c. Raw^c ->{} Unit
 foreign effect use_conn from "./res.mjs" "use"
   retention call
 
-report : Failure e ->{; none} Unit
+report : Failure e ->{} Unit
 let report _ = ()
 
 // The holes of TypeScript (docs/formal/ts-holes.md): a JS value of unknown
