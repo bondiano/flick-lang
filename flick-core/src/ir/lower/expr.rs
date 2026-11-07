@@ -2,7 +2,7 @@
 
 use super::numeric::{apply, arith_of};
 use super::{Lower, type_name};
-use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
+use crate::ir::{Arm, BinOp, Expr, ExprKind, Handler, Lit, Pat, Stage, Stmt};
 use crate::numeric::Arith;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -119,8 +119,13 @@ impl Lower<'_> {
             }
             K::TryExpr | K::ProvideExpr if self.handles_effects(node) => self.handler(node),
             K::TryExpr => {
-                let body = self.boxed(children[0]);
-                ExprKind::Try(body, self.arms(node))
+                let body = *self.boxed(children[0]);
+                ExprKind::Handle(Box::new(Handler {
+                    effects: Vec::new(),
+                    body,
+                    ret: None,
+                    errors: self.arms(node),
+                }))
             }
             K::TaskExpr => ExprKind::Task(self.boxed(children[0])),
             K::DoExpr => return self.do_expr(node),

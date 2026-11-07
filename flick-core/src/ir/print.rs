@@ -169,7 +169,6 @@ pub fn expr(e: &Expr) -> String {
         }
         ExprKind::If(c, t, f) => format!("(if {} then {} else {})", expr(c), expr(t), expr(f)),
         ExprKind::Match(s, a) => format!("(match {} {})", expr(s), arms(a)),
-        ExprKind::Try(b, a) => format!("(try {} {})", expr(b), arms(a)),
         ExprKind::Tuple(items) => format!("({})", exprs(items)),
         ExprKind::List(items) => format!("[{}]", exprs(items)),
         ExprKind::Record(f) => format!("{{{}}}", fields(f)),
@@ -216,6 +215,7 @@ pub fn expr(e: &Expr) -> String {
         ),
         ExprKind::Within(owner, e) => format!("(within {owner} {})", expr(e)),
         ExprKind::Provide(l, e) => format!("(provide {} {})", expr(l), expr(e)),
+        ExprKind::Handle(h) if h.is_try() => format!("(try {} {})", expr(&h.body), arms(&h.errors)),
         ExprKind::Handle(h) => handler(h),
         ExprKind::Lift(e, l) => format!("(lift{} {})", lift(l), expr(e)),
     }

@@ -29,6 +29,8 @@ fn count(e: &Expr, name: &str, n: &mut usize) {
 pub fn strict_uses(e: &Expr, name: &str) -> usize {
     match &e.kind {
         ExprKind::Local(l) => usize::from(l == name),
+        // only catching errors, it runs its body at once
+        ExprKind::Handle(h) if h.is_try() => strict_uses(&h.body, name),
         ExprKind::Lambda { .. }
         | ExprKind::Task(_)
         | ExprKind::Scope { .. }
@@ -41,7 +43,7 @@ pub fn strict_uses(e: &Expr, name: &str) -> usize {
         // the body runs once per element, maybe never
         ExprKind::Each { source, .. } => strict_uses(source, name),
         ExprKind::If(c, _, _) => strict_uses(c, name),
-        ExprKind::Match(s, _) | ExprKind::Try(s, _) => strict_uses(s, name),
+        ExprKind::Match(s, _) => strict_uses(s, name),
         // `&&` and `||` may skip their right operand
         ExprKind::Binary(BinOp::And | BinOp::Or, l, _) => strict_uses(l, name),
         ExprKind::Block(stmts, result) => {
@@ -83,7 +85,7 @@ pub fn respan(e: &mut Expr, span: Span) {
 pub fn size(e: &Expr) -> usize {
     let mut n = 1;
     match &e.kind {
-        ExprKind::Match(_, arms) | ExprKind::Try(_, arms) => {
+        ExprKind::Match(_, arms) => {
             n += arms.iter().map(|a| pat_size(&a.pat)).sum::<usize>();
         }
         ExprKind::Handle(h) => n += h.errors.iter().map(|a| pat_size(&a.pat)).sum::<usize>(),
@@ -215,7 +217,7 @@ fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
                 }
             }
         }
-        ExprKind::Match(_, arms) | ExprKind::Try(_, arms) => {
+        ExprKind::Match(_, arms) => {
             for arm in arms {
                 pat_binders(&arm.pat, names, suffix);
             }
@@ -265,7 +267,7 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
                 }
             }
         }
-        ExprKind::Match(_, arms) | ExprKind::Try(_, arms) => {
+        ExprKind::Match(_, arms) => {
             for arm in arms {
                 apply_pat(&mut arm.pat, names);
             }

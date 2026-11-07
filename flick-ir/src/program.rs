@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{FileId, Module};
 
 /// The version of the IR this crate reads and writes.
-pub const VERSION: &str = "0.1.0";
+pub const VERSION: &str = "0.2.0";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Program {
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn a_reader_takes_only_its_own_minor_version_before_1_0() {
         assert!(compatible(VERSION));
-        assert!(!compatible("0.2.0"));
+        assert!(!compatible("0.1.0"));
         assert!(!compatible("1.0.0"));
         assert!(!compatible("0.1"));
         let mut p = program(1.0);

@@ -124,7 +124,7 @@ impl Gen<'_> {
                 self.arms(&s, arms, Some(&r));
                 r
             }
-            ExprKind::Try(body, arms) => self.try_expr(body, arms),
+            ExprKind::Handle(h) if h.is_try() => self.try_expr(&h.body, &h.errors),
             ExprKind::Tuple(items) | ExprKind::List(items) => {
                 let items: Vec<&Expr> = items.iter().collect();
                 format!("[{}]", self.ordered(&items).join(", "))
