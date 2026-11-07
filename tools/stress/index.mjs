@@ -6,6 +6,9 @@
 // first violation stops it, with the case, the target, the seed and the
 // command that repeats the run. Not part of CI.
 //
+// `FLICK_STRESS_TARGETS` names the targets, `js,go` by default: `rt` is Flick's
+// own runtime, for the cases of `tests/run/rt.txt`.
+//
 //   node tools/stress/index.mjs target/debug/flick target/debug/examples/rt_trace [runs] [prefix…]
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
@@ -22,10 +25,15 @@ const root = join(import.meta.dirname, "../..");
 const out = join(root, "target/stress");
 const exe = process.platform === "win32" ? "flick-main.exe" : "flick-main";
 
-const cases = readFileSync(join(root, "tests/run/portable.txt"), "utf8")
-  .split("\n")
-  .map((l) => l.split("#")[0].trim())
-  .filter((l) => l !== "" && prefixes.some((p) => l.startsWith(p)));
+const listed = (file) =>
+  readFileSync(join(root, "tests/run", file), "utf8")
+    .split("\n")
+    .map((l) => l.split("#")[0].trim())
+    .filter((l) => l !== "" && prefixes.some((p) => l.startsWith(p)));
+const portable = listed("portable.txt");
+const onRt = listed("rt.txt");
+const wanted = (process.env.FLICK_STRESS_TARGETS ?? "js,go").split(",");
+const cases = [...new Set([...portable, ...onRt])];
 
 // `<target> <case>`: a case that target does not hold yet, which may not even build there
 const gaps = new Set(
@@ -38,11 +46,13 @@ const gaps = new Set(
 const targets = {
   js: (dir) => ["node", ["--enable-source-maps", join(dir, "flick-main.js")]],
   go: (dir) => [join(dir, exe), []],
+  rt: (dir) => ["node", ["--enable-source-maps", join(dir, "flick-main.js")]],
 };
 
 let failed = false;
 for (const name of cases) {
   for (const [target, command] of Object.entries(targets)) {
+    if (!wanted.includes(target) || !(target === "rt" ? onRt : portable).includes(name)) continue;
     if (gaps.has(`${target} ${name}`)) {
       console.log(`${name} (${target}): a known gap, skipped`);
       continue;
@@ -52,7 +62,9 @@ for (const name of cases) {
     mkdirSync(dir, { recursive: true });
     const build = spawnSync(
       flick,
-      ["build", join(root, "tests/run", `${name}.fl`), "--out-dir", dir, "--emit", target],
+      target === "rt"
+        ? ["build", join(root, "tests/run", `${name}.fl`), "--out-dir", dir, "--rt"]
+        : ["build", join(root, "tests/run", `${name}.fl`), "--out-dir", dir, "--emit", target],
       { encoding: "utf8" },
     );
     if (build.status !== 0) {
@@ -82,4 +94,4 @@ for (const name of cases) {
     console.log(`${name} (${target}): ${runs} runs`);
   }
 }
-console.log(`stress: ${cases.length} cases, ${runs} runs each on js and go, no violation`);
+console.log(`stress: ${cases.length} cases, ${runs} runs each on ${wanted.join(" and ")}, no violation`);

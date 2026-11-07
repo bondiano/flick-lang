@@ -1,6 +1,6 @@
 // Outcomes as Flick sees them: `Exit`, `Failure` and `RawCause` keep a cause
 // opaque.
-import { type Cause, type Exit, recoverable } from "./cause.ts";
+import { type Cause, type Exit, raise, recoverable } from "./cause.ts";
 import { none, type Option, some } from "../core/data.ts";
 
 /** `Failure e`: how a computation failed. */
@@ -34,3 +34,6 @@ export const failurePrimary = (failure: Failure): Option<unknown> => {
 };
 
 export const failureRawCause = (failure: Failure): RawCause => new RawCause(failure.cause);
+
+/** `Failure.rethrow`: fails with the original cause, unchanged. */
+export const failureRethrow = (failure: Failure): never => raise(failure.cause);
