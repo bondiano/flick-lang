@@ -150,4 +150,5 @@ import Formal.Elab.Close
 import Formal.Elab.CallSite
 import Formal.Elab.Witness.Main
 import Formal.Elab.Witness.T6b
+import Formal.FailAbort
 import Formal.Axioms
