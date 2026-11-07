@@ -4,10 +4,10 @@
 import { Cause as ECause, Context, Effect, Exit as EExit, Layer as ELayer, Option as EOption, Result as EResult, Scope as EScope } from "effect";
 
 import { type Cause, type Exit, Raise, failed, fromReasons, raise, succeeded } from "./cause.ts";
-import { type Ctx, type Fiber, type Run, Suspend, currentCtx, currentFiber, forkNow, hosted, asExit, exitOf, raiseOf } from "./fiber.ts";
+import { type Ctx, type Fiber, type Run, Suspend, currentCtx, currentFiber, forkNow, hosted, asExit, exitOf, lookup, raiseOf } from "./fiber.ts";
 import { Failure } from "./outcome.ts";
 import { bridgeHooks } from "./handle.ts";
-import { HOST, Layer, MemoMap, layerHooks, memoizable } from "./layer.ts";
+import { HOST, Layer, MEMO as MEMO_KEY, MemoMap, layerHooks, memoizable } from "./layer.ts";
 import { Owner, addTo, close, inside } from "./owner.ts";
 import { none, some, useHostData } from "../core/data.ts";
 
@@ -38,6 +38,39 @@ const exitValue = (exit: EExit.Exit<unknown, unknown>): unknown => {
   if (exit._tag === "Success") return exit.value;
   return raise(causeIn(exit.cause));
 };
+
+/**
+ * The kernel's services as Effect's code would call them: every call an Effect.
+ * shortcut: from the outside, by what an op gives; the compiler knows each op's stage, and would derive it.
+ */
+const opOut = (f: unknown): unknown =>
+  typeof f !== "function"
+    ? f
+    : (...args: ReadonlyArray<unknown>): unknown => {
+        const out: unknown = Reflect.apply(f, undefined, args);
+        if (typeof out === "function") return opOut(out);
+        return callEffect(() => out);
+      };
+
+const implOut = (impl: unknown): unknown =>
+  new Proxy(Object(impl) as object, {
+    get: (target, name) => opOut(Reflect.get(target, name)),
+  });
+
+/** The Context of the evidence `ctx`: Effect's own, with the kernel's services in, computed once per node. */
+const hostOf = (ctx: Ctx | null): Context.Context<never> => {
+  if (ctx === null) return EMPTY as Context.Context<never>;
+  if (ctx.bridged !== undefined) return ctx.bridged as Context.Context<never>;
+  const below = ctx.next;
+  let out: Context.Context<never>;
+  if (ctx.host !== below?.host) out = ctx.host as Context.Context<never>;
+  else if (ctx.tag !== null && Object.isFrozen(ctx.tag) && ctx.tag !== MEMO_TAG(ctx.tag)) {
+    out = Context.add(hostOf(below), ctx.tag as never, implOut(ctx.impl) as never);
+  } else out = hostOf(below);
+  ctx.bridged = out;
+  return out;
+};
+const MEMO_TAG = (tag: object): object | undefined => (Reflect.get(tag, "key") === "effect/Layer/CurrentMemoMap" ? tag : undefined);
 
 /** What Effect's scope of one crossing holds goes on the owner's stack, at its place in the order. */
 const settled = (owner: Owner | undefined, scope: EScope.Closeable): unknown => {
@@ -89,7 +122,7 @@ export const fromEffect = (effect: unknown): unknown => {
   }
   const ctx = currentCtx();
   const scope = EScope.makeUnsafe();
-  const services = Context.add(Context.add((ctx.host ?? EMPTY) as Context.Context<never>, KERNEL, ctx), EScope.Scope, scope);
+  const services = Context.add(Context.add(hostOf(ctx), KERNEL, ctx), EScope.Scope, scope);
   const fiber = currentFiber();
   const ef = Effect.runForkWith(services)(effect as Effect.Effect<unknown, unknown, never>, { uninterruptible: fiber.mask > 0 }) as unknown as EffectFiber;
   const exit = ef._exit;
@@ -183,9 +216,12 @@ export const layerToEffect = (layer: unknown): unknown => {
         EScope.addFinalizerExit(scope, (exit) =>
           callEffect(() => close(owner, exit._tag === "Success" ? succeeded(undefined) : failed(causeIn(exit.cause)))),
         ).pipe(Effect.runSync);
-        const services = (yield inside(owner, () => layer.build(new MemoMap(undefined), owner))) as ReadonlyArray<readonly [{ readonly key: string }, unknown]>;
+        // the memo map of the `provide` around it: a layer shared with the kernel's side is one build
+        const outer = lookup(MEMO_KEY);
+        const memo = outer instanceof MemoMap ? outer : new MemoMap(undefined);
+        const services = (yield inside(owner, () => layer.build(memo, owner))) as ReadonlyArray<readonly [{ readonly key: string }, unknown]>;
         const map = new Map<string, unknown>();
-        for (const [tag, impl] of services) map.set(tag.key, impl);
+        for (const [tag, impl] of services) map.set(tag.key, implOut(impl));
         return Context.makeUnsafe(map);
       }),
     ),

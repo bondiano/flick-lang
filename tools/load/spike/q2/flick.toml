@@ -1,0 +1,9 @@
+schema-version = 1
+
+[project]
+kind = "app"
+source-dir = "src"
+entries = { server = "App.Main" }
+
+[build]
+out-dir = "dist"

@@ -1,0 +1,69 @@
+// Q1: an Effect in a kernel fiber: suspends, resumes, fails as a cause,
+// and interrupting the kernel fiber interrupts the Effect fiber and waits for it.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+  deriving Show
+
+later : Float -> String ->{Async;} String
+foreign effect later from "./e.mjs" "later"
+  arity 2
+
+fails : Boom ->{Async; Boom} Int
+foreign effect fails from "./e.mjs" "fails"
+
+dies : String ->{Async;} Int
+foreign effect dies from "./e.mjs" "dies"
+
+slow_finalizer : Float ->{Async;} Unit
+foreign effect slow_finalizer from "./e.mjs" "slowFinalizer"
+
+immediate : Int ->{Async;} Int
+foreign effect immediate from "./e.mjs" "immediate"
+
+syncly : Int ->{Async;} Int
+foreign effect syncly from "./e.mjs" "syncly"
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+ms : Float -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  say ("immediate " ++ show (immediate 1))
+  say ("sync " ++ show (syncly 2))
+  scope s {
+    let other = Fiber.spawn s quiet (task {
+      Effect.sleep (ms 5)
+      say "another kernel fiber ran while the Effect slept"
+    })
+    say ("resumed with " ++ later 30 "value")
+    Fiber.join other
+  }
+  let caught =
+    try fails (Boom "typed") with
+    | Boom m ->
+      say ("try caught " ++ m)
+      0
+  say ("after try " ++ show caught)
+  scope s {
+    let f = Fiber.spawn s quiet (task { dies "a defect" })
+    let exit = Fiber.await_ f
+    say ("defect is a failure: " ++ show (Option.is_some (Exit.failure exit)))
+  }
+  scope s {
+    let f = Fiber.spawn s quiet (task {
+      Scope.add_finalizer (task { say "kernel finalizer of the fiber" })
+      slow_finalizer 40
+    })
+    Effect.sleep (ms 10)
+    say "interrupting"
+    Fiber.interrupt f
+    say "Fiber.interrupt returned"
+  }
+  say "done"

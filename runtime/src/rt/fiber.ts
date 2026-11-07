@@ -19,6 +19,8 @@ export class Ctx {
   readonly owner: Owner | undefined;
   /** spike: the Context of Effect in effect here, when a bridge gave one. */
   readonly host: unknown;
+  /** spike: what the bridge computed for this evidence: its Context with the kernel's services in. */
+  bridged: unknown = undefined;
   constructor(tag: object | null, impl: unknown, next: Ctx | null, owner: Owner | undefined, host: unknown = next?.host) {
     this.tag = tag;
     this.impl = impl;

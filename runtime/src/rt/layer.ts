@@ -52,7 +52,7 @@ export class MemoMap {
   }
 }
 
-const MEMO = /*#__PURE__*/ Object.freeze({ key: "effect/Layer/CurrentMemoMap" });
+export const MEMO = /*#__PURE__*/ Object.freeze({ key: "effect/Layer/CurrentMemoMap" });
 
 const held = (map: MemoMap, layer: Layer, entry: Entry, into: Owner): unknown => {
   entry.observers++;

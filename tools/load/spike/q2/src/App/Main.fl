@@ -1,0 +1,91 @@
+// Q2: a Flick callback in a real Stream of Effect: evidence of `provide`, of a
+// `tail` and an `abort` handler installed outside the stream; a typed failure;
+// and an interruption from outside while the callback runs.
+module App.Main exposing (main)
+
+import Fail
+import Stream exposing (Stream)
+
+service Greet =
+  greet : Int ->{} String
+
+effect Count =
+  tail tick : Int ->{} Int
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+type error Nope = Nope Int
+  deriving Show
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+ms : Float -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+/// Built here, outside every handler: the evidence comes when it runs.
+greeted : Stream {Greet, Async} none String
+let greeted =
+  Stream.from_list [1, 2, 3]
+  |> Stream.map_effect (fun x ->
+    Effect.sleep (ms 1)
+    Greet.greet x
+  )
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let a =
+    provide (Layer.succeed Greet { greet = fun x -> "hello " ++ show x; }) {
+      Stream.run_collect greeted
+    }
+  say ("provide reaches the callback: " ++ show a)
+  let b =
+    try
+      Stream.run_collect
+        (Stream.from_list [1, 2, 3] |> Stream.map_effect (fun x -> Count.tick x))
+    with
+    | Count.tick x -> x * 10
+  say ("tail handler reaches the callback: " ++ show b)
+  let c =
+    try
+      Stream.run_collect
+        (Stream.from_list [1, 2, 3] |> Stream.map_effect (fun x -> if x == 2 then Stop.stop "two" else x))
+    with
+    | Stop.stop why ->
+      say ("abort arm ran: " ++ why)
+      [0]
+  say ("abort handler reaches the callback: " ++ show c)
+  let d =
+    try
+      Stream.run_collect
+        (Stream.from_list [1, 2, 3] |> Stream.map_effect (fun x -> if x == 2 then Fail.fail (Nope x) else x))
+    with
+    | Nope x -> [x * 100]
+  say ("a typed failure goes through: " ++ show d)
+  scope s {
+    let f = Fiber.spawn s quiet (task {
+      Stream.run_collect
+        (Stream.from_list [1, 2, 3]
+        |> Stream.map_effect (fun x ->
+          scope inner {
+            Scope.add_finalizer (task {
+              say "callback finalizer starts"
+              Effect.sleep (ms 30)
+              say "callback finalizer ends"
+            })
+            say "callback runs"
+            Effect.sleep (ms 10000)
+            x
+          }
+        ))
+    })
+    Effect.sleep (ms 20)
+    say "interrupting from outside"
+    Fiber.interrupt f
+    say "Fiber.interrupt returned"
+  }
+  say "done"

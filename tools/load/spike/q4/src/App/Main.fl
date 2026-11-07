@@ -1,0 +1,108 @@
+// Q4, both directions in one program: a Flick service given by `provide`, used
+// in a handler on Effect's server; a layer built by Effect, used by Flick code on
+// the kernel; the order of releases against the kernel's finalizers.
+module App.Main exposing (main)
+
+import Http.Router exposing (RouteContext)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+type alias Echo = { n : Float }
+  deriving Schema
+
+service Greet =
+  greet : String ->{} String
+
+service Db =
+  query : String ->{Async;} String
+
+service Db2 =
+  query : String ->{Async;} String
+
+db_layer : ServiceTag {Db} -> Layer none none {Db}
+foreign pure db_layer from "./res.mjs" "dbLayer"
+
+uses_flick : ServiceTag {Db2} -> ServiceTag {Greet} -> Layer {Greet} none {Db2}
+foreign pure uses_flick from "./res.mjs" "usesFlick"
+  arity 2
+
+http_get : String ->{Async;} String
+foreign http_get from "./res.mjs" "httpGet"
+
+http_post : String -> String ->{Async;} String
+foreign http_post from "./res.mjs" "httpPost"
+  arity 2
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// Flick's layer with an acquire and a release on the kernel.
+greet_layer : Unit -> Layer {Scope s} none {Greet}
+let greet_layer () =
+  Layer.effect Greet (task {
+    say "flick layer: acquire Greet"
+    Scope.add_finalizer (task { say "flick layer: release Greet" })
+    { greet = fun name -> "hello " ++ name; }
+  })
+
+ok : Http.ServerResponse.Options
+let ok = Http.ServerResponse.defaults
+
+item : Codec none none Json Echo
+let item = Codec.general (Codec.json Echo.schema)
+
+both : ServerRequest ->{Greet, Db, Async, RouteContext;} ServerResponse
+let both _ =
+  let name = Option.with_default "?" (Http.Router.param "name")
+  let hello = Greet.greet name
+  let row = Db.query name
+  Http.ServerResponse.text (hello ++ ", " ++ row) ok
+
+/// Reads the body with a row that says nothing of `Async`: a Sync stage on the kernel.
+closed : ServerRequest ->{RouteContext; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError} ServerResponse
+let closed request =
+  let got = Http.ServerRequest.schema_body_json item request
+  Http.ServerResponse.schema_json item { n = got.n + 1 } ok
+
+/// The same, with `Async` in its row.
+said : ServerRequest ->{Async, RouteContext; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError} ServerResponse
+let said request =
+  let got = Http.ServerRequest.schema_body_json item request
+  Http.ServerResponse.schema_json item { n = got.n + 1 } ok
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  scope outer {
+    Scope.add_finalizer (task { say "kernel finalizer A, outside the provide" })
+    let gl = greet_layer ()
+    provide (Layer.merge gl (db_layer Db)) {
+      Scope.add_finalizer (task { say "kernel finalizer B, inside the provide" })
+      say ("flick code on the kernel uses Effect's layer: " ++ Db.query "direct")
+      let d2 = provide (Layer.provide_ gl (uses_flick Db2 Greet)) { Db2.query "d2" }
+      say ("an Effect layer on a Flick layer: " ++ d2)
+      try
+        provide Http.Server.layer_services {
+          scope s {
+            Scope.add_finalizer (task { say "kernel finalizer C, before serve" })
+            let app =
+              Http.Router.router Http.Router.config [
+                Http.Router.route (Some Http.Method.GET) "/greet/:name" both,
+                Http.Router.route (Some Http.Method.POST) "/closed" closed,
+                Http.Router.route (Some Http.Method.POST) "/said" said,
+              ]
+            let server = Http.Server.serve { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None } app
+            Scope.add_finalizer (task { say "kernel finalizer D, after serve" })
+            let base = Http.Server.format_address (Http.Server.address server)
+            say ("handler: " ++ http_get (base ++ "/greet/world"))
+            say ("body, row with Async: " ++ http_post (base ++ "/said") "{\"n\": 1}")
+            say ("body, closed row: " ++ http_post (base ++ "/closed") "{\"n\": 1}")
+            say "closing the server's scope"
+          }
+        }
+      with
+      | Http.ServerError.ServeError _ -> say "cannot listen"
+      say "the server's scope closed"
+    }
+    say "the provide closed"
+  }
+  say "done"

@@ -1,0 +1,16 @@
+// Q2, `control`: a `control` handler outside the stream, its operation in the callback.
+module App.Main exposing (main)
+
+effect Emit =
+  control emit : Int ->{} Int
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let r =
+    try
+      Stream.run_collect
+        (Stream.from_list [1, 2, 3] |> Stream.map_effect (fun x -> Emit.emit x))
+    with
+    | Emit.emit x -> resume (x + 1)
+    | return xs -> xs
+  Platform.stdout_line (show r)
