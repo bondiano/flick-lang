@@ -9,13 +9,14 @@
 
 /* Lines, stations and labels of the diagram. */
 .hero-map svg { display: block; width: 100%; height: auto; overflow: visible; }
-.map-lines path { fill: none; stroke-width: 12; stroke-linejoin: round; }
-.map-corridor .map-lines path { stroke-width: 10; }
+.map-lines path { fill: none; stroke-linejoin: round; }
+/* One thickness on the whole map, the same as the rail it hands over to. */
+.hero-map .map-lines path { stroke-width: 8px; vector-effect: non-scaling-stroke; }
 .line-users { stroke: var(--flick-line-cobalt); }
 .line-fails { stroke: var(--flick-line-coral); }
-.line-log { stroke: var(--flick-line-green); transition: stroke 160ms ease-out; }
-.hero-map .map-lines .line-returns { stroke: var(--flick-line-violet); stroke-width: 8px; vector-effect: non-scaling-stroke; }
-.map-prose { font-family: var(--sl-font); font-size: 14px; font-weight: 500; fill: var(--sl-color-gray-2); }
+.line-log { stroke: var(--flick-line-green); transition: stroke 180ms ease-out; }
+.line-returns { stroke: var(--flick-line-violet); }
+.map-prose { font-family: var(--sl-font); font-size: 14px; font-weight: 400; fill: var(--sl-color-gray-2); }
 .map-station { fill: var(--flick-panel); stroke: var(--sl-color-white); stroke-width: 6; }
 .map-labels { font-family: var(--sl-font-mono); font-size: 19px; font-weight: 600; fill: var(--sl-color-white); }
 .map-corridor .map-labels { font-size: 16px; }
@@ -28,7 +29,7 @@
 .map-stop path { fill: none; stroke: var(--sl-color-text-invert); stroke-width: 3.5; stroke-linecap: round; }
 .hero-map[data-broken] .line-log-trunk { stroke: var(--sl-color-gray-5); stroke-dasharray: 3 19; stroke-linecap: round; }
 .hero-map[data-broken] .line-log-cap { stroke: var(--sl-color-gray-5); }
-.hero-map[data-broken] .map-stop { opacity: 1; animation: stop-land 280ms cubic-bezier(0.16, 1, 0.3, 1); transform-box: fill-box; transform-origin: center; }
+.hero-map[data-broken] .map-stop { opacity: 1; animation: stop-land 180ms cubic-bezier(0.16, 1, 0.3, 1); transform-box: fill-box; transform-origin: center; }
 @keyframes stop-land { from { transform: scale(0.2); } to { transform: scale(1); } }
 
 /* The sign, the amber action and the compiler's answer. Hero.fl owns their state. */
@@ -40,7 +41,7 @@
 .sign-fails { color: var(--flick-sign-coral); font-weight: 700; }
 .sign-returns { color: var(--flick-sign-violet); font-weight: 700; }
 .hero-stem { background: var(--flick-sign); }
-.hero-press button { display: block; width: 100%; min-height: 48px; padding: 0.7rem 1.3rem 0.5rem; border: 0; background: var(--flick-line-amber); color: #0e1116; font-family: var(--sl-font); font-size: 1.2rem; font-weight: 800; line-height: 1.1; cursor: pointer; }
+.hero-press button { display: block; width: 100%; min-height: 48px; padding: 0.7rem 1.3rem 0.5rem; border: 0; background: var(--flick-line-amber); color: #0e1116; font-family: var(--sl-font); font-size: 1.2rem; font-weight: 600; line-height: 1.1; cursor: pointer; }
 .hero-press button:hover:not(:disabled) { background: #ffd34d; }
 .hero-press button:disabled { cursor: progress; }
 .hero-status { font-size: 0.98rem; line-height: 1.4; color: var(--sl-color-gray-2); }
@@ -51,7 +52,7 @@
 
 /* Actions are signs too, set in the same square black. */
 .hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.action { display: inline-flex; align-items: center; gap: 0.6rem; min-height: 52px; padding: 0.55rem 1.35rem 0.35rem; font-size: 1.15rem; font-weight: 700; line-height: 1.1; text-decoration: none; color: var(--sl-color-white); box-shadow: inset 0 0 0 3px var(--sl-color-white); }
+.action { display: inline-flex; align-items: center; gap: 0.6rem; min-height: 52px; padding: 0.55rem 1.35rem 0.35rem; font-size: 1.15rem; font-weight: 600; line-height: 1.1; text-decoration: none; color: var(--sl-color-white); box-shadow: inset 0 0 0 3px var(--sl-color-white); }
 .action:hover { color: var(--sl-color-accent-high); box-shadow: inset 0 0 0 3px var(--sl-color-accent); }
 .action-primary, .action-primary:hover { background: var(--flick-sign); color: var(--flick-sign-ink); box-shadow: none; }
 .action-primary:hover { background: var(--sl-color-accent); color: #fff; }
@@ -64,7 +65,7 @@
 /* Phones and tablets: the copy, then the sign, then the diagram as a vertical corridor. */
 .hero { display: flex; flex-direction: column; gap: 2rem; padding: 2.25rem max(1rem, var(--flick-gutter)) 0; }
 .hero-copy { display: grid; gap: 1.5rem; min-width: 0; }
-.hero-copy h1 { margin: 0; font-size: clamp(2.65rem, 10.8vw, 5rem); font-weight: 800; line-height: 1; letter-spacing: -0.035em; }
+.hero-copy h1 { margin: 0; font-size: clamp(2.65rem, 10.8vw, 5rem); font-weight: 800; line-height: 1; }
 .hero-support { max-width: 38rem; font-size: 1.15rem; line-height: 1.45; }
 .hero-limit { font-size: 0.92rem; }
 .hero-proof { display: grid; gap: 0.75rem; }
@@ -113,13 +114,13 @@
 .terminus::after { content: ''; position: absolute; left: calc(var(--rail-x) - 2.5rem - 0.8rem); top: 26px; width: 1.6rem; height: 24rem; background: var(--sl-color-bg); }
 .stop { position: relative; display: grid; gap: 1.25rem; padding: 1.5rem 0 4rem 2.5rem; max-width: 72rem; min-width: 0; }
 .stop > * { min-width: 0; }
-.stop h2 { position: relative; margin: 0; font-size: clamp(2rem, 4.2vw, 3rem); font-weight: 800; line-height: 1.08; letter-spacing: -0.025em; }
+.stop h2 { position: relative; margin: 0; font-size: clamp(2rem, 4.2vw, 3rem); font-weight: 800; line-height: 1.08; }
 .stop h2::before { content: ''; position: absolute; left: calc(var(--rail-x) - 2.5rem - 0.75rem); top: 0.1em; width: 1.5rem; height: 1.5rem; border: 5px solid var(--sl-color-white); border-radius: 50%; background: var(--flick-panel); }
-.stop h3 { margin: 0.75rem 0 0; font-size: 1.4rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.01em; }
+.stop h3 { margin: 0.75rem 0 0; font-size: 1.4rem; font-weight: 800; line-height: 1.2; }
 .stop-lead { max-width: 40rem; font-size: 1.25rem; line-height: 1.45; color: var(--sl-color-white); }
 .stop-text { max-width: 36rem; font-size: 1.0625rem; line-height: 1.6; }
 .stop code { padding: 0.08em 0.28em; background: var(--sl-color-bg-inline-code); color: var(--sl-color-white); white-space: nowrap; }
-.stop-link { display: inline-flex; align-items: center; gap: 0.5rem; justify-self: start; min-height: 44px; font-weight: 700; font-size: 1.05rem; color: var(--sl-color-text-accent); text-decoration: none; }
+.stop-link { display: inline-flex; align-items: center; gap: 0.5rem; justify-self: start; min-height: 44px; font-weight: 600; font-size: 1.05rem; color: var(--sl-color-text-accent); text-decoration: none; }
 .stop-link:hover { text-decoration: underline; }
 .stop-last { padding-bottom: 3rem; }
 .stop-last .hero-actions { margin-top: 0.75rem; }
@@ -138,7 +139,7 @@
 .legend { display: grid; gap: 1.25rem; margin: 0; align-content: start; }
 .legend > div { display: grid; gap: 0.25rem; }
 .legend dt { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-.legend .chip { padding: 0.15em 0.45em 0.05em; font-weight: 700; color: #fff; }
+.legend .chip { padding: 0.15em 0.45em 0.05em; font-weight: 600; color: #fff; }
 .legend dd { margin: 0; font-size: 1.0625rem; line-height: 1.5; }
 .legend .chip-users { background: #1560d4; }
 .legend .chip-log { background: #0a7a4c; }
@@ -158,7 +159,7 @@
 .proved::before { content: ''; position: absolute; inset: 0.9rem auto 0.9rem 0.2rem; width: 5px; background: var(--flick-line-violet); }
 .proved li { position: relative; display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0.55rem 0 0.45rem; border-bottom: 1px solid var(--sl-color-hairline); font-size: 1.0625rem; line-height: 1.3; }
 .proved li::before { content: ''; position: absolute; left: -1.85rem; top: 0.72rem; width: 0.8rem; height: 0.8rem; border: 3px solid var(--sl-color-white); border-radius: 50%; background: var(--flick-panel); }
-.proved b { font-weight: 700; color: var(--sl-color-white); }
+.proved b { font-weight: 600; color: var(--sl-color-white); }
 
 .compare { display: grid; gap: 2rem; }
 .compare article { display: grid; gap: 0.6rem; min-width: 0; }
@@ -169,10 +170,10 @@
 .seam-map path { fill: none; stroke: var(--flick-line-violet); stroke-width: 10; stroke-linejoin: round; }
 .seam-map .map-station { stroke-width: 6; }
 .seam-map text { font-family: var(--sl-font-mono); font-size: 17px; font-weight: 600; fill: var(--sl-color-white); }
-.seam-map .map-prose { font-family: var(--sl-font); font-size: 14px; font-weight: 500; fill: var(--sl-color-gray-2); }
+.seam-map .map-prose { font-family: var(--sl-font); font-size: 14px; font-weight: 400; fill: var(--sl-color-gray-2); }
 .seams { display: grid; gap: 1rem; }
 .sign-panel { display: grid; gap: 0.4rem; padding: 0.95rem 1.15rem 0.8rem; background: var(--flick-sign); color: var(--flick-sign-ink); font-family: var(--sl-font-mono); font-size: 0.92rem; font-variant-ligatures: none; line-height: 1.45; overflow-wrap: anywhere; }
-.sign-caption { font-family: var(--sl-font); font-size: 0.95rem; font-weight: 700; color: var(--flick-sign-muted); }
+.sign-caption { font-family: var(--sl-font); font-size: 0.95rem; font-weight: 600; color: var(--flick-sign-muted); }
 
 .status-list { display: grid; gap: 0.75rem; max-width: 36rem; margin: 0; padding: 0; list-style: none; }
 .status-list li { font-size: 1.0625rem; line-height: 1.5; }
@@ -184,7 +185,7 @@
 .home-footer > a:not(.flick-brand):hover { color: var(--sl-color-accent-high); }
 
 @media (max-width: 47.99rem) {
-  .code-panel pre { font-size: 0.82rem; }
+  .code-panel pre { font-size: 0.875rem; }
   .code-panel .line { padding-inline: 0.75rem; }
   /* wraps at the panel's width: other lines scroll, but this is the line being discussed */
   .code-panel { container-type: inline-size; }
