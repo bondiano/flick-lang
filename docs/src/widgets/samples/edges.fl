@@ -1,0 +1,64 @@
+module Edges exposing (main, in_a_test)
+
+opaque type alias UserId = String
+  deriving Eq
+
+type alias User = { id : UserId; name : String }
+
+type alias UserView = { id : UserId; title : String }
+
+to_view : User -> UserView
+let to_view user = { id = user.id; title = String.trim user.name }
+
+type error NotFound = NotFound UserId
+  deriving Show
+
+service Users =
+  get : UserId ->{; NotFound} User
+
+service Log =
+  info : String ->{} Unit
+
+load_view : UserId ->{Users, Log; NotFound} UserView
+let load_view id =
+  let user = Users.get id
+  let view = to_view user
+  Log.info ("Loaded " ++ view.title)
+  view
+
+live_users : Layer none none {Users}
+let live_users = Layer.succeed Users { get = fun id -> { id = id; name = "from the database" } }
+
+live_log : Layer none none {Log}
+let live_log = Layer.succeed Log { info = fun line -> Platform.stdout_line line }
+
+first : UserId
+let first = "u1"
+
+find_user : UserId -> Option User
+let find_user id = List.find (fun user -> user.id == id) [{ id = first; name = "Ada" }]
+
+test_log : Layer none none {Log}
+let test_log = Layer.succeed Log { info = fun _ -> () }
+
+// show
+main : Unit ->{; AppError} Unit
+let main () = provide Layer.merge live_users live_log {
+  try Log.info (load_view first).title with
+  | NotFound id -> Log.info ("no user " ++ show id)
+}
+
+// show
+test_users : Layer none none {Users}
+let test_users =
+  Layer.succeed Users {
+    get = fun id ->
+      match find_user id with
+      | Some user -> user
+      | None -> from_result (Err (NotFound id));
+  }
+
+in_a_test : Unit ->{; NotFound} UserView
+let in_a_test () =
+  let layers = Layer.merge test_users test_log
+  provide layers { load_view first }

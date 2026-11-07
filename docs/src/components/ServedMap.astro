@@ -1,0 +1,22 @@
+---
+// Where the lines of `load_view` end in one caller: services at `provide`, the error at `try`, or
+// nowhere, when it stays in the caller's signature.
+interface Props { serves: string; handled: boolean; note?: string }
+const { serves, handled, note } = Astro.props;
+---
+<svg class="served-map" viewBox={`0 0 360 ${note ? 134 : 116}`} aria-hidden="true" focusable="false">
+  <g class="map-lines">
+    <path class="line-users" d="M20 44H300" />
+    <path class="line-log" d="M20 62H300" />
+    <path class="line-fails" d={handled ? "M92 80H300" : "M0 80H300"} />
+  </g>
+  <path class="map-terminus" d="M20 34V72" />
+  <rect class="map-station" x="296" y="30" width="30" height="64" rx="15" />
+  {handled && <circle class="map-station" cx="92" cy="80" r="10" />}
+  <g class="map-labels">
+    <text x="346" y="20" text-anchor="end">load_view</text>
+    <text x="20" y="108">{serves}</text>
+    {handled && <text x="74" y="86" text-anchor="end">try</text>}
+    {note && <text class="map-prose" x="20" y="128">{note}</text>}
+  </g>
+</svg>

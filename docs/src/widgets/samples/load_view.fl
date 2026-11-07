@@ -1,0 +1,26 @@
+module LoadView exposing (load_view)
+
+opaque type alias UserId = String
+
+type alias User = { id : UserId; name : String }
+
+type alias UserView = { id : UserId; title : String }
+
+to_view : User -> UserView
+let to_view user = { id = user.id; title = String.trim user.name }
+
+// show
+type error NotFound = NotFound UserId
+
+service Users =
+  get : UserId ->{; NotFound} User
+
+service Log =
+  info : String ->{} Unit
+
+load_view : UserId ->{Users, Log; NotFound} UserView
+let load_view id =
+  let user = Users.get id
+  let view = to_view user
+  Log.info ("Loaded " ++ view.title)
+  view

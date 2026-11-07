@@ -1,10 +1,13 @@
 ---
 import "../styles/custom.css";
+import "../styles/landing.css";
 import Header from "./Header.astro";
 import ThemeInit from "./ThemeInit.astro";
-import SignalWave from "./SignalWave.astro";
 import Brand from "./Brand.astro";
 import Icon from "./Icon.astro";
+import HeroMap from "./HeroMap.astro";
+import ServedMap from "./ServedMap.astro";
+import { highlight, shown } from "./highlight.ts";
 import { Effect } from "@flick-lang/runtime";
 import { uiRenderStatic } from "@flick-lang/runtime/ui/react";
 import { renderToString } from "react-dom/server";
@@ -19,16 +22,43 @@ const text = (en: string, russian: string) => ru ? russian : en;
 const title = text("Flick — Functions that do what they say", "Flick — функции делают то, что говорят");
 const description = text("Flick is a language for whole apps, where every function does what it says. It compiles to JavaScript and Go. Try it in your browser.", "Flick — язык для приложений целиком, где каждая функция делает то, что говорит. Компилируется в JavaScript и Go. Попробуйте прямо в браузере.");
 const heroHtml = renderToString(uiRenderStatic(await Effect.runPromise(initial_view(ru))));
-const features = [
-  { icon: "code", title: text("Inference that follows you", "Типы данных и вывод типов"), body: text("Model with variants, compose with higher-kinded types, and let inference connect the details. Types work for you, not the other way around.", "Описывайте данные вариантными типами, а общие операции — через конструкторы типов. Компилятор выводит типы выражений и проверяет их по сигнатурам."), href: "/reference/types/" },
-  { icon: "effects", title: text("Effects in the signature", "Эффекты видны в сигнатуре"), body: text("Know what a function needs and how it can fail. Write direct calls; the compiler handles the Effect sequencing.", "Сигнатура показывает, какие сервисы нужны функции и какие ошибки она может вернуть. Вызывайте функции напрямую — компилятор свяжет операции через Effect."), href: "/reference/effects/" },
-  { icon: "layers", title: text("JavaScript, not an island", "Работа с JavaScript"), body: text("Compile to ES modules, call JavaScript through typed bindings, and keep Effect as your runtime foundation.", "Flick создаёт ES-модули. Вызывайте библиотеки JavaScript через типизированные привязки; за выполнение эффектов отвечает Effect."), href: "/reference/ffi/" },
+
+const repository = "https://github.com/bondiano/flick-lang";
+const [loadView] = shown("load_view");
+const [edgeMain, edgeTest] = shown("edges");
+const [lookup] = shown("lookup");
+const signatureLine = (loadView ?? "").split("\n").findIndex((line) => line.startsWith("load_view :")) + 1;
+
+const legend = [
+  { line: "needs", names: [["Users", "users"], ["Log", "log"]], body: text("The services it needs. A call to any other service does not compile.", "Сервисы, которые ей нужны. Вызов любого другого сервиса не скомпилируется.") },
+  { line: "fails", names: [["NotFound", "fails"]], body: text("How it can fail. Handle it with `try`, or it stays in the caller's signature.", "Как она может упасть. Обработайте ошибку через `try`, иначе она останется в сигнатуре вызывающей функции.") },
+  { line: "returns", names: [["UserView", "returns"]], body: text("What it returns. The body gets there with plain calls: no `yield`, no `flatMap`.", "Что она возвращает. Тело приходит к этому обычными вызовами, без `yield` и `flatMap`.") },
 ];
-const sections = [
-  { title: text("Learn", "Изучение Flick"), description: text("From your first program to effects, types, and regions. A path, not a wall of reference pages.", "Начните с небольшой программы, затем разберитесь с типами, эффектами и временем жизни ресурсов."), href: "/learn/" },
-  { title: text("Guides", "Руководства"), description: text("Build a CLI, handle failures, connect services, or put a Flick widget on a web page.", "Создайте приложение командной строки, подключите сервис или добавьте интерфейс Flick на веб-страницу."), href: "/guides/" },
-  { title: text("API", "Справочник"), description: text("Language rules, runtime modules, compiler commands. Find the exact contract you need.", "Синтаксис и правила языка, функции библиотек и команды компилятора."), href: "/api/" },
-  { title: text("Ecosystem", "Экосистема"), description: text("Effect, JavaScript interop, editor support, and the tools that connect everything.", "Узнайте, как Flick использует Effect, подключается к JavaScript-проекту и работает в редакторе."), href: "/ecosystem/" },
+const inlineCode = (value: string) => value.replace(/`([^`]+)`/g, "<code>$1</code>");
+
+const signatures = [
+  {
+    name: "TypeScript",
+    code: highlight("async function loadView(id: UserId): Promise<UserView> {\n  const user = await users.get(id);\n  log.info(`Loaded ${user.name}`);\n  return toView(user);\n}", "typescript", 1),
+    verdict: text("Says what it returns. What it needs and how it fails live in the body, the docs or your memory.", "Говорит, что возвращает. Что ей нужно и как она падает, остаётся в теле, в документации или в памяти."),
+  },
+  {
+    name: "TypeScript + Effect",
+    code: highlight("const loadView = (id: UserId): Effect<UserView, NotFound, Users | Log> =>\n  Effect.gen(function* () {\n    const user = yield* Users.get(id);\n    yield* Log.info(`Loaded ${user.name}`);\n    return toView(user);\n  });", "typescript", 1),
+    verdict: text("Says all of it, in the TypeScript and with the ecosystem you already have. The body is written with `yield*`.", "Говорит всё, причём на TypeScript и с экосистемой, которая у вас уже есть. Тело пишется через `yield*`."),
+  },
+  {
+    name: "Flick",
+    code: highlight("load_view : UserId ->{Users, Log; NotFound} UserView\nlet load_view id =\n  let user = Users.get id\n  Log.info (\"Loaded \" ++ user.name)\n  to_view user", "flick", 1),
+    verdict: text("Says all of it, and the body is plain calls. The price is a new language and a smaller ecosystem.", "Говорит всё, а тело состоит из обычных вызовов. Цена — новый язык и экосистема поменьше."),
+  },
+];
+
+const status = [
+  text("Alpha: version 0.1, and a minor release may break programs before 1.0.", "Альфа: версия 0.1, и до 1.0 минорный релиз может сломать программы."),
+  text("Host calls such as `Console.log`, the clock and randomness are not named in signatures yet. Defects stay outside the signature too.", "Вызовы хоста вроде `Console.log`, часы и случайные числа пока не называются в сигнатурах. Дефекты тоже остаются вне сигнатуры."),
+  text("On JavaScript, effects run on Effect for now. `ui` runs only on JavaScript, and parts of the standard library do not compile to Go yet.", "На JavaScript эффекты пока работают на Effect. `ui` работает только на JavaScript, а часть стандартной библиотеки ещё не компилируется в Go."),
+  text("Beyond the standard library there are few Flick packages, and no mobile, desktop or WebAssembly target.", "Помимо стандартной библиотеки пакетов на Flick мало, а целей для мобильных устройств, десктопа и WebAssembly нет."),
 ];
 ---
 <!doctype html>
@@ -58,48 +88,155 @@ const sections = [
     <link rel="icon" type="image/x-icon" href={`${base}/favicon.ico`} sizes="16x16 32x32 48x48" />
     <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
     <link rel="apple-touch-icon" href={`${base}/apple-touch-icon.png`} sizes="180x180" />
-    <link rel="preload" href={`${base}/fonts/geist-${ru ? "cyrillic" : "latin"}.woff2`} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={`${base}/fonts/overpass-${ru ? "cyrillic" : "latin"}.woff2`} as="font" type="font/woff2" crossorigin />
     <ThemeInit />
   </head>
   <body class="flick-home">
     <a class="skip-link" href="#main-content">{text("Skip to content", "Перейти к содержимому")}</a>
     <header class="home-header"><Header locale={locale} /></header>
     <main id="main-content" data-pagefind-body>
-      <section class="signal-hero" aria-labelledby="hero-title">
-        <div class="signal-hero-inner">
-          <div class="hero-copy">
-            <h1 id="hero-title">{text("Functions that", "Функции делают")}<br /><span>{text("do what they say.", "то, что говорят.")}</span></h1>
-            <p class="hero-description">{text("A language for whole apps: browser, server and CLI. The signature says what a function needs and how it can fail, the compiler holds the body to it, and the code still reads like plain code.", "Язык для приложений целиком: браузер, сервер и CLI. Сигнатура говорит, что нужно функции и как она может упасть, компилятор держит тело в этих рамках, а код читается как обычный.")}</p>
-            <div class="hero-actions">
-              <a class="flick-button primary" href={`${prefix}/learn/`}>{text("Start learning", "Начать изучение")} <Icon name="arrow" size={18} /></a>
-              <a class="flick-button secondary" href={`${prefix}/play/`}>{text("Open playground", "Открыть Play")}</a>
+      <section class="hero" aria-labelledby="hero-title">
+        <HeroMap />
+        <div class="hero-copy">
+          <h1 id="hero-title">{text("Functions that", "Функции делают")}<br />{text("do what they say.", "то, что говорят.")}</h1>
+          <p class="hero-support">{text("A language for whole apps: browser, server and CLI. The signature says what a function needs and how it can fail, the compiler holds the body to it, and the code still reads like plain code.", "Язык для приложений целиком: браузер, сервер и CLI. Сигнатура говорит, что нужно функции и как она может упасть, компилятор держит тело в этих рамках, а код читается как обычный.")}</p>
+          <div class="hero-actions">
+            <a class="action action-primary" href={`${prefix}/start/getting-started/`}>{text("Get started", "Начать")} <Icon name="arrow" size={20} /></a>
+            <a class="action" href={`${prefix}/play/`}>{text("Open playground", "Открыть песочницу")}</a>
+          </div>
+          <p class="hero-limit"><a href={`${prefix}/start/why/#where-the-promise-stops`}>{text("Alpha: console, clock and randomness aren't in signatures yet", "Альфа: консоль, часы и случайные числа пока не видны в сигнатуре")} <Icon name="arrow" size={15} /></a></p>
+        </div>
+        <div id="flick-hero" data-flick-ssr set:html={heroHtml}></div>
+      </section>
+
+      <div class="route">
+        <section class="stop" aria-labelledby="read-title">
+          <h2 id="read-title">{text("Read the signature", "Прочитайте сигнатуру")}</h2>
+          <p class="stop-lead" set:html={inlineCode(text("Every named function has one, right above its `let`. It is the whole contract: what the function takes, what it needs, how it can fail and what it returns.", "Она есть у каждой именованной функции, прямо над `let`. Это весь контракт: что функция принимает, что ей нужно, как она может упасть и что возвращает."))} />
+          <div class="read-grid">
+            <div class="code-panel" set:html={highlight(loadView ?? "", "flick", signatureLine)} />
+            <dl class="legend">
+              {legend.map(({ line, names, body }) => <div class={`legend-${line}`}>
+                <dt>{names.map(([name, colour]) => <code class={`chip chip-${colour}`}>{name}</code>)}</dt>
+                <dd set:html={inlineCode(body)} />
+              </div>)}
+            </dl>
+          </div>
+          <h3>{text("Lines end where they are served", "Линии заканчиваются там, где их обслужили")}</h3>
+          <p class="stop-text" set:html={inlineCode(text("A service line runs up through every caller until `provide` serves it. An error line runs until `try` handles it. `main` picks the real services in one place, and a test picks its own, without changing the code under test.", "Линия сервиса идёт вверх через всех вызывающих, пока её не обслужит `provide`. Линия ошибки идёт, пока её не обработает `try`. `main` выбирает настоящие сервисы в одном месте, а тест выбирает свои, не меняя проверяемый код."))} />
+          <div class="edge-grid">
+            <div class="edge">
+              <ServedMap serves="provide live_users, live_log" handled={true} />
+              <div class="code-panel" set:html={highlight(edgeMain ?? "", "flick")} />
             </div>
-            <p class="hero-footnote"><a class="runtime-link" href={`${prefix}/start/why/`}>{text("Alpha: console, clock and randomness aren't in signatures yet", "Альфа: консоль, часы и случайные числа пока не видны в сигнатуре")} <Icon name="arrow" size={16} /></a></p>
+            <div class="edge">
+              <ServedMap serves="provide test_users, test_log" handled={false} note={text("NotFound stays in the signature", "NotFound остаётся в сигнатуре")} />
+              <div class="code-panel" set:html={highlight(edgeTest ?? "", "flick")} />
+            </div>
           </div>
-          <div class="hero-demo">
-            <SignalWave />
-            <div id="flick-hero" data-flick-ssr set:html={heroHtml}></div>
+        </section>
+
+        <section class="stop" aria-labelledby="three-title">
+          <h2 id="three-title">{text("One function, three signatures", "Одна функция, три сигнатуры")}</h2>
+          <div class="compare">
+            {signatures.map(({ name, code, verdict }) => <article>
+              <h3>{name}</h3>
+              <div class="code-panel" set:html={code} />
+              <p set:html={inlineCode(verdict)} />
+            </article>)}
           </div>
-        </div>
-      </section>
-      <section class="home-features home-section" aria-labelledby="features-title">
-        <h2 id="features-title">{text("Your intent, without the scaffolding.", "Что умеет Flick")}</h2>
-        <div class="feature-columns">{features.map((feature) => <article><Icon name={feature.icon} size={24} /><h3><a href={`${prefix}${feature.href}`}>{feature.title}</a></h3><p>{feature.body}</p></article>)}</div>
-      </section>
-      <section class="effect-section home-section" aria-labelledby="effect-title">
-        <div class="effect-intro"><h2 id="effect-title">{text("Built on Effect.\nNot a replacement for it.", "Flick использует Effect.\nНе заменяет его.")}</h2><p>{text("Flick changes how you express a program, not the reason you chose a reliable effect runtime. There are good reasons to use either source language.", "Flick предлагает другой синтаксис и проверки компилятора. Планирование задач, обработка ошибок и освобождение ресурсов по-прежнему опираются на Effect. Выбор зависит от того, что нужно вашему проекту.")}</p><a class="text-link" href={`${prefix}/learn/flick-and-effect/`}>{text("Read the honest comparison", "Чем отличаются Flick и TypeScript с Effect")} <Icon name="arrow" /></a></div>
-        <div class="effect-tradeoffs">
-          <article><h3>{text("What Flick brings", "Что добавляет Flick")}</h3><ul><li>{text("Direct-style effects, typed failures, and services as language constructs.", "Прямые вызовы эффектов, типизированные ошибки и сервисы средствами языка.")}</li><li>{text("Higher-kinded types, type classes, and exhaustive pattern matching.", "Типы высших порядков, классы типов и проверка полноты сопоставления с образцом.")}</li><li>{text("Static region and capture checks for scoped resources.", "Проверка того, что ресурсы и ссылки на них не покидают свою область владения.")}</li></ul></article>
-          <article><h3>{text("What Effect gets right", "Когда удобнее TypeScript с Effect")}</h3><ul><li>{text("Adopt it directly in an existing TypeScript project. No new source language.", "Можно подключить библиотеку в существующий TypeScript-проект, не меняя язык.")}</li><li>{text("Use its ecosystem and installed TypeScript APIs without a binding layer.", "API Effect и других TypeScript-пакетов доступны напрямую, без внешних привязок.")}</li><li>{text("Keep its established resource, concurrency, and observability tools.", "Уже есть средства управления ресурсами, конкурентного выполнения и наблюдаемости.")}</li></ul></article>
-        </div>
-      </section>
-      <section class="explore-section home-section" aria-labelledby="explore-title">
-        <div class="section-intro"><h2 id="explore-title">{text("Find your way in.", "С чего начать")}</h2><p>{text("Read a little. Build a little. Go deeper when you need to.", "Познакомьтесь с языком, решите конкретную задачу или найдите нужную функцию.")}</p></div>
-        <div class="explore-links">{sections.map((section) => <a href={`${prefix}${section.href}`}><div><h3>{section.title}</h3><p>{section.description}</p></div><Icon name="arrow" size={24} /></a>)}</div>
-      </section>
-      <section class="try-section home-section" aria-labelledby="try-title"><div><h2 id="try-title">{text("A little less setup.\nA lot more trying.", "Попробуйте Flick\nбез установки.")}</h2><p>{text("The real compiler, in your browser. This site's widgets? Written in Flick, too.", "Компилятор работает прямо в браузере. Интерфейс редактора и виджеты сайта тоже написаны на Flick.")}</p></div><div class="try-actions"><a class="flick-button primary" href={`${prefix}/play/`}>{text("Write some Flick", "Открыть редактор")} <Icon name="arrow" size={18} /></a><a class="text-link" href={`${prefix}/transpile/`}>{text("See the JavaScript it becomes", "Посмотреть результат компиляции")} <Icon name="arrow" size={18} /></a></div></section>
+        </section>
+
+        <section class="stop" aria-labelledby="app-title">
+          <h2 id="app-title">{text("One app. One language. No unchecked seams.", "Одно приложение. Один язык. Без непроверенных стыков.")}</h2>
+          <p class="stop-lead" set:html={inlineCode(text("Conduit, the RealWorld demo app, is a Go server over PostgreSQL and a React client. Both depend on one package with the API contract, so a route that does not exist is a compile error on both sides.", "Conduit, демонстрационное приложение RealWorld, — это Go-сервер на PostgreSQL и клиент на React. Оба зависят от одного пакета с контрактом API, поэтому несуществующий маршрут — ошибка компиляции с обеих сторон."))} />
+          <svg class="seam-map" viewBox="0 0 460 170" role="img" aria-label={text("One contract package, used by the Go server and the React client", "Один пакет с контрактом, его используют Go-сервер и клиент на React")}>
+            <path d="M28 85H110L166 29H300" />
+            <path d="M110 85L166 141H300" />
+            <circle class="map-station" cx="28" cy="85" r="20" />
+            <circle class="map-station" cx="300" cy="29" r="17" />
+            <circle class="map-station" cx="300" cy="141" r="17" />
+            <text x="8" y="130">contract</text>
+            <text x="328" y="27">server</text>
+            <text class="map-prose" x="328" y="47">Go, PostgreSQL</text>
+            <text x="328" y="139">client</text>
+            <text class="map-prose" x="328" y="159">{text("React, in the browser", "React, в браузере")}</text>
+          </svg>
+          <div class="seams">
+            <div class="sign-panel">
+              <p class="sign-caption">{text("A stale column, checked against your migrations", "Устаревшая колонка, сверка с миграциями")}</p>
+              <p><span class="sign-fails">std/Q001</span> `Users` has no column `nmae`</p>
+            </div>
+            <div class="sign-panel">
+              <p class="sign-caption">{text("A path that disagrees with its parameters", "Путь, который расходится с параметрами")}</p>
+              <p><span class="sign-fails">FLICK-C001</span> `PathParams "/items/:id/:rev" &#123; id : String &#125;` does not hold</p>
+            </div>
+          </div>
+          <p class="stop-text" set:html={inlineCode(text("`sql` blocks are checked against the migrations in your project, not against a live database. `ui` runs only on JavaScript, and when part of the standard library does not compile to Go yet, the build says so with `FLICK-P012`, never at run time.", "Блоки `sql` сверяются с миграциями проекта, а не с живой базой. `ui` работает только на JavaScript, а когда часть стандартной библиотеки ещё не компилируется в Go, об этом говорит сборка кодом `FLICK-P012`, а не работающая программа."))} />
+          <p class="stop-text">{text("The server passes the official RealWorld API suite. The app runs the frontend suite in its full-stack mode: 75 tests pass, and the 65 that need a separate API or browser mocks do not apply. Both are run by hand for now, not in CI.", "Сервер проходит официальный набор RealWorld для API. Приложение запускает набор для фронтенда в режиме full-stack: 75 тестов проходят, а 65, которым нужен отдельный API или моки в браузере, в этом режиме не применяются. Оба набора пока запускаются вручную, а не в CI.")}</p>
+          <a class="stop-link" href={`${repository}/tree/main/examples/conduit`}>{text("Read the Conduit example", "Посмотреть пример Conduit")} <Icon name="arrow" size={18} /></a>
+        </section>
+
+        <section class="stop" aria-labelledby="unread-title">
+          <h2 id="unread-title">{text("For code you didn't write", "Для кода, который писали не вы")}</h2>
+          <div class="split">
+            <div class="split-text">
+              <p class="stop-lead">{text("A teammate, a library or a model wrote it, and now you are reviewing it. The signature tells you what it needs and how it fails before you read the body.", "Его написал коллега, библиотека или модель, а теперь вы его проверяете. Сигнатура говорит, что нужно коду и как он падает, ещё до чтения тела.")}</p>
+          <p class="stop-text" set:html={inlineCode(text("Mistakes are compile errors with codes. `flick explain FLICK-E002` explains one, and `--diagnostics json` gives tools one event per line. The source stays about as long as the same app in Go and React: 30,174 tokens against 29,778 by GPT's tokenizer, for this one app. `node tools/tokens/index.mjs` repeats the count.", "Ошибки — это ошибки компиляции с кодами. `flick explain FLICK-E002` объясняет код, а `--diagnostics json` даёт инструментам по событию на строку. Исходник остаётся примерно такой же длины, как то же приложение на Go и React: 30 174 токена против 29 778 по токенизатору GPT для этого одного приложения. `node tools/tokens/index.mjs` повторяет подсчёт."))} />
+            </div>
+            <div class="sign-panel sign-output">
+              <p><span class="sign-fails">error[FLICK-E002]</span>: the signature of `load_view` does not allow service `Log`, which its body needs</p>
+              <p class="sign-help">help: add service `Log` to the signature of `load_view`</p>
+              <p>load_view : UserId -&gt;&#123;<span class="sign-log">Log</span>, <span class="sign-users">Users</span>; <span class="sign-fails">NotFound</span>&#125; <span class="sign-returns">UserView</span></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="stop" aria-labelledby="proved-title">
+          <h2 id="proved-title">{text("Proved, not promised", "Доказано, а не обещано")}</h2>
+          <div class="split">
+            <div class="split-text">
+              <p class="stop-lead">{text("The rules behind this page are checked by a machine, in Lean 4.", "Правила, стоящие за этой страницей, проверяет машина, на Lean 4.")}</p>
+              <p class="stop-text">{text("That covers the core calculus under stated hypotheses, not the whole compiler, and the known differences from the checker are written down. The build fails on a missing proof or a new axiom.", "Это касается базового исчисления при оговорённых гипотезах, а не всего компилятора, и известные отличия от проверки типов записаны. Сборка падает на недостающем доказательстве или новой аксиоме.")}</p>
+            </div>
+            <ul class="proved">
+              <li><b>{text("Well-typed programs do not get stuck", "Типизированные программы не застревают")}</b><code>T1</code></li>
+              <li><b>{text("Pure code makes only pure steps", "Чистый код делает только чистые шаги")}</b><code>T2a</code></li>
+              <li><b>{text("Runtime code keeps to its row", "Эффектный код не выходит за свой ряд")}</b><code>T2b</code></li>
+              <li><b>{text("Live work reaches only live regions", "Живая работа обращается только к живым регионам")}</b><code>T4</code></li>
+            </ul>
+          </div>
+          <a class="stop-link" href={`${repository}/blob/main/formal/README.md`}>{text("What exactly is proved", "Что именно доказано")} <Icon name="arrow" size={18} /></a>
+        </section>
+
+        <section class="stop" aria-labelledby="host-title">
+          <h2 id="host-title">{text("Use the host, don't rewrite it", "Используйте библиотеки хоста")}</h2>
+          <div class="split">
+            <div class="split-text">
+              <p class="stop-lead" set:html={inlineCode(text("`flick ffi import <package>` reads an npm package's `.d.ts` and writes the bindings, with a report on every export. The compiler takes a binding's signature on trust, so `flick ffi check` tells you when the declarations change.", "`flick ffi import <package>` читает `.d.ts` пакета npm и пишет привязки, с отчётом по каждому экспорту. Сигнатуру привязки компилятор принимает на веру, поэтому `flick ffi check` сообщает, когда объявления меняются."))} />
+              <p class="stop-text" set:html={inlineCode(text("In the other direction, `flick build --emit-dts` writes TypeScript declarations of Flick modules. On Go, bindings are written by hand for now.", "В обратную сторону `flick build --emit-dts` пишет объявления TypeScript для модулей Flick. В Go привязки пока пишутся вручную."))} />
+            </div>
+            <div class="code-panel" set:html={highlight(lookup ?? "", "flick")} />
+          </div>
+        </section>
+
+        <section class="stop stop-last" aria-labelledby="status-title">
+          <h2 id="status-title">{text("Where it stands", "Что сейчас")}</h2>
+          <ul class="status-list">
+            {status.map((line) => <li set:html={inlineCode(line)} />)}
+          </ul>
+          <div class="hero-actions terminus">
+            <a class="action action-primary" href={`${prefix}/start/getting-started/`}>{text("Get started", "Начать")} <Icon name="arrow" size={20} /></a>
+            <a class="action" href={`${prefix}/start/why/`}>{text("Why Flick, in full", "Зачем Flick, подробно")}</a>
+          </div>
+        </section>
+      </div>
     </main>
-    <footer class="home-footer"><Brand href={`${prefix}/`} label={text("Flick home", "Flick — главная")} /><p>{text("A language for whole apps.", "Язык для приложений целиком.")}</p><a href="https://github.com/bondiano/flick-lang"><Icon name="github" /> GitHub</a><a href="https://effect.website/">Effect <Icon name="northeast" size={16} /></a></footer>
+    <footer class="home-footer">
+      <Brand href={`${prefix}/`} label={text("Flick home", "Flick — главная")} />
+      <p>{text("A language for whole apps.", "Язык для приложений целиком.")}</p>
+      <a href={repository}><Icon name="github" /> GitHub</a>
+    </footer>
     <script>
       import { run } from "@flick-lang/runtime/runner/browser";
       import { main } from "../widgets/Hero.fl";

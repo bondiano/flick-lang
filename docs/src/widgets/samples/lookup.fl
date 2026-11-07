@@ -1,0 +1,10 @@
+module Lookup exposing (lookup)
+
+import JsError exposing (JsError)
+
+// show
+lookup : String ->{Async; JsError} Option String
+foreign lookup from "lookup-lib" "lookup"
+  arity 1
+  catch JsError.from_js
+  nullable
