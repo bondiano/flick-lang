@@ -135,6 +135,22 @@ runs a script, and `dev` and the other commands need a member, `--package <name>
 In a member, commands run on that member as usual, and `--package` picks
 another.
 
+The root may give every member a plugin, as a dependency and its grants:
+
+```toml
+[[workspace.plugins]]
+package = "mysql"
+source = { path = "plugins/mysql" }   # relative to the root, or a git or url source
+grants = { fs-read = ["schema/"], net = ["localhost:3306"] }
+```
+
+Each member but the plugin's own package then depends on `mysql`, and grants it
+the root's `grants` on top of its own `[plugins.mysql]`; `fs-read` is from the
+member's directory. A member that names `mysql` from another source is
+`FLICK-P005`. The plugin's member comes before the others, and `flick pack`
+refuses a library that gets a plugin this way: its published manifest would not
+have it, so it names it in `[dependencies]`.
+
 ## Flick dependencies
 
 A project compiles the Flick libraries it depends on from their sources.

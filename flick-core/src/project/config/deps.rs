@@ -112,7 +112,7 @@ pub(super) fn dependencies(
         .collect()
 }
 
-fn source(raw: RawDependency) -> Result<Source, String> {
+pub(super) fn source(raw: RawDependency) -> Result<Source, String> {
     let RawDependency {
         path,
         git,

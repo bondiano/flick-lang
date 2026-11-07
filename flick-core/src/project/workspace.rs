@@ -78,7 +78,16 @@ pub fn find(
         if root != dir && !members.iter().any(|m| dir.starts_with(m)) {
             return Ok(None);
         }
-        let (members, dependencies) = ordered(host, sources, &members, Span::new(file, 0, 0))?
+        // a member that is a plugin's package comes before those that get it
+        let plugins: Vec<PathBuf> = (manifest.plugins.iter())
+            .filter_map(|p| match &p.source {
+                config::Source::Path(path) => Some(normalize(&root.join(path))),
+                _ => None,
+            })
+            .filter(|p| members.contains(p))
+            .collect();
+        let at = Span::new(file, 0, 0);
+        let (members, dependencies) = ordered(host, sources, &members, &plugins, at)?
             .into_iter()
             .unzip();
         return Ok(Some(Workspace {
@@ -98,6 +107,7 @@ fn ordered(
     host: &dyn Host,
     sources: &mut SourceMap,
     members: &[PathBuf],
+    plugins: &[PathBuf],
     at: Span,
 ) -> Result<Vec<(PathBuf, Vec<PathBuf>)>, Diagnostic> {
     let mut needs = Vec::new();
@@ -118,12 +128,14 @@ fn ordered(
             return Err(diagnostic);
         }
         let config = config::parse(&sources.get(file).text, file)?;
-        let deps: Vec<PathBuf> = config
+        let mut deps: Vec<PathBuf> = config
             .dependencies
             .iter()
             .filter_map(|d| Some(normalize(&member.join(d.path()?))))
             .filter(|d| members.contains(d))
             .collect();
+        let others = plugins.iter().filter(|p| *p != member && !deps.contains(p));
+        deps.extend(others.cloned().collect::<Vec<_>>());
         needs.push(deps);
     }
     let mut out: Vec<(PathBuf, Vec<PathBuf>)> = Vec::new();

@@ -14,6 +14,8 @@ mod deps;
 #[cfg(feature = "native-project")]
 mod parse;
 #[cfg(feature = "native-project")]
+mod workspace;
+#[cfg(feature = "native-project")]
 pub use parse::{SCHEMA_VERSION, parse, parse_manifest};
 
 /// A whole `flick.toml`: a project, a workspace of member projects, or both,
@@ -24,8 +26,21 @@ pub struct Manifest {
     /// `[workspace] members`: the directories of the member projects,
     /// relative to the manifest.
     pub members: Option<Vec<String>>,
+    /// `[[workspace.plugins]]`: what every member gets, in order.
+    pub plugins: Vec<WorkspacePlugin>,
     /// `[scripts]`, by name.
     pub scripts: Vec<Script>,
+}
+
+/// A plugin of `[[workspace.plugins]]`: each member of the workspace but its
+/// package depends on `package`, from `source` relative to the workspace's
+/// root, and grants its plugin `grants` on top of its own.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspacePlugin {
+    pub package: String,
+    pub source: Source,
+    pub grants: Grants,
+    pub span: Span,
 }
 
 /// A script of `[scripts]`: shell commands run in order, where `@name` runs

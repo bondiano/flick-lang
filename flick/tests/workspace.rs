@@ -111,3 +111,49 @@ fn scripts_run_their_steps_in_order_until_one_fails() {
     let out = flick_in(dir.join("app"), &["run", "other"]);
     assert_eq!(text(&out.stdout).trim(), "other", "{out:?}");
 }
+
+const PLUGINS: &str = "schema-version = 1
+
+[workspace]
+members = [\"lib\", \"pairs\"]
+
+[[workspace.plugins]]
+package = \"pairs\"
+source = { path = \"pairs\" }
+";
+
+#[test]
+fn a_library_that_gets_a_workspace_plugin_is_not_packed_without_it() {
+    let lib = "schema-version = 1\n[package]\nname = \"lib\"\nversion = \"1.0.0\"\n[project]\nkind = \"lib\"\n";
+    let pairs = "schema-version = 1\n[package]\nname = \"pairs\"\nversion = \"1.0.0\"\n[project]\nkind = \"lib\"\n";
+    let root = project(
+        "workspace-plugin-pack",
+        &[
+            ("flick.toml", PLUGINS),
+            ("lib/flick.toml", lib),
+            ("lib/src/Shared/Answer.fl", &answer(1)),
+            ("pairs/flick.toml", pairs),
+            (
+                "pairs/src/Pairs.fl",
+                "module Pairs exposing (one)\n\none : Float\nlet one = 1\n",
+            ),
+        ],
+    );
+    let out = root.join("packed");
+    let packed = flick_in(
+        root.join("lib"),
+        &["pack", "--out-dir", &out.to_string_lossy()],
+    );
+    assert!(!packed.status.success(), "{packed:?}");
+    let stderr = text(&packed.stderr);
+    assert!(
+        stderr.contains("FLICK-P032") && stderr.contains("`pairs`"),
+        "{stderr}"
+    );
+    // the plugin's own package gets nothing from it, and packs
+    let own = flick_in(
+        root.join("pairs"),
+        &["pack", "--out-dir", &out.to_string_lossy()],
+    );
+    assert!(own.status.success(), "{own:?}");
+}

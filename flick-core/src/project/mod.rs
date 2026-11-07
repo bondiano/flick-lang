@@ -6,6 +6,8 @@
 pub mod cache;
 pub mod config;
 #[cfg(feature = "native-project")]
+mod inherit;
+#[cfg(feature = "native-project")]
 pub mod js;
 mod load;
 #[cfg(feature = "native-project")]
@@ -83,6 +85,9 @@ pub struct Project {
     pub root: PathBuf,
     pub config: Config,
     pub config_file: FileId,
+    /// The manifest of the workspace the project is a member of, whose
+    /// `[[workspace.plugins]]` it got.
+    pub workspace: Option<PathBuf>,
 }
 
 impl Project {
@@ -122,12 +127,18 @@ pub fn discover(
         if let Some(diagnostic) = utf8 {
             return Err(diagnostic);
         }
-        let config = config::parse(&sources.get(file).text, file)?;
+        let mut config = config::parse(&sources.get(file).text, file)?;
         let root = path.parent().map(Path::to_path_buf).unwrap_or_default();
+        let workspace = inherit::around(host, sources, &root)?;
+        if let Some((manifest, plugins)) = &workspace {
+            let at = manifest.parent().unwrap_or(Path::new("/"));
+            inherit::inherit(&mut config, &root, at, plugins)?;
+        }
         return Ok(Some(Project {
             root,
             config,
             config_file: file,
+            workspace: workspace.map(|(manifest, _)| manifest),
         }));
     }
     match explicit {

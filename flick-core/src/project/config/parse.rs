@@ -9,6 +9,7 @@ use toml::{Spanned, de};
 use super::deps::{
     RawDependency, RawGrants, RawJs, RawPackage, dependencies, grants, js_dependencies, package,
 };
+use super::workspace::RawWorkspace;
 use super::{Build, Config, Entry, Kind, MAIN_ENTRY, Manifest, Script};
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::source::{FileId, Span};
@@ -38,12 +39,6 @@ struct Raw {
     workspace: Option<RawWorkspace>,
     #[serde(default)]
     scripts: BTreeMap<String, Spanned<RawScript>>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawWorkspace {
-    members: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -143,7 +138,13 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
     }
     let mut raw: Raw = toml::from_str(text).map_err(invalid)?;
     let scripts = scripts(mem::take(&mut raw.scripts), &span)?;
-    let members = raw.workspace.take().map(|w| w.members);
+    let (members, plugins) = match raw.workspace.take() {
+        Some(workspace) => {
+            let plugins = super::workspace::plugins(workspace.plugins, &span)?;
+            (Some(workspace.members), plugins)
+        }
+        None => (None, Vec::new()),
+    };
     let project = if let Some(project) = raw.project.take() {
         Some(config(project, raw, &span)?)
     } else {
@@ -175,6 +176,7 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
     Ok(Manifest {
         project,
         members,
+        plugins,
         scripts,
     })
 }

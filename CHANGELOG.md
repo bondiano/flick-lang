@@ -6,6 +6,9 @@ break programs.
 
 ## Unreleased
 
+- **Workspace plugins:** `[[workspace.plugins]]` in a workspace's root gives every
+  member a plugin, as a dependency and its grants. The editor reports the root
+  manifest's errors in a member, and a changed root manifest rebuilds the members.
 - **Plugins:** a plugin that fails is no longer quiet. A block of a plugin that does
   not load is `FLICK-P036`; a failure in completion, hover, highlighting or layout
   goes to the server's log, and `flick fmt` reports it and exits 1; a first-party
