@@ -1,6 +1,6 @@
 //! `flick.toml`: the schema version, `[project]`, `[package]`, `[build]`,
-//! `[sql]`, `[lint]`, `[dependencies]`, `[workspace]` and `[scripts]`. Unknown keys are errors so
-//! that a typo never silently means a default.
+//! `[sql]`, `[lint]`, `[dependencies]`, `[js.dependencies]`, `[workspace]` and `[scripts]`. Unknown
+//! keys are errors so that a typo never silently means a default.
 
 use std::collections::BTreeMap;
 
@@ -54,6 +54,16 @@ impl Dependency {
             _ => None,
         }
     }
+}
+
+/// An npm package a manifest needs at run time on the js target, under
+/// `[js.dependencies]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JsDependency {
+    pub name: String,
+    /// A version or range of the registry.
+    pub version: String,
+    pub span: Span,
 }
 
 /// Where the sources of a dependency come from.
@@ -134,6 +144,8 @@ pub struct Config {
     pub entries: Vec<Entry>,
     /// `[dependencies]`, by name.
     pub dependencies: Vec<Dependency>,
+    /// `[js.dependencies]`, by name.
+    pub js_dependencies: Vec<JsDependency>,
     /// `[package]`, which a library others fetch has.
     pub package: Option<Package>,
     pub build: Build,

@@ -143,6 +143,10 @@ fn compiled(m: &Loaded, (ir, declarations): Lowered, interface: Interface) -> Co
 #[derive(Default)]
 pub struct Compilation {
     pub modules: Vec<Compiled>,
+    /// The npm packages its dependency closure asks for, which a js build
+    /// needs installed.
+    #[cfg(feature = "native-project")]
+    pub js_dependencies: Vec<super::js::Wanted>,
 }
 
 /// A module that checked cleanly, lowered to the IR.
@@ -231,6 +235,8 @@ fn run(
         Packages::load(host, sources, p, &mut diagnostics)
     });
     #[cfg(feature = "native-project")]
+    let js_dependencies = project.map_or_else(Vec::new, |p| super::js::closure(p, &packages));
+    #[cfg(feature = "native-project")]
     let precompiled = project
         .zip(saved)
         .map(|(p, saved)| Precompiled::new(&packages, p, saved))
@@ -307,7 +313,11 @@ fn run(
     });
     Output {
         diagnostics,
-        compilation: Compilation { modules: compiled },
+        compilation: Compilation {
+            modules: compiled,
+            #[cfg(feature = "native-project")]
+            js_dependencies,
+        },
         fresh,
         #[cfg(feature = "ide")]
         analyzed: loader.ide.take().unwrap_or_default(),

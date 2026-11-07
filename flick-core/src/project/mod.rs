@@ -5,6 +5,8 @@
 #[cfg(feature = "native-project")]
 pub mod cache;
 pub mod config;
+#[cfg(feature = "native-project")]
+pub mod js;
 mod load;
 #[cfg(feature = "native-project")]
 pub mod lock;

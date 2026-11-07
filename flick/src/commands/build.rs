@@ -7,7 +7,7 @@ use flick_core::build::{self, Artifact, Extras, Settings};
 use flick_core::codegen::Labels;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Build, Emit, Kind, MAIN_ENTRY, Profile};
-use flick_core::project::{self, Compilation, Compiled, Project};
+use flick_core::project::{self, Compilation, Compiled, Project, js};
 use flick_core::source::{FileId, SourceMap};
 
 use super::check::select;
@@ -498,16 +498,37 @@ pub fn artifacts(
             diagnostics,
         };
     }
-    // a library on Effect is also built without it, for applications with `effect = "none"`
-    let library = project.is_some_and(|p| p.config.kind == Kind::Lib) && backend == Backend::Effect;
+    let mut emission = js_artifacts(
+        sources,
+        project.is_some_and(|p| p.config.kind == Kind::Lib) && backend == Backend::Effect,
+        compilation,
+        &settings,
+    );
+    if let Some(project) = project {
+        let wanted = &compilation.js_dependencies;
+        let needs = &mut emission.diagnostics;
+        needs.extend(js::conflicts(host, &project.root, wanted));
+        needs.extend(js::unmet(host, &project.root, wanted));
+    }
+    emission
+}
+
+/// The output of a js build; a library on Effect is also built without it,
+/// for applications with `effect = "none"`.
+fn js_artifacts(
+    sources: &SourceMap,
+    library: bool,
+    compilation: &Compilation,
+    settings: &Settings,
+) -> Emission {
     if !library {
-        let (artifacts, diagnostics) = build::emit(compilation, sources, &settings);
+        let (artifacts, diagnostics) = build::emit(compilation, sources, settings);
         return Emission {
             artifacts,
             diagnostics,
         };
     }
-    let core_dir = out_dir.join(build::effects::CORE_DIR);
+    let core_dir = settings.out_dir.join(build::effects::CORE_DIR);
     let (core, _) = build::emit(
         compilation,
         sources,
@@ -515,20 +536,20 @@ pub fn artifacts(
             out_dir: &core_dir,
             backend: Backend::None,
             extras: Extras {
-                labels: output.extras.labels,
+                labels: settings.extras.labels,
                 ..Extras::default()
             },
             core_only: true,
-            ..settings
+            ..*settings
         },
     );
-    let core_modules = build::core_built(&core, compilation, output.typescript);
+    let core_modules = build::core_built(&core, compilation, settings.typescript);
     let (mut artifacts, diagnostics) = build::emit(
         compilation,
         sources,
         &Settings {
             core_modules: &core_modules,
-            ..settings
+            ..*settings
         },
     );
     artifacts.extend(core.into_iter().map(|a| Artifact {

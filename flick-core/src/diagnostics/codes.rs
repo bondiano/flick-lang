@@ -357,6 +357,7 @@ codes! {
     P037 = Project 37, "plugin block without its import";
     P038 = Project 38, "plugin reaches what the project does not grant";
     P039 = Project 39, "plugin's answer is in no snapshot of an offline run";
+    P040 = Project 40, "packages need different versions of an npm package";
 }
 
 #[cfg(test)]

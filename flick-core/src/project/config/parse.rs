@@ -6,7 +6,9 @@ use std::{mem, ops};
 use serde::Deserialize;
 use toml::{Spanned, de};
 
-use super::deps::{RawDependency, RawGrants, RawPackage, dependencies, grants, package};
+use super::deps::{
+    RawDependency, RawGrants, RawJs, RawPackage, dependencies, grants, js_dependencies, package,
+};
 use super::{Build, Config, Entry, Kind, MAIN_ENTRY, Manifest, Script};
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::source::{FileId, Span};
@@ -30,6 +32,7 @@ struct Raw {
     sql: Option<Spanned<RawSql>>,
     lint: Option<Spanned<RawLint>>,
     dependencies: Option<Spanned<BTreeMap<String, Spanned<RawDependency>>>>,
+    js: Option<Spanned<RawJs>>,
     package: Option<Spanned<RawPackage>>,
     plugins: Option<Spanned<BTreeMap<String, Spanned<RawGrants>>>>,
     workspace: Option<RawWorkspace>,
@@ -156,6 +159,7 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
             ("sql", raw.sql.map(|s| s.span())),
             ("lint", raw.lint.map(|l| l.span())),
             ("dependencies", raw.dependencies.map(|d| d.span())),
+            ("js.dependencies", raw.js.map(|j| j.span())),
             ("package", raw.package.map(|p| p.span())),
             ("plugins", raw.plugins.map(|p| p.span())),
         ];
@@ -277,6 +281,7 @@ fn config(
             .unwrap_or_default(),
         span,
     )?;
+    let js_dependencies = js_dependencies(raw.js.map(Spanned::into_inner), span)?;
     let package = match raw.package {
         Some(raw) => {
             let at = span(raw.span());
@@ -294,6 +299,7 @@ fn config(
         test_dir: project.test_dir,
         entries,
         dependencies,
+        js_dependencies,
         package,
         build: raw.build.map(Spanned::into_inner).unwrap_or_default(),
         sql_dialect,
