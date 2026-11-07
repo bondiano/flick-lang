@@ -1,0 +1,76 @@
+// `Ref.modify` is one step (R7): fibers that take a ticket each, stepping aside
+// between takes, hold each ticket once, in the order each took them; a reader
+// never sees the middle of a transfer; a modify that dies changes nothing.
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// `count` tickets from `cell`, stepping aside after each.
+take : Ref Int -> Int -> List Int ->{Async;} List Int
+let rec take cell count taken =
+  if count == 0 then
+    List.reverse taken
+  else
+    let ticket = Ref.modify cell (fun n -> (n, n + 1))
+    Effect.yield_now ()
+    take cell (count - 1) ([ticket] ++ taken)
+
+ascending : List Int -> Bool
+let rec ascending tickets =
+  match tickets with
+  | [a, b, ...rest] -> a < b && ascending ([b] ++ rest)
+  | _ -> true
+
+tickets : Unit ->{Async;} Unit
+let tickets () =
+  let cell = Ref.make 0
+  let all = parallel_all 8 (List.repeat 8 (task { take cell 25 [] }))
+  say ("each fiber's tickets ascend: " ++ show (List.all ascending all))
+  say ("each ticket once: " ++ show (List.sort (List.concat all) == List.range 0 200))
+  // after every fiber ended, the next take follows all of theirs
+  say ("next ticket: " ++ show (Ref.modify cell (fun n -> (n, n + 1))))
+
+/// Moves from one field to the other while a reader sums them.
+transfers : Unit ->{Async;} Unit
+let transfers () =
+  let cell = Ref.make (100, 0)
+  let move = task {
+    take_moves cell 50
+    true
+  }
+  let read = task { reads_constant cell 200 }
+  let oks = parallel_all 8 [move, move, read, move, read]
+  say ("no reader saw a transfer half done: " ++ show (List.all (fun ok -> ok) oks))
+  say ("after the transfers: " ++ show (Ref.get cell))
+
+take_moves : Ref (Int, Int) -> Int ->{Async;} Unit
+let rec take_moves cell count =
+  if count == 0 then
+    ()
+  else
+    Ref.update cell (fun (a, b) -> if a > 0 then (a - 1, b + 1) else (a + 1, b - 1))
+    Effect.yield_now ()
+    take_moves cell (count - 1)
+
+reads_constant : Ref (Int, Int) -> Int ->{Async;} Bool
+let rec reads_constant cell count =
+  if count == 0 then
+    true
+  else
+    let (a, b) = Ref.get cell
+    Effect.yield_now ()
+    a + b == 100 && reads_constant cell (count - 1)
+
+dying : Unit ->{Async;} Unit
+let dying () =
+  let cell = Ref.make 7
+  let ex : Exit none Int = Effect.exit (task { Ref.modify cell (fun _ -> todo) })
+  say ("the modify died: " ++ show (Exit.has_dies ex))
+  say ("the cell is unchanged: " ++ show (Ref.get cell))
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  tickets ()
+  transfers ()
+  dying ()

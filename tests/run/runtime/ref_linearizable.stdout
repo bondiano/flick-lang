@@ -1,0 +1,7 @@
+each fiber's tickets ascend: true
+each ticket once: true
+next ticket: 200
+no reader saw a transfer half done: true
+after the transfers: (0, 100)
+the modify died: true
+the cell is unchanged: 7

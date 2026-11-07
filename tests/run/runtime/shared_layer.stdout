@@ -1,0 +1,29 @@
+base built
+inner base
+outer base
+base released
+nested: closed
+--
+base built
+base, base
+base released
+in_fibers: closed
+--
+base built
+consumer body done
+child ends with base
+consumer closed
+base released
+with_children: closed
+--
+base built
+first base
+base released
+base built
+second base
+base released
+siblings: closed
+--
+failing layer acquires
+failing layer releases
+Some Boot "no base"
