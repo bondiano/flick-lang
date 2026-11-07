@@ -12,6 +12,7 @@ pub mod source;
 pub mod splice;
 pub mod testing;
 
+use std::panic::{self, AssertUnwindSafe};
 use std::sync::Arc;
 
 use flick_plugin::{
@@ -188,11 +189,11 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
     }
 
     fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String> {
-        Ok(self.plugin.collect(blocks, source))
+        guarded(|| self.plugin.collect(blocks, source))
     }
 
     fn publish(&self, state: &[u8]) -> Result<Vec<Published>, String> {
-        Ok(self.plugin.publish(state))
+        guarded(|| self.plugin.publish(state))
     }
 
     fn expand(
@@ -201,8 +202,8 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         state: &[u8],
         source: &mut BlockSource,
     ) -> Result<Arena, Failure> {
-        self.plugin
-            .expand(block, state, source)
+        guarded(|| self.plugin.expand(block, state, source))
+            .map_err(Failure::Broken)?
             .map_err(Failure::Refused)
     }
 
@@ -214,7 +215,7 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         member: bool,
         source: &mut BlockSource,
     ) -> Result<Vec<Completion>, String> {
-        Ok(self.plugin.complete(block, state, offset, member, source))
+        guarded(|| self.plugin.complete(block, state, offset, member, source))
     }
 
     fn hover(
@@ -224,11 +225,11 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         offset: u32,
         facts: &[Fact],
     ) -> Result<Option<Hover>, String> {
-        Ok(self.plugin.hover(block, state, offset, facts))
+        guarded(|| self.plugin.hover(block, state, offset, facts))
     }
 
     fn highlight(&self, block: &Block, state: &[u8]) -> Result<Vec<Highlight>, String> {
-        Ok(self.plugin.highlight(block, state))
+        guarded(|| self.plugin.highlight(block, state))
     }
 
     fn format(
@@ -237,7 +238,7 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         state: &[u8],
         source: &mut BlockSource,
     ) -> Result<Option<Vec<Piece>>, String> {
-        Ok(self.plugin.format(block, state, source))
+        guarded(|| self.plugin.format(block, state, source))
     }
 
     fn derive(
@@ -249,8 +250,8 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         state: &[u8],
         source: &mut BlockSource,
     ) -> Result<Arena, Failure> {
-        (self.plugin)
-            .derive(target, class, args, module, state, source)
+        guarded(|| (self.plugin).derive(target, class, args, module, state, source))
+            .map_err(Failure::Broken)?
             .map_err(Failure::Refused)
     }
 
@@ -260,8 +261,19 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         state: &[u8],
         facts: &[Fact],
     ) -> Result<Vec<Diagnostic>, String> {
-        Ok(self.plugin.check(block, state, facts))
+        guarded(|| self.plugin.check(block, state, facts))
     }
+}
+
+/// What `call` gives, or why it panicked: a native plugin runs in the
+/// compiler's process, which its panic must not take down.
+fn guarded<T>(call: impl FnOnce() -> T) -> Result<T, String> {
+    panic::catch_unwind(AssertUnwindSafe(call)).map_err(|payload| {
+        let why = (payload.downcast_ref::<&str>().map(|s| (*s).to_owned()))
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "no message".to_owned());
+        format!("panicked: {why}")
+    })
 }
 
 /// What the plugin `package` found wrong at a span of a block whose frame
