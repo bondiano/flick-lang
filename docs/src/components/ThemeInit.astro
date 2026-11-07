@@ -1,10 +1,20 @@
 <script is:inline>
   // Apply browser preferences before paint; interactive controls are implemented in Flick.
+  // The system decides until the visitor presses the theme control, which stores a choice.
   (() => {
-    let theme = "light";
-    try {
-      theme = localStorage.getItem("starlight-theme") === "dark" ? "dark" : "light";
-    } catch { /* Preference storage is optional in private browsing. */ }
-    document.documentElement.dataset.theme = theme;
+    const stored = () => {
+      try {
+        return localStorage.getItem("starlight-theme");
+      } catch {
+        return null; // preference storage is optional in private browsing
+      }
+    };
+    const chosen = () => stored() === "dark" || stored() === "light";
+    const system = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      document.documentElement.dataset.theme = chosen() ? stored() : system.matches ? "dark" : "light";
+    };
+    apply();
+    system.addEventListener("change", apply);
   })();
 </script>
