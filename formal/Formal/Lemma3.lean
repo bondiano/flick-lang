@@ -27,7 +27,7 @@ theorem liftT_add (K k : Nat) (σ : Atom → Ty) : liftT k (liftT K σ) = liftT 
     by_cases h₁ : i < k
     · simp [liftT, h₁, show i < K + k by omega]
     · by_cases h₂ : i - k < K
-      · simp [liftT, h₁, h₂, show i < K + k by omega, Ty.up, Ty.substT, shiftV]; omega
+      · simp [liftT, h₁, h₂, show i < K + k by omega, Ty.up_def, Ty.substT, shiftV]; omega
       · simp only [liftT, h₁, h₂, if_false, show ¬ i < K + k by omega, Ty.up_up]
         congr 3; omega
   | r p => simp [liftT, Ty.up_up]

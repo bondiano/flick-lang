@@ -109,7 +109,8 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | aref hK hU hn hfr hlc hpA _ _ ihA ihr =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.alts
     exact .aref hK hU hn hfr hlc hpA
-      (fun θ hθ hu => ihA θ hθ hu ⟨(h₁.substT _).substT θ, Stage.le_substT θ (Stage.le_substT _ h₂)⟩)
+      (fun θ hθ hu => ihA θ hθ hu ⟨by
+        simp only [Ty.up_def]; exact (h₁.substT _).substT θ, Stage.le_substT θ (Stage.le_substT _ h₂)⟩)
       (ihr ⟨rfl, h₁, h₂⟩)
   | todo => intro _ hJ; obtain ⟨_, _, rfl, _, _⟩ := hJ.ex; exact .todo
   | task he hψ hn hc hT =>

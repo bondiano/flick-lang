@@ -92,7 +92,7 @@ theorem cunif_of (hR : Real P S N) {K : Nat} {c : Ctor} {us : List Ty} {σ : Nat
   obtain ⟨hS, hres, h2, h4⟩ := hR.ctor hK
   have hcl := S.res_closed _ _ _ _ (liftT c.k (trσ N σ)) hS fun i hi => by simp [liftT, hi]
   rw [hres] at hu hcl
-  rw [tcon_subst, trT_tcon h2 h4, Flick.Ty.up, Flick.Ty.tcon_substT, Flick.Ty.tcon_substT,
+  rw [tcon_subst, trT_tcon h2 h4, Flick.Ty.up_def, Flick.Ty.tcon_substT, Flick.Ty.tcon_substT,
     Flick.Ty.tcon_substT] at hu
   have hl := Flick.Ty.tcon_inj (by simp [hlen]) hu
   simp only [List.map_map] at hl
@@ -109,9 +109,8 @@ theorem cunif_of (hR : Real P S N) {K : Nat} {c : Ctor} {us : List Ty} {σ : Nat
     intro y
     rw [trT_subst, ← Flick.Ty.substT_comp]
     have e₁ : (trT N y).substT (trσ N (up c.k)) = (trT N y).up c.k :=
-      Flick.Ty.substT_congr fun a => trσ_up N c.k a
-    rw [e₁, Flick.Ty.up_comm, ← trT_subst]
-    rfl
+      (Flick.Ty.substT_congr fun a => trσ_up N c.k a).trans (Flick.Ty.up_def _ _).symm
+    rw [e₁, Flick.Ty.up_comm, ← trT_subst, Flick.Ty.up_def]
   have hm : c.res.map (fun x => (trT N x).substT fun a => (liftT c.k (trσ N σ) a).substT θ'') =
       us.map (fun y => (trT N (y.subst (up c.k))).substT
         fun a => (liftT c.k (trσ N σ) a).substT θ'') := by

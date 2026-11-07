@@ -177,7 +177,7 @@ theorem SubOk.substT {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (θ : Atom 
   obtain ⟨s₀, hs₀, rfl⟩ := hi
   obtain ⟨ht, hnI, hc⟩ := h _ _ hs₀
   have hf : Fits (liftT s₀.k θ) (σ i) :=
-    ⟨fun p hp => by simp [liftT, (hθ i).1 p hp, Ty.up, Ty.substT, shiftV],
+    ⟨fun p hp => by simp [liftT, (hθ i).1 p hp, Ty.up_def, Ty.substT, shiftV],
       fun hi => (hnI hi).elim, fun hi => (hnI hi).elim, fun hi => (hnI hi).elim⟩
   have := ht.substT (liftT s₀.k θ) hf
   simp only [Flick.J.substT] at this

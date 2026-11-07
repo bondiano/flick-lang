@@ -332,17 +332,12 @@ def Atom.down (k : Nat) : Atom → Option Atom
   | .v i => if i < k then none else some (.v (i - k))
   | .r p => some (.r p)
 
-/-- The atoms shifted by `k`. -/
-def Atom.up (k : Nat) : Atom → Atom
-  | .v i => .v (i + k)
-  | .r p => .r p
-
 @[simp] theorem Atom.down_up (k : Nat) (a : Atom) : Atom.down k (a.up k) = some a := by
   cases a <;> simp [Atom.down, Atom.up]
 
 theorem Ty.reach_up (t : Ty) (k : Nat) (b : Atom) :
     (t.up k).reach b ↔ ∃ a, t.reach a ∧ b = a.up k := by
-  rw [Ty.up, Ty.reach_substT]
+  rw [Ty.up_def, Ty.reach_substT]
   constructor
   · rintro ⟨a, ha, h⟩
     cases a <;> simp [shiftV] at h <;> subst h <;> exact ⟨_, ha, rfl⟩

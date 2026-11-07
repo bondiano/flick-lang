@@ -102,7 +102,7 @@ theorem rot_inst (T : Flick.Ty) {p kk : Nat} (θ : Nat → Ty) :
           Nat.sub_add_cancel (by omega : p ≤ j)]
       · rw [if_neg h2]
         simp only [Flick.Ty.substT, liftT, if_neg (by omega : ¬ j < kk), instT, List.length_map,
-          vars, List.length_range, dif_neg (by omega : ¬ j - kk < p), Flick.Ty.up, shiftV,
+          vars, List.length_range, dif_neg (by omega : ¬ j - kk < p), Flick.Ty.up_def, shiftV,
           dif_neg (by omega : ¬ j - kk - p + kk < kk), trσ, if_neg h2, trT]
         congr 1; omega
 

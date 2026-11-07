@@ -38,7 +38,7 @@ theorem ident_noNames : NoNames Ty.ident := by
 /-- Shifting brings no name into a row. -/
 theorem NoNames.up {σ : Atom → Ty} (h : NoNames σ) (k : Nat) : NoNames fun b => (σ b).up k := by
   intro b N hb
-  simp only [Ty.up, Ty.asRow_substT, Row.substT] at hb
+  simp only [Ty.up_def, Ty.asRow_substT, Row.substT] at hb
   rcases hb with hb | ⟨c, _, hc⟩
   · exact h b N hb
   · cases c <;> simp [shiftV, Ty.asRow_tvar, Ty.asRow_rg] at hc
@@ -60,10 +60,10 @@ theorem shift_lift (k : Nat) (σ : Atom → Ty) (a : Atom) :
   | r p => simp [shiftV, Ty.substT, liftT]
 
 theorem Atom.ty_up (a : Atom) (k : Nat) : a.ty.up k = (a.up k).ty := by
-  cases a <;> simp [Atom.ty, Atom.up, Ty.up, Ty.substT, shiftV]
+  cases a <;> simp [Atom.ty, Atom.up, Ty.up_def, Ty.substT, shiftV]
 
 theorem Fits.lift {σ : Atom → Ty} {e : Tm} (h : Fits σ e) (k : Nat) : Fits (liftT k σ) e := by
-  refine ⟨fun p hp => by simp [liftT, h.1 p hp, Ty.up, Ty.substT, shiftV], fun hi b p hb => ?_,
+  refine ⟨fun p hp => by simp [liftT, h.1 p hp, Ty.up_def, Ty.substT, shiftV], fun hi b p hb => ?_,
     fun hi b a hb => ?_, fun hi => (h.2.2.2 hi).lift k⟩
   · have key : ∀ t : Ty, (t.up k).reach (.r p) → t.reach (.r p) := by
       intro t ht
@@ -112,11 +112,11 @@ theorem shift_comm' (Γ : List Scheme) (k : Nat) (σ : Atom → Ty) :
 
 theorem Facts.up_comm (Θ : Facts) (k : Nat) (σ : Atom → Ty) :
     (Θ.substT (shiftV k)).substT (liftT k σ) = (Θ.substT σ).substT (shiftV k) := by
-  rw [Facts.substT_comp, Facts.substT_comp]; congr 1; funext a; exact shift_lift k σ a
+  rw [Facts.substT_comp, Facts.substT_comp]; congr 1; funext a; rw [shift_lift, Ty.up_def]
 
 theorem Row.up_comm (r : Row) (k : Nat) (σ : Atom → Ty) :
     (r.substT (shiftV k)).substT (liftT k σ) = (r.substT σ).substT (shiftV k) := by
-  rw [Row.substT_comp, Row.substT_comp]; congr 1; funext a; exact shift_lift k σ a
+  rw [Row.substT_comp, Row.substT_comp]; congr 1; funext a; rw [shift_lift, Ty.up_def]
 
 theorem Stage.up_comm (φ : Stage) (k : Nat) (σ : Atom → Ty) :
     (φ.substT (shiftV k)).substT (liftT k σ) = (φ.substT σ).substT (shiftV k) := by
@@ -162,7 +162,7 @@ theorem Typ.aref_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name
     Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ))
       (.acons (Pat.spine K qs) b r) (.alts (t.substT σ) (t'.substT σ) (φ.substT σ)) := by
   have fits : ∀ θ, Fits θ b → Fits (fun a => (liftT k σ a).substT θ) b := fun θ h =>
-    ⟨fun p hp => by simp [liftT, hσ.1 p hp, Ty.up, Ty.substT, shiftV, h.1 p hp],
+    ⟨fun p hp => by simp [liftT, hσ.1 p hp, Ty.up_def, Ty.substT, shiftV, h.1 p hp],
       fun hi => (hn hi).elim, fun hi => (hn hi).elim, fun hi => (hn hi).elim⟩
   have cl : (Ty.tcon T₀ (S.res K)).substT (liftT k σ) = Ty.tcon T₀ (S.res K) := by
     rw [Ty.tcon_substT, S.res_closed K k ts T₀ _ hK fun i hi => by simp [liftT, hi]]
@@ -190,7 +190,7 @@ theorem Typ.aref_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name
   have eP : ∀ θ, ((φ.substT σ).substT (shiftV k)).substT θ =
       (φ.substT (shiftV k)).substT fun a => (liftT k σ a).substT θ := fun θ => by
     simp only [Stage.substT_comp]; congr 1; funext a
-    rw [← Ty.substT_comp, shift_lift]; rfl
+    rw [← Ty.substT_comp, shift_lift, Ty.up_def]
   refine .aref (Δ := fun θ => Δ fun a => (liftT k σ a).substT θ) hK (Ty.hd_substT σ hU) hn
     (by simpa using hfr) (by simpa using hlc)
     (fun θ hθ hu => by have := hpA _ (fits θ hθ) (unif θ hu); rwa [ets] at this)

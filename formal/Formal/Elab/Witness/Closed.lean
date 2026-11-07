@@ -191,6 +191,6 @@ theorem field_inst (t : Ty) (c kk : Nat) :
         simp only [Flick.Ty.substT, liftT, if_neg (show ¬ j < kk by omega), instT,
           List.length_singleton, trT]
         rw [dif_neg (by omega)]
-        simp only [Flick.Ty.up, Flick.Ty.substT, shiftV]; congr 1; omega
+        simp only [Flick.Ty.up_def, Flick.Ty.substT, shiftV]; congr 1; omega
 
 end Flick.Elab

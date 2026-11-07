@@ -301,7 +301,7 @@ theorem trσ_lift (k : Nat) (σ : Nat → Ty) (a : Atom) : trσ N (lift k σ) a 
     simp only [trσ, lift, liftT]
     split
     · rfl
-    · rw [trT_subst]; apply Flick.Ty.substT_congr; intro b; cases b <;> rfl
+    · rw [trT_subst, Flick.Ty.up_def]; apply Flick.Ty.substT_congr; intro b; cases b <;> rfl
   | r p => rfl
 
 theorem trσ_up (k : Nat) (a : Atom) : trσ N (up k) a = shiftV k a := by
