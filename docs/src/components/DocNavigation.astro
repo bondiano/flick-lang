@@ -1,6 +1,4 @@
 ---
-import Icon from "./Icon.astro";
-
 interface Entry {
   type: string;
   label: string;
@@ -18,7 +16,7 @@ const holdsCurrent = (entry: Entry): boolean => entry.isCurrent === true || (ent
     {entry.type === "link"
       ? <a href={entry.href} aria-current={entry.isCurrent ? "page" : undefined}>{entry.label}</a>
       : <details class="doc-nav-group" open={holdsCurrent(entry)}>
-          <summary><span class="doc-nav-chevron"><Icon name="chevron" size={14} /></span>{entry.label}<span class="doc-nav-count">{pages(entry)}</span></summary>
+          <summary><span class="doc-nav-token"></span>{entry.label}<span class="doc-nav-count">{pages(entry)}</span></summary>
           <Astro.self entries={entry.entries ?? []} nested />
         </details>}
   </li>)}

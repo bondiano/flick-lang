@@ -151,8 +151,8 @@ const status = [
           <h2 id="app-title">{text("One app. One language. No unchecked seams.", "Одно приложение. Один язык. Без непроверенных стыков.")}</h2>
           <p class="stop-lead" set:html={inlineCode(text("Conduit, the RealWorld demo app, is a Go server over PostgreSQL and a React client. Both depend on one package with the API contract, so a route that does not exist is a compile error on both sides.", "Conduit, демонстрационное приложение RealWorld, — это Go-сервер на PostgreSQL и клиент на React. Оба зависят от одного пакета с контрактом API, поэтому несуществующий маршрут — ошибка компиляции с обеих сторон."))} />
           <svg class="seam-map" viewBox="0 0 460 170" role="img" aria-label={text("One contract package, used by the Go server and the React client", "Один пакет с контрактом, его используют Go-сервер и клиент на React")}>
-            <path d="M28 85H110L166 29H300" />
-            <path d="M110 85L166 141H300" />
+            <path d="M28 85H94Q110 85 121.3 73.7L154.7 40.3Q166 29 182 29H300" />
+            <path d="M94 85Q110 85 121.3 96.3L154.7 129.7Q166 141 182 141H300" />
             <circle class="map-station" cx="28" cy="85" r="20" />
             <circle class="map-station" cx="300" cy="29" r="17" />
             <circle class="map-station" cx="300" cy="141" r="17" />

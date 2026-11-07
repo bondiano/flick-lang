@@ -184,28 +184,34 @@ code, pre, kbd { font-variant-ligatures: none; }
 /* The sidebar is the site's map: each section is a line and each page a station on it. */
 .site-main-frame { padding-top: var(--sl-nav-height); min-height: 100vh; }
 .site-docs-sidebar { position: fixed; top: var(--sl-nav-height); bottom: 0; left: 0; width: var(--sl-sidebar-width); overflow: auto; padding: 1.25rem 1rem 3rem 1.5rem; border-right: 1px solid var(--sl-color-hairline); background: var(--sl-color-bg); }
-.doc-nav-list { list-style: none; margin: 0; padding: 0; }
+.doc-nav-list { --line: var(--flick-line-violet); --line-x: 0.6rem; --indent: 1.6rem; list-style: none; margin: 0; padding: 0; }
 .doc-nav-list > li { margin: 0; padding: 0; }
-.doc-nav-list { --line: var(--flick-line-violet); }
-.doc-nav-group { margin-bottom: 0.35rem; }
-.doc-nav-group > summary { display: flex; align-items: center; gap: 0.5rem; min-height: 40px; cursor: pointer; font-weight: 700; font-size: 1rem; color: var(--sl-color-white); list-style: none; }
+.doc-nav-group { margin-bottom: 0.25rem; }
+.doc-nav-group > summary { position: relative; display: flex; align-items: center; gap: 0.5rem; min-height: 40px; padding-left: var(--indent); cursor: pointer; font-weight: 700; font-size: 1rem; color: var(--sl-color-white); list-style: none; }
 .doc-nav-group > summary::-webkit-details-marker { display: none; }
 .doc-nav-group > summary:hover { color: var(--sl-color-accent-high); }
 .doc-nav-count { margin-left: auto; font-size: 0.8rem; font-weight: 500; color: var(--sl-color-gray-3); font-variant-numeric: tabular-nums; }
-.doc-nav-chevron { display: inline-flex; color: var(--sl-color-gray-3); transition: transform 120ms ease-out; }
-.doc-nav-group[open] > summary .doc-nav-chevron { transform: rotate(90deg); }
-.doc-nav-nested { position: relative; margin: 0 0 0.6rem 0.3rem; padding-left: 1.05rem; }
-.doc-nav-nested::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--line, var(--sl-color-gray-4)); }
-.doc-nav-nested .doc-nav-nested { margin-left: 0; padding-left: 0.6rem; }
-.doc-nav-nested .doc-nav-nested::before { display: none; }
-.doc-nav-nested .doc-nav-group > summary { min-height: 32px; font-size: 0.82rem; font-weight: 700; color: var(--sl-color-gray-2); }
-.doc-nav-list a { position: relative; display: flex; align-items: center; min-height: 32px; padding: 0.2rem 0.4rem; font-size: 0.92rem; line-height: 1.3; color: var(--sl-color-gray-2); text-decoration: none; }
-.doc-nav-nested > li > a::before { content: ''; position: absolute; left: -1.12rem; top: 50%; width: 11px; height: 3px; margin-top: -1.5px; background: var(--line, var(--sl-color-gray-4)); }
-.doc-nav-nested .doc-nav-nested > li > a::before { left: -0.67rem; width: 6px; }
+/* A section's token: large in the line's colour when open, small and grey when closed. */
+.doc-nav-token { position: absolute; left: var(--line-x); top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--sl-color-gray-4); transform: scale(0.5); transition: transform 140ms ease-out, background-color 140ms ease-out; }
+.doc-nav-group[open] > summary .doc-nav-token { background: var(--line); transform: none; }
+.doc-nav-group > summary:hover .doc-nav-token { background: var(--line); }
+/* The line runs from the token, and ends past the last station on a T. */
+.doc-nav-nested { position: relative; margin: 0 0 0.5rem; padding: 0 0 0.7rem var(--indent); }
+.doc-nav-nested::before { content: ''; position: absolute; left: calc(var(--line-x) - 2px); top: -0.7rem; bottom: 0; width: 4px; background: var(--line); }
+.doc-nav-nested::after { content: ''; position: absolute; left: calc(var(--line-x) - 8px); bottom: 0; width: 16px; height: 4px; background: var(--line); }
+.doc-nav-nested .doc-nav-nested { margin: 0; padding: 0; }
+.doc-nav-nested .doc-nav-nested::before, .doc-nav-nested .doc-nav-nested::after { display: none; }
+.doc-nav-nested .doc-nav-group { margin: 0; }
+.doc-nav-nested .doc-nav-group > summary { min-height: 32px; padding-left: 0; font-size: 0.84rem; color: var(--sl-color-gray-2); }
+/* A nested section is a square station on the same line. */
+.doc-nav-nested .doc-nav-token { left: calc(var(--line-x) - var(--indent)); width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 0; background: var(--sl-color-gray-4); transform: none; }
+.doc-nav-nested .doc-nav-group[open] > summary .doc-nav-token { background: var(--sl-color-bg); border: 3px solid var(--sl-color-white); }
+.doc-nav-list a { position: relative; display: flex; align-items: center; min-height: 32px; padding: 0.2rem 0.4rem 0.2rem 0; font-size: 0.92rem; line-height: 1.3; color: var(--sl-color-gray-2); text-decoration: none; }
+.doc-nav-nested a::before { content: ''; position: absolute; left: calc(var(--line-x) - var(--indent)); top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 2.5px solid var(--sl-color-white); border-radius: 50%; background: var(--sl-color-bg); }
 .doc-nav-list a:hover { color: var(--sl-color-accent-high); }
+.doc-nav-nested a:hover::before { border-color: var(--sl-color-accent); }
 .doc-nav-list a[aria-current='page'] { color: var(--sl-color-white); font-weight: 700; }
-.doc-nav-nested > li > a[aria-current='page']::before { left: -1.32rem; top: 50%; width: 15px; height: 15px; margin-top: -7.5px; border: 3px solid var(--sl-color-white); border-radius: 50%; background: var(--sl-color-bg); }
-.doc-nav-nested .doc-nav-nested > li > a[aria-current='page']::before { left: -0.87rem; }
+.doc-nav-nested a[aria-current='page']::before { width: 18px; height: 18px; margin: -9px 0 0 -9px; border-width: 4px; }
 
 /* Reading comes first: quiet type, one measure, no decoration between the reader and the text. */
 .content-panel { padding-block: 1.5rem; }
@@ -302,5 +308,5 @@ h1#_top { color: var(--sl-color-white); font-weight: 800; letter-spacing: -0.025
   .search-widget { padding: 1rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .doc-nav-chevron, .sl-markdown-content .sl-anchor-link { transition: none; }
+  .doc-nav-token, .sl-markdown-content .sl-anchor-link { transition: none; }
 }
