@@ -85,6 +85,7 @@ fn main() -> ExitCode {
             | Commands::Remove(_)
             | Commands::Update(_)
             | Commands::Deps(_)
+            | Commands::Plugins
             | Commands::Explain(_)
             | Commands::Doctor
     );
@@ -109,6 +110,7 @@ fn main() -> ExitCode {
             | Commands::Remove(_)
             | Commands::Update(_)
             | Commands::Deps(_)
+            | Commands::Plugins
             | Commands::Explain(_)
             | Commands::Doctor
             // after its logging starts
@@ -207,6 +209,7 @@ fn dispatch(args: CommandArguments) -> ExitCode {
             global,
         ),
         Commands::Pack(o) => report(commands::pack(&o, global), global),
+        Commands::Plugins => report(commands::plugins(global), global),
         Commands::Diff(o) => report(commands::diff(&o, global), global),
         Commands::Schema(SchemaCommands::Export(o)) => {
             report(commands::schema_export(&o, project), global)

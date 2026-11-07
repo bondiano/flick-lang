@@ -201,3 +201,46 @@ fn install_pins_the_build_of_a_local_plugin_and_locked_refuses_another() {
         "{lock}"
     );
 }
+
+#[test]
+fn flick_plugins_shows_where_each_comes_from_and_its_build() {
+    let root_manifest = PLUGINS.replace(
+        "members = [\"lib\", \"pairs\"]",
+        "members = [\"app\", \"pairs\"]",
+    );
+    let pairs = "schema-version = 1\n[package]\nname = \"pairs\"\nversion = \"1.0.0\"\nplugin = \"pairs.wasm\"\n[project]\nkind = \"lib\"\n";
+    let root = project(
+        "workspace-plugins-list",
+        &[
+            ("flick.toml", &root_manifest),
+            ("app/flick.toml", LIB),
+            ("app/src/Shared/Answer.fl", &answer(1)),
+            ("pairs/flick.toml", pairs),
+            (
+                "pairs/src/Pairs.fl",
+                "module Pairs exposing (one)\n\none : Float\nlet one = 1\n",
+            ),
+        ],
+    );
+    let app = root.join("app");
+    let listed = |dir: &PathBuf| {
+        let out = flick_in(dir, &["plugins"]);
+        assert!(out.status.success(), "{out:?}");
+        text(&out.stdout)
+    };
+    let before = listed(&app);
+    assert!(
+        before.starts_with("std: linked into flick, blocks cli"),
+        "{before}"
+    );
+    assert!(
+        before.contains("pairs (from the workspace): ../pairs/pairs.wasm, missing"),
+        "{before}"
+    );
+    fs::write(root.join("pairs/pairs.wasm"), "a build").expect("build");
+    assert!(listed(&app).contains("not in `flick.lock`"));
+    assert!(flick_in(&app, &["install"]).status.success());
+    assert!(listed(&app).contains(", pinned"));
+    fs::write(root.join("pairs/pairs.wasm"), "another build").expect("rebuild");
+    assert!(listed(&app).contains("another build than `flick.lock` pins"));
+}

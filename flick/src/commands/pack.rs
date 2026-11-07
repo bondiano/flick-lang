@@ -18,8 +18,7 @@ use flick_core::iface;
 use flick_core::implicit_packages::is_implicit_package;
 use flick_core::project::cache;
 use flick_core::project::config::MAIN_ENTRY;
-use flick_core::project::{self as project_files, config};
-use flick_core::source::{FileId, SourceMap};
+use flick_core::source::SourceMap;
 
 use super::build::{BuildCommand, write};
 use super::diff;
@@ -179,7 +178,7 @@ fn library(project: &Project, out_dir: &str) -> Outcome {
             "`flick pack` packs a library with `[package] name` and `version`".to_owned(),
         );
     };
-    if let Some(name) = inherited(project).first() {
+    if let Some(name) = super::plugins::inherited(project).first() {
         return failure(
             codes::P032,
             format!(
@@ -391,25 +390,6 @@ fn missing_exports(manifest: &serde_json::Value, stage: &Path) -> Option<String>
         .into_iter()
         .find(|p| !p.contains('*') && !stage.join(p).exists())
         .map(|p| format!("`exports` names `{p}`, which the package does not have"))
-}
-
-/// The dependencies `project` has from its workspace, not from its manifest.
-fn inherited(project: &Project) -> Vec<String> {
-    if project.workspace.is_none() {
-        return Vec::new();
-    }
-    let written = fs::read_to_string(project.root.join(project_files::CONFIG_FILE))
-        .ok()
-        .and_then(|text| config::parse(&text, FileId::default()).ok());
-    let own = |name: &str| {
-        (written.iter())
-            .flat_map(|c| &c.dependencies)
-            .any(|d| d.name == name)
-    };
-    (project.config.dependencies.iter())
-        .filter(|d| !own(&d.name))
-        .map(|d| d.name.clone())
-        .collect()
 }
 
 #[cfg(test)]
