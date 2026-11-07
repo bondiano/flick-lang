@@ -19,7 +19,7 @@ use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::parse;
-use crate::types::{builtin_sources, is_std_module, is_type};
+use crate::types::{builtin_sources, implicit_package_of, is_type};
 
 /// A class a module declares with `@derive`, or a type such as `Schema`
 /// whose companions a plugin derives, and the package its attribute names,
@@ -216,7 +216,7 @@ pub fn builtin_expansion(
                 (builtin_derived(m).iter())
                     .find(|d| d.class == class.name)
                     .map(|d| {
-                        let own = is_std_module(m).then(|| "std".to_owned());
+                        let own = implicit_package_of(m).map(str::to_owned);
                         (m.to_owned(), d.package.clone().or(own))
                     })
             };
@@ -299,7 +299,7 @@ fn std_blocks(
     blocks: &mut Vec<Expanded>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let Some(plugin) = first_party::plugin("std") else {
+    let Some(plugin) = first_party::plugin(first_party::PACKAGE) else {
         return;
     };
     let (heads, aliases) = (&syntax.heads(), syntax.aliases());
@@ -361,7 +361,7 @@ fn std_blocks(
         source.see_published(Arc::clone(&published));
         let made = plugin.expand(block, &state, &mut source);
         diagnostics.append(&mut source.diagnostics);
-        let Some(arena) = made_or(made, "std", &source, whole, diagnostics) else {
+        let Some(arena) = made_or(made, first_party::PACKAGE, &source, whole, diagnostics) else {
             continue;
         };
         match render(&arena, block.whole().end, source.place(), &aliases) {
@@ -369,7 +369,7 @@ fn std_blocks(
                 node,
                 rendered,
                 source,
-                plugin: "std".into(),
+                plugin: first_party::PACKAGE.into(),
                 keep: false,
                 whole: (start, end),
             }),

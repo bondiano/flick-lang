@@ -1,6 +1,6 @@
 //! The npm packages a project needs on the js target beyond its own
-//! `package.json`: what the `[js.dependencies]` of its manifest and of the
-//! libraries it depends on name. `flick install` adds them to `package.json`,
+//! `package.json`: what the `[js.dependencies]` of its manifest, of the
+//! implicit packages and of the libraries it depends on name. `flick install` adds them to `package.json`,
 //! so pnpm installs and pins them as the project's own, and a foreign module
 //! of a library, which ships into the project's output, finds them.
 
@@ -11,7 +11,8 @@ use super::config::JsDependency;
 use super::packages::{Packages, manifest};
 use super::{Host, Project};
 use crate::diagnostics::{Diagnostic, codes};
-use crate::source::{SourceMap, Span};
+use crate::source::{FileId, SourceMap, Span};
+use crate::types;
 
 /// An npm package and the package of the closure that asks for it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,15 +41,23 @@ impl Wanted {
     }
 }
 
-/// What the project and each library of `packages` ask for, in that order.
+/// What the project, each implicit package and each library of `packages`
+/// ask for, in that order. An implicit package's manifest is no file of this
+/// run, so its requirement points at no place of it.
 pub(super) fn closure(project: &Project, packages: &Packages) -> Vec<Wanted> {
     let own = project.config.js_dependencies.iter();
+    let implicit = types::implicit_js_dependencies().map(|(by, name, version)| Wanted {
+        name: name.to_owned(),
+        version: version.to_owned(),
+        by: Some(by.to_owned()),
+        span: Span::new(FileId::default(), 0, 0),
+    });
     let libraries = packages
         .libraries()
         .flat_map(|(name, _, l)| l.js_dependencies.iter().map(move |d| (d, Some(name))));
-    own.map(|d| (d, None))
-        .chain(libraries)
-        .map(|(d, by)| Wanted::new(d, by))
+    (own.map(|d| Wanted::new(d, None)))
+        .chain(implicit)
+        .chain(libraries.map(|(d, by)| Wanted::new(d, by)))
         .collect()
 }
 
@@ -241,7 +250,6 @@ fn top_level_value(text: &str, key: &str) -> Option<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::source::FileId;
 
     fn want(name: &str, version: &str) -> Wanted {
         Wanted {

@@ -98,7 +98,7 @@ pub fn describe(
     files.dedup();
     let mut key = Key::default();
     key.add("compiler", toolchain::COMPILER);
-    key.add("std", builtins::std_hash());
+    key.add("implicit packages", builtins::implicit_hash());
     key.add(
         "compiler-binary",
         toolchain::fingerprint().unwrap_or_default(),

@@ -15,7 +15,7 @@ use crate::resolve;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::is_std_module;
+use crate::types::implicit_package_of;
 
 /// The plugin a file's head stands for, when the caller knows it; the
 /// plugin of `std` is known without.
@@ -55,9 +55,7 @@ pub(super) fn layouts(tree: &Node, text: &str, file: FileId, plugin_of: PluginOf
     let plugin = |head: &str| {
         plugin_of(head).or_else(|| {
             let module = modules.get(head)?;
-            is_std_module(module)
-                .then(|| first_party::plugin("std"))
-                .flatten()
+            implicit_package_of(module).and_then(first_party::plugin)
         })
     };
     let shared: Arc<str> = Arc::from(text);

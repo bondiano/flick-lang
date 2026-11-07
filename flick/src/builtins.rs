@@ -38,7 +38,7 @@ pub fn prepare() {
         return;
     }
     // other binaries' files are stale once this one runs; its files for
-    // other `std`s serve other projects
+    // other implicit packages serve other projects
     if let Ok(entries) = fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let file = entry.file_name();
@@ -55,24 +55,26 @@ pub fn prepare() {
 }
 
 /// The cache directory, the prefix of this binary's files and the file
-/// name for its `std`: the interfaces depend on the checker as much as on
-/// the sources, so the name follows the executable, not only the version,
-/// and the hash of the sources of `std`, which a project picks.
+/// name for its implicit packages: the interfaces depend on the checker as
+/// much as on the sources, so the name follows the executable, not only the
+/// version, and the hash of the sources of those packages, which a project picks.
 fn location() -> Option<(PathBuf, String, String)> {
     let dir = store::cache_dir()?;
     let binary = format!("{PREFIX}{}-", toolchain::fingerprint()?);
-    let name = format!("{binary}{}.json", &std_hash()[..16]);
+    let name = format!("{binary}{}.json", &implicit_hash()[..16]);
     Some((dir, binary, name))
 }
 
-/// The hash of the names and texts of the built-in modules: what a cache of
-/// anything checked against `std` keys on.
-pub fn std_hash() -> &'static str {
+/// The hash of the names and texts of the built-in modules of every implicit
+/// package and of the tables that bind them on go: what a cache of anything
+/// checked or emitted against them keys on.
+pub fn implicit_hash() -> &'static str {
     static HASH: OnceLock<String> = OnceLock::new();
     HASH.get_or_init(|| {
         let mut hasher = Sha256::new();
-        for (module, text) in types::builtin_sources() {
-            hasher.update(module.as_bytes());
+        let modules = types::builtin_sources().iter();
+        for (name, text) in modules.chain(types::implicit_go_bindings()) {
+            hasher.update(name.as_bytes());
             hasher.update([0]);
             hasher.update(text.as_bytes());
             hasher.update([0]);

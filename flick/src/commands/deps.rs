@@ -98,7 +98,7 @@ fn fetch(project: &Project, command: &Command) -> Option<Outcome> {
         Command::Update { packages } => (packages.clone(), fetch::Options::default()),
         _ => return None,
     };
-    let dependencies = stdlib::with_std(&project.config.dependencies);
+    let dependencies = stdlib::with_implicit(&project.config.dependencies);
     match fetch::install(&project.root, &dependencies, &update, options) {
         Ok(fetched) => {
             for name in fetched {
@@ -118,6 +118,9 @@ fn add_js_dependencies(command: &Command, global: &GlobalArguments) -> Option<Ou
         Command::Update { .. } => false,
         _ => return None,
     };
+    if let Err(message) = stdlib::prepare(global.project.as_deref()) {
+        return Some(failure(codes::P034, message));
+    }
     let host = FsHost::new();
     let mut sources = SourceMap::default();
     let explicit = global.project.as_deref().map(Path::new);

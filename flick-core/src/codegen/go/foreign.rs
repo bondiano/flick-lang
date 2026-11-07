@@ -18,10 +18,10 @@ fn table() -> &'static HashMap<(String, String), String> {
     static TABLE: OnceLock<HashMap<(String, String), String>> = OnceLock::new();
     TABLE.get_or_init(|| {
         let mut out = HashMap::new();
-        // the tables of `std`, by area: under `[module]` (or `[global Module]`
+        // the tables of the implicit packages, by area: under `[module]` (or `[global Module]`
         // for a JS global, which may mean different things for different
         // types), an export (or binding name) and its function of `flickrt`
-        for (_, text) in types::std_go_bindings() {
+        for (_, text) in types::implicit_go_bindings() {
             let mut module = "";
             for line in text.lines().map(str::trim) {
                 if line.is_empty() || line.starts_with('#') {

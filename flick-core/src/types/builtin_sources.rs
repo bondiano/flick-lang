@@ -49,10 +49,15 @@ pub(super) const CORE: &[(&str, &str)] = &[
     ("Flick.Debug", builtin_source!("core", "Flick/Debug.fl")),
 ];
 
-// `STD`: the modules of `packages/std`, in the order of its `modules.txt`
+/// An implicit package in the binary: its name, its modules in the order of
+/// its `modules.txt`, and the go binding tables of its `src/go`.
 #[cfg(feature = "embedded-std")]
-include!(concat!(env!("OUT_DIR"), "/std_sources.rs"));
+pub(super) type Embedded = (
+    &'static str,
+    &'static [(&'static str, &'static str)],
+    &'static [(&'static str, &'static str)],
+);
 
-// `STD_GO`: the go binding tables of `packages/std/src/go`
+// `IMPLICIT`: each implicit package
 #[cfg(feature = "embedded-std")]
-include!(concat!(env!("OUT_DIR"), "/std_go.rs"));
+include!(concat!(env!("OUT_DIR"), "/implicit_sources.rs"));

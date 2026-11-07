@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: ba5891ed034368a9
+source_hash: 059227187dc5b167
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -152,6 +152,10 @@ contract = { path = "../contract" }
 std = { git = "https://github.com/bondiano/flick-lang", tag = "std-v0.1.0", subdir = "packages/std" }
 text = { url = "https://example.com/text-1.0.0.tgz", sha256 = "<64 шестнадцатеричные цифры>" }
 ```
+
+Проект видит неявные пакеты, сегодня это `std`, не называя их: `flick install`
+скачивает каждый из них для релиза этого компилятора, а запись с таким именем в
+`[dependencies]` выбирает для него другой источник, как `std` выше.
 
 В каталоге библиотеки лежит `flick.toml` с `kind = "lib"`; модули ищутся в
 его `source-dir`, а зависимости самой библиотеки подключаются вместе с ней.

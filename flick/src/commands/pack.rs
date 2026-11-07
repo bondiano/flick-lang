@@ -15,6 +15,7 @@ use std::{env, fs};
 use flick_core::build::{BUILTIN_DIR, effects::CORE_DIR, runner_file};
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::iface;
+use flick_core::implicit_packages::is_implicit_package;
 use flick_core::project::cache;
 use flick_core::project::config::MAIN_ENTRY;
 use flick_core::source::SourceMap;
@@ -30,7 +31,6 @@ use crate::cache::files_under;
 use crate::child;
 use crate::command::{Command, Outcome};
 use crate::report;
-use crate::stdlib;
 use flick_core::project::Project;
 use flick_core::project::config::Kind;
 use flick_core::types;
@@ -53,13 +53,13 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
         }
     };
     let root = &project.root;
-    // std's modules are built in, so a build of them as a project's would
-    // clash with themselves: checking them as built in is the build
+    // an implicit package's modules are built in, so a build of them as a
+    // project's would clash with themselves: checking them as built in is the build
     if project
         .config
         .package
         .as_ref()
-        .is_some_and(|p| p.name == stdlib::NAME)
+        .is_some_and(|p| is_implicit_package(&p.name))
     {
         let _ = types::builtins();
         return library(&project, &options.out_dir);

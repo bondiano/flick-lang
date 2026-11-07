@@ -48,7 +48,7 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
     }
     key.add("config", format!("{:?}", project.config));
     key.add("compiler", toolchain::COMPILER);
-    key.add("std", builtins::std_hash());
+    key.add("implicit packages", builtins::implicit_hash());
     key.add(
         "compiler-binary",
         toolchain::fingerprint().unwrap_or_default(),
