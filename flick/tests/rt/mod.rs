@@ -29,7 +29,9 @@ fn rt_cases() {
     for profile in ["debug", "release"] {
         let results = parallel(&cases, jobs(), |case| {
             let rel = case.strip_prefix(&root).expect("case under root");
-            let out_dir = out_root.join(profile).join(rel.with_extension(""));
+            // `../rt/x` stays under the profile's directory, which may not exist yet
+            let under = rel.strip_prefix("..").unwrap_or(rel);
+            let out_dir = out_root.join(profile).join(under.with_extension(""));
             let ran = run_case_with(case, rel, &out_dir, "js", profile, &["--rt"]);
             (
                 ran.problem
