@@ -4,6 +4,7 @@ mod completion;
 mod features;
 mod ffi;
 mod foreign;
+mod manifests;
 mod quick_fix;
 mod sql_table;
 mod workspace;
