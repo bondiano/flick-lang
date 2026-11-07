@@ -1,7 +1,7 @@
 /* oxlint-disable require-yield, unicorn/consistent-function-scoping, typescript/no-unsafe-type-assertion -- generators that return a call are what the compiler emits */
 // The kernel of `effect = "rt"` alone: fibers, the driver, interruption, causes.
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -31,7 +31,7 @@ import {
   die,
   exitOf,
   caught,
-} from "../src/rt/index.ts";
+} from "../src/rt/kernel.ts";
 import { root, sleep } from "./rt-support.ts";
 
 test("a chain of calls deeper than the JS stack runs on heap frames", async () => {
@@ -313,12 +313,17 @@ test("exits say how a task ended, with a thrown failure kept whole", async () =>
   assert.deepEqual(bad, failed(fail("typed")));
 });
 
-test("no module of the kernel imports Effect", () => {
-  const dir = new URL("../src/rt/", import.meta.url);
-  for (const file of readdirSync(dir, { recursive: true, encoding: "utf8" })) {
-    if (!file.endsWith(".ts")) continue;
-    const text = readFileSync(new URL(file, dir), "utf8");
-    assert.doesNotMatch(text, /from "(effect|@effect\/)/, file);
-    assert.doesNotMatch(text, /from "\.\.\/(?!core\/)/, file);
-  }
+test("nothing the runtime's index reaches imports Effect", () => {
+  const seen = new Set<string>();
+  const visit = (url: URL): void => {
+    if (seen.has(url.href)) return;
+    seen.add(url.href);
+    for (const [, spec] of readFileSync(url, "utf8").matchAll(/from "([^"]+)"/g)) {
+      if (spec === undefined || spec.startsWith("node:")) continue;
+      assert.ok(spec.startsWith("."), `${url.pathname} imports ${spec}`);
+      visit(new URL(spec, url));
+    }
+  };
+  visit(new URL("../src/rt/index.ts", import.meta.url));
+  assert.ok(seen.size > 10);
 });

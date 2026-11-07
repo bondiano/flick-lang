@@ -296,7 +296,7 @@ impl Checking<'_> {
             thresholds: self
                 .project
                 .map_or_else(Default::default, |p| p.config.thresholds),
-            effects: build.is_none_or(|b| b.effect == Backend::Effect),
+            effects: build.is_none_or(|b| b.effect != Backend::None),
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);

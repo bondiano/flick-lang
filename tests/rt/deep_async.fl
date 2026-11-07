@@ -1,0 +1,57 @@
+// Tail recursion through stages that may suspend runs in constant stack too, a
+// million deep: a function whose row has `Async`, a group of two, a function of
+// a row variable, and one that suspends now and then.
+module App.Main exposing (main)
+
+depth : Int
+let depth = 1000000
+
+count_down : Ref Int -> Int ->{Async;} Unit
+let rec count_down cell n =
+  if n == 0 then
+    ()
+  else
+    Ref.set cell (Ref.get cell + 1)
+    count_down cell (n - 1)
+
+rec {
+  even : Ref Int -> Int ->{Async;} Int
+  let even cell n =
+    if n == 0 then
+      Ref.get cell
+    else
+      Ref.set cell (Ref.get cell + 1)
+      odd cell (n - 1)
+
+  odd : Ref Int -> Int ->{Async;} Int
+  let odd cell n = if n == 0 then Ref.get cell else even cell (n - 1)
+}
+
+each : (Int ->{r; e} Unit) -> Int ->{r; e} Unit
+let rec each f n =
+  if n == 0 then
+    ()
+  else
+    f n
+    each f (n - 1)
+
+yielding : Ref Int -> Int ->{Async;} Unit
+let rec yielding cell n =
+  if n == 0 then
+    ()
+  else
+    if n % 100000 == 0 then Effect.yield_now () else Ref.set cell (Ref.get cell + 1)
+    yielding cell (n - 1)
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let cell = Ref.make 0
+  count_down cell depth
+  Platform.stdout_line (show (Ref.get cell))
+  Platform.stdout_line (show (even (Ref.make 0) depth))
+  let total = Ref.make 0
+  each (fun _n -> Ref.set total (Ref.get total + 1)) depth
+  Platform.stdout_line (show (Ref.get total))
+  let more = Ref.make 0
+  yielding more depth
+  Platform.stdout_line (show (Ref.get more))

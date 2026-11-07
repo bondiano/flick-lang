@@ -123,11 +123,17 @@ impl Settings<'_> {
 
 /// The opt-in outputs of a build.
 #[derive(Debug, Clone, Copy, Default)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each flag asks for one thing of a build"
+)]
 pub struct Extras {
     /// Write `A/B.d.ts`, the public TypeScript interface of each module.
     pub dts: bool,
     /// Write `A/B.promise.js`: Promise façades of runtime functions.
     pub promise_facade: bool,
+    /// Build for Flick's own runtime, whatever the project's `build.effect`.
+    pub rt: bool,
     /// The runner of an app compiles pure codecs ahead of use.
     pub schema_aot: bool,
     /// What a release build labels for debugging tools.
@@ -197,6 +203,7 @@ pub fn emit(
         workers: &workers,
         direct: &direct,
         labels: settings.extras.labels,
+        rt: settings.backend == Backend::Rt,
     };
     let mut out = Vec::new();
     #[cfg(feature = "build-artifacts")]
@@ -247,8 +254,18 @@ fn foreign_specifier(
         _ => (spec, (settings.source_dir)(module)),
     };
     let relative = spec.starts_with("./") || spec.starts_with("../");
+    // a foreign module may have a version for Flick's own runtime beside it
+    let beside = spec
+        .strip_suffix(".mjs")
+        .map(|stem| format!("{stem}.rt.mjs"))
+        .filter(|_| settings.backend == Backend::Rt && relative)
+        .filter(|rt| dir.as_ref().is_some_and(|d| d.join(rt).is_file()));
+    let spec = beside.as_deref().unwrap_or(spec);
     if settings.backend == Backend::None && !relative {
         return effects::specifier(spec).unwrap_or_else(|| spec.to_owned());
+    }
+    if settings.backend == Backend::Rt && !relative {
+        return effects::rt_specifier(spec).unwrap_or_else(|| spec.to_owned());
     }
     match (relative, dir) {
         (true, Some(dir)) => {
@@ -362,6 +379,7 @@ fn entry_runners(
                     Some(module) => Start::Run(codegen::relative(&file, &path(module))),
                     None => match kind.and_then(Result::ok) {
                         Some(MainKind::Pure) => Start::Call,
+                        _ if settings.backend == Backend::Rt => Start::RunMainRt,
                         _ => Start::RunMain,
                     },
                 };
@@ -604,7 +622,11 @@ fn compiled_module(
     if ctx.settings.backend == Backend::None {
         effects::check(&module.ir, diagnostics);
     }
-    effects::control_on_js(&module.ir, diagnostics);
+    // Flick's own runtime has `control` arms, and takes what it lacks when it is
+    // called: a module binds more than a program uses
+    if ctx.settings.backend != Backend::Rt {
+        effects::control_on_js(&module.ir, diagnostics);
+    }
     let output = codegen::js(optimized.as_ref().unwrap_or(&module.ir), ctx.options);
     let file = (ctx.path)(&module.name);
     #[cfg(feature = "source-maps")]
@@ -697,6 +719,10 @@ fn runner(file: &str, entry: &str, start: &Start, schema_aot: Option<&str>) -> A
             Some(("runMain", "@flick-lang/runtime")),
             "await runMain(main);",
         ),
+        Start::RunMainRt => (
+            Some(("runMain", "@flick-lang/runtime/rt")),
+            "await runMain(main);",
+        ),
         // what `run` returns is what the host takes from the module, such as Cloudflare's `fetch`
         Start::Run(module) => (Some(("run", module.as_str())), "export default run(main);"),
     };
@@ -723,6 +749,8 @@ enum Start {
     Call,
     /// An effect, run by the runtime's Node runner.
     RunMain,
+    /// [`Start::RunMain`] on Flick's own runtime.
+    RunMainRt,
     /// By `run` of a runner module, at this path from the runner.
     Run(String),
 }

@@ -1,5 +1,5 @@
 // Helpers of the tests of the kernel of `effect = "rt"`.
-import { type Exit, Suspend, currentCtx, fork } from "../src/rt/index.ts";
+import { type Exit, Suspend, currentCtx, fork } from "../src/rt/kernel.ts";
 
 /** Runs `task` in a fiber of its own; how it ended. */
 export const root = (task: () => unknown): Promise<Exit> =>

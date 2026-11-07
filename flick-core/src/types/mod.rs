@@ -106,7 +106,10 @@ pub use question::Question;
 pub use ranges::range_list;
 pub use schemas::companion_name;
 pub use services::{OpClass, Operation};
-pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
+pub use ty::{
+    Binder, Effects, Row, SYNC_SERVICES, Stage, Type, declare_control_effect, set_stages_by_class,
+    stage_of,
+};
 pub use typing::{
     Constructor, ForeignInfo, GenericInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref, Typing,
     default_method, passes_dictionary,

@@ -45,3 +45,14 @@ export const nodeFs = () => {
   if (fs === undefined) throw new Error("node:fs is available only on Node.js");
   return fs;
 };
+
+export const writeStdout = (text: string): void => {
+  const p = host();
+  if (p === undefined) console.log(text.replace(/\n$/, ""));
+  else p.stdout.write(text);
+};
+
+export const args = (): Array<string> => {
+  const argv: unknown = Reflect.get(Object(host()), "argv");
+  return Array.isArray(argv) ? argv.slice(2).map(String) : [];
+};

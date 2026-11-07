@@ -282,15 +282,14 @@ export function* bracket(acquire: () => unknown, use: (resource: unknown) => unk
   const fiber = currentFiber();
   const depth = fiber.mask;
   fiber.mask = depth + 1;
-  let resource: unknown;
   try {
-    resource = yield acquire();
+    const resource: unknown = yield acquire();
+    const used = asExit(yield exitOf(() => atMask(depth, () => use(resource))));
+    const released = asExit(yield exitOf(() => release(resource)));
+    return raiseOf(finalize(used, released));
   } finally {
     fiber.mask = depth;
   }
-  const used = asExit(yield exitOf(() => use(resource)));
-  const released = asExit(yield exitOf(() => uninterruptible(() => release(resource))));
-  return raiseOf(finalize(used, released));
 }
 
 /** What ended with `exit`, then a finalizer that ended with `fin`: a failure of both elects its defects. */

@@ -8,6 +8,9 @@ use crate::types::OpClass;
 
 impl Gen<'_> {
     pub(super) fn handle(&mut self, h: &Handler) -> String {
+        if self.kernel {
+            return self.kernel_handle(h);
+        }
         let mut installs = Vec::new();
         for handled in &h.effects {
             let tag = self.service_ref(&handled.effect);

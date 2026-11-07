@@ -29,7 +29,7 @@ import {
   within,
   withOwner,
   yieldNow,
-} from "../src/rt/index.ts";
+} from "../src/rt/kernel.ts";
 import { root, sleep } from "./rt-support.ts";
 
 const ignoreFailure = (): undefined => undefined;

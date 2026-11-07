@@ -336,6 +336,12 @@ impl Checker<'_> {
                 self.class_schemes(&p.name, members, signed, &quantify);
             }
             Body::Members(members) => {
+                if members
+                    .iter()
+                    .any(|(_, _, class)| *class == OpClass::Control)
+                {
+                    super::ty::declare_control_effect(format!("{module}.{}", p.name));
+                }
                 let operations = members
                     .into_iter()
                     .map(|(name, ty, class)| Operation {

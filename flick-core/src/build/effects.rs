@@ -51,6 +51,31 @@ pub fn specifier(spec: &str) -> Option<String> {
     }
 }
 
+/// The modules of `@flick-lang/runtime/effect/` that Flick's own runtime has,
+/// under `@flick-lang/runtime/rt/effect/`, for the exports it has.
+const IN_RT: &[&str] = &[
+    "Cause", "Deferred", "Effect", "Exit", "Fiber", "FiberSet", "Latch", "Layer", "Scope",
+];
+
+/// What a foreign module `spec` is on Flick's own runtime; `None` when it has no
+/// version there. A module of the program's own is itself.
+pub fn rt_specifier(spec: &str) -> Option<String> {
+    match spec.strip_prefix(RUNTIME) {
+        None => Some(spec.to_owned()),
+        Some("") => Some(format!("{RUNTIME}/rt")),
+        Some(rest) => {
+            let module = rest.strip_prefix("/effect/")?;
+            if IN_RT.contains(&module) {
+                Some(format!("{RUNTIME}/rt/effect/{module}"))
+            } else if IN_CORE.contains(&module) {
+                Some(format!("{RUNTIME}/core/{module}"))
+            } else {
+                None
+            }
+        }
+    }
+}
+
 /// E008 when the program's `module` binds a foreign module that needs
 /// Effect, or makes a schema, which `core` has no codecs for.
 pub fn check(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
@@ -125,7 +150,7 @@ pub fn control_on_js(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{BUILTINS, specifier};
+    use super::{BUILTINS, rt_specifier, specifier};
     use crate::types::builtin_sources;
 
     #[test]
@@ -149,6 +174,25 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn runtime_modules_map_to_flick_runtime_core_or_stay_absent() {
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime").as_deref(),
+            Some("@flick-lang/runtime/rt")
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/effect/Fiber").as_deref(),
+            Some("@flick-lang/runtime/rt/effect/Fiber")
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/effect/Option").as_deref(),
+            Some("@flick-lang/runtime/core/Option")
+        );
+        assert_eq!(rt_specifier("@flick-lang/runtime/effect/Stream"), None);
+        assert_eq!(rt_specifier("@flick-lang/runtime/ui/react"), None);
+        assert_eq!(rt_specifier("./clock.mjs").as_deref(), Some("./clock.mjs"));
     }
 
     #[test]
