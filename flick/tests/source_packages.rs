@@ -51,7 +51,7 @@ const SERVER: &str = "module App.Main exposing (main)
 import Shared.Api exposing (Handlers, api)
 import Shared.Types exposing (Shape(..))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let handlers : { boxes : Handlers none } = {
     boxes = {
@@ -80,7 +80,7 @@ const CLIENT: &str = "module App.Main exposing (main)
 import Shared.Api exposing (get_box)
 import Shared.Types exposing (Shape(..))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let base = Option.with_default \"\" (Platform.env \"BASE\")
   let request = { path = (); query = (); headers = (); payload = () }

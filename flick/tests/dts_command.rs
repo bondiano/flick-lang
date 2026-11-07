@@ -62,7 +62,7 @@ foreign crash from "./crash.mjs" "crash"
 later : Float -> Eff none none Float
 let later n = task { n + 1 }
 
-waiting : Float ->{} Float
+waiting : Float ->{Async;} Float
 let waiting n =
   scope {
     ignore (Resource.acquire_release (task { n }) (fun _ -> cleanup ()))
