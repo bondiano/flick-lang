@@ -7,6 +7,7 @@ use std::mem;
 
 use super::Site;
 use crate::diagnostics::{Diagnostic, Edit, codes};
+use crate::fmt::foralls;
 use crate::source::Span;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Norm, Row, Type, Written};
@@ -273,11 +274,26 @@ impl Checker<'_> {
     /// A resource acquired where no `scope` owns it. The fix is not safe: the
     /// row says the caller provides the owner, which fixes a public boundary.
     fn no_owner(&mut self, scope: &Type, c: &SubRow) {
-        // shortcut: a region not known yet is named `s` even if the signature
-        // has another `s`; pick a fresh name if someone trips on it.
         let region = match scope.spine().1[..] {
             [region] if !matches!(self.store.resolve(region), Type::Meta(_)) => self.show(region),
-            _ => "s".to_owned(),
+            // a region not known yet gets a name the signature does not use
+            _ => {
+                let taken = self
+                    .signature_around(c.span)
+                    .map(|sig| foralls::type_names(sig, self.text))
+                    .unwrap_or_default();
+                let fresh = (0..).map(|i| {
+                    if i == 0 {
+                        "s".to_owned()
+                    } else {
+                        format!("s{i}")
+                    }
+                });
+                fresh
+                    .into_iter()
+                    .find(|name| !taken.contains(name))
+                    .expect("names never run out")
+            }
         };
         let added = format!("Scope {region}");
         let bound = self.local_place(&c.declared);

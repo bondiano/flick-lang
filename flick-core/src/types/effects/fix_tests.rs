@@ -151,6 +151,12 @@ fn a_resource_without_an_owner_asks_the_row_for_its_scope() {
         fixed("f : String ->{; NotFound} Unit", program),
         "f : String ->{Scope s; NotFound} Unit"
     );
+    // a name the signature uses is not taken for it
+    let program = "let f _ x = ignore (Resource.acquire_release (task { x }) (fun _ -> ()))";
+    assert_eq!(
+        fixed("f : s -> String ->{} Unit", program),
+        "f : s -> String ->{Scope s1;} Unit"
+    );
 }
 
 /// `signature` after the edits of the fix of its `Fiber.Provided` G003.

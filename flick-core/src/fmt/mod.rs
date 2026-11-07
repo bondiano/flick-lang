@@ -65,7 +65,7 @@ mod block;
 mod comments;
 mod decl;
 mod expr;
-mod foralls;
+pub(crate) mod foralls;
 mod plugins;
 mod printer;
 mod program;
