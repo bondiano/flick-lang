@@ -55,9 +55,28 @@ fn rt_cases() {
         })
         .cloned()
         .collect();
-    if !on_go.is_empty() {
+    // the cases of tests/rt run on Go too, against their own expectations: the
+    // depth of a tail call and a chain of wakes is no matter of one runtime
+    let own: Vec<PathBuf> = cases
+        .iter()
+        .filter(|case| {
+            case.strip_prefix(&root)
+                .is_ok_and(|r| r.starts_with("../rt"))
+        })
+        .cloned()
+        .collect();
+    if !on_go.is_empty() || !own.is_empty() {
         assert_go();
     }
+    let on_own = parallel(&own, jobs(), |case| {
+        let rel = case.strip_prefix(&root).expect("case under root");
+        let name = case.file_stem().expect("a case has a name");
+        let out_dir = out_root.join("go-own").join(name);
+        run_case(case, rel, &out_dir, "go", "debug")
+            .problem
+            .map(|p| format!("{} (Go):\n{p}", rel.display()))
+    });
+    report.extend(on_own.into_iter().flatten());
     let differing = parallel(&on_go, jobs(), |case| {
         let rel = case.strip_prefix(&root).expect("case under root");
         let out_dir = out_root.join("go").join(rel.with_extension(""));
@@ -70,9 +89,10 @@ fn rt_cases() {
     });
     report.extend(differing.into_iter().flatten());
     println!(
-        "rt target: {} cases, both profiles; {} projections against Go",
+        "rt target: {} cases, both profiles; {} projections against Go; {} of tests/rt on Go",
         cases.len(),
-        on_go.len()
+        on_go.len(),
+        own.len()
     );
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
 }
