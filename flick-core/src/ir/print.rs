@@ -134,7 +134,11 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Global { module, name } => format!("{module}.{name}"),
         ExprKind::Method { dict: d, name } => format!("{}.{name}", dict(d)),
         ExprKind::Con(c) => c.name.clone(),
-        ExprKind::Operation { service, name, .. } => format!("{service}.{name}"),
+        ExprKind::Perform {
+            effect: service,
+            op: name,
+            ..
+        } => format!("{service}.{name}"),
         ExprKind::ServiceTag(key) => format!("tag {key}"),
         ExprKind::Label(l) => format!("label {l:?}"),
         ExprKind::Dicts(e, dicts) => {
@@ -214,7 +218,6 @@ pub fn expr(e: &Expr) -> String {
             expr(body)
         ),
         ExprKind::Within(owner, e) => format!("(within {owner} {})", expr(e)),
-        ExprKind::Provide(l, e) => format!("(provide {} {})", expr(l), expr(e)),
         ExprKind::Handle(h) if h.is_try() => format!("(try {} {})", expr(&h.body), arms(&h.errors)),
         ExprKind::Handle(h) => handler(h),
         ExprKind::Lift(e, l) => format!("(lift{} {})", lift(l), expr(e)),

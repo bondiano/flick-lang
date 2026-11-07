@@ -138,9 +138,9 @@ impl<'a> Gen<'a> {
         match &inner.kind {
             ExprKind::Global { module, name } => self.global_value(module, name, dicts),
             // the implementation takes them, once the operation looked it up
-            ExprKind::Operation {
-                service,
-                name,
+            ExprKind::Perform {
+                effect: service,
+                op: name,
                 stages,
             } => {
                 let arity = self.a.alloc_str(&operation_arity(stages).to_string());

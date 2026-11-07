@@ -35,7 +35,6 @@ pub fn strict_uses(e: &Expr, name: &str) -> usize {
         | ExprKind::Task(_)
         | ExprKind::Scope { .. }
         | ExprKind::Within(..)
-        | ExprKind::Provide(..)
         | ExprKind::Handle(_)
         | ExprKind::Lift(..)
         | ExprKind::Abstract(..)

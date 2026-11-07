@@ -11,9 +11,6 @@ crate `flick-ir` and handlers of effects. Later changes are in
   is inlined like one of the module when its body names only what its
   module exports: `Int.min 3 5` is `3`. Those of the program's other
   modules stay calls.
-- **`Fail`:** `Fail.fail` fails with an error; `Fail e` in the row of an arrow
-  is the error row `e`; `| Fail.fail p ->` in a `try` is `| p ->`. The IR has
-  no `Try` node: a `try` is a `Handle`, and the IR version is 0.2.0.
 - **Effects and handlers:** `effect E params =` declares an effect whose
   operations are `tail` (the default), `abort` (never returns, `forall b. …
   -> b`) or `control`. `try … with` handles them: `| E.op p… -> …` for an

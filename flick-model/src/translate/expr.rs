@@ -48,9 +48,9 @@ impl Tr {
             ExprKind::Global { module, name } => Term::Global(Path::new(module, name)),
             ExprKind::Method { dict: d, name } => Term::Field(rc(dict(d)), name.as_str().into()),
             ExprKind::Con(c) => Term::konst_con(con(c)),
-            ExprKind::Operation {
-                service,
-                name,
+            ExprKind::Perform {
+                effect: service,
+                op: name,
                 stages,
             } => self.operation(service, name, stages, &[]),
             ExprKind::ServiceTag(s) => Term::Tag(Path::parse(s)),
@@ -58,9 +58,9 @@ impl Tr {
                 let dicts: Vec<Term> = dicts.iter().map(dict).collect();
                 match &inner.kind {
                     // the dictionaries go to the implementation, after the lookup
-                    ExprKind::Operation {
-                        service,
-                        name,
+                    ExprKind::Perform {
+                        effect: service,
+                        op: name,
                         stages,
                     } => self.operation(service, name, stages, &dicts),
                     _ => Term::apps(self.expr(inner), dicts),
@@ -69,6 +69,7 @@ impl Tr {
             ExprKind::Abstract(names, body) => {
                 lams(names.iter().map(|n| given(n)), self.expr(body))
             }
+            ExprKind::App { func, arg, .. } if layer_run(func).is_some() => self.provide(func, arg),
             ExprKind::App {
                 func,
                 arg,
@@ -124,7 +125,6 @@ impl Tr {
             ExprKind::Ignore(x) => Term::Let("_".into(), None, rc(self.expr(x)), rc(Term::unit())),
             ExprKind::Await(x) => Term::Await(rc(self.expr(x))),
             ExprKind::Task(x) => Term::Task(rc(self.expr(x))),
-            ExprKind::Provide(l, x) => Term::Provide(rc(self.expr(l)), rc(self.expr(x))),
             ExprKind::Handle(h) => Term::Handler(Rc::new(self.handler(h))),
             // a lift does nothing in the model (§3.4); its correctness is G2
             ExprKind::Lift(x, _) => self.expr(x),
@@ -313,4 +313,39 @@ fn binary(op: BinOp, a: Term, b: Term) -> Term {
         BinOp::Arith(op, num) => Prim::Arith(op, num),
     };
     Term::apps(Term::prim(prim), [a, b])
+}
+
+impl Tr {
+    /// `Layer.run layer arg`, which is `provide layer { body }`: the core's
+    /// form of it.
+    fn provide(&mut self, func: &ir::Expr, arg: &ir::Expr) -> Term {
+        let layer = self.expr(layer_run(func).expect("a call of `Layer.run`"));
+        let body = match &arg.kind {
+            // what `provide` lowers to, which binds nothing
+            ExprKind::Lambda { params, body }
+                if matches!(
+                    params[..],
+                    [ir::Param {
+                        pat: ir::Pat::Wild,
+                        ..
+                    }]
+                ) =>
+            {
+                self.expr(body)
+            }
+            _ => Term::app(self.expr(arg), Term::unit()),
+        };
+        Term::Provide(Rc::new(layer), Rc::new(body))
+    }
+}
+
+/// The layer of `Layer.run layer`.
+fn layer_run(func: &ir::Expr) -> Option<&ir::Expr> {
+    let ExprKind::App { func, arg, .. } = &func.kind else {
+        return None;
+    };
+    match &func.kind {
+        ExprKind::Global { module, name } if module == "Layer" && name == "run" => Some(arg),
+        _ => None,
+    }
 }

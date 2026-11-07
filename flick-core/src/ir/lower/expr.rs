@@ -149,7 +149,7 @@ impl Lower<'_> {
                 self.scope.truncate(mark);
                 ExprKind::Scope { owner, outer, body }
             }
-            K::ProvideExpr => ExprKind::Provide(self.boxed(children[0]), self.boxed(children[1])),
+            K::ProvideExpr => self.layer_run(children[0], children[1], span),
             _ => {
                 self.unsupported(node);
                 ExprKind::Lit(Lit::Unit)
@@ -214,9 +214,9 @@ impl Lower<'_> {
                 service,
                 name,
                 stages,
-            } => ExprKind::Operation {
-                service: service.clone(),
-                name: name.clone(),
+            } => ExprKind::Perform {
+                effect: service.clone(),
+                op: name.clone(),
                 stages: stages.clone(),
             },
             Ref::ServiceTag(key) => ExprKind::ServiceTag(key.clone()),

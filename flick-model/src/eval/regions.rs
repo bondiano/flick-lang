@@ -8,6 +8,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 
 use super::{Control, Frame, Machine, Outcome, Step, stuck};
+use crate::handler::Handler;
 use crate::subst::{any, subst};
 use crate::syntax::{Const, Env, Name, Path, RegionOp, Term};
 
@@ -25,7 +26,16 @@ pub struct Region {
 
 /// The environments `θ` of the `provide`s around the place that
 /// registered work: it runs with them (`runtime.md` §3.5), outermost first.
-pub type Kept = Rc<[Rc<Env>]>;
+pub type Kept = Rc<[Keep]>;
+
+/// What a child or a finalizer keeps of what is around its start.
+#[derive(Clone, Debug)]
+pub enum Keep {
+    Env(Rc<Env>),
+    /// A handler of effects: its operations stay in reach, but its `return`
+    /// is its body's, not the child's.
+    Handler(usize, Rc<Handler>),
+}
 
 #[derive(Clone, Debug)]
 pub enum Finalizer {
@@ -43,6 +53,8 @@ pub struct Lambda {
     pub released: HashSet<usize>,
     /// Kept alive, so no new environment takes the address of one.
     pub ended: Vec<Rc<Env>>,
+    /// Handlers that ended: a child that kept one uses it after its end.
+    pub ended_handlers: HashSet<usize>,
     objects: usize,
 }
 
@@ -146,8 +158,11 @@ impl Machine<'_> {
         };
         if let Some((t, kept)) = work {
             self.push(Frame::Close(pi, s, ended));
-            for env in kept.iter() {
-                self.push(Frame::Kept(env.clone()));
+            for keep in kept.iter() {
+                self.push(match keep {
+                    Keep::Env(env) => Frame::Kept(env.clone()),
+                    Keep::Handler(id, h) => Frame::KeptHandler(*id, h.clone()),
+                });
             }
             return Control::Eval(Term::Await(Rc::new(t)));
         }
@@ -163,7 +178,10 @@ impl Machine<'_> {
         self.frames
             .iter()
             .filter_map(|f| match f {
-                Frame::With(env) | Frame::Kept(env) => Some(env.clone()),
+                Frame::With(env) | Frame::Kept(env) => Some(Keep::Env(env.clone())),
+                Frame::Handler(id, h) | Frame::KeptHandler(id, h) => {
+                    Some(Keep::Handler(*id, h.clone()))
+                }
                 _ => None,
             })
             .collect()

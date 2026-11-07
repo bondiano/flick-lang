@@ -76,18 +76,6 @@ impl<'a> Gen<'a> {
         self.code(r)
     }
 
-    /// `provide layer body`: the body as a task, run with the layer's services.
-    pub(super) fn provide(&mut self, layer: &Expr, body: &Expr) -> Code<'a> {
-        let layer = self.expr(layer);
-        let layer = self.spill(layer);
-        let body = self.task(body);
-        let fb = self
-            .fiber
-            .expect("`provide` runs where a fiber is in scope");
-        let a = self.a;
-        call(a, "flickrt.Provide", [a.text(fb), layer.doc, body.doc]).into()
-    }
-
     /// `try body with arms`: the body as a task, and a handler of its typed
     /// error that gives `flickrt.Unmatched` when no arm matches.
     pub(super) fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> Code<'a> {

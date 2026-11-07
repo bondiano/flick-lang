@@ -1,0 +1,43 @@
+// A child sees the handlers around where it started: `tail` operations run in
+// it, and the handler of `abort` is that of the task it runs.
+module App.Main exposing (main)
+
+service Greeter =
+  greet : String ->{} String
+
+effect Throw =
+  abort throw : forall a. String ->{} a
+
+greeter : Greeter.Impl
+let greeter = { greet = fun name -> "hello " ++ name }
+
+children : Unit ->{} (String, String)
+let children () = provide Greeter greeter {
+  parallel (task { Greeter.greet "a" }) (task { Greeter.greet "b" })
+}
+
+arms : Unit ->{} (String, String)
+let arms () =
+  try parallel (task { Asker.ask () }) (task { Asker.ask () ++ "!" }) with
+  | Asker.ask () -> "arm"
+
+effect Asker =
+  ask : Unit ->{} String
+
+caught : Unit ->{} (String, String)
+let caught () =
+  parallel
+    (task {
+      try Throw.throw "first" with
+      | Throw.throw why -> why
+    })
+    (task {
+      try Throw.throw "second" with
+      | Throw.throw why -> why
+    })
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (children ()))
+  Platform.stdout_line (show (arms ()))
+  Platform.stdout_line (show (caught ()))

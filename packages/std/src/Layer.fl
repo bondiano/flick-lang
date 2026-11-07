@@ -80,6 +80,12 @@ merge_all : Layer ri e ro -> List (Layer ri e ro) -> Layer ri e ro
 foreign pure merge_all from "@flick-lang/runtime/effect/Layer" "flickMergeAll"
   reviewed "effect@4.1.2 sha256:978fac7c8e0e77e3"
 
+@lang layer_run
+/// Runs `body` with the services `layer` builds, which last until it ends;
+/// `provide layer { body }` stands for it. `layer` is built once for the run.
+run : Layer ri e ro -> (Unit ->{ro + r; e2} a) ->{ri + r; e + e2} a
+foreign effect run from "@flick-lang/runtime" "layerRun"
+
 /// `layer` with the services `deps` builds given to it: `layer` needs all
 /// of them, and the result needs the rest of its inputs and those of `deps`.
 provide_ : Layer ri2 e2 ro2 -> Layer (ro2 + ri) e ro -> Layer (ri + ri2) (e + e2) ro

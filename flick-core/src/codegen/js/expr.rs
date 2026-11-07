@@ -79,9 +79,9 @@ impl Gen<'_> {
                 None => format!("{}.{name}", self.dict(dict)),
             },
             ExprKind::Con(c) => self.constructor(c),
-            ExprKind::Operation {
-                service,
-                name,
+            ExprKind::Perform {
+                effect: service,
+                op: name,
                 stages,
             } => self.operation(service, name, stages, &[]),
             ExprKind::ServiceTag(key) => self.service_ref(key),
@@ -89,9 +89,9 @@ impl Gen<'_> {
             ExprKind::Dicts(inner, dicts) => {
                 let dicts: Vec<String> = dicts.iter().map(|d| self.dict(d)).collect();
                 // the implementation takes them, once the operation looked it up
-                if let ExprKind::Operation {
-                    service,
-                    name,
+                if let ExprKind::Perform {
+                    effect: service,
+                    op: name,
                     stages,
                 } = &inner.kind
                 {
@@ -167,7 +167,6 @@ impl Gen<'_> {
                 self.owner = Some(names::ident(owner));
                 self.expr(call)
             }
-            ExprKind::Provide(layer, body) => self.provide(layer, body),
             ExprKind::Handle(h) => self.handle(h),
             ExprKind::Lift(inner, lift) => self.lifted(inner, lift),
         }
@@ -336,14 +335,6 @@ impl Gen<'_> {
             );
             format!("{}({js})", self.rt("runIn"))
         }
-    }
-
-    fn provide(&mut self, layer: &Expr, body: &Expr) -> String {
-        let layer = self.expr(layer);
-        let layer = self.spill(layer);
-        let body = self.gen_block(body);
-        let provide = self.rt("provide");
-        self.run(None, &format!("{provide}({layer}, {body})"))
     }
 
     fn scope(&mut self, owner: Option<&str>, outer: Option<&str>, body: &Expr) -> String {

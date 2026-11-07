@@ -156,7 +156,6 @@ fn inlinable(e: &Expr) -> bool {
             | ExprKind::Yield(_)
             | ExprKind::Scope { .. }
             | ExprKind::Within(..)
-            | ExprKind::Provide(..)
             | ExprKind::Handle(_)
             | ExprKind::Task(_)
             | ExprKind::Await(_)
@@ -164,7 +163,7 @@ fn inlinable(e: &Expr) -> bool {
             | ExprKind::Dicts(..)
             | ExprKind::Method { .. }
             | ExprKind::Lift(..)
-            | ExprKind::Operation { .. }
+            | ExprKind::Perform { .. }
             | ExprKind::Unwrap(_)
             | ExprKind::App {
                 stage: Stage::Sync | Stage::Runtime,

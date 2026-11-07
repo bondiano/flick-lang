@@ -4,12 +4,14 @@
 
 use super::Lower;
 use crate::ir::{
-    Arm, Expr, ExprKind, Handled, Handler, Lit, OpArm, Param, Pat, Stage, Stmt, operation_arity,
+    Arm, Expr, ExprKind, ExprLang, Handled, Handler, Lit, OpArm, Param, Pat, Stage, Stmt,
+    operation_arity,
 };
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::handle::{arm_pattern, operation_path};
+use crate::types::lang::Lang;
 use crate::types::{Dict, OpClass, Ref, dict_local, is_pattern};
 
 /// The arms of one operation, in order.
@@ -24,6 +26,32 @@ struct Group<'n> {
 }
 
 impl Lower<'_> {
+    /// `provide layer { body }`: `Layer.run layer (fun () -> body)`.
+    pub(super) fn layer_run(&mut self, layer: &Node, body: &Node, span: Span) -> ExprKind {
+        let layer = self.expr(layer);
+        let body = self.expr(body);
+        let thunk = ExprKind::Lambda {
+            params: vec![Param {
+                pat: Pat::Wild,
+                stage: Stage::Runtime,
+                ty: None,
+            }],
+            body: Box::new(body),
+        };
+        let applied = ExprKind::App {
+            func: Box::new(Expr::new(ExprKind::lang(Lang::LayerRun), span)),
+            arg: Box::new(layer),
+            stage: Stage::Pure,
+            arg_first: false,
+        };
+        ExprKind::App {
+            func: Box::new(Expr::new(applied, span)),
+            arg: Box::new(Expr::new(thunk, span)),
+            stage: Stage::Runtime,
+            arg_first: false,
+        }
+    }
+
     /// `try body with …` with arms for operations, or `provide S impl { body }`.
     pub(super) fn handler(&mut self, node: &Node) -> ExprKind {
         let children: Vec<&Node> = node.nodes().collect();
@@ -400,9 +428,9 @@ fn forward(
     span: Span,
 ) -> Expr {
     let at = |kind| Expr::new(kind, span);
-    let operation = at(ExprKind::Operation {
-        service: group.effect.clone(),
-        name: group.name.clone(),
+    let operation = at(ExprKind::Perform {
+        effect: group.effect.clone(),
+        op: group.name.clone(),
         stages: group.stages.clone(),
     });
     let operation = if dicts.is_empty() {

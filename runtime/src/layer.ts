@@ -46,6 +46,16 @@ export const provide = <ROut, E, RIn, A, E2, R>(
     "provide",
   );
 
+/** `Layer.run layer (fun () -> body)`, which `provide layer { body }` stands for. */
+export const layerRun = <ROut, E, RIn, A, E2, R>(
+  layer: Layer.Layer<ROut, E, RIn>,
+  body: (unit: undefined) => Effect.Effect<A, E2, R>,
+): Effect.Effect<A, unknown, RIn | Exclude<R, ROut>> =>
+  provide(
+    layer,
+    Effect.suspend(() => body(undefined)),
+  );
+
 export const layerSucceed = <I, S>(tag: Context.Key<I, S>, impl: S): Layer.Layer<I> => Layer.succeed(tag, impl);
 
 export const layerMerge = <A, E, R, A2, E2, R2>(

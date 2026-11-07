@@ -59,6 +59,8 @@ pub enum Frame {
     /// of a `provide` around the place that registered it, which may have
     /// ended (`regions.md` §2.7).
     Kept(Rc<Env>),
+    /// A handler around where a child or a finalizer started.
+    KeptHandler(usize, Rc<Handler>),
     /// `inside π □` (`regions.md` §3.2), its types naming the region `Name`.
     Inside(usize, Name),
     /// `inside π □` while `π` closes (§3.3): `□` is a child or a
@@ -156,7 +158,7 @@ impl Frame {
             })),
             // K[e]: the arm's value goes into the rest of the body
             Frame::Resume(k) => k.iter().rev().fold((*e).clone(), |e, f| f.plug(e)),
-            Frame::Discontinue(..) => (*e).clone(),
+            Frame::KeptHandler(..) | Frame::Discontinue(..) => (*e).clone(),
         }
     }
 }
