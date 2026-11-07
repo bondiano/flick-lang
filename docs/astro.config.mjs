@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import flick from "@flick-lang/astro";
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
+import starlightLinksValidator from "starlight-links-validator";
 
 import { sidebar } from "./astro.sidebar.mjs";
 import { flickBlocks } from "./flick-blocks.mjs";
@@ -57,6 +58,8 @@ export default defineConfig({
       },
     },
     starlight({
+      // the docs link relatively, which the validator resolves against each page
+      plugins: [starlightLinksValidator({ errorOnRelativeLinks: false })],
       title: "Flick",
       description: "A language for whole apps, where every function does what it says",
       favicon: "/favicon.ico",
