@@ -143,6 +143,8 @@ fn compiled(m: &Loaded, (ir, declarations): Lowered, interface: Interface) -> Co
 #[derive(Default)]
 pub struct Compilation {
     pub modules: Vec<Compiled>,
+    /// The libraries of `[dependencies]`, each with its source directory.
+    pub libraries: Vec<(String, PathBuf)>,
     /// The npm packages its dependency closure asks for, which a js build
     /// needs installed.
     #[cfg(feature = "native-project")]
@@ -166,6 +168,35 @@ pub struct Compiled {
     pub interface: Interface,
     /// The module with its plugin blocks expanded, when it has any.
     pub expansion: Option<Arc<Expansion>>,
+}
+
+impl Compilation {
+    /// The library of `[dependencies]` that `module` belongs to, with its
+    /// source directory.
+    pub fn library_of(&self, module: &str) -> Option<(&str, &Path)> {
+        let module = self.modules.iter().find(|m| m.name == module)?;
+        let package = module.package.as_deref()?;
+        (self.libraries.iter())
+            .find(|(name, _)| name == package)
+            .map(|(name, dir)| (name.as_str(), dir.as_path()))
+    }
+
+    /// The file of the foreign module `spec` when the build ships it beside
+    /// `module`: an `.mjs` or `.cjs` of a library, inside its source
+    /// directory, which a tarball or a fetched copy of the library has. Any
+    /// other relative file stays where it is, and the output refers to it.
+    pub fn shipped_foreign(&self, module: &str, spec: &str) -> Option<PathBuf> {
+        if !spec.starts_with("./") && !spec.starts_with("../") {
+            return None;
+        }
+        let shipped = Path::new(spec)
+            .extension()
+            .is_some_and(|e| e == "mjs" || e == "cjs");
+        let (_, dir) = self.library_of(module).filter(|_| shipped)?;
+        let source = self.modules.iter().find(|m| m.name == module)?;
+        let path = normalize(&source.path.parent()?.join(spec));
+        path.starts_with(dir).then_some(path)
+    }
 }
 
 /// Checks `roots` (absolute `.fl` paths) and their transitive imports.
@@ -236,6 +267,13 @@ fn run(
     });
     #[cfg(feature = "native-project")]
     let js_dependencies = project.map_or_else(Vec::new, |p| super::js::closure(p, &packages));
+    #[cfg(feature = "native-project")]
+    let libraries: Vec<(String, PathBuf)> = packages
+        .libraries()
+        .map(|(name, dir, _)| (name.to_owned(), dir.to_path_buf()))
+        .collect();
+    #[cfg(not(feature = "native-project"))]
+    let libraries = Vec::new();
     #[cfg(feature = "native-project")]
     let precompiled = project
         .zip(saved)
@@ -315,6 +353,7 @@ fn run(
         diagnostics,
         compilation: Compilation {
             modules: compiled,
+            libraries,
             #[cfg(feature = "native-project")]
             js_dependencies,
         },

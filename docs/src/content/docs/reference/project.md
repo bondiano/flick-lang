@@ -187,6 +187,20 @@ another package, so instances of its classes and types are its own. A change
 to a path library's sources or its `flick.toml`, or to `flick.lock`, rebuilds
 the project, and `--watch` follows them.
 
+### Foreign modules of a library
+
+A module of a library binds a file beside it as a project's module does:
+`foreign pad from "./pad.mjs" "pad"`. An `.mjs` or `.cjs` inside the library's
+source directory ships with a js build: the output holds it beside the compiled
+module, with the other `.mjs` and `.cjs` of the library it may import, so an app
+packed by `flick pack` has them and they find npm packages from the project. A
+file the `foreign` names that is not there, a link that leaves the library, or
+two libraries with different files at one path are `FLICK-P041`. Any other
+relative file, a `.js` or one outside the source directory, stays where it is
+and the output refers to it there, as for the project's own modules, so it
+ships with no tarball. On the go target the build copies `pad.go` beside the
+same module into the Go module, and a helper it needs goes in that file.
+
 ### npm packages of a library
 
 A project's own npm dependencies stay in `package.json`. A library that needs

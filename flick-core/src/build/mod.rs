@@ -171,7 +171,14 @@ pub fn emit(
             .map(|module| module.interface.clone());
         own
     };
-    let foreign = |module: &str, spec: &str| foreign_specifier(settings, &path, module, spec);
+    let foreign = |module: &str, spec: &str| {
+        // a library's own file ships beside its module, so its spelling holds
+        if compilation.shipped_foreign(module, spec).is_some() {
+            spec.to_owned()
+        } else {
+            foreign_specifier(settings, &path, module, spec)
+        }
+    };
     let any_interface = |m: &str| {
         interface_of(m).or_else(|| types::builtins().iter().find(|i| i.module == m).cloned())
     };

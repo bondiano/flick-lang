@@ -10,6 +10,12 @@ break programs.
   it needs on the js target, and `flick install` adds those of the project's
   whole dependency closure to its `package.json`. A js build without them is
   `FLICK-P034`, and two packages that disagree on a version are `FLICK-P040`.
+- **Foreign modules of a library:** `foreign f from "./x.mjs" "f"` in a library
+  of `[dependencies]` ships with a js build beside the compiled module, so it
+  works from a fetched library, in a packed app, and finds the project's npm
+  packages; the import in the module is `./x.mjs` instead of a path to the
+  library's sources. On go, its `x.go` is named by the package instead of by its
+  absolute path. A file that cannot ship is `FLICK-P041`.
 - **`Scope.run`:** `scope s { body }` stands for `Scope.run (fun s -> body)`, and
   `Scope.run` takes a function polymorphic in the region, also as a value. The
   IR has no `Scope` node; its version is 0.4.0.

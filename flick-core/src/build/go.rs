@@ -68,11 +68,15 @@ pub fn emit(
     let all: Vec<&ir::Module> = optimized.iter().chain(builtin_modules()).collect();
     let own = |m: &str| modules.iter().any(|c| c.name == m);
     let package = |m: &str| super::own_package(modules, settings, m);
-    // `./x.mjs` of a module is `x.go` beside it, named in the Go module by its path
+    // `./x.mjs` of a module is `x.go` beside it, named in the Go module by its
+    // path; a library's by its package and its path in it, as no store path ships
     let foreign_file = |module: &str, spec: &str| {
         let path = normalize(&(settings.source_dir)(module)?.join(spec)).with_extension("go");
         let text = read(&path)?;
-        let name: String = path
+        let named = (compilation.library_of(module)).and_then(|(name, dir)| {
+            Some(Path::new("/").join(name).join(path.strip_prefix(dir).ok()?))
+        });
+        let name: String = (named.as_ref().unwrap_or(&path))
             .with_extension("")
             .to_string_lossy()
             .chars()
