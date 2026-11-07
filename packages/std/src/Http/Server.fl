@@ -9,7 +9,6 @@
 module Http.Server exposing (..)
 
 import Duration
-import Fiber
 import Http.Client
 import Http.ClientError
 import Http.ClientRequest
@@ -37,7 +36,6 @@ type alias ServeOptions = {
 
 /// Serves the handler until the scope of region `s` closes.
 serve :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   ServeOptions ->
   (ServerRequest ->{r; e} ServerResponse)^c ->{Async, Scope s | r; ServeError}
   Server s

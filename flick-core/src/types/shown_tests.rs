@@ -108,6 +108,11 @@ fn a_qualifier_not_implied_stays() {
         shown("forall c d. (Int -> Int)^c -> (Int -> Int)^d"),
         "(Int -> Int)^c -> (Int -> Int)^d"
     );
+    // a nested `forall` holds what it qualifies
+    assert_eq!(
+        shown("forall a b c. (forall v. a^v -> b)^c -> (List a -> List b)^c"),
+        "(forall v. a^v -> b)^c -> List a -> List b"
+    );
     // what a value holds, not a stage
     assert_eq!(shown("forall a c. a^c -> a^c"), "a^c -> a^c");
 }

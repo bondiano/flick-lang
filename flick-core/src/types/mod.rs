@@ -65,6 +65,7 @@ mod server;
 mod services;
 mod settle;
 mod shown;
+mod signature_lints;
 #[cfg(feature = "diagnostic-fixes")]
 mod stub;
 mod sugar_lints;

@@ -29,7 +29,7 @@ foreign effect make from "@flick-lang/runtime/effect/FiberMap" "flickMake"
 /// Runs `task` as the child of `key`; it may hold only what outlives the
 /// map's region.
 run :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
+  Fiber.Outlives c s =>
   RunOptions -> k -> (Eff {Scope s | r} e a)^c -> FiberMap s k e a ->{r;} Fiber.Fiber e a
 foreign effect run from "@flick-lang/runtime/effect/FiberMap" "flickRun"
   arity 1

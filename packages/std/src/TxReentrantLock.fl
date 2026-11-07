@@ -47,21 +47,21 @@ foreign effect write_lock from "@flick-lang/runtime/effect/TxReentrantLock" "wri
   reviewed "effect@4.1.2 sha256:cbc38353299ca90d"
 
 /// Runs `body` holding the read lock.
-with_read_lock : (Eff r e a)^c -> (TxReentrantLock ->{r; e} a)^c
+with_read_lock : (Eff r e a)^c -> TxReentrantLock ->{r; e} a
 foreign effect with_read_lock from "@flick-lang/runtime/effect/TxReentrantLock" "withReadLock"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a080c94a792a5892"
 
 /// Runs `body` holding the write lock.
-with_write_lock : (Eff r e a)^c -> (TxReentrantLock ->{r; e} a)^c
+with_write_lock : (Eff r e a)^c -> TxReentrantLock ->{r; e} a
 foreign effect with_write_lock from "@flick-lang/runtime/effect/TxReentrantLock" "withWriteLock"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:fa9e9410181f8d01"
 
 /// Runs `body` holding the write lock, as `with_write_lock`.
-with_lock : (Eff r e a)^c -> (TxReentrantLock ->{r; e} a)^c
+with_lock : (Eff r e a)^c -> TxReentrantLock ->{r; e} a
 foreign effect with_lock from "@flick-lang/runtime/effect/TxReentrantLock" "withLock"
   arity 1
   retention call

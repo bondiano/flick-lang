@@ -3,7 +3,6 @@
 /// values (`^c`), since nothing keeps it past the call.
 module Stream.Run exposing (..)
 
-import Fiber
 import PubSub
 import Queue
 import Stream.Core exposing (Stream)
@@ -59,14 +58,14 @@ foreign effect run_fold_effect from "@flick-lang/runtime/effect/Stream" "flickRu
   reviewed "effect@4.1.2 sha256:c626d5a96011fd77"
 
 /// Runs `f` on each element.
-run_for_each : (a ->{r2; e2} x)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
+run_for_each : (a ->{r2; e2} x)^c -> (Stream r e a)^c ->{r + r2; e + e2} Unit
 foreign effect run_for_each from "@flick-lang/runtime/effect/Stream" "runForEach"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d91007d002b3f9ac"
 
 /// Runs `f` on each element while it gives `true`.
-run_for_each_while : (a ->{r2; e2} Bool)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
+run_for_each_while : (a ->{r2; e2} Bool)^c -> (Stream r e a)^c ->{r + r2; e + e2} Unit
 foreign effect run_for_each_while from "@flick-lang/runtime/effect/Stream" "runForEachWhile"
   arity 1
   retention call
@@ -74,7 +73,7 @@ foreign effect run_for_each_while from "@flick-lang/runtime/effect/Stream" "runF
 
 /// Runs `f` on each chunk.
 run_for_each_chunk :
-  (NonEmpty.NonEmpty a ->{r2; e2} x)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
+  (NonEmpty.NonEmpty a ->{r2; e2} x)^c -> (Stream r e a)^c ->{r + r2; e + e2} Unit
 foreign effect run_for_each_chunk from "@flick-lang/runtime/effect/Stream" "runForEachArray"
   arity 1
   retention call
@@ -112,7 +111,6 @@ foreign effect run_into_queue from "@flick-lang/runtime/effect/Stream" "runIntoQ
 /// (`None`: no bound), the strategy for a full hub, the last `replay` for a
 /// new subscriber.
 to_pubsub :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   { capacity : Option Int; strategy : Option Queue.Strategy; replay : Option Int } ->
   (Stream r e a)^c ->{Scope s | r;}
   PubSub.PubSub a
@@ -125,7 +123,6 @@ foreign effect to_pubsub from "@flick-lang/runtime/effect/Stream" "flickToPubSub
 /// which shuts the queue down when it closes; the queue ends or fails as
 /// the stream does.
 to_queue :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   { capacity : Option Int; strategy : Option Queue.Strategy } ->
   (Stream r e a)^c ->{Scope s | r;}
   Queue.Queue e a

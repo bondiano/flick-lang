@@ -83,14 +83,14 @@ foreign effect take_up_to from "@flick-lang/runtime/effect/TxPriorityQueue" "tak
   reviewed "effect@4.1.2 sha256:022d31005067b046"
 
 /// Removes the elements the predicate accepts.
-remove_if : (a -> Bool)^c -> (TxPriorityQueue a ->{Tx.Transaction;} Unit)^c
+remove_if : (a -> Bool)^c -> TxPriorityQueue a ->{Tx.Transaction;} Unit
 foreign effect remove_if from "@flick-lang/runtime/effect/TxPriorityQueue" "removeIf"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d1190553201205ed"
 
 /// Keeps only the elements the predicate accepts.
-retain_if : (a -> Bool)^c -> (TxPriorityQueue a ->{Tx.Transaction;} Unit)^c
+retain_if : (a -> Bool)^c -> TxPriorityQueue a ->{Tx.Transaction;} Unit
 foreign effect retain_if from "@flick-lang/runtime/effect/TxPriorityQueue" "retainIf"
   arity 1
   retention call

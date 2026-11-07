@@ -3,7 +3,6 @@
 /// Typed errors alone are handled by `try … with`.
 module Effect.Errors exposing (..)
 
-import Fiber
 import LogLevel
 
 /// Handles every failure of `task`, defects and interruptions included,
@@ -205,9 +204,7 @@ foreign effect on_interrupt from "@flick-lang/runtime/effect/Effect" "flickOnInt
 
 /// Registers `finalizer` with the owner of region `s`: it runs when that
 /// scope closes, with the cause of its failure if it failed.
-add_finalizer :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
-  (Option RawCause ->{r;} Unit)^c ->{Scope s | r;} Unit
+add_finalizer : (Option RawCause ->{r;} Unit)^c ->{Scope s | r;} Unit
 foreign effect add_finalizer from "@flick-lang/runtime/effect/Effect" "flickAddFinalizer"
   retention owner
   reviewed "effect@4.1.2 sha256:de9497fd0e3d4d55"

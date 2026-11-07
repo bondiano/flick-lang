@@ -1,0 +1,29 @@
+// What a signature writes and would get anyway: a later stage of a function
+// holds what its earlier parameters hold.
+module App.SignatureParts exposing (..)
+
+stage : (Int -> Int)^c -> (Int -> Int)^c
+foreign pure stage from "./x.js" "stage"
+  retention call
+
+nested : (Int -> Int)^c -> (Int -> (Int -> Int)^c)^c
+foreign pure nested from "./x.js" "nested"
+  retention call
+
+// says more than the qualifier, so it stays: the last stage holds no `Int -> Int`
+narrower : (Int -> Int)^c -> (Int -> Int)^{}
+foreign pure narrower from "./x.js" "narrower"
+  retention call
+
+other_row : (Int -> Int)^c -> (Int -> Int)^d
+foreign pure other_row from "./x.js" "other_row"
+  retention call
+
+inside : ((Int -> Int)^c -> (Int -> Int)^c) -> Int
+foreign pure inside from "./x.js" "inside"
+  retention call
+
+//~ FLICK-T059 @5:39-5:41 `^c` says what this stage holds anyway
+//~ FLICK-T059 @9:48-9:50 `^c` says what this stage holds anyway
+//~ FLICK-T059 @9:51-9:53 `^c` says what this stage holds anyway
+//~ FLICK-T059 @22:41-22:43 `^c` says what this stage holds anyway

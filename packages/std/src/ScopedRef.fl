@@ -28,7 +28,7 @@ foreign effect use from "@flick-lang/runtime/effect/ScopedRef" "flickUse"
 
 /// Acquires a new resource with `acquire`; the previous one is released
 /// once no `use` holds it. If `acquire` fails, the previous one stays.
-set : (forall t. Eff {Scope t | r} e a^{t})^c -> (ScopedRef s a ->{r; e} Unit)^c
+set : (forall t. Eff {Scope t | r} e a^{t})^c -> ScopedRef s a ->{r; e} Unit
 foreign effect set from "@flick-lang/runtime/effect/ScopedRef" "flickSet"
   arity 1
   retention call

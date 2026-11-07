@@ -171,7 +171,7 @@ fn kind_of<'k>(name: &str, kinds: &'k [(String, Kind)]) -> Option<&'k Kind> {
 }
 
 /// The atoms a capture row names.
-fn row_atoms(row: &Type) -> Atoms {
+pub(super) fn row_atoms(row: &Type) -> Atoms {
     match row {
         Type::Var(name) => Some(BTreeSet::from([name.clone()])),
         Type::Row(r) => {
@@ -242,6 +242,14 @@ fn reach(t: &Type, kinds: &[(String, Kind)], bounded: bool) -> Atoms {
             &reach(param, kinds, bounded),
             &reach(result, kinds, bounded),
         ),
+        // what the `forall` binds is no capture of the value
+        Type::Forall { vars, body, .. } => {
+            let mut inner = kinds.to_vec();
+            inner.extend(vars.iter().map(|v| (v.name.clone(), v.kind.clone())));
+            let mut atoms = reach(body, &inner, bounded)?;
+            atoms.retain(|name| !vars.iter().any(|v| v.name == *name));
+            Some(atoms)
+        }
         _ => None,
     }
 }

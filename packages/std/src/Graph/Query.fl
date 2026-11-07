@@ -22,28 +22,28 @@ foreign pure node_count from "@flick-lang/runtime/effect/Graph" "nodeCount"
   reviewed "effect@4.1.2 sha256:db159f63f3808ccb"
 
 /// The first node, in index order, whose data satisfies `f`.
-find_node : (n -> Bool)^c -> (Graph n e k -> Option NodeIndex)^c
+find_node : (n -> Bool)^c -> Graph n e k -> Option NodeIndex
 foreign pure find_node from "@flick-lang/runtime/effect/Graph" "findNode"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:7ceab3984c35a614"
 
 /// The nodes whose data satisfies `f`, in index order.
-find_nodes : (n -> Bool)^c -> (Graph n e k -> List NodeIndex)^c
+find_nodes : (n -> Bool)^c -> Graph n e k -> List NodeIndex
 foreign pure find_nodes from "@flick-lang/runtime/effect/Graph" "findNodes"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:9d288f982405f616"
 
 /// The first edge for which `f data source target` holds.
-find_edge : (e -> NodeIndex -> NodeIndex -> Bool)^c -> (Graph n e k -> Option EdgeIndex)^c
+find_edge : (e -> NodeIndex -> NodeIndex -> Bool)^c -> Graph n e k -> Option EdgeIndex
 foreign pure find_edge from "@flick-lang/runtime/effect/Graph" "findEdge"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:142479014e32fd77"
 
 /// The edges for which `f data source target` holds, in index order.
-find_edges : (e -> NodeIndex -> NodeIndex -> Bool)^c -> (Graph n e k -> List EdgeIndex)^c
+find_edges : (e -> NodeIndex -> NodeIndex -> Bool)^c -> Graph n e k -> List EdgeIndex
 foreign pure find_edges from "@flick-lang/runtime/effect/Graph" "findEdges"
   arity 1
   retention call

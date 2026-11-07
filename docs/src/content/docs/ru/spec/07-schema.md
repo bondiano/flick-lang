@@ -36,16 +36,16 @@ Schema a
 PureCodec encoded decoded
 Codec decoding_services encoding_services encoded decoded
 
-Codec.decode : (Codec rd re i a)^c -> (Unknown^ci ->{rd; SchemaError} a)^c
+Codec.decode : (Codec rd re i a)^c -> Unknown^ci ->{rd; SchemaError} a
 
-Codec.encode : (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
+Codec.encode : (Codec rd re i a)^c -> a ->{re; SchemaError} i
 
-Codec.decode_result : (PureCodec i a)^c -> (Unknown^ci -> Result SchemaError a)^c
+Codec.decode_result : (PureCodec i a)^c -> Unknown^ci -> Result SchemaError a
 
-Codec.encode_result : (PureCodec i a)^c -> (a -> Result SchemaError i)^c
+Codec.encode_result : (PureCodec i a)^c -> a -> Result SchemaError i
 ```
 
-Захваты кодека сохраняются в частично применённой функции; происхождение возвращаемого `a`/`i` проверяется отдельно и не стирается при передаче обобщённого свидетельства. SchemaError содержит безопасную диагностику, а не исходное значение, которое могло бы вынести ресурс за пределы его области владения.
+Захваты кодека сохраняются в частично применённой функции, потому что следующая стадия удерживает предыдущие параметры; происхождение возвращаемого `a`/`i` проверяется отдельно и не стирается при передаче обобщённого свидетельства. SchemaError содержит безопасную диагностику, а не исходное значение, которое могло бы вынести ресурс за пределы его области владения.
 
 `PureCodec` — непрозрачное свидетельство чистого синхронного выполнения, а не псевдоним типа с пустыми строками сервисов. `Codec none none i a` может выполнять асинхронные и другие эффектные действия. Свидетельство создают проверенные чистые комбинаторы, автоматическое построение схем и FFI с явно доверенным контрактом. Внешняя Effect Schema без такого контракта получает общий Codec. Чистое декодирование принимает только Unknown языка Flick с инертным структурным представлением; произвольное JS-значение сначала проходит эффектный импорт `Js.snapshot` ([FFI](../../reference/ffi/#значения-js)).
 
@@ -231,9 +231,9 @@ Email.value : Email -> String
 Ref.make : a^c ->{} Ref (a^c)
 Ref.get : (Ref a)^c ->{} a^c
 
-Ref.set : (Ref a)^c -> (a^c ->{} Unit)^c
+Ref.set : (Ref a)^c -> a^c ->{} Unit
 
-Ref.modify : (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
+Ref.modify : (Ref a)^c -> (a^c -> (b^x, a^c))^d ->{} b^x
 ```
 
 `make` сохраняет `c` в инвариантном аргументе типа `a^c`: это постоянная

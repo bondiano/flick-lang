@@ -19,11 +19,11 @@ import Mtl.Classes exposing (
 type StateT s (m : Type -> Type) a = StateT (s -> m (a, s))
 
 /// Supply the initial state and remove this layer, yielding `m (a, s)`.
-run : (StateT s m a)^c -> (s^d -> (m (a, s))^(c + d))^c
+run : (StateT s m a)^c -> s^d -> (m (a, s))^(c + d)
 let run (StateT step) state = step state
 
 instance Functor m => Functor (StateT s m) =
-  map : (forall v. a^v -> b)^c -> ((StateT s m a)^d -> (StateT s m b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> (StateT s m a)^d -> (StateT s m b)^(c + d)
   let map f (StateT step) =
     StateT (fun state -> map (fun (value, next) -> (f value, next)) (step state))
 
@@ -31,8 +31,10 @@ instance Monad m => Applicative (StateT s m) =
   pure : a^c -> (StateT s m a)^c
   let pure value = StateT (fun state -> pure (value, state))
   map2 :
-    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-    ((StateT s m a)^d -> ((StateT s m b)^d -> (StateT s m x)^(c + d))^(c + d))^c
+    (forall u v. a^u -> b^v -> x)^c ->
+    (StateT s m a)^d ->
+    (StateT s m b)^d ->
+    (StateT s m x)^(c + d)
   let map2 f left right =
     StateT (fun state -> do {
       (a, next) <- run left state
@@ -42,7 +44,7 @@ instance Monad m => Applicative (StateT s m) =
 
 instance Monad m => Monad (StateT s m) =
   flat_map :
-    (forall v. a^v -> (StateT s m b)^(c + v))^c -> ((StateT s m a)^d -> (StateT s m b)^(c + d))^c
+    (forall v. a^v -> (StateT s m b)^(c + v))^c -> (StateT s m a)^d -> (StateT s m b)^(c + d)
   let flat_map f action =
     StateT (fun state -> do {
       (value, next) <- run action state
@@ -71,7 +73,7 @@ instance MonadReader m r => MonadReader (StateT s m) r =
   ask : StateT s m r
   let ask = lift ask
 
-  local : (forall v. r^v -> r^(c + v))^c -> ((StateT s m a)^d -> (StateT s m a)^(c + d))^c
+  local : (forall v. r^v -> r^(c + v))^c -> (StateT s m a)^d -> (StateT s m a)^(c + d)
   let local update action = StateT (fun current -> local update (run action current))
 
   reader : (forall v. r^v -> a)^c -> (StateT s m a)^c
@@ -105,7 +107,7 @@ instance MonadError m e => MonadError (StateT s m) e =
   let throw_error problem = lift (throw_error problem)
 
   catch_error :
-    (forall v. e^v -> (StateT s m a)^(c + v))^c -> ((StateT s m a)^d -> (StateT s m a)^(c + d))^c
+    (forall v. e^v -> (StateT s m a)^(c + v))^c -> (StateT s m a)^d -> (StateT s m a)^(c + d)
   let catch_error handler action =
     StateT (fun current ->
       catch_error (fun problem -> run (handler problem) current) (run action current)

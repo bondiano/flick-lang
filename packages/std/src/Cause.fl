@@ -103,7 +103,7 @@ foreign pure has_interrupts from "@flick-lang/runtime/effect/Cause" "flickHasInt
   reviewed "effect@4.1.2 sha256:e62729f5a9d564e4"
 
 /// The typed errors changed by `f`; defects and interruptions stay.
-map : (Errors e -> Errors e2)^c -> (Failure e -> Failure e2)^c
+map : (Errors e -> Errors e2)^c -> Failure e -> Failure e2
 foreign pure map from "@flick-lang/runtime/effect/Cause" "flickMap"
   arity 1
   retention call

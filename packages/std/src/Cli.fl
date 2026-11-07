@@ -260,7 +260,7 @@ type alias ActionContext = { commandPath : List String; version : String }
 
 /// The switch `--<name>` of this command and its subcommands, with its help
 /// text: given, it runs `act` instead of any handler, like `--version`.
-action : String -> String -> (ActionContext ->{} Unit)^c -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+action : String -> String -> (ActionContext ->{} Unit)^c -> (Spec r e o)^c -> (Spec r e o)^c
 foreign pure action from "@flick-lang/runtime/cli" "specAction"
   arity 4
   retention call
@@ -293,7 +293,7 @@ foreign pure subcommand from "@flick-lang/runtime/cli" "specSubcommand"
   reviewed "effect@4.1.2 sha256:ce9428c267177c25"
 
 /// The command, running `handler` with the parsed options.
-handle : (o ->{r2; e2} Unit)^c -> ((Spec r e o)^c -> (Command (r + r2) (e + e2))^c)^c
+handle : (o ->{r2; e2} Unit)^c -> (Spec r e o)^c -> (Command (r + r2) (e + e2))^c
 foreign pure handle from "@flick-lang/runtime/cli" "specHandle"
   arity 2
   retention call
@@ -301,7 +301,7 @@ foreign pure handle from "@flick-lang/runtime/cli" "specHandle"
 
 /// [`handle`] with the spec first, so the handler is checked against the
 /// options the spec makes: what the block `cli "name" { … }` stands for.
-handled : (Spec r e o)^c -> ((o ->{r2; e2} Unit)^c -> (Command (r + r2) (e + e2))^c)^c
+handled : (Spec r e o)^c -> (o ->{r2; e2} Unit)^c -> (Command (r + r2) (e + e2))^c
 let handled spec handler = handle handler spec
 
 /// The command without a handler of its own: it needs subcommands, and run
@@ -421,19 +421,19 @@ let settings = { version = "0.0.0"; builtIns = builtins; formatter = None }
 /// Parses `args` and runs the handler of the command they name, in the
 /// current fiber, after the whole line parsed. The built-in flags print to
 /// stdout and run no handler; invalid input is `CliError` with Effect's text.
-run_with : Settings -> (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
+run_with : Settings -> (Command r e)^c -> List String ->{r; CliError | e} Unit
 foreign effect run_with from "@flick-lang/runtime/cli" "cliRunWith"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:fe039b878ff7b17a"
 
 /// `run_with` the `settings` with `version`.
-run_version : String -> (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
+run_version : String -> (Command r e)^c -> List String ->{r; CliError | e} Unit
 foreign effect run_version from "@flick-lang/runtime/cli" "cliRunVersion"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:fe039b878ff7b17a"
 
 /// `run_version "0.0.0"`.
-run : (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
+run : (Command r e)^c -> List String ->{r; CliError | e} Unit
 let run command args = run_version "0.0.0" command args

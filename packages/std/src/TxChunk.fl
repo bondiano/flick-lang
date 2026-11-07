@@ -25,14 +25,14 @@ foreign effect from_iterable from "@flick-lang/runtime/effect/TxChunk" "fromIter
   reviewed "effect@4.1.2 sha256:407ed538a36509ad"
 
 /// Replaces the chunk with the second of `f` of it; returns the first.
-modify : (Chunk.Chunk a -> (b, Chunk.Chunk a))^c -> (TxChunk a ->{Tx.Transaction;} b)^c
+modify : (Chunk.Chunk a -> (b, Chunk.Chunk a))^c -> TxChunk a ->{Tx.Transaction;} b
 foreign effect modify from "@flick-lang/runtime/effect/TxChunk" "modify"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:12617ebb5f2607a6"
 
 /// Replaces the chunk with `f` of it.
-update : (Chunk.Chunk a -> Chunk.Chunk a)^c -> (TxChunk a ->{Tx.Transaction;} Unit)^c
+update : (Chunk.Chunk a -> Chunk.Chunk a)^c -> TxChunk a ->{Tx.Transaction;} Unit
 foreign effect update from "@flick-lang/runtime/effect/TxChunk" "update"
   arity 1
   retention call
@@ -95,14 +95,14 @@ foreign effect slice from "@flick-lang/runtime/effect/TxChunk" "slice"
   reviewed "effect@4.1.2 sha256:fc2fd7c096db9ed7"
 
 /// Replaces each element with `f` of it.
-map : (a -> a)^c -> (TxChunk a ->{Tx.Transaction;} Unit)^c
+map : (a -> a)^c -> TxChunk a ->{Tx.Transaction;} Unit
 foreign effect map from "@flick-lang/runtime/effect/TxChunk" "map"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:7e06d312bae3268e"
 
 /// Keeps the elements the predicate accepts.
-filter : (a -> Bool)^c -> (TxChunk a ->{Tx.Transaction;} Unit)^c
+filter : (a -> Bool)^c -> TxChunk a ->{Tx.Transaction;} Unit
 foreign effect filter from "@flick-lang/runtime/effect/TxChunk" "filter"
   arity 1
   retention call

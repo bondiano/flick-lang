@@ -342,7 +342,7 @@ Provided R ϱ         constraint (like Outlives, §2.4): the provider of each se
 Γ ⊢ Fiber.spawn o f t : Fiber e a ! R⟨r; none⟩
 ```
 
-The scheme of every constant with `retention owner` (G4) requires `Fiber.Provided r s` for the row of the retained task or finalizer, as it requires `Fiber.Outlives c s` for captures; with one region in the signature the checker adds them (`ffi.rs` `with_owner_constraints`), and a foreign function otherwise without them is `FLICK-F002` (`ffi.rs` `owner_retention`).
+The scheme of every constant with `retention owner` (G4) requires `Fiber.Provided r s` and `Detached r` for the row of the retained task or finalizer, as it requires `Fiber.Outlives c s` for captures; with one region in the signature the checker adds them (`ffi.rs` `with_owner_constraints`), and a foreign function otherwise without them is `FLICK-F002` (`ffi.rs` `owner_retention`).
 
 The call site splits `Provided r ϱ` into the services `S ∈ r` (except `Scope` and the obligations themselves) and discharges each in the stage `X` that contains the call, lexically, like `Scope ϱ` (`regions/scopes.rs` `lexical_owner`):
 
@@ -468,7 +468,7 @@ G1–G3 of `core.md` hold, and the following are added:
 
 - **G4 (FFI retention contract).**
   - `retention call`: after returning, the function holds no arguments except those reachable from the result within ⌈result type⌉.
-  - `retention owner` with owner `ϱ` (from `Scope ϱ` or `Owner ϱ`): the function holds its arguments until `ϱ` closes, and its scheme requires `Outlives c ϱ` for each capture row `c` of a retained argument that is not shown by what follows it, and `Provided r ϱ` for the service row `r` of retained work (§2.7), which a signature with one region gets without writing them (`ffi.rs` `with_owner_constraints`, `owner_retention`, `FLICK-F002`). The call site checks `Outlives` for the whole ⌈·⌉ of the retained argument, including what its result shows ([(Spawn) bounds everything the task holds](#spawn-bounds-everything-the-task-holds)).
+  - `retention owner` with owner `ϱ` (from `Scope ϱ` or `Owner ϱ`): the function holds its arguments until `ϱ` closes, and its scheme requires `Outlives c ϱ` for each capture row `c` of a retained argument that is not shown by what follows it, and `Provided r ϱ` with `Detached r` for the service row `r` of retained work (§2.7), which a signature with one region gets without writing them (`ffi.rs` `with_owner_constraints`, `owner_retention`, `FLICK-F002`). The call site checks `Outlives` for the whole ⌈·⌉ of the retained argument, including what its result shows ([(Spawn) bounds everything the task holds](#spawn-bounds-everything-the-task-holds)).
   - An acquisition `∀s. τ_a →R⟨{Scope s} + r; ε⟩ τ` returns capabilities of region `s`, and `s ∈ ⌈τ⌉` unless `τ` is a scalar. Only closing `s` releases them.
   - A function without `retention` counts as `call`. `FLICK-F002` requires the annotation only on parameters with variables of kinds `Region` and `CRow` (`ffi.rs` `foreign_info`). A parameter that is a variable of kind `Type` (`∀a. a →R Unit`) needs no annotation even though it can receive a capability: such a binding is covered only by this hypothesis.
   - Pure operations on a capability (`Rpc.port`, `Http.Server.address`) do not depend on whether the region is live.

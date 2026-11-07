@@ -89,21 +89,21 @@ foreign pure map from "@flick-lang/runtime/effect/HashSet" "flickMap"
   reviewed "effect@4.1.2 sha256:8c4389feb6082d7c"
 
 /// The elements for which `f` holds.
-filter : (a -> Bool)^c -> (HashSet w a -> HashSet w a)^c
+filter : (a -> Bool)^c -> HashSet w a -> HashSet w a
 foreign pure filter from "@flick-lang/runtime/effect/HashSet" "flickFilter"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:cceadac97d43a2dc"
 
 /// Whether `f` holds for some element.
-some : (a -> Bool)^c -> (HashSet w a -> Bool)^c
+some : (a -> Bool)^c -> HashSet w a -> Bool
 foreign pure some from "@flick-lang/runtime/effect/HashSet" "flickSome"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:67c675c78c075f7e"
 
 /// Whether `f` holds for every element.
-every : (a -> Bool)^c -> (HashSet w a -> Bool)^c
+every : (a -> Bool)^c -> HashSet w a -> Bool
 foreign pure every from "@flick-lang/runtime/effect/HashSet" "flickEvery"
   arity 2
   retention call

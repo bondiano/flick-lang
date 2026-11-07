@@ -30,7 +30,6 @@ type Listener (s : Region) a
 /// `owner`. An event that finds the queue full is dropped and reported to
 /// `supervisor`, and so is every failure of the handler.
 listen :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Fiber.Owner s ->
   QueuePolicy ->
   (Failure e ->{Scope s | r;} Unit)^c ->

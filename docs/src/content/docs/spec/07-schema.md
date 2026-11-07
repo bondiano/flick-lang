@@ -1,6 +1,6 @@
 ---
 title: "Schema and standard data types"
-source_hash: ed19ce8886c71994
+source_hash: 27cc4aa99988c481
 ---
 
 ## The boundary between the language core and the library
@@ -37,16 +37,16 @@ Schema a
 PureCodec encoded decoded
 Codec decoding_services encoding_services encoded decoded
 
-Codec.decode : (Codec rd re i a)^c -> (Unknown^ci ->{rd; SchemaError} a)^c
+Codec.decode : (Codec rd re i a)^c -> Unknown^ci ->{rd; SchemaError} a
 
-Codec.encode : (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
+Codec.encode : (Codec rd re i a)^c -> a ->{re; SchemaError} i
 
-Codec.decode_result : (PureCodec i a)^c -> (Unknown^ci -> Result SchemaError a)^c
+Codec.decode_result : (PureCodec i a)^c -> Unknown^ci -> Result SchemaError a
 
-Codec.encode_result : (PureCodec i a)^c -> (a -> Result SchemaError i)^c
+Codec.encode_result : (PureCodec i a)^c -> a -> Result SchemaError i
 ```
 
-The codec's captures are preserved on a partially applied function; the provenance of the returned `a`/`i` is checked separately and is not erased by a generic witness. SchemaError carries a safe diagnostic, not the live source input, which could carry a scoped capability out.
+The codec's captures are preserved on a partially applied function, as any later stage holds its earlier parameters; the provenance of the returned `a`/`i` is checked separately and is not erased by a generic witness. SchemaError carries a safe diagnostic, not the live source input, which could carry a scoped capability out.
 
 `PureCodec` is an opaque certificate of pure synchronous execution, not an alias over empty service rows. `Codec none none i a` may perform async/runtime actions. The certificate is created by checked pure combinators, deriving and explicitly trusted FFI. An external Effect Schema without such a contract gets the general Codec. Pure decoding accepts only a source Unknown with an inert structural representation; arbitrary JS first goes through the runtime import `Js.snapshot` ([FFI](../../reference/ffi/#js-values)).
 
@@ -222,9 +222,9 @@ The Codec type does not prove an isomorphism: round-trip laws are checked by tes
 Ref.make : a^c ->{} Ref (a^c)
 Ref.get : (Ref a)^c ->{} a^c
 
-Ref.set : (Ref a)^c -> (a^c ->{} Unit)^c
+Ref.set : (Ref a)^c -> a^c ->{} Unit
 
-Ref.modify : (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
+Ref.modify : (Ref a)^c -> (a^c -> (b^x, a^c))^d ->{} b^x
 ```
 
 `make` records `c` in the invariant type argument `a^c`: it is the cell's

@@ -86,7 +86,7 @@ let raised path = scope {
   | Wrapped _ -> "caught"
 }
 
-map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
+map_effect : forall c a b r e. (a ->{r; e} b)^c -> List a ->{r; e} List b
 foreign map_effect from "./list.js" "mapEffect"
   retention call
 

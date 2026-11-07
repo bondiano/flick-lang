@@ -397,14 +397,7 @@ impl Checker<'_> {
                 result,
             } => {
                 let param = self.stages(param, kinds, &Type::empty_row());
-                let mut captures = self.captures_of(&param);
-                captures.entries.retain(|(_, atom)| {
-                    matches!(
-                        self.atom_kind(atom, kinds),
-                        None | Some(Kind::Type | Kind::Region | Kind::CaptureRow | Kind::ErrorRow)
-                    )
-                });
-                let held = Type::Union(Box::new(held.clone()), Box::new(captures.into_type()));
+                let held = self.stage_holds(&param, kinds, held);
                 let explicit = self.whnf_captured(result).1.is_some();
                 let mut result = self.stages(result, kinds, &held);
                 let retained = self.store.normalize(&held);
@@ -429,6 +422,24 @@ impl Checker<'_> {
                 }
             }
         }
+    }
+
+    /// What a stage after the parameter `param` holds, with `held` what the
+    /// parameters before it hold.
+    pub(in crate::types) fn stage_holds(
+        &self,
+        param: &Type,
+        kinds: &[(String, Kind)],
+        held: &Type,
+    ) -> Type {
+        let mut captures = self.captures_of(param);
+        captures.entries.retain(|(_, atom)| {
+            matches!(
+                self.atom_kind(atom, kinds),
+                None | Some(Kind::Type | Kind::Region | Kind::CaptureRow | Kind::ErrorRow)
+            )
+        });
+        Type::Union(Box::new(held.clone()), Box::new(captures.into_type()))
     }
 
     /// Whether `atom` is a region or a capture row, not a type variable.

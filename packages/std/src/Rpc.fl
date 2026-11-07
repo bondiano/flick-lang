@@ -213,7 +213,7 @@ foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
 /// the calls it serves finish and runs their finalizers. The handlers run
 /// with the services here.
 listen :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
+  Fiber.Provided r s =>
   ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
   arity 3
@@ -223,7 +223,7 @@ foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
 /// As `listen`, each client a WebSocket at `path` whose messages carry its
 /// calls: `ws://127.0.0.1:8080/rpc`. Every serialization streams over it.
 listen_websocket :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
+  Fiber.Provided r s =>
   ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenWebsocket"
   arity 3
@@ -235,7 +235,7 @@ foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "r
 /// that frames its messages (`ndjson`, `ndjson_rpc`, `binary`) fits a byte
 /// stream; another is `ServeError`. Node only.
 listen_tcp :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
+  Fiber.Provided r s =>
   ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen_tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenTcp"
   arity 3
@@ -254,7 +254,7 @@ foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
 /// "/rpc" (fun request -> rpc request)`. It holds region `s`: when the scope
 /// owning it closes, the calls it serves finish and run their finalizers.
 handler :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
+  Fiber.Provided r s =>
   Serialization ->
   Group r hs ->
   (hs^c ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s})^c
@@ -266,7 +266,7 @@ foreign effect handler from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandler
 /// As `handler`, each client a WebSocket whose messages carry its calls,
 /// for a `GET` route.
 handler_websocket :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
+  Fiber.Provided r s =>
   Serialization ->
   Group r hs ->
   (hs^c ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s})^c

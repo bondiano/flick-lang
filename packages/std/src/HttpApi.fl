@@ -310,7 +310,7 @@ foreign pure add_group from "@flick-lang/runtime/effect/http-api/HttpApi" "httpA
 /// serves finish and runs their finalizers. A request that does not decode
 /// is 400 with the issues; the handlers run with the services here.
 listen :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
+  Fiber.Provided r s =>
   ServeOptions -> Api r gs -> (gs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiListen"
   arity 3

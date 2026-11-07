@@ -21,7 +21,7 @@ foreign effect make from "@flick-lang/runtime/effect/FiberSet" "flickMake"
 /// Runs `task` as a child of the set; it may hold only what outlives the
 /// set's region.
 run :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
+  Fiber.Outlives c s =>
   RunOptions -> (Eff {Scope s | r} e a)^c -> FiberSet s e a ->{r;} Fiber.Fiber e a
 foreign effect run from "@flick-lang/runtime/effect/FiberSet" "flickRun"
   arity 1

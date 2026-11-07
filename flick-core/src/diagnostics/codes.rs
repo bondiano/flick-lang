@@ -236,6 +236,7 @@ codes! {
     T056 = Types 56, "a constructor builds a type it cannot";
     T057 = Types 57, "a refining match needs known types";
     T058 = Types 58, "a refinement Flick does not make";
+    T059 = Types 59, "a part of a signature it gets anyway";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
