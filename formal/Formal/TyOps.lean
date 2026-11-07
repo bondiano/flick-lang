@@ -198,16 +198,4 @@ theorem Row.obs_substT (σ : Atom → Ty) (r : Row) (s : Ty) :
     grind
   | _ => simp [Row.substT, Row.obs]
 
-theorem Const.ty_substT (S : Sig) (c : Const) (ι : CArg) (σ : Atom → Ty) :
-    (c.ty S ι).substT σ = c.ty S (ι.substT σ) := by
-  cases c
-  case addFin | spawn =>
-    simp [Const.ty, Ty.substT, Stage.substT, CArg.substT, Ty.reach_caps, Row.obs_substT σ]
-  case perform E o _ =>
-    rcases h : S.op E o with _ | ⟨c, a, b⟩
-    · simp [Const.ty, h, Ty.substT, Stage.substT]
-    · obtain ⟨ha, hb⟩ := S.op_closed E o c a b σ h
-      cases c <;> simp [Const.ty, h, Ty.substT, Stage.substT, CArg.substT, ha, hb]
-  all_goals simp [Const.ty, Ty.substT, Stage.substT, CArg.substT]
-
 end Flick

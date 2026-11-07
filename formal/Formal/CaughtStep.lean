@@ -109,6 +109,8 @@ theorem RHead.caught {Λ : List Rgn} {μ : List Tm} {r Λ' μ' r'} {n : Nat} {H 
   | refGet hl => exact keep (Tm.Caught.noIns (hμ _ _ hl)) (.refl _)
   | refSet => exact keep (Tm.Caught.noIns (by simp [Tm.NoIns, Tm.Has])) (.refl _)
   | await => exact keep h (.refl _)
+  | scopeRun hv =>
+    exact keep (Tm.Caught.noIns fun h' => vn hv ha.2.1 (Tm.has_scopeRun' h')) (.refl _)
   | tryRaise => exact keep h (.refl _)
   | handleYes _ hm =>
     exact keep (Tm.Caught.noIns fun hi => (subst_match_has hm hi).elim (fun h' => ha.2 (.inl h')) ha.1)

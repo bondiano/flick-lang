@@ -115,7 +115,7 @@ theorem RHead.not_pure {Ψ Θ Λ μ r t Λ' μ' r'} (h : Typ S Ψ Θ [] r (.ex t
   | hdl => cases h with
     | hdl _ _ _ _ _ _ _ _ hφ _ => exact hφ
     | errVal hv | allI hv => exact nv hv
-  | refGet => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
+  | refGet | scopeRun _ => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | open_ => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | op => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | refSet => exact const_app2_rt h fun _ => ⟨_, _, _, _, _, _, _, rfl⟩

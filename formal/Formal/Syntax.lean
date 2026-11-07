@@ -63,7 +63,7 @@ inductive OpClass
 
 /-- Constants of Γ₀ (core.md §1.5, regions.md §1.5). The typing rule instantiates
 their types (`CArg`); `open_` acquires a capability `H ϱ`, `op` uses one; `intEq`
-compares two `Int`s. -/
+compares two `Int`s. `scopeRun` is `Scope.run`, a `scope` whose body is its argument. -/
 inductive Const
   | refMake
   | refGet
@@ -73,6 +73,7 @@ inductive Const
   | addFin
   | spawn
   | intEq
+  | scopeRun
   | perform (E o : Name) (c : OpClass)
 
 def Const.arity : Const → Nat
@@ -270,6 +271,12 @@ def Const.ty (S : Sig) : Const → CArg → Ty
     .arrow (.owner ι.s) .pure (.arrow (.eff (Row.union (Row.scope ι.s) ι.r) ι.e ι.t ι.C)
       (.rt (Row.union ι.r (Row.obs ι.r ι.s)) Row.none) (.base .unit) ι.s.reach) Caps.none
   | .intEq, _ => .arrow (.base .int) .pure (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none
+  | .scopeRun, ι =>
+    let r := ι.r.substT (shiftV 1)
+    .arrow (.all 1 (.arrow (.owner (.tvar 0))
+        (.rt (Row.union (Row.scope (.tvar 0)) (Row.union r (Row.obs r (.tvar 0)))) (ι.e.substT (shiftV 1)))
+        (ι.t.up 1) (ι.C.substT (shiftV 1))))
+      (.rt ι.r ι.e) ι.t Caps.none
   | .perform E o _, ι => match S.op E o with
     | some (.abort, a, _) => .arrow a (.rt (Row.single E) Row.none) ι.t Caps.none
     | some (_, a, b) => .arrow a (.rt (Row.single E) Row.none) b Caps.none

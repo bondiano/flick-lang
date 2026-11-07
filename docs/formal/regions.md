@@ -103,6 +103,9 @@ Fiber.spawn :
 Scope.add_finalizer :
   ∀s c r. Outlives c s ⇒ (Eff r none Unit)^c →R⟨{Scope s} + r; none⟩ Unit
 
+Scope.run :
+  ∀r e a c. (∀s. Owner s →R⟨{Scope s} + r; e⟩ a)^c →R⟨r; e⟩ a
+
 Ref.make  : ∀c α. α^c →R⟨none;none⟩ Ref (α^c)
 Ref.get   : ∀c α. (Ref α)^c →R⟨none;none⟩ α^c
 Ref.set   : ∀c α. (Ref α)^c →P (α^c →R⟨none;none⟩ Unit)^c
@@ -249,6 +252,7 @@ s ∉ fr(τ) ∪ fr(r) ∪ fr(ε)
 ```
 
 - `fr(τ)` are the free regions of `τ`, including qualifiers and rows.
+- `Scope.run f` is `scope s { f s_owner }` for a function `f` of any form: a lambda, or a variable. Its region is the binder of the parameter of `Scope.run` (§1.5), so the three conditions on `s` hold by scoping. `Scope.run (λo. e)` and `scope s { e }` step to the same `inside` form and type each other, with one difference: a `scope` knows that what is outside outlives `s` (§2.4), while a function of `∀s` can be called at any region and knows nothing about it. A child of `s` that holds an atom from outside is typed under `scope` only.
 - `R⟨r; ε⟩` is always part of the result: `scope` is a runtime step, and a pure function cannot open one (`FLICK-E001`).
 - `scope` discharges only the `Scope s` of its own region; every other `Scope ϱ` passes outwards in `r`.
 - A `Scope ϱ` requirement that no `scope` discharges and that the signature does not list is `FLICK-G004`.

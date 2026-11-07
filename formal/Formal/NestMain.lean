@@ -175,6 +175,10 @@ theorem Nest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     | await =>
       rw [nil rfl, List.append_nil]
       exact keep (hn.sub hi hE hnv hrW.2 fun _ h => h)
+    | scopeRun hv =>
+      rw [nil rfl, List.append_nil]
+      exact keep (hn.sub hi hE hnv (fun h => h.elim (fun h => by cases h) (hv.noIns hrW.2.1))
+        fun _ h => Tm.has_scopeRun h)
     | tryRaise hv =>
       rw [nil rfl, List.append_nil]
       exact keep (hn.sub hi hE hnv (fun h => h.elim (hv.noIns hrW.1) hrW.2.2)

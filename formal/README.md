@@ -158,6 +158,8 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | L4 without the store: a value holds no more than its type shows | `Typ.holds` (`Held.lean`) |
 | §5.2 `reach_μ`; L4 | `Reaches`; `lemma_4`, `lemma_4_cell` (`Lemma4.lean`) |
 | regions not yet created, renamed away; facts of the order of creation | `kill`, `Ty.YF`, `Tm.Below`, `Facts.age` (`Fresh.lean`, `Rules.lean`) |
+| `regions.md` §1.5 `Scope.run`, a `scope` whose body gives its argument the owner | `Const.scopeRun`, `RHead.scopeRun`, `scopeRun_body` (`Syntax.lean`, `Semantics.lean`, `ScopeRun.lean`) |
+| §2.3 `Scope.run (λ. e)` and (Scope) agree, with no facts about the region | `scopeRun_agrees`, `Typ.scopeRun_of_scope`, `Typ.scope_of_scopeRun` (`ScopeRun.lean`) |
 | (Scope) and (Inside) in a run-time configuration | `RtCtx`, `scope_body`, `inside_entails` (`ScopeStep.lean`) |
 | a configuration writes only regions that exist | `CfgBelow`, `Step.below` (`Below.lean`, `BelowStep.lean`) |
 | L6 | `lemma_6` (`Lemma4.lean`); the invariant of a configuration: `CfgTy` (`Soundness.lean`) |
