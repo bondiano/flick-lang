@@ -11,6 +11,10 @@
 //! skipped for it. `FLICK_E2E_GO_ONLY` runs only those, without Node: the
 //! platform jobs of CI.
 //!
+//! The cases `tests/run/known_gaps.txt` lists for a target are a law that
+//! target does not hold yet: they must fail there, and one that passes is
+//! reported, so its line goes and the case holds the target from then on.
+//!
 //! Each pass prints how long it took, and `times.tsv` under the output
 //! directory keeps the build and run time of every case (`times`).
 //! `FLICK_E2E_SHARD=k/n` runs the k-th of n shards of the cases, every pass
@@ -20,6 +24,7 @@
 //! checks; for the cases of tests/run/runtime the Go runs must project it
 //! to what the JS debug run projects it to (`trace`).
 
+mod gaps;
 mod times;
 mod trace;
 
@@ -183,7 +188,7 @@ fn portable(root: &Path) -> Vec<String> {
 }
 
 /// The cases under `root` that `FLICK_E2E_ONLY` and `FLICK_E2E_SHARD`
-/// select, sorted, and whether they are a shard.
+/// select, sorted, and whether they are only a part of them.
 fn selected(root: &Path) -> (Vec<PathBuf>, bool) {
     let mut paths = Vec::new();
     cases(root, &mut paths);
@@ -191,9 +196,9 @@ fn selected(root: &Path) -> (Vec<PathBuf>, bool) {
         paths.retain(|p| only.split(',').any(|o| p.to_string_lossy().contains(o)));
     }
     paths.sort();
-    let sharded = shard(&mut paths);
+    let part = shard(&mut paths) || env::var_os("FLICK_E2E_ONLY").is_some();
     assert!(!paths.is_empty(), "no cases under {}", root.display());
-    (paths, sharded)
+    (paths, part)
 }
 
 /// Keeps the shard `FLICK_E2E_SHARD` names, `k/n`: every n-th of the sorted
@@ -292,7 +297,9 @@ fn run_cases() {
         "runtime is not installed: run `pnpm install --frozen-lockfile` in the repository root"
     );
     let root = repo.join("tests/run");
-    let (paths, sharded) = selected(&root);
+    let (paths, part) = selected(&root);
+    let gaps = gaps::load(&root);
+    let is_gap = |target: &str, case: &Path| gaps::listed(&gaps, target, &root, case);
 
     // Under target/, so `@flick-lang/runtime` resolves from the repository root
     // node_modules exactly as it would in a project.
@@ -318,10 +325,10 @@ fn run_cases() {
                 .join(rel.with_extension(""));
             let ran = run_case(case, rel, &out_dir, emit, profile);
             let timing = ran.timing(rel);
-            let problem = ran
-                .problem
+            let gap = is_gap("js", case);
+            let problem = gaps::verdict(gap, ran.problem)
                 .map(|p| format!("{} ({emit}, {profile}):\n{p}", rel.display()));
-            ((problem, ran.projection), timing)
+            ((problem, ran.projection.filter(|_| !gap)), timing)
         });
         passes.push(timed);
         for (case, (problem, projection)) in paths.iter().zip(results) {
@@ -353,13 +360,11 @@ fn run_cases() {
                 _ => None,
             };
             let problems: Vec<String> = ran.problem.into_iter().chain(differs).collect();
-            let problem = (!problems.is_empty()).then(|| {
-                format!(
-                    "{} (go, {profile}):\n{}",
-                    rel.display(),
-                    problems.join("\n")
-                )
-            });
+            let problem = gaps::verdict(
+                is_gap("go", case),
+                (!problems.is_empty()).then(|| problems.join("\n")),
+            )
+            .map(|p| format!("{} (go, {profile}):\n{p}", rel.display()));
             (problem, timing)
         });
         report.extend(problems.into_iter().flatten());
@@ -379,11 +384,14 @@ fn run_cases() {
         assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
         return;
     }
-    report.extend(typecheck(&repo, &out_root.join("debug/ts")));
-    report.extend(typecheck(&repo, &out_root.join("release/ts")));
+    // a part of only gaps of the JS target may have written no TypeScript
+    if paths.iter().any(|case| !is_gap("js", case)) {
+        report.extend(typecheck(&repo, &out_root.join("debug/ts")));
+        report.extend(typecheck(&repo, &out_root.join("release/ts")));
+    }
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
     // the sizes and build times of the whole corpus only compare in one run
-    if !sharded {
+    if !part {
         // the sum of the builds: with the same jobs in both profiles it compares them
         times::metrics(&out_root, passes[0].built(), passes[2].built());
     }

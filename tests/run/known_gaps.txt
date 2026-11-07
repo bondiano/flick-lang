@@ -1,0 +1,5 @@
+# Cases of tests/run that a target does not pass yet: `<target> <case>`, the
+# target `js` or `go`, the case by path without `.fl`, then why. Their `.stdout`
+# is what the contract asks for. The e2e harness still runs them and fails on
+# one that passes, so a line here goes when its target catches up. `just stress`
+# skips them on that target.
