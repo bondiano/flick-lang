@@ -177,6 +177,9 @@ impl Checker<'_> {
         for (errors, span) in mem::take(&mut self.regions.raised) {
             self.check_raised(&errors, span);
         }
+        for (needs, allowed, span) in mem::take(&mut self.regions.tail_calls) {
+            self.check_tail_call(&needs, &allowed, span);
+        }
         for (element, span) in mem::take(&mut self.regions.error_elements) {
             let element = self.zonk(&element);
             if !self.may_be_error(&element) {

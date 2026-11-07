@@ -8,6 +8,7 @@
 use super::Checker;
 use super::env::{Form, Found};
 use super::gadt::branch::{dict_local, field_given};
+use super::lang::{self, Lang};
 use super::patterns::{Ctor, Pat, is_pattern};
 use super::regions::Scope;
 use super::services::{OpClass, Operation};
@@ -38,6 +39,11 @@ impl Handled {
         self.operations
             .iter()
             .all(|o| self.covered.contains(&o.name))
+    }
+
+    /// The row of this effect alone.
+    pub fn row(&self) -> Type {
+        Type::Row(Row::closed(vec![(self.label.clone(), self.entry.clone())]))
     }
 }
 
@@ -190,6 +196,7 @@ impl Checker<'_> {
         }
         // the parameters up to the first runtime arrow, as the operation is called
         let mut params = Vec::new();
+        let mut own = Vec::new();
         let mut value = body.substitute(&subst);
         while let Type::Fun {
             param,
@@ -199,7 +206,8 @@ impl Checker<'_> {
         {
             params.push(*param);
             value = *result;
-            if effects.is_some() {
+            if let Some(effects) = effects {
+                own.push(effects.services);
                 break;
             }
         }
@@ -234,7 +242,7 @@ impl Checker<'_> {
                     }
                 }
                 K::Block => match op.class {
-                    OpClass::Tail => self.check(child, &value),
+                    OpClass::Tail => self.tail_arm_body(child, &value, &own),
                     OpClass::Abort => self.check(child, result),
                     OpClass::Control => {
                         let resume = self.resume_type(&value, result, region);
@@ -256,6 +264,56 @@ impl Checker<'_> {
             self.typing.handled.insert(pattern.range(), entry);
         }
         covers
+    }
+
+    /// The body of a `tail` arm of an operation that declares the rows `own`;
+    /// inside another `tail` arm, that arm's limit holds too.
+    fn tail_arm_body(&mut self, body: &Node, value: &Type, own: &[Type]) {
+        let allowed = self.stage.tail_arm.clone().unwrap_or_else(|| own.to_vec());
+        let outer = self.stage.tail_arm.replace(allowed);
+        self.check(body, value);
+        self.stage.tail_arm = outer;
+    }
+
+    /// A call in a `tail` arm needs `needs`: the arm runs on the stack of a
+    /// caller that may be Sync, so nothing it calls suspends, but through
+    /// what the operation declares or a handler inside the arm catches.
+    pub(in crate::types) fn check_tail_call(&mut self, needs: &Type, allowed: &[Type], span: Span) {
+        let needs = self.store.normalize(needs);
+        let allowed: Vec<_> = allowed.iter().map(|r| self.store.normalize(r)).collect();
+        let reason = needs.entries.iter().find_map(|(label, entry)| {
+            if allowed.iter().any(|row| row.get(label).is_some()) {
+                return None;
+            }
+            if let Type::Con { module, name } = entry.spine().0
+                && lang::is(Lang::Async, module, name)
+            {
+                return Some(format!("it needs `{name}`"));
+            }
+            let (effect, op) = self.control_operation(entry)?;
+            Some(format!(
+                "effect `{effect}` has the `control` operation `{op}`"
+            ))
+        });
+        let reason = reason.or_else(|| {
+            let rigid = needs.tails.iter().find(|tail| {
+                !matches!(tail, Type::Meta(_) | Type::Error)
+                    && !allowed.iter().any(|row| row.tails.contains(*tail))
+            })?;
+            Some(format!(
+                "the row `{}` may hold such an effect",
+                self.show(rigid)
+            ))
+        });
+        if let Some(reason) = reason {
+            self.error(
+                codes::E018,
+                span,
+                format!(
+                    "a `tail` arm may not suspend, and this call may: {reason}; declare it in the row of the operation, or make the operation `control`"
+                ),
+            );
+        }
     }
 
     /// The type of `resume` in a `control` arm: the rest of the body, under

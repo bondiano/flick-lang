@@ -48,7 +48,7 @@ impl Checker<'_> {
     }
 
     /// The effect of a row entry and one of its `control` operations.
-    fn control_operation(&self, entry: &Type) -> Option<(String, String)> {
+    pub(in crate::types) fn control_operation(&self, entry: &Type) -> Option<(String, String)> {
         let Type::Con { module, name } = entry.spine().0 else {
             return None;
         };

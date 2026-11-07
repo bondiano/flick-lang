@@ -59,6 +59,8 @@ pub struct State {
     pub outlives: Vec<solve::Outlives>,
     /// Error rows raised, whose payloads must hold no region.
     pub raised: Vec<(Type, Span)>,
+    /// What each call in a `tail` arm needs, and the rows it may suspend through.
+    pub tail_calls: Vec<(Type, Vec<Type>, Span)>,
     /// Calls inside a `scope` that need `Scope`, until their innermost
     /// scope ends.
     pub needs: Vec<Need>,

@@ -117,3 +117,32 @@ let partial body =
   try body () with
 //~ FLICK-E002 @117:3-117:6 the signature of `partial` does not allow
   | Pick.pick 0 -> 0
+
+/// A `tail` arm runs on the caller's stack: it may not suspend.
+through_control : (Unit ->{Pick; none} Int) ->{Emit Int; none} Int
+let through_control body =
+  try body () with
+  | Pick.pick _ ->
+    Emit.emit 1
+//~ FLICK-E018 @126:5-126:16 a `tail` arm may not suspend
+    1
+
+pause : Unit ->{Async;} Unit
+foreign pause from "./pause.mjs" "pause"
+  arity 0
+
+through_async : (Unit ->{Pick; none} Int) ->{Async; none} Int
+let through_async body =
+  try body () with
+  | Pick.pick _ ->
+    pause ()
+//~ FLICK-E018 @138:5-138:13 a `tail` arm may not suspend
+    1
+
+through_row : forall r. (Unit ->{r; none} Unit) -> (Unit ->{Pick | r; none} Int) ->{r; none} Int
+let through_row other body =
+  try body () with
+  | Pick.pick _ ->
+    other ()
+//~ FLICK-E018 @146:5-146:13 a `tail` arm may not suspend
+    1
