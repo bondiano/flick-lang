@@ -4,6 +4,7 @@ use crate::numeric::NumLang;
 use std::fmt::Write;
 
 use super::Checker;
+use super::shown::short_form;
 use super::ty::{Binder, Row, Type};
 use super::unify::Store;
 use crate::numeric::default_num;
@@ -14,6 +15,7 @@ impl Checker<'_> {
         let printer = Printer {
             store: &self.store,
             qualified: false,
+            zero: false,
         };
         printer.print(&self.held_now(&self.zonk(t)), Prec::Top, &mut out);
         out
@@ -26,6 +28,7 @@ impl Checker<'_> {
         let printer = Printer {
             store: &self.store,
             qualified: true,
+            zero: false,
         };
         printer.print(&self.zonk(t), Prec::Top, &mut out);
         out
@@ -59,6 +62,36 @@ pub fn show_type(t: &Type) -> String {
     Printer {
         store: &store,
         qualified: false,
+        zero: false,
+    }
+    .print(t, Prec::Top, &mut out);
+    out
+}
+
+/// A declared or inferred type as a reader sees it, without what a signature
+/// written that way gets back (`shown`). A parameter or a field on its own
+/// keeps its `forall`: use [`show_type`] for those.
+pub fn show_signature(t: &Type) -> String {
+    let store = Store::default();
+    let mut out = String::new();
+    Printer {
+        store: &store,
+        qualified: false,
+        zero: true,
+    }
+    .print(&short_form(t, &store), Prec::Top, &mut out);
+    out
+}
+
+/// `t` with each constructor written with its module.
+#[cfg(test)]
+pub(super) fn show_type_qualified(t: &Type) -> String {
+    let store = Store::default();
+    let mut out = String::new();
+    Printer {
+        store: &store,
+        qualified: true,
+        zero: true,
     }
     .print(t, Prec::Top, &mut out);
     out
@@ -67,6 +100,9 @@ pub fn show_type(t: &Type) -> String {
 struct Printer<'s> {
     store: &'s Store,
     qualified: bool,
+    /// Writes `^{}`. Without a word about it, the short form would say that a
+    /// later stage holds what its parameters hold.
+    zero: bool,
 }
 
 impl Printer<'_> {
@@ -174,7 +210,9 @@ impl Printer<'_> {
     /// nothing yet and is left out.
     fn print_captured(&self, ty: &Type, captures: &Type, prec: Prec, out: &mut String) {
         let norm = self.store.normalize(captures);
-        if norm.entries.is_empty() && norm.tails.iter().all(|t| matches!(t, Type::Meta(_))) {
+        let unknown =
+            norm.entries.is_empty() && norm.tails.iter().all(|t| matches!(t, Type::Meta(_)));
+        if unknown && !(self.zero && norm.tails.is_empty()) {
             self.print(ty, prec, out);
             return;
         }
@@ -184,6 +222,7 @@ impl Printer<'_> {
             Type::Row(row) if row.entries.is_empty() && row.tail.is_some() => {
                 self.print(captures, Prec::Arg, out);
             }
+            Type::Row(row) if row.entries.is_empty() => out.push_str("{}"),
             Type::Row(_) => {
                 out.push('{');
                 self.print_row_items(captures, out);

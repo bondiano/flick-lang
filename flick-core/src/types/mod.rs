@@ -64,6 +64,7 @@ mod schemas;
 mod server;
 mod services;
 mod settle;
+mod shown;
 #[cfg(feature = "diagnostic-fixes")]
 mod stub;
 mod sugar_lints;
@@ -92,7 +93,7 @@ pub use classes::{Dict, Match, STRUCTURAL, match_type, which};
 pub use component::{instance_key as component_instance, parts as component_parts};
 pub use comprehension::{comprehension, for_parts};
 pub use convert::is_type;
-pub use display::show_type;
+pub use display::{show_signature, show_type};
 pub use do_notation::{bind_key, guard_key};
 pub use effects::NO_EFFECTS;
 pub use env::{Abi, EnumLit, Form, Fundep, Instance, JsClass, Rep, TypeDef};
