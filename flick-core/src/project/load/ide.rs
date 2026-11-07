@@ -86,7 +86,8 @@ pub fn analyze(
     }
 }
 
-/// [`analyze`], reusing and updating what `cache` holds of earlier runs.
+/// [`analyze`], reusing and updating what `cache` holds of earlier runs; for
+/// editors, so its compilation holds no modules.
 pub fn analyze_with(
     host: &dyn Host,
     sources: &mut SourceMap,

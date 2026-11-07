@@ -63,8 +63,8 @@ struct Loaded {
     path: PathBuf,
     file: FileId,
     root: Root,
-    parse: Parse,
-    syntax: ModuleSyntax,
+    parse: Arc<Parse>,
+    syntax: Arc<ModuleSyntax>,
     /// From the header, else from the path; empty for neither.
     name: String,
     /// The module with its plugin blocks expanded, when it has any.
@@ -361,6 +361,21 @@ impl Loader<'_> {
     }
 
     /// Loads and registers a module file once; `Ok(None)` if it is already loaded.
+    /// The parse of a module, from an earlier run while its text stays the same.
+    fn parsed(&mut self, path: &Path, file: FileId) -> (Arc<Parse>, Arc<ModuleSyntax>) {
+        let text = &self.sources.get(file).text;
+        if let Some(found) = self.cache.as_ref().and_then(|c| c.parsed(path, file, text)) {
+            return found;
+        }
+        let parse = Arc::new(syntax::parse(text, file));
+        let module = Arc::new(resolve::module_syntax(&parse.tree, text, file));
+        if let Some(cache) = &mut self.cache {
+            let parsed = (parse.clone(), module.clone());
+            cache.keep_parsed(path, file, text, parsed);
+        }
+        (parse, module)
+    }
+
     fn load(&mut self, path: &Path) -> io::Result<Option<usize>> {
         if self.modules.iter().any(|m| m.path == path) {
             return Ok(None);
@@ -368,9 +383,7 @@ impl Loader<'_> {
         let bytes = self.host.read(path)?;
         let (file, utf8) = self.sources.add_bytes(self.host.display(path), bytes);
         self.diagnostics.extend(utf8);
-        let text = &self.sources.get(file).text;
-        let parse = syntax::parse(text, file);
-        let syntax = resolve::module_syntax(&parse.tree, text, file);
+        let (parse, syntax) = self.parsed(path, file);
         let mut root = self.root_of(path);
         let root_dir = match (&root, self.project) {
             (Root::Source, Some(p)) => Some(p.source_root()),
