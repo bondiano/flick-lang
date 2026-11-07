@@ -130,6 +130,10 @@ export class Frame {
 /** The operations a fiber runs before it gives others a turn. */
 const BUDGET = 2048;
 
+/** How many wakes may nest on a stack: a longer chain of them goes on from the scheduler, or it would overflow. */
+const WAKES_ON_A_STACK = 64;
+let wakes = 0;
+
 let fiberIds = 0;
 
 export class Fiber {
@@ -180,7 +184,17 @@ export class Fiber {
     this.cancel = undefined;
     this.mode = mode;
     this.value = value;
-    if (this.nested === 0) evaluate(this);
+    if (this.nested !== 0) return;
+    if (wakes < WAKES_ON_A_STACK) {
+      wakes++;
+      try {
+        evaluate(this);
+      } finally {
+        wakes--;
+      }
+    } else {
+      schedule(() => evaluate(this));
+    }
   }
 
   /** Asks it to stop; a suspended interruptible fiber stops waiting at once. */
