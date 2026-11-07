@@ -18,6 +18,21 @@ const LOCK_VERSION: i64 = 1;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Lock {
     pub packages: Vec<Locked>,
+    /// The components of the plugins of the dependencies, as `install` found them.
+    pub plugins: Vec<LockedPlugin>,
+}
+
+/// The WebAssembly component of the plugin of a dependency: a local one is
+/// built in place, so the lock says which build the project was installed with.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LockedPlugin {
+    /// The dependency.
+    pub name: String,
+    /// The component's path from the project's root.
+    pub component: String,
+    /// `sha256:` and the hash of the component.
+    pub checksum: String,
 }
 
 /// One fetched package: what the manifest named and what was fetched.
@@ -39,6 +54,8 @@ struct Raw {
     version: i64,
     #[serde(default)]
     package: Vec<Locked>,
+    #[serde(default)]
+    plugin: Vec<LockedPlugin>,
 }
 
 impl Locked {
@@ -87,6 +104,7 @@ impl Lock {
         }
         Ok(Lock {
             packages: raw.package,
+            plugins: raw.plugin,
         })
     }
 
@@ -105,6 +123,17 @@ impl Lock {
                 quote(&p.name),
                 quote(&p.version),
                 quote(&p.source),
+                quote(&p.checksum)
+            );
+        }
+        let mut plugins: Vec<&LockedPlugin> = self.plugins.iter().collect();
+        plugins.sort_by(|a, b| a.name.cmp(&b.name));
+        for p in plugins {
+            let _ = write!(
+                out,
+                "\n[[plugin]]\nname = {}\ncomponent = {}\nchecksum = {}\n",
+                quote(&p.name),
+                quote(&p.component),
                 quote(&p.checksum)
             );
         }
@@ -132,7 +161,7 @@ fn quote(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Lock, Locked};
+    use super::{Lock, Locked, LockedPlugin};
     use crate::project::config::Source;
     use crate::source::SourceMap;
 
@@ -144,6 +173,11 @@ mod tests {
                 version: "0.1.0".into(),
                 source: "git+https://x/y?tag=std-v0.1.0&subdir=packages/std#abc123".into(),
                 checksum: format!("sha256:{}", "0f".repeat(32)),
+            }],
+            plugins: vec![LockedPlugin {
+                name: "mysql".into(),
+                component: "../plugins/mysql/mysql.wasm".into(),
+                checksum: format!("sha256:{}", "1e".repeat(32)),
             }],
         };
         let text = lock.render();

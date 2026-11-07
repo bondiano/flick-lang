@@ -11,9 +11,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use flick_core::project::config::{self, Dependency, Source};
-use flick_core::project::lock::{LOCK_FILE, Lock, Locked};
+use flick_core::project::lock::{LOCK_FILE, Lock, Locked, LockedPlugin};
 use flick_core::project::{self, CONFIG_FILE, store};
 use flick_core::source::SourceMap;
+use sha2::{Digest, Sha256};
 
 /// How far `install` may go to get what the lock lacks.
 #[derive(Debug, Clone, Copy, Default)]
@@ -47,18 +48,61 @@ pub fn install(
         seen: BTreeSet::new(),
     };
     install.add(root, dependencies)?;
-    let Install { lock, fetched, .. } = install;
-    let changed = lock.render() != old.render() || !lock_path.exists() && !lock.packages.is_empty();
+    let Install {
+        mut lock, fetched, ..
+    } = install;
+    lock.plugins = plugins(root, dependencies);
+    let empty = lock.packages.is_empty() && lock.plugins.is_empty();
+    let changed = lock.render() != old.render() || !lock_path.exists() && !empty;
     if changed && options.locked {
-        return Err(format!(
-            "`{LOCK_FILE}` does not pin what the manifests name: run `flick install` without `--locked`"
-        ));
+        let rebuilt = (lock.plugins.iter()).find(|p| !old.plugins.contains(p));
+        return Err(match rebuilt {
+            Some(p) if lock.packages == old.packages => format!(
+                "the component of the plugin of `{}` is not the one `{LOCK_FILE}` was written with: \
+                 run `flick install` without `--locked`",
+                p.name
+            ),
+            _ => format!(
+                "`{LOCK_FILE}` does not pin what the manifests name: run `flick install` without `--locked`"
+            ),
+        });
     }
     if changed {
         fs::write(&lock_path, lock.render())
             .map_err(|e| format!("cannot write `{}`: {e}", lock_path.display()))?;
     }
     Ok(fetched)
+}
+
+/// The components of the plugins of the path dependencies of the project at
+/// `root` that are built: a fetched one is pinned by the package's checksum.
+fn plugins(root: &Path, dependencies: &[Dependency]) -> Vec<LockedPlugin> {
+    (dependencies.iter())
+        .filter_map(|d| {
+            let library = project::normalize(&root.join(d.path()?));
+            let component = manifest(&library)?.package?.plugin?;
+            let path = project::normalize(&library.join(component));
+            let bytes = fs::read(&path).ok()?;
+            let relative = relative(root, &path);
+            Some(LockedPlugin {
+                name: d.name.clone(),
+                component: relative,
+                checksum: format!("sha256:{}", hex(&Sha256::digest(&bytes))),
+            })
+        })
+        .collect()
+}
+
+/// `path` from `root`, with `/` between its parts.
+fn relative(root: &Path, path: &Path) -> String {
+    let (mut from, mut to) = (root.components().peekable(), path.components().peekable());
+    while from.peek().is_some() && from.peek() == to.peek() {
+        from.next();
+        to.next();
+    }
+    let up = from.map(|_| "..".to_owned());
+    let down = to.map(|c| c.as_os_str().to_string_lossy().into_owned());
+    up.chain(down).collect::<Vec<_>>().join("/")
 }
 
 fn read_lock(path: &Path) -> Result<Lock, String> {
