@@ -13,7 +13,7 @@ pub fn is_type(kind: K) -> bool {
     (K::NameType..=K::CaptureType).contains(&kind)
         && !matches!(
             kind,
-            K::EffectAnnot | K::Row | K::RowTail | K::RecordTypeField
+            K::EffectAnnot | K::Row | K::RowTail | K::RowSpread | K::RowOmit | K::RecordTypeField
         )
 }
 

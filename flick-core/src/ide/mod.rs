@@ -444,6 +444,8 @@ mod migration_tests;
 #[cfg(test)]
 mod pattern_tests;
 #[cfg(test)]
+mod set_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod variable_hover_tests;

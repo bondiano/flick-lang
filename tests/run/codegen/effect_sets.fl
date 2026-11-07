@@ -1,0 +1,51 @@
+// A set of services and errors runs as the row it stands for.
+module App.Main exposing (main)
+
+type error Gone = Gone String
+
+type error Late = Late
+
+service Greeter =
+  greet : String ->{} String
+
+type alias Services = {Greeter}
+
+type alias Reads = {...Services; Gone}
+
+type alias All = {...Reads; Late}
+
+type alias Quiet = {...All, -Greeter; -Late}
+
+speak : String ->{...Reads} String
+let speak name = if name == "gone" then Fail.fail (Gone name) else Greeter.greet name
+
+late : Unit ->{...All} String
+let late () = Fail.fail Late
+
+silent : Unit ->{...Quiet} String
+let silent () = Fail.fail (Gone "silent")
+
+// a function of a smaller set runs where a larger one is allowed
+either : String ->{...All} String
+let either name = if name == "late" then late () else speak name
+
+heard : String ->{...Services} String
+let heard name =
+  try either name with
+  | Gone why -> "gone " ++ why
+  | Late -> "late"
+
+built : Layer none none Services
+let built = Layer.succeed Greeter { greet = fun name -> "hello, " ++ name }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let (first, second, third) = provide built { (heard "ada", heard "gone", heard "late") }
+  Platform.stdout_line first
+  Platform.stdout_line second
+  Platform.stdout_line third
+  Platform.stdout_line
+    (
+      try silent () with
+      | Gone why -> why
+    )

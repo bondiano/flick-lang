@@ -3,13 +3,11 @@
 
 use super::{Free, is_type, with_article};
 use crate::diagnostics::codes;
-use crate::iface::Namespace;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::env::{Form, Found};
+use crate::types::env::Form;
 use crate::types::kinds::Kind;
-use crate::types::lang::Lang;
 use crate::types::ty::{Effects, Row, Shape, Type, Written};
 use crate::types::{Checker, ty};
 
@@ -17,13 +15,8 @@ impl Checker<'_> {
     /// `{r; e}` of a runtime arrow; `{}` leaves both rows empty.
     pub(super) fn effects(&mut self, node: &Node, free: Free) -> Effects {
         let mut rows = node.nodes().filter(|n| n.kind == K::Row);
-        let mut side = |this: &mut Self, kind: Kind| {
-            rows.next()
-                .map_or_else(Type::empty_row, |row| this.row(row, &kind, free))
-        };
-        let services = side(self, Kind::ServiceRow);
-        let errors = side(self, Kind::ErrorRow);
-        let (services, errors) = fails_as_errors(services, errors);
+        let (services, errors) = (rows.next(), rows.next());
+        let (services, errors) = self.slots(services, errors, free);
         Effects {
             written: self.row_written(node),
             ..Effects::new(services, errors)
@@ -39,16 +32,21 @@ impl Checker<'_> {
         let shape = match node.nodes().find(|n| n.kind == K::Row) {
             None => Shape::Empty,
             Some(row) => {
+                // what a fix adds to a row with `-` could be what `-` takes out
+                if row.nodes().any(|n| n.kind == K::RowOmit) {
+                    return Written::default();
+                }
                 let items: Vec<&Node> = row.nodes().filter(|n| is_type(n.kind)).collect();
                 let tail = row.nodes().any(|n| n.kind == K::RowTail);
+                let spread = row.nodes().any(|n| n.kind == K::RowSpread);
                 let variable = |n: &Node| {
                     n.kind == K::NameType
                         && !n.has_token(K::NoneKw)
                         && (n.text(self.text).trim()).starts_with(|c: char| c.is_ascii_lowercase())
                 };
                 match items[..] {
-                    [] => Shape::NoServices,
-                    [only] if !tail && variable(only) => Shape::TailOnly,
+                    [] if !spread => Shape::NoServices,
+                    [only] if !tail && !spread && variable(only) => Shape::TailOnly,
                     _ if items
                         .iter()
                         .any(|n| n.kind == K::UnionType || n.has_token(K::NoneKw)) =>
@@ -63,92 +61,49 @@ impl Checker<'_> {
         Written(Some((at, shape)))
     }
 
-    /// A row: `none`, `r`, `r1 + r2`, `A, B`, `A, B | r`, in braces or not.
+    /// A row: `none`, `r`, `r1 + r2`, `A, B`, `A, B | r`, in braces or not; a
+    /// set `{...A, B, -C; E}` of services and errors holds the errors in `Fail`.
     pub fn row(&mut self, node: &Node, kind: &Kind, free: Free) -> Type {
-        let items: Vec<&Node> = node.nodes().filter(|n| is_type(n.kind)).collect();
-        let tail = node.nodes().find(|n| n.kind == K::RowTail);
-        let kind = self.row_kind(&items, kind, node);
-        // `{t | e}` and `{NotFound, t}`: beside other elements, a variable of
-        // an error row is an element, the error type it will stand for
-        let element_variable = kind == Kind::ErrorRow && (items.len() > 1 || tail.is_some());
-        let single_row = |item: &Node| {
-            item.kind == K::UnionType
-                || (item.kind == K::NameType && item.has_token(K::NoneKw))
-                || (item.kind == K::NameType
-                    && kind != Kind::CaptureRow
-                    && !element_variable
-                    && item
-                        .child_tokens()
-                        .next()
-                        .is_some_and(|t| t.kind == K::Ident))
-        };
-        if let [item] = items[..]
-            && tail.is_none()
-            && single_row(item)
-        {
-            return self.ty(item, &kind, free);
-        }
-        let element = match &kind {
-            Kind::ServiceRow => Kind::Service,
-            Kind::CaptureRow => Kind::Region,
-            _ => Kind::Type,
-        };
-        let mut entries: Vec<(String, Type)> = Vec::new();
-        for item in items {
-            if single_row(item) {
+        let kind = self.row_kind(kind, node);
+        let errors = node.nodes().find(|n| n.kind == K::Row);
+        let first_side = node
+            .nodes()
+            .any(|n| is_type(n.kind) || matches!(n.kind, K::RowSpread | K::RowOmit));
+        let set_syntax = errors.is_some()
+            || node
+                .nodes()
+                .any(|n| matches!(n.kind, K::RowSpread | K::RowOmit));
+        match &kind {
+            Kind::ServiceRow => {
+                let (services, errors) = self.slots(Some(node), errors, free);
+                self.with_errors(services, errors)
+            }
+            Kind::ErrorRow if errors.is_some() && first_side => {
+                let text = self.text_of(node);
                 self.error(
                     codes::T002,
-                    self.span(item),
-                    "a row variable goes after `|` at the end of the row: `{A, B | r}`",
+                    self.span(node),
+                    format!("`{text}` holds services, but a row of errors is expected here"),
                 );
-                continue;
+                Type::Error
             }
-            let reported = self.diagnostics.len();
-            let ty = self.ty(item, &element, free);
-            if self.diagnostics.len() > reported {
-                continue;
+            Kind::ErrorRow => self.slots(None, Some(errors.unwrap_or(node)), free).1,
+            _ if set_syntax => {
+                let text = self.text_of(node);
+                self.error(
+                    codes::T002,
+                    self.span(node),
+                    format!("`{text}`: `...`, `-` and `;` are for rows of services and errors"),
+                );
+                Type::Error
             }
-            // an alias of a service or an error stands for it: the row holds what it names
-            let ty = match &kind {
-                Kind::ServiceRow | Kind::ErrorRow => match self.whnf(&ty) {
-                    Type::Error => ty,
-                    expanded => expanded,
-                },
-                _ => ty,
-            };
-            let Some(label) = self.element_label(&ty, &kind, item) else {
-                continue;
-            };
-            // a row tells its elements apart by name, not by arguments
-            match entries.iter().find(|(l, _)| *l == label) {
-                Some((_, held)) if *held != ty => {
-                    let (held, ty) = (self.show(held), self.show(&ty));
-                    self.error(
-                        codes::T003,
-                        self.span(item),
-                        format!(
-                            "the row already holds `{held}`, so it cannot hold `{ty}` too: a row has one element of each name"
-                        ),
-                    );
-                }
-                Some(_) => {}
-                None => entries.push((label, ty)),
-            }
+            _ => self.slot(node, &kind, free).row,
         }
-        let tail = tail
-            .and_then(|t| t.nodes().next())
-            .and_then(|t| self.row_tail(t))
-            .map(|t| Box::new(self.ty(t, &kind, free)));
-        entries.sort_by(|a, b| a.0.cmp(&b.0));
-        Type::Row(Row {
-            entries,
-            tail,
-            ..Row::default()
-        })
     }
 
-    /// The kind of a row: the expected one, or what its elements tell.
-    fn row_kind(&mut self, items: &[&Node], expected: &Kind, node: &Node) -> Kind {
+    /// The kind of a row: the expected one, or what its elements tell: errors
+    /// when they name no service, and services otherwise.
+    fn row_kind(&mut self, expected: &Kind, node: &Node) -> Kind {
         let expected = self.kinds.resolve(expected);
         if expected.is_row() {
             return expected;
@@ -165,32 +120,37 @@ impl Checker<'_> {
             );
             return Kind::ServiceRow;
         }
-        let guess = items.iter().find_map(|item| {
-            let tokens: Vec<_> = item.child_tokens().filter(|t| t.kind == K::Con).collect();
-            let name = tokens.last()?.text(self.text);
-            let Found::Entity(entity) = self.env.find(Namespace::Type, name) else {
-                return None;
-            };
-            match self.env.type_def(&entity.module, name)?.form {
-                Form::Service { .. } => Some(Kind::ServiceRow),
-                Form::Error => Some(Kind::ErrorRow),
-                _ => None,
+        let mut first = node
+            .nodes()
+            .filter(|n| is_type(n.kind) || n.kind == K::RowSpread);
+        let kind = if node.nodes().any(|n| n.kind == K::Row) {
+            if first.next().is_none() {
+                Kind::ErrorRow
+            } else {
+                Kind::ServiceRow
             }
-        });
-        let kind = guess.unwrap_or(Kind::ServiceRow);
+        } else {
+            let sides: Vec<Kind> = first.filter_map(|item| self.row_side(item)).collect();
+            if !sides.is_empty() && sides.iter().all(|k| *k == Kind::ErrorRow) {
+                Kind::ErrorRow
+            } else {
+                Kind::ServiceRow
+            }
+        };
         let _ = self.kinds.unify(&expected, &kind);
         kind
     }
 
-    fn element_label(&mut self, ty: &Type, kind: &Kind, node: &Node) -> Option<String> {
+    pub(super) fn element_label(&mut self, ty: &Type, kind: &Kind, node: &Node) -> Option<String> {
         let (head, _) = ty.spine();
         match head {
             Type::Con { module, name } => {
-                let is_error = matches!(
-                    self.env.type_def(module, name).map(|d| &d.form),
-                    Some(Form::Error)
-                );
-                if *kind == Kind::ErrorRow && !is_error {
+                // a set may name an error of a module not imported here: it was checked there
+                let not_error = self
+                    .env
+                    .type_def(module, name)
+                    .is_some_and(|d| !matches!(d.form, Form::Error));
+                if *kind == Kind::ErrorRow && not_error {
                     self.error(
                         codes::T002,
                         self.span(node),
@@ -263,7 +223,7 @@ impl Checker<'_> {
 
     /// The tail after `|`, which names a row: an applied type there is
     /// `FLICK-T002`.
-    fn row_tail<'n>(&mut self, tail: &'n Node) -> Option<&'n Node> {
+    pub(super) fn row_tail<'n>(&mut self, tail: &'n Node) -> Option<&'n Node> {
         if tail.kind == K::AppType {
             self.error(
                 codes::T002,
@@ -284,35 +244,22 @@ pub(super) fn written_none(span: Span) -> Type {
     })
 }
 
-/// `ty`, a row written in the braces of `node`, with where it is written.
+/// `ty`, a row written in the braces of `node`, with where it is written; a row
+/// with `-` has no such place, as what a fix adds could be what `-` takes out.
 pub(super) fn place_braces(ty: &mut Type, node: &Node, file: FileId) {
     if let Type::Row(row) = ty
         && let Some(brace) = node.child_tokens().find(|t| t.kind == K::LBrace)
+        && !node.nodes().any(|n| n.kind == K::RowOmit)
     {
         let at = Span::new(file, brace.end, brace.end);
+        let first_side = node.nodes().any(|n| n.kind != K::Row);
         let shape = if node.nodes().next().is_none() {
             Shape::EmptyRow
-        } else {
+        } else if first_side {
             Shape::Items
+        } else {
+            Shape::NoServices
         };
         row.written = Written(Some((at, shape)));
     }
-}
-
-/// `{Fail e, r; e2}` is `{r; e + e2}`: the errors have a row of their own.
-// shortcut: only the rows of an arrow, so `Eff {Fail e} none a` keeps `Fail e` as an effect nothing handles; upgrade when a program writes it there.
-fn fails_as_errors(services: Type, errors: Type) -> (Type, Type) {
-    let Type::Row(mut row) = services else {
-        return (services, errors);
-    };
-    let is_fail = |ty: &Type| ty.spine().0.is_lang(Lang::Fail);
-    let mut errors = errors;
-    for (_, ty) in row.entries.iter().filter(|(_, ty)| is_fail(ty)) {
-        let (_, args) = ty.spine();
-        if let [failed] = args[..] {
-            errors = Type::Union(Box::new((*failed).clone()), Box::new(errors));
-        }
-    }
-    row.entries.retain(|(_, ty)| !is_fail(ty));
-    (Type::Row(row), errors)
 }

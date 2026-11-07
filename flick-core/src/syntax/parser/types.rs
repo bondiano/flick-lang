@@ -56,8 +56,9 @@ fn effect_annot(p: &mut Parser) {
     p.bump();
     p.push(Ctx::Bracket);
     if p.raw().kind != K::RBrace {
-        row(p);
-        if p.expect(K::Semi) {
+        // a set may hold errors, so `->{...A;}` would read as if it held none
+        let sets = row(p);
+        if !(sets && p.at(K::RBrace)) && p.expect(K::Semi) {
             row(p);
         }
     }
@@ -67,27 +68,50 @@ fn effect_annot(p: &mut Parser) {
 }
 
 /// One side of an effect annotation: `none`, `r`, `A, B | r`, `r1 + r2`, or
-/// nothing for an empty row, as in `->{; E}`.
-fn row(p: &mut Parser) {
+/// nothing for an empty row, as in `->{; E}`. Whether it merges or omits a set.
+fn row(p: &mut Parser) -> bool {
     let m = p.start();
-    if !matches!(p.current(), K::Semi | K::RBrace) {
-        row_items(p);
-    }
+    let sets = !matches!(p.current(), K::Semi | K::RBrace) && row_items(p);
     p.complete(m, K::Row);
+    sets
 }
 
-fn row_items(p: &mut Parser) {
+/// The items of a row; whether they merge or omit a set.
+fn row_items(p: &mut Parser) -> bool {
+    let mut sets = false;
     if matches!(p.current(), K::Semi | K::RBrace | K::Pipe) {
         p.error_expected("a row (write `none` for an empty row)");
     } else {
-        union(p);
+        sets |= row_item(p);
         while p.eat(K::Comma) {
-            union(p);
+            sets |= row_item(p);
         }
     }
     if p.at(K::Pipe) {
         tail(p);
     }
+    sets
+}
+
+/// An element, `...Set` that merges a set, or `-Element` and `-...Set` that
+/// take out of the row; whether it is one of the last two.
+fn row_item(p: &mut Parser) -> bool {
+    let kind = match p.current() {
+        K::DotDotDot => K::RowSpread,
+        K::Minus => K::RowOmit,
+        _ => {
+            union(p);
+            return false;
+        }
+    };
+    let m = p.start();
+    p.bump();
+    if kind == K::RowOmit {
+        p.eat(K::DotDotDot);
+    }
+    app(p);
+    p.complete(m, kind);
+    true
 }
 
 fn tail(p: &mut Parser) {
@@ -202,7 +226,8 @@ fn atom(p: &mut Parser) -> Option<Done> {
     Some(p.complete(m, kind))
 }
 
-/// `{ f : T; … | r }` record type, or `{A, B | r}` row.
+/// `{ f : T; … | r }` record type, or `{A, B | r}` row; a set of services and
+/// errors, `{A, B; E}`, holds its errors in a `Row` of their own.
 fn brace_type(p: &mut Parser) -> K {
     let opener = p.raw();
     p.bump();
@@ -218,7 +243,12 @@ fn brace_type(p: &mut Parser) -> K {
         p.items(record_type_field, true, |p| p.at(K::Pipe));
     } else {
         p.push(Ctx::Bracket);
-        row_items(p);
+        if first.kind != K::Semi {
+            row_items(p);
+        }
+        if p.eat(K::Semi) {
+            row(p);
+        }
     }
     p.pop();
     p.expect_closer(K::RBrace, opener);

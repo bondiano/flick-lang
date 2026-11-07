@@ -246,13 +246,14 @@ impl Checker<'_> {
     }
 
     /// Whether `t` is, or may still become, an error type: a variable
-    /// passes, as its callers are checked where they name it.
+    /// passes, as its callers are checked where they name it, and so does an
+    /// error of a module not imported here, which a set from another module
+    /// may hold: it was checked there.
     pub fn may_be_error(&self, t: &Type) -> bool {
         match t.spine().0 {
-            Type::Con { module, name } => matches!(
-                self.env.type_def(module, name).map(|d| &d.form),
-                Some(Form::Error)
-            ),
+            Type::Con { module, name } => {
+                (self.env.type_def(module, name)).is_none_or(|d| matches!(d.form, Form::Error))
+            }
             _ => true,
         }
     }

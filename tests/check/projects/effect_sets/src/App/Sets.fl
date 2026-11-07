@@ -1,0 +1,25 @@
+// A set may hold what the modules that name it do not import.
+module App.Sets exposing (Held, OnlyErrors, Paused, Log, boom, other, wait, log)
+
+import App.Errors exposing (Boom(..), Other(..), Suspends)
+
+service Log =
+  info : String ->{} Unit
+
+type alias OnlyErrors = {Boom}
+
+type alias Held = {Log; ...OnlyErrors}
+
+type alias Paused = {Suspends}
+
+boom : Unit ->{; Boom} Int
+let boom () = from_result (Err Boom)
+
+other : Unit ->{; Other} Int
+let other () = from_result (Err Other)
+
+wait : Unit ->{Suspends;} Unit
+let wait () = App.Errors.wait ()
+
+log : String ->{Log;} Unit
+let log line = Log.info line

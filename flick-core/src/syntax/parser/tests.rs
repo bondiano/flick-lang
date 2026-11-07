@@ -116,6 +116,33 @@ fn mid_line_braces_align_on_their_first_item() {
 }
 
 #[test]
+fn rows_merge_and_omit_sets() {
+    assert_eq!(
+        sexp("f : A ->{...B, C, -D, -...E | r; ...F, -G} H"),
+        "(Signature f : (ArrowType (NameType A) -> (EffectAnnot { (Row (RowSpread ... (NameType B)) \
+         , (NameType C) , (RowOmit - (NameType D)) , (RowOmit - ... (NameType E)) (RowTail | \
+         (NameType r))) ; (Row (RowSpread ... (NameType F)) , (RowOmit - (NameType G))) }) \
+         (NameType H)))"
+    );
+    // a row that merges or omits a set needs no `;`, a plain one still does
+    assert_eq!(
+        sexp("f : A ->{...B} C"),
+        "(Signature f : (ArrowType (NameType A) -> (EffectAnnot { (Row (RowSpread ... (NameType B))) \
+         }) (NameType C)))"
+    );
+    assert!(!errors("f : A ->{B} C").is_empty());
+    assert_eq!(
+        sexp("type alias O = {...A, B; C}"),
+        "(TypeDecl type alias O = (RowType { (RowSpread ... (NameType A)) , (NameType B) ; (Row \
+         (NameType C)) }))"
+    );
+    assert_eq!(
+        sexp("type alias O = {; C}"),
+        "(TypeDecl type alias O = (RowType { ; (Row (NameType C)) }))"
+    );
+}
+
+#[test]
 fn effect_arrow_needs_adjacent_brace() {
     assert_eq!(
         sexp("f : A ->{r; e} B"),

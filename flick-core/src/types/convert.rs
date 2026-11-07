@@ -17,7 +17,10 @@ use crate::syntax::literal;
 use crate::types::lang::Lang;
 
 mod kinds;
+mod omit;
 mod rows;
+mod set_names;
+mod sets;
 
 pub use kinds::is_type;
 use kinds::with_article;
@@ -234,7 +237,7 @@ impl Checker<'_> {
             _ => return Type::Error,
         };
         self.expect_kind(&kind, expected, node);
-        ty
+        self.rows_settled(ty, &kind, node)
     }
 
     /// `a -> b`, `a ->{r; e} b`.

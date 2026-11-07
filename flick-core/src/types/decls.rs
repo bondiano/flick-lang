@@ -4,6 +4,7 @@
 //! and class methods.
 
 use std::collections::HashMap;
+use std::mem;
 
 use super::Checker;
 use super::class_members::method_names;
@@ -13,6 +14,7 @@ use super::gadt::scheme::{Variant, quantify};
 use super::kinds::Kind;
 use super::services::{OpClass, Operation};
 use super::ty::{Binder, Type};
+use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::resolve;
 use crate::syntax::cst::Node;
@@ -98,7 +100,7 @@ impl Checker<'_> {
         seen: &mut [bool],
         order: &mut Vec<usize>,
     ) {
-        if std::mem::replace(&mut seen[i], true) {
+        if mem::replace(&mut seen[i], true) {
             return;
         }
         for name in resolve::alias_names(pending[i].node, self.text) {
@@ -309,6 +311,16 @@ impl Checker<'_> {
                     };
                 }
                 let converted = self.ty(body, &result, Free::Reject);
+                if decl.has_token(K::OpaqueKw) && self.kinds.resolve(&result).is_row() {
+                    self.error(
+                        codes::T002,
+                        self.span(decl),
+                        format!(
+                            "`{}` cannot be opaque: a set is its row, which a signature that names it must show",
+                            p.name
+                        ),
+                    );
+                }
                 if let Some(TypeDef {
                     form: Form::Alias { body, .. },
                     ..

@@ -50,6 +50,10 @@ impl Projection<'_> {
         let Some(def) = &export.definition else {
             return Ok(None);
         };
+        // a set of services and errors is expanded in every signature that names it
+        if matches!(def.form, Form::Alias { .. }) && alias_of_row(&def.kind) {
+            return Ok(None);
+        }
         let kinds = params(&def.kind);
         let generics: Vec<String> = (0..kinds.len()).map(|i| format!("P{i}")).collect();
         let brand = |generics: &[String]| {
@@ -311,4 +315,12 @@ fn scope_of(vars: &[Binder], indexed: Option<(&[Type], &[String])>) -> Vars {
             (b.name.clone(), ts)
         })
         .collect()
+}
+
+/// Whether a type alias of `kind`, given its parameters, is a row.
+fn alias_of_row(kind: &Kind) -> bool {
+    match kind {
+        Kind::Arrow(_, result) => alias_of_row(result),
+        other => other.is_row(),
+    }
 }
