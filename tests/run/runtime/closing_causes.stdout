@@ -1,0 +1,7 @@
+value, one dies: ["D"], first first added
+value, two die: ["D", "D"], first last added
+value, two die alike: ["D", "D"], first same
+failure, one dies: ["F", "D"], first first added
+defect, the same dies: ["D"], first same
+under the one that dies
+the stack goes on: ["D"], first on top

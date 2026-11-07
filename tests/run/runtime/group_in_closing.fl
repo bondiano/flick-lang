@@ -1,0 +1,78 @@
+// A group made while its owner closes adds a closing hook (I2) and is open until
+// that hook runs: its child runs (§3.6) and has stopped before the finalizers
+// (C1, R2). `docs/formal/runtime.md#js-a-group-made-while-its-owner-closes-runs-nothing`.
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+ping : Deferred.Deferred none Unit ->{} Unit
+let ping d = ignore (Deferred.succeed () d)
+
+/// A group with a child waiting to be stopped; says whether the child got to
+/// start: a child that is refused ends at once, so nothing here hangs on it.
+late_group : String ->{Scope s, Async;} Unit
+let late_group name =
+  let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  let fiber =
+    FiberSet.run
+      { propagateInterruption = false; startImmediately = true }
+      (task {
+        Effect.ensuring
+          (task { say (name ++ " stopped") })
+          (task {
+            ping started
+            Effect.never ()
+          })
+      })
+      set
+  let ran =
+    race_first
+      (task {
+        Deferred.await_ started
+        true
+      })
+      (task {
+        ignore (Fiber.await_ fiber)
+        false
+      })
+  say (name ++ " started: " ++ show ran)
+
+until_stopped : Deferred.Deferred none Unit -> Eff {Async} none Unit
+let until_stopped started = task {
+  ping started
+  Effect.never ()
+}
+
+/// A group's child makes another group as it stops: a hook added during C1.
+hook_in_c1 : Unit ->{Async;} Unit
+let hook_in_c1 () = scope owner {
+  Scope.add_finalizer (task { say "finalizer" })
+  let set : FiberSet.FiberSet owner none Unit = FiberSet.make ()
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  let _ =
+    FiberSet.run
+      { propagateInterruption = false; startImmediately = true }
+      (task { Effect.ensuring (task { late_group "group made in C1" }) (until_stopped started) })
+      set
+  Deferred.await_ started
+}
+
+making_a_group : Failure none ->{Scope s, Async;} Unit
+let making_a_group _ = late_group "group of a supervisor"
+
+/// A supervisor makes a group as its child ends: a hook added after C1.
+hook_after_c1 : Unit ->{Async;} Unit
+let hook_after_c1 () = scope owner {
+  Scope.add_finalizer (task { say "finalizer" })
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  let _child = Fiber.spawn owner making_a_group (until_stopped started)
+  Deferred.await_ started
+}
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  hook_in_c1 ()
+  say "--"
+  hook_after_c1 ()

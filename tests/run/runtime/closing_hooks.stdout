@@ -1,0 +1,11 @@
+body done
+group a stopped
+group b stopped
+child stopped
+finalizer added last
+finalizer added first
+--
+body done
+group stopped first stopped
+child runs in a stopped group
+its fiber was interrupted: true

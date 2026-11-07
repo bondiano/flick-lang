@@ -1,0 +1,82 @@
+// Closing hooks run first (C1), in order of addition, each to its end: a fiber
+// group stops before the next group, before the children are asked to stop
+// (C2) and before any finalizer, and a group that has stopped runs nothing more
+// (§3.6).
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+ping : Deferred.Deferred none Unit ->{} Unit
+let ping d = ignore (Deferred.succeed () d)
+
+flags : { propagateInterruption : Bool; startImmediately : Bool }
+let flags = { propagateInterruption = false; startImmediately = true }
+
+/// Waits to be stopped, then says `name` stopped; opens `started` first.
+until_stopped : String -> Deferred.Deferred none Unit -> Eff {Async} none Unit
+let until_stopped name started = task {
+  Effect.ensuring
+    (task { say (name ++ " stopped") })
+    (task {
+      ping started
+      Effect.never ()
+    })
+}
+
+/// A group with one child waiting to be stopped, started when this returns.
+group : String ->{Scope s, Async;} FiberSet.FiberSet s none Unit
+let group name =
+  let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  let _ = FiberSet.run flags (until_stopped ("group " ++ name) started) set
+  Deferred.await_ started
+  set
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+/// Groups stop in order of addition, then the children, then the finalizers.
+in_order : Unit ->{Async;} Unit
+let in_order () = scope owner {
+  Scope.add_finalizer (task { say "finalizer added first" })
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  let _child = Fiber.spawn owner quiet (until_stopped "child" started)
+  Deferred.await_ started
+  let _a = group "a"
+  let _b = group "b"
+  Scope.add_finalizer (task { say "finalizer added last" })
+  say "body done"
+}
+
+/// Once its hook ran, a group admits no work: the body does not run.
+closed_group : Unit ->{Async;} Unit
+let closed_group () = scope owner {
+  let set = group "stopped first"
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  let _child =
+    Fiber.spawn
+      owner
+      quiet
+      (task {
+        Effect.ensuring
+          (task {
+            say "child runs in a stopped group"
+            let f = FiberSet.run flags (task { say "not reached: the group has stopped" }) set
+            let ex = Fiber.await_ f
+            say ("its fiber was interrupted: " ++ show (Exit.has_interrupts ex))
+          })
+          (task {
+            ping started
+            Effect.never ()
+          })
+      })
+  Deferred.await_ started
+  say "body done"
+}
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  in_order ()
+  say "--"
+  closed_group ()

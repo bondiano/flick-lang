@@ -1,0 +1,51 @@
+// A foreign call settles before the finalizers run (C4, R2), even when its fiber
+// has ended: the call's work still holds what they would release. The fixture
+// tells when a call is under way, and a call settles some time after it is
+// cancelled, so only C4 orders the lines, not how long that takes.
+module App.Main exposing (main)
+
+settle_later : String ->{Async;} Unit
+foreign settle_later from "./calls.mjs" "settleLater"
+  cancel signal
+
+under_way : String ->{Async;} Unit
+foreign under_way from "./calls.mjs" "underWay"
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+/// A child in a call, the owner closing around it.
+child_in_call : Unit ->{Async;} Unit
+let child_in_call () = scope owner {
+  Scope.add_finalizer (task { say "finalizer, after the call" })
+  let _child = Fiber.spawn owner quiet (task { settle_later "the child's call" })
+  under_way "the child's call"
+  say "body done"
+}
+
+/// The body is the fiber in the call, and the race it lost stops it.
+body_in_call : Unit ->{Async;} Unit
+let body_in_call () =
+  let winner =
+    race_first
+      (task {
+        scope {
+          Scope.add_finalizer (task { say "finalizer, after the call" })
+          settle_later "the body's call"
+          "not reached: the body is stopped in its call"
+        }
+      })
+      (task {
+        under_way "the body's call"
+        "the other branch"
+      })
+  say winner
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  child_in_call ()
+  say "--"
+  body_in_call ()

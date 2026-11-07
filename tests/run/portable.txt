@@ -207,3 +207,10 @@ stdlib/effect/effect_errors
 stdlib/effect/effect_errors_more
 stdlib/effect/exit_cause
 runtime/interrupt_skips
+runtime/closing_hooks
+runtime/closed_owner
+runtime/closing_child_fails
+runtime/supervisor_defect
+runtime/settling_calls
+runtime/closing_causes
+runtime/group_in_closing

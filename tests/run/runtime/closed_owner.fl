@@ -1,0 +1,109 @@
+// A closing owner admits no child (C0, Spawn-Closed): the spawn is a defect of
+// who tried, and the body does not run. Its finalizers are admitted until they
+// start (Fin-Add), and one added from then on runs at once (Fin-Now), with the
+// outcome of the body.
+module App.Main exposing (main)
+
+type error Oops = Oops String
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+ping : Deferred.Deferred none Unit ->{} Unit
+let ping d = ignore (Deferred.succeed () d)
+
+/// A child still running as its owner closes tries to start a sibling.
+spawn_in_closing : Unit ->{Async;} Unit
+let spawn_in_closing () = scope owner {
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  sup : Failure none ->{} Unit
+  let sup f = say ("supervised, a defect: " ++ show (Cause.has_dies f))
+  let _child =
+    Fiber.spawn
+      owner
+      sup
+      (task {
+        Effect.ensuring
+          (task {
+            say "child tries to start a sibling"
+            let _ = Fiber.spawn owner quiet (task { say "not reached: refused" })
+            say "not reached: the spawn died"
+          })
+          (task {
+            ping started
+            Effect.never ()
+          })
+      })
+  Deferred.await_ started
+  say "body done"
+}
+
+/// So does a finalizer, in C5.
+spawn_in_finalizer : Unit ->{Async;} Unit
+let spawn_in_finalizer () =
+  let ex : Exit none Unit =
+    Effect.exit
+      (task {
+        scope owner {
+          Scope.add_finalizer
+            (task {
+              say "finalizer tries to start a child"
+              let _ = Fiber.spawn owner quiet (task { say "not reached: refused" })
+              say "not reached: the spawn died"
+            })
+        }
+      })
+  say ("the scope failed with a defect: " ++ show (Exit.has_dies ex))
+
+/// Added before C5 by a running child: it joins the stack, on top.
+added_in_closing : Unit ->{Async;} Unit
+let added_in_closing () = scope owner {
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  Scope.add_finalizer (task { say "added by the body, runs last" })
+  let _child =
+    Fiber.spawn
+      owner
+      quiet
+      (task {
+        Effect.ensuring
+          (task {
+            Scope.add_finalizer (task { say "added by the child in C2, runs first" })
+            say "child ends"
+          })
+          (task {
+            ping started
+            Effect.never ()
+          })
+      })
+  Deferred.await_ started
+  say "body done"
+}
+
+/// Added in C5: it runs at once, inside the finalizer that added it.
+added_in_finalizer : Unit ->{; Oops} Unit
+let added_in_finalizer () = scope {
+  Scope.add_finalizer (task { say "added first, runs last" })
+  Scope.add_finalizer
+    (task {
+      say "finalizer starts"
+      Scope.add_finalizer_exit (fun cause ->
+        say ("added in C5, at once, the body failed: " ++ show (Option.is_some cause))
+      )
+      say "finalizer ends"
+    })
+  from_result (Err (Oops "the body's"))
+}
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  spawn_in_closing ()
+  say "--"
+  spawn_in_finalizer ()
+  say "--"
+  added_in_closing ()
+  say "--"
+  try added_in_finalizer () with
+  | Oops text -> say text

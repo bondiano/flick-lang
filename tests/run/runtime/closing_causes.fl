@@ -1,0 +1,95 @@
+// What a close ends with (C6): the body's cause, then what the finalizers failed
+// with, last added first. Finalizers among themselves concatenate and joining
+// the body's cause keeps each reason once (R8, §2.1); a value survives a close
+// only if nothing failed.
+module App.Main exposing (main)
+
+type error Oops = Oops String
+  deriving Show
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+view : Failure e -> List String
+let view f =
+  label : Cause.Reason e -> String
+  let label r = if Cause.is_fail_reason r then "F" else if Cause.is_die_reason r then "D" else "I"
+  List.map label (Cause.reasons f)
+
+outcome : Exit {Oops} Float -> String
+let outcome ex =
+  Exit.match_ (fun v -> "value " ++ show v) (fun f -> show (view f) ++ first_defect f) ex
+
+first_defect : Failure e -> String
+let first_defect f =
+  match Cause.find_defect f with
+  | Ok text -> ", first " ++ text
+  | Err _ -> ""
+
+dies : String -> Eff none none Unit
+let dies text = task { Effect.die text }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  // the body succeeds, one finalizer dies: the value is gone
+  let one =
+    Effect.exit
+      (task {
+        scope {
+          Scope.add_finalizer (dies "first added")
+          1
+        }
+      })
+  say ("value, one dies: " ++ outcome one)
+  // last added dies first; both stay, and two equal defects stay two (`⧺`)
+  let two =
+    Effect.exit
+      (task {
+        scope {
+          Scope.add_finalizer (dies "first added")
+          Scope.add_finalizer (dies "last added")
+          1
+        }
+      })
+  say ("value, two die: " ++ outcome two)
+  let same =
+    Effect.exit
+      (task {
+        scope {
+          Scope.add_finalizer (dies "same")
+          Scope.add_finalizer (dies "same")
+          1
+        }
+      })
+  say ("value, two die alike: " ++ outcome same)
+  // the body's reason comes first, and a typed head survives (I_ε)
+  let failed =
+    Effect.exit
+      (task {
+        scope {
+          Scope.add_finalizer (dies "first added")
+          from_result (Err (Oops "the body's"))
+        }
+      })
+  say ("failure, one dies: " ++ outcome failed)
+  // joining with `⊕` keeps a reason the body's cause already has once
+  let joined =
+    Effect.exit
+      (task {
+        scope {
+          Scope.add_finalizer (dies "same")
+          Effect.die "same"
+        }
+      })
+  say ("defect, the same dies: " ++ outcome joined)
+  // a failing finalizer does not stop those under it
+  let rest =
+    Effect.exit
+      (task {
+        scope {
+          Scope.add_finalizer (task { say "under the one that dies" })
+          Scope.add_finalizer (dies "on top")
+          1
+        }
+      })
+  say ("the stack goes on: " ++ outcome rest)
