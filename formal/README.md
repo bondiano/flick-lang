@@ -265,7 +265,14 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    definition. The fields of a constructor have the types of its declaration, so a field
    of a parameter type is opaque: exhaustiveness through type arguments is not modeled.
    The exhaustiveness algorithm (`exhaust.rs`) is not modeled.
-6. **`raise` is a term former**, not a first-class constant; `λx. raise x` recovers the
+6. **`raise` is `Fail.fail`, and `try_` the handler of the row of errors.** `Fail e` has a
+   parameter, and effects here have none, so it is not an element of a row: the second row of
+   an arrow stands for it, as in the checker, whose `Fail e` in a row is that row by another
+   name. `FailAbort.lean` relates it to `abort`: across frames with no `scope` and no arm of a
+   handler between, `raise` and `unw` take the same steps, leave regions and store alone, and
+   reach their arm (`fail_reaches_arms`, `abort_reaches_arm`). They differ in that `raise` stops
+   at any `try`, and `unw` passes it.
+   `raise` is a term former, not a first-class constant; `λx. raise x` recovers the
    constant. It takes `Errors ε` (with stage `R⟨none; ε⟩`) or a value of an error type
    `E ῡ` (with `R⟨none; {E} + ⌈E ῡ⌉⟩`, `Row.err`), which is the `Errors {E ῡ} ≡ E ῡ` of
    §1.5 at the only place the core needs it. (Errors-Val) types values only, as in §3.6.
