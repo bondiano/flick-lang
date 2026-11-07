@@ -109,10 +109,10 @@ def nothing (alternative : Nat) : Scheme :=
   ⟨3, [⟨alternative, [.var 0]⟩],
     .app (.app (.var 0) (.var 2)) (.var 1), .cnil⟩
 
-/-- `Prelude.or_else : forall f a. Alternative f => f a -> (f a -> f a)^{a}` -/
+/-- `Prelude.or_else : forall f a. Alternative f => f a -> (f a -> f a)^{a, f}` -/
 def or_else (alternative : Nat) : Scheme :=
   ⟨5, [⟨alternative, [.var 0]⟩],
-    .arr .P (.app (.app (.var 0) (.var 2)) (.var 1)) (.arr .P (.app (.app (.var 0) (.var 3)) (.var 1)) (.app (.app (.var 0) (.var 4)) (.var 1)) (.var 1)) .cnil, .cnil⟩
+    .arr .P (.app (.app (.var 0) (.var 2)) (.var 1)) (.arr .P (.app (.app (.var 0) (.var 3)) (.var 1)) (.app (.app (.var 0) (.var 4)) (.var 1)) (.cun (.var 1) (.var 0))) .cnil, .cnil⟩
 
 /-- `Prelude.iter : forall f d a. Iterable f => (f a)^d -> (Seq a)^d` -/
 def iter (iterable seq : Nat) : Scheme :=

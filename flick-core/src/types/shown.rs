@@ -157,7 +157,13 @@ fn retained(t: &Type, kinds: &[(String, Kind)]) -> Atoms {
             .filter(|name| {
                 matches!(
                     kind_of(name, kinds),
-                    None | Some(Kind::Type | Kind::Region | Kind::CaptureRow | Kind::ErrorRow)
+                    None | Some(
+                        Kind::Type
+                            | Kind::Arrow(..)
+                            | Kind::Region
+                            | Kind::CaptureRow
+                            | Kind::ErrorRow
+                    )
                 )
             })
             .collect(),
@@ -219,6 +225,9 @@ fn reach(t: &Type, kinds: &[(String, Kind)], bounded: bool) -> Atoms {
             // the services and the errors of an `Eff` are those of its stage
             let skip = if head.is_lang(Lang::Eff) { 2 } else { 0 };
             let mut out = BTreeSet::new();
+            if let (Type::Var(name), false) = (head, bounded) {
+                out.insert(name.clone());
+            }
             for arg in args.into_iter().skip(skip) {
                 out.append(&mut argument(arg, kinds, bounded)?);
             }

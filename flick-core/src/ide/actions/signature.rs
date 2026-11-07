@@ -207,7 +207,7 @@ impl Ide<'_> {
         let types: Vec<&str> = match ty {
             Type::Forall { vars, .. } => vars
                 .iter()
-                .filter(|v| matches!(v.kind, Kind::Type))
+                .filter(|v| matches!(v.kind, Kind::Type | Kind::Arrow(..)))
                 .map(|v| v.name.as_str())
                 .collect(),
             _ => Vec::new(),

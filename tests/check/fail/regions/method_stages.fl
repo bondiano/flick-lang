@@ -1,0 +1,50 @@
+// What the head of `f a` holds stays in the stages of a class method, so a region
+// does not leave its scope through a closure that shows only `Int`.
+module App.MethodStages exposing (..)
+
+type File (s : Region)
+
+open_file : String ->{Scope s;} File s
+foreign effect open_file from "./x.js" "open"
+  retention call
+
+type Holder h a = Holder h a
+
+class Count (f : Type -> Type) =
+  count : f a -> Unit -> Int
+
+instance Count (Holder h) =
+  let count x () =
+    let _ = x
+    1
+
+direct : Unit ->{} Int
+let direct () =
+  let later = scope {
+    let file = open_file "a"
+    count (Holder file 1)
+  }
+  later ()
+
+generic : Count f => f a -> Unit -> Int
+let generic x = count x
+
+through_generic : Unit ->{} Int
+let through_generic () =
+  let later = scope {
+    let file = open_file "a"
+    generic (Holder file 1)
+  }
+  later ()
+
+// a stage said to hold nothing refuses it
+class Empty (f : Type -> Type) =
+  empty : f a -> (Unit -> Int)^{}
+
+instance Empty (Holder h) =
+  let empty x () =
+    let _ = x
+    1
+//~ FLICK-G002 @24:5-25:26 the value of this `scope` has type `(Unit -> Int)^{s, Int}^{s | _}`
+//~ FLICK-G002 @35:5-36:28 the value of this `scope` has type `(Unit -> Int)^{s, Int}^{s | _}`
+//~ FLICK-G001 @45:3-47:6 this function uses `x`, which holds `h`, but the expected type `Unit -> Int` holds no captures

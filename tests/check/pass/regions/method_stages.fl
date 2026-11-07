@@ -1,0 +1,38 @@
+// A later stage holds what its parameters hold, and `f a` holds what `f` does:
+// the instance of a class sees that as what its head holds.
+module App.MethodStages exposing (..)
+
+type Holder h a = Holder h a
+
+class Keep (f : Type -> Type) =
+  keep : f a -> Unit -> f a
+  count : f a -> Unit -> Int
+
+instance Keep (Holder h) =
+  let keep x () = x
+  let count x () =
+    let _ = x
+    1
+
+class Written (f : Type -> Type) =
+  written : f a -> Unit -> f a
+
+instance Written (Holder h) =
+  written : Holder h a -> Unit -> Holder h a
+  let written x () = x
+
+generic : Keep f => f a -> Unit -> f a
+let generic x = keep x
+
+inside : Int -> Int
+let inside n =
+  let held = generic (Holder n n)
+  let Holder _ m = held ()
+  m
+
+// the first value of an applicative `do` is held as the second is
+pair : Applicative f => f a -> f a -> f (a, a)
+let pair a b = do {
+  x <- a and y <- b
+  pure (x, y)
+}

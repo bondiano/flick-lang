@@ -113,6 +113,11 @@ fn a_qualifier_not_implied_stays() {
         shown("forall a b c. (forall v. a^v -> b)^c -> (List a -> List b)^c"),
         "(forall v. a^v -> b)^c -> List a -> List b"
     );
+    // `f a` holds what `f` stands for, and the stage gets that back
+    assert_eq!(
+        shown("Alternative f => f a -> f a -> f a"),
+        "Alternative f => f a -> f a -> f a"
+    );
     // what a value holds, not a stage
     assert_eq!(shown("forall a c. a^c -> a^c"), "a^c -> a^c");
 }
