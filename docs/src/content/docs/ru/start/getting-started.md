@@ -1,8 +1,10 @@
 ---
 title: Начало работы
 description: Установите инструменты, создайте приложение и запустите его.
-source_hash: 77aefbde12764189
+source_hash: 27e4d7c3e930fa92
 ---
+
+## Установка {#install}
 
 Для локального приложения нужны компилятор Flick, Node.js 24.18 или новее
 и pnpm. В macOS и Linux последний релиз ставится в `~/.local/bin` одной
@@ -19,6 +21,24 @@ flick --version
 компилятор из исходников по разделу [Экосистема](../../ecosystem/).
 
 В Windows распакуйте `.zip` и добавьте каталог с `flick.exe` в `PATH`.
+
+## Первая программа
+
+Самая маленькая программа печатает строку:
+
+```flick
+module Main exposing (main)
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line "Hello from Flick"
+```
+
+`->{}` говорит, что `main` работает в среде выполнения и не просит сервисов.
+Вызовы хоста вроде `Platform.stdout_line` в сигнатурах пока не называются;
+подробности в разделе [Зачем Flick](../why/#where-the-promise-stops).
+
+## Проект
 
 Flick создаёт ES-модули JavaScript. Они используют среду выполнения Flick
 и Effect 4.1.2; зависимости устанавливаются через pnpm.

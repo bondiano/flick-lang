@@ -1,46 +1,57 @@
-// Documentation entry points, with existing reference URLs preserved.
+// The sections of the documentation; the sidebar draws each one as a line of its pages.
+const reference = (name) => ({ slug: `reference/${name}` });
+
 export const sidebar = [
   {
-    label: "Learn",
-    translations: { ru: "Изучение Flick" },
-    items: [{ slug: "start/why" }, { slug: "learn" }, { slug: "start/getting-started" }, { slug: "learn/syntax" }, { slug: "learn/flick-and-effect" }, { slug: "start/upgrading" }],
+    label: "Get started",
+    translations: { ru: "Начало работы" },
+    items: [
+      { slug: "start" },
+      { slug: "start/getting-started" },
+      { slug: "start/why" },
+      { slug: "learn" },
+      { slug: "learn/syntax" },
+      { slug: "learn/flick-and-effect" },
+    ],
   },
   {
-    label: "Guides",
-    translations: { ru: "Руководства" },
-    items: [{ slug: "guides" }, ...["ui", "cli-dsl", "http-api", "rpc", "server-fn", "route", "form", "observability", "schema", "sql", "ffi"].map((f) => ({ slug: `reference/${f}` }))],
+    label: "Handbook",
+    translations: { ru: "Руководство" },
+    items: [{ slug: "handbook/upgrading" }],
   },
   {
-    label: "API",
+    label: "Reference",
     translations: { ru: "Справочник" },
     items: [
-      { slug: "api" },
       {
         label: "Language",
         translations: { ru: "Язык" },
-        items: ["types", "effects", "classes", "regions", "modules", "grammar", "keywords"].map((f) => ({ slug: `reference/${f}` })),
+        items: ["types", "effects", "classes", "regions", "modules", "grammar", "keywords"].map(reference),
       },
       {
         label: "Runtime",
         translations: { ru: "Среда выполнения" },
-        items: ["stdlib", "effect-surface", "runtime"].map((f) => ({ slug: `reference/${f}` })),
+        items: ["stdlib", "effect-surface", "runtime"].map(reference),
+      },
+      {
+        label: "Specification",
+        translations: { ru: "Спецификация" },
+        items: [{ autogenerate: { directory: "spec" } }],
       },
     ],
   },
   {
-    label: "Specification",
-    translations: { ru: "Спецификация" },
-    items: [{ autogenerate: { directory: "spec" } }],
+    label: "Guides",
+    translations: { ru: "Задачи" },
+    items: ["ui", "cli-dsl", "http-api", "rpc", "server-fn", "route", "form", "observability", "schema", "sql", "ffi"].map(reference),
   },
   {
-    label: "Ecosystem",
-    translations: { ru: "Экосистема" },
+    label: "Tools",
+    translations: { ru: "Инструменты" },
     items: [
-      { slug: "ecosystem" },
-      ...["cli", "project", "plugins", "editor", "codegen", "iface"].map((f) => ({ slug: `reference/${f}` })),
+      ...["cli", "project", "plugins", "editor", "codegen", "iface"].map(reference),
       { slug: "contributing/testing" },
       { slug: "contributing/implementation-decisions" },
     ],
   },
-  { label: "Play", translations: { ru: "Песочница" }, items: [{ slug: "play" }, { slug: "transpile" }] },
 ];
