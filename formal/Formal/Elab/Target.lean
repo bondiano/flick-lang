@@ -7,7 +7,7 @@ import Formal.Elab.Hyp
 The target is abstract: `Target` gives its typing `⊢⁺` of elaborated terms and its run as
 fields, and the laws T6 needs as fields too. `Elab/Core*.lean` instantiate it with λFlick⁺ (`docs/formal/elaboration.md#dictionaries-need-polymorphic-fields-and-higher-rank-parameters`).
 
-Types of elaborated terms: monotypes `⟦τ⟧ = τ`, arrows `a →φ^q b` and dictionary types `D_Q`.
+Types of elaborated terms: monotypes `⟦τ⟧ = τ`, also a parameter's `∀ᾱ. τ`, arrows `a →φ^q b` and dictionary types `D_Q`.
 A context entry is `∀ᾱ. t`; a record of `D_Q` with `∀`-fields shows only through its laws:
 projecting a method instantiates the field's `∀`, projecting a slot gives the superclass.
 `⌈D_Q⌉ = ∅`: a dictionary holds nothing (§0.1), so the arrows of methods, instances and
@@ -94,6 +94,15 @@ structure Target (P : Prog) where
   /-- (Const) with the instantiation of `∀` -/
   const : ∀ {Γ Δ c s ts φ}, P.consts c = some s → ts.length = s.k →
     Has Γ Δ (.const c) ((dicts .cnil s.ctx (.mono s.ty)).subst (inst ts)) φ
+  /-- (∀I) at a lambda -/
+  allLam : ∀ {Γ Δ k b t ψ}, Has (Γ.map (·.subst (up k))) (Δ.map (·.subst (up k))) (.lam b) (.mono t) .P →
+    Has Γ Δ (.lam b) (.mono (.all k t)) ψ
+  /-- (∀I-Var) -/
+  allVar : ∀ {Γ Δ x k t ψ}, Γ[x]? = some ⟨k, .mono t⟩ → 0 < k → Has Γ Δ (.var x) (.mono (.all k t)) ψ
+  /-- (Var) at an instance of a binder -/
+  varAll : ∀ {Γ Δ x k₀ t₀ ts k t us φ}, Γ[x]? = some ⟨k₀, .mono t₀⟩ → ts.length = k₀ →
+    t₀.subst (inst ts) = .all k t → us.length = k →
+    Has Γ Δ (.var x) (.mono (t.subst (inst us))) φ
   /-- (App); a pure arrow applies at any stage -/
   app : ∀ {Γ Δ f x a b q ψ φ}, Has Γ Δ f (.mono (.arr ψ a b q)) φ → Has Γ Δ x (.mono a) φ →
     (ψ = .P ∨ ψ = φ) → Has Γ Δ (.app f x) (.mono b) φ

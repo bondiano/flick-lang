@@ -274,6 +274,17 @@ inductive Elab : List Scheme → List Cn → Exp → Ty → Stage → Tm → Pro
   | const {Γ Δ c σ ts ds φ} : P.consts c = some σ → ts.length = σ.k →
       Ent P Δ (σ.ctx.map (·.subst (inst ts))) ds →
       Elab Γ Δ (.const c) (σ.ty.subst (inst ts)) φ ((Tm.const c).dapps ds)
+  /-- (∀I) of `core.md` at a lambda: its variables are fresh, at `P`, as in (Let-Sig-Dict) -/
+  | allLam {Γ Δ k b t ψ b'} :
+      Elab (Γ.map (·.subst (up k))) (Δ.map (·.subst (up k))) (.lam b) t .P (.lam b') →
+      Elab Γ Δ (.lam b) (.all k t) ψ (.lam b')
+  /-- (∀I-Var): a variable of a scheme with no dictionaries -/
+  | allVar {Γ Δ x σ ψ} : Γ[x]? = some σ → σ.ctx = [] → 0 < σ.k →
+      Elab Γ Δ (.var x) (.all σ.k σ.ty) ψ (.var x)
+  /-- (Var) at an instance of a binder -/
+  | varAll {Γ Δ x σ ts k t us φ} : Γ[x]? = some σ → σ.ctx = [] → ts.length = σ.k →
+      σ.ty.subst (inst ts) = .all k t → us.length = k →
+      Elab Γ Δ (.var x) (t.subst (inst us)) φ (.var x)
   | app {Γ Δ f x a b q ψ φ f' x'} : Elab Γ Δ f (.arr ψ a b q) φ f' → Elab Γ Δ x a φ x' →
       (ψ = .P ∨ ψ = φ) → Elab Γ Δ (.app f x) b φ (.app f' x')
   | lam {Γ Δ b a t q φ ψ b'} : Elab (⟨0, [], a, .cnil⟩ :: Γ) Δ b t φ b' →

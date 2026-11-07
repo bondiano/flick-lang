@@ -149,6 +149,42 @@ theorem T6a_close (hP : P.ConstsClosed) (hC : P.CtorsClosed) {Γ D e τ φ e'}
     exact X.caseKDead (σ := θ) (ihe hD hρ hg) hK hT hlen hC' (ihr hD hρ hg)
   | app _ _ hψ ih₁ ih₂ =>
     intro _ _ θ _ hD hρ hg; exact X.app (ih₁ hD hρ hg) (ih₂ hD hρ hg) (Stage.subst_or θ hψ)
+  | @allVar Γ D x σ ψ hx hc hk =>
+    intro _ _ θ _ _ _ _
+    simp only [Ty.subst, liftTy_eq]
+    refine X.allVar (k := σ.k) (t := σ.ty.subst (lift σ.k θ)) ?_ hk
+    rw [List.getElem?_map, List.getElem?_map, hx]; simp [Scheme.tr, Scheme.subst, hc, dicts]
+  | @varAll Γ D x σ ts k t us φ hx hc hts hA hus =>
+    intro _ _ θ _ _ _ _
+    have hA' := congrArg (Ty.subst θ) hA
+    simp only [Ty.subst, liftTy_eq] at hA'
+    rw [← Ty.lift_inst hts] at hA'
+    rw [← Ty.lift_inst hus]
+    refine X.varAll (k₀ := σ.k) (t₀ := σ.ty.subst (lift σ.k θ)) (ts := ts.map (·.subst θ))
+      ?_ (by simpa using hts) hA' (by simpa using hus)
+    rw [List.getElem?_map, List.getElem?_map, hx]; simp [Scheme.tr, Scheme.subst, hc, dicts]
+  | @allLam Γ D k b t ψ b' _ ih =>
+    intro Δl Δ θ ρ hD hρ hg; subst hD
+    have hΔ : ∀ (j : Nat) (Q : Cn), (Δ.map (·.subst (up k)))[j]? = some Q →
+        ∃ Q₀ : Cn, Δ[j]? = some Q₀ ∧ Q.subst (lift k θ) = Q₀.subst θ := fun j Q hj => by
+      rw [List.getElem?_map] at hj
+      cases hQ : Δ[j]? with
+      | none => rw [hQ] at hj; cases hj
+      | some Q₀ =>
+        rw [hQ] at hj; cases hj
+        exact ⟨Q₀, rfl, by simp only [Cn.up_lift, Cn.subst_ground (hg j Q₀ hQ)]⟩
+    have h₁ := ih (Δl := Δl.map (·.subst (up k))) (Δ := Δ.map (·.subst (up k))) (θ := lift k θ)
+      (ρ := ρ) (by simp) (fun j Q hj => let ⟨Q₀, h₀, e⟩ := hΔ j Q hj; e ▸ hρ j Q₀ h₀)
+      (fun j Q hj => let ⟨Q₀, h₀, e⟩ := hΔ j Q hj; e ▸ hg j Q₀ h₀)
+    have hΔl : (Δl.map (·.subst (up k))).map (·.subst (lift k θ)) =
+        (Δl.map (·.subst θ)).map (·.subst (up k)) := by
+      simp [List.map_map, Function.comp_def, Cn.up_lift]
+    have hΓ : ((Γ.map (·.subst (up k))).map (·.subst (lift k θ))).map Scheme.tr =
+        ((Γ.map (·.subst θ)).map Scheme.tr).map (·.subst (up k)) := by
+      simp [List.map_map, Function.comp_def, Scheme.up_lift, Scheme.tr_subst]
+    rw [hΔl, hΓ] at h₁
+    simp only [Ty.subst, liftTy_eq]
+    simpa using X.allLam h₁
   | ite _ _ _ ihc iha ihb =>
     intro _ _ _ _ hD hρ hg; exact X.ite (ihc hD hρ hg) (iha hD hρ hg) (ihb hD hρ hg)
   | caseOpt _ _ _ ihe ihn ihs =>

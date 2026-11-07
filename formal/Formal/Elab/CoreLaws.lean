@@ -98,6 +98,32 @@ theorem has_var {Γ Δ x s ts φ} (hx : Γ[x]? = some s) (hk : ts.length = s.k) 
   ⟨_, .var, .var (ts := ts.map (trT N)) (by rw [hc.var, hx]; rfl) (by simpa [trS] using hk)
     (fun _ _ h => (h : False).elim) (by rw [Flick.Scheme.inst, trS, trTT_inst_tr]; exact .refl)⟩
 
+/-- A lambda typed under fresh variables, by (∀I). -/
+theorem has_allLam {Γ Δ k b t ψ}
+    (h : Has S N (Γ.map (·.subst (up k))) (Δ.map (·.subst (up k))) (.lam b) (.mono t) .P) :
+    Has S N Γ Δ (.lam b) (.mono (.all k t)) ψ := by
+  intro Ψ Θ Γc γ δ hc
+  obtain ⟨e', he', te⟩ := h (Ψ.map (Flick.Ty.up k)) (Θ.substT (shiftV k)) _ _ _ (hc.up N k)
+  cases he' with
+  | lam hb => exact ⟨_, .lam hb, .allI .lam te⟩
+
+theorem has_allVar {Γ Δ x k t ψ} (hx : Γ[x]? = some ⟨k, .mono t⟩) (hk : 0 < k) :
+    Has S N Γ Δ (.var x) (.mono (.all k t)) ψ := fun _ _ _ _ _ hc =>
+  ⟨_, .var, .allVar (σ := trS N ⟨k, .mono t⟩) (by rw [hc.var, hx]; rfl) hk fun _ _ h => h⟩
+
+theorem has_varAll {Γ Δ x k₀ t₀ ts k t us φ} (hx : Γ[x]? = some ⟨k₀, .mono t₀⟩)
+    (hts : ts.length = k₀) (hA : t₀.subst (inst ts) = .all k t) (hus : us.length = k) :
+    Has S N Γ Δ (.var x) (.mono (t.subst (inst us))) φ := fun _ _ _ _ _ hc => by
+  have key : ∀ (u : Ty) (vs : List Ty), trT N (u.subst (inst vs)) = (trT N u).substT (instT (vs.map (trT N))) := by
+    intro u vs; rw [trT_subst]; congr 1; funext a; exact trσ_inst N vs a
+  have hA' := congrArg (trT N) hA
+  rw [key] at hA'
+  refine ⟨_, .var, .var (σ := trS N ⟨k₀, .mono t₀⟩) (ts := ts.map (trT N)) (by rw [hc.var, hx]; rfl)
+    (by simpa [trS] using hts) (fun _ _ h => (h : False).elim) ?_⟩
+  show LeI ((trT N t₀).substT (instT (ts.map (trT N)))) (trT N (t.subst (inst us)))
+  rw [hA', key]
+  exact .inst (by simpa using hus) .refl
+
 theorem has_const (hR : Real P S N) {Γ Δ c s ts φ} (hc : P.consts c = some s)
     (hk : ts.length = s.k) :
     Has S N Γ Δ (.const c) ((dicts .cnil s.ctx (.mono s.ty)).subst (inst ts)) φ := fun _ _ _ _ _ _ =>

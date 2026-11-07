@@ -21,7 +21,8 @@ inductive Stage where
 checker (`docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor`). Its qualifier `q` is a capture row written as a type: a variable, `cnil`
 (`∅`) or a union `cun`. Capture variables are ordinary variables. A row of services or errors
 is a type too: a variable, `cnil`, the row `{t}` of one service or error type `t` whose
-constructor is `c` (`rnm c t`), or a union `ρ₁ + ρ₂` (`run`). -/
+constructor is `c` (`rnm c t`), or a union `ρ₁ + ρ₂` (`run`). `all k t` is the type `∀ᾱ. t` of a
+parameter, with `k` variables `var 0 … var (k-1)`. -/
 inductive Ty where
   | var (n : Nat)
   | con (c : Nat)

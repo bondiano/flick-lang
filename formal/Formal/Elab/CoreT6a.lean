@@ -21,6 +21,9 @@ variable {P : Prog} {Sg : Sig} {N : Names}
 def typingTarget (hR : Real P Sg N) : Target P where
   Has := Has Sg N
   var := has_var
+  allLam := has_allLam
+  allVar := has_allVar
+  varAll := has_varAll
   const := has_const hR
   app := has_app
   ite := has_ite
@@ -62,6 +65,20 @@ theorem T6a_core (hR : Real P Sg N) {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ
 theorem T6a_closed (hR : Real P Sg N) {e τ φ e'} (h : Elab P [] [] e τ φ e') (Ψ : List Flick.Ty)
     (Θ : Facts) : ∃ e'', Tr N id id e' e'' ∧ Typ Sg Ψ Θ [] e'' (.ex (trT N τ) (trStage N φ)) :=
   T6a_core hR h (Corr.nil id id)
+
+/-- `f (λx. x)` for a constant `f : (∀a. a → a) → Int` elaborates, and its elaboration is typed
+in the core: a parameter of rank 2. -/
+example (hR : Real P Sg N) {c : Nat}
+    (hc : P.consts c = some ⟨0, [], .arr .P (.all 1 (.arr .P (.var 0) (.var 0) .cnil)) intTy .cnil, .cnil⟩)
+    (Ψ : List Flick.Ty) (Θ : Facts) :
+    ∃ e'', Tr N id id (.app (.const c) (.lam (.var 0))) e'' ∧
+      Typ Sg Ψ Θ [] e'' (.ex (trT N intTy) .pure) := by
+  have hl : Elab P [] [] (.app (.const c) (.lam (.var 0))) intTy .P (.app (.const c) (.lam (.var 0))) := by
+    refine .app (φ := .P) (ψ := .P) (.const (ts := []) (ds := []) hc rfl .nil) (.allLam (k := 1) ?_) (.inl rfl)
+    refine .lam (.var (σ := ⟨0, [], .var 0, .cnil⟩) (ts := []) (ds := []) rfl rfl .nil) fun n hn => ?_
+    rcases hn with ⟨x, s, hx, hs, _⟩
+    cases x <;> simp_all [Exp.Free]
+  exact T6a_closed hR hl Ψ Θ
 
 /-- **T6(a) for `do`** in the core. -/
 theorem T6a_do_core (hR : Real P Sg N) (S : Sugar P) {Γ Δ ss r m b φ}

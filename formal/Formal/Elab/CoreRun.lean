@@ -124,6 +124,9 @@ def RHas (Γ : List TSch) (Δ : List Cn) (e : Tm) (t : TTy) (φ : Stage) : Prop 
 def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg root) : Target P where
   Has := RHas P Sg N
   var hx hk := ⟨(typingTarget hR).var hx hk, fun _ h => by cases h⟩
+  allLam h := ⟨(typingTarget hR).allLam h.1, fun _ h => by cases h⟩
+  allVar hx hk := ⟨(typingTarget hR).allVar hx hk, fun _ h => by cases h⟩
+  varAll hx hk hA hus := ⟨(typingTarget hR).varAll hx hk hA hus, fun _ h => by cases h⟩
   const hc hk := ⟨(typingTarget hR).const hc hk, fun _ h => by cases h⟩
   app h₁ h₂ hψ := ⟨(typingTarget hR).app h₁.1 h₂.1 hψ, fun _ h => by cases h⟩
   ite h₁ h₂ h₃ := ⟨(typingTarget hR).ite h₁.1 h₂.1 h₃.1, fun _ h => by cases h⟩
