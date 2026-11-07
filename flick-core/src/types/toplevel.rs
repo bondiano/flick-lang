@@ -268,7 +268,8 @@ impl<'a> Checker<'a> {
         };
         let scheme = sig
             .and_then(|s| s.nodes().find(|n| is_type(n.kind)))
-            .map(|t| self.signature(t));
+            .map(|t| self.signature(t))
+            .map(|(scheme, explicit)| (self.with_owner_constraints(decl, scheme), explicit));
         let index = self.top.items.len();
         for name in &names {
             self.env.declare(Namespace::Value, name);
