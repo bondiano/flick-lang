@@ -21,7 +21,7 @@ crate `flick-ir` and handlers of effects. Later changes are in
   JavaScript and Go; `control` arms run on Go, and on JavaScript report
   `FLICK-P012` until its own runtime. A task in a fiber of its own needs
   `Detached r`, no `control` effect in its services. New codes:
-  `FLICK-E013` … `FLICK-E017`. The interface format is version 7.
+  `FLICK-E013` … `FLICK-E018`. The interface format is version 7.
 - **GADTs:** a constructor names the type it builds after `:`,
   `| IntLit Int : Expr Int`; variables of its fields that the result does
   not mention are existential. A `match` arm learns the type of the matched

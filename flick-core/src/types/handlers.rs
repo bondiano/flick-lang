@@ -102,6 +102,10 @@ impl Checker<'_> {
         if let Some(needed) = &needed {
             stage.services = needed.clone();
         }
+        // what this handler catches stays below the `tail` arm around it
+        if let Some(allowed) = &mut stage.tail_arm {
+            allowed.extend(handled.iter().map(Handled::row));
+        }
         let outer = mem::replace(&mut self.stage, stage);
         if effects {
             let labels = handled.iter().map(|h: &Handled| h.label.clone()).collect();

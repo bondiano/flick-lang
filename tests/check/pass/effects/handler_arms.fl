@@ -93,3 +93,24 @@ let asked () = parallel (task { Ask.ask () }) (task { Ask.ask () + 1 })
 /// A row variable of the signature is `Detached` by its constraint.
 both_of : forall r e a. Detached r => Eff r e a -> Eff r e a ->{r; e} (a, a)
 let both_of first second = parallel first second
+
+/// A `tail` arm may suspend through what its operation declares, or what a
+/// handler inside the arm catches.
+effect Wait =
+  wait : Unit ->{Async;} Int
+
+pause : Unit ->{Async;} Unit
+foreign pause from "./pause.mjs" "pause"
+  arity 0
+
+declared : (Unit ->{Wait, Async; none} Int) ->{Async; none} Int
+let declared body =
+  try body () with
+  | Wait.wait () ->
+    pause ()
+    1
+
+inside : (Unit ->{Store Int; none} Int) ->{} Int
+let inside body =
+  try body () with
+  | Store.load () -> List.length (collect (fun () -> Emit.emit 1))

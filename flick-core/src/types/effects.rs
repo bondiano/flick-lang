@@ -47,6 +47,9 @@ pub struct Stage {
     pub scopes: usize,
     /// How many `provide`s were open when the stage began.
     pub provides: usize,
+    /// In an arm of a `tail` operation, which runs on the caller's stack:
+    /// the rows whose effects it may still suspend through.
+    pub tail_arm: Option<Vec<Type>>,
 }
 
 /// Where the upper bound of a stage comes from, for diagnostics.
@@ -74,6 +77,7 @@ impl Stage {
             calls: 0,
             scopes: 0,
             provides: 0,
+            tail_arm: None,
         }
     }
 }
@@ -103,6 +107,7 @@ impl Checker<'_> {
             calls: 0,
             scopes: self.regions.open.len(),
             provides: self.regions.provides.len(),
+            tail_arm: None,
         }
     }
 
@@ -172,6 +177,10 @@ impl Checker<'_> {
                 self.error(codes::E001, span, message);
             }
             return;
+        }
+        if let Some(allowed) = &self.stage.tail_arm {
+            let call = (services.clone(), allowed.clone(), span);
+            self.regions.tail_calls.push(call);
         }
         let (bound_services, bound_errors) =
             (self.stage.services.clone(), self.stage.errors.clone());
