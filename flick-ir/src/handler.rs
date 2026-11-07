@@ -1,6 +1,6 @@
-//! A handler of effects: a `try` with arms for operations, or `provide S
-//! impl`. Per effect it has the function of each operation; then the body,
-//! what becomes of the body's value, and the arms for its errors.
+//! A handler of effects: a `try`, or `provide S impl`. Per effect it has the
+//! function of each operation; then the body, what becomes of the body's
+//! value, and the arms for its errors.
 
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +13,7 @@ pub struct Handler {
     /// A function of the body's value, the handler's value; without it the
     /// body's value is the handler's.
     pub ret: Option<Expr>,
-    /// The arms for the body's errors, as those of a `Try`.
+    /// The arms for the body's errors: they see the typed failure.
     pub errors: Vec<Arm>,
 }
 
@@ -46,6 +46,11 @@ pub struct OpArm {
 }
 
 impl Handler {
+    /// Whether it only catches errors, as a `try` with no arms but for them.
+    pub fn is_try(&self) -> bool {
+        self.effects.is_empty() && self.ret.is_none()
+    }
+
     /// Calls `f` on each subexpression, in evaluation order: the
     /// implementations, the body, then the value and the error arms.
     pub fn each_child<'a>(&'a self, f: &mut dyn FnMut(&'a Expr)) {

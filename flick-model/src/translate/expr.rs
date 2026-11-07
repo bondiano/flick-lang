@@ -96,7 +96,9 @@ impl Tr {
             }
             ExprKind::If(c, a, b) => cond(self.expr(c), self.expr(a), self.expr(b)),
             ExprKind::Match(e, arms) => Term::Match(rc(self.expr(e)), self.arms(arms)),
-            ExprKind::Try(e, arms) => Term::Try(rc(self.expr(e)), self.arms(arms)),
+            ExprKind::Handle(h) if h.is_try() => {
+                Term::Try(rc(self.expr(&h.body)), self.arms(&h.errors))
+            }
             ExprKind::Tuple(xs) if xs.is_empty() => Term::unit(),
             ExprKind::Tuple(xs) => Term::Tuple(xs.iter().map(|x| self.expr(x)).collect()),
             ExprKind::List(xs) => Term::List(xs.iter().map(|x| self.expr(x)).collect()),

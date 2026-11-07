@@ -188,8 +188,8 @@ impl<'a> Gen<'a> {
             ExprKind::ServiceTag(key) => self.code(&names::string(key)),
             ExprKind::Label(label) => self.code(&names::string(label)),
             // outside effectful code nothing can fail with a typed error
-            ExprKind::Try(body, _) if self.fiber.is_none() => self.expr(body),
-            ExprKind::Try(body, arms) => self.try_expr(body, arms),
+            ExprKind::Handle(h) if h.is_try() && self.fiber.is_none() => self.expr(&h.body),
+            ExprKind::Handle(h) if h.is_try() => self.try_expr(&h.body, &h.errors),
             ExprKind::Await(task) => {
                 let t = self.expr(task);
                 self.run(t)

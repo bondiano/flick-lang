@@ -138,8 +138,6 @@ pub enum ExprKind {
     Block(Vec<Stmt>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
     Match(Box<Expr>, Vec<Arm>),
-    /// `try body with arms`: the arms see the typed failure.
-    Try(Box<Expr>, Vec<Arm>),
     Tuple(Vec<Expr>),
     List(Vec<Expr>),
     /// Fields in the order written, which is the order of evaluation.
@@ -236,7 +234,7 @@ impl Expr {
                 f(t);
                 f(e);
             }
-            ExprKind::Match(s, arms) | ExprKind::Try(s, arms) => {
+            ExprKind::Match(s, arms) => {
                 f(s);
                 for arm in arms {
                     if let Some(g) = &arm.guard {
@@ -364,7 +362,7 @@ impl Expr {
                 f(t);
                 f(e);
             }
-            ExprKind::Match(s, arms) | ExprKind::Try(s, arms) => {
+            ExprKind::Match(s, arms) => {
                 f(s);
                 for arm in arms {
                     if let Some(g) = &mut arm.guard {
