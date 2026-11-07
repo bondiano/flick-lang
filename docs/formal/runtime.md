@@ -322,7 +322,7 @@ In Effect a synchronous winner can win before the second branch starts; Go start
 
 ### 3.5 Layers and `provide`
 
-`provide L { e }` is a lexical owner (`reference/runtime.md` "Layers"):
+`provide L { e }` is a lexical owner (`reference/runtime.md` "Layers"). `Layer` is a library, not a form of the core: it lowers to `Layer.run L (fun () -> e)` (`core.md` §1.4), and this section is what that library does. A known layer of `Layer.succeed` and `Layer.merge` means a chain of handlers, the first binding of an effect the innermost (`chain`, `layer_typ`, `layer_answers` in `formal/Formal/RecordHandler.lean`); what a chain does not say, the build, its scope and the memo map, is below.
 
 ```text
 (Provide)  provide L e in f  →  owner πₚ by (Scope);  m := fork(M_f) or a new map;
@@ -404,6 +404,8 @@ Labels:
 - JS: [JS] `tryWith` (`cause.ts:39-54`) over [E] `catchCauseFilter`; I_ε ([secondary `Fail`](#a-secondary-fail-gets-the-type-of-the-residual)).
 - Go: [Go] `Try` (`cause.go:105-125`); I_ε (same).
 - The stronger reading "its `fail` is absent from the channel of expected errors" holds only for the head. The cause `Fail B, Fail A` with a branch for `A` propagates whole: this is the spec/05 contract.
+
+R6 is a property of the library: no rule of the core builds or memoizes a layer, and λRT states it of the protocol below.
 
 **R6 (layer).** In one run of `provide L` — together with nested `provide`s that share its memo map — each memoizable layer with a given identity is built at most once. Its scope `σ` closes after all consuming owners that got services from it through this map have closed.
 
@@ -882,7 +884,7 @@ Found by the Lean development of the core (`formal/Formal/`).
 
 - Divergence: R6, the sketch in §6 and hypothesis G11 in Lean (`G11`, `GoodUse`) required every fiber with a `θ` from the `provide` of owner `πₚ` to run only until `πₚ` closes. A child inherits the whole environment of the spawn site (§3.5), and the rule of `regions.md` §2.7 ties to the owner only the providers of the services in the task row. The program `provide L1 { scope outer { provide L2 { Fiber.spawn outer (task { …; ask S1 }) } } }`, where `L1` gives `S1` and `L2` gives `S2`, is accepted: `Provided {S1} outer` is discharged, since the provider of `S1` encloses `outer`. The child runs after `L2` closes and takes `S1`; `GoodUse` saw the released build of `L2` in its environment and reported a violation, although `S1` came from the live `L1`.
 - Cause: the premise was stated about the whole fiber, while typing (point 3 of T4) speaks about service requests.
-- Resolution — this document and the λRT model: the premise is "a request `ask_S` from the environment is answered by the `provide` of a live owner". R6 and §6 state it this way; `G11` and `GoodUse` in `formal/Formal/RT/` speak of the environment entry that answers the request. The Lean core development proves the premise in this form (`T4_3`).
+- Resolution — this document and the λRT model: the premise is "an operation answered from the environment is answered by the handler of a live owner". R6 and §6 state it this way; `G11` and `GoodUse` in `formal/Formal/RT/` speak of the environment entry that answers the request. The Lean core development proves the premise in this form (`T4_3`).
 
 ### Go: HTTP handlers
 

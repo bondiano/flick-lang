@@ -76,6 +76,7 @@ import Formal.T43
 import Formal.T43Main
 import Formal.Effects
 import Formal.Generalization
+import Formal.RecordHandler
 import Formal.Examples
 import Formal.RT.Cause
 import Formal.RT.Recover
