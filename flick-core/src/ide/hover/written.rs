@@ -29,9 +29,12 @@ pub(super) fn as_written(node: &Node, text: &str) -> String {
     let mut lines = text[start as usize..end as usize].lines();
     let first = lines.next().unwrap_or_default().trim_end().to_owned();
     lines.fold(first, |mut acc, line| {
-        let cut = line.len() - line.trim_start().len();
+        let cut = (line.char_indices().take_while(|(_, c)| c.is_whitespace()))
+            .take(indent)
+            .last()
+            .map_or(0, |(at, c)| at + c.len_utf8());
         acc.push('\n');
-        acc.push_str(line[cut.min(indent)..].trim_end());
+        acc.push_str(line[cut..].trim_end());
         acc
     })
 }
