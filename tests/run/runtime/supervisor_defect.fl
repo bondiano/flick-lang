@@ -1,0 +1,32 @@
+// A supervisor that dies while its owner closes does not stop the close, and
+// the root sees it: the program runs to its end and exits with code 1 (R4).
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+ping : Deferred.Deferred none Unit ->{} Unit
+let ping d = ignore (Deferred.succeed () d)
+
+broken : Failure e ->{} Unit
+let broken _ =
+  say "supervisor dies"
+  Effect.die "in the supervisor"
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  scope owner {
+    let started : Deferred.Deferred none Unit = Deferred.make ()
+    Scope.add_finalizer (task { say "owner finalizer" })
+    let _child =
+      Fiber.spawn
+        owner
+        broken
+        (task {
+          ping started
+          Effect.never ()
+        })
+    Deferred.await_ started
+    say "body done"
+  }
+  say "after the scope"

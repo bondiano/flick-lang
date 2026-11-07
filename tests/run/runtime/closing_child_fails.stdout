@@ -1,0 +1,11 @@
+body done
+child fails while its owner closes
+supervised, a defect: false
+owner finalizer, after the supervisor
+the body's value
+child's finalizer dies
+supervised, a defect: true
+owner finalizer, after the supervisor
+the body's value
+supervised, a defect: true
+(false, Some Oops "the body's")

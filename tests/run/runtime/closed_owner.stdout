@@ -1,0 +1,17 @@
+body done
+child tries to start a sibling
+supervised, a defect: true
+--
+finalizer tries to start a child
+the scope failed with a defect: true
+--
+body done
+child ends
+added by the child in C2, runs first
+added by the body, runs last
+--
+finalizer starts
+added in C5, at once, the body failed: true
+finalizer ends
+added first, runs last
+the body's

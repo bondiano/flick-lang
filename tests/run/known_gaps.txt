@@ -3,3 +3,4 @@
 # is what the contract asks for. The e2e harness still runs them and fails on
 # one that passes, so a line here goes when its target catches up. `just stress`
 # skips them on that target.
+js runtime/group_in_closing # docs/formal/runtime.md#js-a-group-made-while-its-owner-closes-runs-nothing

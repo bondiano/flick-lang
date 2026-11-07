@@ -1,0 +1,7 @@
+body done
+the child's call settled
+finalizer, after the call
+--
+the body's call settled
+finalizer, after the call
+the other branch
