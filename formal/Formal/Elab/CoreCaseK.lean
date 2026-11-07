@@ -168,8 +168,7 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
         (fun b => (trσ N θ b).substT fun a => (liftT c.k (trσ N σ) a).substT θ'') =
         (trσ N σ a).substT fun b => (shiftV c.k b).substT θ'' := by
       intro a
-      rw [Flick.Ty.substT_congr hκ, ← Flick.Ty.substT_comp, shift_lift, ← Flick.Ty.substT_comp]
-      rfl
+      rw [Flick.Ty.substT_congr hκ, ← Flick.Ty.substT_comp, shift_lift, ← Flick.Ty.substT_comp, Flick.Ty.up_def]
     have hup : ∀ a, trσ N (up c.k) a = shiftV c.k a := trσ_up N c.k
     have hTy : ∀ X : Flick.Ty, ((X.substT (trσ N (up c.k))).substT (trσ N θ)).substT
         (fun a => (liftT c.k (trσ N σ) a).substT θ'') =
@@ -218,7 +217,7 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
     have eJ₁ : (trTT N (.mono ((t.subst (up c.k)).subst θ))).substT
         (fun a => (liftT c.k (trσ N σ) a).substT θ'') =
         ((trTT N (.mono (t.subst σ))).up c.k).substT θ'' := by
-      simp only [trTT]; rw [trT_subst, trT_subst, trT_subst]; exact hTy (trT N t)
+      simp only [trTT]; rw [trT_subst, trT_subst, trT_subst, Flick.Ty.up_def]; exact hTy (trT N t)
     have eJ₂ : (trStage N ((φ.subst (up c.k)).subst θ)).substT
         (fun a => (liftT c.k (trσ N σ) a).substT θ'') =
         ((trStage N (φ.subst σ)).substT (shiftV c.k)).substT θ'' := by

@@ -9,9 +9,6 @@ discharges at its end, when it keeps the regions and sends atoms to atoms.
 
 namespace Flick
 
-theorem Atom.ty_substT (a : Atom) (σ : Atom → Ty) : a.ty.substT σ = σ a := by
-  cases a <;> rfl
-
 /-- A substitution keeps what a handler gives its body when it keeps the handler's region,
 sends atoms to atoms and brings no names into rows. -/
 theorem Row.hP_substT {Θ : Facts} {q : Nat} {E : Name} {r : Row} {σ : Atom → Ty} (hq : σ (.r q) = .rg q)

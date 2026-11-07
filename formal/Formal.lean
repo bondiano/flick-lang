@@ -1,4 +1,6 @@
+import Formal.TyBase
 import Formal.Syntax
+import Formal.TyComp
 import Formal.TyOps
 import Formal.SchemeOps
 import Formal.DictOps

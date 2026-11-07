@@ -101,8 +101,8 @@ theorem Scheme.up_comm (s : Scheme) (k : Nat) (σ : Atom → Ty) :
   cases a with
   | v i =>
     have : ¬ i + k < k := by omega
-    simp [shiftV, Ty.substT, liftT, Ty.up, this]
-  | r p => simp [shiftV, Ty.substT, liftT, Ty.up]
+    simp [shiftV, Ty.substT, liftT, Ty.up_def, this]
+  | r p => simp [shiftV, Ty.substT, liftT, Ty.up_def]
 
 theorem Scheme.up_substT (s : Scheme) (k : Nat) (ts : List Ty) (h : ts.length = k) :
     (s.up k).substT (instT ts) = s := by

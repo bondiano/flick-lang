@@ -76,7 +76,7 @@ theorem kont_fn {Ψ : List Ty} {p ℓ b₀ r ε t' C'} (hl : Ψ[ℓ]? = some (.a
     obtain ⟨_, _, _, _, h, la, hψ, ht, -⟩ := hT.arrow_left
     cases h
     rw [List.getElem?_map, hl] at hl'
-    simp only [Option.map_some, Option.some.injEq, Ty.up, Ty.substT, Ty.arrow.injEq] at hl'
+    simp only [Option.map_some, Option.some.injEq, Ty.up_def, Ty.substT, Ty.arrow.injEq] at hl'
     obtain ⟨rfl, rfl, rfl, rfl⟩ := hl'
     refine ⟨fun h => ?_, fun hK => ?_⟩
     · simp only [Stage.substT] at hψ

@@ -36,9 +36,9 @@ theorem atom_up_inst (k : Nat) (a : Atom) :
     by_cases hi : i < k
     · simp [liftT, hi, Ty.substT, instT, idTs, Ty.ident]
     · have : ¬ i - k + k + k < k := by omega
-      simp [liftT, hi, Ty.substT, instT, idTs, Ty.ident, Ty.up, shiftV, this]
+      simp [liftT, hi, Ty.substT, instT, idTs, Ty.ident, Ty.up_def, shiftV, this]
       omega
-  | r p => simp [liftT, Ty.up, Ty.substT, shiftV, instT, Ty.ident]
+  | r p => simp [liftT, Ty.up_def, Ty.substT, shiftV, instT, Ty.ident]
 
 theorem Scheme.up_inst_self (s : Scheme) : (s.up s.k).inst (idTs s.k) = s.t := by
   simp only [Scheme.up, Scheme.substT, Scheme.inst, Ty.substT_comp]
@@ -153,11 +153,11 @@ theorem SubOk.up {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (k : Nat) (Φ :
   simp only [List.getElem?_map, Option.map_eq_some_iff] at hi
   obtain ⟨s₀, hs₀, rfl⟩ := hi
   obtain ⟨ht, hnI, hc⟩ := h _ _ hs₀
-  have := ht.substT (liftT s₀.k (shiftV k)) (Fits.noIns hnI fun _ => by simp [liftT, Ty.up, Ty.substT, shiftV])
+  have := ht.substT (liftT s₀.k (shiftV k)) (Fits.noIns hnI fun _ => by simp [liftT, Ty.up_def, Ty.substT, shiftV])
   simp only [Flick.J.substT] at this
   have e₁ : (Ψ.map (Ty.up s₀.k)).map (Ty.substT (liftT s₀.k (shiftV k))) =
       (Ψ.map (Ty.up k)).map (Ty.up s₀.k) := by
-    simp [Ty.up_comm]; intro _ _; rfl
+    simp [Ty.up_comm]; intro _ _; rw [Ty.up_def k]
   have e₂ : (Γ'.map (Scheme.up s₀.k)).map (Scheme.substT (liftT s₀.k (shiftV k))) =
       (Γ'.map (Scheme.up k)).map (Scheme.up s₀.k) := by
     simp [Scheme.up_comm]; intro _ _; rfl

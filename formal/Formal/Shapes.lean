@@ -22,6 +22,7 @@ def Ty.kind : Ty → Nat
   | .owner _ => 11
   | .rg _ | .caps _ | .row _ => 12
   | .dict .. => 13
+  | .all .. => 14
 
 theorem Le.kind {a b : Ty} (h : Le a b) : a.kind = b.kind := by
   cases h <;> rfl
