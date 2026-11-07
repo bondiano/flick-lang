@@ -1,4 +1,8 @@
+use super::as_written;
 use crate::ide::tests::fixture_of;
+use crate::source::SourceMap;
+use crate::syntax;
+use crate::syntax::kind::SyntaxKind as K;
 
 #[test]
 fn a_foreign_function_shows_what_retention_owner_gives_it() {
@@ -27,4 +31,18 @@ foreign pure plain from \"./scope.js\" \"plain\"
     );
     let plain = hover("plain :");
     assert!(plain.contains("plain : a -> a"), "{plain}");
+}
+
+/// The non-breaking space after the first line is more bytes than characters.
+#[test]
+fn a_continuation_line_is_dedented_by_characters() {
+    let text = "module M exposing (..)\n\nf :\n  Int ->\n\u{a0}\u{a0}\u{a0}Int\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("M.fl", text);
+    let parsed = syntax::parse(text, file);
+    let signature = (parsed.tree.nodes())
+        .find(|n| n.kind == K::Signature)
+        .expect("the signature");
+    let ty = signature.nodes().next().expect("its type");
+    assert_eq!(as_written(ty, text), "Int ->\n\u{a0}Int");
 }
