@@ -6,6 +6,11 @@ break programs.
 
 ## Unreleased
 
+- **Signatures:** a local function needs none. Its type is inferred, and without
+  a signature it has one type. A top-level or recursive local function still
+  does, and an instance method still takes the one of its class. G001, G003 and
+  G004 get edits that write what is missing, and G001 says when the qualifier it
+  names is one no one wrote.
 - **`[js.dependencies]`:** a library of `[dependencies]` names the npm packages
   it needs on the js target, and `flick install` adds those of the project's
   whole dependency closure to its `package.json`. A js build without them is

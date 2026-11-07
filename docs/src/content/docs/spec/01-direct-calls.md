@@ -1,6 +1,6 @@
 ---
 title: "Direct effectful calls"
-source_hash: e666da32ad2c5a3a
+source_hash: 83c8341531eef2d1
 ---
 
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.
@@ -46,9 +46,9 @@ The result of the expression `Users.get id` is a `User`, and the effect of compu
 
 Function blocks and `match` are delimited by indentation. `in` is not needed; the last expression is the result of the block. A standalone intermediate expression must have type `Unit`; any other result is discarded explicitly with `ignore`. Curly braces delimit records and the blocks of `task`, `scope`, `provide`, `sql`, `ui`, `cli`, `codec`, `do`, `for` and `rec` (see [Layout](../../reference/grammar/#layout)). Inside them, line breaks separate bindings and expressions; `;` is allowed for compact notation. Arguments and fields are evaluated left to right. Self-recursion is marked with `let rec`; mutual recursion of functions uses `rec { ... }`, where each definition has its own full signature. A recursive value that would be evaluated while it is defined is an error (`FLICK-T012`).
 
-## A full signature above every function
+## A full signature above every top-level function
 
-Every named function has a full signature directly above its definition. The rule is the same for public, internal and local functions and functions obtained by partial application. An instance method may omit its signature: it has the signature of its class, with the instance's types in place of the class parameters. The `let` header keeps the argument names; a second style with parameter and result types in the header is not used.
+Every named function at the top level has a full signature directly above its definition. The rule is the same for public and internal functions and for functions obtained by partial application. A local function may omit it: nothing outside the enclosing body sees it, its type is inferred, and it has one type, not a polymorphic one; a recursive local function needs a signature. An instance method may omit its signature: it has the signature of its class, with the instance's types in place of the class parameters. The `let` header keeps the argument names; a second style with parameter and result types in the header is not used.
 
 ```flick
 # type UserId = UserId String

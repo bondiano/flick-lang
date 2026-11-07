@@ -357,6 +357,9 @@ struct Local {
     /// A function of a recursive group used before its type is proved, by
     /// index into [`Checker::recs`].
     rec: Option<usize>,
+    /// A local function without a signature: it has one type, from its body
+    /// and its first uses.
+    unsigned: bool,
 }
 
 /// A recursive function whose signature has no explicit `forall`: its

@@ -55,9 +55,19 @@ impl Checker<'_> {
             (Some(name), Some(sig)) => self.explain_since(since, param, sig, |t| {
                 format!("the {nth} argument of `{name}` is declared as `{t}` here")
             }),
-            (Some(name), None) => self.explain_since(since, param, span, |t| {
-                format!("`{name}` takes `{t}` as its {nth} argument")
-            }),
+            (Some(name), None) => {
+                let unsigned = (self.locals.iter().rev())
+                    .find(|l| l.name == name)
+                    .is_some_and(|l| l.unsigned);
+                self.explain_since(since, param, span, |t| {
+                    let takes = format!("`{name}` takes `{t}` as its {nth} argument");
+                    if unsigned {
+                        format!("{takes}: without a signature a local function has one type")
+                    } else {
+                        takes
+                    }
+                });
+            }
             (None, _) => self.explain_since(since, param, span, |t| {
                 format!("this function takes `{t}` as its {nth} argument")
             }),

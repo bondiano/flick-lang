@@ -98,7 +98,7 @@ fn signature_quick_fix_makes_the_module_check() {
         .into_iter()
         .filter(|d| d["code"] == "FLICK-T004")
         .collect();
-    assert_eq!(missing.len(), 5, "{missing:?}");
+    assert_eq!(missing.len(), 4, "{missing:?}");
     let mut edits = Vec::new();
     for d in &missing {
         let actions = lsp.request(

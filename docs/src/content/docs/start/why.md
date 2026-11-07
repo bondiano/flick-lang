@@ -42,8 +42,9 @@ would not compile.
   signature does not name is `FLICK-E002`. The compiler offers to add it.
 - **Errors get handled.** `try … with` removes `NotFound` only when its handlers
   cover every value of it. Otherwise the error stays in the caller's signature.
-- **Every function has a signature.** A named function without one is
-  `FLICK-T004`, and the message suggests the inferred type.
+- **Every top-level function has a signature.** One without it is
+  `FLICK-T004`, and the message suggests the inferred type. Only a local function
+  may leave it out, since nothing outside its body sees it.
 - **Every `match` is complete.** A value it misses is `FLICK-T009`.
 - **Resources stay inside their scope.** `scope { … }` releases what it
   acquired when it ends, and nothing usable can outlive it.

@@ -1,0 +1,28 @@
+// A local function needs no signature: its stages, its effects and its captures are
+// inferred, as for an anonymous function, on both targets.
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let double x = x * 2
+  let greet name = say ("hello " ++ name)
+  let add x y = x + y
+  let inc = add 1
+  let apply = fun f x -> f (f x)
+  let prefix = "held: "
+  let holding x = prefix ++ x
+  greet "ada"
+  say (show (double 21))
+  say (show (inc 41))
+  say (show (apply double 1))
+  say (holding "a capture")
+  let answer = scope {
+    let opened x = Resource.acquire_release (task { x }) (fun v -> say ("released " ++ v))
+    let h = opened "h"
+    say ("uses " ++ h)
+    1
+  }
+  say (show answer)

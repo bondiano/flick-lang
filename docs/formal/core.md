@@ -454,7 +454,7 @@ The checker generalizes no more than `Gen`. Fewer generalized variables give the
 3. Variables of unsolved class constraints are not generalized. A scheme without a signature gets no constraints (see [class constraints and generalization](#class-constraints-and-generalization)).
 4. Variables of a value that holds an open capture obligation are not generalized. This belongs to regions.
 5. Unknown call rows inside a binding are closed with `none` before generalization rather than quantified (`effects/solve.rs` `settle_rows`): the checker picks the least solution (see [unknown call rows](#unknown-call-rows-in-a-generalized-binding-close-to-none)).
-6. `let (a, b) = …` and `let assert` are always monomorphic. A function without a signature is `FLICK-T004`.
+6. `let (a, b) = …` and `let assert` are always monomorphic. A top-level or recursive function without a signature is `FLICK-T004`; another local one is monomorphic.
 
 Checker:
 
