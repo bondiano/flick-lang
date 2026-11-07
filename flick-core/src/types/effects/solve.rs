@@ -209,7 +209,7 @@ impl Checker<'_> {
                             self.mismatch(&m, ty, bound, c.span);
                         }
                     }
-                    None if label == regions::scope() => self.no_owner(c.span),
+                    None if label == regions::scope() => self.no_owner(ty, &c),
                     None if label.starts_with(regions::PROVIDED) => {
                         if let [service, owner] = ty.spine().1[..] {
                             let service = self.show(service);
@@ -270,14 +270,41 @@ impl Checker<'_> {
         }
     }
 
-    /// A resource acquired where no `scope` owns it.
-    fn no_owner(&mut self, span: Span) {
+    /// A resource acquired where no `scope` owns it. The fix is not safe: the
+    /// row says the caller provides the owner, which fixes a public boundary.
+    fn no_owner(&mut self, scope: &Type, c: &SubRow) {
+        // shortcut: a region not known yet is named `s` even if the signature
+        // has another `s`; pick a fresh name if someone trips on it.
+        let region = match scope.spine().1[..] {
+            [region] if !matches!(self.store.resolve(region), Type::Meta(_)) => self.show(region),
+            _ => "s".to_owned(),
+        };
+        let added = format!("Scope {region}");
+        let bound = self.local_place(&c.declared);
+        let written = match (bound.0, &self.sites[c.site]) {
+            (Some(_), _) => Some(bound),
+            (None, Site::Signature(_, written) | Site::Expected(_, written)) => Some(*written),
+            (None, Site::Inferred) => None,
+        };
+        let edits: Vec<Edit> = written
+            .and_then(|w| w.adding(&added))
+            .map(|(span, replacement)| Edit { span, replacement })
+            .into_iter()
+            .collect();
+        let advice = if edits.is_empty() {
+            format!(
+                "call it inside `scope {{ … }}`, or add `{added}` to the services of the signature"
+            )
+        } else {
+            format!("add `{added}` to the services of the signature")
+        };
         self.diagnostics.push(
             Diagnostic::error(
                 codes::G004,
                 "this acquires a resource, which needs `Scope`: only `scope { … }` provides an owner",
-                span,
-            ).with_fix(|| ("call it inside `scope { … }`, or add `Scope s` to the services of the signature", Vec::new())),
+                c.span,
+            )
+            .with_fix(|| (advice, edits)),
         );
     }
 

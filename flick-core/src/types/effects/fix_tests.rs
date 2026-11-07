@@ -18,7 +18,7 @@ fn fixed(signature: &str, program: &str) -> String {
     let file = sources.add("Probe.fl", text.clone());
     let diagnostics = crate::check(&sources, file);
     let edits: Vec<_> = (diagnostics.iter())
-        .filter(|d| d.code == codes::E002 || d.code == codes::T003)
+        .filter(|d| [codes::E002, codes::T003, codes::G004].contains(&d.code))
         .flat_map(|d| &d.fixes)
         .flat_map(|f| &f.edits)
         .collect();
@@ -137,5 +137,64 @@ fn the_words_of_before_go_and_a_promise_says_async() {
          foreign wait from \"./wait.mjs\" \"wait\"\n\
          tick : Unit ->{} Unit\n\
          foreign tick from \"./tick.mjs\" \"tick\"\n"
+    );
+}
+
+#[test]
+fn a_resource_without_an_owner_asks_the_row_for_its_scope() {
+    let program = "let f x = ignore (Resource.acquire_release (task { x }) (fun _ -> ()))";
+    assert_eq!(
+        fixed("f : String ->{} Unit", program),
+        "f : String ->{Scope s;} Unit"
+    );
+    assert_eq!(
+        fixed("f : String ->{; NotFound} Unit", program),
+        "f : String ->{Scope s; NotFound} Unit"
+    );
+}
+
+/// `signature` after the edits of the fix of its `Fiber.Provided` G003.
+fn provided(signature: &str) -> String {
+    let text = format!(
+        "module Probe exposing (..)\n\
+         service Log =\n  line : String ->{{}} Unit\n\
+         {signature}\n\
+         let f work = Scope.add_finalizer work\n"
+    );
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.clone());
+    let diagnostics = crate::check(&sources, file);
+    let mut edits: Vec<_> = (diagnostics.iter())
+        .filter(|d| d.code == codes::G003)
+        .filter(|d| d.fixes.iter().any(|f| f.message.contains("Fiber.Provided")))
+        .flat_map(|d| &d.fixes)
+        .flat_map(|f| &f.edits)
+        .collect();
+    assert!(!edits.is_empty(), "{diagnostics:?}");
+    edits.sort_by_key(|e| Reverse(e.span.start));
+    let mut out = text;
+    for e in edits {
+        out.replace_range(e.span.range(), &e.replacement);
+    }
+    out.lines()
+        .find(|l| l.starts_with("f :"))
+        .expect("the signature")
+        .to_owned()
+}
+
+#[test]
+fn the_fix_of_g003_adds_the_constraint_to_the_context() {
+    let row = "(Eff r none Unit)^c ->{Scope s | r;} Unit";
+    assert_eq!(
+        provided(&format!("f : (Fiber.Outlives c s, Detached r) => {row}")),
+        format!("f : (Fiber.Outlives c s, Detached r, Fiber.Provided r s) => {row}")
+    );
+    assert_eq!(
+        provided(&format!("f : Fiber.Outlives c s => {row}")),
+        format!("f : (Fiber.Outlives c s, Fiber.Provided r s) => {row}")
+    );
+    assert_eq!(
+        provided(&format!("f : {row}")),
+        format!("f : Fiber.Provided r s => {row}")
     );
 }

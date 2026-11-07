@@ -11,11 +11,13 @@
 use std::mem;
 
 use super::{Scope, scope};
-use crate::diagnostics::{Diagnostic, codes};
+use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
 use crate::types::classes::args_of;
+use crate::types::convert::is_type;
 use crate::types::gadt::branch::type_eqs;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Norm, Row, Type};
@@ -316,6 +318,14 @@ impl Checker<'_> {
     /// An obligation that reached a signature, or a row variable none
     /// settles.
     pub fn unprovided(&mut self, service: &str, region: &str, span: Span) {
+        // a row variable is the row itself; a service is an element of one
+        let row = if service.starts_with(char::is_lowercase) {
+            service.to_owned()
+        } else {
+            format!("{{{service}}}")
+        };
+        let constraint = format!("Fiber.Provided {row} {region}");
+        let edits = self.constraint_edits(&constraint, span);
         self.diagnostics.push(
             Diagnostic::error(
                 codes::G003,
@@ -324,13 +334,46 @@ impl Checker<'_> {
                 ),
                 span,
             )
-            .with_fix(|| {
-                (
-                    format!("add `Fiber.Provided {{{service}}} {region}` to the signature"),
-                    Vec::new(),
-                )
-            }),
+            .with_fix(|| (format!("add `{constraint}` to the signature"), edits)),
         );
+    }
+
+    /// The edits that add `constraint` to the signature of the top-level
+    /// function around `span`; none when it has no signature to edit.
+    fn constraint_edits(&self, constraint: &str, span: Span) -> Vec<Edit> {
+        let Some(mut ty) = self
+            .signature_around(span)
+            .and_then(|sig| sig.nodes().find(|n| is_type(n.kind)))
+        else {
+            return Vec::new();
+        };
+        if ty.kind == K::ForallType {
+            let Some(body) = ty.nodes().next() else {
+                return Vec::new();
+            };
+            ty = body;
+        }
+        let insert = |at: u32, replacement: String| Edit {
+            span: Span::new(self.file, at, at),
+            replacement,
+        };
+        match (ty.kind == K::ConstrainedType)
+            .then(|| ty.nodes().next())
+            .flatten()
+        {
+            Some(context) => {
+                let (start, end) = context.range();
+                if context.kind == K::TupleType {
+                    vec![insert(end - 1, format!(", {constraint}"))]
+                } else {
+                    vec![
+                        insert(start, "(".to_owned()),
+                        insert(end, format!(", {constraint})")),
+                    ]
+                }
+            }
+            None => vec![insert(ty.range().0, format!("{constraint} => "))],
+        }
     }
 }
 
