@@ -89,3 +89,34 @@ func TestATurnOfATaskOfAllComesAfterItsSiblings(t *testing.T) {
 		}
 	}
 }
+
+// `all` of no tasks forks nothing and never waits, so it holds nothing: a
+// later `all` must not lose a hold on its forks that nobody would release.
+func TestAnAllOfNoTasksLeavesNoHold(t *testing.T) {
+	fb := rootFiber()
+	fb.owner = newOwner()
+	all(fb, nil, 0)
+	if fb.state.forks.Load() != nil {
+		t.Fatal("an empty all holds a cohort it will never suspend out of")
+	}
+	all(fb, nil, 0)
+	all(fb, []Value{Eff(func(*Fiber) Value { return Unit })}, 0)
+	ran := make(chan struct{})
+	turn := forkInTurn(fb, fb.owner, func(*Fiber) { close(ran) })
+	select {
+	case <-ran:
+	case <-time.After(2 * time.Second):
+		t.Fatal("a turn queued after an empty all never ran")
+	}
+	<-turn.done
+}
+
+// Likewise `raceAll` of no tasks, which fails at once.
+func TestARaceOfNoTasksLeavesNoHold(t *testing.T) {
+	fb := rootFiber()
+	fb.owner = newOwner()
+	catch(func() Value { return raceAll(fb, nil, false) })
+	if fb.state.forks.Load() != nil {
+		t.Fatal("an empty race holds a cohort it will never suspend out of")
+	}
+}
