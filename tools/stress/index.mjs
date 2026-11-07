@@ -27,6 +27,14 @@ const cases = readFileSync(join(root, "tests/run/portable.txt"), "utf8")
   .map((l) => l.split("#")[0].trim())
   .filter((l) => l !== "" && prefixes.some((p) => l.startsWith(p)));
 
+// `<target> <case>`: a case that target does not hold yet, which may not even build there
+const gaps = new Set(
+  readFileSync(join(root, "tests/run/known_gaps.txt"), "utf8")
+    .split("\n")
+    .map((l) => l.split("#")[0].trim().replace(/\s+/, " "))
+    .filter((l) => l !== ""),
+);
+
 const targets = {
   js: (dir) => ["node", ["--enable-source-maps", join(dir, "flick-main.js")]],
   go: (dir) => [join(dir, exe), []],
@@ -35,6 +43,10 @@ const targets = {
 let failed = false;
 for (const name of cases) {
   for (const [target, command] of Object.entries(targets)) {
+    if (gaps.has(`${target} ${name}`)) {
+      console.log(`${name} (${target}): a known gap, skipped`);
+      continue;
+    }
     const dir = join(out, target, name);
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });

@@ -1,7 +1,8 @@
 # Cases of tests/run that run on the go target too, by path without `.fl`:
 # `just e2e` builds each with `--emit go` in both profiles and compares the
 # output with the same expectations as the JS target's. A case not listed is
-# reported as skipped for the go target.
+# reported as skipped for the go target. A case may wait for the JS target:
+# known_gaps.txt.
 bootstrap/app_fail
 bootstrap/debug
 bootstrap/hello
