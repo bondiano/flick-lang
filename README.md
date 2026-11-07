@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="./docs/public/flick-wordmark-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="./docs/public/flick-wordmark.svg">
-    <img src="./docs/public/flick-wordmark.svg" width="600" height="240" alt="Flick — a sharp violet woodpecker shaped like a lowercase f.">
+    <img src="./docs/public/flick-wordmark.svg" width="592" height="200" alt="Flick">
   </picture>
 </h1>
 
