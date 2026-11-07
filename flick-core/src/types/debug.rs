@@ -71,9 +71,13 @@ impl Checker<'_> {
         (hole, expected.clone())
     }
 
-    /// A warning for each `_` in a type, with the type inferred for it; one
+    /// A diagnostic for each type placeholder, with its inferred type; one
     /// of generated code is a fact for its plugin's `check` too.
     pub(super) fn report_holes(&mut self) {
+        let clean = !self
+            .diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error);
         for (span, hole, required) in mem::take(&mut self.holes) {
             if span.start >= self.generated {
                 let fact = self.fact(&hole);
@@ -91,10 +95,6 @@ impl Checker<'_> {
             let complete = !shown
                 .split(|c: char| !c.is_alphanumeric() && c != '_')
                 .any(|w| w == "_");
-            let clean = !self
-                .diagnostics
-                .iter()
-                .any(|d| d.severity == Severity::Error);
             self.diagnostics.push(
                 Diagnostic::new(codes::T024, severity, message)
                     .with_span(span)

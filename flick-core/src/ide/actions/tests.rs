@@ -201,6 +201,28 @@ fn nested_todo_type_is_an_error_with_a_replacement() {
     assert!(changed.contains("wrap : Int -> Option Int"), "{changed}");
 }
 
+#[cfg(feature = "diagnostic-fixes")]
+#[test]
+fn each_todo_type_gets_an_independent_replacement() {
+    let src = "module App.Main exposing (wrap, identity)\n\nwrap : Int -> Option todo\nlet wrap x = Some x\n\nidentity : Int -> todo\nlet identity x = x\n";
+    let (fixture, _) = main(src);
+    let diagnostics: Vec<_> = fixture
+        .ide()
+        .analysis
+        .diagnostics
+        .iter()
+        .filter(|d| d.code.to_string() == "FLICK-T024")
+        .collect();
+    assert_eq!(diagnostics.len(), 2, "{diagnostics:?}");
+    for diagnostic in diagnostics {
+        assert_eq!(diagnostic.severity, Severity::Error);
+        assert!(
+            diagnostic.fixes.iter().any(|fix| !fix.edits.is_empty()),
+            "{diagnostic:?}"
+        );
+    }
+}
+
 #[test]
 fn pattern_match_on_a_variable_lists_its_constructors() {
     let src = "module App.Main exposing (area)\n\nimport App.Shapes exposing (..)\n\narea : Shape -> Float\nlet area shape =\n  shape\n";
