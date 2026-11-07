@@ -302,6 +302,14 @@ let waits body =
 `flick check --fix` does not rewrite it: the operation and its callers change
 together.
 
+## `Scope.current` is not exposed
+
+`Scope.current` gave the owner around under any region, so work could stay under
+an owner longer than the region the type of that owner names, and a child could
+use a resource after its release. It is the compiler's now, and a call is
+`FLICK-T001`. Take the owner from `scope s { … }`, or as a parameter of type
+`Fiber.Owner s`.
+
 ## The IR has no `Try`, `Provide`, `Scope` or `Operation`
 
 A reader of `flick build --emit-ir` meets a new version, `0.4.0`. A `try` with
