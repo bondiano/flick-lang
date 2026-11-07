@@ -64,22 +64,53 @@ impl Checker<'_> {
         self.regions
             .holds
             .iter()
-            .map(|hold| Summary {
-                visible: match &hold.visible {
-                    Visible::Now(labels) => labels.clone(),
-                    Visible::Late(ty) | Visible::Refined(ty) => self.shown_by(ty),
-                },
-                bound: self.bound_of(hold),
-                hidden: self.hidden(hold),
-            })
+            .map(|hold| self.summary(hold))
             .collect()
+    }
+
+    fn summary(&self, hold: &Hold) -> Summary {
+        Summary {
+            visible: match &hold.visible {
+                Visible::Now(labels) => labels.clone(),
+                Visible::Late(ty) | Visible::Refined(ty) => self.shown_by(ty),
+            },
+            bound: self.bound_of(hold),
+            hidden: self.hidden(hold),
+        }
+    }
+
+    /// The variables open in what the summary of `hold` reads: binding
+    /// another one leaves it as it is.
+    fn open_in(&self, hold: &Hold) -> HashSet<u32> {
+        let mut open = HashSet::new();
+        let mut read = |t: &Type| {
+            self.store.zonk(t).visit(&mut |x| {
+                if let Type::Meta(m) = x {
+                    open.insert(*m);
+                }
+            });
+        };
+        hold.held.iter().for_each(|(_, ty)| read(ty));
+        read(&hold.bound);
+        if let Visible::Late(ty) | Visible::Refined(ty) = &hold.visible {
+            read(ty);
+        }
+        open
     }
 
     /// Adds to qualifiers not inferred yet what their values hold; `true`
     /// when one grew.
     pub fn grow_holds(&mut self) -> bool {
+        let open_bound = |hold: &Hold| {
+            let bound = self.bound_of(hold);
+            bound.tails.iter().any(|t| matches!(t, Type::Meta(_)))
+        };
+        if !self.regions.holds.iter().any(open_bound) {
+            return false;
+        }
         let mut changed = false;
         let mut summaries = self.summaries();
+        let mut open: Vec<_> = self.regions.holds.iter().map(|h| self.open_in(h)).collect();
         for i in 0..summaries.len() {
             let Summary { bound, hidden, .. } = &summaries[i];
             if !bound.tails.iter().any(|t| matches!(t, Type::Meta(_))) {
@@ -97,9 +128,10 @@ impl Checker<'_> {
                 });
                 // blocking only chooses among the rows: with every one
                 // blocked, the first still grows, and its bound reports
-                let (open, shut): (Vec<u32>, Vec<u32>) = metas.partition(|m| !blocked.contains(m));
-                let mut grew = false;
-                for m in open.into_iter().chain(shut) {
+                let (unblocked, shut): (Vec<u32>, Vec<u32>) =
+                    metas.partition(|m| !blocked.contains(m));
+                let mut grew = None;
+                for m in unblocked.into_iter().chain(shut) {
                     let rest = self.store.fresh_beside(m);
                     let row = Type::Row(Row {
                         entries: vec![(label.clone(), atom.clone())],
@@ -108,12 +140,20 @@ impl Checker<'_> {
                     });
                     if self.bind(m, &row).is_ok() {
                         changed = true;
-                        grew = true;
+                        grew = Some(m);
                         break;
                     }
                 }
-                if grew {
-                    summaries = self.summaries();
+                if let Some(m) = grew {
+                    // only the holds that read it change: all of them at each
+                    // growth would take time quadratic in the holds of a module
+                    for (j, hold) in self.regions.holds.iter().enumerate() {
+                        if open[j].contains(&m) {
+                            summaries[j] = self.summary(hold);
+                            open[j] = self.open_in(hold);
+                        }
+                    }
+                    debug_assert_eq!(summaries, self.summaries());
                     break;
                 }
             }
@@ -404,6 +444,7 @@ impl Checker<'_> {
 }
 
 /// What a hold shows, may hold and holds beyond what it shows.
+#[derive(Debug, PartialEq)]
 struct Summary {
     visible: Vec<String>,
     bound: Norm,
