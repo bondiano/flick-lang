@@ -64,13 +64,14 @@ export default defineConfig({
       head: [
         { tag: "link", attrs: { rel: "icon", type: "image/svg+xml", href: `${base}/favicon.svg` } },
         { tag: "link", attrs: { rel: "apple-touch-icon", href: `${base}/apple-touch-icon.png`, sizes: "180x180" } },
-        { tag: "meta", attrs: { property: "og:image", content: `${site}${base}/social.png` } },
+        // the query makes link previews that cached the old card by URL fetch the new one
+        { tag: "meta", attrs: { property: "og:image", content: `${site}${base}/social.png?v=2` } },
         { tag: "meta", attrs: { property: "og:image:type", content: "image/png" } },
         { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
         { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
-        { tag: "meta", attrs: { property: "og:image:alt", content: "Flick" } },
-        { tag: "meta", attrs: { name: "twitter:image", content: `${site}${base}/social.png` } },
-        { tag: "meta", attrs: { name: "twitter:image:alt", content: "Flick" } },
+        { tag: "meta", attrs: { property: "og:image:alt", content: "Flick: functions that do what they say." } },
+        { tag: "meta", attrs: { name: "twitter:image", content: `${site}${base}/social.png?v=2` } },
+        { tag: "meta", attrs: { name: "twitter:image:alt", content: "Flick: functions that do what they say." } },
       ],
       disable404Route: true,
       defaultLocale: "root",
