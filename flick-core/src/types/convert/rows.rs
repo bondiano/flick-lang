@@ -8,6 +8,8 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::env::Form;
 use crate::types::kinds::Kind;
+use crate::types::lang::{self, Lang};
+use crate::types::services::OpClass;
 use crate::types::ty::{Effects, Row, Shape, Type, Written};
 use crate::types::{Checker, ty};
 
@@ -19,8 +21,39 @@ impl Checker<'_> {
         let (services, errors) = self.slots(services, errors, free);
         Effects {
             written: self.row_written(node),
+            direct: self.direct_row(&services),
             ..Effects::new(services, errors)
         }
+    }
+
+    /// Whether an arrow of the services `row`, as written, is a plain function
+    /// on Flick's own runtime; a variable, a meta or an effect not found says no.
+    pub(in crate::types) fn direct_row(&self, row: &Type) -> bool {
+        self.options.stages_by_class && self.closed_without_suspending(row)
+    }
+
+    fn closed_without_suspending(&self, row: &Type) -> bool {
+        let Type::Row(r) = row else { return false };
+        (r.entries.iter()).all(|(_, entry)| match entry.spine().0 {
+            Type::Con { module, name } => self.never_suspends(module, name),
+            _ => false,
+        }) && r
+            .tail
+            .as_deref()
+            .is_none_or(|t| self.closed_without_suspending(t))
+    }
+
+    /// Whether the service or effect `module.name` is known, is not `Async` and
+    /// has no `control` operation.
+    pub(in crate::types) fn never_suspends(&self, module: &str, name: &str) -> bool {
+        let local = module == self.env.module && self.control_effects.contains(name);
+        !local
+            && !lang::is(Lang::Async, module, name)
+            && matches!(
+                self.env.type_def(module, name).map(|d| &d.form),
+                Some(Form::Service { operations, .. })
+                    if operations.iter().all(|op| op.class != OpClass::Control)
+            )
     }
 
     /// Where `node`, an effect annotation, is written, for a fix that adds

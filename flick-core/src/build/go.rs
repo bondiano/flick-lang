@@ -59,7 +59,7 @@ pub fn emit(
         .iter()
         .map(|module| {
             if settings.release {
-                optimized(modules, module)
+                optimized(modules, module, false)
             } else {
                 module.ir.clone()
             }

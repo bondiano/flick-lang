@@ -340,10 +340,10 @@ impl Checker<'_> {
     fn resume_type(&self, value: &Type, result: &Type, region: Option<&Type>) -> Type {
         let resume = Type::Fun {
             param: Box::new(value.clone()),
-            effects: Some(Box::new(Effects::new(
-                self.stage.services.clone(),
-                self.stage.errors.clone(),
-            ))),
+            effects: Some(Box::new(Effects {
+                direct: self.direct_row(&self.stage.services),
+                ..Effects::new(self.stage.services.clone(), self.stage.errors.clone())
+            })),
             result: Box::new(result.clone()),
         };
         match region {

@@ -238,7 +238,7 @@ impl Loader<'_> {
                     )));
                     continue;
                 }
-                (None, None) if types::builtins().iter().any(|b| b.module == *module) => {
+                (None, None) if self.builtins().iter().any(|b| b.module == *module) => {
                     diagnostics.extend(refuse(format!(
                         "`{module}` is a built-in module, which provides no plugin"
                     )));

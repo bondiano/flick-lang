@@ -6,6 +6,8 @@
 
 ../rt/control_handlers
 ../rt/deep_async
+../rt/deep_control
+../rt/late_effect
 ../rt/wake_chain
 bootstrap/debug
 bootstrap/hello

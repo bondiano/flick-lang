@@ -1,10 +1,7 @@
 //! Types as the checker and `.iface` see them. A type in an interface is
 //! closed: it holds no unification variables, skolems or error markers.
 
-use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::{Deserialize, Serialize};
 
@@ -83,7 +80,7 @@ pub struct Binder {
 }
 
 /// `{services; errors}` of a runtime arrow.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Effects {
     pub services: Type,
     pub errors: Type,
@@ -92,9 +89,32 @@ pub struct Effects {
     /// `Atom.Read` keeps the runtime stage its function was compiled with.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub sync: bool,
+    /// Whether the arrow is written, under `Options::stages_by_class`, with a
+    /// closed row without `Async` or an effect with a `control` operation: a
+    /// plain function on Flick's own runtime, where nothing else suspends. No
+    /// part of the type: `sync` still says what unifies, and the runtime adapts
+    /// a call of either stage to a function of the other.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub direct: bool,
     /// Where the row is written, for a fix that adds to it.
     #[serde(skip)]
     pub written: Written,
+}
+
+impl PartialEq for Effects {
+    fn eq(&self, other: &Effects) -> bool {
+        self.services == other.services && self.errors == other.errors && self.sync == other.sync
+    }
+}
+
+impl Eq for Effects {}
+
+impl Hash for Effects {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.services.hash(state);
+        self.errors.hash(state);
+        self.sync.hash(state);
+    }
 }
 
 /// Where an effect row is written: right after its `{`, and what is
@@ -160,58 +180,18 @@ impl Effects {
             services,
             errors,
             sync,
+            direct: false,
             written: Written::default(),
         }
     }
 
     pub fn stage(&self) -> Stage {
-        if self.sync || (stages_by_class() && direct_row(&self.services)) {
+        if self.sync || self.direct {
             Stage::Sync
         } else {
             Stage::Runtime
         }
     }
-}
-
-/// Whether a stage comes from the classes of the operations of its row, as on
-/// Flick's own runtime, where no effect but `Async` and a `control` operation
-/// suspends. The types do not change: `sync` still says what unifies, and the
-/// runtime adapts a call of either stage to a function of the other.
-static CLASS_STAGES: AtomicBool = AtomicBool::new(false);
-
-/// The effects with a `control` operation declared so far, `Module.Name`.
-static CONTROL_EFFECTS: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
-
-/// Decides stages by class, from now on in this process.
-pub fn set_stages_by_class() {
-    CLASS_STAGES.store(true, Ordering::Relaxed);
-}
-
-pub(super) fn stages_by_class() -> bool {
-    CLASS_STAGES.load(Ordering::Relaxed)
-}
-
-/// Records the effect `Module.Name` as having a `control` operation.
-// shortcut: only effects checked in this process count; one of a library read from its interface runs as Runtime only if a row variable or `Async` says so, until interfaces carry the class
-pub fn declare_control_effect(key: String) {
-    if let Ok(mut effects) = CONTROL_EFFECTS.lock() {
-        effects.insert(key);
-    }
-}
-
-/// Whether `row` is closed, without `Async` or an effect with a `control` operation.
-fn direct_row(row: &Type) -> bool {
-    let Type::Row(r) = row else { return false };
-    let direct = r.entries.iter().all(|(_, entry)| {
-        let Type::Con { module, name } = entry.spine().0 else {
-            return false;
-        };
-        !lang::is(Lang::Async, module, name)
-            && CONTROL_EFFECTS
-                .lock()
-                .is_ok_and(|effects| !effects.contains(&format!("{module}.{name}")))
-    });
-    direct && r.tail.as_deref().is_none_or(direct_row)
 }
 
 /// The stage of an arrow with `effects`.
@@ -414,6 +394,7 @@ impl Type {
                         services: f(&e.services),
                         errors: f(&e.errors),
                         sync: e.sync,
+                        direct: e.direct,
                         written: e.written,
                     })
                 }),
@@ -549,7 +530,33 @@ impl Type {
 
 #[cfg(test)]
 mod tests {
-    use super::{Lang, Type};
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    use super::{Effects, Lang, Stage, Type};
+
+    #[test]
+    fn direct_changes_the_stage_and_not_the_type() {
+        let plain = Effects::new(Type::empty_row(), Type::empty_row());
+        let direct = Effects {
+            direct: true,
+            ..plain.clone()
+        };
+        let hash = |e: &Effects| {
+            let mut hasher = DefaultHasher::new();
+            e.hash(&mut hasher);
+            hasher.finish()
+        };
+        assert_eq!(plain, direct);
+        assert_eq!(hash(&plain), hash(&direct));
+        assert_eq!(plain.stage(), Stage::Runtime);
+        assert_eq!(direct.stage(), Stage::Sync);
+        // an interface of the default mode does not change
+        let json = |e: &Effects| serde_json::to_string(e).expect("serializes");
+        assert!(!json(&plain).contains("direct"));
+        assert!(json(&direct).contains("\"direct\":true"));
+        let read: Effects = serde_json::from_str(&json(&direct)).expect("reads");
+        assert!(read.direct);
+    }
 
     #[test]
     fn substitution_preserves_capture_qualification_kind() {

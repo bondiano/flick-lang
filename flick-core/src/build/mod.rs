@@ -185,10 +185,16 @@ pub fn emit(
             foreign_specifier(settings, &path, module, spec)
         }
     };
+    let by_class = settings.backend == Backend::Rt;
     let any_interface = |m: &str| {
-        interface_of(m).or_else(|| types::builtins().iter().find(|i| i.module == m).cloned())
+        interface_of(m).or_else(|| {
+            types::builtins_of(by_class)
+                .iter()
+                .find(|i| i.module == m)
+                .cloned()
+        })
     };
-    let (workers, direct) = exports(settings.release, modules, &any_interface);
+    let (workers, direct) = exports(settings.release, modules, &any_interface, by_class);
     let workers = |m: &str, name: &str| workers.get(&(m.to_owned(), name.to_owned())).copied();
     let direct = |m: &str, i: &str, method: &str| {
         direct.contains(&(m.to_owned(), i.to_owned(), method.to_owned()))
@@ -509,13 +515,16 @@ fn exports(
     release: bool,
     modules: &[Compiled],
     any_interface: &dyn Fn(&str) -> Option<Interface>,
+    by_class: bool,
 ) -> Exports {
     let mut out = Exports::default();
     if !release {
         return out;
     }
     let own = modules.iter().map(|c| (&c.name, &c.ir.items));
-    let builtin = builtin_modules().iter().map(|m| (&m.name, &m.items));
+    let builtin = builtin_modules_of(by_class)
+        .iter()
+        .map(|m| (&m.name, &m.items));
     for (module, items) in own.chain(builtin) {
         let Some(interface) = any_interface(module) else {
             continue;
@@ -545,16 +554,14 @@ fn builtins(
     #[cfg(feature = "typescript")]
     let dts = ctx.settings.extras.dts;
     let mut pending = imports;
+    let lowered = builtin_modules_of(ctx.settings.backend == Backend::Rt);
     #[cfg(feature = "typescript")]
     if dts {
-        pending = builtin_modules()
-            .iter()
-            .map(|module| module.name.clone())
-            .collect();
+        pending = lowered.iter().map(|module| module.name.clone()).collect();
     }
     let mut written = HashSet::new();
     while let Some(name) = pending.pop() {
-        let Some(module) = builtin_modules().iter().find(|m| m.name == name) else {
+        let Some(module) = lowered.iter().find(|m| m.name == name) else {
             continue;
         };
         if !written.insert(name) {
@@ -584,12 +591,21 @@ fn builtins(
 
 /// The function `name` of `module`, a module of the build or a built-in one,
 /// with its dictionary parameters and body for the optimizer to copy.
-fn generic_of(modules: &[Compiled], module: &str, name: &str) -> Option<(Vec<String>, ir::Expr)> {
+fn generic_of(
+    modules: &[Compiled],
+    module: &str,
+    name: &str,
+    by_class: bool,
+) -> Option<(Vec<String>, ir::Expr)> {
     if let Some(m) = modules.iter().find(|m| m.name == module) {
         return opt::names_only(&m.ir, name, &|n| m.interface.exports_value(n));
     }
-    let ir = builtin_modules().iter().find(|m| m.name == module)?;
-    let interface = types::builtins().iter().find(|i| i.module == module)?;
+    let ir = builtin_modules_of(by_class)
+        .iter()
+        .find(|m| m.name == module)?;
+    let interface = types::builtins_of(by_class)
+        .iter()
+        .find(|i| i.module == module)?;
     opt::names_only(ir, name, &|n| interface.exports_value(n))
 }
 
@@ -618,7 +634,11 @@ fn compiled_module(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Vec<String> {
     // the interface and its summaries come from the reference lowering
-    let optimized = ctx.settings.release.then(|| optimized(ctx.modules, module));
+    let by_class = ctx.settings.backend == Backend::Rt;
+    let optimized = ctx
+        .settings
+        .release
+        .then(|| optimized(ctx.modules, module, by_class));
     if ctx.settings.backend == Backend::None {
         effects::check(&module.ir, diagnostics);
     }
@@ -860,34 +880,46 @@ fn specifier(from: &Path, target: &Path) -> String {
 }
 
 /// The IR of `module` of the build `modules` as a release build optimizes
-/// it, for every target alike.
-pub fn optimized(modules: &[Compiled], module: &Compiled) -> ir::Module {
+/// it, for every target alike; `by_class` is the mode the build is checked in.
+pub fn optimized(modules: &[Compiled], module: &Compiled, by_class: bool) -> ir::Module {
     let mut ir = module.ir.clone();
     let exported = |name: &str| module.interface.exports_value(name);
-    let generics = |m: &str, name: &str| generic_of(modules, m, name);
+    let generics = |m: &str, name: &str| generic_of(modules, m, name, by_class);
     opt::optimize(&mut ir, &exported, &generics);
     ir
 }
 
 /// The built-in modules, lowered.
 pub fn builtin_modules() -> &'static [ir::Module] {
-    &lowered_builtins().0
+    builtin_modules_of(false)
+}
+
+/// The built-in modules, lowered from a check with `stages_by_class`.
+pub fn builtin_modules_of(stages_by_class: bool) -> &'static [ir::Module] {
+    &lowered_builtins(stages_by_class).0
 }
 
 /// What the reference model reads of each built-in module, in the order of
 /// [`builtin_modules`].
 pub fn builtin_declarations() -> &'static [Arc<Interface>] {
-    &lowered_builtins().1
+    &lowered_builtins(false).1
 }
 
-fn lowered_builtins() -> &'static (Vec<ir::Module>, Vec<Arc<Interface>>) {
-    static BUILTINS: OnceLock<(Vec<ir::Module>, Vec<Arc<Interface>>)> = OnceLock::new();
-    BUILTINS.get_or_init(|| {
+/// The built-in modules lowered, with what the reference model reads of each.
+type Lowered = (Vec<ir::Module>, Vec<Arc<Interface>>);
+
+fn lowered_builtins(stages_by_class: bool) -> &'static Lowered {
+    static BUILTINS: [OnceLock<Lowered>; 2] = [OnceLock::new(), OnceLock::new()];
+    BUILTINS[usize::from(stages_by_class)].get_or_init(|| {
         let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
-        types::check_each(types::builtin_sources(), |module, typing| {
-            lowered.push(ir::lower(module, typing).expect("built-in modules compile"));
-            declarations.push(typing.declarations.clone());
-        });
+        types::check_each(
+            types::builtin_sources(),
+            stages_by_class,
+            |module, typing| {
+                lowered.push(ir::lower(module, typing).expect("built-in modules compile"));
+                declarations.push(typing.declarations.clone());
+            },
+        );
         (lowered, declarations)
     })
 }

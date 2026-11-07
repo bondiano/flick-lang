@@ -9,7 +9,6 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Build, Emit, Kind, MAIN_ENTRY, Profile};
 use flick_core::project::{self, Compilation, Compiled, Project, js};
 use flick_core::source::{FileId, SourceMap};
-use flick_core::types::set_stages_by_class;
 
 use self::js_artifacts::js_artifacts;
 use super::check::select;
@@ -21,7 +20,7 @@ use crate::command::{Command, Outcome};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{cache, toolchain};
+use crate::{builtins, cache, toolchain};
 
 mod cached;
 mod js_artifacts;
@@ -113,13 +112,17 @@ impl Command for BuildCommand {
         let plan = self.plan(&host, project.as_ref(), Vec::new());
         let go = plan.go;
         if plan.extras.rt {
-            // the stages of the built-in modules too: nothing has checked one yet
-            set_stages_by_class();
             if plan.typescript || go || plan.extras.dts || plan.extras.promise_facade {
                 let message = "Flick's own runtime has only JavaScript output yet";
                 return Outcome {
                     sources,
                     diagnostics: vec![Diagnostic::new(codes::F004, Severity::Error, message)],
+                };
+            }
+            if let Err(diagnostic) = builtins::prepare_in(true) {
+                return Outcome {
+                    sources,
+                    diagnostics: vec![diagnostic],
                 };
             }
         }
@@ -160,8 +163,14 @@ impl Command for BuildCommand {
         }
         progress.stage("Compiling Flick modules");
         let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
-            let (diagnostics, compilation, fresh) =
-                project::compile_with(&host, &mut sources, project.as_ref(), &roots, saved);
+            let (diagnostics, compilation, fresh) = project::compile_with(
+                &host,
+                &mut sources,
+                project.as_ref(),
+                &roots,
+                saved,
+                plan.extras.rt,
+            );
             ((diagnostics, compilation), fresh)
         });
         if diagnostics.iter().any(|d| d.severity == Severity::Error) {

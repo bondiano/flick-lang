@@ -210,26 +210,33 @@ pub fn builtin_sources() -> &'static [(&'static str, &'static str)] {
     })
 }
 
-static BUILTINS: OnceLock<Vec<Interface>> = OnceLock::new();
+/// The interfaces of the built-in modules in each mode of `stages_by_class`.
+static BUILTINS: [OnceLock<Vec<Interface>>; 2] = [OnceLock::new(), OnceLock::new()];
 
 /// Interfaces of the built-in modules.
 pub fn builtins() -> &'static [Interface] {
-    BUILTINS.get_or_init(|| {
-        let (done, elapsed) = timed(check_builtins);
+    builtins_of(false)
+}
+
+/// Interfaces of the built-in modules, checked with `stages_by_class`.
+pub fn builtins_of(stages_by_class: bool) -> &'static [Interface] {
+    BUILTINS[usize::from(stages_by_class)].get_or_init(|| {
+        let (done, elapsed) = timed(|| check_builtins(stages_by_class));
         debug!(modules = done.len(), ?elapsed, "built-in modules checked");
         done
     })
 }
 
-fn check_builtins() -> Vec<Interface> {
-    check_sources(builtin_sources())
+fn check_builtins(stages_by_class: bool) -> Vec<Interface> {
+    check_each(builtin_sources(), stages_by_class, |_, _| {})
 }
 
-/// [`builtins`], or what the first module of an implicit package that does not
+/// [`builtins_of`], or what the first module of an implicit package that does not
 /// check says: a project or `FLICK_STD_PATH` may name a package of another
 /// compiler. A core module that does not check is still a bug of this one.
-pub fn try_builtins() -> Result<&'static [Interface], String> {
-    if let Some(done) = BUILTINS.get() {
+pub fn try_builtins(stages_by_class: bool) -> Result<&'static [Interface], String> {
+    let slot = &BUILTINS[usize::from(stages_by_class)];
+    if let Some(done) = slot.get() {
         return Ok(done);
     }
     let mut problem = None;
@@ -243,10 +250,10 @@ pub fn try_builtins() -> Result<&'static [Interface], String> {
         };
         problem.get_or_insert_with(|| format!("`{name}` of `{package}`: {}", first.message));
     };
-    let done = check_reporting(builtin_sources(), report, |_, _| {});
+    let done = check_reporting(builtin_sources(), report, stages_by_class, |_, _| {});
     match problem {
         Some(problem) => Err(problem),
-        None => Ok(BUILTINS.get_or_init(|| done)),
+        None => Ok(slot.get_or_init(|| done)),
     }
 }
 
@@ -257,21 +264,27 @@ const ALLOWED: [Code; 2] = [codes::T059, codes::R012];
 
 /// Checks the built-in modules `modules`, as `(module, text)` in
 /// dependency order.
+#[cfg(test)]
 pub(crate) fn check_sources(modules: &[(&str, &str)]) -> Vec<Interface> {
-    check_each(modules, |_, _| {})
+    check_each(modules, false, |_, _| {})
 }
 
 /// [`check_sources`], also giving each module with its typing to `each`.
 /// What the modules before it export grows by one module at a time instead
 /// of being learned again for each module.
-pub fn check_each(modules: &[(&str, &str)], each: impl FnMut(&Module, &Typing)) -> Vec<Interface> {
-    check_allowing(modules, &ALLOWED, each)
+pub fn check_each(
+    modules: &[(&str, &str)],
+    stages_by_class: bool,
+    each: impl FnMut(&Module, &Typing),
+) -> Vec<Interface> {
+    check_allowing(modules, &ALLOWED, stages_by_class, each)
 }
 
 /// [`check_each`], with the built-in modules allowed the warnings `allowed`.
 fn check_allowing(
     modules: &[(&str, &str)],
     allowed: &[Code],
+    stages_by_class: bool,
     each: impl FnMut(&Module, &Typing),
 ) -> Vec<Interface> {
     let report = |name: &str, mut diagnostics: Vec<Diagnostic>| {
@@ -281,13 +294,14 @@ fn check_allowing(
             "built-in module {name} does not check: {diagnostics:?}"
         );
     };
-    check_reporting(modules, report, each)
+    check_reporting(modules, report, stages_by_class, each)
 }
 
 /// [`check_each`], giving what each module's check says to `report`.
 fn check_reporting(
     modules: &[(&str, &str)],
     mut report: impl FnMut(&str, Vec<Diagnostic>),
+    stages_by_class: bool,
     mut each: impl FnMut(&Module, &Typing),
 ) -> Vec<Interface> {
     let mut done: Vec<Interface> = Vec::new();
@@ -323,6 +337,7 @@ fn check_reporting(
             no_let_assert: false,
             thresholds: super::Thresholds::default(),
             effects: true,
+            stages_by_class,
         };
         let (checked, typing, _) =
             super::run_in(&module, &imported, &known, options, &mut interface);
@@ -338,25 +353,29 @@ fn check_reporting(
     done
 }
 
-/// Uses `interfaces`, saved from an earlier [`builtins`] of the same
-/// sources, instead of checking the built-in modules again; false once
-/// they are already in use.
-pub fn install_builtins(interfaces: Vec<Interface>) -> bool {
-    BUILTINS.set(interfaces).is_ok()
+/// Uses `interfaces`, saved from an earlier [`builtins_of`] of the same
+/// sources and mode, instead of checking the built-in modules again; false
+/// once they are already in use.
+pub fn install_builtins(stages_by_class: bool, interfaces: Vec<Interface>) -> bool {
+    BUILTINS[usize::from(stages_by_class)]
+        .set(interfaces)
+        .is_ok()
 }
 
-/// Whether `interfaces` are the built-in modules [`builtins`] holds, without
-/// checking them when they are not checked yet.
-pub(super) fn are_builtins(interfaces: &[Interface]) -> bool {
-    BUILTINS
-        .get()
-        .is_some_and(|b| ptr::eq(b.as_slice(), interfaces))
+/// The mode of the built-in modules [`builtins_of`] holds, if `interfaces` are
+/// those, without checking them when they are not checked yet.
+pub(super) fn are_builtins(interfaces: &[Interface]) -> Option<bool> {
+    [false, true].into_iter().find(|&by_class| {
+        BUILTINS[usize::from(by_class)]
+            .get()
+            .is_some_and(|b| ptr::eq(b.as_slice(), interfaces))
+    })
 }
 
-/// What every module knows of the built-in modules.
-pub(super) fn builtin_env() -> &'static Builtins {
-    static ENV: OnceLock<Builtins> = OnceLock::new();
-    ENV.get_or_init(|| Builtins::new(builtins()))
+/// What every module knows of the built-in modules in a mode.
+pub(super) fn builtin_env(stages_by_class: bool) -> &'static Builtins {
+    static ENV: [OnceLock<Builtins>; 2] = [OnceLock::new(), OnceLock::new()];
+    ENV[usize::from(stages_by_class)].get_or_init(|| Builtins::new(builtins_of(stages_by_class)))
 }
 
 #[cfg(test)]
@@ -367,7 +386,7 @@ mod tests {
 
     #[test]
     fn built_in_signatures_write_nothing_they_get_anyway() {
-        super::check_allowing(super::builtin_sources(), &[], |_, _| {});
+        super::check_allowing(super::builtin_sources(), &[], false, |_, _| {});
     }
 
     #[cfg(feature = "diagnostic-fixes")]
@@ -413,7 +432,7 @@ mod tests {
                         fixes.push((name.to_owned(), edits));
                     }
                 };
-                check_reporting(&sources, report, |_, _| {});
+                check_reporting(&sources, report, false, |_, _| {});
                 if fixes.is_empty() {
                     return;
                 }
@@ -443,7 +462,7 @@ mod tests {
         let unwritten = [("Bool", "Reducer")];
         let mut seen: BTreeSet<String> = BTreeSet::new();
         let mut missing: Vec<(String, BTreeSet<String>)> = Vec::new();
-        super::check_each(super::builtin_sources(), |module, _| {
+        super::check_each(super::builtin_sources(), false, |module, _| {
             let imported = |prefix: &str| {
                 (module.syntax.imports.iter())
                     .any(|i| i.qualifier() == prefix || i.module == prefix)
