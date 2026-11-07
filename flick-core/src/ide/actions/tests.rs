@@ -1,5 +1,6 @@
 use super::super::tests::{Fixture, fixture_of};
 use super::Action;
+use crate::diagnostics::{Diagnostic, Severity};
 
 const SHAPES: &str = "module App.Shapes exposing (..)
 
@@ -74,8 +75,7 @@ fn todo_signature_of_gadt_interpreter_is_checked_before_offering() {
             .analysis
             .diagnostics
             .iter()
-            .any(|d| d.code.to_string() == "FLICK-T024"
-                && d.severity == crate::diagnostics::Severity::Error)
+            .any(|d| d.code.to_string() == "FLICK-T024" && d.severity == Severity::Error)
     );
     assert!(
         !f.ide()
@@ -95,7 +95,7 @@ fn todo_signature_of_gadt_interpreter_is_checked_before_offering() {
             .analysis
             .diagnostics
             .iter()
-            .all(crate::diagnostics::Diagnostic::unnecessary),
+            .all(Diagnostic::unnecessary),
         "{:?}",
         checked.ide().analysis.diagnostics
     );
@@ -113,7 +113,7 @@ fn todo_signature_of_gadt_interpreter_is_checked_before_offering() {
             .analysis
             .diagnostics
             .iter()
-            .all(crate::diagnostics::Diagnostic::unnecessary)
+            .all(Diagnostic::unnecessary)
     );
 }
 
@@ -144,7 +144,7 @@ fn imported_gadt_signature_uses_exposed_type_name() {
             .analysis
             .diagnostics
             .iter()
-            .all(crate::diagnostics::Diagnostic::unnecessary),
+            .all(Diagnostic::unnecessary),
         "{:?}",
         checked.ide().analysis.diagnostics
     );
@@ -185,7 +185,7 @@ fn nested_todo_type_is_an_error_with_a_replacement() {
         .iter()
         .find(|d| d.code.to_string() == "FLICK-T024")
         .expect("todo error");
-    assert_eq!(diagnostic.severity, crate::diagnostics::Severity::Error);
+    assert_eq!(diagnostic.severity, Severity::Error);
     let fix = diagnostic
         .fixes
         .iter()

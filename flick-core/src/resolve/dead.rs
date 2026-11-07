@@ -114,12 +114,11 @@ fn expose_value(module: &Module, name: &str) -> Option<Edit> {
         .nodes()
         .filter(|n| n.kind == K::ExposeItem)
         .collect();
-    let (at, replacement) = match items.last() {
-        Some(last) => (last.range().1, format!(", {name}")),
-        None => {
-            let close = exposing.child_tokens().find(|t| t.kind == K::RParen)?;
-            (close.start, name.to_owned())
-        }
+    let (at, replacement) = if let Some(last) = items.last() {
+        (last.range().1, format!(", {name}"))
+    } else {
+        let close = exposing.child_tokens().find(|t| t.kind == K::RParen)?;
+        (close.start, name.to_owned())
     };
     Some(Edit {
         span: Span::new(module.file, at, at),

@@ -6,6 +6,7 @@ use std::collections::HashSet;
 
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::is_type;
 
 pub(super) fn drop_redundant_foralls(tree: &mut Node, text: &str) {
     visit(tree, text, &HashSet::new(), true);
@@ -88,7 +89,7 @@ fn same_name(sig: &Node, decl: &Node, text: &str) -> bool {
 }
 
 fn signature_type(sig: &Node) -> Option<&Node> {
-    sig.nodes().find(|n| crate::types::is_type(n.kind))
+    sig.nodes().find(|n| is_type(n.kind))
 }
 
 fn type_names(node: &Node, text: &str) -> HashSet<String> {
@@ -103,7 +104,7 @@ fn shorten(sig: &mut Node, text: &str, outer: &HashSet<String>) {
     let Some(Element::Node(ty)) = sig
         .children
         .iter_mut()
-        .find(|c| matches!(c, Element::Node(n) if crate::types::is_type(n.kind)))
+        .find(|c| matches!(c, Element::Node(n) if is_type(n.kind)))
     else {
         return;
     };

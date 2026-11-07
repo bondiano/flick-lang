@@ -3,6 +3,7 @@
 use super::super::{Ide, tree};
 use super::{Action, edit, indent_at, line_start};
 use crate::source::FileId;
+use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Kind, Type, show_type, without_value_captures};
 use crate::{diagnostics::Severity, resolve, syntax, types};
@@ -78,26 +79,7 @@ impl Ide<'_> {
                     } else {
                         continue;
                     };
-                let inferred = self
-                    .analysis
-                    .diagnostics
-                    .iter()
-                    .find(|d| {
-                        d.span
-                            .is_some_and(|s| s.file == file && (s.start, s.end) == hole.range())
-                    })
-                    .and_then(|d| d.message.split('`').nth(3))
-                    .and_then(|s| s.rsplit_once(" -> ").map(|(_, result)| result.to_owned()));
-                let results: Vec<String> = vars
-                    .iter()
-                    .map(|v| (*v).to_owned())
-                    .chain(inferred)
-                    .chain(
-                        ["Unit", "Bool", "Int", "Float", "BigInt", "String"]
-                            .into_iter()
-                            .map(str::to_owned),
-                    )
-                    .collect();
+                let results = self.todo_results(file, hole, &vars);
                 for prefix in prefixes {
                     for result in &results {
                         let full = format!(
@@ -106,7 +88,7 @@ impl Ide<'_> {
                             vars.join(" ")
                         );
                         let replacement = if hole.range()
-                            == sig.nodes().find(|n| crate::types::is_type(n.kind))?.range()
+                            == sig.nodes().find(|n| types::is_type(n.kind))?.range()
                         {
                             full
                         } else {
@@ -128,6 +110,28 @@ impl Ide<'_> {
             }
         }
         None
+    }
+
+    fn todo_results(&self, file: FileId, hole: &Node, vars: &[&str]) -> Vec<String> {
+        let inferred = self
+            .analysis
+            .diagnostics
+            .iter()
+            .find(|d| {
+                d.span
+                    .is_some_and(|s| s.file == file && (s.start, s.end) == hole.range())
+            })
+            .and_then(|d| d.message.split('`').nth(3))
+            .and_then(|s| s.rsplit_once(" -> ").map(|(_, result)| result.to_owned()));
+        vars.iter()
+            .map(|v| (*v).to_owned())
+            .chain(inferred)
+            .chain(
+                ["Unit", "Bool", "Int", "Float", "BigInt", "String"]
+                    .into_iter()
+                    .map(str::to_owned),
+            )
+            .collect()
     }
 
     fn signature_candidate_checks(&self, file: FileId, text: &str) -> bool {
@@ -159,9 +163,9 @@ impl Ide<'_> {
         let local = |_: &str| true;
         let options = types::Options {
             local: &local,
-            limits: Default::default(),
+            limits: types::Limits::default(),
             no_let_assert: false,
-            thresholds: Default::default(),
+            thresholds: types::Thresholds::default(),
             effects: true,
         };
         !types::check(
@@ -232,7 +236,7 @@ impl Ide<'_> {
     }
 }
 
-fn descendant(node: &crate::syntax::cst::Node, kind: K) -> Option<&crate::syntax::cst::Node> {
+fn descendant(node: &Node, kind: K) -> Option<&Node> {
     node.nodes().find_map(|n| {
         if n.kind == kind {
             Some(n)

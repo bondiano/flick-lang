@@ -1,6 +1,8 @@
 //! Layout of declarations and types.
 
 use super::fmt;
+use crate::diagnostics::Severity;
+use crate::source::SourceMap;
 
 #[test]
 fn omits_redundant_outer_forall_on_nonrecursive_functions() {
@@ -8,11 +10,11 @@ fn omits_redundant_outer_forall_on_nonrecursive_functions() {
     let out = fmt(src);
     assert!(out.contains("eval : Expr a -> a\n"), "{out}");
     for text in [src, out.as_str()] {
-        let mut sources = crate::source::SourceMap::default();
+        let mut sources = SourceMap::default();
         let file = sources.add("App/Main.fl", text);
         let errors: Vec<_> = crate::check(&sources, file)
             .into_iter()
-            .filter(|d| d.severity == crate::diagnostics::Severity::Error)
+            .filter(|d| d.severity == Severity::Error)
             .collect();
         assert!(errors.is_empty(), "{errors:?}");
     }
@@ -29,11 +31,11 @@ fn local_forall_respects_enclosing_type_variables() {
     assert!(out.contains("outer : a -> a\n"), "{out}");
     assert!(out.contains("inner : forall a. a -> a\n"), "{out}");
     for text in [safe, shadowed, safe_out.as_str(), out.as_str()] {
-        let mut sources = crate::source::SourceMap::default();
+        let mut sources = SourceMap::default();
         let file = sources.add("App/Main.fl", text);
         let errors: Vec<_> = crate::check(&sources, file)
             .into_iter()
-            .filter(|d| d.severity == crate::diagnostics::Severity::Error)
+            .filter(|d| d.severity == Severity::Error)
             .collect();
         assert!(errors.is_empty(), "{errors:?}");
     }
