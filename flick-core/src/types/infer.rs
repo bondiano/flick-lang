@@ -618,6 +618,7 @@ impl Checker<'_> {
                 }
                 K::Block => self.check(child, result),
                 kind if super::patterns::is_pattern(kind) => {
+                    let child = super::handle::failed_pattern(child, self.text).unwrap_or(child);
                     span = self.span(child);
                     pat = self.bind_arm_pattern(child, scrutinee);
                 }

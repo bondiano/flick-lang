@@ -156,6 +156,7 @@ lang_items! {
     Ge = "ge",
     // functions that syntax stands for or the optimizer knows
     FromResult = "from_result",
+    Fail = "fail",
     Pure = "pure",
     OptionBind = "option_bind",
     ResultBind = "result_bind",

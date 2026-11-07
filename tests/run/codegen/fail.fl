@@ -1,0 +1,56 @@
+// `Fail.fail` raises an error, `Fail e` in a row is the error `e`, and an arm
+// of a `try` catches it in either form.
+module App.Main exposing (main)
+
+type error Gone = Gone String
+
+type error Late = Late Float
+
+gone : String ->{Fail {Gone};} Int
+let gone reason = Fail.fail (Gone reason)
+
+both : Float ->{Fail {Gone}; Late} Int
+let both n = if n > 1 then Fail.fail (Late n) else gone "both"
+
+full : String ->{} String
+let full reason =
+  try show (gone reason) with
+  | Fail.fail (Gone why) -> "full " ++ why
+
+short : String ->{} String
+let short reason =
+  try show (gone reason) with
+  | Gone why -> "short " ++ why
+
+every : String ->{} String
+let every reason =
+  try show (gone reason) with
+  | Fail.fail _ -> "every"
+
+after : Unit ->{} String
+let after () =
+  try
+    let value = gone "after"
+    ignore value
+    "unreachable"
+  with
+  | Gone why -> "stopped " ++ why
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (full "a")
+  Platform.stdout_line (short "b")
+  Platform.stdout_line (every "c")
+  Platform.stdout_line (after ())
+  Platform.stdout_line
+    (
+      try show (both 2) with
+      | Late n -> "late " ++ show n
+      | Gone why -> why
+    )
+  Platform.stdout_line
+    (
+      try show (both 0) with
+      | Late n -> "late " ++ show n
+      | Gone why -> why
+    )

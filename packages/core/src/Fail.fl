@@ -1,0 +1,6 @@
+module Fail exposing (fail)
+
+/// Fails with `failure`: the rest of the computation does not run, and the
+/// nearest `try` with an arm for it, or the caller, receives it.
+fail : Errors e ->{; e} a
+let fail failure = from_result (Err failure)

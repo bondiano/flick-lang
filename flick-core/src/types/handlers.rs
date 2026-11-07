@@ -8,7 +8,7 @@ use std::mem;
 use super::Checker;
 use super::effects::{NO_EFFECTS, Site};
 use super::env::{Form, Found};
-use super::handle::{Handled, arm_pattern, operation_path};
+use super::handle::{Handled, arm_pattern, failed_pattern, operation_path};
 use super::infer::eff;
 use super::patterns::is_pattern;
 use super::services::Operation;
@@ -199,7 +199,8 @@ impl Checker<'_> {
 
     /// An arm for errors.
     fn error_arm(&mut self, arm: &Node, raised: &Type, ty: &Type, caught: &mut Caught) {
-        if arm_pattern(arm).is_some_and(catch_all) {
+        let pattern = arm_pattern(arm).map(|p| failed_pattern(p, self.text).unwrap_or(p));
+        if pattern.is_some_and(catch_all) {
             // it receives every error the body raises, whatever its uses ask for
             let every = self.store.fresh_error_row();
             let errors = Type::app(Type::lang(Lang::Errors), every.clone());

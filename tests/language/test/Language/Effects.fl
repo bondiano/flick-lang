@@ -72,6 +72,24 @@ let tests = [
         Test.expect (Test.equal ["3", "not found b", "invalid 0", "very invalid"] outcomes)
       }),
     Test.effect_test
+      "Fail.fail stops the computation, and either form of an arm catches it"
+      (task {
+        let steps = Ref.make 0
+        failing : Unit ->{Fail {NotFound};} Int
+        let failing () =
+          Ref.set steps 1
+          let value = Fail.fail (NotFound "x")
+          Ref.set steps 2
+          value
+        let full =
+          try show (failing ()) with
+          | Fail.fail (NotFound k) -> "full " ++ k
+        let short =
+          try show (failing ()) with
+          | NotFound k -> "short " ++ k
+        Test.expect (Test.equal ("full x", "short x", 1) (full, short, Ref.get steps))
+      }),
+    Test.effect_test
       "an unhandled error passes through"
       (task {
         let inner =
@@ -118,7 +136,7 @@ let tests = [
               let assert [x] = List.range 0 2 as "one item"
               show x
             })
-        Test.expect (Test.equal "defect: Language.Effects:118: one item: [0,1]" outcome)
+        Test.expect (Test.equal "defect: Language.Effects:136: one item: [0,1]" outcome)
       }),
     Test.effect_test
       "exits"

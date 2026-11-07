@@ -71,6 +71,12 @@ type ServiceTag (r : ServiceRow)
 /// operations runs at once.
 effect Async
 
+@lang fail
+/// Failing with the errors `e`, the second row of an arrow by another name:
+/// `->{r, Fail e}` is `->{r; e}`. `Fail.fail` fails, and an arm of a `try`
+/// catches it: `| NotFound _ ->` or, in full, `| Fail.fail (NotFound _) ->`.
+effect Fail (e : ErrorRow)
+
 @lang scope
 /// The owner of what a `scope` acquires: an operation that acquires a
 /// resource of region `s` needs `Scope s`, which the innermost `scope`

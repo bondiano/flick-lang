@@ -52,10 +52,29 @@ pub fn arm_pattern(arm: &Node) -> Option<&Node> {
     arm.nodes().find(|n| is_pattern(n.kind))
 }
 
+/// `p` of `Fail.fail p`, in an arm of a `try` the same as `p`: `Fail` has its
+/// own row and no handler of its own.
+// shortcut: an arm of a `match` takes this form too, where it can only fail to match its type; upgrade when an arm knows what it belongs to.
+pub fn failed_pattern<'n>(pattern: &'n Node, text: &str) -> Option<&'n Node> {
+    if pattern.kind != K::ConPat {
+        return None;
+    }
+    let path: String = pattern
+        .child_tokens()
+        .filter(|t| matches!(t.kind, K::Con | K::Ident | K::Dot))
+        .map(|t| t.text(text))
+        .collect();
+    let mut args = pattern.nodes().filter(|n| is_pattern(n.kind));
+    match (path.as_str(), args.next(), args.next()) {
+        ("Fail.fail", Some(argument), None) => Some(argument),
+        _ => None,
+    }
+}
+
 /// `E.op` or `M.E.op` of a pattern naming an operation: a path whose last
 /// segment is a name, which no constructor has.
 pub fn operation_path(pattern: &Node, text: &str) -> Option<(String, String)> {
-    if pattern.kind != K::ConPat {
+    if pattern.kind != K::ConPat || failed_pattern(pattern, text).is_some() {
         return None;
     }
     let segments: Vec<_> = pattern
