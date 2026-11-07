@@ -174,6 +174,14 @@ export const scope = <A, E, R>(
   body: (owner: Owner, outer: Owner | undefined) => Effect.Effect<A, E, R>,
 ): Effect.Effect<A, unknown, Exclude<R, Scope.Scope>> => withOwner(body, "scope");
 
+/** `Scope.run f`, which `scope s { body }` stands for. */
+export const scopeRun = <A, E, R>(
+  f: (owner: Owner) => Effect.Effect<A, E, R>,
+): Effect.Effect<A, unknown, Exclude<R, Scope.Scope>> => withOwner((owner) => f(owner), "scope");
+
+/** `Scope.current ()`: the owner around, which a nested `scope` may acquire into. */
+export const scopeCurrent = (): Effect.Effect<Owner | undefined> => Effect.service(CurrentOwner);
+
 /**
  * A call that acquires into the owner of a region the compiler chose
  * lexically: an outer `scope`'s, not the innermost one's.

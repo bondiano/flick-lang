@@ -160,9 +160,6 @@ impl Gen<'_> {
             ExprKind::Generate { .. } | ExprKind::Each { .. } | ExprKind::Yield(_) => {
                 self.generated(e)
             }
-            ExprKind::Scope { owner, outer, body } => {
-                self.scope(owner.as_deref(), outer.as_deref(), body)
-            }
             ExprKind::Within(owner, call) => {
                 self.owner = Some(names::ident(owner));
                 self.expr(call)
@@ -335,18 +332,6 @@ impl Gen<'_> {
             );
             format!("{}({js})", self.rt("runIn"))
         }
-    }
-
-    fn scope(&mut self, owner: Option<&str>, outer: Option<&str>, body: &Expr) -> String {
-        let owner = owner.map_or("$_".to_owned(), names::ident);
-        let params = match outer {
-            Some(outer) => format!("{owner}, {}", names::ident(outer)),
-            None => owner,
-        };
-        let body = self.gen_block(body);
-        let scope = self.rt("scope");
-        let scoped = format!("{scope}({} {body})", self.arrow(&params));
-        self.run(None, &scoped)
     }
 
     /// A value that takes the dictionaries `shown` before it is computed.

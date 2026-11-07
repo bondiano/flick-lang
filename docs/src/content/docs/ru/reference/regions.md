@@ -1,6 +1,6 @@
 ---
 title: "Регионы и захваты"
-source_hash: eac763910f4dda93
+source_hash: fbdd6d7417831192
 ---
 
 `scope` освобождает полученные ресурсы, когда его тело завершается.
@@ -68,6 +68,14 @@ let keep path =
 
 В этом примере `local` освобождается по завершении внутреннего `scope`,
 а файл, который возвращает `keep`, — при закрытии области вызывающего кода.
+
+`scope s { body }` означает `Scope.run (fun s -> body)`. `Scope.run` принимает
+функцию, полиморфную по региону, поэтому тело можно передать как значение:
+
+```flick
+with_region : (forall s. Fiber.Owner s ->{Scope s; none} String) ->{} String
+let with_region body = Scope.run body
+```
 
 ## Захваты
 

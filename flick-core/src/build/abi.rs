@@ -271,7 +271,6 @@ impl Totality<'_> {
             }
             ExprKind::Dicts(..)
             | ExprKind::Await(_)
-            | ExprKind::Scope { .. }
             | ExprKind::Within(..)
             | ExprKind::Handle(_)
             | ExprKind::Generate { .. }

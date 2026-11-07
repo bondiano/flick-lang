@@ -158,6 +158,8 @@ lang_items! {
     FromResult = "from_result",
     Fail = "fail",
     LayerRun = "layer_run",
+    ScopeRun = "scope_run",
+    ScopeCurrent = "scope_current",
     Pure = "pure",
     OptionBind = "option_bind",
     ResultBind = "result_bind",

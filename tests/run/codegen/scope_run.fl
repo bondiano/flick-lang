@@ -1,0 +1,35 @@
+// `Scope.run` is what `scope` stands for, and a function can take the body as
+// a value: it is polymorphic in the region, whose owner it receives.
+module App.Main exposing (main)
+
+log : String -> Eff none none Unit
+let log line = task { Platform.stdout_line line }
+
+with_region : (forall s. Fiber.Owner s ->{Scope s; none} String) ->{} String
+let with_region body = Scope.run body
+
+closes : forall s. Fiber.Owner s ->{Scope s; none} String
+let closes owner =
+  Scope.add_finalizer (log "closed")
+  ignore owner
+  "body"
+
+nested : Unit ->{} String
+let nested () = scope outer {
+  scope inner {
+    ignore (Resource.acquire_release (log "acquired") (fun _ -> Platform.stdout_line "released"))
+    ignore inner
+    ignore outer
+    "nested"
+  }
+}
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line
+    (Scope.run (fun owner ->
+      ignore owner
+      "lambda"
+    ))
+  Platform.stdout_line (with_region closes)
+  Platform.stdout_line (nested ())

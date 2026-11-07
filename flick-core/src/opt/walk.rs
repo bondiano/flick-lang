@@ -33,7 +33,6 @@ pub fn strict_uses(e: &Expr, name: &str) -> usize {
         ExprKind::Handle(h) if h.is_try() => strict_uses(&h.body, name),
         ExprKind::Lambda { .. }
         | ExprKind::Task(_)
-        | ExprKind::Scope { .. }
         | ExprKind::Within(..)
         | ExprKind::Handle(_)
         | ExprKind::Lift(..)
@@ -227,11 +226,6 @@ fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
             }
         }
         ExprKind::Each { pat, .. } => pat_binders(pat, names, suffix),
-        ExprKind::Scope { owner, outer, .. } => {
-            for name in owner.iter().chain(outer) {
-                fresh(names, name, suffix);
-            }
-        }
         _ => {}
     }
     e.each_child(&mut |c| binders(c, names, suffix));
@@ -277,11 +271,6 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
             }
         }
         ExprKind::Each { pat, .. } => apply_pat(pat, names),
-        ExprKind::Scope { owner, outer, .. } => {
-            for n in owner.iter_mut().chain(outer.iter_mut()) {
-                new(n);
-            }
-        }
         _ => {}
     }
     e.each_child_mut(&mut |c| apply(c, names));

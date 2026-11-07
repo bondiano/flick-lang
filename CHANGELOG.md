@@ -6,6 +6,9 @@ break programs.
 
 ## Unreleased
 
+- **`Scope.run`:** `scope s { body }` stands for `Scope.run (fun s -> body)`, and
+  `Scope.run` takes a function polymorphic in the region, also as a value. The
+  IR has no `Scope` node; its version is 0.4.0.
 - **`Layer.run`:** `provide layer { body }` stands for `Layer.run layer (fun
   () -> body)`; the type of `provide` is still the checker's. A child reaches
   the handlers around where it started. The IR has no `Provide` node, and
