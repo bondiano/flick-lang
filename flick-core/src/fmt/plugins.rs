@@ -9,10 +9,11 @@ use std::sync::Arc;
 use flick_plugin::Piece;
 
 use super::printer::{Doc, INDENT, Printer};
+use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::source::BlockSource;
 use crate::plugin::{Expander, blocks_under, first_party, head_token};
 use crate::resolve;
-use crate::source::FileId;
+use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::implicit_package_of;
@@ -41,8 +42,14 @@ pub(super) fn heads(tree: &Node, text: &str, file: FileId) -> Arc<[String]> {
 }
 
 /// The layouts the plugins of the blocks of `tree` give, those of blocks
-/// inside the holes of others too.
-pub(super) fn layouts(tree: &Node, text: &str, file: FileId, plugin_of: PluginOf) -> Layouts {
+/// inside the holes of others too, and `P036` on each block whose plugin
+/// failed to lay it out.
+pub(super) fn layouts(
+    tree: &Node,
+    text: &str,
+    file: FileId,
+    plugin_of: PluginOf,
+) -> (Layouts, Vec<Diagnostic>) {
     let syntax = resolve::module_syntax(tree, text, file);
     let modules: HashMap<&str, &str> = (syntax.imports.iter())
         .flat_map(|i| {
@@ -61,6 +68,7 @@ pub(super) fn layouts(tree: &Node, text: &str, file: FileId, plugin_of: PluginOf
     let shared: Arc<str> = Arc::from(text);
     let heads = syntax.heads();
     let mut out = Layouts::new();
+    let mut failed = Vec::new();
     let mut blocks = Vec::new();
     blocks_under(tree, &mut blocks);
     let mut pending: Vec<Node> = blocks.into_iter().cloned().collect();
@@ -73,7 +81,20 @@ pub(super) fn layouts(tree: &Node, text: &str, file: FileId, plugin_of: PluginOf
         else {
             continue;
         };
-        if let Some(layout) = layout(plugin.as_ref(), source, &node) {
+        let laid_out = layout(plugin.as_ref(), source, &node).unwrap_or_else(|why| {
+            let (start, end) = node.range();
+            let message = format!(
+                "plugin `{}` failed to lay out this block: {why}",
+                plugin.id()
+            );
+            failed.push(Diagnostic::error(
+                codes::P036,
+                message,
+                Span::new(file, start, end),
+            ));
+            None
+        });
+        if let Some(layout) = laid_out {
             for hole in &layout.holes {
                 if matches!(hole.kind, K::PluginExpr | K::PluginDecl) {
                     pending.push(hole.clone());
@@ -86,32 +107,42 @@ pub(super) fn layouts(tree: &Node, text: &str, file: FileId, plugin_of: PluginOf
             out.insert(node.range(), layout);
         }
     }
-    out
+    (out, failed)
 }
 
 /// The layout `plugin` gives the block `node`, read as `source`; a block
 /// with comments of its own but `///` lines keeps its text, which has them.
-fn layout(plugin: &dyn Expander, mut source: BlockSource, node: &Node) -> Option<Layout> {
+/// An error says the plugin failed.
+fn layout(
+    plugin: &dyn Expander,
+    mut source: BlockSource,
+    node: &Node,
+) -> Result<Option<Layout>, String> {
     let commented = (node.tokens().iter()).any(|t| t.kind.is_comment() && t.kind != K::DocComment);
     if !source.closed() || commented {
-        return None;
+        return Ok(None);
     }
     let block = source.block();
-    let state = (plugin.collect(slice::from_ref(&block), &mut BlockSource::default())).ok()?;
-    let pieces = plugin.format(&block, &state, &mut source)?;
+    let state = plugin.collect(slice::from_ref(&block), &mut BlockSource::default())?;
+    let Some(pieces) = plugin.format(&block, &state, &mut source)? else {
+        return Ok(None);
+    };
     let holes = (pieces.iter())
         .filter_map(|p| match p {
             Piece::Hole(h) => Some(source.hole_tree(*h)),
             _ => None,
         })
-        .collect::<Option<Vec<Node>>>()?;
+        .collect::<Option<Vec<Node>>>();
+    let Some(holes) = holes else {
+        return Ok(None);
+    };
     let open = node.child_tokens().find(|t| t.kind == K::LBrace);
-    Some(Layout {
+    Ok(Some(Layout {
         pieces,
         holes,
         opens: open.is_some_and(|o| o.end == source.start()),
         closes: node.has_token(K::RBrace),
-    })
+    }))
 }
 
 impl<'a> Printer<'a> {

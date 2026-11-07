@@ -115,7 +115,11 @@ fn format_reporting(
     drop_redundant_foralls(&mut parsed.tree, text);
     let expected = program(&parsed.tree, text);
     drop_empty_rows(&mut parsed.tree);
-    let (out, kept) = source_file(&parsed.tree, text, file, plugin_of);
+    let (out, kept, failed) = source_file(&parsed.tree, text, file, plugin_of);
+    // a plugin that failed leaves its block as written, and the file with it
+    if !failed.is_empty() {
+        return Err(failed);
+    }
     let again = parse(&out, file);
     let same = again.diagnostics.is_empty()
         && program(&again.tree, &out) == expected
@@ -130,8 +134,13 @@ fn format_reporting(
     Ok((out, kept))
 }
 
-fn source_file(tree: &Node, text: &str, file: FileId, plugin_of: PluginOf) -> (String, Kept) {
-    let layouts = plugins::layouts(tree, text, file, plugin_of);
+fn source_file(
+    tree: &Node,
+    text: &str,
+    file: FileId,
+    plugin_of: PluginOf,
+) -> (String, Kept, Vec<Diagnostic>) {
+    let (layouts, failed) = plugins::layouts(tree, text, file, plugin_of);
     let heads = plugins::heads(tree, text, file);
     let heads: Vec<&str> = heads.iter().map(String::as_str).collect();
     let arena = DocumentArena::new();
@@ -171,7 +180,7 @@ fn source_file(tree: &Node, text: &str, file: FileId, plugin_of: PluginOf) -> (S
     if !out.is_empty() {
         out.push('\n');
     }
-    (out, kept)
+    (out, kept, failed)
 }
 
 /// Ends the current line, if any, leaving a blank line when asked.

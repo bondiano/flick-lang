@@ -26,8 +26,9 @@ impl Ide<'_> {
         let b = self.editor_block(file, offset)?;
         let mut source = b.source();
         source.see_scope(self.in_scope(self.module(file)?));
-        let offered =
-            (b.plugin).complete(&b.block, &b.state, offset - b.start, dotted, &mut source);
+        let offered = (b.plugin)
+            .complete(&b.block, &b.state, offset - b.start, dotted, &mut source)
+            .unwrap_or_else(|why| failed(b.plugin.id(), "complete", &why));
         (!offered.is_empty()).then(|| {
             (offered.into_iter())
                 .map(|c| Completion {
@@ -45,9 +46,9 @@ impl Ide<'_> {
         let m = self.module(file)?;
         let facts =
             (m.expansion.as_ref()).map_or_else(Vec::new, |e| e.facts(b.start, &m.typing.wildcards));
-        let hover = b
-            .plugin
-            .hover(&b.block, &b.state, offset - b.start, &facts)?;
+        let hover = (b.plugin)
+            .hover(&b.block, &b.state, offset - b.start, &facts)
+            .unwrap_or_else(|why| failed(b.plugin.id(), "hover", &why))?;
         let len = u32::try_from(b.block.text.len()).ok()?;
         // a plugin's span outside its block is none
         (hover.span.start <= hover.span.end && hover.span.end <= len).then(|| {
@@ -55,4 +56,11 @@ impl Ide<'_> {
             (hover.markdown, range)
         })
     }
+}
+
+/// What an editor gets from a plugin that failed to answer `what`: nothing,
+/// and a line in the server's log.
+pub(super) fn failed<T: Default>(plugin: &str, what: &str, why: &str) -> T {
+    tracing::warn!(plugin, what, why, "a plugin failed to answer the editor");
+    T::default()
 }
