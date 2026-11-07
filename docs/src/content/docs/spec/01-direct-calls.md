@@ -1,6 +1,6 @@
 ---
 title: "Direct effectful calls"
-source_hash: a9b6069cdf4b1e2e
+source_hash: e666da32ad2c5a3a
 ---
 
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.
@@ -48,7 +48,7 @@ Function blocks and `match` are delimited by indentation. `in` is not needed; th
 
 ## A full signature above every function
 
-Every named function has a full signature directly above its definition. The rule is the same for public, internal and local functions, instance methods and functions obtained by partial application. The `let` header keeps the argument names; a second style with parameter and result types in the header is not used.
+Every named function has a full signature directly above its definition. The rule is the same for public, internal and local functions and functions obtained by partial application. An instance method may omit its signature: it has the signature of its class, with the instance's types in place of the class parameters. The `let` header keeps the argument names; a second style with parameter and result types in the header is not used.
 
 ```flick
 # type UserId = UserId String

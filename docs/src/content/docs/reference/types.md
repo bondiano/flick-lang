@@ -59,8 +59,9 @@ used without its argument and `Float String` are `FLICK-T002`.
 ## Signatures
 
 Every named function has its full signature right above its `let` (see [Direct effectful calls](../../spec/01-direct-calls/)): at
-the top level, locally, in instances, and for a function made by partial
-application. A function without one is `FLICK-T004`, with the inferred type
+the top level, locally, and for a function made by partial application. An
+instance method may take its signature from the class instead of repeating it.
+A function without one is `FLICK-T004`, with the inferred type
 as a suggestion; types written in the `let` header are `FLICK-T005`; a
 signature without the definition right below it is `FLICK-T006`. Values that
 are not functions need no signature, and a local `let x : T = …` is a hint.
