@@ -227,7 +227,9 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 	}
 	ended := make(chan *child, len(tasks))
 	children := make([]*child, len(tasks))
-	holdForks(fb.state)
+	if len(tasks) > 0 { // no task, no wait: nothing would release the hold
+		holdForks(fb.state)
+	}
 	for i, t := range tasks {
 		if permits != nil {
 			task := t
