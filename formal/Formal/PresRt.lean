@@ -1,4 +1,5 @@
 import Formal.PresHdlRt
+import Formal.ScopeRun
 
 /-!
 # Preservation of runtime steps at the redex
@@ -223,6 +224,15 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
                 (hH _))
             | _ => exact hx.elim
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
+  | scopeRun hv =>
+    cases h with
+    | app hf ha hψ hT =>
+      cases hf with
+      | const _ hT' =>
+        obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := hT'.arrow_left
+        cases h; cases la
+        exact same (scopeRun_body hv ha (Stage.le_trans lψ hψ) (lt.trans hT))
+    | errVal hv' | allI hv' => exact (nv hv').elim
   | scope =>
     cases h with
     | scope hn hF hbody hφ' hφs hT =>

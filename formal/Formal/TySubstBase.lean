@@ -122,6 +122,25 @@ theorem Stage.up_comm (φ : Stage) (k : Nat) (σ : Atom → Ty) :
     (φ.substT (shiftV k)).substT (liftT k σ) = (φ.substT σ).substT (shiftV k) := by
   cases φ <;> simp [Stage.substT, Row.up_comm]
 
+theorem Const.ty_substT (S : Sig) (c : Const) (ι : CArg) (σ : Atom → Ty) :
+    (c.ty S ι).substT σ = c.ty S (ι.substT σ) := by
+  cases c
+  case scopeRun =>
+    have hs : (Row.scope (.tvar 0)).substT (liftT 1 σ) = Row.scope (.tvar 0) := by
+      simp [Ty.substT, liftT]
+    have hC : (ι.C.substT (shiftV 1)).substT (liftT 1 σ) = (ι.C.substT σ).substT (shiftV 1) := by
+      rw [Caps.substT_comp, Caps.substT_comp]; congr 1; funext a; rw [shift_lift, Ty.up_def]
+    simp [Const.ty, Ty.substT, Stage.substT, CArg.substT, Row.obs_substT, Row.up_comm, Ty.up_comm, hs, hC,
+      liftT]
+  case addFin | spawn =>
+    simp [Const.ty, Ty.substT, Stage.substT, CArg.substT, Ty.reach_caps, Row.obs_substT σ]
+  case perform E o _ =>
+    rcases h : S.op E o with _ | ⟨c, a, b⟩
+    · simp [Const.ty, h, Ty.substT, Stage.substT]
+    · obtain ⟨ha, hb⟩ := S.op_closed E o c a b σ h
+      cases c <;> simp [Const.ty, h, Ty.substT, Stage.substT, CArg.substT, ha, hb]
+  all_goals simp [Const.ty, Ty.substT, Stage.substT, CArg.substT]
+
 theorem Row.err_substT (E : Name) (U : Ty) (σ : Atom → Ty) :
     (Row.err E U).substT σ = Row.err E (U.substT σ) := by
   simp [Row.err, Row.ofCaps_substT, Ty.reach_caps]

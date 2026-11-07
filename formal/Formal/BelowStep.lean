@@ -137,6 +137,7 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
     · subst hi; rw [List.getElem?_set_self hlt] at hv'; cases hv'; exact sub fun _ h => .inr h
     · rw [List.getElem?_set_ne hi] at hv'; exact h.mem l v hv'
   | await => exact same (sub fun _ h => h)
+  | scopeRun => exact same (sub fun _ h => Tm.has_scopeRun h)
   | tryRaise => exact same (sub fun _ h => h.elim .inl (.inr ·))
   | hwithCatch => exact same (sub fun _ hs => by simp only [Tm.Has] at hs ⊢; grind)
   | @hctlRaise k p w _ _ ℓ κ E r al tl Ei _ hk _ =>

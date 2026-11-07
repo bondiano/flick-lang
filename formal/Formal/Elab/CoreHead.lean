@@ -270,6 +270,14 @@ theorem rhead_sim (hV : BNoVal B) (hR : BNoRaise B) (hA : BNoAlts B) (hC : BClos
           | base hb => exact (nb hb .loc).elim
         | base hb => exact (nb hb .const).elim
       | base hb => exact (nb hb (.constApp rfl .loc)).elim
+  | scopeRun hv =>
+    cases h with
+    | base hb => exact .inl hb
+    | app h₁ h₂ =>
+      cases h₁ with
+      | const =>
+        exact .inr ⟨_, _, _, .scopeRun (Cg.value hV hv h₂).1, .scope (.app (h₂.rename hC _) .var), hΛ, hμ⟩
+      | base hb => exact (nb hb .const).elim
   | await =>
     cases h with
     | base hb => exact .inl hb

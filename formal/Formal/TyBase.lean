@@ -209,6 +209,11 @@ def Ty.ren (ξ : Atom → Atom) : Ty → Ty
   | .dict c a => .dict c (a.ren ξ)
   | .all k t => .all k (t.ren (liftA k ξ))
 
+/-- The renaming `i ↦ i + k` as a substitution; run-time regions stay. -/
+def shiftV (k : Nat) : Atom → Ty
+  | .v i => .tvar (i + k)
+  | .r p => .rg p
+
 /-- Shift the free variables by `k`. -/
 def Ty.up (k : Nat) (t : Ty) : Ty := t.ren (Atom.up k)
 

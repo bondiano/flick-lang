@@ -42,6 +42,7 @@ import Formal.SpineMatch
 import Formal.PresHdl
 import Formal.PresPure
 import Formal.ScopeStep
+import Formal.ScopeRun
 import Formal.PresHdlRt
 import Formal.PresRt
 import Formal.Below

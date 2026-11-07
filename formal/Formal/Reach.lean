@@ -107,6 +107,15 @@ theorem liftR_eq {n : Nat} {ξ : Nat → Nat} {i j : Nat} (h : liftR n ξ i = j 
   unfold liftR at h
   split at h <;> omega
 
+/-- The step of `Scope.run` writes nothing new. -/
+theorem Tm.has_scopeRun {f : Tm} {ξ : Nat → Nat} {s : Site}
+    (h : (Tm.scope (.app (f.rename ξ) (.var 0))).Has s) : (Tm.app (.const .scopeRun) f).Has s := by
+  simpa [Tm.Has, Tm.has_rename] using h
+
+theorem Tm.has_scopeRun' {f : Tm} {ξ : Nat → Nat} {s : Site}
+    (h : (Tm.scope (.app (f.rename ξ) (.var 0))).Has s) : f.Has s := by
+  simpa [Tm.Has, Tm.has_rename] using h
+
 theorem free_rename_bind {n : Nat} {b : Tm} {ξ : Nat → Nat} {j : Nat}
     (ih : ∀ j, (b.rename (liftR n ξ)).Free j → ∃ i, b.Free i ∧ liftR n ξ i = j)
     (h : (b.rename (liftR n ξ)).Free (j + n)) : ∃ i, b.Free (i + n) ∧ ξ i = j := by

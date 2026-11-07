@@ -100,6 +100,8 @@ theorem RHead.asc {Λ μ r Λ' μ' r'} {n : Nat} {e : Tm} (hh : RHead Λ μ r Λ
     · subst hi; rw [List.getElem?_set_self hlt] at hv'; cases hv'; exact vn hv hr.2.1
     · rw [List.getElem?_set_ne hi] at hv'; exact hc.mem l v' hv'
   | await => exact noins hr
+  | scopeRun hv =>
+    exact noins fun h => vn hv hr.2.1 (Tm.has_scopeRun' h)
   | tryRaise hv => exact noins fun h => h.elim (vn hv hr.1) hr.2
   | hctlRaise hE hk hv =>
     subst hk

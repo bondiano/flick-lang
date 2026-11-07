@@ -89,6 +89,9 @@ inductive RHead : List Rgn → List Tm → Tm → List Rgn → List Tm → Tm �
   | hguardNo : Value v → matchP p v = none →
       RHead Λ μ (.handle v (.aguard p g b r)) Λ μ (.handle v r)
   | handleNil : Value v → RHead Λ μ (.handle v .anil) Λ μ (.raise v)
+  /-- `Scope.run f` is a `scope` whose body gives `f` the owner. -/
+  | scopeRun : Value f → RHead Λ μ (.app (.const .scopeRun) f) Λ μ
+      (.scope (.app (f.rename (· + 1)) (.var 0)))
   | scope : RHead Λ μ (.scope e) (Λ ++ [Rgn.new]) μ
       (.inside Λ.length (e.subst (inst [.own Λ.length])))
   | open_ : Λ[p]? = some g → g.live = true →

@@ -73,6 +73,7 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
           hra, Stage.le_svc (Stage.le_trans hψ' hψ) _ rfl⟩)
     | const hok hT' =>
       cases c with
+      | scopeRun => exact step (Step.ofR (.scopeRun hve))
       | perform E o _ => simp_all [Const.ok]
       | refMake => exact step (Step.ofR (.refMake hve))
       | refGet =>

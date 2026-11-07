@@ -11,11 +11,6 @@ laws go through renamings first: `Ty.reach_ren` before `Ty.reach_substT`, `Ty.su
 
 namespace Flick
 
-/-- The renaming `i ↦ i + k` as a substitution; run-time regions stay. -/
-def shiftV (k : Nat) : Atom → Ty
-  | .v i => .tvar (i + k)
-  | .r p => .rg p
-
 /-- Instantiate the binders of a scheme with `ts`. -/
 def instT (ts : List Ty) : Atom → Ty
   | .v i => if h : i < ts.length then ts[i] else .tvar (i - ts.length)

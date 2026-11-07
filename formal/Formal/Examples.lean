@@ -1,4 +1,5 @@
 import Formal.Generalization
+import Formal.Regions
 
 /-!
 # Checks that the rules are usable
@@ -11,6 +12,8 @@ services of its argument and uses it at `{S}`.
 `λf. try f () with _ → ()` removes the row variable of the errors of `f`.
 `(λf. let _ = f 1 in f True) (λx. x)` uses a parameter of type `∀a. a → a` at `Int` and at
 `Bool`, and takes a lambda or a generalized variable as the argument.
+`let f = λo. op (open o) in Scope.run f` passes a variable at the rank-2 type of `Scope.run`,
+and T4 holds of it.
 -/
 
 namespace Flick
@@ -79,6 +82,41 @@ example (S : Sig) :
         (.var (ts := []) rfl rfl (fun _ _ h => h.elim) .refl) (Stage.le_refl _) .refl
     · exact ⟨fun _ h => h.elim, fun _ h => h⟩
   · exact ⟨fun x h => .inl h, fun _ h => h.elim⟩
+
+/-- `∀s. Owner s →R⟨Scope s; ∅⟩ Unit`, the argument of `Scope.run` here, without its `∀`. -/
+def runBodyTy : Ty :=
+  .arrow (.owner (.tvar 0))
+    (.rt (Row.union (Row.scope (.tvar 0)) (Row.union (Row.none.substT (shiftV 1))
+      (Row.obs (Row.none.substT (shiftV 1)) (.tvar 0)))) (Row.none.substT (shiftV 1)))
+    (.base .unit) (Caps.none.substT (shiftV 1))
+
+/-- `let f = λo. op (open o) in Scope.run f`: the argument is a variable, and its type has the
+region of the scope as a binder. -/
+def runProg : Tm :=
+  .let_ (.lam (.app (.const .op) (.app (.const .open_) (.var 0)))) (.app (.const .scopeRun) (.var 0))
+
+theorem runProg_typed (S : Sig) :
+    Typ S [] Facts.none [] runProg (.ex (.base .unit) (.rt Row.none Row.none)) := by
+  refine .letGen (k := 1) (Φ := Facts.none) (a := runBodyTy) ?_ ?_
+  · refine .lam (a := .owner (.tvar 0)) ?_ (fun h => by simp [Tm.Has] at h) ?_ .refl
+    · refine Typ.app (Typ.const (c := .op) (ι := regionArg) (by simp [Const.ok]) .refl) ?_ ?_ .refl
+      · exact .app (.const (c := .open_) (ι := regionArg) (by simp [Const.ok]) .refl)
+          (.var (ts := []) rfl rfl (fun _ _ h => h.elim) .refl)
+          ⟨fun _ h => .inl h, fun _ h => h.elim⟩ .refl
+      · exact ⟨fun _ h => h.elim, fun _ h => h.elim⟩
+    · rintro a (⟨i, s, _, hs, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
+      · simp at hs
+      · simp [Tm.Has] at hp
+      · simp [Tm.Has] at hl
+  · exact .app (.const (c := .scopeRun) (ι := { (default : CArg) with }) (by simp [Const.ok]) .refl)
+      (.allVar (σ := ⟨1, Facts.none, runBodyTy⟩) rfl Nat.one_pos fun _ _ h => h)
+      (Stage.le_refl _) .refl
+
+/-- T4 for that program: a region reached through the instance of the binder is live. -/
+example {S : Sig} {root : Roots} {c : Cfg} (hroot : RootTy S root)
+    (hs : CSteps root ⟨[], [], runProg⟩ c) (p : Nat) (h : Reaches c.mem c.main p) : Live c.rgs p :=
+  (T4 hroot (runProg_typed S) (Tm.Below.empty fun _ => by simp [runProg, Tm.Has]) rfl
+    (by simp [Stage.substT]) hs).2.2.1 p h
 
 /-- The row variable `ρ`, the variable `0` of a scheme. -/
 def rowVar : Row := fun x => x = .rv (.v 0)
