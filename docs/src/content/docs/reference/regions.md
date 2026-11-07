@@ -117,7 +117,8 @@ Each stage of a curried function retains earlier parameters, including
 their generic value captures. `File s -> String -> String` is read as
 `File s -> (String -> String)^{s}`; `a -> b -> a` also retains the first
 value's captures in its second stage. These projections survive `.iface`
-serialization. Use `a^c -> (b -> b)^c` to name the bound explicitly.
+serialization. A qualifier that says just this is noise (`FLICK-T059`); write
+one to say less: `a -> (b -> b)^{}` holds nothing of the first value.
 
 Locals are inferred: a closure without an expected type gets the qualifier
 of what it uses, and a local signature need not name the regions its

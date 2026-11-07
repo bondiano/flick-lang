@@ -241,21 +241,21 @@ let rank o =
   | EQ -> 1
   | GT -> 2
 
-map_list : (forall v. a^v -> b)^c -> ((List a)^d -> (List b)^(c + d))^c
+map_list : (forall v. a^v -> b)^c -> (List a)^d -> (List b)^(c + d)
 foreign pure map_list from "@flick-lang/runtime" "listMap"
   arity 2
   retention call
 
-fold_list : (b -> a -> b)^c -> (b^c -> (List a -> b)^c)^c
+fold_list : (b -> a -> b)^c -> b^c -> List a -> b
 foreign pure fold_list from "@flick-lang/runtime" "listFold"
   arity 3
   retention call
 
-traverse_list : (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
+traverse_list : (a ->{r; e} b)^c -> List a ->{r; e} List b
 foreign effect traverse_list from "@flick-lang/runtime" "listMapEffect"
   retention call
 
-flat_map_list : (forall v. a^v -> (List b)^(c + v))^c -> ((List a)^d -> (List b)^(c + d))^c
+flat_map_list : (forall v. a^v -> (List b)^(c + v))^c -> (List a)^d -> (List b)^(c + d)
 foreign pure flat_map_list from "@flick-lang/runtime" "listFlatMap"
   arity 2
   retention call
@@ -264,40 +264,33 @@ pure_eff : a^c -> (Eff r e a)^c
 foreign pure pure_eff from "@flick-lang/runtime" "succeed"
   retention call
 
-flat_map_eff : (forall v. a^v -> (Eff r e b)^(c + v))^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+flat_map_eff : (forall v. a^v -> (Eff r e b)^(c + v))^c -> (Eff r e a)^d -> (Eff r e b)^(c + d)
 foreign pure flat_map_eff from "@flick-lang/runtime" "flatMapEff"
   arity 2
   retention call
 
-map_eff : (forall v. a^v -> b)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+map_eff : (forall v. a^v -> b)^c -> (Eff r e a)^d -> (Eff r e b)^(c + d)
 foreign pure map_eff from "@flick-lang/runtime" "mapEff"
   arity 2
   retention call
 
-map2_option :
-  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-  ((Option a)^d -> ((Option b)^d -> (Option x)^(c + d))^(c + d))^c
+map2_option : (forall u v. a^u -> b^v -> x)^c -> (Option a)^d -> (Option b)^d -> (Option x)^(c + d)
 foreign pure map2_option from "@flick-lang/runtime" "optionMap2"
   arity 3
   retention call
 
 map2_result :
-  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-  ((Result e a)^d -> ((Result e b)^d -> (Result e x)^(c + d))^(c + d))^c
+  (forall u v. a^u -> b^v -> x)^c -> (Result e a)^d -> (Result e b)^d -> (Result e x)^(c + d)
 foreign pure map2_result from "@flick-lang/runtime" "resultMap2"
   arity 3
   retention call
 
-map2_list :
-  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-  ((List a)^d -> ((List b)^d -> (List x)^(c + d))^(c + d))^c
+map2_list : (forall u v. a^u -> b^v -> x)^c -> (List a)^d -> (List b)^d -> (List x)^(c + d)
 foreign pure map2_list from "@flick-lang/runtime" "listMap2"
   arity 3
   retention call
 
-map2_eff :
-  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-  ((Eff r e a)^d -> ((Eff r e b)^d -> (Eff r e x)^(c + d))^(c + d))^c
+map2_eff : (forall u v. a^u -> b^v -> x)^c -> (Eff r e a)^d -> (Eff r e b)^d -> (Eff r e x)^(c + d)
 foreign pure map2_eff from "@flick-lang/runtime" "map2Eff"
   arity 3
   retention call
@@ -309,49 +302,47 @@ seq_of_list_held : (List a)^d -> (Seq a)^d
 foreign pure seq_of_list_held from "@flick-lang/runtime" "seqOfList"
   retention call
 
-map_seq : (forall v. a^v -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+map_seq : (forall v. a^v -> b)^c -> (Seq a)^d -> (Seq b)^(c + d)
 foreign pure map_seq from "@flick-lang/runtime" "seqMap"
   arity 2
   retention call
 
-flat_map_seq : (forall v. a^v -> (Seq b)^(c + v))^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+flat_map_seq : (forall v. a^v -> (Seq b)^(c + v))^c -> (Seq a)^d -> (Seq b)^(c + d)
 foreign pure flat_map_seq from "@flick-lang/runtime" "seqFlatMap"
   arity 2
   retention call
 
-fold_seq : (b -> a -> b)^c -> (b^c -> (Seq a -> b)^c)^c
+fold_seq : (b -> a -> b)^c -> b^c -> Seq a -> b
 foreign pure fold_seq from "@flick-lang/runtime" "seqFold"
   arity 3
   retention call
 
-map2_seq :
-  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-  ((Seq a)^d -> ((Seq b)^d -> (Seq x)^(c + d))^(c + d))^c
+map2_seq : (forall u v. a^u -> b^v -> x)^c -> (Seq a)^d -> (Seq b)^d -> (Seq x)^(c + d)
 foreign pure map2_seq from "@flick-lang/runtime" "seqMap2"
   arity 3
   retention call
 
-append_seq : (Seq a)^d -> ((Seq a)^d -> (Seq a)^d)^d
+append_seq : (Seq a)^d -> (Seq a)^d -> (Seq a)^d
 foreign pure append_seq from "@flick-lang/runtime" "seqAppend"
   arity 2
   retention call
 
 instance Functor Option =
-  map : (forall v. a^v -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> (Option a)^d -> (Option b)^(c + d)
   let map f value =
     match value with
     | None -> None
     | Some x -> Some (f x)
 
 instance Foldable Option =
-  fold : (b -> a -> b)^c -> (b^c -> (Option a -> b)^c)^c
+  fold : (b -> a -> b)^c -> b^c -> Option a -> b
   let fold f init value =
     match value with
     | None -> init
     | Some x -> f init x
 
 instance Traversable Option =
-  traverse : (a ->{r; e} b)^c -> (Option a ->{r; e} Option b)^c
+  traverse : (a ->{r; e} b)^c -> Option a ->{r; e} Option b
   let traverse f value =
     match value with
     | None -> None
@@ -360,34 +351,32 @@ instance Traversable Option =
 instance Applicative Option =
   pure : a^c -> (Option a)^c
   let pure x = Some x
-  map2 :
-    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-    ((Option a)^d -> ((Option b)^d -> (Option x)^(c + d))^(c + d))^c
+  map2 : (forall u v. a^u -> b^v -> x)^c -> (Option a)^d -> (Option b)^d -> (Option x)^(c + d)
   let map2 f = map2_option f
 
 instance Monad Option =
-  flat_map : (forall v. a^v -> (Option b)^(c + v))^c -> ((Option a)^d -> (Option b)^(c + d))^c
+  flat_map : (forall v. a^v -> (Option b)^(c + v))^c -> (Option a)^d -> (Option b)^(c + d)
   let flat_map f value =
     match value with
     | None -> None
     | Some x -> f x
 
 instance Functor (Result e) =
-  map : (forall v. a^v -> b)^c -> ((Result e a)^d -> (Result e b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> (Result e a)^d -> (Result e b)^(c + d)
   let map f value =
     match value with
     | Err e -> Err e
     | Ok x -> Ok (f x)
 
 instance Foldable (Result e) =
-  fold : (b -> a -> b)^c -> (b^c -> (Result e a -> b)^c)^c
+  fold : (b -> a -> b)^c -> b^c -> Result e a -> b
   let fold f init value =
     match value with
     | Err _ -> init
     | Ok x -> f init x
 
 instance Traversable (Result e) =
-  traverse : (a ->{r; x} b)^c -> (Result e a ->{r; x} Result e b)^c
+  traverse : (a ->{r; x} b)^c -> Result e a ->{r; x} Result e b
   let traverse f value =
     match value with
     | Err e -> Err e
@@ -396,56 +385,50 @@ instance Traversable (Result e) =
 instance Applicative (Result e) =
   pure : a^c -> (Result e a)^c
   let pure x = Ok x
-  map2 :
-    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-    ((Result e a)^d -> ((Result e b)^d -> (Result e x)^(c + d))^(c + d))^c
+  map2 : (forall u v. a^u -> b^v -> x)^c -> (Result e a)^d -> (Result e b)^d -> (Result e x)^(c + d)
   let map2 f = map2_result f
 
 instance Monad (Result e) =
-  flat_map : (forall v. a^v -> (Result e b)^(c + v))^c -> ((Result e a)^d -> (Result e b)^(c + d))^c
+  flat_map : (forall v. a^v -> (Result e b)^(c + v))^c -> (Result e a)^d -> (Result e b)^(c + d)
   let flat_map f value =
     match value with
     | Err e -> Err e
     | Ok x -> f x
 
 instance Functor List =
-  map : (forall v. a^v -> b)^c -> ((List a)^d -> (List b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> (List a)^d -> (List b)^(c + d)
   let map f xs = map_list f xs
 
 instance Foldable List =
-  fold : (b -> a -> b)^c -> (b^c -> (List a -> b)^c)^c
+  fold : (b -> a -> b)^c -> b^c -> List a -> b
   let fold f init xs = fold_list f init xs
 
 instance Traversable List =
-  traverse : (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
+  traverse : (a ->{r; e} b)^c -> List a ->{r; e} List b
   let traverse f xs = traverse_list f xs
 
 instance Applicative List =
   pure : a^c -> (List a)^c
   let pure x = [x]
-  map2 :
-    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-    ((List a)^d -> ((List b)^d -> (List x)^(c + d))^(c + d))^c
+  map2 : (forall u v. a^u -> b^v -> x)^c -> (List a)^d -> (List b)^d -> (List x)^(c + d)
   let map2 f = map2_list f
 
 instance Monad List =
-  flat_map : (forall v. a^v -> (List b)^(c + v))^c -> ((List a)^d -> (List b)^(c + d))^c
+  flat_map : (forall v. a^v -> (List b)^(c + v))^c -> (List a)^d -> (List b)^(c + d)
   let flat_map f xs = flat_map_list f xs
 
 instance Functor (Eff r e) =
-  map : (forall v. a^v -> b)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> (Eff r e a)^d -> (Eff r e b)^(c + d)
   let map f eff = map_eff f eff
 
 instance Applicative (Eff r e) =
   pure : a^c -> (Eff r e a)^c
   let pure x = pure_eff x
-  map2 :
-    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-    ((Eff r e a)^d -> ((Eff r e b)^d -> (Eff r e x)^(c + d))^(c + d))^c
+  map2 : (forall u v. a^u -> b^v -> x)^c -> (Eff r e a)^d -> (Eff r e b)^d -> (Eff r e x)^(c + d)
   let map2 f = map2_eff f
 
 instance Monad (Eff r e) =
-  flat_map : (forall v. a^v -> (Eff r e b)^(c + v))^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+  flat_map : (forall v. a^v -> (Eff r e b)^(c + v))^c -> (Eff r e a)^d -> (Eff r e b)^(c + d)
   let flat_map f eff = flat_map_eff f eff
 
 instance Alternative Option =
@@ -488,23 +471,21 @@ instance Iterable Seq =
   let iter xs = xs
 
 instance Functor Seq =
-  map : (forall v. a^v -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> (Seq a)^d -> (Seq b)^(c + d)
   let map f = map_seq f
 
 instance Foldable Seq =
-  fold : (b -> a -> b)^c -> (b^c -> (Seq a -> b)^c)^c
+  fold : (b -> a -> b)^c -> b^c -> Seq a -> b
   let fold f = fold_seq f
 
 instance Applicative Seq =
   pure : a^c -> (Seq a)^c
   let pure x = seq_of_list_held [x]
-  map2 :
-    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-    ((Seq a)^d -> ((Seq b)^d -> (Seq x)^(c + d))^(c + d))^c
+  map2 : (forall u v. a^u -> b^v -> x)^c -> (Seq a)^d -> (Seq b)^d -> (Seq x)^(c + d)
   let map2 f = map2_seq f
 
 instance Monad Seq =
-  flat_map : (forall v. a^v -> (Seq b)^(c + v))^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+  flat_map : (forall v. a^v -> (Seq b)^(c + v))^c -> (Seq a)^d -> (Seq b)^(c + d)
   let flat_map f xs = flat_map_seq f xs
 
 instance Alternative Seq =

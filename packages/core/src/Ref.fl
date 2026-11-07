@@ -45,42 +45,42 @@ same : Ref a -> Ref a -> Bool
 foreign pure same from "@flick-lang/runtime" "refSame"
 
 /// Replaces the contents.
-set : (Ref a)^c -> (a^c ->{} Unit)^c
+set : (Ref a)^c -> a^c ->{} Unit
 foreign set from "@flick-lang/runtime" "refSet"
   retention call
   reviewed "effect@4.1.2 sha256:7ab1cc29131d058b"
 
 /// `f` gives the result and the new contents, in one step.
-modify : (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
+modify : (Ref a)^c -> (a^c -> (b^x, a^c))^d ->{} b^x
 foreign modify from "@flick-lang/runtime" "refModify"
   retention call
   reviewed "effect@4.1.2 sha256:2931caacecf3556c"
 
 /// The contents after a partial update: `next`, or `old` with `None`.
-or_old : a^c -> ((Option a)^c -> a^c)^c
+or_old : a^c -> (Option a)^c -> a^c
 let or_old old next =
   match next with
   | Some value -> value
   | None -> old
 
 /// Replaces the contents, giving the previous ones.
-get_and_set : (Ref a)^c -> (a^c ->{} a^c)^c
+get_and_set : (Ref a)^c -> a^c ->{} a^c
 let get_and_set ref value = modify ref (fun old -> (old, value))
 
 /// Applies `f` to the contents, giving the previous ones.
-get_and_update : (Ref a)^c -> ((a^c -> a^c)^d ->{} a^c)^c
+get_and_update : (Ref a)^c -> (a^c -> a^c)^d ->{} a^c
 let get_and_update ref f = modify ref (fun old -> (old, f old))
 
 /// Applies `f` where it gives `Some`, giving the previous contents.
-get_and_update_some : (Ref a)^c -> ((a^c -> (Option a)^c)^d ->{} a^c)^c
+get_and_update_some : (Ref a)^c -> (a^c -> (Option a)^c)^d ->{} a^c
 let get_and_update_some ref f = modify ref (fun old -> (old, or_old old (f old)))
 
 /// Replaces the contents, giving the new ones.
-set_and_get : (Ref a)^c -> (a^c ->{} a^c)^c
+set_and_get : (Ref a)^c -> a^c ->{} a^c
 let set_and_get ref value = modify ref (fun _ -> (value, value))
 
 /// `modify` where `f` may leave the contents as they are with `None`.
-modify_some : (Ref a)^c -> ((a^c -> (b^x, (Option a)^c))^d ->{} b^x)^c
+modify_some : (Ref a)^c -> (a^c -> (b^x, (Option a)^c))^d ->{} b^x
 let modify_some ref f =
   modify ref (fun old ->
     let (result, next) = f old
@@ -88,11 +88,11 @@ let modify_some ref f =
   )
 
 /// Applies `f` to the contents.
-update : (Ref a)^c -> ((a^c -> a^c)^d ->{} Unit)^c
+update : (Ref a)^c -> (a^c -> a^c)^d ->{} Unit
 let update ref f = modify ref (fun old -> ((), f old))
 
 /// Applies `f` to the contents, giving the new ones.
-update_and_get : (Ref a)^c -> ((a^c -> a^c)^d ->{} a^c)^c
+update_and_get : (Ref a)^c -> (a^c -> a^c)^d ->{} a^c
 let update_and_get ref f =
   modify ref (fun old ->
     let next = f old
@@ -100,11 +100,11 @@ let update_and_get ref f =
   )
 
 /// Applies `f` where it gives `Some`.
-update_some : (Ref a)^c -> ((a^c -> (Option a)^c)^d ->{} Unit)^c
+update_some : (Ref a)^c -> (a^c -> (Option a)^c)^d ->{} Unit
 let update_some ref f = modify ref (fun old -> ((), or_old old (f old)))
 
 /// Applies `f` where it gives `Some`, giving the contents after.
-update_some_and_get : (Ref a)^c -> ((a^c -> (Option a)^c)^d ->{} a^c)^c
+update_some_and_get : (Ref a)^c -> (a^c -> (Option a)^c)^d ->{} a^c
 let update_some_and_get ref f =
   modify ref (fun old ->
     let next = or_old old (f old)
@@ -112,7 +112,7 @@ let update_some_and_get ref f =
   )
 
 /// Sets the contents to `next` only if they equal `expected`; whether it did.
-compare_and_set : Eq a => (Ref a)^c -> (a^c -> (a^c ->{} Bool)^c)^c
+compare_and_set : Eq a => (Ref a)^c -> a^c -> a^c ->{} Bool
 let compare_and_set ref expected next =
   modify ref (fun a -> if a == expected then (true, next) else (false, a))
 

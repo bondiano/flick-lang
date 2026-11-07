@@ -188,7 +188,7 @@ foreign effect when_ from "@flick-lang/runtime/effect/Effect" "when"
 /// is acquired now and again by the schedule, and released when the
 /// innermost `scope` (or the one of region `s`) closes.
 resource_auto :
-  (Fiber.Outlives c s, Fiber.Provided r s, Fiber.Provided r2 s, Detached r, Detached r2) =>
+  Fiber.Provided r2 s =>
   Schedule.Schedule r2 e2 i o ->
   (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r + r2;}
   Resource.Resource s e a

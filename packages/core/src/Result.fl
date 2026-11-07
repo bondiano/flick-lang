@@ -26,14 +26,14 @@ module Result exposing (
 )
 
 /// `Ok (f x)` for `Ok x`.
-map : (forall v. a^v -> b)^c -> ((Result e a)^d -> (Result e b)^(c + d))^c
+map : (forall v. a^v -> b)^c -> (Result e a)^d -> (Result e b)^(c + d)
 let map f result =
   match result with
   | Err e -> Err e
   | Ok x -> Ok (f x)
 
 /// `Err (f e)` for `Err e`.
-map_err : (e -> x)^c -> (Result e a -> Result x a)^c
+map_err : (e -> x)^c -> Result e a -> Result x a
 let map_err f result =
   match result with
   | Err e -> Err (f e)
@@ -41,7 +41,7 @@ let map_err f result =
 
 @lang result_bind
 /// `f x` for `Ok x`.
-bind : (a -> Result e b)^c -> (Result e a -> Result e b)^c
+bind : (a -> Result e b)^c -> Result e a -> Result e b
 let bind f result =
   match result with
   | Err e -> Err e
@@ -135,7 +135,7 @@ foreign pure merge from "@flick-lang/runtime/effect/Result" "merge"
   reviewed "effect@4.1.2 sha256:62b47b3b1ccee695"
 
 /// `Ok x` kept, `Err e` replaced by `that e`.
-or_else : (e -> Result e2 a)^c -> (Result e a -> Result e2 a)^c
+or_else : (e -> Result e2 a)^c -> Result e a -> Result e2 a
 foreign pure or_else from "@flick-lang/runtime/effect/Result" "orElse"
   arity 1
   retention call
@@ -157,7 +157,7 @@ foreign pure transpose_option from "@flick-lang/runtime/effect/Result" "transpos
   reviewed "effect@4.1.2 sha256:7eb3e223921bc88c"
 
 /// `f` of the value of an option, the result moved out: `None` is `Ok None`.
-transpose_map_option : (a -> Result e b)^c -> (Option a -> Result e (Option b))^c
+transpose_map_option : (a -> Result e b)^c -> Option a -> Result e (Option b)
 foreign pure transpose_map_option from "@flick-lang/runtime/effect/Result" "transposeMapOption"
   arity 1
   retention call

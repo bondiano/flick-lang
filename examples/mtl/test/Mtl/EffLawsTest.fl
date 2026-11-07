@@ -149,7 +149,8 @@ let laws = [
             ap :
               forall c d x y.
               (Eff none {Offline} (x -> y))^c ->
-              ((Eff none {Offline} x)^d -> (Eff none {Offline} y)^(c + d))^c
+              (Eff none {Offline} x)^d ->
+              (Eff none {Offline} y)^(c + d)
             let ap functions values = map2 (fun f x -> f x) functions values
             u : Eff none {Offline} (Float -> Float)
             let u = task {

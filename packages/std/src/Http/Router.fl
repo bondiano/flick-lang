@@ -75,9 +75,7 @@ foreign pure prefix_route from "@flick-lang/runtime/effect/http/HttpRouter" "pre
 /// One handler of the routes: the first route that matches a request
 /// answers it, and a request none matches fails with `RouteNotFound`.
 router :
-  RouterConfig ->
-  List ((Route r e)^c) ->{}
-  (ServerRequest ->{r; HttpServerError | e} ServerResponse)^c
+  RouterConfig -> List ((Route r e)^c) ->{} ServerRequest ->{r; HttpServerError | e} ServerResponse
 foreign effect router from "@flick-lang/runtime/effect/http/HttpRouter" "flickRouter"
   arity 2
   retention call

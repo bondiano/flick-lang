@@ -51,7 +51,7 @@ foreign effect get from "@flick-lang/runtime/effect/Pool" "get"
   reviewed "effect@4.1.2 sha256:8a6e6eaddc6c9d40"
 
 /// Runs `f` with an item, given back when `f` ends.
-use : (a ->{r; e2} b)^c -> (Pool s e a ->{r; e + e2} b)^c
+use : (a ->{r; e2} b)^c -> Pool s e a ->{r; e + e2} b
 foreign effect use from "@flick-lang/runtime/effect/Pool" "use"
   arity 1
   retention call

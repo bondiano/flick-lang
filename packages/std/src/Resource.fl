@@ -2,8 +2,6 @@
 /// again on `refresh`, released when its `scope` closes.
 module Resource exposing (acquire_release, bracket, Resource, manual, use, refresh)
 
-import Fiber
-
 /// A value of `a` of region `s` that its acquisition, failing with `e`,
 /// may give anew.
 type Resource (s : Region) (e : ErrorRow) a
@@ -11,16 +9,14 @@ type Resource (s : Region) (e : ErrorRow) a
 /// Runs `acquire` and registers `release` with the owner of region `s`,
 /// which runs it when that scope closes; `release` has no typed errors.
 /// The value holds region `s`, so it cannot leave that scope.
-acquire_release :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
-  (Eff r e a)^c -> ((a ->{r;} Unit)^c ->{Scope s | r; e} a^{s})^c
+acquire_release : (Eff r e a)^c -> (a ->{r;} Unit)^c ->{Scope s | r; e} a^{s}
 foreign effect acquire_release from "@flick-lang/runtime" "acquireRelease"
   retention owner
   reviewed "effect@4.1.2 sha256:8c69fda7dc943ca4"
 
 /// Runs `acquire`, `use` and then `release`, even when `use` fails;
 /// `release` may fail with a typed error of its own.
-bracket : (Eff r e a)^c -> ((a ->{r; e} b)^c -> ((a ->{r; e} Unit)^c ->{r; e} b)^c)^c
+bracket : (Eff r e a)^c -> (a ->{r; e} b)^c -> (a ->{r; e} Unit)^c ->{r; e} b
 foreign effect bracket from "@flick-lang/runtime" "bracket"
   retention call
   reviewed "effect@4.1.2 sha256:447feb1119a6d518"
@@ -28,9 +24,7 @@ foreign effect bracket from "@flick-lang/runtime" "bracket"
 /// A resource owned by the innermost `scope` (or the one of region `s`),
 /// acquired now by `acquire`, which runs with the services of this call and
 /// acquires into a region `t` of its own; `refresh` acquires it again.
-manual :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
-  (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r;} Resource s e a
+manual : (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r;} Resource s e a
 foreign effect manual from "@flick-lang/runtime/effect/Resource" "flickManual"
   retention owner
 

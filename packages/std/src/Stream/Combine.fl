@@ -27,7 +27,7 @@ foreign pure prepend from "@flick-lang/runtime/effect/Stream" "prepend"
 
 /// The elements of the stream `f` gives for each element, one stream after
 /// the other.
-flat_map : (a -> Stream r2 e2 b)^c -> ((Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c)^c
+flat_map : (a -> Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c
 foreign pure flat_map from "@flick-lang/runtime/effect/Stream" "flatMap"
   arity 1
   retention call
@@ -41,7 +41,8 @@ flat_map_par :
     bufferSize : Option Int;
   } ->
   (a -> Stream r2 e2 b)^c ->
-  ((Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c)^c
+  (Stream r e a)^c ->
+  (Stream (r + r2) (e + e2) b)^c
 foreign pure flat_map_par from "@flick-lang/runtime/effect/Stream" "flickFlatMapPar"
   arity 2
   retention call
@@ -49,7 +50,7 @@ foreign pure flat_map_par from "@flick-lang/runtime/effect/Stream" "flickFlatMap
 
 /// `flat_map` where a new element interrupts the inner stream of the
 /// previous one.
-switch_map : (a -> Stream r2 e2 b)^c -> ((Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c)^c
+switch_map : (a -> Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c
 foreign pure switch_map from "@flick-lang/runtime/effect/Stream" "switchMap"
   arity 1
   retention call
@@ -343,14 +344,15 @@ foreign pure halt_when from "@flick-lang/runtime/effect/Stream" "haltWhen"
 /// values of one key.
 group_by :
   (a ->{r2; e2} (k, v))^c ->
-  ((Stream r e a)^c -> (Stream (r + r2) (e + e2) (k, Stream none none v))^c)^c
+  (Stream r e a)^c ->
+  (Stream (r + r2) (e + e2) (k, Stream none none v))^c
 foreign pure group_by from "@flick-lang/runtime/effect/Stream" "groupBy"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:32fe4c313ba6bcdb"
 
 /// Groups by the key `f` gives (compared by `==`).
-group_by_key : (a -> k)^c -> ((Stream r e a)^c -> (Stream r e (k, Stream none none a))^c)^c
+group_by_key : (a -> k)^c -> (Stream r e a)^c -> (Stream r e (k, Stream none none a))^c
 foreign pure group_by_key from "@flick-lang/runtime/effect/Stream" "groupByKey"
   arity 1
   retention call
@@ -368,9 +370,7 @@ type alias Split = {
 /// A stream that consumers in the scope of region `s` may each run: the
 /// source runs once, as a child of that scope, and every consumer sees its
 /// elements.
-broadcast :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
-  Split -> (Stream r e a)^c ->{Scope s | r;} (Stream none e a)^{s}
+broadcast : Split -> (Stream r e a)^c ->{Scope s | r;} (Stream none e a)^{s}
 foreign effect broadcast from "@flick-lang/runtime/effect/Stream" "flickBroadcast"
   arity 1
   retention owner
@@ -378,9 +378,7 @@ foreign effect broadcast from "@flick-lang/runtime/effect/Stream" "flickBroadcas
 
 /// `n` streams that each see every element of the source, which runs once
 /// as a child of the scope of region `s`.
-broadcast_n :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
-  Int -> Split -> (Stream r e a)^c ->{Scope s | r;} List ((Stream none e a)^{s})
+broadcast_n : Int -> Split -> (Stream r e a)^c ->{Scope s | r;} List ((Stream none e a)^{s})
 foreign effect broadcast_n from "@flick-lang/runtime/effect/Stream" "flickBroadcastN"
   arity 2
   retention owner
@@ -388,9 +386,7 @@ foreign effect broadcast_n from "@flick-lang/runtime/effect/Stream" "flickBroadc
 
 /// `broadcast` that starts the source with its first consumer and stops it
 /// `idleTimeToLive` (`None`: at once) after its last one ends.
-share :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
-  Split -> Option Duration.Duration -> (Stream r e a)^c ->{Scope s | r;} (Stream none e a)^{s}
+share : Split -> Option Duration.Duration -> (Stream r e a)^c ->{Scope s | r;} (Stream none e a)^{s}
 foreign effect share from "@flick-lang/runtime/effect/Stream" "flickShare"
   arity 2
   retention owner
@@ -399,7 +395,6 @@ foreign effect share from "@flick-lang/runtime/effect/Stream" "flickShare"
 /// The values the filter passes and those it refuses, as two streams of
 /// the scope of region `s`; the source runs once as a child of it.
 partition :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Filter.Filter a p f ->
   (Stream r e a)^c ->{Scope s | r;}
   ((Stream none e p)^{s}, (Stream none e f)^{s})
@@ -410,7 +405,7 @@ foreign effect partition from "@flick-lang/runtime/effect/Stream" "partition"
 
 /// `partition` with a task as the filter.
 partition_effect :
-  (Fiber.Outlives c s, Fiber.Provided r s, Fiber.Provided r2 s, Detached r, Detached r2) =>
+  Fiber.Provided r2 s =>
   Filter.FilterEffect r2 e2 a p f ->
   (Stream r e a)^c ->{Scope s | r + r2;}
   ((Stream none (e + e2) p)^{s}, (Stream none (e + e2) f)^{s})
@@ -423,7 +418,6 @@ foreign effect partition_effect from "@flick-lang/runtime/effect/Stream" "partit
 /// runs as a child of the scope of region `s`, which shuts them down when
 /// it closes.
 partition_queue :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Filter.Filter a p f -> (Stream r e a)^c ->{Scope s | r;} (Queue.Queue e p, Queue.Queue e f)
 foreign effect partition_queue from "@flick-lang/runtime/effect/Stream" "partitionQueue"
   arity 1

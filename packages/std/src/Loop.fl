@@ -4,7 +4,7 @@ module Loop exposing (Step(..), loop, Trampoline, done, suspend, run)
 type Step s a = Continue s | Done a
 
 /// Runs `step` from `state` until it is `Done`, without growing the stack.
-loop : (s -> Step s a)^c -> (s -> a)^c
+loop : (s -> Step s a)^c -> s -> a
 foreign pure loop from "@flick-lang/runtime" "loop"
   arity 2
   retention call

@@ -13,5 +13,5 @@ service FileSystem =
 read_later : File s -> (Eff {FileSystem} {ReadError} String)^{s}
 let read_later file = task { FileSystem.read_all file }
 
-reader : File s -> (Unit ->{FileSystem; ReadError} String)^{s}
+reader : File s -> Unit ->{FileSystem; ReadError} String
 let reader file = fun () -> FileSystem.read_all file

@@ -11,25 +11,25 @@ type error ExportError = ExportError String
 type StandardSchema i a
 
 /// Decodes unknown input, failing with `SchemaError`; the input must be inert data.
-decode : (Codec rd re i a)^c -> (Unknown^ci ->{rd; SchemaError} a)^c
+decode : (Codec rd re i a)^c -> Unknown^ci ->{rd; SchemaError} a
 foreign effect decode from "@flick-lang/runtime" "codecDecode"
   retention call
   reviewed "effect@4.1.2 sha256:0ba82b2229e48f1a"
 
 /// Encodes a value to its wire form, failing with `SchemaError`.
-encode : (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
+encode : (Codec rd re i a)^c -> a ->{re; SchemaError} i
 foreign effect encode from "@flick-lang/runtime" "codecEncode"
   retention call
   reviewed "effect@4.1.2 sha256:4152dced7e364e25"
 
 /// `decode` of a pure codec, at once.
-decode_result : (PureCodec i a)^c -> (Unknown^ci -> Result SchemaError a)^c
+decode_result : (PureCodec i a)^c -> Unknown^ci -> Result SchemaError a
 foreign pure decode_result from "@flick-lang/runtime" "codecDecodeResult"
   retention call
   reviewed "effect@4.1.2 sha256:1770b64eba8235d3"
 
 /// `encode` of a pure codec, at once.
-encode_result : (PureCodec i a)^c -> (a -> Result SchemaError i)^c
+encode_result : (PureCodec i a)^c -> a -> Result SchemaError i
 foreign pure encode_result from "@flick-lang/runtime" "codecEncodeResult"
   retention call
   reviewed "effect@4.1.2 sha256:0475f2036c0a9a24"
@@ -315,7 +315,7 @@ foreign pure check_effect from "@flick-lang/runtime/effect/Schema" "flickCheckEf
   reviewed "effect@4.1.2 sha256:2166212aa1cb7a69"
 
 /// The value encoded by the codec, written as XML under `<root>`.
-encode_xml : (Codec rd re i a)^c -> (a ->{re; SchemaError} String)^c
+encode_xml : (Codec rd re i a)^c -> a ->{re; SchemaError} String
 foreign effect encode_xml from "@flick-lang/runtime/effect/Schema" "flickToEncoderXml"
   retention call
   reviewed "effect@4.1.2 sha256:3b9304a35b08fe20"

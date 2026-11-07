@@ -15,21 +15,23 @@ run : (WriterT w m a)^c -> (m (a, w))^c
 let run (WriterT action) = action
 
 instance Functor m => Functor (WriterT w m) =
-  map : (forall v. a^v -> b)^c -> ((WriterT w m a)^d -> (WriterT w m b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> (WriterT w m a)^d -> (WriterT w m b)^(c + d)
   let map f (WriterT action) = WriterT (map (fun (value, output) -> (f value, output)) action)
 
 instance (Monoid w, Applicative m) => Applicative (WriterT w m) =
   pure : a^c -> (WriterT w m a)^c
   let pure value = WriterT (pure (value, empty))
   map2 :
-    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-    ((WriterT w m a)^d -> ((WriterT w m b)^d -> (WriterT w m x)^(c + d))^(c + d))^c
+    (forall u v. a^u -> b^v -> x)^c ->
+    (WriterT w m a)^d ->
+    (WriterT w m b)^d ->
+    (WriterT w m x)^(c + d)
   let map2 f (WriterT left) (WriterT right) =
     WriterT (map2 (fun (a, prefix) (b, suffix) -> (f a b, combine prefix suffix)) left right)
 
 instance (Monoid w, Monad m) => Monad (WriterT w m) =
   flat_map :
-    (forall v. a^v -> (WriterT w m b)^(c + v))^c -> ((WriterT w m a)^d -> (WriterT w m b)^(c + d))^c
+    (forall v. a^v -> (WriterT w m b)^(c + v))^c -> (WriterT w m a)^d -> (WriterT w m b)^(c + d)
   let flat_map f (WriterT action) =
     WriterT
       (do {
@@ -53,7 +55,7 @@ instance (Monoid w, MonadState m s) => MonadState (WriterT w m) s =
 instance (Monoid w, MonadReader m r) => MonadReader (WriterT w m) r =
   ask : WriterT w m r
   let ask = lift ask
-  local : (forall v. r^v -> r^(c + v))^c -> ((WriterT w m a)^d -> (WriterT w m a)^(c + d))^c
+  local : (forall v. r^v -> r^(c + v))^c -> (WriterT w m a)^d -> (WriterT w m a)^(c + d)
   let local update (WriterT action) = WriterT (local update action)
   reader : (forall v. r^v -> a)^c -> (WriterT w m a)^c
   let reader project = lift (reader project)
@@ -76,6 +78,6 @@ instance (Monoid w, MonadError m e) => MonadError (WriterT w m) e =
   throw_error : e^c -> (WriterT w m a)^c
   let throw_error problem = lift (throw_error problem)
   catch_error :
-    (forall v. e^v -> (WriterT w m a)^(c + v))^c -> ((WriterT w m a)^d -> (WriterT w m a)^(c + d))^c
+    (forall v. e^v -> (WriterT w m a)^(c + v))^c -> (WriterT w m a)^d -> (WriterT w m a)^(c + d)
   let catch_error handle (WriterT action) =
     WriterT (catch_error (fun problem -> run (handle problem)) action)

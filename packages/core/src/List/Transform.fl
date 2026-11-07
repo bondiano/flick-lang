@@ -46,14 +46,14 @@ foreign pure scan_right from "@flick-lang/runtime/effect/Array" "scanRight"
   reviewed "effect@4.1.2 sha256:ca9246706cc0e8d7"
 
 /// `f` of each suffix of the list, longest first.
-extend : (List a -> b)^c -> (List a -> List b)^c
+extend : (List a -> b)^c -> List a -> List b
 foreign pure extend from "@flick-lang/runtime/effect/Array" "extend"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d8cac66dc625bf46"
 
 /// The `Ok` values of `f` over the elements, up to the first `Err`.
-filter_map_while : (a -> Result e b)^c -> (List a -> List b)^c
+filter_map_while : (a -> Result e b)^c -> List a -> List b
 foreign pure filter_map_while from "@flick-lang/runtime/effect/Iterable" "flickFilterMapWhile"
   arity 1
   retention call
@@ -80,7 +80,7 @@ foreign pure separate from "@flick-lang/runtime/effect/Array" "separate"
   reviewed "effect@4.1.2 sha256:64996beb2cefeaff"
 
 /// The `Ok` values and the `Err` errors of `f` over the elements.
-partition_map : (a -> Result f p)^c -> (List a -> (List p, List f))^c
+partition_map : (a -> Result f p)^c -> List a -> (List p, List f)
 foreign pure partition_map from "@flick-lang/runtime/effect/Array" "partition"
   arity 1
   retention call

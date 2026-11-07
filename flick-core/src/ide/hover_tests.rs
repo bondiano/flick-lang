@@ -436,7 +436,7 @@ import App.Public as P exposing (MonadError(..), Box(..), Token(..))
                 &[
                     "throw_error : MonadError m e => e^c -> (m a)^c",
                     "catch_error : ",
-                    "((m a)^d -> (m a)^(c + d))^c",
+                    "(m a)^d -> (m a)^(c + d)",
                     "Raises a domain error.",
                     "Handles a domain error.",
                 ][..],

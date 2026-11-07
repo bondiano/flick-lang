@@ -111,14 +111,14 @@ foreign pure match_ from "@flick-lang/runtime/effect/Exit" "flickMatch"
   reviewed "effect@4.1.2 sha256:b8fd5abf3f9ca77d"
 
 /// The value of a success changed by `f`.
-map : (a -> b)^c -> (Exit e a -> Exit e b)^c
+map : (a -> b)^c -> Exit e a -> Exit e b
 foreign pure map from "@flick-lang/runtime/effect/Exit" "flickMap"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:ca82cf9d1072f180"
 
 /// The typed errors changed by `f`.
-map_error : (Errors e -> Errors e2)^c -> (Exit e a -> Exit e2 a)^c
+map_error : (Errors e -> Errors e2)^c -> Exit e a -> Exit e2 a
 foreign pure map_error from "@flick-lang/runtime/effect/Exit" "flickMapError"
   arity 1
   retention call

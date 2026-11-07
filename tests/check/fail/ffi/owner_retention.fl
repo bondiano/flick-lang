@@ -13,7 +13,7 @@ defer_checked :
 foreign effect defer_checked from "./scope.js" "defer"
   retention owner
 
-shown : (Unit -> a)^c -> (Unit -> a)^c
+shown : (Unit -> a)^c -> Unit -> a
 foreign pure shown from "./scope.js" "shown"
   retention owner
 
@@ -37,3 +37,4 @@ foreign effect two_regions from "./scope.js" "defer"
 //~ FLICK-G003 @22:32-22:37 this keeps work that uses `r` until `s` closes
 //~ FLICK-E017 @29:29-29:34 cannot deduce `Detached r`
 //~ FLICK-F002 @34:1-35:18 with `retention owner`
+//~ FLICK-T059 @12:3-12:55 `retention owner` gives this signature `Fiber.Outlives c s, Fiber.Provided r s, Detached r` anyway

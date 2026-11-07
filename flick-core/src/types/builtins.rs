@@ -20,6 +20,7 @@ use super::Typing;
 use super::builtin_sources::CORE;
 use super::env::Builtins;
 use crate::clock::timed;
+use crate::diagnostics::{Code, Diagnostic, codes};
 use crate::iface::Interface;
 #[cfg(feature = "native-project")]
 use crate::implicit_packages::IMPLICIT_PACKAGES;
@@ -233,8 +234,32 @@ pub(crate) fn check_sources(modules: &[(&str, &str)]) -> Vec<Interface> {
 /// [`check_sources`], also giving each module with its typing to `each`.
 /// What the modules before it export grows by one module at a time instead
 /// of being learned again for each module.
-pub fn check_each(
+pub fn check_each(modules: &[(&str, &str)], each: impl FnMut(&Module, &Typing)) -> Vec<Interface> {
+    // `flick check --fix` has to get past them to fix them, and the import a
+    // fixed signature no longer uses; a test below says the modules here have none
+    check_allowing(modules, &[codes::T059, codes::R012], each)
+}
+
+/// [`check_each`], with the built-in modules allowed the warnings `allowed`.
+fn check_allowing(
     modules: &[(&str, &str)],
+    allowed: &[Code],
+    each: impl FnMut(&Module, &Typing),
+) -> Vec<Interface> {
+    let report = |name: &str, mut diagnostics: Vec<Diagnostic>| {
+        diagnostics.retain(|d| !allowed.contains(&d.code));
+        assert!(
+            diagnostics.is_empty(),
+            "built-in module {name} does not check: {diagnostics:?}"
+        );
+    };
+    check_reporting(modules, report, each)
+}
+
+/// [`check_each`], giving what each module's check says to `report`.
+fn check_reporting(
+    modules: &[(&str, &str)],
+    mut report: impl FnMut(&str, Vec<Diagnostic>),
     mut each: impl FnMut(&Module, &Typing),
 ) -> Vec<Interface> {
     let mut done: Vec<Interface> = Vec::new();
@@ -277,10 +302,7 @@ pub fn check_each(
         if let Some(expansion) = &expansion {
             expansion.restore(&mut diagnostics, None);
         }
-        assert!(
-            diagnostics.is_empty(),
-            "built-in module {name} does not check: {diagnostics:?}"
-        );
+        report(name, diagnostics);
         each(&module, &typing);
         known.add(&interface);
         done.push(interface);
@@ -314,6 +336,72 @@ mod tests {
     use std::collections::BTreeSet;
 
     use crate::resolve;
+
+    #[test]
+    fn built_in_signatures_write_nothing_they_get_anyway() {
+        super::check_allowing(super::builtin_sources(), &[], |_, _| {});
+    }
+
+    #[cfg(feature = "diagnostic-fixes")]
+    mod fixes {
+        use std::cmp::Reverse;
+        use std::fs;
+        use std::path::Path;
+
+        use crate::diagnostics::{Diagnostic, Edit, codes};
+        use crate::types::builtins::{builtin_sources, check_reporting};
+
+        /// Writes the fixes of what `built_in_signatures_write_nothing_they_get_anyway`
+        /// refuses into `packages`, then `flick fmt packages` lays them out. A project
+        /// of std's own source does not get as far: its instances overlap the built-in
+        /// ones, so their methods are not checked.
+        #[test]
+        #[ignore = "writes packages/*/src"]
+        fn write_fixes_of_built_in_signatures() {
+            let packages = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages");
+            let path = |module: &str| {
+                let file = format!("src/{}.fl", module.replace('.', "/"));
+                (["core", "std"].iter())
+                    .map(|package| packages.join(package).join(&file))
+                    .find(|path| path.is_file())
+                    .expect("the source of a built-in module")
+            };
+            let mut modules: Vec<(String, String)> = (builtin_sources().iter())
+                .map(|(name, text)| ((*name).to_owned(), (*text).to_owned()))
+                .collect();
+            loop {
+                let mut fixes: Vec<(String, Vec<Edit>)> = Vec::new();
+                let sources: Vec<(&str, &str)> = (modules.iter())
+                    .map(|(name, text)| (name.as_str(), text.as_str()))
+                    .collect();
+                let report = |name: &str, diagnostics: Vec<Diagnostic>| {
+                    let (ours, other): (Vec<_>, Vec<_>) = (diagnostics.into_iter())
+                        .partition(|d| [codes::T059, codes::R012].contains(&d.code));
+                    assert!(other.is_empty(), "{name}: {other:?}");
+                    let edits: Vec<Edit> = (ours.iter().flat_map(|d| &d.fixes))
+                        .flat_map(|fix| fix.edits.iter().cloned())
+                        .collect();
+                    if !edits.is_empty() {
+                        fixes.push((name.to_owned(), edits));
+                    }
+                };
+                check_reporting(&sources, report, |_, _| {});
+                if fixes.is_empty() {
+                    return;
+                }
+                for (name, mut edits) in fixes {
+                    let (_, text) = (modules.iter_mut())
+                        .find(|(module, _)| *module == name)
+                        .expect("a checked module");
+                    edits.sort_by_key(|e| Reverse(e.span.start));
+                    for edit in edits {
+                        text.replace_range(edit.span.range(), &edit.replacement);
+                    }
+                    fs::write(path(&name), &*text).expect("the source is written");
+                }
+            }
+        }
+    }
 
     /// A module of an implicit package uses another of them only through an
     /// `import`, so what a package needs is written down; the core modules are

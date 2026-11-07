@@ -14,17 +14,15 @@ run : (Identity a)^c -> a^c
 let run (Identity value) = value
 
 instance Functor Identity =
-  map : (forall v. a^v -> b)^c -> ((Identity a)^d -> (Identity b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> (Identity a)^d -> (Identity b)^(c + d)
   let map f (Identity value) = Identity (f value)
 
 instance Applicative Identity =
   pure : a^c -> (Identity a)^c
   let pure value = Identity value
-  map2 :
-    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-    ((Identity a)^d -> ((Identity b)^d -> (Identity x)^(c + d))^(c + d))^c
+  map2 : (forall u v. a^u -> b^v -> x)^c -> (Identity a)^d -> (Identity b)^d -> (Identity x)^(c + d)
   let map2 f (Identity left) (Identity right) = Identity (f left right)
 
 instance Monad Identity =
-  flat_map : (forall v. a^v -> (Identity b)^(c + v))^c -> ((Identity a)^d -> (Identity b)^(c + d))^c
+  flat_map : (forall v. a^v -> (Identity b)^(c + v))^c -> (Identity a)^d -> (Identity b)^(c + d)
   let flat_map f (Identity value) = f value

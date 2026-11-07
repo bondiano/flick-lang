@@ -20,7 +20,7 @@ let hide file =
   try from_result (Err (Wrapped file)) with
   | err -> keep err
 
-hide_shown : File s ->{} (Unit -> Unit)^{s}
+hide_shown : File s ->{} Unit -> Unit
 let hide_shown file = hide file
 
 hide_field : File s ->{} { run : (Unit -> Unit)^{s} }

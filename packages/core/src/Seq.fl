@@ -31,7 +31,7 @@ foreign pure range_by from "@flick-lang/runtime" "seqRangeBy"
   arity 3
 
 /// `x`, `f x`, `f (f x)`, … without end.
-iterate : (a -> a)^c -> (a -> (Seq a)^c)^c
+iterate : (a -> a)^c -> a -> (Seq a)^c
 foreign pure iterate from "@flick-lang/runtime" "seqIterate"
   arity 2
   retention call
@@ -45,36 +45,36 @@ cycle : List a -> Seq a
 foreign pure cycle from "@flick-lang/runtime" "seqCycle"
 
 /// The values of `f` from the seed until it gives `None`.
-unfold : (s -> Option (a, s))^c -> (s -> (Seq a)^c)^c
+unfold : (s -> Option (a, s))^c -> s -> (Seq a)^c
 foreign pure unfold from "@flick-lang/runtime" "seqUnfold"
   arity 2
   retention call
 
 /// The elements of the first, then those of the second.
-append : (Seq a)^d -> ((Seq a)^d -> (Seq a)^d)^d
+append : (Seq a)^d -> (Seq a)^d -> (Seq a)^d
 foreign pure append from "@flick-lang/runtime" "seqAppend"
   arity 2
   retention call
 
 @lang seq_map
-map : (forall v. a^v -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+map : (forall v. a^v -> b)^c -> (Seq a)^d -> (Seq b)^(c + d)
 foreign pure map from "@flick-lang/runtime" "seqMap"
   arity 2
   retention call
 
 @lang seq_filter
-filter : (a -> Bool)^c -> ((Seq a)^d -> (Seq a)^(c + d))^c
+filter : (a -> Bool)^c -> (Seq a)^d -> (Seq a)^(c + d)
 foreign pure filter from "@flick-lang/runtime" "seqFilter"
   arity 2
   retention call
 
-filter_map : (a -> Option b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+filter_map : (a -> Option b)^c -> (Seq a)^d -> (Seq b)^(c + d)
 foreign pure filter_map from "@flick-lang/runtime" "seqFilterMap"
   arity 2
   retention call
 
 @lang seq_flat_map
-flat_map : (forall v. a^v -> (Seq b)^(c + v))^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+flat_map : (forall v. a^v -> (Seq b)^(c + v))^c -> (Seq a)^d -> (Seq b)^(c + d)
 foreign pure flat_map from "@flick-lang/runtime" "seqFlatMap"
   arity 2
   retention call
@@ -87,7 +87,7 @@ foreign pure take from "@flick-lang/runtime" "seqTake"
   arity 2
   retention call
 
-take_while : (a -> Bool)^c -> ((Seq a)^d -> (Seq a)^(c + d))^c
+take_while : (a -> Bool)^c -> (Seq a)^d -> (Seq a)^(c + d)
 foreign pure take_while from "@flick-lang/runtime" "seqTakeWhile"
   arity 2
   retention call
@@ -98,18 +98,18 @@ foreign pure drop from "@flick-lang/runtime" "seqDrop"
   arity 2
   retention call
 
-drop_while : (a -> Bool)^c -> ((Seq a)^d -> (Seq a)^(c + d))^c
+drop_while : (a -> Bool)^c -> (Seq a)^d -> (Seq a)^(c + d)
 foreign pure drop_while from "@flick-lang/runtime" "seqDropWhile"
   arity 2
   retention call
 
 /// Pairs in order, as long as the shorter one.
-zip : (Seq a)^d -> ((Seq b)^d -> (Seq (a, b))^d)^d
+zip : (Seq a)^d -> (Seq b)^d -> (Seq (a, b))^d
 foreign pure zip from "@flick-lang/runtime" "seqZip"
   arity 2
   retention call
 
-zip_with : (a -> b -> x)^c -> ((Seq a)^d -> ((Seq b)^d -> (Seq x)^(c + d))^(c + d))^c
+zip_with : (a -> b -> x)^c -> (Seq a)^d -> (Seq b)^d -> (Seq x)^(c + d)
 foreign pure zip_with from "@flick-lang/runtime" "seqZipWith"
   arity 3
   retention call
@@ -120,7 +120,7 @@ foreign pure enumerate from "@flick-lang/runtime" "seqEnumerate"
   retention call
 
 /// `init`, then each running fold: `scan (+) 0 [1, 2]` is `0, 1, 3`.
-scan : (b -> a -> b)^c -> (b -> ((Seq a)^d -> (Seq b)^(c + d))^c)^c
+scan : (b -> a -> b)^c -> b -> ((Seq a)^d -> (Seq b)^(c + d))^c
 foreign pure scan from "@flick-lang/runtime" "seqScan"
   arity 3
   retention call
@@ -144,25 +144,25 @@ foreign pure to_list from "@flick-lang/runtime" "seqToList"
   retention call
 
 /// Folds from the first element; never ends on an infinite sequence.
-fold : (b -> a -> b)^c -> (b -> ((Seq a)^d -> b)^c)^c
+fold : (b -> a -> b)^c -> b -> ((Seq a)^d -> b)^c
 foreign pure fold from "@flick-lang/runtime" "seqFold"
   arity 3
   retention call
 
 /// Stops at the first element that satisfies `p`.
-any : (a -> Bool)^c -> ((Seq a)^d -> Bool)^c
+any : (a -> Bool)^c -> (Seq a)^d -> Bool
 foreign pure any from "@flick-lang/runtime" "seqAny"
   arity 2
   retention call
 
 /// Stops at the first element that does not satisfy `p`.
-all : (a -> Bool)^c -> ((Seq a)^d -> Bool)^c
+all : (a -> Bool)^c -> (Seq a)^d -> Bool
 foreign pure all from "@flick-lang/runtime" "seqAll"
   arity 2
   retention call
 
 /// The first element that satisfies `p`.
-find : (a -> Bool)^c -> ((Seq a)^d -> Option a)^c
+find : (a -> Bool)^c -> (Seq a)^d -> Option a
 foreign pure find from "@flick-lang/runtime" "seqFind"
   arity 2
   retention call
@@ -172,12 +172,12 @@ foreign pure first from "@flick-lang/runtime" "seqFirst"
   retention call
 
 /// Runs a runtime function on each element in order, for what it does.
-each_effect : (a ->{r; e} Unit)^c -> ((Seq a)^d ->{r; e} Unit)^c
+each_effect : (a ->{r; e} Unit)^c -> (Seq a)^d ->{r; e} Unit
 foreign effect each_effect from "@flick-lang/runtime" "seqEachEffect"
   retention call
 
 /// Folds from the first element with a runtime function.
-fold_effect : (b -> a ->{r; e} b)^c -> (b -> ((Seq a)^d ->{r; e} b)^c)^c
+fold_effect : (b -> a ->{r; e} b)^c -> b -> ((Seq a)^d ->{r; e} b)^c
 foreign effect fold_effect from "@flick-lang/runtime" "seqFoldEffect"
   retention call
 

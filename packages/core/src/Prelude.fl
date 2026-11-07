@@ -133,11 +133,11 @@ class Show a =
 /// Containers whose elements a pure function maps. A container may apply
 /// the function later, so the result keeps the captures of both.
 class Functor (f : Type -> Type) =
-  map : forall c d a b. (forall v. a^v -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
+  map : forall c d a b. (forall v. a^v -> b)^c -> (f a)^d -> (f b)^(c + d)
 
 /// Containers folded from the first element to the last.
 class Foldable (f : Type -> Type) =
-  fold : forall c a b. (b -> a -> b)^c -> (b^c -> (f a -> b)^c)^c
+  fold : forall c a b. (b -> a -> b)^c -> b^c -> f a -> b
   /// The elements, each mapped by `f`, combined from `empty`.
   fold_map : forall a m. Monoid m => (a -> m) -> f a -> m
   let fold_map f xs = fold (fun acc x -> combine acc (f x)) empty xs
@@ -145,20 +145,18 @@ class Foldable (f : Type -> Type) =
 /// Containers whose elements a runtime function maps, one after another
 /// from the first.
 class Functor f => Traversable (f : Type -> Type) =
-  traverse : forall c a b r e. (a ->{r; e} b)^c -> (f a ->{r; e} f b)^c
+  traverse : forall c a b r e. (a ->{r; e} b)^c -> f a ->{r; e} f b
 
 class Functor f => Applicative (f : Type -> Type) =
   @lang pure
   pure : forall c a. a^c -> (f a)^c
   @lang map2
   /// `f` of the values of both, in order: for `List`, every pair.
-  map2 :
-    forall c d a b x.
-    (forall u v. a^u -> (b^v -> x)^(c + u))^c -> ((f a)^d -> ((f b)^d -> (f x)^(c + d))^(c + d))^c
+  map2 : forall c d a b x. (forall u v. a^u -> b^v -> x)^c -> (f a)^d -> (f b)^d -> (f x)^(c + d)
 
 class Applicative m => Monad (m : Type -> Type) =
   @lang flat_map
-  flat_map : forall c d a b. (forall v. a^v -> (m b)^(c + v))^c -> ((m a)^d -> (m b)^(c + d))^c
+  flat_map : forall c d a b. (forall v. a^v -> (m b)^(c + v))^c -> (m a)^d -> (m b)^(c + d)
 
 /// Applicative containers with a choice: `nothing` holds no value, and
 /// `or_else` keeps the first that holds one (`List` keeps both).
@@ -240,7 +238,7 @@ class Detached (r : ServiceRow)
 
 /// Runs both, as children: on a failure the other one is interrupted and
 /// awaited. The results keep the order of the arguments.
-parallel : Detached r => (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c
+parallel : Detached r => (Eff r e a)^c -> (Eff r e b)^c ->{r; e} (a, b)
 foreign effect parallel from "@flick-lang/runtime" "parallel"
   retention call
 
@@ -262,13 +260,13 @@ foreign effect parallel_exits from "@flick-lang/runtime" "parallelExits"
   retention call
 
 /// The first task to succeed; the loser is interrupted and awaited.
-race_success : Detached r => (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
+race_success : Detached r => (Eff r e a)^c -> (Eff r e a)^c ->{r; e} a
 foreign effect race_success from "@flick-lang/runtime" "raceSuccess"
   retention call
   reviewed "effect@4.1.2 sha256:ac5b5886f22dc7c6"
 
 /// The first task to end, however it ends.
-race_first : Detached r => (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
+race_first : Detached r => (Eff r e a)^c -> (Eff r e a)^c ->{r; e} a
 foreign effect race_first from "@flick-lang/runtime" "raceFirst"
   retention call
   reviewed "effect@4.1.2 sha256:5247faa250c6adc7"
@@ -286,11 +284,11 @@ foreign effect timeout_option from "@flick-lang/runtime" "timeoutOption"
   reviewed "effect@4.1.2 sha256:35e1a71b230ac8e2"
 
 /// `ma` followed by `f` of its value, for any monad.
-bind : Monad m => (m a)^c -> ((a -> (m b)^d)^d -> (m b)^(c + d))^c
+bind : Monad m => (m a)^c -> (a -> (m b)^d)^d -> (m b)^(c + d)
 let bind ma f = flat_map f ma
 
 /// A task followed by `f` of its value; the rows of both join.
-bind_eff : (Eff r1 e1 a)^c -> ((a -> (Eff r2 e2 b)^d)^d -> (Eff (r1 + r2) (e1 + e2) b)^(c + d))^c
+bind_eff : (Eff r1 e1 a)^c -> (a -> (Eff r2 e2 b)^d)^d -> (Eff (r1 + r2) (e1 + e2) b)^(c + d)
 foreign pure bind_eff from "@flick-lang/runtime" "bindEff"
   arity 2
   retention call
@@ -321,14 +319,14 @@ foreign pure option_as_nullish from "@flick-lang/runtime" "codecOptionNullish"
 
 /// A missing key decodes to `default ()`, called once per decode; `null` or
 /// a wrong value is still an error.
-on_missing : (Unit -> a)^c -> (FieldCodec rd a -> FieldCodec rd a)^c
+on_missing : (Unit -> a)^c -> FieldCodec rd a -> FieldCodec rd a
 foreign pure on_missing from "@flick-lang/runtime" "dslOnMissing"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:f0155391ca2658bc"
 
 /// `on_missing` with a runtime default, whose services decoding then needs.
-on_missing_effect : (Unit ->{r; SchemaError} a)^c -> (FieldCodec rd a -> FieldCodec (rd + r) a)^c
+on_missing_effect : (Unit ->{r; SchemaError} a)^c -> FieldCodec rd a -> FieldCodec (rd + r) a
 foreign pure on_missing_effect from "@flick-lang/runtime" "dslOnMissingEffect"
   arity 2
   retention call

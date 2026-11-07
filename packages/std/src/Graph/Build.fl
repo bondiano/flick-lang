@@ -64,28 +64,28 @@ foreign pure remove_edges from "@flick-lang/runtime/effect/Graph" "flickRemoveEd
   reviewed "effect@4.1.2 sha256:a2c2a02f45158dd0"
 
 /// The graph with the node's data replaced by `f data`, if it has the node.
-update_node : NodeIndex -> (n -> n)^c -> (Graph n e k -> Graph n e k)^c
+update_node : NodeIndex -> (n -> n)^c -> Graph n e k -> Graph n e k
 foreign pure update_node from "@flick-lang/runtime/effect/Graph" "flickUpdateNode"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:16154ff1d833075b"
 
 /// The graph with the edge's data replaced by `f data`, if it has the edge.
-update_edge : EdgeIndex -> (e -> e)^c -> (Graph n e k -> Graph n e k)^c
+update_edge : EdgeIndex -> (e -> e)^c -> Graph n e k -> Graph n e k
 foreign pure update_edge from "@flick-lang/runtime/effect/Graph" "flickUpdateEdge"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:da31781c36322abd"
 
 /// Each node's data replaced by `f data`.
-map_nodes : (n -> n)^c -> (Graph n e k -> Graph n e k)^c
+map_nodes : (n -> n)^c -> Graph n e k -> Graph n e k
 foreign pure map_nodes from "@flick-lang/runtime/effect/Graph" "flickMapNodes"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:49ad1d9a33c6bcad"
 
 /// Each edge's data replaced by `f data`.
-map_edges : (e -> e)^c -> (Graph n e k -> Graph n e k)^c
+map_edges : (e -> e)^c -> Graph n e k -> Graph n e k
 foreign pure map_edges from "@flick-lang/runtime/effect/Graph" "flickMapEdges"
   arity 2
   retention call
@@ -93,28 +93,28 @@ foreign pure map_edges from "@flick-lang/runtime/effect/Graph" "flickMapEdges"
 
 /// The nodes `f` keeps with `Some`, with that data; the others and their
 /// edges removed.
-filter_map_nodes : (n -> Option n)^c -> (Graph n e k -> Graph n e k)^c
+filter_map_nodes : (n -> Option n)^c -> Graph n e k -> Graph n e k
 foreign pure filter_map_nodes from "@flick-lang/runtime/effect/Graph" "flickFilterMapNodes"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:0e74a13a7f978229"
 
 /// The edges `f` keeps with `Some`, with that data.
-filter_map_edges : (e -> Option e)^c -> (Graph n e k -> Graph n e k)^c
+filter_map_edges : (e -> Option e)^c -> Graph n e k -> Graph n e k
 foreign pure filter_map_edges from "@flick-lang/runtime/effect/Graph" "flickFilterMapEdges"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:bfdd4166a7069936"
 
 /// The nodes whose data satisfies `f`, with the edges between them.
-filter_nodes : (n -> Bool)^c -> (Graph n e k -> Graph n e k)^c
+filter_nodes : (n -> Bool)^c -> Graph n e k -> Graph n e k
 foreign pure filter_nodes from "@flick-lang/runtime/effect/Graph" "flickFilterNodes"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:b38e674035378886"
 
 /// The edges whose data satisfies `f`.
-filter_edges : (e -> Bool)^c -> (Graph n e k -> Graph n e k)^c
+filter_edges : (e -> Bool)^c -> Graph n e k -> Graph n e k
 foreign pure filter_edges from "@flick-lang/runtime/effect/Graph" "flickFilterEdges"
   arity 2
   retention call
@@ -158,7 +158,7 @@ foreign pure sum from "@flick-lang/runtime/effect/Graph" "sum"
 
 /// The same nodes with an edge, of data `f source target`, between each
 /// pair the graph does not join.
-complement : (n -> n -> e)^c -> (Graph n e k -> Graph n e k)^c
+complement : (n -> n -> e)^c -> Graph n e k -> Graph n e k
 foreign pure complement from "@flick-lang/runtime/effect/Graph" "complement"
   arity 1
   retention call

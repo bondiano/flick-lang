@@ -27,15 +27,13 @@ from_option : Applicative m => (Option a)^c -> (MaybeT m a)^c
 let from_option value = MaybeT (pure value)
 
 instance Functor m => Functor (MaybeT m) =
-  map : (forall v. a^v -> b)^c -> ((MaybeT m a)^d -> (MaybeT m b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> (MaybeT m a)^d -> (MaybeT m b)^(c + d)
   let map f (MaybeT action) = MaybeT (map (Option.map f) action)
 
 instance Monad m => Applicative (MaybeT m) =
   pure : a^c -> (MaybeT m a)^c
   let pure value = MaybeT (pure (Some value))
-  map2 :
-    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-    ((MaybeT m a)^d -> ((MaybeT m b)^d -> (MaybeT m x)^(c + d))^(c + d))^c
+  map2 : (forall u v. a^u -> b^v -> x)^c -> (MaybeT m a)^d -> (MaybeT m b)^d -> (MaybeT m x)^(c + d)
   let map2 f left right =
     MaybeT
       (do {
@@ -49,7 +47,7 @@ instance Monad m => Applicative (MaybeT m) =
       })
 
 instance Monad m => Monad (MaybeT m) =
-  flat_map : (forall v. a^v -> (MaybeT m b)^(c + v))^c -> ((MaybeT m a)^d -> (MaybeT m b)^(c + d))^c
+  flat_map : (forall v. a^v -> (MaybeT m b)^(c + v))^c -> (MaybeT m a)^d -> (MaybeT m b)^(c + d)
   let flat_map f value =
     MaybeT
       (do {
@@ -77,7 +75,7 @@ instance MonadReader m r => MonadReader (MaybeT m) r =
   ask : MaybeT m r
   let ask = lift ask
 
-  local : (forall v. r^v -> r^(c + v))^c -> ((MaybeT m a)^d -> (MaybeT m a)^(c + d))^c
+  local : (forall v. r^v -> r^(c + v))^c -> (MaybeT m a)^d -> (MaybeT m a)^(c + d)
   let local update (MaybeT action) = MaybeT (local update action)
 
   reader : (forall v. r^v -> a)^c -> (MaybeT m a)^c
@@ -115,7 +113,6 @@ instance MonadError m e => MonadError (MaybeT m) e =
   throw_error : e^c -> (MaybeT m a)^c
   let throw_error problem = lift (throw_error problem)
 
-  catch_error :
-    (forall v. e^v -> (MaybeT m a)^(c + v))^c -> ((MaybeT m a)^d -> (MaybeT m a)^(c + d))^c
+  catch_error : (forall v. e^v -> (MaybeT m a)^(c + v))^c -> (MaybeT m a)^d -> (MaybeT m a)^(c + d)
   let catch_error handler (MaybeT action) =
     MaybeT (catch_error (fun problem -> run (handler problem)) action)

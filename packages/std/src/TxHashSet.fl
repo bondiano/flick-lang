@@ -88,13 +88,13 @@ foreign effect is_subset from "@flick-lang/runtime/effect/TxHashSet" "flickIsSub
   reviewed "effect@4.1.2 sha256:0713e855a175b048"
 
 /// Whether the predicate accepts an element.
-some : (a -> Bool)^c -> (TxHashSet w a ->{Tx.Transaction;} Bool)^c
+some : (a -> Bool)^c -> TxHashSet w a ->{Tx.Transaction;} Bool
 foreign effect some from "@flick-lang/runtime/effect/TxHashSet" "flickSome"
   retention call
   reviewed "effect@4.1.2 sha256:24dbf9cbd167f5f7"
 
 /// Whether the predicate accepts every element.
-every : (a -> Bool)^c -> (TxHashSet w a ->{Tx.Transaction;} Bool)^c
+every : (a -> Bool)^c -> TxHashSet w a ->{Tx.Transaction;} Bool
 foreign effect every from "@flick-lang/runtime/effect/TxHashSet" "flickEvery"
   retention call
   reviewed "effect@4.1.2 sha256:2b7dc8fe2bf663f3"
@@ -106,7 +106,7 @@ foreign effect map from "@flick-lang/runtime/effect/TxHashSet" "flickMap"
   reviewed "effect@4.1.2 sha256:71aaf1f462aafbf6"
 
 /// A new set of the elements the predicate accepts.
-filter : (a -> Bool)^c -> (TxHashSet w a ->{Tx.Transaction;} TxHashSet w a)^c
+filter : (a -> Bool)^c -> TxHashSet w a ->{Tx.Transaction;} TxHashSet w a
 foreign effect filter from "@flick-lang/runtime/effect/TxHashSet" "flickFilter"
   retention call
   reviewed "effect@4.1.2 sha256:f7f0674a2944ebb0"

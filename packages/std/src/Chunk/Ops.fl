@@ -6,21 +6,21 @@ module Chunk.Ops exposing (..)
 import Chunk.Core exposing (Chunk, to_list)
 
 /// The elements that satisfy `p`.
-filter : (a -> Bool)^c -> (Chunk a -> Chunk a)^c
+filter : (a -> Bool)^c -> Chunk a -> Chunk a
 foreign pure filter from "@flick-lang/runtime/effect/Chunk" "filter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:5b6f8b4df57d9246"
 
 /// The `Ok` values of `f` over the elements.
-filter_map : (a -> Result e b)^c -> (Chunk a -> Chunk b)^c
+filter_map : (a -> Result e b)^c -> Chunk a -> Chunk b
 foreign pure filter_map from "@flick-lang/runtime/effect/Chunk" "filterMap"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:472ff04b8075832b"
 
 /// The `Ok` values of `f` over the elements, up to the first `Err`.
-filter_map_while : (a -> Result e b)^c -> (Chunk a -> Chunk b)^c
+filter_map_while : (a -> Result e b)^c -> Chunk a -> Chunk b
 foreign pure filter_map_while from "@flick-lang/runtime/effect/Chunk" "filterMapWhile"
   arity 1
   retention call
@@ -32,7 +32,7 @@ foreign pure compact from "@flick-lang/runtime/effect/Chunk" "compact"
   reviewed "effect@4.1.2 sha256:2254fda6c17b10cc"
 
 /// The chunks `f` gives each element, joined.
-flat_map : (a -> Chunk b)^c -> (Chunk a -> Chunk b)^c
+flat_map : (a -> Chunk b)^c -> Chunk a -> Chunk b
 foreign pure flat_map from "@flick-lang/runtime/effect/Chunk" "flatMap"
   arity 1
   retention call
@@ -44,11 +44,11 @@ foreign pure flatten from "@flick-lang/runtime/effect/Chunk" "flatten"
   reviewed "effect@4.1.2 sha256:d40db7f5af1f97b5"
 
 /// Runs a runtime function on each element in order, for what it does.
-each_effect : (a ->{r; e} Unit)^c -> (Chunk a ->{r; e} Unit)^c
+each_effect : (a ->{r; e} Unit)^c -> Chunk a ->{r; e} Unit
 let each_effect f chunk = List.each_effect f (to_list chunk)
 
 /// Whether an element is `same` as `x`.
-contains_with : (a -> a -> Bool)^c -> (a -> Chunk a -> Bool)^c
+contains_with : (a -> a -> Bool)^c -> a -> Chunk a -> Bool
 foreign pure contains_with from "@flick-lang/runtime/effect/Chunk" "containsWith"
   arity 1
   retention call
@@ -69,7 +69,7 @@ foreign pure dedupe_adjacent from "@flick-lang/runtime/effect/Chunk" "dedupeAdja
   reviewed "effect@4.1.2 sha256:b643d6b5bba0afdc"
 
 /// `c |> difference_with same d`: the elements of `c` with none `same` in `d`.
-difference_with : (a -> a -> Bool)^c -> (Chunk a -> Chunk a -> Chunk a)^c
+difference_with : (a -> a -> Bool)^c -> Chunk a -> Chunk a -> Chunk a
 foreign pure difference_with from "@flick-lang/runtime/effect/Chunk" "differenceWith"
   arity 1
   retention call
@@ -92,42 +92,42 @@ foreign pure union from "@flick-lang/runtime/effect/Chunk" "union"
   reviewed "effect@4.1.2 sha256:4da0b21887053551"
 
 /// Whether every element satisfies `p`.
-every : (a -> Bool)^c -> (Chunk a -> Bool)^c
+every : (a -> Bool)^c -> Chunk a -> Bool
 foreign pure every from "@flick-lang/runtime/effect/Chunk" "every"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:e830ddc44d126681"
 
 /// Whether some element satisfies `p`.
-some : (a -> Bool)^c -> (Chunk a -> Bool)^c
+some : (a -> Bool)^c -> Chunk a -> Bool
 foreign pure some from "@flick-lang/runtime/effect/Chunk" "some"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d15067e9e6730a3e"
 
 /// The first element that satisfies `p`.
-find_first : (a -> Bool)^c -> (Chunk a -> Option a)^c
+find_first : (a -> Bool)^c -> Chunk a -> Option a
 foreign pure find_first from "@flick-lang/runtime/effect/Chunk" "findFirst"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:10dae4d47f952371"
 
 /// The index of the first element that satisfies `p`.
-find_first_index : (a -> Bool)^c -> (Chunk a -> Option Int)^c
+find_first_index : (a -> Bool)^c -> Chunk a -> Option Int
 foreign pure find_first_index from "@flick-lang/runtime/effect/Chunk" "findFirstIndex"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:aff106aee52f9c1d"
 
 /// The last element that satisfies `p`.
-find_last : (a -> Bool)^c -> (Chunk a -> Option a)^c
+find_last : (a -> Bool)^c -> Chunk a -> Option a
 foreign pure find_last from "@flick-lang/runtime/effect/Chunk" "findLast"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:868885f7ed37200d"
 
 /// The index of the last element that satisfies `p`.
-find_last_index : (a -> Bool)^c -> (Chunk a -> Option Int)^c
+find_last_index : (a -> Bool)^c -> Chunk a -> Option Int
 foreign pure find_last_index from "@flick-lang/runtime/effect/Chunk" "findLastIndex"
   arity 1
   retention call
@@ -148,7 +148,7 @@ foreign pure map_accum from "@flick-lang/runtime/effect/Chunk" "mapAccum"
   reviewed "effect@4.1.2 sha256:8a280bbf63fd6efa"
 
 /// The `Ok` values and the `Err` errors of `f` over the elements.
-partition : (a -> Result f p)^c -> (Chunk a -> (Chunk p, Chunk f))^c
+partition : (a -> Result f p)^c -> Chunk a -> (Chunk p, Chunk f)
 foreign pure partition from "@flick-lang/runtime/effect/Chunk" "partition"
   arity 1
   retention call
@@ -174,7 +174,7 @@ foreign pure reduce_right from "@flick-lang/runtime/effect/Chunk" "reduceRight"
   reviewed "effect@4.1.2 sha256:54edc840a88d4e23"
 
 /// Sorts by `compare`, keeping equal elements in their order.
-sort_by : (a -> a -> Ordering)^c -> (Chunk a -> Chunk a)^c
+sort_by : (a -> a -> Ordering)^c -> Chunk a -> Chunk a
 foreign pure sort_by from "@flick-lang/runtime/effect/Chunk" "flickSortBy"
   arity 1
   retention call

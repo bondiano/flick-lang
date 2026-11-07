@@ -4,7 +4,6 @@
 module Channel.Run exposing (..)
 
 import Channel.Core exposing (..)
-import Fiber
 import PubSub
 import Queue
 
@@ -92,9 +91,7 @@ foreign effect run_into_queue_array from "@flick-lang/runtime/effect/Channel" "r
 /// Runs the channel in the background of the innermost `scope` (or the
 /// one of region `s`) into a queue with the options; the queue ends, or
 /// fails, as the channel does, and is shut down when the scope closes.
-to_queue :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
-  Buffer -> (Channel r e i o d none Unit)^c ->{Scope s | r;} Queue.Queue e o
+to_queue : Buffer -> (Channel r e i o d none Unit)^c ->{Scope s | r;} Queue.Queue e o
 foreign effect to_queue from "@flick-lang/runtime/effect/Channel" "flickToQueue"
   arity 1
   retention owner
@@ -102,7 +99,6 @@ foreign effect to_queue from "@flick-lang/runtime/effect/Channel" "flickToQueue"
 
 /// `to_queue` of the elements of each chunk.
 to_queue_array :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Buffer -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{Scope s | r;} Queue.Queue e o
 foreign effect to_queue_array from "@flick-lang/runtime/effect/Channel" "flickToQueueArray"
   arity 1
@@ -121,9 +117,7 @@ type alias HubOptions = {
 
 /// Runs the channel in the background of the innermost `scope` (or the
 /// one of region `s`), publishing its elements to a new hub.
-to_pubsub :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
-  HubOptions -> (Channel r e i o d none Unit)^c ->{Scope s | r;} PubSub.PubSub o
+to_pubsub : HubOptions -> (Channel r e i o d none Unit)^c ->{Scope s | r;} PubSub.PubSub o
 foreign effect to_pubsub from "@flick-lang/runtime/effect/Channel" "flickToPubSub"
   arity 1
   retention owner
@@ -131,7 +125,6 @@ foreign effect to_pubsub from "@flick-lang/runtime/effect/Channel" "flickToPubSu
 
 /// `to_pubsub` of the elements of each chunk.
 to_pubsub_array :
-  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   HubOptions -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{Scope s | r;} PubSub.PubSub o
 foreign effect to_pubsub_array from "@flick-lang/runtime/effect/Channel" "flickToPubSubArray"
   arity 1

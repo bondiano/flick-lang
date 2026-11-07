@@ -62,7 +62,7 @@ foreign pure tap_sink from "@flick-lang/runtime/effect/Stream" "tapSink"
 /// The first value of the sink and the rest of the stream, which belongs to
 /// the scope of region `s`.
 peel :
-  (Fiber.Outlives c s, Fiber.Provided r s, Fiber.Provided r2 s, Detached r, Detached r2) =>
+  Fiber.Provided r2 s =>
   Sink r2 e2 a a b -> (Stream r e a)^c ->{Scope s | r + r2; e + e2} (b, (Stream none e a)^{s})
 foreign effect peel from "@flick-lang/runtime/effect/Stream" "peel"
   arity 1
