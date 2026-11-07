@@ -240,7 +240,7 @@ impl Gen<'_> {
         use flick_ir::Shape;
         match s {
             Shape::Data => v,
-            Shape::Fun { args, result, runtime } => {
+            Shape::Fun { args, result, runtime, sync } => {
                 let d = self.bridge_depth();
                 let xs: Vec<String> = (0..args.len()).map(|k| format!("$h{d}_{k}")).collect();
                 let mut call = v;
@@ -248,7 +248,12 @@ impl Gen<'_> {
                     let arg = self.from_host(a, x.clone());
                     call = format!("{call}({arg})");
                 }
-                let body = if *runtime {
+                let body = if *sync {
+                    let at = format!("$r{d}");
+                    let map = self.to_host(result, at.clone());
+                    let ran = format!("{}(() => {call})", self.rt("callSync"));
+                    if map == at { ran } else { format!("(({at}) => {map})({ran})") }
+                } else if *runtime {
                     let at = format!("$r{d}");
                     let map = self.to_host(result, at.clone());
                     if map == at {
@@ -300,6 +305,7 @@ impl Gen<'_> {
                 format!("(($t{d}) => ({{ ...$t{d}, {} }}))({v})", parts.join(", "))
             }
             Shape::Layer => format!("{}({v})", self.rt("layerToEffect")),
+            Shape::Handlers => format!("{}({v})", self.rt("handlersToEffect")),
             Shape::Exit => format!("{}({v})", self.rt("exitToEffect")),
             Shape::Failure => format!("{}({v})", self.rt("failureToEffect")),
         }
@@ -309,8 +315,8 @@ impl Gen<'_> {
     pub(super) fn from_host(&mut self, s: &flick_ir::Shape, v: String) -> String {
         use flick_ir::Shape;
         match s {
-            Shape::Data | Shape::Layer => v,
-            Shape::Fun { args, result, runtime } => {
+            Shape::Data | Shape::Layer | Shape::Handlers => v,
+            Shape::Fun { args, result, runtime, sync } => {
                 let d = self.bridge_depth();
                 let xs: Vec<String> = (0..args.len()).map(|k| format!("$g{d}_{k}")).collect();
                 let mut call = v;
@@ -318,7 +324,10 @@ impl Gen<'_> {
                     let arg = self.to_host(a, x.clone());
                     call = format!("{call}({arg})");
                 }
-                let mut body = if *runtime {
+                let mut body = if *sync {
+                    let value = format!("{}(() => {call})", self.rt("inSyncContext"));
+                    self.from_host(result, value)
+                } else if *runtime {
                     let at = format!("$r{d}");
                     let map = self.from_host(result, at.clone());
                     let ran = format!("{}({call})", self.rt("fromEffect"));

@@ -331,9 +331,6 @@
 @flick-lang/runtime/rt derive
 @flick-lang/runtime/rt divBigInt
 @flick-lang/runtime/rt divInt
-@flick-lang/runtime/rt durationMillis
-@flick-lang/runtime/rt durationMinutes
-@flick-lang/runtime/rt durationSeconds
 @flick-lang/runtime/rt equals
 @flick-lang/runtime/rt err
 @flick-lang/runtime/rt exitFailure

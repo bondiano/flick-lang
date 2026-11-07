@@ -61,7 +61,13 @@ let body () =
   say ("kernel Exits carried by a stream: " ++ show (List.map (fun e -> Option.is_some (Exit.value e)) exits))
   // Effect's turn in a stage that runs at once
   say ("a long decode in a Sync stage: " ++ show (sync_decode 20000))
+  say ("a long stream in a Sync stage: " ++ show (sync_stream 20000))
   say "done"
+
+/// Enough of Effect's operations that its fiber gives its turn, without waiting for anything.
+sync_stream : Int ->{} Int
+let sync_stream n =
+  List.length (Stream.run_collect (Stream.from_list (List.range 0 n) |> Stream.map_effect (fun x -> x + 1) |> Stream.rechunk 1))
 
 sync_decode : Int ->{; SchemaError} Int
 let sync_decode n =

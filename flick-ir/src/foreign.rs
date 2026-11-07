@@ -92,6 +92,8 @@ pub enum Shape {
         args: Vec<Shape>,
         result: Box<Shape>,
         runtime: bool,
+        /// A Sync stage on both modes: Effect's side calls it and gets its value.
+        sync: bool,
     },
     Eff(Box<Shape>),
     List(Box<Shape>),
@@ -101,6 +103,9 @@ pub enum Shape {
     Tuple(Vec<Shape>),
     Record(Vec<(String, Shape)>),
     Layer,
+    /// A record of handlers whose shape the signature hides behind a type
+    /// variable (`Api r gs -> gs`, `Group r hs -> hs`): walked at run time.
+    Handlers,
     Exit,
     Failure,
 }

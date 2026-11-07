@@ -35,7 +35,11 @@ impl Checker<'_> {
     /// Whether an arrow of the services `row`, as written, is a plain function
     /// on Flick's own runtime; a variable, a meta or an effect not found says no.
     pub(in crate::types) fn direct_row(&self, row: &Type) -> bool {
-        self.options.stages_by_class && self.closed_without_suspending(row)
+        // spike: a build over the bridge may keep every closed row a runtime stage,
+        // for an Effect binding suspends whatever its row says
+        self.options.stages_by_class
+            && std::env::var_os("FLICK_NO_DIRECT").is_none()
+            && self.closed_without_suspending(row)
     }
 
     fn closed_without_suspending(&self, row: &Type) -> bool {

@@ -1,17 +1,22 @@
 // spike: the bridge between the kernel and Effect. Effect's Context travels on
 // the kernel's evidence (`Ctx.host`); the kernel's evidence travels in Effect's
 // Context under `KERNEL`. A crossing that ends at once takes no suspension.
-import { Cause as ECause, Context, Effect, Exit as EExit, Layer as ELayer, Option as EOption, Result as EResult, Scope as EScope } from "effect";
+import { Cause as ECause, Context, Duration as EDuration, Effect, Exit as EExit, Layer as ELayer, Option as EOption, Result as EResult, Scope as EScope } from "effect";
 
 import { Failure as HostFailure } from "../cause.ts";
 import { failureCause, flickExit, nativeExit } from "../stdlib/outcome.ts";
+import { syncContext, syncIn } from "../sync.ts";
 import { type Cause, type Exit, Raise, failed, fromReasons, raise, succeeded } from "./cause.ts";
-import { type Ctx, type Fiber, type Run, Suspend, currentCtx, currentFiber, forkNow, hosted, asExit, exitOf, lookup, raiseOf } from "./fiber.ts";
+import { type Ctx, type Fiber, type Run, Suspend, currentCtx, currentFiber, forkNow, hosted, inCtx, asExit, exitOf, lookup, raiseOf, runIn } from "./fiber.ts";
+import { Duration } from "./duration.ts";
 import { Failure } from "./outcome.ts";
 import { bridgeHooks } from "./handle.ts";
 import { HOST, Layer, MEMO as MEMO_KEY, MemoMap, layerHooks, memoizable } from "./layer.ts";
 import { Owner, addTo, close, inside } from "./owner.ts";
-import { none, some, useHostData } from "../core/data.ts";
+import { none, some, useHostData, useHostEquality } from "../core/data.ts";
+import { equals as hostEquals, hash as hostHash } from "../data.ts";
+import { CurrentOwner, Owner as HostOwner, close as closeHost } from "../owner.ts";
+import { durationHooks } from "./duration.ts";
 
 interface EffectFiber {
   readonly id: number;
@@ -66,6 +71,7 @@ const hostOf = (ctx: Ctx | null): Context.Context<never> => {
   const below = ctx.next;
   let out: Context.Context<never>;
   if (ctx.host !== below?.host) out = ctx.host as Context.Context<never>;
+  else if (ctx.owner !== below?.owner && ctx.owner !== undefined) out = Context.add(hostOf(below), CurrentOwner, hostOwnerOf(ctx.owner) as never);
   else if (ctx.tag !== null && Object.isFrozen(ctx.tag) && ctx.tag !== MEMO_TAG(ctx.tag)) {
     out = Context.add(hostOf(below), ctx.tag as never, implOut(ctx.impl) as never);
   } else out = hostOf(below);
@@ -73,6 +79,20 @@ const hostOf = (ctx: Ctx | null): Context.Context<never> => {
   return out;
 };
 const MEMO_TAG = (tag: object): object | undefined => (Reflect.get(tag, "key") === "effect/Layer/CurrentMemoMap" ? tag : undefined);
+
+/**
+ * The owner Effect's side of the runtime sees for a kernel's owner: one per owner, closed with it.
+ * shortcut: its place on the owner's stack is that of the first crossing, not of each acquire; a crossing's own `Scope` keeps the order.
+ */
+const hostOwners = /*#__PURE__*/ new WeakMap<Owner, HostOwner>();
+const hostOwnerOf = (owner: Owner): HostOwner => {
+  const found = hostOwners.get(owner);
+  if (found !== undefined) return found;
+  const made = new HostOwner(EScope.makeUnsafe());
+  hostOwners.set(owner, made);
+  addTo(owner, (exit: Exit) => fromEffect(closeHost(made, exit.cause === undefined ? EExit.void : EExit.failCause(causeOut(exit.cause)))), true);
+  return made;
+};
 
 /** What Effect's scope of one crossing holds goes on the owner's stack, at its place in the order. */
 const settled = (owner: Owner | undefined, scope: EScope.Closeable): unknown => {
@@ -164,6 +184,23 @@ export const callEffect = (call: () => unknown): Effect.Effect<unknown, unknown>
     });
   });
 
+/** A Sync stage of Flick that Effect's side calls and that gives its value: the evidence is the services the side set. */
+export const callSync = (call: () => unknown): unknown => {
+  const context = syncContext();
+  const base = Context.getOrUndefined(context, KERNEL) ?? ROOT_CTX;
+  return inCtx(hosted(base, context), () => runIn(call()));
+};
+
+/** A Sync stage of Effect's side that Flick calls: the services it reads are those of the evidence. */
+export const inSyncContext = (call: () => unknown): unknown => syncIn(hostOf(currentCtx()), call);
+
+/** A record of handlers the signature does not show: each function in it, as Effect's side calls one. */
+export const handlersToEffect = (handlers: unknown): unknown => {
+  if (typeof handlers === "function") return (x: unknown) => callEffect(() => (handlers as (x: unknown) => unknown)(x));
+  if (typeof handlers !== "object" || handlers === null) return handlers;
+  return Object.fromEntries(Object.entries(handlers).map(([k, v]) => [k, handlersToEffect(v)]));
+};
+
 export const optionMapped = (value: { readonly _tag: string; readonly value?: unknown }, f: (a: unknown) => unknown): unknown =>
   value._tag === "Some" ? some(f(value.value)) : none;
 
@@ -239,6 +276,8 @@ export const layerToEffect = (layer: unknown): unknown => {
 
 if (!process.env["FLICK_BRIDGE_PLAIN_DATA"]) {
   useHostData(EOption.some as never, EOption.none() as never, EResult.succeed as never, EResult.fail as never);
+  useHostEquality(hostEquals, hostHash);
+  durationHooks.millis = (d) => (d instanceof Duration ? d.millis : EDuration.toMillis(d as EDuration.Duration));
 }
 
 bridgeHooks.operation = (tag) => {
@@ -250,3 +289,5 @@ layerHooks.adopt = adopt;
 layerHooks.merge = (a, b) => (a === undefined ? b : Context.merge(a as Context.Context<never>, b as Context.Context<never>));
 
 export { Raise, asExit, exitOf, raiseOf };
+export { label } from "../atoms.ts";
+export { refinedParse } from "../schema/index.ts";

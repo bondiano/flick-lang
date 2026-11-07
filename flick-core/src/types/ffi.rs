@@ -92,7 +92,7 @@ impl Checker<'_> {
             })
             .collect();
         info.adapter.copies = self.copies(&params, &body, arity, &info.adapter.callbacks);
-        info.adapter.shapes = params.iter().take(arity).map(|p| self.shape(p, 0)).collect();
+        info.adapter.shapes = self.param_shapes(&params, arity);
         info.adapter.result_shape = self
             .call_result(&body, arity)
             .map_or(flick_ir::Shape::Data, |r| self.shape(&r, 0));

@@ -24,5 +24,5 @@ export const usesFlick = (tag, greet) =>
     yield* log(`effect layer read a Flick service: ${hello}`);
     return { query: (q) => Effect.succeed(`${hello} ${q}`) };
   }));
-export const httpGet = (url) => fetch(url).then(async (r) => `${r.status} ${await r.text()}`);
-export const httpPost = (url, body) => fetch(url, { method: "POST", body, headers: { "content-type": "application/json" } }).then(async (r) => `${r.status} ${await r.text()}`);
+export const httpGet = (url) => fetch(url).then(async (r) => `${r.status} ${await r.text()}`, (e) => `failed ${e}`);
+export const httpPost = (url, body) => fetch(url, { method: "POST", body, headers: { "content-type": "application/json" } }).then(async (r) => `${r.status} ${await r.text()}`, (e) => `failed ${e}`);

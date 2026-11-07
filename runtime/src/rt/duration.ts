@@ -27,14 +27,18 @@ export const durationMillis = (n: number) => checked("millis", n, 1);
 export const durationSeconds = (n: number) => checked("seconds", n, 1000);
 export const durationMinutes = (n: number) => checked("minutes", n, 60_000);
 
+/** spike: a duration may be Effect's: the one the bridge gives Flick, for Effect's code to read. */
+export const durationHooks: { millis: (d: unknown) => number } = { millis: (d) => (d as Duration).millis };
+
 /** A duration that is not positive yields; an infinite one never ends. */
 export const sleep = (d: Duration): Instruction =>
   new Suspend((resolve) => {
-    if (d.millis <= 0) {
+    const millis = durationHooks.millis(d);
+    if (millis <= 0) {
       schedule(() => resolve(undefined));
       return undefined;
     }
-    if (d.millis === Infinity) return undefined;
-    const timer = setTimeout(() => resolve(undefined), d.millis);
+    if (millis === Infinity) return undefined;
+    const timer = setTimeout(() => resolve(undefined), millis);
     return () => clearTimeout(timer);
   });

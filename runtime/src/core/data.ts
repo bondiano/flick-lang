@@ -71,7 +71,7 @@ const isObject = (a: unknown): a is Readonly<Record<string, unknown>> => typeof 
 const held = (k: string): boolean => k.charCodeAt(0) === 36;
 
 /** `==`: structural equality with SameValueZero on numbers. */
-export const equals = (a: unknown, b: unknown): boolean => {
+export let equals = (a: unknown, b: unknown): boolean => {
   // oxlint-disable-next-line no-self-compare -- SameValueZero: NaN equals NaN
   if (a === b || (a !== a && b !== b)) return true;
   if (!isObject(a) || !isObject(b)) return false;
@@ -107,7 +107,7 @@ const hashString = (s: string): number => {
 };
 
 /** A hash consistent with `equals`. */
-export const hash = (a: unknown): number => {
+export let hash = (a: unknown): number => {
   if (typeof a === "number") return hashString(Object.is(a, -0) ? "0" : String(a));
   if (!isObject(a)) return hashString(`${typeof a}:${String(a)}`);
   if (Array.isArray(a)) return listHash(hash, a);
@@ -365,3 +365,9 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
 export const copyData = <A>(value: A): A =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a copy has the shape of what it copies
   copyThrough(value, (x) => x) as A;
+
+/** spike: `==` and `hash` that also know Effect's values: a `Url`, a `DateTime`, a `HashMap`. */
+export const useHostEquality = (e: (a: unknown, b: unknown) => boolean, h: (a: unknown) => number): void => {
+  equals = e;
+  hash = h;
+};

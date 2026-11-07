@@ -46,6 +46,27 @@ impl Checker<'_> {
         }
     }
 
+    /// spike: the shapes of the first `arity` parameters; a type variable that an
+    /// `Api` or a `Group` beside it also has is the record of handlers they need.
+    pub(super) fn param_shapes(&self, params: &[Type], arity: usize) -> Vec<flick_ir::Shape> {
+        let hidden = |p: &Type| {
+            let Type::Var(v) = self.whnf_captured(p).0 else {
+                return false;
+            };
+            params.iter().any(|q| {
+                let q = self.whnf_captured(q).0;
+                let (head, args) = q.spine();
+                matches!(head, Type::Con { name, .. } if name == "Api" || name == "Group")
+                    && args.iter().any(|a| matches!(a, Type::Var(w) if *w == v))
+            })
+        };
+        params
+            .iter()
+            .take(arity)
+            .map(|p| if hidden(p) { flick_ir::Shape::Handlers } else { self.shape(p, 0) })
+            .collect()
+    }
+
     /// spike: the part of `ty` the bridge to Effect converts, from the signature.
     pub(super) fn shape(&self, ty: &Type, depth: usize) -> flick_ir::Shape {
         use flick_ir::Shape;
@@ -68,6 +89,7 @@ impl Checker<'_> {
                             args,
                             result: Box::new(self.shape(&result, depth + 1)),
                             runtime: true,
+                            sync: effects.as_deref().is_some_and(|e| e.sync),
                         };
                     }
                     cur = *result;
@@ -76,7 +98,7 @@ impl Checker<'_> {
                 if result.is_data() && args.iter().all(Shape::is_data) {
                     return Shape::Data;
                 }
-                Shape::Fun { args, result: Box::new(result), runtime: false }
+                Shape::Fun { args, result: Box::new(result), runtime: false, sync: false }
             }
             Type::Tuple(items) => {
                 let shapes: Vec<Shape> = items.iter().map(|i| self.shape(i, depth + 1)).collect();

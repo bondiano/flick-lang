@@ -34,3 +34,4 @@ export { absent, flickAssert, flickEcho, flickTodo, refGet, refMake, refModify, 
 export { exitFailure, exitValue, failurePrimary, failureRawCause, failureRethrow } from "./outcome.ts";
 export { acquireRelease, bracket, reportedDefects } from "./owner.ts";
 export * from "./bridge.ts";
+export { label, refinedParse } from "./bridge.ts";
