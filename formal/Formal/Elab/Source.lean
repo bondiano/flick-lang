@@ -1,4 +1,5 @@
 import Formal.Elab.Unify
+import Formal.Elab.TyRen
 
 /-!
 # Elaboration: the source and `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (elaboration.md §2.2, §2.4)
@@ -25,6 +26,9 @@ def up (k : Nat) : Nat → Ty := fun n => .var (n + k)
 /-- A substitution under `k` binders. -/
 def lift (k : Nat) (σ : Nat → Ty) : Nat → Ty :=
   fun n => if n < k then .var n else (σ (n - k)).subst (up k)
+
+theorem liftTy_eq (k : Nat) (σ : Nat → Ty) : liftTy k σ = lift k σ := by
+  funext n; simp only [liftTy, lift]; rw [Ty.ren_eq]; rfl
 
 /-- Instantiate the binders of a scheme with `ts`. -/
 def inst (ts : List Ty) : Nat → Ty :=

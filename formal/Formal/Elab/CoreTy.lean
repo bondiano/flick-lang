@@ -86,6 +86,7 @@ def trT : Ty → Flick.Ty
   | .cun q q' => .caps fun a => (trT q).reach a ∨ (trT q').reach a
   | .rnm c t => .row (Row.err (N.con c) (trT t))
   | .run r r' => .row (Row.union (trT r).asRow (trT r').asRow)
+  | .all k t => .all k (trT t)
 
 /-- `⟦P⟧ = pure`, `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ⌈⟦e⟧⌉ ∪ allNames)`. -/
 def trStage : Stage → Flick.Stage
@@ -159,6 +160,9 @@ theorem trT_reach (t : Ty) (a : Atom) : (trT N t).reach a ↔ ∃ n, a = .v n �
   | cnil => simp [trT, Flick.Ty.reach, Caps.none, Ty.Occurs]
   | cun q q' ihq ihq' => simp only [trT, Flick.Ty.reach, ihq, ihq', Ty.Occurs, ex_or]
   | rnm c t iht => simp [trT, Flick.Ty.reach, Row.err, Row.union, Row.single, Row.ofCaps, iht, Ty.Occurs]
+  | all k t iht =>
+    simp only [trT, Flick.Ty.reach, iht, Ty.Occurs]
+    cases a <;> simp [Atom.up]
   | run r r' ihr ihr' =>
     simp only [Ty.Occurs, ← ex_or, ← ihr, ← ihr']
     rw [Ty.reach_asRow (trT N r), Ty.reach_asRow (trT N r')]
@@ -207,20 +211,6 @@ theorem Caps.substT_or (C C' : Caps) (σ : Atom → Flick.Ty) :
     · exact ⟨b, .inl h, hb⟩
     · exact ⟨b, .inr h, hb⟩
 
-theorem Ty.occurs_subst_iff (σ : Nat → Ty) (t : Ty) (n : Nat) :
-    (t.subst σ).Occurs n ↔ ∃ m, t.Occurs m ∧ (σ m).Occurs n := by
-  induction t using Ty.ind with
-  | var m => simp [Ty.subst, Ty.Occurs]
-  | con | cnil => simp [Ty.subst, Ty.Occurs]
-  | app t u iht ihu | cun t u iht ihu | run t u iht ihu =>
-    simp only [Ty.subst, Ty.Occurs, iht, ihu]; grind
-  | rnm c t iht => simp only [Ty.subst, Ty.Occurs, iht]
-  | arr φ a b q iha ihb ihq ihφ =>
-    cases φ with
-    | P => simp only [Ty.subst, Stage.subst, Ty.Occurs, Stage.Occurs, iha, ihb, ihq]; grind
-    | R r e =>
-      simp only [Ty.subst, Stage.subst, Ty.Occurs, Stage.Occurs, iha, ihb, ihq, ihφ.1, ihφ.2]; grind
-
 theorem Stage.atoms_subst (φ : Stage) (σ : Nat → Ty) :
     (φ.subst σ).atoms = φ.atoms.substT (trσ N σ) := by
   funext x; apply propext
@@ -237,35 +227,66 @@ theorem Stage.atoms_subst (φ : Stage) (σ : Nat → Ty) :
       obtain ⟨n, rfl, hn⟩ := (trT_reach N _ x).1 hx
       exact ⟨n, rfl, hm.imp (fun h => ⟨m, h, hn⟩) fun h => ⟨m, h, hn⟩⟩
 
-/-- **The translation commutes with substitution.** -/
-theorem trT_subst (t : Ty) (σ : Nat → Ty) : trT N (t.subst σ) = (trT N t).substT (trσ N σ) := by
-  induction t using Ty.ind with
+/-- The translation commutes with a substitution whose types shift as they should. -/
+theorem trT_subst_of (t : Ty) (σ : Nat → Ty)
+    (hσ : ∀ k n, trT N ((σ n).ren (· + k)) = (trT N (σ n)).substT (shiftV k)) :
+    trT N (t.subst σ) = (trT N t).substT (trσ N σ) := by
+  induction t using Ty.ind generalizing σ with
+  | all k t iht =>
+    have hl : trσ N (liftTy k σ) = liftT k (trσ N σ) := by
+      funext a
+      cases a with
+      | v n =>
+        simp only [trσ, liftTy, liftT]
+        split
+        · rfl
+        · rw [hσ, Flick.Ty.up_def]
+      | r p => simp [trσ, liftT, Flick.Ty.up_def, Flick.Ty.substT, shiftV]
+    simp only [Ty.subst, trT, Flick.Ty.substT]
+    rw [iht _ fun j n => ?_, hl]
+    simp only [liftTy]
+    split
+    · simp [Ty.ren, trT, Flick.Ty.substT, shiftV]
+    · rw [Ty.ren_ren, show (fun x => x + k + j) = (· + (k + j)) by funext x; omega, hσ, hσ,
+        Flick.Ty.substT_comp]
+      congr 1; funext a
+      cases a with
+      | v i => simp [shiftV, Flick.Ty.substT]; omega
+      | r p => rfl
   | var n => rfl
   | con c => simp only [Ty.subst, trT]; split <;> (try split) <;> rfl
-  | app t u iht ihu => simp [Ty.subst, trT, Flick.Ty.substT, iht, ihu]
+  | app t u iht ihu => simp [Ty.subst, trT, Flick.Ty.substT, iht σ hσ, ihu σ hσ]
   | arr φ a b q iha ihb ihq ihφ =>
     have hφ : trStage N (φ.subst σ) = (trStage N φ).substT (trσ N σ) := by
       cases φ with
       | P => rfl
       | R r e =>
-        simp [Stage.subst, trStage, Flick.Stage.substT, ihφ.1, ihφ.2, Ty.asRow_substT, errRow_substT]
+        simp [Stage.subst, trStage, Flick.Stage.substT, ihφ.1 σ hσ, ihφ.2 σ hσ, Ty.asRow_substT, errRow_substT]
     have hq : (φ.subst σ).qual (trT N (q.subst σ)).reach =
         Caps.substT (trσ N σ) (φ.qual (trT N q).reach) := by
-      rw [ihq, ← Ty.reach_caps]
+      rw [ihq σ hσ, ← Ty.reach_caps]
       cases φ with
       | P => rfl
       | R r e =>
         show (fun x => _ ∨ _) = Caps.substT _ (fun x => _ ∨ _)
         rw [Caps.substT_or, ← Stage.atoms_subst N (.R r e) σ]
-    simp only [Ty.subst, trT_arr, Flick.Ty.substT, iha, ihb, hφ, hq]
+    simp only [Ty.subst, trT_arr, Flick.Ty.substT, iha σ hσ, ihb σ hσ, hφ, hq]
   | cnil => simp [Ty.subst, trT, Flick.Ty.substT]
   | cun q q' ihq ihq' =>
-    simp only [Ty.subst, trT, Flick.Ty.substT, ihq, ihq', Caps.substT_or, Ty.reach_caps]
+    simp only [Ty.subst, trT, Flick.Ty.substT, ihq σ hσ, ihq' σ hσ, Caps.substT_or, Ty.reach_caps]
   | rnm c t iht =>
-    simp only [Ty.subst, trT, Flick.Ty.substT, iht, Row.err, Row.union_substT, Row.single_substT,
+    simp only [Ty.subst, trT, Flick.Ty.substT, iht σ hσ, Row.err, Row.union_substT, Row.single_substT,
       Row.ofCaps_substT, Ty.reach_caps]
   | run r r' ihr ihr' =>
-    simp only [Ty.subst, trT, Flick.Ty.substT, ihr, ihr', Row.union_substT, Ty.asRow_substT]
+    simp only [Ty.subst, trT, Flick.Ty.substT, ihr σ hσ, ihr' σ hσ, Row.union_substT, Ty.asRow_substT]
+
+theorem trT_ren (t : Ty) (k : Nat) : trT N (t.ren (· + k)) = (trT N t).substT (shiftV k) := by
+  rw [Ty.ren_eq, trT_subst_of N t _ fun _ _ => rfl]
+  congr 1
+
+/-- **The translation commutes with substitution.** -/
+theorem trT_subst (t : Ty) (σ : Nat → Ty) : trT N (t.subst σ) = (trT N t).substT (trσ N σ) :=
+  trT_subst_of N t σ fun k n => trT_ren N (σ n) k
 
 theorem trStage_subst (φ : Stage) (σ : Nat → Ty) :
     trStage N (φ.subst σ) = (trStage N φ).substT (trσ N σ) := by

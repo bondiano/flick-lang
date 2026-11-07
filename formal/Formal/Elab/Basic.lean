@@ -4,19 +4,20 @@ import Formal.Elab.Hyp
 
 namespace Flick.Elab
 
-theorem Ty.subst_comp (t : Ty) (σ θ : Nat → Ty) :
-    (t.subst σ).subst θ = t.subst fun n => (σ n).subst θ := by
-  induction t using Ty.ind
-  case arr φ a b q iha ihb ihq ihφ => cases φ <;> simp_all [Ty.subst, Stage.subst, Stage.All]
-  all_goals simp_all [Ty.subst]
-
 theorem Cn.subst_comp (c : Cn) (σ θ : Nat → Ty) :
     (c.subst σ).subst θ = c.subst fun n => (σ n).subst θ := by
   simp [Cn.subst, Ty.subst_comp]
 
 theorem Ty.subst_agree {t : Ty} {σ σ' : Nat → Ty} (h : ∀ n, t.Occurs n → σ n = σ' n) :
     t.subst σ = t.subst σ' := by
-  induction t using Ty.ind with
+  induction t using Ty.ind generalizing σ σ' with
+  | all k t iht =>
+    simp only [Ty.subst]
+    rw [iht fun n hn => ?_]
+    simp only [liftTy]
+    split
+    · rfl
+    · rw [h (n - k) (by rwa [Ty.Occurs, Nat.sub_add_cancel (by omega)])]
   | var n => exact h n rfl
   | con c => rfl
   | cnil => rfl
@@ -40,7 +41,13 @@ theorem Ty.subst_agree {t : Ty} {σ σ' : Nat → Ty} (h : ∀ n, t.Occurs n →
 
 theorem Ty.agree_of_eq {t : Ty} {σ σ' : Nat → Ty} (h : t.subst σ = t.subst σ') :
     ∀ n, t.Occurs n → σ n = σ' n := by
-  induction t using Ty.ind with
+  induction t using Ty.ind generalizing σ σ' with
+  | all k t iht =>
+    simp only [Ty.subst, Ty.all.injEq, true_and] at h
+    intro n hn
+    have := iht h (n + k) hn
+    simp only [liftTy, show ¬ (n + k < k) by omega, if_false, Nat.add_sub_cancel] at this
+    exact Ty.ren_inj this
   | var m => intro n hn; cases hn; exact h
   | con c => intro n hn; cases hn
   | cnil => intro n hn; cases hn

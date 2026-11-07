@@ -75,26 +75,8 @@ theorem Cn.lift_inst {k : Nat} {ts : List Ty} (hk : ts.length = k) (θ : Nat →
 
 /-- A variable of a substituted type comes from a variable of the type. -/
 theorem Ty.occurs_of_subst {σ : Nat → Ty} {n : Nat} {t : Ty} (h : (t.subst σ).Occurs n) :
-    ∃ m, t.Occurs m ∧ (σ m).Occurs n := by
-  induction t using Ty.ind with
-  | var m => exact ⟨m, rfl, h⟩
-  | con | cnil => cases h
-  | app _ _ ih₁ ih₂ | cun _ _ ih₁ ih₂ | run _ _ ih₁ ih₂ =>
-    rcases h with h | h
-    · obtain ⟨m, hm, h⟩ := ih₁ h; exact ⟨m, .inl hm, h⟩
-    · obtain ⟨m, hm, h⟩ := ih₂ h; exact ⟨m, .inr hm, h⟩
-  | rnm _ _ ih => exact ih h
-  | arr φ _ _ _ ih₁ ih₂ ih₃ ihφ =>
-    rcases h with h | h | h | h
-    · obtain ⟨m, hm, h⟩ := ih₁ h; exact ⟨m, .inl hm, h⟩
-    · obtain ⟨m, hm, h⟩ := ih₂ h; exact ⟨m, .inr (.inl hm), h⟩
-    · obtain ⟨m, hm, h⟩ := ih₃ h; exact ⟨m, .inr (.inr (.inl hm)), h⟩
-    · cases φ with
-      | P => exact h.elim
-      | R r e =>
-        rcases h with h | h
-        · obtain ⟨m, hm, h⟩ := ihφ.1 h; exact ⟨m, .inr (.inr (.inr (.inl hm))), h⟩
-        · obtain ⟨m, hm, h⟩ := ihφ.2 h; exact ⟨m, .inr (.inr (.inr (.inr hm))), h⟩
+    ∃ m, t.Occurs m ∧ (σ m).Occurs n :=
+  (Ty.occurs_subst_iff σ t n).mp h
 
 theorem Ty.occurs_lift {σ : Nat → Ty} {k n : Nat} {t : Ty} (h : (t.subst (lift k σ)).Occurs (n + k)) :
     ∃ m, t.Occurs (m + k) ∧ (σ m).Occurs n := by

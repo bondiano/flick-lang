@@ -24,17 +24,8 @@ def Scheme.row (s : Scheme) : Ty :=
 def ctxRow (Γ : List Scheme) : Ty := Γ.foldr (fun s q => .cun s.row q) .cnil
 
 theorem Ty.occurs_subst {σ : Nat → Ty} {m n : Nat} {t : Ty} (ht : t.Occurs m)
-    (hs : (σ m).Occurs n) : (t.subst σ).Occurs n := by
-  induction t using Ty.ind with
-  | var => cases ht; exact hs
-  | con | cnil => cases ht
-  | app _ _ ih₁ ih₂ | cun _ _ ih₁ ih₂ | run _ _ ih₁ ih₂ => exact ht.imp ih₁ ih₂
-  | rnm _ _ ih => exact ih ht
-  | arr φ _ _ _ ih₁ ih₂ ih₃ ihφ =>
-    refine ht.imp ih₁ (Or.imp ih₂ (Or.imp ih₃ fun h => ?_))
-    cases φ with
-    | P => exact h.elim
-    | R r e => exact h.imp ihφ.1 ihφ.2
+    (hs : (σ m).Occurs n) : (t.subst σ).Occurs n :=
+  (Ty.occurs_subst_iff σ t n).mpr ⟨m, ht, hs⟩
 
 theorem cov_ctxRow (Γ : List Scheme) : Cov Γ (ctxRow Γ) := by
   induction Γ with

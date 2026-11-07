@@ -110,6 +110,7 @@ import Formal.Decomp
 import Formal.Closed
 import Formal.SubstComp
 import Formal.Elab.Syntax
+import Formal.Elab.TyRen
 import Formal.Elab.Unify
 import Formal.Elab.PreludeSchemes
 import Formal.Elab.Hyp

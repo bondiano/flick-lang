@@ -28,11 +28,6 @@ theorem lift_up_zero (k : Nat) : lift k (up 0) = .var := by
   simp only [lift, up, Nat.add_zero, Ty.subst]
   split <;> first | rfl | (congr 1; omega)
 
-theorem Ty.subst_id (t : Ty) : t.subst .var = t := by
-  induction t using Ty.ind
-  case arr φ a b q iha ihb ihq ihφ => cases φ <;> simp_all [Ty.subst, Stage.subst, Stage.All]
-  all_goals simp_all [Ty.subst]
-
 theorem Stage.subst_id (φ : Stage) : φ.subst .var = φ := by
   cases φ <;> simp [Stage.subst, Ty.subst_id]
 
