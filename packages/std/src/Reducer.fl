@@ -2,6 +2,8 @@
 /// list: `Reducer.combine_all Reducer.number_sum [1, 2, 3]` is 6.
 module Reducer exposing (..)
 
+import Combiner
+
 /// Effect's reducer of values of `a`.
 type Reducer a
 

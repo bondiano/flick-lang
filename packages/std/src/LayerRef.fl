@@ -2,6 +2,8 @@
 /// while in use and built anew on `refresh` or after `invalidate`.
 module LayerRef exposing (..)
 
+import Duration
+
 /// The services `ro` of a layer failing with `e`, owned by the scope of
 /// region `s`.
 type LayerRef (s : Region) (e : ErrorRow) (ro : ServiceRow)

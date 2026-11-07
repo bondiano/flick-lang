@@ -4,6 +4,11 @@
 /// JSON type, so strict JSON Schema export refuses them.
 module Http.Codecs exposing (..)
 
+import Http.Cookies
+import Http.Headers
+import Http.Url
+import Http.UrlParams
+
 /// Headers as a JSON object of strings; names are read in lower case.
 headers : PureCodec Json Http.Headers.Headers
 foreign pure headers from "@flick-lang/runtime/effect/SchemaHttp" "flickHeaders"

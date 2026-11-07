@@ -3,6 +3,10 @@
 /// keeps the witness of its keys.
 module TxHashMap exposing (..)
 
+import EqHash
+import HashMap
+import Tx
+
 /// A transactional hash map from `k` to `v` under the witness `w`.
 type TxHashMap w k v
 

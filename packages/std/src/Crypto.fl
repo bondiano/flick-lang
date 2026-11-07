@@ -23,6 +23,9 @@ module Crypto exposing (
   system,
 )
 
+import Bytes
+import Layer
+
 /// What the platform refused: a bad size or a failed digest.
 type error CryptoError = CryptoError String
   deriving Eq, Show

@@ -4,6 +4,9 @@
 /// be tried several times; the task's error, of type `i`, decides retries.
 module ExecutionPlan exposing (..)
 
+import Duration
+import Schedule
+
 /// A plan of steps providing `p` from `r`, failing with `e`, for a task
 /// whose errors are `i`.
 type ExecutionPlan (p : ServiceRow) (r : ServiceRow) (e : ErrorRow) i

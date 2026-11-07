@@ -4,6 +4,8 @@
 /// `with_redacted_names` sets).
 module Http.UrlParams exposing (..)
 
+import Http.Headers
+
 /// Parameters, an immutable value.
 type UrlParams
 

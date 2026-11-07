@@ -2,6 +2,11 @@
 /// repetition, defects and the exit of a task.
 module Effect.Core exposing (..)
 
+import Duration
+import Fiber
+import Resource
+import Schedule
+
 /// How many tasks of a collection run at once: one after another, at most
 /// `n`, or all of them.
 type Concurrency = Sequential | Bounded Int | Unbounded

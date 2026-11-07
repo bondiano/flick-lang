@@ -3,6 +3,8 @@
 /// `join` waits for its failure, so the handle supervises its child.
 module FiberHandle exposing (..)
 
+import Fiber
+
 /// A child of region `s` that fails with an error of `e` or gives `a`.
 type FiberHandle (s : Region) (e : ErrorRow) a
 

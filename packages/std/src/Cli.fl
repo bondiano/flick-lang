@@ -5,6 +5,12 @@
 /// arguments and only then runs the handler.
 module Cli exposing (..)
 
+import BigInt
+import Cli.Prompt
+import Config
+import DateTime
+import Redacted
+
 /// A command ready to run.
 type Command (r : ServiceRow) (e : ErrorRow)
 

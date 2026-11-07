@@ -3,6 +3,8 @@
 /// `node` those of Node.js (`node:path`).
 module Path exposing (..)
 
+import PlatformError
+
 /// A path taken apart: `format` puts it back together.
 type alias Parsed = { root : String; dir : String; base : String; ext : String; name : String }
 

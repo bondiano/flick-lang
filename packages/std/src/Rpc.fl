@@ -7,8 +7,11 @@
 /// `effect/rpc`.
 module Rpc exposing (..)
 
+import Fiber
+import Http.Headers
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
+import Stdio
 import Stream.Core exposing (Stream)
 
 /// A procedure named `l`, whose handler has the type `f`: `p ->{r; e} s`.

@@ -3,6 +3,8 @@
 /// connections, closed with the scope of the `provide`.
 module Database exposing (..)
 
+import Sql
+
 service Database =
   run_query :
     forall a. Sql.Query Sql.Pg a ->{Async; Sql.EncodeError, Sql.DbError, Sql.DecodeError} List a

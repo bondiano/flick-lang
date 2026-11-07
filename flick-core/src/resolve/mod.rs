@@ -44,6 +44,9 @@ pub fn declarations(tree: &Node, text: &str, file: FileId) -> Vec<Declared> {
 
 pub use crate::iface::{Decl, Entity, Export, Hidden, Interface, Namespace};
 
+#[cfg(test)]
+use std::collections::BTreeSet;
+
 use crate::diagnostics::Diagnostic;
 use crate::doc;
 use crate::source::{FileId, Span};
@@ -64,6 +67,16 @@ pub struct Module<'a> {
 
 /// [`Module::generated`] of a module without generated code.
 pub const NO_GENERATED: u32 = u32::MAX;
+
+/// The qualifier of each reference in `module`, as written: `M` of `M.name`,
+/// `M.N` of `M.N.name`.
+#[cfg(test)]
+pub(crate) fn qualifiers(module: &Module) -> BTreeSet<String> {
+    let (references, _) = uses::references(module);
+    (references.into_iter())
+        .filter_map(|reference| reference.qualifier)
+        .collect()
+}
 
 /// Resolves one module against the interfaces of its imports; `imported`
 /// returns `None` for a module that could not be loaded, whose names are then

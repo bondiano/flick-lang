@@ -5,6 +5,11 @@
 /// that handle's scope.
 module Stream.Core exposing (..)
 
+import Duration
+import PubSub
+import Queue
+import Schedule
+
 @lang stream
 /// A description of a stream of `a` that needs `r` and fails with `e`.
 type Stream (r : ServiceRow) (e : ErrorRow) a

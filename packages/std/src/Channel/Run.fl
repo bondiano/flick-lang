@@ -4,6 +4,9 @@
 module Channel.Run exposing (..)
 
 import Channel.Core exposing (..)
+import Fiber
+import PubSub
+import Queue
 
 /// Every element, in order.
 run_collect : forall r e i o d c. (Channel r e i o d none Unit)^c ->{r; e} List o

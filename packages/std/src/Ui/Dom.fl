@@ -2,6 +2,8 @@
 /// works with renderers that do not install `react-dom` or provide a document.
 module Ui.Dom exposing (..)
 
+import Atom
+
 /// The DOM element a root renders into.
 type Container
 

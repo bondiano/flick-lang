@@ -21,6 +21,9 @@ break programs.
   directory `packages/<name>` beside it, with its own `modules.txt`, and
   `FLICK_STD_PATH` finds it next to `std`. Their go binding tables are now part
   of the build's key.
+- **`std`:** its modules import each other explicitly, and a test keeps it so;
+  programs may still qualify built-in modules without an import. The line of
+  `Form.report` in its emitted `place` label moves with the imports above it.
 - **`Scope.run`:** `scope s { body }` stands for `Scope.run (fun s -> body)`, and
   `Scope.run` takes a function polymorphic in the region, also as a value. The
   IR has no `Scope` node; its version is 0.4.0.

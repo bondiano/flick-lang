@@ -29,7 +29,9 @@
 /// `PureCodec Json` of it, else by the JSON codec of its schema.
 module HttpApi.Derive exposing (..)
 
+import Codec
 import HttpApi exposing (Endpoint, ErrorCases, Request, Security, error_case, with_success)
+import Schema
 
 /// What `deriving HttpApi` makes of a record: its companions `api` and
 /// `endpoints`, which std's plugin writes with the functions below.

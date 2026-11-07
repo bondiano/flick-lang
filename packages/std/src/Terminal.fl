@@ -3,6 +3,8 @@
 /// Effect's queue of key presses (`readInput`) is not wrapped yet.
 module Terminal exposing (..)
 
+import PlatformError
+
 /// A key, with the modifiers held.
 type alias Key = { name : String; ctrl : Bool; meta : Bool; shift : Bool }
 

@@ -3,6 +3,9 @@
 /// formatted back into them. Constructors refuse a negative or inexact size.
 module ByteSize exposing (..)
 
+import Combiner
+import Reducer
+
 /// A number of bytes, a `BigInt` at run time.
 type ByteSize
 

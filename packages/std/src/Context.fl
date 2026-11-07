@@ -4,6 +4,8 @@
 /// `Reference` is a value with a default that a task may replace for a body.
 module Context exposing (..)
 
+import Layer
+
 /// The implementations of the services of `r`.
 type alias Context (r : ServiceRow) = Layer.Context r
 

@@ -5,6 +5,8 @@
 /// or interrupted, they interrupt the fiber.
 module TxQueue exposing (..)
 
+import Tx
+
 /// A transactional queue of `a` that may end with an error of `e`.
 type TxQueue a (e : ErrorRow)
 

@@ -3,6 +3,8 @@
 /// the supervisor of the children it runs.
 module FiberSet exposing (..)
 
+import Fiber
+
 /// Children of region `s` that fail with an error of `e` or succeed with `a`.
 type FiberSet (s : Region) (e : ErrorRow) a
 

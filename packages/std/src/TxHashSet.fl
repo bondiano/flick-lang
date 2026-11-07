@@ -3,6 +3,10 @@
 /// keeps its witness.
 module TxHashSet exposing (..)
 
+import EqHash
+import HashSet
+import Tx
+
 /// A transactional hash set of `a` under the witness `w`.
 type TxHashSet w a
 

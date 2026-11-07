@@ -3,6 +3,11 @@
 /// it; a missing or malformed value is a `ConfigError`.
 module Config exposing (..)
 
+import ConfigProvider
+import Duration
+import LogLevel
+import Server
+
 /// Configuration that reads to an `a`.
 type Config a
 

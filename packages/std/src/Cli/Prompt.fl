@@ -3,6 +3,10 @@
 /// press at a time. Prompts are ordinary runtime calls inside a handler.
 module Cli.Prompt exposing (..)
 
+import DateTime
+import Queue
+import Terminal
+
 /// Questions that end in an `a`; building one asks nothing.
 type Prompt a
 

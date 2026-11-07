@@ -9,6 +9,9 @@ module Http.Client exposing (..)
 import Http.ClientError exposing (HttpClientError)
 import Http.ClientRequest exposing (ClientRequest)
 import Http.ClientResponse exposing (ClientResponse)
+import Http.Cookies
+import Http.Url
+import Schedule
 
 /// A client as a value.
 type Client (r : ServiceRow) (e : ErrorRow)

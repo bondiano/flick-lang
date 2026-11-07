@@ -3,6 +3,9 @@
 /// `DateTimeError`, never with a raw Effect error.
 module DateTime exposing (..)
 
+import Duration
+import Layer
+
 /// An instant, in UTC or in a time zone.
 type DateTime
 

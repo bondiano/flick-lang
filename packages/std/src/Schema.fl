@@ -3,7 +3,11 @@
 /// combinators build them by hand.
 module Schema exposing (..)
 
+import BigDecimal
+import Chunk
+import Duration
 import Enum
+import Gen
 
 /// Numbers, `NaN` and the infinities included.
 number : Schema Float

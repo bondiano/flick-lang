@@ -2,6 +2,8 @@
 /// `layer` makes strong tags, `layer_weak` weak ones.
 module Http.Etag exposing (..)
 
+import FileSystem
+
 /// An entity tag.
 type Etag = Weak String | Strong String
   deriving Eq, Show

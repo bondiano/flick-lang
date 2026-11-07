@@ -2,6 +2,8 @@
 /// whose -1, 0 and 1 are `LT`, `EQ` and `GT`.
 module Ordering exposing (..)
 
+import Reducer
+
 /// `LT` and `GT` swapped.
 reverse : Ordering -> Ordering
 let reverse o =

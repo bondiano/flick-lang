@@ -4,6 +4,8 @@
 module Channel.Control exposing (..)
 
 import Channel.Core exposing (..)
+import Schedule
+import Tracer
 
 /// Recovers from a typed error with the channel `f` builds of it; a
 /// defect or an interruption is not recovered.

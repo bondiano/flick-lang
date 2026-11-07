@@ -2,6 +2,7 @@
 /// checks of a task's result.
 module Effect.Collections exposing (..)
 
+import Cause
 import Effect.Core exposing (Concurrency)
 
 /// Every typed error of `validate`, in the order of the elements.

@@ -3,6 +3,11 @@
 /// to a supervisor.
 module Events exposing (..)
 
+import Failure
+import Fiber
+import Log
+import RawCause
+
 /// How events wait for their handler.
 type QueuePolicy
 

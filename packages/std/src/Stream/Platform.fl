@@ -3,7 +3,13 @@
 /// stdin through `Stdio`. Bytes are lists of numbers from 0 to 255.
 module Stream.Platform exposing (..)
 
+import ByteSize
+import FileSystem
+import PlatformError
+import Stdio
 import Stream.Core exposing (Stream)
+import SubscriptionRef
+import TxSubscriptionRef
 
 /// UTF-8 text decoded from chunks of bytes.
 decode_text : forall c r e. (Stream r e (List Int))^c -> (Stream r e String)^c

@@ -3,6 +3,13 @@
 /// secret headers.
 module Http.ClientRequest exposing (..)
 
+import FileSystem
+import Http.Body
+import Http.Headers
+import Http.Method
+import Http.Url
+import Http.UrlParams
+import PlatformError
 import Stream.Core exposing (Stream)
 
 /// A request.

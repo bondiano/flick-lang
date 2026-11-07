@@ -3,6 +3,8 @@
 /// of its own to that release.
 module Scope exposing (..)
 
+import Fiber
+
 @lang scope_run
 /// Runs `body` with the owner of a new region `s`, and closes it after: what
 /// `scope s { … }` stands for.

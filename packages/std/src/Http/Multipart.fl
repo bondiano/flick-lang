@@ -4,7 +4,10 @@
 /// may hold. `parts` reads a form part by part, as a stream.
 module Http.Multipart exposing (..)
 
+import ByteSize
 import Channel exposing (Channel)
+import Http.ServerError
+import Http.ServerRequest
 import Stream.Core exposing (Stream)
 
 /// A file of a form, written to `path` until the scope closes.

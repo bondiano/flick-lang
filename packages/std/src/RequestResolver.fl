@@ -3,7 +3,10 @@
 /// `Request.succeed`, `Request.fail` or `Request.complete`.
 module RequestResolver exposing (..)
 
+import Cache
+import Duration
 import Request exposing (Entry)
+import Tracer
 
 /// Resolves requests of payload `p` for an `a`, failing with `e`.
 type alias RequestResolver p (e : ErrorRow) a = Request.RequestResolver p e a

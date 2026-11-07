@@ -1,6 +1,8 @@
 /// Logging as a service; `console` writes to the standard streams.
 module Log exposing (..)
 
+import Layer
+
 service Log =
   write : String -> String ->{} Unit
 

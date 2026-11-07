@@ -36,6 +36,9 @@ module Form exposing (
   unsafe_field,
 )
 
+import Atom
+import Ui
+
 /// A field of a form's record: `Signup.fields.name`.
 type Field
 

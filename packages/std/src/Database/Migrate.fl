@@ -5,8 +5,10 @@
 /// failing step leaves the schema as it was.
 module Database.Migrate exposing (Migration, MigrationError(..), run)
 
-import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+import Codec
 import Database exposing (Database)
+import Schema
+import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 
 /// A step: its version, above that of the step before it, a name for the
 /// record, and its statements, run in order.

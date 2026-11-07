@@ -3,6 +3,8 @@
 /// `s` closes.
 module LayerMap exposing (..)
 
+import Duration
+
 /// Keys of `k` to the services `ro` of a layer failing with `e`, owned by
 /// the scope of region `s`.
 type LayerMap (s : Region) k (e : ErrorRow) (ro : ServiceRow)

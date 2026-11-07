@@ -5,6 +5,8 @@
 /// a process group of its own, which stopping it signals.
 module ChildProcess exposing (..)
 
+import Duration
+import PlatformError
 import Stream.Core exposing (Stream)
 
 /// A program to run, with its arguments and how it runs.

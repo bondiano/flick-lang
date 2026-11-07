@@ -1,5 +1,5 @@
-# The modules of std in the order they are checked: each sees the ones
-# before it, and the core modules before all of them.
+# The modules of std in the order they are checked: each imports the ones it
+# uses, which come before it. Every module sees the core modules.
 
 Platform
 Generic

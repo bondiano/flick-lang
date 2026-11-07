@@ -313,6 +313,61 @@ pub(super) fn builtin_env() -> &'static Builtins {
 mod tests {
     use std::collections::BTreeSet;
 
+    use crate::resolve;
+
+    /// A module of an implicit package uses another of them only through an
+    /// `import`, so what a package needs is written down; the core modules are
+    /// what every module sees. A qualifier may also name a type or a service
+    /// under a module: the longest prefix that is a module decides.
+    #[test]
+    fn implicit_packages_use_each_other_through_imports() {
+        let core = |name: &str| super::CORE.iter().any(|(n, _)| *n == name);
+        // the uses no import can say yet: `Bool` names the type `Reducer.Reducer`, and a
+        // module with a build without Effect imports only others that have one
+        let unwritten = [("Bool", "Reducer")];
+        let mut seen: BTreeSet<String> = BTreeSet::new();
+        let mut missing: Vec<(String, BTreeSet<String>)> = Vec::new();
+        super::check_each(super::builtin_sources(), |module, _| {
+            let imported = |prefix: &str| {
+                (module.syntax.imports.iter())
+                    .any(|i| i.qualifier() == prefix || i.module == prefix)
+            };
+            let unimported: BTreeSet<String> = resolve::qualifiers(module)
+                .into_iter()
+                .filter_map(|qualifier| {
+                    let prefixes = (qualifier.match_indices('.').map(|(i, _)| &qualifier[..i]))
+                        .chain([qualifier.as_str()])
+                        .rev();
+                    for prefix in prefixes {
+                        if imported(prefix) || prefix == module.name || core(prefix) {
+                            return None;
+                        }
+                        if unwritten.contains(&(module.name, prefix)) {
+                            return None;
+                        }
+                        if seen.contains(prefix) {
+                            return Some(prefix.to_owned());
+                        }
+                    }
+                    None
+                })
+                .collect();
+            if !core(module.name) && !unimported.is_empty() {
+                missing.push((module.name.to_owned(), unimported));
+            }
+            seen.insert(module.name.to_owned());
+        });
+        let lines: Vec<String> = missing
+            .iter()
+            .map(|(module, uses)| format!("{module}\t{}", Vec::from_iter(uses.clone()).join(" ")))
+            .collect();
+        assert!(
+            lines.is_empty(),
+            "modules that use others without an import:\n{}",
+            lines.join("\n")
+        );
+    }
+
     #[test]
     fn builtins_check_cleanly() {
         let names: Vec<&str> = super::builtins()

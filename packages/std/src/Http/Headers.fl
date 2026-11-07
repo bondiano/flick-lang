@@ -3,6 +3,8 @@
 /// `x-api-key`, or the names `with_redacted_names` sets).
 module Http.Headers exposing (..)
 
+import Redacted
+
 /// Headers, an immutable value.
 type Headers
 

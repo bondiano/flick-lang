@@ -3,9 +3,12 @@
 /// type, `ETag` and ranges; a path outside the directory is not found.
 module Http.StaticServer exposing (..)
 
+import Http.Method
+import Http.Router
 import Http.ServerError exposing (HttpServerError)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
+import PlatformError
 
 /// The directory, the file a directory's path answers with (`index.html`
 /// unless given), whether a path of no file answers with that index (a

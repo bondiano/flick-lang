@@ -6,6 +6,9 @@
 /// `capacity` and `limit` are positive integers.
 module Action exposing (..)
 
+import Atom
+import Ui
+
 @lang action
 /// A handler of events with a snapshot `s`.
 type alias Action s = Ui.Handler s

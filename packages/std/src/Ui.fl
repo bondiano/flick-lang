@@ -6,6 +6,7 @@
 /// directly: `badge props` means `Ui.component badge props`.
 module Ui exposing (.., SafeUrl, SanitizedHtml, safe_url, trusted_html)
 
+import Atom
 import Ui.Safe exposing (SafeUrl, SanitizedHtml, safe_url, trusted_html)
 
 @lang ui_handler

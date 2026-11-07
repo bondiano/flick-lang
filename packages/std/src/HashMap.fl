@@ -2,6 +2,8 @@
 /// of its keys.
 module HashMap exposing (..)
 
+import EqHash
+
 /// A map from keys `k` to values `v` under the witness `w` of its keys.
 type HashMap w k v
 

@@ -2,6 +2,9 @@
 /// `traceparent` and Zipkin's B3, to and from spans.
 module Http.TraceContext exposing (..)
 
+import Http.Headers
+import Tracer
+
 /// Reads the parent span of a request from its headers.
 type alias FromHeaders = Http.Headers.Headers -> Option Tracer.Span
 

@@ -4,6 +4,8 @@
 /// 500 otherwise.
 module Http.ServerError exposing (..)
 
+import Http.Method
+
 /// The request a failure is about: its method, URL and what went wrong.
 type alias RequestDetails = {
   method : Http.Method.Method;

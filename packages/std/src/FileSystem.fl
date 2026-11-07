@@ -6,6 +6,8 @@
 /// `sink` of a file is not wrapped yet.
 module FileSystem exposing (..)
 
+import PlatformError
+
 /// An open file of region `s`, closed when that scope ends.
 type File (s : Region)
 

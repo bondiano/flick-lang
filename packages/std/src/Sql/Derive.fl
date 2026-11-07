@@ -3,6 +3,8 @@
 /// the one of its SQL type.
 module Sql.Derive exposing (..)
 
+import Sql
+
 /// A column as the runtime reads it: its name, its SQL kind, whether it may
 /// be `NULL` and the codec of its values, of any types.
 type Column
