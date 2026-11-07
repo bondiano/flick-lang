@@ -286,6 +286,13 @@ fn a_plugin_that_does_not_load_is_reported_on_its_import_and_each_block() {
             "FLICK-P036 `other { a = 1 }`: plugin `other` is not loaded, so this block has no code",
         ]
     );
+    // a head a plugin that loads gives too keeps that plugin
+    let both = "module App.Main exposing (x)\n\nimport Pairs exposing (plugin pairs)\nimport Other exposing (plugin pairs)\n\nx : { a : Float; blocks : Float }\nlet x = pairs { a = 1.0 }\n";
+    let found = report(both);
+    assert!(
+        found.iter().all(|f| !f.starts_with("FLICK-P036")),
+        "{found:?}"
+    );
     // a module of the project or a built-in one has no plugin
     let main = "module App.Main exposing (x)\n\nimport App.Main exposing (plugin mine)\nimport List exposing (plugin list)\n\nlet x = 1\n";
     let found = report(main);
