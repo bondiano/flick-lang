@@ -104,7 +104,7 @@ fn signature_type(sig: &Node) -> Option<&Node> {
     sig.nodes().find(|n| is_type(n.kind))
 }
 
-fn type_names(node: &Node, text: &str) -> HashSet<String> {
+pub(crate) fn type_names(node: &Node, text: &str) -> HashSet<String> {
     node.tokens()
         .into_iter()
         .filter(|t| t.kind == K::Ident)
