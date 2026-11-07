@@ -1,7 +1,7 @@
 ---
 title: Переход на 0.2
 description: Что изменилось после Flick 0.1.0 и как обновить проект.
-source_hash: ffff7a44ee573498
+source_hash: 1a6c3391e12ab0cf
 ---
 
 Flick 0.2 разрабатывается в `main` и ещё не выпущен. До 1.0 минорный релиз
@@ -260,6 +260,57 @@ flick check --fix --only E002,F001,T003
 `[package]` с `name` и `version` (без них — `FLICK-P032`); приложение
 по-прежнему упаковывается в npm-пакет со своими раннерами. Это изменение
 для автора библиотеки.
+
+## Ветка `tail` не приостанавливается
+
+Ветка `tail` выполняется на стеке вызывающего, а он может быть Sync, поэтому
+ничего из вызванного в ней не приостанавливается. Вызов в ней, которому нужен
+`Async`, эффект с операцией `control` или переменная строки, теперь даёт
+`FLICK-E018`:
+
+```flick fail
+# effect Ask =
+#   ask : Unit ->{} Int
+#
+# pause : Unit ->{Async;} Unit
+# foreign pause from "./pause.mjs" "pause"
+#   arity 0
+#
+waits : (Unit ->{Ask; none} Int) ->{Async; none} Int
+let waits body =
+  try body () with
+  | Ask.ask () ->
+    pause ()
+    1
+```
+
+Объявите то, что нужно ветке, в строке операции, как ниже, или сделайте операцию
+`control`. Такой эффект может поймать и handler внутри ветки.
+
+```flick
+# pause : Unit ->{Async;} Unit
+# foreign pause from "./pause.mjs" "pause"
+#   arity 0
+#
+effect Ask =
+  ask : Unit ->{Async;} Int
+
+waits : (Unit ->{Ask, Async; none} Int) ->{Async; none} Int
+let waits body =
+  try body () with
+  | Ask.ask () ->
+    pause ()
+    1
+```
+
+`flick check --fix` этого не переписывает: операция и её вызовы меняются вместе.
+
+## В IR нет `Try`, `Provide`, `Scope` и `Operation`
+
+Читатель `flick build --emit-ir` получит новую версию, `0.4.0`. `try` с ветками
+только для ошибок — это `Handle`, `provide layer { body }` — вызов `Layer.run`,
+`scope s { body }` — вызов `Scope.run`, а операция — `Perform { effect, op }`.
+Исходный код не меняется.
 
 ## Экземпляр принадлежит одному пакету
 

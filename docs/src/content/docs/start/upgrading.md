@@ -258,6 +258,57 @@ by path, git tag or tarball (see
 still packs an npm package with its runners. This is a change for the
 library's author.
 
+## A `tail` arm may not suspend
+
+A `tail` arm runs on the stack of the caller, which may be Sync, so nothing it
+calls may suspend. A call in it that needs `Async`, an effect with a `control`
+operation or a row variable is now `FLICK-E018`:
+
+```flick fail
+# effect Ask =
+#   ask : Unit ->{} Int
+#
+# pause : Unit ->{Async;} Unit
+# foreign pause from "./pause.mjs" "pause"
+#   arity 0
+#
+waits : (Unit ->{Ask; none} Int) ->{Async; none} Int
+let waits body =
+  try body () with
+  | Ask.ask () ->
+    pause ()
+    1
+```
+
+Declare what the arm needs in the row of the operation, as below, or make the
+operation `control`. A handler inside the arm may catch such an effect too.
+
+```flick
+# pause : Unit ->{Async;} Unit
+# foreign pause from "./pause.mjs" "pause"
+#   arity 0
+#
+effect Ask =
+  ask : Unit ->{Async;} Int
+
+waits : (Unit ->{Ask, Async; none} Int) ->{Async; none} Int
+let waits body =
+  try body () with
+  | Ask.ask () ->
+    pause ()
+    1
+```
+
+`flick check --fix` does not rewrite it: the operation and its callers change
+together.
+
+## The IR has no `Try`, `Provide`, `Scope` or `Operation`
+
+A reader of `flick build --emit-ir` meets a new version, `0.4.0`. A `try` with
+arms only for errors is a `Handle`, `provide layer { body }` is a call of
+`Layer.run`, `scope s { body }` is a call of `Scope.run`, and an operation is
+`Perform { effect, op }`. Source code does not change.
+
 ## Instances belong to one package
 
 A library is another package for the checker, a path dependency too. Only
