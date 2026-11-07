@@ -23,6 +23,12 @@ import {
   skipHandler,
 } from "./fiber.ts";
 
+/** spike: set by `bridge.ts`, so that this module stays without Effect. */
+export const bridgeHooks: {
+  operation: ((tag: object) => unknown) | undefined;
+  ran: (value: unknown) => unknown;
+} = { operation: undefined, ran: (value) => value };
+
 /** An operation of a handler: its name, arm, class, and how many dictionaries and arguments it takes. */
 export type OpInstall = readonly [
   name: string,
@@ -70,6 +76,11 @@ export const operation = (tag: object, name: string, arity: number, dicts: Reado
   const call = (args: ReadonlyArray<unknown>): unknown => {
     const impl = lookup(tag);
     if (impl === undefined) {
+      // spike: a service Effect's side provided, under the same key
+      if (bridgeHooks.operation !== undefined) {
+        const found = bridgeHooks.operation(tag);
+        if (found !== undefined) return bridgeHooks.ran(applyAll(dictsApplied(Reflect.get(Object(found), name), dicts), args));
+      }
       throw new Error(`no handler of \`${String(Reflect.get(tag, "key"))}\` is in effect`);
     }
     return applyAll(dictsApplied(Reflect.get(Object(impl), name), dicts), args);

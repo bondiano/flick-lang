@@ -31,16 +31,6 @@ impl Gen<'_> {
         // it is called, not when the module loads: a module binds more than a program uses
         let mut namespaces: Vec<&str> = Vec::new();
         for (source, export, alias) in &self.foreign {
-            // a module the kernel does not have is no import at all
-            if self.kernel && source.starts_with(&format!("{RUNTIME}/effect/")) {
-                let _ = writeln!(
-                    code,
-                    "const {alias} = $rt.absent({}, {});",
-                    names::string(source),
-                    names::string(export)
-                );
-                continue;
-            }
             if self.kernel && source.starts_with(RUNTIME) {
                 let at = namespaces
                     .iter()

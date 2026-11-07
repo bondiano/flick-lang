@@ -17,11 +17,14 @@ export class Ctx {
   readonly impl: unknown;
   readonly next: Ctx | null;
   readonly owner: Owner | undefined;
-  constructor(tag: object | null, impl: unknown, next: Ctx | null, owner: Owner | undefined) {
+  /** spike: the Context of Effect in effect here, when a bridge gave one. */
+  readonly host: unknown;
+  constructor(tag: object | null, impl: unknown, next: Ctx | null, owner: Owner | undefined, host: unknown = next?.host) {
     this.tag = tag;
     this.impl = impl;
     this.next = next;
     this.owner = owner;
+    this.host = host;
   }
 }
 
@@ -55,6 +58,9 @@ export const extend = (ctx: Ctx, tag: object, impl: unknown): Ctx => new Ctx(tag
 
 /** The evidence `ctx` with `owner` as the owner. */
 export const owned = (ctx: Ctx, owner: Owner | undefined): Ctx => new Ctx(null, undefined, ctx, owner);
+
+/** spike: the evidence `ctx` with `host` as Effect's Context. */
+export const hosted = (ctx: Ctx, host: unknown): Ctx => new Ctx(null, undefined, ctx, ctx.owner, host);
 
 /** Calls `f` with `ctx` as the evidence. */
 export const inCtx = <A>(ctx: Ctx, f: () => A): A => {

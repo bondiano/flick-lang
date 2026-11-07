@@ -77,6 +77,36 @@ pub struct Adapter {
     /// host a callback is adapted to.
     pub callbacks: Vec<Option<usize>>,
     pub copies: Copies,
+    /// spike: what the bridge to Effect converts, each parameter and the result.
+    pub shapes: Vec<Shape>,
+    pub result_shape: Shape,
+}
+
+/// spike: the part of a type the bridge to Effect has to convert.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub enum Shape {
+    #[default]
+    Data,
+    /// A function: the pure arrows up to and including the first runtime one.
+    Fun {
+        args: Vec<Shape>,
+        result: Box<Shape>,
+        runtime: bool,
+    },
+    Eff(Box<Shape>),
+    List(Box<Shape>),
+    Option(Box<Shape>),
+    Tuple(Vec<Shape>),
+    Record(Vec<(String, Shape)>),
+    Layer,
+    Exit,
+    Failure,
+}
+
+impl Shape {
+    pub fn is_data(&self) -> bool {
+        matches!(self, Shape::Data)
+    }
 }
 
 /// Where a call may pass Flick data, which a function outside the runtime

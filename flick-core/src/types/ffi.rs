@@ -12,6 +12,7 @@
 //! | `variadic` | the last argument is a `List a` spread into the call |
 //! | `retention call` / `retention owner` | what a parameter that may hold a scope's capabilities is kept for |
 
+mod bridge_shape;
 mod suspends;
 
 use std::slice;
@@ -91,6 +92,11 @@ impl Checker<'_> {
             })
             .collect();
         info.adapter.copies = self.copies(&params, &body, arity, &info.adapter.callbacks);
+        info.adapter.shapes = params.iter().take(arity).map(|p| self.shape(p, 0)).collect();
+        info.adapter.result_shape = self
+            .call_result(&body, arity)
+            .map_or(flick_ir::Shape::Data, |r| self.shape(&r, 0));
+        self.bridge_dump(decl, &info);
         let scoped: Vec<String> = binders
             .iter()
             .filter(|b| matches!(b.kind, Kind::Region | Kind::CaptureRow))

@@ -22,11 +22,19 @@ fn copies(f: &Foreign) -> Option<&Copies> {
 impl Gen<'_> {
     pub(super) fn foreign(&mut self, f: &Foreign) -> String {
         let alias = format!("$f_{}", f.name);
+        let mut bridged = false;
+        let mut host_effect = false;
         let target = match &f.binding.from {
             Some(module) => {
-                let spec = (self.options.foreign)(self.module, module);
-                // a module the kernel does not have: see `write_imports`
-                self.runtime |= self.kernel && spec.starts_with("@flick-lang/runtime/effect/");
+                let mut spec = (self.options.foreign)(self.module, module);
+                // spike: what the kernel has no export for comes from Effect, over the bridge
+                if self.kernel && !crate::build::effects::on_kernel(&spec, &f.binding.name) {
+                    spec = module.clone();
+                    bridged = true;
+                }
+                // spike: a foreign `effect` of the program's own may give an Effect
+                host_effect = self.kernel && !module.starts_with("@flick-lang/runtime");
+                self.runtime |= self.kernel;
                 self.foreign
                     .push((spec, f.binding.name.clone(), alias.clone()));
                 alias
@@ -45,19 +53,43 @@ impl Gen<'_> {
         let copy_result = copies(f).is_some_and(|c| c.result);
         if f.arity == 0 && params.is_empty() && f.dicts == 0 && f.mode == ForeignMode::Pure {
             let value = self.copied(copy_result, target);
+            let value = if bridged { self.from_host(&info.result_shape, value) } else { value };
             return self.export(&names::ident(&f.name), &value);
         }
         let id = names::ident(&f.name);
-        let plain = self.direct_foreigns.contains_key(&f.name);
+        // spike: a shape to convert means a wrapper
+        let plain = self.direct_foreigns.contains_key(&f.name)
+            && !(bridged && (!info.result_shape.is_data() || info.shapes.iter().any(|s| !s.is_data())));
         // a constant, not `export { … as … }`: the module names it too
         if plain && params.len() == 1 {
             return self.export(&id, &target);
         }
-        let call = self.foreign_call(f, &target, &dicts, &params);
+        let call = self.foreign_call(f, &target, &dicts, &params, bridged);
         let result = |g: &mut Self, v: &str| g.foreign_result(f, copy_result, v);
         let catch = f.catch.as_ref().map(|c| self.expr(c));
         let mut body = match (f.mode, runtime) {
+            (ForeignMode::Pure, _) | (_, false) if bridged => {
+                let value = result(self, &call);
+                self.from_host(&info.result_shape, value)
+            }
             (ForeignMode::Pure, _) | (_, false) => result(self, &call),
+            (ForeignMode::Effect, true) if bridged || host_effect => {
+                let made = match catch {
+                    Some(c) => format!("{}(() => {}({call}), {c})", self.rt("foreignEffect"), self.rt("fromEffect")),
+                    None => format!("{}({call})", self.rt("fromEffect")),
+                };
+                let value = result(self, "$v");
+                let value = self.from_host(&info.result_shape, value);
+                if value == "$v" { made } else { format!("{}({made}, ($v) => {value})", self.rt("mapped")) }
+            }
+            (ForeignMode::Sync, true) if bridged => {
+                let value = result(self, &call);
+                let value = self.from_host(&info.result_shape, value);
+                match catch {
+                    Some(c) => format!("{}(() => {value}, {c})", self.rt("foreignSync")),
+                    None => value,
+                }
+            }
             (ForeignMode::Sync | ForeignMode::Effect, true) if self.kernel => {
                 self.kernel_foreign(f, copy_result, &call, catch)
             }
@@ -119,6 +151,7 @@ impl Gen<'_> {
         target: &str,
         dicts: &[String],
         params: &[String],
+        bridged: bool,
     ) -> String {
         let info = &f.adapter;
         let copies = copies(f);
@@ -127,6 +160,9 @@ impl Gen<'_> {
             let copy = copies.is_some_and(|c| c.args.get(i) == Some(&true));
             let callback = copies.and_then(|c| c.callbacks.get(i).cloned().flatten());
             let arg = match info.callbacks.get(i).copied().flatten() {
+                _ if bridged && !info.shapes.get(i).is_none_or(flick_ir::Shape::is_data) => {
+                    self.to_host(&info.shapes[i], param.clone())
+                }
                 _ if info.receiver && i == 0 => self.copied(copy, param.clone()),
                 Some(n) => self.callback(param, n, callback.as_ref()),
                 None if info.optional.contains(&i) => {
@@ -196,6 +232,143 @@ impl Gen<'_> {
         }
         let call = self.copied(result, call);
         format!("{} {call}", self.arrow(&xs.join(", ")))
+    }
+}
+
+impl Gen<'_> {
+    /// spike: the Flick value `v` as Effect's side takes it.
+    pub(super) fn to_host(&mut self, s: &flick_ir::Shape, v: String) -> String {
+        use flick_ir::Shape;
+        match s {
+            Shape::Data => v,
+            Shape::Fun { args, result, runtime } => {
+                let d = self.bridge_depth();
+                let xs: Vec<String> = (0..args.len()).map(|k| format!("$h{d}_{k}")).collect();
+                let mut call = v;
+                for (x, a) in xs.iter().zip(args) {
+                    let arg = self.from_host(a, x.clone());
+                    call = format!("{call}({arg})");
+                }
+                let body = if *runtime {
+                    let at = format!("$r{d}");
+                    let map = self.to_host(result, at.clone());
+                    if map == at {
+                        format!("{}(() => {call})", self.rt("callEffect"))
+                    } else {
+                        format!("{}(() => {}({call}, ({at}) => {map}))", self.rt("callEffect"), self.rt("mapped"))
+                    }
+                } else {
+                    self.to_host(result, call)
+                };
+                format!("({}) => {body}", xs.join(", "))
+            }
+            Shape::Eff(inner) => {
+                let d = self.bridge_depth();
+                let at = format!("$r{d}");
+                let map = self.to_host(inner, at.clone());
+                if map == at {
+                    format!("{}(() => {v}())", self.rt("callEffect"))
+                } else {
+                    format!("{}(() => {}({v}(), ({at}) => {map}))", self.rt("callEffect"), self.rt("mapped"))
+                }
+            }
+            Shape::List(inner) => {
+                let d = self.bridge_depth();
+                let map = self.to_host(inner, format!("$e{d}"));
+                format!("({v}).map(($e{d}) => {map})")
+            }
+            Shape::Option(inner) => {
+                let d = self.bridge_depth();
+                let map = self.to_host(inner, format!("$e{d}"));
+                format!("{}({v}, ($e{d}) => {map})", self.rt("optionMapped"))
+            }
+            Shape::Tuple(items) => {
+                let d = self.bridge_depth();
+                let parts: Vec<String> = items.iter().enumerate().map(|(i, s)| self.to_host(s, format!("$t{d}[{i}]"))).collect();
+                format!("(($t{d}) => [{}])({v})", parts.join(", "))
+            }
+            Shape::Record(fields) => {
+                let d = self.bridge_depth();
+                let parts: Vec<String> = fields.iter().filter(|(_, s)| !s.is_data()).map(|(n, s)| {
+                    let name = names::string(n);
+                    format!("[{name}]: {}", self.to_host(s, format!("$t{d}[{name}]")))
+                }).collect();
+                format!("(($t{d}) => ({{ ...$t{d}, {} }}))({v})", parts.join(", "))
+            }
+            Shape::Layer => format!("{}({v})", self.rt("layerToEffect")),
+            Shape::Exit => format!("{}({v})", self.rt("exitToEffect")),
+            Shape::Failure => format!("{}({v})", self.rt("failureToEffect")),
+        }
+    }
+
+    /// spike: the value `v` of Effect's side as Flick takes it.
+    pub(super) fn from_host(&mut self, s: &flick_ir::Shape, v: String) -> String {
+        use flick_ir::Shape;
+        match s {
+            Shape::Data | Shape::Layer => v,
+            Shape::Fun { args, result, runtime } => {
+                let d = self.bridge_depth();
+                let xs: Vec<String> = (0..args.len()).map(|k| format!("$g{d}_{k}")).collect();
+                let mut call = v;
+                for (x, a) in xs.iter().zip(args) {
+                    let arg = self.to_host(a, x.clone());
+                    call = format!("{call}({arg})");
+                }
+                let mut body = if *runtime {
+                    let at = format!("$r{d}");
+                    let map = self.from_host(result, at.clone());
+                    let ran = format!("{}({call})", self.rt("fromEffect"));
+                    if map == at { ran } else { format!("{}({ran}, ({at}) => {map})", self.rt("mapped")) }
+                } else {
+                    self.from_host(result, call)
+                };
+                for x in xs.iter().rev() {
+                    body = format!("({x}) => {body}");
+                }
+                body
+            }
+            Shape::Eff(inner) => {
+                let d = self.bridge_depth();
+                let at = format!("$r{d}");
+                let map = self.from_host(inner, at.clone());
+                let ran = format!("{}({v})", self.rt("fromEffect"));
+                if map == at {
+                    format!("() => {ran}")
+                } else {
+                    format!("() => {}({ran}, ({at}) => {map})", self.rt("mapped"))
+                }
+            }
+            Shape::List(inner) => {
+                let d = self.bridge_depth();
+                let map = self.from_host(inner, format!("$e{d}"));
+                format!("({v}).map(($e{d}) => {map})")
+            }
+            Shape::Option(inner) => {
+                let d = self.bridge_depth();
+                let map = self.from_host(inner, format!("$e{d}"));
+                format!("{}({v}, ($e{d}) => {map})", self.rt("optionMapped"))
+            }
+            Shape::Tuple(items) => {
+                let d = self.bridge_depth();
+                let parts: Vec<String> = items.iter().enumerate().map(|(i, s)| self.from_host(s, format!("$t{d}[{i}]"))).collect();
+                format!("(($t{d}) => [{}])({v})", parts.join(", "))
+            }
+            Shape::Record(fields) => {
+                let d = self.bridge_depth();
+                let parts: Vec<String> = fields.iter().filter(|(_, s)| !s.is_data()).map(|(n, s)| {
+                    let name = names::string(n);
+                    format!("[{name}]: {}", self.from_host(s, format!("$t{d}[{name}]")))
+                }).collect();
+                format!("(($t{d}) => ({{ ...$t{d}, {} }}))({v})", parts.join(", "))
+            }
+            Shape::Exit => format!("{}({v})", self.rt("exitFromEffect")),
+            Shape::Failure => format!("{}({v})", self.rt("failureFromEffect")),
+        }
+    }
+
+    fn bridge_depth(&mut self) -> String {
+        let t = self.temp();
+        t.trim_start_matches('$').to_owned()
     }
 }
 

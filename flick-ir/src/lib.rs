@@ -21,7 +21,7 @@ pub use expr::{
     Arm, BinOp, Expr, ExprKind, Item, ItemKind, Label, Lit, Module, Param, Pat, Stmt,
     operation_arity,
 };
-pub use foreign::{Adapter, Binding, Copies, Foreign, ForeignMode, ResultAdapter};
+pub use foreign::{Adapter, Binding, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 pub use handler::{Handled, Handler, OpArm};
 pub use instance::{GenericInfo, InstanceInfo};
 pub use num::{Arith, Num, NumKind};

@@ -4,7 +4,7 @@
 // body }` builds it into the owner of the body. A nested `provide` reads the
 // memo map of the one around it; sibling ones build anew.
 import { type Cause, type Exit, raise } from "./cause.ts";
-import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, lookup, owned, raiseOf } from "./fiber.ts";
+import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, hosted, lookup, owned, raiseOf } from "./fiber.ts";
 import { Owner, addTo, close, withOwner } from "./owner.ts";
 import { traceEvent, traceLayer, tracing } from "./trace.ts";
 
@@ -21,6 +21,13 @@ export class Layer {
   }
 }
 
+/** spike: what `bridge.ts` puts in; an Effect layer becomes a kernel one, its Context under `HOST`. */
+export const HOST = /*#__PURE__*/ Object.freeze({ key: "flick/bridge/HostContext" });
+export const layerHooks: {
+  adopt: (layer: unknown) => Layer;
+  merge: (a: unknown, b: unknown) => unknown;
+} = { adopt: (layer) => layer as Layer, merge: (_, b) => b };
+
 const servicesOf = (value: unknown): Services => (Array.isArray(value) ? (value as Services) : []);
 
 interface Entry {
@@ -33,7 +40,7 @@ interface Entry {
 }
 
 /** What one build shares; a forked map reads the entries of its parent. */
-class MemoMap {
+export class MemoMap {
   readonly parent: MemoMap | undefined;
   readonly entries = new Map<Layer, Entry>();
   constructor(parent: MemoMap | undefined) {
@@ -98,7 +105,7 @@ function* memoized(self: Layer, memo: MemoMap, into: Owner, build: Build): Run {
 }
 
 /** A layer whose build the memo map shares. */
-const memoizable = (build: Build): Layer => {
+export const memoizable = (build: Build): Layer => {
   const self: Layer = new Layer((memo, into) => memoized(self, memo, into, build));
   return self;
 };
@@ -120,8 +127,8 @@ export const empty: Layer = /*#__PURE__*/ new Layer(() => constant([]));
 // shortcut: builds one after the other into one owner, not side by side into scopes of their own; upgrade when the rest of `Layer` comes
 export const layerMerge = (a: Layer, b: Layer): Layer =>
   new Layer(function* (memo, into): Run {
-    const first = servicesOf(yield a.build(memo, into));
-    const second = servicesOf(yield b.build(memo, into));
+    const first = servicesOf(yield layerHooks.adopt(a).build(memo, into));
+    const second = servicesOf(yield layerHooks.adopt(b).build(memo, into));
     return [...first, ...second];
   });
 
@@ -138,9 +145,13 @@ export const effect =
 
 /** The evidence `ctx` with `services`, the map `memo` current. */
 const provided = (ctx: Ctx, services: Services, memo: MemoMap): Ctx =>
-  services.reduce((c: Ctx, [tag, impl]) => extend(c, tag, impl), extend(ctx, MEMO, memo));
+  services.reduce(
+    (c: Ctx, [tag, impl]) => (tag === HOST ? hosted(c, layerHooks.merge(c.host, impl)) : extend(c, tag, impl)),
+    extend(ctx, MEMO, memo),
+  );
 
-function* provide(layer: Layer, body: (unit: undefined) => unknown): Run {
+function* provide(given: Layer, body: (unit: undefined) => unknown): Run {
+  const layer = layerHooks.adopt(given);
   return yield withOwner(function* (owner: Owner): Run {
     const outer = lookup(MEMO);
     const memo = new MemoMap(outer instanceof MemoMap ? outer : undefined);

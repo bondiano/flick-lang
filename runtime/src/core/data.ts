@@ -41,10 +41,24 @@ export interface ShowDict<A> {
   readonly show: (a: A) => string;
 }
 
-export const some = <A>(value: A): Option<A> => ({ _tag: "Some", value });
-export const none: Option<never> = /*#__PURE__*/ Object.freeze({ _tag: "None" });
-export const ok = <A>(success: A): Result<A> => ({ _tag: "Success", success });
-export const err = <E>(failure: E): Result<never, E> => ({ _tag: "Failure", failure });
+// spike: `let`, so that the bridge makes them Effect's own: see `useHostData`
+export let some = <A>(value: A): Option<A> => ({ _tag: "Some", value });
+export let none: Option<never> = /*#__PURE__*/ Object.freeze({ _tag: "None" });
+export let ok = <A>(success: A): Result<A> => ({ _tag: "Success", success });
+export let err = <E>(failure: E): Result<never, E> => ({ _tag: "Failure", failure });
+
+/** spike: Flick's `Option` and `Result` become the objects of Effect's, in the same fields. */
+export const useHostData = (
+  s: <A>(value: A) => Option<A>,
+  n: Option<never>,
+  o: <A>(success: A) => Result<A>,
+  e: <E>(failure: E) => Result<never, E>,
+): void => {
+  some = s;
+  none = n;
+  ok = o;
+  err = e;
+};
 
 const ordering = (name: "LT" | "EQ" | "GT"): Ordering => Object.freeze({ _tag: tag(`Prelude.Ordering.${name}`) });
 export const LT = /*#__PURE__*/ ordering("LT");
