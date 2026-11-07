@@ -1,0 +1,66 @@
+// Two layers that need one layer value, merged and given it, share one build of
+// it, and it is released after both (R6). Not under tests/run/runtime: the JS
+// runtime's trace counts each composite layer as a build, the Go one only
+// memoizable ones, so the trace projections differ.
+module App.Main exposing (main)
+
+service Base =
+  base : Unit ->{} String
+
+service Left =
+  left : Unit ->{} String
+
+service Right =
+  right : Unit ->{} String
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// Tells how many consumers it has outlived, from `released`, as it goes.
+base_layer : Ref Float -> Layer {Async, Scope s} none {Base}
+let base_layer released =
+  Layer.effect
+    Base
+    (task {
+      say "base built"
+      // a second consumer that asks now finds the build under way
+      Effect.yield_now ()
+      Scope.add_finalizer
+        (task { say ("base released, consumers released before: " ++ show (Ref.get released)) })
+      { base = fun () -> "base" }
+    })
+
+left_layer : Ref Float -> Layer {Base, Scope s} none {Left}
+let left_layer released =
+  Layer.effect
+    Left
+    (task {
+      let b = Base.base ()
+      Scope.add_finalizer (task { Ref.increment released })
+      { left = fun () -> "left of " ++ b }
+    })
+
+right_layer : Ref Float -> Layer {Base, Scope s} none {Right}
+let right_layer released =
+  Layer.effect
+    Right
+    (task {
+      let b = Base.base ()
+      Scope.add_finalizer (task { Ref.increment released })
+      { right = fun () -> "right of " ++ b }
+    })
+
+main : Unit ->{Async; AppError} Unit
+let main () = scope {
+  let released = Ref.make 0
+  let base = base_layer released
+  let both =
+    Layer.merge
+      (left_layer released |> Layer.provide_ base)
+      (right_layer released |> Layer.provide_ base)
+  provide both {
+    say (Left.left ())
+    say (Right.right ())
+  }
+  say "closed"
+}

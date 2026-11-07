@@ -1,0 +1,118 @@
+// A layer shared by two consumers is built once and released after both (R6):
+// through a nested `provide`, in fibers or with children using it. Two sibling
+// `provide`s are not shared, a layer that fails to build releases what it
+// acquired, and each release runs once.
+module App.Main exposing (main)
+
+type error Boot = Boot String
+  deriving Show
+
+service Base =
+  base : Unit ->{} String
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+base_layer : Unit -> Layer {Async, Scope s} none {Base}
+let base_layer () =
+  Layer.effect
+    Base
+    (task {
+      say "base built"
+      // a second consumer that asks now finds the build under way
+      Effect.yield_now ()
+      Scope.add_finalizer (task { say "base released" })
+      { base = fun () -> "base" }
+    })
+
+/// The inner `provide` reads the outer one's map; release waits for the outer.
+nested : Unit ->{Async;} Unit
+let nested () = scope {
+  let base = base_layer ()
+  provide base {
+    provide base { say ("inner " ++ Base.base ()) }
+    say ("outer " ++ Base.base ())
+  }
+  say "nested: closed"
+}
+
+/// Consumers in fibers, each with a nested `provide`, share the outer build.
+in_fibers : Unit ->{Async;} Unit
+let in_fibers () = scope {
+  let base = base_layer ()
+  provide base {
+    let (a, b) =
+      parallel (task { provide base { Base.base () } }) (task { provide base { Base.base () } })
+    say (a ++ ", " ++ b)
+  }
+  say "in_fibers: closed"
+}
+
+/// The children of a consumer end before the layer is released.
+with_children : Unit ->{Async;} Unit
+let with_children () = scope {
+  let base = base_layer ()
+  provide base {
+    let ran : Deferred.Deferred none Unit = Deferred.make ()
+    scope owner {
+      let _child =
+        Fiber.spawn
+          owner
+          quiet
+          (task {
+            Effect.ensuring
+              (task { say ("child ends with " ++ Base.base ()) })
+              (task {
+                let _ = Deferred.succeed () ran
+                Effect.never ()
+              })
+          })
+      Deferred.await_ ran
+      say "consumer body done"
+    }
+    say "consumer closed"
+  }
+  say "with_children: closed"
+}
+
+siblings : Unit ->{Async;} Unit
+let siblings () = scope {
+  let base = base_layer ()
+  provide base { say ("first " ++ Base.base ()) }
+  provide base { say ("second " ++ Base.base ()) }
+  say "siblings: closed"
+}
+
+failed_build : Unit ->{} Unit
+let failed_build () =
+  let ex : Exit {Boot} Unit =
+    Effect.exit
+      (task {
+        scope {
+          let failing : Layer {Scope s} {Boot} {Base} =
+            Layer.effect
+              Base
+              (task {
+                say "failing layer acquires"
+                Scope.add_finalizer (task { say "failing layer releases" })
+                from_result (Err (Boot "no base"))
+              })
+          provide failing { say "not reached: no service" }
+        }
+      })
+  say (show (Exit.find_error_option ex))
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  nested ()
+  say "--"
+  in_fibers ()
+  say "--"
+  with_children ()
+  say "--"
+  siblings ()
+  say "--"
+  failed_build ()
