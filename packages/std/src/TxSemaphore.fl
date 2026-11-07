@@ -3,6 +3,8 @@
 /// the transaction until they are.
 module TxSemaphore exposing (..)
 
+import Tx
+
 /// A transactional semaphore.
 type TxSemaphore
 

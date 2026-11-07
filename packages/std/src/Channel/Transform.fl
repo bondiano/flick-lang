@@ -3,6 +3,7 @@
 module Channel.Transform exposing (..)
 
 import Channel.Core exposing (..)
+import Filter
 
 /// Each element mapped by `f`.
 map : (o -> b) -> Channel r e i o d ie id -> Channel r e i b d ie id

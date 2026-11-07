@@ -2,6 +2,7 @@
 /// do not load it.
 module Ui.Server exposing (..)
 
+import Atom
 import Stream.Core exposing (Stream)
 
 /// The markup of `ui`; a client root mounted on it with `Ui.Dom.mount`

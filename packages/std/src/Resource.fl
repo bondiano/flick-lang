@@ -2,6 +2,8 @@
 /// again on `refresh`, released when its `scope` closes.
 module Resource exposing (acquire_release, bracket, Resource, manual, use, refresh)
 
+import Fiber
+
 /// A value of `a` of region `s` that its acquisition, failing with `e`,
 /// may give anew.
 type Resource (s : Region) (e : ErrorRow) a

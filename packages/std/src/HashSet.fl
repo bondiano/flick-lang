@@ -1,6 +1,8 @@
 /// Immutable hash sets over Effect's `HashSet`; each set keeps its witness.
 module HashSet exposing (..)
 
+import EqHash
+
 /// A set of elements `a` under the witness `w`.
 type HashSet w a
 

@@ -2,6 +2,9 @@
 /// of many tasks, caching a task's result, and execution plans.
 module Effect.Concurrency exposing (..)
 
+import Duration
+import ExecutionPlan
+
 /// Interrupts the current fiber.
 interrupt : Unit ->{} a
 foreign effect interrupt from "@flick-lang/runtime/effect/Effect" "flickInterrupt"

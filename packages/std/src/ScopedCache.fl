@@ -5,6 +5,8 @@
 /// `==`.
 module ScopedCache exposing (..)
 
+import Duration
+
 /// A cache of region `s` from keys of `k` to values of `a`, whose lookup
 /// fails with `e`.
 type ScopedCache (s : Region) k (e : ErrorRow) a

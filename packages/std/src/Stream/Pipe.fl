@@ -3,9 +3,12 @@
 /// channel it is made of and back, and a stream retried by a plan.
 module Stream.Pipe exposing (..)
 
-import Stream.Core exposing (Stream)
-import Sink exposing (Sink)
 import Channel exposing (Channel)
+import ExecutionPlan
+import Fiber
+import Schedule
+import Sink exposing (Sink)
+import Stream.Core exposing (Stream)
 
 /// Runs the stream into the sink and gives what the sink gives.
 run : forall c r e a r2 e2 l b. Sink r2 e2 a l b -> (Stream r e a)^c ->{r + r2; e + e2} b

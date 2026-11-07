@@ -4,6 +4,11 @@
 /// a `scope` (`broadcast`, `share`, `partition`) belongs to that scope.
 module Stream.Combine exposing (..)
 
+import Duration
+import Fiber
+import Filter
+import Queue
+import Schedule
 import Stream.Core exposing (Stream, HaltStrategy)
 
 /// `first` and then `second`: `first |> Stream.concat second`.

@@ -4,6 +4,9 @@
 /// makes a stream that cannot leave that scope, and may be used inside it.
 module Stream.Transform exposing (..)
 
+import Duration
+import Filter
+import Queue
 import Stream.Core exposing (Stream)
 
 /// What `throttle` does with a chunk over the budget: drop it, or delay it.

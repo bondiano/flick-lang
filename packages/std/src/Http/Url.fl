@@ -2,6 +2,8 @@
 /// gives a changed copy. `show` is the URL with its password masked.
 module Http.Url exposing (..)
 
+import Http.UrlParams
+
 /// An absolute URL.
 type Url
 

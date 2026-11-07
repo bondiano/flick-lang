@@ -3,6 +3,9 @@
 /// failures, defects and failed cleanup apart.
 module Test exposing (..)
 
+import Duration
+import Gen
+
 type Test
 
 /// The outcome of a check.

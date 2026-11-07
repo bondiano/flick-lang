@@ -2,6 +2,8 @@
 /// types with an `Ord` instance. The combinators build orders from others.
 module Order exposing (..)
 
+import Reducer
+
 /// An order: `LT` when `self` comes before `that`.
 type alias Order a = a -> a -> Ordering
 

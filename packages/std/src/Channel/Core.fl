@@ -3,6 +3,11 @@
 /// that starts a pipeline.
 module Channel.Core exposing (..)
 
+import Chunk
+import PubSub
+import Queue
+import Schedule
+
 /// A pull-based pipeline stage: it reads elements of `i` from upstream,
 /// which may fail with `ie` and end with `id`, and emits elements of `o`,
 /// may fail with `e`, and ends with `d`; running it needs `r`. A channel

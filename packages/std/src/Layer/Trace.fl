@@ -2,6 +2,8 @@
 /// `provide`, or builds another layer inside one.
 module Layer.Trace exposing (..)
 
+import Tracer
+
 /// How `span` and `with_span` make their span; `onEnd` runs when it ends,
 /// with how the body ended (`None`: it succeeded).
 type alias SpanOptions = {

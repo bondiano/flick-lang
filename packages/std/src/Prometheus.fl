@@ -3,6 +3,10 @@
 /// `effect/observability`.
 module Prometheus exposing (..)
 
+import Http.Method
+import Http.Router
+import Http.ServerResponse
+
 /// The metrics recorded so far.
 format : Unit ->{} String
 foreign effect format from "@flick-lang/runtime/effect/observability/PrometheusMetrics" "prometheusFormat"

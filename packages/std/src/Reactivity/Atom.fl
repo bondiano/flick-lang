@@ -5,6 +5,9 @@
 /// same atom read through two registries has two values.
 module Reactivity.Atom exposing (..)
 
+import Duration
+import Reactivity.AsyncResult
+
 @lang reactivity_atom
 /// A value a registry computes and keeps.
 type Atom a

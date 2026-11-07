@@ -2,6 +2,9 @@
 /// takes part in the enclosing `Tx.atomically` transaction.
 module TxChunk exposing (..)
 
+import Chunk
+import Tx
+
 /// A transactional chunk of `a`.
 type TxChunk a
 

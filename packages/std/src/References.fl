@@ -3,6 +3,9 @@
 /// fibers it starts.
 module References exposing (..)
 
+import Cause
+import LogLevel
+
 /// The level `Effect.log` writes at.
 current_log_level : Unit ->{} LogLevel.LogLevel
 foreign effect current_log_level from "@flick-lang/runtime/effect/References" "flickCurrentLogLevel"

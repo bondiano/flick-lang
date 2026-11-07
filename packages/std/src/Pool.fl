@@ -3,6 +3,8 @@
 /// owning the pool's region closes.
 module Pool exposing (..)
 
+import Duration
+
 /// A pool of items of `a` of region `s`, whose acquisition fails with `e`.
 type Pool (s : Region) (e : ErrorRow) a
 

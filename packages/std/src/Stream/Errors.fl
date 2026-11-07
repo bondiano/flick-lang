@@ -3,6 +3,8 @@
 /// `Failure`, never as a typed error.
 module Stream.Errors exposing (..)
 
+import Filter
+import Schedule
 import Stream.Core exposing (Stream)
 
 /// The stream `f` gives for the error, after the elements so far.

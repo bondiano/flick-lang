@@ -6,6 +6,11 @@
 /// `openapi` writes the API as strict OpenAPI 3.1.
 module HttpApi exposing (..)
 
+import Codec
+import Fiber
+import Http.Multipart
+import Http.Router
+import Schema
 import Stream.Core exposing (Stream)
 
 type Method = Get | Post | Put | Patch | Delete | Head | Options | Query

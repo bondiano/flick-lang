@@ -4,7 +4,12 @@
 /// service to them.
 module Logger exposing (..)
 
+import Duration
+import FileSystem
+import Layer
 import Log exposing (Log)
+import LogLevel
+import PlatformError
 
 /// Turns each log message into an `o`.
 type Logger o

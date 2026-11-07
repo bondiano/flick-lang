@@ -2,6 +2,8 @@
 /// weekdays, optionally in a time zone; `Schedule.cron` runs by one.
 module Cron exposing (..)
 
+import DateTime
+
 /// A parsed cron expression.
 type Cron
 

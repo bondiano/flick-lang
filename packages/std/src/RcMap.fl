@@ -2,6 +2,8 @@
 /// an `RcRef` is. Keys are compared by `==`.
 module RcMap exposing (..)
 
+import Duration
+
 /// Resources of `a` by keys of `k`, of region `s`, whose lookup fails with
 /// `e`.
 type RcMap (s : Region) k (e : ErrorRow) a

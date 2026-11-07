@@ -3,6 +3,8 @@
 /// equivalences from others.
 module Equivalence exposing (..)
 
+import Reducer
+
 /// An equivalence: `true` when `self` and `that` count as equal.
 type alias Equivalence a = a -> a -> Bool
 

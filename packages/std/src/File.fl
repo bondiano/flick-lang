@@ -2,6 +2,8 @@
 /// `scope` that owns its region and is closed when that scope ends.
 module File exposing (..)
 
+import Layer
+
 type alias Path = String
 
 /// An open file of region `s`.

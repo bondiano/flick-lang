@@ -3,6 +3,7 @@
 /// `Known Get`: `parse` knows every literal of the enum.
 module Open exposing (Open(..), parse, value, schema)
 
+import Codec
 import Enum
 
 type Open t b = Known t | Unknown b

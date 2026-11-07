@@ -2,6 +2,10 @@
 /// files, as a service; `node` is the platform of Node.js.
 module Http.Platform exposing (..)
 
+import ByteSize
+import Http.ServerResponse
+import PlatformError
+
 /// How a response body may be compressed.
 type CompressionAlgorithm = Gzip | Deflate | Brotli | Zstd
   deriving Eq, Show

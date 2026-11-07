@@ -3,6 +3,8 @@
 /// it is completed.
 module TxDeferred exposing (..)
 
+import Tx
+
 /// A transactional deferred that completes with an `a` or an error of `e`.
 type TxDeferred a (e : ErrorRow)
 

@@ -5,6 +5,9 @@
 /// `Effect.retry` run a task by a schedule.
 module Schedule exposing (..)
 
+import Cron
+import Duration
+
 type Schedule (r : ServiceRow) (e : ErrorRow) i o
 
 /// What a callback of a schedule sees of the step it decides.

@@ -4,6 +4,9 @@
 /// are exact, and refuses it otherwise.
 module Check exposing (..)
 
+import BigDecimal
+import HashSet
+
 /// A check of values of type `a`.
 type Check a
 

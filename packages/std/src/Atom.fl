@@ -7,8 +7,10 @@
 /// `Reactivity.Atom.Registry`, re-exported.
 module Atom exposing (.., Registry)
 
-import Reactivity.Atom exposing (Registry)
 import CallSite exposing (CallSite)
+import Failure
+import Reactivity.Atom exposing (Registry)
+import Stream.Core
 
 @lang atom
 /// A value to read.

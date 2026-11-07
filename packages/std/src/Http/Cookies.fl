@@ -5,6 +5,9 @@
 /// `maxAge`, is a `CookiesError`.
 module Http.Cookies exposing (..)
 
+import DateTime
+import Duration
+
 /// One cookie: its name, value and attributes.
 type Cookie
 

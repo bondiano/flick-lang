@@ -12,6 +12,9 @@ module Server.Derive exposing (
   with_error,
 )
 
+import Rpc
+import Server
+
 /// The witnesses of the errors a server function sends, `e` their row.
 type Errors (e : ErrorRow)
 

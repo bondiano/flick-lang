@@ -3,6 +3,8 @@
 /// fiber may take a lock it already holds again.
 module TxReentrantLock exposing (..)
 
+import Tx
+
 /// A transactional read/write lock.
 type TxReentrantLock
 

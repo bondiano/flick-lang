@@ -4,6 +4,9 @@
 /// answers back.
 module HttpApi.Inject exposing (call)
 
+import Http.ServerError
+import Http.ServerRequest
+import Http.ServerResponse
 import HttpApi exposing (ClientError, Endpoint, Request)
 
 /// `HttpApi.call` whose request goes to `handler`, the server's router, as

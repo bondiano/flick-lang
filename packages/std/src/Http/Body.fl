@@ -3,6 +3,10 @@
 /// holds no services or region; its stream's failure ends the body.
 module Http.Body exposing (..)
 
+import ByteSize
+import FileSystem
+import Http.UrlParams
+import PlatformError
 import Stream.Core exposing (Stream)
 
 /// A body.

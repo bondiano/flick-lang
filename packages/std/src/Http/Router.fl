@@ -4,6 +4,8 @@
 /// the parameters of its path through the service `RouteContext`.
 module Http.Router exposing (..)
 
+import Codec
+import Http.Method
 import Http.ServerError exposing (HttpServerError)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)

@@ -5,7 +5,13 @@
 /// WebSocket upgrades wait for Flick's streams.
 module Http.ServerRequest exposing (..)
 
+import ByteSize
+import Http.ClientRequest
+import Http.Headers
+import Http.Method
 import Http.ServerError exposing (HttpServerError)
+import Http.Url
+import Http.UrlParams
 
 /// A request.
 type ServerRequest

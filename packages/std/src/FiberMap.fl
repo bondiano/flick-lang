@@ -3,6 +3,8 @@
 /// `join` waits for the first failure, so the map supervises its children.
 module FiberMap exposing (..)
 
+import Fiber
+
 /// Children of region `s` by keys of `k`, failing with `e` or giving `a`.
 type FiberMap (s : Region) k (e : ErrorRow) a
 

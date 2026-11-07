@@ -4,6 +4,8 @@
 /// `write_stdout` and `write_stderr` write text through them.
 module Stdio exposing (..)
 
+import PlatformError
+
 /// The operations of Effect's `Stdio`; the functions below call them.
 service Stdio =
   args : Unit ->{} List String

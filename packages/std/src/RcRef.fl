@@ -4,6 +4,8 @@
 /// reference does.
 module RcRef exposing (..)
 
+import Duration
+
 /// A shared resource of `a` of region `s`, whose acquisition fails with `e`.
 type RcRef (s : Region) (e : ErrorRow) a
 

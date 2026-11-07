@@ -5,6 +5,10 @@
 module Sink exposing (..)
 
 import Channel exposing (Channel, WritableStream)
+import Duration
+import Filter
+import PubSub
+import Queue
 import Stream.Core exposing (Stream)
 
 /// A consumer of elements of `i` giving `a`, with leftovers of `l`.

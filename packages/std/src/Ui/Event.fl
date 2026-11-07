@@ -3,6 +3,9 @@
 /// positive integers; a constant that is not one is `FLICK-U001`.
 module Ui.Event exposing (..)
 
+import Atom
+import Ui
+
 @lang event_exhaust
 /// Ignores events while the task of an earlier one runs.
 exhaust :

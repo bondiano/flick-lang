@@ -3,6 +3,9 @@
 /// of a `provide`.
 module ConfigProvider exposing (..)
 
+import FileSystem
+import PlatformError
+
 /// A source of configuration values.
 type ConfigProvider
 

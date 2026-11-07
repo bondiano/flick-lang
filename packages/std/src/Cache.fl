@@ -3,6 +3,8 @@
 /// compared by `==`.
 module Cache exposing (..)
 
+import Duration
+
 /// A cache from keys of `k` to values of `a`, whose lookup fails with `e`.
 type Cache k (e : ErrorRow) a
 

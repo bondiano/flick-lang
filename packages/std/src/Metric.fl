@@ -3,6 +3,8 @@
 /// takes inputs `i` and has a state `s`; `snapshot` reads them all.
 module Metric exposing (..)
 
+import Duration
+
 /// A metric that takes inputs `i` and has the state `s`.
 type Metric i s
 

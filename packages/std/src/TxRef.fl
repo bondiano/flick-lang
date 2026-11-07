@@ -2,6 +2,8 @@
 /// enclosing `Tx.atomically` transaction.
 module TxRef exposing (..)
 
+import Tx
+
 /// A transactional cell holding an `a`.
 type TxRef a
 

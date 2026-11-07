@@ -2,6 +2,9 @@
 /// value to its subscribers.
 module TxSubscriptionRef exposing (..)
 
+import Tx
+import TxPubSub
+
 /// A transactional cell of `a` with subscribers.
 type TxSubscriptionRef a
 

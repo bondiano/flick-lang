@@ -3,6 +3,8 @@
 /// (Effect's native one by default); `parent_span` is the span a task runs in.
 module Tracer exposing (..)
 
+import LogLevel
+
 /// A span of the tracer, or an external one from another process.
 type Span
 

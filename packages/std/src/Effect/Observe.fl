@@ -3,6 +3,13 @@
 /// tasks end.
 module Effect.Observe exposing (..)
 
+import Cause
+import Duration
+import LogLevel
+import Logger
+import Metric
+import Tracer
+
 /// Logs the message at the current log level (`References`).
 log : String ->{} Unit
 foreign effect log from "@flick-lang/runtime/effect/Effect" "log"

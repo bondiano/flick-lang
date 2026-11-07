@@ -5,6 +5,9 @@
 /// is unstable, as Effect marks `effect/observability`.
 module Otlp exposing (..)
 
+import Duration
+import Tracer
+
 /// Where the exporter sends and the service it names in what it sends.
 type alias Options = { url : String; service_name : String }
 

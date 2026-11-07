@@ -3,6 +3,9 @@
 /// as a child of its scope; `layer` installs reporters for a body.
 module ErrorReporter exposing (..)
 
+import Events
+import LogLevel
+
 /// Hands reports to a listener of region `s`.
 type ErrorReporter (s : Region)
 

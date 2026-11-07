@@ -3,6 +3,8 @@
 /// belongs to the `scope` that owns its region and ends when it closes.
 module TxPubSub exposing (..)
 
+import Tx
+
 /// A transactional hub of `a`.
 type TxPubSub a
 

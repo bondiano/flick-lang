@@ -3,6 +3,9 @@
 /// values (`^c`), since nothing keeps it past the call.
 module Stream.Run exposing (..)
 
+import Fiber
+import PubSub
+import Queue
 import Stream.Core exposing (Stream)
 
 /// The elements, once the stream ends.

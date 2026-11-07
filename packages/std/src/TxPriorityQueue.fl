@@ -3,6 +3,8 @@
 /// empty one retries the transaction until it holds an element.
 module TxPriorityQueue exposing (..)
 
+import Tx
+
 /// A transactional priority queue of `a`.
 type TxPriorityQueue a
 

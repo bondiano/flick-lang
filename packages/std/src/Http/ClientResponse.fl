@@ -5,6 +5,10 @@
 module Http.ClientResponse exposing (..)
 
 import Http.ClientError exposing (HttpClientError)
+import Http.ClientRequest
+import Http.Cookies
+import Http.Headers
+import Http.UrlParams
 import Stream.Core exposing (Stream)
 
 /// A response.
