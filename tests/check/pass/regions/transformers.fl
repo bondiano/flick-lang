@@ -26,33 +26,29 @@ zero : a^{} -> a^{}
 let zero value = value
 
 instance Functor Identity =
-  map : forall c d a b. (forall v. a^v -> b)^c -> ((Identity a)^d -> (Identity b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> ((Identity a)^d -> (Identity b)^(c + d))^c
   let map f (Identity value) = Identity (f value)
 
 instance Applicative Identity =
-  pure : forall c a. a^c -> (Identity a)^c
+  pure : a^c -> (Identity a)^c
   let pure value = Identity value
   map2 :
-    forall c d a b x.
     (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
     ((Identity a)^d -> ((Identity b)^d -> (Identity x)^(c + d))^(c + d))^c
   let map2 f (Identity left) (Identity right) = Identity (f left right)
 
 instance Monad Identity =
-  flat_map :
-    forall c d a b.
-    (forall v. a^v -> (Identity b)^(c + v))^c -> ((Identity a)^d -> (Identity b)^(c + d))^c
+  flat_map : (forall v. a^v -> (Identity b)^(c + v))^c -> ((Identity a)^d -> (Identity b)^(c + d))^c
   let flat_map f (Identity value) = f value
 
 instance Functor m => Functor (MaybeT m) =
-  map : forall c d a b. (forall v. a^v -> b)^c -> ((MaybeT m a)^d -> (MaybeT m b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> ((MaybeT m a)^d -> (MaybeT m b)^(c + d))^c
   let map f (MaybeT action) = MaybeT (map (Option.map f) action)
 
 instance Monad m => Applicative (MaybeT m) =
-  pure : forall c a. a^c -> (MaybeT m a)^c
+  pure : a^c -> (MaybeT m a)^c
   let pure value = MaybeT (pure (Some value))
   map2 :
-    forall c d a b x.
     (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
     ((MaybeT m a)^d -> ((MaybeT m b)^d -> (MaybeT m x)^(c + d))^(c + d))^c
   let map2 f left right =
@@ -68,9 +64,7 @@ instance Monad m => Applicative (MaybeT m) =
       })
 
 instance Monad m => Monad (MaybeT m) =
-  flat_map :
-    forall c d a b.
-    (forall v. a^v -> (MaybeT m b)^(c + v))^c -> ((MaybeT m a)^d -> (MaybeT m b)^(c + d))^c
+  flat_map : (forall v. a^v -> (MaybeT m b)^(c + v))^c -> ((MaybeT m a)^d -> (MaybeT m b)^(c + d))^c
   let flat_map f value =
     MaybeT
       (do {
@@ -81,15 +75,14 @@ instance Monad m => Monad (MaybeT m) =
       })
 
 instance Functor m => Functor (StateT s m) =
-  map : forall c d a b. (forall v. a^v -> b)^c -> ((StateT s m a)^d -> (StateT s m b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> ((StateT s m a)^d -> (StateT s m b)^(c + d))^c
   let map f (StateT step) =
     StateT (fun initial -> map (fun (value, next) -> (f value, next)) (step initial))
 
 instance Monad m => Applicative (StateT s m) =
-  pure : forall c a. a^c -> (StateT s m a)^c
+  pure : a^c -> (StateT s m a)^c
   let pure value = StateT (fun initial -> pure (value, initial))
   map2 :
-    forall c d a b x.
     (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
     ((StateT s m a)^d -> ((StateT s m b)^d -> (StateT s m x)^(c + d))^(c + d))^c
   let map2 f left right =
@@ -101,7 +94,6 @@ instance Monad m => Applicative (StateT s m) =
 
 instance Monad m => Monad (StateT s m) =
   flat_map :
-    forall c d a b.
     (forall v. a^v -> (StateT s m b)^(c + v))^c -> ((StateT s m a)^d -> (StateT s m b)^(c + d))^c
   let flat_map f action =
     StateT (fun initial -> do {
@@ -110,14 +102,13 @@ instance Monad m => Monad (StateT s m) =
     })
 
 instance Functor m => Functor (ReaderT r m) =
-  map : forall c d a b. (forall v. a^v -> b)^c -> ((ReaderT r m a)^d -> (ReaderT r m b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> ((ReaderT r m a)^d -> (ReaderT r m b)^(c + d))^c
   let map f (ReaderT read) = ReaderT (fun environment -> map f (read environment))
 
 instance Applicative m => Applicative (ReaderT r m) =
-  pure : forall c a. a^c -> (ReaderT r m a)^c
+  pure : a^c -> (ReaderT r m a)^c
   let pure value = ReaderT (fun _ -> pure value)
   map2 :
-    forall c d a b x.
     (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
     ((ReaderT r m a)^d -> ((ReaderT r m b)^d -> (ReaderT r m x)^(c + d))^(c + d))^c
   let map2 f left right =
@@ -125,7 +116,6 @@ instance Applicative m => Applicative (ReaderT r m) =
 
 instance Monad m => Monad (ReaderT r m) =
   flat_map :
-    forall c d a b.
     (forall v. a^v -> (ReaderT r m b)^(c + v))^c -> ((ReaderT r m a)^d -> (ReaderT r m b)^(c + d))^c
   let flat_map f action =
     ReaderT (fun environment -> do {

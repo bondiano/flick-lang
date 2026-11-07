@@ -13,7 +13,7 @@ instance Functor Option =
     | Some x -> Some (f x)
 
 instance Functor (Eff r e) =
-  map : forall c d a b. (forall v. a^v -> b)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+  map : (forall v. a^v -> b)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
   let map f eff = task { f (await eff) }
 
 twice : Functor f => f Float -> f Float

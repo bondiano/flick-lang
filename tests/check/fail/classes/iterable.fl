@@ -5,7 +5,7 @@ module App.Iterable exposing (..)
 type Box a = Box a a
 
 instance Iterable Box =
-  iter : forall d a. (Box a)^d -> (Seq a)^d
+  iter : (Box a)^d -> (Seq a)^d
   let iter b =
     match b with
     | Box x y -> iter [x, y]

@@ -19,6 +19,6 @@ let leaks reason = written reason
 two : String ->{} Int
 let two reason =
   try written reason with
-//~ FLICK-E002 @21:3-21:6 the signature of `two` does not allow
+  //~ FLICK-E002 @21:3-21:6 the signature of `two` does not allow
   | Fail.fail (Gone _) (Gone _) -> 0
 //~ FLICK-T001 @23:5-23:14 effect `Fail` has no operation `fail`
