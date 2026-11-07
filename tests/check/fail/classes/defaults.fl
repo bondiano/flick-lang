@@ -8,6 +8,6 @@ class Pretty a =
 //~ FLICK-C011 @7:3-7:20 `extra` is not a method of class `Pretty`
 
 instance Pretty Float =
-//       ^^^^^^^^^^^^ FLICK-C011 `Pretty Float` lacks method `pretty`
+  //~ FLICK-C011 @10:10-10:22 `Pretty Float` lacks method `pretty`
   verbose : Float -> String
   let verbose n = "number"

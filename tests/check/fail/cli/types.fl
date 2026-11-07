@@ -6,28 +6,25 @@ import Cli exposing (plugin cli)
 type Color = Red | Green
 
 typo : Cli.Command none none
-let typo =
-  cli "typo" {
-    flag loud : Bool
-    handle fun { lowd } -> ()
-//             ^^^^^^^^ FLICK-T003
-  }
+let typo = cli "typo" {
+  flag loud : Bool
+  handle fun { lowd } -> ()
+//~ FLICK-T003 @11:14-11:22
+}
 
 unparsed : Cli.Command none none
-let unparsed =
-  cli "unparsed" {
-    flag color : Color
-//  ^^^^ FLICK-C001 no instance for `Value Color`
-    handle fun { color } -> ()
-  }
+let unparsed = cli "unparsed" {
+  flag color : Color
+//~ FLICK-C001 @17:3-17:7 no instance for `Value Color`
+  handle fun { color } -> ()
+}
 
 wrong_default : Cli.Command none none
-let wrong_default =
-  cli "wrong" {
-    flag times : Float = "once"
-//                       ^^^^^^ FLICK-T003 expected `Float`, found `String`
-    handle fun { times } -> ()
-  }
+let wrong_default = cli "wrong" {
+  flag times : Float = "once"
+//~ FLICK-T003 @24:24-24:30 expected `Float`, found `String`
+  handle fun { times } -> ()
+}
 
 type Box = Box Float
   deriving Cli.Value

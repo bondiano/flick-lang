@@ -14,7 +14,7 @@ let nap millis =
   | Ok d -> Effect.sleep d
   | Err _ -> ()
 
-quiet : forall e. Failure e ->{} Unit
+quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 main : Unit ->{Async; AppError} Unit

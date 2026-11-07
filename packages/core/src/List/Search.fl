@@ -95,7 +95,7 @@ union : Eq a => List a -> List a -> List a
 let union ys xs = union_with ys eq xs
 
 /// Runs of adjacent elements that `same` relates to the first of their run.
-group_with : forall c a. (a -> a -> Bool)^c -> (List a -> List (NonEmpty.NonEmpty a))^c
+group_with : (a -> a -> Bool)^c -> (List a -> List (NonEmpty.NonEmpty a))^c
 let group_with same xs =
   match NonEmpty.from_list xs with
   | None -> []

@@ -31,7 +31,7 @@ let chained a b = do {
   Some z
 }
 
-carry : forall c a. a^c -> (Option (a, a))^c
+carry : a^c -> (Option (a, a))^c
 let carry value = do {
   kept <- Some value and n <- Some 2
   _ <- Some n

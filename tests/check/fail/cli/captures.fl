@@ -14,11 +14,10 @@ foreign read_file from "./files.js" "read"
   retention call
 
 leak : Unit ->{} Cli.Command none none
-let leak () =
-  scope {
-    let file = open_file "config"
-    cli "show" {
-      handle fun {} -> Platform.stdout_line (read_file file)
-    }
+let leak () = scope {
+  let file = open_file "config"
+  cli "show" {
+    handle fun {} -> Platform.stdout_line (read_file file)
   }
-//~ FLICK-G001 @20:5-22:6 holds region `s`
+}
+//~ FLICK-G001 @19:3-21:4 holds region `s`

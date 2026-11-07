@@ -21,59 +21,46 @@ service FileSystem =
   read_all : forall s. File s ->{; ReadError} String
 
 bad_deferred : Path ->{FileSystem; OpenError} Eff {FileSystem} {ReadError} String
-let bad_deferred path =
-  scope {
-    let file = FileSystem.open_scoped path
-    task { FileSystem.read_all file }
-  }
+let bad_deferred path = scope {
+  let file = FileSystem.open_scoped path
+  task { FileSystem.read_all file }
+}
 
 bad_callback : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
-let bad_callback path =
-  scope {
-    let file = FileSystem.open_scoped path
-    fun () -> FileSystem.read_all file
-  }
+let bad_callback path = scope {
+  let file = FileSystem.open_scoped path
+  fun () -> FileSystem.read_all file
+}
 
 result : Path ->{FileSystem; OpenError} Unit
 let result path =
-  let file =
-    scope {
-      FileSystem.open_scoped path
-    }
+  let file = scope { FileSystem.open_scoped path }
   ()
 
 container : Path ->{FileSystem; OpenError} List (Unit ->{FileSystem; ReadError} String)
-let container path =
-  scope {
-    let file = FileSystem.open_scoped path
-    [fun () -> FileSystem.read_all file]
-  }
+let container path = scope {
+  let file = FileSystem.open_scoped path
+  [fun () -> FileSystem.read_all file]
+}
 
 in_record : Path ->{FileSystem; OpenError} Unit
 let in_record path =
-  let record =
-    scope {
-      let file = FileSystem.open_scoped path
-      read : Unit ->{FileSystem; ReadError} String
-      let read () = FileSystem.read_all file
-      { read = read }
-    }
+  let record = scope {
+    let file = FileSystem.open_scoped path
+    read : Unit ->{FileSystem; ReadError} String
+    let read () = FileSystem.read_all file
+    { read = read }
+  }
   ()
 
 wrapper : Path ->{FileSystem; OpenError} Unit
 let wrapper path =
-  let wrapped =
-    scope {
-      Wrapper (FileSystem.open_scoped path)
-    }
+  let wrapped = scope { Wrapper (FileSystem.open_scoped path) }
   ()
 
 sealed : Path ->{FileSystem; OpenError} Unit
 let sealed path =
-  let hidden =
-    scope {
-      Sealed (FileSystem.open_scoped path)
-    }
+  let hidden = scope { Sealed (FileSystem.open_scoped path) }
   ()
 
 outer_cell : Path ->{FileSystem; OpenError} Unit
@@ -93,14 +80,11 @@ let outer_callback path =
   }
 
 raised : Path ->{FileSystem; OpenError} String
-let raised path =
-  scope {
-    let file = FileSystem.open_scoped path
-    try
-      from_result (Err (Wrapped file))
-    with
-    | Wrapped _ -> "caught"
-  }
+let raised path = scope {
+  let file = FileSystem.open_scoped path
+  try from_result (Err (Wrapped file)) with
+  | Wrapped _ -> "caught"
+}
 
 map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
 foreign map_effect from "./list.js" "mapEffect"
@@ -108,16 +92,14 @@ foreign map_effect from "./list.js" "mapEffect"
 
 partial : Path ->{FileSystem; OpenError} Unit
 let partial path =
-  let run =
-    scope {
-      let file = FileSystem.open_scoped path
-      { go = map_effect (fun n -> FileSystem.read_all file) }
-    }
+  let run = scope {
+    let file = FileSystem.open_scoped path
+    { go = map_effect (fun n -> FileSystem.read_all file) }
+  }
   ()
 
 no_owner : Path ->{FileSystem; OpenError} Unit
-let no_owner path =
-  ignore (FileSystem.open_scoped path)
+let no_owner path = ignore (FileSystem.open_scoped path)
 
 // a cell made empty in a scope and written there still cannot leave it
 empty_cell_out : Path ->{FileSystem; OpenError} Unit
@@ -128,16 +110,16 @@ let empty_cell_out path =
     cell
   }
   ignore out
-//~ FLICK-G001 @27:5-27:38
-//~ FLICK-G001 @34:5-34:39
-//~ FLICK-G002 @41:7-41:34
-//~ FLICK-G001 @49:6-49:40
-//~ FLICK-G002 @58:7-58:45
-//~ FLICK-G002 @67:7-67:44
-//~ FLICK-G002 @75:7-75:43
-//~ FLICK-G002 @84:19-84:28
-//~ FLICK-G001 @92:19-92:52
-//~ FLICK-E005 @100:7-100:39
-//~ FLICK-G002 @114:26-114:59
-//~ FLICK-G004 @120:11-120:38
-//~ FLICK-G002 @126:5-128:9
+//~ FLICK-G001 @26:3-26:36
+//~ FLICK-G001 @32:3-32:37
+//~ FLICK-G002 @37:22-37:49
+//~ FLICK-G001 @43:4-43:38
+//~ FLICK-G002 @58:25-58:62
+//~ FLICK-G002 @63:24-63:60
+//~ FLICK-G002 @71:19-71:28
+//~ FLICK-G002 @97:24-97:57
+//~ FLICK-G001 @79:19-79:52
+//~ FLICK-E005 @85:7-85:39
+//~ FLICK-G002 @108:5-110:9
+//~ FLICK-G004 @102:29-102:56
+//~ FLICK-G002 @51:5-51:43

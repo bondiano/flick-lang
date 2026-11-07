@@ -16,7 +16,8 @@ held : Atom.Atom (Unit -> List Float)
 let held =
   Atom.derived (fun () ->
     let xs = for n <- [1] yield Atom.value count + n
-    fun () -> Seq.to_list xs)
+    fun () -> Seq.to_list xs
+  )
 
 //~ FLICK-G001 @10:38-10:77 holds the reader of a lazy `for`
 //~ FLICK-G001 @13:17-13:56 holds the reader of a lazy `for`

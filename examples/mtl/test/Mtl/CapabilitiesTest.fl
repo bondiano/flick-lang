@@ -9,7 +9,7 @@ import Mtl.WriterT as WriterT exposing (WriterT)
 import Mtl.ExceptT as ExceptT exposing (ExceptT)
 import App.Capabilities as Capabilities exposing (Stack)
 
-state_probe : forall m. MonadState m Float => m (List Float)
+state_probe : MonadState m Float => m (List Float)
 let state_probe = do {
   first <- get
   same <- get
@@ -25,7 +25,7 @@ let state_probe = do {
   pure [first, same, restored, seven, nine, old, final]
 }
 
-reader_probe : forall m. MonadReader m Float => m (List Float)
+reader_probe : MonadReader m Float => m (List Float)
 let reader_probe = do {
   before <- ask
   inside <- local (fun n -> n + 10) ask
@@ -38,7 +38,7 @@ let reader_probe = do {
   pure [before, inside, after, projected, mapped, unchanged, nested, composed]
 }
 
-writer_probe : forall m. MonadWriter m (List String) => m ((Float, List String), Float)
+writer_probe : MonadWriter m (List String) => m ((Float, List String), Float)
 let writer_probe = do {
   tell []
   tell ["prefix"]
@@ -59,7 +59,7 @@ let writer_probe = do {
   pure (heard, changed)
 }
 
-error_probe : forall m. MonadError m String => m (Float, Float)
+error_probe : MonadError m String => m (Float, Float)
 let error_probe = do {
   recovered <-
     catch_error

@@ -55,7 +55,7 @@ let format_address a =
   | UnixAddress path -> "unix://" ++ path
 
 /// `f` of the URL of the server.
-address_formatted_with : forall s r e a. (String ->{r; e} a) -> Server s ->{r; e} a
+address_formatted_with : (String ->{r; e} a) -> Server s ->{r; e} a
 let address_formatted_with f server = f (format_address (address server))
 
 /// Logs `Listening on <url>` at the info level of Effect's logger.
@@ -66,15 +66,13 @@ foreign effect log_address from "@flick-lang/runtime/effect/http/HttpServer" "fl
 
 /// The client of the service, with each request's URL below the server's.
 test_client :
-  forall s.
   Server s ->{Http.Client.HttpClient;} Http.Client.Client none {Http.ClientError.HttpClientError}
 let test_client server =
   Http.Client.current ()
   |> Http.Client.map_request (Http.ClientRequest.prepend_url (format_address (address server)))
 
 /// The service of `test_client`.
-layer_test_client :
-  forall s. Server s -> Layer {Http.Client.HttpClient} none {Http.Client.HttpClient}
+layer_test_client : Server s -> Layer {Http.Client.HttpClient} none {Http.Client.HttpClient}
 let layer_test_client server =
   let url = format_address (address server)
   Http.Client.layer

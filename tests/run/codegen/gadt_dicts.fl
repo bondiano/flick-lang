@@ -14,7 +14,7 @@ let describe s =
   match s with
   | Showable x -> show x
 
-twins : forall a. Show a => Pair a -> String
+twins : Show a => Pair a -> String
 let twins p =
   match p with
   | Pair a x y -> show a ++ (if x == y then " twins " else " pair ") ++ show x

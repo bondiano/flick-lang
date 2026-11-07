@@ -20,66 +20,70 @@ type Same (r : Region) (s : Region) =
 
 type Bad =
   | NotMine Int : Option Int
-//~ FLICK-T056 @22:17-22:29 a constructor of `Bad` builds `Bad` applied
+  //~ FLICK-T056 @22:17-22:29 a constructor of `Bad` builds `Bad` applied
   | Partly : Bad
 
-local_value : forall a. Expr a -> Int
+local_value : Expr a -> Int
 let local_value e =
   let n =
     match e with
     | IntLit n -> n
-//~ FLICK-T057 @30:7-30:15 this constructor refines the type of the
+    //~ FLICK-T057 @30:7-30:15 this constructor refines the type of the
     | BoolLit _ -> 0
-//~ FLICK-T057 @32:7-32:16 this constructor refines the type of the
+    //~ FLICK-T057 @32:7-32:16 this constructor refines the type of the
     | Lit _ -> 1
   n
 
-partial : forall a. Expr a -> _
-//~ FLICK-T024 @37:31-37:32 `_` is `Int`
+partial : Expr a -> _
+//~ FLICK-T024 @37:21-37:22 `_` is `Int`
 let partial e =
   match e with
   | IntLit n -> n
-//~ FLICK-T057 @41:5-41:13 this constructor refines the type of the
+  //~ FLICK-T057 @41:5-41:13 this constructor refines the type of the
   | BoolLit _ -> 0
-//~ FLICK-T057 @43:5-43:14 this constructor refines the type of the
+  //~ FLICK-T057 @43:5-43:14 this constructor refines the type of the
   | Lit _ -> 1
 
-unknown : forall a. Expr a -> Int
+unknown : Expr a -> Int
 let unknown e =
   (fun x ->
     match x with
     | IntLit n -> n
-//~ FLICK-T057 @51:7-51:15 the type of the matched value is
-    | _ -> 0) e
+    //~ FLICK-T057 @51:7-51:15 the type of the matched value is
+    | _ -> 0
+  )
+    e
 //~ FLICK-T055 @53:7-53:8 `_` stands for `BoolLit`, `Lit` of `Expr`:
 
-untouchable : forall a. Ty a -> a -> String
+untouchable : Ty a -> a -> String
 let untouchable t x =
-  show (
-    match t with
-    | TInt -> x
-//~ FLICK-T057 @60:15-60:16 expected `_`, found `Int`: a type from
-    | TStr -> 0)
+  show
+    (
+      match t with
+      | TInt -> x
+      //~ FLICK-T057 @63:17-63:18 expected `_`, found `Int`: a type from
+      | TStr -> 0
+    )
 
 escape : Box -> Int
 let escape box =
   let inside =
     match box with
     | Box x -> x
-//~ FLICK-T007 @68:16-68:17 expected `_`, found `b`: the type variable
+  //~ FLICK-T007 @72:16-72:17 expected `_`, found `b`: the type variable
   ignore inside
   0
 
-regions : forall r s. Same r s -> Int
+regions : Same r s -> Int
 let regions same =
   match same with
   | Same -> 0
-//~ FLICK-T058 @76:5-76:9 matching this constructor would mean that two
+//~ FLICK-T058 @80:5-80:9 matching this constructor would mean that two
 
 in_let : Box -> Int
 let in_let box =
   let Box _ = box
-//~ FLICK-T058 @81:7-81:12 this constructor hides or refines a type,
+  //~ FLICK-T058 @85:7-85:12 this constructor hides or refines a type,
   0
 
 dead : Ty Int -> Int
@@ -87,4 +91,4 @@ let dead t =
   match t with
   | TInt -> 1
   | TStr -> 2
-//~ FLICK-T010 @89:5-89:9 this arm is never reached: no value
+//~ FLICK-T010 @93:5-93:9 this arm is never reached: no value

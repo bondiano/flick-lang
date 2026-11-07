@@ -14,15 +14,19 @@ let lookup id = if id < 0 then from_result (Err (Conflict { id = id })) else id
 
 http : Unit ->{Async; HttpApi.ServeError} Unit
 let http () =
-  let options : HttpApi.ServeOptions =
-    { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
+  let options : HttpApi.ServeOptions = {
+    host = "127.0.0.1";
+    port = 0;
+    openapi = None;
+    swagger = None;
+    scalar = None;
+  }
   let find =
     HttpApi.endpoint HttpApi.Get "/find" (Record.label : Record.Label "find")
-      |> HttpApi.with_errors
-        (HttpApi.errors |> HttpApi.error_case 404 (Codec.json NotFound.schema))
+    |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json NotFound.schema))
   let api =
     HttpApi.api "app"
-      |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "app") |> HttpApi.add find)
+    |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "app") |> HttpApi.add find)
   scope s {
     let _server = HttpApi.listen options api { app = { find = fun _ -> ignore (lookup 1) } }
     ()
@@ -32,7 +36,7 @@ rpc : Unit ->{Async; Rpc.ServeError} Unit
 let rpc () =
   let find =
     Rpc.make (Record.label : Record.Label "find")
-      |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json NotFound.schema))
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json NotFound.schema))
   scope s {
     let _server =
       Rpc.listen Rpc.defaults (Rpc.group |> Rpc.add find) { find = fun () -> ignore (lookup 1) }
@@ -49,6 +53,6 @@ let bare () =
     ()
   }
 
-//~ FLICK-E002 @27:80-27:88 does not allow error `Conflict`
-//~ FLICK-C001 @38:45-38:52 Conflict, NotFound
-//~ FLICK-C001 @48:45-48:52 Conflict, NotFound
+//~ FLICK-E002 @31:80-31:88 does not allow error `Conflict`
+//~ FLICK-C001 @42:45-42:52 Conflict, NotFound
+//~ FLICK-C001 @52:45-52:52 Conflict, NotFound

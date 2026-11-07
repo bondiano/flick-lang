@@ -37,8 +37,7 @@ users_layer : Layer none none {Users}
 let users_layer = Layer.succeed Users { get = fun id -> "user" }
 
 with_users : Layer none none {Users} -> Eff {Users} none String ->{} String
-let with_users layer action =
-  provide layer { await action }
+let with_users layer action = provide layer { await action }
 
 prepare : Float ->{Users; none} Eff {Users} none String
 let prepare id =
@@ -57,5 +56,5 @@ type error Late = Late String (Ref Float)
 //~ FLICK-E005 @20:21-20:31 the payload of error `Failed` holds `Eff none none Unit`, a live value; an error
 //~ FLICK-E004 @31:16-31:51 both layers build `Clock`: a merged environment has one implementation of each s
 //~ FLICK-T003 @34:46-34:47 expected `Unit ->{} Float`, found `Int`
-//~ FLICK-E003 @49:43-49:55 this argument runs a runtime call before `with_users` is applied, although `with
-//~ FLICK-E005 @51:19-51:42 the payload of error `Late` holds `Ref Float`, a live value; an error carries d
+//~ FLICK-E003 @48:43-48:55 this argument runs a runtime call before `with_users` is applied, although `with
+//~ FLICK-E005 @50:19-50:42 the payload of error `Late` holds `Ref Float`, a live value; an error carries d

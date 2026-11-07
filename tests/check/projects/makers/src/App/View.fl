@@ -4,9 +4,7 @@ import App.State
 
 view : Ui.View Float
 let view =
-  Ui.view
-    (
-      fun n ->
-        ui { text (show (Atom.value (App.State.fresh n) + Atom.value (App.State.pick true))) }
-    )
-//~ FLICK-U006 @10:38-10:53 `App.State.fresh` while rendering
+  Ui.view (fun n -> ui {
+    text (show (Atom.value (App.State.fresh n) + Atom.value (App.State.pick true)))
+  })
+//~ FLICK-U006 @8:29-8:44 `App.State.fresh` while rendering

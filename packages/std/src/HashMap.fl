@@ -57,7 +57,7 @@ foreign pure from_list from "@flick-lang/runtime/effect/HashMap" "flickFromList"
 
 /// The map of the pairs of a sequence, such as a `for` that yields them,
 /// as `from_list` builds it: `HashMap.from_seq EqHash.canonical (for { … } yield (k, v))`.
-from_seq : forall d w k v. EqHash.EqHash w k -> (Seq (k, v))^d -> HashMap w k v
+from_seq : EqHash.EqHash w k -> (Seq (k, v))^d -> HashMap w k v
 let from_seq witness pairs = from_list witness (Seq.to_list pairs)
 
 /// The entries as a sequence, in no particular order: a source of `for`.
@@ -197,7 +197,7 @@ foreign pure every from "@flick-lang/runtime/effect/HashMap" "flickEvery"
   reviewed "effect@4.1.2 sha256:41932a7027a04fd5"
 
 /// Runs `f value key` on each entry, in no particular order.
-for_each : forall c w k v r e. (v -> k ->{r; e} Unit)^c -> (HashMap w k v ->{r; e} Unit)^c
+for_each : (v -> k ->{r; e} Unit)^c -> (HashMap w k v ->{r; e} Unit)^c
 let for_each f m = List.each_effect (fun (key, value) -> f value key) (to_list m)
 
 /// A map as a JSON array of `[key, value]` pairs, rebuilt with the

@@ -18,7 +18,7 @@ let unhandled () = Ask.ask ()
 guarded : (Unit ->{Ask Int; none} Int) ->{} Int
 let guarded body =
   try
-//~ FLICK-E002 @20:3-20:6 the signature of `guarded` does not allow
+    //~ FLICK-E002 @20:3-20:6 the signature of `guarded` does not allow
     body ()
   with
   | Ask.ask () when true -> 0
@@ -31,49 +31,43 @@ let zero () = 0
 escaped : (Unit ->{Emit Int; none} Int) ->{} Int
 let escaped body =
   let cell = Ref.make zero
-  try
-    body ()
-  with
+  try body () with
   | Emit.emit _ ->
     Ref.set cell resume
-//~ FLICK-G002 @38:18-38:24 this value holds region `resume`: `resume` stays
+    //~ FLICK-G002 @36:18-36:24 this value holds region `resume`: `resume` stays
     0
 
 /// One `return` arm, matching every value, without a guard.
 returns : (Unit ->{Emit Int; none} Int) ->{} Int
 let returns body =
-  try
-    body ()
-  with
+  try body () with
   | Emit.emit _ -> resume ()
   | return 0 -> 0
-//~ FLICK-E015 @49:12-49:13 a handler has one `return` arm, without
+//~ FLICK-E015 @45:12-45:13 a handler has one `return` arm, without
 
 unknown : (Unit ->{Ask Int; none} Int) ->{} Int
 let unknown body =
   try
-//~ FLICK-E002 @54:3-54:6 the signature of `unknown` does not allow
+    //~ FLICK-E002 @50:3-50:6 the signature of `unknown` does not allow
     body ()
   with
   | Ask.tell () -> 0
-//~ FLICK-T001 @58:5-58:13 effect `Ask` has no operation `tell`
+  //~ FLICK-T001 @54:5-54:13 effect `Ask` has no operation `tell`
   | Ask.ask -> 1
-//~ FLICK-T018 @60:5-60:12 operation `ask` takes 1 argument(s) before it
+//~ FLICK-T018 @56:5-56:12 operation `ask` takes 1 argument(s) before it
 
 /// An `abort` arm is the value of the handler.
 aborted : (Unit ->{Throw; none} Int) ->{} Int
 let aborted body =
-  try
-    body ()
-  with
+  try body () with
   | Throw.throw message -> message
-//~ FLICK-T003 @69:28-69:35 expected `Int`, found `String`
+//~ FLICK-T003 @63:28-63:35 expected `Int`, found `String`
 
 /// A `tail` arm is the value of the operation.
 told : (Unit ->{Ask Int; none} Int) ->{} Int
 let told body =
   try
-//~ FLICK-T003 @75:3-75:6 expected `Ask String`, found `Ask Int`
+    //~ FLICK-T003 @69:3-69:6 expected `Ask String`, found `Ask Int`
     body ()
   with
   | Ask.ask () -> "one"
@@ -81,7 +75,7 @@ let told body =
 /// Only a service is handled by a record.
 recorded : (Unit ->{Ask Int; none} Int) ->{} Int
 let recorded body = provide Ask ({ ask = fun () -> 1 }) { body () }
-//~ FLICK-E016 @83:21-83:28 `provide Ask impl` takes a service, and
+//~ FLICK-E016 @77:21-77:28 `provide Ask impl` takes a service, and
 
 service Greeter =
   greet : String ->{} String
@@ -89,24 +83,23 @@ service Greeter =
 /// The record has the type of the service's operations.
 wrong_record : Unit ->{} String
 let wrong_record () = provide Greeter ({ greet = fun n -> n + 1 }) { Greeter.greet "x" }
-//~ FLICK-T003 @91:63-91:64 expected `String`, found `Int`
+//~ FLICK-T003 @85:63-85:64 expected `String`, found `Int`
 
 /// The handler of `Emit` is in this fiber: a child cannot reach it.
 children : Unit ->{} List Int
-let children () =
-  collect (fun () -> parallel (task { Emit.emit 1 }) (task { Emit.emit 2 }))
-//~ FLICK-E017 @97:22-97:30 `Detached {Emit Int}` does not hold: effect
+let children () = collect (fun () -> parallel (task { Emit.emit 1 }) (task { Emit.emit 2 }))
+//~ FLICK-E017 @90:38-90:46 `Detached {Emit Int}` does not hold: effect
 
-collect : forall a b r e. (Unit ->{Emit a | r; e} b) ->{r; e} List a
+collect : (Unit ->{Emit a | r; e} b) ->{r; e} List a
 let collect body =
   try body () with
   | Emit.emit x -> [x] ++ resume ()
   | return _ -> []
 
 /// A row variable may hold a `control` effect.
-both_of : forall r e a. Eff r e a -> Eff r e a ->{r; e} (a, a)
+both_of : Eff r e a -> Eff r e a ->{r; e} (a, a)
 let both_of first second = parallel first second
-//~ FLICK-E017 @108:28-108:36 cannot deduce `Detached r` from the constraints
+//~ FLICK-E017 @101:28-101:36 cannot deduce `Detached r` from the constraints
 
 /// An arm whose pattern misses a value covers nothing: `Pick` may go on.
 effect Pick =
@@ -115,7 +108,7 @@ effect Pick =
 partial : (Unit ->{Pick; none} Int) ->{} Int
 let partial body =
   try body () with
-//~ FLICK-E002 @117:3-117:6 the signature of `partial` does not allow
+  //~ FLICK-E002 @110:3-110:6 the signature of `partial` does not allow
   | Pick.pick 0 -> 0
 
 /// A `tail` arm runs on the caller's stack: it may not suspend.
@@ -124,7 +117,7 @@ let through_control body =
   try body () with
   | Pick.pick _ ->
     Emit.emit 1
-//~ FLICK-E018 @126:5-126:16 a `tail` arm may not suspend
+    //~ FLICK-E018 @131:5-131:13 a `tail` arm may not suspend
     1
 
 pause : Unit ->{Async;} Unit
@@ -136,13 +129,13 @@ let through_async body =
   try body () with
   | Pick.pick _ ->
     pause ()
-//~ FLICK-E018 @138:5-138:13 a `tail` arm may not suspend
+    //~ FLICK-E018 @139:5-139:13 a `tail` arm may not suspend
     1
 
-through_row : forall r. (Unit ->{r; none} Unit) -> (Unit ->{Pick | r; none} Int) ->{r; none} Int
+through_row : (Unit ->{r; none} Unit) -> (Unit ->{Pick | r; none} Int) ->{r; none} Int
 let through_row other body =
   try body () with
   | Pick.pick _ ->
     other ()
-//~ FLICK-E018 @146:5-146:13 a `tail` arm may not suspend
+    //~ FLICK-E018 @119:5-119:16 a `tail` arm may not suspend
     1

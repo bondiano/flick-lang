@@ -7,7 +7,7 @@ type alias User = { id : String }
 get_user : HttpApi.Endpoint "get_user" (HttpApi.Request Unit Unit Unit Unit ->{r;} User)
 let get_user =
   HttpApi.endpoint HttpApi.Get "/user" (Record.label : Record.Label "get_user")
-    |> HttpApi.with_success 200 (Codec.json User.schema)
+  |> HttpApi.with_success 200 (Codec.json User.schema)
 
 ping : HttpApi.Endpoint "ping" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
 let ping = HttpApi.endpoint HttpApi.Get "/ping" (Record.label : Record.Label "ping")
@@ -21,11 +21,10 @@ let serve () =
   scope s {
     let missing = HttpApi.listen options api { users = { get_user = fun _ -> { id = "1" } } }
     let extra =
-      HttpApi.listen
-        options
-        api
-        { users = { get_user = fun _ -> { id = "1" }; ping = fun _ -> (); pong = fun _ -> () } }
+      HttpApi.listen options api {
+        users = { get_user = fun _ -> { id = "1" }; ping = fun _ -> (); pong = fun _ -> () };
+      }
     ()
   }
 //~ FLICK-T003 @22:56-22:92 field `ping` is missing from `users`
-//~ FLICK-T003 @27:19-27:95 `users` has field `pong`, which the expected type does not
+//~ FLICK-T003 @25:17-25:93 `users` has field `pong`, which the expected type does not

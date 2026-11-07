@@ -28,7 +28,7 @@ let late entered =
       from_result (Err (A 1))
     })
 
-quiet : forall e. Failure e ->{} Unit
+quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 /// The reasons of a failure: `F` typed, `D` defect, `I` interruption.

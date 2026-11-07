@@ -43,5 +43,5 @@ fewer : Unit
 let fewer = handle (nothing |> cover (NotFound "") |> cover (Conflict "")) missing
 
 // the shape a signature states, before anything is covered
-covering : forall e. Covered e -> Covered {NotFound | e}
+covering : Covered e -> Covered {NotFound | e}
 let covering covered = cover (NotFound "") covered

@@ -19,7 +19,7 @@ let nap millis =
   | Ok d -> Effect.sleep d
   | Err _ -> ()
 
-report : forall e. Failure e ->{} Unit
+report : Failure e ->{} Unit
 let report f =
   say ("supervised " ++ show (Cause.has_fails f, Cause.has_dies f, Cause.has_interrupts f))
 
@@ -52,7 +52,7 @@ supervisor_owner : Unit ->{Async;} Unit
 let supervisor_owner () = scope outer {
   // the supervisor and the inner body take turns through this, not through a timer
   let ran : Deferred.Deferred none Unit = Deferred.make ()
-  sup : forall e. Failure e ->{Scope outer;} Unit
+  sup : Failure e ->{Scope outer;} Unit
   let sup _ =
     let _r = open_res "sup"
     say "supervisor ran"

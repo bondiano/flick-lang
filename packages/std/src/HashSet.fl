@@ -19,7 +19,7 @@ foreign pure from_list from "@flick-lang/runtime" "hashSetFromList"
   reviewed "effect@4.1.2 sha256:72aa0394a4d8e14b"
 
 /// The set of the elements of a sequence, such as a `for`.
-from_seq : forall d w a. EqHash.EqHash w a -> (Seq a)^d -> HashSet w a
+from_seq : EqHash.EqHash w a -> (Seq a)^d -> HashSet w a
 let from_seq witness elements = from_list witness (Seq.to_list elements)
 
 /// The elements as a sequence, in no particular order.

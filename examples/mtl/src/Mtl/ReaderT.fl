@@ -19,7 +19,7 @@ import Mtl.Classes exposing (
 type ReaderT r (m : Type -> Type) a = ReaderT (r -> m a)
 
 /// Supply the environment and remove this layer, yielding `m a`.
-run : forall c d r m a. (ReaderT r m a)^c -> (r^d -> (m a)^(c + d))^c
+run : (ReaderT r m a)^c -> (r^d -> (m a)^(c + d))^c
 let run (ReaderT read) environment = read environment
 
 instance Functor m => Functor (ReaderT r m) =

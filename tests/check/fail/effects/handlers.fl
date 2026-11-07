@@ -7,8 +7,7 @@ type error B = B String
 type error C = C String
 
 raise_any : Bool ->{; A, B, C} Unit
-let raise_any b =
-  if b then from_result (Err (C "not a number")) else from_result (Err (B "x"))
+let raise_any b = if b then from_result (Err (C "not a number")) else from_result (Err (B "x"))
 
 rethrow : Errors {A, B} ->{; A, B} String
 let rethrow e = from_result (Err e)
@@ -43,6 +42,6 @@ let annotated () =
   with
   | (e : Errors {A, B}) -> rethrow e
 
-//~ FLICK-E002 @28:5-28:6 the expected type `Errors {A, B}` does not allow error `C`, which this needs
-//~ FLICK-E002 @36:5-36:6 the expected type `Errors {A}` does not allow errors `B`, `C`, which this needs
-//~ FLICK-E002 @44:5-44:24 the expected type `Errors {A, B}` does not allow error `C`, which this needs
+//~ FLICK-E002 @27:5-27:6 the expected type `Errors {A, B}` does not allow error `C`, which this needs
+//~ FLICK-E002 @35:5-35:6 the expected type `Errors {A}` does not allow errors `B`, `C`, which this needs
+//~ FLICK-E002 @43:5-43:24 the expected type `Errors {A, B}` does not allow error `C`, which this needs

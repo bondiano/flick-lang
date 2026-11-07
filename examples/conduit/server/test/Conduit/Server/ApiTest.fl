@@ -29,7 +29,6 @@ let services =
 
 /// Sends `request` to `endpoint` of the server, as a client of `/api` would.
 send :
-  forall l p q h b r e s.
   HttpApi.Request p q h b ->
   HttpApi.Endpoint l (HttpApi.Request p q h b ->{r; e} s) ->{Async, Database, Keys, Crypto.Crypto; PlatformError.PlatformError, HttpApi.ClientError | e}
   s

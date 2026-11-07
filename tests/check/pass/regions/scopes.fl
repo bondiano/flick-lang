@@ -29,7 +29,7 @@ let deferred_read path = task {
   }
 }
 
-open_two : forall s. Path ->{FileSystem, Scope s; OpenError} (File s, File s)
+open_two : Path ->{FileSystem, Scope s; OpenError} (File s, File s)
 let open_two path = (FileSystem.open_scoped path, FileSystem.open_scoped path)
 
 callbacks : Path ->{FileSystem; OpenError, ReadError} String
@@ -71,7 +71,6 @@ let children path = scope outer {
 }
 
 spawn_given :
-  forall s c.
   (Fiber.Outlives c s, Fiber.Provided {FileSystem} s) =>
   Fiber.Owner s -> (Eff {FileSystem} {ReadError} String)^c ->{FileSystem; none} Unit
 let spawn_given owner work = ignore (Fiber.spawn owner report work)

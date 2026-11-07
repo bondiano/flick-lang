@@ -11,9 +11,7 @@ service Users =
   get : UserId ->{; NotFound} User
 
 find : UserId ->{} User
-let find id =
-  { id = id; name = "Ada" }
+let find id = { id = id; name = "Ada" }
 
 users_layer : Layer none none {Users}
-let users_layer =
-  Layer.succeed Users { get = find }
+let users_layer = Layer.succeed Users { get = find }

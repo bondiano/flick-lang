@@ -11,7 +11,7 @@ type Showable =
 
 /// The value of a typed expression as a `Showable`, where its type has a
 /// `Show`.
-showable : forall a. Ty a -> a -> Option Showable
+showable : Ty a -> a -> Option Showable
 let showable t x =
   match t with
   | TInt -> Some (Showable x)

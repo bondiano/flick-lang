@@ -20,7 +20,7 @@ let flags f = show (Cause.has_fails f, Cause.has_dies f, Cause.has_interrupts f)
 ended : Exit {Boom} Float -> String
 let ended exit = Exit.match_ (fun v -> "value " ++ show v) (fun f -> "failed " ++ flags f) exit
 
-quiet : forall e. Failure e ->{} Unit
+quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 main : Unit ->{Async; AppError} Unit

@@ -14,17 +14,17 @@ service FileSystem =
   open_scoped : forall s. Path ->{Scope s; OpenError} File s
 
 // a field is no curried stage: its bare type allows no captures
-keep_field : forall e. Errors e -> { run : Unit -> Unit }
+keep_field : Errors e -> { run : Unit -> Unit }
 let keep_field x = { run = fun () -> ignore x }
 
 // an argument of kind `ErrorRow` counts as `Errors` does
-keep_exit : forall e. Exit e Int -> { run : Unit -> Unit }
+keep_exit : Exit e Int -> { run : Unit -> Unit }
 let keep_exit x = { run = fun () -> ignore x }
 
-keep : forall e. Errors e -> (Unit -> Unit)
+keep : Errors e -> (Unit -> Unit)
 let keep x = fun () -> ignore x
 
-hide : forall s. File s ->{} (Unit -> Unit)
+hide : File s ->{} (Unit -> Unit)
 let hide file =
   try from_result (Err (Wrapped file)) with
   | err -> keep err
@@ -38,14 +38,14 @@ let leak path = scope {
 
 // a local without a signature: the row of what it closes over is not known
 // when its qualifier is inferred, and counts once it is
-leak_local : forall s. File s ->{} { run : Unit -> Unit }
+leak_local : File s ->{} { run : Unit -> Unit }
 let leak_local file =
   let k = { keep = fun y -> fun () -> ignore (Exit.fail y) }
   try from_result (Err (Wrapped file)) with
   | err -> { run = k.keep err }
 
 // a local generalized over the row its stage holds
-leak_generic : forall s. File s ->{} { run : Unit -> Unit }
+leak_generic : File s ->{} { run : Unit -> Unit }
 let leak_generic file =
   let k = { keep = keep }
   try from_result (Err (Wrapped file)) with
@@ -54,7 +54,7 @@ let leak_generic file =
 // the errors `err` stands for are `e` and a row not known yet, with no error
 // in it: still a row of errors, not a capture row whose unknown tail would
 // take the region of what the cell is set to
-leak_cell : forall s e. File s -> (Unit ->{; e} Unit) ->{} Unit
+leak_cell : File s -> (Unit ->{; e} Unit) ->{} Unit
 let leak_cell file act =
   try act () with
   | err ->

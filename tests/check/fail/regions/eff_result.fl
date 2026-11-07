@@ -12,21 +12,20 @@ service Files =
 report : Failure none ->{} Unit
 let report _ = ()
 
-forget_result : forall s. Eff {Files} none (Handle s) -> Eff {Files} none Unit
+forget_result : Eff {Files} none (Handle s) -> Eff {Files} none Unit
 let forget_result t = task { ignore (await t) }
 
 spawned : Unit ->{Files;} Unit
-let spawned () =
-  scope outer {
-    scope inner {
-      let h = Files.open "inner"
-      let t : Eff {Files} none (Handle inner) = task {
-        Files.touch h
-        h
-      }
-      ignore (Fiber.spawn outer report t)
+let spawned () = scope outer {
+  scope inner {
+    let h = Files.open "inner"
+    let t : Eff {Files} none (Handle inner) = task {
+      Files.touch h
+      h
     }
+    ignore (Fiber.spawn outer report t)
   }
+}
 
 stored : Unit ->{Files;} Unit
 let stored () =
@@ -41,16 +40,15 @@ let stored () =
   }
 
 in_row : Unit ->{Files;} Unit
-let in_row () =
-  scope outer {
-    scope inner {
-      let h = Files.open "inner"
-      let t : Eff {Files, Scope inner} none Unit = task { Files.touch h }
-      ignore (Fiber.spawn outer report t)
-    }
+let in_row () = scope outer {
+  scope inner {
+    let h = Files.open "inner"
+    let t : Eff {Files, Scope inner} none Unit = task { Files.touch h }
+    ignore (Fiber.spawn outer report t)
   }
+}
 //~ FLICK-G001 @16:23-16:48
-//~ FLICK-G003 @27:15-27:26
-//~ FLICK-G001 @40:19-40:44
-//~ FLICK-G001 @48:52-48:74
-//~ FLICK-T008 @49:40-49:41
+//~ FLICK-G003 @26:13-26:24
+//~ FLICK-G001 @39:19-39:44
+//~ FLICK-G001 @46:50-46:72
+//~ FLICK-T008 @47:38-47:39

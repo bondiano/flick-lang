@@ -24,7 +24,7 @@ let leak raw = raw
 partial : Shape -> Float
 let partial shape =
   match shape with
-//^^^^^^^^^^^ FLICK-T009 `Square _` is not matched
+  //~ FLICK-T009 @26:3-26:14 `Square _` is not matched
   | Circle r -> r
 
 wrong_arg : Unit -> String

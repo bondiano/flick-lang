@@ -3,7 +3,7 @@
 // need `Setup s` too.
 module App.ComponentSetup exposing (..)
 
-counted : forall s. Float ->{Setup s;} (Atom.Writable Float)^{s}
+counted : Float ->{Setup s;} (Atom.Writable Float)^{s}
 let counted start = Atom.local (start + 1)
 
 component counter (start : Float) =

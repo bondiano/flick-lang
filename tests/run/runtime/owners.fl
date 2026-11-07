@@ -8,7 +8,7 @@ open_res : forall s. String ->{Scope s;} Res s
 foreign effect open_res from "./resources.mjs" "open"
 
 /// Acquires into the caller's region from inside a scope of its own.
-keep : forall s. String ->{Scope s;} Res s
+keep : String ->{Scope s;} Res s
 let keep name =
   acquire : Unit ->{Scope s;} Res s
   let acquire () = open_res name

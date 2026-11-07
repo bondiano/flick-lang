@@ -10,9 +10,8 @@ service FileSystem =
   open_scoped : forall s. String ->{Scope s; OpenError} File s
   read_all : forall s. File s ->{; ReadError} String
 
-read_later : forall s. File s -> (Eff {FileSystem} {ReadError} String)^{s}
-let read_later file =
-  task { FileSystem.read_all file }
+read_later : File s -> (Eff {FileSystem} {ReadError} String)^{s}
+let read_later file = task { FileSystem.read_all file }
 
-reader : forall s. File s -> (Unit ->{FileSystem; ReadError} String)^{s}
+reader : File s -> (Unit ->{FileSystem; ReadError} String)^{s}
 let reader file = fun () -> FileSystem.read_all file

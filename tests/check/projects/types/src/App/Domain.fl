@@ -9,9 +9,7 @@ let new_id raw = raw
 
 type alias User = { id : UserId; name : String }
 
-type Shape =
-  | Circle Float
-  | Square Float
+type Shape = Circle Float | Square Float
 
 type alias Box (f : Type -> Type) a = { value : f a }
 

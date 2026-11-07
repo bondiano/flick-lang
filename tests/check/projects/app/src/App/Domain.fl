@@ -8,9 +8,7 @@ let new_id raw = raw
 
 type alias User = { id : UserId; name : String }
 
-type Shape =
-  | Circle Float
-  | Square Float
+type Shape = Circle Float | Square Float
 
 // recursive nominal data is fine; only transparent aliases must be acyclic
 type Tree a = Leaf | Node a (List (Tree a))

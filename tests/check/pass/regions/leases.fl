@@ -17,7 +17,7 @@ ping : forall c. Raw^c ->{} String
 foreign effect ping from "./conn.js" "ping"
   retention call
 
-conn : forall s. String ->{Scope s;} Raw^{s}
+conn : String ->{Scope s;} Raw^{s}
 let conn name = Resource.acquire_release (task { make_conn name }) close_conn
 
 refs : Unit ->{} String
@@ -57,7 +57,6 @@ let direct () = scope {
 }
 
 listen_on :
-  forall c s r hs.
   (Fiber.Outlives c s, Fiber.Provided r s) =>
   Rpc.ServeOptions -> Rpc.Group r hs -> hs^c ->{Async, Scope s | r; Rpc.ServeError} Rpc.Server s
 let listen_on options group handlers = Rpc.listen options group handlers

@@ -27,18 +27,19 @@ component counter () =
   let _kept = Ui.on_mount (task { Atom.set latest count })
   let _shown = Ui.on_mount (task { Atom.set focused field })
   ui {
-    input_at
-      field
-      { value = ""; placeholder = ""; on_input = Ui.Event.latest (fun _ -> task { () }) }
+    input_at field {
+      value = "";
+      placeholder = "";
+      on_input = Ui.Event.latest (fun _ -> task { () });
+    }
   }
 
 keep : Unit ->{Files, Atom.Write;} Unit
-let keep () =
-  scope s {
-    let file = Files.open "notes"
-    Atom.set reader (fun () -> Files.read file)
-  }
+let keep () = scope s {
+  let file = Files.open "notes"
+  Atom.set reader (fun () -> Files.read file)
+}
 
 //~ FLICK-G001 @27:51-27:56 holds `s`
 //~ FLICK-G001 @28:53-28:58 holds `s`
-//~ FLICK-G001 @39:22-39:47 uses `file`, which holds region `s`
+//~ FLICK-G001 @40:20-40:45 uses `file`, which holds region `s`

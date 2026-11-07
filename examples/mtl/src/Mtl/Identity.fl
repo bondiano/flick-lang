@@ -10,7 +10,7 @@ module Mtl.Identity exposing (Identity(..), run)
 type Identity a = Identity a
 
 /// Remove the base wrapper, preserving the value's captures.
-run : forall c a. (Identity a)^c -> a^c
+run : (Identity a)^c -> a^c
 let run (Identity value) = value
 
 instance Functor Identity =

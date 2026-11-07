@@ -11,10 +11,10 @@ import Mtl.Classes exposing (
 
 type ExceptT e (m : Type -> Type) a = ExceptT (m (Result e a))
 
-run : forall c e m a. (ExceptT e m a)^c -> (m (Result e a))^c
+run : (ExceptT e m a)^c -> (m (Result e a))^c
 let run (ExceptT action) = action
 
-from_result : forall c e m a. Applicative m => (Result e a)^c -> (ExceptT e m a)^c
+from_result : Applicative m => (Result e a)^c -> (ExceptT e m a)^c
 let from_result value = ExceptT (pure value)
 
 instance Functor m => Functor (ExceptT e m) =

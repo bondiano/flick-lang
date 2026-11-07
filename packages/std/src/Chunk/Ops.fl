@@ -44,7 +44,7 @@ foreign pure flatten from "@flick-lang/runtime/effect/Chunk" "flatten"
   reviewed "effect@4.1.2 sha256:d40db7f5af1f97b5"
 
 /// Runs a runtime function on each element in order, for what it does.
-each_effect : forall c a r e. (a ->{r; e} Unit)^c -> (Chunk a ->{r; e} Unit)^c
+each_effect : (a ->{r; e} Unit)^c -> (Chunk a ->{r; e} Unit)^c
 let each_effect f chunk = List.each_effect f (to_list chunk)
 
 /// Whether an element is `same` as `x`.

@@ -319,7 +319,7 @@ foreign pure handle from "@flick-lang/runtime/ui/react" "uiElementHandle"
   arity 1
 
 /// An element of the instance whose setup makes it.
-element : forall s t. Unit ->{Setup s;} (Element t)^{s}
+element : Unit ->{Setup s;} (Element t)^{s}
 let element () = Setup.own (handle ())
 
 /// `input props` whose node is `element`'s.
@@ -343,19 +343,19 @@ foreign pure div_at from "@flick-lang/runtime/ui/react" "uiDivAt"
   retention call
 
 /// Moves the keyboard focus to `element`'s node.
-focus : forall t d. (Element t)^d ->{Document; Detached} Unit
+focus : (Element t)^d ->{Document; Detached} Unit
 let focus element = Document.focus element
 
 /// Takes the keyboard focus away from `element`'s node.
-blur : forall t d. (Element t)^d ->{Document; Detached} Unit
+blur : (Element t)^d ->{Document; Detached} Unit
 let blur element = Document.blur element
 
 /// Scrolls the page until `element`'s node is in view.
-scroll_into_view : forall t d. (Element t)^d ->{Document; Detached} Unit
+scroll_into_view : (Element t)^d ->{Document; Detached} Unit
 let scroll_into_view element = Document.scroll_into_view element
 
 /// Where `element`'s node is on the page.
-measure : forall t d. (Element t)^d ->{Document; Detached} Rect
+measure : (Element t)^d ->{Document; Detached} Rect
 let measure element = Document.measure element
 
 /// The component whose instances run `setup` once, when they mount, and
@@ -375,7 +375,7 @@ foreign pure mounted from "@flick-lang/runtime/ui/react" "uiMounted"
 /// task of the root: its unmount interrupts it and waits for it, and a
 /// defect goes to the root's supervisor. React's `useEffect` without
 /// dependencies, run once per instance.
-on_mount : forall s c. (Eff {Async, Atom.Write, Document} none Unit)^c ->{Setup s;} Unit
+on_mount : (Eff {Async, Atom.Write, Document} none Unit)^c ->{Setup s;} Unit
 let on_mount work = Setup.start (mounted work)
 
 /// `run` of what `read` reads as work of an instance, again whenever it
@@ -394,7 +394,6 @@ foreign pure watched from "@flick-lang/runtime/ui/react" "uiWatched"
 /// interrupts the last one. The dependencies are the atoms read, not a
 /// list.
 watch :
-  forall s c a.
   (Unit ->{Atom.Read;} a)^c ->
   (a -> (Eff {Async, Atom.Write, Document} none Unit)^c)^c ->{Setup s;}
   Unit
@@ -533,7 +532,6 @@ foreign pure suspended from "@flick-lang/runtime/ui/react" "uiSuspended"
 /// A view of a task atom, its props: `fallback` while it loads, `failed`
 /// of its failure, `render` of its value. It is `suspended` reading one task.
 awaiting :
-  forall c a e.
   (Failure e -> Ui^c)^c ->
   Ui^c ->
   (a ->{Atom.Read;} Ui^c)^c ->

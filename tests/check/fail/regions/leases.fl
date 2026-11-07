@@ -11,37 +11,36 @@ close_conn : forall c. Raw^c ->{} Unit
 foreign effect close_conn from "./conn.js" "close"
   retention call
 
-conn : forall s. String ->{Scope s;} Raw^{s}
+conn : String ->{Scope s;} Raw^{s}
 let conn name = Resource.acquire_release (task { make_conn name }) close_conn
 
 returned : Unit ->{} Unit
-let returned () =
-  scope {
-    let r = ScopedRef.from_acquire (task { conn "a" })
-    let leaked = ScopedRef.use r (fun c -> c)
-    ()
-  }
+let returned () = scope {
+  let r = ScopedRef.from_acquire (task { conn "a" })
+  let leaked = ScopedRef.use r (fun c -> c)
+  ()
+}
 
 kept : Unit ->{} Unit
-let kept () =
-  scope {
-    let r = ScopedRef.from_acquire (task { conn "a" })
-    later : Unit ->{} Unit
-    let later = ScopedRef.use r (fun c -> fun () -> close_conn c)
-    ()
-  }
+let kept () = scope {
+  let r = ScopedRef.from_acquire (task { conn "a" })
+  later : Unit ->{} Unit
+  let later = ScopedRef.use r (fun c -> fun () -> close_conn c)
+  ()
+}
 
 stashed : Unit ->{} Unit
-let stashed () =
-  scope {
-    let cell = Ref.make None
-    let r = ScopedRef.from_acquire (task {
-      let c = conn "a"
-      Ref.set cell (Some c)
-      c
-    })
-    ()
-  }
-//~ FLICK-T007 @21:44-21:45
-//~ FLICK-G002 @30:43-30:65
-//~ FLICK-T007 @40:21-40:27
+let stashed () = scope {
+  let cell = Ref.make None
+  let r =
+    ScopedRef.from_acquire
+      (task {
+        let c = conn "a"
+        Ref.set cell (Some c)
+        c
+      })
+  ()
+}
+//~ FLICK-T007 @20:42-20:43
+//~ FLICK-G002 @28:41-28:63
+//~ FLICK-T007 @39:23-39:29

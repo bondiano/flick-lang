@@ -25,31 +25,31 @@ map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
 foreign map_effect from "./list.js" "mapEffect"
   retention call
 
-read_later : forall s. Handle s -> (Unit ->{; ReadError} String)^{s}
+read_later : Handle s -> (Unit ->{; ReadError} String)^{s}
 let read_later file = fun () -> read_all file
 
-task_later : forall s. Handle s -> (Eff none {ReadError} String)^{s}
+task_later : Handle s -> (Eff none {ReadError} String)^{s}
 let task_later file = task { read_all file }
 
-wider : forall s t. Handle s -> (Unit ->{; ReadError} String)^{s, t}
+wider : Handle s -> (Unit ->{; ReadError} String)^{s, t}
 let wider file = fun () -> read_all file
 
-shown : forall s. Handle s -> Unit -> Handle s
+shown : Handle s -> Unit -> Handle s
 let shown file () = file
 
-reader : forall s. Handle s -> (List Float ->{; ReadError} List String)^{s}
+reader : Handle s -> (List Float ->{; ReadError} List String)^{s}
 let reader file = map_effect (fun n -> read_all file)
 
-labels : forall s. Handle s -> (Option Float -> Option (Handle s))^{s}
+labels : Handle s -> (Option Float -> Option (Handle s))^{s}
 let labels file = map (fun n -> file)
 
 // A stage holds the parameters before it without a written qualifier.
-curried : forall s. Handle s -> String -> String
+curried : Handle s -> String -> String
 let curried file label =
   ignore file
   label
 
-held_later : forall s. Handle s -> (String -> String)^{s}
+held_later : Handle s -> (String -> String)^{s}
 let held_later file = curried file
 
 compose : (b -> c) -> (a -> b) -> a -> c

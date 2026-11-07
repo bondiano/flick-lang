@@ -11,12 +11,9 @@ report : Failure e ->{} Unit
 let report _ = ()
 
 elsewhere : Unit ->{Files;} Unit
-let elsewhere () =
-  scope inner {
-    let cell = Ref.make (Some (Files.open "first"))
-    let t = task { Ref.set cell (Some (Files.open "child")) }
-    scope inner2 {
-      ignore (Fiber.spawn inner2 report t)
-    }
-  }
-//~ FLICK-T008 @19:41-19:42
+let elsewhere () = scope inner {
+  let cell = Ref.make (Some (Files.open "first"))
+  let t = task { Ref.set cell (Some (Files.open "child")) }
+  scope inner2 { ignore (Fiber.spawn inner2 report t) }
+}
+//~ FLICK-T008 @17:52-17:53

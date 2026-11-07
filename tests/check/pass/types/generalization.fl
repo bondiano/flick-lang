@@ -7,7 +7,7 @@ module App.Generalization exposing (
   use_tasks,
 )
 
-make_empty : forall a. Unit ->{} Ref (Option a)
+make_empty : Unit ->{} Ref (Option a)
 let make_empty () = Ref.make None
 
 use_separate_cells : Unit ->{} Unit
@@ -20,10 +20,10 @@ let use_separate_cells () =
 make_identity : Unit -> (a -> a)
 let make_identity () = fun value -> value
 
-identity_again : forall a. a -> a
+identity_again : a -> a
 let identity_again = make_identity ()
 
-fresh_cell : forall a. Eff none none (Ref (Option a))
+fresh_cell : Eff none none (Ref (Option a))
 let fresh_cell = task { Ref.make None }
 
 use_tasks : Unit ->{} Unit

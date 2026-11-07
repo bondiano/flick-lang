@@ -38,7 +38,6 @@ foreign effect make from "@flick-lang/runtime/effect/http/HttpStaticServer" "fli
 
 /// A route of `GET` below the prefix to the handler of the files.
 route :
-  forall r e.
   StaticOptions ->
   String ->{; PlatformError.PlatformError}
   Http.Router.Route r {HttpServerError | e}

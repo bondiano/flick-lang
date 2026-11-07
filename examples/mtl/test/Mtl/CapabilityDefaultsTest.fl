@@ -6,7 +6,7 @@ import App.Capabilities as Capabilities exposing (Stack)
 
 type Defaults a = Defaults (Stack Identity a)
 
-unwrap : forall c a. (Defaults a)^c -> (Stack Identity a)^c
+unwrap : (Defaults a)^c -> (Stack Identity a)^c
 let unwrap (Defaults action) = action
 
 instance Functor Defaults =

@@ -11,7 +11,7 @@ import Mtl.Classes exposing (
 
 type WriterT w (m : Type -> Type) a = WriterT (m (a, w))
 
-run : forall c w m a. (WriterT w m a)^c -> (m (a, w))^c
+run : (WriterT w m a)^c -> (m (a, w))^c
 let run (WriterT action) = action
 
 instance Functor m => Functor (WriterT w m) =

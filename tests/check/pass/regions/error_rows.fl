@@ -8,35 +8,35 @@ type File (s : Region)
 type error Wrapped a = Wrapped a
 
 // read as `Errors e -> (Unit -> Unit)^{e}`
-keep : forall e. Errors e -> (Unit -> Unit)
+keep : Errors e -> (Unit -> Unit)
 let keep x = fun () -> ignore x
 
-keep_field : forall c e. (Errors e)^c -> { run : (Unit -> Unit)^c }
+keep_field : (Errors e)^c -> { run : (Unit -> Unit)^c }
 let keep_field x = { run = fun () -> ignore x }
 
 // the closure `keep` returns holds `s`, which the stage shows
-hide : forall s. File s ->{} (Unit -> Unit)
+hide : File s ->{} (Unit -> Unit)
 let hide file =
   try from_result (Err (Wrapped file)) with
   | err -> keep err
 
-hide_shown : forall s. File s ->{} (Unit -> Unit)^{s}
+hide_shown : File s ->{} (Unit -> Unit)^{s}
 let hide_shown file = hide file
 
-hide_field : forall s. File s ->{} { run : (Unit -> Unit)^{s} }
+hide_field : File s ->{} { run : (Unit -> Unit)^{s} }
 let hide_field file =
   try from_result (Err (Wrapped file)) with
   | err -> keep_field err
 
 // a local without a signature over a row not known yet, and one generalized
 // over it: what the row becomes is held
-show_local : forall s. File s ->{} { run : (Unit -> Unit)^{s} }
+show_local : File s ->{} { run : (Unit -> Unit)^{s} }
 let show_local file =
   let k = { keep = fun y -> fun () -> ignore (Exit.fail y) }
   try from_result (Err (Wrapped file)) with
   | err -> { run = k.keep err }
 
-show_generic : forall s. File s ->{} { run : (Unit -> Unit)^{s}; other : Unit -> Unit }
+show_generic : File s ->{} { run : (Unit -> Unit)^{s}; other : Unit -> Unit }
 let show_generic file =
   let k = { keep = keep }
   let run =
@@ -49,7 +49,7 @@ let show_generic file =
 
 // the errors `err` stands for are `e` and a row not known yet: a cell of
 // what `keep err` holds takes it again
-keep_cell : forall e. (Unit ->{; e} Unit) ->{} Unit
+keep_cell : (Unit ->{; e} Unit) ->{} Unit
 let keep_cell act =
   try act () with
   | err ->

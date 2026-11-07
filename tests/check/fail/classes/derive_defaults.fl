@@ -42,7 +42,6 @@ type Unit2 = Unit2
 empty : Empty
 let empty = default
 
-
 //~ FLICK-C013 @26:3-26:19 cannot derive `Default Point`: the default of `default` needs `GDefault (Con "Point" (Field "_0" Float, Unit))`
 //~ FLICK-C013 @34:3-34:18 the class `Pretty` has no derive: `pretty` has no default; deriving covers `Eq`, `Ord`, `Hash`, `Show`, `Generic`, the classes marked `@derive` and those of one parameter with a default for each method
 //~ FLICK-C013 @40:3-40:19 the class `Convert` has no derive: it has more than one parameter, and a derived class has one; deriving covers `Eq`, `Ord`, `Hash`, `Show`, `Generic`, the classes marked `@derive` and those of one parameter with a default for each method

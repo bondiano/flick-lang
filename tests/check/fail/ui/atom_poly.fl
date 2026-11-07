@@ -28,7 +28,7 @@ let poke () =
 
 poke_signed : Unit ->{Atom.Write;} Unit
 let poke_signed () =
-  signed : forall a. Atom.Writable (Option a)
+  signed : Atom.Writable (Option a)
   let signed = Atom.fresh None
   Atom.set signed (Some 1)
 
