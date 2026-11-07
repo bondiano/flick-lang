@@ -1,6 +1,7 @@
 // The performance baseline: the time to check the check corpus, the
 // language server's hover latency, the throughput of the load servers of
-// tools/load at concurrency 16 and the size of the Go one. Writes
+// tools/load at concurrency 16 and the size of the Go one, and the resident
+// memory of the language server and those servers at their peak. Writes
 // target/perf.json and a table (also to $GITHUB_STEP_SUMMARY) and fails
 // when a metric is past its budget in budgets.json; a budget of null is
 // only reported. A metric that beats its budget by a factor of more than
@@ -24,7 +25,13 @@ export const METRICS = {
   "load.json.go.rps": { unit: "req/s", better: "higher" },
   "load.json.go.binary": { unit: "bytes", better: "lower" },
   "load.ssr.rps": { unit: "req/s", better: "higher" },
+  "lsp.rss.peak": { unit: "MiB", better: "lower" },
+  "load.json.go.rss.peak": { unit: "MiB", better: "lower" },
+  "load.ssr.rss.peak": { unit: "MiB", better: "lower" },
 };
+
+/** The peak in MiB that tools/load and tools/lsp-bench print. */
+export const peakRss = (out) => Number(/^RSS, MiB: .*\bpeak ([\d.]+)/m.exec(out)[1]);
 
 const RUNS = 5;
 const HOVERS = 50;
@@ -89,7 +96,7 @@ const hovers = (flick) => {
   );
   process.stdout.write(out);
   const p95 = (label) => Number(new RegExp(`^${label}, \\d+ samples +p50 +[\\d.]+ ms +p95 +([\\d.]+) ms`, "m").exec(out)[1]);
-  return { hover: p95("hover"), afterEdit: p95("hover after edit") };
+  return { hover: p95("hover"), afterEdit: p95("hover after edit"), rss: peakRss(out) };
 };
 
 const answers = async (url) => {
@@ -122,7 +129,7 @@ const throughput = async (command, { port, path: route, expect, env = {} }) => {
       { cwd: root, encoding: "utf8" },
     );
     process.stdout.write(out);
-    return Number(/^\| median \| 16 \| (\d+) \|/m.exec(out)[1]);
+    return { rps: Number(/^\| median \| 16 \| (\d+) \|/m.exec(out)[1]), rss: peakRss(out) };
   } finally {
     server.kill();
   }
@@ -137,9 +144,10 @@ const main = async () => {
   values["check.corpus"] = Math.round(checkCorpus(flick));
   console.log(`check corpus: median ${values["check.corpus"]} ms of ${RUNS}`);
 
-  const { hover, afterEdit } = hovers(flick);
+  const { hover, afterEdit, rss } = hovers(flick);
   values["lsp.hover.p95"] = hover;
   values["lsp.hover_after_edit.p95"] = afterEdit;
+  values["lsp.rss.peak"] = rss;
 
   // the binary's budget is that of the Go in runtime-go/go.mod, which CI sets up: a newer
   // Go builds a bigger one, so a local run builds with that version, which Go fetches once
@@ -152,19 +160,23 @@ const main = async () => {
   build("tools/load/json", ["--emit", "go", "--out-dir", "dist/go"], withGo);
   const go = "tools/load/json/dist/go/flick-server";
   values["load.json.go.binary"] = statSync(path.join(root, go)).size;
-  values["load.json.go.rps"] = await throughput([go], { port: 3930, path: "/item/{id}", expect: '"item {id}"' });
+  const json = await throughput([go], { port: 3930, path: "/item/{id}", expect: '"item {id}"' });
+  values["load.json.go.rps"] = json.rps;
+  values["load.json.go.rss.peak"] = json.rss;
 
   build("tools/load/ssr", []);
   execFileSync("node", ["tools/load/bundle.mjs", "tools/load/ssr/dist/flick-client.js", "tools/load/ssr/dist/client.js"], {
     cwd: root,
     stdio: "inherit",
   });
-  values["load.ssr.rps"] = await throughput(["node", "tools/load/ssr/dist/flick-server.js"], {
+  const ssr = await throughput(["node", "tools/load/ssr/dist/flick-server.js"], {
     port: 3931,
     path: "/render/{id}",
     expect: "request {id}",
     env: { NODE_ENV: "production", CLIENT_JS: "tools/load/ssr/dist/client.js" },
   });
+  values["load.ssr.rps"] = ssr.rps;
+  values["load.ssr.rss.peak"] = ssr.rss;
 
   const budgets = JSON.parse(readFileSync(path.join(root, "tools/perf/budgets.json"), "utf8"));
   const rows = Object.entries(METRICS).map(([metric, { unit }]) => ({ metric, value: values[metric], unit }));

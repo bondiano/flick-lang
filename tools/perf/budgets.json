@@ -4,5 +4,8 @@
   "lsp.hover_after_edit.p95": { "budget": 40, "tolerance": 0.5 },
   "load.json.go.rps": { "budget": 8500, "tolerance": 0.25 },
   "load.json.go.binary": { "budget": 10000000, "tolerance": 0.05 },
-  "load.ssr.rps": { "budget": 5200, "tolerance": 0.25 }
+  "load.ssr.rps": { "budget": 5200, "tolerance": 0.25 },
+  "lsp.rss.peak": { "budget": null, "tolerance": 0.25 },
+  "load.json.go.rss.peak": { "budget": null, "tolerance": 0.25 },
+  "load.ssr.rss.peak": { "budget": null, "tolerance": 0.25 }
 }
