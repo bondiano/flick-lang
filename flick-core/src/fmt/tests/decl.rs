@@ -21,6 +21,27 @@ fn omits_redundant_outer_forall_on_nonrecursive_functions() {
 }
 
 #[test]
+fn omits_redundant_outer_forall_on_instance_methods() {
+    let src = "instance Monad m => Applicative (ExceptT e m) =\n  pure : forall c a. a^c -> (ExceptT e m a)^c\n  let pure value = ExceptT (pure (Ok value))\n  state : forall c a. (forall v. e^v -> a)^c -> (ExceptT e m a)^c\n  let state step = step\n";
+    let out = fmt(src);
+    assert!(out.contains("pure : a^c -> (ExceptT e m a)^c\n"), "{out}");
+    assert!(
+        out.contains("state : (forall v. e^v -> a)^c -> (ExceptT e m a)^c\n"),
+        "{out}"
+    );
+}
+
+#[test]
+fn keeps_instance_forall_that_shadows_a_head_variable() {
+    let src = "instance Monad m => Applicative (ExceptT e m) =\n  pure : forall m a. a -> ExceptT e m a\n  let pure value = ExceptT (pure (Ok value))\n";
+    let out = fmt(src);
+    assert!(
+        out.contains("pure : forall m a. a -> ExceptT e m a\n"),
+        "{out}"
+    );
+}
+
+#[test]
 fn local_forall_respects_enclosing_type_variables() {
     let safe = "outer : Float -> (Float, String)\nlet outer x =\n  inner : forall a. a -> a\n  let inner y = y\n  (inner x, inner \"ok\")\n";
     let safe_out = fmt(safe);

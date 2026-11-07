@@ -13,15 +13,27 @@ pub(super) fn drop_redundant_foralls(tree: &mut Node, text: &str) {
 }
 
 fn visit(node: &mut Node, text: &str, outer: &HashSet<String>, scope_known: bool) {
-    // A class/instance/service or recursive group has other type binders or
-    // recursion rules. Leave every signature inside it alone.
-    if matches!(
-        node.kind,
-        K::ClassDecl | K::InstanceDecl | K::ServiceDecl | K::RecGroup
-    ) {
+    // Instance methods can generalize their own signature variables, but
+    // those variables must not shadow the instance head or its constraints.
+    if node.kind == K::InstanceDecl {
+        let mut scoped = outer.clone();
+        for child in &mut node.children {
+            if let Element::Node(child) = child {
+                if child.kind == K::Members {
+                    visit(child, text, &scoped, scope_known);
+                } else if child.kind == K::Context || is_type(child.kind) {
+                    scoped.extend(type_names(child, text));
+                }
+            }
+        }
         return;
     }
-    if matches!(node.kind, K::SourceFile | K::Block) {
+    // Class and service binders, and recursive groups, need their written
+    // quantifiers to preserve the checker's scoping and recursion rules.
+    if matches!(node.kind, K::ClassDecl | K::ServiceDecl | K::RecGroup) {
+        return;
+    }
+    if matches!(node.kind, K::SourceFile | K::Block | K::Members) {
         let positions: Vec<usize> = node
             .children
             .iter()
