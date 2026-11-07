@@ -26,7 +26,7 @@ export const sidebar = [
       {
         label: "Language",
         translations: { ru: "Язык" },
-        items: ["types", "effects", "classes", "regions", "modules", "grammar", "keywords"].map(reference),
+        items: ["types", "gadts", "effects", "classes", "regions", "modules", "grammar", "keywords"].map(reference),
       },
       {
         label: "Runtime",

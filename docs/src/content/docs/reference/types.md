@@ -161,7 +161,8 @@ an error (`FLICK-T027`).
 A constructor may name the type it builds after `:`. Its type variables are
 its own, and those of its fields that the result does not mention are
 existential: a value hides their types. A constructor without `: R` builds
-`T a…` as usual, and both kinds mix in one type.
+`T a…` as usual, and both kinds mix in one type. [GADTs](../gadts/) walks
+through what follows with examples.
 
 ```flick
 type Expr a =
@@ -204,6 +205,10 @@ let rec size e =
   | IntLit _ -> 1
   | Add x y -> size x + size y
 ```
+
+What one constructor tells holds across the matched value: on `(x, y)` of type
+`(Ty a, Ty a)`, a pair of different constructors of `Ty` needs no arm. A type
+the constructor hides is not followed.
 
 The checker learns from a branch only where the types are known
 (`FLICK-T057`): the function has a complete signature, the type of the matched
