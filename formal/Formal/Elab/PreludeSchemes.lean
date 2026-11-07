@@ -194,10 +194,10 @@ def timeout_option (detached float eff option : Nat) : Scheme :=
   ⟨4, [⟨detached, [.var 1]⟩],
     .arr .P (.con float) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con eff) (.var 0)) (.var 3)) (.app (.con option) (.var 3)) .cnil) .cnil, .cnil⟩
 
-/-- `Prelude.bind : forall c d m a b. Monad m => (m a)^c -> ((a -> (m b)^d)^d -> (m b)^(c + d))^c` -/
+/-- `Prelude.bind : forall m a c b d. Monad m => (m a)^c -> ((a -> (m b)^d)^d -> (m b)^(c + d))^c` -/
 def bind (monad : Nat) : Scheme :=
-  ⟨6, [⟨monad, [.var 2]⟩],
-    .arr .P (.app (.app (.var 2) (.var 0)) (.var 3)) (.arr .P (.arr .P (.var 3) (.app (.app (.var 2) (.var 1)) (.var 4)) (.var 5)) (.app (.app (.var 2) (.cun (.cun (.var 0) (.var 3)) (.cun (.cun (.var 1) (.var 4)) (.var 5)))) (.var 4)) (.cun (.var 0) (.var 3))) .cnil, .cnil⟩
+  ⟨6, [⟨monad, [.var 0]⟩],
+    .arr .P (.app (.app (.var 0) (.var 2)) (.var 1)) (.arr .P (.arr .P (.var 1) (.app (.app (.var 0) (.var 4)) (.var 3)) (.var 5)) (.app (.app (.var 0) (.cun (.cun (.var 2) (.var 1)) (.cun (.cun (.var 4) (.var 3)) (.var 5)))) (.var 3)) (.cun (.var 2) (.var 1))) .cnil, .cnil⟩
 
 /-- `Prelude.bind_eff : forall c d r1 r2 e1 e2 a b. (Eff r1 e1 a)^c -> ((a -> (Eff r2 e2 b)^d)^d -> (Eff (r1 + r2) (e1 + e2) b)^(c + d))^c` -/
 def bind_eff (eff : Nat) : Scheme :=
@@ -414,15 +414,15 @@ def Seq.singleton (seq : Nat) : Scheme :=
   ⟨2, [],
     .arr .P (.var 0) (.app (.app (.con seq) (.var 1)) (.var 0)) .cnil, .cnil⟩
 
-/-- `Option.map : forall c d a b. (forall v. a^v -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c` -/
+/-- `Option.map : forall a b c d. (forall v. a^v -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c` -/
 def Option.map (option : Nat) : Scheme :=
   ⟨3, [],
-    .arr .P (.arr .P (.var 1) (.var 2) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 2)) (.var 0)) .cnil, .cnil⟩
+    .arr .P (.arr .P (.var 0) (.var 1) (.var 2)) (.arr .P (.app (.con option) (.var 0)) (.app (.con option) (.var 1)) (.var 2)) .cnil, .cnil⟩
 
-/-- `Option.bind : forall c a b. (a -> Option b)^c -> (Option a -> Option b)^c` -/
+/-- `Option.bind : forall a b c. (a -> Option b)^c -> (Option a -> Option b)^c` -/
 def Option.bind (option : Nat) : Scheme :=
   ⟨3, [],
-    .arr .P (.arr .P (.var 1) (.app (.con option) (.var 2)) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 2)) (.var 0)) .cnil, .cnil⟩
+    .arr .P (.arr .P (.var 0) (.app (.con option) (.var 1)) (.var 2)) (.arr .P (.app (.con option) (.var 0)) (.app (.con option) (.var 1)) (.var 2)) .cnil, .cnil⟩
 
 /-- `Option.with_default : forall a. a -> (Option a -> a)^{a}` -/
 def Option.with_default (option : Nat) : Scheme :=
@@ -579,20 +579,20 @@ def Option.zip_with (option : Nat) : Scheme :=
   ⟨5, [],
     .arr .P (.app (.con option) (.var 2)) (.arr .P (.arr .P (.var 1) (.arr .P (.var 2) (.var 3) (.var 4)) (.var 0)) (.arr .P (.app (.con option) (.var 1)) (.app (.con option) (.var 3)) (.cun (.var 0) (.var 4))) (.var 2)) .cnil, .cnil⟩
 
-/-- `Result.map : forall c d e a b. (forall v. a^v -> b)^c -> ((Result e a)^d -> (Result e b)^(c + d))^c` -/
+/-- `Result.map : forall a b c e d. (forall v. a^v -> b)^c -> ((Result e a)^d -> (Result e b)^(c + d))^c` -/
 def Result.map (result : Nat) : Scheme :=
   ⟨4, [],
-    .arr .P (.arr .P (.var 2) (.var 3) (.var 0)) (.arr .P (.app (.app (.con result) (.var 1)) (.var 2)) (.app (.app (.con result) (.var 1)) (.var 3)) (.var 0)) .cnil, .cnil⟩
+    .arr .P (.arr .P (.var 0) (.var 1) (.var 2)) (.arr .P (.app (.app (.con result) (.var 3)) (.var 0)) (.app (.app (.con result) (.var 3)) (.var 1)) (.var 2)) .cnil, .cnil⟩
 
-/-- `Result.map_err : forall c e x a. (e -> x)^c -> (Result e a -> Result x a)^c` -/
+/-- `Result.map_err : forall e x c a. (e -> x)^c -> (Result e a -> Result x a)^c` -/
 def Result.map_err (result : Nat) : Scheme :=
   ⟨4, [],
-    .arr .P (.arr .P (.var 1) (.var 2) (.var 0)) (.arr .P (.app (.app (.con result) (.var 1)) (.var 3)) (.app (.app (.con result) (.var 2)) (.var 3)) (.var 0)) .cnil, .cnil⟩
+    .arr .P (.arr .P (.var 0) (.var 1) (.var 2)) (.arr .P (.app (.app (.con result) (.var 0)) (.var 3)) (.app (.app (.con result) (.var 1)) (.var 3)) (.var 2)) .cnil, .cnil⟩
 
-/-- `Result.bind : forall c e a b. (a -> Result e b)^c -> (Result e a -> Result e b)^c` -/
+/-- `Result.bind : forall a e b c. (a -> Result e b)^c -> (Result e a -> Result e b)^c` -/
 def Result.bind (result : Nat) : Scheme :=
   ⟨4, [],
-    .arr .P (.arr .P (.var 2) (.app (.app (.con result) (.var 1)) (.var 3)) (.var 0)) (.arr .P (.app (.app (.con result) (.var 1)) (.var 2)) (.app (.app (.con result) (.var 1)) (.var 3)) (.var 0)) .cnil, .cnil⟩
+    .arr .P (.arr .P (.var 0) (.app (.app (.con result) (.var 1)) (.var 2)) (.var 3)) (.arr .P (.app (.app (.con result) (.var 1)) (.var 0)) (.app (.app (.con result) (.var 1)) (.var 2)) (.var 3)) .cnil, .cnil⟩
 
 /-- `Result.with_default : forall a e. a -> (Result e a -> a)^{a}` -/
 def Result.with_default (result : Nat) : Scheme :=
@@ -1089,10 +1089,10 @@ def List.union (eq list : Nat) : Scheme :=
   ⟨1, [⟨eq, [.var 0]⟩],
     .arr .P (.app (.con list) (.var 0)) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.var 0)) (.var 0)) .cnil, .cnil⟩
 
-/-- `List.group_with : forall c a. (a -> (a -> Bool)^{a | c})^c -> (List a -> List (NonEmpty a))^c` -/
+/-- `List.group_with : forall a c. (a -> (a -> Bool)^{a | c})^c -> (List a -> List (NonEmpty a))^c` -/
 def List.group_with (bool list nonempty : Nat) : Scheme :=
   ⟨3, [],
-    .arr .P (.arr .P (.var 1) (.arr .P (.var 1) (.con bool) (.var 2)) (.var 0)) (.arr .P (.app (.con list) (.var 1)) (.app (.con list) (.app (.con nonempty) (.var 1))) (.cun (.var 0) (.var 2))) .cnil, .cnil⟩
+    .arr .P (.arr .P (.var 0) (.arr .P (.var 0) (.con bool) (.var 2)) (.var 1)) (.arr .P (.app (.con list) (.var 0)) (.app (.con list) (.app (.con nonempty) (.var 0))) (.cun (.var 1) (.var 2))) .cnil, .cnil⟩
 
 /-- `List.group : forall a. Eq a => List a -> List (NonEmpty a)` -/
 def List.group (eq list nonempty : Nat) : Scheme :=

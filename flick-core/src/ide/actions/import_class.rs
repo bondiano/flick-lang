@@ -1,10 +1,12 @@
 //! Import a class named by an unresolved type in a signature or constraint.
 
+use std::collections::HashSet;
+
 use super::super::{Ide, enrich::import_edit, tree};
 use super::{Action, edit};
 use crate::diagnostics::codes;
 use crate::iface::{Decl, Namespace};
-use crate::resolve::module_syntax;
+use crate::resolve::{ItemKind, module_syntax};
 use crate::source::FileId;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::builtins;
@@ -28,12 +30,13 @@ impl Ide<'_> {
         let Some(token) = name_type.child_tokens().find(|t| t.kind == K::Con) else {
             return Vec::new();
         };
-        if !(token.start <= offset && offset <= token.end)
-            || !self.analysis.diagnostics.iter().any(|d| {
+        if !(token.start <= offset
+            && offset <= token.end
+            && self.analysis.diagnostics.iter().any(|d| {
                 d.code == codes::T001
                     && d.span
                         .is_some_and(|s| s.file == file && s.start <= offset && offset <= s.end)
-            })
+            }))
         {
             return Vec::new();
         }
@@ -46,7 +49,7 @@ impl Ide<'_> {
                 !i.module.contains('.') && !matches!(i.module.as_str(), "Prelude" | "Instances")
             })
             .map(|i| i.module.clone());
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::new();
         let mut actions = Vec::new();
         for module in project.chain(builtin) {
             if !seen.insert(module.clone()) || module == m.name {
@@ -66,7 +69,7 @@ impl Ide<'_> {
                 if import
                     .exposing
                     .iter()
-                    .any(|i| i.name == name || i.kind == crate::resolve::ItemKind::All)
+                    .any(|i| i.name == name || i.kind == ItemKind::All)
                 {
                     continue;
                 }
