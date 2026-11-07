@@ -579,9 +579,9 @@ cascade into others in the same statement.
 the result depends on the code and the line width (100 columns) only, not on
 how the source was laid out, apart from the few choices listed below. Literals,
 multi-line strings and comments are copied verbatim. The formatter drops a
-redundant outer `forall` from a nonrecursive `let` signature when its variables
-remain implicitly quantified; it keeps one needed by recursion, local type
-shadowing or a comment. Other rewrites are separators that change nothing: `;` between
+redundant outer `forall` from a nonrecursive `let` signature, including a method
+of an `instance`, when its variables remain implicitly quantified; it keeps one
+needed by recursion, type shadowing or a comment. Other rewrites are separators that change nothing: `;` between
 statements becomes a line break, a broken bracket gets a trailing `,` and a
 broken record a `;` after every field, a broken variant list starts with
 `|`, and empty rows of an arrow are dropped, which are the same type:
