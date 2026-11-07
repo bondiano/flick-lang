@@ -172,6 +172,12 @@ stress runs="20" +prefixes="runtime/":
     pnpm -C runtime build
     node tools/stress/index.mjs target/debug/flick target/debug/examples/rt_trace {{runs}} {{prefixes}}
 
+# The runtime contract, once on each target and on the model: the cases of
+# docs/formal/runtime.md §6.2
+conformance: e2e-prepare
+    FLICK_E2E_ONLY=tests/run/runtime/,effect/shared_layer_merged cargo test --profile e2e -p flick --test e2e -- --ignored run_cases
+    FLICK_MODEL_ONLY=runtime/ cargo test --profile e2e -p flick-model --test run -- --include-ignored model_prints
+
 # Run SQL queries against PostgreSQL in Docker
 e2e-postgres: e2e-prepare
     cargo test --profile e2e -p flick --test sql_postgres -- --ignored

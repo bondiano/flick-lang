@@ -524,9 +524,41 @@ Limitations (`shortcut:` in the code):
 
 - JS does not see finalizers that Effect itself adds (layers, channels, servers). So R1 and R2 are checked on Flick finalizers, and Go does not write its internal ones either;
 - an owner opened by a fiber outside the `main` tree (an internal Go owner) is a root of the projection (`stdlib/http/lifecycle`);
-- interruption delivery is not traced, only the C2 request.
+- interruption delivery is not traced, only the C2 request;
+- the JS trace counts each composite layer as a build, since Effect memoizes them too, and the Go trace counts only memoizable layers. So a case with a composite layer is not under `tests/run/runtime/`.
 
 `just stress` runs every case of `tests/run/runtime/` N times on both runtimes with `FLICK_STRESS=<seed>` and checks every trace with the monitor. In Go, interruption points and fiber start yield or sleep at random, and turns are off. In JS, `main` runs under a scheduler that shuffles the tasks of a round within a priority and yields at random. A violation is printed with the case, the runtime, the seed and the command to reproduce it. CI does not run the recipe.
+
+### 6.2 Conformance
+
+Each law below names the cases that exercise it, under `tests/run/runtime/` unless a path says otherwise. They run on the JS target and as a Go executable unless the row says otherwise. "Trace" means the monitor checks the law on the trace of those runs, and on every other run of `tests/run`, under §6.1; "output" means the expected `.stdout` and exit code of the case pin it. `just conformance` runs all of them, and `just stress` runs those under `tests/run/runtime/` in random interleavings under the monitor.
+
+| Law | Cases | Targets | Checked by |
+| - | - | - | - |
+| R1 | `scope_close`, `scope_releases`, `abort_closes_scopes`, `interrupt_in_finalizer`, `closed_owner` | both | trace, output |
+| R1, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go; JS waits for `control` arms (`FLICK-P012`) | trace, output |
+| R2 | `close_phases`, `scope_owners`, `closing_hooks`, `settling_calls`, `closing_child_fails`, `interrupt_in_finalizer`, `abort_stops_children` | both | trace, output. Group children are not traced: output only |
+| R2, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go; JS waits | trace, output |
+| R3 | `parallel`, `close_phases`, `closing_hooks`, `abort_stops_children`; `discontinued_fiber` on Go | both | trace for children and watchers; output for group children and combinator branches, which are not traced |
+| R4 | `close_phases`, `closing_child_fails`, `supervisor_defect` (exit code), `cause_lists` (`parallel`) | both | trace for the call of the supervisor; output for the root seeing its failure and for `parallel` |
+| R5 | `cause_laws`, `cause_lists` | both | output (properties) |
+| R6 | `shared_layer`, `stdlib/effect/shared_layer_merged` | both | trace for build and release counts; output for at most one build and for the release after consumers. The projection of the merged case is not compared: see below |
+| R7 | `ref_linearizable`, `handoff` | both; only Go takes steps at once | output: by its consequences (each ticket once, each fiber's tickets in order, no half-done transfer seen, a cell unchanged by a dying `modify`). Not a check of the history itself |
+| R8 | `cause_laws`, `cause_lists`, `closing_causes`; `cause_test.go` for (Seq=Par) | both | output |
+| C0 | `closed_owner` | both | trace (`refuse`, the phase), output |
+| C1 | `closing_hooks`; a hook added during C1 or C3: `group_in_closing` | both; `group_in_closing` passes on Go and is a [known gap on JS](#js-a-group-made-while-its-owner-closes-runs-nothing) | output: hooks are not traced, only the place of the phase |
+| C1, a failing hook; a hook added during C4 | not checked by a case: the hooks a Flick program adds (group stops, listener detaches) do not fail, and only a foreign callback can add one in C4. Unit tests: `runtime/test/scope.test.ts`, `owner_test.go` (a hook added during C4) | | not on a run of a program |
+| C2 | `closing_hooks`, `interrupt_in_finalizer` (closing asks every child before it waits for one), `closing_child_fails` | both | trace (`interrupt`, not projected), output |
+| C3 | `close_phases`, `closing_child_fails`, `supervisor_defect` | both | trace; the output of these cases can hold without the wait, so the monitor is what checks it |
+| C4 | `settling_calls`, `hung_io`, `scopes` | both | trace on JS, where every call is tracked (not projected), output. A call that starts another while settling is not checked |
+| C5 | `scope_close`, `closing_causes`, `closed_owner`, `interrupt_in_finalizer` | both | trace, output |
+| C6 | `closing_causes`, `closing_child_fails`, `scope_close` | both | output: causes are not traced. `c_H` is not checked, as for C1 |
+
+The law (Unmask) of §3.2 has its own case, `interrupt_after_close`, a [known gap on Go](#go-leaving-a-close-does-not-deliver-a-pending-interruption).
+
+`tests/run/known_gaps.txt` lists the cases a target does not pass yet, each with its reason. Their `.stdout` is what the contract asks for; the harness runs them and fails on one that passes, so a case joins its target as soon as the target holds the law.
+
+A differential check: the cases of `tests/run/model.txt` also run on `flick-model`. Of this table it runs `abort_closes_scopes` and `discontinued_body`. It cannot run the others: it has no `parallel`, `Deferred`, `Effect.exit`, `Scope.add_finalizer_exit` or memo map of layers, and it runs children when a region closes, so nothing can wait for a child or a child be interrupted there. It rejects `scope_owners`, which acquires into an outer region from an inner one.
 
 ## 7. Known divergences
 
@@ -885,6 +917,17 @@ Found by the Lean development of the core (`formal/Formal/`).
 - Divergence: R6, the sketch in §6 and hypothesis G11 in Lean (`G11`, `GoodUse`) required every fiber with a `θ` from the `provide` of owner `πₚ` to run only until `πₚ` closes. A child inherits the whole environment of the spawn site (§3.5), and the rule of `regions.md` §2.7 ties to the owner only the providers of the services in the task row. The program `provide L1 { scope outer { provide L2 { Fiber.spawn outer (task { …; ask S1 }) } } }`, where `L1` gives `S1` and `L2` gives `S2`, is accepted: `Provided {S1} outer` is discharged, since the provider of `S1` encloses `outer`. The child runs after `L2` closes and takes `S1`; `GoodUse` saw the released build of `L2` in its environment and reported a violation, although `S1` came from the live `L1`.
 - Cause: the premise was stated about the whole fiber, while typing (point 3 of T4) speaks about service requests.
 - Resolution — this document and the λRT model: the premise is "an operation answered from the environment is answered by the handler of a live owner". R6 and §6 state it this way; `G11` and `GoodUse` in `formal/Formal/RT/` speak of the environment entry that answers the request. The Lean core development proves the premise in this form (`T4_3`).
+
+### Go: leaving a close does not deliver a pending interruption
+
+- Divergence: the fiber is asked to stop while a finalizer of its `scope` runs. On Node the statement after the scope does not run and the fiber ends interrupted. On Go the statement runs, and the fiber ends with success if no interruption point follows, so its supervisor is not called. If the finalizer died, Go's cause lacks the `Int` that Node's has.
+- Cause: closing runs at `mask (…)`, and (Unmask) delivers a pending request when the depth returns to zero. Go's internal masks leave the request until the next interruption point ([mask exit in Go](#go-leaving-a-mask-does-not-deliver-a-pending-interruption)), and a direct call is not one. Breaks (Unmask) and the parity of §2.5; R1–R4 hold.
+- Resolution: recorded. Case: `tests/run/runtime/interrupt_after_close.fl`, listed in `tests/run/known_gaps.txt` for Go. A fix is a check when `scope` and `provide` have left the close, at depth zero, not inside it.
+
+### JS: a group made while its owner closes runs nothing
+
+- Divergence: a supervisor or a stopping group child makes a `FiberSet` in the region of the closing owner and runs a task in it. On Go the group is open until its hook runs (§3.6): the task runs and has stopped before the finalizers. On Node `inOwner` refuses any child of a closing owner (`stdlib/fibers.ts`): the fiber is interrupted and the task does not run. R2 and R3 hold on both, and so a hook added during C1 or C3 cannot be observed on Node from a program.
+- Resolution: recorded; §3.6 is the rule. Case: `tests/run/runtime/group_in_closing.fl`, listed in `tests/run/known_gaps.txt` for JS.
 
 ### Go: HTTP handlers
 
