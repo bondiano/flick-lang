@@ -1,0 +1,34 @@
+// An instance method may write its signature: it is checked against the class
+// (C010 elsewhere), and one that only repeats the class is noise.
+module App.MethodSignatures exposing (..)
+
+class Pretty a =
+  pretty : a -> String
+  verbose : a -> String
+  let verbose x = "<" ++ pretty x ++ ">"
+
+// a typed override of a default
+instance Pretty Bool =
+  let pretty b = if b then "yes" else "no"
+  verbose : Bool -> String
+  let verbose b = "the answer is " ++ pretty b
+
+class Mapper (f : Type -> Type) =
+  over : (forall v. a^v -> b)^c -> (f a)^d -> (f b)^(c + d)
+
+// a typed method of a higher-kinded instance
+instance Mapper (Eff r e) =
+  over : (forall v. a^v -> b)^c -> (Eff r e a)^d -> (Eff r e b)^(c + d)
+  let over f eff = task { f (await eff) }
+
+type Box a = Box a
+
+// a signature the body needs: it names `b`, so it stays and nothing warns
+instance Mapper Box =
+  over : (forall v. a^v -> b)^c -> (Box a)^d -> (Box b)^(c + d)
+  let over f (Box x) =
+    let _ : Option b = None
+    Box (f x)
+
+//~ FLICK-T059 @13:3-13:27 this method has the type its class gives it
+//~ FLICK-T059 @21:3-21:72 this method has the type its class gives it
