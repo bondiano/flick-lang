@@ -315,6 +315,20 @@ of the files given, stands for, the user's code in place. Built with
 `crate-type = ["cdylib"]`, the `guest` feature of `flick-plugin` and
 `--target wasm32-wasip2`, as the script does, the crate is a component.
 
+## Disabling a plugin
+
+A project may refuse part of a plugin it gets, the compiler's own included, in
+the same table: `disable` names heads of blocks and classes the plugin derives.
+
+```toml
+[plugins.std]
+disable = ["sql", "Cli.Value"]
+```
+
+A block of a disabled head and a `deriving` of a disabled class are `FLICK-P042`,
+at the block's head or the class, with the manifest's line beside it, in
+`flick check` and in the editor alike.
+
 ## Reaching outside
 
 A plugin reaches nothing but its blocks unless the project that uses it

@@ -376,6 +376,11 @@ impl Sink<'_> {
             }
             return;
         };
+        if let Some(off) = loader.disabled(package, head, Span::new(m.file, token.start, token.end))
+        {
+            diagnostics.push(off);
+            return;
+        }
         if let Some(Err(_)) = self.plugins.get(package) {
             let import = (m.syntax.imports.iter())
                 .flat_map(|i| &i.plugins)
@@ -452,5 +457,22 @@ impl Loader<'_> {
             let _ = package;
             None
         }
+    }
+}
+
+impl Loader<'_> {
+    /// `P042` at `at` when the manifest disables `what`, a head or a class, of
+    /// the plugin of `package`.
+    pub(super) fn disabled(&self, package: &str, what: &str, at: Span) -> Option<Diagnostic> {
+        let grants = self.project?.config.plugins.get(package)?;
+        if !grants.disable.iter().any(|d| d == what) {
+            return None;
+        }
+        let message = format!("the manifest disables `{what}` of the plugin of `{package}`");
+        let d = Diagnostic::error(codes::P042, message, at);
+        Some(match grants.span {
+            Some(span) => d.with_related(span, "disabled here"),
+            None => d,
+        })
     }
 }

@@ -256,6 +256,10 @@ impl Call<'_, '_> {
             }
             return None;
         };
+        if let Some(off) = loader.disabled(&package, &qualified, at) {
+            diagnostics.push(off);
+            return None;
+        }
         let plugin = match loader.load_plugin(plugins, &package) {
             Ok(plugin) => plugin,
             Err(why) => {

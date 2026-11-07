@@ -6,6 +6,13 @@ break programs.
 
 ## Unreleased
 
+- **Plugins:** a plugin that fails is no longer quiet. A block of a plugin that does
+  not load is `FLICK-P036`; a failure in completion, hover, highlighting or layout
+  goes to the server's log, and `flick fmt` reports it and exits 1; a first-party
+  plugin that panics fails its block, not the compiler. `[plugins.<package>]
+  disable = ["sql", "Cli.Value"]` refuses part of a plugin with `FLICK-P042`. The
+  editor shows why a `flick.toml` does not read, a missing `.wasm` says how to
+  build it, and a rebuilt plugin rebuilds what used it.
 - **Sets of services and errors:** a `type alias` of a row names a set, as in
   `type alias Orders = {...Reads, Billing; OrderNotFound}`. `...` merges a set
   into a row, also in an arrow (`->{...Orders, Async | r; Boom}`), and `-` takes
