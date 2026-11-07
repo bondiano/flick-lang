@@ -68,7 +68,7 @@ let read_later path =
 Полные правила — в разделах [Эффекты, ошибки и сервисы](../../reference/effects/)
 и [Регионы и захваты](../../reference/regions/).
 
-## Где обещание заканчивается {#where-the-promise-stops}
+## Где обещание заканчивается
 
 - **Вызовы хоста пока не названы.** `Console.log`, `Platform.env`, `DateTime.now`
   и `Random.next_int` — функции `->{}`. Такая сигнатура говорит только о том, что
