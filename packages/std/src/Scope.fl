@@ -1,7 +1,7 @@
 /// Effect's `Scope` as Flick's lexical `scope`: the owner of a region
 /// releases what was acquired into it when the block ends. These add work
 /// of its own to that release.
-module Scope exposing (..)
+module Scope exposing (run, add_finalizer, add_finalizer_exit)
 
 import Fiber
 
@@ -12,7 +12,10 @@ run : forall r e a. (forall s. Fiber.Owner s ->{Scope s | r; e} a) ->{r; e} a
 foreign effect run from "@flick-lang/runtime" "scopeRun"
 
 @lang scope_current
-/// The owner of the region this runs in, or none outside of any.
+// Not exposed: its `s` is any region, so a program could keep work under an
+// owner longer than the region the type of that owner names.
+/// The owner of the region this runs in, or none outside of any: what the
+/// compiler reads for the outer owner of a `scope`.
 current : Unit ->{} Fiber.Owner s
 foreign effect current from "@flick-lang/runtime" "scopeCurrent"
 

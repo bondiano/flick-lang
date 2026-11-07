@@ -24,6 +24,9 @@ break programs.
 - **`std`:** its modules import each other explicitly, and a test keeps it so;
   programs may still qualify built-in modules without an import. The line of
   `Form.report` in its emitted `place` label moves with the imports above it.
+- **`Scope.current`:** it is not exposed. Its region was any, so a child could
+  stay under an owner longer than the region its type names and use a resource
+  after its release. Take the owner from `scope s { … }`.
 - **`Scope.run`:** `scope s { body }` stands for `Scope.run (fun s -> body)`, and
   `Scope.run` takes a function polymorphic in the region, also as a value. The
   IR has no `Scope` node; its version is 0.4.0.
