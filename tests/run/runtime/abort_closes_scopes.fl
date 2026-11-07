@@ -1,0 +1,48 @@
+// An `abort` closes the scopes it leaves before its arm runs, finalizers last
+// added first (R1, R2), and a scope around the handler stays open.
+module App.Main exposing (main)
+
+effect Throw =
+  abort throw : forall a. String ->{} a
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+nested : Unit ->{} String
+let nested () =
+  try
+    scope {
+      Scope.add_finalizer (task { say "outer, added first" })
+      Scope.add_finalizer (task { say "outer, added last" })
+      scope {
+        Scope.add_finalizer (task { say "inner" })
+        Throw.throw "left two scopes"
+      }
+    }
+  with
+  | Throw.throw why ->
+    say "arm runs"
+    why
+
+around : Unit ->{} String
+let around () = scope {
+  Scope.add_finalizer (task { say "around, when its scope ends" })
+  let why =
+    try
+      scope {
+        Scope.add_finalizer (task { say "inside, before the arm" })
+        Throw.throw "left one scope"
+      }
+    with
+    | Throw.throw why ->
+      say "arm runs"
+      why
+  say "after the handler"
+  why
+}
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say (nested ())
+  say "--"
+  say (around ())

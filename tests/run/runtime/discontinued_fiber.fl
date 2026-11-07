@@ -1,0 +1,111 @@
+// A `control` arm that lets the body go, with a fiber in the picture: a child of
+// the abandoned scope stops before its finalizers (R2, R3), an `ensuring` in the
+// body runs, a fiber stopped inside an arm closes the body it holds, and a second
+// `resume` is a defect that closes the body once. The JavaScript build reports
+// FLICK-P012 for it until its runtime has such a body of its own.
+module App.Main exposing (main)
+
+effect Emit =
+  control emit : Int ->{} Unit
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+report : Failure e ->{} Unit
+let report f = say ("supervised, an interruption: " ++ show (Cause.has_interrupts f))
+
+ping : Deferred.Deferred none Unit ->{} Unit
+let ping d = ignore (Deferred.succeed () d)
+
+/// A child of the abandoned scope stops before its finalizers run.
+with_child : Unit ->{Async;} Int
+let with_child () =
+  try
+    scope owner {
+      Scope.add_finalizer (task { say "finalizer, after the child" })
+      let started : Deferred.Deferred none Unit = Deferred.make ()
+      let _child =
+        Fiber.spawn
+          owner
+          report
+          (task {
+            Effect.ensuring
+              (task { say "child stops" })
+              (task {
+                ping started
+                Effect.never ()
+              })
+          })
+      Deferred.await_ started
+      Emit.emit 2
+      say "not reached: the rest was let go"
+    }
+    0
+  with
+  | Emit.emit x -> x
+
+/// An `ensuring` in the body runs too.
+ensuring : Unit ->{} Int
+let ensuring () =
+  try
+    Effect.ensuring
+      (task { say "ensuring, when the body is let go" })
+      (task {
+        Emit.emit 5
+        0
+      })
+  with
+  | Emit.emit x -> x
+
+/// A fiber stopped in an arm closes the scopes of the body it holds, once.
+stopped_in_arm : Unit ->{Async;} Unit
+let stopped_in_arm () =
+  scope owner {
+    let in_arm : Deferred.Deferred none Unit = Deferred.make ()
+    let fiber =
+      Fiber.spawn
+        owner
+        report
+        (task {
+          try
+            scope {
+              Scope.add_finalizer (task { say "the body held by the arm closes" })
+              Emit.emit 6
+            }
+          with
+          | Emit.emit _ ->
+            ping in_arm
+            Effect.never ()
+        })
+    Deferred.await_ in_arm
+    Fiber.interrupt fiber
+  }
+  // after the scope: its close waits for the supervisor, which runs beside the interrupting fiber
+  say "the fiber stopped"
+
+/// A second resume is a defect, and the body's scopes still close once.
+twice : Unit ->{} Unit
+let twice () =
+  let ex : Exit none Int =
+    Effect.exit
+      (task {
+        try
+          scope {
+            Scope.add_finalizer (task { say "finalizer of what resumed" })
+            Emit.emit 7
+            7
+          }
+        with
+        | Emit.emit _ -> resume () + resume ()
+      })
+  say ("a second resume is a defect: " ++ show (Exit.has_dies ex))
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  say (show (with_child ()))
+  say "--"
+  say (show (ensuring ()))
+  say "--"
+  stopped_in_arm ()
+  say "--"
+  twice ()

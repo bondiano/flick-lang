@@ -1,0 +1,71 @@
+// A `control` arm that does not resume lets the rest of the body go: the scopes
+// the body opened close, finalizers last added first (R1, R2), each once; a scope
+// around the handler stays open. The arm's value is the handler's. The JavaScript
+// build reports FLICK-P012 for it until its runtime has such a body of its own.
+module App.Main exposing (main)
+
+effect Emit =
+  control emit : Int ->{} Unit
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// Nested scopes in the body: the arm abandons them all.
+nested : Unit ->{} Int
+let nested () =
+  try
+    scope {
+      Scope.add_finalizer (task { say "outer, added first" })
+      Scope.add_finalizer (task { say "outer, added last" })
+      scope {
+        Scope.add_finalizer (task { say "inner" })
+        Emit.emit 1
+        say "not reached: the rest was let go"
+      }
+      say "not reached: the rest was let go"
+    }
+    0
+  with
+  | Emit.emit x ->
+    say "arm ends without resume"
+    x
+
+/// A resume, then a discontinue: only the second lets the body go.
+resumed_once : Unit ->{} Int
+let resumed_once () =
+  try
+    scope {
+      Scope.add_finalizer (task { say "finalizer, once" })
+      Emit.emit 0
+      say "resumed"
+      Emit.emit 3
+      say "not reached: the rest was let go"
+    }
+    0
+  with
+  | Emit.emit x -> if x == 0 then resume () else x
+
+/// A scope around the handler closes on its own.
+around : Unit ->{} Int
+let around () = scope {
+  Scope.add_finalizer (task { say "around, when its scope ends" })
+  let x =
+    try
+      scope {
+        Scope.add_finalizer (task { say "inside, when the body is let go" })
+        Emit.emit 4
+      }
+      0
+    with
+    | Emit.emit x -> x
+  say "after the handler"
+  x
+}
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say (show (nested ()))
+  say "--"
+  say (show (resumed_once ()))
+  say "--"
+  say (show (around ()))

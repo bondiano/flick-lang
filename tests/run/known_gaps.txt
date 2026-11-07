@@ -5,3 +5,5 @@
 # skips them on that target.
 js runtime/group_in_closing # docs/formal/runtime.md#js-a-group-made-while-its-owner-closes-runs-nothing
 go runtime/interrupt_after_close # docs/formal/runtime.md#go-leaving-a-close-does-not-deliver-a-pending-interruption
+js runtime/discontinued_body # FLICK-P012: `control` arms do not run on JS yet
+js runtime/discontinued_fiber # FLICK-P012: `control` arms do not run on JS yet

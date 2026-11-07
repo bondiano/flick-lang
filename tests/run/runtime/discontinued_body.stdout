@@ -1,0 +1,14 @@
+arm ends without resume
+inner
+outer, added last
+outer, added first
+1
+--
+resumed
+finalizer, once
+3
+--
+inside, when the body is let go
+after the handler
+around, when its scope ends
+4

@@ -1,0 +1,58 @@
+// An `abort` that leaves a scope stops its children before its finalizers and
+// its arm (R2, R3), and an `ensuring` it leaves runs before its arm.
+module App.Main exposing (main)
+
+effect Throw =
+  abort throw : forall a. String ->{} a
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+ping : Deferred.Deferred none Unit ->{} Unit
+let ping d = ignore (Deferred.succeed () d)
+
+with_child : Unit ->{Async;} String
+let with_child () =
+  try
+    scope owner {
+      Scope.add_finalizer (task { say "finalizer, after the child" })
+      let started : Deferred.Deferred none Unit = Deferred.make ()
+      let _child =
+        Fiber.spawn
+          owner
+          quiet
+          (task {
+            Effect.ensuring
+              (task { say "child stops" })
+              (task {
+                ping started
+                Effect.never ()
+              })
+          })
+      Deferred.await_ started
+      Throw.throw "left a child"
+    }
+  with
+  | Throw.throw why ->
+    say "arm runs"
+    why
+
+ensuring : Unit ->{} String
+let ensuring () =
+  try
+    Effect.ensuring
+      (task { say "ensuring, before the arm" })
+      (task { Throw.throw "left an ensuring" })
+  with
+  | Throw.throw why ->
+    say "arm runs"
+    why
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  say (with_child ())
+  say "--"
+  say (ensuring ())

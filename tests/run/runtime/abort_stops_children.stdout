@@ -1,0 +1,8 @@
+child stops
+finalizer, after the child
+arm runs
+left a child
+--
+ensuring, before the arm
+arm runs
+left an ensuring

@@ -219,3 +219,7 @@ runtime/interrupt_after_close
 runtime/ref_linearizable
 runtime/shared_layer
 stdlib/effect/shared_layer_merged
+runtime/abort_closes_scopes
+runtime/abort_stops_children
+runtime/discontinued_body
+runtime/discontinued_fiber
