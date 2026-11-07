@@ -24,7 +24,6 @@ The source of an expected error is `raise`; the source of a defect is `todo`.
 | Classes, dictionaries, `do`, `for`, `?` | `elaboration.md` | The core receives a program with dictionaries already inserted; schemes carry no constraints |
 | Fibers, `parallel`, `race`, `spawn`, Cause, interruption, layer memoization | `runtime.md` (λRT) | The core has one thread of execution; the "interrupted" outcome appears only in λRT |
 | The Sync stage | — | For typing this is the runtime arrow `R⟨ρ; ε⟩` with `ρ` a closed row of effects of `tail` and `abort` operations. Sync is a way of compiling such an arrow, not a separate kind of stage; what may suspend has the effect `Async` in `ρ` |
-| Nested `∀` in a parameter (higher rank) | later | The core is predicative and rank 1. The generalization rule applies there too: checking against `∀` is done by a single branch of `check_value` (see [an annotation with `forall`](#an-annotation-with-forall-bypasses-let-sig)) |
 | `foreign` | hypothesis G1 (§4) | Bindings enter Γ₀ with their declared types |
 
 ## 1. Syntax
@@ -51,6 +50,7 @@ Checker: `kinds.rs`, `convert/kinds.rs`, `convert/rows.rs` `Checker::row`, `row_
     | {ℓ₁ : τ₁, …, ℓₙ : τₙ | ρ}    exact record; closed without a tail
     | Errors ρ                    the errors of a row as a type
     | S.Impl                      implementation record of service S
+    | ∀ᾱ. τ                       polymorphic value: a parameter of higher rank
 
 φ ::= P                           pure stage:      a -> b
     | R⟨ρ; ρ⟩                     runtime stage:   a ->{r; e} b
@@ -256,7 +256,15 @@ x : ∀ᾱ.τ ∈ Γ      τ̄ monotypes                 Γ ⊢ e : τ ! φ    �
 Γ ⊢ x : τ[ᾱ := τ̄] ! P                        Γ ⊢ e : τ' ! φ'
 ```
 
-(Const) and constructors are like (Var), using Γ₀ and the declarations.
+(Const) and constructors are like (Var), using Γ₀ and the declarations. (Var) also instantiates a variable whose type is `∀ᾱ. τ`, once for each binder at its head.
+
+```text
+v a value    ᾱ ∩ ftv(Γ) = ∅    Γ, ᾱ ⊢ v : τ ! P              x : ∀ᾱ. τ ∈ Γ    ᾱ ≠ ∅
+──────────────────────────────────────────── (∀I)            ───────────────────── (∀I-Var)
+Γ ⊢ v : ∀ᾱ. τ ! φ                                            Γ ⊢ x : ∀ᾱ. τ ! φ
+```
+
+(∀I) is (Let-Gen) for an argument: `Γ` holds no `ᾱ`, and the premise `P` is its premise. The body of a value is typed at `P`. (∀I-Var) takes a variable of a scheme where a polymorphic value is expected. A pure term that is not a value takes the same route: `let g = e in f g`. An instance is taken only at a variable, not at the result of an arbitrary term. Subtyping (§2.2) does not look under `∀`: `∀ᾱ. τ` is below itself only, so a term that is not a variable keeps its binder until it is bound.
 
 Checker:
 

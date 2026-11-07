@@ -25,17 +25,17 @@ theorem SubOk.of_get {Ψ Θ Γ₁ Γ₂} {τ : Nat → Flick.Tm}
     (h : ∀ i s, Γ₁[i]? = some s → (∃ j, τ i = .var j ∧ Γ₂[j]? = some s) ∨
       ((∀ x, ¬ (τ i).Free x) ∧ (∀ a, ¬ (τ i).Has a) ∧
         Typ S (Ψ.map (Flick.Ty.up s.k)) (Θ.at s) (Γ₂.map (Flick.Scheme.up s.k)) (τ i)
-          (.ex s.t .pure))) :
+          (.ex s.t .pure) ∧ s.k = 0 ∧ ∃ c u, s.t = .dict c u)) :
     SubOk S Ψ Θ Γ₁ Γ₂ τ := by
   intro i s hi
-  rcases h i s hi with ⟨j, hj, hs⟩ | ⟨hf, hn, ht⟩
+  rcases h i s hi with ⟨j, hj, hs⟩ | ⟨hf, hn, ht, hd⟩
   · rw [hj]
-    refine ⟨Typ.var_self hs, fun h => False.elim h, ?_⟩
+    refine ⟨Typ.var_self hs, fun h => False.elim h, ?_, .inr (.inl ⟨_, rfl, hs⟩)⟩
     rintro a (⟨j', s', hj', hs', ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
     · cases hj'; rw [hs] at hs'; cases hs'; exact ha
     · cases hp
     · cases hl
-  · exact ⟨ht, hn .ins, fun a ha => (held_none hf hn a ha).elim⟩
+  · exact ⟨ht, hn .ins, fun a ha => (held_none hf hn a ha).elim, .inr (.inr (.inr hd))⟩
 
 /-- The core context of `Γ` and `Δ`, the premises first. -/
 def canonC (Γ : List TSch) (Δ : List Cn) : List Flick.Scheme :=

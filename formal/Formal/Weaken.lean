@@ -8,128 +8,6 @@ namespace Flick
 
 variable {S : Sig}
 
-/-- A typed term names only cells of its store typing. -/
-theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l) → l < Ψ.length := by
-  induction h with
-  | loc hl => intro l h; cases h; exact getElem?_lt hl
-  | letGen _ _ ih₁ ih₂ =>
-    intro l h; rcases h with h | h
-    · simpa using ih₁ l h
-    · exact ih₂ l h
-  | scope _ _ _ _ _ _ ih => intro l h; simpa using ih l h
-  | aref _ _ _ _ hlc _ _ _ _ ih => intro l h; exact h.elim (hlc l) (ih l)
-  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
-    intro l h; subst hk
-    simp only [Tm.Has] at h
-    rcases h with h | h | h | h | h | h
-    · cases h
-    · cases h
-    · exact ih₁ l h
-    · exact ih₂ l h
-    · exact ih₄ l h
-    · rcases plug_has_iff.mp h with h | h
-      · exact ih₃ l (plug_has_iff.mpr (.inl h))
-      · simp [Tm.Has] at h
-  | hkarm _ _ _ _ hk _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
-    intro l h; subst hk
-    simp only [Tm.Has] at h
-    rcases h with h | h | h | h | h
-    · cases h
-    · cases h
-    · exact ih₁ l h
-    · exact ih₃ l h
-    · rcases plug_has_iff.mp h with h | h
-      · exact ih₂ l (plug_has_iff.mpr (.inl h))
-      · simp [Tm.Has] at h
-  | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
-    intro l h; subst ha
-    simp only [Tm.Has] at h
-    rcases h with h | h | h | h
-    · cases h
-    · cases h
-    · rcases plug_has_iff.mp h with h | h
-      · exact ih₂ l (plug_has_iff.mpr (.inl h))
-      · simp [Tm.Has] at h
-    · exact ih₁ l h
-  | _ => intro l h; (try simp only [Tm.Has] at h) <;> grind
-
-theorem HPat.binds {ε₀ p θ Δ} (h : HPat S ε₀ p θ Δ) : Δ.length = p.binds := by
-  cases h with
-  | wild => rfl
-  | var => rfl
-  | ctor hp => exact hp.binds
-
-
-/-- A typed term names only variables of its context. -/
-theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → i < Γ.length := by
-  induction h with
-  | var => intro i h; cases h; exact getElem?_lt ‹_›
-  | lam _ _ _ _ ih => intro i h; have := ih _ h; simp at this; omega
-  | let_ _ _ ih₁ ih₂ =>
-    intro i h; rcases h with h | h
-    · exact ih₁ i h
-    · have := ih₂ _ h; simp at this; omega
-  | letGen _ _ ih₁ ih₂ =>
-    intro i h; rcases h with h | h
-    · simpa using ih₁ i h
-    · have := ih₂ _ h; simp at this; omega
-  | letrec _ _ _ _ ih₁ ih₂ =>
-    intro i h; rcases h with h | h
-    · have := ih₁ _ h; simp at this; omega
-    · have := ih₂ _ h; simp at this; omega
-  | fix _ _ _ _ ih => intro i h; have := ih _ h; simp at this; omega
-  | task _ _ _ _ _ ih => intro i h; exact ih i h
-  | scope _ _ _ _ _ _ ih => intro i h; have := ih _ h; simp at this; omega
-  | acons hp _ _ ih₁ ih₂ =>
-    intro i h; rcases h with h | h
-    · have := ih₁ _ h; simp [hp.binds] at this; omega
-    · exact ih₂ i h
-  | aguard hp _ _ _ ih₁ ih₂ ih₃ =>
-    intro i h; rcases h with h | h | h
-    · have := ih₁ _ h; simp [hp.binds] at this; omega
-    · have := ih₂ _ h; simp [hp.binds] at this; omega
-    · exact ih₃ i h
-  | aref _ _ _ hfr _ _ _ _ _ ih₂ =>
-    intro i h; rcases h with h | h
-    · have := hfr _ h; omega
-    · exact ih₂ i h
-  | hcons hp _ _ _ ih₁ ih₂ =>
-    intro i h; rcases h with h | h
-    · have := ih₁ _ h; simp [hp.binds] at this; omega
-    · exact ih₂ i h
-  | hguard hp _ _ _ _ ih₁ ih₂ ih₃ =>
-    intro i h; rcases h with h | h | h
-    · have := ih₁ _ h; simp [hp.binds] at this; omega
-    · have := ih₂ _ h; simp [hp.binds] at this; omega
-    · exact ih₃ i h
-  | hatail _ _ _ ih₁ ih₂ | haabort _ _ _ ih₁ ih₂ =>
-    intro i h; rcases h with h | h
-    · have := ih₁ _ h; simp [Pat.spine_binds, Pat.binds] at this; omega
-    · exact ih₂ i h
-  | hactl _ _ _ ih₁ ih₂ =>
-    intro i h; rcases h with h | h
-    · have := ih₁ _ h; simp [Pat.spine_binds, Pat.binds] at this; omega
-    · exact ih₂ i h
-  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
-    intro i h; subst hk
-    rcases h with h | h | h | h
-    · exact ih₁ i h
-    · exact ih₂ i h
-    · exact ih₄ i h
-    · exact absurd (ih₃ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
-  | hkarm _ _ _ _ hk _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ =>
-    intro i h; subst hk
-    rcases h with h | h | h
-    · exact ih₁ i h
-    · exact ih₃ i h
-    · exact absurd (ih₂ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
-  | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
-    intro i h; subst ha
-    rcases h with h | h
-    · exact absurd (ih₂ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
-    · exact ih₁ i h
-  | _ => intro i h; (try simp only [Tm.Free] at h) <;> grind
-
 theorem held_weaken {Ψ Γ e} (X : List Ty) (hl : ∀ l, e.Has (.loc l) → l < Ψ.length) :
     Caps.Sub (held (Ψ ++ X) Γ e) (held Ψ Γ e) := by
   rintro a (h | ⟨p, hp, rfl⟩ | ⟨l, t, hle, ht, hr⟩)
@@ -144,6 +22,8 @@ theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
   induction h generalizing X with
   | loc hl => exact .loc (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl)
   | var hi hts hH hT => exact .var hi hts hH hT
+  | allVar hi hk hc => exact .allVar hi hk hc
+  | allI hv _ ih => refine .allI hv ?_; rw [List.map_append]; exact ih _
   | lam hb hn hc hT ih => exact .lam (ih X) hn (Caps.Sub.trans (held_weaken X hb.locs) hc) hT
   | app _ _ hψ hT ih₁ ih₂ => exact .app (ih₁ X) (ih₂ X) hψ hT
   | let_ _ _ ih₁ ih₂ => exact .let_ (ih₁ X) (ih₂ X)
@@ -292,6 +172,8 @@ theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ {Γ' ξ}, RenOk Γ Γ' ξ → Typ S Ψ Θ Γ' (e.rename ξ) J := by
   induction h with
   | var hi hts hH hT => intro _ _ hξ; exact .var (hξ _ _ hi) hts hH hT
+  | allVar hi hk hc => intro _ _ hξ; exact .allVar (hξ _ _ hi) hk hc
+  | allI hv _ ih => intro _ _ hξ; exact .allI hv.rename (ih (hξ.up _))
   | lam hb hn hc hT ih =>
     intro _ _ hξ
     exact .lam (ih (hξ.lift [_] rfl)) (hn.rename _)

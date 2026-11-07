@@ -48,7 +48,7 @@ theorem Const.ty_arrow (c : Const) (ι : CArg) : ∃ x φ y C, c.ty S ι = .arro
 def PureTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (T : Ty) : Prop :=
   ∃ T₀, Le T₀ T ∧ Typ S Ψ Θ Γ e (.ex T₀ .pure) ∧
     (∀ K, e.head = .ctor K → T₀.PureSpine) ∧
-    (∀ c, e = .const c → ∃ ι, T₀ = c.ty S ι)
+    (∀ c, e = .const c → ¬ T.isAll → ∃ ι, T₀ = c.ty S ι)
 
 theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     Value e → ∀ {T φ}, J = .ex T φ → PureTy S Ψ Θ Γ e T := by
@@ -66,7 +66,7 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .loc hl, by simp [Tm.head], by simp⟩
   | const hc hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, hT, .const hc .refl, by simp [Tm.head], fun _ h => by cases h; exact ⟨_, rfl⟩⟩
+    exact ⟨_, hT, .const hc .refl, by simp [Tm.head], fun _ h _ => by cases h; exact ⟨_, rfl⟩⟩
   | ctor hK hk hH hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨_, hT, .ctor hK hk hH .refl, fun _ _ => Sig.ctorTyR_pureSpine _ _ _ _, by simp⟩
@@ -82,12 +82,15 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       obtain ⟨_, l₂, t₂, -⟩ := ih₂ hv₂ rfl
       exact ⟨_, .refl, .rcons hR hl (t₁.sub ⟨l₁, Stage.le_refl _⟩) (t₂.sub ⟨l₂, Stage.le_refl _⟩),
         by simp [Tm.head], by simp⟩
+  | allI hv' h =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨_, .refl, .allI hv' h, fun _ _ => trivial, fun _ _ h => (h trivial).elim⟩
   | errVal hv' _ hU hE ih =>
     intro _ _ _ hJ; cases hJ
     obtain ⟨T₀, l, t, _, hc⟩ := ih hv' rfl
     refine ⟨_, .refl, .errVal hv' (t.sub ⟨l, Stage.le_refl _⟩) hU hE, fun _ _ => trivial,
-      fun c hc' => ?_⟩
-    obtain ⟨ι, hι⟩ := hc c hc'
+      fun c hc' _ => ?_⟩
+    obtain ⟨ι, hι⟩ := hc c hc' (Ty.not_all_of_hd hU)
     obtain ⟨_, _, _, _, h⟩ := Const.ty_arrow (S := S) c ι
     rw [h] at hι; subst hι
     obtain ⟨_, _, _, _, rfl, -⟩ := l.arrow_left
@@ -104,7 +107,7 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
         fun _ _ => sp', fun _ h => (by cases h)⟩
     | constApp hc hve =>
       obtain ⟨T₀, l₀, t₀, _, hcT⟩ := ih₁ .const rfl
-      obtain ⟨ι, hι⟩ := hcT _ rfl
+      obtain ⟨ι, hι⟩ := hcT _ rfl (by simp [Ty.isAll])
       obtain ⟨x, y, hxy⟩ := Const.ty_first (S := S) (ι := ι) hc
       rw [hι, hxy] at l₀ t₀
       obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := l₀.arrow_left
@@ -117,7 +120,7 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     exact ⟨_, .refl, .drec hc hk hr hn hh, by simp [Tm.head], by simp⟩
   | @perform E o c a b t T _ _ _ _ hop hT =>
     intro _ _ _ hJ; cases hJ
-    refine ⟨_, hT, .perform hop .refl, by simp [Tm.head], fun _ h => ?_⟩
+    refine ⟨_, hT, .perform hop .refl, by simp [Tm.head], fun _ h _ => ?_⟩
     cases h
     exact ⟨{ (default : CArg) with t := t }, by cases c <;> simp [Const.ty, hop]⟩
   | kont hl hC hT =>

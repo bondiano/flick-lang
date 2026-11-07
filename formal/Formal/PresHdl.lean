@@ -48,7 +48,7 @@ theorem refill_app {Ψ Θ E f x t₀ φ₀ a₀ w ψ₀ B} (hE : OkE E) (hn : ¬
       simp only [List.map_up_zero] at hx
       simpa using Refill.id back [] w (by
         simpa using hw _ _ hΘ (Stage.le_trans hψ₀ hψ) (hB _ _ hbt hT) (hx.sub ⟨ha, Stage.le_refl _⟩))
-  | errVal hv => exact (hn hv).elim
+  | errVal hv | allI hv => exact (hn hv).elim
 
 /-- An operation of a declared effect at the hole. -/
 theorem perform_fn {Ψ E o c a₀ b₀} (hop : S.op E o = some (c, a₀, b₀)) :

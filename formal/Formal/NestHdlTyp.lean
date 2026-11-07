@@ -41,7 +41,7 @@ theorem perform_arg {Θ Ei Ef o c v t φ} (hEi : OkE Ei)
       · simp only [List.map_up_zero] at hx
         exact ⟨_, _, _, hx.sub ⟨la, Stage.le_refl _⟩, (op_YF hop).1⟩
     | const hok _ => exact hok.elim
-  | errVal hv => exact (perform_not_value hv).elim
+  | errVal hv | allI hv => exact (perform_not_value hv).elim
 
 /-- The body of a handler in the store of its context. -/
 theorem hwith_body {Θ E p ℓ Ef al rf e t φ} (hE : OkE E)
@@ -50,7 +50,7 @@ theorem hwith_body {Θ E p ℓ Ef al rf e t φ} (hE : OkE E)
   obtain ⟨Θ', t', φ', hr⟩ := hole_typ0 hE (fun h => by cases h) h fun h => hwith_not_pure h
   cases hr with
   | hwith _ _ _ _ he _ _ _ _ => exact ⟨_, _, _, he⟩
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- The arm of a handler in the store of its context. -/
 theorem hctl_typ {Θ E p ℓ κ tl Ef al rf a k t φ} (hE : OkE E)
@@ -65,13 +65,13 @@ theorem hkeep_body {Θ E q ℓ Ef al e t φ} (hE : OkE E)
   obtain ⟨Θ', t', φ', hr⟩ := hole_typ0 hE (fun h => by cases h) h fun h => hkeep_not_pure h
   cases hr with
   | hkeep _ _ he _ _ _ _ _ _ => exact ⟨_, _, _, he⟩
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 theorem hkarm_not_pure {Θ q ℓ E al a k t} (h : Typ S Ψ Θ [] (.hkarm q ℓ E al a k) (.ex t .pure)) :
     False := by
   cases h with
   | hkarm _ _ _ _ _ _ _ _ _ _ hle hφ _ => exact Stage.le_trans hle hφ
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- The value of an arm of a kept handler has a type without regions. -/
 theorem kept_val {Θ E q ℓ Ef al w k t φ} (hE : OkE E)
@@ -80,7 +80,7 @@ theorem kept_val {Θ E q ℓ Ef al w k t φ} (hE : OkE E)
   obtain ⟨Θ', t', φ', hr⟩ := hole_typ0 hE (fun h => by cases h) h fun h => hkarm_not_pure h
   cases hr with
   | hkarm _ _ hop _ _ _ _ _ _ ha _ _ _ => exact ⟨_, _, _, ha, (op_YF hop).2⟩
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- What an arm of a kept handler raises has a type of the errors of its cell. -/
 theorem kept_raise {Θ E q ℓ Ef al w k t φ} (hE : OkE E) (hw : Value w)
@@ -90,7 +90,7 @@ theorem kept_raise {Θ E q ℓ Ef al w k t φ} (hE : OkE E) (hw : Value w)
   obtain ⟨Θ', t', φ', hr⟩ := hole_typ0 hE (fun h => by cases h) h fun h => hkarm_not_pure h
   cases hr with
   | hkarm hℓ _ _ _ _ _ _ _ _ ha _ _ _ => exact ⟨_, _, _, _, _, _, hℓ, raise_errors hw ha⟩
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- The value of a `tail` arm has a type without regions. -/
 theorem tail_val {Θ p ℓ κ Ef al rf w k t φ} (h : Typ S Ψ Θ [] (.hctl p ℓ κ true Ef al rf w k) (.ex t φ)) :
@@ -98,7 +98,7 @@ theorem tail_val {Θ p ℓ κ Ef al rf w k t φ} (h : Typ S Ψ Θ [] (.hctl p �
   cases h with
   | hctl _ _ _ _ hop _ htl _ _ _ _ ha _ _ _ _ =>
     exact ⟨_, _, by simpa using ha, (op_YF hop).2⟩
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- The argument of `resume` has a type without regions. -/
 theorem resume_arg {Θ p ℓ κ Ef al rf u k t φ} {A : List Frame} (hA : OkE A)
@@ -116,15 +116,15 @@ theorem resume_arg {Θ p ℓ κ Ef al rf u k t φ} {A : List Frame} (hA : OkE A)
       · exact (hψp (Stage.eq_pure (hp ▸ hψ))).elim
       · simp only [List.map_up_zero] at hx
         exact ⟨_, _, _, hx.sub ⟨(hb rfl).1, Stage.le_refl _⟩, (op_YF hop).2⟩
-    | errVal hv => exact (kont_not_value hv).elim
-  | errVal hv => cases hv
+    | errVal hv | allI hv => exact (kont_not_value hv).elim
+  | errVal hv | allI hv => cases hv
 
 /-- What a resumed body gives back names no region younger than its handler. -/
 theorem hres_val {Θ p ℓ a w t φ} (hc : HCell Ψ p ℓ) (h : Typ S Ψ Θ [] (.hres p ℓ a w) (.ex t φ)) :
     ∃ T φ', Typ S Ψ Θ [] w (.ex T φ') ∧ ∀ x, T.reach (.r x) → x < p := by
   cases h with
   | hres hℓ hb _ _ _ _ _ _ => exact ⟨_, _, hb, fun x hx => (hc.res hℓ).1.reach hx⟩
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- What a resumed body raises names no region younger than its handler. -/
 theorem hres_raise {Θ p ℓ a w t φ} (hc : HCell Ψ p ℓ) (hw : Value w)
@@ -136,11 +136,11 @@ theorem hres_raise {Θ p ℓ a w t φ} (hc : HCell Ψ p ℓ) (hw : Value w)
     obtain ⟨_, _, he, -, hs⟩ := Stage.rt_le hε
     cases he
     exact ⟨_, _, hw', fun x hx => (hc.res hℓ).2.reach (hx.imp (hs _) (hs _))⟩
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 theorem hres_not_pure {Θ p ℓ a b t} (h : Typ S Ψ Θ [] (.hres p ℓ a b) (.ex t .pure)) : False := by
   cases h with
   | hres _ _ _ _ _ _ hφ _ => exact hφ
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 end Flick

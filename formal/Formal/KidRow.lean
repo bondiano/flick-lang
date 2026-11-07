@@ -92,11 +92,11 @@ theorem installs_op {Ψ' Θ x t φ} {F : Frame} {N : Name} (h : Typ S Ψ' Θ [] 
   · subst hi
     cases h with
     | hwith _ _ _ _ _ _ hc _ _ => exact hc.1
-    | errVal hv => cases hv
+    | errVal hv | allI hv => cases hv
   · subst hi
     cases h with
     | hkeep _ _ _ _ hc _ _ _ _ => exact hc.1
-    | errVal hv => cases hv
+    | errVal hv | allI hv => cases hv
 
 /-- The row of the work under a kept handler of `E`: what the work needs besides `E` and what
 the handler's arms and the operations it does not answer need. -/

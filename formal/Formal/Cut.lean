@@ -51,6 +51,9 @@ theorem Entails.trans {Θ₁ Θ₂ Θ₃ : Facts} (h₁ : Entails Θ₁ Θ₂) (
     Entails Θ₁ Θ₃ := fun C s h => h₂ C s (h₁ C s h)
 
 /-- Facts that hold of the order of creation entail themselves under `Facts.age`. -/
+theorem Entails.union_none {Θ : Facts} : Entails (Facts.union Θ Facts.none) Θ :=
+  fun _ _ h x hx => (h x hx).imp_right fun ⟨C', hu, h₂⟩ => ⟨C', hu.elim id False.elim, h₂⟩
+
 theorem Entails.of_age {Θ : Facts} (h : ∀ C s, Θ C s → Facts.age C s) : Entails Θ Facts.age :=
   fun _ _ hC x hx => (hC x hx).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', h _ _ h₁, h₂⟩
 
@@ -91,6 +94,8 @@ theorem Row.hP_mono {Θ₁ Θ₂ : Facts} {q : Nat} {E : Name} {r : Row} (hΘ : 
 theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Entails Θ₁ Θ₂ → Typ S Ψ Θ₂ Γ e J := by
   induction h with
   | var hi hts hH hT => intro _ hΘ; exact .var hi hts (hH.mono hΘ) hT
+  | allVar hi hk hc => intro _ _; exact .allVar hi hk hc
+  | allI hv _ ih => intro _ hΘ; exact .allI hv (ih (hΘ.substT _))
   | lam _ hn hc hT ih => intro _ hΘ; exact .lam (ih hΘ) hn hc hT
   | app _ _ hψ hT ih₁ ih₂ => intro _ hΘ; exact .app (ih₁ hΘ) (ih₂ hΘ) hψ hT
   | let_ _ _ ih₁ ih₂ => intro _ hΘ; exact .let_ (ih₁ hΘ) (ih₂ hΘ)

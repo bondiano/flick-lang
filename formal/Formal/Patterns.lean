@@ -22,11 +22,13 @@ theorem field_typ {Ψ Θ Γ l φ} :
       split at hw
       · simp_all
       · next hne => simp only [hne, if_false] at hR; exact ih hr hw hR
+    | allI hv => simp [Ty.field] at hR
     | errVal => simp [Ty.field] at hR
   | drec =>
     intro _ _ _ h _ hR
     cases h with
     | drec => simp [Ty.field] at hR
+    | allI hv => simp [Ty.field] at hR
     | errVal => simp [Ty.field] at hR
   | _ => intro _ _ _ _ hw; simp [Tm.field] at hw
 
@@ -45,11 +47,13 @@ theorem Value.field {Ψ Θ Γ l φ} : ∀ {v w R t}, Value v → Typ S Ψ Θ Γ 
         split at hw
         · cases hw; exact hv₁
         · next hne => simp only [hne, if_false] at hR; exact ih hv₂ hr hw hR
+      | allI hv => simp [Ty.field] at hR
       | errVal => simp [Ty.field] at hR
   | drec =>
     intro _ _ _ _ h _ hR
     cases h with
     | drec => simp [Ty.field] at hR
+    | allI hv => simp [Ty.field] at hR
     | errVal => simp [Ty.field] at hR
   | _ => intro _ _ _ _ _ hw; simp [Tm.field] at hw
 
@@ -69,6 +73,7 @@ theorem setField_typ {Ψ Θ Γ l w t φ} (hw : Typ S Ψ Θ Γ w (.ex t φ)) :
       · simp_all only [if_false]
         obtain ⟨r', hr', rfl⟩ := Option.map_eq_some_iff.mp hv
         exact .rcons hRec hl he (ih hr hr' hR)
+    | allI hv => simp [Ty.field] at hR
     | errVal => simp [Ty.field] at hR
   | _ => intro _ _ _ hv; simp [Tm.setField] at hv
 
@@ -132,25 +137,26 @@ theorem Ty.tcon_eq_adt {T T' : Name} {us : List Ty} (h : Ty.tcon T us = .adt T')
 /-- The final type of a typed constructor spine is its type at an instance. -/
 theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X φ}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
-      J = .ex X φ → X.kind ≠ 7 →
+      J = .ex X φ → X.kind ≠ 7 → ¬ X.isAll →
         ∃ us, us.length = k ∧ X.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) := by
   induction h with
   | ctor hK hk _ hT =>
-    intro _ _ _ _ _ _ _ hK' hS hJ _
+    intro _ _ _ _ _ _ _ hK' hS hJ _ _
     cases hJ; simp only [Tm.head] at hK'; cases hK'
     rw [hK] at hS; cases hS
     exact ⟨_, hk, hT.res_tcon (Sig.ctorTyR_res _ _ _ _)⟩
   | app hf _ _ hT ih₁ _ =>
-    intro hv _ _ _ _ _ _ hK hS hJ hk
+    intro hv _ _ _ _ _ _ hK hS hJ hk _
     cases hJ
     cases hv with
     | ctorApp hvf hK' _ =>
       simp only [Tm.head] at hK
-      obtain ⟨us, hl, hr⟩ := ih₁ hvf hK hS rfl (by simp [Ty.kind])
+      obtain ⟨us, hl, hr⟩ := ih₁ hvf hK hS rfl (by simp [Ty.kind]) (by simp [Ty.isAll])
       simp only [Ty.res] at hr
       exact ⟨us, hl, hT.res_tcon hr⟩
     | constApp => simp [Tm.head] at hK
   | errVal => intro _ _ _ _ _ _ _ _ _ hJ hk; cases hJ; simp [Ty.kind] at hk
+  | allI => intro _ _ _ _ _ _ _ _ _ hJ _ hA; cases hJ; exact (hA trivial).elim
   | _ => intro hv _ _ _ _ _ _ hK; cases hv <;> simp [Tm.head] at hK
 
 /-- The head of a constructor pattern, and the final type of its spine. -/
@@ -203,6 +209,7 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
       -- the instance of what it builds is the instance of the constructor
       cases Sig.inst_inj hj hk'' hk (Ty.tcon_inj (by simp) this.symm)
       exact ⟨hT, .nil⟩
+    | allI => exact (Ty.res_tcon_not_all (hres.trans (Sig.ctorTyR_res _ _ _ _))).elim
     | errVal => exact absurd rfl hk7
   | app _ _ ih₁ ih₂ =>
     intro v δ _ hvv hv hm _ hk
@@ -227,6 +234,9 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
         obtain ⟨_, i₂⟩ := ih₂ hvf.2 (he.sub ⟨la, Stage.le_refl _⟩) h2 (fun _ => rfl)
           (fun h => by cases h)
         exact ⟨lt.trans hT, i₁.append i₂⟩
+      | allI =>
+        obtain ⟨_, _, _, _, _, _, _, hr, _⟩ := (‹PatTy S false _ _ _›).spine rfl
+        exact (Ty.res_tcon_not_all (hres.trans hr)).elim
       | errVal => exact absurd rfl hk7
     | _ => simp [matchP] at hm
   | adt _ hU ih =>
@@ -269,7 +279,7 @@ theorem HPat.inst {Ψ Θ Γ ε₀ p θ Δ v δ} (hp : HPat S ε₀ p θ Δ) (hvv
     rw [hm' v δ hm] at hK; cases hK
     rw [hS] at hS'; cases hS'
     have hU7 : U.kind ≠ 7 := by rw [Ty.kind_of_hd hU]; decide
-    obtain ⟨_, _, hr'⟩ := hv'.spine_res hvv (hm' v δ hm) hS rfl hU7
+    obtain ⟨_, _, hr'⟩ := hv'.spine_res hvv (hm' v δ hm) hS rfl hU7 (Ty.not_all_of_hd hU)
     -- an error's constructor builds the error type itself
     obtain ⟨hnil, rfl⟩ := Ty.tcon_eq_adt hr.symm
     have hrs : S.res K = [] := List.map_eq_nil_iff.mp hnil

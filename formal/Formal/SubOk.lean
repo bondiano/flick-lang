@@ -1,5 +1,4 @@
-import Formal.TySubst
-import Formal.Held
+import Formal.AllElim
 import Formal.Cut
 
 /-!
@@ -21,11 +20,11 @@ variable {S : Sig}
 def Facts.at (Θ : Facts) (s : Scheme) : Facts := Facts.union (Θ.substT (shiftV s.k)) s.cs
 
 /-- A substitution `σ : Γ → Γ'`: each variable goes to a pure term of its scheme,
-without `inside`, holding no more than its scheme shows. -/
+without `inside`, holding no more than its scheme shows, a value or a variable. -/
 def SubOk (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ Γ' : List Scheme) (σ : Nat → Tm) : Prop :=
   ∀ (i : Nat) s, Γ[i]? = some s →
     Typ S (Ψ.map (Ty.up s.k)) (Θ.at s) (Γ'.map (Scheme.up s.k)) (σ i) (.ex s.t .pure) ∧
-      (σ i).NoIns ∧ Caps.Sub (held Ψ Γ' (σ i)) s.reach
+      (σ i).NoIns ∧ Caps.Sub (held Ψ Γ' (σ i)) s.reach ∧ (σ i).StandsAt Γ' s
 
 @[simp] theorem idTs_length (k : Nat) : (idTs k).length = k := by simp [idTs]
 
@@ -63,17 +62,6 @@ theorem Typ.var_self {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} {s
     Typ S Ψ (Θ.at s) (Γ.map (Scheme.up s.k)) (.var i) (.ex s.t φ) :=
   .var (σ := s.up s.k) (ts := idTs s.k) (by simp [hi]) (by simp [Scheme.up, Scheme.substT])
     (s.up_holds_self Θ) (by rw [Scheme.up_inst_self]; exact .refl)
-
-theorem Facts.up_substT (Θ : Facts) (k : Nat) (ts : List Ty) (h : ts.length = k) :
-    (Θ.substT (shiftV k)).substT (instT ts) = Θ := by
-  rw [Facts.substT_comp]; conv => rhs; rw [← Θ.substT_ident]
-  congr 1; funext a
-  cases a with
-  | v i =>
-    have : ¬ i + k < ts.length := by omega
-    simp only [shiftV, Ty.substT, instT, dif_neg this, Ty.ident]
-    congr 1; omega
-  | r p => simp [shiftV, Ty.substT, instT, Ty.ident]
 
 /-- A term at the level of a scheme, at an instance whose facts hold. -/
 theorem Typ.instantiate {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {e : Tm} {s : Scheme}
@@ -120,8 +108,8 @@ theorem held_down {Ψ Γ e} {s : Scheme}
 /-- A value at the level of its scheme is a fit replacement. -/
 theorem SubOk.value {Ψ : List Ty} {Θ : Facts} {Γ' : List Scheme} {v : Tm} {s : Scheme} (hv : Value v)
     (h : Typ S (Ψ.map (Ty.up s.k)) (Θ.at s) (Γ'.map (Scheme.up s.k)) v (.ex s.t .pure)) :
-    v.NoIns ∧ Caps.Sub (held Ψ Γ' v) s.reach :=
-  ⟨h.noIns hv, held_down (h.holds hv rfl).1⟩
+    v.NoIns ∧ Caps.Sub (held Ψ Γ' v) s.reach ∧ v.StandsAt Γ' s :=
+  ⟨h.noIns hv, held_down (h.holds hv rfl).1, .inl hv⟩
 
 theorem SubOk.lift {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (Δ : List Scheme) {n} (hn : Δ.length = n) :
     SubOk S Ψ Θ (Δ ++ Γ) (Δ ++ Γ') (liftS n σ) := by
@@ -132,16 +120,18 @@ theorem SubOk.lift {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (Δ : List Sc
   · rw [List.getElem?_append_left (by omega)] at hi
     refine ⟨Typ.var_self (by rw [List.getElem?_append_left (by omega)]; exact hi), ?_, ?_⟩
     · intro h; cases h
+    refine ⟨?_, .inr (.inl ⟨_, rfl, by rw [List.getElem?_append_left (by omega)]; exact hi⟩)⟩
     rintro a (⟨j, s', hj, hs, ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
     · cases hj; rw [List.getElem?_append_left (by omega), hi] at hs; cases hs; exact ha
     · cases hp
     · cases hl
   · rw [List.getElem?_append_right (by omega)] at hi
-    obtain ⟨ht, hnI, hc⟩ := h _ _ hi
+    obtain ⟨ht, hnI, hc, hV⟩ := h _ _ hi
     have hr : RenOk Γ' (Δ ++ Γ') (· + Δ.length) := fun j s hj => by
       show (Δ ++ Γ')[j + Δ.length]? = some s
       rw [List.getElem?_append_right (by omega)]; simpa using hj
-    refine ⟨ht.rename fun j s hj => ?_, hnI.rename _, (held_rename hr fun j hj => ?_).trans hc⟩
+    refine ⟨ht.rename fun j s hj => ?_, hnI.rename _, (held_rename hr fun j hj => ?_).trans hc,
+      hV.rename hr⟩
     · rw [List.map_append, List.getElem?_append_right (by simp only [List.length_map]; omega)]
       simpa using hj
     · have := ht.frees j hj; simpa using this
@@ -152,7 +142,7 @@ theorem SubOk.up {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (k : Nat) (Φ :
   intro i s hi
   simp only [List.getElem?_map, Option.map_eq_some_iff] at hi
   obtain ⟨s₀, hs₀, rfl⟩ := hi
-  obtain ⟨ht, hnI, hc⟩ := h _ _ hs₀
+  obtain ⟨ht, hnI, hc, hV⟩ := h _ _ hs₀
   have := ht.substT (liftT s₀.k (shiftV k)) (Fits.noIns hnI fun _ => by simp [liftT, Ty.up_def, Ty.substT, shiftV])
   simp only [Flick.J.substT] at this
   have e₁ : (Ψ.map (Ty.up s₀.k)).map (Ty.substT (liftT s₀.k (shiftV k))) =
@@ -165,7 +155,7 @@ theorem SubOk.up {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (k : Nat) (Φ :
       Facts.union ((Θ.substT (shiftV k)).substT (shiftV s₀.k)) (s₀.up k).cs := by
     simp only [Facts.at, Facts.union_substT, Facts.up_comm]; rfl
   rw [e₁, e₂, e₃] at this
-  refine ⟨this.cut ?_, hnI, held_up k hc⟩
+  refine ⟨this.cut ?_, hnI, held_up k hc, hV.substT _⟩
   have hk : (s₀.up k).k = s₀.k := rfl
   simp only [Facts.at, hk]
   intro C r hC x hx
@@ -208,7 +198,7 @@ theorem SubOk.mono {Ψ Θ Θ' Γ Γ'} {σ : Nat → Tm} (h : SubOk S Ψ Θ Γ Γ
 theorem SubOk.held {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {e : Tm} {T : Caps} {σ : Nat → Tm} (hσ : SubOk S Ψ Θ Γ Γ' σ)
     (hΓ : ∀ i, e.Free i → i < Γ.length) (h : Caps.Sub (held Ψ Γ e) T) :
     Caps.Sub (held Ψ Γ' (e.subst σ)) T :=
-  (held_subst hΓ fun i s hs => (hσ i s hs).2.2).trans h
+  (held_subst hΓ fun i s hs => (hσ i s hs).2.2.1).trans h
 
 theorem SubOk.noIns {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {e : Tm} {σ : Nat → Tm} (hσ : SubOk S Ψ Θ Γ Γ' σ)
     (hΓ : ∀ i, e.Free i → i < Γ.length) (h : e.NoIns) : (e.subst σ).NoIns :=

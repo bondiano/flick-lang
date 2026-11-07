@@ -15,6 +15,14 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) e (J.substT σ) := by
   induction h with
   | var hi hts hH hT => intro σ _; exact Typ.var_substT hi hts hH hT σ
+  | allVar hi hk hc =>
+    intro σ _
+    exact .allVar (σ := Scheme.substT σ _) (by simp [hi]) hk fun _ _ ⟨_, _, h, _⟩ => hc _ _ h
+  | allI hv _ ih =>
+    intro σ hσ
+    refine .allI hv ?_
+    rw [← shift_comm, ← shift_comm', ← Facts.up_comm]
+    exact ih _ (hσ.lift _)
   | lam _ hn hc hT ih =>
     intro σ hσ; have := ih σ hσ
     simp only [List.map_cons, Scheme.mono_substT, Flick.J.substT] at this

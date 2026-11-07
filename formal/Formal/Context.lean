@@ -117,7 +117,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
         (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
           (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
         ⟨hc.1, fun h => .inl (hc.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case hctlA p ℓ κ tl E al rf k =>
     cases h with
     | hctl hℓ hal hrf hψ hop hc htl hE hk hp' hφ₀ ha hl hcm hφ hT =>
@@ -138,7 +138,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
         refine ⟨C'.substT σ, ?_, ⟨_, hl₂, by simp [hp]⟩⟩
         rw [List.getElem?_append_left (by simpa using getElem?_lt hl₁), List.getElem?_map, hl₁]
         simp [Ty.substT, Stage.substT, hb]
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case hkeep q ℓ E al =>
     cases h with
     | hkeep hℓ hal he hφ₀ hc hnt hle hφ hT =>
@@ -151,7 +151,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
           (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
         ⟨hc.1, fun h => .inl (hc.2 h)⟩ (fun h => .inl (hnt h))
         (by simpa [Stage.substT] using Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case hkarmA q ℓ E al k =>
     cases h with
     | hkarm hℓ hal hop hE hk hp' hφ₀ hc hnt ha hle hφ hT =>
@@ -168,7 +168,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
           (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
         ⟨hc.1, fun h => .inl (hc.2 h)⟩ (fun h => .inl (hnt h)) (by simpa [hb] using h')
         (by simpa [Stage.substT] using Stage.le_substT σ hle) (Stage.le_substT σ hφ) (hT.substT σ)
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case hresB p ℓ a =>
     cases h with
     | hres hℓ hb hA ha hp' hl hφ hT =>
@@ -184,24 +184,24 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
       exact .hres (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h' hA rfl h₂
         (by rw [List.getElem?_append_left (by simpa using getElem?_lt hl), List.getElem?_map, hl]; rfl)
         (Stage.le_substT σ hφ) (hT.substT σ)
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case hdone p =>
     cases h with
     | hdone ha =>
       exact .mk0 ⟨_, _, ha, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .hdone h'⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case appL =>
     cases h with
     | app h₁ h₂ hψ hT =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .app h' (h₂.sx (hσ.sub fun _ h => .inr h) X) (Stage.le_substT σ hψ)
         (hT.substT σ)⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case appR =>
     cases h with
     | app h₁ h₂ hψ hT =>
       exact .mk0 ⟨_, _, h₂, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .app (h₁.sx (hσ.sub fun _ h => .inl h) X) h' (Stage.le_substT σ hψ)
         (hT.substT σ)⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case let_ =>
     cases h with
     | let_ h₁ h₂ =>
@@ -211,7 +211,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
         fun _ h => (h rfl).elim⟩, .inl rfl, fun σ hσ X _ h' => .letGen (by
           simpa [Facts.union_substT, Facts.up_comm] using h')
           (by simpa [Scheme.substT] using (h₂.substT σ (hσ.sub fun _ h => .inr h)).weakenStore X)⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case match_ =>
     cases h with
     | match_ h₁ h₂ hc =>
@@ -219,45 +219,45 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _),
         fun σ hσ X _ h' => .match_ h' (h₂.sx (hσ.sub fun _ h => .inr h) X)
           (.inl fun v hs => hx v (Shp.of_substT hs))⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case rconsL =>
     cases h with
     | rcons hR hl h₁ h₂ =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _),
         fun σ hσ X _ h' => .rcons (hR.substT σ) (by rw [Ty.labels_substT σ hR]; exact hl) h'
           (h₂.sx (hσ.sub fun _ h => .inr h) X)⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case rconsR =>
     cases h with
     | rcons hR hl h₁ h₂ =>
       exact .mk0 ⟨_, _, h₂, .of_le (Stage.le_refl _),
         fun σ hσ X _ h' => .rcons (hR.substT σ) (by rw [Ty.labels_substT σ hR]; exact hl)
           (h₁.sx (hσ.sub fun _ h => .inl h) X) h'⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case proj =>
     cases h with
     | proj h₁ hR hT =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .proj h' (Ty.field_substT σ hR) (hT.substT σ)⟩
     | dproj h₁ hc hk hl hts hH hT =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun _ _ _ _ h' => .dproj_at h' hc hk hl hts hH hT⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case updL =>
     cases h with
     | update h₁ hR h₂ =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _),
         fun σ hσ X _ h' => .update h' (Ty.field_substT σ hR) (h₂.sx (hσ.sub fun _ h => .inr h) X)⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case updR =>
     cases h with
     | update h₁ hR h₂ =>
       exact .mk0 ⟨_, _, h₂, .of_le (Stage.le_refl _),
         fun σ hσ X _ h' => .update (h₁.sx (hσ.sub fun _ h => .inl h) X) (Ty.field_substT σ hR) h'⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case await =>
     cases h with
     | await h₁ hφ hT =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .await h' (Stage.le_substT σ hφ) (hT.substT σ)⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case raise =>
     cases h with
     | raise h₁ hφ =>
@@ -266,7 +266,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
     | raiseAdt h₁ hU hφ =>
       exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .raiseAdt h'
         (Ty.hd_substT σ hU) (by simpa [Stage.substT, Row.err_substT] using Stage.le_substT σ hφ)⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case try_ =>
     cases h with
     | tryR h₁ h₂ hφ hs =>
@@ -280,7 +280,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
         fun h => (h trivial).elim⟩, fun σ hσ X _ h' => .tryP h' (by
           have := h₂.sx (hσ.sub fun _ h => .inr h) X
           simp only [Flick.J.substT, Row.none_substT] at this; exact this)⟩
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
   case inside p =>
     cases h with
     | inside hF h₁ hφ' ht hε hφ hT =>
@@ -315,6 +315,6 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
           · exact .inr (.inr (Row.disch_substT (fun y hy => by rw [hp] at hy; exact hy) x hx))
         · obtain ⟨b, hb, h''⟩ := (Ty.reach_substT σ _ _).mp h
           rwa [hav b _ h''] at hb
-    | errVal hv => exact (nv hv).elim
+    | errVal hv | allI hv => exact (nv hv).elim
 
 end Flick

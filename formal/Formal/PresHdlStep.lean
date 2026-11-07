@@ -21,26 +21,26 @@ theorem hwith_not_pure {Ψ Θ p ℓ E al r e t} (h : Typ S Ψ Θ [] (.hwith p �
     False := by
   cases h with
   | hwith _ _ _ _ _ _ _ hφ _ => exact hφ
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 theorem hkeep_not_pure {Ψ Θ q ℓ E al e t} (h : Typ S Ψ Θ [] (.hkeep q ℓ E al e) (.ex t .pure)) :
     False := by
   cases h with
   | hkeep _ _ _ _ _ _ _ hφ _ => exact hφ
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 theorem hctl_not_pure {Ψ Θ p ℓ κ tl E al r a k t}
     (h : Typ S Ψ Θ [] (.hctl p ℓ κ tl E al r a k) (.ex t .pure)) : False := by
   cases h with
   | hctl _ _ _ _ _ _ _ _ _ _ _ _ _ _ hφ _ => exact hφ
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 theorem unw_not_value {p ℓ a} : ¬ Value (.unw p ℓ a) := fun h => by cases h
 
 theorem unw_not_pure {Ψ Θ p ℓ a t} (h : Typ S Ψ Θ [] (.unw p ℓ a) (.ex t .pure)) : False := by
   cases h with
   | unw _ _ h => exact h
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- Removing a frame around unwinding keeps it typed. -/
 theorem unw_frame {Ψ Θ p ℓ a t φ} {F : Frame} (hF : F.ok) (hni : ¬ F.isInside)
@@ -53,7 +53,7 @@ theorem unw_frame {Ψ Θ p ℓ a t φ} {F : Frame} (hF : F.ok) (hni : ¬ F.isIns
     obtain rfl := hΘ hni
     simp only [List.map_up_zero] at hℓ ha
     exact .unw hℓ ha (Stage.none_le fun hp => hne (rel.pure hp))
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- Facts of a hole, renamed with the regions not yet created, follow from those around. -/
 theorem kill_entails {Θ Θ' : Facts} {n : Nat} (hidem : Θ.substT (kill n) = Θ)
@@ -82,7 +82,7 @@ theorem hole_arg {Ψ Θ E f x t₀ φ₀ a₀ ψ₀ B n} (hE : OkE E) (hn : ¬ V
       rw [List.map_kill_YF hc.yf] at h₁
       simp only [Flick.J.substT, ha] at h₁
       exact (h₁.cut (kill_entails hc.idem hc.inΘ hΘ)).valueAny hx _
-  | errVal hv => exact (hn hv).elim
+  | errVal hv | allI hv => exact (hn hv).elim
 
 theorem perform_op {Ψ Θ E o c x t φ} {Ei : List Frame} (hEi : OkE Ei)
     (h : Typ S Ψ Θ [] (plug Ei (.app (.const (.perform E o c)) x)) (.ex t φ)) :
@@ -93,7 +93,7 @@ theorem perform_op {Ψ Θ E o c x t φ} {Ei : List Frame} (hEi : OkE Ei)
     cases hf with
     | perform hop _ => exact ⟨_, _, hop⟩
     | const hok _ => exact hok.elim
-  | errVal hv => exact (perform_not_value hv).elim
+  | errVal hv | allI hv => exact (perform_not_value hv).elim
 
 /-- `todo` for the argument of the hole. -/
 theorem refill_todo {Ψ Θ E f x t₀ φ₀} (hE : OkE E) (hn : ¬ Value (.app f x))
@@ -101,7 +101,7 @@ theorem refill_todo {Ψ Θ E f x t₀ φ₀} (hE : OkE E) (hn : ¬ Value (.app f
   obtain ⟨K, Θ', t', φ', hr, -, -, back⟩ := ctx_typing E hE hn h
   cases hr with
   | app hf' _ hψ hT => simpa using Refill.id back [] (.app f .todo) (by simpa using Typ.app hf' .todo hψ hT)
-  | errVal hv => exact (hn hv).elim
+  | errVal hv | allI hv => exact (hn hv).elim
 
 /-- The cell of `resume` has no region not yet created. -/
 theorem ctl_cell_yf {Ψ : List Ty} {Θ n} {ℓ p : Nat} {r ε : Row} {t' b₀ : Ty} (hc : RtCtx Ψ Θ n)
@@ -126,7 +126,7 @@ theorem abort_pres {Ψ Θ p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hEi : Ok
       fun T φ' hΘ hψ₀ _ hx => ?_) hφ₀ hc hφ hT
     exact .unw hℓ ((hb.cut hΘ.entails).inst (Δ := [_]) (.cons hv (hx.valueAny hv _) .nil))
       (Stage.none_le (Stage.rt_ne_pure hψ₀))
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- `tail`: the arm runs at the handler while the body waits for its value. -/
 theorem tail_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : RtCtx Ψ Θ n)
@@ -143,7 +143,7 @@ theorem tail_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : Rt
       (refill_todo hEi perform_not_value he) hφ₀ ?_ (fun h => by cases h) hc' hφ hT
     rw [if_pos rfl]
     exact hb.inst (Δ := [_]) (.cons hv hx .nil)
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- `tail` under a kept handler: its arm runs there while the body waits for its value. -/
 theorem kept_pres {Ψ Θ n q ℓ Ef al o v b t φ} {Ei : List Frame} (hc : RtCtx Ψ Θ n)
@@ -158,7 +158,7 @@ theorem kept_pres {Ψ Θ n q ℓ Ef al o v b t φ} {Ei : List Frame} (hc : RtCtx
       (S.op_closed _ _ _ _ _ (kill n) hop).1
     exact .hkarm hℓ hal hop hEi rfl (refill_todo hEi perform_not_value he) hφ₀ hc' hnt
       (hb.inst (Δ := [_]) (.cons hv hx .nil)) hle hφ hT
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- `control`: the arm runs at the handler with `resume`, a new cell of the type of the rest
 of the body. -/
@@ -182,7 +182,7 @@ theorem ctl_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : RtC
     rw [if_neg (by decide)]
     exact (hb.weakenStore _).inst (Δ := [_, _])
       (.cons hv (hx.weakenStore _) (.cons .kont (.kont List.getElem?_concat_length rfl .refl) .nil))
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- `resume`: the body runs again under its handler, while the arm waits for its value. -/
 theorem resume_pres {Ψ Θ n p ℓh ℓ Ef al rf u k t φ} {A Ei : List Frame} (hc : RtCtx Ψ Θ n)
@@ -199,6 +199,6 @@ theorem resume_pres {Ψ Θ n p ℓh ℓ Ef al rf u k t φ} {A Ei : List Frame} (
         fun T φ' hΘ _ hB _ => ((hx.valueAny hu φ').sub (J' := .ex T φ') ⟨hB hc', Stage.le_refl _⟩).cut
           hΘ.entails) hφ₀ hcm (Stage.le_refl _) .refl
     exact .hres hℓh hw hA rfl (refill_todo hA kont_not_value ha) hl₁ hφ hT
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 end Flick

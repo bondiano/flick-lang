@@ -4,8 +4,8 @@ import Formal.TyBase
 # Syntax of λFlick with regions (core.md §1, regions.md §1)
 
 Variables of every kind — types, regions, capture rows — are de Bruijn indices
-`tvar n`; a run-time region `π` is `rg π`. `∀` appears only in the schemes of a
-typing context (`Scheme`). Terms carry no types (Curry style) and use de Bruijn
+`tvar n`; a run-time region `π` is `rg π`. A scheme of a context has `∀`, and so does `Ty.all`, a
+polymorphic value. Terms carry no types (Curry style) and use de Bruijn
 indices; see `formal/README.md` for the encoding of lists (record fields, match
 arms, constructor arguments, environments, type arguments) as spines.
 -/

@@ -261,7 +261,7 @@ theorem has_caseK (hR : Real P S N) {Γ : List TSch} {Δl Δ : List Cn} {e b r :
               show i < (armΔ c θ (Δl ++ Δ)).length + (armT c θ Γ).length by omega,
               show i - (c.ctx.length + Δl.length) = i - c.ctx.length - Δl.length by omega]
           rw [hτ]
-          refine ⟨trDt_noFree (hcl _), fun a => (TrD.total (N := N) _ _).has N a, ?_⟩
+          refine ⟨trDt_noFree (hcl _), fun a => (TrD.total (N := N) _ _).has N a, ?_, rfl, _, _, rfl⟩
           have := closed_dict hR (hρ _ _ hq₂) (fun a => (shiftV c.k a).substT θ'')
           rw [Flick.Scheme.mono_substT, trD_subst, trD_subst, hTy, ← trD_subst,
             show i - c.ctx.length - Δl.length = i - c.ctx.length - Δl.length from rfl]

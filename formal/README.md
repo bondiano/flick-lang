@@ -151,6 +151,7 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | `regions.md` §3.1 `Λ`, children step at any time | `Rgn`, `Cfg`, `CStep`, `CSteps` (`Semantics.lean`) |
 | L1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_owner`, `canonical_hnd`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `Canonical.lean`) |
 | (Let-Gen), (Let-Mono) | `Typ.letGen`, `Typ.let_` (`Rules.lean`) |
+| §2.3 (∀I), (∀I-Var), (Var) at an instance | `Typ.allI`, `Typ.allVar`, `LeI` (`Rules.lean`, `Typing.lean`); `Typ.allInv`, `Typ.elim`, `Tm.StandsAt` in `SubOk` (`AllElim.lean`) |
 | type substitution lemma | `Typ.substT`, with `Fits` (`TySubst.lean`, `SubstPat.lean`) |
 | L2 | `Typ.subst`, `Typ.instantiate`, `SubOk.one` (`Substitution.lean`) |
 | L3 | `ctx_typing` (`Lemma3.lean`); its `Refill` holds after any substitution that fits the term (`Context.lean`) |
@@ -261,8 +262,11 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    (`Sig.ctor_closed`, `Sig.ctor_reach`); services have no parameters (`Sig.impl_closed`).
    (Let-Sig) is (Let-Gen) or (Let-Mono) with the annotation erased: terms carry no types,
    and the premise `ᾱ ≠ ∅ ⇒ φ₁ = P` is the premise `P` of (Let-Gen). `let rec` is
-   monomorphic in its body and its scope (`σ° = τ_f` and `σ = τ_f`). Higher-rank
-   arguments are out of scope, as in `core.md`.
+   monomorphic in its body and its scope (`σ° = τ_f` and `σ = τ_f`). A type can have a
+   binder (`Ty.all`), with (∀I) and (∀I-Var) of `core.md` §2.3 as `Typ.allI` and `Typ.allVar`.
+   (∀I) takes a value only, and an instance is taken only at a variable (`LeI` in `Typ.var`):
+   the checker also takes a pure term against `∀`, which here is `let g = e in f g`. `Le` has
+   only reflexivity on a binder, so every other rule keeps its inversion.
 2. **Declarations** are a parameter `S : Sig`: constructor ↦ the number of parameters,
    argument types and type name; service ↦ `S.Impl`. An error type `E` is an ADT whose
    constructors are the error's constructors.

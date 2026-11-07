@@ -127,7 +127,53 @@ theorem Const.ty_isArrow (c : Const) (ι : CArg) (S : Sig) :
 def HeldC (S : Sig) (Ψ : List Ty) (Γ : List Scheme) (e : Tm) (T : Ty) : Prop :=
   Caps.Sub (held Ψ Γ e) T.reach ∧
     (∀ K, e.head = .ctor K → T.Shows ∧ Caps.Sub (held Ψ Γ e) T.res.reach) ∧
-    (∀ c, e = .const c → ∃ ι, Le (c.ty S ι) T)
+    (∀ c, e = .const c → ¬ T.isAll → ∃ ι, Le (c.ty S ι) T)
+
+theorem Ty.tcon_hd (T : Name) (us : List Ty) : (Ty.tcon T us).hd = .adt T := by
+  have : ∀ (us : List Ty) (f : Ty), f.hd = .adt T → (us.foldl .tapp f).hd = .adt T := by
+    intro us; induction us with
+    | nil => intro f h; exact h
+    | cons x xs ih => intro f h; exact ih _ h
+  exact this us _ rfl
+
+theorem Ty.not_all_of_hd {U : Ty} {E : Name} (h : U.hd = .adt E) : ¬ U.isAll := by
+  cases U <;> simp_all [Ty.hd, Ty.isAll]
+
+theorem Ty.res_tcon_not_all {k : Nat} {t : Ty} {T : Name} {us : List Ty}
+    (h : (Ty.all k t).res = Ty.tcon T us) : False :=
+  Ty.not_all_of_hd (Ty.tcon_hd T us) (h ▸ trivial)
+
+/-- Going under a binder keeps what a term holds. -/
+theorem held_shift {Ψ Γ e} (k : Nat) {a : Atom} (h : held Ψ Γ e a) :
+    held (Ψ.map (Ty.up k)) (Γ.map (Scheme.up k)) e (a.up k) := by
+  rcases h with ⟨i, s', hi, hs, ha⟩ | ⟨p, hp, rfl⟩ | ⟨l, t, hl, ht, ha⟩
+  · exact .inl ⟨i, _, hi, by simp [hs], (Scheme.reach_up _ _ _).mpr ha⟩
+  · exact .inr (.inl ⟨p, hp, rfl⟩)
+  · exact .inr (.inr ⟨l, t.up k, hl, by simp [ht], (Ty.reach_up _ _ _).mpr ⟨a, ha, rfl⟩⟩)
+
+theorem Le.not_all {x y : Ty} (h : Le x y) (hx : ¬ x.isAll) : ¬ y.isAll := by
+  cases h <;> first | exact hx | simp [Ty.isAll]
+
+/-- The result of a constructor spine is not a binder, unless the value itself is one. -/
+theorem Typ.spine_notAll {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    Value e → ∀ {K T φ}, e.head = .ctor K → J = .ex T φ → T.isAll ∨ ¬ T.res.isAll := by
+  induction h with
+  | allI => intro _ _ _ _ _ hJ; cases hJ; exact .inl trivial
+  | errVal => intro _ _ _ _ _ hJ; cases hJ; exact .inr (by simp [Ty.res, Ty.isAll])
+  | ctor hK hk hH hT =>
+    intro _ _ _ _ _ hJ; cases hJ
+    refine .inr (Le.not_all hT.res ?_)
+    rw [Sig.ctorTyR, Ty.arrows_res _ _ (Ty.tcon_not_arrow _ _)]
+    exact Ty.not_all_of_hd (Ty.tcon_hd _ _)
+  | app hf _ _ hT ih₁ _ =>
+    intro hv _ _ _ hK hJ; cases hJ
+    cases hv with
+    | ctorApp hvf hK' _ =>
+      rcases ih₁ hvf hK' rfl with h' | h'
+      · exact h'.elim
+      · exact .inr (Le.not_all hT.res h')
+    | constApp => simp [Tm.head] at hK
+  | _ => intro hv _ _ _ hK hJ; cases hJ <;> cases hv <;> simp [Tm.head] at hK
 
 theorem held_app {Ψ Γ f e} :
     Caps.Sub (held Ψ Γ (.app f e)) fun a => held Ψ Γ f a ∨ held Ψ Γ e a := by
@@ -190,7 +236,7 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | const _ hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨(held_none (by simp [Tm.Free]) (by simp [Tm.Has])).of_none _, by simp [Tm.head],
-      fun _ h => by cases h; exact ⟨_, hT⟩⟩
+      fun _ h _ => by cases h; exact ⟨_, hT⟩⟩
   | ctor hK hk hH hT =>
     intro _ _ _ hJ; cases hJ
     have hs := Sig.ctorTyR_shows hH
@@ -209,12 +255,17 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       · exact .inr ((ih₂ hv₂ rfl).1 _ (.inr (.inl ⟨p, hp, rfl⟩)))
       · exact .inl ((ih₁ hv₁ rfl).1 a (.inr (.inr ⟨l, t, hl, ht, ha⟩)))
       · exact .inr ((ih₂ hv₂ rfl).1 a (.inr (.inr ⟨l, t, hl, ht, ha⟩)))
+  | allI hv' _ ih =>
+    intro _ _ _ hJ; cases hJ
+    have key : Caps.Sub (held _ _ _) (Ty.all _ _).reach := fun a ha =>
+      (ih hv' rfl).1 _ (held_shift _ ha)
+    exact ⟨key, fun _ _ => ⟨trivial, key⟩, fun _ _ h => (h trivial).elim⟩
   | errVal hv' _ hU hE ih =>
     intro _ _ _ hJ; cases hJ
     obtain ⟨h₁, _, hc⟩ := ih hv' rfl
     have key : Caps.Sub (held _ _ _) (Ty.errors _).reach := fun a ha => .inl (hE _ (.inr (h₁ a ha)))
-    refine ⟨key, fun _ _ => ⟨trivial, key⟩, fun c hc' => ?_⟩
-    obtain ⟨ι, hι⟩ := hc c hc'
+    refine ⟨key, fun _ _ => ⟨trivial, key⟩, fun c hc' _ => ?_⟩
+    obtain ⟨ι, hι⟩ := hc c hc' (Ty.not_all_of_hd hU)
     obtain ⟨_, _, _, _, hx⟩ := Const.ty_isArrow c ι S
     rw [hx] at hι
     obtain ⟨_, _, _, _, rfl, -⟩ := hι.arrow_left
@@ -235,7 +286,7 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | constApp hc hve =>
       rename_i c
       obtain ⟨_, _, hcT⟩ := ih₁ .const rfl
-      obtain ⟨ι, hι⟩ := hcT _ rfl
+      obtain ⟨ι, hι⟩ := hcT _ rfl (by simp [Ty.isAll])
       obtain ⟨a₀, t₀, hty, hsh⟩ := Const.shows_first _ ι S hc
       rw [hty] at hι
       obtain ⟨_, _, _, _, he', ha, _, ht, _⟩ := hι.arrow_left
@@ -252,7 +303,7 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | @perform E o c a b t T _ _ _ _ hop hT =>
     intro _ _ _ hJ; cases hJ
     refine ⟨(held_none (by simp [Tm.Free]) (by simp [Tm.Has])).of_none _, by simp [Tm.head],
-      fun _ h => ?_⟩
+      fun _ h _ => ?_⟩
     cases h
     refine ⟨{ (default : CArg) with t := t }, ?_⟩
     cases c <;> simpa [Const.ty, hop] using hT
@@ -277,7 +328,7 @@ theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns 
       rintro (h | h)
       · exact ih₁ hv₁ h
       · exact ih₂ hv₂ h
-  | errVal hv _ _ _ ih => intro _; exact ih hv
+  | errVal hv _ _ _ ih | allI hv _ ih => intro _; exact ih hv
   | app _ _ _ _ ih₁ ih₂ =>
     intro hv
     cases hv with
