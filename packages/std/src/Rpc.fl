@@ -220,7 +220,7 @@ foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
 /// with the services here.
 listen :
   forall c s r hs.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
   arity 3
@@ -231,7 +231,7 @@ foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
 /// calls: `ws://127.0.0.1:8080/rpc`. Every serialization streams over it.
 listen_websocket :
   forall c s r hs.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenWebsocket"
   arity 3
@@ -244,7 +244,7 @@ foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "r
 /// stream; another is `ServeError`. Node only.
 listen_tcp :
   forall c s r hs.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
 foreign effect listen_tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenTcp"
   arity 3
@@ -264,7 +264,7 @@ foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
 /// owning it closes, the calls it serves finish and run their finalizers.
 handler :
   forall c s r hs.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Serialization ->
   Group r hs ->
   (hs^c ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s})^c
@@ -277,7 +277,7 @@ foreign effect handler from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandler
 /// for a `GET` route.
 handler_websocket :
   forall c s r hs.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Serialization ->
   Group r hs ->
   (hs^c ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s})^c

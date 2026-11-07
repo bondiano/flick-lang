@@ -310,6 +310,15 @@ use a resource after its release. It is the compiler's now, and a call is
 `FLICK-T001`. Take the owner from `scope s { … }`, or as a parameter of type
 `Fiber.Owner s`.
 
+## Work a region keeps holds no `control` effect
+
+`Scope.add_finalizer`, `Resource.acquire_release`, the listeners and the servers
+now need `Detached r`, as `Fiber.spawn` does. A finalizer that performed a
+`control` operation stopped there without an error once a handler let the body
+go. It is `FLICK-E017` now: handle the effect inside the work. A function that
+passes on a row variable names `Detached r` in its signature, and `flick check
+--fix` does not add it.
+
 ## The IR has no `Try`, `Provide`, `Scope` or `Operation`
 
 A reader of `flick build --emit-ir` meets a new version, `0.4.0`. A `try` with

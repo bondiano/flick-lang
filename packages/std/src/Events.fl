@@ -31,7 +31,7 @@ type Listener (s : Region) a
 /// `supervisor`, and so is every failure of the handler.
 listen :
   forall c s r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Fiber.Owner s ->
   QueuePolicy ->
   (Failure e ->{Scope s | r;} Unit)^c ->

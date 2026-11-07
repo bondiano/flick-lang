@@ -13,7 +13,7 @@ type Resource (s : Region) (e : ErrorRow) a
 /// The value holds region `s`, so it cannot leave that scope.
 acquire_release :
   forall c s r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   (Eff r e a)^c -> ((a ->{r;} Unit)^c ->{Scope s | r; e} a^{s})^c
 foreign effect acquire_release from "@flick-lang/runtime" "acquireRelease"
   retention owner
@@ -32,7 +32,7 @@ foreign effect bracket from "@flick-lang/runtime" "bracket"
 /// acquires into a region `t` of its own; `refresh` acquires it again.
 manual :
   forall c s r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r;} Resource s e a
 foreign effect manual from "@flick-lang/runtime/effect/Resource" "flickManual"
   retention owner

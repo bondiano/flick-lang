@@ -117,7 +117,7 @@ foreign effect run_into_queue from "@flick-lang/runtime/effect/Stream" "runIntoQ
 /// new subscriber.
 to_pubsub :
   forall s c r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   { capacity : Option Int; strategy : Option Queue.Strategy; replay : Option Int } ->
   (Stream r e a)^c ->{Scope s | r;}
   PubSub.PubSub a
@@ -131,7 +131,7 @@ foreign effect to_pubsub from "@flick-lang/runtime/effect/Stream" "flickToPubSub
 /// the stream does.
 to_queue :
   forall s c r e a.
-  (Fiber.Outlives c s, Fiber.Provided r s) =>
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   { capacity : Option Int; strategy : Option Queue.Strategy } ->
   (Stream r e a)^c ->{Scope s | r;}
   Queue.Queue e a
