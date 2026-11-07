@@ -201,9 +201,17 @@ theorem Typ.aref_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name
 theorem Tm.NoIns.of_has {e e' : Tm} (h : e.NoIns) (hs : ∀ s, e'.Has s → e.Has s) : e'.NoIns :=
   fun h' => h (hs _ h')
 
+theorem LeI.substT {a b : Ty} (σ : Atom → Ty) (h : LeI a b) : LeI (a.substT σ) (b.substT σ) := by
+  induction h with
+  | le h => exact .le (h.substT σ)
+  | @inst k t T us hus _ ih =>
+    subst hus
+    refine .inst (us := us.map (Ty.substT σ)) (by simp) ?_
+    rw [Ty.inst_substT]; exact ih
+
 theorem Typ.var_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} {σ' : Scheme}
     {ts : List Ty} {T : Ty} {φ : Stage} (hi : Γ[i]? = some σ') (hts : ts.length = σ'.k)
-    (hH : σ'.Holds Θ ts) (hT : Le (σ'.inst ts) T) (σ : Atom → Ty) :
+    (hH : σ'.Holds Θ ts) (hT : LeI (σ'.inst ts) T) (σ : Atom → Ty) :
     Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) (.var i)
       (.ex (T.substT σ) (φ.substT σ)) := by
   refine .var (σ := σ'.substT σ) (ts := ts.map (Ty.substT σ)) (by simp [hi])

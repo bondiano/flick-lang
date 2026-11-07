@@ -17,13 +17,13 @@ theorem raise_any {Ψ Θ w} : AnyTy S Ψ Θ (.raise w) := by
   cases h with
   | raise h₁ hφ => exact .raise h₁ hφ
   | raiseAdt h₁ hU hφ => exact .raiseAdt h₁ hU hφ
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 theorem unw_any {Ψ Θ q ℓ a} : AnyTy S Ψ Θ (.unw q ℓ a) := by
   intro _ _ _ h
   cases h with
   | unw h₁ h₂ h₃ => exact .unw h₁ h₂ h₃
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- The handler catches its signal and runs what it holds. -/
 theorem hwith_catch {Ψ Θ p ℓ E al r a t φ}
@@ -36,8 +36,8 @@ theorem hwith_catch {Ψ Θ p ℓ E al r a t φ}
       simp only [Option.some.injEq, Ty.arrow.injEq, Stage.rt.injEq] at hℓ'
       obtain ⟨-, ⟨rfl, rfl⟩, rfl, -⟩ := hℓ'
       exact ha.sub ⟨hT, hφ⟩
-    | errVal hv => cases hv
-  | errVal hv => cases hv
+    | errVal hv | allI hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- A signal of an arm unwinds the parked body to the handler. -/
 theorem hctl_signal {Ψ Θ p ℓ κ tl E al r x k t φ} {Ei : List Frame} (hEi : OkE Ei)
@@ -50,7 +50,7 @@ theorem hctl_signal {Ψ Θ p ℓ κ tl E al r x k t φ} {Ei : List Frame} (hEi :
     refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
       fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT
     exact .unw hℓ (hx (ha.cut hΘ.entails)) (Stage.none_le (Stage.rt_ne_pure hψ₀))
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- An arm of a kept handler that raises lets the parked body go. -/
 theorem hkarm_raise {Ψ Θ q ℓ E al w k t φ} {Ei : List Frame} (hEi : OkE Ei) (hk : k = plug Ei (.hole q))
@@ -62,7 +62,7 @@ theorem hkarm_raise {Ψ Θ q ℓ E al w k t φ} {Ei : List Frame} (hEi : OkE Ei)
     refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
       fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
     exact .unw hℓ (raise_any (ha.cut hΘ.entails)) (Stage.none_le (Stage.rt_ne_pure hψ₀))
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- A signal in an arm of a kept handler goes on through the parked body. -/
 theorem hkarm_unw {Ψ Θ q ℓ E al q' ℓ' a k t φ} {Ei : List Frame} (hEi : OkE Ei)
@@ -75,8 +75,8 @@ theorem hkarm_unw {Ψ Θ q ℓ E al q' ℓ' a k t φ} {Ei : List Frame} (hEi : O
       fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hc hnt hle hφ hT
     cases ha with
     | unw hℓ' ha' _ => exact .unw hℓ' (ha'.cut hΘ.entails) (Stage.none_le (Stage.rt_ne_pure hψ₀))
-    | errVal hv => cases hv
-  | errVal hv => cases hv
+    | errVal hv | allI hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- A signal of a resumed body lets the parked arm go. -/
 theorem hres_signal {Ψ Θ p ℓ a x t φ} {A : List Frame} (hA : OkE A) (ha : a = plug A (.hole p))
@@ -88,7 +88,7 @@ theorem hres_signal {Ψ Θ p ℓ a x t φ} {A : List Frame} (hA : OkE A) (ha : a
     have h₁ := refill_app hA' kont_not_value hp (kont_fn hl) (fun _ _ h l => h.trans l)
       fun T φ' hΘ hψ₀ _ _ => hx ((hb.cut hΘ.entails).sub (J' := .ex _ φ') ⟨.refl, hψ₀⟩)
     exact .hdone (h₁.sub ⟨hT, hφ⟩)
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- The arms of a new handler, in its run-time region `n`: the regions not yet created are
 renamed out, and `n` is put for the region of `resume`. -/

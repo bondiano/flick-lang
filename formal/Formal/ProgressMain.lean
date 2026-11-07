@@ -44,7 +44,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
   have step : ∀ {e l o D}, Step root l Λ μ e o → Value e ∨ NV S root Λ μ e D :=
     fun h => .inr (.step ⟨_, _, h⟩)
   induction h with
-  | var hi => intro _ hΓ; subst hΓ; simp at hi
+  | var hi | allVar hi => intro _ hΓ; subst hΓ; simp at hi
   | lam => intros; exact .inl .lam
   | fix => intros; exact .inl .fix
   | lit => intros; exact .inl .lit
@@ -64,7 +64,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
     obtain ⟨_, hv⟩ := Option.isSome_iff_exists.mp (hroot.globs _ _ hg)
     exact step (Step.glob (E := []) OkE.nil hv)
   | scope => intros; exact step (Step.ofR .scope)
-  | errVal hv => intros; exact .inl hv
+  | errVal hv | allI hv => intros; exact .inl hv
   | anil => intro _ _ _ _ hJ; cases hJ
   | acons => intro _ _ _ _ hJ; cases hJ
   | aguard => intro _ _ _ _ hJ; cases hJ

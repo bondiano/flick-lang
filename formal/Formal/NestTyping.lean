@@ -62,6 +62,11 @@ theorem owner_arg {Θ : Facts} {c : Const} {p : Nat} {T : Ty} {φ : Stage} {w : 
           rcases la'.reach _ hx with h' | h'
           · exact .inr h'
           · exact .inl h'
+  | allI hv' =>
+    exfalso
+    rcases hc with rfl | rfl <;>
+    · cases hv' with
+      | ctorApp _ hK _ => simp [Tm.head] at hK
   | errVal hv' =>
     exfalso
     rcases hc with rfl | rfl <;>
@@ -90,6 +95,6 @@ theorem close_move {Θ : Facts} {p : Nat} {w : Tm} {T : Ty} {φ : Stage} {A : Na
       refine ⟨hAq, ha, hf, fun x hx => (hanc x hx).resolve_right fun hxp => ?_⟩
       subst hxp
       exact hqp (Nat.le_antisymm (hle x q (by rw [hp]; exact .inl hAq)) (hle q x hx))
-  | errVal hv => exact absurd hv inside_not_value
+  | errVal hv | allI hv => exact absurd hv inside_not_value
 
 end Flick

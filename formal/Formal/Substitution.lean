@@ -45,8 +45,19 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   induction h with
   | var hi hts hH hT =>
     intro _ _ hσ
-    obtain ⟨ht, hnI, _⟩ := hσ _ _ hi
-    exact (Typ.instantiate hts hH hnI ht).sub ⟨hT, Stage.pure_le _⟩
+    obtain ⟨ht, hnI, _, hV⟩ := hσ _ _ hi
+    exact (Typ.elim (hV.stands _) hnI (Typ.instantiate hts hH hnI ht) hT).sub ⟨.refl, Stage.pure_le _⟩
+  | allVar hi hk hc =>
+    intro _ σ hσ
+    obtain ⟨ht, _, _, hV⟩ := hσ _ _ hi
+    show Typ _ _ _ _ (σ _) _
+    rcases hV with hv | ⟨j, hj, hs⟩ | hj | ⟨hk', -⟩
+    · refine .allI hv (ht.cut fun _ _ h x hx => (h x hx).imp_right fun ⟨C', hu, h₂⟩ => ⟨C', ?_, h₂⟩)
+      exact hu.elim id fun h => (hc _ _ h).elim
+    · rw [hj]; exact .allVar hs hk hc
+    · rw [hj]; exact .todo
+    · omega
+  | allI hv _ ih => intro _ _ hσ; exact .allI hv.subst (ih ((SubOk.up hσ _ _).mono Entails.union_none))
   | lam hb hnb hcb hT ih =>
     intro _ _ hσ
     have hΓ : ∀ i, (Tm.lam _).Free i → i < _ := fun i h => by
@@ -222,7 +233,7 @@ theorem Inst.ok {Ψ Θ Γ δ Δ} (h : Inst S Ψ Θ Γ δ Δ) :
     exact ⟨hv', SubOk.value hvv hv'⟩
   · rw [List.getElem?_append_right (by simp; omega)] at hi
     have hi' : Γ[i - δ.length]? = some s := by simpa [h.1] using hi
-    refine ⟨Typ.var_self hi', ?_, ?_⟩
+    refine ⟨Typ.var_self hi', ?_, ?_, .inr (.inl ⟨_, rfl, hi'⟩)⟩
     · intro h; cases h
     rintro a (⟨j, s', hj, hs, ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
     · cases hj; rw [hi'] at hs; cases hs; exact ha

@@ -57,6 +57,32 @@ inductive Le : Ty → Ty → Prop
       Caps.Sub (Ty.eff r e t C).reach (Ty.eff r' e' t' C').reach →
       Le (.eff r e t C) (.eff r' e' t' C')
 
+/-- A polymorphic type: a value of it can have any form. -/
+def Ty.isAll : Ty → Prop
+  | .all .. => True
+  | _ => False
+
+/-- What a variable of type `A` gives at `T`: `A` below `T`, or `A` a binder with an
+instance that gives `T`. `Le` keeps a binder as it is, so no other rule sees an instance. -/
+inductive LeI : Ty → Ty → Prop
+  | le : Le a b → LeI a b
+  | inst {us : List Ty} : us.length = k → LeI (t.substT (instT us)) T → LeI (.all k t) T
+
+theorem LeI.refl : LeI t t := .le .refl
+
+theorem LeI.trans {a b c : Ty} (h : LeI a b) (hc : ∀ {x}, Le x b → Le x c) : LeI a c := by
+  induction h with
+  | le h => exact .le (hc h)
+  | inst hus _ ih => exact .inst hus (ih hc)
+
+/-- One more instance at the end. -/
+theorem LeI.snoc {a k t} {us : List Ty} (h : LeI a (.all k t)) (hus : us.length = k) :
+    LeI a (t.substT (instT us)) := by
+  generalize ht : Ty.all k t = T at h
+  induction h with
+  | le h => subst ht; cases h; exact .inst hus .refl
+  | inst hus' _ ih => exact .inst hus' (ih ht)
+
 /-- Types whose values patterns cannot inspect: all but base types, records and
 nominal data, read at the head of an application. -/
 def Ty.Opaque (t : Ty) : Prop :=

@@ -9,6 +9,8 @@ type is `Unit`, and `Scope s` leaves the row of the scope.
 `let app = λf. f () in app (λ_. let _ = S.op () in ())` generalizes `app` over the row of
 services of its argument and uses it at `{S}`.
 `λf. try f () with _ → ()` removes the row variable of the errors of `f`.
+`(λf. let _ = f 1 in f True) (λx. x)` uses a parameter of type `∀a. a → a` at `Int` and at
+`Bool`, and takes a lambda or a generalized variable as the argument.
 -/
 
 namespace Flick
@@ -26,6 +28,41 @@ example (S : Sig) :
   · refine .let_ (a := .base .int) ?_ ?_
     · exact .app (.var (ts := [.base .int]) rfl rfl (fun _ _ h => h.elim) .refl) .lit trivial .refl
     · exact .app (.var (ts := [.base .bool]) rfl rfl (fun _ _ h => h.elim) .refl) .lit trivial .refl
+
+/-- `∀a. a → a`. -/
+def idAll : Ty := .all 1 (.arrow (.tvar 0) .pure (.tvar 0) Caps.none)
+
+/-- `apply_twice : (∀a. a → a) → Bool`. -/
+theorem apply_twice_lam (S : Sig) :
+    Typ S [] Facts.none [] (.lam (.let_ (.app (.var 0) (.lit (.int 1))) (.app (.var 1) (.lit (.bool true)))))
+      (.ex (.arrow idAll .pure (.base .bool) Caps.none) .pure) := by
+  have inst : ∀ {Γ i} (t : Ty), Γ[i]? = some (Scheme.mono idAll) →
+      Typ S [] Facts.none Γ (.var i) (.ex (.arrow t .pure t Caps.none) .pure) := fun t hi =>
+    .var (ts := []) hi rfl (fun _ _ h => h.elim) (.inst (us := [t]) rfl (by
+      simp [Ty.substT, Stage.substT]; exact .refl))
+  refine .lam (a := idAll) (ψ := .pure) (.let_ (a := .base .int) ?_ ?_)
+    (fun h => by simp [Tm.Has] at h) ?_ .refl
+  · exact .app (inst (.base .int) rfl) .lit trivial .refl
+  · exact .app (inst (.base .bool) rfl) .lit trivial .refl
+  · rintro a (⟨i, s, hi, hs, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
+    · simp at hs
+    · simp [Tm.Has] at hp
+    · simp [Tm.Has] at hl
+
+/-- `λx. x` as a value of `∀a. a → a`. -/
+theorem id_lam_all (S : Sig) : Typ S [] Facts.none [] (.lam (.var 0)) (.ex idAll .pure) := by
+  refine .allI .lam (.lam (a := .tvar 0) (.var (ts := []) rfl rfl (fun _ _ h => h.elim) .refl)
+    (fun h => h) ?_ .refl)
+  rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
+  · simp [Tm.Free] at hi
+  · exact hp.elim
+  · exact hl.elim
+
+/-- A generalized variable as a value of its polymorphic type: the argument need not be a
+lambda where it is passed. -/
+example (S : Sig) (i : Nat) (Γ : List Scheme) (h : Γ[i]? = some ⟨1, Facts.none, .arrow (.tvar 0) .pure (.tvar 0) Caps.none⟩) :
+    Typ S [] Facts.none Γ (.var i) (.ex idAll .pure) :=
+  .allVar (σ := ⟨1, Facts.none, .arrow (.tvar 0) .pure (.tvar 0) Caps.none⟩) h Nat.one_pos fun _ _ h => h
 
 /-- The instance of `open_` and `op` at the region `s` of the scope. -/
 def regionArg : CArg := { (default : CArg) with s := .tvar 0 }

@@ -17,7 +17,7 @@ theorem raise_stage {Ψ Θ e t φ} (h : Typ S Ψ Θ [] (.raise e) (.ex t φ)) :
   cases h with
   | raise _ hφ => exact ⟨_, hφ⟩
   | raiseAdt _ _ hφ => exact ⟨_, hφ⟩
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 theorem raise_not_pure {Ψ Θ e t} (h : Typ S Ψ Θ [] (.raise e) (.ex t .pure)) : False := by
   obtain ⟨_, hε⟩ := raise_stage h; exact hε
@@ -36,6 +36,10 @@ theorem const_app_rt {Ψ Θ c w t} (h : Typ S Ψ Θ [] (.app (.const c) w) (.ex 
     | perform _ hT' =>
       obtain ⟨_, _, _, _, h, _, lψ, _, -⟩ := hT'.arrow_left
       cases h; exact Stage.le_trans lψ hψ
+  | allI hv _ => cases hv with
+    | constApp hc' _ =>
+      cases ‹Const› <;> simp_all [Const.arity, Const.ty] <;> exact (hc default).elim
+    | ctorApp _ hK _ => simp [Tm.head] at hK
   | errVal hv _ _ _ => cases hv with
     | constApp hc' _ =>
       cases ‹Const› <;> simp_all [Const.arity, Const.ty] <;> exact (hc default).elim
@@ -58,6 +62,8 @@ theorem const_app2_rt {Ψ Θ c w₁ w₂ t} (h : Typ S Ψ Θ [] (.app (.app (.co
         cases h
         obtain ⟨_, _, _, _, h, _, lψ, _, -⟩ := (lt.trans hT₁).arrow_left
         cases h; exact Stage.le_trans lψ hψ
+  | allI hv _ => cases hv with
+    | ctorApp _ hK _ => simp [Tm.head] at hK
   | errVal hv _ _ _ => cases hv with
     | ctorApp _ hK _ => simp [Tm.head] at hK
 
@@ -76,7 +82,7 @@ theorem perform_svc {Ψ Θ E o c w t φ} (h : Typ S Ψ Θ [] (.app (.const (.per
       cases h
       exact Stage.le_svc (Stage.le_trans lψ hψ) _ rfl
     | const hok _ => exact hok.elim
-  | errVal hv => exact (perform_not_value hv).elim
+  | errVal hv | allI hv => exact (perform_not_value hv).elim
 
 /-- An operation that has a type is declared. -/
 theorem perform_op' {Ψ Θ E o c w t φ} (h : Typ S Ψ Θ [] (.app (.const (.perform E o c)) w) (.ex t φ)) :
@@ -86,7 +92,7 @@ theorem perform_op' {Ψ Θ E o c w t φ} (h : Typ S Ψ Θ [] (.app (.const (.per
     cases hf with
     | perform hop _ => exact ⟨_, _, hop⟩
     | const hok _ => exact hok.elim
-  | errVal hv => exact (perform_not_value hv).elim
+  | errVal hv | allI hv => exact (perform_not_value hv).elim
 
 /-- No runtime redex has a pure stage. -/
 theorem RHead.not_pure {Ψ Θ Λ μ r t Λ' μ' r'} (h : Typ S Ψ Θ [] r (.ex t .pure))
@@ -96,39 +102,39 @@ theorem RHead.not_pure {Ψ Θ Λ μ r t Λ' μ' r'} (h : Typ S Ψ Θ [] r (.ex t
   | refMake => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | hctlRaise _ _ _ | hctlUnw _ _ => cases h with
     | hctl _ _ _ _ _ _ _ _ _ _ _ _ _ _ hφ _ => exact hφ
-    | errVal hv => exact nv hv
+    | errVal hv | allI hv => exact nv hv
   | hkarmRaise _ _ _ | hkarmUnw _ _ => cases h with
     | hkarm _ _ _ _ _ _ _ _ _ _ hle hφ _ => exact Stage.le_trans hle hφ
-    | errVal hv => exact nv hv
+    | errVal hv | allI hv => exact nv hv
   | hresRaise _ _ _ | hresUnw _ _ => cases h with
     | hres _ _ _ _ _ _ hφ _ => exact hφ
-    | errVal hv => exact nv hv
+    | errVal hv | allI hv => exact nv hv
   | hwithCatch => cases h with
     | hwith _ _ _ _ _ _ _ hφ _ => exact hφ
-    | errVal hv => exact nv hv
+    | errVal hv | allI hv => exact nv hv
   | hdl => cases h with
     | hdl _ _ _ _ _ _ _ _ hφ _ => exact hφ
-    | errVal hv => exact nv hv
+    | errVal hv | allI hv => exact nv hv
   | refGet => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | open_ => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | op => exact const_app_rt h fun _ => ⟨_, _, _, _, _, rfl⟩
   | refSet => exact const_app2_rt h fun _ => ⟨_, _, _, _, _, _, _, rfl⟩
   | await => cases h with
     | await _ hφ => exact hφ
-    | errVal hv => exact nv hv
+    | errVal hv | allI hv => exact nv hv
   | tryRaise => cases h with
     | tryR _ _ hφ => exact hφ
     | tryP hb => exact raise_not_pure hb
-    | errVal hv => exact nv hv
+    | errVal hv | allI hv => exact nv hv
   | handleYes | handleNo | hguardYes | hguardNo | handleNil => cases h with
     | handle _ _ _ _ _ hφ => exact hφ
-    | errVal hv => exact nv hv
+    | errVal hv | allI hv => exact nv hv
   | scope => cases h with
     | scope _ _ _ _ hφ => exact hφ
-    | errVal hv => exact nv hv
+    | errVal hv | allI hv => exact nv hv
   | finRun | close => cases h with
     | inside _ _ _ _ _ hφ => exact hφ
-    | errVal hv => exact nv hv
+    | errVal hv | allI hv => exact nv hv
 
 /-- Removing a frame around `raise v` keeps the type of the hole. -/
 theorem raise_frame {Ψ Θ v t φ} {F : Frame} (hF : F.ok) (hnt : ¬ F.isTry) (hni : ¬ F.isInside)
@@ -169,7 +175,7 @@ theorem fin_unit {Ψ Θ c p w T φ} (h : Typ S Ψ Θ [] (.app (.app (.const c) (
           cases h
           obtain ⟨_, _, _, _, h, _, _, lt', -⟩ := (lt.trans hT₁).arrow_left
           cases h; cases lt'; cases hT; exact .lit
-  | errVal hv' => exact (fin_not_value hc hv').elim
+  | errVal hv' | allI hv' => exact (fin_not_value hc hv').elim
 
 /-- The hole of a registration is not pure. -/
 theorem fin_not_pure {Ψ Θ c p w} (h : Typ S Ψ Θ [] (.app (.app (.const c) (.own p)) w) (.ex T .pure))
@@ -228,7 +234,7 @@ theorem glob_preservation {root Ψ Θ g T φ v} (hroot : RootTy S root)
     rw [hs] at hs'; cases hs'
     refine (Typ.instantiate (Γ := []) hts hH (hno _) ?_).sub ⟨hT, Stage.pure_le _⟩
     exact (ht.weakenStore _).cut fun _ _ h => h.mono fun _ _ h => .inr h
-  | errVal hv => cases hv
+  | errVal hv | allI hv => cases hv
 
 /-- A root writes no region: its type names none. -/
 theorem root_no_rgn {root : Roots} (hroot : RootTy S root) {N v} (h : root.svc N = some v) (p : Nat) :
@@ -260,7 +266,7 @@ theorem root_field {root Ψ Θ Ef o w f c v t φ} (hroot : RootTy S root) (hr₀
       exact .app (ft'.sub ⟨.refl, Stage.pure_le _⟩) (hx.sub ⟨la, Stage.le_refl _⟩)
         (Stage.none_le (Stage.rt_ne_pure (Stage.le_trans lψ hψ))) (lt.trans hT)
     | const hok _ => exact hok.elim
-  | errVal hv' => exact (perform_not_value hv').elim
+  | errVal hv' | allI hv' => exact (perform_not_value hv').elim
 
 theorem preservation {root Ψ Λ μ e t φ l Λ' μ' e'} (hroot : RootTy S root)
     (h : Typ S Ψ Facts.age [] e (.ex t φ)) (hμ : StoreTy S Ψ μ) (hbl : e.Below Λ.length)

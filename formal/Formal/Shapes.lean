@@ -37,13 +37,6 @@ theorem Ty.tcon_kind (T : Name) (us : List Ty) : (Ty.tcon T us).kind = 3 := by
     | cons x xs ih => intro f _; exact ih _ rfl
   exact this us _ rfl
 
-theorem Ty.tcon_hd (T : Name) (us : List Ty) : (Ty.tcon T us).hd = .adt T := by
-  have : ∀ (us : List Ty) (f : Ty), f.hd = .adt T → (us.foldl .tapp f).hd = .adt T := by
-    intro us; induction us with
-    | nil => intro f h; exact h
-    | cons x xs ih => intro f h; exact ih _ h
-  exact this us _ rfl
-
 theorem Ty.arrows_kind (ts : List Ty) (T : Name) (us : List Ty) :
     (Ty.arrows ts (.tcon T us)).kind = 1 ∨ (Ty.arrows ts (.tcon T us)).kind = 3 := by
   cases ts with
@@ -82,8 +75,9 @@ theorem Const.res_kind {c : Const} {ι a ψ t C T'} (hc : c.arity = 2)
   cases h'; rw [← hT.kind, ← lt.kind, hk]
 
 theorem Typ.constApp_kind {Ψ Θ Γ c w T φ} (h : Typ S Ψ Θ Γ (.app (.const c) w) (.ex T φ))
-    (hc : c.arity = 2) : T.kind = 1 := by
+    (hc : c.arity = 2) (hA : ¬ T.isAll) : T.kind = 1 := by
   cases h with
+  | allI => exact (hA trivial).elim
   | app hf _ _ hT => cases hf with
     | const _ hT' => exact Const.res_kind hc hT' hT
     | perform => simp [Const.arity] at hc
@@ -98,6 +92,7 @@ theorem Typ.constApp_kind {Ψ Θ Γ c w T φ} (h : Typ S Ψ Θ Γ (.app (.const 
         cases this
       | perform => simp [Const.arity] at hc
     | errVal _ _ _ _ => simp [Ty.hd] at hU
+    | allI => simp [Ty.hd] at hU
 
 theorem Le.opaque {a b : Ty} (h : Le a b) (ha : a.Opaque) : b.Opaque := by
   cases h with
@@ -176,7 +171,7 @@ def SpineShp (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (
       Typ S Ψ Θ Γ e (.ex U φ) ∧ Row.Sub (Row.err E U) ε
 
 theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T φ}, J = .ex T φ →
-    Shp S true T e ∧ (∀ K, e.head = .ctor K → SpineShp S Ψ Θ Γ e T φ) := by
+    Shp S true T e ∧ (∀ K, e.head = .ctor K → ¬ T.isAll → SpineShp S Ψ Θ Γ e T φ) := by
   induction h with
   | lam _ _ _ hT | fix _ _ _ hT | task _ _ _ _ hT | perform _ hT | kont _ _ hT =>
     intro _ _ _ hJ; cases hJ
@@ -197,16 +192,19 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     intro _ _ _ hJ; cases hJ
     have hh := Shp.head (S := S) hK
     exact ⟨hh.full_of (by rw [Shp.ctor_instR]; exact hT),
-      fun _ _ => .inl ⟨_, _, by rw [Shp.ctor_instR]; exact hT, hh⟩⟩
+      fun _ _ _ => .inl ⟨_, _, by rw [Shp.ctor_instR]; exact hT, hh⟩⟩
+  | allI =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨.hidden (by simp [Ty.Opaque, Ty.hd]), fun _ _ h => (h trivial).elim⟩
   | errVal hv' h' hU hE ih =>
     intro _ _ _ hJ; cases hJ
     refine ⟨.hidden (by simp [Ty.Opaque, Ty.hd]),
-      fun K hK => .inr ⟨_, _, _, rfl, hE _ (.inl rfl), hU, (ih hv' rfl).1, h', hE⟩⟩
+      fun K hK _ => .inr ⟨_, _, _, rfl, hE _ (.inl rfl), hU, (ih hv' rfl).1, h', hE⟩⟩
   | app hf _ _ hT ih₁ ih₂ =>
     intro hv _ _ hJ; cases hJ
     cases hv with
     | ctorApp hvf hK hve =>
-      rcases (ih₁ hvf rfl).2 _ hK with ⟨U, us, hU, hs⟩ | ⟨_, _, _, h, _⟩
+      rcases (ih₁ hvf rfl).2 _ hK (by simp [Ty.isAll]) with ⟨U, us, hU, hs⟩ | ⟨_, _, _, h, _⟩
       · obtain ⟨_, _, _, T₀, ts', _, _, hU'⟩ := hs.false_arrows
         subst hU'
         cases ts' with
@@ -220,11 +218,13 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
           cases he
           have hfield : Shp S true g _ := Shp.of_substT (Shp.le la (ih₂ hve rfl).1)
           have hs' : Shp S false _ _ := .app hs hfield
-          refine ⟨hs'.full_of (us := us) (lt.trans hT), fun _ _ => .inl ⟨_, us, lt.trans hT, hs'⟩⟩
+          refine ⟨hs'.full_of (us := us) (lt.trans hT), fun _ _ _ => .inl ⟨_, us, lt.trans hT, hs'⟩⟩
       · cases h
     | constApp hc _ =>
-      have hk := (Typ.app hf ‹_› ‹_› hT).constApp_kind hc
-      exact ⟨.hidden (Ty.opaque_of_kind hk), by simp [Tm.head]⟩
+      refine ⟨.hidden (Ty.opaque_of_kind ?_), by simp [Tm.head]⟩
+      cases hf with
+      | const _ hT' => exact Const.res_kind hc hT' hT
+      | perform => simp [Const.arity] at hc
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
 end Flick

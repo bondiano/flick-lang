@@ -22,6 +22,7 @@ import Formal.TySubstBase
 import Formal.TySubst
 import Formal.ArefMgu
 import Formal.RowSubst
+import Formal.AllElim
 import Formal.SubOk
 import Formal.SubstArm
 import Formal.Substitution

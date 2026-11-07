@@ -45,12 +45,12 @@ theorem matchP_spine_head {K qs v δ} (hm : matchP (Pat.spine K qs) v = some δ)
 type of the value is `T rs` at `us`, and patterns of the fields at `us` match. -/
 theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
-      J = .ex X .pure → X.kind ≠ 7 →
+      J = .ex X .pure → X.kind ≠ 7 → ¬ X.isAll →
       ∃ us, us.length = k ∧ X.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) ∧
         ∀ {p Z Δ δ}, SpTy S K us p Z Δ → matchP p v = some δ → Le Z X ∧ Inst S Ψ Θ Γ δ Δ := by
   induction h with
   | ctor hK hk _ hT =>
-    intro _ _ _ _ _ _ hK' hS hJ _
+    intro _ _ _ _ _ _ hK' hS hJ _ _
     cases hJ; simp only [Tm.head] at hK'; cases hK'
     rw [hK] at hS; cases hS
     refine ⟨_, hk, hT.res_tcon (Sig.ctorTyR_res _ _ _ _), fun hp hm => ?_⟩
@@ -61,12 +61,12 @@ theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
       exact ⟨hT, .nil⟩
     | app => simp [matchP] at hm
   | app _ he _ hT ih₁ _ =>
-    intro hv _ _ _ _ _ hK hS hJ _
+    intro hv _ _ _ _ _ hK hS hJ _ _
     cases hJ
     cases hv with
     | ctorApp hvf _ hve =>
       simp only [Tm.head] at hK
-      obtain ⟨us, hl, hr, hus⟩ := ih₁ hvf hK hS rfl (by simp [Ty.kind])
+      obtain ⟨us, hl, hr, hus⟩ := ih₁ hvf hK hS rfl (by simp [Ty.kind]) (by simp [Ty.isAll])
       simp only [Ty.res] at hr
       refine ⟨us, hl, hT.res_tcon hr, fun hp hm => ?_⟩
       cases hp with
@@ -79,6 +79,7 @@ theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
         exact ⟨lt.trans hT, i₁.append (hq.inst hve (he.sub ⟨la, Stage.le_refl _⟩) h2)⟩
     | constApp => simp [Tm.head] at hK
   | errVal => intro _ _ _ _ _ _ _ _ hJ hk; cases hJ; simp [Ty.kind] at hk
+  | allI => intro _ _ _ _ _ _ _ _ hJ _ hA; cases hJ; exact (hA trivial).elim
   | _ => intro hv _ _ _ _ _ hK; cases hv <;> simp [Tm.head] at hK
 
 theorem Stage.up_substT (φ : Stage) (k : Nat) (us : List Ty) (h : us.length = k) :
@@ -109,7 +110,7 @@ theorem aref_match {Ψ Θ v t t' φ K k ts T₀ qs b δ} {Δ : (Atom → Ty) →
     Typ S Ψ Θ [] (b.subst (inst δ)) (.ex t' φ) := by
   have hU7 : t.kind ≠ 7 := by rw [Ty.kind_of_hd hU]; decide
   obtain ⟨us, hk, hr, hus⟩ :=
-    (h₁.valueAny hv .pure).spine_match hv (matchP_spine_head hm) hK rfl hU7
+    (h₁.valueAny hv .pure).spine_match hv (matchP_spine_head hm) hK rfl hU7 (Ty.not_all_of_hd hU)
   rw [Ty.res_of_hd hU] at hr
   have hF : Fits (instT us) b := ⟨fun _ _ => rfl, fun h => (hn h).elim, fun h => (hn h).elim,
     fun h => (hn h).elim⟩

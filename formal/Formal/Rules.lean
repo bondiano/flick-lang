@@ -68,8 +68,13 @@ theorem Stage.le_of_svc {φ : Stage} {r r' ε : Row} (h : φ.le (.rt r ε)) (hr 
 variable (S : Sig)
 
 inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
-  | var {ts : List Ty} : Γ[i]? = some σ → ts.length = σ.k → σ.Holds Θ ts → Le (σ.inst ts) T →
+  | var {ts : List Ty} : Γ[i]? = some σ → ts.length = σ.k → σ.Holds Θ ts → LeI (σ.inst ts) T →
       Typ Ψ Θ Γ (.var i) (.ex T φ)
+  /-- A value of a polymorphic type, typed under `k` fresh variables as in (Let-Gen). -/
+  | allI : Value e → Typ (Ψ.map (Ty.up k)) (Θ.substT (shiftV k)) (Γ.map (Scheme.up k)) e (.ex t .pure) →
+      Typ Ψ Θ Γ e (.ex (.all k t) φ)
+  /-- A variable of a scheme without facts, as a value of its polymorphic type. -/
+  | allVar : Γ[i]? = some σ → 0 < σ.k → (∀ C s, ¬ σ.cs C s) → Typ Ψ Θ Γ (.var i) (.ex (.all σ.k σ.t) φ)
   | lam : Typ Ψ Θ (.mono a :: Γ) b (.ex t ψ) → b.NoIns →
       Caps.Sub (held Ψ Γ (.lam b)) (Ty.arrow a ψ t C).reach → Le (.arrow a ψ t C) T →
       Typ Ψ Θ Γ (.lam b) (.ex T φ)

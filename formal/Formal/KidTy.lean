@@ -47,7 +47,7 @@ theorem withs_typing {x r : Tm} {o : Nat}
             (fun hn => .inr (.inr ⟨rfl, hn⟩)) ⟨Row.kid_out, fun _ h => .inr h⟩ (Stage.le_refl _) .refl, hk'⟩
         · rename_i hq
           exact ⟨t', R', ε', hw, kid_dropped (G := .hwith q ℓ E' al rf) hΘ rfl trivial hA hq hrow up hk⟩
-      | errVal hv' => exact (not_value_plug hnv _ hv').elim
+      | errVal hv' | allI hv' => exact (not_value_plug hnv _ hv').elim
     | hkeep q ℓ E' al =>
       cases h with
       | hkeep hℓ hal hb hrow hc hnt hle hφ _ =>
@@ -63,7 +63,7 @@ theorem withs_typing {x r : Tm} {o : Nat}
             ⟨fun y hy => Row.kid_out y (hle.1 y hy), fun y hy => .inr (hle.2 y hy)⟩ (Stage.le_refl _) .refl, hk'⟩
         · rename_i hq
           exact ⟨t', R', ε', hw, kid_dropped (G := .hkeep q ℓ E' al) hΘ rfl trivial hA hq hrow up hk⟩
-      | errVal hv' => exact (not_value_plug hnv _ hv').elim
+      | errVal hv' | allI hv' => exact (not_value_plug hnv _ hv').elim
     | inside p =>
       cases h with
       | inside hF hb hrow _ _ hφ _ =>
@@ -92,7 +92,7 @@ theorem withs_typing {x r : Tm} {o : Nat}
               · cases h'.1; exact .inr (.inl (by simp))
             · exact .inr (.inl (mem h₂))
             · exact .inr (.inr ⟨F, mem' hF', x⟩)
-      | errVal hv' => exact (not_value_plug hnv _ hv').elim
+      | errVal hv' | allI hv' => exact (not_value_plug hnv _ hv').elim
     | _ =>
       obtain ⟨k, Θ', t₁, φ₁, h₁, rel, hk, -⟩ := frame_typing hnv _ hG h
       rcases hk with rfl | ⟨rfl, -, hΘ'⟩
@@ -161,7 +161,7 @@ theorem fin_await {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ : Sta
           · rcases inr _ ha with ⟨_, h'⟩ | h'
             · cases h'
             · exact ⟨.inl (up _ (.inl h')), .inl (up _ (.inr ⟨h', by rw [hs]; rfl⟩))⟩
-  | errVal hv' => exact (fin_not_value hc hv').elim
+  | errVal hv' | allI hv' => exact (fin_not_value hc hv').elim
 
 /-- An operation at the hole of a context that no frame answers has its effect in the stage of
 the context: a handler without an arm for it leaves its effect in the row outside. -/
@@ -192,7 +192,7 @@ theorem perform_out {Ef o : Name} {c : OpClass} {r : Tm}
           refine Stage.le_svc hφ _ (hc.2 fun hcomp => ?_)
           have h₁ := hcomp o c a b hop
           simp [Frame.handles, h₁] at hhG
-        | errVal hv' => exact (not_value_plug hnv _ hv').elim
+        | errVal hv' | allI hv' => exact (not_value_plug hnv _ hv').elim
       · subst h₂
         cases h with
         | hkeep _ _ _ _ hc hnt _ hφ _ =>
@@ -203,6 +203,6 @@ theorem perform_out {Ef o : Name} {c : OpClass} {r : Tm}
             have h₁ := hcomp o _ a b hop
             simp [Frame.handles, h₁] at hhG
           · exact hnt ⟨o, c, a, b, hop, hct⟩
-        | errVal hv' => exact (not_value_plug hnv _ hv').elim
+        | errVal hv' | allI hv' => exact (not_value_plug hnv _ hv').elim
 
 end Flick

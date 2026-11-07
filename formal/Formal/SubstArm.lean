@@ -161,7 +161,7 @@ theorem SubOk.restrict {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (P : Nat 
   by_cases hP : P i
   · simpa [hP] using h i s hi
   · simp only [hP, if_false]
-    refine ⟨.todo, fun h => False.elim h, ?_⟩
+    refine ⟨.todo, fun h => False.elim h, ?_, .inr (.inr (.inl rfl))⟩
     rintro a (⟨j, _, hj, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
     · exact False.elim hj
     · exact False.elim hp
@@ -175,7 +175,7 @@ theorem SubOk.substT {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (θ : Atom 
   intro i s hi
   simp only [List.getElem?_map, Option.map_eq_some_iff] at hi
   obtain ⟨s₀, hs₀, rfl⟩ := hi
-  obtain ⟨ht, hnI, hc⟩ := h _ _ hs₀
+  obtain ⟨ht, hnI, hc, hV⟩ := h _ _ hs₀
   have hf : Fits (liftT s₀.k θ) (σ i) :=
     ⟨fun p hp => by simp [liftT, (hθ i).1 p hp, Ty.up_def, Ty.substT, shiftV],
       fun hi => (hnI hi).elim, fun hi => (hnI hi).elim, fun hi => (hnI hi).elim⟩
@@ -185,7 +185,7 @@ theorem SubOk.substT {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (θ : Atom 
   have e₃ : (Θ.at s₀).substT (liftT s₀.k θ) = (Θ.substT θ).at (s₀.substT θ) := by
     simp only [Facts.at, Facts.union_substT, Facts.up_comm]; rfl
   rw [e₃] at this
-  exact ⟨this, hnI, held_substS (hθ i) hc⟩
+  exact ⟨this, hnI, held_substS (hθ i) hc, hV.substT _⟩
 
 theorem SubOk.frees {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) {e : Tm}
     (hf : ∀ i, e.Free i → i < Γ.length) : ∀ j, (e.subst σ).Free j → j < Γ'.length := by

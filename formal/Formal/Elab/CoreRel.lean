@@ -86,7 +86,7 @@ theorem perform_app_not_pure {Ψ Θ E o c v t} (h : Typ S Ψ Θ [] (.app (.const
       obtain ⟨_, _, _, _, he, -, lψ, -, -⟩ := hT.arrow_left
       cases he; exact Stage.le_trans lψ hψ
     | const hc => exact hc.elim
-  | errVal hv => exact (perform_not_value hv).elim
+  | errVal hv | allI hv => exact (perform_not_value hv).elim
 
 theorem kont_redex {p ℓ : Nat} {u : Flick.Tm} (hu : Value u) : Redex (.app (.kont p ℓ) u) := by
   refine ⟨kont_not_value, fun F a _ ha => ?_⟩
@@ -218,7 +218,7 @@ theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
       (hA.append' (hE'.cons' trivial)) (kont_redex hu) hq'
     cases h with
     | app hf => cases hf with | kont hl => simp at hl
-    | errVal hv => exact (kont_not_value hv).elim
+    | errVal hv | allI hv => exact (kont_not_value hv).elim
 
 /-- A pure step makes no run-time form. -/
 theorem _root_.Flick.PStep.noIns {x x₁ : Flick.Tm} (hs : PStep root x x₁) (hroot : RootTy S root) (hn : x.NoIns) :

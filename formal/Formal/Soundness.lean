@@ -68,6 +68,9 @@ theorem await_arg {Ψ Θ c w t₀ T φ} (h : Typ S Ψ Θ [] (.app (.app (.const 
         cases h
         obtain ⟨_, _, _, _, rfl, -⟩ := la.eff_right
         exact ⟨_, _, .await (ht.valueAny hv _) (Stage.le_refl _) .refl⟩
+  | allI hv' => exact absurd hv' (by
+      intro hv''; cases hv'' with
+      | ctorApp _ hK _ => simp [Tm.head] at hK)
   | errVal hv' => exact absurd hv' (by
       intro hv''; cases hv'' with
       | ctorApp _ hK _ => simp [Tm.head] at hK)
