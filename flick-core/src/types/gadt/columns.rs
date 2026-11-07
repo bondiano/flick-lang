@@ -10,6 +10,9 @@ use crate::types::lang::Lang;
 use crate::types::patterns::Ctor;
 use crate::types::ty::Type;
 
+/// What each rigid variable of a matched type equals, as a constructor tells.
+type Equals = Vec<(u32, Type)>;
+
 impl Checker<'_> {
     /// Whether the constructor `name` of the type `module.ty_name` builds
     /// values of type `ty`.
@@ -28,16 +31,28 @@ impl Checker<'_> {
         self.ctor_fields_at(&ctor, ty, 0).is_some()
     }
 
-    /// The types of the `arity` fields of `ctor` in a value of type `ty`;
-    /// `None` when no value of `ty` is built by it. A type that is not
-    /// known makes its fields not known either (`Error`).
-    pub(in crate::types) fn ctor_fields_at(
+    /// The columns once one of type `ty` is specialized to `ctor`: its
+    /// `arity` fields, then `rest`, the other parts of the same value, which
+    /// learn what `ctor` tells about the rigid variables of `ty`. `None` when
+    /// no value of `ty` is built by `ctor`.
+    pub(in crate::types) fn columns_after(
         &self,
         ctor: &Ctor,
         ty: &Type,
         arity: usize,
+        rest: &[Type],
     ) -> Option<Vec<Type>> {
-        let unknown = || Some(vec![Type::Error; arity]);
+        let (mut columns, equals) = self.ctor_fields_at(ctor, ty, arity)?;
+        columns.extend(rest.iter().map(|t| replace_skolems(t, &equals)));
+        Some(columns)
+    }
+
+    /// The types of the `arity` fields of `ctor` in a value of type `ty`, and
+    /// what it tells about the rigid variables of `ty`; `None` when no value
+    /// of `ty` is built by it. A type that is not known makes its fields not
+    /// known either (`Error`).
+    fn ctor_fields_at(&self, ctor: &Ctor, ty: &Type, arity: usize) -> Option<(Vec<Type>, Equals)> {
+        let unknown = || Some((vec![Type::Error; arity], Vec::new()));
         if *ty == Type::Error {
             return unknown();
         }
@@ -81,18 +96,18 @@ impl Checker<'_> {
                     current = *result;
                 }
                 if fields.len() == arity {
-                    Some(fields)
+                    Some((fields, equals))
                 } else {
                     unknown()
                 }
             }
             Ctor::Tuple(_) => match t {
-                Type::Tuple(items) if items.len() == arity => Some(items),
+                Type::Tuple(items) if items.len() == arity => Some((items, Vec::new())),
                 _ => unknown(),
             },
             Ctor::List(_) | Ctor::ListRest(_) => match t.spine() {
                 (head, args) if head.is_lang(Lang::List) && args.len() == 1 => {
-                    Some(vec![args[0].clone(); arity])
+                    Some((vec![args[0].clone(); arity], Vec::new()))
                 }
                 _ => unknown(),
             },

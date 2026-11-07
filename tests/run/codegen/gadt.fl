@@ -61,6 +61,32 @@ let same t x y =
   | TInt -> x == y
   | TStr -> x == y
 
+/// No arm for a pair of different tags: both have the one `a`.
+agree : Ty a -> Ty a -> Bool
+let agree x y =
+  match (x, y) with
+  | (TInt, TInt) -> true
+  | (TStr, TStr) -> false
+
+/// The value's type is built from the types of its parts.
+type Two a =
+  | One Int : Two Int
+  | Both (Two x) (Two y) : Two (x, y)
+
+eval_two : forall a. Two a -> a
+let rec eval_two t =
+  match t with
+  | One n -> n
+  | Both l r -> (eval_two l, eval_two r)
+
+type Equ a b =
+  | Same : Equ a a
+
+coerce : Equ a b -> a -> b
+let coerce eq =
+  match eq with
+  | Same -> fun x -> x
+
 main : Unit ->{} Unit
 let main () =
   let sum = Add (IntLit 1) (If (Less (IntLit 1) (IntLit 2)) (IntLit 2) (Lit 3))
@@ -71,3 +97,6 @@ let main () =
   Platform.stdout_line (show (as_int Refl 5))
   Platform.stdout_line (describe TInt 21 ++ " " ++ describe TStr "hi")
   Platform.stdout_line (show (same TInt 1 1) ++ " " ++ show (same TStr "a" "b"))
+  Platform.stdout_line (show (agree TInt TInt) ++ " " ++ show (agree TStr TStr))
+  Platform.stdout_line (show (eval_two (Both (One 1) (One 2))))
+  Platform.stdout_line (show (coerce Same 42))

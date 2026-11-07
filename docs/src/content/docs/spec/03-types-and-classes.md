@@ -1,6 +1,6 @@
 ---
 title: "Types and classes"
-source_hash: 4c088b3d69f04647
+source_hash: 0ac8db8e60b30228
 ---
 
 ## Computations and kinds
@@ -86,7 +86,7 @@ The details of resolution, the instance rules and their diagnostics are in [Clas
 
 - Higher-rank callbacks with a nested `forall`, checking of full signatures and type inference inside the body.
 - Nominal ADTs, exact structural records with row polymorphism and exhaustive `match`.
-- GADTs: a constructor names the type it builds (`| IntLit Int : Expr Int`) and may hide the types of its fields; a `match` branch learns the type of the matched value under a complete signature, and exhaustiveness asks no branch for an impossible constructor. Indices are types, finite kinds and `Symbol`; regions, rows and captures are not refined.
+- GADTs: a constructor names the type it builds (`| IntLit Int : Expr Int`) and may hide the types of its fields; a `match` branch learns the type of the matched value under a complete signature, and exhaustiveness asks no branch for an impossible constructor, across all parts of the matched value. Indices are types, finite kinds and `Symbol`; regions, rows and captures are not refined.
 - HKT with type constructors and partial application.
 - Multiparameter classes, superclasses and functional dependencies; the row solver has fixed deterministic primitives.
 - Unique canonical instances without overlap, orphans and local implicit lookup; ownership is determined by the package.

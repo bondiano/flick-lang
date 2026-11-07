@@ -152,7 +152,7 @@ impl Checker<'_> {
                             .chain(iter::repeat_n(Pat::Wild, arity - m))
                             .chain(rest.iter().cloned())
                             .collect();
-                        let tys = self.column_types(ctor, ty, *arity, tys)?;
+                        let tys = self.columns_after(ctor, ty, *arity, tys)?;
                         let witness = self.useful_at(&specialized, &v, &tys)?;
                         Some(rebuild(ctor, witness, *arity))
                     })
@@ -160,7 +160,7 @@ impl Checker<'_> {
             Pat::Ctor(ctor, args) => {
                 let specialized = specialize(&rows, ctor, args.len());
                 let v: Vec<Pat> = args.iter().chain(rest).cloned().collect();
-                let tys = self.column_types(ctor, ty, args.len(), tys)?;
+                let tys = self.columns_after(ctor, ty, args.len(), tys)?;
                 let witness = self.useful_at(&specialized, &v, &tys)?;
                 Some(rebuild(ctor, witness, args.len()))
             }
@@ -181,20 +181,6 @@ impl Checker<'_> {
             }
             Pat::Wild => self.useful_wild(&rows, rest, ty, tys),
         }
-    }
-
-    /// The types of the columns once the first one is specialized to
-    /// `ctor`; `None` when no value of its type `ty` is built by `ctor`.
-    fn column_types(
-        &self,
-        ctor: &Ctor,
-        ty: &Type,
-        arity: usize,
-        rest: &[Type],
-    ) -> Option<Vec<Type>> {
-        let mut tys = self.ctor_fields_at(ctor, ty, arity)?;
-        tys.extend(rest.iter().cloned());
-        Some(tys)
     }
 
     fn useful_wild(
@@ -234,7 +220,7 @@ impl Checker<'_> {
             // the constructors that build values of the column's type
             Some(
                 all.into_iter()
-                    .filter(|(c, arity)| self.ctor_fields_at(c, ty, *arity).is_some())
+                    .filter(|(c, arity)| self.columns_after(c, ty, *arity, &[]).is_some())
                     .collect::<Vec<_>>(),
             )
         });
@@ -247,7 +233,7 @@ impl Checker<'_> {
                 let v: Vec<Pat> = iter::repeat_n(Pat::Wild, *arity)
                     .chain(rest.iter().cloned())
                     .collect();
-                let tys = self.column_types(ctor, ty, *arity, tys)?;
+                let tys = self.columns_after(ctor, ty, *arity, tys)?;
                 let witness = self.useful_at(&specialized, &v, &tys)?;
                 Some(rebuild(ctor, witness, *arity))
             });
@@ -257,15 +243,30 @@ impl Checker<'_> {
             .filter(|r| r[0] == Pat::Wild)
             .map(|r| r[1..].to_vec())
             .collect();
+        if let Some(all) = &all {
+            // A constructor no row names is left to the rows with a wildcard,
+            // under what it tells the other columns. Nearly all tell nothing,
+            // so columns that came out the same are not tried again.
+            let mut tried: Vec<Vec<Type>> = Vec::new();
+            for (ctor, arity) in all.iter().filter(|(c, _)| !covered(c)) {
+                let Some(mut columns) = self.columns_after(ctor, ty, *arity, tys) else {
+                    continue;
+                };
+                let after = columns.split_off(*arity);
+                if tried.contains(&after) {
+                    continue;
+                }
+                if let Some(witness) = self.useful_at(&defaults, rest, &after) {
+                    let missing = Pat::Ctor(ctor.clone(), vec![Pat::Wild; *arity]);
+                    return Some(iter::once(missing).chain(witness).collect());
+                }
+                tried.push(after);
+            }
+            return None;
+        }
         let witness = self.useful_at(&defaults, rest, tys)?;
-        let missing = match (&all, seen.first()) {
-            (Some(all), _) => all
-                .iter()
-                .find(|(c, _)| !covered(c))
-                .map_or(Pat::Wild, |(c, arity)| {
-                    Pat::Ctor(c.clone(), vec![Pat::Wild; *arity])
-                }),
-            (None, Some(Ctor::List(_))) => {
+        let missing = match seen.first() {
+            Some(Ctor::List(_)) => {
                 let n = (0..=seen.len())
                     .find(|n| !seen.contains(&&Ctor::List(*n)))
                     .expect("one of n + 1 lengths is free");
