@@ -1,0 +1,20 @@
+== rt 1
+kernel_loop_baseline	88.56626699999993
+from_effect_succeed	172.00160200000005
+from_effect_sync	561.0775469999999
+from_effect_two_steps	764.0088259999993
+from_effect_yield	8705.744759999998
+effect_loop_baseline	113.70888500000001
+callback_plain	500.9113289999987
+callback_generator	688.1360859999986
+callback_suspends	2551.8805299999804
+== js 1
+kernel_loop_baseline	9685.185440000001
+from_effect_succeed	6172.361750999989
+from_effect_sync	5913.251789000002
+from_effect_two_steps	6593.335391999979
+from_effect_yield	11951.42526999989
+effect_loop_baseline	112.23710600001505
+callback_plain	2543.2786119999946
+callback_generator	7699.894925999979
+callback_suspends	13567.48527000018
