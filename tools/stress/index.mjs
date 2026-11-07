@@ -50,6 +50,7 @@ const targets = {
 };
 
 let failed = false;
+const stressed = new Set();
 for (const name of cases) {
   for (const [target, command] of Object.entries(targets)) {
     if (!wanted.includes(target) || !(target === "rt" ? onRt : portable).includes(name)) continue;
@@ -91,7 +92,8 @@ for (const name of cases) {
       }
     }
     if (failed) process.exit(1);
+    stressed.add(name);
     console.log(`${name} (${target}): ${runs} runs`);
   }
 }
-console.log(`stress: ${cases.length} cases, ${runs} runs each on ${wanted.join(" and ")}, no violation`);
+console.log(`stress: ${stressed.size} cases, ${runs} runs each on ${wanted.join(" and ")}, no violation`);
