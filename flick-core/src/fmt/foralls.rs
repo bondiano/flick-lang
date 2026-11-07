@@ -120,35 +120,42 @@ fn shorten(sig: &mut Node, text: &str, outer: &HashSet<String>) {
     else {
         return;
     };
+    if let Some(body) = implicit_body(ty, text, outer).cloned() {
+        *ty = body;
+    }
+}
+
+/// The type under the outer `forall` of `ty`, when the signature binds the same
+/// variables without it; `outer` are the names already in scope.
+pub(crate) fn implicit_body<'n>(
+    ty: &'n Node,
+    text: &str,
+    outer: &HashSet<String>,
+) -> Option<&'n Node> {
     if ty.kind != K::ForallType {
-        return;
+        return None;
     }
     let vars: Vec<String> = ty
         .child_tokens()
         .filter(|t| t.kind == K::Ident)
         .map(|t| t.text(text).to_owned())
         .collect();
-    let Some(body) = ty.nodes().next() else {
-        return;
-    };
+    let body = ty.nodes().next()?;
     let distinct: HashSet<&str> = vars.iter().map(String::as_str).collect();
     if vars.is_empty()
         || distinct.len() != vars.len()
         || body.kind == K::ForallType
         || vars.iter().any(|v| outer.contains(v))
     {
-        return;
+        return None;
     }
     // Replacing the wrapper must never discard a comment attached to it.
     if ty.tokens().iter().any(|t| t.kind.is_comment()) {
-        return;
+        return None;
     }
     let mut used = HashSet::new();
     used_names(body, text, &mut used);
-    if vars.iter().any(|v| !used.contains(v)) {
-        return;
-    }
-    *ty = body.clone();
+    vars.iter().all(|v| used.contains(v)).then_some(body)
 }
 
 fn used_names(node: &Node, text: &str, used: &mut HashSet<String>) {

@@ -98,7 +98,7 @@ impl<'n> Checker<'_> {
                 .collect();
             let instance = Instance {
                 module: module.clone(),
-                name: self.show(&head),
+                name: self.show_exact(&head),
                 vars: params.clone(),
                 context,
                 head,

@@ -1,0 +1,29 @@
+// A message drops the outer `forall` of a type, unless the `forall` is the point.
+module App.ShownForall exposing (..)
+
+takes_poly : (forall a. a -> a) -> Int
+let takes_poly f = f 1
+
+poly_id : a -> a
+let poly_id x = x
+
+plain : (a -> b) -> a -> b
+let plain f x = f x
+
+instantiated : Unit -> Int
+let instantiated () = plain takes_poly poly_id
+
+rank3 : ((forall a. a -> a) -> Int) -> Int
+let rank3 g = g poly_id
+
+monomorphic : (Int -> Int) -> Int
+let monomorphic g = g 1
+
+nested : Unit -> Int
+let nested () = rank3 monomorphic
+
+short : Unit -> Int
+let short () = poly_id "text"
+//~ FLICK-T003 @14:29-14:39 expected `_ -> _`, found `(forall a. a -> a) -> Int`: a type variable cannot stand for the polymorphic type `forall a. a -> a`
+//~ FLICK-T003 @23:23-23:34 expected `(forall a. a -> a) -> Int`, found `(Int -> Int) -> Int`
+//~ FLICK-T003 @26:16-26:30 expected `Int`, found `String`

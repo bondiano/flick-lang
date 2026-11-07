@@ -6,6 +6,11 @@ break programs.
 
 ## Unreleased
 
+- **Types as shown:** hover, inlay hints, completion, `flick doc`, inserted
+  signatures and error messages leave out an outer `forall` and the qualifier of a
+  later stage when a signature written that way gets them back, as `lift : Monad m
+  => (m a)^c -> (MaybeT m a)^c`. A `forall` of rank 2 stays, and so does what a
+  message is about: G001–G004 and a mismatch with a polymorphic side show all of it.
 - **Signatures:** a local function needs none. Its type is inferred, and without
   a signature it has one type. A top-level or recursive local function still
   does, and an instance method still takes the one of its class. G001, G003 and

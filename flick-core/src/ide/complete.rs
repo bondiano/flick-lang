@@ -15,7 +15,7 @@ use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang;
-use crate::types::{Form, Type, show_type};
+use crate::types::{Form, Type, show_signature, show_type};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CompletionKind {
@@ -101,7 +101,7 @@ impl Ide<'_> {
                 .types
                 .iter()
                 .find(|(r, _)| r.0 == binder.0)
-                .map(|(_, t)| show_type(t));
+                .map(|(_, t)| show_signature(t));
             add(LOCAL, item(&name, CompletionKind::Local, ty));
         }
         for c in exports(&m.interface) {
@@ -185,7 +185,13 @@ impl Ide<'_> {
             {
                 return operations
                     .iter()
-                    .map(|o| item(&o.name, CompletionKind::Operation, Some(show_type(&o.ty))))
+                    .map(|o| {
+                        item(
+                            &o.name,
+                            CompletionKind::Operation,
+                            Some(show_signature(&o.ty)),
+                        )
+                    })
                     .collect();
             }
         }
@@ -284,7 +290,7 @@ fn companions(interface: &Interface, owner: &str) -> Vec<Completion> {
                 ..item(
                     member,
                     CompletionKind::Value,
-                    e.scheme.as_ref().map(show_type),
+                    e.scheme.as_ref().map(show_signature),
                 )
             })
         })
@@ -299,7 +305,7 @@ fn completion(e: &Export) -> Completion {
     };
     Completion {
         module: Some(e.entity.module.clone()),
-        ..item(&e.entity.name, kind, e.scheme.as_ref().map(show_type))
+        ..item(&e.entity.name, kind, e.scheme.as_ref().map(show_signature))
     }
 }
 

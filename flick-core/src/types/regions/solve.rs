@@ -235,7 +235,7 @@ impl Checker<'_> {
         for (element, span) in mem::take(&mut self.regions.error_elements) {
             let element = self.zonk(&element);
             if !self.may_be_error(&element) {
-                let shown = self.show(&element);
+                let shown = self.show_exact(&element);
                 self.error(
                     codes::T002,
                     span,
@@ -271,7 +271,7 @@ impl Checker<'_> {
                     None => (format!("`{name}`"), None),
                 }
             }
-            other => (format!("`{}`", self.show(other)), None),
+            other => (format!("`{}`", self.show_exact(other)), None),
         }
     }
 
@@ -330,7 +330,7 @@ impl Checker<'_> {
                 } else {
                     format!("allows only {}", allowed.join(", "))
                 };
-                let what = format!("the expected type `{}`", self.show(expected));
+                let what = format!("the expected type `{}`", self.show_exact(expected));
                 // a stage's qualifier may be one no one wrote, so say where it is from
                 let origin = if implied_stage(&hold.bound) {
                     "; the signature does not write this qualifier: a later stage of a function holds what its earlier parameters hold"
@@ -347,10 +347,10 @@ impl Checker<'_> {
                     };
                     format!(
                         "a qualifier names regions, not {what} `{}`: build the value without what holds it, such as with `match` instead of a callback that uses it",
-                        self.show(atom)
+                        self.show_exact(atom)
                     )
                 } else {
-                    let region = self.show(atom);
+                    let region = self.show_exact(atom);
                     // shortcut: only a qualifier written in braces gets the edit, not `T` or `T^c`; upgrade when the type of a value leads to where it is written.
                     edits.extend(
                         self.local_place(&hold.bound)
@@ -454,7 +454,7 @@ impl Checker<'_> {
                 .find(|(_, t)| self.scope_index(t).is_some())
             {
                 let (region, _) = self.describe(atom);
-                let shown = self.show(&error);
+                let shown = self.show_exact(&error);
                 self.error(
                     codes::E005,
                     span,

@@ -487,7 +487,7 @@ impl Checker<'_> {
             .context
             .iter()
             .filter(|c| passes_dictionary(c))
-            .map(|c| self.show(&self.canon(c)))
+            .map(|c| self.show_exact(&self.canon(c)))
             .collect();
         let derived = fields.map(|fields| {
             let target = d.instance.head.spine().1.first().map(|t| (*t).clone());

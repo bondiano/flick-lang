@@ -128,6 +128,21 @@ fn type_definition_and_inlay_hints_come_from_the_checker() {
 }
 
 #[test]
+fn inlay_hints_show_what_has_no_signature_in_short_form() {
+    let source = "module App.Hints exposing (..)\n\
+                  class Named a =\n  name : a -> String\n\
+                  instance Named Int =\n  let name _ = \"int\"\n\
+                  outer : Int -> Int\n\
+                  let outer n =\n  let double x = x * 2\n  double n\n";
+    let f = fixture_of(&[("src/App/Hints.fl", source)]);
+    let ide = f.ide();
+    let hints: Vec<String> = (ide.inlay_hints(f.file("App.Hints")).into_iter())
+        .map(|(_, l)| l)
+        .collect();
+    assert_eq!(hints, [": Int -> String", ": Int -> Int"], "{hints:?}");
+}
+
+#[test]
 fn semantic_tokens_classify_names_and_folding_spans_blocks() {
     let f = fixture_of(&[("src/App/Shapes.fl", SHAPES), ("src/App/Main.fl", MAIN)]);
     let ide = f.ide();

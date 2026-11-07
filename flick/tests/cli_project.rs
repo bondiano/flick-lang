@@ -527,8 +527,8 @@ fn doc_shows_source_types_kinds_constraints_effects_and_captures() {
         "service Store =",
         "put : String ->{none; StoreError} Unit",
         "class Named a =",
-        "fetch : forall a. Named a => List a ->{Store; StoreError} Unit",
-        "keep : forall c. (Unit -> Float)^c -> (Unit -> Float)^c",
+        "fetch : Named a => List a ->{Store; StoreError} Unit",
+        "keep : (Unit -> Float)^c -> Unit -> Float",
         "The area.",
     ] {
         assert!(page.contains(expected), "`{expected}` in\n{page}");

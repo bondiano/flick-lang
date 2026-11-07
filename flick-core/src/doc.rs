@@ -10,7 +10,7 @@ use std::ptr;
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, show_type};
+use crate::types::{Form, show_signature, show_type};
 
 /// The `///` comment right above each top-level declaration, and above
 /// each constructor on a line of its own (`| Circle Float`), by name. A
@@ -166,7 +166,10 @@ pub fn page(interface: &Interface, text: &str) -> String {
     }
     for e in values {
         let name = &e.entity.name;
-        let ty = e.scheme.as_ref().map_or_else(|| "?".to_owned(), show_type);
+        let ty = e
+            .scheme
+            .as_ref()
+            .map_or_else(|| "?".to_owned(), show_signature);
         let _ = write!(out, "\n### `{name}`\n\n```flick\n{name} : {ty}\n```\n");
         if let Some(reason) = &e.blocked {
             let _ = writeln!(out, "\nBlocked: {reason}");
@@ -207,7 +210,7 @@ fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) 
                 .members(name)
                 .filter(|m| m.entity.namespace == Namespace::Constructor)
                 .map(|m| {
-                    let ty = m.scheme.as_ref().map_or_else(String::new, show_type);
+                    let ty = m.scheme.as_ref().map_or_else(String::new, show_signature);
                     format!("{} : {ty}", m.entity.name)
                 })
                 .collect();
@@ -220,7 +223,7 @@ fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) 
         Form::Service { operations, .. } => {
             let ops: Vec<String> = operations
                 .iter()
-                .map(|o| format!("  {} : {}", o.name, show_type(&o.ty)))
+                .map(|o| format!("  {} : {}", o.name, show_signature(&o.ty)))
                 .collect();
             let _ = writeln!(out, "\n```flick\nservice {name} =\n{}\n```", ops.join("\n"));
         }
@@ -244,7 +247,7 @@ fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) 
                         .iter()
                         .find(|x| x.entity.name == *m && x.parent.as_deref() == Some(name))
                         .and_then(|x| x.scheme.as_ref())
-                        .map_or_else(String::new, show_type);
+                        .map_or_else(String::new, show_signature);
                     format!("  {m} : {ty}")
                 })
                 .collect();

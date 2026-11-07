@@ -365,13 +365,7 @@ let generic = get
         ("ask", 1, "Box String", "Reads the environment.", true),
         ("get", 1, "Box Float", "Reads the state.", true),
         ("put", 1, "Float -> Box Unit", "Replaces the state.", true),
-        (
-            "get",
-            2,
-            "forall m s. MonadState m s => m s",
-            "Reads the state.",
-            false,
-        ),
+        ("get", 2, "MonadState m s => m s", "Reads the state.", false),
     ] {
         let start = f.at("App.Main", name, nth);
         let (markdown, range) = ide.hover(file, start + 1).expect("method hover");
@@ -440,9 +434,8 @@ import App.Public as P exposing (MonadError(..), Box(..), Token(..))
             (
                 "MonadError",
                 &[
-                    "throw_error : forall ",
-                    "MonadError m e => e^c -> (m a)^c",
-                    "catch_error : forall ",
+                    "throw_error : MonadError m e => e^c -> (m a)^c",
+                    "catch_error : ",
                     "((m a)^d -> (m a)^(c + d))^c",
                     "Raises a domain error.",
                     "Handles a domain error.",
@@ -450,10 +443,7 @@ import App.Public as P exposing (MonadError(..), Box(..), Token(..))
             ),
             (
                 "Box",
-                &[
-                    "Empty : forall a. Box a",
-                    "Box : forall a captures. a^captures -> (Box a)^{captures}",
-                ][..],
+                &["Empty : Box a", "Box : a^captures -> (Box a)^{captures}"][..],
             ),
             ("Token", &["Visible : Token"][..]),
         ] {
@@ -590,7 +580,7 @@ instance MonadTrans MaybeT =
     let (markdown, range) = ide.hover(file, start + 1).expect("lift hover");
     assert_eq!(range, (start, start + 4));
     assert!(
-        markdown.contains("lift : forall c m a. Monad m => (m a)^c -> (MaybeT m a)^c"),
+        markdown.contains("lift : Monad m => (m a)^c -> (MaybeT m a)^c"),
         "{markdown}"
     );
     assert!(markdown.contains("from `instance MonadTrans MaybeT`"));

@@ -6,7 +6,7 @@ use std::fmt::Write;
 
 use super::{Ide, documentation, tree};
 use crate::source::FileId;
-use crate::types::{Abi, EnumLit, Form, Ref, TypeDef, show_type};
+use crate::types::{Abi, EnumLit, Form, Ref, TypeDef, show_signature};
 
 impl Ide<'_> {
     pub(super) fn companion_hover(
@@ -29,7 +29,7 @@ impl Ide<'_> {
         let ty = m.typing.types.get(&range)?;
         let mut markdown = format!(
             "```flick\n{owner}.{member} : {}\n```\n\n{note}",
-            show_type(ty)
+            show_signature(ty)
         );
         if let Some(docs) = self.source(module).and_then(|s| documentation(&s, owner)) {
             let _ = write!(markdown, "\n\n{docs}");
