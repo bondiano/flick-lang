@@ -10,7 +10,7 @@ class Collection c a | c -> a =
   empty : c
 
 instance Collection UserSet User =
-  empty : UserSet
+
   let empty = UserSet []
 
 instance Collection UserSet String =
@@ -25,7 +25,7 @@ class Describe a =
   describe : a -> String
 
 instance Describe a => Describe (List a) =
-  describe : List a -> String
+
   let describe items = "list"
 
 instance Describe (List Float) =
@@ -35,13 +35,13 @@ instance Describe (List Float) =
 type Wrap a = Wrap a
 
 instance Describe (List a) => Describe (Wrap a) =
-  describe : Wrap a -> String
+
   let describe w = "wrap"
 
 type Pair a = Pair a a
 
 instance Describe b => Describe (Pair a) =
-  describe : Pair a -> String
+
   let describe p = "pair"
 
 class Second a => First a
@@ -63,7 +63,7 @@ class Show a => Pretty a =
 type Secret = Secret String
 
 instance Pretty Secret =
-  pretty : Secret -> String
+
   let pretty s = "***"
 
 //~ FLICK-C004 @16:1-18:25 break the functional dependency `c -> a`

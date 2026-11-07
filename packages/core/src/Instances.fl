@@ -28,39 +28,30 @@ show_list : (a -> String) -> List a -> String
 foreign pure show_list from "@flick-lang/runtime" "listShow"
 
 instance Eq Int =
-  eq : Int -> Int -> Bool
   let eq x y = eq_prim x y
 
 instance Eq Float =
-  eq : Float -> Float -> Bool
   let eq x y = eq_prim x y
 
 instance Eq BigInt =
-  eq : BigInt -> BigInt -> Bool
   let eq x y = eq_prim x y
 
 instance Eq String =
-  eq : String -> String -> Bool
   let eq x y = eq_prim x y
 
 instance Eq Bool =
-  eq : Bool -> Bool -> Bool
   let eq x y = eq_prim x y
 
 instance Eq Unit =
-  eq : Unit -> Unit -> Bool
   let eq _x _y = true
 
 instance Eq Ordering =
-  eq : Ordering -> Ordering -> Bool
   let eq x y = eq_prim x y
 
 instance Eq a => Eq (List a) =
-  eq : List a -> List a -> Bool
   let eq xs ys = eq_list eq xs ys
 
 instance Eq a => Eq (Option a) =
-  eq : Option a -> Option a -> Bool
   let eq x y =
     match (x, y) with
     | (Some a, Some b) -> eq a b
@@ -68,7 +59,6 @@ instance Eq a => Eq (Option a) =
     | _ -> false
 
 instance (Eq e, Eq a) => Eq (Result e a) =
-  eq : Result e a -> Result e a -> Bool
   let eq x y =
     match (x, y) with
     | (Ok a, Ok b) -> eq a b
@@ -93,35 +83,27 @@ ord_ge : Ord a => a -> a -> Bool
 let ord_ge x y = compare x y != LT
 
 instance Ord Int =
-  compare : Int -> Int -> Ordering
   let compare x y = compare_prim x y
 
 instance Ord Float =
-  compare : Float -> Float -> Ordering
   let compare x y = compare_prim x y
 
 instance Ord BigInt =
-  compare : BigInt -> BigInt -> Ordering
   let compare x y = compare_prim x y
 
 instance Ord String =
-  compare : String -> String -> Ordering
   let compare x y = compare_prim x y
 
 instance Ord Bool =
-  compare : Bool -> Bool -> Ordering
   let compare x y = compare_prim x y
 
 instance Ord Unit =
-  compare : Unit -> Unit -> Ordering
   let compare _x _y = EQ
 
 instance Ord a => Ord (List a) =
-  compare : List a -> List a -> Ordering
   let compare xs ys = compare_list compare xs ys
 
 instance Ord a => Ord (Option a) =
-  compare : Option a -> Option a -> Ordering
   let compare x y =
     match (x, y) with
     | (Some a, Some b) -> compare a b
@@ -130,88 +112,69 @@ instance Ord a => Ord (Option a) =
     | _ -> GT
 
 instance Hash Int =
-  hash : Int -> Int
   let hash x = hash_prim x
 
 instance Hash Float =
-  hash : Float -> Int
   let hash x = hash_prim x
 
 instance Hash BigInt =
-  hash : BigInt -> Int
   let hash x = hash_prim x
 
 instance Hash String =
-  hash : String -> Int
   let hash x = hash_prim x
 
 instance Hash Bool =
-  hash : Bool -> Int
   let hash x = hash_prim x
 
 instance Hash Unit =
-  hash : Unit -> Int
   let hash _x = 0
 
 instance Hash a => Hash (List a) =
-  hash : List a -> Int
   let hash xs = hash_list hash xs
 
 instance Hash a => Hash (Option a) =
-  hash : Option a -> Int
   let hash x =
     match x with
     | Some a -> hash a
     | None -> 0
 
 instance Show Int =
-  show : Int -> String
   let show x = show_prim x
 
 instance Show Float =
-  show : Float -> String
   let show x = show_prim x
 
 instance Show BigInt =
-  show : BigInt -> String
   let show x = show_prim x
 
 instance Show String =
-  show : String -> String
   let show x = show_prim x
 
 instance Show Bool =
-  show : Bool -> String
   let show x = show_prim x
 
 instance Show Unit =
-  show : Unit -> String
   let show _x = "()"
 
 instance Show Ordering =
-  show : Ordering -> String
   let show x = show_prim x
 
 instance Show a => Show (List a) =
-  show : List a -> String
   let show xs = show_list show xs
 
 instance Show a => Show (Option a) =
-  show : Option a -> String
   let show x =
     match x with
     | Some a -> "Some " ++ show a
     | None -> "None"
 
 instance (Show e, Show a) => Show (Result e a) =
-  show : Result e a -> String
   let show x =
     match x with
     | Ok a -> "Ok " ++ show a
     | Err e -> "Err " ++ show e
 
 instance (Ord e, Ord a) => Ord (Result e a) =
-  compare : Result e a -> Result e a -> Ordering
   let compare x y =
     match (x, y) with
     | (Err a, Err b) -> compare a b
@@ -220,18 +183,15 @@ instance (Ord e, Ord a) => Ord (Result e a) =
     | _ -> GT
 
 instance (Hash e, Hash a) => Hash (Result e a) =
-  hash : Result e a -> Int
   let hash x =
     match x with
     | Ok a -> hash a
     | Err e -> 1 + hash e
 
 instance Hash Ordering =
-  hash : Ordering -> Int
   let hash x = hash_prim x
 
 instance Ord Ordering =
-  compare : Ordering -> Ordering -> Ordering
   let compare x y = compare_prim (rank x) (rank y)
 
 rank : Ordering -> Int
@@ -328,180 +288,139 @@ foreign pure append_seq from "@flick-lang/runtime" "seqAppend"
   retention call
 
 instance Functor Option =
-  map : (forall v. a^v -> b)^c -> (Option a)^d -> (Option b)^(c + d)
   let map f value =
     match value with
     | None -> None
     | Some x -> Some (f x)
 
 instance Foldable Option =
-  fold : (b -> a -> b)^c -> b^c -> Option a -> b
   let fold f init value =
     match value with
     | None -> init
     | Some x -> f init x
 
 instance Traversable Option =
-  traverse : (a ->{r; e} b)^c -> Option a ->{r; e} Option b
   let traverse f value =
     match value with
     | None -> None
     | Some x -> Some (f x)
 
 instance Applicative Option =
-  pure : a^c -> (Option a)^c
   let pure x = Some x
-  map2 : (forall u v. a^u -> b^v -> x)^c -> (Option a)^d -> (Option b)^d -> (Option x)^(c + d)
   let map2 f = map2_option f
 
 instance Monad Option =
-  flat_map : (forall v. a^v -> (Option b)^(c + v))^c -> (Option a)^d -> (Option b)^(c + d)
   let flat_map f value =
     match value with
     | None -> None
     | Some x -> f x
 
 instance Functor (Result e) =
-  map : (forall v. a^v -> b)^c -> (Result e a)^d -> (Result e b)^(c + d)
   let map f value =
     match value with
     | Err e -> Err e
     | Ok x -> Ok (f x)
 
 instance Foldable (Result e) =
-  fold : (b -> a -> b)^c -> b^c -> Result e a -> b
   let fold f init value =
     match value with
     | Err _ -> init
     | Ok x -> f init x
 
 instance Traversable (Result e) =
-  traverse : (a ->{r; x} b)^c -> Result e a ->{r; x} Result e b
   let traverse f value =
     match value with
     | Err e -> Err e
     | Ok a -> Ok (f a)
 
 instance Applicative (Result e) =
-  pure : a^c -> (Result e a)^c
   let pure x = Ok x
-  map2 : (forall u v. a^u -> b^v -> x)^c -> (Result e a)^d -> (Result e b)^d -> (Result e x)^(c + d)
   let map2 f = map2_result f
 
 instance Monad (Result e) =
-  flat_map : (forall v. a^v -> (Result e b)^(c + v))^c -> (Result e a)^d -> (Result e b)^(c + d)
   let flat_map f value =
     match value with
     | Err e -> Err e
     | Ok x -> f x
 
 instance Functor List =
-  map : (forall v. a^v -> b)^c -> (List a)^d -> (List b)^(c + d)
   let map f xs = map_list f xs
 
 instance Foldable List =
-  fold : (b -> a -> b)^c -> b^c -> List a -> b
   let fold f init xs = fold_list f init xs
 
 instance Traversable List =
-  traverse : (a ->{r; e} b)^c -> List a ->{r; e} List b
   let traverse f xs = traverse_list f xs
 
 instance Applicative List =
-  pure : a^c -> (List a)^c
   let pure x = [x]
-  map2 : (forall u v. a^u -> b^v -> x)^c -> (List a)^d -> (List b)^d -> (List x)^(c + d)
   let map2 f = map2_list f
 
 instance Monad List =
-  flat_map : (forall v. a^v -> (List b)^(c + v))^c -> (List a)^d -> (List b)^(c + d)
   let flat_map f xs = flat_map_list f xs
 
 instance Functor (Eff r e) =
-  map : (forall v. a^v -> b)^c -> (Eff r e a)^d -> (Eff r e b)^(c + d)
   let map f eff = map_eff f eff
 
 instance Applicative (Eff r e) =
-  pure : a^c -> (Eff r e a)^c
   let pure x = pure_eff x
-  map2 : (forall u v. a^u -> b^v -> x)^c -> (Eff r e a)^d -> (Eff r e b)^d -> (Eff r e x)^(c + d)
   let map2 f = map2_eff f
 
 instance Monad (Eff r e) =
-  flat_map : (forall v. a^v -> (Eff r e b)^(c + v))^c -> (Eff r e a)^d -> (Eff r e b)^(c + d)
   let flat_map f eff = flat_map_eff f eff
 
 instance Alternative Option =
-  nothing : Option a
   let nothing = None
-  or_else : Option a -> Option a -> Option a
   let or_else first second =
     match first with
     | None -> second
     | Some _ -> first
 
 instance Alternative List =
-  nothing : List a
   let nothing = []
-  or_else : List a -> List a -> List a
   let or_else xs ys = xs ++ ys
 
 instance Semigroup String =
-  combine : String -> String -> String
   let combine x y = x ++ y
 
 instance Monoid String =
-  empty : String
   let empty = ""
 
 instance Semigroup (List a) =
-  combine : List a -> List a -> List a
   let combine xs ys = xs ++ ys
 
 instance Monoid (List a) =
-  empty : List a
   let empty = []
 
 instance Iterable List =
-  iter : (List a)^d -> (Seq a)^d
   let iter xs = seq_of_list_held xs
 
 instance Iterable Seq =
-  iter : (Seq a)^d -> (Seq a)^d
   let iter xs = xs
 
 instance Functor Seq =
-  map : (forall v. a^v -> b)^c -> (Seq a)^d -> (Seq b)^(c + d)
   let map f = map_seq f
 
 instance Foldable Seq =
-  fold : (b -> a -> b)^c -> b^c -> Seq a -> b
   let fold f = fold_seq f
 
 instance Applicative Seq =
-  pure : a^c -> (Seq a)^c
   let pure x = seq_of_list_held [x]
-  map2 : (forall u v. a^u -> b^v -> x)^c -> (Seq a)^d -> (Seq b)^d -> (Seq x)^(c + d)
   let map2 f = map2_seq f
 
 instance Monad Seq =
-  flat_map : (forall v. a^v -> (Seq b)^(c + v))^c -> (Seq a)^d -> (Seq b)^(c + d)
   let flat_map f xs = flat_map_seq f xs
 
 instance Alternative Seq =
-  nothing : Seq a
   let nothing = seq_of_list []
-  or_else : Seq a -> Seq a -> Seq a
   let or_else xs ys = append_seq xs ys
 
 instance Eq SchemaError =
-  eq : SchemaError -> SchemaError -> Bool
   let eq x y =
     match (x, y) with
     | (SchemaError a, SchemaError b) -> eq a b
 
 instance Show SchemaError =
-  show : SchemaError -> String
   let show x =
     match x with
     | SchemaError issues -> "SchemaError " ++ show issues

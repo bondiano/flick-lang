@@ -10,11 +10,9 @@ unboxed type Sum = Sum Float
   deriving Eq, Show
 
 instance Semigroup Sum =
-  combine : Sum -> Sum -> Sum
   let combine (Sum a) (Sum b) = Sum (a + b)
 
 instance Monoid Sum =
-  empty : Sum
   let empty = Sum 0
 
 /// Numbers combined by `*`, from `1`.
@@ -22,11 +20,9 @@ unboxed type Product = Product Float
   deriving Eq, Show
 
 instance Semigroup Product =
-  combine : Product -> Product -> Product
   let combine (Product a) (Product b) = Product (a * b)
 
 instance Monoid Product =
-  empty : Product
   let empty = Product 1
 
 /// The first value present, from none.
@@ -34,14 +30,12 @@ unboxed type First a = First (Option a)
   deriving Eq, Show
 
 instance Semigroup (First a) =
-  combine : First a -> First a -> First a
   let combine first other =
     match first with
     | First (Some _) -> first
     | First None -> other
 
 instance Monoid (First a) =
-  empty : First a
   let empty = First None
 
 /// The last value present, from none.
@@ -49,14 +43,12 @@ unboxed type Last a = Last (Option a)
   deriving Eq, Show
 
 instance Semigroup (Last a) =
-  combine : Last a -> Last a -> Last a
   let combine other last =
     match last with
     | Last (Some _) -> last
     | Last None -> other
 
 instance Monoid (Last a) =
-  empty : Last a
   let empty = Last None
 
 /// The least value; there is no empty one, so wrap a `First` or an
@@ -65,7 +57,6 @@ unboxed type Min a = Min a
   deriving Eq, Show
 
 instance Ord a => Semigroup (Min a) =
-  combine : Min a -> Min a -> Min a
   let combine (Min a) (Min b) = if compare b a == LT then Min b else Min a
 
 /// The greatest value; there is no empty one.
@@ -73,5 +64,4 @@ unboxed type Max a = Max a
   deriving Eq, Show
 
 instance Ord a => Semigroup (Max a) =
-  combine : Max a -> Max a -> Max a
   let combine (Max a) (Max b) = if compare b a == GT then Max b else Max a

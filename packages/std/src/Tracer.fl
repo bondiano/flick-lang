@@ -30,13 +30,11 @@ consumer : SpanKind
 let consumer = SpanKind "consumer"
 
 instance Eq SpanKind =
-  eq : SpanKind -> SpanKind -> Bool
   let eq x y =
     match (x, y) with
     | (SpanKind a, SpanKind b) -> a == b
 
 instance Show SpanKind =
-  show : SpanKind -> String
   let show k =
     match k with
     | SpanKind name -> name

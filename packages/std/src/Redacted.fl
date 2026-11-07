@@ -20,7 +20,6 @@ foreign equivalent from "@flick-lang/runtime/effect/Redacted" "flickEquivalent"
   reviewed "effect@4.1.2 sha256:5508d5211d1a1370"
 
 instance Show (Redacted a) =
-  show : Redacted a -> String
   let show _x = "<redacted>"
 
 /// The content's own wire form: an explicit decision to let the secret out.

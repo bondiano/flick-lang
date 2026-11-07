@@ -51,19 +51,15 @@ foreign pure zero from "@flick-lang/runtime/effect/ByteSize" "zero"
   reviewed "effect@4.1.2 sha256:c8f5ad84568cdd21"
 
 instance Eq ByteSize =
-  eq : ByteSize -> ByteSize -> Bool
   let eq x y = equals x y
 
 instance Ord ByteSize =
-  compare : ByteSize -> ByteSize -> Ordering
   let compare x y = compare (to_bigint x) (to_bigint y)
 
 instance Hash ByteSize =
-  hash : ByteSize -> Int
   let hash x = hash (to_bigint x)
 
 instance Show ByteSize =
-  show : ByteSize -> String
   let show x = format default_format x
 
 /// `n` bytes; `None` unless that is a whole, non-negative, safe number of bytes.

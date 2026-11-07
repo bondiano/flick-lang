@@ -199,9 +199,7 @@ foreign pure show_cookies from "@flick-lang/runtime/effect/http/Cookies" "flickS
   reviewed "effect@4.1.2 sha256:11fd4e6d22a3d7d7"
 
 instance Show Cookie =
-  show : Cookie -> String
   let show x = show_cookie x
 
 instance Show Cookies =
-  show : Cookies -> String
   let show x = show_cookies x

@@ -72,11 +72,11 @@ impl Checker<'_> {
                         continue;
                     }
                     defined.push(name.clone());
-                    let sig = j
+                    let signature = j
                         .checked_sub(1)
                         .map(|k| members[k])
-                        .filter(|s| s.kind == K::Signature && self.pairs(s, member))
-                        .and_then(|s| s.nodes().find(|n| is_type(n.kind)));
+                        .filter(|s| s.kind == K::Signature && self.pairs(s, member));
+                    let sig = signature.and_then(|s| s.nodes().find(|n| is_type(n.kind)));
                     let expected = self.method_type(&cm, &name, &info.params, &args);
                     // A class fixes this type even when the instance omits its
                     // optional signature. Keep it at the definition for IDE hover.
@@ -90,6 +90,12 @@ impl Checker<'_> {
                             let (scheme, _) = self.signature(sig);
                             if let Some(expected) = expected {
                                 self.compare_method(&name, &scheme, &expected, self.span(sig));
+                                if let Some(signature) = signature {
+                                    let (scheme, expected) = (&scheme, &expected);
+                                    self.redundant_method_signature(
+                                        signature, member, scheme, expected,
+                                    );
+                                }
                             }
                             self.check_signed(member, &parts, &scheme, None, None);
                         }

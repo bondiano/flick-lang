@@ -11,10 +11,8 @@ class Collection c a | c -> a =
   insert : a -> c -> c
 
 instance Collection UserSet User =
-  empty : UserSet
   let empty = UserSet []
 
-  insert : User -> UserSet -> UserSet
   let insert user set =
     match set with
     | UserSet users -> UserSet ([user] ++ users)

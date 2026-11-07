@@ -106,11 +106,9 @@ foreign pure modify_url_params from "@flick-lang/runtime/effect/http/Url" "modif
   reviewed "effect@4.1.2 sha256:89ad3ec2a04aac9f"
 
 instance Eq Url =
-  eq : Url -> Url -> Bool
   let eq x y = href x == href y
 
 instance Show Url =
-  show : Url -> String
   let show x = show_url x
 
 show_url : Url -> String

@@ -105,9 +105,7 @@ foreign pure show_headers from "@flick-lang/runtime/effect/http/Headers" "flickS
   reviewed "effect@4.1.2 sha256:e90b32f055e0a039"
 
 instance Eq Headers =
-  eq : Headers -> Headers -> Bool
   let eq x y = equivalent x y
 
 instance Show Headers =
-  show : Headers -> String
   let show x = show_headers x

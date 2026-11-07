@@ -16,18 +16,18 @@ instance Render Shape =
   render : Show b => Shape -> String
   let render shape = "shape"
 
-  width : Shape -> Float
+
   let width shape = 1
 
 instance Render Box =
   render : Box -> Float
   let render box = 1
 
-  width : Box -> Float
+
   let width box = 2
 
 instance Render Tag =
-  render : Tag -> String
+
   let render tag = "tag"
 
   height : Tag -> Float

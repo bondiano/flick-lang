@@ -14,13 +14,6 @@ instance Keep (Holder h) =
     let _ = x
     1
 
-class Written (f : Type -> Type) =
-  written : f a -> Unit -> f a
-
-instance Written (Holder h) =
-  written : Holder h a -> Unit -> Holder h a
-  let written x () = x
-
 generic : Keep f => f a -> Unit -> f a
 let generic x = keep x
 

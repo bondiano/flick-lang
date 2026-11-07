@@ -10,37 +10,27 @@ unwrap : (Defaults a)^c -> (Stack Identity a)^c
 let unwrap (Defaults action) = action
 
 instance Functor Defaults =
-  map : (forall v. a^v -> b)^c -> (Defaults a)^d -> (Defaults b)^(c + d)
   let map f (Defaults action) = Defaults (map f action)
 
 instance Applicative Defaults =
-  pure : a^c -> (Defaults a)^c
   let pure value = Defaults (pure value)
-  map2 : (forall u v. a^u -> b^v -> x)^c -> (Defaults a)^d -> (Defaults b)^d -> (Defaults x)^(c + d)
   let map2 f (Defaults left) (Defaults right) = Defaults (map2 f left right)
 
 instance Monad Defaults =
-  flat_map : (forall v. a^v -> (Defaults b)^(c + v))^c -> (Defaults a)^d -> (Defaults b)^(c + d)
   let flat_map f (Defaults action) = Defaults (flat_map (fun value -> unwrap (f value)) action)
 
 // Omit state, reader and writer so this wrapper executes the class defaults.
 instance MonadState Defaults Float =
-  get : Defaults Float
   let get = Defaults get
-  put : Float^c -> (Defaults Unit)^c
   let put next = Defaults (put next)
 
 instance MonadReader Defaults Float =
-  ask : Defaults Float
   let ask = Defaults ask
-  local : (forall v. Float^v -> Float^(c + v))^c -> (Defaults a)^d -> (Defaults a)^(c + d)
   let local update (Defaults action) = Defaults (local update action)
 
 instance MonadWriter Defaults (List String) =
   let tell output = Defaults (tell output)
-  listen : (Defaults a)^c -> (Defaults (a, List String))^c
   let listen (Defaults action) = Defaults (listen action)
-  pass : (Defaults (a, (List String -> List String)^c))^d -> (Defaults a)^(c + d)
   let pass (Defaults action) = Defaults (pass action)
 
 tests : List Test.Test

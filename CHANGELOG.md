@@ -25,7 +25,7 @@ break programs.
 - **Signatures:** a foreign function with `retention owner` and one region gets
   `Fiber.Outlives`, `Fiber.Provided` and `Detached` without writing them. New
   warning `FLICK-T059` names what a signature would get anyway, such as a qualifier
-  of a later stage, and `flick check --fix --only T059` removes it. `flick fmt`
+  of a later stage or the signature of an instance method that repeats its class, and `flick check --fix --only T059` removes it. `flick fmt`
   drops an outer `forall` on a `foreign` too.
 - **Types as shown:** hover, inlay hints, completion, `flick doc`, inserted
   signatures and error messages leave out an outer `forall` and the qualifier of a

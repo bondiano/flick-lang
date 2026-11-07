@@ -45,6 +45,15 @@ instance Empty (Holder h) =
   let empty x () =
     let _ = x
     1
+// the wider stage may be written too: it says what the class gives this instance
+class Written (f : Type -> Type) =
+  written : f a -> Unit -> f a
+
+instance Written (Holder h) =
+  written : Holder h a -> Unit -> Holder h a
+  let written x () = x
+
 //~ FLICK-G002 @24:5-25:26 the value of this `scope` has type `(Unit -> Int)^{s, Int}^{s | _}`
 //~ FLICK-G002 @35:5-36:28 the value of this `scope` has type `(Unit -> Int)^{s, Int}^{s | _}`
 //~ FLICK-G001 @45:3-47:6 this function uses `x`, which holds `h`, but the expected type `Unit -> Int` holds no captures
+//~ FLICK-T059 @53:3-53:45 this method has the type its class gives it

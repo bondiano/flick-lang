@@ -46,11 +46,9 @@ foreign pure map from "@flick-lang/runtime" "chunkMap"
   retention call
 
 instance Eq a => Eq (Chunk a) =
-  eq : Chunk a -> Chunk a -> Bool
   let eq x y = eq (to_list x) (to_list y)
 
 instance Show a => Show (Chunk a) =
-  show : Chunk a -> String
   let show x = "Chunk " ++ show (to_list x)
 
 /// A chunk with at least one element.

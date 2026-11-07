@@ -346,7 +346,6 @@ foreign pure body from "@flick-lang/runtime/effect/http/HttpClientRequest" "flic
   reviewed "effect@4.1.2 sha256:afa4b1c1920c9f89"
 
 instance Show ClientRequest =
-  show : ClientRequest -> String
   let show x =
     "ClientRequest "
       ++ show (method x)

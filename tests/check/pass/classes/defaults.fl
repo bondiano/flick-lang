@@ -8,13 +8,10 @@ class Pretty a =
   let verbose x = "<" ++ pretty x ++ ">"
 
 instance Pretty Float =
-  pretty : Float -> String
   let pretty n = show n
 
 instance Pretty Bool =
-  pretty : Bool -> String
   let pretty b = if b then "yes" else "no"
-  verbose : Bool -> String
   let verbose b = "the answer is " ++ pretty b
 
 both : (String, String)

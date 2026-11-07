@@ -7,7 +7,7 @@ instance Show Float =
   let show n = "number"
 
 instance Show Bool =
-  show : Bool -> String
+
   let show b = b
 
 instance Show Missing =

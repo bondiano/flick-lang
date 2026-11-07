@@ -15,7 +15,6 @@ class Functor (f : Type -> Type) =
   map : forall c d a b. (forall v. a^v -> b)^c -> (f a)^d -> (f b)^(c + d)
 
 instance Functor Option =
-  map : (forall v. a^v -> b)^c -> (Option a)^d -> (Option b)^(c + d)
   let map f value =
     match value with
     | None -> None

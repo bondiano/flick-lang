@@ -23,18 +23,11 @@ run : (StateT s m a)^c -> s^d -> (m (a, s))^(c + d)
 let run (StateT step) state = step state
 
 instance Functor m => Functor (StateT s m) =
-  map : (forall v. a^v -> b)^c -> (StateT s m a)^d -> (StateT s m b)^(c + d)
   let map f (StateT step) =
     StateT (fun state -> map (fun (value, next) -> (f value, next)) (step state))
 
 instance Monad m => Applicative (StateT s m) =
-  pure : a^c -> (StateT s m a)^c
   let pure value = StateT (fun state -> pure (value, state))
-  map2 :
-    (forall u v. a^u -> b^v -> x)^c ->
-    (StateT s m a)^d ->
-    (StateT s m b)^d ->
-    (StateT s m x)^(c + d)
   let map2 f left right =
     StateT (fun state -> do {
       (a, next) <- run left state
@@ -43,8 +36,6 @@ instance Monad m => Applicative (StateT s m) =
     })
 
 instance Monad m => Monad (StateT s m) =
-  flat_map :
-    (forall v. a^v -> (StateT s m b)^(c + v))^c -> (StateT s m a)^d -> (StateT s m b)^(c + d)
   let flat_map f action =
     StateT (fun state -> do {
       (value, next) <- run action state
@@ -52,7 +43,6 @@ instance Monad m => Monad (StateT s m) =
     })
 
 instance MonadTrans (StateT s) =
-  lift : Monad m => (m a)^c -> (StateT s m a)^c
   let lift action =
     StateT (fun current -> do {
       value <- action
@@ -60,27 +50,20 @@ instance MonadTrans (StateT s) =
     })
 
 instance Monad m => MonadState (StateT s m) s =
-  get : StateT s m s
   let get = StateT (fun current -> pure (current, current))
 
-  put : s^c -> (StateT s m Unit)^c
   let put next = StateT (fun _ -> pure ((), next))
 
-  state : (forall v. s^v -> (a, s)^(c + v))^c -> (StateT s m a)^c
   let state step = StateT (fun current -> pure (step current))
 
 instance MonadReader m r => MonadReader (StateT s m) r =
-  ask : StateT s m r
   let ask = lift ask
 
-  local : (forall v. r^v -> r^(c + v))^c -> (StateT s m a)^d -> (StateT s m a)^(c + d)
   let local update action = StateT (fun current -> local update (run action current))
 
-  reader : (forall v. r^v -> a)^c -> (StateT s m a)^c
   let reader project = lift (reader project)
 
 instance MonadWriter m w => MonadWriter (StateT s m) w =
-  tell : w^c -> (StateT s m Unit)^c
   let tell output = lift (tell output)
 
   listen : (StateT s m a)^c -> (StateT s m (a, w))^c
@@ -99,15 +82,11 @@ instance MonadWriter m w => MonadWriter (StateT s m) w =
       pass (map adapt (run action current))
     )
 
-  writer : (a, w)^c -> (StateT s m a)^c
   let writer value = lift (writer value)
 
 instance MonadError m e => MonadError (StateT s m) e =
-  throw_error : e^c -> (StateT s m a)^c
   let throw_error problem = lift (throw_error problem)
 
-  catch_error :
-    (forall v. e^v -> (StateT s m a)^(c + v))^c -> (StateT s m a)^d -> (StateT s m a)^(c + d)
   let catch_error handler action =
     StateT (fun current ->
       catch_error (fun problem -> run (handler problem) current) (run action current)

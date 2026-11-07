@@ -405,11 +405,9 @@ foreign pure format_iso_zoned from "@flick-lang/runtime/effect/DateTime" "flickF
   reviewed "effect@4.1.2 sha256:14f754be4e6145cc"
 
 instance Eq DateTime =
-  eq : DateTime -> DateTime -> Bool
   let eq x y = compare_date_time x y == EQ
 
 instance Ord DateTime =
-  compare : DateTime -> DateTime -> Ordering
   let compare x y = compare_date_time x y
 
 /// A date-time as JSON ISO 8601 text, decoded to UTC; encodes only UTC ones.
