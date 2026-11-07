@@ -250,14 +250,18 @@ impl Loader<'_> {
                         None => self.host.plugin(&package, self.component(&package)),
                     }
                 });
-            // its blocks still find it, to say they have no code
+            // its blocks still find it, to say they have no code, unless an
+            // import of a plugin that loads gives the head
+            let loaded = plugin.is_ok();
             if let Err(why) = plugin {
                 diagnostics.extend(refuse(format!(
                     "the plugin of package `{package}` cannot be loaded: {why}"
                 )));
             }
             for item in &import.plugins {
-                heads.insert(item.name.clone(), package.clone());
+                if loaded || !heads.contains_key(&item.name) {
+                    heads.insert(item.name.clone(), package.clone());
+                }
             }
         }
         heads
