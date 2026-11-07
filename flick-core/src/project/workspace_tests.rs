@@ -142,3 +142,25 @@ fn a_path_dependency_must_be_a_library() {
         "{diagnostics:?}"
     );
 }
+
+#[test]
+fn the_package_of_a_workspace_plugin_comes_before_the_members_that_get_it() {
+    let root = "schema-version = 1
+[workspace]
+members = [\"app\", \"plugin\"]
+
+[[workspace.plugins]]
+package = \"mine\"
+source = { path = \"plugin\" }
+";
+    let host = memory(&[
+        ("flick.toml", root),
+        ("app/flick.toml", LIB),
+        ("plugin/flick.toml", LIB),
+    ]);
+    let mut sources = SourceMap::default();
+    let workspace = find(&host, &mut sources, Path::new("/w"))
+        .expect("valid")
+        .expect("a workspace");
+    assert_eq!(workspace.names(), ["plugin", "app"]);
+}

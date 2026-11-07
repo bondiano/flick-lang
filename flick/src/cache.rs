@@ -122,6 +122,7 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
         ]
         .map(|file| project.root.join(file)),
     );
+    files.extend(project.workspace.clone());
     files.extend(dependency_files(&project.root));
     library_files(&project.root, &project.config.dependencies, &mut files);
     // what plugins read: the files the project grants them, and snapshots

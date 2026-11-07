@@ -148,6 +148,7 @@ fn library(sources: &mut SourceMap) -> Project {
     Project {
         root: PathBuf::from("/p"),
         config_file: sources.add("flick.toml", ""),
+        workspace: None,
         config: Config {
             kind: Kind::Lib,
             source_dir: "src".into(),

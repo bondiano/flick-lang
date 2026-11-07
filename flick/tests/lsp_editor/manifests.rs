@@ -55,3 +55,25 @@ fn a_plugin_that_does_not_load_is_reported_on_its_import_and_its_block() {
     assert!(found.contains(&"FLICK-P036".to_owned()), "{found:?}");
     lsp.close();
 }
+
+#[test]
+fn the_manifest_of_the_workspace_around_a_member_reports_its_errors() {
+    let root = "schema-version = 1\n\n[workspace]\nmembers = [\"app\"]\n\n[[workspace.plugins]]\npackage = \"pairs\"\n";
+    let dir = project(
+        "lsp_workspace_manifest",
+        &[
+            ("flick.toml", root),
+            ("app/flick.toml", LIB),
+            (
+                "app/src/App/M.fl",
+                "module App.M exposing (..)\n\nx : Int\nlet x = 1\n",
+            ),
+        ],
+    );
+    let file = dir.join("app/src/App/M.fl");
+    let text = fs::read_to_string(&file).expect("source");
+    let mut lsp = Lsp::start(&dir.join("app"));
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": text } }));
+    assert_eq!(codes(&mut lsp, &dir.join("flick.toml")), ["FLICK-P005"]);
+    lsp.close();
+}
