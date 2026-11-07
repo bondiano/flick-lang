@@ -13,8 +13,8 @@
 <p align="center">
   <a href="https://bondiano.github.io/flick-lang/">Documentation</a> ·
   <a href="./docs/src/content/docs/start/why.md">Why Flick</a> ·
-  <a href="./docs/src/content/docs/learn/index.md">Learn</a> ·
   <a href="./docs/src/content/docs/start/getting-started.md">Get started</a> ·
+  <a href="./docs/src/content/docs/learn/index.md">Learn</a> ·
   <a href="./examples/">Examples</a> ·
   <a href="./editors/README.md">Editor setup</a>
 </p>
@@ -42,13 +42,14 @@ let message greeting =
   | Hello name -> "Hello, " ++ name ++ "!"
   | Goodbye -> "See you soon!"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{} Unit
 let main () =
   Platform.stdout_line (message (Hello "Flick"))
 ```
 
-`message` is pure. `main` performs an effect, and its signature makes the
-possible `AppError` explicit. Generated programs are ordinary ES modules.
+`message` is pure: its arrow is a plain `->`. `main` runs in the runtime, so its
+arrow has braces, which would name the services it needs and how it can fail.
+Generated programs are ordinary ES modules.
 
 ## Install
 

@@ -1,35 +1,10 @@
 ---
 title: Why Flick
-description: What Flick is for, who it suits, and who it does not suit yet.
+description: What Flick promises, where the promise stops, and who it does not suit yet.
 ---
 
-Flick is a functional language for applications that run in a browser, on a
-server and on the command line. It compiles to JavaScript for the browser
-and Node, and to Go for a standalone executable. This page says what that
-gives you, and what it does not give you yet.
-
-## One language from the browser to the command line
-
-The same modules build for two targets:
-
-- **JavaScript.** ES modules for the browser and Node. `ui` views render
-  with React, and effects run on [Effect](https://effect.website/) through
-  `@flick-lang/runtime`.
-- **Go.** `flick build --emit go` builds an app into one executable that
-  needs no Node.
-
-A library package is compiled for the target of each package that depends
-on it. Pure code, such as types, validation, routes and codecs, is written
-once and shared. In the [Conduit example](https://github.com/bondiano/flick-lang/tree/main/examples/conduit),
-the API contract is one package. The Go server and the browser client both
-depend on it, so a mismatch between them is a type error.
-
-## Effectful code reads like ordinary code
-
-You do not need to know what a monad is to write Flick. In a runtime
-function, a service call is a direct call, `let` binds its result, and the
-lines run from top to bottom. This code is from the
-[first slice example](https://github.com/bondiano/flick-lang/tree/main/examples/first-slice):
+Flick is a language for whole apps: the browser, the server and the command
+line. Its main idea fits in one signature:
 
 ```flick
 # opaque type alias UserId = String
@@ -52,37 +27,29 @@ let load_view id =
   let view = to_view user
   Log.info ("Loaded " ++ view.title)
   view
-
-load_two : UserId -> UserId ->{Users, Log; NotFound} (UserView, UserView)
-let load_two first_id second_id =
-  let first = task { load_view first_id }
-  let second = task { load_view second_id }
-  parallel first second
 ```
 
-`load_view` has no `yield`, `flatMap` or `pipe`: the compiler sequences the
-calls. `task { … }` makes a call a value without running it, and `parallel`
-runs both concurrently and returns both results. Local mutable variables
-and general loops are planned; they are not in the language yet.
+Read `load_view` from left to right. It takes a `UserId`, needs the services
+`Users` and `Log`, can fail with `NotFound`, and returns a `UserView`. The
+compiler holds the body to that. If the body also called another service, this
+would not compile.
 
-## Safety from the types, not from discipline
+## What the compiler holds you to
 
-Three things a reviewer would otherwise check by hand are in the types:
+- **Pure code is pure.** `a -> b` is a pure function. A runtime call inside one
+  is `FLICK-E001`.
+- **Services and errors are named.** A body that needs a service or an error its
+  signature does not name is `FLICK-E002`. The compiler offers to add it.
+- **Errors get handled.** `try … with` removes `NotFound` only when its handlers
+  cover every value of it. Otherwise the error stays in the caller's signature.
+- **Every function has a signature.** A named function without one is
+  `FLICK-T004`, and the message suggests the inferred type.
+- **Every `match` is complete.** A value it misses is `FLICK-T009`.
+- **Resources stay inside their scope.** `scope { … }` releases what it
+  acquired when it ends, and nothing usable can outlive it.
 
-- **Effects.** `a -> b` is a pure function. `a ->{Users, Log; NotFound} b`
-  is a runtime call that needs the services `Users` and `Log`. A runtime call
-  in a pure function is a compile error (`FLICK-E001`), and so is a body that
-  needs a service or an error its signature does not name (`FLICK-E002`).
-- **Errors.** `NotFound` is a `type error`, part of the error row.
-  `try … with` removes it only when the handlers cover every value of it;
-  an error left unhandled stays in the caller's signature.
-- **Resources.** `scope { … }` releases what it acquired when it ends. The
-  region checker proves that nothing usable outlives the scope, including a
-  resource hidden in a closure or a `task`.
-
-The closure below would read a file after its scope has closed it. The
-compiler rejects it with `FLICK-G001`: the closure holds the scope's region,
-and its type allows none.
+The closure below would read a file after its scope has closed it. The compiler
+rejects it with `FLICK-G001`.
 
 ```flick fail
 # import File exposing (Path, FileSystem, OpenError, ReadError)
@@ -95,142 +62,106 @@ let read_later path =
   }
 ```
 
-Host calls have an empty row today. `Console.log`, the clock and random
-numbers are `->{}` functions, so such a signature says only that the function
-runs in the runtime, not what it touches. Defects stay outside the signature
-too.
-
 [Effects, errors and services](../../reference/effects/) and
 [Regions and captures](../../reference/regions/) have the full rules.
 
-## Use the host's libraries instead of rewriting them
+## Where the promise stops
 
-Flick does not need its own copy of every library. A `foreign` declaration
-binds a JavaScript function to a Flick signature, and the tools write and
-check most of these declarations:
+- **Host calls are not named yet.** `Console.log`, `Platform.env`,
+  `DateTime.now` and `Random.next_int` are `->{}` functions. Such a signature
+  says only that the function runs in the runtime, not what it touches.
+- **Defects stay outside the signature.** A pure function can still die with a
+  defect or never finish. A runtime function can also be interrupted.
+- **`foreign` is taken on trust.** The compiler believes the signature of a
+  foreign binding. `flick ffi check` compares it only with the package's
+  `.d.ts`.
+- **The proofs cover the core, not the whole compiler.** The core calculus is
+  proved in Lean under stated hypotheses, and the known differences from the
+  checker are written down. See [`formal/`](https://github.com/bondiano/flick-lang/tree/main/formal).
 
-- `flick ffi import <package> --out <dir>` reads the `.d.ts` of an installed
-  npm package and writes Flick bindings, with a report on every export:
-  supported, needs a policy, or unsupported, with the reason. The import
-  infers nothing a declaration cannot show: a call is never assumed pure,
-  and a Promise needs an error conversion.
-- In an editor, the code action "Regenerate from `<pkg>@<version>`" on the
-  header line of a generated module writes it again from the installed
-  declarations. `flick ffi check` reports bindings whose declarations have
-  changed.
-- In the other direction, `flick build --emit-dts` writes TypeScript
-  declarations of Flick modules, so TypeScript calls Flick with its types.
-  `--promise-facade` adds a Promise entry point to a runtime function.
+## Effects read like ordinary code
 
-For `lookup(id: string): Promise<string | undefined>`, with a policy that
-says how it fails and what `undefined` means, the import gives this
-binding:
+You do not need to know what a monad is to write Flick. A service call is a
+direct call, `let` binds its result, and the lines run from top to bottom.
+`load_view` above has no `yield`, `flatMap` or `pipe`. To run work concurrently,
+make the calls values with `task`:
 
 ```flick
-# import JsError exposing (JsError)
+# opaque type alias UserId = String
+# type alias UserView = { id : UserId; title : String }
+# type error NotFound = NotFound UserId
+# service Users =
+#   get : UserId ->{; NotFound} UserView
+# service Log =
+#   info : String ->{} Unit
+# load_view : UserId ->{Users, Log; NotFound} UserView
+# let load_view id = Users.get id
 #
-lookup : String ->{Async; JsError} Option String
-foreign lookup from "lookup-lib" "lookup"
-  arity 1
-  catch JsError.from_js
-  nullable
+load_two : UserId -> UserId ->{Users, Log; NotFound} (UserView, UserView)
+let load_two first_id second_id =
+  let first = task { load_view first_id }
+  let second = task { load_view second_id }
+  parallel first second
 ```
 
-On the Go target, a binding to a module of the program calls the Go
-function of the same name in a `.go` file beside it. See
-[Foreign functions](../../reference/ffi/) and the TypeScript section of
-[Code generation](../../reference/codegen/#typescript).
+Local mutable variables and general loops are planned; they are not in the
+language yet.
 
-## Code a model writes and a person reviews
+## One language for the whole app
 
-Flick suits code that a language model writes and a person reviews:
+The same modules build for two targets. JavaScript gives ES modules for the
+browser and Node: `ui` views render with React, and effects run on
+[Effect](https://effect.website/) for now. Go gives one executable that needs no
+Node. `just language` compares the behaviour of both targets in CI.
 
-- **Signatures are required.** Every named function has its full signature
-  right above its `let`. A function without one is `FLICK-T004`, and the
-  message suggests the inferred type. The signature says what the function
-  needs, how it can fail and whether it is pure, and the compiler holds the
-  body to it.
-- **Mistakes are compile errors with codes.** Misplaced effects, unhandled
-  errors, escaping resources and incomplete matches are reported before the
-  program runs. `flick explain <code>` explains a code, and
-  `--diagnostics json` gives tools one event per line.
-- **The standard library covers a typical application.** HTTP APIs, RPC,
-  typed PostgreSQL queries, schemas and codecs, command lines, React views,
-  tracing and metrics, cryptography and JWTs are part of it. There are
-  fewer packages to choose and to learn. See the
-  [overview](../../reference/stdlib/).
+Pure code is written once and shared. In the
+[Conduit example](https://github.com/bondiano/flick-lang/tree/main/examples/conduit),
+a Go server over PostgreSQL and a browser client depend on one package with the
+API contract. A route that does not exist is a compile error on both sides, and
+`sql` blocks are checked against the migrations, not against a live database.
 
-The source is about as long as the same app in Go and React. `just tokens`
-counts the hand-written source of `examples/conduit` (the contract, the Go
-server and the browser client) against the RealWorld reference of the same
-app: a Go (gin) backend and a React/Redux client, each pinned to a commit.
-Tests, vendored files and generated files are not counted.
+There are limits. `ui` runs only on JavaScript, and parts of the standard
+library do not compile to Go yet. The compiler reports that as `FLICK-P012` when
+it builds, never at run time.
 
-| Tokenizer | Flick | Reference | Ratio |
-| - | -: | -: | -: |
-| Claude (Opus 5.5) | 48,180 | 52,034 | 0.93 |
-| o200k_base (GPT) | 30,018 | 29,778 | 1.01 |
+## Use the host's libraries
 
-By Claude's tokenizer, Flick is about 7% shorter (0.98 for the server, 0.87
-for the client). By GPT's, the two are about even. The method is in
-[`tools/tokens`](https://github.com/bondiano/flick-lang/blob/main/tools/tokens/index.mjs).
+Flick does not need its own copy of every library. A `foreign` declaration binds
+a JavaScript function to a Flick signature, and `flick ffi import <package>`
+writes most of them from the package's `.d.ts`, with a report on every export.
+In the other direction, `flick build --emit-dts` writes TypeScript declarations
+of Flick modules. On Go, bindings are written by hand for now. See
+[Foreign functions](../../reference/ffi/).
 
-## Three examples
+## Code you did not write
 
-### A full-stack web app
+A teammate, a library or a model wrote it, and you are reviewing it. The
+signature tells you what it needs and how it fails before you read the body.
+Mistakes are compile errors with codes, `flick explain <code>` explains a code,
+and `--diagnostics json` gives tools one event per line.
 
-[`examples/conduit`](https://github.com/bondiano/flick-lang/tree/main/examples/conduit)
-is RealWorld's Conduit, a Medium clone: a Go server over PostgreSQL and a
-single-page client rendered with React, which share one typed contract of
-the API. The endpoints are records that derive `HttpApi`, so a misspelt
-path is a type error, and the OpenAPI document comes from the same value.
-The queries are `sql` blocks checked against the migrations. The example
-needs no foreign bindings, and the official RealWorld API and frontend
-suites run against it.
+The source is about as long as the same app in Go and React.
+[`tools/tokens`](https://github.com/bondiano/flick-lang/blob/main/tools/tokens/index.mjs)
+counts `examples/conduit` against the RealWorld reference of the same app. With
+GPT's `o200k_base` the two are about even: 30,174 tokens against 29,778, a ratio
+of 1.01. With Claude's tokenizer the ratio was 0.93 when last measured. It is
+one app, so treat these as a sanity check.
 
-### A command-line tool on two targets
+## Who Flick is not for yet
 
-[`examples/cli-tool`](https://github.com/bondiano/flick-lang/tree/main/examples/cli-tool)
-is a notes CLI described by one `cli` block: subcommands, a wizard that
-asks for the first note, help, version and shell completions. The logic is
-a pure module, so its tests need no file. The same source builds as a Go
-executable without Node, and prints the same help, errors and completions.
-
-### Services you replace in tests
-
-[`examples/first-slice`](https://github.com/bondiano/flick-lang/tree/main/examples/first-slice)
-is where the code above comes from. `App.Main` provides the real `Users`
-and `Log` as layers, in one place. The tests provide implementations over a
-fixed list and a `Ref` instead, without changing the code under test.
-
-The [examples](https://github.com/bondiano/flick-lang/tree/main/examples)
-also include a shop that reports to an OpenTelemetry collector and a
-planner built on monad transformers written in Flick.
-
-## Who Flick is not for (yet)
-
-- **Projects that need a stable language.** Flick is at version 0.1, and
-  the language is still changing. Before 1.0, a minor release may break
-  programs.
-- **Teams that expect a large ecosystem.** Beyond the standard library,
-  there are few Flick packages. A JavaScript library is used through
-  bindings you generate and review.
-- **Pages that must ship little JavaScript.** A UI program's bundle carries
-  the Effect runtime and React: the interactive UI programs this repository
-  tracks are held to budgets of 117–126 KB gzipped. A program can be built
-  without Effect (`effect = "none"`), but then it makes no runtime calls
-  and uses only a few core modules, such as `List` and `String`. Moving
-  Effect out of the language core is planned.
-- **Other platforms.** There is no mobile, desktop or WebAssembly target;
-  these are directions, not features. On Go, parts of the standard library
-  and some `foreign` metadata do not compile yet; the compiler reports them
-  when it builds, never at run time.
-- **Teams already productive with TypeScript and Effect.** On JavaScript,
-  Flick runs on the same Effect, so adopting it is a choice of source
-  language, not of runtime. [Flick and Effect](../../learn/flick-and-effect/)
-  compares the two.
+- **Projects that need a stable language.** Flick is at version 0.1, and a minor
+  release may break programs before 1.0.
+- **Teams that expect a large ecosystem.** Beyond the standard library there are
+  few Flick packages.
+- **Pages that must ship little JavaScript.** A UI program carries the Effect
+  runtime and React: the UI programs this repository tracks are held to budgets
+  of 117–126 KB gzipped.
+- **Other platforms.** There is no mobile, desktop or WebAssembly target.
+- **Teams already productive with TypeScript and Effect.** On JavaScript, Flick
+  runs on the same Effect, so adopting it is a choice of source language, not of
+  runtime. [Flick and Effect](../../learn/flick-and-effect/) compares the two.
 
 ## Next
 
-[Getting started](../getting-started/) installs the compiler and runs a
-first app. [Learn Flick](../../learn/) introduces the ideas in order.
+[Getting started](../getting-started/) installs the compiler and runs a first
+program. [Learn Flick](../../learn/) introduces the ideas in order.

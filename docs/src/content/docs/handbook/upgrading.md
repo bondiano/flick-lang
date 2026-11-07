@@ -37,7 +37,7 @@ change needs.
 | [`deriving HttpApi` is stricter](#deriving-httpapi-is-stricter) | no | `std/D011`, `FLICK-C001` |
 | [SQL queries are stricter](#sql-queries-are-stricter) | no | `std/Q010`, `FLICK-T003` |
 | [What may suspend says `Async`](#what-may-suspend-says-async) | yes: `--only E002,F001,T003` | `FLICK-E002`, `FLICK-F001`, `FLICK-T003` |
-| [Libraries are compiled from sources](#libraries-are-compiled-from-sources) | no | `FLICK-R003` |
+| Libraries are compiled from sources | no | `FLICK-R003` |
 | [Instances belong to one package](#instances-belong-to-one-package) | no | `FLICK-C006` |
 | [Plugins reach only what is granted](#plugins-reach-only-what-is-granted) | no | `FLICK-P038`, `FLICK-P039` |
 | [`LogLevel` is an enum](#loglevel-is-an-enum) | no | `FLICK-T001` |

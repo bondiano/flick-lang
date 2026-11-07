@@ -34,6 +34,10 @@ export default defineConfig({
   site,
   base,
   output: "static",
+  redirects: {
+    "/start/upgrading/": "/handbook/upgrading/",
+    "/ru/start/upgrading/": "/ru/handbook/upgrading/",
+  },
   vite: {
     environments: {
       client: { build: { rolldownOptions: { output } } },

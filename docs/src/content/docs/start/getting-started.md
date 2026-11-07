@@ -3,6 +3,8 @@ title: Getting started
 description: Install the toolchain, create an application and run it.
 ---
 
+## Install
+
 A local application needs the Flick compiler, Node.js 24.18 or later and
 pnpm. On macOS or Linux, install the latest release into `~/.local/bin`:
 
@@ -17,6 +19,24 @@ or with Homebrew: `brew install bondiano/tap/flick`. You can also download a
 a source checkout as described in [Ecosystem](../../ecosystem/).
 
 On Windows, extract the `.zip` and add the folder with `flick.exe` to `PATH`.
+
+## A first program
+
+The smallest program prints a line:
+
+```flick
+module Main exposing (main)
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line "Hello from Flick"
+```
+
+`->{}` says that `main` runs in the runtime and asks for no services. Host calls
+such as `Platform.stdout_line` are not named in signatures yet;
+[Why Flick](../why/#where-the-promise-stops) has the details.
+
+## A project
 
 Flick compiles to ES modules that run with the Flick runtime and
 Effect 4.1.2. Packages are installed with pnpm. Create a project and run it:
