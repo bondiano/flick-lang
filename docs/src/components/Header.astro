@@ -16,16 +16,19 @@ const unlocalized = current.replace(/^\/ru(?=\/|$)/, "") || "/";
 const notFound = route?.entry.id === "404";
 const english = `${base}${notFound ? "/" : unlocalized}`;
 const russian = notFound ? `${base}/ru/` : `${base}/ru${unlocalized === "/" ? "/" : unlocalized}`;
+const playground = unlocalized.startsWith("/play/") || unlocalized.startsWith("/transpile/");
 const links = [
-  [ru ? "Изучение" : "Learn", "/learn/"], [ru ? "Руководства" : "Guides", "/guides/"], [ru ? "Справочник" : "API", "/api/"], [ru ? "Экосистема" : "Ecosystem", "/ecosystem/"],
+  { label: ru ? "Документация" : "Docs", href: "/start/", current: unlocalized !== "/" && !playground && !notFound },
+  { label: ru ? "Песочница" : "Playground", href: "/play/", current: playground },
 ];
+const install = ru ? "Установить" : "Install";
 const sidebar = route?.hasSidebar ? route.sidebar : undefined;
 const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(shell(ru))));
 ---
 <div class="site-header" data-pagefind-ignore>
   <Brand href={`${prefix}/`} label={ru ? "Flick — главная" : "Flick home"} />
   <nav class="site-links" aria-label={ru ? "Основная навигация" : "Main navigation"}>
-    {links.map(([label, href]) => <a href={`${prefix}${href}`} aria-current={unlocalized.startsWith(href) ? "page" : undefined}>{label}</a>)}
+    {links.map(({ label, href, current }) => <a href={`${prefix}${href}`} aria-current={current ? "page" : undefined}>{label}</a>)}
   </nav>
   <div class="site-header-right">
     <div id="flick-site-controls" data-flick-ssr set:html={controlsHtml}></div>
@@ -34,11 +37,11 @@ const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(shell
       <span class="locale-divider" aria-hidden="true">/</span>
       {ru ? <span aria-current="true">RU</span> : <a href={russian} lang="ru" aria-label="Переключить на русский">RU</a>}
     </div>
-    <a class="header-transpile" href={`${prefix}/transpile/`}>Transpile</a>
-    <a class="header-play" href={`${prefix}/play/`}>Play <Icon name="northeast" size={17} /></a>
+    <a class="header-github" href="https://github.com/bondiano/flick-lang" aria-label="GitHub"><Icon name="github" /></a>
+    <a class="header-install" href={`${prefix}/start/getting-started/#install`}>{install}</a>
   </div>
   <nav id="flick-navigation" class="mobile-navigation" popover="auto" aria-label={ru ? "Навигация по сайту" : "Site navigation"}>
-    <div class="mobile-primary-links">{links.map(([label, href]) => <a href={`${prefix}${href}`}>{label}</a>)}<a href={`${prefix}/play/`}>Play</a><a href={`${prefix}/transpile/`}>Transpile</a></div>
+    <div class="mobile-primary-links">{links.map(({ label, href }) => <a href={`${prefix}${href}`}>{label}</a>)}<a href={`${prefix}/start/getting-started/#install`}>{install}</a></div>
     <div class="mobile-languages" aria-label={ru ? "Язык документации" : "Documentation language"}>
       <a href={english} lang="en" aria-current={!ru ? "page" : undefined}>English</a>
       <a href={russian} lang="ru" aria-current={ru ? "page" : undefined}>Русский</a>

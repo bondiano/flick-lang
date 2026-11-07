@@ -1,4 +1,6 @@
 ---
+import Icon from "./Icon.astro";
+
 interface Entry {
   type: string;
   label: string;
@@ -8,11 +10,16 @@ interface Entry {
 }
 interface Props { entries: Entry[]; nested?: boolean }
 const { entries, nested = false } = Astro.props;
+const pages = (entry: Entry): number => entry.type === "link" ? 1 : (entry.entries ?? []).reduce((sum, child) => sum + pages(child), 0);
+const holdsCurrent = (entry: Entry): boolean => entry.isCurrent === true || (entry.entries ?? []).some(holdsCurrent);
 ---
 <ul class:list={["doc-nav-list", { "doc-nav-nested": nested }]}>
   {entries.map((entry) => <li>
     {entry.type === "link"
       ? <a href={entry.href} aria-current={entry.isCurrent ? "page" : undefined}>{entry.label}</a>
-      : <section class="doc-nav-group"><h2>{entry.label}</h2><Astro.self entries={entry.entries ?? []} nested /></section>}
+      : <details class="doc-nav-group" open={holdsCurrent(entry)}>
+          <summary><span class="doc-nav-chevron"><Icon name="chevron" size={14} /></span>{entry.label}<span class="doc-nav-count">{pages(entry)}</span></summary>
+          <Astro.self entries={entry.entries ?? []} nested />
+        </details>}
   </li>)}
 </ul>
