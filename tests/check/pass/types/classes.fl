@@ -14,21 +14,18 @@ class Functor (f : Type -> Type) =
 type Shape = Circle Float | Empty
 
 instance Show Shape =
-  show : Shape -> String
   let show shape =
     match shape with
     | Circle _ -> "circle"
     | Empty -> "empty"
 
 instance Show a => Show (List a) =
-  show : List a -> String
   let show items =
     match items with
     | [] -> "[]"
     | _ -> "[…]"
 
 instance Functor Option =
-  map : (a -> b) -> Option a -> Option b
   let map f value =
     match value with
     | None -> None

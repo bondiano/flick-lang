@@ -223,19 +223,15 @@ compare_decimal : BigDecimal -> BigDecimal -> Ordering
 foreign pure compare_decimal from "@flick-lang/runtime" "decimalCompare"
 
 instance Eq BigDecimal =
-  eq : BigDecimal -> BigDecimal -> Bool
   let eq x y = compare_decimal x y == EQ
 
 instance Ord BigDecimal =
-  compare : BigDecimal -> BigDecimal -> Ordering
   let compare x y = compare_decimal x y
 
 instance Hash BigDecimal =
-  hash : BigDecimal -> Int
   let hash x = hash (to_string_normal x)
 
 instance Show BigDecimal =
-  show : BigDecimal -> String
   let show x = to_string x
 
 to_string_normal : BigDecimal -> String

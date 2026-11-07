@@ -20,11 +20,9 @@ parse_ip : String -> Result SchemaError IpAddress
 foreign pure parse_ip from "@flick-lang/runtime/effect/Net" "flickParseIp"
 
 instance Eq IpAddress =
-  eq : IpAddress -> IpAddress -> Bool
   let eq x y = format_ip x == format_ip y
 
 instance Show IpAddress =
-  show : IpAddress -> String
   let show x = format_ip x
 
 /// An IP address with its prefix length: `10.1.2.3/8`.
@@ -39,11 +37,9 @@ parse_interface : String -> Result SchemaError IpInterface
 foreign pure parse_interface from "@flick-lang/runtime/effect/Net" "flickParseInterface"
 
 instance Eq IpInterface =
-  eq : IpInterface -> IpInterface -> Bool
   let eq x y = format_interface x == format_interface y
 
 instance Show IpInterface =
-  show : IpInterface -> String
   let show x = format_interface x
 
 /// An IP network without host bits: `10.0.0.0/8`.
@@ -58,11 +54,9 @@ parse_network : String -> Result SchemaError IpNetwork
 foreign pure parse_network from "@flick-lang/runtime/effect/Net" "flickParseNetwork"
 
 instance Eq IpNetwork =
-  eq : IpNetwork -> IpNetwork -> Bool
   let eq x y = format_network x == format_network y
 
 instance Show IpNetwork =
-  show : IpNetwork -> String
   let show x = format_network x
 
 /// A MAC address: `aa:bb:cc:dd:ee:ff`.
@@ -77,11 +71,9 @@ parse_mac : String -> Result SchemaError MacAddress
 foreign pure parse_mac from "@flick-lang/runtime/effect/Net" "flickParseMac"
 
 instance Eq MacAddress =
-  eq : MacAddress -> MacAddress -> Bool
   let eq x y = format_mac x == format_mac y
 
 instance Show MacAddress =
-  show : MacAddress -> String
   let show x = format_mac x
 
 /// A lowercased domain name: `example.com`.
@@ -96,11 +88,9 @@ parse_domain : String -> Result SchemaError DomainName
 foreign pure parse_domain from "@flick-lang/runtime/effect/Net" "flickParseDomain"
 
 instance Eq DomainName =
-  eq : DomainName -> DomainName -> Bool
   let eq x y = format_domain x == format_domain y
 
 instance Show DomainName =
-  show : DomainName -> String
   let show x = format_domain x
 
 /// An IPv6 address with a zone: `fe80::1%eth0`.
@@ -115,11 +105,9 @@ parse_scoped : String -> Result SchemaError ScopedIpv6Literal
 foreign pure parse_scoped from "@flick-lang/runtime/effect/Net" "flickParseScoped"
 
 instance Eq ScopedIpv6Literal =
-  eq : ScopedIpv6Literal -> ScopedIpv6Literal -> Bool
   let eq x y = format_scoped x == format_scoped y
 
 instance Show ScopedIpv6Literal =
-  show : ScopedIpv6Literal -> String
   let show x = format_scoped x
 
 /// An IP address, a scoped IPv6 literal or a domain name.
@@ -134,11 +122,9 @@ parse_host : String -> Result SchemaError Host
 foreign pure parse_host from "@flick-lang/runtime/effect/Net" "flickParseHost"
 
 instance Eq Host =
-  eq : Host -> Host -> Bool
   let eq x y = format_host x == format_host y
 
 instance Show Host =
-  show : Host -> String
   let show x = format_host x
 
 /// A host and a port: `example.com:8080`.
@@ -153,11 +139,9 @@ parse_host_port : String -> Result SchemaError HostPort
 foreign pure parse_host_port from "@flick-lang/runtime/effect/Net" "flickParseHostPort"
 
 instance Eq HostPort =
-  eq : HostPort -> HostPort -> Bool
   let eq x y = format_host_port x == format_host_port y
 
 instance Show HostPort =
-  show : HostPort -> String
   let show x = format_host_port x
 
 /// An IP socket address: `127.0.0.1:80`, `[::1]:80`.
@@ -172,11 +156,9 @@ parse_inet : String -> Result SchemaError InetAddress
 foreign pure parse_inet from "@flick-lang/runtime/effect/Net" "flickParseInet"
 
 instance Eq InetAddress =
-  eq : InetAddress -> InetAddress -> Bool
   let eq x y = format_inet x == format_inet y
 
 instance Show InetAddress =
-  show : InetAddress -> String
   let show x = format_inet x
 
 /// A Unix socket path: `/run/app.sock`.
@@ -191,11 +173,9 @@ parse_unix_path : String -> Result SchemaError UnixPathAddress
 foreign pure parse_unix_path from "@flick-lang/runtime/effect/Net" "flickParseUnixPath"
 
 instance Eq UnixPathAddress =
-  eq : UnixPathAddress -> UnixPathAddress -> Bool
   let eq x y = format_unix_path x == format_unix_path y
 
 instance Show UnixPathAddress =
-  show : UnixPathAddress -> String
   let show x = format_unix_path x
 
 /// An IP socket address or a Unix socket path.
@@ -210,11 +190,9 @@ parse_socket : String -> Result SchemaError SocketAddress
 foreign pure parse_socket from "@flick-lang/runtime/effect/Net" "flickParseSocket"
 
 instance Eq SocketAddress =
-  eq : SocketAddress -> SocketAddress -> Bool
   let eq x y = format_socket x == format_socket y
 
 instance Show SocketAddress =
-  show : SocketAddress -> String
   let show x = format_socket x
 
 /// The record as one line of zone-file text: `"MX 10 mail.example.com"`.

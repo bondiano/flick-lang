@@ -5,22 +5,22 @@ module App.Ids exposing (LocalExternalId(..), LocalEmail(..))
 import Acme.Ids exposing (ExternalId, Convert)
 
 instance Eq ExternalId =
-  eq : ExternalId -> ExternalId -> Bool
+
   let eq a b = true
 
 instance Hash ExternalId =
-  hash : ExternalId -> Int
+
   let hash id = 0
 
 // a nominal wrapper of this package may have them
 type LocalExternalId = LocalExternalId ExternalId
 
 instance Eq LocalExternalId =
-  eq : LocalExternalId -> LocalExternalId -> Bool
+
   let eq a b = true
 
 instance Hash LocalExternalId =
-  hash : LocalExternalId -> Int
+
   let hash id = 0
 
 type LocalEmail = LocalEmail String

@@ -90,3 +90,60 @@ fn a_fix_would_not_take_a_comment_away() {
         .expect("the warning");
     assert!(warning.fixes.is_empty(), "{warning:?}");
 }
+
+/// The instance of a class, with the signature of its method if `signature`,
+/// and whether T059 calls it redundant; the fix must leave the module checking.
+fn method_warns(signature: &str, body: &str) -> bool {
+    let text = format!(
+        "module Probe exposing (..)\n\
+         type Box a = Box a\n\
+         class Mapper (f : Type -> Type) =\n  over : (forall v. a^v -> b)^c -> (f a)^d -> (f b)^(c + d)\n\
+         instance Mapper Box =\n  {signature}\n  {body}\n"
+    );
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.clone());
+    let diagnostics = crate::check(&sources, file);
+    let errors: Vec<_> = (diagnostics.iter())
+        .filter(|d| d.severity == Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    let Some(warning) = diagnostics.iter().find(|d| d.code == codes::T059) else {
+        return false;
+    };
+    let mut out = text;
+    let fix = warning.fixes.first().expect("the fix");
+    for edit in &fix.edits {
+        out.replace_range(edit.span.range(), &edit.replacement);
+    }
+    assert!(!out.contains(signature), "{out}");
+    let mut sources = SourceMap::default();
+    let again = sources.add("Probe.fl", out.clone());
+    let errors: Vec<_> = (crate::check(&sources, again).into_iter())
+        .filter(|d| d.severity == Severity::Error || d.code == codes::T059)
+        .collect();
+    assert!(errors.is_empty(), "{out}: {errors:?}");
+    true
+}
+
+#[test]
+fn a_method_signature_goes_when_it_says_what_the_class_says() {
+    let body = "let over f (Box x) = Box (f x)";
+    assert!(method_warns(
+        "over : (forall v. a^v -> b)^c -> (Box a)^d -> (Box b)^(c + d)",
+        body
+    ));
+    // other names for the same binders
+    assert!(method_warns(
+        "over : (forall u. x^u -> y)^k -> (Box x)^e -> (Box y)^(k + e)",
+        body
+    ));
+}
+
+#[test]
+fn a_method_signature_stays_when_the_body_names_its_binders() {
+    let body = "let over f (Box x) =\n    let _ : Option b = None\n    Box (f x)";
+    assert!(!method_warns(
+        "over : (forall v. a^v -> b)^c -> (Box a)^d -> (Box b)^(c + d)",
+        body
+    ));
+}

@@ -27,13 +27,10 @@ from_option : Applicative m => (Option a)^c -> (MaybeT m a)^c
 let from_option value = MaybeT (pure value)
 
 instance Functor m => Functor (MaybeT m) =
-  map : (forall v. a^v -> b)^c -> (MaybeT m a)^d -> (MaybeT m b)^(c + d)
   let map f (MaybeT action) = MaybeT (map (Option.map f) action)
 
 instance Monad m => Applicative (MaybeT m) =
-  pure : a^c -> (MaybeT m a)^c
   let pure value = MaybeT (pure (Some value))
-  map2 : (forall u v. a^u -> b^v -> x)^c -> (MaybeT m a)^d -> (MaybeT m b)^d -> (MaybeT m x)^(c + d)
   let map2 f left right =
     MaybeT
       (do {
@@ -47,7 +44,6 @@ instance Monad m => Applicative (MaybeT m) =
       })
 
 instance Monad m => Monad (MaybeT m) =
-  flat_map : (forall v. a^v -> (MaybeT m b)^(c + v))^c -> (MaybeT m a)^d -> (MaybeT m b)^(c + d)
   let flat_map f value =
     MaybeT
       (do {
@@ -58,31 +54,23 @@ instance Monad m => Monad (MaybeT m) =
       })
 
 instance MonadTrans MaybeT =
-  lift : Monad m => (m a)^c -> (MaybeT m a)^c
   let lift action = MaybeT (map Some action)
 
 instance MonadState m s => MonadState (MaybeT m) s =
-  get : MaybeT m s
   let get = lift get
 
-  put : s^c -> (MaybeT m Unit)^c
   let put next = lift (put next)
 
-  state : (forall v. s^v -> (a, s)^(c + v))^c -> (MaybeT m a)^c
   let state step = lift (state step)
 
 instance MonadReader m r => MonadReader (MaybeT m) r =
-  ask : MaybeT m r
   let ask = lift ask
 
-  local : (forall v. r^v -> r^(c + v))^c -> (MaybeT m a)^d -> (MaybeT m a)^(c + d)
   let local update (MaybeT action) = MaybeT (local update action)
 
-  reader : (forall v. r^v -> a)^c -> (MaybeT m a)^c
   let reader project = lift (reader project)
 
 instance MonadWriter m w => MonadWriter (MaybeT m) w =
-  tell : w^c -> (MaybeT m Unit)^c
   let tell output = lift (tell output)
 
   listen : (MaybeT m a)^c -> (MaybeT m (a, w))^c
@@ -106,13 +94,10 @@ instance MonadWriter m w => MonadWriter (MaybeT m) w =
       | Some (value, update) -> (Some value, update)
     MaybeT (pass (map adapt action))
 
-  writer : (a, w)^c -> (MaybeT m a)^c
   let writer value = lift (writer value)
 
 instance MonadError m e => MonadError (MaybeT m) e =
-  throw_error : e^c -> (MaybeT m a)^c
   let throw_error problem = lift (throw_error problem)
 
-  catch_error : (forall v. e^v -> (MaybeT m a)^(c + v))^c -> (MaybeT m a)^d -> (MaybeT m a)^(c + d)
   let catch_error handler (MaybeT action) =
     MaybeT (catch_error (fun problem -> run (handler problem)) action)

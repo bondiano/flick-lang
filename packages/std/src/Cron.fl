@@ -67,5 +67,4 @@ foreign pure equals_cron from "@flick-lang/runtime/effect/Cron" "Equivalence"
   reviewed "effect@4.1.2 sha256:72a90d81cf191e92"
 
 instance Eq Cron =
-  eq : Cron -> Cron -> Bool
   let eq x y = equals_cron x y

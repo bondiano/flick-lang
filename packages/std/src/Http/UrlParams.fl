@@ -145,9 +145,7 @@ foreign pure show_params from "@flick-lang/runtime/effect/http/UrlParams" "flick
   reviewed "effect@4.1.2 sha256:071fcc57ba7aec7c"
 
 instance Eq UrlParams =
-  eq : UrlParams -> UrlParams -> Bool
   let eq x y = equivalent x y
 
 instance Show UrlParams =
-  show : UrlParams -> String
   let show x = show_params x

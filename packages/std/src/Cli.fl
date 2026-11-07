@@ -53,11 +53,9 @@ let refined name check text =
   | Err why -> Err why
 
 instance Value String =
-  parse : String ->{} Result String String
   let parse text = Ok text
 
 instance Value Bool =
-  parse : String ->{} Result String Bool
   let parse text =
     match text with
     | "true" -> Ok true
@@ -65,33 +63,28 @@ instance Value Bool =
     | _ -> Err ("not true or false: " ++ text)
 
 instance Value Int =
-  parse : String ->{} Result String Int
   let parse text =
     match Int.parse text with
     | Some n -> Ok n
     | None -> Err ("not an Int: " ++ text)
 
 instance Value Float =
-  parse : String ->{} Result String Float
   let parse text =
     match Float.parse text with
     | Some n -> if Float.is_nan n then Err ("not a number: " ++ text) else Ok n
     | None -> Err ("not a number: " ++ text)
 
 instance Value BigInt =
-  parse : String ->{} Result String BigInt
   let parse text =
     match BigInt.parse text with
     | Some n -> Ok n
     | None -> Err ("not an integer: " ++ text)
 
 instance Value (Redacted String) =
-  parse : String ->{} Result String (Redacted String)
   let parse text = Ok (Redacted.make text)
 
 /// An ISO 8601 date and time, `2026-10-23T10:00:00Z`.
 instance Value DateTime.DateTime =
-  parse : String ->{} Result String DateTime.DateTime
   let parse text =
     match DateTime.make text with
     | Ok date -> Ok date
@@ -99,7 +92,6 @@ instance Value DateTime.DateTime =
 
 /// `key=value`, split at the first `=`; a `List` of them is a map of options.
 instance Value (String, String) =
-  parse : String ->{} Result String (String, String)
   let parse text =
     match String.index_of "=" text with
     | Some at -> Ok (String.slice 0 at text, String.slice (at + 1) (String.length text) text)

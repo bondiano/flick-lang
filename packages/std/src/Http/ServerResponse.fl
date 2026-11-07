@@ -248,6 +248,5 @@ let exit_response exit =
   | (None, None) -> empty { defaults with status = Some 500 }
 
 instance Show ServerResponse =
-  show : ServerResponse -> String
   let show x =
     "ServerResponse " ++ show (status x) ++ " " ++ show (headers x) ++ " " ++ show (cookies x)

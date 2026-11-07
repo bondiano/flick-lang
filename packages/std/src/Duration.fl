@@ -243,15 +243,12 @@ foreign pure format from "@flick-lang/runtime" "durationFormat"
   reviewed "effect@4.1.2 sha256:5aef00b392b3dadc"
 
 instance Eq Duration =
-  eq : Duration -> Duration -> Bool
   let eq x y = compare_duration x y == EQ
 
 instance Ord Duration =
-  compare : Duration -> Duration -> Ordering
   let compare x y = compare_duration x y
 
 instance Show Duration =
-  show : Duration -> String
   let show x = format x
 
 /// A duration as a finite, non-negative JSON number of milliseconds.

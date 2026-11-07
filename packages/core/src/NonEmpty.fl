@@ -66,11 +66,9 @@ foreign pure map from "@flick-lang/runtime" "listMap"
   retention call
 
 instance Eq a => Eq (NonEmpty a) =
-  eq : NonEmpty a -> NonEmpty a -> Bool
   let eq x y = eq (to_list x) (to_list y)
 
 instance Show a => Show (NonEmpty a) =
-  show : NonEmpty a -> String
   let show x = "NonEmpty " ++ show (to_list x)
 
 /// The list with `x` added at the end.

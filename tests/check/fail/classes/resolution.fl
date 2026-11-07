@@ -12,7 +12,7 @@ class Collection c a | c -> a =
   empty : c
 
 instance Collection UserSet User =
-  empty : UserSet
+
   let empty = UserSet []
 
 no_instance : String

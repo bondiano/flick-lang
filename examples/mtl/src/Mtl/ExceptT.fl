@@ -18,17 +18,10 @@ from_result : Applicative m => (Result e a)^c -> (ExceptT e m a)^c
 let from_result value = ExceptT (pure value)
 
 instance Functor m => Functor (ExceptT e m) =
-  map : (forall v. a^v -> b)^c -> (ExceptT e m a)^d -> (ExceptT e m b)^(c + d)
   let map f (ExceptT action) = ExceptT (map (Result.map f) action)
 
 instance Monad m => Applicative (ExceptT e m) =
-  pure : a^c -> (ExceptT e m a)^c
   let pure value = ExceptT (pure (Ok value))
-  map2 :
-    (forall u v. a^u -> b^v -> x)^c ->
-    (ExceptT e m a)^d ->
-    (ExceptT e m b)^d ->
-    (ExceptT e m x)^(c + d)
   let map2 f left right =
     ExceptT
       (do {
@@ -42,8 +35,6 @@ instance Monad m => Applicative (ExceptT e m) =
       })
 
 instance Monad m => Monad (ExceptT e m) =
-  flat_map :
-    (forall v. a^v -> (ExceptT e m b)^(c + v))^c -> (ExceptT e m a)^d -> (ExceptT e m b)^(c + d)
   let flat_map f action =
     ExceptT
       (do {
@@ -54,29 +45,20 @@ instance Monad m => Monad (ExceptT e m) =
       })
 
 instance MonadTrans (ExceptT e) =
-  lift : Monad m => (m a)^c -> (ExceptT e m a)^c
   let lift action = ExceptT (map Ok action)
 
 instance MonadState m s => MonadState (ExceptT e m) s =
-  get : ExceptT e m s
   let get = lift get
-  put : s^c -> (ExceptT e m Unit)^c
   let put next = lift (put next)
-  state : (forall v. s^v -> (a, s)^(c + v))^c -> (ExceptT e m a)^c
   let state step = lift (state step)
 
 instance MonadReader m r => MonadReader (ExceptT e m) r =
-  ask : ExceptT e m r
   let ask = lift ask
-  local : (forall v. r^v -> r^(c + v))^c -> (ExceptT e m a)^d -> (ExceptT e m a)^(c + d)
   let local update (ExceptT action) = ExceptT (local update action)
-  reader : (forall v. r^v -> a)^c -> (ExceptT e m a)^c
   let reader project = lift (reader project)
 
 instance MonadWriter m w => MonadWriter (ExceptT e m) w =
-  tell : w^c -> (ExceptT e m Unit)^c
   let tell output = lift (tell output)
-  listen : (ExceptT e m a)^c -> (ExceptT e m (a, w))^c
   let listen (ExceptT action) =
     ExceptT
       (map
@@ -93,14 +75,10 @@ instance MonadWriter m w => MonadWriter (ExceptT e m) w =
         (Err problem, unchanged)
       | Ok (value, modify) -> (Ok value, modify)
     ExceptT (pass (map adapt action))
-  writer : (a, w)^c -> (ExceptT e m a)^c
   let writer pair = lift (writer pair)
 
 instance Monad m => MonadError (ExceptT e m) e =
-  throw_error : e^c -> (ExceptT e m a)^c
   let throw_error problem = ExceptT (pure (Err problem))
-  catch_error :
-    (forall v. e^v -> (ExceptT e m a)^(c + v))^c -> (ExceptT e m a)^d -> (ExceptT e m a)^(c + d)
   let catch_error handle (ExceptT action) =
     ExceptT
       (do {

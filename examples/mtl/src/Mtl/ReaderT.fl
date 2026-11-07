@@ -23,23 +23,14 @@ run : (ReaderT r m a)^c -> r^d -> (m a)^(c + d)
 let run (ReaderT read) environment = read environment
 
 instance Functor m => Functor (ReaderT r m) =
-  map : (forall v. a^v -> b)^c -> (ReaderT r m a)^d -> (ReaderT r m b)^(c + d)
   let map f (ReaderT read) = ReaderT (fun environment -> map f (read environment))
 
 instance Applicative m => Applicative (ReaderT r m) =
-  pure : a^c -> (ReaderT r m a)^c
   let pure value = ReaderT (fun _ -> pure value)
-  map2 :
-    (forall u v. a^u -> b^v -> x)^c ->
-    (ReaderT r m a)^d ->
-    (ReaderT r m b)^d ->
-    (ReaderT r m x)^(c + d)
   let map2 f left right =
     ReaderT (fun environment -> map2 f (run left environment) (run right environment))
 
 instance Monad m => Monad (ReaderT r m) =
-  flat_map :
-    (forall v. a^v -> (ReaderT r m b)^(c + v))^c -> (ReaderT r m a)^d -> (ReaderT r m b)^(c + d)
   let flat_map f action =
     ReaderT (fun environment -> do {
       value <- run action environment
@@ -47,40 +38,26 @@ instance Monad m => Monad (ReaderT r m) =
     })
 
 instance MonadTrans (ReaderT r) =
-  lift : Monad m => (m a)^c -> (ReaderT r m a)^c
   let lift action = ReaderT (fun _ -> action)
 
 instance Monad m => MonadReader (ReaderT r m) r =
-  ask : ReaderT r m r
   let ask = ReaderT (fun environment -> pure environment)
-  local : (forall v. r^v -> r^(c + v))^c -> (ReaderT r m a)^d -> (ReaderT r m a)^(c + d)
   let local update action = ReaderT (fun environment -> run action (update environment))
-  reader : (forall v. r^v -> a)^c -> (ReaderT r m a)^c
   let reader project = ReaderT (fun environment -> pure (project environment))
 
 instance MonadState m s => MonadState (ReaderT r m) s =
-  get : ReaderT r m s
   let get = lift get
-  put : s^c -> (ReaderT r m Unit)^c
   let put value = lift (put value)
-  state : (forall v. s^v -> (a, s)^(c + v))^c -> (ReaderT r m a)^c
   let state step = lift (state step)
 
 instance MonadWriter m w => MonadWriter (ReaderT r m) w =
-  tell : w^c -> (ReaderT r m Unit)^c
   let tell output = lift (tell output)
-  listen : (ReaderT r m a)^c -> (ReaderT r m (a, w))^c
   let listen action = ReaderT (fun environment -> listen (run action environment))
-  pass : (ReaderT r m (a, (w -> w)^c))^d -> (ReaderT r m a)^(c + d)
   let pass action = ReaderT (fun environment -> pass (run action environment))
-  writer : (a, w)^c -> (ReaderT r m a)^c
   let writer value = lift (writer value)
 
 instance MonadError m e => MonadError (ReaderT r m) e =
-  throw_error : e^c -> (ReaderT r m a)^c
   let throw_error failure = lift (throw_error failure)
-  catch_error :
-    (forall v. e^v -> (ReaderT r m a)^(c + v))^c -> (ReaderT r m a)^d -> (ReaderT r m a)^(c + d)
   let catch_error handler action =
     ReaderT (fun environment ->
       catch_error (fun failure -> run (handler failure) environment) (run action environment)

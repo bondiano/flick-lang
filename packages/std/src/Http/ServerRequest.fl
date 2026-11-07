@@ -132,7 +132,6 @@ foreign effect schema_body_url_params from "@flick-lang/runtime/effect/http/Http
   reviewed "effect@4.1.2 sha256:181408c3b4093545"
 
 instance Show ServerRequest =
-  show : ServerRequest -> String
   let show x =
     "ServerRequest "
       ++ show (method x)

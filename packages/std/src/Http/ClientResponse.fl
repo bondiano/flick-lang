@@ -112,5 +112,4 @@ foreign effect schema_headers from "@flick-lang/runtime/effect/http/HttpClientRe
   reviewed "effect@4.1.2 sha256:c09a4db863a5e1ca"
 
 instance Show ClientResponse =
-  show : ClientResponse -> String
   let show x = "ClientResponse " ++ show (status x) ++ " " ++ show (headers x)

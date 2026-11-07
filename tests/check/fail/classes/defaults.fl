@@ -9,5 +9,5 @@ class Pretty a =
 
 instance Pretty Float =
   //~ FLICK-C011 @10:10-10:22 `Pretty Float` lacks method `pretty`
-  verbose : Float -> String
+
   let verbose n = "number"

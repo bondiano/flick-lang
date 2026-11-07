@@ -69,11 +69,9 @@ foreign pure labels from "@flick-lang/runtime" "recordLabels"
 type ReadonlyRecord a
 
 instance Eq a => Eq (ReadonlyRecord a) =
-  eq : ReadonlyRecord a -> ReadonlyRecord a -> Bool
   let eq x y = make_equivalence eq x y
 
 instance Show a => Show (ReadonlyRecord a) =
-  show : ReadonlyRecord a -> String
   let show x = "Record " ++ show (to_entries x)
 
 /// The dictionary without keys.
