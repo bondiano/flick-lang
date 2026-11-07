@@ -99,7 +99,14 @@ theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
     (h : ∀ n, t.Occurs n → σ (.v n) = σ' (.v n)) : (trT N t).substT σ = (trT N t).substT σ' := by
   have hc : ∀ b, (trT N t).reach b → σ b = σ' b := by
     intro b hb; obtain ⟨n, rfl, hn⟩ := (trT_reach N t b).1 hb; exact h n hn
-  induction t using Ty.ind with
+  induction t using Ty.ind generalizing σ σ' with
+  | all k t iht =>
+    simp only [trT, Flick.Ty.substT]
+    have hl : ∀ n, t.Occurs n → liftT k σ (.v n) = liftT k σ' (.v n) := by
+      intro n hn; simp only [liftT]; split
+      · rfl
+      · rw [h (n - k) (by rwa [Ty.Occurs, Nat.sub_add_cancel (by omega)])]
+    rw [iht hl fun b hb => by obtain ⟨n, rfl, hn⟩ := (trT_reach N t b).1 hb; exact hl n hn]
   | var n => exact h n rfl
   | con c => unfold trT; split <;> (try split) <;> rfl
   | cnil => simp [trT, Flick.Ty.substT]

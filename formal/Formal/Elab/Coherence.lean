@@ -229,10 +229,7 @@ theorem lemma_6_1 (h : Coherent P lt) {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat
   cases closed_unique h e₁ e₂
   exact .trans r₁ (.symm r₂)
 
-theorem Ty.subst_var (t : Ty) : t.subst .var = t := by
-  induction t using Ty.ind
-  case arr φ a b q iha ihb ihq ihφ => cases φ <;> simp_all [Ty.subst, Stage.subst, Stage.All]
-  all_goals simp_all [Ty.subst]
+theorem Ty.subst_var (t : Ty) : t.subst .var = t := Ty.subst_id t
 
 /-- **Lemma 6.2 (cache).** A constraint without variables solved without premises: its
 derivation in any `Δ` is, after `ρ`, `≈` that solution (`docs/formal/elaboration.md#lemma-62-needs-the-substitution`). -/

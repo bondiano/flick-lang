@@ -1,4 +1,4 @@
-import Formal.Elab.Syntax
+import Formal.Elab.TyRen
 
 /-!
 # Elaboration: K1–K8 and the simulation hypothesis (elaboration.md §4.1)

@@ -31,6 +31,7 @@ inductive Ty where
   | cun (q q' : Ty)
   | rnm (c : Nat) (t : Ty)
   | run (r r' : Ty)
+  | all (k : Nat) (t : Ty)
 end
 
 deriving instance DecidableEq for Stage, Ty
@@ -46,7 +47,8 @@ theorem Ty.ind {motive : Ty → Prop} (var : ∀ n, motive (.var n)) (con : ∀ 
     (arr : ∀ φ a b q, motive a → motive b → motive q → φ.All motive → motive (.arr φ a b q))
     (cnil : motive .cnil) (cun : ∀ q q', motive q → motive q' → motive (.cun q q'))
     (rnm : ∀ c t, motive t → motive (.rnm c t))
-    (run : ∀ r r', motive r → motive r' → motive (.run r r')) : ∀ t, motive t := by
+    (run : ∀ r r', motive r → motive r' → motive (.run r r'))
+    (all : ∀ k t, motive t → motive (.all k t)) : ∀ t, motive t := by
   intro t
   induction t using Ty.rec (motive_1 := Stage.All motive) with
   | P => trivial
@@ -59,6 +61,31 @@ theorem Ty.ind {motive : Ty → Prop} (var : ∀ n, motive (.var n)) (con : ∀ 
   | cun q q' ihq ihq' => exact cun q q' ihq ihq'
   | rnm c t iht => exact rnm c t iht
   | run r r' ihr ihr' => exact run r r' ihr ihr'
+  | all k t iht => exact all k t iht
+
+/-- A renaming under `k` binders. -/
+def liftN (k : Nat) (ξ : Nat → Nat) : Nat → Nat := fun n => if n < k then n else ξ (n - k) + k
+
+mutual
+def Ty.ren (ξ : Nat → Nat) : Ty → Ty
+  | .var n => .var (ξ n)
+  | .con c => .con c
+  | .app t u => .app (t.ren ξ) (u.ren ξ)
+  | .arr φ a b q => .arr (φ.ren ξ) (a.ren ξ) (b.ren ξ) (q.ren ξ)
+  | .cnil => .cnil
+  | .cun q q' => .cun (q.ren ξ) (q'.ren ξ)
+  | .rnm c t => .rnm c (t.ren ξ)
+  | .run r r' => .run (r.ren ξ) (r'.ren ξ)
+  | .all k t => .all k (t.ren (liftN k ξ))
+
+def Stage.ren (ξ : Nat → Nat) : Stage → Stage
+  | .P => .P
+  | .R r e => .R (r.ren ξ) (e.ren ξ)
+end
+
+/-- A substitution under `k` binders. -/
+def liftTy (k : Nat) (σ : Nat → Ty) : Nat → Ty :=
+  fun n => if n < k then .var n else (σ (n - k)).ren (· + k)
 
 mutual
 def Ty.subst (σ : Nat → Ty) : Ty → Ty
@@ -70,6 +97,7 @@ def Ty.subst (σ : Nat → Ty) : Ty → Ty
   | .cun q q' => .cun (q.subst σ) (q'.subst σ)
   | .rnm c t => .rnm c (t.subst σ)
   | .run r r' => .run (r.subst σ) (r'.subst σ)
+  | .all k t => .all k (t.subst (liftTy k σ))
 
 def Stage.subst (σ : Nat → Ty) : Stage → Stage
   | .P => .P
@@ -87,6 +115,7 @@ def Ty.Occurs (n : Nat) : Ty → Prop
   | .cun q q' => q.Occurs n ∨ q'.Occurs n
   | .rnm _ t => t.Occurs n
   | .run r r' => r.Occurs n ∨ r'.Occurs n
+  | .all k t => t.Occurs (n + k)
 
 def Stage.Occurs (n : Nat) : Stage → Prop
   | .P => False
