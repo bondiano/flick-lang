@@ -26,6 +26,14 @@
       "types": "./dist/core/*.d.ts",
       "default": "./dist/core/*.js"
     },
+    "./rt": {
+      "types": "./dist/rt/index.d.ts",
+      "default": "./dist/rt/index.js"
+    },
+    "./rt/*": {
+      "types": "./dist/rt/*.d.ts",
+      "default": "./dist/rt/*.js"
+    },
     "./runner/*": {
       "types": "./dist/runner/*.d.ts",
       "default": "./dist/runner/*.js"
