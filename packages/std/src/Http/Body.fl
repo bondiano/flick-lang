@@ -83,7 +83,7 @@ foreign pure to_text from "@flick-lang/runtime/effect/http/HttpBody" "flickToTex
 
 /// The chunks of bytes of the stream, of the content type or
 /// `application/octet-stream`, and of the length if it is known.
-stream : forall e. Stream none e (List Int) -> Option String -> Option Float -> Body
+stream : Stream none e (List Int) -> Option String -> Option Float -> Body
 foreign pure stream from "@flick-lang/runtime/effect/http/HttpBody" "flickStream"
   arity 3
   reviewed "effect@4.1.2 sha256:52e3ba8e5568e864"

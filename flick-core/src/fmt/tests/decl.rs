@@ -42,6 +42,15 @@ fn keeps_instance_forall_that_shadows_a_head_variable() {
 }
 
 #[test]
+fn omits_redundant_outer_forall_on_foreign_declarations() {
+    let src = "first : forall a. List a -> a\nforeign pure first from \"./x.js\" \"first\"\n\nrank : (forall a. a -> a) -> Int\nforeign pure rank from \"./x.js\" \"rank\"\n\nphantom : forall a. Int\nforeign pure phantom from \"./x.js\" \"phantom\"\n";
+    let out = fmt(src);
+    assert!(out.contains("first : List a -> a\n"), "{out}");
+    assert!(out.contains("rank : (forall a. a -> a) -> Int\n"), "{out}");
+    assert!(out.contains("phantom : forall a. Int\n"), "{out}");
+}
+
+#[test]
 fn local_forall_respects_enclosing_type_variables() {
     let safe = "outer : Float -> (Float, String)\nlet outer x =\n  inner : forall a. a -> a\n  let inner y = y\n  (inner x, inner \"ok\")\n";
     let safe_out = fmt(safe);

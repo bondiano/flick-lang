@@ -32,7 +32,7 @@ foreign effect close from "@flick-lang/runtime/effect/Latch" "close"
   reviewed "effect@4.1.2 sha256:709612a527ca08b3"
 
 /// Runs `task` once the latch is open: `task |> Latch.when_open latch`.
-when_open : forall c r e a. Latch -> (Eff r e a)^c ->{r; e} a
+when_open : Latch -> (Eff r e a)^c ->{r; e} a
 foreign effect when_open from "@flick-lang/runtime/effect/Latch" "whenOpen"
   arity 1
   retention call

@@ -25,7 +25,7 @@ type alias Meta = {
 /// Runs `body` as one transaction: its changes to transactional values
 /// commit together or not at all, and it runs again when a value it read
 /// changes before it commits. Inside another transaction it joins it.
-atomically : forall c r e a. (Eff {Transaction | r} e a)^c ->{r; e} a
+atomically : (Eff {Transaction | r} e a)^c ->{r; e} a
 foreign effect atomically from "@flick-lang/runtime/effect/Effect" "tx"
   retention call
   reviewed "effect@4.1.2 sha256:3e9edfbfca5d9263"

@@ -21,7 +21,7 @@ type alias RunOptions = {
 }
 
 /// An empty handle owned by the innermost `scope` (or the one of region `s`).
-make : forall s e a. Unit ->{Scope s;} FiberHandle s e a
+make : Unit ->{Scope s;} FiberHandle s e a
 foreign effect make from "@flick-lang/runtime/effect/FiberHandle" "flickMake"
   arity 0
   reviewed "effect@4.1.2 sha256:c6550d9883ffb295"
@@ -29,7 +29,6 @@ foreign effect make from "@flick-lang/runtime/effect/FiberHandle" "flickMake"
 /// Runs `task` as the child of the handle; it may hold only what outlives
 /// the handle's region.
 run :
-  forall s c r e a.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   RunOptions -> (Eff {Scope s | r} e a)^c -> FiberHandle s e a ->{r;} Fiber.Fiber e a
 foreign effect run from "@flick-lang/runtime/effect/FiberHandle" "flickRun"

@@ -13,7 +13,7 @@ type LayerRef (s : Region) (e : ErrorRow) (ro : ServiceRow)
 type alias Options = { idleTimeToLive : Option Duration.Duration; preload : Bool }
 
 /// A ref of the services `layer` builds.
-make : forall s ri e ro. Layer ri e ro -> Options ->{Scope s | ri; e} LayerRef s e ro
+make : Layer ri e ro -> Options ->{Scope s | ri; e} LayerRef s e ro
 foreign effect make from "@flick-lang/runtime/effect/LayerRef" "flickMake"
   reviewed "effect@4.1.2 sha256:920ebbf52b1b72f1"
 

@@ -14,7 +14,6 @@ import HttpApi exposing (ClientError, Endpoint, Request)
 /// failure, or `ClientError`; an error the handler does not answer is
 /// answered as a server would answer it, a missing route with 404.
 call :
-  forall l p q h b r e s a.
   (Http.ServerRequest.ServerRequest ->{a; Http.ServerError.HttpServerError}
     Http.ServerResponse.ServerResponse) ->
   String ->

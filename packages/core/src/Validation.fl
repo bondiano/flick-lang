@@ -35,7 +35,6 @@ instance Semigroup e => Applicative (Validation e) =
   let map2 f = map2_validation combine f
 
 map2_validation :
-  forall c d e a b x.
   (e -> e -> e) ->
   (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
   ((Validation e a)^d -> ((Validation e b)^d -> (Validation e x)^(c + d))^(c + d))^c

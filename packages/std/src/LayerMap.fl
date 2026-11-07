@@ -18,13 +18,12 @@ type alias Options k = { idleTimeToLive : Option Duration.Duration; preloadKeys 
 type alias RecordOptions = { idleTimeToLive : Option Duration.Duration; preload : Bool }
 
 /// A map building the layer `lookup key` for each key it is asked for.
-make : forall s k ri e ro. (k -> Layer ri e ro) -> Options k ->{Scope s | ri; e} LayerMap s k e ro
+make : (k -> Layer ri e ro) -> Options k ->{Scope s | ri; e} LayerMap s k e ro
 foreign effect make from "@flick-lang/runtime/effect/LayerMap" "flickMake"
   reviewed "effect@4.1.2 sha256:b3f9d448a158acb0"
 
 /// A map of the layers of `layers`, by name.
 from_record :
-  forall s ri e ro.
   List (String, Layer ri e ro) -> RecordOptions ->{Scope s | ri; e} LayerMap s String e ro
 foreign effect from_record from "@flick-lang/runtime/effect/LayerMap" "flickFromRecord"
   reviewed "effect@4.1.2 sha256:9ffecdbbd834efcf"

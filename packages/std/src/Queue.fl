@@ -150,7 +150,7 @@ foreign effect is_full from "@flick-lang/runtime/effect/Queue" "isFull"
 
 /// Runs `task` and then ends `queue`, or fails it as the task failed:
 /// `task |> Queue.into queue`.
-into : forall c r e a x. Queue e a -> (Eff r e x)^c ->{r;} Bool
+into : Queue e a -> (Eff r e x)^c ->{r;} Bool
 foreign effect into from "@flick-lang/runtime/effect/Queue" "into"
   arity 1
   retention call

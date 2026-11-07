@@ -22,7 +22,6 @@ foreign container from "@flick-lang/runtime/ui" "uiContainer"
 /// tasks are interrupted and joined, and only then it ends. A failure of `supervisor` itself ends it
 /// as a defect. Markup a server rendered into `container` is hydrated.
 mount :
-  forall c r.
   Container ->
   (Failure none ->{r; none} Unit)^c ->
   Ui^c ->{Atom.Registry, Atom.Write | r; none}

@@ -12,7 +12,6 @@ type Resource (s : Region) (e : ErrorRow) a
 /// which runs it when that scope closes; `release` has no typed errors.
 /// The value holds region `s`, so it cannot leave that scope.
 acquire_release :
-  forall c s r e a.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   (Eff r e a)^c -> ((a ->{r;} Unit)^c ->{Scope s | r; e} a^{s})^c
 foreign effect acquire_release from "@flick-lang/runtime" "acquireRelease"
@@ -21,8 +20,7 @@ foreign effect acquire_release from "@flick-lang/runtime" "acquireRelease"
 
 /// Runs `acquire`, `use` and then `release`, even when `use` fails;
 /// `release` may fail with a typed error of its own.
-bracket :
-  forall c r e a b. (Eff r e a)^c -> ((a ->{r; e} b)^c -> ((a ->{r; e} Unit)^c ->{r; e} b)^c)^c
+bracket : (Eff r e a)^c -> ((a ->{r; e} b)^c -> ((a ->{r; e} Unit)^c ->{r; e} b)^c)^c
 foreign effect bracket from "@flick-lang/runtime" "bracket"
   retention call
   reviewed "effect@4.1.2 sha256:447feb1119a6d518"
@@ -31,7 +29,6 @@ foreign effect bracket from "@flick-lang/runtime" "bracket"
 /// acquired now by `acquire`, which runs with the services of this call and
 /// acquires into a region `t` of its own; `refresh` acquires it again.
 manual :
-  forall c s r e a.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r;} Resource s e a
 foreign effect manual from "@flick-lang/runtime/effect/Resource" "flickManual"
@@ -39,12 +36,12 @@ foreign effect manual from "@flick-lang/runtime/effect/Resource" "flickManual"
 
 /// Runs `f` with the current value, which stays acquired until `f` ends;
 /// fails as the acquisition did if it never succeeded.
-use : forall c s r e e2 a b. Resource s e a -> (forall t. a^{t} ->{r; e2} b)^c ->{r; e + e2} b
+use : Resource s e a -> (forall t. a^{t} ->{r; e2} b)^c ->{r; e + e2} b
 foreign effect use from "@flick-lang/runtime/effect/Resource" "flickUse"
   retention call
 
 /// Acquires the value again; the previous one is released once no `use`
 /// holds it. If the acquisition fails, the previous value stays.
-refresh : forall s e a. Resource s e a ->{Async; e} Unit
+refresh : Resource s e a ->{Async; e} Unit
 foreign effect refresh from "@flick-lang/runtime/effect/Resource" "flickRefresh"
   retention call

@@ -66,7 +66,7 @@ type alias SpanOptions = {
 }
 
 /// Runs `task` in a new span with the name, which ends with the task.
-with_span : forall c r e a. String -> SpanOptions -> (Eff r e a)^c ->{r; e} a
+with_span : String -> SpanOptions -> (Eff r e a)^c ->{r; e} a
 foreign effect with_span from "@flick-lang/runtime/effect/Tracer" "flickWithSpan"
   arity 2
   retention call
@@ -132,21 +132,21 @@ foreign pure native_tracer from "@flick-lang/runtime/effect/Tracer" "nativeTrace
 
 /// Runs `task` with the tracer making its spans; a tracer of a scope, such
 /// as `Otlp.tracer`'s, only inside it.
-with_tracer : forall c d r e a. Tracer^d -> (Eff r e a)^c ->{r; e} a
+with_tracer : Tracer^d -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer from "@flick-lang/runtime/effect/Tracer" "flickWithTracer"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:40a85ade38165224"
 
 /// Runs `task` with the level its spans get when they name none.
-with_trace_level : forall c r e a. LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
+with_trace_level : LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
 foreign effect with_trace_level from "@flick-lang/runtime/effect/Tracer" "flickWithTraceLevel"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:6856a540a66c3ea7"
 
 /// Runs `task` tracing only the spans of at least the level.
-with_minimum_trace_level : forall c r e a. LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
+with_minimum_trace_level : LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
 foreign effect with_minimum_trace_level from "@flick-lang/runtime/effect/Tracer" "flickWithMinimumTraceLevel"
   arity 1
   retention call

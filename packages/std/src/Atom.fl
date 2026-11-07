@@ -133,7 +133,7 @@ foreign pure derived from "@flick-lang/runtime" "atomDerived"
   arity 1
 
 /// A state read as an atom.
-readonly : forall d a. (Writable a)^d -> (Atom a)^d
+readonly : (Writable a)^d -> (Atom a)^d
 foreign pure readonly from "@flick-lang/runtime/effect/reactivity/Atom" "flickReadonly"
   retention call
 
@@ -188,7 +188,7 @@ foreign pure query from "@flick-lang/runtime" "atomQuery"
 /// The task atom of `load` of the route's value, run anew when the route
 /// changes: a page's data. Made serializable, the result a server loaded
 /// for the requested URL is where the client starts.
-loader : forall d r e a. (Writable r)^d -> (r -> Eff {Prelude.Async} e a) -> (Atom (Async a e))^d
+loader : (Writable r)^d -> (r -> Eff {Prelude.Async} e a) -> (Atom (Async a e))^d
 foreign pure loader from "@flick-lang/runtime" "atomLoader"
   arity 2
   retention call
@@ -202,7 +202,7 @@ foreign pure query_stream from "@flick-lang/runtime" "atomQueryStream"
 
 /// `f`, after which, when it succeeds, every `query` of one of `keys` the
 /// registry reads runs anew: `let place = Atom.mutation ["orders"] Shop.place`.
-mutation : forall p r e s. List String -> (p ->{r; e} s) -> p ->{Write | r; e} s
+mutation : List String -> (p ->{r; e} s) -> p ->{Write | r; e} s
 foreign effect mutation from "@flick-lang/runtime" "atomMutation"
   arity 3
 

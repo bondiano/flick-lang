@@ -38,7 +38,6 @@ class Provided (r : ServiceRow) (s : Region)
 /// Starts `task` as a child of `owner`; `supervisor` observes its failure.
 /// Both may hold only what outlives the owner.
 spawn :
-  forall s c r e a.
   (Outlives c s, Provided r s, Detached r) =>
   Owner s ->
   (Failure e ->{Scope s | r; none} Unit)^c ->

@@ -13,7 +13,7 @@ type FiberSet (s : Region) (e : ErrorRow) a
 type alias RunOptions = { propagateInterruption : Bool; startImmediately : Bool }
 
 /// An empty set owned by the innermost `scope` (or the one of region `s`).
-make : forall s e a. Unit ->{Scope s;} FiberSet s e a
+make : Unit ->{Scope s;} FiberSet s e a
 foreign effect make from "@flick-lang/runtime/effect/FiberSet" "flickMake"
   arity 0
   reviewed "effect@4.1.2 sha256:0ccf473d77d74576"
@@ -21,7 +21,6 @@ foreign effect make from "@flick-lang/runtime/effect/FiberSet" "flickMake"
 /// Runs `task` as a child of the set; it may hold only what outlives the
 /// set's region.
 run :
-  forall s c r e a.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   RunOptions -> (Eff {Scope s | r} e a)^c -> FiberSet s e a ->{r;} Fiber.Fiber e a
 foreign effect run from "@flick-lang/runtime/effect/FiberSet" "flickRun"

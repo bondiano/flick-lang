@@ -78,7 +78,7 @@ foreign effect publish_all from "@flick-lang/runtime/effect/TxPubSub" "publishAl
   reviewed "effect@4.1.2 sha256:0f2fc6b1f4a733b6"
 
 /// Subscribes until the scope of region `s` closes.
-subscribe : forall s a. TxPubSub a ->{Scope s;} Subscription s a
+subscribe : TxPubSub a ->{Scope s;} Subscription s a
 foreign effect subscribe from "@flick-lang/runtime/effect/TxPubSub" "subscribe"
   reviewed "effect@4.1.2 sha256:c0f21797880736f7"
 
@@ -94,25 +94,25 @@ foreign effect await_shutdown from "@flick-lang/runtime/effect/TxPubSub" "awaitS
   reviewed "effect@4.1.2 sha256:2e6d0d63d84a3814"
 
 /// Removes the oldest element of the subscription, waiting for one.
-take : forall s a. Subscription s a ->{Tx.Transaction;} a
+take : Subscription s a ->{Tx.Transaction;} a
 foreign effect take from "@flick-lang/runtime/effect/TxQueue" "take"
   retention call
   reviewed "effect@4.1.2 sha256:98a03d7d64e0d279"
 
 /// Removes the oldest element of the subscription, if there is one.
-poll : forall s a. Subscription s a ->{Tx.Transaction;} Option a
+poll : Subscription s a ->{Tx.Transaction;} Option a
 foreign effect poll from "@flick-lang/runtime/effect/TxQueue" "poll"
   retention call
   reviewed "effect@4.1.2 sha256:d90ea7655e719948"
 
 /// Removes every element of the subscription, waiting for at least one.
-take_all : forall s a. Subscription s a ->{Tx.Transaction;} NonEmpty.NonEmpty a
+take_all : Subscription s a ->{Tx.Transaction;} NonEmpty.NonEmpty a
 foreign effect take_all from "@flick-lang/runtime/effect/TxQueue" "takeAll"
   retention call
   reviewed "effect@4.1.2 sha256:4308b512040656d0"
 
 /// The number of elements waiting in the subscription.
-pending : forall s a. Subscription s a ->{Tx.Transaction;} Int
+pending : Subscription s a ->{Tx.Transaction;} Int
 foreign effect pending from "@flick-lang/runtime/effect/TxQueue" "size"
   retention call
   reviewed "effect@4.1.2 sha256:4f107de686c5ad9d"

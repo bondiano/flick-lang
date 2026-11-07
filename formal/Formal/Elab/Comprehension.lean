@@ -56,7 +56,7 @@ theorem gen_elab {Γ Δ cs e t} (h : GenOk S Γ Δ cs e t) :
     obtain ⟨q, _, hk⟩ := ih
     obtain ⟨_, hi⟩ := elab_iter S hd hs
     have hf := elab_const (Γ := Γ) (Δ := Δ) (φ := .P) S.hSeqFlatMap
-      (ts := [ctxRow Γ, .cun d a, a, t, q]) rfl (τ := bindTy (.con S.seq) (ctxRow Γ) (.cun d a) a t q) rfl
+      (ts := [a, t, ctxRow Γ, .cun d a, q]) rfl (τ := bindTy (.con S.seq) (ctxRow Γ) (.cun d a) a t q) rfl
     exact ⟨_, _, .app (.app hf (.lam hk (lam_cov (cov_ctxRow Γ))) (.inl rfl)) hi (.inl rfl)⟩
   | @guard Γ Δ c cs e t c' hc _ ih =>
     obtain ⟨q, _, hk⟩ := ih
@@ -73,7 +73,7 @@ theorem forSeq_elab {Γ Δ cs e t} (h : GenOk S Γ Δ cs e t) (φ : Stage) :
 theorem forList_elab {Γ Δ cs e t} (h : GenOk S Γ Δ cs e t) (φ : Stage) :
     ∃ e', Elab P Γ Δ (S.forList cs e) (.app (.con S.list) t) φ e' := by
   obtain ⟨q, _, he⟩ := forSeq_elab S h φ
-  exact ⟨_, .app (elab_const S.hToList (ts := [q, t]) rfl
+  exact ⟨_, .app (elab_const S.hToList (ts := [t, q]) rfl
     (τ := arrP (appQ (.con S.seq) q t) (.app (.con S.list) t)) rfl) he (.inl rfl)⟩
 
 /-- **`for … do e` elaborates.** -/
@@ -88,7 +88,7 @@ theorem loop_elab {φ Γ Δ cs e} (h : LoopOk S φ Γ Δ cs e) :
         (.arr φ (appQ (.con S.seq) (.cun d a) a) (.con S.unit) (ctxRow Γ))) φ (.const (S.each φ)) := by
       cases φ with
       | P => exact elab_const (S.hEach .P) (ts := [ctxRow Γ, .cun d a, a]) rfl rfl
-      | R r e => exact elab_const (S.hEach (.R r e)) (ts := [ctxRow Γ, .cun d a, a, r, e]) rfl rfl
+      | R r e => exact elab_const (S.hEach (.R r e)) (ts := [a, r, e, ctxRow Γ, .cun d a]) rfl rfl
     exact ⟨_, .app (.app hf (.lam hk (lam_cov (cov_ctxRow Γ))) (.inl rfl)) hi (.inr rfl)⟩
   | guard hc _ ih =>
     obtain ⟨_, hk⟩ := ih

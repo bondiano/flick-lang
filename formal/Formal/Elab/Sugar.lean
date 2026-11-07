@@ -65,13 +65,13 @@ def uncSch (tup n : Nat) : Scheme :=
 
 /-- `each_φ`, the loop of `for … do` at the stage `φ` (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`):
 `each_P : ∀c d a. (a →P^c Unit) →P (Seq d a →P^c Unit)`, which has no Prelude name, and for every
-`R r e` the one `each_R : ∀c d a r e. (a →R⟨r;e⟩^c Unit) →P (Seq d a →R⟨r;e⟩^c Unit)`, which is
+`R r e` the one `each_R : ∀a r e c d. (a →R⟨r;e⟩^c Unit) →P (Seq d a →R⟨r;e⟩^c Unit)`, which is
 `Seq.each_effect` (`eachSch_R`) and is used at the rows of the loop. -/
 def eachSch (unit seq : Nat) : Stage → Scheme
   | .P => ⟨3, [], arrP (.arr .P (.var 2) (.con unit) (.var 0))
       (.arr .P (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil⟩
-  | .R _ _ => ⟨5, [], arrP (.arr (.R (.var 3) (.var 4)) (.var 2) (.con unit) (.var 0))
-      (.arr (.R (.var 3) (.var 4)) (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil⟩
+  | .R _ _ => ⟨5, [], arrP (.arr (.R (.var 1) (.var 2)) (.var 0) (.con unit) (.var 3))
+      (.arr (.R (.var 1) (.var 2)) (appQ (.con seq) (.var 4) (.var 0)) (.con unit) (.var 3)), .cnil⟩
 
 theorem eachSch_R (unit seq : Nat) (r e : Ty) :
     eachSch unit seq (.R r e) = PreludeSchemes.Seq.each_effect unit seq := rfl

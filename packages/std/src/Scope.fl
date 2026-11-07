@@ -8,7 +8,7 @@ import Fiber
 @lang scope_run
 /// Runs `body` with the owner of a new region `s`, and closes it after: what
 /// `scope s { … }` stands for.
-run : forall r e a. (forall s. Fiber.Owner s ->{Scope s | r; e} a) ->{r; e} a
+run : (forall s. Fiber.Owner s ->{Scope s | r; e} a) ->{r; e} a
 foreign effect run from "@flick-lang/runtime" "scopeRun"
 
 @lang scope_current
@@ -22,7 +22,6 @@ foreign effect current from "@flick-lang/runtime" "scopeCurrent"
 /// Runs `finalizer` when the owner of region `s` closes, after the
 /// resources acquired later are released.
 add_finalizer :
-  forall c s r.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) => (Eff r none Unit)^c ->{Scope s | r;} Unit
 foreign effect add_finalizer from "@flick-lang/runtime/effect/Scope" "flickAddFinalizer"
   retention owner
@@ -31,7 +30,6 @@ foreign effect add_finalizer from "@flick-lang/runtime/effect/Scope" "flickAddFi
 /// `add_finalizer`, the finalizer seeing how the scope ended: `None` when
 /// its body succeeded, the cause otherwise.
 add_finalizer_exit :
-  forall c s r.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   (Option RawCause ->{r;} Unit)^c ->{Scope s | r;} Unit
 foreign effect add_finalizer_exit from "@flick-lang/runtime/effect/Scope" "flickAddFinalizerExit"

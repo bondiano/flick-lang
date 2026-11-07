@@ -6,7 +6,7 @@ module Clock exposing (..)
 type Clock
 
 /// Runs `f` with the fiber's clock.
-clock_with : forall c r e a. (Clock ->{r; e} a)^c ->{r; e} a
+clock_with : (Clock ->{r; e} a)^c ->{r; e} a
 foreign effect clock_with from "@flick-lang/runtime/effect/Clock" "clockWith"
   retention call
   reviewed "effect@4.1.2 sha256:744511f0e3b70f8b"

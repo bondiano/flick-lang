@@ -1,6 +1,6 @@
 module Elements exposing (attributes, icon, route)
 
-attributes : forall c. List (String, String) -> Ui^c -> Ui^c
+attributes : List (String, String) -> Ui^c -> Ui^c
 foreign pure attributes from "./dom.ts" "attributes"
   arity 2
   retention call

@@ -7,7 +7,7 @@ type Handle (s : Region)
 
 type error ReadError = ReadError String
 
-read_all : forall s. Handle s ->{; ReadError} String
+read_all : Handle s ->{; ReadError} String
 foreign read_all from "./files.js" "readAll"
   retention call
 
@@ -21,7 +21,7 @@ instance Functor Option =
     | None -> None
     | Some x -> Some (f x)
 
-map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
+map_effect : (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
 foreign map_effect from "./list.js" "mapEffect"
   retention call
 

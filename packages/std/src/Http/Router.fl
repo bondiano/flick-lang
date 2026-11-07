@@ -50,7 +50,6 @@ let param name =
 /// A route of the method (`None`: every method) and the path pattern; it
 /// holds what its handler holds, such as the region of `Rpc.handler`.
 route :
-  forall c r e.
   Option Http.Method.Method ->
   String ->
   (ServerRequest ->{RouteContext | r; e} ServerResponse)^c ->
@@ -67,7 +66,7 @@ foreign pure prefix_path from "@flick-lang/runtime/effect/http/HttpRouter" "pref
   reviewed "effect@4.1.2 sha256:d18943285f673c79"
 
 /// The route below the prefix.
-prefix_route : forall c r e. String -> (Route r e)^c -> (Route r e)^c
+prefix_route : String -> (Route r e)^c -> (Route r e)^c
 foreign pure prefix_route from "@flick-lang/runtime/effect/http/HttpRouter" "prefixRoute"
   arity 1
   retention call
@@ -76,7 +75,6 @@ foreign pure prefix_route from "@flick-lang/runtime/effect/http/HttpRouter" "pre
 /// One handler of the routes: the first route that matches a request
 /// answers it, and a request none matches fails with `RouteNotFound`.
 router :
-  forall c r e.
   RouterConfig ->
   List ((Route r e)^c) ->{}
   (ServerRequest ->{r; HttpServerError | e} ServerResponse)^c

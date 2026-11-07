@@ -18,14 +18,14 @@ foreign effect resize from "@flick-lang/runtime/effect/Semaphore" "resize"
 
 /// Runs `task` holding `permits` permits, waiting for them first; they are
 /// given back however it ends.
-with_permits : forall c r e a. Semaphore -> Int -> (Eff r e a)^c ->{r; e} a
+with_permits : Semaphore -> Int -> (Eff r e a)^c ->{r; e} a
 foreign effect with_permits from "@flick-lang/runtime/effect/Semaphore" "withPermits"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:1c963a339f788ddd"
 
 /// `with_permits` with one permit.
-with_permit : forall c r e a. Semaphore -> (Eff r e a)^c ->{r; e} a
+with_permit : Semaphore -> (Eff r e a)^c ->{r; e} a
 foreign effect with_permit from "@flick-lang/runtime/effect/Semaphore" "withPermit"
   arity 1
   retention call
@@ -33,7 +33,7 @@ foreign effect with_permit from "@flick-lang/runtime/effect/Semaphore" "withPerm
 
 /// Runs `task` with `permits` permits if they are free now, `None` without
 /// running it otherwise.
-with_permits_if_available : forall c r e a. Semaphore -> Int -> (Eff r e a)^c ->{r; e} Option a
+with_permits_if_available : Semaphore -> Int -> (Eff r e a)^c ->{r; e} Option a
 foreign effect with_permits_if_available from "@flick-lang/runtime/effect/Semaphore" "withPermitsIfAvailable"
   arity 2
   retention call

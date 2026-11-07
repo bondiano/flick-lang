@@ -14,11 +14,11 @@ type Covered (e : ErrorRow)
 nothing : Covered none
 foreign pure nothing from "./covered.mjs" "nothing"
 
-cover : forall t e. t -> Covered e -> Covered {t | e}
+cover : t -> Covered e -> Covered {t | e}
 foreign pure cover from "./covered.mjs" "cover"
   arity 2
 
-handle : forall e. Covered e -> (Unit ->{; e} Float) -> Unit
+handle : Covered e -> (Unit ->{; e} Float) -> Unit
 foreign pure handle from "./covered.mjs" "handle"
   arity 2
 

@@ -10,7 +10,7 @@ import Stream.Core exposing (Stream)
 /// request its own with `provide Atom.layer { … }`, so requests
 /// rendered at once do not see each other's atoms, and nothing reads that
 /// registry once its `provide` ends. Handlers do not run here.
-render : forall c. Ui^c ->{Async, Atom.Registry; none} String
+render : Ui^c ->{Async, Atom.Registry; none} String
 foreign effect render from "@flick-lang/runtime/ui/server" "uiServerRender"
   retention call
 

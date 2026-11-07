@@ -60,7 +60,7 @@ length : NonEmpty a -> Int
 foreign pure length from "@flick-lang/runtime" "listLength"
 
 /// Applies a pure function to each element.
-map : forall c a b. (a -> b)^c -> (NonEmpty a -> NonEmpty b)^c
+map : (a -> b)^c -> (NonEmpty a -> NonEmpty b)^c
 foreign pure map from "@flick-lang/runtime" "listMap"
   arity 2
   retention call
@@ -80,7 +80,7 @@ foreign pure append from "@flick-lang/runtime/effect/Array" "append"
   reviewed "effect@4.1.2 sha256:1242e48aa3d7a343"
 
 /// `f 0`, …, `f (n - 1)`, with at least `f 0`: `n` is taken as at least 1.
-make_by : forall c a. Int -> (Int -> a)^c -> NonEmpty a
+make_by : Int -> (Int -> a)^c -> NonEmpty a
 foreign pure make_by from "@flick-lang/runtime/effect/Array" "makeBy"
   retention call
   reviewed "effect@4.1.2 sha256:e70091e0cb298790"
@@ -112,7 +112,7 @@ foreign pure init from "@flick-lang/runtime/effect/Array" "initNonEmpty"
   reviewed "effect@4.1.2 sha256:ae1dbbce233c5179"
 
 /// The first element replaced by `f` of it.
-modify_head : forall c a. (a -> a)^c -> (NonEmpty a -> NonEmpty a)^c
+modify_head : (a -> a)^c -> (NonEmpty a -> NonEmpty a)^c
 foreign pure modify_head from "@flick-lang/runtime/effect/Array" "modifyHeadNonEmpty"
   arity 1
   retention call
@@ -125,7 +125,7 @@ foreign pure set_head from "@flick-lang/runtime/effect/Array" "setHeadNonEmpty"
   reviewed "effect@4.1.2 sha256:d6ba945e2d8fb313"
 
 /// The last element replaced by `f` of it.
-modify_last : forall c a. (a -> a)^c -> (NonEmpty a -> NonEmpty a)^c
+modify_last : (a -> a)^c -> (NonEmpty a -> NonEmpty a)^c
 foreign pure modify_last from "@flick-lang/runtime/effect/Array" "modifyLastNonEmpty"
   arity 1
   retention call
@@ -154,7 +154,7 @@ foreign pure unprepend from "@flick-lang/runtime/effect/Array" "unprepend"
   reviewed "effect@4.1.2 sha256:ca87b1ccd853c6ac"
 
 /// Runs of adjacent elements that `same` relates to the first of their run.
-group_with : forall c a. (a -> a -> Bool)^c -> (NonEmpty a -> NonEmpty (NonEmpty a))^c
+group_with : (a -> a -> Bool)^c -> (NonEmpty a -> NonEmpty (NonEmpty a))^c
 foreign pure group_with from "@flick-lang/runtime/effect/Array" "groupWith"
   arity 1
   retention call
@@ -164,12 +164,12 @@ foreign pure group_with from "@flick-lang/runtime/effect/Array" "groupWith"
 group : Eq a => NonEmpty a -> NonEmpty (NonEmpty a)
 let group xs = group_with eq xs
 
-max_by : forall c a. (a -> a -> Ordering)^c -> (NonEmpty a -> a)^c
+max_by : (a -> a -> Ordering)^c -> (NonEmpty a -> a)^c
 foreign pure max_by from "@flick-lang/runtime/effect/Array" "flickMax"
   arity 1
   retention call
 
-min_by : forall c a. (a -> a -> Ordering)^c -> (NonEmpty a -> a)^c
+min_by : (a -> a -> Ordering)^c -> (NonEmpty a -> a)^c
 foreign pure min_by from "@flick-lang/runtime/effect/Array" "flickMin"
   arity 1
   retention call

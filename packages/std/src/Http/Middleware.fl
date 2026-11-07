@@ -105,21 +105,21 @@ foreign pure decompression from "@flick-lang/runtime/effect/http/HttpMiddleware"
   reviewed "effect@4.1.2 sha256:efe18001f13cf523"
 
 /// Runs `task` with no server span for the requests `f` accepts.
-with_tracer_disabled_when : forall c r e a. (ServerRequest -> Bool) -> (Eff r e a)^c ->{r; e} a
+with_tracer_disabled_when : (ServerRequest -> Bool) -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer_disabled_when from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithTracerDisabledWhen"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:ed330b667501bce9"
 
 /// Runs `task` with no server span for requests of the URLs.
-with_tracer_disabled_for_urls : forall c r e a. List String -> (Eff r e a)^c ->{r; e} a
+with_tracer_disabled_for_urls : List String -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer_disabled_for_urls from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithTracerDisabledForUrls"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:a1edbac479e1c390"
 
 /// Runs `task` naming the server span of a request by `f`.
-with_span_name_generator : forall c r e a. (ServerRequest -> String) -> (Eff r e a)^c ->{r; e} a
+with_span_name_generator : (ServerRequest -> String) -> (Eff r e a)^c ->{r; e} a
 foreign effect with_span_name_generator from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithSpanNameGenerator"
   arity 2
   retention call
@@ -127,7 +127,7 @@ foreign effect with_span_name_generator from "@flick-lang/runtime/effect/http/Ht
 
 /// Runs `task` recording in server spans only the headers `f name phase`
 /// accepts; the phase is `"request"` or `"response"`.
-with_tracer_header_filter : forall c r e a. (String -> String -> Bool) -> (Eff r e a)^c ->{r; e} a
+with_tracer_header_filter : (String -> String -> Bool) -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer_header_filter from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithTracerHeaderFilter"
   arity 2
   retention call

@@ -39,7 +39,7 @@ function : Hash a => Gen b -> Gen (a -> b)
 foreign pure function from "@flick-lang/runtime" "genFunction"
   arity 1
 
-map : forall c a b. (a -> b)^c -> (Gen a -> Gen b)^c
+map : (a -> b)^c -> (Gen a -> Gen b)^c
 foreign pure map from "@flick-lang/runtime" "genMap"
   arity 2
   retention call

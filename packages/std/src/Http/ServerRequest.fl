@@ -77,7 +77,7 @@ foreign effect bytes from "@flick-lang/runtime/effect/http/HttpServerRequest" "f
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// Runs `task` with the largest body a request may have.
-with_max_body_size : forall c r e a. ByteSize.ByteSize -> (Eff r e a)^c ->{r; e} a
+with_max_body_size : ByteSize.ByteSize -> (Eff r e a)^c ->{r; e} a
 foreign effect with_max_body_size from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickWithMaxBodySize"
   arity 2
   retention call

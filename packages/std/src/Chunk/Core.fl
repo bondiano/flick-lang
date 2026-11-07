@@ -39,7 +39,7 @@ foreign pure get from "@flick-lang/runtime" "chunkGet"
   reviewed "effect@4.1.2 sha256:bf32eaa2e937dd0a"
 
 /// Applies a pure function to each element.
-map : forall c a b. (a -> b)^c -> (Chunk a -> Chunk b)^c
+map : (a -> b)^c -> (Chunk a -> Chunk b)^c
 foreign pure map from "@flick-lang/runtime" "chunkMap"
   reviewed "effect@4.1.2 sha256:84dd2c3aef65c490"
   arity 2
@@ -82,7 +82,7 @@ foreign pure make from "@flick-lang/runtime/effect/Chunk" "make"
   reviewed "effect@4.1.2 sha256:13c3dcd82f057205"
 
 /// `f 0`, …, `f (n - 1)`, with at least `f 0`.
-make_by : forall c a. Int -> (Int -> a)^c -> NonEmptyChunk a
+make_by : Int -> (Int -> a)^c -> NonEmptyChunk a
 foreign pure make_by from "@flick-lang/runtime/effect/Chunk" "makeBy"
   retention call
   reviewed "effect@4.1.2 sha256:aa518f13a96a2a82"
@@ -159,14 +159,14 @@ foreign pure drop_right from "@flick-lang/runtime/effect/Chunk" "dropRight"
   reviewed "effect@4.1.2 sha256:fb2a52f5de072e79"
 
 /// The longest prefix whose elements satisfy `p`.
-take_while : forall c a. (a -> Bool)^c -> (Chunk a -> Chunk a)^c
+take_while : (a -> Bool)^c -> (Chunk a -> Chunk a)^c
 foreign pure take_while from "@flick-lang/runtime/effect/Chunk" "takeWhile"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:7b184d69b9f8a531"
 
 /// The chunk without its longest prefix whose elements satisfy `p`.
-drop_while : forall c a. (a -> Bool)^c -> (Chunk a -> Chunk a)^c
+drop_while : (a -> Bool)^c -> (Chunk a -> Chunk a)^c
 foreign pure drop_while from "@flick-lang/runtime/effect/Chunk" "dropWhile"
   arity 1
   retention call
@@ -191,7 +191,7 @@ foreign pure split from "@flick-lang/runtime/effect/Chunk" "split"
   reviewed "effect@4.1.2 sha256:77424bdbf7e89f6b"
 
 /// The elements before the first one that satisfies `p`, and the rest.
-split_where : forall c a. (a -> Bool)^c -> (Chunk a -> (Chunk a, Chunk a))^c
+split_where : (a -> Bool)^c -> (Chunk a -> (Chunk a, Chunk a))^c
 foreign pure split_where from "@flick-lang/runtime/effect/Chunk" "splitWhere"
   arity 1
   retention call
@@ -210,7 +210,7 @@ foreign pure remove from "@flick-lang/runtime/effect/Chunk" "remove"
   reviewed "effect@4.1.2 sha256:7479f14c2d120cd5"
 
 /// The element at index `i` replaced by `f` of it; `None` out of range.
-modify : forall c a. Int -> (a -> a)^c -> (Chunk a -> Option (Chunk a))^c
+modify : Int -> (a -> a)^c -> (Chunk a -> Option (Chunk a))^c
 foreign pure modify from "@flick-lang/runtime/effect/Chunk" "modify"
   arity 2
   retention call

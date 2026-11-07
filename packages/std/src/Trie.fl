@@ -101,35 +101,35 @@ foreign pure longest_prefix_of from "@flick-lang/runtime/effect/Trie" "longestPr
   reviewed "effect@4.1.2 sha256:fc45c3158c2361e5"
 
 /// The trie with the value of `key` replaced by `f value`, if it has the key.
-modify : forall c v. String -> (v -> v)^c -> (Trie v -> Trie v)^c
+modify : String -> (v -> v)^c -> (Trie v -> Trie v)^c
 foreign pure modify from "@flick-lang/runtime/effect/Trie" "modify"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:78662eed9ba277ca"
 
 /// Folds the entries in key order: `f acc value key`.
-reduce : forall c z v. z -> (z -> v -> String -> z)^c -> (Trie v -> z)^c
+reduce : z -> (z -> v -> String -> z)^c -> (Trie v -> z)^c
 foreign pure reduce from "@flick-lang/runtime/effect/Trie" "reduce"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:7ae1c8eb56558fb8"
 
 /// Each value mapped by `f value key`.
-map : forall c v b. (v -> String -> b)^c -> (Trie v -> Trie b)^c
+map : (v -> String -> b)^c -> (Trie v -> Trie b)^c
 foreign pure map from "@flick-lang/runtime/effect/Trie" "map"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:9e54d3639492a8d3"
 
 /// The entries for which `f value key` holds.
-filter : forall c v. (v -> String -> Bool)^c -> (Trie v -> Trie v)^c
+filter : (v -> String -> Bool)^c -> (Trie v -> Trie v)^c
 foreign pure filter from "@flick-lang/runtime/effect/Trie" "filter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:6448cac4164e2537"
 
 /// The entries `f value key` keeps with `Ok`, mapped to its value.
-filter_map : forall c v x b. (v -> String -> Result x b)^c -> (Trie v -> Trie b)^c
+filter_map : (v -> String -> Result x b)^c -> (Trie v -> Trie b)^c
 foreign pure filter_map from "@flick-lang/runtime/effect/Trie" "filterMap"
   arity 1
   retention call

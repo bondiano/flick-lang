@@ -9,67 +9,64 @@ import Queue
 import Stream.Core exposing (Stream)
 
 /// The elements, once the stream ends.
-run_collect : forall c r e a. (Stream r e a)^c ->{r; e} List a
+run_collect : (Stream r e a)^c ->{r; e} List a
 foreign effect run_collect from "@flick-lang/runtime/effect/Stream" "runCollect"
   retention call
   reviewed "effect@4.1.2 sha256:c5ab88400187ac59"
 
 /// The number of elements.
-run_count : forall c r e a. (Stream r e a)^c ->{r; e} Int
+run_count : (Stream r e a)^c ->{r; e} Int
 foreign effect run_count from "@flick-lang/runtime/effect/Stream" "runCount"
   retention call
   reviewed "effect@4.1.2 sha256:0dd55d94628aa779"
 
 /// The sum of the elements.
-run_sum : forall c r e. (Stream r e Float)^c ->{r; e} Float
+run_sum : (Stream r e Float)^c ->{r; e} Float
 foreign effect run_sum from "@flick-lang/runtime/effect/Stream" "runSum"
   retention call
   reviewed "effect@4.1.2 sha256:5dd277444cbb44f0"
 
 /// Runs the stream for its effects.
-run_drain : forall c r e a. (Stream r e a)^c ->{r; e} Unit
+run_drain : (Stream r e a)^c ->{r; e} Unit
 foreign effect run_drain from "@flick-lang/runtime/effect/Stream" "runDrain"
   retention call
   reviewed "effect@4.1.2 sha256:885365880ef69610"
 
 /// The first element, if any; the rest is not run.
-run_head : forall c r e a. (Stream r e a)^c ->{r; e} Option a
+run_head : (Stream r e a)^c ->{r; e} Option a
 foreign effect run_head from "@flick-lang/runtime/effect/Stream" "runHead"
   retention call
   reviewed "effect@4.1.2 sha256:39d2583ecfed87b6"
 
 /// The last element, if any.
-run_last : forall c r e a. (Stream r e a)^c ->{r; e} Option a
+run_last : (Stream r e a)^c ->{r; e} Option a
 foreign effect run_last from "@flick-lang/runtime/effect/Stream" "runLast"
   retention call
   reviewed "effect@4.1.2 sha256:a0e68a4884220098"
 
 /// The elements folded by `f` from `initial`.
-run_fold : forall c r e a z. z -> (z -> a -> z)^c -> ((Stream r e a)^c ->{r; e} z)^c
+run_fold : z -> (z -> a -> z)^c -> ((Stream r e a)^c ->{r; e} z)^c
 foreign effect run_fold from "@flick-lang/runtime/effect/Stream" "flickRunFold"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:b323a8cfa66ab7cb"
 
 /// `run_fold` with a task as the step.
-run_fold_effect :
-  forall c r e a z r2 e2. z -> (z -> a ->{r2; e2} z)^c -> ((Stream r e a)^c ->{r + r2; e + e2} z)^c
+run_fold_effect : z -> (z -> a ->{r2; e2} z)^c -> ((Stream r e a)^c ->{r + r2; e + e2} z)^c
 foreign effect run_fold_effect from "@flick-lang/runtime/effect/Stream" "flickRunFoldEffect"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:c626d5a96011fd77"
 
 /// Runs `f` on each element.
-run_for_each :
-  forall c r e a r2 e2 x. (a ->{r2; e2} x)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
+run_for_each : (a ->{r2; e2} x)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
 foreign effect run_for_each from "@flick-lang/runtime/effect/Stream" "runForEach"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d91007d002b3f9ac"
 
 /// Runs `f` on each element while it gives `true`.
-run_for_each_while :
-  forall c r e a r2 e2. (a ->{r2; e2} Bool)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
+run_for_each_while : (a ->{r2; e2} Bool)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
 foreign effect run_for_each_while from "@flick-lang/runtime/effect/Stream" "runForEachWhile"
   arity 1
   retention call
@@ -77,7 +74,6 @@ foreign effect run_for_each_while from "@flick-lang/runtime/effect/Stream" "runF
 
 /// Runs `f` on each chunk.
 run_for_each_chunk :
-  forall c r e a r2 e2 x.
   (NonEmpty.NonEmpty a ->{r2; e2} x)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
 foreign effect run_for_each_chunk from "@flick-lang/runtime/effect/Stream" "runForEachArray"
   arity 1
@@ -85,19 +81,19 @@ foreign effect run_for_each_chunk from "@flick-lang/runtime/effect/Stream" "runF
   reviewed "effect@4.1.2 sha256:73c83ac485a51123"
 
 /// The strings joined.
-mk_string : forall c r e. (Stream r e String)^c ->{r; e} String
+mk_string : (Stream r e String)^c ->{r; e} String
 foreign effect mk_string from "@flick-lang/runtime/effect/Stream" "mkString"
   retention call
   reviewed "effect@4.1.2 sha256:99d1bb18ca2caca5"
 
 /// The chunks of bytes joined.
-mk_bytes : forall c r e. (Stream r e (List Int))^c ->{r; e} List Int
+mk_bytes : (Stream r e (List Int))^c ->{r; e} List Int
 foreign effect mk_bytes from "@flick-lang/runtime/effect/Stream" "flickMkBytes"
   retention call
   reviewed "effect@4.1.2 sha256:7f99932dcb9c7332"
 
 /// Publishes each element to the hub.
-run_into_pubsub : forall c r e a. PubSub.PubSub a -> (Stream r e a)^c ->{r; e} Unit
+run_into_pubsub : PubSub.PubSub a -> (Stream r e a)^c ->{r; e} Unit
 foreign effect run_into_pubsub from "@flick-lang/runtime/effect/Stream" "runIntoPubSub"
   arity 1
   retention call
@@ -105,7 +101,7 @@ foreign effect run_into_pubsub from "@flick-lang/runtime/effect/Stream" "runInto
 
 /// Offers each element to the queue, then ends it, or fails it with the
 /// stream's failure.
-run_into_queue : forall c r e a. Queue.Queue e a -> (Stream r e a)^c ->{r;} Unit
+run_into_queue : Queue.Queue e a -> (Stream r e a)^c ->{r;} Unit
 foreign effect run_into_queue from "@flick-lang/runtime/effect/Stream" "runIntoQueue"
   arity 1
   retention call
@@ -116,7 +112,6 @@ foreign effect run_into_queue from "@flick-lang/runtime/effect/Stream" "runIntoQ
 /// (`None`: no bound), the strategy for a full hub, the last `replay` for a
 /// new subscriber.
 to_pubsub :
-  forall s c r e a.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   { capacity : Option Int; strategy : Option Queue.Strategy; replay : Option Int } ->
   (Stream r e a)^c ->{Scope s | r;}
@@ -130,7 +125,6 @@ foreign effect to_pubsub from "@flick-lang/runtime/effect/Stream" "flickToPubSub
 /// which shuts the queue down when it closes; the queue ends or fails as
 /// the stream does.
 to_queue :
-  forall s c r e a.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   { capacity : Option Int; strategy : Option Queue.Strategy } ->
   (Stream r e a)^c ->{Scope s | r;}

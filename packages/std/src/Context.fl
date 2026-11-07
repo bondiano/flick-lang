@@ -88,7 +88,7 @@ read : Reference a ->{} a
 foreign effect read from "@flick-lang/runtime/effect/Context" "flickRead"
 
 /// Runs `task` with `value` as the value of `ref`.
-with_reference : forall c r e a b. Reference a -> a -> (Eff r e b)^c ->{r; e} b
+with_reference : Reference a -> a -> (Eff r e b)^c ->{r; e} b
 foreign effect with_reference from "@flick-lang/runtime/effect/Context" "flickWithReference"
   arity 2
   retention call

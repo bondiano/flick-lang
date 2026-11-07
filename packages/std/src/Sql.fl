@@ -46,25 +46,25 @@ type error DbError = DbError { code : String; message : String; constraint : Opt
 
 /// The codec of a column whose type is not its SQL type's: `decode` reads
 /// a value of the SQL type and may refuse it, `encode` gives one back.
-codec : forall c a b. (a -> Result SchemaError b)^c -> (b -> a)^c -> (PureCodec a b)^c
+codec : (a -> Result SchemaError b)^c -> (b -> a)^c -> (PureCodec a b)^c
 foreign pure codec from "@flick-lang/runtime/sql" "sqlCodec"
   arity 2
   retention call
 
 /// Binds the parameters: no I/O.
-bind : forall d p r. Template d p r -> p -> Query d r
+bind : Template d p r -> p -> Query d r
 foreign pure bind from "@flick-lang/runtime/sql" "sqlBind"
 
 /// The SQL text of a query, with `$n` placeholders for its parameters.
-text : forall d r. Query d r -> String
+text : Query d r -> String
 foreign pure text from "@flick-lang/runtime/sql" "sqlText"
 
 /// The SQL text of a template: the same as of any query bound from it.
-template_text : forall d p r. Template d p r -> String
+template_text : Template d p r -> String
 foreign pure template_text from "@flick-lang/runtime/sql" "sqlTemplateText"
 
 /// How many parameters a query passes beside its text.
-parameter_count : forall d r. Query d r -> Int
+parameter_count : Query d r -> Int
 foreign pure parameter_count from "@flick-lang/runtime/sql" "sqlParameterCount"
 
 /// A checked SQL identifier: letters, digits and `_`, not starting with a
@@ -88,21 +88,21 @@ ident : Identifier -> Raw
 foreign pure ident from "@flick-lang/runtime/sql" "sqlRawIdent"
 
 /// A value passed as a placeholder, encoded to JSON by its codec.
-param : forall a. PureCodec Json a -> a -> Raw
+param : PureCodec Json a -> a -> Raw
 foreign pure param from "@flick-lang/runtime/sql" "sqlRawParam"
 
 /// Raw SQL outside the checked subset, its rows decoded by `decoder`:
 /// `int2`, `int4` and floats as numbers, `bool` as booleans, `json` parsed,
 /// anything else as its text.
-unsafe_query : forall a. List Raw -> PureCodec Json a -> Query Pg a
+unsafe_query : List Raw -> PureCodec Json a -> Query Pg a
 foreign pure unsafe_query from "@flick-lang/runtime/sql" "sqlRawQuery"
 
 /// What a `sql table` block compiles to.
-make_table : forall a b. a -> b
+make_table : a -> b
 foreign pure make_table from "@flick-lang/runtime/sql" "sqlTable"
 
 /// What a `sql { … }` block compiles to.
-make_template : forall a b. a -> b
+make_template : a -> b
 foreign pure make_template from "@flick-lang/runtime/sql" "sqlTemplate"
 
 /// A type named without a value: what the methods of `Param` and `Numeric`

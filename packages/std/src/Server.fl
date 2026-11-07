@@ -41,7 +41,6 @@ type error Unauthorized = Unauthorized
 /// does not run the function. Each call has its own: concurrent callers do
 /// not see each other's.
 authenticated :
-  forall a r.
   ServiceTag a ->
   (Http.Headers.Headers ->{r; Unauthorized} ServiceImpl a) ->
   List (Guarded (a + r)) ->
@@ -57,7 +56,6 @@ let path = "/_flick/fn"
 /// The calls of `functions`, each a POST of its name and payload as
 /// NDJSON, for a route at `path`. It holds region `s`: when the scope
 /// owning it closes, the calls it serves finish and run their finalizers.
-handler :
-  forall s r. List (Function r) ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s}
+handler : List (Function r) ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s}
 foreign effect handler from "@flick-lang/runtime/effect/server/FunctionsNode" "serverHandler"
   retention owner

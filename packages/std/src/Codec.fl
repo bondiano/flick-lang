@@ -11,25 +11,25 @@ type error ExportError = ExportError String
 type StandardSchema i a
 
 /// Decodes unknown input, failing with `SchemaError`; the input must be inert data.
-decode : forall c ci rd re i a. (Codec rd re i a)^c -> (Unknown^ci ->{rd; SchemaError} a)^c
+decode : (Codec rd re i a)^c -> (Unknown^ci ->{rd; SchemaError} a)^c
 foreign effect decode from "@flick-lang/runtime" "codecDecode"
   retention call
   reviewed "effect@4.1.2 sha256:0ba82b2229e48f1a"
 
 /// Encodes a value to its wire form, failing with `SchemaError`.
-encode : forall c rd re i a. (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
+encode : (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
 foreign effect encode from "@flick-lang/runtime" "codecEncode"
   retention call
   reviewed "effect@4.1.2 sha256:4152dced7e364e25"
 
 /// `decode` of a pure codec, at once.
-decode_result : forall c ci i a. (PureCodec i a)^c -> (Unknown^ci -> Result SchemaError a)^c
+decode_result : (PureCodec i a)^c -> (Unknown^ci -> Result SchemaError a)^c
 foreign pure decode_result from "@flick-lang/runtime" "codecDecodeResult"
   retention call
   reviewed "effect@4.1.2 sha256:1770b64eba8235d3"
 
 /// `encode` of a pure codec, at once.
-encode_result : forall c i a. (PureCodec i a)^c -> (a -> Result SchemaError i)^c
+encode_result : (PureCodec i a)^c -> (a -> Result SchemaError i)^c
 foreign pure encode_result from "@flick-lang/runtime" "codecEncodeResult"
   retention call
   reviewed "effect@4.1.2 sha256:0475f2036c0a9a24"
@@ -61,7 +61,7 @@ tagged_option : PureCodec Json a -> PureCodec Json (Option a)
 foreign pure tagged_option from "@flick-lang/runtime" "codecTaggedOption"
 
 /// A pure transformation both ways.
-transform : forall c a b. (a -> b)^c -> (b -> a)^c -> (PureCodec Json a -> PureCodec Json b)^c
+transform : (a -> b)^c -> (b -> a)^c -> (PureCodec Json a -> PureCodec Json b)^c
 foreign pure transform from "@flick-lang/runtime" "codecTransformPure"
   arity 3
   retention call
@@ -69,15 +69,13 @@ foreign pure transform from "@flick-lang/runtime" "codecTransformPure"
 
 /// `transform` whose values are those of `s`: a union, or the errors of an
 /// `HttpApi` endpoint, tells them from others by their constructors.
-transform_as :
-  forall c a b. Schema b -> (a -> b)^c -> (b -> a)^c -> (PureCodec Json a -> PureCodec Json b)^c
+transform_as : Schema b -> (a -> b)^c -> (b -> a)^c -> (PureCodec Json a -> PureCodec Json b)^c
 foreign pure transform_as from "@flick-lang/runtime" "codecTransformAs"
   arity 4
   retention call
 
 /// A decoding that may fail, and its encoding.
 transform_result :
-  forall c a b.
   (a -> Result SchemaError b)^c -> (b -> a)^c -> (PureCodec Json a -> PureCodec Json b)^c
 foreign pure transform_result from "@flick-lang/runtime" "codecTransformResult"
   arity 3
@@ -86,7 +84,6 @@ foreign pure transform_result from "@flick-lang/runtime" "codecTransformResult"
 
 /// A runtime decoding, whose services decoding needs: no `PureCodec`.
 transform_effect :
-  forall c r a b.
   (a ->{r; SchemaError} b)^c -> (b -> a)^c -> (PureCodec Json a -> Codec r none Json b)^c
 foreign pure transform_effect from "@flick-lang/runtime" "codecTransformEffect"
   arity 3
@@ -94,7 +91,7 @@ foreign pure transform_effect from "@flick-lang/runtime" "codecTransformEffect"
   reviewed "effect@4.1.2 sha256:c600e745195e0d87"
 
 /// A check of the whole decoded value.
-check : forall c a. (a -> Bool)^c -> String -> (PureCodec Json a -> PureCodec Json a)^c
+check : (a -> Bool)^c -> String -> (PureCodec Json a -> PureCodec Json a)^c
 foreign pure check from "@flick-lang/runtime" "codecCheckWhole"
   arity 3
   retention call
@@ -318,7 +315,7 @@ foreign pure check_effect from "@flick-lang/runtime/effect/Schema" "flickCheckEf
   reviewed "effect@4.1.2 sha256:2166212aa1cb7a69"
 
 /// The value encoded by the codec, written as XML under `<root>`.
-encode_xml : forall c rd re i a. (Codec rd re i a)^c -> (a ->{re; SchemaError} String)^c
+encode_xml : (Codec rd re i a)^c -> (a ->{re; SchemaError} String)^c
 foreign effect encode_xml from "@flick-lang/runtime/effect/Schema" "flickToEncoderXml"
   retention call
   reviewed "effect@4.1.2 sha256:3b9304a35b08fe20"

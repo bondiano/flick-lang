@@ -24,14 +24,14 @@ foreign effect set from "@flick-lang/runtime/effect/TxRef" "set"
   reviewed "effect@4.1.2 sha256:cc7dc9d082f8540d"
 
 /// Replaces the value with `f` of it.
-update : forall c a. (a -> a)^c -> (TxRef a ->{Tx.Transaction;} Unit)^c
+update : (a -> a)^c -> (TxRef a ->{Tx.Transaction;} Unit)^c
 foreign effect update from "@flick-lang/runtime/effect/TxRef" "update"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:65fa1fa830be5d12"
 
 /// Replaces the value with the second of `f` of it; returns the first.
-modify : forall c a b. (a -> (b, a))^c -> (TxRef a ->{Tx.Transaction;} b)^c
+modify : (a -> (b, a))^c -> (TxRef a ->{Tx.Transaction;} b)^c
 foreign effect modify from "@flick-lang/runtime/effect/TxRef" "modify"
   arity 1
   retention call

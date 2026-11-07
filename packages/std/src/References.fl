@@ -13,14 +13,14 @@ foreign effect current_log_level from "@flick-lang/runtime/effect/References" "f
   reviewed "effect@4.1.2 sha256:baa823ff308c24fd"
 
 /// Runs `task` with `Effect.log` writing at the level.
-with_current_log_level : forall c r e a. LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
+with_current_log_level : LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
 foreign effect with_current_log_level from "@flick-lang/runtime/effect/References" "flickWithCurrentLogLevel"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:baa823ff308c24fd"
 
 /// Runs `task` dropping log messages below the level.
-with_minimum_log_level : forall c r e a. LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
+with_minimum_log_level : LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
 foreign effect with_minimum_log_level from "@flick-lang/runtime/effect/References" "flickWithMinimumLogLevel"
   arity 1
   retention call
@@ -28,7 +28,7 @@ foreign effect with_minimum_log_level from "@flick-lang/runtime/effect/Reference
 
 /// Runs `task` logging a failure no one handled at the level, or not at
 /// all with `None`.
-with_unhandled_log_level : forall c r e a. Option LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
+with_unhandled_log_level : Option LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
 foreign effect with_unhandled_log_level from "@flick-lang/runtime/effect/References" "flickWithUnhandledLogLevel"
   arity 1
   retention call
@@ -54,21 +54,21 @@ foreign effect current_stack_frame from "@flick-lang/runtime/effect/References" 
 
 /// Runs `task` with spans that, if `disabled`, are not traced and that
 /// the spans inside skip when they look for their parent.
-with_disable_propagation : forall c r e a. Bool -> (Eff r e a)^c ->{r; e} a
+with_disable_propagation : Bool -> (Eff r e a)^c ->{r; e} a
 foreign effect with_disable_propagation from "@flick-lang/runtime/effect/References" "flickWithDisablePropagation"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:f9a31da22b2b4f40"
 
 /// Runs `task` with tracing on or off: off, its spans are not traced.
-with_tracer_enabled : forall c r e a. Bool -> (Eff r e a)^c ->{r; e} a
+with_tracer_enabled : Bool -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer_enabled from "@flick-lang/runtime/effect/References" "flickWithTracerEnabled"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b9aa00511cf3e2fc"
 
 /// Runs `task` with span timing on or off: off, spans take no clock time.
-with_tracer_timing : forall c r e a. Bool -> (Eff r e a)^c ->{r; e} a
+with_tracer_timing : Bool -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer_timing from "@flick-lang/runtime/effect/References" "flickWithTracerTimingEnabled"
   arity 1
   retention call

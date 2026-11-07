@@ -92,38 +92,38 @@ foreign effect publish_all from "@flick-lang/runtime/effect/PubSub" "publishAll"
 
 /// Subscribes in the innermost `scope` (or the one of region `s`), which
 /// unsubscribes when it closes.
-subscribe : forall s a. PubSub a ->{Scope s;} Subscription s a
+subscribe : PubSub a ->{Scope s;} Subscription s a
 foreign effect subscribe from "@flick-lang/runtime/effect/PubSub" "subscribe"
   reviewed "effect@4.1.2 sha256:56c65ae30ac7d9eb"
 
 /// The next message, waiting for one.
-take : forall s a. Subscription s a ->{} a
+take : Subscription s a ->{} a
 foreign effect take from "@flick-lang/runtime/effect/PubSub" "take"
   retention call
   reviewed "effect@4.1.2 sha256:36e5e47294d9fdd7"
 
 /// Every message there is, waiting for at least one.
-take_all : forall s a. Subscription s a ->{} NonEmpty.NonEmpty a
+take_all : Subscription s a ->{} NonEmpty.NonEmpty a
 foreign effect take_all from "@flick-lang/runtime/effect/PubSub" "takeAll"
   retention call
   reviewed "effect@4.1.2 sha256:c7dc5dc478fced97"
 
 /// At most `max` of the messages there are, without waiting.
-take_up_to : forall s a. Int -> Subscription s a ->{} List a
+take_up_to : Int -> Subscription s a ->{} List a
 foreign effect take_up_to from "@flick-lang/runtime/effect/PubSub" "takeUpTo"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:f29fc6302c5293f5"
 
 /// At least `min` and at most `max` messages, waiting for `min`.
-take_between : forall s a. Int -> Int -> Subscription s a ->{} List a
+take_between : Int -> Int -> Subscription s a ->{} List a
 foreign effect take_between from "@flick-lang/runtime/effect/PubSub" "takeBetween"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:42d1896fef0497f1"
 
 /// The number of messages waiting for the subscriber.
-remaining : forall s a. Subscription s a ->{} Int
+remaining : Subscription s a ->{} Int
 foreign effect remaining from "@flick-lang/runtime/effect/PubSub" "remaining"
   retention call
   reviewed "effect@4.1.2 sha256:ce959e5af55fbdb8"

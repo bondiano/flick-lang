@@ -19,7 +19,7 @@ foreign effect await_ from "@flick-lang/runtime/effect/Deferred" "await"
 
 /// Runs `task` once and completes the deferred with its outcome; whether
 /// this call completed it.
-complete : forall c r e a. (Eff r e a)^c -> (Deferred e a ->{r;} Bool)^c
+complete : (Eff r e a)^c -> (Deferred e a ->{r;} Bool)^c
 foreign effect complete from "@flick-lang/runtime/effect/Deferred" "complete"
   arity 1
   retention call
@@ -44,7 +44,7 @@ foreign effect fail from "@flick-lang/runtime/effect/Deferred" "fail"
   reviewed "effect@4.1.2 sha256:27c39aca7eb7ed57"
 
 /// Fails the deferred with the error `f ()` computes.
-fail_sync : forall c e a. (Unit -> Errors e)^c -> (Deferred e a ->{} Bool)^c
+fail_sync : (Unit -> Errors e)^c -> (Deferred e a ->{} Bool)^c
 foreign effect fail_sync from "@flick-lang/runtime/effect/Deferred" "failSync"
   arity 1
   retention call
@@ -57,7 +57,7 @@ foreign effect fail_cause from "@flick-lang/runtime/effect/Deferred" "flickFailC
   reviewed "effect@4.1.2 sha256:6d2e3e3fc161ebf2"
 
 /// Fails the deferred with the cause of the failure `f ()` gives.
-fail_cause_sync : forall c e a. (Unit -> Failure e)^c -> (Deferred e a ->{} Bool)^c
+fail_cause_sync : (Unit -> Failure e)^c -> (Deferred e a ->{} Bool)^c
 foreign effect fail_cause_sync from "@flick-lang/runtime/effect/Deferred" "flickFailCauseSync"
   arity 1
   retention call
@@ -93,7 +93,7 @@ foreign effect succeed from "@flick-lang/runtime/effect/Deferred" "succeed"
   reviewed "effect@4.1.2 sha256:851dfa260c442d90"
 
 /// Completes the deferred with the value `f ()` computes.
-sync : forall c e a. (Unit -> a)^c -> (Deferred e a ->{} Bool)^c
+sync : (Unit -> a)^c -> (Deferred e a ->{} Bool)^c
 foreign effect sync from "@flick-lang/runtime/effect/Deferred" "sync"
   arity 1
   retention call
@@ -101,7 +101,7 @@ foreign effect sync from "@flick-lang/runtime/effect/Deferred" "sync"
 
 /// Runs `task` and completes `deferred` with its outcome:
 /// `task |> Deferred.into deferred`.
-into : forall c r e a. Deferred e a -> (Eff r e a)^c ->{r;} Bool
+into : Deferred e a -> (Eff r e a)^c ->{r;} Bool
 foreign effect into from "@flick-lang/runtime/effect/Deferred" "into"
   arity 1
   retention call

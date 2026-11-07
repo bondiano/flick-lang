@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 
-use crate::syntax::cst::{Element, Node};
+use crate::syntax::cst::{Element, Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::is_type;
 
@@ -46,11 +46,14 @@ fn visit(node: &mut Node, text: &str, outer: &HashSet<String>, scope_known: bool
             let (Element::Node(sig), Element::Node(decl)) = (&mut before[left], &after[0]) else {
                 continue;
             };
-            if sig.kind != K::Signature
-                || decl.kind != K::LetDecl
-                || decl.has_token(K::RecKw)
-                || !same_name(sig, decl, text)
-            {
+            let signs = match decl.kind {
+                K::LetDecl => !decl.has_token(K::RecKw) && same_name(sig, decl, text),
+                K::ForeignDecl => {
+                    foreign_words(decl).1.map(|t| t.text(text)) == signature_name(sig, text)
+                }
+                _ => false,
+            };
+            if sig.kind != K::Signature || !signs {
                 continue;
             }
             if scope_known {
@@ -86,11 +89,14 @@ fn visit(node: &mut Node, text: &str, outer: &HashSet<String>, scope_known: bool
     }
 }
 
-fn same_name(sig: &Node, decl: &Node, text: &str) -> bool {
-    let name = sig
-        .child_tokens()
+fn signature_name<'t>(sig: &Node, text: &'t str) -> Option<&'t str> {
+    sig.child_tokens()
         .find(|t| t.kind == K::Ident)
-        .map(|t| t.text(text));
+        .map(|t| t.text(text))
+}
+
+fn same_name(sig: &Node, decl: &Node, text: &str) -> bool {
+    let name = signature_name(sig, text);
     name.is_some()
         && decl
             .nodes()

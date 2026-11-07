@@ -82,35 +82,35 @@ foreign pure is_subset from "@flick-lang/runtime/effect/HashSet" "flickIsSubset"
   reviewed "effect@4.1.2 sha256:f95f211b5e6524d3"
 
 /// Each element mapped by `f`, into a set of the witness given.
-map : forall c v w a b. EqHash.EqHash v b -> (a -> b)^c -> (HashSet w a -> HashSet v b)^c
+map : EqHash.EqHash v b -> (a -> b)^c -> (HashSet w a -> HashSet v b)^c
 foreign pure map from "@flick-lang/runtime/effect/HashSet" "flickMap"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:8c4389feb6082d7c"
 
 /// The elements for which `f` holds.
-filter : forall c w a. (a -> Bool)^c -> (HashSet w a -> HashSet w a)^c
+filter : (a -> Bool)^c -> (HashSet w a -> HashSet w a)^c
 foreign pure filter from "@flick-lang/runtime/effect/HashSet" "flickFilter"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:cceadac97d43a2dc"
 
 /// Whether `f` holds for some element.
-some : forall c w a. (a -> Bool)^c -> (HashSet w a -> Bool)^c
+some : (a -> Bool)^c -> (HashSet w a -> Bool)^c
 foreign pure some from "@flick-lang/runtime/effect/HashSet" "flickSome"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:67c675c78c075f7e"
 
 /// Whether `f` holds for every element.
-every : forall c w a. (a -> Bool)^c -> (HashSet w a -> Bool)^c
+every : (a -> Bool)^c -> (HashSet w a -> Bool)^c
 foreign pure every from "@flick-lang/runtime/effect/HashSet" "flickEvery"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:445bad072e617cfb"
 
 /// Folds the elements in no particular order.
-reduce : forall c w a z. z -> (z -> a -> z)^c -> (HashSet w a -> z)^c
+reduce : z -> (z -> a -> z)^c -> (HashSet w a -> z)^c
 foreign pure reduce from "@flick-lang/runtime/effect/HashSet" "flickReduce"
   arity 3
   retention call

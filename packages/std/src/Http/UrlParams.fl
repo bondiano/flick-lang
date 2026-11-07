@@ -119,7 +119,7 @@ foreign pure default_redacted_names from "@flick-lang/runtime/effect/http/UrlPar
   reviewed "effect@4.1.2 sha256:c7a7b9cf63e3925a"
 
 /// Runs `task` with the names of the parameters that logs and `show` mask.
-with_redacted_names : forall c r e a. List String -> (Eff r e a)^c ->{r; e} a
+with_redacted_names : List String -> (Eff r e a)^c ->{r; e} a
 foreign effect with_redacted_names from "@flick-lang/runtime/effect/http/UrlParams" "flickWithRedactedNames"
   arity 2
   retention call

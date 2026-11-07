@@ -57,20 +57,20 @@ foreign effect release_n from "@flick-lang/runtime/effect/TxSemaphore" "releaseN
   reviewed "effect@4.1.2 sha256:3b656b3d1a23f8ab"
 
 /// Runs `body` holding a permit.
-with_permit : forall c r e a. TxSemaphore -> ((Eff r e a)^c ->{r; e} a)^c
+with_permit : TxSemaphore -> ((Eff r e a)^c ->{r; e} a)^c
 foreign effect with_permit from "@flick-lang/runtime/effect/TxSemaphore" "withPermit"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:dd3edbbad1400f0e"
 
 /// Runs `body` holding `n` permits.
-with_permits : forall c r e a. TxSemaphore -> Int -> ((Eff r e a)^c ->{r; e} a)^c
+with_permits : TxSemaphore -> Int -> ((Eff r e a)^c ->{r; e} a)^c
 foreign effect with_permits from "@flick-lang/runtime/effect/TxSemaphore" "withPermits"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:fc6ba8bb4220e466"
 
 /// Holds a permit until the scope of region `s` closes.
-with_permit_scoped : forall s. TxSemaphore ->{Scope s;} Unit
+with_permit_scoped : TxSemaphore ->{Scope s;} Unit
 foreign effect with_permit_scoped from "@flick-lang/runtime/effect/TxSemaphore" "withPermitScoped"
   reviewed "effect@4.1.2 sha256:a86f59bd6eafdd1c"

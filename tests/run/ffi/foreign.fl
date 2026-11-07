@@ -73,12 +73,11 @@ foreign pure to_upper from global "String.prototype.toUpperCase"
   this
 
 // Rank-two capture bounds do not change the callbacks' JavaScript arity.
-combine : forall c. (forall u v. Float^u -> (Float^v -> Float)^(c + u))^c -> Float -> Float -> Float
+combine : (forall u v. Float^u -> (Float^v -> Float)^(c + u))^c -> Float -> Float -> Float
 foreign pure combine from "./bindings.mjs" "combine"
   retention call
 
 combine_three :
-  forall c.
   (forall u v w. Float^u -> (Float^v -> (Float^w -> Float)^(c + u + v))^(c + u))^c ->
   Float ->
   Float ->
@@ -87,8 +86,7 @@ combine_three :
 foreign pure combine_three from "./bindings.mjs" "combineThree"
   retention call
 
-same_callback :
-  forall c d. (forall v. String^v -> String)^c -> (forall v. String^v -> String)^d -> Bool
+same_callback : (forall v. String^v -> String)^c -> (forall v. String^v -> String)^d -> Bool
 foreign pure same_callback from "./bindings.mjs" "sameCallback"
   retention call
 

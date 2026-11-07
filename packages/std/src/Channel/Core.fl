@@ -144,15 +144,13 @@ foreign pure from_queue_array from "@flick-lang/runtime/effect/Channel" "fromQue
 
 /// Emits the messages of a subscription; the channel holds its region, so
 /// it cannot leave the subscription's `scope`.
-from_subscription :
-  forall s a i ie id. PubSub.Subscription s a -> (Channel none none i a Unit ie id)^{s}
+from_subscription : PubSub.Subscription s a -> (Channel none none i a Unit ie id)^{s}
 foreign pure from_subscription from "@flick-lang/runtime/effect/Channel" "fromSubscription"
   retention owner
   reviewed "effect@4.1.2 sha256:669854ebe54e976a"
 
 /// `from_subscription`, a chunk of the messages there are at a time.
 from_subscription_array :
-  forall s a i ie id.
   PubSub.Subscription s a -> (Channel none none i (NonEmpty.NonEmpty a) Unit ie id)^{s}
 foreign pure from_subscription_array from "@flick-lang/runtime/effect/Channel" "fromSubscriptionArray"
   retention owner

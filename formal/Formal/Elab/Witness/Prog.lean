@@ -58,14 +58,14 @@ def methSch : Nat → Option (Nat × Scheme)
 def constSch : Nat → Option Scheme
   | 0 => some ⟨2, [], arrP (.var 0) (arrP (.var 1) (.app (.app (.con 10) (.var 0)) (.var 1))), .cnil⟩
   | 1 => some ⟨1, [], optTy (.var 0), .cnil⟩
-  | 2 => some ⟨5, [], bindTy (.con 9) (.var 0) (.var 1) (.var 2) (.var 3) (.var 4), .cnil⟩
+  | 2 => some ⟨5, [], bindTy (.con 9) (.var 2) (.var 3) (.var 0) (.var 1) (.var 4), .cnil⟩
   | 3 => some ⟨2, [], arrP (.var 0) (appQ (.con 9) (.var 1) (.var 0)), .cnil⟩
   | 4 => some ⟨2, [], appQ (.con 9) (.var 1) (.var 0), .cnil⟩
-  | 5 => some ⟨2, [], arrP (appQ (.con 9) (.var 0) (.var 1)) (.app (.con 8) (.var 1)), .cnil⟩
+  | 5 => some ⟨2, [], arrP (appQ (.con 9) (.var 1) (.var 0)) (.app (.con 8) (.var 0)), .cnil⟩
   | 6 => some ⟨3, [], arrP (.arr .P (.var 2) (.con 1) (.var 0))
       (.arr .P (appQ (.con 9) (.var 1) (.var 2)) (.con 1) (.var 0)), .cnil⟩
-  | 7 => some ⟨5, [], arrP (.arr (.R (.var 3) (.var 4)) (.var 2) (.con 1) (.var 0))
-      (.arr (.R (.var 3) (.var 4)) (appQ (.con 9) (.var 1) (.var 2)) (.con 1) (.var 0)), .cnil⟩
+  | 7 => some ⟨5, [], arrP (.arr (.R (.var 1) (.var 2)) (.var 0) (.con 1) (.var 3))
+      (.arr (.R (.var 1) (.var 2)) (appQ (.con 9) (.var 4) (.var 0)) (.con 1) (.var 3)), .cnil⟩
   | 8 => some ⟨0, [], .con 1, .cnil⟩
   | 9 => none
   | n + 10 => if n % 2 = 0 then (if 0 < n / 2 then some (uncSch 10 (n / 2)) else none)

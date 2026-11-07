@@ -104,28 +104,28 @@ foreign pure find_defect from "@flick-lang/runtime/effect/Exit" "flickFindDefect
   reviewed "effect@4.1.2 sha256:e9dba04776a6cfa0"
 
 /// `on_success` of the value or `on_failure` of the failure.
-match_ : forall c e a b. (a -> b)^c -> (Failure e -> b)^c -> (Exit e a -> b)^c
+match_ : (a -> b)^c -> (Failure e -> b)^c -> (Exit e a -> b)^c
 foreign pure match_ from "@flick-lang/runtime/effect/Exit" "flickMatch"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:b8fd5abf3f9ca77d"
 
 /// The value of a success changed by `f`.
-map : forall c e a b. (a -> b)^c -> (Exit e a -> Exit e b)^c
+map : (a -> b)^c -> (Exit e a -> Exit e b)^c
 foreign pure map from "@flick-lang/runtime/effect/Exit" "flickMap"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:ca82cf9d1072f180"
 
 /// The typed errors changed by `f`.
-map_error : forall c e e2 a. (Errors e -> Errors e2)^c -> (Exit e a -> Exit e2 a)^c
+map_error : (Errors e -> Errors e2)^c -> (Exit e a -> Exit e2 a)^c
 foreign pure map_error from "@flick-lang/runtime/effect/Exit" "flickMapError"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:611c058a82a1a4cf"
 
 /// The typed errors changed by `on_failure`, the value by `on_success`.
-map_both : forall c e e2 a b. (Errors e -> Errors e2)^c -> (a -> b)^c -> (Exit e a -> Exit e2 b)^c
+map_both : (Errors e -> Errors e2)^c -> (a -> b)^c -> (Exit e a -> Exit e2 b)^c
 foreign pure map_both from "@flick-lang/runtime/effect/Exit" "flickMapBoth"
   arity 2
   retention call

@@ -25,8 +25,7 @@ foreign effect sleep from "@flick-lang/runtime/effect/Effect" "sleep"
 /// Runs `task` again after each typed failure, as long as the schedule,
 /// which gets the error, recurs; then fails with the last error. A defect
 /// or an interruption is never retried.
-retry :
-  forall c r e a r2 e2 o. Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{r + r2; e + e2} a
+retry : Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
   arity 1
   retention call
@@ -35,7 +34,6 @@ foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
 /// `retry`, with `fallback` given the last error and the schedule's output
 /// when the schedule stops.
 retry_or_else :
-  forall c r e a r2 e2 o r3 e3.
   Schedule.Schedule r2 e2 (Errors e) o ->
   (Errors e -> o ->{r3; e3} a) ->
   (Eff r e a)^c ->{r + r2 + r3; e2 + e3}
@@ -48,7 +46,7 @@ foreign effect retry_or_else from "@flick-lang/runtime/effect/Effect" "retryOrEl
 /// Runs `task`, then again as long as the schedule, which gets each
 /// result, recurs; the schedule's last output. The first typed failure
 /// stops it.
-repeat : forall c r e a r2 e2 o. Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{r + r2; e + e2} o
+repeat : Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{r + r2; e + e2} o
 foreign effect repeat from "@flick-lang/runtime/effect/Effect" "repeat"
   arity 1
   retention call
@@ -57,7 +55,6 @@ foreign effect repeat from "@flick-lang/runtime/effect/Effect" "repeat"
 /// `repeat`, with `fallback` given the error and the metadata of the last
 /// step, if one ran, when the task or the schedule fails.
 repeat_or_else :
-  forall c r e a r2 e2 o r3 e3.
   Schedule.Schedule r2 e2 a o ->
   (Errors (e + e2) -> Option (Schedule.Metadata o a) ->{r3; e3} o) ->
   (Eff r e a)^c ->{r + r2 + r3; e3}
@@ -69,16 +66,14 @@ foreign effect repeat_or_else from "@flick-lang/runtime/effect/Effect" "repeatOr
 
 /// Runs `task` by the schedule, which gets no input, delaying before each
 /// run after the first; the schedule's last output.
-schedule :
-  forall c r e a r2 e2 i o. Schedule.Schedule r2 e2 i o -> (Eff r e a)^c ->{r + r2; e + e2} o
+schedule : Schedule.Schedule r2 e2 i o -> (Eff r e a)^c ->{r + r2; e + e2} o
 foreign effect schedule from "@flick-lang/runtime/effect/Effect" "schedule"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:2f8fe183096c3d87"
 
 /// `repeat` with `initial` as the schedule's first input.
-schedule_from :
-  forall c r e a r2 e2 o. a -> Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{r + r2; e + e2} o
+schedule_from : a -> Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{r + r2; e + e2} o
 foreign effect schedule_from from "@flick-lang/runtime/effect/Effect" "scheduleFrom"
   arity 2
   retention call
@@ -91,7 +86,7 @@ foreign effect die from "@flick-lang/runtime/effect/Effect" "die"
   reviewed "effect@4.1.2 sha256:cf34f67c8ed6636c"
 
 /// Fails with the whole cause of the failure `f ()` gives.
-fail_cause_sync : forall c e a. (Unit -> Failure e)^c ->{; e} a
+fail_cause_sync : (Unit -> Failure e)^c ->{; e} a
 foreign effect fail_cause_sync from "@flick-lang/runtime/effect/Effect" "flickFailCauseSync"
   retention call
   reviewed "effect@4.1.2 sha256:aab9e6230fa8e4ed"
@@ -116,56 +111,54 @@ foreign effect yield_now_with from "@flick-lang/runtime/effect/Effect" "yieldNow
 
 /// How `task` ends, its typed failure, defect or interruption included;
 /// never fails itself.
-exit : forall c r e a. (Eff r e a)^c ->{r;} Exit e a
+exit : (Eff r e a)^c ->{r;} Exit e a
 foreign effect exit from "@flick-lang/runtime/effect/Effect" "flickExit"
   retention call
   reviewed "effect@4.1.2 sha256:f4b245f186c9f3a9"
 
 /// Runs `task`, then `other`: both results. `parallel` runs them at once.
-zip : forall c r e a r2 e2 b. (Eff r2 e2 b)^c -> (Eff r e a)^c ->{r + r2; e + e2} (a, b)
+zip : (Eff r2 e2 b)^c -> (Eff r e a)^c ->{r + r2; e + e2} (a, b)
 foreign effect zip from "@flick-lang/runtime/effect/Effect" "zip"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:827d4c0d73b7f936"
 
 /// Runs `task`, then `other`, and combines their results with `f`.
-zip_with :
-  forall c r e a r2 e2 b d. (Eff r2 e2 b)^c -> (a -> b -> d)^c -> (Eff r e a)^c ->{r + r2; e + e2} d
+zip_with : (Eff r2 e2 b)^c -> (a -> b -> d)^c -> (Eff r e a)^c ->{r + r2; e + e2} d
 foreign effect zip_with from "@flick-lang/runtime/effect/Effect" "zipWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:5915af61e36fd58f"
 
 /// Runs `task` after the duration.
-delay : forall c r e a. Duration.Duration -> (Eff r e a)^c ->{r; e} a
+delay : Duration.Duration -> (Eff r e a)^c ->{r; e} a
 foreign effect delay from "@flick-lang/runtime/effect/Effect" "delay"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:1c71f203aeea12d2"
 
 /// The result of `task` with how long it ran.
-timed : forall c r e a. (Eff r e a)^c ->{r; e} (Duration.Duration, a)
+timed : (Eff r e a)^c ->{r; e} (Duration.Duration, a)
 foreign effect timed from "@flick-lang/runtime/effect/Effect" "timed"
   retention call
   reviewed "effect@4.1.2 sha256:b7b453eb3154ac8d"
 
 /// Runs `fallback` instead when `task` does not end within the duration;
 /// `task` is interrupted.
-timeout_or_else :
-  forall c r e a r2 e2. Duration.Duration -> (Eff r2 e2 a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
+timeout_or_else : Duration.Duration -> (Eff r2 e2 a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect timeout_or_else from "@flick-lang/runtime/effect/Effect" "flickTimeoutOrElse"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:3de84923ba3336b1"
 
 /// Runs `task` again and again until it fails.
-forever : forall c r e a b. (Eff r e a)^c ->{r; e} b
+forever : (Eff r e a)^c ->{r; e} b
 foreign effect forever from "@flick-lang/runtime/effect/Effect" "forever"
   retention call
   reviewed "effect@4.1.2 sha256:fe36215c57cef002"
 
 /// Runs `task` again after each typed failure until it succeeds.
-eventually : forall c r e a. (Eff r e a)^c ->{r;} a
+eventually : (Eff r e a)^c ->{r;} a
 foreign effect eventually from "@flick-lang/runtime/effect/Effect" "eventually"
   retention call
   reviewed "effect@4.1.2 sha256:0a54a91084aa5c5e"
@@ -178,14 +171,14 @@ foreign pure replicate from "@flick-lang/runtime/effect/Effect" "replicate"
 
 /// Runs `task` `n` times, as many at once as `concurrency` lets; the
 /// results in order.
-replicate_effect : forall c r e a. Detached r => Concurrency -> Int -> (Eff r e a)^c ->{r; e} List a
+replicate_effect : Detached r => Concurrency -> Int -> (Eff r e a)^c ->{r; e} List a
 foreign effect replicate_effect from "@flick-lang/runtime/effect/Effect" "flickReplicateEffect"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:0747f16ecf18fcaa"
 
 /// Runs `task` only if `condition` gives `true`: its result, or `None`.
-when_ : forall c r e a r2 e2. (Eff r2 e2 Bool)^c -> (Eff r e a)^c ->{r + r2; e + e2} Option a
+when_ : (Eff r2 e2 Bool)^c -> (Eff r e a)^c ->{r + r2; e + e2} Option a
 foreign effect when_ from "@flick-lang/runtime/effect/Effect" "when"
   arity 1
   retention call
@@ -195,7 +188,6 @@ foreign effect when_ from "@flick-lang/runtime/effect/Effect" "when"
 /// is acquired now and again by the schedule, and released when the
 /// innermost `scope` (or the one of region `s`) closes.
 resource_auto :
-  forall c s r e a r2 e2 i o.
   (Fiber.Outlives c s, Fiber.Provided r s, Fiber.Provided r2 s, Detached r, Detached r2) =>
   Schedule.Schedule r2 e2 i o ->
   (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r + r2;}
