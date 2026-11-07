@@ -7,6 +7,7 @@ use crate::fmt::foralls;
 use crate::project::Analyzed;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::keeps_for_owner;
 
 /// A signature as written, without an outer `forall` it does not need.
 pub(super) fn signature_as_written(node: &Node, text: &str, outer: &HashSet<String>) -> String {
@@ -39,12 +40,20 @@ impl Ide<'_> {
     /// The signature of a top-level value as its source writes it.
     pub(super) fn signature(&self, module: &str, name: &str) -> Option<String> {
         let source = self.source(module)?;
-        let sig = source.tree.nodes().find(|d| {
+        let mut nodes = source.tree.nodes();
+        let sig = nodes.find(|d| {
             d.kind == K::Signature
                 && d.child_tokens()
                     .next()
                     .is_some_and(|t| t.text(&source.text) == name)
         })?;
+        // the constraints of `retention owner` are in no text: show the scheme
+        if nodes
+            .next()
+            .is_some_and(|decl| keeps_for_owner(decl, &source.text))
+        {
+            return None;
+        }
         Some(signature_as_written(
             sig.nodes().next()?,
             &source.text,
@@ -76,3 +85,7 @@ impl Ide<'_> {
         Some(signature_as_written(sig.nodes().next()?, text, &head))
     }
 }
+
+#[cfg(test)]
+#[path = "written_tests.rs"]
+mod tests;

@@ -97,6 +97,7 @@ pub use display::{show_signature, show_type};
 pub use do_notation::{bind_key, guard_key};
 pub use effects::NO_EFFECTS;
 pub use env::{Abi, EnumLit, Form, Fundep, Instance, JsClass, Rep, TypeDef};
+pub use ffi::keeps_for_owner;
 pub use gadt::branch::dict_local;
 pub use gadt::scheme::{built, is_indexed, written_dicts};
 pub use generalize::without_value_captures;

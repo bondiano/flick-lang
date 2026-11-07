@@ -12,9 +12,10 @@
 //! | `variadic` | the last argument is a `List a` spread into the call |
 //! | `retention call` / `retention owner` | what a parameter that may hold a scope's capabilities is kept for |
 
-mod suspends;
+mod retention;
+pub use retention::keeps_for_owner;
 
-use std::slice;
+mod suspends;
 
 use super::Checker;
 use super::env::Form;
@@ -235,82 +236,6 @@ impl Checker<'_> {
     }
 
     /// The parameters of a curried function type, one per arrow.
-    /// What a foreign function keeps until an owner closes may hold only what
-    /// outlives that owner: a capture row of a parameter that nothing after
-    /// its last parameter shows needs `Fiber.Outlives`.
-    fn owner_retention(&mut self, scheme: &Type, body: &Type, span: Span) {
-        let Type::Forall {
-            vars, constraints, ..
-        } = scheme
-        else {
-            return;
-        };
-        let outlived: Vec<&str> = constraints
-            .iter()
-            .filter_map(
-                |c| match super::classes::args_of(c, Lang::Outlives)?.first()? {
-                    Type::Var(v) => Some(v.as_str()),
-                    _ => None,
-                },
-            )
-            .collect();
-        let kept = vars.iter().find(|v| {
-            let name = slice::from_ref(&v.name);
-            if !matches!(v.kind, Kind::CaptureRow) || outlived.contains(&v.name.as_str()) {
-                return false;
-            }
-            // what follows the last parameter that holds the row
-            let (mut rest, mut after) = (body.clone(), None);
-            while let Type::Fun { param, result, .. } = self.whnf_captured(&rest).0 {
-                if mentions(&param, name) {
-                    after = Some((*result).clone());
-                }
-                rest = *result;
-            }
-            after.is_some_and(|after| !mentions(&after, name))
-        });
-        // work kept until the owner closes runs with the caller's services,
-        // which must outlive the owner too (`docs/formal/runtime.md#a-provide-service-outlives-the-release-of-its-layer`)
-        let provided: Vec<&str> = constraints
-            .iter()
-            .filter_map(
-                |c| match super::classes::args_of(c, Lang::Provided)?.first()? {
-                    Type::Var(v) => Some(v.as_str()),
-                    _ => None,
-                },
-            )
-            .collect();
-        let outlived: Vec<String> = outlived.iter().map(|v| (*v).to_owned()).collect();
-        let held = self.params_of(body);
-        let unprovided = vars.iter().find(|v| {
-            matches!(v.kind, Kind::ServiceRow)
-                && !provided.contains(&v.name.as_str())
-                && held
-                    .iter()
-                    .any(|p| mentions(p, &outlived) && mentions(p, slice::from_ref(&v.name)))
-        });
-        if let Some(row) = unprovided {
-            self.error(
-                codes::F002,
-                span,
-                format!(
-                    "with `retention owner` the foreign function keeps work that uses the services `{0}` until its owner closes, so its signature needs `Fiber.Provided {0} s` for the owner's region `s`",
-                    row.name
-                ),
-            );
-        }
-        if let Some(row) = kept {
-            self.error(
-                codes::F002,
-                span,
-                format!(
-                    "with `retention owner` the foreign function keeps what `{0}` holds until its owner closes, so its signature needs `Fiber.Outlives {0} s` for the owner's region `s`",
-                    row.name
-                ),
-            );
-        }
-    }
-
     fn params_of(&self, ty: &Type) -> Vec<Type> {
         let mut out = Vec::new();
         let mut ty = ty.clone();

@@ -174,7 +174,7 @@ the enclosing bound. Primitive fields such as `Float` gain no captures.
 | a nominal or opaque wrapper | a visible region or hidden field capture cannot be erased |
 | a cell or binding from outside the scope | its type may not come to mention the region; mutable storage and its qualified element types are invariant (`FLICK-T003`), even when a value bound could otherwise widen |
 | an error | its payload holds no region, even when a handler inside the scope catches it (`FLICK-E005`); `type error E (s : Region) = E (File s)` is rejected where it is declared |
-| a foreign function | its signature is its retention contract: what it keeps is in its result's qualifier; with `retention owner`, a capture row it keeps needs `Fiber.Outlives` (`FLICK-F002`) |
+| a foreign function | its signature is its retention contract: what it keeps is in its result's qualifier; with `retention owner` and one region in the signature, it gets `Fiber.Outlives` for a capture row it keeps and `Fiber.Provided` and `Detached` for the services of kept work; with two regions the signature writes them (`FLICK-F002`) |
 
 ## Leases
 
@@ -237,5 +237,5 @@ of a background `Stream` or `Channel`.
 
 | Construct | Today |
 | - | - |
-| foreign retention contracts | signatures are written and reviewed by hand; the checker requires `retention`, and `Fiber.Outlives` for what `retention owner` keeps, but does not inspect foreign bodies |
+| foreign retention contracts | signatures are written and reviewed by hand; the checker requires `retention`, and derives or requires `Fiber.Outlives` for what `retention owner` keeps, but does not inspect foreign bodies |
 | a region variable unified late with another region in a capture row | the two are kept apart, which may reject a program |

@@ -1,24 +1,39 @@
 // With `retention owner` the JS code keeps an argument until the owner of
-// a region closes: a capture row it keeps needs `Fiber.Outlives`, unless
-// the result shows it, and the services of kept work `Fiber.Provided`.
+// a region closes: a capture row it keeps outlives that region, unless the
+// result shows it, and the services of kept work are provided and detached. A
+// signature with one region gets those constraints; with two it has to say which.
 module App.OwnerRetention exposing (..)
 
-defer : forall c s r. (Eff r none Unit)^c ->{Scope s | r;} Unit
+defer : (Eff r none Unit)^c ->{Scope s | r;} Unit
 foreign effect defer from "./scope.js" "defer"
   retention owner
 
 defer_checked :
-  forall c s r.
-  (Fiber.Outlives c s, Fiber.Provided r s) => (Eff r none Unit)^c ->{Scope s | r;} Unit
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) => (Eff r none Unit)^c ->{Scope s | r;} Unit
 foreign effect defer_checked from "./scope.js" "defer"
   retention owner
 
-shown : forall c a. (Unit -> a)^c -> (Unit -> a)^c
+shown : (Unit -> a)^c -> (Unit -> a)^c
 foreign pure shown from "./scope.js" "shown"
   retention owner
 
-defer_unprovided : forall c s r. Fiber.Outlives c s => (Eff r none Unit)^c ->{Scope s | r;} Unit
-foreign effect defer_unprovided from "./scope.js" "defer"
+// the caller has to meet what `defer` gets
+without_constraints : (Eff r none Unit)^c ->{Scope s | r;} Unit
+let without_constraints work = defer work
+
+with_constraints :
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) => (Eff r none Unit)^c ->{Scope s | r;} Unit
+let with_constraints work = defer work
+
+without_detached : (Fiber.Outlives c s, Fiber.Provided r s) => (Eff r none Unit)^c ->{Scope s | r;} Unit
+let without_detached work = defer work
+
+type Handle (t : Region) = Handle
+
+two_regions : Handle t -> (Eff r none Unit)^c ->{Scope s | r;} Unit
+foreign effect two_regions from "./scope.js" "defer"
   retention owner
-//~ FLICK-F002 @7:1-8:18
-//~ FLICK-F002 @21:1-22:18
+//~ FLICK-G003 @22:32-22:37 the child holds `c`, which may end before its owner `s`
+//~ FLICK-G003 @22:32-22:37 this keeps work that uses `r` until `s` closes
+//~ FLICK-E017 @29:29-29:34 cannot deduce `Detached r`
+//~ FLICK-F002 @34:1-35:18 with `retention owner`

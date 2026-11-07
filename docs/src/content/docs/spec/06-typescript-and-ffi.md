@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: 5ae12791d6f2b9ee
+source_hash: 3a5f79baeb815217
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -189,7 +189,7 @@ conservatively gets `Unit ->{} Float`. The function may read the clock or change
 
 The import writes only the generated module. A binding checked by hand lives in a module of its own and carries `reviewed "<pkg>@<ver> sha256:…"`, the fingerprint of the declaration it was checked against. `flick ffi check` imports each package again and reports a generated module that differs from the new import (`FLICK-F006`), a reviewed binding whose declaration changed or disappeared or that lacks what its shape needs (`FLICK-F007`), and a policy for an export the package does not have (`FLICK-F008`).
 
-A callback with unknown retention does not accept a scoped handle or a closure capturing it: `retention call` (only for the duration of the call) or `retention owner` (until the owner of the region closes) states how long JS keeps it. TS `readonly` does not rule out changes through another alias.
+A callback with unknown retention does not accept a scoped handle or a closure capturing it: `retention call` (only for the duration of the call) or `retention owner` (until the owner of the region closes) states how long JS keeps it. With `retention owner` and one region in the signature, it gets `Fiber.Outlives` for a kept capture row and `Fiber.Provided` and `Detached` for the services of kept work; with two regions the signature writes them. TS `readonly` does not rule out changes through another alias.
 
 ## One signature and an explicit mode of the foreign call
 
