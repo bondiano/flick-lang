@@ -170,6 +170,19 @@ func (c *Cause) message() string {
 	return defectMessage(c.defect)
 }
 
+// causeInterrupted is whether `c` has an interruption among its reasons.
+func causeInterrupted(c *Cause) bool {
+	if c == nil {
+		return false
+	}
+	for _, r := range c.reasons() {
+		if r.kind == causeInterrupt {
+			return true
+		}
+	}
+	return false
+}
+
 // withoutInterrupts is the cause without its interruptions; nil when only
 // they were left.
 func withoutInterrupts(c *Cause) *Cause {
