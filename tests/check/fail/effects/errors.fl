@@ -1,0 +1,24 @@
+module App.FailErrors exposing (..)
+
+type error Gone = Gone String
+
+/// `Fail.fail` needs its error in the row.
+unallowed : String ->{} Int
+let unallowed reason = Fail.fail (Gone reason)
+//~ FLICK-E002 @7:24-7:47 the signature of `unallowed` does not allow
+
+/// `Fail e` in a row is the error `e`, as the row of errors says.
+written : String ->{Fail {Gone};} Int
+let written reason = Fail.fail (Gone reason)
+
+leaks : String ->{} Int
+let leaks reason = written reason
+//~ FLICK-E002 @15:20-15:34 the signature of `leaks` does not allow
+
+/// `Fail.fail` is a pattern for an arm of a `try`, where it takes one error.
+two : String ->{} Int
+let two reason =
+  try written reason with
+//~ FLICK-E002 @21:3-21:6 the signature of `two` does not allow
+  | Fail.fail (Gone _) (Gone _) -> 0
+//~ FLICK-T001 @23:5-23:14 effect `Fail` has no operation `fail`

@@ -12,6 +12,7 @@ codegen/patterns
 codegen/closures
 codegen/task_twice
 codegen/errors
+codegen/fail
 codegen/services
 codegen/service_dictionary
 codegen/higher_rank

@@ -235,6 +235,23 @@ let checked result =
   from_result result
 ```
 
+`Fail.fail` fails with an error directly. The second row of an arrow is the
+effect `Fail`: `->{Fail {NotFound}; }` is `->{; NotFound}`, and an arm of a
+`try` catches it, written `| NotFound _ ->` or, in full,
+`| Fail.fail (NotFound _) ->`:
+
+```flick
+# type error NotFound = NotFound String
+#
+find : String ->{Fail {NotFound};} Int
+let find name = Fail.fail (NotFound name)
+
+found : String ->{} Int
+let found name =
+  try find name with
+  | Fail.fail (NotFound _) -> 0
+```
+
 ## Services
 
 A `service` lists operations with full signatures. Running an operation looks

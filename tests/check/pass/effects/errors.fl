@@ -101,3 +101,24 @@ let rethrown t = task {
   try await t with
   | e -> from_result (Err e)
 }
+
+/// `Fail e` in a row is the error `e`, and `Fail.fail` raises it.
+type error Gone = Gone String
+
+gone : String ->{Fail {Gone};} Int
+let gone reason = Fail.fail (Gone reason)
+
+caught : String ->{} Int
+let caught reason =
+  try gone reason with
+  | Fail.fail (Gone _) -> 0
+
+short : String ->{} Int
+let short reason =
+  try gone reason with
+  | Gone _ -> 0
+
+every_failure : String ->{} Int
+let every_failure reason =
+  try gone reason with
+  | Fail.fail _ -> 0

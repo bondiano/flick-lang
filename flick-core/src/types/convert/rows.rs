@@ -9,6 +9,7 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::env::{Form, Found};
 use crate::types::kinds::Kind;
+use crate::types::lang::Lang;
 use crate::types::ty::{Effects, Row, Shape, Type, Written};
 use crate::types::{Checker, ty};
 
@@ -22,6 +23,7 @@ impl Checker<'_> {
         };
         let services = side(self, Kind::ServiceRow);
         let errors = side(self, Kind::ErrorRow);
+        let (services, errors) = fails_as_errors(services, errors);
         Effects {
             written: self.row_written(node),
             ..Effects::new(services, errors)
@@ -291,4 +293,22 @@ pub(super) fn place_braces(ty: &mut Type, node: &Node, file: FileId) {
         };
         row.written = Written(Some((at, shape)));
     }
+}
+
+/// `{Fail e, r; e2}` is `{r; e + e2}`: the errors have a row of their own.
+// shortcut: only the rows of an arrow, so `Eff {Fail e} none a` keeps `Fail e` as an effect nothing handles; upgrade when a program writes it there.
+fn fails_as_errors(services: Type, errors: Type) -> (Type, Type) {
+    let Type::Row(mut row) = services else {
+        return (services, errors);
+    };
+    let is_fail = |ty: &Type| ty.spine().0.is_lang(Lang::Fail);
+    let mut errors = errors;
+    for (_, ty) in row.entries.iter().filter(|(_, ty)| is_fail(ty)) {
+        let (_, args) = ty.spine();
+        if let [failed] = args[..] {
+            errors = Type::Union(Box::new((*failed).clone()), Box::new(errors));
+        }
+    }
+    row.entries.retain(|(_, ty)| !is_fail(ty));
+    (Type::Row(row), errors)
 }

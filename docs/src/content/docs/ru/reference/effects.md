@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: abf9acc5aaa0ec75
+source_hash: 3c5e800d2bc53977
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -252,6 +252,23 @@ let find_optional id =
 checked : Result NotFound User ->{; NotFound} User
 let checked result =
   from_result result
+```
+
+`Fail.fail` завершает вычисление с ошибкой напрямую. Вторая строка стрелки —
+это эффект `Fail`: `->{Fail {NotFound}; }` то же, что `->{; NotFound}`, а ветка
+`try` его ловит, в виде `| NotFound _ ->` или полностью
+`| Fail.fail (NotFound _) ->`:
+
+```flick
+# type error NotFound = NotFound String
+#
+find : String ->{Fail {NotFound};} Int
+let find name = Fail.fail (NotFound name)
+
+found : String ->{} Int
+let found name =
+  try find name with
+  | Fail.fail (NotFound _) -> 0
 ```
 
 ## Сервисы

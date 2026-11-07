@@ -7,7 +7,7 @@ use crate::numeric::Arith;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::handle::{arm_pattern, operation_path};
+use crate::types::handle::{arm_pattern, failed_pattern, operation_path};
 use crate::types::lang::{self, Lang};
 use crate::types::{Dict, Identity, Range, Ref, is_pattern, let_parts};
 
@@ -475,7 +475,10 @@ impl Lower<'_> {
             match child.kind {
                 K::Guard => guard = child.nodes().next().map(|g| self.expr(g)),
                 K::Block => body = Some(self.expr(child)),
-                kind if is_pattern(kind) => pat = self.pattern(child),
+                kind if is_pattern(kind) => {
+                    let child = failed_pattern(child, self.text).unwrap_or(child);
+                    pat = self.pattern(child);
+                }
                 _ => {}
             }
         }

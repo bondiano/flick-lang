@@ -19,6 +19,7 @@ codegen/do_notation
 codegen/enums
 codegen/call_site
 codegen/errors
+codegen/fail
 codegen/eval_order
 codegen/exports
 codegen/for_comprehension
