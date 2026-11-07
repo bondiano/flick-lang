@@ -3,7 +3,7 @@ import type { HighlighterCore, LanguageRegistration, ThemeRegistration } from "s
 export type HighlightLanguage = "flick" | "javascript";
 export type HighlightToken = {
   readonly text: string;
-  readonly class_name: "" | "fp-token-comment" | "fp-token-keyword" | "fp-token-string" | "fp-token-invalid";
+  readonly class_name: "" | "fp-token-comment" | "fp-token-keyword" | "fp-token-string" | "fp-token-invalid" | "fp-token-needs" | "fp-token-fails";
 };
 
 const theme: ThemeRegistration = {
@@ -16,6 +16,8 @@ const theme: ThemeRegistration = {
     { scope: ["keyword", "storage", "entity.name.type", "support.type", "support.class"], settings: { foreground: "#584dd0" } },
     { scope: ["string", "constant", "support.constant"], settings: { foreground: "#347b57" } },
     { scope: "invalid", settings: { foreground: "#b43b4f" } },
+    { scope: "meta.effect-row.needs", settings: { foreground: "#1560d4" } },
+    { scope: "meta.effect-row.fails", settings: { foreground: "#c8283f" } },
   ],
 };
 
@@ -24,6 +26,8 @@ const classes: Readonly<Record<string, HighlightToken["class_name"]>> = {
   "#584DD0": "fp-token-keyword",
   "#347B57": "fp-token-string",
   "#B43B4F": "fp-token-invalid",
+  "#1560D4": "fp-token-needs",
+  "#C8283F": "fp-token-fails",
 };
 
 let highlighter: HighlighterCore | undefined;

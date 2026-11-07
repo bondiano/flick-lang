@@ -257,6 +257,8 @@
 .fp .fp-token-keyword { color: var(--sl-color-accent-high); }
 .fp .fp-token-string { color: var(--flick-success); }
 .fp .fp-token-invalid { color: var(--flick-error); }
+.fp .fp-token-needs { color: var(--flick-line-cobalt); }
+.fp .fp-token-fails { color: var(--flick-line-coral-ink); }
 
 .fp-generated-code {
   min-height: 30rem;
