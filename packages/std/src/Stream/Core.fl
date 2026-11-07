@@ -50,7 +50,7 @@ foreign pure from_list from "@flick-lang/runtime/effect/Stream" "fromArray"
   reviewed "effect@4.1.2 sha256:6c43f74d4003ca81"
 
 /// The stream of the elements of the sequence, pulled as the stream runs.
-from_seq : forall d a. (Seq a)^d -> (Stream none none a)^d
+from_seq : (Seq a)^d -> (Stream none none a)^d
 foreign pure from_seq from "@flick-lang/runtime/effect/Stream" "fromIterable"
   retention call
 
@@ -148,7 +148,7 @@ foreign pure from_pubsub from "@flick-lang/runtime/effect/Stream" "fromPubSub"
 
 /// The messages of the subscription: the stream holds its region and
 /// cannot leave the subscription's scope.
-from_subscription : forall s a. PubSub.Subscription s a -> (Stream none none a)^{s}
+from_subscription : PubSub.Subscription s a -> (Stream none none a)^{s}
 foreign pure from_subscription from "@flick-lang/runtime/effect/Stream" "fromSubscription"
   retention call
   reviewed "effect@4.1.2 sha256:3067d6d121f26d54"

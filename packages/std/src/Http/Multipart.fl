@@ -54,7 +54,7 @@ let limits = {
 
 /// Reads the form of the request; its files are removed when the scope of
 /// region `s` closes.
-persisted : forall s. Http.ServerRequest.ServerRequest ->{Scope s; MultipartError} Persisted
+persisted : Http.ServerRequest.ServerRequest ->{Scope s; MultipartError} Persisted
 foreign effect persisted from "@flick-lang/runtime/effect/http/Multipart" "flickPersisted"
   reviewed "effect@4.1.2 sha256:7c2d97a9b575ef4e"
 
@@ -83,7 +83,6 @@ foreign effect schema_json from "@flick-lang/runtime/effect/http/Multipart" "fli
 
 /// Decodes the form of the request, as `schema_persisted` of `persisted`.
 schema_body_multipart :
-  forall s rd re a.
   Codec rd re Json a ->
   Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError}
   a
@@ -94,7 +93,6 @@ foreign effect schema_body_multipart from "@flick-lang/runtime/effect/http/Multi
 /// Decodes the form of the request: a multipart form as
 /// `schema_body_multipart`, any other as URL parameters.
 schema_body_form :
-  forall s rd re a.
   Codec rd re Json a ->
   Http.ServerRequest.ServerRequest ->{Scope s | rd; Http.ServerError.HttpServerError, MultipartError, SchemaError}
   a
@@ -104,7 +102,6 @@ foreign effect schema_body_form from "@flick-lang/runtime/effect/http/Multipart"
 
 /// Decodes the JSON text of the field of the request's form.
 schema_body_form_json :
-  forall s rd re a.
   Codec rd re Json a ->
   String ->
   Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError}
@@ -114,7 +111,7 @@ foreign effect schema_body_form_json from "@flick-lang/runtime/effect/http/Multi
   reviewed "effect@4.1.2 sha256:689e48d5b357ade0"
 
 /// Runs `task` with the limits for the forms it reads.
-with_limits : forall c r e a. Limits -> (Eff r e a)^c ->{r; e} a
+with_limits : Limits -> (Eff r e a)^c ->{r; e} a
 foreign effect with_limits from "@flick-lang/runtime/effect/http/Multipart" "flickWithLimits"
   arity 2
   retention call
@@ -164,7 +161,6 @@ foreign pure parts from "@flick-lang/runtime/effect/http/Multipart" "flickParts"
 /// the form's message, its `content-type` naming the boundary. It reads the
 /// limits of `with_limits` when it runs.
 make_channel :
-  forall e.
   List (String, String) ->
   Channel
     none
@@ -179,6 +175,6 @@ foreign pure make_channel from "@flick-lang/runtime/effect/http/Multipart" "flic
 
 /// The whole form of the parts, as `persisted` reads it: files are written
 /// to temporary files that the scope of region `s` removes.
-to_persisted : forall s. Stream none {MultipartError} Part ->{Scope s; MultipartError} Persisted
+to_persisted : Stream none {MultipartError} Part ->{Scope s; MultipartError} Persisted
 foreign effect to_persisted from "@flick-lang/runtime/effect/http/Multipart" "flickToPersisted"
   reviewed "effect@4.1.2 sha256:22e22f2f7418accd"

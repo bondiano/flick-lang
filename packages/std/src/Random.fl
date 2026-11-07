@@ -42,7 +42,7 @@ foreign effect choice from "@flick-lang/runtime/effect/Random" "choice"
   reviewed "effect@4.1.2 sha256:902606ec0b585c36"
 
 /// Runs `task` with a generator seeded by `seed`: the same seed, the same draws.
-with_seed : forall c r e a. Float -> (Eff r e a)^c ->{r; e} a
+with_seed : Float -> (Eff r e a)^c ->{r; e} a
 foreign effect with_seed from "@flick-lang/runtime/effect/Random" "withSeed"
   arity 1
   retention call

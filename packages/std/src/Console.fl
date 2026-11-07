@@ -13,7 +13,7 @@ foreign effect current from "@flick-lang/runtime/effect/Console" "flickCurrent"
   reviewed "effect@4.1.2 sha256:2f4fb053b0d4b28f"
 
 /// Runs `task` with `console` as its console.
-with_console : forall c r e a. Console -> (Eff r e a)^c ->{r; e} a
+with_console : Console -> (Eff r e a)^c ->{r; e} a
 foreign effect with_console from "@flick-lang/runtime/effect/Console" "flickWithConsole"
   arity 1
   retention call
@@ -94,12 +94,12 @@ foreign effect table from "@flick-lang/runtime/effect/Console" "flickTable"
 type alias GroupOptions = { label : Option String; collapsed : Bool }
 
 /// Indents what the console writes until the scope of region `s` closes.
-group : forall s. GroupOptions ->{Scope s;} Unit
+group : GroupOptions ->{Scope s;} Unit
 foreign effect group from "@flick-lang/runtime/effect/Console" "flickGroup"
   reviewed "effect@4.1.2 sha256:7a1e604473cf5f21"
 
 /// Runs `task` in a group.
-with_group : forall c r e a. GroupOptions -> (Eff r e a)^c ->{r; e} a
+with_group : GroupOptions -> (Eff r e a)^c ->{r; e} a
 foreign effect with_group from "@flick-lang/runtime/effect/Console" "flickWithGroup"
   arity 1
   retention call
@@ -107,7 +107,7 @@ foreign effect with_group from "@flick-lang/runtime/effect/Console" "flickWithGr
 
 /// Starts the timer of the label; the scope of region `s` ends it, writing
 /// `label: <elapsed>`.
-time : forall s. String ->{Scope s;} Unit
+time : String ->{Scope s;} Unit
 foreign effect time from "@flick-lang/runtime/effect/Console" "time"
   reviewed "effect@4.1.2 sha256:98ff0a1f2599c827"
 
@@ -118,7 +118,7 @@ foreign effect time_log from "@flick-lang/runtime/effect/Console" "timeLog"
   reviewed "effect@4.1.2 sha256:74bd15e1b169e4c4"
 
 /// Runs `task` under the timer of the label.
-with_time : forall c r e a. String -> (Eff r e a)^c ->{r; e} a
+with_time : String -> (Eff r e a)^c ->{r; e} a
 foreign effect with_time from "@flick-lang/runtime/effect/Console" "withTime"
   arity 1
   retention call

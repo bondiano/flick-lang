@@ -9,7 +9,7 @@ foreign pure cartesian from "@flick-lang/runtime/effect/Array" "cartesian"
   reviewed "effect@4.1.2 sha256:27e8b9b64b93c694"
 
 /// `f` of every pair of an element of `xs` and one of `ys`.
-cartesian_with : forall c a b d. List b -> (a -> b -> d)^c -> (List a -> List d)^c
+cartesian_with : List b -> (a -> b -> d)^c -> (List a -> List d)^c
 foreign pure cartesian_with from "@flick-lang/runtime/effect/Array" "cartesianWith"
   arity 2
   retention call
@@ -17,7 +17,7 @@ foreign pure cartesian_with from "@flick-lang/runtime/effect/Array" "cartesianWi
 
 /// `xs |> zip_with ys f`: `f` of the elements at each index of both, as
 /// long as the shorter one.
-zip_with : forall c a b d. List b -> (a -> b -> d)^c -> (List a -> List d)^c
+zip_with : List b -> (a -> b -> d)^c -> (List a -> List d)^c
 foreign pure zip_with from "@flick-lang/runtime/effect/Array" "zipWith"
   arity 2
   retention call
@@ -25,35 +25,35 @@ foreign pure zip_with from "@flick-lang/runtime/effect/Array" "zipWith"
 
 /// Maps each element while threading a state from the first: the final
 /// state and the mapped list.
-map_accum : forall c s a b. s -> (s -> a -> (s, b))^c -> (List a -> (s, List b))^c
+map_accum : s -> (s -> a -> (s, b))^c -> (List a -> (s, List b))^c
 foreign pure map_accum from "@flick-lang/runtime/effect/Array" "mapAccum"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:9eae82ec484758de"
 
 /// Every intermediate result of `fold_left`, `init` first.
-scan : forall c a b. b -> (b -> a -> b)^c -> (List a -> NonEmpty.NonEmpty b)^c
+scan : b -> (b -> a -> b)^c -> (List a -> NonEmpty.NonEmpty b)^c
 foreign pure scan from "@flick-lang/runtime/effect/Array" "scan"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:59c151daea4e9ab8"
 
 /// Every intermediate result of a fold from the last element, `init` last.
-scan_right : forall c a b. b -> (b -> a -> b)^c -> (List a -> NonEmpty.NonEmpty b)^c
+scan_right : b -> (b -> a -> b)^c -> (List a -> NonEmpty.NonEmpty b)^c
 foreign pure scan_right from "@flick-lang/runtime/effect/Array" "scanRight"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:ca9246706cc0e8d7"
 
 /// `f` of each suffix of the list, longest first.
-extend : forall c a b. (List a -> b)^c -> (List a -> List b)^c
+extend : (List a -> b)^c -> (List a -> List b)^c
 foreign pure extend from "@flick-lang/runtime/effect/Array" "extend"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d8cac66dc625bf46"
 
 /// The `Ok` values of `f` over the elements, up to the first `Err`.
-filter_map_while : forall c a b e. (a -> Result e b)^c -> (List a -> List b)^c
+filter_map_while : (a -> Result e b)^c -> (List a -> List b)^c
 foreign pure filter_map_while from "@flick-lang/runtime/effect/Iterable" "flickFilterMapWhile"
   arity 1
   retention call
@@ -80,14 +80,14 @@ foreign pure separate from "@flick-lang/runtime/effect/Array" "separate"
   reviewed "effect@4.1.2 sha256:64996beb2cefeaff"
 
 /// The `Ok` values and the `Err` errors of `f` over the elements.
-partition_map : forall c a f p. (a -> Result f p)^c -> (List a -> (List p, List f))^c
+partition_map : (a -> Result f p)^c -> (List a -> (List p, List f))^c
 foreign pure partition_map from "@flick-lang/runtime/effect/Array" "partition"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:2041b78a35e1a52a"
 
 /// The elements `f` produces from `seed`, until it gives `None`.
-unfold : forall c a b. b -> (b -> Option (a, b))^c -> List a
+unfold : b -> (b -> Option (a, b))^c -> List a
 foreign pure unfold from "@flick-lang/runtime/effect/Array" "unfold"
   retention call
   reviewed "effect@4.1.2 sha256:e0d90f7405483233"

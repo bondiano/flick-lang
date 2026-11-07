@@ -64,7 +64,7 @@ foreign effect invalidate from "@flick-lang/runtime/effect/Cache" "invalidate"
   reviewed "effect@4.1.2 sha256:fbc8b81fc750f59d"
 
 /// Drops `key` if its value satisfies `f`; whether it did.
-invalidate_when : forall c k e a. k -> (a -> Bool)^c -> (Cache k e a ->{} Bool)^c
+invalidate_when : k -> (a -> Bool)^c -> (Cache k e a ->{} Bool)^c
 foreign effect invalidate_when from "@flick-lang/runtime/effect/Cache" "invalidateWhen"
   arity 2
   retention call

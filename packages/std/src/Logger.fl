@@ -175,7 +175,7 @@ foreign pure to_file from "@flick-lang/runtime/effect/Logger" "flickToFile"
   reviewed "effect@4.1.2 sha256:7a672d271850c9b0"
 
 /// Runs `task` with exactly these loggers.
-with_loggers : forall c r e a. List (Logger o) -> (Eff r e a)^c ->{r; e} a
+with_loggers : List (Logger o) -> (Eff r e a)^c ->{r; e} a
 foreign effect with_loggers from "@flick-lang/runtime/effect/Logger" "flickWithLoggers"
   arity 1
   retention call
@@ -183,7 +183,7 @@ foreign effect with_loggers from "@flick-lang/runtime/effect/Logger" "flickWithL
 
 /// Runs `task` with the default logger writing to stderr when the flag is
 /// `true`.
-with_log_to_stderr : forall c r e a. Bool -> (Eff r e a)^c ->{r; e} a
+with_log_to_stderr : Bool -> (Eff r e a)^c ->{r; e} a
 foreign effect with_log_to_stderr from "@flick-lang/runtime/effect/Logger" "flickWithLogToStderr"
   arity 1
   retention call

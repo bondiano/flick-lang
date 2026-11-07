@@ -296,7 +296,6 @@ foreign pure body_form_data from "@flick-lang/runtime/effect/http/HttpClientRequ
 /// A body of the stream's chunks of bytes, of the content type or
 /// `application/octet-stream`, and of the length if it is known.
 body_stream :
-  forall e.
   Stream none e (List Int) -> Option String -> Option Float -> ClientRequest -> ClientRequest
 foreign pure body_stream from "@flick-lang/runtime/effect/http/HttpClientRequest" "flickBodyStream"
   arity 4

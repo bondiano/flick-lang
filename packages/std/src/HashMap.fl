@@ -88,7 +88,7 @@ foreign pure has_hash from "@flick-lang/runtime/effect/HashMap" "flickHasHash"
   reviewed "effect@4.1.2 sha256:b48ec23d49255978"
 
 /// Whether some entry satisfies `f value key`.
-has_by : forall c w k v. (v -> k -> Bool)^c -> (HashMap w k v -> Bool)^c
+has_by : (v -> k -> Bool)^c -> (HashMap w k v -> Bool)^c
 foreign pure has_by from "@flick-lang/runtime/effect/HashMap" "flickHasBy"
   arity 2
   retention call
@@ -106,22 +106,21 @@ foreign pure values from "@flick-lang/runtime/effect/HashMap" "flickValues"
 
 /// The map with the entry of `key` decided by `f`: it gets the current value,
 /// if any, and `None` removes the key.
-modify_at : forall c w k v. k -> (Option v -> Option v)^c -> (HashMap w k v -> HashMap w k v)^c
+modify_at : k -> (Option v -> Option v)^c -> (HashMap w k v -> HashMap w k v)^c
 foreign pure modify_at from "@flick-lang/runtime/effect/HashMap" "flickModifyAt"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:3929f93f5f8676d1"
 
 /// `modify_at` with the key's hash already computed by the map's witness.
-modify_hash :
-  forall c w k v. k -> Int -> (Option v -> Option v)^c -> (HashMap w k v -> HashMap w k v)^c
+modify_hash : k -> Int -> (Option v -> Option v)^c -> (HashMap w k v -> HashMap w k v)^c
 foreign pure modify_hash from "@flick-lang/runtime/effect/HashMap" "flickModifyHash"
   arity 4
   retention call
   reviewed "effect@4.1.2 sha256:c9e2e6707e113108"
 
 /// The map with the value of `key` replaced by `f value`, if it has the key.
-modify : forall c w k v. k -> (v -> v)^c -> (HashMap w k v -> HashMap w k v)^c
+modify : k -> (v -> v)^c -> (HashMap w k v -> HashMap w k v)^c
 foreign pure modify from "@flick-lang/runtime/effect/HashMap" "flickModify"
   arity 3
   retention call
@@ -138,28 +137,28 @@ foreign pure insert_many from "@flick-lang/runtime/effect/HashMap" "flickSetMany
   reviewed "effect@4.1.2 sha256:36d7d1b98d742872"
 
 /// Each value mapped by `f value key`.
-map : forall c w k v b. (v -> k -> b)^c -> (HashMap w k v -> HashMap w k b)^c
+map : (v -> k -> b)^c -> (HashMap w k v -> HashMap w k b)^c
 foreign pure map from "@flick-lang/runtime/effect/HashMap" "flickMap"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:11fd79f781246f3f"
 
 /// The union of the maps `f value key` gives for each entry.
-flat_map : forall c w k v b. (v -> k -> HashMap w k b)^c -> (HashMap w k v -> HashMap w k b)^c
+flat_map : (v -> k -> HashMap w k b)^c -> (HashMap w k v -> HashMap w k b)^c
 foreign pure flat_map from "@flick-lang/runtime/effect/HashMap" "flickFlatMap"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:e8c2f9a507f5008d"
 
 /// Folds the entries in no particular order: `f acc value key`.
-reduce : forall c w k v z. z -> (z -> v -> k -> z)^c -> (HashMap w k v -> z)^c
+reduce : z -> (z -> v -> k -> z)^c -> (HashMap w k v -> z)^c
 foreign pure reduce from "@flick-lang/runtime/effect/HashMap" "flickReduce"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:b02d09a6ed2b5624"
 
 /// The entries for which `f value key` holds.
-filter : forall c w k v. (v -> k -> Bool)^c -> (HashMap w k v -> HashMap w k v)^c
+filter : (v -> k -> Bool)^c -> (HashMap w k v -> HashMap w k v)^c
 foreign pure filter from "@flick-lang/runtime/effect/HashMap" "flickFilter"
   arity 2
   retention call
@@ -171,28 +170,28 @@ foreign pure compact from "@flick-lang/runtime/effect/HashMap" "flickCompact"
   reviewed "effect@4.1.2 sha256:ef072299ad732c26"
 
 /// The entries `f value key` keeps with `Ok`, mapped to its value.
-filter_map : forall c w k v x b. (v -> k -> Result x b)^c -> (HashMap w k v -> HashMap w k b)^c
+filter_map : (v -> k -> Result x b)^c -> (HashMap w k v -> HashMap w k b)^c
 foreign pure filter_map from "@flick-lang/runtime/effect/HashMap" "flickFilterMap"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:fc1dcf974915e056"
 
 /// Some entry for which `f value key` holds, if any.
-find_first : forall c w k v. (v -> k -> Bool)^c -> (HashMap w k v -> Option (k, v))^c
+find_first : (v -> k -> Bool)^c -> (HashMap w k v -> Option (k, v))^c
 foreign pure find_first from "@flick-lang/runtime/effect/HashMap" "flickFindFirst"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:6ac8055ee88dd5f9"
 
 /// Whether `f value key` holds for some entry.
-some : forall c w k v. (v -> k -> Bool)^c -> (HashMap w k v -> Bool)^c
+some : (v -> k -> Bool)^c -> (HashMap w k v -> Bool)^c
 foreign pure some from "@flick-lang/runtime/effect/HashMap" "flickSome"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:e6700f35e9537c7a"
 
 /// Whether `f value key` holds for every entry.
-every : forall c w k v. (v -> k -> Bool)^c -> (HashMap w k v -> Bool)^c
+every : (v -> k -> Bool)^c -> (HashMap w k v -> Bool)^c
 foreign pure every from "@flick-lang/runtime/effect/HashMap" "flickEvery"
   arity 2
   retention call

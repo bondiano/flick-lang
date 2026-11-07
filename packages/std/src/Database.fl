@@ -23,7 +23,7 @@ let execute q = Database.run_execute q
 /// undoes only its own writes, and the outer transaction goes on. A commit
 /// whose answer is lost, as when the connection breaks, fails with the code
 /// `"commit_unknown"`: the transaction may or may not have happened.
-transaction : forall c r e a. (Eff {Database | r} e a)^c ->{Database | r; Sql.DbError | e} a
+transaction : (Eff {Database | r} e a)^c ->{Database | r; Sql.DbError | e} a
 foreign effect transaction from "@flick-lang/runtime/sql" "pgTransaction"
   retention call
 

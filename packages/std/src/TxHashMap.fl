@@ -67,14 +67,13 @@ foreign effect is_non_empty from "@flick-lang/runtime/effect/TxHashMap" "flickIs
 
 /// Replaces the value of the key, if it has one, with `f` of it; the old
 /// value.
-modify : forall c w k v. k -> (v -> v)^c -> (TxHashMap w k v ->{Tx.Transaction;} Option v)^c
+modify : k -> (v -> v)^c -> (TxHashMap w k v ->{Tx.Transaction;} Option v)^c
 foreign effect modify from "@flick-lang/runtime/effect/TxHashMap" "flickModify"
   retention call
   reviewed "effect@4.1.2 sha256:56732f6408593818"
 
 /// Sets or removes the key by `f` of its value.
-modify_at :
-  forall c w k v. k -> (Option v -> Option v)^c -> (TxHashMap w k v ->{Tx.Transaction;} Unit)^c
+modify_at : k -> (Option v -> Option v)^c -> (TxHashMap w k v ->{Tx.Transaction;} Unit)^c
 foreign effect modify_at from "@flick-lang/runtime/effect/TxHashMap" "flickModifyAt"
   retention call
   reviewed "effect@4.1.2 sha256:705c17efddeaf801"
@@ -135,22 +134,19 @@ foreign effect has_hash from "@flick-lang/runtime/effect/TxHashMap" "flickHasHas
   reviewed "effect@4.1.2 sha256:8c5c148986f01cae"
 
 /// A new map of `f value key` for each entry.
-map : forall c w k v b. (v -> k -> b)^c -> (TxHashMap w k v ->{Tx.Transaction;} TxHashMap w k b)^c
+map : (v -> k -> b)^c -> (TxHashMap w k v ->{Tx.Transaction;} TxHashMap w k b)^c
 foreign effect map from "@flick-lang/runtime/effect/TxHashMap" "flickMap"
   retention call
   reviewed "effect@4.1.2 sha256:4b2559c8279dc48c"
 
 /// A new map of the entries the predicate accepts.
-filter :
-  forall c w k v. (v -> k -> Bool)^c -> (TxHashMap w k v ->{Tx.Transaction;} TxHashMap w k v)^c
+filter : (v -> k -> Bool)^c -> (TxHashMap w k v ->{Tx.Transaction;} TxHashMap w k v)^c
 foreign effect filter from "@flick-lang/runtime/effect/TxHashMap" "flickFilter"
   retention call
   reviewed "effect@4.1.2 sha256:366c0b297ddce515"
 
 /// A new map of the `Ok` values of `f value key`.
-filter_map :
-  forall c w k v x b.
-  (v -> k -> Result x b)^c -> (TxHashMap w k v ->{Tx.Transaction;} TxHashMap w k b)^c
+filter_map : (v -> k -> Result x b)^c -> (TxHashMap w k v ->{Tx.Transaction;} TxHashMap w k b)^c
 foreign effect filter_map from "@flick-lang/runtime/effect/TxHashMap" "flickFilterMap"
   retention call
   reviewed "effect@4.1.2 sha256:1347f1c7adc3b7f1"
@@ -162,7 +158,6 @@ foreign effect compact from "@flick-lang/runtime/effect/TxHashMap" "flickCompact
 
 /// A new map of the entries of the maps `f value key` makes.
 flat_map :
-  forall c w k v b.
   (v -> k ->{Tx.Transaction;} TxHashMap w k b)^c ->
   (TxHashMap w k v ->{Tx.Transaction;} TxHashMap w k b)^c
 foreign effect flat_map from "@flick-lang/runtime/effect/TxHashMap" "flickFlatMap"
@@ -170,39 +165,37 @@ foreign effect flat_map from "@flick-lang/runtime/effect/TxHashMap" "flickFlatMa
   reviewed "effect@4.1.2 sha256:47018e4a5b37b24d"
 
 /// Folds the entries, in no particular order, from `zero`.
-reduce : forall c w k v a. a -> (a -> v -> k -> a)^c -> (TxHashMap w k v ->{Tx.Transaction;} a)^c
+reduce : a -> (a -> v -> k -> a)^c -> (TxHashMap w k v ->{Tx.Transaction;} a)^c
 foreign effect reduce from "@flick-lang/runtime/effect/TxHashMap" "flickReduce"
   retention call
   reviewed "effect@4.1.2 sha256:717f3dea2004f2e5"
 
 /// Whether the predicate accepts an entry.
-has_by : forall c w k v. (v -> k -> Bool)^c -> (TxHashMap w k v ->{Tx.Transaction;} Bool)^c
+has_by : (v -> k -> Bool)^c -> (TxHashMap w k v ->{Tx.Transaction;} Bool)^c
 foreign effect has_by from "@flick-lang/runtime/effect/TxHashMap" "flickHasBy"
   retention call
   reviewed "effect@4.1.2 sha256:b0a6982a29a3e53f"
 
 /// Whether the predicate accepts an entry, as `has_by`.
-some : forall c w k v. (v -> k -> Bool)^c -> (TxHashMap w k v ->{Tx.Transaction;} Bool)^c
+some : (v -> k -> Bool)^c -> (TxHashMap w k v ->{Tx.Transaction;} Bool)^c
 foreign effect some from "@flick-lang/runtime/effect/TxHashMap" "flickSome"
   retention call
   reviewed "effect@4.1.2 sha256:9096620e98bc2c47"
 
 /// Whether the predicate accepts every entry.
-every : forall c w k v. (v -> k -> Bool)^c -> (TxHashMap w k v ->{Tx.Transaction;} Bool)^c
+every : (v -> k -> Bool)^c -> (TxHashMap w k v ->{Tx.Transaction;} Bool)^c
 foreign effect every from "@flick-lang/runtime/effect/TxHashMap" "flickEvery"
   retention call
   reviewed "effect@4.1.2 sha256:4a0f88e8415cee3c"
 
 /// An entry the predicate accepts, if any.
-find_first :
-  forall c w k v. (v -> k -> Bool)^c -> (TxHashMap w k v ->{Tx.Transaction;} Option (k, v))^c
+find_first : (v -> k -> Bool)^c -> (TxHashMap w k v ->{Tx.Transaction;} Option (k, v))^c
 foreign effect find_first from "@flick-lang/runtime/effect/TxHashMap" "flickFindFirst"
   retention call
   reviewed "effect@4.1.2 sha256:e05c71daca04194e"
 
 /// Runs `f value key` for each entry, in no particular order.
-for_each :
-  forall c w k v r e. (v -> k ->{r; e} Unit)^c -> (TxHashMap w k v ->{Tx.Transaction | r; e} Unit)^c
+for_each : (v -> k ->{r; e} Unit)^c -> (TxHashMap w k v ->{Tx.Transaction | r; e} Unit)^c
 foreign effect for_each from "@flick-lang/runtime/effect/TxHashMap" "flickForEach"
   retention call
   reviewed "effect@4.1.2 sha256:286e8a090d429313"

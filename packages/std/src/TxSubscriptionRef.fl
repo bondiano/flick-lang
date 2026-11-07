@@ -19,7 +19,7 @@ foreign effect get from "@flick-lang/runtime/effect/TxSubscriptionRef" "get"
   reviewed "effect@4.1.2 sha256:33c61c174f79caae"
 
 /// Replaces the value with the second of `f` of it; returns the first.
-modify : forall c a b. (a -> (b, a))^c -> (TxSubscriptionRef a ->{Tx.Transaction;} b)^c
+modify : (a -> (b, a))^c -> (TxSubscriptionRef a ->{Tx.Transaction;} b)^c
 foreign effect modify from "@flick-lang/runtime/effect/TxSubscriptionRef" "modify"
   arity 1
   retention call
@@ -32,7 +32,7 @@ foreign effect set from "@flick-lang/runtime/effect/TxSubscriptionRef" "set"
   reviewed "effect@4.1.2 sha256:1cbe4957b141632b"
 
 /// Replaces the value with `f` of it.
-update : forall c a. (a -> a)^c -> (TxSubscriptionRef a ->{Tx.Transaction;} Unit)^c
+update : (a -> a)^c -> (TxSubscriptionRef a ->{Tx.Transaction;} Unit)^c
 foreign effect update from "@flick-lang/runtime/effect/TxSubscriptionRef" "update"
   arity 1
   retention call
@@ -45,14 +45,14 @@ foreign effect get_and_set from "@flick-lang/runtime/effect/TxSubscriptionRef" "
   reviewed "effect@4.1.2 sha256:043ad471769a9316"
 
 /// Replaces the value with `f` of it; returns the old one.
-get_and_update : forall c a. (a -> a)^c -> (TxSubscriptionRef a ->{Tx.Transaction;} a)^c
+get_and_update : (a -> a)^c -> (TxSubscriptionRef a ->{Tx.Transaction;} a)^c
 foreign effect get_and_update from "@flick-lang/runtime/effect/TxSubscriptionRef" "getAndUpdate"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b7dc4ac3de1eae68"
 
 /// Replaces the value with `f` of it; returns the new one.
-update_and_get : forall c a. (a -> a)^c -> (TxSubscriptionRef a ->{Tx.Transaction;} a)^c
+update_and_get : (a -> a)^c -> (TxSubscriptionRef a ->{Tx.Transaction;} a)^c
 foreign effect update_and_get from "@flick-lang/runtime/effect/TxSubscriptionRef" "updateAndGet"
   arity 1
   retention call
@@ -60,6 +60,6 @@ foreign effect update_and_get from "@flick-lang/runtime/effect/TxSubscriptionRef
 
 /// Subscribes until the scope of region `s` closes: the subscription
 /// holds the current value, then each new one.
-changes : forall s a. TxSubscriptionRef a ->{Scope s;} TxPubSub.Subscription s a
+changes : TxSubscriptionRef a ->{Scope s;} TxPubSub.Subscription s a
 foreign effect changes from "@flick-lang/runtime/effect/TxSubscriptionRef" "changes"
   reviewed "effect@4.1.2 sha256:5d5df32fd724aaba"

@@ -67,38 +67,38 @@ foreign pure inherit_output from "@flick-lang/runtime/effect/ChildProcess" "flic
   reviewed "effect@4.1.2 sha256:08317a9ab947f5ff"
 
 /// Starts the command; the scope of region `s` stops it if it still runs.
-spawn : forall s. Command ->{Scope s; PlatformError.PlatformError} Process s
+spawn : Command ->{Scope s; PlatformError.PlatformError} Process s
 foreign effect spawn from "@flick-lang/runtime/effect/ChildProcess" "flickSpawn"
   reviewed "effect@4.1.2 sha256:40dccc7fabdf7b49"
 
 /// The process's ID.
-pid : forall s. Process s -> Int
+pid : Process s -> Int
 foreign pure pid from "@flick-lang/runtime/effect/ChildProcess" "flickPid"
   retention call
   reviewed "effect@4.1.2 sha256:f7d1cc90ab08e778"
 
 /// Waits for the process to end: its exit code. A process a signal ended
 /// fails.
-wait : forall s. Process s ->{Async; PlatformError.PlatformError} Int
+wait : Process s ->{Async; PlatformError.PlatformError} Int
 foreign effect wait from "@flick-lang/runtime/effect/ChildProcess" "flickWait"
   retention call
   reviewed "effect@4.1.2 sha256:6da3b9d4e047c7e2"
 
 /// Whether the process still runs.
-is_running : forall s. Process s ->{; PlatformError.PlatformError} Bool
+is_running : Process s ->{; PlatformError.PlatformError} Bool
 foreign effect is_running from "@flick-lang/runtime/effect/ChildProcess" "flickIsRunning"
   retention call
   reviewed "effect@4.1.2 sha256:2687b5e42628f930"
 
 /// Stops the process with `SIGTERM`, waits for it to end and gives the rest
 /// of its process group a second more.
-kill : forall s. Process s ->{Async; PlatformError.PlatformError} Unit
+kill : Process s ->{Async; PlatformError.PlatformError} Unit
 foreign effect kill from "@flick-lang/runtime/effect/ChildProcess" "flickKill"
   retention call
   reviewed "effect@4.1.2 sha256:2687b5e42628f930"
 
 /// Stops the process with the signal, then `SIGKILL` after `force_after`.
-kill_with : forall s. KillOptions -> Process s ->{Async; PlatformError.PlatformError} Unit
+kill_with : KillOptions -> Process s ->{Async; PlatformError.PlatformError} Unit
 foreign effect kill_with from "@flick-lang/runtime/effect/ChildProcess" "flickKillWith"
   arity 2
   retention call
@@ -106,13 +106,13 @@ foreign effect kill_with from "@flick-lang/runtime/effect/ChildProcess" "flickKi
 
 /// The bytes the process writes to stdout; the stream cannot leave the
 /// process's scope.
-stdout : forall s. Process s -> (Stream none {PlatformError.PlatformError} (List Int))^{s}
+stdout : Process s -> (Stream none {PlatformError.PlatformError} (List Int))^{s}
 foreign pure stdout from "@flick-lang/runtime/effect/ChildProcess" "flickStdout"
   retention call
   reviewed "effect@4.1.2 sha256:fbc5852c8234490f"
 
 /// The bytes the process writes to stderr.
-stderr : forall s. Process s -> (Stream none {PlatformError.PlatformError} (List Int))^{s}
+stderr : Process s -> (Stream none {PlatformError.PlatformError} (List Int))^{s}
 foreign pure stderr from "@flick-lang/runtime/effect/ChildProcess" "flickStderr"
   retention call
   reviewed "effect@4.1.2 sha256:3fe00f74628a0caf"

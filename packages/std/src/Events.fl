@@ -30,7 +30,6 @@ type Listener (s : Region) a
 /// `owner`. An event that finds the queue full is dropped and reported to
 /// `supervisor`, and so is every failure of the handler.
 listen :
-  forall c s r e a.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Fiber.Owner s ->
   QueuePolicy ->
@@ -43,7 +42,6 @@ foreign effect listen from "@flick-lang/runtime" "eventsListen"
 /// Registers `listener` with `add`. When the owner of `s` begins to close,
 /// later events are ignored at once and `remove` gets the very function
 /// `add` got; then the handler's tasks end and resources are released.
-attach :
-  forall s a. Listener s a -> (Listener s a ->{} Unit) -> (Listener s a ->{} Unit) ->{Scope s;} Unit
+attach : Listener s a -> (Listener s a ->{} Unit) -> (Listener s a ->{} Unit) ->{Scope s;} Unit
 foreign effect attach from "@flick-lang/runtime" "eventsAttach"
   retention owner

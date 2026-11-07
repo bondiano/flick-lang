@@ -222,34 +222,34 @@ foreign pure command from "@flick-lang/runtime/cli" "specCommand"
 /// The help text of the command. Like every combinator here, it keeps the
 /// captures `c` of what it is given, so a command whose handler holds a
 /// resource of a scope cannot leave that scope.
-description : forall c r e o. String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+description : String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure description from "@flick-lang/runtime/cli" "specDescription"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:886f18ab4b8311a8"
 
 /// The line that lists the command among its parent's subcommands.
-short_description : forall c r e o. String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+short_description : String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure short_description from "@flick-lang/runtime/cli" "specShortDescription"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:0275fa273590d7b2"
 
 /// Another name of the command as a subcommand.
-alias : forall c r e o. String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+alias : String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure alias from "@flick-lang/runtime/cli" "specAlias"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:2252299d039557d0"
 
 /// The command is left out of its parent's help; it still runs.
-unlisted : forall c r e o. (Spec r e o)^c -> (Spec r e o)^c
+unlisted : (Spec r e o)^c -> (Spec r e o)^c
 foreign pure unlisted from "@flick-lang/runtime/cli" "specUnlisted"
   retention call
   reviewed "effect@4.1.2 sha256:6f69c621e82d6d55"
 
 /// An example command line for help, with what it does (`""`: nothing).
-example : forall c r e o. String -> String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+example : String -> String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure example from "@flick-lang/runtime/cli" "specExample"
   arity 3
   retention call
@@ -260,9 +260,7 @@ type alias ActionContext = { commandPath : List String; version : String }
 
 /// The switch `--<name>` of this command and its subcommands, with its help
 /// text: given, it runs `act` instead of any handler, like `--version`.
-action :
-  forall c r e o.
-  String -> String -> (ActionContext ->{} Unit)^c -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+action : String -> String -> (ActionContext ->{} Unit)^c -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure action from "@flick-lang/runtime/cli" "specAction"
   arity 4
   retention call
@@ -271,7 +269,6 @@ foreign pure action from "@flick-lang/runtime/cli" "specAction"
 /// The flag `--<label>` (underscores become dashes), with more names
 /// (`"n"` is `-n`), its help text and how its values make field `l`.
 flag :
-  forall c a l o t out r e.
   (Value a, Record.Lacks l o, Record.UnionDisjoint o (Record.Field l t) out) =>
   Record.Label l -> List String -> String -> Multi a t -> ((Spec r e o)^c -> (Spec r e out)^c)^c
 foreign pure flag from "@flick-lang/runtime/cli" "specFlag"
@@ -281,7 +278,6 @@ foreign pure flag from "@flick-lang/runtime/cli" "specFlag"
 
 /// The next positional argument, with its help text.
 arg :
-  forall c a l o t out r e.
   (Value a, Record.Lacks l o, Record.UnionDisjoint o (Record.Field l t) out) =>
   Record.Label l -> String -> Multi a t -> ((Spec r e o)^c -> (Spec r e out)^c)^c
 foreign pure arg from "@flick-lang/runtime/cli" "specArg"
@@ -290,17 +286,14 @@ foreign pure arg from "@flick-lang/runtime/cli" "specArg"
   reviewed "effect@4.1.2 sha256:82fa61fff2987aa0"
 
 /// A nested command, with its help text.
-subcommand :
-  forall c r e o r2 e2.
-  (Command r2 e2)^c -> String -> ((Spec r e o)^c -> (Spec (r + r2) (e + e2) o)^c)^c
+subcommand : (Command r2 e2)^c -> String -> ((Spec r e o)^c -> (Spec (r + r2) (e + e2) o)^c)^c
 foreign pure subcommand from "@flick-lang/runtime/cli" "specSubcommand"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:ce9428c267177c25"
 
 /// The command, running `handler` with the parsed options.
-handle :
-  forall c r e o r2 e2. (o ->{r2; e2} Unit)^c -> ((Spec r e o)^c -> (Command (r + r2) (e + e2))^c)^c
+handle : (o ->{r2; e2} Unit)^c -> ((Spec r e o)^c -> (Command (r + r2) (e + e2))^c)^c
 foreign pure handle from "@flick-lang/runtime/cli" "specHandle"
   arity 2
   retention call
@@ -313,7 +306,7 @@ let handled spec handler = handle handler spec
 
 /// The command without a handler of its own: it needs subcommands, and run
 /// without one it prints its help and fails with `CliError`.
-group : forall c r e o. (Spec r e o)^c -> (Command r e)^c
+group : (Spec r e o)^c -> (Command r e)^c
 foreign pure group from "@flick-lang/runtime/cli" "specGroup"
   retention call
   reviewed "effect@4.1.2 sha256:ccc0103e6db4f51a"
@@ -382,7 +375,7 @@ foreign pure display_width from "@flick-lang/runtime/cli" "cliDisplayWidth"
   reviewed "effect@4.1.2 sha256:2a6f63717edc3afe"
 
 /// The help document `--help` gives after the subcommand names `path`.
-help_doc : forall c r e. List String -> (Command r e)^c ->{} HelpDoc
+help_doc : List String -> (Command r e)^c ->{} HelpDoc
 foreign effect help_doc from "@flick-lang/runtime/cli" "cliHelpDoc"
   arity 2
   retention call
@@ -397,7 +390,7 @@ type Shell = Bash | Zsh | Fish | PowerShell
   deriving Eq, Show
 
 /// The script that completes the command line of `command` in `shell`.
-completions : forall c r e. Shell -> (Command r e)^c ->{} String
+completions : Shell -> (Command r e)^c ->{} String
 foreign effect completions from "@flick-lang/runtime/cli" "cliCompletions"
   arity 2
   retention call
@@ -428,14 +421,14 @@ let settings = { version = "0.0.0"; builtIns = builtins; formatter = None }
 /// Parses `args` and runs the handler of the command they name, in the
 /// current fiber, after the whole line parsed. The built-in flags print to
 /// stdout and run no handler; invalid input is `CliError` with Effect's text.
-run_with : forall c r e. Settings -> (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
+run_with : Settings -> (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
 foreign effect run_with from "@flick-lang/runtime/cli" "cliRunWith"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:fe039b878ff7b17a"
 
 /// `run_with` the `settings` with `version`.
-run_version : forall c r e. String -> (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
+run_version : String -> (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
 foreign effect run_version from "@flick-lang/runtime/cli" "cliRunVersion"
   arity 3
   retention call

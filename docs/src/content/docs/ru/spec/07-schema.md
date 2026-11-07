@@ -36,23 +36,13 @@ Schema a
 PureCodec encoded decoded
 Codec decoding_services encoding_services encoded decoded
 
-Codec.decode :
-  forall c ci rd re i a.
-  (Codec rd re i a)^c ->
-  (Unknown^ci ->{rd; SchemaError} a)^c
+Codec.decode : (Codec rd re i a)^c -> (Unknown^ci ->{rd; SchemaError} a)^c
 
-Codec.encode :
-  forall c rd re i a.
-  (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
+Codec.encode : (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
 
-Codec.decode_result :
-  forall c ci i a.
-  (PureCodec i a)^c ->
-  (Unknown^ci -> Result SchemaError a)^c
+Codec.decode_result : (PureCodec i a)^c -> (Unknown^ci -> Result SchemaError a)^c
 
-Codec.encode_result :
-  forall c i a.
-  (PureCodec i a)^c -> (a -> Result SchemaError i)^c
+Codec.encode_result : (PureCodec i a)^c -> (a -> Result SchemaError i)^c
 ```
 
 Захваты кодека сохраняются в частично применённой функции; происхождение возвращаемого `a`/`i` проверяется отдельно и не стирается при передаче обобщённого свидетельства. SchemaError содержит безопасную диагностику, а не исходное значение, которое могло бы вынести ресурс за пределы его области владения.
@@ -238,16 +228,12 @@ Email.value : Email -> String
 `Ref` доступен через обычные библиотечные функции. Анализатор типов учитывает их эффектные стрелки и применяет [правило обобщения](../03-types-and-classes/#обобщение-при-наличии-ref).
 
 ```text
-Ref.make : forall c a. a^c ->{} Ref (a^c)
-Ref.get : forall c a. (Ref a)^c ->{} a^c
+Ref.make : a^c ->{} Ref (a^c)
+Ref.get : (Ref a)^c ->{} a^c
 
-Ref.set :
-  forall c a.
-  (Ref a)^c -> (a^c ->{} Unit)^c
+Ref.set : (Ref a)^c -> (a^c ->{} Unit)^c
 
-Ref.modify :
-  forall c d x a b.
-  (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
+Ref.modify : (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
 ```
 
 `make` сохраняет `c` в инвариантном аргументе типа `a^c`: это постоянная

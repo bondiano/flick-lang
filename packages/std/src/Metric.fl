@@ -170,7 +170,7 @@ foreign pure with_attributes from "@flick-lang/runtime/effect/Metric" "withAttri
   reviewed "effect@4.1.2 sha256:b5509a6111af12fd"
 
 /// Runs `task` with the attributes added to every metric it updates.
-with_current_attributes : forall c r e a. Attributes -> (Eff r e a)^c ->{r; e} a
+with_current_attributes : Attributes -> (Eff r e a)^c ->{r; e} a
 foreign effect with_current_attributes from "@flick-lang/runtime/effect/Metric" "flickWithCurrentAttributes"
   arity 1
   retention call
@@ -205,13 +205,13 @@ foreign pure exponential_boundaries from "@flick-lang/runtime/effect/Metric" "ex
   reviewed "effect@4.1.2 sha256:06bb01033a19c1c9"
 
 /// Runs `task` counting the fibers it starts and ends.
-enable_runtime_metrics : forall c r e a. (Eff r e a)^c ->{r; e} a
+enable_runtime_metrics : (Eff r e a)^c ->{r; e} a
 foreign effect enable_runtime_metrics from "@flick-lang/runtime/effect/Metric" "enableRuntimeMetrics"
   retention call
   reviewed "effect@4.1.2 sha256:e483ef6416bf088a"
 
 /// Runs `task` without counting its fibers.
-disable_runtime_metrics : forall c r e a. (Eff r e a)^c ->{r; e} a
+disable_runtime_metrics : (Eff r e a)^c ->{r; e} a
 foreign effect disable_runtime_metrics from "@flick-lang/runtime/effect/Metric" "disableRuntimeMetrics"
   retention call
   reviewed "effect@4.1.2 sha256:f1ab50373d790fb2"

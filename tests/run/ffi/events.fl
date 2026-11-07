@@ -10,11 +10,11 @@ emitter : Unit ->{} Emitter
 foreign emitter from "./bindings.mjs" "emitter"
   arity 0
 
-on : forall s. Emitter -> Events.Listener s Float ->{} Unit
+on : Emitter -> Events.Listener s Float ->{} Unit
 foreign on from "./bindings.mjs" "on"
   retention owner
 
-off : forall s. Emitter -> Events.Listener s Float ->{} Unit
+off : Emitter -> Events.Listener s Float ->{} Unit
 foreign off from "./bindings.mjs" "off"
   retention call
 

@@ -28,13 +28,13 @@ module Ref exposing (
 )
 
 /// A fresh cell holding `value`.
-make : forall c a. a^c ->{} Ref (a^c)
+make : a^c ->{} Ref (a^c)
 foreign make from "@flick-lang/runtime" "refMake"
   retention call
   reviewed "effect@4.1.2 sha256:13ba531db6f50e31"
 
 /// The current contents.
-get : forall c a. (Ref a)^c ->{} a^c
+get : (Ref a)^c ->{} a^c
 foreign get from "@flick-lang/runtime" "refGet"
   retention call
   reviewed "effect@4.1.2 sha256:b4713cd12c52d94d"
@@ -45,13 +45,13 @@ same : Ref a -> Ref a -> Bool
 foreign pure same from "@flick-lang/runtime" "refSame"
 
 /// Replaces the contents.
-set : forall c a. (Ref a)^c -> (a^c ->{} Unit)^c
+set : (Ref a)^c -> (a^c ->{} Unit)^c
 foreign set from "@flick-lang/runtime" "refSet"
   retention call
   reviewed "effect@4.1.2 sha256:7ab1cc29131d058b"
 
 /// `f` gives the result and the new contents, in one step.
-modify : forall c d x a b. (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
+modify : (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
 foreign modify from "@flick-lang/runtime" "refModify"
   retention call
   reviewed "effect@4.1.2 sha256:2931caacecf3556c"

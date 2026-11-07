@@ -8,36 +8,33 @@ import Ui
 
 @lang event_exhaust
 /// Ignores events while the task of an earlier one runs.
-exhaust :
-  forall c s. (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+exhaust : (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
 foreign pure exhaust from "@flick-lang/runtime/ui/react" "eventExhaust"
   retention call
 
 @lang event_latest
 /// Interrupts the running task, waits until it stopped, then runs the
 /// last event; one event waits at most.
-latest : forall c s. (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+latest : (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
 foreign pure latest from "@flick-lang/runtime/ui/react" "eventLatest"
   retention call
 
 @lang event_queue
 /// Runs events one by one, `capacity` of them waiting at most; an event
 /// that finds the queue full is rejected and reported to the supervisor.
-queue :
-  forall c s. Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+queue : Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
 foreign pure queue from "@flick-lang/runtime/ui/react" "eventQueue"
   retention call
 
 @lang event_concurrent
 /// Runs at most `limit` tasks at once; an event beyond that is rejected and
 /// reported to the supervisor.
-concurrent :
-  forall c s. Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
+concurrent : Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
 foreign pure concurrent from "@flick-lang/runtime/ui/react" "eventConcurrent"
   retention call
 
 /// Calls `decide` on the snapshot while the browser still waits, and
 /// prevents the default action when it says so.
-prevent_default : forall c s. (s -> Bool)^c -> (Ui.Handler s)^c -> (Ui.Handler s)^c
+prevent_default : (s -> Bool)^c -> (Ui.Handler s)^c -> (Ui.Handler s)^c
 foreign pure prevent_default from "@flick-lang/runtime/ui/react" "eventPreventDefault"
   retention call

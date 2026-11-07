@@ -12,26 +12,25 @@ import SubscriptionRef
 import TxSubscriptionRef
 
 /// UTF-8 text decoded from chunks of bytes.
-decode_text : forall c r e. (Stream r e (List Int))^c -> (Stream r e String)^c
+decode_text : (Stream r e (List Int))^c -> (Stream r e String)^c
 foreign pure decode_text from "@flick-lang/runtime/effect/Stream" "flickDecodeText"
   retention call
   reviewed "effect@4.1.2 sha256:5871a80d125209cb"
 
 /// Each string encoded as UTF-8 bytes.
-encode_text : forall c r e. (Stream r e String)^c -> (Stream r e (List Int))^c
+encode_text : (Stream r e String)^c -> (Stream r e (List Int))^c
 foreign pure encode_text from "@flick-lang/runtime/effect/Stream" "flickEncodeText"
   retention call
   reviewed "effect@4.1.2 sha256:6e8bfde1a02ed5eb"
 
 /// Lines of the text, split at `\n` or `\r\n` across chunks.
-split_lines : forall c r e. (Stream r e String)^c -> (Stream r e String)^c
+split_lines : (Stream r e String)^c -> (Stream r e String)^c
 foreign pure split_lines from "@flick-lang/runtime/effect/Stream" "splitLines"
   retention call
   reviewed "effect@4.1.2 sha256:364a68b0860b56e7"
 
 /// Chunks of bytes up to `limit`; past it, `on_limit` instead of the rest.
 limit_bytes :
-  forall c r e.
   ByteSize.ByteSize ->
   (Stream r e (List Int))^c ->
   (Stream r e (List Int))^c ->

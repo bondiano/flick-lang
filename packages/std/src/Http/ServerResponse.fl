@@ -61,7 +61,7 @@ foreign pure text from "@flick-lang/runtime/effect/http/HttpServerResponse" "fli
 
 /// A body of the stream's chunks of bytes, sent as they come;
 /// `application/octet-stream` unless the options set a content type.
-stream : forall e. Stream none e (List Int) -> Options -> ServerResponse
+stream : Stream none e (List Int) -> Options -> ServerResponse
 foreign pure stream from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickStream"
   arity 2
   reviewed "effect@4.1.2 sha256:261a610a1e39cd04"
@@ -69,7 +69,7 @@ foreign pure stream from "@flick-lang/runtime/effect/http/HttpServerResponse" "f
 /// A body of the stream's chunks of text in UTF-8, sent as they come, as
 /// `Ui.Server.stream` makes them; `text/plain` unless the options set a
 /// content type.
-stream_text : forall e. Stream none e String -> Options -> ServerResponse
+stream_text : Stream none e String -> Options -> ServerResponse
 foreign pure stream_text from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickStreamText"
   arity 2
   reviewed "effect@4.1.2 sha256:261a610a1e39cd04"

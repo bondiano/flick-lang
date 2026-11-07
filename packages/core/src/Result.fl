@@ -95,7 +95,7 @@ foreign pure void from "@flick-lang/runtime/effect/Result" "void"
   reviewed "effect@4.1.2 sha256:0abb2e23f70b5a58"
 
 /// `Ok x` kept when `p x` holds, `Err (or_fail_with x)` otherwise.
-filter_or_fail : forall c e a. (a -> Bool)^c -> (a -> e)^c -> (Result e a -> Result e a)^c
+filter_or_fail : (a -> Bool)^c -> (a -> e)^c -> (Result e a -> Result e a)^c
 foreign pure filter_or_fail from "@flick-lang/runtime/effect/Result" "filterOrFail"
   arity 2
   retention call
@@ -135,7 +135,7 @@ foreign pure merge from "@flick-lang/runtime/effect/Result" "merge"
   reviewed "effect@4.1.2 sha256:62b47b3b1ccee695"
 
 /// `Ok x` kept, `Err e` replaced by `that e`.
-or_else : forall c e e2 a. (e -> Result e2 a)^c -> (Result e a -> Result e2 a)^c
+or_else : (e -> Result e2 a)^c -> (Result e a -> Result e2 a)^c
 foreign pure or_else from "@flick-lang/runtime/effect/Result" "orElse"
   arity 1
   retention call
@@ -157,7 +157,7 @@ foreign pure transpose_option from "@flick-lang/runtime/effect/Result" "transpos
   reviewed "effect@4.1.2 sha256:7eb3e223921bc88c"
 
 /// `f` of the value of an option, the result moved out: `None` is `Ok None`.
-transpose_map_option : forall c e a b. (a -> Result e b)^c -> (Option a -> Result e (Option b))^c
+transpose_map_option : (a -> Result e b)^c -> (Option a -> Result e (Option b))^c
 foreign pure transpose_map_option from "@flick-lang/runtime/effect/Result" "transposeMapOption"
   arity 1
   retention call

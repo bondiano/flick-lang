@@ -1,6 +1,6 @@
 ---
 title: "Higher-order functions and collection traversal"
-source_hash: b9e42dd5d6c66ba8
+source_hash: a4921a0eeff98c3d
 ---
 
 ## Pure and effectful traversal
@@ -36,14 +36,9 @@ let load_users_parallel user_ids =
 `List.map` takes a pure callback, `List.map_effect` runs a runtime callback sequentially from left to right, and `parallel_all` requires an explicit concurrency limit. Building `requests_for user_ids` does not start the requests. There is no single effect-polymorphic `map`.
 
 ```text
-List.map :
-  forall c a b.
-  (a -> b)^c -> (List a -> List b)^c
+List.map : (a -> b)^c -> (List a -> List b)^c
 
-List.map_effect :
-  forall c a b r e.
-  (a ->{r; e} b)^c ->
-  (List a ->{r; e} List b)^c
+List.map_effect : (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
 ```
 
 Partial application retains the callback and its `c`. After an eager traversal, the resulting `List b` keeps the captures of `b` itself, but need not retain the already executed callback. This is more precise than the general `Functor.map`, which allows deferred application.

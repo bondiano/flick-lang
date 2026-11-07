@@ -124,83 +124,83 @@ foreign pure text from "@flick-lang/runtime/ui/react" "uiText"
 empty : Ui
 let empty = fragment []
 
-fragment : forall c. List (Ui^c) -> Ui^c
+fragment : List (Ui^c) -> Ui^c
 foreign pure fragment from "@flick-lang/runtime/ui/react" "uiFragment"
   retention call
 
 /// The node, or nothing.
-optional : forall c. Option (Ui^c) -> Ui^c
+optional : Option (Ui^c) -> Ui^c
 foreign pure optional from "@flick-lang/runtime/ui/react" "uiOptional"
   retention call
 
 /// The React key of a node in a dynamic list: metadata, not a prop.
-keyed : forall c. String -> Ui^c -> Ui^c
+keyed : String -> Ui^c -> Ui^c
 foreign pure keyed from "@flick-lang/runtime/ui/react" "uiKeyed"
   retention call
 
-div : forall c. ElementProps -> List (Ui^c) -> Ui^c
+div : ElementProps -> List (Ui^c) -> Ui^c
 foreign pure div from "@flick-lang/runtime/ui/react" "uiDiv"
   retention call
 
-span : forall c. ElementProps -> List (Ui^c) -> Ui^c
+span : ElementProps -> List (Ui^c) -> Ui^c
 foreign pure span from "@flick-lang/runtime/ui/react" "uiSpan"
   retention call
 
-paragraph : forall c. List (Ui^c) -> Ui^c
+paragraph : List (Ui^c) -> Ui^c
 foreign pure paragraph from "@flick-lang/runtime/ui/react" "uiParagraph"
   retention call
 
-heading : forall c. List (Ui^c) -> Ui^c
+heading : List (Ui^c) -> Ui^c
 foreign pure heading from "@flick-lang/runtime/ui/react" "uiHeading"
   retention call
 
-list : forall c. List (Ui^c) -> Ui^c
+list : List (Ui^c) -> Ui^c
 foreign pure list from "@flick-lang/runtime/ui/react" "uiList"
   retention call
 
-item : forall c. List (Ui^c) -> Ui^c
+item : List (Ui^c) -> Ui^c
 foreign pure item from "@flick-lang/runtime/ui/react" "uiItem"
   retention call
 
-button : forall c. ButtonProps c -> List (Ui^c) -> Ui^c
+button : ButtonProps c -> List (Ui^c) -> Ui^c
 foreign pure button from "@flick-lang/runtime/ui/react" "uiButton"
   retention call
 
 /// A text input; it has no children.
-input : forall c. InputProps c -> Ui^c
+input : InputProps c -> Ui^c
 foreign pure input from "@flick-lang/runtime/ui/react" "uiInput"
   retention call
 
 /// A text area of several lines; like `input`, `value` is the initial text.
-textarea : forall c. InputProps c -> Ui^c
+textarea : InputProps c -> Ui^c
 foreign pure textarea from "@flick-lang/runtime/ui/react" "uiTextarea"
   retention call
 
 /// Preformatted text: spaces and line breaks are kept.
-pre : forall c. ElementProps -> List (Ui^c) -> Ui^c
+pre : ElementProps -> List (Ui^c) -> Ui^c
 foreign pure pre from "@flick-lang/runtime/ui/react" "uiPre"
   retention call
 
-link : forall c. LinkProps -> List (Ui^c) -> Ui^c
+link : LinkProps -> List (Ui^c) -> Ui^c
 foreign pure link from "@flick-lang/runtime/ui/react" "uiLink"
   retention call
 
 /// A link inside the app: a plain left click writes `to` to `route`, which
 /// pushes its URL without a reload; other clicks, and markup without a
 /// client, follow its `href`, `Route.print url to`.
-route_link : forall c a. RouteLinkProps a -> List (Ui^c) -> Ui^c
+route_link : RouteLinkProps a -> List (Ui^c) -> Ui^c
 foreign pure route_link from "@flick-lang/runtime/ui/react" "uiRouteLink"
   retention call
 
-nav : forall c. ElementProps -> List (Ui^c) -> Ui^c
+nav : ElementProps -> List (Ui^c) -> Ui^c
 foreign pure nav from "@flick-lang/runtime/ui/react" "uiNav"
   retention call
 
-footer : forall c. ElementProps -> List (Ui^c) -> Ui^c
+footer : ElementProps -> List (Ui^c) -> Ui^c
 foreign pure footer from "@flick-lang/runtime/ui/react" "uiFooter"
   retention call
 
-fieldset : forall c. ElementProps -> List (Ui^c) -> Ui^c
+fieldset : ElementProps -> List (Ui^c) -> Ui^c
 foreign pure fieldset from "@flick-lang/runtime/ui/react" "uiFieldset"
   retention call
 
@@ -215,12 +215,12 @@ foreign pure hr from "@flick-lang/runtime/ui/react" "uiHr"
 image : ImageProps -> Ui
 foreign pure image from "@flick-lang/runtime/ui/react" "uiImage"
 
-form : forall c. FormProps c -> List (Ui^c) -> Ui^c
+form : FormProps c -> List (Ui^c) -> Ui^c
 foreign pure form from "@flick-lang/runtime/ui/react" "uiForm"
   retention call
 
 /// The button that submits the `form` around it.
-submit : forall c. SubmitProps -> List (Ui^c) -> Ui^c
+submit : SubmitProps -> List (Ui^c) -> Ui^c
 foreign pure submit from "@flick-lang/runtime/ui/react" "uiSubmit"
   retention call
 
@@ -229,34 +229,33 @@ html : SanitizedHtml -> Ui
 foreign pure html from "@flick-lang/runtime/ui/react" "uiHtml"
 
 /// A listbox of `items`; choosing one runs `on_change` with it.
-select : forall c a. SelectProps a c -> Ui^c
+select : SelectProps a c -> Ui^c
 foreign pure select from "@flick-lang/runtime/ui/react" "uiSelect"
   retention call
 
 /// Header, body and an optional footer, each in its place.
-panel : forall c. PanelSlots c -> Ui^c
+panel : PanelSlots c -> Ui^c
 foreign pure panel from "@flick-lang/runtime/ui/react" "uiPanel"
   retention call
 
-tab : forall c. String -> Ui^c -> Tab^c
+tab : String -> Ui^c -> Tab^c
 foreign pure tab from "@flick-lang/runtime/ui/react" "uiTab"
   retention call
 
 /// At least one tab; `selected` counts from 0.
-tabs : forall c. TabsProps -> NonEmpty.NonEmpty (Tab^c) -> Ui^c
+tabs : TabsProps -> NonEmpty.NonEmpty (Tab^c) -> Ui^c
 foreign pure tabs from "@flick-lang/runtime/ui/react" "uiTabs"
   retention call
 
 /// A foreign component with its props, which React gets as they are.
 /// Inside `ui { … }`, `value props` inserts this operation automatically
 /// when `value` has type `Component p`; the component itself stays opaque.
-component : forall p. Component p -> p -> Ui
+component : Component p -> p -> Ui
 foreign pure component from "@flick-lang/runtime/ui/react" "uiComponent"
 
 /// `Ui.Dom.mount` with a renderer factory, called when this call starts,
 /// instead of a DOM container. The elements here are still DOM ones.
 mount_with :
-  forall c r.
   Renderer ->
   (Failure none ->{r; none} Unit)^c ->
   Ui^c ->{Atom.Registry, Atom.Write | r; none}
@@ -272,7 +271,7 @@ type View p
 @lang view
 @maker
 /// The component of `render`.
-view : forall c p. (p ->{Atom.Read;} Ui^c)^c -> (View p)^c
+view : (p ->{Atom.Read;} Ui^c)^c -> (View p)^c
 foreign pure view from "@flick-lang/runtime/ui/react" "uiView"
   retention call
 
@@ -324,22 +323,22 @@ element : Unit ->{Setup s;} (Element t)^{s}
 let element () = Setup.own (handle ())
 
 /// `input props` whose node is `element`'s.
-input_at : forall c d. (Element Input)^d -> InputProps c -> Ui^(c + d)
+input_at : (Element Input)^d -> InputProps c -> Ui^(c + d)
 foreign pure input_at from "@flick-lang/runtime/ui/react" "uiInputAt"
   retention call
 
 /// `textarea props` whose node is `element`'s.
-textarea_at : forall c d. (Element Textarea)^d -> InputProps c -> Ui^(c + d)
+textarea_at : (Element Textarea)^d -> InputProps c -> Ui^(c + d)
 foreign pure textarea_at from "@flick-lang/runtime/ui/react" "uiTextareaAt"
   retention call
 
 /// `button props children` whose node is `element`'s.
-button_at : forall c d. (Element Button)^d -> ButtonProps c -> List (Ui^c) -> Ui^(c + d)
+button_at : (Element Button)^d -> ButtonProps c -> List (Ui^c) -> Ui^(c + d)
 foreign pure button_at from "@flick-lang/runtime/ui/react" "uiButtonAt"
   retention call
 
 /// `div props children` whose node is `element`'s.
-div_at : forall c d. (Element Div)^d -> ElementProps -> List (Ui^c) -> Ui^(c + d)
+div_at : (Element Div)^d -> ElementProps -> List (Ui^c) -> Ui^(c + d)
 foreign pure div_at from "@flick-lang/runtime/ui/react" "uiDivAt"
   retention call
 
@@ -361,14 +360,13 @@ let measure element = Document.measure element
 
 /// The component whose instances run `setup` once, when they mount, and
 /// render with what it made, which has the instance's region `s`.
-stateful :
-  forall c p. (forall s. p ->{Setup s;} (p ->{Atom.Read;} Ui^{s | c})^{s | c})^c -> (View p)^c
+stateful : (forall s. p ->{Setup s;} (p ->{Atom.Read;} Ui^{s | c})^{s | c})^c -> (View p)^c
 foreign pure stateful from "@flick-lang/runtime/ui/react" "uiStateful"
   retention call
 
 /// `task` as work of an instance: it starts after the instance mounts,
 /// and its unmount interrupts it.
-mounted : forall c. (Eff {Async, Atom.Write, Document} none Unit)^c -> Lifecycle^c
+mounted : (Eff {Async, Atom.Write, Document} none Unit)^c -> Lifecycle^c
 foreign pure mounted from "@flick-lang/runtime/ui/react" "uiMounted"
   retention call
 
@@ -382,7 +380,6 @@ let on_mount work = Setup.start (mounted work)
 /// `run` of what `read` reads as work of an instance, again whenever it
 /// changes.
 watched :
-  forall c a.
   (Unit ->{Atom.Read;} a)^c ->
   (a -> (Eff {Async, Atom.Write, Document} none Unit)^c)^c ->
   Lifecycle^c
@@ -402,12 +399,12 @@ let watch read run = Setup.start (watched read run)
 
 @maker
 /// The component named `name` in React's developer tools.
-named : forall c p. String -> (View p)^c -> (View p)^c
+named : String -> (View p)^c -> (View p)^c
 foreign pure named from "@flick-lang/runtime/ui/react" "uiNamed"
   retention call
 
 /// The component with the props `props`.
-render : forall c p. (View p)^c -> p^c -> Ui^c
+render : (View p)^c -> p^c -> Ui^c
 foreign pure render from "@flick-lang/runtime/ui/react" "uiRender"
   retention call
 
@@ -425,12 +422,12 @@ type alias FieldProps c = {
 /// inside the browser's event, so the caret and an IME composition stay
 /// where the user left them; a write to the state from elsewhere, a reset,
 /// shows in the field. `on_input` then runs as a task.
-field : forall c. FieldProps c -> Ui^c
+field : FieldProps c -> Ui^c
 foreign pure field from "@flick-lang/runtime/ui/react" "uiField"
   retention call
 
 /// A text area bound to a state as `field` is.
-field_area : forall c. FieldProps c -> Ui^c
+field_area : FieldProps c -> Ui^c
 foreign pure field_area from "@flick-lang/runtime/ui/react" "uiFieldArea"
   retention call
 
@@ -509,7 +506,7 @@ let host = {
 /// lowercase letters, digits and hyphens, written `data-<name>`. On a
 /// `field` or `field_area` they go on its input or text area. Another node
 /// that is not an element is a defect.
-with_host : forall c. Host -> Ui^c -> Ui^c
+with_host : Host -> Ui^c -> Ui^c
 foreign pure with_host from "@flick-lang/runtime/ui/react" "uiWithHost"
   retention call
 
@@ -518,7 +515,7 @@ type Level = H1 | H2 | H3 | H4 | H5 | H6
   deriving Eq, Show
 
 /// A heading of the level.
-heading_at : forall c. Level -> List (Ui^c) -> Ui^c
+heading_at : Level -> List (Ui^c) -> Ui^c
 foreign pure heading_at from "@flick-lang/runtime/ui/react" "uiHeadingAt"
   retention call
 
@@ -526,7 +523,7 @@ foreign pure heading_at from "@flick-lang/runtime/ui/react" "uiHeadingAt"
 /// A view whose render may read tasks with `Atom.ready`: while one loads
 /// it shows `fallback`, and when one failed it shows `failed` of the
 /// failure, so each error of `x` has a place to go.
-suspended : forall c p x. (Failure x -> Ui^c)^c -> Ui^c -> (p ->{Atom.Read; x} Ui^c)^c -> (View p)^c
+suspended : (Failure x -> Ui^c)^c -> Ui^c -> (p ->{Atom.Read; x} Ui^c)^c -> (View p)^c
 foreign pure suspended from "@flick-lang/runtime/ui/react" "uiSuspended"
   retention call
 

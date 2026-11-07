@@ -209,7 +209,7 @@ foreign pure with_cookies_ref from "@flick-lang/runtime/effect/http/HttpClient" 
 
 /// The client whose responses stay open until the scope of region `s`
 /// closes, instead of until their body is read.
-with_scope : forall s r e. Client r e -> Client {Scope s | r} e
+with_scope : Client r e -> Client {Scope s | r} e
 foreign pure with_scope from "@flick-lang/runtime/effect/http/HttpClient" "withScope"
   arity 1
   reviewed "effect@4.1.2 sha256:d35002632b8689ef"
@@ -222,7 +222,7 @@ foreign pure follow_redirects from "@flick-lang/runtime/effect/http/HttpClient" 
   reviewed "effect@4.1.2 sha256:383ebd85fe4d37a8"
 
 /// Runs `task` with no client span for the requests `f` accepts.
-with_tracer_disabled_when : forall c r e a. (ClientRequest -> Bool) -> (Eff r e a)^c ->{r; e} a
+with_tracer_disabled_when : (ClientRequest -> Bool) -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer_disabled_when from "@flick-lang/runtime/effect/http/HttpClient" "flickWithTracerDisabledWhen"
   arity 2
   retention call
@@ -230,21 +230,21 @@ foreign effect with_tracer_disabled_when from "@flick-lang/runtime/effect/http/H
 
 /// Runs `task` recording in client spans only the headers `f name phase`
 /// accepts; the phase is `"request"` or `"response"`.
-with_tracer_header_filter : forall c r e a. (String -> String -> Bool) -> (Eff r e a)^c ->{r; e} a
+with_tracer_header_filter : (String -> String -> Bool) -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer_header_filter from "@flick-lang/runtime/effect/http/HttpClient" "flickWithTracerHeaderFilter"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:80416986cda2fed8"
 
 /// Runs `task` sending trace context headers with requests, or not.
-with_tracer_propagation : forall c r e a. Bool -> (Eff r e a)^c ->{r; e} a
+with_tracer_propagation : Bool -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer_propagation from "@flick-lang/runtime/effect/http/HttpClient" "flickWithTracerPropagation"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:d2af437eaa149cfd"
 
 /// Runs `task` naming the span of a request by `f`.
-with_span_name_generator : forall c r e a. (ClientRequest -> String) -> (Eff r e a)^c ->{r; e} a
+with_span_name_generator : (ClientRequest -> String) -> (Eff r e a)^c ->{r; e} a
 foreign effect with_span_name_generator from "@flick-lang/runtime/effect/http/HttpClient" "flickWithSpanNameGenerator"
   arity 2
   retention call

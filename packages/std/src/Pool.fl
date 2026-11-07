@@ -17,7 +17,6 @@ type TimeToLiveStrategy = Creation | Usage
 /// serves `concurrency` tasks at once (`None`: one), and the pool grows
 /// when `targetUtilization` of it is in use (`None`: all of it).
 make :
-  forall s r e a.
   {
     acquire : Eff r e a;
     size : Int;
@@ -31,7 +30,6 @@ foreign effect make from "@flick-lang/runtime/effect/Pool" "flickMake"
 /// `make` with `min` to `max` items, where an item beyond `min` is released
 /// after `timeToLive` (by `timeToLiveStrategy`; `None`: `Usage`).
 make_with_ttl :
-  forall s r e a.
   {
     acquire : Eff r e a;
     min : Int;
@@ -47,13 +45,13 @@ foreign effect make_with_ttl from "@flick-lang/runtime/effect/Pool" "flickMakeWi
 
 /// An item, waiting for one to be free; the innermost `scope` (or the one
 /// of region `t`) holds it until it closes.
-get : forall s t e a. Pool s e a ->{Scope t; e} a^{t}
+get : Pool s e a ->{Scope t; e} a^{t}
 foreign effect get from "@flick-lang/runtime/effect/Pool" "get"
   retention call
   reviewed "effect@4.1.2 sha256:8a6e6eaddc6c9d40"
 
 /// Runs `f` with an item, given back when `f` ends.
-use : forall c s r e e2 a b. (a ->{r; e2} b)^c -> (Pool s e a ->{r; e + e2} b)^c
+use : (a ->{r; e2} b)^c -> (Pool s e a ->{r; e + e2} b)^c
 foreign effect use from "@flick-lang/runtime/effect/Pool" "use"
   arity 1
   retention call
@@ -61,7 +59,7 @@ foreign effect use from "@flick-lang/runtime/effect/Pool" "use"
 
 /// Releases `item`, the very value `get` gave, once its tasks are done;
 /// the pool acquires another when it needs one.
-invalidate : forall s e a. a -> Pool s e a ->{Async;} Unit
+invalidate : a -> Pool s e a ->{Async;} Unit
 foreign effect invalidate from "@flick-lang/runtime/effect/Pool" "invalidate"
   arity 1
   retention call
@@ -70,7 +68,7 @@ foreign effect invalidate from "@flick-lang/runtime/effect/Pool" "invalidate"
 /// Keeps the borrowed `item` for this task alone until the innermost
 /// `scope` (or the one of region `t`) closes; with a `concurrency` of one
 /// it changes nothing.
-reserve : forall s t e a. a -> Pool s e a ->{Scope t;} Unit
+reserve : a -> Pool s e a ->{Scope t;} Unit
 foreign effect reserve from "@flick-lang/runtime/effect/Pool" "reserve"
   arity 1
   retention call

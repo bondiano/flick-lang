@@ -4,7 +4,7 @@ module Loop exposing (Step(..), loop, Trampoline, done, suspend, run)
 type Step s a = Continue s | Done a
 
 /// Runs `step` from `state` until it is `Done`, without growing the stack.
-loop : forall c s a. (s -> Step s a)^c -> (s -> a)^c
+loop : (s -> Step s a)^c -> (s -> a)^c
 foreign pure loop from "@flick-lang/runtime" "loop"
   arity 2
   retention call
@@ -15,7 +15,7 @@ type Trampoline a
 done : a -> Trampoline a
 foreign pure done from "@flick-lang/runtime" "trampolineDone"
 
-suspend : forall c a. (Unit -> Trampoline a)^c -> (Trampoline a)^c
+suspend : (Unit -> Trampoline a)^c -> (Trampoline a)^c
 foreign pure suspend from "@flick-lang/runtime" "trampolineSuspend"
   retention call
 

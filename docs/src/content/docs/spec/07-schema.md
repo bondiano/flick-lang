@@ -1,6 +1,6 @@
 ---
 title: "Schema and standard data types"
-source_hash: 88e2b5f877ec9125
+source_hash: ed19ce8886c71994
 ---
 
 ## The boundary between the language core and the library
@@ -37,23 +37,13 @@ Schema a
 PureCodec encoded decoded
 Codec decoding_services encoding_services encoded decoded
 
-Codec.decode :
-  forall c ci rd re i a.
-  (Codec rd re i a)^c ->
-  (Unknown^ci ->{rd; SchemaError} a)^c
+Codec.decode : (Codec rd re i a)^c -> (Unknown^ci ->{rd; SchemaError} a)^c
 
-Codec.encode :
-  forall c rd re i a.
-  (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
+Codec.encode : (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
 
-Codec.decode_result :
-  forall c ci i a.
-  (PureCodec i a)^c ->
-  (Unknown^ci -> Result SchemaError a)^c
+Codec.decode_result : (PureCodec i a)^c -> (Unknown^ci -> Result SchemaError a)^c
 
-Codec.encode_result :
-  forall c i a.
-  (PureCodec i a)^c -> (a -> Result SchemaError i)^c
+Codec.encode_result : (PureCodec i a)^c -> (a -> Result SchemaError i)^c
 ```
 
 The codec's captures are preserved on a partially applied function; the provenance of the returned `a`/`i` is checked separately and is not erased by a generic witness. SchemaError carries a safe diagnostic, not the live source input, which could carry a scoped capability out.
@@ -229,16 +219,12 @@ The Codec type does not prove an isomorphism: round-trip laws are checked by tes
 `Ref` is conveniently provided by ordinary library functions. The checker uses their runtime arrows and applies the [generalization rule](../03-types-and-classes/#generalization-in-the-presence-of-ref).
 
 ```text
-Ref.make : forall c a. a^c ->{} Ref (a^c)
-Ref.get : forall c a. (Ref a)^c ->{} a^c
+Ref.make : a^c ->{} Ref (a^c)
+Ref.get : (Ref a)^c ->{} a^c
 
-Ref.set :
-  forall c a.
-  (Ref a)^c -> (a^c ->{} Unit)^c
+Ref.set : (Ref a)^c -> (a^c ->{} Unit)^c
 
-Ref.modify :
-  forall c d x a b.
-  (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
+Ref.modify : (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
 ```
 
 `make` records `c` in the invariant type argument `a^c`: it is the cell's

@@ -11,7 +11,7 @@ import Sink exposing (Sink)
 import Stream.Core exposing (Stream)
 
 /// Runs the stream into the sink and gives what the sink gives.
-run : forall c r e a r2 e2 l b. Sink r2 e2 a l b -> (Stream r e a)^c ->{r + r2; e + e2} b
+run : Sink r2 e2 a l b -> (Stream r e a)^c ->{r + r2; e + e2} b
 foreign effect run from "@flick-lang/runtime/effect/Stream" "run"
   arity 1
   retention call
@@ -19,8 +19,7 @@ foreign effect run from "@flick-lang/runtime/effect/Stream" "run"
 
 /// The values of the sink, run again over the rest each time it ends; an
 /// element it leaves over starts its next run.
-transduce :
-  forall c r e a r2 e2 b. Sink r2 e2 a a b -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c
+transduce : Sink r2 e2 a a b -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c
 foreign pure transduce from "@flick-lang/runtime/effect/Stream" "transduce"
   arity 1
   retention call
@@ -28,8 +27,7 @@ foreign pure transduce from "@flick-lang/runtime/effect/Stream" "transduce"
 
 /// `transduce` that feeds the sink while the downstream is busy, so a slow
 /// consumer gets fewer, larger values.
-aggregate :
-  forall c r e a r2 e2 b. Sink r2 e2 a a b -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c
+aggregate : Sink r2 e2 a a b -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c
 foreign pure aggregate from "@flick-lang/runtime/effect/Stream" "aggregate"
   arity 1
   retention call
@@ -38,7 +36,6 @@ foreign pure aggregate from "@flick-lang/runtime/effect/Stream" "aggregate"
 /// `aggregate` that also ends the sink's run each time the schedule fires;
 /// the schedule gets the last value, if any.
 aggregate_within :
-  forall c r e a r2 e2 b r3 e3 o.
   Sink r2 e2 a a b ->
   Schedule.Schedule r3 e3 (Option b) o ->
   (Stream r e a)^c ->
@@ -49,16 +46,14 @@ foreign pure aggregate_within from "@flick-lang/runtime/effect/Stream" "aggregat
   reviewed "effect@4.1.2 sha256:47dbb4412f1ede76"
 
 /// The leftovers of the sink, which reads the stream.
-pipe_through :
-  forall c r e a r2 e2 l b. Sink r2 e2 a l b -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) l)^c
+pipe_through : Sink r2 e2 a l b -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) l)^c
 foreign pure pipe_through from "@flick-lang/runtime/effect/Stream" "pipeThrough"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:11b397949cd59f9d"
 
 /// The stream, with every element also fed to the sink.
-tap_sink :
-  forall c r e a r2 e2 l x. Sink r2 e2 a l x -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
+tap_sink : Sink r2 e2 a l x -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
 foreign pure tap_sink from "@flick-lang/runtime/effect/Stream" "tapSink"
   arity 1
   retention call
@@ -67,7 +62,6 @@ foreign pure tap_sink from "@flick-lang/runtime/effect/Stream" "tapSink"
 /// The first value of the sink and the rest of the stream, which belongs to
 /// the scope of region `s`.
 peel :
-  forall s c r e a r2 e2 b.
   (Fiber.Outlives c s, Fiber.Provided r s, Fiber.Provided r2 s, Detached r, Detached r2) =>
   Sink r2 e2 a a b -> (Stream r e a)^c ->{Scope s | r + r2; e + e2} (b, (Stream none e a)^{s})
 foreign effect peel from "@flick-lang/runtime/effect/Stream" "peel"
@@ -76,15 +70,13 @@ foreign effect peel from "@flick-lang/runtime/effect/Stream" "peel"
   reviewed "effect@4.1.2 sha256:707e1796543327f9"
 
 /// The channel the stream is made of: it emits chunks of the elements.
-to_channel :
-  forall c r e a i ie id. (Stream r e a)^c -> (Channel r e i (NonEmpty.NonEmpty a) Unit ie id)^c
+to_channel : (Stream r e a)^c -> (Channel r e i (NonEmpty.NonEmpty a) Unit ie id)^c
 foreign pure to_channel from "@flick-lang/runtime/effect/Stream" "toChannel"
   retention call
   reviewed "effect@4.1.2 sha256:55d89455ce5afc88"
 
 /// The stream of the elements of the chunks the channel emits.
-from_channel :
-  forall c r e a i. (Channel r e i (NonEmpty.NonEmpty a) Unit none Unit)^c -> (Stream r e a)^c
+from_channel : (Channel r e i (NonEmpty.NonEmpty a) Unit none Unit)^c -> (Stream r e a)^c
 foreign pure from_channel from "@flick-lang/runtime/effect/Stream" "fromChannel"
   retention call
   reviewed "effect@4.1.2 sha256:bbbdae98c9854d69"
@@ -92,7 +84,6 @@ foreign pure from_channel from "@flick-lang/runtime/effect/Stream" "fromChannel"
 /// What the channel emits when it reads the chunks of the stream, its
 /// failure and its end.
 pipe_through_channel :
-  forall c r e a r2 e2 b d.
   Channel r2 e2 (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty b) d e Unit ->
   (Stream r e a)^c ->
   (Stream (r + r2) e2 b)^c
@@ -104,7 +95,6 @@ foreign pure pipe_through_channel from "@flick-lang/runtime/effect/Stream" "pipe
 /// `pipe_through_channel` with a channel that sees no failure: one of the
 /// stream fails the result directly.
 pipe_through_channel_or_fail :
-  forall c r e a r2 e2 b d.
   Channel r2 e2 (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty b) d none Unit ->
   (Stream r e a)^c ->
   (Stream (r + r2) (e + e2) b)^c
@@ -118,7 +108,6 @@ foreign pure pipe_through_channel_or_fail from "@flick-lang/runtime/effect/Strea
 /// `preventFallback`, a failure after the first element is not retried.
 /// `on_event` sees each attempt.
 with_execution_plan :
-  forall c p r e a r2 e2.
   ExecutionPlan.ExecutionPlan p r2 e2 (Errors e) ->
   Bool ->
   (ExecutionPlan.Event e ->{r;} Unit)^c ->

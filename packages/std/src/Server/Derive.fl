@@ -23,7 +23,7 @@ no_errors : Errors none
 foreign pure no_errors from "@flick-lang/runtime/effect/server/Functions" "serverNoErrors"
 
 /// The errors `e` and `t`, sent with its witness.
-with_error : forall t e. Schema t -> Errors e -> Errors {t | e}
+with_error : Schema t -> Errors e -> Errors {t | e}
 foreign pure with_error from "@flick-lang/runtime/effect/server/Functions" "serverError"
   arity 2
 
@@ -32,24 +32,23 @@ foreign pure with_error from "@flick-lang/runtime/effect/server/Functions" "serv
 type Procedure p (e : ErrorRow) s
 
 /// The procedure of the server function `name`, its module's with it.
-procedure : forall p e s. String -> Schema p -> Schema s -> Errors e -> Procedure p e s
+procedure : String -> Schema p -> Schema s -> Errors e -> Procedure p e s
 foreign pure procedure from "@flick-lang/runtime/effect/server/Functions" "serverProcedure"
   arity 4
 
 /// A call of the procedure: to `FLICK_SERVER_URL` on Node, to the page's
 /// origin in a browser, at `Server.path`.
-call : forall p e s. Procedure p e s -> p ->{Async; Rpc.ClientError | e} s
+call : Procedure p e s -> p ->{Async; Rpc.ClientError | e} s
 foreign effect call from "@flick-lang/runtime/effect/server/Functions" "serverCall"
   arity 2
 
 /// The implementation of a procedure: what it needs, and `Server`, so no
 /// client reaches it.
-function :
-  forall p r e s. Procedure p e s -> (p ->{r; e} s) -> Server.Function ({Server.Server} + r)
+function : Procedure p e s -> (p ->{r; e} s) -> Server.Function ({Server.Server} + r)
 foreign pure function from "@flick-lang/runtime/effect/server/Functions" "serverFunction"
   arity 2
 
 /// The implementation of a procedure whose errors have `Unauthorized`.
-guarded : forall p r e s. Procedure p e s -> (p ->{r; e} s) -> Server.Guarded ({Server.Server} + r)
+guarded : Procedure p e s -> (p ->{r; e} s) -> Server.Guarded ({Server.Server} + r)
 foreign pure guarded from "@flick-lang/runtime/effect/server/Functions" "serverFunction"
   arity 2

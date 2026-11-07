@@ -9,38 +9,37 @@ import PubSub
 import Queue
 
 /// Every element, in order.
-run_collect : forall r e i o d c. (Channel r e i o d none Unit)^c ->{r; e} List o
+run_collect : (Channel r e i o d none Unit)^c ->{r; e} List o
 foreign effect run_collect from "@flick-lang/runtime/effect/Channel" "runCollect"
   retention call
   reviewed "effect@4.1.2 sha256:a579a781daa25c53"
 
 /// The number of elements.
-run_count : forall r e i o d c. (Channel r e i o d none Unit)^c ->{r; e} Int
+run_count : (Channel r e i o d none Unit)^c ->{r; e} Int
 foreign effect run_count from "@flick-lang/runtime/effect/Channel" "runCount"
   retention call
   reviewed "effect@4.1.2 sha256:92bd1128b972ff79"
 
 /// Runs the channel for its effects; its done value.
-run_drain : forall r e i o d c. (Channel r e i o d none Unit)^c ->{r; e} d
+run_drain : (Channel r e i o d none Unit)^c ->{r; e} d
 foreign effect run_drain from "@flick-lang/runtime/effect/Channel" "runDrain"
   retention call
   reviewed "effect@4.1.2 sha256:f87d19b55e46b366"
 
 /// The first element, if any; the rest is not pulled.
-run_head : forall r e i o d c. (Channel r e i o d none Unit)^c ->{r; e} Option o
+run_head : (Channel r e i o d none Unit)^c ->{r; e} Option o
 foreign effect run_head from "@flick-lang/runtime/effect/Channel" "runHead"
   retention call
   reviewed "effect@4.1.2 sha256:c9501f65006cd8ab"
 
 /// The last element, if any.
-run_last : forall r e i o d c. (Channel r e i o d none Unit)^c ->{r; e} Option o
+run_last : (Channel r e i o d none Unit)^c ->{r; e} Option o
 foreign effect run_last from "@flick-lang/runtime/effect/Channel" "runLast"
   retention call
   reviewed "effect@4.1.2 sha256:915b541bcee8f9fb"
 
 /// Folds the elements from `initial` with `f`.
-run_fold :
-  forall z o r e i d c. (Unit -> z) -> (z -> o -> z) -> (Channel r e i o d none Unit)^c ->{r; e} z
+run_fold : (Unit -> z) -> (z -> o -> z) -> (Channel r e i o d none Unit)^c ->{r; e} z
 foreign effect run_fold from "@flick-lang/runtime/effect/Channel" "runFold"
   arity 2
   retention call
@@ -48,7 +47,6 @@ foreign effect run_fold from "@flick-lang/runtime/effect/Channel" "runFold"
 
 /// `run_fold` with a task for each step.
 run_fold_effect :
-  forall z o r2 e2 r e i d c.
   (Unit -> z) -> (z -> o ->{r2; e2} z) -> (Channel r e i o d none Unit)^c ->{r + r2; e + e2} z
 foreign effect run_fold_effect from "@flick-lang/runtime/effect/Channel" "runFoldEffect"
   arity 2
@@ -56,33 +54,28 @@ foreign effect run_fold_effect from "@flick-lang/runtime/effect/Channel" "runFol
   reviewed "effect@4.1.2 sha256:19e47755d3d1221f"
 
 /// Runs `f` on each element; the done value.
-run_for_each :
-  forall o r2 e2 r e i d c.
-  (o ->{r2; e2} Unit) -> (Channel r e i o d none Unit)^c ->{r + r2; e + e2} d
+run_for_each : (o ->{r2; e2} Unit) -> (Channel r e i o d none Unit)^c ->{r + r2; e + e2} d
 foreign effect run_for_each from "@flick-lang/runtime/effect/Channel" "runForEach"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:5b2f4a8deae8de50"
 
 /// Runs `f` on each element while it gives `True`.
-run_for_each_while :
-  forall o r2 e2 r e i d c.
-  (o ->{r2; e2} Bool) -> (Channel r e i o d none Unit)^c ->{r + r2; e + e2} Unit
+run_for_each_while : (o ->{r2; e2} Bool) -> (Channel r e i o d none Unit)^c ->{r + r2; e + e2} Unit
 foreign effect run_for_each_while from "@flick-lang/runtime/effect/Channel" "runForEachWhile"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:87dea9b128efdb10"
 
 /// The bytes of all the chunks, concatenated.
-mk_uint8_array :
-  forall r e i d c. (Channel r e i (NonEmpty.NonEmpty (List Int)) d none Unit)^c ->{r; e} List Int
+mk_uint8_array : (Channel r e i (NonEmpty.NonEmpty (List Int)) d none Unit)^c ->{r; e} List Int
 foreign effect mk_uint8_array from "@flick-lang/runtime/effect/Channel" "flickMkUint8Array"
   retention call
   reviewed "effect@4.1.2 sha256:55b163c5f42bdbee"
 
 /// Offers every element to the queue, then ends it, or fails it with the
 /// channel's failure.
-run_into_queue : forall e o r i d c. Queue.Queue e o -> (Channel r e i o d none Unit)^c ->{r;} Unit
+run_into_queue : Queue.Queue e o -> (Channel r e i o d none Unit)^c ->{r;} Unit
 foreign effect run_into_queue from "@flick-lang/runtime/effect/Channel" "runIntoQueue"
   arity 1
   retention call
@@ -90,7 +83,6 @@ foreign effect run_into_queue from "@flick-lang/runtime/effect/Channel" "runInto
 
 /// `run_into_queue` of the elements of each chunk.
 run_into_queue_array :
-  forall e o r i d c.
   Queue.Queue e o -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{r;} Unit
 foreign effect run_into_queue_array from "@flick-lang/runtime/effect/Channel" "runIntoQueueArray"
   arity 1
@@ -101,7 +93,6 @@ foreign effect run_into_queue_array from "@flick-lang/runtime/effect/Channel" "r
 /// one of region `s`) into a queue with the options; the queue ends, or
 /// fails, as the channel does, and is shut down when the scope closes.
 to_queue :
-  forall c s r e i o d.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Buffer -> (Channel r e i o d none Unit)^c ->{Scope s | r;} Queue.Queue e o
 foreign effect to_queue from "@flick-lang/runtime/effect/Channel" "flickToQueue"
@@ -111,7 +102,6 @@ foreign effect to_queue from "@flick-lang/runtime/effect/Channel" "flickToQueue"
 
 /// `to_queue` of the elements of each chunk.
 to_queue_array :
-  forall c s r e i o d.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Buffer -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{Scope s | r;} Queue.Queue e o
 foreign effect to_queue_array from "@flick-lang/runtime/effect/Channel" "flickToQueueArray"
@@ -132,7 +122,6 @@ type alias HubOptions = {
 /// Runs the channel in the background of the innermost `scope` (or the
 /// one of region `s`), publishing its elements to a new hub.
 to_pubsub :
-  forall c s r e i o d.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   HubOptions -> (Channel r e i o d none Unit)^c ->{Scope s | r;} PubSub.PubSub o
 foreign effect to_pubsub from "@flick-lang/runtime/effect/Channel" "flickToPubSub"
@@ -142,7 +131,6 @@ foreign effect to_pubsub from "@flick-lang/runtime/effect/Channel" "flickToPubSu
 
 /// `to_pubsub` of the elements of each chunk.
 to_pubsub_array :
-  forall c s r e i o d.
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   HubOptions -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{Scope s | r;} PubSub.PubSub o
 foreign effect to_pubsub_array from "@flick-lang/runtime/effect/Channel" "flickToPubSubArray"
@@ -153,7 +141,6 @@ foreign effect to_pubsub_array from "@flick-lang/runtime/effect/Channel" "flickT
 /// Publishes every element to the hub, shutting it down at the end when
 /// `shutdownOnEnd`.
 run_into_pubsub :
-  forall o r e i d c.
   { shutdownOnEnd : Bool } -> PubSub.PubSub o -> (Channel r e i o d none Unit)^c ->{r; e} Unit
 foreign effect run_into_pubsub from "@flick-lang/runtime/effect/Channel" "flickRunIntoPubSub"
   arity 2
@@ -162,7 +149,6 @@ foreign effect run_into_pubsub from "@flick-lang/runtime/effect/Channel" "flickR
 
 /// `run_into_pubsub` of the elements of each chunk; the done value.
 run_into_pubsub_array :
-  forall o r e i d c.
   { shutdownOnEnd : Bool } ->
   PubSub.PubSub o ->
   (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{r; e}

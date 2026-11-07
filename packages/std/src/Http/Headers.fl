@@ -81,7 +81,7 @@ foreign pure is_redacted_name from "@flick-lang/runtime/effect/http/Headers" "is
   reviewed "effect@4.1.2 sha256:446af9f2160ae36a"
 
 /// Runs `task` with the names of the headers that logs and `show` mask.
-with_redacted_names : forall c r e a. List String -> (Eff r e a)^c ->{r; e} a
+with_redacted_names : List String -> (Eff r e a)^c ->{r; e} a
 foreign effect with_redacted_names from "@flick-lang/runtime/effect/http/Headers" "flickWithRedactedNames"
   arity 2
   retention call

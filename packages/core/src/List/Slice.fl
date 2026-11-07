@@ -19,35 +19,35 @@ foreign pure drop_right from "@flick-lang/runtime/effect/Array" "dropRight"
   reviewed "effect@4.1.2 sha256:3525d3278c5bf7d4"
 
 /// The longest prefix whose elements satisfy `p`.
-take_while : forall c a. (a -> Bool)^c -> (List a -> List a)^c
+take_while : (a -> Bool)^c -> (List a -> List a)^c
 foreign pure take_while from "@flick-lang/runtime/effect/Array" "takeWhile"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:6c3edb21850229b8"
 
 /// The list without its longest prefix whose elements satisfy `p`.
-drop_while : forall c a. (a -> Bool)^c -> (List a -> List a)^c
+drop_while : (a -> Bool)^c -> (List a -> List a)^c
 foreign pure drop_while from "@flick-lang/runtime/effect/Array" "dropWhile"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b1c0ff068967514d"
 
 /// The `Ok` values of `f` over the elements, up to the first `Err`.
-take_while_filter : forall c a b e. (a -> Result e b)^c -> (List a -> List b)^c
+take_while_filter : (a -> Result e b)^c -> (List a -> List b)^c
 foreign pure take_while_filter from "@flick-lang/runtime/effect/Array" "takeWhileFilter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:80554d0e0ee091c8"
 
 /// The list from the first element for which `f` gives an `Err`.
-drop_while_filter : forall c a b e. (a -> Result e b)^c -> (List a -> List a)^c
+drop_while_filter : (a -> Result e b)^c -> (List a -> List a)^c
 foreign pure drop_while_filter from "@flick-lang/runtime/effect/Array" "dropWhileFilter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:9721247b81d1b0b2"
 
 /// The longest prefix whose elements satisfy `p`, and the rest.
-span : forall c a. (a -> Bool)^c -> (List a -> (List a, List a))^c
+span : (a -> Bool)^c -> (List a -> (List a, List a))^c
 foreign pure span from "@flick-lang/runtime/effect/Array" "span"
   arity 1
   retention call
@@ -66,7 +66,7 @@ foreign pure split from "@flick-lang/runtime/effect/Array" "split"
   reviewed "effect@4.1.2 sha256:d21b35fff72d4eb3"
 
 /// The elements before the first one that satisfies `p`, and the rest.
-split_where : forall c a. (a -> Bool)^c -> (List a -> (List a, List a))^c
+split_where : (a -> Bool)^c -> (List a -> (List a, List a))^c
 foreign pure split_where from "@flick-lang/runtime/effect/Array" "splitWhere"
   arity 1
   retention call
@@ -85,7 +85,7 @@ foreign pure window from "@flick-lang/runtime/effect/Array" "window"
   reviewed "effect@4.1.2 sha256:ca2e713ca8eb60f1"
 
 /// Repeatedly takes a value and the rest from what is left, until nothing is.
-chop : forall c a b. (NonEmpty.NonEmpty a -> (b, List a))^c -> (List a -> List b)^c
+chop : (NonEmpty.NonEmpty a -> (b, List a))^c -> (List a -> List b)^c
 foreign pure chop from "@flick-lang/runtime/effect/Array" "chop"
   arity 1
   retention call
@@ -127,7 +127,7 @@ foreign pure remove from "@flick-lang/runtime/effect/Array" "remove"
   reviewed "effect@4.1.2 sha256:deb0b958f3b561d5"
 
 /// The element at index `i` replaced by `f` of it; `None` out of range.
-modify : forall c a. Int -> (a -> a)^c -> (List a -> Option (List a))^c
+modify : Int -> (a -> a)^c -> (List a -> Option (List a))^c
 foreign pure modify from "@flick-lang/runtime/effect/Array" "modify"
   arity 2
   retention call

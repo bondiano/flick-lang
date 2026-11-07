@@ -117,7 +117,7 @@ foreign pure compose_k from "@flick-lang/runtime/effect/Option" "composeK"
   reviewed "effect@4.1.2 sha256:1a3778745be6f23d"
 
 /// Whether the option is `Some` of a value `same` as `x`.
-contains_with : forall c a. (a -> a -> Bool)^c -> (a -> Option a -> Bool)^c
+contains_with : (a -> a -> Bool)^c -> (a -> Option a -> Bool)^c
 foreign pure contains_with from "@flick-lang/runtime/effect/Option" "containsWith"
   arity 1
   retention call
@@ -128,21 +128,21 @@ contains : Eq a => a -> Option a -> Bool
 let contains x value = contains_with eq x value
 
 /// Whether the option is `Some` of a value that satisfies `p`.
-exists : forall c a. (a -> Bool)^c -> (Option a -> Bool)^c
+exists : (a -> Bool)^c -> (Option a -> Bool)^c
 foreign pure exists from "@flick-lang/runtime/effect/Option" "exists"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:63ae3a2be4773897"
 
 /// `Some x` when `p x` holds, `None` otherwise.
-filter : forall c a. (a -> Bool)^c -> (Option a -> Option a)^c
+filter : (a -> Bool)^c -> (Option a -> Option a)^c
 foreign pure filter from "@flick-lang/runtime/effect/Option" "filter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a1d98773e037261f"
 
 /// `Some` of the `Ok` value of `f`, `None` for an `Err`.
-filter_map : forall c a b e. (a -> Result e b)^c -> (Option a -> Option b)^c
+filter_map : (a -> Result e b)^c -> (Option a -> Option b)^c
 foreign pure filter_map from "@flick-lang/runtime/effect/Option" "filterMap"
   arity 1
   retention call
@@ -178,21 +178,21 @@ foreign pure match_ from "@flick-lang/runtime/effect/Option" "match"
   reviewed "effect@4.1.2 sha256:79d0200e36bffb1d"
 
 /// `Some (Err x)` for `Some x`, otherwise `that ()` with its value as `Ok`.
-or_else_result : forall c a b. (Unit -> Option b)^c -> (Option a -> Option (Result a b))^c
+or_else_result : (Unit -> Option b)^c -> (Option a -> Option (Result a b))^c
 foreign pure or_else_result from "@flick-lang/runtime/effect/Option" "orElseResult"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:735142c56dbce113"
 
 /// The option itself when `Some`, `Some (fallback ())` otherwise.
-or_else_some : forall c a. (Unit -> a)^c -> (Option a -> Option a)^c
+or_else_some : (Unit -> a)^c -> (Option a -> Option a)^c
 foreign pure or_else_some from "@flick-lang/runtime/effect/Option" "orElseSome"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:83167a64df28d03f"
 
 /// The `Ok` and the `Err` of `f` of the value, each as an option.
-partition_map : forall c a b d. (a -> Result b d)^c -> (Option a -> (Option d, Option b))^c
+partition_map : (a -> Result b d)^c -> (Option a -> (Option d, Option b))^c
 foreign pure partition_map from "@flick-lang/runtime/effect/Option" "partitionMap"
   arity 1
   retention call
@@ -211,14 +211,14 @@ foreign pure product_many from "@flick-lang/runtime/effect/Option" "productMany"
   reviewed "effect@4.1.2 sha256:ee2b8b144c477b90"
 
 /// Folds the values of the `Some` elements.
-reduce_compact : forall c a b. b -> (b -> a -> b)^c -> (List (Option a) -> b)^c
+reduce_compact : b -> (b -> a -> b)^c -> (List (Option a) -> b)^c
 foreign pure reduce_compact from "@flick-lang/runtime/effect/Option" "reduceCompact"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:37ef635ab0b23e65"
 
 /// The option itself when `f` of its value is `Some`, `None` otherwise.
-tap : forall c a x. (a -> Option x)^c -> (Option a -> Option a)^c
+tap : (a -> Option x)^c -> (Option a -> Option a)^c
 foreign pure tap from "@flick-lang/runtime/effect/Option" "tap"
   arity 1
   retention call
@@ -237,7 +237,7 @@ foreign pure zip_right from "@flick-lang/runtime/effect/Option" "zipRight"
   reviewed "effect@4.1.2 sha256:a19da2db6fcbe826"
 
 /// `self |> zip_with that f`: `f` of both values when both are `Some`.
-zip_with : forall c a b d. Option b -> (a -> b -> d)^c -> (Option a -> Option d)^c
+zip_with : Option b -> (a -> b -> d)^c -> (Option a -> Option d)^c
 foreign pure zip_with from "@flick-lang/runtime/effect/Option" "zipWith"
   arity 2
   retention call

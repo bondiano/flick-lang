@@ -4,7 +4,7 @@ module App.Main exposing (main)
 
 type Res (s : Region)
 
-open_res : forall s. String ->{Scope s;} Res s
+open_res : String ->{Scope s;} Res s
 foreign effect open_res from "./resources.mjs" "open"
 
 /// Acquires into the caller's region from inside a scope of its own.
