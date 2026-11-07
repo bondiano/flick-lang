@@ -8,14 +8,14 @@ import Database exposing (Database)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 import Conduit.Server.Routes as Routes
-import Conduit.Server.Session exposing (Keys)
+import Conduit.Server.Session exposing (Keys, Signing)
 
 /// A request answered with the services the server runs with.
 type alias Handler =
   ServerRequest ->{Database, Keys, Crypto.Crypto; Http.ServerError.HttpServerError} ServerResponse
 
 /// The router of the API and, given a directory, of the client's files.
-router : Option String ->{Async, Database, Keys, Crypto.Crypto; PlatformError.PlatformError} Handler
+router : Option String ->{...Signing; PlatformError.PlatformError} Handler
 let router files =
   let api = HttpApi.route "/api/*" Routes.api Routes.handlers
   let client =

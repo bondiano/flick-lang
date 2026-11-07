@@ -8,7 +8,7 @@ module Conduit.Server.Main exposing (main)
 import Database exposing (Database)
 import Conduit.Server.App as Server
 import Conduit.Server.Schema as Schema
-import Conduit.Server.Session exposing (Keys)
+import Conduit.Server.Session exposing (Signing)
 
 /// What the server reads from its environment.
 type alias Settings = { port : Float; database : String; secret : String; files : String }
@@ -24,7 +24,7 @@ let settings () = {
 
 /// Migrates the database, then serves until the process is stopped.
 serve :
-  Settings ->{Async, Database, Keys, Crypto.Crypto, Http.Platform.HttpPlatform, FileSystem.FileSystem; PlatformError.PlatformError, Http.ServerError.ServeError}
+  Settings ->{...Signing, Http.Platform.HttpPlatform, FileSystem.FileSystem; PlatformError.PlatformError, Http.ServerError.ServeError}
   Unit
 let serve config =
   // without its schema the server cannot answer anything

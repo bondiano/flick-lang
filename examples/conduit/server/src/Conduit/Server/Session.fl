@@ -4,9 +4,12 @@
 /// that needs a user and `maybe` that of one that serves anyone, both from
 /// the header the endpoint declares; a refused token is the endpoint's 401.
 module Conduit.Server.Session exposing (
+  Authorized,
+  InSession,
   Keys,
   Session,
   Signed,
+  Signing,
   check,
   maybe,
   issue,
@@ -25,6 +28,15 @@ type alias Signed = { account : Account; token : String }
 /// Who makes the request, if anyone.
 service Session =
   current : Unit ->{} Option Signed
+
+/// What an endpoint of a signed-in user needs.
+type alias InSession = {Async, Session, Database}
+
+/// And when it refuses a token.
+type alias Authorized = {...InSession; Unauthorized}
+
+/// What signs users in, before there is a session.
+type alias Signing = {Async, Database, Keys, Crypto.Crypto}
 
 /// The secret the server signs tokens with.
 service Keys =
@@ -75,7 +87,7 @@ let signed_id token =
     })
 
 /// The user a header names, or 401.
-known : String ->{Async, Database, Keys, Crypto.Crypto; Unauthorized} Signed
+known : String ->{...Signing; Unauthorized} Signed
 let known header =
   let token = Option.with_default "" (token_of header)
   let account =
@@ -91,18 +103,14 @@ session : Option Signed -> Session.Impl
 let session signed = { current = fun () -> signed }
 
 /// The session of a request that must name a user.
-check :
-  HttpApi.Request p q Credentials b ->{Async, Database, Keys, Crypto.Crypto; Unauthorized}
-  Session.Impl
+check : HttpApi.Request p q Credentials b ->{...Signing; Unauthorized} Session.Impl
 let check request =
   match request.headers.authorization with
   | Some header -> session (Some (known header))
   | None -> refuse "is missing"
 
 /// The session of a request that may name a user.
-maybe :
-  HttpApi.Request p q Credentials b ->{Async, Database, Keys, Crypto.Crypto; Unauthorized}
-  Session.Impl
+maybe : HttpApi.Request p q Credentials b ->{...Signing; Unauthorized} Session.Impl
 let maybe request =
   match request.headers.authorization with
   | Some header -> session (Some (known header))

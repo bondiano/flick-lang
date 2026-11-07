@@ -16,7 +16,7 @@ import Conduit.Problem as Problem exposing (
 )
 import Conduit.Server.People as People exposing (Account)
 import Conduit.Server.Present as Present
-import Conduit.Server.Session as Auth exposing (Keys, Session)
+import Conduit.Server.Session as Auth exposing (Authorized, Keys, Session, Signing)
 import Conduit.Server.Validate as Validate
 
 /// The value of a valid request, or 422 with its problems.
@@ -41,9 +41,7 @@ signed : Account ->{Async, Keys, Crypto.Crypto;} UserBody
 let signed account = { user = Present.user account (Auth.issue account) }
 
 /// Signs a user up: 422 for a field missing or malformed, 409 for a name or email taken.
-register :
-  Request Unit Unit NewUserBody ->{Async, Database, Keys, Crypto.Crypto | r; Conflict, Unprocessable}
-  UserBody
+register : Request Unit Unit NewUserBody ->{...Signing | r; Conflict, Unprocessable} UserBody
 let register request =
   let given = valid (Validate.registration request.payload.user)
   unique (People.taken None (Some given.username) (Some given.email))
@@ -58,9 +56,7 @@ let register request =
   | None -> Effect.die "a new user is not there"
 
 /// Signs a user in: 401 for an unknown email or a wrong password.
-login :
-  Request Unit Unit LoginBody ->{Async, Database, Keys, Crypto.Crypto | r; Unauthorized, Unprocessable}
-  UserBody
+login : Request Unit Unit LoginBody ->{...Signing | r; Unauthorized, Unprocessable} UserBody
 let login request =
   let given = valid (Validate.credentials request.payload.user)
   let refused = Unauthorized (Problem.problem "credentials" "invalid")
@@ -94,7 +90,7 @@ let changed account change = {
 
 /// Changes the signed-in user: a name or email another has is 409.
 update_user :
-  Request Unit Unit UpdateUserBody ->{Async, Session, Database, Crypto.Crypto | r; Unauthorized, Conflict, Unprocessable}
+  Request Unit Unit UpdateUserBody ->{...Authorized, Crypto.Crypto | r; Conflict, Unprocessable}
   UserBody
 let update_user request =
   let me = Auth.signed_in ()
@@ -112,23 +108,20 @@ let named username =
   | None -> from_result (Err (NotFound (Problem.problem "profile" "not found")))
 
 /// The profile of `:username`, and whether the reader follows them.
-get_profile :
-  Request ProfilePath Unit Unit ->{Async, Session, Database | r; Unauthorized, NotFound} ProfileBody
+get_profile : Request ProfilePath Unit Unit ->{...Authorized | r; NotFound} ProfileBody
 let get_profile request =
   let account = named (Username.value request.path.username)
   { profile = Present.profile account (People.follows (Auth.reader ()) account.id) }
 
 /// The reader follows `:username`; following twice changes nothing.
-follow :
-  Request ProfilePath Unit Unit ->{Async, Session, Database | r; Unauthorized, NotFound} ProfileBody
+follow : Request ProfilePath Unit Unit ->{...Authorized | r; NotFound} ProfileBody
 let follow request =
   let account = named (Username.value request.path.username)
   People.follow (Auth.signed_in ()).account.id account.id
   { profile = Present.profile account true }
 
 /// The reader stops following `:username`.
-unfollow :
-  Request ProfilePath Unit Unit ->{Async, Session, Database | r; Unauthorized, NotFound} ProfileBody
+unfollow : Request ProfilePath Unit Unit ->{...Authorized | r; NotFound} ProfileBody
 let unfollow request =
   let account = named (Username.value request.path.username)
   People.unfollow (Auth.signed_in ()).account.id account.id
