@@ -1,4 +1,6 @@
 ---
+import CodeText from "./CodeText.astro";
+
 interface Entry {
   type: string;
   label: string;
@@ -14,9 +16,9 @@ const holdsCurrent = (entry: Entry): boolean => entry.isCurrent === true || (ent
 <ul class:list={["doc-nav-list", { "doc-nav-nested": nested }]}>
   {entries.map((entry) => <li>
     {entry.type === "link"
-      ? <a href={entry.href} aria-current={entry.isCurrent ? "page" : undefined}>{entry.label}</a>
+      ? <a href={entry.href} aria-current={entry.isCurrent ? "page" : undefined}><span><CodeText text={entry.label} /></span></a>
       : <details class="doc-nav-group" open={holdsCurrent(entry)}>
-          <summary><span class="doc-nav-token"></span>{entry.label}<span class="doc-nav-count">{pages(entry)}</span></summary>
+          <summary><span class="doc-nav-token"></span><span><CodeText text={entry.label} /></span><span class="doc-nav-count">{pages(entry)}</span></summary>
           <Astro.self entries={entry.entries ?? []} nested />
         </details>}
   </li>)}

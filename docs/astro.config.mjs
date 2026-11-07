@@ -80,8 +80,10 @@ export default defineConfig({
       },
       sidebar,
       customCss: ["./src/styles/custom.css"],
+      routeMiddleware: "./src/routeData.ts",
       components: {
         Header: "./src/components/Header.astro",
+        PageTitle: "./src/components/PageTitle.astro",
         PageFrame: "./src/components/DocFrame.astro",
         Sidebar: "./src/components/Sidebar.astro",
         ThemeProvider: "./src/components/ThemeInit.astro",

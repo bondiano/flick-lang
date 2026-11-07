@@ -217,7 +217,11 @@ code, pre, kbd { font-variant-ligatures: none; }
 .content-panel { padding-block: 1.5rem; }
 .content-panel + .content-panel { border-top: 0; padding-top: 0; }
 [data-has-sidebar] .content-panel:first-of-type { padding-top: 2.5rem; }
-h1#_top { color: var(--sl-color-white); font-weight: 800; letter-spacing: -0.025em; line-height: 1.08; text-wrap: balance; }
+h1#_top { margin-top: 1rem; font-size: var(--sl-text-h1); color: var(--sl-color-white); font-weight: 800; letter-spacing: -0.025em; line-height: 1.08; text-wrap: balance; }
+/* Code in a heading is code: the mono face at its optical size, without tracking. */
+h1#_top code, .sl-markdown-content :is(h2, h3, h4) code { font-family: var(--sl-font-mono); font-size: 0.86em; font-weight: 700; letter-spacing: -0.01em; font-variant-ligatures: none; }
+h1#_top code { padding: 0.04em 0.22em; background: var(--sl-color-bg-inline-code); color: var(--sl-color-white); }
+.doc-nav-list code { font-family: var(--sl-font-mono); font-size: 0.92em; background: none; padding: 0; color: inherit; font-variant-ligatures: none; }
 .sl-markdown-content { line-height: 1.65; }
 /* About 75 characters of Overpass; code and tables keep the full column. */
 .sl-markdown-content > :is(p, ul, ol, dl, blockquote) { max-width: 36rem; }
