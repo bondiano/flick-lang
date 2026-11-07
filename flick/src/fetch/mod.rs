@@ -94,7 +94,7 @@ fn plugins(root: &Path, dependencies: &[Dependency]) -> Vec<LockedPlugin> {
 }
 
 /// `path` from `root`, with `/` between its parts.
-fn relative(root: &Path, path: &Path) -> String {
+pub fn relative(root: &Path, path: &Path) -> String {
     let (mut from, mut to) = (root.components().peekable(), path.components().peekable());
     while from.peek().is_some() && from.peek() == to.peek() {
         from.next();
@@ -103,6 +103,11 @@ fn relative(root: &Path, path: &Path) -> String {
     let up = from.map(|_| "..".to_owned());
     let down = to.map(|c| c.as_os_str().to_string_lossy().into_owned());
     up.chain(down).collect::<Vec<_>>().join("/")
+}
+
+/// The `flick.lock` of the project at `root`; none is an empty one.
+pub fn lock_of(root: &Path) -> Result<Lock, String> {
+    read_lock(&root.join(LOCK_FILE))
 }
 
 fn read_lock(path: &Path) -> Result<Lock, String> {

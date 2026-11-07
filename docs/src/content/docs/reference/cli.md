@@ -28,6 +28,7 @@ installs from the store) and `--help`; `flick help <command>` prints a command's
 | `install [--locked]` | installs with pnpm (`--frozen-lockfile`, and `--offline` with the global `--offline`); at a workspace root, each member's |
 | `add <pkg>… [--dev]`, `remove <pkg>…`, `update [pkg]…` | changes dependencies with pnpm |
 | `deps [--why <pkg>]` | the installed graph, and the Flick modules of each direct dependency |
+| `plugins` | the plugins the project gets, the compiler's own first: where each comes from, the hash of its component and whether `flick.lock` pins that build |
 | `pack --out-dir <dir>` | a release build and its npm tarball; refuses `todo` and `echo` (`FLICK-P024`), and warns when the public API breaks importers since the latest tag |
 | `diff [ref]` | the public API changes since a git revision (the latest tag by default), each `MAJOR` (removed or changed) or `MINOR` (added), and the version they call for from `package.json` |
 | `ffi import <pkg> --out <dir> [--select a,b]` | reads the `.d.ts` of an installed package and writes `<dir>/<Pkg>/Generated.fl` with a coverage report; `--select` imports only the named exports (see [Importing a package's `.d.ts`](../ffi/#importing-a-packages-dts)) |
