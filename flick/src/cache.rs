@@ -202,6 +202,9 @@ fn library_files(dir: &Path, dependencies: &[config::Dependency], out: &mut Vec<
         let Ok(library) = config::parse(&text, id) else {
             continue;
         };
+        // a plugin's component expands blocks, so a new build of it is an input
+        let component = library.package.as_ref().and_then(|p| p.plugin.as_ref());
+        out.extend(component.map(|c| at.join(c)));
         // the foreign files a build ships or compiles are inputs as its modules are
         let mut modules = Vec::new();
         files_under(&at.join(&library.source_dir), &mut modules);
@@ -375,8 +378,37 @@ mod tests {
     use flick_core::project::{self, discover};
     use flick_core::source::SourceMap;
 
-    use super::read_unchanged;
+    use super::{input_files, read_unchanged};
     use crate::sources::FsHost;
+
+    #[test]
+    fn the_component_of_a_plugin_a_library_provides_is_an_input() {
+        let root = env::temp_dir().join(format!("flick-cache-plugin-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("app/src/App")).expect("dir");
+        fs::create_dir_all(root.join("lib/src")).expect("dir");
+        fs::write(
+            root.join("app/flick.toml"),
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[dependencies]\npairs = { path = \"../lib\" }\n",
+        )
+        .expect("write");
+        fs::write(
+            root.join("lib/flick.toml"),
+            "schema-version = 1\n[package]\nname = \"pairs\"\nversion = \"1.0.0\"\nplugin = \"pairs.wasm\"\n[project]\nkind = \"lib\"\n",
+        )
+        .expect("write");
+        let host = FsHost::new();
+        let mut sources = SourceMap::default();
+        let project = discover(&host, &mut sources, &root.join("app"), None)
+            .expect("project")
+            .expect("found");
+        let inputs = input_files(&project, &[]);
+        assert!(
+            inputs.iter().any(|p| p.ends_with("lib/pairs.wasm")),
+            "{inputs:?}"
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn a_source_saved_after_it_was_read_keeps_the_build_out_of_the_cache() {

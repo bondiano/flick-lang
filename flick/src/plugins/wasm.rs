@@ -6,6 +6,7 @@
 //! whose blocks all come from the cache never compiles it.
 
 use std::fs;
+use std::io;
 use std::mem;
 use std::path::Path;
 use std::str;
@@ -34,7 +35,13 @@ const MEMORY: usize = 64 << 20;
 
 /// The plugin of `package` in the component at `path`.
 pub fn load(package: &str, path: &Path) -> Result<Arc<dyn Expander>, String> {
-    let bytes = fs::read(path).map_err(|e| format!("cannot read `{}`: {e}", path.display()))?;
+    let bytes = fs::read(path).map_err(|e| {
+        let hint = match e.kind() {
+            io::ErrorKind::NotFound => "; build it, as `flick run plugin` in its package does",
+            _ => "",
+        };
+        format!("cannot read `{}`: {e}{hint}", path.display())
+    })?;
     match interface_version(&bytes) {
         Some(version) if version == flick_plugin::VERSION => {}
         Some(version) => {
