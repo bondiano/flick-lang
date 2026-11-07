@@ -353,3 +353,45 @@ fn a_type_may_stand_twice_and_an_expression_once() {
     assert_eq!(rendered.text, "p : (Pair (Hole) (Hole))");
     assert_eq!(rendered.holes.len(), 2);
 }
+
+/// A plugin linked into the compiler that panics on every block.
+struct Panicking;
+
+impl flick_plugin::Plugin for Panicking {
+    fn collect(&self, _: &[flick_plugin::Block], _: &mut dyn Compiler) -> Vec<u8> {
+        Vec::new()
+    }
+
+    fn expand(
+        &self,
+        _: &flick_plugin::Block,
+        _: &[u8],
+        _: &mut dyn Compiler,
+    ) -> Result<Arena, Vec<flick_plugin::Diagnostic>> {
+        panic!("out of bounds")
+    }
+
+    fn highlight(&self, _: &flick_plugin::Block, _: &[u8]) -> Vec<flick_plugin::Highlight> {
+        panic!("no colors")
+    }
+}
+
+#[test]
+fn a_native_plugin_that_panics_fails_the_block_not_the_compiler() {
+    use super::{Expander, Failure, Native};
+    let mut map = SourceMap::default();
+    let file = map.add("Main.fl", SRC);
+    let parsed = parse(SRC, file);
+    let node = find(&parsed.tree, K::PluginExpr).expect("a block");
+    let mut source = BlockSource::new(Arc::from(SRC), file, node, Arc::from([])).expect("closed");
+    let block = source.block();
+    let plugin = Native::new("panicking", Panicking);
+    match plugin.expand(&block, &[], &mut source) {
+        Err(Failure::Broken(why)) => assert_eq!(why, "panicked: out of bounds"),
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(
+        plugin.highlight(&block, &[]).expect_err("it panicked"),
+        "panicked: no colors"
+    );
+}
