@@ -1,0 +1,41 @@
+name: Perf
+
+# The performance baseline; its numbers are the artifact perf.json. Nightly
+# calls it; by hand it measures any ref, to find which commit moved a number.
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The ref to measure
+        type: string
+
+jobs:
+  perf:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: runtime-go/go.mod
+          cache-dependency-path: runtime-go/go.sum
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
+      # version comes from `packageManager` in package.json
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: just perf
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: perf
+          path: target/perf.json
