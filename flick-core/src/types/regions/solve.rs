@@ -7,12 +7,24 @@
 use std::{collections::HashSet, mem};
 
 use super::{Hold, Visible};
-use crate::diagnostics::{Diagnostic, codes};
+use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::types::env::Form;
 use crate::types::kinds::Kind;
 use crate::types::ty::{Norm, Row, Type};
 use crate::types::{Checker, ty};
+
+/// Whether `captures` is what `stages` gives a later stage, which starts from
+/// the empty row: a written `^(c + d)` does not.
+fn implied_stage(captures: &Type) -> bool {
+    match captures {
+        Type::Union(left, _) => {
+            matches!(&**left, Type::Row(r) if r.entries.is_empty() && r.tail.is_none())
+                || implied_stage(left)
+        }
+        _ => false,
+    }
+}
 
 /// `Outlives c s`: the captures `c` live at least as long as the region `s`.
 #[derive(Debug, Clone)]
@@ -319,11 +331,14 @@ impl Checker<'_> {
                     format!("allows only {}", allowed.join(", "))
                 };
                 let what = format!("the expected type `{}`", self.show(expected));
-                Diagnostic::error(
-                    codes::G001,
-                    format!("{subject}, but {what} {allowed}"),
-                    hold.span,
-                ).with_fix(|| (if reader {
+                // a stage's qualifier may be one no one wrote, so say where it is from
+                let origin = if implied_stage(&hold.bound) {
+                    "; the signature does not write this qualifier: a later stage of a function holds what its earlier parameters hold"
+                } else {
+                    ""
+                };
+                let mut edits = Vec::new();
+                let advice = if reader {
                     "build a list with `[for …]`, or iterate the sequence in the function that builds it".to_owned()
                 } else if !self.is_region(atom, &[]) {
                     let what = match self.atom_kind(atom, &[]) {
@@ -335,11 +350,21 @@ impl Checker<'_> {
                         self.show(atom)
                     )
                 } else {
-                    format!(
-                        "add the region to the qualifier: `T^{{{}}}`",
-                        self.show(atom)
-                    )
-                }, Vec::new()))
+                    let region = self.show(atom);
+                    // shortcut: only a qualifier written in braces gets the edit, not `T` or `T^c`; upgrade when the type of a value leads to where it is written.
+                    edits.extend(
+                        self.local_place(&hold.bound)
+                            .adding(&region)
+                            .map(|(span, replacement)| Edit { span, replacement }),
+                    );
+                    format!("add the region to the qualifier: `T^{{{region}}}`")
+                };
+                Diagnostic::error(
+                    codes::G001,
+                    format!("{subject}, but {what} {allowed}{origin}"),
+                    hold.span,
+                )
+                .with_fix(|| (advice, edits))
             }
         };
         let ends = if self.handler_region(atom) {
