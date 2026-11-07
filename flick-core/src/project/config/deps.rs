@@ -194,6 +194,8 @@ pub(super) struct RawGrants {
     net: Vec<String>,
     #[serde(default)]
     env: Vec<String>,
+    #[serde(default)]
+    disable: Vec<String>,
 }
 
 /// The grants of `[plugins]`, by package, each entry checked.
@@ -220,7 +222,12 @@ pub(super) fn grants(
     raw.into_iter()
         .map(|(package, value)| {
             let at = span(value.span());
-            let RawGrants { fs_read, net, env } = value.into_inner();
+            let RawGrants {
+                fs_read,
+                net,
+                env,
+                disable,
+            } = value.into_inner();
             let wrong = |what: String| {
                 Diagnostic::error(codes::P005, format!("`[plugins.{package}]`: {what}"), at)
             };
@@ -239,7 +246,19 @@ pub(super) fn grants(
                     "`env` names `{v}`, which is no name of a variable"
                 )));
             }
-            Ok((package, Grants { fs_read, net, env }))
+            if let Some(d) = disable.iter().find(|d| !d.split('.').all(variable)) {
+                return Err(wrong(format!(
+                    "`disable` names `{d}`, which is no head of a block or class, as `sql` or `Cli.Value`"
+                )));
+            }
+            let grants = Grants {
+                fs_read,
+                net,
+                env,
+                disable,
+                span: Some(at),
+            };
+            Ok((package, grants))
         })
         .collect()
 }

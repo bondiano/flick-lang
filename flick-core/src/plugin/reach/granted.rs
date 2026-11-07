@@ -235,6 +235,7 @@ mod tests {
                 fs_read: vec!["schema".into()],
                 net: vec!["db.example.com".into()],
                 env: vec!["TOKEN".into()],
+                ..Grants::default()
             },
             outside: Arc::clone(outside) as Arc<dyn Outside>,
         })))

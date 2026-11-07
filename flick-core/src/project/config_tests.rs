@@ -344,7 +344,16 @@ fn a_project_grants_a_plugin_files_hosts_and_variables() {
     assert_eq!(sql.fs_read, ["schema/", "db/extra.sql"]);
     assert_eq!(sql.net, ["db.example.com", "localhost:8080"]);
     assert_eq!(sql.env, ["SQL_TOKEN"]);
-    assert!(with("").expect("valid").plugins["sql"] == Grants::default());
+    let empty = with("").expect("valid").plugins["sql"].clone();
+    assert!(empty.span.is_some());
+    assert!(
+        Grants {
+            span: None,
+            ..empty
+        } == Grants::default()
+    );
+    let disabled = with("disable = [\"sql\", \"Cli.Value\"]").expect("valid");
+    assert_eq!(disabled.plugins["sql"].disable, ["sql", "Cli.Value"]);
     for wrong in [
         "fs-read = [\"../secrets\"]",
         "fs-read = [\"/etc/passwd\"]",
@@ -356,6 +365,8 @@ fn a_project_grants_a_plugin_files_hosts_and_variables() {
         "net = [\"a..b\"]",
         "net = [\"db-.example.com\"]",
         "env = [\"A-B\"]",
+        "disable = [\"no such\"]",
+        "disable = [\"Cli.\"]",
         "exec = [\"sh\"]",
     ] {
         let refused = with(wrong).expect_err(wrong);

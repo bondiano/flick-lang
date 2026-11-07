@@ -166,3 +166,18 @@ fn collect_reaches_what_the_project_grants_once_for_the_group() {
         "{found:?}"
     );
 }
+
+#[test]
+fn a_head_the_manifest_disables_is_refused_at_each_block() {
+    let world = Arc::new(World::default());
+    let host = reaching("pairs { x = 1 }", &world);
+    let grants = Grants {
+        disable: vec!["pairs".into()],
+        ..Grants::default()
+    };
+    let (_, shown) = built(&host, grants);
+    assert_eq!(
+        shown,
+        ["FLICK-P042 `pairs`: the manifest disables `pairs` of the plugin of `pairs`"]
+    );
+}

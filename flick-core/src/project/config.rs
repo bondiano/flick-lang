@@ -132,6 +132,11 @@ pub struct Grants {
     pub net: Vec<String>,
     /// Variables of the environment it reads.
     pub env: Vec<String>,
+    /// The heads of blocks and the classes, as `Cli.Value`, the project does
+    /// not let the plugin handle.
+    pub disable: Vec<String>,
+    /// Where `[plugins.<package>]` is.
+    pub span: Option<Span>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
