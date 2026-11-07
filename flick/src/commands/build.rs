@@ -23,6 +23,7 @@ use crate::{cache, toolchain};
 
 mod cached;
 mod progress;
+mod shipped;
 
 pub struct BuildCommand {
     pub options: BuildArguments,
@@ -521,8 +522,11 @@ fn js_artifacts(
     compilation: &Compilation,
     settings: &Settings,
 ) -> Emission {
+    let (shipped, problems) = shipped::foreign_files(compilation, &|_| true);
     if !library {
-        let (artifacts, diagnostics) = build::emit(compilation, sources, settings);
+        let (mut artifacts, mut diagnostics) = build::emit(compilation, sources, settings);
+        artifacts.extend(shipped);
+        diagnostics.extend(problems);
         return Emission {
             artifacts,
             diagnostics,
@@ -544,7 +548,7 @@ fn js_artifacts(
         },
     );
     let core_modules = build::core_built(&core, compilation, settings.typescript);
-    let (mut artifacts, diagnostics) = build::emit(
+    let (mut artifacts, mut diagnostics) = build::emit(
         compilation,
         sources,
         &Settings {
@@ -552,7 +556,11 @@ fn js_artifacts(
             ..*settings
         },
     );
-    artifacts.extend(core.into_iter().map(|a| Artifact {
+    artifacts.extend(shipped);
+    diagnostics.extend(problems);
+    let (core_shipped, _) =
+        shipped::foreign_files(compilation, &|m| core_modules.iter().any(|c| c == m));
+    artifacts.extend(core.into_iter().chain(core_shipped).map(|a| Artifact {
         path: format!("{}{}", build::effects::CORE_DIR, a.path),
         contents: a.contents,
     }));

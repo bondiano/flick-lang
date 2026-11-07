@@ -11,6 +11,7 @@ use std::process::{Command, Output};
 use std::{fs, thread};
 
 use common::project;
+use flick_core::build::go::executable;
 
 const APP: &str = "schema-version = 1
 
@@ -355,4 +356,132 @@ fn a_released_std_is_fetched_by_its_tarball() {
     assert!(installed.status.success(), "{installed:?}");
     let checked = released(&app, &store, &["check"]);
     assert!(checked.status.success(), "{checked:?}");
+}
+
+const GREET: &str = "module Lib.Greet exposing (hi)
+
+hi : String ->{} String
+foreign hi from \"./greet.mjs\" \"hi\"
+";
+
+const GREET_MAIN: &str = "module App.Main exposing (main)
+
+import Lib.Greet
+
+main : Unit ->{} Unit
+let main () = Console.log (Lib.Greet.hi \"there\")
+";
+
+/// The library `lib` of a foreign module on both targets, and an app of it
+/// from `source`, built from the store by `emit`.
+fn built_with_foreign(name: &str, source: &str, store: &Path, emit: &str) -> PathBuf {
+    let manifest = format!(
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[dependencies]\nlib = {source}\n\n[build]\nemit = \"{emit}\"\n"
+    );
+    let app = project(
+        name,
+        &[("flick.toml", &manifest), ("src/App/Main.fl", GREET_MAIN)],
+    );
+    let install = run(&app, store, &["install"]);
+    assert!(install.status.success(), "{install:?}");
+    let build = run(&app, store, &["build"]);
+    assert!(build.status.success(), "{build:?}");
+    app
+}
+
+/// The library `lib` under `dir`.
+fn foreign_library(name: &str) -> PathBuf {
+    project(
+        name,
+        &[
+            (
+                "lib/flick.toml",
+                "schema-version = 1\n\n[package]\nname = \"lib\"\nversion = \"1.0.0\"\n\n[project]\nkind = \"lib\"\n",
+            ),
+            ("lib/src/Lib/Greet.fl", GREET),
+            (
+                "lib/src/Lib/greet.mjs",
+                "export const hi = (name) => `hello ${name}`;\n",
+            ),
+            (
+                "lib/src/Lib/greet.go",
+                "package main\n\nimport \"flick.app/flickrt\"\n\nfunc hi(fb *flickrt.Fiber, name flickrt.Value) flickrt.Value {\n\treturn \"hello \" + name.(string)\n}\n",
+            ),
+        ],
+    )
+}
+
+/// A git source of `foreign_library`, tagged `v1.0.0`.
+fn foreign_repository(name: &str) -> String {
+    let repo = foreign_library(name);
+    git(&repo, &["init", "--quiet"]);
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "--quiet", "-m", "lib"]);
+    git(&repo, &["tag", "v1.0.0"]);
+    format!(
+        "{{ git = \"file://{}\", tag = \"v1.0.0\", subdir = \"lib\" }}",
+        repo.display()
+    )
+}
+
+/// A tarball source of `foreign_library`, as `flick pack` makes one.
+fn foreign_tarball(name: &str, store: &Path) -> String {
+    let lib = foreign_library(name).join("lib");
+    let out = lib.join("packed");
+    let packed = run(&lib, store, &["pack", "--out-dir", &out.to_string_lossy()]);
+    assert!(packed.status.success(), "{packed:?}");
+    let line = String::from_utf8_lossy(&packed.stdout).into_owned();
+    let (sha, file) = line.trim().split_once("  ").expect("sha and path");
+    let url = serve_once(fs::read(file).expect("tarball"));
+    format!("{{ url = \"{url}\", sha256 = \"{sha}\" }}")
+}
+
+#[test]
+fn a_fetched_library_ships_its_foreign_module() {
+    let store = project("foreign-store", &[]);
+    let sources = [
+        foreign_repository("foreign-git"),
+        foreign_tarball("foreign-tarball", &store),
+    ];
+    for (i, source) in sources.iter().enumerate() {
+        let app = built_with_foreign(&format!("foreign-js-{i}"), source, &store, "js");
+        let code = fs::read_to_string(app.join("dist/Lib/Greet.js")).expect("the module");
+        assert!(code.contains("from \"./greet.mjs\""), "{code}");
+        assert!(app.join("dist/Lib/greet.mjs").is_file());
+    }
+}
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn a_fetched_library_runs_with_its_foreign_module_on_js() {
+    let store = project("foreign-node-store", &[]);
+    let source = foreign_repository("foreign-node-git");
+    let app = built_with_foreign("foreign-node", &source, &store, "js");
+    let ran = Command::new("node")
+        .arg("dist/flick-main.js")
+        .current_dir(&app)
+        .output()
+        .expect("node runs");
+    assert!(ran.status.success(), "{ran:?}");
+    assert_eq!(String::from_utf8_lossy(&ran.stdout).trim(), "hello there");
+}
+
+#[test]
+#[ignore = "needs Go"]
+fn a_fetched_library_runs_with_its_foreign_module_on_go() {
+    let store = project("foreign-go-store", &[]);
+    let sources = [
+        foreign_repository("foreign-go-git"),
+        foreign_tarball("foreign-go-tarball", &store),
+    ];
+    for (i, source) in sources.iter().enumerate() {
+        let app = built_with_foreign(&format!("foreign-go-{i}"), source, &store, "go");
+        // the file is named by its package, not by where the store is
+        assert!(app.join("dist/go/main/ffi_lib_Lib_greet.go").is_file());
+        let ran = Command::new(app.join("dist").join(executable("main")))
+            .output()
+            .expect("the program runs");
+        assert!(ran.status.success(), "{ran:?}");
+        assert_eq!(String::from_utf8_lossy(&ran.stdout).trim(), "hello there");
+    }
 }

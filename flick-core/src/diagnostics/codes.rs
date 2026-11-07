@@ -358,6 +358,7 @@ codes! {
     P038 = Project 38, "plugin reaches what the project does not grant";
     P039 = Project 39, "plugin's answer is in no snapshot of an offline run";
     P040 = Project 40, "packages need different versions of an npm package";
+    P041 = Project 41, "foreign module of a library cannot ship";
 }
 
 #[cfg(test)]

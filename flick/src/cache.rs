@@ -172,7 +172,7 @@ fn dependency_files(root: &Path) -> Vec<PathBuf> {
                 out.extend(
                     sources
                         .into_iter()
-                        .filter(|p| p.extension().is_some_and(|e| e == "fl")),
+                        .filter(|p| p.extension().is_some_and(|e| e == "fl" || e == "go")),
                 );
             }
         }
@@ -202,13 +202,13 @@ fn library_files(dir: &Path, dependencies: &[config::Dependency], out: &mut Vec<
         let Ok(library) = config::parse(&text, id) else {
             continue;
         };
+        // the foreign files a build ships or compiles are inputs as its modules are
         let mut modules = Vec::new();
         files_under(&at.join(&library.source_dir), &mut modules);
-        out.extend(
-            modules
-                .into_iter()
-                .filter(|p| p.extension().is_some_and(|e| e == "fl")),
-        );
+        out.extend(modules.into_iter().filter(|p| {
+            p.extension()
+                .is_some_and(|e| e == "fl" || e == "go" || e == "mjs" || e == "cjs")
+        }));
         library_files(&at, &library.dependencies, out);
     }
 }
