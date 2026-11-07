@@ -93,6 +93,14 @@ impl Checker<'_> {
                         let s = inner(a);
                         if s.is_data() { s } else { Shape::Option(Box::new(s)) }
                     }
+                    [e, a] if head.is_lang(Lang::Result) => {
+                        let (e, a) = (inner(e), inner(a));
+                        if e.is_data() && a.is_data() {
+                            Shape::Data
+                        } else {
+                            Shape::Result(Box::new(e), Box::new(a))
+                        }
+                    }
                     _ => Shape::Data,
                 }
             }

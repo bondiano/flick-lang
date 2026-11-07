@@ -96,6 +96,8 @@ pub enum Shape {
     Eff(Box<Shape>),
     List(Box<Shape>),
     Option(Box<Shape>),
+    /// `Result e a`: the failure, the success.
+    Result(Box<Shape>, Box<Shape>),
     Tuple(Vec<Shape>),
     Record(Vec<(String, Shape)>),
     Layer,

@@ -282,6 +282,11 @@ impl Gen<'_> {
                 let map = self.to_host(inner, format!("$e{d}"));
                 format!("{}({v}, ($e{d}) => {map})", self.rt("optionMapped"))
             }
+            Shape::Result(e, a) => {
+                let d = self.bridge_depth();
+                let (fe, fa) = (self.to_host(e, format!("$e{d}")), self.to_host(a, format!("$a{d}")));
+                format!("{}({v}, ($a{d}) => {fa}, ($e{d}) => {fe})", self.rt("resultMapped"))
+            }
             Shape::Tuple(items) => {
                 let d = self.bridge_depth();
                 let parts: Vec<String> = items.iter().enumerate().map(|(i, s)| self.to_host(s, format!("$t{d}[{i}]"))).collect();
@@ -347,6 +352,11 @@ impl Gen<'_> {
                 let d = self.bridge_depth();
                 let map = self.from_host(inner, format!("$e{d}"));
                 format!("{}({v}, ($e{d}) => {map})", self.rt("optionMapped"))
+            }
+            Shape::Result(e, a) => {
+                let d = self.bridge_depth();
+                let (fe, fa) = (self.from_host(e, format!("$e{d}")), self.from_host(a, format!("$a{d}")));
+                format!("{}({v}, ($a{d}) => {fa}, ($e{d}) => {fe})", self.rt("resultMapped"))
             }
             Shape::Tuple(items) => {
                 let d = self.bridge_depth();

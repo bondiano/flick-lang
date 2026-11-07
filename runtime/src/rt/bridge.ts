@@ -3,6 +3,8 @@
 // Context under `KERNEL`. A crossing that ends at once takes no suspension.
 import { Cause as ECause, Context, Effect, Exit as EExit, Layer as ELayer, Option as EOption, Result as EResult, Scope as EScope } from "effect";
 
+import { Failure as HostFailure } from "../cause.ts";
+import { failureCause, flickExit, nativeExit } from "../stdlib/outcome.ts";
 import { type Cause, type Exit, Raise, failed, fromReasons, raise, succeeded } from "./cause.ts";
 import { type Ctx, type Fiber, type Run, Suspend, currentCtx, currentFiber, forkNow, hosted, asExit, exitOf, lookup, raiseOf } from "./fiber.ts";
 import { Failure } from "./outcome.ts";
@@ -167,11 +169,18 @@ export const optionMapped = (value: { readonly _tag: string; readonly value?: un
 
 // `Exit`, `Failure` at the boundary: the kernel's and Effect's are different classes.
 export const exitToEffect = (exit: Exit): unknown =>
-  exit.cause === undefined ? EExit.succeed(exit.value) : EExit.failCause(causeOut(exit.cause));
-export const exitFromEffect = (exit: EExit.Exit<unknown, unknown>): Exit =>
-  exit._tag === "Success" ? succeeded(exit.value) : failed(causeIn(exit.cause));
-export const failureToEffect = (failure: Failure): unknown => causeOut(failure.cause);
-export const failureFromEffect = (cause: ECause.Cause<unknown>): Failure => new Failure(causeIn(cause));
+  flickExit(exit.cause === undefined ? EExit.succeed(exit.value) : EExit.failCause(causeOut(exit.cause)));
+export const exitFromEffect = (exit: never): Exit => {
+  const native = nativeExit<unknown, unknown>(exit);
+  return native._tag === "Success" ? succeeded(native.value) : failed(causeIn(native.cause));
+};
+export const failureToEffect = (failure: Failure): unknown => new HostFailure(causeOut(failure.cause));
+export const failureFromEffect = (failure: HostFailure): Failure => new Failure(causeIn(failureCause(failure)));
+export const resultMapped = (
+  value: { readonly _tag: string; readonly success?: unknown; readonly failure?: unknown },
+  f: (a: unknown) => unknown,
+  g: (e: unknown) => unknown,
+): unknown => (value._tag === "Success" ? EResult.succeed(f(value.success)) : EResult.fail(g(value.failure)));
 
 /** One memo map of Effect per memo map of the kernel: an Effect layer shared inside Effect is built once. */
 const memos = /*#__PURE__*/ new WeakMap<MemoMap, ELayer.MemoMap>();
