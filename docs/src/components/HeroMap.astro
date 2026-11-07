@@ -1,6 +1,7 @@
 ---
 // The program on the hero as a line diagram: each line is a service or an error, each station a
 // real function. `Log` running through `load_view` is what the hero's button takes away.
+// The violet line's bend must end above the hero's bottom edge, where the page's rail starts.
 ---
 <div id="flick-map" class="hero-map" aria-hidden="true">
   <svg class="map-wide" viewBox="0 0 1440 770" focusable="false">
@@ -27,7 +28,7 @@
       <text class="map-note" x="134" y="750">provide Users, Log · try NotFound</text>
     </g>
   </svg>
-  <svg class="map-corridor" viewBox="0 0 358 412" focusable="false">
+  <svg class="map-corridor" viewBox="0 0 358 426" focusable="false">
     <g class="map-lines">
       <path class="line-users" d="M34 2V340M26 2H42M26 340H42" />
       <path class="line-fails" d="M58 2V340M50 2H66M50 340H66" />
