@@ -32,6 +32,10 @@ jobs:
           node-version: 24.18.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # nothing is published with a translation behind, a broken example or a dead link:
+      # the link validator runs as part of the site's build
+      - run: node docs/scripts/parity.mjs
+      - run: cargo test -p flick-core --test corpus docs_examples_check
       - run: just docs
       - uses: actions/upload-pages-artifact@v5
         with:
