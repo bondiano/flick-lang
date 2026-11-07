@@ -9,15 +9,14 @@
 
 /* Lines, stations and labels of the diagram. */
 .hero-map svg { display: block; width: 100%; height: auto; overflow: visible; }
-.map-lines path { fill: none; stroke-width: 15; stroke-linejoin: round; }
-.map-corridor .map-lines path { stroke-width: 13; }
+.map-lines path { fill: none; stroke-width: 12; stroke-linejoin: round; }
+.map-corridor .map-lines path { stroke-width: 10; }
 .line-users { stroke: var(--flick-line-cobalt); }
 .line-fails { stroke: var(--flick-line-coral); }
 .line-log { stroke: var(--flick-line-green); transition: stroke 160ms ease-out; }
-.map-lines .line-returns { stroke: var(--flick-line-violet); stroke-width: 8; stroke-linejoin: miter; }
+.hero-map .map-lines .line-returns { stroke: var(--flick-line-violet); stroke-width: 8px; vector-effect: non-scaling-stroke; }
 .map-prose { font-family: var(--sl-font); font-size: 14px; font-weight: 500; fill: var(--sl-color-gray-2); }
-.map-terminus { fill: none; stroke: var(--sl-color-white); stroke-width: 7; }
-.map-station { fill: var(--flick-panel); stroke: var(--sl-color-white); stroke-width: 7; }
+.map-station { fill: var(--flick-panel); stroke: var(--sl-color-white); stroke-width: 6; }
 .map-labels { font-family: var(--sl-font-mono); font-size: 19px; font-weight: 600; fill: var(--sl-color-white); }
 .map-corridor .map-labels { font-size: 16px; }
 .map-returns { fill: var(--flick-line-violet); }
@@ -28,6 +27,7 @@
 .map-stop circle { fill: var(--flick-line-coral-ink); }
 .map-stop path { fill: none; stroke: var(--sl-color-text-invert); stroke-width: 3.5; stroke-linecap: round; }
 .hero-map[data-broken] .line-log-trunk { stroke: var(--sl-color-gray-5); stroke-dasharray: 3 19; stroke-linecap: round; }
+.hero-map[data-broken] .line-log-cap { stroke: var(--sl-color-gray-5); }
 .hero-map[data-broken] .map-stop { opacity: 1; animation: stop-land 280ms cubic-bezier(0.16, 1, 0.3, 1); transform-box: fill-box; transform-origin: center; }
 @keyframes stop-land { from { transform: scale(0.2); } to { transform: scale(1); } }
 
@@ -105,16 +105,16 @@
 }
 
 /* Below the hero, the page is one line and each section a station on it. */
-.route { position: relative; max-width: 1760px; margin-inline: auto; padding: 0.5rem max(1rem, var(--flick-gutter)) 0; --rail: 0.5rem; }
-.route::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(max(1rem, var(--flick-gutter)) + 0.3rem); width: var(--rail); background: var(--flick-line-violet); }
+.route { --rail: 0.5rem; --g: max(1rem, var(--flick-gutter)); --rail-x: calc(9 * min(100vw - 2 * var(--g), 26rem) / 358); position: relative; max-width: 1760px; margin-inline: auto; padding: 0.5rem var(--g) 0; }
+.route::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(var(--g) + var(--rail-x) - 0.25rem); width: var(--rail); background: var(--flick-line-violet); }
 .terminus { position: relative; }
-.terminus::before { content: ''; position: absolute; z-index: 1; left: calc(-2.5rem - 0.25rem); top: calc(26px - 3.5px); width: 1.6rem; height: 7px; background: var(--sl-color-white); }
+.terminus::before { content: ''; position: absolute; z-index: 1; left: calc(var(--rail-x) - 2.5rem - 0.8rem); top: calc(26px - 0.25rem); width: 1.6rem; height: var(--rail); background: var(--flick-line-violet); }
 /* Below the terminus the rail is painted out: the actions may wrap to any height. */
-.terminus::after { content: ''; position: absolute; left: calc(-2.5rem - 0.25rem); top: 26px; width: 1.6rem; height: 24rem; background: var(--sl-color-bg); }
+.terminus::after { content: ''; position: absolute; left: calc(var(--rail-x) - 2.5rem - 0.8rem); top: 26px; width: 1.6rem; height: 24rem; background: var(--sl-color-bg); }
 .stop { position: relative; display: grid; gap: 1.25rem; padding: 1.5rem 0 4rem 2.5rem; max-width: 72rem; min-width: 0; }
 .stop > * { min-width: 0; }
 .stop h2 { position: relative; margin: 0; font-size: clamp(2rem, 4.2vw, 3rem); font-weight: 800; line-height: 1.08; letter-spacing: -0.025em; }
-.stop h2::before { content: ''; position: absolute; left: calc(-2.5rem - 0.2rem); top: 0.1em; width: 1.5rem; height: 1.5rem; border: 5px solid var(--sl-color-white); border-radius: 50%; background: var(--flick-panel); }
+.stop h2::before { content: ''; position: absolute; left: calc(var(--rail-x) - 2.5rem - 0.75rem); top: 0.1em; width: 1.5rem; height: 1.5rem; border: 5px solid var(--sl-color-white); border-radius: 50%; background: var(--flick-panel); }
 .stop h3 { margin: 0.75rem 0 0; font-size: 1.4rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.01em; }
 .stop-lead { max-width: 40rem; font-size: 1.25rem; line-height: 1.45; color: var(--sl-color-white); }
 .stop-text { max-width: 36rem; font-size: 1.0625rem; line-height: 1.6; }
@@ -147,8 +147,7 @@
 .edge-grid { display: grid; gap: 1.5rem; align-items: start; }
 .edge { display: grid; gap: 0.75rem; min-width: 0; }
 .served-map { display: block; width: 100%; max-width: 26rem; height: auto; }
-.served-map .map-lines path { stroke-width: 11; }
-.served-map .map-terminus { stroke-width: 6; }
+.served-map .map-lines path { stroke-width: 9; }
 .served-map .map-station { stroke-width: 5; }
 .served-map .map-labels { font-size: 15px; }
 .split { display: grid; gap: 1.5rem; min-width: 0; }
@@ -167,7 +166,7 @@
 .compare p { max-width: 36rem; font-size: 1.0625rem; line-height: 1.5; }
 
 .seam-map { display: block; width: 100%; max-width: 32rem; height: auto; }
-.seam-map path { fill: none; stroke: var(--flick-line-violet); stroke-width: 13; stroke-linejoin: round; }
+.seam-map path { fill: none; stroke: var(--flick-line-violet); stroke-width: 10; stroke-linejoin: round; }
 .seam-map .map-station { stroke-width: 6; }
 .seam-map text { font-family: var(--sl-font-mono); font-size: 17px; font-weight: 600; fill: var(--sl-color-white); }
 .seam-map .map-prose { font-family: var(--sl-font); font-size: 14px; font-weight: 500; fill: var(--sl-color-gray-2); }
@@ -197,8 +196,8 @@
 @media (min-width: 64rem) {
   .read-grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; gap: 2.5rem; }
   .stop { padding: 2rem 0 5rem 3.5rem; }
-  .stop h2::before { left: calc(-3.5rem - 0.2rem); }
-  .terminus::before, .terminus::after { left: calc(-3.5rem - 0.25rem); }
+  .stop h2::before { left: calc(var(--rail-x) - 3.5rem - 0.75rem); }
+  .terminus::before, .terminus::after { left: calc(var(--rail-x) - 3.5rem - 0.8rem); }
   .split { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 2.5rem; align-items: start; }
   .compare article { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); column-gap: 2rem; align-items: start; }
   .compare h3 { grid-column: 1 / -1; }
@@ -210,8 +209,9 @@
 }
 /* The rail stands where the violet line leaves the diagram, in the hero's own units. */
 @media (min-width: 75rem) {
-  .route { padding-left: calc(min(100vw, 1760px) / 20); }
-  .route::before { left: calc(min(100vw, 1760px) * 81 / 1440 - 0.25rem); }
+  .route { container-type: inline-size; padding-inline: 0; --rail-x: calc(var(--u) * 9); }
+  .route::before { left: calc(var(--u) * 81 - 0.25rem); }
+  .stop { margin-inline: calc(var(--u) * 72); }
 }
 @media (prefers-reduced-motion: reduce) {
   .line-log { transition: none; }

@@ -5,20 +5,20 @@
 <div id="flick-map" class="hero-map" aria-hidden="true">
   <svg class="map-wide" viewBox="0 0 1440 770" focusable="false">
     <g class="map-lines">
-      <path class="line-users" d="M118 616H940L1316 240" />
-      <path class="line-fails" d="M118 644H952L1330 266" />
-      <path class="line-log" d="M784 672H1100L1316 456" />
-      <path class="line-log line-log-trunk" d="M118 672H736" />
-      <path class="line-returns" d="M118 692V735L81 772" />
+      <path class="line-users" d="M118 616H924Q940 616 951.3 604.7L1356 200M1348 192L1364 208M118 604V628" />
+      <path class="line-fails" d="M118 644H936Q952 644 963.3 632.7L1370 226M1362 218L1378 234M118 632V656" />
+      <path class="line-log" d="M784 672H1084Q1100 672 1111.3 660.7L1352 420M1344 412L1360 428" />
+      <path class="line-log line-log-trunk" d="M124 672H736" />
+      <path class="line-log line-log-cap" d="M118 660V684" />
+      <path class="line-returns" d="M118 688V719Q118 735 106.7 746.3L92.3 760.7Q81 772 81 788V827" />
     </g>
-    <path class="map-terminus" d="M118 596V692" />
     <rect class="map-station" x="736" y="596" width="48" height="96" rx="24" />
     <circle class="map-station" cx="1323" cy="253" r="31" />
     <circle class="map-station" cx="1316" cy="456" r="21" />
     <g class="map-stop"><circle cx="712" cy="672" r="17" /><path d="m704 664 16 16m0-16-16 16" /></g>
     <g class="map-labels">
-      <text x="1323" y="202" text-anchor="middle">Users.get</text>
-      <text x="1316" y="418" text-anchor="middle">Log.info</text>
+      <text x="1276" y="238" text-anchor="end">Users.get</text>
+      <text x="1282" y="450" text-anchor="end">Log.info</text>
       <text class="map-small" x="104" y="622" text-anchor="end">Users</text>
       <text class="map-small" x="104" y="650" text-anchor="end">NotFound</text>
       <text class="map-small" x="104" y="678" text-anchor="end">Log</text>
@@ -27,24 +27,24 @@
       <text class="map-note" x="134" y="750">provide Users, Log · try NotFound</text>
     </g>
   </svg>
-  <svg class="map-corridor" viewBox="0 0 358 400" focusable="false">
+  <svg class="map-corridor" viewBox="0 0 358 412" focusable="false">
     <g class="map-lines">
-      <path class="line-users" d="M34 62V340" />
-      <path class="line-fails" d="M58 62V340" />
-      <path class="line-log" d="M206 58L82 182V214" />
-      <path class="line-log line-log-trunk" d="M82 258V340" />
-      <path class="line-returns" d="M58 340V352L10 400" />
+      <path class="line-users" d="M34 2V340M26 2H42M26 340H42" />
+      <path class="line-fails" d="M58 2V340M50 2H66M50 340H66" />
+      <path class="line-log" d="M232 28L92 168Q82 178 82 192V214M224 20L240 36" />
+      <path class="line-log line-log-trunk" d="M82 258V334" />
+      <path class="line-log line-log-cap" d="M74 340H90" />
+      <path class="line-returns" d="M58 346V354Q58 364 51 371L16 406Q9 413 9 423V462" />
     </g>
-    <path class="map-terminus" d="M20 340H96" />
     <rect class="map-station" x="18" y="214" width="80" height="44" rx="22" />
     <circle class="map-station" cx="46" cy="40" r="26" />
     <circle class="map-station" cx="210" cy="50" r="18" />
     <g class="map-stop"><circle cx="82" cy="282" r="13" /><path d="m76 276 12 12m0-12-12 12" /></g>
     <g class="map-labels">
       <text x="84" y="46">Users.get</text>
-      <text x="236" y="56">Log.info</text>
+      <text x="236" y="70">Log.info</text>
       <text x="112" y="242">load_view</text>
-      <text class="map-small map-returns" x="34" y="370" text-anchor="end">Unit</text>
+      <text class="map-small map-returns" x="34" y="384" text-anchor="end">Unit</text>
       <text x="112" y="336">main</text>
       <text class="map-note" x="112" y="356">provide Users, Log</text>
       <text class="map-note" x="112" y="372">try NotFound</text>

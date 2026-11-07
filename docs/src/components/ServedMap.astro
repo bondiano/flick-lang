@@ -6,17 +6,15 @@ const { serves, handled, note } = Astro.props;
 ---
 <svg class="served-map" viewBox={`0 0 360 ${note ? 134 : 116}`} aria-hidden="true" focusable="false">
   <g class="map-lines">
-    <path class="line-users" d="M20 44H300" />
-    <path class="line-log" d="M20 62H300" />
-    <path class="line-fails" d={handled ? "M92 80H300" : "M0 80H300"} />
+    <path class="line-users" d="M20 44H300M20 37V51" />
+    <path class="line-log" d="M20 62H300M20 55V69" />
+    <path class="line-fails" d={handled ? "M84 80H300M84 73V87" : "M0 80H300"} />
   </g>
-  <path class="map-terminus" d="M20 34V72" />
   <rect class="map-station" x="296" y="30" width="30" height="64" rx="15" />
-  {handled && <circle class="map-station" cx="92" cy="80" r="10" />}
-  <g class="map-labels">
+    <g class="map-labels">
     <text x="346" y="20" text-anchor="end">load_view</text>
     <text x="20" y="108">{serves}</text>
-    {handled && <text x="74" y="86" text-anchor="end">try</text>}
+    {handled && <text x="72" y="86" text-anchor="end">try</text>}
     {note && <text class="map-prose" x="20" y="128">{note}</text>}
   </g>
 </svg>
