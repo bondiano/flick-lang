@@ -92,3 +92,40 @@ let dead t =
   | TInt -> 1
   | TStr -> 2
 //~ FLICK-T010 @93:5-93:9 this arm is never reached: no value
+
+type Tagged a =
+  | IsNat : Tagged Int
+  | IsBool : Tagged Bool
+
+half : Tagged a -> Tagged a -> Bool
+let half x y =
+  match (x, y) with
+  | (IsNat, IsNat) -> true
+//~ FLICK-T009 @102:3-102:15 `match` does not cover every value: `(IsBool, _)`
+
+mixed : Tagged a -> Tagged a -> Bool
+let mixed x y =
+  match (x, y) with
+  | (IsNat, IsNat) -> true
+  | (IsBool, IsBool) -> true
+  | (IsNat, IsBool) -> false
+//~ FLICK-T010 @111:5-111:20 this arm is never reached: no value
+
+/// `a` and `b` may be different types, so a mixed pair is built.
+unrelated : Tagged a -> Tagged b -> Bool
+let unrelated x y =
+  match (x, y) with
+  | (IsNat, IsNat) -> true
+  | (IsBool, IsBool) -> false
+//~ FLICK-T009 @117:3-117:15 `match` does not cover every value: `(IsNat, IsBool)`
+
+/// A type the constructor hides is not followed.
+type Packed =
+  | Packed (Tagged x) (Tagged x) : Packed
+
+hidden : Packed -> Bool
+let hidden p =
+  match p with
+  | Packed IsNat IsNat -> true
+  | Packed IsBool IsBool -> false
+//~ FLICK-T009 @128:3-128:10 `match` does not cover every value: `Packed IsNat IsBool`

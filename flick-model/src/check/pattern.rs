@@ -236,8 +236,6 @@ impl Checker<'_> {
                 .collect::<Vec<_>>()
         });
         match signature {
-            // a constructor no row names is covered only by the rows with a
-            // wildcard: the default matrix decides, as below
             Some(ctors) if ctors.iter().all(used) => {
                 for ctor in ctors {
                     // what the constructor learns holds for its own rows only
@@ -257,7 +255,26 @@ impl Checker<'_> {
                 }
                 Ok(false)
             }
-            _ => {
+            // a constructor no row names is covered only by the rows with a
+            // wildcard: the default matrix decides, under what it learns
+            Some(ctors) => {
+                let default: Vec<Vec<P>> = rows
+                    .iter()
+                    .filter(|r| matches!(r[0], P::Wild))
+                    .map(|r| r[1..].to_vec())
+                    .collect();
+                for ctor in ctors.iter().filter(|c| !used(c)) {
+                    let saved = self.clone();
+                    self.ctor_fields(ctor, first)?;
+                    let missing = self.missing(default.clone(), rest);
+                    *self = saved;
+                    if missing? {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            None => {
                 let default = rows
                     .iter()
                     .filter(|r| matches!(r[0], P::Wild))

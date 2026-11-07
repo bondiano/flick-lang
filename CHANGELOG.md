@@ -6,6 +6,9 @@ break programs.
 
 ## Unreleased
 
+- **GADTs:** a `match` follows a type variable across the parts of the matched
+  value. On `(x, y)` of type `(Tagged a, Tagged a)` it needs no arm for a pair of
+  different constructors, and an arm for one is `FLICK-T010`.
 - **Signatures:** a foreign function with `retention owner` and one region gets
   `Fiber.Outlives`, `Fiber.Provided` and `Detached` without writing them. New
   warning `FLICK-T059` names what a signature would get anyway, such as a qualifier

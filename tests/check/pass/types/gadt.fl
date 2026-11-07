@@ -56,3 +56,55 @@ let coerce a b x =
   match equal_types a b with
   | Some eq -> Some (TypeEq.cast eq x)
   | None -> None
+
+/// Two tags of one `a`: a pair of different ones is never built, whichever
+/// way the arms are written.
+type Tagged a =
+  | IsNat : Tagged Int
+  | IsBool : Tagged Bool
+
+agree : Tagged a -> Tagged a -> Bool
+let agree x y =
+  match (x, y) with
+  | (IsNat, IsNat) -> true
+  | (IsBool, IsBool) -> true
+
+either : Tagged a -> Tagged a -> Bool
+let either x y =
+  match (x, y) with
+  | (IsNat, _) -> true
+  | (_, IsBool) -> false
+
+all_three : Tagged a -> Tagged a -> Tagged a -> Bool
+let all_three x y z =
+  match (x, y, z) with
+  | (IsNat, IsNat, IsNat) -> true
+  | (IsBool, IsBool, IsBool) -> false
+
+maybe_agree : Option (Tagged a) -> Tagged a -> Bool
+let maybe_agree x y =
+  match (x, y) with
+  | (None, _) -> false
+  | (Some IsNat, IsNat) -> true
+  | (Some IsBool, IsBool) -> true
+
+in_turn : Tagged a -> Tagged a -> Bool
+let in_turn x y =
+  match x with
+  | IsNat ->
+    match y with
+    | IsNat -> true
+  | IsBool ->
+    match y with
+    | IsBool -> true
+
+/// The type of a value that can only be a pair, built from the types of its parts.
+type Two a =
+  | One Int : Two Int
+  | Both (Two x) (Two y) : Two (x, y)
+
+eval_two : forall a. Two a -> a
+let rec eval_two t =
+  match t with
+  | One n -> n
+  | Both l r -> (eval_two l, eval_two r)
