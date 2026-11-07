@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { peakRss } from "./index.mjs";
 import { compare } from "./ratchet.mjs";
 
 const time = (budget, extra = {}) => ({ x: { better: "lower", unit: "ms", budget, tolerance: 0.25, ...extra } });
@@ -35,4 +36,9 @@ test("a budget added or removed is printed", () => {
   assert.deepEqual(compare({}, time(100)), [{ line: "x: new, 100 ms ±25%" }]);
   assert.deepEqual(compare(time(100), {}), [{ line: "x: removed" }]);
   assert.deepEqual(compare(time(100), time(100)), []);
+});
+
+test("the peak is read from what both tools print", () => {
+  assert.equal(peakRss("x\nRSS, MiB: peak 89.4\ny"), 89.4);
+  assert.equal(peakRss("RSS, MiB: before soak 26.6, peak 371.4, after 0 s idle 26.6"), 371.4);
 });
