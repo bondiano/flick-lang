@@ -201,6 +201,11 @@ rather than change the lock, `flick update <name>` fetches a library again,
 `flick add <name> --git URL --tag T [--subdir S]` (or `--url U --sha256 H`,
 or `--path DIR`) adds one and `flick remove <name>` drops it.
 
+A path library's plugin is built in place, so `flick.lock` also records the
+hash of its component under `[[plugin]]`. A build is not held to it;
+`flick install --locked` fails when the component is another build, and
+`flick plugins` shows it.
+
 A library is compiled like a [source package](#packages): for the target the
 project emits, without its warnings, after the project's own modules, as
 another package, so instances of its classes and types are its own. A change
