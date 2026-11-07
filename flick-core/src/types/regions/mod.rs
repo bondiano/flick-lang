@@ -155,7 +155,7 @@ pub struct Hold {
 
 /// The types whose values hold nothing of their arguments: a witness
 /// describes values of its type, holding none of them.
-const HOLD_NOTHING: [Lang; 6] = [
+pub(super) const HOLD_NOTHING: [Lang; 6] = [
     Lang::Layer,
     Lang::ServiceTag,
     Lang::ServiceImpl,
