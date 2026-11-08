@@ -44,6 +44,8 @@ impl Checker<'_> {
             let p = &pending[i];
             bodies[i] = self.with_params(&p.params, |this| this.body(p, &mut refined));
         }
+        // before a constructor's scheme expands an alias it names
+        self.break_alias_cycles(&pending);
         for (p, body) in pending.iter().zip(bodies) {
             self.finish(p, body);
         }
@@ -52,7 +54,6 @@ impl Checker<'_> {
                 self.check_error_payload(&p.name, self.span(variant));
             }
         }
-        self.break_alias_cycles(&pending);
         for p in &pending {
             self.check_abi(p.node, &p.name);
         }
