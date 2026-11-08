@@ -39,6 +39,44 @@ fn parts(state: &[u8]) -> (&[u8], &[u8]) {
 flick_plugin::export!(Pairs);
 
 impl Plugin for Pairs {
+    /// A `.pairs` file: a line `name = "text"` is `let name : String =
+    /// "text"`, at that line; any other line that is not blank is `X004`.
+    fn load(&self, _: &str, bytes: &[u8]) -> Result<Arena, Vec<Diagnostic>> {
+        let text = String::from_utf8_lossy(bytes);
+        let mut b = Builder::new(Span { start: 0, end: 0 });
+        let mut decls = Vec::new();
+        let mut start = 0u32;
+        for line in text.split_inclusive('\n') {
+            let at = Span {
+                start,
+                end: start + u32::try_from(line.trim_end().len()).unwrap_or(0),
+            };
+            start += u32::try_from(line.len()).unwrap_or(0);
+            if line.trim().is_empty() {
+                continue;
+            }
+            let parsed = (line.split_once('=')).and_then(|(name, value)| {
+                let value = value.trim().strip_prefix('"')?.strip_suffix('"')?;
+                Some((name.trim(), value))
+            });
+            let Some((name, value)) = parsed else {
+                let message = "expected `name = \"text\"`";
+                return Err(vec![Diagnostic::error(message, at).with_code("X004")]);
+            };
+            let ty = b.at(at).ty(flick_plugin::Ty::Name("String".into()));
+            let body = b.at(at).expr(flick_plugin::Expr::Text(value.into()));
+            decls.push(b.at(at).decl(flick_plugin::Decl::Let {
+                name: name.into(),
+                params: Vec::new(),
+                ty: Some(ty),
+                body,
+                rec: false,
+            }));
+        }
+        let root = b.group(decls);
+        Ok(b.finish(root))
+    }
+
     /// The number of `pairs` blocks, the length of what `reach` reads and
     /// it, then the notes of `published`.
     fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8> {

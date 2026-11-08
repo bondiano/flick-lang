@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **Files of other languages:** a library whose `[package]` says `load = ["proto"]`
+  beside its `plugin` turns each `.proto` file into a module: `import App.User`
+  finds `App/User.proto`, the plugin's `load` gives its declarations at the
+  file's spans, the project checks them, the editor goes to the file, and a
+  changed file rebuilds the project. Two libraries loading one extension are
+  `FLICK-P045`. Rebuild a plugin's component for the new interface.
 - **`component` is a block of `std`:** the plugin of `std` gives the code of
   `component name (props : P) = body`, as the compiler did, so programs, their
   diagnostics, their hover and their bundles stay as they were. The word starts a

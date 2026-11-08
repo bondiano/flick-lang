@@ -11,6 +11,7 @@ use flick_test_pairs::Pairs;
 
 mod derive;
 mod forms;
+mod loaded;
 mod names;
 mod nested;
 mod published;
@@ -56,6 +57,10 @@ impl Expander for Counting {
     ) -> Result<Arena, Failure> {
         self.expands.fetch_add(1, Ordering::Relaxed);
         self.inner.expand(block, state, source)
+    }
+
+    fn load(&self, path: &str, bytes: &[u8]) -> Result<Arena, Failure> {
+        self.inner.load(path, bytes)
     }
 
     fn derive(

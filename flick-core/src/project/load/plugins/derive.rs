@@ -199,10 +199,13 @@ impl Loader<'_> {
     }
 
     /// The text of `module` and its file, from the loaded modules or the
-    /// built-in ones.
+    /// built-in ones; a file of another language has no Flick to read.
     fn source_of(&self, module: &str) -> Option<(FileId, String)> {
         if let Some(&j) = self.by_name.get(module) {
             let m = &self.modules[j];
+            if m.loader.is_some() {
+                return None;
+            }
             return Some((m.file, self.sources.get(m.file).text.clone()));
         }
         let (_, text) = types::builtin_sources()

@@ -293,6 +293,10 @@ world plugin {
   /// What the blocks of other groups and modules may ask of the state of a
   /// group, before any block expands.
   export publish: func(state: list<u8>) -> list<published>;
+  /// The module a file at `path` from the project's root stands for, its
+  /// contents `bytes`: declarations, at spans of the file. Only a plugin whose
+  /// package says `load = ["ext"]` gets the files of that extension.
+  export load: func(path: string, bytes: list<u8>) -> result<arena, list<diagnostic>>;
   /// The code a block stands for, given what `collect` learned.
   export expand: func(block: block, state: list<u8>) -> result<arena, list<diagnostic>>;
   /// What an editor may insert at `offset` of the block; `member` says the

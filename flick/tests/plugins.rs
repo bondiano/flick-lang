@@ -179,6 +179,40 @@ mod wasm {
     }
 
     #[test]
+    fn a_file_a_wasm_plugin_loads_is_a_module_the_project_checks() {
+        let main = "module App.Main exposing (main, greeting)\n\nimport App.Words\n\ngreeting : String\nlet greeting = App.Words.hello\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
+        let root = app("plugins-load", main);
+        let loading = LIB.replace(
+            "plugin = \"pairs.wasm\"\n",
+            "plugin = \"pairs.wasm\"\nload = [\"pairs\"]\n",
+        );
+        fs::write(root.join("lib/flick.toml"), loading).expect("write");
+        fs::write(root.join("app/src/App/Words.pairs"), "hello = \"hi\"\n").expect("write");
+        let checked = flick(&root, &["check"]);
+        assert!(
+            checked.status.success(),
+            "{}",
+            String::from_utf8_lossy(&checked.stderr)
+        );
+        assert!(
+            trace(&root).iter().any(|l| l.starts_with("load pairs")),
+            "{:?}",
+            trace(&root)
+        );
+        fs::write(
+            root.join("app/src/App/Words.pairs"),
+            "hello = \"hi\"\noops\n",
+        )
+        .expect("write");
+        let checked = flick(&root, &["check"]);
+        let stderr = String::from_utf8_lossy(&checked.stderr);
+        assert!(
+            stderr.contains("pairs/X004") && stderr.contains("Words.pairs:2"),
+            "{stderr}"
+        );
+    }
+
+    #[test]
     fn a_plugin_runs_within_its_fuel_and_memory() {
         let main = "module App.Main exposing (main, a, b)\n\nimport Pairs exposing (plugin spin, plugin hog)\n\nlet a = spin {}\nlet b = hog {}\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
         let root = app("plugins-limits", main);

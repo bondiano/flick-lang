@@ -43,6 +43,12 @@ pub trait Expander: Send + Sync {
         state: &[u8],
         source: &mut BlockSource,
     ) -> Result<Arena, Failure>;
+    /// The module the file at `path` stands for, its contents `bytes`, as
+    /// declarations at spans of the file; why there is none.
+    fn load(&self, path: &str, bytes: &[u8]) -> Result<Arena, Failure> {
+        let _ = (path, bytes);
+        Err(Failure::Broken("it loads no files".into()))
+    }
     /// What an editor may insert at `offset` of `block`, whether the user
     /// typed `name.` before `offset`; `source` answers what the block's
     /// module sees. An error when the plugin fails.
@@ -203,6 +209,12 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         source: &mut BlockSource,
     ) -> Result<Arena, Failure> {
         guarded(|| self.plugin.expand(block, state, source))
+            .map_err(Failure::Broken)?
+            .map_err(Failure::Refused)
+    }
+
+    fn load(&self, path: &str, bytes: &[u8]) -> Result<Arena, Failure> {
+        guarded(|| self.plugin.load(path, bytes))
             .map_err(Failure::Broken)?
             .map_err(Failure::Refused)
     }

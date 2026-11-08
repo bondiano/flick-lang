@@ -94,6 +94,11 @@ impl Expander for Traced {
         self.inner.expand(block, state, source)
     }
 
+    fn load(&self, path: &str, bytes: &[u8]) -> Result<Arena, Failure> {
+        self.trace(&format!("load {} {path}", self.inner.id()));
+        self.inner.load(path, bytes)
+    }
+
     fn complete(
         &self,
         block: &Block,

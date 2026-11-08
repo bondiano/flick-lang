@@ -63,6 +63,7 @@ impl Loader<'_> {
         let mut round = Vec::new();
         let mut editing = Vec::new();
         let mut heads = Vec::new();
+        self.load_files(&mut plugins, &mut diagnostics);
         for (i, m) in self.modules.iter().enumerate() {
             heads.push(self.heads(m, &mut plugins, &mut diagnostics));
             let mut blocks = Vec::new();
@@ -463,7 +464,7 @@ fn refusal(found: &Found, package: &str, d: &flick_plugin::Diagnostic) -> Diagno
 impl Loader<'_> {
     /// The component of the plugin of the dependency `package`.
     #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
-    fn component(&self, package: &str) -> Option<&Path> {
+    pub(super) fn component(&self, package: &str) -> Option<&Path> {
         #[cfg(feature = "native-project")]
         return self.packages.plugin(package);
         #[cfg(not(feature = "native-project"))]

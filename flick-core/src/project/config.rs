@@ -132,6 +132,9 @@ pub struct Package {
     /// `plugin = "…"`: the WebAssembly component of the plugin the library
     /// provides, relative to its directory.
     pub plugin: Option<String>,
+    /// `load = ["proto"]`: the extensions of the files its plugin turns into
+    /// modules, without the dot.
+    pub load: Vec<String>,
     pub span: Span,
 }
 

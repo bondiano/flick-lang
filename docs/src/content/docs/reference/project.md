@@ -193,6 +193,11 @@ version = "1.0.0"
 plugin = "pairs.wasm"
 ```
 
+`load = ["proto"]` beside `plugin` says its plugin turns the files of those
+extensions into modules: `App/User.proto` is the module `App.User` (see
+[plugins.md](../plugins/#files-of-other-languages)). Two libraries that load
+one extension are `FLICK-P045`.
+
 `flick install` fetches each git or url library the manifests name, directly
 or through a library, into the package store (`FLICK_STORE`, else
 `flick/pkg` in the user's cache directory), where each sits under the hash of

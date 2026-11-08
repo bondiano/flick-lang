@@ -13,6 +13,7 @@ mod checking;
 #[cfg(test)]
 mod checking_tests;
 mod entry;
+mod files;
 mod format_plugins;
 #[cfg(feature = "ide")]
 mod ide;
@@ -37,7 +38,7 @@ pub(crate) use target::js_only;
 
 #[cfg(feature = "native-project")]
 use super::packages::Packages;
-use super::{Host, Project, module_name, module_path, normalize};
+use super::{Host, Project, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::ir;
 use crate::plugin::EditorBlock;
@@ -45,6 +46,7 @@ use crate::plugin::expansion::Expansion;
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
 use crate::syntax::{self, Parse};
+use files::expected_name;
 use precompiled::Precompiled;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -70,6 +72,8 @@ struct Loaded {
     expansion: Option<Arc<Expansion>>,
     /// Its plugin blocks, as editors ask their plugins about them.
     editing: Vec<EditorBlock>,
+    /// The package whose plugin gives its code, for a file of another language.
+    loader: Option<String>,
 }
 
 /// How far a run goes past checking.
@@ -431,7 +435,7 @@ impl Loader<'_> {
         let bytes = self.host.read(path)?;
         let (file, utf8) = self.sources.add_bytes(self.host.display(path), bytes);
         self.diagnostics.extend(utf8);
-        let (parse, syntax) = self.parsed(path, file);
+        let loader = self.loader_of(path);
         let mut root = self.root_of(path);
         let root_dir = match (&root, self.project) {
             (Root::Source, Some(p)) => Some(p.source_root()),
@@ -443,9 +447,9 @@ impl Loader<'_> {
                 .map(|(_, dir)| dir),
             _ => None,
         };
-        let expected = root_dir
-            .as_ref()
-            .map(|dir| module_name(path.strip_prefix(dir).unwrap_or(path)));
+        let expected = (root_dir.as_ref()).map(|dir| expected_name(path, dir, loader.is_some()));
+        let named = expected.as_ref().and_then(|e| e.as_deref());
+        let (parse, syntax) = self.syntax_of(path, file, loader.is_some(), named);
         let header = syntax.header.as_ref();
         let name = match (header, &expected) {
             (Some(h), _) => h.name.clone(),
@@ -520,6 +524,7 @@ impl Loader<'_> {
             name,
             expansion: None,
             editing: Vec::new(),
+            loader,
         });
         Ok(Some(index))
     }

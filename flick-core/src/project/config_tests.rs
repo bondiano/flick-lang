@@ -330,6 +330,29 @@ fn a_package_names_its_plugin_inside_itself() {
 }
 
 #[test]
+fn a_package_names_the_extensions_its_plugin_loads() {
+    let package = |rest: &str| {
+        parse_text(&format!(
+            "schema-version = 1\n[package]\nname = \"protos\"\nversion = \"1.0.0\"\n{rest}\n[project]\nkind = \"lib\"\n"
+        ))
+    };
+    let config = package("plugin = \"protos.wasm\"\nload = [\"proto\", \"pb2\"]").expect("valid");
+    assert_eq!(
+        config.package.map(|p| p.load),
+        Some(vec!["proto".into(), "pb2".into()])
+    );
+    for refused in [
+        "load = [\"proto\"]",
+        "plugin = \"protos.wasm\"\nload = [\".proto\"]",
+        "plugin = \"protos.wasm\"\nload = [\"fl\"]",
+        "plugin = \"protos.wasm\"\nload = [\"\"]",
+    ] {
+        let err = package(refused).expect_err(refused);
+        assert_eq!(err.code, codes::P032, "{refused}: {}", err.message);
+    }
+}
+
+#[test]
 fn a_project_grants_a_plugin_files_hosts_and_variables() {
     let with = |grants: &str| {
         parse_text(&format!(
