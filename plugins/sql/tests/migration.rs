@@ -6,7 +6,7 @@ use flick_plugin_sql::Sql;
 
 const SOURCE: &str = "module App.Schema exposing (..)
 
-import Sql exposing (plugin sql)
+import Sql
 
 sql migration 1 \"people\" {
   create table people (id bigint primary key generated always as identity, name text not null);

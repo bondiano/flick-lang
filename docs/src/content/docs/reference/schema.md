@@ -102,7 +102,7 @@ A `codec` block is the plugin `codec` of `std`, which a file imports from
 `Codec`. A type's witness is `T.schema`.
 
 ```flick
-import Codec exposing (plugin codec)
+import Codec
 # refined type Email = String where Checks.non_empty
 #   deriving Schema
 # type alias Profile = { email : Email; nickname : Option String }

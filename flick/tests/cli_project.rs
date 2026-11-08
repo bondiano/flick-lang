@@ -114,7 +114,7 @@ fn explain_reads_a_plugins_code_in_its_package() {
 
 #[test]
 fn expand_prints_the_code_of_each_plugin_block() {
-    let main = "module App.Main exposing (main)\n\nimport Cli exposing (plugin cli)\n\ntool : Cli.Command none none\nlet tool = cli \"tool\" {\n  flag loud : Bool\n  handle fun { loud } -> Platform.stdout_line (show loud)\n}\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
+    let main = "module App.Main exposing (main)\n\nimport Cli\n\ntool : Cli.Command none none\nlet tool = cli \"tool\" {\n  flag loud : Bool\n  handle fun { loud } -> Platform.stdout_line (show loud)\n}\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
     let dir = project(
         "cli_expand",
         &[("flick.toml", APP), ("src/App/Main.fl", main)],

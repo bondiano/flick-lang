@@ -28,8 +28,8 @@ sql table Users "users" {
 `sql table Name "table" { … }` declares the type `Name` of a row (each
 column's type, in `Option` when the column may be `NULL`) and the table
 `Name.table : Sql.Table "table" { column : Sql.Column t n w, … }`, exported
-with the type. The block is the plugin `sql` of std, which the file imports:
-`import Sql exposing (Pg, plugin sql)`; `flick expand` shows its code. The indices say whether the column may be `NULL`
+with the type. The block is the plugin `sql` of std, which every module has
+without an import; `flick expand` shows its code. The indices say whether the column may be `NULL`
 (`Sql.NonNull`, `Sql.Nullable`) and what an insert must give it
 (`Sql.Required`, `Sql.Defaulted`, `Sql.Generated`).
 
@@ -64,7 +64,7 @@ from the module's migrations (below).
 ## Queries
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # type UserId = UserId BigInt
@@ -111,7 +111,7 @@ and a value whose type has no SQL form is `FLICK-C001`: the class
 template, so a function builds the template from its arguments:
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # type UserId = UserId BigInt
@@ -207,7 +207,7 @@ subquery or a union (`std/Q002`).
 ## Running queries
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # import App.Queries exposing (UserId, BalanceRow, balances)
@@ -242,7 +242,7 @@ no network. Other programs carry no driver and build offline.
 ## Transactions
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # import App.Queries exposing (withdraw, deposit)
@@ -282,7 +282,7 @@ written, for `Database.Migrate.run`. The block is the plugin `sql` of std,
 as `sql table`.
 
 ```flick
-# import Sql exposing (plugin sql)
+# import Sql
 sql migration 1 "people" {
   create table people (
     id bigint primary key generated always as identity,

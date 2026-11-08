@@ -6,8 +6,7 @@ use flick_plugin_sql::Sql;
 
 /// What `block` stands for, the one block of a module.
 fn one(block: &str) -> Result<String, Vec<String>> {
-    let source =
-        format!("module App.Main exposing (..)\n\nimport Sql exposing (plugin sql)\n\n{block}\n");
+    let source = format!("module App.Main exposing (..)\n\nimport Sql\n\n{block}\n");
     let mut found = expand(&Sql, &source);
     assert_eq!(found.len(), 1, "{found:?}");
     found.remove(0)

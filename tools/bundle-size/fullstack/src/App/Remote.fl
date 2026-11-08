@@ -2,7 +2,7 @@
 module App.Remote exposing (lookup)
 
 import App.Db
-import Server exposing (plugin server)
+import Server
 
 lookup : String ->{Server.Server;} String
 server fn lookup key = App.Db.lookup key

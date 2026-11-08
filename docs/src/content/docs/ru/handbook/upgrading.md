@@ -1,7 +1,7 @@
 ---
 title: Переход на 0.2
 description: Что изменилось после Flick 0.1.0 и как обновить проект.
-source_hash: de6cff6cd3865607
+source_hash: 60776437ff50a31d
 ---
 
 Flick 0.2 разрабатывается в `main` и ещё не выпущен. До 1.0 минорный релиз
@@ -25,15 +25,15 @@ flick check --fix
 ```
 
 `flick check --fix` применяет безопасные исправления: переписывает
-`schema T` и добавляет импорты, которые нужны блокам плагинов, а заодно и
-остальные исправления, которые применяет всегда. То, что осталось, он
+`schema T` и убирает импорты голов плагинов, которые есть в каждом модуле, а
+заодно и остальные исправления, которые применяет всегда. То, что осталось, он
 сообщает, а разделы ниже говорят, что нужно для каждого изменения.
 
 | Изменение | `flick check --fix` | Что вы увидите |
 | - | - | - |
 | [`std` приходит из пакета](#std-приходит-из-пакета) | нет: выполните `flick install` | `FLICK-P034` |
 | [`schema T` стало `T.schema`](#schema-t-стало-tschema) | да | `FLICK-T001` |
-| [Блокам плагинов нужен импорт](#блокам-плагинов-нужен-импорт) | да | `FLICK-P037` |
+| [Блокам `std` импорт не нужен](#блокам-std-импорт-не-нужен) | да | `FLICK-R012` |
 | [Коды диагностик под `std/`](#коды-диагностик-под-std) | нет | новые коды |
 | [`deriving HttpApi` строже](#deriving-httpapi-строже) | нет | `std/D011`, `FLICK-C001` |
 | [Запросы SQL строже](#запросы-sql-строже) | нет | `std/Q010`, `FLICK-T003` |
@@ -48,9 +48,7 @@ flick check --fix
 | [Компилятор собирается Rust 1.95](#компилятор-собирается-rust-195) | нет | — |
 
 `flick check --fix page.md` переписывает блоки кода `flick` страницы
-Markdown. Там каждый блок проверяется сам по себе, а его импорты берутся на
-веру, поэтому о пропущенном импорте плагина он не сообщает: добавьте импорт
-вручную.
+Markdown, каждый проверяется сам по себе.
 
 ## `std` приходит из пакета
 
@@ -104,38 +102,13 @@ let profile_schema = Profile.schema
 
 `flick check --fix` переписывает это сам.
 
-## Блокам плагинов нужен импорт
+## Блокам `std` импорт не нужен
 
 Блоки `cli`, `codec`, `server fn` и `sql` (запросы, `sql table` и
-`sql migration`) теперь плагины `std`.
-Файл, в котором есть такой блок, импортирует его голову:
-
-| Блок | Импорт |
-| - | - |
-| `cli "name" { … }` | `import Cli exposing (plugin cli)` |
-| `codec s { … }` | `import Codec exposing (plugin codec)` |
-| `server fn f x = …`, `server f` | `import Server exposing (plugin server)` |
-| `sql { … }`, `sql p { … }`, `sql table Name "table" { … }`, `sql migration 1 "name" { … }` | `import Sql exposing (plugin sql)` |
-
-В 0.1 блоку `codec` импорт был не нужен:
-
-```flick ignore
-type alias Profile = { email : String; nickname : Option String }
-  deriving Schema
-
-profile_json : PureCodec Json Profile
-let profile_json =
-  codec (schema Profile) {
-    email = field "email_address" String.json;
-    nickname = field "nickname" (option_as_null String.json);
-  }
-```
-
-Теперь блок без импорта — `FLICK-P037`, и его исправление добавляет импорт:
+`sql migration`) теперь плагин `std`, и их головы есть в каждом модуле:
+блоку импорт не нужен, как и в 0.1.
 
 ```flick
-import Codec exposing (plugin codec)
-
 type alias Profile = { email : String; nickname : Option String }
   deriving Schema
 
@@ -147,9 +120,15 @@ let profile_json =
   }
 ```
 
-`flick check --fix` за один запуск добавляет импорт и переписывает
-`schema Profile`. `cli`, `codec`, `server` и `fn` больше не ключевые слова;
-`plugin` — ключевое слово только среди открытых имён импорта.
+Импорт такой головы, `import Codec exposing (plugin codec)`, —
+`FLICK-R012`, и `flick check --fix` его убирает. Импорт нужен только блоку
+без `{`, например `cli Main`. Другой плагин эти головы дать не может: его
+импорт такой головы — `FLICK-P044`.
+
+`cli`, `codec`, `server` и `fn` больше не ключевые слова: они начинают блок
+перед `{` или в начале объявления, как `server fn` и `sql table`, а в
+остальных местах это обычные имена. `plugin` — ключевое слово только среди
+открытых имён импорта.
 
 ## Коды диагностик под `std/`
 

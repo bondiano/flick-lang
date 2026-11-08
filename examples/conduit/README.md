@@ -136,8 +136,6 @@ migrations make, and `migrations` is what `Database.Migrate.run` applies
 when the server starts:
 
 ```flick
-import Sql exposing (plugin sql)
-
 sql migration 1 "conduit" {
   create table users (
     id bigint primary key generated always as identity,

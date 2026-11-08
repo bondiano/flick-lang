@@ -1,7 +1,7 @@
 // `cli` blocks: flags, arguments of every multiplicity, subcommands.
 module App.Tool exposing (tool)
 
-import Cli exposing (plugin cli)
+import Cli
 
 greet : Cli.Command none none
 let greet = cli "greet" {

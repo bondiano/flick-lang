@@ -2,7 +2,7 @@
 module App.Main exposing (main)
 
 import App.Plan as Plan
-import Cli exposing (plugin cli)
+import Cli
 
 refined type Minutes = Float where fun n -> Float.is_safe_integer n && n >= 0
   deriving Cli.Value

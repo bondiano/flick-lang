@@ -2,7 +2,7 @@
 // a handler or subcommands, no arguments beside subcommands.
 module App.Shape exposing (defaults, many, twice, empty, mixed)
 
-import Cli exposing (plugin cli)
+import Cli
 
 defaults : Cli.Command none none
 let defaults = cli "defaults" {

@@ -6,7 +6,7 @@
 module Conduit.Input exposing (..)
 
 import Conduit.Route exposing (CommentId, Slug, Username)
-import Codec exposing (plugin codec)
+import Codec
 
 /// The fields of a sign-up.
 type alias NewUser = { username : Option String; email : Option String; password : Option String }

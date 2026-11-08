@@ -5,7 +5,7 @@ module Main exposing (main, import_main)
 import Bump
 import Import
 import Surface
-import Cli exposing (plugin cli)
+import Cli
 
 import_command : Cli.Command {Path.Path, Stdio.Stdio} {AppError, PlatformError.PlatformError}
 let import_command = cli "import" {

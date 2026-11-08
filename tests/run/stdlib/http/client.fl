@@ -6,7 +6,7 @@ module App.Main exposing (main)
 import Http.ClientError exposing (HttpClientError)
 import Http.ClientRequest exposing (ClientRequest)
 import Http.ClientResponse exposing (ClientResponse)
-import Codec exposing (plugin codec)
+import Codec
 
 type alias Item = { label : String; size : Float }
   deriving Schema

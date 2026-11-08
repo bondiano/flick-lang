@@ -1,7 +1,5 @@
 module App.Schema exposing (..)
 
-import Sql exposing (plugin sql)
-
 sql table People "people" {
   id : bigint primary key generated always as BigInt
   name : text not null as String

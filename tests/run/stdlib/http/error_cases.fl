@@ -4,7 +4,7 @@
 // as the error it was.
 module App.Main exposing (main)
 
-import Codec exposing (plugin codec)
+import Codec
 
 type alias Problems = List (String, List String)
 

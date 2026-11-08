@@ -6,7 +6,7 @@ use flick_plugin_sql::Sql;
 
 const TABLES: &str = "module App.Main exposing (..)
 
-import Sql exposing (Pg, plugin sql)
+import Sql exposing (Pg)
 
 sql table Users \"users\" {
   id : bigint primary key generated always as BigInt

@@ -1,7 +1,7 @@
 // A command whose handler holds a file of a scope runs inside that scope.
 module App.Scoped exposing (show)
 
-import Cli exposing (plugin cli)
+import Cli
 
 type File (s : Region)
 

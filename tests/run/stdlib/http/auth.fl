@@ -6,7 +6,7 @@
 // group needs no session, and the document lists each security requirement.
 module App.Main exposing (main)
 
-import Codec exposing (plugin codec)
+import Codec
 
 /// Refused credentials, in the body RealWorld answers with.
 type error Unauthorized = Unauthorized { errors : { token : List String } }

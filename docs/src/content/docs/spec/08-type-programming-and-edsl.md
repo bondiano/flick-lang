@@ -1,6 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
-source_hash: 5247d571766d7e43
+source_hash: 9755fd9d9d0f7302
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
@@ -29,7 +29,7 @@ Constraint solving has a budget per checked definition: `solver-steps` (100 000)
 `sql table Name "table" { … }` declares the row type `Name` and its table; the compiler never connects to a database. `sql [p] { … }` is a pure, checked `Sql.Template Pg params row`. The name after `sql` binds the parameters, whose types follow from where they are used; `$name` captures a value of the program as a placeholder.
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # type UserId = UserId BigInt
@@ -148,7 +148,7 @@ A handler field has the opaque type `Ui.Handler snapshot`, which only a policy m
 A command-line application is a value `Cli.Command r e`: a pure description of flags, positional arguments, subcommands and a handler that needs services `r` and may fail with errors `e`. Building a command parses and runs nothing.
 
 ```flick
-import Cli exposing (plugin cli)
+import Cli
 
 greet : Cli.Command none none
 let greet = cli "greet" {

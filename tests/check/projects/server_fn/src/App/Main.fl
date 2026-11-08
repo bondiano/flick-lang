@@ -2,7 +2,7 @@
 module App.Main exposing (main)
 
 import App.Api
-import Server exposing (plugin server)
+import Server
 
 main : Unit ->{; AppError} Unit
 let main () = provide Server.node {

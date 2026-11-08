@@ -6,9 +6,7 @@ use flick_plugin_cli::Cli;
 
 /// What `block` stands for, the one block of a module.
 fn one(block: &str) -> Result<String, Vec<String>> {
-    let source = format!(
-        "module App.Main exposing (..)\n\nimport Cli exposing (plugin cli)\n\nlet c = {block}\n"
-    );
+    let source = format!("module App.Main exposing (..)\n\nimport Cli\n\nlet c = {block}\n");
     let mut found = expand(&Cli, &source);
     assert_eq!(found.len(), 1, "{found:?}");
     found.remove(0)

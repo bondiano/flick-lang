@@ -3,7 +3,7 @@
 // with OTLP, sending to `OTEL_EXPORTER_OTLP_ENDPOINT` as `OTEL_SERVICE_NAME`.
 module App.Main exposing (main)
 
-import Cli exposing (plugin cli)
+import Cli
 
 start : Unit ->{Async;} Float
 foreign start from "../observability/receiver.mjs" "start"

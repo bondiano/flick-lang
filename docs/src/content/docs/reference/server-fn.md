@@ -11,7 +11,7 @@ crosses the network, so the two sides cannot disagree.
 ```flick
 module App.Shop exposing (Order, OutOfStock, place)
 
-import Server exposing (plugin server)
+import Server
 # import App.Db
 
 type alias Order = { item : String; count : Float }
@@ -67,7 +67,7 @@ them on one route; a client entry that names `server place` reaches
 ```flick
 # import Http.ServerRequest exposing (ServerRequest)
 # import Http.ServerResponse exposing (ServerResponse)
-# import Server exposing (plugin server)
+# import Server
 # import App.Db
 # import App.Shop
 #
@@ -116,7 +116,7 @@ guarding one that does not list `Server.Unauthorized`, is `FLICK-E011`.
 ```flick
 # import Http.ServerRequest exposing (ServerRequest)
 # import Http.ServerResponse exposing (ServerResponse)
-# import Server exposing (plugin server)
+# import Server
 #
 service Session =
   user : Unit ->{} String

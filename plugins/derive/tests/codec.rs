@@ -24,9 +24,7 @@ impl Plugin for Codecs {
 
 /// What the one block of a module with `value` stands for.
 fn one(value: &str) -> Result<String, Vec<String>> {
-    let source = format!(
-        "module App.Main exposing (..)\n\nimport Codec exposing (plugin codec)\n\nlet c = {value}\n"
-    );
+    let source = format!("module App.Main exposing (..)\n\nimport Codec\n\nlet c = {value}\n");
     let mut found = expand(&Codecs, &source);
     assert_eq!(found.len(), 1, "{found:?}");
     found.remove(0)

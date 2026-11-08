@@ -2,7 +2,7 @@
 // each part of it has a Schema witness.
 module App.ServerFn exposing (..)
 
-import Server exposing (plugin server)
+import Server
 
 type alias Order = { item : String }
   deriving Schema

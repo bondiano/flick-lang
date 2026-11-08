@@ -5,7 +5,7 @@
 // `flick/tests/sql_postgres.rs`.
 module App.Main exposing (main)
 
-import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 import Database exposing (Database)
 import BigDecimal exposing (BigDecimal)
 

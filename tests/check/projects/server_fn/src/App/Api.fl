@@ -2,7 +2,7 @@
 module App.Api exposing (Order, place)
 
 import App.Db
-import Server exposing (plugin server)
+import Server
 
 type alias Order = { item : String }
   deriving Schema

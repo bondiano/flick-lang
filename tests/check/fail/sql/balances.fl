@@ -2,7 +2,7 @@
 // elaboration refuses besides the cases of `queries.fl`. Running a
 // template needs `Sql.bind` first.
 
-import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 import Database exposing (Database)
 import BigDecimal exposing (BigDecimal)
 

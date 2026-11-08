@@ -2,7 +2,7 @@ use super::*;
 
 const SOURCE: &str = "module App.Main exposing (..)
 
-import Cli exposing (plugin cli)
+import Cli
 
 refined type Minutes = Float
   where fun n -> n >= 0
@@ -178,14 +178,16 @@ fn cli_completion_recovers_partial_clauses_without_hiding_flick_expressions() {
 
 #[test]
 fn cli_semantic_tokens_distinguish_clauses_parameters_and_handler_locals() {
+    // the head an import exposes is colored too, needed or not
+    let source = SOURCE.replace("import Cli\n", "import Cli exposing (plugin cli)\n");
     let dir = project(
         "lsp_cli_tokens",
-        &[("flick.toml", LIB), ("src/App/Main.fl", SOURCE)],
+        &[("flick.toml", LIB), ("src/App/Main.fl", &source)],
     );
     let file = dir.join("src/App/Main.fl");
     let doc = json!({ "uri": uri(&file) });
     let mut lsp = Lsp::start(&dir);
-    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": SOURCE } }));
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": source } }));
     let init = lsp.request("initialize", &json!({}));
     let legend = init["result"]["capabilities"]["semanticTokensProvider"]["legend"]["tokenTypes"]
         .as_array()
@@ -221,7 +223,7 @@ fn cli_semantic_tokens_distinguish_clauses_parameters_and_handler_locals() {
         ("cli)", "cli", "macro"),
         ("cli \"child\"", "cli", "macro"),
     ] {
-        let point = position(SOURCE, SOURCE.find(needle).expect("occurs"));
+        let point = position(&source, source.find(needle).expect("occurs"));
         assert!(
             decoded.contains(&(
                 point["line"].as_u64().expect("line"),

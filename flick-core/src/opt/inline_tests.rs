@@ -25,7 +25,7 @@ fn a_small_function_of_another_module_is_inlined() {
 fn a_query_of_std_folds_into_one_text() {
     let js = release(
         "module App exposing (named)\n\n\
-         import Sql exposing (Pg, plugin sql)\n\n\
+         import Sql exposing (Pg)\n\n\
          sql table Users \"users\" {\n  id : bigint primary key generated always as BigInt\n  name : text not null as String\n}\n\n\
          named : Option String -> Sql.Template Pg {} { id : BigInt }\n\
          let named tag = sql {\n  from u in Users\n  where is_null $tag || u.name == $tag\n  limit 5\n  select { id = u.id }\n}\n",

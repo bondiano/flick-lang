@@ -4,7 +4,7 @@
 module Conduit.Problem exposing (..)
 
 import HttpApi.Derive exposing (Problem)
-import Codec exposing (plugin codec)
+import Codec
 
 /// What is wrong, by field or resource, in order.
 type alias Problems = List (String, List String)

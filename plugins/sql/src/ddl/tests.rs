@@ -17,7 +17,7 @@ fn tables(text: &str) -> (Vec<Table>, Vec<Problem>) {
 
 const CONDUIT: &str = r#"module App.Schema exposing (..)
 
-import Sql exposing (plugin sql)
+import Sql
 
 sql migration 1 "first" {
   create table users (
@@ -91,7 +91,7 @@ fn a_statement_runs_as_written() {
 fn what_does_not_apply_is_a_problem() {
     let text = r#"module App.Schema exposing (..)
 
-import Sql exposing (plugin sql)
+import Sql
 
 sql migration 2 "a" {
   create table posts (author bigint references people, title text);

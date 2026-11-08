@@ -2,7 +2,7 @@
 // the DDL stays in the subset; the tables it leaves are still declared.
 module App.Schema exposing (..)
 
-import Sql exposing (Pg, plugin sql)
+import Sql exposing (Pg)
 
 sql migration 1 "people" {
   create table people (id bigint primary key, name text not null, born date);

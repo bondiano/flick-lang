@@ -127,7 +127,7 @@ fn a_field_of_a_signature_shows_its_comment() {
 fn a_codec_label_shows_its_field_type() {
     let source = "module App.Main exposing (..)
 
-import Codec exposing (plugin codec)
+import Codec
 
 refined type Email = String where Checks.email
   deriving Schema

@@ -1,6 +1,6 @@
 ---
 title: "Запросы SQL"
-source_hash: 5a797e9006c37393
+source_hash: b84cad9fa67a6880
 ---
 
 Flick проверяет запросы к PostgreSQL по объявлениям таблиц в исходном коде.
@@ -30,9 +30,8 @@ sql table Users "users" {
 
 `sql table Name "table" { … }` объявляет тип строки `Name` и значение таблицы
 `Name.table : Sql.Table "table" { column : Sql.Column t n w, … }`.
-Они экспортируются вместе. Блок — плагин `sql` из std, который файл
-импортирует: `import Sql exposing (Pg, plugin sql)`; его код показывает
-`flick expand`. Если столбец допускает `NULL`, его тип в `Name`
+Они экспортируются вместе. Блок — плагин `sql` из std, который есть в
+каждом модуле без импорта; его код показывает `flick expand`. Если столбец допускает `NULL`, его тип в `Name`
 оборачивается в `Option`.
 Индексы `Sql.Column` указывают, допускает ли столбец `NULL`
 (`Sql.NonNull`, `Sql.Nullable`) и как он заполняется при вставке
@@ -73,7 +72,7 @@ sql table Users "users" {
 ## Запросы
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # type UserId = UserId BigInt
@@ -124,7 +123,7 @@ let balances =
 шаблон из своих аргументов:
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # type UserId = UserId BigInt
@@ -232,7 +231,7 @@ let balances_of id =
 ## Выполнение запросов
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # import App.Queries exposing (UserId, BalanceRow, balances)
@@ -270,7 +269,7 @@ v5.7.6, его скачивает первый `go build` в кэш модуле
 ## Транзакции
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # import App.Queries exposing (withdraw, deposit)
@@ -309,7 +308,7 @@ DDL, а таблицы — это схема, которую они строят
 `Database.Migrate.run`. Блок — плагин `sql` из std, как и `sql table`.
 
 ```flick
-# import Sql exposing (plugin sql)
+# import Sql
 sql migration 1 "people" {
   create table people (
     id bigint primary key generated always as identity,

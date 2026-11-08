@@ -3,8 +3,6 @@
 
 module App.Enums exposing (..)
 
-import Sql exposing (plugin sql)
-
 untagged type Role = Admin = "admin" | Guest = "guest"
 
 untagged type Code = Ok200 = 200 | Missing = 404
@@ -15,5 +13,5 @@ sql table Requests "requests" {
   code : text as Code
 }
 
-//~ std/Q011 @14:30-14:34 a `number` column holds `Int`, not `Role`: give a codec with `via`
-//~ std/Q011 @15:18-15:22 a `text` column holds `String`, not `Code`: give a codec with `via`
+//~ std/Q011 @12:30-12:34 a `number` column holds `Int`, not `Role`: give a codec with `via`
+//~ std/Q011 @13:18-13:22 a `text` column holds `String`, not `Code`: give a codec with `via`

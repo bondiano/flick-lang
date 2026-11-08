@@ -23,16 +23,16 @@ flick install
 flick check --fix
 ```
 
-`flick check --fix` applies the safe fixes: it rewrites `schema T` and adds
-the imports that plugin blocks need, along with the other fixes it always
-applies. It reports what is left, and the sections below say what each
+`flick check --fix` applies the safe fixes: it rewrites `schema T` and
+removes the imports of plugin heads every module has, along with the other
+fixes it always applies. It reports what is left, and the sections below say what each
 change needs.
 
 | Change | `flick check --fix` | What you see |
 | - | - | - |
 | [`std` comes from a package](#std-comes-from-a-package) | no: run `flick install` | `FLICK-P034` |
 | [`schema T` is `T.schema`](#schema-t-is-tschema) | yes | `FLICK-T001` |
-| [Plugin blocks need their import](#plugin-blocks-need-their-import) | yes | `FLICK-P037` |
+| [Blocks of `std` need no import](#blocks-of-std-need-no-import) | yes | `FLICK-R012` |
 | [Diagnostic codes under `std/`](#diagnostic-codes-under-std) | no | new codes |
 | [`deriving HttpApi` is stricter](#deriving-httpapi-is-stricter) | no | `std/D011`, `FLICK-C001` |
 | [SQL queries are stricter](#sql-queries-are-stricter) | no | `std/Q010`, `FLICK-T003` |
@@ -47,8 +47,7 @@ change needs.
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
-page. There each block is checked on its own, with its imports taken on
-trust, so a missing plugin import is not reported: add it by hand.
+page, each checked on its own.
 
 ## `std` comes from a package
 
@@ -102,39 +101,13 @@ let profile_schema = Profile.schema
 
 `flick check --fix` rewrites it.
 
-## Plugin blocks need their import
+## Blocks of `std` need no import
 
 `cli`, `codec`, `server fn` and `sql` blocks (queries, `sql table` and
-`sql migration`) are plugins of `std` now. A file that writes one imports
-its head:
-
-| Block | Import |
-| - | - |
-| `cli "name" { … }` | `import Cli exposing (plugin cli)` |
-| `codec s { … }` | `import Codec exposing (plugin codec)` |
-| `server fn f x = …`, `server f` | `import Server exposing (plugin server)` |
-| `sql { … }`, `sql p { … }`, `sql table Name "table" { … }`, `sql migration 1 "name" { … }` | `import Sql exposing (plugin sql)` |
-
-In 0.1 a `codec` block needed no import:
-
-```flick ignore
-type alias Profile = { email : String; nickname : Option String }
-  deriving Schema
-
-profile_json : PureCodec Json Profile
-let profile_json =
-  codec (schema Profile) {
-    email = field "email_address" String.json;
-    nickname = field "nickname" (option_as_null String.json);
-  }
-```
-
-Now the block without its import is `FLICK-P037`, whose fix adds the
-import:
+`sql migration`) are the plugin of `std` now, and every module has their
+heads: a block needs no import, as in 0.1.
 
 ```flick
-import Codec exposing (plugin codec)
-
 type alias Profile = { email : String; nickname : Option String }
   deriving Schema
 
@@ -146,9 +119,15 @@ let profile_json =
   }
 ```
 
-`flick check --fix` adds the import and rewrites `schema Profile` in the
-same run. `cli`, `codec`, `server` and `fn` are no keywords any more;
-`plugin` is a keyword only in the exposed items of an import.
+An import of such a head, `import Codec exposing (plugin codec)`, is
+`FLICK-R012`, and `flick check --fix` removes it. Only a block without
+`{`, such as `cli Main`, still needs the import. Another plugin may not give
+these heads: its import of one is `FLICK-P044`.
+
+`cli`, `codec`, `server` and `fn` are no keywords any more: they start a
+block before `{` or at the start of a declaration, as `server fn` and
+`sql table`, and are ordinary names elsewhere. `plugin` is a keyword only in
+the exposed items of an import.
 
 ## Diagnostic codes under `std/`
 

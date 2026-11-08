@@ -49,10 +49,13 @@ gives the value of.
 The compiler comes with the plugin of `std`, whose heads are `cli` (see
 [command-line applications](../cli-dsl/)), `server` (see
 [server functions](../server-fn/)) and `codec` (see
-[the codec DSL](../schema/#the-codec-dsl)). `cli "x" { … }`, with its body, and
-`server fn f x = …` or `server f` are blocks even in a file that does not
-import them, so the compiler can say which import they need: `FLICK-P037`,
-whose fix `flick check --fix` applies.
+[the codec DSL](../schema/#the-codec-dsl)), and `sql`. Every module has these
+heads without an import: `cli "x" { … }`, with its body, and `server fn f x =
+…` or `server f` are blocks of `std`'s plugin, and the words stay ordinary
+names elsewhere. Only a block without `{`, such as `cli Main`, needs `import
+Cli exposing (plugin cli)`; elsewhere such an import is `FLICK-R012`, which
+`flick check --fix` removes. Another plugin may not give these heads:
+`FLICK-P044`.
 
 The plugin is the one of the package the imported module belongs to; a
 module of the project or a built-in one has none. The code a plugin gives
@@ -395,7 +398,7 @@ answers.
 | the plugin a module imports cannot be found or loaded | `FLICK-P035` on the import |
 | a plugin refuses a block, fails or gives code that does not fit | `FLICK-P036` on the block, or at the span the plugin names |
 | an error the plugin gives under its own code, such as `L001` | `<package>/L001`, as `std/L001`, at the span it names |
-| a head of the compiler's own plugins whose import the file lacks | `FLICK-P037` on the head, with the import as its fix |
+| an import of a head of `std`'s plugin from another package | `FLICK-P044` on the import |
 | an error in the user's code inside a block | the usual one, at that code |
 | an error in the code a plugin gave | the usual one, on the code it stands for, with a note naming the plugin |
 | what a plugin's `check` finds | `<package>/X001` at the span it names; `FLICK-P036` when `check` fails |

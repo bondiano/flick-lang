@@ -2,7 +2,7 @@
 /// whether the reader, if anyone, follows them.
 module Conduit.Server.Comments exposing (..)
 
-import Sql exposing (Pg, plugin sql)
+import Sql exposing (Pg)
 import Database exposing (Database)
 import Conduit.Server.Db as Db
 import Conduit.Server.Schema exposing (Comments, Follows, Users)

@@ -4,7 +4,7 @@ use super::*;
 
 const SOURCE: &str = r#"module App.Ledger exposing (Accounts, label, same, user_id)
 
-import Sql exposing (Pg, plugin sql)
+import Sql exposing (Pg)
 import BigDecimal exposing (BigDecimal)
 import App.Ids as Ids exposing (UserId(..))
 
@@ -35,7 +35,7 @@ sql table Accounts "accounts" {
 
 const IDS: &str = "module App.Ids exposing (..)
 
-import Sql exposing (plugin sql)
+import Sql
 
 type UserId = UserId BigInt
 
