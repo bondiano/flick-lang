@@ -4,32 +4,36 @@ import { type Exit, die, fail, failed, interrupt, succeeded } from "../cause.ts"
 import { type Run, Suspend, asExit, currentFiber, exitOf, raiseOf } from "../fiber.ts";
 import type { Failure } from "../outcome.ts";
 
+/** What a set deferred gives each waiter: the task it was set to, which each runs, or one of how it ended. */
+type Task = () => unknown;
+
 export class Deferred {
-  exit: Exit | undefined = undefined;
-  readonly waiters = new Set<(exit: Exit) => void>();
+  task: Task | undefined = undefined;
+  readonly waiters = new Set<(task: Task) => void>();
 }
 
 export const make = (): Deferred => new Deferred();
 
-const settle = (self: Deferred, exit: Exit): boolean => {
-  if (self.exit !== undefined) return false;
-  self.exit = exit;
+const setTo = (self: Deferred, task: Task): boolean => {
+  if (self.task !== undefined) return false;
+  self.task = task;
   const waiters = [...self.waiters];
   self.waiters.clear();
-  for (const wake of waiters) wake(exit);
+  for (const wake of waiters) wake(task);
   return true;
 };
 
+const settle = (self: Deferred, exit: Exit): boolean => setTo(self, () => raiseOf(exit));
+
 /** Waits for it to be set: its value or failure. */
 function* awaited(self: Deferred): Run {
-  if (self.exit !== undefined) return raiseOf(self.exit);
-  const exit = asExit(
-    yield new Suspend((resolve) => {
-      self.waiters.add(resolve);
-      return () => self.waiters.delete(resolve);
-    }),
-  );
-  return raiseOf(exit);
+  if (self.task !== undefined) return self.task();
+  const task = yield new Suspend((resolve) => {
+    self.waiters.add(resolve);
+    return () => self.waiters.delete(resolve);
+  });
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a waiter is woken with the task
+  return (task as Task)();
 }
 export { awaited as await };
 
@@ -68,20 +72,18 @@ export const interruptWith =
   (fiberId: number) =>
   (self: Deferred): boolean =>
     settle(self, failed(interrupt(fiberId)));
-export const isDone = (self: Deferred): boolean => self.exit !== undefined;
-export const poll = (self: Deferred): Option<() => unknown> => {
-  const { exit } = self;
-  return exit === undefined ? none : some(() => raiseOf(exit));
-};
+export const isDone = (self: Deferred): boolean => self.task !== undefined;
+export const poll = (self: Deferred): Option<() => unknown> => (self.task === undefined ? none : some(self.task));
 export const complete =
   (task: () => unknown) =>
   (self: Deferred): Run =>
     (function* (): Run {
-      if (self.exit !== undefined) return false;
+      if (self.task !== undefined) return false;
       return settle(self, asExit(yield exitOf(task)));
     })();
+/** Sets it to `task`, which each waiter runs. */
 export const completeWith =
   (task: () => unknown) =>
   (self: Deferred): boolean =>
-    settle(self, succeeded(task));
+    setTo(self, task);
 export const defectOf = (message: string): Exit => failed(die(message));
