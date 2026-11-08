@@ -45,7 +45,10 @@ pub(super) fn ide(snapshot: &Snapshot) -> Ide<'_> {
 impl Server {
     pub(super) fn request(&mut self, method: &str, params: &Value) -> Reply {
         match method {
-            "initialize" => Ok(capabilities()),
+            "initialize" => {
+                self.registered = super::registration::registrations(params);
+                Ok(capabilities())
+            }
             "textDocument/formatting" => {
                 let (path, text) = self.document(params)?;
                 // the plugins of the module's blocks, as the analysis loaded them

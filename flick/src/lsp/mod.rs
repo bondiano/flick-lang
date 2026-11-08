@@ -9,6 +9,7 @@ mod features;
 mod logging;
 mod members;
 pub mod protocol;
+mod registration;
 mod requests;
 mod snapshot;
 
@@ -37,6 +38,11 @@ pub struct Server {
     /// Each context clears only the diagnostics it previously published.
     published: HashMap<Context, HashSet<PathBuf>>,
     out: Box<dyn Write>,
+    /// The extensions of loaded files registered with the client; none when
+    /// the client registers nothing later.
+    registered: Option<HashSet<String>>,
+    /// The requests the server sent the client.
+    requests: u64,
 }
 
 pub fn serve() -> ExitCode {
@@ -57,6 +63,8 @@ pub fn serve() -> ExitCode {
         caches: Caches::new(),
         published: HashMap::new(),
         out: Box::new(io::stdout()),
+        registered: None,
+        requests: 0,
     };
     let mut input = BufReader::new(io::stdin().lock());
     let mut shut_down = false;
@@ -103,6 +111,8 @@ pub fn serve() -> ExitCode {
                 shut_down = true;
                 server.send(&protocol::response(id, &Value::Null));
             }
+            // what the client answers a request of the server's
+            ("", Some(_)) => debug!("response received"),
             (_, Some(id)) => {
                 let reply = match server.request(method, params) {
                     Ok(result) => protocol::response(id, &result),
@@ -230,6 +240,7 @@ impl Server {
     /// Re-analyzes and publishes this context's diagnostics.
     fn refresh(&mut self, path: &Path) {
         let snapshot = analyze(&self.docs, path, &mut self.caches);
+        self.register_loaded(snapshot.analysis.modules.iter().map(|m| m.path.as_path()));
         let mut by_file: HashMap<PathBuf, Vec<&Diagnostic>> = HashMap::new();
         for d in &snapshot.analysis.diagnostics {
             if let Some(span) = d.span {
