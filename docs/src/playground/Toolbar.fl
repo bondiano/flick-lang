@@ -1,6 +1,6 @@
 module Toolbar exposing (choice, view)
 
-import Actions exposing (choose, format, run_program, update)
+import Actions exposing (choose, discard_draft, download, format, run_program, share, update)
 import Dom exposing (attributes, notify)
 import Examples exposing (Example)
 import State exposing (Model, Profile(..), errors, status, tr)
@@ -138,6 +138,20 @@ let view model m = ui {
     examples_view model m,
     run_button model m,
     format_button model m,
+    Ui.button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { share model }) } [
+      Ui.text (tr m.locale "Share" "Поделиться"),
+    ],
+    Ui.button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { download model }) } [
+      Ui.text (tr m.locale "Download .fl" "Скачать .fl"),
+    ],
+    Ui.button
+      { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { discard_draft model }) }
+      [Ui.text (tr m.locale "Clear draft" "Удалить черновик")],
+    if m.storage_notice != "" then
+      Ui.with_host
+        { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }
+        (span { class_name = "fp-storage-notice" } [text m.storage_notice])
+    else empty,
     Ui.with_host
       { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }
       (span

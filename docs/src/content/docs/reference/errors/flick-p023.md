@@ -1,0 +1,12 @@
+---
+title: "FLICK-P023"
+---
+
+`[sql] dialect` in `flick.toml` is not the name of a SQL dialect. The names
+are `postgresql`, `mysql`, `sqlite`, `clickhouse` and `oracle`; only
+`postgresql` is supported now.
+
+```toml
+[sql]
+dialect = "postgresql"
+```

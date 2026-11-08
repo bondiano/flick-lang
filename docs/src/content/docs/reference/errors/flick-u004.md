@@ -1,0 +1,25 @@
+---
+title: "FLICK-U004"
+---
+
+A view's render (`Ui.view`) and a derived atom's computation
+(`Atom.derived`) have the services `Atom.Read` alone: React may render a
+view again at any time, and a registry computes a derived atom whenever an
+atom it read changes, so they only read atoms. A write (`Atom.set`,
+`Atom.update`, which need `Atom.Write`) belongs in an
+`Action`, which runs on an event; a task with other services runs as
+`Atom.task`, whose result the render reads; a failure is handled in the
+render, or the view is made with `Ui.suspended`, which gives each failure a
+view.
+
+```flick ignore
+count : Atom.Writable Float
+let count = Atom.make 0
+
+increment : Action.Action Ui.ClickSnapshot
+let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+
+counter : Ui.View Unit
+let counter =
+  Ui.view (fun () -> ui { button { disabled = false; on_click = increment } [text (show (Atom.value count))] })
+```

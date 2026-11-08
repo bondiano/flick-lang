@@ -1,0 +1,19 @@
+---
+title: "FLICK-F007"
+---
+
+A binding with `reviewed "<pkg>@<ver> sha256:…"` vouches for one shape of a
+declaration. After a dependency update the declaration may differ: review
+the binding again and write the new fingerprint, which the generated module
+shows above the export. A binding must also state what the shape cannot:
+`catch` for a returned Promise, `nullable` for an `undefined` or `null`
+result, `retention` for a callback.
+
+```flick ignore
+lookup : String ->{Async; JsError} Option String
+foreign lookup from "lookup-lib" "lookup"
+  arity 1
+  catch JsError.from_js
+  nullable
+  reviewed "lookup-lib@1.1.0 sha256:…"
+```

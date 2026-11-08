@@ -1,0 +1,10 @@
+---
+title: "FLICK-P006"
+---
+
+`flick.toml` declares a `schema-version` this compiler does not support, or
+none. The only supported version is `1`.
+
+```toml
+schema-version = 1
+```

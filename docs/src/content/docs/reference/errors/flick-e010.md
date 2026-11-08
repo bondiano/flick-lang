@@ -1,0 +1,19 @@
+---
+title: "FLICK-E010"
+---
+
+`server name` names the implementation `name$server` that a `server fn`
+declares, and `name` is no `server fn`: only a `server fn` has an
+implementation to serve. The shape of a `server fn` itself is the plugin's
+to check, `std/E010`.
+
+```flick ignore
+module App.Api exposing (greet, functions)
+
+import Server
+
+greet : String ->{Server.Server;} String
+server fn greet name = "Hello, " ++ name
+
+let functions = [server greet]
+```

@@ -1,0 +1,18 @@
+---
+title: "FLICK-S015"
+source_hash: "d6c5577401f2a4b0"
+---
+
+Конструктор называет тип, который он строит, после `:` (`| IntLit Int : Expr Int`)
+только в объявлении `type` и только если у него нет буквального значения.
+Конструктор `type error` и член `kind` строят собственный тип,
+а конструктор `untagged type` является его литералом.
+
+```flick ignore
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+```
+
+`type error NotFound = NotFound String : NotFound` и
+`| Get = "GET" : Method` сообщаются.

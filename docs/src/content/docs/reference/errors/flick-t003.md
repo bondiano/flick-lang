@@ -1,0 +1,14 @@
+---
+title: "FLICK-T003"
+---
+
+An expression has a type other than the one its position requires. Flick has no
+implicit conversions: `1 + 1n` mixes `Float` and `BigInt`, `"a" ++ 1` mixes
+`String` and `Float`. Records are exact: a record with extra fields does not
+pass for a smaller closed record type (no width subtyping); accept the extra
+fields with an open row `{ name : String | fields }` or project them away.
+
+```flick ignore
+label : Float -> String
+let label n = "count: " ++ Float.to_string n
+```

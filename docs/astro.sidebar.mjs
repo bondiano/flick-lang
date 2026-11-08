@@ -2,6 +2,7 @@
 const reference = (name) => ({ slug: `reference/${name}` });
 
 export const sidebar = [
+  { label: "Tour", translations: { ru: "Тур" }, items: [{ slug: "tour/signatures" }] },
   {
     label: "Get started",
     translations: { ru: "Начало работы" },
@@ -25,6 +26,7 @@ export const sidebar = [
         translations: { ru: "Язык" },
         items: ["types", "gadts", "effects", "classes", "regions", "modules", "grammar", "keywords"].map(reference),
       },
+      { slug: "reference/errors" },
       {
         label: "Runtime",
         translations: { ru: "Среда выполнения" },

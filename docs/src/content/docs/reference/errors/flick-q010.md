@@ -1,0 +1,8 @@
+---
+title: "FLICK-Q010"
+---
+
+Retired. The compiler checked `sql { … }` queries itself and reported this
+code; the queries are now the plugin `sql` of `std`, which reports the same rule as `std/Q010`: see `flick explain std/Q010`.
+
+The code remains registered for historical diagnostics and is never reused.

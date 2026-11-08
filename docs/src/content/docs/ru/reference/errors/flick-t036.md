@@ -1,0 +1,13 @@
+---
+title: "FLICK-T036"
+source_hash: "9477cc3df34adb5d"
+---
+
+Функция, тело которой длиннее `[lint] max-function-lines` в `flick.toml` (по умолчанию 60), слишком большая для восприятия за один раз. Разбейте её на функции, каждая из которых выполняет одну часть, и дайте каждой части имя.
+
+```flick ignore
+summary : Order -> String
+let summary order = header order ++ "\n" ++ lines order ++ "\n" ++ total order
+```
+
+Увеличьте лимит с помощью `max-function-lines = 100` в `[lint]` или отключите предупреждение с помощью `allow = ["FLICK-T036"]`.

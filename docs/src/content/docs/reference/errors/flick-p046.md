@@ -1,0 +1,12 @@
+---
+title: "FLICK-P046"
+---
+
+A plugin whose package says `hooks = ["emit"]` changed a `.js` file of
+`flick build` but left its source map, `.js.map`, as the build wrote it, or
+dropped it. The map would point the code's positions at the wrong lines of
+the source, or the script would lose it, so the build keeps the files as
+they were and reports the plugin.
+
+A plugin that changes the code of a script gives its map too: shift the
+mappings by what it inserted, or write a new map.

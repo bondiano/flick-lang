@@ -1,0 +1,17 @@
+---
+title: "FLICK-T054"
+---
+
+A function written inside another that uses none of the locals around it
+does not need to be there: as a top-level function it is made once, can
+have a signature and a test, and keeps the outer function short.
+
+```flick ignore
+double : Float -> Float
+let double x = x * 2
+
+total : List Float -> Float
+let total xs = List.sum (List.map double xs)
+```
+
+A `let rec` worker and a helper of one line are not reported.

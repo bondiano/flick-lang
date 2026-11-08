@@ -1,0 +1,20 @@
+---
+title: "FLICK-T029"
+source_hash: "f7b9b66d6df32239"
+---
+
+Предупреждение: блок `do` над `Eff` строит вычисление через
+`Monad (Eff r e)`, которое фиксирует количество строк каждого выражения равным одному.
+`task { … }` с прямыми вызовами строит то же «холодное» вычисление и объединяет
+строки своих вызовов. Быстрое исправление переписывает `x <- e` как `let x = await e`,
+выражение как `await e` и конечный `pure v` как `v`.
+
+```flick ignore
+load_both : Eff {Users} {NotFound} (User, User)
+let load_both =
+  task {
+    let first = await (task { Users.get 1 })
+    let second = await (task { Users.get 2 })
+    (first, second)
+  }
+```

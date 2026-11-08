@@ -13,6 +13,14 @@ module Actions exposing (
   run_program,
   runtime_messages,
   report,
+  restore_source,
+  share,
+  download,
+  discard_draft,
+  check_lesson,
+  reveal_lesson_hint,
+  show_lesson_solution,
+  reset_lesson,
 )
 
 import Dom exposing (notify, source_value, tab_in_address)
@@ -30,6 +38,7 @@ import State exposing (
   first_source,
   profile_name,
   requested_tab,
+  tr,
   wants_code,
 )
 
@@ -88,6 +97,33 @@ foreign editor_text from "./editor.ts" "editorText"
 set_editor_text : String ->{} Unit
 foreign set_editor_text from "./editor.ts" "setEditorText"
   arity 1
+
+restore_draft : Unit ->{Async; JsError} { source : String; status : String }
+foreign restore_draft from "./drafts.ts" "restoreSource"
+  arity 0
+  catch JsError.from_js
+
+save_draft : String ->{} Unit
+foreign save_draft from "./drafts.ts" "saveDraft"
+  arity 1
+
+clear_draft : Unit ->{} Unit
+foreign clear_draft from "./drafts.ts" "clearDraft"
+  arity 0
+
+share_source : String ->{Async; JsError} String
+foreign share_source from "./drafts.ts" "shareSource"
+  arity 1
+  catch JsError.from_js
+
+download_source : String ->{} Unit
+foreign download_source from "./drafts.ts" "downloadSource"
+  arity 1
+
+evaluate_lesson : String ->{Async; JsError} String
+foreign evaluate_lesson from "./lesson.ts" "checkLesson"
+  arity 1
+  catch JsError.from_js
 
 mark_diagnostics : String -> List Diagnostic ->{} Unit
 foreign mark_diagnostics from "./editor.ts" "markDiagnostics"
@@ -254,6 +290,7 @@ let load_compiler model =
 edit : Atom.Writable Model -> String ->{Atom.Write;} Unit
 let edit model source =
   update model (fun m -> { m with source = source })
+  save_draft source
   notify "fp-compile"
 
 /// Takes in what the reader typed into the editor.
@@ -265,6 +302,107 @@ replace : Atom.Writable Model -> String ->{Atom.Write;} Unit
 let replace model source =
   set_editor_text source
   edit model source
+
+restore_source : Atom.Writable Model ->{Async, Atom.Write;} Unit
+let restore_source model =
+  let result =
+    try Ok (restore_draft ()) with
+    | JsError _ -> Err ()
+  match result with
+  | Err () -> ()
+  | Ok restored ->
+    if restored.source != "" && (Atom.current model).revision == 0 then
+      set_editor_text restored.source
+      update model (fun m -> { m with source = restored.source; revision = 1 })
+      notify "fp-compile"
+    if restored.status == "invalid-link" then
+      update model (fun m -> {
+        m with
+        storage_notice = tr m.locale "This shared link is invalid." "Ссылка на код повреждена.";
+      })
+
+share : Atom.Writable Model ->{Async, Atom.Write;} Unit
+let share model =
+  let m = Atom.current model
+  let outcome =
+    try share_source m.source with
+    | JsError _ -> "unavailable"
+  let message =
+    if outcome == "copied" then
+      tr m.locale "Link copied." "Ссылка скопирована."
+    else if outcome == "address-bar" then
+      tr m.locale "Copy the link from the address bar." "Скопируйте ссылку из адресной строки."
+    else if outcome == "too-large" then
+      tr m.locale "This source is too large to share." "Этот код слишком велик для ссылки."
+    else
+      tr
+        m.locale
+        "Sharing is unavailable in this browser."
+        "Не удалось создать ссылку в этом браузере."
+  update model (fun m -> { m with storage_notice = message })
+
+download : Atom.Writable Model ->{Atom.Write;} Unit
+let download model = download_source (Atom.current model).source
+
+discard_draft : Atom.Writable Model ->{Atom.Write;} Unit
+let discard_draft model =
+  clear_draft ()
+  let source = first_source (Atom.current model).examples
+  set_editor_text source
+  update model (fun m -> {
+    m with
+    source = source;
+    revision = m.revision + 1;
+    storage_notice = tr m.locale "Draft cleared." "Черновик удалён.";
+  })
+  notify "fp-compile"
+
+check_lesson : Atom.Writable Model ->{Async, Atom.Write;} Unit
+let check_lesson model =
+  let m = Atom.current model
+  update model (fun m -> { m with lesson_checking = true; lesson_result = "" })
+  let result =
+    try evaluate_lesson m.source with
+    | JsError _ -> "failed"
+  let message =
+    if result == "passed" then
+      tr
+        m.locale
+        "Correct. The signature says String -> Int."
+        "Верно. Сигнатура указывает String -> Int."
+    else if result == "fix-errors" then
+      tr m.locale "Fix the compiler errors first." "Сначала исправьте ошибки компилятора."
+    else if result == "type" then
+      tr
+        m.locale
+        "Export length_of with the type String -> Int."
+        "Экспортируйте length_of с типом String -> Int."
+    else if result == "output" then
+      tr m.locale "The program must print 5 for Flick." "Программа должна напечатать 5 для Flick."
+    else
+      tr
+        m.locale
+        "The check could not finish. Try again."
+        "Проверка не завершилась. Попробуйте ещё раз."
+  update model (fun m -> {
+    m with
+    lesson_checking = false;
+    lesson_result = message;
+    lesson_done = m.lesson_done || result == "passed";
+  })
+
+reveal_lesson_hint : Atom.Writable Model ->{Atom.Write;} Unit
+let reveal_lesson_hint model = update model (fun m -> { m with lesson_hint = true })
+
+show_lesson_solution : Atom.Writable Model ->{Atom.Write;} Unit
+let show_lesson_solution model =
+  replace model (Atom.current model).lesson_solution
+  update model (fun m -> { m with lesson_result = "" })
+
+reset_lesson : Atom.Writable Model ->{Atom.Write;} Unit
+let reset_lesson model =
+  replace model (first_source (Atom.current model).examples)
+  update model (fun m -> { m with lesson_result = ""; lesson_hint = false })
 
 choose : Atom.Writable Model -> Example ->{Atom.Write;} Unit
 let choose model example =

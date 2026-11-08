@@ -32,6 +32,64 @@ test("Run prints what the program writes", async ({ page }) => {
   await expect(page.locator(".fp-output")).toContainText("Hello from Flick", { timeout: 60_000 });
 });
 
+test("a shared program opens without running and a draft survives reload", async ({ page, context }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.type("\n// shared draft\n");
+  await page.getByRole("button", { name: "Share" }).click();
+  await expect(page).toHaveURL(/#code=/);
+  const linked = await context.newPage();
+  await linked.goto(page.url());
+  await ready(linked);
+  await expect(linked.locator(".cm-content")).toContainText("shared draft");
+  await expect(linked.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+  await expect(linked.locator(".fp-output, .fp-frame-open")).toHaveCount(0);
+  await page.reload();
+  await ready(page);
+  await expect(page.locator(".cm-content")).toContainText("shared draft");
+  await page.getByRole("button", { name: "Clear draft" }).click();
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  await expect(page.locator(".cm-content")).not.toContainText("shared draft");
+});
+
+test("source downloads as a Flick file", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download .fl" }).click();
+  expect((await download).suggestedFilename()).toBe("Main.fl");
+});
+
+test("editing works when browser storage is blocked", async ({ page, context }) => {
+  await context.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", { configurable: true, get: () => { throw new Error("blocked"); } });
+  });
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.type("\n// storage blocked\n");
+  await expect(page.locator(".cm-content")).toContainText("storage blocked");
+});
+
+test("a signature lesson checks a correction and remembers completion", async ({ page }) => {
+  await page.goto("/flick-lang/tour/signatures/");
+  await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
+  await page.getByRole("button", { name: "Check answer" }).click();
+  await expect(page.locator(".fp-lesson")).toContainText("Fix the compiler errors first");
+  await page.getByRole("button", { name: "Hint" }).click();
+  await expect(page.locator(".fp-lesson")).toContainText("String.length returns Int");
+  await page.getByRole("button", { name: "Show solution" }).click();
+  await page.getByRole("button", { name: "Check answer" }).click();
+  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature says String -> Int", { timeout: 30_000 });
+  await page.reload();
+  await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".fp-lesson")).toContainText("Lesson completed");
+});
+
 test("an interface runs in a sandbox and Run starts it again", async ({ page }) => {
   await page.goto("/flick-lang/play/");
   await ready(page);
@@ -92,6 +150,8 @@ test("an example from the gallery fails with its code", async ({ page }) => {
   await expect(page.locator(".fp-gallery")).toBeHidden();
   await expect(page.locator(".fp-status")).toContainText("Errors", { timeout: 60_000 });
   await expect(page.locator(".fp-problems-panel")).toContainText("FLICK-T003");
+  await page.getByRole("link", { name: "Full explanation" }).first().click();
+  await expect(page).toHaveURL(/\/reference\/errors\/flick-t003\/$/);
 });
 
 test("the splitter moves with the keys and stays where it was put", async ({ page }) => {

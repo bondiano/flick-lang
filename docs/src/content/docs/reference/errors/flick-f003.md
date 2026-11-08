@@ -1,0 +1,18 @@
+---
+title: "FLICK-F003"
+---
+
+`catch f` maps a JS exception or rejection to a typed error: `f` has type
+`JsValue -> E`, where `E` is an error of the signature's error row and holds
+no capability of a scope.
+
+```flick ignore
+type error FsError = FsError String
+
+from_js : JsValue -> FsError
+let from_js value = FsError "the file system failed"
+
+read_text : String ->{Async; FsError} String
+foreign read_text from "./fs.js" "readText"
+  catch from_js
+```

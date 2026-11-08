@@ -1,0 +1,17 @@
+---
+title: "FLICK-T026"
+---
+
+`let assert` stops the program when its pattern does not match. A
+top-level value is computed when its module loads, and a module does not
+fail while it loads: write `let assert` inside a function's block, or
+`match` over the value.
+
+```flick ignore
+module App.Config exposing (port)
+
+port : List Float -> Float
+let port ports =
+  let assert [first, ..._] = ports as "no port configured"
+  first
+```

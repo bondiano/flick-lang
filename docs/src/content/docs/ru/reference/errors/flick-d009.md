@@ -1,0 +1,13 @@
+---
+title: "FLICK-D009"
+source_hash: "bf80195f140eed39"
+---
+
+`deriving Url` сопоставляет каждый конструктор вариативного типа с путем, поэтому тип должен также наследовать `Schema`, а каждое поле должно помещаться в URL: сегмент типа `String`, `Float`, `Bool` или уточненного типа на их основе, либо конечное поле записи из таких полей, query, где поле может быть `Option`.  
+Список, вложенный вариативный тип или обобщенный тип не имеют формы URL; сообщение указывает имя поля.
+
+```text
+type Page = Home | User Float | Search { q : String; page : Option Float }
+  deriving (Schema, Url)
+// was: User { id : Float } (List String), a list is not a segment
+```

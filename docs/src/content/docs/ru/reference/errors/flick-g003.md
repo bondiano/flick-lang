@@ -1,0 +1,16 @@
+---
+title: "FLICK-G003"
+source_hash: "e14a6bc7a4cc0652"
+---
+
+`Fiber.spawn owner supervisor task` регистрирует задачу с `owner`: она выполняется до закрытия области владельца. Задача и её супервизор могут удерживать только регионы, которые заканчиваются не раньше, поэтому задачу, использующую ресурс внутренней области, нельзя передавать владельцу внешней области. Запускайте её с внутренним владельцем.
+
+```text
+scope outer {
+  scope inner {
+    let file = File.open_scoped path
+    // was: Fiber.spawn outer report (task { File.read_all file })
+    Fiber.spawn inner report (task { File.read_all file })
+  }
+}
+```

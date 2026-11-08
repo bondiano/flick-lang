@@ -1,0 +1,17 @@
+---
+title: "FLICK-S012"
+---
+
+A pattern binds its names inconsistently. Every alternative of an or-pattern
+`p | q` must bind exactly the same names (the checker also requires the same
+types), so the arm body can use them whichever alternative matched. A name
+can be bound only once by one pattern or by the parameters of one function.
+
+```flick ignore
+area : Shape -> Float
+let area shape =
+  match shape with
+  | Square side | Circle side -> side * side
+  | Rect width height when width == height -> width * width
+  | Rect width height -> width * height
+```

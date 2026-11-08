@@ -1,0 +1,13 @@
+---
+title: "FLICK-R011"
+---
+
+An `exposing` list in the module header names something the module neither
+defines nor imports, or uses `Type(..)` for a type without constructors to
+export: an alias, or an opaque type, whose representation stays private.
+
+```flick ignore
+module App.Ids exposing (UserId, user_id)
+
+opaque type alias UserId = String
+```

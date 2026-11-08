@@ -1,0 +1,38 @@
+---
+title: "FLICK-C005"
+---
+
+Coverage: every type variable in the determined part of a functional
+dependency must follow from the determining part of the instance head.
+The checker starts with those variables and repeatedly applies functional
+dependencies from the instance context and its instantiated superclasses.
+A rule applies only when all its determining variables are covered.
+
+```flick ignore
+class Collection c a | c -> a =
+  empty : c
+
+// not `instance Collection (Set a) b`
+instance Collection (Set a) a =
+  empty : Set a
+  let empty = Set []
+```
+
+Context-assisted coverage permits lifting a capability through a wrapper:
+
+```flick ignore
+class State m s | m -> s =
+  get : m s
+
+instance State m s => State (ReaderT r m) s =
+  let get = ReaderT (fun _ -> get)
+```
+
+Here the head determines `m`, and the context's `m -> s` determines `s`.
+Unrelated constraints, reversed dependencies and unseeded cycles do not
+cover a variable. Aliases are expanded before this check.
+
+Coverage does not select an instance: only its head does. Overlap and FD
+conflicts remain errors, and contexts must still satisfy the structural
+restrictions of `FLICK-C007`. Resolution is also bounded by the existing
+step and depth limits (`FLICK-C009`).

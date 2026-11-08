@@ -1,0 +1,12 @@
+---
+title: "FLICK-R001"
+---
+
+A source file in the source or test root must declare the module its path
+names: the path below the root, with `/` read as `.` and without `.fl`. Every
+directory and the file name must be capitalized names.
+
+```flick ignore
+// src/App/Users.fl
+module App.Users exposing (load_user)
+```

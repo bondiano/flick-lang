@@ -1,0 +1,9 @@
+---
+title: "FLICK-E012"
+---
+
+Retired. The compiler checked `server fn` itself and refused it in a build
+without the `server-stdlib` Cargo feature. A `server fn` is now the plugin
+`server` of `std`, which every build has.
+
+The code remains registered for historical diagnostics and is never reused.

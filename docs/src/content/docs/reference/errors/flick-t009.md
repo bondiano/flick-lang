@@ -1,0 +1,17 @@
+---
+title: "FLICK-T009"
+---
+
+A `match` must cover every value of its scrutinee; the diagnostic shows a value
+no arm matches. Arms with `when` guards cover nothing, since the guard may be
+false. A pattern in `let` or in a parameter must match every value: use `match`
+for a pattern that can fail.
+
+```flick ignore
+describe : Option Float -> String
+let describe value =
+  match value with
+  | Some 0 -> "zero"
+  | Some _ -> "number"
+  | None -> "nothing"
+```
