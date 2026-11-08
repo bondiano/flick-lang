@@ -1,5 +1,6 @@
 ---
 import CodeText from "./CodeText.astro";
+import { holdsCurrent, lineOf } from "./lines.ts";
 
 interface Entry {
   type: string;
@@ -11,10 +12,9 @@ interface Entry {
 interface Props { entries: Entry[]; nested?: boolean }
 const { entries, nested = false } = Astro.props;
 const pages = (entry: Entry): number => entry.type === "link" ? 1 : (entry.entries ?? []).reduce((sum, child) => sum + pages(child), 0);
-const holdsCurrent = (entry: Entry): boolean => entry.isCurrent === true || (entry.entries ?? []).some(holdsCurrent);
 ---
 <ul class:list={["doc-nav-list", { "doc-nav-nested": nested }]}>
-  {entries.map((entry) => <li>
+  {entries.map((entry, index) => <li style={nested ? undefined : lineOf(index)}>
     {entry.type === "link"
       ? <a href={entry.href} aria-current={entry.isCurrent ? "page" : undefined}><span><CodeText text={entry.label} /></span></a>
       : <details class="doc-nav-group" open={holdsCurrent(entry)}>

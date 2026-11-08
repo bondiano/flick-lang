@@ -1,4 +1,10 @@
 ---
 import CodeText from "./CodeText.astro";
+import { holdsCurrent, lineOf } from "./lines.ts";
+
+const { entry, sidebar } = Astro.locals.starlightRoute;
+const index = sidebar.findIndex(holdsCurrent);
+const section = sidebar[index];
 ---
-<h1 id="_top"><CodeText text={Astro.locals.starlightRoute.entry.data.title} /></h1>
+{section && section.type === "group" && <p class="doc-section" style={lineOf(index)}><span class="doc-section-token"></span><CodeText text={section.label} /></p>}
+<h1 id="_top"><CodeText text={entry.data.title} /></h1>

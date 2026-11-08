@@ -7,6 +7,7 @@ import Brand from "./Brand.astro";
 import Icon from "./Icon.astro";
 import HeroMap from "./HeroMap.astro";
 import ServedMap from "./ServedMap.astro";
+import RouteBend from "./RouteBend.astro";
 import { highlight, shown } from "./highlight.ts";
 import { Effect } from "@flick-lang/runtime";
 import { uiRenderStatic } from "@flick-lang/runtime/ui/react";
@@ -54,12 +55,21 @@ const signatures = [
   },
 ];
 
-const status = [
-  text("Alpha: version 0.1, and a minor release may break programs before 1.0.", "Альфа: версия 0.1, и до 1.0 минорный релиз может сломать программы."),
-  text("Host calls such as `Console.log`, the clock and randomness are not named in signatures yet. Defects stay outside the signature too.", "Вызовы хоста вроде `Console.log`, часы и случайные числа пока не называются в сигнатурах. Дефекты тоже остаются вне сигнатуры."),
-  text("On JavaScript, effects run on Effect for now. `ui` runs only on JavaScript, and parts of the standard library do not compile to Go yet.", "На JavaScript эффекты пока работают на Effect. `ui` работает только на JavaScript, а часть стандартной библиотеки ещё не компилируется в Go."),
-  text("Beyond the standard library there are few Flick packages, and no mobile, desktop or WebAssembly target.", "Помимо стандартной библиотеки пакетов на Flick мало, а целей для мобильных устройств, десктопа и WebAssembly нет."),
+const next = [
+  { title: text("The host in the signature", "Хост в сигнатуре"), body: text("The console, the clock, randomness, the environment and the arguments become services. The signature names them, and a test swaps them like any other.", "Консоль, часы, случайные числа, окружение и аргументы станут сервисами. Сигнатура будет их называть, а тест — подменять, как любой другой сервис.") },
+  { title: text("A runtime of its own", "Свой рантайм"), body: text("Effects run on a small runtime of Flick's own, on JavaScript and Go alike. Effect becomes a package.", "Эффекты будут работать на собственном небольшом рантайме Flick и в JavaScript, и в Go. Effect станет отдельным пакетом.") },
+  { title: text("Loops and local state", "Циклы и локальное состояние"), body: text("`let mut`, `loop` and `while`. A function that changes its own variables stays pure from the outside.", "`let mut`, `loop` и `while`. Функция, которая меняет свои переменные, снаружи останется чистой.") },
+  { title: "WebAssembly", body: text("A third target: command-line programs and servers on WASI, Node, and the browser with `ui`.", "Третья цель: консольные программы и серверы на WASI, Node и браузер вместе с `ui`.") },
+  { title: text("A small core", "Маленькое ядро"), body: text("The compiler keeps types, effects and regions. The standard library, its blocks and the Go backend are packages and plugins that update without a compiler release.", "В компиляторе останутся типы, эффекты и регионы. Стандартная библиотека, её блоки и Go-бэкенд станут пакетами и плагинами и будут обновляться без релиза компилятора.") },
 ];
+
+// The column each station stands in, in steps of 120 design pixels; the rail bends between them.
+const columns = { read: 0, three: 1, app: 2, unread: 1, proved: 2, host: 0, next: 0 };
+type Stop = keyof typeof columns;
+const order = Object.keys(columns) as Stop[];
+const from = (stop: Stop) => columns[order[Math.max(0, order.indexOf(stop) - 1)]];
+const bendHeight = (stop: Stop) => columns[stop] === from(stop) ? 0 : Math.abs(columns[stop] - from(stop)) * 120 + 32;
+const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(stop)}`;
 ---
 <!doctype html>
 <html lang={locale} data-theme="light">
@@ -104,13 +114,13 @@ const status = [
             <a class="action action-primary" href={`${prefix}/start/getting-started/`}>{text("Get started", "Начать")} <Icon name="arrow" size={20} /></a>
             <a class="action" href={`${prefix}/play/`}>{text("Open playground", "Открыть песочницу")}</a>
           </div>
-          <p class="hero-limit"><a href={`${prefix}/start/why/#${ru ? "ограничения" : "where-the-promise-stops"}`}>{text("Alpha: console, clock and randomness aren't in signatures yet", "Альфа: консоль, часы и случайные числа пока не видны в сигнатуре")} <Icon name="arrow" size={15} /></a></p>
+          <p class="hero-limit"><a href={`${prefix}/start/why/#${ru ? "ограничения" : "where-the-promise-stops"}`}>{text("Alpha: console, clock and randomness join signatures in 0.2", "Альфа: консоль, часы и случайные числа войдут в сигнатуры в 0.2")} <Icon name="arrow" size={15} /></a></p>
         </div>
         <div id="flick-hero" data-flick-ssr set:html={heroHtml}></div>
       </section>
 
       <div class="route">
-        <section class="stop" aria-labelledby="read-title">
+        <section class="stop" style={place("read")} aria-labelledby="read-title">
           <h2 id="read-title">{text("Read the signature", "Прочитайте сигнатуру")}</h2>
           <p class="stop-lead" set:html={inlineCode(text("Every named function has one, right above its `let`. It is the whole contract: what the function takes, what it needs, how it can fail and what it returns.", "Она есть у каждой именованной функции, прямо над `let`. Это весь контракт: что функция принимает, что ей нужно, как она может упасть и что возвращает."))} />
           <div class="read-grid">
@@ -136,7 +146,8 @@ const status = [
           </div>
         </section>
 
-        <section class="stop" aria-labelledby="three-title">
+        <section class="stop" style={place("three")} aria-labelledby="three-title">
+          <RouteBend from={from("three")} to={columns.three} />
           <h2 id="three-title">{text("One function, three signatures", "Одна функция, три сигнатуры")}</h2>
           <div class="compare">
             {signatures.map(({ name, code, verdict }) => <article>
@@ -147,7 +158,8 @@ const status = [
           </div>
         </section>
 
-        <section class="stop" aria-labelledby="app-title">
+        <section class="stop" style={place("app")} aria-labelledby="app-title">
+          <RouteBend from={from("app")} to={columns.app} />
           <h2 id="app-title">{text("One app. One language. No unchecked seams.", "Одно приложение. Один язык. Проверяемые контракты между частями.")}</h2>
           <p class="stop-lead" set:html={inlineCode(text("Conduit, the RealWorld demo app, is a Go server over PostgreSQL and a React client. Both depend on one package with the API contract, so a route that does not exist is a compile error on both sides.", "Conduit, демонстрационное приложение RealWorld, — это Go-сервер на PostgreSQL и клиент на React. Оба зависят от одного пакета с контрактом API, поэтому несуществующий маршрут — ошибка компиляции с обеих сторон."))} />
           <svg class="seam-map" viewBox="0 0 460 170" role="img" aria-label={text("One contract package, used by the Go server and the React client", "Один пакет с контрактом, его используют Go-сервер и клиент на React")}>
@@ -177,7 +189,8 @@ const status = [
           <a class="stop-link" href={`${repository}/tree/main/examples/conduit`}>{text("Read the Conduit example", "Посмотреть пример Conduit")} <Icon name="arrow" size={18} /></a>
         </section>
 
-        <section class="stop" aria-labelledby="unread-title">
+        <section class="stop" style={place("unread")} aria-labelledby="unread-title">
+          <RouteBend from={from("unread")} to={columns.unread} />
           <h2 id="unread-title">{text("For code you didn't write", "Для кода, который писали не вы")}</h2>
           <div class="split">
             <div class="split-text">
@@ -192,7 +205,8 @@ const status = [
           </div>
         </section>
 
-        <section class="stop" aria-labelledby="proved-title">
+        <section class="stop" style={place("proved")} aria-labelledby="proved-title">
+          <RouteBend from={from("proved")} to={columns.proved} />
           <h2 id="proved-title">{text("Proved, not promised", "Доказано, а не обещано")}</h2>
           <div class="split">
             <div class="split-text">
@@ -209,7 +223,8 @@ const status = [
           <a class="stop-link" href={`${repository}/blob/main/formal/README.md`}>{text("What exactly is proved", "Что именно доказано")} <Icon name="arrow" size={18} /></a>
         </section>
 
-        <section class="stop" aria-labelledby="host-title">
+        <section class="stop" style={place("host")} aria-labelledby="host-title">
+          <RouteBend from={from("host")} to={columns.host} />
           <h2 id="host-title">{text("Use the host, don't rewrite it", "Используйте библиотеки хоста")}</h2>
           <div class="split">
             <div class="split-text">
@@ -220,12 +235,19 @@ const status = [
           </div>
         </section>
 
-        <section class="stop stop-last" aria-labelledby="status-title">
-          <h2 id="status-title">{text("Where it stands", "Текущее состояние")}</h2>
-          <ul class="status-list">
-            {status.map((line) => <li set:html={inlineCode(line)} />)}
-          </ul>
-          <div class="hero-actions terminus">
+        <section class="stop stop-next" style={place("next")} aria-labelledby="next-title">
+          <RouteBend from={from("next")} to={columns.next} />
+          <div class="next-built">
+            <h2 id="next-title">{text("Where it's going", "Куда движется Flick")}</h2>
+            <p class="stop-lead">{text("Flick is in alpha, at version 0.1: before 1.0 a minor release may break programs. These are the next stations, all in 0.2.", "Flick в альфе, версия 0.1: до 1.0 минорный релиз может сломать программы. Следующие станции — все в версии 0.2.")}</p>
+          </div>
+          <ol class="next-stops">
+            {next.map(({ title, body }) => <li>
+              <h3>{title}</h3>
+              <p set:html={inlineCode(body)} />
+            </li>)}
+          </ol>
+          <div class="hero-actions">
             <a class="action action-primary" href={`${prefix}/start/getting-started/`}>{text("Get started", "Начать")} <Icon name="arrow" size={20} /></a>
             <a class="action" href={`${prefix}/start/why/`}>{text("Why Flick, in full", "Зачем Flick, подробно")}</a>
           </div>
