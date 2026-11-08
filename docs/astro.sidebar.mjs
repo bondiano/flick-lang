@@ -2,6 +2,7 @@
 const reference = (name) => ({ slug: `reference/${name}` });
 
 export const sidebar = [
+  { label: "Tour", translations: { ru: "Тур" }, items: [{ slug: "tour/signatures" }] },
   {
     label: "Get started",
     translations: { ru: "Начало работы" },

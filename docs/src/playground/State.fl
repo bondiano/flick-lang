@@ -36,7 +36,13 @@ type Profile = Debug | Release
 type Tab = Output | Problems | Js | Dts
   deriving Eq
 
-type alias Configuration = { locale : String; examples : List Example }
+type alias Configuration = {
+  locale : String;
+  examples : List Example;
+  lesson : Bool;
+  solution : String;
+  done : Bool;
+}
 type alias SyntaxToken = { text : String; class_name : String }
 /// A change a fix makes; `start` and `end` are UTF-16 offsets of the module.
 type alias Edit = { start : Int; end : Int; insert : String }
@@ -91,6 +97,13 @@ type alias Model = {
   load_error : String;
   compile_error : String;
   fault : String;
+  storage_notice : String;
+  lesson : Bool;
+  lesson_solution : String;
+  lesson_hint : Bool;
+  lesson_result : String;
+  lesson_done : Bool;
+  lesson_checking : Bool;
 }
 
 empty_generated : Generated
@@ -181,4 +194,11 @@ let initial_model config = {
   load_error = "";
   compile_error = "";
   fault = "";
+  storage_notice = "";
+  lesson = config.lesson;
+  lesson_solution = config.solution;
+  lesson_hint = false;
+  lesson_result = "";
+  lesson_done = config.done;
+  lesson_checking = false;
 }

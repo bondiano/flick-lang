@@ -3,6 +3,7 @@ module View exposing (view)
 import Actions exposing (edited, load_compiler, refresh, runtime_messages, update)
 import Dom exposing (notify)
 import Editor exposing (declarations_pane, generated_pane, source_pane)
+import Lesson
 import Results exposing (current_problems, diagnostic_label, output_pane)
 import State exposing (Model, Tab(..), tr)
 import Toolbar exposing (choice)
@@ -98,6 +99,7 @@ let view model m = ui {
         { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { runtime_messages model }) }
         []),
     div { class_name = "fp-workspace" } [
+      if m.lesson then Lesson.view model m else empty,
       Toolbar.view model m,
       if m.load_error != "" then
         Ui.with_host
