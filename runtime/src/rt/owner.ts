@@ -213,10 +213,15 @@ export function* withOwner(body: (owner: Owner, outer: Owner | undefined) => unk
 }
 
 /** The exit of a test body and that of its cleanup, apart, and the failures of its supervisors. */
-export interface OwnedExits {
+export class OwnedExits {
   readonly exit: Exit;
   readonly cleanup: Exit;
   readonly defects: ReadonlyArray<Cause>;
+  constructor(exit: Exit, cleanup: Exit, defects: ReadonlyArray<Cause>) {
+    this.exit = exit;
+    this.cleanup = cleanup;
+    this.defects = defects;
+  }
 }
 
 /** Runs `body(owner)` as the owner of a fresh scope and closes it, for the test runner. */
@@ -229,8 +234,7 @@ export function* ownedExits(body: (owner: Owner) => unknown): Run {
     const ctx = owned(currentCtx(), owner);
     const exit = asExit(yield exitOf(() => atMask(depth, () => new Under(ctx, () => body(owner)))));
     const cleanup = asExit(yield close(owner, succeeded(undefined)));
-    const out: OwnedExits = { exit, cleanup, defects: owner.defects };
-    return out;
+    return new OwnedExits(exit, cleanup, owner.defects);
   } finally {
     fiber.mask = depth;
   }

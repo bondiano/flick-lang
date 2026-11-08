@@ -155,7 +155,7 @@ export class TestClock implements Clock {
 }
 
 /** The test clock of what runs now. */
-export const testClock = (): TestClock => {
+export const currentTestClock = (): TestClock => {
   const found = lookup(CLOCK);
   if (found instanceof TestClock) return found;
   throw new Error("a test moves only the clock of its own `Test.clock_test`");

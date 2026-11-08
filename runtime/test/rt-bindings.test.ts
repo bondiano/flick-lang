@@ -8,12 +8,13 @@ import { test } from "node:test";
 const repo = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, repo), "utf8");
 
-/** The modules of the kernel's first tier, but `Ui`, `Atom` and `Test`, which come later. */
+/** The modules of the kernel's first tier, but `Ui` and `Atom`, which come later. */
 const MODULES = [
   "Cause",
   "Clock",
   "Failure",
   "Fiber",
+  "Gen",
   "Instances",
   "Layer",
   "List.Core",
@@ -24,6 +25,7 @@ const MODULES = [
   "Ref",
   "Schedule",
   "Scope",
+  "Test",
 ];
 
 /** A list of module names in `flick-core/src/build/effects.rs`. */
