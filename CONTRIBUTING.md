@@ -7,6 +7,10 @@ describes the test suites and their fixture formats, and
 [implementation decisions](./docs/src/content/docs/contributing/implementation-decisions.md)
 the architecture of the compiler.
 
+For agent-assisted work, start with [AGENTS.md](./AGENTS.md), the
+[validation matrix](./docs/agents/validation.md) and the
+[compiler change workflow](./docs/agents/compiler-workflow.md).
+
 ## Setup
 
 Install the [pinned Rust toolchain](./rust-toolchain.toml), Node.js
