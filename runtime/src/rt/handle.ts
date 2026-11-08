@@ -35,8 +35,21 @@ export type OpInstall = readonly [
 /** One effect a handler installs. */
 export type Install = readonly [tag: object, operations: ReadonlyArray<OpInstall>];
 
-/** A service's tag: an object of its own, compared by identity. */
-export const service = (key: string): Readonly<{ key: string }> => Object.freeze({ key });
+const tags = /*#__PURE__*/ new Map<string, Readonly<{ key: string }>>();
+
+/**
+ * A service's tag, compared by identity: one per key, `Module.Service`, as
+ * Effect's keys compare by name, so the runtime reaches the services of
+ * `Atom` and `Ui` that a program declares.
+ */
+export const service = (key: string): Readonly<{ key: string }> => {
+  let tag = tags.get(key);
+  if (tag === undefined) {
+    tag = Object.freeze({ key });
+    tags.set(key, tag);
+  }
+  return tag;
+};
 
 /** `f a` for a curried function of the program. */
 const apply = (f: unknown, a: unknown): unknown => {

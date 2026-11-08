@@ -42,6 +42,29 @@ export { layerMerge, layerOverride, layerRun, layerSucceed } from "./layer.ts";
 export { absent, flickAssert, flickEcho, flickTodo, refGet, refMake, refModify, refSame, refSet } from "./builtins.ts";
 export { exitFailure, exitValue, failureInspect, failurePrimary, failureRawCause, failureRethrow, rawCauseInspect } from "./outcome.ts";
 export { describeReport } from "./describe.ts";
+export {
+  atomAt,
+  atomClientOnly,
+  atomDerived,
+  atomFamily,
+  atomForget,
+  atomLoader,
+  atomLocal,
+  atomMutation,
+  atomOnServer,
+  atomPending,
+  atomQuery,
+  atomQueryStream,
+  atomRoute,
+  atomSearchParam,
+  atomSerializableResult,
+  atomSerializableTask,
+  atomServing,
+  atomState,
+  atomStored,
+  atomTask,
+  label,
+} from "./atoms/atom.ts";
 export { hash } from "./hash.ts";
 export { acquireRelease, bracket, reportedDefects } from "./owner.ts";
 export {
