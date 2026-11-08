@@ -1,7 +1,7 @@
 // Tests on the kernel: what `Test` binds, and `runTests`, which runs each test
 // in an owner of its own and reports assertions, typed failures, defects and
 // failed cleanup apart, as the runner on Effect does.
-import { type Engine, type Suites as SuitesOf, type TestOptions, type TestResult, parseTestArgs, runTestsWith } from "../core/test-run.ts";
+import { type Engine, type Suites as SuitesOf, type TestOptions, type TestResult, parseTestArgs, runTestsWith } from "../core/suites.ts";
 import * as Core from "../core/testing.ts";
 import { type Cause, type Exit, combine, failed, hasDies, hasInterruptsOnly, isFail, raise, succeeded } from "./cause.ts";
 import { CLOCK, TestClock, currentTestClock } from "./clock.ts";

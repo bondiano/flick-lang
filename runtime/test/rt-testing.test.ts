@@ -23,7 +23,7 @@ import {
   testPure,
   testSuite,
 } from "../src/rt/testing.ts";
-import type { TestResult } from "../src/core/test-run.ts";
+import type { TestResult } from "../src/core/suites.ts";
 import { tag } from "../src/tags.ts";
 
 const PASS = Object.freeze({ _tag: tag("Test.Assertion.Pass") });

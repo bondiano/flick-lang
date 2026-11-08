@@ -5,7 +5,7 @@ import { Cause, type Context, type Duration, Effect, Exit, Fiber, Layer, Scope }
 import * as TestClock from "effect/testing/TestClock";
 
 import { describeCause } from "../cause.ts";
-import { type Engine, type Suites as SuitesOf, type TestOptions, type TestResult, parseTestArgs, runTestsWith } from "../core/test-run.ts";
+import { type Engine, type Suites as SuitesOf, type TestOptions, type TestResult, parseTestArgs, runTestsWith } from "../core/suites.ts";
 import * as Core from "../core/testing.ts";
 import { service } from "../effects.ts";
 import { buildInto } from "../layer.ts";
@@ -27,8 +27,8 @@ export {
   testPure,
 } from "../core/testing.ts";
 export type { Assertion, Gen, Rng } from "../core/testing.ts";
-export { parseTestArgs } from "../core/test-run.ts";
-export type { FailureKind, TestOptions, TestResult } from "../core/test-run.ts";
+export { parseTestArgs } from "../core/suites.ts";
+export type { FailureKind, TestOptions, TestResult } from "../core/suites.ts";
 
 type Task = Effect.Effect<unknown, unknown>;
 type AnyLayer = Layer.Layer<unknown, unknown>;
