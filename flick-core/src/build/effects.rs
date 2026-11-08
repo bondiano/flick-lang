@@ -86,7 +86,9 @@ pub fn on_kernel(spec: &str, export: &str) -> bool {
     if !spec.starts_with(RUNTIME) {
         return true;
     }
-    RT_EXPORTS.lines().any(|l| l.split_once(' ') == Some((spec, export)))
+    RT_EXPORTS
+        .lines()
+        .any(|l| l.split_once(' ') == Some((spec, export)))
 }
 
 /// E008 when the program's `module` binds a foreign module that needs

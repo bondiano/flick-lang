@@ -32,7 +32,9 @@ impl Gen<'_> {
                     bridged = true;
                 }
                 // spike: a foreign `effect` of the program's own gives an Effect
-                bridged |= self.kernel && f.mode == ForeignMode::Effect && !module.starts_with("@flick-lang/runtime");
+                bridged |= self.kernel
+                    && f.mode == ForeignMode::Effect
+                    && !module.starts_with("@flick-lang/runtime");
                 self.runtime |= self.kernel;
                 self.foreign
                     .push((spec, f.binding.name.clone(), alias.clone()));
@@ -52,13 +54,18 @@ impl Gen<'_> {
         let copy_result = copies(f).is_some_and(|c| c.result);
         if f.arity == 0 && params.is_empty() && f.dicts == 0 && f.mode == ForeignMode::Pure {
             let value = self.copied(copy_result, target);
-            let value = if bridged { self.from_host(&info.result_shape, value) } else { value };
+            let value = if bridged {
+                self.from_host(&info.result_shape, value)
+            } else {
+                value
+            };
             return self.export(&names::ident(&f.name), &value);
         }
         let id = names::ident(&f.name);
         // spike: a shape to convert means a wrapper
         let plain = self.direct_foreigns.contains_key(&f.name)
-            && !(bridged && (!info.result_shape.is_data() || info.shapes.iter().any(|s| !s.is_data())));
+            && !(bridged
+                && (!info.result_shape.is_data() || info.shapes.iter().any(|s| !s.is_data())));
         // a constant, not `export { … as … }`: the module names it too
         if plain && params.len() == 1 {
             return self.export(&id, &target);
@@ -74,12 +81,20 @@ impl Gen<'_> {
             (ForeignMode::Pure, _) | (_, false) => result(self, &call),
             (ForeignMode::Effect, true) if bridged => {
                 let made = match catch {
-                    Some(c) => format!("{}(() => {}({call}), {c})", self.rt("foreignEffect"), self.rt("fromEffect")),
+                    Some(c) => format!(
+                        "{}(() => {}({call}), {c})",
+                        self.rt("foreignEffect"),
+                        self.rt("fromEffect")
+                    ),
                     None => format!("{}({call})", self.rt("fromEffect")),
                 };
                 let value = result(self, "$v");
                 let value = self.from_host(&info.result_shape, value);
-                if value == "$v" { made } else { format!("{}({made}, ($v) => {value})", self.rt("mapped")) }
+                if value == "$v" {
+                    made
+                } else {
+                    format!("{}({made}, ($v) => {value})", self.rt("mapped"))
+                }
             }
             (ForeignMode::Sync, true) if bridged => {
                 let value = result(self, &call);
@@ -244,7 +259,12 @@ impl Gen<'_> {
         use flick_ir::Shape;
         match s {
             Shape::Data => v,
-            Shape::Fun { args, result, runtime, sync } => {
+            Shape::Fun {
+                args,
+                result,
+                runtime,
+                sync,
+            } => {
                 let d = self.bridge_depth();
                 let xs: Vec<String> = (0..args.len()).map(|k| format!("$h{d}_{k}")).collect();
                 let mut call = v;
@@ -256,14 +276,22 @@ impl Gen<'_> {
                     let at = format!("$r{d}");
                     let map = self.to_host(result, at.clone());
                     let ran = format!("{}(() => {call})", self.rt("callSync"));
-                    if map == at { ran } else { format!("(({at}) => {map})({ran})") }
+                    if map == at {
+                        ran
+                    } else {
+                        format!("(({at}) => {map})({ran})")
+                    }
                 } else if *runtime {
                     let at = format!("$r{d}");
                     let map = self.to_host(result, at.clone());
                     if map == at {
                         format!("{}(() => {call})", self.rt("callEffect"))
                     } else {
-                        format!("{}(() => {}({call}, ({at}) => {map}))", self.rt("callEffect"), self.rt("mapped"))
+                        format!(
+                            "{}(() => {}({call}, ({at}) => {map}))",
+                            self.rt("callEffect"),
+                            self.rt("mapped")
+                        )
                     }
                 } else {
                     self.to_host(result, call)
@@ -281,7 +309,11 @@ impl Gen<'_> {
                 if map == at {
                     format!("{}(() => {v}())", self.rt("callEffect"))
                 } else {
-                    format!("{}(() => {}({v}(), ({at}) => {map}))", self.rt("callEffect"), self.rt("mapped"))
+                    format!(
+                        "{}(() => {}({v}(), ({at}) => {map}))",
+                        self.rt("callEffect"),
+                        self.rt("mapped")
+                    )
                 }
             }
             Shape::List(inner) => {
@@ -296,20 +328,34 @@ impl Gen<'_> {
             }
             Shape::Result(e, a) => {
                 let d = self.bridge_depth();
-                let (fe, fa) = (self.to_host(e, format!("$e{d}")), self.to_host(a, format!("$a{d}")));
-                format!("{}({v}, ($a{d}) => {fa}, ($e{d}) => {fe})", self.rt("resultMapped"))
+                let (fe, fa) = (
+                    self.to_host(e, format!("$e{d}")),
+                    self.to_host(a, format!("$a{d}")),
+                );
+                format!(
+                    "{}({v}, ($a{d}) => {fa}, ($e{d}) => {fe})",
+                    self.rt("resultMapped")
+                )
             }
             Shape::Tuple(items) => {
                 let d = self.bridge_depth();
-                let parts: Vec<String> = items.iter().enumerate().map(|(i, s)| self.to_host(s, format!("$t{d}[{i}]"))).collect();
+                let parts: Vec<String> = items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, s)| self.to_host(s, format!("$t{d}[{i}]")))
+                    .collect();
                 format!("(($t{d}) => [{}])({v})", parts.join(", "))
             }
             Shape::Record(fields) => {
                 let d = self.bridge_depth();
-                let parts: Vec<String> = fields.iter().filter(|(_, s)| !s.is_data()).map(|(n, s)| {
-                    let name = names::string(n);
-                    format!("[{name}]: {}", self.to_host(s, format!("$t{d}[{name}]")))
-                }).collect();
+                let parts: Vec<String> = fields
+                    .iter()
+                    .filter(|(_, s)| !s.is_data())
+                    .map(|(n, s)| {
+                        let name = names::string(n);
+                        format!("[{name}]: {}", self.to_host(s, format!("$t{d}[{name}]")))
+                    })
+                    .collect();
                 format!("(($t{d}) => ({{ ...$t{d}, {} }}))({v})", parts.join(", "))
             }
             Shape::Layer => format!("{}({v})", self.rt("layerToEffect")),
@@ -324,7 +370,12 @@ impl Gen<'_> {
         use flick_ir::Shape;
         match s {
             Shape::Data | Shape::Layer | Shape::Handlers => v,
-            Shape::Fun { args, result, runtime, sync } => {
+            Shape::Fun {
+                args,
+                result,
+                runtime,
+                sync,
+            } => {
                 let d = self.bridge_depth();
                 let xs: Vec<String> = (0..args.len()).map(|k| format!("$g{d}_{k}")).collect();
                 let mut call = v;
@@ -339,7 +390,11 @@ impl Gen<'_> {
                     let at = format!("$r{d}");
                     let map = self.from_host(result, at.clone());
                     let ran = format!("{}({call})", self.rt("fromEffect"));
-                    if map == at { ran } else { format!("{}({ran}, ({at}) => {map})", self.rt("mapped")) }
+                    if map == at {
+                        ran
+                    } else {
+                        format!("{}({ran}, ({at}) => {map})", self.rt("mapped"))
+                    }
                 } else {
                     self.from_host(result, call)
                 };
@@ -371,20 +426,34 @@ impl Gen<'_> {
             }
             Shape::Result(e, a) => {
                 let d = self.bridge_depth();
-                let (fe, fa) = (self.from_host(e, format!("$e{d}")), self.from_host(a, format!("$a{d}")));
-                format!("{}({v}, ($a{d}) => {fa}, ($e{d}) => {fe})", self.rt("resultMapped"))
+                let (fe, fa) = (
+                    self.from_host(e, format!("$e{d}")),
+                    self.from_host(a, format!("$a{d}")),
+                );
+                format!(
+                    "{}({v}, ($a{d}) => {fa}, ($e{d}) => {fe})",
+                    self.rt("resultMapped")
+                )
             }
             Shape::Tuple(items) => {
                 let d = self.bridge_depth();
-                let parts: Vec<String> = items.iter().enumerate().map(|(i, s)| self.from_host(s, format!("$t{d}[{i}]"))).collect();
+                let parts: Vec<String> = items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, s)| self.from_host(s, format!("$t{d}[{i}]")))
+                    .collect();
                 format!("(($t{d}) => [{}])({v})", parts.join(", "))
             }
             Shape::Record(fields) => {
                 let d = self.bridge_depth();
-                let parts: Vec<String> = fields.iter().filter(|(_, s)| !s.is_data()).map(|(n, s)| {
-                    let name = names::string(n);
-                    format!("[{name}]: {}", self.from_host(s, format!("$t{d}[{name}]")))
-                }).collect();
+                let parts: Vec<String> = fields
+                    .iter()
+                    .filter(|(_, s)| !s.is_data())
+                    .map(|(n, s)| {
+                        let name = names::string(n);
+                        format!("[{name}]: {}", self.from_host(s, format!("$t{d}[{name}]")))
+                    })
+                    .collect();
                 format!("(($t{d}) => ({{ ...$t{d}, {} }}))({v})", parts.join(", "))
             }
             Shape::Exit => format!("{}({v})", self.rt("exitFromEffect")),

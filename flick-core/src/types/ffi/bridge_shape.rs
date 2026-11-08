@@ -10,9 +10,13 @@ use crate::types::typing::ForeignInfo;
 fn row_class(mut ty: &Type) -> &'static str {
     loop {
         match ty {
-            Type::Fun { effects: Some(e), .. } => {
+            Type::Fun {
+                effects: Some(e), ..
+            } => {
                 let label = crate::types::lang::label(Lang::Async);
-                let Type::Row(r) = &e.services else { return "open" };
+                let Type::Row(r) = &e.services else {
+                    return "open";
+                };
                 if r.entries.iter().any(|(l, _)| Some(l.as_str()) == label) {
                     return "async";
                 }
@@ -30,7 +34,13 @@ impl Checker<'_> {
     pub(super) fn bridge_dump(&self, decl: &Node, info: &ForeignInfo, body: &Type) {
         if let Ok(path) = std::env::var("FLICK_BRIDGE_DUMP") {
             use std::io::Write;
-            let binding = decl.text(self.text).lines().find(|l| l.trim_start().starts_with("foreign")).unwrap_or("").trim().to_owned();
+            let binding = decl
+                .text(self.text)
+                .lines()
+                .find(|l| l.trim_start().starts_with("foreign"))
+                .unwrap_or("")
+                .trim()
+                .to_owned();
             let line = format!(
                 "{}\t{}\t{:?}\t{:?}\t{:?}\t{}\n",
                 self.env.module,
@@ -40,7 +50,11 @@ impl Checker<'_> {
                 info.adapter.result_shape,
                 row_class(body),
             );
-            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+            {
                 let _ = f.write_all(line.as_bytes());
             }
         }
@@ -63,7 +77,13 @@ impl Checker<'_> {
         params
             .iter()
             .take(arity)
-            .map(|p| if hidden(p) { flick_ir::Shape::Handlers } else { self.shape(p, 0) })
+            .map(|p| {
+                if hidden(p) {
+                    flick_ir::Shape::Handlers
+                } else {
+                    self.shape(p, 0)
+                }
+            })
             .collect()
     }
 
@@ -80,7 +100,12 @@ impl Checker<'_> {
                 let mut args = Vec::new();
                 let mut cur = t.clone();
                 loop {
-                    let Type::Fun { param, effects, result } = self.whnf_captured(&cur).0 else {
+                    let Type::Fun {
+                        param,
+                        effects,
+                        result,
+                    } = self.whnf_captured(&cur).0
+                    else {
                         break;
                     };
                     args.push(self.shape(&param, depth + 1));
@@ -98,11 +123,20 @@ impl Checker<'_> {
                 if result.is_data() && args.iter().all(Shape::is_data) {
                     return Shape::Data;
                 }
-                Shape::Fun { args, result: Box::new(result), runtime: false, sync: false }
+                Shape::Fun {
+                    args,
+                    result: Box::new(result),
+                    runtime: false,
+                    sync: false,
+                }
             }
             Type::Tuple(items) => {
                 let shapes: Vec<Shape> = items.iter().map(|i| self.shape(i, depth + 1)).collect();
-                if shapes.iter().all(Shape::is_data) { Shape::Data } else { Shape::Tuple(shapes) }
+                if shapes.iter().all(Shape::is_data) {
+                    Shape::Data
+                } else {
+                    Shape::Tuple(shapes)
+                }
             }
             Type::Record(row) => {
                 let fields: Vec<(String, Shape)> = row
@@ -110,7 +144,11 @@ impl Checker<'_> {
                     .iter()
                     .map(|(n, ty)| (n.clone(), self.shape(ty, depth + 1)))
                     .collect();
-                if fields.iter().all(|(_, s)| s.is_data()) { Shape::Data } else { Shape::Record(fields) }
+                if fields.iter().all(|(_, s)| s.is_data()) {
+                    Shape::Data
+                } else {
+                    Shape::Record(fields)
+                }
             }
             _ => {
                 if let Some((_, _, a)) = self.eff_parts(&t) {
@@ -130,11 +168,19 @@ impl Checker<'_> {
                 match targs[..] {
                     [a] if head.is_lang(Lang::List) => {
                         let s = inner(a);
-                        if s.is_data() { s } else { Shape::List(Box::new(s)) }
+                        if s.is_data() {
+                            s
+                        } else {
+                            Shape::List(Box::new(s))
+                        }
                     }
                     [a] if head.is_lang(Lang::Option) => {
                         let s = inner(a);
-                        if s.is_data() { s } else { Shape::Option(Box::new(s)) }
+                        if s.is_data() {
+                            s
+                        } else {
+                            Shape::Option(Box::new(s))
+                        }
                     }
                     [e, a] if head.is_lang(Lang::Result) => {
                         let (e, a) = (inner(e), inner(a));
@@ -149,5 +195,4 @@ impl Checker<'_> {
             }
         }
     }
-
 }
