@@ -64,6 +64,7 @@ impl Checker<'_> {
                     self.note_type(span, ty);
                     self.locals.push(Local {
                         name: name.text(self.text).to_owned(),
+                        at: Some(name.start),
                         generated: name.start >= self.generated,
                         ty: ty.clone(),
                         rec: None,
@@ -282,6 +283,7 @@ impl Checker<'_> {
                 } else {
                     self.locals.push(Local {
                         name: label.clone(),
+                        at: None,
                         generated: node.range().0 >= self.generated,
                         ty: field_ty,
                         rec: None,

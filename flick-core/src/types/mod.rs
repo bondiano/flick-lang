@@ -354,6 +354,9 @@ pub fn beside_syntax_errors(tree: &Node, checked: Vec<Diagnostic>) -> Vec<Diagno
 #[derive(Debug, Clone)]
 struct Local {
     name: String,
+    /// Where its name is written; none for a field a record pattern binds by
+    /// its label.
+    at: Option<u32>,
     /// Whether a plugin generated it: only generated names see it.
     generated: bool,
     ty: Type,
