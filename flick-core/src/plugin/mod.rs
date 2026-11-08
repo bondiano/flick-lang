@@ -341,6 +341,9 @@ pub fn head_token(node: &Node) -> Option<Token> {
     (head.kind == K::Ident).then_some(head)
 }
 
+/// How many blocks a block may be nested in, in the user's code of others.
+pub const ROUNDS: usize = 8;
+
 /// The plugin blocks under `node`, expressions and declarations, not those
 /// inside them.
 pub fn blocks_under<'n>(node: &'n Node, out: &mut Vec<&'n Node>) {

@@ -460,3 +460,36 @@ fn a_match_an_if_and_a_block_render_as_the_parser_reads_them() {
     });
     assert_eq!(armless, Err("a `match` without arms".into()));
 }
+
+#[test]
+fn a_built_in_module_expands_a_head_of_std_without_an_import_and_says_what_it_cannot() {
+    use super::derive::builtin_expansion;
+    use crate::resolve::module_syntax;
+    let expand = |text: &str| {
+        let mut map = SourceMap::default();
+        let file = map.add("Tool.fl", text);
+        let parsed = parse(text, file);
+        let syntax = module_syntax(&parsed.tree, text, file);
+        let (expansion, diagnostics) = builtin_expansion(text, file, &parsed.tree, "Tool", &syntax);
+        let codes: Vec<String> = diagnostics.iter().map(|d| d.code.to_string()).collect();
+        (expansion.is_some(), codes)
+    };
+    let one = "module Tool exposing (tool)\n\ntool : Cli.Command none none\nlet tool = cli \"tool\" { handle fun {} -> Platform.stdout_line \"hi\" }\n";
+    assert_eq!(expand(one), (true, vec![]));
+    // a block in the code of another expands in a later round, up to ROUNDS deep
+    let nested = |depth: usize| {
+        let mut command =
+            "cli \"leaf\" { handle fun {} -> Platform.stdout_line \"hi\" }".to_owned();
+        for i in 0..depth {
+            command = format!("cli \"c{i}\" {{ subcommand {command} }}");
+        }
+        format!(
+            "module Tool exposing (tool)\n\ntool : Cli.Command none none\nlet tool = {command}\n"
+        )
+    };
+    assert_eq!(expand(&nested(1)), (true, vec![]));
+    assert_eq!(
+        expand(&nested(super::ROUNDS + 1)),
+        (true, vec!["FLICK-P036".to_owned()])
+    );
+}
