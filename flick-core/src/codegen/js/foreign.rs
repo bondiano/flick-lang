@@ -159,8 +159,12 @@ impl Gen<'_> {
             let copy = copies.is_some_and(|c| c.args.get(i) == Some(&true));
             let callback = copies.and_then(|c| c.callbacks.get(i).cloned().flatten());
             let arg = match info.callbacks.get(i).copied().flatten() {
-                _ if bridged && !info.shapes.get(i).is_none_or(flick_ir::Shape::is_data) => {
-                    self.to_host(&info.shapes[i], param.clone())
+                n if bridged && !info.shapes.get(i).is_none_or(flick_ir::Shape::is_data) => {
+                    let host = self.to_host(&info.shapes[i], param.clone());
+                    match n {
+                        Some(n) => self.callback(&format!("({host})"), n, callback.as_ref()),
+                        None => host,
+                    }
                 }
                 _ if info.receiver && i == 0 => self.copied(copy, param.clone()),
                 Some(n) => self.callback(param, n, callback.as_ref()),
@@ -264,7 +268,11 @@ impl Gen<'_> {
                 } else {
                     self.to_host(result, call)
                 };
-                format!("({}) => {body}", xs.join(", "))
+                // curried, as Flick calls it: a callback the binding's host calls with several
+                // arguments at once is adapted by `callback`, as when nothing is bridged
+                xs.iter()
+                    .rev()
+                    .fold(body, |body, x| format!("({x}) => {body}"))
             }
             Shape::Eff(inner) => {
                 let d = self.bridge_depth();
