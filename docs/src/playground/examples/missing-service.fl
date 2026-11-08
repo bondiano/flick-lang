@@ -1,0 +1,15 @@
+// `report` uses `Log`, but its signature does not say so. Add `Log` to fix it.
+module Main exposing (main)
+
+service Log =
+  info : String ->{} Unit
+
+report : String ->{} String
+let report name =
+  Log.info ("reporting " ++ name)
+  "done"
+
+main : Unit ->{} Unit
+let main () =
+  let quiet = Layer.succeed Log { info = fun _ -> () }
+  Platform.stdout_line (provide quiet { report "ada" })

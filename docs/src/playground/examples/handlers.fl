@@ -1,0 +1,20 @@
+// An effect declares operations; `try … with` decides what each one does.
+module Main exposing (main)
+
+effect Ask =
+  ask : String ->{} Int
+
+total : Unit ->{Ask; none} Int
+let total () = Ask.ask "apples" + Ask.ask "pears"
+
+main : Unit ->{} Unit
+let main () =
+  let counted =
+    try total () with
+    | Ask.ask "apples" -> 3
+    | Ask.ask _ -> 4
+  Platform.stdout_line ("fruit: " ++ show counted)
+  let none_left =
+    try total () with
+    | Ask.ask _ -> 0
+  Platform.stdout_line ("after lunch: " ++ show none_left)

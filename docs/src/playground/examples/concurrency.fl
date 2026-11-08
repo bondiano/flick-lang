@@ -1,0 +1,14 @@
+// Two tasks run at once: `parallel` waits for both, `race_first` takes the first.
+module Main exposing (main)
+
+after : Float -> String -> Eff {Async} none String
+let after millis text = task {
+  Effect.sleep (Result.with_default Duration.zero (Duration.millis millis))
+  text
+}
+
+main : Unit ->{Async;} Unit
+let main () =
+  let (a, b) = parallel (after 20 "slow") (after 1 "fast")
+  Platform.stdout_line (a ++ " " ++ b)
+  Platform.stdout_line (race_first (after 30 "late") (after 1 "early"))

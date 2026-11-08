@@ -1,0 +1,46 @@
+{
+  "groups": [
+    {
+      "id": "basics", "en": "Basics", "ru": "Основы",
+      "examples": [
+        { "id": "hello", "en": "Hello", "ru": "Приветствие", "expect": "run" },
+        { "id": "shapes", "en": "Data and patterns", "ru": "Данные и образцы", "expect": "run" },
+        { "id": "records", "en": "Records and lists", "ru": "Записи и списки", "expect": "run" },
+        { "id": "options", "en": "Option and Result", "ru": "Option и Result", "expect": "run" }
+      ]
+    },
+    {
+      "id": "types", "en": "Types", "ru": "Типы",
+      "examples": [
+        { "id": "classes", "en": "Classes and instances", "ru": "Классы и экземпляры", "expect": "run" },
+        { "id": "gadt", "en": "A typed interpreter", "ru": "Типизированный интерпретатор", "expect": "run" }
+      ]
+    },
+    {
+      "id": "effects", "en": "Effects", "ru": "Эффекты",
+      "examples": [
+        { "id": "typed-errors", "en": "Typed errors", "ru": "Типизированные ошибки", "expect": "run" },
+        { "id": "services", "en": "Services", "ru": "Сервисы", "expect": "run" },
+        { "id": "handlers", "en": "Handlers", "ru": "Обработчики", "expect": "run" },
+        { "id": "resources", "en": "Resources", "ru": "Ресурсы", "expect": "run" },
+        { "id": "retry", "en": "Retry", "ru": "Повторные попытки", "expect": "run" },
+        { "id": "concurrency", "en": "Concurrency", "ru": "Конкурентность", "expect": "run" }
+      ]
+    },
+    {
+      "id": "caught", "en": "What the compiler catches", "ru": "Что ловит компилятор",
+      "examples": [
+        { "id": "type-error", "en": "A type error", "ru": "Ошибка типа", "expect": "fail FLICK-T003" },
+        { "id": "missing-service", "en": "A service the signature hides", "ru": "Сервис, которого нет в сигнатуре", "expect": "fail FLICK-E002" },
+        { "id": "missing-case", "en": "A forgotten case", "ru": "Забытый вариант", "expect": "fail FLICK-T009" },
+        { "id": "escaping-resource", "en": "A resource leaving its scope", "ru": "Ресурс покидает scope", "expect": "fail FLICK-G001" }
+      ]
+    },
+    {
+      "id": "ui", "en": "Interface", "ru": "Интерфейс",
+      "examples": [
+        { "id": "counter", "en": "A counter", "ru": "Счётчик", "expect": "ui" }
+      ]
+    }
+  ]
+}

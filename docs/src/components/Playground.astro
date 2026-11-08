@@ -4,6 +4,7 @@ import { Effect } from "@flick-lang/runtime";
 import { uiRenderStatic } from "@flick-lang/runtime/ui/react";
 import { renderToString } from "react-dom/server";
 import { initial_view } from "../playground/Playground.fl";
+import { examples } from "./gallery.ts";
 
 interface Props {
   mode: "play" | "transpile";
@@ -11,10 +12,14 @@ interface Props {
 }
 
 const { mode, locale } = Astro.props;
-const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ mode, locale }))));
+const gallery = examples();
+const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ mode, locale, examples: gallery }))));
+// the browser reads the same examples back; `<` cannot end the script early
+const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 ---
 
 <div id="flick-playground" class="not-content flick-playground-shell" data-mode={mode} data-locale={locale} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
+<script is:inline type="application/json" id="flick-playground-examples" set:html={embedded}></script>
 <noscript>
   <p class="fp-boot">{locale === "ru" ? "Для компиляции и запуска в браузере нужен JavaScript." : "Browser compilation and execution require JavaScript."}</p>
 </noscript>

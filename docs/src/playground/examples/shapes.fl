@@ -1,0 +1,17 @@
+// A type with two shapes, and a function that takes either apart.
+module Main exposing (main)
+
+type Shape = Circle Float | Rect Float Float
+  deriving Eq, Show
+
+area : Shape -> Float
+let area shape =
+  match shape with
+  | Circle r -> 3.14159 * r * r
+  | Rect w h -> w * h
+
+main : Unit ->{} Unit
+let main () =
+  let shapes = [Circle 1, Rect 2 3]
+  Platform.stdout_line (show shapes)
+  Platform.stdout_line (show (List.map area shapes))

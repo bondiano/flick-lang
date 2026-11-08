@@ -1,0 +1,15 @@
+// A service is what a function needs; `provide` gives it one implementation.
+module Main exposing (main)
+
+service Greeter =
+  greet : String ->{} String
+
+welcome : String ->{Greeter; none} String
+let welcome name = Greeter.greet name ++ "!"
+
+main : Unit ->{} Unit
+let main () =
+  let polite = Layer.succeed Greeter { greet = fun name -> "Good day, " ++ name }
+  let casual = Layer.succeed Greeter { greet = fun name -> "Hi, " ++ name }
+  Platform.stdout_line (provide polite { welcome "Ada" })
+  Platform.stdout_line (provide casual { welcome "Ada" })

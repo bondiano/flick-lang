@@ -1,0 +1,22 @@
+// A class names what a type can do; an instance says how one type does it.
+module Main exposing (main)
+
+class Describe a =
+  describe : a -> String
+
+type Weather = Sun | Rain
+  deriving Eq, Show
+
+instance Describe Weather =
+  let describe w =
+    match w with
+    | Sun -> "go outside"
+    | Rain -> "take an umbrella"
+
+instance Describe a => Describe (List a) =
+  let describe xs = String.join ", " (List.map describe xs)
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (describe Sun)
+  Platform.stdout_line (describe [Sun, Rain, Sun])

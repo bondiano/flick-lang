@@ -1,0 +1,25 @@
+// A counter: an atom holds the state, a click updates it, the view shows it.
+module Main exposing (main)
+
+count : Atom.Writable Int
+let count = Atom.make 0
+
+component counter () = ui {
+  div { class_name = "counter" } [
+    button
+      {
+        disabled = false;
+        on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
+      }
+      [text "+1"],
+    text (" clicked " ++ show (Atom.value count) ++ " times"),
+  ]
+}
+
+main : Unit ->{; AppError} Unit
+let main () =
+  match Ui.Dom.container "app" with
+  | None -> App.fail "the page has no #app"
+  | Some root -> provide Atom.layer {
+    ignore (Ui.Dom.mount root (fun _ -> ()) (Ui.render counter ()))
+  }

@@ -55,12 +55,26 @@
 }
 
 .fp-examples {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: start;
+  display: flex;
+  align-items: center;
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
+
+/* The gallery is a native popover: Escape and a click outside close it. */
+.fp-gallery {
+  width: min(44rem, calc(100vw - 2rem));
+  max-height: min(80dvh, 40rem);
+  margin: 12vh auto auto;
+  padding: 1.25rem 1.5rem;
+  overflow: auto;
+  border: 2px solid var(--sl-color-white);
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+}
+.fp-gallery::backdrop { background: #0e111640; }
+.fp-gallery-group + .fp-gallery-group { margin-top: 1rem; }
+.fp-gallery-group p { margin: 0 0 0.5rem; color: var(--sl-color-gray-3); font-size: 0.8125rem; font-weight: 600; }
 
 .fp-control-label {
   flex-shrink: 0;
@@ -310,8 +324,8 @@
 }
 
 @media (max-width: 36rem) {
-  .fp-examples { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
   .fp-example-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fp-gallery { margin-top: 5vh; padding: 1rem; }
   .fp button { min-height: 2.75rem; padding-inline: 0.625rem; }
   .fp-example-options button { height: 100%; overflow-wrap: anywhere; }
   .fp-toolbar { gap: 0.625rem; padding: 0.75rem; }

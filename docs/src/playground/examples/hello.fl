@@ -1,0 +1,5 @@
+// The smallest program. `->{}` says that `main` runs and asks for no services.
+module Main exposing (main)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "Hello from Flick"
