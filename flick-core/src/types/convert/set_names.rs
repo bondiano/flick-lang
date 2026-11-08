@@ -69,20 +69,26 @@ impl Checker<'_> {
         );
     }
 
-    pub(super) fn set_needs_dots(&mut self, item: &Node) {
+    /// A set written as one element; the fix may also take away `semi`, a `;`
+    /// the row no longer needs.
+    pub(super) fn set_needs_dots(&mut self, item: &Node, semi: Option<Span>) {
         let text = self.text_of(item);
         let span = self.span(item);
-        let edit = Edit {
+        let mut edits = vec![Edit {
             span: Span::new(span.file, span.start, span.start),
             replacement: "...".to_owned(),
-        };
+        }];
+        edits.extend(semi.map(|span| Edit {
+            span,
+            replacement: String::new(),
+        }));
         self.diagnostics.push(
             Diagnostic::error(
                 codes::T002,
                 format!("`{text}` is a set, not one element"),
                 span,
             )
-            .with_safe_fix(|| (format!("write `...{text}`"), vec![edit])),
+            .with_safe_fix(|| (format!("write `...{text}`"), edits)),
         );
     }
 
