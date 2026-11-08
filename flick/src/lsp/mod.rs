@@ -41,7 +41,11 @@ pub struct Server {
 
 pub fn serve() -> ExitCode {
     logging::init();
-    builtins::prepare();
+    // the server cannot check a file without them; the editor shows the log
+    if let Err(diagnostic) = builtins::prepare() {
+        error!(code = %diagnostic.code, "{}", diagnostic.message);
+        return ExitCode::FAILURE;
+    }
     info!(
         version = env!("CARGO_PKG_VERSION"),
         pid = process::id(),

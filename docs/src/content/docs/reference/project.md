@@ -168,6 +168,8 @@ text = { url = "https://example.com/text-1.0.0.tgz", sha256 = "<64 hexadecimal d
 A project sees the implicit packages, `std` today, without naming them:
 `flick install` fetches each of this compiler's release, and an entry of that
 name in `[dependencies]` picks another source for it, as the `std` above does.
+A compiler built from a checkout takes that checkout's own instead of the
+release, and a `std` that does not check with the compiler is `FLICK-P043`.
 
 The library's directory holds a `flick.toml` of `kind = "lib"`; its
 `source-dir` is where the modules are, and its own dependencies come along.

@@ -1,23 +1,36 @@
-use std::sync::Once;
+use std::sync::OnceLock;
+
+use flick_core::diagnostics::Diagnostic;
+use flick_core::source::SourceMap;
 
 use super::BuildCommand;
 use crate::builtins;
+use crate::command::Outcome;
 use crate::progress::{Mode, Progress};
 
 impl BuildCommand {
     pub(super) fn progress(&self) -> Progress {
-        let progress = Progress::new(if self.options.inputs {
+        Progress::new(if self.options.inputs {
             Mode::Hidden
         } else {
             self.display.unwrap_or(Mode::Hidden)
-        });
-        if self.display.is_some() {
-            static PREPARED: Once = Once::new();
-            PREPARED.call_once(|| {
-                progress.stage("Preparing compiler");
-                builtins::prepare();
-            });
+        })
+    }
+
+    /// The built-in modules checked, once a run, or the outcome of why they
+    /// cannot be. `--inputs` only names files and needs none.
+    pub(super) fn prepare(&self, progress: &Progress) -> Result<(), Outcome> {
+        static PREPARED: OnceLock<Result<(), Diagnostic>> = OnceLock::new();
+        if self.options.inputs {
+            return Ok(());
         }
-        progress
+        let prepared = PREPARED.get_or_init(|| {
+            progress.stage("Preparing compiler");
+            builtins::prepare()
+        });
+        prepared.clone().map_err(|diagnostic| Outcome {
+            sources: SourceMap::default(),
+            diagnostics: vec![diagnostic],
+        })
     }
 }

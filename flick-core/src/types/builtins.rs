@@ -225,6 +225,36 @@ fn check_builtins() -> Vec<Interface> {
     check_sources(builtin_sources())
 }
 
+/// [`builtins`], or what the first module of an implicit package that does not
+/// check says: a project or `FLICK_STD_PATH` may name a package of another
+/// compiler. A core module that does not check is still a bug of this one.
+pub fn try_builtins() -> Result<&'static [Interface], String> {
+    if let Some(done) = BUILTINS.get() {
+        return Ok(done);
+    }
+    let mut problem = None;
+    let report = |name: &str, mut diagnostics: Vec<Diagnostic>| {
+        diagnostics.retain(|d| !ALLOWED.contains(&d.code));
+        let Some(first) = diagnostics.first() else {
+            return;
+        };
+        let Some(package) = implicit_package_of(name) else {
+            panic!("built-in module {name} does not check: {diagnostics:?}");
+        };
+        problem.get_or_insert_with(|| format!("`{name}` of `{package}`: {}", first.message));
+    };
+    let done = check_reporting(builtin_sources(), report, |_, _| {});
+    match problem {
+        Some(problem) => Err(problem),
+        None => Ok(BUILTINS.get_or_init(|| done)),
+    }
+}
+
+/// The warnings the built-in modules may have: `flick check --fix` has to get
+/// past them to fix them, and the import a fixed signature no longer uses; a
+/// test below says the modules here have none.
+const ALLOWED: [Code; 2] = [codes::T059, codes::R012];
+
 /// Checks the built-in modules `modules`, as `(module, text)` in
 /// dependency order.
 pub(crate) fn check_sources(modules: &[(&str, &str)]) -> Vec<Interface> {
@@ -235,9 +265,7 @@ pub(crate) fn check_sources(modules: &[(&str, &str)]) -> Vec<Interface> {
 /// What the modules before it export grows by one module at a time instead
 /// of being learned again for each module.
 pub fn check_each(modules: &[(&str, &str)], each: impl FnMut(&Module, &Typing)) -> Vec<Interface> {
-    // `flick check --fix` has to get past them to fix them, and the import a
-    // fixed signature no longer uses; a test below says the modules here have none
-    check_allowing(modules, &[codes::T059, codes::R012], each)
+    check_allowing(modules, &ALLOWED, each)
 }
 
 /// [`check_each`], with the built-in modules allowed the warnings `allowed`.

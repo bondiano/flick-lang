@@ -1,11 +1,13 @@
 //! The implicit packages of a run. The compiler holds only the core modules;
 //! each implicit package comes from the package the project depends on, by its
 //! name in `[dependencies]` or, without one, the tag of this compiler's
-//! release, which `flick install` fetches and `flick.lock` pins.
+//! release, which `flick install` fetches and `flick.lock` pins. A compiler
+//! built from a checkout takes that checkout's own instead of the tag.
 //! `FLICK_STD_PATH` names a directory to use for the first of them instead,
 //! the others beside it, as this repository's own builds do.
 
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::{env, fs};
 
 use flick_core::implicit_packages::{IMPLICIT_PACKAGES, is_implicit_package};
@@ -73,16 +75,25 @@ pub fn prepare(explicit: Option<&str>) -> Result<(), String> {
         .map(|name| {
             let dir = match &project {
                 Some(project) => in_project(project, name)?,
-                None => {
-                    checkout_package(&host.cwd, name).map_or_else(|| outside_project(name), Ok)?
-                }
+                None => local_package(&host.cwd, name).map_or_else(|| outside_project(name), Ok)?,
             };
+            if *name == IMPLICIT_PACKAGES[0] {
+                let _ = READ_FROM.set(dir.clone());
+            }
             types::read_package(name, &dir)
                 .map_err(|e| format!("cannot read `{name}` at `{}`: {e}", dir.display()))
         })
         .collect::<Result<_, _>>()?;
     types::set_implicit_packages(packages);
     Ok(())
+}
+
+/// The directory of the first implicit package, as [`prepare`] chose it.
+static READ_FROM: OnceLock<PathBuf> = OnceLock::new();
+
+/// The directory `std` was read from in this run, when it is known.
+pub fn std_dir() -> Option<PathBuf> {
+    overridden_dir(IMPLICIT_PACKAGES[0]).or_else(|| READ_FROM.get().cloned())
 }
 
 fn overridden() -> bool {
@@ -113,10 +124,21 @@ pub fn package_dir(name: &str, explicit: Option<&str>) -> Result<PathBuf, String
     match project {
         Some(project) => in_project(&project, name),
         None if is_implicit_package(name) => {
-            checkout_package(&host.cwd, name).map_or_else(|| outside_project(name), Ok)
+            local_package(&host.cwd, name).map_or_else(|| outside_project(name), Ok)
         }
         None => Err(format!("`{name}` is no dependency here: no project")),
     }
+}
+
+/// The implicit package `name` of a source checkout: the one around `dir`, or
+/// the one this binary was built from while it is still there, since the
+/// release of the same version can lag behind. A release archive was built at
+/// a path that does not exist where it runs.
+fn local_package(dir: &Path, name: &str) -> Option<PathBuf> {
+    checkout_package(dir, name).or_else(|| {
+        let built_from = Path::new(env!("CARGO_MANIFEST_DIR")).parent()?;
+        checkout_package(built_from, name)
+    })
 }
 
 /// A source checkout uses its own implicit packages when a CLI or editor starts
@@ -140,7 +162,7 @@ fn in_project(project: &Project, name: &str) -> Result<PathBuf, String> {
     }
     if is_implicit_package(name)
         && !project.config.dependencies.iter().any(|d| d.name == name)
-        && let Some(package) = checkout_package(&project.root, name)
+        && let Some(package) = local_package(&project.root, name)
     {
         return Ok(package);
     }

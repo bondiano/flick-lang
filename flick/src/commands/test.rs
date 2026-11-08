@@ -98,7 +98,10 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         return Ok(runner);
     }
     progress.stage("Preparing compiler");
-    builtins::prepare();
+    if let Err(diagnostic) = builtins::prepare() {
+        drop(progress);
+        return fail(&sources, vec![diagnostic]);
+    }
     progress.stage("Compiling Flick modules");
     let (diagnostics, compilation) = package_cache::with_saved(|saved| {
         let (diagnostics, compilation, fresh) =

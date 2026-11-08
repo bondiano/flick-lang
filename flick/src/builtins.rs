@@ -7,10 +7,12 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::{fs, process};
 
+use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface::Interface;
 use flick_core::types;
 
 use crate::fetch;
+use crate::stdlib;
 use crate::toolchain;
 use flick_core::project::store;
 use sha2::{Digest, Sha256};
@@ -18,10 +20,11 @@ use sha2::{Digest, Sha256};
 const PREFIX: &str = "builtins-";
 
 /// Installs the saved interfaces, or checks the built-in modules and saves
-/// them. Any failure only means they are checked again.
-pub fn prepare() {
+/// them. A failure to read or save only means they are checked again; an
+/// implicit package that does not check with this compiler is `FLICK-P043`.
+pub fn prepare() -> Result<(), Diagnostic> {
     let Some((dir, binary, name)) = location() else {
-        return;
+        return types::try_builtins().map(drop).map_err(|p| unfit(&p));
     };
     let path = dir.join(&name);
     if let Some(interfaces) = fs::read(&path)
@@ -29,13 +32,13 @@ pub fn prepare() {
         .and_then(|bytes| serde_json::from_slice::<Vec<Interface>>(&bytes).ok())
     {
         types::install_builtins(interfaces);
-        return;
+        return Ok(());
     }
-    let Ok(json) = serde_json::to_vec(types::builtins()) else {
-        return;
+    let Ok(json) = serde_json::to_vec(types::try_builtins().map_err(|p| unfit(&p))?) else {
+        return Ok(());
     };
     if fs::create_dir_all(&dir).is_err() {
-        return;
+        return Ok(());
     }
     // other binaries' files are stale once this one runs; its files for
     // other implicit packages serve other projects
@@ -52,6 +55,17 @@ pub fn prepare() {
     if fs::write(&pending, json).is_ok() && fs::rename(&pending, &path).is_err() {
         let _ = fs::remove_file(&pending);
     }
+    Ok(())
+}
+
+/// What `problem`, the first error of an implicit module, means for the run.
+fn unfit(problem: &str) -> Diagnostic {
+    let from = stdlib::std_dir().map_or_else(String::new, |d| format!(" at `{}`", d.display()));
+    let message = format!(
+        "the `std`{from} does not fit flick {}: {problem}",
+        toolchain::COMPILER
+    );
+    Diagnostic::new(codes::P043, Severity::Error, message)
 }
 
 /// The cache directory, the prefix of this binary's files and the file

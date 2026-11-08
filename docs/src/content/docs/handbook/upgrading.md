@@ -63,10 +63,11 @@ modules stops:
 error[FLICK-P034]: `std` from `git+https://github.com/bondiano/flick-lang?tag=std-v0.1.0&subdir=packages/std` is not installed: run `flick install`
 ```
 
-Until 0.2 is released, a compiler built from `main` still reports version
-0.1.0, so it takes the `std` of the 0.1.0 tag, which lacks the functions
-the compiler's plugins now write. Name the `std` of the same checkout
-instead:
+A compiler built from a checkout takes the `std` of that checkout instead,
+while the checkout stays where it was built, so it needs no `flick install`
+for `std`. A `std` written for another compiler stops every command with
+`FLICK-P043`, which names the module that does not check. Then name the `std`
+of the compiler's own source:
 
 ```toml
 [dependencies]
