@@ -23,7 +23,9 @@ break programs.
   into a row, also in an arrow (`->{...Orders, Async | r; Boom}`), and `-` takes
   an element or a set out (`{...Orders, -Log; -InvalidEmail}`). A set expands
   where it is named, so it fits wherever its row does; `Eff {...Orders} none a`
-  takes the errors of a set into its row of errors.
+  takes the errors of a set into its row of errors. An arrow row with a set needs
+  no `;` before empty errors, and `flick fmt` drops it: `->{...Env;}` becomes
+  `->{...Env}`.
 - **Aliases in declarations:** a declaration may use an alias written below it.
   `run : Unit ->{Time; Failure} Float` above `type alias Failure = Oops` was
   `FLICK-T002`.

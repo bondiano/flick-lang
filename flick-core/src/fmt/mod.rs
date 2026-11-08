@@ -76,7 +76,7 @@ use comments::Comments;
 use foralls::drop_redundant_foralls;
 pub use plugins::PluginOf;
 use printer::{Printer, nodes};
-use program::program;
+use program::{holds_set, program};
 
 /// The line width the layout aims at.
 pub const WIDTH: usize = 100;
@@ -227,15 +227,29 @@ fn verbatim(declaration: &Node, text: &str) -> String {
     out.trim_end().to_owned()
 }
 
-/// Drops empty rows of an arrow: `->{none; E}` becomes `->{; E}` and
-/// `->{none; none}` becomes `->{}`; a row holding a comment is kept.
+/// Drops empty rows of an arrow: `->{none; E}` becomes `->{; E}`,
+/// `->{none; none}` becomes `->{}`, and `->{...S;}` becomes `->{...S}`; a row
+/// holding a comment is kept.
 fn drop_empty_rows(node: &mut Node) {
     if node.kind == K::EffectAnnot {
-        let empty = |n: &Node| is_bare_none(n) || n.children.iter().all(is_whitespace);
+        let blank = |n: &Node| n.children.iter().all(is_whitespace);
+        let empty = |n: &Node| is_bare_none(n) || blank(n);
         let rows: Vec<&Node> = node.nodes().filter(|n| n.kind == K::Row).collect();
         if rows.len() == 2 && rows.iter().all(|r| empty(r)) {
             node.children
                 .retain(|c| matches!(c, Element::Token(t) if t.kind != K::Semi));
+        } else if let [services, errors] = rows[..]
+            && holds_set(services.nodes().map(|n| n.kind))
+            && blank(errors)
+        {
+            let mut rows = 0;
+            node.children.retain(|c| match c {
+                Element::Token(t) => t.kind != K::Semi,
+                Element::Node(n) => {
+                    rows += usize::from(n.kind == K::Row);
+                    rows < 2
+                }
+            });
         } else if let Some(Element::Node(services)) = node
             .children
             .iter_mut()

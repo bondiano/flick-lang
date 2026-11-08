@@ -155,6 +155,22 @@ fn drops_empty_arrow_rows() {
     "#);
 }
 
+/// A set in an arrow needs no `;` before an empty error slot. A plain row
+/// needs it, and in an alias body it makes a row of services.
+#[test]
+fn drops_the_semicolon_a_set_does_not_need() {
+    let src = "f : A ->{...Env;} B\ng : A ->{...Env, -Log ; } B\nh : A ->{...Env; Boom} B\ni : A ->{...Env; none} B\nj : A ->{...Env; /* why */} B\nk : A ->{Log;} B\ntype alias Errs = {...UserErrors;}\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    f : A ->{...Env} B
+    g : A ->{...Env, -Log} B
+    h : A ->{...Env; Boom} B
+    i : A ->{...Env; none} B
+    j : A ->{...Env/* why */ } B
+    k : A ->{Log;} B
+    type alias Errs = {...UserErrors;}
+    "#);
+}
+
 /// Members, foreign metadata and `rec` groups go one per line.
 #[test]
 fn puts_members_and_metadata_on_their_own_lines() {
