@@ -1,5 +1,5 @@
 // The bindings of `Cause` on the kernel, over Flick's opaque `Failure e`.
-import { err, none, ok, type Option, type Result, some } from "../../core/data.ts";
+import { err, fromNullable, none, ok, type Option, type Result, some } from "../../core/data.ts";
 import { describeDefect } from "../describe.ts";
 import {
   type Cause,
@@ -120,3 +120,34 @@ export const flickFilterInterruptors = (failure: Failure): Result<Array<number>,
 export const flickPretty = (failure: Failure): string => pretty(failure.cause);
 export const flickPrettyErrors = (failure: Failure): Array<string> =>
   failure.cause.reasons.flatMap((r) => (isFail(r) ? [String(r.error)] : isDie(r) ? [describeDefect(r.defect)] : []));
+
+/** A frame of a span, which a reason may carry: nothing on this runtime makes one, but `annotate` keeps one given. */
+interface StackFrame {
+  readonly name: string;
+  readonly stack: () => string | undefined;
+  readonly parent: StackFrame | undefined;
+}
+
+const isFrame = (value: unknown): value is StackFrame => typeof value === "object" && value !== null && typeof Reflect.get(value, "name") === "string";
+
+const traceOf = (reason: Reason): StackFrame | undefined => {
+  const trace: unknown = Reflect.get(reason, "trace");
+  return isFrame(trace) ? trace : undefined;
+};
+
+const frameOption = (frame: StackFrame | undefined): Option<StackFrame> => (frame === undefined ? none : some(frame));
+
+/** The frame of the failure: the annotations of its reasons merged, the last one winning. */
+export const flickStackTrace = (failure: Failure): Option<StackFrame> =>
+  frameOption(failure.cause.reasons.reduce<StackFrame | undefined>((frame, r) => traceOf(r) ?? frame, undefined));
+// shortcut: always `None`, as an interruption here carries the fiber's id only, as on Go; record its frame if a program reads it
+export const flickInterruptorStackTrace = (_failure: Failure): Option<StackFrame> => none;
+export const flickReasonStackTrace = (reason: Reason): Option<StackFrame> => frameOption(traceOf(reason));
+export const flickAnnotate =
+  (overwrite: boolean) =>
+  (frame: StackFrame) =>
+  (failure: Failure): Failure =>
+    new Failure(fromReasons(failure.cause.reasons.map((r) => (overwrite || traceOf(r) === undefined ? { ...r, trace: frame } : r))));
+export const flickFrameName = (frame: StackFrame): string => frame.name;
+export const flickFrameStack = (frame: StackFrame): Option<string> => fromNullable(frame.stack());
+export const flickFrameParent = (frame: StackFrame): Option<StackFrame> => frameOption(frame.parent);

@@ -2,6 +2,7 @@
 // opaque.
 import { type Cause, type Exit, raise, recoverable } from "./cause.ts";
 import { none, type Option, some } from "../core/data.ts";
+import { type CauseReport, report } from "./describe.ts";
 
 /** `Failure e`: how a computation failed. */
 export class Failure {
@@ -37,3 +38,7 @@ export const failureRawCause = (failure: Failure): RawCause => new RawCause(fail
 
 /** `Failure.rethrow`: fails with the original cause, unchanged. */
 export const failureRethrow = (failure: Failure): never => raise(failure.cause);
+
+/** `Failure.inspect`: an inert report; building it runs no code of a payload. */
+export const failureInspect = (failure: Failure): CauseReport => report(failure.cause);
+export const rawCauseInspect = (raw: RawCause): CauseReport => report(raw.cause);
